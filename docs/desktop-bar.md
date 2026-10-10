@@ -282,18 +282,19 @@ color alone.
 
 | id | terminal | hand test | pass | chunk | check |
 |---|---|---|---|---|---|
-| TP-R6 ⇧⇥ approvals mode | ⇧⇥ in the composer switches the approvals mode (yolo ↔ auto), with a 3 s flash on the label line. The typed /approvals and the label line's mode are already done | in a thread's composer, press ⇧⇥ twice | the mode flips each time; the label line shows it and flashes for 3 s; the hub has the new mode | amb-win | qa-flows: a composer key case |
-| TP-N1 /keychain on, /keychain off | a window command in the proto catalog (`rust/proto/src/commands.rs`, client). Today the window has no windowRun case and no settings switch for it, so the / list shows it greyed out, 'not yet' | type '/keychain on' ⏎; then settings | the secrets move to the macOS keychain, and settings has the switch that does the same | amb-win, amb-core (amb-home for the settings switch) | qa-flows: `/keychain` on the fake keychain |
-| TP-N2 /log, an agent's raw session | `rust/tui/src/logview.rs`, which shipped to everyone in 92f72225. It is not in the window's / list and not in the proto catalog | in an agent's thread, type '/log' ⏎ | a read-only screen with that agent's raw session; esc goes back to the thread | amb-feed (the catalog entry and a read command), amb-win (the screen) | qa-flows: thread/log |
+| TP-R6 ⇧⇥ approvals mode | ⇧⇥ in the composer switches the approvals mode (yolo ↔ auto), with a 3 s flash on the label line. The typed /approvals and the label line's mode are already done | in a thread's composer, press ⇧⇥ twice | the mode flips each time; the label line shows it and flashes for 3 s; the hub has the new mode | amb-web (composer keys; ambient-lead m_17251) | qa-flows: a composer key case |
+| TP-N1 /keychain on, /keychain off | a window command in the proto catalog (`rust/proto/src/commands.rs`, client). Today the window has no windowRun case and no settings switch for it, so the / list shows it greyed out, 'not yet' | type '/keychain on' ⏎; then settings | the secrets move to the macOS keychain, and settings has the switch that does the same | amb-home (ambient-lead m_17251) | qa-flows: `/keychain` on the fake keychain |
+| TP-N2 /log, an agent's raw session | `rust/tui/src/logview.rs`, which shipped to everyone in 92f72225. It is not in the window's / list and not in the proto catalog | in an agent's thread, type '/log' ⏎ | a read-only screen with that agent's raw session; esc goes back to the thread | amb-web (the screen), amb-feed (the catalog entry and a read command); ambient-lead m_17251 | qa-flows: thread/log |
+| TP-K7b ctrl+c stops a turn | ctrl+c interrupts (the TUI's key). On the Mac, copy is ⌘C, so ctrl+c is free in the window. esc keeps stopping the turn as well (K7, ⛔6) | during a long answer, press ctrl+c in the composer | the turn stops in under 1 s, and the composer keeps its text | amb-web, with TP-R6 (ambient-lead m_17251) | qa-flows: thread/interrupt with a ctrl+c case |
 
 My calls on the re-audit's two "your call" lines:
 
 - **TP-N2 /log is in scope.** The user's goal (lead m_7006) is that everything the terminal does can
   be done from the app. /log ships to everyone in the terminal, so the window needs it too. It is
   a bar row, and it blocks the merge into main like the others.
-- **R18, esc against ctrl+c, stays on purpose.** It is K7 above: esc stops the turn in the window,
-  as ⛔6 asks. K7 also asks that the TUI's own interrupt key stops a turn in the window, and that
-  half is still unproven: qa-flows `thread/interrupt` must press ctrl+c too.
+- **R18, esc against ctrl+c: both stop the turn.** esc stays, as in K7 above and ⛔6. ctrl+c stops
+  the turn too, because copy on the Mac is ⌘C, so ctrl+c is free (ambient-lead m_17251). That is
+  row TP-K7b.
 - **/version and /release-bise stay out**: they are dev only, as tui-parity says.
 
 ## Regression list (try gate)
