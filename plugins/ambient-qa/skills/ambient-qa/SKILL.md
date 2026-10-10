@@ -151,6 +151,14 @@ so don't wrap `world up` in the lock yourself (a `lockf -k heavy.lock
 qa.py world up` once waited on itself and held the lock for everyone,
 main m_9310).
 
+## Artifacts
+
+One artifact per gate or check, never one per image: register its index
+page (a bise page or an index.html next to the shots) or a contact sheet
+of the shots with `sb artifact add`, once. Never `sb artifact add` each
+PNG: the user's /artifacts filled with 47 QA screenshots (art-archive,
+m_16871). Old ones go away with `sb artifact archive`.
+
 ## Limits
 
 - One throwaway hub per agent; a `model` hub costs credits.

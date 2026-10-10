@@ -400,6 +400,16 @@ QUOTE_REPLY = ("Mostly. With the batch back at 500 the p99 fell from 910 ms to 6
                "The rest is the panel's old percentile, which the fix replaces.")
 
 
+def queued_count(agent):
+    """His queued messages on an agent row: client-protocol's msgs_queued, or its queued list (the
+    old hub sent a number in `queued`; a list compared to 1 raised and the world waited forever). Pure."""
+    a = agent or {}
+    q = a.get("queued")
+    if a.get("msgs_queued") is not None:
+        return int(a["msgs_queued"])
+    return len(q) if isinstance(q, list) else int(q or 0)
+
+
 def quoted_message(quoted=QUOTED, words=QUOTE_WORDS, frm="main"):
     """His message quoting an earlier answer, as the window's composer builds it. Pure."""
     return '<selection from="%s">\n%s\n</selection>\n%s' % (frm, quoted, words)
@@ -607,7 +617,7 @@ def rich_seed(world, hubs, holds, agents, timeout):
         # QUEUED: behind ingest's 2-hour turn ('working'): it waits for the turn's end, i.e. until world down
         c.wait_status("ingest", ["working", "thinking"], timeout)
         c.say(QUEUED_TEXT, focus="ingest", mode="queued")
-        c.wait(lambda: (c.agent("ingest") or {}).get("queued", 0) >= 1, timeout, "his message queued on ingest")
+        c.wait(lambda: queued_count(c.agent("ingest")) >= 1, timeout, "his message queued on ingest")
         out_["queued"] = "telemetry/ingest: %s" % QUEUED_TEXT
         return out_
 
@@ -656,7 +666,8 @@ def rich_seed(world, hubs, holds, agents, timeout):
         c = by["bise"]
         put_script(sd, "screen", SCREEN_TEXT, (), SCREEN_REPLY)
         c.wait_idle("main", timeout=timeout)
-        c.send(screen_input())
+        s = screen_input()     # client-protocol: command/run with SendOpts' context (the core's send)
+        c.say(s["text"], focus=s["focus"], context=s["context"])
         c.wait_line("main", SCREEN_REPLY.split("\n")[0][:50], timeout)
         return "bise main"
 
@@ -680,9 +691,17 @@ def rich_seed(world, hubs, holds, agents, timeout):
              "I asked to drop %s: its work is on its branch, nothing is lost." % name)
         # main's drop is a suggestion to him (a 'drop' card): his yes archives the agent
         c = by[project]
-        card = c.wait(lambda: next((cd for cd in c.cards() if cd.get("kind") == "drop"), None), timeout, "the drop card")
+        # client-protocol: a drop is bise's own bookkeeping, in hub/cards' `others`, never his `cards`
+        # (proto_view.rs his(); the archived part waited on it forever, so 'answered' never ran)
+        def drop_card():
+            with c.lock:
+                others = list((c.hub.get("hub/cards") or {}).get("others", []))
+            return next((cd for cd in c.cards() + others if cd.get("kind") == "drop" and cd.get("agent") == name), None)
+        card = c.wait(drop_card, timeout, "the drop card")
         c.say("/answer %d yes" % card["id"])
-        c.wait(lambda: all(a.get("status") == "archived" for a in (c.state or {}).get("agents", []) if a.get("name") == name),
+        # client-protocol: an archived agent reads status 'done' with archived: true (proto_view.rs)
+        c.wait(lambda: all(a.get("status") == "archived" or a.get("archived") for a in (c.state or {}).get("agents", [])
+                           if a.get("name") == name),
                timeout, "%s archived" % name)
         return "%s/%s archived" % (project, name)
 

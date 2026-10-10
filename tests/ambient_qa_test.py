@@ -642,6 +642,9 @@ def rich_world_fixtures():
     del tree[10], tree[5]
     tree[20] = (1, "nice -n 10 bash tests/checks/real.sh")
     check(not world.under_heavy_lock(50, ps=tree.get), "no slot in the ancestry")
+    # the client-protocol's agent rows (ambient-lead m_16823): queued is a list, msgs_queued its count
+    check(world.queued_count({"queued": [{"id": 215, "text": "x"}], "msgs_queued": 1}) == 1 and world.queued_count({"queued": 2}) == 2
+          and world.queued_count({"queued": []}) == 0 and world.queued_count(None) == 0, "queued counts")
     # his right-aligned messages (ambient-lead m_16198): queued, steered, quoting an earlier answer
     q = world.quoted_message()
     check(q == '<selection from="main">\n%s\n</selection>\n%s' % (world.QUOTED, world.QUOTE_WORDS), q)

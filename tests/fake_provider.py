@@ -498,7 +498,9 @@ def is_think_delta(family, name, data):
         parts = [p for c in data.get("candidates", []) for p in (c.get("content") or {}).get("parts", [])]
         return any("text" in p and p.get("thought") for p in parts)
     ch = data.get("choices") or [{}]
-    return bool((ch[0].get("delta") or {}).get("reasoning_content"))
+    d = ch[0].get("delta") or {}
+    blocks = d.get("content") if isinstance(d.get("content"), list) else []
+    return bool(d.get("reasoning_content")) or any(b.get("type") == "thinking" for b in blocks)
 
 
 # ------------------------------------------------------------------ errors
@@ -534,9 +536,22 @@ def error_reply(family, err):
 # of (event name or None, data dict or "[DONE]")). `mid_error`: the stream
 # breaks with the family's error event after its start.
 
+def mistral_blocks(model):
+    """Mistral's API sends reasoning as content blocks ([{type: thinking, thinking: [{type: text,
+    text}]}, {type: text, text}], the vibe CLI's ThinkChunk), never reasoning_content: the hub's
+    Mistral path keeps only those (ambient-lead m_16823: the rich world's thinking row was empty)."""
+    return str(model).split("/")[-1].startswith(("mistral", "magistral", "devstral"))
+
+
+def think_block(text):
+    return {"type": "thinking", "thinking": [{"type": "text", "text": text}]}
+
+
 def whole_openai_chat(turn, model):
     m = {"role": "assistant", "content": turn["text"]}
-    if turn["reasoning"]:
+    if turn["reasoning"] and mistral_blocks(model):
+        m["content"] = [think_block(turn["reasoning"])] + ([{"type": "text", "text": turn["text"]}] if turn["text"] else [])
+    elif turn["reasoning"]:
         m["reasoning_content"] = turn["reasoning"]
     if turn["calls"]:
         m["tool_calls"] = [{"id": c["id"], "type": "function",
@@ -568,7 +583,7 @@ def sse_openai_chat(turn, model, include_usage=False, mid_error=False):
                               choices=[{"index": 0, "delta": {"content": ""}, "finish_reason": "error"}])))
         return ev
     for p in text_pieces(turn["reasoning"], turn) if turn["reasoning"] else []:
-        ev.append(chunk({"content": None, "reasoning_content": p}))
+        ev.append(chunk({"content": [think_block(p)]} if mistral_blocks(model) else {"content": None, "reasoning_content": p}))
     for p in text_pieces(turn["text"], turn) if turn["text"] else []:
         ev.append(chunk({"content": p}))
     for i, c in enumerate(turn["calls"]):
