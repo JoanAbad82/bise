@@ -457,6 +457,35 @@ isn't judging. A row marked ok names the shot that was looked at.
   list. amb-win is fixing it. The re-cut also carries the chip glyph 3c209f33 and "4 KB of 18 KB
   shown" 91af5059, and qa-native re-checks those rows.
 
+- **9108fdae: GO for promote, with one amber and three rows open** (ambient-pm, from qa-native
+  m_16816; check af83ea41; `~/.bise/gate/try-gate/9108fdae/index.md`). Every shot was looked at
+  by qa-native.
+  - Green:
+    - INIT over JSON-RPC, the sidebar and LIGHTS;
+    - the inbox block on thread, settings and review, from ⌘I and from a notification;
+    - R41 on all 9 paths, R36, and DOCKROW (0 switchboard rows);
+    - R45–R47 and a0;
+    - MSGRIGHT at 1100 and 600, in light and dark;
+    - **STEERED**: 'steered · dashboards read it mid-turn' shows under the steer in all 4 views.
+      This closes f640424d's gap (a);
+    - the quote's source reads 'bise';
+    - type-anywhere;
+    - the inbox draft after a reload;
+    - the scheduled list and pane;
+    - '… 4 KB of 18 KB shown'.
+  - Amber, gap (b) narrowed: ctrl+o in the inbox now puts all 16 lines in the card's DOM, but
+    the card stays 396 px, and the frames are the same before and after (lines 1–5). His try
+    already has this gap, so it stays a named gap (amb-home).
+  - Open:
+    - computer use: the window code (69269638, e93879d4, bf199372) is in the cut, and qa-flows
+      has thread/computer-use green on the real core (20c44bf9). The gate's own check skipped
+      itself because its seam probe failed;
+    - FOLDS2: no thinking row in dashboards' thread, even scrolled to the top;
+    - the docked p99 row: only bise's plain line is there.
+
+    These rows are not shown wrong. They are not proven on the packed app, and they stay
+    not-pass for main.
+
 - **f640424d: GO for promote, with (a) and (b) as named gaps** (ambient-pm to ambient-lead m_16431,
   from qa-native m_16423; check 697d506e; `~/.bise/gate/try-gate/f640424d/index.md`).
   - Green:
@@ -923,7 +952,7 @@ No app was run, and no heavy job. Words used:
 | S.4 where bise works (no terminal) | **pass (harness, 10-10)**: settings › projects ('add a project', the sidebar's ⌘N). settings/projects-add is green on the built app (1ad161dd) | amb-home | none |
 | V3 the help filter | **built-no-check**: built in 677c70cf, and no land names a filter case in settings/keys | amb-win | qa-flows: a filter case in settings/keys |
 | N2 color alone | **pass (harness, 10-10)**: ds/contrast is green on the built app (1ad161dd). With increase contrast on, every status dot has its words and its own glyph (∿ working, ✓ done, ! error), and the shots were looked at | amb-kit, amb-home | none |
-| S29/L19 computer use, live | **not built** | amb-win, amb-core | plan the "took the wheel" event with architect first |
+| S29/L19 computer use, live | **pass (real core), not proven on a gate**: built in amb-win 69269638 + e93879d4 and amb-core bf199372. qa-flows' thread/computer-use is green on the real core next to the TUI (20c44bf9). On 9108fdae the gate's run of it skipped itself, because its seam probe failed | amb-win, amb-core, qa-native | qa-native: the gate's computer-use run on the next cut, with the seam probe fixed |
 | S.1 no CLI (VM) | **not run**: native/vm/vm-pass is opt-in | amb-mac, qa-native | one VM pass when a heavy slot is free |
 | B16 narrow window | **not checked** | ambient-pm | my hand pass, on the re-cut |
 | Nits still open | **open**: the docked p99 answer's row in telemetry's thread was not shot (19d26863). The 4 KB output cut now passes on gate 6ef40154: `seq 1 4000` reads '… 4 KB of 18 KB shown' (cut/TOOLLONG, looked at) | amb-win, amb-tools | qa-native's next gate on amb-tools' 63eb6c0a world (with R37/FOLDS2) |
