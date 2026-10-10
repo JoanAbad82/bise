@@ -79,6 +79,9 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
     await expect(page.getByTestId('thread.cardanswer.4.head')).toHaveText('✓you answered: merge checkout into main? (2 files, tests pass)');
     await expect(page.getByTestId('thread.cardanswer.4.words')).toHaveText('this one');
     await expect(page.getByTestId('thread.cardanswer.4.image.1')).toHaveText('[Image #1]');
+    // the raw line names no file: the chip keeps its 16 px slot with a faint image glyph (designer m_15943)
+    const slot = await page.getByTestId('thread.cardanswer.4.image.1').locator('.thumb').boundingBox();
+    expect(Math.round(slot?.width ?? 0), 'the same 16 px slot as the chips with a thumbnail').toBe(16);
     const ys = await Promise.all(['head', 'words', 'image.1'].map(async (k) => (await page.getByTestId(`thread.cardanswer.4.${k}`).boundingBox())?.y ?? 0));
     expect(ys[0] ?? 0, 'his words under the question').toBeLessThan(ys[1] ?? 0);
     expect(ys[1] ?? 0, 'the chip under his words').toBeLessThan(ys[2] ?? 0);

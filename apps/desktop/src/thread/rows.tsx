@@ -309,7 +309,7 @@ function ImageChips({ images, testId }: { images: readonly { name: string; path:
     <div className="th-images">
       {images.map((img, i) => (
         <span key={`${img.path}#${String(i)}`} className="b-chip image" data-kind="image" data-testid={`${testId}.image.${String(i + 1)}`}>
-          <img className="thumb" src={fileUrl(img.path)} alt="" />
+          <Thumb path={img.path} />
           {/* designer's R36 rule: always '[Image #n]' (its order in this message), never the
               store's file name (a sha .png on real data) */}
           <span className="lbl">{imageLabel(i)}</span>
@@ -317,6 +317,23 @@ function ImageChips({ images, testId }: { images: readonly { name: string; path:
       ))}
     </div>
   );
+}
+
+/**
+ * A chip's 16 px image slot: his file's thumbnail, or, when there's no file (an older hub's raw
+ * line) or it's gone, the same slot with a faint image glyph, so every chip reads the same
+ * (designer m_15943).
+ */
+function Thumb({ path }: { path?: string }) {
+  const [gone, setGone] = useState(false);
+  if (path == null || path === '' || gone) {
+    return (
+      <span className="thumb none" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="16" height="16"><rect x="2.5" y="3.5" width="11" height="9" rx="1.5" fill="none" stroke="currentColor" /><circle cx="6" cy="6.5" r="1" fill="currentColor" /><path d="M3 11.5l3.5-3 2.5 2 2-1.5 2.5 2" fill="none" stroke="currentColor" /></svg>
+      </span>
+    );
+  }
+  return <img className="thumb" src={fileUrl(path)} alt="" onError={() => { setGone(true); }} />;
 }
 
 /** An answer's n-th image chip label: '[Image #n]', whatever the file is called. Pure. */
@@ -346,6 +363,7 @@ function CardAnsweredRow({ pos, a }: { pos: number; a: { card: number; question:
         <div className="th-images">
           {images.map((_, i) => (
             <span key={i} className="b-chip image" data-kind="image" data-testid={`thread.cardanswer.${String(pos)}.image.${String(i + 1)}`}>
+              <Thumb />
               <span className="lbl">{imageLabel(i)}</span>
             </span>
           ))}

@@ -556,6 +556,13 @@
   border-radius: 3px;
   object-fit: cover;
 }
+/* no file (an older hub's raw line) or it's gone: the same slot, a faint image glyph */
+.th-images .b-chip.image .thumb.none {
+  display: inline-flex;
+  flex: 0 0 16px;
+  color: var(--c-text-3);
+  opacity: 0.7;
+}
 
 /* batch 3b: a scheduled task's faint ◷ line (the TUI's wire.rs Scheduled), its words under it */
 .th-sched {
