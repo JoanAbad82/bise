@@ -55,6 +55,10 @@ def main():
         sc = t.wait("sum up ▤ 1 please")
         t.wait("▤ 1 “pasted line 001 of the log")
         t.wait("· 300 lines")
+        # the answer streams in (live rows) before its entry: wait for the
+        # turn's end, so the entry doesn't land under the opened message
+        t.wait("ack: sum up")
+        t.wait_re(MAIN_IDLE)
         sc = t.screen()
         # (the fake's `ack:` echoes the tag: that is the model's text)
         assert "pasted line 150" not in sc, sc

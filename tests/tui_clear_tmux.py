@@ -22,10 +22,14 @@ def main():
         t.wait_re(MAIN_IDLE)
         t.typed("first-marker")
         t.keys("Enter")
+        # the answer streams in (live rows) before its entry: wait for
+        # the turn's end, or the entry lands after the /clear below
         t.wait("ack: first-marker")
+        t.wait_re(MAIN_IDLE)
         t.typed("second-marker")
         t.keys("Enter")
         t.wait("ack: second-marker")
+        t.wait_re(MAIN_IDLE)
         # /clear: the feed is empty but for the notice
         t.typed("/clear")
         t.keys("Enter")
@@ -37,6 +41,7 @@ def main():
         t.keys("Enter")
         sc = t.wait("ack: third-marker")
         assert "first-marker" not in sc, sc
+        sc = t.wait_re(MAIN_IDLE)
         assert sc.index("display cleared") < sc.index("third-marker"), sc
         # scrolling up brings the cleared lines back, in order
         sc = scroll_up_until(t, "ack: first-marker")
