@@ -1219,21 +1219,44 @@ def register(bise, home, workspaces):
 
 # ---------------------------------------------------------------- the commands
 
-def under_heavy_lock(pid=None):
-    """True when this process (or the given one) runs under a `lockf ... heavy.lock` of its own
-    ancestry: taking the lock again would wait on itself."""
+SLOTS = (LOCK, os.path.join(os.path.dirname(LOCK), "heavy2.lock"))
+
+
+def holds_a_slot(cmd):
+    """True when this command line holds one of the heavy slots: a `lockf ... heavy.lock` or
+    `lockf ... heavy2.lock` (~/.bise/run/heavy-run takes either, slot 2 when slot 1 is busy), or the
+    heavy-run script itself (`/bin/bash .../heavy-run ...`), which holds a slot for all it runs.
+    Pure."""
+    argv = cmd.split()
+    if not argv:
+        return False
+    if os.path.basename(argv[0]) == "lockf" and any(s in argv for s in SLOTS):
+        return True
+    return any(os.path.basename(a) == "heavy-run" for a in argv[:2])
+
+
+def _ps(pid):
+    r = subprocess.run(["ps", "-ww", "-o", "ppid=,command=", "-p", str(pid)], capture_output=True, text=True)
+    ppid, _, cmd = r.stdout.strip().partition(" ")
+    return (int(ppid.strip() or 0), cmd.strip()) if r.stdout.strip() else None
+
+
+def under_heavy_lock(pid=None, ps=_ps):
+    """True when this process (or the given one) runs under a heavy slot of its own ancestry (either
+    slot, or heavy-run around it): taking the lock again would wait on itself, or on the other slot's
+    job while this one already holds a slot (qa-flows 82b584d6: a world up under heavy-run around
+    real.sh, 'not seeded in time: shop.gift-ui'). ps(pid) -> (ppid, command) or None."""
     pid = pid or os.getpid()
-    for _ in range(32):
-        r = subprocess.run(["ps", "-o", "ppid=,command=", "-p", str(pid)], capture_output=True, text=True)
-        line = r.stdout.strip()
-        if not line:
+    for _ in range(64):
+        got = ps(pid)
+        if not got:
             return False
-        ppid, _, cmd = line.partition(" ")
-        if "lockf" in cmd.split(" ", 1)[0] and LOCK in cmd:
+        ppid, cmd = got
+        if holds_a_slot(cmd):
             return True
-        pid = int(ppid.strip() or 0)
-        if pid <= 1:
+        if ppid <= 1 or ppid == pid:
             return False
+        pid = ppid
     return False
 
 

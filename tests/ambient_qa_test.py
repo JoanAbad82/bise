@@ -622,6 +622,21 @@ def rich_world_fixtures():
     check(len(out) == world.LONG_OUT_BYTES > 4096 * 4 and out.startswith(b"batch 0001  ingest ok"), (len(out), out[:40]))
     check(not any(world.P99_ASK.split("\n")[0] in t for t in [other["text"], long_out["text"]] + list(world.SEED_WORDS.values())),
           "p99's question is matched by main's script only")
+    # a world up under heavy-run takes no slot again (qa-flows 82b584d6, ambient-lead m_16227): either slot's
+    # lockf, or the heavy-run script, in its ancestry
+    run_ = os.path.dirname(world.LOCK)
+    check(world.holds_a_slot("/usr/bin/lockf -k -t 0 %s/heavy.lock nice -n 10 bash real.sh" % run_), "slot 1")
+    check(world.holds_a_slot("/usr/bin/lockf -k -t 0 %s/heavy2.lock nice -n 10 bash real.sh" % run_), "slot 2")
+    check(world.holds_a_slot("/bin/bash %s/heavy-run bash tests/checks/real.sh" % run_), "heavy-run itself")
+    check(not world.holds_a_slot("/usr/bin/lockf -k /tmp/other.lock make") and not world.holds_a_slot("bash real.sh heavy.lock")
+          and not world.holds_a_slot(""), "other locks and words")
+    tree = {50: (40, "python3 qa.py world up"), 40: (30, "node playwright test"), 30: (20, "bash tests/checks/real.sh"),
+            20: (10, "nice -n 10 bash tests/checks/real.sh"), 10: (5, "/usr/bin/lockf -k -t 0 %s/heavy2.lock nice -n 10 bash real.sh" % run_),
+            5: (1, "/bin/bash %s/heavy-run bash real.sh" % run_)}
+    check(world.under_heavy_lock(50, ps=tree.get), "under slot 2, five levels up")
+    del tree[10], tree[5]
+    tree[20] = (1, "nice -n 10 bash tests/checks/real.sh")
+    check(not world.under_heavy_lock(50, ps=tree.get), "no slot in the ancestry")
     # his right-aligned messages (ambient-lead m_16198): queued, steered, quoting an earlier answer
     q = world.quoted_message()
     check(q == '<selection from="main">\n%s\n</selection>\n%s' % (world.QUOTED, world.QUOTE_WORDS), q)
