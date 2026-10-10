@@ -442,6 +442,21 @@ isn't judging. A row marked ok names the shot that was looked at.
         thinking (qa-native).
     - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
       dev tool (amb-web's list, or amb-home's commands).
+- **f5ff0e72: no verdict asked** (ambient-lead m_16025); it gets re-cut at the tip with the fix.
+  qa-native gated it green but for one red (m_16018; check 1fcd3632). Green:
+  - the ask line "? bise asks: … · in the inbox below";
+  - "! bise asks · docs" with no kind id;
+  - a tool row opening to the hub's real output;
+  - one "✓ you answered main" row with its chip and no "[Image #1]" in the words, so 19d26863's
+    nit is closed;
+  - no bare "0%"; INIT, LIGHTS and the inbox block.
+
+  **Red, the scheduled list:** ambient-pm looked at rerun/cut/SCHED.png as an image. At 1100, with
+  a task open, the list shows only the "wakes" and "how often" columns ("dashboards · telemetry ·
+  every 30m"). The task names show only in the opened pane's head ("fake timer name"), not in the
+  list. amb-win is fixing it. The re-cut also carries the chip glyph 3c209f33 and "4 KB of 18 KB
+  shown" 91af5059, and qa-native re-checks those rows.
+
 - **19d26863: GO for promote** (ambient-pm m_15901 to ambient-lead). qa-native gated every row
   green (m_15884; checks 0d4500b7). The reruns are at the bottom of
   `~/.bise/gate/try-gate/19d26863/index.md`.
