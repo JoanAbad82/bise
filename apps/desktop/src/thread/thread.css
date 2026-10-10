@@ -626,6 +626,7 @@ button.th-sched-head {
    accent on accent 13%); at the right, quiet: its branch and files, 'changes ⌘D', '⋯'. Under
    1000 px the name and role go to the titlebar's crumb: the chip and the buttons stay. */
 .ah {
+  position: relative;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -657,8 +658,8 @@ button.th-sched-head {
   font-weight: 400;
 }
 .ah-role {
-  /* the role first (designer N1, m_17181): the usage note and the branch give way before it (their
-     shrink is 1000 to its 1), then it ends with '…', never clipped silently */
+  /* the role first (designer N1, m_17181, m_17194): the context note and the branch drop whole before
+     it (useHeadFit), then it ends with '…', never clipped silently */
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -706,12 +707,16 @@ button.th-sched-head {
   box-shadow: 0 0 0 2px var(--c-focus);
 }
 .ah-note {
-  flex: 0 1000 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: none;
   color: var(--c-text-3);
   font-size: var(--t-12);
+}
+/* a meta item that can't show whole drops whole (designer m_17194; AgentHead's useHeadFit): out of the
+   flow, unseen, still measured */
+.ah .ah-gone {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
 }
 .ah-end {
   display: flex;
@@ -721,15 +726,8 @@ button.th-sched-head {
   min-width: 0;
   margin-left: auto;
 }
-/* its branch gives way before the role (designer m_17181: at 1100 + the panel, 'sb/perf' goes first) */
-.ah-end .ah-quiet {
-  flex: 0 1000 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ah-end .ah-btn,
-.ah-end > :not(.ah-quiet) {
+/* the end's items never shrink: the branch drops whole when the row is short (useHeadFit) */
+.ah-end > * {
   flex: none;
 }
 .ah-quiet,

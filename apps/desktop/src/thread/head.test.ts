@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { biseChip, branchLine, composerWords, dividerEnd, emptyEnter, emptyEnterAct, roleOf, stateChip, STARTING_MS, usageLine } from './head';
+import { biseChip, branchLine, composerWords, dropsFor, dividerEnd, emptyEnter, emptyEnterAct, roleOf, stateChip, STARTING_MS, usageLine } from './head';
 
 const NOW = 1_791_100_000_000;
 const MIN = 60_000;
@@ -83,5 +83,19 @@ describe('R9/S3: whom it waits on, in the state chip', () => {
   });
   it('a kind this window does not know changes nothing', () => {
     expect(stateChip({ status: 'done', since_ms: NOW2, waits: 0, waiting_on: { who: 'unknown' } }, NOW2).text).toBe('✓ done');
+  });
+});
+
+describe("the head's fit (designer m_17194: a meta item whole or not at all)", () => {
+  it('drops the context note first, then the branch; never cuts them', () => {
+    const base = { who: 150, chip: 108, notes: [] as number[], usage: 100, branch: 57, end: 129 };
+    // 150+108 + 2 gaps + 129 = 407; + usage 110 + branch 63 = 580
+    expect(dropsFor({ ...base, avail: 600 })).toBe(0);
+    expect(dropsFor({ ...base, avail: 500 })).toBe(1);
+    expect(dropsFor({ ...base, avail: 420 })).toBe(2);
+    expect(dropsFor({ ...base, avail: 300 })).toBe(2);
+    // no context note or branch: nothing to drop
+    expect(dropsFor({ ...base, usage: 0, branch: 0, avail: 300 })).toBe(2);
+    expect(dropsFor({ ...base, usage: 0, avail: 480 })).toBe(0);
   });
 });

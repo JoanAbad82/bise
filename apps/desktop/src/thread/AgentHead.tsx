@@ -4,14 +4,14 @@
 // storefront', the project's chip. Under 1000 px the name goes to the titlebar's crumb (amb-win's)
 // and the head keeps the chip and the buttons. LiveLine: what it does now, at the thread's end.
 // StartingLine: the empty thread's line. The words are head.ts's. Owner: amb-home.
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { Agent } from '@/proto';
 import { useAgents, useComputerLive, useDiff } from '@/store';
 import { useNow } from '@/app/clock';
 import { ago } from '@/agents/model';
 import { useRouter } from '@/app/router';
 import { BisePearl } from '@/app/BisePearl';
-import { biseChip, branchLine, roleOf, stateChip, usageLine, type StateChip } from './head';
+import { biseChip, branchLine, dropsFor, roleOf, stateChip, usageLine, type StateChip } from './head';
 
 /** an agent whose wheel he took waits for him, like any agent that asks him */
 const HELD: StateChip = { text: '? waiting for you', needs: true, live: false };
@@ -22,6 +22,36 @@ function Chip({ chip, testId }: { chip: StateChip; testId: string }) {
       {chip.text}
     </span>
   );
+}
+
+function useHeadFit(ref: RefObject<HTMLDivElement | null>, words: string): 0 | 1 | 2 {
+  const [drop, setDrop] = useState<0 | 1 | 2>(0);
+  useLayoutEffect(() => {
+    const head = ref.current;
+    if (head === null) return;
+    const measure = () => {
+      const q = (id: string) => head.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+      const nat = (e: HTMLElement | null) => (e === null ? 0 : Math.ceil(e.scrollWidth));
+      const cs = getComputedStyle(head);
+      const avail = head.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const name = q('thread.head.name');
+      const role = q('thread.head.role');
+      const who = nat(name) + (role === null ? 0 : 8 + nat(role));
+      const end = head.querySelector<HTMLElement>('.ah-end');
+      const endFixed = end === null ? 0 : [...end.children].filter((c) => !(c as HTMLElement).dataset['testid']?.startsWith('thread.head.branch')).reduce((n, c, i) => n + Math.ceil((c as HTMLElement).offsetWidth) + (i > 0 ? 6 : 0), 0);
+      const voice = q('thread.voice');
+      const next = dropsFor({ avail, who, chip: nat(q('thread.head.state')), notes: voice === null ? [] : [nat(voice)], usage: nat(q('thread.usage')), branch: nat(q('thread.head.branch')), end: endFixed });
+      setDrop((d) => (d === next ? d : next));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(head);
+    return () => {
+      ro.disconnect();
+    };
+  }, [ref, words]);
+  return drop;
 }
 
 /** An agent's head (`starting`: its thread has nothing of its own yet). `more` is the '⋯' button (rename, model; the screen owns its panel); `note` a quiet word after the chip ('voice mode'); its context gauge after it. */
@@ -36,8 +66,10 @@ export function AgentHead({ project, a, more, note, starting = false }: { projec
   const review = () => {
     router.go({ screen: 'review', project, agent: a.name });
   };
+  const headRef = useRef<HTMLDivElement>(null);
+  const drop = useHeadFit(headRef, `${a.name}|${roleOf(a)}|${usage}|${branch}|${note ?? ''}`);
   return (
-    <div className="ah" data-testid="thread.head">
+    <div className="ah" data-testid="thread.head" ref={headRef} data-drop={drop}>
       <span className="ah-who">
         <b className="ah-name" data-testid="thread.head.name">
           {a.name}
@@ -58,13 +90,13 @@ export function AgentHead({ project, a, more, note, starting = false }: { projec
           they are in its tune panel (⋯) and the TUI's divider */}
       {/* its context gauge, the hub's words as sent (the TUI's divider: '42k · 17%') */}
       {usage !== '' && (
-        <span className="ah-note" data-testid="thread.usage">
+        <span className={drop >= 1 ? 'ah-note ah-gone' : 'ah-note'} data-testid="thread.usage" aria-hidden={drop >= 1 || undefined}>
           {usage}
         </span>
       )}
       <span className="ah-end">
         {branch !== '' && (
-          <button type="button" className="ah-quiet" onClick={review} data-testid="thread.head.branch" title="its changes">
+          <button type="button" className={drop >= 2 ? 'ah-quiet ah-gone' : 'ah-quiet'} onClick={review} data-testid="thread.head.branch" title="its changes" tabIndex={drop >= 2 ? -1 : undefined} aria-hidden={drop >= 2 || undefined}>
             {branch}
           </button>
         )}

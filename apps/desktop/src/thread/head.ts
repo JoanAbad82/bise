@@ -128,3 +128,22 @@ export function emptyEnterAct(
 export function emptyEnter(cards: readonly { kind: string; waiting?: readonly string[] | null }[], agent: string): { cmd: 'sign_in'; id: 'chatgpt' } | null {
   return cards.some((c) => c.kind === 'signin' && (c.waiting ?? []).includes(agent)) ? { cmd: 'sign_in', id: 'chatgpt' } : null;
 }
+
+/**
+ * What the head drops so the rest fits (designer m_17194): a meta item shows whole or not at all, never
+ * cut. The context note goes first, then the branch; the role takes the room they leave and ends with '…'
+ * only if it still doesn't fit. Dropped items stay in the DOM out of the flow ('ah-gone'), so their
+ * width is still read; the head re-measures when it resizes or its words change. 0: all shown, 1: no
+ * context note, 2: no branch either.
+ */
+export function dropsFor(widths: { avail: number; who: number; chip: number; notes: number[]; usage: number; branch: number; end: number }): 0 | 1 | 2 {
+  const GAP = 10;
+  const END_GAP = 6;
+  const items = [widths.who, widths.chip, ...widths.notes].filter((w) => w > 0);
+  const base = items.reduce((n, w) => n + w, 0) + GAP * items.length + widths.end;
+  const withUsage = widths.usage > 0 ? widths.usage + GAP : 0;
+  const withBranch = widths.branch > 0 ? widths.branch + END_GAP : 0;
+  if (base + withUsage + withBranch <= widths.avail) return 0;
+  if (base + withBranch <= widths.avail) return 1;
+  return 2;
+}

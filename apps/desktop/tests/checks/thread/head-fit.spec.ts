@@ -1,8 +1,8 @@
 // thread/head-fit · the agent head's room (designer N1, m_17181 on 29ec1b92's shots): 'perf  make t' cut the
 // role to 6 letters with no '…' while 'context 42k · 17%' and 'sb/perf' kept their room. Passes when, on the
-// built app with the scripted core (FakeCore's default world, fake data), in perf's thread at 1400 and at
-// 1100 with the panel open: the role ends with '…' when it is cut (never clipped silently), and it is cut
-// only once the usage note and the branch have given their room; the state chip and 'changes ⌘D' stay whole.
+// built app with the scripted core (FakeCore's default world, fake data), in perf's thread at 1400, at 1100
+// with the panel open, and at 800 (under 1000 the name and role go to the titlebar's crumb): the role ends with '…' when it is cut (never clipped silently), and it is cut
+// only once the context note and the branch are gone, each of them shown whole or not at all (m_17194); the state chip and 'changes ⌘D' stay whole.
 // Owner: amb-home.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
@@ -15,13 +15,13 @@ test("thread/head-fit: the role gets the head's room first and ends with '…'",
   try {
     await expect(page.getByTestId('thread.head.role')).toBeVisible({ timeout: 10_000 });
     const win = await s.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().sort((a, b) => (b.getSize()[0] ?? 0) - (a.getSize()[0] ?? 0))[0]?.id ?? -1);
-    for (const w of [1400, 1100]) {
+    for (const w of [1400, 1100, 800]) {
       await s.app.evaluate(({ BrowserWindow }, [id, w2]) => BrowserWindow.fromId(id ?? -1)?.setContentSize(w2 ?? 0, 720), [win, w]);
       await expect.poll(() => page.evaluate(() => window.innerWidth), { timeout: 5000 }).toBe(w);
       await page.waitForTimeout(200);
       const m = await page.evaluate(() => {
         const el = (id: string) => document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
-        const fit = (e: HTMLElement | null) => (e === null ? null : { w: Math.round(e.clientWidth), full: e.scrollWidth <= e.clientWidth + 1 });
+        const fit = (e: HTMLElement | null) => (e === null ? null : { w: Math.round(e.clientWidth), full: e.scrollWidth <= e.clientWidth + 1, gone: e.classList.contains('ah-gone') });
         const role = el('thread.head.role');
         return {
           role: fit(role),
@@ -34,9 +34,13 @@ test("thread/head-fit: the role gets the head's room first and ends with '…'",
       });
       test.info().annotations.push({ type: `head ${String(w)}`, description: JSON.stringify(m) });
       expect(m.ellipsis, `${String(w)}: a cut role ends with '…'`).toBe('ellipsis');
-      if (m.role !== null && !m.role.full) {
-        expect(m.usage === null || m.usage.w <= 4, `${String(w)}: the usage note gave its room before the role was cut ${JSON.stringify(m)}`).toBe(true);
-        expect(m.branch === null || m.branch.w <= 4, `${String(w)}: the branch gave its room before the role was cut ${JSON.stringify(m)}`).toBe(true);
+      // a meta item shows whole or not at all, never cut (designer m_17194): the context note first, then the branch
+      for (const [k, v] of [['usage', m.usage], ['branch', m.branch]] as const) {
+        expect(v === null || v.gone || v.full, `${String(w)}: the ${k} is whole or gone ${JSON.stringify(m)}`).toBe(true);
+      }
+      expect(!(m.usage !== null && !m.usage.gone && m.branch !== null && m.branch.gone), `${String(w)}: the context note goes before the branch ${JSON.stringify(m)}`).toBe(true);
+      if (m.role !== null && m.role.w > 0 && !m.role.full) {
+        expect((m.usage === null || m.usage.gone) && (m.branch === null || m.branch.gone), `${String(w)}: the role is cut only once the context note and the branch are gone ${JSON.stringify(m)}`).toBe(true);
       }
       expect(m.chip?.full, `${String(w)}: the state chip stays whole`).toBe(true);
       expect(m.changes?.full, `${String(w)}: 'changes ⌘D' stays whole`).toBe(true);
