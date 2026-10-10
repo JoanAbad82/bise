@@ -227,8 +227,9 @@ export type VoiceLit = {
  */
 pos: number, 
 /**
- * Unicode scalars of the entry's text said so far (the end of the
- * last said word; 0: none yet)
+ * UTF-16 code units of the entry's text said so far, as JS slices
+ * it: `text.slice(0, said)` (the end of the last said word; 0: none
+ * yet)
  */
 said: number, 
 /**

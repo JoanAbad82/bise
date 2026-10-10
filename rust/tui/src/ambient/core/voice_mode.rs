@@ -65,14 +65,16 @@ pub(super) struct VoiceOn {
 const HANDED_KEEP: usize = 8;
 
 /// `voice_mode`'s `lit` (amb-web m_16805): the entry the controller lights
-/// (the last handed one with its text), how far it is said in Unicode
-/// scalars (the end of the last said word; spans are byte ranges of the
-/// text), and whether he cut in.
+/// (the last handed one with its text), how far it is said in UTF-16 code
+/// units of the text, as JS slices it (the end of the last said word;
+/// spans are byte ranges of the text; architect m_16910: the only reader
+/// is TS, and an emoji before the cut would shift scalars by one), and
+/// whether he cut in.
 fn lit_of(handed: &std::collections::VecDeque<(u64, String)>, lit: &crate::voicemode::Lit) -> Option<Value> {
     use crate::voicemode::LitState;
     let pos = handed.iter().rev().find(|(_, t)| *t == lit.text)?.0;
     let end = lit.spans.iter().filter(|(_, s)| *s == LitState::Said).map(|(r, _)| r.end).max().unwrap_or(0);
-    let said = lit.text.get(..end).map_or(0, |s| s.chars().count());
+    let said = lit.text.get(..end).map_or(0, |s| s.encode_utf16().count());
     let cut = lit.spans.iter().any(|(_, s)| *s == LitState::Cut);
     Some(json!({"pos": pos, "said": said, "cut": cut}))
 }
@@ -318,4 +320,32 @@ fn strip_nulls(mut v: Value) -> Value {
         m.retain(|k, x| !x.is_null() && !(k == "muted" && *x == Value::Bool(false)));
     }
     v
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lit_of;
+    use crate::voicemode::{Lit, LitState};
+
+    /// Law (architect m_16910): `said` is what JS's `text.slice(0, said)`
+    /// needs: with an emoji (two UTF-16 units, one scalar, four bytes) and
+    /// an accent before the said word, the slice ends exactly after it.
+    #[test]
+    fn lit_said_is_the_js_slice_length_past_an_emoji() {
+        let text = "Café 🚀 prêt, warm runs skip it.";
+        let end = text.find(',').unwrap(); // "Café 🚀 prêt" said
+        let lit = Lit {
+            agent: "perf".into(),
+            text: text.into(),
+            spans: vec![(0..end, LitState::Said), (end..text.len(), LitState::ToSay)],
+        };
+        let handed = [(40, text.to_string())].into_iter().collect();
+        let v = lit_of(&handed, &lit).expect("the handed entry");
+        let said = v["said"].as_u64().unwrap() as usize;
+        let js: Vec<u16> = text.encode_utf16().collect();
+        assert_eq!(String::from_utf16(&js[..said]).unwrap(), "Café 🚀 prêt", "the JS slice ends after the said word");
+        assert_eq!(said, text[..end].chars().count() + 1, "the emoji counts two, not one");
+        assert_eq!(v["pos"], 40);
+        assert_eq!(v["cut"], false);
+    }
 }

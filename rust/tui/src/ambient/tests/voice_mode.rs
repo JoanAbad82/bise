@@ -169,7 +169,8 @@ fn quiet_says_nothing_mute_and_type_pause_the_mic() {
 }
 
 /// Law (amb-web m_16805): `lit` names the agent entry being said (its
-/// pos) and how far, in Unicode scalars of that entry's text, never past
+/// pos) and how far, in UTF-16 code units of that entry's text (as JS
+/// slices it; the emoji case is in core/voice_mode.rs), never past
 /// its end and never going back; a cut marks it `cut`; his next turn sent,
 /// `lit` is gone. No answer said yet: no `lit`.
 #[test]
@@ -204,12 +205,12 @@ fn lit_says_which_entry_and_how_far_until_his_next_turn() {
     seen.extend(t.take());
     let lits: Vec<Value> = modes(&seen).iter().filter_map(|v| v.get("lit").cloned()).collect();
     assert!(!lits.is_empty(), "lit while it speaks");
-    let max = text.chars().count() as u64;
+    let max = text.encode_utf16().count() as u64;
     let mut last = 0;
     for l in &lits {
         assert_eq!(l["pos"], 40, "the entry handed to be said: {l}");
         let n = l["said"].as_u64().unwrap();
-        assert!(n <= max && n >= last, "scalars, within the text, never back: {lits:?}");
+        assert!(n <= max && n >= last, "UTF-16 units, within the text, never back: {lits:?}");
         last = n;
     }
     // he cuts in: the rest stays unsaid, marked

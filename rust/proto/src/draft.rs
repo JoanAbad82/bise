@@ -257,8 +257,9 @@ pub struct PeekShot {
 pub struct VoiceLit {
     /// the agent's thread entry being said (or last said)
     pub pos: Pos,
-    /// Unicode scalars of the entry's text said so far (the end of the
-    /// last said word; 0: none yet)
+    /// UTF-16 code units of the entry's text said so far, as JS slices
+    /// it: `text.slice(0, said)` (the end of the last said word; 0: none
+    /// yet)
     pub said: u32,
     /// he cut in: the rest stays unsaid
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
