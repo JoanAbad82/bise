@@ -249,6 +249,22 @@ pub struct PeekShot {
     pub at_ms: u64,
 }
 
+/// How far voice mode got saying an agent's message (`voice_mode`'s `lit`,
+/// amb-web m_16805): the window inks `text[..said]` of that thread entry
+/// and leaves the rest faint ('you cut in' when `cut`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct VoiceLit {
+    /// the agent's thread entry being said (or last said)
+    pub pos: Pos,
+    /// Unicode scalars of the entry's text said so far (the end of the
+    /// last said word; 0: none yet)
+    pub said: u32,
+    /// he cut in: the rest stays unsaid
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub cut: bool,
+}
+
 /// One project's part of `away_summary` (only a project where something
 /// happened while he was away).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -472,7 +488,9 @@ pub enum CoreEv {
     /// his words so far), sending, thinking (the agent works), speaking
     /// (`said`: the sentence being said), muted, typing, failed (`fail`:
     /// why, voice mode stays on). `on: false` is its last (he left, his
-    /// window went, the core stopped; `note`: how long, how many turns)
+    /// window went, the core stopped; `note`: how long, how many turns).
+    /// `lit`: the agent message being said and how far, while it speaks
+    /// and after (a cut too), until his next turn
     VoiceMode {
         project: Project,
         agent: String,
@@ -488,6 +506,8 @@ pub enum CoreEv {
         note: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         fail: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        lit: Option<VoiceLit>,
     },
     Dictation {
         id: String,

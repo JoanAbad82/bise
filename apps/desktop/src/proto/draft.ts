@@ -217,6 +217,26 @@ export type PeekShot = {
 data: string, mime: string, width: number, height: number, at_ms: number, };
 
 /**
+ * How far voice mode got saying an agent's message (`voice_mode`'s `lit`,
+ * amb-web m_16805): the window inks `text[..said]` of that thread entry
+ * and leaves the rest faint ('you cut in' when `cut`).
+ */
+export type VoiceLit = { 
+/**
+ * the agent's thread entry being said (or last said)
+ */
+pos: number, 
+/**
+ * Unicode scalars of the entry's text said so far (the end of the
+ * last said word; 0: none yet)
+ */
+said: number, 
+/**
+ * he cut in: the rest stays unsaid
+ */
+cut?: boolean, };
+
+/**
  * A role's model (V17, config.toml's `[roles]`, the TUI's `/models`
  * screen as data): `kind` chat or voice; `source`: `config` (set in
  * config.toml), `env` (an env var sets it), `default` (unset: bise picks,
@@ -274,7 +294,7 @@ export type PickFolder = { path: string, locked?: boolean, };
 /**
  * What the core sends the app besides the hubs' events (S3b).
  */
-export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "signing", id: string, url: string, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, } | { "ev": "computer_use", on: boolean, ready: boolean, rows: Array<CuRow>, said?: string | null, flash?: string | null, } | { "ev": "level", who: string, v: number, } | { "ev": "heard", text: string, final: boolean, } | { "ev": "roles", items: Array<RoleRow>, } | { "ev": "commands", items: Array<PickCommand>, } | { "ev": "skills", project: string, items: Array<PickSkill>, } | { "ev": "files", project: string, rid: number, q: string, items: Array<PickFile>, folder?: PickFolder | null, partial?: boolean, } | { "ev": "voice_answer", project: string, card: number, n: number, line: string, ms: number, } | { "ev": "voice_mode", project: string, agent: string, on: boolean, state: string, heard?: string | null, said?: string | null, muted?: boolean, note?: string | null, fail?: string | null, } | { "ev": "dictation", id: string, text: string, final: boolean, cancelled?: boolean, error?: string | null, } | { "ev": "app_update", version: string, url: string, sha256: string, } | { "ev": "hub_refused", project: string, error: string, } | { "ev": "index", projects: Array<IndexRow>, } | { "ev": "setup_first", project: string, agent: string, provider: string, name: string, model: string, cid?: number | null, } | { "ev": "computer_live", items: Array<ComputerAgent>, } | { "ev": "computer_peek", key: string, shot?: PeekShot | null, why?: string | null, };
+export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "signing", id: string, url: string, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, } | { "ev": "computer_use", on: boolean, ready: boolean, rows: Array<CuRow>, said?: string | null, flash?: string | null, } | { "ev": "level", who: string, v: number, } | { "ev": "heard", text: string, final: boolean, } | { "ev": "roles", items: Array<RoleRow>, } | { "ev": "commands", items: Array<PickCommand>, } | { "ev": "skills", project: string, items: Array<PickSkill>, } | { "ev": "files", project: string, rid: number, q: string, items: Array<PickFile>, folder?: PickFolder | null, partial?: boolean, } | { "ev": "voice_answer", project: string, card: number, n: number, line: string, ms: number, } | { "ev": "voice_mode", project: string, agent: string, on: boolean, state: string, heard?: string | null, said?: string | null, muted?: boolean, note?: string | null, fail?: string | null, lit?: VoiceLit | null, } | { "ev": "dictation", id: string, text: string, final: boolean, cancelled?: boolean, error?: string | null, } | { "ev": "app_update", version: string, url: string, sha256: string, } | { "ev": "hub_refused", project: string, error: string, } | { "ev": "index", projects: Array<IndexRow>, } | { "ev": "setup_first", project: string, agent: string, provider: string, name: string, model: string, cid?: number | null, } | { "ev": "computer_live", items: Array<ComputerAgent>, } | { "ev": "computer_peek", key: string, shot?: PeekShot | null, why?: string | null, };
 
 /**
  * What the app asks the core itself (never forwarded to a hub).

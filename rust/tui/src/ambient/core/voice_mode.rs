@@ -53,6 +53,28 @@ pub(super) struct VoiceOn {
     /// a note to carry on the next event
     note: Option<String>,
     levels: (f32, f32),
+    /// the agent entries handed to the controller to say, (pos, text), the
+    /// last few: `lit`'s pos is the one whose text the controller lights
+    handed: std::collections::VecDeque<(u64, String)>,
+    /// `lit` goes out: from an answer handed to be said until his next
+    /// turn is sent
+    lit_on: bool,
+}
+
+/// How many said entries `handed` keeps.
+const HANDED_KEEP: usize = 8;
+
+/// `voice_mode`'s `lit` (amb-web m_16805): the entry the controller lights
+/// (the last handed one with its text), how far it is said in Unicode
+/// scalars (the end of the last said word; spans are byte ranges of the
+/// text), and whether he cut in.
+fn lit_of(handed: &std::collections::VecDeque<(u64, String)>, lit: &crate::voicemode::Lit) -> Option<Value> {
+    use crate::voicemode::LitState;
+    let pos = handed.iter().rev().find(|(_, t)| *t == lit.text)?.0;
+    let end = lit.spans.iter().filter(|(_, s)| *s == LitState::Said).map(|(r, _)| r.end).max().unwrap_or(0);
+    let said = lit.text.get(..end).map_or(0, |s| s.chars().count());
+    let cut = lit.spans.iter().any(|(_, s)| *s == LitState::Cut);
+    Some(json!({"pos": pos, "said": said, "cut": cut}))
 }
 
 impl Core {
@@ -144,6 +166,8 @@ impl Core {
             last: None,
             note: None,
             levels: (0.0, 0.0),
+            handed: Default::default(),
+            lit_on: false,
         });
         self.voice_sub(Some((project, agent)));
     }
@@ -202,6 +226,11 @@ impl Core {
                 }
                 let spoken = crate::voicemode::speak::speakable(&entry.text, lang.as_deref());
                 v.vm.on_message(agent, &entry.text, spoken);
+                if v.handed.len() >= HANDED_KEEP {
+                    v.handed.pop_front();
+                }
+                v.handed.push_back((entry.pos, entry.text.clone()));
+                v.lit_on = true;
             }
             _ => {}
         }
@@ -219,6 +248,10 @@ impl Core {
         for a in acts {
             match a {
                 Act::Send { agent, text } => {
+                    // his next turn: the last answer is no longer lit
+                    if let Some(v) = self.voice_on.as_mut() {
+                        v.lit_on = false;
+                    }
                     if let Some(line) = self.voice_answer_agent(&project, &agent, &text) {
                         if let Some(v) = self.voice_on.as_mut() {
                             v.vm.show_heard(line, now);
@@ -255,9 +288,10 @@ impl Core {
         };
         let heard = (view.who == Who::You && !words.is_empty() && matches!(state, "hearing" | "sending")).then(|| words.clone());
         let said = (matches!(view.who, Who::Agent(_)) && !words.is_empty() && state == "speaking").then_some(words);
+        let lit = if v.lit_on { v.vm.lit().and_then(|l| lit_of(&v.handed, &l)) } else { None };
         let ev = strip_nulls(json!({
             "ev": "voice_mode", "project": v.project, "agent": view.agent, "on": true, "state": state,
-            "heard": heard, "said": said, "muted": view.muted, "note": v.note.clone(), "fail": fail,
+            "heard": heard, "said": said, "muted": view.muted, "note": v.note.clone(), "fail": fail, "lit": lit,
         }));
         let mut out = Vec::new();
         if v.last.as_ref() != Some(&ev) {

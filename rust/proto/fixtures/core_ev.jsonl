@@ -18,7 +18,8 @@
 {"ev":"dictation","id":"d2","text":"","final":true,"cancelled":true}
 {"ev":"dictation","id":"d3","text":"","final":true,"error":"the mic is busy."}
 {"ev":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":true,"state":"hearing","heard":"why is the cold bench slow"}
-{"ev":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":true,"state":"speaking","said":"The cold bench reads the cache from disk."}
+{"ev":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":true,"state":"speaking","said":"The cold bench reads the cache from disk.","lit":{"pos":12,"said":9}}
+{"ev":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":true,"state":"listening","lit":{"pos":12,"said":17,"cut":true}}
 {"ev":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":true,"state":"thinking","muted":true}
 {"ev":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":true,"state":"failed","fail":"no voice model: /voice"}
 {"ev":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":false,"state":"listening","note":"voice mode ended · 4 min · 3 turns"}

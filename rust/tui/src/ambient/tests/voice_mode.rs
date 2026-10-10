@@ -168,6 +168,60 @@ fn quiet_says_nothing_mute_and_type_pause_the_mic() {
     assert!(t.vf.synth.lock().unwrap().iter().any(|c| c.text.starts_with("Warm")), "the typed turn's answer is said");
 }
 
+/// Law (amb-web m_16805): `lit` names the agent entry being said (its
+/// pos) and how far, in Unicode scalars of that entry's text, never past
+/// its end and never going back; a cut marks it `cut`; his next turn sent,
+/// `lit` is gone. No answer said yet: no `lit`.
+#[test]
+fn lit_says_which_entry_and_how_far_until_his_next_turn() {
+    let mut t = T::new();
+    let mut w = shop(&mut t);
+    on(&mut t, &mut w, "perf");
+    shop_next(&mut w);
+    let mut seen = t.take();
+    assert!(modes(&seen).iter().all(|v| v.get("lit").is_none()), "nothing said yet: no lit");
+    say(&mut t, &mut w, "why is the cold bench slow");
+    shop_next(&mut w);
+    let text = "Le cache froid est relu du disque à chaque passe. **Warm** runs skip it.";
+    answer(&mut t, &mut w, "perf", 40, text);
+    // its first sentence is synthesized, pushed, and plays to the end
+    // (the speaker already has voice mode's own sounds: the sentence's
+    // utt is the first pushed after its audio comes)
+    let before = t.vf.speaker.lock().unwrap().pushed.len();
+    let ev = t.vf.synth.lock().unwrap().first().expect("the first sentence goes to the synth").events.clone();
+    ev.send(crate::voicemode::Synth::Audio(vec![0.1; 4800])).unwrap();
+    ev.send(crate::voicemode::Synth::Done).unwrap();
+    let t0 = std::time::Instant::now();
+    let utt = loop {
+        w.until_ticking(&mut t, |_| true);
+        if let Some(p) = t.vf.speaker.lock().unwrap().pushed.get(before) {
+            break p.0;
+        }
+        assert!(t0.elapsed() < Duration::from_secs(3), "its audio reaches the speaker");
+    };
+    t.vf.speaker.lock().unwrap().clock = Some((utt, Duration::from_secs(10)));
+    w.until_ticking(&mut t, |o| modes(o).iter().any(|v| v["lit"]["said"].as_u64().is_some_and(|n| n > 0)));
+    seen.extend(t.take());
+    let lits: Vec<Value> = modes(&seen).iter().filter_map(|v| v.get("lit").cloned()).collect();
+    assert!(!lits.is_empty(), "lit while it speaks");
+    let max = text.chars().count() as u64;
+    let mut last = 0;
+    for l in &lits {
+        assert_eq!(l["pos"], 40, "the entry handed to be said: {l}");
+        let n = l["said"].as_u64().unwrap();
+        assert!(n <= max && n >= last, "scalars, within the text, never back: {lits:?}");
+        last = n;
+    }
+    // he cuts in: the rest stays unsaid, marked
+    typed(&mut t, json!({"cmd": "voice_cut"}));
+    w.until_ticking(&mut t, |o| modes(o).iter().any(|v| v["lit"]["cut"] == true));
+    // his next turn sent: no lit any more
+    say(&mut t, &mut w, "and the warm one");
+    w.until_ticking(&mut t, |_| true);
+    let after = modes(&t.take());
+    assert!(after.last().is_some_and(|v| v.get("lit").is_none()), "his next turn: lit gone: {after:?}");
+}
+
 /// Law: cut: its voice stops and its running turn is stopped (`stop`
 /// on its project).
 #[test]
