@@ -115,10 +115,14 @@ test("agents/view: an agent's own question shows on its row and in its view, as 
     expect(id, 'the hub has the card for gift-ui\'s question').toBeDefined();
     const card = page.locator(`[data-testid="thread.card.${String(id)}"]`);
     await expect(card, "the card shows in gift-ui's thread").toBeVisible({ timeout: 5000 });
-    await expect(page.locator(`[data-testid="thread.card.${String(id)}.opt.1"]`), 'with its first option').toContainText('on the cart page');
+    // b (designer m_15612): the thread's line points at the inbox block, the one place to answer
+    await expect(card, 'one line, no options in the thread').toContainText('in the inbox below');
     await page.screenshot({ path: test.info().outputPath('card.png') });
+    await card.click();
+    const opt = page.locator(`[data-testid$="-${String(id)}.opt.1"][data-testid^="inbox.block.card."]`);
+    await expect(opt, 'the line opens it in the inbox block, with its first option').toContainText('on the cart page', { timeout: 5000 });
     // his click answers it: the hub and the TUI see it answered, gift-ui gets the reply
-    await page.locator(`[data-testid="thread.card.${String(id)}.opt.1"]`).click();
+    await opt.click();
     await expect.poll(async () => (await cards()).some((c) => c.id === id), { timeout: 15_000, message: 'the hub has the card answered' }).toBe(false);
     await expect.poll(() => tuiInbox(t?.screen() ?? '').some((r) => r.agent === 'gift-ui'), { timeout: 10_000, message: "the TUI's inbox drops gift-ui's card" }).toBe(false);
     await expect.poll(() => transcriptHas(w, 'shop', 'gift-ui', 'on the cart page'), { timeout: 30_000, message: 'gift-ui gets the reply' }).toBe(true);

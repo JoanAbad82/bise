@@ -183,6 +183,38 @@ test("inbox/block-views: a window opened on a notification's 'inbox?card=' has t
   }
 });
 
+test("inbox/block-views: an open card in the thread is one dim line pointing at the block, never a second copy with its options (designer m_15612)", async () => {
+  const ask = { id: 13, project: P, kind: 'question', rank: 1, agent: 'main', question: 'which branch first?', options: two('checkout', 'gift-ui'), urgent: false, since_ms: NOW - 90_000 };
+  const thread = {
+    ev: 'thread',
+    project: P,
+    agent: 'main',
+    entries: [
+      { pos: 1, at_ms: NOW - 120_000, kind: 'agent', text: 'two branches are ready to merge.' },
+      { pos: 2, at_ms: NOW - 90_000, kind: 'card', text: ask.question, card: { id: 13, question: ask.question, options: ask.options, answered: false } },
+    ],
+    before: null,
+    more: false,
+  };
+  const core = new FakeCore([...world([ask]), thread] as unknown as ConstructorParameters<typeof FakeCore>[0]);
+  const s = await launchDesktop({ core, route: `project/${P}`, size: '1100x720' });
+  try {
+    const { page } = s;
+    const line = page.getByTestId('thread.card.13');
+    await expect(line).toHaveText('? bise asks: which branch first? · in the inbox below', { timeout: 10_000 });
+    await expect(page.locator('[data-testid^="thread.card.13.opt"]'), 'no options in the thread').toHaveCount(0);
+    await expect(page.getByTestId('inbox.block.row.1')).toContainText('which branch first?');
+    await shoot(page, core, 'thread-line');
+    await line.click();
+    await expect(page.getByTestId(`inbox.block.card.${P}-13`), 'the line opens it in the block').toBeVisible({ timeout: 3000 });
+    await expect(page.locator('[data-testid="thread.list"]').getByText('[1]', { exact: false }), 'one copy of the options: in the block').toHaveCount(0);
+    await shoot(page, core, 'thread-line-open');
+  } finally {
+    await s.close();
+    core.dispose();
+  }
+});
+
 test("inbox/block-views: the permission row asks macOS once ('turn on'), then goes", async () => {
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: `agent/${P}/perf`, size: '1100x720' });

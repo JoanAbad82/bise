@@ -56,6 +56,14 @@ export function openInbox(at?: { project: string; card: number }): void {
   for (const f of [...openers]) f(at);
 }
 
+/** Hear openInbox (the block itself, a test): returns the unsubscribe. */
+export function onOpenInbox(f: (at: OpenAt) => void): () => void {
+  openers.add(f);
+  return () => {
+    openers.delete(f);
+  };
+}
+
 // ---- the notifications' permission row (amb-mac's window.bise.notify, 97a5939a; designer m_14211)
 
 type Notify = { state: () => Promise<NotifyAuth>; onState: (f: (s: NotifyAuth) => void) => () => void; ask: () => Promise<NotifyAuth> };

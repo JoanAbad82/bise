@@ -7,7 +7,8 @@ import { Store, StoreProvider, replay, threadKey } from '@/store';
 import { placesOf } from '@/review/EnvironmentsScreen';
 import { Markdown, langOf } from './Markdown';
 import { newAtEnd } from './ThreadList';
-import { digitsOf, EntryRow, foldOf, NOTICE_MARK, thoughtFor, toAgentName, type RowCtx } from './rows';
+import { cardLine, EntryRow, foldOf, NOTICE_MARK, thoughtFor, toAgentName, type RowCtx } from './rows';
+import { onOpenInbox } from '@/inbox/Block';
 import { countsOf, ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
 
@@ -161,12 +162,17 @@ describe('code colors (tui-parity B15)', () => {
     expect(v.queryByTestId('thread.asks.7')).toBeNull();
     expect(v.getByTestId('thread.to.8').textContent).toContain('✉ gift-ui → bise');
     expect(v.getByTestId('thread.to.8').textContent).toContain(ask);
-    // main's card follows its ask: one copy of the question (on the ask), the card's options right under it, waiting for him
+    // main's card follows its ask: one copy of the question (on the ask); with b the inbox block is the one
+    // place to answer, so the card is one dim line pointing there, no options (designer m_15612)
     expect(v.queryByTestId('thread.asks.8')).toBeNull();
-    expect(v.getByTestId('thread.card.2').textContent).not.toContain(ask);
-    expect(v.getByTestId('thread.card.2.waits').textContent).toBe('waits for you · 1 or 2');
-    fireEvent.click(v.getByTestId('thread.card.2.opt.2'));
-    expect(cmds).toContainEqual(expect.objectContaining({ cmd: 'answer', project: P, card: 2, reply: '2' }));
+    expect(v.getByTestId('thread.card.2').textContent).toBe('? waits for you · in the inbox below');
+    expect(v.queryByTestId('thread.card.2.opt.2')).toBeNull();
+    const opened: unknown[] = [];
+    const off = onOpenInbox((at) => opened.push(at));
+    fireEvent.click(v.getByTestId('thread.card.2'));
+    off();
+    expect(opened).toEqual([{ project: P, card: 2 }]);
+    expect(cmds.some((c) => c.cmd === 'answer'), 'a click opens it in the inbox, never answers').toBe(false);
     // answered: one line, no options
     act(() => {
       store.apply({
@@ -194,9 +200,13 @@ describe('who a question waits for (ambient m_10689)', () => {
     );
     expect(v.getByTestId('thread.asks.4').textContent).toBe('waits for bise');
     expect(v.getByTestId('thread.asks.4').className).toContain('main');
-    expect(digitsOf([1, 2])).toBe('1 or 2');
-    expect(digitsOf([1, 2, 3])).toBe('1, 2 or 3');
-    expect(digitsOf([1])).toBe('1');
+  });
+
+  it("b: an open card's line in the thread points at the inbox block, the one place to answer (designer m_15612)", () => {
+    const multi = ['which branch first?', '1 checkout', '2 gift-ui'].join(String.fromCharCode(10));
+    expect(cardLine('bise', multi, false)).toBe('? bise asks: which branch first? · in the inbox below');
+    expect(cardLine('perf', '', false)).toBe('? perf asks · in the inbox below');
+    expect(cardLine('perf', 'which bench?', true)).toBe('? waits for you · in the inbox below');
   });
 });
 

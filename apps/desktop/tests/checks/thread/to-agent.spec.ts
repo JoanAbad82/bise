@@ -23,7 +23,25 @@ const world = () => [
       shots_keep_days: 7,
     },
   },
-  { ev: 'projects', projects: [{ project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 2, working: 0, waits: 1, running: true }] },
+  {
+    ev: 'projects',
+    projects: [
+      {
+        project: HOME,
+        name: 'bise',
+        path: '/nowhere',
+        git: false,
+        home: true,
+        order: 0,
+        agents: 2,
+        working: 0,
+        waits: 1,
+        running: true,
+        // the same card in the inbox block, the one place to answer (b, designer m_15612)
+        cards: [{ id: 2, project: HOME, kind: 'question', rank: 1, agent: 'gift-ui', question: ASK, options: [{ n: 1, label: 'on the cart page' }, { n: 2, label: 'only at checkout' }], urgent: false, since_ms: 1791100005000 }],
+      },
+    ],
+  },
   { ev: 'welcome', project: HOME, proto: 1, workspace: '/nowhere', name: 'bise' },
   { ev: 'agents', project: HOME, agents: [agent('main'), agent('gift-ui', { status: 'blocked', waits: 1 })] },
   {
@@ -62,17 +80,21 @@ test("thread/to-agent: gift-ui's own thread shows its message to main, its quest
     await expect(page.getByTestId('thread.to.4')).toContainText(ASK);
     // one copy of the question (ambient m_10689): on the ask; main's card right under it with its options only
     await expect(page.getByTestId('thread.asks.4'), 'with a card for it, the ask itself carries no wait tag').toHaveCount(0);
-    await expect(page.getByTestId('thread.card.2'), "main's card for it, its options only").not.toContainText(ASK);
-    await expect(page.getByTestId('thread.card.2.waits'), 'it waits for him, with the digits that answer it').toHaveText('waits for you · 1 or 2');
-    await expect(page.getByTestId('thread.screen').getByText(ASK, { exact: false }), 'the question shows once').toHaveCount(1);
+    // b (designer m_15612): main's card for it is one dim line pointing at the inbox block, no options
+    await expect(page.getByTestId('thread.card.2'), "main's card for it: one line, the question stays on the ask").toHaveText('? waits for you · in the inbox below');
+    await expect(page.getByTestId('thread.card.2.opt.2'), 'no options in the thread').toHaveCount(0);
+    await expect(page.locator('[data-testid="thread.list"]').getByText(ASK, { exact: false }), 'the question shows once in the thread').toHaveCount(1);
     // in the DOM is not on screen (amb-win 35d08ae5): a short thread's rows are shown
     await expectShown(page.getByTestId('thread.to.3'), 'its message to main');
     await expectShown(page.getByTestId('thread.to.4'), 'its question');
-    await expectShown(page.getByTestId('thread.card.2.opt.2'), "the card's answer");
+    await expectShown(page.getByTestId('thread.card.2'), "the card's line");
     await page.screenshot({ path: test.info().outputPath('to-agent.png') });
-    await page.getByTestId('thread.card.2.opt.2').click();
+    // a click on the line opens it in the inbox block, where its options answer it
+    await page.getByTestId('thread.card.2').click();
+    await expect(page.getByTestId(`inbox.block.card.${HOME}-2`), 'the line opens the card in the inbox block').toBeVisible({ timeout: 3000 });
+    await page.getByTestId(`inbox.block.card.${HOME}-2.opt.2`).click();
     const cmd = await core.waitCmd((c) => c.cmd === 'answer', 5000);
-    expect(cmd, 'a click answers the card').toMatchObject({ cmd: 'answer', project: HOME, card: 2, reply: '2' });
+    expect(cmd, 'its option in the block answers the card').toMatchObject({ cmd: 'answer', project: HOME, card: 2, reply: '2' });
   } finally {
     await s.close();
     helper.dispose();

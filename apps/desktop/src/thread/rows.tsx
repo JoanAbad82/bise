@@ -4,7 +4,8 @@
 // usePending), so a new or replaced entry re-renders that row alone; the
 // list above it only holds keys. Memo'd on their props (strings, numbers).
 import { memo, useEffect, useState, type ReactNode } from 'react';
-import { Answered, Button, Chip, Fold, Marker, Msg, Opts, Pearl, Tool } from '@/ds';
+import { Answered, Button, Chip, Fold, Marker, Msg, Pearl, Tool } from '@/ds';
+import { openInbox } from '@/inbox/Block';
 import type { Entry } from '@/proto';
 import { useAgents, useCoreState, useEntry, useHubRefused, usePending, useProjects, useStore, useThreadOrder, useToolOut } from '@/store';
 import { refusedLead } from '@/app/Refused';
@@ -847,12 +848,6 @@ export function cardFollows(ask: Entry, card: Entry): boolean {
   return ask.kind === 'to_agent' && ask.asks === true && card.kind === 'card' && card.card != null && card.card.question.trim() === ask.text.trim();
 }
 
-/** '1 or 2', '1, 2 or 3': the digits that answer a card. Pure. */
-export function digitsOf(ns: readonly number[]): string {
-  const d = ns.map(String);
-  return d.length <= 1 ? (d[0] ?? '') : `${d.slice(0, -1).join(', ')} or ${d.at(-1) ?? ''}`;
-}
-
 /** The entry before (-1) or after (+1) this one in the thread's order. */
 function useNeighbor(tkey: string, pos: number, dir: -1 | 1): Entry | undefined {
   const { order } = useThreadOrder(tkey);
@@ -872,39 +867,36 @@ export function toAgentName(from: string, to: string, asks: boolean): string {
  * the question and the card only its options (one copy of it).
  */
 function CardRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
-  const store = useStore();
   const prev = useNeighbor(ctx.tkey, e.pos, -1);
   const c = e.card;
   if (!c) return <Marker>{e.text}</Marker>;
   const follows = prev !== undefined && cardFollows(prev, e);
   if (c.answered) return <Answered testId={`thread.card.${String(c.id)}`}>{follows ? '✓ answered' : `✓ answered: ${c.question}`}</Answered>;
-  const opts = (
-    <>
-      <Opts
-        items={c.options.map((o) => ({ n: o.n, text: o.label }))}
-        onPick={(n) => {
-          store.answer(ctx.project, c.id, String(n));
-        }}
-        testId={`thread.card.${String(c.id)}.opt`}
-      />
-      <span className="th-waits you" data-testid={`thread.card.${String(c.id)}.waits`}>
-        waits for you · {digitsOf(c.options.map((o) => o.n))}
-      </span>
-    </>
-  );
-  if (follows) {
-    return (
-      <div className="th-card-opts" data-testid={`thread.card.${String(c.id)}`}>
-        {opts}
-      </div>
-    );
-  }
+  // b (his card #476, designer m_15612): the inbox block is the one place to answer; the thread says
+  // one dim line that points there, never a second copy with its options. A click opens it there.
   return (
-    <Msg from={ctx.bise && ctx.agent === 'main' ? 'bise' : 'agent'} name={shownName(ctx.agent)} time={clock(e.at_ms)} testId={`thread.card.${String(c.id)}`}>
-      <Markdown text={c.question} onLink={ctx.onLink} />
-      {opts}
-    </Msg>
+    <button
+      type="button"
+      className="th-card-line"
+      data-testid={`thread.card.${String(c.id)}`}
+      onClick={() => {
+        openInbox({ project: ctx.project, card: c.id });
+      }}
+    >
+      {cardLine(shownName(ctx.agent), c.question, follows)}
+    </button>
   );
+}
+
+/**
+ * An open card's line in the thread (designer m_15612): '? bise asks: which branch first? · in the
+ * inbox below'; right under the ask it answers (the ask carries the question), '? waits for you · in
+ * the inbox below'. Pure.
+ */
+export function cardLine(who: string, question: string, follows: boolean): string {
+  if (follows) return '? waits for you · in the inbox below';
+  const first = question.split('\n').find((l) => l.trim() !== '')?.trim() ?? '';
+  return first === '' ? `? ${who} asks · in the inbox below` : `? ${who} asks: ${first} · in the inbox below`;
 }
 
 /**

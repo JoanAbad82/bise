@@ -410,17 +410,29 @@
   font-size: 12px;
 }
 
-.th-waits.you {
-  color: var(--c-accent);
-}
-
 .th-waits.main {
   color: var(--c-text-2);
 }
 
-/* a card right under its ask: its options only, aligned with the ask's words */
-.th-card-opts {
-  margin: -4px 0 8px 52px;
+/* an open card in the thread (designer m_15612, b): one dim line pointing at the inbox block, the one
+   place to answer; a click opens it there */
+.th-card-line {
+  display: block;
+  max-width: 100%;
+  margin: 2px 0 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: var(--t-13) var(--font-ui);
+  color: var(--c-text-2);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.th-card-line:hover {
+  color: var(--c-text);
 }
 
 /* amb-feed's batch 2 rows (b8cb4b1e) */
