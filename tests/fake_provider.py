@@ -390,6 +390,11 @@ def reply_for(conv, seen=0):
     sc = scripted(user)
     if sc:
         marks = [(c["tool"], c["arg"] if isinstance(c["arg"], str) else json.dumps(c["arg"])) for c in sc.get("calls", [])]
+        # "think": the script's first step starts with that reasoning (the window's thinking row)
+        if sc.get("think") and calls_done == 0:
+            turn["reasoning"] = sc["think"]
+        if isinstance(sc.get("stream"), dict):
+            turn["stream"] = sc["stream"]
     else:
         marks = MARK.findall(user) or INNER.findall(user)
     if calls_done < len(marks):
@@ -480,6 +485,22 @@ def is_text_delta(family, name, data):
     return bool((ch[0].get("delta") or {}).get("content"))
 
 
+def is_think_delta(family, name, data):
+    """this SSE event carries a piece of the reasoning (paced like the text under a script's "stream",
+    so the window's thinking row runs for a while: 'thought N s')"""
+    if not isinstance(data, dict):
+        return False
+    if family == "anthropic":
+        return data.get("type") == "content_block_delta" and (data.get("delta") or {}).get("type") == "thinking_delta"
+    if family == "openai-responses":
+        return name == "response.reasoning_summary_text.delta"
+    if family == "gemini":
+        parts = [p for c in data.get("candidates", []) for p in (c.get("content") or {}).get("parts", [])]
+        return any("text" in p and p.get("thought") for p in parts)
+    ch = data.get("choices") or [{}]
+    return bool((ch[0].get("delta") or {}).get("reasoning_content"))
+
+
 # ------------------------------------------------------------------ errors
 # (status, headers, body) of an error reply, per family.
 
@@ -546,7 +567,7 @@ def sse_openai_chat(turn, model, include_usage=False, mid_error=False):
         ev.append((None, dict(base, error={"code": "server_error", "message": "Internal server error"},
                               choices=[{"index": 0, "delta": {"content": ""}, "finish_reason": "error"}])))
         return ev
-    for p in pieces(turn["reasoning"]) if turn["reasoning"] else []:
+    for p in text_pieces(turn["reasoning"], turn) if turn["reasoning"] else []:
         ev.append(chunk({"content": None, "reasoning_content": p}))
     for p in text_pieces(turn["text"], turn) if turn["text"] else []:
         ev.append(chunk({"content": p}))
@@ -594,7 +615,7 @@ def sse_anthropic(turn, model, mid_error=False):
     for i, b in enumerate(anth_blocks(turn)):
         if b["type"] == "thinking":
             first = {"type": "thinking", "thinking": ""}
-            deltas = [{"type": "thinking_delta", "thinking": p} for p in pieces(b["thinking"])]
+            deltas = [{"type": "thinking_delta", "thinking": p} for p in text_pieces(b["thinking"], turn)]
             deltas.append({"type": "signature_delta", "signature": b["signature"]})
         elif b["type"] == "text":
             first = {"type": "text", "text": ""}
@@ -665,7 +686,7 @@ def sse_responses(turn, model, encrypted=False, mid_error=False):
             text = it["summary"][0]["text"]
             add("response.reasoning_summary_part.added", item_id=iid, output_index=oi, summary_index=0,
                 part={"type": "summary_text", "text": ""})
-            for p in pieces(text):
+            for p in text_pieces(text, turn):
                 add("response.reasoning_summary_text.delta", item_id=iid, output_index=oi, summary_index=0,
                     delta=p)
             add("response.reasoning_summary_text.done", item_id=iid, output_index=oi, summary_index=0, text=text)
@@ -717,7 +738,7 @@ def gem_parts(turn):
     """the parts in stream order: thoughts, text, then whole function calls
     (Gemini never splits a functionCall); the first functionCall of a step
     carries the thoughtSignature (Gemini 3)"""
-    out = [[{"text": p, "thought": True}] for p in pieces(turn["reasoning"])] if turn["reasoning"] else []
+    out = [[{"text": p, "thought": True}] for p in text_pieces(turn["reasoning"], turn)] if turn["reasoning"] else []
     out += [[{"text": p}] for p in text_pieces(turn["text"], turn)] if turn["text"] else []
     calls = [{"functionCall": {"name": c["name"], "args": c["args"]}} for c in turn["calls"]]
     if calls:
@@ -1081,7 +1102,8 @@ class H(http.server.BaseHTTPRequestHandler):
                                                int(drip.group(1)), float(drip.group(2)))
             elif sse and turn.get("stream") and float(turn["stream"].get("every") or 0) > 0:
                 self.send_sse_paced([sse_bytes(family, [e]) for e in out],
-                                    [is_text_delta(family, *e) for e in out], float(turn["stream"]["every"]))
+                                    [is_text_delta(family, *e) or is_think_delta(family, *e) for e in out],
+                                    float(turn["stream"]["every"]))
             elif sse:
                 self.send_sse([sse_bytes(family, [e]) for e in out])
             else:  # Gemini without alt=sse: one JSON array

@@ -349,6 +349,40 @@ def dash_messages(n=30):
     return out
 
 
+# the bar's seeds (ambient-lead m_16108, ambient-pm 70ba71ae): R37/FOLDS2's '▸ N other step' pill and
+# thinking row (a 'skill' call is ToolKind::Other, rust/proto/src/thread.rs; reasoning paced so
+# 'thought N s' shows), and a tool output past the hub's 4 KB cap (TOOL_TEXT_CAP) with a known total
+LOG_LINE = "batch %04d  ingest ok  lag 41 ms"
+LOG_LINES = 640
+LONG_OUT_BYTES = LOG_LINES * (len(LOG_LINE % 1) + 1)      # 21120 bytes: '… 4 KB of 21 KB shown'
+
+
+def bar_turns():
+    """The dashboards agent's two extra turns for the bar, as scripts: {text, calls, reply, needle,
+    think?, stream?}. Pure."""
+    other = {"text": "work out which panels still have no data, and check the pages guide before you write it up",
+             "think": "Three panels came back empty: cold starts, db time and timeouts, all in us-east. That's the region "
+                      "without the exporter, so it's not the panels. Before I write this up as a page I should read the "
+                      "pages guide, then list them with what each needs.",
+             "stream": {"chunks": 10, "every": 0.4},
+             "calls": [("skill", "bise-pages"),
+                       ("bash", "grep -c 'us-east' panels.md @@ count the us-east panels"),
+                       ("bash", "tail -n 3 panels.md")],
+             "reply": "Three panels have no data yet, all in us-east: **cold starts**, **db time** and **timeouts**. "
+                      "The exporter isn't on there; once it is, they fill without a change on our side."}
+    out = {"text": "show me the last hour of the ingest log",
+           "calls": [("bash", "for i in $(seq 1 %d); do printf '%s\\n' \"$i\"; done @@ print the last hour of the ingest log"
+                      % (LOG_LINES, LOG_LINE.replace("%04d", "%04d")))],
+           "reply": "The last hour of ingest: %d batches, every one ok, lag steady at 41 ms." % LOG_LINES}
+    for t in (other, out):
+        t["needle"] = t["reply"].split("\n")[0][:60]
+    return [other, out]
+
+
+P99_ASK = "ship the p99 fix today or after the batch test?\n1. today\n2. after the batch test"
+P99_ANSWER = {"text": "after the batch test", "why": "the batch test runs tomorrow and could move the threshold; one day costs nothing"}
+
+
 SCREEN_TEXT = "make the apply-code button match this mock"
 SCREEN_CONTEXT = {"app": "Figma", "title": "checkout, mobile cart", "file": "Checkout.fig", "selection": "Apply code",
                   "window_text": "Cart · 3 items · Subtotal 89.99 · Apply code · Checkout"}
@@ -480,6 +514,48 @@ def rich_seed(world, hubs, holds, agents, timeout):
             turn("telemetry", "dashboards", m["text"], m["needle"])
         return len(msgs)
 
+    def bar():
+        # R37/FOLDS2 (an 'other' step + a thinking row) and the 4 KB output cut, on the dashboards agent
+        turns = bar_turns()
+        for i, t in enumerate(turns):
+            put_script(sd, "bar-%d" % i, t["text"], t["calls"], t["reply"])
+            if t.get("think") or t.get("stream"):
+                f = os.path.join(sd, "bar-%d.json" % i)
+                s = json.load(open(f))
+                s.update({k: t[k] for k in ("think", "stream") if t.get(k)})
+                with open(f + ".tmp", "w") as fh:
+                    json.dump(s, fh)
+                os.replace(f + ".tmp", f)
+        for t in turns:
+            turn("telemetry", "dashboards", t["text"], t["needle"])
+        return {"other_step": turns[0]["text"], "long_output_bytes": LONG_OUT_BYTES}
+
+    def answered():
+        # the docked 'answered … for you' row, last in telemetry's thread so a check reaches it (the
+        # seed's PagerDuty answer sits under 110 messages): p99 asks main, main answers for him with why
+        f = ask_file(world, "telemetry", "p99-ship")
+        os.makedirs(os.path.dirname(f), exist_ok=True)
+        q = shlex.quote
+        ask = os.path.join(d, "p99-ask.sh")
+        with open(ask, "w") as fh:
+            fh.write("sb send main --expect-reply %s | sed -n 's/^sent \\(m_[0-9]*\\).*/\\1/p' > %s.tmp && mv %s.tmp %s\n"
+                     % (q(P99_ASK), q(f), q(f), q(f)))
+        reply = os.path.join(d, "p99-answer.sh")
+        with open(reply, "w") as fh:
+            fh.write("for i in $(seq 120); do [ -s %s ] && break; sleep 0.5; done\nsb send p99 --reply-to \"$(cat %s)\" --why %s %s\ntouch %s.done\n"
+                     % (q(f), q(f), q(P99_ANSWER["why"]), q(P99_ANSWER["text"]), q(reply)))
+        words = "ask main whether the p99 fix ships today"
+        put_script(sd, "p99-ask", words, [("bash", "bash %s" % ask)], "Asked main: today or after the batch test.")
+        put_script(sd, "p99-answer", P99_ASK.split("\n")[0], [("bash", "bash %s" % reply)],
+                   "I answered p99 for you: after the batch test, since it runs tomorrow and could move the threshold.")
+        c = by["telemetry"]
+        c.wait_idle("main", timeout=timeout)
+        c.wait_idle("p99", timeout=timeout)
+        c.say(words, focus="p99")
+        c.wait(lambda: os.path.exists(reply + ".done"), timeout, "main's answer for p99")
+        c.wait_idle("main", timeout=timeout)
+        return "telemetry: main answered p99 for him (%s)" % P99_ANSWER["text"]
+
     def scheduled():
         bash("telemetry", "check the p99 panel every 30 minutes, and make me the morning page every day at 9",
              "sb every 30m 'check the p99 panel and tell me if it moved' --to dashboards\n"
@@ -566,9 +642,9 @@ def rich_seed(world, hubs, holds, agents, timeout):
         c.wait_status("ingest", ["working", "thinking"], timeout)
         return "telemetry/ingest"
 
-    for name, fn in (("main_thread", long_main), ("tool_thread", dash), ("scheduled", scheduled), ("crowd", more_agents),
+    for name, fn in (("main_thread", long_main), ("tool_thread", dash), ("bar", bar), ("scheduled", scheduled), ("crowd", more_agents),
                      ("pages", pages), ("screen_context", screen), ("feature_approval", approval), ("archived", archived),
-                     ("working", working)):
+                     ("answered", answered), ("working", working)):
         part(name, fn)
     return out
 

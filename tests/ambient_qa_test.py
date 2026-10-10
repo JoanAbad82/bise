@@ -615,6 +615,13 @@ def rich_world_fixtures():
     check(world.world_timeout({"AMBIENT_QA_WORLD_TIMEOUT": "3000"}, 4.0) == 3000, "the override wins")
     check(world.world_timeout({"AMBIENT_QA_WORLD_TIMEOUT": "x"}, 2.0) == 1800 and world.world_timeout({"AMBIENT_QA_WORLD_TIMEOUT": "0"}, 1.0) == 900,
           "a bad or zero override falls back")
+    # the bar's seeds (ambient-lead m_16108): an 'other' step with a paced thinking row, a > 4 KB output of known size
+    other, long_out = world.bar_turns()
+    check([t for t, _ in other["calls"]].count("skill") == 1 and other["think"] and other["stream"]["every"] > 0, other)
+    out = subprocess.run(["bash", "-c", long_out["calls"][0][1].split(" @@ ")[0]], capture_output=True).stdout
+    check(len(out) == world.LONG_OUT_BYTES > 4096 * 4 and out.startswith(b"batch 0001  ingest ok"), (len(out), out[:40]))
+    check(not any(world.P99_ASK.split("\n")[0] in t for t in [other["text"], long_out["text"]] + list(world.SEED_WORDS.values())),
+          "p99's question is matched by main's script only")
     ps = world.plan(3, rich=True)
     names = {p["name"]: [a["name"] for a in p["agents"]] for p in ps}
     check({"dashboards", "ingest"} <= set(names["telemetry"]) and "perf" in names["shop"] and "changelog" in names["docs"], names)
@@ -692,6 +699,20 @@ def rich_world_fixtures():
             evs = fp.render(fam, st, "fake", True, {})
             n = sum(fp.is_text_delta(fam, *e) for e in evs)
             check(n == 12, (fam, n))
+        # "think": reasoning on the script's first step only, in N paced deltas under "stream" (the thinking row)
+        sp.update(think="the three empty panels are all in us-east", calls=[{"tool": "skill", "arg": "bise-pages"}])
+        json.dump(sp, open(os.path.join(sd, "s.json"), "w"))
+        os.utime(sd)
+        ask = {"role": "user", "text": "streamed please", "calls": 0, "images": []}
+        t1 = fp.reply_for([sysm, ask])
+        check(t1["reasoning"] == sp["think"] and t1["calls"][0]["name"] == "skill" and t1["calls"][0]["args"] == {"name": "bise-pages"}, t1)
+        t2 = fp.reply_for([sysm, ask, {"role": "assistant", "text": "", "calls": 1, "images": []},
+                           {"role": "tool", "text": "the guide", "calls": 0, "images": []}])
+        check(t2["reasoning"] == "" and t2["text"].startswith("one two"), t2)
+        for fam in ("anthropic", "openai-chat", "openai-responses", "gemini"):
+            evs = fp.render(fam, t1, "fake", True, {})
+            n = sum(fp.is_think_delta(fam, *e) for e in evs)
+            check(n == 12 and not any(fp.is_think_delta(fam, *e) and fp.is_text_delta(fam, *e) for e in evs), (fam, "think", n))
     finally:
         for k, v in old.items():
             if v is None:
