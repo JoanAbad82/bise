@@ -206,7 +206,7 @@ Slice 1 holds its done-when except speed and 10-12.
 
 ### Results: fake accounts, real model (2026-10-02, tip; amb-tools' canned Camille mailbox, Slack, Linear)
 
-Pages driven in a throwaway headless Chrome (`plugins/ambient-qa/pagedrive.mjs`), never his.
+Pages driven in a throwaway headless Chrome (`.agents/plugins/ambient-qa/pagedrive.mjs`), never his.
 
 - **Slice 1 done-when, "draft my weekly update from Slack and Linear": pass.** A skeleton
   (`writing…`) ~27 s after the ask, the filled page ~77 s (target 90): a Slack message draft for

@@ -3,7 +3,7 @@ draft-making connector call needs no card, but not before the user's word
 on the page it comes from.
 
 A real hub in auto (the checker off), the scripted model, a temp HOME and
-BISE_HOME, and amb-tools' fake Gmail (plugins/ambient-qa/fake-accounts,
+BISE_HOME, and amb-tools' fake Gmail (.agents/plugins/ambient-qa/fake-accounts,
 fixture data, its writes go to a throwaway outbox file): never the user's
 accounts. main publishes a review page, then calls tools.gmail.create_draft:
 a card says it wants drafts in Gmail before the review, and the draft is
@@ -23,7 +23,7 @@ sys.path.insert(0, HERE)
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-FAKE = os.path.join(HERE, "..", "plugins", "ambient-qa", "fake-accounts", "fake_accounts.py")
+FAKE = os.path.join(HERE, "..", ".agents", "plugins", "ambient-qa", "fake-accounts", "fake_accounts.py")
 PAGE = (
     '<section data-kit="review" data-id="replies"><ol>'
     '<li data-id="r1"><p>Nina asks if the Safari fix ships today</p></li>'

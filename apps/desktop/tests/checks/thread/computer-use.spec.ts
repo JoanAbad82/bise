@@ -40,7 +40,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 // it said 'no world up' and the first run skipped itself)
 // (one folder deeper than world.ts: tests/checks/thread)
 const REPO = path.resolve(__dirname, '..', '..', '..', '..', '..');
-const QA = path.join(REPO, 'plugins', 'ambient-qa', 'qa.py');
+const QA = path.join(REPO, '.agents', 'plugins', 'ambient-qa', 'qa.py');
 const qa = (args: string[]): string => execFileSync('python3', ['-B', QA, ...args], { cwd: REPO, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] });
 /** Whether the fake computer-use world is there (amb-core's seam, 197d9c59): skipped only when qa.py has no such command. */
 function seam(): boolean {

@@ -263,7 +263,7 @@ the page sends the PNG it drew with canvas).
 ## 6. Roadmap A-D as built (docs/ambient-roadmap.md §2)
 
 The contracts as they landed on `ambient-app`. QA: docs/ambient-qa.md's done-when checks, run on
-fake accounts only (`plugins/ambient-qa`, `qa.py run <scenario>`).
+fake accounts only (`.agents/plugins/ambient-qa`, `qa.py run <scenario>`).
 
 ### 6.1 Rules every slice follows
 - **Nothing leaves before his word on the page** (main's rule + the guide, amb-kit 038fc00b): no

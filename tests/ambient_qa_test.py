@@ -1,4 +1,4 @@
-"""plugins/ambient-qa: bise's QA plugin for the throwaway world (no app).
+""".agents/plugins/ambient-qa: bise's QA plugin for the throwaway world (no app).
 
 Offline (no hub, no app): the manifest, the MCP server's handshake and
 tools, the fake accounts, the scenarios' truths and page laws, the world's
@@ -21,7 +21,7 @@ import threading
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PLUGIN = os.path.join(HERE, "..", "plugins", "ambient-qa")
+PLUGIN = os.path.join(HERE, "..", ".agents", "plugins", "ambient-qa")
 sys.path.insert(0, PLUGIN)
 import qa  # noqa: E402
 sys.path.insert(0, os.path.join(PLUGIN, "fake-accounts"))

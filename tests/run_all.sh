@@ -19,6 +19,8 @@ for a in "$@"; do
 done
 echo "== No blind sleep in tests/ (tests/sleep_check.py: wait for a state with tests/wait.py)"
 python3 tests/sleep_check.py --self-test && python3 tests/sleep_check.py || exit 1
+echo "== The release's built-in plugins are exactly the shipped list (tests/release_plugins_test.py)"
+python3 tests/release_plugins_test.py || exit 1
 echo "== Rust: build, unit and scenario tests, clippy"
 # the Bend binaries the e2e/tmux tests run (./repl-live, ./repl-scripted,
 # ./sb-core; not in git): from bins.sh's cache, compiled on a miss
