@@ -179,7 +179,10 @@ test('composer/lists-real: real core: /, @ and $ list what the TUI lists, in its
     await expect.poll(async () => (await appRows(page)).length, { message: 'the / list has its rows' }).toBeGreaterThan(20);
     const appSlash = await appRows(page);
     const greyed = await picker.locator(T.pickerRow, { hasText: 'not yet' }).count();
-    const tuiCore = tuiSlash.filter((n) => COMMANDS.includes(n));
+    // the TUI's commands the window leaves out on purpose (src/thread/commands.ts LEFT_OUT,
+    // c14366b3: /version, a terminal dev tool; ambient-lead m_16241) are not compared
+    const leftOut = new Set(['/version']);
+    const tuiCore = tuiSlash.filter((n) => COMMANDS.includes(n) && !leftOut.has(n));
     const missing = tuiCore.filter((n) => !appSlash.includes(n));
     test.info().annotations.push({ type: '/ list', description: `TUI ${String(tuiSlash.length)} rows (${String(tuiCore.length)} of commands.rs; dev-build rows: ${tuiSlash.filter((n) => !COMMANDS.includes(n)).join(' ') || 'none'}) · window ${String(appSlash.length)} rows, ${String(greyed)} 'not yet' · the window's own: ${appSlash.filter((n) => !tuiSlash.includes(n)).join(' ') || 'none'}` });
     expect.soft(tuiCore.length, "the TUI's / popup was read").toBeGreaterThan(20);

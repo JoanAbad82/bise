@@ -64,9 +64,11 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
   const { page } = s;
   const list = page.locator(T.list);
   const toThread = async () => {
-    if (await page.locator(T.field).first().isVisible()) return;
+    // the thread's list, not the composer: a commit screen has the composer too (63eb6c0a: the
+    // landed sha's commit stayed open and the PR step looked for rows and ⌘F there)
+    if (await page.locator(T.list).isVisible()) return;
     await page.locator(`[data-testid="app.sidebar.project.${project}"]`).click({ timeout: 10_000 });
-    await expect(page.locator(T.field).first(), "back in shop's thread").toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(T.list), "back in shop's thread").toBeVisible({ timeout: 10_000 });
   };
   const note = (type: string, v: unknown) => test.info().annotations.push({ type, description: typeof v === 'string' ? v : JSON.stringify(v) });
   try {
@@ -101,9 +103,16 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       // seeds push it up the thread
       await expect.poll(() => transcriptHas(w, 'shop', 'main', 'sb pr : red : 412'), { timeout: 60_000, message: "the hub's event: #412's checks fail" }).toBe(true);
       const row = list.locator(T.pr).filter({ hasText: '#412' }).filter({ hasText: 'checks fail' }).last();
+      // the thread as it is when the hub has the event: its PR rows, or none
+      note('pr-rows-at-event', (await list.locator(T.pr).allTextContents()).map((r) => r.trim().slice(0, 120)));
+      await page.screenshot({ path: test.info().outputPath('pr-at-event.png') });
       if ((await row.count()) === 0) {
         await page.locator(T.field).first().click();
         await page.keyboard.press('Meta+f');
+        await sleep(500);
+        // the ⌘F moment, framed whatever happens (12a9efbf/63eb6c0a: its field never showed)
+        await page.screenshot({ path: test.info().outputPath('find.png') });
+        note('find-after-cmd-f', { field: await page.locator('[data-testid="thread.find.field"]').count(), bar: await page.locator('[data-testid="thread.find"]').count(), focused: await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? document.activeElement?.tagName ?? '') });
         await page.locator('[data-testid="thread.find.field"]').waitFor({ timeout: 5000 });
         await page.keyboard.type('checks fail: e2e');
         await page.keyboard.press('Enter');
@@ -121,7 +130,7 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       await expect.soft(pr, 'failing: an err tone').toHaveAttribute('data-tone', 'err', { timeout: 5000 });
       const words = ((await pr.textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();
       note('pr', { id: rowId, window: words, tone: await pr.getAttribute('data-tone', { timeout: 2000 }).catch(() => null), tuiHas: flat(term().screen()).includes('#412 checks fail: e2e') });
-      await row.screenshot({ path: test.info().outputPath('pr.png') }).catch(() => undefined);
+      await pr.screenshot({ path: test.info().outputPath('pr.png') }).catch(() => undefined);
       // the number is a button (rows.tsx PrRow: ctx.onLink(url)); the world's fake gh seeds
       // https://github.com/acme-qa/shop/pull/412. Every miss is said: the row's id, the link's
       // words, the click's error (no silent catch), main's stdout

@@ -19,7 +19,8 @@ const T = {
 };
 // a listed key, what it opens (a test id that shows), how to come back
 const ACTS: readonly { keys: string; press: string; shows: string }[] = [
-  { keys: '⌘I', press: 'Meta+i', shows: '[data-testid="inbox.root"]' },
+  // ⌘I opens the inbox in place on a thread (the inbox block, R42-R47), its screen elsewhere
+  { keys: '⌘I', press: 'Meta+i', shows: '[data-testid="inbox.root"], [data-testid="inbox.block"][data-open]' },
   { keys: '⌘K', press: 'Meta+k', shows: '[data-testid="app.palette"]' },
   { keys: '⌘,', press: 'Meta+,', shows: '[data-testid="settings.root"]' },
   { keys: '⌘F', press: 'Meta+f', shows: '[data-testid="thread.find"]' },

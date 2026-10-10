@@ -56,7 +56,8 @@ done
 for s in ${mine[@]+"${mine[@]}"}; do
   case "${fresh[0]}" in "$s"/*) later+=("${fresh[0]}") ;; esac
 done
-grep='real core|thread/|inbox/|agents/|review/|pages/|settings/|app/'
+# composer/controls is a harness check (scripted core) named in the bar's reruns: let it run when named
+grep='real core|thread/|inbox/|agents/|review/|pages/|settings/|app/|composer/controls'
 rc=0
 # the list on stdout, and every annotation (the checks' measured times) in a JSON beside it
 # (given to Playwright alone, never exported: world up refuses any env value that reaches
