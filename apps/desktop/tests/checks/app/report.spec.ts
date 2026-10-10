@@ -29,7 +29,12 @@ test('app/report: the crash report in the window, with copy and show in Finder',
       await expect(screen.locator('.b-head .t2')).toHaveText(/^~\/\.bise\/reports\/crash-\d\d-\d\d\.md$/);
       await expect(page.getByTestId('app.report.text')).toContainText('bise crashed: core panicked: no hub for acme: the workspace moved');
       await expect(page.getByTestId('app.report.text')).toContainText("thread 'main' panicked at rust/core/src/hub.rs:212:9:");
-      await page.screenshot({ path: test.info().outputPath('report.png') });
+      await page.screenshot({ path: test.info().outputPath('report-light.png') });
+      // the dark one for designer's sheet (the fixture world's theme follows the system)
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor)).not.toBe('rgb(255, 255, 255)');
+      await page.screenshot({ path: test.info().outputPath('report-dark.png') });
+      await page.emulateMedia({ colorScheme: 'light' });
 
       await page.getByTestId('app.report.copy').click();
       await expect(page.getByTestId('app.report.copy')).toHaveText('copied');

@@ -51,7 +51,12 @@ test("artifacts/archived: archived ones behind a faint 'N archived' row, a shows
     await expect(page.getByTestId('artifacts.list.row.before-after')).toBeVisible();
     await expect(page.getByTestId('artifacts.archived')).toHaveText('2 archived');
     await expect(page.getByTestId('artifacts.keys')).toContainText('a archived');
-    await page.screenshot({ path: test.info().outputPath('archived-row.png') });
+    await page.screenshot({ path: test.info().outputPath('archived-row-light.png') });
+    await core.send({ ev: 'prefs', prefs: { onboarded: true, theme: 'dark' } } as never);
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset['theme']), { timeout: 5000 }).toBe('dark');
+    await page.screenshot({ path: test.info().outputPath('archived-row-dark.png') });
+    await core.send({ ev: 'prefs', prefs: { onboarded: true, theme: 'light' } } as never);
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset['theme']), { timeout: 5000 }).toBe('light');
 
     await page.getByTestId('artifacts.list').focus();
     await page.keyboard.press('a');
