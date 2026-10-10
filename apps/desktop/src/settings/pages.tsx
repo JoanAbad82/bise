@@ -407,6 +407,47 @@ function Models({ data, ports }: { data: SettingsData; ports: SettingsPorts }) {
           }
         }}
       />
+      {data.keychain != null && <KeychainRow k={data.keychain} send={ports.send} />}
     </>
+  );
+}
+
+/**
+ * N1 (the TUI's /keychain [on|off], designer m_13193's words): where his keys and sign-ins are kept,
+ * the macOS keychain or files in ~/.bise. The switch moves them (AppCmd keychain, the core's thread);
+ * while it runs the switch waits and says so; the move's lines (item names and counts) under it, a
+ * failed one in the error tone.
+ */
+function KeychainRow({ k, send }: { k: NonNullable<SettingsData['keychain']>; send: (cmd: AppCmd) => void }) {
+  const on = k.store === 'keychain';
+  const said = k.moving ? 'moving them…' : (k.lines?.join(' ') ?? '');
+  const where = on ? 'in the macOS keychain' : 'in files in ~/.bise';
+  return (
+    <Group
+      title="your keys and sign-ins"
+      testId="settings.keychain"
+      items={[
+        {
+          id: 'keychain',
+          label: 'keep them in the macOS keychain',
+          sub: (
+            <span data-testid="settings.keychain.sub" className={k.failed === true && !k.moving ? 'settings-err' : undefined}>
+              {said !== '' ? said : `now ${where}. /keychain in the terminal.`}
+            </span>
+          ),
+          control: (
+            <Toggle
+              on={on}
+              state={k.moving ? 'disabled' : undefined}
+              label="keep your keys and sign-ins in the macOS keychain"
+              onChange={(v) => {
+                send({ cmd: 'keychain', to: v ? 'on' : 'off' });
+              }}
+              testId="settings.keychain.toggle"
+            />
+          ),
+        },
+      ]}
+    />
   );
 }

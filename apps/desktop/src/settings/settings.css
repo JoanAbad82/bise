@@ -14,6 +14,9 @@
 .settings-cu-st.done { color: var(--c-ok); }
 .settings-cu-st.waits { color: var(--c-accent); }
 .settings-cu-st.failed { color: var(--c-err); }
+/* a failed line under a settings row: the ds's '.b-gi .l span' (every span of a row's label, text-2)
+   would win over one class, so the rule names the row (N1's failed keychain move) */
+.b-gi .l .settings-err { color: var(--c-err); }
 .settings-cu-help { display: block; color: var(--c-text-3); }
 /* a role's model (V17): the system's select, on the ds field's look */
 .settings-select { height: 28px; max-width: 240px; padding: 0 8px; border: 0; border-radius: var(--r-2); background: var(--c-sunken); box-shadow: inset 0 0 0 1px var(--c-line); color: var(--c-text); font: var(--t-13) var(--font-ui); }

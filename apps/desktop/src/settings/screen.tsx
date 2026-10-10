@@ -3,7 +3,7 @@
 // through it (store.command: the core's AppCmd). Owner: amb-home.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { JsonValue, Perm, ProjectRow } from '@/proto';
-import { useAccounts, useApprovals, useComputerUse, useCoreEvent, useFound, useModels, usePlugins, usePrefs, useProjects, useRoles, useSigning, useStore, type Ev } from '@/store';
+import { useAccounts, useApprovals, useComputerUse, useCoreEvent, useFound, useKeychain, useModels, usePlugins, usePrefs, useProjects, useRoles, useSigning, useStore, type Ev } from '@/store';
 import type { KeyError } from './accounts';
 import { holdForSetup, useHeld } from './hold';
 import { useHeldSetup } from './setup-first';
@@ -117,6 +117,7 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
       accounts={accounts}
       projects={projects}
       roles={useRoles()}
+      keychain={useKeychain()}
       models={models}
       roleError={roleError?.text ?? null}
       held={held}

@@ -107,6 +107,10 @@ export function windowRun(name: string, args: string, at: { project: string; age
       return arg === 'off' || arg === 'uninstall' ? { app: { cmd: 'computer_use', act: arg } } : go({ screen: 'settings', page: 'computer' });
     case 'scheduled':
       return go({ screen: 'scheduled' });
+    case 'keychain':
+      // N1 (the TUI's /keychain [on|off]): on/off moves his keys and sign-ins as settings · models'
+      // switch does; bare: that page, which says where they are
+      return arg === 'on' || arg === 'off' ? { app: { cmd: 'keychain', to: arg } } : go({ screen: 'settings', page: 'models' });
     case 'quit':
       // the window and the capsule quit; the agents keep running (the hub is its own process)
       return { quit: true };

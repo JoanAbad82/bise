@@ -49,6 +49,10 @@ describe('a command line runs as the TUI runs it', () => {
     expect(windowRun('/plugins', '', at)).toEqual({ go: { screen: 'settings', page: 'plugins' } });
     expect(windowRun('/welcome', '', at)).toEqual({ go: { screen: 'onboarding' } });
     expect(windowRun('/scheduled', '', at), 'R4').toEqual({ go: { screen: 'scheduled' } });
+    // N1: /keychain on|off moves the secrets as settings' switch does; bare opens that page
+    expect(windowRun('/keychain', 'on', at)).toEqual({ app: { cmd: 'keychain', to: 'on' } });
+    expect(windowRun('/keychain', 'off', at)).toEqual({ app: { cmd: 'keychain', to: 'off' } });
+    expect(windowRun('/keychain', '', at)).toEqual({ go: { screen: 'settings', page: 'models' } });
     expect(windowRun('/quit', '', at), 'R5: quits, the agents keep running').toEqual({ quit: true });
     expect(windowRun('/diff', 'sb/x', at), 'R7: a branch, with or without an agent').toEqual({ go: { screen: 'branch', project: P, branch: 'sb/x' } });
     expect(windowRun('/diff', 'feat/a/b', at), 'its slashes kept').toEqual({ go: { screen: 'branch', project: P, branch: 'feat/a/b' } });

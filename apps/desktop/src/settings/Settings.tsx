@@ -50,6 +50,16 @@ export interface SettingsData {
   home?: string;
   /** macOS's notifications permission (window.bise.notify; none: no row on general) */
   notify?: NotifyAuth | null;
+  /** N1: where his keys and sign-ins are kept and the last /keychain move (the core's keychain; none yet: null) */
+  keychain?: KeychainState | null;
+}
+
+/** The core's keychain event, as settings · models reads it. */
+export interface KeychainState {
+  readonly store: string;
+  readonly moving: boolean;
+  readonly lines?: readonly string[];
+  readonly failed?: boolean;
 }
 
 export interface SettingsPorts {
