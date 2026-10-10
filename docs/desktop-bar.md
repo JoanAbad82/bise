@@ -1063,7 +1063,7 @@ Still not pass:
 
 | row | status | owner | the check that would prove it |
 |---|---|---|---|
-| R40 streaming with the signed animation | **built-no-check on a gate**: green in the harness (spotlight/streaming, thread/streaming), and never shot on a packed try. amb-core's bench waits for a heavy slot | amb-core, amb-web, amb-win | the bench, then qa-native's R40 frames on a cut |
+| R40 streaming with the signed animation | **fail (bench, CPU), 10-10** (amb-core m_17424): the window side is green in the harness (spotlight/streaming, thread/streaming). amb-core's bench ran 3 alternating long-reply pairs (heavy-run --alone). Over the wire it passes: base 59,190 B against stream about 94,500 B, 1.77x the reply, inside the 2x bar. On CPU it fails: the stream adds +0.11, +0.57 and +0.44 s against base (median +0.44 s, the bar is +0.05 s), about 0.8 ms per partial over about 512 partials. Wall time and RSS are the same. sb/stream stays off the merge until a fix passes the same 3 pairs, then qa-native shoots R40 on a cut | amb-core (the per-partial path), then qa-native | the bench rerun green, then R40's frames on a packed try |
 | S29/L19 computer use on a gate | **pass on the real core** (qa-flows 20c44bf9). Not proven on a gate: the gate's run waits on the TUI being ready | qa-flows, qa-native | the gate's thread/computer-use on the next cut |
 | TP-R6 ⇧⇥ approvals mode, and TP-K7b ctrl+c stops a turn | **built-no-check**: amb-web 21002943 | amb-web | qa-flows: a composer ⇧⇥ case, and thread/interrupt with ctrl+c |
 | TP-N1 /keychain on, /keychain off | **in progress**: the core landed in 8acd83b9; the window side is being built | amb-home | qa-flows: /keychain on the fake keychain |
