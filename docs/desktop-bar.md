@@ -481,6 +481,18 @@ isn't judging. A row marked ok names the shot that was looked at.
   list. amb-win is fixing it. The re-cut also carries the chip glyph 3c209f33 and "4 KB of 18 KB
   shown" 91af5059, and qa-native re-checks those rows.
 
+- **ea81cabc: GO for promote** (ambient-pm m_17477 to ambient-lead m_17475, from qa-native
+  m_17473; `~/.bise/gate/try-gate/ea81cabc/index.md`). 10/10 checks are green on the packed app
+  with the rich world.
+  - KEYS: ⇧⇥ and ctrl+c (TP-R6, TP-K7b).
+  - KEYCHAIN (TP-N1).
+  - HEADFIT with p99's context note.
+  - **S29 computer use on a gate** (a900b528).
+  - voice-real, FOLDS2 (0–0.2 px), STEERRX, TOOLCOUNT, INIT and MSGRIGHT.
+
+  'said ✓✓' is not on this cut (amb-web is writing its check). It is no regression, because his
+  try never had it.
+
 - **e3f7e598: GO for promote, and B16 passes** (ambient-pm m_17331 to ambient-lead m_17326, from
   qa-native m_17319; `~/.bise/gate/try-gate/e3f7e598/index.md`).
   - HEADFIT is green:
@@ -1064,12 +1076,12 @@ Still not pass:
 | row | status | owner | the check that would prove it |
 |---|---|---|---|
 | R40 streaming with the signed animation | **fail (bench, CPU), 10-10; the recount puts it close** (amb-core m_17424, then m_17465): the window side is green in the harness (spotlight/streaming, thread/streaming). The first bench gave +0.44 s CPU against base; that was load noise from launchd time. The recount uses instructions (proc_pid_rusage, which load doesn't move), on 2 pairs of a 20k-char reply (about 1,667 SSE events). Base is 2,118 and 2,106 M instructions, and stream is 2,585 and 2,653 M: about +507 M, or **about +0.08 s CPU against a +0.05 s bar**. Over the wire it passes: 88.5 and 92.2 KB against 59.2 KB, inside 2x. RSS is the same. The cost is the fold per piece (cut, decode and parse each time), not IO and not O(n²). amb-core's fix keeps the raw pieces in a pending list and folds them only when an emit is due (at most 1 per 250 ms). sb/stream stays off the merge until a fix passes the same 3 pairs, then qa-native shoots R40 on a cut | amb-core (the per-partial path), then qa-native | the bench rerun green, then R40's frames on a packed try |
-| S29/L19 computer use on a gate | **pass on the real core** (qa-flows 20c44bf9). Not proven on a gate: the gate's run waits on the TUI being ready | qa-flows, qa-native | the gate's thread/computer-use on the next cut |
-| TP-R6 ⇧⇥ approvals mode, and TP-K7b ctrl+c stops a turn | **built-no-check**: amb-web 21002943 | amb-web | qa-flows: a composer ⇧⇥ case, and thread/interrupt with ctrl+c |
-| TP-N1 /keychain on, /keychain off | **in progress**: the core landed in 8acd83b9; the window side is being built | amb-home | qa-flows: /keychain on the fake keychain |
-| TP-N2 /log | **in progress**: amb-feed's typed read is on its branch log-read; amb-web's screen waits on its shape | amb-feed, amb-web | qa-flows: thread/log |
+| S29/L19 computer use on a gate | **pass (gate ea81cabc)**, with a900b528: driving, 'took the wheel' and 'give it back', peek, stopped, next to the TUI. It is also green on the real core (qa-flows 20c44bf9) | qa-flows, qa-native | none |
+| TP-R6 ⇧⇥ approvals mode, and TP-K7b ctrl+c stops a turn | **pass (gate ea81cabc)**: ⇧⇥ flashes 'auto · safe calls run…' with the mode in ink, and the divider follows. keys-real flips the hub's mode both ways, as the TUI does. ctrl+c (with no text selected) and esc stop a busy turn, and the draft stays; neither does it while text is selected | amb-web | none |
+| TP-N1 /keychain on, /keychain off | **pass (gate ea81cabc, scripted keychain)**: the models page's switch goes on, off and failed ('couldn't move chatgpt: the keychain is locked.'), in light and dark | amb-home | none |
+| TP-N2 /log | **in progress**: amb-feed's TS for /log is on ambient-app (c6192880), and amb-web's screen comes next | amb-feed, amb-web | qa-flows: thread/log |
 | 'said ✓✓' (a spoken turn's mark) | **built-no-check on a gate**: amb-win's unit test and d85bd249; no world has a spoken turn | amb-win, amb-tools | a world with a spoken turn, then qa-native |
-| HEADFIT's context note | **built-no-check on a gate**: amb-home's thread/head-fit is green in the harness; the rich world has no context note | amb-tools, qa-native | a world with a usage note |
+| HEADFIT's context note | **pass (gate ea81cabc, with amb-tools' a40569c8 seed)**: p99's 'context 44k · 17%' is whole at 1400. At 1100 with the panel, the note and the branch are both gone whole. At 800 the head shows the crumb, the note and the branch. The order (the note drops before the branch) can't be seen at these widths, and amb-home's thread/head-fit proves it | amb-home | none |
 | S.1 no CLI (VM) | **not run, prepped** (amb-mac m_17354): 15 rows (TCC, the fn tap, the tray, ⌘F, fn held, fn fn, fn space, esc, full screen, the glass, ⌘Q). It needs the 27 GB tart image pulled again, a kit and one packed app, and it runs after amb-core's bench, on ambient-lead's ok. 2 of its rows are stale against b3 and fn fn voice, and amb-mac updates them | amb-mac, qa-native | the VM pass; amb-mac sends the result to ambient-lead and ambient-pm |
 
 Beyond the rows, the merge needs four more things:
