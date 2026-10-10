@@ -223,7 +223,13 @@ test('gate/right: messages right, type anywhere, inbox drafts + ctrl+o, folds, t
         await sleep(700);
         const h1 = (await open.boundingBox())?.height ?? 0;
         await shot('INBOXDRAFT-2-ctrl-o');
-        row('INBOXDRAFT ctrl+o', `the long ask's card ${String(Math.round(h0))} px -> ${String(Math.round(h1))} px after ctrl+o; text has 'line 14': ${String((await open.innerText()).includes('line 14'))}`);
+        const whole = (await open.innerText()).includes('line 14');
+        // a second ctrl+o folds it again (7b06587c)
+        await p.keyboard.press('Control+o');
+        await sleep(700);
+        const h2 = (await open.boundingBox())?.height ?? 0;
+        await shot('INBOXDRAFT-2b-ctrl-o-again');
+        row('INBOXDRAFT ctrl+o', `the long ask's card ${String(Math.round(h0))} px -> ${String(Math.round(h1))} px after ctrl+o ('line 14' shown: ${String(whole)}) -> ${String(Math.round(h2))} px after a second ctrl+o`);
         // a draft for this item, then a reload
         const words = `draft-${String(run)} fix totals first`;
         await p.locator(FIELD).click();
@@ -251,15 +257,32 @@ test('gate/right: messages right, type anywhere, inbox drafts + ctrl+o, folds, t
       }
     }
 
+    // the thread may draw only what is near the view: scroll its scroller up until `sel` (with `text`) is there
+    const scrollUpTo = async (sel: string, text: RegExp | null): Promise<boolean> => {
+      for (let i = 0; i < 40; i++) {
+        const loc = text ? p.locator(sel).filter({ hasText: text }) : p.locator(sel);
+        if ((await loc.count()) > 0) { await loc.last().scrollIntoViewIfNeeded().catch(() => undefined); return true; }
+        const top = await p.evaluate(() => {
+          let el: HTMLElement | null = document.querySelector<HTMLElement>('[data-testid="thread.list"]');
+          while (el && !(el.scrollHeight > el.clientHeight && /auto|scroll/.test(getComputedStyle(el).overflowY))) el = el.parentElement;
+          if (!el) return true;
+          el.scrollTop = Math.max(0, el.scrollTop - 500);
+          return el.scrollTop === 0;
+        });
+        await sleep(300);
+        if (top && i > 0) { const last = text ? p.locator(sel).filter({ hasText: text }) : p.locator(sel); return (await last.count()) > 0; }
+      }
+      return false;
+    };
+
     // FOLDS2: dashboards' thinking row and '▸ 1 other step' (amb-tools 63eb6c0a)
     if (on('FOLDS2')) {
       await go(s, `agent/${tel}/dashboards`);
       await sleep(1000);
-      const think = p.locator('[data-testid^="thread.think."]').last();
-      const pill = p.getByTestId('thread.list').getByText(/other steps?/).last();
-      for (const [name, el] of [['thinking', think], ['pill', pill]] as const) {
-        if (!(await el.isVisible().catch(() => false))) { row(`FOLDS2 ${name}`, 'not on screen'); continue; }
-        await el.scrollIntoViewIfNeeded().catch(() => undefined);
+      for (const [name, sel, text] of [['thinking', '[data-testid^="thread.think."]', null], ['pill', '[data-testid="thread.list"] *', /^▸?\s*1 other step/]] as const) {
+        const there = await scrollUpTo(sel, text);
+        const el = text ? p.locator(sel).filter({ hasText: text }).last() : p.locator(sel).last();
+        if (!there) { await shot(`FOLDS2-${name}-a-closed`); row(`FOLDS2 ${name}`, 'not in the thread after scrolling to its top'); continue; }
         const t0 = (await el.innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
         await shot(`FOLDS2-${name}-a-closed`);
         const len0 = (await p.getByTestId('thread.list').innerText()).length;
@@ -267,7 +290,7 @@ test('gate/right: messages right, type anywhere, inbox drafts + ctrl+o, folds, t
         await sleep(700);
         const len1 = (await p.getByTestId('thread.list').innerText()).length;
         await shot(`FOLDS2-${name}-b-open`);
-        row(`FOLDS2 ${name}`, `${JSON.stringify(t0.slice(0, 80))}; a click opens it: thread text ${String(len0)} -> ${String(len1)} chars`);
+        row(`FOLDS2 ${name}`, `${JSON.stringify(t0.slice(0, 80))}; a click: thread text ${String(len0)} -> ${String(len1)} chars`);
       }
     }
 
@@ -275,12 +298,15 @@ test('gate/right: messages right, type anywhere, inbox drafts + ctrl+o, folds, t
     if (on('P99ROW')) {
       await go(s, `project/${tel}`);
       await sleep(1000);
-      const r = p.getByTestId('thread.list').getByText(/answered .* for you/).last();
-      const seen = await r.isVisible().catch(() => false);
-      if (seen) await r.scrollIntoViewIfNeeded().catch(() => undefined);
+      const there = await scrollUpTo('[data-testid="thread.list"] *', /answered p99 for you|answered .* for you/);
+      const r = p.getByTestId('thread.list').locator('*').filter({ hasText: /answered .* for you/ }).last();
       await shot('P99ROW');
-      row('P99ROW', seen ? JSON.stringify((await r.innerText()).replace(/\s+/g, ' ').trim().slice(0, 160)) : "no 'answered … for you' row on screen");
+      row('P99ROW', there ? JSON.stringify((await r.innerText()).replace(/\s+/g, ' ').trim().slice(0, 200)) : "no 'answered … for you' row in telemetry's thread");
+      // names: the quote's source in a main's thread says 'bise' (lead m_16742)
+      const src = await p.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>('[data-testid*=".quote."]')).map((q) => q.innerText.split('\n')[0] ?? '').slice(-2));
+      row('NAMES quote source in telemetry main', JSON.stringify(src));
     }
+
   } finally {
     appendFileSync(path.join(OUT, 'index.md'), ['', `## gate/right (${new Date().toISOString()})`, '', '| row | what the app did |', '|---|---|', ...rows, ''].join('\n'));
     await s.close().catch(() => undefined);
