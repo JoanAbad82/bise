@@ -614,6 +614,11 @@ by?: string,
  */
 archived?: boolean, 
 /**
+ * the artifact itself was archived at (ms; `sb artifact archive`):
+ * out of the default list, behind its `N archived` row
+ */
+archived_at?: number | null, 
+/**
  * when it was first added (ms)
  */
 created_ms?: number | null, 

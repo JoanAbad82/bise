@@ -75,6 +75,8 @@ export const TAGS = {
   prs: true,
   models: true,
   tool_out: true,
+  // the answer to queued_take (turn/unqueue): his taken-back words, to the asking window (main 34c35175)
+  queued_taken: true,
   diff: true,
   route: true,
   route_done: true,

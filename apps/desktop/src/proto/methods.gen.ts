@@ -27,6 +27,7 @@ export const METHODS = {
   "artifacts/seen": { cmd: "artifacts_seen", result: null },
   "diff/read": { cmd: "diff", result: "diff" },
   "tool/output": { cmd: "tool_out", result: "tool_out" },
+  "turn/unqueue": { cmd: "queued_take", result: "queued_taken" },
   "worktrees/list": { cmd: "worktrees", result: "worktrees" },
   "devServers/list": { cmd: "dev_servers", result: "dev_servers" },
   "merged/list": { cmd: "merged", result: "merged" },
