@@ -443,3 +443,16 @@ describe("a tool call's real output (amb-feed dece0fe9)", () => {
     expect(store.toolOut(P, 'perf', 7)).toBeNull();
   });
 });
+
+describe("a diff that answers another view's req (lead m_16528)", () => {
+  it("a terminal's /diff answer (req this window never sent) never replaces the review's diff", () => {
+    const store = new Store(null);
+    const review = { ev: 'diff', project: P, agent: 'perf', base: 'main', files: [] } as const;
+    store.apply(review);
+    expect(store.diff(P, 'perf')).toMatchObject({ base: 'main' });
+    store.apply({ ev: 'diff', project: P, agent: 'perf', base: 'HEAD~1', files: [], req: 7 });
+    expect(store.diff(P, 'perf'), "someone else's req: dropped").toMatchObject({ base: 'main' });
+    store.apply({ ev: 'diff', project: P, agent: 'perf', base: 'HEAD~2', files: [] });
+    expect(store.diff(P, 'perf'), 'no req: the review asked it').toMatchObject({ base: 'HEAD~2' });
+  });
+});

@@ -225,6 +225,12 @@ export class Store {
   /** tool_out asks in flight (by key), and each project's last one (an error names no call) */
   private readonly toolAsks = new Set<string>();
   private readonly toolAsk = new Map<string, string>();
+  /**
+   * the diff asks this window sent with a `req` (none today: the review asks without one); a diff
+   * that answers another `req` (a terminal's `/diff` the hub broadcasts) is for the view that
+   * asked, never the review's diff of the same agent (lead m_16528)
+   */
+  private readonly diffReqs = new Set<number>();
   /** the dictations this window started and not over yet (bar I) */
   private readonly dictating = new Set<string>();
   /** the `@` queries on their way: rid -> its project and resolve; each project's newest rid */
@@ -484,6 +490,11 @@ export class Store {
         return;
       }
       case 'diff':
+        // an answer to someone else's `req` (a terminal's /diff) never lands on this window's views
+        if (ev.req != null) {
+          if (!this.diffReqs.has(ev.req)) return;
+          this.diffReqs.delete(ev.req);
+        }
         this.put(diffKey(ev.project, ev.agent, ev.commit ?? undefined), ev);
         return;
       case 'prefs':
