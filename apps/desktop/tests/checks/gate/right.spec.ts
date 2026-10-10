@@ -12,7 +12,7 @@
 import { appendFileSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { FakeHelper, test, type Session } from '../../harness';
 import { launchReal, realWorld, worldSay } from '../world';
 import { sleep } from '../native/world';
@@ -277,25 +277,178 @@ test('gate/right: messages right, type anywhere, inbox drafts + ctrl+o, folds, t
 
     // FOLDS2: dashboards' thinking row and '▸ 1 other step' (amb-tools 63eb6c0a)
     if (on('FOLDS2')) {
+      // every press is measured the same way: the pressed row's top in the window, then 700 ms later; < 2 px holds
+      const yOf = async (l: Locator): Promise<number | null> => (await l.boundingBox().catch(() => null))?.y ?? null;
+      const press = async (l: Locator, act: () => Promise<void>): Promise<string> => {
+        const y0 = await yOf(l);
+        await act();
+        await sleep(700);
+        const y1 = await yOf(l);
+        const d = y0 === null || y1 === null ? null : Math.round(Math.abs(y1 - y0) * 10) / 10;
+        // a row off screen at the press is scrolled in by the click itself: that move is Playwright's, not the app's
+        const vh = await p.evaluate(() => window.innerHeight);
+        const off = y0 !== null && (y0 < 0 || y0 > vh);
+        return `${String(y0)} -> ${String(y1)} px (${d === null ? 'not measured' : off ? 'off screen at the press: not measured' : d < 2 ? `moved ${String(d)} px: holds` : `moved ${String(d)} px: RED`})`;
+      };
+      const opened = (): Promise<number> => p.locator('[data-testid="thread.list"] [aria-expanded="true"], [data-testid="thread.list"] .th-think-body').count();
+
+      // (1) at the thread's end: the list stuck to its end, the lowest fold toggle in view
       await go(s, `agent/${tel}/dashboards`);
-      await sleep(1000);
-      for (const [name, sel, text] of [['thinking', '[data-testid^="thread.think."]', null], ['pill', '[data-testid="thread.list"] *', /^▸?\s*1 other step/]] as const) {
+      await sleep(1500);
+      const stuck = await p.getByTestId('thread.list').getAttribute('data-stuck').catch(() => null);
+      const endId = await p.evaluate(() => {
+        const sel = '[data-testid^="thread.think."][data-testid$=".head"], [data-testid^="thread.tools."], [data-testid^="thread.fold."], [data-testid^="thread.tool."][role="button"]';
+        const inView = Array.from(document.querySelectorAll<HTMLElement>(sel)).filter((e) => {
+          const r = e.getBoundingClientRect();
+          return r.height > 0 && r.top >= 0 && r.bottom <= window.innerHeight;
+        });
+        return inView[inView.length - 1]?.dataset['testid'] ?? '';
+      });
+      if (endId === '') {
+        await shot('FOLDS2-end-a');
+        row('FOLDS2 at the end', `data-stuck=${String(stuck)}; no fold toggle in view at the thread's end`);
+      } else {
+        const t = p.getByTestId(endId).first();
+        await shot('FOLDS2-end-a');
+        const o = await press(t, () => t.click());
+        await shot('FOLDS2-end-b-open');
+        const c = await press(t, () => t.click());
+        await shot('FOLDS2-end-c-closed');
+        row('FOLDS2 at the end', `data-stuck=${String(stuck)} before; ${endId} (${JSON.stringify((await t.innerText().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 50))}) open: ${o}; close: ${c}`);
+      }
+      // a click holds its row for 1.5 s (ThreadList HOLD_MS) against any scroll that isn't his wheel or keys: the
+      // scripted scroll-up below must start after it, or the hold pulls the view back and the next row is off screen
+      await sleep(2000);
+
+      // (2) the thinking row and '▸ 1 other step' up the thread: open, then close
+      for (const [name, sel, text] of [['thinking', '[data-testid^="thread.think."][data-testid$=".head"]', null], ['pill', '[data-testid^="thread.tools."]', /1 other step/]] as const) {
         const there = await scrollUpTo(sel, text);
         const el = text ? p.locator(sel).filter({ hasText: text }).last() : p.locator(sel).last();
         if (!there) { await shot(`FOLDS2-${name}-a-closed`); row(`FOLDS2 ${name}`, 'not in the thread after scrolling to its top'); continue; }
+        await el.scrollIntoViewIfNeeded().catch(() => undefined);
+        await sleep(400);
         const t0 = (await el.innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
         await shot(`FOLDS2-${name}-a-closed`);
-        const len0 = (await p.getByTestId('thread.list').innerText()).length;
-        const y0 = (await el.boundingBox())?.y ?? null;
-        await el.click();
-        await sleep(700);
-        const len1 = (await p.getByTestId('thread.list').innerText()).length;
-        // does the opened row stay where his click was, or does the view jump away from it?
-        const y1 = (await el.boundingBox().catch(() => null))?.y ?? null;
+        const n0 = await opened();
+        const o = await press(el, () => el.click());
+        const n1 = await opened();
         await shot(`FOLDS2-${name}-b-open`);
         await el.screenshot({ path: path.join(OUT, `FOLDS2-${name}-c-row.png`) }).catch(() => undefined);
-        row(`FOLDS2 ${name}`, `${JSON.stringify(t0.slice(0, 80))}; a click: thread text ${String(len0)} -> ${String(len1)} chars; the row's top in the window ${String(y0)} -> ${String(y1)} px`);
+        const c = await press(el, () => el.click());
+        await shot(`FOLDS2-${name}-d-closed`);
+        row(`FOLDS2 ${name}`, `${JSON.stringify(t0.slice(0, 60))}; open: ${o} (open folds ${String(n0)} -> ${String(n1)}); close: ${c}`);
       }
+
+      // (3) ⌘E (open everything, the TUI's ctrl+o) from the composer: the row at the top of the view stays
+      const topIdx = await p.evaluate(() => {
+        const list = document.querySelector('[data-testid="thread.list"]');
+        const edge = list === null ? 0 : list.getBoundingClientRect().top;
+        const r = Array.from(document.querySelectorAll<HTMLElement>('[data-testid="thread.list"] [data-item-index]')).find((e) => e.getBoundingClientRect().top >= edge);
+        return r?.dataset['itemIndex'] ?? '';
+      });
+      if (topIdx === '') row('FOLDS2 ⌘E', 'no row at the top of the view');
+      else {
+        const top = p.locator(`[data-testid="thread.list"] [data-item-index="${topIdx}"]`);
+        await p.locator(FIELD).first().click().catch(() => undefined);
+        const n0 = await opened();
+        const e1 = await press(top, () => p.keyboard.press('Meta+e'));
+        const n1 = await opened();
+        await shot('FOLDS2-cmdE-a-open');
+        const e2 = await press(top, () => p.keyboard.press('Meta+e'));
+        await shot('FOLDS2-cmdE-b-folded');
+        row('FOLDS2 ⌘E', `top row (item ${topIdx}) open all: ${e1} (open folds ${String(n0)} -> ${String(n1)}); fold all: ${e2}`);
+      }
+    }
+
+    // STEERRX: his bubbles' delivery marks (sent ✓ / read ✓✓, sb-core's steer-rx + steered receipts, a712b0f2) in
+    // dashboards' thread, where the seeded steer is
+    // (amb-win 0bc66c22: thread.you.<pos>.mark after the time, ✓ got it / ✓✓ read it / ▲ not sent; a steered one has
+    // no mark, its 'steered · … read it mid-turn' line is its ✓✓). Crops of each marked under-line, light + dark,
+    // for designer's sheet (STEERRX-crop-<theme>-<n>.png).
+    const marksOf = (): Promise<{ id: string; words: string; under: string; mark: string; tone: string; title: string; color: string; time: string }[]> =>
+      p.evaluate(() =>
+        Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="thread.you."]'))
+          .filter((e) => /^thread\.you\.\d+$/.test(e.dataset['testid'] ?? ''))
+          .map((e) => {
+            const id = e.dataset['testid'] ?? '';
+            const m = document.querySelector<HTMLElement>(`[data-testid="${id}.mark"]`);
+            const under = m?.parentElement ?? null;
+            const time = under?.querySelector<HTMLElement>('time, .th-time, [class*="time"]') ?? null;
+            return {
+              id,
+              words: (e.querySelector<HTMLElement>('.th-bubble')?.innerText ?? '').replace(/\s+/g, ' ').slice(0, 40),
+              under: (under?.innerText ?? '').replace(/\s+/g, ' '),
+              mark: m?.innerText ?? '',
+              tone: m?.dataset['tone'] ?? '',
+              title: m?.getAttribute('title') ?? '',
+              color: m === null ? '' : getComputedStyle(m).color,
+              time: time === null ? '' : getComputedStyle(time).color,
+            };
+          }),
+      );
+    const crops = async (sel: string, name: string, max: number): Promise<number> => {
+      const l = p.locator(sel);
+      const n = Math.min(await l.count(), max);
+      let k = 0;
+      for (let i = 0; i < n; i++) {
+        const el = l.nth(i);
+        await el.scrollIntoViewIfNeeded().catch(() => undefined);
+        await sleep(200);
+        if ((await el.boundingBox().catch(() => null)) === null) continue;
+        const target = el.locator('xpath=ancestor::*[@data-item-index][1]');
+        await ((await target.count()) > 0 ? target : el).screenshot({ path: path.join(OUT, `${name}-${String(k)}.png`) }).catch(() => undefined);
+        k++;
+      }
+      return k;
+    };
+    if (on('STEERRX')) {
+      for (const [where, route] of [['dashboards', `agent/${tel}/dashboards`], ['telemetry main', `project/${tel}`]] as const) {
+        await go(s, route);
+        await sleep(2000);
+        const all = await marksOf();
+        const marked = all.filter((m) => m.mark !== '');
+        await shot(`STEERRX-${where.replace(' ', '-')}`);
+        row(`STEERRX ${where}`, `${String(all.length)} of his bubbles, ${String(marked.length)} with a mark: ${JSON.stringify(marked.slice(-6))}; the last 3 without: ${JSON.stringify(all.filter((m) => m.mark === '').slice(-3).map((m) => [m.words, m.under]))}`);
+      }
+      for (const t of ['light', 'dark'] as const) {
+        await theme(t);
+        await go(s, `agent/${tel}/dashboards`);
+        await sleep(2000);
+        const k = await crops('[data-testid^="thread.you."][data-testid$=".mark"]', `STEERRX-crop-${t}`, 3);
+        const st = await crops('[data-testid="thread.list"] .th-row:has-text("steered · ")', `STEERRX-steered-${t}`, 1);
+        row(`STEERRX crops ${t}`, `${String(k)} marked rows + ${String(st)} steered row cropped`);
+      }
+      await theme('light');
+    }
+
+    // TOOLCOUNT: an edit's line reads '± <file>' with '+N −M' dim after it (amb-home 29ec1b92: thread.tool.<pos>.count)
+    if (on('TOOLCOUNT')) {
+      for (const t of ['light', 'dark'] as const) {
+        await theme(t);
+        await go(s, `agent/${tel}/dashboards`);
+        await sleep(2000);
+        const counts = await p.evaluate(() =>
+          Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="thread.tool."][data-testid$=".count"]')).map((c) => {
+            const line = c.closest<HTMLElement>('[data-testid^="thread.tool."]:not([data-testid$=".count"])') ?? c.parentElement;
+            const words = line?.querySelector<HTMLElement>('.th-tool-text') ?? null;
+            const wr = words?.getBoundingClientRect();
+            const cr = c.getBoundingClientRect();
+            return {
+              id: c.dataset['testid'] ?? '',
+              line: (line?.innerText ?? '').replace(/\s+/g, ' '),
+              words: words?.innerText ?? '',
+              count: c.innerText,
+              gap: wr === undefined ? null : Math.round(cr.left - wr.right),
+              countColor: getComputedStyle(c).color,
+              wordsColor: words === null ? '' : getComputedStyle(words).color,
+            };
+          }),
+        );
+        await shot(`TOOLCOUNT-${t}`);
+        const k = await crops('[data-testid^="thread.tool."][data-testid$=".count"]', `TOOLCOUNT-crop-${t}`, 3);
+        row(`TOOLCOUNT ${t}`, `${String(counts.length)} edit lines with counts in dashboards (${String(k)} cropped): ${JSON.stringify(counts.slice(-4))}`);
+      }
+      await theme('light');
     }
 
     // P99ROW: the bottom of telemetry's thread
