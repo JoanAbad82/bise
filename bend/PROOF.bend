@@ -6096,3 +6096,9 @@ def Laws.live_offset_per_block():
 
 def Laws.live_throttle():
   {==}
+
+def Laws.live_fast_reads_as_slow():
+  {==}
+
+def Laws.live_streamed_text_is_the_reply():
+  {==}

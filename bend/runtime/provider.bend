@@ -422,17 +422,34 @@ def call.raced.got(n: Out, r: Race.Raced<Got>, +tok: String, +cpath: String)
         u : Unit <- P.write_file(cpath, tok)
         IO.pure(Out & Got, (n, Got{Pvp.AFail{Pvp.interrupted_by(who)}, 0, ""}))
 
+# a partial line: the hub reads the REPL's lines from the wire log only
+# (switchboard daemon/repl.rs pump_wire; the socket is only drained), so
+# a partial goes there and nowhere else: no TCP send, and the log's path
+# read once per call (wpath), not per partial (R40's CPU bar)
+def note.partial(n: Out, +wpath: String, +line: String) -> IO(Out):
+  match n:
+    case OStd{}:
+      do IO<Out>:
+        IO.print(line)
+        IO.pure(Out, OStd{})
+    case ONet{sock}:
+      do IO<Out>:
+        wire_log.when(String.is_empty(wpath), wpath, String.append(line, "
+"))
+        IO.pure(Out, ONet{sock})
+
 # the race read until its end; each partial the attempt sends is written
 # here, by the one owner of the wire (Out)
 @unsafe
 def call.raced.read(x: Race.Next<Got>, n: Out, +c: Chan(Race.Step<Got>),
-    +ipath: String, +tok: String, +cpath: String) -> IO(Out & Got):
+    +ipath: String, +tok: String, +cpath: String, +wpath: String)
+    -> IO(Out & Got):
   match x:
     case Race.NPart{+line}:
       do IO<Out & Got>:
-        n2 : Out <- note(n, line)
+        n2 : Out <- note.partial(n, wpath, line)
         y : Race.Next<Got> <- Race.next(Got, c, ipath)
-        call.raced.read(y, n2, c, ipath, tok, cpath)
+        call.raced.read(y, n2, c, ipath, tok, cpath, wpath)
     case Race.NDone{r}:
       call.raced.got(n, r, tok, cpath)
 
@@ -450,8 +467,10 @@ def call.raced(n: Out, +tok: String, +id: String, live: Bool,
     +c : Chan(Race.Step<Got>) <- Race.open(Got, +c2 =>
       call.by_style(c2, Lp.lv0(live, id, st), tok, cpath, st, url, hdrs, body,
         w))
+    fr : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_WIRE_LOG")
+    +wpath : String <- IO.pure(String, P.env_or(fr, ""))
     x : Race.Next<Got> <- Race.next(Got, c, ipath)
-    call.raced.read(x, n, c, ipath, tok, cpath)
+    call.raced.read(x, n, c, ipath, tok, cpath, wpath)
 
 # the attempt, into the session debug log when it is an incident
 def model_call.log(+call: Nat, +tries: Nat, +model: String, +url: String,

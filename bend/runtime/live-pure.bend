@@ -27,10 +27,13 @@ import ../core/api.bend as Api
 import ../core/wire.bend as W
 import ../core/text.bend as Tx
 import ../vendor/json.bend as J
+import ../vendor/http/encoding/utf8.bend as U8
 
-# at most one partial per this many ms (main m_12376)
+# at most one partial per this many ms (designer m_17504: 400 ms, under
+# main m_12376's 250 ms ceiling; each partial costs the REPL a wire.log
+# write, so the rate is part of the R40 CPU bar)
 def every_ms() -> Nat:
-  250n
+  400n
 
 # one attempt's live state. on: False for a call whose text is not the
 # agent's answer (a compaction summary, a one-shot): feed does nothing.
@@ -193,17 +196,186 @@ def applies(xs: List<&2, Ex>, +lv: Lv) -> Lv:
     case Con{+x, rest}:
       applies(rest, apply(x, lv))
 
-# one complete line, decoded (its newline taken off)
+# ---- the fast path: a Messages API text delta without J.parse ----
+#
+# Nearly every line of an answer is a text delta, and decoding and
+# parsing each whole line was most of the live reader's cost (R40). The
+# Messages API writes them in one exact shape:
+#   data: {"type":"content_block_delta","index":N,"delta":{"type":"text_delta","text":"..."}}
+# fast reads that shape only: the index's digits as the block key, then
+# the text's string literal, decoded and unescaped alone (J's own string
+# reader), then "}}" and nothing else. Any other line, or any doubt (a
+# leading zero, a field out of order, a space, a bad escape), is None and
+# J.parse decides (slow). For every line fast reads, it reads what slow
+# reads (the laws, and bend/tests/live-fast.bend over the fixtures).
+
+def anth.pre() -> String:
+  "data: {\"type\":\"content_block_delta\",\"index\":"
+
+def anth.mid() -> String:
+  ",\"delta\":{\"type\":\"text_delta\",\"text\":\""
+
+def is_digit(+c: U32) -> Bool:
+  Bool.and(U32.is_ge(c, 48), U32.is_le(c, 57))
+
+# the leading digits of a string, and what follows them
+type Dg is Data:
+  Dg{ds: String, rest: String}
+
+type DgSt is Data:
+  DgNext{}
+  DgChar{dig: Bool, c: U32}
+
+def digits.go(fuel: Nat, st: DgSt, s: String, acc: String) -> Dg:
+  match fuel:
+    case 0n:
+      Dg{String.reverse(acc), s}
+    case 1n+p:
+      match st:
+        case DgNext{}:
+          match s:
+            case SNil{}:
+              Dg{String.reverse(acc), ""}
+            case SCon{Chr{+c}, +t}:
+              digits.go(p, DgChar{is_digit(c), c}, t, acc)
+        case DgChar{dig, +c}:
+          match dig:
+            case True{}:
+              digits.go(p, DgNext{}, s, SCon{Chr{c}, acc})
+            case False{}:
+              Dg{String.reverse(acc), SCon{Chr{c}, s}}
+
+# at most 10 digits (an index past that is a doubt: slow reads it)
+def digits(+s: String) -> Dg:
+  digits.go(20n, DgNext{}, s, "")
+
+# the digits J.stringify writes for the same number: one or more, no
+# leading zero but "0" itself
+def anth.key_ok(+ds: String) -> Bool:
+  Bool.and(Bool.not(String.is_empty(ds)),
+    Bool.or(String.eq(ds, "0"), Bool.not(String.starts_with(ds, "0"))))
+
+# the text's literal, from just past its opening quote; the rest after
+# its closing quote must be "}}" (and the blanks slow trims)
+def anth.text(r: J.StrRes, +key: String) -> Maybe<&2, List<&2, Ex>>:
+  match r:
+    case J.SOk{+t, +rest}:
+      Bool.pick(Maybe<&2, List<&2, Ex>>, String.eq(String.trim(rest), "}}"),
+        Some{one(key, t)}, None{})
+    case J.SErr{_}:
+      None{}
+
+def anth.body(+key: String, +body: String) -> Maybe<&2, List<&2, Ex>>:
+  +s = U8.utf8.decode(body)
+  anth.text(J.parse_str.loop(Nat.add(Nat.mul(String.length(s), 8n), 100n),
+    J.StrNormal{}, s, Nil{}), key)
+
+def anth.mid_ok(ok: Bool, +key: String, +rest: String)
+    -> Maybe<&2, List<&2, Ex>>:
+  match ok:
+    case True{}:
+      anth.body(key, String.drop(rest, String.length(anth.mid())))
+    case False{}:
+      None{}
+
+def anth.digits(d: Dg) -> Maybe<&2, List<&2, Ex>>:
+  match d:
+    case Dg{+ds, +rest}:
+      anth.mid_ok(Bool.and(anth.key_ok(ds), String.starts_with(rest, anth.mid())),
+        ds, rest)
+
+def anth.fast(hit: Bool, +l: String) -> Maybe<&2, List<&2, Ex>>:
+  match hit:
+    case True{}:
+      anth.digits(digits(String.drop(l, String.length(anth.pre()))))
+    case False{}:
+      None{}
+
+# a raw data line read without J.parse, when it is the family's exact
+# text-delta shape; else None (slow decides)
+def fast(fam: Api.Style, +l: String) -> Maybe<&2, List<&2, Ex>>:
+  match fam:
+    case Api.Anthropic{}:
+      anth.fast(String.starts_with(l, anth.pre()), l)
+    case _:
+      None{}
+
+# a raw data line decoded whole and read by J.parse
+def slow(fam: Api.Style, +l: String) -> List<&2, Ex>:
+  parsed(J.parse(String.trim(String.drop(U8.utf8.decode(l), 5n))), fam)
+
+def line.fast(m: Maybe<&2, List<&2, Ex>>, +l: String, +lv: Lv) -> Lv:
+  match m:
+    case Some{+xs}:
+      applies(xs, lv)
+    case None{}:
+      applies(slow(fam_of(lv), l), lv)
+
+# one complete raw line (its newline taken off)
 def line(is_data: Bool, +l: String, +lv: Lv) -> Lv:
   match is_data:
     case True{}:
-      applies(parsed(J.parse(String.trim(String.drop(l, 5n))), fam_of(lv)),
-        lv)
+      line.fast(fast(fam_of(lv), l), l, lv)
     case False{}:
       lv
 
-# the complete lines of the pieces, decoded (oldest first): the IO half
-# decodes them (Enc.utf8.decode), a line holds whole UTF-8 sequences
+# ---- for the laws: fast agrees with slow ----
+
+def ex.eq(+a: Ex, +b: Ex) -> Bool:
+  match a:
+    case ETxt{+ka, +ta}:
+      match b:
+        case ETxt{+kb, +tb}:
+          Bool.and(String.eq(ka, kb), String.eq(ta, tb))
+        case EBrk{}:
+          False{}
+    case EBrk{}:
+      match b:
+        case ETxt{_, _}:
+          False{}
+        case EBrk{}:
+          True{}
+
+def exs.eq(xs: List<&2, Ex>, ys: List<&2, Ex>) -> Bool:
+  match xs:
+    case Nil{}:
+      match ys:
+        case Nil{}:
+          True{}
+        case Con{_, _}:
+          False{}
+    case Con{+x, xr}:
+      match ys:
+        case Nil{}:
+          False{}
+        case Con{+y, yr}:
+          Bool.and(ex.eq(x, y), exs.eq(xr, yr))
+
+def agree.m(m: Maybe<&2, List<&2, Ex>>, fam: Api.Style, +l: String) -> Bool:
+  match m:
+    case Some{+xs}:
+      exs.eq(xs, slow(fam, l))
+    case None{}:
+      True{}
+
+# fast reads l as slow does, or leaves it to slow
+def agree(+fam: Api.Style, +l: String) -> Bool:
+  agree.m(fast(fam, l), fam, l)
+
+# fast reads l (the laws: the fixtures' text deltas do take the fast path)
+def fires.m(m: Maybe<&2, List<&2, Ex>>) -> Bool:
+  match m:
+    case Some{_}:
+      True{}
+    case None{}:
+      False{}
+
+def fires(fam: Api.Style, +l: String) -> Bool:
+  fires.m(fast(fam, l))
+
+# the complete raw lines of the pieces (oldest first). A line holds
+# whole UTF-8 sequences (a newline never sits inside one): fast decodes
+# only the text's literal, slow the whole line
 def read(ls: List<&2, String>, +lv: Lv) -> Lv:
   match ls:
     case Nil{}:
@@ -333,3 +505,42 @@ def emit_lv(e: Emit) -> Lv:
   match e:
     case Em{_, +lv}:
       lv
+
+# ---- for the laws: a stream fed in groups of pieces, a take after each
+# group when text waits (as the live reader does when due) ----
+
+type Rn is Data:
+  Rn{lines: List<&2, String>, lv: Lv}
+
+def runs.em(e: Emit, +ls: List<&2, String>) -> Rn:
+  match e:
+    case Em{+l, +lv}:
+      Rn{Con{l, ls}, lv}
+
+def runs.flush(has: Bool, +lv: Lv, +ls: List<&2, String>) -> Rn:
+  match has:
+    case True{}:
+      runs.em(take(lv, 0n), ls)
+    case False{}:
+      Rn{ls, lv}
+
+def runs.group(+lv: Lv, +ls: List<&2, String>) -> Rn:
+  runs.flush(has(lv), lv, ls)
+
+def runs.go(gs: List<&2, List<&2, String>>, +r: Rn) -> Rn:
+  match gs:
+    case Nil{}:
+      r
+    case Con{+g, rest}:
+      match r:
+        case Rn{+ls, +lv}:
+          runs.go(rest, runs.group(feeds(g, lv), ls))
+
+def runs.lines(r: Rn) -> List<&2, String>:
+  match r:
+    case Rn{+ls, _}:
+      List.reverse(&2, String, ls)
+
+# the partial lines sent, oldest first
+def runs(gs: List<&2, List<&2, String>>, +lv: Lv) -> List<&2, String>:
+  runs.lines(runs.go(gs, Rn{Nil{}, lv}))

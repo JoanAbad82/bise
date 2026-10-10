@@ -41,18 +41,12 @@ type Ck is Data:
 
 # ---- the live reader (the pure half: runtime/live-pure.bend) ----
 
-def decode_all(ls: List<&2, String>) -> List<&2, String>:
-  match ls:
-    case Nil{}:
-      Nil{}
-    case Con{+l, rest}:
-      Con{Enc.utf8.decode(l), decode_all(rest)}
-
-# a piece's complete lines, decoded, through the fold
+# a piece's complete raw lines through the fold (it decodes what it
+# reads: a text delta's literal alone, any other data line whole)
 def live.cut(c: Lp.Cut) -> Lp.Lv:
   match c:
     case Lp.Cut{+ls, +lv}:
-      Lp.read(decode_all(ls), lv)
+      Lp.read(ls, lv)
 
 def live.send(-A: Type, +c: Chan(Race.Step<A>), e: Lp.Emit) -> IO(Lp.Lv):
   match e:
