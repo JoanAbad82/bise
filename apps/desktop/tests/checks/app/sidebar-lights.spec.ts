@@ -63,6 +63,10 @@ for (const size of ['1100x720', '1400x900']) {
       const { page } = s;
       await expect(page.getByTestId('app.sidebar.search')).toBeVisible({ timeout: 10_000 });
       await clear(page, `${size} at rest`);
+      const top = page.getByTestId('app.sidebar.top');
+      const fade = () => top.evaluate((el) => getComputedStyle(el, '::after').opacity);
+      await expect(top, 'at rest: no fade under the field').toHaveAttribute('data-scrolled', 'false');
+      expect(await fade()).toBe('0');
       // the user's case: the sidebar scrolled down its rows
       const scrolled = await page.getByTestId('app.sidebar').evaluate((el) => {
         el.scrollTop = el.scrollHeight;
@@ -71,6 +75,23 @@ for (const size of ['1100x720', '1400x900']) {
       expect(scrolled, 'the sidebar is long enough to scroll').toBeGreaterThan(100);
       await page.waitForTimeout(100);
       await clear(page, `${size} scrolled to its end`);
+      // designer m_15023: scrolled, the edge under the field fades (16 px), 'more above'
+      await expect(top, 'scrolled: the fade under the field').toHaveAttribute('data-scrolled', 'true');
+      expect(await fade()).toBe('1');
+      expect(await top.evaluate((el) => getComputedStyle(el, '::after').height)).toBe('16px');
+      // macOS full screen (amb-mac's onFullScreen, f58585d2): no lights, so no 36 px room; back on leave
+      const emit = (what: 'enter-full-screen' | 'leave-full-screen') =>
+        s.app.evaluate(({ BrowserWindow }, ev) => {
+          for (const w of BrowserWindow.getAllWindows()) w.emit(ev);
+        }, what);
+      await emit('enter-full-screen');
+      await expect(top, 'full screen').toHaveAttribute('data-full', 'true');
+      const fieldTop = () => page.getByTestId('app.sidebar.search').evaluate((el) => el.getBoundingClientRect().top);
+      expect(await fieldTop(), 'full screen: the field moves up, no room for lights that are not there').toBeLessThan(20);
+      await page.screenshot({ path: test.info().outputPath(`lights-${size.replace('x', '-')}-fullscreen.png`) });
+      await emit('leave-full-screen');
+      await expect(top, 'out of full screen').toHaveAttribute('data-full', 'false');
+      await clear(page, `${size} back from full screen`);
       const name = size.replace('x', '-');
       await page.mouse.move(600, 300);
       await page.screenshot({ path: test.info().outputPath(`lights-${name}-light.png`) });

@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { copyText, QuotePop } from '@/quote/QuotePop';
 import { flatRows, handQuotes, quotesOf, range, type RowAt, type Sel } from './quote';
-import { Button, Diff, Empty, Head, Skel } from '@/ds';
+import { Button, Diff, Empty, Head } from '@/ds';
 import { useCards, useDiff, useMerged, useStore } from '@/store';
 import { clock } from '@/thread/entry';
 import { useRouter } from '@/app/router';
@@ -172,10 +172,11 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
         }
       />
       <div className="rv-body" data-testid="review.files" tabIndex={-1} ref={body} onKeyDown={onKey} onMouseDown={onMouseDown} onMouseOver={onMouseOver} data-selecting={sel !== null || undefined}>
+        {/* never a bare grey bar (designer m_15244): say what it waits for, or that nothing differs */}
         {diff === null ? (
-          <Skel />
+          <p className="rv-wait" data-testid="review.loading">{loadingWords(agent, commit)}</p>
         ) : diff.files.length === 0 ? (
-          <Empty title="no changes to show">{diff.note ?? 'nothing differs from its base'}</Empty>
+          <Empty title={commit === undefined ? 'no changes against main' : 'no changes in this commit'}>{diff.note ?? undefined}</Empty>
         ) : (
           diff.files.map((f, i) => (
             <div key={f.path} className="rv-file">
@@ -194,6 +195,12 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
       </div>
     </section>
   );
+}
+
+/** What the review says while its diff comes: 'loading perf's changes…' (main is bise), a commit's. Pure. */
+export function loadingWords(agent: string, commit: string | undefined): string {
+  if (commit !== undefined) return `loading commit ${commit.slice(0, 7)}…`;
+  return `loading ${agent === MAIN ? 'bise' : agent}'s changes…`;
 }
 
 /** Row `i` of the flat list is in the selection. */

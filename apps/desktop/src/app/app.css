@@ -47,6 +47,26 @@ body:has(.app-shell) {
   padding: 0 8px;
   background: linear-gradient(var(--c-sidebar), var(--c-sidebar)), var(--c-solid);
 }
+/* full screen: no lights, so no room for them; a little air above the field */
+.app-side-top.full .b-lights {
+  height: 10px;
+}
+/* scrolled: the rows under the field fade out over 16 px, as under the thread's head (designer
+   m_15023), so a half-hidden row reads as 'more above' instead of being cut flat */
+.app-side-top::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 16px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(var(--c-solid), transparent);
+}
+.app-side-top.scrolled::after {
+  opacity: 1;
+}
 .app-shell .b-head {
   -webkit-app-region: drag;
 }

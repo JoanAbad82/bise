@@ -158,10 +158,41 @@ function StillPearl({ pink }: { pink?: boolean }) {
   );
 }
 
+/** The window in macOS full screen (amb-mac f58585d2: told at once, then on each enter/leave). */
+function useFullScreen(): boolean {
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    // the page outside Electron (a component test) has no preload
+    const on = (window as Partial<Window>).bise?.onFullScreen;
+    return on === undefined ? undefined : on(setFull);
+  }, []);
+  return full;
+}
+
+/** The sidebar's list scrolled off its top (its rows pass under the field): for the fade. */
+function useSideScrolled(): boolean {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>('[data-testid="app.sidebar"]');
+    if (el === null) return;
+    const f = () => {
+      setScrolled(el.scrollTop > 0);
+    };
+    f();
+    el.addEventListener('scroll', f, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', f);
+    };
+  }, []);
+  return scrolled;
+}
+
 export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const router = useRouter();
   // where he was in a long sidebar comes back after a reload (keep.ts)
   useKeptScroll('sidebar', () => document.querySelector<HTMLElement>('[data-testid="app.sidebar"]'));
+  const full = useFullScreen();
+  const scrolled = useSideScrolled();
   const route = useRoute();
   const rows = useProjects();
   const home = rows.find((p) => p.home);
@@ -196,9 +227,10 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
     >
       {/* his shot (ambient-lead m_14497): in a long sidebar the whole column scrolled, so the
           search field rode up under macOS's lights. The lights' 36 px room and the field stay put
-          at the top; only the rows scroll under them. (In full screen the room stays: the page has
-          no reliable full-screen signal yet, the window size lies in the off-screen harness.) */}
-      <div className="app-side-top" data-testid="app.sidebar.top">
+          at the top; only the rows scroll under them. In full screen there are no lights: no room
+          (amb-me's onFullScreen). Scrolled, the edge under the field fades over 16 px like the
+          thread's top, so a half-hidden row reads as 'more above' (designer m_15023). */}
+      <div className={`app-side-top${full ? ' full' : ''}${scrolled ? ' scrolled' : ''}`} data-testid="app.sidebar.top" data-full={full} data-scrolled={scrolled}>
         <div className="b-lights" data-testid="app.sidebar.lights" />
         <button type="button" className="app-search" onClick={onSearch} data-testid="app.sidebar.search">
           <span aria-hidden="true">⌕</span>

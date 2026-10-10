@@ -113,3 +113,12 @@ describe('the window /commands (bar 2.1, A.2)', () => {
     expect(runWindowCommand('new', 'x', { project: P, agent: 'main' })).toBeUndefined();
   });
 });
+
+describe('the review while its diff comes (designer m_15244: never a bare bar)', () => {
+  it("says whose changes it loads, main as bise, a commit by its short sha", async () => {
+    const { loadingWords } = await import('./ReviewScreen');
+    expect(loadingWords('perf', undefined)).toBe("loading perf's changes…");
+    expect(loadingWords('main', undefined)).toBe("loading bise's changes…");
+    expect(loadingWords('main', '155ffb0aa1')).toBe('loading commit 155ffb0…');
+  });
+});

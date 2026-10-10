@@ -66,6 +66,8 @@ for (const [route, project, agent, words] of [
     try {
       const { page } = s;
       await expect(page.getByTestId('app.bottom'), `${route} has the block`).toBeVisible({ timeout: 10_000 });
+      // the scripted core never answers the diff: the review says what it waits for, never a bare bar
+      if (route.startsWith('review/')) await expect(page.getByTestId('review.loading')).toHaveText("loading perf's changes…");
       await sendsTo(page, core, words, project, agent);
       expect(await noScroll(page), `${route}: the window never scrolls`).toBe(true);
       const name = route.replace(/\W+/g, '-');

@@ -17,6 +17,12 @@
   margin-bottom: 14px;
 }
 
+/* the diff on its way: its words, dim, never a bare bar (designer m_15244) */
+.rv-wait {
+  margin: 8px 0;
+  color: var(--c-text-3);
+}
+
 .rv-note,
 .rv-foot {
   color: var(--c-text-2);
