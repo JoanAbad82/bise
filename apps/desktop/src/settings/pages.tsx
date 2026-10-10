@@ -214,7 +214,13 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
     case 'computer':
       return <Computer cu={data.computerUse} send={ports.send} />;
     case 'keys':
-      return <KeyList />;
+      // N1: where his keys and sign-ins are kept heads the keys page (designer m_17435: found under keys)
+      return (
+        <>
+          {data.keychain != null && <KeychainRow k={data.keychain} send={ports.send} />}
+          <KeyList />
+        </>
+      );
   }
 }
 
@@ -407,21 +413,21 @@ function Models({ data, ports }: { data: SettingsData; ports: SettingsPorts }) {
           }
         }}
       />
-      {data.keychain != null && <KeychainRow k={data.keychain} send={ports.send} />}
     </>
   );
 }
 
 /**
- * N1 (the TUI's /keychain [on|off], designer m_13193's words): where his keys and sign-ins are kept,
+ * N1 (the TUI's /keychain [on|off], designer m_17435's words): where his keys and sign-ins are kept,
  * the macOS keychain or files in ~/.bise. The switch moves them (AppCmd keychain, the core's thread);
  * while it runs the switch waits and says so; the move's lines (item names and counts) under it, a
  * failed one in the error tone.
  */
 function KeychainRow({ k, send }: { k: NonNullable<SettingsData['keychain']>; send: (cmd: AppCmd) => void }) {
   const on = k.store === 'keychain';
+  // a move's own lines are the core's (secrets_cli, the terminal's words); with none, where they are
   const said = k.moving ? 'moving them…' : (k.lines?.join(' ') ?? '');
-  const where = on ? 'in the macOS keychain' : 'in files in ~/.bise';
+  const now = on ? 'on: your keys and sign-ins are in the macOS keychain.' : "off: they're in files in ~/.bise. same switch as /keychain in the terminal.";
   return (
     <Group
       title="your keys and sign-ins"
@@ -432,7 +438,7 @@ function KeychainRow({ k, send }: { k: NonNullable<SettingsData['keychain']>; se
           label: 'keep them in the macOS keychain',
           sub: (
             <span data-testid="settings.keychain.sub" className={k.failed === true && !k.moving ? 'settings-err' : undefined}>
-              {said !== '' ? said : `now ${where}. /keychain in the terminal.`}
+              {said !== '' ? said : now}
             </span>
           ),
           control: (
