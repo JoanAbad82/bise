@@ -97,11 +97,29 @@ test('scheduled/screens: the list and one task, light and dark, 1400 and 800', a
     expect(await page.getByTestId('scheduled.pane.words').textContent()).toContain('check the deploy of the storefront');
     for (const t of ['light', 'dark'] as const) {
       await theme(t);
-      for (const w of [1400, 800]) {
+      for (const w of [1400, 1100, 800]) {
         await size(w);
         expect.soft(await inside(), `task ${t} ${String(w)}: nothing leaves the window`).toEqual([]);
         // under 1000 the pane replaces the list
         expect.soft(await page.getByTestId('scheduled.list').isVisible(), `task ${t} ${String(w)}: the list ${w >= 1000 ? 'stays' : 'gives way'}`).toBe(w >= 1000);
+        if (w >= 1000) {
+          // qa-native m_16020 (f5ff0e72, 1100 with a task open): the names stay on screen, the other
+          // columns give way first: 'how often', then 'next run', then 'wakes' (designer m_16028)
+          const rows = await page.locator('.sch-row:not(.sch-cols)').evaluateAll((els) => {
+            const list = document.querySelector('[data-testid="scheduled.list"]')?.getBoundingClientRect();
+            return els.map((row) => {
+              const kids = Array.from(row.children) as HTMLElement[];
+              const on = kids.map((k) => k.getClientRects().length > 0);
+              const r = kids[0]?.getBoundingClientRect();
+              const name = !!r && !!list && on[0] === true && r.width >= 120 && r.left >= list.left - 1 && r.right <= list.right + 1;
+              return { name, wakes: on[1] === true, often: on[2] === true, next: on[3] === true };
+            });
+          });
+          expect.soft(rows.length, `task ${t} ${String(w)}: the list has its rows`).toBe(4);
+          expect.soft(rows.filter((r) => !r.name).length, `task ${t} ${String(w)}: every name is on screen, 120 px at least`).toBe(0);
+          expect.soft(rows.filter((r) => (r.often && !r.next) || (r.next && !r.wakes)).length, `task ${t} ${String(w)}: drop order how often > next run > wakes`).toBe(0);
+          if (w === 1100) expect.soft(rows.some((r) => r.often), `task ${t} 1100: 'how often' is the first to go`).toBe(false);
+        }
         await page.screenshot({ path: test.info().outputPath(`task-${t}-${String(w)}.png`) });
       }
     }
