@@ -158,6 +158,21 @@ def stale_bise(bise, root, slack_s=1800):
     return None
 
 
+OTHER_BRANCH = 100
+
+
+def other_branch(bise, root, n=None):
+    """Why this bise's tree is another branch's (None when it is ambient-app's or close to it): a tree
+    missing more than OTHER_BRANCH of ambient-app's commits runs another hub and protocol (ambient-lead
+    m_16321: every built bise was a client-protocol tree, 1286 behind; its hub never showed main to
+    ambient-app's tests/e2e.py: 'waiting for main in [idle] (now None)'). n: behind(root), for tests."""
+    n = behind(root) if n is None else n
+    if n > OTHER_BRANCH:
+        return "%s's tree lacks %s of ambient-app's commits (another branch: its hub never shows main to this e2e.py)" % (
+            bise, n if n < 10 ** 6 else "all")
+    return None
+
+
 def find_bise(explicit=None):
     """A bise with `ambient-core` and its app root (a tree with a built
     repl-live): --bise, $AMBIENT_QA_BISE, the last launch's pair, the repo's
@@ -192,7 +207,7 @@ def find_bise(explicit=None):
                 if _is_exe(p) and os.path.isdir(os.path.join(wt, task, "harness", "rust", "tui", "src", "ambient")):
                     root = app_root_of(p)
                     if root:
-                        why = stale_bise(p, root)
+                        why = stale_bise(p, root) or other_branch(p, root)
                         if why:
                             skipped.append(why)
                         else:
@@ -202,7 +217,7 @@ def find_bise(explicit=None):
         _, _, p, root = min((behind(root), -mt, p, root) for mt, p, root in found)
         return p, root
     if skipped:
-        raise QAError("every bise found is older than its tree's Rust (an old hub with a fresh sb-core: main never shows): %s; "
+        raise QAError("no bise found fits: %s; "
                       "build one at ambient-app's tip (cargo build -p bend-harness, then scripts/bins.sh repl-live repl-scripted sb-core)"
                       % "; ".join(skipped))
     raise QAError("no bise with ambient-core next to a built repl-live: pass bise=<exe> (a debug build of the ambient-app branch, "

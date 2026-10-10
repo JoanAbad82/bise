@@ -622,6 +622,11 @@ def rich_world_fixtures():
     check(len(out) == world.LONG_OUT_BYTES > 4096 * 4 and out.startswith(b"batch 0001  ingest ok"), (len(out), out[:40]))
     check(not any(world.P99_ASK.split("\n")[0] in t for t in [other["text"], long_out["text"]] + list(world.SEED_WORDS.values())),
           "p99's question is matched by main's script only")
+    # a bise from another branch's tree (client-protocol, 1286 behind) is never picked (ambient-lead m_16321)
+    check(qa.other_branch("/x/bise", "/x", n=1286) and "1286" in qa.other_branch("/x/bise", "/x", n=1286), "another branch refused")
+    check(qa.other_branch("/x/bise", "/x", n=10 ** 6) and "all" in qa.other_branch("/x/bise", "/x", n=10 ** 6), "unknown tree refused")
+    check(qa.other_branch("/x/bise", "/x", n=0) is None and qa.other_branch("/x/bise", "/x", n=qa.OTHER_BRANCH) is None,
+          "ambient-app's tree, or one a little behind, is fine")
     # a world up under heavy-run takes no slot again (qa-flows 82b584d6, ambient-lead m_16227): either slot's
     # lockf, or the heavy-run script, in its ancestry
     run_ = os.path.dirname(world.LOCK)
