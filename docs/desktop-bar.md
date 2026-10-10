@@ -442,6 +442,25 @@ isn't judging. A row marked ok names the shot that was looked at.
         thinking (qa-native).
     - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
       dev tool (amb-web's list, or amb-home's commands).
+- **19d26863: GO for promote** (ambient-pm m_15901 to ambient-lead). qa-native gated every row
+  green (m_15884; checks 0d4500b7). The reruns are at the bottom of
+  `~/.bise/gate/try-gate/19d26863/index.md`.
+  - **ambient-pm looked at** rerun3/R41's R36-answered.png and R41-dock-after.png as images:
+    - "✓ you answered gift-ui" shows his words, then the "[Image #1]" chip with its thumbnail,
+      inside the column.
+    - There is no "switchboard" row any more, so ca9ee485's named gap is closed.
+    - The inbox block below it carries the notifications opt-in, "turn on / not now".
+  - **also green** (qa-native):
+    - INIT: the packed core comes up through initialize, and core.log is clean.
+    - LIGHTS: 36 / 10 / 36 px.
+    - The inbox block shows on the thread, settings and review. ⌘I from the menu opens it in place,
+      and a notification click brings its card to the front.
+    - R41 on all 5 groups of paths: the card answer and the escalated question now go from the
+      block, and gift-ui's request carries the image.
+    - R45–R47, and Help's test notification.
+  - **nit, next cut:** "[Image #1]" shows twice in the answered row, once in his words and once as
+    the chip (amb-win).
+
 - **ca9ee485: GO** (ambient-pm m_15196 to ambient-lead). It brings R36's chip fix, Help's "send a
   test notification" and the hub-lag fix 04a47c0e. qa-native shot it off-screen on the packed
   bundle with the rich world on its own bise, and looked at every shot (m_15188; checks ceea46e2).
