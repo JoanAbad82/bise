@@ -45,7 +45,7 @@ the `/` list clears the text (`composer/pm/PmField.tsx:777`).
 | R6 | bar row TP-R6 (owner there) | part missing: ⇧⇥ in the composer doesn't switch the approvals mode (the TUI's key, with its 3 s flash); typed `/approvals yolo` and the mode on the label line are done | ⇧⇥ in the composer flips yolo ↔ auto and the label line shows it |
 | N1 | bar row TP-N1 (owner there) | `/keychain on\|off` is a window command in the catalog (`rust/proto/src/commands.rs`, client) with no `windowRun` case and no settings page: the `/` list shows it greyed "not yet" | `/keychain on` ⏎ moves the secrets as the TUI does, or settings shows the switch |
 | N2 | bar row TP-N2, in scope, blocks main (ambient-pm m_17249: amb-feed's catalog + amb-win's screen) | `/log` (the agent's raw session, `rust/tui/src/logview.rs`, shipped to everyone in 92f72225) has no window screen and isn't in the window's `/` list (it is not in the proto catalog) | `/log` ⏎ opens the agent's raw session (full history and one request's context, redacted), listed in the `/` list |
-| R18 | decided, bar K7 (ambient-lead m_17247, ambient-pm m_17249) | esc stops the turn in the window on purpose (⛔6, green), and the window must ALSO stop on ctrl+c as the TUI does (ambient-pm) | ctrl+c while a turn runs stops it (qa-flows thread/interrupt) |
+| R18 | done, bar K7 (ambient-lead m_17253) | ctrl+c stops a turn in the window as in the TUI (amb-web; on the Mac copy is ⌘C, so ctrl+c is free), and esc stops it too, on purpose (⛔6) | ctrl+c while a turn runs stops it (qa-flows thread/interrupt) |
 
 Left out on purpose: `/version` (dev tool, bar 2.1), `/release-bise` (dev). Not re-checked: the
 first audit's planned rows beyond these lines, and a narrow window (B16).
