@@ -622,6 +622,24 @@ def rich_world_fixtures():
     check(len(out) == world.LONG_OUT_BYTES > 4096 * 4 and out.startswith(b"batch 0001  ingest ok"), (len(out), out[:40]))
     check(not any(world.P99_ASK.split("\n")[0] in t for t in [other["text"], long_out["text"]] + list(world.SEED_WORDS.values())),
           "p99's question is matched by main's script only")
+    # his right-aligned messages (ambient-lead m_16198): queued, steered, quoting an earlier answer
+    q = world.quoted_message()
+    check(q == '<selection from="main">\n%s\n</selection>\n%s' % (world.QUOTED, world.QUOTE_WORDS), q)
+    check(world.long_answer("the api").split("\n")[0] == world.QUOTED, "the quote is the first line of an earlier answer")
+    mine = [world.QUEUED_TEXT, world.STEER_TURN["text"], world.STEER_TEXT, world.QUOTE_WORDS]
+    check(len(set(mine)) == 4 and not any("<" in t or "[[" in t or "{{" in t for t in mine), "plain, different")
+    others = ([m["text"] for m in world.rich_messages()] + [m["text"] for m in world.dash_messages()] + list(world.SEED_WORDS.values())
+              + [other["text"], long_out["text"], world.P99_ASK])
+    check(not any(t in o or o in t for t in mine for o in others), "each of his phrases picks its own script only")
+    check(not any(a in b for a in mine for b in mine if a != b), "no phrase inside another")
+    panels = "".join("# %s\n" % ("%s · %s" % (m, r)) for r in world.REGIONS for m in world.METRICS)
+    for m in world.dash_messages():
+        for t, a in m["calls"]:
+            if t == "edit":
+                panels = panels.replace(a["old_string"], a["new_string"], 1)
+    check("# p99 latency · eu-west (last 24 h, by host)\n" in panels, "the steer's edit finds its line in panels.md")
+    check(world.STEER_TURN["calls"][0][1].startswith("sleep ") and world.STEER_REPLY.split(",")[0] == world.STEER_TURN["reply"].rstrip("."),
+          "a slow first step, and the reply's first clause is waited on")
     ps = world.plan(3, rich=True)
     names = {p["name"]: [a["name"] for a in p["agents"]] for p in ps}
     check({"dashboards", "ingest"} <= set(names["telemetry"]) and "perf" in names["shop"] and "changelog" in names["docs"], names)

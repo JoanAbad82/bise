@@ -379,6 +379,29 @@ def bar_turns():
     return [other, out]
 
 
+# his messages for the right-aligned rows (ambient-lead m_16198, designer's messages-right): one
+# QUEUED behind ingest's 2-hour turn (input op "queued": true, as the core sends it: stays queued
+# until world down), one STEERED into a dashboards turn while its slow command runs (the hub hands it
+# to the agent mid-turn: the turn's next step answers it), and one to telemetry's main QUOTING an
+# earlier answer (the composer's `<selection from="main">…</selection>` in front of his words,
+# apps/desktop/src/composer/message.ts quoteTag + buildMessage)
+QUEUED_TEXT = "when it drops, also tell me what the peak was"
+STEER_TURN = {"text": "rebuild the latency panels from the raw series",
+              "calls": [("bash", "sleep 6 && echo rebuilt 9 panels @@ rebuild the latency panels from the raw series")],
+              "reply": "Rebuilt the 9 latency panels from the raw series."}
+STEER_TEXT = "while you're at it, put p95 next to p99 on each of them"
+STEER_REPLY = "Rebuilt the 9 latency panels from the raw series, and added **p95** next to p99 on each, as you asked mid-way."
+QUOTED = "Agreed on the api: it's the shared batch size, not one noisy host. Here is the whole picture."
+QUOTE_WORDS = "is that still true now that the batch size is back to 500?"
+QUOTE_REPLY = ("Mostly. With the batch back at 500 the p99 fell from 910 ms to 640 ms in us-east, so the batch was most of it. "
+               "The rest is the panel's old percentile, which the fix replaces.")
+
+
+def quoted_message(quoted=QUOTED, words=QUOTE_WORDS, frm="main"):
+    """His message quoting an earlier answer, as the window's composer builds it. Pure."""
+    return '<selection from="%s">\n%s\n</selection>\n%s' % (frm, quoted, words)
+
+
 P99_ASK = "ship the p99 fix today or after the batch test?\n1. today\n2. after the batch test"
 P99_ANSWER = {"text": "after the batch test", "why": "the batch test runs tomorrow and could move the threshold; one day costs nothing"}
 
@@ -556,6 +579,35 @@ def rich_seed(world, hubs, holds, agents, timeout):
         c.wait_idle("main", timeout=timeout)
         return "telemetry: main answered p99 for him (%s)" % P99_ANSWER["text"]
 
+    def messages():
+        c = by["telemetry"]
+        out_ = {}
+        # STEERED: his words reach dashboards while its slow command runs; the turn's next step answers them
+        put_script(sd, "steer-turn", STEER_TURN["text"], STEER_TURN["calls"], STEER_TURN["reply"])
+        put_script(sd, "steer-words", STEER_TEXT, [("edit", {"file_path": "panels.md", "old_string": "# p99 latency · eu-west (last 24 h, by host)\n",
+                                                             "new_string": "# p99 latency · eu-west (last 24 h, by host), with p95\n"})],
+                   STEER_REPLY)
+        c.wait_idle("dashboards", timeout=timeout)
+        c.say(STEER_TURN["text"], focus="dashboards")
+        log = hub["telemetry"]["fake_log"]
+        c.wait(lambda: os.path.exists(log) and "sleep 6 && echo rebuilt" in open(log, errors="replace").read(), timeout,
+               "dashboards' slow command started")
+        c.say(STEER_TEXT, focus="dashboards")       # no "queued": a steer, as the window's send while it works
+        c.wait_line("dashboards", STEER_REPLY.split(",")[0], timeout)
+        out_["steered"] = "telemetry/dashboards: %s" % STEER_TEXT
+        # QUOTED: his message to telemetry's main quoting the first line of an earlier long answer
+        put_script(sd, "quoted", QUOTE_WORDS, (), QUOTE_REPLY)
+        c.wait_idle("main", timeout=timeout)
+        c.say(quoted_message())
+        c.wait_line("main", QUOTE_REPLY[:40], timeout)
+        out_["quoted"] = "telemetry/main: %s" % QUOTE_WORDS
+        # QUEUED: behind ingest's 2-hour turn ('working'): it waits for the turn's end, i.e. until world down
+        c.wait_status("ingest", ["working", "thinking"], timeout)
+        c.send({"op": "input", "focus": "ingest", "text": QUEUED_TEXT, "queued": True})
+        c.wait(lambda: (c.agent("ingest") or {}).get("queued", 0) >= 1, timeout, "his message queued on ingest")
+        out_["queued"] = "telemetry/ingest: %s" % QUEUED_TEXT
+        return out_
+
     def scheduled():
         bash("telemetry", "check the p99 panel every 30 minutes, and make me the morning page every day at 9",
              "sb every 30m 'check the p99 panel and tell me if it moved' --to dashboards\n"
@@ -644,7 +696,7 @@ def rich_seed(world, hubs, holds, agents, timeout):
 
     for name, fn in (("main_thread", long_main), ("tool_thread", dash), ("bar", bar), ("scheduled", scheduled), ("crowd", more_agents),
                      ("pages", pages), ("screen_context", screen), ("feature_approval", approval), ("archived", archived),
-                     ("answered", answered), ("working", working)):
+                     ("answered", answered), ("working", working), ("messages", messages)):
         part(name, fn)
     return out
 
