@@ -12,7 +12,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Answer, Markdown } from './Markdown';
-import { THOUGHT_MS, answeredCardOf, briefOf, chipOf, clock, dayLabel, groupHead, lastOfRun, quotesOf, sameDay, sideOf, steeredOf, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf, type ToolLine } from './entry';
+import { THOUGHT_MS, answeredCardOf, briefOf, chipOf, clock, dayLabel, groupHead, lastOfRun, quotesOf, sameDay, sideOf, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf, type ToolLine } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -61,7 +61,7 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, sti
       <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={live === undefined ? `thread.entry.${pos}` : 'thread.stream'} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head} data-side={side} data-turn={turn || undefined}>
         {/* a turn that opens on its work (tools, a thinking) still shows who and when */}
         {head && (e.kind === 'tools' || (e.kind === 'thinking' && !thoughtNothing(e))) && <NameLine e={e} ctx={ctx} />}
-        <EntryBody e={e} ctx={ctx} head={head} prev={p} next={n} live={live !== undefined} still={still} />
+        <EntryBody e={e} ctx={ctx} head={head} next={n} live={live !== undefined} still={still} />
       </div>
     </>
   );
@@ -79,7 +79,7 @@ function NameLine({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   );
 }
 
-function EntryBody({ e, ctx, head, prev, next, live, still }: { e: Entry; ctx: RowCtx; head: boolean; prev: Entry | undefined; next: Entry | undefined; live: boolean; still: boolean }) {
+function EntryBody({ e, ctx, head, next, live, still }: { e: Entry; ctx: RowCtx; head: boolean; next: Entry | undefined; live: boolean; still: boolean }) {
   // the hub's brief opens a task's thread: one quiet row, the brief folded under it (designer; the TUI's is_brief)
   const brief = e.kind === 'you' || e.kind === 'from_agent' || e.kind === 'agent' ? briefOf(e.text) : null;
   if (brief !== null) return <BriefRow pos={e.pos} name={brief.name} objective={brief.objective} body={brief.body} ctx={ctx} />;
@@ -127,7 +127,7 @@ function EntryBody({ e, ctx, head, prev, next, live, still }: { e: Entry; ctx: R
       );
     }
     case 'you':
-      return <YouRow e={e} ctx={ctx} prev={prev} next={next} />;
+      return <YouRow e={e} ctx={ctx} next={next} />;
     case 'to_agent':
       return <ToAgentRow e={e} ctx={ctx} />;
     // amb-feed's batch 2 (b8cb4b1e): the lines the hub's fold used to drop
@@ -728,7 +728,7 @@ export function YouBubble({
   );
 }
 
-function YouRow({ e, ctx, prev, next }: { e: Entry; ctx: RowCtx; prev: Entry | undefined; next: Entry | undefined }) {
+function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | undefined }) {
   const [open, setOpen] = useFold(false, e.pos);
   // the fn context block the hub appended never shows: a chip from the typed context instead;
   // the quotes he sent in front of his words show first in his bubble, with their rail and source
@@ -740,8 +740,9 @@ function YouRow({ e, ctx, prev, next }: { e: Entry; ctx: RowCtx; prev: Entry | u
   const chip = e.context != null ? chipOf(e.context) : null;
   // in bise's or a main's thread, a message that went to someone else says so; to the owner, nothing
   const to = e.to != null && e.to !== '' && e.to !== ctx.agent ? `to ${e.to}` : undefined;
-  // a steer: where it landed in the agent's turn, 'steered · perf read it mid-turn' under it
-  const steered = steeredOf(prev, next);
+  // a steer: the hub's receipt says where the agent read it (the list placed it there), with
+  // 'steered · perf read it mid-turn' under it (amb-feed 9633cd2a; no more guessing from neighbors)
+  const steered = e.steered_at != null;
   const under = steered ? `steered · ${shownName(ctx.agent)} read it mid-turn` : e.at_ms > 0 ? clock(e.at_ms) : undefined;
   return (
     <YouBubble head={to} under={under} timeAlways={steered || lastOfRun(e, next)} testId={`thread.you.${String(e.pos)}`}>

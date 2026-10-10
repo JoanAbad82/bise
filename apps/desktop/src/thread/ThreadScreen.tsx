@@ -38,7 +38,7 @@ import { SignInLine, useThreadSignIn } from './signin';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, QueuedRow, TypingLine, type RowCtx } from './rows';
 import { ComputerLine, computerRowOf, computerState } from './ComputerLine';
-import { entryKey, pendingKey, posOfKey } from './entry';
+import { entryKey, pendingKey, placeSteered, posOfKey } from './entry';
 import { FindBar } from './FindBar';
 import { NoProject } from './NoProject';
 import { foldedRuns, runKey, runWords, withRuns } from './runs';
@@ -476,8 +476,11 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
   // virtual list, so his row is drawn in ⏎'s own frame (bar ⛔3: < 100 ms)
   // R13: more than 3 agent-to-agent messages in a row fold into '▸ 4 messages between 2 agents'
   const [openRuns, setOpenRuns] = useState<ReadonlySet<number>>(() => new Set());
-  const runs = useMemo(() => foldedRuns(view.order, (pos) => store.entry(tkey, pos), agent), [view, store, tkey, agent]);
-  const listed = useMemo(() => withRuns(view.order, runs, openRuns, entryKey), [view, runs, openRuns]);
+  // a steer shows where the agent read it (its receipt's pos), not where it was written
+  // (the store bumps the order when a steered_at comes, so this recomputes)
+  const shown = useMemo(() => placeSteered(view.order, (pos) => store.entry(tkey, pos)?.steered_at), [view, store, tkey]);
+  const runs = useMemo(() => foldedRuns(shown, (pos) => store.entry(tkey, pos), agent), [shown, store, tkey, agent]);
+  const listed = useMemo(() => withRuns(shown, runs, openRuns, entryKey), [shown, runs, openRuns]);
   // the reply being written (streaming): a live row at the end, drawn as the entry it becomes,
   // which takes its place with the same key (live.ts, text-appearing v2)
   const partial = usePartialText(project, agent);
@@ -516,9 +519,9 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
     [tkey, project, agent, bise, base],
   );
   // each row reads the one before it: its group and its day (ambient m_11777)
-  const prevOf = useMemo(() => new Map(view.order.map((p, i) => [p, view.order[i - 1]])), [view]);
+  const prevOf = useMemo(() => new Map(shown.map((p, i) => [p, shown[i - 1]])), [shown]);
   // and the one after it: his last bubble of a run shows its time (messages-right v1)
-  const nextOf = useMemo(() => new Map(view.order.map((p, i) => [p, view.order[i + 1]])), [view]);
+  const nextOf = useMemo(() => new Map(shown.map((p, i) => [p, shown[i + 1]])), [shown]);
   const row = useCallback(
     (key: string) => {
       const run = key.startsWith('r:') ? runs.find((r) => runKey(r.start) === key) : undefined;

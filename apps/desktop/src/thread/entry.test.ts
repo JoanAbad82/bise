@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, lastOfRun, quotesOf, sideOf, steeredOf, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, lastOfRun, quotesOf, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -265,17 +265,22 @@ describe('messages-right v1: whose side a row is on', () => {
 });
 
 describe('messages-right v1: a quote, a steer', () => {
-  const e = (kind: string): Entry => ({ pos: 1, at_ms: 1, kind, text: '' }) as unknown as Entry;
   it("reads the composer's quotes in front of his words, with their source", () => {
     expect(quotesOf('<selection from="main">\nAgreed on the api.\n</selection>\nis that still true?')).toEqual({ quotes: [{ source: 'main', text: 'Agreed on the api.' }], words: 'is that still true?' });
     expect(quotesOf('<selection from="perf vs main" file="src/q.rs" new="10-11">\nfn a() {}\n</selection>\nwhy?').quotes).toEqual([{ source: 'src/q.rs:10-11', text: 'fn a() {}' }]);
     expect(quotesOf('no quote here')).toEqual({ quotes: [], words: 'no quote here' });
   });
-  it("a steer lands in the agent's work: its tools before, its work or answer right after", () => {
-    expect(steeredOf(e('tools'), e('tools'))).toBe(true);
-    expect(steeredOf(e('tools'), e('agent'))).toBe(true);
-    expect(steeredOf(e('agent'), e('tools'))).toBe(false);
-    expect(steeredOf(e('tools'), undefined)).toBe(false);
-    expect(steeredOf(e('tools'), e('you'))).toBe(false);
+  it("a steer shows where the agent read it: right before the first row past its receipt, bundled steers in their order", () => {
+    // 1 his ask, 2 tools, 3 his steer (read at the receipt 5), 4 more tools, 6 the answer
+    const at = new Map<number, number>([[3, 5]]);
+    expect(placeSteered([1, 2, 3, 4, 6], (p) => at.get(p))).toEqual([1, 2, 4, 3, 6]);
+    // two messages read at one receipt keep their order
+    const two = new Map<number, number>([[3, 5], [4, 5]]);
+    expect(placeSteered([1, 2, 3, 4, 5, 6, 7], (p) => two.get(p))).toEqual([1, 2, 5, 3, 4, 6, 7]);
+    // a receipt past every row: at the end; none, or one at or before its own pos: nothing moves
+    expect(placeSteered([1, 2, 3], (p) => (p === 1 ? 9 : undefined))).toEqual([2, 3, 1]);
+    const order = [1, 2, 3];
+    expect(placeSteered(order, () => undefined)).toBe(order);
+    expect(placeSteered(order, (p) => (p === 2 ? 2 : null))).toBe(order);
   });
 });

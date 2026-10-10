@@ -414,13 +414,35 @@ export function quotesOf(text: string): { quotes: SentQuote[]; words: string } {
 }
 
 /**
- * Did his message land in the middle of the agent's turn (a steer: ⏎ while it works)? The hub
- * says nothing of it yet (asked of amb-feed), so the thread tells: the agent's work runs right
- * before it and goes on right after it. Pure.
+ * Where each row shows (amb-feed 9633cd2a, designer m_16435): a message the agent read mid-turn
+ * (a steer, `steered_at` = the pos of the hub's receipt, the same for a bundled steer) sits right
+ * before the first row whose pos is past that receipt (after the work it read it under), else at
+ * the end; every other row keeps its pos order. A steered_at at or before its own pos moves
+ * nothing. Pure.
  */
-export function steeredOf(prev: Entry | undefined, next: Entry | undefined): boolean {
-  const work = (x: Entry | undefined): boolean => x !== undefined && (x.kind === 'tools' || x.kind === 'thinking');
-  return work(prev) && next !== undefined && (work(next) || next.kind === 'agent');
+export function placeSteered(order: readonly number[], steeredAt: (pos: number) => number | null | undefined): readonly number[] {
+  const moved = new Map<number, number>();
+  for (const pos of order) {
+    const at = steeredAt(pos);
+    if (at != null && at > pos) moved.set(pos, at);
+  }
+  if (moved.size === 0) return order;
+  const rest = order.filter((pos) => !moved.has(pos));
+  const out: number[] = [];
+  const waiting = [...moved.entries()];
+  for (const pos of rest) {
+    // the steers whose receipt is before this row go in front of it, in their own order
+    for (let i = 0; i < waiting.length; ) {
+      const w = waiting[i];
+      if (w !== undefined && w[1] < pos) {
+        out.push(w[0]);
+        waiting.splice(i, 1);
+      } else i += 1;
+    }
+    out.push(pos);
+  }
+  for (const [pos] of waiting) out.push(pos);
+  return out;
 }
 
 /** His bubbles closer than this make one run: its time shows under the last one only. */

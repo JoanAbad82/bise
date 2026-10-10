@@ -712,6 +712,12 @@ export class Store {
     if (old !== undefined && sameJson(old, e)) return;
     t.byPos.set(e.pos, e);
     this.emit(`entry:${key}:${String(e.pos)}`);
+    // a steer's receipt came (amb-feed 9633cd2a: the entry is re-sent with steered_at): the rows
+    // move (the window shows it where the agent read it), so the order's readers recompute
+    if (old !== undefined && t.view.loaded && (old.steered_at ?? null) !== (e.steered_at ?? null)) {
+      t.view = { ...t.view };
+      this.emit(`order:${key}`);
+    }
   }
 
   /** His words landed in the thread: the oldest pending send with these words goes. */

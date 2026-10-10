@@ -45,9 +45,11 @@ const world = () => [
       // his answer to a card: his side, '✓ you answered perf' over his words
       { pos: 8, at_ms: NOW - 8 * MIN, kind: 'approval', text: 'you answered perf: 1 · merge', approval: { ok: true, text: 'you answered perf: 1 · merge' } },
       { pos: 9, at_ms: NOW - 6 * MIN, kind: 'agent', text: 'merged. the thumbnails are 380 KB now.' },
-      // a steer (amb-tools' 7335fde7 seed): his words land between the agent's work of one turn
-      { pos: 10, at_ms: NOW - 5 * MIN, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 10, at_ms: NOW - 5 * MIN, text: 'pnpm bench', kind: 'run', state: 'ok', ms: 6000 }] } },
-      { pos: 11, at_ms: NOW - 4 * MIN, kind: 'you', text: 'also try webp' },
+      // a steer (amb-tools' 7335fde7 seed, qa-native m_16425): written while the bench ran, so its
+      // pos is before the bench's; the hub's receipt (steered_at 11) says the agent read it after
+      // the bench: it shows there, between the two benches (amb-feed 9633cd2a)
+      { pos: 10, at_ms: NOW - 5 * MIN + 1000, kind: 'you', text: 'also try webp', msg_id: 41, steered_at: 11 },
+      { pos: 11, at_ms: NOW - 5 * MIN, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 11, at_ms: NOW - 5 * MIN, text: 'pnpm bench', kind: 'run', state: 'ok', ms: 6000 }] } },
       { pos: 12, at_ms: NOW - 4 * MIN + 2000, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 12, at_ms: NOW - 4 * MIN + 2000, text: 'pnpm bench --webp', kind: 'run', state: 'ok', ms: 4000 }] } },
       { pos: 13, at_ms: NOW - 3 * MIN, kind: 'agent', text: 'webp saves another 30%, as you asked mid-way.' },
       // a quote he sent (the composer's <selection>): first in his bubble, its rail and source
@@ -105,7 +107,7 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
         const rows = await boxes();
         const his = rows.filter((r) => r.side === 'you');
         const theirs = rows.filter((r) => r.side === 'them');
-        expect(his.map((r) => r.id), `${t} ${String(w)}: his rows on his side`).toEqual(['thread.entry.1', 'thread.entry.3', 'thread.entry.4', 'thread.entry.6', 'thread.entry.8', 'thread.entry.11', 'thread.entry.14', 'thread.queued.1']);
+        expect(his.map((r) => r.id), `${t} ${String(w)}: his rows on his side`).toEqual(['thread.entry.1', 'thread.entry.3', 'thread.entry.4', 'thread.entry.6', 'thread.entry.8', 'thread.entry.10', 'thread.entry.14', 'thread.queued.1']);
         for (const r of his) {
           expect.soft(r.box, `${t} ${String(w)} ${r.id}: a bubble`).not.toBeNull();
           if (r.box === null) continue;
@@ -130,7 +132,7 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
     // source and text first in his bubble, then his words, never the raw tag; a queued bubble
     // the source by the name the thread shows ('bise' for a main, designer m_16360), as the steer and queued words
     await expect(page.getByTestId('thread.you.14.quote.1')).toContainText('bise');
-    await expect(page.getByTestId('thread.you.11.under')).toHaveText('steered · bise read it mid-turn');
+    await expect(page.getByTestId('thread.you.10.under')).toHaveText('steered · bise read it mid-turn');
     await expect(page.getByTestId('thread.queued.1.bubble.under')).toHaveText("queued · sends when bise's turn ends");
     await expect(page.getByTestId('thread.you.14.quote.1')).toContainText('webp saves another 30%.');
     expect(await page.getByTestId('thread.you.14').innerText()).not.toContain('<selection');
@@ -169,7 +171,14 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
     });
     expect(Math.round(gap), "a run's bubbles 4 px apart").toBe(4);
     // a steer: 'steered · bise read it mid-turn' under it (bise: this is shop's main, named bise)
-    await expect(page.getByTestId('thread.you.11.under')).toHaveText(/^steered · \S+ read it mid-turn$/u);
+    await expect(page.getByTestId('thread.you.10.under')).toHaveText(/^steered · \S+ read it mid-turn$/u);
+    // where the agent read it: after the first bench (tools 11), before the second (tools 12)
+    // (the list is virtual: the steer is brought to the middle so both benches are drawn)
+    await page.getByTestId('thread.you.10').evaluate((el) => { el.scrollIntoView({ block: 'center' }); });
+    await expect(page.getByTestId('thread.toolrow.12')).toBeVisible();
+    const ys = await page.evaluate(() => ['thread.toolrow.11', 'thread.you.10', 'thread.toolrow.12'].map((id) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect().top ?? -1));
+    expect(ys[0] ?? -1, 'the first bench is drawn').toBeGreaterThan(0);
+    expect((ys[0] ?? 0) < (ys[1] ?? 0) && (ys[1] ?? 0) < (ys[2] ?? 0), `bench 11, the steer, bench 12, top to bottom (${ys.join(', ')})`).toBe(true);
   } finally {
     await s.close();
     core.dispose();

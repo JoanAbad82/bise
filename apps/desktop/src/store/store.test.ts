@@ -112,6 +112,22 @@ describe('store', () => {
     expect(seen).toEqual(['2', 'order']);
   });
 
+  it("a steer's receipt (an entry re-sent with steered_at) tells the order's readers: the rows move", () => {
+    const { store } = fake();
+    store.apply({ ev: 'thread', project: P, agent: 'perf', entries: [entry(1, 'a', 'you'), entry(2, 'b', 'tools'), entry(3, 'c')], before: null, more: false });
+    const order = store.threadOrder(K);
+    const seen: string[] = [];
+    store.subscribe(`order:${K}`, () => seen.push('order'));
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { ...entry(1, 'a', 'you'), steered_at: 2 } });
+    expect(seen).toEqual(['order']);
+    expect(store.threadOrder(K)).not.toBe(order);
+    expect(store.threadOrder(K).order).toEqual([1, 2, 3]);
+    expect(store.entry(K, 1)?.steered_at).toBe(2);
+    // the same mark again moves nothing
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { ...entry(1, 'a', 'you'), steered_at: 2 } });
+    expect(seen).toEqual(['order']);
+  });
+
   it('typing re-renders only typing, and only on a change', () => {
     const { store } = fake();
     const seen: string[] = [];
