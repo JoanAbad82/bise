@@ -810,6 +810,93 @@ isn't judging. A row marked ok names the shot that was looked at.
   - **the 30-minute use** with designer waits for the re-cut: with the project routes missing,
     most of the app can't be reached.
 
+## Status at ambient-app 6ef40154: for the merge into main (ambient-pm, for ambient-lead m_16090)
+
+The user's order (main m_16087): ambient-app goes into main only when it is ready. That means four
+things:
+
+- his tries pass with no must-fix;
+- every row of this bar passes;
+- designer and ambient-pm give a GO;
+- architect has reviewed it.
+
+How this was read: the 163 specs under `apps/desktop/tests/checks`, the 237 lands since a2039499,
+and the try-gate indexes 387ad740, ca9ee485, 19d26863 and f5ff0e72 under `~/.bise/gate/try-gate/`.
+No app was run, and no heavy job. Words used:
+
+- **pass**: a check is green, named in a land or a gate index. "gate" means a shot on a packed try
+  build, looked at as an image. "real" means the real core. "harness" means the fake hub only.
+- **fail**: the last result found is red.
+- **built-no-check**: the code landed, but no green result was found for it (no check, or a check
+  that was never run, or not run since its fix).
+- **not built**: no land does it.
+
+### What passes
+
+- **⛔1–⛔6, ⛔1s, ⛔1p, 2.4–2.7, 3.1–3.4, S.2, S.3, S.5, S.6–S.9, P.1, P.2, O.3, O.4, O.5**: as in
+  the a2039499 section below. S.5 and O.4 were closed on 10-09 (app/core-line asserts "copied").
+- **3.5 the key list**: settings/keys, green on the real core (51621282).
+- **O.2 pages**: pages/open, real (51621282).
+- **O.6 every control clicks**: app/clicks is green in the harness on b1 (048af68e). Its real-core
+  red at 12a9efbf (thread.agents hover) has no real rerun; see the table.
+- **S9/R11 tool calls**: thread/tool-rows in the harness (91af5059), and thread/tools-real on the
+  real core next to the TUI (bb6d6122).
+- **S40/W3 the divider**: 55ca0e88 names the context as the head does. qa-native's DIVIDER row was
+  green on 387ad740, and its "15" nit was fixed in 55ca0e88.
+- **S3 waiting on someone, and the failed turn (R9/R12 of the re-audit)**: ebb46ad2, plus the
+  colours in 82e86e36. thread/waiting-failed is green in the harness. Not shot on a gate: the rich
+  world holds no such chain.
+- **W5**: agents/worktrees, real. **W11**: thread/at-artifacts, real. **C3, C13, C40, C42**:
+  thread/commands, real (51621282); its one red was the TUI capture of /undo, which is the
+  checker's side, not the window's.
+- **F1/F2 fold all and fold one**: thread/folds and thread/folds-open, green after 5234894c and
+  55ca0e88. Click and ctrl+o were shot green on 387ad740.
+- **Dark**: signed on 723648da. composer/stop-dark is green (fe0a7b5d). DARK-card was green on
+  7b27e678.
+- **Every R row from R01 to R47, except the ones in the table below**. The gate rows are green on
+  19d26863, f5ff0e72 or earlier cuts:
+  - R03, R18, R24 and R34 on d94b7996 and cb1f2b44;
+  - R17 and DOCKOPT on 387ad740;
+  - R36 and DOCKROW on 19d26863 and f5ff0e72;
+  - R41, all 9 paths, on 19d26863, and paths (5) to main again on f5ff0e72;
+  - R42 to R47 on 19d26863: the inbox block on thread, settings and review; ⌘I opens it in place; a
+    notification click opens its card in front; no knock when focused; the action and the reply
+    reach the hub; the Help test notification;
+  - INIT and LIGHTS on 19d26863 and f5ff0e72;
+  - the ask line, the '!' card with no kind id, and the "you answered" row on f5ff0e72.
+- **Section T**: the rows the a2039499 section listed as passing, plus I3/R19 and I8 in the key
+  list (dd0934d2, settings/keys reads it). V3's help filter is in the table below.
+
+### What is not pass
+
+| row | status | owner | the check that would prove it |
+|---|---|---|---|
+| Scheduled list at 1100 (f5ff0e72's one red, gate (4)) | **built-no-check on a gate**: fixed in 6ef40154, and scheduled/screens is green on the built app | amb-home | qa-native: gate/cut (4) on the 6ef40154 re-cut, SCHED.png looked at |
+| R40 streaming with the signed animation | **built-no-check on a gate**: amb-core's partial events, and spotlight/streaming (40194604) plus thread/streaming (7c9e6b35) are green in the harness. Never shot on a packed try build. amb-core's streaming bench still waits for a heavy-run slot | amb-core, amb-web, amb-win | the bench, then a qa-native R40 shot on the re-cut (from the first words, frames about 150 ms apart) |
+| R07-a the spotlight's preview of an agent's last actions | **built-no-check on a gate**: spotlight/preview is green in the harness (dece0fe9). The last gate shot (cb1f2b44) showed 2 actions, which was the world's fault | amb-web | qa-native: R07-a on the re-cut, on an agent with 4 actions or more |
+| R37 / FOLDS2: the '▸ N other steps' pill and the thinking rows | **built-no-check**: 5234894c and 55ca0e88 build them. They were never shot: a fake turn draws no kind-other tool and no reasoning (qa-native m_14511) | amb-win; amb-tools for the world | amb-tools seeds an agent with a real kind-other tool item and reasoning; qa-native shoots the pill, the thinking row and "thought N s" |
+| S21 PR news | **fail**: in news-real on the real core (12a9efbf), the PR #412 click is green, but the PR row's text read empty and the test hit 300 s. No rerun since | amb-win, amb-feed | qa-flows: `real.sh thread/news-real`, waiting on the row's event |
+| O.6 on the real core | **fail (stale)**: on the real core, app/clicks was red only on the thread.agents hover (12a9efbf). b1 changed the screens since, and there is no real rerun | amb-win | qa-flows: `real.sh app/clicks` |
+| O.6's composer part | **built-no-check**: composer/controls exists, and no run result was found in a land | amb-web | qa-type posts its result |
+| O.1 approvals as cards (allow / deny from ⌘I) | **built-no-check**: dd0934d2 fixed the real-core red (the gated call had no allow or deny). inbox/approvals and inbox/approvals-cmd-i were not rerun after it | amb-home | qa-flows: `real.sh inbox/approvals` |
+| I3, I8 (the inbox keys) | **built-no-check**: on 12a9efbf the keys worked, but inbox/keys was red because they were missing from the key list. dd0934d2 added them. No rerun | amb-home | qa-flows: `real.sh inbox/keys` |
+| I6/B3 a draft per inbox item | **built-no-check**: inbox/drafts is written (ba2e21b2, fixed in 51621282), and no result was found | amb-home | qa-flows: `real.sh inbox/drafts` |
+| I9/C46/S30 confirmations | **built-no-check**: app/confirm-bar is green in the harness only, with no real run | amb-home | qa-type: `real.sh app/confirm-bar` |
+| 2.1 / 2.2 / 2.3 lists in the real thread | **built-no-check (real)**: thread/composer-sources is green in the harness (2393001f). composer/lists-real was not rerun since 516b891a | amb-web | qa-type: `real.sh composer/lists-real` |
+| K2 ⏎ on an empty composer | **built-no-check**: built in 14c0ef8d, and thread/empty-enter has no result found | amb-win, amb-home | qa-flows: thread/empty-enter |
+| V14/S28/L2 the expired sign-in (with R15 of the re-audit) | **built-no-check**: a7556130 and a7cccb40 are proven by vitest only | amb-home, amb-core | qa-native: setup/sign-in's expired case on the fake subscription |
+| C15/W20/V6 a branch's diff by name | **built-no-check**: ee6d11de is proven by vitest only, with no window check | amb-win | qa-flows: `/diff sb/x` opens the branch screen with its files |
+| S.4 where bise works (no terminal) | **built-no-check**: 14c0ef8d has a harness spec, with no result found | amb-home | qa-flows posts its result |
+| V3 the help filter | **built-no-check**: built in 677c70cf, and no land names a filter case in settings/keys | amb-win | qa-flows: a filter case in settings/keys |
+| N2 color alone | **built-no-check**: a824752f, with no check | amb-kit | qa-type: a contrast check with increase contrast on |
+| S29/L19 computer use, live | **not built** | amb-win, amb-core | plan the "took the wheel" event with architect first |
+| S.1 no CLI (VM) | **not run**: native/vm/vm-pass is opt-in | amb-mac, qa-native | one VM pass when a heavy slot is free |
+| B16 narrow window | **not checked** | ambient-pm | my hand pass, on the re-cut |
+| Nits still open | **open**: the docked p99 answer's row in telemetry's thread was not shot (19d26863). The ⌘I 4 KB output cut was not reached, because no output on the world is long enough (f5ff0e72 (3)) | amb-win, amb-tools | qa-native on the re-cut, with a long tool output in the world |
+
+Beyond the rows, the merge needs three more things: designer's GO and mine on the 6ef40154 re-cut,
+architect's review, and his next try with no must-fix.
+
 ## Status at ambient-app a2039499: what is left (ambient-pm, for ambient-lead m_12152)
 
 How this was read: the 117 specs in `apps/desktop/tests/checks`, the 214 lands since 6b1530fc, and
