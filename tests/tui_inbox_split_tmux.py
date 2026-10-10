@@ -44,7 +44,10 @@ def main():
         gone = ("waiting for you", "ctrl+1 open", "needs you", "ia needs you")
         wait.holds(lambda: (lambda s: not any(g in s for g in gone) and s)(t.screen()), 1.5,
                    "nothing for the user: %r" % (gone,), poll=wait.SCREEN_POLL)
-        # main escalates: one row in the user's inbox
+        # main escalates: one row in the user's inbox (once main is done
+        # with the tasks' messages: typed into a busy turn, the words
+        # join it and the fake never runs the card command)
+        t.wait_re(MAIN_IDLE)
         t.typed('[[bash: sb card "ship the export on friday?"]]')
         t.keys("Enter")
         t.wait("waiting for you", 60)

@@ -30,6 +30,9 @@ def main():
         t.typed("read [the guide](https://guide.example/start) then https://bare.example/x.")
         t.keys("Enter")
         t.wait("ack: read the guide then https://bare.example/x.")
+        # the live rows (as it streams in) carry no links: the kept
+        # answer, at the turn's end, does
+        t.wait_re(MAIN_IDLE)
         # tmux keeps the hyperlinks of the cells: the label and the bare
         # url, each inside its own OSC 8
         sc = t.screen(colors=True)
@@ -55,6 +58,9 @@ def main():
         t.typed("here **http://127.0.0.1:4748/hero-cine.html**. and `http://localhost:5173/a` or http://127.0.0.1:4748/user-stories.html.")
         t.keys("Enter")
         t.wait("ack: here http://127.0.0.1:4748/hero-cine.html.")
+        # same as above: the click and the screen checks wait for the
+        # kept answer and the turn's end, so the rows no longer move
+        t.wait_re(MAIN_IDLE)
         sc = t.screen(colors=True)
         for url in ("http://127.0.0.1:4748/hero-cine.html", "http://localhost:5173/a", "http://127.0.0.1:4748/user-stories.html"):
             assert ";" + url + "\x1b\\" in sc, "no OSC 8 for %s in %r" % (url, sc[-3000:])

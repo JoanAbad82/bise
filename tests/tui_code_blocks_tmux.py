@@ -48,7 +48,10 @@ def main():
         # the reply: `done: <the tool's output>`, two fenced blocks
         t.typed("[[bash: printf 'see:\\n```ts\\n%s\\n```\\nthen:\\n```bash\\n%s\\n```\\n']]" % (CODE_TS, CODE_SH))
         t.keys("Enter")
-        sc = t.wait("╭─ bash ─")
+        t.wait("╭─ bash ─")
+        # the answer streams in first as live rows (dim, no syntax
+        # colors); the kept answer replaces them at the turn's end
+        sc = t.wait_re(MAIN_IDLE)
         x, y = at(sc, "╭─ ts ─")
         rows = sc.splitlines()
         assert ("│ " + CODE_TS) in rows[y + 1], sc
