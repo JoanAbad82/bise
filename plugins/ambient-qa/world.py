@@ -880,6 +880,7 @@ def daemon(bise, root, n, rich=False, agents=0):
     signal.signal(signal.SIGTERM, lambda *_: stop.update(now=True))
     signal.signal(signal.SIGINT, lambda *_: stop.update(now=True))
     hubs, envs, holds = [], [], []
+    t_up = time.time()     # each step's time goes to world.log (ambient-lead m_15705)
     bindir = fake_gh(world, projects)
     try:
         for name, files in [(HOME_NAME, None)] + [(p["name"], p["files"]) for p in projects]:
@@ -927,6 +928,8 @@ def daemon(bise, root, n, rich=False, agents=0):
                          "fake_pid": E.fake.pid, "fake_log": E.fake_log, "home": files is None})
         for h, c in zip(hubs, holds):
             c.wait_status("main", "idle", 120 * load_factor())
+        print("world: step hubs (%d up, mains idle) in %.0f s" % (len(hubs), time.time() - t_up), flush=True)
+        t_step = time.time()
         want = write_seeds(world, projects, rich)
         for p in projects:
             c = holds[[h["project"] for h in hubs].index(p["name"])]
@@ -949,14 +952,21 @@ def daemon(bise, root, n, rich=False, agents=0):
             if stop["now"] or time.time() - t0 > 300 * load_factor():
                 raise RuntimeError("not seeded in time: %s" % [os.path.basename(m) for m in want if not os.path.exists(m)])
             time.sleep(0.3)
+        print("world: step seed (%d agents) in %.0f s" % (len(want), time.time() - t_step), flush=True)
+        t_step = time.time()
         for p in projects:
             if p.get("approval"):
                 c = holds[[h["project"] for h in hubs].index(p["name"])]
                 approval_seed(c, home, p["approval"], 120 * load_factor(), scripts_dir(world) if rich else None)
+        print("world: step approval in %.0f s" % (time.time() - t_step), flush=True)
+        t_step = time.time()
         rich_out = rich_seed(world, hubs, holds, agents, 300 * load_factor()) if rich else None
+        if rich:
+            print("world: step rich in %.0f s" % (time.time() - t_step), flush=True)
         home_env = envs[[h["home"] for h in hubs].index(True)].env
         real = try_real(os.path.join(world, "try-real"), [h for h in hubs if not h["home"]], home_env["BEND_PROVIDER_URL"])
         home_account(home, home_env["BEND_PROVIDER_URL"])
+        print("world: up in %.0f s (load factor %.1f)" % (time.time() - t_up, load_factor()), flush=True)
         info = {"pid": os.getpid(), "world": world, "home": home, "bise": bise, "root": root, "projects": n,
                 "hubs": hubs, "registry": register(bise, home, [h["ws"] for h in hubs if not h["home"]]),
                 "rich": rich_out, "try_real": real, "up_ms": int(time.time() * 1000)}
@@ -1172,8 +1182,10 @@ def up(n=3, bise=None, root=None, rich=False, agents=0):
     p = subprocess.Popen([sys.executable, "-u", "-B", os.path.join(HERE, "qa.py"), "_world", "--bise", bise, "--root", root, "--projects", str(n)]
                          + (["--rich", "--agents", str(agents)] if rich else []),
                          stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True, cwd=qa.REPO, env=env)
-    t0 = time.time()
-    while time.time() - t0 < 900:
+    t0, limit = time.time(), world_timeout()
+    print("world: up within %.0f s at most (load factor %.1f%s)" % (limit, _load_factor(),
+          ", AMBIENT_QA_WORLD_TIMEOUT" if os.environ.get("AMBIENT_QA_WORLD_TIMEOUT") else ""), file=log, flush=True)
+    while time.time() - t0 < limit:
         info = _read(P["json"])
         if info and info.get("pid") == p.pid:
             return dict(state(), log=P["log"])
@@ -1181,7 +1193,33 @@ def up(n=3, bise=None, root=None, rich=False, agents=0):
             raise qa.QAError("the world's daemon exited (%s): %s" % (p.returncode, open(P["log"], errors="replace").read()[-2500:]))
         time.sleep(0.3)
     p.terminate()
-    raise qa.QAError("the world didn't come up in 900 s: see %s" % P["log"])
+    raise qa.QAError("the world didn't come up in %.0f s (AMBIENT_QA_WORLD_TIMEOUT raises it): see %s; its steps' times are in that log"
+                     % (limit, P["log"]))
+
+
+WORLD_UP_S = 900
+
+
+def _load_factor():
+    """tests/wait.py's load factor (load average per core, 1 to 4), 1 when it can't be read."""
+    try:
+        return max(1.0, min(4.0, os.getloadavg()[0] / (os.cpu_count() or 1)))
+    except OSError:
+        return 1.0
+
+
+def world_timeout(env=None, lf=None):
+    """How long `up` waits for the world (qa-native's 19d26863 rerun: the crowd step alone took 822 s
+    at load 27, past the fixed 900 s): $AMBIENT_QA_WORLD_TIMEOUT seconds when it is a positive number,
+    else 900 s times the load factor (1 to 4, as every e2e wait). Pure but for the load."""
+    env = os.environ if env is None else env
+    try:
+        v = float(env.get("AMBIENT_QA_WORLD_TIMEOUT") or 0)
+    except ValueError:
+        v = 0
+    if v > 0:
+        return v
+    return WORLD_UP_S * (_load_factor() if lf is None else max(1.0, lf))
 
 
 def down():

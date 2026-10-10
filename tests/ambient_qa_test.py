@@ -610,6 +610,11 @@ def rich_world_fixtures():
     up to --agents, his fn context as the input op's context, a try-real dir on the fake provider; no marker in his words
     or the briefs (D5)"""
     import world
+    # up's limit (ambient-lead m_15705): 900 s x the load factor (1 to 4), or $AMBIENT_QA_WORLD_TIMEOUT when positive
+    check(world.world_timeout({}, 1.0) == 900 and world.world_timeout({}, 2.5) == 2250 and world.world_timeout({}, 0.3) == 900, "load-scaled")
+    check(world.world_timeout({"AMBIENT_QA_WORLD_TIMEOUT": "3000"}, 4.0) == 3000, "the override wins")
+    check(world.world_timeout({"AMBIENT_QA_WORLD_TIMEOUT": "x"}, 2.0) == 1800 and world.world_timeout({"AMBIENT_QA_WORLD_TIMEOUT": "0"}, 1.0) == 900,
+          "a bad or zero override falls back")
     ps = world.plan(3, rich=True)
     names = {p["name"]: [a["name"] for a in p["agents"]] for p in ps}
     check({"dashboards", "ingest"} <= set(names["telemetry"]) and "perf" in names["shop"] and "changelog" in names["docs"], names)
