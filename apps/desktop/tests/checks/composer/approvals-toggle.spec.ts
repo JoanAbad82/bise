@@ -42,7 +42,18 @@ test('composer/approvals-toggle: ⇧⇥ switches yolo ↔ auto and the label lin
     await core.send(approvals('auto', true) as never);
     await expect(flash).toHaveText('auto · safe calls run, risky ones ask you', { timeout: 3000 });
     const color = (sel: string) => page.locator(sel).evaluate((el) => getComputedStyle(el).color);
-    expect(await color('[data-testid="composer.flash"] .flash-word'), 'the mode word is in accent').not.toBe(await color('[data-testid="composer.flash"]'));
+    // designer m_17329: the mode word in ink, weight 600, never the accent (the accent is for what waits on him)
+    const word = page.locator('[data-testid="composer.flash"] .flash-word');
+    const ink = await page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--c-text)';
+      document.body.append(probe);
+      const c = getComputedStyle(probe).color;
+      probe.remove();
+      return c;
+    });
+    expect(await color('[data-testid="composer.flash"] .flash-word'), 'the mode word is in ink').toBe(ink);
+    expect(await word.evaluate((el) => getComputedStyle(el).fontWeight), 'the mode word weighs 600').toBe('600');
     await page.screenshot({ path: test.info().outputPath('1-flash-auto.png') });
     // after 3 s: the divider again, with the new mode
     await expect(flash, 'the flash lasts 3 s').toHaveCount(0, { timeout: 4500 });
