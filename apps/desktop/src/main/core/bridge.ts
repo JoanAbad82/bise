@@ -2,7 +2,7 @@
 // ipcRenderer. Sandbox-safe (electron's ipcRenderer only). Owner: amb-core;
 // src/main/preload.ts puts it on window.bise.
 import type { IpcRenderer, IpcRendererEvent } from 'electron';
-import { CORE_IPC, type CoreExit, type CorePort, type CoreState } from '../../shared/api';
+import { CORE_IPC, type CoreExit, type CorePort, type CoreState, type CrashReport } from '../../shared/api';
 
 export function coreBridge(ipc: IpcRenderer): CorePort {
   return {
@@ -30,6 +30,10 @@ export function coreBridge(ipc: IpcRenderer): CorePort {
     state: async () => (await ipc.invoke(CORE_IPC.stateNow)) as CoreState,
     snapshot: async () => (await ipc.invoke(CORE_IPC.snapshot)) as Record<string, unknown>[],
     lastExit: async () => (await ipc.invoke(CORE_IPC.exitNow)) as CoreExit | null,
+    start: () => {
+      ipc.send(CORE_IPC.start);
+    },
+    report: async () => (await ipc.invoke(CORE_IPC.report)) as CrashReport | null,
     revealLog: () => {
       ipc.send(CORE_IPC.revealLog);
     },

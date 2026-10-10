@@ -62,9 +62,18 @@ test('app/keep: his words, ⌘F and an open row come back after a reload, a rela
     await allBack(page, 'after a reload');
 
     // (c) the core stops and comes back: the store refills, no field is reset
+    // (a spell under 2 s says nothing in the window: designer's bise-down words, lead m_16794; so
+    // the restart is read from the window's core states instead of the line)
+    await page.evaluate(() => {
+      const w = window as unknown as { __keepStates: string[]; bise: { core: { onState: (fn: (st: string) => void) => void } } };
+      w.__keepStates = [];
+      w.bise.core.onState((st) => { w.__keepStates.push(st); });
+    });
     await core.exit(1);
-    await expect(page.getByTestId('app.core'), 'the window sees the core stop').toBeVisible({ timeout: 5000 });
-    await expect(page.getByTestId('app.core'), 'and come back').toHaveCount(0, { timeout: 20_000 });
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __keepStates: string[] }).__keepStates.join(' ')), { message: 'the core stops, then main starts it again', timeout: 15_000 })
+      .toMatch(/down.*up/u);
+    await expect(page.getByTestId('app.core'), 'nothing left in the window once it is back').toHaveCount(0, { timeout: 20_000 });
     await allBack(page, 'after a core restart');
     // the update swap quits the app the normal way (app.quit, then the new one starts)
     const gone = new Promise<void>((r) => s.app.process().once('exit', () => { r(); }));

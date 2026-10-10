@@ -10,7 +10,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { closeSync, openSync, readSync, statSync } from 'node:fs';
 import { Backoff, coreArgs, coreEnv, type CoreConfig } from './env';
-import { exitOf, failedToStart } from './exit';
+import { constants } from 'node:os';
+import { crashLoop, exitOf, failedToStart, reasonOf } from './exit';
 import { INITIALIZED_LINE, initializeLine, LineSplitter, notAnEventLog, readLine, refusedLog, requestOf } from './lines';
 import type { CoreExit, CoreState } from '../../shared/api';
 
@@ -23,6 +24,8 @@ export interface CoreHooks {
   readonly onState: (state: CoreState) => void;
   /** how a run ended (exit.ts): before the 'down' it causes; never at stop() */
   readonly onExit?: (exit: CoreExit) => void;
+  /** a crash's report (report.ts), written before onExit: its path, or null (amb-mac, designer's 'show the report') */
+  readonly report?: (exit: CoreExit, tail: string) => string | null;
   /** a log line of main (not the core's stderr, which goes to the log file) */
   readonly log: (line: string) => void;
 }
@@ -51,6 +54,10 @@ export class CoreProcess {
   /** this run's next request id (0 is its initialize) and the methods waiting for their answer */
   private nextId = 1;
   private readonly waiting = new Map<number, string>();
+  /** the crashes of the last 10 min (exit.ts crashLoop) */
+  private crashTimes: number[] = [];
+  /** the third crash in 10 min: no restart until 'start bise' (restart()) */
+  private gaveUp = false;
 
   constructor(
     private readonly opts: CoreOptions,
@@ -64,6 +71,29 @@ export class CoreProcess {
   start(): void {
     this.stopped = false;
     this.launch();
+  }
+
+  /**
+   * 'start bise' after it stopped restarting (designer): the crash count starts over. A no-op
+   * while a core is up or starting or a restart is due (two clicks never start two; amb-core m_16798).
+   */
+  restart(): boolean {
+    if (this.stopped || this.child !== null || this.timer !== null || this.stateNow !== 'down') return false;
+    this.crashTimes = [];
+    this.gaveUp = false;
+    this.launch();
+    return true;
+  }
+
+  /** How a run ended, with the crash count, whether it gives up, and the report written for a crash. */
+  private ended(raw: CoreExit, tail: string): CoreExit {
+    const e: CoreExit = { ...raw, reason: reasonOf(raw, constants.signals) };
+    if (!e.crash) return e;
+    const loop = crashLoop(this.crashTimes, e.at_ms);
+    this.crashTimes = loop.times;
+    this.gaveUp = loop.stop;
+    const counted: CoreExit = { ...e, crashes: loop.count, stopped: loop.stop };
+    return { ...counted, report: this.hooks.report?.(counted, tail) ?? null };
   }
 
   /** Stops it for good (at quit): stdin closed, then SIGTERM. */
@@ -184,12 +214,15 @@ export class CoreProcess {
     });
     child.on('error', (e) => {
       this.hooks.log(`core: ${e.message}`);
-      if (g === this.gen && !this.stopped) this.hooks.onExit?.(failedToStart(e.message, Date.now()));
+      if (g === this.gen && !this.stopped) this.hooks.onExit?.(this.ended(failedToStart(e.message, Date.now()), ''));
       this.exited(g);
     });
     child.on('exit', (code, signal) => {
       this.hooks.log(`core: exited ${String(code ?? signal)}`);
-      if (g === this.gen && !this.stopped) this.hooks.onExit?.(exitOf(code, signal, this.runTail(), this.opts.logFile ?? null, Date.now()));
+      if (g === this.gen && !this.stopped) {
+        const tail = this.runTail();
+        this.hooks.onExit?.(this.ended(exitOf(code, signal, tail, this.opts.logFile ?? null, Date.now()), tail));
+      }
       this.exited(g);
     });
   }
@@ -230,6 +263,11 @@ export class CoreProcess {
     this.child = null;
     this.setState('down');
     if (this.stopped) return;
+    // three crashes in 10 min: it stops trying, the window says so and offers 'start bise'
+    if (this.gaveUp) {
+      this.hooks.log('core: 3 crashes in 10 min, not restarting it');
+      return;
+    }
     const lived = (Date.now() - this.startedAt) / 1000;
     const wait = this.backoff.after(lived) * (this.opts.scale ?? 1000);
     this.hooks.log(`core: restart in ${String(wait)} ms`);

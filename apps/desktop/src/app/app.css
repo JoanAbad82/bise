@@ -145,6 +145,11 @@ body:has(.app-shell) {
   align-items: baseline;
 }
 
+/* it doesn't come back by itself: the line in the error tone (designer: ▲ …) */
+.app-core.err {
+  color: var(--c-err);
+}
+
 /* a crash's report: plain words in ink, as links */
 .app-core-act {
   border: 0;

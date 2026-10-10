@@ -85,25 +85,46 @@ describe('router', () => {
   });
 });
 
-describe('the core line (bar S.5)', () => {
-  it("says when the core is down or coming back, never on a quick first start, gone once it's up", async () => {
-    const { coreLine } = await import('./CoreLine');
-    expect(coreLine('up', { wasUp: true, slow: true })).toBeUndefined();
-    expect(coreLine('down', { wasUp: true, slow: false })).toBe("bise isn't running · starting it again…");
-    expect(coreLine('starting', { wasUp: true, slow: false })).toBe('starting bise again…');
-    expect(coreLine('starting', { wasUp: false, slow: false })).toBeUndefined();
-    expect(coreLine('starting', { wasUp: false, slow: true })).toBe('starting bise…');
+describe('the core line (bar S.5, O.4; designer voice-window part 2)', () => {
+  const base = { code: null, signal: null, crash: false, last: '', log: null, at_ms: 1 } as const;
+  it('a short spell says nothing; a long one says it is coming back; back says so; a slow first start', async () => {
+    const { coreView } = await import('./CoreLine');
+    expect(coreView('up', { wasUp: true, slow: true })).toBeUndefined();
+    expect(coreView('down', { wasUp: true, slow: false }), 'under 2 s: nothing').toBeUndefined();
+    expect(coreView('starting', { wasUp: true, slow: false, long: true })?.text).toBe('bise stopped. starting it again… nothing is lost.');
+    expect(coreView('down', { wasUp: true, slow: false, long: true })?.tone).toBe('dim');
+    expect(coreView('up', { wasUp: true, slow: false, back: true })?.text).toBe('bise is back.');
+    expect(coreView('starting', { wasUp: false, slow: false })).toBeUndefined();
+    expect(coreView('starting', { wasUp: false, slow: true })?.text).toBe('starting bise…');
   });
 
-  it('says how the core ended while it comes back; a panic or a fatal signal is a crash', async () => {
-    const { coreLine, exitWords } = await import('./CoreLine');
-    const base = { code: null, signal: null, crash: false, last: '', log: null, at_ms: 1 };
-    const code2 = { ...base, how: 'code' as const, code: 2 };
-    expect(coreLine('down', { wasUp: true, slow: false, exit: code2 })).toBe('bise stopped (exit 2) · starting it again…');
-    expect(coreLine('starting', { wasUp: true, slow: false, exit: code2 })).toBe('bise stopped (exit 2) · starting it again…');
-    expect(coreLine('up', { wasUp: true, slow: false, exit: code2 }), 'gone once it is up').toBeUndefined();
-    const panic = { ...base, how: 'code' as const, code: 101, crash: true, last: 'no hub for acme', log: '/u/core.log' };
-    expect(coreLine('down', { wasUp: true, slow: false, exit: panic })).toBe('bise crashed · starting it again…');
+  it('a crash that comes back says only that it is coming back', async () => {
+    const { coreView } = await import('./CoreLine');
+    const crash = { ...base, how: 'signal' as const, signal: 'SIGSEGV', crash: true, reason: 'core exited with signal 11', crashes: 1, stopped: false, report: '/r/crash-14-32.md' };
+    expect(coreView('starting', { wasUp: true, slow: false, exit: crash, crashed: true, long: true })).toEqual({ text: 'bise stopped. starting it again… nothing is lost.', tone: 'dim', start: false, report: false });
+  });
+
+  it("a crash whose restart failed: '▲ bise crashed and didn't start again', start bise, the report", async () => {
+    const { coreView } = await import('./CoreLine');
+    const failed = { ...base, how: 'failed' as const, reason: "core couldn't start: ENOENT", report: '/r/crash-14-32.md' };
+    expect(coreView('down', { wasUp: true, slow: false, exit: failed, crashed: true })).toEqual({ text: "▲ bise crashed and didn't start again: core couldn't start: ENOENT.", tone: 'err', start: true, report: true });
+    expect(coreView('down', { wasUp: false, slow: false, exit: { ...failed, report: null } })).toEqual({ text: "▲ bise didn't start: core couldn't start: ENOENT.", tone: 'err', start: true, report: false });
+  });
+
+  it("3 crashes in 10 min: '▲ bise keeps crashing', start bise, the report, 'it stopped trying'", async () => {
+    const { coreView } = await import('./CoreLine');
+    const loop = { ...base, how: 'signal' as const, signal: 'SIGSEGV', crash: true, reason: 'core exited with signal 11', crashes: 3, stopped: true, report: '/r/crash-14-32.md' };
+    expect(coreView('down', { wasUp: true, slow: false, exit: loop, crashed: true })).toEqual({
+      text: '▲ bise keeps crashing: 3 times in 10 min, the last one: core exited with signal 11.',
+      tone: 'err',
+      start: true,
+      report: true,
+      note: 'it stopped trying',
+    });
+  });
+
+  it('exitWords still names how it ended (the reason when main gave none)', async () => {
+    const { exitWords } = await import('./CoreLine');
     expect(exitWords({ ...base, how: 'signal', signal: 'SIGSEGV', crash: true })).toBe('bise crashed');
     expect(exitWords({ ...base, how: 'signal', signal: 'SIGTERM' })).toBe('bise stopped (SIGTERM)');
     expect(exitWords({ ...base, how: 'clean', code: 0 })).toBe('bise stopped');

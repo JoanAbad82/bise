@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exitOf, failedToStart, lastLine, redactLine } from './exit';
+import { crashLoop, exitOf, failedToStart, lastLine, reasonOf, redactLine } from './exit';
 
 const NL = String.fromCharCode(10);
 
@@ -53,5 +53,29 @@ describe('redactLine', () => {
 describe('failedToStart', () => {
   it('says why, never a crash', () => {
     expect(failedToStart('spawn /nope ENOENT', 1)).toEqual({ how: 'failed', code: null, signal: null, crash: false, last: 'spawn /nope ENOENT', log: null, at_ms: 1 });
+  });
+});
+
+describe('crashLoop (designer: after 3 crashes in 10 min it stops trying)', () => {
+  const min = 60 * 1000;
+  it('a first and a second crash restart; the third within 10 min stops', () => {
+    expect(crashLoop([], 0)).toEqual({ times: [0], count: 1, stop: false });
+    expect(crashLoop([0], 2 * min)).toMatchObject({ count: 2, stop: false });
+    expect(crashLoop([0, 2 * min], 9 * min)).toMatchObject({ count: 3, stop: true });
+  });
+  it('crashes older than 10 min no longer count', () => {
+    expect(crashLoop([0, 2 * min], 11 * min)).toMatchObject({ times: [2 * min, 11 * min], count: 2, stop: false });
+  });
+});
+
+describe('reasonOf (the words after the colon)', () => {
+  const sig = { SIGSEGV: 11, SIGABRT: 6 };
+  const base = { code: null, signal: null, crash: false, last: '', log: null, at_ms: 0 } as const;
+  it('a signal by its number, an exit code, a panic by its message, a failed start', () => {
+    expect(reasonOf({ ...base, how: 'signal', signal: 'SIGSEGV', crash: true }, sig)).toBe('core exited with signal 11');
+    expect(reasonOf({ ...base, how: 'code', code: 2 }, sig)).toBe('core exited with code 2');
+    expect(reasonOf({ ...base, how: 'code', code: 101, crash: true, last: 'index out of bounds' }, sig)).toBe('core panicked: index out of bounds');
+    expect(reasonOf({ ...base, how: 'failed', last: 'ENOENT' }, sig)).toBe("core couldn't start: ENOENT");
+    expect(reasonOf({ ...base, how: 'signal', signal: 'SIGWHAT', crash: true }, sig)).toBe('core exited with signal SIGWHAT');
   });
 });

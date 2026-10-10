@@ -1,12 +1,10 @@
-// One line at the top of the window while bise's core can't be reached
-// (bar S.5; qa-native's setup/offline, test id app.core). Owner: amb-win.
-//
-// The core is Electron main's child (amb-core's src/main/core): main
-// starts it again by itself, so the line only says what happens; it goes
-// once the core is up. A first start says nothing for its first 2 s (a
-// normal launch never flashes it). When the core ended (amb-mac's CoreExit,
-// e9b26d21), the line says how, its last stderr line goes dim under it, and
-// a crash (bar O.4) offers its report: shown in Finder, or its path copied.
+// One line at the top of the window while bise's core can't be reached (bar S.5, O.4; test id
+// app.core). Owner: amb-win (designer's words on voice-window part 2, written in by amb-mac with its
+// ok, m_16800). Main restarts the core by itself, so the line only says what happens: nothing for
+// a spell under 2 s; then dim 'bise stopped. starting it again… nothing is lost.'; 'bise is
+// back.' for 3 s once it is. Only when it doesn't come back by itself does it ask him: a crash
+// whose restart failed, or 3 crashes in 10 min (main stopped trying), with 'start bise' and
+// 'show the report' (the report main wrote, ~/.bise/reports; never sent anywhere).
 import { useEffect, useState } from 'react';
 import type { BiseApi, CoreExit, CoreState } from '@/shared/api';
 import { useCoreState } from '@/store';
@@ -14,12 +12,11 @@ import { useCoreState } from '@/store';
 /** How long a first start may take before the line says so. */
 export const QUIET_START_MS = 2000;
 
-/**
- * How long a crash's line stays once the core is back (bar O.4): main restarts the core in
- * about half a second, so without it 'show the report' and 'copy its path' left before he could
- * reach them (qa-native's app/core-line red).
- */
-export const CRASH_STAYS_MS = 8000;
+
+/** How long bise may be down before the window says so (designer: under 2 s, nothing at all). */
+export const QUIET_DOWN_MS = 2000;
+/** How long 'bise is back.' stays. */
+export const BACK_MS = 3000;
 
 /** How the core's last run ended, in words. Pure. */
 export function exitWords(exit: CoreExit): string {
@@ -36,17 +33,38 @@ export function exitWords(exit: CoreExit): string {
   }
 }
 
-/** The line's words for a core state; none when nothing is to be said. Pure. */
-export function coreLine(state: CoreState, o: { wasUp: boolean; slow: boolean; exit?: CoreExit | null }): string | undefined {
-  if (state === 'up') return undefined;
-  if (o.exit) return `${exitWords(o.exit)} · starting it again…`;
-  switch (state) {
-    case 'down':
-      return "bise isn't running · starting it again…";
-    case 'starting':
-      if (o.wasUp) return 'starting bise again…';
-      return o.slow ? 'starting bise…' : undefined;
+/** What the line shows: its words, its tone, its actions ('start bise', 'show the report') and a dim note. */
+export type CoreView = {
+  readonly text: string;
+  readonly tone: 'dim' | 'err';
+  readonly start: boolean;
+  readonly report: boolean;
+  readonly note?: string;
+};
+
+/**
+ * The line for the core's state (designer, voice-window part 2). Pure.
+ * `exit`: how its last run ended; `crashed`: a crash in this down spell; `long`: down 2 s or more;
+ * `back`: it came back after a long spell, less than 3 s ago.
+ */
+export function coreView(state: CoreState, o: { wasUp: boolean; slow: boolean; exit?: CoreExit | null; crashed?: boolean; long?: boolean; back?: boolean }): CoreView | undefined {
+  const plain = (text: string): CoreView => ({ text, tone: 'dim', start: false, report: false });
+  if (state === 'up') return o.back === true ? plain('bise is back.') : undefined;
+  const e = o.exit ?? null;
+  const reason = e === null ? '' : (e.reason ?? exitWords(e));
+  const report = e?.report != null;
+  // it stopped trying: 3 crashes in 10 min
+  if (e?.stopped === true && state === 'down') {
+    return { text: `▲ bise keeps crashing: ${String(e.crashes ?? 3)} times in 10 min, the last one: ${reason}.`, tone: 'err', start: true, report, note: 'it stopped trying' };
   }
+  // it crashed and its restart failed
+  if (e?.how === 'failed' && state === 'down') {
+    return o.crashed === true
+      ? { text: `▲ bise crashed and didn't start again: ${reason}.`, tone: 'err', start: true, report }
+      : { text: `▲ bise didn't start: ${reason}.`, tone: 'err', start: true, report: false };
+  }
+  if (o.wasUp) return o.long === true ? plain('bise stopped. starting it again… nothing is lost.') : undefined;
+  return o.slow ? plain('starting bise…') : undefined;
 }
 
 /** window.bise, or none (a unit test's DOM). */
@@ -76,29 +94,40 @@ export function CoreLine() {
   const exit = useCoreExit();
   const [wasUp, setWasUp] = useState(false);
   const [slow, setSlow] = useState(false);
-  const [copied, setCopied] = useState(false);
-  if (state === 'up' && !wasUp) setWasUp(true);
-  // the last crash seen while down, kept a while once the core is back (the next run's exit is null)
-  const [crash, setCrash] = useState<CoreExit | null>(null);
-  const [after, setAfter] = useState<CoreExit | null>(null);
+  const [long, setLong] = useState(false);
+  const [back, setBack] = useState(false);
+  const [crashed, setCrashed] = useState(false);
   const [prev, setPrev] = useState(state);
-  if (exit?.crash && state !== 'up' && crash !== exit) setCrash(exit);
+  if (state === 'up' && !wasUp) setWasUp(true);
+  if (exit?.crash === true && state !== 'up' && !crashed) setCrashed(true);
   if (prev !== state) {
     setPrev(state);
-    if (state === 'up' && crash !== null) {
-      setAfter(crash);
-      setCrash(null);
-    } else if (state !== 'up') setAfter(null);
+    if (state === 'up') {
+      // back after a spell he saw: 'bise is back.' for 3 s; a short one said nothing
+      setBack(long);
+      setLong(false);
+      setCrashed(false);
+    } else if (prev === 'up') setBack(false);
   }
+  // down 2 s or more (after it was up): then the line says so
   useEffect(() => {
-    if (after === null) return;
+    if (state === 'up' || !wasUp) return;
     const t = setTimeout(() => {
-      setAfter(null);
-    }, CRASH_STAYS_MS);
+      setLong(true);
+    }, QUIET_DOWN_MS);
     return () => {
       clearTimeout(t);
     };
-  }, [after]);
+  }, [state, wasUp]);
+  useEffect(() => {
+    if (!back) return;
+    const t = setTimeout(() => {
+      setBack(false);
+    }, BACK_MS);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [back]);
   useEffect(() => {
     if (state !== 'starting' || wasUp) return;
     const t = setTimeout(() => {
@@ -108,37 +137,27 @@ export function CoreLine() {
       clearTimeout(t);
     };
   }, [state, wasUp]);
-  const shown = after ?? exit;
-  const text = after !== null ? `${exitWords(after)} · running again` : coreLine(state, { wasUp, slow, exit });
-  if (text === undefined) return null;
-  const log = shown?.crash ? shown.log : null;
+  const v = coreView(state, { wasUp, slow, exit, crashed, long, back });
+  if (v === undefined) return null;
+  const path = exit?.report ?? null;
   return (
-    <div className="app-core" role="status" data-testid="app.core" data-state={state}>
+    <div className={`app-core${v.tone === 'err' ? ' err' : ''}`} role="status" data-testid="app.core" data-state={state}>
       <div className="app-core-head">
-        <span data-testid="app.core.text">{text}</span>
-        {log !== null && (
-          <>
-            <button type="button" className="app-core-act" data-testid="app.core.report" onClick={() => bise()?.core.revealLog?.()}>
-              show the report
-            </button>
-            <button
-              type="button"
-              className="app-core-act"
-              data-testid="app.core.copy"
-              onClick={() => {
-                void bise()?.copy(log).then(() => {
-                  setCopied(true);
-                });
-              }}
-            >
-              {copied ? 'copied' : 'copy its path'}
-            </button>
-          </>
+        <span data-testid="app.core.text">{v.text}</span>
+        {v.start && (
+          <button type="button" className="app-core-act" data-testid="app.core.start" onClick={() => bise()?.core.start?.()}>
+            start bise
+          </button>
+        )}
+        {v.report && path !== null && (
+          <button type="button" className="app-core-act" data-testid="app.core.report" onClick={() => void bise()?.showInFinder(path)}>
+            show the report
+          </button>
         )}
       </div>
-      {shown && shown.last !== '' && (
-        <div className="app-core-last" data-testid="app.core.last">
-          {shown.last}
+      {v.note !== undefined && (
+        <div className="app-core-last" data-testid="app.core.note">
+          {v.note}
         </div>
       )}
     </div>

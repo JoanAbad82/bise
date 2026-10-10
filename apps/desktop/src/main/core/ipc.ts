@@ -2,10 +2,13 @@
 // starts the one core child for the app, sends every event and state change
 // to every window, writes the windows' commands to it. Owner: amb-core.
 // src/main/index.ts calls startCore() once at ready and stopCore() at quit.
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { constants, homedir, release } from 'node:os';
 import { join } from 'node:path';
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
-import { CORE_IPC, CORE_REVEAL_LINE, TEST_ENV, type CoreExit, type CoreState } from '../../shared/api';
+import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron';
+import { CORE_CRASH_NOTE_LINE, CORE_IPC, CORE_REVEAL_LINE, TEST_ENV, type CoreExit, type CoreState, type CrashReport } from '../../shared/api';
+import { reasonOf } from './exit';
+import { writeReport } from './report';
 import { binPath } from '../paths';
 import { configOf } from './env';
 import { Latest } from '../../shared/latest';
@@ -111,9 +114,50 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
     log("core: no bise: none shipped in the app, no BISE_DESKTOP_BISE path, no repo build (never PATH's bise)");
     return;
   }
+  // a crash's report and, with no bise window shown, one notification (designer, voice-window part 2)
+  const test = env[TEST_ENV] === '1';
+  const reportsDir = env['BISE_HOME'] !== undefined && env['BISE_HOME'] !== '' ? join(env['BISE_HOME'], 'reports') : join(homedir(), '.bise', 'reports');
+  let lastReport: string | null = null;
+  let told = false;
+  ipcMain.on(CORE_IPC.start, () => {
+    if (core?.restart() === true) log('core: started again by his click');
+  });
+  ipcMain.handle(CORE_IPC.report, (): CrashReport | null => {
+    if (lastReport === null) return null;
+    try {
+      return { path: lastReport, text: readFileSync(lastReport, 'utf8') };
+    } catch {
+      return null;
+    }
+  });
+  const crashed = (e: CoreExit): void => {
+    if (!e.crash || told) return;
+    const shown = BrowserWindow.getAllWindows().some((w) => !w.isDestroyed() && w.isVisible() && !w.webContents.getURL().includes('surface=capsule'));
+    if (shown) return;
+    told = true;
+    if (test) {
+      process.stdout.write(`${CORE_CRASH_NOTE_LINE} bise crashed · open bise${String.fromCharCode(10)}`);
+      return;
+    }
+    const n = new Notification({ title: 'bise crashed', body: 'open bise' });
+    n.on('click', () => {
+      app.emit('activate');
+      for (const w of BrowserWindow.getAllWindows()) if (!w.webContents.getURL().includes('surface=capsule')) w.show();
+    });
+    n.show();
+  };
   core = new CoreProcess(
     { config, logFile, env },
     {
+      report: (e, tail) => {
+        lastReport = writeReport(
+          reportsDir,
+          e,
+          { reason: reasonOf(e, constants.signals), app: `${app.getName()} ${app.getVersion()}`, bise: config.bise, os: `macOS ${release()}`, log: logFile },
+          tail,
+        );
+        return lastReport;
+      },
       onEvent: (ev) => {
         // a dictation's words: its window only, never kept, never main's listeners
         const r = dictations.route(ev);
@@ -134,10 +178,13 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
         // a core gone took its mic with it: its dictations end
         if (s !== 'up') for (const r of dictations.coreGone()) toWindow(r);
         state = s;
+        // back up: a next crash may tell him again
+        if (s === 'up') told = false;
         sendState(s);
       },
       onExit: (e) => {
         lastExit = e;
+        crashed(e);
         log(`core: ended ${e.how}${e.code === null ? '' : ` ${String(e.code)}`}${e.signal === null ? '' : ` ${e.signal}`}${e.crash ? ' (crash)' : ''}`);
       },
       log,

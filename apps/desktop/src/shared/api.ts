@@ -168,6 +168,14 @@ export interface CoreExit {
   readonly last: string;
   readonly log: string | null;
   readonly at_ms: number;
+  /** why, in designer's words ('core exited with signal 11'): main's reasonOf */
+  readonly reason?: string;
+  /** crashes in the last 10 min, this one included (designer's 'keeps crashing: 3 times in 10 min') */
+  readonly crashes?: number;
+  /** main stopped restarting it (3 crashes in 10 min); 'start bise' (core.start) tries once more */
+  readonly stopped?: boolean;
+  /** the crash report bise wrote for this crash (~/.bise/reports/crash-HH-MM.md), never sent anywhere */
+  readonly report?: string | null;
 }
 
 /** What the window sends the core: bise-proto's typed commands only (a HubCmd carries its project). */
@@ -191,6 +199,10 @@ export interface CorePort {
   readonly lastExit?: () => Promise<CoreExit | null>;
   /** Shows the core's log in Finder (a crash's report); in test mode a CORE_REVEAL_LINE on stdout. */
   readonly revealLog?: () => void;
+  /** 'start bise': starts the core again after main stopped restarting it; a no-op while it is up or starting. */
+  readonly start?: () => void;
+  /** The last crash report bise wrote (designer's 'show the report'), or null. */
+  readonly report?: () => Promise<CrashReport | null>;
   /**
    * The core's last state events (projects, prefs, accounts, agents, cards...),
    * kept by main: a window that loads late replays them once, after it
@@ -209,10 +221,23 @@ export const CORE_IPC = {
   snapshot: 'bise:core-snapshot',
   exitNow: 'bise:core-exit-now',
   revealLog: 'bise:core-reveal-log',
+  /** 'start bise' after main stopped restarting it (a no-op while it is up or starting) */
+  start: 'bise:core-start',
+  /** the last crash report: {path, text} or null */
+  report: 'bise:core-report',
 } as const;
+
+/** A crash report bise wrote (src/main/core/report.ts): never sent anywhere, his to read or share. */
+export interface CrashReport {
+  readonly path: string;
+  readonly text: string;
+}
 
 /** Test mode: revealLog prints `CORE_REVEAL_LINE <log path>` instead of opening Finder. */
 export const CORE_REVEAL_LINE = 'bise-desktop: reveal';
+
+/** Test mode: the one 'bise crashed · open bise' notification when no window shows (never posted). */
+export const CORE_CRASH_NOTE_LINE = 'bise-desktop: crash-note';
 
 export type Surface = 'window' | 'capsule';
 

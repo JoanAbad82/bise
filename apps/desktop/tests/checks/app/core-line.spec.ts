@@ -1,43 +1,38 @@
-// app/core-line · bar S.5 + O.4 (lead m_10715, amb-mac e9b26d21): the core panics (a Rust panic on
-// stderr, exit 101). Passes when the window's core line says 'bise crashed · starting it again…',
-// shows the panic's message dim and mono under it, offers 'show the report' (main's test mode prints
-// its reveal line, never Finder) and 'copy its path' (the test clipboard gets the log's path), and
-// goes a while after the core is back (it then says 'running again'). The scripted core (FakeCore's stub) wrapped in fakes/core-panic.mjs,
-// which panics on its first run only. Owner: amb-win.
+// app/core-line · bar S.5 + O.4 in designer's words (voice-window part 2, lead m_16794): the core
+// panics once (a Rust panic on stderr, exit 101) and main starts it again. Passes when the window
+// never asks him anything for it (no ▲ line, no 'start bise': it came back by itself), says only
+// the dim 'bise stopped. starting it again… nothing is lost.' if the spell lasts 2 s or more, then
+// 'bise is back.' for 3 s, and main wrote the crash report: the panic's message as the reason and
+// the log's last lines (window.bise.core.report()). The scripted core wrapped in
+// fakes/core-panic.mjs, which panics on its first run only. Owner: amb-win (updated by amb-mac with
+// its ok, m_16800).
 import path from 'node:path';
-import { CORE_REVEAL_LINE, COPY_LINE } from '../../../src/shared/api';
 import { test, expect } from '../../harness';
-import { onWorld } from '../native/world';
+import { onWorld, sleep } from '../native/world';
 
 const PANIC = path.join(__dirname, 'fakes', 'core-panic.mjs');
+type Report = { path: string; text: string } | null;
 
-test('app/core-line: a panicked core: the line says it crashed, its last line, the report; gone once back', async () => {
+test('app/core-line: a panicked core that comes back asks nothing; its report says why', async () => {
   await onWorld(
-    async ({ s, out }) => {
+    async ({ s }) => {
       const { page } = s;
-      const line = page.getByTestId('app.core');
-      await expect(line, 'one line about the core once it panicked').toBeVisible({ timeout: 5000 });
-      // main restarts it within a second: the crash's line stays a while after, saying so (CRASH_STAYS_MS)
-      await expect(page.getByTestId('app.core.text')).toHaveText(/^bise crashed · (starting it again…|running again)$/);
-      const last = page.getByTestId('app.core.last');
-      await expect(last, "the panic's message, under the words").toHaveText('no hub for acme: the workspace moved');
-      const look = await last.evaluate((el) => {
-        const cs = getComputedStyle(el);
-        const mono = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim();
-        return { font: cs.fontFamily, mono, size: cs.fontSize };
-      });
-      expect(look.font.split(',')[0], 'mono').toBe(look.mono.split(',')[0]);
-      expect(look.size).toBe('12px');
-      await page.screenshot({ path: test.info().outputPath('core-crashed.png') });
-
-      await page.getByTestId('app.core.report').click();
-      const log = await out.wait(CORE_REVEAL_LINE, (rest) => rest.endsWith('core.log'), 2000);
-      await page.getByTestId('app.core.copy').click();
-      await out.wait(COPY_LINE, (rest) => rest === JSON.stringify(log), 2000);
-      await expect(page.getByTestId('app.core.copy'), 'says it copied').toHaveText('copied');
-
-      await expect(page.getByTestId('app.core.text'), 'the core is back').toHaveText('bise crashed · running again');
-      await expect(line, 'gone a while after the core is back').toBeHidden({ timeout: 12_000 });
+      const report = (): Promise<Report> => page.evaluate(() => (window as unknown as { bise: { core: { report: () => Promise<unknown> } } }).bise.core.report()) as Promise<Report>;
+      await expect.poll(async () => (await report())?.path ?? '', { message: 'the panic wrote a report', timeout: 8000 }).toMatch(/crash-\d\d-\d\d\.md$/);
+      const r = await report();
+      expect(r?.text).toContain('# bise crashed: core panicked: no hub for acme: the workspace moved');
+      expect(r?.text).toContain("thread 'main' panicked at rust/core/src/hub.rs:212:9:");
+      // while it comes back: nothing under 2 s, else the dim words only
+      const seen: string[] = [];
+      for (let i = 0; i < 30; i += 1) {
+        const t = await page.getByTestId('app.core.text').textContent({ timeout: 100 }).catch(() => null);
+        if (t !== null) seen.push(t);
+        await sleep(100);
+      }
+      for (const t of seen) expect(['bise stopped. starting it again… nothing is lost.', 'bise is back.']).toContain(t);
+      await expect(page.getByTestId('app.core.start'), 'it came back by itself: nothing to click').toHaveCount(0);
+      if (seen.length > 0) await page.screenshot({ path: test.info().outputPath('core-line.png') });
+      await expect(page.getByTestId('app.core'), 'gone once it is back').toBeHidden({ timeout: 6000 });
     },
     { env: { BISE_DESKTOP_BISE: PANIC } },
   );

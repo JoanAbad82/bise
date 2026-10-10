@@ -75,3 +75,26 @@ export function exitOf(code: number | null, signal: string | null, tail: string,
 export function failedToStart(reason: string, now: number): CoreExit {
   return { how: 'failed', code: null, signal: null, crash: false, last: redactLine(reason), log: null, at_ms: now };
 }
+
+/** How many crashes in how long make main stop restarting the core (designer: 3 in 10 min). */
+export const CRASH_LOOP = { count: 3, ms: 10 * 60 * 1000 } as const;
+
+/**
+ * The crashes still in the window after this one (`times`: earlier crash times, any order) and
+ * whether main stops restarting: the third crash in 10 min stops it. Pure.
+ */
+export function crashLoop(times: readonly number[], now: number): { readonly times: number[]; readonly count: number; readonly stop: boolean } {
+  const kept = [...times.filter((t) => now - t < CRASH_LOOP.ms && t <= now), now];
+  return { times: kept, count: kept.length, stop: kept.length >= CRASH_LOOP.count };
+}
+
+/**
+ * The reason in designer's words ('core exited with signal 11', 'core exited with code 101', a
+ * panic's message): `signals` maps a signal name to its number (os.constants.signals). Pure.
+ */
+export function reasonOf(e: CoreExit, signals: Readonly<Record<string, number>>): string {
+  if (e.how === 'failed') return `core couldn't start: ${e.last}`;
+  if (e.signal !== null) return `core exited with signal ${String(signals[e.signal] ?? e.signal)}`;
+  if (e.crash && e.last !== '') return `core panicked: ${e.last}`;
+  return `core exited with code ${String(e.code ?? '?')}`;
+}
