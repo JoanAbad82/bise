@@ -1270,6 +1270,39 @@ button.th-sched-head {
 .th-you {
   position: relative;
 }
+/* a queued bubble's 'edit · drop' after its words (designer's messages-right; amb-feed 34c35175) */
+.th-queued-acts {
+  margin-left: 10px;
+}
+.th-queued-act {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-text-2);
+  font: inherit;
+  cursor: pointer;
+}
+.th-queued-act:hover:not(:disabled) {
+  color: var(--c-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.th-queued-act:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.th-queued-act:focus-visible {
+  outline: 2px solid var(--c-text);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+/* the hub's refusal (already delivered, no longer waiting): its words, right under the bubble */
+.th-queued-err {
+  margin-top: 2px;
+  color: var(--c-err, var(--c-accent));
+  font: var(--t-12) var(--font-ui);
+  text-align: right;
+}
 .th-you-under.th-hover {
   position: absolute;
   right: calc(100% + 8px);

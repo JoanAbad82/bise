@@ -502,4 +502,17 @@ describe("a diff that answers another view's req (lead m_16528)", () => {
     store.askVersions(P);
     expect(sent.slice(-2)).toEqual([{ cmd: 'branches', project: P }, { cmd: 'versions', project: P }]);
   });
+  it('takes back a queued message: queued_take with its id; its words, or the hub refusal on that one (amb-feed 34c35175)', () => {
+    const { store, sent } = fake();
+    expect(store.queuedTaken(P, 'perf', 4)).toBeNull();
+    store.queuedTake(P, 'perf', 4);
+    expect(sent.at(-1)).toEqual({ cmd: 'queued_take', project: P, agent: 'perf', id: 4 });
+    store.apply({ ev: 'queued_taken', project: P, agent: 'perf', id: 4, text: 'then open a PR' });
+    expect(store.queuedTaken(P, 'perf', 4)).toEqual({ text: 'then open a PR' });
+    // asked again: the old answer goes; a refusal lands on that ask
+    store.queuedTake(P, 'perf', 5);
+    store.apply({ ev: 'error', project: P, cmd: 'queued_take', text: 'already delivered' });
+    expect(store.queuedTaken(P, 'perf', 5)).toEqual({ error: 'already delivered' });
+    expect(store.queuedTaken(P, 'perf', 4)).toEqual({ text: 'then open a PR' });
+  });
 });

@@ -131,6 +131,11 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   // his bug 3: a selection in the thread, then a key, quotes it in the composer
   const section = useRef<HTMLElement>(null);
   const composer = useRef<ComposerActions | null>(null);
+  // his queued message taken back to edit (QueuedRow): its words at the composer's caret, for him to resend
+  const takeBack = useCallback((text: string) => {
+    composer.current?.insertText(text);
+    composer.current?.focusEnd();
+  }, []);
   const onComposer = useCallback(
     (a: ComposerActions) => {
       composer.current = a;
@@ -363,7 +368,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         {/* the list and, over an empty one, the first-run block centred in the column (his try:
             it sat bottom-left at the column's edge) */}
         <div className="th-main">
-          <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} />
+          <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} onTakeBack={takeBack} />
           {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} bise={bise} />}
         </div>
         {stopping && <Marker>stopping {agent}…</Marker>}
@@ -471,7 +476,7 @@ function FirstRunSlot({ tkey, project, composer, bise }: { tkey: string; project
   );
 }
 
-const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey: string; project: string; agent: string; bise: boolean; listRef: RefObject<ThreadListHandle | null> }) {
+const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBack }: { tkey: string; project: string; agent: string; bise: boolean; listRef: RefObject<ThreadListHandle | null>; onTakeBack?: (text: string) => void }) {
   const store = useStore();
   const view = useThreadOrder(tkey);
   const pending = usePending(tkey);
@@ -511,6 +516,7 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
       agent,
       bise,
       onLink: openLink,
+      ...(onTakeBack === undefined ? {} : { onTakeBack }),
       ...(base === undefined
         ? {}
         : {
@@ -519,7 +525,7 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
             },
           }),
     }),
-    [tkey, project, agent, bise, base],
+    [tkey, project, agent, bise, base, onTakeBack],
   );
   // each row reads the one before it: its group and its day (ambient m_11777)
   const prevOf = useMemo(() => new Map(shown.map((p, i) => [p, shown[i - 1]])), [shown]);

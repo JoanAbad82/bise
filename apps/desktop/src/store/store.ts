@@ -255,6 +255,8 @@ export class Store {
   /** tool_out asks in flight (by key), and each project's last one (an error names no call) */
   private readonly toolAsks = new Set<string>();
   private readonly toolAsk = new Map<string, string>();
+  /** each project's last queued_take (its error carries no id: it answers that one) */
+  private readonly takeAsk = new Map<string, string>();
   /**
    * the diff asks this window sent with a `req` (none today: the review asks without one); a diff
    * that answers another `req` (a terminal's `/diff` the hub broadcasts) is for the view that
@@ -467,6 +469,22 @@ export class Store {
     this.toolAsk.set(project, key);
     this.port?.send({ cmd: 'tool_out', project, agent, pos });
   }
+  /** His queued message taken back (queued_take): its words, or the hub's refusal; null until then. */
+  queuedTaken(project: string, agent: string, id: number): QueuedTake | null {
+    return this.slice<QueuedTake | null>(takeKey(project, agent, id), null);
+  }
+  /**
+   * Take back a message the hub holds until the agent's turn ends (amb-feed 34c35175: 'edit' =
+   * take + his words back in the composer, 'drop' = take). The answer is queued_taken (its words),
+   * or an error with the hub's words (already delivered, no longer waiting); the row leaves
+   * Agent.queued at the next agents event.
+   */
+  queuedTake(project: string, agent: string, id: number): void {
+    const key = takeKey(project, agent, id);
+    if (this.slices.get(key) != null) this.put(key, null);
+    this.takeAsk.set(project, key);
+    this.command({ cmd: 'queued_take', project, agent, id });
+  }
   /** The latest diff of an agent's change, or of one commit (`commit`). */
   diff(project: string, agent: string, commit?: string): Diff | null {
     return this.slice<Diff | null>(diffKey(project, agent, commit), null);
@@ -570,6 +588,12 @@ export class Store {
         this.put(key, { out: ev.out, cut: ev.cut, ...(ev.total == null ? {} : { total: ev.total }) } satisfies ToolOut);
         return;
       }
+      case 'queued_taken': {
+        const key = takeKey(ev.project, ev.agent, ev.id);
+        if (this.takeAsk.get(ev.project) === key) this.takeAsk.delete(ev.project);
+        this.put(key, { text: ev.text } satisfies QueuedTake);
+        return;
+      }
       case 'diff':
         // an answer to someone else's `req` (a terminal's /diff) never lands on this window's views
         if (ev.req != null) {
@@ -651,6 +675,15 @@ export class Store {
         if (ev.cmd === 'slash' && ev.project != null) {
           this.put(`notice:${ev.project}`, { text: ev.text, level: 'error' } satisfies HubLine);
           return;
+        }
+        // a queued message he took back had gone already (delivered, no longer waiting): the hub's words on its row
+        if (ev.cmd === 'queued_take' && ev.project != null) {
+          const key = this.takeAsk.get(ev.project);
+          if (key !== undefined) {
+            this.takeAsk.delete(ev.project);
+            this.put(key, { error: ev.text } satisfies QueuedTake);
+            return;
+          }
         }
         // the hub found no such call or no result yet: that project's last ask says so (asked again on the next open)
         if (ev.cmd === 'tool_out' && ev.project != null) {
@@ -1119,6 +1152,13 @@ export class Store {
 export type ToolOut = { readonly out: string; readonly cut: boolean; readonly total?: number } | { readonly error: string };
 
 /** The slice key of one call's output (pos is the key: ToolItem.id repeats). Pure. */
+/** A queued message taken back: its words, or the hub's refusal. */
+export type QueuedTake = { readonly text: string } | { readonly error: string };
+
+export function takeKey(project: string, agent: string, id: number): string {
+  return `queued_taken:${project}/${agent}/${String(id)}`;
+}
+
 export function toolOutKey(project: string, agent: string, pos: number): string {
   return `tool_out:${project}/${agent}/${String(pos)}`;
 }

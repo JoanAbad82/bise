@@ -7,7 +7,7 @@ import { memo, useEffect, useState, type ReactNode } from 'react';
 import { Answered, Button, Chip, Fold, Marker, Msg, Pearl, Tool } from '@/ds';
 import { openInbox } from '@/inbox/Block';
 import type { Entry } from '@/proto';
-import { useAgents, useCoreState, useEntry, useHubRefused, usePending, useProjects, useStore, useThreadOrder, useToolOut } from '@/store';
+import { useAgents, useCoreState, useEntry, useHubRefused, usePending, useProjects, useStore, useQueuedTake, useThreadOrder, useToolOut } from '@/store';
 import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
@@ -29,6 +29,8 @@ export interface RowCtx {
   readonly onLink: (url: string) => void;
   /** a file path named in an answer, relative to the agent's folder (M4, B14) */
   readonly onPath?: (path: string, line?: number) => void;
+  /** his queued message taken back to edit: its words go back in the composer */
+  readonly onTakeBack?: (text: string) => void;
 }
 
 export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, still = false }: { ctx: RowCtx; pos: number; prev?: number | undefined; next?: number | undefined; live?: Entry | undefined; still?: boolean }) {
@@ -1146,13 +1148,58 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
  * goes, the hub drops it from the list and it lands as his normal bubble. No edit / drop yet: no
  * command takes a queued message back (asked of amb-feed).
  */
+/**
+ * His message the hub holds until the agent's turn ends (designer's messages-right, amb-feed
+ * 34c35175): a dashed bubble, 'queued · sends when perf's turn ends', then 'edit · drop'. Both take
+ * it back (queued_take); edit puts its words back in the composer for him to resend, drop lets it
+ * go. The row itself leaves when the agents event no longer lists it (nothing drawn before); a
+ * refusal (already delivered, no longer waiting) shows the hub's words under it.
+ */
 export const QueuedRow = memo(function QueuedRow({ ctx, q }: { ctx: RowCtx; q: { id: number; text: string } }) {
   const who = shownName(ctx.agent);
+  const store = useStore();
+  const taken = useQueuedTake(ctx.project, ctx.agent, q.id);
+  const [asked, setAsked] = useState<'edit' | 'drop' | null>(null);
+  const [given, setGiven] = useState(false);
+  // edit: his words go back in the composer once, when the hub gave them back
+  if (asked === 'edit' && !given && taken !== null && 'text' in taken) {
+    setGiven(true);
+    ctx.onTakeBack?.(taken.text);
+  }
+  const take = (how: 'edit' | 'drop') => () => {
+    setAsked(how);
+    setGiven(false);
+    store.queuedTake(ctx.project, ctx.agent, q.id);
+  };
+  const id = `thread.queued.${String(q.id)}`;
+  const refused = asked !== null && taken !== null && 'error' in taken ? taken.error : null;
   return (
-    <div className="th-row th-queued" data-side="you" data-testid={`thread.queued.${String(q.id)}`}>
-      <YouBubble under={`queued · sends when ${who}'s turn ends`} state="queued" testId={`thread.queued.${String(q.id)}.bubble`}>
+    <div className="th-row th-queued" data-side="you" data-testid={id}>
+      <YouBubble
+        under={
+          <>
+            <span>queued · sends when {who}'s turn ends</span>
+            <span className="th-queued-acts">
+              <button type="button" className="th-queued-act" onClick={take('edit')} disabled={asked !== null && refused === null} data-testid={`${id}.edit`}>
+                edit
+              </button>
+              <span aria-hidden="true"> · </span>
+              <button type="button" className="th-queued-act" onClick={take('drop')} disabled={asked !== null && refused === null} data-testid={`${id}.drop`}>
+                drop
+              </button>
+            </span>
+          </>
+        }
+        state="queued"
+        testId={`${id}.bubble`}
+      >
         <Markdown text={q.text} onLink={ctx.onLink} breaks />
       </YouBubble>
+      {refused !== null && (
+        <div className="th-queued-err" role="status" data-testid={`${id}.error`}>
+          {refused}
+        </div>
+      )}
     </div>
   );
 });

@@ -6,7 +6,7 @@
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import type { Account, Agent, FlowMode, ReleaseEv, UpdateEv, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
-import { diffKey, toolOutKey, Store, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadOrder, type VoiceModeState } from './store';
+import { diffKey, takeKey, toolOutKey, Store, type QueuedTake, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadOrder, type VoiceModeState } from './store';
 
 /**
  * Feeds a store from a core port: its live events, then the state events
@@ -101,6 +101,9 @@ export const useDiff = (project: string, agent: string, commit?: string): Diff |
 /** A tool call's real output once its open row asked (askToolOut), or the hub's refusal; null until then. */
 export const useToolOut = (project: string, agent: string, pos: number): ToolOut | null =>
   useSlice(toolOutKey(project, agent, pos), (s) => s.toolOut(project, agent, pos));
+/** His queued message taken back (store.queuedTake): its words or the hub's refusal; null until then. */
+export const useQueuedTake = (project: string, agent: string, id: number): QueuedTake | null =>
+  useSlice(takeKey(project, agent, id), (s) => s.queuedTaken(project, agent, id));
 export const useAway = (): Away | null => useSlice('away', (s) => s.away());
 /** Each role's model and effort (V17), at the core's start, after each role_set, at setup_check. */
 export const useRoles = (): readonly RoleRow[] => useSlice('roles', (s) => s.roles());
