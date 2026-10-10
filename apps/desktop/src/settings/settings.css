@@ -1,6 +1,9 @@
 /* settings (src/settings, amb-home): ds tokens only; the frame is the ds's .b-set */
-.settings { height: 100%; min-height: 0; outline: none; }
-.settings .b-set { height: 100%; }
+.settings { height: 100%; min-height: 0; outline: none; overflow: hidden; }
+/* b2: the inbox block under settings grows when an item opens; the frame shrinks with it (the ds's
+   380 px floor would run the nav under the block) and its nav and page scroll inside */
+.settings .b-set { height: 100%; min-height: 0; }
+.settings .b-set .nav, .settings .b-set .pg { min-height: 0; overflow-y: auto; }
 .settings-row-acts { display: inline-flex; align-items: center; gap: var(--s-1); }
 .settings-key { margin-top: var(--s-3); max-width: 420px; }
 .settings-sheet { margin-top: var(--s-4); padding: var(--s-4); border-radius: var(--r-3); background: var(--c-raised); box-shadow: var(--e-1); }
