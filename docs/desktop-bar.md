@@ -481,6 +481,21 @@ isn't judging. A row marked ok names the shot that was looked at.
   list. amb-win is fixing it. The re-cut also carries the chip glyph 3c209f33 and "4 KB of 18 KB
   shown" 91af5059, and qa-native re-checks those rows.
 
+- **d67ff9e3: GO for promote** (ambient-pm to ambient-lead m_17571, from qa-native m_17568).
+  The gates are `~/.bise/gate/try-gate/e037c58a/index.md` and `…/d67ff9e3/index.md`.
+  - e037c58a's main run is 8/8 green:
+    - SAID: 'said · 0:04 ✓✓', dim, through voice-real;
+    - KEYCHAIN heads settings › keys, and the nit is gone;
+    - thread/streaming is green, reduced motion included;
+    - HEADFIT, FOLDS2, STEERRX, TOOLCOUNT, INIT and MSGRIGHT.
+  - The quick KEYS + S29 run is green: ⇧⇥ both ways next to the TUI, ctrl+c and esc stop as the
+    TUI does, and computer use works.
+  - d67ff9e3's reshoot: **/log** is green through thread/log-screen, and INIT smoke is green.
+    Designer signed /log. **TP-N2 passes.**
+  - Amber: thread/ctrl-c-stop failed once. ctrl+c with a row selected sent a stop. It then ran
+    3/3 green on d67ff9e3, with the same thread and composer code as his try ea81cabc. It is a
+    flake, not a regression, and amb-web has it.
+
 - **ea81cabc: GO for promote** (ambient-pm m_17477 to ambient-lead m_17475, from qa-native
   m_17473; `~/.bise/gate/try-gate/ea81cabc/index.md`). 10/10 checks are green on the packed app
   with the rich world.
@@ -1079,7 +1094,7 @@ Still not pass:
 | S29/L19 computer use on a gate | **pass (gate ea81cabc)**, with a900b528: driving, 'took the wheel' and 'give it back', peek, stopped, next to the TUI. It is also green on the real core (qa-flows 20c44bf9) | qa-flows, qa-native | none |
 | TP-R6 ⇧⇥ approvals mode, and TP-K7b ctrl+c stops a turn | **pass (gate ea81cabc)**: ⇧⇥ flashes 'auto · safe calls run…' with the mode in ink, and the divider follows. keys-real flips the hub's mode both ways, as the TUI does. ctrl+c (with no text selected) and esc stop a busy turn, and the draft stays; neither does it while text is selected | amb-web | none |
 | TP-N1 /keychain on, /keychain off | **pass (gate ea81cabc, scripted keychain)**: the models page's switch goes on, off and failed ('couldn't move chatgpt: the keychain is locked.'), in light and dark | amb-home | none |
-| TP-N2 /log | **built, designer signed, not yet on a gate**: amb-feed's hub and TS side (main 0c227ae3, merged as c6192880; TS 493de27f) and amb-web's read-only screen (e037c58a). It got designer's 5 fixes in d67ff9e3, and single-letter keys no longer steal focus to the composer. qa-native is gating e037c58a now | amb-feed, amb-web | qa-native's gate on e037c58a, or later, with /log opened on an agent |
+| TP-N2 /log | **pass (gate d67ff9e3), designer signed**: thread/log-screen is green on the packed app. It covers an edit row with its diff, a folded result '▸ 34 lines · 1.2 KB', find '2 of 8', the older page, and dark. Built from amb-feed's hub and TS side (main 0c227ae3, merged as c6192880; TS 493de27f) and amb-web's screen (e037c58a, plus designer's fixes in d67ff9e3) | amb-feed, amb-web | none |
 | 'said ✓✓' (a spoken turn's mark) | **pass (real core, fake voice), 5ecc3cc3** (amb-web m_17499): voice/voice-real asserts his spoken bubble's under line /^said · 0:0N ✓✓$/, with the ✓✓ dim (--c-text-2, never the accent). It ran 1 passed, and the shot reads 'said · 0:04 ✓✓'. qa-native's next gate shows it on a packed app | amb-web | none for the bar; qa-native's voice-real on the next cut |
 | HEADFIT's context note | **pass (gate ea81cabc, with amb-tools' a40569c8 seed)**: p99's 'context 44k · 17%' is whole at 1400. At 1100 with the panel, the note and the branch are both gone whole. At 800 the head shows the crumb, the note and the branch. The order (the note drops before the branch) can't be seen at these widths, and amb-home's thread/head-fit proves it | amb-home | none |
 | S.1 no CLI (VM) | **not run, prepped** (amb-mac m_17354): 15 rows (TCC, the fn tap, the tray, ⌘F, fn held, fn fn, fn space, esc, full screen, the glass, ⌘Q). It needs the 27 GB tart image pulled again, a kit and one packed app, and it runs after amb-core's bench, on ambient-lead's ok. 2 of its rows are stale against b3 and fn fn voice, and amb-mac updates them | amb-mac, qa-native | the VM pass; amb-mac sends the result to ambient-lead and ambient-pm |
