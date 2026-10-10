@@ -11,6 +11,11 @@
 //! - `journal.jsonl`: the durable state; `agents/<dir>/transcript.log`:
 //!   every line of each feed, for the views, `sb inspect` and
 //!   `sb history`.
+//!
+//! The loop (`run`): every thread sends a `Msg` on one channel; the
+//! loop reads it through `daemon/inbox` (the clients' messages ahead of
+//! the rest, so a hello is served while REPL lines wait) and runs each
+//! one with `daemon/dispatch`.
 
 mod accept;
 mod art;
@@ -35,7 +40,10 @@ mod session_log;
 mod skills;
 mod versions;
 mod dev_servers;
+mod dispatch;
+mod inbox;
 mod merged;
+mod state_gate;
 mod worktrees;
 mod xhub;
 mod xread;
@@ -224,6 +232,16 @@ enum Msg {
     },
 }
 
+impl Msg {
+    /// A client's own message (its hello, a line, its end): the inbox's
+    /// urgent lane (daemon/inbox.rs), one lane so its order holds.
+    /// TODO(client-protocol): its RpcNew and Typed answers join this lane
+    /// when that branch merges (architect m_14659).
+    fn is_client(m: &Msg) -> bool {
+        matches!(m, Msg::ClientNew { .. } | Msg::ClientLine { .. } | Msg::ClientGone { .. })
+    }
+}
+
 struct Repl {
     stream: TcpStream,
     steer: String,
@@ -356,6 +374,8 @@ struct Shell {
     proto: proto::Proto,
     /// view.json's writer (bise desktop S1, daemon/projects.rs)
     projects: projects::Projects,
+    /// when the state goes to the clients (daemon/state_gate.rs)
+    state_gate: state_gate::StateGate,
     /// bise's home hub: the projects its routing guesses from (daemon/routing.rs)
     routing: routing::Routing,
     /// S9: the fn context of the input being stepped: (agent, its JSON).
@@ -644,8 +664,7 @@ impl Shell {
                 switch: None,
             },
         });
-        let snap = self.snapshot();
-        self.broadcast(&snap);
+        self.state_now();
     }
 
     /// Each agent's model for `sb list`, `sb tasks` and the roster
@@ -758,6 +777,27 @@ impl Shell {
             }
         }
         snap
+    }
+
+    /// The state to the clients, with its page hooks and view.json: what
+    /// sb-core's `state` effect did at once, now when the loop's gate
+    /// allows (daemon/state_gate.rs).
+    fn push_state(&mut self) {
+        self.page_answers();
+        self.page_agent_push();
+        self.page_watch_push();
+        let snap = self.snapshot();
+        self.broadcast(&snap);
+        self.view_changed(&snap);
+        self.state_gate.sent(now_ms());
+    }
+
+    /// A user action's snapshot, to every client at once; a throttled
+    /// push still pending waits its period from now (state_gate `shown`).
+    fn state_now(&mut self) {
+        let snap = self.snapshot();
+        self.broadcast(&snap);
+        self.state_gate.shown(now_ms());
     }
 
     fn transcript(&self, dir: &str) -> PathBuf {
@@ -1051,14 +1091,8 @@ impl Shell {
                 }
                 self.broadcast(&json!({"ev": "renamed", "old": old, "new": new}));
             }
-            Effect::State => {
-                self.page_answers();
-                self.page_agent_push();
-                self.page_watch_push();
-                let snap = self.snapshot();
-                self.broadcast(&snap);
-                self.view_changed(&snap);
-            }
+            // sent by the loop when the gate allows (daemon/state_gate.rs)
+            Effect::State => self.state_gate.changed(),
             Effect::AskRole { dir, key, request } => self.ask_role(dir, key, request),
             Effect::Confirm { card, agent: _, text } => self.on_confirm(card, &text),
             Effect::Flow { client, token, set } => {
@@ -1075,8 +1109,7 @@ impl Shell {
                     write_json(&mut s, &body);
                 }
                 if ok && set.is_some() {
-                    let snap = self.snapshot();
-                    self.broadcast(&snap);
+                    self.state_now();
                 }
             }
             Effect::Choose { client, agent, model, effort, default } => {
@@ -1089,8 +1122,7 @@ impl Shell {
                         write_json(s, &json!({"ev": "notice", "text": text}));
                     }
                 }
-                let snap = self.snapshot();
-                self.broadcast(&snap);
+                self.state_now();
                 self.switch_idle_repls();
             }
             Effect::SpawnModel { token, agent, ask, mut body } => {
@@ -1098,8 +1130,7 @@ impl Shell {
                 if let Some(mut s) = self.replies.remove(&token) {
                     write_json(&mut s, &body);
                 }
-                let snap = self.snapshot();
-                self.broadcast(&snap);
+                self.state_now();
             }
             Effect::Switch { token, from, to, model, effort } => {
                 let res = self.switch_model(&from, &to, &model, &effort);
@@ -1110,8 +1141,7 @@ impl Shell {
                     };
                     write_json(&mut s, &body);
                 }
-                let snap = self.snapshot();
-                self.broadcast(&snap);
+                self.state_now();
             }
             Effect::ModelRefused { agent, why } => self.model_refused(&agent, &why),
             Effect::Pr(e) => log_line(&self.opts.paths, &crate::forge::log_line(&e)),
@@ -2112,6 +2142,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         positions: BTreeMap::new(),
         proto: proto::Proto::default(),
         projects: projects::Projects::boot(&paths),
+        state_gate: state_gate::StateGate::default(),
         routing: routing::Routing::default(),
         search: search::Index::default(),
         xsearch: search::Index::default(),
@@ -2271,242 +2302,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     boot.step("boot done (REPLs spawned)");
     boot.done();
 
-    let mut keep_agents = false;
-    while let Ok(m) = rx.recv() {
-        match m {
-            Msg::In(i) => {
-                let tick = matches!(i, Input::Tick);
-                if tick {
-                    tick_queued.store(false, std::sync::atomic::Ordering::Release);
-                    sh.flush_offsets();
-                }
-                sh.step(i);
-                if tick {
-                    sh.page_waits_check();
-                    sh.check_starts();
-                    sh.plugins_changed(false);
-                    sh.switch_idle_repls();
-                    sh.announce_update();
-                    sh.release_check(None);
-                    sh.plan_prs();
-                    sh.idle_check();
-                    // computer use (design §7.3): each stop, one line in main's feed
-                    for l in sh.cu.poll() {
-                        sh.feed(crate::model::MAIN, &format!("sb computer : {}", crate::util::wire_escape(&l)));
-                    }
-                }
-            }
-            Msg::ReplConnected {
-                dir,
-                gen,
-                stream,
-                steer,
-                interrupt,
-                pid,
-                adopted,
-                busy,
-            } => {
-                if sh.gens.get(&dir) != Some(&gen) {
-                    // killed while it was starting
-                    kill_pid(pid);
-                    continue;
-                }
-                if !adopted {
-                    let _ = std::fs::write(&steer, "");
-                    let _ = std::fs::write(&interrupt, "");
-                }
-                sh.repls.insert(
-                    dir.clone(),
-                    Repl {
-                        stream,
-                        steer,
-                        interrupt,
-                    },
-                );
-                sh.start_connected(&dir);
-                sh.recycle_started(&dir);
-                crate::util::timing(&format!("repl connected {} (adopted {})", dir, adopted));
-                if let Some(q) = sh.switching.remove(&dir) {
-                    // a switched REPL: same session, the core never saw
-                    // it go; the writes it missed go now
-                    log_line(&sh.opts.paths, &format!("switched the REPL of {}", dir));
-                    if let Some(r) = sh.repls.get_mut(&dir) {
-                        for l in &q {
-                            let _ = r.stream.write_all(l.as_bytes());
-                        }
-                    }
-                    if !q.is_empty() {
-                        continue;
-                    }
-                }
-                if !adopted && sh.resume_turn.remove(&dir) {
-                    // its turn was cut: the first turn of the new process
-                    // continues it (queued writes of the core come after)
-                    if let Some(r) = sh.repls.get_mut(&dir) {
-                        let _ = r
-                            .stream
-                            .write_all(format!("say {}\n", wire_escape(RESUME_TEXT)).as_bytes());
-                    }
-                    if let Some(name) = sh.agent_by_dir(&dir).map(|a| a.name.clone()) {
-                        sh.feed(
-                            &name,
-                            "sb info : its turn was interrupted by a restart — it continues where it left off",
-                        );
-                    }
-                }
-                if let Some(name) = sh.agent_by_dir(&dir).map(|a| a.name.clone()) {
-                    if busy {
-                        // adopted mid-turn: busy until its `--- idle`
-                        sh.step(Input::ReplLine {
-                            agent: name.clone(),
-                            line: "  obs: turn_started".into(),
-                        });
-                    } else {
-                        sh.step(Input::ReplReady { agent: name.clone() });
-                    }
-                    // design §10: a restart keeps the card the REPL waits on
-                    if adopted {
-                        sh.gate_restore(&dir, &name);
-                    } else {
-                        sh.gate_fresh(&name);
-                    }
-                }
-            }
-            Msg::ReplStartStep { dir, gen } => sh.start_step(&dir, gen),
-            Msg::ReplSpawned { dir, gen, pid } => {
-                sh.start_step(&dir, gen);
-                let _ = std::fs::write(
-                    sh.opts.paths.agent_dir(&dir).join("repl.pid"),
-                    pid.to_string(),
-                );
-                crate::procs::add_sid(&sh.opts.paths.agent_dir(&dir).join("repl.sids"), pid);
-                if sh.gens.get(&dir) == Some(&gen) {
-                    sh.pids.insert(dir, (gen, pid));
-                } else {
-                    kill_pid(pid);
-                }
-            }
-            Msg::ReplLine {
-                dir,
-                gen,
-                line,
-                offset,
-            } => {
-                if sh.gens.get(&dir) == Some(&gen) {
-                    if !sh.on_ev_line(&dir, &line, offset) {
-                        sh.on_repl_line(&dir, &line);
-                    }
-                    sh.offsets.insert(dir, offset);
-                }
-            }
-            Msg::ReplGone {
-                dir,
-                gen,
-                reason,
-                cause,
-            } => {
-                // a killed generation is not live anymore: its exit is
-                // expected; any exit of the live one is a crash (the hub
-                // never asks a REPL to quit)
-                if sh.gens.get(&dir) != Some(&gen) {
-                    continue;
-                }
-                sh.start_gone(&dir, cause);
-                sh.gens.remove(&dir);
-                sh.repls.remove(&dir);
-                sh.gate_forget(&dir);
-                sh.pids.remove(&dir);
-                // its writer's lock goes with it (a respawn resumes the log)
-                sh.recorders.remove(&dir);
-                if sh.switching.contains_key(&dir) && !sh.switch_spawned.contains(&dir) {
-                    // the reload a switch asked for: the same session on
-                    // this hub's binary, the same port
-                    let port = sh.ports.get(&dir).copied();
-                    if let Some(name) = sh.agent_by_dir(&dir).map(|a| a.name.clone()) {
-                        sh.restored.insert(dir.clone());
-                        sh.switch_spawned.insert(dir.clone());
-                        sh.spawn_on(&name, true, None, port);
-                        continue;
-                    }
-                }
-                // the new process of a switch died: a crash like any other
-                sh.switching.remove(&dir);
-                sh.switch_spawned.remove(&dir);
-                sh.restored.remove(&dir);
-                // a new version on probation: a REPL that dies is a
-                // reason to roll back, a slow start is not (repl_start)
-                if cause.reports() {
-                    crate::switch::report_failure(&sh.opts.paths, &format!("the REPL of {} stopped: {}", dir, reason));
-                }
-                if let Some(name) = sh.agent_by_dir(&dir).map(|a| a.name.clone()) {
-                    sh.step(Input::ReplExited {
-                        agent: name,
-                        crashed: true,
-                        reason,
-                    });
-                }
-            }
-            Msg::Page(m) => sh.page_msg(m),
-            Msg::ClientNew { id, stream } => sh.client_hello(id, stream),
-            Msg::ClientLine { id, v } => sh.client_line(id, v),
-            Msg::ClientGone { id } => {
-                if sh.clients.remove(&id).is_some() {
-                    sh.step(Input::ClientGone { client: id });
-                }
-            }
-            Msg::AgentNew { token, stream, v } => sh.agent_request(token, stream, v),
-            Msg::XHub { token, stream, v } => sh.xhub_op(token, stream, v),
-            Msg::Version { mut stream, v } => {
-                let from = v.get("from").and_then(|x| x.as_str()).unwrap_or("");
-                let what = v.get("do").and_then(|x| x.as_str()).unwrap_or("");
-                match version_allowed(from, what) {
-                    Ok(()) => {
-                        let text = sh.version_op(&v);
-                        write_json(&mut stream, &json!({"ok": true, "text": text}));
-                    }
-                    Err(e) => {
-                        write_json(&mut stream, &json!({"ok": false, "error": e}));
-                    }
-                }
-            }
-            Msg::Notice { kind, text } => {
-                let kind = if kind == "warn" { "warn" } else { "info" };
-                sh.feed(MAIN, &format!("sb {} : {}", kind, wire_escape(&text)));
-                sh.broadcast_versions();
-            }
-            Msg::Release { client, v } => sh.release_event(client, v),
-            Msg::Update(v) => sh.update_event(v),
-            Msg::Changes { name, v } => sh.on_changes(name, v),
-            Msg::RoutePick { rid, pick } => sh.route_picked(rid, pick),
-            Msg::ToClient { id, v } => {
-                if let Some(c) = sh.clients.get_mut(&id) {
-                    write_json(c, &v);
-                }
-            }
-            Msg::RoleLine { dir, key, line } => sh.step(Input::RoleLine { dir, key, line }),
-            Msg::GateChecked { dir, n, req, out } => sh.on_checked(&dir, &n, *req, out),
-            Msg::BuildEnded { rev } => {
-                sh.building.remove(&rev);
-                sh.broadcast_versions();
-            }
-            Msg::Land { line } => {
-                if let Some((kind, text)) = line {
-                    sh.feed(MAIN, &format!("sb {} : {}", kind, wire_escape(&text)));
-                    // a land moved main or a feature: the features' facts again
-                    sh.refresh_features();
-                    if kind == "landed" {
-                        sh.merged_all();
-                    }
-                }
-                let snap = sh.snapshot();
-                sh.broadcast(&snap);
-            }
-            Msg::Shutdown { keep } => {
-                keep_agents = keep;
-                break;
-            }
-        }
-    }
+    let keep_agents = sh.serve(rx, &tick_queued);
     // for good: no new client reaches a hub that is going (it would wait
     // for a hello that never comes); a `bise` meanwhile starts the next
     // hub, which waits for this one to be gone (`wait_previous_hub`)
