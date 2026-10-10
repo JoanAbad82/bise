@@ -7,6 +7,7 @@ export type * from './context';
 export type * from './diff';
 export type * from './rows';
 export type * from './thread';
+export type * from './log';
 export type * from './ops';
 export type * from './hub';
 export type * from './rpc';

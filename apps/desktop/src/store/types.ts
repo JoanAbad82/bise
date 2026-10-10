@@ -25,6 +25,9 @@ export const TAGS = {
   tool_out: true,
   // the answer to queued_take (turn/unqueue): his taken-back words, to the asking window (main 34c35175)
   queued_taken: true,
+  // the answer to log (log/read): a page of an agent's raw session, read through onEvent by the
+  // window's /log screen (main 0c227ae3)
+  log: true,
   diff: true,
   route: true,
   route_done: true,
