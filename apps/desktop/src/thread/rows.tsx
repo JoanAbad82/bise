@@ -328,26 +328,28 @@ export function fileUrl(path: string): string {
   return `file://${path.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-/** His answer to main's own card: '✓ you answered: <question> · <words>', each '[Image #n]' the window's chip. */
+/**
+ * His answer to main's own card, in the same order as every '✓ you answered' row (designer
+ * m_15420): line 1 what was asked, line 2 his words, line 3 a chip for each '[Image #n]' he sent.
+ */
 function CardAnsweredRow({ pos, a }: { pos: number; a: { card: number; question: string; words: string } }) {
-  const split = a.words.split(/(\[Image #\d+\])/u).filter((p) => p !== '');
-  // each image's order in his answer (the chip's '[Image #n]'), 0 for words
-  const parts = split.map((p, i) => ({ p, img: /^\[Image #\d+\]$/u.test(p) ? split.slice(0, i + 1).filter((x) => /^\[Image #\d+\]$/u.test(x)).length : 0 }));
+  const images = a.words.match(/\[Image #\d+\]/gu) ?? [];
+  const words = a.words.replace(/\[Image #\d+\]/gu, ' ').replace(/\s+/gu, ' ').trim();
   return (
     <div className="th-approval" data-testid={`thread.cardanswer.${String(pos)}`} data-card={a.card}>
       <NewsLine mark="✓" tone="ok" testId={`thread.cardanswer.${String(pos)}.head`}>
         {`you answered: ${a.question}`}
-        {parts.length > 0 && ' · '}
-        {parts.map(({ p, img }, i) =>
-          img === 0 ? (
-            <span key={i}>{p}</span>
-          ) : (
-            <span key={i} className="b-chip image th-inline-chip" data-kind="image" data-testid={`thread.cardanswer.${String(pos)}.image.${String(img)}`}>
-              <span className="lbl">{imageLabel(img - 1)}</span>
-            </span>
-          ),
-        )}
       </NewsLine>
+      {words !== '' && <div className="th-news-note" data-testid={`thread.cardanswer.${String(pos)}.words`}>{words}</div>}
+      {images.length > 0 && (
+        <div className="th-images">
+          {images.map((_, i) => (
+            <span key={i} className="b-chip image" data-kind="image" data-testid={`thread.cardanswer.${String(pos)}.image.${String(i + 1)}`}>
+              <span className="lbl">{imageLabel(i)}</span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

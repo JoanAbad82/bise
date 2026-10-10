@@ -43,6 +43,8 @@ test('thread/dock-choice: a docked merge is decided only by 1/2; typed words go 
       await expect(page.getByTestId('inbox.block.open.1')).toBeVisible({ timeout: 3000 });
       // the label's left (its right is the S40/W3 divider, here 'waiting')
       await expect(label.locator('.lbl')).toHaveText('to bise · the merge waits for 1 or 2');
+      // the label wins over the divider words (designer m_14523): never cut while they're there
+      expect(await label.locator('.lbl').evaluate((el) => el.scrollWidth - el.clientWidth), 'the label whole').toBeLessThanOrEqual(1);
       await expect(page.getByTestId('inbox.block.open.1'), 'no type hint on a choice item').not.toContainText('type your answer');
       await page.screenshot({ path: test.info().outputPath('dock-merge.png') });
       await page.locator('[data-testid="composer.field"]').first().click();

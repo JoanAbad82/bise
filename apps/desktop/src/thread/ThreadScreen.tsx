@@ -105,7 +105,9 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
           mode: approvals?.mode,
           status: me.status,
           turnMs: me.status === 'working' ? (me.turn_ms ?? now - me.since_ms) : null,
-          context: me.usage?.words,
+          // named like the head's gauge ('context 42k · 17%'), none at 0% (designer m_14523: a bare
+          // '15 · 0%' read as nothing)
+          context: usageLine(me.usage?.words),
         });
   // voice mode on this agent: its pane takes the composer's place (amb-home's src/voicemode)
   const voice = useVoiceHere(project, agent);

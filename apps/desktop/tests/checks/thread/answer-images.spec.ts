@@ -73,9 +73,13 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
     }
     await expect(page.getByTestId('thread.answered.3.image.1'), "bise's answer for him: the same chip").toHaveText('[Image #1]');
     // main's own card answered: the '✓ you answered' row with the chip, never the hub's raw line
-    const card = page.getByTestId('thread.cardanswer.4');
-    await expect(card).toHaveText('✓you answered: merge checkout into main? (2 files, tests pass) · [Image #1] this one');
+    // the same order as the rows above (designer m_15420): what was asked, his words, the chip
+    await expect(page.getByTestId('thread.cardanswer.4.head')).toHaveText('✓you answered: merge checkout into main? (2 files, tests pass)');
+    await expect(page.getByTestId('thread.cardanswer.4.words')).toHaveText('this one');
     await expect(page.getByTestId('thread.cardanswer.4.image.1')).toHaveText('[Image #1]');
+    const ys = await Promise.all(['head', 'words', 'image.1'].map(async (k) => (await page.getByTestId(`thread.cardanswer.4.${k}`).boundingBox())?.y ?? 0));
+    expect(ys[0] ?? 0, 'his words under the question').toBeLessThan(ys[1] ?? 0);
+    expect(ys[1] ?? 0, 'the chip under his words').toBeLessThan(ys[2] ?? 0);
     const all = await page.getByTestId('thread.list').innerText();
     expect(all, 'never the raw line').not.toContain('the user answered card');
     expect(all, 'never the old product name').not.toContain('switchboard');
