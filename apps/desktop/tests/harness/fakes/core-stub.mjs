@@ -13,7 +13,7 @@
 //      BISE_HARNESS_CORE_SOCK    the unix socket a test writes events to (fakes/core.ts)
 //      BISE_HARNESS_CORE_LOG     the file the commands go to
 // (src/main/core/env.ts drops BISE_DESKTOP_* from the core's env; BISE_HARNESS_* passes.)
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runStub } from './stub-lib.mjs';
@@ -22,9 +22,17 @@ const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const jsonl = (file) => readFileSync(file, 'utf8').split(String.fromCharCode(10)).map((l) => l.trim()).filter(Boolean);
 
 const world = process.env.BISE_HARNESS_CORE_EVENTS;
-const start = world === 'none' ? []
+const all = world === 'none' ? []
   : world ? jsonl(world)
   : [...jsonl(path.join(FIXTURES, 'core_ev.jsonl')), ...jsonl(path.join(FIXTURES, 'hub_ev.jsonl'))];
+// A restart (FakeCore.exit: the app's main spawns the stub again) sends the start world again, but
+// never the hub's one-shot ask: a `confirm` goes to the connection whose command asked it, and a
+// real core restart is a new connection, so it is gone (app/keep-all :166 red: the replayed
+// 'archive it anyway? (y/n)' bar took the keys from Tune's half-typed model id).
+const started = process.env.BISE_HARNESS_CORE_LOG ? `${process.env.BISE_HARNESS_CORE_LOG}.started` : null;
+const again = started !== null && existsSync(started);
+if (started !== null) writeFileSync(started, '');
+const start = again ? all.filter((l) => JSON.parse(l).ev !== 'confirm') : all;
 
 // The world is written at spawn: the app's main keeps the newest state events and replays them to
 // a window that loads later (amb-core 162ec18b). A thread's lines aren't state: like the real core,
