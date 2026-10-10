@@ -192,6 +192,22 @@ def is_down(r: M.Run) -> Bool:
     case _:
       False{}
 
+# issue 22: an agent's ended turns after its run goes from `was` to
+# `now`: one more when it leaves RBusy (to idle, down or starting), the
+# same otherwise. set_rt, the one writer of a runtime state, applies it,
+# so a turn that ends and a next one that starts in the same step (the
+# idle's pump) still counts.
+def turns_after(was: M.Run, now: M.Run, +n: Nat) -> Nat:
+  match was:
+    case M.RBusy{}:
+      match now:
+        case M.RBusy{}:
+          n
+        case _:
+          1n+n
+    case _:
+      n
+
 def is_active(l: M.Life) -> Bool:
   match l:
     case M.LActive{}:
@@ -204,7 +220,7 @@ def is_active(l: M.Life) -> Bool:
 def rt_find(xs: List<&2, X.Rt>, +n: String) -> X.Rt:
   match xs:
     case Nil{}:
-      X.Rt{n, M.RDown{}, False{}, None{}}
+      X.Rt{n, M.RDown{}, False{}, None{}, 0n}
     case Con{+h, +t}:
       Bool.pick(X.Rt, String.eq(X.Rt.name(h), n), h, rt_find(t, n))
 
@@ -309,6 +325,10 @@ def get_key(~A: Data, ~B: Data, ~key: A -> String, ~val: A -> B, xs: List<&2, A>
 def steer_get(xs: List<&2, X.Steer>, +n: String) -> List<&2, Nat>:
   get_key(~X.Steer, ~List<&2, Nat>, ~X.Steer.agent, ~X.Steer.ids, xs, n, Nil{})
 
+# how many of an agent's steered ids a receipt already reported
+def steer_seen(xs: List<&2, X.Steer>, +n: String) -> Nat:
+  get_key(~X.Steer, ~Nat, ~X.Steer.agent, ~X.Steer.seen, xs, n, 0n)
+
 def cnt_get(xs: List<&2, X.Cnt>, +n: String) -> X.Cnt:
   get_key(~X.Cnt, ~X.Cnt, ~X.Cnt.agent, ~(c => c), xs, n, X.Cnt{n, 0n, 0n})
 
@@ -336,14 +356,14 @@ def steer_del(xs: List<&2, X.Steer>, +n: String) -> List<&2, X.Steer>:
       Bool.pick(List<&2, X.Steer>, String.eq(X.Steer.agent(h), n), rest, h <> rest)
 
 def steer_add(+xs: List<&2, X.Steer>, +n: String, +ids: List<&2, Nat>) -> List<&2, X.Steer>:
-  M.snoc(X.Steer, steer_del(xs, n), X.Steer{n, List.append(&2, Nat, steer_get(xs, n), ids)})
+  M.snoc(X.Steer, steer_del(xs, n), X.Steer{n, List.append(&2, Nat, steer_get(xs, n), ids), steer_seen(xs, n)})
 
 def steer_rename(xs: List<&2, X.Steer>, +old: String, +new: String) -> List<&2, X.Steer>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+h, +t}:
-      Bool.pick(X.Steer, String.eq(X.Steer.agent(h), old), X.Steer{new, X.Steer.ids(h)}, h) <> steer_rename(t, old, new)
+      Bool.pick(X.Steer, String.eq(X.Steer.agent(h), old), X.Steer{new, X.Steer.ids(h), X.Steer.seen(h)}, h) <> steer_rename(t, old, new)
 
 def ids_of(xs: List<&2, M.Msg>) -> List<&2, Nat>:
   match xs:
@@ -388,12 +408,20 @@ def jturn(m: Maybe<&2, Nat>) -> J.Json:
     case Some{+t}:
       J.JNum{t}
 
-# set the runtime state of an agent (the Rust mirror follows)
-def set_rt(-o: M.St, +cx: X.Cx<o>, +x: X.Rt) -> X.Cx<o>:
+# the runtime state `x` as set_rt stores it over `was`, the agent's
+# runtime before: its ended turns are was's, one more when the run
+# leaves RBusy (turns_after); x's own count is never read
+def rt_next(+was: X.Rt, +x: X.Rt) -> X.Rt:
+  X.Rt.with_turns(x, turns_after(X.Rt.run(was), X.Rt.run(x), X.Rt.turns(was)))
+
+# set the runtime state of an agent (the Rust mirror follows): every
+# runtime change goes through here, so its ended turns count here
+def set_rt(-o: M.St, +cx: X.Cx<o>, +x0: X.Rt) -> X.Cx<o>:
+  +x = rt_next(rt(o, cx, X.Rt.name(x0)), x0)
   +cx2 = set_r(o, cx, X.R.with_rts(rr(o, cx), rt_put(X.R.rts(rr(o, cx)), x)))
   out(o, cx2, [J.kv("fx", J.JStr{"rt"}), J.kv("agent", J.JStr{X.Rt.name(x)}),
     J.kv("run", J.JStr{run_str(X.Rt.run(x))}), J.kv("waiting", J.JBool{X.Rt.waiting(x)}),
-    J.kv("turn_ms", jturn(X.Rt.turn(x)))])
+    J.kv("turn_ms", jturn(X.Rt.turn(x))), J.kv("turns", J.JNum{X.Rt.turns(x)})])
 
 def set_run(-o: M.St, +cx: X.Cx<o>, +n: String, +run: M.Run) -> X.Cx<o>:
   set_rt(o, cx, X.Rt.with_run(rt(o, cx, n), run))
@@ -451,7 +479,7 @@ def status_of_decl(d: Maybe<&2, M.Decl>) -> String:
 
 def status_of_run(+a: M.Agent, x: X.Rt) -> String:
   match x:
-    case X.Rt{_, run, +w, _}:
+    case X.Rt{_, run, +w, _, _}:
       match run:
         case M.RDown{}:
           "starting"
@@ -638,8 +666,10 @@ def deliver.line(-o: M.St, again: Bool, you: Bool, +cx: X.Cx<o>, +name: String, 
   match again you:
     case True{} _:
       cx
+    # his line, then its message id on the next one (the feed only: the
+    # clients key his entry by it, the steered receipt names it)
     case False{} True{}:
-      line(o, cx, name, "you", M.Msg.text(m))
+      line(o, line(o, cx, name, "you", M.Msg.text(m)), name, "you-id", mid(M.Msg.id(m)))
     case False{} False{}:
       line(o, cx, name, "msg-in", cat([M.Msg.from(m), " ", mid(M.Msg.id(m)), " : ", M.Msg.text(m)]))
 
@@ -669,7 +699,7 @@ def pump.send.go(-o: M.St, busy: Bool, +cx: X.Cx<o>, +name: String, +ids: List<&
       dirty(o, out(o, cx2, J.kv("fx", J.JStr{"deliver"}) <> J.kv("mode", J.JStr{"steer"}) <> kvs))
     case False{}:
       # the turn starts now: nothing else may `say` meanwhile
-      +cx2 = upd_rt(o, cx, X.Rt{name, M.RBusy{}, X.Rt.waiting(rt(o, cx, name)), Some{now(o, cx)}})
+      +cx2 = upd_rt(o, cx, X.Rt{name, M.RBusy{}, X.Rt.waiting(rt(o, cx, name)), Some{now(o, cx)}, 0n})
       dirty(o, out(o, cx2, J.kv("fx", J.JStr{"deliver"}) <> J.kv("mode", J.JStr{"say"}) <> kvs))
 
 def pump.send(-o: M.St, busy: Bool, p: X.Cx<o> & List<&2, J.Json>, +name: String, +ids: List<&2, Nat>, +kvs0: List<&2, Sigma<&2, &2, String, _ => J.Json>>) -> X.Cx<o>:
@@ -3171,6 +3201,40 @@ def steer_count(-o: M.St, +cx: X.Cx<o>, +agent: String, +injected: Bool) -> X.Cx
   +c2 = Bool.pick(X.Cnt, injected, X.Cnt{agent, X.Cnt.recv(c), 1n+X.Cnt.inj(c)}, X.Cnt{agent, 1n+X.Cnt.recv(c), X.Cnt.inj(c)})
   set_r(o, cx, X.R.with_counts(r, M.snoc(X.Cnt, cnt_del(X.R.counts(r), agent), c2)))
 
+# an agent's steered list with `seen` set to `k` (the list itself kept)
+def steer_mark(xs: List<&2, X.Steer>, +n: String, +k: Nat) -> List<&2, X.Steer>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Bool.pick(X.Steer, String.eq(X.Steer.agent(h), n), X.Steer{n, X.Steer.ids(h), k}, h) <> steer_mark(t, n, k)
+
+def mids(xs: List<&2, Nat>) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      mid(h) <> mids(t)
+
+# the receipt's ids: the steer-mode deliveries since the last receipt
+# (none: a second receipt with no new steer marks nothing)
+def steer_receipt.go(-o: M.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: String, +total: Nat) -> X.Cx<o>:
+  match new:
+    case Nil{}:
+      cx
+    case Con{+h, +t}:
+      +r = rr(o, cx)
+      +cx2 = set_r(o, cx, X.R.with_steered(r, steer_mark(X.R.steered(r), agent, total)))
+      line(o, cx2, agent, "steered", String.join(mids(h <> t), " "))
+
+# the runtime read the steering (ISteered): the feed line naming the
+# messages it read, at this point of the turn ('sb steered : m_3 m_4');
+# R.steered stays whole for the turn's end (repl_idle reads it)
+def steer_receipt(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
+  +xs = X.R.steered(rr(o, cx))
+  +ids = steer_get(xs, agent)
+  steer_receipt.go(o, List.drop(&2, Nat, ids, steer_seen(xs, agent)), cx, agent, List.length(&2, Nat, ids))
+
 def assistant(-o: M.St, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
   +r = rr(o, cx)
   set_r(o, cx, X.R.with_last(r, M.snoc(X.Kv, kv_del(X.R.last(r), agent), X.Kv{agent, text})))
@@ -3407,7 +3471,7 @@ def idle.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +agent: String, +l
     case None{}:
       cx
     case Some{+a}:
-      +cx2 = dirty(o, set_rt(o, cx, X.Rt{agent, M.RIdle{}, False{}, None{}}))
+      +cx2 = dirty(o, set_rt(o, cx, X.Rt{agent, M.RIdle{}, False{}, None{}, 0n}))
       +r = rr(o, cx2)
       +text = kv_get(X.R.last(r), agent)
       +cx3 = set_r(o, cx2, X.R.with_last(r, kv_del(X.R.last(r), agent)))
@@ -3538,7 +3602,8 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
     case ISteerRx{}:
       steer_count(o, cx, C.get_s(i, "agent"), False{})
     case ISteered{}:
-      steer_count(o, cx, C.get_s(i, "agent"), True{})
+      +agent = C.get_s(i, "agent")
+      steer_receipt(o, steer_count(o, cx, agent, True{}), agent)
     case IAssistant{}:
       assistant(o, cx, C.get_s(i, "agent"), C.get_s(i, "text"))
     case ITouch{}:

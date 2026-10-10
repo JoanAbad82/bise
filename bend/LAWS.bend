@@ -5511,6 +5511,48 @@ law main_card_answer_routes_once:
         HM.MAIN(), "route", HC.cat(["you → @", HM.MAIN(), " (answer to card #", HC.ns(HM.Card.id(c)), ") : ", text])),
       HM.Card.id(c), "answered") : HX.Cx<o>}
 
+# LAW: his message's feed line is followed, in the same step, by its id
+# ('sb you-id : m_N'): the clients key his entry by it (nothing else may
+# fall between them); the REPL and the model get the same delivery.
+law you_line_carries_its_id:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +name: String
+  for +m: HM.Msg
+  {HC.deliver.line(o, False{}, True{}, cx, name, m)
+    == HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m))) : HX.Cx<o>}
+
+# LAW: a steered receipt names the steer-mode deliveries since the last
+# one, on one feed line at this point of the turn, and marks them seen.
+law steered_receipt_names_the_new_ones:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +agent: String
+  for +h: Nat
+  for +t: List<&2, Nat>
+  for +total: Nat
+  {HC.steer_receipt.go(o, h <> t, cx, agent, total)
+    == HC.line(o, HC.set_r(o, cx, HX.R.with_steered(HC.rr(o, cx), HC.steer_mark(HX.R.steered(HC.rr(o, cx)), agent, total))),
+      agent, "steered", String.join(HC.mids(h <> t), " ")) : HX.Cx<o>}
+
+# LAW: a receipt once every steered id was seen (or with none) marks
+# nothing and writes nothing (a second receipt with no new steer).
+law steered_receipt_after_all_seen_is_nothing:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +agent: String
+  for +ids: List<&2, Nat>
+  for +total: Nat
+  {HC.steer_receipt.go(o, List.drop(&2, Nat, ids, List.length(&2, Nat, ids)), cx, agent, total) == cx : HX.Cx<o>}
+
+# LAW: a new steer keeps the cursor: the ids already reported stay
+# reported, the new ones come after them.
+law steer_add_keeps_seen:
+  for +xs: List<&2, HX.Steer>
+  for +n: String
+  for +ids: List<&2, Nat>
+  {HC.steer_seen(HC.steer_add(xs, n, ids), n) == HC.steer_seen(xs, n) : Nat}
+
 # ---- MCP calls that fail (runtime/mcp-pure.bend) ----
 
 # LAW: a call is tried again (fresh initialize) only when it never
@@ -5538,3 +5580,36 @@ law mcp_fail_text_says_why_and_safety:
       "mcp call failed: web_search.web_search (api.mistral.ai), initialize: cannot resolve api.mistral.ai (dns) — check your network or VPN. bise reconnected and retried 2 times. the call never reached the server: safe to call again."),
     String.eq(Mc.fail_text("x.y", "h", Mc.SCall{}, Mc.WStatus{502, "{\"message\":\"bad gateway\"}"}, 0n),
       "mcp call failed: x.y (h), tools/call: h answered HTTP 502: bad gateway. not retried: the call may have run on the server, check before calling it again (safe if the tool only reads).")) == True{} : Bool}
+
+# ---- an agent's ended turns, counted where its run changes (issue 22,
+# architect m_16521): the agents row carries working and turns from one
+# source, sb-core's runtime state, so no row has one half without the
+# other. set_rt is the one writer of a runtime state ----
+
+# LAW: a run that leaves RBusy (to idle, down or starting) counts one
+# more ended turn.
+law hub_turns_counts_every_busy_exit:
+  for now: HM.Run
+  for +n: Nat
+  for e: {HC.is_busy(now) == False{} : Bool}
+  {HC.turns_after(HM.RBusy{}, now, n) == 1n+n : Nat}
+
+# LAW: any other run change (busy to busy, or from a run that was not
+# busy) leaves the count as it was.
+law hub_turns_never_moves_otherwise:
+  for was: HM.Run
+  for now: HM.Run
+  for +n: Nat
+  for e: {Bool.and(HC.is_busy(was), Bool.not(HC.is_busy(now))) == False{} : Bool}
+  {HC.turns_after(was, now, n) == n : Nat}
+
+# LAW: set_rt, every runtime change, stores the agent's ended turns as
+# its runtime before them moved by turns_after (whatever count the new
+# state carried): a step that ends a turn and starts the next one (the
+# idle's pump) goes through it twice, Busy -> Idle (+1), Idle -> Busy.
+law hub_set_rt_counts_turns:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +x: HX.Rt
+  {HX.Rt.turns(HC.rt(o, HC.set_rt(o, cx, x), HX.Rt.name(x)))
+    == HC.turns_after(HX.Rt.run(HC.rt(o, cx, HX.Rt.name(x))), HX.Rt.run(x), HX.Rt.turns(HC.rt(o, cx, HX.Rt.name(x)))) : Nat}

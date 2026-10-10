@@ -225,9 +225,9 @@ pub(super) struct Sb {
     seen: HashMap<String, crate::entry_reads::Seen>,
     /// The threads subscribed on this connection (sb/feed_entries.rs).
     subscribed: std::collections::HashSet<String>,
-    /// Each agent's last row as the turn edges read it: working, its
-    /// ended turns, what its edges owe (feed_entries::agent_row).
-    turns_seen: HashMap<String, (bool, u64, crate::queue::Owed)>,
+    /// Each agent's last row as the turn edges read it: its turn runs,
+    /// its ended turns (feed_entries::agent_row).
+    turns_seen: HashMap<String, (bool, u64)>,
     /// The agent whose first page `ready` waits for (the focus at the
     /// connection, sb/feed_entries.rs `on_ready`): none, it came.
     ready_page: Option<String>,
@@ -1051,6 +1051,10 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
         // S9: the fn context of the 'you' line before it (the window's
         // thread shows it on his message; the TUI doesn't)
         Hub::Context(_) => return None,
+        // his message's id and the steered receipt: the window's thread
+        // reads them (msg_id, steered_at); the TUI shows neither (its
+        // marks come from the runtime's steering lines)
+        Hub::YouId(_) | Hub::Steered(_) => return None,
         // BISE-86
         Hub::Undelivered { to, text } => Ev::Undelivered { name: to, text, open: true },
         // v1: what this feed's owner received (`@{from}`: an old direct
