@@ -3,7 +3,7 @@
 // not history: no entry kind). The words are the core's (bise_computer_use::live::line, the TUI's
 // line: mark + words, amb-core m_16595); the window only adds ' · 2 min' while it drives.
 // Driving: '↖ driving Chrome · amazon.fr · 2 min' with 'take the wheel' and 'stop'; taken:
-// '? you took the wheel · ⏎ give it back' (accent) with 'give it back'; stopped: dim; no row:
+// '? you took the wheel' (accent: the button 'give it back ⏎' says the rest); stopped: dim; no row:
 // nothing. A click sends computer {act, key} and draws nothing until the rows move (no
 // optimistic state). A click on the words opens a small still of what it drives (usePeek:
 // inline, never stored); esc or a click closes it. Owner: amb-win.
@@ -25,8 +25,17 @@ export function computerState(r: ComputerAgent): ComputerState {
  * plus ' · 2 min' from since_ms while it drives. No words are built here. Pure.
  */
 export function computerWords(r: ComputerAgent, now: number): string {
+  // paused: the button carries 'give it back' (designer m_16663): the words stop at the first dot
+  if (r.kind === 'paused') return `${r.mark} ${r.words.split(' · ')[0] ?? r.words}`;
   const since = r.kind === 'driving' && r.since_ms != null && r.since_ms > 0 ? ` · ${ago(r.since_ms, now)}` : '';
   return `${r.mark} ${r.words}${since}`;
+}
+
+/** The still's caption: 'a still from 15:31 · esc closes' (its arrival time, local). Pure. */
+export function stillCaption(at: number | null): string {
+  if (at === null) return 'a still · esc closes';
+  const d = new Date(at);
+  return `a still from ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} · esc closes`;
 }
 
 /** This agent's row of his computer use, if it drives (another bise's agents have no project). Pure. */
@@ -90,7 +99,7 @@ function Line({ row }: { row: ComputerAgent }) {
         )}
         {state === 'paused' && (
           <button type="button" className="th-cu-act" onClick={act('hand_back')} data-testid="thread.computer.back">
-            give it back
+            give it back <kbd className="th-cu-key">⏎</kbd>
           </button>
         )}
       </div>
@@ -102,12 +111,21 @@ function Line({ row }: { row: ComputerAgent }) {
 /** W4: a small still of what it drives, asked while open, kept nowhere. */
 function Peek({ rowKey, onClose }: { rowKey: string; onClose: () => void }) {
   const peek = usePeek(rowKey, { on: true, maxWidth: 480 });
+  const now = useNow();
   const shot = peek?.shot ?? null;
   const why = peek?.why ?? null;
+  // when this still came (a still, not a live view: designer m_16663); a new still moves it
+  // (adjusted while rendering, React's 'state from a changed prop' pattern: no effect, no extra pass)
+  const [seen, setSeen] = useState<{ shot: typeof shot; at: number | null }>({ shot: null, at: null });
+  if (shot !== seen.shot) setSeen({ shot, at: shot === null ? null : now });
+  const at = seen.at;
   return (
     <button type="button" className="th-cu-peek" onClick={onClose} data-testid="thread.computer.peek" aria-label="close the still">
       {shot !== null ? (
-        <img src={`data:${shot.mime};base64,${shot.data}`} width={shot.width} height={shot.height} alt="what it drives now" />
+        <>
+          <img src={`data:${shot.mime};base64,${shot.data}`} width={shot.width} height={shot.height} alt="what it drives now" />
+          <span className="th-cu-cap" data-testid="thread.computer.peek.cap">{stillCaption(at)}</span>
+        </>
       ) : (
         <span className="th-cu-none">{peek === null ? 'looking…' : why === 'too_soon' ? 'looking…' : 'nothing to show'}</span>
       )}

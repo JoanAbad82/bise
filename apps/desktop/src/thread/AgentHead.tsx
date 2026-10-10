@@ -6,12 +6,15 @@
 // StartingLine: the empty thread's line. The words are head.ts's. Owner: amb-home.
 import type { ReactNode } from 'react';
 import type { Agent } from '@/proto';
-import { useAgents, useDiff } from '@/store';
+import { useAgents, useComputerLive, useDiff } from '@/store';
 import { useNow } from '@/app/clock';
 import { ago } from '@/agents/model';
 import { useRouter } from '@/app/router';
 import { BisePearl } from '@/app/BisePearl';
 import { biseChip, branchLine, roleOf, stateChip, usageLine, type StateChip } from './head';
+
+/** an agent whose wheel he took waits for him, like any agent that asks him */
+const HELD: StateChip = { text: '? waiting for you', needs: true, live: false };
 
 function Chip({ chip, testId }: { chip: StateChip; testId: string }) {
   return (
@@ -28,6 +31,8 @@ export function AgentHead({ project, a, more, note, starting = false }: { projec
   const router = useRouter();
   const diff = useDiff(project, a.name);
   const branch = branchLine(a.branch, diff?.files.length);
+  // S29/L19: he took the wheel: it waits for him until he gives it back (amb-win, designer m_16663)
+  const held = useComputerLive().some((r) => r.project === project && r.agent === a.name && r.kind === 'paused');
   const review = () => {
     router.go({ screen: 'review', project, agent: a.name });
   };
@@ -43,7 +48,7 @@ export function AgentHead({ project, a, more, note, starting = false }: { projec
           </span>
         )}
       </span>
-      <Chip chip={starting && a.waits === 0 ? { text: 'starting', needs: false, live: true } : stateChip(a, now)} testId="thread.head.state" />
+      <Chip chip={starting && a.waits === 0 ? { text: 'starting', needs: false, live: true } : held ? HELD : stateChip(a, now)} testId="thread.head.state" />
       {note !== undefined && (
         <span className="ah-note" data-testid="thread.voice">
           {note}

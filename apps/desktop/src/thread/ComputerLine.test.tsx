@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { ComputerAgent } from '@/proto';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
-import { ComputerLine, computerRowOf, computerState, computerWords } from './ComputerLine';
+import { ComputerLine, computerRowOf, computerState, computerWords, stillCaption } from './ComputerLine';
 
 const P = 'acme-1a2b3c4d';
 const NOW = 1_760_000_120_000;
@@ -26,9 +26,14 @@ afterEach(cleanup);
 describe('the computer-use line (pure)', () => {
   it("draws the core's mark and words, and adds the age only while it drives", () => {
     expect(computerWords(driving, NOW)).toBe('↖ driving Chrome · amazon.fr · 2 min');
-    expect(computerWords(paused, NOW)).toBe('? you took the wheel · ⏎ give it back');
+    // paused: the button carries 'give it back' (designer m_16663)
+    expect(computerWords(paused, NOW)).toBe('? you took the wheel');
     expect(computerWords(stopped, NOW)).toBe('↖ you stopped it driving Chrome · write to it to go on');
     expect(computerWords({ ...driving, since_ms: null }, NOW)).toBe('↖ driving Chrome · amazon.fr');
+  });
+  it("the still's caption says when it is from, not live", () => {
+    expect(stillCaption(new Date(2026, 9, 10, 15, 31).getTime())).toBe('a still from 15:31 · esc closes');
+    expect(stillCaption(null)).toBe('a still · esc closes');
   });
   it("its state is the core's kind; its row is this project's agent, never another bise's", () => {
     expect([driving, paused, stopped].map(computerState)).toEqual(['driving', 'paused', 'stopped']);

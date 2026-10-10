@@ -1051,6 +1051,18 @@ button.th-sched-head {
   max-width: 100%;
   height: auto;
 }
+.th-cu-key {
+  margin-left: 4px;
+  color: var(--c-text-3);
+  font: var(--t-12) var(--font-mono);
+}
+.th-cu-cap {
+  display: block;
+  padding: 6px 10px;
+  color: var(--c-text-3);
+  font: var(--t-12) var(--font-ui);
+  text-align: left;
+}
 .th-cu-none {
   display: block;
   padding: 10px 14px;

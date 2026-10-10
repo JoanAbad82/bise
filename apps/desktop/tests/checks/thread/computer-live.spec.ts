@@ -5,10 +5,12 @@
 //   - no row: no line; perf drives Chrome: '↖ driving Chrome · amazon.fr · 2 min' with 'take the
 //     wheel' and 'stop', and the sidebar's perf row has the '↖';
 //   - 'take the wheel' sends computer {take, key} and the line stays as it is until the rows move;
-//   - paused ('? you took the wheel · ⏎ give it back', accent): ⏎ on the empty composer sends
-//     computer {hand_back, key} and nothing else (no send);
+//   - paused ('? you took the wheel' in the accent, the button 'give it back ⏎'; the head's chip
+//     '? waiting for you'): ⏎ on the empty composer sends computer {hand_back, key} and nothing
+//     else (no send);
 //   - stopped: his message sends computer {hand_back, key} first, then the send;
-//   - a click on the words asks a peek of its key and shows the still; esc closes it and nothing
+//   - a click on the words asks a peek of its key and shows the still with 'a still from hh:mm ·
+//     esc closes' under it; esc closes it and nothing
 //     else (the turn goes on: no stop);
 //   - the line sits on the head's left edge (16 px), at 1400 and 800;
 //   - a row of another bise (no project) draws nothing.
@@ -108,8 +110,11 @@ test('thread/computer-live: the live line under the head, its acts with the key,
 
     // paused: ⏎ on the empty composer gives it back, sends nothing
     await live([paused(now)]);
-    await expect(words).toHaveText('? you took the wheel · ⏎ give it back');
-    await expect(page.getByTestId('thread.computer.back')).toHaveText('give it back');
+    await expect(words).toHaveText('? you took the wheel');
+    await expect(page.getByTestId('thread.computer.back')).toHaveText('give it back ⏎');
+    // it waits for him until he gives it back: the head's chip says so, like the sidebar's '?'
+    await expect(page.getByTestId('thread.head.state')).toHaveText('? waiting for you');
+    await expect(page.getByTestId('thread.head.state')).toHaveAttribute('data-needs', 'true');
     const field = page.locator('[data-testid="composer.field"]').first();
     await field.click();
     const before = core.cmds().length;
@@ -120,6 +125,7 @@ test('thread/computer-live: the live line under the head, its acts with the key,
     // stopped: his message gives it back first, then goes
     await live([stopped(now)]);
     await expect(words).toHaveText('↖ you stopped it driving Chrome · write to it to go on');
+    await expect(page.getByTestId('thread.head.state'), 'given back: the chip is its own again').toHaveText(/working/);
     await expect(page.getByTestId('thread.computer.take')).toHaveCount(0);
     const at = core.cmds().length;
     await field.click();
@@ -136,6 +142,7 @@ test('thread/computer-live: the live line under the head, its acts with the key,
     expect(await core.waitCmd((c) => c.cmd === 'computer' && c.act === 'peek', 3000)).toMatchObject({ key: KEY });
     await core.send({ ev: 'computer_peek', key: KEY, shot: { mime: 'image/png', data: STILL, width: 480, height: 300 } } as never);
     await expect(page.getByTestId('thread.computer.peek').locator('img')).toBeVisible();
+    await expect(page.getByTestId('thread.computer.peek.cap')).toHaveText(/^a still from \d\d:\d\d · esc closes$/);
     await page.screenshot({ path: test.info().outputPath('peek-light-1400.png') });
     const stops = core.cmds().length;
     await page.keyboard.press('Escape');
