@@ -198,9 +198,15 @@ impl Core {
     }
 
     /// His typed send to the agent voice mode waits on: its answer is said.
+    /// Typed or said, a send to that agent is his next turn: the last
+    /// answer is no longer lit (as for his voice turn's Act::Send).
     pub(super) fn voice_mode_typed(&mut self, project: &str, agent: &str) {
         let Some(v) = self.voice_on.as_mut() else { return };
-        if v.project == project && v.vm.agent() == agent && v.vm.typing() {
+        if v.project != project || v.vm.agent() != agent {
+            return;
+        }
+        v.lit_on = false;
+        if v.vm.typing() {
             v.vm.typed_sent();
         }
     }

@@ -221,6 +221,15 @@ fn lit_says_which_entry_and_how_far_until_his_next_turn() {
     w.until_ticking(&mut t, |_| true);
     let after = modes(&t.take());
     assert!(after.last().is_some_and(|v| v.get("lit").is_none()), "his next turn: lit gone: {after:?}");
+    // the next answer is lit; his TYPED next turn (tab, then send) puts it out too
+    shop_next(&mut w);
+    answer(&mut t, &mut w, "perf", 41, "Warm is 0.9 seconds.");
+    w.until_ticking(&mut t, |o| modes(o).iter().any(|v| v["lit"]["pos"] == 41));
+    typed(&mut t, json!({"cmd": "voice_type", "on": true}));
+    typed(&mut t, json!({"cmd": "send", "project": "shop", "agent": "perf", "text": "and the cold one?", "mode": "now"}));
+    w.until_ticking(&mut t, |_| true);
+    let typed_after = modes(&t.take());
+    assert!(typed_after.last().is_some_and(|v| v.get("lit").is_none()), "his typed next turn: lit gone: {typed_after:?}");
 }
 
 /// Law: cut: its voice stops and its running turn is stopped (`stop`

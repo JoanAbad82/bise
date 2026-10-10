@@ -83,15 +83,58 @@ test('voice/voice-real (real core): ctrl+r twice on checkout, his words reach it
       expect.soft(transcriptHas(w, 'shop', 'main', heard), "shop's main never got them").toBe(false);
     });
 
-    await test.step("checkout's answer comes back said", async () => {
+    let litPos = '';
+    await test.step("checkout's answer comes back said, its row lit while it speaks", async () => {
       await expect(pane, 'speaking').toHaveAttribute('data-state', 'speaking', { timeout: 45_000 });
       // the bar says only 'speaking' (/p/voice-window); the answer's words are in the thread
       await expect.soft(page.locator(T.words), 'the bar').toHaveText('speaking');
       await expect.soft(page.locator(T.list), "the answer's words in the thread").toContainText(n, { timeout: 10_000 });
       note('said', ((await page.locator(T.words).textContent()) ?? '').trim());
+      // the lit ink (the core's voice_mode.lit, amb-web 79dcf3d1): checkout's answer row, and only
+      // it, carries '∿ speaking' under it and its words split in ink (said) and faint (not yet)
+      const mark = page.locator(`${T.list} [data-testid^="thread.voice."][data-mark="speaking"]`);
+      await expect(mark, "'∿ speaking' under one answer").toHaveCount(1, { timeout: 5000 });
+      await expect.soft(mark).toHaveText('∿ speaking');
+      litPos = ((await mark.getAttribute('data-testid')) ?? '').replace('thread.voice.', '');
+      note('lit_pos', litPos);
+      await expect(page.getByTestId(`thread.entry.${litPos}`), "the lit row is checkout's answer").toContainText(n);
+      const ink = page.locator(`[data-testid="thread.lit.${litPos}"] .vm-said`);
+      await expect(ink, 'its said words in ink, the rest faint, while it speaks').toBeAttached({ timeout: 5000 });
+      const inked: string[] = [];
+      while ((await pane.getAttribute('data-state')) === 'speaking' && inked.length < 40) {
+        const t = await ink.textContent({ timeout: 200 }).catch(() => null);
+        if (t !== null && inked.at(-1) !== t) inked.push(t);
+        await page.waitForTimeout(150);
+      }
+      note('inked', inked);
+      expect.soft(inked.every((t, i) => i === 0 || t.startsWith(inked[i - 1] ?? '')), 'the ink only grows').toBe(true);
       await page.screenshot({ path: test.info().outputPath('speaking.png') });
       // its voice ends: the pane listens again
       await expect.soft(pane, 'listening after the answer').toHaveAttribute('data-state', 'listening', { timeout: 30_000 });
+      await expect.soft(page.getByTestId(`thread.voice.${litPos}`), "no '∿ speaking' once it stopped talking").toHaveCount(0);
+      note('lit_after_speaking', await page.getByTestId(`thread.lit.${litPos}`).count());
+    });
+
+    await test.step('his next turn (tab, typed, sent): the lit goes from that answer', async () => {
+      await pane.focus();
+      await page.keyboard.press('Tab');
+      const typing = page.locator(T.field).first();
+      await expect(typing, 'tab: the composer back to type').toBeVisible({ timeout: 5000 });
+      const next = `and the shipping ${n}x`;
+      await typing.click();
+      await page.keyboard.type(next);
+      await page.keyboard.press('Enter');
+      await expect.poll(() => transcriptHas(w, 'shop', AGENT, next), { timeout: 45_000, message: 'checkout got his typed turn' }).toBe(true);
+      await expect(page.getByTestId(`thread.lit.${litPos}`), 'the old answer: no ink').toHaveCount(0, { timeout: 5000 });
+      await expect(page.getByTestId(`thread.voice.${litPos}`), "the old answer: no '∿ speaking'").toHaveCount(0);
+      // the typed turn's answer is said in turn, and its own row is the one lit
+      await expect.soft(pane, 'its answer said').toHaveAttribute('data-state', 'speaking', { timeout: 45_000 });
+      const mark = page.locator(`${T.list} [data-testid^="thread.voice."][data-mark="speaking"]`);
+      await expect.soft(mark, 'the new answer lit').toHaveCount(1, { timeout: 5000 });
+      const pos2 = ((await mark.getAttribute('data-testid', { timeout: 1000 }).catch(() => '')) ?? '').replace('thread.voice.', '');
+      note('lit_pos_next', pos2);
+      expect.soft(pos2 !== '' && pos2 !== litPos, 'another row than the first answer').toBe(true);
+      await expect.soft(pane, 'listening after it').toHaveAttribute('data-state', 'listening', { timeout: 30_000 });
     });
 
     await test.step('fn while it is on: refused, the label line says so', async () => {
