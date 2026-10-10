@@ -261,6 +261,35 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
       await vm.vnc.keys('Meta+q');
       await sleep(800);
     }
+    // the control (lead m_17666): does this guest draw vibrancy at all? macOS's own Spotlight over the
+    // same black then white; no difference there = the VM's GPU, not bise
+    const ctl: number[] = [];
+    for (const bg of ['black', 'white']) {
+      await sh(`open -a Preview ${Q}/${bg}.png`, true);
+      await sleep(2000);
+      await vm.vnc.keys('Control+Meta+f');
+      await sleep(2500);
+      await vm.vnc.keys('Meta+space');
+      await sleep(1500);
+      const f = await frame(`spotlight-over-${bg}`);
+      const sw = (JSON.parse((await qa('windows', 'Spotlight')).trim() || '[]') as Win[]).filter((w) => w.onscreen && w.h > 30).sort((x, y) => y.w * y.h - x.w * x.h)[0];
+      if (sw) {
+        const png = PNG.sync.read(readFileSync(path.join(out, f.file)));
+        const px = Math.round((sw.x + sw.w - 24) * scale), py = Math.round((sw.y + sw.h / 2) * scale);
+        const i = (py * png.width + px) * 4;
+        ctl.push(((png.data[i] ?? 0) + (png.data[i + 1] ?? 0) + (png.data[i + 2] ?? 0)) / 3);
+      }
+      await vm.vnc.keys('Escape');
+      await sleep(500);
+      await vm.vnc.keys('Control+Meta+f');
+      await sleep(2000);
+      await vm.vnc.keys('Meta+q');
+      await sleep(800);
+    }
+    const guestDraws = ctl.length === 2 && Math.abs((ctl[1] ?? 0) - (ctl[0] ?? 0)) > 20;
+    tally.push({ row: "control: the guest draws macOS's own vibrancy (Spotlight over black vs white)", pass: guestDraws, saw: `Spotlight's level over black ${String(ctl[0])}, over white ${String(ctl[1])}${ctl.length < 2 ? ' (Spotlight window not found)' : ''}` });
+    const asked = (await sh(`grep 'glass: capsule' ${Q}/main.err | tail -1`)).trim();
+    tally.push({ row: 'control: main asked macOS for the capsule vibrancy', pass: /vibrancy=popover state=active/.test(asked), saw: asked || 'no glass line in main.err' });
     row({ row: 'glass: what is behind the capsule shows through (vibrancy)', pass: glass.length === 2 && Math.abs((glass[1] ?? 0) - (glass[0] ?? 0)) > 20, saw: `mean glass level over black ${String(glass[0])}, over white ${String(glass[1])}` });
 
     // ⌘Q for real: bise and its helper end

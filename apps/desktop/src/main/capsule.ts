@@ -34,6 +34,7 @@ export class Capsule {
 
   constructor(private readonly testMode: boolean) {
     const mac = process.platform === 'darwin';
+    const glass = glassOf('capsule', process.platform, testMode);
     const win = new BrowserWindow({
       ...START,
       ...(testMode ? { x: OFF, y: OFF, focusable: false } : {}),
@@ -50,10 +51,14 @@ export class Capsule {
       alwaysOnTop: true,
       ...(mac ? { type: 'panel' } : { type: 'toolbar' }),
       // macOS: the vibrancy is the glass (glass.ts), the window is the glass
-      ...glassOf('capsule', process.platform, testMode),
+      ...glass,
       title: 'bise capsule',
       webPreferences: webPreferences('capsule', testMode),
     });
+    // what macOS was asked to draw under the page (lead m_17666: the VM pass tells VM from app with it)
+    if (glass.vibrancy !== undefined) {
+      process.stderr.write(`bise-desktop: glass: capsule vibrancy=${glass.vibrancy} state=${String(glass.visualEffectState)} background=${win.getBackgroundColor()}\n`);
+    }
     if (!testMode) {
       win.setAlwaysOnTop(true, 'screen-saver');
       win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
