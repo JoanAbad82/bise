@@ -1073,3 +1073,137 @@ button.th-sched-head {
 .th-report:not([data-waits]) .b-marker {
   color: var(--c-text-2);
 }
+
+/* his messages on the right (designer's messages-right v1, http://127.0.0.1:47438/p/messages-right):
+   the look in one place. agents, bise, tools and cards stay left, full column, as before. */
+.th-row[data-side='you'] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-bottom: 4px;
+}
+/* an answer's wrapper takes the whole column, so its bubble's 75% / 85% is the column's */
+.th-row[data-side='you'] > .th-approval {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  align-self: stretch;
+}
+/* 16 px when the side changes, 4 px between his bubbles in a run */
+.th-row[data-turn='true'] {
+  padding-top: 16px;
+}
+.th-row[data-side='you'][data-head='true']:not([data-turn='true']) {
+  padding-top: 0;
+}
+.th-you {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+  max-width: 75%;
+}
+.th-you-head {
+  margin: 0 2px 3px;
+  font: var(--t-12) var(--font-ui);
+  color: var(--c-text-3);
+  text-align: right;
+}
+.th-you-mark {
+  margin-right: 5px;
+}
+.th-you-mark.ok {
+  color: var(--c-ok, var(--c-text-2));
+}
+.th-bubble {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  padding: 8px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: 16px 16px 6px 16px;
+  background: var(--c-raised);
+  text-align: left;
+}
+.th-bubble > :first-child,
+.th-bubble .th-md > :first-child {
+  margin-top: 0;
+}
+.th-bubble > :last-child,
+.th-bubble .th-md > :last-child {
+  margin-bottom: 0;
+}
+/* a code block takes the bubble's full width and scrolls */
+.th-bubble pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+/* inside: a quote first, then image chips, then his words */
+.th-bubble .b-quote {
+  margin: 0 0 6px;
+}
+.th-bubble .th-images {
+  margin: 6px 0 0;
+}
+.th-bubble .b-ctx {
+  margin-top: 6px;
+}
+.th-you-words {
+  white-space: pre-wrap;
+}
+.th-you-under {
+  margin: 3px 2px 0;
+  font: var(--t-12) var(--font-ui);
+  color: var(--c-text-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+/* a bubble inside a run: its time on hover only */
+.th-you-under.th-hover {
+  opacity: 0;
+  transition: opacity var(--d-fast) var(--ease-out);
+}
+.th-row:hover .th-you-under.th-hover {
+  opacity: 1;
+}
+.th-you[data-state='sending'] .th-bubble {
+  opacity: 0.7;
+}
+/* queued: a dashed bubble, dim words, sends when the turn ends */
+.th-you[data-state='queued'] .th-bubble {
+  border-style: dashed;
+  background: transparent;
+  color: var(--c-text-2);
+}
+.th-you-fail {
+  display: inline-flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.th-you-err {
+  color: var(--c-err);
+}
+.th-you-act {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--c-text-2);
+  cursor: default;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.th-you-act:hover {
+  color: var(--c-text);
+}
+/* the pending row's old dimming is the bubble's state now */
+.th-pending[data-side='you'] .th-you,
+.th-routed[data-side='you'] .th-you {
+  opacity: 1;
+}
+/* under 640 px his bubble takes 85% of the column, never closer than 48 px to its left edge */
+@media (max-width: 640px) {
+  .th-you {
+    max-width: min(85%, calc(100% - 48px));
+  }
+}

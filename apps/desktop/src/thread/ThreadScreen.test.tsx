@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay, threadKey } from '@/store';
-import { cutWords, EntryRow, type RowCtx, withoutImageMarks } from './rows';
+import { approvalParts, cutWords, EntryRow, type RowCtx, withoutImageMarks } from './rows';
 import { ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
 
@@ -129,7 +129,8 @@ describe('the thread screen', () => {
       store.apply({ ev: 'error', project: P, cmd: 'send', text: 'no agent perf' });
     });
     expect(row.getByTestId(`thread.pending.${p.cid}`).dataset.state).toBe('failed');
-    expect(row.getByTestId(`thread.pending.${p.cid}`).textContent).toContain('not sent · no agent perf');
+    expect(row.getByTestId(`thread.pending.${p.cid}`).textContent).toContain('▲ not sent: no agent perf');
+    expect(row.getByTestId(`thread.retry.${p.cid}`).textContent).toBe('try again');
     fireEvent.click(row.getByTestId(`thread.retry.${p.cid}`));
     expect(cmds.at(-1)).toMatchObject({ cmd: 'send', project: P, agent: 'perf', text: 'hi there', mode: 'now' });
   });
@@ -216,5 +217,13 @@ describe('a cut tool output', () => {
     expect(cutWords('x'.repeat(4096), 18 * 1024)).toBe('… 4 KB of 18 KB shown');
     expect(cutWords('é'.repeat(2048), 9000)).toBe('… 4 KB of 9 KB shown');
     expect(cutWords('x'.repeat(4096))).toBe('… cut after 4 KB');
+  });
+});
+
+describe('his answer to a card, on his side', () => {
+  it("the hub's text splits into the dim head and his words in the bubble", () => {
+    expect(approvalParts('you answered main: this one')).toEqual({ head: 'you answered main', words: 'this one' });
+    expect(approvalParts('you answered gift-ui')).toEqual({ head: 'you answered gift-ui', words: '' });
+    expect(approvalParts('you answered perf: 1 · merge')).toEqual({ head: 'you answered perf', words: '1 · merge' });
   });
 });

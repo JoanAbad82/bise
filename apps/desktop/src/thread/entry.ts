@@ -373,6 +373,28 @@ export function answeredCardOf(text: string): { card: number; question: string; 
   return { card: Number(m[1]), question, words: (m[3] ?? '').trim() };
 }
 
+/**
+ * Which side of the column a row sits on (designer's messages-right v1): everything he said goes
+ * right (his messages, his answers to cards, the hub's raw line of his answer to main's card);
+ * what bise or an agent said or did stays left (a task's brief too: the hub wrote it). Pure.
+ */
+export function sideOf(e: Entry | undefined): 'you' | 'them' {
+  if (e === undefined) return 'them';
+  if (e.kind === 'you') return briefOf(e.text) === null ? 'you' : 'them';
+  if (e.kind === 'approval') return 'you';
+  if ((e.kind === 'from_agent' || e.kind === 'agent') && answeredCardOf(e.text) !== null) return 'you';
+  return 'them';
+}
+
+/** His bubbles closer than this make one run: its time shows under the last one only. */
+export const RUN_MS = 2 * 60_000;
+
+/** Is this bubble of his the last of its run (the next row isn't his, or comes 2 min later)? Pure. */
+export function lastOfRun(e: Entry, next: Entry | undefined): boolean {
+  if (next === undefined || sideOf(next) !== 'you') return true;
+  return e.at_ms <= 0 || next.at_ms <= 0 || next.at_ms - e.at_ms > RUN_MS;
+}
+
 /** The hub's brief, the first message of a task's thread ('# Task `gift-ui`', then 'Objective: …'; the TUI's is_brief): its name, objective and body without the heading; none for any other text. Pure. */
 export function briefOf(text: string): { name: string; objective: string; body: string } | null {
   const m = /^# Task `([^`]+)`[^\n]*\n?/.exec(text);

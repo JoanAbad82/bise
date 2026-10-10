@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, TOOL_LINES, briefOf, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, lastOfRun, sideOf, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -241,5 +241,25 @@ describe("a call that rounds to 0.0 s (designer m_15569)", () => {
     expect(toolEnd({ pos: 1, at_ms: 0, text: '', kind: 'run', state: 'ok', ms: 30 }, '')).toBe('✓');
     expect(toolEnd({ pos: 1, at_ms: 0, text: '', kind: 'run', state: 'err', exit: 1, ms: 20 }, '')).toBe('✗ exit 1');
     expect(toolEnd({ pos: 1, at_ms: 0, text: '', kind: 'run', state: 'ok', ms: 60 }, '')).toBe('✓ 0.1 s');
+  });
+});
+
+describe('messages-right v1: whose side a row is on', () => {
+  const at = 1_000_000;
+  const e = (kind: string, text: string, ms = at): Entry => ({ pos: 1, at_ms: ms, kind, text }) as unknown as Entry;
+  it('everything he said goes right; what bise or an agent said or did stays left', () => {
+    expect(sideOf(e('you', 'cap them at 400 KB'))).toBe('you');
+    expect(sideOf(e('approval', 'you answered perf: 1 · merge'))).toBe('you');
+    expect(sideOf(e('from_agent', 'the user answered card #1 ("merge? 1. yes 2. no"): "1"'))).toBe('you');
+    expect(sideOf(e('agent', 'on it.'))).toBe('them');
+    expect(sideOf(e('answered', 'answered gift-ui for you'))).toBe('them');
+    expect(sideOf(e('you', '# Task `gift-ui`\n\nObjective: x'))).toBe('them');
+    expect(sideOf(undefined)).toBe('them');
+  });
+  it('his time shows under the last bubble of a 2 min run', () => {
+    expect(lastOfRun(e('you', 'a'), e('you', 'b', at + 60_000))).toBe(false);
+    expect(lastOfRun(e('you', 'a'), e('you', 'b', at + RUN_MS + 1))).toBe(true);
+    expect(lastOfRun(e('you', 'a'), e('agent', 'b', at + 1000))).toBe(true);
+    expect(lastOfRun(e('you', 'a'), undefined)).toBe(true);
   });
 });

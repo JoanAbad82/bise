@@ -514,6 +514,8 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
   );
   // each row reads the one before it: its group and its day (ambient m_11777)
   const prevOf = useMemo(() => new Map(view.order.map((p, i) => [p, view.order[i - 1]])), [view]);
+  // and the one after it: his last bubble of a run shows its time (messages-right v1)
+  const nextOf = useMemo(() => new Map(view.order.map((p, i) => [p, view.order[i + 1]])), [view]);
   const row = useCallback(
     (key: string) => {
       const run = key.startsWith('r:') ? runs.find((r) => runKey(r.start) === key) : undefined;
@@ -540,9 +542,9 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
       }
       if (key === LIVE) return live.entry === null ? null : <EntryRow ctx={ctx} pos={-1} prev={lastPos < 0 ? undefined : lastPos} live={live.entry} still={still} />;
       const pos = posOfKey(key);
-      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} still={still} />;
+      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} next={nextOf.get(pos)} still={still} />;
     },
-    [ctx, prevOf, runs, openRuns, live.entry, lastPos, still],
+    [ctx, prevOf, nextOf, runs, openRuns, live.entry, lastPos, still],
   );
   const onOlder = useCallback(() => {
     store.olderPage(project, agent);

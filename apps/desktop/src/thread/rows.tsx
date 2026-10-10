@@ -12,7 +12,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Answer, Markdown } from './Markdown';
-import { THOUGHT_MS, answeredCardOf, briefOf, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf, type ToolLine } from './entry';
+import { THOUGHT_MS, answeredCardOf, briefOf, chipOf, clock, dayLabel, groupHead, lastOfRun, sameDay, sideOf, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf, type ToolLine } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -30,12 +30,13 @@ export interface RowCtx {
   readonly onPath?: (path: string, line?: number) => void;
 }
 
-export const EntryRow = memo(function EntryRow({ ctx, pos, prev, live, still = false }: { ctx: RowCtx; pos: number; prev?: number | undefined; live?: Entry | undefined; still?: boolean }) {
+export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, still = false }: { ctx: RowCtx; pos: number; prev?: number | undefined; next?: number | undefined; live?: Entry | undefined; still?: boolean }) {
   // the live row (live.ts) is this same row drawing the entry it becomes, so
   // the entry takes its place with nothing unmounted (text-appearing v2 (4))
   const stored = useEntry(ctx.tkey, pos);
   const e = live ?? stored;
   const before = useEntry(ctx.tkey, prev ?? -1);
+  const afterIt = useEntry(ctx.tkey, next ?? -1);
   const hit = useIsCurrent(pos);
   const today = useToday();
   if (e === undefined) return null;
@@ -46,6 +47,10 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev, live, still = f
   // min of silence); the rows inside show their time on hover in its place
   const day = e.at_ms > 0 && (p === undefined || !sameDay(p.at_ms, e.at_ms)) ? dayLabel(e.at_ms, today) : null;
   const head = groupHead(p, e, ctx);
+  // his on the right, the rest on the left (messages-right v1); a change of side opens more room
+  const side = sideOf(e);
+  const turn = p !== undefined && day === null && sideOf(p) !== side;
+  const n = next === undefined ? undefined : afterIt;
   return (
     <>
       {day !== null && (
@@ -53,10 +58,10 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev, live, still = f
           <span>{day}</span>
         </div>
       )}
-      <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={live === undefined ? `thread.entry.${pos}` : 'thread.stream'} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head}>
+      <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={live === undefined ? `thread.entry.${pos}` : 'thread.stream'} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head} data-side={side} data-turn={turn || undefined}>
         {/* a turn that opens on its work (tools, a thinking) still shows who and when */}
         {head && (e.kind === 'tools' || (e.kind === 'thinking' && !thoughtNothing(e))) && <NameLine e={e} ctx={ctx} />}
-        <EntryBody e={e} ctx={ctx} head={head} live={live !== undefined} still={still} />
+        <EntryBody e={e} ctx={ctx} head={head} next={n} live={live !== undefined} still={still} />
       </div>
     </>
   );
@@ -74,14 +79,14 @@ function NameLine({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   );
 }
 
-function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head: boolean; live: boolean; still: boolean }) {
+function EntryBody({ e, ctx, head, next, live, still }: { e: Entry; ctx: RowCtx; head: boolean; next: Entry | undefined; live: boolean; still: boolean }) {
   // the hub's brief opens a task's thread: one quiet row, the brief folded under it (designer; the TUI's is_brief)
   const brief = e.kind === 'you' || e.kind === 'from_agent' || e.kind === 'agent' ? briefOf(e.text) : null;
   if (brief !== null) return <BriefRow pos={e.pos} name={brief.name} objective={brief.objective} body={brief.body} ctx={ctx} />;
   // his answer to main's own card, as the hub still sends it (a raw line from 'switchboard'):
   // the '✓ you answered' row, never the raw line (designer m_15195, ambient-lead m_15382)
   const answeredCard = e.kind === 'from_agent' || e.kind === 'agent' ? answeredCardOf(e.text) : null;
-  if (answeredCard !== null) return <CardAnsweredRow pos={e.pos} a={answeredCard} />;
+  if (answeredCard !== null) return <CardAnsweredRow pos={e.pos} a={answeredCard} at={e.at_ms} timeAlways={lastOfRun(e, next)} />;
   switch (e.kind) {
     case 'tools':
       return <ToolsRow e={e} ctx={ctx} />;
@@ -122,7 +127,7 @@ function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head:
       );
     }
     case 'you':
-      return <YouRow e={e} ctx={ctx} head={head} />;
+      return <YouRow e={e} ctx={ctx} next={next} />;
     case 'to_agent':
       return <ToAgentRow e={e} ctx={ctx} />;
     // amb-feed's batch 2 (b8cb4b1e): the lines the hub's fold used to drop
@@ -166,7 +171,7 @@ function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head:
     case 'answered':
       return <AnsweredRow e={e} />;
     case 'approval':
-      return <ApprovalRow e={e} />;
+      return <ApprovalRow e={e} next={next} />;
     // batch 3b (6e9d68f8): a scheduled task's ◷ line
     case 'scheduled':
       return <ScheduledRow e={e} ctx={ctx} />;
@@ -360,27 +365,57 @@ export function fileUrl(path: string): string {
  * His answer to main's own card, in the same order as every '✓ you answered' row (designer
  * m_15420): line 1 what was asked, line 2 his words, line 3 a chip for each '[Image #n]' he sent.
  */
-function CardAnsweredRow({ pos, a }: { pos: number; a: { card: number; question: string; words: string } }) {
+function CardAnsweredRow({ pos, a, at, timeAlways }: { pos: number; a: { card: number; question: string; words: string }; at: number; timeAlways: boolean }) {
   const images = a.words.match(/\[Image #\d+\]/gu) ?? [];
   const words = withoutImageMarks(a.words);
+  const id = `thread.cardanswer.${String(pos)}`;
+  // something he said: on his side, '✓ you answered: <question>' dim over his bubble (messages-right)
   return (
-    <div className="th-approval" data-testid={`thread.cardanswer.${String(pos)}`} data-card={a.card}>
-      <NewsLine mark="✓" tone="ok" testId={`thread.cardanswer.${String(pos)}.head`}>
-        {`you answered: ${a.question}`}
-      </NewsLine>
-      {words !== '' && <div className="th-news-note" data-testid={`thread.cardanswer.${String(pos)}.words`}>{words}</div>}
-      {images.length > 0 && (
-        <div className="th-images">
-          {images.map((_, i) => (
-            <span key={i} className="b-chip image" data-kind="image" data-testid={`thread.cardanswer.${String(pos)}.image.${String(i + 1)}`}>
-              <Thumb />
-              <span className="lbl">{imageLabel(i)}</span>
-            </span>
-          ))}
-        </div>
-      )}
+    <div className="th-approval" data-card={a.card}>
+      <YouBubble
+        head={<AnsweredHead ok>{`you answered: ${a.question}`}</AnsweredHead>}
+        under={at > 0 ? clock(at) : undefined}
+        timeAlways={timeAlways}
+        testId={id}
+      >
+        {words === '' && images.length === 0 ? undefined : (
+          <>
+            {words !== '' && <div data-testid={`${id}.words`}>{words}</div>}
+            {images.length > 0 && (
+              <div className="th-images">
+                {images.map((_, i) => (
+                  <span key={i} className="b-chip image" data-kind="image" data-testid={`${id}.image.${String(i + 1)}`}>
+                    <Thumb />
+                    <span className="lbl">{imageLabel(i)}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </YouBubble>
     </div>
   );
+}
+
+/** '✓ you answered gift-ui': the dim head over his answer's bubble, the mark saying it with no color alone. */
+function AnsweredHead({ ok, children }: { ok: boolean; children: ReactNode }) {
+  return (
+    <>
+      <span className={ok ? 'th-you-mark ok' : 'th-you-mark'}>{ok ? '✓' : '✕'}</span>
+      {children}
+    </>
+  );
+}
+
+/**
+ * The hub's approval text split into its head and his words: 'you answered main: this one' ->
+ * head 'you answered main', words 'this one'; a text with no words is all head. Pure.
+ */
+export function approvalParts(text: string): { head: string; words: string } {
+  const m = /^(you (?:answered|said no to|allowed|denied) [^:]+?):\s*([\s\S]+)$/u.exec(text.trim());
+  if (m === null) return { head: text.trim(), words: '' };
+  return { head: (m[1] ?? '').trim(), words: (m[2] ?? '').trim() };
 }
 
 /**
@@ -392,20 +427,31 @@ export function withoutImageMarks(words: string): string {
 }
 
 /** His answer to an approval, folded: allowed or said no, and his words under it. */
-function ApprovalRow({ e }: { e: Entry }) {
+function ApprovalRow({ e, next }: { e: Entry; next: Entry | undefined }) {
   const a = e.approval;
   if (a == null) return <Marker>{e.text}</Marker>;
   // the chips draw his images: their marks leave the words (once, never twice)
   const chips = (a.images ?? []).length > 0;
   const say = (s: string): string => (chips ? withoutImageMarks(s).replace(/:$/u, '') : s);
+  const parts = approvalParts(say(a.text));
   const note = a.note == null ? '' : say(a.note);
+  // his words (after the head's ':' or the note), then the image chips under them, in his bubble
+  const words = [parts.words, note].filter((w) => w !== '').join('\n');
   return (
-    <div className="th-approval" data-testid={`thread.approval.${e.pos}`} data-ok={a.ok}>
-      <NewsLine mark={a.ok ? '✓' : '✕'} tone={a.ok ? 'ok' : 'dim'} testId={`thread.approval.${e.pos}.head`}>
-        {say(a.text)}
-      </NewsLine>
-      {note !== '' && <div className="th-news-note">{note}</div>}
-      <ImageChips images={a.images ?? []} testId={`thread.approval.${e.pos}`} />
+    <div className="th-approval" data-ok={a.ok}>
+      <YouBubble
+        head={<AnsweredHead ok={a.ok}>{parts.head}</AnsweredHead>}
+        under={e.at_ms > 0 ? clock(e.at_ms) : undefined}
+        timeAlways={lastOfRun(e, next)}
+        testId={`thread.approval.${e.pos}`}
+      >
+        {words === '' && !chips ? undefined : (
+          <>
+            {words !== '' && <div className="th-you-words" data-testid={`thread.approval.${e.pos}.words`}>{words}</div>}
+            <ImageChips images={a.images ?? []} testId={`thread.approval.${e.pos}`} />
+          </>
+        )}
+      </YouBubble>
     </div>
   );
 }
@@ -632,7 +678,47 @@ export function foldOf(text: string): { head: string; lines: number } | undefine
   return { head: head.length > LONG_CHARS ? `${head.slice(0, LONG_CHARS)}…` : head, lines: lines.length };
 }
 
-function YouRow({ e, ctx, head }: { e: Entry; ctx: RowCtx; head: boolean }) {
+/**
+ * His words on the right in a soft bubble (designer's messages-right v1; the look lives in
+ * thread.css '.th-you'): no 'you' line, the side says who spoke. A dim head over it only when it
+ * says something ('to perf', '✓ you answered gift-ui'); inside, a quote, then his words, then what
+ * rides with them; under it, its time (always under the last bubble of a run, on hover for the
+ * others) or its state ('sending…', 'not sent…') in the time's place.
+ */
+export function YouBubble({
+  head,
+  children,
+  under,
+  timeAlways = true,
+  state,
+  testId,
+}: {
+  head?: ReactNode;
+  children?: ReactNode;
+  under?: ReactNode;
+  /** false: the time shows on hover only (a bubble inside a run) */
+  timeAlways?: boolean;
+  state?: 'sending' | 'failed' | 'queued';
+  testId?: string;
+}) {
+  return (
+    <div className="th-you" data-state={state} data-testid={testId}>
+      {head != null && head !== '' && (
+        <div className="th-you-head" data-testid={testId === undefined ? undefined : `${testId}.head`}>
+          {head}
+        </div>
+      )}
+      {children != null && <div className="b-text th-bubble">{children}</div>}
+      {under != null && under !== '' && (
+        <div className={timeAlways ? 'th-you-under' : 'th-you-under th-hover'} data-testid={testId === undefined ? undefined : `${testId}.under`}>
+          {under}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | undefined }) {
   const [open, setOpen] = useFold(false, e.pos);
   // the fn context block the hub appended never shows: a chip from the typed context instead
   const text = stripContext(e.text);
@@ -641,21 +727,22 @@ function YouRow({ e, ctx, head }: { e: Entry; ctx: RowCtx; head: boolean }) {
     setOpen((o) => !o);
   };
   const chip = e.context != null ? chipOf(e.context) : null;
+  // in bise's or a main's thread, a message that went to someone else says so; to the owner, nothing
+  const to = e.to != null && e.to !== '' && e.to !== ctx.agent ? `to ${e.to}` : undefined;
   return (
-    <Msg
-      from="you"
-      name="you"
-      time={clock(e.at_ms)}
-      head={head}
-      context={chip === null ? undefined : <ContextChip chip={chip} ctx={ctx} pos={e.pos} />}
-    >
+    <YouBubble head={to} under={e.at_ms > 0 ? clock(e.at_ms) : undefined} timeAlways={lastOfRun(e, next)} testId={`thread.you.${String(e.pos)}`}>
       <Markdown text={fold === undefined || open ? text : fold.head} onLink={ctx.onLink} onPath={ctx.onPath} breaks />
       {fold !== undefined && (
         <Fold open={open} onToggle={toggle} testId={`thread.fold.${e.pos}`}>
           {open ? 'fold it' : `show all · ${String(fold.lines)} lines`}
         </Fold>
       )}
-    </Msg>
+      {chip !== null && (
+        <div className="b-ctx">
+          <ContextChip chip={chip} ctx={ctx} pos={e.pos} />
+        </div>
+      )}
+    </YouBubble>
   );
 }
 
@@ -963,35 +1050,46 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
   // a routed send: its route's state is the row's (lead m_9854)
   const failed = p.state === 'failed' && hold?.state !== 'sent';
   const state = hold !== undefined && hold.state !== 'cancelled' ? hold.state : p.state;
-  const time = hold?.state === 'held' ? undefined : hold?.state === 'sent' ? `sent to ${hold.name}` : failed ? `not sent${p.why !== undefined && p.why !== 'not sent' ? ` · ${p.why}` : ''}` : (connecting ?? 'sending…');
+  // under his bubble, in its time's place (messages-right v1): 'sending…' until it lands, the
+  // reason it wasn't sent in --c-err with 'try again' (his words stay in the bubble), where it went
+  const queued = p.mode === 'queued' && !failed && hold === undefined;
+  const why = p.why !== undefined && p.why !== 'not sent' ? `: ${p.why}` : '';
+  const under =
+    hold?.state === 'held' ? undefined : hold?.state === 'sent' ? `sent to ${hold.name}` : failed ? (
+      <span className="th-you-fail">
+        <span className="th-you-err">{`▲ not sent${why}`}</span>
+        <button
+          type="button"
+          className="th-you-act"
+          onClick={() => {
+            store.retry(ctx.tkey, cid);
+          }}
+          data-testid={`thread.retry.${cid}`}
+        >
+          try again
+        </button>
+        <button
+          type="button"
+          className="th-you-act"
+          onClick={() => {
+            store.dismiss(ctx.tkey, cid);
+          }}
+          data-testid={`thread.dismiss.${cid}`}
+        >
+          drop
+        </button>
+      </span>
+    ) : queued ? (
+      `queued · sends when ${ctx.agent}'s turn ends`
+    ) : (
+      (connecting ?? 'sending…')
+    );
   return (
-    <div className={failed ? 'th-row th-pending th-failed' : hold?.state === 'sent' ? 'th-row th-routed' : 'th-row th-pending'} data-testid={`thread.pending.${cid}`} data-state={state}>
-      <Msg from="you" name="you" time={time} state={failed ? 'error' : undefined}>
-        <Markdown text={p.text} onLink={ctx.onLink} />
-      </Msg>
+    <div className={failed ? 'th-row th-pending th-failed' : hold?.state === 'sent' ? 'th-row th-routed' : 'th-row th-pending'} data-testid={`thread.pending.${cid}`} data-state={state} data-side="you">
+      <YouBubble under={under} state={failed ? 'failed' : queued ? 'queued' : 'sending'}>
+        <Markdown text={p.text} onLink={ctx.onLink} breaks />
+      </YouBubble>
       {hold?.state === 'held' && <HoldLine hold={hold} />}
-      {failed && (
-        <div className="th-failed-acts">
-          <Button
-            kind="ghost"
-            onClick={() => {
-              store.retry(ctx.tkey, cid);
-            }}
-            testId={`thread.retry.${cid}`}
-          >
-            retry
-          </Button>
-          <Button
-            kind="ghost"
-            onClick={() => {
-              store.dismiss(ctx.tkey, cid);
-            }}
-            testId={`thread.dismiss.${cid}`}
-          >
-            dismiss
-          </Button>
-        </div>
-      )}
     </div>
   );
 });

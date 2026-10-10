@@ -86,7 +86,9 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
     expect(ys[0] ?? 0, 'his words under the question').toBeLessThan(ys[1] ?? 0);
     expect(ys[1] ?? 0, 'the chip under his words').toBeLessThan(ys[2] ?? 0);
     // a newer hub's typed row: the chip is the image, so his words never say '[Image #1]' too (designer m_15891)
-    await expect(page.getByTestId('thread.approval.5.head')).toHaveText('✓you answered main: this one');
+    // messages-right v1: his side, '✓ you answered main' dim over his words in the bubble
+    await expect(page.getByTestId('thread.approval.5.head')).toHaveText('✓you answered main');
+    await expect(page.getByTestId('thread.approval.5.words')).toHaveText('this one');
     await expect(page.getByTestId('thread.approval.5.image.1')).toHaveText('[Image #1]');
     expect(await page.getByTestId('thread.approval.5').innerText(), 'the mark once: the chip').toMatch(/^[^[]*\[Image #1\][^[]*$/u);
     const all = await page.getByTestId('thread.list').innerText();
