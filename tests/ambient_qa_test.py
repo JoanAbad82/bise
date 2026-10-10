@@ -980,6 +980,96 @@ def http_retries_a_reset():
     srv.close()
 
 
+@test
+def fake_cu_pure():
+    """fake computer use (fake_cu.py): the broker's FNV-1a, short socket path and agent key; each state's state.json row; pause/resume/stop/peek as broker/ctl.rs"""
+    import fake_cu as cu
+    check(cu.fnv1a("") == "cbf29ce484222325" and cu.fnv1a("a") == "af63dc4c8601ec8c", "FNV-1a 64 test vectors")
+    short = "/tmp/h/.bise/run/computer-use-ctl.sock"
+    check(cu.socket_path(short, 501) == short, "a path that fits stays")
+    long_ = "/x" * 50 + "/computer-use-ctl.sock"
+    check(cu.socket_path(long_, 501) == "/tmp/bise-501/%s/computer-use-ctl.sock" % cu.fnv1a("/x" * 50), cu.socket_path(long_, 501))
+    check(cu.hub_id("/tmp/h/.bise/hubs/shop-1") == cu.fnv1a("/tmp/h/.bise/hubs/shop-1/hub.sock"), "hub id = hash of its socket")
+    k = cu.agent_key("0123456789abcdef", "check out.1")
+    check(k == "0123456789abcdef.check_out_1" and cu.name_of(k) == "check_out_1" and cu.name_of("plain") == "plain", k)
+    k = cu.agent_key("0123456789abcdef", "checkout")
+    d = cu.row(k, "driving", "Chrome · amazon.fr", 7)
+    check(d == {"driving": "Chrome", "where": "amazon.fr", "since_ms": 7, "paused": False, "stopped": False, "name": "checkout", "hub": "0123456789abcdef"}, d)
+    check(cu.row(k, "driving", "Notes", 7)["where"] == "Notes", "an app is its own place")
+    check(cu.row(k, "paused", "Chrome · amazon.fr", 7)["paused"] is True, "paused")
+    s = cu.row(k, "stopped", "Chrome · amazon.fr", 7)
+    check(s["driving"] is None and s["stopped"] and s["was"] == "Chrome" and s["stopped_by"] == "you" and s["since_ms"] is None, s)
+    check(cu.row(k, "none", None, 7) is None, "none: no row")
+    try:
+        cu.row(k, "flying", None, 7)
+        check(False, "an unknown state passed")
+    except ValueError:
+        pass
+    rows = {k: d}
+    r, after = cu.step(rows, "pause", {"agent": k}, 9)
+    check(r["ok"] and after[k]["paused"] and not rows[k]["paused"], "pause: paused, the input untouched")
+    r, back = cu.step(after, "resume", {"agent": k}, 9)
+    check(r["ok"] and back[k]["paused"] is False and back[k]["driving"] == "Chrome", back)
+    r, st = cu.step(rows, "stop", {"agent": k}, 9)
+    check(r == {"ok": True, "result": {"stopped": [k]}} and st[k]["was"] == "Chrome" and st[k]["driving"] is None and st[k]["stopped_by"] == "you", st)
+    r, gone = cu.step(st, "resume", {"agent": k}, 9)
+    check(r["ok"] and k not in gone, "a resumed agent that drives nothing holds nothing: no row")
+    r, _ = cu.step(st, "pause", {"agent": k}, 9)
+    check(r["error"]["code"] == "not_found" and "checkout drives nothing now" in r["error"]["message"], r)
+    r, same = cu.step(rows, "peek", {"agent": k, "max_width": 480}, 11)
+    check(r["ok"] and r["result"]["mime"] == "image/png" and r["result"]["width"] == 320 and r["result"]["at_ms"] == 11
+          and r["result"]["url"] == "https://amazon.fr/" and same == rows, "peek: the still, the rows unchanged")
+    import base64
+    check(base64.b64decode(r["result"]["data"])[:8] == b"\x89PNG\r\n\x1a\n", "the still is a PNG")
+    check(cu.step(st, "peek", {"agent": k}, 9)[0]["error"]["code"] == "not_found", "no still from a stopped agent")
+    check(cu.step(rows, "stop", {}, 9)[0]["error"]["code"] == "bad_args" and cu.step(rows, "fly", {"agent": k}, 9)[0]["error"]["code"] == "bad_args", "bad args")
+
+
+@test
+def fake_cu_daemon():
+    """fake computer use: its daemon answers the ctl protocol on the run dir's commands' socket, moves state.json as the broker, logs each call, and stop() leaves nothing"""
+    import fake_cu as cu
+    run = tempfile.mkdtemp(prefix="cu-", dir="/tmp")
+    k = cu.agent_key("0123456789abcdef", "checkout")
+    F = cu.files(run)
+    try:
+        cu.ensure(run, os.path.join(PLUGIN, "qa.py"))
+        cu.ensure(run, os.path.join(PLUGIN, "qa.py"))    # a second ensure starts nothing
+        check(cu.set_agent(run, k, "driving", "Chrome · amazon.fr")["driving"] == "Chrome", "driving row")
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(5)
+        s.connect(F["sock"])
+        f = s.makefile("rw")
+
+        def call(i, op, args):
+            f.write(json.dumps({"id": i, "op": op, "args": args}) + "\n")
+            f.flush()
+            return json.loads(f.readline())
+        f.write(json.dumps({"op": "hello", "role": "ctl"}) + "\n")
+        r = call(1, "pause", {"agent": k})
+        check(r["id"] == 1 and r["ok"], r)
+        check(json.load(open(F["state"]))["agents"][k]["paused"] is True, "pause reached state.json")
+        r = call(2, "peek", {"agent": k, "max_width": 480})
+        check(r["id"] == 2 and r["ok"] and r["result"]["data"], "a still")
+        r = call(3, "resume", {"agent": k})
+        st = json.load(open(F["state"]))
+        check(r["ok"] and st["v"] == 2 and st["agents"][k]["paused"] is False, st)
+        s.close()
+        log = cu.calls(run)
+        check([(c["act"], c["agent"], c["ok"]) for c in log] == [("pause", "checkout", True), ("peek", "checkout", True), ("resume", "checkout", True)], log)
+        check(cu.set_agent(run, k, "none", None) is None and json.load(open(F["state"]))["agents"] == {}, "none drops the row")
+        pid = int(open(F["pid"]).read())
+    finally:
+        cu.stop(run)
+    check(not cu.answers(F["sock"]) and not os.path.exists(F["state"]) and not os.path.exists(F["pid"]), "stop: nothing answers, no state, no pid")
+    try:
+        os.kill(pid, 0)
+        check(False, "the daemon outlived stop()")
+    except OSError:
+        pass
+    shutil.rmtree(run, ignore_errors=True)
+
+
 if __name__ == "__main__":
     print("%d failed" % len(failures) if failures else "all ambient-qa tests pass")
     sys.exit(1 if failures else 0)

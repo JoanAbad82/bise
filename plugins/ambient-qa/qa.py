@@ -2388,15 +2388,24 @@ def _cli(argv):
     ws.add_parser("down"); ws.add_parser("state")
     q = ws.add_parser("say"); q.add_argument("project"); q.add_argument("text")
     q = ws.add_parser("feature"); q.add_argument("project"); q.add_argument("name")
+    q = ws.add_parser("computer", help="one agent's row in the world's fake computer-use world (fake_cu.py)")
+    q.add_argument("project"); q.add_argument("agent"); q.add_argument("state", choices=["driving", "paused", "stopped", "none"])
+    q.add_argument("place", nargs="?", help="'Chrome · amazon.fr' (an app on a place) or 'Notes'")
+    ws.add_parser("computer-log", help="every call the fake computer-use broker got, JSON")
+    p = sub.add_parser("_cu"); p.add_argument("--run", required=True)
     p = sub.add_parser("_world"); p.add_argument("--bise", required=True); p.add_argument("--root", required=True); p.add_argument("--projects", type=int, default=3)
     p.add_argument("--rich", action="store_true"); p.add_argument("--agents", type=int, default=0)
     a = ap.parse_args(argv)
+    if a.cmd == "_cu":
+        import fake_cu
+        return fake_cu.serve(a.run)
     if a.cmd in ("world", "_world"):
         import world
         if a.cmd == "_world":
             return world.daemon(a.bise, a.root, a.projects, a.rich, a.agents)
         r = {"up": lambda: world.up(a.projects, a.bise, a.root, a.rich, a.agents), "down": world.down, "state": world.state,
-             "say": lambda: world.say(a.project, a.text), "feature": lambda: world.feature(a.project, a.name)}[a.wcmd]()
+             "say": lambda: world.say(a.project, a.text), "feature": lambda: world.feature(a.project, a.name),
+             "computer": lambda: world.computer(a.project, a.agent, a.state, a.place), "computer-log": world.computer_log}[a.wcmd]()
         print(json.dumps(r, indent=1, ensure_ascii=False))
         return
     if a.cmd == "_hub":

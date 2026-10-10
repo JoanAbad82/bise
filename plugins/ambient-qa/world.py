@@ -12,6 +12,9 @@ options, a merge question, a blocked agent, an artifact.
   qa.py world up [--projects 2|3] [--bise EXE]  the hubs, seeded; returns the world
   qa.py world state                             what each hub holds: agents, cards, diffs
   qa.py world say <project|bise> "<words>"      words to that project's main (the fake one)
+  qa.py world computer <project> <agent> driving|paused|stopped|none [place]
+                                                that agent's row in the fake computer use (fake_cu.py)
+  qa.py world computer-log                      the calls the fake computer-use broker got
   qa.py world down                              stops every hub of the world by its pid
 
 `up` takes the heavy lock (/usr/bin/lockf -k ~/.bise/run/heavy.lock nice
@@ -1380,6 +1383,8 @@ def down():
     if not info:
         return {"down": "no world up"}
     pids = [info["pid"]] + [h[k] for h in info["hubs"] for k in ("hub_pid", "fake_pid")]
+    import fake_cu
+    fake_cu.stop(_run_dir(info))
     if _alive(info["pid"]):
         os.kill(info["pid"], signal.SIGTERM)
     t0 = time.time()
@@ -1456,6 +1461,42 @@ def say(project, text):
     finally:
         c.s.close()
     return {"sent": text, "project": h[0]["project"]}
+
+
+def _run_dir(info):
+    """The world's run dir: its hubs', its TUI's and the app's core's (HOME/.bise/run, worldEnv)."""
+    return os.path.join(info["home"], ".bise", "run")
+
+
+def computer(project, agent, state, place=None):
+    """One agent's computer-use row in the world's fake computer-use world (fake_cu.py): driving,
+    paused, stopped or none, on `place` ('Chrome · amazon.fr'); its fake broker's commands' socket
+    started if it isn't up. Returns {key, agent: the row or None}."""
+    import qa
+    import fake_cu
+    info = _read(_paths(world_dir())["json"])
+    if not info:
+        raise qa.QAError("no world up")
+    guard(info["world"])
+    h = [h for h in info["hubs"] if h["project"] == project or (project == HOME_NAME and h["home"])]
+    if not h:
+        raise qa.QAError("no project %r in the world (%s)" % (project, ", ".join(x["project"] for x in info["hubs"])))
+    if state not in fake_cu.STATES:
+        raise qa.QAError("state is one of %s" % "|".join(fake_cu.STATES))
+    run = _run_dir(info)
+    key = fake_cu.agent_key(fake_cu.hub_id(os.path.dirname(h[0]["sock"])), agent)
+    fake_cu.ensure(run, os.path.join(os.path.dirname(os.path.abspath(__file__)), "qa.py"))
+    return {"key": key, "agent": fake_cu.set_agent(run, key, state, place)}
+
+
+def computer_log():
+    """Every call the world's fake computer-use broker got so far: [{act, agent, key, args, ok}]."""
+    import qa
+    import fake_cu
+    info = _read(_paths(world_dir())["json"])
+    if not info:
+        raise qa.QAError("no world up")
+    return fake_cu.calls(_run_dir(info))
 
 
 def feature(project, name, timeout=120):

@@ -64,7 +64,14 @@ agents, a question main answered for him (with why), a tool approval he
 refused with a note in auto mode, receipts. `world state` lists each
 hub's agents, commits, diffs, cards and socket; `world say` sends words
 to that project's fake main (`[[bash: ...]]` scripts it); `world feature`
-makes a real approval card. Always `world down` when done: it stops
+makes a real approval card. `world computer <project> <agent>
+driving|paused|stopped|none ['Chrome · amazon.fr']` sets that agent's
+computer-use row in a fake computer-use world under the world's run dir
+(fake_cu.py: state.json in the broker's shape and a fake broker on the
+commands' socket answering pause/resume/stop/peek with a canned still;
+no browser, never his computer use), so the app's real core, the window
+and the TUI show it; `world computer-log` lists the calls that fake
+broker got ({act, agent, key, args, ok}). Always `world down` when done: it stops
 every hub by pid. A world outside `~/.bise/gate`, or a value reaching his
 hubs, is refused.
 
