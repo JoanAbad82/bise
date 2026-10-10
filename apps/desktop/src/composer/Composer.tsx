@@ -31,8 +31,10 @@ export interface ComposerProps {
   readonly onEmptyEnter?: () => void;
   /** R18: an esc no list took, while busy or on a blank field: the screen's (stop the turn, ...). */
   readonly onEscape?: () => void;
+  /** TP-R6, ⇧⇥ (no list open): the screen's (the TUI's: switch the approvals mode yolo ↔ auto). */
+  readonly onShiftTab?: () => void;
   /** a key hint at the label line's right ('esc write a plain message' while it answers a docked card) */
-  readonly toEnd?: string;
+  readonly toEnd?: ReactNode;
   readonly placeholder?: string;
   /** A fixed key bar (a screen of its own); unset: the bar follows the composer's mode (W9). */
   readonly keys?: string;
@@ -200,6 +202,13 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
         onEscape={() => {
           cb.current.onEscape?.();
         }}
+        onShiftTab={
+          props.onShiftTab === undefined
+            ? undefined
+            : () => {
+                cb.current.onShiftTab?.();
+              }
+        }
       />
     </ComposerFrame>
   );

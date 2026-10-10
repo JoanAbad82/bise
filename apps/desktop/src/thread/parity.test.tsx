@@ -15,6 +15,8 @@ import { createRouter, RouterContext } from '@/app/router';
 vi.mock('@/composer', () => ({
   Composer: () => <div data-testid="composer" />,
   useComposerSources: () => ({ agents: [], skills: [], commands: [], files: () => Promise.resolve([]), saveImage: () => Promise.resolve(null) }),
+  useApprovalsFlash: () => false,
+  flashWords: () => ({ word: '', rest: '' }),
 }));
 
 afterEach(cleanup);

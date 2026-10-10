@@ -9,7 +9,7 @@
 // entry, a step nor a send ever re-renders it.
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { Button, Head, Marker } from '@/ds';
-import { Composer, useComposerSources } from '@/composer';
+import { Composer, flashWords, useApprovalsFlash, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer';
 import { quoteFrom, quoteKey, quoteText } from './quote';
 import type { Outgoing } from '@/composer/message';
@@ -209,6 +209,13 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape' && !e.defaultPrevented) {
       if (escape()) e.preventDefault();
+    } else if (e.key === 'c' && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && !e.defaultPrevented) {
+      // K6, the TUI's ctrl+c (ambient-pm m_17250): it stops the turn too; copy is ⌘C on the Mac, so
+      // ctrl+c is free, but with text selected it does nothing else (he may be copying by habit)
+      if (busy && (window.getSelection()?.isCollapsed ?? true)) {
+        e.preventDefault();
+        stop();
+      }
     } else if (e.key === 'f' && e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {
       e.preventDefault();
       setFindOpen(true);
@@ -785,6 +792,20 @@ export const ThreadComposer = memo(function ThreadComposer({
 }) {
   const store = useStore();
   const router = useRouter();
+  // TP-R6 (amb-web's composer/approvals.ts): ⇧⇥ switches the hub's approvals mode yolo ↔ auto like
+  // the TUI; for 3 s after a switch the label line's right says it (the TUI's key bar flash)
+  const approvals = useApprovals(project);
+  const flash = useApprovalsFlash(approvals) && approvals !== null ? flashWords(approvals.mode, approvals.checker, approvals.env) : null;
+  const end: ReactNode =
+    flash === null ? toEnd : (
+      <span data-testid="composer.flash">
+        <span className="flash-word">{flash.word}</span>
+        {flash.rest}
+      </span>
+    );
+  const onShiftTab = useCallback(() => {
+    store.command({ cmd: 'approvals', project, mode: 'toggle' });
+  }, [store, project]);
   // the composer's lists from the core (amb-core's C/A/B 40f14a12): the TUI's
   // commands in its order (window ones ready when their screen exists, the
   // hub's when they run typed), the workspace's $ skills, its @ files ranked
@@ -875,7 +896,7 @@ export const ThreadComposer = memo(function ThreadComposer({
     if (act.act === 'again') document.querySelector<HTMLButtonElement>(`[data-testid="thread.notdelivered.${String(act.pos)}.again"]`)?.click();
     else store.command(act.cmd);
   }, [cards, agent, store, project]);
-  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} {...(toEnd === undefined ? {} : { toEnd })} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} {...(keys === undefined ? {} : { keys })} lead={lead} testId="composer" />;
+  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} {...(end === undefined ? {} : { toEnd: end })} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} {...(keys === undefined ? {} : { keys })} lead={lead} testId="composer" />;
 });
 
 /** A message about an artifact: `about [its title](its url): his words` (the chip's own link form). Pure. */

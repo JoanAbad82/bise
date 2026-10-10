@@ -56,3 +56,5 @@
 @media (prefers-reduced-motion: reduce) { .b-composer .keys .mic .meter i { transition: none; } }
 /* voice mode's ∿ (designer's voice-window page (1)): next to dictate, as wide as its words */
 .b-composer .keys .mic.voice { min-width: 0; }
+/* TP-R6: the 3 s flash of an approvals switch on the label line, its mode word in accent (keybar.rs) */
+.b-composer .flash-word { color: var(--c-accent); font-weight: 600; }

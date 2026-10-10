@@ -71,6 +71,8 @@ export interface PmFieldProps {
    * (captureKeyDown), so a screen's bubbling handler never sees it as free.
    */
   readonly onEscape?: (() => void) | undefined;
+  /** TP-R6, ⇧⇥ with no list open: the screen's act (switch the approvals mode); unset: the browser's. */
+  readonly onShiftTab?: (() => void) | undefined;
 }
 
 /** The draft is written this long after the last change (never on each key of a burst). */
@@ -764,6 +766,13 @@ export function PmField(p: PmFieldProps): JSX.Element {
           e.preventDefault();
           const row = l.rows[l.index];
           if (row !== undefined && !row.off) apply(completion(row));
+          return true;
+        }
+        // approvals-design.md §8.1 (the TUI's input.rs): in the composer shift+tab always switches
+        // yolo ↔ auto (a list item outdents with backspace)
+        if (e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && props.current.onShiftTab !== undefined) {
+          e.preventDefault();
+          props.current.onShiftTab();
           return true;
         }
         if (!e.shiftKey && run(indent)) return true;

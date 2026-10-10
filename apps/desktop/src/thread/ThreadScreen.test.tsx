@@ -16,6 +16,8 @@ vi.mock('@/composer', () => ({
     return <div data-testid="composer" />;
   },
   useComposerSources: () => ({ agents: [], skills: [], commands: [], files: () => Promise.resolve([]), saveImage: () => Promise.resolve(null) }),
+  useApprovalsFlash: () => false,
+  flashWords: () => ({ word: '', rest: '' }),
 }));
 
 const P = 'acme-1a2b3c4d';
