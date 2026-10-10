@@ -144,20 +144,25 @@ export function CoreLine() {
     <div className={`app-core${v.tone === 'err' ? ' err' : ''}`} role="status" data-testid="app.core" data-state={state}>
       <div className="app-core-head">
         <span data-testid="app.core.text">{v.text}</span>
-        {v.start && (
-          <button type="button" className="app-core-act" data-testid="app.core.start" onClick={() => bise()?.core.start?.()}>
-            start bise
-          </button>
-        )}
-        {v.report && path !== null && (
-          <button type="button" className="app-core-act" data-testid="app.core.report" onClick={() => void bise()?.showInFinder(path)}>
-            show the report
-          </button>
-        )}
       </div>
-      {v.note !== undefined && (
-        <div className="app-core-last" data-testid="app.core.note">
-          {v.note}
+      {/* designer m_16922: the actions on their own row under the words, as buttons, then the note */}
+      {(v.start || (v.report && path !== null) || v.note !== undefined) && (
+        <div className="app-core-row">
+          {v.start && (
+            <button type="button" className="app-core-btn" data-testid="app.core.start" onClick={() => bise()?.core.start?.()}>
+              start bise
+            </button>
+          )}
+          {v.report && path !== null && (
+            <button type="button" className="app-core-btn" data-testid="app.core.report" onClick={() => void bise()?.showInFinder(path)}>
+              show the report
+            </button>
+          )}
+          {v.note !== undefined && (
+            <span className="app-core-note" data-testid="app.core.note">
+              {v.note}
+            </span>
+          )}
         </div>
       )}
     </div>
