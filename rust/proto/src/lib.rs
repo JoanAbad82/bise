@@ -47,6 +47,10 @@
 //! one parser of each line kind, which the TUI's `wire.rs`/`sb.rs` call
 //! too, and [`thread::words`] makes the words both show.
 //!
+//! [`parts`] is his message as typed parts (a quote, a paste, an image,
+//! a file, his words) and the one owner of the template the model reads
+//! them in (render, and parse for an old text).
+//!
 //! [`ops`] holds the rows of the answers that were the terminal's older
 //! untyped events (`/diff`'s branches, `/version`'s picker), typed for
 //! their methods (client-protocol step 3).
@@ -67,6 +71,7 @@ pub mod helper;
 pub mod hub;
 pub mod log;
 pub mod ops;
+pub mod parts;
 pub mod pty;
 pub mod rows;
 pub mod jsonrpc;
