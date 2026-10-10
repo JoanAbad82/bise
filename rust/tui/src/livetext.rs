@@ -70,13 +70,30 @@ fn build(ev: &Ev, gap: bool, tick: u32, width: usize) -> Vec<Line<'static>> {
     if gap {
         rows.push(Line::from(""));
     }
-    rows.extend(ev_rows(ev, tick, width));
+    // no link tags: the live rows are not in the frame's link hits, and a
+    // tagged live cell equal to the settled one would keep the diff from
+    // rewriting it, so the settled link would never get its OSC 8
+    // (tui_file_links_tmux found it)
+    rows.extend(ev_rows(ev, tick, width).into_iter().map(untagged));
     if crate::find::no_color() {
         mark_unsettled(&mut rows, width);
         return rows;
     }
     let dim = crate::theme::dim();
     rows.into_iter().map(|l| dimmed(l, dim)).collect()
+}
+
+/// Every span without its link tag (links.rs), its look kept.
+fn untagged(l: Line<'static>) -> Line<'static> {
+    let spans: Vec<Span<'static>> = l
+        .spans
+        .into_iter()
+        .map(|mut s| {
+            s.style.add_modifier = crate::links::with_tag(s.style.add_modifier, 0);
+            s
+        })
+        .collect();
+    Line { spans, ..l }
 }
 
 /// Every span in the dim color, its modifiers kept (bold, italic: the
@@ -153,6 +170,25 @@ fn main() {", false, 0, 60);
         let dim = crate::theme::dim();
         let own = kept_rows("the plan, in **three** steps", 0, 60);
         assert!(own.iter().flat_map(|l| &l.spans).all(|s| s.style.fg == Some(dim)));
+    }
+
+    // a link drawn live has no tag: the settled link's cells differ from
+    // the live ones, so the diff rewrites them with their OSC 8
+    #[test]
+    fn a_live_link_has_no_tag_so_the_settled_one_is_redrawn() {
+        let dir = std::env::temp_dir().join(format!("sblive-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("notes")).unwrap();
+        std::fs::write(dir.join("notes/plan.md"), "x
+").unwrap();
+        crate::file_links::set_dirs(vec![dir.clone()]);
+        let text = "look at notes/plan.md:3 and [the site](https://example.com)";
+        let fin = crate::feed::build_rows(&[Ev::Assistant(text.into())], 0, false, 60, 0);
+        let tags = |rows: &[Line]| rows.iter().flat_map(|l| &l.spans).filter(|s| crate::links::tag_of(s.style.add_modifier) != 0).count();
+        assert!(tags(&fin) >= 2, "the settled reply links both");
+        let live = rows(&[], text, false, 0, 60);
+        assert_eq!(tags(&live), 0);
+        crate::file_links::set_dirs(Vec::new());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

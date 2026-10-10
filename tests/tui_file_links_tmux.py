@@ -43,6 +43,10 @@ def ask(t):
     t.typed(MSG)
     t.keys("Enter")
     t.wait("ack: " + MSG)
+    # the streamed text (livetext.rs) shows the words first, plain; the
+    # links come with the kept answer, which replaces it in place
+    wait_until(lambda: "notes/plan.md\x1b\\" in t.screen(colors=True), 10,
+               lambda: "the kept answer never linked the path:\n" + t.screen())
     rows = t.screen().splitlines()
     y = max(i for i, r in enumerate(rows) if "ack: look at" in r)
     return rows, y, rows[y].find("notes/plan.md")
