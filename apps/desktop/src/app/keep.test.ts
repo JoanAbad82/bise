@@ -114,7 +114,11 @@ describe('the keep', () => {
     expect(again.get('shop-1')).toBe('only at checkout');
     again.prune(new Set());
     expect(again.get('acme-2')).toBe('v2');
+    // a list with only shop's cards (acme's hub not back yet after the reload) keeps acme's draft
     again.prune(new Set(['shop-1']));
+    expect(again.get('acme-2')).toBe('v2');
+    // acme's cards are in, and its card 2 is not: its draft goes
+    again.prune(new Set(['shop-1', 'acme-3']));
     expect(again.get('acme-2')).toBe('');
     again.drop('shop-1');
     expect(keptDrafts(createKeep(s, c.now, c.later)).get('shop-1')).toBe('');

@@ -18,6 +18,7 @@ import { dotOf, folds, InboxCard, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { inboxDrafts, type Drafts } from './drafts';
 import { caretAtEnd } from '@/app/keep';
+import { useMenuAction } from '@/app/menu';
 import { saveImageFile, thumbnail } from '@/composer/attach';
 import type { SavedImage } from '@/composer/sources';
 import { current, prune, START, step, takesWords, visible, type Act, type Key } from './model';
@@ -151,6 +152,12 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
     caretAtEnd(field.current);
   }, [curKey]);
 
+  // ctrl+o (and ⌘E): the window's capture listener takes the key (app/keys.ts 'fold-all', the
+  // TUI's ctrl+o) before any field; the open item's folded lines open, again folds them (bar I8)
+  useMenuAction('fold-all', () => {
+    if (cur && curKey !== null && folds(cur.question)) setWhole(whole === curKey ? null : curKey);
+  });
+
   const run = (a: Act) => {
     if (a.t === 'answer') {
       const k = `${a.project}-${String(a.card)}`;
@@ -183,11 +190,6 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
       // the heard answer is undone: nothing goes
       e.preventDefault();
       setDone(heard);
-      return;
-    }
-    if (e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'o') {
-      e.preventDefault();
-      if (cur && curKey !== null && folds(cur.question)) setWhole(whole === curKey ? null : curKey);
       return;
     }
     // ⌫ at the start of his words takes the last image chip away, as the composer's ⌫ before a chip

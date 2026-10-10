@@ -81,6 +81,9 @@ test('inbox/keys: ↑↓ ←→ ctrl+n ctrl+p walk the inbox, ctrl+o opens a fol
       // a question: words in its field; ↓ is his words', ctrl+n still walks
       const q = items.find((x) => x !== a) ?? a;
       await page.locator(`[data-testid="inbox.item.${q}"]`).click();
+      // q is open before he types: a click on the field while the previous item's is still there put
+      // the words outside the new one (82b584d6's first run: ↓ then walked, the field being empty)
+      await expect.poll(() => current(page), { timeout: 3000, message: 'the clicked item is open' }).toBe(q);
       const field = page.locator(T.answer);
       if ((await field.count()) > 0) {
         await field.click();

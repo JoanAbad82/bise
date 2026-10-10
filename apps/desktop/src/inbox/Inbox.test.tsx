@@ -5,6 +5,7 @@ import type { Card } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
 import { Inbox, keyOf, type InboxPorts } from './Inbox';
 import { makeDrafts } from './drafts';
+import { emitAction } from '@/app/menu';
 import { glyphOf, InboxCard, kindTitle, PICKED_MS } from './InboxCard';
 
 describe("a card's head (designer m_15412)", () => {
@@ -148,10 +149,15 @@ describe('Inbox', () => {
     expect(card()).toContain('line 6');
     expect(card()).not.toContain('line 7');
     expect(screen.getByTestId(more).textContent).toContain('6 more lines');
-    fireEvent.keyDown(screen.getByTestId('inbox.root'), { key: 'o', ctrlKey: true });
+    // ctrl+o reaches a screen as the window's 'fold-all' (app/keys.ts, its capture listener)
+    act(() => {
+      emitAction('fold-all');
+    });
     expect(card()).toContain('line 12');
     expect(screen.queryByTestId(more)).toBeNull();
-    fireEvent.keyDown(screen.getByTestId('inbox.root'), { key: 'o', ctrlKey: true });
+    act(() => {
+      emitAction('fold-all');
+    });
     expect(card()).not.toContain('line 12');
     cleanup();
     render(<Inbox cards={[c]} names={{}} ports={ports()} now={1791100400000} />);

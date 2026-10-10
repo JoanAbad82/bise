@@ -51,9 +51,21 @@ export function keptDrafts(k: Keep): Drafts {
     },
     prune: (open) => {
       if (open.size === 0) return;
-      k.pruneTexts('card:', (x) => open.has(x.slice('card:'.length)));
+      // only within the projects whose cards are in the list: after a reload the projects' rows come
+      // one hub at a time, and home's cards alone must not take shop's drafts (qa-flows 82b584d6, I6)
+      const live = new Set([...open].map(projectOf));
+      k.pruneTexts('card:', (x) => {
+        const key = x.slice('card:'.length);
+        return open.has(key) || !live.has(projectOf(key));
+      });
     },
   };
+}
+
+/** A card key's project ('shop-5e6f7a8b-12' -> 'shop-5e6f7a8b'). Pure. */
+export function projectOf(key: string): string {
+  const at = key.lastIndexOf('-');
+  return at < 0 ? key : key.slice(0, at);
 }
 
 /** The window's drafts: they outlive the inbox screen, and the window itself. */
