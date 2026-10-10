@@ -451,6 +451,132 @@ test('gate/right: messages right, type anywhere, inbox drafts + ctrl+o, folds, t
       await theme('light');
     }
 
+    // HEADFIT: the agent head shows each meta item whole or not at all (amb-home 69192579): at 1400, 1100 with the
+    // artifacts panel, 800; light + dark; on telemetry · p99 and shop · gift-ui (a blocked one: its chip)
+    if (on('HEADFIT')) {
+      const headOf = (): Promise<string> =>
+        p.evaluate(() => {
+          const h = document.querySelector<HTMLElement>('[data-testid="thread.head"]');
+          if (h === null) return 'no head';
+          const it = (id: string): string => {
+            const e = h.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+            if (e === null) return '-';
+            if (e.classList.contains('ah-gone')) return 'gone';
+            const r = e.getBoundingClientRect();
+            if (r.width === 0) return 'hidden';
+            const cut = e.scrollWidth > e.clientWidth + 1;
+            return `${cut ? 'CUT' : 'whole'} ${JSON.stringify(e.innerText.replace(/\s+/g, ' ').trim().slice(0, 40))}`;
+          };
+          const hr = h.getBoundingClientRect();
+          const over = Array.from(h.querySelectorAll<HTMLElement>('*')).some((e) => !e.classList.contains('ah-gone') && e.getBoundingClientRect().right > hr.right + 1);
+          return `drop=${h.dataset['drop'] ?? '?'}; name ${it('thread.head.name')}; role ${it('thread.head.role')}; context ${it('thread.usage')}; branch ${it('thread.head.branch')}; changes ${it('thread.head.changes')}; past the head's right edge: ${String(over)}`;
+        });
+      for (const t of ['light', 'dark'] as const) {
+        await theme(t);
+        for (const [who, route] of [['p99', `agent/${tel}/p99`], ['gift-ui', `agent/${shop}/gift-ui`]] as const) {
+          await go(s, route);
+          for (const wd of [1400, 1100, 800]) {
+            await size(wd);
+            await sleep(900);
+            await shot(`HEADFIT-${who}-${String(wd)}-${t}`);
+            await p.getByTestId('thread.head').screenshot({ path: path.join(OUT, `HEADFIT-${who}-${String(wd)}-${t}-head.png`) }).catch(() => undefined);
+            row(`HEADFIT ${who} ${String(wd)} ${t}`, await headOf());
+          }
+          await size(1100);
+        }
+      }
+      await theme('light');
+    }
+
+    // B16 (ambient-pm m_17235): the narrow window, light: its minimum width (MAIN_SIZE.minWidth 680), then 600 and 520
+    // with the minimum lowered for the shot (the app itself never goes under its minimum: said in each row). Screens:
+    // a thread with a long answer and a tool row, the inbox block with a card's options open, settings · models,
+    // scheduled with a task open, review, and the sidebar folded/unfolded. Each row: the real width, anything past
+    // the window's right edge, any element scrolled sideways, the composer's and the keys line's line count.
+    if (on('B16')) {
+      await theme('light');
+      const min = await s.app.evaluate(({ BrowserWindow }) => {
+        const b = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('index.html'));
+        return b?.getMinimumSize()[0] ?? 0;
+      });
+      const narrow = (w: number): Promise<number> =>
+        s.app.evaluate(({ BrowserWindow }, [v, lower]) => {
+          const b = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().includes('index.html'));
+          if (b === undefined) return 0;
+          if (lower === 1) b.setMinimumSize(Math.min(v ?? 0, b.getMinimumSize()[0] ?? 0), b.getMinimumSize()[1] ?? 0);
+          b.setContentSize(v ?? 0, b.getContentSize()[1] ?? 720);
+          return b.getContentSize()[0] ?? 0;
+        }, [w, w < min ? 1 : 0]);
+      const look = (): Promise<string> =>
+        p.evaluate(() => {
+          const W = document.documentElement.clientWidth;
+          const past = Array.from(document.querySelectorAll<HTMLElement>('body *')).filter((e) => {
+            const r = e.getBoundingClientRect();
+            const st = getComputedStyle(e);
+            return r.width > 0 && r.right > W + 1 && st.visibility !== 'hidden' && st.position !== 'fixed' && e.closest('[aria-hidden="true"], .ah-gone') === null;
+          });
+          const sideways = Array.from(document.querySelectorAll<HTMLElement>('body *')).filter((e) => {
+            const st = getComputedStyle(e);
+            return e.scrollLeft > 0 || (e.scrollWidth > e.clientWidth + 1 && /auto|scroll/.test(st.overflowX) && !/^(PRE|CODE)$/.test(e.tagName));
+          });
+          const lines = (sel: string): string => {
+            const e = document.querySelector<HTMLElement>(sel);
+            if (e === null) return '-';
+            const lh = parseFloat(getComputedStyle(e).lineHeight) || 18;
+            return String(Math.round(e.getBoundingClientRect().height / lh));
+          };
+          const tag = (e: HTMLElement): string => e.dataset['testid'] ?? e.getAttribute('class')?.split(' ')[0] ?? e.tagName;
+          return `doc ${String(W)} px, scrollWidth ${String(document.documentElement.scrollWidth)}; past the right edge: ${String(past.length)} ${JSON.stringify(past.slice(0, 4).map(tag))}; scrolled sideways: ${String(sideways.length)} ${JSON.stringify(sideways.slice(0, 4).map(tag))}; keys line ~${lines('.composer-keys, [data-testid="composer.keys"]')} lines; sidebar ${document.querySelector<HTMLElement>('[data-testid="app.sidebar"]')?.getBoundingClientRect().width.toFixed(0) ?? 'none'} px`;
+        });
+      const screens: [string, () => Promise<void>][] = [
+        ['thread-long', async () => { await go(s, `project/${tel}`); await sleep(1500); }],
+        ['thread-tools', async () => { await go(s, `agent/${tel}/dashboards`); await sleep(1500); }],
+        ['inbox-card', async () => {
+          await go(s, `project/${shop}`);
+          await sleep(1200);
+          await p.locator(FIELD).first().click().catch(() => undefined);
+          await p.keyboard.press('Control+1');
+          await sleep(900);
+        }],
+        ['settings-models', async () => { await go(s, 'settings/models'); await sleep(1200); }],
+        ['scheduled', async () => {
+          await go(s, 'scheduled');
+          await sleep(1200);
+          await p.locator('[data-testid^="scheduled.row."]').first().click().catch(() => undefined);
+          await sleep(800);
+        }],
+        ['review', async () => { await go(s, `review/${shop}/gift-ui`); await sleep(1500); }],
+      ];
+      for (const w of [min, 600, 520]) {
+        const real = await narrow(w);
+        await sleep(600);
+        for (const [name, open] of screens) {
+          await open();
+          await shot(`B16-${name}-${String(w)}`);
+          row(`B16 ${name} ${String(w)}`, `${w < min ? `under the app's minimum ${String(min)} (lowered for the shot); ` : ''}content width ${String(real)}; ${await look()}`);
+        }
+        // the sidebar: its toggle, if the narrow window has one (folded, then unfolded)
+        const toggle = p.locator('[data-testid*="sidebar.toggle"], [data-testid*="sidebar.fold"], [aria-label*="sidebar" i]').first();
+        if ((await toggle.count()) > 0 && (await toggle.isVisible().catch(() => false))) {
+          await go(s, `project/${tel}`);
+          await sleep(800);
+          await shot(`B16-sidebar-a-${String(w)}`);
+          const a = await look();
+          await toggle.click().catch(() => undefined);
+          await sleep(700);
+          await shot(`B16-sidebar-b-${String(w)}`);
+          row(`B16 sidebar ${String(w)}`, `before: ${a} · after its toggle: ${await look()}`);
+          await toggle.click().catch(() => undefined);
+          await sleep(500);
+        } else row(`B16 sidebar ${String(w)}`, 'no sidebar toggle in view at this width');
+      }
+      await s.app.evaluate(({ BrowserWindow }, m) => {
+        const b = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().includes('index.html'));
+        b?.setMinimumSize(m, b.getMinimumSize()[1] ?? 0);
+        b?.setContentSize(1100, b.getContentSize()[1] ?? 720);
+      }, min);
+    }
+
     // P99ROW: the bottom of telemetry's thread
     if (on('P99ROW')) {
       await go(s, `project/${tel}`);
