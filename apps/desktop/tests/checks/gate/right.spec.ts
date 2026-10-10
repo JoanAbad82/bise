@@ -577,6 +577,17 @@ test('gate/right: messages right, type anywhere, inbox drafts + ctrl+o, folds, t
       }, min);
     }
 
+    // SETKEYS (designer m_17479, fa91c73a): settings › keys with the keychain switch at its head, light, 1100
+    if (on('SETKEYS')) {
+      await theme('light');
+      await size(1100);
+      await go(s, 'settings/keys');
+      await sleep(1200);
+      await shot('SETKEYS-1100-light');
+      const words = await p.evaluate(() => (document.querySelector<HTMLElement>('main, [data-testid^="settings"]')?.innerText ?? document.body.innerText).replace(/\s+/g, ' ').slice(0, 400));
+      row('SETKEYS settings › keys 1100 light', JSON.stringify(words));
+    }
+
     // P99ROW: the bottom of telemetry's thread
     if (on('P99ROW')) {
       await go(s, `project/${tel}`);
