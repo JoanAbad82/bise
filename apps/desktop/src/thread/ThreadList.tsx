@@ -9,7 +9,7 @@
 //   (firstItemIndex goes down by the rows added in front);
 // - at the bottom it follows new rows; scrolled up, it stays where he is;
 // - the list never holds the composer: it sits beside it in the screen.
-import { useCallback, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { keep } from '@/app/keep';
 import './thread.css';
@@ -30,6 +30,11 @@ export interface ThreadListHandle {
   scrollTo(key: string): void;
   /** to the newest row */
   scrollToEnd(): void;
+  /**
+   * Keep the view still while rows open or close (⌘E opens everything): the row at the top of
+   * the view keeps its y, the thread grows below it (designer m_17092).
+   */
+  holdView(): void;
 }
 
 export interface ThreadListProps {
@@ -108,7 +113,8 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
   // an older page comes in front, that row is held at that y (hold below)
   const scroller = useRef<HTMLElement | null>(null);
   const reading = useRef<{ index: number; top: number } | undefined>(undefined);
-  const held = useRef<{ index: number; top: number; until: number } | undefined>(undefined);
+  // click: held because he opened or closed a row (it keeps its y even at the end: never re-stuck)
+  const held = useRef<{ index: number; top: number; until: number; click?: boolean } | undefined>(undefined);
   const holdRef = useRef<() => void>(() => undefined);
   const measure = useCallback(() => {
     const el = scroller.current;
@@ -182,31 +188,33 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
     const h = held.current;
     const el = scroller.current;
     if (h === undefined || el === null) return;
-    if (stick.current || Date.now() > h.until) {
+    if ((stick.current && h.click !== true) || Date.now() > h.until) {
       held.current = undefined;
       return;
     }
     const row = el.querySelector<HTMLElement>(`[data-item-index="${String(h.index)}"]`);
     if (row === null) return;
     const d = partOf(row, holdPart).getBoundingClientRect().top - h.top;
-    if (Math.abs(d) >= 0.5) el.scrollTop += d;
+    if (Math.abs(d) < 0.5) return;
+    el.scrollTop += d;
+    // he opened a row at the end: he reads it there now, the list no longer follows the end
+    if (h.click === true && stick.current) {
+      stick.current = false;
+      setStuck(false);
+    }
   }, [holdPart]);
   useLayoutEffect(() => {
     holdRef.current = hold;
   }, [hold]);
-  const firstIndex = useRef(next.index);
-  useLayoutEffect(() => {
-    const before = firstIndex.current;
-    firstIndex.current = next.index;
-    // an older page came in front: hold the row he read at the last scroll
-    if (next.index >= before || stick.current || reading.current === undefined) return;
-    held.current = { ...reading.current, until: Date.now() + HOLD_MS };
+  // Virtuoso draws new or grown rows over its next commits and frames: each
+  // scroll it makes comes back through measure (-> hold), each DOM change
+  // or resize in the list through the observers (a mutation is a
+  // microtask: it runs in a window in the background too, where frames and
+  // timers are throttled), and a timer covers the rest; until the hold ends
+  const stopHold = useRef<() => void>(() => undefined);
+  const keepHeld = useCallback((): (() => void) => {
+    stopHold.current();
     hold();
-    // Virtuoso draws the new rows over its next commits and frames: each
-    // scroll it makes comes back through measure (-> hold), each DOM change
-    // or resize in the list through the observers (a mutation is a
-    // microtask: it runs in a window in the background too, where frames and
-    // timers are throttled), and a timer covers the rest
     const el = scroller.current;
     let timer = 0;
     const stop = () => {
@@ -229,10 +237,48 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
       if (held.current !== undefined) timer = window.setTimeout(tick, 16);
     };
     timer = window.setTimeout(tick, 0);
+    stopHold.current = stop;
     return stop;
-  }, [next.index, hold]);
+  }, [hold]);
+  useEffect(
+    () => () => {
+      stopHold.current();
+    },
+    [],
+  );
+  /**
+   * He opens or closes a row (a click on its toggle, ⌘E): that row, else the one at the top of
+   * the view, keeps its y while the list measures what changed (designer m_17092: an opened row
+   * never moves, the thread grows below it; never back to the end on his click).
+   */
+  const holdRow = useCallback(
+    (rowEl: HTMLElement | null) => {
+      const el = scroller.current;
+      if (el === null) return;
+      const top = el.getBoundingClientRect().top;
+      const r =
+        rowEl ??
+        [...el.querySelectorAll<HTMLElement>('[data-item-index]')].find((x) => x.getBoundingClientRect().bottom > top) ??
+        null;
+      if (r === null) return;
+      held.current = { index: Number(r.dataset.itemIndex), top: partOf(r, holdPart).getBoundingClientRect().top, until: Date.now() + HOLD_MS, click: true };
+      keepHeld();
+    },
+    [holdPart, keepHeld],
+  );
+  const firstIndex = useRef(next.index);
+  useLayoutEffect(() => {
+    const before = firstIndex.current;
+    firstIndex.current = next.index;
+    // an older page came in front: hold the row he read at the last scroll
+    if (next.index >= before || stick.current || reading.current === undefined) return;
+    held.current = { ...reading.current, until: Date.now() + HOLD_MS };
+    return keepHeld();
+  }, [next.index, keepHeld]);
   const onGrow = useCallback(() => {
-    if (stick.current) toEndNow();
+    // a row he opened stays where he opened it, even at the end
+    if (held.current?.click === true) hold();
+    else if (stick.current) toEndNow();
     else hold();
   }, [toEndNow, hold]);
 
@@ -272,8 +318,11 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         if (i >= 0) virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
       },
       scrollToEnd: toEnd,
+      holdView() {
+        holdRow(null);
+      },
     }),
-    [keys, toEnd],
+    [keys, toEnd, holdRow],
   );
 
   return (
@@ -281,8 +330,14 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
       className="th-list"
       data-testid={testId}
       data-stuck={stuck}
-      onPointerDown={() => {
+      onPointerDown={(e) => {
         held.current = undefined;
+        // a press on a row's toggle (a fold, a thinking row, a tool line): that row keeps its y
+        // while it opens or closes
+        const t = e.target as HTMLElement;
+        const toggle = t.closest('button, [role="button"], summary, [aria-expanded]');
+        const rowEl = toggle?.closest<HTMLElement>('[data-item-index]') ?? null;
+        if (rowEl !== null) holdRow(rowEl);
       }}
       onWheel={(e) => {
         held.current = undefined;
@@ -301,7 +356,8 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         firstItemIndex={next.index}
         computeItemKey={(_, key) => (reactKey === undefined ? key : reactKey(key))}
         itemContent={(_, key) => row(key)}
-        followOutput={(b) => (b || stick.current ? 'auto' : false)}
+        // never back to the end while a row he opened is held
+        followOutput={(b) => (held.current?.click === true ? false : b || stick.current ? 'auto' : false)}
         totalListHeightChanged={onGrow}
         rangeChanged={onRange}
         alignToBottom

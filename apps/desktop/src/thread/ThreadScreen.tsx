@@ -170,6 +170,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   // the window's keys (app/keys.ts): ⌘E everything folded, ⌘. stop,
   // end back to the bottom, ctrl+y copy a code block
   useMenuAction('fold-all', () => {
+    // the row at the top of the view keeps its y while everything opens or closes (designer m_17092)
+    list.current?.holdView();
     folds.toggle();
   });
   useMenuAction('to-end', () => {
