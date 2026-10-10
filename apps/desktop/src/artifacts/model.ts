@@ -89,6 +89,17 @@ export interface Filter {
 
 export const ALL: Filter = { project: '', agent: '', kinds: [], q: '' };
 
+/** Archived by him or an agent (art-archive's archived_at): out of the default list, behind 'N archived'. */
+export const isArchived = (a: Artifact): boolean => a.archived_at != null;
+
+/** The list's items and how many archived ones it leaves behind (the TUI's faint '2 archived' row). Pure. */
+export function splitArchived(items: readonly Item[]): { live: Item[]; archived: Item[] } {
+  const live: Item[] = [];
+  const archived: Item[] = [];
+  for (const it of items) (isArchived(it.a) ? archived : live).push(it);
+  return { live, archived };
+}
+
 /** The items the filter keeps, newest first. */
 export function filterItems(items: readonly Item[], f: Filter): Item[] {
   const words = f.q.toLowerCase().split(/\s+/).filter((w) => w !== '');

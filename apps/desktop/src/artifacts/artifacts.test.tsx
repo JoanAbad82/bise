@@ -6,7 +6,7 @@ import { Store, StoreProvider } from '@/store';
 import { RouterContext, createRouter } from '@/app/router';
 import type { Route } from '@/app/route';
 import { formatRoute, parseRoute } from '@/app/route';
-import { byDay, dayWords, filterItems, glyphOf, kindWords, ALL, timeOf, versions, whenWords, type Item } from './model';
+import { byDay, dayWords, filterItems, glyphOf, kindWords, ALL, splitArchived, timeOf, versions, whenWords, type Item } from './model';
 import { ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
 import { putInDraft } from './put';
 import { themedUrl } from './Open';
@@ -212,6 +212,59 @@ describe('artifacts screens', () => {
     store.apply({ ev: 'prefs', prefs: { theme: 'dark' } });
     render(<StoreProvider store={store}><RouterContext.Provider value={createRouter({ screen: 'artifacts', project: 'shop-1', id: 'notes' })}><ArtifactOpen project="shop-1" id="notes" /></RouterContext.Provider></StoreProvider>);
     expect(screen.getByTestId('artifact.page').getAttribute('src')).toBe('http://127.0.0.1:47123/p/notes?theme=dark');
+  });
+});
+
+describe('archived artifacts (art-archive archived_at, the TUI artifacts screen)', () => {
+  const archivedWorld = () => {
+    const store = world();
+    store.apply({ ev: 'artifacts', project: 'shop-1', items: [art('notes', 'page'), art('old-deck', 'page', { archived_at: at(1, 9, 0) }), art('old-doc', 'file', { archived_at: at(2, 9, 0), at_ms: at(2, 8, 0) })] });
+    return store;
+  };
+  const mountWith = (store: Store, node: React.ReactNode) => {
+    render(<StoreProvider store={store}><RouterContext.Provider value={createRouter({ screen: 'artifacts', project: '' })}>{node}</RouterContext.Provider></StoreProvider>);
+  };
+
+  it('splits the archived ones from the list', () => {
+    const { live, archived } = splitArchived([item(art('a', 'page')), item(art('b', 'page', { archived_at: 1 })), item(art('c', 'file', { archived_at: null }))]);
+    expect(live.map((it) => it.a.id)).toEqual(['a', 'c']);
+    expect(archived.map((it) => it.a.id)).toEqual(['b']);
+  });
+
+  it("the screen leaves them behind a faint '2 archived' row; a (or a click) shows them alone, esc goes back", () => {
+    mountWith(archivedWorld(), <ArtifactsScreen />);
+    const ids = () => [...screen.getByTestId('artifacts.list').querySelectorAll('[role=option]')].map((r) => r.getAttribute('data-testid'));
+    expect(ids()).not.toContain('artifacts.list.row.old-deck');
+    expect(screen.getByTestId('artifacts.archived').textContent).toBe('2 archived');
+    expect(screen.getByTestId('artifacts.keys').textContent).toContain('a archived');
+    fireEvent.keyDown(screen.getByTestId('artifacts.screen'), { key: 'a' });
+    expect(screen.getByTestId('artifacts.screen').querySelector('.art-h1')?.textContent).toBe('artifacts · archived');
+    expect(ids()).toEqual(['artifacts.list.row.old-deck', 'artifacts.list.row.old-doc']);
+    expect(screen.queryByTestId('artifacts.archived')).toBeNull();
+    expect(screen.getByTestId('artifacts.keys').textContent).toContain('esc back to the list');
+    fireEvent.keyDown(screen.getByTestId('artifacts.screen'), { key: 'Escape' });
+    expect(ids()).not.toContain('artifacts.list.row.old-deck');
+    fireEvent.click(screen.getByTestId('artifacts.archived'));
+    expect(ids()).toEqual(['artifacts.list.row.old-deck', 'artifacts.list.row.old-doc']);
+  });
+
+  it("nothing archived: no row, and the archived view says the TUI's words", () => {
+    mountWith(world(), <ArtifactsScreen />);
+    expect(screen.queryByTestId('artifacts.archived')).toBeNull();
+    expect(screen.getByTestId('artifacts.keys').textContent).not.toContain('archived');
+    fireEvent.keyDown(screen.getByTestId('artifacts.screen'), { key: 'a' });
+    expect(screen.getByTestId('artifacts.none').textContent).toBe('nothing archived. esc goes back.');
+  });
+
+  it("panel A: the faint row too; a click shows them under the others, again hides them", () => {
+    mountWith(archivedWorld(), <ArtifactList project="shop-1" onOpen={() => undefined} />);
+    const n = () => screen.getByTestId('artifacts.panel').querySelectorAll('[role=option]').length;
+    // shop's live one (notes); its two archived ones behind the row
+    expect(n()).toBe(1);
+    expect(screen.getByTestId('artifacts.panel.archived').textContent).toBe('2 archived');
+    fireEvent.click(screen.getByTestId('artifacts.panel.archived'));
+    expect(n()).toBe(3);
+    expect(screen.getByTestId('artifacts.panel.archived').textContent).toBe('hide the archived ones');
   });
 });
 

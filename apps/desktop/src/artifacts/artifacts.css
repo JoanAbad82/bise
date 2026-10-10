@@ -52,6 +52,10 @@
 
 .art-keys { flex: none; display: flex; gap: 3ch; padding: 10px 8px 12px; border-top: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
 .art-keys b { font-weight: 500; color: var(--c-text-2); }
+/* the archived ones left behind (the TUI's faint '2 archived' row): a quiet line, a click shows them */
+.art-archived { flex: none; display: block; width: 100%; padding: 8px; border: 0; background: none; text-align: left; font: var(--t-12) var(--font-ui); color: var(--c-text-3); cursor: pointer; }
+.art-archived:hover { color: var(--c-text-2); text-decoration: underline; text-underline-offset: 3px; }
+.art-archived:focus-visible { outline: 2px solid var(--c-text); outline-offset: 2px; border-radius: 3px; }
 .art-empty { padding: 32px 8px; font: var(--t-14) var(--font-read); color: var(--c-text-2); }
 
 /* one artifact open */

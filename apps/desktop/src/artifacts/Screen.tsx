@@ -2,14 +2,14 @@
 // artifacts[/<p>]): what his agents made, across his projects. Title, the filters (projects,
 // agents, kinds, words), the rows by day, the keys line. ⏎ opens one in the window
 // (artifacts/<p>/<id>). Owner: amb-kit.
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { Button, Field, Menu, MenuItem } from '@/ds';
 import { useProjects } from '@/store';
 import { useRouter } from '@/app/router';
 import { useAllArtifacts } from './hooks';
 import { ArtifactRows, useLook } from './List';
 import { usePutInMessage } from './Open';
-import { agentsOf, ALL, filterItems, KIND_FILTERS, keyOf, type Filter, type Item, type KindFilter } from './model';
+import { agentsOf, ALL, filterItems, KIND_FILTERS, keyOf, splitArchived, type Filter, type Item, type KindFilter } from './model';
 import './artifacts.css';
 
 export function ArtifactsScreen({ project = '' }: { project?: string }) {
@@ -20,7 +20,12 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   const [sel, setSel] = useState<string | null>(null);
   const [menu, setMenu] = useState<'project' | 'agent' | null>(null);
   const [now] = useState(() => Date.now());
-  const items = filterItems(all, f);
+  // the archived ones leave the list behind a faint 'N archived' row; a (or a click) shows them
+  // alone, esc goes back (the TUI's artifacts screen)
+  const [archivedOn, setArchivedOn] = useState(false);
+  const kept = filterItems(all, f);
+  const { live, archived } = splitArchived(kept);
+  const items = archivedOn ? archived : live;
   const projectName = projects.find((p) => p.project === f.project)?.name ?? f.project;
   const open = (it: Item) => {
     router.go({ screen: 'artifacts', project: it.project, id: it.a.id });
@@ -30,11 +35,24 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   const toggleKind = (k: KindFilter) => {
     setF({ ...f, kinds: f.kinds.includes(k) ? f.kinds.filter((x) => x !== k) : [...f.kinds, k] });
   };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]') !== null) return;
+    if (!archivedOn && e.key === 'a') {
+      e.preventDefault();
+      setArchivedOn(true);
+      setSel(null);
+    } else if (archivedOn && e.key === 'Escape') {
+      e.preventDefault();
+      setArchivedOn(false);
+      setSel(null);
+    }
+  };
   return (
-    <section className="art-screen" data-testid="artifacts.screen">
+    <section className="art-screen" data-testid="artifacts.screen" data-archived={archivedOn || undefined} onKeyDown={onKey}>
       <header className="art-head">
-        <div className="art-h1">artifacts</div>
-        <div className="art-h2">what your agents made</div>
+        <div className="art-h1">{archivedOn ? 'artifacts · archived' : 'artifacts'}</div>
+        <div className="art-h2">{archivedOn ? 'what you or your agents put away' : 'what your agents made'}</div>
       </header>
       <div className="art-filters">
         <span className="art-drop">
@@ -77,7 +95,9 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
           <Field placeholder="search" value={f.q} onChange={(e) => { setF({ ...f, q: e.currentTarget.value }); }} testId="artifacts.search" />
         </span>
       </div>
-      {all.length === 0 ? (
+      {archivedOn && items.length === 0 ? (
+        <div className="art-empty" data-testid="artifacts.none">nothing archived. esc goes back.</div>
+      ) : all.length === 0 || (live.length === 0 && archived.length > 0 && f.q === '' && f.kinds.length === 0 && f.agent === '') ? (
         <div className="art-empty" data-testid="artifacts.empty">nothing yet. when an agent makes a page, a doc or a file for you, it lands here.</div>
       ) : items.length === 0 ? (
         <div className="art-empty" data-testid="artifacts.none">nothing matches. clear a filter to see more.</div>
@@ -85,12 +105,22 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
         <ArtifactRows items={items} now={now} sel={sel ?? (items[0] ? keyOf(items[0]) : null)} onSel={setSel} onOpen={open} onLook={look}
           onPut={(it) => { put(it.project, it.a); }} form="screen" testId="artifacts.list" />
       )}
+      {!archivedOn && archived.length > 0 && (
+        <button type="button" className="art-archived" onClick={() => { setArchivedOn(true); setSel(null); }} data-testid="artifacts.archived">
+          {archived.length} archived
+        </button>
+      )}
       <div className="art-keys" data-testid="artifacts.keys">
         <span><b>⏎</b> open</span>
         <span><b>space</b> quick look</span>
         <span><b>v</b> versions</span>
         <span><b>@</b> put it in a message</span>
         <span><b>⌘C</b> copy</span>
+        {archivedOn ? (
+          <span><b>esc</b> back to the list</span>
+        ) : (
+          archived.length > 0 && <span><b>a</b> archived</span>
+        )}
       </div>
     </section>
   );

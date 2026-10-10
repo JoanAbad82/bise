@@ -153,6 +153,9 @@ export function crumbOf(route: Route, name: (project: string) => string): string
       return route.page === undefined ? ['settings'] : ['settings', route.page];
     case 'notfound':
       return ['not found'];
+    case 'report':
+      // the page's own words (designer m_17010)
+      return ['crash report'];
     case 'lab':
       return ['lab', route.lab];
     default:

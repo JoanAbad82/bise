@@ -3,7 +3,7 @@
 // (amb-win's Panel.tsx mounts <ArtifactList project onOpen />). Both grouped by day; ↑↓ move, ⏎ opens,
 // space looks. Owner: amb-kit.
 import { memo, useState, type KeyboardEvent, type Ref } from 'react';
-import { byDay, glyphOf, keyOf, kindWords, madeBy, pathOf, timeOf, type Item } from './model';
+import { byDay, glyphOf, keyOf, kindWords, madeBy, pathOf, splitArchived, timeOf, type Item } from './model';
 import { useAllArtifacts } from './hooks';
 import { bridge, copyLink, openWithVersions, usePutInMessage } from './Open';
 import './artifacts.css';
@@ -139,21 +139,34 @@ const ArtRow = memo(function ArtRow({ it, on, form, onPick, onOpen, testId, ref 
  * the window (onOpen with its id), space looks at its file (else opens), @ puts it in a message.
  */
 export function ArtifactList({ project, onOpen, testId = 'artifacts.panel' }: { project: string; onOpen: (id: string) => void; testId?: string }) {
-  const items = useAllArtifacts(project);
+  const { live, archived } = splitArchived(useAllArtifacts(project));
   const put = usePutInMessage();
   const look = useLook((it) => { onOpen(it.a.id); });
   const [sel, setSel] = useState<string | null>(null);
+  // the archived ones behind a faint 'N archived' row; a click shows them under the others
+  const [showArchived, setShowArchived] = useState(false);
   // the clock of the day groups: when the panel mounted (a render reads no clock)
   const [now] = useState(() => Date.now());
+  const items = showArchived ? [...live, ...archived] : live;
+  const more =
+    archived.length > 0 ? (
+      <button type="button" className="art-archived" onClick={() => { setShowArchived((o) => !o); }} data-testid={`${testId}.archived`}>
+        {showArchived ? 'hide the archived ones' : `${String(archived.length)} archived`}
+      </button>
+    ) : null;
   if (items.length === 0) {
     return (
       <div className="art-empty" data-testid={`${testId}.empty`}>
         nothing yet. when an agent makes a page, a doc or a file for you, it lands here.
+        {more}
       </div>
     );
   }
   return (
-    <ArtifactRows items={items} now={now} sel={sel} onSel={setSel} onOpen={(it) => { onOpen(it.a.id); }} onLook={look}
-      onPut={(it) => { put(it.project, it.a); }} form="panel" testId={testId} />
+    <>
+      <ArtifactRows items={items} now={now} sel={sel} onSel={setSel} onOpen={(it) => { onOpen(it.a.id); }} onLook={look}
+        onPut={(it) => { put(it.project, it.a); }} form="panel" testId={testId} />
+      {more}
+    </>
   );
 }
