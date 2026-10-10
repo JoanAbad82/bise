@@ -286,11 +286,15 @@ test('gate/right: messages right, type anywhere, inbox drafts + ctrl+o, folds, t
         const t0 = (await el.innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
         await shot(`FOLDS2-${name}-a-closed`);
         const len0 = (await p.getByTestId('thread.list').innerText()).length;
+        const y0 = (await el.boundingBox())?.y ?? null;
         await el.click();
         await sleep(700);
         const len1 = (await p.getByTestId('thread.list').innerText()).length;
+        // does the opened row stay where his click was, or does the view jump away from it?
+        const y1 = (await el.boundingBox().catch(() => null))?.y ?? null;
         await shot(`FOLDS2-${name}-b-open`);
-        row(`FOLDS2 ${name}`, `${JSON.stringify(t0.slice(0, 80))}; a click: thread text ${String(len0)} -> ${String(len1)} chars`);
+        await el.screenshot({ path: path.join(OUT, `FOLDS2-${name}-c-row.png`) }).catch(() => undefined);
+        row(`FOLDS2 ${name}`, `${JSON.stringify(t0.slice(0, 80))}; a click: thread text ${String(len0)} -> ${String(len1)} chars; the row's top in the window ${String(y0)} -> ${String(y1)} px`);
       }
     }
 
@@ -299,8 +303,12 @@ test('gate/right: messages right, type anywhere, inbox drafts + ctrl+o, folds, t
       await go(s, `project/${tel}`);
       await sleep(1000);
       const there = await scrollUpTo('[data-testid="thread.list"] *', /answered p99 for you|answered .* for you/);
-      const r = p.getByTestId('thread.list').locator('*').filter({ hasText: /answered .* for you/ }).last();
+      const r = p.getByTestId('thread.list').locator('*').filter({ hasText: /answered p99 for you/ }).last();
+      // later turns (R41's dock) push it up: bring this row itself into the frame before the shot
+      await r.scrollIntoViewIfNeeded().catch(() => undefined);
+      await sleep(400);
       await shot('P99ROW');
+      await r.screenshot({ path: path.join(OUT, 'P99ROW-row.png') }).catch(() => undefined);
       row('P99ROW', there ? JSON.stringify((await r.innerText()).replace(/\s+/g, ' ').trim().slice(0, 200)) : "no 'answered … for you' row in telemetry's thread");
       // names: the quote's source in a main's thread says 'bise' (lead m_16742)
       const src = await p.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>('[data-testid*=".quote."]')).map((q) => q.innerText.split('\n')[0] ?? '').slice(-2));
