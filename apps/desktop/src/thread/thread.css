@@ -772,6 +772,12 @@ button.th-sched-head {
 .th-tool-code {
   color: var(--c-text);
 }
+/* under a call's output: it was cut at 4 KB, or the hub had none (amb-feed dece0fe9) */
+.th-tool-cut {
+  margin-top: 4px;
+  color: var(--c-text-3);
+  font: var(--t-11) / 1.4 var(--font-mono);
+}
 .th-tool-code + .th-tool-out {
   margin-top: 6px;
   padding-top: 6px;

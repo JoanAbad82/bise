@@ -80,6 +80,12 @@ test("thread/tool-rows: each call says ✓ time or ✗ exit · time with its err
     await expect(page.getByTestId('thread.tool.4.open')).toContainText('npm run lint');
     await expect(page.getByTestId('thread.tool.4.open')).toContainText('exit 1: src/a.ts:3:7 error: x is unused');
     await expect(page.getByTestId('thread.tool.4.err'), 'open, the box says the error: the red line goes').toHaveCount(0);
+    // open, it asks the hub for the call's real output once (amb-feed dece0fe9: up to 4 KB, cut)
+    const ask = (await core.waitCmd((c) => (c as { cmd?: string }).cmd === 'tool_out', 5000)) as Record<string, unknown>;
+    expect(ask).toMatchObject({ cmd: 'tool_out', project: P, agent: 'perf', pos: 4 });
+    await core.send({ ev: 'tool_out', project: P, agent: 'perf', pos: 4, out: 'exit 1: src/a.ts:3:7 error: x is unused\nsrc/b.ts:9:1 warning: y is never read\n2 problems (1 error, 1 warning)', cut: true } as never);
+    await expect(page.getByTestId('thread.tool.4.out'), 'the real output replaces the preview').toContainText('2 problems (1 error, 1 warning)');
+    await expect(page.getByTestId('thread.tool.4.cut'), 'and says it was cut').toHaveText('… cut: the first 4 KB');
     await page.mouse.move(1, 300);
     await page.screenshot({ path: test.info().outputPath('tools-open-light.png') });
     await core.send(prefs('dark') as never);

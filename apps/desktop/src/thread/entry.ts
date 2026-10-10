@@ -296,7 +296,8 @@ export function toolTime(ms: number): string {
 
 /** What a call's line says on its right, as the TUI's tool row: ok '✓ 0.3 s' (dim), failed '✗ exit 1 · 0.3 s' (err), a replay its step's length. Pure. */
 export function toolEnd(t: ToolLike, time: string): string {
-  const took = t.ms != null && t.ms > 0 ? toolTime(t.ms) : '';
+  // a call that rounds to 0.0 s says '✓' alone (designer m_15569: never '✓ 0.0 s')
+  const took = t.ms != null && t.ms >= 50 ? toolTime(t.ms) : '';
   if (t.state === 'ok') return took === '' ? '✓' : `✓ ${took}`;
   if (t.state === 'err') {
     const exit = t.exit != null && t.exit !== 0 ? `exit ${String(t.exit)}` : '';

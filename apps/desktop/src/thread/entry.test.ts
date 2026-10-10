@@ -235,3 +235,11 @@ describe("his answer to main's own card, the hub's raw line (designer m_15195)",
     expect(answeredCardOf('done: the build is green')).toBeNull();
   });
 });
+
+describe("a call that rounds to 0.0 s (designer m_15569)", () => {
+  it("says '✓' alone, never '✓ 0.0 s'; 0.1 s and up keep their time", () => {
+    expect(toolEnd({ pos: 1, at_ms: 0, text: '', kind: 'run', state: 'ok', ms: 30 }, '')).toBe('✓');
+    expect(toolEnd({ pos: 1, at_ms: 0, text: '', kind: 'run', state: 'err', exit: 1, ms: 20 }, '')).toBe('✗ exit 1');
+    expect(toolEnd({ pos: 1, at_ms: 0, text: '', kind: 'run', state: 'ok', ms: 60 }, '')).toBe('✓ 0.1 s');
+  });
+});

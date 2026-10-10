@@ -6,7 +6,7 @@
 import { memo, useEffect, useState, type ReactNode } from 'react';
 import { Answered, Button, Chip, Fold, Marker, Msg, Opts, Pearl, Tool } from '@/ds';
 import type { Entry } from '@/proto';
-import { useAgents, useCoreState, useEntry, useHubRefused, usePending, useProjects, useStore, useThreadOrder } from '@/store';
+import { useAgents, useCoreState, useEntry, useHubRefused, usePending, useProjects, useStore, useThreadOrder, useToolOut } from '@/store';
 import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
@@ -680,7 +680,7 @@ function ToolsRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   return (
     <div className="th-tools" data-testid={`thread.toolrow.${String(e.pos)}`}>
       {t.lines.map((l) => (
-        <ToolLineRow key={l.pos} l={l} live={live?.pos === l.pos} runFor={runFor} />
+        <ToolLineRow key={l.pos} l={l} live={live?.pos === l.pos} runFor={runFor} project={ctx.project} agent={ctx.agent} />
       ))}
       {(t.rest.length > 0 || items.length === 0) && (
         <Tool
@@ -692,7 +692,7 @@ function ToolsRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
             // the same rows as the lines above: no bullets, no fill (designer m_14269)
             <div className="th-steps">
               {t.rest.map((r) => (
-                <ToolLineRow key={r.pos} l={r} live={false} runFor={0} />
+                <ToolLineRow key={r.pos} l={r} live={false} runFor={0} project={ctx.project} agent={ctx.agent} />
               ))}
             </div>
           }
@@ -711,9 +711,17 @@ function ToolsRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
  * failed call's first error line under it; a click (or ⌘E, the TUI's ctrl+o) opens its code and
  * output.
  */
-function ToolLineRow({ l, live, runFor }: { l: ToolLine; live: boolean; runFor: number }) {
+function ToolLineRow({ l, live, runFor, project, agent }: { l: ToolLine; live: boolean; runFor: number; project: string; agent: string }) {
   const [open, setOpen] = useFold(false);
-  const opens = l.code !== '' || l.out !== '';
+  const store = useStore();
+  // the call's real output (amb-feed dece0fe9): asked once when it opens, its 200-char preview until then
+  const full = useToolOut(project, agent, l.pos);
+  const finished = !live && (l.state === 'ok' || l.state === 'err');
+  const opens = l.code !== '' || l.out !== '' || finished;
+  useEffect(() => {
+    if (open && finished) store.askToolOut(project, agent, l.pos);
+  }, [open, finished, store, project, agent, l.pos]);
+  const out = full !== null && 'out' in full && full.out !== '' ? full.out : l.out;
   const id = `thread.tool.${String(l.pos)}`;
   const state = live ? 'run' : l.state;
   return (
@@ -764,7 +772,21 @@ function ToolLineRow({ l, live, runFor }: { l: ToolLine; live: boolean; runFor: 
       {open && opens && (
         <div className="th-tool-open" data-testid={`${id}.open`}>
           {l.code !== '' && <pre className="th-tool-code">{l.code}</pre>}
-          {l.out !== '' && <pre className="th-tool-out">{l.out}</pre>}
+          {out !== '' && (
+            <pre className="th-tool-out" data-testid={`${id}.out`}>
+              {out}
+            </pre>
+          )}
+          {full !== null && 'cut' in full && full.cut && (
+            <div className="th-tool-cut" data-testid={`${id}.cut`}>
+              … cut: the first 4 KB
+            </div>
+          )}
+          {full !== null && 'error' in full && out === '' && (
+            <div className="th-tool-cut" data-testid={`${id}.none`}>
+              {full.error}
+            </div>
+          )}
         </div>
       )}
     </div>

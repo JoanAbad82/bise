@@ -420,3 +420,22 @@ describe('computer use live (S29)', () => {
     expect(store.peek('h.perf')).toBeNull();
   });
 });
+
+describe("a tool call's real output (amb-feed dece0fe9)", () => {
+  const P = 'acme-1a2b3c4d';
+  it('asks once, keeps the answer by its pos, and a refusal names the last ask', () => {
+    const sent: CoreCmd[] = [];
+    const store = new Store({ send: (c) => sent.push(c) }, { now: () => 1000 });
+    store.askToolOut(P, 'perf', 4);
+    store.askToolOut(P, 'perf', 4);
+    expect(sent.filter((c) => c.cmd === 'tool_out')).toEqual([{ cmd: 'tool_out', project: P, agent: 'perf', pos: 4 }]);
+    store.apply({ ev: 'tool_out', project: P, agent: 'perf', pos: 4, out: 'running 40 tests', cut: true });
+    expect(store.toolOut(P, 'perf', 4)).toEqual({ out: 'running 40 tests', cut: true });
+    store.askToolOut(P, 'perf', 4);
+    expect(sent.filter((c) => c.cmd === 'tool_out'), 'answered: never asked again').toHaveLength(1);
+    store.askToolOut(P, 'perf', 9);
+    store.apply({ ev: 'error', cmd: 'tool_out', project: P, text: 'no result yet' });
+    expect(store.toolOut(P, 'perf', 9)).toEqual({ error: 'no result yet' });
+    expect(store.toolOut(P, 'perf', 7)).toBeNull();
+  });
+});

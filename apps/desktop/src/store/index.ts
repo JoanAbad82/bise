@@ -4,6 +4,6 @@
 // olderPage / files (useFiles), askSkills / dictateStart, dictateStop, dictateCancel (useDictation) / voiceMode, voiceMute, voiceType, voiceSend, voiceCut (useVoiceMode) /
 // command(any typed AppCmd | HubCmd). Tests: new Store(fakePort),
 // StoreProvider, replay(store, fixtures) from './replay'.
-export { Store, TAGS, typed, threadKey, diffKey, type Ev, type EvOf, type Pending, type ThreadOrder, type Diff, type Away, type Confirm, type Dictation, type HubLine, type FilesAnswer, type PrsList, type VoiceModeState } from './store';
+export { Store, TAGS, typed, threadKey, diffKey, toolOutKey, type ToolOut, type Ev, type EvOf, type Pending, type ThreadOrder, type Diff, type Away, type Confirm, type Dictation, type HubLine, type FilesAnswer, type PrsList, type VoiceModeState } from './store';
 export * from './hooks';
 export { replay, allFixtureEvents } from './replay';

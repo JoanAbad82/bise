@@ -212,6 +212,9 @@ export class Store {
   private cid = 0;
   /** R8: when this window last sent a /model (a setup_first after it is his; a replayed one isn't) */
   private modelSentAt = Number.NEGATIVE_INFINITY;
+  /** tool_out asks in flight (by key), and each project's last one (an error names no call) */
+  private readonly toolAsks = new Set<string>();
+  private readonly toolAsk = new Map<string, string>();
   /** the dictations this window started and not over yet (bar I) */
   private readonly dictating = new Set<string>();
   /** the `@` queries on their way: rid -> its project and resolve; each project's newest rid */
@@ -370,6 +373,22 @@ export class Store {
   jobs(project: string): readonly Job[] {
     return this.slice(`jobs:${project}`, EMPTY);
   }
+  /**
+   * A tool call's real output (amb-feed dece0fe9: up to 4 KB from the session log, `cut` when
+   * longer or only the 200-char preview was found), or the hub's refusal; null until asked and
+   * answered. Ask with askToolOut on open: the answer goes to the asking connection only.
+   */
+  toolOut(project: string, agent: string, pos: number): ToolOut | null {
+    return this.slice<ToolOut | null>(toolOutKey(project, agent, pos), null);
+  }
+  /** Ask the hub for a call's output once (an open row asks; a second open reads what came). */
+  askToolOut(project: string, agent: string, pos: number): void {
+    const key = toolOutKey(project, agent, pos);
+    if (this.slices.get(key) != null || this.toolAsks.has(key)) return;
+    this.toolAsks.add(key);
+    this.toolAsk.set(project, key);
+    this.port?.send({ cmd: 'tool_out', project, agent, pos });
+  }
   /** The latest diff of an agent's change, or of one commit (`commit`). */
   diff(project: string, agent: string, commit?: string): Diff | null {
     return this.slice<Diff | null>(diffKey(project, agent, commit), null);
@@ -448,6 +467,12 @@ export class Store {
       case 'prs':
         this.put(`prs:${ev.project}`, { head: ev.head, items: ev.items, none: ev.none ?? null } satisfies PrsList);
         return;
+      case 'tool_out': {
+        const key = toolOutKey(ev.project, ev.agent, ev.pos);
+        this.toolAsks.delete(key);
+        this.put(key, { out: ev.out, cut: ev.cut } satisfies ToolOut);
+        return;
+      }
       case 'diff':
         this.put(diffKey(ev.project, ev.agent, ev.commit ?? undefined), ev);
         return;
@@ -523,6 +548,15 @@ export class Store {
         // a typed line the hub's router refused (HubCmd slash): his words to fix, as an error line
         if (ev.cmd === 'slash' && ev.project != null) {
           this.put(`notice:${ev.project}`, { text: ev.text, level: 'error' } satisfies HubLine);
+          return;
+        }
+        // the hub found no such call or no result yet: that project's last ask says so (asked again on the next open)
+        if (ev.cmd === 'tool_out' && ev.project != null) {
+          const key = this.toolAsk.get(ev.project);
+          if (key !== undefined) {
+            this.toolAsks.delete(key);
+            this.put(key, { error: ev.text } satisfies ToolOut);
+          }
           return;
         }
         if (ev.cmd !== 'send') return;
@@ -968,6 +1002,14 @@ export class Store {
 }
 
 /** The listener key of a diff slice (hooks.ts subscribes with it). */
+/** A tool call's output: its real lines and whether they were cut, or the hub's refusal. */
+export type ToolOut = { readonly out: string; readonly cut: boolean } | { readonly error: string };
+
+/** The slice key of one call's output (pos is the key: ToolItem.id repeats). Pure. */
+export function toolOutKey(project: string, agent: string, pos: number): string {
+  return `tool_out:${project}/${agent}/${String(pos)}`;
+}
+
 export function diffKey(project: string, agent: string, commit?: string): string {
   return commit === undefined ? `diff:${project}/${agent}` : `diff:${project}/@${commit}`;
 }
