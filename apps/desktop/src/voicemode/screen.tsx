@@ -16,6 +16,9 @@ import { noteSaid } from './said';
 
 export type VoiceHere = 'off' | 'pane' | 'typing';
 
+/** How long after a turn sent with no words his next bubble still takes its 'said' time. */
+const UNWORDED_MS = 30_000;
+
 /** Voice mode on this agent's thread: the bar, the composer back while he types, or off. */
 export function useVoiceHere(project: string, agent: string): VoiceHere {
   const v = useVoiceMode();
@@ -102,19 +105,38 @@ export function ThreadVoice({ project, agent }: { project: string; agent: string
     setLast(state);
     if (state !== 'muted') setSpoke(state === 'speaking');
   }
-  useEffect(() => {
-    if (!here) return;
-    if (state === 'hearing') {
-      turn.current = { at: turn.current?.at ?? Date.now(), words: heard ?? turn.current?.words ?? '' };
-      return;
-    }
-    if (state === 'sending' && heard !== null && turn.current !== null) turn.current = { ...turn.current, words: heard };
-    if ((state === 'sending' || state === 'thinking') && turn.current !== null) {
-      noteSaid(project, agent, turn.current.words, Date.now() - turn.current.at);
-      turn.current = null;
-    }
-    if (state === 'listening' || state === 'failed') turn.current = null;
-  }, [here, state, heard, project, agent]);
+  // a turn sent with no words in the core's events (its listener can give them only at the end):
+  // how long he talked, for his next bubble in this thread (the hub's 'you' entry carries the words)
+  const unworded = useRef<{ ms: number; at: number } | null>(null);
+  // read from every voice_mode event, not from the rendered state: the core's hearing -> sending can
+  // land in one batch of events, and a render would only see 'sending' (no turn to note)
+  useEffect(
+    () =>
+      store.onEvent((ev) => {
+        if (ev.ev === 'entry' && ev.project === project && ev.agent === agent && ev.entry.kind === 'you') {
+          const u = unworded.current;
+          unworded.current = null;
+          if (u !== null && Date.now() - u.at < UNWORDED_MS) noteSaid(project, agent, ev.entry.text, u.ms);
+          return;
+        }
+        if (ev.ev !== 'voice_mode' || ev.project !== project || ev.agent !== agent) return;
+        const s = ev.on ? stateOf(ev.state) : 'listening';
+        const words = ev.heard ?? null;
+        if (s === 'hearing') {
+          turn.current = { at: turn.current?.at ?? Date.now(), words: words ?? turn.current?.words ?? '' };
+          return;
+        }
+        if (s === 'sending' && words !== null && turn.current !== null) turn.current = { ...turn.current, words };
+        if ((s === 'sending' || s === 'thinking') && turn.current !== null) {
+          const ms = Date.now() - turn.current.at;
+          if (turn.current.words.trim() === '') unworded.current = { ms, at: Date.now() };
+          else noteSaid(project, agent, turn.current.words, ms);
+          turn.current = null;
+        }
+        if (s === 'listening' || s === 'failed') turn.current = null;
+      }),
+    [store, project, agent],
+  );
 
   if (!here) return null;
   if (state === 'typing') return <VoiceTyping onAct={act} />;

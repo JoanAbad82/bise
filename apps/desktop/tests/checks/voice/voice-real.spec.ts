@@ -81,6 +81,17 @@ test('voice/voice-real (real core): ctrl+r twice on checkout, his words reach it
 
     await test.step('ctrl+r twice: voice mode on checkout, the pane in the composer place', async () => {
       await field.click();
+      // every state the bar showed, in order (the 'said' note needs hearing before sending)
+      await page.evaluate(() => {
+        const seen: string[] = [];
+        (window as unknown as { __states: string[] }).__states = seen;
+        new MutationObserver(() => {
+          const pane = document.querySelector('[data-testid="voice.pane"]');
+          const words = pane?.querySelector('[data-testid="voice.words"]')?.textContent ?? '';
+          const s = pane === null ? '' : `${pane.getAttribute('data-state') ?? ''}${words === '' ? '' : `:${words}`}`;
+          if (s !== '' && seen.at(-1) !== s) seen.push(s);
+        }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-state'] });
+      });
       const t0 = Date.now();
       await page.keyboard.press('Control+r');
       await page.keyboard.press('Control+r');
@@ -141,6 +152,39 @@ test('voice/voice-real (real core): ctrl+r twice on checkout, his words reach it
       await expect.soft(pane, 'listening after the answer').toHaveAttribute('data-state', 'listening', { timeout: 30_000 });
       await expect.soft(page.getByTestId(`thread.voice.${litPos}`), "no '∿ speaking' once it stopped talking").toHaveCount(0);
       note('lit_after_speaking', await page.getByTestId(`thread.lit.${litPos}`).count());
+    });
+
+    await test.step("his spoken turn, read by checkout: 'said · 0:0N ✓✓' under his bubble, the mark dim", async () => {
+      // the 'said' note is the window's own (no seed makes it, amb-tools m_17406): his bubble for the
+      // heard words carries how long he talked, then the hub's read receipt as ✓✓ (designer's
+      // messages-right v3: ✓✓ dim, --c-text-2, never the accent)
+      const bubble = page.locator(`${T.list} .th-you`).filter({ hasText: n }).first();
+      await expect(bubble, 'his spoken turn in the thread').toBeVisible({ timeout: 10_000 });
+      const id = (await bubble.getAttribute('data-testid')) ?? '';
+      note('spoken_pos', id);
+      const states = await page.evaluate(() => (window as unknown as { __states: string[] }).__states);
+      note('pane_states', states);
+      const said = ((await bubble.textContent()) ?? '').trim();
+      const under = page.getByTestId(`${id}.under`);
+      await expect(under, `his bubble's under line (bar states ${JSON.stringify(states)}, bubble '${said}')`).toHaveText(/^said · 0:0\d ✓✓$/, { timeout: 45_000 });
+      note('spoken_under', ((await under.textContent()) ?? '').trim());
+      const mark = page.getByTestId(`${id}.mark`);
+      await expect.soft(mark).toHaveAttribute('data-tone', 'read');
+      const tones = await mark.evaluate((el) => {
+        const probe = (v: string) => {
+          const p = document.createElement('span');
+          p.style.color = `var(${v})`;
+          el.parentElement?.appendChild(p);
+          const c = getComputedStyle(p).color;
+          p.remove();
+          return c;
+        };
+        return { mark: getComputedStyle(el).color, dim: probe('--c-text-2'), accent: probe('--c-accent') };
+      });
+      note('spoken_mark_tones', tones);
+      expect.soft(tones.mark, '✓✓ dim (--c-text-2)').toBe(tones.dim);
+      expect.soft(tones.mark, '✓✓ never the accent').not.toBe(tones.accent);
+      await bubble.screenshot({ path: test.info().outputPath('said-read.png') });
     });
 
     await test.step('his next turn (tab, typed, sent): the lit goes from that answer', async () => {
