@@ -230,6 +230,7 @@
 .th-screen .th-live,
 .th-screen .th-signin,
 .th-screen .th-starting,
+.th-screen .th-stopping,
 .th-screen .th-refused,
 .th-screen .inbox-strip,
 .th-screen .inbox-dock,
@@ -1285,6 +1286,10 @@ button.th-sched-head {
   color: var(--c-text-3);
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+/* 'stopping perf…' on the column's edge, dim, not the accent (designer via lead m_17333) */
+.th-stopping .b-marker {
+  color: var(--c-text-2);
 }
 /* his message's delivery mark after the time (designer's messages-right v3): ✓ got it faint,
    ✓✓ read it dim, never the accent; not sent in the error tone */

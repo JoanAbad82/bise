@@ -380,7 +380,12 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
           <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} onTakeBack={takeBack} />
           {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} bise={bise} />}
         </div>
-        {stopping && <Marker>stopping {agent}…</Marker>}
+        {/* in the thread's column like the lines under it (amb-web m_17316: it sat flush left) */}
+        {stopping && (
+          <div className="th-stopping" data-testid="thread.stopping">
+            <Marker>stopping {agent}…</Marker>
+          </div>
+        )}
         {fresh && <StartingLine a={me} />}
         {!bise && agent !== MAIN && !fresh && <LiveLine a={me} />}
         {signIn.on && <SignInLine copied={signIn.copied} />}

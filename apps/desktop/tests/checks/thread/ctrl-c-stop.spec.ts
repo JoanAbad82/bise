@@ -55,6 +55,17 @@ test('thread/ctrl-c-stop: ctrl+c stops the working turn, but not while text is s
       await core.waitCmd((c) => c.cmd === 'stop' && c.project === ACME && c.agent === 'perf');
       expect(stops(), 'one stop').toHaveLength(1);
       await expect(field, 'the composer keeps his draft').toHaveText('garde ça');
+      // 'stopping perf…' sits in the thread's column, on the composer's left and width (amb-web
+      // m_17316 saw it flush left outside the column; lead m_17322)
+      const stopping = page.getByTestId('thread.stopping');
+      await expect(stopping).toHaveText('stopping perf…');
+      const box = await stopping.boundingBox();
+      const col = await page.locator('[data-testid="thread.screen"] .b-composer').first().boundingBox();
+      expect(box !== null && col !== null, 'both drawn').toBe(true);
+      if (box !== null && col !== null) {
+        expect(Math.abs(box.x - col.x), "the stopping line's left = the column's").toBeLessThanOrEqual(1);
+        expect(Math.abs(box.width - col.width), "the stopping line's width = the column's").toBeLessThanOrEqual(1);
+      }
       await page.screenshot({ path: test.info().outputPath('2-ctrl-c-stopping.png') });
     });
   } finally {
