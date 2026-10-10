@@ -124,8 +124,14 @@ async function go(s: Session, route: string): Promise<void> {
   await sleep(1200);
 }
 
+// staged in every window's private clipboard; a window that never acks (seen under load 27) gives false after 10 s
 const stage = (s: Session): Promise<boolean> =>
-  s.app.evaluate((_e, file) => (globalThis as unknown as { __biseTestClip?: (c: { file: string }) => Promise<boolean> }).__biseTestClip?.({ file }) ?? Promise.resolve(false), PNG);
+  Promise.race([
+    s.app.evaluate((_e, file) => (globalThis as unknown as { __biseTestClip?: (c: { file: string }) => Promise<boolean> }).__biseTestClip?.({ file }) ?? Promise.resolve(false), PNG),
+    sleep(10_000).then(() => false),
+  ]);
+// BISE_R41_FROM=4 skips paths (1)-(3) (a rerun of the later paths on a loaded Mac)
+const FROM = Number(process.env['BISE_R41_FROM'] ?? '1');
 
 async function chips(p: Page): Promise<number> {
   await p.locator(CHIP).first().waitFor({ timeout: 3000 }).catch(() => undefined);
@@ -149,6 +155,8 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
   let r36 = 'not reached';
   const run = Date.now() % 1_000_000;
   const nonce = (k: string): string => `r41-${k}-${String(run)}`;
+  // where a run is: one timestamped line per step in OUT/progress.log (a timeout names its step)
+  const step = (what: string): void => { try { writeFileSync(path.join(OUT, 'progress.log'), `${new Date().toISOString()} ${what}\n`, { flag: 'a' }); } catch { /* the index still says it */ } };
   const shot = async (name: string, pg: Page = p): Promise<void> => { await pg.screenshot({ path: path.join(OUT, `${name}.png`) }).catch(() => undefined); };
   try {
     // a fresh keep shows setup first: skip it
@@ -188,69 +196,95 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
       note += `; R17: rows with his words ${String(list.split(n).length - 1)}, 'sending…' in the thread: ${String(/sending…/.test(list))}`;
       rows.push({ path: how === 'paste' ? '(1) window composer ⌘V' : '(2) window composer drop', to, how, seen, note });
     };
-    await composer('paste-main', 'bise', 'bise · main', 'paste');
-    await composer('paste-agent', `agent/${tel}/dashboards`, 'telemetry · dashboards', 'paste');
-    await composer('drop-main', `project/${shop}`, 'shop · main', 'drop');
-    await composer('drop-agent', `agent/${tel}/dashboards`, 'telemetry · dashboards', 'drop');
+    if (FROM <= 2) {
+      await composer('paste-main', 'bise', 'bise · main', 'paste');
+      await composer('paste-agent', `agent/${tel}/dashboards`, 'telemetry · dashboards', 'paste');
+      await composer('drop-main', `project/${shop}`, 'shop · main', 'drop');
+      await composer('drop-agent', `agent/${tel}/dashboards`, 'telemetry · dashboards', 'drop');
+    }
 
-    // (3) the spotlight: ⌘V in its field, then a drop on the capsule, sent to bise
-    const cap = await capsulePage(s);
-    const spot = async (): Promise<void> => {
-      await helper.send({ ev: 'fn', act: 'key', key: 'space' });
-      await out.wait(CAPSULE, (l) => l.startsWith('show'), 5000).catch(() => undefined);
-      await sleep(500);
+    // b1b: open a card in shop's inbox block (its row, else the first item then ↓ until it is in front)
+    const openCard = async (match: RegExp): Promise<boolean> => {
+      await go(s, `project/${shop}`);
+      const blk = p.getByTestId('inbox.block');
+      const row = blk.locator('[data-testid^="inbox.block.row."]').filter({ hasText: match }).first();
+      if (await row.isVisible().catch(() => false)) await row.click();
+      else await blk.locator('[data-testid^="inbox.block.row."], [data-testid="inbox.block.more"]').first().click().catch(() => undefined);
+      for (let i = 0; i < 12; i++) {
+        await sleep(400);
+        const open = await blk.locator('[data-testid^="inbox.block.open."]').first().innerText().catch(() => '');
+        if (match.test(open)) return true;
+        await p.keyboard.press('ArrowDown');
+      }
+      return false;
     };
-    const hide = async (): Promise<void> => { await helper.send({ ev: 'fn', act: 'esc' }); await sleep(500); };
-    for (const how of ['paste', 'drop'] as const) {
-      await spot();
-      const input = cap.getByTestId('spotlight.input');
-      await input.click().catch(() => undefined);
-      let note = '';
-      if (how === 'paste') {
-        note = `staged: ${String(await stage(s))}`;
-        await cap.keyboard.press('Meta+V');
-      } else {
-        await dropFiles(cap, '[data-testid="capsule"]', [PNG]).catch((e: unknown) => { note = `drop: ${String(e).split('\n')[0] ?? ''}`; });
-      }
+    // the open card's answer from the composer: ⌘V the checker, his words, ⏎
+    const answerFromComposer = async (words: string, shotName: string): Promise<string> => {
+      const label = (await p.locator('body').innerText()).split('\n').find((l) => l.startsWith('answering')) ?? '(no answering label)';
+      await p.locator(FIELD).click();
+      const staged = await stage(s);
+      await p.keyboard.press('Meta+V');
       await sleep(600);
-      const field = (await input.inputValue().catch(() => '')).trim();
-      note += `${note === '' ? '' : ', '}spot field after: ${JSON.stringify(field.slice(0, 80))}, image chips in the capsule: ${String(await cap.locator('[data-kind="image"], img[src^="blob:"], img[src^="data:"]').count())}`;
-      const n = nonce(`spot-${how}`);
-      await input.click().catch(() => undefined);
-      await cap.keyboard.type(` what is in this picture ${n}`);
-      await shot(`R41-spot-${how}`, cap);
-      await cap.keyboard.press('Enter');
-      rows.push({ path: `(3) spotlight ${how === 'paste' ? '⌘V' : 'drop on the capsule'}`, to: 'bise · main', how, seen: await waitSeen(n), note });
-      await hide();
-    }
+      const chips = await p.locator('[data-testid^="composer.image"], [data-kind="image"]').count();
+      await p.keyboard.type(words);
+      await shot(shotName);
+      await p.keyboard.press('Enter');
+      return `, composer ${JSON.stringify(label.slice(0, 80))}, staged: ${String(staged)}, image chips: ${String(chips)}`;
+    };
 
-    // (4) a card answer with an image: ⌘I's answer field on the asking agent's question (shop · gift-ui)
-    {
-      await go(s, 'inbox');
-      // the list row of gift-ui's own question (the first cut matched the whole list and answered card #1, main's)
-      const row = p.getByText(/gift-ui asks/i).first();
-      await row.click({ timeout: 5000 }).catch(() => undefined);
-      await sleep(600);
-      const ans = p.getByTestId('inbox.answer');
-      let note = '';
-      if (await ans.isVisible().catch(() => false)) {
-        await ans.click();
-        note = `staged: ${String(await stage(s))}`;
-        await p.keyboard.press('Meta+V');
+    if (FROM <= 3) {
+      step('(3) spotlight');
+      // (3) the spotlight: ⌘V in its field, then a drop on the capsule, sent to bise
+      const cap = await capsulePage(s);
+      const spot = async (): Promise<void> => {
+        await helper.send({ ev: 'fn', act: 'key', key: 'space' });
+        await out.wait(CAPSULE, (l) => l.startsWith('show'), 5000).catch(() => undefined);
+        await sleep(500);
+      };
+      const hide = async (): Promise<void> => { await helper.send({ ev: 'fn', act: 'esc' }); await sleep(500); };
+      for (const how of ['paste', 'drop'] as const) {
+        step(`(3) spotlight ${how}`);
+        await spot();
+        const input = cap.getByTestId('spotlight.input');
+        await input.click().catch(() => undefined);
+        let note = '';
+        if (how === 'paste') {
+          note = `staged: ${String(await stage(s))}`;
+          await cap.keyboard.press('Meta+V');
+        } else {
+          await dropFiles(cap, '[data-testid="capsule"]', [PNG]).catch((e: unknown) => { note = `drop: ${String(e).split('\n')[0] ?? ''}`; });
+        }
         await sleep(600);
-        note += `, field after ⌘V: ${JSON.stringify((await ans.inputValue()).slice(0, 80))}, ⌘I image chips: ${String(await p.locator('[data-testid^="inbox.answer.image."]').count())} ${JSON.stringify((await p.getByTestId('inbox.answer.image.1').innerText().catch(() => '')).trim())}`;
-        const n = nonce('card');
-        await ans.click();
-        await p.keyboard.type(` the balance on the cart page ${n}`);
-        await shot('R41-card');
-        await p.keyboard.press('Enter');
-        rows.push({ path: '(4) card answer (⌘I)', to: 'shop · gift-ui (asked)', how: 'paste', seen: await waitSeen(n), note });
-      } else {
-        await shot('R41-card');
-        rows.push({ path: '(4) card answer (⌘I)', to: 'shop · gift-ui (asked)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '' }, note: 'no answer field (inbox.answer) on the card' });
+        const field = (await input.inputValue().catch(() => '')).trim();
+        note += `${note === '' ? '' : ', '}spot field after: ${JSON.stringify(field.slice(0, 80))}, image chips in the capsule: ${String(await cap.locator('[data-kind="image"], img[src^="blob:"], img[src^="data:"]').count())}`;
+        const n = nonce(`spot-${how}`);
+        await input.click().catch(() => undefined);
+        await cap.keyboard.type(` what is in this picture ${n}`);
+        await shot(`R41-spot-${how}`, cap);
+        await cap.keyboard.press('Enter');
+        rows.push({ path: `(3) spotlight ${how === 'paste' ? '⌘V' : 'drop on the capsule'}`, to: 'bise · main', how, seen: await waitSeen(n), note });
+        await hide();
       }
     }
 
+    step('(4) card answer');
+    // (4) a card answer with an image on the asking agent's question (shop · gift-ui). b1b (416a4ad3): the inbox
+    // is the block over the composer, never a screen: the card opens in the block and his words + image go from
+    // the composer ('answering gift-ui · …')
+    {
+      const opened = await openCard(/gift cards: show the balance/);
+      let note = `card open in the block: ${String(opened)}`;
+      if (opened) {
+        const n = nonce('card');
+        note += await answerFromComposer(` the balance on the cart page ${n}`, 'R41-card');
+        rows.push({ path: '(4) card answer (inbox block)', to: 'shop · gift-ui (asked)', how: 'paste', seen: await waitSeen(n), note });
+      } else {
+        await shot('R41-card');
+        rows.push({ path: '(4) card answer (inbox block)', to: 'shop · gift-ui (asked)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '' }, note });
+      }
+    }
+
+    step('(4b) docked answer');
     // (4b) the thread's docked answer: shop's strip, its first card (main's), an image pasted in the composer + words
     {
       await go(s, `project/${shop}`);
@@ -287,6 +321,7 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
       }
     }
 
+    step('(5) escalated');
     // (5) an agent's question escalated by main with `sb card --for`, answered with an image from ⌘I: the
     // ASKING agent's request must carry it. The chain runs on the world's fake scripts ($FAKE_SCRIPTS, read
     // live): shop's main asks gift-ui to ask; gift-ui sends main its question (sb send --expect-reply); main
@@ -308,32 +343,25 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
         `id=$(grep -o 'agent_message from="gift-ui"[^>]*' "${shopDir}/agents/main/transcript.log" | grep -o 'id="m_[0-9]*"' | tail -1 | cut -d'"' -f2); echo "for $id"; sb card --for "$id" "${k}-card gift-ui asks: which of the two pictures shows the bug?"`,
         'I put it in your inbox.');
       worldSay('shop', `${k}-start please get gift-ui's question to me`);
-      await go(s, 'inbox');
-      const row = p.getByText(new RegExp(`${k}-card|which of the two pictures`)).first();
       let note = '';
       const t0 = Date.now();
-      while (!(await row.isVisible().catch(() => false)) && Date.now() - t0 < 90_000) await sleep(1000);
-      if (await row.isVisible().catch(() => false)) {
-        await row.click();
-        await sleep(600);
-        const ans = p.getByTestId('inbox.answer');
-        await ans.click();
-        note = `card shown after ${String(Math.round((Date.now() - t0) / 1000))} s, staged: ${String(await stage(s))}`;
-        await p.keyboard.press('Meta+V');
-        await sleep(600);
-        note += `, ⌘I image chips: ${String(await p.locator('[data-testid^="inbox.answer.image."]').count())}`;
+      let opened = false;
+      while (!opened && Date.now() - t0 < 90_000) {
+        opened = await openCard(new RegExp(`${k}-card|which of the two pictures`));
+        if (!opened) await sleep(3000);
+      }
+      if (opened) {
+        note = `card open in the block after ${String(Math.round((Date.now() - t0) / 1000))} s`;
         const n = nonce('esc-answer');
-        await ans.click();
-        await p.keyboard.type(` the second one ${n}`);
-        await shot('R41-escalated');
-        await p.keyboard.press('Enter');
-        rows.push({ path: '(5) escalated question (sb card --for), ⌘I', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: await waitSeen(n, 60_000), note });
+        note += await answerFromComposer(` the second one ${n}`, 'R41-escalated');
+        rows.push({ path: '(5) escalated question (sb card --for), inbox block', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: await waitSeen(n, 60_000), note });
       } else {
         await shot('R41-escalated');
-        rows.push({ path: '(5) escalated question (sb card --for), ⌘I', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '' }, note: `no card with '${k}-card' in ⌘I after 90 s (the script chain: shop main -> gift-ui -> main -> sb card --for)` });
+        rows.push({ path: '(5) escalated question (sb card --for), inbox block', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '' }, note: `no card with '${k}-card' in the inbox block after 90 s (the script chain: shop main -> gift-ui -> main -> sb card --for)` });
       }
     }
 
+    step('R36');
     // R36: shop main's 'you answered gift-ui' rows: his words + one image chip, never the hub's '<image' marker or a path
     {
       await go(s, `project/${shop}`);
@@ -373,6 +401,10 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
       out.push(await measure());
       await shot('R36-answered-panel');
       await p.keyboard.press('Alt+Meta+0');
+      // DOCKROW (ambient-lead m_15419): the docked answer reads '✓ you answered … [Image #1]', never a 'switchboard' row with the hub's raw line
+      const listText = await p.getByTestId('thread.list').innerText().catch(() => '');
+      const dockLines = listText.split('\n').filter((l) => l.includes('r41-dock'));
+      out.push(`DOCKROW: lines with the docked words ${JSON.stringify(dockLines.slice(0, 3))}; 'switchboard' in the thread ${String(listText.split('\n').filter((l) => l.trim() === 'switchboard' || l.startsWith('switchboard ')).length)}; 'the user answered card' ${String(listText.includes('the user answered card'))}`);
       r36 = out.join(' · ') || 'no thread.answered row in shop main\'s thread';
     }
   } finally {

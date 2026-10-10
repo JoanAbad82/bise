@@ -107,14 +107,15 @@ test('gate/notify-real: R45-R47 on the real core: knock when away, words, choice
     const d = `nfd-${String(run)}`;
     const pd = await card(d);
     if (pd?.note) {
-      await p.evaluate(() => { (window as unknown as { bise: { openWindow: (r?: string) => void } }).bise.openWindow('inbox'); });
-      await sleep(1200);
-      await p.getByText(new RegExp(d)).first().click({ timeout: 5000 }).catch(() => undefined);
-      await sleep(600);
+      // b1b (416a4ad3): the inbox is a block, never a screen of its own; 'inbox?card=<project>/<id>' (what ⌘I
+      // and a click open) puts that card in front in bise's block, where '1' over an empty composer picks
+      const route = `inbox?card=${pd.note.key.replace('#', '/')}`;
+      await p.evaluate((r) => { (window as unknown as { bise: { openWindow: (r?: string) => void } }).bise.openWindow(r); }, route);
+      await sleep(1500);
       await p.keyboard.press('1');
       const closed = await waitFor((l) => l.t === 'close' && l.key === pd.note?.key, 20_000);
       await p.screenshot({ path: path.join(OUT, 'R47-answered-elsewhere.png') });
-      row('R47 elsewhere', closed !== undefined && answered(d, '1'), `answered in ⌘I with '1' (transcript: ${String(answered(d, '1'))}); its notification closed: ${String(closed !== undefined)}`);
+      row('R47 elsewhere', closed !== undefined && answered(d, '1'), `answered in bise's inbox block (${route}) with '1' (transcript: ${String(answered(d, '1'))}); its notification closed: ${String(closed !== undefined)}`);
     } else row('R47 elsewhere', false, 'no post for that card in 45 s');
 
     // a0 (amb-mac 830e0676): Help › 'send a test notification' is in the menu of a try/check/test build and
