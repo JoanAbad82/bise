@@ -23,6 +23,7 @@ import { entryOf, entrySegments } from '../entry';
 import { agentRows, argRows, artifactRows, commandLine, commandRows, completion, emojiRows, enterSends, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from '../pick';
 import { isImagePath, type ComposerSources, type PickFile } from '../sources';
 import { thumbnail } from '../attach';
+import { registerGrab } from '../grab';
 import { argAt, browseText, parentQuery, triggerAt, type Trigger } from '../tokens';
 import { emojiToken, typedEmoji } from '../emoji';
 import { dictated, HOLD_MS } from '../dictate';
@@ -217,7 +218,18 @@ export function PmField(p: PmFieldProps): JSX.Element {
       changed.current(transaction);
     };
     editor.on('transaction', onTr);
+    // a key or a paste with nothing focused comes here, the caret at the end (grab.ts, main m_16044)
+    const unGrab = registerGrab({
+      el: editor.view.dom,
+      take: () => {
+        const v = editor.view;
+        v.dispatch(v.state.tr.setSelection(TextSelection.atEnd(v.state.doc)));
+        v.focus();
+      },
+      paste: (e) => paste.current(e),
+    });
     return () => {
+      unGrab();
       writeNow(); // the screen goes: the draft is kept before the editor does
       editor.off('transaction', onTr);
       editor.destroy();
