@@ -778,6 +778,31 @@ def fake_cu_daemon():
     shutil.rmtree(run, ignore_errors=True)
 
 
+@test
+def real_shape_pure():
+    """real-shape (realshape.py): the app's childEnv drops BISE_APP_ROOT, the shape walks as the scan does, a world builds from a made-up shape, the reds read from a report"""
+    import realshape as rs
+    internal, test_vars = rs.env_lists()
+    check("BISE_APP_ROOT" in internal and internal and test_vars, "env table parsed: %d internal, %d test" % (len(internal), len(test_vars)))
+    env = rs.child_env(rs.launch_env("/h", {"BISE_APP_ROOT": "/r", "BISE_DESKTOP_OFFSCREEN": "1", "PATH": "/x"}), internal, test_vars)
+    check("BISE_APP_ROOT" not in env and "BISE_DESKTOP_OFFSCREEN" not in env and env["HOME"] == "/h" and env["PATH"] == "/x", env)
+    d = tempfile.mkdtemp(prefix="rs-")
+    for p in ("a/b", "Library/x", ".hidden/y", "node_modules/z"):
+        os.makedirs(os.path.join(d, p))
+    os.makedirs(os.path.join(d, "repo", ".git"))
+    tree = rs.tree_of(d)
+    check(sorted(n["kind"] for n in tree) == ["plain", "repo"] and rs.counts({"tree": tree, "projects": [], "hubs": []})["folders"] == 3, tree)
+    shape = {"at_ms": 1, "home_workspace": "plain", "hubs": [{"name": "p", "live": True, "agents": 2}],
+             "projects": [{"name": "proj-a", "rel": "code/proj-a", "order": 0, "kind": "repo"}], "tree": tree}
+    w = rs.build(shape, os.path.join(d, "w"))
+    reg = json.load(open(os.path.join(w["bise_home"], "projects.json")))
+    check([p["name"] for p in reg["projects"]] == ["proj-a"] and os.path.isdir(os.path.join(w["home"], "code", "proj-a", ".git"))
+          and os.path.isdir(os.path.join(w["home"], "bise")) and os.path.isdir(os.path.join(w["home"], "folder-01", ".git")), reg)
+    red = {"log": {"repl_live_not_found": 8}, "scan": {"answered": False}, "add": {"answered": True, "ev": "projects"}}
+    check(rs.verdicts(red) == {"repl_live_not_found": True, "scan_stuck": True, "add_does_nothing": False}, rs.verdicts(red))
+    shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     print("%d failed" % len(failures) if failures else "all ambient-qa tests pass")
     sys.exit(1 if failures else 0)
