@@ -28,7 +28,7 @@ impl Shell {
     /// allows (daemon/state_gate.rs: at most once per 100 ms, the last
     /// change always sent, a pending one flushed at the stop).
     pub(super) fn serve(&mut self, rx: Receiver<Msg>, tick_queued: &AtomicBool) -> bool {
-        let mut inbox = Inbox::new(rx, Msg::is_client);
+        let mut inbox = Inbox::new(rx, Msg::is_urgent);
         let keep = loop {
             if self.state_gate.due(now_ms()) {
                 self.push_state();
