@@ -8,6 +8,7 @@ import { useAgents, useStore } from '@/store';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
 import { clock, handoffOf, schedHead } from './entry';
+import { wakeLine, wakeTail } from './wake';
 import { useRouter } from '@/app/router';
 import type { RowCtx } from './rows';
 /** A news line's mark: what it means, never its color alone. */
@@ -146,6 +147,46 @@ export function CompactedRow({ e }: { e: Entry }) {
         context compacted
       </Fold>
       {open && e.text !== '' && <div className="th-think-body">{e.text}</div>}
+    </div>
+  );
+}
+
+/**
+ * event-wake (designer's page): a watch's end, the hub's own line ('· cargo test ended · rc 101 ·
+ * after 3m10s'), dim, only a non-zero rc in the error tone; '–' when he stopped waiting; its last
+ * output lines folded ('▸ its last 3 lines', ⌘E / a click opens them, mono).
+ */
+export function WakeRow({ e }: { e: Entry }) {
+  const [open, setOpen] = useFold(false, e.pos);
+  const { mark, parts } = wakeLine(e);
+  const tail = e.wake?.tail ?? [];
+  const words = wakeTail(tail.length);
+  return (
+    <div className="th-wake" data-testid={`thread.wake.${String(e.pos)}`}>
+      <div className="th-wake-head">
+        <span className="th-wake-mark" aria-hidden="true">
+          {mark}
+        </span>
+        {parts.map((p, i) => (
+          <span key={i} className={p.err ? 'th-wake-err' : undefined} data-err={p.err || undefined}>
+            {/* a flex item drops its leading space: the one before '·' is kept unbreakable */}
+            {i > 0 && '\u00a0· '}
+            {p.text}
+          </span>
+        ))}
+        {words !== null && (
+          <Fold
+            open={open}
+            onToggle={() => {
+              setOpen((o) => !o);
+            }}
+            testId={`thread.wake.${String(e.pos)}.fold`}
+          >
+            {words}
+          </Fold>
+        )}
+      </div>
+      {open && tail.length > 0 && <pre className="th-wake-out">{tail.join('\n')}</pre>}
     </div>
   );
 }

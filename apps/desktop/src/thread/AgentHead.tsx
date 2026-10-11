@@ -12,6 +12,7 @@ import { ago } from '@/agents/model';
 import { useRouter } from '@/app/router';
 import { BisePearl } from '@/app/BisePearl';
 import { biseChip, branchLine, dropsFor, roleOf, stateChip, usageLine, type StateChip } from './head';
+import { waitingFor, waitsEvent } from './wake';
 
 /** an agent whose wheel he took waits for him, like any agent that asks him */
 const HELD: StateChip = { text: '? waiting for you', needs: true, live: false };
@@ -140,6 +141,14 @@ export function BiseHead({ project, name, more }: { project: string; name: strin
 /** The live line at the thread's end while it works (v6 (2)): '∿ running the bench three more times · 1 min'. */
 export function LiveLine({ a }: { a: Agent | undefined }) {
   const now = useNow();
+  // event-wake (designer's page): the thread ends on what it waits for, dim, never the accent
+  if (a !== undefined && !a.archived && waitsEvent(a)) {
+    return (
+      <div className="th-live" data-testid="thread.waiting" aria-live="polite">
+        … {waitingFor(a.watching, now)}
+      </div>
+    );
+  }
   if (a === undefined || a.archived || a.status !== 'working' || a.title === '') return null;
   const t = ago(a.since_ms, now);
   return (

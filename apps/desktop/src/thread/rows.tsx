@@ -18,7 +18,7 @@ import { useIsCurrent } from './findmark';
 import { useVoiceLit } from '@/voicemode';
 import { AnsweredRow, ApprovalRow, CardAnsweredRow, CardRow, ToAgentRow } from './rows-cards';
 import { YouRow } from './rows-messages';
-import { ArtChip, BriefRow, CompactedRow, LandedRow, MadeRow, NotDeliveredRow, NOTICE_MARK, NoticeRow, PrRow, ScheduledRow } from './rows-news';
+import { ArtChip, BriefRow, CompactedRow, LandedRow, MadeRow, NotDeliveredRow, NOTICE_MARK, NoticeRow, PrRow, ScheduledRow, WakeRow } from './rows-news';
 import { ThinkingLine, thoughtFor, ToolsRow } from './rows-tools';
 /** What a row needs of its thread. */
 export interface RowCtx {
@@ -179,6 +179,9 @@ function EntryBody({ e, ctx, head, next, live, still }: { e: Entry; ctx: RowCtx;
     // batch 3b (6e9d68f8): a scheduled task's ◷ line
     case 'scheduled':
       return <ScheduledRow e={e} ctx={ctx} />;
+    // event-wake: a watch's end, the hub's line with its folded output
+    case 'wake':
+      return <WakeRow e={e} />;
     case 'unknown':
       // a kind from a newer hub: its words, plain and dim
       return (

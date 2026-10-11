@@ -7,6 +7,7 @@
 import type { Agent, ComputerAgent, ProjectRow } from '@/proto';
 import { MAIN, type Route } from './route';
 import { shortAge, shownName } from '@/agents/model';
+import { waitAge, waitingFor, waitSince, waitsEvent } from '@/thread/wake';
 
 /** A sign's tone: ink (at work), accent (asks him), err (failed), dim (the rest). */
 export type Tone = 'ink' | 'acc' | 'err' | 'dim';
@@ -47,6 +48,12 @@ export function signOf(a: Agent, now: number, wake?: number): Sign {
   // R9/S3: whom it waits on, typed by the hub (the TUI's panel: ? when it is him, … another agent)
   if (a.waiting_on?.who === 'you') return { g: '?', tone: 'acc', end: '', endTone: 'dim', count: 0, title: `asks you · ${what}` };
   if (a.waiting_on?.who === 'agent') return { g: '⋯', tone: 'dim', end: 'waiting', endTone: 'dim', count: 0, title: `waiting on ${shownName(a.waiting_on.name)} · ${what}` };
+  // event-wake (designer's page event-wake): it waits for an event, not idle: '…' in ink, how long
+  // it waits on the right, what it waits for on hover; never the accent (it doesn't wait on him)
+  if (waitsEvent(a)) {
+    const since = waitSince(a.watching) ?? now;
+    return { g: '…', tone: 'ink', end: waitAge(now - since), endTone: 'dim', count: 0, title: `${waitingFor(a.watching, now) ?? 'waiting'} · ${what}` };
+  }
   switch (a.status) {
     case 'working':
       return { g: '∿', tone: 'ink', end: turnShort(a.turn_ms ?? now - a.since_ms), endTone: 'dim', count: 0, title: `working · ${what}` };

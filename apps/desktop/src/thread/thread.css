@@ -1287,6 +1287,38 @@ button.th-sched-head {
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+/* event-wake (designer's page): a watch's end, dim, on the column's edge; only a non-zero rc in
+   the error tone; its folded output in mono, like a tool row's opened box */
+.th-wake {
+  color: var(--c-text-2);
+  font: var(--t-13) var(--font-ui);
+}
+.th-wake-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0;
+}
+.th-wake-mark {
+  width: 1.2em;
+  flex: none;
+}
+.th-wake-err {
+  color: var(--c-err);
+}
+.th-wake .b-fold {
+  margin-left: 12px;
+}
+.th-wake-out {
+  margin: 6px 0 0 1.2em;
+  padding: 8px 10px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-2);
+  font: var(--t-12) / 1.5 var(--font-mono);
+  color: var(--c-text-2);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
 /* 'stopping perf…' on the column's edge, dim, not the accent (designer via lead m_17333) */
 .th-stopping .b-marker {
   color: var(--c-text-2);
