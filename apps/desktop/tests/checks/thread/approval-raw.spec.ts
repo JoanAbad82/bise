@@ -4,7 +4,9 @@
 // his no with the note 'use a branch, never force main'). Records, as attachments:
 //   - every core event the window got that names that push: the kept snapshot (what a page gets on
 //     start) and the live events after a re-subscribe of shop's thread (another screen, then back);
-//   - the lines of shop's main transcript.log that name it ('sb approval : …' / 'sb answered : …').
+//   - the lines of shop's main transcript.log that name it, in either form (core-f, issue 25
+//     chunk F): the record 'sb approval :: {how, who, what, note}' / 'sb answered :: {…}' or the
+//     older text 'sb approval : …' / 'sb answered : …' (the filter's ' :' matches both).
 // Passes when the entry the row is drawn from is an approval whose ok is a boolean.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -72,7 +74,7 @@ test("thread/approval-raw: the approval row's entry as the window got it, and it
     const log = path.join(path.dirname(shop.sock), 'agents', 'main', 'transcript.log');
     let lines: string[] = [];
     try {
-      lines = readFileSync(log, 'utf8').split('\n').filter((l) => l.includes(PUSH) || /sb (approval|answered) :/.test(l));
+      lines = readFileSync(log, 'utf8').split('\n').filter((l) => l.includes(PUSH) || /sb (approval|answered) ::? /.test(l));
     } catch (e) {
       lines = [`unreadable: ${String(e)}`];
     }

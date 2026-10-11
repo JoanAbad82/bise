@@ -14,7 +14,7 @@
 import path from 'node:path';
 import { test, expect } from '../../harness';
 import { Lines } from '../native/world';
-import { hubOf, launchOn, realWorld, transcriptHas, tui, tuiReady, worldSay, type Tui } from '../world';
+import { hubOf, launchOn, realWorld, transcriptFeed, transcriptHas, tui, tuiReady, worldSay, type Tui } from '../world';
 
 const T = {
   field: '[data-testid="composer.field"]',
@@ -110,10 +110,13 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       // #412 has several news rows ('opened', then 'checks fail: e2e'): the failing one is the TUI's '↑ #412 checks fail'
       note('pr-rows', (await list.locator(T.pr).allTextContents()).map((r) => r.trim().slice(0, 120)));
       // wait on the row's event, not a time (bar S21): the hub's own feed line for #412's failing
-      // checks ('sb pr : red : 412 : … : checks fail: e2e …' in main's transcript), then go to it
-      // as he would, with the thread's find (⌘F): only the rows near the view are drawn, and the
-      // seeds push it up the thread
-      await expect.poll(() => transcriptHas(w, 'shop', 'main', 'sb pr : red : 412'), { timeout: 60_000, message: "the hub's event: #412's checks fail" }).toBe(true);
+      // checks in main's transcript, in either form (core-f, issue 25 chunk F): the record
+      // 'sb pr :: {"state":"failing","number":412,…}' or the older 'sb pr : red : 412 : … : checks
+      // fail: e2e …', then go to it as he would, with the thread's find (⌘F): only the rows near
+      // the view are drawn, and the seeds push it up the thread
+      const failing412 = (): boolean =>
+        transcriptFeed(w, 'shop', 'main', 'pr').some((l) => (l.json ? l.json['state'] === 'failing' && Number(l.json['number']) === 412 : l.raw.includes('sb pr : red : 412')));
+      await expect.poll(failing412, { timeout: 60_000, message: "the hub's event: #412's checks fail" }).toBe(true);
       const row = list.locator(T.pr).filter({ hasText: '#412' }).filter({ hasText: 'checks fail' }).last();
       // the thread as it is when the hub has the event: its PR rows, or none
       note('pr-rows-at-event', (await list.locator(T.pr).allTextContents()).map((r) => r.trim().slice(0, 120)));

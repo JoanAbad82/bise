@@ -171,6 +171,42 @@ export function transcriptHas(w: World, project: string, agent: string, words: s
 }
 
 /**
+ * The hub's own lines of one kind in that agent's transcript ('sb approval', 'sb pr', …), in both
+ * forms: the record form `sb <kind> :: <json>` (bise_proto::core::Feed, rust/proto/src/core/feed.rs:
+ * json is the record's fields, e.g. approval {how, who, what, note}, pr {state, number, url, text})
+ * and the older text form `sb <kind> : <text>` that old transcripts keep (json undefined there).
+ */
+export function transcriptFeed(w: World, project: string, agent: string, kind: string): { raw: string; json?: Record<string, unknown> }[] {
+  const f = path.join(path.dirname(hubOf(w, project).sock), 'agents', agent, 'transcript.log');
+  let text = '';
+  try {
+    text = readFileSync(f, 'utf8');
+  } catch {
+    return [];
+  }
+  return feedLines(text, kind);
+}
+
+/** `transcriptFeed` on a transcript's text. */
+export function feedLines(text: string, kind: string): { raw: string; json?: Record<string, unknown> }[] {
+  const out: { raw: string; json?: Record<string, unknown> }[] = [];
+  for (const raw of text.split('\n')) {
+    const at = raw.indexOf(`sb ${kind} :`);
+    if (at < 0) continue;
+    const rest = raw.slice(at + `sb ${kind}`.length);
+    if (rest.startsWith(' :: ')) {
+      try {
+        const v: unknown = JSON.parse(rest.slice(4));
+        out.push(v !== null && typeof v === 'object' ? { raw, json: v as Record<string, unknown> } : { raw });
+      } catch {
+        out.push({ raw });
+      }
+    } else out.push({ raw });
+  }
+  return out;
+}
+
+/**
  * The TUI's side panel, one trimmed string per screen line: the text between the panel's left
  * border (the '┬' in the top border) and the right border. Cut by column, not by '│': a tip
  * popover ('new: your agents…') drawn over the feed can cover the border between feed and panel.
