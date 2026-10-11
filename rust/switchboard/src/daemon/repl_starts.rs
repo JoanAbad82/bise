@@ -221,7 +221,12 @@ impl Shell {
         let dir = a.dir.clone();
         let adir = self.opts.paths.agent_dir(&dir);
         let (tmp, run) = (self.opts.paths.agent_tmp(&dir), self.opts.paths.agent_run(&dir));
-        // a fresh process: a fresh wire log
+        // a fresh process: a fresh wire log, once the old one's events
+        // the hub never took are in the session log (architect m_18556)
+        let caught = self.catch_up_wire(&dir, &adir);
+        if caught > 0 {
+            log_line(&self.opts.paths, &format!("session log of {}: {} events of its last REPL recorded before the restart", name, caught));
+        }
         write_logged(&self.opts.paths, &adir.join("wire.log"), "");
         write_logged(&self.opts.paths, &adir.join("wire.offset"), "0");
         let _ = std::fs::remove_file(adir.join("repl.json"));

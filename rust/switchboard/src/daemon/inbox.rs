@@ -5,7 +5,10 @@
 //! CPU, reached a hello after hours ('no agents yet' in the TUI and the
 //! desktop app). One client's messages share the lane, so their order
 //! holds; a client only refers to state it has seen, so its lines never
-//! depend on a queued REPL line (architect m_14659). A flooding client
+//! depend on a queued REPL line (architect m_14659). A stop goes in the
+//! urgent lane too (`Msg::is_urgent`): behind the REPLs' lines, a
+//! `bise switchboard --stop` ran 85 s late on 2026-10-11, under a client
+//! that had attached since. A flooding client
 //! never starves the rest: after [`URGENT_RUN`] urgent messages in a row,
 //! one of the rest.
 //!

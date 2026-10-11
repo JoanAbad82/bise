@@ -219,6 +219,8 @@ enum Late {
 /// the new hub is not up.
 fn replace_hub(paths: &Paths, root: &Path, same: bool, late: Late) -> Result<(), String> {
     let old = hub_pid(paths);
+    // Err (no answer, or still there after its wait): the old pid is
+    // killed just below before a new hub starts, never two at once
     let _ = client::stop(paths, true);
     if let Some(p) = old {
         let t0 = Instant::now();

@@ -210,6 +210,35 @@ impl Shell {
         }
     }
 
+    /// Before a fresh REPL resets the wire log: the `ev:` lines of the
+    /// old process the hub never took (a stop ahead of queued lines, a
+    /// killed hub) go into its session log first, so the record and the
+    /// next resume have them. Returns how many.
+    pub(super) fn catch_up_wire(&mut self, dir: &str, adir: &Path) -> usize {
+        let Ok(bytes) = std::fs::read(adir.join("wire.log")) else { return 0 };
+        let done: u64 = std::fs::read_to_string(adir.join(EV_OFFSET)).ok().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
+        let evs = pending_evs(&bytes, done);
+        if evs.is_empty() {
+            return 0;
+        }
+        if !self.recorders.contains_key(dir) {
+            let Some(id) = session_of(adir) else { return 0 };
+            let home = bise_home::Home::from_env();
+            match Recorder::attach(&home.sessions_dir().join(&id), &home.blobs_dir()) {
+                Ok(r) => self.keep(dir, r),
+                Err(e) => {
+                    log_line(&self.opts.paths, &format!("session log of {dir}: {e}"));
+                    return 0;
+                }
+            }
+        }
+        let n = evs.len();
+        for (ev, offset) in evs {
+            self.on_ev_line(dir, &ev, offset);
+        }
+        n
+    }
+
     /// A wire line; true when it was an `ev:` line (not for the feed).
     pub(super) fn on_ev_line(&mut self, dir: &str, line: &str, offset: u64) -> bool {
         let Some(ev) = line.strip_prefix("  ev: ") else { return false };
@@ -225,5 +254,43 @@ impl Shell {
             write_small(&adir.join(EV_OFFSET), &offset.to_string());
         }
         true
+    }
+}
+
+/// The `ev:` lines of a wire log after `done` (the offset of the last one
+/// recorded), each with the offset just after it (`pump_wire`'s). A last
+/// line without its newline is not whole yet: left out.
+fn pending_evs(wire: &[u8], done: u64) -> Vec<(String, u64)> {
+    let mut out = Vec::new();
+    let mut offset = 0u64;
+    for raw in wire.split_inclusive(|b| *b == b'\n') {
+        offset += raw.len() as u64;
+        if !raw.ends_with(b"\n") || offset <= done {
+            continue;
+        }
+        let line = String::from_utf8_lossy(raw).trim_end_matches(['\n', '\r']).to_string();
+        if line.starts_with("  ev: ") {
+            out.push((line, offset));
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pending_evs;
+
+    /// A stop that went ahead of queued lines (2026-10-11): the `ev:`
+    /// lines after the recorded offset are found again, with pump_wire's
+    /// offsets; the feed lines and a half-written line are not.
+    #[test]
+    fn the_evs_the_hub_never_took_are_found_again() {
+        let wire = b"  ev: {\"a\":1}\nhello\n  ev: {\"a\":2}\n  ev: {\"a\":3}\n  ev: {\"a\"";
+        let first = "  ev: {\"a\":1}\n".len() as u64;
+        assert_eq!(pending_evs(wire, 0).len(), 3);
+        let after = pending_evs(wire, first);
+        assert_eq!(after.iter().map(|(l, _)| l.as_str()).collect::<Vec<_>>(), ["  ev: {\"a\":2}", "  ev: {\"a\":3}"]);
+        assert_eq!(after[0].1, first + "hello\n".len() as u64 + "  ev: {\"a\":2}\n".len() as u64);
+        assert!(pending_evs(wire, wire.len() as u64).is_empty());
     }
 }

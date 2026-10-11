@@ -246,11 +246,18 @@ enum Msg {
 }
 
 impl Msg {
-    /// A client's own message (its hello or `initialize`, a line, its end,
-    /// a thread's typed answer to its request): the inbox's urgent lane
-    /// (daemon/inbox.rs), one lane so its order holds (architect m_14659).
-    fn is_client(m: &Msg) -> bool {
-        matches!(m, Msg::OlderHello { .. } | Msg::RpcNew { .. } | Msg::ClientLine { .. } | Msg::ClientGone { .. } | Msg::Typed { .. })
+    /// The inbox's urgent lane (daemon/inbox.rs): a client's own message
+    /// (its hello or `initialize`, a line, its end, a thread's typed answer
+    /// to its request), one lane so its order holds (architect m_14659);
+    /// and a stop (`bise switchboard --stop`, a switch's, idle-exit's),
+    /// which runs at once: in the rest lane, behind the REPLs' lines, a
+    /// stop asked at 22:18:16 ran at 22:19:41 (2026-10-11), after the
+    /// client had said "stopped" and a new `bise` had attached.
+    fn is_urgent(m: &Msg) -> bool {
+        matches!(
+            m,
+            Msg::OlderHello { .. } | Msg::RpcNew { .. } | Msg::ClientLine { .. } | Msg::ClientGone { .. } | Msg::Typed { .. } | Msg::Shutdown { .. }
+        )
     }
 }
 
@@ -2347,10 +2354,34 @@ mod tests {
     #[test]
     fn a_clients_own_messages_take_the_urgent_lane() {
         let (a, _b) = UnixStream::pair().unwrap();
-        assert!(Msg::is_client(&Msg::RpcNew { id: 1, stream: a, v: Value::Null }));
-        assert!(Msg::is_client(&Msg::Typed { to: rpc::Typed::Answer(1), v: Value::Null }));
-        assert!(Msg::is_client(&Msg::ClientGone { id: 1 }));
-        assert!(!Msg::is_client(&Msg::In(Input::Tick)));
+        assert!(Msg::is_urgent(&Msg::RpcNew { id: 1, stream: a, v: Value::Null }));
+        assert!(Msg::is_urgent(&Msg::Typed { to: rpc::Typed::Answer(1), v: Value::Null }));
+        assert!(Msg::is_urgent(&Msg::ClientGone { id: 1 }));
+        assert!(!Msg::is_urgent(&Msg::In(Input::Tick)));
+    }
+
+    /// 2026-10-11, his hub: `bise switchboard --stop` at 22:18:16, its
+    /// Shutdown queued behind ~85 s of REPL lines, the client said
+    /// "stopped", bise-dev attached again, and the stop fired at 22:19:41
+    /// under him (main and 7 busy agents SIGTERMed). A stop, keep or not,
+    /// is the loop's next message whatever waits in the rest lane.
+    #[test]
+    fn a_stop_goes_ahead_of_queued_repl_lines() {
+        use super::inbox::{Inbox, Next};
+        let (tx, rx) = std::sync::mpsc::channel();
+        let line = |n: u64| Msg::ReplLine { dir: "amb-win".into(), gen: 1, line: format!("--- line {n}"), offset: n };
+        for n in 0..5000 {
+            tx.send(line(n)).unwrap();
+        }
+        tx.send(Msg::Shutdown { keep: false }).unwrap();
+        tx.send(line(5000)).unwrap();
+        let mut inbox = Inbox::new(rx, Msg::is_urgent);
+        match inbox.next(Some(Duration::ZERO)) {
+            Next::Msg(Msg::Shutdown { keep }) => assert!(!keep),
+            Next::Msg(_) => panic!("a REPL line went before the stop"),
+            _ => panic!("nothing in the inbox"),
+        }
+        assert!(Msg::is_urgent(&Msg::Shutdown { keep: true }));
     }
 
     /// one rename (no temp file left); only a link is dropped for an

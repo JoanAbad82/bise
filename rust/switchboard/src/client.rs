@@ -98,19 +98,29 @@ pub fn open(paths: &Paths, exe: &Path, app_root: &Path) -> std::io::Result<UnixS
 /// older hub (before client-protocol) gets its hello and the `stop_hub`
 /// op instead.
 pub fn stop(paths: &Paths, keep_agents: bool) -> std::io::Result<bool> {
-    stop_at(&paths.socket(), keep_agents)
+    stop_at(&paths.socket(), keep_agents, STOP_ANSWER, STOP_WAIT)
 }
 
-fn stop_at(socket: &Path, keep_agents: bool) -> std::io::Result<bool> {
+/// `answer`: the wait for the hub's `initialize` answer; `wait`: for its
+/// socket to go once the stop is asked. Not gone: an error, never "stopped".
+fn stop_at(socket: &Path, keep_agents: bool, answer: Duration, wait: Duration) -> std::io::Result<bool> {
     use bise_proto::hub::HubCmd;
     use bise_proto::rpc::{self, Id, Init, InitializeParams, Message, Request};
     let Ok(mut s) = UnixStream::connect(socket) else { return Ok(false) };
     let params = serde_json::to_value(InitializeParams::new("bise", env!("CARGO_PKG_VERSION"))).unwrap_or_default();
     writeln!(s, "{}", Message::Request(Request::new(Id::Num(0), rpc::INITIALIZE, params)).to_value())?;
-    s.set_read_timeout(Some(Duration::from_secs(5)))?;
+    s.set_read_timeout(Some(answer))?;
     let mut lines = BufReader::new(s.try_clone()?).lines();
     let project = loop {
-        let Some(Ok(line)) = lines.next() else { return Ok(true) };
+        let line = match lines.next() {
+            Some(Ok(line)) => line,
+            // no answer in 5 s: nothing was asked, the hub runs on
+            Some(Err(e)) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {
+                return Err(std::io::Error::other(format!("{} {} s: it was not stopped", NO_ANSWER, answer.as_secs())));
+            }
+            // it closed the connection: going already
+            _ => return Ok(true),
+        };
         match rpc::init_answer(&serde_json::from_str(&line).unwrap_or(Value::Null), &Id::Num(0)) {
             Init::Ready(res) => break Some(res.project),
             // refused (it runs in an agent's process): the hub stays
@@ -135,13 +145,27 @@ fn stop_at(socket: &Path, keep_agents: bool) -> std::io::Result<bool> {
     let _ = s.set_read_timeout(Some(Duration::from_millis(100)));
     let mut sink = [0u8; 65536];
     let t0 = Instant::now();
-    while socket.exists() && t0.elapsed() < Duration::from_secs(5) {
+    while socket.exists() && t0.elapsed() < wait {
         if let Ok(0) = std::io::Read::read(&mut s, &mut sink) {
             std::thread::sleep(Duration::from_millis(50));
         }
     }
+    // never "stopped" while it still runs: a stop that lands later kills
+    // the work of whoever attached meanwhile (2026-10-11, 85 s late)
+    if socket.exists() {
+        return Err(std::io::Error::other(format!(
+            "the hub got the stop but still runs after {} s; `bise switchboard --stop` again to check",
+            wait.as_secs()
+        )));
+    }
     Ok(true)
 }
+
+/// How long `stop` waits for the hub's `initialize` answer.
+const STOP_ANSWER: Duration = Duration::from_secs(5);
+/// How long `stop` waits for the hub's socket to go: the hub removes it
+/// as its loop ends, before its REPLs checkpoint.
+const STOP_WAIT: Duration = Duration::from_secs(30);
 
 /// An older hub (before client-protocol): its hello, then the op.
 // TODO(client-protocol, the plan's 'after the release' step, with
@@ -260,7 +284,7 @@ mod tests {
             std::fs::remove_file(&path).unwrap();
             req
         });
-        assert!(stop_at(&p, true).unwrap());
+        assert!(stop_at(&p, true, STOP_ANSWER, STOP_WAIT).unwrap());
         let req = hub.join().unwrap();
         assert_eq!((req["method"].as_str(), req["params"]["project"].as_str(), req["params"]["keep_agents"].as_bool()), (Some("hub/stop"), Some("p1"), Some(true)));
     }
@@ -282,7 +306,47 @@ mod tests {
             std::fs::remove_file(&path).unwrap();
             op
         });
-        assert!(stop_at(&p, false).unwrap());
+        assert!(stop_at(&p, false, STOP_ANSWER, STOP_WAIT).unwrap());
         assert_eq!(hub.join().unwrap(), json!({"op": "stop_hub", "keep_agents": false}));
+    }
+
+    /// 2026-10-11: the hub took the stop but ran on (its stop queued 85 s
+    /// behind REPL lines); `bise switchboard --stop` said "stopped" and
+    /// the next bise attached to it. Still there after the wait: an error.
+    #[test]
+    fn a_hub_still_running_after_the_stop_is_not_stopped() {
+        let (p, l) = sock(3);
+        let hub = std::thread::spawn(move || {
+            let (mut w, _) = l.accept().unwrap();
+            let mut r = BufReader::new(w.try_clone().unwrap());
+            let _ = read(&mut r);
+            let res = json!({"project": "p1", "proto": bise_proto::PROTO, "workspace": "/w", "name": "w", "methods": ["hub/stop"],
+                "notifications": [], "hub": {"watermark": {"epoch": 1, "seq": 0}, "state": []}});
+            writeln!(w, "{}", json!({"jsonrpc": "2.0", "id": 0, "result": res})).unwrap();
+            let req = read(&mut r);
+            // the socket stays: the hub runs on
+            std::thread::sleep(Duration::from_millis(600));
+            req
+        });
+        let e = stop_at(&p, false, STOP_ANSWER, Duration::from_millis(300)).unwrap_err();
+        assert!(e.to_string().starts_with("the hub got the stop but still runs"), "{e}");
+        assert_eq!(hub.join().unwrap()["method"], "hub/stop");
+        let _ = std::fs::remove_file(&p);
+    }
+
+    /// A hub that does not answer `initialize` in time was asked nothing:
+    /// an error, never "stopped".
+    #[test]
+    fn a_hub_that_does_not_answer_was_not_stopped() {
+        let (p, l) = sock(4);
+        let hub = std::thread::spawn(move || {
+            let (w, _) = l.accept().unwrap();
+            std::thread::sleep(Duration::from_millis(700));
+            drop(w);
+        });
+        let e = stop_at(&p, false, Duration::from_millis(200), STOP_WAIT).unwrap_err();
+        assert!(e.to_string().contains("it was not stopped"), "{e}");
+        hub.join().unwrap();
+        let _ = std::fs::remove_file(&p);
     }
 }
