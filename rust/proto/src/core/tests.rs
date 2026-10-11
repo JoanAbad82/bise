@@ -168,3 +168,31 @@ fn an_answer_keeps_what_it_does_not_know() {
     assert!(matches!(Answer::decode_line("{}").unwrap(), Answer::Done(_)));
     assert!(Answer::decode_line("nope").is_err());
 }
+
+#[test]
+fn an_answer_with_fx_is_never_unknown_whatever_its_items() {
+    for fx in [
+        json!([]),
+        json!([{"fx": "kill"}]),
+        json!([{"fx": "kill", "agent": 3}]),
+        json!([7, "x", null, {"no": "tag"}, {"fx": 1}]),
+        json!("not a list"),
+    ] {
+        for v in [json!({"fx": fx.clone(), "dirty": true, "view": {}}), json!({"fx": fx.clone()})] {
+            let a: Answer = serde_json::from_value(v.clone()).unwrap();
+            assert!(matches!(a, Answer::Step(_)), "{v} -> {a:?}");
+        }
+    }
+}
+
+#[test]
+fn a_bad_effect_costs_only_itself() {
+    let a = Answer::decode_line(
+        r#"{"fx": [{"fx": "kill", "agent": "a"}, {"fx": "rt", "agent": "b", "turns": "many"}, {"fx": "kill", "agent": "c"}], "dirty": true, "view": {}}"#,
+    )
+    .unwrap();
+    let Answer::Step(s) = a else { panic!("{a:?}") };
+    let kills: Vec<&str> = s.fx.iter().filter_map(|f| if let Fx::Kill(k) = f { Some(k.agent.as_str()) } else { None }).collect();
+    assert_eq!(kills, ["a", "c"], "both good effects, in order");
+    assert!(matches!(&s.fx[1], Fx::Unknown { tag, raw } if tag == "rt" && raw["turns"] == "many"), "the bad one kept whole");
+}

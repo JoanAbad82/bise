@@ -46,6 +46,7 @@ pub enum Answer {
 pub struct AStep {
     #[serde(with = "fx_list")]
     pub fx: Vec<Fx>,
+    #[serde(default)]
     pub dirty: bool,
     #[serde(default)]
     pub view: serde_json::Value,
@@ -104,19 +105,31 @@ impl Answer {
     }
 }
 
-/// An answer's `fx`: each item through [`Fx::decode`], so a tag this side
-/// doesn't know is `Fx::Unknown` (logged by the hub), never a failed answer.
+/// An answer's `fx`, which never fails (architect m_18746): a failed list
+/// would make the untagged `Answer` fall through to `Unknown` and the hub
+/// drop every effect of the step, its journal included. Each item goes
+/// through [`Fx::decode`]; a tag this side doesn't know, or a known tag
+/// whose fields don't decode, or an item without a tag, is `Fx::Unknown`
+/// (the hub logs it), and costs only that item. Not a list: no effects.
 mod fx_list {
     use super::Fx;
     use serde::{Deserialize, Deserializer, Serializer};
+    use serde_json::Value;
 
     pub fn serialize<S: Serializer>(fx: &[Fx], s: S) -> Result<S::Ok, S::Error> {
         s.collect_seq(fx.iter().map(Fx::to_value))
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<Fx>, D::Error> {
-        let vals = Vec::<serde_json::Value>::deserialize(d)?;
-        vals.into_iter().map(|v| Fx::decode(v).map_err(serde::de::Error::custom)).collect()
+        let Value::Array(vals) = Value::deserialize(d)? else { return Ok(Vec::new()) };
+        Ok(vals.into_iter().map(item).collect())
+    }
+
+    fn item(v: Value) -> Fx {
+        Fx::decode(v.clone()).unwrap_or_else(|_| Fx::Unknown {
+            tag: v.get("fx").and_then(Value::as_str).unwrap_or_default().to_string(),
+            raw: v,
+        })
     }
 }
 
