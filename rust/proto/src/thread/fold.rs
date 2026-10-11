@@ -411,8 +411,13 @@ impl Fold<'_> {
         match h {
             // the approvals gate holds the running call (§3.1)
             Hub::Gate(step) => self.gate(ms, step),
+            // his message: its parts read back from its text (an old
+            // journal, an older client); a you-parts line after it, the
+            // parts he sent, replaces them
             Hub::You(text) => {
-                let i = self.push(Entry::new(pos, ms, EntryKind::You, text));
+                let mut e = Entry::new(pos, ms, EntryKind::You, text);
+                e.parts = read_parts(&e.text);
+                let i = self.push(e);
                 (self.cont, self.you) = (Some(i), Some(i));
             }
             // his fn context: on the 'you' line right before it, else
@@ -601,12 +606,22 @@ impl Fold<'_> {
             // ride apart, never a marker in the row
             Hub::Route { who, card, said } => {
                 let a = (self.ctx.attached)(&said);
-                let (text, note) = words::answered_split(&who, &a.words, self.ctx.width);
+                // with parts, the row's words are his words alone: no
+                // quote or paste tag in the head or its note
+                let parts = read_parts(&said);
+                let said_words = match parts.is_empty() {
+                    true => a.words,
+                    false => crate::parts::words(&parts).trim().to_string(),
+                };
+                let (text, note) = words::answered_split(&who, &said_words, self.ctx.width);
                 self.approval(pos, ms, true, text, note, Some(card));
                 // TODO(msg-parts sha d): images/files go when the desktop
                 // draws the answer from Entry.parts (architect m_17621)
-                if let Some(f) = self.out.last_mut().and_then(|e| e.approval.as_mut()) {
-                    (f.images, f.files) = (a.images, a.files);
+                if let Some(e) = self.out.last_mut() {
+                    e.parts = parts;
+                    if let Some(f) = e.approval.as_mut() {
+                        (f.images, f.files) = (a.images, a.files);
+                    }
                 }
                 self.route = self.out.len().checked_sub(1);
             }
@@ -635,8 +650,18 @@ impl Fold<'_> {
             }
             // a warning, a spawn, computer use, a direct message
             h => {
+                // a message he routed by hand (`you → @docs : …`): its
+                // route-parts line may follow; until then its text read back
+                let routed = match &h {
+                    Hub::Other { kind, text } if kind == "route" => text.split_once(" : ").map(|(_, said)| read_parts(said)),
+                    _ => None,
+                };
                 if let Some(n) = words::hub_notice(&h) {
                     self.notice(pos, ms, n);
+                    if let (Some(parts), Some(e)) = (routed, self.out.last_mut()) {
+                        e.parts = parts;
+                        self.route = self.out.len().checked_sub(1);
+                    }
                 }
             }
         }
@@ -671,6 +696,14 @@ impl Delivered for Entry {
     fn msg_id(&self) -> Option<u64> {
         (self.kind == EntryKind::You).then_some(self.msg_id)?
     }
+}
+
+/// His message's parts read back from the text the model got
+/// (`parts::parse`, once, at the entry's creation): only when it holds
+/// more than his words (a quote, a paste, an image, a file), so a plain
+/// message stays drawn from its text and the wire carries nothing more.
+fn read_parts(text: &str) -> Vec<Part> {
+    crate::parts::of_text(text)
 }
 
 /// An agent's transcript lines as entries, oldest first.

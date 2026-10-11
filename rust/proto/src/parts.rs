@@ -343,6 +343,18 @@ fn image_at(s: &str) -> Option<(Part, usize)> {
 
 // ---- reading parts ----
 
+/// The parts of an old text (`parse`), only when it holds more than words
+/// (a quote, a paste, an image, a file): none for a plain text, which is
+/// drawn from itself. The fold's read of an entry with no parts line, and
+/// a client's own event of a text it has (a resend, a history line).
+pub fn of_text(text: &str) -> Vec<Part> {
+    let parts = parse(text);
+    match parts.iter().all(|p| matches!(p, Part::Text { .. })) {
+        true => Vec::new(),
+        false => parts,
+    }
+}
+
 /// His words: the text parts, the pastes and images as nothing (the
 /// gist of a row, a notification).
 pub fn words(parts: &[Part]) -> String {

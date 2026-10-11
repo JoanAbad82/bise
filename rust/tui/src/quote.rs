@@ -41,8 +41,6 @@ pub(crate) const MAX_CHARS: usize = 8_000;
 /// How the label of a quote starts (`[Quote #2]`).
 pub(crate) const OPEN: &str = "[Quote #";
 
-const TAG_OPEN: &str = "<selection from=\"";
-const TAG_CLOSE: &str = "</selection>";
 
 /// The label of quote `n`.
 pub(crate) fn label(n: usize) -> String {
@@ -74,15 +72,8 @@ pub(crate) struct Where {
 /// file="src/a.rs" new="12-14" old="11-12">`, an attribute only when
 /// it has a value.
 pub(crate) fn tag_at(from: &str, at: &Where, text: &str) -> String {
-    let attr = |s: &str| s.replace('"', "'").replace('\n', " ");
-    let mut head = format!("{TAG_OPEN}{}\"", attr(from));
-    for (k, v) in [("file", &at.file), ("new", &at.new), ("old", &at.old)] {
-        if !v.is_empty() {
-            head.push_str(&format!(" {k}=\"{}\"", attr(v)));
-        }
-    }
-    let text = text.replace(TAG_CLOSE, "</selection >");
-    format!("{head}>\n{text}\n{TAG_CLOSE}")
+    // the one template (msg-parts): bise_proto's, the hub's and desktop's
+    bise_proto::parts::quote_tag(from, &at.file, &at.new, &at.old, text)
 }
 
 /// A quote read back from its tag.
@@ -92,50 +83,6 @@ pub(crate) struct Quote {
     pub(crate) text: String,
     /// from a diff: where (else all empty)
     pub(crate) at: Where,
-}
-
-/// The tag at the start of `s` (spaces and newlines before it allowed):
-/// the quote and the rest after it.
-fn parse_one(s: &str) -> Option<(Quote, &str)> {
-    let s = s.trim_start();
-    let rest = s.strip_prefix(TAG_OPEN)?;
-    let (head, rest) = rest.split_once("\">")?;
-    if head.contains('\n') {
-        return None;
-    }
-    // `from` up to its quote, then ` key="value"` pairs
-    let (from, mut attrs) = head.split_once('"').unwrap_or((head, ""));
-    let mut at = Where::default();
-    while !attrs.trim_start().is_empty() {
-        let (k, v) = attrs.trim_start().split_once("=\"")?;
-        let (v, more) = v.split_once('"').unwrap_or((v, ""));
-        match k {
-            "file" => at.file = v.to_string(),
-            "new" => at.new = v.to_string(),
-            "old" => at.old = v.to_string(),
-            _ => {}
-        }
-        attrs = more;
-    }
-    let (text, rest) = rest.split_once(TAG_CLOSE)?;
-    let text = text.strip_prefix('\n').unwrap_or(text);
-    let text = text.strip_suffix('\n').unwrap_or(text);
-    Some((Quote { from: from.to_string(), text: text.to_string(), at }, rest))
-}
-
-/// The tags in front of a message, and its text after them (the newline
-/// after the last tag dropped). No tag: none, the whole message.
-pub(crate) fn split(msg: &str) -> (Vec<Quote>, &str) {
-    let mut out = Vec::new();
-    let mut rest = msg;
-    while let Some((q, r)) = parse_one(rest) {
-        out.push(q);
-        rest = r;
-    }
-    if out.is_empty() {
-        return (out, msg);
-    }
-    (out, rest.strip_prefix('\n').unwrap_or(rest))
 }
 
 /// Lines in `text` (a last empty line not counted; at least 1).
@@ -192,7 +139,21 @@ pub(crate) fn of(a: &Attachment) -> Option<Quote> {
     if !is_quote(&a.label) {
         return None;
     }
-    parse_one(&a.marker).map(|(q, _)| q)
+    // its tag read back as its part (msg-parts: bise_proto's one read)
+    match bise_proto::parts::parse(&a.marker).as_slice() {
+        [bise_proto::parts::Part::Quote { from, text, file, new, old }] => {
+            Some(Quote { from: from.clone(), text: text.clone(), at: Where { file: file.clone(), new: new.clone(), old: old.clone() } })
+        }
+        _ => None,
+    }
+}
+
+/// The quotes in front of a sent message and its words after them, as
+/// the history reads them (tests: the old `split`'s cases).
+#[cfg(test)]
+fn split(msg: &str) -> (Vec<Quote>, String) {
+    let v = crate::said::view(&crate::said::Said::from(msg));
+    (v.quotes, v.body)
 }
 
 /// The quote chips in `text` (first char, past it, N).
@@ -432,8 +393,8 @@ mod tests {
         assert_eq!(rest, "why?");
         assert_eq!(qs[0], Quote { from: "main".into(), text: "fn a() {}\n  b".into(), ..Default::default() });
         assert_eq!(qs[1], Quote { from: "you, docs".into(), text: "x </selection > y".into(), ..Default::default() });
-        assert_eq!(split("hello <selection from=\"x\">"), (vec![], "hello <selection from=\"x\">"));
-        assert_eq!(split("<selection from=\"x\">\nno end"), (vec![], "<selection from=\"x\">\nno end"));
+        assert_eq!(split("hello <selection from=\"x\">"), (vec![], "hello <selection from=\"x\">".to_string()));
+        assert_eq!(split("<selection from=\"x\">\nno end"), (vec![], "<selection from=\"x\">\nno end".to_string()));
     }
 
     use crate::wire::Ev;
@@ -550,7 +511,7 @@ mod tests {
         assert_eq!(rest, "why?");
         assert_eq!(qs.len(), 1);
         assert!(app.attachments.is_empty());
-        let rows: Vec<String> = crate::render::user_block_lines(&sent, crate::wire::Mark::Sent, false, 60)
+        let rows: Vec<String> = crate::render::user_block_lines(&sent.as_str().into(), crate::wire::Mark::Sent, false, 60)
             .iter()
             .map(|l| l.spans.iter().map(|s| s.content.as_ref()).collect())
             .collect();

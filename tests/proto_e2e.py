@@ -81,6 +81,116 @@ def required_keys():
     return keys
 
 
+def quote_tag(frm, text):
+    return '<selection from="%s">\n%s\n</selection>' % (frm, text)
+
+
+def paste_tag(n, text):
+    return '<pasted n="%d" lines="%d">\n%s\n</pasted>' % (n, max(1, len(text.rstrip("\n").split("\n"))), text)
+
+
+def render(parts):
+    """bise_proto::parts::render for quotes, words and pastes: the quotes
+    in front one per line, then the words with the pastes in place."""
+    head = [quote_tag(p["from"], p["text"]) for p in parts if p["kind"] == "quote"]
+    body = "".join(p["text"] if p["kind"] == "text" else paste_tag(p["n"], p["text"]) for p in parts if p["kind"] in ("text", "paste"))
+    return "\n".join(head + ([body] if body else []))
+
+
+def parts_round(c, d, E, project, typed):
+    """msg-parts (architect m_17621): his message as typed parts. The hub
+    renders the model's text from them and keeps them on his entry; the
+    same message sent as text reads back as the same parts and the model
+    reads the same bytes (both shapes); a `slash` line carries them when
+    it is their text; a card answer keeps them on the 'you answered' row.
+    At the size limits: an 8000-char quote (quote.rs MAX_CHARS) and a
+    2000-line paste."""
+    def yous():
+        return [x["entry"] for x in typed(d, "entry") if x["agent"] == "main" and x["entry"]["kind"] == "you"]
+
+    def reads(text):
+        """main's model requests whose user text ends with `text` (the
+        fake provider logs its first 3000 chars and its last 300; bise's
+        notes may come before his words, never after)"""
+        tail = text[-250:]
+        return sum(1 for r in E.fake_requests() if r.get("agent") == "main" and tail in r.get("user_tail", "") + "\x00" + r.get("user", ""))
+
+    def model_read(text):
+        return reads(text) > 0
+
+    n = len(typed(d, "thread"))
+    d.send({"cmd": "subscribe", "project": project, "agent": "main"})
+    c.wait(lambda: len(typed(d, "thread")) > n, 20, "main's thread for parts")
+    big_quote = "\n".join(("q%d " % i) + "x" * 74 for i in range(100))[:8000]
+    big_paste = "\n".join("paste line %d" % i for i in range(1, 2001))
+    parts = [
+        {"kind": "quote", "from": "main", "text": big_quote},
+        {"kind": "text", "text": "parts one "},
+        {"kind": "paste", "n": 1, "text": big_paste},
+        {"kind": "text", "text": " end"},
+    ]
+    text = render(parts)
+    d.send({"cmd": "send", "project": project, "agent": "main", "text": "", "parts": parts, "mode": "now"})
+    c.wait(lambda: any(x.get("parts") == parts for x in yous()), 60, "his parts on his entry")
+    c.wait_idle("main", timeout=90)
+    e = [x for x in yous() if x.get("parts") == parts][-1]
+    check(e["text"] == text, "the entry's text is the parts' template: %r" % e["text"][:200])
+    check(model_read(text), "the model read the parts' template: %r" % [r.get("user_tail") for r in E.fake_requests() if r.get("agent") == "main"][-2:])
+    tr = [l.split("\t", 1)[1] for l in open(os.path.join(E.state, "agents", "main", "transcript.log")).read().splitlines() if "\t" in l]
+    check(any(l.startswith("sb you-parts : ") for l in tr), "the you-parts line is journaled")
+    # both shapes: the same message as text alone (an older client) reads
+    # back as the same parts, and the model reads the same bytes
+    parts2 = [{"kind": "quote", "from": "t1", "text": "le process"}, {"kind": "text", "text": "Son process prenait tout mon CPU!"}]
+    text2 = render(parts2)
+    d.send({"cmd": "send", "project": project, "agent": "main", "text": text2, "mode": "now"})
+    c.wait(lambda: any(x["text"] == text2 and x.get("parts") == parts2 for x in yous()), 60, "a text read back as its parts")
+    c.wait_idle("main", timeout=90)
+    n_reads = reads(text2)
+    check(n_reads > 0, "the text shape read: %r" % [r.get("user_tail") for r in E.fake_requests() if r.get("agent") == "main"][-2:])
+    d.send({"cmd": "send", "project": project, "agent": "main", "text": "", "parts": parts2, "mode": "now"})
+    c.wait(lambda: len([x for x in yous() if x.get("parts") == parts2]) >= 2, 60, "the same message as parts")
+    c.wait_idle("main", timeout=90)
+    try:
+        c.wait(lambda: reads(text2) > n_reads, 30, "both shapes: the model reads the same bytes")
+    except Exception:
+        check(False, "both shapes: %r" % [(r.get("user_tail"), r.get("user", "")[:300]) for r in E.fake_requests() if r.get("agent") == "main"][-3:])
+    # the terminal's path: a `slash` line that is the parts' text after
+    # its verb; a line that isn't is refused, and so is a kind this hub
+    # doesn't know (it would drop his words)
+    parts3 = [{"kind": "text", "text": "via slash "}, {"kind": "paste", "n": 2, "text": "a\nb"}]
+    d.send({"cmd": "slash", "project": project, "agent": "main", "line": "say " + render(parts3), "parts": parts3, "mode": "now"})
+    c.wait(lambda: any(x.get("parts") == parts3 for x in yous()), 60, "a slash line's parts")
+    c.wait_idle("main", timeout=90)
+    nerr = len(typed(d, "error"))
+    d.send({"cmd": "slash", "project": project, "agent": "main", "line": "say not the parts", "parts": parts3, "mode": "now", "cid": 71})
+    c.wait(lambda: len(typed(d, "error")) > nerr, 20, "a slash line that isn't its parts refused")
+    check(typed(d, "error")[-1].get("cid") == 71 and "parts" in typed(d, "error")[-1]["text"], "refused with its cid: %r" % typed(d, "error")[-1])
+    d.send({"cmd": "send", "project": project, "agent": "main", "text": "", "parts": [{"kind": "sticker", "id": 3}], "mode": "now", "cid": 72})
+    c.wait(lambda: len(typed(d, "error")) > nerr + 1, 20, "an unknown part refused")
+    check(typed(d, "error")[-1].get("cid") == 72 and "sticker" in typed(d, "error")[-1]["text"], "the unknown kind named: %r" % typed(d, "error")[-1])
+    check(not any("not the parts" in l for l in c.lines("main")), "nothing delivered on a refusal")
+    # his screenshot: a card answer with a quote of main
+    c.say('[[bash: sb send main --expect-reply "quel process ?"]]', focus="t3")
+    c.wait(lambda: any(l.startswith("sb msg-in : t3 m_") and "quel process" in l for l in c.lines("main")), 120, "t3 asks main (parts)")
+    c.wait_idle("main", "t3", timeout=120)
+    mid = [l.split()[4] for l in c.lines("main") if l.startswith("sb msg-in : t3 m_") and "quel process" in l][0]
+    c.say('[[bash: sb card --for %s "quel process ?"]]' % mid)
+    c.wait(lambda: any(x["kind"] == "question" for x in c.cards()), 60, "the parts card")
+    card = [x for x in c.cards() if x["kind"] == "question"][0]
+    c.wait_idle("main")
+    aparts = [{"kind": "quote", "from": "main", "text": "le process"}, {"kind": "text", "text": "Son process prenait tout mon CPU!"}]
+    d.send({"cmd": "answer", "project": project, "card": card["id"], "reply": "", "parts": aparts})
+    c.wait(lambda: not c.cards(), 30, "the parts card closed by the answer")
+    c.wait(lambda: any(x["entry"]["kind"] == "approval" and x["entry"].get("parts") == aparts for x in typed(d, "entry") if x["agent"] == "main"), 30, "the answer's row keeps its parts")
+    row = [x["entry"] for x in typed(d, "entry") if x["agent"] == "main" and x["entry"]["kind"] == "approval" and x["entry"].get("parts") == aparts][-1]
+    check("<selection" not in row["text"] + row["approval"].get("note", "") and "you answered t3" in row["text"], "no tag on the row: %r" % row)
+    c.wait_line("t3", "Son process prenait", 60)
+    c.wait_idle("t3", timeout=90)
+    t3tr = open(os.path.join(E.state, "agents", "t3", "transcript.log")).read()
+    check(render(aparts).replace("\n", "\\n") in t3tr or "le process" in t3tr, "t3 got his quote and words: %s" % t3tr[-600:])
+    d.send({"cmd": "unsubscribe", "project": project, "agent": "main"})
+
+
 def main():
     if not os.path.exists(EXE):
         sys.exit("build first: scripts/bins.sh")
@@ -420,9 +530,16 @@ def main():
         a = ans[-1]["approval"] if ans else {}
         check(ans and [i["path"] for i in a.get("images", [])] == [png],
               "main's row for his answer has the image apart: %r" % ans[-1:])
-        check("<image" not in json.dumps(mthread) and ".b64" not in json.dumps(mthread),
+        # msg-parts: the image's store path rides only in its typed part
+        # (architect m_17621 Q2: b64_file), never in the words
+        words = json.dumps([{k: v for k, v in x.items() if k != "parts"} for x in mthread])
+        check("<image" not in words and ".b64" not in words,
               "no image marker or store path in main's thread: %r" % [x for x in mthread if "<image" in json.dumps(x)][:2])
+        check(all(p["kind"] != "image" or p.get("b64_file", "").endswith(".b64") for x in mthread for p in x.get("parts", [])),
+              "an image part names its store file: %r" % [x.get("parts") for x in ans[-1:]])
         d.send({"cmd": "unsubscribe", "project": project, "agent": "main"})
+
+        parts_round(c, d, E, project, typed)
 
         # a tool row's detail (ambient-lead m_14200, architect m_14218/m_14228):
         # the row from the typed door d, its detail by JSON-RPC tool/output

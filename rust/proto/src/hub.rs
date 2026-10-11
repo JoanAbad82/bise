@@ -653,6 +653,11 @@ pub enum HubCmd {
         /// command is refused (a command never waits)
         #[serde(flatten)]
         opts: SendOpts,
+        /// his words' typed parts (msg-parts, as `Send.parts`): a line
+        /// that isn't a command takes `send`'s path with them (`line` is
+        /// then ignored); a command never has any
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        parts: Vec<Part>,
     },
     /// run scheduled task `id` now (the TUI's /scheduled `r`); an unknown
     /// or ended id is an `error`

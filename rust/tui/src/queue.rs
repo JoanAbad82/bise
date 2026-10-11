@@ -72,10 +72,12 @@ pub(crate) fn next_at(app: &mut App, now: std::time::Instant) -> Option<String> 
     let q = app.queued.remove(0);
     // expand with its own images; the composer keeps its own
     let mine = std::mem::replace(&mut app.attachments, q.attachments);
-    let text = crate::attach::expand(app, &q.text);
+    let said = crate::attach::expand(app, &q.text);
     app.attachments = mine;
     app.queue_out = Some(now);
-    Some(text)
+    // msg-parts: its parts go with the line the caller sends next
+    app.sb.parts_out = said.parts;
+    Some(said.text)
 }
 
 /// The queued message that went has its turn (it started or ended), or

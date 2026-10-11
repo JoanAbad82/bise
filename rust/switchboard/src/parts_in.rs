@@ -44,14 +44,24 @@ pub fn said(parts: &[Part], files: &[String], store: &Path) -> Result<Said, Stri
     Ok(Said { text, parts: json })
 }
 
-/// `file` is a `.b64` file directly inside `store` (no `..`, no link out
-/// by name).
+/// `file` is a `.b64` file directly inside `store` (no `..`), and stays
+/// there once its links are followed (architect m_17749: a `.b64` link in
+/// the store pointing outside is refused). A file that doesn't exist yet
+/// is judged by its name only (nothing to read).
 fn in_store(file: &str, store: &Path) -> bool {
     let p = Path::new(file);
-    p.is_absolute()
+    let named = p.is_absolute()
         && p.extension().is_some_and(|e| e == "b64")
         && p.components().all(|c| !matches!(c, Component::ParentDir))
-        && p.parent() == Some(store)
+        && p.parent() == Some(store);
+    if !named {
+        return false;
+    }
+    match (p.canonicalize(), store.canonicalize()) {
+        (Ok(real), Ok(dir)) => real.parent() == Some(dir.as_path()),
+        // a link that leads nowhere: refused; no such file: by its name
+        _ => std::fs::symlink_metadata(p).is_err(),
+    }
 }
 
 #[cfg(test)]
@@ -92,6 +102,30 @@ mod tests {
         for bad in ["/etc/passwd", "/h/images/../secrets/k.b64", "/h/images/sub/a.b64", "rel/a.b64", "/h/images/a.png", "/h/imagesx/a.b64"] {
             assert!(said(&[img(bad)], &[], store).is_err(), "{bad}");
         }
+    }
+
+    /// architect m_17749: a `.b64` link inside the store that points
+    /// outside is refused; a real file in the store passes.
+    #[cfg(unix)]
+    #[test]
+    fn a_link_out_of_the_store_is_refused() {
+        let root = std::env::temp_dir().join(format!("parts-in-{}", std::process::id()));
+        let store = root.join("images");
+        std::fs::create_dir_all(&store).unwrap();
+        let secret = root.join("secret.txt");
+        std::fs::write(&secret, "key").unwrap();
+        let real = store.join("ok.b64");
+        std::fs::write(&real, "aGk=").unwrap();
+        let link = store.join("evil.b64");
+        let _ = std::fs::remove_file(&link);
+        std::os::unix::fs::symlink(&secret, &link).unwrap();
+        let dangling = store.join("gone.b64");
+        let _ = std::fs::remove_file(&dangling);
+        std::os::unix::fs::symlink(root.join("nothing"), &dangling).unwrap();
+        assert!(said(&[img(real.to_str().unwrap())], &[], &store).is_ok());
+        assert!(said(&[img(link.to_str().unwrap())], &[], &store).is_err(), "a link out");
+        assert!(said(&[img(dangling.to_str().unwrap())], &[], &store).is_err(), "a dangling link");
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

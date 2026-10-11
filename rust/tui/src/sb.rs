@@ -219,6 +219,9 @@ pub(super) struct Sb {
     /// header's held `lands via PRs` (dev-flow §7).
     flow: String,
     cards: Vec<Card>,
+    /// msg-parts: the typed parts of the message the composer is sending
+    /// (`attach::expand`), taken by the next line that is their text
+    pub(super) parts_out: Vec<bise_proto::parts::Part>,
     /// dev-flow §5.1: the feature merge item asking `drop it?` once more
     /// (its `3 drop the branch` was picked), by card id.
     feature_drop_ask: Option<u64>,
@@ -552,7 +555,14 @@ impl Sb {
     fn send_input_to(&mut self, agent: &str, text: String) {
         // computer use: the hub resumes a stopped or paused agent before
         // his words reach it (Shell::resume_computer_use)
-        self.call("command/run", json!({"agent": agent, "line": text}), rpc::Then::Line);
+        // msg-parts: his parts ride with the line that is their text (the
+        // hub keeps them on his message; an older hub ignores them)
+        let parts = std::mem::take(&mut self.parts_out);
+        let mut params = json!({"agent": agent, "line": text});
+        if !parts.is_empty() && text.ends_with(&bise_proto::parts::render(&parts)) {
+            params["parts"] = json!(parts);
+        }
+        self.call("command/run", params, rpc::Then::Line);
     }
 }
 
@@ -1064,7 +1074,7 @@ pub(super) fn parse_hub_line(rest: &str) -> Option<Ev> {
 pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
     let msg = |from: String, to: String, text: String, level: u8, id: String| Ev::AgentMsg { from, to, text, level, id, open: false, fold: false };
     Some(match h {
-        Hub::You(text) => Ev::You(text, Mark::Sent, false, None),
+        Hub::You(text) => Ev::You(text.into(), Mark::Sent, false, None),
         // S9: the fn context of the 'you' line before it (the window's
         // thread shows it on his message; the TUI doesn't)
         Hub::Context(_) => return None,
@@ -1131,14 +1141,16 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
         // the sentences are bise_proto's (the hub's fold says the same)
         Hub::Approval { how, who, what, note } => {
             let (ok, text, note) = bise_proto::thread::words::approval(&how, &who, &what, &note);
-            Ev::Approval { ok, text, note, asked: String::new(), open: false }
+            Ev::Approval { ok, text, note, parts: Vec::new(), asked: String::new(), open: false }
         }
         Hub::CardClosed { id, res } => Ev::CardClosed { id, res },
         // an answer to an item: the box's fold line (BISE-305, designer:
-        // one sentence), `✓ you answered flow-prompts: oui`
+        // one sentence), `✓ you answered flow-prompts: oui`; its quotes,
+        // pastes and images as parts, never tags (msg-parts)
         Hub::Route { who, said, .. } => {
-            let (text, note) = cards::answered(&who, &said);
-            Ev::Approval { ok: true, text, note, asked: String::new(), open: false }
+            let said = crate::said::Said::from(said);
+            let (text, note) = cards::answered(&who, said.words().trim());
+            Ev::Approval { ok: true, text, note, parts: said.parts, asked: String::new(), open: false }
         }
         // pr-news (pr-design §4)
         Hub::Pr { state, number, url, text } => Ev::Pr { tone: pr_look(state).into(), number, url, text, url_row: false },

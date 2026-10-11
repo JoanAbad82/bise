@@ -25,6 +25,9 @@ const MAX_LIMIT: usize = 200;
 const LINES: usize = 600;
 /// A queued line that is a command (core.rs user_input's rule).
 const QUEUED_COMMAND: &str = "a command can't wait in the queue: send it now";
+/// A `slash` line whose parts aren't its words (msg-parts): what the
+/// model would read and what clients draw would differ.
+const PARTS_NOT_THE_LINE: &str = "this line isn't its parts' text: update bise";
 
 fn lines_of(raw: Vec<(usize, Option<u64>, String)>) -> Vec<Line> {
     raw.into_iter().map(|(pos, ts, l)| (pos as u64, ts.unwrap_or(0), l)).collect()
@@ -388,7 +391,22 @@ impl Shell {
             HubCmd::Follow { agent, on, .. } => self.step_typed(id, &tag, Input::Follow { client: Some(id), agent, on }),
             // a command: the router's parse; his words or an @route:
             // `send`'s path (architect m_13089 change 3)
-            HubCmd::Slash { agent, line, cid, opts, .. } => {
+            HubCmd::Slash { agent, line, cid, opts, parts, .. } => {
+                // msg-parts: the line is his parts' text after its verb
+                // (`say `, `steer `), so the model reads what it read
+                // before; a line that isn't refuses (never a command)
+                if !parts.is_empty() {
+                    let refused = cid.map(|_| "refused");
+                    return match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir()) {
+                        Ok(s) => match line.strip_suffix(s.text.as_str()) {
+                            Some("" | "say " | "steer ") if !line.trim_start().starts_with('/') => {
+                                self.proto_input(id, &tag, agent, line.clone(), opts, cid, s.parts)
+                            }
+                            _ => self.proto_error_cid(id, &tag, PARTS_NOT_THE_LINE, cid, refused),
+                        },
+                        Err(e) => self.proto_error_cid(id, &tag, &e, cid, refused),
+                    };
+                }
                 if !line.trim_start().starts_with('/') {
                     return self.proto_input(id, &tag, agent, line, opts, cid, String::new());
                 }

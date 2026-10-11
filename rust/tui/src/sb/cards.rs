@@ -866,6 +866,18 @@ fn step(app: &mut App, d: isize, wrap: bool) {
 /// (`✓ you answered perf: both`); the view moves on.
 /// `picked`: the short label of the option picked (on the line).
 fn answer(app: &mut App, id: u64, reply: &str, picked: Option<&str>) {
+    answer_with(app, id, &crate::said::Said { text: reply.to_string(), parts: Vec::new() }, picked);
+}
+
+/// [`answer`] with his typed words (msg-parts): the parts go to the hub
+/// with the text, and the fold line draws his quotes, pastes and images
+/// from them.
+fn answer_said(app: &mut App, id: u64, said: &crate::said::Said) {
+    answer_with(app, id, said, None);
+}
+
+fn answer_with(app: &mut App, id: u64, said: &crate::said::Said, picked: Option<&str>) {
+    let reply = said.text.as_str();
     // the TUI's own cards: answered here, their own result row
     if super::setup::is_local(id) {
         if super::setup::valid(app, id, reply) {
@@ -875,12 +887,18 @@ fn answer(app: &mut App, id: u64, reply: &str, picked: Option<&str>) {
         return;
     }
     let Some(c) = app.sb.card_by_id(id).cloned() else { return };
-    app.sb.call("card/answer", json!({"card": id, "reply": reply}), super::rpc::Then::Line);
+    let mut params = json!({"card": id, "reply": reply});
+    if !said.parts.is_empty() {
+        params["parts"] = json!(said.parts);
+    }
+    app.sb.call("card/answer", params, super::rpc::Then::Line);
     // the thread says the box's fold line (designer: one sentence); a
-    // gate's card folds with the hub's own (`✓ you allowed …`)
-    let fold = fold_of(&c, reply, picked);
+    // gate's card folds with the hub's own (`✓ you allowed …`); his
+    // words alone on it, his chips under it
+    let words = said.words();
+    let fold = fold_of(&c, words.trim(), picked);
     if c.kind != "confirm" {
-        let ev = Ev::Approval { ok: fold.ok, text: fold.text.clone(), note: fold.note.clone(), asked: fold.asked.clone(), open: false };
+        let ev = Ev::Approval { ok: fold.ok, text: fold.text.clone(), note: fold.note.clone(), parts: said.parts.clone(), asked: fold.asked.clone(), open: false };
         push_event(&mut app.events, &mut app.cache, ev);
         app.sb.card.folded.push((id, app.sb.focus.clone()));
     }
@@ -1058,10 +1076,12 @@ fn submit(app: &mut App) {
     // the chips go out whole, as a message to the thread would
     // (input.rs): a paste's text inline in its tag, an image's marker
     // with its saved path; a bare `[Paste #1]` reached the asker empty
-    let text = crate::attach::expand(app, &text);
+    // msg-parts: as typed parts (a deny's note keeps its text: its
+    // `deny: ` is the hub's word, not his)
+    let said = crate::attach::expand(app, &text);
     match enter {
-        Enter::Deny => answer(app, id, &format!("deny: {text}"), None),
-        _ => answer(app, id, &text, None),
+        Enter::Deny => answer(app, id, &format!("deny: {}", said.text), None),
+        _ => answer_said(app, id, &said),
     }
 }
 

@@ -630,7 +630,7 @@ pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>
             let m = lines::Mark::Failed { to: name.clone(), text: text.clone() };
             if !deliver(events, cache, &m) {
                 let t = format!("@{} {}", name, text);
-                push_event(events, cache, Ev::You(t, Mark::Failed, false, None));
+                push_event(events, cache, Ev::You(t.into(), Mark::Failed, false, None));
             }
         }
         // C3: a steering line moves the mark of your message (bise-proto's
@@ -933,7 +933,7 @@ pub(crate) fn discloses(ev: &Ev) -> bool {
         Ev::You(t, ..) => crate::render::you_folds(t),
         // an answer to an inbox item opens on its full question and
         // words (BISE-307)
-        Ev::Approval { text, note, asked, .. } => crate::render::answer_opens(text, note, asked),
+        Ev::Approval { text, note, parts, asked, .. } => crate::render::answer_opens(text, note, parts, asked),
         _ => false,
     }
 }

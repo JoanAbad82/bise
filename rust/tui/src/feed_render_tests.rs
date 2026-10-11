@@ -477,7 +477,7 @@ fn measure_feed() -> Vec<Ev> {
     let mut tool = tool;
     tool.opened = true;
     vec![
-        Ev::You(prose.clone(), Mark::Read, false, None),
+        Ev::You(prose.clone().into(), Mark::Read, false, None),
         Ev::Assistant(prose.clone()),
         Ev::AgentMsg { from: "docs".into(), to: "main".into(), text: prose.clone(), level: 3, id: String::new(), open: false, fold: false },
         Ev::Thinking { ms: 1200, text: prose.clone(), open: true },
@@ -1277,7 +1277,7 @@ fn marks(events: &[Ev]) -> Vec<(String, Mark)> {
     events
         .iter()
         .filter_map(|e| match e {
-            Ev::You(t, m, ..) => Some((t.clone(), *m)),
+            Ev::You(t, m, ..) => Some((t.text.clone(), *m)),
             _ => None,
         })
         .collect()
@@ -1438,7 +1438,7 @@ fn feed_line(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>>, l: &str) 
 }
 
 fn yours(events: &[Ev]) -> Vec<(String, Mark, Option<u64>)> {
-    events.iter().filter_map(|e| if let Ev::You(t, m, _, id) = e { Some((t.clone(), *m, *id)) } else { None }).collect()
+    events.iter().filter_map(|e| if let Ev::You(t, m, _, id) = e { Some((t.text.clone(), *m, *id)) } else { None }).collect()
 }
 
 const STEER_START: [&str; 5] = ["sb you : go", "sb you-id : m_1", "  obs: turn_started", "  obs: tool_started #1", "tool #1 bash : sleep 8"];
@@ -1864,7 +1864,7 @@ fn the_ascii_edits_fold() {
 #[test]
 fn a_long_message_of_yours_folds_to_twenty_rows_and_its_hint() {
     let text = (1..=30).map(|n| format!("line {n}")).collect::<Vec<_>>().join("\n");
-    let (mut events, mut cache) = arrive(vec![Ev::You(text, Mark::Read, false, None)]);
+    let (mut events, mut cache) = arrive(vec![Ev::You(text.into(), Mark::Read, false, None)]);
     let rows = cached_text(&events, &mut cache, 60);
     let body: Vec<&String> = rows.iter().filter(|r| !r.trim().is_empty()).collect();
     // 20 rows of text (BISE-262; 12 before, 8 at first), then the hint
@@ -1892,7 +1892,7 @@ fn a_line_cut_to_fit_counts_as_hidden() {
     lines.push("word ".repeat(30));
     lines.push("a".into());
     lines.push("b".into());
-    let (events, mut cache) = arrive(vec![Ev::You(lines.join("\n"), Mark::Read, false, None)]);
+    let (events, mut cache) = arrive(vec![Ev::You(lines.join("\n").into(), Mark::Read, false, None)]);
     let rows = cached_text(&events, &mut cache, 60);
     let body: Vec<&String> = rows.iter().filter(|r| !r.trim().is_empty()).collect();
     assert_eq!(body.len(), YOU_ROWS + 1, "{rows:#?}");
@@ -1903,7 +1903,7 @@ fn a_line_cut_to_fit_counts_as_hidden() {
 #[test]
 fn a_short_message_of_yours_stays_whole() {
     let text = (1..=20).map(|n| format!("line {n}")).collect::<Vec<_>>().join("\n");
-    let (events, mut cache) = arrive(vec![Ev::You(text, Mark::Read, false, None)]);
+    let (events, mut cache) = arrive(vec![Ev::You(text.into(), Mark::Read, false, None)]);
     let rows = cached_text(&events, &mut cache, 60);
     assert_eq!(rows.iter().filter(|r| r.starts_with("│  line")).count(), 20, "{rows:#?}");
     assert!(rows.iter().any(|r| r == "│  line 20 ✓✓") && !rows.iter().any(|r| r.contains("more line") || r.contains('▾')), "{rows:#?}");
@@ -1913,7 +1913,7 @@ fn a_short_message_of_yours_stays_whole() {
 #[test]
 fn a_click_on_the_hint_row_opens_just_that_message() {
     let long = (1..=24).map(|n| format!("line {n}")).collect::<Vec<_>>().join("\n");
-    let (mut events, mut cache) = arrive(vec![Ev::You(long.clone(), Mark::Read, false, None), Ev::You(long, Mark::Read, false, None)]);
+    let (mut events, mut cache) = arrive(vec![Ev::You(long.clone().into(), Mark::Read, false, None), Ev::You(long.into(), Mark::Read, false, None)]);
     let rows = cached_text(&events, &mut cache, 60);
     let n = cache[1].as_ref().unwrap().rows.len();
     assert!(rows.iter().filter(|r| r.contains("▸ 4 more lines")).count() == 2, "{rows:#?}");
@@ -1937,7 +1937,7 @@ fn a_click_on_the_hint_row_opens_just_that_message() {
 fn a_click_on_the_hint_opens_a_message_whose_image_sizes_wrap() {
     let shot = |n: u32| format!("<image name=\"[Image #{n}]\" path=\"/shots/Screenshot 2026-10-02 at 11.3{n}.59.png\" mime=\"image/png\" b64=\"/nowhere/{n}.b64\">");
     let long = (1..=24).map(|n| format!("{n}. {} line {n}", shot(n % 6))).collect::<Vec<_>>().join("\n");
-    let (mut events, mut cache) = arrive(vec![Ev::You(long, Mark::Read, false, None)]);
+    let (mut events, mut cache) = arrive(vec![Ev::You(long.into(), Mark::Read, false, None)]);
     let rows = cached_text(&events, &mut cache, 60);
     let n = cache[0].as_ref().unwrap().rows.len();
     let hint = rows.iter().position(|r| r.contains("▸") && r.contains("more lines")).expect("a hint row");
@@ -1969,7 +1969,7 @@ fn a_click_on_the_hint_opens_a_message_whose_image_sizes_wrap() {
 fn a_long_paste_in_your_message_is_a_chip_and_opens_like_a_fold() {
     let body: String = (1..=40).map(|n| format!("row {n}\n")).collect();
     let msg = format!("see {} ok", crate::pasted::tag(1, body.trim_end()));
-    let (mut events, mut cache) = arrive(vec![Ev::You(msg, Mark::Read, false, None)]);
+    let (mut events, mut cache) = arrive(vec![Ev::You(msg.into(), Mark::Read, false, None)]);
     assert!(crate::feed::discloses(&events[0]) && crate::feed::anything_closed(&events));
     let rows = cached_text(&events, &mut cache, 80);
     let mine: Vec<&String> = rows.iter().filter(|r| r.starts_with('│')).collect();

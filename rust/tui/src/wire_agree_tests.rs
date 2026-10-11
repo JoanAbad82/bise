@@ -38,7 +38,7 @@ fn tui_words(ls: &[&str]) -> Vec<(EntryKind, String, String)> {
         let failed = matches!(read(l), Rec::Obs(Obs::TurnDone(TurnEnd::Failed(_))));
         match parse_line(l) {
             Some(Ev::Err(t) | Ev::Warn(t)) if failed => out.push((EntryKind::TurnFailed, t, String::new())),
-            Some(Ev::You(t, ..)) => out.push((EntryKind::You, t, String::new())),
+            Some(Ev::You(t, ..)) => out.push((EntryKind::You, t.text, String::new())),
             Some(Ev::Assistant(t)) => {
                 // run.rs makes its thinking a section, its head the shared
                 // words (no time: these lines have none); the fold puts it
@@ -319,7 +319,7 @@ fn the_tui_and_the_fold_agree_on_his_messages_marks() {
             crate::feed::push_event(&mut events, &mut cache, ev);
         }
     }
-    let tui: Vec<(String, Option<Mark>, Option<u64>)> = events.iter().filter_map(|e| if let Ev::You(t, m, _, id) = e { Some((t.clone(), Some(*m), *id)) } else { None }).collect();
+    let tui: Vec<(String, Option<Mark>, Option<u64>)> = events.iter().filter_map(|e| if let Ev::You(t, m, _, id) = e { Some((t.text.clone(), Some(*m), *id)) } else { None }).collect();
     assert_eq!(tui, folded);
     assert_eq!(tui.iter().map(|y| y.1).collect::<Vec<_>>(), [Some(Mark::Read), Some(Mark::Read), Some(Mark::Received)], "{tui:?}");
 }

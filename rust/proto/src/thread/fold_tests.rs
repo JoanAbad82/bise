@@ -68,7 +68,11 @@ fn an_answer_with_pasted_files_is_its_words_images_and_files() {
     assert_eq!((r.text.as_str(), r.note.as_str()), ("you answered gift-ui: the cart page", ""));
     assert_eq!((r.images.len(), r.files.as_slice()), (1, ["/w/notes.md".to_string()].as_slice()));
     let json = serde_json::to_string(&e[2]).unwrap();
-    assert!(!json.contains("<image") && !json.contains("b64"), "{json}");
+    assert!(!json.contains("<image"), "{json}");
+    // msg-parts: its parts (read back once): his words, then the image
+    // as its part (the store's b64 path rides only there, never data)
+    assert!(!serde_json::to_string(r).unwrap().contains("b64"), "{json}");
+    assert!(matches!(e[2].parts.as_slice(), [crate::parts::Part::Text { .. }, crate::parts::Part::Image { .. }]), "{json}");
 }
 
 #[test]
@@ -1036,4 +1040,33 @@ fn his_parts_go_on_his_entry() {
     assert!(e[5].parts.is_empty(), "unreadable: nothing");
     // the text the model got stays the entry's text
     assert!(e[0].text.starts_with("<selection from=\"main\">"));
+}
+
+/// msg-parts (architect m_17749): an old journal's message of his (no
+/// parts line: before parts, or an older client) gets its parts read back
+/// from its text once, in the fold, so the TUI and the window draw the
+/// same chips: his message, his "you answered" row (his screenshot's
+/// case) and his message routed to another agent; a plain one stays
+/// drawn from its text (no parts).
+#[test]
+fn an_old_journals_messages_read_as_their_parts() {
+    use crate::parts::Part;
+    let none = |_: &str| None;
+    let ctx = ctx_with(&[], &none);
+    let l = |pos: u64, line: &str| (pos, pos, line.to_string());
+    let lines = vec![
+        l(1, "sb you : <selection from=\"main\">\\namb-core a été tué\\n</selection>\\nSon process prenait tout mon CPU!"),
+        l(2, "sb you : just words"),
+        l(3, "sb route : you → @main (answer to card #4) : <selection from=\"main\">\\nNouvel essai\\n</selection>\\nSon process"),
+        l(4, "sb route : you → @perf : look <pasted n=\"1\" lines=\"2\">\\na\\nb\\n</pasted> here"),
+    ];
+    let e = fold(&lines, &ctx);
+    let quote = |t: &str| Part::Quote { from: "main".into(), text: t.into(), file: String::new(), new: String::new(), old: String::new() };
+    let text = |t: &str| Part::Text { text: t.into() };
+    assert_eq!(e[0].parts, [quote("amb-core a été tué"), text("Son process prenait tout mon CPU!")]);
+    assert!(e[1].parts.is_empty(), "a plain message: its text");
+    assert_eq!(e[2].kind, EntryKind::Approval);
+    assert_eq!(e[2].parts, [quote("Nouvel essai"), text("Son process")]);
+    assert_eq!(e[3].kind, EntryKind::Notice, "a routed message stays the notice it was (the wire rule)");
+    assert_eq!(e[3].parts, [text("look "), Part::Paste { n: 1, text: "a\nb".into() }, text(" here")]);
 }

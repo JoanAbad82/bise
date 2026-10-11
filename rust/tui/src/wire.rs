@@ -111,7 +111,8 @@ pub(crate) enum Ev {
     // your message; the bool: opened whole (a long one folds, BISE-239);
     // its id (sb-core's `sb you-id` line right after it; None: a
     // transcript before 9633cd2a, or not yet read)
-    You(String, Mark, bool, Option<u64>),
+    // msg-parts: its text and typed parts (drawn from the parts)
+    You(crate::said::Said, Mark, bool, Option<u64>),
     // in memory only: the id of your message right before it (`sb you-id
     // : m_N`); push_event sets it on that message, never appended
     YouId(u64),
@@ -121,7 +122,9 @@ pub(crate) enum Ev {
     // the box's own fold): allowed or not, the sentence, the user's own
     // words under it (a typed answer, a no's note), what the item asked,
     // opened (BISE-307: the full question and the whole answer)
-    Approval { ok: bool, text: String, note: String, asked: String, open: bool },
+    // `parts`: his answer's typed parts (msg-parts): its quotes, pastes
+    // and images drawn under the sentence; `note` then his words alone
+    Approval { ok: bool, text: String, note: String, parts: Vec<bise_proto::parts::Part>, asked: String, open: bool },
     Assistant(String),
     // the model's reasoning for the message that follows: rendered
     // collapsed as "thought for Ns"; ctrl+o expands every section, a
@@ -381,7 +384,7 @@ fn rec_ev(rec: Rec) -> Option<Ev> {
         // BR-003: right after an interrupt, an info; else an error
         Rec::Rejected(r) => notice_ev(words::rejected(&r)),
         // a replayed message was committed: the model read it
-        Rec::HistYou(t) => Ev::You(t, Mark::Read, false, None),
+        Rec::HistYou(t) => Ev::You(t.into(), Mark::Read, false, None),
         // steering the Core committed: your message with this text was
         // read; none (a notification): the old info line
         Rec::Injected(text) => {
