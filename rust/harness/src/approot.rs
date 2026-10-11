@@ -4,7 +4,10 @@
 //! repo must not pick the repo's REPL.
 //!
 //! In order:
-//!   1. `BISE_APP_ROOT` (run.sh, a hub started by a TUI, a version switch);
+//!   1. `BISE_APP_ROOT` (run.sh, a hub started by a TUI, a version switch;
+//!      a version's `bise.app/Contents/MacOS` counts as the version dir:
+//!      what a TUI of before the bundle layout hands over when it follows
+//!      a bundle hub, v2026.10.2-30's);
 //!   2. the executable's folder when it holds `VERSION` (a version dir, an
 //!      installed bundle);
 //!   3. dev only: a source tree (it holds `rust/Cargo.toml` and the REPL):
@@ -75,7 +78,10 @@ pub(crate) fn find(
     has: &dyn Fn(&Path, &str) -> bool,
 ) -> Result<(PathBuf, Via), String> {
     if let Some(r) = &inp.env_root {
-        let r = std::path::absolute(r).unwrap_or_else(|_| r.clone());
+        // a version's bundle folder counts as the version dir: an older
+        // TUI (before bise_home::exe_home_dir) that follows a bundle
+        // hub's exe hands over <root>/bise.app/Contents/MacOS
+        let r = bise_home::exe_home_dir(&std::path::absolute(r).unwrap_or_else(|_| r.clone()));
         return if has(&r, repl) {
             Ok((r, Via::Env))
         } else {
@@ -150,6 +156,26 @@ mod tests {
         assert_eq!(find(&inp(Some("/r"), "/v/bise", None), "repl-live", &has), Ok(("/r".into(), Via::Env)));
         let err = find(&inp(Some("/x"), "/v/bise", None), "repl-live", &has).unwrap_err();
         assert!(err.contains("BISE_APP_ROOT=/x has no repl-live"), "{err}");
+    }
+
+    #[test]
+    fn an_env_root_in_a_version_bundle_is_the_version_dir() {
+        // v2026.10.2-30's TUI follows a bundle hub's exe and sets
+        // BISE_APP_ROOT to the exe's folder (its of_exe knows no bundle)
+        let d = std::env::temp_dir().join(format!("approot-bundle-{}", std::process::id()));
+        let v = d.join("v1");
+        let macos = v.join("bise.app/Contents/MacOS");
+        std::fs::create_dir_all(&macos).unwrap();
+        std::fs::write(v.join("VERSION"), "id=v1\n").unwrap();
+        std::fs::write(v.join("repl-live"), "").unwrap();
+        let real = |d: &Path, f: &str| d.join(f).exists();
+        let got = find(&inp(Some(macos.to_str().unwrap()), "/elsewhere/bise", None), "repl-live", &real);
+        assert_eq!(got, Ok((v.clone(), Via::Env)));
+        // any other folder without the REPL stays an error
+        let other = v.join("bise.app/Contents");
+        let err = find(&inp(Some(other.to_str().unwrap()), "/elsewhere/bise", None), "repl-live", &real).unwrap_err();
+        assert!(err.contains("has no repl-live"), "{err}");
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]
