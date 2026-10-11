@@ -50,7 +50,8 @@
 /* the thread's signed one-line looks as ds variants (designer m_18626): the landed sha / PR # (Act
    ref), the '→ perf' handoff (Route handoff), the scheduled head, the brief line, the card line */
 .b-act.ref{margin:0 -2px;color:var(--c-text);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
-.b-act.ref:hover,.b-act.ref.is-hover{color:var(--c-text);text-decoration:underline;text-decoration-thickness:2px}
+/* hover: the same 1 px underline as at rest, the words in ink (designer m_18804) */
+.b-act.ref:hover,.b-act.ref.is-hover{color:var(--c-text);text-decoration:underline}
 .b-route.handoff{display:block;margin:0;padding:2px 0;border:0;border-radius:0;background:none;box-shadow:none;color:var(--c-text);font:var(--t-13) var(--font-ui);text-align:left;cursor:pointer}
 .b-route.handoff .p2{font-size:inherit;white-space:normal}
 .b-route.handoff:hover .p2,.b-route.handoff.is-hover .p2{color:var(--c-text)}

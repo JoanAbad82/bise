@@ -1,6 +1,6 @@
 // thread/answer-images · R36 (ambient-lead m_14252 / m_14267; amb-feed's 037c83ca: Answered and
 // ApprovalFold carry images: ImageRef {name, path} apart from his words). On the REAL thread screen
-// (FakeCore): his answer to gift-ui's card with a pasted image reads 'you answered gift-ui' and his
+// (FakeCore; his images ride in Entry.parts since msg-parts sha d, a4babf54): his answer to gift-ui's card with a pasted image reads 'you answered gift-ui' and his
 // words, then the window's one image chip ('[Image #1]' with its 16 px thumbnail drawn from his
 // source path, accent on accent-soft); an answer bise gave for him ('answered … for you') shows its
 // chip the same way. Never the hub's marker ('<image', 'b64'), never a path in the row's text.
@@ -42,12 +42,12 @@ const world = () => [
     agent: 'main',
     entries: [
       { pos: 1, at_ms: NOW - 5 * MIN, kind: 'agent', text: 'gift-ui asks: show the balance on the cart page, or only at checkout?' },
-      { pos: 2, at_ms: NOW - 4 * MIN, kind: 'approval', text: 'you answered gift-ui', approval: { ok: true, text: 'you answered gift-ui', note: 'the balance on the cart page', images: [{ name: SHA, path: PNG }] } },
+      { pos: 2, at_ms: NOW - 4 * MIN, kind: 'approval', text: 'you answered gift-ui', approval: { ok: true, text: 'you answered gift-ui', note: 'the balance on the cart page' }, parts: [{ kind: 'text', text: 'the balance on the cart page' }, { kind: 'image', name: SHA, source: PNG }] },
       { pos: 3, at_ms: NOW - 3 * MIN, kind: 'answered', text: 'answered gift-ui for you', answered: { agent: 'gift-ui', question: 'which colour for the badge?', answer: 'the green one', why: 'he showed it', images: [{ name: SHA, path: PNG }] } },
       // his answer to main's OWN card, as the hub still sends it: a raw line from 'switchboard' (designer m_15195)
       { pos: 4, at_ms: NOW - 2 * MIN, kind: 'from_agent', from: 'switchboard', text: 'the user answered card #1 ("merge checkout into main? (2 files, tests pass) 1. merge 2. not yet"): "[Image #1] this one"' },
       // the same answer as a newer hub sends it (amb-feed c02ad231): ONE typed approval row, the raw line gone
-      { pos: 5, at_ms: NOW - 1 * MIN, kind: 'approval', text: 'you answered main: [Image #1] this one', approval: { ok: true, text: 'you answered main: [Image #1] this one', images: [{ name: SHA, path: PNG }] } },
+      { pos: 5, at_ms: NOW - 1 * MIN, kind: 'approval', text: 'you answered main: [Image #1] this one', approval: { ok: true, text: 'you answered main: [Image #1] this one' }, parts: [{ kind: 'image', name: SHA, source: PNG }, { kind: 'text', text: 'this one' }] },
     ],
     before: null,
     more: false,

@@ -227,6 +227,9 @@ describe('his answer to a card, on his side', () => {
     expect(approvalParts('you answered main: this one')).toEqual({ head: 'you answered main', words: 'this one' });
     expect(approvalParts('you answered gift-ui')).toEqual({ head: 'you answered gift-ui', words: '' });
     expect(approvalParts('you answered perf: 1 · merge')).toEqual({ head: 'you answered perf', words: '1 · merge' });
+    // a decision's tail is what he decided on, not his words: the head keeps it word for word (lead m_18803)
+    expect(approvalParts('you said no to perf: rm -rf target')).toEqual({ head: 'you said no to perf: rm -rf target', words: '' });
+    expect(approvalParts('you allowed perf: cargo test')).toEqual({ head: 'you allowed perf: cargo test', words: '' });
   });
 });
 

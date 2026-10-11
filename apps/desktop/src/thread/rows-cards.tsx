@@ -135,10 +135,12 @@ function AnsweredHead({ ok, children }: { ok: boolean | null | undefined; childr
 
 /**
  * The hub's approval text split into its head and his words: 'you answered main: this one' ->
- * head 'you answered main', words 'this one'; a text with no words is all head. Pure.
+ * head 'you answered main', words 'this one'; a text with no words is all head, and so is a
+ * decision ('you said no to perf: rm -rf target': its tail is what he decided on, not his words;
+ * his note goes in the bubble), word for word as the TUI says it (lead m_18803). Pure.
  */
 export function approvalParts(text: string): { head: string; words: string } {
-  const m = /^(you (?:answered|said no to|allowed|denied) [^:]+?):\s*([\s\S]+)$/u.exec(text.trim());
+  const m = /^(you answered [^:]+?):\s*([\s\S]+)$/u.exec(text.trim());
   if (m === null) return { head: text.trim(), words: '' };
   return { head: (m[1] ?? '').trim(), words: (m[2] ?? '').trim() };
 }
