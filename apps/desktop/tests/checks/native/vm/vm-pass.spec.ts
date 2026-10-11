@@ -23,6 +23,11 @@ const KIT = process.env['QA_KIT'] ?? '';
 const APP_DIR = process.env['QA_APP_ZIP_DIR'] ?? '';
 const FIXTURES = path.resolve(__dirname, '../../../../../../rust/proto/fixtures');
 const Q = '/Users/admin/bise-qa';
+/** the packed app's name and bundle id: the release's by default; a merge candidate's try build is
+ *  'bise try' / dev.bise.desktop.try (QA_APP_NAME, QA_APP_ID) */
+const NAME = process.env['QA_APP_NAME'] ?? 'bise';
+const ID = process.env['QA_APP_ID'] ?? 'dev.bise.desktop';
+const APP = `/Applications/${NAME}.app`;
 const SHARED = '/Volumes/My Shared Files';
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -44,7 +49,7 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
   const sh = async (cmd: string, aqua = false): Promise<string> => (await vm.exec(['/bin/sh', '-c', cmd], { aqua })).stdout;
   const qa = async (...a: string[]): Promise<string> => (await vm.exec([`${Q}/biseqa`, ...a], { aqua: true })).stdout;
   const front = async (): Promise<string> => (JSON.parse((await qa('front')).trim() || '{}') as { bundle?: string }).bundle ?? '';
-  const wins = async (): Promise<Win[]> => JSON.parse((await qa('windows', 'bise')).trim() || '[]') as Win[];
+  const wins = async (): Promise<Win[]> => JSON.parse((await qa('windows', NAME)).trim() || '[]') as Win[];
   /** a frame from the guest's screen, saved, and the text Vision reads in it (pixels) */
   const frame = async (name: string): Promise<{ file: string; text: Text[] }> => {
     const file = path.join(out, `${String(++n).padStart(2, '0')}-${name}.png`);
@@ -66,12 +71,12 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
     // written to TCC.db: SIP is off in this image), then bise opened by LaunchServices as he would
     const setup = await sh(
       [
-        `rm -rf ${Q} /Applications/bise.app`,
+        `rm -rf ${Q} "${APP}"`,
         `ditto "${SHARED}/qa" ${Q}`,
         `sudo ditto -x -k "${SHARED}/app/bise.zip" /Applications`,
         `printf 'note\\n' > ${Q}/note.txt`,
         ...['kTCCServiceAccessibility', 'kTCCServiceListenEvent', 'kTCCServiceScreenCapture', 'kTCCServicePostEvent'].flatMap((svc) => [
-          `sudo sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "insert or replace into access (service,client,client_type,auth_value,auth_reason,auth_version,indirect_object_identifier,flags,last_modified) values ('${svc}','dev.bise.desktop',0,2,4,1,'UNUSED',0,strftime('%s','now'))"`,
+          `sudo sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "insert or replace into access (service,client,client_type,auth_value,auth_reason,auth_version,indirect_object_identifier,flags,last_modified) values ('${svc}','${ID}',0,2,4,1,'UNUSED',0,strftime('%s','now'))"`,
           `sudo sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "insert or replace into access (service,client,client_type,auth_value,auth_reason,auth_version,indirect_object_identifier,flags,last_modified) values ('${svc}','${Q}/biseqa',1,2,4,1,'UNUSED',0,strftime('%s','now'))"`,
         ]),
         'sudo killall tccd 2>/dev/null; true',
@@ -82,12 +87,12 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
     const scr = JSON.parse((await qa('screen')).trim()) as { w: number; h: number };
     scale = PNG.sync.read(await vm.vnc.shot()).width / scr.w;
 
-    await sh(`open -a /Applications/bise.app --stdout ${Q}/main.out --stderr ${Q}/main.err`, true);
+    await sh(`open -a "${APP}" --stdout ${Q}/main.out --stderr ${Q}/main.err`, true);
     await sleep(9000);
     const launch = await frame('launch');
     const helperPid = (await sh('pgrep -x bise-mac-helper')).trim().split('\n')[0] ?? '';
     const proc = helperPid === '' ? '' : await sh(`sudo launchctl procinfo ${helperPid} 2>/dev/null | grep -i responsible`);
-    row({ row: 'TCC: macOS charges the helper to bise.app', pass: /bise\.app/.test(proc), saw: proc.trim() || `no helper (pid '${helperPid}')`, frame: launch.file });
+    row({ row: 'TCC: macOS charges the helper to bise.app', pass: proc.includes(`${NAME}.app`), saw: proc.trim() || `no helper (pid '${helperPid}')`, frame: launch.file });
     row({ row: 'the helper is trusted through the app (its fn tap runs)', pass: !/tap failed|not trusted|no tap/i.test(await sh(`cat ${Q}/main.err`)), saw: (await sh(`grep -i -E 'helper|tap|trust' ${Q}/main.err | tail -5`)).trim() });
 
     // the menu bar's pearl (tray): macOS 26 draws status items in Control Center's windows, so it is
@@ -116,7 +121,7 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
     }
 
     // the keys, for real, in the window
-    await sh('open -a /Applications/bise.app', true);
+    await sh(`open -a "${APP}"`, true);
     await sleep(1500);
     for (const [key, re, what] of [
       ['Meta+,', /general|appearance|settings/i, '⌘, opens settings'],
@@ -224,7 +229,7 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
     await sleep(2500);
 
     // fn fn with bise's window in front: voice mode on the agent in view, never the capsule (dba197c7)
-    await sh('open -a /Applications/bise.app', true);
+    await sh(`open -a "${APP}"`, true);
     await sleep(2000);
     const fb = await front();
     const b3 = (await coreCmds()).length;
@@ -235,7 +240,7 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
     const capVoice = capsule(await wins());
     row({
       row: "fn fn with bise's window in front: voice mode on the agent in view, no capsule talk",
-      pass: fb === 'dev.bise.desktop' && afterVoice.includes('voice_mode') && !afterVoice.includes('talk_start') && capVoice === undefined,
+      pass: fb === ID && afterVoice.includes('voice_mode') && !afterVoice.includes('talk_start') && capVoice === undefined,
       saw: `front ${fb}; core ${afterVoice.join(',')}; capsule ${JSON.stringify(capVoice)}`,
       frame: vf.file,
     });
@@ -301,11 +306,11 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
     row({ row: 'glass: what is behind the capsule shows through (vibrancy)', pass: glass.length === 2 && Math.abs((glass[1] ?? 0) - (glass[0] ?? 0)) > 20, saw: `mean glass level over black ${String(glass[0])}, over white ${String(glass[1])}` });
 
     // ⌘Q for real: bise and its helper end
-    await sh('open -a /Applications/bise.app', true);
+    await sh(`open -a "${APP}"`, true);
     await sleep(1500);
     await vm.vnc.keys('Meta+q');
     await sleep(3000);
-    const left = (await sh('pgrep -x bise; pgrep -x bise-mac-helper')).trim();
+    const left = (await sh(`pgrep -x "${NAME}"; pgrep -x bise-mac-helper`)).trim();
     row({ row: 'keys: ⌘Q quits bise and its helper', pass: left === '', saw: left === '' ? 'both gone' : `still running: ${left}` });
   } finally {
     writeFileSync(path.join(out, 'tally.json'), JSON.stringify(tally, null, 2));
