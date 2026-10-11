@@ -1,7 +1,7 @@
 // The agent view's head words (designer's desktop-screens v6, (1) and (3)): the state chip, the
 // role line, the branch line, the composer's label and placeholder. Pure: AgentHead.tsx draws
 // them. The words are the TUI's. Owner: amb-home.
-import type { Agent } from '@/proto';
+import type { Agent, EntryKind } from '@/proto';
 import { ago, shortAge, shownName } from '@/agents/model';
 import { waitingFor, waitsEvent } from './wake';
 
@@ -12,6 +12,16 @@ export interface StateChip {
   readonly needs: boolean;
   /** working: its ∿ breathes */
   readonly live: boolean;
+}
+
+/**
+ * A thread with nothing of the agent's own yet (designer's v6 (5), m_18624): no entry, or only
+ * the message that started it (his, or the brief another agent sent). An agent whose one entry
+ * is its own words is working, not starting. Pure: the kinds of the thread's entries, in order.
+ */
+export function nothingOwnYet(kinds: readonly (EntryKind | undefined)[]): boolean {
+  if (kinds.length === 0) return true;
+  return kinds.length === 1 && (kinds[0] === 'you' || kinds[0] === 'from_agent');
 }
 
 /** A working agent under this long is still starting (its first turn, its folder). */

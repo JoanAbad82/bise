@@ -121,6 +121,17 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
     look();
   };
 
+  const scanHead = (
+    <span className="settings-add-scan" data-testid="settings.add.scan" data-state={said.kind}>
+      <span className={said.kind === 'failed' ? 'err' : undefined}>{said.text}</span>
+      {said.kind === 'failed' && (
+        <Act onClick={again} testId="settings.add.rescan">
+          look again
+        </Act>
+      )}
+    </span>
+  );
+
   return (
     <Sheet
       open
@@ -169,17 +180,14 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
           </Button>
         )}
       </div>
+      {list.length === 0 ? (
+        // no rows yet (looking, nothing new, or failed): the head alone, never an empty group's bare line (designer m_19020)
+        <div className="b-gt" data-testid="settings.add.found">
+          {scanHead}
+        </div>
+      ) : (
       <Group
-        title={
-          <span className="settings-add-scan" data-testid="settings.add.scan" data-state={said.kind}>
-            <span className={said.kind === 'failed' ? 'err' : undefined}>{said.text}</span>
-            {said.kind === 'failed' && (
-              <Act onClick={again} testId="settings.add.rescan">
-                look again
-              </Act>
-            )}
-          </span>
-        }
+        title={scanHead}
         testId="settings.add.found"
         items={list.map((f) => ({
           id: f.path,
@@ -197,6 +205,7 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
           ),
         }))}
       />
+      )}
       <div className="settings-add-opts">
         <Group
           testId="settings.add.opts"

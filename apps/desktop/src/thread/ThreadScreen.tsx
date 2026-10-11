@@ -33,7 +33,7 @@ import { InboxBlock, type Answering } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
-import { composerWords, dividerEnd, emptyEnter, emptyEnterAct, usageLine } from './head';
+import { composerWords, dividerEnd, emptyEnter, emptyEnterAct, nothingOwnYet, usageLine } from './head';
 import { waitAge, waitSince, waitsEvent } from './wake';
 import { useNow } from '@/app/clock';
 import { SignInLine, useThreadSignIn } from './signin';
@@ -321,7 +321,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   const writing = usePartialText(project, agent) !== null;
   const [wrote, setWrote] = useState<string | null>(null);
   if (writing && wrote !== tkey) setWrote(tkey);
-  const fresh = !bise && agent !== MAIN && me !== undefined && !me.archived && order.loaded && order.order.length <= 1 && me.status === 'working' && me.waits === 0 && !writing && wrote !== tkey;
+  const fresh = !bise && agent !== MAIN && me !== undefined && !me.archived && order.loaded && nothingOwnYet(order.order.map((pos) => store.entry(tkey, pos)?.kind)) && me.status === 'working' && me.waits === 0 && !writing && wrote !== tkey;
   // designer's desktop-screens v6 (1): '⋯' at the head's right (rename, model, reasoning)
   const more =
     me && !me.archived && !bise ? (

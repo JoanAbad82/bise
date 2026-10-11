@@ -68,6 +68,9 @@ test('settings/projects-add: he picks a folder with no terminal, it becomes a pr
     const scan = page.getByTestId('settings.add.scan');
     await expect(scan).toHaveAttribute('data-state', 'looking');
     await expect(scan).toContainText('looking in your folders');
+    // designer m_19020: no rows yet, so the head alone, never an empty group's bare line
+    await expect(page.getByTestId('settings.add.found').locator('.b-group')).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath('add-sheet-looking.png') });
     await core.send(FOUND as never);
     await expect(scan).toHaveText('found in your folders · 2');
     await expect(page.getByTestId('settings.add.found')).toContainText('/nowhere/code/blog · git · today');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { biseChip, branchLine, composerWords, dropsFor, dividerEnd, emptyEnter, emptyEnterAct, roleOf, stateChip, STARTING_MS, usageLine } from './head';
+import { biseChip, branchLine, composerWords, dropsFor, dividerEnd, emptyEnter, emptyEnterAct, nothingOwnYet, roleOf, stateChip, STARTING_MS, usageLine } from './head';
 
 const NOW = 1_791_100_000_000;
 const MIN = 60_000;
@@ -100,5 +100,20 @@ describe("the head's fit (designer m_17194: a meta item whole or not at all)", (
     // no context note or branch: nothing to drop
     expect(dropsFor({ ...base, usage: 0, branch: 0, avail: 300 })).toBe(2);
     expect(dropsFor({ ...base, usage: 0, avail: 480 })).toBe(0);
+  });
+});
+
+describe("'starting' = nothing of its own yet (designer m_18624, amb-home m_18628)", () => {
+  it('no entry, or only his message or the brief that started it, is starting', () => {
+    expect(nothingOwnYet([])).toBe(true);
+    expect(nothingOwnYet(['you'])).toBe(true);
+    expect(nothingOwnYet(['from_agent'])).toBe(true);
+  });
+  it("one entry of the agent's own (perf in sidebar-v6, 14 min in) is working, not starting", () => {
+    expect(nothingOwnYet(['agent'])).toBe(false);
+    expect(nothingOwnYet(['tools'])).toBe(false);
+    expect(nothingOwnYet([undefined])).toBe(false);
+    expect(nothingOwnYet(['you', 'agent'])).toBe(false);
+    expect(nothingOwnYet(['from_agent', 'you'])).toBe(false);
   });
 });
