@@ -96,6 +96,13 @@ if (mode === 'first') {
   }, 120000) : null;
   await shot('scan');
   step('the scan answers with its count', !!ft, (ft ?? (await text('[data-testid="settings.add"]')) ?? '').slice(0, 800));
+  // designer's final sign (ambient-lead m_19035): the sheet open after the scan answered, light
+  if (ft) {
+    await page.emulateMedia({ colorScheme: 'light' }).catch(() => {});
+    await page.waitForTimeout(400);
+    await shot('add-sheet-light');
+    await page.emulateMedia({ colorScheme: null }).catch(() => {});
+  }
   // one found repo, then add
   const rows = page.locator('[data-testid^="settings.add.found."]');
   const count = await rows.count().catch(() => 0);
