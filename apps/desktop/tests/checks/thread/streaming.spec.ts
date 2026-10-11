@@ -1,5 +1,5 @@
 // thread/streaming · ambient's text-appearing v2 (designer signed), lead m_12371, amb-core's partial
-// draft (m_12357). Passes when a reply streamed as partials (the whole text so far, every 250 ms)
+// draft (m_12357). Passes when a reply streamed as partials (R40: the new text at its offset)
 // grows in place in perf's thread: no raw ** or backtick in any frame, a word / a code line / a
 // table row only once whole, text already shown never moves inside the row, the working sign rides
 // after the last word, and the final entry takes the live row's place as the same element (no
@@ -60,7 +60,15 @@ const cuts = (s: string): number[] => {
   const at = (needle: string, plus = 0) => s.indexOf(needle) + plus;
   return [at('cold', 2), at('**4.1', 4), at('`load', 4), at('once in the', 4), at('- keep', 4), at('fn load_all', 8), at('    ix.rows', 9), at('| run', 10), at('|---|---|---|', 13), at('| cold', 8), at('| warm', 20), at('That', 4), s.length];
 };
-const say = (core: FakeCore, text: string) => core.send({ ev: 'partial', project: P, agent: 'perf', call: '48.1', text } as never);
+// sent as the hub sends since R40 (main 35509c3b): only the new text at `off`, in UTF-16 units
+// (a JS string's length); off 0 starts again, '' at 0 clears
+const sent = new WeakMap<FakeCore, string>();
+const say = (core: FakeCore, text: string) => {
+  const prev = sent.get(core) ?? '';
+  sent.set(core, text);
+  const off = text !== '' && text.startsWith(prev) ? prev.length : 0;
+  return core.send({ ev: 'partial', project: P, agent: 'perf', call: '48.1', off, text: text.slice(off) } as never);
+};
 
 async function liveText(page: Page): Promise<string> {
   return page

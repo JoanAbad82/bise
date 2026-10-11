@@ -1,5 +1,6 @@
-// The streaming draft's reader (amb-core m_12358's fixtures): whole text, replace, a new call
-// replaces, '' clears at once, at most one update per 250 ms.
+// The streaming draft's reader (amb-core m_12358's fixtures): whole text (no off: an older hub),
+// replace, a new call replaces, '' clears at once, at most one update per 250 ms; R40's deltas
+// (text at off, UTF-16 units, the cases of bise-proto's LiveText law).
 import { describe, expect, it } from 'vitest';
 import { PARTIAL_EVERY_MS, followPartial, partialOf, type LivePartial } from './partial';
 
@@ -22,6 +23,39 @@ describe('partialOf', () => {
     expect(partialOf(a, ev(B, '48.1', 'search'), P, 'perf', 900)).toBeUndefined();
     expect(partialOf(a, ev(B, '48.1', 'perf', 'other'), P, 'perf', 900)).toBeUndefined();
     expect(partialOf(a, { ev: 'typing', project: P, agent: 'perf', text: 'x' }, P, 'perf', 900)).toBeUndefined();
+  });
+});
+
+describe('partialOf deltas (R40: text at off, UTF-16 units)', () => {
+  const d = (off: number, text: string, call = '48.1'): Record<string, unknown> => ({ ev: 'partial', project: P, agent: 'perf', call, off, text });
+  const fold = (evs: Record<string, unknown>[]): LivePartial | null => evs.reduce<LivePartial | null>((p, e) => partialOf(p, e, P, 'perf', 7) ?? p, null);
+
+  it('appends at the end, and a delta that comes twice changes nothing', () => {
+    const at = A.length;
+    expect(fold([d(0, A), d(at, B.slice(at))])?.text).toBe(B);
+    expect(fold([d(0, A), d(at, B.slice(at)), d(at, B.slice(at))])?.text).toBe(B);
+  });
+  it('an off inside the text rewrites from there; off 0 starts again; "" at 0 clears', () => {
+    expect(fold([d(0, 'The cold bench'), d(4, 'warm bench')])?.text).toBe('The warm bench');
+    expect(fold([d(0, A), d(0, 'Then')])?.text).toBe('Then');
+    expect(partialOf(fold([d(0, A)]), d(0, ''), P, 'perf', 9)).toBeNull();
+  });
+  it('counts UTF-16 units: an emoji before the cut is two', () => {
+    // 'a😀b' is 4 units: off 4 appends after b, off 3 rewrites after the emoji
+    expect(fold([d(0, 'a😀b'), d(4, 'c')])?.text).toBe('a😀bc');
+    expect(fold([d(0, 'a😀b'), d(3, 'x')])?.text).toBe('a😀x');
+    expect(fold([d(0, '日😀'), d(3, '!')])?.text).toBe('日😀!');
+  });
+  it('a gap clears until the next off 0: past the end, inside a surrogate pair, another call', () => {
+    expect(partialOf(fold([d(0, 'abc')]), d(5, 'x'), P, 'perf', 9)).toBeNull();
+    expect(partialOf(fold([d(0, 'a😀b')]), d(2, 'x'), P, 'perf', 9)).toBeNull();
+    expect(partialOf(fold([d(0, 'abc')]), d(3, 'x', '48.2'), P, 'perf', 9)).toBeNull();
+    expect(partialOf(null, d(3, 'x'), P, 'perf', 9)).toBeNull();
+    expect(fold([d(0, 'abc'), d(5, 'x'), d(3, 'd'), d(0, 'again')])?.text).toBe('again');
+  });
+  it('a bad off is not ours', () => {
+    expect(partialOf(null, d(-1, 'x'), P, 'perf', 9)).toBeUndefined();
+    expect(partialOf(null, d(1.5, 'x'), P, 'perf', 9)).toBeUndefined();
   });
 });
 

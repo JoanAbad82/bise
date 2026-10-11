@@ -614,6 +614,10 @@ button.th-sched-head {
 .th-unknown {
   color: var(--c-text-2);
 }
+/* R40: a reply cut off mid-stream, kept dim at its place (its code and links too) */
+.th-cut {
+  opacity: 0.55;
+}
 .th-notdelivered {
   outline: none;
 }

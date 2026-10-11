@@ -274,6 +274,17 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
     expect(rowOf(store, 40).getByTestId('thread.unknown.40').textContent).toBe('from a newer hub');
   });
 
+  it('a reply cut off mid-stream (R40 Entry.cut) stays as he read it, dim; a whole reply is not dim', () => {
+    const store = new Store(null);
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 50, at_ms: 1, kind: 'agent', text: 'the warm run reads the ca', cut: true } });
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 51, at_ms: 2, kind: 'agent', text: 'the warm run reads the cache.' } });
+    const cut = rowOf(store, 50).getByTestId('thread.cut.50');
+    expect(cut.className).toBe('th-cut');
+    expect(cut.textContent).toContain('the warm run reads the ca');
+    cleanup();
+    expect(rowOf(store, 51).queryByTestId('thread.cut.51')).toBeNull();
+  });
+
   it('not delivered: send again sends his words to that agent; esc drops it from view', () => {
     const cmds: CoreCmd[] = [];
     const port: CorePort = { send: (c) => cmds.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };

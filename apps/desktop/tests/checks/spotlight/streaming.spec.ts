@@ -1,7 +1,8 @@
 // spotlight/streaming · the streaming draft in the spotlight (his decision via main m_12381; the
 // hub's partial, amb-core m_12358; how it appears: ambient's text-appearing, m_12403). Owner:
 // amb-web. The new app on the scripted core (FakeCore), fn+space from the scripted helper, real
-// keys; the core plays bise main's partials as the hub sends them (whole text so far, '' clears).
+// keys; the core plays bise main's partials as the hub sends them (R40: the new text at its
+// offset, '' clears).
 // Passes when:
 //   - the first words show in the spotlight's answer from the first partial, with the '∿' sign
 //     after the last word and no caret;
@@ -16,12 +17,21 @@ import { test, expect, FakeCore, FakeHelper, launchDesktop, Recorder, changedIns
 const HOME = 'bise-home-00000000';
 const A = 'The cold bench takes 4.1 s because';
 const B = 'The cold bench takes 4.1 s because the index is walked twice.';
-// not in bise-proto's HubEv yet (amb-core adds it with the hub code): sent as the hub will
+// sent as the hub sends since R40 (main 35509c3b): only the new text at `off`, in UTF-16 units (a
+// JS string's length); off 0 starts again (a new call too), '' at 0 clears. One sender per test.
 type Ev = Parameters<FakeCore['send']>[0];
-const partial = (text: string, call = '7.1'): Ev => ({ ev: 'partial', project: HOME, agent: 'main', call, text }) as unknown as Ev;
+const deltas = () => {
+  let last = { call: '', text: '' };
+  return (text: string, call = '7.1'): Ev => {
+    const off = text !== '' && call === last.call && text.startsWith(last.text) ? last.text.length : 0;
+    last = { call, text };
+    return { ev: 'partial', project: HOME, agent: 'main', call, off, text: text.slice(off) } as unknown as Ev;
+  };
+};
 
 test('spotlight/streaming: bise main\'s reply streams in, only new words fade, nothing shown moves, no raw marks', async () => {
   test.setTimeout(120_000);
+  const partial = deltas();
   const core = new FakeCore();
   const helper = new FakeHelper();
   const s = await launchDesktop({ core, helper });
@@ -144,6 +154,7 @@ test('spotlight/streaming: bise main\'s reply streams in, only new words fade, n
 // cap: a long spoken answer keeps its first lines above, scrolled, the newest at the bottom.
 test("spotlight/streaming: the '∿' after a block moves nothing, tables as the thread's, main's cards read bise, the capsule's cap scrolls", async () => {
   test.setTimeout(120_000);
+  const partial = deltas();
   const core = new FakeCore();
   const helper = new FakeHelper();
   const s = await launchDesktop({ core, helper });

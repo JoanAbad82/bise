@@ -1,9 +1,13 @@
 // An agent's reply while it is written (the streaming draft, amb-core m_12358; his decision via
 // main m_12381: streamed in the window, the spotlight and the capsule, at most every 250 ms).
-// The hub's HubEv {ev:'partial', project, agent, call:'<call>.<attempt>', text} carries the WHOLE
-// text so far of one model call: it replaces, never appends; a new call replaces the old one;
-// text '' clears it (the entry landed, turn done, stop, error, retry). One reader for the
-// thread (amb-win's live row), the spotlight and the capsule (amb-web).
+// The hub's HubEv {ev:'partial', project, agent, call:'<call>.<attempt>', off, text} (R40, main
+// 35509c3b) carries a DELTA: `text` goes at `off`, in UTF-16 code units (JS string indexes, as
+// VoiceLit.said): the text keeps text[..off] and appends, so an event that comes twice changes
+// nothing. off 0 starts again (a subscriber gets the whole text that way; an older hub without
+// `off` sends whole texts, read as off 0); '' at 0 clears it (the entry landed, turn done, stop,
+// error, retry). An off past the text, inside a surrogate pair, or another call's delta is a gap:
+// it clears until the next off 0, never a guess. The fold is bise-proto's LiveText::apply.
+// One reader for the thread (amb-win's live row), the spotlight and the capsule (amb-web).
 //
 // Read from the raw core port (window.bise.core.onEvent): the store narrows events to its known
 // tags and 'partial' is not one yet. When amb-core's usePartial(threadKey(project, agent)) lands,
@@ -22,17 +26,33 @@ export interface LivePartial {
 /** At most one update this often (his decision: a throttle; the core sends at most 4 a second). */
 export const PARTIAL_EVERY_MS = 250;
 
+/** `off` falls between the two halves of a surrogate pair in `s`. */
+const splitsPair = (s: string, off: number): boolean => {
+  if (off <= 0 || off >= s.length) return false;
+  const hi = s.charCodeAt(off - 1);
+  const lo = s.charCodeAt(off);
+  return hi >= 0xd800 && hi <= 0xdbff && lo >= 0xdc00 && lo <= 0xdfff;
+};
+
 /**
  * What a raw core event does to the live partial of `project`/`agent`: undefined when the event
- * is not about it, null when it clears it, else the new one (a new call starts a new at_ms).
+ * is not about it, null when it clears it (the end, or a gap), else the new one (a new call
+ * starts a new at_ms). The delta fold of the header.
  */
 export function partialOf(prev: LivePartial | null, ev: Record<string, unknown>, project: string, agent: string, now: number): LivePartial | null | undefined {
   if (ev['ev'] !== 'partial' || ev['project'] !== project || ev['agent'] !== agent) return undefined;
   const call = ev['call'];
   const text = ev['text'];
-  if (typeof call !== 'string' || typeof text !== 'string') return undefined;
-  if (text === '') return null;
-  return { call, text, at_ms: prev !== null && prev.call === call ? prev.at_ms : now };
+  const rawOff = ev['off'] ?? 0;
+  if (typeof call !== 'string' || typeof text !== 'string' || typeof rawOff !== 'number' || !Number.isInteger(rawOff) || rawOff < 0) return undefined;
+  const sameCall = prev !== null && prev.call === call;
+  let kept: string;
+  if (rawOff === 0) kept = '';
+  else if (!sameCall || rawOff > prev.text.length || splitsPair(prev.text, rawOff)) return null;
+  else kept = prev.text.slice(0, rawOff);
+  const next = kept + text;
+  if (next === '') return null;
+  return { call, text: next, at_ms: sameCall ? prev.at_ms : now };
 }
 
 interface Clock {
