@@ -65,6 +65,7 @@
 pub mod approvals;
 pub mod commands;
 pub mod context;
+pub mod core;
 pub mod diff;
 pub mod draft;
 pub mod helper;

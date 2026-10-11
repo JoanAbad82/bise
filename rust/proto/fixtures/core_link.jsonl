@@ -1,0 +1,5 @@
+{"t": "init", "workspace": "/w"}
+{"t": "ping"}
+{"ev": {"id": 1, "type": "message_settled"}, "t": "replay"}
+{"evs": [{"at_ms": 1, "text": "hello", "type": "main_note"}, {"name": "a", "type": "from_a_newer_hub"}], "t": "replay_many"}
+{"t": "view_all"}
