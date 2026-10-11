@@ -6,11 +6,11 @@ free disk), HEAD 9b8ad22 (applied on 6bf6a86+), with other agents working at the
 
 ## 0. Gating rules for agents (applied)
 
-1. Start a task with `tests/gate.sh new <name>` (from any tree; `<name>` defaults to `$SB_AGENT`): its folder `~/.bise/worktrees/<project-id>/<name>/` (BISE-230, like Codex's `~/.codex/worktrees`) holds a worktree of HEAD (`harness/`) and its own target (`target/`), an APFS clone of the warm seed for the current deps (~3-10 s, 0 bytes; the seed, `~/.bise/cache/gate-seed/<key>`, one at a time, ~7 GB of blocks the clones share, is built once per Cargo.lock/Cargo.toml/.cargo/config.toml/rustc change, ~2 min, by the first task that needs it). Run what it prints (`cd` + `export CARGO_TARGET_DIR`). End it with `gate.sh done <name>` (refused while the worktree has uncommitted changes or commits on no branch). The hub removes the folder too, at the task's /drop and, for an orphan (a task archived or unknown), at its start, never when the worktree has such work (it says so in main's thread). Never clone another task's target: they grow to 15 GB (see §8). Never share a CARGO_TARGET_DIR between worktrees either: a build of main there overwrote a branch's binary (proto-lead).
+1. Start a task with `tests/gate.sh new <name>` (from any tree; `<name>` defaults to `$SB_AGENT`): its folder `~/.bise/worktrees/<project-id>/<name>/` (BISE-230, like Codex's `~/.codex/worktrees`) holds a worktree of HEAD (`harness/`) and its own target (`target/`), an APFS clone of the warm seed for the current deps (~3-10 s, 0 bytes; the seed, `~/.bise/cache/gate-seed/<key>`, one at a time, ~7 GB of blocks the clones share, is built once per Cargo.lock/Cargo.toml/.cargo/config.toml/rustc change, ~2 min, by the first task that needs it). Run what it prints (`cd` + `export CARGO_TARGET_DIR`). End it with `gate.sh done <name>` (refused while the worktree has uncommitted changes or commits on no branch). The hub removes the folder too, at the task's /drop and, for an orphan (a task archived or unknown), at its start, never when the worktree has such work (it says so in main's thread). A task worktree the hub made (`<task dir>/<repo>` with `<task dir>/owner`, no `rust/target` yet) needs nothing: `gate.sh quick|full` use `<task dir>/target`, a clone of the seed, by themselves (§10). Never clone another task's target: they grow to 15 GB (see §8). Never share a CARGO_TARGET_DIR between worktrees either: a build of main there overwrote a branch's binary (proto-lead).
 2. Each commit: `tests/gate.sh` (quick), in the foreground. It runs clippy -D warnings (in `$CARGO_TARGET_DIR/clippy`, next to the tests) and the tests of the changed crates and their users; no `cargo build` any more (the full gate builds the binary). A change to a `.bend` file of core/ hub/ vendor/ or LAWS/PROOF runs PROOF.bend in 4 shards in parallel; the tests run `scripts/bins.sh path sb-core`, the cache file itself (SB_CORE_BIN; on a hub/ vendor/ change it compiles next to cargo, once per source hash for every worktree and the full gate). PROOF is cached by content in `$CARGO_TARGET_DIR/gate-cache`. An sb-core gone after its build (the EDR of a company Mac deletes fresh unsigned copies at their first spawn) is one line: `sb-core vanished after it was built: an antivirus (EDR) may have removed it`. Warm: **~5 s** for a Rust change, **~11 s** for a hub change, 16 s the first time in a new worktree with a cloned target.
 3. Once per task, on the last commit: `gate.sh full` (one at a time on the machine, rule 5; cargo build; ./repl-live ./repl-scripted ./sb-core put in place by `./bins.sh`, compiled when their sources changed; run_all.sh with FUZZ_RUNS=2000: every Rust test, the whole PROOF.bend, e2e and the 14 tmux tests, 4 jobs in parallel), ~55 s warm.
 4. Never `sleep N; tail log`. A gate the bash tool put in the background: `gate.sh wait <its .out file or pid>` (blocks until it ends, at most 25 s, then shows the result).
-5. One full gate at a time on the machine (BISE-244, §9): `gate.sh full` takes a lock; a second one prints `waiting for the gate: <agent>'s full gate runs` and sets your note to `waiting for the gate`, then runs. Do not kill it to retry, and do not run `run_all.sh` by hand to skip the queue: two full gates at once take as long as two in a row and load the machine for everyone. Quick gates never wait. Iterate with the quick gate; the full gate once, before the last commit. If a full gate fails on a tmux timing, rerun that test alone (`python3 -u tests/<t>.py`) before blaming your change.
+5. One full gate at a time on the machine (BISE-244, §9): `gate.sh full` takes a lock; a second one prints `waiting for the gate: <agent>'s full gate runs` and sets your note to `waiting for the gate`, then runs. Do not kill it to retry, and do not run `run_all.sh` by hand to skip the queue: two full gates at once take as long as two in a row and load the machine for everyone. Quick gates never wait. Iterate with the quick gate; the full gate once, before the last commit. A full gate red only on e2e/tmux tests: `gate.sh rerun` runs those tests alone, one by one, on the same tree (it says which ones were flaky; §10); never a whole new full gate for a flake, never by hand.
 6. `run_all.sh --serial` runs e2e/tmux one by one (debugging a flake); `SB_TEST_JOBS=n` changes the parallelism; `FUZZ_RUNS=2000` for the long fuzz run.
 7. A red gate: fix forward, rerun the same gate; say in your report which gate you ran (quick/full) and its time.
 8. The Bend binaries (repl-live, repl-scripted, sb-core, harness-demo) are **not in git** (BISE-114, since 2026-09-30): never commit them, even with a hub/ or runtime/ change. `./bins.sh <name>...` puts the build of your tree's sources in place, from a cache keyed by the content of the sources and shared by every worktree and versions.sh (`${XDG_STATE_HOME:-~/.local/state}/switchboard/build/cache`): a hit is a copy (~0.3 s), a miss a compile (sb-core ~15 s, a REPL 1-2 min, once per source state for everyone). run.sh, run_all.sh, gate.sh (full, and quick without a hub change) and move-live.sh call it; a fresh worktree needs nothing else. A binary the EDR ate: `./bins.sh <name>` again. A version (versions.sh) gets the RELEASE engine of its sources, `bins.sh path bend-jsrt` (same cache, BISE-133). The V8 engine goes to the runtime as BEND_JSRT_BIN (the harness finds `bend-jsrt` in its app root, else rust/jsrt/target/debug, else release); run.sh rebuilds it when rust/jsrt or rust/images is newer, and always runs `cargo build` for bend-harness (~0.2 s when nothing changed).
@@ -408,3 +408,46 @@ gate`, wait (`gate.sh wait <.out>`), do not kill it and do not run
 `run_all.sh` by hand to jump the queue; a test that failed during a full
 gate: rerun it alone before blaming the change (`tui_queue_tmux` failed
 once at load 24 and passed twice alone).
+
+## 10. Round 5 (loop-speed-4): measured from the agents' traces
+
+Measured on 2026-10-11/12 from the agents' sessions, the hub's wake journal,
+the gate logs and heavy-run's new log, with `scripts/loop_audit.py`
+(rerunnable: docs/loop-speed-audit.md). Load 20-22 on 12 cores.
+
+Change written → landed, tonight's 8 code tasks (468 min): 53 % waiting on
+their own builds and gates, 25 % model, 15 % waiting on other agents, 7 %
+tool time. Measured against the doc above:
+
+| | doc | measured |
+|---|---:|---:|
+| quick gate, green, p50 / p90 | 5-11 s | 40 / 99 s |
+| full gate, green | ~55 s | 502 s (1 green of 7 in 4 days; 0 of 7 in 24 h) |
+| full-gate lock wait p50 (tonight) | | 7.4 min, holding a heavy-run slot idle |
+| hub-made task worktrees with a seed clone | all | none: cold rust/target, 3-13 GB each (disk full on 2026-10-11) |
+| sccache hits (live servers) | | 0 of 41 |
+
+What changed (no test dropped, no coverage lost):
+
+1. **Task targets**: `gate.sh quick|full` in a hub-made task worktree with
+   no CARGO_TARGET_DIR and no rust/target use `<task dir>/target`, a clone
+   of the seed of these deps (else the newest one: only the changed deps
+   rebuild). The hub removes the task dir, target included.
+2. **Open files**: quick and full raise `ulimit -n` to 10240: a launchd job
+   (`launchctl submit`) starts at 256 and bend-tui's tests failed with
+   EMFILE (core-b: 25 red tests).
+3. **`gate.sh rerun`**: a full gate red only on e2e/tmux tests writes them
+   to `<gate dir>/red-<tree state>`; `gate.sh rerun` runs them alone on the
+   same tree (HEAD + diff + untracked) and says which were flaky.
+4. **Slowest tests first**: run_all.sh records each e2e/tmux test's wall
+   and CPU in `~/.bise/gate/timings.tsv` and starts the slowest first
+   (`tests/slow_first.py`): on the measured medians the 4-job batch ends at
+   508 s instead of 588 s.
+5. **PROOF.bend whole, cached by content**: the full gate's unsharded run
+   (2.5-3 min of one core) is skipped when the same .bend files and bend
+   version passed whole before, in any worktree
+   (`~/.bise/gate/proof-cache`).
+6. **heavy-run** (`~/.bise/run/heavy-run`, outside the repo): a `gate.sh
+   full` job waits for the full-gate lock before it takes a slot, and every
+   job logs its submit and start times to `~/.bise/run/heavy.log`.
+

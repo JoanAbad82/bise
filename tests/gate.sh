@@ -17,6 +17,10 @@
 #                     (~60 s warm; e2e + tmux tests in parallel, SB_TEST_JOBS),
 #                     then no binary built needs a macOS newer than the
 #                     target (./bins.sh minos, BISE-164).
+#   gate.sh rerun     after a full gate red only on e2e/tmux tests: those
+#                     tests alone, one by one, on the same tree (HEAD + diff +
+#                     untracked; <gate dir>/red-<state>), instead of a whole
+#                     new full gate; green says which ones were flaky.
 #   gate.sh new [name]
 #                     start a task (name: default $SB_AGENT): its folder
 #                     ~/.bise/worktrees/<project-id>/<name>/ holds a worktree
@@ -40,7 +44,10 @@
 #                     the bash tool put a gate in the background: block until
 #                     it ends (at most 25 s), then show its end and exit code.
 # "Changed" = the tree vs GATE_BASE (default HEAD), untracked files included.
-# CARGO_TARGET_DIR is honoured (the e2e/tmux tests run its bise);
+# CARGO_TARGET_DIR is honoured (the e2e/tmux tests run its bise); unset,
+# in a task worktree the hub made (<task dir>/<repo> with <task dir>/owner)
+# with no rust/target yet, it is <task dir>/target, a clone of the seed.
+# Raises the open-files limit to 10240 (a launchd job starts at 256).
 # the bend results are cached in $CARGO_TARGET_DIR/gate-cache.
 # Sharing the machine (BISE-244, loop-speed.md §0): quick, full and new's
 # seed build run under nice 10 (GATE_NICE) with CARGO_BUILD_JOBS = half the
@@ -68,6 +75,20 @@ share_machine() {
   renice "${GATE_NICE:-10}" -p $$ >/dev/null 2>&1
   local n; n="$(sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
   export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-$(( (n + 1) / 2 ))}"
+  # a launchd job (launchctl submit) starts with 256 open files: bend-tui's
+  # tests then fail on UnixStream::pair (EMFILE) and the gate is red for
+  # nothing (core-b, 2026-10-12)
+  [ "$(ulimit -n)" != unlimited ] && [ "$(ulimit -n)" -lt 10240 ] && ulimit -n 10240 2>/dev/null
+  return 0
+}
+# the bise home, and the warm seeds of gate.sh new (one per deps key)
+bise_home() {
+  if [ -n "${BISE_HOME:-}" ]; then echo "$BISE_HOME"
+  elif [ -f "$HOME/.bise/migrated.json" ]; then echo "$HOME/.bise"; fi
+}
+seeds_dir() { local h; h="$(bise_home)"; echo "${h:-$HOME/.bend-harness}/cache/gate-seed"; }
+seed_key() {  # in the repo root: the deps' key (Cargo.lock, Cargo.tomls, cargo config, rustc)
+  { cat rust/Cargo.lock rust/.cargo/config.toml $(git ls-files 'rust/Cargo.toml' 'rust/*/Cargo.toml'); rustc -vV; } | shasum | cut -c1-12
 }
 proc_start() { ps -o lstart= -p "$1" 2>/dev/null | tr -s ' ' _; }
 older_than_a_minute() { [ -n "$(find "$1" -maxdepth 0 -mmin +1 2>/dev/null)" ]; }
@@ -97,7 +118,7 @@ if [ "$mode" = new ] || [ "$mode" = done ]; then
   elif [ -f "$HOME/.bise/migrated.json" ]; then home="$HOME/.bise"
   else home=""; fi
   wtroot="${home:-$HOME/.local/state/switchboard}/worktrees"
-  seeds="${home:-$HOME/.bend-harness}/cache/gate-seed"
+  seeds="$(seeds_dir)"
   # the project's id, as the hub computes it (switchboard::paths::workspace_id,
   # pinned by its test ids_match_the_python_copies)
   pid="$(python3 - "$main" <<'PY'
@@ -135,7 +156,7 @@ PY
   # these deps, one at a time (<home>/cache/gate-seed/<key>, ~7 GB of
   # blocks every clone shares); the workspace crates recompile in the task
   # anyway (a new checkout's mtimes), incrementally
-  key="$( { cat rust/Cargo.lock rust/.cargo/config.toml $(git ls-files 'rust/Cargo.toml' 'rust/*/Cargo.toml'); rustc -vV; } | shasum | cut -c1-12)"
+  key="$(seed_key)"
   seed="$seeds/$key"
   mkdir -p "$seeds"
   # the seed of the old layout (/tmp/sb-seed-<key>): a clone, without the
@@ -185,12 +206,31 @@ PY
   echo "now: cd $wt && export CARGO_TARGET_DIR=$tgt   (end: gate.sh done $name)"
   exit 0
 fi
-case "$mode" in quick|full) ;; *) echo "usage: gate.sh [quick|full|new [name]|done [name]|wait <file|pid>]" >&2; exit 2 ;; esac
+case "$mode" in quick|full|rerun) ;; *) echo "usage: gate.sh [quick|full|rerun|new [name]|done [name]|wait <file|pid>]" >&2; exit 2 ;; esac
 cd "$(dirname "$0")/.."
 root="$PWD"
 # a linked worktree has a .git file (the shared checkout a directory)
 [ -f "$root/.git" ] && sb_place "$root"
 share_machine
+# a task worktree the hub made (<task dir>/<repo>, its <task dir>/owner)
+# with no CARGO_TARGET_DIR and no rust/target yet: its target is
+# <task dir>/target, a clone of the warm seed (0 bytes, ~3 s), like
+# gate.sh new's, instead of a cold rust/target (3-13 GB and 2-5 min a task;
+# 5 of them filled the disk on 2026-10-11). The hub's task dirs are removed
+# with the task, target included.
+if [ -z "${CARGO_TARGET_DIR:-}" ] && [ -f "$root/.git" ] && [ -f "$(dirname "$root")/owner" ] && [ ! -d "$root/rust/target" ]; then
+  tdir="$(dirname "$root")/target"
+  if [ ! -d "$tdir" ]; then
+    s=$SECONDS sd="$(seeds_dir)" k="$(seed_key)"
+    from="$sd/$k"; [ -d "$from" ] || from="$(ls -dt "$sd"/* 2>/dev/null | grep -vE '\.(tmp|building|lock)$' | head -1)"
+    if [ -n "$from" ] && cp -cR "$from" "$tdir.tmp" 2>/dev/null && mv "$tdir.tmp" "$tdir"; then
+      echo "target: $tdir, a clone of the seed $(basename "$from")$([ "$from" = "$sd/$k" ] || echo ' (older deps: the changed ones rebuild)') ($((SECONDS - s))s)"
+    else
+      rm -rf "$tdir.tmp"; mkdir -p "$tdir"; echo "target: $tdir (no seed to clone: a cold build)"
+    fi
+  fi
+  export CARGO_TARGET_DIR="$tdir"
+fi
 # ---- BISE-244: what a run starts dies with it. Its TMPDIR, <gate dir>/<pid>
 # (short: the hubs' sockets live under it), holds the tests' workspaces, so
 # a test hub names it in its command line even orphaned; its sb-core and
@@ -336,10 +376,33 @@ sbcore_gone() {  # <file>: say so and true when the sb-core that was built is go
   echo "FAIL sb-core vanished after it was built: an antivirus (EDR) may have removed it ($1)"
 }
 
+# the tree's state (HEAD, the diff, the untracked files): a red full gate
+# leaves the e2e/tmux tests it failed in <gate dir>/red-<state>, for
+# gate.sh rerun on exactly this tree
+tree_state() {
+  { git rev-parse HEAD; git diff HEAD; git ls-files --others --exclude-standard | while read -r f; do echo "$f"; cat "$f" 2>/dev/null; done; } | shasum | cut -c1-16
+}
+red="$gdir/red-$(tree_state)"
+if [ "$mode" = rerun ]; then
+  # the e2e/tmux tests the last full gate failed on this same tree, alone
+  # (one by one): what the agents did by hand. Green = every test of the
+  # full gate passed on this tree; the flaky ones are said and kept in
+  # timings.tsv (rc 1 then 0) for the audit. A Rust red has no list: fix it.
+  [ -s "$red" ] || { echo "no red full gate on this tree (its e2e/tmux part): run gate.sh full"; exit 2; }
+  s=$SECONDS t="$(tr '\n' ' ' <"$red")"
+  echo "rerun alone: $t"
+  tests/run_all.sh --serial --only "$t" & wait $!; rc=$?
+  if [ $rc = 0 ]; then
+    rm -f "$red"; echo "GATE rerun GREEN ($((SECONDS - s))s): failed in the full gate, passed alone (flaky): $t"
+  else echo "GATE rerun FAILED"; fi
+  exit $rc
+fi
 if [ "$mode" = full ]; then
   s=$SECONDS
   export FUZZ_RUNS="${FUZZ_RUNS:-2000}"
+  rm -f "$red"; export SB_RED_FILE="$red"
   tests/run_all.sh & wait $!; rc=$?
+  [ $rc = 0 ] || { [ -s "$red" ] && echo "only e2e/tmux tests failed: gate.sh rerun runs them alone on this tree"; }
   [ $rc = 0 ] || sbcore_gone "$root/sb-core"
   # apps/desktop/src/proto matches bise-proto every time (a generated file
   # changed by a merge or a rebase can't slip through; quick runs it on a change)

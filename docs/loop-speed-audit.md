@@ -1,0 +1,76 @@
+# The feedback-loop audit
+
+How to find, from the agents' own traces, where the time goes between
+"change written" and "landed", and whether the gates stay fast and useful.
+Rerun it every day (a timer: `sb every day 08:00 "loop audit" --to main`),
+and after any change to the gates, heavy-run or the tests' list. The first
+run and its findings: docs/loop-speed.md §10 and the loop-speed-4 page.
+
+## Run it
+
+```
+python3 scripts/loop_audit.py --since 24h [--json $TMPDIR/audit.json]
+```
+
+Read only, ~30 s (it reads every session written in the window). It prints
+the health checks, then the sections below. `--since 8h` for one night,
+`--hub <id>` for another hub than the newest. `--self-test` checks its
+parsing on synthetic traces.
+
+## Where the numbers come from
+
+| source | what it gives |
+|---|---|
+| `~/.bise/sessions/*/events.jsonl` | each agent's turns and tool calls with their times; edits (`edit`, `write_file`) and lands (`sb land` that answered "landed") |
+| `~/.bise/hubs/<hub>/journal.jsonl` | the wakes: `wake_set` (kind job, file, bg, pid), `wake_end` (hit, max, stopped) |
+| `~/.bise/hubs/<hub>/agents/*/tmp/**` | the agents' gate logs: `GATE quick/full/rerun GREEN (Ns)` or `FAILED`, each step and test line, `got the gate after Ns` |
+| `~/.bise/run/*.log` | the release gates' logs, same lines |
+| `~/.bise/gate/timings.tsv` | run_all.sh's history: one line per e2e/tmux test run (time, commit, test, rc, wall s, CPU s, load) |
+| `~/.bise/run/heavy.log` | heavy-run: when each job was submitted and when it got its slot |
+
+## What it computes
+
+- **change written → landed** ("cycles"): from the first edit after a land
+  to the next land, per agent. The time is cut into: `model` (in a turn, no
+  tool running), `tool:<class>` (bash calls classed by their command:
+  `gate`, `cargo`, `job-submit`, `wait-poll`, `test-rerun`, `land`,
+  `shell`...), and the time between turns, named by what woke the next
+  turn: `wait:job` (a wake on a job, a file or a background command),
+  `wait:timer` (an `sb every` timer), `wait:agent` (another agent's
+  message), `wait:user`.
+- **gates**: runs, green share, green time p50/p90, the wait for the
+  full-gate lock, each quick step's p50.
+- **tests**: wall p50/p90 and CPU p50 per test, how many runs it was red in.
+- **waits**: sb wake watches by kind, the ones that ran to `--max` (a job
+  that died without writing its file), heavy-run's slot waits.
+
+## Health checks (the script prints ok / SLOW)
+
+| check | limit | why |
+|---|---|---|
+| quick gate p50 | 60 s | iterate in the foreground, under the bash tool's 30 s window when warm |
+| full gate p50, green | 10 min | one per task |
+| full-gate lock wait p50 | 5 min | |
+| heavy-run slot wait p50 | 5 min | |
+| full gates red | 20 % | a red gate for nothing costs a rerun; above that, fix flakes first |
+| wakes that ran to --max | 0 | a dead job nobody noticed |
+
+## How to read it, what to do
+
+1. `wait:job` the biggest share: the gates are the loop. Look at the gate
+   section: a quick gate far over its doc means cold targets (task
+   worktrees without the seed clone) or load; a full gate's lock or slot
+   wait over 5 min means too many full gates for one machine.
+2. Full gates mostly red: take the failing tests list. A test red in more
+   than 1 of 10 runs and green alone is a flake: fix its cause (the
+   loop-speed.md tables say how the earlier ones were found), never raise
+   its timeout blindly. `gate.sh rerun` keeps the agents moving meanwhile.
+3. A test whose p50 grew: compare with the previous audit's slowest tests;
+   timings.tsv has the commit of each run, so the change that made it slow
+   is between two lines.
+4. `wait:agent` large: not the gate's fault (reviews, a lander, main);
+   say so to main.
+5. Wakes at `--max`: an agent waited on a file a dead job never wrote.
+   Watch the job (`sb wake --on-job <label>`), not only its file.
+
+Keep the thresholds here and in `health()` of the script the same.
