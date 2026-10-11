@@ -35,7 +35,11 @@ const CHIP = '[data-testid^="composer.chip."][data-kind="image"]';
 // ------------------------------------------------------------------ the request bodies (pure)
 
 type Part = Record<string, unknown>;
-type Seen = { found: boolean; image: string; text: string; agent: string; family: string };
+// every request that carries his words: a route forward (bise main -> a project's main, '<user_message via="bise">')
+// makes a second request on another hub; each one must carry the image (amb-web m_18148: run 1 of 4543f8d3 matched the
+// routed project's request as 'main' and its image was dropped by the hub's route forward)
+type Hop = { agent: string; routed: boolean; image: string };
+type Seen = { found: boolean; image: string; text: string; agent: string; family: string; hops: Hop[] };
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const obj = (v: unknown): Record<string, unknown> => (v !== null && typeof v === 'object' ? (v as Record<string, unknown>) : {});
@@ -76,6 +80,10 @@ const textOf = (p: Part): string => str(p['text']);
 function agentOf(body: Record<string, unknown>, msgs: Part[]): string {
   const sys = [str(body['system']), ...(Array.isArray(body['system']) ? (body['system'] as Part[]).map(textOf) : []),
     ...msgs.filter((m) => m['role'] === 'system' || m['role'] === 'developer').flatMap((m) => partsOf(m).map(textOf))].join('\n');
+  // which hub: its prompt names the agent's own tmp dir, <home>/.bise/hubs/<project>-<8 hex>/agents/<agent>/tmp (the
+  // home's hub is bise's); the matcher must say whose main it read (bise vs shop, ambient-lead m_18156)
+  const hub = /\.bise\/hubs\/([^/`\s]+?)-[0-9a-f]{8}\/agents\/([^/`\s]+)\//.exec(sys);
+  if (hub !== null) return `${hub[1] ?? '?'} · ${hub[2] ?? '?'}`;
   const task = /task `([^`]+)`/.exec(sys);
   if (task !== null) return task[1] ?? '';
   return /\bmain\b/.test(sys) ? 'main' : '?';
@@ -83,7 +91,8 @@ function agentOf(body: Record<string, unknown>, msgs: Part[]): string {
 
 /** The last request whose message holds `nonce`: that message's image block and text parts. */
 export function seenIn(lines: string[], nonce: string): Seen {
-  let seen: Seen = { found: false, image: '', text: '', agent: '', family: '' };
+  let seen: Seen = { found: false, image: '', text: '', agent: '', family: '', hops: [] };
+  const hops = new Map<string, Hop>();
   for (const line of lines) {
     if (!line.includes(nonce)) continue;
     let rec: { family?: string; body?: Record<string, unknown> };
@@ -93,16 +102,27 @@ export function seenIn(lines: string[], nonce: string): Seen {
     const m = [...msgs].reverse().find((x) => partsOf(x).some((p) => textOf(p).includes(nonce)));
     if (m === undefined) continue;
     const parts = partsOf(m);
+    const all = parts.map(textOf).filter((t) => t !== '').join(' ¶ ').replace(/\s+/g, ' ');
+    const image = parts.map(imageOf).find((x) => x !== '') ?? '';
+    const routed = /<user_message[^>]*via="bise"/.test(all);
+    const agent = agentOf(body, msgs);
+    // one hop per (agent, routed): its last request wins, as before
+    hops.set(`${agent}|${String(routed)}`, { agent, routed, image });
     seen = {
       found: true,
-      image: parts.map(imageOf).find((x) => x !== '') ?? '',
+      image,
       // around his words: a message can start with the hub's own blocks (<task_status>…)
-      text: ((t: string) => t.slice(Math.max(0, t.indexOf(nonce) - 200), t.indexOf(nonce) + nonce.length + 120))(
-        parts.map(textOf).filter((t) => t !== '').join(' ¶ ').replace(/\s+/g, ' ')),
-      agent: agentOf(body, msgs),
+      text: all.slice(Math.max(0, all.indexOf(nonce) - 200), all.indexOf(nonce) + nonce.length + 120),
+      agent,
       family: rec.family ?? '',
+      hops: [],
     };
   }
+  seen.hops = [...hops.values()];
+  // the image counts only if every hop his words took carries it
+  if (seen.hops.some((h) => h.image === '')) seen.image = '';
+  else if (seen.image === '') seen.image = seen.hops.find((h) => h.image !== '')?.image ?? '';
+  if (seen.hops.length > 1 || seen.hops.some((h) => h.routed)) seen.agent = seen.hops.map((h) => `${h.routed ? 'routed by bise to ' : ''}${h.agent}: ${h.image === '' ? 'NO image' : 'image'}`).join(', ');
   return seen;
 }
 
@@ -265,6 +285,57 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
         rows.push({ path: `(3) spotlight ${how === 'paste' ? '⌘V' : 'drop on the capsule'}`, to: 'bise · main', how, seen: await waitSeen(n), note });
         await hide();
       }
+    }
+
+    // (6) ambient-pm's R41 (6): an image ask from bise's home that bise ROUTES to shop must reach shop main's request
+    // with the image (amb-web m_18148: the hub's route forward kept only the text). '[[route: shop]]' makes the world's
+    // fake route pick answer shop every time (amb-tools d6583281). Two ways in: the spotlight (⌘V) and bise's own
+    // thread (the window composer, ⌘V). Every hop his words take must carry the image, and one hop must be shop's main.
+    if (FROM <= 6) {
+      step('(6) routed');
+      const routedRow = (path: string, n: string, note: string, seen: Seen): Row => {
+        const toShop = seen.hops.some((h) => h.agent === `shop · main` || (h.routed && /shop/.test(h.agent)));
+        const seen2: Seen = toShop ? seen : { ...seen, image: '', agent: `${seen.agent} (no request on shop's main: bise didn't route it)` };
+        return { path, to: 'bise -> routed to shop · main', how: 'paste', seen: seen2, note: `${note}; hops: ${JSON.stringify(seen.hops)}; nonce ${n}` };
+      };
+      // the routed hop comes after bise main's turn: wait for a request on shop's main (or 60 s)
+      const waitRouted = async (n: string): Promise<Seen> => {
+        const t0 = Date.now();
+        for (;;) {
+          const seen = seenIn(bodies(), n);
+          if (seen.hops.some((h) => /^shop · /.test(h.agent)) || Date.now() - t0 > 60_000) return seen;
+          await sleep(500);
+        }
+      };
+      // the spotlight
+      const cap = await capsulePage(s);
+      await helper.send({ ev: 'fn', act: 'key', key: 'space' });
+      await out.wait(CAPSULE, (l) => l.startsWith('show'), 5000).catch(() => undefined);
+      await sleep(500);
+      const input = cap.getByTestId('spotlight.input');
+      await input.click().catch(() => undefined);
+      let note = `staged: ${String(await stage(s))}`;
+      await cap.keyboard.press('Meta+V');
+      await sleep(600);
+      let n = nonce('route-spot');
+      await input.click().catch(() => undefined);
+      await cap.keyboard.type(` what is in this picture ${n} [[route: shop]]`);
+      await shot('R41-route-spot', cap);
+      await cap.keyboard.press('Enter');
+      rows.push(routedRow('(6) routed from the spotlight ⌘V', n, note, await waitRouted(n)));
+      await helper.send({ ev: 'fn', act: 'esc' });
+      await sleep(500);
+      // bise's own thread
+      await go(s, 'bise');
+      await p.locator(FIELD).click();
+      note = `staged: ${String(await stage(s))}`;
+      await p.keyboard.press('Meta+V');
+      note += `, image chips: ${String(await chips(p))}`;
+      n = nonce('route-home');
+      await p.keyboard.type(`what is in this picture ${n} [[route: shop]]`);
+      await shot('R41-route-home');
+      await p.keyboard.press('Enter');
+      rows.push(routedRow("(6) routed from bise's thread ⌘V", n, note, await waitRouted(n)));
     }
 
     step('(4) card answer');
