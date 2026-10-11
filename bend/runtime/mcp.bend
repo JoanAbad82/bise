@@ -613,11 +613,25 @@ def tries(+fuel: Nat, +n: Nat, +name: String, +host: String, +url: String,
         try_next(Bool.and(Mcp.again(t), Bool.not(Nat.is_eq(p, 0n))), t, name,
           host, n, tries(p, Nat.add(n, 1n), name, host, url, h, tool, args))
 
-def mcp_call.found(+name: String, +cid: String, +tool: String, +args: String,
+def mcp_call.send(+name: String, +cid: String, +tool: String, +args: String,
     +key: String) -> IO(MR):
   tries(Mcp.max_tries(), 0n, name, Pvp.url_host(gateway_url(cid)),
     gateway_url(cid), mcp_hdrs(Bool.pick(String, is_local(cid), "", key)),
     tool, args)
+
+# a gateway call needs the Mistral key: without one, say so and send nothing
+def mcp_call.keyed(no_key: Bool, +name: String, +cid: String, +tool: String,
+    +args: String, +key: String) -> IO(MR):
+  match no_key:
+    case True{}:
+      IO.pure(MR, MR{False{}, Mcp.no_key_text()})
+    case False{}:
+      mcp_call.send(name, cid, tool, args, key)
+
+def mcp_call.found(+name: String, +cid: String, +tool: String, +args: String,
+    +key: String) -> IO(MR):
+  mcp_call.keyed(Bool.and(String.is_empty(key), Bool.not(is_local(cid))),
+    name, cid, tool, args, key)
 
 # a call with no arguments still needs a JSON object body
 def call_args.of(is_empty: Bool, +args: String) -> String:

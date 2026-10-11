@@ -175,6 +175,14 @@ def run(exe, tmp, port):
           "not retried: the call may have run on the server, check before calling it again (safe if the tool only reads)." % (port, port),
           "rpc error: the text %r" % text)
 
+    # 9. a Mistral connector (not a loopback URL) with no key: said at
+    # once, nothing sent (an empty bearer came back as 'HTTP 401: Invalid
+    # API Key', read as a revoked key; the probe passes an empty key)
+    st, text, took = call(exe, tmp, "c0ffee-connector", "fake.echo", {"text": "k"})
+    check(st == "err" and text == "no Mistral key for connectors: run bise login mistral",
+          "no key: the text %r %r" % (st, text))
+    check(took < 5, "no key: no network, no retry (%.1f s)" % took)
+
     print("PASS mcp_retry" if not FAILS else "FAIL mcp_retry (%d)" % len(FAILS))
     return 1 if FAILS else 0
 
