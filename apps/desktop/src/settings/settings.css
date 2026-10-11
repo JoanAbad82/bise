@@ -6,10 +6,14 @@
 .settings .b-set .nav, .settings .b-set .pg { min-height: 0; overflow-y: auto; }
 .settings-row-acts { display: inline-flex; align-items: center; gap: var(--s-1); }
 .settings-key { margin-top: var(--s-3); max-width: 420px; }
-.settings-sheet { margin-top: var(--s-4); padding: var(--s-4); border-radius: var(--r-3); background: var(--c-raised); box-shadow: var(--e-1); }
-.settings-sheet-h { font-size: var(--t-15); color: var(--c-text); margin-bottom: var(--s-1); }
-.settings-sheet .b-field { flex: 1; }
-.settings-sheet-acts { display: flex; justify-content: flex-end; margin-top: var(--s-3); }
+/* the add sheet (AddSheet.tsx, shot 19): the path line, the scan's head with its wait or its error,
+   the add's words in the foot before cancel; errors in plain words, red */
+.settings-add-path { display: flex; align-items: center; gap: var(--s-2); margin-bottom: var(--s-3); }
+.settings-add-path .b-field { flex: 1; }
+.settings-add-scan { display: inline-flex; align-items: baseline; gap: var(--s-2); }
+.settings-add-scan .err { color: var(--c-err); text-transform: none; letter-spacing: normal; }
+.settings-add-say { margin-right: auto; font-size: var(--t-13); color: var(--c-text-2); }
+.settings-add-say.err { color: var(--c-err); }
 .settings-cu-st { display: inline-block; width: 1em; color: var(--c-text-3); }
 .settings-cu-st.done { color: var(--c-ok); }
 .settings-cu-st.waits { color: var(--c-accent); }

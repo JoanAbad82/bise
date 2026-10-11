@@ -9,6 +9,7 @@ import { Accounts, expiredWords } from './accounts';
 import type { ApprovalsCmd, ApprovalsEv } from './approvals';
 import type { ApprovalRule } from '@/proto';
 import { core_ev, hub_ev } from '@/proto/fixtures.gen';
+import { Store, StoreProvider } from '@/store';
 import { Settings, type SettingsPorts } from './Settings';
 import { appName, excludedApps, flag, getPref, knownApps, onboarded, putPref, type Prefs } from './prefs';
 import { addPaths, offers, ordered, projectSub } from './projects';
@@ -51,8 +52,18 @@ const ports = (): SettingsPorts & { sent: AppCmd[]; went: string[] } => {
   return { sent, went, send: (c) => sent.push(c), back: () => went.push('back'), go: (p) => went.push(p) };
 };
 
-const view = (page: string, p = ports(), extra: Partial<Parameters<typeof Settings>[0]> = {}) =>
-  render(<Settings page={page} prefs={prefs()} accounts={accounts()} projects={projects()} found={found()} plugins={null} computerUse={null} perms={{}} ports={p} {...extra} />);
+const view = (page: string, p = ports(), extra: Partial<Parameters<typeof Settings>[0]> = {}, store?: Store) => {
+  const node = <Settings page={page} prefs={prefs()} accounts={accounts()} projects={projects()} found={found()} plugins={null} computerUse={null} perms={{}} ports={p} {...extra} />;
+  return render(store === undefined ? node : <StoreProvider store={store}>{node}</StoreProvider>);
+};
+
+/** A store with the fixtures' projects and found (the add sheet reads the store's own). */
+const storeWith = (): Store => {
+  const s = new Store(null);
+  s.apply({ ev: 'projects', projects: projects() });
+  s.apply(ev('found'));
+  return s;
+};
 
 describe('prefs', () => {
   it('reads and puts dotted keys without touching the rest', () => {
@@ -198,7 +209,7 @@ describe('Settings', () => {
 
   it('projects: remove asks once; rename; add a found repo with land', () => {
     const p = ports();
-    view('projects', p);
+    view('projects', p, {}, storeWith());
     fireEvent.click(screen.getByTestId('settings.project.acme-1a2b3c4d.remove'));
     expect(p.sent).toEqual([]);
     fireEvent.click(screen.getByTestId('settings.project.acme-1a2b3c4d.remove.yes'));
@@ -213,6 +224,8 @@ describe('Settings', () => {
     expect(p.sent).toEqual([
       { cmd: 'project_remove', project: 'acme-1a2b3c4d' },
       { cmd: 'project_rename', project: 'acme-1a2b3c4d', name: 'engine' },
+      // the sheet looks in his folders again at each open
+      { cmd: 'found_scan' },
       { cmd: 'project_add', path: '/Users/camille/code/shop', land: true },
     ]);
   });

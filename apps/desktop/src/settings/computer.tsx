@@ -8,7 +8,7 @@
 // Owner: amb-home.
 import { useEffect } from 'react';
 import type { AppCmd, CoreEv } from '@/proto';
-import { Button, Chip, Group, Help, Toggle, type GroupItem } from '@/ds';
+import { Act, Button, Chip, Group, Help, Toggle, type GroupItem } from '@/ds';
 
 export type ComputerUse = Extract<CoreEv, { ev: 'computer_use' }>;
 
@@ -94,15 +94,15 @@ export function Computer({ cu, send }: { cu: ComputerUse | null; send: (cmd: App
       {cu?.flash != null && <Chip tone="ok">{cu.flash}</Chip>}
       {cu?.said != null && <Help err>{cu.said}</Help>}
       {on && (
-        <Button
-          kind="ghost"
+        <Act
+          tone="err"
           onClick={() => {
             send({ cmd: 'computer_use', act: 'uninstall' });
           }}
           testId="settings.cu.uninstall"
         >
           turn off and remove its files
-        </Button>
+        </Act>
       )}
     </>
   );

@@ -5,7 +5,7 @@
 // Owner: amb-home.
 import { useEffect, useState, type ReactNode } from 'react';
 import type { AppCmd, JsonValue, Plugin } from '@/proto';
-import { Button, Chip, Field, Group, Kbd, Seg, Toggle, type GroupItem } from '@/ds';
+import { Act, Button, Chip, Field, Group, Kbd, Seg, Toggle, type GroupItem } from '@/ds';
 import { Accounts } from './accounts';
 import { Roles } from './roles';
 import { Approvals } from './approvals';
@@ -239,15 +239,17 @@ function notifyItems(auth: NotifyAuth | null, act: ((a: 'ask' | 'open') => void)
             on
           </Chip>
         ) : (
-          <Button
-            kind={go === 'ask' ? 'pri' : 'ghost'}
-            onClick={() => {
-              act?.(go);
-            }}
-            testId={`settings.notify.${go}`}
-          >
-            {row.button}
-          </Button>
+          // designer m_18736: nothing ghost in rows; 'turn on' (ask) is the row's own action, the
+          // way to the system's settings an Act
+          go === 'ask' ? (
+            <Button kind="pri" onClick={() => { act?.(go); }} testId={`settings.notify.${go}`}>
+              {row.button}
+            </Button>
+          ) : (
+            <Act onClick={() => { act?.(go); }} testId={`settings.notify.${go}`}>
+              {row.button}
+            </Act>
+          )
         ),
     },
   ];

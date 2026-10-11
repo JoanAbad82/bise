@@ -5,7 +5,7 @@
 // Owner: amb-home.
 import { useState } from 'react';
 import type { Account, AppCmd } from '@/proto';
-import { Button, Chip, Field, Group, Help, type GroupItem } from '@/ds';
+import { Act, Button, Chip, Field, Group, Help, type GroupItem } from '@/ds';
 
 /**
  * The expired ChatGPT sign-in (bar V14 / S28 / L2): the agents its expiry stopped (the hub's
@@ -184,13 +184,13 @@ export function Accounts({ accounts, send, keyError = null, want = null, signin 
             <Help>{`waiting for you to sign in to ${label} in your browser…`}</Help>
             <span className="settings-row-acts">
               {url !== null && copy && (
-                <Button kind="ghost" onClick={() => { copy(url); }} testId="settings.signing.copy">
+                <Act onClick={() => { copy(url); }} testId="settings.signing.copy">
                   copy the link
-                </Button>
+                </Act>
               )}
-              <Button kind="ghost" onClick={cancel} testId="settings.signing.cancel">
+              <Act onClick={cancel} testId="settings.signing.cancel">
                 cancel
-              </Button>
+              </Act>
             </span>
           </div>
         );

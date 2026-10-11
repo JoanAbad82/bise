@@ -6,7 +6,7 @@
 // the store's useApprovals) and says what he changes (HubCmd approvals / remove_rule; a refusal
 // comes as error {cmd: approvals|remove_rule}). Owner: amb-kit.
 import { useState } from 'react';
-import { Button, Group, Help, Seg, type GroupItem } from '@/ds';
+import { Act, Group, Help, Seg, type GroupItem } from '@/ds';
 import type { ApprovalRule, HubCmd, HubEv } from '@/proto';
 
 export type ApprovalsEv = Extract<HubEv, { ev: 'approvals' }>;
@@ -99,8 +99,9 @@ export function Approvals({ approvals: a, send, error = null, home = '', now: pi
       asking === r ? (
         <span className="settings-row-acts" role="group" aria-label="remove it?">
           <span className="settings-ask">remove it?</span>
-          <Button
-            kind="danger"
+          {/* designer m_18736: nothing ghost in rows; remove is an Act in the error tone, asked once */}
+          <Act
+            tone="err"
             onClick={() => {
               if (send) send({ cmd: 'remove_rule', project: a.project, rule: r });
               setAsking(null);
@@ -108,15 +109,15 @@ export function Approvals({ approvals: a, send, error = null, home = '', now: pi
             testId={`settings.approvals.rule.${String(i)}.yes`}
           >
             remove
-          </Button>
-          <Button kind="ghost" onClick={() => { setAsking(null); }} testId={`settings.approvals.rule.${String(i)}.keep`}>
+          </Act>
+          <Act onClick={() => { setAsking(null); }} testId={`settings.approvals.rule.${String(i)}.keep`}>
             keep it
-          </Button>
+          </Act>
         </span>
       ) : (
-        <Button kind="ghost" disabled={send === null} onClick={() => { setAsking(r); }} testId={`settings.approvals.rule.${String(i)}.remove`}>
+        <Act tone="err" disabled={send === null} onClick={() => { setAsking(r); }} testId={`settings.approvals.rule.${String(i)}.remove`}>
           remove
-        </Button>
+        </Act>
       ),
   }));
   return (

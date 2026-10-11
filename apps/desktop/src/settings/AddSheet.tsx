@@ -1,0 +1,239 @@
+// The add-a-project sheet (designer's signed S11 v2 shot 19, ambient-lead m_18490): the ds Sheet,
+// a modal over the dimmed window, the same from settings › projects and from the sidebar's
+// '+ add a project' / ⌘N. Its head 'add a project' and sub; the path Field and 'choose…' (the
+// system's folder panel, window.bise.pickFolder); FOUND IN YOUR FOLDERS, the repos found_scan
+// found, each with its Check; the Toggle 'main may land on main' (the repo's flow mode); the foot:
+// cancel, and the primary that says what it adds ('add shop', 'add 2 projects').
+// Neither wait spins forever (his real-home try: the scan never ended, add did nothing): the scan's
+// head counts the seconds, then says what it found, the core's refusal, its broken state, or that
+// it didn't answer, with 'look again'; add says 'adding shop…', then closes once the project is in
+// the list (onAdded gets its rows) or says why not, and the button works again. The words are
+// add.ts's (pure). Every change is the core's (project_add, found_scan). Owner: amb-home.
+import { useCallback, useEffect, useState } from 'react';
+import type { AppCmd, ProjectRow } from '@/proto';
+import { Act, Button, Check, Field, Group, Help, Sheet, Toggle } from '@/ds';
+import { useBroken, useCoreEvent, useFound, useProjects, type Ev } from '@/store';
+import { addLabel, addPaths, addSay, foundSub, offers, scanSay } from './add';
+
+/** The clock, read only in the click handlers (when he looks again or adds). */
+const clock = (): number => Date.now();
+
+export interface AddSheetProps {
+  open: boolean;
+  onClose: () => void;
+  send: (cmd: AppCmd) => void;
+  /** the system's folder panel (none: no 'choose…') */
+  pickFolder?: (() => Promise<string | null>) | undefined;
+  /** the core added them: their rows (the sidebar's opener shows the first) */
+  onAdded?: (rows: readonly ProjectRow[]) => void;
+}
+
+/** The sheet; its state (ticks, typed path, the waits) starts again at each open. */
+export function AddSheet(props: AddSheetProps) {
+  return props.open ? <OpenSheet {...props} /> : null;
+}
+
+/** The core's refusals of one command since mount, counted (the same words twice count). */
+function useRefusal(cmd: string): { n: number; text: string } | null {
+  const [err, setErr] = useState<{ n: number; text: string } | null>(null);
+  const on = useCallback(
+    (ev: Ev) => {
+      if (ev.ev === 'error' && ev.cmd === cmd) setErr((e) => ({ n: (e?.n ?? 0) + 1, text: ev.text }));
+    },
+    [cmd],
+  );
+  useCoreEvent(on);
+  return err;
+}
+
+/** Now, every second while `on` (the waits' seconds and their end). */
+function useSeconds(on: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!on) return;
+    const t = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(t);
+    };
+  }, [on]);
+  return now;
+}
+
+interface Adding {
+  paths: string[];
+  before: ReadonlySet<string>;
+  at: number;
+  /** the refusal count when he clicked: only a newer one is this add's */
+  err0: number;
+}
+
+function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
+  const found = useFound();
+  const projects = useProjects();
+  const broken = useBroken();
+  const scanErr = useRefusal('found_scan');
+  const addErr = useRefusal('project_add');
+  const [ticked, setTicked] = useState<readonly string[]>([]);
+  const [typed, setTyped] = useState('');
+  const [land, setLand] = useState(false);
+  // the scan: asked at open (and on 'look again'); answered once a found comes after the ask
+  const [scan, setScan] = useState(() => ({ at: Date.now(), found0: found, err0: 0 }));
+  const [adding, setAdding] = useState<Adding | null>(null);
+  const look = useCallback(() => {
+    send({ cmd: 'found_scan' });
+  }, [send]);
+  useEffect(look, [look]);
+
+  const list = offers(found, projects);
+  const scanError = scanErr !== null && scanErr.n > scan.err0 ? scanErr.text : null;
+  const scanWaits = found === scan.found0 && scanError === null && broken === null;
+  const addWaits = adding !== null;
+  const now = useSeconds(scanWaits || addWaits);
+  const said = scanSay({ answered: found !== scan.found0, n: list.length, error: scanError, broken, ms: Math.max(0, now - scan.at) });
+  const add =
+    adding === null
+      ? null
+      : addSay({ paths: adding.paths, projects, before: adding.before, error: addErr !== null && addErr.n > adding.err0 ? addErr.text : null, broken, ms: Math.max(0, now - adding.at) });
+
+  // added: the sheet goes, the rows are in the list (and the sidebar)
+  const addedRows = add?.kind === 'added' ? add.rows : null;
+  useEffect(() => {
+    if (addedRows === null) return;
+    onAdded?.(addedRows);
+    onClose();
+  }, [addedRows, onAdded, onClose]);
+
+  // one cause, said once: the scan's head already says the broken words, the foot doesn't repeat them
+  const footSay = add !== null && add.kind !== 'added' && !(add.kind === 'failed' && said.kind === 'failed' && add.text === said.text) ? add : null;
+  const all = addPaths(ticked, typed);
+  const busy = add?.kind === 'adding';
+  const go = () => {
+    if (all.length === 0 || busy) return;
+    for (const path of all) send(land ? { cmd: 'project_add', path, land: true } : { cmd: 'project_add', path });
+    setAdding({ paths: all, before: new Set(projects.map((p) => p.project)), at: clock(), err0: addErr?.n ?? 0 });
+  };
+  const again = () => {
+    setScan({ at: clock(), found0: found, err0: scanErr?.n ?? 0 });
+    look();
+  };
+
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title="add a project"
+      sub="a folder, a git repo. its main starts right away."
+      onPrimary={go}
+      testId="settings.add"
+      foot={
+        <>
+          {footSay !== null && (
+            <span className={footSay.kind === 'failed' ? 'settings-add-say err' : 'settings-add-say'} data-testid="settings.add.say" role="status">
+              {footSay.text}
+            </span>
+          )}
+          <Button kind="ghost" onClick={onClose} testId="settings.add.cancel">
+            cancel
+          </Button>
+          <Button kind="pri" disabled={all.length === 0} state={busy ? 'loading' : undefined} onClick={go} testId="settings.add.go">
+            {addLabel(all)}
+          </Button>
+        </>
+      }
+    >
+      <div className="settings-add-path">
+        <Field
+          autoFocus
+          placeholder="a folder's path"
+          value={typed}
+          onChange={(e) => {
+            setTyped(e.currentTarget.value);
+          }}
+          testId="settings.add.path"
+        />
+        {pickFolder && (
+          <Button
+            size="sm"
+            onClick={() => {
+              void pickFolder().then((p) => {
+                if (p !== null) setTicked((t) => (t.includes(p) ? t : [...t, p]));
+              });
+            }}
+            testId="settings.add.choose"
+          >
+            choose…
+          </Button>
+        )}
+      </div>
+      <Group
+        title={
+          <span className="settings-add-scan" data-testid="settings.add.scan" data-state={said.kind}>
+            <span className={said.kind === 'failed' ? 'err' : undefined}>{said.text}</span>
+            {said.kind === 'failed' && (
+              <Act onClick={again} testId="settings.add.rescan">
+                look again
+              </Act>
+            )}
+          </span>
+        }
+        testId="settings.add.found"
+        items={list.map((f) => ({
+          id: f.path,
+          label: f.name,
+          sub: foundSub(f, now),
+          check: (
+            <Check
+              on={ticked.includes(f.path)}
+              label={f.name}
+              onChange={(on) => {
+                setTicked((t) => (on ? [...t, f.path] : t.filter((x) => x !== f.path)));
+              }}
+              testId={`settings.add.found.${f.name}`}
+            />
+          ),
+        }))}
+      />
+      <Group
+        testId="settings.add.opts"
+        items={[
+          {
+            id: 'land',
+            label: 'main may land on main',
+            sub: land ? 'sb land after the tests, without asking you' : "otherwise your repo's flow decides: a pull request or an approval",
+            control: <Toggle on={land} label="main may land on main" onChange={setLand} testId="settings.add.land" />,
+          },
+        ]}
+      />
+      {broken !== null && said.kind !== 'failed' && <Help>{`the core can't start projects now (${broken}); add will say so.`}</Help>}
+    </Sheet>
+  );
+}
+
+// the sidebar's opener (amb-win wires '+ add a project' and ⌘N to it): one host in the window
+const hosts = new Set<() => void>();
+
+/** Opens the window's add sheet; false when no host is mounted (then go to settings › projects). */
+export function openAddSheet(): boolean {
+  for (const h of hosts) h();
+  return hosts.size > 0;
+}
+
+/** Mount once in the window: the sheet openAddSheet() opens. */
+export function AddSheetHost(props: Omit<AddSheetProps, 'open' | 'onClose'>) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const h = () => {
+      setOpen(true);
+    };
+    hosts.add(h);
+    return () => {
+      hosts.delete(h);
+    };
+  }, []);
+  const close = useCallback(() => {
+    setOpen(false);
+  }, []);
+  return <AddSheet {...props} open={open} onClose={close} />;
+}

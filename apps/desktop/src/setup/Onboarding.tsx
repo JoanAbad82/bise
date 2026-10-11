@@ -6,7 +6,7 @@
 // permissions and fn. Owner: amb-home.
 import { useState } from 'react';
 import type { Account, AppCmd, Found, Perm } from '@/proto';
-import { Button, Check, Chip, Field, Group, Help, Onb, type GroupItem } from '@/ds';
+import { Act, Button, Check, Chip, Field, Group, Help, Onb, type GroupItem } from '@/ds';
 import { Accounts, signedIn, type KeyError } from '@/settings';
 import {
   allAllowed, back, choose as choose_, chosenTicked, filterFound, finish, fnAct, next, pick, pickChosen, PERMS, START, stepOf, STEPS, ticked,
@@ -256,14 +256,15 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
       {body}
       <div className="setup-foot">
         {s.at > 0 && (
-          <Button kind="ghost" onClick={() => { setSt(back(s)); }} testId="setup.back">
+          // designer m_18736: back and skip are Acts; only the step's own action is a Button (pri)
+          <Act onClick={() => { setSt(back(s)); }} testId="setup.back">
             ← back
-          </Button>
+          </Act>
         )}
         {at !== 'fn' && (
-          <Button kind="ghost" onClick={() => { run(finish(s)); }} testId="setup.skip">
+          <Act onClick={() => { run(finish(s)); }} testId="setup.skip">
             skip for now
-          </Button>
+          </Act>
         )}
       </div>
     </section>

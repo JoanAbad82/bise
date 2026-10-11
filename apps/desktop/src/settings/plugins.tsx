@@ -5,7 +5,7 @@
 // that logs in, with log in (his browser, only on his click) and log out.
 // The core answers every act with `plugins` again. Owner: amb-home.
 import type { AppCmd, Plugin, PluginLogin } from '@/proto';
-import { Button, Chip, Group, Help, Toggle, type GroupItem } from '@/ds';
+import { Act, Button, Chip, Group, Help, Toggle, type GroupItem } from '@/ds';
 
 /** A plugin counts as on when it loads (disabled: off; shadowed, invalid: not his to toggle). */
 export function isOn(p: Plugin): boolean {
@@ -62,9 +62,9 @@ export function Plugins({ items, project, send }: { items: readonly Plugin[] | n
             sub: loginWords(l),
             control:
               l.state === 'in' ? (
-                <Button kind="ghost" onClick={() => { send({ cmd: 'plugin_logout', ...at, name: l.name }); }} testId={`settings.login.${l.name}.out`}>
+                <Act tone="err" onClick={() => { send({ cmd: 'plugin_logout', ...at, name: l.name }); }} testId={`settings.login.${l.name}.out`}>
                   log out
-                </Button>
+                </Act>
               ) : (
                 <Button
                   state={l.state === 'pending' ? 'loading' : undefined}

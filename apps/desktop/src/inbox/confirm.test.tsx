@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { CoreCmd } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
-import { ConfirmBar } from './confirm';
+import { ConfirmBar, confirmWords } from './confirm';
 
 afterEach(cleanup);
 
@@ -55,6 +55,19 @@ describe('ConfirmBar', () => {
     fireEvent.keyDown(screen.getByTestId('confirm.bar'), { key: 'Escape' });
     expect(sent.length).toBe(n);
     expect(screen.queryByTestId('confirm.bar')).toBeNull();
+  });
+
+  it("no is the default (the TUI's [y/N], designer m_18733): the filled button, and ⏎; the keycaps say y/n, the words don't", () => {
+    const { sent, ask } = setup();
+    ask(7);
+    expect(screen.getByTestId('confirm.bar').textContent).not.toContain('(y/n)');
+    expect(screen.getByTestId('confirm.no').className).toContain('pri');
+    expect(screen.getByTestId('confirm.yes').className).not.toContain('pri');
+    fireEvent.keyDown(screen.getByTestId('confirm.bar'), { key: 'Enter' });
+    expect(sent.at(-1)).toEqual({ cmd: 'confirm', project: P, id: 7, yes: false });
+    expect(confirmWords('archive it anyway? (y/n)')).toBe('archive it anyway?');
+    expect(confirmWords('drop it? [y/N]')).toBe('drop it?');
+    expect(confirmWords("archive @perf? it's mid-turn.")).toBe("archive @perf? it's mid-turn.");
   });
 
   it('the buttons do the same as the keys', () => {
