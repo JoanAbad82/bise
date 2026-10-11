@@ -33,6 +33,7 @@ pub mod card_link;
 pub mod cli;
 pub mod client;
 pub mod computer_use;
+pub mod contexts;
 pub mod core;
 #[cfg(test)]
 mod core_fresh;
@@ -67,6 +68,7 @@ pub mod role;
 pub mod route;
 pub mod router;
 pub mod search;
+pub mod snapshot_rows;
 pub mod sweep;
 pub mod switch;
 pub mod tools_env;

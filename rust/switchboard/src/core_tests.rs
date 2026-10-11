@@ -32,7 +32,7 @@ impl Env for FakeEnv {
             _ => Err(format!("no project named {}", name)),
         }
     }
-    fn is_git(&self) -> bool {
+    fn is_git(&mut self) -> bool {
         self.git
     }
     fn worktree_create(&mut self, name: &str, _with_changes: bool) -> Result<Workspace, String> {
@@ -349,7 +349,7 @@ fn ask_waits_for_the_reply() {
     let id = t
         .hub
         .st
-        .msgs
+        .msgs()
         .values()
         .find(|m| m.text == "v1 ou v2 ?")
         .unwrap()
@@ -402,15 +402,15 @@ fn a_waiting_agent_says_who_it_waits_on() {
             timeout_s: 20,
         },
     );
-    let agent = |t: &T, n: &str| {
+    let agent = |t: &mut T, n: &str| {
         let snap = t.hub.snapshot(0);
         snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == n).cloned().unwrap()
     };
-    let docs = agent(&t, "docs");
+    let docs = agent(&mut t, "docs");
     assert_eq!(docs["status"], "waiting");
     assert_eq!(docs["waiting_on"], MAIN, "{}", docs);
-    assert!(agent(&t, MAIN)["waiting_on"].is_null());
-    let id = t.hub.st.msgs.values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
+    assert!(agent(&mut t, MAIN)["waiting_on"].is_null());
+    let id = t.hub.st.msgs().values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
     let (_, fx) = t.req(
         MAIN,
         AgentReq::Send {
@@ -424,7 +424,7 @@ fn a_waiting_agent_says_who_it_waits_on() {
         },
     );
     assert!(reply(&fx, tok).is_some(), "the wait ends");
-    assert!(agent(&t, "docs")["waiting_on"].is_null());
+    assert!(agent(&mut t, "docs")["waiting_on"].is_null());
 }
 
 #[test]
@@ -723,7 +723,7 @@ fn an_escalated_question_is_answered_by_the_user() {
     let id = t
         .hub
         .st
-        .msgs
+        .msgs()
         .values()
         .find(|m| m.text == "v1 ou v2 ?")
         .unwrap()
@@ -770,7 +770,7 @@ fn answering_in_the_task_view_answers_its_question() {
     let id = t
         .hub
         .st
-        .msgs
+        .msgs()
         .values()
         .find(|m| m.text == "v1 ou v2 ?")
         .unwrap()
@@ -827,7 +827,7 @@ fn a_crashing_repl_restarts_then_fails() {
     // BISE-299: a failure is main's to handle (a bise message), never a
     // card in the user's inbox
     assert!(t.hub.st.cards.is_empty());
-    assert!(t.hub.st.msgs.values().any(|m| m.to == MAIN && m.text.contains("agent @a failed")));
+    assert!(t.hub.st.msgs().values().any(|m| m.to == MAIN && m.text.contains("agent @a failed")));
     // the user's message revives it
     let fx = t.user(MAIN, "@a réessaie");
     assert!(fx
@@ -1043,7 +1043,7 @@ fn journal_replay_rebuilds_the_same_state() {
     let mut h = Hub::new("/w");
     assert!(h.replay(&journal).is_empty(), "sb-core knows every kind it wrote");
     assert_eq!(h.st.order, t2.hub.st.order);
-    assert_eq!(h.st.msgs, t2.hub.st.msgs);
+    assert_eq!(h.st.msgs(), t2.hub.st.msgs());
     assert_eq!(h.st.agents["b"].ws, t2.hub.st.agents["b"].ws);
 }
 
@@ -1314,7 +1314,7 @@ fn agents_talk_as_long_as_they_want() {
             i,
             fx
         );
-        last = t.hub.st.msgs.values().last().map(|m| m.id);
+        last = t.hub.st.msgs().values().last().map(|m| m.id);
     }
     assert!(t.hub.st.cards.is_empty());
 }
@@ -1349,13 +1349,13 @@ fn a_queued_message_waits_for_the_end_of_the_turn() {
     let id = t
         .hub
         .st
-        .msgs
+        .msgs()
         .values()
         .find(|m| m.text == "later")
         .unwrap()
         .id;
     assert!(
-        t.hub.st.msgs[&id].queued,
+        t.hub.st.msgs()[&id].queued,
         "the mode is in the journal event"
     );
     // a steer message meanwhile goes in at once, alone
@@ -1374,7 +1374,7 @@ fn a_queued_message_waits_for_the_end_of_the_turn() {
         "{}",
         s
     );
-    assert_eq!(t.hub.st.msg_state[&id], MsgState::Delivered);
+    assert_eq!(t.hub.st.msg_state()[&id], MsgState::Delivered);
 }
 
 /// The window's "send queued": the user's queued inputs wait for the end of
@@ -1390,9 +1390,9 @@ fn the_users_queued_inputs_wait_for_the_end_of_the_turn() {
     t.user_queued("a", "@a second later");
     let ids: Vec<u64> = ["first later", "second later"]
         .iter()
-        .map(|x| t.hub.st.msgs.values().find(|m| m.text == *x).unwrap().id)
+        .map(|x| t.hub.st.msgs().values().find(|m| m.text == *x).unwrap().id)
         .collect();
-    assert!(ids.iter().all(|i| t.hub.st.msgs[i].queued && t.hub.st.msgs[i].from == USER));
+    assert!(ids.iter().all(|i| t.hub.st.msgs()[i].queued && t.hub.st.msgs()[i].from == USER));
     let rows = crate::board::Waiting::of(&t.hub.st).queued_inputs("a");
     assert_eq!(rows.iter().map(|r| r["text"].as_str().unwrap()).collect::<Vec<_>>(), ["first later", "second later"]);
     // a plain input meanwhile is steered in at once, alone
@@ -1407,7 +1407,7 @@ fn the_users_queued_inputs_wait_for_the_end_of_the_turn() {
     let s = say_to(&fx, "a").expect("a new turn");
     let (i1, i2) = (s.find("first later").expect("first"), s.find("second later").expect("second"));
     assert!(i1 < i2, "{}", s);
-    assert!(ids.iter().all(|i| t.hub.st.msg_state[i] == MsgState::Delivered));
+    assert!(ids.iter().all(|i| t.hub.st.msg_state()[i] == MsgState::Delivered));
     assert!(crate::board::Waiting::of(&t.hub.st).queued_inputs("a").is_empty());
     let fx = t.turn("a", "done");
     assert!(say_to(&fx, "a").is_none(), "delivered once: {:?}", fx);
@@ -1428,7 +1428,7 @@ fn a_take_back_and_the_turns_end_give_exactly_one_outcome_in_either_order() {
             _ => None,
         })
     };
-    let id_of = |t: &T, text: &str| t.hub.st.msgs.values().find(|m| m.text == text).unwrap().id;
+    let id_of = |t: &T, text: &str| t.hub.st.msgs().values().find(|m| m.text == text).unwrap().id;
     let taken = MsgState::Rejected { error: "taken_back".into() };
 
     // taken back first: the turn's end pumps nothing of it
@@ -1437,15 +1437,15 @@ fn a_take_back_and_the_turns_end_give_exactly_one_outcome_in_either_order() {
     t.user_queued("a", "take me back");
     let id = id_of(&t, "take me back");
     let fx = t.go(Input::ClientUnqueue { client: 1, id });
-    assert_eq!(t.hub.st.msg_state[&id], taken, "{:?}", fx);
+    assert_eq!(t.hub.st.msg_state()[&id], taken, "{:?}", fx);
     assert!(crate::board::Waiting::of(&t.hub.st).queued_inputs("a").is_empty());
     let fx = t.go(Input::ReplIdle { agent: "a".into(), leftover: false });
     assert!(say_to(&fx, "a").is_none_or(|s| !s.contains("take me back")), "never pumped: {:?}", fx);
     assert!(steer_to(&fx, "a").is_none_or(|s| !s.contains("take me back")), "{:?}", fx);
-    assert_eq!(t.hub.st.msg_state[&id], taken);
+    assert_eq!(t.hub.st.msg_state()[&id], taken);
     let fx = t.turn("a", "done");
     assert!(say_to(&fx, "a").is_none_or(|s| !s.contains("take me back")), "{:?}", fx);
-    assert_eq!(t.hub.st.msg_state[&id], taken, "still taken back after the next turn");
+    assert_eq!(t.hub.st.msg_state()[&id], taken, "still taken back after the next turn");
 
     // delivered first: the take-back is refused, it stays delivered
     let mut t = T::new();
@@ -1454,20 +1454,20 @@ fn a_take_back_and_the_turns_end_give_exactly_one_outcome_in_either_order() {
     let id = id_of(&t, "too late");
     let fx = t.go(Input::ReplIdle { agent: "a".into(), leftover: false });
     assert!(say_to(&fx, "a").is_some_and(|s| s.contains("too late")), "{:?}", fx);
-    assert_eq!(t.hub.st.msg_state[&id], MsgState::Delivered);
+    assert_eq!(t.hub.st.msg_state()[&id], MsgState::Delivered);
     let fx = t.go(Input::ClientUnqueue { client: 1, id });
     assert_eq!(notice(&fx).as_deref(), Some(format!("m_{id} already reached @a: it can't be taken back").as_str()), "{:?}", fx);
-    assert_eq!(t.hub.st.msg_state[&id], MsgState::Delivered, "the take-back changed nothing");
+    assert_eq!(t.hub.st.msg_state()[&id], MsgState::Delivered, "the take-back changed nothing");
 
     // the other refusals say why and change nothing
     let fx = t.go(Input::ClientUnqueue { client: 1, id: 9999 });
     assert_eq!(notice(&fx).as_deref(), Some("no message m_9999 to take back"));
     let (_, _) = send(&mut t, MAIN, "a", "from main", false);
     let mid = id_of(&t, "from main");
-    let before = t.hub.st.msg_state.get(&mid).cloned();
+    let before = t.hub.st.msg_state().get(&mid).cloned();
     let fx = t.go(Input::ClientUnqueue { client: 1, id: mid });
     assert_eq!(notice(&fx).as_deref(), Some(format!("m_{mid} isn't one of your messages").as_str()));
-    assert_eq!(t.hub.st.msg_state.get(&mid).cloned(), before);
+    assert_eq!(t.hub.st.msg_state().get(&mid).cloned(), before);
 }
 
 #[test]
@@ -1491,7 +1491,7 @@ fn a_queued_message_does_not_end_a_wait() {
     let q = t
         .hub
         .st
-        .msgs
+        .msgs()
         .values()
         .find(|m| m.text == "question")
         .unwrap()
@@ -1547,7 +1547,7 @@ fn docs_question_card(t: &mut T) -> (u64, u64) {
     let id = t
         .hub
         .st
-        .msgs
+        .msgs()
         .values()
         .find(|m| m.text == "v1 ou v2 ?")
         .unwrap()
@@ -1604,7 +1604,7 @@ fn main_cannot_answer_an_escalated_question_only_the_user_can() {
     let e = err_of(&fx, tok);
     assert!(e.contains("in the user's inbox") && e.contains("--withdraw"), "{e}");
     assert!(t.hub.st.cards.contains_key(&card));
-    assert!(!t.hub.st.msgs.values().any(|m| m.text == "v2"));
+    assert!(!t.hub.st.msgs().values().any(|m| m.text == "v2"));
     // a peer's too (no withdraw hint: it is not its card)
     t.spawn_task("peer");
     let (tok, fx) = t.req(
@@ -1625,7 +1625,7 @@ fn main_cannot_answer_an_escalated_question_only_the_user_can() {
     // the user's answer resolves it and goes to docs, as a reply to its question
     t.user(MAIN, &format!("/answer {} v2", card));
     assert!(t.hub.st.cards.is_empty());
-    let a = t.hub.st.msgs.values().find(|m| m.text == "v2").expect("the user's answer");
+    let a = t.hub.st.msgs().values().find(|m| m.text == "v2").expect("the user's answer");
     assert_eq!((a.from.as_str(), a.to.as_str(), a.reply_to), (USER, "docs", Some(id)));
 }
 
@@ -1664,7 +1664,7 @@ fn agent_traffic_never_reaches_the_user_inbox() {
     let snap = t.hub.snapshot(t.env.now);
     let main = snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == MAIN).unwrap().clone();
     assert_eq!(main["inbox"], 2, "{main}");
-    assert!(t.hub.st.msgs.values().any(|m| m.to == MAIN && m.text.contains("@a is blocked: need a key")));
+    assert!(t.hub.st.msgs().values().any(|m| m.to == MAIN && m.text.contains("@a is blocked: need a key")));
 }
 
 /// BISE-299: main withdraws its own card with a why (the user sees it);
@@ -1781,7 +1781,7 @@ fn question_then_reply(t: &mut T, queued: bool) -> (u64, u64) {
             switch: None,
         },
     );
-    let q = t.hub.st.msgs.values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
+    let q = t.hub.st.msgs().values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
     t.req(
         MAIN,
         AgentReq::Send {
@@ -1794,7 +1794,7 @@ fn question_then_reply(t: &mut T, queued: bool) -> (u64, u64) {
             switch: None,
         },
     );
-    let r = t.hub.st.msgs.values().find(|m| m.text == "v2").unwrap().id;
+    let r = t.hub.st.msgs().values().find(|m| m.text == "v2").unwrap().id;
     (q, r)
 }
 
@@ -1813,7 +1813,7 @@ fn delivered_events(fx: &[Effect], id: u64) -> usize {
 fn waiting_for_a_delivered_reply_does_not_deliver_it_twice() {
     let mut t = T::new();
     let (q, r) = question_then_reply(&mut t, false);
-    assert!(matches!(t.hub.st.msg_state.get(&r), Some(MsgState::Delivered)));
+    assert!(matches!(t.hub.st.msg_state().get(&r), Some(MsgState::Delivered)));
     let (tok, fx) = t.req("docs", AgentReq::Wait { msg: q, timeout_s: 20 });
     assert_eq!(reply(&fx, tok).expect("the wait returns the reply")["message"], "v2");
     assert_eq!(delivered_events(&fx, r), 0, "{:?}", fx);
@@ -1825,7 +1825,7 @@ fn waiting_for_a_delivered_reply_does_not_deliver_it_twice() {
 fn a_queued_reply_is_not_handed_to_a_wait() {
     let mut t = T::new();
     let (q, r) = question_then_reply(&mut t, true);
-    assert!(matches!(t.hub.st.msg_state.get(&r), Some(MsgState::Queued { .. })));
+    assert!(matches!(t.hub.st.msg_state().get(&r), Some(MsgState::Queued { .. })));
     let (tok, fx) = t.req("docs", AgentReq::Wait { msg: q, timeout_s: 20 });
     assert!(reply(&fx, tok).is_none(), "the wait keeps waiting: {:?}", fx);
     assert_eq!(delivered_events(&fx, r), 0);
@@ -2050,13 +2050,13 @@ fn a_message_queued_before_a_rename_reaches_the_new_name() {
     t.spawn_task("docs");
     t.hub.force_run("docs", Run::Starting);
     t.user(MAIN, "@docs change de plan");
-    let id = t.hub.st.msgs.values().find(|m| m.text == "change de plan").unwrap().id;
-    assert!(matches!(t.hub.st.msg_state.get(&id), Some(MsgState::Queued { .. })));
+    let id = t.hub.st.msgs().values().find(|m| m.text == "change de plan").unwrap().id;
+    assert!(matches!(t.hub.st.msg_state().get(&id), Some(MsgState::Queued { .. })));
     t.user(MAIN, "/rename docs api");
     assert!(t.hub.st.agents.contains_key("api"));
     let fx = t.go(Input::ReplReady { agent: "api".into() });
     assert!(say_to(&fx, "api").unwrap_or_default().contains("change de plan"), "{:?}", fx);
-    assert!(matches!(t.hub.st.msg_state.get(&id), Some(MsgState::Delivered)));
+    assert!(matches!(t.hub.st.msg_state().get(&id), Some(MsgState::Delivered)));
 }
 
 /// Found by the L4 proof (no message stuck in a queue), also in the Rust
@@ -2355,7 +2355,7 @@ fn main_answering_a_question_is_answered() {
         },
     );
     t.turn(MAIN, "thinking");
-    let q = t.hub.st.msgs.values().find(|m| m.from == "docs" && m.to == MAIN).map(|m| m.id).expect("the question");
+    let q = t.hub.st.msgs().values().find(|m| m.from == "docs" && m.to == MAIN).map(|m| m.id).expect("the question");
     let _ = tok;
     let fx = send_v2(&mut t, MAIN, "docs", "v2", false, Some(q), "the brief says v2");
     let main = lines_of(&fx, MAIN);
@@ -2378,7 +2378,7 @@ fn main_answering_a_question_is_answered() {
             switch: None,
         },
     );
-    let q2 = t.hub.st.msgs.values().filter(|m| m.from == "docs" && m.to == MAIN).map(|m| m.id).max().unwrap();
+    let q2 = t.hub.st.msgs().values().filter(|m| m.from == "docs" && m.to == MAIN).map(|m| m.id).max().unwrap();
     let fx = send_v2(&mut t, MAIN, "docs", "keep it", false, Some(q2), "");
     assert!(lines_of(&fx, MAIN).contains(&"sb answered : docs : and the title? : keep it : "), "{:?}", fx);
 }
@@ -2392,7 +2392,7 @@ fn main_replying_to_a_non_question_is_msg() {
     t.turn(MAIN, "ok");
     send_v2(&mut t, "docs", MAIN, "fyi: done", false, None, "");
     t.turn(MAIN, "noted");
-    let id = t.hub.st.msgs.values().filter(|m| m.from == "docs").map(|m| m.id).max().unwrap();
+    let id = t.hub.st.msgs().values().filter(|m| m.from == "docs").map(|m| m.id).max().unwrap();
     let fx = send_v2(&mut t, MAIN, "docs", "thanks", false, Some(id), "");
     assert!(lines_of(&fx, MAIN).iter().any(|l| l.starts_with("sb msg : main → docs m_") && l.ends_with(" : thanks")), "{:?}", fx);
 }
@@ -2452,7 +2452,7 @@ fn ask_role(fx: &[Effect]) -> Option<(String, String, String)> {
     })
 }
 
-fn role_of(t: &T, name: &str) -> String {
+fn role_of(t: &mut T, name: &str) -> String {
     let snap = t.hub.snapshot(t.env.now);
     let a = snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == name).unwrap().clone();
     a["role"].as_str().unwrap().to_string()
@@ -2465,8 +2465,8 @@ fn role_of(t: &T, name: &str) -> String {
 fn a_role_line_is_asked_once_per_changed_turn() {
     let mut t = T::new();
     t.spawn_task("docs");
-    assert_eq!(role_of(&t, "docs"), "objective of docs");
-    assert_eq!(role_of(&t, MAIN), "");
+    assert_eq!(role_of(&mut t, "docs"), "objective of docs");
+    assert_eq!(role_of(&mut t, MAIN), "");
     // main's turns never ask
     assert!(ask_role(&t.turn(MAIN, "hello")).is_none());
     // the task's first turn ends with a report: one call
@@ -2478,7 +2478,7 @@ fn a_role_line_is_asked_once_per_changed_turn() {
     assert!(ask_role(&fx).is_none(), "one call in flight at most: {:?}", fx);
     // ...but one when the first call is over (the inputs changed since)
     let fx = t.go(Input::RoleLine { dir: dir.clone(), key, line: Some("drafting the docs outline".into()) });
-    assert_eq!(role_of(&t, "docs"), "drafting the docs outline");
+    assert_eq!(role_of(&mut t, "docs"), "drafting the docs outline");
     assert!(fx.contains(&Effect::State), "the views get the new line: {:?}", fx);
     let (_, key2, request2) = ask_role(&fx).expect("the pending look");
     assert!(request2.contains("wrote chapter one"), "{}", request2);
@@ -2492,7 +2492,7 @@ fn a_role_line_is_asked_once_per_changed_turn() {
     let fx = t.turn("docs", "wrote chapter two");
     let (_, key3, _) = ask_role(&fx).unwrap();
     t.go(Input::RoleLine { dir: dir.clone(), key: key3, line: None });
-    assert_eq!(role_of(&t, "docs"), "writing chapter one");
+    assert_eq!(role_of(&mut t, "docs"), "writing chapter one");
     assert!(ask_role(&t.turn("docs", "wrote chapter three")).is_none());
     t.env.now += ROLE_RETRY_MS;
     assert!(ask_role(&t.turn("docs", "wrote chapter four")).is_some());
@@ -2508,7 +2508,7 @@ fn a_saved_role_line_is_kept() {
     let mut t2 = T::new();
     t2.spawn_task("docs");
     t2.hub.load_role(&dir, "drafting the outline".into(), key);
-    assert_eq!(role_of(&t2, "docs"), "drafting the outline");
+    assert_eq!(role_of(&mut t2, "docs"), "drafting the outline");
     assert!(ask_role(&t2.turn("docs", "drafted the outline")).is_none());
 }
 
@@ -2520,11 +2520,11 @@ fn a_saved_role_line_is_kept() {
 fn an_agent_says_where_it_works() {
     let mut t = T::new();
     t.spawn_task("docs");
-    let place = |t: &T| {
+    let place = |t: &mut T| {
         let snap = t.hub.snapshot(0);
         snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == "docs").unwrap()["place"].clone()
     };
-    assert!(place(&t).is_null());
+    assert!(place(&mut t).is_null());
     // the fallback: a linked worktree has a .git file
     let wt = std::env::temp_dir().join(format!("sb-place-{}", std::process::id()));
     std::fs::create_dir_all(&wt).unwrap();
@@ -2537,21 +2537,21 @@ fn an_agent_says_where_it_works() {
         })
     };
     bash(&mut t, "cd /tmp && ls");
-    assert!(place(&t).is_null(), "not a linked worktree");
+    assert!(place(&mut t).is_null(), "not a linked worktree");
     let fx = bash(&mut t, &format!("cd {} && cargo test", wt));
-    assert_eq!(place(&t), json!(wt));
+    assert_eq!(place(&mut t), json!(wt));
     assert!(fx.contains(&Effect::State), "the views learn it");
     // told: the fallback stops guessing
     let (tok, fx) = t.req("docs", AgentReq::Worktree { path: "/tmp/docs-wt".into() });
     assert!(fx.contains(&Effect::Reply { token: tok, body: json!({"ok": true, "path": "/tmp/docs-wt"}) }), "{:?}", fx);
-    assert_eq!(place(&t), json!("/tmp/docs-wt"));
+    assert_eq!(place(&mut t), json!("/tmp/docs-wt"));
     let (_, fx) = t.req(MAIN, AgentReq::Tasks);
     assert!(format!("{:?}", fx).contains("private worktree /tmp/docs-wt"), "{:?}", fx);
     bash(&mut t, &format!("cd {} && cargo test", wt));
-    assert_eq!(place(&t), json!("/tmp/docs-wt"));
+    assert_eq!(place(&mut t), json!("/tmp/docs-wt"));
     // none: its own workspace again
     t.req("docs", AgentReq::Worktree { path: String::new() });
-    assert!(place(&t).is_null());
+    assert!(place(&mut t).is_null());
     // the CLI's JSON: an absolute path or none
     let r = |p: &str| AgentReq::from_json(&json!({"cmd": "worktree", "path": p}));
     assert_eq!(r("none"), Ok(AgentReq::Worktree { path: String::new() }));
@@ -2580,15 +2580,15 @@ fn a_private_worktree_is_a_place() {
     for a in ["docs", "api"] {
         t.req(a, AgentReq::Worktree { path: "/p/docs-wt".into() });
     }
-    let view = |t: &T| {
+    let view = |t: &mut T| {
         let snap = t.hub.snapshot(0);
         snap["places"].as_array().unwrap().iter().find(|p| p["id"] == "pt:/p/docs-wt").cloned().unwrap_or(Value::Null)
     };
     let snap = t.hub.snapshot(0);
     let docs = snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == "docs").unwrap().clone();
     assert_eq!(docs["place_id"], "pt:/p/docs-wt");
-    assert_eq!(view(&t)["agents"], json!(["docs", "api"]));
-    assert_eq!(view(&t)["branch"], Value::Null);
+    assert_eq!(view(&mut t)["agents"], json!(["docs", "api"]));
+    assert_eq!(view(&mut t)["branch"], Value::Null);
     let w = t.hub.pr_watches();
     assert_eq!(w.len(), 1, "{:?}", w);
     assert!(w[0].head && w[0].branch.is_empty() && w[0].path == "/p/docs-wt");
@@ -2597,13 +2597,13 @@ fn a_private_worktree_is_a_place() {
         Input::Prs(Report { at_ms: 1_000, prs: None, local, activity: Vec::new() })
     };
     t.go(read("", 2));
-    assert_eq!(view(&t)["lid"], "no PR yet · 2 commits");
+    assert_eq!(view(&mut t)["lid"], "no PR yet · 2 commits");
     t.go(read("", 0));
-    assert_eq!(view(&t)["lid"], Value::Null);
+    assert_eq!(view(&mut t)["lid"], Value::Null);
     // a branch checked out there: the place's name, the forge's question
     let fx = t.go(read("feat/x", 0));
     assert!(fx.contains(&Effect::State), "{:?}", fx);
-    assert_eq!(view(&t)["branch"], "feat/x");
+    assert_eq!(view(&mut t)["branch"], "feat/x");
     assert_eq!(t.hub.pr_watches()[0].branch, "feat/x");
     // merged: its agents stay
     let merged = PrSnapshot {
@@ -2620,12 +2620,12 @@ fn a_private_worktree_is_a_place() {
     let local = vec![Local { place: "pt:/p/docs-wt".into(), branch: "feat/x".into(), tip: Some("h".into()), commits: Some(0), dirty: Some(false) }];
     let fx = t.go(Input::Prs(Report { at_ms: 2_000, prs: Some(Ok(vec![merged])), local, activity: Vec::new() }));
     assert!(!format!("{:?}", fx).contains("\"drop\""), "{:?}", fx);
-    assert_eq!(view(&t)["agents"], json!(["docs", "api"]));
+    assert_eq!(view(&mut t)["agents"], json!(["docs", "api"]));
     // none: back in the shared folder, the place goes
     for a in ["docs", "api"] {
         t.req(a, AgentReq::Worktree { path: String::new() });
     }
-    assert_eq!(view(&t), Value::Null);
+    assert_eq!(view(&mut t), Value::Null);
 }
 
 
@@ -2721,20 +2721,69 @@ fn bench_step() {
         queued: false,
         parts: String::new(),
     });
+    // every context from nothing (before contexts.rs, at each input)
     let t0 = std::time::Instant::now();
     for _ in 0..10 {
-        let (w, g) = (board::Waiting::of(&h.st), board::Group::of(&h.st, env.now, &h.models));
-        for n in &active {
-            let _ = if n == MAIN { board::main_context(&h.st, env.now, &w) } else { board::task_context(n, &g, &w) };
-        }
+        let _ = crate::contexts::fresh(&h.st, env.now, &h.models);
     }
-    eprintln!("refresh_contexts alone: {:?}", t0.elapsed() / 10);
+    eprintln!("contexts from nothing: {:?}", t0.elapsed() / 10);
+    // the kept ones (contexts.rs), with no change, then after an activity
+    let mut c = crate::contexts::Contexts::default();
+    c.refresh(&h.st, env.now, &h.models);
+    let t0 = std::time::Instant::now();
+    for i in 0..10 {
+        let a = active[i % active.len()].clone();
+        h.set_activity(&a, env.now, format!("tool #{} bash : echo {}", i, i));
+        c.refresh(&h.st, env.now, &h.models);
+    }
+    eprintln!("refresh_contexts after an activity: {:?}", t0.elapsed() / 10);
+    let fresh = crate::contexts::fresh(&h.st, env.now, &h.models);
+    for (n, text) in &fresh {
+        assert_eq!(c.text(n), Some(text.as_str()), "{n}: the kept context is the fresh one");
+    }
     let t0 = std::time::Instant::now();
     for _ in 0..10 {
         let _ = h.snapshot(env.now);
     }
     let snap = t0.elapsed() / 10;
     eprintln!("snapshot alone: {:?}", snap);
+    {
+        // from nothing (every row built, as before snapshot_rows.rs), then
+        // the same snapshot again: byte for byte, and its JSON text
+        h.rows = Default::default();
+        let t0 = std::time::Instant::now();
+        let cold = h.snapshot(env.now);
+        let t_cold = t0.elapsed();
+        let built = h.rows.built;
+        let t0 = std::time::Instant::now();
+        let warm = h.snapshot(env.now);
+        let snap = t0.elapsed();
+        assert_eq!(cold, warm, "the kept rows are the built ones");
+        // what a kept snapshot still does: each agent's watches, the
+        // compare of each agent, the clone of each row
+        let agents: Vec<&Agent> = h.st.order.iter().filter_map(|n| h.st.agents.get(n)).collect();
+        let copies: Vec<Agent> = agents.iter().map(|a| (*a).clone()).collect();
+        let t0 = std::time::Instant::now();
+        let n: usize = agents.iter().map(|a| h.st.wakes.watching(&a.name).len()).sum();
+        let t_w = t0.elapsed();
+        let t0 = std::time::Instant::now();
+        let same = agents.iter().zip(&copies).filter(|(a, b)| **a == *b).count();
+        let t_eq = t0.elapsed();
+        let t0 = std::time::Instant::now();
+        let _rows = warm["agents"].clone();
+        eprintln!("  watching {:?} ({} watches), {} agents compared {:?}, rows cloned {:?}", t_w, n, same, t_eq, t0.elapsed());
+        let t0 = std::time::Instant::now();
+        let text = serde_json::to_string(&warm).unwrap();
+        eprintln!(
+            "  snapshot from nothing {:?} ({} rows built), kept {:?} ({} rows built again); its JSON text ({} bytes) {:?}",
+            t_cold,
+            built,
+            snap,
+            h.rows.built - built,
+            text.len(),
+            t0.elapsed()
+        );
+    }
     // hub-fifo: a flood of tool lines over the active agents, 1 ms apart.
     // Each one dirties the view (Effect::State): before the state gate
     // the shell built a snapshot for each; now at most one per 100 ms.
@@ -2950,7 +2999,7 @@ mod prs {
         Input::Prs(Report { at_ms: at, prs: Some(prs), local: local(dirty), activity: Vec::new() })
     }
 
-    fn place_view(t: &T, now: u64) -> Value {
+    fn place_view(t: &mut T, now: u64) -> Value {
         let snap = t.hub.snapshot(now);
         snap["places"].as_array().unwrap().iter().find(|p| p["id"] == "wt:dark").cloned().unwrap_or(Value::Null)
     }
@@ -2973,7 +3022,7 @@ mod prs {
         // no PR yet: the held line counts the commits
         let fx = t.go(report(1_000, Ok(vec![]), None));
         assert!(events(&fx).is_empty());
-        let v = place_view(&t, 1_000);
+        let v = place_view(&mut t, 1_000);
         assert_eq!(v["pr"], Value::Null);
         assert_eq!(v["lid"], "no PR yet · 2 commits");
         // opened: seen, journaled with its number; the lid goes
@@ -2981,7 +3030,7 @@ mod prs {
         assert_eq!(events(&fx), ["PR seen"]);
         assert!(fx.contains(&Effect::State));
         assert!(t.journal.borrow().iter().any(|j| j["type"] == "pr_seen" && j["number"] == 412 && j["place"] == "wt:dark"));
-        let v = place_view(&t, 2_000);
+        let v = place_view(&mut t, 2_000);
         assert_eq!(v["pr"]["number"], 412);
         assert_eq!(v["pr"]["state"], "open");
         assert_eq!(v["pr"]["checks"]["state"], "running");
@@ -3000,7 +3049,7 @@ mod prs {
         ] {
             let fx = t.go(report(4_000, Ok(vec![pr(412, PrState::Open, review, checks.clone())]), None));
             assert_eq!(events(&fx), ["PR changed"]);
-            let v = place_view(&t, 4_000);
+            let v = place_view(&mut t, 4_000);
             assert_eq!(v["pr"]["review"], want);
             assert_eq!(v["pr"]["checks"], serde_json::to_value(&checks).unwrap());
         }
@@ -3015,7 +3064,7 @@ mod prs {
         assert!(!has_line(&fx, MAIN, "work saved"), "no backup: {:?}", fx);
         assert!(has_line(&fx, MAIN, "@dark archived"), "{:?}", fx);
         // the place is gone, its PR with it
-        assert_eq!(place_view(&t, 6_000), Value::Null);
+        assert_eq!(place_view(&mut t, 6_000), Value::Null);
         assert!(t.hub.pr_watches().is_empty());
         t.go(report(6_000, Ok(vec![pr(412, PrState::Merged, Review::Approved, Checks::Pass)]), Some(false)));
         assert!(t.hub.prs.is_empty());
@@ -3095,8 +3144,8 @@ mod prs {
             fx
         );
         assert_eq!(merge_cards(&t).len(), 1);
-        let note = |t: &T| t.hub.snapshot(8_000)["cards"].as_array().unwrap().iter().find(|x| x["kind"] == "merge").map(|x| x["note"].clone());
-        assert_eq!(note(&t), Some(json!("merging…")));
+        let note = |t: &mut T| t.hub.snapshot(8_000)["cards"].as_array().unwrap().iter().find(|x| x["kind"] == "merge").map(|x| x["note"].clone());
+        assert_eq!(note(&mut t), Some(json!("merging…")));
         // twice: one merge
         let fx = t.user(MAIN, &format!("/answer {} 1", id));
         assert!(!fx.iter().any(|e| matches!(e, Effect::Merge { .. })));
@@ -3109,7 +3158,7 @@ mod prs {
         assert_eq!(closed_as(&t, id).as_deref(), Some("merge failed"));
         t.go(report(9_000, Ok(vec![ready_pr("tip2", &["alice", "bob"])]), None));
         let id = merge_cards(&t)[0].id;
-        assert_eq!(note(&t), Some(json!("gh couldn't merge it: Pull request is not mergeable")));
+        assert_eq!(note(&mut t), Some(json!("gh couldn't merge it: Pull request is not mergeable")));
         // merged: closed, main told; the forge's next answer archives the place
         t.user(MAIN, &format!("/answer {} 1", id));
         let fx = t.go(Input::Merged { card: id, place: "wt:dark".into(), number: 412, res: Ok(()) });
@@ -3184,8 +3233,8 @@ mod prs {
         assert!(fx.iter().any(|e| matches!(e, Effect::Update { id: r, version, .. } if r == "6" && version == "v2026.10.2-6")), "{:?}", fx);
         let fx = t.user(MAIN, &format!("/answer {} 1", id));
         assert!(!fx.iter().any(|e| matches!(e, Effect::Update { .. })));
-        let note = |t: &T| t.hub.snapshot(3_000)["cards"].as_array().unwrap().iter().find(|x| x["kind"] == "update").map(|x| x["note"].clone());
-        assert_eq!(note(&t), Some(json!("updating to v2026.10.2-6…")));
+        let note = |t: &mut T| t.hub.snapshot(3_000)["cards"].as_array().unwrap().iter().find(|x| x["kind"] == "update").map(|x| x["note"].clone());
+        assert_eq!(note(&mut t), Some(json!("updating to v2026.10.2-6…")));
         // failed: closed, main told, the running version stays
         let fx = t.go(Input::Updated { card: id, version: "v2026.10.2-6".into(), res: Err("cannot download the release.".into()) });
         assert!(
@@ -3242,7 +3291,7 @@ mod prs {
         let mut t = T::new();
         spawn_wt(&mut t, "dark");
         t.go(report(1_000, Ok(vec![pr(7, PrState::Draft, Review::None, Checks::None)]), None));
-        assert_eq!(place_view(&t, 1_000)["pr"]["state"], "draft");
+        assert_eq!(place_view(&mut t, 1_000)["pr"]["state"], "draft");
         for (i, e) in [
             ForgeError::Offline("error connecting to api.github.com".into()),
             ForgeError::Auth("HTTP 401: Bad credentials".into()),
@@ -3265,16 +3314,16 @@ mod prs {
             assert!(t.hub.st.cards.is_empty());
         }
         // the last state stays, with its age
-        let v = place_view(&t, 61_000);
+        let v = place_view(&mut t, 61_000);
         assert_eq!(v["pr"]["state"], "draft");
         assert_eq!(v["pr"]["stale_ms"], 60_000);
         // back: fresh again
         let fx = t.go(report(70_000, Ok(vec![pr(7, PrState::Draft, Review::None, Checks::None)]), None));
         assert!(fx.contains(&Effect::State));
-        assert_eq!(place_view(&t, 70_000)["pr"]["stale_ms"], Value::Null);
+        assert_eq!(place_view(&mut t, 70_000)["pr"]["stale_ms"], Value::Null);
         // no answer for a long time (no client: 5 min cadence, a hung gh)
         let late = 70_000 + PR_STALE_MS + 1;
-        assert_eq!(place_view(&t, late)["pr"]["stale_ms"], PR_STALE_MS + 1);
+        assert_eq!(place_view(&mut t, late)["pr"]["stale_ms"], PR_STALE_MS + 1);
     }
 
     #[test]
@@ -3289,7 +3338,7 @@ mod prs {
         assert!(skipped.is_empty(), "the hub's own lines never reach sb-core: {:?}", skipped);
         let fx = t2.go(report(2_000, Ok(vec![pr(412, PrState::Open, Review::None, Checks::None)]), None));
         assert!(events(&fx).is_empty(), "{:?}", events(&fx));
-        assert_eq!(place_view(&t2, 2_000)["pr"]["number"], 412);
+        assert_eq!(place_view(&mut t2, 2_000)["pr"]["number"], 412);
     }
 
     #[test]
@@ -3315,8 +3364,8 @@ mod prs {
         let fx = t.go(report(1_000, Ok(vec![old]), Some(false)));
         assert!(events(&fx).is_empty());
         assert_ne!(t.status("dark"), Status::Archived);
-        assert_eq!(place_view(&t, 1_000)["pr"], Value::Null);
-        assert_eq!(place_view(&t, 1_000)["lid"], "no PR yet · 2 commits");
+        assert_eq!(place_view(&mut t, 1_000)["pr"], Value::Null);
+        assert_eq!(place_view(&mut t, 1_000)["lid"], "no PR yet · 2 commits");
         let _ = PrEvent::Unreachable { error: ForgeError::Missing };
     }
 
@@ -3326,10 +3375,10 @@ mod prs {
         spawn_wt(&mut t, "dark");
         t.hub.flow = Some(crate::flow::FlowMode::Trunk);
         t.go(report(1_000, Ok(vec![]), None));
-        assert_eq!(place_view(&t, 1_000)["lid"], Value::Null);
+        assert_eq!(place_view(&mut t, 1_000)["lid"], Value::Null);
         // the land queue's line is the held line there
         t.hub.lids.insert("wt:dark".into(), "waits to land · 2nd".into());
-        assert_eq!(place_view(&t, 1_000)["lid"], "waits to land · 2nd");
+        assert_eq!(place_view(&mut t, 1_000)["lid"], "waits to land · 2nd");
     }
 
     /// The local git of the fake life: the branch's tip, fixed.
@@ -3410,7 +3459,7 @@ mod prs {
         // no PR yet
         std::fs::write(dir.join("answer"), r#"{"data":{"repository":{"b0":{"nodes":[]}}}}"#).unwrap();
         round(&mut w, &mut t, &mut now);
-        assert_eq!(place_view(&t, now)["lid"], "no PR yet · 2 commits");
+        assert_eq!(place_view(&mut t, now)["lid"], "no PR yet · 2 commits");
         let life: [(&str, bool, &str, &str, Value); 6] = [
             ("OPEN", true, "", "PENDING", json!({"state": "draft", "review": "none", "checks": {"state": "running"}})),
             ("OPEN", false, "CHANGES_REQUESTED", "SUCCESS", json!({"state": "open", "review": "changes_requested", "checks": {"state": "pass"}})),
@@ -3430,7 +3479,7 @@ mod prs {
                 assert!(has_line(&fx, MAIN, "@dark archived"), "{:?}", fx);
                 continue;
             }
-            let v = place_view(&t, now);
+            let v = place_view(&mut t, now);
             for k in ["state", "review", "checks"] {
                 assert_eq!(v["pr"][k], want[k], "{} after {} {}: {}", k, state, review, v);
             }
@@ -3465,7 +3514,7 @@ mod prs {
             let r = w.step(at).expect("asked");
             assert!(matches!(r.prs, Some(Err(_))), "{:?}", r.prs);
             t.go(Input::Prs(r));
-            let v = place_view(&t, at);
+            let v = place_view(&mut t, at);
             assert_eq!(v["pr"]["state"], "open", "the last state stays");
             assert_eq!(v["pr"]["stale_ms"], at - 1_000, "faint, with its age");
             // backing off: no ask before the back-off ends
@@ -3475,7 +3524,7 @@ mod prs {
         assert!(t.hub.st.cards.is_empty(), "never an inbox item");
         std::fs::remove_file(dir.join("stderr")).unwrap();
         t.go(Input::Prs(w.step(at).unwrap()));
-        assert_eq!(place_view(&t, at)["pr"]["stale_ms"], Value::Null);
+        assert_eq!(place_view(&mut t, at)["pr"]["stale_ms"], Value::Null);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -3486,7 +3535,7 @@ mod prs {
     }
 
     fn from_github(t: &T, to: &str) -> Vec<String> {
-        t.hub.st.msgs.values().filter(|m| m.from == "github" && m.to == to).map(|m| m.text.clone()).collect()
+        t.hub.st.msgs().values().filter(|m| m.from == "github" && m.to == to).map(|m| m.text.clone()).collect()
     }
 
     fn pr_line(fx: &[Effect]) -> Vec<String> {
@@ -3547,7 +3596,7 @@ mod prs {
         assert!(card.text.contains("e2e still fails after 2 fixes by dark"), "{}", card.text);
         // the user's answer goes to the agent
         t.user(MAIN, &format!("/answer {} skip it, it's flaky", card.id));
-        assert!(t.hub.st.msgs.values().any(|m| m.from == "user" && m.to == "dark" && m.text == "skip it, it's flaky"));
+        assert!(t.hub.st.msgs().values().any(|m| m.from == "user" && m.to == "dark" && m.text == "skip it, it's flaky"));
         assert!(!t.hub.st.cards.contains_key(&card.id), "answered: closed");
         // /prs lists it
         let fx = t.user(MAIN, "/prs");
@@ -3607,7 +3656,7 @@ mod prs {
         t.spawn_task("t1");
         let fx = expired_turn(&mut t, "t1");
         assert!(say_to(&fx, MAIN).is_none(), "main is not woken: {:?}", fx);
-        assert!(!t.hub.st.msgs.values().any(|m| m.to == MAIN && m.from == "t1"), "no report nor auto reply to main");
+        assert!(!t.hub.st.msgs().values().any(|m| m.to == MAIN && m.from == "t1"), "no report nor auto reply to main");
         let cs = signin_cards(&t);
         assert_eq!(cs.len(), 1, "{:?}", t.hub.st.cards);
         assert_eq!(cs[0].place.as_deref(), Some("signin:chatgpt"));
@@ -3679,8 +3728,8 @@ fn a_batched_replay_builds_the_same_state_as_one_event_at_a_time() {
         one.raw(&json!({"t": "replay", "ev": e}));
     }
     one.view_all();
-    assert_eq!(batched.st.msgs.len(), 1200 + 240);
-    assert_eq!(batched.st.msgs, one.st.msgs);
+    assert_eq!(batched.st.msgs().len(), 1200 + 240);
+    assert_eq!(batched.st.msgs(), one.st.msgs());
     assert_eq!(batched.st.order, one.st.order);
     assert_eq!(batched.st.agents["a"].ws, one.st.agents["a"].ws);
     assert_eq!(batched.raw(&json!({"t": "view_all"})), one.raw(&json!({"t": "view_all"})));
@@ -3715,7 +3764,7 @@ fn xreplies(fx: &[Effect]) -> Vec<(String, u64, String)> {
 }
 
 fn last_msg(t: &T) -> u64 {
-    *t.hub.st.msgs.keys().max().unwrap()
+    *t.hub.st.msgs().keys().max().unwrap()
 }
 
 // home side: only main forwards, only his own message, once; the outbox
@@ -3759,12 +3808,12 @@ fn bise_forwards_his_message_once_and_settles_on_the_answer() {
     assert!(xdelivers(&t.go(Input::Tick)).is_empty());
     // the answer: main hears it from @shop, once
     t.go(Input::XReply { xid: 1, name: "shop".into(), text: "fixed on sb/login".into() });
-    let ans = t.hub.st.msgs.values().find(|m| m.from == "@shop").expect("an answer from @shop");
+    let ans = t.hub.st.msgs().values().find(|m| m.from == "@shop").expect("an answer from @shop");
     assert_eq!(ans.to, MAIN);
     assert!(ans.text.contains("fixed on sb/login") && ans.text.contains(&format!("m_{}", his)), "{}", ans.text);
-    let n = t.hub.st.msgs.len();
+    let n = t.hub.st.msgs().len();
     t.go(Input::XReply { xid: 1, name: "shop".into(), text: "again".into() });
-    assert_eq!(t.hub.st.msgs.len(), n);
+    assert_eq!(t.hub.st.msgs().len(), n);
     // bise's own question: no message of his needed
     let (tok, fx) = t.req(MAIN, AgentReq::ProjectAsk { project: "shop".into(), text: "is the login fixed?".into() });
     assert_eq!(reply(&fx, tok).unwrap()["ok"], true);
@@ -3850,11 +3899,11 @@ fn hold(t: &mut T, text: &str) -> Vec<Effect> {
 fn a_held_route_goes_at_two_seconds_once_with_no_turn() {
     let mut t = T::new();
     let now = t.env.now;
-    let n = t.hub.st.msgs.len();
+    let n = t.hub.st.msgs().len();
     let fx = hold(&mut t, "why does p99 rise");
     assert_eq!(routes(&fx), vec![(1, "shop-1".into(), "shop".into(), now + 2000)]);
     assert!(xdelivers(&fx).is_empty() && say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none());
-    assert_eq!(t.hub.st.msgs.len(), n, "no message while held");
+    assert_eq!(t.hub.st.msgs().len(), n, "no message while held");
     t.env.now += 1_500;
     assert!(xdelivers(&t.go(Input::Tick)).is_empty());
     t.env.now += 600;
@@ -3863,7 +3912,7 @@ fn a_held_route_goes_at_two_seconds_once_with_no_turn() {
     assert_eq!(route_dones(&fx), vec![(1, "sent".into(), "shop-1".into(), Some(1))]);
     assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none(), "no turn: {:?}", fx);
     let his = last_msg(&t);
-    let m = &t.hub.st.msgs[&his];
+    let m = &t.hub.st.msgs()[&his];
     assert_eq!((m.from.as_str(), m.to.as_str(), m.text.as_str()), (crate::model::USER, MAIN, "why does p99 rise"));
     let note = t.hub.st.main_notes.last().expect("a note for main");
     assert!(note.contains(&format!("m_{his}")) && note.contains("shop"), "{note}");
@@ -3941,8 +3990,8 @@ fn a_routed_message_carries_his_context_to_the_project() {
     assert_eq!(sent.len(), 1, "{:?}", fx);
     assert_eq!(sent[0].0, "why does p99 rise");
     assert_eq!(serde_json::from_str::<Value>(&sent[0].1).unwrap(), ctx);
-    let his = *h.st.msgs.keys().max().unwrap();
-    assert_eq!(h.st.msgs[&his].text, "why does p99 rise", "no context on the home hub");
+    let his = *h.st.msgs().keys().max().unwrap();
+    assert_eq!(h.st.msgs()[&his].text, "why does p99 rise", "no context on the home hub");
     // a forward or an ask carries none
     let (_, fx) = t.req(MAIN, AgentReq::ProjectAsk { project: "shop".into(), text: "status?".into() });
     assert!(fx.iter().any(|e| matches!(e, Effect::XDeliver { context, .. } if context.is_empty())), "{:?}", fx);
@@ -3970,14 +4019,14 @@ fn a_routed_message_carries_his_parts_to_the_project() {
         })
         .collect();
     assert_eq!(sent, vec![parts.to_string()], "{:?}", fx);
-    let his = *h.st.msgs.keys().max().unwrap();
-    assert_eq!(h.st.msgs[&his].parts, parts, "his message at home keeps them");
+    let his = *h.st.msgs().keys().max().unwrap();
+    assert_eq!(h.st.msgs()[&his].parts, parts, "his message at home keeps them");
     // a cancel: his words to main with his parts
     let mut t = T::new();
     t.go(Input::RouteHold { text: "look".into(), via: String::new(), to: "shop-1".into(), name: "shop".into(), why: "you named shop".into(), context: None, parts: parts.into() });
     t.go(Input::RouteCancel { client: None, rid: 1 });
     let his = last_msg(&t);
-    assert_eq!((t.hub.st.msgs[&his].text.as_str(), t.hub.st.msgs[&his].parts.as_str()), ("look", parts));
+    assert_eq!((t.hub.st.msgs()[&his].text.as_str(), t.hub.st.msgs()[&his].parts.as_str()), ("look", parts));
     // no parts: the forward carries none (the out JSON has no key)
     let mut t = T::new();
     hold(&mut t, "why does p99 rise");
@@ -3989,10 +4038,10 @@ fn a_routed_message_carries_his_parts_to_the_project() {
     let mut t = T::new();
     t.go(Input::XIn { token: 900, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "look".into(), name: String::new(), parts: parts.into() });
     let his = last_msg(&t);
-    assert_eq!(t.hub.st.msgs[&his].parts, parts);
+    assert_eq!(t.hub.st.msgs()[&his].parts, parts);
     t.go(Input::XIn { token: 901, hub: "home-1".into(), xid: 8, kind: "ask".into(), text: "status?".into(), name: String::new(), parts: parts.into() });
     let q = last_msg(&t);
-    assert!(t.hub.st.msgs[&q].parts.is_empty(), "bise's own question has no parts");
+    assert!(t.hub.st.msgs()[&q].parts.is_empty(), "bise's own question has no parts");
 }
 
 // a restart mid-hold: the act is in the journal, it fires once after
@@ -4481,7 +4530,7 @@ fn close_closes_every_kind_of_card() {
 fn an_agents_row_says_running_and_turns_from_one_source() {
     let mut t = T::new();
     t.spawn_task("a");
-    let row = |t: &T| -> (bool, u64) {
+    let row = |t: &mut T| -> (bool, u64) {
         let snap = t.hub.snapshot(t.env.now);
         let mut since = crate::proto_view::Since::new();
         let rows = crate::proto_view::agents(&snap, &mut since, t.env.now, crate::model::user_kind, &|_| None, &|_| None, &|_| None);
@@ -4495,43 +4544,43 @@ fn an_agents_row_says_running_and_turns_from_one_source() {
         t.go(Input::ReplIdle { agent: "a".into(), leftover: false });
     };
     // the brief's turn runs (spawn_task started it)
-    let base = row(&t).1;
-    assert_eq!(row(&t), (true, base));
+    let base = row(&mut t).1;
+    assert_eq!(row(&mut t), (true, base));
     // it ends: one step, both halves
     idle(&mut t);
-    assert_eq!(row(&t), (false, base + 1), "a quick turn ends");
+    assert_eq!(row(&mut t), (false, base + 1), "a quick turn ends");
     // a turn with no entry
     t.user("a", "go");
     line(&mut t, "  obs: turn_started");
-    assert_eq!(row(&t), (true, base + 1));
+    assert_eq!(row(&mut t), (true, base + 1));
     idle(&mut t);
-    assert_eq!(row(&t), (false, base + 2), "a turn with no entry");
+    assert_eq!(row(&mut t), (false, base + 2), "a turn with no entry");
     // an interrupted one: its turn_done line moves nothing, its idle does
     t.user("a", "long job");
     line(&mut t, "  obs: turn_started");
     line(&mut t, "  obs: turn_done: interrupted");
-    assert_eq!(row(&t), (true, base + 2), "the line alone never moves the count");
+    assert_eq!(row(&mut t), (true, base + 2), "the line alone never moves the count");
     idle(&mut t);
-    assert_eq!(row(&t), (false, base + 3), "an interrupted turn");
+    assert_eq!(row(&mut t), (false, base + 3), "an interrupted turn");
     // a failed one
     t.user("a", "try");
     line(&mut t, "  obs: turn_started");
     line(&mut t, "  obs: turn_done: failed: 500");
     idle(&mut t);
-    assert_eq!(row(&t), (false, base + 4), "a failed turn");
+    assert_eq!(row(&mut t), (false, base + 4), "a failed turn");
     // a queued message: the idle's pump starts its turn in the same step
     t.user("a", "first");
     line(&mut t, "  obs: turn_started");
     t.user_queued("a", "then this");
     idle(&mut t);
-    assert_eq!(row(&t), (true, base + 5), "ended and the next one started in one step");
+    assert_eq!(row(&mut t), (true, base + 5), "ended and the next one started in one step");
     idle(&mut t);
-    assert_eq!(row(&t), (false, base + 6));
+    assert_eq!(row(&mut t), (false, base + 6));
     // a crash mid-turn ends it too
     t.user("a", "crash");
     line(&mut t, "  obs: turn_started");
     t.go(Input::ReplExited { agent: "a".into(), crashed: true, reason: "test".into() });
-    assert_eq!(row(&t), (false, base + 7), "a crash mid-turn");
+    assert_eq!(row(&mut t), (false, base + 7), "a crash mid-turn");
 }
 
 /// No number a client sends panics the hub (core_num.rs).
@@ -4547,12 +4596,12 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     let mut t = T::new();
     t.spawn_task("perf");
     t.go(Input::ReplIdle { agent: "perf".into(), leftover: false });
-    let watching = |t: &T| t.hub.snapshot(t.env.now)["agents"].as_array().unwrap().iter().find(|a| a["name"] == "perf").unwrap()["watching"].clone();
-    assert_eq!(watching(&t), json!([]));
+    let watching = |t: &mut T| t.hub.snapshot(t.env.now)["agents"].as_array().unwrap().iter().find(|a| a["name"] == "perf").unwrap()["watching"].clone();
+    assert_eq!(watching(&mut t), json!([]));
     let spec = crate::wake::Spec { what: crate::wake::What::Pid { pid: 4242, start: String::new() }, tail: None, note: "the build".into() };
     let (tok, _) = t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.clone(), max_ms: crate::wake::MAX_DEFAULT_MS }));
     let _ = tok;
-    let w = watching(&t);
+    let w = watching(&mut t);
     assert_eq!((w[0]["what"].as_str(), w[0]["kind"].as_str()), (Some("the build"), Some("pid")), "{w}");
     let id = w[0]["id"].as_u64().unwrap();
     let wakes = |fx: &[Effect]| lines_of(fx, "perf").into_iter().filter(|l| l.starts_with("sb wake : ")).map(String::from).collect::<Vec<_>>();
@@ -4562,10 +4611,10 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     let l: bise_proto::thread::WakeFold = serde_json::from_str(ls[0].trim_start_matches("sb wake : ")).unwrap();
     let sent = t.journal.borrow().iter().rev().find(|j| j["type"] == "message_sent" && j["msg"]["to"] == "perf").map(|j| j["msg"]["id"].as_u64()).unwrap();
     assert_eq!((l.ev, l.what.as_str(), l.after_ms, l.msg), (bise_proto::thread::WakeEv::Ended, "the build", 5_000, sent));
-    assert_eq!(watching(&t), json!([]), "the hit ends it: the row moves");
+    assert_eq!(watching(&mut t), json!([]), "the hit ends it: the row moves");
     // a stop: one line, no message
     t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.clone(), max_ms: crate::wake::MAX_DEFAULT_MS }));
-    let id = watching(&t)[0]["id"].as_u64().unwrap();
+    let id = watching(&mut t)[0]["id"].as_u64().unwrap();
     let (_, fx) = t.req("perf", AgentReq::Wake(WakeReq::Stop(id)));
     let ls = wakes(&fx);
     assert_eq!(ls.len(), 1, "{fx:?}");
@@ -4599,7 +4648,7 @@ fn his_parts_follow_his_message_at_its_delivery() {
     // `a` is busy: queued, nothing written yet
     let fx = t.user_parts("a", text, parts, true);
     assert!(lines_of(&fx, "a").iter().all(|l| !l.starts_with("sb you")), "{:?}", fx);
-    let id = t.hub.st.msgs.values().find(|m| m.text == text).unwrap().id;
+    let id = t.hub.st.msgs().values().find(|m| m.text == text).unwrap().id;
     // the turn ends: said, his three lines in order
     let fx = t.go(Input::ReplIdle { agent: "a".into(), leftover: false });
     assert!(say_to(&fx, "a").is_some_and(|s| s.contains("<selection from=\"main\">")), "the model's text: {:?}", fx);
@@ -4627,7 +4676,7 @@ fn his_card_answer_keeps_its_parts() {
         "docs",
         AgentReq::Send { to: MAIN.into(), text: "v1 ou v2 ?".into(), expect_reply: true, reply_to: None, queued: false, why: String::new(), switch: None },
     );
-    let id = t.hub.st.msgs.values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
+    let id = t.hub.st.msgs().values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
     t.req(MAIN, AgentReq::Card { text: "La doc : v1 ou v2 ?".into(), for_msg: Some(id) });
     t.turn(MAIN, "J'ai demandé à l'utilisateur.");
     let card = *t.hub.st.cards.keys().next().unwrap();
@@ -4637,6 +4686,6 @@ fn his_card_answer_keeps_its_parts() {
     let ls = lines_of(&fx, MAIN);
     let at = ls.iter().position(|l| l.starts_with("sb route : you → @docs (answer to card #")).expect("the route line");
     assert_eq!(ls[at + 1], format!("sb route-parts : {parts}"), "{ls:?}");
-    let answer = t.hub.st.msgs.values().find(|m| m.text == text).expect("the asker's message");
+    let answer = t.hub.st.msgs().values().find(|m| m.text == text).expect("the asker's message");
     assert_eq!(answer.parts, parts);
 }

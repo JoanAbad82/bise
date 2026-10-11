@@ -1,10 +1,10 @@
 //! The hub ↔ sb-core link as it really goes (issue 25): every line of
-//! `fixtures/core_{in,link,fx}.jsonl`, captured from the e2e corpus and
+//! `fixtures/core_{in,link,fx,answer}.jsonl`, captured from the e2e corpus and
 //! switchboard's tests on throwaway hubs (tests/core_capture.py), reads
 //! as its kind (never `Unknown`) and writes back the same JSON value; and
 //! every kind of `In`, `Link` and `Fx` has at least one line.
 
-use bise_proto::core::{Fx, In, Link, Step, Table};
+use bise_proto::core::{Answer, Fx, In, Link, Step, Table};
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -63,4 +63,26 @@ fn every_effect_line_round_trips() {
         seen.insert(f.tag().to_string());
     }
     covered(&Fx::TABLE, &seen, "core_fx.jsonl");
+}
+
+#[test]
+fn every_answer_line_round_trips() {
+    use bise_proto::core::link::{Skipped, ANSWER};
+    let mut seen = BTreeSet::new();
+    for v in lines("core_answer.jsonl") {
+        let a: Answer = serde_json::from_value(v.clone()).unwrap_or_else(|e| panic!("{e}: {v}"));
+        let tag = match &a {
+            Answer::Step(_) => "step",
+            Answer::Need(_) => "need",
+            Answer::View(_) => "view",
+            Answer::Skipped(s) if matches!(s.skipped, Skipped::One(_)) => "skipped",
+            Answer::Skipped(_) => "skipped_at",
+            Answer::Error(_) => "error",
+            Answer::Done(_) => "done",
+            Answer::Unknown(_) => panic!("unknown answer: {v}"),
+        };
+        assert_eq!(a.to_value(), v, "{tag}");
+        seen.insert(tag.to_string());
+    }
+    covered(&ANSWER, &seen, "core_answer.jsonl");
 }

@@ -1,0 +1,572 @@
+#!/usr/bin/env python3
+"""The feedback-loop audit (docs/loop-speed-audit.md): where the agents'
+time goes between "change written" and "landed", from their traces.
+
+  python3 scripts/loop_audit.py [--since 24h] [--hub <id>] [--json <file>]
+  python3 scripts/loop_audit.py --self-test
+
+Read only. Sources, all under the bise home ($BISE_HOME, else ~/.bise):
+  sessions/*/events.jsonl   each agent's turns and tool calls, timed
+  hubs/<hub>/journal.jsonl  the wakes (sb wake): set, ended, why
+  hubs/<hub>/agents/*/tmp/  the agents' gate logs (gate.sh quick/full)
+  run/*.log                 the release gates' logs
+  gate/timings.tsv          run_all.sh's per-test wall and CPU history
+  run/heavy.log             heavy-run's slot waits (one line per job)
+Prints a report (markdown) and the health checks with their thresholds;
+--json writes the numbers for the loop-speed page.
+"""
+import argparse
+import glob
+import json
+import os
+import re
+import statistics
+import sys
+import time
+from datetime import datetime
+
+NL = chr(10)
+
+# ---- pure part: classify, cut, sum ----------------------------------------
+
+# a bash command's class, first match wins
+BASH_CLASSES = [
+    ("job-submit", re.compile(r"launchctl submit|heavy-run|nohup |setsid ")),
+    ("gate", re.compile(r"gate\.sh (quick|full)|run_all\.sh|gate\.sh\s*($|;|&|\|)")),
+    ("wait-poll", re.compile(r"gate\.sh wait|^\s*sleep |; *sleep \d|kill -0|launchctl list|tail -[nf]? ?\d* .*\.(out|log)|cat [^|;]*\.rc\b")),
+    ("test-rerun", re.compile(r"python3? (-u )?(\S*/)?tests/\w+\.py|cargo test .*(--exact|-- \w)")),
+    ("cargo", re.compile(r"\bcargo (build|test|clippy|check|run)\b|bins\.sh")),
+    ("wake-setup", re.compile(r"\bsb (wake|every)\b")),
+    ("land", re.compile(r"\bsb land\b|git (commit|rebase|merge|cherry-pick)")),
+    ("talk", re.compile(r"\bsb (send|ask|report|status|page|artifact)\b")),
+]
+
+
+def classify(name, args):
+    """A tool call's class: edit, read, gate, cargo, wait-poll, ..."""
+    if name in ("edit", "write_file"):
+        return "edit"
+    if name != "bash":
+        return name
+    try:
+        cmd = json.loads(args).get("arg", "") if isinstance(args, str) else args.get("arg", "")
+    except (ValueError, AttributeError):
+        cmd = str(args)
+    for cls, rx in BASH_CLASSES:
+        if rx.search(cmd):
+            return cls
+    return "shell"
+
+
+def iso_epoch(s):
+    """ISO UTC time to epoch seconds (no local time involved)."""
+    d = datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
+    frac = float(s[19:23]) if s[19:20] == "." else 0.0
+    return (d - datetime(1970, 1, 1)).total_seconds() + frac
+
+
+def union(intervals):
+    """Total length of a set of [a, b] intervals."""
+    tot, end = 0.0, None
+    for a, b in sorted(intervals):
+        if end is None or a > end:
+            tot += b - a
+            end = b
+        elif b > end:
+            tot += b - end
+            end = b
+    return tot
+
+
+def overlap(a, b, intervals):
+    """Length of [a, b] covered by the intervals."""
+    return union([(max(a, x), min(b, y)) for x, y in intervals if min(b, y) > max(a, x)])
+
+
+def session_view(events):
+    """One session's timeline: agent, turns [(a, b)], tool calls
+    [(start, end, class, cmd)], lands [t], edits [t]."""
+    agent, turns, calls, lands, edits = None, [], [], [], []
+    pending, open_turn, results = {}, None, {}
+    causes, want_cause = {}, False
+    for e in events:
+        t, d = e.get("type"), e.get("data") or {}
+        at = iso_epoch(e["at"]) if "at" in e else None
+        turn = e.get("turn")  # call ids restart at each turn
+        if t == "session_start":
+            agent = ((d.get("agent") or {}).get("name"))
+        elif t == "turn_started":
+            open_turn, want_cause = at, True
+        elif want_cause and t in ("agent_message", "user_message"):
+            text = ((d.get("content") or [{}])[0]).get("text", "")
+            causes[open_turn] = wake_cause(text)
+            want_cause = False
+        elif t == "turn_ended" and open_turn is not None:
+            turns.append((open_turn, at))
+            open_turn = None
+        elif t == "assistant_message":
+            for c in d.get("calls") or []:
+                pending[(turn, c.get("id"))] = (c.get("name"), c.get("args"))
+        elif t == "tool_started":
+            results[(turn, d.get("call"))] = at
+        elif t == "tool_result":
+            cid = (turn, d.get("call"))
+            name, args = pending.get(cid, ("?", ""))
+            start = results.get(cid, at)
+            cls = classify(name, args)
+            text = ""
+            for part in d.get("content") or []:
+                if part.get("kind") == "text":
+                    text = part.get("text", "")[:400]
+                    break
+            calls.append((start, at, cls, args if isinstance(args, str) else json.dumps(args)))
+            if cls == "edit" and " ok" in text[:40]:
+                edits.append(start)
+            if cls == "land" and "sb land" in str(args) and re.search(r"landed|main moves|committed|\bon main\b", text):
+                lands.append(at)
+    if open_turn is not None and calls:
+        turns.append((open_turn, max(c[1] for c in calls)))
+    return {"agent": agent, "turns": turns, "calls": calls, "lands": lands, "edits": edits, "causes": causes}
+
+
+def wake_cause(text):
+    """What woke a turn, from its first message: job (a wake on a job, a
+    file, a background command), timer, agent, user."""
+    m = re.search(r'from="([^"]+)"', text[:300])
+    if not m:
+        return "user"
+    if m.group(1) != "bise":
+        return "agent"
+    body = text[text.find(">") + 1:][:300]
+    if re.match(r"\s*timer #", body):
+        return "timer"
+    return "job"
+
+
+def cycles(view, waits):
+    """change written -> landed: from the first edit after a land (or the
+    session start) to the next land, cut into where the time went."""
+    out, prev = [], None
+    for land in view["lands"]:
+        firsts = [e for e in view["edits"] if (prev is None or e > prev) and e <= land]
+        if not firsts:
+            prev = land
+            continue
+        a, b = firsts[0], land
+        out.append(breakdown(a, b, view, waits))
+        prev = land
+    return out
+
+
+def breakdown(a, b, view, waits):
+    """[a, b] of an agent's time: tool classes, model time (in a turn, no
+    tool running), waiting on a job or file wake (out of turns), idle."""
+    turns = [(max(a, x), min(b, y)) for x, y in view["turns"] if min(b, y) > max(a, x)]
+    busy = union(turns)
+    by = {}
+    tool_iv = []
+    for s, e, cls, _ in view["calls"]:
+        s2, e2 = max(a, s), min(b, e)
+        if e2 > s2:
+            by.setdefault(cls, []).append((s2, e2))
+            tool_iv.append((s2, e2))
+    tools = {k: round(union(v)) for k, v in by.items()}
+    model = busy - union(tool_iv)
+    # out of a turn: named by what woke the next turn (a job's end, a
+    # timer, another agent, the user)
+    waited = {"job": 0.0, "timer": 0.0, "agent": 0.0, "user": 0.0}
+    last, causes = a, view.get("causes") or {}
+    for x, y in sorted(turns):
+        if x > last:
+            waited[causes.get(x, "user")] += x - last
+        last = max(last, y)
+    out = {"start": a, "end": b, "total": round(b - a), "model": round(model), "tools": tools}
+    for k, v in waited.items():
+        out["wait:" + k] = round(v)
+    return out
+
+
+GATE_RX = re.compile(r"GATE (quick|full|rerun) (GREEN \((\d+)s\)|FAILED)")
+TEST_RX = re.compile(r"^(ok|FAIL)\s+(\w+) \((\d+)s(?:, cpu (\d+)s)?\)", re.M)
+QUEUE_RX = re.compile(r"got the gate after (\d+)s")
+STEP_RX = re.compile(r"^ok\s+(test-build|clippy|PROOF|sb-core|proto_ts|test_\S+|desktop_check) \((\d+)s", re.M)
+
+
+def gate_run(text):
+    """A gate log's summary, or None: mode, green, seconds, queue, steps,
+    tests {name: (ok, wall, cpu)}."""
+    m = None
+    for m in GATE_RX.finditer(text):
+        pass
+    runall = "E2E (real hub" in text
+    if not m and not runall:
+        return None
+    tests = {t: (r == "ok", int(w), int(c) if c else None) for r, t, w, c in TEST_RX.findall(text)
+             if t not in ("clippy", "PROOF") or True}
+    steps = {}
+    for s, w in STEP_RX.findall(text):
+        steps.setdefault(s if not s.startswith("test_") else "tests", int(w))
+    q = QUEUE_RX.search(text)
+    return {"mode": m.group(1) if m else "full", "green": bool(m and m.group(2).startswith("GREEN")),
+            "secs": int(m.group(3)) if m and m.group(3) else None, "queue": int(q.group(1)) if q else 0,
+            "steps": steps, "tests": tests, "ended": bool(m)}
+
+
+def pct(v, p):
+    v = sorted(v)
+    return v[min(len(v) - 1, int(len(v) * p))] if v else None
+
+
+def med(v):
+    return statistics.median(v) if v else None
+
+
+# ---- reading the traces ----------------------------------------------------
+
+def home():
+    if os.environ.get("BISE_HOME"):
+        return os.environ["BISE_HOME"]
+    return os.path.expanduser("~/.bise")
+
+
+def read_jsonl(path):
+    with open(path, errors="replace") as fh:
+        for line in fh:
+            try:
+                yield json.loads(line)
+            except ValueError:
+                continue
+
+
+def sessions(h, since, hub):
+    """{agent: [views]} of the sessions written since `since`."""
+    out = {}
+    for f in glob.glob(os.path.join(h, "sessions", "*", "events.jsonl")):
+        try:
+            if os.path.getmtime(f) < since:
+                continue
+        except OSError:
+            continue
+        evs = list(read_jsonl(f))
+        if not evs:
+            continue
+        first = evs[0].get("data") or {}
+        if hub and ((first.get("agent") or {}).get("hub")) != hub:
+            continue
+        v = session_view(evs)
+        if v["agent"]:
+            out.setdefault(v["agent"], []).append(v)
+    return out
+
+
+def wakes(h, hub, since):
+    """{agent: [(set, end, kind, why)]} from the hub's journal."""
+    path = os.path.join(h, "hubs", hub, "journal.jsonl")
+    sets, out = {}, {}
+    if not os.path.exists(path):
+        return out
+    for e in read_jsonl(path):
+        t = e.get("type")
+        if t == "wake_set":
+            w = e.get("watch") or {}
+            sets[w.get("id")] = (w.get("agent"), (w.get("set_at") or 0) / 1000, (w.get("spec") or {}).get("kind"))
+        elif t == "wake_end" and e.get("id") in sets:
+            agent, s, kind = sets.pop(e["id"])
+            end = (e.get("at") or 0) / 1000
+            if end >= since:
+                out.setdefault(agent, []).append((s, end, kind, e.get("why", "")))
+    now = time.time()
+    for agent, s, kind in sets.values():  # still open
+        out.setdefault(agent, []).append((s, now, kind, "open"))
+    return out
+
+
+def gate_logs(h, hub, since):
+    """[(agent, path, mtime, birth, run)] of the gate logs written since."""
+    pats = [os.path.join(h, "hubs", hub, "agents", "*", "tmp", "**", "*"), os.path.join(h, "run", "*.log")]
+    out, seen = [], set()
+    for pat in pats:
+        for f in glob.glob(pat, recursive=True):
+            try:
+                st = os.stat(f)
+            except OSError:
+                continue
+            if not os.path.isfile(f) or st.st_mtime < since or st.st_size > 5_000_000 or f.endswith((".jsonl", ".json", ".png")):
+                continue
+            try:
+                with open(f, errors="replace") as fh:
+                    text = fh.read()
+            except OSError:
+                continue
+            if "GATE " not in text and "E2E (real hub" not in text:
+                continue
+            key = (text[-2000:], st.st_size)
+            if key in seen:  # a copy (x.out and x_gate.out)
+                continue
+            seen.add(key)
+            r = gate_run(text)
+            if r:
+                m = re.search(r"/agents/([^/]+)/", f)
+                out.append((m.group(1) if m else "release", f, st.st_mtime, getattr(st, "st_birthtime", st.st_mtime), r))
+    return out
+
+
+def timings(h, since):
+    rows = []
+    path = os.path.join(h, "gate", "timings.tsv")
+    if os.path.exists(path):
+        for line in open(path, errors="replace"):
+            f = line.rstrip().split("	")
+            if len(f) >= 6 and f[0].isdigit() and int(f[0]) >= since:
+                rows.append({"t": int(f[0]), "rev": f[1], "test": f[2], "rc": f[3], "wall": float(f[4]),
+                             "cpu": float(f[5]) if f[1] != "import" else None})
+    return rows
+
+
+def heavy_waits(h, since):
+    """heavy-run's log: <submit> <start> <end> <slot> <rc> <cwd> <cmd>."""
+    path = os.path.join(h, "run", "heavy.log")
+    out = []
+    if os.path.exists(path):
+        for line in open(path, errors="replace"):
+            f = line.split("	")
+            if len(f) >= 3 and f[0].isdigit() and int(f[0]) >= since:
+                out.append({"submit": int(f[0]), "start": int(f[1]) if f[1].isdigit() else None,
+                            "end": int(f[2]) if f[2].isdigit() else None, "cmd": f[-1].strip()[:80]})
+    return out
+
+
+# ---- the report ------------------------------------------------------------
+
+def audit(h, hub, since):
+    ss = sessions(h, since, hub)
+    ws = wakes(h, hub, since)
+    gl = gate_logs(h, hub, since)
+    tm = timings(h, since)
+    hv = heavy_waits(h, since)
+    rep = {"since": since, "hub": hub, "agents": {}, "cycles": [], "gates": {}, "tests": {}, "waits": {}, "heavy": {}}
+    # change written -> landed, per agent
+    tot = {}
+    for agent, views in ss.items():
+        a_tot = {}
+        for v in views:
+            for c in cycles(v, []):
+                if c["end"] < since:
+                    continue
+                c["agent"] = agent
+                rep["cycles"].append(c)
+                for k, x in c.items():
+                    if k.startswith("wait:") or k in ("model", "total"):
+                        a_tot[k] = a_tot.get(k, 0) + x
+                for k, x in c["tools"].items():
+                    a_tot["tool:" + k] = a_tot.get("tool:" + k, 0) + x
+        if a_tot:
+            rep["agents"][agent] = a_tot
+        for k, x in a_tot.items():
+            tot[k] = tot.get(k, 0) + x
+    rep["total"] = tot
+    # gates
+    for mode in ("quick", "full"):
+        runs = [r for *_, r in gl if r["mode"] == mode and r["ended"]]
+        green = [r["secs"] for r in runs if r["green"] and r["secs"]]
+        rep["gates"][mode] = {"runs": len(runs), "green": sum(r["green"] for r in runs),
+                              "secs_p50": med(green), "secs_p90": pct(green, 0.9),
+                              "queue_p50": med([r["queue"] for r in runs]), "queue_max": max([r["queue"] for r in runs] or [0]),
+                              "steps_p50": {s: med([r["steps"][s] for r in runs if s in r["steps"]])
+                                            for s in sorted({s for r in runs for s in r["steps"]})}}
+    # red full gates: what failed
+    reds = {}
+    for *_, r in gl:
+        for t, (ok, w, c) in r["tests"].items():
+            if not ok:
+                reds[t] = reds.get(t, 0) + 1
+    # tests: logs + timings history
+    per = {}
+    for *_, r in gl:
+        for t, (ok, w, c) in r["tests"].items():
+            per.setdefault(t, {"wall": [], "cpu": [], "runs": 0, "fails": 0})
+            per[t]["wall"].append(w)
+            per[t]["runs"] += 1
+            per[t]["fails"] += 0 if ok else 1
+            if c is not None:
+                per[t]["cpu"].append(c)
+    for row in tm:
+        if row["rev"] == "import":
+            continue
+        p = per.setdefault(row["test"], {"wall": [], "cpu": [], "runs": 0, "fails": 0})
+        if row["cpu"] is not None:
+            p["cpu"].append(row["cpu"])
+    rep["tests"] = {t: {"wall_p50": med(p["wall"]), "wall_p90": pct(p["wall"], 0.9), "cpu_p50": med(p["cpu"]),
+                        "runs": p["runs"], "fails": p["fails"]} for t, p in per.items()}
+    # waits
+    allw = [w for v in ws.values() for w in v]
+    rep["waits"] = {"set": len(allw), "by_kind": {}, "ended_at_max": [], "open_now": 0}
+    for s, e, k, why in allw:
+        bk = rep["waits"]["by_kind"].setdefault(k or "?", {"n": 0, "hours": 0.0})
+        bk["n"] += 1
+        bk["hours"] = round(bk["hours"] + (e - s) / 3600, 2)
+        if why == "max":
+            rep["waits"]["ended_at_max"].append({"kind": k, "hours": round((e - s) / 3600, 2)})
+        if why == "open":
+            rep["waits"]["open_now"] += 1
+    starts = [x["start"] - x["submit"] for x in hv if x["start"]]
+    rep["heavy"] = {"jobs": len(hv), "wait_p50": med(starts), "wait_p90": pct(starts, 0.9), "wait_max": max(starts or [0])}
+    rep["reds"] = reds
+    return rep
+
+
+def group(cs):
+    out = {}
+    for c in cs:
+        out.setdefault(c["agent"], []).append(c["total"])
+    return out
+
+
+def fmt_s(v):
+    if v is None:
+        return "-"
+    v = float(v)
+    return "%.0f s" % v if v < 120 else ("%.1f min" % (v / 60) if v < 7200 else "%.1f h" % (v / 3600))
+
+
+# health checks: (name, value from the report, threshold, ok when value <= threshold)
+def health(rep):
+    q, f = rep["gates"]["quick"], rep["gates"]["full"]
+    full_green = f["green"] / f["runs"] if f["runs"] else None
+    checks = [
+        ("quick gate p50", q["secs_p50"], 60),
+        ("full gate p50 (green)", f["secs_p50"], 600),
+        ("full gate queue p50", f["queue_p50"], 300),
+        ("heavy-run slot wait p50", rep["heavy"]["wait_p50"], 300),
+        ("full gates red (share)", None if full_green is None else round(1 - full_green, 2), 0.2),
+        ("wakes that ran to --max", len(rep["waits"]["ended_at_max"]), 0),
+    ]
+    return [(n, v, lim, v is None or v <= lim) for n, v, lim in checks]
+
+
+def report(rep):
+    L = []
+    w = L.append
+    w("# loop audit since %s (hub %s)" % (datetime.fromtimestamp(rep["since"]).strftime("%Y-%m-%d %H:%M"), rep["hub"]))
+    w("")
+    w("## health")
+    for n, v, lim, ok in health(rep):
+        w("- %s %s: %s (limit %s)" % ("ok  " if ok else "SLOW", n, v, lim))
+    w("")
+    cs = rep["cycles"]
+    w("## change written -> landed (%d cycles)" % len(cs))
+    if cs:
+        tots = [c["total"] for c in cs]
+        w("- duration p50 %s, p90 %s" % (fmt_s(med(tots)), fmt_s(pct(tots, 0.9))))
+        agg = {}
+        for c in cs:
+            for k, x in c.items():
+                if k.startswith("wait:") or k == "model":
+                    agg[k] = agg.get(k, 0) + x
+            for k, s in c["tools"].items():
+                agg["tool:" + k] = agg.get("tool:" + k, 0) + s
+        whole = sum(tots) or 1
+        for k in sorted(agg, key=lambda k: -agg[k]):
+            w("- %-22s %5.0f %%  %6.1f h" % (k, 100 * agg[k] / whole, agg[k] / 3600))
+        w("- per agent (cycles, p50): " + ", ".join(
+            "%s %d %s" % (a, n, fmt_s(m)) for a, n, m in sorted(
+                ((a, len(v), med(v)) for a, v in group(cs).items()), key=lambda r: -r[1])))
+    w("")
+    w("## gates")
+    for mode, g in rep["gates"].items():
+        w("- %s: %d runs, %d green; green p50 %s, p90 %s; queue p50 %s, max %s; steps p50 %s" % (
+            mode, g["runs"], g["green"], fmt_s(g["secs_p50"]), fmt_s(g["secs_p90"]), fmt_s(g["queue_p50"]),
+            fmt_s(g["queue_max"]), ", ".join("%s %s" % (s, fmt_s(v)) for s, v in g["steps_p50"].items())))
+    w("")
+    w("## slowest tests (wall p50 of the gate logs)")
+    tests = sorted(rep["tests"].items(), key=lambda kv: -(kv[1]["wall_p50"] or 0))
+    for name, s in tests[:15]:
+        w("- %-28s p50 %-8s p90 %-8s cpu %-6s fails %d/%d" % (name, fmt_s(s["wall_p50"]), fmt_s(s["wall_p90"]),
+                                                             fmt_s(s["cpu_p50"]), s["fails"], s["runs"]))
+    w("")
+    w("## failing tests (gate logs)")
+    for name, n in sorted(rep["reds"].items(), key=lambda kv: -kv[1])[:12]:
+        w("- %-28s %d of %d runs" % (name, n, rep["tests"].get(name, {}).get("runs", 0)))
+    w("")
+    w("## waits (sb wake)")
+    for k, v in rep["waits"]["by_kind"].items():
+        w("- %s: %d, %.1f h" % (k, v["n"], v["hours"]))
+    w("- ran to --max: %s" % rep["waits"]["ended_at_max"])
+    hv = rep["heavy"]
+    w("- heavy-run: %d jobs, slot wait p50 %s, p90 %s, max %s" % (hv["jobs"], fmt_s(hv["wait_p50"]), fmt_s(hv["wait_p90"]), fmt_s(hv["wait_max"])))
+    return NL.join(L)
+
+
+def self_test():
+    assert classify("bash", json.dumps({"arg": "launchctl submit -l x -- heavy-run tests/gate.sh full"})) == "job-submit"
+    assert classify("bash", json.dumps({"arg": "bash tests/gate.sh quick"})) == "gate"
+    assert classify("bash", json.dumps({"arg": "python3 -u tests/every_e2e.py"})) == "test-rerun"
+    assert classify("bash", json.dumps({"arg": "sleep 20; tail -5 x.out"})) == "wait-poll"
+    assert classify("bash", json.dumps({"arg": "sb land --here 'x'"})) == "land"
+    assert classify("edit", "{}") == "edit"
+    assert union([(0, 10), (5, 15), (20, 25)]) == 20
+    assert overlap(0, 100, [(10, 20), (90, 200)]) == 20
+    assert iso_epoch("1970-01-01T00:01:00.500Z") == 60.5
+
+    def ev(at, typ, **d):
+        return {"at": "2026-01-01T00:%02d:%02d.000Z" % (at // 60, at % 60), "type": typ, "data": d}
+    evs = [
+        ev(0, "session_start", agent={"name": "a", "hub": "h"}),
+        ev(0, "turn_started"),
+        ev(10, "assistant_message", calls=[{"id": "c1", "name": "edit", "args": "{}"}]),
+        ev(10, "tool_started", call="c1"),
+        ev(11, "tool_result", call="c1", content=[{"kind": "text", "text": "tool edit ok: done"}]),
+        ev(20, "assistant_message", calls=[{"id": "c2", "name": "bash", "args": json.dumps({"arg": "launchctl submit -l g -- heavy-run gate.sh full"})}]),
+        ev(20, "tool_started", call="c2"),
+        ev(21, "tool_result", call="c2", content=[{"kind": "text", "text": "tool bash ok"}]),
+        ev(30, "turn_ended"),
+        ev(630, "turn_started"),
+        ev(640, "assistant_message", calls=[{"id": "c3", "name": "bash", "args": json.dumps({"arg": "sb land 'x'"})}]),
+        ev(640, "tool_started", call="c3"),
+        ev(650, "tool_result", call="c3", content=[{"kind": "text", "text": "tool bash ok: landed abc on main"}]),
+        ev(660, "turn_ended"),
+    ]
+    v = session_view(evs)
+    assert v["agent"] == "a" and len(v["turns"]) == 2 and len(v["edits"]) == 1 and len(v["lands"]) == 1, v
+    base = iso_epoch("2026-01-01T00:00:00.000Z")
+    cs = cycles(v, [(base + 25, base + 600)])
+    assert len(cs) == 1, cs
+    c = cs[0]
+    # edit at 10 -> land at 650: 640 s; out of turns 30..630 = 600, of which the wake covers 30..600
+    # edit at 10 -> land at 650: 640 s; 30..630 out of a turn, woken by the user
+    assert c["total"] == 640 and c["wait:user"] == 600 and c["wait:job"] == 0, c
+    assert c["tools"]["job-submit"] == 1 and c["tools"]["land"] == 10, c
+    text = "ok   e2e (49s, cpu 120s): ok" + NL + "FAIL every_e2e (93s): x" + NL + "got the gate after 637s" + NL + "GATE full FAILED"
+    r = gate_run(text)
+    assert r["mode"] == "full" and not r["green"] and r["queue"] == 637, r
+    assert r["tests"] == {"e2e": (True, 49, 120), "every_e2e": (False, 93, None)}, r
+    q = gate_run("ok   test-build (15s)" + NL + "ok   clippy (10s)" + NL + "GATE quick GREEN (35s): x")
+    assert q["secs"] == 35 and q["steps"] == {"test-build": 15, "clippy": 10}, q
+    print("loop_audit self-test: ok")
+
+
+def main(argv):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--since", default="24h", help="24h, 3d, or epoch seconds")
+    ap.add_argument("--hub", default=None, help="hub id (default: the one with the newest journal)")
+    ap.add_argument("--json", default=None)
+    ap.add_argument("--self-test", action="store_true")
+    a = ap.parse_args(argv[1:])
+    if a.self_test:
+        return self_test()
+    m = re.fullmatch(r"(\d+)([hd])", a.since)
+    since = time.time() - int(m.group(1)) * (3600 if m.group(2) == "h" else 86400) if m else float(a.since)
+    h = home()
+    hub = a.hub
+    if not hub:
+        js = glob.glob(os.path.join(h, "hubs", "*", "journal.jsonl"))
+        hub = os.path.basename(os.path.dirname(max(js, key=os.path.getmtime))) if js else "?"
+    rep = audit(h, hub, since)
+    print(report(rep))
+    if a.json:
+        with open(a.json, "w") as fh:
+            json.dump(rep, fh, indent=1, default=str)
+
+
+if __name__ == "__main__":
+    main(sys.argv)

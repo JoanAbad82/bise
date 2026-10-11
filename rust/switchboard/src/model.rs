@@ -143,7 +143,7 @@ impl Status {
 
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Agent {
     pub name: String,
     /// The name at creation: its directories never move on a rename.
@@ -330,9 +330,14 @@ pub fn choice_kind(kind: &str) -> bool {
 pub struct State {
     pub agents: BTreeMap<String, Agent>,
     pub order: Vec<String>,
-    pub msgs: BTreeMap<u64, Msg>,
-    pub msg_state: BTreeMap<u64, MsgState>,
-    pub settled: BTreeSet<u64>,
+    /// The messages, their states and the settled ones: written only by
+    /// [`State::put_msg`] and [`State::clear_msgs`], which bump
+    /// `msgs_rev`, so a cache of what is built from them (contexts.rs)
+    /// knows when it is stale. Read with [`State::msgs`] and siblings.
+    msgs: BTreeMap<u64, Msg>,
+    msg_state: BTreeMap<u64, MsgState>,
+    settled: BTreeSet<u64>,
+    msgs_rev: u64,
     pub cards: BTreeMap<u64, Card>,
     pub main_notes: Vec<String>,
     pub next_msg: u64,
@@ -389,6 +394,50 @@ impl State {
         );
         st.order.push(MAIN.to_string());
         st
+    }
+
+    /// Every message, by id.
+    pub fn msgs(&self) -> &BTreeMap<u64, Msg> {
+        &self.msgs
+    }
+
+    /// Each message's delivery state, by id.
+    pub fn msg_state(&self) -> &BTreeMap<u64, MsgState> {
+        &self.msg_state
+    }
+
+    /// The messages a reply settled.
+    pub fn settled(&self) -> &BTreeSet<u64> {
+        &self.settled
+    }
+
+    /// Bumped at each write of the messages: equal revisions, equal
+    /// messages, states and settled set.
+    pub fn msgs_rev(&self) -> u64 {
+        self.msgs_rev
+    }
+
+    /// The one writer of a message: its row, its state (None: unchanged)
+    /// and whether a reply settled it.
+    pub fn put_msg(&mut self, m: Msg, state: Option<MsgState>, settled: bool) {
+        self.msgs_rev += 1;
+        if let Some(state) = state {
+            self.msg_state.insert(m.id, state);
+        }
+        if settled {
+            self.settled.insert(m.id);
+        } else {
+            self.settled.remove(&m.id);
+        }
+        self.msgs.insert(m.id, m);
+    }
+
+    /// Forget every message (a view that carries them all).
+    pub fn clear_msgs(&mut self) {
+        self.msgs_rev += 1;
+        self.msgs.clear();
+        self.msg_state.clear();
+        self.settled.clear();
     }
 
     /// The canonical name of an agent: itself, or the task an alias

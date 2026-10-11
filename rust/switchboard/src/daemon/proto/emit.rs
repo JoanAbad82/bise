@@ -306,8 +306,12 @@ impl Shell {
                 let step = proto_view::step_of(&line);
                 let sent = self.proto_live_of(&agent, |l, ctx| l.push((pos, ts, line.clone()), ctx));
                 let moved = self.proto_head_line(&agent, (pos, ts, line.clone()));
+                // its head or its usage moved: the agents rows go with the
+                // next gated state push (at most EVERY_MS away), never a
+                // whole snapshot per line (hub-lag-7: one per tool line,
+                // with git subprocesses, was 40% of a flooded loop)
                 if self.proto_usage_line(&agent, &line) || moved {
-                    self.proto_agents_again(&ids);
+                    self.state_gate.changed();
                 }
                 if let Some(text) = step {
                     let project = self.project();
@@ -379,19 +383,6 @@ impl Shell {
     /// P4b: an agent renamed: its head follows it.
     pub(in crate::daemon) fn proto_renamed(&mut self, old: &str, new: &str) {
         self.proto.heads.rename(old, new);
-    }
-
-    /// The `agents` rows again, to `ids` when they changed (an agent's
-    /// context moved between two state broadcasts).
-    fn proto_agents_again(&mut self, ids: &[ClientId]) {
-        let snap = self.snapshot();
-        let (agents, _) = self.proto_rows(&snap);
-        let a = agents.encode();
-        if a == self.proto.last.0 {
-            return;
-        }
-        self.proto.last.0 = a;
-        self.proto_note(ids, &agents);
     }
 
     /// Every subscription refolded: the entries that changed go out.

@@ -738,6 +738,7 @@ pub fn page(lines: &[Line], ahead: &[Line], ctx: &Ctx, limit: usize) -> (Vec<Ent
 }
 
 pub mod fold;
+pub mod legacy;
 pub mod lines;
 pub mod scheduled;
 pub mod when;

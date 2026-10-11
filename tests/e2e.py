@@ -269,6 +269,9 @@ class Client:
         self.said = []
         # the hub-wide notifications' latest params, by method
         self.hub = {}
+        # every hub-wide notification with the time it was read:
+        # (time.time(), method, params), oldest first
+        self.note_log = []
         self.state = None
         self.lock = threading.Lock()
         self._tails = {}
@@ -287,6 +290,7 @@ class Client:
         """A hub-wide notification: the latest of its kind; agents and
         cards are the state the helpers read (lock held)."""
         self.hub[method] = params
+        self.note_log.append((time.time(), method, params))
         if method in ("hub/agents", "hub/cards"):
             st = dict(self.state or {"agents": [], "cards": []})
             key = method.split("/")[1]

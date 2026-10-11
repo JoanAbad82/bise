@@ -21,6 +21,8 @@ wire = os.environ["BEND_WIRE_LOG"]
 rate = int(os.environ.get("FLOOD_RATE", "400"))
 life = float(os.environ.get("FLOOD_SECS", "120"))
 go = os.environ.get("FLOOD_GO", "")
+# FLOOD_STOP: a file; once it exists no more lines (the REPL stays up)
+stop = os.environ.get("FLOOD_STOP", "")
 here = os.path.dirname(wire)
 steer, interrupt = os.path.join(here, "steer.txt"), os.path.join(here, "interrupt.txt")
 for p in (steer, interrupt):
@@ -45,19 +47,32 @@ def drain():
 
 threading.Thread(target=drain, daemon=True).start()
 t0 = time.time()
-batch = max(1, rate // 50)
+# paced: `rate` lines a second from the flood's start, written every 20 ms;
+# each line ends with its write time (` @<ms>`): the hub's transcript
+# stamps it with its own time, the difference is the hub's lag
+flood_t0 = None
 n = 0
 with open(wire, "a") as f:
     f.write("  obs: turn_started\n")
     f.flush()
     while not gone.is_set() and time.time() - t0 < life:
         # FLOOD_GO: no flood until that file exists (every REPL started)
-        if not go or os.path.exists(go):
+        if (not go or os.path.exists(go)) and not (stop and os.path.exists(stop)):
+            now = time.time()
+            if flood_t0 is None:
+                flood_t0 = now
+            due = int(rate * (now - flood_t0)) + 1
             lines = []
-            for _ in range(batch):
+            while n < due:
                 n += 1
-                lines.append("tool #%d bash : echo flood %d\n" % (n, n))
+                lines.append("tool #%d bash : echo flood %d @%d\n" % (n, n, int(now * 1000)))
             f.write("".join(lines))
             f.flush()
+        elif stop and os.path.exists(stop) and flood_t0 is not None:
+            # once: a line that starts a new thread entry (a tool flood
+            # stays one entry), so the agent's head moves at the end
+            f.write("sb info : flood stopped @%d\n" % int(time.time() * 1000))
+            f.flush()
+            flood_t0 = None
         time.sleep(0.02)
 sys.exit(0)

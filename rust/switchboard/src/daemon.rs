@@ -368,6 +368,10 @@ struct Shell {
     /// The catalog and config.toml (BISE-135: the model and effort each
     /// agent runs with), re-read when config.toml changes.
     setup: Option<(Option<std::time::SystemTime>, bise_catalog::Setup)>,
+    /// config.toml's path, found once (the env a hub runs with doesn't
+    /// change): `setup()` runs per REPL line, `Home::from_env` each time
+    /// was 8% of a flooded loop (hub-lag-7); only the stat is per call.
+    config_path: Option<PathBuf>,
     /// Each live REPL's session log writer (BISE-196), by agent dir.
     recorders: BTreeMap<String, bise_session::recorder::Recorder>,
     /// The archived agents (dirs): one more is a /drop, whose worktree
@@ -553,7 +557,7 @@ impl Shell {
     /// The catalog merged with config.toml, re-read when the file
     /// changes (a `/model ... default`, the user's editor).
     fn setup(&mut self) -> &bise_catalog::Setup {
-        let path = bise_home::Home::from_env().config_file();
+        let path = self.config_path.get_or_insert_with(|| bise_home::Home::from_env().config_file()).clone();
         let mtime = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
         if self.setup.as_ref().is_none_or(|(t, _)| *t != mtime) {
             self.setup = Some((mtime, bise_catalog::Setup::load(&path)));
@@ -2017,6 +2021,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         config: Config::load(&paths),
         log: Box::new(move |s| log_line(&log_paths, s)),
         merged: BTreeMap::new(),
+        git_memo: None,
     };
     // the checker (approvals-design.md §4): a chat model in the role runs
     // through repl-live's one-shot, like the role lines
@@ -2069,6 +2074,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         recycle: recycling::Recycle::from_env(),
         small_broken: Default::default(),
         setup: None,
+        config_path: None,
         archived: BTreeSet::new(),
         proc_hub: proc_hub.clone(),
         down: BTreeSet::new(),

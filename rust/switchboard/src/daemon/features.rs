@@ -28,7 +28,14 @@ struct Inner {
     busy: BTreeSet<String>,
     /// The trunk's short name at the last refresh ("" before it).
     main: String,
+    /// When the last refresh began (ms; 0: never).
+    refreshed_ms: u64,
 }
+
+/// The features' facts and the trunk's name are read again at least this
+/// often (the tick), besides after a land: someone may switch the shared
+/// folder's branch or fetch by hand.
+pub(super) const FACTS_EVERY_MS: u64 = 60_000;
 
 /// The registry, the facts and the builds, shared with the threads.
 #[derive(Clone, Default)]
@@ -65,9 +72,23 @@ impl Features {
         proto_view::features(&g.reg.features, &g.facts, &g.building, main, agents, cards)
     }
 
-    /// The views' part (`Hub::feature_lids`, `Hub::trying`), by place id.
-    pub(super) fn views(&self, main: &str, now: u64) -> (BTreeMap<String, String>, BTreeSet<String>) {
+    /// The facts are older than [`FACTS_EVERY_MS`] (the tick refreshes
+    /// them); marks them as being refreshed from `now`.
+    pub(super) fn due(&self, now: u64) -> bool {
+        let mut g = self.lock();
+        let due = now.saturating_sub(g.refreshed_ms) >= FACTS_EVERY_MS;
+        if due {
+            g.refreshed_ms = now;
+        }
+        due
+    }
+
+    /// The views' part (`Hub::feature_lids`, `Hub::trying`), by place id,
+    /// against the trunk the last refresh read: no git (it ran per
+    /// snapshot, 2-3 subprocesses each, hub-lag-7).
+    pub(super) fn views(&self, now: u64) -> (BTreeMap<String, String>, BTreeSet<String>) {
         let g = self.lock();
+        let main = if g.main.is_empty() { "main" } else { g.main.as_str() };
         let mut lids = BTreeMap::new();
         let mut trying = BTreeSet::new();
         for f in &g.reg.features {
@@ -221,8 +242,7 @@ impl Shell {
 
     /// The views' part, before a snapshot (`Shell::snapshot`).
     pub(super) fn feature_views(&mut self) {
-        let main = crate::trunk::trunk_ref(&self.opts.paths.workspace).unwrap_or_else(|_| "main".into());
-        let (lids, trying) = self.features.views(crate::land::short(&main), crate::util::now_ms());
+        let (lids, trying) = self.features.views(crate::util::now_ms());
         self.hub.feature_lids = lids;
         self.hub.trying = trying;
     }

@@ -7,6 +7,7 @@
 //! `transcript.log`. The file only grows, so a position never moves.
 
 use crate::util::{age, clip, one_line, strip_thinking, wire_unescape};
+use bise_proto::thread::lines::{self, Hub, Rec};
 use std::path::Path;
 
 /// Chars one answer may carry (the rest is reachable with cursors).
@@ -48,34 +49,35 @@ pub fn readable(line: &str) -> Option<String> {
         let v = strip_thinking(&wire_unescape(r));
         return (!v.is_empty()).then(|| format!("assistant: {}", v));
     }
-    if let Some(r) = line.strip_prefix("sb you : ") {
-        return Some(format!("user: {}", wire_unescape(r)));
-    }
-    if let Some(r) = line.strip_prefix("sb msg-in : ") {
-        return Some(format!("message from {}", wire_unescape(r)));
-    }
-    // hub line protocol v2 (C2)
-    if let Some(r) = line.strip_prefix("sb msg : ") {
-        return Some(format!("message {}", wire_unescape(r)));
-    }
-    if let Some(r) = line.strip_prefix("sb msg-you : ") {
-        let (from, text) = r.split_once(" : ").unwrap_or(("?", r));
-        return Some(format!("{} to the user: {}", from, wire_unescape(text)));
-    }
-    if let Some(r) = line.strip_prefix("sb answered : ") {
-        let f: Vec<String> = r.split(" : ").map(|x| wire_unescape(&x.replace(" \\: ", " : "))).collect();
-        let get = |i: usize| f.get(i).map(String::as_str).unwrap_or("");
-        let why = if get(3).is_empty() { String::new() } else { format!(" (why: {})", get(3)) };
-        return Some(format!("main answered @{} for the user: {} -> {}{}", get(0), get(1), get(2), why));
+    if let Some(rest) = line.strip_prefix("sb ") {
+        return Some(match lines::hub(rest) {
+            Hub::You(t) => format!("user: {t}"),
+            Hub::MsgIn { from, id, body } if from.is_empty() => format!("message from {}", with_id(&id, &body)),
+            Hub::MsgIn { from, id, body } => format!("message from {} {}", from, with_id(&id, &body)),
+            // hub line protocol v2 (C2)
+            Hub::Msg { from, id, body, .. } if from.is_empty() => format!("message {}", with_id(&id, &body)),
+            Hub::Msg { from, to, id, body } => format!("message {} → {} {}", from, to, with_id(&id, &body)),
+            Hub::MsgYou { from, body } => format!("{} to the user: {}", if from.is_empty() { "?" } else { &from }, body),
+            Hub::Answered { agent, question, answer, why } => {
+                let why = if why.is_empty() { String::new() } else { format!(" (why: {why})") };
+                format!("main answered @{agent} for the user: {question} -> {answer}{why}")
+            }
+            _ => format!("hub: {}", wire_unescape(rest)),
+        });
     }
     if let Some(r) = line.strip_prefix("tool #") {
         let r = r.split_once(' ').map(|x| x.1).unwrap_or(r);
         return Some(format!("tool: {}", clip(&wire_unescape(r), 300)));
     }
-    if let Some(r) = line.strip_prefix("sb ") {
-        return Some(format!("hub: {}", wire_unescape(r)));
-    }
     None
+}
+
+/// A message's `m_<n> : <text>` (the id when it has one).
+fn with_id(id: &str, body: &str) -> String {
+    match id {
+        "" => format!(": {body}"),
+        id => format!("{id} : {body}"),
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -295,10 +297,11 @@ pub fn render_page(agent: &str, query: &str, page: &Page, now: u64) -> String {
 fn spawn_line(raw: &[Raw], task: &str, created_ms: u64) -> Option<(usize, bool)> {
     let tag = format!("@{}", task);
     raw.iter()
-        .filter(|(_, _, l)| {
-            let Some(r) = l.strip_prefix("sb spawn : ") else {
-                return false;
-            };
+        .filter_map(|(pos, ms, l)| match lines::read(l) {
+            Rec::Hub(Hub::Spawn(text)) => Some((*pos, *ms, text)),
+            _ => None,
+        })
+        .filter(|(_, _, r)| {
             // " → new agent " (older journals: " → new task ", " → nouvelle tâche ")
             r.split_once(" → new agent ")
                 .or_else(|| r.split_once(" → new task "))
@@ -314,7 +317,7 @@ fn spawn_line(raw: &[Raw], task: &str, created_ms: u64) -> Option<(usize, bool)>
                 .unwrap_or(false)
         })
         .min_by_key(|(_, ms, _)| ms.abs_diff(created_ms))
-        .map(|(pos, _, l)| (*pos, (l.starts_with("sb spawn : you →") || l.starts_with("sb spawn : toi →"))))
+        .map(|(pos, _, r)| (pos, (r.starts_with("you →") || r.starts_with("toi →"))))
 }
 
 /// Where a task came from in its parent's thread.
@@ -333,7 +336,7 @@ pub fn origin(raw: &[Raw], task: &str, created_ms: u64) -> Option<Origin> {
     } else {
         raw.iter()
             .rev()
-            .filter(|(p, _, l)| *p < spawn && l.starts_with("sb you : "))
+            .filter(|(p, _, l)| *p < spawn && matches!(lines::read(l), Rec::Hub(Hub::You(_))))
             .map(|(p, _, _)| *p)
             .next()
     };

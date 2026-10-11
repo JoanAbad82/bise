@@ -7,6 +7,9 @@
 //! - [`Link`] (tag `"t"`): the link's own requests that main.bend answers
 //!   before any dispatch (`init`, `replay`, `replay_many`, `ping`,
 //!   `view_all`);
+//! - [`Answer`] (untagged): sb-core's answer line to each, a step's
+//!   `{fx, dirty, view}` or its `{need}`, `{view}`, `{skipped}`,
+//!   `{error}`, `{}` (`link::ANSWER`: its shapes, for the Bend encoders);
 //! - [`Fx`] (tag `"fx"`): one variant per effect sb-core answers with;
 //! - [`Feed`] (tag `"sb"`, DRAFT): the typed records of an agent's
 //!   transcript, the hub's `sb <kind> : …` lines.
@@ -37,7 +40,7 @@ pub mod link;
 pub use feed::Feed;
 pub use fx::Fx;
 pub use input::{In, Step};
-pub use link::Link;
+pub use link::{Answer, Link};
 
 use serde::{Deserialize, Serialize};
 

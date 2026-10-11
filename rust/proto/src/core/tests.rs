@@ -118,8 +118,81 @@ fn a_step_carries_the_envelope() {
 fn a_feed_record_is_one_line_with_its_kind_in_front() {
     let r = Feed::CardClosed(feed::CardClosed { id: 3, res: "answered".into() });
     let l = r.line();
-    assert_eq!(l, r#"sb card-closed : {"id":3,"res":"answered"}"#);
-    let (kind, json) = l.strip_prefix("sb ").unwrap().split_once(" : ").unwrap();
-    assert_eq!(Feed::read(kind, json).unwrap().unwrap(), r);
-    assert!(Feed::read("card-closed", "#3 answered").is_none(), "an older text line is the legacy reader's");
+    assert_eq!(l, r#"sb card-closed :: {"id":3,"res":"answered"}"#);
+    let (kind, back) = Feed::read_rest(l.strip_prefix("sb ").unwrap()).unwrap();
+    assert_eq!((kind, back.unwrap()), ("card-closed", r));
+    // an older text line is the legacy reader's, whatever its text
+    for old in ["card-closed : #3 answered", "you : {\"text\": \"x\"}", "you : a :: b", "you : :: x"] {
+        assert!(Feed::read_rest(old).is_none(), "{old}");
+    }
+    assert!(Feed::read_rest("card :: [1]").unwrap().1.is_err(), "not an object: the writer's bug, never a guess");
+}
+
+#[test]
+fn each_answer_shape_reads_as_its_row_and_writes_back() {
+    let kill = json!({"fx": "kill", "agent": "a"});
+    for k in link::ANSWER.kinds {
+        let mut m = Map::new();
+        for f in k.fields {
+            let v = match (k.tag, f.name) {
+                ("step", "fx") => json!([kill, {"fx": "dance", "x": 1}]),
+                _ => full(f.kind, f.name),
+            };
+            m.insert(f.name.into(), v);
+        }
+        let v = Value::Object(m);
+        let a: Answer = serde_json::from_value(v.clone()).unwrap();
+        let rust = match &a {
+            Answer::Step(_) => "Step",
+            Answer::Need(_) => "Need",
+            Answer::View(_) => "View",
+            Answer::Skipped(_) => "Skipped",
+            Answer::Error(_) => "Error",
+            Answer::Done(_) => "Done",
+            Answer::Unknown(_) => "Unknown",
+        };
+        assert_eq!(rust, k.rust, "{}: {v}", k.tag);
+        assert_eq!(a.to_value(), v, "{}", k.tag);
+    }
+}
+
+#[test]
+fn an_answer_keeps_what_it_does_not_know() {
+    let a = Answer::decode_line(r#"{"fx": [{"fx": "dance"}], "dirty": true, "view": {}}"#).unwrap();
+    let Answer::Step(s) = &a else { panic!("{a:?}") };
+    assert!(matches!(&s.fx[0], Fx::Unknown { tag, .. } if tag == "dance"), "an unknown effect, not a failed answer");
+    // an old sb-core's step without a view
+    assert!(matches!(Answer::decode_line(r#"{"fx": [], "dirty": false}"#).unwrap(), Answer::Step(_)));
+    let odd = json!({"weather": "blue"});
+    assert_eq!(serde_json::from_value::<Answer>(odd.clone()).unwrap(), Answer::Unknown(odd));
+    assert!(matches!(Answer::decode_line("{}").unwrap(), Answer::Done(_)));
+    assert!(Answer::decode_line("nope").is_err());
+}
+
+#[test]
+fn an_answer_with_fx_is_never_unknown_whatever_its_items() {
+    for fx in [
+        json!([]),
+        json!([{"fx": "kill"}]),
+        json!([{"fx": "kill", "agent": 3}]),
+        json!([7, "x", null, {"no": "tag"}, {"fx": 1}]),
+        json!("not a list"),
+    ] {
+        for v in [json!({"fx": fx.clone(), "dirty": true, "view": {}}), json!({"fx": fx.clone()})] {
+            let a: Answer = serde_json::from_value(v.clone()).unwrap();
+            assert!(matches!(a, Answer::Step(_)), "{v} -> {a:?}");
+        }
+    }
+}
+
+#[test]
+fn a_bad_effect_costs_only_itself() {
+    let a = Answer::decode_line(
+        r#"{"fx": [{"fx": "kill", "agent": "a"}, {"fx": "rt", "agent": "b", "turns": "many"}, {"fx": "kill", "agent": "c"}], "dirty": true, "view": {}}"#,
+    )
+    .unwrap();
+    let Answer::Step(s) = a else { panic!("{a:?}") };
+    let kills: Vec<&str> = s.fx.iter().filter_map(|f| if let Fx::Kill(k) = f { Some(k.agent.as_str()) } else { None }).collect();
+    assert_eq!(kills, ["a", "c"], "both good effects, in order");
+    assert!(matches!(&s.fx[1], Fx::Unknown { tag, raw } if tag == "rt" && raw["turns"] == "many"), "the bad one kept whole");
 }

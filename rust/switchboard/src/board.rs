@@ -3,12 +3,12 @@
 //! task, and the `sb list` answer. All built without an LLM, from the
 //! state alone.
 //!
-//! The hub rebuilds every agent's context at each input, and the
-//! snapshot at each change: what they share is built once per input
-//! ([`Waiting`]: one pass over the messages; [`Group`]: the roster's
-//! rows), never once per agent. Per agent, a long-lived hub (470 agents,
-//! 14,500 messages) spent its whole loop there and a client's hello
-//! never got its turn.
+//! The contexts are built here and kept by contexts.rs, which rebuilds
+//! only those whose inputs changed; the snapshot is built at each change.
+//! What they share is built once ([`Waiting`]: one pass over the
+//! messages; [`Group`]: the roster's rows), never once per agent. Per
+//! agent, a long-lived hub (470 agents, 14,500 messages) spent its whole
+//! loop there and a client's hello never got its turn.
 
 use crate::model::{Agent, Mode, Msg, State, Status, MAIN, USER};
 use crate::prompts::relation;
@@ -86,7 +86,7 @@ pub fn user_board(st: &State, now: u64) -> String {
 /// first (RFC 0003 §9).
 pub fn agent_threads(st: &State, limit: usize) -> Vec<String> {
     let mut threads: BTreeMap<u64, Vec<&crate::model::Msg>> = BTreeMap::new();
-    for m in st.msgs.values() {
+    for m in st.msgs().values() {
         threads.entry(m.thread).or_default().push(m);
     }
     let mut shown: Vec<(u64, u64, Vec<&crate::model::Msg>, Vec<&str>)> = threads
@@ -109,7 +109,7 @@ pub fn agent_threads(st: &State, limit: usize) -> Vec<String> {
         .map(|(_, t, ms, parties)| {
             let open = ms
                 .iter()
-                .any(|m| m.expect_reply && !st.settled.contains(&m.id));
+                .any(|m| m.expect_reply && !st.settled().contains(&m.id));
             format!(
                 "t_{} {}  {} message{}  {}  \"{}\"",
                 t,
@@ -136,7 +136,10 @@ fn parties_of<'a>(ms: &[&'a crate::model::Msg]) -> Vec<&'a str> {
 }
 
 /// The block appended to every model request of main.
-pub fn main_context(st: &State, now: u64, waiting: &Waiting) -> String {
+/// `threads`: [`agent_threads`]`(st, 8)`; `questions`: [`questions_for`]
+/// main's unanswered messages (both built from the messages alone, so
+/// contexts.rs keeps them until the messages change).
+pub fn main_context(st: &State, now: u64, threads: &[String], questions: &[String]) -> String {
     let mut s = String::from(
         "<bise_state>\nLive state injected by bise before this call (not a user message).\n<task_board>\n",
     );
@@ -163,7 +166,7 @@ pub fn main_context(st: &State, now: u64, waiting: &Waiting) -> String {
         ));
     }
     s.push_str("</task_board>\n");
-    push_block(&mut s, "agent_threads", &agent_threads(st, 8));
+    push_block(&mut s, "agent_threads", threads);
     let cards: Vec<String> = st
         .open_cards()
         .map(|c| {
@@ -182,7 +185,7 @@ pub fn main_context(st: &State, now: u64, waiting: &Waiting) -> String {
         })
         .collect();
     push_block(&mut s, "open_cards", &cards);
-    push_block(&mut s, "questions_for_you", &questions_for(waiting.unanswered(MAIN)));
+    push_block(&mut s, "questions_for_you", questions);
     s.push_str("</bise_state>");
     s
 }
@@ -322,9 +325,9 @@ pub fn tasks_detail(st: &State, now: u64, models: &Models) -> String {
             ));
         }
         for m in st
-            .msgs
+            .msgs()
             .values()
-            .filter(|m| m.from == a.name && m.expect_reply && !st.settled.contains(&m.id))
+            .filter(|m| m.from == a.name && m.expect_reply && !st.settled().contains(&m.id))
         {
             b.push(format!(
                 "waits for a reply from {} (m_{}): \"{}\"",
@@ -408,6 +411,12 @@ impl<'a> Group<'a> {
         Group { st, rows }
     }
 
+    /// What [`Group::seen_by`] reads besides the viewer: each row's
+    /// agent, its parent and its row (two equal lists, equal rosters).
+    pub fn rows(&self) -> Vec<(String, Option<String>, String)> {
+        self.rows.iter().map(|(a, rest)| (a.name.clone(), a.parent.clone(), rest.clone())).collect()
+    }
+
     /// The roster as `viewer` sees it: who is itself, its parent, its
     /// children, its peers.
     pub fn seen_by(&self, viewer: &str) -> Vec<String> {
@@ -431,7 +440,8 @@ impl<'a> Group<'a> {
 }
 
 /// The block appended to every model request of a task.
-pub fn task_context(name: &str, group: &Group, waiting: &Waiting) -> String {
+/// `questions`: [`questions_for`] its unanswered messages.
+pub fn task_context(name: &str, group: &Group, questions: &[String]) -> String {
     let mut s = format!(
         "<bise_state>\nLive state injected by bise before this call (not a user message). You are `{}`.\n<group>\n",
         name
@@ -441,7 +451,7 @@ pub fn task_context(name: &str, group: &Group, waiting: &Waiting) -> String {
         s.push('\n');
     }
     s.push_str("</group>\n");
-    push_block(&mut s, "questions_for_you", &questions_for(waiting.unanswered(name)));
+    push_block(&mut s, "questions_for_you", questions);
     s.push_str("</bise_state>");
     s
 }
@@ -460,7 +470,7 @@ fn push_block(s: &mut String, tag: &str, lines: &[String]) {
 }
 
 /// The delivered messages still waiting for their recipient's reply.
-fn questions_for(unanswered: &[&Msg]) -> Vec<String> {
+pub fn questions_for(unanswered: &[&Msg]) -> Vec<String> {
     unanswered
         .iter()
         .map(|m| format!("m_{} from {}: \"{}\"", m.id, m.from, clip(&one_line(&m.text), 80)))
@@ -469,12 +479,12 @@ fn questions_for(unanswered: &[&Msg]) -> Vec<String> {
 
 /// Queued messages, for the board shown to the user.
 pub fn queued_count(st: &State, name: &str) -> usize {
-    st.msgs.values().filter(|m| m.to == name && st.is_queued(m)).count()
+    st.msgs().values().filter(|m| m.to == name && st.is_queued(m)).count()
 }
 
 /// What waits for each agent, from one pass over the messages: those
 /// queued for it, and the delivered ones it owes a reply to. Oldest
-/// first, as in `st.msgs`.
+/// first, as in `st.msgs()`.
 pub struct Waiting<'a> {
     queued: BTreeMap<&'a str, Vec<&'a Msg>>,
     unanswered: BTreeMap<&'a str, Vec<&'a Msg>>,
@@ -483,7 +493,7 @@ pub struct Waiting<'a> {
 impl<'a> Waiting<'a> {
     pub fn of(st: &'a State) -> Waiting<'a> {
         let mut w = Waiting { queued: BTreeMap::new(), unanswered: BTreeMap::new() };
-        for m in st.msgs.values() {
+        for m in st.msgs().values() {
             if st.is_queued(m) {
                 w.queued.entry(m.to.as_str()).or_default().push(m);
             }
@@ -518,6 +528,12 @@ impl<'a> Waiting<'a> {
     pub fn unanswered(&self, name: &str) -> &[&'a Msg] {
         self.unanswered.get(name).map_or(&[], Vec::as_slice)
     }
+
+    /// Each agent's `<questions_for_you>` lines ([`questions_for`]), for
+    /// every agent that owes a reply.
+    pub fn questions(&self) -> BTreeMap<String, Vec<String>> {
+        self.unanswered.iter().map(|(n, ms)| (n.to_string(), questions_for(ms))).collect()
+    }
 }
 
 #[cfg(test)]
@@ -539,7 +555,7 @@ mod tests {
     #[test]
     fn the_board_lists_every_live_task() {
         let st = state();
-        let c = main_context(&st, 12 * 60_000, &Waiting::of(&st));
+        let c = main_context(&st, 12 * 60_000, &agent_threads(&st, 8), &[]);
         assert!(c.contains("auth-fix"), "{}", c);
         assert!(c.contains("\"Doc API v2\""), "{}", c);
         assert!(c.contains("12m"), "{}", c);
@@ -549,14 +565,7 @@ mod tests {
     #[test]
     fn peer_threads_are_summarized_for_main() {
         let mut st = state();
-        st.msg_state.insert(
-            1,
-            MsgState::Queued {
-                reason: "new".into(),
-            },
-        );
-        st.msgs.insert(
-            1,
+        st.put_msg(
             Msg {
                 id: 1,
                 thread: 1,
@@ -572,6 +581,8 @@ mod tests {
                 via: None,
                 parts: String::new(),
             },
+            Some(MsgState::Queued { reason: "new".into() }),
+            false,
         );
         let t = agent_threads(&st, 8);
         assert_eq!(t.len(), 1);
@@ -611,17 +622,15 @@ mod tests {
         let names = [MAIN, "auth-fix", "docs", USER];
         for id in 1..=60u64 {
             let (from, to) = (names[(id % 4) as usize], names[((id + 1) % 4) as usize]);
-            st.msgs.insert(id, msg(id, from, to, id % 2 == 0, id % 5 == 0));
-            st.msg_state.insert(id, states[(id % 3) as usize].clone());
+            st.put_msg(msg(id, from, to, id % 2 == 0, id % 5 == 0), Some(states[(id % 3) as usize].clone()), id == 4);
         }
-        st.settled.insert(4);
         let w = Waiting::of(&st);
         for n in names {
             assert_eq!(w.queued_count(n), queued_count(&st, n), "{n}");
             let ids = |ms: &[&Msg]| ms.iter().map(|m| m.id).collect::<Vec<_>>();
             assert_eq!(ids(w.unanswered(n)), ids(&st.unanswered_for(n)), "{n}");
             let inputs: Vec<serde_json::Value> = st
-                .msgs
+                .msgs()
                 .values()
                 .filter(|m| m.to == n && m.queued && m.from == USER && st.is_queued(m))
                 .map(|m| serde_json::json!({"id": m.id, "text": m.text, "created_ms": m.created_ms}))
@@ -637,9 +646,8 @@ mod tests {
     #[test]
     fn a_task_context_has_the_roster_it_sees_and_its_questions() {
         let mut st = state();
-        st.msgs.insert(1, msg(1, "auth-fix", "docs", true, false));
-        st.msg_state.insert(1, MsgState::Delivered);
-        let c = task_context("docs", &Group::of(&st, 0, &Models::new()), &Waiting::of(&st));
+        st.put_msg(msg(1, "auth-fix", "docs", true, false), Some(MsgState::Delivered), false);
+        let c = task_context("docs", &Group::of(&st, 0, &Models::new()), &questions_for(Waiting::of(&st).unanswered("docs")));
         let mut want = String::from("<group>\n");
         for l in roster(&st, "docs", 0, &Models::new()) {
             want.push_str(&l);

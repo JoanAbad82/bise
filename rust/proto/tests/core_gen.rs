@@ -20,7 +20,7 @@
 //! `In` table with today's `in_tag` (fixtures/core_in_tags.txt, from
 //! core.bend at 84ddc10d, and core.bend's own while it still has one).
 
-use bise_proto::core::{fx, FieldKind, Fx, In, Kind, Link, Step, Table};
+use bise_proto::core::{fx, link, FieldKind, Fx, In, Kind, Link, Step, Table};
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -161,9 +161,17 @@ fn encode(k: FieldKind, name: &str, v: &str) -> Result<String, String> {
 
 /// The key-value list of a record: its tag, then each field in order.
 fn kv_list(tag_key: &str, tag: &str, k: &Kind) -> String {
-    let mut segs: Vec<Result<String, String>> = vec![Ok(format!("J.kv(\"{tag_key}\", J.JStr{{\"{tag}\"}})"))];
+    kv_fields(Some(format!("J.kv(\"{tag_key}\", J.JStr{{\"{tag}\"}})")), k)
+}
+
+/// The key-value list of a record's fields, after its tag if it has one.
+fn kv_fields(tag: Option<String>, k: &Kind) -> String {
+    let mut segs: Vec<Result<String, String>> = tag.into_iter().map(Ok).collect();
     for f in k.fields {
         segs.push(encode(f.kind, f.name, &var(f.name)));
+    }
+    if segs.is_empty() {
+        return "Nil{}".into();
     }
     if segs.iter().all(Result::is_ok) {
         return format!("[{}]", segs.into_iter().map(Result::unwrap).collect::<Vec<_>>().join(", "));
@@ -270,6 +278,10 @@ fn codec(g: &Gen) -> String {
     writeln!(s, "    case {}{{}}:\n      Nil{{}}\n", g.fallback).unwrap();
     writeln!(s, "def json(x: {}) -> J.Json:\n  J.obj(kvs(x))\n", g.ty).unwrap();
 
+    if g.ty == "Link" {
+        answer(&mut s);
+    }
+
     if g.ty == "Fx" {
         writeln!(s, "# ---- one encoder per effect (per shape for line and confirm): the list").unwrap();
         writeln!(s, "# sb-core's `out` takes ----\n").unwrap();
@@ -308,6 +320,36 @@ fn codec(g: &Gen) -> String {
         }
     }
     s
+}
+
+/// sb-core's answer line (`link::ANSWER`, untagged: its keys say which
+/// shape): one record per shape, each with its field reads (for the
+/// laws) and its encoder `answer_<tag>`, the object main.bend writes.
+fn answer(s: &mut String) {
+    let t = &link::ANSWER;
+    writeln!(s, "# ---- sb-core's answer: bise_proto::core::link::Answer (untagged: its keys").unwrap();
+    writeln!(s, "# say which shape) ----\n").unwrap();
+    writeln!(s, "type Answer is Data:").unwrap();
+    for k in t.kinds {
+        let fs: Vec<String> = k.fields.iter().map(|f| format!("{}: {}", var(f.name), bend_ty(f.kind))).collect();
+        writeln!(s, "  # {}\n  {}{{{}}}", k.tag, k.bend, fs.join(", ")).unwrap();
+    }
+    writeln!(s).unwrap();
+    for k in t.kinds {
+        let ds: Vec<String> = k.fields.iter().map(|f| decode(f.kind, f.name)).collect();
+        let i = if k.fields.is_empty() { "i" } else { "+i" };
+        writeln!(s, "def {}.of({i}: J.Json) -> Answer:\n  {}\n", k.bend, ctor(k, &ds)).unwrap();
+    }
+    writeln!(s, "def answer_kvs(x: Answer) -> List<&2, {KV}>:\n  match x:").unwrap();
+    for k in t.kinds {
+        let pats: Vec<String> = field_vars(k).iter().map(|v| format!("+{v}")).collect();
+        writeln!(s, "    case {}:\n      {}", ctor(k, &pats), kv_fields(None, k)).unwrap();
+    }
+    writeln!(s, "\ndef answer_json(x: Answer) -> J.Json:\n  J.obj(answer_kvs(x))\n").unwrap();
+    for k in t.kinds {
+        let ps: Vec<String> = k.fields.iter().map(|f| format!("+{}: {}", var(f.name), bend_ty(f.kind))).collect();
+        writeln!(s, "def answer_{}({}) -> J.Json:\n  answer_json({})\n", k.tag, ps.join(", "), ctor(k, &field_vars(k))).unwrap();
+    }
 }
 
 const KIT: &str = r#"
@@ -579,13 +621,33 @@ fn laws() -> String {
         // decode∘encode
         for k in records(t) {
             let law = format!("{}_{}_round", g.prefix, k.bend);
+            round_law(&mut s, &law, &m, g.ty, k, &|x| format!("{m}.of({m}.json({x}))"));
+        }
+    }
+    // the answer: each shape's fields read back what its encoder wrote
+    // (which shape a line is, serde's untagged order, is Rust's: tests in
+    // src/core/tests.rs and the fixture core_answer.jsonl)
+    writeln!(s, "# ---- Answer ----\n").unwrap();
+    for k in link::ANSWER.kinds {
+        let law = format!("answer_{}_round", k.tag);
+        round_law(&mut s, &law, "LINK", "Answer", k, &|x| format!("LINK.{}.of(LINK.answer_json({x}))", k.bend));
+    }
+    s
+}
+
+/// The law and proof that `lhs_of(record)`, its decode∘encode, is the
+/// record: split on each field whose encoding has cases (omitted when
+/// empty or none), each list field rewritten by its lemma.
+fn round_law(s: &mut String, law: &str, m: &str, ty: &str, k: &Kind, lhs_of: &dyn Fn(&str) -> String) {
+    {
+        {
             let vars = field_vars(k);
             writeln!(s, "law {law}:").unwrap();
             for f in k.fields {
                 writeln!(s, "  for {}: {}", var(f.name), bend_ty(f.kind)).unwrap();
             }
             let qual = |args: &[String]| format!("{m}.{}", ctor(k, args));
-            writeln!(s, "  {{{m}.of({m}.json({})) == {} : {m}.{}}}\n", qual(&vars), qual(&vars), g.ty).unwrap();
+            writeln!(s, "  {{{} == {} : {m}.{ty}}}\n", lhs_of(&qual(&vars)), qual(&vars)).unwrap();
             writeln!(s, "def {law}({}):", vars.join(", ")).unwrap();
             let split: Vec<usize> = (0..k.fields.len()).filter(|&i| cases(k.fields[i].kind, &vars[i]).len() > 1).collect();
             let per: Vec<_> = k.fields.iter().zip(&vars).map(|(f, v)| cases(f.kind, v)).collect();
@@ -615,13 +677,12 @@ fn laws() -> String {
                 }
                 // each list field rewritten in turn: its hole `_`, the ones
                 // before it already in their read-back form
-                let lhs = format!("{m}.of({m}.json({}))", qual(&args));
+                let lhs = lhs_of(&qual(&args));
                 let mut rhs = args.clone();
                 for (i, lemma, x, hole) in rws {
                     let mut with_hole = rhs.clone();
                     with_hole[i] = hole.clone();
-                    let ty = format!("{m}.{}", g.ty);
-                    writeln!(s, "{ind}%K.{lemma}_round({x}) : {{{lhs} == {} : {ty}}}", qual(&with_hole)).unwrap();
+                    writeln!(s, "{ind}%K.{lemma}_round({x}) : {{{lhs} == {} : {m}.{ty}}}", qual(&with_hole)).unwrap();
                     rhs[i] = rewritten(lemma, &x, &hole);
                 }
                 writeln!(s, "{ind}{{==}}").unwrap();
@@ -629,7 +690,6 @@ fn laws() -> String {
             writeln!(s).unwrap();
         }
     }
-    s
 }
 
 /// Every generated file, by its path under the repo.

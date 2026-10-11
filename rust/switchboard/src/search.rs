@@ -85,17 +85,12 @@ pub fn classify(line: &str) -> Option<(Role, String)> {
         return Some((Role::Hub, format!("compaction summary: {}", wire_unescape(r))));
     }
     let text = readable(line)?;
-    let role = if line.starts_with("sb you : ") {
-        Role::User
-    } else if line.trim_start().starts_with("obs: assistant: ") {
-        Role::Assistant
-    } else if ["sb msg-in : ", "sb msg : ", "sb msg-you : ", "sb answered : "]
-        .iter()
-        .any(|p| line.starts_with(p))
-    {
-        Role::Message
-    } else {
-        Role::Hub
+    use bise_proto::thread::lines::{read, Hub, Rec};
+    let role = match read(line) {
+        Rec::Hub(Hub::You(_)) => Role::User,
+        Rec::Obs(bise_proto::thread::lines::Obs::Assistant(_)) => Role::Assistant,
+        Rec::Hub(Hub::MsgIn { .. } | Hub::Msg { .. } | Hub::MsgYou { .. } | Hub::Answered { .. }) => Role::Message,
+        _ => Role::Hub,
     };
     Some((role, text))
 }

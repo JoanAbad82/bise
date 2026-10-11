@@ -60,7 +60,9 @@ Chunks (each owns its files; chunk 0's schema is the others' contract):
   The records inside sb-core stay. ALL PROOFS CHECK; core.bend only
   shrinks.
 - **F · the feed** (rust/proto/src/thread/, the line writers): new lines
-  are `sb <kind> : <json>` of `Feed`; every old shape moves to
+  are `sb <kind> :: <json>` of `Feed` (two colons: no old writer ever
+  wrote ` :: ` after the kind, so the form is one prefix test, architect
+  m_18679); every old shape moves to
   `thread/legacy.rs` behind `upgrade(line) -> Option<Feed>`, with a corpus
   of each shape ever written. Transcripts and the journal are never
   rewritten (positions are ids; a rollback must still read them).
@@ -79,7 +81,8 @@ approval, pr, landed, scheduled, wake.
 
 - `rg 'json!\(\{"t"' rust/switchboard/src --glob '!*tests*'` → 0;
 - `rg 'jstr\(f, "fx"\)' rust/switchboard` → 0;
-- `rg 'String.eq\(t, "' bend/hub` → 0, and `in_tag` is gone from core.bend;
+- `rg 'String.eq\(t, "' bend/hub --glob '!codec.bend'` → 0 (the input
+  and link dispatch), and `in_tag` is gone from core.bend;
 - `rg 'J.kv\("fx"' bend/hub --glob '!gen/*'` → 0;
 - lines.rs reads no `sb <kind> : ` prefix outside `thread/legacy.rs`; new
   writers write only `Feed` JSON;
@@ -95,6 +98,40 @@ values, the journal byte-equal on a replay, the e2e transcripts equal
 (but the kinds F moves, named), ALL PROOFS CHECK (4 shards),
 `old_core_replay` for -28, -29 and main.
 
+## Not in this slice
+
+- the journal events: codec.bend's `ev_kind` is still a 38-step
+  `String.eq(t, "…")` pick chain (bend/hub/codec.bend:304-342); generating
+  codec.bend (and model.rs's serde) is the next slice (architect m_18761).
+- the typed hot view from sb-core (D3, issue 21).
+
 ## Status
 
 - chunk 0: schema, generator, laws and fixtures, signed by architect (m_18504).
+- chunk F sha 1 (the reader, no writer): `thread/legacy.rs` reads every
+  older `sb <kind> : <text>` shape into a `Feed` (`upgrade`), the new form
+  is read with serde, `lines::Hub` is the view of a `Feed` the fold and the
+  TUI match on; switchboard's transcript.rs, search.rs and
+  proto_view/merged.rs read lines through `lines::read`. Corpus:
+  rust/proto/fixtures/legacy_lines.jsonl, 97 shapes. It ships in a release
+  BEFORE sha 2 writes the new form, so a probation rollback always reads
+  his transcripts (architect m_18679 Q3).
+- chunk B sha 1: `Answer` (link.rs), sb-core's answer line typed too
+  (architect m_18671): untagged, one shape per row of `link::ANSWER`
+  (`{fx, dirty, view}`, `{need}`, `{view}`, `{skipped: true}`,
+  `{skipped: [i]}`, `{error}`, `{}`), `Unknown` kept whole, an unknown
+  effect in `fx` an `Fx::Unknown`; its Bend encoders `answer_<shape>` in
+  gen/link.bend with a decode∘encode law each; fixture
+  core_answer.jsonl (one real sb-core answer per shape). Then fx_list
+  never fails: a bad effect is `Fx::Unknown` and costs only itself
+  (architect m_18746).
+- chunk B sha 2: sb-core decodes each input with gen/in.bend (`in_tag`,
+  core.bend's tag-only `In` and every `C.get_*(i, …)` gone) and builds
+  every effect with gen/fx.bend; main.bend reads the link with
+  gen/link.bend (`tag_of` gone) and writes its answers with
+  `answer_<shape>`. core.bend 4,008 → 3,849 lines. 6,058 captured lines
+  (e2e + switchboard lib on main and on B) give equal answers from main's
+  and B's sb-core. Its cost: the slowest PROOF shard went 70 → 82 s in the
+  same job (+17%), the generated codecs now being in every shard. If the
+  shards' total grows again with F's encoders, gen/laws.bend's per-record
+  laws move to their own shard (architect m_18807).

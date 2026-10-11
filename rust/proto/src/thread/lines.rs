@@ -1,10 +1,12 @@
 //! One parser per transcript line kind (architect m_10476): a line of an
 //! agent's transcript (the runtime's `tool #…`/`  obs: …` lines, the
-//! hub's `sb <kind> : …` lines) read into a typed [`Rec`]. The hub's
+//! hub's `sb <kind> …` lines) read into a typed [`Rec`]. The hub's
 //! fold ([`super::fold`]) and the TUI (`wire.rs`, `sb.rs`) both read
-//! lines through here, so a line means one thing on both sides; when
-//! typed transcript records replace the text lines, only this module
-//! changes. Pure: std and the line's own escapes, nothing else.
+//! lines through here, so a line means one thing on both sides. A hub
+//! line is a [`Feed`] record (`sb <kind> :: <json>`, read with serde) or
+//! an older text line, which only `thread::legacy` reads; [`Hub`] is the
+//! view of a `Feed` record the fold and the TUI match on (Feed is the
+//! source). Pure: std, serde and the line's own escapes, nothing else.
 
 /// `\n` escapes back to newlines (the TUI's `markdown::unescape_md`).
 pub fn unescape(s: &str) -> String {
@@ -250,8 +252,8 @@ pub enum GateStep {
     Done,
 }
 
-/// The hub's own lines in a feed (`sb <kind> : <text>`, hub line
-/// protocol C2). Texts are unescaped; fields too (their `" \: "`).
+/// The hub's own lines in a feed, as the fold and the TUI read them: a
+/// view of a [`Feed`] record ([`view`]), whichever form the line has.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Hub {
     /// his message
@@ -326,6 +328,8 @@ pub enum Hub {
     /// doesn't parse: its kind and unescaped text
     Other { kind: String, text: String },
 }
+
+use crate::core::Feed;
 
 /// A live transcript line, read.
 pub fn read(line: &str) -> Rec {
@@ -706,133 +710,83 @@ pub fn obs(o: &str) -> Obs {
     Obs::Other(s(o))
 }
 
-/// A hub line, its `sb ` taken off: `<kind> : <text>`.
+/// A hub line, its `sb ` taken off: a [`Feed`] record
+/// (`<kind> :: <json>`, read with serde) or an older text line
+/// (`thread::legacy`), as the view the fold and the TUI read.
 pub fn hub(rest: &str) -> Hub {
-    let (kind, raw) = rest.split_once(" : ").unwrap_or((rest, ""));
-    let text = unescape(raw);
-    let other = |text: String| Hub::Other { kind: kind.to_string(), text };
-    match kind {
-        "you" => Hub::You(text),
-        "you-id" => match msg_id(raw.trim()) {
-            Some(id) => Hub::YouId(id),
-            None => other(text),
-        },
-        "steered" | "steer-rx" => match raw.split_whitespace().map(msg_id).collect::<Option<Vec<u64>>>() {
-            Some(ids) if !ids.is_empty() && kind == "steered" => Hub::Steered(ids),
-            Some(ids) if !ids.is_empty() => Hub::SteerRx(ids),
-            _ => other(text),
-        },
-        "context" => Hub::Context(raw.to_string()),
-        // raw: the JSON has no newline to unescape, and its own `\n`
-        // escapes must stay as they are
-        "you-parts" => Hub::YouParts(raw.to_string()),
-        "route-parts" => Hub::RouteParts(raw.to_string()),
-        "undelivered" => {
-            let (name, t) = raw.split_once(" : ").unwrap_or((raw, ""));
-            Hub::Undelivered { to: field(name), text: field(t) }
-        }
-        "msg-in" => {
-            let (head, body) = text.split_once(" : ").unwrap_or(("", text.as_str()));
-            let (from, id) = head.split_once(' ').unwrap_or((head, ""));
-            Hub::MsgIn { from: from.into(), id: id.into(), body: body.into() }
-        }
-        "msg" => {
-            let (head, body) = text.split_once(" : ").unwrap_or(("", text.as_str()));
-            let (from, to) = head.split_once(" → ").unwrap_or((head, ""));
-            let (to, id) = match to.rsplit_once(' ') {
-                Some((t, id)) if is_msg_id(id) => (t, id),
-                _ => (to, ""),
-            };
-            Hub::Msg { from: from.into(), to: to.into(), id: id.into(), body: body.into() }
-        }
-        "sent" => {
-            let f: Vec<String> = raw.splitn(4, " : ").map(field).collect();
-            match f.as_slice() {
-                [to, id, ask, body] => Hub::Sent { to: to.clone(), id: id.clone(), ask: ask == "1", body: body.clone() },
-                _ => other(text),
-            }
-        }
-        "msg-you" => {
-            let (from, body) = text.split_once(" : ").unwrap_or(("", text.as_str()));
-            Hub::MsgYou { from: from.into(), body: body.into() }
-        }
-        "answered" => {
-            let mut f = raw.splitn(4, " : ").map(field);
-            let mut next = || f.next().unwrap_or_default();
-            Hub::Answered { agent: next(), question: next(), answer: next(), why: next() }
-        }
-        "card" => {
-            let (head, body) = text.split_once(" : ").unwrap_or((text.as_str(), ""));
-            let mut w = head.split_whitespace();
-            let id = w.next().and_then(|i| i.strip_prefix('#')).and_then(|i| i.parse().ok());
-            let kind = w.next().unwrap_or("question").to_string();
-            let body = body.to_string();
-            Hub::Card { text, id, kind, body }
-        }
-        "gate" => Hub::Gate(match text.split_whitespace().next() {
-            Some("check") => GateStep::Check,
-            Some("card") => GateStep::Card,
-            _ => GateStep::Done,
-        }),
-        "approval" => {
-            let f: Vec<String> = raw.split(" : ").map(field).collect();
-            let get = |i: usize| f.get(i).cloned().unwrap_or_default();
-            Hub::Approval { how: get(0), who: get(1), what: get(2), note: get(3) }
-        }
-        "card-closed" => match text.strip_prefix('#').and_then(|t| t.split_once(' ')) {
-            Some((id, res)) if id.parse::<u64>().is_ok() => Hub::CardClosed { id: id.parse().unwrap_or(0), res: res.trim().to_string() },
-            _ => other(text),
-        },
-        "route" => match answer_route(&text) {
-            Some((who, card, said)) => Hub::Route { who: who.into(), card, said: said.into() },
-            None => other(text),
-        },
-        "pr" => {
-            let mut f = raw.splitn(4, " : ").map(field);
-            let mut next = || f.next().unwrap_or_default();
-            let (tone, number, url, t) = (next(), next(), next(), next());
-            match number.parse::<u64>() {
-                Ok(number) => Hub::Pr { state: pr_state(&tone), number, url, text: t },
-                // no number: its text field alone, never lost
-                Err(_) => other(t),
-            }
-        }
-        "artifact" => {
-            let mut f = raw.splitn(5, " : ").map(field);
-            let mut next = || f.next().unwrap_or_default();
-            let (id, agent, title, kind, v) = (next(), next(), next(), next(), next());
-            if id.is_empty() {
-                return other(text);
-            }
-            Hub::Artifact { id, agent, title, kind, v: v.trim_start_matches('v').parse().unwrap_or(1) }
-        }
-        "landed" => {
-            let f: Vec<String> = raw.splitn(7, " : ").map(field).collect();
-            let g = |i: usize| f.get(i).cloned().unwrap_or_default();
-            let num = |i: usize| g(i).trim().parse::<u64>().unwrap_or(0);
-            if g(3).is_empty() {
-                return other(text);
-            }
-            Hub::Landed { agent: g(0), target: g(1), from: g(2), sha: g(3), files: num(4), add: num(5), del: num(6) }
-        }
-        "spawn" => Hub::Spawn(text),
-        "computer" => Hub::Computer(text),
-        "direct" => Hub::Direct(text),
-        "warn" => Hub::Warn(text),
-        "scheduled" => Hub::Scheduled(text),
-        "stopped" => Hub::Stopped(text),
-        "wake" => Hub::Wake(text),
-        "kept" => Hub::Kept(text),
-        _ => other(text),
+    match Feed::read_rest(rest) {
+        Some((_, Ok(f))) => view(f),
+        // the writer's bug: its JSON shown, never a guess
+        Some((kind, Err(_))) => Hub::Other { kind: kind.to_string(), text: rest[kind.len() + crate::core::feed::SEP.len()..].to_string() },
+        None => super::legacy::hub(rest),
     }
 }
 
-/// The hub's line for an answer to an item (core.bend `answer.q.sent`):
-/// `you → @{asker} (answer to card #{id}) : {text}` → (asker, id, text).
-pub fn answer_route(text: &str) -> Option<(&str, u64, &str)> {
-    let (head, said) = text.split_once(" : ")?;
-    let (who, id) = head.strip_prefix("you → @")?.split_once(" (answer to card #")?;
-    Some((who, id.strip_suffix(')')?.parse().ok()?, said))
+/// A record as the view [`Hub`] (`Feed` is the source; this is what the
+/// fold and the TUI match on).
+pub fn view(f: Feed) -> Hub {
+    use crate::thread::PrNewsState;
+    let m = |id: Option<u64>| id.map(|n| format!("m_{n}")).unwrap_or_default();
+    let other = |kind: &str, text: String| Hub::Other { kind: kind.to_string(), text };
+    match f {
+        Feed::You(r) => Hub::You(r.text),
+        Feed::YouId(r) => Hub::YouId(r.id),
+        Feed::YouParts(r) => Hub::YouParts(r.parts.to_string()),
+        Feed::RouteParts(r) => Hub::RouteParts(r.parts.to_string()),
+        Feed::Steered(r) => Hub::Steered(r.ids),
+        Feed::SteerRx(r) => Hub::SteerRx(r.ids),
+        Feed::Context(r) => Hub::Context(r.context.to_string()),
+        Feed::Undelivered(r) => Hub::Undelivered { to: r.to, text: r.text },
+        Feed::MsgIn(r) => Hub::MsgIn { from: r.from, id: m(r.id), body: r.body },
+        Feed::Msg(r) => Hub::Msg { from: r.from, to: r.to, id: m(r.id), body: r.body },
+        Feed::Sent(r) => Hub::Sent { to: r.to, id: m(Some(r.id)), ask: r.ask, body: r.body },
+        Feed::MsgYou(r) => Hub::MsgYou { from: r.from, body: r.body },
+        Feed::Answered(r) => Hub::Answered { agent: r.agent, question: r.question, answer: r.answer, why: r.why },
+        Feed::Card(r) => {
+            let head = format!("#{} {} @{}", r.id, r.kind, r.agent);
+            let text = if r.body.is_empty() { head } else { format!("{head} : {}", r.body) };
+            Hub::Card { text, id: Some(r.id), kind: r.kind, body: r.body }
+        }
+        Feed::Gate(r) => Hub::Gate(match r.step.as_str() {
+            "check" => GateStep::Check,
+            "card" => GateStep::Card,
+            _ => GateStep::Done,
+        }),
+        Feed::Approval(r) => Hub::Approval { how: r.how, who: r.who, what: r.what, note: r.note },
+        Feed::CardClosed(r) => Hub::CardClosed { id: r.id, res: r.res },
+        Feed::Route(r) => match r.card {
+            Some(card) => Hub::Route { who: r.who, card, said: r.said },
+            // his words to an agent: the line's text, as before
+            None => other("route", format!("you → @{} : {}", r.who, r.said)),
+        },
+        Feed::Pr(r) => {
+            let state = serde_json::from_value(serde_json::Value::String(r.state)).unwrap_or(PrNewsState::Unknown);
+            Hub::Pr { state, number: r.number, url: r.url, text: r.text }
+        }
+        Feed::Artifact(r) => Hub::Artifact { id: r.id, agent: r.agent, title: r.title, kind: r.kind, v: u32::try_from(r.version).unwrap_or(u32::MAX) },
+        Feed::Landed(r) => Hub::Landed { agent: r.agent, target: r.target, from: r.from, sha: r.sha, files: r.files, add: r.add, del: r.del },
+        Feed::Spawn(r) => Hub::Spawn(r.text),
+        Feed::Computer(r) => Hub::Computer(r.text),
+        Feed::Direct(r) => Hub::Direct(r.text),
+        Feed::Info(r) => other("info", r.text),
+        Feed::Warn(r) => Hub::Warn(r.text),
+        Feed::Scheduled(r) => Hub::Scheduled(r.timer.to_string()),
+        Feed::Stopped(r) => Hub::Stopped(r.text),
+        Feed::Wake(r) => Hub::Wake(r.watch.to_string()),
+        Feed::Kept(r) => Hub::Kept(r.text),
+        // a newer hub's kind: its text when it has one, else its JSON
+        Feed::Unknown { tag, raw } => {
+            let text = raw.get("text").and_then(|t| t.as_str()).map(str::to_string);
+            let text = text.unwrap_or_else(|| {
+                let mut r = raw.clone();
+                if let Some(o) = r.as_object_mut() {
+                    o.remove("sb");
+                }
+                r.to_string()
+            });
+            other(&tag, text)
+        }
+    }
 }
 
 // ---- reading a bash call ----
@@ -942,19 +896,6 @@ pub fn is_main_answer_note(text: &str) -> bool {
 /// switchboard core test `answering_mains_card_routes_it_and_notes_main`
 /// against the real sb-core, so a wording change there goes red).
 pub const MAIN_ANSWER_NOTE: &str = "the user answered card #";
-
-/// A `pr` line's tone word (forge::news::Tone, the hub's writer) as what
-/// it means (architect m_11122: no color on the wire): `plain` is news,
-/// `dim` nothing for him (done), `red` failing checks.
-pub fn pr_state(tone: &str) -> crate::thread::PrNewsState {
-    use crate::thread::PrNewsState;
-    match tone {
-        "plain" => PrNewsState::News,
-        "dim" => PrNewsState::Done,
-        "red" => PrNewsState::Failing,
-        _ => PrNewsState::Unknown,
-    }
-}
 
 /// What one feed item says about an agent's context: a usage after a
 /// call, a compaction's end, or nothing.
