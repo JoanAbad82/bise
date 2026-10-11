@@ -549,8 +549,9 @@ def main():
         mthread = typed(d, "thread")[-1]["entries"]
         # his answer's row: 'you answered t3: this one' (the route fold)
         ans = [x for x in mthread if x["kind"] == "approval" and "you answered t3" in x["text"] and "this one" in x["text"] + x["approval"].get("note", "")]
-        a = ans[-1]["approval"] if ans else {}
-        check(ans and [i["path"] for i in a.get("images", [])] == [png],
+        # the image apart, as an image part of the row (msg-parts: the
+        # window draws the answer's chips from Entry.parts)
+        check(ans and [p.get("source") for p in ans[-1].get("parts", []) if p["kind"] == "image"] == [png],
               "main's row for his answer has the image apart: %r" % ans[-1:])
         # msg-parts: the image's store path rides only in its typed part
         # (architect m_17621 Q2: b64_file), never in the words

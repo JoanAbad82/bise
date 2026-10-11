@@ -66,8 +66,11 @@ fn an_answer_with_pasted_files_is_its_words_images_and_files() {
     assert!(!serde_json::to_string(b).unwrap().contains("images"));
     let r = e[2].approval.as_ref().unwrap();
     assert_eq!((r.text.as_str(), r.note.as_str()), ("you answered gift-ui: the cart page", ""));
-    assert_eq!((r.images.len(), r.files.as_slice()), (1, ["/w/notes.md".to_string()].as_slice()));
     let json = serde_json::to_string(&e[2]).unwrap();
+    // his images and files ride only in Entry.parts (msg-parts sha d):
+    // none on the approval row itself
+    let row = serde_json::to_string(r).unwrap();
+    assert!(!row.contains("images") && !row.contains("files"), "{row}");
     assert!(!json.contains("<image"), "{json}");
     // msg-parts: its parts (read back once): his words, then the image
     // as its part (the store's b64 path rides only there, never data)
