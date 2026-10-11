@@ -54,6 +54,36 @@ export interface SpotFile {
 export const spotFileLabel = (f: SpotFile): string =>
   f.image ? `[Image #${String(f.n)}]` : f.name;
 
+/** A chip's words on screen, as the sent bubble's chip (amb-win 900f998e, designer m_18136): an
+ *  image reads 'image n' in ink, never its '[Image #n]' tag; a file by its name. */
+export const spotChipWords = (f: SpotFile): string =>
+  f.image ? `image ${String(f.n)}` : f.name;
+
+/** The bubble's no-file glyph (rows-cards Thumb): an image chip whose thumbnail could not be drawn. */
+function NoThumb() {
+  return (
+    <span className="thumb none" aria-hidden="true">
+      <svg viewBox="0 0 16 16" width="16" height="16">
+        <rect
+          x="2.5"
+          y="3.5"
+          width="11"
+          height="9"
+          rx="1.5"
+          fill="none"
+          stroke="currentColor"
+        />
+        <circle cx="6" cy="6.5" r="1" fill="currentColor" />
+        <path
+          d="M3 11.5l3.5-3 2.5 2 2-1.5 2.5 2"
+          fill="none"
+          stroke="currentColor"
+        />
+      </svg>
+    </span>
+  );
+}
+
 /** His ask with chips as typed parts (msg-parts, like the thread's d68b4867): each chip in order, an
  *  image by its source in the image store alone (the hub stores it, main 18a32ce3; no b64_file), a
  *  file by its path, then his words. The text keeps the chips' labels before his words for older
@@ -545,15 +575,18 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
                 {files.map((f) => (
                   <span
                     key={f.n}
-                    className="b-chip image"
+                    className="b-spot-chip"
                     data-kind={f.image ? "image" : "file"}
                     title={f.path}
                     data-testid={`${testId}.file.${String(f.n)}`}
                   >
-                    {f.thumb !== undefined && (
-                      <img className="thumb" src={f.thumb} alt="" />
-                    )}
-                    {spotFileLabel(f)}
+                    {f.image &&
+                      (f.thumb !== undefined ? (
+                        <img className="thumb" src={f.thumb} alt="" />
+                      ) : (
+                        <NoThumb />
+                      ))}
+                    {spotChipWords(f)}
                   </span>
                 ))}
               </span>

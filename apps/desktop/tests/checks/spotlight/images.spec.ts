@@ -90,7 +90,7 @@ test("spotlight/images: ⌘V of an image and an image dropped on the pearl are c
     ).toBe(true);
     await cap.keyboard.press("Meta+V");
     const one = cap.locator('[data-testid="spot.file.1"]');
-    await expect(one, "the pasted PNG is a chip").toHaveText("[Image #1]", {
+    await expect(one, "the pasted PNG is a chip").toHaveText("image 1", {
       timeout: 5000,
     });
     await expect(one).toHaveAttribute("data-kind", "image");
@@ -140,7 +140,7 @@ test("spotlight/images: ⌘V of an image and an image dropped on the pearl are c
     await expect(
       cap.locator('[data-testid="spot.file.2"]'),
       "the dropped image is a chip",
-    ).toHaveText("[Image #2]", { timeout: 5000 });
+    ).toHaveText("image 2", { timeout: 5000 });
 
     await input.pressSequentially("what is wrong in these");
     await expect(cap.locator('[data-testid="spot.frame"] .keys')).toHaveText(

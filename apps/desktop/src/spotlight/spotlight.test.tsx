@@ -179,7 +179,7 @@ describe("the spotlight", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
     expect(saveImage).toHaveBeenCalledWith(png);
-    expect(ui.getByTestId("spot.file.1").textContent).toBe("[Image #1]");
+    expect(ui.getByTestId("spot.file.1").textContent).toBe("image 1");
     const notes = new File(["q3"], "q3-notes.md", { type: "text/markdown" });
     const drop = new Event("drop", { cancelable: true }) as Event & {
       dataTransfer: unknown;

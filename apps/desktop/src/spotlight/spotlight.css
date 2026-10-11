@@ -1,59 +1,243 @@
 /* The spotlight's own parts in amb-kit's Spot: bise's answer, readable (his bug 6: too small to
    read). Tokens only. The panel grows with the content (Spotlight's onHeight). */
-.b-spotlight { width: 100%; }
-.b-spot-answer { padding: 4px 20px 12px 70px; font: var(--t-15)/1.5 var(--font-read); color: var(--c-text); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.b-spotlight {
+  width: 100%;
+}
+.b-spot-answer {
+  padding: 4px 20px 12px 70px;
+  font: var(--t-15)/1.5 var(--font-read);
+  color: var(--c-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
 /* a line about the answer (asked, waiting for the first words; sent to another project): dim */
-.b-spot-answer.note { color: var(--c-text-2); }
-.b-live-pearl { flex: none; }
+.b-spot-answer.note {
+  color: var(--c-text-2);
+}
+.b-live-pearl {
+  flex: none;
+}
 /* R41: what he pasted or dropped, chips before his words on the field's line (the composer's
    image chip: accent on accent-soft, 16 px thumbnail), the words keep the rest of the line */
-.b-spot-field { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.b-spot-field > input { flex: 1; min-width: 4em; }
-.b-spot-files { display: flex; gap: 4px; flex: none; max-width: 60%; overflow: hidden; }
-.b-spot-files .b-chip { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--r-2); font: var(--t-13) var(--font-ui); white-space: nowrap; color: var(--c-accent); background: var(--c-accent-soft); }
-.b-spot-files .b-chip .thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; margin-right: 6px; }
+.b-spot-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.b-spot-field > input {
+  flex: 1;
+  min-width: 4em;
+}
+.b-spot-files {
+  display: flex;
+  gap: 4px;
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+}
+.b-spot-files {
+  gap: 6px;
+}
+/* the sent bubble's chip (amb-win 900f998e, designer m_18136): ink words, 1 px line, r 9, no fill */
+.b-spot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid var(--c-line);
+  border-radius: 9px;
+  background: none;
+  font: var(--t-13) var(--font-ui);
+  white-space: nowrap;
+  color: var(--c-text);
+}
+.b-spot-chip .thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex: none;
+}
+.b-spot-chip .thumb.none {
+  display: inline-flex;
+  flex: 0 0 16px;
+  color: var(--c-text-3);
+  opacity: 0.7;
+}
 /* R07-a: the selected agent's last actions in its right column (designer m_13271): the row grows to
    fit, no height tween; name and project stay on the first line; newest last in --c-text, the
    older dim; the time right-aligned dim; a question that waits on him in accent; each line cut with … */
-.b-spot .r:has(.b-spot-acts) { height: auto; min-height: 34px; align-items: start; padding-top: 8px; padding-bottom: 8px; }
-.b-spot .r:has(.b-spot-acts) > :is(b, .pp, .ky) { line-height: 18px; }
-.b-spot-acts { display: grid; gap: 2px; min-width: 0; }
-.b-spot-acts .a { display: flex; gap: 10px; min-width: 0; line-height: 18px; color: var(--c-text-3); }
-.b-spot-acts .a.new { color: var(--c-text); }
-.b-spot-acts .a.ask { color: var(--c-accent); }
-.b-spot-acts .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.b-spot-acts .tm { flex: none; color: var(--c-text-3); font-size: var(--t-12); }
-.b-spot-route { display: flex; align-items: baseline; gap: 14px; padding: 4px 20px 10px 70px; font: var(--t-15)/1.4 var(--font-read); color: var(--c-text); }
-.b-spot-route .keep { margin-left: auto; padding: 0; border: 0; background: none; font: var(--t-12) var(--font-mono); color: var(--c-text-3); cursor: default; }
+.b-spot .r:has(.b-spot-acts) {
+  height: auto;
+  min-height: 34px;
+  align-items: start;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.b-spot .r:has(.b-spot-acts) > :is(b, .pp, .ky) {
+  line-height: 18px;
+}
+.b-spot-acts {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.b-spot-acts .a {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  line-height: 18px;
+  color: var(--c-text-3);
+}
+.b-spot-acts .a.new {
+  color: var(--c-text);
+}
+.b-spot-acts .a.ask {
+  color: var(--c-accent);
+}
+.b-spot-acts .t {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.b-spot-acts .tm {
+  flex: none;
+  color: var(--c-text-3);
+  font-size: var(--t-12);
+}
+.b-spot-route {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 4px 20px 10px 70px;
+  font: var(--t-15)/1.4 var(--font-read);
+  color: var(--c-text);
+}
+.b-spot-route .keep {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: var(--t-12) var(--font-mono);
+  color: var(--c-text-3);
+  cursor: default;
+}
 /* bise's answer while it streams and once done (LiveText, ambient's text-appearing spec): only
    the new words fade in, 180 ms ease-out, staggered (--d); no caret, the '∿' rides after the last
    word; a text that is not a continuation crossfades once, 120 ms. Shared by the capsule. */
-.b-live .fade { animation: b-live-in 180ms var(--ease-out) var(--d, 0ms) both; }
-.b-live.swap0 { animation: b-live-swap0 120ms var(--ease-out); }
-.b-live.swap1 { animation: b-live-swap1 120ms var(--ease-out); }
-.b-live { display: block; position: relative; }
-.b-live strong { font-weight: 600; }
-.b-live code, .b-live .box { font-family: var(--font-mono); font-size: .88em; }
+.b-live .fade {
+  animation: b-live-in 180ms var(--ease-out) var(--d, 0ms) both;
+}
+.b-live.swap0 {
+  animation: b-live-swap0 120ms var(--ease-out);
+}
+.b-live.swap1 {
+  animation: b-live-swap1 120ms var(--ease-out);
+}
+.b-live {
+  display: block;
+  position: relative;
+}
+.b-live strong {
+  font-weight: 600;
+}
+.b-live code,
+.b-live .box {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
 /* inline code: 2 px each side at most, so punctuation hugs it (amb-kit's fix, ambient m_12433) */
-.b-live code { padding: 0 2px; border-radius: 4px; background: var(--c-sunken); }
-.b-live .box, .b-live .table { display: block; margin: 6px 0; overflow-x: auto; }
-.b-live .box { padding: 8px 10px; border-radius: 8px; background: var(--c-sunken); white-space: pre; animation: b-live-in 180ms var(--ease-out) both; }
+.b-live code {
+  padding: 0 2px;
+  border-radius: 4px;
+  background: var(--c-sunken);
+}
+.b-live .box,
+.b-live .table {
+  display: block;
+  margin: 6px 0;
+  overflow-x: auto;
+}
+.b-live .box {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--c-sunken);
+  white-space: pre;
+  animation: b-live-in 180ms var(--ease-out) both;
+}
 /* a table as the thread's: ui font, header 600 over a 1 px --c-line rule, tabular numbers, the
    columns fixed from the header (each row a grid with the same columns) */
-.b-live .table { white-space: normal; font-variant-numeric: tabular-nums; }
-.b-live .table .tr { display: grid; }
-.b-live .table .tr > span { padding: 3px 10px 3px 0; overflow-wrap: anywhere; }
-.b-live .table .th { border-bottom: 1px solid var(--c-line); }
+.b-live .table {
+  white-space: normal;
+  font-variant-numeric: tabular-nums;
+}
+.b-live .table .tr {
+  display: grid;
+}
+.b-live .table .tr > span {
+  padding: 3px 10px 3px 0;
+  overflow-wrap: anywhere;
+}
+.b-live .table .th {
+  border-bottom: 1px solid var(--c-line);
+}
 /* the weight on the cells, not the row: the row's ch (its columns) stays the body's */
-.b-live .table .th > span { font-weight: 600; }
-.b-live .sign { color: var(--c-text-2); animation: b-live-pulse 1.4s var(--ease-out) infinite; }
+.b-live .table .th > span {
+  font-weight: 600;
+}
+.b-live .sign {
+  color: var(--c-text-2);
+  animation: b-live-pulse 1.4s var(--ease-out) infinite;
+}
 /* after a code box or a table: in its bottom margin, at the answer's left edge, out of the layout */
-.b-live .sign.after { position: absolute; left: 0; top: 100%; line-height: 1; }
-.b-live .sign.still { animation: none; }
-@keyframes b-live-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes b-live-swap0 { from { opacity: .55; } to { opacity: 1; } }
-@keyframes b-live-swap1 { from { opacity: .55; } to { opacity: 1; } }
-@keyframes b-live-pulse { 50% { opacity: .45; } }
+.b-live .sign.after {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  line-height: 1;
+}
+.b-live .sign.still {
+  animation: none;
+}
+@keyframes b-live-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes b-live-swap0 {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes b-live-swap1 {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes b-live-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .b-live .fade, .b-live .box, .b-live.swap0, .b-live.swap1, .b-live .sign { animation: none; }
+  .b-live .fade,
+  .b-live .box,
+  .b-live.swap0,
+  .b-live.swap1,
+  .b-live .sign {
+    animation: none;
+  }
 }
