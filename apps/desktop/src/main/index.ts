@@ -33,10 +33,18 @@ import { testHomeProblem } from './testhome';
 import { themeSourceOf } from './theme';
 import { takeRoute, Updates, updateTarget } from './update/run';
 import { MainWindow } from './windows';
+import { fenceOffscreen, isOffscreen } from './offscreen';
 import { Notifier } from './notify/run';
 import { langOf } from './notify/plan';
 
 const testMode = process.env[TEST_ENV] === '1';
+// amb-tools' as-he-does runs: every window off his screen, nothing else changes (offscreen.ts)
+const offscreen = isOffscreen(process.env, testMode);
+if (offscreen) {
+  app.on('browser-window-created', (_e, win) => {
+    fenceOffscreen(win);
+  });
+}
 
 // a test run starts only in the throwaway home its harness made (testhome.ts):
 // else it says why and stops here, before any window, helper or core (main
@@ -140,8 +148,8 @@ void app.whenReady().then(() => {
       }),
     ),
   );
-  const main = new MainWindow(testMode);
-  const capsule = new Capsule(testMode);
+  const main = new MainWindow(testMode, offscreen);
+  const capsule = new Capsule(testMode, offscreen);
   installCapsuleIpc(capsule);
   ipcMain.on(IPC.quit, () => {
     app.quit();

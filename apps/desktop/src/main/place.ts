@@ -36,10 +36,13 @@ export const TOP = 170;
 export const BOTTOM = 96;
 export const MENU_GAP = 6;
 
+/** Where a window goes to be on no display (test mode, BISE_DESKTOP_OFFSCREEN): far from every real one. */
+export const OFF = -30000;
+
 /** A test run's display, far from every real one (never shown anyway: test mode is offscreen). */
 export const OFF_DISPLAY: DisplayBox = {
-  bounds: { x: -30000, y: -30000, width: 1920, height: 1200 },
-  workArea: { x: -30000, y: -30000, width: 1920, height: 1200 },
+  bounds: { x: OFF, y: OFF, width: 1920, height: 1200 },
+  workArea: { x: OFF, y: OFF, width: 1920, height: 1200 },
 };
 
 /**

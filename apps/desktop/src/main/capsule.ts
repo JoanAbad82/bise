@@ -32,12 +32,16 @@ export class Capsule {
   private state: CapsuleState = { shown: false, at: 'bottom', keys: false, why: 'asked' };
   tray: Tray | null = null;
 
-  constructor(private readonly testMode: boolean) {
+  /** `offscreen`: BISE_DESKTOP_OFFSCREEN (offscreen.ts): placed off every display, never shown */
+  constructor(
+    private readonly testMode: boolean,
+    private readonly offscreen = false,
+  ) {
     const mac = process.platform === 'darwin';
     const glass = glassOf('capsule', process.platform, testMode);
     const win = new BrowserWindow({
       ...START,
-      ...(testMode ? { x: OFF, y: OFF, focusable: false } : {}),
+      ...(testMode ? { x: OFF, y: OFF, focusable: false } : offscreen ? { x: OFF, y: OFF } : {}),
       show: false,
       frame: false,
       transparent: true,
@@ -82,6 +86,8 @@ export class Capsule {
     this.place();
     if (this.testMode) {
       process.stdout.write(`${CAPSULE_LINE} show ${at}${keys ? ' keys' : ''}\n`);
+    } else if (this.offscreen) {
+      // placed off every display (display()), never ordered in
     } else if (keys) {
       this.win.show();
     } else {
@@ -114,7 +120,7 @@ export class Capsule {
   }
 
   private display(): DisplayBox {
-    if (this.testMode) return OFF_DISPLAY;
+    if (this.testMode || this.offscreen) return OFF_DISPLAY;
     const d = this.state.at === 'menu' && this.tray !== null ? screen.getDisplayMatching(this.tray.getBounds()) : screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     return { bounds: d.bounds, workArea: d.workArea };
   }

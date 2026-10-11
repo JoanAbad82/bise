@@ -17,8 +17,10 @@ import { app, BrowserWindow, type BrowserWindowConstructorOptions } from 'electr
 import { HOME_ARG, IPC, READY_LINE, ROUTE_ENV, SURFACE_ARG, type Surface } from '../shared/api';
 import { glassOf } from './glass';
 import { MAIN_SIZE } from './mainsize';
+import { OFF } from './place';
 
-export const OFF = -30000;
+// -30000: off every display (place.ts, read by offscreen.ts too without Electron)
+export { OFF };
 
 /** macOS's window buttons in the sidebar's 36 px top room (app.css .b-lights). */
 export const LIGHTS = { x: 16, y: 13 } as const;
@@ -57,7 +59,11 @@ export class MainWindow {
   private win: BrowserWindow | null = null;
   private title = 'bise';
 
-  constructor(private readonly testMode: boolean) {}
+  /** `offscreen`: BISE_DESKTOP_OFFSCREEN (offscreen.ts): placed off every display, never shown or focused */
+  constructor(
+    private readonly testMode: boolean,
+    private readonly offscreen = false,
+  ) {}
 
   get window(): BrowserWindow | null {
     return this.win;
@@ -79,7 +85,7 @@ export class MainWindow {
       show: false,
       // focusable false: a stray focus() can never activate the app over his;
       // the harness draws the caret with CDP focus emulation.
-      ...(test ? { x: OFF, y: OFF, focusable: false } : {}),
+      ...(test ? { x: OFF, y: OFF, focusable: false } : this.offscreen ? { x: OFF, y: OFF } : {}),
       title: this.title,
       // one set of controls (his try round 3): macOS's lights over the
       // sidebar's top room, no title bar and no title text; the page's
@@ -109,7 +115,7 @@ export class MainWindow {
       });
     } else {
       win.once('ready-to-show', () => {
-        win.show();
+        if (!this.offscreen) win.show();
       });
     }
     loadRenderer(win, 'window', route ?? (test ? process.env[ROUTE_ENV] : undefined));
@@ -124,7 +130,7 @@ export class MainWindow {
       return;
     }
     if (route !== undefined && route !== '') win.webContents.send(IPC.route, route);
-    if (this.testMode) return;
+    if (this.testMode || this.offscreen) return;
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();

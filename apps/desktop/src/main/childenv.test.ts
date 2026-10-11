@@ -27,6 +27,12 @@ describe('childEnv', () => {
     expect(childEnv(agentShell(), false)).toEqual(HIS);
   });
 
+  it('the off-screen knob (BISE_DESKTOP_OFFSCREEN, main only: offscreen.ts) never reaches the core, in either mode', () => {
+    for (const test of [false, true]) {
+      expect(childEnv({ ...agentShell(), BISE_DESKTOP_OFFSCREEN: '1' }, test)).not.toHaveProperty('BISE_DESKTOP_OFFSCREEN');
+    }
+  });
+
   it('in test mode: the test settings pass too (the harness configures its core and shells by env), never an internal one', () => {
     const env = childEnv(agentShell(), true);
     for (const k of INTERNAL_VARS) expect(env[k], k).toBeUndefined();

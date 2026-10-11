@@ -255,8 +255,11 @@ def staged_never_over_a_running_try():
         # he quits: the next --try swaps it in, with no build step
         running.clear()
         old = T.swap_staged(paths)
-        check(old == paths["app"] + ".old" and mark(paths["app"]) == "build 2" and mark(old) == "build 1"
-              and not os.path.exists(paths["staged"]), "swapped: live is the staged build, the old one at .old")
+        check(old == os.path.join(build, "desktop-try", "prev", "mac-arm64", "bise try.app") and mark(paths["app"]) == "build 2"
+              and mark(old) == "build 1" and not os.path.exists(paths["staged"]),
+              "swapped: live is the staged build, the old one in prev/: %s" % old)
+        check(not os.path.exists(paths["app"] + ".old") and not any(n.endswith(".old") for n in os.listdir(os.path.dirname(paths["app"]))),
+              "nothing next to the bundle: '<app>.old' is the app updater's alone (ambient-lead m_18341)")
         check(T.read_stamp(paths)["where"] == "live", "the stamp says live")
         check(T.try_root(paths) == root2, "the swap moves the root with the bundle: the app opens on %s" % T.try_root(paths))
         check(T.build(env, paths) is False and len(scripts) == 2, "the swapped build is up to date: no build call")
@@ -273,6 +276,92 @@ def staged_never_over_a_running_try():
         T.subprocess.run, T.say, T.bundle_pids, T.core_up = real_run, real_say, real_pids, real_core
         if old_sign is not None:
             os.environ["BISE_TRY_SIGN_DIR"] = old_sign
+        shutil.rmtree(w, ignore_errors=True)
+
+
+def legacy_old_retired():
+    """A launcher before prev/ left 'bise try.app.old' next to the bundle, which the app's updater
+    read as a failed update ('the new bise didn't start right', ambient-lead m_18341): the next
+    --try or swap moves it to prev/ (or drops it when prev/ holds one), never touching the bundle."""
+    w = tempfile.mkdtemp(prefix="dtry-legacy-")
+    try:
+        staged_dir = os.path.join(w, "build", "desktop-try", "staged")
+        paths = {"app": os.path.join(w, "dist", "mac-arm64", "bise try.app"), "staged_dir": staged_dir,
+                 "staged": os.path.join(staged_dir, "mac-arm64", "bise try.app")}
+        prev = T.prev_bundle(paths)
+        check(prev == os.path.join(w, "build", "desktop-try", "prev", "mac-arm64", "bise try.app"), "prev/ is under desktop-try: %s" % prev)
+        check(T.retire_legacy_old(paths) is None, "no legacy .old: nothing to do")
+        for d, mark in ((paths["app"], "live"), (paths["app"] + ".old", "old")):
+            os.makedirs(os.path.join(d, "Contents"))
+            open(os.path.join(d, "Contents", "m"), "w").write(mark)
+        check(T.retire_legacy_old(paths) == prev and not os.path.exists(paths["app"] + ".old")
+              and open(os.path.join(prev, "Contents", "m")).read() == "old"
+              and open(os.path.join(paths["app"], "Contents", "m")).read() == "live", "the legacy .old moves to prev/, the bundle stays")
+        os.makedirs(paths["app"] + ".old")
+        check(T.retire_legacy_old(paths) is None and not os.path.exists(paths["app"] + ".old") and os.path.isdir(prev),
+              "prev/ holds one already: the legacy .old goes")
+    finally:
+        shutil.rmtree(w, ignore_errors=True)
+
+
+def real_opens_with_nothing():
+    """bise-ambient --real (ambient-lead m_18348): his own home gets no variable at all; a stand-in
+    home (amb-tools' real-shaped world, under ~/.bise/gate, BISE_TRY_REAL=<home>/.bise) gets HOME
+    and BISE_HOME, plus BISE_DESKTOP_OFFSCREEN only when the caller set it; anything else is
+    refused. A bundle without its runtime inside (amb-core m_18365) is refused, never patched
+    with BISE_APP_ROOT. Then one run through the open hook on a stand-in: the legacy .old is
+    retired and the app gets exactly HOME and BISE_HOME."""
+    his = os.path.expanduser("~/.bise")
+    check(T.real_app_env({"BISE_DESKTOP_OFFSCREEN": "1", "BISE_APP_ROOT": "/x", "BISE_DESKTOP_TEST": "1"}, his, his) == [],
+          "his own home: no variable, not even the off-screen knob or a test one")
+    stand = os.path.join(T.GATE, "real-shape", "w", "h", ".bise")
+    check(T.real_app_env({}, stand, his) == ["HOME=%s" % os.path.dirname(stand), "BISE_HOME=%s" % stand],
+          "a stand-in home: HOME and BISE_HOME, the projects scan stays in it")
+    check(T.real_app_env({"BISE_DESKTOP_OFFSCREEN": "1", "BISE_DESKTOP_TEST": "1"}, stand, his)[-1] == "BISE_DESKTOP_OFFSCREEN=1"
+          and len(T.real_app_env({"BISE_DESKTOP_OFFSCREEN": "1"}, stand, his)) == 3, "the off-screen run adds that knob only")
+    for bad in ("/tmp/h/.bise", os.path.join(T.GATE, "w", "h")):
+        try:
+            T.real_app_env({}, bad, his)
+            check(False, "%s refused" % bad)
+        except T.TryError:
+            check(True, "%s refused" % bad)
+    w = tempfile.mkdtemp(prefix="dtry-real-", dir=T.GATE if os.path.isdir(T.GATE) else None)
+    try:
+        app = os.path.join(w, "dist", "mac-arm64", "bise try.app")
+        os.makedirs(os.path.join(app, "Contents", "Resources", "bin"))
+        check(T.self_contained(app) == ["bise", "VERSION", "repl-live", "sb-core"], "an empty bundle lacks its runtime")
+        for n in T.SELF_CONTAINED:
+            open(os.path.join(app, "Contents", "Resources", "bin", n), "w").close()
+        check(T.self_contained(app) == [], "the runtime inside: self-contained")
+        if not os.path.isdir(T.GATE):
+            return
+        real = os.path.join(w, "h", ".bise")
+        os.makedirs(real)
+        os.makedirs(app + ".old")
+        staged_dir = os.path.join(w, "build", "desktop-try", "staged")
+        paths = {"app": app, "staged_dir": staged_dir, "staged": os.path.join(staged_dir, "mac-arm64", "bise try.app"),
+                 "helper": os.path.join(w, "build", "desktop-try", "bise-mac-helper")}
+        got = os.path.join(w, "got")
+        hook = os.path.join(w, "hook.sh")
+        with open(hook, "w") as f:
+            f.write("#!/bin/sh\nprintf '%%s\\n' \"$@\" > %s\n" % shlex.quote(got))
+        os.chmod(hook, 0o755)
+        said, real_say, old_hook = [], T.say, os.environ.get("BISE_TRY_OPEN")
+        T.say = lambda *a: said.append(" ".join(str(x) for x in a))
+        os.environ["BISE_TRY_OPEN"] = hook
+        try:
+            T.open_real(real, os.path.join(real, "try", "desktop"), paths, environ={"BISE_DESKTOP_TEST": "1", "PATH": "/usr/bin:/bin"}, timeout=0.5)
+        finally:
+            T.say = real_say
+            if old_hook is None:
+                os.environ.pop("BISE_TRY_OPEN", None)
+            else:
+                os.environ["BISE_TRY_OPEN"] = old_hook
+        check(open(got).read().split("\n")[:3] == [app, "HOME=%s" % os.path.join(w, "h"), "BISE_HOME=%s" % real],
+              "the app gets HOME and BISE_HOME only: %r" % open(got).read())
+        check(not os.path.exists(app + ".old"), "the legacy .old is out of the updater's path")
+        check(any(("your home %s" % real) in s and app in s for s in said), "it says the home and the bundle: %s" % said)
+    finally:
         shutil.rmtree(w, ignore_errors=True)
 
 
@@ -489,6 +578,8 @@ if __name__ == "__main__":
     pure()
     stamp_skips_build()
     staged_never_over_a_running_try()
+    legacy_old_retired()
+    real_opens_with_nothing()
     candidate_then_promote()
     if "--pure" not in sys.argv:
         hook_keeps_pid()

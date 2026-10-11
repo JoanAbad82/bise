@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """desktop-try: the user's first try of bise desktop (the new app, apps/desktop), on a bise home of its own.
 
-  bise-ambient --try [repo…] [--fresh] [--replace]   build, set up the try home, open the app on it
+  bise-ambient --real                                the promoted bundle on YOUR bise home and hubs (no build, no
+                                                     try world): stops any open try or instance first, opens it
+                                                     with no variable, says the sha, the bundle and the home
+  bise-ambient --try [repo…] [--fresh] [--replace]   build, set up the try home, open the app on it (internal
+                                                     fallback until --real is proven: ambient-lead m_18348)
   bise-ambient --try --stop                          quit the try's app and stop its hubs (by pid)
   scripts/desktop-try.sh --candidate <sha>           a gate candidate in its own dir (<build>/desktop-cand/<sha12>),
                                                      never the try checkout, stamp or staged dir; prints cand.json
@@ -485,20 +489,49 @@ def try_root(paths):
     return root if root and os.path.exists(os.path.join(root, "repl-live")) else None
 
 
+def prev_bundle(paths):
+    """Where the previous bundle waits after a swap: <build>/desktop-try/prev/<arch>/bise try.app,
+    next to the staging dir. Never '<app>.old': the folder next to the bundle belongs to the app's
+    own updater, which reads a '<app>.old' it didn't make as a failed update (ambient-lead m_18341,
+    architect m_18352)."""
+    staged_dir = paths["staged_dir"]
+    return os.path.join(os.path.dirname(staged_dir), "prev", os.path.relpath(paths["staged"], staged_dir))
+
+
+def retire_legacy_old(paths):
+    """A launcher before prev/ left its previous bundle at '<app>.old': it goes to prev/ (or away
+    when prev/ holds one already), so the app's updater never sees it. Returns the moved path."""
+    legacy, prev = paths["app"] + ".old", prev_bundle(paths)
+    if not os.path.isdir(legacy):
+        return None
+    if os.path.exists(prev):
+        shutil.rmtree(legacy, ignore_errors=True)
+        return None
+    os.makedirs(os.path.dirname(prev), exist_ok=True)
+    try:
+        os.rename(legacy, prev)
+    except OSError:
+        shutil.rmtree(legacy, ignore_errors=True)
+        return None
+    return prev
+
+
 def swap_staged(paths):
-    """A staged build goes live when nothing runs from the live bundle: live -> <app>.old, staged ->
-    live (renames), the stamp then says 'live'. Returns the .old path to remove once the new app's
-    core answers (finish_swap), or None when there is nothing to swap or the try is open (then
-    untouched: 'your try is open: quit it to get the new build')."""
+    """A staged build goes live when nothing runs from the live bundle: live -> prev/ (prev_bundle),
+    staged -> live (renames), the stamp then says 'live'. Returns the prev/ path to remove once the
+    new app's core answers (finish_swap), or None when there is nothing to swap or the try is open
+    (then untouched: 'your try is open: quit it to get the new build')."""
     saved = read_stamp(paths)
     if not saved or saved.get("where") != "staged" or not outputs_there(paths, paths["staged"], saved.get("root")):
         return None
     if bundle_pids(paths["app"]):
         say("your try is open: quit it to get the new build")
         return None
-    app, old = paths["app"], paths["app"] + ".old"
+    retire_legacy_old(paths)
+    app, old = paths["app"], prev_bundle(paths)
     if os.path.exists(old):
         shutil.rmtree(old)
+    os.makedirs(os.path.dirname(old), exist_ok=True)
     os.makedirs(os.path.dirname(app), exist_ok=True)
     if os.path.exists(app):
         os.rename(app, old)
@@ -510,7 +543,7 @@ def swap_staged(paths):
         shutil.copytree(paths["staged"], app + ".new", symlinks=True)
         os.rename(app + ".new", app)
         shutil.rmtree(paths["staged_dir"], ignore_errors=True)
-    # the staged build's snapshot root goes live with it; the old one is retired with .old
+    # the staged build's snapshot root goes live with it; the old one is retired with prev/
     live = {k: v for k, v in saved.items() if k != "live_root"}
     live["where"] = "live"
     if saved.get("live_root") and saved["live_root"] != saved.get("root"):
@@ -636,7 +669,7 @@ def promote(env, sha, checkout=None, repo=REPO):
     subprocess.run(["git", "-C", repo, "worktree", "remove", "--force", probe["src"]], env=env, capture_output=True)
     shutil.rmtree(probe["dir"], ignore_errors=True)
     if m.swap_staged(tp):
-        say("promoted %s: live now (the previous bundle is kept as .old until the next --try)" % sha[:8])
+        say("promoted %s: live now (the previous bundle waits in %s until the new core answers)" % (sha[:8], prev_bundle(tp)))
     else:
         say("promoted %s: staged; it goes live at his next bise-ambient --try" % sha[:8])
     return read_stamp(tp)
@@ -650,7 +683,7 @@ def core_up(app):
 
 
 def finish_swap(old, app, timeout=60, paths=None):
-    """Removes the previous bundle (<app>.old), and with it its snapshot root (the stamp's
+    """Removes the previous bundle (prev/, prev_bundle), and with it its snapshot root (the stamp's
     old_root), once the swapped-in app's core answers; both kept (for a rollback by hand) if it
     doesn't within the timeout."""
     t0 = time.time()
@@ -767,6 +800,109 @@ def open_app(app, tryh, env, root):
     return keep_app_pid(app, tryh)
 
 
+def bundle_apps(app):
+    """The app processes (the main executable, not its helpers or core) running from that bundle,
+    on any home: the try's and the real one share it."""
+    exe = app_exe(app)
+    out = subprocess.run(["ps", "-axww", "-o", "pid=,command="], capture_output=True, text=True).stdout
+    pids = []
+    for l in out.splitlines():
+        pid, _, cmd = l.strip().partition(" ")
+        if pid.isdigit() and (cmd == exe or cmd.startswith(exe + " ")) and int(pid) != os.getpid():
+            pids.append(int(pid))
+    return pids
+
+
+def quit_bundle(app, timeout=10):
+    """Every instance of the bundle quits (one app holds fn and the menu bar): an Apple Event
+    quit by the bundle id, then SIGTERM to each checked pid, never by name. Returns the pids."""
+    pids = bundle_apps(app)
+    if not pids:
+        return []
+    subprocess.run(["osascript", "-e", 'tell application id "%s" to quit' % APP_ID], capture_output=True, timeout=15)
+    for sig in (None, signal.SIGTERM, signal.SIGKILL):
+        if sig is not None:
+            for pid in [p for p in pids if pid_alive(p)]:
+                try:
+                    os.kill(pid, sig)
+                except OSError:
+                    pass
+        t0 = time.time()
+        while any(pid_alive(p) for p in pids) and time.time() - t0 < timeout:
+            time.sleep(0.2)
+        if not any(pid_alive(p) for p in pids):
+            break
+    return pids
+
+
+def real_app_env(environ, real, default_real):
+    """What --real opens the app with: nothing, the app reads his own ~/.bise as on a normal start.
+    A proof on a stand-in home (BISE_TRY_REAL=<home>/.bise, under ~/.bise/gate only: amb-tools'
+    real-shaped world) adds HOME=<home> and BISE_HOME=<home>/.bise (BISE_HOME alone would let the
+    projects scan walk his real folders: amb-tools m_18370), and BISE_DESKTOP_OFFSCREEN=1 when the
+    caller set it (the off-screen run); never another variable. Pure."""
+    if os.path.realpath(real) == os.path.realpath(default_real):
+        return []
+    if not under(real, GATE) or os.path.basename(real) != ".bise":
+        raise TryError("--real on a stand-in home: BISE_TRY_REAL=<home>/.bise under ~/.bise/gate only (got %s)" % real)
+    out = ["HOME=%s" % os.path.dirname(real), "BISE_HOME=%s" % real]
+    if environ.get("BISE_DESKTOP_OFFSCREEN") == "1":
+        out.append("BISE_DESKTOP_OFFSCREEN=1")
+    return out
+
+
+SELF_CONTAINED = ("bise", "VERSION", "repl-live", "sb-core")
+
+
+def self_contained(app):
+    """The bundle runs with no variable: its runtime is in Contents/Resources/bin (amb-core m_18365,
+    update.rs REQUIRED). Returns what is missing."""
+    return [n for n in SELF_CONTAINED if not os.path.exists(os.path.join(app, "Contents", "Resources", "bin", n))]
+
+
+def open_real(real, tryh, paths, environ=None, timeout=20):
+    """bise-ambient --real (ambient-lead m_18348): the promoted bundle on his real bise home, his
+    running hubs; no build, no try world. Any open try is stopped and any instance of the bundle
+    quits first; the bundle is opened with no variable (real_app_env). Says what it opened."""
+    environ = os.environ if environ is None else environ
+    app = paths["app"]
+    extra = real_app_env(environ, real, os.path.expanduser("~/.bise"))
+    if os.path.isdir(tryh) and (app_running(app, tryh) or any(os.path.exists(s) for s in hub_socks(tryh))):
+        r = stop(real, tryh, app)
+        say("stopped the try (app %s, %d hubs)" % (r["app"] or "not running", len(r["hubs"])))
+    quit_bundle(app)
+    swap_staged(paths)
+    retire_legacy_old(paths)
+    if not os.environ.get("BISE_TRY_OPEN") and not os.path.isdir(app):
+        raise TryError("no promoted bundle at %s: scripts/desktop-try.sh --promote <sha> first" % app)
+    missing = [] if os.environ.get("BISE_TRY_OPEN") else self_contained(app)
+    if missing:
+        raise TryError("the promoted bundle %s needs its runtime inside (Contents/Resources/bin lacks %s): "
+                       "promote a candidate built with amb-core's self-contained pack" % (app, ", ".join(missing)))
+    saved = read_stamp(paths) or {}
+    hook = os.environ.get("BISE_TRY_OPEN")
+    if hook:
+        if not under(real, GATE):
+            raise TryError("BISE_TRY_OPEN: for tests on a stand-in home under ~/.bise/gate only")
+        run([hook, app] + extra, his_env(environ))
+    else:
+        cmd = ["open", "-n", "-a", app]
+        for e in extra:
+            cmd += ["--env", e]
+        run(cmd, his_env(environ))
+    t0, pids = time.time(), []
+    while not pids and time.time() - t0 < timeout:
+        pids = bundle_apps(app)
+        if not pids:
+            time.sleep(0.3)
+    if pids and os.path.exists(prev_bundle(paths)):
+        # the previous bundle and its snapshot root, once the new core answers
+        finish_swap(prev_bundle(paths), app, paths=paths)
+    say("bise desktop is open on your home %s: %s (%s%s). the try is stopped; its home %s stays on disk"
+        % (real, app, (saved.get("head") or "unknown sha")[:8], ", pid %d" % pids[0] if pids else ", not seen yet", tryh))
+    return pids[0] if pids else None
+
+
 def keep_app_pid(app, tryh, timeout=20):
     """Waits for the try's app to show up (find_app_pid) and keeps its pid in <try>/dev/desktop/app.pid,
     which app_running and --stop read. None when it never shows up."""
@@ -857,9 +993,9 @@ def stop(real, tryh, app=None):
 def main(argv):
     args = [a for a in argv if not a.startswith("--")]
     flags = {a for a in argv if a.startswith("--")}
-    bad = flags - {"--try", "--stop", "--fresh", "--replace", "--no-build", "--no-open", "--candidate", "--promote"}
+    bad = flags - {"--try", "--real", "--stop", "--fresh", "--replace", "--no-build", "--no-open", "--candidate", "--promote"}
     if bad:
-        raise TryError("unknown option %s (--try [repo…] [--fresh|--replace], --try --stop, --candidate <sha>, --promote <sha>)"
+        raise TryError("unknown option %s (--real, --try [repo…] [--fresh|--replace], --try --stop, --candidate <sha>, --promote <sha>)"
                        % ", ".join(sorted(bad)))
     cand = os.environ.get("BISE_TRY_CANDIDATE") if "--promote" not in flags else None
     if "--candidate" in flags or cand:
@@ -876,6 +1012,12 @@ def main(argv):
         if not args:
             raise TryError("--promote <sha>")
         print(json.dumps(promote(his_env(os.environ), args[0])))
+        return 0
+    if "--real" in flags:
+        if flags - {"--real"} or args:
+            raise TryError("--real takes nothing: it opens the promoted bundle on your home")
+        real, tryh = homes()
+        open_real(real, tryh, try_paths(his_env(os.environ)))
         return 0
     real, tryh = homes()
     guard(real, tryh)
@@ -937,9 +1079,10 @@ def main(argv):
     if not os.environ.get("BISE_TRY_OPEN") and not os.path.isdir(paths["app"]):
         raise TryError("no app at %s: build first (without --no-build)" % paths["app"])
     pid = open_app(paths["app"], tryh, env, root)
-    if os.path.exists(paths["app"] + ".old"):
+    retire_legacy_old(paths)
+    if os.path.exists(prev_bundle(paths)):
         # the previous bundle and its snapshot root, once the new core answers
-        finish_swap(paths["app"] + ".old", paths["app"], paths=paths)
+        finish_swap(prev_bundle(paths), paths["app"], paths=paths)
     say("bise desktop is open on the try home %s (%d projects%s). stop it: bise-ambient --try --stop"
         % (tryh, len(done), ", pid %d" % pid if pid else ""))
     return 0
