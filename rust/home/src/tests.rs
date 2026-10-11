@@ -489,3 +489,17 @@ fn the_window_sets_known_prefs_by_dotted_key_and_keeps_their_types() {
     assert_eq!(w["app_names"].as_object().map(|m| m.len()), Some(prefs::EXCLUDED_APPS_SEED.len()));
     assert!(prefs::set_dotted(&o, "app_names", json!({})).is_err());
 }
+
+#[test]
+fn an_executable_in_a_version_bundle_finds_the_version_dir() {
+    let d = tmp("exe-home");
+    let macos = d.join("v1/bise.app/Contents/MacOS");
+    std::fs::create_dir_all(&macos).unwrap();
+    assert_eq!(exe_home_dir(&macos), macos, "no VERSION above the bundle: the folder itself");
+    std::fs::write(d.join("v1/VERSION"), "id=v1\n").unwrap();
+    assert_eq!(exe_home_dir(&macos), d.join("v1"), "<root>/bise.app/Contents/MacOS -> <root>");
+    assert_eq!(exe_home_dir(&d.join("v1")), d.join("v1"), "a plain version dir: itself");
+    let other = d.join("v1/bise.app/Contents/Resources");
+    assert_eq!(exe_home_dir(&other), other, "only Contents/MacOS");
+    let _ = std::fs::remove_dir_all(&d);
+}

@@ -4,7 +4,9 @@
 # A version is an immutable app root built from one git commit (or from
 # the working tree, uncommitted changes included):
 #   $SB_VERSIONS_DIR/<id>/  bise (+ bend-harness -> bise, one release;
-#                           sb -> bise, the agents' command),
+#                           sb -> bise, the agents' command; with the dev
+#                           identity, bise -> bise.app/Contents/MacOS/bise,
+#                           a signed bundle: scripts/dev-sign.sh),
 #                           repl-live, prompts/ (tool-desc-*.txt,
 #                           prompt-*.txt; at the top before the root
 #                           cleanup), sb-core (when bend/hub/ exists),
@@ -104,7 +106,21 @@ build_from() {
   # link for the switchers and scripts that still look for it
   local exe=bend-harness
   grep -q '^name = "bise"' "$src/rust/harness/Cargo.toml" && exe=bise
-  cp "$target/release/$exe" "$tmp/bise"
+  # bise = a link to bise.app/Contents/MacOS/bise (dev-sign.sh app: bundle
+  # id dev.bise.bise, the stable 'bise ambient dev' identity): macOS keys a
+  # Documents/Desktop grant on the bundle id and signature, the same for
+  # every version, so the user grants it once (a plain bise is a new path
+  # each version: asked again). Everything runs that one file (TUI, hub,
+  # the agents' sb); bise_home::exe_home_dir finds <root> from it. Only a
+  # source that has exe_home_dir (an older bise can't find its root from
+  # the bundle), and only with the identity: else a plain bise, as before.
+  # The Bend binaries and bend-jsrt come signed from bins.sh's cache.
+  if grep -q 'pub fn exe_home_dir' "$src/rust/home/src/lib.rs" 2>/dev/null \
+     && "$REPO/scripts/dev-sign.sh" app "$tmp/bise.app" "$target/release/$exe" "$id"; then
+    ln -s bise.app/Contents/MacOS/bise "$tmp/bise"
+  else
+    cp "$target/release/$exe" "$tmp/bise"
+  fi
   ln -s bise "$tmp/bend-harness"
   # sb: the agents' command, the same binary called by that name
   ln -s bise "$tmp/sb"

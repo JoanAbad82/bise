@@ -394,7 +394,7 @@ pub fn extension_dir(paths: &Paths) -> Option<PathBuf> {
     c.extend(bise_home::env::test_setting("BISE_CU_EXTENSION").map(PathBuf::from));
     c.extend(env("BISE_APP_ROOT").map(|r| r.join("computer-use").join("extension")));
     // a version dir or a bundle: the executable's folder holds VERSION
-    if let Some(dir) = std::env::current_exe().ok().and_then(|e| e.canonicalize().ok()).and_then(|e| e.parent().map(PathBuf::from)) {
+    if let Some(dir) = std::env::current_exe().ok().and_then(|e| e.canonicalize().ok()).and_then(|e| e.parent().map(bise_home::exe_home_dir)) {
         if dir.join("VERSION").is_file() {
             c.push(dir.join("computer-use").join("extension"));
         }

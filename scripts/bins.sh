@@ -177,10 +177,15 @@ cached() {  # <src> <name>
     say "$name: compiling (sb-core ~15 s, a REPL 1-2 min, bend-jsrt 1-5 min)..."
     local s=$SECONDS
     compile "$src" "$name" "$f.tmp.$$" || { rm -f "$f.tmp.$$"; return 1; }
+    # signed with bise's stable dev identity (dev-sign.sh): every copy of
+    # it keeps one designated requirement, so macOS keeps its grants
+    "$REPO/scripts/dev-sign.sh" sign "$name" "$f.tmp.$$"
     mv "$f.tmp.$$" "$f"
     say "$name: built in $((SECONDS - s)) s ($f)"
     prune "$name"
   else
+    # a build from before dev-sign.sh: signed now (a no-op once it is)
+    "$REPO/scripts/dev-sign.sh" sign "$name" "$f"
     touch "$f"
   fi
   echo "$f"

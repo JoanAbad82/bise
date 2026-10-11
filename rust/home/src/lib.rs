@@ -50,6 +50,26 @@ pub use migrate::migrate;
 crate::test_home!();
 pub use prefs::{Pref, Slot};
 
+/// The folder an executable's own files are looked up in, from the
+/// executable's (canonical) folder: a version dir's `bise` is a link to
+/// `<root>/bise.app/Contents/MacOS/bise` (scripts/versions.sh: one bundle
+/// id and signature, so macOS keeps a folder grant across versions), so
+/// `<root>/<x>.app/Contents/MacOS` with `VERSION` in `<root>` -> `<root>`;
+/// any other folder is itself.
+pub fn exe_home_dir(exe_dir: &Path) -> PathBuf {
+    let name = |p: Option<&Path>| p.and_then(Path::file_name).map(|n| n.to_string_lossy().into_owned());
+    let contents = exe_dir.parent();
+    let app = contents.and_then(Path::parent);
+    let root = app.and_then(Path::parent);
+    let bundled = name(Some(exe_dir)).as_deref() == Some("MacOS")
+        && name(contents).as_deref() == Some("Contents")
+        && name(app).is_some_and(|n| n.ends_with(".app"));
+    match root {
+        Some(r) if bundled && r.join("VERSION").is_file() => r.to_path_buf(),
+        _ => exe_dir.to_path_buf(),
+    }
+}
+
 /// Moves the whole state (the bise layout, at this path).
 pub const BISE_HOME: &str = "BISE_HOME";
 /// The stamp of the exported paths: `<HOME>\n<BISE_HOME>` they were computed for.

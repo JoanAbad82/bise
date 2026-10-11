@@ -82,7 +82,8 @@ pub(crate) fn find(
             Err(format!("{}={} has no {}", ENV, r.display(), repl))
         };
     }
-    let exe_dir = inp.exe.as_ref().and_then(|e| e.parent()).map(Path::to_path_buf);
+    // a version's bundle (<root>/bise.app/Contents/MacOS) counts as <root>
+    let exe_dir = inp.exe.as_ref().and_then(|e| e.parent()).map(bise_home::exe_home_dir);
     if let Some(d) = &exe_dir {
         if has(d, "VERSION") {
             return if has(d, repl) {
