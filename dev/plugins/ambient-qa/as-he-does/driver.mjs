@@ -71,16 +71,22 @@ const side = await text('[data-testid="app.sidebar"]');
 step('sidebar', !!side, side);
 
 if (mode === 'first') {
-  // settings › projects, its own 'add a project' (the sidebar's only routes here)
-  await click('open settings', page.locator('[data-testid="app.sidebar.settings"]').first());
-  const root = page.locator('[data-testid="settings.root"]').first();
-  await root.waitFor({ timeout: 8000 }).catch(() => {});
-  await click('settings › projects', root.getByText('projects', { exact: true }).first());
-  await page.locator('[data-testid="settings.projects"]').first().waitFor({ timeout: 8000 }).catch(() => {});
-  await shot('settings-projects');
-  const opened = await click('add a project', page.locator('[data-testid="settings.project.add"]').first());
+  // the sidebar's '+ add a project' opens amb-home's add sheet in place (amb-win a83184e3), as he
+  // does; when it doesn't, settings › projects and its own 'add a project'
   const sheet = page.locator('[data-testid="settings.add"]').first();
-  const shown = opened && await sheet.waitFor({ timeout: 10000 }).then(() => true, () => false);
+  let opened = await click('add a project (sidebar)', page.locator('[data-testid="app.sidebar.add"]').first());
+  let shown = opened && await sheet.waitFor({ timeout: 10000 }).then(() => true, () => false);
+  if (!shown) {
+    await click('open settings', page.locator('[data-testid="app.sidebar.settings"]').first());
+    const root = page.locator('[data-testid="settings.root"]').first();
+    await root.waitFor({ timeout: 8000 }).catch(() => {});
+    await click('settings › projects', root.getByText('projects', { exact: true }).first());
+    await page.locator('[data-testid="settings.projects"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+    await shot('settings-projects');
+    opened = await click('add a project (settings)', page.locator('[data-testid="settings.project.add"]').first());
+    shown = opened && await sheet.waitFor({ timeout: 10000 }).then(() => true, () => false);
+  }
+  step('the add sheet opens from the sidebar', shown, null);
   step('the add sheet opens', shown, await text('[data-testid="settings.add"]'));
   // the scan: its found list with a count (never the folder picker)
   const found = page.locator('[data-testid="settings.add.found"]').first();
