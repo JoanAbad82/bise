@@ -91,14 +91,14 @@ impl Shell {
             HubCmd::Send { agent, text, opts, cid, parts, .. } if parts.is_empty() => self.proto_input(id, &tag, agent, text, opts, cid, String::new()),
             // msg-parts: the model's text from his parts, the parts kept
             // on his message (a part this hub doesn't know: refused)
-            HubCmd::Send { agent, opts, cid, parts, .. } => match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir()) {
+            HubCmd::Send { agent, opts, cid, parts, .. } => match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image) {
                 Ok(s) => self.proto_input(id, &tag, agent, s.text, opts, cid, s.parts),
                 Err(e) => self.proto_error_cid(id, &tag, &e, cid, cid.map(|_| "refused")),
             },
             HubCmd::Answer { card, reply, files, parts, .. } => {
                 let (reply, parts) = match parts.is_empty() {
                     true => (reply, String::new()),
-                    false => match crate::parts_in::said(&parts, &files, &bise_home::Home::from_env().images_dir()) {
+                    false => match crate::parts_in::said(&parts, &files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image) {
                         Ok(s) => (s.text, s.parts),
                         Err(e) => return self.proto_error(id, &tag, &e),
                     },
@@ -397,7 +397,7 @@ impl Shell {
                 // before; a line that isn't refuses (never a command)
                 if !parts.is_empty() {
                     let refused = cid.map(|_| "refused");
-                    return match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir()) {
+                    return match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image) {
                         Ok(s) => match line.strip_suffix(s.text.as_str()) {
                             Some("" | "say " | "steer ") if !line.trim_start().starts_with('/') => {
                                 self.proto_input(id, &tag, agent, line.clone(), opts, cid, s.parts)

@@ -169,6 +169,28 @@ def parts_round(c, d, E, project, typed):
     c.wait(lambda: len(typed(d, "error")) > nerr + 1, 20, "an unknown part refused")
     check(typed(d, "error")[-1].get("cid") == 72 and "sticker" in typed(d, "error")[-1]["text"], "the unknown kind named: %r" % typed(d, "error")[-1])
     check(not any("not the parts" in l for l in c.lines("main")), "nothing delivered on a refusal")
+    # an image part sent with its source only (the window's pasted or
+    # dropped file, ambient-lead m_17967): the hub stores it itself
+    # (bend_images::store_file), the entry's part names its store file and
+    # mime, and the model gets it as an image part; a relative source is
+    # refused, nothing delivered
+    shot = os.path.join(E.tmp, "by-source.png")
+    with open(shot, "wb") as f:
+        f.write(e2e.tiny_png())
+    iparts = [{"kind": "text", "text": "by source "}, {"kind": "image", "name": "[Image #1]", "source": shot}]
+    n_img = len([r for r in E.fake_requests() if r.get("agent") == "main" and r.get("images")])
+    d.send({"cmd": "send", "project": project, "agent": "main", "text": "", "parts": iparts, "mode": "now", "cid": 73})
+    c.wait(lambda: any(any(p.get("kind") == "image" and p.get("source") == shot for p in x.get("parts", [])) for x in yous()), 60, "the image part on his entry")
+    c.wait_idle("main", timeout=90)
+    ip = [p for x in yous() for p in x.get("parts", []) if p.get("kind") == "image" and p.get("source") == shot][-1]
+    check(ip.get("b64_file", "").endswith(".b64") and os.path.isfile(ip["b64_file"]) and ip.get("mime") == "image/png",
+          "the hub stored the image and named it on the part: %r" % ip)
+    check(len([r for r in E.fake_requests() if r.get("agent") == "main" and r.get("images")]) > n_img
+          and any(i.startswith("data:image/png;base64,") for i in [r for r in E.fake_requests() if r.get("agent") == "main" and r.get("images")][-1]["images"]),
+          "main's model got the image sent by its source: %r" % [[i[:40] for i in r.get("images", [])] for r in E.fake_requests() if r.get("agent") == "main"][-2:])
+    d.send({"cmd": "send", "project": project, "agent": "main", "text": "", "parts": [{"kind": "text", "text": "relative "}, {"kind": "image", "name": "[Image #1]", "source": "by-source.png"}], "mode": "now", "cid": 74})
+    c.wait(lambda: any(x.get("cid") == 74 for x in typed(d, "error")), 20, "a relative image source refused")
+    check("absolute" in [x for x in typed(d, "error") if x.get("cid") == 74][-1]["text"], "the refusal says why: %r" % typed(d, "error")[-1])
     # his screenshot: a card answer with a quote of main
     c.say('[[bash: sb send main --expect-reply "quel process ?"]]', focus="t3")
     c.wait(lambda: any(l.startswith("sb msg-in : t3 m_") and "quel process" in l for l in c.lines("main")), 120, "t3 asks main (parts)")
