@@ -27,20 +27,32 @@ describe('designated (codesign -d -r-)', () => {
   });
 });
 
-describe('startup after a swap (.old kept until started ok)', () => {
-  const rec = (attempts: number, ok: boolean) => ({ version: '2026.10.2-26', attempts, ok });
+describe('startup after a swap (.old kept until started ok, write-ahead record: architect m_18352)', () => {
+  const OLD = '/A/bise.app.old';
+  const rec = (attempts: number, ok: boolean, phase: 'staged' | 'swapped' = 'swapped', old_path = OLD) => ({
+    phase, old_path, from_version: '2026.10.1-25', to_version: '2026.10.2-26', attempts, ok,
+  });
   it('no swap, a forgotten one, the first start, a confirmed one', () => {
-    expect(startup(false, null)).toBe('none');
-    expect(startup(false, rec(1, false))).toBe('forget');
-    expect(startup(true, rec(0, false))).toBe('first');
-    expect(startup(true, rec(1, true))).toBe('confirmed');
+    expect(startup(OLD, false, null)).toBe('none');
+    expect(startup(OLD, false, rec(1, false))).toBe('forget');
+    expect(startup(OLD, false, rec(0, false, 'staged'))).toBe('forget');
+    expect(startup(OLD, true, rec(0, false))).toBe('first');
+    expect(startup(OLD, true, rec(0, false, 'staged'))).toBe('first');
+    expect(startup(OLD, true, rec(1, true))).toBe('confirmed');
   });
-  it('started before and never said ok, or no record: offer to go back', () => {
-    expect(startup(true, rec(1, false))).toBe('went_bad');
-    expect(startup(true, null)).toBe('went_bad');
+  it('the record names this .old, started before and never said ok: offer to go back', () => {
+    expect(startup(OLD, true, rec(1, false))).toBe('went_bad');
   });
-  it('a record reads back, junk is none', () => {
-    expect(readSwap(JSON.stringify(rec(0, false)))).toEqual(rec(0, false));
+  it("a .old the updater didn't make (no record, or a record naming another path) is stray: never went_bad", () => {
+    expect(startup(OLD, true, null)).toBe('stray');
+    expect(startup(OLD, true, rec(1, false, 'swapped', '/B/bise.app.old'))).toBe('stray');
+    expect(startup(OLD, true, rec(1, true, 'swapped', '/B/bise.app.old'))).toBe('stray');
+  });
+  it('a record reads back; junk, or one without what it owns, is none', () => {
+    expect(readSwap(JSON.stringify(rec(0, false, 'staged')))).toEqual(rec(0, false, 'staged'));
+    expect(readSwap(JSON.stringify({ version: '2026.10.2-26', attempts: 1, ok: false }))).toBeNull();
+    expect(readSwap(JSON.stringify({ ...rec(0, false), phase: 'done' }))).toBeNull();
+    expect(readSwap(JSON.stringify({ ...rec(0, false), old_path: '' }))).toBeNull();
     expect(readSwap('{"version":1}')).toBeNull();
     expect(readSwap('{')).toBeNull();
   });

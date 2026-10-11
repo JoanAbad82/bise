@@ -99,9 +99,10 @@ test('setup/update (S.6, real core) good: offered, ready, nothing by itself; his
     expect(out.of(RELAUNCH), 'no relaunch before his click').toEqual([]);
     expect(statSync(f.target).ino, 'the running bundle is untouched before his click').toBe(inoBefore);
     expect(existsSync(`${f.target}.old`), 'no .old before his click').toBe(false);
-    // he is on his inbox (⌘I, through the app's menu) when he sees the line, and clicks restart
-    await clickMenu(s, 'Go/Inbox');
-    await expect(s.page.getByTestId('inbox.root'), 'the inbox is open').toBeVisible({ timeout: 5000 });
+    // he is on his settings (⌘, through the app's menu) when he sees the line, and clicks restart (the
+    // inbox opens in place since 416a4ad3, never a screen: a screen is what the route keeps)
+    await clickMenu(s, 'bise/Settings…');
+    await expect(s.page.getByTestId('settings.root'), 'settings are open').toBeVisible({ timeout: 5000 });
     const line = s.page.locator('[data-testid="app.update"][data-state="ready"]');
     await expect(line, 'the window says the new bise is ready').toBeVisible({ timeout: 5000 });
     await expect(line, 'its words name the version').toContainText(OFFERED.version);
@@ -111,8 +112,10 @@ test('setup/update (S.6, real core) good: offered, ready, nothing by itself; his
     expect(existsSync(`${f.target}.old`), '<target>.old keeps the previous app').toBe(true);
     expect(existsSync(path.join(f.target, 'Contents', 'Info.plist')), 'a whole app in place').toBe(true);
     expect(statSync(f.target).ino, '<target> is a new directory').not.toBe(inoBefore);
-    expect(JSON.parse(readFileSync(path.join(updates, 'swap.json'), 'utf8')), 'swap.json records the swap').toEqual({ version: OFFERED.version, attempts: 0, ok: false });
-    expect(JSON.parse(readFileSync(path.join(updates, 'route.json'), 'utf8')), 'route.json holds his screen').toEqual({ route: 'inbox' });
+    expect(JSON.parse(readFileSync(path.join(updates, 'swap.json'), 'utf8')), 'swap.json records the swap, naming its .old').toMatchObject({
+      phase: 'swapped', old_path: `${f.target}.old`, to_version: OFFERED.version, attempts: 0, ok: false,
+    });
+    expect(JSON.parse(readFileSync(path.join(updates, 'route.json'), 'utf8')), 'route.json holds his screen').toEqual({ route: 'settings' });
     expect(states(out).filter((x) => x.state === 'failed'), 'no failure on the way').toEqual([]);
   } finally {
     await first.s.close();
@@ -122,7 +125,7 @@ test('setup/update (S.6, real core) good: offered, ready, nothing by itself; his
   const second = await launch(w, f.env, userData);
   try {
     const { s } = second;
-    await expect(s.page.getByTestId('inbox.root'), 'the route he was on reopens').toBeVisible({ timeout: 15_000 });
+    await expect(s.page.getByTestId('settings.root'), 'the route he was on reopens').toBeVisible({ timeout: 15_000 });
     await expect.poll(() => existsSync(`${f.target}.old`) || existsSync(path.join(updates, 'swap.json')), {
       timeout: 30_000, message: 'once the core answered, .old and swap.json are gone (confirmed)',
     }).toBe(false);
@@ -171,7 +174,9 @@ test('setup/update (S.6, real core) went_bad: a swapped-in app that never said i
   cpSync(f.target, `${f.target}.old`, { recursive: true, verbatimSymlinks: true });
   writeFileSync(path.join(f.target, 'Contents', 'Resources', 'BAD'), 'the new app that went bad');
   mkdirSync(updates, { recursive: true });
-  writeFileSync(path.join(updates, 'swap.json'), JSON.stringify({ version: OFFERED.version, attempts: 1, ok: false }));
+  writeFileSync(path.join(updates, 'swap.json'), JSON.stringify({
+    phase: 'swapped', old_path: `${f.target}.old`, from_version: 'before', to_version: OFFERED.version, attempts: 1, ok: false,
+  }));
   const oldIno = statSync(`${f.target}.old`).ino;
 
   const { s, out } = await launch(w, f.env, userData);
@@ -189,6 +194,29 @@ test('setup/update (S.6, real core) went_bad: a swapped-in app that never said i
     expect(statSync(f.target).ino, 'the previous app is in place again').toBe(oldIno);
     expect(existsSync(path.join(f.target, 'Contents', 'Resources', 'BAD')), 'the bad app is gone').toBe(false);
     expect(existsSync(path.join(updates, 'swap.json')), 'the swap record is gone').toBe(false);
+  } finally {
+    await s.close();
+  }
+});
+
+test("setup/update (S.6, real core) stray: a .old next to the bundle with no swap record (a launcher's copy) shows nothing and stays", async () => {
+  test.setTimeout(90_000);
+  const w = realWorld();
+  const f = makeUpdateFeed(w.home, 'good');
+  const dir = caseDir(w, 'stray-old');
+  const userData = path.join(dir, 'userdata');
+  // what 'desktop-try.sh --promote' left before prev/ (ambient-lead m_18341): <target>.old, no swap.json
+  cpSync(f.target, `${f.target}.old`, { recursive: true, verbatimSymlinks: true });
+  const oldIno = statSync(`${f.target}.old`).ino;
+  const { s, out } = await launch(w, f.env, userData);
+  try {
+    await expect(s.page.getByTestId('app.root'), 'the window is up').toBeVisible({ timeout: 15_000 });
+    await sleep(4000);
+    expect(states(out).filter((x) => x.state === 'went_bad'), "never 'the new bise didn't start right'").toEqual([]);
+    await expect(s.page.locator('[data-testid="app.update"][data-state="went_bad"]'), 'no went_bad line').toHaveCount(0);
+    expect(existsSync(`${f.target}.old`) && statSync(`${f.target}.old`).ino === oldIno, 'the stray .old is left as is').toBe(true);
+    expect(existsSync(path.join(userData, 'updates', 'swap.json')), 'no record made up').toBe(false);
+    await s.page.screenshot({ path: test.info().outputPath('stray-old.png') });
   } finally {
     await s.close();
   }

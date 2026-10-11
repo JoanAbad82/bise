@@ -6,10 +6,15 @@
 // (fail closed on any codesign error), the quarantine cleared: then the
 // window hears {state:'ready', version}. Only his click installs it: the core
 // stops (the hubs are their own processes and keep every agent), the bundle
-// is swapped (current → <name>.app.old, the new one in place, rolled back
-// on any error), and the app starts again from the new bundle. .old stays
-// until the new app ran and said so (plan.ts startup); a new app that never
-// did is offered a way back, on his click.
+// is swapped (swap.ts: a write-ahead record first, then current →
+// <name>.app.old, the new one in place, rolled back on any error), and the
+// app starts again from the new bundle. .old stays until the new app ran and
+// said so (plan.ts startup); a new app that never did is offered a way back,
+// on his click.
+//
+// The folder next to the bundle is the updater's alone: `<name>.app.old` is
+// its own only when swap.json names it; any other .old (a launcher's copy) is
+// 'stray': left on disk, never offered, never deleted (architect m_18352).
 //
 // Test mode: never his bundle or a real feed. BISE_DESKTOP_UPDATE_TARGET
 // names a fake .app inside the test HOME, only a local feed (file://,
@@ -25,6 +30,7 @@ import { app, net } from 'electron';
 import { RELAUNCH_LINE, UPDATE_LINE, UPDATE_TARGET_ENV, type UpdateState } from '../../shared/api';
 import { inside } from '../testhome';
 import { bundleOf, designated, leftovers, localFeed, readSwap, readVersion, startup, zipName, type AppBuild } from './plan';
+import { swapIn, writeRecord } from './swap';
 
 const run = promisify(execFile);
 
@@ -86,7 +92,10 @@ export class Updates {
     const recFile = join(this.dir, 'swap.json');
     const rec = existsSync(recFile) ? readSwap(readFileSync(recFile, 'utf8')) : null;
     const old = `${this.target}.old`;
-    switch (startup(existsSync(old), rec)) {
+    switch (startup(old, existsSync(old), rec)) {
+      case 'stray':
+        console.log(`update: ${old} is not this updater's (no swap record names it): left as is`);
+        break;
       case 'forget':
         await rm(recFile, { force: true });
         break;
@@ -95,11 +104,11 @@ export class Updates {
         await rm(recFile, { force: true });
         break;
       case 'first':
-        if (rec !== null) await writeFile(recFile, JSON.stringify({ ...rec, attempts: 1 }));
+        if (rec !== null) await writeRecord(recFile, { ...rec, attempts: 1 });
         this.first = true;
         break;
       case 'went_bad':
-        this.set({ state: 'went_bad', version: rec?.version ?? '' });
+        this.set({ state: 'went_bad', version: rec?.to_version ?? '' });
         break;
       case 'none':
         break;
@@ -191,19 +200,14 @@ export class Updates {
   async install(route: string | null): Promise<boolean> {
     const s = this.state;
     if (s.state !== 'ready' || this.staged === null) return false;
-    const old = `${this.target}.old`;
-    await rm(old, { recursive: true, force: true });
     if (route !== null) await writeFile(join(this.dir, 'route.json'), JSON.stringify({ route }));
     this.d.stopCore();
-    await rename(this.target, old);
     try {
-      await rename(this.staged, this.target);
+      await swapIn(this.target, this.staged, join(this.dir, 'swap.json'), { from: this.build?.id ?? '', to: s.version });
     } catch (e) {
-      await rename(old, this.target);
       this.set({ state: 'failed', version: s.version, why: `the swap failed: ${e instanceof Error ? e.message : String(e)}` });
       return false;
     }
-    await writeFile(join(this.dir, 'swap.json'), JSON.stringify({ version: s.version, attempts: 0, ok: false }));
     this.relaunch();
     return true;
   }

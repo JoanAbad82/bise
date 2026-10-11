@@ -47,42 +47,61 @@ export function designated(out: string): string | null {
   return null;
 }
 
-/** What a swap leaves for the next start (`<userData>/updates/swap.json`). */
+/**
+ * The swap's write-ahead record (`<userData>/updates/swap.json`, architect
+ * m_18352): written (tmp + rename) BEFORE any rename, so a `.old` the updater
+ * made always has one naming it; a `.old` with none is someone else's.
+ */
 export interface SwapRecord {
+  /** 'staged': written, the renames may not have run; 'swapped': both renames done */
+  readonly phase: 'staged' | 'swapped';
+  /** the previous bundle this swap keeps (`<target>.old`) */
+  readonly old_path: string;
+  /** the version swapped out */
+  readonly from_version: string;
   /** the version swapped in */
-  readonly version: string;
+  readonly to_version: string;
   /** the starts of the new app so far */
   readonly attempts: number;
   /** the new app wrote it started fine */
   readonly ok: boolean;
 }
 
-/** A swap record from its JSON, or null. */
+/** A swap record from its JSON, or null (junk, or a record without what it owns). */
 export function readSwap(text: string): SwapRecord | null {
   try {
     const v = JSON.parse(text) as Partial<SwapRecord>;
-    if (typeof v.version !== 'string' || typeof v.attempts !== 'number' || typeof v.ok !== 'boolean') return null;
-    return { version: v.version, attempts: v.attempts, ok: v.ok };
+    if (v.phase !== 'staged' && v.phase !== 'swapped') return null;
+    if (typeof v.old_path !== 'string' || v.old_path === '' || typeof v.from_version !== 'string' || typeof v.to_version !== 'string') return null;
+    if (typeof v.attempts !== 'number' || typeof v.ok !== 'boolean') return null;
+    return { phase: v.phase, old_path: v.old_path, from_version: v.from_version, to_version: v.to_version, attempts: v.attempts, ok: v.ok };
   } catch {
     return null;
   }
 }
 
 /**
- * What a start does about the last swap (architect m_11169: keep
- * `<name>.app.old` until the new app started and wrote its 'started ok'):
- * - `none`: no swap;
- * - `forget`: a record but no .old (he removed it): drop the record;
- * - `first`: the new app's first start: count it, and confirm once it runs;
+ * What a start does about the last swap, a table over (`old`: this run's
+ * `<target>.old` exists, the record, its phase, whether it names this .old)
+ * (architect m_11169, m_18352):
+ * - `none`: no .old, no record;
+ * - `forget`: a record but no .old (the swap never got that far, or it was
+ *   cleaned): drop the record, nothing shown;
+ * - `stray`: a .old with no record, or a record naming another path: not
+ *   the updater's (a launcher's copy): left on disk, no offer, no delete, one
+ *   log line;
+ * - `first`: the new app's first start: count it, confirm once it runs. A
+ *   record still 'staged' counts as swapped here: this run starts from the
+ *   target, so the second rename happened;
  * - `confirmed`: it said it started fine: remove .old and the record;
- * - `went_bad`: it was started before and never said so (or the record is
- *   gone): offer to go back to .old, on his click, never by itself.
+ * - `went_bad`: the record names this .old, the new app started before and
+ *   never said ok: offer to go back, on his click, never by itself.
  */
-export type Startup = 'none' | 'forget' | 'first' | 'confirmed' | 'went_bad';
+export type Startup = 'none' | 'forget' | 'stray' | 'first' | 'confirmed' | 'went_bad';
 
-export function startup(oldExists: boolean, rec: SwapRecord | null): Startup {
+export function startup(old: string, oldExists: boolean, rec: SwapRecord | null): Startup {
   if (!oldExists) return rec === null ? 'none' : 'forget';
-  if (rec === null) return 'went_bad';
+  if (rec === null || rec.old_path !== old) return 'stray';
   if (rec.ok) return 'confirmed';
   return rec.attempts === 0 ? 'first' : 'went_bad';
 }
