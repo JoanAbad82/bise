@@ -29,16 +29,16 @@ export interface RowProps {
   /** the one in view */
   on?: boolean;
   state?: UiState;
-  onClick?: MouseEventHandler<HTMLDivElement>;
+  /** with it, the row is a real <button> (full width, left-aligned, the row's hover and on tints) */
+  onClick?: MouseEventHandler<HTMLElement>;
   testId?: string;
-  ref?: Ref<HTMLDivElement>;
+  ref?: Ref<HTMLElement>;
 }
-/** a list row (sidebar, side views, settings nav, any list) */
+/** a list row (sidebar, side views, settings nav, any list); a real button when it has onClick */
 export const Row = memo(function Row({ kind, name, sub, dot, lead: own, end, needs, on, state, onClick, testId, ref }: RowProps) {
   const lead = kind === "me" ? <Pearl size={22} /> : own ?? (dot !== undefined ? <Dot state={dot} lg={kind === "pj"} /> : null);
-  return (
-    <div ref={ref} className={cx("b-row", kind, on && "on", st(state))} onClick={onClick} role={onClick ? "button" : undefined}
-      aria-current={on || undefined} data-testid={testId}>
+  const body = (
+    <>
       {lead}
       {kind === "me" ? (
         <span><span className="nm">{name}</span>{sub != null && <span className="sub">{sub}</span>}</span>
@@ -46,6 +46,19 @@ export const Row = memo(function Row({ kind, name, sub, dot, lead: own, end, nee
         <span className="nm">{name}</span>
       )}
       {end != null && end !== "" && <span className={cx("end", needs && "nd")}>{end}</span>}
+    </>
+  );
+  if (onClick !== undefined) {
+    return (
+      <button ref={ref as Ref<HTMLButtonElement>} type="button" className={cx("b-row", "btn", kind, on && "on", st(state))} onClick={onClick}
+        aria-current={on || undefined} data-testid={testId}>
+        {body}
+      </button>
+    );
+  }
+  return (
+    <div ref={ref as Ref<HTMLDivElement>} className={cx("b-row", kind, on && "on", st(state))} aria-current={on || undefined} data-testid={testId}>
+      {body}
     </div>
   );
 });

@@ -19,3 +19,4 @@ export * from "./composer";
 export * from "./thread";
 export * from "./overlays";
 export * from "./panels";
+export * from "./controls";

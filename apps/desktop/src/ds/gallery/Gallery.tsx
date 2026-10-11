@@ -7,9 +7,9 @@ import { Markdown } from "@/thread/Markdown";
 // the thread's layout around the markdown (its code block's head, its pre), as the window draws it
 import "@/thread/thread.css";
 import {
-  Answered, Art, Bar, Board, Button, Capsule, Card, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Empty, Err,
-  Field, Fold, Group, Head, Help, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Quote, Route, Row,
-  SectionHead, Seg, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, Thread, Thumbs, Toast, Toggle, Tool,
+  Act, Answered, Art, Bar, Board, Button, Capsule, Card, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Empty, Err,
+  Field, Fold, Group, Head, Help, IconButton, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Quote, Route, Row,
+  SectionHead, Seg, Select, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
   Win, type Opt,
 } from "../index";
 
@@ -317,6 +317,40 @@ export const SECTIONS: Record<string, () => ReactNode> = {
         </div>
       ))}
     </div>
+  ),
+  // designer's raw-controls call (m_18343): the controls a screen may not draw itself, in their states
+  actions: () => (
+    <>
+      <div className="g-row">
+        <IconButton label="sidebar" keys="⌘\\" testId="ds.ibtn">☰</IconButton><IconButton label="panel" pressed>▥</IconButton>
+        <IconButton label="close" state="hover">✕</IconButton><IconButton label="close" state="focus">✕</IconButton>
+        <IconButton label="close" state="disabled">✕</IconButton><IconButton label="to the end" size="bar">↓</IconButton>
+      </div>
+      <div className="g-row">
+        <span>queued · sends when bise's turn ends <Act testId="ds.act">edit</Act> · <Act>drop</Act></span>
+        <Act state="hover">give it back</Act><Act state="focus">show the report</Act><Act tone="err">retry</Act><Act state="disabled">copied</Act>
+      </div>
+      <div className="g-row g-col">
+        <TextArea defaultValue={"a brief over\ntwo lines"} placeholder="what should it do?" readOnly testId="ds.area" />
+        <TextArea defaultValue="" placeholder="or type your answer" readOnly state="error" />
+      </div>
+      <div className="g-row g-col">
+        <Select value="mistral-medium" label="model" testId="ds.select" onChange={() => undefined}
+          options={[{ value: "mistral-medium", label: "Mistral Medium", hint: "default" }, { value: "mistral-small", label: "Mistral Small" }]} />
+        <Select value="" placeholder="pick a model" label="model" onChange={() => undefined} options={[{ value: "a", label: "a" }]} />
+      </div>
+      <div className="g-row g-col">
+        <Row kind="pj" name="telemetry" dot="nd" end="2" needs onClick={() => undefined} testId="ds.row.btn" />
+        <Row kind="ag" name="perf" dot="wk" end="4 min" on onClick={() => undefined} />
+        <Row kind="ag" name="alerts" dot="ok" end="done" state="hover" onClick={() => undefined} />
+      </div>
+      {/* the Sheet's own markup, drawn in place (live it is a modal over a 40% scrim, Radix Dialog) */}
+      <div className="b-sheet still" data-testid="ds.sheet">
+        <div className="b-sheet-head"><h2 className="t">add a project</h2><p className="sub">a folder, a git repo. its main starts right away.</p></div>
+        <div className="b-sheet-body"><Field defaultValue="~/code/shop" readOnly /></div>
+        <div className="b-sheet-foot"><Button kind="ghost">cancel</Button><Button kind="pri">add 2 projects</Button></div>
+      </div>
+    </>
   ),
   // an answer in the TUI's markdown colors (ambient-lead m_11457): the thread's real renderer on the
   // left, the TUI's markdown.rs rules drawn as the terminal draws them on the right
