@@ -625,6 +625,10 @@ button.th-sched-head {
 .th-notice.interrupted .th-notice-mark {
   color: var(--c-text-2);
 }
+/* 8 px above it, as the wake line: it never touches a cut reply's last list item (designer m_18098) */
+.th-notice.interrupted {
+  margin-top: 8px;
+}
 .th-notdelivered {
   outline: none;
 }

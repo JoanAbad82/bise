@@ -182,6 +182,8 @@ test("thread/streaming: a reply cut off mid-stream stays as he read it at 0.7, t
     const lineTone = await line.evaluate((el) => getComputedStyle(el).color);
     const markTone = await line.locator('.th-notice-mark').evaluate((el) => getComputedStyle(el).color);
     expect(markTone, "the ▲ is the line's dim tone, not the error one").toBe(lineTone);
+    const [cutBox, lineBox] = await Promise.all([cut.locator('li').last().boundingBox(), line.boundingBox()]);
+    expect((lineBox?.y ?? 0) - ((cutBox?.y ?? 0) + (cutBox?.height ?? 0)), "the line has the wake line's 8 px above it, never touching the last list item").toBeGreaterThanOrEqual(8);
     await page.waitForTimeout(500);
     await page.screenshot({ path: test.info().outputPath('cut-light.png') });
   } finally {
