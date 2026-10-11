@@ -1,0 +1,69 @@
+{"ans": [], "card": 1, "git": true, "now": 1000000, "parts": "[{\"kind\":\"quote\",\"from\":\"main\",\"text\":\"q\"},{\"kind\":\"text\",\"text\":\"v2\"}]", "t": "answer", "text": "<selection from=\"main\">\nq\n</selection>\nv2"}
+{"ans": [], "card": 1, "git": true, "now": 1000000, "t": "answer", "text": "4"}
+{"agent": "a", "ans": [], "git": true, "now": 1000000, "t": "assistant", "text": "ok"}
+{"ans": [], "git": true, "now": 1000000, "t": "boot"}
+{"ans": [], "card": 1, "git": true, "now": 1000000, "res": "later", "t": "card_close"}
+{"agent": "main", "ans": [], "git": true, "kind": "signin", "now": 1000000, "place": "signin:chatgpt", "pr": null, "t": "card_open", "text": "your ChatGPT sign-in expired\nyour agents on ChatGPT stopped. sign in again and they go on by themselves.\n\n1. sign in again"}
+{"agent": "dark", "ans": [], "git": true, "kind": "merge", "now": 1000000, "place": "wt:dark", "pr": 412, "t": "card_open", "text": "#412 is ready to merge\ndark mode\napproved · 3 of 3 checks pass · 2 commits · +40 −3\ngithub.com/o/r/pull/412\n\n1. squash and merge\n2. open it on GitHub\n3. not yet"}
+{"ans": [], "card": 1, "git": true, "now": 1000000, "t": "close"}
+{"ans": [], "card": 2, "git": true, "now": 1791748154918, "res": "interrupted", "t": "confirm_close"}
+{"ans": [], "git": true, "name": "fix", "now": 1000000, "t": "confirm_drop"}
+{"agent": "main", "ans": [], "git": true, "now": 1000000, "t": "confirm_open", "text": "main wants to push"}
+{"ans": [], "force": true, "git": true, "name": "b", "now": 1000000, "t": "drop"}
+{"ans": [], "git": true, "id": 1, "name": "first", "now": 1790000000000, "t": "every_name"}
+{"ans": [], "git": true, "id": 1, "now": 1790000420000, "t": "every_run", "text": "timer #1 (every 2m, run now by the user, set by main): check HN\n(stop it: sb every --stop 1)"}
+{"agent": "w", "ans": [], "by": "main", "daily_min": 450, "git": true, "next_ms": 1790055000000, "now": 1790000000000, "t": "every_set", "text": "check HN"}
+{"agent": "w", "ans": [], "by": "main", "daily_min": 450, "git": true, "next_ms": 1790055000000, "now": 1790000000000, "t": "every_set", "text": "check HN", "times": 1}
+{"agent": "main", "ans": [], "by": "main", "daily_min": 1309, "git": true, "next_ms": 1791748140000, "now": 1791748101573, "t": "every_set", "text": "ONE-SHOT brief", "times": 1, "until_ms": 1791755940000}
+{"agent": "w", "ans": [], "by": "main", "every_ms": 600000, "git": true, "name": "my own name", "next_ms": 1790000600000, "now": 1790000000000, "t": "every_set", "text": "x y z"}
+{"agent": "main", "ans": [], "by": "main", "every_ms": 600000, "git": true, "next_ms": 1600000, "now": 1000000, "t": "every_set", "text": "check HN"}
+{"agent": "main", "ans": [], "by": "main", "every_ms": 600000, "git": true, "next_ms": 1600000, "now": 1000000, "t": "every_set", "text": "check HN", "times": 6}
+{"agent": "u", "ans": [], "by": "main", "every_ms": 60000, "git": true, "next_ms": 1790000060000, "now": 1790000000000, "t": "every_set", "text": "check HN", "until_ms": 1790000180000}
+{"ans": [], "git": true, "id": 1, "now": 1000000, "t": "every_stop", "wake": "", "why": "stopped by main"}
+{"ans": [], "git": true, "id": 1, "now": 1790000480000, "t": "every_stop", "wake": "the user stopped timer #1 (check HN): don't set it again unless they ask", "why": "stopped by the user"}
+{"agent": "b", "ans": [], "crashed": false, "git": true, "now": 1000000, "reason": "", "t": "exited"}
+{"agent": "a", "ans": [], "crashed": true, "git": true, "now": 1000000, "reason": "boom", "t": "exited"}
+{"ans": [], "direct": "", "focus": "docs", "git": true, "note": null, "now": 1000000, "t": "focus"}
+{"ans": [], "direct": "You talked to @docs (1 message)", "focus": "main", "git": true, "note": "The user talked directly to @docs (1 message): \"utilise la v2\". Last reply of @docs: \"brief lu ok, v2\"", "now": 1000000, "t": "focus"}
+{"agent": "perf", "ans": [], "git": true, "now": 1000000, "on": true, "t": "follow"}
+{"agent": "w", "run": "idle", "t": "force_run"}
+{"ans": [], "git": true, "now": 1000000, "t": "forge", "text": "#412 (sb/dark): e2e failed again on h3 after 2 tries. The user is asked (inbox): don't push for it until the answer comes.\nhttps://github.com/o/r/pull/412", "to": "dark"}
+{"agent": "dark", "ans": [], "git": true, "now": 1000000, "t": "forge_card", "text": "#412 (sb/dark): e2e still fails after 2 fixes by dark. what should it do? (keep trying, skip it, or you look)"}
+{"ans": [], "git": true, "now": 1000000, "t": "hub_msg", "text": "your ChatGPT sign-in is back. go on where your turn stopped.", "to": "t1"}
+{"agent": "a", "ans": [], "git": true, "held": false, "leftover": false, "now": 1000000, "t": "idle"}
+{"agent": "net", "ans": [], "git": true, "now": 1000000, "t": "interrupt"}
+{"ans": [], "git": true, "name": "a", "now": 1000000, "t": "isolate"}
+{"ans": [], "base": "x", "brief": {"constraints": [], "context": "", "done_when": null, "objective": "y", "report_format": null}, "brief_text": "Objective: y\n\nNo end criterion: this is a long-running task. Stay available.\n", "git": false, "now": 1000000, "objective": "y", "t": "new", "with_changes": false, "worktree": true}
+{"t": "passthrough", "focus": "main", "line": "/status", "now": 2, "git": false, "ans": []}
+{"agent": "a", "ans": [], "git": true, "now": 1000000, "t": "ready"}
+{"ans": [], "git": true, "name": "docs", "new_name": "api", "now": 1000000, "t": "rename", "valid": true}
+{"ans": [], "from": "a", "git": true, "now": 1000000, "req": {"agent": "b", "cmd": "restore"}, "t": "req", "token": 3}
+{"ans": [], "git": true, "name": "fix", "now": 1000000, "t": "restore"}
+{"ans": [], "focus": "docs", "git": true, "now": 1000000, "queued": false, "t": "route", "target": "docs", "text": "merci"}
+{"ans": [], "git": true, "now": 1000000, "rid": 1, "t": "route_cancel"}
+{"ans": [], "git": true, "name": "bise", "now": 1000000, "rid": 1, "t": "route_correct", "to": "bise"}
+{"ans": [], "context": "", "git": true, "name": "", "now": 1000000, "t": "route_hold", "text": "first words", "to": "", "via": "", "why": ""}
+{"ans": [], "context": "", "git": true, "name": "shop", "now": 1000000, "parts": "[{\"kind\":\"text\",\"text\":\"look \"},{\"kind\":\"image\",\"name\":\"[Image #1]\",\"source\":\"/d/s.png\",\"mime\":\"image/png\",\"b64_file\":\"/h/images/ab.b64\"}]", "t": "route_hold", "text": "look", "to": "shop-1", "via": "", "why": "you named shop"}
+{"ans": [], "context": "", "git": true, "name": "shop", "now": 1000000, "t": "route_hold", "text": "update the docs", "to": "shop-1", "via": "", "why": "Safari: shop.test"}
+{"ans": [], "context": "{\"app\":\"Safari\",\"url\":\"https://grafana.shop.test/d/p99\"}", "git": true, "name": "shop", "now": 1000000, "t": "route_hold", "text": "why does p99 rise", "to": "shop-1", "via": "", "why": "the front page"}
+{"ans": [], "git": true, "name": "docs", "now": 1003000, "rid": 1, "t": "route_pick", "to": "docs-2", "why": ""}
+{"ans": [], "git": true, "name": "shop", "now": 1000900, "rid": 1, "t": "route_pick", "to": "shop-1", "why": "bise's model picked shop"}
+{"ans": [], "focus": "a", "git": true, "now": 1000000, "parts": "[{\"kind\":\"quote\",\"from\":\"main\",\"text\":\"q\"},{\"kind\":\"text\",\"text\":\"why?\"}]", "queued": true, "t": "say", "text": "<selection from=\"main\">\nq\n</selection>\nwhy?"}
+{"ans": [], "focus": "a", "git": true, "now": 1000000, "queued": false, "t": "say", "text": "go"}
+{"agent": "main", "ans": [], "git": true, "now": 1000000, "t": "steer_rx"}
+{"agent": "main", "ans": [], "git": true, "now": 1000000, "t": "steered"}
+{"ans": [], "git": true, "now": 1002100, "t": "tick"}
+{"agent": "a", "ans": [], "git": true, "now": 1000000, "path": "src/x.rs", "t": "touch"}
+{"agent": "a", "ans": [], "git": true, "now": 1000000, "t": "turn_started"}
+{"ans": [], "git": true, "id": 2, "now": 1000000, "t": "unqueue"}
+{"ans": [], "git": true, "id": 1, "now": 1000000, "t": "wake_hit", "text": "pid 4242 ended · after 5s · the build"}
+{"agent": "t1", "ans": [], "git": true, "max_ms": 86400000, "max_text": "", "now": 1791747996050, "quiet": true, "spec": {"cmd": "sleep 6", "kind": "bg", "slot": "/tmp/sb-e2e-06e4yxde/st/agents/t1/tmp/bg/1", "tail": "/tmp/sb-e2e-06e4yxde/st/agents/t1/tmp/bg/1.out"}, "t": "wake_set"}
+{"agent": "perf", "ans": [], "git": true, "max_ms": 3600000, "max_text": "pid 4242 still running · after 1h00m · the build\nthis watch stopped at its --max (1h). to keep waiting: sb wake --on-exit 4242 --note 'the build'", "now": 1000000, "quiet": false, "spec": {"kind": "pid", "note": "the build", "pid": 4242, "start": ""}, "t": "wake_set"}
+{"ans": [], "git": true, "id": 2, "now": 1000000, "t": "wake_stop", "why": "stopped by perf"}
+{"ans": [], "git": true, "now": 1006100, "t": "x_ack", "xid": 1}
+{"ans": [], "git": true, "now": 1000000, "t": "x_fail", "xid": 1}
+{"ans": [], "git": true, "hub": "home-1", "kind": "input", "name": "", "now": 1000000, "parts": "[{\"kind\":\"text\",\"text\":\"look \"},{\"kind\":\"image\",\"name\":\"[Image #1]\",\"source\":\"/d/s.png\",\"mime\":\"image/png\",\"b64_file\":\"/h/images/ab.b64\"}]", "t": "x_in", "text": "look", "token": 900, "xid": 7}
+{"ans": [], "git": true, "hub": "home-1", "kind": "ask", "name": "", "now": 1000000, "t": "x_in", "text": "status?", "token": 902, "xid": 8}
+{"ans": [], "git": true, "hub": "home-ws-5289a80a", "kind": "input", "name": "bise", "now": 1791747858278, "parts": "[{\"kind\":\"text\",\"text\":\"look at the shelf on shop \"},{\"kind\":\"image\",\"name\":\"[Image #1]\",\"source\":\"/tmp/sb-e2e-46cghvnl/shelf.png\",\"mime\":\"image/png\",\"b64_file\":\"/tmp/sb-e2e-46cghvnl/images/8255e79eca89d38d621e8d9ad3dd0e42.b64\"}]", "t": "x_in", "text": "look at the shelf on shop <image name=\"[Image #1]\" path=\"/tmp/sb-e2e-46cghvnl/shelf.png\" mime=\"image/png\" b64=\"/tmp/sb-e2e-46cghvnl/images/8255e79eca89d38d621e8d9ad3dd0e42.b64\">", "token": 3, "xid": 4}
+{"ans": [], "git": true, "hub": "home-ws-ad8cde35", "kind": "ask", "name": "bise", "now": 1791748144845, "t": "x_in", "text": "is the login fixed?", "token": 2, "xid": 2}
+{"ans": [], "git": true, "name": "shop", "now": 1066100, "t": "x_reply", "text": "again", "xid": 1}

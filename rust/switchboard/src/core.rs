@@ -983,7 +983,7 @@ pub fn default_core_bin() -> std::path::PathBuf {
     let next_to_exe = std::env::current_exe()
         .ok()
         .map(|e| std::fs::canonicalize(&e).unwrap_or(e))
-        .and_then(|e| e.parent().map(|d| d.join("sb-core")));
+        .and_then(|e| e.parent().map(|d| bise_home::exe_home_dir(d).join("sb-core")));
     #[cfg(debug_assertions)]
     {
         let dev = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../sb-core");

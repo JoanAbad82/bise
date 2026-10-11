@@ -565,7 +565,7 @@ fn broadcast(sh: &Arc<Shared>, v: &Value) {
 pub fn find_helper(home: &std::path::Path) -> Option<PathBuf> {
     let app = format!("{}.app", HELPER_APP);
     let env = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
-    let exe_dir = std::env::current_exe().ok().and_then(|e| e.canonicalize().ok()).and_then(|e| e.parent().map(PathBuf::from));
+    let exe_dir = std::env::current_exe().ok().and_then(|e| e.canonicalize().ok()).and_then(|e| e.parent().map(bise_home::exe_home_dir));
     let mut c: Vec<PathBuf> = Vec::new();
     c.extend(bise_home::env::test_setting("BISE_CU_HELPER").map(PathBuf::from));
     c.extend(env("BISE_APP_ROOT").map(|r| r.join(&app)));

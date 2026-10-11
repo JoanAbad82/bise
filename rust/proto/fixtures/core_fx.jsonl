@@ -1,0 +1,33 @@
+{"fx": "card_choice", "card": 1, "kind": "update", "agent": "main", "place": "release:5", "pr": null, "text": "3"}
+{"fx": "card_choice", "card": 1, "kind": "merge", "agent": "dark", "place": "wt:dark", "pr": 412, "text": "3"}
+{"fx": "confirm", "card": 3, "agent": "t8", "text": "2"}
+{"fx": "confirm", "name": "tq", "text": "archive @tq? the agent is mid-turn. [y/N]"}
+{"fx": "deliver", "mode": "say", "agent": "w", "notes": [], "status": false, "msgs": [{"id": 2, "rel": "hub"}]}
+{"fx": "deliver", "mode": "say", "agent": "main", "notes": ["the user dropped the agent @t1"], "status": true, "msgs": [{"id": 15, "rel": "user"}]}
+{"fx": "focus_main", "name": "g"}
+{"fx": "followed_end", "project": "ws-8bb31211", "agent": "perf", "key": 1791748147887, "state": "done", "label": "make the e2e fast", "summary": "p99 down 31%"}
+{"fx": "interrupt", "agent": "t7"}
+{"fx": "job_end", "agent": "perf", "state": "failed", "label": "objective of perf", "summary": "oom", "key": 1000000, "hub": ""}
+{"fx": "job_end", "agent": "perf", "state": "done", "label": "objective of perf", "summary": "p99 down 31%", "key": 1000000, "hub": "home-1"}
+{"fx": "journal", "ev": {"type": "act_done", "id": 1}}
+{"fx": "kill", "agent": "g"}
+{"fx": "line", "agent": "a", "kind": "sent", "fields": ["b", "m_4", "0", "0"]}
+{"fx": "line", "agent": "a", "kind": "you", "text": "go"}
+{"fx": "notice", "text": "no open card #999"}
+{"fx": "passthrough", "agent": "main", "line": "/status"}
+{"fx": "renamed", "old": "t9", "new": "t9b"}
+{"fx": "reply", "token": 1, "body": {"ok": true}}
+{"fx": "route", "rid": 1, "to": "shop-1", "name": "shop", "text": "look", "due_ms": 1002000, "why": "you named shop"}
+{"fx": "route_ask", "rid": 1, "text": "first words"}
+{"fx": "route_done", "rid": 1, "state": "cancelled", "to": "shop-1", "xid": null}
+{"fx": "route_done", "rid": 1, "state": "sent", "to": "docs-2", "xid": 1}
+{"fx": "rt", "agent": "w", "run": "idle", "waiting": false, "turn_ms": null, "turns": 0}
+{"fx": "rt", "agent": "a", "run": "busy", "waiting": true, "turn_ms": 1000000, "turns": 0}
+{"fx": "say", "agent": "main", "text": "[bise] The message(s) just above arrived while you were writing your last answer: you have not answered them yet. Answer them now."}
+{"fx": "spawn", "agent": "w", "resume": true, "crash_note": null}
+{"fx": "spawn", "agent": "a", "resume": true, "crash_note": "boom"}
+{"fx": "user_sent", "text": "go"}
+{"fx": "xdeliver", "xid": 1, "project": "shop-1", "kind": "input", "msg": 1, "text": "look", "context": "", "parts": "[{\"kind\":\"text\",\"text\":\"look \"},{\"kind\":\"image\",\"name\":\"[Image #1]\",\"source\":\"/d/s.png\",\"mime\":\"image/png\",\"b64_file\":\"/h/images/ab.b64\"}]"}
+{"fx": "xdeliver", "xid": 1, "project": "shop-1", "kind": "ask", "msg": 0, "text": "status?", "context": ""}
+{"fx": "xdeliver", "xid": 1, "project": "shop-1", "kind": "input", "msg": 1, "text": "why does p99 rise", "context": "{\"app\":\"Safari\",\"url\":\"https://grafana.shop.test/d/p99\"}"}
+{"fx": "xreply", "hub": "home-1", "xid": 8, "text": "green"}

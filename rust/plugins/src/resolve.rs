@@ -382,7 +382,8 @@ pub fn builtin_root() -> Option<PathBuf> {
         return has(&r).then(|| r.join("plugins"));
     }
     let exe = std::env::current_exe().ok().map(|e| e.canonicalize().unwrap_or(e));
-    if let Some(dir) = exe.as_deref().and_then(Path::parent) {
+    if let Some(dir) = exe.as_deref().and_then(Path::parent).map(bise_home::exe_home_dir) {
+        let dir = dir.as_path();
         if dir.join("VERSION").exists() {
             return has(dir).then(|| dir.join("plugins"));
         }

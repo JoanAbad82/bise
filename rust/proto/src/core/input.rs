@@ -1,0 +1,168 @@
+//! sb-core's inputs: what the hub's Rust side asks it to decide, one JSON
+//! line each (`{"t": <tag>, …}`), and [`Step`], the envelope the hub adds
+//! (its clock, whether the workspace is git, the answers to the step's
+//! queries so far).
+//!
+//! One variant per tag of sb-core's dispatch (`in_tag` in
+//! bend/hub/core.bend at 84ddc10d, tag for tag: `card_close` is its own
+//! tag and the Bend constructor `IConfirmClose`, as there). Fields are
+//! today's: a field sb-core reads with `C.get_s` is `Str` (missing reads
+//! ""), `C.get_nat` `Nat`, `C.get_b` `Bool`, `C.opt_str`/`C.opt_nat`
+//! `OptStr`/`OptNat` (or their `Omit` twins when the hub writes nothing
+//! for none), a value it keeps whole `Json`.
+
+use super::core_kinds;
+use serde_json::Value;
+
+core_kinds! {
+    /// One input of sb-core (its dispatch's tags).
+    pub enum In, tag "t" {
+        /// an agent's `sb` request (`token` 0: the hub's own, no reply
+        /// awaited); `req` is the request as the agent sent it
+        Req = "req" => IReq { token: Nat, from: Str, req: Json },
+        /// the waits' timeouts, `sb every`'s timers and `sb wake`'s max
+        Tick = "tick" => ITick {},
+        /// an agent's turn ended (`leftover`: steering its runtime never
+        /// read; `held`: stopped on an expired sign-in, not over)
+        Idle = "idle" => IIdle { agent: Str, leftover: Bool, held: Bool },
+        TurnStarted = "turn_started" => ITurnStarted { agent: Str },
+        /// the runtime received steered messages
+        SteerRx = "steer_rx" => ISteerRx { agent: Str },
+        /// the model read steered messages
+        Steered = "steered" => ISteered { agent: Str },
+        /// an agent's written answer
+        Assistant = "assistant" => IAssistant { agent: Str, text: Str },
+        /// an agent edited a file
+        Touch = "touch" => ITouch { agent: Str, path: Str },
+        /// an agent's REPL is up
+        Ready = "ready" => IReady { agent: Str },
+        Exited = "exited" => IExited { agent: Str, crashed: Bool, reason: Str },
+        /// the hub started: sb-core's state is the replayed journal
+        Boot = "boot" => IBoot {},
+        /// his message to the agent in view (`parts`: msg-parts JSON, only
+        /// when he sent typed parts)
+        Say = "say" => ISay { focus: Str, text: Str, queued: Bool, parts: StrOmit },
+        /// his `@agent` message
+        Route = "route" => IRoute { target: Str, text: Str, focus: Str, queued: Bool, parts: StrOmit },
+        /// `/new`: `brief` is the Brief as JSON, `brief_text` its body
+        New = "new" => INew { base: Str, brief: Json, brief_text: Str, objective: Str, worktree: Bool, with_changes: Bool },
+        Drop = "drop" => IDrop { name: Str, force: Bool },
+        ConfirmDrop = "confirm_drop" => IConfirmDrop { name: Str },
+        Restore = "restore" => IRestore { name: Str },
+        Isolate = "isolate" => IIsolate { name: Str },
+        Rename = "rename" => IRename { name: Str, new_name: Str, valid: Bool },
+        /// his answer to a card
+        Answer = "answer" => IAnswer { card: Nat, text: Str, parts: StrOmit },
+        Interrupt = "interrupt" => IInterrupt { agent: Str },
+        /// his queued message taken back (HubCmd queued_take)
+        Unqueue = "unqueue" => IUnqueue { id: Nat },
+        Passthrough = "passthrough" => IPassthrough { focus: Str, line: Str },
+        /// a client's view moved (`note`, `direct`: what he decided
+        /// directly with the agent he leaves, RFC 0001 §7.4)
+        Focus = "focus" => IFocus { focus: Str, note: OptStr, direct: Str },
+        /// `/close N`
+        Close = "close" => IClose { card: Nat },
+        /// tests, and a restarted sb-core: an agent's REPL state
+        ForceRun = "force_run" => IForceRun { agent: Str, run: Str },
+        /// the approvals gate: a card opens, closes
+        ConfirmOpen = "confirm_open" => IConfirmOpen { agent: Str, text: Str },
+        ConfirmClose = "confirm_close" => IConfirmClose { card: Nat, res: Str },
+        /// pr-news: GitHub's news to the agent that owns the PR
+        Forge = "forge" => IForge { to: Str, text: Str },
+        /// a check still fails after two tries: a card for him
+        ForgeCard = "forge_card" => IForgeCard { agent: Str, text: Str },
+        /// a hub item about a place (pr-design §6.3)
+        CardOpen = "card_open" => ICardOpen { kind: Str, agent: Str, text: Str, place: OptStr, pr: OptNat },
+        /// a hub item closed: the same step as `confirm_close`
+        CardClose = "card_close" => IConfirmClose { card: Nat, res: Str },
+        /// a message of the hub itself (from `bise`) to an agent
+        HubMsg = "hub_msg" => IHubMsg { to: Str, text: Str },
+        /// `sb every`: the hub checked the request and computed `next_ms`;
+        /// one of `every_ms`, `daily_min`; `name` only when given
+        EverySet = "every_set" => IEverySet {
+            agent: Str, by: Str, text: Str, next_ms: Nat, name: StrOmit,
+            every_ms: OptNatOmit, daily_min: OptNatOmit, until_ms: OptNatOmit, times: OptNatOmit, page: OptStrOmit,
+        },
+        /// `wake`: what bise tells the agent when he stopped it ("" none)
+        EveryStop = "every_stop" => IEveryStop { id: Nat, why: Str, wake: Str },
+        EveryRun = "every_run" => IEveryRun { id: Nat, text: Str },
+        EveryName = "every_name" => IEveryName { id: Nat, name: Str },
+        /// bise's cross-hub messages (S2): a project hub receives one
+        XIn = "x_in" => IXIn { token: Nat, hub: Str, xid: Nat, kind: Str, text: Str, name: Str, parts: StrOmit },
+        XAck = "x_ack" => IXAck { xid: Nat },
+        XFail = "x_fail" => IXFail { xid: Nat },
+        XReply = "x_reply" => IXReply { xid: Nat, name: Str, text: Str },
+        /// the routing hold (S2 step 2): `context` is his fn context's
+        /// JSON text ("" none)
+        RouteHold = "route_hold" => IRouteHold { text: Str, via: Str, to: Str, name: Str, why: Str, context: Str, parts: StrOmit },
+        RouteCorrect = "route_correct" => IRouteCorrect { rid: Nat, to: Str, name: Str },
+        RouteCancel = "route_cancel" => IRouteCancel { rid: Nat },
+        /// S2 step 5: the model's pick for his unclear words
+        RoutePick = "route_pick" => IRoutePick { rid: Nat, to: Str, name: Str, why: Str },
+        /// S10: follow a task
+        Follow = "follow" => IFollow { agent: Str, on: Bool },
+        /// `sb wake`: `spec` is the watch's spec as the hub wrote it
+        WakeSet = "wake_set" => IWakeSet { agent: Str, spec: Json, max_text: Str, max_ms: Nat, quiet: Bool },
+        WakeStop = "wake_stop" => IWakeStop { id: Nat, why: Str },
+        WakeHit = "wake_hit" => IWakeHit { id: Nat, text: Str },
+    }
+}
+
+/// One input as the link carries it: the input's own fields and the
+/// envelope sb-core's `start` reads (`now`, `git`, `ans`), in one object.
+/// (A restarted sb-core gets its agents' `force_run` bare, without it:
+/// `Hub::raw`; sb-core reads 0, false, none.)
+#[derive(Clone, Debug, PartialEq)]
+pub struct Step {
+    pub input: In,
+    /// the hub's clock for the input and its re-sends (ms)
+    pub now: u64,
+    /// the workspace is a git repository
+    pub git: bool,
+    /// the answers to the step's queries so far (a `need` replays it)
+    pub ans: Vec<Value>,
+}
+
+impl Step {
+    /// The envelope fields, in the order the hub writes them.
+    pub const FIELDS: &'static [super::Field] = &[
+        super::Field { name: "now", kind: super::FieldKind::Nat },
+        super::Field { name: "git", kind: super::FieldKind::Bool },
+        super::Field { name: "ans", kind: super::FieldKind::Jsons },
+    ];
+
+    /// The input's object with the envelope's fields set.
+    pub fn to_value(&self) -> Value {
+        let mut v = self.input.to_value();
+        if let Value::Object(m) = &mut v {
+            m.insert("now".into(), Value::from(self.now));
+            m.insert("git".into(), Value::Bool(self.git));
+            m.insert("ans".into(), Value::Array(self.ans.clone()));
+        }
+        v
+    }
+
+    pub fn encode(&self) -> String {
+        self.to_value().to_string()
+    }
+
+    /// One link line: the envelope read with sb-core's defaults (0, false,
+    /// none), the rest as an [`In`].
+    pub fn decode(v: Value) -> Result<Step, String> {
+        let Value::Object(mut m) = v else { return Err("not an object".into()) };
+        let now = m.remove("now").and_then(|n| n.as_u64()).unwrap_or(0);
+        let git = m.remove("git").and_then(|g| g.as_bool()).unwrap_or(false);
+        let ans = match m.remove("ans") {
+            Some(Value::Array(a)) => a,
+            _ => Vec::new(),
+        };
+        Ok(Step { input: In::decode(Value::Object(m))?, now, git, ans })
+    }
+}
+
+impl In {
+    /// The input as a step with this envelope.
+    pub fn step(self, now: u64, git: bool, ans: Vec<Value>) -> Step {
+        Step { input: self, now, git, ans }
+    }
+}
