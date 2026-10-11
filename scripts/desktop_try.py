@@ -4,6 +4,7 @@
   bise-ambient --real                                the promoted bundle on YOUR bise home and hubs (no build, no
                                                      try world): stops any open try or instance first, opens it
                                                      with no variable, says the sha, the bundle and the home
+  bise-ambient --real --stop                         quits it; on a stand-in home (a test's) also its hubs
   bise-ambient --try [repo…] [--fresh] [--replace]   build, set up the try home, open the app on it (internal
                                                      fallback until --real is proven: ambient-lead m_18348)
   bise-ambient --try --stop                          quit the try's app and stop its hubs (by pid)
@@ -905,6 +906,36 @@ def open_real(real, tryh, paths, environ=None, timeout=20):
     return pids[0] if pids else None
 
 
+def stop_real(real, app, default_real=None):
+    """bise-ambient --real --stop: every instance of the bundle quits. On a stand-in home (under
+    ~/.bise/gate, amb-tools' world) its hubs stop too, then every process left whose args name that
+    home (repl-live outlived the app: ambient-lead m_18642), by pid; on his own home, never his hubs."""
+    default_real = default_real or os.path.expanduser("~/.bise")
+    out = {"app": quit_bundle(app), "hubs": [], "killed": []}
+    if os.path.realpath(real) == os.path.realpath(default_real):
+        return out
+    if not under(real, GATE):
+        raise TryError("--real --stop on a stand-in home %s: under ~/.bise/gate only" % real)
+    # its processes name the stand-in HOME (the hubs' --workspace <home>/bise is beside .bise, not in
+    # it: the law's run left an sbd), so match the home that holds this .bise when it is under the gate
+    home = os.path.dirname(os.path.normpath(real)) if os.path.basename(os.path.normpath(real)) == ".bise" else real
+    if not under(home, GATE):
+        home = real
+    for sock in hub_socks(real):
+        if os.path.exists(sock) and stop_hub(sock):
+            out["hubs"].append(sock)
+    t0 = time.time()
+    while try_pids(home) and time.time() - t0 < 15:
+        time.sleep(0.3)
+    for pid in try_pids(home):
+        try:
+            os.kill(pid, signal.SIGTERM)
+            out["killed"].append(pid)
+        except OSError:
+            pass
+    return out
+
+
 def keep_app_pid(app, tryh, timeout=20):
     """Waits for the try's app to show up (find_app_pid) and keeps its pid in <try>/dev/desktop/app.pid,
     which app_running and --stop read. None when it never shows up."""
@@ -1016,10 +1047,16 @@ def main(argv):
         print(json.dumps(promote(his_env(os.environ), args[0])))
         return 0
     if "--real" in flags:
-        if flags - {"--real"} or args:
-            raise TryError("--real takes nothing: it opens the promoted bundle on your home")
+        if flags - {"--real", "--stop"} or args:
+            raise TryError("--real [--stop] takes nothing else: it opens (or stops) the promoted bundle on your home")
         real, tryh = homes()
-        open_real(real, tryh, try_paths(his_env(os.environ)))
+        paths = try_paths(his_env(os.environ))
+        if "--stop" in flags:
+            r = stop_real(real, paths["app"])
+            say("stopped bise desktop (%d instances, %d hubs, %d processes left killed)%s"
+                % (len(r["app"]), len(r["hubs"]), len(r["killed"]), "" if r["hubs"] or r["killed"] else "; your hubs weren't touched"))
+            return 0
+        open_real(real, tryh, paths)
         return 0
     real, tryh = homes()
     guard(real, tryh)

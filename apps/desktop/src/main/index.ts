@@ -30,6 +30,7 @@ import { hasTestNotify, menuTemplate } from './menu';
 import { startTerms, type TermHost } from './term/host';
 import { startTray } from './tray';
 import { testHomeProblem } from './testhome';
+import { standInPaths } from './userdata';
 import { themeSourceOf } from './theme';
 import { takeRoute, Updates, updateTarget } from './update/run';
 import { MainWindow } from './windows';
@@ -65,6 +66,17 @@ if (testMode) {
 // app takes its bundle's own name (productName: 'bise', or a try build's), which
 // also names its userData folder, so a try never shares his app's (appname.ts)
 app.setName(appName(app.isPackaged, process.platform, process.execPath));
+
+// a stand-in (another HOME, or a bise home that isn't his ~/.bise): the app's
+// folders go under it, never his real Library (userdata.ts, m_18637)
+const standIn = testMode ? null : standInPaths(process.env, userInfo().homedir, app.getName());
+if (standIn !== null) {
+  app.setPath('userData', standIn.userData);
+  app.setPath('sessionData', standIn.sessionData);
+  app.setPath('crashDumps', standIn.crashDumps);
+  app.setPath('logs', standIn.logs);
+  app.setPath('temp', standIn.temp);
+}
 
 if (testMode) {
   // never his ~/Library/Application Support: the harness's folder, else a fresh temp one

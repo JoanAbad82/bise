@@ -368,6 +368,32 @@ def real_opens_with_nothing():
         shutil.rmtree(w, ignore_errors=True)
 
 
+def real_stop_never_his_hubs():
+    """bise-ambient --real --stop (ambient-lead m_18642): the bundle quits; on his own home his hubs
+    are never touched; a stand-in outside ~/.bise/gate is refused; on a stand-in under it, its hubs
+    are stopped (here: none running, nothing killed). quit_bundle is faked: no app is touched."""
+    real_quit = T.quit_bundle
+    T.quit_bundle = lambda app: []
+    try:
+        his = os.path.expanduser("~/.bise")
+        r = T.stop_real(his, "/nowhere/bise try.app", default_real=his)
+        check(r == {"app": [], "hubs": [], "killed": []}, "his home: only the app, never his hubs: %r" % r)
+        try:
+            T.stop_real("/tmp/x/.bise", "/nowhere/bise try.app", default_real=his)
+            check(False, "a stand-in outside the gate is refused")
+        except T.TryError:
+            check(True, "a stand-in outside the gate is refused")
+        if os.path.isdir(T.GATE):
+            w = tempfile.mkdtemp(prefix="dtry-realstop-", dir=T.GATE)
+            try:
+                r = T.stop_real(os.path.join(w, ".bise"), "/nowhere/bise try.app", default_real=his)
+                check(r == {"app": [], "hubs": [], "killed": []}, "a stand-in with no hub: nothing to stop: %r" % r)
+            finally:
+                shutil.rmtree(w, ignore_errors=True)
+    finally:
+        T.quit_bundle = real_quit
+
+
 def hook_keeps_pid():
     """BISE_TRY_OPEN (the gate's open): the app the hook starts is found and its pid kept in
     <try>/dev/desktop/app.pid, so --stop finds it (qa-native m_11066). The 'app' is a throwaway
@@ -583,6 +609,7 @@ if __name__ == "__main__":
     staged_never_over_a_running_try()
     legacy_old_retired()
     real_opens_with_nothing()
+    real_stop_never_his_hubs()
     candidate_then_promote()
     if "--pure" not in sys.argv:
         hook_keeps_pid()
