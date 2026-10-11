@@ -112,6 +112,16 @@ impl Feed {
         Some((kind, Feed::read(kind, json)))
     }
 
+    /// An info line.
+    pub fn info(text: impl Into<String>) -> Feed {
+        Feed::Info(Info { text: text.into() })
+    }
+
+    /// A warning line.
+    pub fn warn(text: impl Into<String>) -> Feed {
+        Feed::Warn(Warn { text: text.into() })
+    }
+
     /// A kind and its JSON (without the tag) read back.
     pub fn read(kind: &str, json: &str) -> Result<Feed, String> {
         let mut m = match serde_json::from_str::<Value>(json) {

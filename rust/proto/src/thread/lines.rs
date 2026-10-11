@@ -481,11 +481,12 @@ impl Partial {
         PartialStep::Delta { off: at, text: delta }
     }
 
-    /// The `sb kept : <text>` line that keeps the text so far in the
-    /// thread (a failed turn, [`keeps_partial`]); None when there is
-    /// nothing to keep (no text, or a block dropped on a bad offset).
+    /// The `kept` record's line that keeps the text so far in the thread
+    /// (a failed turn, [`keeps_partial`]); None when there is nothing to
+    /// keep (no text, or a block dropped on a bad offset).
     pub fn kept_line(&self) -> Option<String> {
-        (!self.broken && !self.esc.trim().is_empty()).then(|| format!("sb kept : {}", self.esc))
+        let text = unescape(&self.esc);
+        (!self.broken && !self.esc.trim().is_empty()).then(|| Feed::Kept(crate::core::feed::Kept { text }).line())
     }
 }
 

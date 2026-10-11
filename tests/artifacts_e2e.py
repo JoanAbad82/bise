@@ -71,8 +71,9 @@ def main():
         n0 = len(arts(c))
         out = sb("t1", wt, "artifact", "add", "out/pricing-plans.csv", "--title", "pricing plans")
         check(out == "added pricing plans (sheet) · v1 · link it as [pricing plans](artifact:pricing-plans)", out)
-        c.wait_line("t1", "sb artifact : pricing-plans : t1 : pricing plans : sheet : 1", 10)
-        c.wait_line("main", "sb artifact : pricing-plans : t1 : pricing plans : sheet : 1", 10)
+        v1 = dict(id="pricing-plans", agent="t1", title="pricing plans", kind="sheet", version=1)
+        c.wait_feed("t1", "artifact", 10, **v1)
+        c.wait_feed("main", "artifact", 10, **v1)
         c.wait(lambda: len(arts(c)) > n0, 10, "a fresh hub/artifacts")
         row = last_art(c)["rows"][0]
         check(row["id"] == "pricing-plans" and row["agent"] == "t1" and row["by"] == "t1" and row["version"] == 1, row)
@@ -87,8 +88,8 @@ def main():
         open(plan, "a").write("pro,20\n")
         out = sb("t1", wt, "artifact", "add", "out/pricing-plans.csv")
         check(out.startswith("added pricing plans (sheet) · v2"), out)
-        c.wait_line("main", "sb artifact : pricing-plans : t1 : pricing plans : sheet : 2", 10)
-        check(sum("sb artifact : pricing-plans" in l for l in c.lines("main")) == 2, "no line for the unchanged add")
+        c.wait_feed("main", "artifact", 10, **dict(v1, version=2))
+        check(sum(r["id"] == "pricing-plans" for r in c.feed("main", "artifact")) == 2, "no line for the unchanged add")
 
         err = sb("t1", wt, "artifact", "add", "notes/plan.md", fail=True)
         check(err == "error: no file or link at notes/plan.md.", err)

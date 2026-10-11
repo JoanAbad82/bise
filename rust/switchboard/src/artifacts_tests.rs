@@ -290,7 +290,7 @@ fn the_reply_link_form_parses() {
 }
 
 #[test]
-fn the_thread_line_escapes_its_fields() {
+fn the_thread_record_keeps_its_fields_whole() {
     let m = Meta {
         id: "x".into(),
         agent: "a".into(),
@@ -299,7 +299,10 @@ fn the_thread_line_escapes_its_fields() {
         versions: vec![Version { v: 2, ..Default::default() }],
         ..Default::default()
     };
-    assert_eq!(thread_line(&m), "x : a : plan \\: v2 : doc : 2");
+    let line = thread_rec(&m).line();
+    assert_eq!(line, r#"sb artifact :: {"agent":"a","id":"x","kind":"doc","title":"plan : v2","version":2}"#);
+    let read = bise_proto::thread::lines::read(&line);
+    assert!(matches!(read, bise_proto::thread::lines::Rec::Hub(bise_proto::thread::lines::Hub::Artifact { title, v: 2, .. }) if title == "plan : v2"));
 }
 
 #[test]

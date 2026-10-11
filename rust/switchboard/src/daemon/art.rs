@@ -184,7 +184,7 @@ impl Shell {
     /// The ↗ line of a new artifact or version: in the maker's thread and
     /// in main's.
     fn art_lines(&mut self, a: &Added) {
-        let line = format!("sb artifact : {}", wire_escape(&artifacts::thread_line(&a.meta)));
+        let line = artifacts::thread_rec(&a.meta).line();
         let maker = self.art_who()(&a.meta.agent).map(|(n, _)| n);
         if let Some(m) = &maker {
             if m != MAIN {
@@ -501,10 +501,9 @@ fn diff_answer(ask: Ask, shared: &Path, req: Value) -> Value {
     ev
 }
 
-/// The `landed` line of a land, after its `info` line in main's feed:
-/// `agent : target : from : sha : files : add : del` (from = the
-/// target's tip before, short). None when git cannot say.
-pub(super) fn landed_fields(shared: &Path, agent: &str, target: &str, sha: &str, commits: usize) -> Option<String> {
+/// The `landed` record of a land, after its `info` line in main's feed
+/// (from = the target's tip before, short). None when git cannot say.
+pub(super) fn landed_rec(shared: &Path, agent: &str, target: &str, sha: &str, commits: usize) -> Option<Feed> {
     if commits == 0 {
         return None;
     }
@@ -519,15 +518,16 @@ pub(super) fn landed_fields(shared: &Path, agent: &str, target: &str, sha: &str,
     }
     let from = String::from_utf8_lossy(&out.stdout).trim().to_string();
     let (files, add, del) = diff::range_stat(shared, &from, sha);
-    Some(crate::core::join_fields(&[
-        agent.to_string(),
-        target.to_string(),
+    Some(Feed::Landed(bise_proto::core::feed::Landed {
+        v: 1,
+        agent: agent.to_string(),
+        target: target.to_string(),
         from,
-        sha.to_string(),
-        files.to_string(),
-        add.to_string(),
-        del.to_string(),
-    ]))
+        sha: sha.to_string(),
+        files: files as u64,
+        add,
+        del,
+    }))
 }
 
 #[cfg(test)]

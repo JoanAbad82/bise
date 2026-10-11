@@ -42,11 +42,14 @@ pub enum Tone {
 }
 
 impl Tone {
-    pub fn as_str(self) -> &'static str {
+    /// What it means on the wire (a `pr` record's `state`, architect
+    /// m_11122: no color on the wire): plain is news, dim done (nothing
+    /// for him), red failing checks.
+    pub fn state(self) -> &'static str {
         match self {
-            Tone::Plain => "plain",
-            Tone::Dim => "dim",
-            Tone::Red => "red",
+            Tone::Plain => "news",
+            Tone::Dim => "done",
+            Tone::Red => "failing",
         }
     }
 }

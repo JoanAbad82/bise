@@ -111,6 +111,25 @@ def own_side_channels(tmp):
     }
 
 
+
+def feed_rec(line):
+    """A transcript line's hub record, in either form (issue 25): (kind,
+    fields) for `sb <kind> :: <json>` (a bise_proto::core::Feed record);
+    (kind, {"text": <its text>}) for an older `sb <kind> : <text>` line;
+    None for any other line. The one place the tests read hub lines: a
+    format change is here."""
+    if not line.startswith("sb "):
+        return None
+    kind, sep, rest = line[3:].partition(" :: ")
+    if sep and kind and " " not in kind:
+        try:
+            r = json.loads(rest)
+        except ValueError:
+            r = None
+        return kind, r if isinstance(r, dict) else {}
+    kind, _, text = line[3:].partition(" : ")
+    return kind, {"text": text}
+
 class Env:
     def __init__(self, fake_env=None):
         self.tmp = tempfile.mkdtemp(prefix="sb-e2e-", dir=short_tmp())
@@ -408,6 +427,19 @@ class Client:
                 lines.append(text if tab and ts.isdigit() else raw.decode("utf-8", "replace"))
             self._tails[path] = (at + len(got), lines, rest)
         return lines
+
+    def feed(self, agent, kind):
+        """`agent`'s hub records of one kind, in order (feed_rec)."""
+        return [r for k, r in filter(None, map(feed_rec, self.lines(agent))) if k == kind]
+
+    def wait_feed(self, agent, kind, timeout=90, /, **want):
+        """Wait for a record of `kind` in `agent`'s feed whose fields are
+        `want` (`text_has=` a part of its text); the record. Positional
+        only: a record has fields named agent, kind, who."""
+        def hit(r):
+            return all((v in r.get("text", "")) if k == "text_has" else r.get(k) == v for k, v in want.items())
+        return self.wait(lambda: next((r for r in self.feed(agent, kind) if hit(r)), None), timeout,
+                         "%s %r in %s" % (kind, want, agent))
 
     def lines(self, agent=None):
         """`agent`'s transcript lines (every agent's with none), as the

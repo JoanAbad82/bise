@@ -275,7 +275,7 @@ fn asked_name(fx: &[Effect]) -> Option<(u64, String)> {
 fn scheduled_lines(fx: &[Effect]) -> Vec<String> {
     fx.iter()
         .filter_map(|e| match e {
-            Effect::Line { line, .. } if line.starts_with("sb scheduled : ") => Some(line.clone()),
+            Effect::Line { line, .. } if line.starts_with("sb scheduled :: ") => Some(line.clone()),
             _ => None,
         })
         .collect()

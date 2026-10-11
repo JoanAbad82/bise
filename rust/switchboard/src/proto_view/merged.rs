@@ -9,7 +9,7 @@ use bise_proto::rows::Merged;
 /// commit per line, fields split by the unit separator.
 pub const LOG_FORMAT: &str = "--format=%H%x1f%s%x1f%ct";
 
-/// A `landed` line of main's feed (art.rs `landed_fields`), read by
+/// A `landed` line of main's feed (art.rs `landed_rec`), read by
 /// bise-proto's `thread::lines`: (agent, from, sha).
 pub fn landed_line(line: &str) -> Option<(String, String, String)> {
     use bise_proto::thread::lines::{read, Hub, Rec};

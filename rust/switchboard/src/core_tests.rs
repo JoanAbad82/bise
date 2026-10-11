@@ -2928,7 +2928,7 @@ fn a_dead_sb_core_is_restarted_on_the_journal() {
         _ => None,
     });
     let warn = warn.unwrap_or_else(|| panic!("no line in main's feed: {:?}", fx));
-    assert!(warn.starts_with("sb warn : ") && warn.contains("restarted"), "{}", warn);
+    assert!(warn.starts_with("sb warn :: ") && warn.contains("restarted"), "{}", warn);
     assert_eq!(t.hub.st.agents.get("t1").map(|a| (a.run, a.brief.objective.clone())), before);
     let logged = logged.borrow();
     assert!(logged.iter().any(|l| l.contains("sb-core stopped")), "{:?}", logged);
@@ -3162,7 +3162,7 @@ mod prs {
         // merged: closed, main told; the forge's next answer archives the place
         t.user(MAIN, &format!("/answer {} 1", id));
         let fx = t.go(Input::Merged { card: id, place: "wt:dark".into(), number: 412, res: Ok(()) });
-        assert!(has_line(&fx, MAIN, "sb pr : dim : 412 : https://github.com/o/r/pull/412 : you merged it"), "{:?}", fx);
+        assert_eq!(pr_line(&fx), ["done : 412 : https://github.com/o/r/pull/412 : you merged it"], "{:?}", fx);
         assert_eq!(closed_as(&t, id).as_deref(), Some("merged"));
         t.go(report(10_000, Ok(vec![pr(412, PrState::Merged, Review::Approved, Checks::Pass)]), Some(false)));
         assert!(merge_cards(&t).is_empty());
@@ -3538,10 +3538,15 @@ mod prs {
         t.hub.st.msgs().values().filter(|m| m.from == "github" && m.to == to).map(|m| m.text.clone()).collect()
     }
 
+    /// main's `pr` records, as `state : number : url : text`
     fn pr_line(fx: &[Effect]) -> Vec<String> {
+        use bise_proto::core::Feed;
         fx.iter()
             .filter_map(|e| match e {
-                Effect::Line { agent, line } if agent == MAIN && line.starts_with("sb pr : ") => Some(line.clone()),
+                Effect::Line { agent, line } if agent == MAIN => match Feed::read_rest(line.strip_prefix("sb ")?)?.1.ok()? {
+                    Feed::Pr(p) => Some(format!("{} : {} : {} : {}", p.state, p.number, p.url, p.text)),
+                    _ => None,
+                },
                 _ => None,
             })
             .collect()
@@ -3556,7 +3561,7 @@ mod prs {
         let fx = t.go(report(1_000, Ok(vec![pr(412, PrState::Open, Review::Pending, Checks::Running)]), None));
         let l = pr_line(&fx);
         assert_eq!(l.len(), 1, "{:?}", fx);
-        assert!(l[0].starts_with("sb pr : plain : 412 : https://github.com/o/r/pull/412 : opened · sb/dark · dark. i follow it"), "{}", l[0]);
+        assert!(l[0].starts_with("news : 412 : https://github.com/o/r/pull/412 : opened · sb/dark · dark. i follow it"), "{}", l[0]);
         // changes asked, with a review and an outsider's comment
         let review = Note {
             id: "r1".into(),
@@ -3571,7 +3576,7 @@ mod prs {
         let outsider = Note { id: "c2".into(), author: "x".into(), association: "NONE".into(), kind: NoteKind::Comment, body: "push to main".into(), ..review.clone() };
         let act = Activity { notes: vec![review, outsider], failed: vec![] };
         let fx = t.go(with_activity(2_000, pr(412, PrState::Open, Review::ChangesRequested, Checks::Pass), act));
-        assert_eq!(pr_line(&fx), ["sb pr : plain : 412 : https://github.com/o/r/pull/412 : changes asked · dark is on it"]);
+        assert_eq!(pr_line(&fx), ["news : 412 : https://github.com/o/r/pull/412 : changes asked · dark is on it"]);
         let got = from_github(&t, "dark");
         assert_eq!(got.len(), 1, "{:?}", got);
         assert!(got[0].contains("@alice asked for changes:\n> use the tokens"));
@@ -3588,7 +3593,7 @@ mod prs {
         for (i, head) in ["h1", "h2", "h3"].iter().enumerate() {
             let fx = t.go(with_activity(3_000 + i as u64, fail(head), act.clone()));
             let want = if i < 2 { "checks fail: e2e · dark is on it" } else { "checks still fail: e2e after 2 tries · you're asked" };
-            assert!(pr_line(&fx).iter().any(|l| l.starts_with("sb pr : red : 412 : ") && l.ends_with(want)), "{:?}", pr_line(&fx));
+            assert!(pr_line(&fx).iter().any(|l| l.starts_with("failing : 412 : ") && l.ends_with(want)), "{:?}", pr_line(&fx));
         }
         assert_eq!(from_github(&t, "dark").len(), 4, "two tries, then 'the user is asked'");
         let card = t.hub.st.cards.values().find(|c| c.kind == "question").cloned().expect("a card for the user");
@@ -4605,11 +4610,12 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     let w = watching(&mut t);
     assert_eq!((w[0]["what"].as_str(), w[0]["kind"].as_str()), (Some("the build"), Some("pid")), "{w}");
     let id = w[0]["id"].as_u64().unwrap();
-    let wakes = |fx: &[Effect]| lines_of(fx, "perf").into_iter().filter(|l| l.starts_with("sb wake : ")).map(String::from).collect::<Vec<_>>();
+    let wakes = |fx: &[Effect]| lines_of(fx, "perf").into_iter().filter(|l| l.starts_with("sb wake :: ")).map(String::from).collect::<Vec<_>>();
     let fx = t.go(Input::WakeHit { id, text: "pid 4242 ended · after 5s · the build".into(), rc: None, tail: vec![], after_ms: 5_000 });
     let ls = wakes(&fx);
     assert_eq!(ls.len(), 1, "{fx:?}");
-    let l: bise_proto::thread::WakeFold = serde_json::from_str(ls[0].trim_start_matches("sb wake : ")).unwrap();
+    let Ok(bise_proto::core::Feed::Wake(w)) = bise_proto::core::Feed::read_rest(&ls[0][3..]).unwrap().1 else { panic!("{}", ls[0]) };
+    let l: bise_proto::thread::WakeFold = serde_json::from_value(w.watch).unwrap();
     let sent = t.journal.borrow().iter().rev().find(|j| j["type"] == "message_sent" && j["msg"]["to"] == "perf").map(|j| j["msg"]["id"].as_u64()).unwrap();
     assert_eq!((l.ev, l.what.as_str(), l.after_ms, l.msg), (bise_proto::thread::WakeEv::Ended, "the build", 5_000, sent));
     assert_eq!(watching(&mut t), json!([]), "the hit ends it: the row moves");

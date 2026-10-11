@@ -12,8 +12,8 @@
 //! writes the verdict, saves the rule on "always", and folds the card.
 //! Identical calls from several agents share one card.
 //!
-//! The feed lines the TUI reads (`sb gate : …`, `sb approval : …`) are
-//! [`gate_line`] and [`fold_line`].
+//! The feed records the TUI reads (`gate`, `approval`) are [`gate_line`]
+//! and [`fold_line`].
 
 use super::{log_line, Msg, Shell};
 use crate::approvals::check::{CheckOut, CheckReq, Runner};
@@ -21,6 +21,7 @@ use crate::approvals::sandbox::{self, Denial, Rerun};
 use crate::approvals::{self, mode, rules, Cache, CacheKey, Call, Checker, Mode, Part, Verdict};
 use crate::core::Input;
 use crate::model::MAIN;
+use bise_proto::core::{feed, Feed};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -201,13 +202,11 @@ pub(super) fn verdict_line(n: &str, nonce: &str, allow: bool, reason: &str) -> S
     }
 }
 
-/// A gate state line of an agent's feed: `sb gate : check <n>` (the
-/// checker runs), `card <n> <id>` (it waits on you), `done <n>`.
-pub(super) fn gate_line(what: &str, n: &str, card: Option<u64>) -> String {
-    match card {
-        Some(c) => format!("sb gate : {what} {n} {c}"),
-        None => format!("sb gate : {what} {n}"),
-    }
+/// A gate state record of an agent's feed: `check` (the checker runs),
+/// `card` (it waits on you), `done`; `n` (the call) and `card` (its card)
+/// are not part of it: no reader needs them.
+pub(super) fn gate_line(what: &str) -> String {
+    Feed::Gate(feed::Gate { step: what.into() }).line()
 }
 
 /// How a card was answered, for its fold.
@@ -221,20 +220,19 @@ pub(super) enum Fold {
     OutsideAlways,
 }
 
-/// The folded card (design §9): `sb approval : allowed : <agent> :
-/// <summary>`, `no : <agent> : <summary> : <note>`, a sandbox card's
-/// `outside : <agent> : <summary>` or `outside-always : <agent> :
-/// <rules>` (designer: the fold says the sandbox was off for it; fields
-/// escaped).
+/// The folded card (design §9), an `approval` record: `allowed`, `no`
+/// (with his note), a sandbox card's `outside` or `outside-always` (its
+/// rules; designer: the fold says the sandbox was off for it); who and
+/// what on one line each.
 pub(super) fn fold_line(how: Fold, agents: &[String], summary: &str, note: &str) -> String {
-    let esc = |s: &str| crate::util::one_line(s).replace(" : ", " \\: ");
-    let who = agents.join(", ");
-    match how {
-        Fold::Allowed => format!("sb approval : allowed : {} : {}", esc(&who), esc(summary)),
-        Fold::Outside => format!("sb approval : outside : {} : {}", esc(&who), esc(summary)),
-        Fold::OutsideAlways => format!("sb approval : outside-always : {} : {}", esc(&who), esc(summary)),
-        Fold::No => format!("sb approval : no : {} : {} : {}", esc(&who), esc(summary), esc(note)),
-    }
+    let one = crate::util::one_line;
+    let (how, note) = match how {
+        Fold::Allowed => ("allowed", String::new()),
+        Fold::Outside => ("outside", String::new()),
+        Fold::OutsideAlways => ("outside-always", String::new()),
+        Fold::No => ("no", one(note)),
+    };
+    Feed::Approval(feed::Approval { v: 1, how: how.into(), who: one(&agents.join(", ")), what: one(summary), note }).line()
 }
 
 /// What the user's answer says: allow, allow always, or no with a note.
@@ -624,7 +622,7 @@ impl Shell {
         }
         let Some(w) = self.gates.waiting.get(dir) else { return };
         let (agent, n) = (w.agent.clone(), w.n.clone());
-        self.feed(&agent, &gate_line("check", &n, None));
+        self.feed(&agent, &gate_line("check"));
         let task = self.hub.st.agents.get(&agent).map(|a| a.brief.objective.clone()).unwrap_or_default();
         let req = CheckReq {
             call,
@@ -663,7 +661,7 @@ impl Shell {
                 }
                 let Some(w) = self.gates.waiting.get(dir) else { return };
                 let (agent, n) = (w.agent.clone(), w.n.clone());
-                self.feed(&agent, &gate_line("check", &n, None));
+                self.feed(&agent, &gate_line("check"));
                 let task = self
                     .hub
                     .st
@@ -814,7 +812,7 @@ impl Shell {
             w.card = Some(id);
         }
         self.hub.set_on_you(&w.agent, true);
-        self.feed(&w.agent, &gate_line("card", &w.n, Some(id)));
+        self.feed(&w.agent, &gate_line("card"));
         self.state_now();
     }
 
@@ -901,7 +899,7 @@ impl Shell {
             }
         }
         let _ = how;
-        self.feed(name, &gate_line("done", &n, None));
+        self.feed(name, &gate_line("done"));
     }
 
     /// The snapshot's gate cards held by several agents: `agent` lists
@@ -1104,10 +1102,10 @@ mod tests {
         // brief 1e: an allow carries the sandbox's flags
         assert_eq!(verdict_line("7", "x1", true, "sandbox net"), "7 x1 allow sandbox net\n");
         assert_eq!(verdict_line("7", "x1", false, "the user\nsaid no."), "7 x1 deny the user said no.\n");
-        assert_eq!(gate_line("card", "7", Some(12)), "sb gate : card 7 12");
+        assert_eq!(gate_line("card"), r#"sb gate :: {"step":"card"}"#);
         assert_eq!(
-            fold_line(Fold::No, &["api-v2".into()], "git push : x", "use a branch"),
-            "sb approval : no : api-v2 : git push \\: x : use a branch"
+            fold_line(Fold::No, &["api-v2".into()], "git push : x", "use a\nbranch"),
+            r#"sb approval :: {"how":"no","note":"use a branch","v":1,"what":"git push : x","who":"api-v2"}"#
         );
     }
 

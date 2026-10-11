@@ -97,7 +97,8 @@ impl Hub {
                 _ => None,
             });
             if let Some(l) = wake::end_line(&e.watch, &why, e.at, hit, msg) {
-                fx.push(line(agent, "wake", &serde_json::to_string(&l).unwrap_or_default()));
+                let watch = serde_json::to_value(&l).unwrap_or_default();
+                fx.push(feed(agent, Feed::Wake(feed_rec::Wake { v: 1, watch })));
             }
         }
     }

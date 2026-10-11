@@ -343,7 +343,7 @@ impl Shell {
             }
             crate::pages::PageMsg::Mirror { id, error } => {
                 // the last good public copy stays up; main hears it once (designer m_7509)
-                self.feed(MAIN, &format!("sb warn : {}", wire_escape(&format!("▲ couldn't publish {id} to the public mirror: {error}"))));
+                self.feed_rec(MAIN, Feed::warn(format!("▲ couldn't publish {id} to the public mirror: {error}")));
             }
             crate::pages::PageMsg::Sent { id, agent, text } => {
                 // start notes (an item the user wants an agent on): main's,
@@ -567,7 +567,7 @@ impl Shell {
                 Untaken::Warn => {
                     let text = format!("his notes on the page {} reached no one: main took no turn on them", pages.join(", "));
                     log_line(&self.opts.paths, &text);
-                    self.feed(MAIN, &format!("sb warn : {}", crate::util::wire_escape(&text)));
+                    self.feed_rec(MAIN, Feed::warn(text));
                 }
                 Untaken::Wait => {}
             }

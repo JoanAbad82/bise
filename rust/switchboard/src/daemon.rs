@@ -58,6 +58,7 @@ use repl::{adopt, adoptable, busy_at, kill_pid, supervise};
 use skills::{skill_roots, skills_fingerprint};
 use versions::version_allowed;
 use crate::core::{AgentReq, ClientId, Effect, Hub, Input, Token};
+use bise_proto::core::Feed;
 use crate::devflow;
 use crate::model::{Agent, Lifecycle, MAIN};
 use crate::paths::Paths;
@@ -213,9 +214,9 @@ enum Msg {
         out: crate::approvals::check::CheckOut,
     },
     /// A land joined the line or ended (`sb land`): the views refresh
-    /// (the lids); `line`: main's feed line, (kind, text).
+    /// (the lids); `line`: main's feed record (info, warn, landed).
     Land {
-        line: Option<(String, String)>,
+        line: Option<Feed>,
     },
     /// The page server (docs/ambient-pages.md §2.4): notes sent from a
     /// page, or its drafts changed.
@@ -597,9 +598,15 @@ impl Shell {
         }
     }
 
-    /// A line of the hub in an agent's thread (`sb info : ...`).
+    /// A line of the hub in an agent's thread (an `info` record).
     fn info_line(&mut self, agent: &str, text: &str) {
-        self.feed(agent, &format!("sb info : {}", wire_escape(text)));
+        self.feed_rec(agent, Feed::info(text));
+    }
+
+    /// A record of the hub's into a feed (issue 25: every line the hub
+    /// writes is a `Feed` record).
+    fn feed_rec(&mut self, name: &str, rec: Feed) {
+        self.feed(name, &rec.line());
     }
 
     /// `sb spawn ... --model/--effort/--profile`: pick what the new task
@@ -747,10 +754,10 @@ impl Shell {
             let res = crate::land::run(&job, &queue, &mut || {
                 let _ = txj.send(Msg::Land { line: None });
             });
-            let mut landed: Option<String> = None;
+            let mut landed: Option<Feed> = None;
             let (body, line) = match res {
                 Ok(o) => {
-                    landed = art::landed_fields(&job.shared, &job.agent, &o.target, &o.sha, o.commits);
+                    landed = art::landed_rec(&job.shared, &job.agent, &o.target, &o.sha, o.commits);
                     let mut text = crate::flow::land_line(&job.agent, o.commits, &o.target, &o.sha, o.pushed);
                     if let Some(e) = &o.push_error {
                         text = format!("{} ({})", text, e);
@@ -759,18 +766,18 @@ impl Shell {
                     if !note.is_empty() {
                         text = format!("{}. {}", text, note);
                     }
-                    (json!({"ok": true, "text": text}), ("info".to_string(), text))
+                    (json!({"ok": true, "text": text.clone()}), Feed::info(text))
                 }
                 Err(e) => (
                     json!({"ok": false, "error": e}),
-                    ("warn".to_string(), format!("@{} can't land: {}", job.agent, e)),
+                    Feed::warn(format!("@{} can't land: {}", job.agent, e)),
                 ),
             };
             write_json(&mut stream, &body);
             let _ = tx.send(Msg::Land { line: Some(line) });
             // the ± door of the land, right after its line (docs/artifacts.md)
             if let Some(f) = landed {
-                let _ = tx.send(Msg::Land { line: Some(("landed".to_string(), f)) });
+                let _ = tx.send(Msg::Land { line: Some(f) });
             }
         });
     }
@@ -2181,7 +2188,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     let notice = paths.state.join("switch-notice");
     if let Ok(t) = std::fs::read_to_string(&notice) {
         let _ = std::fs::remove_file(&notice);
-        sh.feed(MAIN, &format!("sb warn : {}", wire_escape(&t)));
+        sh.feed_rec(MAIN, Feed::warn(t));
     }
     // a reload started this hub: every REPL it adopts is relaunched
     sh.reload_id = crate::switch::take_reload(&paths).unwrap_or_default();

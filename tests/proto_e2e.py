@@ -339,9 +339,10 @@ def main():
         got = seen[-1]
         check(got.get("context") == ctx and all(x["pos"] == got["pos"] for x in seen), "the entry's context: %r" % seen)
         tr = [l.split("\t", 1)[1] for l in open(os.path.join(E.state, "agents", "main", "transcript.log")).read().splitlines() if "\t" in l]
-        i = tr.index("sb you : why is this slow?")
-        check(tr[i + 1].startswith("sb context : ") and json.loads(tr[i + 1][len("sb context : "):]) == ctx, "the context line right after: %r" % tr[i : i + 2])
-        check(not any("screen_context" in l for l in tr if l.startswith("sb you : ")), "no block on a 'you' line")
+        recs = [e2e.feed_rec(l) or ("", {}) for l in tr]
+        i = recs.index(("you", {"text": "why is this slow?"}))
+        check(recs[i + 1] == ("context", {"context": ctx}), "the context line right after: %r" % tr[i : i + 2])
+        check(not any("screen_context" in r.get("text", "") for k, r in recs if k == "you"), "no block on a 'you' line")
 
         # steered (architect m_16497/m_16499): sb-core writes `sb you-id :
         # m_N` right after every 'you' line (the entry's msg_id), and at the

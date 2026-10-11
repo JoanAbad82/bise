@@ -342,7 +342,7 @@ fn partial_kept_when_an_attempt_ends_without_its_answer() {
     }
 }
 
-// the kept line carries the text as escaped on the wire, read back whole;
+// the kept record carries the text whole (a new line), read back whole;
 // nothing to keep: no line
 #[test]
 fn partial_kept_line_round_trips() {
@@ -351,6 +351,7 @@ fn partial_kept_line_round_trips() {
     p.step("1.0", 0, "first\\nsecond");
     p.step("1.0", 13, " and more");
     let l = p.kept_line().expect("a kept line");
+    assert!(l.starts_with("sb kept :: {"), "{l}");
     assert_eq!(read(&l), Rec::Hub(Hub::Kept("first
 second and more".into())));
     // a new attempt's first delta replaces the text

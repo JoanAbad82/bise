@@ -88,16 +88,19 @@ impl Shell {
     }
 
     /// The lines a feed line becomes: the 'you' line of the input being
-    /// stepped with a fn context as two lines, his words (the rendered
-    /// block cut off, the model got it) and `sb context : <json>` (the
-    /// window's thread reads it, the TUI skips it); any other line, itself.
+    /// stepped with a fn context as two records, his words (the rendered
+    /// block cut off, the model got it) and his `context` (the window's
+    /// thread reads it, the TUI skips it); any other line, itself.
     pub(super) fn fn_ctx_lines(&mut self, name: &str, line: &str) -> Vec<String> {
+        use bise_proto::core::{feed, Feed};
+        use bise_proto::thread::lines::{read, Hub, Rec};
         let Some((_, json)) = self.fn_ctx.as_ref().filter(|(a, _)| a == name) else { return vec![line.to_string()] };
-        let Some(said) = line.strip_prefix("sb you : ") else { return vec![line.to_string()] };
+        let Rec::Hub(Hub::You(said)) = read(line) else { return vec![line.to_string()] };
         // no block: a context with a shot only (the core's marker is in
         // his words), or a line sb-core cut before it
-        let words = crate::fn_context::strip_block(said).unwrap_or(said);
-        let lines = vec![format!("sb you : {words}"), format!("sb context : {json}")];
+        let words = crate::fn_context::strip_block(&said).unwrap_or(&said).to_string();
+        let context = serde_json::from_str(json).unwrap_or_default();
+        let lines = vec![Feed::You(feed::You { text: words }).line(), Feed::Context(feed::Context { context }).line()];
         self.fn_ctx = None;
         lines
     }

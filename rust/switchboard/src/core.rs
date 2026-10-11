@@ -23,6 +23,8 @@ use crate::router::{self, UserCmd};
 use crate::util::{clip, clip_tail, one_line, wire_escape};
 use crate::wire::{self, Wire};
 use bise_proto::core::{input as ci, link as cl, In, Link};
+use bise_proto::core::feed as feed_rec;
+use bise_proto::core::Feed;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::{BufRead, BufReader, Write};
@@ -1270,6 +1272,14 @@ struct Role {
 /// After a failed role-line call, the next one waits this long.
 const ROLE_RETRY_MS: u64 = 5 * 60 * 1000;
 
+/// A record of an agent's feed, as its line (`sb <kind> :: <json>`,
+/// issue 25): every line the hub writes itself.
+pub fn feed(agent: &str, rec: bise_proto::core::Feed) -> Effect {
+    Effect::Line { agent: agent.to_string(), line: rec.line() }
+}
+
+/// sb-core's `line` effect as its line (`sb <kind> : <text>`): its older
+/// text form, until sb-core writes `Feed` records (issue 25 chunk F).
 fn line(agent: &str, kind: &str, text: &str) -> Effect {
     Effect::Line {
         agent: agent.to_string(),
@@ -1865,17 +1875,18 @@ impl Hub {
         }
     }
 
-    /// A timer's line in the feeds (`sb scheduled : <json>`, the TUI's ◷
+    /// A timer's line in the feeds (the `scheduled` record, the TUI's ◷
     /// line): its agent's feed, and main's when main set it for another
     /// agent (main's thread shows the timers main sets, never another
     /// agent's wakes). `ev`: the timer's state json with `ev` set/end.
     fn timer_lines(&self, fx: &mut Fx, agent: &str, by: &str, ev: &Value) {
-        fx.push(line(agent, "scheduled", &ev.to_string()));
+        let rec = |timer: Value| Feed::Scheduled(feed_rec::Scheduled { v: 1, timer });
+        fx.push(feed(agent, rec(ev.clone())));
         if by == MAIN && agent != MAIN {
             // main's copy says so: its ended line names the agent
             let mut m = ev.clone();
             m["in"] = json!(MAIN);
-            fx.push(line(MAIN, "scheduled", &m.to_string()));
+            fx.push(feed(MAIN, rec(m)));
         }
     }
 
@@ -1896,7 +1907,7 @@ impl Hub {
             Some("every_fired") if ev["undelivered"] == true => {
                 if let Some(t) = self.st.timers.map.get(&id) {
                     let w = format!("timer #{id}: its wake did not reach @{}; tried again in a minute", t.agent);
-                    fx.push(line(MAIN, "warn", &w));
+                    fx.push(feed(MAIN, Feed::warn(w)));
                 }
                 return;
             }
@@ -2118,19 +2129,17 @@ impl Hub {
     }
 
     /// pr-news' decisions, carried out: a message from `github` (sb-core's
-    /// `forge`, a pseudo sender like a peer), a line in main's feed (`sb
-    /// pr : tone : number : url : text`), a question card for the user
+    /// `forge`, a pseudo sender like a peer), a `pr` record in main's
+    /// feed, a question card for the user
     /// (`forge_card`: its answer goes to the agent), a journal line.
     fn news_out(&mut self, fx: &mut Fx, env: &mut dyn Env, outs: Vec<crate::forge::news::Out>) {
         use crate::forge::news::Out;
         for o in outs {
             match o {
                 Out::Tell { to, text } => self.core(fx, env, None, In::Forge(ci::Forge { to, text })),
-                Out::Line { tone, number, url, text } => fx.push(line(
-                    MAIN,
-                    "pr",
-                    &join_fields(&[tone.as_str().to_string(), number.to_string(), url, text]),
-                )),
+                Out::Line { tone, number, url, text } => {
+                    fx.push(feed(MAIN, Feed::Pr(feed_rec::Pr { v: 1, state: tone.state().into(), number, url, text })))
+                }
                 Out::Card { agent, text } => {
                     self.core(fx, env, None, In::ForgeCard(ci::ForgeCard { agent, text }))
                 }
