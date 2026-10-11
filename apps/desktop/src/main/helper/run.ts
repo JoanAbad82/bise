@@ -21,6 +21,7 @@ import { IPC, TEST_ENV } from '../../shared/api';
 import { fnToWindow } from './fnroute';
 import type { HelperConfig } from './config';
 import { decodeEv, encodeCmd, HelperState, LineSplitter, restartDelay, windowMaySend } from './lines';
+import { noAsks } from '../offscreen';
 
 export const HELPER_ENV = 'BISE_DESKTOP_HELPER';
 const BINARY = 'bise-mac-helper';
@@ -143,15 +144,22 @@ function frontWindow(): BrowserWindow | null {
 }
 
 /** Starts the helper when this run has one, and answers the windows' helper calls either way. */
+/** What the pages see in an off-screen run: every permission granted, none asked. */
+export const GRANTED: HelperEv = { ev: 'perms', accessibility: 'allowed', mic: 'allowed', screen: 'allowed', calendar: 'allowed' };
+
 export function startHelper(testMode: boolean): Helper | null {
-  const path = helperPath(testMode);
+  // an off-screen run asks him nothing: no helper, so no fn tap and no TCC preflight (offscreen.ts)
+  const quiet = noAsks(process.env, testMode);
+  const path = quiet ? null : helperPath(testMode);
   const helper = path === null ? null : new Helper(path);
-  ipcMain.handle(IPC.helperState, () => helper?.snapshot() ?? []);
+  // an off-screen run has no helper: the pages see every permission granted (as harness option 3
+  // did), so nothing in them offers to ask macOS
+  ipcMain.handle(IPC.helperState, () => (quiet ? [GRANTED] : (helper?.snapshot() ?? [])));
   ipcMain.on(IPC.helperCmd, (_e, c: HelperCmd) => {
     if (helper !== null && windowMaySend(c)) helper.send(c);
   });
   if (helper === null) {
-    process.stderr.write('helper: none in this run\n');
+    process.stderr.write(quiet ? 'helper: none (off-screen run: no permission asks)\n' : 'helper: none in this run\n');
     return null;
   }
   helper.start();

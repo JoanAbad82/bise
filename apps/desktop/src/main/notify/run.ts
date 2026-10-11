@@ -20,6 +20,8 @@ import { Arrivals, bundleIdOf, cardRoute, effectOf, knocks, ncPrefsOf, noteOf, t
 
 export type NotifyDeps = {
   readonly testMode: boolean;
+  /** an off-screen run (offscreen.ts noAsks): nothing is posted, macOS is never asked */
+  readonly quiet?: boolean;
   readonly lang: Lang;
   /** a command to the core: false when it can't be sent */
   readonly send: (cmd: unknown) => boolean;
@@ -154,6 +156,10 @@ export class Notifier {
 
   private post(note: Note): void {
     if (this.shown.has(note.key)) return;
+    if (this.d.quiet === true) {
+      process.stderr.write(`notify: not posted (off-screen run): ${note.key}\n`);
+      return;
+    }
     if (this.d.testMode) {
       this.shown.set(note.key, { note, n: null });
       this.line({ t: 'post', note });
@@ -209,6 +215,7 @@ export class Notifier {
     };
     this.testLog = log;
     const note = testNote(this.d.lang);
+    if (this.d.quiet === true) return;
     this.shown.set(note.key, { note, n: null });
     if (this.d.testMode) {
       this.line({ t: 'test', note });
@@ -283,6 +290,7 @@ export class Notifier {
   /** One more notification: the answer didn't leave; a click opens the inbox where it still waits. */
   private failed(note: Note): void {
     const body = WORDS[this.d.lang].failed(note.title.split(' ')[0] ?? 'bise');
+    if (this.d.quiet === true) return;
     if (this.d.testMode) {
       this.line({ t: 'failed', key: note.key, body });
       return;

@@ -11,6 +11,7 @@ import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
 import { menuTarget } from './menu';
 import { externalUrl } from './external';
+import { noAsks, offscreenGrants } from './offscreen';
 import { imageDir, saveImage } from './images';
 import { pickedInTest } from './pick';
 import { allowedPath } from './reveal';
@@ -106,6 +107,15 @@ export function installIpc(testMode: boolean): void {
     s.setPermissionCheckHandler((_wc, permission) => !CLIPBOARD_PERMS.has(permission));
     s.setPermissionRequestHandler((_wc, permission, done) => {
       done(!CLIPBOARD_PERMS.has(permission));
+    });
+  }
+  // an off-screen run: a page's permission (mic, camera, screen, notifications...) is denied before
+  // macOS can ask him; only the clipboard passes (offscreen.ts)
+  if (noAsks(process.env, testMode)) {
+    const s = session.defaultSession;
+    s.setPermissionCheckHandler((_wc, permission) => offscreenGrants(permission));
+    s.setPermissionRequestHandler((_wc, permission, done) => {
+      done(offscreenGrants(permission));
     });
   }
   ipcMain.handle(IPC.openExternal, (_e, raw: unknown): Promise<boolean> => openLink(raw, testMode));

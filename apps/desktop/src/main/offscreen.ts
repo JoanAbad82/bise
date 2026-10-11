@@ -47,3 +47,22 @@ export function fenceOffscreen(win: BrowserWindow): void {
 export function offscreenActivation(on: boolean, platform: string): 'accessory' | null {
   return on && platform === 'darwin' ? 'accessory' : null;
 }
+
+/**
+ * Under the knob nothing may ask him anything or post to him (amb-tools m_18837: a macOS alert for
+ * 'bise try' came front for ~6 s during an as-he-does run): no helper (its fn tap, Input Monitoring,
+ * Accessibility, screen and mic preflights), no TCC request from a page (media, screen, notifications:
+ * denied before macOS sees them), no notification posted, and no command that opens the mic in the
+ * core. Same as isOffscreen; its own name so each call site says why. Pure.
+ */
+export function noAsks(env: Readonly<Record<string, string | undefined>>, testMode: boolean): boolean {
+  return isOffscreen(env, testMode);
+}
+
+/** The core commands that open his mic (the core is the app's child: macOS asks for 'bise try'). */
+export const MIC_CMDS: ReadonlySet<string> = new Set(['dictate_start', 'voice_mode', 'talk_start']);
+
+/** The page permissions an off-screen run still grants (no TCC behind them): the clipboard only. */
+export function offscreenGrants(permission: string): boolean {
+  return permission === 'clipboard-sanitized-write' || permission === 'clipboard-read';
+}

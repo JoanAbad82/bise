@@ -34,7 +34,7 @@ import { standInPaths } from './userdata';
 import { themeSourceOf } from './theme';
 import { takeRoute, Updates, updateTarget } from './update/run';
 import { MainWindow } from './windows';
-import { fenceOffscreen, isOffscreen, offscreenActivation } from './offscreen';
+import { fenceOffscreen, isOffscreen, noAsks, offscreenActivation } from './offscreen';
 import { Notifier } from './notify/run';
 import { langOf } from './notify/plan';
 
@@ -182,6 +182,7 @@ void app.whenReady().then(() => {
   // his questions as macOS notifications when no bise window has the keys (notify/, card #476)
   const notifier = new Notifier({
     testMode,
+    quiet: noAsks(process.env, testMode),
     lang: langOf(app.getPreferredSystemLanguages()),
     send: sendToCore,
     open: (route) => {
