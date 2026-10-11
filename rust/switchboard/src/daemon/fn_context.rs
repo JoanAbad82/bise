@@ -23,6 +23,14 @@ fn look_file(path: &str) -> crate::attached::Look {
     }
 }
 
+/// An image part sent with its source only, put in the image store by the
+/// same storer as an attached path (`bend_images::store_file`: one FNV
+/// name, one downscale), for `crate::parts_in::said`.
+pub(super) fn store_image(p: &std::path::Path) -> Result<crate::parts_in::Stored, String> {
+    let stored = bend_images::store_file(p)?;
+    Ok(crate::parts_in::Stored { b64: stored.b64.to_string_lossy().into_owned(), mime: stored.kind.mime().into() })
+}
+
 /// His words with the input op's attached files rendered after them (item
 /// H), once, before routing: a routed send carries the same text to the
 /// other project (image-store markers are global to every hub). Never on a
