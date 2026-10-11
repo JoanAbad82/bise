@@ -9,13 +9,12 @@ use bise_proto::rows::Merged;
 /// commit per line, fields split by the unit separator.
 pub const LOG_FORMAT: &str = "--format=%H%x1f%s%x1f%ct";
 
-/// A `landed` line of main's feed (`sb landed : agent : target : from :
-/// sha : files : add : del`, art.rs `landed_fields`): (agent, from, sha).
+/// A `landed` line of main's feed (art.rs `landed_fields`), read by
+/// bise-proto's `thread::lines`: (agent, from, sha).
 pub fn landed_line(line: &str) -> Option<(String, String, String)> {
-    let rest = line.strip_prefix("sb landed : ")?;
-    let f: Vec<String> = rest.split(crate::core::FIELD_SEP).map(|x| x.replace(" \\: ", " : ")).collect();
-    match f.as_slice() {
-        [agent, _target, from, sha, ..] if !agent.is_empty() && !sha.is_empty() => Some((agent.clone(), from.clone(), sha.clone())),
+    use bise_proto::thread::lines::{read, Hub, Rec};
+    match read(line) {
+        Rec::Hub(Hub::Landed { agent, from, sha, .. }) if !agent.is_empty() && !sha.is_empty() => Some((agent, from, sha)),
         _ => None,
     }
 }

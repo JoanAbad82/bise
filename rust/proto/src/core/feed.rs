@@ -1,8 +1,13 @@
-//! DRAFT: the typed records of an agent's transcript, the hub's lines
-//! (`sb <kind> : …`). Nothing writes them yet: issue 25's chunk F moves
-//! the writers to `sb <kind> : <json>` of this type, and reads every older
-//! text shape in one place (`thread/legacy.rs`). Until its first writer
-//! lands, a name here may still change; from then on the wire rule binds.
+//! The typed records of an agent's transcript, the hub's lines: a new
+//! line is `sb <kind> :: <json>` ([`Feed::line`], two colons), read back
+//! with serde ([`Feed::read_rest`]); every older text line
+//! (`sb <kind> : <text>`, one colon and a space) is read in one place,
+//! `thread/legacy.rs`. Two colons make the new form one prefix test: no
+//! old writer ever wrote ` :: ` right after the kind. Transcripts are never
+//! rewritten (their positions are ids, a rollback reads them), so both
+//! forms stay readable. DRAFT until the first writer lands (issue 25,
+//! chunk F sha 2): a name here may still change; from then on the wire
+//! rule binds.
 //!
 //! One variant per kind the hub writes today (sb-core's `line` effects
 //! and the Rust side's own lines), its fields what
@@ -55,8 +60,9 @@ core_kinds! {
         Approval = "approval" => RApproval { v: Ver, how: Str, who: Str, what: Str, note: Str },
         /// a card closed (`res`: answered, closed, …)
         CardClosed = "card-closed" => RCardClosed { id: Nat, res: Str },
-        /// his answer to an item, routed to `who`
-        Route = "route" => RRoute { who: Str, card: Nat, said: Str },
+        /// his words routed to `who`: his answer to card `card`, or (none)
+        /// his message to that agent
+        Route = "route" => RRoute { who: Str, card: OptNatOmit, said: Str },
         /// pr-news: `state` news|done|failing
         Pr = "pr" => RPr { v: Ver, state: Str, number: Nat, url: Str, text: Str },
         /// an artifact registered, its `version`
@@ -81,22 +87,39 @@ core_kinds! {
     }
 }
 
+/// Between a new line's kind and its JSON (an old line has ` : `).
+pub const SEP: &str = " :: ";
+
 impl Feed {
-    /// Its transcript line: `sb <kind> : <json without the tag>`.
+    /// Its transcript line: `sb <kind> :: <json without the tag>`.
     pub fn line(&self) -> String {
         let mut v = self.to_value();
         if let Value::Object(m) = &mut v {
             m.remove("sb");
         }
-        format!("sb {} : {}", self.tag(), v)
+        format!("sb {}{SEP}{}", self.tag(), v)
     }
 
-    /// A line's kind and JSON text (after `sb <kind> : `) read back;
-    /// None when the text is not a JSON object (an older text line: the
-    /// legacy reader's).
-    pub fn read(kind: &str, json: &str) -> Option<Result<Feed, String>> {
-        let Ok(Value::Object(mut m)) = serde_json::from_str::<Value>(json) else { return None };
+    /// A hub line after its `sb `, read when it is the new form
+    /// (`<kind> :: <json>`): its kind and the record (an error when the
+    /// JSON doesn't fit the kind: a bug of the writer); None for an older
+    /// text line (the legacy reader's).
+    pub fn read_rest(rest: &str) -> Option<(&str, Result<Feed, String>)> {
+        let (kind, json) = rest.split_once(SEP)?;
+        if kind.is_empty() || kind.contains(' ') {
+            return None;
+        }
+        Some((kind, Feed::read(kind, json)))
+    }
+
+    /// A kind and its JSON (without the tag) read back.
+    pub fn read(kind: &str, json: &str) -> Result<Feed, String> {
+        let mut m = match serde_json::from_str::<Value>(json) {
+            Ok(Value::Object(m)) => m,
+            Ok(_) => return Err(format!("sb {kind}: not a JSON object")),
+            Err(e) => return Err(format!("sb {kind}: {e}")),
+        };
         m.insert("sb".into(), Value::String(kind.to_string()));
-        Some(Feed::decode(Value::Object(m)))
+        Feed::decode(Value::Object(m))
     }
 }

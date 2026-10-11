@@ -60,7 +60,9 @@ Chunks (each owns its files; chunk 0's schema is the others' contract):
   The records inside sb-core stay. ALL PROOFS CHECK; core.bend only
   shrinks.
 - **F · the feed** (rust/proto/src/thread/, the line writers): new lines
-  are `sb <kind> : <json>` of `Feed`; every old shape moves to
+  are `sb <kind> :: <json>` of `Feed` (two colons: no old writer ever
+  wrote ` :: ` after the kind, so the form is one prefix test, architect
+  m_18679); every old shape moves to
   `thread/legacy.rs` behind `upgrade(line) -> Option<Feed>`, with a corpus
   of each shape ever written. Transcripts and the journal are never
   rewritten (positions are ids; a rollback must still read them).
@@ -98,3 +100,11 @@ values, the journal byte-equal on a replay, the e2e transcripts equal
 ## Status
 
 - chunk 0: schema, generator, laws and fixtures, signed by architect (m_18504).
+- chunk F sha 1 (the reader, no writer): `thread/legacy.rs` reads every
+  older `sb <kind> : <text>` shape into a `Feed` (`upgrade`), the new form
+  is read with serde, `lines::Hub` is the view of a `Feed` the fold and the
+  TUI match on; switchboard's transcript.rs, search.rs and
+  proto_view/merged.rs read lines through `lines::read`. Corpus:
+  rust/proto/fixtures/legacy_lines.jsonl, 97 shapes. It ships in a release
+  BEFORE sha 2 writes the new form, so a probation rollback always reads
+  his transcripts (architect m_18679 Q3).

@@ -68,7 +68,8 @@ fn hub_lines_read_their_fields() {
     assert_eq!(h("card-closed : odd"), Hub::Other { kind: "card-closed".into(), text: "odd".into() });
     assert_eq!(h("route : you → @docs (answer to card #4) : v2"), Hub::Route { who: "docs".into(), card: 4, said: "v2".into() });
     assert_eq!(h("pr : red : 412 : https://x/412 : checks fail \\: e2e"), Hub::Pr { state: crate::thread::PrNewsState::Failing, number: 412, url: "https://x/412".into(), text: "checks fail : e2e".into() });
-    assert_eq!(h("pr : plain : x : u : hi"), Hub::Other { kind: "pr".into(), text: "hi".into() });
+    // no number: its text alone, an info line (thread::legacy)
+    assert_eq!(h("pr : plain : x : u : hi"), Hub::Other { kind: "info".into(), text: "hi".into() });
     assert_eq!(h("artifact : q3 : designer : Q3 plan : page : v2"), Hub::Artifact { id: "q3".into(), agent: "designer".into(), title: "Q3 plan".into(), kind: "page".into(), v: 2 });
     assert_eq!(h("landed : api : main : sb/api : a1b2c3d : 3 : 42 : 18"), Hub::Landed { agent: "api".into(), target: "main".into(), from: "sb/api".into(), sha: "a1b2c3d".into(), files: 3, add: 42, del: 18 });
     assert_eq!(h("landed : api : main : sb/api :  : 3"), Hub::Other { kind: "landed".into(), text: "api : main : sb/api :  : 3".into() });

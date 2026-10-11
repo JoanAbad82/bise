@@ -118,8 +118,12 @@ fn a_step_carries_the_envelope() {
 fn a_feed_record_is_one_line_with_its_kind_in_front() {
     let r = Feed::CardClosed(feed::CardClosed { id: 3, res: "answered".into() });
     let l = r.line();
-    assert_eq!(l, r#"sb card-closed : {"id":3,"res":"answered"}"#);
-    let (kind, json) = l.strip_prefix("sb ").unwrap().split_once(" : ").unwrap();
-    assert_eq!(Feed::read(kind, json).unwrap().unwrap(), r);
-    assert!(Feed::read("card-closed", "#3 answered").is_none(), "an older text line is the legacy reader's");
+    assert_eq!(l, r#"sb card-closed :: {"id":3,"res":"answered"}"#);
+    let (kind, back) = Feed::read_rest(l.strip_prefix("sb ").unwrap()).unwrap();
+    assert_eq!((kind, back.unwrap()), ("card-closed", r));
+    // an older text line is the legacy reader's, whatever its text
+    for old in ["card-closed : #3 answered", "you : {\"text\": \"x\"}", "you : a :: b", "you : :: x"] {
+        assert!(Feed::read_rest(old).is_none(), "{old}");
+    }
+    assert!(Feed::read_rest("card :: [1]").unwrap().1.is_err(), "not an object: the writer's bug, never a guess");
 }
