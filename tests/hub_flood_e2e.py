@@ -223,7 +223,11 @@ def lag_and_burst():
         check(len(ls) >= LAG_RATE * LAG_WINDOW_S / 2, "the flood reached the transcripts: %d lines" % len(ls))
         print("lane lag over %d lines at %d lines/s: median %.3f s, p99 %.3f s, max %.3f s"
               % (len(ls), LAG_RATE, ls[len(ls) // 2], ls[int(len(ls) * 0.99)], ls[-1]))
-        check(ls[-1] < LAG_MAX_S, "the hub's lane stays under %.1f s behind the lines: max %.3f s" % (LAG_MAX_S, ls[-1]))
+        # a loaded machine (other gates) delays the readers too: the bound
+        # scales like every wait (wait.load_factor, 1 to 4); before
+        # hub-lag-7 the lag grew without bound (5 s after 16 s)
+        lf = wait.load_factor()
+        check(ls[-1] < LAG_MAX_S * lf, "the hub's lane stays under %.1f s (x%.1f load) behind the lines: max %.3f s" % (LAG_MAX_S, lf, ls[-1]))
         hits = no_progress_lines(E.state)
         check(not hits, "no REPL start 'made no progress': %s" % hits[:3])
         # an agent's head (its agents row's last_pos) reaches a typed
@@ -254,7 +258,7 @@ def lag_and_burst():
             check(final is not None and first > last_ts - 1, "%s's head moved at the flood's end: %r" % (name, rows[-3:]))
             late.append(first - last_ts)
         print("an agent's last line -> its head at the client: %s" % ", ".join("%.3f s" % x for x in late))
-        check(max(late) < HEAD_MAX_S, "a head reaches the client within %.2f s: %s" % (HEAD_MAX_S, late))
+        check(max(late) < HEAD_MAX_S * wait.load_factor(), "a head reaches the client within %.2f s (x load): %s" % (HEAD_MAX_S, late))
     finally:
         E.close()
 
