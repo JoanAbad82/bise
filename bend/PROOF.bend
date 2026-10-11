@@ -189,6 +189,15 @@ def Laws.glm_thinking_surfaces():
 def Laws.api_tool_calls_map():
   {==}
 
+def Laws.api_tool_call_renamed_arg():
+  {==}
+
+def Laws.flat_in_renamed_arg_with_description():
+  {==}
+
+def Laws.flat_in_two_fields_no_guess():
+  {==}
+
 def Laws.api_error_maps():
   {==}
 

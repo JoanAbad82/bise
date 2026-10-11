@@ -27,7 +27,7 @@ from tui_tmux import tui_session, run  # noqa: E402
 NORMAL = "   @ file   "
 CASES = [
     # (provider id, its name, its model, its keys page, the family's path)
-    ("mistral", "Mistral", "mistral-medium-latest", "https://console.mistral.ai/api-keys", "openai-chat"),
+    ("mistral", "Mistral", "mistral-large-4", "https://console.mistral.ai/api-keys", "openai-chat"),
     ("anthropic", "Anthropic", "claude-opus-5-5", "https://platform.claude.com/settings/keys", "anthropic"),
     ("openai", "OpenAI", "gpt-6-astra", "https://platform.openai.com/api-keys", "openai-responses"),
     ("fake", "Fake Cloud", "fake-large", "https://fake.test/keys", "openai-chat"),

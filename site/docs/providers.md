@@ -71,7 +71,7 @@ bise auth check anthropic
 | Anthropic | `anthropic` | `ANTHROPIC_API_KEY` | `anthropic/claude-opus-5-5` | [platform.claude.com](https://platform.claude.com/settings/keys) |
 | OpenAI | `openai` | `OPENAI_API_KEY` | `openai/gpt-6-astra` | [platform.openai.com](https://platform.openai.com/api-keys) |
 | Google AI Studio | `google` | `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | `google/gemini-3.8-flash` | [aistudio.google.com](https://aistudio.google.com/app/apikey) |
-| Mistral | `mistral` | `MISTRAL_API_KEY` | `mistral/mistral-medium-latest` | [console.mistral.ai](https://console.mistral.ai/api-keys) |
+| Mistral | `mistral` | `MISTRAL_API_KEY` | `mistral/mistral-large-4` | [console.mistral.ai](https://console.mistral.ai/api-keys) |
 | OpenRouter | `openrouter` | `OPENROUTER_API_KEY` | `openrouter/anthropic/claude-sonnet-5.5` | [openrouter.ai](https://openrouter.ai/settings/keys) |
 | Groq | `groq` | `GROQ_API_KEY` | `groq/openai/gpt-oss-120b` | [console.groq.com](https://console.groq.com/keys) |
 | xAI | `xai` | `XAI_API_KEY` | `xai/grok-4.7` | [console.x.ai](https://console.x.ai/team/default/api-keys) |

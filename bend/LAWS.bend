@@ -1400,6 +1400,28 @@ law api_tool_calls_map:
       "{\"choices\":[{\"message\":{\"content\":\"\",\"tool_calls\":[{\"function\":{\"name\":\"echo\",\"arguments\":\"{\\\"arg\\\": \\\"hi\\\"}\"}}]}}]}")
     == "OK \nCALL 1 echo : hi\nEND\n" : String}
 
+# LAW: a model that renames the flat arg (Mistral Large 4 calls bash
+# with {"command": ...} whatever the schema says) still gets its command
+# run: the call's one string field other than its description.
+law api_tool_call_renamed_arg:
+  {Oai.reply_of(200,
+      "{\"choices\":[{\"message\":{\"content\":\"\",\"tool_calls\":[{\"function\":{\"name\":\"bash\",\"arguments\":\"{\\\"command\\\": \\\"echo hi\\\"}\"}}]}}]}")
+    == "OK 
+CALL 1 bash : echo hi
+END
+" : String}
+
+# LAW: a renamed arg with a description keeps the canonical JSON args.
+law flat_in_renamed_arg_with_description:
+  {W.flat_in("bash", J.obj(Con{J.kv("command", J.str("ls")),
+      Con{J.kv("description", J.str("list")), Nil{}}}), "x")
+    == "{\"arg\":\"ls\",\"description\":\"list\"}" : String}
+
+# LAW: two string fields and no arg: no guess, the raw args.
+law flat_in_two_fields_no_guess:
+  {W.flat_in("bash", J.obj(Con{J.kv("a", J.str("ls")),
+      Con{J.kv("b", J.str("pwd")), Nil{}}}), "raw") == "raw" : String}
+
 # LAW: a provider error becomes the ERROR reply line, flattened and
 # capped at 300 chars, with the status.
 law api_error_maps:
