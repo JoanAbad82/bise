@@ -1103,7 +1103,9 @@ pub struct Hub {
     /// (time, text) of recent assistant messages, for direct-exchange
     /// excerpts.
     recent: BTreeMap<String, VecDeque<(u64, String)>>,
-    contexts: BTreeMap<String, String>,
+    /// The agents' contexts, rebuilt where their inputs changed
+    /// (contexts.rs).
+    contexts: crate::contexts::Contexts,
     /// The last thing each agent did (from its REPL lines, for the views).
     activity: BTreeMap<String, (u64, String)>,
     /// The role line of each task, by dir (BISE-126).
@@ -1329,7 +1331,7 @@ impl Hub {
             confirms: BTreeMap::new(),
             next_confirm: 1,
             recent: BTreeMap::new(),
-            contexts: BTreeMap::new(),
+            contexts: Default::default(),
             activity: BTreeMap::new(),
             roles: BTreeMap::new(),
             timer_names: Default::default(),
@@ -1581,22 +1583,12 @@ impl Hub {
         }
         self.st.agents = agents;
         if v["all_msgs"].as_bool() == Some(true) {
-            self.st.msgs.clear();
-            self.st.msg_state.clear();
-            self.st.settled.clear();
+            self.st.clear_msgs();
         }
         for r in v["msgs"].as_array().into_iter().flatten() {
             let Some(m) = parse(&r["msg"]) else { continue };
             let m: Msg = m;
-            if let Some(state) = parse(&r["state"]) {
-                self.st.msg_state.insert(m.id, state);
-            }
-            if r["settled"].as_bool() == Some(true) {
-                self.st.settled.insert(m.id);
-            } else {
-                self.st.settled.remove(&m.id);
-            }
-            self.st.msgs.insert(m.id, m);
+            self.st.put_msg(m, parse(&r["state"]), r["settled"].as_bool() == Some(true));
         }
         if let Some(cards) = v.get("cards") {
             self.st.cards = cards
@@ -2299,7 +2291,7 @@ impl Hub {
         }
         let m = self
             .st
-            .msgs
+            .msgs()
             .values()
             .rev()
             .take_while(|m| m.created_ms >= c.created_ms)
@@ -2786,7 +2778,7 @@ impl Hub {
         }
         for m in f["msgs"].as_array().into_iter().flatten() {
             let id = m["id"].as_u64().unwrap_or(0);
-            if let Some(msg) = self.st.msgs.get(&id) {
+            if let Some(msg) = self.st.msgs().get(&id) {
                 parts.push(prompts::tagged(msg, &jstr(m, "rel"), self.user_ids && agent == MAIN));
             }
         }
@@ -2947,27 +2939,10 @@ impl Hub {
         self.core(fx, env, Some(client), json!({"t": "confirm_drop", "name": name}));
     }
 
+    /// At every input: the contexts whose inputs changed (contexts.rs).
     fn refresh_contexts(&mut self, fx: &mut Fx, now: u64) {
-        let names: Vec<String> = self
-            .st
-            .agents
-            .values()
-            .filter(|a| a.lifecycle == Lifecycle::Active)
-            .map(|a| a.name.clone())
-            .collect();
-        // at every input: what the contexts share is built once (board.rs)
-        let waiting = board::Waiting::of(&self.st);
-        let group = board::Group::of(&self.st, now, &self.models);
-        for name in names {
-            let text = if name == MAIN {
-                board::main_context(&self.st, now, &waiting)
-            } else {
-                board::task_context(&name, &group, &waiting)
-            };
-            if self.contexts.get(&name) != Some(&text) {
-                self.contexts.insert(name.clone(), text.clone());
-                fx.push(Effect::Context { agent: name, text });
-            }
+        for (agent, text) in self.contexts.refresh(&self.st, now, &self.models) {
+            fx.push(Effect::Context { agent, text });
         }
     }
 

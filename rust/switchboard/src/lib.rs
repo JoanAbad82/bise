@@ -33,6 +33,7 @@ pub mod card_link;
 pub mod cli;
 pub mod client;
 pub mod computer_use;
+pub mod contexts;
 pub mod core;
 #[cfg(test)]
 mod core_fresh;
