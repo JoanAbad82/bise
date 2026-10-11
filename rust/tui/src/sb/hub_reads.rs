@@ -194,9 +194,9 @@ fn apply(app: &mut App, n: &Notification) {
             }
             feed_entries::entry(app, agent, entry)
         }
-        // the answer as it streams in (whole text; "" when it ended):
-        // drawn under the focused feed (livetext.rs)
-        HubEv::Partial { agent, call, text, .. } => crate::livetext::on_event(&mut app.sb.lives, agent, call, text),
+        // the answer as it streams in (a delta at off; "" at 0 when it
+        // ended): drawn under the focused feed (livetext.rs)
+        HubEv::Partial { agent, call, off, text, .. } => crate::livetext::on_event(&mut app.sb.lives, agent, call, *off as usize, text),
         // P4c-5: `/version`'s picker, a release run's steps, `/update`'s build
         HubEv::Versions { dev, items, .. } => versions::set(app, *dev, items),
         HubEv::Release(r) => release::event(app, r),

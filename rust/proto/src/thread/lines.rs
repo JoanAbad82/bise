@@ -400,50 +400,79 @@ fn partial(r: &str) -> Option<Rec> {
 /// (`<call>.<attempt>`) and the escaped text of the block in progress.
 /// A delta whose offset doesn't match drops the block's partials until
 /// the next block (a new call, or offset 0), never a guess.
+///
+/// It also keeps the unescaped text it sent, so each line goes out as a
+/// delta (`off` in chars of the unescaped text, architect m_17813), never
+/// the whole text again: a trailing `\` is held back until the next
+/// delta says whether it starts a `\n`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Partial {
     pub call: String,
     esc: String,
     len: usize,
     broken: bool,
+    /// the unescaped text sent so far, and its length in chars
+    sent: String,
+    sent_len: usize,
+    /// the escaped text ends in a `\` not sent yet
+    held: bool,
 }
 
 /// What a `partial` line did to the live answer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PartialStep {
-    /// the whole text so far, unescaped: send it
-    Text(String),
+    /// send it: the unescaped `text` goes at `off` (chars) of the text so
+    /// far ([`LiveText::apply`]); off 0 starts the answer again
+    Delta { off: usize, text: String },
     /// an offset that doesn't match (the first one of the block): its
     /// log line; later ones of the block are dropped silently
     Mismatch { call: String, off: usize, have: usize },
-    /// dropped (a block already broken)
+    /// nothing to send (a block already broken, or a delta with nothing
+    /// new to show yet)
     Drop,
 }
 
 impl Partial {
-    /// The whole text so far, unescaped ("" while the block is dropped).
+    /// The whole text so far, unescaped ("" while the block is dropped):
+    /// what a new subscriber gets once, at offset 0.
     pub fn text(&self) -> String {
         if self.broken {
             String::new()
+        } else if self.held {
+            format!("{}\\", self.sent)
         } else {
-            unescape(&self.esc)
+            self.sent.clone()
         }
     }
 
     /// One `partial` line into the live answer.
     pub fn step(&mut self, call: &str, off: usize, text: &str) -> PartialStep {
         if off == 0 {
-            *self = Partial { call: call.to_string(), esc: String::new(), len: 0, broken: false };
+            *self = Partial { call: call.to_string(), ..Partial::default() };
         } else if self.broken && self.call == call {
             return PartialStep::Drop;
         } else if self.call != call || off != self.len {
             let have = if self.call == call { self.len } else { 0 };
-            *self = Partial { call: call.to_string(), esc: String::new(), len: 0, broken: true };
+            *self = Partial { call: call.to_string(), broken: true, ..Partial::default() };
             return PartialStep::Mismatch { call: call.to_string(), off, have };
         }
         self.esc.push_str(text);
         self.len += text.chars().count();
-        PartialStep::Text(unescape(&self.esc))
+        // the new escaped chars, with a held `\` first; a `\` at the end
+        // waits (it may start a `\n`), as unescape would read it whole
+        let mut new = if self.held { format!("\\{text}") } else { text.to_string() };
+        self.held = new.ends_with('\\');
+        if self.held {
+            new.pop();
+        }
+        let delta = unescape(&new);
+        let at = self.sent_len;
+        if delta.is_empty() && off != 0 {
+            return PartialStep::Drop;
+        }
+        self.sent.push_str(&delta);
+        self.sent_len += delta.chars().count();
+        PartialStep::Delta { off: at, text: delta }
     }
 
     /// The `sb kept : <text>` line that keeps the text so far in the
@@ -451,6 +480,47 @@ impl Partial {
     /// nothing to keep (no text, or a block dropped on a bad offset).
     pub fn kept_line(&self) -> Option<String> {
         (!self.broken && !self.esc.trim().is_empty()).then(|| format!("sb kept : {}", self.esc))
+    }
+}
+
+/// A client's live answer, folded from the `partial` events
+/// ([`PartialStep::Delta`]: `text` goes at `off` chars): the text keeps
+/// `text[..off]` and appends, so an event that comes twice changes
+/// nothing. Offset 0 starts again (a new subscriber gets the whole text
+/// that way); "" at 0 is the end. An offset past the text or another
+/// call's delta (a gap) empties it until the next offset 0: never a
+/// guess.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct LiveText {
+    pub call: String,
+    pub text: String,
+    chars: usize,
+}
+
+impl LiveText {
+    /// One event; false when it was a gap (the text is empty now).
+    pub fn apply(&mut self, call: &str, off: usize, text: &str) -> bool {
+        if off == 0 {
+            self.call = call.to_string();
+            self.text.clear();
+            self.chars = 0;
+        } else if call != self.call || off > self.chars {
+            self.text.clear();
+            self.chars = 0;
+            return false;
+        } else if off < self.chars {
+            let at = self.text.char_indices().nth(off).map_or(self.text.len(), |(i, _)| i);
+            self.text.truncate(at);
+            self.chars = off;
+        }
+        self.text.push_str(text);
+        self.chars += text.chars().count();
+        true
+    }
+
+    /// Nothing to show.
+    pub fn is_empty(&self) -> bool {
+        self.text.is_empty()
     }
 }
 

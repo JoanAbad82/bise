@@ -188,18 +188,96 @@ fn partial_lines_read_as_deltas() {
 // block or call starts again, a mismatch drops the block until the next
 #[test]
 fn partial_appends_checks_and_restarts() {
+    let d = |off: usize, text: &str| PartialStep::Delta { off, text: text.into() };
     let mut p = Partial::default();
-    assert_eq!(p.step("1.0", 0, "a\\n"), PartialStep::Text("a\n".into()));
-    assert_eq!(p.step("1.0", 3, "é"), PartialStep::Text("a\né".into()));
+    assert_eq!(p.step("1.0", 0, "a\\n"), d(0, "a\n"));
+    // offsets on the wire count escaped chars, the deltas unescaped ones
+    assert_eq!(p.step("1.0", 3, "é"), d(2, "é"));
+    // a `\` at the end waits for the next delta: here it starts a `\n`
+    assert_eq!(p.step("1.0", 4, "x\\"), d(3, "x"));
+    assert_eq!(p.text(), "a\néx\\");
+    assert_eq!(p.step("1.0", 6, "ny"), d(4, "\ny"));
+    // a lone held `\` is nothing to send yet; the next char decides
+    assert_eq!(p.step("1.0", 8, "\\"), PartialStep::Drop);
+    assert_eq!(p.step("1.0", 9, "z"), d(6, "\\z"));
     // a gap: the first mismatch is logged, the rest of the block dropped
-    assert_eq!(p.step("1.0", 9, "x"), PartialStep::Mismatch { call: "1.0".into(), off: 9, have: 4 });
-    assert_eq!(p.step("1.0", 10, "y"), PartialStep::Drop);
+    assert_eq!(p.step("1.0", 99, "x"), PartialStep::Mismatch { call: "1.0".into(), off: 99, have: 10 });
+    assert_eq!(p.step("1.0", 100, "y"), PartialStep::Drop);
+    assert_eq!(p.text(), "");
     // the next block (offset 0) streams again
-    assert_eq!(p.step("1.0", 0, "b"), PartialStep::Text("b".into()));
+    assert_eq!(p.step("1.0", 0, "b"), d(0, "b"));
     // a retry is another call: it replaces the text
-    assert_eq!(p.step("1.1", 0, "c"), PartialStep::Text("c".into()));
+    assert_eq!(p.step("1.1", 0, "c"), d(0, "c"));
     // another call that doesn't start at 0: dropped, never glued on
     assert!(matches!(p.step("2.0", 1, "d"), PartialStep::Mismatch { have: 0, .. }));
+}
+
+// law (architect m_17813): whatever the cuts of the escaped stream, a
+// client folding the hub's deltas (LiveText) holds the hub's text after
+// every event, a repeated event changes nothing, and a client that
+// subscribes midway (the whole text at 0, then the deltas) ends with the
+// same text; the deltas sum to the text once, never quadratic
+#[test]
+fn law_live_text_fold_is_the_hubs_text() {
+    let pieces = ["a", "\\", "n", "\\n", "é", "日本", "\\\\", "x\\", "\\nb", " ", "**", "😀"];
+    let mut seed = 0x9e3779b97f4a7c15u64;
+    let mut next = move |n: usize| {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        (seed % n as u64) as usize
+    };
+    for _ in 0..500 {
+        let esc: String = (0..next(40)).map(|_| pieces[next(pieces.len())]).collect();
+        let chars: Vec<char> = esc.chars().collect();
+        let (mut hub, mut client, mut late) = (Partial::default(), LiveText::default(), None::<LiveText>);
+        let (mut at, mut sent) = (0, 0);
+        while at < chars.len() || at == 0 {
+            let n = (1 + next(5)).min(chars.len() - at).max(usize::from(chars.is_empty()));
+            let chunk: String = chars[at..at + n.min(chars.len() - at)].iter().collect();
+            if let PartialStep::Delta { off, text } = hub.step("1.0", at, &chunk) {
+                sent += text.chars().count();
+                assert!(client.apply("1.0", off, &text));
+                let once = client.clone();
+                assert!(client.apply("1.0", off, &text), "a repeated event");
+                assert_eq!(client, once, "a repeated event changes nothing");
+                if let Some(l) = late.as_mut() {
+                    l.apply("1.0", off, &text);
+                }
+            }
+            // the client's text is the hub's, but for a held `\`
+            assert!(hub.text() == client.text || hub.text() == format!("{}\\", client.text), "{esc:?}: {:?} vs {:?}", hub.text(), client.text);
+            if late.is_none() && next(3) == 0 {
+                let mut l = LiveText::default();
+                l.apply("1.0", 0, &hub.text());
+                late = Some(l);
+            }
+            at += chunk.chars().count();
+            if chars.is_empty() {
+                break;
+            }
+        }
+        assert_eq!(hub.text(), unescape(&esc), "{esc:?}");
+        assert!(sent <= unescape(&esc).chars().count(), "each char sent once: {esc:?}");
+        if let Some(l) = late {
+            // a late joiner ends with the same text (its whole text may
+            // have carried the held `\` already)
+            assert!(l.text == client.text || l.text == format!("{}\\", client.text), "{esc:?}: {:?} vs {:?}", l.text, client.text);
+        }
+    }
+    // an event past the text or of another call is a gap: empty, never glued
+    let mut c = LiveText::default();
+    c.apply("1.0", 0, "abc");
+    assert!(!c.apply("1.0", 9, "x") && c.is_empty());
+    c.apply("1.0", 0, "abc");
+    assert!(!c.apply("2.0", 3, "x") && c.is_empty());
+    // an older offset rewrites from there (a resend after a reconnect)
+    c.apply("1.0", 0, "abcdé");
+    c.apply("1.0", 2, "Z");
+    assert_eq!(c.text, "abZ");
+    // "" at 0 ends it
+    c.apply("1.0", 0, "");
+    assert!(c.is_empty());
 }
 
 // every clear reason ends the live answer; a tool line or usage doesn't

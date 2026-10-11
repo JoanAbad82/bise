@@ -28,20 +28,21 @@ impl Shell {
         (out, events)
     }
 
-    /// A `partial` line of `name`: the delta onto its live answer, the
-    /// whole text so far to every client (`partial` event; typed
-    /// connections subscribed to it get HubEv::Partial). A delta whose
-    /// offset doesn't match drops the block (one hub.log line).
+    /// A `partial` line of `name`: the delta onto its live answer, and
+    /// the same delta, unescaped, to every client (`partial` event: text
+    /// at off; typed connections subscribed to it get HubEv::Partial). A
+    /// delta whose offset doesn't match drops the block (one hub.log
+    /// line).
     pub(super) fn on_partial(&mut self, name: &str, line: &str) {
         use bise_proto::thread::lines::{read, PartialStep, Rec};
         let Rec::Partial { call, off, text } = read(line) else { return };
         let p = self.partials.entry(name.to_string()).or_default();
         match p.step(&call, off, &text) {
-            PartialStep::Text(t) => self.broadcast(&partial_event(name, &call, &t)),
+            PartialStep::Delta { off, text } => self.broadcast(&partial_event(name, &call, off, &text)),
             PartialStep::Mismatch { call, off, have } => {
                 log_line(&self.opts.paths, &format!("partial of {name} #{call} dropped: offset {off}, the hub has {have}"));
                 // a client keeps no stale text meanwhile
-                self.broadcast(&partial_event(name, &call, ""));
+                self.broadcast(&partial_event(name, &call, 0, ""));
             }
             PartialStep::Drop => {}
         }
@@ -72,12 +73,13 @@ impl Shell {
             return;
         }
         if let Some(p) = self.partials.remove(name) {
-            self.broadcast(&partial_event(name, &p.call, ""));
+            self.broadcast(&partial_event(name, &p.call, 0, ""));
         }
     }
 }
 
-/// The `partial` event (C2): the whole text so far, "" when it ended.
-pub(super) fn partial_event(agent: &str, call: &str, text: &str) -> Value {
-    json!({"ev": "partial", "agent": agent, "call": call, "text": text})
+/// The `partial` event (C2): `text` goes at `off` chars of the text so
+/// far (architect m_17813); "" at 0 when it ended.
+pub(super) fn partial_event(agent: &str, call: &str, off: usize, text: &str) -> Value {
+    json!({"ev": "partial", "agent": agent, "call": call, "off": off, "text": text})
 }

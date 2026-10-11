@@ -37,8 +37,26 @@ def stream(c, agent="main"):
                 if e.get("method") in EVS and "id" not in e and (e.get("params") or {}).get("agent") == agent]
 
 
+def fold(text, call, e):
+    """One thread/partial onto the text so far (bise-proto's LiveText):
+    `text` goes at `off` chars; off 0 starts again; a gap empties it."""
+    off = e.get("off", 0)
+    if off == 0:
+        return e["text"], e["call"]
+    if e["call"] != call or off > len(text):
+        return "", call
+    return text[:off] + e["text"], call
+
+
 def partials(c, agent="main"):
-    return [e for e in stream(c, agent) if e["ev"] == "partial"]
+    """The partials as the client folds them: each with `text` the whole
+    text after it and `delta` what the event carried."""
+    out, text, call = [], "", ""
+    for e in stream(c, agent):
+        if e["ev"] == "partial":
+            text, call = fold(text, call, e)
+            out.append(dict(e, text=text, delta=e["text"]))
+    return out
 
 
 def thread(c, agent="main"):
@@ -115,6 +133,11 @@ def main():
         check(len(live) >= 2, "at least two partials before the entry: %d" % len(live))
         check(all(final.startswith(t) for t in live), "each partial a prefix of the final: %r" % [t[-30:] for t in live])
         check(all(len(a) < len(b) for a, b in zip(live, live[1:])), "each partial grows")
+        # deltas, never the whole text again (architect m_17813): the
+        # events carry the answer once
+        sent = sum(len(p["delta"]) for p in ps)
+        check(sent == len(live[-1]), "the deltas add up to the text once: %d chars sent for %d" % (sent, len(live[-1])))
+        check(all(p["off"] == len(a) for p, a in zip(ps[1:], live) if p["delta"]), "each delta at the end of the text so far")
         check(len({p["call"] for p in ps}) == 1, "one call: %r" % {p["call"] for p in ps})
         check([p["text"] for p in ps].count("") == 1, "cleared once: %r" % [len(p["text"]) for p in ps])
         # the "" comes at the entry: no partial after it is non-empty

@@ -291,10 +291,11 @@ impl Shell {
             Some("partial") => {
                 let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
                 let (agent, call, text) = (s("agent"), s("call"), s("text"));
+                let off = v.get("off").and_then(Value::as_u64).map_or(0, |o| u32::try_from(o).unwrap_or(u32::MAX));
                 let project = self.project();
                 let subs: Vec<ClientId> = self.proto.conns.iter().filter(|(_, c)| c.subs.contains_key(&agent)).map(|(id, _)| *id).collect();
                 for id in subs {
-                    self.proto_send(id, &HubEv::Partial { project: project.clone(), agent: agent.clone(), call: call.clone(), text: text.clone() });
+                    self.proto_send(id, &HubEv::Partial { project: project.clone(), agent: agent.clone(), call: call.clone(), off, text: text.clone() });
                 }
             }
             Some("line") => {

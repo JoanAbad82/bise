@@ -12,19 +12,16 @@ use crate::wire::Ev;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
-/// One agent's answer so far.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct Live {
-    pub(crate) call: String,
-    pub(crate) text: String,
-}
+/// One agent's answer so far (bise-proto's fold of the deltas).
+pub(crate) type Live = bise_proto::thread::lines::LiveText;
 
-/// The `partial` event: the whole text so far; "" ends it.
-pub(crate) fn on_event(lives: &mut std::collections::HashMap<String, Live>, agent: &str, call: &str, text: &str) {
-    if text.is_empty() {
+/// The `partial` event: `text` goes at `off` chars of the answer so far;
+/// "" at 0 ends it, a gap empties it until the next off 0.
+pub(crate) fn on_event(lives: &mut std::collections::HashMap<String, Live>, agent: &str, call: &str, off: usize, text: &str) {
+    let live = lives.entry(agent.to_string()).or_default();
+    live.apply(call, off, text);
+    if live.is_empty() {
         lives.remove(agent);
-    } else {
-        lives.insert(agent.to_string(), Live { call: call.to_string(), text: text.to_string() });
     }
 }
 
@@ -194,10 +191,13 @@ fn main() {", false, 0, 60);
     #[test]
     fn the_event_ends_it() {
         let mut lives = std::collections::HashMap::new();
-        on_event(&mut lives, "main", "c1.1", "hel");
-        on_event(&mut lives, "main", "c1.1", "hello");
+        on_event(&mut lives, "main", "c1.1", 0, "hel");
+        on_event(&mut lives, "main", "c1.1", 3, "lo");
         assert_eq!(lives["main"].text, "hello");
-        on_event(&mut lives, "main", "c1.1", "");
+        on_event(&mut lives, "main", "c1.1", 0, "");
+        assert!(lives.is_empty());
+        // a gap (a delta past the text) shows nothing, never a guess
+        on_event(&mut lives, "main", "c1.1", 4, "x");
         assert!(lives.is_empty());
     }
 }

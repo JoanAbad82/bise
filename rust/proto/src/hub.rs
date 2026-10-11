@@ -85,10 +85,14 @@ pub enum HubEv {
     /// a subscribed agent's current step ("" when its turn ends)
     Typing { project: Project, agent: String, text: String },
     /// a subscribed agent's answer as it streams in (at most ~4 a
-    /// second): `call` its `<call>.<attempt>`, `text` the WHOLE text so
-    /// far (replace, never append); "" when it ends (its entry came, the
-    /// turn ended, a stop, an error, a retry)
-    Partial { project: Project, agent: String, call: String, text: String },
+    /// second): `call` its `<call>.<attempt>`, `text` what goes at `off`
+    /// (in chars, Unicode scalar values) of the text so far: the client
+    /// keeps `text[..off] + text` (thread::lines::LiveText, so a repeated
+    /// event is harmless), never the whole text again (architect m_17813:
+    /// whole texts were quadratic in the reply). Subscribe sends the
+    /// whole text once at off 0; "" at off 0 when it ends (its entry
+    /// came, the turn ended, a stop, an error, a retry)
+    Partial { project: Project, agent: String, call: String, off: u32, text: String },
     /// every artifact of the project, at hello and on change; `new`: made
     /// or changed since he last looked (`artifacts_seen` clears it)
     /// `seen_ms`: when he last looked (an item's `new` is after it, not
