@@ -254,13 +254,6 @@ pub struct ApprovalFold {
     pub text: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub note: String,
-    /// an answer's pasted images (`you answered gift-ui` + his words,
-    /// R41): each the window's chip, never a marker in `text`/`note`
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub images: Vec<ImageRef>,
-    /// an answer's other files (absolute paths)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub files: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub card: Option<u64>,
 }

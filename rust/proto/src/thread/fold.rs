@@ -387,7 +387,7 @@ impl Fold<'_> {
 
     fn approval(&mut self, pos: u64, ms: u64, ok: bool, text: String, note: String, card: Option<u64>) {
         let mut e = Entry::new(pos, ms, EntryKind::Approval, text.clone());
-        e.approval = Some(ApprovalFold { ok, text, note, images: Vec::new(), files: Vec::new(), card });
+        e.approval = Some(ApprovalFold { ok, text, note, card });
         self.push(e);
     }
 
@@ -615,13 +615,10 @@ impl Fold<'_> {
                 };
                 let (text, note) = words::answered_split(&who, &said_words, self.ctx.width);
                 self.approval(pos, ms, true, text, note, Some(card));
-                // TODO(msg-parts sha d): images/files go when the desktop
-                // draws the answer from Entry.parts (architect m_17621)
+                // his images and files ride in Entry.parts (msg-parts):
+                // the window draws the answer's chips from them
                 if let Some(e) = self.out.last_mut() {
                     e.parts = parts;
-                    if let Some(f) = e.approval.as_mut() {
-                        (f.images, f.files) = (a.images, a.files);
-                    }
                 }
                 self.route = self.out.len().checked_sub(1);
             }
