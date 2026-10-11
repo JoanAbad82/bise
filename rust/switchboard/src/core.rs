@@ -1392,7 +1392,7 @@ impl Hub {
     #[cfg(test)]
     pub fn force_run(&mut self, agent: &str, run: Run) {
         if let Some(out) = self.call(&force_run_input(agent, run)) {
-            self.load_view(&out["view"]);
+            self.load_answer_view(&out);
         }
     }
 
@@ -1425,7 +1425,7 @@ impl Hub {
         for batch in core.chunks(REPLAY_BATCH) {
             let evs = batch.iter().map(|ev| (*ev).clone()).collect();
             let out = self.raw(&Link::ReplayMany(cl::ReplayMany { evs }).to_value());
-            for i in out["skipped"].as_array().into_iter().flatten().filter_map(Value::as_u64) {
+            for i in core_fx::skipped_of(&core_fx::answer(&out)) {
                 if let Some(ev) = batch.get(i as usize) {
                     skipped.push((*ev).clone());
                 }
@@ -1439,7 +1439,16 @@ impl Hub {
 
     fn view_all(&mut self) {
         if let Some(out) = self.call(&Link::ViewAll(cl::ViewAll {}).to_value()) {
-            self.load_view(&out["view"]);
+            self.load_answer_view(&out);
+        }
+    }
+
+    /// The view an answer of sb-core carries (core_fx::view_of), loaded;
+    /// none (a newer sb-core's shape): the mirror stays as it is.
+    fn load_answer_view(&mut self, out: &Value) {
+        match core_fx::view_of(&core_fx::answer(out)) {
+            Some(v) => self.load_view(v),
+            None => eprintln!("sb-core: an answer without a view (skipped): {}", out),
         }
     }
 
@@ -1522,7 +1531,7 @@ impl Hub {
             self.raw(&force_run_input(&agent, run));
         }
         let out = self.raw(&Link::ViewAll(cl::ViewAll {}).to_value());
-        self.load_view(&out["view"]);
+        self.load_answer_view(&out);
         if let Some(r) = self.revive.as_ref() {
             (r.log)(&format!("sb-core restarted: {} journal events replayed ({} skipped)", events.len(), skipped));
         }

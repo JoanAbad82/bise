@@ -8,6 +8,7 @@
 
 use super::core_fx::{self, Plain};
 use super::*;
+use bise_proto::core::link::{ANeed, Answer};
 use bise_proto::core::{fx as cfx, Fx as CoreFx, In};
 
 impl Hub {
@@ -35,21 +36,24 @@ impl Hub {
                 fx.push(line(MAIN, "warn", &l));
             }
             let Some(out) = out else { return };
-            if let Some(q) = out.get("need") {
-                // sb every's wakes: their words and the local clock
-                let a = if q["q"] == "every_wake" { self.st.timers.wakes(q, now) } else { self.query(env, q) };
-                step.ans.push(a);
-                continue;
-            }
-            if let Some(e) = out.get("error") {
-                panic!("sb-core: {}", e);
-            }
-            if out.get("dirty").and_then(|d| d.as_bool()) == Some(true) {
+            let s = match core_fx::answer(&out) {
+                Answer::Need(ANeed { need: q }) => {
+                    // sb every's wakes: their words and the local clock
+                    let a = if q["q"] == "every_wake" { self.st.timers.wakes(&q, now) } else { self.query(env, &q) };
+                    step.ans.push(a);
+                    continue;
+                }
+                Answer::Error(e) => panic!("sb-core: {}", e.error),
+                Answer::Step(s) => s,
+                // not a step's answer (a newer sb-core?): nothing applied
+                other => return eprintln!("sb-core: not a step's answer (skipped): {}", other.to_value()),
+            };
+            if s.dirty {
                 self.dirty = true;
             }
             // the state after the step first: the deliveries render from it
-            self.load_view(&out["view"]);
-            for f in out.get("fx").and_then(|x| x.as_array()).into_iter().flatten() {
+            self.load_view(&s.view);
+            for f in s.fx {
                 match core_fx::read(f) {
                     Plain::Effect(e) => fx.push(e),
                     Plain::Nothing => {}
