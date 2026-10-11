@@ -60,6 +60,10 @@ impl Shell {
                 }
                 self.step(i);
                 if tick {
+                    // the trunk's name and the features' facts, off the loop
+                    if self.features.due(now_ms()) {
+                        self.refresh_features();
+                    }
                     self.page_waits_check();
                     self.wakes_look();
                     self.check_starts();

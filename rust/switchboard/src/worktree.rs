@@ -149,7 +149,16 @@ pub struct GitEnv {
     pub log: Box<dyn FnMut(&str) + Send>,
     /// pr-design §6.4: branch -> the head of its merged PR (`pr_merged`).
     pub merged: BTreeMap<String, String>,
+    /// [`Env::is_git`]'s last answer and when (the hub's clock): sb-core
+    /// gets it with every input, and a `git rev-parse` per input was 16%
+    /// of a flooded loop (hub-lag-7). Asked again after
+    /// [`IS_GIT_FRESH_MS`] (a `git init` by hand) and after this env's own
+    /// worktree ops; None: ask.
+    pub git_memo: Option<(bool, u64)>,
 }
+
+/// How long [`GitEnv`] trusts its last `is_git` answer.
+pub const IS_GIT_FRESH_MS: u64 = 10_000;
 
 impl GitEnv {
     fn ws(&self) -> &Path {
@@ -279,11 +288,20 @@ impl Env for GitEnv {
         bise_home::projects::target(&rows, name, &crate::paths::workspace_id(self.ws()))
     }
 
-    fn is_git(&self) -> bool {
-        is_git_dir(self.ws())
+    fn is_git(&mut self) -> bool {
+        let now = self.now();
+        match self.git_memo {
+            Some((yes, at)) if now.saturating_sub(at) < IS_GIT_FRESH_MS => yes,
+            _ => {
+                let yes = is_git_dir(self.ws());
+                self.git_memo = Some((yes, now));
+                yes
+            }
+        }
     }
 
     fn worktree_create(&mut self, name: &str, with_changes: bool) -> Result<Workspace, String> {
+        self.git_memo = None;
         // issue #8: main's tip, never the shared folder's HEAD (it may be
         // on another agent's branch); PR flow: the PR's base, origin's copy
         let flow = crate::devflow::resolve(
@@ -402,6 +420,7 @@ impl Env for GitEnv {
         ws: &Workspace,
         loss: &Loss,
     ) -> Result<Option<String>, String> {
+        self.git_memo = None;
         let path = PathBuf::from(&ws.path);
         let branch = ws.branch.clone().unwrap_or_default();
         let mut snapshot = None;
@@ -451,6 +470,7 @@ impl Env for GitEnv {
         ws: &Workspace,
         snapshot: Option<&str>,
     ) -> Result<Workspace, String> {
+        self.git_memo = None;
         let branch = self.free_branch(name);
         let path = PathBuf::from(&ws.path);
         let path = if path.exists() {
@@ -550,6 +570,7 @@ mod tests {
                 config,
                 log: Box::new(|_| {}),
                 merged: BTreeMap::new(),
+                git_memo: None,
             },
         )
     }

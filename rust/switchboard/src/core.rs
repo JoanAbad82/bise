@@ -47,7 +47,8 @@ impl Loss {
 /// The side of the world the core may query synchronously.
 pub trait Env {
     fn now(&self) -> u64;
-    fn is_git(&self) -> bool;
+    /// The workspace is a git work tree (may be remembered a few seconds).
+    fn is_git(&mut self) -> bool;
     /// RFC 0002 §4.1: a worktree on `sb/<name>` for this task.
     fn worktree_create(&mut self, name: &str, with_changes: bool) -> Result<Workspace, String>;
     fn worktree_loss(&mut self, ws: &Workspace) -> Loss;

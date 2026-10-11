@@ -35,6 +35,8 @@ STATE_WINDOW_S = 3.0
 LAG_RATE = 400
 LAG_WINDOW_S = 10
 LAG_MAX_S = 1.0
+# a head move reaches a typed client: one gate period (100 ms) and the push
+HEAD_MAX_S = 0.25
 
 
 def app_root(tmp):
@@ -129,13 +131,28 @@ def main():
         E.close()
 
 
-def lags(state):
-    """Every stamped flood line the hub wrote to a transcript: the hub's
-    time minus the line's write time (s), from the line's `@<ms>` and the
-    transcript's `<ts>\t` (daemon/lines.rs)."""
+def connected(timing):
+    """When the hub took each REPL's connection (its `repl connected
+    <dir>` mark, SB_TIMING), in ms, by agent dir."""
+    out = {}
+    for line in open(timing, errors="replace") if os.path.exists(timing) else []:
+        parts = line.split()
+        if len(parts) >= 4 and parts[1:3] == ["hub", "repl"] and parts[3] == "connected":
+            out.setdefault(parts[4], float(parts[0]))
+    return out
+
+
+def lags(state, since=None):
+    """Every stamped flood line the hub wrote to a transcript: (its write
+    time ms, the hub's time minus it in s), from the line's `@<ms>` and
+    the transcript's `<ts>\t` (daemon/lines.rs). `since`: by agent dir,
+    only the lines written after the hub took that REPL's connection
+    (before it, a line waits for the start, not for the lane)."""
     out = []
     d = os.path.join(state, "agents")
     for a in os.listdir(d) if os.path.isdir(d) else []:
+        if since is not None and a not in since:
+            continue
         p = os.path.join(d, a, "transcript.log")
         if not os.path.exists(p):
             continue
@@ -143,7 +160,8 @@ def lags(state):
             ts, _, text = line.rstrip("\n").partition("\t")
             at = text.rsplit(" @", 1)
             if ts.isdigit() and len(at) == 2 and at[1].isdigit() and "echo flood" in text:
-                out.append((int(at[1]), (int(ts) - int(at[1])) / 1000.0))
+                if since is None or int(at[1]) >= since[a]:
+                    out.append((int(at[1]), (int(ts) - int(at[1])) / 1000.0))
     return out
 
 
@@ -182,12 +200,24 @@ def lag_and_burst():
         seed_tasks(E.state, E.ws, names)
         E.env["BISE_APP_ROOT"] = app_root(E.tmp)
         E.env["FLOOD_RATE"] = str(-(-LAG_RATE // (TASKS + 1)))
+        stop = os.path.join(E.tmp, "flood-stop")
+        E.env["FLOOD_STOP"] = stop
+        timing = os.path.join(E.tmp, "hub-timing.log")
+        E.env["SB_TIMING"] = timing
         t0 = time.time()
-        E.start_hub()
+        c = E.start_hub()
         wait.until(lambda: started(E.state) >= TASKS + 1, 120, "main and %d tasks started" % TASKS, poll=0.2)
         print("%d REPL starts while the first ones flood: %.1f s" % (TASKS + 1, time.time() - t0))
-        time.sleep(LAG_WINDOW_S)
-        stamped = lags(E.state)
+        # the window: LAG_WINDOW_S of the whole flood in the transcripts
+        wait.until(lambda: len(lags(E.state)) >= LAG_RATE * LAG_WINDOW_S, LAG_WINDOW_S * 4,
+                   "%d s of flood fed" % LAG_WINDOW_S, poll=0.5)
+        # a REPL writes its first line at accept, before the hub's loop
+        # takes the connection: wait for the hub's marks
+        wait.until(lambda: len(connected(timing)) >= TASKS + 1, 60, "the hub took every REPL's connection")
+        since = connected(timing)
+        everything = sorted(lag for _, lag in lags(E.state))
+        print("every line, those written before the hub took their REPL too: max %.3f s" % everything[-1])
+        stamped = lags(E.state, since)
         print("worst lag by second of writing (s from the hub's start): " + by_second(stamped, t0))
         ls = sorted(lag for _, lag in stamped)
         check(len(ls) >= LAG_RATE * LAG_WINDOW_S / 2, "the flood reached the transcripts: %d lines" % len(ls))
@@ -196,6 +226,35 @@ def lag_and_burst():
         check(ls[-1] < LAG_MAX_S, "the hub's lane stays under %.1f s behind the lines: max %.3f s" % (LAG_MAX_S, ls[-1]))
         hits = no_progress_lines(E.state)
         check(not hits, "no REPL start 'made no progress': %s" % hits[:3])
+        # an agent's head (its agents row's last_pos) reaches a typed
+        # client with the next gated state push, not per line: the flood
+        # stops, each agent's last line is in its transcript at the hub's
+        # time T; the first hub/agents with its final last_pos comes by
+        # T + one gate period (100 ms) + the push itself
+        open(stop, "w").close()
+        trs = [os.path.join(E.state, "agents", n, "transcript.log") for n in names[:5]]
+        # the last lines fed, and quiet long enough for the gated push
+        wait.stable(lambda: [os.path.getsize(p) for p in trs], 20, "the flood's end in the transcripts", quiet=1.0)
+        late = []
+        for name in names[:5]:
+            tr = os.path.join(E.state, "agents", name, "transcript.log")
+            last_ts = int(open(tr, errors="replace").read().splitlines()[-1].partition("\t")[0]) / 1000.0
+            rows = [(t, next((a.get("last_pos") for a in p.get("agents", []) if a.get("name") == name), None))
+                    for t, m, p in list(c.note_log) if m == "hub/agents"]
+            # when it took its final value for good (a head may come back
+            # to an earlier pos while an entry's tail folds)
+            final = rows[-1][1]
+            first = rows[-1][0]
+            for t, pos in reversed(rows):
+                if pos != final:
+                    break
+                first = t
+            # the fake's last line ('sb info : flood stopped') is a new
+            # entry: the head must have moved to it at the end
+            check(final is not None and first > last_ts - 1, "%s's head moved at the flood's end: %r" % (name, rows[-3:]))
+            late.append(first - last_ts)
+        print("an agent's last line -> its head at the client: %s" % ", ".join("%.3f s" % x for x in late))
+        check(max(late) < HEAD_MAX_S, "a head reaches the client within %.2f s: %s" % (HEAD_MAX_S, late))
     finally:
         E.close()
 

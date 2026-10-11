@@ -1,8 +1,9 @@
 # 21 · the hub's hot state carries every message and every agent it ever had
 
-Status: plan agreed by architect (m_15238), not started. Found by hub-fifo (2026-10-09). Label: hub,
-perf. Follows bcca8231 (one pass per step) and hub-fifo's inbox lanes and
-state throttle.
+Status: step 2 (the Rust mirror) done by hub-lag-7 (2026-10-11, see "Done"
+below); steps 3-4 (sb-core) not started. Plan agreed by architect
+(m_15238). Found by hub-fifo (2026-10-09). Label: hub, perf. Follows
+bcca8231 (one pass per step) and hub-fifo's inbox lanes and state throttle.
 
 ## The problem
 
@@ -140,6 +141,29 @@ tui_queue_tmux, tui_archived_tmux.
    dominates, step 2 ships alone and the history is measured again before
    sb-core is touched. Stop when a step's gain on his journal is below
    ~10 % of a tick.
+
+## Done (hub-lag-7, after his hub ran 1-2 min behind on 2026-10-11)
+
+- 5b: contexts.rs keeps the contexts; the message parts until
+  `State::msgs_rev` moves (one writer, `put_msg`), a task's only when its
+  roster rows, parent or messages changed. His journal copy: Hub::handle
+  per REPL tool line 33.2 -> 2.4 ms, a tick 31.3 -> 3.5 ms.
+- 7: snapshot_rows.rs keeps each agent row with the inputs it read. A
+  snapshot 59 ms from nothing -> ~11 ms kept (0 of 514 rows rebuilt).
+- Outside this plan, found by a `sample` of hub_flood_e2e's hub: per REPL
+  line the daemon built a whole snapshot (`proto_agents_again`, with 2-3
+  `git` subprocesses in `feature_views`) and Hub::core ran `git
+  rev-parse` (`is_git`). Now a moved head marks the state gate, GitEnv
+  keeps `is_git` (10 s, cleared by its worktree ops), the trunk's name
+  comes with the features' facts (a land, the tick every 60 s).
+  hub_flood_e2e's lag_and_burst: 400 lines/s from 31 REPLs starting at
+  once, the lane's lag stays under 1 s (it grew to 5 s before).
+- Later (architect m_18690): sb-core gets `git` with every input
+  (`input["git"]`); it already has the `{need}` protocol for git, so
+  once core-schema's B chunk is in, `git` should be a need of the few
+  inputs that use it, and the memo can go.
+- Still per line: main's context.txt write (its activity changes at
+  every tool line; the file must be current at the REPL's call), ~4 %.
 
 ## Risks
 

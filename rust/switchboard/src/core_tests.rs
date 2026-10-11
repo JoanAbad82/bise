@@ -32,7 +32,7 @@ impl Env for FakeEnv {
             _ => Err(format!("no project named {}", name)),
         }
     }
-    fn is_git(&self) -> bool {
+    fn is_git(&mut self) -> bool {
         self.git
     }
     fn worktree_create(&mut self, name: &str, _with_changes: bool) -> Result<Workspace, String> {
