@@ -49,6 +49,8 @@ import ./hub/xhub.bend as HXB
 import ./hub/codec.bend as HCo
 import ./hub/pause.bend as HP
 
+import ./hub/gen/feed.bend as HFD
+
 # LAW: a checkpoint restores to exactly the session it exported.
 law checkpoint_roundtrip:
   for +s: T.Session
@@ -5592,7 +5594,7 @@ law interrupt_says_stopped_once:
   for +cx: HX.Cx<o>
   for +n: String
   for e: {HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))) == True{} : Bool}
-  {HC.interrupt.go(o, Some{n}, cx) == HC.line(o, HC.interrupt.fx(o, cx, n), n, "stopped", "stopped") : HX.Cx<o>}
+  {HC.interrupt.go(o, Some{n}, cx) == HC.feed(o, HC.interrupt.fx(o, cx, n), n, HFD.stopped("stopped")) : HX.Cx<o>}
 
 # LAW: with no turn running, the interrupt is only a notice: no fx
 # interrupt, no 'stopped' line.
@@ -5612,7 +5614,7 @@ law req_interrupt_says_stopped_once:
   for +agent: String
   for +n: String
   for e: {HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))) == True{} : Bool}
-  {HC.req_interrupt(o, Some{n}, cx, token, agent) == HC.reply(o, HC.line(o, HC.interrupt.fx(o, cx, n), n, "stopped", "stopped"), token, HC.ok_body(Nil{})) : HX.Cx<o>}
+  {HC.req_interrupt(o, Some{n}, cx, token, agent) == HC.reply(o, HC.feed(o, HC.interrupt.fx(o, cx, n), n, HFD.stopped("stopped")), token, HC.ok_body(Nil{})) : HX.Cx<o>}
 
 # ---- what a task sent is a fact of its own thread (desktop bar A.3 and
 # S16, architect m_10203): sb-core writes one 'sent' line in the sender's
@@ -5620,14 +5622,15 @@ law req_interrupt_says_stopped_once:
 # 'msg' lines, a message to the user stays 'msg-you'. A card main opens
 # for a task's message shows in that task's feed too. Views only ----
 
-# LAW: a task's message to another agent writes exactly one 'sent' line
-# in the task's feed: to, the message id, 1 if it waits for a reply, text.
+# LAW: a task's message to another agent writes exactly one 'sent' record
+# in the task's feed: to, the message id, whether it waits for a reply,
+# text.
 law task_send_says_sent_once:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +m: HM.Msg
   for e: {HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)) == True{} : Bool}
-  {HC.feed_sender(o, cx, m) == HC.line_fields(o, cx, HM.Msg.from(m), "sent", [HM.Msg.to(m), HC.mid(HM.Msg.id(m)), Bool.pick(String, HM.Msg.expect(m), "1", "0"), HM.Msg.text(m)]) : HX.Cx<o>}
+  {HC.feed_sender(o, cx, m) == HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))) : HX.Cx<o>}
 
 # LAW: main's messages, the user's, a message to the user, and a message
 # from a name that isn't an agent of this hub write no 'sent' line.
@@ -5657,7 +5660,7 @@ law task_card_shows_in_its_feed:
   for +agent: String
   for +text: String
   for e: {HC.is_task_of(o, cx, agent) == True{} : Bool}
-  {HC.card_to_asker(o, cx, id, agent, text) == HC.line(o, cx, agent, "card", HC.cat(["#", HC.ns(id), " question @", agent, " : ", text])) : HX.Cx<o>}
+  {HC.card_to_asker(o, cx, id, agent, text) == HC.feed(o, cx, agent, HFD.card(id, "question", agent, text)) : HX.Cx<o>}
 
 # LAW: a card whose agent isn't an agent of this hub (or is main) writes
 # no extra line.
@@ -5693,7 +5696,7 @@ law main_card_answer_routes_once:
     == HC.close_card(o,
       HC.route_line(o,
         HC.notify_main(o, cx, HC.cat([HC.MAIN_ANSWER_HEAD(), HC.ns(HM.Card.id(c)), " (\"", HM.one_line(HM.Card.text(c)), "\"): \"", HM.one_line(text), "\""])),
-        HC.cat(["you → @", HM.MAIN(), " (answer to card #", HC.ns(HM.Card.id(c)), ") : ", text]), parts),
+        HM.MAIN(), Some{HM.Card.id(c)}, text, parts),
       HM.Card.id(c), "answered") : HX.Cx<o>}
 
 # LAW: his message's feed line is followed, in the same step, by its id
@@ -5708,7 +5711,7 @@ law you_line_carries_its_id:
   for +m: HM.Msg
   for e: {String.is_empty(HM.Msg.parts(m)) == True{} : Bool}
   {HC.deliver.line(o, False{}, True{}, cx, name, m)
-    == HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m))) : HX.Cx<o>}
+    == HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m))) : HX.Cx<o>}
 
 # ---- his message's parts (msg-parts) ----
 # The clients send his message as typed parts (bise_proto::parts: his
@@ -5726,7 +5729,7 @@ law you_parts_follow_the_id:
   for +m: HM.Msg
   for e: {String.is_empty(HM.Msg.parts(m)) == False{} : Bool}
   {HC.deliver.line(o, False{}, True{}, cx, name, m)
-    == HC.line(o, HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m))), name, "you-parts", HM.Msg.parts(m)) : HX.Cx<o>}
+    == HC.feed(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m))), name, HFD.you_parts(HC.parts_json(HM.Msg.parts(m)))) : HX.Cx<o>}
 
 # LAW: parts never change what he said: the same message with or without
 # parts writes the same lines (his text, its id), the parts only after
@@ -5738,24 +5741,28 @@ law parts_never_change_text:
   for +m: HM.Msg
   for +p: String
   {HC.deliver.line(o, False{}, True{}, cx, name, HM.Msg.with_parts(m, p))
-    == HC.parts_line(o, HC.deliver.line(o, False{}, True{}, cx, name, HM.Msg.with_parts(m, "")), name, "you-parts", p) : HX.Cx<o>}
+    == HC.you_parts(o, HC.deliver.line(o, False{}, True{}, cx, name, HM.Msg.with_parts(m, "")), name, p) : HX.Cx<o>}
 
 # LAW: a line with no parts is no line: a route line (an answer to a card,
 # a message to another agent) with none is the route line alone.
 law no_parts_no_line:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +text: String
-  {HC.route_line(o, cx, text, "") == HC.line(o, cx, HM.MAIN(), "route", text) : HX.Cx<o>}
+  for +who: String
+  for +card: Maybe<&2, Nat>
+  for +said: String
+  {HC.route_line(o, cx, who, card, said, "") == HC.feed(o, cx, HM.MAIN(), HFD.route(who, card, said)) : HX.Cx<o>}
 
 # LAW: a route line with parts is followed by one 'route-parts' line.
 law route_parts_follow_the_route:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +text: String
+  for +who: String
+  for +card: Maybe<&2, Nat>
+  for +said: String
   for +parts: String
   for e: {String.is_empty(parts) == False{} : Bool}
-  {HC.route_line(o, cx, text, parts) == HC.line(o, HC.line(o, cx, HM.MAIN(), "route", text), HM.MAIN(), "route-parts", parts) : HX.Cx<o>}
+  {HC.route_line(o, cx, who, card, said, parts) == HC.feed(o, HC.feed(o, cx, HM.MAIN(), HFD.route(who, card, said)), HM.MAIN(), HFD.route_parts(HC.parts_json(parts))) : HX.Cx<o>}
 
 # LAW: his answer to a question card reaches the asker with his parts on
 # the message (the asker's thread draws it like any message of his).
@@ -5776,8 +5783,8 @@ law steered_receipt_names_the_new_ones:
   for +t: List<&2, Nat>
   for +total: Nat
   {HC.steer_receipt.go(o, h <> t, cx, agent, total)
-    == HC.line(o, HC.set_r(o, cx, HX.R.with_steered(HC.rr(o, cx), HC.steer_mark(HX.R.steered(HC.rr(o, cx)), agent, total))),
-      agent, "steered", String.join(HC.mids(h <> t), " ")) : HX.Cx<o>}
+    == HC.feed(o, HC.set_r(o, cx, HX.R.with_steered(HC.rr(o, cx), HC.steer_mark(HX.R.steered(HC.rr(o, cx)), agent, total))),
+      agent, HFD.steered(h <> t)) : HX.Cx<o>}
 
 # LAW: a receipt once every steered id was seen (or with none) marks
 # nothing and writes nothing (a second receipt with no new steer).
@@ -5813,8 +5820,8 @@ law steer_rx_receipt_names_the_new_ones:
   for +t: List<&2, Nat>
   for +total: Nat
   {HC.steer_rx_receipt.go(o, h <> t, cx, agent, total)
-    == HC.line(o, HC.set_r(o, cx, HX.R.with_steered(HC.rr(o, cx), HC.steer_rx_mark(HX.R.steered(HC.rr(o, cx)), agent, total))),
-      agent, "steer-rx", String.join(HC.mids(h <> t), " ")) : HX.Cx<o>}
+    == HC.feed(o, HC.set_r(o, cx, HX.R.with_steered(HC.rr(o, cx), HC.steer_rx_mark(HX.R.steered(HC.rr(o, cx)), agent, total))),
+      agent, HFD.steer_rx(h <> t)) : HX.Cx<o>}
 
 # LAW: a received receipt with nothing new marks nothing and writes
 # nothing.

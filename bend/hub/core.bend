@@ -29,6 +29,7 @@ import ./gen/fx.bend as F
 import ./gen/kit.bend as K
 
 import ./pause.bend as P
+import ./gen/feed.bend as FD
 
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
@@ -356,19 +357,36 @@ def set_r(-o: M.St, +cx: X.Cx<o>, +r: X.R) -> X.Cx<o>:
 def out(-o: M.St, +cx: X.Cx<o>, +kvs: List<&2, Sigma<&2, &2, String, _ => J.Json>>) -> X.Cx<o>:
   X.out(o, cx, J.obj(kvs))
 
-def line(-o: M.St, +cx: X.Cx<o>, +agent: String, +kind: String, +text: String) -> X.Cx<o>:
-  out(o, cx, F.line(agent, kind, text))
+# one record of an agent's feed (FD: bise_proto::core::Feed's encoders);
+# the hub writes it as the line 'sb <kind> :: <json>'
+def feed(-o: M.St, +cx: X.Cx<o>, +agent: String, +rec: J.Json) -> X.Cx<o>:
+  out(o, cx, F.feed(agent, rec))
 
-# his message's parts after the line that shows it (msg-parts): `kind`
-# `you-parts` after his you-id, `route-parts` after a route line; none
-# when he sent none, so those lines are what they always were (law
-# no_parts_no_line)
-def parts_line(-o: M.St, +cx: X.Cx<o>, +agent: String, +kind: String, +parts: String) -> X.Cx<o>:
-  pick_lazy(X.Cx<o>, String.is_empty(parts), u => cx, u => line(o, cx, agent, kind, parts))
+def parts_json.of(r: Result<&2, &2, String, J.Json>) -> J.Json:
+  match r:
+    case Done{+j}:
+      j
+    case Fail{_}:
+      J.JNull{}
 
-# his route line in main's feed (`you → @asker …`), then its parts
-def route_line(-o: M.St, +cx: X.Cx<o>, +text: String, +parts: String) -> X.Cx<o>:
-  parts_line(o, line(o, cx, M.MAIN(), "route", text), M.MAIN(), "route-parts", parts)
+# his message's parts (msg-parts JSON, kept as a string on the message);
+# unreadable: null (its readers drop it)
+def parts_json(+s: String) -> J.Json:
+  parts_json.of(J.parse(s))
+
+# his message's parts after his you-id (msg-parts); none when he sent
+# none, so those lines are what they always were (law no_parts_no_line)
+def you_parts(-o: M.St, +cx: X.Cx<o>, +agent: String, +parts: String) -> X.Cx<o>:
+  pick_lazy(X.Cx<o>, String.is_empty(parts), u => cx, u => feed(o, cx, agent, FD.you_parts(parts_json(parts))))
+
+# a route's parts after it, likewise
+def route_parts(-o: M.St, +cx: X.Cx<o>, +parts: String) -> X.Cx<o>:
+  pick_lazy(X.Cx<o>, String.is_empty(parts), u => cx, u => feed(o, cx, M.MAIN(), FD.route_parts(parts_json(parts))))
+
+# his route in main's feed (his answer to `who`'s card, or his words to
+# `who`), then its parts
+def route_line(-o: M.St, +cx: X.Cx<o>, +who: String, +card: Maybe<&2, Nat>, +said: String, +parts: String) -> X.Cx<o>:
+  route_parts(o, feed(o, cx, M.MAIN(), FD.route(who, card, said)), parts)
 
 def reply(-o: M.St, +cx: X.Cx<o>, +token: Nat, +body: J.Json) -> X.Cx<o>:
   out(o, cx, F.reply(token, body))
@@ -505,7 +523,7 @@ def note_main(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
 def open_card_at(-o: M.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: String, +for_msg: Maybe<&2, Nat>, +place: Maybe<&2, String>, +pr: Maybe<&2, Nat>) -> X.Cx<o>:
   +id = M.St.next_card(st(o, cx))
   +cx2 = emit(o, cx, M.ECardOpened{M.Card{id, kind, agent, text, for_msg, now(o, cx), place, pr}}, {==}, Unit{}, Unit{})
-  line(o, cx2, M.MAIN(), "card", cat(["#", ns(id), " ", kind, " @", agent, " : ", text]))
+  feed(o, cx2, M.MAIN(), FD.card(id, kind, agent, text))
 
 def open_card(-o: M.St, +cx: X.Cx<o>, +kind: String, +agent: String, +text: String, +for_msg: Maybe<&2, Nat>) -> X.Cx<o>:
   open_card_at(o, cx, kind, agent, text, for_msg, None{}, None{})
@@ -531,7 +549,7 @@ def close_ids(-o: M.St, ids: List<&2, Nat>, +cx: X.Cx<o>, +res: String) -> X.Cx<
       cx
     case Con{+id, +rest}:
       +cx2 = emit(o, cx, M.ECardClosed{id, res}, Unit{}, Unit{}, Unit{})
-      close_ids(o, rest, line(o, cx2, M.MAIN(), "card-closed", cat(["#", ns(id), " ", res])), res)
+      close_ids(o, rest, feed(o, cx2, M.MAIN(), FD.card_closed(id, res)), res)
 
 # the cards of `agent` whose kind is in `kinds` (Nil: every kind)
 def card_ids(cs: List<&2, M.Card>, +agent: String, +kinds: List<&2, String>) -> List<&2, Nat>:
@@ -570,7 +588,7 @@ def waiter_reply(-o: M.St, +cx: X.Cx<o>, +w: X.Waiter, +m: M.Msg, +kind: String)
     J.kv("expects_reply", J.JBool{M.Msg.expect(m)}), J.kv("auto", J.JBool{M.Msg.auto(m)}),
     J.kv("asked", J.JStr{mid(X.Waiter.msg(w))}),
     J.kv("message", J.JStr{M.Msg.text(m)})]))
-  +cx4 = line(o, cx3, X.Waiter.agent(w), "msg-in", cat([M.Msg.from(m), " ", mid(M.Msg.id(m)), " : ", M.Msg.text(m)]))
+  +cx4 = feed(o, cx3, X.Waiter.agent(w), FD.msg_in(M.Msg.from(m), Some{M.Msg.id(m)}, M.Msg.text(m)))
   +still = any_waiter(X.R.waiters(rr(o, cx4)), X.Waiter.agent(w))
   +x = X.Rt.with_waiting(rt(o, cx4, X.Waiter.agent(w)), still)
   dirty(o, upd_rt(o, cx4, x))
@@ -642,10 +660,10 @@ def deliver.line(-o: M.St, again: Bool, you: Bool, +cx: X.Cx<o>, +name: String, 
     # his parts when he sent some (msg-parts: written at the delivery, so
     # a queued or steered message gets them when it is said)
     case False{} True{}:
-      +cx2 = line(o, line(o, cx, name, "you", M.Msg.text(m)), name, "you-id", mid(M.Msg.id(m)))
-      parts_line(o, cx2, name, "you-parts", M.Msg.parts(m))
+      +cx2 = feed(o, feed(o, cx, name, FD.you(M.Msg.text(m))), name, FD.you_id(M.Msg.id(m)))
+      you_parts(o, cx2, name, M.Msg.parts(m))
     case False{} False{}:
-      line(o, cx, name, "msg-in", cat([M.Msg.from(m), " ", mid(M.Msg.id(m)), " : ", M.Msg.text(m)]))
+      feed(o, cx, name, FD.msg_in(M.Msg.from(m), Some{M.Msg.id(m)}, M.Msg.text(m)))
 
 def deliver_each(-o: M.St, batch: List<&2, M.Msg>, +cx: X.Cx<o>, +name: String, +acc: List<&2, K.Delivered>) -> X.Cx<o> & List<&2, K.Delivered>:
   match batch:
@@ -919,16 +937,13 @@ def send.user(-o: M.St, user: Bool, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
 
 # a hub line whose text is several fields joined by " : " (the daemon
 # escapes " : " inside each field, see core.rs)
-def line_fields(-o: M.St, +cx: X.Cx<o>, +agent: String, +kind: String, +fields: List<&2, String>) -> X.Cx<o>:
-  out(o, cx, F.line_fields(agent, kind, fields))
-
 # C2 amendment (BISE-86): a message from the user that cannot reach its
 # agent (stopped, dropped, archived) says so in the feed where the user
-# wrote it: `undelivered : {name} : {text}` (the TUI marks the line ✗)
-def undelivered.if(-o: M.St, gone: Bool, +cx: X.Cx<o>, +feed: String, +name: String, +text: String) -> X.Cx<o>:
+# wrote it: an `undelivered` record {to, text} (the TUI marks it ✗)
+def undelivered.if(-o: M.St, gone: Bool, +cx: X.Cx<o>, +view: String, +name: String, +text: String) -> X.Cx<o>:
   match gone:
     case True{}:
-      line_fields(o, cx, feed, "undelivered", [name, text])
+      feed(o, cx, view, FD.undelivered(name, text))
     case False{}:
       cx
 
@@ -990,16 +1005,16 @@ def feed_main(-o: M.St, +cx: X.Cx<o>, +m: M.Msg, +why: String) -> X.Cx<o>:
   +answered = String.eq(from, M.MAIN()) && asked_main(q, to)
   +agents = Bool.not(String.eq(from, M.USER())) && Bool.not(String.eq(to, M.MAIN()))
   pick_lazy(X.Cx<o>, answered,
-    u => line_fields(o, cx, M.MAIN(), "answered", [to, question_text(q), M.Msg.text(m), why]),
+    u => feed(o, cx, M.MAIN(), FD.answered(to, question_text(q), M.Msg.text(m), why)),
     u => pick_lazy(X.Cx<o>, agents,
-      v => line(o, cx, M.MAIN(), "msg", cat([from, " → ", to, " ", mid(M.Msg.id(m)), " : ", M.Msg.text(m)])),
+      v => feed(o, cx, M.MAIN(), FD.msg(from, to, Some{M.Msg.id(m)}, M.Msg.text(m))),
       v => cx))
 
 # What a task sent is a fact of its own thread (desktop bar A.3, S16;
 # architect m_10203): a message from a task (not main, whose feed has
 # `msg` for every message, not the user) to another agent writes one
-# line in the task's own feed, `sent : {to} : m_<n> : {ask} : {text}`
-# (ask 1: it waits for a reply, --expect-reply or sb ask). A message to
+# record in the task's own feed, `sent` {to, id, ask, body} (ask: it
+# waits for a reply, --expect-reply or sb ask). A message to
 # the user is `msg-you` already. A view only: no state changes.
 # The sender must be an agent of this hub (architect m_10280): '@bise'
 # (a cross-hub delegation) or the hub's own name has no feed here.
@@ -1010,7 +1025,7 @@ def feed_sender(-o: M.St, +cx: X.Cx<o>, +m: M.Msg) -> X.Cx<o>:
   +from = M.Msg.from(m)
   +to = M.Msg.to(m)
   pick_lazy(X.Cx<o>, is_task_send(o, cx, from, to),
-    u => line_fields(o, cx, from, "sent", [to, mid(M.Msg.id(m)), Bool.pick(String, M.Msg.expect(m), "1", "0"), M.Msg.text(m)]),
+    u => feed(o, cx, from, FD.sent(to, M.Msg.id(m), M.Msg.expect(m), M.Msg.text(m))),
     u => cx)
 
 def send.fed(-o: M.St, p: X.Cx<o> & SendR, +why: String) -> X.Cx<o> & SendR:
@@ -1048,7 +1063,7 @@ def create.go.new(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Jso
   +obj = M.one_line(NewTask.objective(t))
   +cx2 = emit(o, cx, M.ETaskCreated{name, parent, NewTask.brief(t), ws, now(o, cx)}, e, Unit{}, Unit{})
   +who = Bool.pick(String, String.eq(parent, M.USER()), "you", parent)
-  +cx3 = line(o, cx2, M.MAIN(), "spawn", cat([who, " → new agent @", name, label, " : ", obj]))
+  +cx3 = feed(o, cx2, M.MAIN(), FD.spawn(cat([who, " → new agent @", name, label, " : ", obj])))
   +cx4 = pick_lazy(X.Cx<o>, String.eq(parent, M.USER()), u => note_main(o, cx3, cat(["the user created the agent @", name, label, ": ", obj])), u => cx3)
   +cx5 = spawn(o, cx4, name, False{})
   create.sent(o, send(o, cx5, msg(parent, name, cat(["# Task `", name, "`\n\n", NewTask.brief_text(t)]), String.eq(parent, M.MAIN()), None{}, String.eq(parent, M.USER()), False{})), name)
@@ -1687,7 +1702,7 @@ def drop.ws(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: M.Age
       drop.left(o, left, emit(o, cx2, M.ESnapshot{M.Agent.name(a), sn}, Unit{}, Unit{}, Unit{}), sn)
 
 def drop.finish(-o: M.St, +cx: X.Cx<o>, +a: M.Agent, +label: String) -> X.Cx<o> & DropR:
-  +cx2 = line(o, cx, M.MAIN(), "info", cat(["@", M.Agent.name(a), " archived", label]))
+  +cx2 = feed(o, cx, M.MAIN(), FD.info(cat(["@", M.Agent.name(a), " archived", label])))
   # a client looking at it goes back to main
   (out(o, cx2, F.focus_main(M.Agent.name(a))), DDone{})
 
@@ -1774,7 +1789,7 @@ def restore.go(-o: M.St, +cx: X.Cx<o>, +a: M.Agent) -> X.Cx<o> & TaskR:
   +cx3 = set_r(o, cx2, X.R.with_crashes(r, kn_del(X.R.crashes(r), n)))
   +cx4 = spawn(o, cx3, n, True{})
   # an idle task back from failed gets the mail it kept (law L4)
-  (line(o, pump(o, cx4, n), M.MAIN(), "info", cat(["@", n, " restored"])), TOk{n})
+  (feed(o, pump(o, cx4, n), M.MAIN(), FD.info(cat(["@", n, " restored"]))), TOk{n})
 
 def restore.res(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +a: M.Agent) -> X.Cx<o> & TaskR:
   match r:
@@ -1832,7 +1847,7 @@ def isolate.sent(-o: M.St, p: X.Cx<o> & SendR, +n: String, +branch: String) -> X
     case (+cx, SErr{+e}):
       (cx, TErr{e})
     case (+cx, SOk{_}):
-      (line(o, cx, M.MAIN(), "info", cat(["@", n, " now works in the worktree ", branch])), TOk{n})
+      (feed(o, cx, M.MAIN(), FD.info(cat(["@", n, " now works in the worktree ", branch]))), TOk{n})
 
 def isolate.res(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +n: String) -> X.Cx<o> & TaskR:
   match r:
@@ -1885,7 +1900,7 @@ def move.sent(-o: M.St, p: X.Cx<o> & SendR, +n: String, +dest: String) -> X.Cx<o
     case (+cx, SErr{+e}):
       (cx, TErr{e})
     case (+cx, SOk{_}):
-      (line(o, cx, M.MAIN(), "info", cat(["@", n, " moved to ", dest])), TOk{n})
+      (feed(o, cx, M.MAIN(), FD.info(cat(["@", n, " moved to ", dest]))), TOk{n})
 
 def move.res(-o: M.St, +cx: X.Cx<o>, +n: String, +ws: J.Json) -> X.Cx<o> & TaskR:
   +path = M.ws_path(ws)
@@ -1937,7 +1952,7 @@ def user_sent(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
 
 def close_card(-o: M.St, +cx: X.Cx<o>, +id: Nat, +res: String) -> X.Cx<o>:
   +cx2 = emit(o, cx, M.ECardClosed{id, res}, Unit{}, Unit{}, Unit{})
-  line(o, cx2, M.MAIN(), "card-closed", cat(["#", ns(id), " ", res]))
+  feed(o, cx2, M.MAIN(), FD.card_closed(id, res))
 
 def answer.q.sent(-o: M.St, p: X.Cx<o> & SendR, +c: M.Card, +asker: String, +text: String, +parts: String) -> X.Cx<o>:
   match p:
@@ -1946,7 +1961,7 @@ def answer.q.sent(-o: M.St, p: X.Cx<o> & SendR, +c: M.Card, +asker: String, +tex
     case (+cx, SOk{_}):
       +id = M.Card.id(c)
       +cx2 = note_main(o, cx, cat(["the user answered card #", ns(id), " (@", asker, " asked: \"", M.one_line(M.Card.text(c)), "\"): \"", M.one_line(text), "\""]))
-      +cx3 = route_line(o, cx2, cat(["you → @", asker, " (answer to card #", ns(id), ") : ", text]), parts)
+      +cx3 = route_line(o, cx2, asker, Some{id}, text, parts)
       close_card(o, cx3, id, "answered")
 
 # main's own card: the answer wakes main with a turn that holds it, like
@@ -1965,7 +1980,7 @@ def MAIN_ANSWER_HEAD() -> String:
 def answer.q.main(-o: M.St, +cx: X.Cx<o>, +c: M.Card, +text: String, +parts: String) -> X.Cx<o>:
   +id = M.Card.id(c)
   +cx2 = notify_main(o, cx, cat([MAIN_ANSWER_HEAD(), ns(id), " (\"", M.one_line(M.Card.text(c)), "\"): \"", M.one_line(text), "\""]))
-  +cx3 = route_line(o, cx2, cat(["you → @", M.MAIN(), " (answer to card #", ns(id), ") : ", text]), parts)
+  +cx3 = route_line(o, cx2, M.MAIN(), Some{id}, text, parts)
   close_card(o, cx3, id, "answered")
 
 # his answer as a message to the asker, his parts with it
@@ -2173,7 +2188,7 @@ def route.sent(-o: M.St, p: X.Cx<o> & SendR, +name: String, +text: String, +focu
     case (+cx, SErr{+e}):
       undelivered.if(o, unavailable_err(e), notice(o, cx, e), focus, name, text)
     case (+cx, SOk{+m}):
-      +cx2 = route_line(o, cx, cat(["you → @", name, " : ", text]), parts)
+      +cx2 = route_line(o, cx, name, None{}, text, parts)
       +cx3 = pick_lazy(X.Cx<o>, Bool.not(String.eq(focus, M.MAIN())) || Bool.not(String.eq(name, focus)),
         u => note_main(o, cx2, cat(["the user wrote directly to @", name, ": \"", M.one_line(text), "\""])), u => cx2)
       cx3
@@ -2247,7 +2262,7 @@ def rename.apply.new(-o: M.St, +cx: X.Cx<o>, +old: String, +new: String, +e: {M.
   +cx3 = set_r(o, cx2, X.R.with_rts(X.R.with_waiters(X.R.with_steered(r, steer_rename(X.R.steered(r), old, new)),
     waiters_rename(X.R.waiters(r), old, new)), rt_rename(X.R.rts(r), old, new)))
   +cx4 = out(o, cx3, F.renamed(old, new))
-  line(o, cx4, M.MAIN(), "info", cat(["@", old, " s'appelle maintenant @", new]))
+  feed(o, cx4, M.MAIN(), FD.info(cat(["@", old, " s'appelle maintenant @", new])))
 
 def rename.apply.free(-o: M.St, taken: Bool, +cx: X.Cx<o>, +old: String, +new: String, +e: {M.name_taken(X.d(o, cx), new) == taken : Bool}) -> X.Cx<o>:
   match taken:
@@ -2280,7 +2295,7 @@ def rename.old(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +new
 # step as the interrupt, a 'stopped' line in that agent's feed; the thread's
 # fold turns it into an entry of kind 'stopped' at its position
 def stopped(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
-  line(o, cx, agent, "stopped", "stopped")
+  feed(o, cx, agent, FD.stopped("stopped"))
 
 # the interrupt's effect for that agent (the shell flags its REPL)
 def interrupt.fx(-o: M.St, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
@@ -2393,7 +2408,7 @@ def passthrough(-o: M.St, +cx: X.Cx<o>, +focus: String, +l: String) -> X.Cx<o>:
 def focus(-o: M.St, +cx: X.Cx<o>, +f: String, note: Maybe<&2, String>, +direct: String) -> X.Cx<o>:
   match note:
     case Some{+n}:
-      line(o, note_main(o, cx, n), M.MAIN(), "direct", direct)
+      feed(o, note_main(o, cx, n), M.MAIN(), FD.direct(direct))
     case None{}:
       cx
 
@@ -3130,7 +3145,7 @@ def req_stop(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +agent: 
       reply_err(o, cx, token, String.append("no agent named ", agent))
     case Some{+n}:
       pick_lazy(X.Cx<o>, String.eq(n, M.MAIN()), u => reply_err(o, cx, token, String.append("no agent named ", agent)),
-        u => reply(o, line(o, stop_noted(o, cx, n, M.LStopped{}, reason), M.MAIN(), "info", cat(["main → @", n, " stopped: ", reason])), token, ok_body(Nil{})))
+        u => reply(o, feed(o, stop_noted(o, cx, n, M.LStopped{}, reason), M.MAIN(), FD.info(cat(["main → @", n, " stopped: ", reason]))), token, ok_body(Nil{})))
 
 def req_drop.res(-o: M.St, p: X.Cx<o> & DropR, +token: Nat, +agent: String) -> X.Cx<o>:
   match p:
@@ -3163,7 +3178,7 @@ def is_task_of(-o: M.St, +cx: X.Cx<o>, +agent: String) -> Bool:
 
 def card_to_asker(-o: M.St, +cx: X.Cx<o>, +id: Nat, +agent: String, +text: String) -> X.Cx<o>:
   pick_lazy(X.Cx<o>, is_task_of(o, cx, agent),
-    u => line(o, cx, agent, "card", cat(["#", ns(id), " question @", agent, " : ", text])),
+    u => feed(o, cx, agent, FD.card(id, "question", agent, text)),
     u => cx)
 
 def req_card.go(-o: M.St, +cx: X.Cx<o>, +token: Nat, +agent: String, +text: String, +for_msg: Maybe<&2, Nat>) -> X.Cx<o>:
@@ -3399,13 +3414,6 @@ def steer_rx_mark(xs: List<&2, X.Steer>, +n: String, +k: Nat) -> List<&2, X.Stee
     case Con{+h, +t}:
       Bool.pick(X.Steer, String.eq(X.Steer.agent(h), n), X.Steer{n, X.Steer.ids(h), X.Steer.seen(h), k}, h) <> steer_rx_mark(t, n, k)
 
-def mids(xs: List<&2, Nat>) -> List<&2, String>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      mid(h) <> mids(t)
-
 # the receipt's ids: the steer-mode deliveries since the last receipt
 # (none: a second receipt with no new steer marks nothing)
 def steer_receipt.go(-o: M.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: String, +total: Nat) -> X.Cx<o>:
@@ -3415,7 +3423,7 @@ def steer_receipt.go(-o: M.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: String,
     case Con{+h, +t}:
       +r = rr(o, cx)
       +cx2 = set_r(o, cx, X.R.with_steered(r, steer_mark(X.R.steered(r), agent, total)))
-      line(o, cx2, agent, "steered", String.join(mids(h <> t), " "))
+      feed(o, cx2, agent, FD.steered(h <> t))
 
 # the runtime read the steering (ISteered): the feed line naming the
 # messages it read, at this point of the turn ('sb steered : m_3 m_4');
@@ -3434,7 +3442,7 @@ def steer_rx_receipt.go(-o: M.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: Stri
     case Con{+h, +t}:
       +r = rr(o, cx)
       +cx2 = set_r(o, cx, X.R.with_steered(r, steer_rx_mark(X.R.steered(r), agent, total)))
-      line(o, cx2, agent, "steer-rx", String.join(mids(h <> t), " "))
+      feed(o, cx2, agent, FD.steer_rx(h <> t))
 
 # the runtime received the steering (ISteerRx, before it reads it): the
 # feed line naming those messages ('sb steer-rx : m_3 m_4', the clients'
@@ -3511,14 +3519,14 @@ def repl_ready(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
 def crash.restart(-o: M.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: String) -> X.Cx<o>:
   +cx2 = set_run(o, cx, agent, M.RStarting{})
   +cx3 = out(o, cx2, F.spawn(agent, True{}, Some{reason}))
-  +cx4 = line(o, cx3, M.MAIN(), "warn", cat(["the session of @", agent, " crashed (", reason, ") — restart ", ns(n), "/", ns(MAX_CRASHES())]))
+  +cx4 = feed(o, cx3, M.MAIN(), FD.warn(cat(["the session of @", agent, " crashed (", reason, ") — restart ", ns(n), "/", ns(MAX_CRASHES())])))
   pick_lazy(X.Cx<o>, String.eq(agent, M.MAIN()), u => cx4,
     u => notify_main(o, cx4, cat(["agent @", agent, " crashed (", reason, "). Its session restarts on its saved checkpoint (attempt ", ns(n), "/", ns(MAX_CRASHES()), "); the turn it was running is interrupted and it may need a new message to continue."])))
 
 def crash.fail(-o: M.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: String) -> X.Cx<o>:
   +why = cat(["the REPL crashed ", ns(n), " times: ", reason])
   +cx2 = job_end(o, emit(o, cx, M.ELifecycle{agent, M.LFailed{}, Some{why}}, Unit{}, Unit{}, Unit{}), agent, "failed", why)
-  +cx3 = line(o, cx2, M.MAIN(), "warn", cat(["@", agent, " failed: ", why]))
+  +cx3 = feed(o, cx2, M.MAIN(), FD.warn(cat(["@", agent, " failed: ", why])))
   pick_lazy(X.Cx<o>, String.eq(agent, M.MAIN()), u => cx3,
     u => notify_main(o, cx3, cat(["agent @", agent, " failed: ", why, ". It is not restarted anymore. A new message from you or the user restarts it; otherwise tell the user."])))
 
@@ -3629,7 +3637,7 @@ def auto_reply.local(-o: M.St, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: Str
     case Some{+view}:
       +cx2 = emit(o, cx, M.ESettled{M.Msg.id(m)}, Unit{}, Unit{}, Unit{})
       # an agent writing to the user (C2 `msg-you`, level 2)
-      +cx3 = line(o, cx2, view, "msg-you", cat([agent, " : ", body]))
+      +cx3 = feed(o, cx2, view, FD.msg_you(agent, body))
       note_main(o, cx3, cat(["@", agent, " answered the user (asked from @", view, "'s view: \"", M.clip(M.one_line(M.Msg.text(m)), 500n),
         "\"): \"", M.clip_tail(M.one_line(body), 2000n), "\""]))
 

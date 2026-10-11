@@ -36,6 +36,8 @@ import ./hub/gen/kit.bend as HK
 
 import ./hub/gen/fx.bend as HF
 
+import ./hub/gen/feed.bend as HFD
+
 import ./core/api.bend as Api
 
 import ./hub/pause.bend as HP
@@ -2591,43 +2593,43 @@ def hub_cards_gone(-o: HM.St, +g: Bool, +cx: HX.Cx<o>, +n: String, +ns: List<&2,
     case True{}:
       hub_cards_gone_each(o, HTM.ids_in(HC.live(o, cx), ns), cx, HC.cat(["@", n, " is gone"]))
 
-def hub_d_line(-o: HM.St, +cx: HX.Cx<o>, +a: String, +k: String, +t: String) -> {HX.d(o, HC.line(o, cx, a, k, t)) == HX.d(o, cx) : HM.St}:
+def hub_d_feed(-o: HM.St, +cx: HX.Cx<o>, +a: String, +rec: J.Json) -> {HX.d(o, HC.feed(o, cx, a, rec)) == HX.d(o, cx) : HM.St}:
   match cx:
     case HX.Cx{c, r}:
       match c:
         case HX.Core{d, fx, p, f, q, v}:
           {==}
 
-# a line written or not (pick_lazy on a Bool) keeps the core state
-def hub_d_pick_line(-o: HM.St, b: Bool, +cx: HX.Cx<o>, +a: String, +k: String, +t: String)
-    -> {HX.d(o, HC.pick_lazy(HX.Cx<o>, b, u => cx, u => HC.line(o, cx, a, k, t))) == HX.d(o, cx) : HM.St}:
+# a feed record written or not (pick_lazy on a Bool) keeps the core state
+def hub_d_pick_feed(-o: HM.St, b: Bool, +cx: HX.Cx<o>, +a: String, +rec: J.Json)
+    -> {HX.d(o, HC.pick_lazy(HX.Cx<o>, b, u => cx, u => HC.feed(o, cx, a, rec))) == HX.d(o, cx) : HM.St}:
   match b:
     case True{}:
       {==}
     case False{}:
-      hub_d_line(o, cx, a, k, t)
+      hub_d_feed(o, cx, a, rec)
 
-# his parts' line (msg-parts) keeps the core state, written or not
-def hub_d_parts_line(-o: HM.St, +cx: HX.Cx<o>, +a: String, +k: String, +p: String)
-    -> {HX.d(o, HC.parts_line(o, cx, a, k, p)) == HX.d(o, cx) : HM.St}:
-  hub_d_pick_line(o, String.is_empty(p), cx, a, k, p)
+# his parts (msg-parts) keep the core state, written or not
+def hub_d_you_parts(-o: HM.St, +cx: HX.Cx<o>, +a: String, +p: String)
+    -> {HX.d(o, HC.you_parts(o, cx, a, p)) == HX.d(o, cx) : HM.St}:
+  hub_d_pick_feed(o, String.is_empty(p), cx, a, HFD.you_parts(HC.parts_json(p)))
 
-# a delivered message's feed line (or none, for a steer_leftover) keeps the state
+# a delivered message's feed record (or none, for a steer_leftover) keeps the state
 def hub_d_dline(-o: HM.St, again: Bool, you: Bool, +cx: HX.Cx<o>, +name: String, +m: HM.Msg)
     -> {HX.d(o, HC.deliver.line(o, again, you, cx, name, m)) == HX.d(o, cx) : HM.St}:
   match again you:
     case True{} _:
       {==}
     case False{} True{}:
-      +ln = HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m)))
-      Equal.trans(HM.St, HX.d(o, HC.parts_line(o, ln, name, "you-parts", HM.Msg.parts(m))), HX.d(o, ln), HX.d(o, cx),
-        hub_d_parts_line(o, ln, name, "you-parts", HM.Msg.parts(m)),
+      +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m)))
+      Equal.trans(HM.St, HX.d(o, HC.you_parts(o, ln, name, HM.Msg.parts(m))), HX.d(o, ln), HX.d(o, cx),
+        hub_d_you_parts(o, ln, name, HM.Msg.parts(m)),
         Equal.trans(HM.St, HX.d(o, ln),
-          HX.d(o, HC.line(o, cx, name, "you", HM.Msg.text(m))), HX.d(o, cx),
-          hub_d_line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m))),
-          hub_d_line(o, cx, name, "you", HM.Msg.text(m))))
+          HX.d(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m)))), HX.d(o, cx),
+          hub_d_feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m))),
+          hub_d_feed(o, cx, name, HFD.you(HM.Msg.text(m)))))
     case False{} False{}:
-      hub_d_line(o, cx, name, "msg-in", HC.cat([HM.Msg.from(m), " ", HC.mid(HM.Msg.id(m)), " : ", HM.Msg.text(m)]))
+      hub_d_feed(o, cx, name, HFD.msg_in(HM.Msg.from(m), Some{HM.Msg.id(m)}, HM.Msg.text(m)))
 
 # closing cards keeps the messages
 def hub_msgs_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
@@ -2637,11 +2639,11 @@ def hub_msgs_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: Stri
       {==}
     case Con{id, rest}:
       +cx2 = HC.emit(o, cx, HM.ECardClosed{id, res}, Unit{}, Unit{}, Unit{})
-      +cx3 = HC.line(o, cx2, HM.MAIN(), "card-closed", HC.cat(["#", HC.ns(id), " ", res]))
+      +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
       Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.St.msgs(HX.d(o, cx3)), HM.St.msgs(HX.d(o, cx)),
         hub_msgs_close_ids(o, rest, cx3, res),
         Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, cx3)), HM.St.msgs(HX.d(o, cx2)), HM.St.msgs(HX.d(o, cx)),
-          hub_msgs_eq(o, cx3, cx2, hub_d_line(o, cx2, HM.MAIN(), "card-closed", HC.cat(["#", HC.ns(id), " ", res]))),
+          hub_msgs_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
           Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, cx2)), HM.St.msgs(HM.apply(HX.d(o, cx), HM.ECardClosed{id, res})), HM.St.msgs(HX.d(o, cx)),
             Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.St.msgs(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.ECardClosed{id, res}),
               hub_d_emit(o, cx, HM.ECardClosed{id, res}, Unit{}, Unit{}, Unit{})),
@@ -2668,11 +2670,11 @@ def hub_agents_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: St
     case Con{id, rest}:
       +ev = {HM.ECardClosed{id, res} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      +cx3 = HC.line(o, cx2, HM.MAIN(), "card-closed", HC.cat(["#", HC.ns(id), " ", res]))
+      +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
       Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.St.agents(HX.d(o, cx3)), HM.St.agents(HX.d(o, cx)),
         hub_agents_close_ids(o, rest, cx3, res),
         Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, cx3)), HM.St.agents(HX.d(o, cx2)), HM.St.agents(HX.d(o, cx)),
-          hub_agents_eq(o, cx3, cx2, hub_d_line(o, cx2, HM.MAIN(), "card-closed", HC.cat(["#", HC.ns(id), " ", res]))),
+          hub_agents_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
           Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, cx2)), HM.St.agents(HM.apply(HX.d(o, cx), ev)), HM.St.agents(HX.d(o, cx)),
             Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
             hub_agents_closed(HX.d(o, cx), id, res))))
@@ -2873,13 +2875,13 @@ def hub_cards_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: Str
     case Con{id, rest}:
       +ev = {HM.ECardClosed{id, res} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
-      +cx3 = HC.line(o, cx2, HM.MAIN(), "card-closed", HC.cat(["#", HC.ns(id), " ", res]))
+      +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
       Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, HC.close_ids(o, rest, cx3, res))), hub_dropc(rest, HM.St.cards(HX.d(o, cx3))),
         hub_dropc(id <> rest, HM.St.cards(HX.d(o, cx))),
         hub_cards_close_ids(o, rest, cx3, res),
         Equal.cong(List<&2, HM.Card>, List<&2, HM.Card>, cs => hub_dropc(rest, cs), HM.St.cards(HX.d(o, cx3)), HM.drop_card(HM.St.cards(HX.d(o, cx)), id),
           Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, cx3)), HM.St.cards(HX.d(o, cx2)), HM.drop_card(HM.St.cards(HX.d(o, cx)), id),
-            hub_cards_eq(o, cx3, cx2, hub_d_line(o, cx2, HM.MAIN(), "card-closed", HC.cat(["#", HC.ns(id), " ", res]))),
+            hub_cards_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
             Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, cx2)), HM.St.cards(HM.apply(HX.d(o, cx), ev)), HM.drop_card(HM.St.cards(HX.d(o, cx)), id),
               Equal.cong(HM.St, List<&2, HM.Card>, s => HM.St.cards(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), ev), hub_d_emit(o, cx, ev, Unit{}, Unit{}, Unit{})),
               hub_cards_closed(HX.d(o, cx), id, res)))))
@@ -3221,8 +3223,8 @@ def hub_ag_mark.go(-o: HM.St, +cx: HX.Cx<o>, +id: Nat, c: Bool, +e: {HX.queued_a
 def hub_ag_mark(-o: HM.St, +cx: HX.Cx<o>, +id: Nat) -> {hub_ag(o, HC.mark_delivered(o, cx, id)) == hub_ag(o, cx) : List<&2, HM.Agent>}:
   hub_ag_mark.go(o, cx, id, HX.queued_at(HX.d(o, cx), id), {==})
 
-def hub_ag_line(-o: HM.St, +cx: HX.Cx<o>, +a: String, +k: String, +t: String) -> {hub_ag(o, HC.line(o, cx, a, k, t)) == hub_ag(o, cx) : List<&2, HM.Agent>}:
-  Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, HC.line(o, cx, a, k, t)), HX.d(o, cx), hub_d_line(o, cx, a, k, t))
+def hub_ag_feed(-o: HM.St, +cx: HX.Cx<o>, +a: String, +rec: J.Json) -> {hub_ag(o, HC.feed(o, cx, a, rec)) == hub_ag(o, cx) : List<&2, HM.Agent>}:
+  Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, HC.feed(o, cx, a, rec)), HX.d(o, cx), hub_d_feed(o, cx, a, rec))
 
 def hub_ag_pick(-o: HM.St, c: Bool, +x: HX.Cx<o>, +y: HX.Cx<o>, -z: HX.Cx<o>, ex: {hub_ag(o, x) == hub_ag(o, z) : List<&2, HM.Agent>},
     ey: {hub_ag(o, y) == hub_ag(o, z) : List<&2, HM.Agent>}) -> {hub_ag(o, Bool.pick(HX.Cx<o>, c, x, y)) == hub_ag(o, z) : List<&2, HM.Agent>}:
@@ -3385,23 +3387,23 @@ def hub_rts_emit(-o: HM.St, cx: HX.Cx<o>, +e: HM.Ev, +k: HX.FreshEv(HX.d(o, cx),
         case HX.R{a, b, c2, d, e2, f, g, h, i, j, k2, l}:
           {==}
 
-def hub_rts_line(-o: HM.St, cx: HX.Cx<o>, +a: String, +k: String, +t: String) -> {hub_rts(o, HC.line(o, cx, a, k, t)) == hub_rts(o, cx) : List<&2, HX.Rt>}:
+def hub_rts_feed(-o: HM.St, cx: HX.Cx<o>, +a: String, +rec: J.Json) -> {hub_rts(o, HC.feed(o, cx, a, rec)) == hub_rts(o, cx) : List<&2, HX.Rt>}:
   match cx:
     case HX.Cx{c, r}:
       {==}
 
-# a line written or not keeps the runtimes (msg-parts' parts line)
-def hub_rts_pick_line(-o: HM.St, b: Bool, +cx: HX.Cx<o>, +a: String, +k: String, +t: String)
-    -> {hub_rts(o, HC.pick_lazy(HX.Cx<o>, b, u => cx, u => HC.line(o, cx, a, k, t))) == hub_rts(o, cx) : List<&2, HX.Rt>}:
+# a feed record written or not keeps the runtimes (msg-parts' parts)
+def hub_rts_pick_feed(-o: HM.St, b: Bool, +cx: HX.Cx<o>, +a: String, +rec: J.Json)
+    -> {hub_rts(o, HC.pick_lazy(HX.Cx<o>, b, u => cx, u => HC.feed(o, cx, a, rec))) == hub_rts(o, cx) : List<&2, HX.Rt>}:
   match b:
     case True{}:
       {==}
     case False{}:
-      hub_rts_line(o, cx, a, k, t)
+      hub_rts_feed(o, cx, a, rec)
 
-def hub_rts_parts_line(-o: HM.St, +cx: HX.Cx<o>, +a: String, +k: String, +p: String)
-    -> {hub_rts(o, HC.parts_line(o, cx, a, k, p)) == hub_rts(o, cx) : List<&2, HX.Rt>}:
-  hub_rts_pick_line(o, String.is_empty(p), cx, a, k, p)
+def hub_rts_you_parts(-o: HM.St, +cx: HX.Cx<o>, +a: String, +p: String)
+    -> {hub_rts(o, HC.you_parts(o, cx, a, p)) == hub_rts(o, cx) : List<&2, HX.Rt>}:
+  hub_rts_pick_feed(o, String.is_empty(p), cx, a, HFD.you_parts(HC.parts_json(p)))
 
 def hub_rts_dline(-o: HM.St, again: Bool, you: Bool, +cx: HX.Cx<o>, +name: String, +m: HM.Msg)
     -> {hub_rts(o, HC.deliver.line(o, again, you, cx, name, m)) == hub_rts(o, cx) : List<&2, HX.Rt>}:
@@ -3409,15 +3411,15 @@ def hub_rts_dline(-o: HM.St, again: Bool, you: Bool, +cx: HX.Cx<o>, +name: Strin
     case True{} _:
       {==}
     case False{} True{}:
-      +ln = HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m)))
-      Equal.trans(List<&2, HX.Rt>, hub_rts(o, HC.parts_line(o, ln, name, "you-parts", HM.Msg.parts(m))), hub_rts(o, ln), hub_rts(o, cx),
-        hub_rts_parts_line(o, ln, name, "you-parts", HM.Msg.parts(m)),
+      +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m)))
+      Equal.trans(List<&2, HX.Rt>, hub_rts(o, HC.you_parts(o, ln, name, HM.Msg.parts(m))), hub_rts(o, ln), hub_rts(o, cx),
+        hub_rts_you_parts(o, ln, name, HM.Msg.parts(m)),
         Equal.trans(List<&2, HX.Rt>, hub_rts(o, ln),
-          hub_rts(o, HC.line(o, cx, name, "you", HM.Msg.text(m))), hub_rts(o, cx),
-          hub_rts_line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m))),
-          hub_rts_line(o, cx, name, "you", HM.Msg.text(m))))
+          hub_rts(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m)))), hub_rts(o, cx),
+          hub_rts_feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m))),
+          hub_rts_feed(o, cx, name, HFD.you(HM.Msg.text(m)))))
     case False{} False{}:
-      hub_rts_line(o, cx, name, "msg-in", HC.cat([HM.Msg.from(m), " ", HC.mid(HM.Msg.id(m)), " : ", HM.Msg.text(m)]))
+      hub_rts_feed(o, cx, name, HFD.msg_in(HM.Msg.from(m), Some{HM.Msg.id(m)}, HM.Msg.text(m)))
 
 def hub_rts_mark.go(-o: HM.St, +cx: HX.Cx<o>, +id: Nat, c: Bool, +e: {HX.queued_at(HX.d(o, cx), id) == c : Bool})
     -> {hub_rts(o, HC.mark_delivered.go(o, cx, id, c, e)) == hub_rts(o, cx) : List<&2, HX.Rt>}:
@@ -5966,7 +5968,7 @@ def Laws.xhub_ask_needs_words(text, b, e):
   {==}
 
 def Laws.interrupt_says_stopped_once(o, cx, n, e):
-  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.stopped(o, HC.interrupt.fx(o, cx, n), n), u => HC.notice(o, cx, "no turn in progress to interrupt")) == HC.line(o, HC.interrupt.fx(o, cx, n), n, "stopped", "stopped") : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.stopped(o, HC.interrupt.fx(o, cx, n), n), u => HC.notice(o, cx, "no turn in progress to interrupt")) == HC.feed(o, HC.interrupt.fx(o, cx, n), n, HFD.stopped("stopped")) : HX.Cx<o>}
   {==}
 
 def Laws.interrupt_idle_says_nothing(o, cx, n, e):
@@ -5974,23 +5976,23 @@ def Laws.interrupt_idle_says_nothing(o, cx, n, e):
   {==}
 
 def Laws.req_interrupt_says_stopped_once(o, cx, token, agent, n, e):
-  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.reply(o, HC.stopped(o, HC.interrupt.fx(o, cx, n), n), token, HC.ok_body(Nil{})), u => HC.reply_err(o, cx, token, "no turn in progress")) == HC.reply(o, HC.line(o, HC.interrupt.fx(o, cx, n), n, "stopped", "stopped"), token, HC.ok_body(Nil{})) : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.reply(o, HC.stopped(o, HC.interrupt.fx(o, cx, n), n), token, HC.ok_body(Nil{})), u => HC.reply_err(o, cx, token, "no turn in progress")) == HC.reply(o, HC.feed(o, HC.interrupt.fx(o, cx, n), n, HFD.stopped("stopped")), token, HC.ok_body(Nil{})) : HX.Cx<o>}
   {==}
 
 def Laws.task_send_says_sent_once(o, cx, m, e):
-  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.line_fields(o, cx, HM.Msg.from(m), "sent", [HM.Msg.to(m), HC.mid(HM.Msg.id(m)), Bool.pick(String, HM.Msg.expect(m), "1", "0"), HM.Msg.text(m)]), u => cx) == HC.line_fields(o, cx, HM.Msg.from(m), "sent", [HM.Msg.to(m), HC.mid(HM.Msg.id(m)), Bool.pick(String, HM.Msg.expect(m), "1", "0"), HM.Msg.text(m)]) : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), u => cx) == HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))) : HX.Cx<o>}
   {==}
 
 def Laws.other_send_says_no_sent(o, cx, m, e):
-  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.line_fields(o, cx, HM.Msg.from(m), "sent", [HM.Msg.to(m), HC.mid(HM.Msg.id(m)), Bool.pick(String, HM.Msg.expect(m), "1", "0"), HM.Msg.text(m)]), u => cx) == cx : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), u => cx) == cx : HX.Cx<o>}
   {==}
 
 def Laws.task_card_shows_in_its_feed(o, cx, id, agent, text, e):
-  %Equal.sym(Bool, HC.is_task_of(o, cx, agent), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.line(o, cx, agent, "card", HC.cat(["#", HC.ns(id), " question @", agent, " : ", text])), u => cx) == HC.line(o, cx, agent, "card", HC.cat(["#", HC.ns(id), " question @", agent, " : ", text])) : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_task_of(o, cx, agent), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.feed(o, cx, agent, HFD.card(id, "question", agent, text)), u => cx) == HC.feed(o, cx, agent, HFD.card(id, "question", agent, text)) : HX.Cx<o>}
   {==}
 
 def Laws.other_card_no_extra_line(o, cx, id, agent, text, e):
-  %Equal.sym(Bool, HC.is_task_of(o, cx, agent), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.line(o, cx, agent, "card", HC.cat(["#", HC.ns(id), " question @", agent, " : ", text])), u => cx) == cx : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_task_of(o, cx, agent), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.feed(o, cx, agent, HFD.card(id, "question", agent, text)), u => cx) == cx : HX.Cx<o>}
   {==}
 
 def Laws.unknown_sender_is_no_task_send(o, cx, from, to, e):
@@ -6005,13 +6007,14 @@ def Laws.main_card_answer_routes_once(o, cx, c, text, parts):
   {==}
 
 def Laws.you_line_carries_its_id(o, cx, name, m, e):
-  +ln = HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m)))
-  %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.line(o, ln, name, "you-parts", HM.Msg.parts(m))) == ln : HX.Cx<o>}
+  +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m)))
+  %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, name, HFD.you_parts(HC.parts_json(HM.Msg.parts(m))))) == ln : HX.Cx<o>}
   {==}
 
 def Laws.you_parts_follow_the_id(o, cx, name, m, e):
-  +ln = HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m)))
-  %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.line(o, ln, name, "you-parts", HM.Msg.parts(m))) == HC.line(o, ln, name, "you-parts", HM.Msg.parts(m)) : HX.Cx<o>}
+  +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m)))
+  +rec = HFD.you_parts(HC.parts_json(HM.Msg.parts(m)))
+  %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, name, rec)) == HC.feed(o, ln, name, rec) : HX.Cx<o>}
   {==}
 
 def Laws.parts_never_change_text(o, cx, name, m, p):
@@ -6019,12 +6022,13 @@ def Laws.parts_never_change_text(o, cx, name, m, p):
     case HM.Msg{i, th, f, to, r, ex, a, tx, c, pl, q, v, pa}:
       {==}
 
-def Laws.no_parts_no_line(o, cx, text):
+def Laws.no_parts_no_line(o, cx, who, card, said):
   {==}
 
-def Laws.route_parts_follow_the_route(o, cx, text, parts, e):
-  +ln = HC.line(o, cx, HM.MAIN(), "route", text)
-  %Equal.sym(Bool, String.is_empty(parts), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.line(o, ln, HM.MAIN(), "route-parts", parts)) == HC.line(o, ln, HM.MAIN(), "route-parts", parts) : HX.Cx<o>}
+def Laws.route_parts_follow_the_route(o, cx, who, card, said, parts, e):
+  +ln = HC.feed(o, cx, HM.MAIN(), HFD.route(who, card, said))
+  +rec = HFD.route_parts(HC.parts_json(parts))
+  %Equal.sym(Bool, String.is_empty(parts), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, HM.MAIN(), rec)) == HC.feed(o, ln, HM.MAIN(), rec) : HX.Cx<o>}
   {==}
 
 def Laws.answer_keeps_its_parts(to, text, r, parts):
