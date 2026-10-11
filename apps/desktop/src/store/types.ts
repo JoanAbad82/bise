@@ -14,6 +14,7 @@ export const TAGS = {
   thread: true,
   entry: true,
   typing: true,
+  partial: true,
   artifacts: true,
   scheduled: true,
   worktrees: true,

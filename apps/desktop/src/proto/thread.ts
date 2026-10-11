@@ -355,4 +355,10 @@ turn_end_ms?: number | null,
  * his message from `text` (the model's templated text, kept for
  * older clients, search and copy)
  */
-parts?: Array<Part>, };
+parts?: Array<Part>, 
+/**
+ * an `agent` entry cut off: the text he read as it streamed in,
+ * kept when its turn failed before the answer came (the hub's `sb
+ * kept` line); drawn dim, the failure's notice after it
+ */
+cut?: boolean, };

@@ -74,6 +74,7 @@ export const NOTIFICATIONS = {
   "job/followedEnd": { ev: "followed_end", scope: "hub" },
   "thread/entry": { ev: "entry", scope: "thread" },
   "thread/typing": { ev: "typing", scope: "thread" },
+  "thread/partial": { ev: "partial", scope: "thread" },
   "route/held": { ev: "route", scope: "hub" },
   "route/done": { ev: "route_done", scope: "hub" },
   "confirm/ask": { ev: "confirm", scope: "one" },
