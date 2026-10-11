@@ -116,6 +116,21 @@ rule as `versions.sh`: "rebuilding never changes a running system, only
 an explicit switch does"). The installer keeps the last 3 versions, never
 the current one nor one a running process uses.
 
+The desktop app (`apps/desktop`, electron-builder) carries its own
+runtime: `Contents/Resources/bin/` holds bise next to a version dir's
+files (VERSION, repl-live, sb-core, bend-jsrt, prompts/, plugins/, kit/,
+computer-use/extension), so `open bise.app` finds them with no env
+(approot: VERSION next to the executable). They come from
+`BISE_PACK_ROOT`, a pack-time input read only by the packaging scripts
+(`scripts/desktop_try.py`, `scripts/desktop_app.py`: a snapshot made like
+`versions.sh` makes a version dir); the pack fails without it. Hubs never
+run from inside the `.app` (an app update renames it to `.old`, then
+deletes it): the core installs that runtime once as
+`$PREFIX/versions/<its VERSION id>` (`BISE_PREFIX`, else
+`~/.local/share/bise`; update.rs `place`, the same code a release
+install uses), without touching `current`, and starts hubs from there.
+`BISE_APP_ROOT` is internal: an app never gets it.
+
 ## 5. The prototype
 
 `packaging/`:

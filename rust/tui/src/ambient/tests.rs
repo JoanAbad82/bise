@@ -696,7 +696,7 @@ fn the_run_loop_writes_lines_and_ends_with_stdin() {
     };
     let mut core = Core::new(WS.into(), hub, ports);
     // an event before initialize is held; a line before it is refused
-    tx.send(super::In::Hub(HubIn::Down)).unwrap();
+    tx.send(super::In::Hub(HubIn::Down(None))).unwrap();
     tx.send(super::In::Line(r#"{"jsonrpc":"2.0","id":1,"method":"core/hush"}"#.into())).unwrap();
     tx.send(super::In::Line(r#"{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"proto":1,"client":{"name":"t"}}}"#.into())).unwrap();
     tx.send(super::In::Line(r#"{"jsonrpc":"2.0","method":"initialized"}"#.into())).unwrap();

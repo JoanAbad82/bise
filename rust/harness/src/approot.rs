@@ -102,12 +102,23 @@ pub(crate) fn find(
             return Ok((d, Via::DevTree));
         }
     }
-    Err(format!(
+    Err(missing_words(exe_dir.as_deref(), repl))
+}
+
+/// Why there is no app root, in the words its reader can act on: inside
+/// a `.app` (the desktop app's bise, `Contents/Resources/bin`), the app's
+/// own runtime is missing and reinstalling it is the fix (no variable to
+/// set: an app gets none); else how a developer points at one. The
+/// window draws these words as they are (CoreEv::Broken).
+pub(crate) fn missing_words(exe_dir: Option<&Path>, repl: &str) -> String {
+    let dir = exe_dir.map(|d| d.display().to_string()).unwrap_or_else(|| "unknown".into());
+    if dir.contains(".app/Contents/") {
+        return format!("bise's runtime is missing: no {} in {}. reinstall bise", repl, dir);
+    }
+    format!(
         "{} not found: no VERSION next to the executable ({}); set {} to the folder that holds it, or build it in the repo with ./run.sh",
-        repl,
-        exe_dir.map(|d| d.display().to_string()).unwrap_or_else(|| "unknown".into()),
-        ENV
-    ))
+        repl, dir, ENV
+    )
 }
 
 /// `find` on the real environment and file system.
@@ -179,6 +190,16 @@ mod tests {
     fn nothing_found_says_how_to_fix() {
         let err = find(&inp(None, "/usr/local/bin/bise", None), "repl-live", &fs(&[])).unwrap_err();
         assert!(err.contains("set BISE_APP_ROOT"), "{err}");
+        // the desktop app's bise: its runtime is missing, reinstall; never a variable to set
+        let err = find(&inp(None, "/Applications/bise.app/Contents/Resources/bin/bise", None), "repl-live", &fs(&[])).unwrap_err();
+        assert_eq!(err, "bise's runtime is missing: no repl-live in /Applications/bise.app/Contents/Resources/bin. reinstall bise");
+    }
+
+    #[test]
+    fn a_packed_app_is_a_version_dir_found_with_no_env() {
+        let bin = "/Applications/bise.app/Contents/Resources/bin";
+        let has = fs(&[&format!("{bin}/VERSION"), &format!("{bin}/repl-live")]);
+        assert_eq!(find(&inp(None, &format!("{bin}/bise"), None), "repl-live", &has), Ok((bin.into(), Via::Bundle)));
     }
 
     #[test]

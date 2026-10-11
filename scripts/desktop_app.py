@@ -33,7 +33,7 @@ import sys
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, HERE)
-from desktop_try import DESKTOP, REPO, bundle_pids, build_dir  # noqa: E402  (one rule for both)
+from desktop_try import DESKTOP, REPO, bundle_pids, build_dir, root_script  # noqa: E402  (one rule for both)
 
 APP_NAME = "bise"
 APP_ID = "dev.bise.desktop"
@@ -58,26 +58,39 @@ def app_paths(env):
             "stamp": os.path.join(d, "app.stamp"), "sign": os.path.join(build_dir(env), "ambient", "sign")}
 
 
-def build_script(paths, bise, sign_dir=None):
-    """The build, run under the heavy lock from this checkout: the native helper, then the app
-    (pnpm install --frozen-lockfile, build, dist = electron-builder --mac --dir) packed into the
-    staging dir, a fresh one each time. Pure."""
+def build_script(paths, bise, sign_dir=None, root=None):
+    """The build, run under the heavy lock from this checkout: the runtime snapshot `root`
+    (desktop_try's root_script: repl-live, sb-core, bend-jsrt, prompts..., VERSION; the older
+    snapshots removed), the native helper, then the app (pnpm install --frozen-lockfile, build,
+    dist = electron-builder --mac --dir) packed into the staging dir, a fresh one each time, with
+    that runtime inside (BISE_PACK_ROOT: the app opens with no env, architect m_18354). Pure."""
     q = shlex.quote
     sign = " BISE_PACK_SIGN_DIR=%s" % q(sign_dir) if sign_dir else ""
+    snap = []
+    if root:
+        snap = ["find %s -maxdepth 1 -name 'root-*' ! -name %s -exec rm -rf {} +" % (q(paths["dir"]), q(os.path.basename(root)))]
+        snap += root_script(root)
     return "\n".join([
         "set -euo pipefail",
         "cd %s" % q(REPO),
         "export MACOSX_DEPLOYMENT_TARGET=\"$(scripts/bins.sh macos-target)\"",
         "mkdir -p %s" % q(paths["dir"]),
+        *snap,
         # ad hoc here; afterPack signs the whole app deep with the stable identity
         "apps/desktop/native/mac/build.sh %s" % q(paths["helper"]),
         "cd %s" % q(DESKTOP),
         "pnpm install --frozen-lockfile",
         "pnpm build",
         "rm -rf %s" % q(paths["staging"]),
-        "BISE_PACK_NAME=%s BISE_PACK_APP_ID=%s BISE_PACK_BISE=%s BISE_PACK_HELPER=%s%s BISE_PACK_OUT=%s pnpm dist"
-        % (q(APP_NAME), q(APP_ID), q(bise), q(paths["helper"]), sign, q(paths["staging"])),
+        "BISE_PACK_NAME=%s BISE_PACK_APP_ID=%s BISE_PACK_BISE=%s BISE_PACK_HELPER=%s%s%s BISE_PACK_OUT=%s pnpm dist"
+        % (q(APP_NAME), q(APP_ID), q(bise), q(paths["helper"]), " BISE_PACK_ROOT=%s" % q(root) if root else "", sign, q(paths["staging"])),
     ]) + "\n"
+
+
+def root_for(paths, parts):
+    """The runtime snapshot of a build: <dir>/root-<its key's hash>, so its VERSION id (the
+    folder's name) names one build: the core installs each id once. Pure."""
+    return os.path.join(paths["dir"], "root-" + hashlib.sha256(key_text(parts).encode()).hexdigest()[:16])
 
 
 def file_hash(path):
@@ -172,7 +185,8 @@ def build(env, bise):
         return paths["app"]
     say("building %s (waits for other heavy jobs first)…" % key_text(parts))
     os.makedirs(os.path.dirname(LOCK), exist_ok=True)
-    r = subprocess.run(["/usr/bin/lockf", "-k", LOCK, "nice", "-n", "10", "/bin/bash", "-c", build_script(paths, bise, sign)], env=env)
+    script = build_script(paths, bise, sign, root_for(paths, parts))
+    r = subprocess.run(["/usr/bin/lockf", "-k", LOCK, "nice", "-n", "10", "/bin/bash", "-c", script], env=env)
     if r.returncode != 0:
         raise AppError("the build failed (exit %d)" % r.returncode)
     write_stamp(paths, parts)
@@ -181,10 +195,10 @@ def build(env, bise):
     return paths["app"]
 
 
-def open_command(app, workspace, app_root):
+def open_command(app, workspace):
     """`open` for his app on that workspace ('' = his home workspace): a new instance of that exact
-    bundle with the core's workspace and app root in its env. Pure."""
-    return ["open", "-n", "-a", app, "--env", "BISE_DESKTOP_WORKSPACE=" + workspace, "--env", "BISE_APP_ROOT=" + app_root]
+    bundle with the core's workspace in its env; never an app root (its runtime is inside). Pure."""
+    return ["open", "-n", "-a", app, "--env", "BISE_DESKTOP_WORKSPACE=" + workspace]
 
 
 def open_app(env, workspace, bise):
@@ -195,7 +209,7 @@ def open_app(env, workspace, bise):
         subprocess.run(["open", "-a", app])
         say("bise was already open: brought it in front")
         return 0
-    return subprocess.run(open_command(app, workspace, REPO)).returncode
+    return subprocess.run(open_command(app, workspace)).returncode
 
 
 def stop(env):

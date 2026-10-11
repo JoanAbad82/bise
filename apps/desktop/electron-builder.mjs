@@ -1,6 +1,10 @@
 // Packaging bise desktop (electron-builder; `pnpm dist`). Owner: amb-mac.
 // The app carries what it runs, so nothing is looked up on PATH:
 //   Contents/Resources/bin/bise          the bise it runs (src/main/paths.ts binPath)
+//   Contents/Resources/bin/VERSION, repl-live, sb-core, bend-jsrt, prompts/, plugins/, kit/,
+//                                        computer-use/extension: the runtime (BISE_PACK_ROOT),
+//                                        a version dir's layout; the core installs it as
+//                                        <prefix>/versions/<id> and runs hubs from there
 //   Contents/MacOS/bise-mac-helper       the native helper, next to the app's executable
 //                                        so macOS charges its permissions to the app
 //                                        (src/main/helper/run.ts helperPath)
@@ -14,9 +18,9 @@
 // never shares his app's userData, single-instance lock or permissions:
 // BISE_PACK_APP_ID (default dev.bise.desktop) and BISE_PACK_NAME (default
 // 'bise'; it names the .app, the menus and ~/Library/Application Support/<name>).
-// Both binaries are built before, never here (the Rust build takes the heavy
-// lock): BISE_PACK_BISE and BISE_PACK_HELPER give their paths; a missing one
-// stops the build with its name.
+// Both binaries and the runtime are built before, never here (the Rust build
+// takes the heavy lock): BISE_PACK_BISE, BISE_PACK_HELPER and BISE_PACK_ROOT
+// give their paths; a missing one stops the build with its name.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -31,6 +35,15 @@ function need(name) {
 
 const bise = need('BISE_PACK_BISE');
 const helper = need('BISE_PACK_HELPER');
+// the runtime bise runs its hubs with (architect m_18354): a version dir's layout (VERSION,
+// repl-live, sb-core, bend-jsrt, prompts/, plugins/, kit/, computer-use/extension), packed next to
+// bise in Contents/Resources/bin, so the app finds it with no env (approot: VERSION next to the
+// executable). Its core installs it once as <prefix>/versions/<id> and runs hubs from there, never
+// from inside the .app. Required: a bundle without it could start no hub.
+const root = need('BISE_PACK_ROOT');
+for (const f of ['VERSION', 'repl-live', 'sb-core']) {
+  if (!existsSync(join(root, f))) throw new Error(`electron-builder.mjs: BISE_PACK_ROOT (${root}) has no ${f}: not a runtime`);
+}
 // optional: the release's VERSION file (make-release writes id= and built=)
 const version = process.env['BISE_PACK_VERSION'] ? need('BISE_PACK_VERSION') : null;
 
@@ -79,6 +92,9 @@ export default {
   files: ['out/**', 'package.json'],
   asar: true,
   extraResources: [
+    // the runtime first, then bise over it (a snapshot's own bise never wins); its rust/
+    // (an old path's hard link to bend-jsrt) would be a second 100 MB copy
+    { from: root, to: 'bin', filter: ['**/*', '!rust/**', '!bise'] },
     { from: bise, to: 'bin/bise' },
     ...(version === null ? [] : [{ from: version, to: 'VERSION' }]),
     { from: 'resources/pearl', to: 'pearl', filter: ['*.png'] },

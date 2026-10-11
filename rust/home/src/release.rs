@@ -34,6 +34,16 @@ pub const NO_UPDATE_ENV: &str = "BISE_NO_UPDATE";
 /// The manifest's name at the channel's base URL.
 pub const MANIFEST: &str = "latest.json";
 
+/// Overrides install.sh's prefix (install.sh reads it too).
+pub const PREFIX_ENV: &str = "BISE_PREFIX";
+
+/// install.sh's prefix: `BISE_PREFIX`, else `<user home>/.local/share/bise`
+/// (install.sh's default). The desktop app installs its runtime under its
+/// `versions/` (the binary's `update::from_bundle`).
+pub fn default_prefix(env: crate::Lookup, user_home: &Path) -> PathBuf {
+    env(PREFIX_ENV).filter(|p| !p.is_empty()).map(PathBuf::from).unwrap_or_else(|| user_home.join(".local/share/bise"))
+}
+
 /// The `key=value` lines of a VERSION file.
 pub fn version_fields(text: &str) -> BTreeMap<String, String> {
     text.lines()

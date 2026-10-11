@@ -1,7 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { crashLoop, exitOf, failedToStart, lastLine, reasonOf, redactLine } from './exit';
+import { crashLoop, earlyEnd, exitOf, failedToStart, lastLine, reasonOf, redactLine } from './exit';
 
 const NL = String.fromCharCode(10);
+
+describe('earlyEnd (architect m_18354: a core that ends before initialize never loops in silence)', () => {
+  const code = (last: string) => exitOf(1, null, last, null, 0);
+  const crash = exitOf(null, 'SIGSEGV', '', '/log', 0);
+  const NO_ROOT = 'repl-live not found: no VERSION next to the executable';
+  it.each([
+    ['a first early end restarts and remembers its line', null, code(NO_ROOT), false, { last: NO_ROOT, giveUp: false }],
+    ['the same early end twice in a row gives up', NO_ROOT, code(NO_ROOT), false, { last: NO_ROOT, giveUp: true }],
+    ['another line before initialize: one more try', NO_ROOT, code('ambient-core: refused: jail'), false, { last: 'ambient-core: refused: jail', giveUp: false }],
+    ['a run that wrote nothing twice gives up too', '', code(''), false, { last: '', giveUp: true }],
+    ['a crash after initialize restarts as today (crashLoop counts it)', NO_ROOT, crash, true, { last: null, giveUp: false }],
+    ['an exit code after initialize restarts and resets', NO_ROOT, code(NO_ROOT), true, { last: null, giveUp: false }],
+    ['a clean exit never gives up', '', exitOf(0, null, '', null, 0), false, { last: null, giveUp: false }],
+  ] as const)('%s', (_name, prev, e, answered, want) => {
+    expect(earlyEnd(prev, e, answered)).toEqual(want);
+  });
+});
 
 describe('exitOf', () => {
   it('a clean exit, an exit code, a signal', () => {

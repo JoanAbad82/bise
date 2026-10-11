@@ -65,6 +65,8 @@ function useSlice<T>(key: string, read: (s: Store) => T): T {
 }
 
 export const useProjects = (): readonly ProjectRow[] => useSlice('projects', (s) => s.projects());
+/** Why this core can start no hub (its runtime is missing); null: it can. */
+export const useBroken = (): string | null => useSlice('broken', (s) => s.broken());
 export const useAgents = (project: string): readonly Agent[] => useSlice(`agents:${project}`, (s) => s.agents(project));
 export const useCards = (project: string): readonly Card[] => useSlice(`cards:${project}`, (s) => s.cards(project));
 export const useVoiceAnswer = (): EvOf<'voice_answer'> | null => useSlice('voice_answer', (s) => s.voiceAnswer());

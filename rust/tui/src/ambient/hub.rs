@@ -24,8 +24,11 @@ pub enum HubIn {
     Line(String),
     /// connected (the hello replay follows, then `ready`)
     Up,
-    /// lost, or not reachable yet: the thread keeps trying
-    Down,
+    /// lost, or not reachable yet: the thread keeps trying. `Some`: the
+    /// connector's error, in its words (a hub that didn't start:
+    /// `client::open`'s cause and log; a core without its runtime: why),
+    /// said once per spell, then the pauses back off (1/2/5/10 s)
+    Down(Option<String>),
     /// the hub refused this connection (bise_proto HubEv::Refused, its
     /// words): the thread has ended, it never connects again (the hub's
     /// verdict is about this process: retrying alone wouldn't change it)
@@ -84,8 +87,11 @@ impl Hub {
             // the pause before the next attempt: `retry`, or the backoff's
             // next step while it backs off (its count reset when it doesn't)
             let mut misses = 0usize;
-            let mut pause = move || {
-                if slow.load(Ordering::SeqCst) {
+            // a connector that failed with a cause (a start that failed):
+            // backs off like `slow` until it connects
+            let mut failed = false;
+            let mut pause = move |failed: bool| {
+                if failed || slow.load(Ordering::SeqCst) {
                     std::thread::sleep(BACKOFF[misses.min(BACKOFF.len() - 1)]);
                     misses += 1;
                 } else {
@@ -107,19 +113,24 @@ impl Hub {
                 }
                 let stream = match connect() {
                     Ok(s) => s,
-                    Err(_) => {
-                        if !down_said {
+                    Err(e) => {
+                        // a cause the user can read: an error the connector
+                        // made (`Other`), never a bare refused or missing socket
+                        let cause = (e.kind() == io::ErrorKind::Other).then(|| e.to_string());
+                        if !down_said || (cause.is_some() && !failed) {
                             down_said = true;
-                            if tx.send(wrap(HubIn::Down)).is_err() {
+                            failed = cause.is_some();
+                            if tx.send(wrap(HubIn::Down(cause))).is_err() {
                                 return;
                             }
                         }
-                        pause();
+                        pause(failed);
                         continue;
                     }
                 };
+                failed = false;
                 let Ok(w) = stream.try_clone() else {
-                    pause();
+                    pause(false);
                     continue;
                 };
                 if let Ok(mut slot) = writer.lock() {
@@ -161,10 +172,10 @@ impl Hub {
                     return;
                 }
                 down_said = true;
-                if tx.send(wrap(HubIn::Down)).is_err() {
+                if tx.send(wrap(HubIn::Down(None))).is_err() {
                     return;
                 }
-                pause();
+                pause(false);
             }
         });
         hub
@@ -246,5 +257,35 @@ mod tests {
         assert!(rx.recv_timeout(Duration::from_millis(200)).is_err());
         assert_eq!(calls.load(Ordering::SeqCst), 1, "connected once");
         assert!(!hub.send(&serde_json::json!({"cmd": "x"})), "nothing goes to a hub that refused");
+    }
+
+    /// A start that fails says why, once (architect m_18354): the cause
+    /// rides on `Down`, a bare missing socket says none, and the reader
+    /// backs off (1 s first) instead of retrying every `retry`.
+    #[test]
+    fn a_failed_start_says_its_cause_once_then_backs_off() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let c2 = calls.clone();
+        let connect: Connect = Box::new(move || {
+            c2.fetch_add(1, Ordering::SeqCst);
+            Err(io::Error::other("the hub did not start: sb-core: no such file (its log: /h/hub.err)"))
+        });
+        let (tx, rx) = mpsc::channel();
+        let hub = Hub::start(connect, tx, |h| h, Duration::from_millis(5));
+        assert_eq!(
+            rx.recv_timeout(Duration::from_secs(3)).unwrap(),
+            HubIn::Down(Some("the hub did not start: sb-core: no such file (its log: /h/hub.err)".into()))
+        );
+        // said once; with a 5 ms retry it would try ~100 times in 500 ms
+        assert!(rx.recv_timeout(Duration::from_millis(500)).is_err(), "said once");
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "backed off: no second attempt within 1 s");
+        hub.close();
+
+        // no socket yet (a plain connect's NotFound): Down with no cause
+        let connect: Connect = Box::new(|| Err(io::Error::from(io::ErrorKind::NotFound)));
+        let (tx, rx) = mpsc::channel();
+        let hub = Hub::start(connect, tx, |h| h, Duration::from_millis(5));
+        assert_eq!(rx.recv_timeout(Duration::from_secs(3)).unwrap(), HubIn::Down(None));
+        hub.close();
     }
 }

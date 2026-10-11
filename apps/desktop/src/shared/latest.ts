@@ -29,6 +29,9 @@ export const STATE_TAGS: ReadonlySet<string> = new Set([
   'scheduled',
   // a project's hub refused this core: kept until its hub welcomes it again
   'hub_refused',
+  // this core can start no hub (its runtime is missing): said once, so a window that loads
+  // later needs it kept (CoreLine, settings › projects)
+  'broken',
   // a project's approvals mode, checker and rules, whole each time (bar V8/W21): the composer's
   // divider reads its mode and ⇧⇥ flips it (TP-R6); a window that loads after the hub said it
   // showed no mode at all

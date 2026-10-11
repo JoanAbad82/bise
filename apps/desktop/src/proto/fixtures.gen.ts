@@ -174,6 +174,7 @@ export const hub_cmd: readonly HubCmd[] = [
 
 /** rust/proto/fixtures/core_ev.jsonl */
 export const core_ev: readonly CoreEv[] = [
+  {"ev":"projects","projects":[{"agents":0,"down":"the hub did not start: sb-core: no such file (its log: /Users/camille/.bise/hubs/acme-1a2b3c4d/hub.err)","git":true,"home":false,"name":"acme","order":0,"path":"/Users/camille/acme","project":"acme-1a2b3c4d","running":false,"waits":0,"working":0}]},
   {"ev":"projects","projects":[{"agents":1,"git":false,"home":true,"name":"bise","order":0,"path":"/Users/camille/bise","project":"bise-home-00000000","running":true,"waits":0,"working":0},{"agents":3,"branch":"main","cards":[{"agent":"perf","id":9,"kind":"question","options":[{"label":"cold","n":1},{"label":"warm","n":2}],"project":"acme-1a2b3c4d","question":"which bench?","rank":1,"since_ms":1791100310000,"urgent":false},{"agent":"perf","approval":true,"id":10,"kind":"confirm","options":[{"label":"yes","n":1},{"label":"no","n":2}],"project":"acme-1a2b3c4d","question":"run rm -rf target?","rank":0,"since_ms":1791100320000,"urgent":true}],"git":true,"home":false,"name":"acme","order":1,"path":"/Users/camille/acme","project":"acme-1a2b3c4d","running":false,"waits":2,"web":"https://github.com/acme/engine","working":1}]},
   {"agent":"perf","ev":"open","project":"acme-1a2b3c4d","what":"thread"},
   {"ev":"open","id":"perf-notes","project":"acme-1a2b3c4d","what":"artifact"},
@@ -217,6 +218,7 @@ export const core_ev: readonly CoreEv[] = [
   {"ev":"keychain","moving":false,"store":"file"},
   {"ev":"keychain","lines":["moved 3 items to the macOS keychain: auth.json's 2 sign-ins, 1 MCP login"],"moving":false,"store":"keychain"},
   {"ev":"keychain","moving":true,"store":"file"},
+  {"ev":"broken","reason":"bise's runtime is missing: no repl-live in /Applications/bise.app/Contents/Resources/bin. reinstall bise"},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */

@@ -12,7 +12,7 @@ import { closeSync, openSync, readSync, statSync } from 'node:fs';
 import { childEnv } from '../childenv';
 import { Backoff, coreArgs, type CoreConfig } from './env';
 import { constants } from 'node:os';
-import { crashLoop, exitOf, failedToStart, reasonOf } from './exit';
+import { crashLoop, earlyEnd, exitOf, failedToStart, reasonOf } from './exit';
 import { INITIALIZED_LINE, initializeLine, LineSplitter, notAnEventLog, readLine, refusedLog, requestOf } from './lines';
 import type { CoreExit, CoreState } from '../../shared/api';
 
@@ -59,8 +59,12 @@ export class CoreProcess {
   private readonly waiting = new Map<number, string>();
   /** the crashes of the last 10 min (exit.ts crashLoop) */
   private crashTimes: number[] = [];
-  /** the third crash in 10 min: no restart until 'start bise' (restart()) */
+  /** the third crash in 10 min, or a second early end alike: no restart until 'start bise' (restart()) */
   private gaveUp = false;
+  /** this run answered its initialize */
+  private answered = false;
+  /** the last line of the previous run when it ended before answering (exit.ts earlyEnd) */
+  private earlyLast: string | null = null;
 
   constructor(
     private readonly opts: CoreOptions,
@@ -84,12 +88,22 @@ export class CoreProcess {
     if (this.stopped || this.child !== null || this.timer !== null || this.stateNow !== 'down') return false;
     this.crashTimes = [];
     this.gaveUp = false;
+    this.earlyLast = null;
     this.launch();
     return true;
   }
 
   /** How a run ended, with the crash count, whether it gives up, and the report written for a crash. */
-  private ended(raw: CoreExit, tail: string): CoreExit {
+  private ended(raw0: CoreExit, tail: string): CoreExit {
+    // the same early end twice: 'failed', never a silent restart loop (architect m_18354)
+    const early = earlyEnd(this.earlyLast, raw0, this.answered);
+    this.earlyLast = early.last;
+    if (early.giveUp) {
+      this.gaveUp = true;
+      const failed: CoreExit = { ...raw0, how: 'failed', crash: false };
+      return { ...failed, reason: reasonOf(failed, constants.signals) };
+    }
+    const raw = raw0;
     const e: CoreExit = { ...raw, reason: reasonOf(raw, constants.signals) };
     if (!e.crash) return e;
     const loop = crashLoop(this.crashTimes, e.at_ms);
@@ -152,6 +166,7 @@ export class CoreProcess {
         return;
       }
       child.stdin.write(INITIALIZED_LINE);
+      this.answered = true;
       this.setState('up');
       return;
     }
@@ -172,6 +187,7 @@ export class CoreProcess {
     this.gen += 1;
     const g = this.gen;
     this.startedAt = Date.now();
+    this.answered = false;
     this.logFrom = this.logSize();
     let err: number | 'ignore' = 'ignore';
     if (this.opts.logFile !== undefined) {

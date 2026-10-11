@@ -112,8 +112,11 @@ def pure():
           "dist packs the try's bise into its own bundle, signed stable; no old app: %s" % sc)
     check("BISE_PACK_SIGN_DIR" not in T.build_script(p, None), "no sign dir: ad hoc")
     ae = T.app_env("/h/.bise/try/desktop", {"PATH": "/usr/bin"}, "/h/build/desktop-try/root-abc")
-    check("BISE_APP_ROOT=/h/build/desktop-try/root-abc" in ae and "BISE_APP_ROOT=%s" % ROOT not in ae,
-          "the app root is the build's snapshot, never the checkout: %s" % ae)
+    check(not any(e.startswith("BISE_APP_ROOT=") for e in ae),
+          "never an app root in the app's env: the snapshot is inside the bundle (architect m_18354): %s" % ae)
+    sr = T.build_script(p, "/h/sign", root="/h/build/desktop-try/root-abc")
+    check("BISE_PACK_ROOT=/h/build/desktop-try/root-abc " in sr and "BISE_PACK_ROOT" not in sc,
+          "the snapshot is packed into the bundle when there is one: %s" % sr)
     check(ae[:2] == ["BISE_HOME=/h/.bise/try/desktop", "BISE_HOME_WORKSPACE=/h/.bise/try/desktop/bise"] and "PATH=/usr/bin" in ae
           and not any(e.split("=")[0] in ("BISE_DESKTOP_TEST", "BISE_TEST_HOME", "BISE_DESKTOP_USER_DATA", "BISE_DESKTOP_HELPER", "BISE_DESKTOP_BISE")
                       for e in ae), "the app's env: the try home, never a test variable: %s" % ae)

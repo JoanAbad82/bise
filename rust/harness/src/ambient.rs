@@ -13,13 +13,33 @@ pub fn core(args: &[String]) -> std::io::Result<i32> {
         eprintln!("ambient-core: cannot create {}: {}", switchboard::paths::home_workspace().display(), e);
     }
     let paths = switchboard::paths::Paths::for_workspace(&ambient_workspace(args, true));
-    let root = crate::live_app_root_or_exit();
     let exe = std::env::current_exe()?;
     let workspace = paths.workspace.to_string_lossy().to_string();
-    let projects = ambient_projects(exe.clone(), root.clone());
-    let home_move = home_move(paths.clone(), root.clone());
-    let connect = ambient_connector(paths, exe, root);
-    Ok(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects), Some(ambient_setup()), Some(home_move)))
+    // never an exit before `initialize` (the window would only see a
+    // restart loop): no runtime, the core still answers, says why
+    // (`broken`) and every hub's row says it too
+    let root = crate::approot::locate("repl-live").map(|(r, _)| r).and_then(|r| crate::update::hub_root(&r));
+    let (projects, home_move, connect, broken) = match root {
+        Ok(root) => {
+            let projects = ambient_projects(Connector::Hub(exe.clone(), root.clone()));
+            let home_move = home_move(paths.clone(), root.clone());
+            (projects, Some(home_move), ambient_connector(paths, Connector::Hub(exe, root)), None)
+        }
+        Err(why) => {
+            eprintln!("ambient-core: {why}");
+            let projects = ambient_projects(Connector::Broken(why.clone()));
+            (projects, None, ambient_connector(paths, Connector::Broken(why.clone())), Some(why))
+        }
+    };
+    Ok(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects), Some(ambient_setup()), home_move, broken))
+}
+
+/// How the core reaches a hub: through `client::open` with this bise
+/// and its app root, or never (no runtime: each attempt fails with why).
+#[derive(Clone)]
+enum Connector {
+    Hub(std::path::PathBuf, std::path::PathBuf),
+    Broken(String),
 }
 
 /// The core's move of an older home hub to its own version (architect
@@ -75,11 +95,17 @@ fn ambient_workspace(args: &[String], core: bool) -> std::path::PathBuf {
 /// only connect: the user may have stopped bise. It says nothing: the
 /// core's first line is JSON-RPC's `initialize` (the home hub's
 /// connection since client-protocol step 5, a project's since P1c).
-fn ambient_connector(paths: switchboard::paths::Paths, exe: std::path::PathBuf, root: std::path::PathBuf) -> bend_tui::ambient::Connect {
+/// A start that fails says why (`client::open`'s cause, an `Other`
+/// error: the reader's `HubIn::Down` carries it to the row).
+fn ambient_connector(paths: switchboard::paths::Paths, how: Connector) -> bend_tui::ambient::Connect {
     let mut first = true;
     Box::new(move || {
+        let (exe, root) = match &how {
+            Connector::Hub(exe, root) => (exe, root),
+            Connector::Broken(why) => return Err(std::io::Error::other(why.clone())),
+        };
         let s = if std::mem::take(&mut first) {
-            switchboard::client::open(&paths, &exe, &root)?
+            switchboard::client::open(&paths, exe, root).map_err(|e| std::io::Error::other(e.to_string()))?
         } else {
             std::os::unix::net::UnixStream::connect(paths.socket())?
         };
@@ -91,9 +117,9 @@ fn ambient_connector(paths: switchboard::paths::Paths, exe: std::path::PathBuf, 
 /// connection to any project's hub (it may start that hub, like the
 /// voice target's), the registry rows, each hub's view.json, its pid, the
 /// checkout's branch. Read-only but the connection.
-fn ambient_projects(exe: std::path::PathBuf, root: std::path::PathBuf) -> (bend_tui::ambient::ConnectFor, bend_tui::ambient::ProjectFacts) {
+fn ambient_projects(how: Connector) -> (bend_tui::ambient::ConnectFor, bend_tui::ambient::ProjectFacts) {
     let connect_for: bend_tui::ambient::ConnectFor = Box::new(move |path| {
-        ambient_connector(switchboard::paths::Paths::for_workspace(path), exe.clone(), root.clone())
+        ambient_connector(switchboard::paths::Paths::for_workspace(path), how.clone())
     });
     let facts = bend_tui::ambient::ProjectFacts {
         rows: Box::new(|| bise_home::projects::list(&bise_home::Home::from_env(), &switchboard::paths::home_workspace())),

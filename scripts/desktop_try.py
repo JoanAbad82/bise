@@ -273,9 +273,11 @@ def build_script(paths, sign_dir=None, out=None, root=None, repo=REPO):
              "cd %s" % q(desktop),
              "pnpm install --frozen-lockfile",
              "pnpm build",
-             "BISE_PACK_NAME=%s BISE_PACK_APP_ID=%s BISE_PACK_BISE=%s BISE_PACK_HELPER=%s%s%s pnpm dist"
-             % (q(APP_NAME), q(APP_ID), q(paths["bise"]), q(paths["helper"]), " BISE_PACK_SIGN_DIR=%s" % q(sign_dir) if sign_dir else "",
-                " BISE_PACK_OUT=%s" % q(out) if out else "")]
+             # BISE_PACK_ROOT: the snapshot goes inside the bundle (Contents/Resources/bin), so the
+             # app opens with no env (architect m_18354); its core installs it as a version dir
+             "BISE_PACK_NAME=%s BISE_PACK_APP_ID=%s BISE_PACK_BISE=%s BISE_PACK_HELPER=%s%s%s%s pnpm dist"
+             % (q(APP_NAME), q(APP_ID), q(paths["bise"]), q(paths["helper"]), " BISE_PACK_ROOT=%s" % q(root) if root else "",
+                " BISE_PACK_SIGN_DIR=%s" % q(sign_dir) if sign_dir else "", " BISE_PACK_OUT=%s" % q(out) if out else "")]
     if out:
         # a fresh staging dir: a half-written bundle from a failed build never gets swapped in
         lines.insert(lines.index("cd %s" % q(desktop)), "rm -rf %s" % q(out))
@@ -614,7 +616,7 @@ def candidate(env, paths, sha, repo=REPO, sign=None):
     with open(c["json"] + ".tmp", "w") as f:
         json.dump(info, f, indent=1)
     os.replace(c["json"] + ".tmp", c["json"])
-    say("candidate %s built: %s (open it with BISE_APP_ROOT=%s)" % (sha[:8], c["app"], c["root"]))
+    say("candidate %s built: %s (its runtime %s is inside it: open it with no env)" % (sha[:8], c["app"], c["root"]))
     return info
 
 
@@ -747,9 +749,9 @@ def setup(real, tryh, repos, env, bise):
 
 def app_env(tryh, env, root):
     """What the new app is opened with (open --env): the try home, its own home workspace, the
-    build's snapshot app root for the hubs' repl-live, sb-core and runtime files (never this
-    checkout: ambient-lead m_11624), the try's PATH. Pure."""
-    return ["BISE_HOME=%s" % tryh, "BISE_HOME_WORKSPACE=%s" % os.path.join(tryh, "bise"), "BISE_APP_ROOT=%s" % root,
+    try's PATH. Never an app root: the build's snapshot is inside the bundle (BISE_PACK_ROOT), and
+    main never passes BISE_APP_ROOT to its core (an internal name). `root` is unused. Pure."""
+    return ["BISE_HOME=%s" % tryh, "BISE_HOME_WORKSPACE=%s" % os.path.join(tryh, "bise"),
             "PATH=%s" % env.get("PATH", "/usr/bin:/bin")]
 
 

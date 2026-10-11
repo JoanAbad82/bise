@@ -94,11 +94,14 @@ struct Conn {
     cmds: Vec<String>,
     /// its JSON-RPC side (P1c, `hub_rpc.rs`)
     rpc: RpcConn,
+    /// why its hub couldn't start (`HubIn::Down`'s cause), until it's up:
+    /// the row's `down`
+    down: Option<String>,
 }
 
 impl Conn {
     fn new(hub: Hub, until: Option<Instant>) -> Conn {
-        Conn { hub, welcomed: false, rows: None, pending: Vec::new(), until, cmds: Vec::new(), rpc: RpcConn::default() }
+        Conn { hub, welcomed: false, rows: None, pending: Vec::new(), until, cmds: Vec::new(), rpc: RpcConn::default(), down: None }
     }
 
     /// One window command (a `HubCmd`'s JSON) to its hub: a request once
@@ -160,6 +163,9 @@ pub(super) struct Hubs {
     /// ambient-qa run on a real workspace, is refused by design), so
     /// retrying on our own would never change it
     refused: BTreeMap<String, String>,
+    /// why bise's own (home) hub couldn't start, until it's up: the home
+    /// row's `down` (its connection is the core's `hub`, not a `Conn`)
+    pub(super) home_down: Option<String>,
 }
 
 /// What a command to a refused project's hub answers (kind hub_refused).
@@ -494,6 +500,7 @@ impl Core {
             // release): the older hello, then the typed one
             HubIn::Up => {
                 c.welcomed = false;
+                let was_down = c.down.take().is_some();
                 if older {
                     c.hub.send(&json!({"op": "hello"}));
                     c.hub.send(&json!({"cmd": "hello", "proto": bise_proto::PROTO, "typed_only": true}));
@@ -501,11 +508,18 @@ impl Core {
                     let init = c.rpc.initialize(env!("CARGO_PKG_VERSION"));
                     c.hub.send(&init);
                 }
+                if was_down {
+                    self.emit_projects();
+                }
             }
-            HubIn::Down => {
+            HubIn::Down(cause) => {
                 c.welcomed = false;
                 c.rpc.ready = false;
                 c.rows = None;
+                // a cause stays until it's up: a later bare loss keeps it
+                if cause.is_some() {
+                    c.down = cause;
+                }
                 self.emit_projects();
             }
             HubIn::Refused(why) => self.project_refused(id, why),
@@ -670,7 +684,7 @@ impl Core {
     }
 
     /// `projects` when the rows changed.
-    fn emit_projects(&mut self) {
+    pub(super) fn emit_projects(&mut self) {
         // no rows before the window says what it shows (home's early
         // welcome, agents or cards say nothing yet)
         if self.hubs.shown.is_none() {
@@ -696,7 +710,12 @@ impl Core {
                 // old hub process still does (lead m_8979)
                 f.running = !f.missing && (held || (p.facts.running)(&f.row.path));
                 let c = self.hubs.git.get(&f.row.id).cloned().unwrap_or_default();
-                projects::row(&f, i as u32, &c)
+                let mut row = projects::row(&f, i as u32, &c);
+                row.down = match f.row.home {
+                    true => self.hubs.home_down.clone(),
+                    false => conns.get(&f.row.id).and_then(|c| c.down.clone()).filter(|_| !held),
+                };
+                row
             })
             .collect();
         let ev = json!({"ev": "projects", "projects": rows});

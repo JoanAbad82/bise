@@ -9,11 +9,22 @@
 import { useState } from 'react';
 import type { Found, ProjectRow } from '@/proto';
 import { Button, Check, Field, Group, Help, Kbd, Toggle } from '@/ds';
+import { useBroken } from '@/store';
 import type { SettingsPorts } from './Settings';
 
 /** The projects he orders (bise's home is not one of them), in their order. */
 export function ordered(projects: readonly ProjectRow[]): ProjectRow[] {
   return projects.filter((p) => !p.home).sort((a, b) => a.order - b.order);
+}
+
+/**
+ * A row's line under its name: its folder, and what's wrong with it in plain words (its folder
+ * gone; its hub couldn't start: the core's `down`, architect m_18354), never a silent row. Pure.
+ */
+export function projectSub(p: ProjectRow): string {
+  if (p.missing === true) return `${p.path} · its folder is gone`;
+  if (p.down != null && p.down !== '') return `${p.path} · ${p.down}`;
+  return p.path;
 }
 
 /** What "add" adds: the ticked paths, plus the one typed (once). */
@@ -30,6 +41,7 @@ export function offers(found: readonly Found[], projects: readonly ProjectRow[])
 
 export function Projects({ projects, found, ports }: { projects: readonly ProjectRow[]; found: readonly Found[]; ports: SettingsPorts }) {
   const ps = ordered(projects);
+  const broken = useBroken();
   const [confirm, setConfirm] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
@@ -66,7 +78,7 @@ export function Projects({ projects, found, ports }: { projects: readonly Projec
                 {i < 9 && <Kbd>{`⌘${String(i + 1)}`}</Kbd>} {p.name}
               </>
             ),
-          sub: p.missing === true ? `${p.path} · its folder is gone` : p.path,
+          sub: projectSub(p),
           control:
             confirm === p.project ? (
               <span className="settings-row-acts" data-testid={`settings.project.${p.project}.confirm`}>
@@ -86,7 +98,13 @@ export function Projects({ projects, found, ports }: { projects: readonly Projec
               </span>
             ),
         }))}
-        help={confirm !== null ? `remove ${ps.find((p) => p.project === confirm)?.name ?? ''} from bise? its folder and its git history stay.` : undefined}
+        help={
+          confirm !== null
+            ? `remove ${ps.find((p) => p.project === confirm)?.name ?? ''} from bise? its folder and its git history stay.`
+            : broken !== null
+              ? `▲ bise can't start your projects: ${broken}.`
+              : undefined
+        }
       />
       {sheet ? (
         <AddSheet

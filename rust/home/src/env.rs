@@ -148,6 +148,7 @@ pub const VARS: &[Var] = &[
     internal("BISE_OWNERS", "the agents a process belongs to (BISE-243)"),
     internal("BISE_PAGES_EXPORT", "the public pages' export folder, for the mirror command the hub runs (pages/mirror.rs)"),
     user("BISE_POINTER", "mouse pointer shapes on or off"),
+    user("BISE_PREFIX", "where bise is installed (install.sh's prefix; the desktop app installs its runtime there)"),
     test_input("BISE_PROTO_BLESS", "the generated TS tests (bise-proto's ts test, bise_home's env table) rewrite their files in apps/desktop instead of failing on stale ones"),
     user("BISE_RECYCLE_TOKENS", "context tokens an agent's REPL reads before the hub restarts it at idle (0: never)"),
     user("BISE_REDUCE_MOTION", "fewer animations"),

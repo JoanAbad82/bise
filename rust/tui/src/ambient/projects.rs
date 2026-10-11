@@ -118,6 +118,8 @@ pub fn row(f: &Facts, order: u32, c: &Checkout) -> ProjectRow {
         missing: f.missing,
         cards: f.view.as_ref().map(|v| v.cards.clone()).unwrap_or_default(),
         web,
+        // the core's own fact (its connection), set by core/hubs.rs
+        down: None,
     }
 }
 

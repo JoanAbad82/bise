@@ -89,11 +89,24 @@ export function crashLoop(times: readonly number[], now: number): { readonly tim
 }
 
 /**
+ * A run that ended before it answered `initialize` (architect m_18354): a core that exits at once
+ * would otherwise restart forever while the window says 'starting bise…' (his real-home try: 18
+ * exits, no word). `prev`: the last line of the previous run when it too ended early, else null.
+ * The second early end in a row with the same last line gives up: it is 'failed' (the window
+ * says why, with 'start bise'), no restart. A run that answered, or a clean exit, resets it: a
+ * crash after `initialize` keeps restarting as before (crashLoop). Pure.
+ */
+export function earlyEnd(prev: string | null, e: CoreExit, answered: boolean): { readonly last: string | null; readonly giveUp: boolean } {
+  if (answered || e.how === 'clean') return { last: null, giveUp: false };
+  return { last: e.last, giveUp: prev !== null && prev === e.last };
+}
+
+/**
  * The reason in designer's words ('core exited with signal 11', 'core exited with code 101', a
  * panic's message): `signals` maps a signal name to its number (os.constants.signals). Pure.
  */
 export function reasonOf(e: CoreExit, signals: Readonly<Record<string, number>>): string {
-  if (e.how === 'failed') return `core couldn't start: ${e.last}`;
+  if (e.how === 'failed') return e.last === '' ? `core couldn't start (it said nothing)` : `core couldn't start: ${e.last}`;
   if (e.signal !== null) return `core exited with signal ${String(signals[e.signal] ?? e.signal)}`;
   if (e.crash && e.last !== '') return `core panicked: ${e.last}`;
   return `core exited with code ${String(e.code ?? '?')}`;

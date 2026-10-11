@@ -220,6 +220,9 @@ pub type ConnectFor = Box<dyn Fn(&std::path::Path) -> Connect>;
 
 /// `setup`: the window's setup commands' ports (S11; the binary's live
 /// ones, `setup::live`), prefs and accounts said at the start.
+/// `broken`: this core can't start any hub (no runtime), why in plain
+/// words: it still answers, says `broken` once, and its connectors fail
+/// with those words (every hub's row says them).
 pub fn core_main(
     workspace: String,
     connect: Connect,
@@ -227,6 +230,7 @@ pub fn core_main(
     projects: Option<(ConnectFor, ProjectFacts)>,
     setup: Option<setup::SetupPorts>,
     home_move: Option<HomeMove>,
+    broken: Option<String>,
 ) -> i32 {
     let (tx, rx) = mpsc::channel::<In>();
     let hub = Hub::start(connect, tx.clone(), In::Hub, RETRY);
@@ -259,6 +263,9 @@ pub fn core_main(
     }
     let (ports, fake_ev) = ports_for_env(user_kind);
     let mut core = Core::new(workspace, hub, ports);
+    if let Some(reason) = broken {
+        core.broken(reason);
+    }
     if let Some(p) = projects {
         core.set_projects(p);
         // the window shows computer use live (S29); the capsule alone doesn't

@@ -52,12 +52,20 @@ def recipe_law():
         assert want in s, want
     assert "ambient.sh" not in s and "apps/ambient" not in s and "cargo" not in s, "never the Swift app, no Rust build here"
     assert "BISE_PACK_SIGN_DIR" not in A.build_script(p, "/b/bise", None), "ad hoc without an identity"
+    # the runtime snapshot goes inside the bundle (architect m_18354): built first, then packed
+    r = A.build_script(p, "/b/bise", None, "/h/.bise/dev/build/desktop/root-abc")
+    assert "BISE_PACK_ROOT=/h/.bise/dev/build/desktop/root-abc " in r, r
+    assert r.index("mv /h/.bise/dev/build/desktop/root-abc.tmp /h/.bise/dev/build/desktop/root-abc") < r.index("pnpm dist"), r
+    assert "! -name root-abc -exec rm -rf" in r, "the older snapshots go"
+    parts = {"tree": "t", "changes": "", "bise": "b", "recipe": "r"}
+    assert A.root_for(p, parts) == A.root_for(p, dict(parts)) != A.root_for(p, {**parts, "bise": "c"}), "one id per build"
 
 
 def open_law():
-    c = A.open_command("/h/b/desktop/bise.app", "/w/shop", "/repo")
-    assert c == ["open", "-n", "-a", "/h/b/desktop/bise.app", "--env", "BISE_DESKTOP_WORKSPACE=/w/shop", "--env", "BISE_APP_ROOT=/repo"], c
-    assert "BISE_DESKTOP_WORKSPACE=" in A.open_command("/a.app", "", "/r"), "'' = his home workspace"
+    c = A.open_command("/h/b/desktop/bise.app", "/w/shop")
+    assert c == ["open", "-n", "-a", "/h/b/desktop/bise.app", "--env", "BISE_DESKTOP_WORKSPACE=/w/shop"], c
+    assert "BISE_DESKTOP_WORKSPACE=" in A.open_command("/a.app", ""), "'' = his home workspace"
+    assert not any("BISE_APP_ROOT" in a for a in c), "never an app root: the runtime is inside the bundle (architect m_18354)"
 
 
 def parse_law():

@@ -98,6 +98,22 @@ describe('the core line (bar S.5, O.4; designer voice-window part 2)', () => {
     expect(coreView('starting', { wasUp: false, slow: false })).toBeUndefined();
     expect(coreView('starting', { wasUp: false, slow: true })?.text).toBe('starting bise…');
   });
+  it("a core that can start no hub says why at once, in red, with no 'start bise' (architect m_18354)", async () => {
+    const { coreView } = await import('./CoreLine');
+    const why = "bise's runtime is missing: no repl-live in /Applications/bise.app/Contents/Resources/bin. reinstall bise";
+    expect(coreView('up', { wasUp: true, slow: false, broken: why })).toEqual({
+      text: `▲ bise can't start your projects: ${why}.`,
+      tone: 'err',
+      start: false,
+      report: false,
+    });
+    expect(coreView('up', { wasUp: true, slow: false, broken: null }), 'a whole core says nothing').toBeUndefined();
+  });
+  it("an early end given up says it didn't start, with its line, never 'starting bise…'", async () => {
+    const { coreView } = await import('./CoreLine');
+    const e = { ...base, how: 'failed' as const, code: 1, last: 'ambient-core: refused: jail', reason: "core couldn't start: ambient-core: refused: jail" };
+    expect(coreView('down', { wasUp: false, slow: true, exit: e })).toMatchObject({ text: "▲ bise didn't start: core couldn't start: ambient-core: refused: jail.", tone: 'err', start: true });
+  });
 
   it('a crash that comes back says only that it is coming back', async () => {
     const { coreView } = await import('./CoreLine');

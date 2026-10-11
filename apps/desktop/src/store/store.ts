@@ -525,6 +525,10 @@ export class Store {
         // a project's hub refused this core: its words until he retries
         this.put(`hub_refused:${ev.project}`, ev.error);
         return;
+      case 'broken':
+        // this core can start no hub (its runtime is missing): why, for this core's life
+        this.put('broken', ev.reason);
+        return;
       case 'welcome':
         // its hub took this core (again): no refusal holds
         if (this.slices.get(`hub_refused:${ev.project}`) != null) this.put(`hub_refused:${ev.project}`, null);
@@ -737,6 +741,11 @@ export class Store {
   setupFirst(): EvOf<'setup_first'> | null {
     return this.slice<EvOf<'setup_first'> | null>('setup_first', null);
   }
+  /** Why this core can start no hub (CoreEv broken: its runtime is missing); null: it can. */
+  broken(): string | null {
+    return this.slice<string | null>('broken', null);
+  }
+
   /** N1: where his keys and sign-ins are (the core's keychain event); none yet: null */
   keychain(): EvOf<'keychain'> | null {
     return this.slice<EvOf<'keychain'> | null>('keychain', null);

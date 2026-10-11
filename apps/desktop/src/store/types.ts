@@ -77,6 +77,8 @@ export const TAGS = {
   release: true,
   update: true,
   versions: true,
+  // the core can't start any hub (its runtime is missing): Rust's words, drawn by CoreLine
+  broken: true,
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */

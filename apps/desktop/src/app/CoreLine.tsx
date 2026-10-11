@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import type { BiseApi, CoreExit, CoreState } from '@/shared/api';
 import { Button } from '@/ds';
-import { useCoreState } from '@/store';
+import { useBroken, useCoreState } from '@/store';
 import { useRouter } from './router';
 
 /** How long a first start may take before the line says so. */
@@ -49,8 +49,14 @@ export type CoreView = {
  * `exit`: how its last run ended; `crashed`: a crash in this down spell; `long`: down 2 s or more;
  * `back`: it came back after a long spell, less than 3 s ago.
  */
-export function coreView(state: CoreState, o: { wasUp: boolean; slow: boolean; exit?: CoreExit | null; crashed?: boolean; long?: boolean; back?: boolean }): CoreView | undefined {
+export function coreView(
+  state: CoreState,
+  o: { wasUp: boolean; slow: boolean; exit?: CoreExit | null; crashed?: boolean; long?: boolean; back?: boolean; broken?: string | null },
+): CoreView | undefined {
   const plain = (text: string): CoreView => ({ text, tone: 'dim', start: false, report: false });
+  // the core runs but can start no hub (its runtime is missing): its words, at once, for as long
+  // as it runs (architect m_18354); 'start bise' wouldn't change it, reinstalling does
+  if (state === 'up' && o.broken != null && o.broken !== '') return { text: `▲ bise can't start your projects: ${o.broken}.`, tone: 'err', start: false, report: false };
   if (state === 'up') return o.back === true ? plain('bise is back.') : undefined;
   const e = o.exit ?? null;
   const reason = e === null ? '' : (e.reason ?? exitWords(e));
@@ -94,6 +100,7 @@ function useCoreExit(): CoreExit | null {
 export function CoreLine() {
   const router = useRouter();
   const state = useCoreState();
+  const broken = useBroken();
   const exit = useCoreExit();
   const [wasUp, setWasUp] = useState(false);
   const [slow, setSlow] = useState(false);
@@ -140,7 +147,7 @@ export function CoreLine() {
       clearTimeout(t);
     };
   }, [state, wasUp]);
-  const v = coreView(state, { wasUp, slow, exit, crashed, long, back });
+  const v = coreView(state, { wasUp, slow, exit, crashed, long, back, broken });
   if (v === undefined) return null;
   const path = exit?.report ?? null;
   return (

@@ -235,17 +235,12 @@ fn unpack(inst: &Install, rel: &Release, base: &str, work: &Path, dir: &Path) ->
         .find(|p| p.join("app").is_dir())
         .ok_or("the tarball has no app/ folder")?;
     let app = bundle.join("app");
-    if let Some(f) = REQUIRED.iter().find(|f| !app.join(f).exists()) {
-        return Err(format!("incomplete release: app/{} missing", f));
-    }
     let id = release::read_version(&app).get("id").cloned().unwrap_or_default();
-    if id != rel.id {
+    if REQUIRED.iter().all(|f| app.join(f).exists()) && id != rel.id {
         return Err(format!("the tarball holds version {}, the manifest says {}", id, rel.id));
     }
-    let tmp = inst.versions_dir().join(format!(".{}.tmp", rel.id));
-    let _ = std::fs::remove_dir_all(&tmp);
-    std::fs::rename(&app, &tmp).map_err(|e| format!("{}: {}", tmp.display(), e))?;
-    std::fs::rename(&tmp, dir).map_err(|e| format!("{}: {}", dir.display(), e))?;
+    place(&inst.versions_dir(), &rel.id, &app, false).map_err(|e| format!("incomplete release: {}", e))?;
+    debug_assert!(dir.join("bise").exists());
     // the newest installer: `bise uninstall` runs it
     let sh = bundle.join("install.sh");
     if sh.is_file() {
@@ -255,6 +250,82 @@ fn unpack(inst: &Install, rel: &Release, base: &str, work: &Path, dir: &Path) ->
         }
     }
     Ok(())
+}
+
+/// Put the app root `from` at `<versions>/<id>`, the one way a version
+/// dir is made from a release (a tarball's `app/`, moved) or from the
+/// desktop app's bundle (copied, it stays): REQUIRED checked, then
+/// through `.<id>.<pid>.tmp` and one rename, so a half copy never shows
+/// and two at once leave one. Its dir; already there: kept as it is.
+fn place(versions: &Path, id: &str, from: &Path, copy: bool) -> Result<PathBuf, String> {
+    if id.is_empty() || id.starts_with('.') || id.contains('/') {
+        return Err(format!("{}: no usable VERSION id ('{}')", from.display(), id));
+    }
+    if let Some(f) = REQUIRED.iter().find(|f| !from.join(f).exists()) {
+        return Err(format!("{} is missing from {}", f, from.display()));
+    }
+    let dir = versions.join(id);
+    if dir.join("bise").exists() {
+        return Ok(dir);
+    }
+    std::fs::create_dir_all(versions).map_err(|e| format!("{}: {}", versions.display(), e))?;
+    let tmp = versions.join(format!(".{}.{}.tmp", id, std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    let made = if copy {
+        // a clone on APFS (`cp -c`: no second 100 MB), else a plain copy
+        let cp = |clone: bool| {
+            let mut c = Command::new("/bin/cp");
+            c.arg(if clone { "-Rc" } else { "-R" }).arg(from).arg(&tmp).stderr(Stdio::piped());
+            c.output().map_err(|e| e.to_string()).and_then(|o| match o.status.success() {
+                true => Ok(()),
+                false => Err(String::from_utf8_lossy(&o.stderr).trim().to_string()),
+            })
+        };
+        cp(true).or_else(|_| {
+            let _ = std::fs::remove_dir_all(&tmp);
+            cp(false)
+        })
+    } else {
+        std::fs::rename(from, &tmp).map_err(|e| e.to_string())
+    };
+    if let Err(e) = made {
+        let _ = std::fs::remove_dir_all(&tmp);
+        return Err(format!("{}: {}", tmp.display(), e));
+    }
+    match std::fs::rename(&tmp, &dir) {
+        Ok(()) => Ok(dir),
+        // another one placed it first: theirs stays
+        Err(_) if dir.join("bise").exists() => {
+            let _ = std::fs::remove_dir_all(&tmp);
+            Ok(dir)
+        }
+        Err(e) => {
+            let _ = std::fs::remove_dir_all(&tmp);
+            Err(format!("{}: {}", dir.display(), e))
+        }
+    }
+}
+
+/// The app root hubs run from (architect m_18354): the desktop app's
+/// bise finds its runtime in `<x>.app/Contents/Resources/bin` (a version
+/// dir the app carries), but a hub never runs from inside a `.app` (its
+/// update renames the bundle to `.old`, then deletes it; probation and
+/// rollback want immutable dirs): that runtime is installed once as
+/// `<prefix>/versions/<its VERSION id>` ([`place`], copied), and that dir
+/// is the root. Any other root is returned as it is.
+pub(crate) fn hub_root(root: &Path) -> Result<PathBuf, String> {
+    if !in_app(root) {
+        return Ok(root.to_path_buf());
+    }
+    let id = release::read_version(root).get("id").cloned().unwrap_or_default();
+    let home = bise_home::Home::from_env();
+    let versions = release::default_prefix(&env, home.user_home()).join("versions");
+    place(&versions, &id, root, true).map_err(|e| format!("bise couldn't install its runtime: {}. reinstall bise", e))
+}
+
+/// A path inside an app bundle (`….app/Contents/…`).
+pub(crate) fn in_app(p: &Path) -> bool {
+    p.to_string_lossy().contains(".app/Contents/")
 }
 
 /// `current -> versions/<id>`, atomically (a symlink renamed over it).
@@ -466,6 +537,45 @@ mod tests {
         assert!(!due(Some(Duration::from_secs(3600)), day));
         assert!(due(Some(day), day));
         assert!(due(Some(Duration::ZERO), Duration::ZERO));
+    }
+
+    /// The desktop app's runtime (architect m_18354): copied once out of
+    /// the .app into `versions/<id>` (the bundle stays whole), a second
+    /// launch copies nothing, a broken bundle says what it lacks.
+    #[test]
+    fn a_bundles_runtime_is_placed_once_as_a_version_dir() {
+        let t = std::env::temp_dir().join(format!("bise-place-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&t);
+        let bin = t.join("bise.app/Contents/Resources/bin");
+        std::fs::create_dir_all(bin.join("prompts")).unwrap();
+        for f in REQUIRED {
+            std::fs::write(bin.join(f), "x").unwrap();
+        }
+        std::fs::write(bin.join("VERSION"), "id=root-abc
+").unwrap();
+        std::fs::write(bin.join("prompts/p.txt"), "p").unwrap();
+        assert!(in_app(&bin) && !in_app(&t.join("versions/root-abc")));
+        let versions = t.join("prefix/versions");
+        let dir = place(&versions, "root-abc", &bin, true).unwrap();
+        assert_eq!(dir, versions.join("root-abc"));
+        assert_eq!(std::fs::read_to_string(dir.join("prompts/p.txt")).unwrap(), "p");
+        assert!(bin.join("repl-live").exists(), "copied: the bundle stays whole");
+        // the second launch: kept as it is, nothing copied over it
+        std::fs::write(dir.join("marker"), "first").unwrap();
+        std::fs::write(bin.join("prompts/p.txt"), "changed").unwrap();
+        assert_eq!(place(&versions, "root-abc", &bin, true).unwrap(), dir);
+        assert_eq!(std::fs::read_to_string(dir.join("prompts/p.txt")).unwrap(), "p");
+        assert!(dir.join("marker").exists());
+        // no temp dir left
+        let left: Vec<String> = std::fs::read_dir(&versions).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into()).collect();
+        assert_eq!(left, ["root-abc"]);
+        // a bundle without its runtime, or a bad id: why, nothing placed
+        std::fs::remove_file(bin.join("sb-core")).unwrap();
+        let e = place(&versions, "root-new", &bin, true).unwrap_err();
+        assert!(e.starts_with("sb-core is missing from ") && e.ends_with("bise.app/Contents/Resources/bin"), "{e}");
+        assert!(place(&versions, "../x", &bin, true).unwrap_err().contains("no usable VERSION id"));
+        assert!(!versions.join("root-new").exists());
+        let _ = std::fs::remove_dir_all(&t);
     }
 
     #[test]

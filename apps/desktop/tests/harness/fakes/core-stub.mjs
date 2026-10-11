@@ -22,9 +22,11 @@ const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const jsonl = (file) => readFileSync(file, 'utf8').split(String.fromCharCode(10)).map((l) => l.trim()).filter(Boolean);
 
 const world = process.env.BISE_HARNESS_CORE_EVENTS;
+// The fixtures' `broken` (a core with no runtime: no hub can start) is not part of the healthy
+// world: a test that wants it sends it (app/keep, app/core-line went red with its ▲ line on).
 const all = world === 'none' ? []
   : world ? jsonl(world)
-  : [...jsonl(path.join(FIXTURES, 'core_ev.jsonl')), ...jsonl(path.join(FIXTURES, 'hub_ev.jsonl'))];
+  : [...jsonl(path.join(FIXTURES, 'core_ev.jsonl')), ...jsonl(path.join(FIXTURES, 'hub_ev.jsonl'))].filter((l) => JSON.parse(l).ev !== 'broken');
 // A restart (FakeCore.exit: the app's main spawns the stub again) sends the start world again, but
 // never the hub's one-shot ask: a `confirm` goes to the connection whose command asked it, and a
 // real core restart is a new connection, so it is gone (app/keep-all :166 red: the replayed

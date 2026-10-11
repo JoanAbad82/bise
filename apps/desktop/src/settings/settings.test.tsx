@@ -11,7 +11,7 @@ import type { ApprovalRule } from '@/proto';
 import { core_ev, hub_ev } from '@/proto/fixtures.gen';
 import { Settings, type SettingsPorts } from './Settings';
 import { appName, excludedApps, flag, getPref, knownApps, onboarded, putPref, type Prefs } from './prefs';
-import { addPaths, offers, ordered } from './projects';
+import { addPaths, offers, ordered, projectSub } from './projects';
 import { KEY_SECTIONS } from './keys';
 import { notifyRow } from './pages';
 import { checks } from './check';
@@ -29,7 +29,12 @@ const prefs = (): Prefs => {
   return { ...p, app_names: { 'com.apple.MobileSMS': 'Messages', 'com.bitwarden.desktop': 'Bitwarden' } };
 };
 const accounts = (): Account[] => ev('accounts').items;
-const projects = (): ProjectRow[] => ev('projects').projects;
+// the last projects line: the one a replay of the fixtures ends with (the first has a down hub)
+const projects = (): ProjectRow[] => {
+  const e = core_ev.filter((x) => x.ev === 'projects').at(-1);
+  if (e?.ev !== 'projects') throw new Error('no projects fixture');
+  return e.projects;
+};
 const found = (): Found[] => ev('found').items;
 
 const ports = (): SettingsPorts & { sent: AppCmd[]; went: string[] } => {
@@ -70,6 +75,14 @@ describe('projects', () => {
     expect(offers(found(), projects()).map((f) => f.name)).toEqual(['shop']);
     expect(addPaths(['/a'], ' /b ')).toEqual(['/a', '/b']);
     expect(addPaths(['/a'], '/a')).toEqual(['/a']);
+  });
+  it("a row says why its hub couldn't start, never a silent row (architect m_18354)", () => {
+    const [p] = ordered(projects());
+    if (p === undefined) throw new Error('no project');
+    expect(projectSub(p)).toBe(p.path);
+    const why = 'the hub did not start: sb-core: no such file (its log: /h/hub.err)';
+    expect(projectSub({ ...p, down: why })).toBe(`${p.path} · ${why}`);
+    expect(projectSub({ ...p, down: why, missing: true }), 'a gone folder says that first').toBe(`${p.path} · its folder is gone`);
   });
 });
 

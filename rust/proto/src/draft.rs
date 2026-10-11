@@ -88,6 +88,11 @@ pub struct ProjectRow {
     /// the review opens `<web>/commit/<sha>`; absent: no GitHub remote
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub web: Option<String>,
+    /// its hub couldn't start, in plain words (the cause and its log);
+    /// absent: it runs, or nothing tried yet. The core keeps retrying,
+    /// backing off; the row says it at once, never a silent loop
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub down: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -580,12 +585,17 @@ pub enum CoreEv {
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         failed: bool,
     },
+    /// this core can't start any hub (its runtime is missing): why, in
+    /// plain words (the binary's `approot::missing_words`), once after
+    /// `initialized`. It still answers; every hub the window asks for is
+    /// down with the same words, never a silent retry
+    Broken { reason: String },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })

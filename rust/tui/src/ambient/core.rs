@@ -609,13 +609,30 @@ impl Core {
         self.forget(all);
     }
 
+    /// This core can't start any hub (`bise ambient-core` without its
+    /// runtime): the window says why at once (CoreEv::Broken, held until
+    /// `initialized` like every event).
+    pub fn broken(&mut self, reason: String) {
+        self.emit(serde_json::to_value(bise_proto::draft::CoreEv::Broken { reason }).unwrap_or_default());
+    }
+
     // ---- the hub ----
 
     pub fn hub(&mut self, h: HubIn) {
         match h {
             // JSON-RPC's `initialize`, then typed events only (core/home.rs)
-            HubIn::Up => self.home_up(),
-            HubIn::Down => {
+            HubIn::Up => {
+                if self.hubs.home_down.take().is_some() {
+                    self.emit_projects();
+                }
+                self.home_up()
+            }
+            HubIn::Down(cause) => {
+                // why it didn't start: the home row says it until it's up
+                if cause.is_some() && cause != self.hubs.home_down {
+                    self.hubs.home_down = cause;
+                    self.emit_projects();
+                }
                 if self.hub_up != Some(false) {
                     self.hub_up = Some(false);
                     let ws = self.workspace.clone();
