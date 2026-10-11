@@ -64,8 +64,14 @@ for n in first second; do
   breach; libgate $n-open
   node $HERE/driver.mjs 9341 $O $n 2>&1 | tail -5
   breach
-  L="$H/Library/Application Support/bise try/core.log"
-  say "core.log: $(wc -c < "$L") bytes, repl-live not found: $(grep -c 'repl-live not found' "$L")"; cp "$L" $O/core-$n.log
+  # the app's core.log is in its actual userData, wherever the stand-in put it (amb-core's caveat,
+  # ambient-lead m_19049): the newest core.log under the world's home written during this run
+  L=$(find "$H" -name core.log -newer $O/before.json -not -path "*/.bise/hubs/*" 2>/dev/null | xargs ls -t 2>/dev/null | head -1)
+  if [ -n "$L" ]; then
+    say "core.log at $L: $(wc -c < "$L") bytes, repl-live not found: $(grep -c 'repl-live not found' "$L")"; cp "$L" $O/core-$n.log
+  else
+    say "core.log: none written under $H during the run"
+  fi
   say "hubs: $(ls $H/.bise/hubs/ | tr '\n' ' ')"
   stopall
   breach; libgate $n-stop
