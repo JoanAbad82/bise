@@ -108,8 +108,34 @@ test('thread/parts: his message, his card answer from their typed parts, never a
       await expect(page.getByTestId('thread.you.2.quote.1')).toContainText('the batch size is the shared one.');
       await expect(page.getByTestId('thread.you.2')).toContainText('what does ▤ 1 mean?');
       await expect(page.getByTestId('thread.you.2.paste.1')).toHaveText('▤ 1 · 14 lines');
-      await expect(page.getByTestId('thread.you.2.image.1')).toBeVisible();
+      await expect(page.getByTestId('thread.you.2.image.1')).toHaveText('image 1');
       await expect(page.getByTestId('thread.you.2.file')).toHaveText('notes.md');
+      // designer m_17969: the parts in one row (paste, file, image), the artifact chip's look:
+      // a 1 px line, r 9, 6 px apart, never the accent (pink is for what waits on him)
+      const chips = await page.getByTestId('thread.you.2.parts').evaluate((row) =>
+        Array.from(row.children).map((c) => {
+          const s = getComputedStyle(c);
+          const b = c.getBoundingClientRect();
+          return { top: Math.round(b.top), left: b.left, right: b.right, border: s.borderTopWidth, radius: s.borderTopLeftRadius, bg: s.backgroundColor, color: s.color };
+        }),
+      );
+      expect(chips.length).toBe(3);
+      expect(new Set(chips.map((c) => c.top)).size, `${t}: one row`).toBe(1);
+      for (const c of chips) {
+        expect(c.border, `${t}: a 1 px line`).toBe('1px');
+        expect(c.radius, `${t}: r 9`).toBe('9px');
+      }
+      for (let i = 1; i < chips.length; i++) expect(Math.round((chips[i]?.left ?? 0) - (chips[i - 1]?.right ?? 0)), `${t}: 6 px apart`).toBe(6);
+      const accent = await page.evaluate(() => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--c-accent)';
+        document.body.appendChild(probe);
+        const c = getComputedStyle(probe).color;
+        probe.remove();
+        return c;
+      });
+      const img = await page.getByTestId('thread.you.2.image.1').locator('.th-part-img').evaluate((e) => getComputedStyle(e).color);
+      expect(img, `${t}: the image's words never in the accent`).not.toBe(accent);
       // never a tag on screen
       expect(await screen.innerText(), `${t}: no tag drawn`).not.toMatch(/<selection|<pasted|<image|\[files he attached:\]/u);
       await page.mouse.move(1, 300);

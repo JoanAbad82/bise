@@ -1298,6 +1298,72 @@ button.th-sched-head {
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+/* msg-parts: his message's parts in one row under his words, wrapping only when the bubble is full
+   (designer m_17969): the artifact chip's look, 1 px line, r 9, text-2, 6 px apart, never the accent;
+   an image's words in ink beside its 16 px thumbnail (or the no-file glyph slot) */
+.th-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  min-width: 0;
+}
+.th-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid var(--c-line);
+  border-radius: 9px;
+  background: none;
+  color: var(--c-text-2);
+  font: var(--t-12) var(--font-ui);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+button.th-part {
+  cursor: pointer;
+}
+button.th-part:hover {
+  background: var(--c-hover);
+}
+button.th-part:focus-visible {
+  outline: 2px solid var(--c-text);
+  outline-offset: 2px;
+}
+.th-part .thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex: none;
+}
+.th-part .thumb.none {
+  display: inline-flex;
+  flex: 0 0 16px;
+  color: var(--c-text-3);
+  opacity: 0.7;
+}
+.th-part-img {
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.th-part-paste {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-2);
+  font: var(--t-12) / 1.5 var(--font-mono);
+  color: var(--c-text-2);
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow: auto;
+}
 /* event-wake (designer's page): a watch's end, dim, on the column's edge; only a non-zero rc in
    the error tone; its folded output in mono, like a tool row's opened box */
 .th-wake {

@@ -54,7 +54,7 @@ export function ImageChips({ images, testId }: { images: readonly { name: string
  * line) or it's gone, the same slot with a faint image glyph, so every chip reads the same
  * (designer m_15943).
  */
-function Thumb({ path }: { path?: string }) {
+export function Thumb({ path }: { path?: string }) {
   const [gone, setGone] = useState(false);
   if (path == null || path === '' || gone) {
     return (

@@ -13,7 +13,7 @@ import { chipOf, clock, deliveryMark, lastOfRun, quotesOf, stripContext } from '
 import { shownName } from '@/agents/model';
 import { saidFor, useSaidMs } from '@/voicemode';
 import type { RowCtx } from './rows';
-import { ImageChips } from './rows-cards';
+import { Thumb } from './rows-cards';
 import { youView, type YouView } from './parts';
 import { lineCount, quoteAbout } from '@/composer/message';
 /** A message of his longer than this folds to its first lines (tui-parity B11, the TUI's You(_, _, open)). */
@@ -132,9 +132,11 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
 }
 
 /**
- * What rides with his words when his message came as parts (msg-parts): his long pastes as their
- * chips ('▤ 1 · 240 lines', a click shows the paste), his images as their chips (the thumbnail, the
- * same chips as a card answer's), his other files as chips that open in his editor. Never a tag.
+ * What rides with his words when his message came as parts (msg-parts): one row of chips, wrapping
+ * only when the bubble is full (designer m_17969): his long pastes ('▤ 1 · 240 lines', a click shows
+ * the paste), his other files (open in his editor), his images (the thumbnail, else the no-file
+ * glyph slot, and 'image 1' or its file name in ink). The artifact chip's look: 1 px line, r 9,
+ * 6 px apart; never the accent (pink is for what waits on him). Never a tag.
  */
 function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos: number }) {
   const [shown, setShown] = useState<number | null>(null);
@@ -143,49 +145,57 @@ function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos: number
   const id = `thread.you.${String(pos)}`;
   return (
     <>
-      {view.pastes.length + view.files.length > 0 && (
-        <div className="th-parts">
-          {view.pastes.map((p) => (
-            <button
-              key={`p${String(p.n)}`}
-              type="button"
-              className="b-chip th-part"
-              data-kind="paste"
-              aria-expanded={shown === p.n}
-              onClick={() => {
-                setShown((s) => (s === p.n ? null : p.n));
-              }}
-              data-testid={`${id}.paste.${String(p.n)}`}
-            >
-              ▤ {p.n} · {lineCount(p.text)} lines
-            </button>
-          ))}
-          {view.files.map((f) => (
-            <button
-              key={f}
-              type="button"
-              className="b-chip th-part"
-              data-kind="file"
-              title={f}
-              onClick={() => {
-                if (ctx.onPath !== undefined) ctx.onPath(f);
-                else void (window as Partial<Window>).bise?.openPath(f, {});
-              }}
-              data-testid={`${id}.file`}
-            >
-              {f.split('/').at(-1) ?? f}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="th-parts" data-testid={`${id}.parts`}>
+        {view.pastes.map((p) => (
+          <button
+            key={`p${String(p.n)}`}
+            type="button"
+            className="th-part"
+            data-kind="paste"
+            aria-expanded={shown === p.n}
+            onClick={() => {
+              setShown((s) => (s === p.n ? null : p.n));
+            }}
+            data-testid={`${id}.paste.${String(p.n)}`}
+          >
+            ▤ {p.n} · {lineCount(p.text)} lines
+          </button>
+        ))}
+        {view.files.map((f) => (
+          <button
+            key={f}
+            type="button"
+            className="th-part"
+            data-kind="file"
+            title={f}
+            onClick={() => {
+              if (ctx.onPath !== undefined) ctx.onPath(f);
+              else void (window as Partial<Window>).bise?.openPath(f, {});
+            }}
+            data-testid={`${id}.file`}
+          >
+            {f.split('/').at(-1) ?? f}
+          </button>
+        ))}
+        {view.images.map((img, i) => (
+          <span key={`${img.path}#${String(i)}`} className="th-part" data-kind="image" title={img.path} data-testid={`${id}.image.${String(i + 1)}`}>
+            <Thumb path={img.path} />
+            <span className="th-part-img">{partImageWords(img.name, i)}</span>
+          </span>
+        ))}
+      </div>
       {paste !== undefined && (
         <pre className="th-part-paste" data-testid={`${id}.paste.${String(paste.n)}.text`}>
           {paste.text}
         </pre>
       )}
-      <ImageChips images={view.images} testId={id} />
     </>
   );
+}
+
+/** An image part's chip words: its file name when it has one, else 'image 1' (its order here), never the '[Image #n]' tag (designer m_17969). Pure. */
+export function partImageWords(name: string, i: number): string {
+  return name !== '' && !name.startsWith('[') ? name : `image ${String(i + 1)}`;
 }
 
 /** '◫ with Chrome · localhost:4801/sett…': a url opens in his browser, a file in his editor; a shot alone isn't kept. */
