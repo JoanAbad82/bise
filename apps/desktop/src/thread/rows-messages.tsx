@@ -147,39 +147,38 @@ function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos: number
     <>
       <div className="th-parts" data-testid={`${id}.parts`}>
         {view.pastes.map((p) => (
-          <Press
+          <Chip
             key={`p${String(p.n)}`}
-            look="th-part"
-            data-kind="paste"
-            aria-expanded={shown === p.n}
+            kind="part"
+            of="paste"
+            expanded={shown === p.n}
             onClick={() => {
               setShown((s) => (s === p.n ? null : p.n));
             }}
-            data-testid={`${id}.paste.${String(p.n)}`}
+            testId={`${id}.paste.${String(p.n)}`}
           >
             ▤ {p.n} · {lineCount(p.text)} lines
-          </Press>
+          </Chip>
         ))}
         {view.files.map((f) => (
-          <Press
+          <Chip
             key={f}
-            look="th-part"
-            data-kind="file"
+            kind="part"
+            of="file"
             title={f}
             onClick={() => {
               if (ctx.onPath !== undefined) ctx.onPath(f);
               else void (window as Partial<Window>).bise?.openPath(f, {});
             }}
-            data-testid={`${id}.file`}
+            testId={`${id}.file`}
           >
             {f.split('/').at(-1) ?? f}
-          </Press>
+          </Chip>
         ))}
         {view.images.map((img, i) => (
-          <span key={`${img.path}#${String(i)}`} className="th-part" data-kind="image" title={img.path} data-testid={`${id}.image.${String(i + 1)}`}>
-            <Thumb path={img.path} />
-            <span className="th-part-img">{partImageWords(img.name, i)}</span>
-          </span>
+          <Chip key={`${img.path}#${String(i)}`} kind="part" of="image" title={img.path} thumb={<Thumb path={img.path} />} testId={`${id}.image.${String(i + 1)}`}>
+            {partImageWords(img.name, i)}
+          </Chip>
         ))}
       </div>
       {paste !== undefined && (

@@ -12,7 +12,7 @@ import { keep } from './keep';
 import { useArtifactCount } from './Panel';
 import { formatRoute } from './route';
 import { useRoute } from './router';
-import { crumbOf, NARROW_PX, PANEL_OPEN_PX, panelAt, panelProject } from './side';
+import { crumbOf, NARROW_PX, PANEL_OPEN_PX, panelAt, panelProject, panelWords } from './side';
 import { useWaitingTotal } from './Sidebar';
 
 export type Width = 'narrow' | 'mid' | 'wide';
@@ -162,7 +162,7 @@ export function Titlebar({ frame }: { frame: FrameState }) {
       </span>
       {frame.panel !== undefined && (
         <Button size="sm" pressed={panelOn} onClick={() => { frame.toggle('panel'); }} testId="app.title.panel">
-          ↗ {frame.width === 'narrow' ? String(count) : `artifacts · ${String(count)}`} <Kbd>⌥⌘0</Kbd>
+          ↗ {panelWords(frame.width === 'narrow', count)} <Kbd>⌥⌘0</Kbd>
         </Button>
       )}
     </div>

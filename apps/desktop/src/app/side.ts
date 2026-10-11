@@ -183,3 +183,12 @@ export function panelAt(width: number, kept: boolean | undefined): { docked: boo
   if (width < NARROW_PX) return { docked: false, open: false };
   return { docked: true, open: kept ?? width >= PANEL_OPEN_PX };
 }
+
+/**
+ * The title bar's panel button words after its '↗': 'artifacts · 5' ('5' under 1000 px); at zero
+ * the count goes ('artifacts', '' when narrow), designer m_18734. Pure.
+ */
+export function panelWords(narrow: boolean, count: number): string {
+  if (count <= 0) return narrow ? '' : 'artifacts';
+  return narrow ? String(count) : `artifacts · ${String(count)}`;
+}

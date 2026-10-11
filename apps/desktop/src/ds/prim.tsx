@@ -40,15 +40,32 @@ export function Button({ children, kind, size, pressed, state, disabled, onClick
 export interface ChipProps {
   children: ReactNode;
   tone?: Tone;
-  onClick?: MouseEventHandler<HTMLSpanElement>;
+  /** part: a part of his message under its words (a paste, a file, an image: 1 px line, r 9, designer m_18626) */
+  kind?: "part";
+  /** an image part's 16 px thumb (or the no-file glyph slot): the words then read in ink */
+  thumb?: ReactNode;
+  /** what it is, on the element (data-kind: "paste", "file", "image") */
+  of?: string;
+  /** its tooltip (a file's whole path) */
+  title?: string;
+  /** what it opens shows (aria-expanded): a paste's text under the row */
+  expanded?: boolean;
+  state?: "hover";
+  /** a real button when set */
+  onClick?: MouseEventHandler<HTMLButtonElement>;
   testId?: string;
 }
-/** a chip: a small label, clickable when it has onClick */
-export function Chip({ children, tone, onClick, testId }: ChipProps) {
+/** a chip: a small label; a real button when it has onClick */
+export function Chip({ children, tone, kind, thumb, of, title, expanded, state, onClick, testId }: ChipProps) {
+  const cls = cx("b-chip", tone, kind, state === "hover" && "is-hover");
+  const words = thumb === undefined ? children : <>{thumb}<span className="ink">{children}</span></>;
+  if (onClick === undefined) {
+    return <span className={cls} data-kind={of} title={title} data-testid={testId}>{words}</span>;
+  }
   return (
-    <span className={cx("b-chip", tone)} onClick={onClick} role={onClick ? "button" : undefined} data-testid={testId}>
-      {children}
-    </span>
+    <button type="button" className={cls} data-kind={of} title={title} aria-expanded={expanded} onClick={onClick} data-testid={testId}>
+      {words}
+    </button>
   );
 }
 

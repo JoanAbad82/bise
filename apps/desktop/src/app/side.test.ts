@@ -1,7 +1,7 @@
 // The sidebar's signs and words, the frame's widths (designer's desktop-screens v6/v7, signed).
 import { describe, expect, it } from 'vitest';
 import type { Agent, ProjectRow } from '@/proto';
-import { computerDot, crumbOf, folds, moreWords, panelAt, panelProject, projectSide, signOf, turnShort } from './side';
+import { computerDot, crumbOf, folds, moreWords, panelAt, panelWords, panelProject, projectSide, signOf, turnShort } from './side';
 import { keyAction, type KeyLike } from './keys';
 import { newWords } from './Sidebar';
 
@@ -117,5 +117,14 @@ describe('the computer-use mark beside an agent (S29/L19 W3)', () => {
     expect(computerDot({ ...base, kind: 'paused', mark: '?', words: 'you took the wheel · ⏎ give it back' })).toMatchObject({ g: '?', tone: 'acc' });
     expect(computerDot({ ...base, kind: 'stopped', mark: '↖', words: 'stopped · write to it to go on' })).toMatchObject({ g: '↖', tone: 'dim' });
     expect(computerDot(undefined)).toBeNull();
+  });
+});
+
+describe('panelWords', () => {
+  it("drops the count at zero (designer m_18734): 'artifacts', and nothing after ↗ when narrow", () => {
+    expect(panelWords(false, 5)).toBe('artifacts · 5');
+    expect(panelWords(true, 5)).toBe('5');
+    expect(panelWords(false, 0)).toBe('artifacts');
+    expect(panelWords(true, 0)).toBe('');
   });
 });

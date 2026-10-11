@@ -7,9 +7,9 @@ import { Markdown } from "@/thread/Markdown";
 // the thread's layout around the markdown (its code block's head, its pre), as the window draws it
 import "@/thread/thread.css";
 import {
-  Act, Answered, Art, Bar, Board, Button, Capsule, Card, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Empty, Err,
+  Act, Answered, Art, Bar, Board, BriefLine, Button, Capsule, Card, CardLine, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Empty, Err,
   Field, Fold, Group, Head, Help, IconButton, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Quote, Route, Row,
-  SectionHead, Seg, Select, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
+  SchedHead, SectionHead, Seg, Select, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
   Win, type Opt,
 } from "../index";
 
@@ -351,6 +351,30 @@ export const SECTIONS: Record<string, () => ReactNode> = {
         <div className="b-sheet-foot"><Button kind="ghost">cancel</Button><Button kind="pri">add 2 projects</Button></div>
       </div>
     </>
+  ),
+  // the thread's signed looks as named variants (designer m_18626), each in its states
+  variants: () => (
+    <div className="g-col">
+      <div className="g-row" data-testid="ds.variants.part">
+        <Chip kind="part" of="paste" onClick={() => undefined} testId="ds.chip.part">▤ 1 · 42 lines</Chip>
+        <Chip kind="part" of="paste" expanded state="hover" onClick={() => undefined}>▤ 2 · 8 lines</Chip>
+        <Chip kind="part" of="file" title="~/code/shop/src/main.rs" onClick={() => undefined}>main.rs</Chip>
+        <Chip kind="part" of="image" thumb={<span className="thumb none" aria-hidden="true">▣</span>}>image 1</Chip>
+      </div>
+      <div className="g-row" data-testid="ds.variants.ref">
+        <span>perf landed on main · <Act kind="ref" testId="ds.act.ref">a1b2c3d</Act> · 3 files +42 −18</span>
+        <Act kind="ref" state="hover">PR #482</Act><Act kind="ref" state="focus">PR #483</Act>
+      </div>
+      <div className="g-col" data-testid="ds.variants.lines">
+        <Route kind="handoff" to="perf" role="product page speed" onClick={() => undefined} testId="ds.route.handoff" />
+        <span>◷ <SchedHead open={false} onClick={() => undefined} testId="ds.sched">main scheduled dashboards · every 30m · next 16:56</SchedHead></span>
+        <span>◷ <SchedHead>main scheduled nightly · every day 02:00</SchedHead></span>
+        <BriefLine open={false} onClick={() => undefined} testId="ds.brief">bise started gift-ui · make the gift card page load under a second</BriefLine>
+        <BriefLine open onClick={() => undefined}>bise started perf · product page speed</BriefLine>
+        <CardLine text="? bise asks: which branch first? · in the inbox below" onClick={() => undefined} testId="ds.cardline" />
+        <CardLine text="? waits for you · in the inbox below" onClick={() => undefined} />
+      </div>
+    </div>
   ),
   // an answer in the TUI's markdown colors (ambient-lead m_11457): the thread's real renderer on the
   // left, the TUI's markdown.rs rules drawn as the terminal draws them on the right

@@ -39,7 +39,7 @@ test("thread/brief-row: the hub's brief is one quiet row 'bise started gift-ui Â
     await expect(screen.locator('h1'), 'no heading drawn').toHaveCount(0);
     await expect(screen, 'the brief is folded').not.toContainText('No end criterion');
     await expect(screen).not.toContainText('# Task');
-    const look = await row.locator('.th-brief-line').evaluate((el) => ({ size: getComputedStyle(el).fontSize, h: el.getBoundingClientRect().height }));
+    const look = await row.locator('.b-brief-line').evaluate((el) => ({ size: getComputedStyle(el).fontSize, h: el.getBoundingClientRect().height }));
     expect(Number.parseFloat(look.size), 'quiet: 13 px words').toBeLessThanOrEqual(13);
     expect(look.h, 'one line').toBeLessThan(24);
     await expect(page.getByTestId('thread.entry.2')).toContainText('measuring the gift page');
@@ -48,7 +48,7 @@ test("thread/brief-row: the hub's brief is one quiet row 'bise started gift-ui Â
     await page.screenshot({ path: test.info().outputPath('brief-dark.png') });
     await dark(page, false);
 
-    await row.locator('.th-brief-line').click();
+    await row.locator('.b-brief-line').click();
     const body = page.getByTestId('thread.brief.1.body');
     await expect(body).toContainText('No end criterion: this is a long-running task. Stay available.');
     await expect(body).toContainText('Context: the cart team asked');
@@ -66,7 +66,7 @@ test("thread/brief-row: the hub's brief is one quiet row 'bise started gift-ui Â
     await page.screenshot({ path: test.info().outputPath('brief-open-light.png') });
     await dark(page, true);
     await page.screenshot({ path: test.info().outputPath('brief-open-dark.png') });
-    await row.locator('.th-brief-line').click();
+    await row.locator('.b-brief-line').click();
     await expect(body).toHaveCount(0);
   } finally {
     await s.close().catch(() => undefined);

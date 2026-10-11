@@ -134,7 +134,7 @@ test('thread/parts: his message, his card answer from their typed parts, never a
         probe.remove();
         return c;
       });
-      const img = await page.getByTestId('thread.you.2.image.1').locator('.th-part-img').evaluate((e) => getComputedStyle(e).color);
+      const img = await page.getByTestId('thread.you.2.image.1').locator('.ink').evaluate((e) => getComputedStyle(e).color);
       expect(img, `${t}: the image's words never in the accent`).not.toBe(accent);
       // never a tag on screen
       expect(await screen.innerText(), `${t}: no tag drawn`).not.toMatch(/<selection|<pasted|<image|\[files he attached:\]/u);

@@ -435,31 +435,6 @@
   color: var(--c-text-2);
 }
 
-/* an open card in the thread (designer m_15612, b): one dim line pointing at the inbox block, the one
-   place to answer; a click opens it there */
-.th-card-line {
-  display: block;
-  max-width: 100%;
-  margin: 2px 0 6px;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: var(--t-13) var(--font-ui);
-  color: var(--c-text-2);
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
-}
-.th-card-line:hover {
-  color: var(--c-text);
-}
-/* its '?' waits on him: the accent, as in the sidebar and the inbox rows (designer m_15708) */
-.th-card-mark {
-  color: var(--c-accent);
-}
-
 /* amb-feed's batch 2 rows (b8cb4b1e) */
 .th-think,
 .th-compact {
@@ -522,25 +497,6 @@
 .th-news.dim {
   color: var(--c-text-3);
 }
-.th-news-link {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: var(--c-text);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-.th-news-link:hover {
-  color: var(--c-text);
-  text-decoration-thickness: 2px;
-}
-.th-news-link:focus-visible {
-  outline: 0;
-  box-shadow: 0 0 0 2px var(--c-focus);
-  border-radius: 3px;
-}
 .th-news-note {
   margin: 2px 0 0 calc(1em + 8px);
   color: var(--c-text-3);
@@ -592,17 +548,6 @@
   gap: 6px;
   align-items: baseline;
   color: var(--c-text-3);
-}
-.th-sched-head {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-}
-button.th-sched-head {
-  cursor: default;
 }
 .th-sched-words {
   flex-basis: 100%;
@@ -901,33 +846,9 @@ button.th-sched-head {
 .th-live.th-waiting {
   padding-top: 16px;
 }
-.th-handoff {
-  display: block;
-  padding: 2px 0;
-  border: 0;
-  background: none;
-  color: var(--c-text);
-  font: var(--t-13) var(--font-ui);
-  text-align: left;
-  cursor: pointer;
-}
-.th-handoff-role {
-  color: var(--c-text-2);
-}
-.th-handoff:hover .th-handoff-role {
-  color: var(--c-text);
-}
 /* the hub's brief (designer): one dim row 'bise started gift-ui · <objective>', cut with …; open, the
    whole brief under a thin rail, dim, its markdown at reading size without big headings */
 .th-brief { padding: 2px 0; }
-.th-brief-line {
-  display: flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 0; border: 0; background: none;
-  color: var(--c-text-2); font: var(--t-13) var(--font-ui); text-align: left; cursor: pointer;
-}
-.th-brief-line:hover { color: var(--c-text); }
-.th-brief-chev { flex: none; color: var(--c-text-3); transition: transform var(--d-fast) var(--ease-out); }
-.th-brief[data-open] .th-brief-chev { transform: rotate(90deg); }
-.th-brief-words { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .th-brief-body { margin: 6px 0 2px 3px; padding-left: 12px; border-left: 1px solid var(--c-line); color: var(--c-text-2); font-size: var(--t-14); }
 /* bise's note to the agent, not the conversation: its words in --c-text-2 too (the markdown's own text colour) */
 .th-brief-body, .th-brief-body .b-md { --md-text: var(--c-text-2); }
@@ -1322,51 +1243,6 @@ button.th-sched-head {
   gap: 6px;
   margin-top: 6px;
   min-width: 0;
-}
-.th-part {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  max-width: 100%;
-  height: 22px;
-  padding: 0 9px;
-  border: 1px solid var(--c-line);
-  border-radius: 9px;
-  background: none;
-  color: var(--c-text-2);
-  font: var(--t-12) var(--font-ui);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-button.th-part {
-  cursor: pointer;
-}
-button.th-part:hover {
-  background: var(--c-hover);
-}
-button.th-part:focus-visible {
-  outline: 2px solid var(--c-text);
-  outline-offset: 2px;
-}
-.th-part .thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  object-fit: cover;
-  flex: none;
-}
-.th-part .thumb.none {
-  display: inline-flex;
-  flex: 0 0 16px;
-  color: var(--c-text-3);
-  opacity: 0.7;
-}
-.th-part-img {
-  color: var(--c-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .th-part-paste {
   margin: 6px 0 0;

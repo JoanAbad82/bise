@@ -46,8 +46,13 @@
 .b-field.b-select .chev svg{display:block}
 .b-field.b-select.is-disabled,.b-field.b-select[data-disabled]{opacity:.4}
 .b-select-menu{z-index:60;min-width:var(--radix-select-trigger-width);max-height:var(--radix-select-content-available-height);overflow:auto}
+/* designer m_18733 (2): the highlighted item a 9% ink tint (as a row on), never a ring: the ring
+   is the trigger's only; the current value carries a ✓ at its right */
 .b-select-menu .b-mi{outline:0}
-.b-select-menu .b-mi[data-highlighted]{background:var(--c-hover)}
+.b-select-menu .b-mi:focus-visible{box-shadow:none}
+.b-select-menu .b-mi:hover,.b-select-menu .b-mi[data-highlighted]{background:color-mix(in srgb,var(--c-text) 9%,transparent)}
+.b-select-menu .b-mi .mark{margin-left:auto;padding-left:8px;color:var(--c-text-2)}
+.b-select-menu .b-mi .k+.mark{margin-left:0}
 .b-select-menu .b-mi[data-state="checked"]{font-weight:600}
 
 /* Sheet: a modal over the dimmed window (40% scrim), raised, r-4, e-3, 560 wide (90% under 700) */

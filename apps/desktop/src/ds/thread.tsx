@@ -1,5 +1,5 @@
 // src/ds · the thread's parts (desktop-ds v5: components/thread.html, css/thread.css): Thread, Msg,
-// Tool, Fold, Day, Answered, Marker, Route, Art, Diff. The answer's words come in as ReactNode: the
+// Tool, Fold, Day, Answered, Marker, Route (and its handoff), SchedHead, BriefLine, CardLine, Art, Diff. The answer's words come in as ReactNode: the
 // markdown render is src/thread's. Msg is memo'd: it sits in a long, virtualized list, and a new
 // message must not re-render the others.
 import { memo, type MouseEventHandler, type ReactNode, type Ref } from "react";
@@ -124,6 +124,7 @@ export function Marker({ children }: { children: ReactNode }) {
 }
 
 export interface RouteProps {
+  kind?: undefined;
   state: "wk" | "ok" | "er";
   /** "telemetry · main → alerts" */
   p1: ReactNode;
@@ -136,8 +137,28 @@ export interface RouteProps {
   onClick?: MouseEventHandler<HTMLDivElement>;
   testId?: string;
 }
-/** a delegation line */
-export function Route({ state, p1, p2, p3, pct, onClick, testId }: RouteProps) {
+export interface HandoffProps {
+  /** a main's handoff in its thread: '→ perf · product page speed', a click opens perf's thread */
+  kind: "handoff";
+  /** the agent it went to */
+  to: string;
+  /** its role, else the brief's first words; dim, ink on hover */
+  role?: string;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  testId?: string;
+}
+/** a delegation line; kind 'handoff': the one-line '→ perf · its role' a main's thread shows (designer m_18626) */
+export function Route(props: RouteProps | HandoffProps) {
+  if (props.kind === "handoff") {
+    const { to, role, onClick, testId } = props;
+    return (
+      <button type="button" className="b-route handoff" onClick={onClick} data-testid={testId}>
+        → {to}
+        {role !== undefined && role !== "" && <span className="p2"> · {role}</span>}
+      </button>
+    );
+  }
+  const { state, p1, p2, p3, pct, onClick, testId } = props;
   return (
     <div className="b-route" onClick={onClick} role={onClick ? "button" : undefined} data-testid={testId}>
       <Dot state={state} />
@@ -145,6 +166,57 @@ export function Route({ state, p1, p2, p3, pct, onClick, testId }: RouteProps) {
       <span className="p3">{p3}</span>
       {state === "wk" && (pct == null ? <Bar /> : <Bar pct={pct} />)}
     </div>
+  );
+}
+
+export interface SchedHeadProps {
+  /** '◷ main scheduled dashboards · every 30m · next 16:56' (the hub's words; the ◷ is the row's) */
+  children: ReactNode;
+  /** its words show under it; a click toggles them. Unset: nothing opens, the head is plain words */
+  open?: boolean;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  testId?: string;
+}
+/** a scheduled message's head in the thread: a real button when its words open under it (no chevron, designer N2) */
+export function SchedHead({ children, open, onClick, testId }: SchedHeadProps) {
+  if (onClick === undefined) return <span className="b-sched-head" data-testid={testId}>{children}</span>;
+  return (
+    <button type="button" className="b-sched-head" aria-expanded={open ?? false} onClick={onClick} data-testid={testId}>
+      {children}
+    </button>
+  );
+}
+
+export interface BriefLineProps {
+  /** 'bise started gift-ui · <objective>', cut with … */
+  children: ReactNode;
+  open: boolean;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  testId?: string;
+}
+/** the hub's brief as one dim row with its ▸ (turned when open); the brief opens under it, the screen's */
+export function BriefLine({ children, open, onClick, testId }: BriefLineProps) {
+  return (
+    <button type="button" className={cx("b-brief-line", open && "open")} aria-expanded={open} onClick={onClick} data-testid={testId}>
+      <span className="chev" aria-hidden="true">▸</span>
+      <span className="w">{children}</span>
+    </button>
+  );
+}
+
+export interface CardLineProps {
+  /** '? bise asks: which branch first? · in the inbox below': its first '?' in the accent, the rest dim */
+  text: string;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  testId?: string;
+}
+/** an open card in the thread: one dim line pointing at the inbox block, the one place to answer (designer m_15612) */
+export function CardLine({ text, onClick, testId }: CardLineProps) {
+  return (
+    <button type="button" className="b-card-line" onClick={onClick} data-testid={testId}>
+      <span className="mark">{text.slice(0, 1)}</span>
+      {text.slice(1)}
+    </button>
   );
 }
 

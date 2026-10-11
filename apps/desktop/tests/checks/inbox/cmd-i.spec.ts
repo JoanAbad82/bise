@@ -19,14 +19,16 @@ import { hubOf, hubState, launchReal, realWorld, tui, tuiInbox, tuiReady } from 
 const T = {
   field: '[data-testid="composer.field"]',
   setupSkip: '[data-testid="setup.skip"]',
-  inbox: '[data-testid="inbox.root"]',
-  item: '[data-testid^="inbox.item."]',
+  // b1/b2 (his card #476, 416a4ad3): ⌘I opens the inbox block IN PLACE under the screen he is on,
+  // its first item open; the old inbox screen (inbox.root) is gone
+  inbox: '[data-testid="inbox.block"]',
+  open: '[data-testid^="inbox.block.open."]',
 };
 
 type Card = { id: number; text?: string; question?: string };
 const firstLine = (c: Card): string => (c.question ?? c.text ?? '').split('\n')[0]?.trim() ?? '';
 
-test('inbox/cmd-i: ⌘I opens the inbox with every hub card, in the TUI order, esc closes it', async () => {
+test('inbox/cmd-i: ⌘I opens the inbox block in place on its first item, counting every hub card, esc folds it', async () => {
   test.setTimeout(240_000);
   const w = realWorld();
   const projects = w.hubs.filter((h) => !h.home).map((h) => h.project);
@@ -90,19 +92,18 @@ test('inbox/cmd-i: ⌘I opens the inbox with every hub card, in the TUI order, e
     });
     expect(ran, 'the app menu has an item on ⌘I').not.toBe('');
     const inbox = page.locator(T.inbox);
+    const open = inbox.locator(T.open);
     try {
-      await expect(inbox, '⌘I opens the inbox in the window').toBeVisible({ timeout: 1000 });
+      await expect(open, '⌘I opens the inbox block in place, its first item open').toBeVisible({ timeout: 1000 });
     } finally {
       await page.screenshot({ path: test.info().outputPath('inbox.png') });
     }
-    const rows = await inbox.locator(T.item).evaluateAll((es) => es.map((e) => ({ id: e.getAttribute('data-testid') ?? '', text: (e as HTMLElement).innerText })));
-    expect(rows.length, 'one row per hub card').toBe(total);
-    for (const p of want) {
-      const mine = rows.filter((r) => r.id.startsWith(`inbox.item.${p.project}-`));
-      expect.soft(mine.map((r) => p.cards.findIndex((c) => r.text.includes(c))), `${p.project}: its cards, in the TUI's order`).toEqual(p.cards.map((_, i) => i));
-    }
+    await expect(inbox, 'the block counts every hub card').toContainText(`${String(total)} waiting`);
+    // its first item is the first card of the TUI's inbox on one of the hubs
+    const first = await open.innerText();
+    expect(want.some((p) => p.cards[0] !== undefined && first.includes(p.cards[0])), `the open item is a hub's first card: ${first}`).toBe(true);
     await page.keyboard.press('Escape');
-    await expect(inbox, 'esc closes the inbox').toBeHidden();
+    await expect(open, 'esc folds the open item').toBeHidden();
     await expect(field, "the composer's text is kept").toHaveText('brouillon');
   } finally {
     await s.close();

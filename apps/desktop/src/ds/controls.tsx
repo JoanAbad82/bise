@@ -95,6 +95,8 @@ export interface ActProps {
   children: ReactNode;
   /** err: the words in the error tone */
   tone?: "err";
+  /** ref: a reference in a news line (the landed sha, 'PR #12'): ink, always underlined (designer m_18626) */
+  kind?: "ref";
   state?: UiState;
   disabled?: boolean;
   onClick?: MouseEventHandler<HTMLButtonElement>;
@@ -103,10 +105,10 @@ export interface ActProps {
   ref?: Ref<HTMLButtonElement>;
 }
 /** an inline text action in a line ('edit · drop', 'give it back', 'show the report'): text-2, underlined on hover */
-export function Act({ children, tone, state, disabled, onClick, testId, title, ref }: ActProps) {
+export function Act({ children, tone, kind, state, disabled, onClick, testId, title, ref }: ActProps) {
   const off = disabled || state === "disabled";
   return (
-    <button ref={ref} type="button" className={cx("b-act", tone, st(state))} disabled={off} onClick={onClick} data-testid={testId} title={title}>
+    <button ref={ref} type="button" className={cx("b-act", tone, kind, st(state))} disabled={off} onClick={onClick} data-testid={testId} title={title}>
       {children}
     </button>
   );
@@ -208,6 +210,7 @@ export function Select({ value, options, onChange, label, placeholder, state, te
               <RSelect.Item key={o.value} value={o.value} className="b-mi" data-testid={testId === undefined ? undefined : `${testId}.opt.${o.value}`}>
                 <RSelect.ItemText>{o.label}</RSelect.ItemText>
                 {o.hint != null && <span className="k">{o.hint}</span>}
+                <RSelect.ItemIndicator className="mark" aria-hidden="true">✓</RSelect.ItemIndicator>
               </RSelect.Item>
             ))}
           </RSelect.Viewport>
