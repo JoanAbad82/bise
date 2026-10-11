@@ -94,7 +94,10 @@ impl Shell {
     /// `text`: his words (the guess reads them); `held`: what goes to the
     /// project, his words with his attached files already rendered once
     /// (item H: image-store markers, global to every hub, and paths).
-    pub(super) fn route_input(&mut self, focus: &str, text: &str, held: &str, via: &str, queued: bool, context: Option<&serde_json::Value>) -> bool {
+    /// `parts`: his message's parts (msg-parts JSON, "" none), held and
+    /// forwarded with his words (R41 (6)).
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn route_input(&mut self, focus: &str, text: &str, held: &str, via: &str, queued: bool, context: Option<&serde_json::Value>, parts: &str) -> bool {
         if !routable(focus, text, via, queued) || !crate::paths::is_home(&self.opts.paths.workspace) {
             return false;
         }
@@ -111,13 +114,13 @@ impl Shell {
             }
             self.routing.ask = Some(Ask { text: text.to_string(), held: held.to_string(), title: ctx.title.clone(), url: ctx.url.clone(), projects });
             let (to, name, why) = (String::new(), String::new(), String::new());
-            self.step(Input::RouteHold { text: held.to_string(), via: via.to_string(), to, name, why, context: context.cloned() });
+            self.step(Input::RouteHold { text: held.to_string(), via: via.to_string(), to, name, why, context: context.cloned(), parts: parts.to_string() });
             self.routing.ask = None;
             return true;
         };
         let name = projects.iter().find(|c| c.id == to).map_or_else(|| to.clone(), |c| c.name.clone());
         let why = why_line(&g, &name);
-        self.step(Input::RouteHold { text: held.to_string(), via: via.to_string(), to, name, why, context: context.cloned() });
+        self.step(Input::RouteHold { text: held.to_string(), via: via.to_string(), to, name, why, context: context.cloned(), parts: parts.to_string() });
         true
     }
 

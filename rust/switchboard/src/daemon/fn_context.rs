@@ -31,6 +31,16 @@ pub(super) fn store_image(p: &std::path::Path) -> Result<crate::parts_in::Stored
     Ok(crate::parts_in::Stored { b64: stored.b64.to_string_lossy().into_owned(), mime: stored.kind.mime().into() })
 }
 
+/// A routed image whose source is gone, put in this hub's store from the
+/// sender's `.b64` (its base64 text decoded, then `store_bytes`: the same
+/// FNV name and downscale), for `crate::parts_in::restored` (R41 (6)).
+pub(super) fn store_b64(p: &std::path::Path) -> Result<crate::parts_in::Stored, String> {
+    let text = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
+    let bytes = bend_images::base64_decode(text.trim()).ok_or_else(|| format!("{}: not base64", p.display()))?;
+    let stored = bend_images::store_bytes(bytes)?;
+    Ok(crate::parts_in::Stored { b64: stored.b64.to_string_lossy().into_owned(), mime: stored.kind.mime().into() })
+}
+
 /// His words with the input op's attached files rendered after them (item
 /// H), once, before routing: a routed send carries the same text to the
 /// other project (image-store markers are global to every hub). Never on a

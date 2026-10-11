@@ -68,9 +68,10 @@ def forward(+s: M.St, +from: String, +id: Nat) -> Fwd:
 def ask_ok(+text: String) -> Maybe<&2, String>:
   Bool.pick(Maybe<&2, String>, M.trim_is_empty(text), Some{"empty question"}, None{})
 
-# the outbox entry of a new send: the next xid, pending, never tried
-def new_out(+x: XH.Xs, +project: String, +k: XH.XKind, +msg: Nat, +text: String, +context: String) -> XH.Out:
-  XH.Out{XH.Xs.next_xid(x), project, k, msg, text, XH.OPending{}, 0n, context}
+# the outbox entry of a new send: the next xid, pending, never tried;
+# `parts` his routed message's (R41 (6)), "" for the rest
+def new_out(+x: XH.Xs, +project: String, +k: XH.XKind, +msg: Nat, +text: String, +context: String, +parts: String) -> XH.Out:
+  XH.Out{XH.Xs.next_xid(x), project, k, msg, text, XH.OPending{}, 0n, context, parts}
 
 # ---- the outbox's steps (home side) ----
 
@@ -178,8 +179,8 @@ def HOLD_MS() -> Nat:
 
 # a new held route: the next rid, due HOLD_MS from `now`, its act the
 # clock's next one
-def new_route(+x: XH.Xs, +tm: TM.Tms, +text: String, +via: String, +to: String, +name: String, +why: String, +now: Nat, +context: String) -> XH.Route:
-  XH.Route{XH.Xs.next_rid(x), text, via, to, name, Nat.add(now, HOLD_MS()), TM.Tms.next_act(tm), why, XH.RHeld{}, context}
+def new_route(+x: XH.Xs, +tm: TM.Tms, +text: String, +via: String, +to: String, +name: String, +why: String, +now: Nat, +context: String, +parts: String) -> XH.Route:
+  XH.Route{XH.Xs.next_rid(x), text, via, to, name, Nat.add(now, HOLD_MS()), TM.Tms.next_act(tm), why, XH.RHeld{}, context, parts}
 
 # the act that sends a held route at its due time (law
 # route_fires_at_due_only: timers.bend's acts_due)
@@ -229,8 +230,8 @@ def PICK_MS() -> Nat:
   1500n
 
 # a new held route due at `due` (an unclear one, or one behind it)
-def new_route_at(+x: XH.Xs, +tm: TM.Tms, +text: String, +via: String, +to: String, +name: String, +why: String, +due: Nat, +context: String) -> XH.Route:
-  XH.Route{XH.Xs.next_rid(x), text, via, to, name, due, TM.Tms.next_act(tm), why, XH.RHeld{}, context}
+def new_route_at(+x: XH.Xs, +tm: TM.Tms, +text: String, +via: String, +to: String, +name: String, +why: String, +due: Nat, +context: String, +parts: String) -> XH.Route:
+  XH.Route{XH.Xs.next_rid(x), text, via, to, name, due, TM.Tms.next_act(tm), why, XH.RHeld{}, context, parts}
 
 # held, with no target yet
 def is_unclear(+r: XH.Route) -> Bool:

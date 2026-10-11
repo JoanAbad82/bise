@@ -30,7 +30,8 @@ impl Shell {
                     // his attached files, rendered once (item H)
                     let said = fn_context::with_files(v, s("text"));
                     // bise's home hub: words about a project go there (daemon/routing.rs)
-                    if self.route_input(&s("focus"), &s("text"), &said, &s("via"), queued, v.get("context")) {
+                    // his parts (msg-parts) go with his routed words (R41 (6))
+                    if self.route_input(&s("focus"), &s("text"), &said, &s("via"), queued, v.get("context"), &s("parts")) {
                         return self.page_answers();
                     }
                     let t = Self::capsule_hint(said, &s("via"));

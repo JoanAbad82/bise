@@ -5583,8 +5583,8 @@ def Laws.xhub_forward_needs_his_message(m, id, e):
 def hub_x_settled.head(+h: HXH.Out, +t: List<&2, HXH.Out>, +xid: Nat, +e: {Nat.is_eq(HXH.Out.xid(h), xid) == True{} : Bool})
     -> {HXB.open.of(HXH.out_of(HXH.out_op(HXH.OpSettled{}, h) <> t, xid)) == None{} : Maybe<&2, HXH.Out>}:
   match h:
-    case HXH.Out{xi, p, k, m, tx, s, n, cx}:
-      %Equal.sym(Bool, Nat.is_eq(xi, xid), True{}, e) : {HXB.open.of(Bool.pick(Maybe<&2, HXH.Out>, _, Some{HXH.Out{xi, p, k, m, tx, HXH.OSettled{}, n, cx}}, HXH.out_of(t, xid))) == None{} : Maybe<&2, HXH.Out>}
+    case HXH.Out{xi, p, k, m, tx, s, n, cx, ps}:
+      %Equal.sym(Bool, Nat.is_eq(xi, xid), True{}, e) : {HXB.open.of(Bool.pick(Maybe<&2, HXH.Out>, _, Some{HXH.Out{xi, p, k, m, tx, HXH.OSettled{}, n, cx, ps}}, HXH.out_of(t, xid))) == None{} : Maybe<&2, HXH.Out>}
       {==}
 
 def hub_x_settled.go(c: Bool, +h: HXH.Out, +t: List<&2, HXH.Out>, +xid: Nat, +e: {Nat.is_eq(HXH.Out.xid(h), xid) == c : Bool},
@@ -5646,10 +5646,10 @@ def Laws.xhub_xin_replied_once(i):
 
 def Laws.route_one_outcome(r, s, e):
   match r:
-    case HXH.Route{a, b, c, d, f, g, h, i, j, k}:
+    case HXH.Route{a, b, c, d, f, g, h, i, j, k, l}:
       match s:
         case HXH.RHeld{}:
-          hub_absurd_eq(hub_tf_absurd(e), Maybe<&2, HXH.Route>, Some{HXH.Route{a, b, c, d, f, g, h, i, HXH.RHeld{}, k}}, None{})
+          hub_absurd_eq(hub_tf_absurd(e), Maybe<&2, HXH.Route>, Some{HXH.Route{a, b, c, d, f, g, h, i, HXH.RHeld{}, k, l}}, None{})
         case HXH.RSent{}:
           {==}
         case HXH.RCancelled{}:
@@ -5660,10 +5660,10 @@ def Laws.route_correct_only_held(o, cx, rid, to, name):
 
 def Laws.route_correct_keeps_due(r, to, name):
   match r:
-    case HXH.Route{a, b, c, d, f, g, h, i, j, k}:
+    case HXH.Route{a, b, c, d, f, g, h, i, j, k, l}:
       {==}
 
-def Laws.route_fires_at_due_only(x, tm, text, via, to, name, why, now, context):
+def Laws.route_fires_at_due_only(x, tm, text, via, to, name, why, now, context, parts):
   {==}
 
 def Laws.route_fire_makes_no_turn(o, cx, r):
@@ -5673,7 +5673,7 @@ def Laws.route_unclear_goes_plain(o, cx, r, e):
   %Equal.sym(Bool, HXB.is_unclear(r), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.route_plain(o, cx, r), u => HC.route_fire(o, Some{r}, cx)) == HC.route_plain(o, cx, r) : HX.Cx<o>}
   {==}
 
-def Laws.route_unclear_waits_pick_ms(x, tm, text, via, now, context):
+def Laws.route_unclear_waits_pick_ms(x, tm, text, via, now, context, parts):
   {==}
 
 def Laws.route_pick_only_unclear(o, cx, to, name, why):
@@ -5693,6 +5693,23 @@ def hub_unclear_max_ge(+d: Nat, m: Maybe<&2, Nat>) -> {Nat.is_ge(Maybe.default(&
 def Laws.route_behind_is_latest(r, t, e):
   %Equal.sym(Bool, HXB.is_unclear(r), True{}, e) : {Nat.is_ge(Maybe.default(&2, Nat, HXB.unclear_due.add(_, HXH.Route.due(r), HXB.unclear_due(t)), 0n), HXH.Route.due(r)) == True{} : Bool}
   hub_unclear_max_ge(HXH.Route.due(r), HXB.unclear_due(t))
+
+def Laws.route_to_keeps_parts(r, to, name):
+  match r:
+    case HXH.Route{a, b, c, d, f, g, h, i, j, k, l}:
+      {==}
+
+def Laws.route_out_carries_parts(x, r, id):
+  {==}
+
+def Laws.route_no_parts_no_key():
+  {==}
+
+def Laws.xin_input_keeps_parts(text, parts):
+  {==}
+
+def Laws.xin_ask_has_no_parts(text, parts):
+  {==}
 
 def Laws.follow_quiet_before_end(o, cx, from, summary):
   {==}

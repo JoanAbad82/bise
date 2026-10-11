@@ -45,13 +45,27 @@ impl Shell {
             "xin" => {
                 // sb-core answers through the token (Effect::Reply)
                 self.replies.insert(token, stream);
+                // his routed message's images completed in this hub's
+                // store (R41 (6), parts_in::restored): kept when already
+                // in it, else stored from their source or the sender's .b64
+                let (text, parts) = match s("kind").as_str() {
+                    "input" => {
+                        let store = bise_home::Home::from_env().images_dir();
+                        let r = crate::parts_in::restored(&s("text"), &s("parts"), &store, &super::fn_context::store_image, &super::fn_context::store_b64);
+                        if let Some(n) = &r.note {
+                            log_line(&self.opts.paths, &format!("xhub: x{xid} from {}: {n}", s("hub")));
+                        }
+                        (r.text, r.parts)
+                    }
+                    _ => (s("text"), String::new()),
+                };
                 // a routed message's fn context (S2, 9dc23d9c): rendered
                 // here once, the same block as a direct input's (S9)
                 let text = match crate::fn_context::of(v.get("context")) {
-                    Some(ctx) => crate::fn_context::with_context(&s("text"), &ctx),
-                    None => s("text"),
+                    Some(ctx) => crate::fn_context::with_context(&text, &ctx),
+                    None => text,
                 };
-                self.step(Input::XIn { token, hub: s("hub"), xid, kind: s("kind"), text, name: s("name") });
+                self.step(Input::XIn { token, hub: s("hub"), xid, kind: s("kind"), text, name: s("name"), parts });
             }
             // S10: bise's `sb follow <p>/<agent>`: main's follow here, its
             // answer (ok or why not) back to bise's hub at once
@@ -71,7 +85,9 @@ impl Shell {
     /// bise's home hub: deliver outbox entry `xid` to the hub `project`.
     /// `context`: a routed message's fn context (FnContext JSON text, ""
     /// none), sent as the op's `context` for the project to render.
-    pub(super) fn xdeliver(&mut self, xid: u64, project: String, kind: String, text: String, context: String) {
+    /// `parts`: a routed message's parts (msg-parts JSON, "" none), sent as
+    /// the op's `parts` for the project to complete in its own store.
+    pub(super) fn xdeliver(&mut self, xid: u64, project: String, kind: String, text: String, context: String, parts: String) {
         let own = crate::paths::workspace_id(&self.opts.paths.workspace);
         let ws = self.opts.paths.workspace.clone();
         let (tx, exe, root, log) = (self.tx.clone(), self.opts.exe.clone(), self.opts.app_root.clone(), self.opts.paths.clone());
@@ -80,6 +96,9 @@ impl Shell {
             let mut req = json!({"op": "xin", "hub": own, "xid": xid, "kind": kind, "text": text, "name": own_name(&ws)});
             if let Some(c) = serde_json::from_str::<Value>(&context).ok().filter(Value::is_object) {
                 req["context"] = c;
+            }
+            if !parts.is_empty() {
+                req["parts"] = json!(parts);
             }
             let res = hub_paths(&project).and_then(|p| call(&p, &exe, &root, &req));
             let input = match res {
