@@ -285,6 +285,25 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
     expect(rowOf(store, 51).queryByTestId('thread.cut.51')).toBeNull();
   });
 
+  it("the turn's '▲ turn interrupted (by main)' is the TUI's dim line, not the error tone; another warning keeps it", () => {
+    const store = new Store(null);
+    const warn = (pos: number, text: string) =>
+      store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos, at_ms: 1, kind: 'notice', text, notice: { level: 'warn', text } } });
+    warn(60, 'turn interrupted by main');
+    warn(61, 'turn interrupted');
+    warn(62, 'context nearly full');
+    for (const [pos, words] of [
+      [60, '▲turn interrupted by main'],
+      [61, '▲turn interrupted'],
+    ] as const) {
+      const n = rowOf(store, pos).getByTestId(`thread.notice.${String(pos)}`);
+      expect(n.className).toBe('th-notice warn interrupted');
+      expect(n.textContent).toBe(words);
+      cleanup();
+    }
+    expect(rowOf(store, 62).getByTestId('thread.notice.62').className).toBe('th-notice warn');
+  });
+
   it('not delivered: send again sends his words to that agent; esc drops it from view', () => {
     const cmds: CoreCmd[] = [];
     const port: CorePort = { send: (c) => cmds.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };

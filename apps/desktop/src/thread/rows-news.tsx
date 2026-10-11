@@ -208,8 +208,11 @@ export function NoticeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       </div>
     );
   }
+  // '▲ turn interrupted' / '▲ turn interrupted by main' (proto words.rs): the TUI draws it dim, a
+  // stop he or main asked for, read under a cut reply as stopped, not as a failure
+  const interrupted = level === 'warn' && (text === 'turn interrupted' || text.startsWith('turn interrupted by '));
   return (
-    <div className={`th-notice ${level}`} data-level={level} data-testid={`thread.notice.${e.pos}`}>
+    <div className={`th-notice ${level}${interrupted ? ' interrupted' : ''}`} data-level={level} data-testid={`thread.notice.${e.pos}`}>
       <span className="th-notice-mark" aria-label={level === 'err' ? 'error' : level === 'warn' ? 'warning' : 'note'}>
         {NOTICE_MARK[level]}
       </span>

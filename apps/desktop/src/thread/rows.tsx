@@ -227,7 +227,8 @@ function AgentMsg({ e, ctx, who, head, live, still }: { e: Entry; ctx: RowCtx; w
         </div>
       ) : e.cut === true ? (
         // R40: a reply cut off when its turn failed: the words he read as it streamed, kept at
-        // their place and dim (designer); the failure's notice follows it
+        // their place and dim (0.7, designer m_18084); the turn's end follows it, '▲ turn
+        // interrupted (by main)' dim as the TUI's (rows-news NoticeRow) or the failure's row
         <div className="th-cut" data-testid={`thread.cut.${String(e.pos)}`}>
           <Answer text={text} live={false} still={still} onLink={ctx.onLink} onPath={ctx.onPath} />
         </div>

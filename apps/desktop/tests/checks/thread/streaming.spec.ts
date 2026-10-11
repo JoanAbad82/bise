@@ -156,6 +156,40 @@ test('thread/streaming: a reply grows in place, whole words only, no raw marks, 
   }
 });
 
+test("thread/streaming: a reply cut off mid-stream stays as he read it at 0.7, the TUI's dim '▲ turn interrupted by main' under it", async () => {
+  const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
+  const s = await launchDesktop({ core, route: `agent/${P}/perf` });
+  try {
+    const { page } = s;
+    await page.emulateMedia({ colorScheme: 'light' });
+    await core.waitCmd((c) => c.cmd === 'subscribe' && c.agent === 'perf', 10_000);
+    const t0 = Date.now();
+    const said = ANSWER.slice(0, ANSWER.indexOf('```rust'));
+    const entries = [
+      { pos: 40, at_ms: t0 - 5000, kind: 'you', text: 'why is the cold bench slow?' },
+      // R40 Hub::Kept: the words he read, then the turn's end (proto words.rs)
+      { pos: 41, at_ms: t0 - 2000, kind: 'agent', text: said.trim(), cut: true },
+      { pos: 42, at_ms: t0 - 2000, kind: 'notice', text: 'turn interrupted by main', notice: { level: 'warn', text: 'turn interrupted by main' } },
+    ];
+    await core.send({ ev: 'thread', project: P, agent: 'perf', entries, before: null, more: false } as never);
+    const cut = page.getByTestId('thread.cut.41');
+    await expect(cut).toBeVisible({ timeout: 10_000 });
+    await expect(cut).toContainText('keep the cache warm');
+    expect(await cut.evaluate((el) => getComputedStyle(el).opacity), 'the cut reply is dim, still readable').toBe('0.7');
+    const line = page.getByTestId('thread.notice.42');
+    await expect(line).toHaveText('▲turn interrupted by main');
+    await expect(line).toHaveClass(/interrupted/);
+    const lineTone = await line.evaluate((el) => getComputedStyle(el).color);
+    const markTone = await line.locator('.th-notice-mark').evaluate((el) => getComputedStyle(el).color);
+    expect(markTone, "the ▲ is the line's dim tone, not the error one").toBe(lineTone);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: test.info().outputPath('cut-light.png') });
+  } finally {
+    await s.close();
+    core.dispose();
+  }
+});
+
 test('thread/streaming: with reduced motion the text still comes, never mid-fade', async () => {
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: `agent/${P}/perf` });
