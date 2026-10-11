@@ -158,23 +158,24 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
       spaceNext = false;
       continue;
     }
-    if (c.kind === 'image') {
-      images = true;
-      if (!files.includes(c.path)) files.push(c.path);
-    }
     const label = c.kind === 'artifact' ? `[${c.title.replace(/[[\]]/gu, '')}](${c.url})` : chipLabel(c);
     const pad = /\S$/u.test(body) ? ' ' : '';
     body += pad + label;
-    say(pad + label);
+    if (c.kind === 'image') {
+      // an image goes typed with its source alone: the hub stores it and writes its marker in
+      // place (main 18a32ce3, bend_images::store_file); never text + files any more
+      images = true;
+      say(pad);
+      bodyParts.push({ kind: 'image', name: label, source: c.path });
+    } else say(pad + label);
     spaceNext = true;
   }
   // `say …` and `steer …` go out without their word (sb.rs, C45)
   const words = body.trim().replace(/^(?:steer|say) /u, '').trim();
   const text = [...quotes, words].filter((x) => x !== '').join('\n');
-  // parts only when they say more than words (the TUI's of_parts), and never with an image: its
-  // file goes as `files` and the hub stores it (a part's image must already be in the store as a
-  // .b64, which the window doesn't make); a message of words alone stays text
-  const parts = images || (quoteParts.length === 0 && !bodyParts.some((p) => p.kind === 'paste')) ? undefined : [...quoteParts, ...trimParts(bodyParts)];
+  // parts only when they say more than words (the TUI's of_parts): a quote, a paste or an image
+  // (its source alone: the hub stores it, main 18a32ce3); a message of words alone stays text
+  const parts = !images && quoteParts.length === 0 && !bodyParts.some((p) => p.kind === 'paste') ? undefined : [...quoteParts, ...trimParts(bodyParts)];
   return parts === undefined ? { text, files } : { text, files, parts };
 }
 

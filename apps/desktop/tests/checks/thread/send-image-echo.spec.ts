@@ -49,7 +49,9 @@ test("thread/send-image-echo: a send with an image leaves 'sending…' when its 
     await page.keyboard.type(WORDS);
     await page.keyboard.press('Enter');
     const sent = (await core.waitCmd((c) => c.cmd === 'send', 5000)) as Record<string, unknown>;
-    const file = (sent['files'] as string[] | undefined)?.[0] ?? '';
+    const img = ((sent['parts'] ?? []) as Record<string, unknown>[]).find((p) => p['kind'] === 'image');
+    const file = typeof img?.['source'] === 'string' ? img['source'] : '';
+    expect(file, 'the image goes as a typed part with its source').not.toBe('');
     const pending = page.locator('[data-testid^="thread.pending."]');
     await expect(pending, 'his row at once, sending').toHaveCount(1);
     // the hub's echo: the marker it rendered for the model, then his words (rust/images marker())

@@ -17,7 +17,7 @@ export const CASES: readonly { name: string; content: Content; golden: Outgoing 
   { name: 'plain text', content: [['ça va ? 👍']], golden: { text: 'ça va ? 👍', files: [] } },
   { name: 'line breaks and trimmed ends', content: [['  first\nsecond\n\n']], golden: { text: 'first\nsecond', files: [] } },
   { name: 'two paragraphs (an old draft)', content: [['one'], ['two']], golden: { text: 'one\ntwo', files: [] } },
-  { name: 'an image', content: [['see ', img, ' here']], golden: { text: 'see [Image #1] here', files: ['/Users/g/shot.png'] } },
+  { name: 'an image', content: [['see ', img, ' here']], golden: { text: 'see [Image #1] here', files: [], parts: [{ kind: 'text', text: 'see ' }, { kind: 'image', name: '[Image #1]', source: '/Users/g/shot.png' }, { kind: 'text', text: ' here' }] } },
   {
     name: 'a long paste',
     content: [['look: ', paste]],

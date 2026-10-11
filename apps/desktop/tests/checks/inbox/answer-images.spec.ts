@@ -3,7 +3,8 @@
 //   - ⌘I: a PNG pasted in the item's answer field is a chip '[Image #1] checker.png'; his words + ⏎
 //     send answer {card 9, reply, files: [the image's path in the test home's store]};
 //   - an image alone (no words) + ⏎ answers with the image only (reply '');
-//   - the thread's docked answer: a PNG pasted in the composer goes with his words as answer {files}.
+//   - the thread's docked answer: a PNG pasted in the composer goes with his words as answer
+//     {parts: [..., {kind:'image', source: its path}]}, no files (amb-win, main 18a32ce3).
 // That the asking agent's request carries the image block is the hub's (amb-feed's laws) and
 // qa-native's R41 (4)(5) on FAKE_BODIES. Owner: amb-home.
 import path from 'node:path';
@@ -29,7 +30,7 @@ const world = () => [
   { ev: 'agents', project: P, agents: [agent('main'), agent('perf')] },
   { ev: 'thread', project: P, agent: 'main', entries: [{ pos: 1, at_ms: 1791100001000, kind: 'agent', text: 'hello' }], before: null, more: false },
 ];
-type Cmd = { cmd?: string; card?: number; reply?: string; files?: string[] };
+type Cmd = { cmd?: string; card?: number; reply?: string; files?: string[]; parts?: { kind: string; source?: string }[] };
 const answers = (core: FakeCore) => core.cmds().filter((c) => (c as Cmd).cmd === 'answer') as Cmd[];
 
 test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked answer) goes with it as files', async () => {
@@ -117,7 +118,12 @@ test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked 
       const a = answers(core)[2];
       expect(a).toMatchObject({ card: 9 });
       expect(a?.reply ?? '').toContain('warm, like this');
-      expect(a?.files?.length, 'the pasted image goes with the answer').toBe(1);
+      // the thread's composer sends its image as a typed part with its source (main 18a32ce3,
+      // ambient-lead m_17999), never as files beside parts
+      expect(a?.files, 'no files beside parts').toBeUndefined();
+      const img = (a?.parts ?? []).filter((p) => p.kind === 'image');
+      expect(img.length, 'the pasted image goes with the answer').toBe(1);
+      expect(img[0]?.source ?? '', "the image's path in the test home's store").toMatch(/\/images\/[0-9a-f]+\.png$/);
     });
   } finally {
     await s.close().catch(() => undefined);

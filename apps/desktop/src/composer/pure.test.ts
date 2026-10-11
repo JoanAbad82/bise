@@ -46,7 +46,7 @@ describe('triggers (the TUI rules)', () => {
 });
 
 describe('the send', () => {
-  it('quotes go in front, pastes in place as tags, images as labels with their file', () => {
+  it('quotes go in front, pastes in place as tags, images as labels in the text and typed parts with their source, never files', () => {
     const segs: Segment[] = [
       { kind: 'text', text: '  what about ' },
       { kind: 'chip', chip: { kind: 'paste', n: 2, text: 'a\nb' } },
@@ -57,7 +57,24 @@ describe('the send', () => {
     ];
     expect(buildMessage(segs)).toEqual({
       text: '<selection from="main">\nfn main()\n</selection>\nwhat about <pasted n="2" lines="2">\na\nb\n</pasted> and [Image #3]?',
-      files: ['/tmp/x.png'],
+      files: [],
+      parts: [
+        { kind: 'quote', from: 'main', text: 'fn main()' },
+        { kind: 'text', text: 'what about ' },
+        { kind: 'paste', n: 2, text: 'a\nb' },
+        { kind: 'text', text: ' and ' },
+        { kind: 'image', name: '[Image #3]', source: '/tmp/x.png' },
+        { kind: 'text', text: '?' },
+      ],
+    });
+    // an image alone with words: typed too (main 18a32ce3: the hub stores it from its source)
+    expect(buildMessage([{ kind: 'chip', chip: { kind: 'image', n: 1, path: '/i/a.png', name: 'a.png' } }, { kind: 'text', text: 'what is wrong' }])).toEqual({
+      text: '[Image #1] what is wrong',
+      files: [],
+      parts: [
+        { kind: 'image', name: '[Image #1]', source: '/i/a.png' },
+        { kind: 'text', text: ' what is wrong' },
+      ],
     });
     expect(nextChipNumber(segs)).toBe(4);
   });

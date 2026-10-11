@@ -858,7 +858,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   const onSend = useCallback(
     (out: Outgoing) => {
       // a '/word' line the composer's list doesn't know is still a command: the hub's router runs it
-      const sl = out.files.length === 0 ? slashLine(out.text) : null;
+      // (never a line with an image: '/word [Image #1]' is a message)
+      const sl = out.files.length === 0 && !(out.parts ?? []).some((p) => p.kind === 'image') ? slashLine(out.text) : null;
       if (sl !== null) {
         onCommand(sl.name, sl.args);
         return;

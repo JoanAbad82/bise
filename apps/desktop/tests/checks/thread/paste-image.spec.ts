@@ -5,8 +5,9 @@
 // Passes when:
 //   - a real ⌘V of a PNG (staged on the test clipboard through main's TEST_CLIP_HOOK) in bise main's
 //     composer makes an image chip with its thumbnail drawn;
-//   - ⏎ sends {cmd:'send', project: home, agent:'main', files: [one absolute path]} to the core,
-//     his words in text and no path in them;
+//   - ⏎ sends {cmd:'send', project: home, agent:'main', parts: [{kind:'image', name:'[Image #1]',
+//     source: one absolute path}, {kind:'text', text:' his words'}]} to the core, no files, no
+//     b64_file (the hub stores it, main 18a32ce3), his words in text and no path in them;
 //   - the path is a file in the test home's image store (BISE_HOME/images/<sha256>.png) holding the
 //     PNG's bytes, so the hub can make the image block the model sees (qa-native's $FAKE_BODIES read
 //     is the model side of R41).
@@ -67,11 +68,17 @@ test("thread/paste-image: ⌘V of a PNG in bise main's composer is a chip, ⏎ s
     const sent = (await core.waitCmd((c) => c.cmd === 'send', 5000)) as Record<string, unknown>;
     expect(sent['project']).toBe(HOME);
     expect(sent['agent']).toBe('main');
-    const files = sent['files'];
-    expect(Array.isArray(files), `the send carries files: ${JSON.stringify(sent)}`).toBe(true);
-    const list = files as string[];
-    expect(list).toHaveLength(1);
-    const f = list[0] ?? '';
+    // msg-parts (main 18a32ce3, ambient-lead m_17999): the image goes as a typed part with its
+    // source alone (the hub stores it), never text + files
+    expect(sent['files'], `no files beside parts: ${JSON.stringify(sent)}`).toBeUndefined();
+    const parts = (sent['parts'] ?? []) as Record<string, unknown>[];
+    const images = parts.filter((p) => p['kind'] === 'image');
+    expect(images, `one image part: ${JSON.stringify(sent)}`).toHaveLength(1);
+    expect(images[0]?.['name']).toBe('[Image #1]');
+    expect(images[0]?.['b64_file'], 'no b64_file: the hub stores it').toBeUndefined();
+    expect(parts.map((p) => p['kind'])).toEqual(['image', 'text']);
+    expect(parts[1]?.['text']).toBe(' what is wrong in this');
+    const f = typeof images[0]?.['source'] === 'string' ? images[0]['source'] : '';
     expect(path.isAbsolute(f), f).toBe(true);
     expect(f, "in the image store, the TUI's").toMatch(/\/images\/[0-9a-f]{64}\.png$/u);
     expect(readFileSync(f).equals(readFileSync(PNG_FILE)), `${f} holds the PNG's bytes`).toBe(true);
