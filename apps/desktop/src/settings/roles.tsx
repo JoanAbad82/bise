@@ -4,7 +4,7 @@
 // the TUI's /models shows the same). A chat model whose provider has no key opens that provider's
 // setup first (bar L5, hold.ts). Pure: draws the core's roles and models. Owner: amb-kit.
 import type { AppCmd, Model, RoleRow } from '@/proto';
-import { Group, Help, Seg, type GroupItem } from '@/ds';
+import { Group, Help, Seg, Select, type GroupItem } from '@/ds';
 import { modelRow } from './hold';
 
 /** Where a role's model comes from, in his words. */
@@ -24,8 +24,9 @@ export function effortOf(r: RoleRow, models: readonly Model[]): string | null {
   return r.effort ?? modelRow(r.model, models)?.default_effort ?? null;
 }
 
-/** the select's value for "back to its fallback" (role_set with no model) */
-const FALLBACK = '';
+/** the picker's value for "back to its fallback" (role_set with no model); Radix Select takes no
+ * empty value, so it is a word no model id can be */
+export const FALLBACK = '(fallback)';
 
 export interface RolesProps {
   roles: readonly RoleRow[];
@@ -50,27 +51,23 @@ export function Roles({ roles, models, error = null, set }: RolesProps) {
       control: (
         <span className="settings-row-acts">
           {chat ? (
-            <select
-              className="settings-select"
-              aria-label={`${r.name}'s model`}
-              value={r.source === 'default' ? FALLBACK : r.model}
-              onChange={(e) => {
-                const v = e.currentTarget.value;
-                set({ cmd: 'role_set', role: r.role, model: v === FALLBACK ? null : v }, v === FALLBACK ? null : v);
-              }}
-              data-testid={`settings.role.${r.role}.model`}
-            >
-              <option value={FALLBACK}>{r.follows != null && r.follows !== '' ? `as ${r.follows}` : 'the default'}</option>
-              {!known && r.source !== 'default' && <option value={r.model}>{r.model}</option>}
-              {models
-                .filter((m) => m.alias_of == null || m.alias_of === '')
-                .map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                    {m.key_ready === false ? ` · ${m.provider}: set up first` : ''}
-                  </option>
-                ))}
-            </select>
+            <span className="settings-pick">
+              <Select
+                label={`${r.name}'s model`}
+                value={r.source === 'default' ? FALLBACK : r.model}
+                options={[
+                  { value: FALLBACK, label: r.follows != null && r.follows !== '' ? `as ${r.follows}` : 'the default' },
+                  ...(!known && r.source !== 'default' ? [{ value: r.model, label: r.model }] : []),
+                  ...models
+                    .filter((m) => m.alias_of == null || m.alias_of === '')
+                    .map((m) => ({ value: m.id, label: m.label, hint: m.key_ready === false ? `${m.provider}: set up first` : undefined })),
+                ]}
+                onChange={(v) => {
+                  set({ cmd: 'role_set', role: r.role, model: v === FALLBACK ? null : v }, v === FALLBACK ? null : v);
+                }}
+                testId={`settings.role.${r.role}.model`}
+              />
+            </span>
           ) : (
             <span className="v" data-testid={`settings.role.${r.role}.model`}>
               {r.model}

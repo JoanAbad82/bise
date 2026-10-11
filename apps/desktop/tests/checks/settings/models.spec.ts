@@ -46,7 +46,8 @@ test('settings/models: the roles are the TUI\'s; a model and a reasoning picked 
     const before = await models(t);
     test.info().attachments.push({ name: 'tui-models-before', contentType: 'text/plain', body: Buffer.from(before) });
     const rows = await page.locator(`${T.roles} [data-testid^="settings.role."][data-testid$=".model"]`).evaluateAll((els) =>
-      els.map((e) => ({ role: (e.getAttribute('data-testid') ?? '').replace(/^settings\.role\./, '').replace(/\.model$/, ''), select: e.tagName === 'SELECT', value: (e as HTMLSelectElement).value })));
+      // a chat role's model is the ds Select (raw-controls, designer m_18343): its trigger is a combobox
+      els.map((e) => ({ role: (e.getAttribute('data-testid') ?? '').replace(/^settings\.role\./, '').replace(/\.model$/, ''), select: e.getAttribute('role') === 'combobox', value: e.textContent.trim() })));
     const labels = await page.locator(`${T.roles} .b-gi, ${T.roles} [data-testid^="settings.roles."]`).allInnerTexts();
     test.info().annotations.push({ type: 'roles', description: JSON.stringify({ rows, labels }) });
     await page.screenshot({ path: test.info().outputPath('roles.png') });
@@ -61,12 +62,17 @@ test('settings/models: the roles are the TUI\'s; a model and a reasoning picked 
     expect(role, 'a role with a model to pick').toBeDefined();
     const R = role?.role ?? '';
     const sel = page.locator(T.model(R));
-    const options = await sel.locator('option').evaluateAll((os) => os.map((o) => ({ v: (o as HTMLOptionElement).value, t: o.textContent })));
-    const pick = options.find((o) => o.v !== '' && o.v !== role?.value && !o.t.includes('set up first'));
+    const opt = (v: string) => page.getByTestId(`settings.role.${R}.model.opt.${v}`);
+    // the picker's options (its menu opens in a portal): value from the test id, label, and which is on
+    const prefix = `settings.role.${R}.model.opt.`;
+    await sel.click();
+    const options = await page.locator(`[data-testid^="${prefix}"]`).evaluateAll((os, pre) => os.map((o) => ({ v: (o.getAttribute('data-testid') ?? '').slice(pre.length), t: o.textContent, on: o.getAttribute('data-state') === 'checked' })), prefix);
+    const was = options.find((o) => o.on)?.v ?? '';
+    const pick = options.find((o) => o.v !== '(fallback)' && !o.on && !o.t.includes('set up first'));
     test.info().annotations.push({ type: 'options', description: JSON.stringify({ role: R, options, pick }) });
     expect(pick, 'a ready model to pick').toBeDefined();
-    await sel.selectOption(pick?.v ?? '');
-    await expect(sel, 'the select follows the core').toHaveValue(pick?.v ?? '', { timeout: 10_000 });
+    await opt(pick?.v ?? '').click();
+    await expect(sel, 'the picker follows the core').toContainText(pick?.t.trim().split('·')[0]?.trim() ?? '', { timeout: 10_000 });
     await expect(page.locator(T.error), 'no refusal').toHaveCount(0);
     const picked = await models(t);
     test.info().attachments.push({ name: 'tui-models-picked', contentType: 'text/plain', body: Buffer.from(picked) });
@@ -89,8 +95,9 @@ test('settings/models: the roles are the TUI\'s; a model and a reasoning picked 
       expect.soft(flat(reasoned), `the TUI's /models shows ${R}'s reasoning '${word}'`).toContain(word);
     }
     // back to its default
-    await sel.selectOption(role?.value ?? '');
-    await expect(sel, 'back to how it was').toHaveValue(role?.value ?? '', { timeout: 10_000 });
+    await sel.click();
+    await opt(was).click();
+    await expect(sel, 'back to how it was').toHaveText(role?.value ?? '', { timeout: 10_000 });
     await page.screenshot({ path: test.info().outputPath('roles-back.png') });
   } finally {
     if (t) t.close();

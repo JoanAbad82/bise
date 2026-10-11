@@ -7,7 +7,7 @@
 // while it shows, then gives them back. amb-win mounts it in the thread
 // over the composer. Owner: amb-home.
 import { useEffect, useRef, type KeyboardEvent } from 'react';
-import { Kbd } from '@/ds';
+import { Act, Button, Kbd } from '@/ds';
 import { useConfirms, useNotice, useStore } from '@/store';
 import './inbox.css';
 
@@ -56,15 +56,16 @@ export function ConfirmBar({ project }: { project: string }) {
   return (
     <div className="confirm-bar" role="alertdialog" aria-label={q.text} tabIndex={-1} ref={bar} onKeyDown={onKeyDown} data-testid="confirm.bar">
       <span className="q">{q.text}</span>
-      <button type="button" onClick={yes} data-testid="confirm.yes">
+      {/* raw-controls (designer m_18343): the ds's Button and Act, never a bare button */}
+      <Button kind="pri" size="sm" onClick={yes} testId="confirm.yes">
         <Kbd>y</Kbd> yes
-      </button>
-      <button type="button" onClick={no} data-testid="confirm.no">
+      </Button>
+      <Button size="sm" onClick={no} testId="confirm.no">
         <Kbd>n</Kbd> no
-      </button>
-      <button type="button" onClick={later} data-testid="confirm.later">
+      </Button>
+      <Act onClick={later} testId="confirm.later">
         <Kbd>esc</Kbd> later
-      </button>
+      </Act>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 // fills the composer with those words, selected (typing replaces them, ⏎ sends them), and never
 // sends. Pure: the screen that shows it (main's empty thread) hands `onFill`, which puts the words
 // in the composer through its actions. Owner: amb-kit (src/setup).
+import { Act } from '@/ds';
 
 /** The empty thread's question, then what bise is, then the suggestion (the TUI's words). */
 export const FIRST_RUN = ["what's on your mind?", "say it and keep talking. the work runs in the background, i'm always here."] as const;
@@ -35,20 +36,22 @@ export function FirstRun({ ready = false, onFill }: FirstRunProps) {
       ) : (
         <p>
           try: “
-          <button
-            type="button"
+          <span
             className="setup-firstrun-demo"
-            data-testid="setup.firstrun.demo"
             onMouseDown={(e) => {
               // keep the composer's focus and selection: the click must not blur it first
               e.preventDefault();
             }}
-            onClick={() => {
-              onFill(DEMO);
-            }}
           >
-            {DEMO}
-          </button>
+            <Act
+              testId="setup.firstrun.demo"
+              onClick={() => {
+                onFill(DEMO);
+              }}
+            >
+              {DEMO}
+            </Act>
+          </span>
           ”
         </p>
       )}

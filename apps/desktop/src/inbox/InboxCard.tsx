@@ -10,7 +10,7 @@
 // row shows picked for PICKED_MS, then picks. Owner: amb-home.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Card as CardRow } from '@/proto';
-import { Kbd } from '@/ds';
+import { Act, Kbd } from '@/ds';
 import { cardKey } from './order';
 import { takesWords } from './model';
 
@@ -153,12 +153,15 @@ function Footer({ card, acts, on, id, pick }: { card: CardRow; acts: InboxCardAc
   const n = card.options.length;
   const page = card.page;
   const outside = acts.open !== undefined;
-  const pair = (k: string | null, words: string, test: string, run: (() => void) | undefined, end = false) => (
-    <button type="button" className={end ? 'end' : undefined} onClick={run} data-testid={`${id}.${test}`}>
-      {k !== null && <Kbd>{k}</Kbd>}
-      {words}
-    </button>
-  );
+  const pair = (k: string | null, words: string, test: string, run: (() => void) | undefined, end = false) => {
+    const act = (
+      <Act onClick={run} testId={`${id}.${test}`}>
+        {k !== null && <Kbd>{k}</Kbd>}
+        {words}
+      </Act>
+    );
+    return end ? <span className="ic-foot-end">{act}</span> : act;
+  };
   return (
     <>
       {n > 0 && pair(pickKeys(n), 'pick', 'pick', on !== null ? () => { pick(on); } : undefined)}
@@ -198,7 +201,7 @@ function Folded({ text, testId }: { text: string; testId: string }) {
   return (
     <>
       {lines.slice(0, FOLD_SHOW).join('\n')}
-      <span className="inbox-more" data-testid={testId}>
+      <span data-testid={testId}>
         {`\n… ${String(more)} more lines `}
         <Kbd>ctrl o</Kbd>
       </span>

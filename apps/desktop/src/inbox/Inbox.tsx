@@ -6,14 +6,14 @@
 // amb-home.
 //
 // Typing stays smooth (the reset's bug 1): the answer field is an
-// uncontrolled <textarea>, so a key in it changes no state and re-renders
+// uncontrolled text area (the ds TextArea), so a key in it changes no state and re-renders
 // nothing; each item keeps its typed words (drafts.ts: saved on input into
 // a plain map, so they outlive the screen; dropped by an answer or a
 // close). The list's rows are memo'd: moving the keyboard re-renders the
 // two rows that change.
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { Card as CardRow, Part } from '@/proto';
-import { Empty, Head, Row } from '@/ds';
+import { Empty, Head, Row, TextArea } from '@/ds';
 import { dotOf, folds, InboxCard, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { inboxDrafts, type Drafts } from './drafts';
@@ -275,10 +275,9 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
                     {`image ${String(i + 1)}`}
                   </span>
                 ))}
-                <textarea
+                <TextArea
                   key={cardKey(cur)}
                   ref={field}
-                  className="inbox-field"
                   rows={2}
                   placeholder={cur.options.length > 0 ? 'or type your answer' : 'type your answer'}
                   defaultValue={drafts.get(cardKey(cur))}
@@ -286,7 +285,7 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
                     drafts.keep(cardKey(cur), e.currentTarget.value);
                   }}
                   aria-label="your answer"
-                  data-testid="inbox.answer"
+                  testId="inbox.answer"
                   onPaste={(e) => {
                     const fs = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
                     if (fs.length === 0 || curKey === null) return;

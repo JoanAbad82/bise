@@ -7,7 +7,7 @@
 // mounts, fed by the store. Owner: amb-home.
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Card, Part } from '@/proto';
-import { Dot, Kbd } from '@/ds';
+import { Dot, Kbd, Row } from '@/ds';
 import { age, dotOf, InboxCard, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { STRIP_KEYS, stripKey, stripList, stripOpen, stripView, stripWords } from './stripRows';
@@ -187,16 +187,13 @@ export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip
           />
         ))}
         {view.more > 0 && view.next && (
-          <button
-            type="button"
-            className="strip-row strip-more"
-            data-testid="strip.more"
+          <Row
+            name={<span className="strip-more">{`+ ${String(view.more)} more · ${titleOf(view.next)}`}</span>}
             onClick={() => {
               openTo(view.next ? cardKey(view.next) : null);
             }}
-          >
-            {`+ ${String(view.more)} more · ${titleOf(view.next)}`}
-          </button>
+            testId="strip.more"
+          />
         )}
       </section>
     </>
@@ -245,12 +242,23 @@ export function useStripCard(project: string): Card | null {
 function StripRow({ c, n, now, onOpen }: { c: Card; n: number; now: number; onOpen: () => void }) {
   const { who, what } = stripWords(c);
   return (
-    <button type="button" className="strip-row" data-testid={`strip.row.${String(n)}`} onClick={onOpen}>
-      <span className="strip-n">{n}</span>
-      <Dot state={c.approval === true || c.urgent ? 'nd' : dotOf(c)} />
-      <span className="strip-who">{who}</span>
-      {what !== '' && <span className="strip-what">{` · ${what}`}</span>}
-      <span className="strip-age">{age(now - c.since_ms)}</span>
-    </button>
+    // raw-controls (designer m_18343): the ds's Row as a button
+    <Row
+      lead={
+        <>
+          <span className="strip-n">{n}</span>
+          <Dot state={c.approval === true || c.urgent ? 'nd' : dotOf(c)} />
+        </>
+      }
+      name={
+        <>
+          <span className="strip-who">{who}</span>
+          {what !== '' && <span className="strip-what">{` · ${what}`}</span>}
+        </>
+      }
+      end={age(now - c.since_ms)}
+      onClick={onOpen}
+      testId={`strip.row.${String(n)}`}
+    />
   );
 }

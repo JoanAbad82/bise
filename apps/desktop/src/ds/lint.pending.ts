@@ -4,13 +4,6 @@
 
 /** bare controls per file (path under src/) */
 export const PENDING_RAW: Readonly<Record<string, number>> = {
-  'inbox/Block.tsx': 4,
-  'inbox/Inbox.tsx': 2,
-  'inbox/InboxCard.tsx': 1,
-  'inbox/Strip.tsx': 2,
-  'inbox/confirm.tsx': 3,
-  'settings/roles.tsx': 1,
-  'setup/FirstRun.tsx': 1,
 };
 
 /** classes a .tsx names that no .css has a rule for (some are test hooks: they become data-testid) */
@@ -22,7 +15,6 @@ export const PENDING_CLASSES: readonly string[] = [
   'art-day',
   'c',
   'hit',
-  'inbox-more',
   'lab',
   'lab-sent',
   'pearl',

@@ -15,6 +15,14 @@ import { addPaths, offers, ordered, projectSub } from './projects';
 import { KEY_SECTIONS } from './keys';
 import { notifyRow } from './pages';
 import { checks } from './check';
+import { FALLBACK } from './roles';
+
+/** a role's model picker (the ds Select): open it from the keyboard, then pick that option */
+function pickRole(role: string, value: string): void {
+  const id = `settings.role.${role}.model`;
+  fireEvent.keyDown(screen.getByTestId(id), { key: 'Enter' });
+  fireEvent.click(screen.getByTestId(`${id}.opt.${value}`));
+}
 
 afterEach(cleanup);
 
@@ -358,14 +366,14 @@ describe('which model does what (V17) and a model with no key (L5)', () => {
     expect(roles.textContent).toContain('your team lead · set here');
     expect(roles.textContent).toContain('follows main');
     expect(roles.textContent).toContain('from your environment');
-    expect(screen.getByTestId<HTMLSelectElement>('settings.role.main.model').value).toBe('anthropic/claude-opus-5-5');
-    expect(screen.getByTestId<HTMLSelectElement>('settings.role.agents.model').value).toBe('');
+    expect(screen.getByTestId('settings.role.main.model').textContent).toContain('opus 5.5');
+    expect(screen.getByTestId('settings.role.agents.model').textContent).toContain('as main');
     expect(screen.getByTestId('settings.role.voice.model').textContent).toBe('mistral/voxtral-mini-latest');
     expect(screen.getByTestId('settings.role.main.effort.2').className).toContain('on');
     fireEvent.click(screen.getByTestId('settings.role.main.effort.3'));
     expect(p.sent).toEqual([{ cmd: 'role_set', role: 'main', effort: 'max' }]);
     // back to its fallback: no model
-    fireEvent.change(screen.getByTestId('settings.role.main.model'), { target: { value: '' } });
+    pickRole('main', FALLBACK);
     expect(p.sent[1]).toEqual({ cmd: 'role_set', role: 'main', model: null });
   });
 
@@ -373,7 +381,7 @@ describe('which model does what (V17) and a model with no key (L5)', () => {
     const p = ports();
     const held: Held[] = [];
     const r = view('models', { ...p, hold: (h) => held.push(h) }, { roles: ROLES, models: MODELS, accounts: ACCOUNTS });
-    fireEvent.change(screen.getByTestId('settings.role.main.model'), { target: { value: 'mistral/devstral-medium-latest' } });
+    pickRole('main', 'mistral/devstral-medium-latest');
     expect(p.sent).toEqual([]);
     expect(held).toEqual([{ provider: 'mistral', providerName: 'Mistral', model: 'devstral medium', cmd: { cmd: 'role_set', role: 'main', model: 'mistral/devstral-medium-latest' } }]);
     r.rerender(<Settings page="models" prefs={prefs()} accounts={ACCOUNTS} projects={projects()} found={found()} plugins={null} computerUse={null} perms={{}} ports={p} roles={ROLES} models={MODELS} held={held[0] ?? null} />);

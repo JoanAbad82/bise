@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
 import type { NotifyAuth } from '@/shared/api';
-import { Dot, Kbd } from '@/ds';
+import { Act, Button, Dot, Kbd, Row } from '@/ds';
 import { useProjects, useStore } from '@/store';
 import { shownName } from '@/agents/model';
 import { age, dotOf, folds, InboxCard } from './InboxCard';
@@ -320,12 +320,12 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
       {notify.show && (
         <div className="ib-notify" data-testid="inbox.block.notify">
           <span className="ib-notify-words">questions can reach you when bise isn't in front, as macOS notifications.</span>
-          <button type="button" className="ib-notify-on" onClick={notify.on} data-testid="inbox.block.notify.on">
+          <Button size="sm" onClick={notify.on} testId="inbox.block.notify.on">
             turn on
-          </button>
-          <button type="button" className="ib-notify-later" onClick={notify.later} data-testid="inbox.block.notify.later">
+          </Button>
+          <Act onClick={notify.later} testId="inbox.block.notify.later">
             not now
-          </button>
+          </Act>
         </div>
       )}
       {shown.map((c) => {
@@ -360,34 +360,37 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
         const { who, what } = stripWords(c);
         const sign = signOf(c);
         return (
-          <button
+          // raw-controls (designer m_18343): the ds's Row as a button, never a bare button
+          <Row
             key={cardKey(c)}
-            type="button"
-            className="strip-row"
-            data-testid={`inbox.block.row.${String(n)}`}
+            lead={
+              <>
+                <span className="strip-n">{n}</span>
+                {sign !== null ? <span className={sign === '!' ? 'ib-sign acc' : 'ib-sign'}>{sign}</span> : <Dot state={dotOf(c)} />}
+              </>
+            }
+            name={
+              <>
+                <span className="strip-who">{shownName(who)}</span>
+                {what !== '' && <span className="strip-what">{` · ${what}`}</span>}
+              </>
+            }
+            end={`${row?.home === true ? '' : `${row?.name ?? c.project} · `}${age(now - c.since_ms)}`}
             onClick={() => {
               openTo(cardKey(c));
             }}
-          >
-            <span className="strip-n">{n}</span>
-            {sign !== null ? <span className={sign === '!' ? 'ib-sign acc' : 'ib-sign'}>{sign}</span> : <Dot state={dotOf(c)} />}
-            <span className="strip-who">{shownName(who)}</span>
-            {what !== '' && <span className="strip-what">{` · ${what}`}</span>}
-            <span className="strip-age">{`${row?.home === true ? '' : `${row?.name ?? c.project} · `}${age(now - c.since_ms)}`}</span>
-          </button>
+            testId={`inbox.block.row.${String(n)}`}
+          />
         );
       })}
       {more > 0 && next !== undefined && (
-        <button
-          type="button"
-          className="strip-row strip-more"
-          data-testid="inbox.block.more"
+        <Row
+          name={<span className="strip-more">{`+ ${String(more)} more`}</span>}
           onClick={() => {
             openTo(cardKey(next));
           }}
-        >
-          {`+ ${String(more)} more`}
-        </button>
+          testId="inbox.block.more"
+        />
       )}
     </section>
   );
