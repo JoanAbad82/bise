@@ -32,6 +32,10 @@ import ./hub/xhub.bend as HXB
 
 import ./hub/codec.bend as HCo
 
+import ./hub/gen/kit.bend as HK
+
+import ./hub/gen/fx.bend as HF
+
 import ./core/api.bend as Api
 
 import ./LAWS.bend as Laws
@@ -3166,7 +3170,7 @@ def hub_rt_put_find(+xs: List<&2, HX.Rt>, +n: String, +run: HM.Run, +w: Bool, +t
     case Con{h, t}:
       hub_rt_put_find.pick(String.eq(HX.Rt.name(h), n), h, t, n, run, w, tm, k, {==}, hub_rt_put_find(t, n, run, w, tm, k))
 
-def hub_p1(-o: HM.St, p: HX.Cx<o> & List<&2, J.Json>) -> HX.Cx<o>:
+def hub_p1(-o: HM.St, p: HX.Cx<o> & List<&2, HK.Delivered>) -> HX.Cx<o>:
   match p:
     case (cx, a):
       cx
@@ -3215,7 +3219,7 @@ def hub_ag_pick(-o: HM.St, c: Bool, +x: HX.Cx<o>, +y: HX.Cx<o>, -z: HX.Cx<o>, ex
       ey
 
 # delivering a batch keeps the agents
-def hub_ag_deliver(-o: HM.St, +b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +name: String, +acc: List<&2, J.Json>)
+def hub_ag_deliver(-o: HM.St, +b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +name: String, +acc: List<&2, HK.Delivered>)
     -> {hub_ag(o, hub_p1(o, HC.deliver_each(o, b, cx, name, acc))) == hub_ag(o, cx) : List<&2, HM.Agent>}:
   match b:
     case Nil{}:
@@ -3227,9 +3231,9 @@ def hub_ag_deliver(-o: HM.St, +b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +name: String
       +you = HM.Msg.plain(m) || Maybe.is_some(&2, String, HM.Msg.via(m))
       +cx3 = HC.deliver.line(o, again, you, cx2, name, m)
       +rel = HC.relation(HM.Msg.from(m), HM.Msg.to(m), HC.parent_of(HM.get_agent(s, HM.Msg.from(m))), HC.parent_of(HM.get_agent(s, HM.Msg.to(m))))
-      Equal.trans(List<&2, HM.Agent>, hub_ag(o, hub_p1(o, HC.deliver_each(o, rest, cx3, name, HM.snoc(J.Json, acc, J.obj([J.kv("id", J.JNum{HM.Msg.id(m)}), J.kv("rel", J.JStr{rel})]))))),
+      Equal.trans(List<&2, HM.Agent>, hub_ag(o, hub_p1(o, HC.deliver_each(o, rest, cx3, name, HM.snoc(HK.Delivered, acc, HK.Delivered{HM.Msg.id(m), rel})))),
         hub_ag(o, cx3), hub_ag(o, cx),
-        hub_ag_deliver(o, rest, cx3, name, HM.snoc(J.Json, acc, J.obj([J.kv("id", J.JNum{HM.Msg.id(m)}), J.kv("rel", J.JStr{rel})]))),
+        hub_ag_deliver(o, rest, cx3, name, HM.snoc(HK.Delivered, acc, HK.Delivered{HM.Msg.id(m), rel})),
         Equal.trans(List<&2, HM.Agent>, hub_ag(o, cx3), hub_ag(o, cx2), hub_ag(o, cx),
           Equal.cong(HM.St, List<&2, HM.Agent>, s2 => HM.St.agents(s2), HX.d(o, cx3), HX.d(o, cx2), hub_d_dline(o, again, you, cx2, name, m)),
           hub_ag_mark(o, cx, HM.Msg.id(m))))
@@ -3270,16 +3274,16 @@ def hub_run_if_agent(-o: HM.St, known: Bool, +cx: HX.Cx<o>, +n: String, +w: Bool
       hub_absurd_eq(hub_ft_absurd(e), HM.Run, HX.Rt.run(HC.rt_find(hub_rts(o, HC.if_agent(o, False{}, cx, HX.Rt{n, HM.RBusy{}, w, tm, k})), n)), HM.RBusy{})
 
 # a new turn marks its agent busy
-def hub_send_busy(-o: HM.St, p: HX.Cx<o> & List<&2, J.Json>, +n: String, +ids: List<&2, Nat>, +kvs0: List<&2, Sigma<&2, &2, String, _ => J.Json>>,
+def hub_send_busy(-o: HM.St, p: HX.Cx<o> & List<&2, HK.Delivered>, +n: String, +ids: List<&2, Nat>, +notes: List<&2, String>, +status: Bool,
     h: {HC.has_agent(o, hub_p1(o, p), n) == True{} : Bool})
-    -> {HX.Rt.run(HC.rt_find(hub_rts(o, HC.pump.send(o, False{}, p, n, ids, kvs0)), n)) == HM.RBusy{} : HM.Run}:
+    -> {HX.Rt.run(HC.rt_find(hub_rts(o, HC.pump.send(o, False{}, p, n, ids, notes, status)), n)) == HM.RBusy{} : HM.Run}:
   match p:
     case (+cx, +msgs):
       +x = {HX.Rt{n, HM.RBusy{}, HX.Rt.waiting(HC.rt(o, cx, n)), Some{HC.now(o, cx)}, 0n} : HX.Rt}
       +cx2 = HC.upd_rt(o, cx, x)
-      +kvs = HM.snoc(Sigma<&2, &2, String, _ => J.Json>, kvs0, J.kv("msgs", J.JArr{msgs}))
-      %Equal.sym(List<&2, HX.Rt>, hub_rts(o, HC.dirty(o, HC.out(o, cx2, J.kv("fx", J.JStr{"deliver"}) <> J.kv("mode", J.JStr{"say"}) <> kvs))), hub_rts(o, cx2),
-          hub_rts_dirty_out(o, cx2, J.kv("fx", J.JStr{"deliver"}) <> J.kv("mode", J.JStr{"say"}) <> kvs)) : {HX.Rt.run(HC.rt_find(_, n)) == HM.RBusy{} : HM.Run}
+      +kvs = HF.deliver("say", n, notes, status, msgs)
+      %Equal.sym(List<&2, HX.Rt>, hub_rts(o, HC.dirty(o, HC.out(o, cx2, kvs))), hub_rts(o, cx2),
+          hub_rts_dirty_out(o, cx2, kvs)) : {HX.Rt.run(HC.rt_find(_, n)) == HM.RBusy{} : HM.Run}
       hub_run_if_agent(o, HC.has_agent(o, cx, n), cx, n, HX.Rt.waiting(HC.rt(o, cx, n)), Some{HC.now(o, cx)}, 0n, h)
 
 def hub_has_tr(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, -n: String, e: {hub_ag(o, a) == hub_ag(o, b) : List<&2, HM.Agent>},
@@ -3294,7 +3298,7 @@ def hub_batch_idle(-o: HM.St, +m: HM.Msg, +t: List<&2, HM.Msg>, +cx: HX.Cx<o>, +
   +b = {m <> t : List<&2, HM.Msg>}
   +notes = Bool.pick(List<&2, String>, im, HM.St.notes(HC.st(o, cx)), Nil{})
   +cx2 = HC.pump.flush(o, Bool.not(List.is_empty(&2, String, notes)), cx)
-  hub_send_busy(o, HC.deliver_each(o, b, cx2, n, Nil{}), n, HC.ids_of(b), [J.kv("agent", J.JStr{n}), J.kv("notes", J.JArr{HC.jstrs(notes)}), J.kv("status", J.JBool{im && HC.any_from_user(b)})],
+  hub_send_busy(o, HC.deliver_each(o, b, cx2, n, Nil{}), n, HC.ids_of(b), notes, im && HC.any_from_user(b),
     hub_has_tr(o, hub_p1(o, HC.deliver_each(o, b, cx2, n, Nil{})), cx, n,
       Equal.trans(List<&2, HM.Agent>, hub_ag(o, hub_p1(o, HC.deliver_each(o, b, cx2, n, Nil{}))), hub_ag(o, cx2), hub_ag(o, cx),
         hub_ag_deliver(o, b, cx2, n, Nil{}), hub_ag_flush(o, Bool.not(List.is_empty(&2, String, notes)), cx)),
@@ -3365,7 +3369,7 @@ def hub_rts_pick(-o: HM.St, c: Bool, +x: HX.Cx<o>, +y: HX.Cx<o>, -z: HX.Cx<o>, e
     case False{}:
       ey
 
-def hub_rts_deliver(-o: HM.St, +b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +name: String, +acc: List<&2, J.Json>)
+def hub_rts_deliver(-o: HM.St, +b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +name: String, +acc: List<&2, HK.Delivered>)
     -> {hub_rts(o, hub_p1(o, HC.deliver_each(o, b, cx, name, acc))) == hub_rts(o, cx) : List<&2, HX.Rt>}:
   match b:
     case Nil{}:
@@ -3377,15 +3381,15 @@ def hub_rts_deliver(-o: HM.St, +b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +name: Strin
       +you = HM.Msg.plain(m) || Maybe.is_some(&2, String, HM.Msg.via(m))
       +cx3 = HC.deliver.line(o, again, you, cx2, name, m)
       +rel = HC.relation(HM.Msg.from(m), HM.Msg.to(m), HC.parent_of(HM.get_agent(s, HM.Msg.from(m))), HC.parent_of(HM.get_agent(s, HM.Msg.to(m))))
-      Equal.trans(List<&2, HX.Rt>, hub_rts(o, hub_p1(o, HC.deliver_each(o, rest, cx3, name, HM.snoc(J.Json, acc, J.obj([J.kv("id", J.JNum{HM.Msg.id(m)}), J.kv("rel", J.JStr{rel})]))))),
+      Equal.trans(List<&2, HX.Rt>, hub_rts(o, hub_p1(o, HC.deliver_each(o, rest, cx3, name, HM.snoc(HK.Delivered, acc, HK.Delivered{HM.Msg.id(m), rel})))),
         hub_rts(o, cx3), hub_rts(o, cx),
-        hub_rts_deliver(o, rest, cx3, name, HM.snoc(J.Json, acc, J.obj([J.kv("id", J.JNum{HM.Msg.id(m)}), J.kv("rel", J.JStr{rel})]))),
+        hub_rts_deliver(o, rest, cx3, name, HM.snoc(HK.Delivered, acc, HK.Delivered{HM.Msg.id(m), rel})),
         Equal.trans(List<&2, HX.Rt>, hub_rts(o, cx3), hub_rts(o, cx2), hub_rts(o, cx),
           hub_rts_dline(o, again, you, cx2, name, m),
           hub_rts_mark.go(o, cx, HM.Msg.id(m), HX.queued_at(HX.d(o, cx), HM.Msg.id(m)), {==})))
 
-def hub_rts_steer(-o: HM.St, p: HX.Cx<o> & List<&2, J.Json>, +n: String, +ids: List<&2, Nat>, +kvs0: List<&2, Sigma<&2, &2, String, _ => J.Json>>)
-    -> {hub_rts(o, HC.pump.send(o, True{}, p, n, ids, kvs0)) == hub_rts(o, hub_p1(o, p)) : List<&2, HX.Rt>}:
+def hub_rts_steer(-o: HM.St, p: HX.Cx<o> & List<&2, HK.Delivered>, +n: String, +ids: List<&2, Nat>, +notes: List<&2, String>, +status: Bool)
+    -> {hub_rts(o, HC.pump.send(o, True{}, p, n, ids, notes, status)) == hub_rts(o, hub_p1(o, p)) : List<&2, HX.Rt>}:
   match p:
     case (cx, msgs):
       match cx:
@@ -3405,10 +3409,10 @@ def hub_batch_busy(-o: HM.St, +b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +n: String, +
       +notes = Bool.pick(List<&2, String>, im, HM.St.notes(HC.st(o, cx)), Nil{})
       +cx2 = HC.pump.flush(o, Bool.not(List.is_empty(&2, String, notes)), cx)
       Equal.trans(List<&2, HX.Rt>, hub_rts(o, HC.pump.send(o, True{}, HC.deliver_each(o, bb, cx2, n, Nil{}), n, HC.ids_of(bb),
-          [J.kv("agent", J.JStr{n}), J.kv("notes", J.JArr{HC.jstrs(notes)}), J.kv("status", J.JBool{im && HC.any_from_user(bb)})])),
+          notes, im && HC.any_from_user(bb))),
         hub_rts(o, hub_p1(o, HC.deliver_each(o, bb, cx2, n, Nil{}))), hub_rts(o, cx),
         hub_rts_steer(o, HC.deliver_each(o, bb, cx2, n, Nil{}), n, HC.ids_of(bb),
-          [J.kv("agent", J.JStr{n}), J.kv("notes", J.JArr{HC.jstrs(notes)}), J.kv("status", J.JBool{im && HC.any_from_user(bb)})]),
+          notes, im && HC.any_from_user(bb)),
         Equal.trans(List<&2, HX.Rt>, hub_rts(o, hub_p1(o, HC.deliver_each(o, bb, cx2, n, Nil{}))), hub_rts(o, cx2), hub_rts(o, cx),
           hub_rts_deliver(o, bb, cx2, n, Nil{}), hub_rts_flush(o, Bool.not(List.is_empty(&2, String, notes)), cx)))
 
@@ -3866,8 +3870,8 @@ def hub_qimp_flush(s: HM.St, +n: String) -> {hub_qimp(s, HM.apply(s, HM.ENotesFl
 
 # ---- L4 support: the frame of a delivery to another agent ----
 
-def hub_d_steer(-o: HM.St, cx: HX.Cx<o>, +a: String, +ids: List<&2, Nat>, +kvs: List<&2, Sigma<&2, &2, String, _ => J.Json>>)
-    -> {HX.d(o, HC.pump.send.go(o, True{}, cx, a, ids, kvs)) == HX.d(o, cx) : HM.St}:
+def hub_d_steer(-o: HM.St, cx: HX.Cx<o>, +a: String, +ids: List<&2, Nat>, +notes: List<&2, String>, +status: Bool, +msgs: List<&2, HK.Delivered>)
+    -> {HX.d(o, HC.pump.send.go(o, True{}, cx, a, ids, notes, status, msgs)) == HX.d(o, cx) : HM.St}:
   match cx:
     case HX.Cx{c, r}:
       match c:
@@ -3881,22 +3885,22 @@ def hub_d_dirty_out(-o: HM.St, cx: HX.Cx<o>, +kvs: List<&2, Sigma<&2, &2, String
         case HX.Core{d, fx, p, f, q, v}:
           {==}
 
-def hub_d_send.go(-o: HM.St, b: Bool, +cx: HX.Cx<o>, +a: String, +ids: List<&2, Nat>, +kvs: List<&2, Sigma<&2, &2, String, _ => J.Json>>)
-    -> {HX.d(o, HC.pump.send.go(o, b, cx, a, ids, kvs)) == HX.d(o, cx) : HM.St}:
+def hub_d_send.go(-o: HM.St, b: Bool, +cx: HX.Cx<o>, +a: String, +ids: List<&2, Nat>, +notes: List<&2, String>, +status: Bool, +msgs: List<&2, HK.Delivered>)
+    -> {HX.d(o, HC.pump.send.go(o, b, cx, a, ids, notes, status, msgs)) == HX.d(o, cx) : HM.St}:
   match b:
     case True{}:
-      hub_d_steer(o, cx, a, ids, kvs)
+      hub_d_steer(o, cx, a, ids, notes, status, msgs)
     case False{}:
       +x = {HX.Rt{a, HM.RBusy{}, HX.Rt.waiting(HC.rt(o, cx, a)), Some{HC.now(o, cx)}, 0n} : HX.Rt}
-      Equal.trans(HM.St, HX.d(o, HC.pump.send.go(o, False{}, cx, a, ids, kvs)), HX.d(o, HC.upd_rt(o, cx, x)), HX.d(o, cx),
-        hub_d_dirty_out(o, HC.upd_rt(o, cx, x), J.kv("fx", J.JStr{"deliver"}) <> J.kv("mode", J.JStr{"say"}) <> kvs),
+      Equal.trans(HM.St, HX.d(o, HC.pump.send.go(o, False{}, cx, a, ids, notes, status, msgs)), HX.d(o, HC.upd_rt(o, cx, x)), HX.d(o, cx),
+        hub_d_dirty_out(o, HC.upd_rt(o, cx, x), HF.deliver("say", a, notes, status, msgs)),
         hub_d_upd_rt(o, cx, x))
 
-def hub_d_send(-o: HM.St, b: Bool, p: HX.Cx<o> & List<&2, J.Json>, +a: String, +ids: List<&2, Nat>, +kvs0: List<&2, Sigma<&2, &2, String, _ => J.Json>>)
-    -> {HX.d(o, HC.pump.send(o, b, p, a, ids, kvs0)) == HX.d(o, hub_p1(o, p)) : HM.St}:
+def hub_d_send(-o: HM.St, b: Bool, p: HX.Cx<o> & List<&2, HK.Delivered>, +a: String, +ids: List<&2, Nat>, +notes: List<&2, String>, +status: Bool)
+    -> {HX.d(o, HC.pump.send(o, b, p, a, ids, notes, status)) == HX.d(o, hub_p1(o, p)) : HM.St}:
   match p:
     case (+cx, +msgs):
-      hub_d_send.go(o, b, cx, a, ids, HM.snoc(Sigma<&2, &2, String, _ => J.Json>, kvs0, J.kv("msgs", J.JArr{msgs})))
+      hub_d_send.go(o, b, cx, a, ids, notes, status, msgs)
 
 def hub_d_eq_qimp(-o: HM.St, +a: HX.Cx<o>, +b: HX.Cx<o>, +n: String, e: {HX.d(o, b) == HX.d(o, a) : HM.St}) -> {hub_qimp(HX.d(o, a), HX.d(o, b), n) == True{} : Bool}:
   hub_qimp_eq(HX.d(o, a), HX.d(o, b), n, e)
@@ -3922,7 +3926,7 @@ def hub_qimp_pick(-o: HM.St, c: Bool, +x: HX.Cx<o>, +y: HX.Cx<o>, +z: HX.Cx<o>, 
       hub_qimp_eq(HX.d(o, z), HX.d(o, y), n, ey)
 
 # delivering a batch never fills a queue
-def hub_qimp_deliver(-o: HM.St, +b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +name: String, +acc: List<&2, J.Json>, +n: String)
+def hub_qimp_deliver(-o: HM.St, +b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +name: String, +acc: List<&2, HK.Delivered>, +n: String)
     -> {hub_qimp(HX.d(o, cx), HX.d(o, hub_p1(o, HC.deliver_each(o, b, cx, name, acc))), n) == True{} : Bool}:
   match b:
     case Nil{}:
@@ -3934,7 +3938,7 @@ def hub_qimp_deliver(-o: HM.St, +b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +name: Stri
       +you = HM.Msg.plain(m) || Maybe.is_some(&2, String, HM.Msg.via(m))
       +cx3 = HC.deliver.line(o, again, you, cx2, name, m)
       +rel = HC.relation(HM.Msg.from(m), HM.Msg.to(m), HC.parent_of(HM.get_agent(s, HM.Msg.from(m))), HC.parent_of(HM.get_agent(s, HM.Msg.to(m))))
-      +acc2 = HM.snoc(J.Json, acc, J.obj([J.kv("id", J.JNum{HM.Msg.id(m)}), J.kv("rel", J.JStr{rel})]))
+      +acc2 = HM.snoc(HK.Delivered, acc, HK.Delivered{HM.Msg.id(m), rel})
       hub_qimp_trans(HX.d(o, cx), HX.d(o, cx3), HX.d(o, hub_p1(o, HC.deliver_each(o, rest, cx3, name, acc2))), n,
         hub_qimp_trans(HX.d(o, cx), HX.d(o, cx2), HX.d(o, cx3), n,
           hub_qimp_mark.go(o, cx, HM.Msg.id(m), n, HX.queued_at(HX.d(o, cx), HM.Msg.id(m)), {==}),
@@ -3961,15 +3965,15 @@ def hub_rts_if_other(-o: HM.St, known: Bool, +cx: HX.Cx<o>, +a: String, +w: Bool
       {==}
 
 # a new turn of A leaves the runtime state of any other agent as it was
-def hub_rts_send_other(-o: HM.St, p: HX.Cx<o> & List<&2, J.Json>, +a: String, +ids: List<&2, Nat>, +kvs0: List<&2, Sigma<&2, &2, String, _ => J.Json>>, +n: String, +ne: {String.eq(a, n) == False{} : Bool})
-    -> {HC.rt_find(hub_rts(o, HC.pump.send(o, False{}, p, a, ids, kvs0)), n) == HC.rt_find(hub_rts(o, hub_p1(o, p)), n) : HX.Rt}:
+def hub_rts_send_other(-o: HM.St, p: HX.Cx<o> & List<&2, HK.Delivered>, +a: String, +ids: List<&2, Nat>, +notes: List<&2, String>, +status: Bool, +n: String, +ne: {String.eq(a, n) == False{} : Bool})
+    -> {HC.rt_find(hub_rts(o, HC.pump.send(o, False{}, p, a, ids, notes, status)), n) == HC.rt_find(hub_rts(o, hub_p1(o, p)), n) : HX.Rt}:
   match p:
     case (+cx, +msgs):
       +x = {HX.Rt{a, HM.RBusy{}, HX.Rt.waiting(HC.rt(o, cx, a)), Some{HC.now(o, cx)}, 0n} : HX.Rt}
       +cx2 = HC.upd_rt(o, cx, x)
-      +kvs = HM.snoc(Sigma<&2, &2, String, _ => J.Json>, kvs0, J.kv("msgs", J.JArr{msgs}))
-      %Equal.sym(List<&2, HX.Rt>, hub_rts(o, HC.dirty(o, HC.out(o, cx2, J.kv("fx", J.JStr{"deliver"}) <> J.kv("mode", J.JStr{"say"}) <> kvs))), hub_rts(o, cx2),
-          hub_rts_dirty_out(o, cx2, J.kv("fx", J.JStr{"deliver"}) <> J.kv("mode", J.JStr{"say"}) <> kvs)) : {HC.rt_find(_, n) == HC.rt_find(hub_rts(o, cx), n) : HX.Rt}
+      +kvs = HF.deliver("say", a, notes, status, msgs)
+      %Equal.sym(List<&2, HX.Rt>, hub_rts(o, HC.dirty(o, HC.out(o, cx2, kvs))), hub_rts(o, cx2),
+          hub_rts_dirty_out(o, cx2, kvs)) : {HC.rt_find(_, n) == HC.rt_find(hub_rts(o, cx), n) : HX.Rt}
       hub_rts_if_other(o, HC.has_agent(o, cx, a), cx, a, HX.Rt.waiting(HC.rt(o, cx, a)), Some{HC.now(o, cx)}, 0n, n, ne)
 
 def hub_rt_run_eq(+x: List<&2, HX.Rt>, +y: List<&2, HX.Rt>, +n: String, e: {HC.rt_find(x, n) == HC.rt_find(y, n) : HX.Rt})
@@ -3980,32 +3984,32 @@ def hub_ga_eq(-o: HM.St, +a: HX.Cx<o>, +b: HX.Cx<o>, +n: String, e: {hub_ag(o, a
     -> {HM.get_agent(HX.d(o, a), n) == HM.get_agent(HX.d(o, b), n) : Maybe<&2, HM.Agent>}:
   Equal.cong(List<&2, HM.Agent>, Maybe<&2, HM.Agent>, xs => HM.agent_named(xs, n), hub_ag(o, a), hub_ag(o, b), e)
 
-def hub_pb_rt.go(-o: HM.St, busy: Bool, +bb: List<&2, HM.Msg>, +cx2: HX.Cx<o>, +cx: HX.Cx<o>, +a: String, +kvs: List<&2, Sigma<&2, &2, String, _ => J.Json>>, +n: String,
+def hub_pb_rt.go(-o: HM.St, busy: Bool, +bb: List<&2, HM.Msg>, +cx2: HX.Cx<o>, +cx: HX.Cx<o>, +a: String, +notes: List<&2, String>, +status: Bool, +n: String,
     +ne: {String.eq(a, n) == False{} : Bool}, +ep: {hub_rts(o, hub_p1(o, HC.deliver_each(o, bb, cx2, a, Nil{}))) == hub_rts(o, cx) : List<&2, HX.Rt>})
-    -> {HX.Rt.run(HC.rt_find(hub_rts(o, HC.pump.send(o, busy, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), kvs)), n))
+    -> {HX.Rt.run(HC.rt_find(hub_rts(o, HC.pump.send(o, busy, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), notes, status)), n))
         == HX.Rt.run(HC.rt_find(hub_rts(o, cx), n)) : HM.Run}:
   match busy:
     case True{}:
-      hub_rt_run_eq(hub_rts(o, HC.pump.send(o, True{}, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), kvs)), hub_rts(o, cx), n,
-        Equal.cong(List<&2, HX.Rt>, HX.Rt, xs => HC.rt_find(xs, n), hub_rts(o, HC.pump.send(o, True{}, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), kvs)), hub_rts(o, cx),
-          Equal.trans(List<&2, HX.Rt>, hub_rts(o, HC.pump.send(o, True{}, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), kvs)),
+      hub_rt_run_eq(hub_rts(o, HC.pump.send(o, True{}, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), notes, status)), hub_rts(o, cx), n,
+        Equal.cong(List<&2, HX.Rt>, HX.Rt, xs => HC.rt_find(xs, n), hub_rts(o, HC.pump.send(o, True{}, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), notes, status)), hub_rts(o, cx),
+          Equal.trans(List<&2, HX.Rt>, hub_rts(o, HC.pump.send(o, True{}, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), notes, status)),
             hub_rts(o, hub_p1(o, HC.deliver_each(o, bb, cx2, a, Nil{}))), hub_rts(o, cx),
-            hub_rts_steer(o, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), kvs), ep)))
+            hub_rts_steer(o, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), notes, status), ep)))
     case False{}:
-      hub_rt_run_eq(hub_rts(o, HC.pump.send(o, False{}, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), kvs)), hub_rts(o, cx), n,
-        Equal.trans(HX.Rt, HC.rt_find(hub_rts(o, HC.pump.send(o, False{}, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), kvs)), n),
+      hub_rt_run_eq(hub_rts(o, HC.pump.send(o, False{}, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), notes, status)), hub_rts(o, cx), n,
+        Equal.trans(HX.Rt, HC.rt_find(hub_rts(o, HC.pump.send(o, False{}, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), notes, status)), n),
           HC.rt_find(hub_rts(o, hub_p1(o, HC.deliver_each(o, bb, cx2, a, Nil{}))), n), HC.rt_find(hub_rts(o, cx), n),
-          hub_rts_send_other(o, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), kvs, n, ne),
+          hub_rts_send_other(o, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), notes, status, n, ne),
           Equal.cong(List<&2, HX.Rt>, HX.Rt, xs => HC.rt_find(xs, n), hub_rts(o, hub_p1(o, HC.deliver_each(o, bb, cx2, a, Nil{}))), hub_rts(o, cx), ep)))
 
 # the runtime state of another agent after a batch to A
-def hub_pb_rt(-o: HM.St, busy: Bool, +bb: List<&2, HM.Msg>, +cx2: HX.Cx<o>, +cx: HX.Cx<o>, +a: String, +kvs: List<&2, Sigma<&2, &2, String, _ => J.Json>>, +n: String,
+def hub_pb_rt(-o: HM.St, busy: Bool, +bb: List<&2, HM.Msg>, +cx2: HX.Cx<o>, +cx: HX.Cx<o>, +a: String, +notes: List<&2, String>, +status: Bool, +n: String,
     +ne: {String.eq(a, n) == False{} : Bool}, +e2: {hub_rts(o, cx2) == hub_rts(o, cx) : List<&2, HX.Rt>})
-    -> {HX.Rt.run(HC.rt_find(hub_rts(o, HC.pump.send(o, busy, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), kvs)), n))
+    -> {HX.Rt.run(HC.rt_find(hub_rts(o, HC.pump.send(o, busy, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), notes, status)), n))
         == HX.Rt.run(HC.rt_find(hub_rts(o, cx), n)) : HM.Run}:
   +p1 = hub_p1(o, HC.deliver_each(o, bb, cx2, a, Nil{}))
   +ep = Equal.trans(List<&2, HX.Rt>, hub_rts(o, p1), hub_rts(o, cx2), hub_rts(o, cx), hub_rts_deliver(o, bb, cx2, a, Nil{}), e2)
-  hub_pb_rt.go(o, busy, bb, cx2, cx, a, kvs, n, ne, ep)
+  hub_pb_rt.go(o, busy, bb, cx2, cx, a, notes, status, n, ne, ep)
 
 # a batch to A never makes another agent stuck
 def hub_pb_frame(-o: HM.St, +busy: Bool, b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +a: String, +im: Bool, +n: String,
@@ -4019,12 +4023,12 @@ def hub_pb_frame(-o: HM.St, +busy: Bool, b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +a:
       +notes = Bool.pick(List<&2, String>, im, HM.St.notes(HC.st(o, cx)), Nil{})
       +f = Bool.not(List.is_empty(&2, String, notes))
       +cx2 = HC.pump.flush(o, f, cx)
-      +kvs = {[J.kv("agent", J.JStr{a}), J.kv("notes", J.JArr{HC.jstrs(notes)}), J.kv("status", J.JBool{im && HC.any_from_user(bb)})] : List<&2, Sigma<&2, &2, String, _ => J.Json>>}
+      +status = im && HC.any_from_user(bb)
       +p1 = hub_p1(o, HC.deliver_each(o, bb, cx2, a, Nil{}))
-      +fin = HC.pump.send(o, busy, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), kvs)
-      +edf = hub_d_send(o, busy, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), kvs)
+      +fin = HC.pump.send(o, busy, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), notes, status)
+      +edf = hub_d_send(o, busy, HC.deliver_each(o, bb, cx2, a, Nil{}), a, HC.ids_of(bb), notes, status)
       hub_frame(HX.d(o, cx), hub_rts(o, cx), HX.d(o, fin), hub_rts(o, fin), n,
-        hub_pb_rt(o, busy, bb, cx2, cx, a, kvs, n, ne, hub_rts_flush(o, f, cx)),
+        hub_pb_rt(o, busy, bb, cx2, cx, a, notes, status, n, ne, hub_rts_flush(o, f, cx)),
         hub_ga_eq(o, fin, cx, n,
           Equal.trans(List<&2, HM.Agent>, hub_ag(o, fin), hub_ag(o, p1), hub_ag(o, cx),
             Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, fin), HX.d(o, p1), edf),

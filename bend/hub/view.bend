@@ -54,7 +54,7 @@ def agent_json(+a: M.Agent, +x: X.Rt, +wo: J.Json) -> J.Json:
     J.kv("follow", J.JBool{M.Agent.follow(a)}),
     J.kv("run", J.JStr{H.run_str(X.Rt.run(x))}), J.kv("waiting", J.JBool{X.Rt.waiting(x)}),
     J.kv("waiting_on", wo),
-    J.kv("turn_ms", H.jturn(X.Rt.turn(x))), J.kv("turns", J.JNum{X.Rt.turns(x)})])
+    J.kv("turn_ms", C.jmaybe_nat(X.Rt.turn(x))), J.kv("turns", J.JNum{X.Rt.turns(x)})])
 
 def is_archived(l: M.Life) -> Bool:
   match l:

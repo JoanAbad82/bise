@@ -26,19 +26,16 @@ import ./core.bend as H
 
 import ./view.bend as V
 
+# the link's requests and answers, generated from bise_proto::core
+import ./gen/link.bend as L
+
+import ./gen/fx.bend as F
+
 type Got is Type:
   Got{s: Socket, h: H.Hub, buf: String}
 
 type Split is Data:
   Split{line: String, rest: String}
-
-type Tag is Data:
-  TInit{}
-  TReplay{}
-  TReplayMany{}
-  TPing{}
-  TView{}
-  TStep{}
 
 type Flow is Type:
   Go{h: H.Hub}
@@ -46,7 +43,7 @@ type Flow is Type:
 def fx_json(f: X.Fx) -> J.Json:
   match f:
     case X.FJ{+e}:
-      J.obj([J.kv("fx", J.JStr{"journal"}), J.kv("ev", C.ev_json(e))])
+      J.obj(F.journal(C.ev_json(e)))
     case X.FO{+o}:
       o
 
@@ -63,12 +60,12 @@ def fxs_json(xs: List<&2, X.Fx>) -> List<&2, J.Json>:
 def answer.go(need: Maybe<&2, J.Json>, +h: H.Hub, +fx: List<&2, X.Fx>, +before: List<&2, V.Mark>) -> H.Hub & String:
   match need:
     case Some{+q}:
-      (h, J.stringify(J.obj([J.kv("need", q)])))
+      (h, J.stringify(L.answer_need(q)))
     case None{}:
-      (h, J.stringify(J.obj([J.kv("fx", J.JArr{fxs_json(fx)}), J.kv("dirty", J.JBool{X.R.dirty(H.Hub.r(h))}),
-        J.kv("view", V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), False{}, V.touched(X.journal(fx)),
+      (h, J.stringify(L.answer_step(fxs_json(fx), X.R.dirty(H.Hub.r(h)),
+        V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), False{}, V.touched(X.journal(fx)),
           V.changed(X.journal(fx), before, X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h))),
-          X.journal(fx)))])))
+          X.journal(fx)))))
 
 # the answer line of a committed step (H.commit, the law run_replays)
 def answer(+before: List<&2, V.Mark>, +o: H.Out) -> H.Hub & String:
@@ -79,9 +76,9 @@ def answer(+before: List<&2, V.Mark>, +o: H.Out) -> H.Hub & String:
 def replay(+h: H.Hub, m: Maybe<&2, M.Ev>) -> H.Hub & String:
   match m:
     case None{}:
-      (h, J.stringify(J.obj([J.kv("skipped", J.JBool{True{}})])))
+      (h, J.stringify(L.answer_skipped(True{})))
     case Some{+e}:
-      (H.Hub{M.apply(H.Hub.d(h), e), H.Hub.r(h)}, "{}")
+      (H.Hub{M.apply(H.Hub.d(h), e), H.Hub.r(h)}, J.stringify(L.answer_done()))
 
 # {"t":"replay_many","evs":[..]}: a batch of journal events at boot,
 # answered {"skipped":[<index in the batch>..]}. The messages stay newest
@@ -94,58 +91,46 @@ def evs_of(evs: List<&2, J.Json>) -> List<&2, Maybe<&2, M.Ev>>:
     case Con{+e, +rest}:
       C.ev_of(e) <> evs_of(rest)
 
-def json_list(m: Maybe<&2, J.Json>) -> List<&2, J.Json>:
-  match m:
-    case Some{J.JArr{+vals}}:
-      vals
-    case _:
-      Nil{}
-
-def replay_many.go(ms: List<&2, Maybe<&2, M.Ev>>, +st: M.St, +i: Nat, +sk: List<&2, J.Json>) -> M.St & List<&2, J.Json>:
+def replay_many.go(ms: List<&2, Maybe<&2, M.Ev>>, +st: M.St, +i: Nat, +sk: List<&2, Nat>) -> M.St & List<&2, Nat>:
   match ms:
     case Nil{}:
-      (st, List.reverse(&2, J.Json, sk))
+      (st, List.reverse(&2, Nat, sk))
     case Con{None{}, +rest}:
-      replay_many.go(rest, st, 1n+i, J.JNum{i} <> sk)
+      replay_many.go(rest, st, 1n+i, i <> sk)
     case Con{Some{+e}, +rest}:
       replay_many.go(rest, M.apply_rev(e, st), 1n+i, sk)
 
-def replay_many.done(p: M.St & List<&2, J.Json>, +r: X.R) -> H.Hub & String:
+def replay_many.done(p: M.St & List<&2, Nat>, +r: X.R) -> H.Hub & String:
   match p:
     case (+d, +sk):
-      (H.Hub{M.msgs_rev(d), r}, J.stringify(J.obj([J.kv("skipped", J.JArr{sk})])))
+      (H.Hub{M.msgs_rev(d), r}, J.stringify(L.answer_skipped_at(sk)))
 
 def replay_many(+h: H.Hub, +evs: List<&2, J.Json>) -> H.Hub & String:
   replay_many.done(replay_many.go(evs_of(evs), M.msgs_rev(H.Hub.d(h)), 0n, Nil{}), H.Hub.r(h))
 
-def tag_of(+t: String) -> Tag:
-  Bool.pick(Tag, String.eq(t, "init"), TInit{},
-    Bool.pick(Tag, String.eq(t, "replay_many"), TReplayMany{},
-    Bool.pick(Tag, String.eq(t, "replay"), TReplay{},
-      Bool.pick(Tag, String.eq(t, "ping"), TPing{},
-        Bool.pick(Tag, String.eq(t, "view_all"), TView{}, TStep{})))))
-
-def handle.tag(tag: Tag, +h: H.Hub, +i: J.Json) -> H.Hub & String:
-  match tag:
-    case TInit{}:
-      (H.hub_new(J.get_str_or(i, "workspace", "")), "{}")
-    case TReplay{}:
-      replay(h, C.ev_of(Maybe.default(&2, J.Json, J.get(i, "ev"), J.JNull{})))
-    case TReplayMany{}:
-      replay_many(h, json_list(J.get(i, "evs")))
-    case TPing{}:
-      (h, "{}")
-    case TView{}:
-      (h, J.stringify(J.obj([J.kv("view", V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), True{}, Nil{}, Nil{}, Nil{}))])))
-    case TStep{}:
+# the link's own requests (gen/link.bend, from bise_proto::core::Link);
+# any other tag is a step of sb-core
+def handle.link(l: L.Link, +h: H.Hub, +i: J.Json) -> H.Hub & String:
+  match l:
+    case L.TInit{+workspace}:
+      (H.hub_new(workspace), J.stringify(L.answer_done()))
+    case L.TReplay{+ev}:
+      replay(h, C.ev_of(ev))
+    case L.TReplayMany{+evs}:
+      replay_many(h, evs)
+    case L.TPing{}:
+      (h, J.stringify(L.answer_done()))
+    case L.TView{}:
+      (h, J.stringify(L.answer_view(V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), True{}, Nil{}, Nil{}, Nil{}))))
+    case L.TStep{}:
       answer(V.marks(X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h))), H.commit(h, i))
 
 def handle.parsed(r: Result<&2, &2, String, J.Json>, +h: H.Hub) -> H.Hub & String:
   match r:
     case Fail{+e}:
-      (h, J.stringify(J.obj([J.kv("error", J.JStr{String.append("json: ", e)})])))
+      (h, J.stringify(L.answer_error(String.append("json: ", e))))
     case Done{+i}:
-      handle.tag(tag_of(J.get_str_or(i, "t", "")), h, i)
+      handle.link(L.of(i), h, i)
 
 # one input line
 def handle(+h: H.Hub, +line: String) -> H.Hub & String:

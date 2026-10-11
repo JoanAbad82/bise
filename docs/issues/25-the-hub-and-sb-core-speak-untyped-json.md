@@ -81,7 +81,8 @@ approval, pr, landed, scheduled, wake.
 
 - `rg 'json!\(\{"t"' rust/switchboard/src --glob '!*tests*'` → 0;
 - `rg 'jstr\(f, "fx"\)' rust/switchboard` → 0;
-- `rg 'String.eq\(t, "' bend/hub` → 0, and `in_tag` is gone from core.bend;
+- `rg 'String.eq\(t, "' bend/hub --glob '!codec.bend'` → 0 (the input
+  and link dispatch), and `in_tag` is gone from core.bend;
 - `rg 'J.kv\("fx"' bend/hub --glob '!gen/*'` → 0;
 - lines.rs reads no `sb <kind> : ` prefix outside `thread/legacy.rs`; new
   writers write only `Feed` JSON;
@@ -96,6 +97,13 @@ Each sha keeps: the link traffic of the capture corpus equal as JSON
 values, the journal byte-equal on a replay, the e2e transcripts equal
 (but the kinds F moves, named), ALL PROOFS CHECK (4 shards),
 `old_core_replay` for -28, -29 and main.
+
+## Not in this slice
+
+- the journal events: codec.bend's `ev_kind` is still a 38-step
+  `String.eq(t, "…")` pick chain (bend/hub/codec.bend:304-342); generating
+  codec.bend (and model.rs's serde) is the next slice (architect m_18761).
+- the typed hot view from sb-core (D3, issue 21).
 
 ## Status
 
@@ -114,4 +122,13 @@ values, the journal byte-equal on a replay, the e2e transcripts equal
   `{skipped: [i]}`, `{error}`, `{}`), `Unknown` kept whole, an unknown
   effect in `fx` an `Fx::Unknown`; its Bend encoders `answer_<shape>` in
   gen/link.bend with a decode∘encode law each; fixture
-  core_answer.jsonl (one real sb-core answer per shape).
+  core_answer.jsonl (one real sb-core answer per shape). Then fx_list
+  never fails: a bad effect is `Fx::Unknown` and costs only itself
+  (architect m_18746).
+- chunk B sha 2: sb-core decodes each input with gen/in.bend (`in_tag`,
+  core.bend's tag-only `In` and every `C.get_*(i, …)` gone) and builds
+  every effect with gen/fx.bend; main.bend reads the link with
+  gen/link.bend (`tag_of` gone) and writes its answers with
+  `answer_<shape>`. core.bend 4,008 → 3,849 lines. 6,058 captured lines
+  (e2e + switchboard lib on main and on B) give equal answers from main's
+  and B's sb-core.
