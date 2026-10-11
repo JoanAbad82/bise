@@ -27,6 +27,9 @@ core_kinds! {
         /// a line of an agent's feed: `text`, or `fields` (C2's
         /// multi-field lines, each field's ` : ` escaped by the hub)
         Line = "line" => FLine { agent: Str, kind: Str, text: OptStrOmit, fields: OptStrsOmit },
+        /// a record of an agent's feed (issue 25): `rec` is a `Feed` value
+        /// with its `sb` tag, written as `sb <kind> :: <json>`
+        Feed = "feed" => FFeed { agent: Str, rec: Json },
         /// the answer to an agent's request
         Reply = "reply" => FReply { token: Nat, body: Json },
         /// a notice to the client that typed the input

@@ -1043,6 +1043,12 @@ law fx_line_bare:
 def fx_line_bare():
   {==}
 
+law fx_feed_bare:
+  {FX.of(J.obj([J.kv("fx", J.JStr{"feed"})])) == FX.FFeed{"", J.JNull{}} : FX.Fx}
+
+def fx_feed_bare():
+  {==}
+
 law fx_reply_bare:
   {FX.of(J.obj([J.kv("fx", J.JStr{"reply"})])) == FX.FReply{0n, J.JNull{}} : FX.Fx}
 
@@ -1229,6 +1235,14 @@ def fx_FLine_round(agent, kind, text, fields):
     case Some{x_text} Some{x_fields}:
       %K.strs_round(x_fields) : {FX.of(FX.json(FX.FLine{agent, kind, Some{x_text}, Some{x_fields}})) == FX.FLine{agent, kind, Some{x_text}, Some{_}} : FX.Fx}
       {==}
+
+law fx_FFeed_round:
+  for agent: String
+  for rec: J.Json
+  {FX.of(FX.json(FX.FFeed{agent, rec})) == FX.FFeed{agent, rec} : FX.Fx}
+
+def fx_FFeed_round(agent, rec):
+  {==}
 
 law fx_FReply_round:
   for token: Nat

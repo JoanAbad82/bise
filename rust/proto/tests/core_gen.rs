@@ -9,6 +9,8 @@
 //!   binary search over the sorted tags, an unknown or missing tag gives
 //!   the fallback record), its encode, and for `Fx` one encoder per kind or
 //!   shape returning the key-value list sb-core's `out` takes, in wire order;
+//! - `feed.bend`: one encoder per `Feed` record (the JSON object sb-core's
+//!   `feed` effect carries as `rec`), `Ver` written as 1;
 //! - `laws.bend`: per record, decode∘encode is the identity, and an object
 //!   with only its tag decodes to the record's defaults (so the tag table
 //!   is the enum's, tag for tag); an unknown and a missing tag give the
@@ -20,7 +22,7 @@
 //! `In` table with today's `in_tag` (fixtures/core_in_tags.txt, from
 //! core.bend at 84ddc10d, and core.bend's own while it still has one).
 
-use bise_proto::core::{fx, link, FieldKind, Fx, In, Kind, Link, Step, Table};
+use bise_proto::core::{fx, link, Feed, FieldKind, Fx, In, Kind, Link, Step, Table};
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -350,6 +352,32 @@ fn answer(s: &mut String) {
         let ps: Vec<String> = k.fields.iter().map(|f| format!("+{}: {}", var(f.name), bend_ty(f.kind))).collect();
         writeln!(s, "def answer_{}({}) -> J.Json:\n  answer_json({})\n", k.tag, ps.join(", "), ctor(k, &field_vars(k))).unwrap();
     }
+}
+
+/// `feed.bend`: one encoder per `Feed` record, its JSON object with its
+/// `sb` tag (what sb-core's `feed` effect carries as `rec`); a `Ver` field
+/// is no argument, the encoder writes 1.
+fn feed_codec() -> String {
+    let t = Feed::TABLE;
+    let mut s = String::new();
+    header(&mut s, &format!("feed: bise_proto::core::Feed (tag \"{}\"), one encoder per record of an agent's feed.", t.tag_key));
+    writeln!(s, "\nimport ./kit.bend as K\n").unwrap();
+    for k in t.kinds {
+        let ps: Vec<String> = k.fields.iter().filter(|f| f.kind != FieldKind::Ver).map(|f| format!("+{}: {}", var(f.name), bend_ty(f.kind))).collect();
+        let mut segs: Vec<Result<String, String>> = vec![Ok(format!("J.kv(\"{}\", J.JStr{{\"{}\"}})", t.tag_key, k.tag))];
+        for f in k.fields {
+            let v = if f.kind == FieldKind::Ver { "1n".to_string() } else { var(f.name) };
+            segs.push(encode(f.kind, f.name, &v));
+        }
+        let body = if segs.iter().all(Result::is_ok) {
+            format!("[{}]", segs.into_iter().map(Result::unwrap).collect::<Vec<_>>().join(", "))
+        } else {
+            let parts: Vec<String> = segs.into_iter().map(|x| x.map(|kv| format!("[{kv}]")).unwrap_or_else(|l| l)).collect();
+            format!("K.cat([{}])", parts.join(", "))
+        };
+        writeln!(s, "def {}({}) -> J.Json:\n  J.obj({body})\n", k.tag.replace('-', "_"), ps.join(", ")).unwrap();
+    }
+    s
 }
 
 const KIT: &str = r#"
@@ -699,6 +727,7 @@ fn files() -> BTreeMap<String, String> {
     for g in gens() {
         out.insert(format!("bend/hub/gen/{}.bend", g.file), codec(&g));
     }
+    out.insert("bend/hub/gen/feed.bend".into(), feed_codec());
     out.insert("bend/hub/gen/laws.bend".into(), laws());
     out
 }
