@@ -12,6 +12,9 @@
 .settings-add-path .b-field { flex: 1; }
 .settings-add-scan { display: inline-flex; align-items: baseline; gap: var(--s-2); }
 .settings-add-scan .err { color: var(--c-err); text-transform: none; letter-spacing: normal; }
+/* options -> foot = 24 (designer m_18973): the sheet body's 16 bottom + the foot's 12 top, less 4 */
+.settings-add-opts { margin-bottom: calc(-1 * var(--s-1)); }
+.settings-add-opts .b-group { margin-bottom: 0; }
 .settings-add-say { margin-right: auto; font-size: var(--t-13); color: var(--c-text-2); }
 .settings-add-say.err { color: var(--c-err); }
 .settings-cu-st { display: inline-block; width: 1em; color: var(--c-text-3); }

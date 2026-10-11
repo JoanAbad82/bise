@@ -143,6 +143,12 @@ test("settings/projects-add: the core's refusal and its broken state show in pla
     await expect(page.getByTestId('settings.add.rescan')).toBeVisible();
     const sheetText = await page.getByTestId('settings.add').innerText();
     expect(sheetText.split("can't start your projects").length - 1, 'the sheet says the broken cause once').toBe(1);
+    // designer m_18973: add waits while the core can't start projects; cancel and 'look again' stay live
+    await expect(go, 'add is off while the core is broken').toBeDisabled();
+    await expect(page.getByTestId('settings.add.cancel')).toBeEnabled();
+    await expect(page.getByTestId('settings.add.rescan')).toBeEnabled();
+    // one place for the global failure: the window's top line, never the projects page's own copy
+    await expect(page.getByTestId('settings.projects')).not.toContainText("can't start your projects");
     await page.screenshot({ path: test.info().outputPath('add-sheet-broken.png') });
     // esc closes it, nothing else sent
     await page.keyboard.press('Escape');

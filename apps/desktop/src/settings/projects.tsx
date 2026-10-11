@@ -8,10 +8,8 @@
 import { useState } from 'react';
 import type { Found, ProjectRow } from '@/proto';
 import { Act, Button, Field, Group, IconButton, Kbd } from '@/ds';
-import { useBroken } from '@/store';
 import type { SettingsPorts } from './Settings';
 import { AddSheet } from './AddSheet';
-import { brokenLine } from './add';
 
 /** The projects he orders (bise's home is not one of them), in their order. */
 export function ordered(projects: readonly ProjectRow[]): ProjectRow[] {
@@ -33,7 +31,6 @@ export { addPaths, offers } from './add';
 /** `found` stays in the props (pages.tsx passes it); the sheet reads the store's own. */
 export function Projects({ projects, ports }: { projects: readonly ProjectRow[]; found?: readonly Found[]; ports: SettingsPorts }) {
   const ps = ordered(projects);
-  const broken = useBroken();
   const [confirm, setConfirm] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
@@ -94,9 +91,8 @@ export function Projects({ projects, ports }: { projects: readonly ProjectRow[];
         help={
           confirm !== null
             ? `remove ${ps.find((p) => p.project === confirm)?.name ?? ''} from bise? its folder and its git history stay.`
-            : broken !== null
-              ? brokenLine(broken)
-              : undefined
+            : // a broken core says so in the window's top line (CoreLine), its one place (designer m_18973)
+              undefined
         }
       />
       <Button

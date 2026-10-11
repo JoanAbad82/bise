@@ -11,7 +11,7 @@
 // add.ts's (pure). Every change is the core's (project_add, found_scan). Owner: amb-home.
 import { useCallback, useEffect, useState } from 'react';
 import type { AppCmd, ProjectRow } from '@/proto';
-import { Act, Button, Check, Field, Group, Help, Sheet, Toggle } from '@/ds';
+import { Act, Button, Check, Field, Group, Sheet, Toggle } from '@/ds';
 import { useBroken, useCoreEvent, useFound, useProjects, type Ev } from '@/store';
 import { addLabel, addPaths, addSay, foundSub, offers, scanSay } from './add';
 
@@ -109,8 +109,10 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
   const footSay = add !== null && add.kind !== 'added' && !(add.kind === 'failed' && said.kind === 'failed' && add.text === said.text) ? add : null;
   const all = addPaths(ticked, typed);
   const busy = add?.kind === 'adding';
+  // a core that can't start projects: the scan's line above says why; add waits for 'look again' (designer m_18973)
+  const blocked = all.length === 0 || broken !== null;
   const go = () => {
-    if (all.length === 0 || busy) return;
+    if (blocked || busy) return;
     for (const path of all) send(land ? { cmd: 'project_add', path, land: true } : { cmd: 'project_add', path });
     setAdding({ paths: all, before: new Set(projects.map((p) => p.project)), at: clock(), err0: addErr?.n ?? 0 });
   };
@@ -137,7 +139,7 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
           <Button kind="ghost" onClick={onClose} testId="settings.add.cancel">
             cancel
           </Button>
-          <Button kind="pri" disabled={all.length === 0} state={busy ? 'loading' : undefined} onClick={go} testId="settings.add.go">
+          <Button kind="pri" disabled={blocked} state={busy ? 'loading' : undefined} onClick={go} testId="settings.add.go">
             {addLabel(all)}
           </Button>
         </>
@@ -195,18 +197,19 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
           ),
         }))}
       />
-      <Group
-        testId="settings.add.opts"
-        items={[
-          {
-            id: 'land',
-            label: 'main may land on main',
-            sub: land ? 'sb land after the tests, without asking you' : "otherwise your repo's flow decides: a pull request or an approval",
-            control: <Toggle on={land} label="main may land on main" onChange={setLand} testId="settings.add.land" />,
-          },
-        ]}
-      />
-      {broken !== null && said.kind !== 'failed' && <Help>{`the core can't start projects now (${broken}); add will say so.`}</Help>}
+      <div className="settings-add-opts">
+        <Group
+          testId="settings.add.opts"
+          items={[
+            {
+              id: 'land',
+              label: 'main may land on main',
+              sub: land ? 'sb land after the tests, without asking you' : "otherwise your repo's flow decides: a pull request or an approval",
+              control: <Toggle on={land} label="main may land on main" onChange={setLand} testId="settings.add.land" />,
+            },
+          ]}
+        />
+      </div>
     </Sheet>
   );
 }
