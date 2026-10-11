@@ -3790,19 +3790,19 @@ fn a_pending_send_goes_again_after_a_restart() {
 #[test]
 fn a_project_says_bise_message_once_and_answers_it_once() {
     let mut t = T::new();
-    let fx = t.go(Input::XIn { token: 900, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "fix the login".into(), name: String::new() });
+    let fx = t.go(Input::XIn { token: 900, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "fix the login".into(), name: String::new(), parts: String::new() });
     assert_eq!(reply(&fx, 900).unwrap()["ok"], true, "{:?}", fx);
     let said = say_to(&fx, MAIN).expect("main hears it");
     assert!(said.contains("<user_message via=\"bise\">") && said.contains("fix the login"), "{}", said);
     // the same origin again: acked, not said again
-    let fx = t.go(Input::XIn { token: 901, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "fix the login".into(), name: String::new() });
+    let fx = t.go(Input::XIn { token: 901, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "fix the login".into(), name: String::new(), parts: String::new() });
     assert_eq!(reply(&fx, 901).unwrap()["seen"], true);
     assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none());
     // main's turn ends: its answer goes back to bise's hub
     let fx = t.turn(MAIN, "on it: sb/login");
     assert_eq!(xreplies(&fx), vec![("home-1".into(), 7, "on it: sb/login".into())]);
     // bise's own question, answered with sb send @bise --reply-to, once
-    let fx = t.go(Input::XIn { token: 902, hub: "home-1".into(), xid: 8, kind: "ask".into(), text: "status?".into(), name: String::new() });
+    let fx = t.go(Input::XIn { token: 902, hub: "home-1".into(), xid: 8, kind: "ask".into(), text: "status?".into(), name: String::new(), parts: String::new() });
     let said = say_to(&fx, MAIN).or_else(|| steer_to(&fx, MAIN)).expect("main hears it");
     assert!(said.contains("from=\"@bise\""), "{}", said);
     let q = last_msg(&t);
@@ -3840,7 +3840,7 @@ fn route_dones(fx: &[Effect]) -> Vec<(u64, String, String, Option<u64>)> {
 }
 
 fn hold(t: &mut T, text: &str) -> Vec<Effect> {
-    t.go(Input::RouteHold { text: text.into(), via: String::new(), to: "shop-1".into(), name: "shop".into(), why: "Safari: shop.test".into(), context: None })
+    t.go(Input::RouteHold { text: text.into(), via: String::new(), to: "shop-1".into(), name: "shop".into(), why: "Safari: shop.test".into(), context: None, parts: String::new() })
 }
 
 // his words wait 2 s on the timers' clock, then go once: his message to
@@ -3924,7 +3924,7 @@ fn a_cancelled_route_is_said_to_main_and_never_sent() {
 fn a_routed_message_carries_his_context_to_the_project() {
     let mut t = T::new();
     let ctx = json!({"app": "Safari", "url": "https://grafana.shop.test/d/p99"});
-    t.go(Input::RouteHold { text: "why does p99 rise".into(), via: String::new(), to: "shop-1".into(), name: "shop".into(), why: "the front page".into(), context: Some(ctx.clone()) });
+    t.go(Input::RouteHold { text: "why does p99 rise".into(), via: String::new(), to: "shop-1".into(), name: "shop".into(), why: "the front page".into(), context: Some(ctx.clone()), parts: String::new() });
     let journal = t.journal.borrow().clone();
     let mut h = Hub::new("/w");
     h.replay(&journal);
@@ -3946,6 +3946,53 @@ fn a_routed_message_carries_his_context_to_the_project() {
     // a forward or an ask carries none
     let (_, fx) = t.req(MAIN, AgentReq::ProjectAsk { project: "shop".into(), text: "status?".into() });
     assert!(fx.iter().any(|e| matches!(e, Effect::XDeliver { context, .. } if context.is_empty())), "{:?}", fx);
+}
+
+// R41 (6): his parts ride the route (kept across a restart) to the
+// project's delivery, his message at home keeps them, a cancel says them
+// to main with them, and the project's message keeps what came
+#[test]
+fn a_routed_message_carries_his_parts_to_the_project() {
+    let parts = r#"[{"kind":"text","text":"look "},{"kind":"image","name":"[Image #1]","source":"/d/s.png","mime":"image/png","b64_file":"/h/images/ab.b64"}]"#;
+    let mut t = T::new();
+    t.go(Input::RouteHold { text: "look".into(), via: String::new(), to: "shop-1".into(), name: "shop".into(), why: "you named shop".into(), context: None, parts: parts.into() });
+    let journal = t.journal.borrow().clone();
+    let mut h = Hub::new("/w");
+    h.replay(&journal);
+    let mut env = FakeEnv::new();
+    env.now = t.env.now + 2_500;
+    let fx = h.handle(Input::Tick, &mut env);
+    let sent: Vec<String> = fx
+        .iter()
+        .filter_map(|e| match e {
+            Effect::XDeliver { parts, .. } => Some(parts.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(sent, vec![parts.to_string()], "{:?}", fx);
+    let his = *h.st.msgs.keys().max().unwrap();
+    assert_eq!(h.st.msgs[&his].parts, parts, "his message at home keeps them");
+    // a cancel: his words to main with his parts
+    let mut t = T::new();
+    t.go(Input::RouteHold { text: "look".into(), via: String::new(), to: "shop-1".into(), name: "shop".into(), why: "you named shop".into(), context: None, parts: parts.into() });
+    t.go(Input::RouteCancel { client: None, rid: 1 });
+    let his = last_msg(&t);
+    assert_eq!((t.hub.st.msgs[&his].text.as_str(), t.hub.st.msgs[&his].parts.as_str()), ("look", parts));
+    // no parts: the forward carries none (the out JSON has no key)
+    let mut t = T::new();
+    hold(&mut t, "why does p99 rise");
+    t.env.now += 2_100;
+    let fx = t.go(Input::Tick);
+    assert!(fx.iter().any(|e| matches!(e, Effect::XDeliver { parts, .. } if parts.is_empty())), "{:?}", fx);
+    assert!(!t.journal.borrow().iter().any(|l| l.to_string().contains("\"parts\"")), "no parts key in the journal");
+    // the project: his forwarded message keeps them; bise's question none
+    let mut t = T::new();
+    t.go(Input::XIn { token: 900, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "look".into(), name: String::new(), parts: parts.into() });
+    let his = last_msg(&t);
+    assert_eq!(t.hub.st.msgs[&his].parts, parts);
+    t.go(Input::XIn { token: 901, hub: "home-1".into(), xid: 8, kind: "ask".into(), text: "status?".into(), name: String::new(), parts: parts.into() });
+    let q = last_msg(&t);
+    assert!(t.hub.st.msgs[&q].parts.is_empty(), "bise's own question has no parts");
 }
 
 // a restart mid-hold: the act is in the journal, it fires once after
@@ -4075,7 +4122,7 @@ fn a_task_followed_for_bise_sends_its_end_back_once_through_the_outbox() {
 fn bise_hears_a_followed_task_end_once() {
     let mut t = T::new();
     let end = r#"{"agent":"perf","key":1791100500000,"state":"done","label":"make the e2e fast","summary":"p99 down 31%"}"#;
-    let fx = t.go(Input::XIn { token: 910, hub: "shop-5e6f7a8b".into(), xid: 4, kind: "job_end".into(), text: end.into(), name: "shop".into() });
+    let fx = t.go(Input::XIn { token: 910, hub: "shop-5e6f7a8b".into(), xid: 4, kind: "job_end".into(), text: end.into(), name: "shop".into(), parts: String::new() });
     assert_eq!(reply(&fx, 910).unwrap()["ok"], true, "{:?}", fx);
     let said = say_to(&fx, MAIN).or_else(|| steer_to(&fx, MAIN)).expect("bise's main hears it");
     assert!(said.contains("from=\"@shop\"") && said.contains("[report: done] @perf (followed): p99 down 31%"), "{}", said);
@@ -4087,7 +4134,7 @@ fn bise_hears_a_followed_task_end_once() {
         })
         .collect();
     assert_eq!(ends, vec![("shop-5e6f7a8b".to_string(), "perf".to_string(), 1791100500000, "done".to_string())]);
-    let fx = t.go(Input::XIn { token: 911, hub: "shop-5e6f7a8b".into(), xid: 4, kind: "job_end".into(), text: end.into(), name: "shop".into() });
+    let fx = t.go(Input::XIn { token: 911, hub: "shop-5e6f7a8b".into(), xid: 4, kind: "job_end".into(), text: end.into(), name: "shop".into(), parts: String::new() });
     assert_eq!(reply(&fx, 911).unwrap()["seen"], true);
     assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none());
     assert!(!fx.iter().any(|e| matches!(e, Effect::FollowedEnd { .. })), "{:?}", fx);
@@ -4283,7 +4330,7 @@ fn asks(fx: &[Effect]) -> Vec<(u64, String)> {
 }
 
 fn unclear(t: &mut T, text: &str) -> Vec<Effect> {
-    t.go(Input::RouteHold { text: text.into(), via: String::new(), to: String::new(), name: String::new(), why: String::new(), context: None })
+    t.go(Input::RouteHold { text: text.into(), via: String::new(), to: String::new(), name: String::new(), why: String::new(), context: None, parts: String::new() })
 }
 
 // held 1.5 s with no target, the shell asked; the window sees nothing;

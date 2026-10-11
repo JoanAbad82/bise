@@ -68,6 +68,71 @@ pub fn said(parts: &[Part], files: &[String], store: &Path, put: &dyn Fn(&Path) 
     Ok(Said { text, parts: json })
 }
 
+/// A routed message as the project hub delivers it (R41 (6)): the text its
+/// model reads and his parts' JSON ("" none). `note`: one log line when
+/// something could not be done (the words still go).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Restored {
+    pub text: String,
+    pub parts: String,
+    pub note: Option<String>,
+}
+
+/// His routed message on the project hub (architect m_18164): `parts` the
+/// JSON bise's home hub forwarded ("" none: an older home hub, or the
+/// terminal's text-only send, read back from `text` like the fold does).
+/// Each image is completed in THIS hub's store: a `b64_file` already in
+/// it is kept, nothing written (the normal case: one bise home, one
+/// store); else stored from its source by `put_file` (the one storer), or
+/// from the sender's `.b64` by `put_b64`; neither: left as is and noted
+/// (the runtime says unavailable, the forward never refuses). The text is
+/// the completed parts' render, so it and the parts name the same file;
+/// with a kind this hub doesn't know, the sender's text is kept unchanged
+/// (render drops unknown kinds, it would lose his words), noted. No image
+/// to complete in a text-only message: everything unchanged.
+pub fn restored(text: &str, parts: &str, store: &Path, put_file: &dyn Fn(&Path) -> Result<Stored, String>, put_b64: &dyn Fn(&Path) -> Result<Stored, String>) -> Restored {
+    let same = |note: Option<String>| Restored { text: text.to_string(), parts: parts.to_string(), note };
+    let (mut list, sent) = match parts.is_empty() {
+        true => (parts::of_text(text), false),
+        false => match serde_json::from_str::<Vec<Part>>(parts) {
+            Ok(l) => (l, true),
+            Err(e) => return same(Some(format!("routed parts not read ({e}): his text as sent"))),
+        },
+    };
+    if list.iter().any(|p| matches!(p, Part::Unknown(_))) {
+        return same(Some("a routed part of a kind this bise doesn't know: his text as sent".into()));
+    }
+    let mut changed = false;
+    let mut notes = Vec::new();
+    for p in &mut list {
+        let Part::Image { name, source, mime, b64_file } = p else { continue };
+        if !b64_file.is_empty() && Path::new(b64_file.as_str()).is_file() && in_store(b64_file, store) {
+            continue;
+        }
+        let src = Path::new(source.as_str());
+        let got = match (src.is_absolute() && src.is_file(), !b64_file.is_empty() && Path::new(b64_file.as_str()).is_file()) {
+            (true, _) => put_file(src),
+            (false, true) => put_b64(Path::new(b64_file.as_str())),
+            (false, false) => Err("neither its source nor its .b64 is there".into()),
+        };
+        match got {
+            Ok(s) => {
+                (*b64_file, *mime) = (s.b64, s.mime);
+                changed = true;
+            }
+            Err(e) => notes.push(format!("routed image {name} not stored here: {e}")),
+        }
+    }
+    let note = (!notes.is_empty()).then(|| notes.join("; "));
+    if !sent && !changed {
+        return same(note);
+    }
+    match serde_json::to_string(&list) {
+        Ok(json) => Restored { text: parts::render(&list), parts: json, note },
+        Err(e) => same(Some(format!("parts: {e}"))),
+    }
+}
+
 /// `file` is a `.b64` file directly inside `store` (no `..`), and stays
 /// there once its links are followed (architect m_17749: a `.b64` link in
 /// the store pointing outside is refused). A file that doesn't exist yet
@@ -192,6 +257,61 @@ mod tests {
         assert!(said(&[img(real.to_str().unwrap())], &[], &store, &none).is_ok());
         assert!(said(&[img(link.to_str().unwrap())], &[], &store, &none).is_err(), "a link out");
         assert!(said(&[img(dangling.to_str().unwrap())], &[], &store, &none).is_err(), "a dangling link");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Laws of `restored` (R41 (6), architect m_18164), on a real folder:
+    /// an image already in this hub's store is kept and nothing written
+    /// (the shared store, the normal case); one from another store is
+    /// stored from its source, else from its .b64; neither: left as is
+    /// with a note; the text is the completed parts' render; an unknown
+    /// kind keeps the sender's text; a text with no image is unchanged.
+    #[cfg(unix)]
+    #[test]
+    fn a_routed_image_is_completed_in_this_hubs_store() {
+        let root = std::env::temp_dir().join(format!("parts-restored-{}", std::process::id()));
+        let (store, other) = (root.join("images"), root.join("other"));
+        std::fs::create_dir_all(&store).unwrap();
+        std::fs::create_dir_all(&other).unwrap();
+        let (shared, theirs, src) = (store.join("ab.b64"), other.join("cd.b64"), root.join("s.png"));
+        for f in [&shared, &theirs, &src] {
+            std::fs::write(f, "aGk=").unwrap();
+        }
+        let put = |dir: &'static str| {
+            let store = store.clone();
+            move |_: &Path| -> Result<Stored, String> { Ok(Stored { b64: store.join(format!("{dir}.b64")).to_string_lossy().into(), mime: "image/png".into() }) }
+        };
+        let (by_file, by_b64) = (put("from-file"), put("from-b64"));
+        let image = |source: &Path, b64: &Path| Part::Image { name: "[Image #1]".into(), source: source.to_string_lossy().into(), mime: "image/png".into(), b64_file: b64.to_string_lossy().into() };
+        let json = |ps: &[Part]| serde_json::to_string(ps).unwrap();
+        // in this store: kept, no store call, text = render
+        let ps = vec![t("look "), image(&src, &shared)];
+        let r = restored("look", &json(&ps), &store, &none, &none);
+        assert_eq!((r.text.as_str(), r.parts.as_str(), r.note), (parts::render(&ps).as_str(), json(&ps).as_str(), None));
+        // another store: from its source
+        let r = restored("x", &json(&[image(&src, &theirs)]), &store, &by_file, &none);
+        let back: Vec<Part> = serde_json::from_str(&r.parts).unwrap();
+        assert!(matches!(&back[0], Part::Image { b64_file, .. } if b64_file.ends_with("from-file.b64")), "{back:?}");
+        assert_eq!(r.text, parts::render(&back), "the text names the stored file");
+        // its source gone: from the sender's .b64
+        let gone = root.join("gone.png");
+        let r = restored("x", &json(&[image(&gone, &theirs)]), &store, &none, &by_b64);
+        assert!(r.parts.contains("from-b64.b64") && r.note.is_none(), "{r:?}");
+        // neither: as is, noted, never refused
+        let r = restored("x", &json(&[image(&gone, &other.join("none.b64"))]), &store, &none, &none);
+        assert!(r.note.is_some() && r.parts.contains("none.b64"), "{r:?}");
+        // an unknown kind: the sender's text and parts unchanged, noted
+        let odd = r#"[{"kind":"voice","ms":3},{"kind":"text","text":"hi"}]"#;
+        let r = restored("hi [voice]", odd, &store, &none, &none);
+        assert_eq!((r.text.as_str(), r.parts.as_str()), ("hi [voice]", odd));
+        assert!(r.note.is_some());
+        // no parts and no image in the text: unchanged
+        let r = restored("plain words", "", &store, &none, &none);
+        assert_eq!(r, Restored { text: "plain words".into(), parts: String::new(), note: None });
+        // no parts, a marker of this store (an older home hub): unchanged
+        let text = parts::render(&[t("see "), image(&src, &shared)]);
+        let r = restored(&text, "", &store, &none, &none);
+        assert_eq!((r.text.as_str(), r.parts.as_str()), (text.as_str(), ""));
         let _ = std::fs::remove_dir_all(&root);
     }
 

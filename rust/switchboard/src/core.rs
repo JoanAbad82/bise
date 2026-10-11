@@ -632,6 +632,9 @@ pub enum Input {
         /// the sender's project name (J: a followed task's end, kind
         /// job_end, is said from `@<name>`; "" from bise's home hub)
         name: String,
+        /// his routed message's parts (msg-parts JSON, completed in this
+        /// hub's image store by `parts_in::restored`; "" none, R41 (6))
+        parts: String,
     },
     /// desktop S2, bise's home hub: the project hub has outbox entry `xid`.
     XAck {
@@ -660,6 +663,9 @@ pub enum Input {
         /// carries it as text to the project, which renders it there
         /// (fn_context::with_context); never on the home hub
         context: Option<Value>,
+        /// his message's parts (msg-parts JSON, "" none): held with his
+        /// words, kept on his message here and forwarded (R41 (6))
+        parts: String,
     },
     /// A held route goes to `to` instead (the shell checked it in the
     /// registry; `bise`: a cancel). `client`: the typed connection that
@@ -890,6 +896,8 @@ pub enum Effect {
         text: String,
         /// a routed message's fn context (FnContext JSON text, "" none)
         context: String,
+        /// a routed message's parts (msg-parts JSON, "" none, R41 (6))
+        parts: String,
     },
     /// desktop S2, a project hub: main's answer to bise's message `xid`
     /// goes back to bise's hub `hub` (`xreply` on its hub.sock).
@@ -2466,8 +2474,11 @@ impl Hub {
             Input::Release(c) => self.release_in(&mut fx, env, c),
             Input::SignedIn => self.signed_in(&mut fx, env),
             Input::Updated { card, version, res } => self.updated(&mut fx, env, card, &version, res),
-            Input::XIn { token, hub, xid, kind, text, name } => {
-                let i = json!({"t": "x_in", "token": token, "hub": hub, "xid": xid, "kind": kind, "text": text, "name": name});
+            Input::XIn { token, hub, xid, kind, text, name, parts } => {
+                let mut i = json!({"t": "x_in", "token": token, "hub": hub, "xid": xid, "kind": kind, "text": text, "name": name});
+                if !parts.is_empty() {
+                    i["parts"] = json!(parts);
+                }
                 self.core(&mut fx, env, None, i)
             }
             Input::XAck { xid } => self.core(&mut fx, env, None, json!({"t": "x_ack", "xid": xid})),
@@ -2475,9 +2486,12 @@ impl Hub {
             Input::XReply { xid, name, text } => {
                 self.core(&mut fx, env, None, json!({"t": "x_reply", "xid": xid, "name": name, "text": text}))
             }
-            Input::RouteHold { text, via, to, name, why, context } => {
+            Input::RouteHold { text, via, to, name, why, context, parts } => {
                 let context = context.filter(|c| !c.is_null()).map_or(String::new(), |c| c.to_string());
-                let i = json!({"t": "route_hold", "text": text, "via": via, "to": to, "name": name, "why": why, "context": context});
+                let mut i = json!({"t": "route_hold", "text": text, "via": via, "to": to, "name": name, "why": why, "context": context});
+                if !parts.is_empty() {
+                    i["parts"] = json!(parts);
+                }
                 self.core(&mut fx, env, None, i)
             }
             Input::RouteCorrect { client, rid, to, name } => {
@@ -2654,6 +2668,7 @@ impl Hub {
                 kind: jstr(f, "kind"),
                 text: jstr(f, "text"),
                 context: jstr(f, "context"),
+                parts: jstr(f, "parts"),
             }),
             "xreply" => fx.push(Effect::XReply { hub: jstr(f, "hub"), xid: f["xid"].as_u64().unwrap_or(0), text: jstr(f, "text") }),
             "route" => fx.push(Effect::Route {

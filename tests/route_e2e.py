@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from e2e import EXE, ROOT, check  # noqa: E402
+from proto_e2e import Door  # noqa: E402
 
 PROJECTS = ["shop", "atlas", "ledger"]
 
@@ -166,6 +167,58 @@ def main():
         got = [m["msg"]["text"] for m in of_type(pstate["shop"], "message_sent")
                if m["msg"]["from"] == "user" and "look at the cart" in m["msg"]["text"]][0]
         check('<image name="cart.png"' in got and notes in got, "shop's main has his files: %r" % got)
+
+        # R41 (6) (architect m_18164): his message as typed parts, an
+        # image by its source (the window's paste, sha A 18a32ce3), routed
+        # to shop: the route holds his parts, the out carries them, shop's
+        # message keeps them with its b64 in the store, and shop main's
+        # model gets the image as an image part, not '[image unavailable]'
+        d = Door(hsock)
+        d.send({"cmd": "hello", "proto": 1})
+        wait.until(lambda: [e for e in d.events if e.get("ev") == "welcome"], 20, "the home hub's welcome")
+        hproject = [e for e in d.events if e.get("ev") == "welcome"][0]["project"]
+        c.wait_idle("main")
+        shelf = os.path.join(E.tmp, "shelf.png")
+        with open(shelf, "wb") as f:
+            f.write(tiny_png())
+        iparts = [{"kind": "text", "text": "look at the shelf on shop "}, {"kind": "image", "name": "[Image #1]", "source": shelf}]
+        n_req = len(E.fake_requests())
+        d.send({"cmd": "send", "project": hproject, "agent": "main", "text": "", "parts": iparts, "mode": "now"})
+        wait.until(lambda: [e for e in of_type(hstate, "x_out") if "look at the shelf" in e["out"]["text"]], 15, "the parts' route sent")
+        out = [e["out"] for e in of_type(hstate, "x_out") if "look at the shelf" in e["out"]["text"]][0]
+        sent_parts = json.loads(out.get("parts", "[]"))
+        check([p.get("source") for p in sent_parts if p["kind"] == "image"] == [shelf], "the out carries his parts: %r" % out)
+        home_msg = [m["msg"] for m in of_type(hstate, "message_sent") if "look at the shelf" in m["msg"]["text"]]
+        check(home_msg and home_msg[-1].get("parts"), "his message at home keeps his parts: %r" % home_msg[-1:])
+        wait.until(lambda: [m for m in of_type(pstate["shop"], "message_sent")
+                            if m["msg"]["from"] == "user" and "look at the shelf" in m["msg"]["text"]], 60, "shop got the parts")
+        pm = [m["msg"] for m in of_type(pstate["shop"], "message_sent") if m["msg"]["from"] == "user" and "look at the shelf" in m["msg"]["text"]][0]
+        pimgs = [p for p in json.loads(pm.get("parts") or "[]") if p["kind"] == "image"]
+        check(pimgs and pimgs[0]["b64_file"].endswith(".b64") and os.path.isfile(pimgs[0]["b64_file"]) and pimgs[0]["b64_file"] in pm["text"],
+              "shop's message keeps the image part, its .b64 in the store and in the text: %r" % pm)
+
+        def shop_saw_image():
+            return [r for r in E.fake_requests()[n_req:]
+                    if "look at the shelf" in json.dumps(r) and any(i.startswith("data:image/png;base64,") for i in r.get("images", []))]
+        try:
+            wait.until(shop_saw_image, 90, "shop main's model got the image")
+        except Exception:
+            check(False, "shop main's request carries the image part: %r" % [(r.get("agent"), r.get("user_tail", "")[-200:], [i[:40] for i in r.get("images", [])])
+                                                                             for r in E.fake_requests()[n_req:]][-3:])
+        check(not any("image unavailable" in json.dumps(r) and "look at the shelf" in json.dumps(r) for r in E.fake_requests()[n_req:]),
+              "no '[image unavailable]' for it")
+
+        # a cancel keeps his parts: his words reach bise's main with them
+        c.wait_idle("main")
+        d.send({"cmd": "send", "project": hproject, "agent": "main", "text": "", "mode": "now",
+                "parts": [{"kind": "text", "text": "the shelf again on shop "}, {"kind": "image", "name": "[Image #1]", "source": shelf}]})
+        wait.until(lambda: [e for e in d.events if e.get("ev") == "route" and "the shelf again" in e.get("text", "")], 10, "the second route held")
+        rid = [e for e in d.events if e.get("ev") == "route" and "the shelf again" in e.get("text", "")][0]["rid"]
+        d.send({"cmd": "route_cancel", "project": hproject, "rid": rid})
+        wait.until(lambda: [m for m in of_type(hstate, "message_sent") if "the shelf again" in m["msg"]["text"]], 15, "the cancel said it to main")
+        cm = [m["msg"] for m in of_type(hstate, "message_sent") if "the shelf again" in m["msg"]["text"]][-1]
+        check(any(p["kind"] == "image" for p in json.loads(cm.get("parts") or "[]")), "the cancel keeps his parts: %r" % cm)
+        check(not [e for e in of_type(hstate, "x_out") if "the shelf again" in e["out"]["text"]], "a cancel forwards nothing")
     except AssertionError as e:
         print("FAIL", e)
         ok = False

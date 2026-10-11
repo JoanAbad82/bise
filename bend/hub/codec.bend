@@ -348,14 +348,14 @@ def out_st_of(+s: String) -> XH.OutSt:
 
 def out_of(+j: J.Json) -> XH.Out:
   XH.Out{get_nat(j, "xid"), get_s(j, "project"), XH.kind_of(get_s(j, "kind")), get_nat(j, "msg"), get_s(j, "text"),
-    out_st_of(get_s(j, "state")), get_nat(j, "tries"), get_s(j, "context")}
+    out_st_of(get_s(j, "state")), get_nat(j, "tries"), get_s(j, "context"), get_s(j, "parts")}
 
 def xin_of(+j: J.Json) -> XH.XIn:
   XH.XIn{get_s(j, "hub"), get_nat(j, "xid"), get_nat(j, "msg"), XH.kind_of(get_s(j, "kind")), get_b(j, "replied")}
 
 def route_of(+j: J.Json) -> XH.Route:
   XH.Route{get_nat(j, "rid"), get_s(j, "text"), get_s(j, "via"), get_s(j, "to"), get_s(j, "name"), get_nat(j, "due_ms"),
-    get_nat(j, "act"), get_s(j, "why"), XH.rst_of(get_s(j, "state")), get_s(j, "context")}
+    get_nat(j, "act"), get_s(j, "why"), XH.rst_of(get_s(j, "state")), get_s(j, "context"), get_s(j, "parts")}
 
 def what_of(+j: J.Json) -> TM.What:
   Bool.pick(TM.What, String.eq(get_s(j, "kind"), "retry"), TM.Retry{get_nat(j, "xid")}, TM.RouteSend{get_nat(j, "rid")})

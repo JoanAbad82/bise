@@ -4700,7 +4700,8 @@ law route_fires_at_due_only:
   for +why: String
   for +now: Nat
   for +context: String
-  {HTM.Act.due(HXB.route_act(HXB.new_route(x, tm, text, via, to, name, why, now, context))) == Nat.add(now, 2000n) : Nat}
+  for +parts: String
+  {HTM.Act.due(HXB.route_act(HXB.new_route(x, tm, text, via, to, name, why, now, context, parts))) == Nat.add(now, 2000n) : Nat}
 
 # LAW (architect m_8883): a fire makes no turn: his message is journaled
 # (an id for the history and `--input`) by route_said, never by a send
@@ -4734,7 +4735,8 @@ law route_unclear_waits_pick_ms:
   for +via: String
   for +now: Nat
   for +context: String
-  {HTM.Act.due(HXB.route_act(HXB.new_route_at(x, tm, text, via, "", "", "", Nat.add(now, HXB.PICK_MS()), context))) == Nat.add(now, 1500n) : Nat}
+  for +parts: String
+  {HTM.Act.due(HXB.route_act(HXB.new_route_at(x, tm, text, via, "", "", "", Nat.add(now, HXB.PICK_MS()), context, parts))) == Nat.add(now, 1500n) : Nat}
 
 # LAW: a pick acts only on a route still held: one that went (its due
 # passed, plain to main) or got a target changes nothing.
@@ -4756,7 +4758,7 @@ law route_plain_waits_behind_unclear:
   for +text: String
   for +queued: Bool
   for +parts: String
-  {HC.user_input.behind(o, Some{d}, cx, to, text, queued, parts) == HC.route_behind(o, cx, text, d) : HX.Cx<o>}
+  {HC.user_input.behind(o, Some{d}, cx, to, text, queued, parts) == HC.route_behind(o, cx, text, d, parts) : HX.Cx<o>}
 
 # LAW: ... which is no earlier than any unclear route's due, so the
 # unclear one fires first (acts_due keeps the acts' order) and both reach
@@ -4766,6 +4768,41 @@ law route_behind_is_latest:
   for +t: List<&2, HXH.Route>
   for e: {HXB.is_unclear(r) == True{} : Bool}
   {Nat.is_ge(Maybe.default(&2, Nat, HXB.unclear_due(r <> t), 0n), HXH.Route.due(r)) == True{} : Bool}
+
+# ---- his parts go with his routed words (R41 (6), architect m_18164) ----
+
+# LAW: a route's correction or pick keeps his parts (only its target
+# changes), so what fires carries what he sent.
+law route_to_keeps_parts:
+  for +r: HXH.Route
+  for +to: String
+  for +name: String
+  {HXH.Route.parts(HXH.route_op(HXH.RTo{to, name}, r)) == HXH.Route.parts(r) : String}
+
+# LAW: the outbox entry a fired route makes carries its parts to the
+# project (route_fire.sent's new_out).
+law route_out_carries_parts:
+  for +x: HXH.Xs
+  for +r: HXH.Route
+  for +id: Nat
+  {HXH.Out.parts(HXB.new_out(x, HXH.Route.to(r), HXH.KInput{}, id, HXH.Route.text(r), HXH.Route.context(r), HXH.Route.parts(r))) == HXH.Route.parts(r) : String}
+
+# LAW: no parts, no key: an out or a route without parts journals and is
+# delivered byte for byte as before (an older core replays it unchanged).
+law route_no_parts_no_key:
+  {HXH.parts_kv("") == Nil{} : List<&2, Sigma<&2, &2, String, _ => J.Json>>}
+
+# LAW: on the project, his forwarded message keeps its parts (the
+# you-parts path of a direct input); bise's own question has none.
+law xin_input_keeps_parts:
+  for +text: String
+  for +parts: String
+  {HC.xin.snd(HXH.KInput{}, text, parts) == HC.Snd{HM.USER(), HM.MAIN(), text, True{}, None{}, False{}, False{}, False{}, Some{HXB.VIA_BISE()}, parts} : HC.Snd}
+
+law xin_ask_has_no_parts:
+  for +text: String
+  for +parts: String
+  {HC.xin.snd(HXH.KAsk{}, text, parts) == HC.Snd{HXB.FROM_BISE(), HM.MAIN(), text, True{}, None{}, False{}, False{}, False{}, None{}, ""} : HC.Snd}
 
 # ---- followed jobs (desktop S10, core.bend's `followed jobs`) ----
 
