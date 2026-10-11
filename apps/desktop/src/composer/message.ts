@@ -9,6 +9,8 @@
 //                 absolute paths: run 5's shape; docs/images.md).
 // One number sequence per draft for images, pastes and quotes (a number points at one chip).
 
+import type { Part } from '@/proto';
+
 export type Chip =
   | { readonly kind: 'image'; readonly n: number; readonly path: string; readonly name: string; readonly thumb?: string }
   | { readonly kind: 'paste'; readonly n: number; readonly text: string }
@@ -37,6 +39,9 @@ export type Segment = { readonly kind: 'text'; readonly text: string } | { reado
 export interface Outgoing {
   readonly text: string;
   readonly files: readonly string[];
+  /** msg-parts: the same message as typed parts (quotes, words, pastes), when it has more than words
+   *  and no image; the hub renders the model's text from them */
+  readonly parts?: readonly Part[];
 }
 
 /** A paste at least this long (lines or characters) becomes a chip (pasted.rs). */
@@ -113,36 +118,74 @@ const quoteTag = (from: string, text: string, at?: QuoteAt): string =>
 export function buildMessage(segments: readonly Segment[]): Outgoing {
   const quotes: string[] = [];
   const files: string[] = [];
+  // msg-parts (architect m_17621): the same message as typed parts, the hub renders the model's text
+  // from them (byte for byte these tags); kept in order beside the text
+  const quoteParts: Part[] = [];
+  const bodyParts: Part[] = [];
+  let images = false;
+  const say = (t: string): void => {
+    const last = bodyParts.at(-1);
+    if (last?.kind === 'text') bodyParts[bodyParts.length - 1] = { kind: 'text', text: last.text + t };
+    else if (t !== '') bodyParts.push({ kind: 'text', text: t });
+  };
   let body = '';
   // an inline label (an image's `[Image #1]`, an artifact's link) gets one space from the words
   // on each side, as the TUI inserts it: never '[Image #1]what is…' (qa-native's R41 read)
   let spaceNext = false;
   for (const s of segments) {
     if (s.kind === 'text') {
-      if (spaceNext && /^[^\s.,;:!?)\]]/u.test(s.text)) body += ' ';
+      if (spaceNext && /^[^\s.,;:!?)\]]/u.test(s.text)) {
+        body += ' ';
+        say(' ');
+      }
       if (s.text !== '') spaceNext = false;
       body += s.text;
+      say(s.text);
       continue;
     }
     const c = s.chip;
     if (c.kind === 'quote') {
-      if (quotes.length < QUOTE_MAX) quotes.push(quoteTag(c.from, c.text, c.at));
+      if (quotes.length < QUOTE_MAX) {
+        quotes.push(quoteTag(c.from, c.text, c.at));
+        const at = c.at === undefined ? {} : Object.fromEntries((['file', 'new', 'old'] as const).filter((k) => c.at?.[k] !== '').map((k) => [k, c.at?.[k] ?? '']));
+        quoteParts.push({ kind: 'quote', from: attr(c.from), text: chars(c.text).slice(0, QUOTE_MAX_CHARS).join(''), ...at });
+      }
       continue;
     }
     if (c.kind === 'paste') {
       body += pasteTag(c.n, c.text);
+      bodyParts.push({ kind: 'paste', n: c.n, text: c.text });
       spaceNext = false;
       continue;
     }
-    if (c.kind === 'image' && !files.includes(c.path)) files.push(c.path);
+    if (c.kind === 'image') {
+      images = true;
+      if (!files.includes(c.path)) files.push(c.path);
+    }
     const label = c.kind === 'artifact' ? `[${c.title.replace(/[[\]]/gu, '')}](${c.url})` : chipLabel(c);
-    body += (/\S$/u.test(body) ? ' ' : '') + label;
+    const pad = /\S$/u.test(body) ? ' ' : '';
+    body += pad + label;
+    say(pad + label);
     spaceNext = true;
   }
   // `say …` and `steer …` go out without their word (sb.rs, C45)
   const words = body.trim().replace(/^(?:steer|say) /u, '').trim();
   const text = [...quotes, words].filter((x) => x !== '').join('\n');
-  return { text, files };
+  // parts only when they say more than words (the TUI's of_parts), and never with an image: its
+  // file goes as `files` and the hub stores it (a part's image must already be in the store as a
+  // .b64, which the window doesn't make); a message of words alone stays text
+  const parts = images || (quoteParts.length === 0 && !bodyParts.some((p) => p.kind === 'paste')) ? undefined : [...quoteParts, ...trimParts(bodyParts)];
+  return parts === undefined ? { text, files } : { text, files, parts };
+}
+
+/** The words' parts trimmed like the text (both ends, and `say ` / `steer ` in front), empty text parts dropped. */
+function trimParts(ps: readonly Part[]): Part[] {
+  const out = [...ps];
+  const first = out[0];
+  if (first?.kind === 'text') out[0] = { kind: 'text', text: first.text.trimStart().replace(/^(?:steer|say) /u, '').trimStart() };
+  const last = out.at(-1);
+  if (last?.kind === 'text') out[out.length - 1] = { kind: 'text', text: last.text.trimEnd() };
+  return out.filter((p) => p.kind !== 'text' || p.text !== '');
 }
 
 /** The line a message with images gets when the model reads none (attach.rs no_vision_error). */

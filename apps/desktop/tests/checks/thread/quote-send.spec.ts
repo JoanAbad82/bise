@@ -63,8 +63,14 @@ test('thread/quote-send: drag selects an answer, typing quotes it with its strip
     await expect(page.getByTestId('composer'), "its strip names where it's from and its lines").toContainText(/main · \d+ lines?/);
     await page.screenshot({ path: test.info().outputPath('quote.png') });
     await page.keyboard.press('Enter');
-    const sent = (await core.waitCmd((c) => c.cmd === 'send', 5000)) as { text?: string };
+    const sent = (await core.waitCmd((c) => c.cmd === 'send', 5000)) as { text?: string; parts?: { kind: string; from?: string; text?: string }[] };
     const text = sent.text ?? '';
+    // msg-parts: the same message typed, so the hub renders the model's text and every client
+    // draws his quote from it, never the tag: the quote from main first, then his words
+    expect(sent.parts?.map((p) => p.kind), 'his quote and words go as typed parts').toEqual(['quote', 'text']);
+    expect(sent.parts?.[0]?.from).toBe('main');
+    expect(sent.parts?.[0]?.text).toContain('14:00 compaction runs');
+    expect(sent.parts?.[1]?.text).toBe('why 03:00?');
     expect(text.startsWith('<selection from="main">\n'), 'the quote in front, as the TUI sends it').toBe(true);
     expect(text).toContain('14:00 compaction runs');
     expect(text).toContain('</selection>');

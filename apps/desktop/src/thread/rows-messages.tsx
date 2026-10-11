@@ -13,6 +13,9 @@ import { chipOf, clock, deliveryMark, lastOfRun, quotesOf, stripContext } from '
 import { shownName } from '@/agents/model';
 import { saidFor, useSaidMs } from '@/voicemode';
 import type { RowCtx } from './rows';
+import { ImageChips } from './rows-cards';
+import { youView, type YouView } from './parts';
+import { lineCount, quoteAbout } from '@/composer/message';
 /** A message of his longer than this folds to its first lines (tui-parity B11, the TUI's You(_, _, open)). */
 export const LONG_LINES = 12;
 export const LONG_CHARS = 1200;
@@ -70,7 +73,12 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   const [open, setOpen] = useFold(false, e.pos);
   // the fn context block the hub appended never shows: a chip from the typed context instead;
   // the quotes he sent in front of his words show first in his bubble, with their rail and source
-  const { quotes, words: text } = quotesOf(stripContext(e.text));
+  // msg-parts: with typed parts, his message comes from them, never from Entry.text (the model's
+  // templated text): no tag shows; without (an older hub), the text as before
+  const view = e.parts != null && e.parts.length > 0 ? youView(e.parts) : null;
+  const old = view === null ? quotesOf(stripContext(e.text)) : null;
+  const quotes = view !== null ? view.quotes.map((q) => ({ source: q.from, text: q.text, about: q.file !== '' ? quoteAbout(q.from, q.text, q) : '' })) : (old?.quotes ?? []).map((q) => ({ ...q, about: '' }));
+  const text = view !== null ? view.words : (old?.words ?? '');
   const fold = foldOf(text);
   const toggle = () => {
     setOpen((o) => !o);
@@ -103,22 +111,80 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
     <YouBubble head={to} under={under} timeAlways={steered || saidMs !== null || lastOfRun(e, next)} testId={`thread.you.${String(e.pos)}`}>
       {quotes.map((q, i) => (
         <blockquote key={i} className="th-you-quote" data-testid={`thread.you.${String(e.pos)}.quote.${String(i + 1)}`}>
-          {q.source !== '' && <span className="th-you-quote-src">{shownName(q.source)}</span>}
+          {q.source !== '' && <span className="th-you-quote-src">{q.about !== '' ? q.about : shownName(q.source)}</span>}
           <span className="th-you-quote-text">{q.text}</span>
         </blockquote>
       ))}
-      <Markdown text={fold === undefined || open ? text : fold.head} onLink={ctx.onLink} onPath={ctx.onPath} breaks />
+      {text !== '' && <Markdown text={fold === undefined || open ? text : fold.head} onLink={ctx.onLink} onPath={ctx.onPath} breaks />}
       {fold !== undefined && (
         <Fold open={open} onToggle={toggle} testId={`thread.fold.${e.pos}`}>
           {open ? 'fold it' : `show all · ${String(fold.lines)} lines`}
         </Fold>
       )}
+      {view !== null && <PartChips view={view} ctx={ctx} pos={e.pos} />}
       {chip !== null && (
         <div className="b-ctx">
           <ContextChip chip={chip} ctx={ctx} pos={e.pos} />
         </div>
       )}
     </YouBubble>
+  );
+}
+
+/**
+ * What rides with his words when his message came as parts (msg-parts): his long pastes as their
+ * chips ('▤ 1 · 240 lines', a click shows the paste), his images as their chips (the thumbnail, the
+ * same chips as a card answer's), his other files as chips that open in his editor. Never a tag.
+ */
+function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos: number }) {
+  const [shown, setShown] = useState<number | null>(null);
+  const paste = view.pastes.find((p) => p.n === shown);
+  if (view.pastes.length === 0 && view.images.length === 0 && view.files.length === 0) return null;
+  const id = `thread.you.${String(pos)}`;
+  return (
+    <>
+      {view.pastes.length + view.files.length > 0 && (
+        <div className="th-parts">
+          {view.pastes.map((p) => (
+            <button
+              key={`p${String(p.n)}`}
+              type="button"
+              className="b-chip th-part"
+              data-kind="paste"
+              aria-expanded={shown === p.n}
+              onClick={() => {
+                setShown((s) => (s === p.n ? null : p.n));
+              }}
+              data-testid={`${id}.paste.${String(p.n)}`}
+            >
+              ▤ {p.n} · {lineCount(p.text)} lines
+            </button>
+          ))}
+          {view.files.map((f) => (
+            <button
+              key={f}
+              type="button"
+              className="b-chip th-part"
+              data-kind="file"
+              title={f}
+              onClick={() => {
+                if (ctx.onPath !== undefined) ctx.onPath(f);
+                else void (window as Partial<Window>).bise?.openPath(f, {});
+              }}
+              data-testid={`${id}.file`}
+            >
+              {f.split('/').at(-1) ?? f}
+            </button>
+          ))}
+        </div>
+      )}
+      {paste !== undefined && (
+        <pre className="th-part-paste" data-testid={`${id}.paste.${String(paste.n)}.text`}>
+          {paste.text}
+        </pre>
+      )}
+      <ImageChips images={view.images} testId={id} />
+    </>
   );
 }
 

@@ -1,5 +1,5 @@
 // The composer's wire, golden (architect m_11500 (1)): for each content, the exact text and files
-// the send carries. engine.test.tsx proves both engines give these bytes; the table stays as the
+// the send carries, and its typed parts when it has quotes or pastes (msg-parts). engine.test.tsx proves both engines give these bytes; the table stays as the
 // fixture once the Lexical engine is gone, with fixtures/lexical-entries.json (each content as
 // the Lexical engine saved it, for the old-draft reader).
 import type { Chip, Outgoing } from '../message';
@@ -21,12 +21,17 @@ export const CASES: readonly { name: string; content: Content; golden: Outgoing 
   {
     name: 'a long paste',
     content: [['look: ', paste]],
-    golden: { text: `look: <pasted n="2" lines="14">\n${(paste as { text: string }).text}\n</pasted>`, files: [] },
+    golden: { text: `look: <pasted n="2" lines="14">\n${(paste as { text: string }).text}\n</pasted>`, files: [], parts: [{ kind: 'text', text: 'look: ' }, { kind: 'paste', n: 2, text: (paste as { text: string }).text }] },
   },
   {
     name: 'a quote of diff lines',
     content: [[quote, 'why this order?']],
-    golden: { text: '<selection from="perf vs main" file="src/q.rs" new="10-11">\nfn a() {}\nfn b() {}\n</selection>\nwhy this order?', files: [] },
+    golden: {
+      text: '<selection from="perf vs main" file="src/q.rs" new="10-11">\nfn a() {}\nfn b() {}\n</selection>\nwhy this order?',
+      files: [],
+      // msg-parts: the same message typed (the hub renders the text above from it)
+      parts: [{ kind: 'quote', from: 'perf vs main', text: 'fn a() {}\nfn b() {}', file: 'src/q.rs', new: '10-11' }, { kind: 'text', text: 'why this order?' }],
+    },
   },
   { name: 'an artifact', content: [['read ', artifact]], golden: { text: 'read [Q3 plan](https://bise.dev/m/q3)', files: [] } },
   { name: 'a code fence', content: [['```ts\nconst a = 1;\n  return a;\n```']], golden: { text: '```ts\nconst a = 1;\n  return a;\n```', files: [] } },

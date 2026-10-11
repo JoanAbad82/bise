@@ -18,7 +18,7 @@
 // runtime: only the tags of TAGS are applied, and TAGS is checked complete
 // against the generated unions at compile time. The store's shapes, TAGS and
 // its key and compare helpers live in types.ts (re-exported here).
-import type { Account, Card, ComputerAgent, Agent, Artifact, DevServer, Entry, Found, IndexRow, Job, JsonValue, Feature, Merged, Mode, Model, PickCommand, RoleRow, PickSkill, Plugin, ProjectRow, ScheduledTask, Worktree, FlowMode, ReleaseEv, UpdateEv } from '@/proto';
+import type { Account, Card, ComputerAgent, Agent, Artifact, DevServer, Entry, Found, IndexRow, Job, JsonValue, Feature, Merged, Mode, Model, Part, PickCommand, RoleRow, PickSkill, Plugin, ProjectRow, ScheduledTask, Worktree, FlowMode, ReleaseEv, UpdateEv } from '@/proto';
 import type { CoreCmd, CorePort, CoreState } from '@/shared/api';
 import { type Away, type BranchesList, type Confirm, type Dictation, type Diff, diffKey, type Ev, type EvOf, type FilesAnswer, type HubLine, type PagesList, type Pending, type PrsList, type QueuedTake, sameJson, sameOrder, sameStrings, sentWords, takeKey, threadKey, type ThreadOrder, type ToolOut, toolOutKey, typed, type VersionsList, type VoiceModeState } from './types';
 const EMPTY_ORDER: ThreadOrder = { order: [], before: null, more: false, loaded: false };
@@ -850,12 +850,14 @@ export class Store {
    * files: absolute paths he attached; the hub renders them once after his
    * words (an image as one the model sees, any other file by its path).
    */
-  send(a: { project: string; agent: string; text: string; mode?: Mode; files?: readonly string[] }): number {
+  send(a: { project: string; agent: string; text: string; mode?: Mode; files?: readonly string[]; parts?: readonly Part[] }): number {
     const key = threadKey(a.project, a.agent);
     const t = this.thread(key);
     this.cid += 1;
     const mode = a.mode ?? 'now';
     const files = a.files !== undefined && a.files.length > 0 ? [...a.files] : undefined;
+    // msg-parts: his message typed (quotes, words, pastes); the hub renders the model's text from them
+    const parts = a.parts !== undefined && a.parts.length > 0 ? [...a.parts] : undefined;
     const p: Pending = {
       cid: this.cid,
       project: a.project,
@@ -863,6 +865,7 @@ export class Store {
       text: a.text,
       mode,
       ...(files === undefined ? {} : { files }),
+      ...(parts === undefined ? {} : { parts }),
       at_ms: this.now(),
       state: 'sending',
     };
@@ -873,7 +876,7 @@ export class Store {
       return p.cid;
     }
     // G: the cid goes along; the core or the hub echoes it on this send's error
-    this.command({ cmd: 'send', project: a.project, agent: a.agent, text: a.text, mode, ...(files === undefined ? {} : { files }), cid: p.cid });
+    this.command({ cmd: 'send', project: a.project, agent: a.agent, text: a.text, mode, ...(files === undefined ? {} : { files }), ...(parts === undefined ? {} : { parts }), cid: p.cid });
     return p.cid;
   }
 
@@ -884,7 +887,7 @@ export class Store {
     if (t === undefined || p === undefined) return;
     t.pending = t.pending.filter((x) => x.cid !== cid);
     this.emit(`pending:${key}`);
-    this.send({ project: p.project, agent: p.agent, text: p.text, mode: p.mode, ...(p.files === undefined ? {} : { files: p.files }) });
+    this.send({ project: p.project, agent: p.agent, text: p.text, mode: p.mode, ...(p.files === undefined ? {} : { files: p.files }), ...(p.parts === undefined ? {} : { parts: p.parts }) });
   }
 
   /** Drops a failed send (he gave up on it). */
@@ -923,8 +926,8 @@ export class Store {
     this.command({ cmd: 'page', project, agent, before: v.before, ...(limit === undefined ? {} : { limit }) });
   }
   /** His answer to card `card`: its words, and the images he pasted or dropped (R41: absolute paths, as a send's files). */
-  answer(project: string, card: number, reply: string, files?: readonly string[]): void {
-    this.command({ cmd: 'answer', project, card, reply, ...(files !== undefined && files.length > 0 ? { files: [...files] } : {}) });
+  answer(project: string, card: number, reply: string, files?: readonly string[], parts?: readonly Part[]): void {
+    this.command({ cmd: 'answer', project, card, reply, ...(files !== undefined && files.length > 0 ? { files: [...files] } : {}), ...(parts !== undefined && parts.length > 0 ? { parts: [...parts] } : {}) });
   }
   /** His answer to the hub's yes/no question (a no's line comes back as a notice). */
   confirm(project: string, id: number, yes: boolean): void {

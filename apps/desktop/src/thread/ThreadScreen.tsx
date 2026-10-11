@@ -866,7 +866,8 @@ export const ThreadComposer = memo(function ThreadComposer({
       // the open card's answer (any project's: the block lists them all): his words and the images
       // he attached, the hub's one /answer path (R41)
       if (answer !== null) {
-        store.answer(answer.project, answer.card, out.text, out.files);
+        // msg-parts: his quotes and pastes go typed (the hub renders the model's text from them)
+        store.answer(answer.project, answer.card, out.text, out.files, out.parts);
         onSent();
         return;
       }
@@ -878,7 +879,10 @@ export const ThreadComposer = memo(function ThreadComposer({
       // never subscribed: the rows moving must not re-render the composer)
       const cu = computerRowOf(store.computerLive(), project, agent);
       if (cu !== undefined && computerState(cu) === 'stopped') store.computer('hand_back', cu.key);
-      store.send({ project, agent, text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}) });
+      // msg-parts: his quotes and pastes go typed, never templated by the window; an artifact's
+      // question keeps its text (its 'about' lead lives in the text alone)
+      const parts = about === undefined ? out.parts : undefined;
+      store.send({ project, agent, text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}), ...(parts === undefined ? {} : { parts }) });
       onSent();
     },
     [store, project, agent, onSent, onCommand, answer, about],

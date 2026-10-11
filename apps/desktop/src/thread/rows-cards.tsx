@@ -12,6 +12,7 @@ import { shownName } from '@/agents/model';
 import { YouBubble } from './rows-messages';
 import { NewsLine } from './rows-news';
 import type { RowCtx } from './rows';
+import { youView } from './parts';
 /** Main answered an agent's question for him: the question, the answer, and why, dim. */
 export function AnsweredRow({ e }: { e: Entry }) {
   const a = e.answered;
@@ -32,7 +33,7 @@ export function AnsweredRow({ e }: { e: Entry }) {
  * the spotlight's, ⌘I's): its 16 px thumbnail read from his source path and its label ('[Image #1]');
  * never the hub's marker or a path in the words.
  */
-function ImageChips({ images, testId }: { images: readonly { name: string; path: string }[]; testId: string }) {
+export function ImageChips({ images, testId }: { images: readonly { name: string; path: string }[]; testId: string }) {
   if (images.length === 0) return null;
   return (
     <div className="th-images">
@@ -154,13 +155,18 @@ export function withoutImageMarks(words: string): string {
 export function ApprovalRow({ e, next }: { e: Entry; next: Entry | undefined }) {
   const a = e.approval;
   if (a == null) return <Marker>{e.text}</Marker>;
+  // msg-parts: his answer's own parts (the note's), when the hub sent them: his words and images
+  // from them, never from the templated text (no tag shows); the head stays the hub's words
+  const view = e.parts != null && e.parts.length > 0 ? youView(e.parts) : null;
+  const images = view !== null ? view.images : (a.images ?? []);
   // the chips draw his images: their marks leave the words (once, never twice)
-  const chips = (a.images ?? []).length > 0;
+  const chips = images.length > 0;
   const say = (s: string): string => (chips ? withoutImageMarks(s).replace(/:$/u, '') : s);
   const parts = approvalParts(say(a.text));
-  const note = a.note == null ? '' : say(a.note);
-  // his words (after the head's ':' or the note), then the image chips under them, in his bubble
-  const words = [parts.words, note].filter((w) => w !== '').join('\n');
+  const note = view !== null ? view.words : a.note == null ? '' : say(a.note);
+  // his words (after the head's ':' or the note), then the image chips under them, in his bubble;
+  // with parts, the words are the parts' alone (the head's tail is the same answer, templated)
+  const words = view !== null ? note : [parts.words, note].filter((w) => w !== '').join('\n');
   return (
     <div className="th-approval" data-ok={a.ok}>
       <YouBubble
@@ -172,7 +178,7 @@ export function ApprovalRow({ e, next }: { e: Entry; next: Entry | undefined }) 
         {words === '' && !chips ? undefined : (
           <>
             {words !== '' && <div className="th-you-words" data-testid={`thread.approval.${e.pos}.words`}>{words}</div>}
-            <ImageChips images={a.images ?? []} testId={`thread.approval.${e.pos}`} />
+            <ImageChips images={images} testId={`thread.approval.${e.pos}`} />
           </>
         )}
       </YouBubble>

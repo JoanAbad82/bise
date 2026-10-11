@@ -2,7 +2,7 @@
 // checked complete at compile time), the slices' list types, and the key and
 // compare helpers. Pure, no state. Split out of store.ts (pure move). Owner:
 // amb-core (the hub slices with amb-win).
-import type { AwayProject, CoreEv, HubEv, Mode, Pr, PickFile, PickFolder, BranchRow, Page, VersionItem } from '@/proto';
+import type { AwayProject, CoreEv, HubEv, Mode, Part, Pr, PickFile, PickFolder, BranchRow, Page, VersionItem } from '@/proto';
 export type Ev = HubEv | CoreEv;
 export type EvOf<T extends Ev['ev']> = Extract<Ev, { ev: T }>;
 
@@ -138,6 +138,8 @@ export interface Pending {
   readonly mode: Mode;
   /** files he attached (absolute paths), sent with his words */
   readonly files?: readonly string[];
+  /** msg-parts: his message typed, sent with it (a retry sends them again) */
+  readonly parts?: readonly Part[];
   readonly at_ms: number;
   readonly state: 'sending' | 'failed';
   readonly why?: string;
