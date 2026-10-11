@@ -28,7 +28,9 @@ export type KeyAct =
   | { readonly palette: true }
   | { readonly help: true }
   | { readonly screen: ScreenAction }
-  | { readonly frame: FrameAction };
+  | { readonly frame: FrameAction }
+  /** ⌘N: the add-a-project sheet (settings › projects when none is mounted) */
+  | { readonly addProject: true };
 
 export interface KeyLike {
   readonly key: string;
@@ -83,7 +85,7 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
   // designer's desktop-screens v6: ⌘\ the sidebar, ⌥⌘0 the right panel, ⌘N add a project, ⌘, settings
   if (only('meta') && e.code === 'Backslash') return { frame: 'sidebar' };
   if (e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey && e.code === 'Digit0') return { frame: 'panel' };
-  if (only('meta') && e.code === 'KeyN') return { go: { screen: 'settings', page: 'projects' } };
+  if (only('meta') && e.code === 'KeyN') return { addProject: true };
   if (only('meta') && e.code === 'Comma') return { go: { screen: 'settings' } };
   if (only('meta') && e.code === 'KeyD') {
     const r = c.route;

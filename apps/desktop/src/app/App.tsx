@@ -8,7 +8,7 @@
 // touches, never the shell, the sidebar or the composer.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
-import { bottomTarget, formatRoute, inboxAtOf, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
+import { bottomTarget, formatRoute, inboxAtOf, MAIN, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
 import { BottomBlock } from '@/thread/Bottom';
 import { askInbox, useInboxAsks } from './inboxAsk';
 import { keep } from './keep';
@@ -46,6 +46,9 @@ import { useTheme } from '@/theme';
 import { HELP_EVENT, keyAction, typingIn, type FrameAction } from './keys';
 import { emitAction, useMenuAction } from './menu';
 import { TerminalPanel } from '@/terminal/Terminal';
+import { AddSheetHost } from '@/settings/AddSheet';
+import { pickerPort } from '@/settings/picker';
+import { addProject } from './addProject';
 import { isToggleKey, shellProject, shellTakes } from '@/terminal/model';
 import { panel } from '@/terminal/panel';
 import { ArtifactOpen, ArtifactsScreen } from '@/artifacts';
@@ -245,6 +248,7 @@ function Current({ top }: { top: ReactNode }) {
       <UpdateLine />
       <HubUpdateLine />
       <HubMoments />
+      <AddHost />
       <div className="app-screen">
         <ScreenOf key={formatRoute(route)} route={route} />
       </div>
@@ -440,6 +444,7 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
       else if ('palette' in act) openPalette();
       else if ('help' in act) openHelp();
       else if ('frame' in act) frameRef.current(act.frame);
+      else if ('addProject' in act) addProject(router);
       else emitAction(act.screen);
     };
     window.addEventListener('keydown', onKey, true);
@@ -469,4 +474,23 @@ function useHistoryKeys() {
       window.removeEventListener('keydown', onKey);
     };
   }, [router]);
+}
+
+/** The add-a-project sheet, mounted once (ambient-lead m_18949): the sidebar's '+ add a project' and
+ * ⌘N open it; once the core adds them, the first new project's thread opens. */
+function AddHost() {
+  const store = useStore();
+  const router = useRouter();
+  return (
+    <AddSheetHost
+      send={(cmd) => {
+        store.command(cmd);
+      }}
+      {...pickerPort()}
+      onAdded={(rows) => {
+        const first = rows[0];
+        if (first !== undefined) router.go({ screen: 'thread', project: first.project, agent: MAIN });
+      }}
+    />
+  );
 }

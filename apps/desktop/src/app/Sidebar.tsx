@@ -17,6 +17,7 @@ import { RefusedLine } from './Refused';
 import { groupsOf } from '@/review/feature';
 import { archivedOf, liveOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
+import { addProject } from './addProject';
 import { useRoute, useRouter } from './router';
 import { useNow } from './clock';
 import { Tip } from '@/setup';
@@ -211,7 +212,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const scheduled = useSum('scheduled', ids, (s, p) => s.scheduled(p).length);
   const projects = projectsOf(rows);
   const add = () => {
-    router.go({ screen: 'settings', page: 'projects' });
+    addProject(router);
   };
   return (
     <Side

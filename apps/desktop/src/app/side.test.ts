@@ -90,7 +90,7 @@ describe('the frame', () => {
     expect(keyAction(k('Backslash'), ctx)).toEqual({ frame: 'sidebar' });
     expect(keyAction(k('Digit0', { altKey: true }), ctx)).toEqual({ frame: 'panel' });
     expect(keyAction(k('Digit0'), ctx)).toEqual({ go: { screen: 'bise' } });
-    expect(keyAction(k('KeyN'), ctx)).toEqual({ go: { screen: 'settings', page: 'projects' } });
+    expect(keyAction(k('KeyN'), ctx)).toEqual({ addProject: true });
     expect(keyAction(k('Comma'), ctx)).toEqual({ go: { screen: 'settings' } });
   });
 });
