@@ -26,6 +26,8 @@ the injected <bise_state> block is not one):
   verbatim (markdown kept), instead of "done: …" / "ack: …";
 - `[[ts: CODE]]`: a run_typescript call with that program (CODE without
   `]]`);
+- `[[say: TEXT]]`: every tool-call reply to that message starts with
+  TEXT (text, then the call, in one reply);
 - `[[think: TEXT]]`: every reply to that message starts with reasoning
   TEXT (Anthropic thinking + signature, reasoning_content, a Responses
   reasoning item, Gemini thought parts + thoughtSignature);
@@ -33,6 +35,10 @@ the injected <bise_state> block is not one):
   that message fail (N = 1), then the script goes on. KIND: 429, 500,
   overloaded (Anthropic 529, the others 503), stream (a 200 stream that
   breaks with the family's error event; a whole reply gets a 500),
+  cut (the same, but the error event comes after two thirds of the
+  answer's events: the text started streaming, then the stream broke;
+  a turn that is a bare tool call streams the `[[reply: PATH]]` text
+  instead, so the retry can answer with the call alone),
   badname (a final 400: the API refusing a tool name, BISE-293).
   Several markers fail in their order. `retry=S` sets Retry-After (1);
 - `[[slow: S]]`: every request for that message waits S seconds (a
@@ -48,6 +54,10 @@ the injected <bise_state> block is not one):
   in two in the middle (inside an event), S seconds between the halves;
   the log line has its sha256 (`split_sha`): the client must read it
   byte for byte across a pause longer than its quiet slice (issue 13);
+- `[[pieces: N S]]` (streamed): the whole streamed body re-cut every N
+  bytes, S seconds between the pieces, whatever the events: an event
+  split across pieces, an event boundary (and a block's) inside one. The
+  answer streams in slowly (the partial lines, runtime/live-pure.bend);
 - `[[fixture: NAME]]`: the first request for that message is answered
   with the recorded file tests/providers/<family>/NAME.sse (streamed) or
   NAME.json (whole), or NAME.<status>.json (an error with that status),
@@ -96,12 +106,14 @@ FAMILIES = ("anthropic", "openai-chat", "openai-responses", "gemini")
 MARK = re.compile(r"\[\[(bash|skill|edit|write_file|apply_patch|run_typescript|ts): (.*?)\]\]", re.S)
 INNER = re.compile(r"\{\{(bash): (.*?)\}\}", re.S)
 THINK = re.compile(r"\[\[think: (.*?)\]\]", re.S)
+SAY = re.compile(r"\[\[say: (.*?)\]\]", re.S)
 REPLY = re.compile(r"\[\[reply: ([^\]\n]+)\]\]")
 ERROR = re.compile(r"\[\[error: (\w+)(?: x(\d+))?(?: retry=(\d+))?\]\]")
 FIXTURE = re.compile(r"\[\[fixture: ([\w.-]+)\]\]")
 SLOW = re.compile(r"\[\[slow: ([\d.]+)\]\]")
 DRIP = re.compile(r"\[\[drip: (\d+) ([\d.]+)\]\]")
 SPLIT = re.compile(r"\[\[split: ([\d.]+)\]\]")
+PIECES = re.compile(r"\[\[pieces: (\d+) ([\d.]+)\]\]")
 PLAN = re.compile(r"\[\[plan: ([\w-]+)(?: x(\d+))?\]\]")
 USAGE = {"input": 10, "cached": 2, "output": 5, "reasoning": 3}
 
@@ -382,6 +394,18 @@ def reply_for(conv, seen=0):
         return turn
     user = script_of(conv[idx]["text"])
     errs = errors_of(user)
+    if seen < len(errs) and errs[seen]["kind"] == "cut":
+        # the answer's text streams in before the break: the turn the
+        # script gives once its errors are over (a fixture never)
+        turn = reply_for(conv, len(errs) + 1)
+        turn["error"] = errs[seen]
+        rep = REPLY.search(user)
+        if not turn["text"] and rep:
+            try:
+                turn["text"], turn["calls"] = open(rep.group(1).strip(), encoding="utf-8").read(), []
+            except OSError:
+                pass
+        return turn
     if seen < len(errs):
         turn["error"] = errs[seen]
         return turn
@@ -428,6 +452,9 @@ def reply_for(conv, seen=0):
             cmd, desc = arg.split(" @@ ", 1)
             args = {"arg": cmd.strip(), "description": desc.strip()}
         turn["calls"] = [{"id": "call_%d_%d" % (idx, calls_done), "name": tool, "args": args}]
+        say = SAY.search(user)
+        if say:
+            turn["text"] = say.group(1).strip()
         return turn
     if sc:
         turn["text"] = sc.get("reply") or plain(PLAIN_DONE, user)
@@ -523,7 +550,7 @@ def error_reply(family, err):
     if kind == "badname":
         # BISE-293: a final 400, the API's words for a tool name off its pattern
         return 400, {}, name_error(family, {"tools": [{"name": "self.compact", "function": {"name": "self.compact"}}]}) or {}
-    status = {"429": 429, "500": 500, "stream": 500}.get(kind, 529 if family == "anthropic" else 503)
+    status = {"429": 429, "500": 500, "stream": 500, "cut": 500}.get(kind, 529 if family == "anthropic" else 503)
     hdr = {"retry-after": str(err.get("retry", 1))} if status in (429, 503, 529) else {}
     if family == "anthropic":
         t, m = {429: ("rate_limit_error", "Number of request tokens has exceeded your per-minute rate limit"),
@@ -941,6 +968,28 @@ class H(http.server.BaseHTTPRequestHandler):
             return sent, True
         return sent, False
 
+    def send_sse_pieces(self, data_chunks, n, gap):
+        """[[pieces: N S]]: the body re-cut every N bytes, S s apart"""
+        crlf = bytes([13, 10])
+        body = b"".join(c for c in data_chunks if c)
+        self.send_response(200)
+        self.send_header("content-type", "text/event-stream")
+        self.send_header("transfer-encoding", "chunked")
+        self.send_header("connection", "close")
+        self.end_headers()
+        self.close_connection = True
+        try:
+            for i in range(0, len(body), max(1, n)):
+                if i:
+                    time.sleep(gap)
+                part = body[i:i + max(1, n)]
+                self.wfile.write(b"%x" % len(part) + crlf + part + crlf)
+                self.wfile.flush()
+            self.wfile.write(b"0" + crlf + crlf)
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
     def send_sse_split(self, data_chunks, gap):
         """[[split: S]]: the body in two writes, cut mid-event, S s apart;
         its sha256."""
@@ -1095,6 +1144,7 @@ class H(http.server.BaseHTTPRequestHandler):
         self.drip = None
         split = SPLIT.search(script_of(conv[idx]["text"])) if idx is not None else None
         self.split = None
+        cut = PIECES.search(script_of(conv[idx]["text"])) if idx is not None else None
         model = body.get("model") or self.path.split("/models/")[-1].split(":")[0] or "fake"
         status = 200
         fail = plan_fail(script_of(conv[idx]["text"]) if idx is not None else "", seen) if plan else None
@@ -1117,14 +1167,21 @@ class H(http.server.BaseHTTPRequestHandler):
                 self.send_sse([data])
             else:
                 self.send(status, data)
-        elif turn["error"] and not (turn["error"]["kind"] == "stream" and stream):
+        elif turn["error"] and not (turn["error"]["kind"] in ("stream", "cut") and stream):
             status, hdr, err = error_reply(family, turn["error"])
             self.send(status, json.dumps(err).encode(), headers=hdr)
         else:
             mid = bool(turn["error"])
             out = render(family, turn, model, stream, body, mid)
+            if mid and turn["error"]["kind"] == "cut":
+                # the text streamed in, then the family's error event
+                full = render(family, turn, model, stream, body)
+                out = full[:len(full) * 2 // 3] + out[-1:]
             if not stream:
                 self.send(200, json.dumps(out).encode())
+            elif sse and cut:
+                self.send_sse_pieces([sse_bytes(family, [e]) for e in out],
+                                     int(cut.group(1)), float(cut.group(2)))
             elif sse and split and family == "anthropic":
                 self.split = self.send_sse_split([sse_bytes(family, [e]) for e in out],
                                                  float(split.group(1)))

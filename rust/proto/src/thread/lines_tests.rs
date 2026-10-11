@@ -174,3 +174,191 @@ fn an_old_wake_still_reads() {
         assert_eq!(timer_wake(not), None, "{not}");
     }
 }
+
+#[test]
+fn partial_lines_read_as_deltas() {
+    assert_eq!(read("partial #17.0 +0 : Hel"), Rec::Partial { call: "17.0".into(), off: 0, text: "Hel".into() });
+    assert_eq!(read("partial #17.1 +3 : a\\nb : c"), Rec::Partial { call: "17.1".into(), off: 3, text: "a\\nb : c".into() });
+    assert_eq!(read("partial #17.0 +0 :"), Rec::Partial { call: "17.0".into(), off: 0, text: String::new() });
+    assert_eq!(read("partial #17.0 +x : y"), Rec::Dropped);
+    assert_eq!(read("partial #17.0 : y"), Rec::Dropped);
+}
+
+// the hub's live answer: deltas append (offsets in escaped chars), a new
+// block or call starts again, a mismatch drops the block until the next
+#[test]
+fn partial_appends_checks_and_restarts() {
+    let d = |off: usize, text: &str| PartialStep::Delta { off, text: text.into() };
+    let mut p = Partial::default();
+    assert_eq!(p.step("1.0", 0, "a\\n"), d(0, "a\n"));
+    // offsets on the wire count escaped chars, the deltas unescaped ones
+    assert_eq!(p.step("1.0", 3, "é"), d(2, "é"));
+    // a `\` at the end waits for the next delta: here it starts a `\n`
+    assert_eq!(p.step("1.0", 4, "x\\"), d(3, "x"));
+    assert_eq!(p.text(), "a\néx\\");
+    assert_eq!(p.step("1.0", 6, "ny"), d(4, "\ny"));
+    // a lone held `\` is nothing to send yet; the next char decides
+    assert_eq!(p.step("1.0", 8, "\\"), PartialStep::Drop);
+    assert_eq!(p.step("1.0", 9, "z"), d(6, "\\z"));
+    // a gap: the first mismatch is logged, the rest of the block dropped
+    assert_eq!(p.step("1.0", 99, "x"), PartialStep::Mismatch { call: "1.0".into(), off: 99, have: 10 });
+    assert_eq!(p.step("1.0", 100, "y"), PartialStep::Drop);
+    assert_eq!(p.text(), "");
+    // the next block (offset 0) streams again
+    assert_eq!(p.step("1.0", 0, "b"), d(0, "b"));
+    // a retry is another call: it replaces the text
+    assert_eq!(p.step("1.1", 0, "c"), d(0, "c"));
+    // another call that doesn't start at 0: dropped, never glued on
+    assert!(matches!(p.step("2.0", 1, "d"), PartialStep::Mismatch { have: 0, .. }));
+}
+
+// law (architect m_17813): whatever the cuts of the escaped stream, a
+// client folding the hub's deltas (LiveText) holds the hub's text after
+// every event, a repeated event changes nothing, and a client that
+// subscribes midway (the whole text at 0, then the deltas) ends with the
+// same text; the deltas sum to the text once, never quadratic
+#[test]
+fn law_live_text_fold_is_the_hubs_text() {
+    let pieces = ["a", "\\", "n", "\\n", "é", "日本", "\\\\", "x\\", "\\nb", " ", "**", "😀"];
+    let mut seed = 0x9e3779b97f4a7c15u64;
+    let mut next = move |n: usize| {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        (seed % n as u64) as usize
+    };
+    for _ in 0..500 {
+        let esc: String = (0..next(40)).map(|_| pieces[next(pieces.len())]).collect();
+        let chars: Vec<char> = esc.chars().collect();
+        let (mut hub, mut client, mut late) = (Partial::default(), LiveText::default(), None::<LiveText>);
+        let (mut at, mut sent) = (0, 0);
+        while at < chars.len() || at == 0 {
+            let n = (1 + next(5)).min(chars.len() - at).max(usize::from(chars.is_empty()));
+            let chunk: String = chars[at..at + n.min(chars.len() - at)].iter().collect();
+            if let PartialStep::Delta { off, text } = hub.step("1.0", at, &chunk) {
+                sent += utf16_len(&text);
+                assert!(client.apply("1.0", off, &text));
+                let once = client.clone();
+                assert!(client.apply("1.0", off, &text), "a repeated event");
+                assert_eq!(client, once, "a repeated event changes nothing");
+                if let Some(l) = late.as_mut() {
+                    l.apply("1.0", off, &text);
+                }
+            }
+            // the client's text is the hub's, but for a held `\`
+            assert!(hub.text() == client.text || hub.text() == format!("{}\\", client.text), "{esc:?}: {:?} vs {:?}", hub.text(), client.text);
+            if late.is_none() && next(3) == 0 {
+                let mut l = LiveText::default();
+                l.apply("1.0", 0, &hub.text());
+                late = Some(l);
+            }
+            at += chunk.chars().count();
+            if chars.is_empty() {
+                break;
+            }
+        }
+        assert_eq!(hub.text(), unescape(&esc), "{esc:?}");
+        assert!(sent <= utf16_len(&unescape(&esc)), "each char sent once: {esc:?}");
+        if let Some(l) = late {
+            // a late joiner ends with the same text (its whole text may
+            // have carried the held `\` already)
+            assert!(l.text == client.text || l.text == format!("{}\\", client.text), "{esc:?}: {:?} vs {:?}", l.text, client.text);
+        }
+    }
+    // an event past the text or of another call is a gap: empty, never glued
+    let mut c = LiveText::default();
+    c.apply("1.0", 0, "abc");
+    assert!(!c.apply("1.0", 9, "x") && c.is_empty());
+    c.apply("1.0", 0, "abc");
+    assert!(!c.apply("2.0", 3, "x") && c.is_empty());
+    // an older offset rewrites from there (a resend after a reconnect)
+    c.apply("1.0", 0, "abcdé");
+    c.apply("1.0", 2, "Z");
+    assert_eq!(c.text, "abZ");
+    // off counts UTF-16 code units, as the desktop's JS does (architect
+    // m_17866): an astral char before the cut counts 2, a cut inside its
+    // surrogate pair is a gap
+    c.apply("1.0", 0, "a😀b");
+    assert!(c.apply("1.0", 4, "c"));
+    assert_eq!(c.text, "a😀bc");
+    assert!(c.apply("1.0", 3, "Z"));
+    assert_eq!(c.text, "a😀Z");
+    assert!(!c.apply("1.0", 2, "Z") && c.is_empty());
+    let mut h = Partial::default();
+    assert_eq!(h.step("1.0", 0, "日😀"), PartialStep::Delta { off: 0, text: "日😀".into() });
+    assert_eq!(h.step("1.0", 2, "x"), PartialStep::Delta { off: 3, text: "x".into() });
+    // "" at 0 ends it
+    c.apply("1.0", 0, "");
+    assert!(c.is_empty());
+}
+
+// every clear reason ends the live answer; a tool line or usage doesn't
+#[test]
+fn partial_clears_on_every_end() {
+    for l in [
+        "  obs: assistant: hi",
+        "  obs: turn_done: completed",
+        "  obs: turn_done: failed: boom",
+        "  obs: turn_done: interrupted",
+        "sb stopped : by the user",
+        "--- idle",
+        // a new attempt starts empty: its text or its tool calls never
+        // run under the old attempt's live text (architect m_13563)
+        "  obs: candidate_discarded: empty",
+        "  obs: provider_retry: 2/10 · 529 · retry in 4s",
+    ] {
+        assert!(clears_partial(&read(l)), "{l}");
+    }
+    for l in ["  obs: usage: model=m in=1 out=2", "tool #3 bash : ls", "partial #1.0 +0 : x", "  obs: turn_started"] {
+        assert!(!clears_partial(&read(l)), "{l}");
+    }
+}
+
+// an attempt that ends without its answer keeps the text read so far,
+// at its place, the notices under it (designer m_13334, m_13562); a
+// stop, a completed turn or an answer don't
+#[test]
+fn partial_kept_when_an_attempt_ends_without_its_answer() {
+    for l in [
+        "  obs: turn_done: failed: boom",
+        "  obs: turn_stalled: no progress",
+        "  obs: harness_restarted: crash",
+        "  obs: provider_retry: 2/10 · 529 · retry in 4s",
+        "  obs: candidate_discarded: empty",
+    ] {
+        assert!(keeps_partial(&read(l)), "{l}");
+        assert!(clears_partial(&read(l)), "{l}: kept, then cleared");
+    }
+    for l in [
+        "  obs: turn_done: completed",
+        "  obs: turn_done: interrupted",
+        "  obs: turn_done: failed: interrupted by the user",
+        "  obs: assistant: hi",
+        "sb stopped : by the user",
+        "tool #3 bash : ls",
+    ] {
+        assert!(!keeps_partial(&read(l)), "{l}");
+    }
+}
+
+// the kept line carries the text as escaped on the wire, read back whole;
+// nothing to keep: no line
+#[test]
+fn partial_kept_line_round_trips() {
+    let mut p = Partial::default();
+    assert_eq!(p.kept_line(), None);
+    p.step("1.0", 0, "first\\nsecond");
+    p.step("1.0", 13, " and more");
+    let l = p.kept_line().expect("a kept line");
+    assert_eq!(read(&l), Rec::Hub(Hub::Kept("first
+second and more".into())));
+    // a new attempt's first delta replaces the text
+    p.step("1.1", 0, "again");
+    assert_eq!(read(&p.kept_line().unwrap()), Rec::Hub(Hub::Kept("again".into())));
+    // a broken block keeps nothing
+    p.step("1.1", 9, "x");
+    assert_eq!(p.kept_line(), None);
+    let mut blank = Partial::default();
+    blank.step("2.0", 0, "  ");
+    assert_eq!(blank.kept_line(), None);
+}

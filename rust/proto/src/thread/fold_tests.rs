@@ -150,6 +150,27 @@ fn a_wake_line_takes_its_message_in_by_id() {
     assert_eq!(e.iter().map(|e| e.kind).collect::<Vec<_>>(), [EntryKind::Wake]);
 }
 
+/// A failed turn's kept text (the hub's `sb kept` line, written right
+/// before the failure) is an `agent` entry, cut, the failure's notice
+/// after it (designer m_13334: text he read never vanishes).
+#[test]
+fn a_kept_line_is_a_cut_reply_above_its_failure() {
+    let page = |_: &str| None;
+    let ls = vec![
+        (1, 1001, "sb you : go".to_string()),
+        (2, 1002, "sb kept : the plan, in **three** steps:\\n1. read".to_string()),
+        (3, 1003, "  obs: turn_done: failed: provider 400".to_string()),
+    ];
+    let e = fold(&ls, &ctx_with(&[], &page));
+    let kinds: Vec<EntryKind> = e.iter().map(|e| e.kind).collect();
+    assert_eq!(kinds, [EntryKind::You, EntryKind::Agent, EntryKind::TurnFailed]);
+    assert!(e[1].cut && !e[0].cut && !e[2].cut);
+    assert!(e[1].text.starts_with("the plan, in **three** steps:") && e[1].text.ends_with("1. read"), "{:?}", e[1].text);
+    assert!(e[1].payload_matches_kind());
+    assert!(!serde_json::to_string(&e[0]).unwrap().contains("cut"), "cut: false is left out on the wire");
+    assert!(serde_json::to_string(&e[1]).unwrap().contains("\"cut\":true"));
+}
+
 /// What a task sent (sb-core's `sent` line, architect m_10203) is a
 /// `to_agent` entry: to whom, its id, whether it asks; the card main
 /// opens for it, written in the task's feed too, is its card entry.

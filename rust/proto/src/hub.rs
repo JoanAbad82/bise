@@ -84,6 +84,16 @@ pub enum HubEv {
     Entry { project: Project, agent: String, entry: Box<Entry> },
     /// a subscribed agent's current step ("" when its turn ends)
     Typing { project: Project, agent: String, text: String },
+    /// a subscribed agent's answer as it streams in (at most ~4 a
+    /// second): `call` its `<call>.<attempt>`, `text` what goes at `off`
+    /// of the text so far, `off` in UTF-16 code units (as JS indexes a
+    /// string, like VoiceLit.said; architect m_17866): the client
+    /// keeps `text[..off] + text` (thread::lines::LiveText, so a repeated
+    /// event is harmless), never the whole text again (architect m_17813:
+    /// whole texts were quadratic in the reply). Subscribe sends the
+    /// whole text once at off 0; "" at off 0 when it ends (its entry
+    /// came, the turn ended, a stop, an error, a retry)
+    Partial { project: Project, agent: String, call: String, off: u32, text: String },
     /// every artifact of the project, at hello and on change; `new`: made
     /// or changed since he last looked (`artifacts_seen` clears it)
     /// `seen_ms`: when he last looked (an item's `new` is after it, not
@@ -347,7 +357,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "pages", "page_changed", "card_open", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "pages", "page_changed", "card_open", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)

@@ -188,6 +188,12 @@ pub enum Rec {
     /// steering or a notification the core committed (`history
     /// injected : …`, unescaped)
     Injected(String),
+    /// `partial #<call>.<attempt> +<offset> : <text>`: the answer as it
+    /// streams in (bend/runtime/live-pure.bend), the text since the last
+    /// partial, escaped as on the wire; `off` counts the escaped chars
+    /// this block already sent. Never journaled: the hub keeps the whole
+    /// text in memory ([`Partial`]).
+    Partial { call: String, off: usize, text: String },
     /// any other line (the next line of a message)
     Raw(String),
 }
@@ -311,6 +317,11 @@ pub enum Hub {
     Stopped(String),
     /// event-wake: a watch ended, its JSON (`thread::WakeFold`)
     Wake(String),
+    /// `kept : <text>`: the answer he had read as it streamed in, when
+    /// its turn failed before the answer came (the hub writes it right
+    /// before the failure's line, [`keeps_partial`]): drawn dim, never
+    /// lost (designer m_13334)
+    Kept(String),
     /// a kind this reader doesn't know, or a known kind's line that
     /// doesn't parse: its kind and unescaped text
     Other { kind: String, text: String },
@@ -345,6 +356,9 @@ pub fn read(line: &str) -> Rec {
     if let Some(r) = line.strip_prefix("subtool ") {
         return sub(r).unwrap_or(Rec::Dropped);
     }
+    if let Some(r) = line.strip_prefix("partial #") {
+        return partial(r).unwrap_or(Rec::Dropped);
+    }
     if let Some(r) = line.strip_prefix("core rejected: ") {
         return Rec::Rejected(r.to_string());
     }
@@ -371,6 +385,215 @@ fn tool(r: &str) -> Option<Rec> {
     let (id, rest) = r.split_once(' ')?;
     let (name, args) = rest.split_once(" : ").unwrap_or((rest, ""));
     Some(Rec::Tool { id: id.parse().ok()?, name: name.trim().to_string(), args: args.to_string() })
+}
+
+fn partial(r: &str) -> Option<Rec> {
+    let (head, text) = r.split_once(" : ").or_else(|| r.strip_suffix(" :").map(|h| (h, "")))?;
+    let (call, off) = head.split_once(" +")?;
+    if call.is_empty() || call.contains(' ') {
+        return None;
+    }
+    Some(Rec::Partial { call: call.to_string(), off: off.parse().ok()?, text: text.to_string() })
+}
+
+/// The live answer of one agent, as the hub keeps it: its call
+/// (`<call>.<attempt>`) and the escaped text of the block in progress.
+/// A delta whose offset doesn't match drops the block's partials until
+/// the next block (a new call, or offset 0), never a guess.
+///
+/// It also keeps the unescaped text it sent, so each line goes out as a
+/// delta (`off` in UTF-16 code units of the unescaped text, architect
+/// m_17813 and m_17866), never
+/// the whole text again: a trailing `\` is held back until the next
+/// delta says whether it starts a `\n`.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Partial {
+    pub call: String,
+    esc: String,
+    len: usize,
+    broken: bool,
+    /// the unescaped text sent so far, and its length in UTF-16 code
+    /// units (the unit of a delta's `off`)
+    sent: String,
+    sent_len: usize,
+    /// the escaped text ends in a `\` not sent yet
+    held: bool,
+}
+
+/// What a `partial` line did to the live answer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PartialStep {
+    /// send it: the unescaped `text` goes at `off` (chars) of the text so
+    /// far ([`LiveText::apply`]); off 0 starts the answer again
+    Delta { off: usize, text: String },
+    /// an offset that doesn't match (the first one of the block): its
+    /// log line; later ones of the block are dropped silently
+    Mismatch { call: String, off: usize, have: usize },
+    /// nothing to send (a block already broken, or a delta with nothing
+    /// new to show yet)
+    Drop,
+}
+
+impl Partial {
+    /// The whole text so far, unescaped ("" while the block is dropped):
+    /// what a new subscriber gets once, at offset 0.
+    pub fn text(&self) -> String {
+        if self.broken {
+            String::new()
+        } else if self.held {
+            format!("{}\\", self.sent)
+        } else {
+            self.sent.clone()
+        }
+    }
+
+    /// One `partial` line into the live answer.
+    pub fn step(&mut self, call: &str, off: usize, text: &str) -> PartialStep {
+        if off == 0 {
+            *self = Partial { call: call.to_string(), ..Partial::default() };
+        } else if self.broken && self.call == call {
+            return PartialStep::Drop;
+        } else if self.call != call || off != self.len {
+            let have = if self.call == call { self.len } else { 0 };
+            *self = Partial { call: call.to_string(), broken: true, ..Partial::default() };
+            return PartialStep::Mismatch { call: call.to_string(), off, have };
+        }
+        self.esc.push_str(text);
+        self.len += text.chars().count();
+        // the new escaped chars, with a held `\` first; a `\` at the end
+        // waits (it may start a `\n`), as unescape would read it whole
+        let mut new = if self.held { format!("\\{text}") } else { text.to_string() };
+        self.held = new.ends_with('\\');
+        if self.held {
+            new.pop();
+        }
+        let delta = unescape(&new);
+        let at = self.sent_len;
+        if delta.is_empty() && off != 0 {
+            return PartialStep::Drop;
+        }
+        self.sent.push_str(&delta);
+        self.sent_len += utf16_len(&delta);
+        PartialStep::Delta { off: at, text: delta }
+    }
+
+    /// The `sb kept : <text>` line that keeps the text so far in the
+    /// thread (a failed turn, [`keeps_partial`]); None when there is
+    /// nothing to keep (no text, or a block dropped on a bad offset).
+    pub fn kept_line(&self) -> Option<String> {
+        (!self.broken && !self.esc.trim().is_empty()).then(|| format!("sb kept : {}", self.esc))
+    }
+}
+
+/// A client's live answer, folded from the `partial` events
+/// ([`PartialStep::Delta`]: `text` goes at `off` UTF-16 code units): the
+/// text keeps `text[..off]` and appends, so an event that comes twice
+/// changes nothing. Offset 0 starts again (a new subscriber gets the
+/// whole text that way); "" at 0 is the end. An offset past the text,
+/// inside a surrogate pair, or another call's delta (a gap) empties it
+/// until the next offset 0: never a guess.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct LiveText {
+    pub call: String,
+    pub text: String,
+    /// the text's length in UTF-16 code units (the unit of `off`)
+    units: usize,
+}
+
+impl LiveText {
+    /// One event; false when it was a gap (the text is empty now).
+    pub fn apply(&mut self, call: &str, off: usize, text: &str) -> bool {
+        if off == 0 {
+            self.call = call.to_string();
+            self.text.clear();
+            self.units = 0;
+        } else if call != self.call || off > self.units {
+            return self.gap();
+        } else if off < self.units {
+            let Some(at) = utf16_byte_index(&self.text, off) else { return self.gap() };
+            self.text.truncate(at);
+            self.units = off;
+        }
+        self.text.push_str(text);
+        self.units += utf16_len(text);
+        true
+    }
+
+    fn gap(&mut self) -> bool {
+        self.text.clear();
+        self.units = 0;
+        false
+    }
+
+    /// Nothing to show.
+    pub fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+}
+
+/// The length of `s` in UTF-16 code units: the unit of a partial's `off`,
+/// as JS indexes strings (architect m_17866; VoiceLit.said too).
+pub fn utf16_len(s: &str) -> usize {
+    s.chars().map(char::len_utf16).sum()
+}
+
+/// The byte index of UTF-16 code unit `off` in `s`; None when `off` falls
+/// inside a surrogate pair or past the end.
+fn utf16_byte_index(s: &str, off: usize) -> Option<usize> {
+    let mut units = 0;
+    for (i, c) in s.char_indices() {
+        if units == off {
+            return Some(i);
+        }
+        if units > off {
+            return None;
+        }
+        units += c.len_utf16();
+    }
+    (units == off).then_some(s.len())
+}
+
+/// The lines that end a streamed attempt without its answer: a provider
+/// retry, a discarded candidate, a failure, a stall, a harness restart.
+/// The text he already read as it streamed in stays in the thread (an
+/// `sb kept` line written right before that line), dim, at the place it
+/// streamed; the notices go under it in arrival order (designer m_13334
+/// and m_13562: text he read never vanishes and never moves). Each of
+/// these lines also clears ([`clears_partial`]), so a next attempt (its
+/// text, its tool calls) never runs with the old text still live. A stop
+/// clears with nothing kept.
+pub fn keeps_partial(rec: &Rec) -> bool {
+    matches!(
+        rec,
+        Rec::Obs(
+            Obs::TurnDone(TurnEnd::Failed(_))
+                | Obs::TurnStalled(_)
+                | Obs::HarnessRestarted(_)
+                | Obs::ProviderRetry(_)
+                | Obs::CandidateDiscarded(_)
+        )
+    )
+}
+
+/// The lines that end an agent's live answer: its answer came (the
+/// assistant line, also written before a reply's tool calls), the turn
+/// ended (done, failed, interrupted, stalled), a provider retry or a
+/// discarded candidate (a new attempt starts empty), a stop, a restart.
+/// One rule for the hub and the TUI; the ones that end an attempt
+/// without its answer keep the text first ([`keeps_partial`]).
+pub fn clears_partial(rec: &Rec) -> bool {
+    matches!(
+        rec,
+        Rec::Obs(
+            Obs::Assistant(_)
+                | Obs::TurnDone(_)
+                | Obs::TurnStalled(_)
+                | Obs::HarnessRestarted(_)
+                | Obs::ProviderRetry(_)
+                | Obs::CandidateDiscarded(_)
+        ) | Rec::Hub(Hub::Stopped(_))
+            | Rec::Idle
+    )
 }
 
 fn intent(r: &str) -> Option<Rec> {
@@ -599,6 +822,7 @@ pub fn hub(rest: &str) -> Hub {
         "scheduled" => Hub::Scheduled(text),
         "stopped" => Hub::Stopped(text),
         "wake" => Hub::Wake(text),
+        "kept" => Hub::Kept(text),
         _ => other(text),
     }
 }

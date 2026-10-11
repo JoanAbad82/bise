@@ -349,7 +349,7 @@ pub(crate) fn build_rows(events: &[Ev], i: usize, debug: bool, width: usize, tic
 pub(crate) fn is_message(ev: &Ev) -> bool {
     // an answer to an inbox item reads like your message (BISE-307): a
     // block with a blank row around it
-    matches!(ev, Ev::You(..) | Ev::Assistant(_) | Ev::Thinking { .. } | Ev::AgentMsg { .. } | Ev::Answered { .. } | Ev::Approval { .. })
+    matches!(ev, Ev::You(..) | Ev::Assistant(_) | Ev::Kept(_) | Ev::Thinking { .. } | Ev::AgentMsg { .. } | Ev::Answered { .. } | Ev::Approval { .. })
 }
 
 pub(crate) fn is_tool_block(ev: &Ev) -> bool {
@@ -403,7 +403,8 @@ pub(crate) fn wants_gap_before(ev: &Ev, prev: Option<&Ev>) -> bool {
     let prev_tool = is_tool_block(p);
     let prev_notice = is_notice(p);
     match ev {
-        Ev::Assistant(_) => {
+        // a kept answer sits where the live text was: the reply's gap
+        Ev::Assistant(_) | Ev::Kept(_) => {
             !matches!(p, Ev::Thinking { .. })
                 && (prev_message || prev_tool || prev_notice)
         }
@@ -1098,7 +1099,7 @@ pub(crate) const PAUSE_MS: u128 = 5 * 60 * 1000;
 /// an agent writing to you, a report (not a brief, not level 3).
 pub(crate) fn is_l2(ev: &Ev) -> bool {
     match ev {
-        Ev::Assistant(_) | Ev::Answered { .. } => true,
+        Ev::Assistant(_) | Ev::Kept(_) | Ev::Answered { .. } => true,
         Ev::Release(r) => r.is_l2(),
         Ev::AgentMsg { text, .. } => !is_brief(text) && !is_l3(ev),
         _ => false,

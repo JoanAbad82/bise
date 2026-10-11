@@ -68,7 +68,13 @@ impl Shell {
                 if let Some(c) = self.proto.conns.get_mut(&id) {
                     c.subs.insert(agent.clone(), live);
                 }
-                self.proto_send(id, &HubEv::Thread { project, agent, entries, before, more });
+                // its answer streaming in, if one is: the whole text once,
+                // at off 0; the deltas follow
+                let partial = self.partials.get(&agent).map(|p| (p.call.clone(), p.text())).filter(|(_, t)| !t.is_empty());
+                self.proto_send(id, &HubEv::Thread { project: project.clone(), agent: agent.clone(), entries, before, more });
+                if let Some((call, text)) = partial {
+                    self.proto_send(id, &HubEv::Partial { project, agent, call, off: 0, text });
+                }
             }
             HubCmd::Unsubscribe { agent, .. } => {
                 if let Some(c) = self.proto.conns.get_mut(&id) {

@@ -243,6 +243,9 @@ pub(super) struct Sb {
     /// What the live reads of entries remember of each thread
     /// (`crate::entry_reads`).
     seen: HashMap<String, crate::entry_reads::Seen>,
+    /// Each agent's answer as it streams in (the `thread/partial`
+    /// notification, livetext.rs): memory only.
+    pub(super) lives: HashMap<String, crate::livetext::Live>,
     /// The threads subscribed on this connection (sb/feed_entries.rs).
     subscribed: std::collections::HashSet<String>,
     /// Each agent's last row as the turn edges read it: its turn runs,
@@ -651,6 +654,7 @@ fn hub_reconnected(app: &mut App) {
     }
     sb.activity.clear();
     sb.seen.clear();
+    sb.lives.clear();
     sb.ready = false;
     sb.confirm = None;
     sb.release_ask = None;
@@ -1174,6 +1178,9 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
         Hub::Stopped(_) => return None,
         // event-wake: a watch ended (its JSON, the fold's WakeFold)
         Hub::Wake(json) => return serde_json::from_str(&json).ok().map(|w| crate::entry_ev::wake_ev(&w)),
+        // a failed turn's text so far, dim above its failure (the reply's
+        // escape: the same renderer reads it)
+        Hub::Kept(text) => Ev::Kept(text.replace('\n', "\\n")),
         // a known kind's line that doesn't parse, as before
         Hub::Other { kind, text } => match kind.as_str() {
             "card-closed" => Ev::Info(format!("card {} ", text)),

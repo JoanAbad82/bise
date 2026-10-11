@@ -610,6 +610,11 @@ pub struct Entry {
     /// older clients, search and copy)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parts: Vec<crate::parts::Part>,
+    /// an `agent` entry cut off: the text he read as it streamed in,
+    /// kept when its turn failed before the answer came (the hub's `sb
+    /// kept` line); drawn dim, the failure's notice after it
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub cut: bool,
 }
 
 impl Entry {
@@ -646,6 +651,7 @@ impl Entry {
             turn_start: false,
             turn_end_ms: None,
             parts: Vec::new(),
+            cut: false,
         }
     }
 

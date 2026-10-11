@@ -62,6 +62,7 @@ mod syntax;
 mod mdlive;
 mod sanitize;
 mod render;
+mod livetext;
 mod answered;
 mod toolbox;
 mod toolrow;

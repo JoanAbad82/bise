@@ -36,6 +36,8 @@ import ./runtime/debug-pure.bend as Dg
 import ./runtime/usage-pure.bend as Us
 import ./runtime/gate-pure.bend as Gt
 import ./runtime/race-pure.bend as Rc
+import ./runtime/live-pure.bend as Lp
+import ./vendor/http/encoding/utf8.bend as U8
 import ./hub/model.bend as HM
 import ./hub/cx.bend as HX
 import ./hub/core.bend as HC
@@ -5834,3 +5836,159 @@ law hub_set_rt_counts_turns:
   for +x: HX.Rt
   {HX.Rt.turns(HC.rt(o, HC.set_rt(o, cx, x), HX.Rt.name(x)))
     == HC.turns_after(HX.Rt.run(HC.rt(o, cx, HX.Rt.name(x))), HX.Rt.run(x), HX.Rt.turns(HC.rt(o, cx, HX.Rt.name(x)))) : Nat}
+
+# ---- the answer as it streams in (runtime/live-pure.bend) ----
+
+# LAW: pieces cut anywhere (an event split across pieces, the next
+# event's start inside a piece) give the same partial as one piece: the
+# text since the last one, at offset 0 of its block.
+law live_pieces_cut_anywhere_same_line:
+  {Con{Lp.emit_line(Lp.take(Lp.feeds(Con{"event: content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}
+event: content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"lo\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n)),
+    Con{Lp.emit_line(Lp.take(Lp.feeds(Con{"event: content_block_delta
+dat", Con{"a: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}
+event", Con{": content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"lo\"}}
+", Nil{}}}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n)), Nil{}}}
+    == Con{"partial #17.0 +0 : Hello", Con{"partial #17.0 +0 : Hello", Nil{}}} : List<&2, String>}
+
+# LAW: a call that is not the agent's answer (compaction, one-shot)
+# streams nothing: no text waits.
+law live_off_streams_nothing:
+  {Lp.has(Lp.feeds(Con{"event: content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}
+event: content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"lo\"}}
+", Nil{}}, Lp.lv0(False{}, "17.0", Api.Anthropic{}))) == False{} : Bool}
+
+# LAW: thinking never streams, only the answer's text.
+law live_thinking_never_streams:
+  {Lp.emit_line(Lp.take(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"hmm\"}}
+", Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ok\"}}
+", Nil{}}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n))
+    == "partial #17.0 +0 : ok" : String}
+
+# LAW: the offset counts what the block already sent (escaped); a new
+# block starts again at 0 (the hub replaces the text).
+law live_offset_per_block:
+  {Con{Lp.emit_line(Lp.take(Lp.feed(Lp.emit_lv(Lp.take(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ab\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n)), "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"c\"}}
+"), 300n)),
+    Con{Lp.emit_line(Lp.take(Lp.feed(Lp.emit_lv(Lp.take(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ab\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n)), "data: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"c\"}}
+"), 300n)), Nil{}}}
+    == Con{"partial #17.0 +2 : c", Con{"partial #17.0 +0 : c", Nil{}}} : List<&2, String>}
+
+# LAW: at most one partial per every_ms(): due only with text waiting
+# and the last one 400 ms old (designer m_17504).
+law live_throttle:
+  {Con{Lp.due(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"a\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 399n),
+    Con{Lp.due(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"a\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 400n),
+    Con{Lp.due(Lp.lv0(True{}, "17.0", Api.Anthropic{}), 900n), Nil{}}}}
+    == Con{False{}, Con{True{}, Con{False{}, Nil{}}}} : List<&2, Bool>}
+
+# the Messages API's text delta, up to its text's opening quote
+def live_pre() -> String:
+  "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\""
+
+# raw UTF-8 in the literal: an é (2 bytes) and an emoji (4 bytes)
+def live_l1() -> String:
+  String.concat([live_pre(), U8.utf8.encode("café 😀"), "\"}}
+"])
+
+# JSON escapes: a newline, quotes, \u00e9, a surrogate pair
+def live_l2() -> String:
+  String.concat([live_pre(), "a\\nb \\\"q\\\" \\u00e9 \\ud83d\\ude00\"}}
+"])
+
+def live_agrees(ls: List<&2, String>) -> List<&2, Bool>:
+  match ls:
+    case Nil{}:
+      Nil{}
+    case Con{+l, rest}:
+      Con{Lp.agree(Api.Anthropic{}, l), live_agrees(rest)}
+
+def live_fires(ls: List<&2, String>) -> List<&2, Bool>:
+  match ls:
+    case Nil{}:
+      Nil{}
+    case Con{+l, rest}:
+      Con{Lp.fires(Api.Anthropic{}, l), live_fires(rest)}
+
+# LAW: the fast path (a text delta read without J.parse) reads what
+# J.parse reads, on every line it takes, and takes only the exact shape:
+# a plain delta, escapes and a surrogate pair, raw UTF-8, index 12, an
+# empty delta, trailing blanks; never a leading zero, a space, an extra
+# field, a bad escape, junk after the object, a thinking delta, an
+# unterminated literal or a lone surrogate (those go to J.parse).
+law live_fast_reads_as_slow:
+  {Con{live_agrees(
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}",
+      Con{String.trim(live_l2()), Con{String.trim(live_l1()),
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}} \r",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":01,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\": 0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\",\"y\":1}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\q\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}x",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\ud83d\"}}",
+      Nil{}}}}}}}}}}}}}}}),
+    Con{live_fires(
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}",
+      Con{String.trim(live_l2()), Con{String.trim(live_l1()),
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}} \r",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":01,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\": 0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\",\"y\":1}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\q\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}x",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\ud83d\"}}",
+      Nil{}}}}}}}}}}}}}}}), Nil{}}}
+    == Con{[True{}, True{}, True{}, True{}, True{}, True{}, True{}, True{},
+        True{}, True{}, True{}, True{}, True{}, True{}],
+      Con{[True{}, True{}, True{}, True{}, True{}, True{}, False{}, False{},
+        False{}, False{}, False{}, False{}, False{}, False{}], Nil{}}}
+      : List<&2, List<&2, Bool>>}
+
+# LAW: streaming on agrees with streaming off. The same stream, its
+# pieces cut inside an emoji's bytes, a take after each group (a flush
+# with several parts waiting), gives partials whose text, joined, is the
+# final reply's text byte for byte (As.reply, the stream decoded whole);
+# fed as one piece it gives that text in one partial.
+law live_streamed_text_is_the_reply:
+  {Con{As.reply(U8.utf8.decode(String.concat([
+      "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}
+", live_l1(), live_l2(), live_pre(), "\"}}
+", live_pre(), "!\"}}
+", "data: {\"type\":\"content_block_stop\",\"index\":0}
+data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}
+"]))),
+    Con{String.join(Lp.runs([["event: content_block_delta
+", String.take(live_l1(), 91n)],
+      [String.drop(live_l1(), 91n), "event: content_block_delta
+", live_l2()],
+      [String.concat([live_pre(), "\"}}
+"]), String.concat([live_pre(), "!\"}}
+"])]], Lp.lv0(True{}, "17.0", Api.Anthropic{})), "|"),
+    Con{String.join(Lp.runs([[String.concat([live_l1(), live_l2(), live_pre(),
+      "\"}}
+", live_pre(), "!\"}}
+"])]], Lp.lv0(True{}, "17.0", Api.Anthropic{})), "|"), Nil{}}}}
+    == Con{"OK café 😀a\\nb \"q\" é 😀!
+END
+",
+      Con{"partial #17.0 +0 : café 😀a\\nb \"q\" é 😀|partial #17.0 +18 : !",
+      Con{"partial #17.0 +0 : café 😀a\\nb \"q\" é 😀!", Nil{}}}} : List<&2, String>}

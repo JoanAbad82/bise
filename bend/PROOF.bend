@@ -6081,3 +6081,24 @@ def Laws.hub_set_rt_counts_turns(o, cx, x):
       %Equal.sym(HX.Rt, HC.rt_find(HC.rt_put(hub_rts(o, cx), HX.Rt{n, run, w, tm, t}), n), HX.Rt{n, run, w, tm, t},
           hub_rt_put_find(hub_rts(o, cx), n, run, w, tm, t)) : {HX.Rt.turns(_) == t : Nat}
       {==}
+
+def Laws.live_pieces_cut_anywhere_same_line():
+  {==}
+
+def Laws.live_off_streams_nothing():
+  {==}
+
+def Laws.live_thinking_never_streams():
+  {==}
+
+def Laws.live_offset_per_block():
+  {==}
+
+def Laws.live_throttle():
+  {==}
+
+def Laws.live_fast_reads_as_slow():
+  {==}
+
+def Laws.live_streamed_text_is_the_reply():
+  {==}

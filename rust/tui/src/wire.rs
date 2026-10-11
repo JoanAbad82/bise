@@ -116,6 +116,10 @@ pub(crate) enum Ev {
     // in memory only: the id of your message right before it (`sb you-id
     // : m_N`); push_event sets it on that message, never appended
     YouId(u64),
+    // the answer he read as it streamed in, kept when its turn failed
+    // before it came (`sb kept`, escaped like a reply): the reply's rows,
+    // dim (livetext::kept_rows, designer m_13334)
+    Kept(String),
     // the approvals gate of the running call (`sb gate : check|card|done <n>`)
     Gate(Gate),
     // an inbox item answered (`sb approval`, an answer's `sb route`, or
@@ -375,6 +379,8 @@ fn rec_ev(rec: Rec) -> Option<Ev> {
     Some(match rec {
         // the session-log facts (BISE-195) are for the hub's writer
         Rec::Empty | Rec::Fact | Rec::Dropped => return None,
+        // the live answer comes as the hub's `partial` event, not a line
+        Rec::Partial { .. } => return None,
         Rec::Idle => Ev::Idle,
         // switchboard: the hub's own lines in a feed
         Rec::Hub(h) => return sb::hub_ev(h),

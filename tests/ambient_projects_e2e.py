@@ -134,6 +134,13 @@ def main():
         check(not home_you, "the words went to shop's main only: %r" % home_you)
         core.wait(lambda e: e.get("ev") == "voice_mode" and e.get("project") == shop_id and e.get("state") == "speaking" and e.get("said"),
                   90, "shop main's answer said", since=at)
+        # the answer is said before its turn ends: the turn's end comes
+        # as the same pos again with turn_end_ms (a replace); wait for it,
+        # or it lands after the off below and reads as a leak
+        core.wait(lambda e: e.get("ev") == "entry" and e.get("project") == shop_id and e.get("agent") == "main"
+                  and e["entry"].get("kind") == "agent" and e["entry"].get("turn_end_ms")
+                  and "what is the state of the build" in e["entry"].get("text", ""),
+                  60, "shop main's answer turn ended", since=at)
         off = core.mark()
         core.cmd(cmd="voice_mode", project=shop_id, agent="main", on=False)
         core.wait(lambda e: e.get("ev") == "voice_mode" and e.get("on") is False, 30, "voice mode off", since=off)

@@ -32,7 +32,9 @@ type Job is Data:
 type Effect is Data:
   EPrints{lines: List<&2, String>}
   # a real provider call: the hub HTTP client, in this process
-  EModel{action: U32, request: String, after: List<&2, T.Act>}
+  # live: an agent's answer call, whose text streams as partial lines
+  # (compaction calls stay silent)
+  EModel{action: U32, request: String, after: List<&2, T.Act>, live: Bool}
   # a real tool execution (bash, the merged search, remote MCP calls).
   # The live flag keeps scripted scenarios hermetic: no MCP index reads.
   EExec{call: T.Call, after: List<&2, T.Act>, live: Bool}
@@ -105,7 +107,8 @@ def trans.model.live(+sess: T.Session, +rt: Rt, +rest: List<&2, T.Act>,
     +action: U32, +input: List<&2, T.Msg>) -> Trans:
   match sess:
     case T.Sess{+cfg, _, _, _, _, _, _, _}:
-      Tr{EModel{action, Rem.build_request(cfg, input), rest}, rt, JIdle{}}
+      Tr{EModel{action, Rem.build_request(cfg, input), rest, True{}}, rt,
+        JIdle{}}
 
 def script_of(+rt: Rt) -> List<&2, M.Reply>:
   match rt:
@@ -147,7 +150,7 @@ def trans.model.compact.live(+sess: T.Session, +rt: Rt,
   match sess:
     case T.Sess{+cfg, _, _, _, _, +pending, _, _}:
       Tr{EModel{action, compact_request(compact_first(pending), cfg, input),
-        rest}, rt, JIdle{}}
+        rest, False{}}, rt, JIdle{}}
 
 def trans.model.compact.script(+rt: Rt, +rest: List<&2, T.Act>,
     +action: U32) -> Trans:

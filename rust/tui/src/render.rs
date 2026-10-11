@@ -156,6 +156,10 @@ pub(crate) fn code_width(width: usize) -> usize {
 /// its measure, a tool (its line, its code, its output) at the code
 /// measure. The extra width stays empty: rows never stretch.
 pub(crate) fn ev_rows(ev: &Ev, tick: u32, width: usize) -> Vec<Line<'static>> {
+    // a kept answer: the reply's own rows, dim (as it was live)
+    if let Ev::Kept(t) = ev {
+        return crate::livetext::kept_rows(t, tick, width);
+    }
     let w = match ev {
         Ev::Tool(_) => code_width(width),
         // a reply wraps its prose at the prose measure itself; its tables
@@ -370,6 +374,8 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
     let text_st = Style::default().fg(text());
     let err_st = Style::default().fg(error());
     match ev {
+        // a failed turn's kept text: the reply's rows, dim
+        Ev::Kept(t) => crate::livetext::kept_rows(t, 0, width),
         // an image marker is an accent chip `▣ login.png` (book §14)
         Ev::You(t, mark, open, _) => user_block_lines(t, *mark, *open, width),
         Ev::MarkYou { .. } | Ev::YouId(_) => vec![],

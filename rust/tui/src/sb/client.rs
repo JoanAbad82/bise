@@ -132,6 +132,7 @@ pub(super) fn new_sb(writer: std::sync::Arc<std::sync::Mutex<UnixStream>>, works
         drop_ask: None,
         activity: Default::default(),
         seen: Default::default(),
+        lives: Default::default(),
         subscribed: Default::default(),
         turns_seen: HashMap::new(),
         ready_page: None,
