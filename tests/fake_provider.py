@@ -381,12 +381,19 @@ def reply_for(conv, seen=0):
         turn["text"] = json.dumps({"contained": not risky, "serves_task": True, "secrets": False})
         return turn
     if agent_of(conv) == "(route pick)":
-        # `[[route: N]]` in his words: the N-th project listed; else none
+        # `[[route: N]]` in his words: the N-th project listed; `[[route: <name>]]`: the listed
+        # project whose name starts with it (qa-native m_18165: 'shop' every time, whatever the
+        # order); else none
         text = " ".join(m["text"] for m in conv if m["role"] == "user")
-        n = re.search(r"\[\[route: (\d+)\]\]", text)
-        names = re.findall(r"project: ([^\n]+)", text.replace("\\n", "\n"))
-        k = int(n.group(1)) - 1 if n else -1
-        turn["text"] = names[k].strip() if 0 <= k < len(names) else "none"
+        n = re.search(r"\[\[route: ([^\]]+)\]\]", text)
+        names = [x.strip() for x in re.findall(r"project: ([^\n]+)", text.replace("\\n", "\n"))]
+        want = n.group(1).strip() if n else ""
+        if want.isdigit():
+            k = int(want) - 1
+            turn["text"] = names[k] if 0 <= k < len(names) else "none"
+        else:
+            hit = [x for x in names if want and x.startswith(want)]
+            turn["text"] = hit[0] if hit else "none"
         return turn
     idx = last_user(conv)
     if idx is None:
