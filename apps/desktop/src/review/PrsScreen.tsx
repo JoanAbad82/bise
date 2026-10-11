@@ -3,7 +3,7 @@
 // failing and which ones, review); a click opens it in his browser. Empty,
 // the hub's own words ('no open PR. in PR flow…'). Owner: amb-win.
 import { useEffect } from 'react';
-import { Dot, Empty, Head, Skel } from '@/ds';
+import { Dot, Head, Empty, Press, Skel } from '@/ds';
 import { usePrs, useStore } from '@/store';
 import type { Pr } from '@/proto';
 import { agentsOf, toneOf, wordsOf, type PrTone } from './prs';
@@ -45,7 +45,7 @@ function PrRow({ p }: { p: Pr }) {
     void (window as Partial<Window>).bise?.openExternal(p.url);
   };
   return (
-    <button type="button" className={`pr-row pr-${tone}`} data-testid={`prs.row.${String(p.number)}`} data-tone={tone} title={p.url} onClick={open}>
+    <Press look={`pr-row pr-${tone}`} data-testid={`prs.row.${String(p.number)}`} data-tone={tone} title={p.url} onClick={open}>
       <span className="pr-dot">{dot !== undefined ? <Dot state={dot} /> : <span className="pr-rest">○</span>}</span>
       <span className="pr-num">#{p.number}</span>
       <span className="pr-main">
@@ -55,6 +55,6 @@ function PrRow({ p }: { p: Pr }) {
       <span className="pr-words" data-testid={`prs.words.${String(p.number)}`}>
         {wordsOf(p)}
       </span>
-    </button>
+    </Press>
   );
 }

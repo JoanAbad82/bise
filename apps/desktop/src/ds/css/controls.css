@@ -1,6 +1,15 @@
 /* src/ds · the controls of controls.tsx (designer's raw-controls call m_18343): IconButton, Act,
    TextArea, Sheet, Select, and Row as a real button. Roles only (--c-*, --t-*, --r-*, --e-*). */
 
+/* Press: a real button that keeps a signed row's look: the native frame reset, the ds focus ring;
+   the screen's look class (loaded after the ds) draws the rest */
+/* :where() keeps the reset at zero specificity: any look class wins, wherever its css loads */
+:where(.b-press){margin:0;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:inherit;cursor:default}
+:where(.b-press):focus-visible{outline:2px solid var(--c-focus);outline-offset:1px}
+
+/* Input: an input in a frame a screen drew; the frame's own rules style it */
+:where(.b-input){font:inherit;color:inherit}
+
 /* IconButton: 28×28 (24 in bars), r-2, the glyph text-2, a 6% tint on hover, the ds focus ring */
 .b-ibtn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:28px;height:28px;padding:0;border:0;border-radius:var(--r-2);background:none;color:var(--c-text-2);font:var(--t-14)/1 var(--font-ui);cursor:default;transition:background var(--d-fast) var(--ease-out),color var(--d-fast) var(--ease-out)}
 .b-ibtn.bar{width:24px;height:24px;font-size:var(--t-13)}

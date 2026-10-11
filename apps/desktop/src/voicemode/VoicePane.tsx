@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from
 import { LivePearl } from '@/pearl';
 import { buttonsOf, failedPairs, failOf, keyAct, labelOf, pairsOf, poseOf, spaceHeld, spaceUp, trimPairs, wordsOf, HOLD_MS, KEY_TRIMS, type Act, type VoiceState } from './model';
 import './voicemode.css';
+import { Press } from '@/ds';
 
 export interface VoicePaneProps {
   state: VoiceState;
@@ -149,9 +150,9 @@ export function VoicePane({ state, agent, heard, fail, model = '', speaking = fa
         </p>
         <span className="vm-btns">
           {buttonsOf(state, failed).map((p) => (
-            <button
+            <Press
+              look="vm-btn"
               key={p.act}
-              type="button"
               tabIndex={-1}
               onMouseDown={(e) => {
                 e.preventDefault(); // the bar keeps focus (space and m)
@@ -163,15 +164,15 @@ export function VoicePane({ state, agent, heard, fail, model = '', speaking = fa
             >
               {p.words}
               {p.key !== '' && <kbd>{p.key}</kbd>}
-            </button>
+            </Press>
           ))}
         </span>
       </div>
       <div ref={keysRef} className="vm-keys" data-testid="voice.keys" data-trim={trim}>
         {keys.map((p) => (
-          <button
+          <Press
+            look="vm-key"
             key={p.act}
-            type="button"
             tabIndex={-1}
             onMouseDown={(e) => {
               e.preventDefault();
@@ -182,7 +183,7 @@ export function VoicePane({ state, agent, heard, fail, model = '', speaking = fa
             data-testid={`voice.key.${p.act}`}
           >
             <kbd>{p.key}</kbd> {p.words}
-          </button>
+          </Press>
         ))}
       </div>
     </section>

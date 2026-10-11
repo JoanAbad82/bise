@@ -13,6 +13,7 @@ import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, u
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { keep } from '@/app/keep';
 import './thread.css';
+import { Press } from '@/ds';
 
 // no extra parts (Virtuoso reads its `components` object: never undefined)
 const NONE = {};
@@ -374,9 +375,9 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
       />
       {tail}
       {!atBottom && !stuck && (
-        <button type="button" className="th-to-end" onClick={toEnd} data-testid="thread.to-end">
+        <Press look="th-to-end" onClick={toEnd} data-testid="thread.to-end">
           ↓ back to the bottom{seen.unseen > 0 ? ` · ${String(seen.unseen)} new` : ''}
-        </button>
+        </Press>
       )}
     </div>
   );

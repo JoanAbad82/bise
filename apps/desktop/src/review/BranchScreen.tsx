@@ -3,7 +3,7 @@
 // diffed yet: the hub's typed diff takes {project, agent, commit?}, no branch (a gap for amb-feed),
 // so the screen says so in place, with the changes screen's link. Owner: amb-win.
 import { useEffect } from 'react';
-import { Empty, Head } from '@/ds';
+import { Head, Empty, Press } from '@/ds';
 import { useStore, useWorktrees } from '@/store';
 import { useRouter } from '@/app/router';
 import { ReviewScreen } from './ReviewScreen';
@@ -31,9 +31,9 @@ export function BranchScreen({ project, branch }: { project: string; branch: str
         <Empty title="no agent works on this branch">
           <span data-testid="branch.none">
             its diff needs an agent on it for now.{' '}
-            <button type="button" className="rv-link" onClick={() => { router.go({ screen: 'changes', project }); }} data-testid="branch.changes">
+            <Press look="rv-link" onClick={() => { router.go({ screen: 'changes', project }); }} data-testid="branch.changes">
               see the changes
-            </button>
+            </Press>
           </span>
         </Empty>
       </div>

@@ -12,6 +12,7 @@ import { dragHeight, shellTakes, shortPath, writesOf } from './model';
 import { panel, usePanel } from './panel';
 import { useProjects } from '@/store';
 import './terminal.css';
+import { Press } from '@/ds';
 
 /** The panel for the project in view; nothing until it was first shown. */
 export const TerminalPanel = memo(function TerminalPanel({ project }: { project: string | undefined }) {
@@ -32,16 +33,15 @@ export const TerminalPanel = memo(function TerminalPanel({ project }: { project:
       <Grip box={box} />
       <div className="term-head" data-testid="terminal.head">
         <span>terminal · {shortPath(folder, (window as { bise?: { home?: string } }).bise?.home || undefined)}</span>
-        <button
-          type="button"
-          className="term-hide"
+        <Press
+          look="term-hide"
           onClick={() => {
             panel.hide();
           }}
           data-testid="terminal.hide"
         >
           ⌃` hide
-        </button>
+        </Press>
       </div>
       {/* one shell view per project: another project's shell runs on in main */}
       <ShellView key={project} project={project} shown={p.shown} />
@@ -197,16 +197,15 @@ function ShellView({ project, shown }: { project: string; shown: boolean }) {
       {life.s === 'ended' && (
         <p className="term-line" data-testid="terminal.ended">
           the shell ended{life.code !== null ? ` (${String(life.code)})` : ''} ·{' '}
-          <button
-            type="button"
-            className="term-again"
+          <Press
+            look="term-again"
             data-testid="terminal.restart"
             onClick={() => {
               live.current?.restart();
             }}
           >
             start a new one
-          </button>
+          </Press>
         </p>
       )}
     </div>

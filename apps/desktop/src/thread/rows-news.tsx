@@ -2,7 +2,7 @@
 // notices, a task's brief, a handoff, a message not delivered. Owner: amb-win.
 // Split out of rows.tsx (pure move).
 import { useState, type ReactNode } from 'react';
-import { Button, Fold, Marker } from '@/ds';
+import { Button, Fold, Marker, Press } from '@/ds';
 import type { Entry } from '@/proto';
 import { useAgents, useStore } from '@/store';
 import { useFold } from './folds';
@@ -31,16 +31,15 @@ export function LandedRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   return (
     <NewsLine mark="✓" tone="ok" testId={`thread.landed.${e.pos}`}>
       {l.agent} landed on {l.target} ·{' '}
-      <button
-        type="button"
-        className="th-news-link"
+      <Press
+        look="th-news-link"
         onClick={() => {
           router.go({ screen: 'commit', project: ctx.project, sha: l.sha });
         }}
         data-testid={`thread.landed.${e.pos}.sha`}
       >
         {l.sha.slice(0, 7)}
-      </button>
+      </Press>
       {e.text !== '' ? ` · ${e.text}` : ''}
     </NewsLine>
   );
@@ -53,16 +52,15 @@ export function PrRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const [mark, tone] = p.state === 'failing' ? (['▲', 'err'] as const) : p.state === 'done' ? (['✓', 'dim'] as const) : (['•', 'plain'] as const);
   return (
     <NewsLine mark={mark} tone={tone} testId={`thread.pr.${e.pos}`}>
-      <button
-        type="button"
-        className="th-news-link"
+      <Press
+        look="th-news-link"
         onClick={() => {
           ctx.onLink(p.url);
         }}
         data-testid={`thread.pr.${e.pos}.link`}
       >
         PR #{p.number}
-      </button>{' '}
+      </Press>{' '}
       · {p.text}
     </NewsLine>
   );
@@ -89,10 +87,10 @@ export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 /** An artifact or a page as one line (designer m_12065 (2)): '↗ product page, before / after   page · v2', 1 px line, r 9, fit-content, no thumbnail box. */
 export function ArtChip({ title, meta, onOpen, testId }: { title: string; meta: string; onOpen: () => void; testId: string }) {
   return (
-    <button type="button" className="th-art" onClick={onOpen} data-testid={testId}>
+    <Press look="th-art" onClick={onOpen} data-testid={testId}>
       <span className="th-art-title">↗ {title}</span>
       {meta !== '' && <span className="th-art-meta">{meta}</span>}
-    </button>
+    </Press>
   );
 }
 
@@ -115,9 +113,8 @@ export function ScheduledRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
         <span className="th-sched-head">{schedHead(head, ctx.agent === 'main' ? null : ctx.agent)}</span>
       ) : (
         // its words open on a click, with no chevron (designer N2: '◷ main scheduled dashboards · every 30m · next 16:56')
-        <button
-          type="button"
-          className="th-sched-head"
+        <Press
+          look="th-sched-head"
           aria-expanded={open}
           onClick={() => {
             setOpen((o) => !o);
@@ -125,7 +122,7 @@ export function ScheduledRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
           data-testid={`thread.scheduled.${e.pos}.head`}
         >
           {schedHead(head, ctx.agent === 'main' ? null : ctx.agent)}
-        </button>
+        </Press>
       )}
       {open && words !== '' && (
         <div className="th-sched-words" data-testid={`thread.scheduled.${e.pos}.words`}>
@@ -226,9 +223,8 @@ export function BriefRow({ pos, name, objective, body, ctx }: { pos: number; nam
   const [open, setOpen] = useFold(false, pos);
   return (
     <div className="th-brief" data-open={open || undefined} data-testid={`thread.brief.${String(pos)}`}>
-      <button
-        type="button"
-        className="th-brief-line"
+      <Press
+        look="th-brief-line"
         aria-expanded={open}
         onClick={() => {
           setOpen((o) => !o);
@@ -241,7 +237,7 @@ export function BriefRow({ pos, name, objective, body, ctx }: { pos: number; nam
           bise started {name}
           {objective !== '' && ` · ${objective}`}
         </span>
-      </button>
+      </Press>
       {open && (
         <div className="th-brief-body" data-testid={`thread.brief.${String(pos)}.body`}>
           <Markdown text={body} onLink={ctx.onLink} onPath={ctx.onPath} />
@@ -257,9 +253,8 @@ function HandoffRow({ pos, to, brief, ctx }: { pos: number; to: string; brief: s
   const a = useAgents(ctx.project).find((x) => x.name === to);
   const role = a !== undefined && a.purpose !== '' ? a.purpose : brief;
   return (
-    <button
-      type="button"
-      className="th-handoff"
+    <Press
+      look="th-handoff"
       onClick={() => {
         router.go({ screen: 'thread', project: ctx.project, agent: to });
       }}
@@ -267,7 +262,7 @@ function HandoffRow({ pos, to, brief, ctx }: { pos: number; to: string; brief: s
     >
       → {to}
       {role !== '' && <span className="th-handoff-role"> · {role}</span>}
-    </button>
+    </Press>
   );
 }
 

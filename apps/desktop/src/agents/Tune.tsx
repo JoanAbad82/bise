@@ -6,7 +6,7 @@
 // words here, a change shows when the next agents event comes. And the
 // '+ new agent' sheet (A.1). Owner: amb-win.
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Button } from '@/ds';
+import { Button, Check, Input, Press, TextArea } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAgents, useCoreEvent, useModels, useStore, useWorktrees, type Ev } from '@/store';
 import { defaultWords, EFFORTS, effortsFor, hasChanges, modelGroups, modelOf, nameProblem, newAgent, renameAgent, setEffort } from './actions';
@@ -135,7 +135,7 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
       {!a.main && (
         <label className="ag-field">
           <span>name</span>
-          <input
+          <Input
             value={name}
             onChange={(e) => {
               setName(e.target.value);
@@ -167,12 +167,11 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
               {g.rows.map((m) => {
                 const on = m.id === current;
                 return (
-                  <button
+                  <Press
                     key={m.id}
-                    type="button"
                     role="option"
                     aria-selected={on}
-                    className={on ? 'ag-model on' : 'ag-model'}
+                    look={on ? 'ag-model on' : 'ag-model'}
                     onClick={() => {
                       pick(m.id);
                     }}
@@ -183,7 +182,7 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
                     {/* the catalog's own words, as they come (never rebuilt here) */}
                     <span className="ag-model-short">{m.short}</span>
                     {defaultWords(m) !== '' && <span className="ag-model-def">{defaultWords(m)}</span>}
-                  </button>
+                  </Press>
                 );
               })}
             </div>
@@ -192,7 +191,7 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
       </div>
       <label className="ag-field">
         <span>or an id</span>
-        <input
+        <Input
           value={model}
           placeholder="provider/model"
           onChange={(e) => {
@@ -221,12 +220,11 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
       <div className="ag-field" role="radiogroup" aria-label="reasoning effort">
         <span>reasoning</span>
         {efforts.map((e) => (
-          <button
+          <Press
             key={e}
-            type="button"
             role="radio"
             aria-checked={a.effort === e}
-            className={a.effort === e ? 'ag-seg on' : 'ag-seg'}
+            look={a.effort === e ? 'ag-seg on' : 'ag-seg'}
             title={hintOf(e)}
             onClick={() => {
               refusal.clear();
@@ -235,7 +233,7 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
             data-testid={`agents.effort.${id}.${e}`}
           >
             {e}
-          </button>
+          </Press>
         ))}
         {efforts.length === 0 && (
           <em className="ag-why" data-testid={`agents.effort.${id}.none`}>
@@ -286,8 +284,7 @@ export function NewAgentSheet({ project, onDone }: { project: string; onDone: ()
   if (sent && refusal.text === undefined && sentName !== '' && agents.some((a) => a.name === sentName)) onDone();
   return (
     <div className="ag-sheet" data-testid="agents.newsheet">
-      <textarea
-        className="ag-brief"
+      <TextArea
         autoFocus
         rows={3}
         placeholder="what should it do?"
@@ -304,12 +301,12 @@ export function NewAgentSheet({ project, onDone }: { project: string; onDone: ()
             cancel();
           }
         }}
-        data-testid="agents.new.brief"
+        testId="agents.new.brief"
       />
       <div className="ag-sheet-row">
         <label className="ag-field">
           <span>name</span>
-          <input
+          <Input
             value={name}
             placeholder="bise names it"
             onChange={(e) => {
@@ -320,29 +317,15 @@ export function NewAgentSheet({ project, onDone }: { project: string; onDone: ()
           />
           {problem !== undefined && <em className="ag-why">{problem}</em>}
         </label>
-        <label className="ag-check">
-          <input
-            type="checkbox"
-            checked={worktree}
-            onChange={(e) => {
-              setWorktree(e.target.checked);
-            }}
-            data-testid="agents.new.worktree"
-          />
+        <span className="ag-check">
+          <Check on={worktree} onChange={setWorktree} label="its own worktree" testId="agents.new.worktree" />
           its own worktree
-        </label>
+        </span>
         {changes && worktree && (
-          <label className="ag-check">
-            <input
-              type="checkbox"
-              checked={withChanges}
-              onChange={(e) => {
-                setWithChanges(e.target.checked);
-              }}
-              data-testid="agents.new.changes"
-            />
+          <span className="ag-check">
+            <Check on={withChanges} onChange={setWithChanges} label="with my changes" testId="agents.new.changes" />
             with my changes
-          </label>
+          </span>
         )}
       </div>
       <div className="ag-acts">

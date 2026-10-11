@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useAllScheduled } from './hooks';
 import { ahead, asks, bySoonest, howOften, keyOf } from './model';
 import './scheduled.css';
+import { Press } from '@/ds';
 
 export function ScheduledHere({ project, onOpen, testId = 'scheduled.here' }: { project: string; onOpen: () => void; testId?: string }) {
   const tasks = bySoonest(useAllScheduled(project));
@@ -16,7 +17,7 @@ export function ScheduledHere({ project, onOpen, testId = 'scheduled.here' }: { 
     <section className="sch-here" data-testid={testId} aria-label="scheduled here">
       <div className="sch-here-h">scheduled here</div>
       {tasks.map((x) => (
-        <button key={keyOf(x)} type="button" className="sch-here-row" onClick={onOpen} data-testid={`${testId}.row.${String(x.t.id)}`}>
+        <Press key={keyOf(x)} look="sch-here-row" onClick={onOpen} data-testid={`${testId}.row.${String(x.t.id)}`}>
           <span className="sch-here-g" aria-hidden="true">◷</span>
           <span className="sch-here-two">
             <span className="sch-here-t" title={x.t.words}>{asks(x.t)}</span>
@@ -24,7 +25,7 @@ export function ScheduledHere({ project, onOpen, testId = 'scheduled.here' }: { 
               {`${x.t.agent} · ${howOften(x.t)}${typeof x.t.next_ms === 'number' ? ` · ${ahead(x.t.next_ms, now)}` : ''}`}
             </span>
           </span>
-        </button>
+        </Press>
       ))}
     </section>
   );

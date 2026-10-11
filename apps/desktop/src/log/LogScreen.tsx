@@ -18,7 +18,7 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 import type { LogItem } from "@/proto";
-import { Head } from "@/ds";
+import { Head, Input, Press } from "@/ds";
 import { useCoreEvent, useStore } from "@/store";
 import type { Ev } from "@/store/store";
 import { useRouter } from "@/app/router";
@@ -394,10 +394,9 @@ export function LogScreen({
       {filtering && (
         <div className="lg-filter" data-testid="log.filter">
           {kinds.map((k) => (
-            <button
-              type="button"
+            <Press
               key={k}
-              className={`lg-chip k-${k}${hidden.has(k) ? " off" : ""}`}
+              look={`lg-chip k-${k}${hidden.has(k) ? " off" : ""}`}
               data-testid={`log.filter.${k}`}
               aria-pressed={!hidden.has(k)}
               onClick={() => {
@@ -410,7 +409,7 @@ export function LogScreen({
               }}
             >
               {k}
-            </button>
+            </Press>
           ))}
         </div>
       )}
@@ -454,7 +453,7 @@ export function LogScreen({
         {finding ? (
           <span className="lg-find">
             <span className="w">find</span>
-            <input
+            <Input
               ref={field}
               data-testid="log.find"
               value={needle}
@@ -642,9 +641,8 @@ function Entry({
             {it.body.cut === true && <div className="meta">cut at 4 KB</div>}
           </div>
         ) : (
-          <button
-            type="button"
-            className="lg-fold"
+          <Press
+            look="lg-fold"
             data-testid={`${id}.fold`}
             onClick={() => {
               onPick(key);
@@ -652,7 +650,7 @@ function Entry({
             }}
           >
             {foldLabel(it)}
-          </button>
+          </Press>
         ))}
     </div>
   );
@@ -674,16 +672,15 @@ function Edit({ it, diff, id }: { it: LogItem; diff: EditDiff; id: string }) {
       {args ? (
         <Body it={it} />
       ) : (
-        <button
-          type="button"
-          className="lg-fold args"
+        <Press
+          look="lg-fold args"
           data-testid={`${id}.args`}
           onClick={() => {
             setArgs(true);
           }}
         >
           ▸ args
-        </button>
+        </Press>
       )}
     </>
   );

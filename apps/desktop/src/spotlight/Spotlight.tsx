@@ -1,5 +1,5 @@
 // The spotlight (fn space; bar ⛔1s, his bugs 7, 6 and 2): amb-kit's Spot frame, an uncontrolled
-// <input> the app never writes while he types (only a send clears it), the list under it as
+// <Input> the app never writes while he types (only a send clears it), the list under it as
 // memo'd rows keyed by id (a keystroke updates the rows that changed, the input and the other rows
 // stay the same nodes), the live pearl mounted once. bise's answer shows under the input at a
 // readable size; the panel grows with it (onHeight tells the window), and past ANSWER_MAX_LINES it
@@ -15,7 +15,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { Spot, SpotGroup, SpotRow, type DotState } from "@/ds";
+import { type DotState, Input, Press, Spot, SpotGroup, SpotRow } from "@/ds";
 import { cx } from "@/ds/cx";
 import { LivePearl, type Mood } from "@/pearl";
 import {
@@ -336,14 +336,13 @@ export function RouteLine({
     <div className="b-spot-route" data-testid={testId} data-left={left}>
       <span className="to">{W.routeTo(route.name, left)}</span>
       {onKeep !== undefined && (
-        <button
-          type="button"
-          className="keep"
+        <Press
+          look="keep"
           onClick={onKeep}
           data-testid={`${testId}.keep`}
         >
           {W.keepWithBise}
-        </button>
+        </Press>
       )}
     </div>
   );
@@ -591,7 +590,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
                 ))}
               </span>
             )}
-            <input
+            <Input
               ref={input}
               type="text"
               placeholder={W.ph}

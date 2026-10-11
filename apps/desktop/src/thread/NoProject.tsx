@@ -2,7 +2,7 @@
 // m_12093): its pearl, 'bise is here.', what a project gives, 'add a project ⌘N', and from the
 // first-run text only its demo, as a quiet button. The composer stays under it: bise answers
 // without a project too. Owner: amb-win.
-import { Button } from '@/ds';
+import { Button, Press } from '@/ds';
 import { BisePearl } from '@/app/BisePearl';
 import { DEMO } from '@/setup';
 import { useRouter } from '@/app/router';
@@ -20,16 +20,15 @@ export function NoProject({ onDemo }: { onDemo: (text: string) => void }) {
         <Button kind="pri" onClick={() => { router.go({ screen: 'settings', page: 'projects' }); }} testId="thread.noproject.add">
           add a project <kbd>⌘N</kbd>
         </Button>
-        <button
-          type="button"
-          className="th-noproj-demo"
+        <Press
+          look="th-noproj-demo"
           // keep the composer's focus and selection: the click must not blur it first
           onMouseDown={(e) => { e.preventDefault(); }}
           onClick={() => { onDemo(DEMO); }}
           data-testid="thread.noproject.demo"
         >
           {DEMO}
-        </button>
+        </Press>
       </div>
     </div>
   );

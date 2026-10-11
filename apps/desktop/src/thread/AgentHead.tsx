@@ -13,6 +13,7 @@ import { useRouter } from '@/app/router';
 import { BisePearl } from '@/app/BisePearl';
 import { biseChip, branchLine, dropsFor, roleOf, stateChip, usageLine, type StateChip } from './head';
 import { waitingFor, waitsEvent } from './wake';
+import { Press } from '@/ds';
 
 /** an agent whose wheel he took waits for him, like any agent that asks him */
 const HELD: StateChip = { text: '? waiting for you', needs: true, live: false };
@@ -97,13 +98,13 @@ export function AgentHead({ project, a, more, note, starting = false }: { projec
       )}
       <span className="ah-end">
         {branch !== '' && (
-          <button type="button" className={drop >= 2 ? 'ah-quiet ah-gone' : 'ah-quiet'} onClick={review} data-testid="thread.head.branch" title="its changes" tabIndex={drop >= 2 ? -1 : undefined} aria-hidden={drop >= 2 || undefined}>
+          <Press look={drop >= 2 ? 'ah-quiet ah-gone' : 'ah-quiet'} onClick={review} data-testid="thread.head.branch" title="its changes" tabIndex={drop >= 2 ? -1 : undefined} aria-hidden={drop >= 2 || undefined}>
             {branch}
-          </button>
+          </Press>
         )}
-        <button type="button" className="ah-btn" onClick={review} data-testid="thread.head.changes">
+        <Press look="ah-btn" onClick={review} data-testid="thread.head.changes">
           changes <kbd>⌘D</kbd>
-        </button>
+        </Press>
         {more}
       </span>
     </div>
@@ -123,16 +124,15 @@ export function BiseHead({ project, name, more }: { project: string; name: strin
           bise<span className="ah-project"> · {name}</span>
         </b>
       </span>
-      <button
-        type="button"
-        className="ah-chip-btn"
+      <Press
+        look="ah-chip-btn"
         onClick={() => {
           router.go({ screen: 'agents', project });
         }}
         data-testid="thread.agents"
       >
         <Chip chip={biseChip(agents)} testId="thread.head.state" />
-      </button>
+      </Press>
       <span className="ah-end">{more}</span>
     </div>
   );

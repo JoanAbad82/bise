@@ -4,36 +4,13 @@
 
 /** bare controls per file (path under src/) */
 export const PENDING_RAW: Readonly<Record<string, number>> = {
-  'agents/Tune.tsx': 8,
-  'app/Palette.tsx': 3,
-  'artifacts/List.tsx': 1,
-  'artifacts/Screen.tsx': 2,
-  'capsule/Capsule.tsx': 1,
-  'composer/Composer.tsx': 2,
   'inbox/Block.tsx': 4,
   'inbox/Inbox.tsx': 2,
   'inbox/InboxCard.tsx': 1,
   'inbox/Strip.tsx': 2,
   'inbox/confirm.tsx': 3,
-  'log/LogScreen.tsx': 4,
-  'quote/QuotePop.tsx': 3,
-  'review/BranchScreen.tsx': 1,
-  'review/PrsScreen.tsx': 1,
-  'scheduled/Here.tsx': 1,
   'settings/roles.tsx': 1,
   'setup/FirstRun.tsx': 1,
-  'spotlight/Spotlight.tsx': 3,
-  'terminal/Terminal.tsx': 2,
-  'thread/AgentHead.tsx': 3,
-  'thread/ComputerLine.tsx': 5,
-  'thread/Markdown.tsx': 1,
-  'thread/NoProject.tsx': 1,
-  'thread/ThreadList.tsx': 1,
-  'thread/ThreadScreen.tsx': 1,
-  'thread/rows-cards.tsx': 1,
-  'thread/rows-messages.tsx': 7,
-  'thread/rows-news.tsx': 6,
-  'voicemode/VoicePane.tsx': 2,
 };
 
 /** classes a .tsx names that no .css has a rule for (some are test hooks: they become data-testid) */

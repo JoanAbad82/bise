@@ -7,8 +7,41 @@
 // Pure renders of their props, like every ds component (index.ts's rules); css/controls.css.
 import * as Dialog from "@radix-ui/react-dialog";
 import * as RSelect from "@radix-ui/react-select";
-import type { KeyboardEvent, MouseEventHandler, ReactNode, Ref, TextareaHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent, MouseEventHandler, ReactNode, Ref, TextareaHTMLAttributes } from "react";
 import { cx, st, type UiState } from "./cx";
+
+export interface PressProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className" | "type"> {
+  /** the row's own signed look (a class with its rule in the screen's css: the ds lint checks it) */
+  look: string;
+  ref?: Ref<HTMLButtonElement>;
+}
+/**
+ * a real button that keeps a signed row's own look (the thread's part chips, the landed sha, the
+ * brief line…): the ds resets the native button (no frame, no fill, the line's font and color) and
+ * gives it the ds focus ring; the look class draws the rest. For a control nobody drew, use Button,
+ * IconButton, Act or Chip instead (designer m_18343 / amb-win m_18625).
+ */
+export function Press({ look, ref, children, ...button }: PressProps) {
+  return (
+    <button ref={ref} type="button" className={cx("b-press", look)} {...button}>
+      {children}
+    </button>
+  );
+}
+
+export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "className"> {
+  /** the field's own signed look, when its frame isn't the ds Field's (the palette's, the spotlight's) */
+  look?: string;
+  ref?: Ref<HTMLInputElement>;
+}
+/**
+ * an <input> inside a frame a screen drew and designer signed (the palette's query, the spotlight's
+ * line, the log's find, an agent's inline rename): the line's font and color, the frame's look.
+ * Anywhere else, use Field (one line) or TextArea (several).
+ */
+export function Input({ look, ref, ...input }: InputProps) {
+  return <input ref={ref} className={cx("b-input", look)} {...input} />;
+}
 
 export interface IconButtonProps {
   /** what it does, in words: its aria-label and its tooltip (with `keys` after it) */

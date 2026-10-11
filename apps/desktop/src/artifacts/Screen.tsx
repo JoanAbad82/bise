@@ -3,7 +3,7 @@
 // agents, kinds, words), the rows by day, the keys line. ⏎ opens one in the window
 // (artifacts/<p>/<id>). Owner: amb-kit.
 import { useState, type KeyboardEvent } from 'react';
-import { Button, Field, Menu, MenuItem } from '@/ds';
+import { Button, Field, Menu, MenuItem, Press } from '@/ds';
 import { useProjects } from '@/store';
 import { useRouter } from '@/app/router';
 import { useAllArtifacts } from './hooks';
@@ -85,10 +85,10 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
         </span>
         <span className="art-kinds">
           {KIND_FILTERS.map((k) => (
-            <button key={k.id} type="button" className={`art-kind${f.kinds.includes(k.id) ? ' on' : ''}`} aria-pressed={f.kinds.includes(k.id)}
+            <Press key={k.id} look={`art-kind${f.kinds.includes(k.id) ? ' on' : ''}`} aria-pressed={f.kinds.includes(k.id)}
               onClick={() => { toggleKind(k.id); }} data-testid={`artifacts.kind.${k.id}`}>
               {k.label}
-            </button>
+            </Press>
           ))}
         </span>
         <span className="art-search">
@@ -106,9 +106,9 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
           onPut={(it) => { put(it.project, it.a); }} form="screen" testId="artifacts.list" />
       )}
       {!archivedOn && archived.length > 0 && (
-        <button type="button" className="art-archived" onClick={() => { setArchivedOn(true); setSel(null); }} data-testid="artifacts.archived">
+        <Press look="art-archived" onClick={() => { setArchivedOn(true); setSel(null); }} data-testid="artifacts.archived">
           {archived.length} archived
-        </button>
+        </Press>
       )}
       <div className="art-keys" data-testid="artifacts.keys">
         <span><b>⏎</b> open</span>

@@ -2,7 +2,7 @@
 // image chips, and one agent's message to another. Owner: amb-win. Split out of
 // rows.tsx (pure move).
 import { useState, type ReactNode } from 'react';
-import { Answered, Marker, Msg } from '@/ds';
+import { Answered, Marker, Msg, Press } from '@/ds';
 import { openInbox } from '@/inbox/Block';
 import type { Entry } from '@/proto';
 import { useEntry, useThreadOrder } from '@/store';
@@ -261,16 +261,15 @@ export function CardRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   // b (his card #476, designer m_15612): the inbox block is the one place to answer; the thread says
   // one dim line that points there, never a second copy with its options. A click opens it there.
   return (
-    <button
-      type="button"
-      className="th-card-line"
+    <Press
+      look="th-card-line"
       data-testid={`thread.card.${String(c.id)}`}
       onClick={() => {
         openInbox({ project: ctx.project, card: c.id });
       }}
     >
       <CardLineWords text={cardLine(shownName(ctx.agent), c.question, follows)} />
-    </button>
+    </Press>
   );
 }
 

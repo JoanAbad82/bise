@@ -16,6 +16,7 @@ import { pathOf } from './paths';
 import { Code, PlainCode, known } from './Code';
 import { fade, type FadeOpts } from './fade';
 import { streamView } from './stream';
+import { Press } from '@/ds';
 
 /** A link he may open from an answer: http, https or mailto. */
 export function openable(href: string | undefined): href is string {
@@ -130,16 +131,15 @@ export const Markdown = memo(function Markdown({
         <div className={boxIn ? 'th-code th-in' : 'th-code'}>
           <div className="th-code-head">
             <span className="th-code-lang b-md-lang">{lang ?? ''}</span>
-            <button
-              type="button"
-              className="th-code-copy"
+            <Press
+              look="th-code-copy"
               onClick={() => {
                 void (window as Partial<Window>).bise?.copy(text);
               }}
               data-testid="thread.code.copy"
             >
               copy
-            </button>
+            </Press>
           </div>
           <pre className="th-pre">{known(lang) ? <Code text={text} lang={lang} from={fresh} /> : fresh !== undefined ? <PlainCode text={text} from={fresh} /> : children}</pre>
         </div>

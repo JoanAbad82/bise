@@ -12,6 +12,7 @@ import type { ComputerAgent } from '@/proto';
 import { useComputerLive, usePeek, useStore } from '@/store';
 import { useNow } from '@/app/clock';
 import { ago } from '@/agents/model';
+import { Press } from '@/ds';
 
 export type ComputerState = ComputerAgent['kind'];
 
@@ -75,9 +76,8 @@ function Line({ row }: { row: ComputerAgent }) {
   return (
     <div className="th-cu" data-state={state} data-testid="thread.computer">
       <div className="th-cu-line">
-        <button
-          type="button"
-          className="th-cu-words"
+        <Press
+          look="th-cu-words"
           aria-expanded={open}
           onClick={() => {
             setOpen((o) => !o);
@@ -86,21 +86,21 @@ function Line({ row }: { row: ComputerAgent }) {
           title="see what it drives"
         >
           {computerWords(row, now)}
-        </button>
+        </Press>
         {state === 'driving' && (
           <>
-            <button type="button" className="th-cu-act" onClick={act('take')} data-testid="thread.computer.take">
+            <Press look="th-cu-act" onClick={act('take')} data-testid="thread.computer.take">
               take the wheel
-            </button>
-            <button type="button" className="th-cu-act" onClick={act('stop')} data-testid="thread.computer.stop">
+            </Press>
+            <Press look="th-cu-act" onClick={act('stop')} data-testid="thread.computer.stop">
               stop
-            </button>
+            </Press>
           </>
         )}
         {state === 'paused' && (
-          <button type="button" className="th-cu-act" onClick={act('hand_back')} data-testid="thread.computer.back">
+          <Press look="th-cu-act" onClick={act('hand_back')} data-testid="thread.computer.back">
             give it back <kbd className="th-cu-key">⏎</kbd>
-          </button>
+          </Press>
         )}
       </div>
       {open && <Peek rowKey={row.key} onClose={() => { setOpen(false); }} />}
@@ -120,7 +120,7 @@ function Peek({ rowKey, onClose }: { rowKey: string; onClose: () => void }) {
   if (shot !== seen.shot) setSeen({ shot, at: shot === null ? null : now });
   const at = seen.at;
   return (
-    <button type="button" className="th-cu-peek" onClick={onClose} data-testid="thread.computer.peek" aria-label="close the still">
+    <Press look="th-cu-peek" onClick={onClose} data-testid="thread.computer.peek" aria-label="close the still">
       {shot !== null ? (
         <>
           <img src={`data:${shot.mime};base64,${shot.data}`} width={shot.width} height={shot.height} alt="what it drives now" />
@@ -129,6 +129,6 @@ function Peek({ rowKey, onClose }: { rowKey: string; onClose: () => void }) {
       ) : (
         <span className="th-cu-none">{peek === null ? 'looking…' : why === 'too_soon' ? 'looking…' : 'nothing to show'}</span>
       )}
-    </button>
+    </Press>
   );
 }

@@ -10,7 +10,7 @@ import {
   type JSX,
   type ReactNode,
 } from "react";
-import { Menu, MenuItem, MenuSep } from "@/ds";
+import { Menu, MenuItem, MenuSep, Press } from "@/ds";
 import { LivePearl, type Mood } from "@/pearl";
 import {
   LiveText,
@@ -230,14 +230,13 @@ function Answer({
         />
       </div>
       {a?.cut === true && (
-        <button
-          type="button"
-          className="more"
+        <Press
+          look="more"
           onClick={onOpen}
           data-testid="capsule.answer.more"
         >
           {W.restInBise}
-        </button>
+        </Press>
       )}
     </div>
   );

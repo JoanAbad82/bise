@@ -8,6 +8,7 @@
 // must shrink, '⌘C copy' goes first, then 'tab quote'. Owner: amb-web.
 import type { MouseEvent, ReactNode } from 'react';
 import './quote.css';
+import { Press } from '@/ds';
 
 /** The words (one place, so the thread's pop and the review's read the same). */
 export const QW = {
@@ -32,17 +33,17 @@ const keep = (e: MouseEvent): void => {
 export function QuotePop({ to, onAsk, onCopy, testId }: QuotePopProps): ReactNode {
   return (
     <span className="q-pop" data-testid={testId} onMouseDown={keep}>
-      <button type="button" tabIndex={-1} className="q-part" data-testid={`${testId}.ask`} onMouseDown={keep} onClick={onAsk}>
+      <Press tabIndex={-1} look="q-part" data-testid={`${testId}.ask`} onMouseDown={keep} onClick={onAsk}>
         {QW.ask(to)}
-      </button>
+      </Press>
       <span className="q-dot q-key"> · </span>
-      <button type="button" tabIndex={-1} className="q-part q-key" data-testid={`${testId}.key`} onMouseDown={keep} onClick={onAsk}>
+      <Press tabIndex={-1} look="q-part q-key" data-testid={`${testId}.key`} onMouseDown={keep} onClick={onAsk}>
         {QW.key}
-      </button>
+      </Press>
       <span className="q-dot q-copy"> · </span>
-      <button type="button" tabIndex={-1} className="q-part q-copy" data-testid={`${testId}.copy`} onMouseDown={keep} onClick={onCopy}>
+      <Press tabIndex={-1} look="q-part q-copy" data-testid={`${testId}.copy`} onMouseDown={keep} onClick={onCopy}>
         {QW.copy}
-      </button>
+      </Press>
     </span>
   );
 }

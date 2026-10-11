@@ -8,7 +8,7 @@
 // its own data; the composer is memo'd with stable props, so neither an
 // entry, a step nor a send ever re-renders it.
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
-import { Button, Head, Marker } from '@/ds';
+import { Button, Head, Marker, Press } from '@/ds';
 import { Composer, flashWords, useApprovalsFlash, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer';
 import type { Part } from '@/proto';
@@ -555,9 +555,8 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBac
       if (run !== undefined) {
         const open = openRuns.has(run.start);
         return (
-          <button
-            type="button"
-            className="th-run"
+          <Press
+            look="th-run"
             aria-expanded={open}
             onClick={() => {
               setOpenRuns((s) => {
@@ -570,7 +569,7 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBac
             data-testid={`thread.run.${String(run.start)}`}
           >
             {runWords(run, open)}
-          </button>
+          </Press>
         );
       }
       if (key === LIVE) return live.entry === null ? null : <EntryRow ctx={ctx} pos={-1} prev={lastPos < 0 ? undefined : lastPos} live={live.entry} still={still} />;

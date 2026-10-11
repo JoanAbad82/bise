@@ -8,7 +8,7 @@
 // Mounted once per screen (React never re-creates the editor: the initial config is read once,
 // the callbacks go through refs). The frame around it is amb-kit's ComposerFrame.
 import { memo, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react';
-import { ComposerFrame } from '@/ds';
+import { ComposerFrame, Press } from '@/ds';
 import './composer.css';
 import type { ComposerActions, FieldBar } from './actions';
 import { PmField } from './pm/PmField';
@@ -140,9 +140,8 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
           )}
           {sources.voice !== undefined && keys === undefined && (
             // voice mode with the agent in view (designer's voice-window page (1)): ∿, or ctrl+r twice
-            <button
-              type="button"
-              className="mic voice"
+            <Press
+              look="mic voice"
               onMouseDown={(e) => {
                 e.preventDefault(); // the field keeps the caret
               }}
@@ -152,7 +151,7 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
               data-testid={`${testId}.voice`}
             >
               <span className="kk">∿</span> voice
-            </button>
+            </Press>
           )}
           <span className="pairs" data-testid={`${testId}.keys`} data-mode={keys === undefined ? mode : 'fixed'}>
             {keys ??
@@ -218,9 +217,8 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
  *  'listening…'; then '…' while the last words come. Its own state only: the field never re-renders. */
 function Mic({ state, level, onClick, testId }: { state: 'recording' | 'transcribing' | null; level: DictatePort['level']; onClick: () => void; testId: string }): JSX.Element {
   return (
-    <button
-      type="button"
-      className={`mic${state === null ? '' : ` ${state}`}`}
+    <Press
+      look={`mic${state === null ? '' : ` ${state}`}`}
       onMouseDown={(e) => {
         e.preventDefault(); // the field keeps the caret
       }}
@@ -241,7 +239,7 @@ function Mic({ state, level, onClick, testId }: { state: 'recording' | 'transcri
       ) : (
         '…'
       )}
-    </button>
+    </Press>
   );
 }
 

@@ -2,7 +2,7 @@
 // message), his sends not confirmed yet, his queued messages, the route hold and
 // the agent's typing line. Owner: amb-win. Split out of rows.tsx (pure move).
 import { memo, useEffect, useState, type ReactNode } from 'react';
-import { Button, Chip, Fold } from '@/ds';
+import { Button, Chip, Fold, Press } from '@/ds';
 import type { Entry } from '@/proto';
 import { useAgents, useCoreState, useHubRefused, usePending, useProjects, useStore, useQueuedTake } from '@/store';
 import { refusedLead } from '@/app/Refused';
@@ -147,10 +147,9 @@ function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos: number
     <>
       <div className="th-parts" data-testid={`${id}.parts`}>
         {view.pastes.map((p) => (
-          <button
+          <Press
             key={`p${String(p.n)}`}
-            type="button"
-            className="th-part"
+            look="th-part"
             data-kind="paste"
             aria-expanded={shown === p.n}
             onClick={() => {
@@ -159,13 +158,12 @@ function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos: number
             data-testid={`${id}.paste.${String(p.n)}`}
           >
             ▤ {p.n} · {lineCount(p.text)} lines
-          </button>
+          </Press>
         ))}
         {view.files.map((f) => (
-          <button
+          <Press
             key={f}
-            type="button"
-            className="th-part"
+            look="th-part"
             data-kind="file"
             title={f}
             onClick={() => {
@@ -175,7 +173,7 @@ function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos: number
             data-testid={`${id}.file`}
           >
             {f.split('/').at(-1) ?? f}
-          </button>
+          </Press>
         ))}
         {view.images.map((img, i) => (
           <span key={`${img.path}#${String(i)}`} className="th-part" data-kind="image" title={img.path} data-testid={`${id}.image.${String(i + 1)}`}>
@@ -212,9 +210,9 @@ function ContextChip({ chip, ctx, pos }: { chip: NonNullable<ReturnType<typeof c
             void (window as Partial<Window>).bise?.openPath(open.file, {});
           };
   return (
-    <button type="button" className="th-ctx" disabled={run === undefined} title={chip.tip} onClick={run} data-testid={`thread.context.${String(pos)}`}>
+    <Press look="th-ctx" disabled={run === undefined} title={chip.tip} onClick={run} data-testid={`thread.context.${String(pos)}`}>
       {chip.label}
-    </button>
+    </Press>
   );
 }
 
@@ -240,26 +238,24 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
     hold?.state === 'held' ? undefined : hold?.state === 'sent' ? `sent to ${hold.name}` : failed ? (
       <span className="th-you-fail">
         <span className="th-you-err">{`▲ not sent${why}`}</span>
-        <button
-          type="button"
-          className="th-you-act"
+        <Press
+          look="th-you-act"
           onClick={() => {
             store.retry(ctx.tkey, cid);
           }}
           data-testid={`thread.retry.${cid}`}
         >
           try again
-        </button>
-        <button
-          type="button"
-          className="th-you-act"
+        </Press>
+        <Press
+          look="th-you-act"
           onClick={() => {
             store.dismiss(ctx.tkey, cid);
           }}
           data-testid={`thread.dismiss.${cid}`}
         >
           drop
-        </button>
+        </Press>
       </span>
     ) : queued ? (
       `queued · sends when ${ctx.agent}'s turn ends`
@@ -314,13 +310,13 @@ export const QueuedRow = memo(function QueuedRow({ ctx, q }: { ctx: RowCtx; q: {
           <>
             <span>queued · sends when {who}'s turn ends</span>
             <span className="th-queued-acts">
-              <button type="button" className="th-queued-act" onClick={take('edit')} disabled={asked !== null && refused === null} data-testid={`${id}.edit`}>
+              <Press look="th-queued-act" onClick={take('edit')} disabled={asked !== null && refused === null} data-testid={`${id}.edit`}>
                 edit
-              </button>
+              </Press>
               <span aria-hidden="true"> · </span>
-              <button type="button" className="th-queued-act" onClick={take('drop')} disabled={asked !== null && refused === null} data-testid={`${id}.drop`}>
+              <Press look="th-queued-act" onClick={take('drop')} disabled={asked !== null && refused === null} data-testid={`${id}.drop`}>
                 drop
-              </button>
+              </Press>
             </span>
           </>
         }

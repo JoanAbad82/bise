@@ -58,7 +58,7 @@
   gap: 4px;
   padding: 8px 14px 2px;
 }
-.app-k-scopes button {
+.app-k-scopes .app-k-scope {
   height: 22px;
   padding: 0 9px;
   border: 0;
@@ -69,10 +69,10 @@
   font-size: 12px;
   cursor: pointer;
 }
-.app-k-scopes button:hover {
+.app-k-scopes .app-k-scope:hover {
   background: var(--c-hover);
 }
-.app-k-scopes button.on {
+.app-k-scopes .app-k-scope.on {
   background: color-mix(in srgb, var(--c-text) 9%, transparent);
   color: var(--c-text);
 }

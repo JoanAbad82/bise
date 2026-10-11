@@ -7,6 +7,7 @@ import { byDay, glyphOf, keyOf, kindWords, madeBy, pathOf, splitArchived, timeOf
 import { useAllArtifacts } from './hooks';
 import { bridge, copyLink, openWithVersions, usePutInMessage } from './Open';
 import './artifacts.css';
+import { Press } from '@/ds';
 
 export interface RowsProps {
   items: readonly Item[];
@@ -150,9 +151,9 @@ export function ArtifactList({ project, onOpen, testId = 'artifacts.panel' }: { 
   const items = showArchived ? [...live, ...archived] : live;
   const more =
     archived.length > 0 ? (
-      <button type="button" className="art-archived" onClick={() => { setShowArchived((o) => !o); }} data-testid={`${testId}.archived`}>
+      <Press look="art-archived" onClick={() => { setShowArchived((o) => !o); }} data-testid={`${testId}.archived`}>
         {showArchived ? 'hide the archived ones' : `${String(archived.length)} archived`}
-      </button>
+      </Press>
     ) : null;
   if (items.length === 0) {
     return (

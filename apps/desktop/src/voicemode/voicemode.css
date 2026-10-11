@@ -25,17 +25,17 @@
 /* '● listening': the mic is live for him, the dot in the accent (designer m_16835) */
 .vm-words .vm-dot { color: var(--c-accent); }
 .vm-btns { display: flex; gap: 6px; align-self: center; }
-.vm-btns button {
+.vm-btns .vm-btn {
   display: inline-flex; align-items: baseline; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: var(--r-3);
   box-shadow: 0 0 0 1px var(--c-line); background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); white-space: nowrap; cursor: default; align-items: center;
   transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
-.vm-btns button:hover { background: var(--c-hover); color: var(--c-text); }
+.vm-btns .vm-btn:hover { background: var(--c-hover); color: var(--c-text); }
 .vm-btns kbd { font: var(--t-11) var(--font-mono); color: var(--c-text-3); }
 /* the key line: the composer's (keys in text-2, what they do dim, 3ch between pairs) */
 .vm-keys { display: flex; flex-wrap: nowrap; overflow: hidden; column-gap: 3ch; row-gap: 0; padding: 7px 4px 0; font: var(--t-11) var(--font-mono); color: var(--c-text-3); white-space: pre; }
-.vm-keys button { flex: none; font: inherit; color: inherit; background: none; border: 0; padding: 0; white-space: pre; cursor: default; }
-.vm-keys button:hover { color: var(--c-text-2); }
+.vm-keys .vm-key { flex: none; font: inherit; color: inherit; background: none; border: 0; padding: 0; white-space: pre; cursor: default; }
+.vm-keys .vm-key:hover { color: var(--c-text-2); }
 .vm-keys kbd { font: inherit; color: var(--c-text-2); }
 /* typing: the composer is back in place, the pearl grey and small at its left (ThreadVoice) */
 .vm-type-pearl { display: inline-flex; width: 20px; height: 20px; flex: none; align-self: center; margin-right: -2px; filter: grayscale(1); opacity: .6; }

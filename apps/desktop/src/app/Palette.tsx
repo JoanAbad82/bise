@@ -17,6 +17,7 @@ import { useNow } from './clock';
 import { MAIN } from './route';
 import { useRouter } from './router';
 import './palette.css';
+import { Input, Press } from '@/ds';
 
 /** The kept view bit: ⌘K open (lead m_11997, keep.ts: an open panel, no age). */
 const OPEN_KEY = 'palette.open';
@@ -199,7 +200,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
       <div className="app-k" onKeyDown={onKey} role="dialog" aria-label="search">
         <label className="app-k-field">
           <span aria-hidden>⌕</span>
-          <input
+          <Input
             ref={field}
             value={q}
             placeholder={PW.ph}
@@ -214,12 +215,11 @@ export function Palette({ onClose }: { onClose: () => void }) {
         </label>
         <div className="app-k-scopes" role="tablist">
           {SCOPES.map((s) => (
-            <button
+            <Press
               key={s}
-              type="button"
               role="tab"
               aria-selected={s === scope}
-              className={s === scope ? 'on' : undefined}
+              look={s === scope ? 'app-k-scope on' : 'app-k-scope'}
               tabIndex={-1}
               onMouseDown={(e) => {
                 e.preventDefault();
@@ -231,7 +231,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
               data-testid={`app.palette.scope.${s}`}
             >
               {s}
-            </button>
+            </Press>
           ))}
         </div>
         <div className="app-k-body" role="listbox" aria-label="results">
@@ -246,9 +246,9 @@ export function Palette({ onClose }: { onClose: () => void }) {
                 ⌕
               </span>
               <p>{PW.none(q.trim())}</p>
-              <button type="button" className="app-k-ask" onClick={ask} data-testid="app.palette.ask">
+              <Press look="app-k-ask" onClick={ask} data-testid="app.palette.ask">
                 {PW.ask(q.trim())} <kbd>⏎</kbd>
-              </button>
+              </Press>
             </div>
           )}
           {askRow && (
