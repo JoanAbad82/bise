@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay, threadKey } from '@/store';
 import { answeredMark, approvalParts, cutWords, EntryRow, type RowCtx, withoutImageMarks } from './rows';
-import { ThreadScreen } from './ThreadScreen';
+import { aboutParts, ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
 
 // the composer is amb-web's: here a stand-in that counts its renders
@@ -236,5 +236,16 @@ describe("his answer's mark", () => {
     expect(answeredMark(false)).toBe('✕');
     expect(answeredMark(undefined)).toBe('·');
     expect(answeredMark(null)).toBe('·');
+  });
+});
+
+describe("an artifact's question with typed parts (delta review D2)", () => {
+  it("puts the 'about' lead after his quotes, joined with his first words", () => {
+    const a = { title: 'Q3 [plan]', url: 'http://h/q3' };
+    expect(aboutParts(a, [{ kind: 'quote', from: 'main', text: 'q' }, { kind: 'text', text: 'why?' }])).toEqual([
+      { kind: 'quote', from: 'main', text: 'q' },
+      { kind: 'text', text: 'about [Q3 plan](http://h/q3): why?' },
+    ]);
+    expect(aboutParts(a, [{ kind: 'paste', n: 1, text: 'x' }])).toEqual([{ kind: 'text', text: 'about [Q3 plan](http://h/q3): ' }, { kind: 'paste', n: 1, text: 'x' }]);
   });
 });

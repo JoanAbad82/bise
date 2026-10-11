@@ -46,7 +46,7 @@ describe('triggers (the TUI rules)', () => {
 });
 
 describe('the send', () => {
-  it('quotes go in front, pastes in place as tags, images as labels in the text and typed parts with their source, never files', () => {
+  it('a quote, a paste or an image: typed parts (quotes in front, pastes and images in place, an image by its source), the text his words with labels, never a template or files', () => {
     const segs: Segment[] = [
       { kind: 'text', text: '  what about ' },
       { kind: 'chip', chip: { kind: 'paste', n: 2, text: 'a\nb' } },
@@ -56,7 +56,8 @@ describe('the send', () => {
       { kind: 'text', text: '?\n' },
     ];
     expect(buildMessage(segs)).toEqual({
-      text: '<selection from="main">\nfn main()\n</selection>\nwhat about <pasted n="2" lines="2">\na\nb\n</pasted> and [Image #3]?',
+      // the text: his words with the chips' labels, never the model's template (delta review D2)
+      text: 'what about ▤ 2 and [Image #3]?',
       files: [],
       parts: [
         { kind: 'quote', from: 'main', text: 'fn main()' },

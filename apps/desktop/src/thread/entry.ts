@@ -410,33 +410,6 @@ export function sideOf(e: Entry | undefined): 'you' | 'them' {
   return 'them';
 }
 
-/** A quote he sent in front of his words: its source ('main', 'src/q.rs:10-11') and its text. */
-export interface SentQuote {
-  readonly source: string;
-  readonly text: string;
-}
-
-const SELECTION = /^\s*<selection((?:\s+\w+="[^"]*")*)\s*>\n?([\s\S]*?)\n?<\/selection>\s*/u;
-
-/**
- * The quotes the composer put in front of his words (buildMessage's `<selection from="main"
- * file=".." new="10-11">…</selection>`, quote.rs), and his words after them: his bubble draws each
- * quote with its rail and source above his words (messages-right v1). None: all words. Pure.
- */
-export function quotesOf(text: string): { quotes: SentQuote[]; words: string } {
-  const quotes: SentQuote[] = [];
-  let rest = text;
-  for (let m = SELECTION.exec(rest); m !== null; m = SELECTION.exec(rest)) {
-    const attrs = new Map(Array.from((m[1] ?? '').matchAll(/(\w+)="([^"]*)"/gu), (a) => [a[1] ?? '', a[2] ?? '']));
-    const file = attrs.get('file') ?? '';
-    const lines = attrs.get('new') ?? attrs.get('old') ?? '';
-    const source = file !== '' ? `${file}${lines !== '' ? `:${lines}` : ''}` : (attrs.get('from') ?? '');
-    quotes.push({ source, text: (m[2] ?? '').replaceAll('</selection >', '</selection>') });
-    rest = rest.slice(m[0].length);
-  }
-  return { quotes, words: quotes.length === 0 ? text : rest };
-}
-
 /**
  * Where each row shows (amb-feed 9633cd2a, designer m_16435): a message the agent read mid-turn
  * (a steer, `steered_at` = the pos of the hub's receipt, the same for a bundled steer) sits right

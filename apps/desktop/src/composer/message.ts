@@ -1,12 +1,13 @@
-// What the composer sends: its content as segments (text and chips), turned into the words and
-// files of one send. Pure, no Lexical: the editor reads its nodes into segments, this builds
-// the message. The tags are the terminal's, so the model and the history read a desktop message
-// exactly like a TUI one:
-//   a long paste  `<pasted n="1" lines="240">\n…\n</pasted>` where the chip was (pasted.rs);
-//   a quote       `<selection from="main">\n…\n</selection>` in front of the words (quote.rs);
-//   an artifact   `[title](url)` where the chip was (attach.rs insert_artifact);
-//   an image      `[Image #1]` where the chip was, its file in `files` (the core's send takes
-//                 absolute paths: run 5's shape; docs/images.md).
+// What the composer sends: its content as segments (text and chips), turned into one send. Pure,
+// no editor: the editor reads its nodes into segments, this builds the message. The window never
+// writes the model's template (the terminal's <selection>/<pasted> tags, image markers): a message
+// with a quote, a paste or an image goes as typed parts and the hub renders the model's text from
+// them (bise_proto::parts::render, the one renderer; architect's delta review D2):
+//   a long paste  {kind:'paste', n, text} where the chip was;
+//   a quote       {kind:'quote', from, text, file?, new?, old?} in front of the words;
+//   an artifact   `[title](url)` in his words where the chip was (attach.rs insert_artifact);
+//   an image      {kind:'image', name:'[Image #1]', source:<absolute path>} where the chip was
+//                 (the hub stores it, main 18a32ce3).
 // One number sequence per draft for images, pastes and quotes (a number points at one chip).
 
 import type { Part } from '@/proto';
@@ -39,8 +40,8 @@ export type Segment = { readonly kind: 'text'; readonly text: string } | { reado
 export interface Outgoing {
   readonly text: string;
   readonly files: readonly string[];
-  /** msg-parts: the same message as typed parts (quotes, words, pastes), when it has more than words
-   *  and no image; the hub renders the model's text from them */
+  /** msg-parts: his message as typed parts, when it has more than words (a quote, a paste, an
+   *  image); the hub renders the model's text from them and ignores `text` */
   readonly parts?: readonly Part[];
 }
 
@@ -103,26 +104,17 @@ export function chipStrip(c: Chip): string {
   }
 }
 
-const pasteTag = (n: number, text: string): string =>
-  `<pasted n="${n}" lines="${lineCount(text)}">\n${text.replaceAll('</pasted>', '</pasted >')}\n</pasted>`;
-
-const attr = (s: string): string => s.replaceAll('"', "'").replaceAll('\n', ' ');
-/** quote.rs tag_at: from, then file / new / old when known. */
-const quoteHead = (from: string, at?: QuoteAt): string =>
-  [`from="${attr(from)}"`, ...(at === undefined ? [] : (['file', 'new', 'old'] as const).filter((k) => at[k] !== '').map((k) => `${k}="${attr(at[k])}"`))].join(' ');
-const quoteTag = (from: string, text: string, at?: QuoteAt): string =>
-  `<selection ${quoteHead(from, at)}>\n${chars(text).slice(0, QUOTE_MAX_CHARS).join('').replaceAll('</selection>', '</selection >')}\n</selection>`;
-
-/** The send for these segments: quotes in front, pastes and image labels in place, the words
- *  trimmed at both ends. Empty text and no files: nothing to send. */
+/** The send for these segments (architect's delta review D2: the window never templates; the hub
+ *  renders the model's text from the parts, bise_proto::parts::render). A message of words alone
+ *  goes as its text; one with a quote, a paste or an image goes as typed parts: the quotes in front
+ *  (at most QUOTE_MAX, each cut at QUOTE_MAX_CHARS), the words with the pastes and images in place
+ *  (an image with its source alone: the hub stores it, main 18a32ce3). `text` is then his words
+ *  with the chips' labels ('▤ 1', '[Image #1]'), for the hub's older readers, the composer's strip
+ *  and the pending row's match, never the model's template. Empty: nothing to send. */
 export function buildMessage(segments: readonly Segment[]): Outgoing {
-  const quotes: string[] = [];
   const files: string[] = [];
-  // msg-parts (architect m_17621): the same message as typed parts, the hub renders the model's text
-  // from them (byte for byte these tags); kept in order beside the text
   const quoteParts: Part[] = [];
   const bodyParts: Part[] = [];
-  let images = false;
   const say = (t: string): void => {
     const last = bodyParts.at(-1);
     if (last?.kind === 'text') bodyParts[bodyParts.length - 1] = { kind: 'text', text: last.text + t };
@@ -145,15 +137,14 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
     }
     const c = s.chip;
     if (c.kind === 'quote') {
-      if (quotes.length < QUOTE_MAX) {
-        quotes.push(quoteTag(c.from, c.text, c.at));
+      if (quoteParts.length < QUOTE_MAX) {
         const at = c.at === undefined ? {} : Object.fromEntries((['file', 'new', 'old'] as const).filter((k) => c.at?.[k] !== '').map((k) => [k, c.at?.[k] ?? '']));
-        quoteParts.push({ kind: 'quote', from: attr(c.from), text: chars(c.text).slice(0, QUOTE_MAX_CHARS).join(''), ...at });
+        quoteParts.push({ kind: 'quote', from: c.from, text: chars(c.text).slice(0, QUOTE_MAX_CHARS).join(''), ...at });
       }
       continue;
     }
     if (c.kind === 'paste') {
-      body += pasteTag(c.n, c.text);
+      body += chipLabel(c);
       bodyParts.push({ kind: 'paste', n: c.n, text: c.text });
       spaceNext = false;
       continue;
@@ -162,21 +153,16 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
     const pad = /\S$/u.test(body) ? ' ' : '';
     body += pad + label;
     if (c.kind === 'image') {
-      // an image goes typed with its source alone: the hub stores it and writes its marker in
-      // place (main 18a32ce3, bend_images::store_file); never text + files any more
-      images = true;
       say(pad);
       bodyParts.push({ kind: 'image', name: label, source: c.path });
     } else say(pad + label);
     spaceNext = true;
   }
   // `say …` and `steer …` go out without their word (sb.rs, C45)
-  const words = body.trim().replace(/^(?:steer|say) /u, '').trim();
-  const text = [...quotes, words].filter((x) => x !== '').join('\n');
-  // parts only when they say more than words (the TUI's of_parts): a quote, a paste or an image
-  // (its source alone: the hub stores it, main 18a32ce3); a message of words alone stays text
-  const parts = !images && quoteParts.length === 0 && !bodyParts.some((p) => p.kind === 'paste') ? undefined : [...quoteParts, ...trimParts(bodyParts)];
-  return parts === undefined ? { text, files } : { text, files, parts };
+  const text = body.trim().replace(/^(?:steer|say) /u, '').trim();
+  // parts only when they say more than words (the TUI's of_parts); words alone stay text
+  const typed = quoteParts.length > 0 || bodyParts.some((p) => p.kind !== 'text');
+  return typed ? { text, files, parts: [...quoteParts, ...trimParts(bodyParts)] } : { text, files };
 }
 
 /** The words' parts trimmed like the text (both ends, and `say ` / `steer ` in front), empty text parts dropped. */

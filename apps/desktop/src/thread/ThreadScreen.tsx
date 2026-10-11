@@ -11,6 +11,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardE
 import { Button, Head, Marker } from '@/ds';
 import { Composer, flashWords, useApprovalsFlash, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer';
+import type { Part } from '@/proto';
 import { quoteFrom, quoteKey, quoteText } from './quote';
 import type { Outgoing } from '@/composer/message';
 import { threadKey, useAgents, useApprovals, useModels, useCards, useCommands, useCoreState, useEntry, useFiles, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
@@ -858,8 +859,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   const onSend = useCallback(
     (out: Outgoing) => {
       // a '/word' line the composer's list doesn't know is still a command: the hub's router runs it
-      // (never a line with an image: '/word [Image #1]' is a message)
-      const sl = out.files.length === 0 && !(out.parts ?? []).some((p) => p.kind === 'image') ? slashLine(out.text) : null;
+      // (never a line with typed parts: '/word [Image #1]' or a quoted '/word' is a message)
+      const sl = out.files.length === 0 && out.parts === undefined ? slashLine(out.text) : null;
       if (sl !== null) {
         onCommand(sl.name, sl.args);
         return;
@@ -880,9 +881,9 @@ export const ThreadComposer = memo(function ThreadComposer({
       // never subscribed: the rows moving must not re-render the composer)
       const cu = computerRowOf(store.computerLive(), project, agent);
       if (cu !== undefined && computerState(cu) === 'stopped') store.computer('hand_back', cu.key);
-      // msg-parts: his quotes and pastes go typed, never templated by the window; an artifact's
-      // question keeps its text (its 'about' lead lives in the text alone)
-      const parts = about === undefined ? out.parts : undefined;
+      // msg-parts: his quotes, pastes and images go typed, never templated by the window; an
+      // artifact's question puts its 'about' lead in front of his words, as a text part too
+      const parts = about === undefined || out.parts === undefined ? out.parts : aboutParts(about, out.parts);
       store.send({ project, agent, text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}), ...(parts === undefined ? {} : { parts }) });
       onSent();
     },
@@ -915,6 +916,17 @@ export const ThreadComposer = memo(function ThreadComposer({
 /** A message about an artifact: `about [its title](its url): his words` (the chip's own link form). Pure. */
 export function aboutText(a: { title: string; url: string }, text: string): string {
   return `about [${a.title.replace(/[[\]]/gu, '')}](${a.url}): ${text}`;
+}
+
+/** The same lead on typed parts: after his quotes (the hub renders them in front anyway), before his words. Pure. */
+export function aboutParts(a: { title: string; url: string }, parts: readonly Part[]): Part[] {
+  const lead: Part = { kind: 'text', text: aboutText(a, '') };
+  const i = parts.findIndex((p) => p.kind !== 'quote');
+  const at = i < 0 ? parts.length : i;
+  const next = parts[at];
+  // joined with his first words when they are words (parts as a composer makes them: adjacent texts joined)
+  if (next?.kind === 'text') return [...parts.slice(0, at), { kind: 'text', text: lead.text + next.text }, ...parts.slice(at + 1)];
+  return [...parts.slice(0, at), lead, ...parts.slice(at)];
 }
 
 /** A card of a project, as the composer answers it. */

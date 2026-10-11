@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { app_cmd, core_ev, hub_cmd, hub_ev } from '@/proto/fixtures.gen';
-import type { Entry } from '@/proto';
+import type { Entry, Part } from '@/proto';
 import type { CoreCmd } from '@/shared/api';
 import { allFixtureEvents, replay } from './replay';
-import { sentWords, Store, TAGS, threadKey, typed } from './store';
+import { sentParts, sentWords, Store, TAGS, threadKey, typed } from './store';
 
 const P = 'acme-1a2b3c4d';
 const K = threadKey(P, 'perf');
@@ -166,6 +166,15 @@ what is in this picture?`, 'you') });
     store.apply({ ev: 'entry', project: P, agent: 'perf', entry: entry(10, `${marker.replace('shot', 'b')} and this one`, 'you') });
     expect(store.pending(K)).toEqual([]);
     expect(sentWords('<image name="[Image #2]" path="a b.png" mime="image/png" b64="x">  hi\n there')).toBe('hi there');
+  });
+
+  it("a typed send matches its echo by parts, not by the hub's template text (delta review D2)", () => {
+    const mine: Part[] = [{ kind: 'quote', from: 'main', text: 'q' }, { kind: 'text', text: 'why ' }, { kind: 'paste', n: 1, text: 'x\ny' }, { kind: 'image', name: '[Image #2]', source: '/i/a.png' }];
+    // the hub keeps the image with its stored copy filled in
+    const echo: Part[] = [{ kind: 'quote', from: 'main', text: 'q' }, { kind: 'text', text: 'why ' }, { kind: 'paste', n: 1, text: 'x\ny' }, { kind: 'image', name: '[Image #2]', source: '/i/a.png', mime: 'image/png', b64_file: '/s/a.b64' }];
+    expect(sentParts(echo)).toBe(sentParts(mine));
+    expect(sentParts([{ kind: 'text', text: 'why' }])).not.toBe(sentParts(mine));
+    expect(sentParts([{ kind: 'quote', from: 'main', text: 'other' }, { kind: 'text', text: 'why' }])).not.toBe(sentParts([{ kind: 'quote', from: 'main', text: 'q' }, { kind: 'text', text: 'why' }]));
   });
 
   it('a send carries the files he attached, typed, and a retry sends them again; no files means no field', () => {

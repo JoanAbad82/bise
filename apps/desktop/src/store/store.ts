@@ -20,7 +20,7 @@
 // its key and compare helpers live in types.ts (re-exported here).
 import type { Account, Card, ComputerAgent, Agent, Artifact, DevServer, Entry, Found, IndexRow, Job, JsonValue, Feature, Merged, Mode, Model, Part, PickCommand, RoleRow, PickSkill, Plugin, ProjectRow, ScheduledTask, Worktree, FlowMode, ReleaseEv, UpdateEv } from '@/proto';
 import type { CoreCmd, CorePort, CoreState } from '@/shared/api';
-import { type Away, type BranchesList, type Confirm, type Dictation, type Diff, diffKey, type Ev, type EvOf, type FilesAnswer, type HubLine, type PagesList, type Pending, type PrsList, type QueuedTake, sameJson, sameOrder, sameStrings, sentWords, takeKey, threadKey, type ThreadOrder, type ToolOut, toolOutKey, typed, type VersionsList, type VoiceModeState } from './types';
+import { type Away, type BranchesList, type Confirm, type Dictation, type Diff, diffKey, type Ev, type EvOf, type FilesAnswer, type HubLine, type PagesList, type Pending, type PrsList, type QueuedTake, sameJson, sameOrder, sameStrings, sentParts, sentWords, takeKey, threadKey, type ThreadOrder, type ToolOut, toolOutKey, typed, type VersionsList, type VoiceModeState } from './types';
 const EMPTY_ORDER: ThreadOrder = { order: [], before: null, more: false, loaded: false };
 const EMPTY: readonly never[] = [];
 
@@ -620,7 +620,7 @@ export class Store {
       const order = [...t.view.order, ev.entry.pos].sort((a, b) => a - b);
       this.setOrder(key, t, order, t.view.before, t.view.more);
     }
-    if (ev.entry.kind === 'you') this.landed(key, t, ev.entry.text);
+    if (ev.entry.kind === 'you') this.landed(key, t, ev.entry);
   }
 
   private putEntry(key: string, t: Thread, e: Entry): void {
@@ -636,12 +636,14 @@ export class Store {
     }
   }
 
-  /** His words landed in the thread: the oldest pending send with these words goes. */
-  private landed(key: string, t: Thread, text: string): void {
-    // a send with images comes back with the hub's markers ('<image name="[Image #1]" …>') before
-    // his words: compared without them, else its row stayed 'sending…' forever (qa-native R41)
-    const said = sentWords(text);
-    const i = t.pending.findIndex((p) => sentWords(p.text) === said);
+  /** His message landed in the thread: the oldest pending send with the same message goes. */
+  private landed(key: string, t: Thread, e: Entry): void {
+    // msg-parts: a send with typed parts comes back with them (the hub's text is the model's
+    // template, never the window's): compared by parts; else by words, the hub's image markers
+    // ('<image name="[Image #1]" …>') left out (qa-native R41). architect's A1 matches by id later.
+    const typed = e.parts != null && e.parts.length > 0 ? sentParts(e.parts) : null;
+    const said = sentWords(e.text);
+    const i = t.pending.findIndex((p) => (typed !== null && p.parts !== undefined ? sentParts(p.parts) === typed : sentWords(p.text) === said));
     if (i < 0) return;
     t.pending = t.pending.filter((_, j) => j !== i);
     this.emit(`pending:${key}`);
@@ -952,5 +954,5 @@ export class Store {
 }
 
 // the store's shapes and helpers live in types.ts; importers keep reading them here
-export { TAGS, diffKey, sentWords, takeKey, threadKey, toolOutKey, typed } from './types';
+export { TAGS, diffKey, sentParts, sentWords, takeKey, threadKey, toolOutKey, typed } from './types';
 export type { Away, AwayProject, BranchesList, Confirm, Dictation, Diff, Ev, EvOf, FilesAnswer, HubLine, PagesList, Pending, PrsList, QueuedTake, ThreadOrder, ToolOut, VersionsList, VoiceModeState } from './types';

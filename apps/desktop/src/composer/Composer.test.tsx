@@ -52,7 +52,7 @@ describe('the composer', () => {
     expect(field.textContent).toBe('');
   });
 
-  it("quote(text, from): a quote chip at the caret, then his words; the send puts the TUI's <selection> in front (amb-win)", async () => {
+  it("quote(text, from): a quote chip at the caret, then his words; the send carries it as a quote part in front (amb-win)", async () => {
     const { getByTestId, onSend, act: a } = await mount();
     await act(async () => {
       a.quote('one\ntwo\nthree', 'main');
@@ -66,10 +66,10 @@ describe('the composer', () => {
       a.submit();
       await Promise.resolve();
     });
-    const sent = (onSend.mock.calls[0]?.[0] as { text: string } | undefined)?.text ?? '';
-    expect(sent.startsWith('<selection from="main">')).toBe(true);
-    expect(sent).toContain('one\ntwo\nthree');
-    expect(sent.trim().endsWith('why 03:00?')).toBe(true);
+    const sent = onSend.mock.calls[0]?.[0] as { text: string; parts?: unknown[] } | undefined;
+    // typed: the quote part in front, then his words; the hub renders the model's tag (delta review D2)
+    expect(sent?.parts).toEqual([{ kind: 'quote', from: 'main', text: 'one\ntwo\nthree' }, { kind: 'text', text: 'why 03:00?' }]);
+    expect(sent?.text).toBe('why 03:00?');
   });
 
   it('fill(text): the field holds the words alone, all selected, and nothing is sent (L1/M18, amb-kit)', async () => {

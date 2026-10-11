@@ -2,15 +2,16 @@
 // type: a 'src/a.rs:12-14 · 3 lines' quote). Passes when, on perf's review (the fixture's diff of
 // src/query.rs), a drag over 3 lines marks them and shows 'type to ask perf about it', typing 'w'
 // opens perf's thread with one quote chip saying 'src/query.rs:10-12 · 3 lines' and the 'w'
-// after it, and the send carries the TUI's tag with the file and its lines; shift+↓ selects from
+// after it, and the send carries a typed quote part with the file and its lines (the hub renders
+// the TUI's tag); shift+↓ selects from
 // the keyboard too, and esc ends a selection without leaving. The scripted core (FakeCore, every
 // fixture). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
 const P = 'acme-1a2b3c4d';
-type Cmd = { cmd?: string; text?: string };
+type Cmd = { cmd?: string; text?: string; parts?: unknown[] };
 
-test('review/quote: drag or shift+↓ over diff lines, then type: a quote saying where, sent with the TUI tag', async () => {
+test('review/quote: drag or shift+↓ over diff lines, then type: a quote saying where, sent as a typed quote part', async () => {
   const core = new FakeCore();
   const s = await launchDesktop({ core, route: `review/${P}/perf` });
   try {
@@ -48,7 +49,13 @@ test('review/quote: drag or shift+↓ over diff lines, then type: a quote saying
     await page.screenshot({ path: test.info().outputPath('quoted.png') });
     await page.keyboard.press('Enter');
     const sent = (await core.waitCmd((c) => (c as Cmd).cmd === 'send')) as Cmd;
-    expect(sent.text).toBe('<selection from="perf vs main" file="src/query.rs" new="10-12" old="10-11">\n let rows = db.query(q);\n-rows.sort();\n+rows.sort_unstable();\n+rows.dedup();\n</selection>\nwhy this order?');
+    // typed: a quote part with its file and lines, then his words; the hub renders the TUI's tag
+    // from it, the window never writes it (architect's delta review D2)
+    expect(sent.parts).toEqual([
+      { kind: 'quote', from: 'perf vs main', text: ' let rows = db.query(q);\n-rows.sort();\n+rows.sort_unstable();\n+rows.dedup();', file: 'src/query.rs', new: '10-12', old: '10-11' },
+      { kind: 'text', text: 'why this order?' },
+    ]);
+    expect(sent.text).toBe('why this order?');
   } finally {
     await s.close();
     core.dispose();

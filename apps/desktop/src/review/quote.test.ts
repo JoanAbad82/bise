@@ -37,15 +37,17 @@ describe('quote diff lines', () => {
     expect(quotesOf(['src/a.rs'], files, rows, { anchor: 0, head: 0 })).toEqual([]);
   });
 
-  it("the chip says where, as quote.rs about(); the send carries the TUI's tag", () => {
+  it("the chip says where, as quote.rs about(); the send carries it as a typed quote", () => {
     expect(quoteAbout('perf vs main', ' a\n-b\n+c', { file: 'src/a.rs', new: '12-14', old: '11-12' })).toBe('src/a.rs:12-14 · 3 lines');
     expect(quoteAbout('perf vs main', '-a\n-b', { file: 'src/b.rs', new: '', old: '1-2' })).toBe('src/b.rs:1-2 · 2 removed lines');
     expect(quoteAbout('main', 'one')).toBe('main · 1 line');
     const chip = { kind: 'quote', n: 1, text: ' a\n-b\n+c', from: 'perf vs main', at: { file: 'src/a "b".rs', new: '12-14', old: '11' } } as const;
     expect(chipStrip(chip)).toContain('src/a "b".rs:12-14 · 3 lines');
-    expect(buildMessage([{ kind: 'chip', chip }, { kind: 'text', text: 'why?' }]).text).toBe(
-      '<selection from="perf vs main" file="src/a \'b\'.rs" new="12-14" old="11">\n a\n-b\n+c\n</selection>\nwhy?',
-    );
+    // typed: the hub renders quote.rs's tag from the part (delta review D2)
+    expect(buildMessage([{ kind: 'chip', chip }, { kind: 'text', text: 'why?' }]).parts).toEqual([
+      { kind: 'quote', from: 'perf vs main', text: ' a\n-b\n+c', file: 'src/a "b".rs', new: '12-14', old: '11' },
+      { kind: 'text', text: 'why?' },
+    ]);
   });
 
   it('the hand-off goes to the thread it names, once', () => {

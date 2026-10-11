@@ -216,6 +216,30 @@ export function sameJson(a: unknown, b: unknown): boolean {
 }
 
 /**
+ * His message as sent, from its typed parts, to match a pending send with its echo: the words
+ * (spaces collapsed), each paste, quote and file by its content, each image by its name (the hub
+ * fills its b64_file and mime on the kept part). Pure.
+ */
+export function sentParts(parts: readonly Part[]): string {
+  return parts
+    .map((p) => {
+      switch (p.kind) {
+        case 'text':
+          return p.text;
+        case 'image':
+          return `\u0000image:${p.name}\u0000`;
+        case 'file':
+          return `\u0000file:${p.path}\u0000`;
+        default:
+          return `\u0000${p.kind}:${p.text}\u0000`;
+      }
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * His words as sent, to match a pending send with its echo: the hub's image markers
  * (`<image name="[Image #1]" path=… mime=… b64=…>`, rust/images marker()) and the composer's
  * '[Image #n]' labels out, spaces collapsed. Pure.

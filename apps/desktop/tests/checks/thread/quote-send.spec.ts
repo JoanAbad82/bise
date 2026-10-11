@@ -1,7 +1,8 @@
 // thread/quote-send · his bug 3, parity M6/B7 (the TUI's quote.rs, input.rs:415): a drag across an
 // answer in the real thread selects it (rows were visibility:hidden behind Virtuoso's initial
 // scroll until now), typing puts it in the composer as a quote chip with its strip, and ⏎ sends
-// it as the TUI does: '<selection from="main">…</selection>' in front of his words. Owner: amb-win
+// it typed: a quote part from main in front of his words (the hub renders the TUI's
+// '<selection from="main">…</selection>' from it; the window never writes the tag). Owner: amb-win
 // (lead m_10647). The new app on the scripted core; the send read in the core's command log.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { expectShown } from './shown';
@@ -37,7 +38,7 @@ const world = () => [
   },
 ];
 
-test('thread/quote-send: drag selects an answer, typing quotes it with its strip, ⏎ sends the TUI\'s <selection> in front', async () => {
+test('thread/quote-send: drag selects an answer, typing quotes it with its strip, ⏎ sends it as a quote part in front', async () => {
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: `agent/${HOME}/main` });
   try {
@@ -71,10 +72,8 @@ test('thread/quote-send: drag selects an answer, typing quotes it with its strip
     expect(sent.parts?.[0]?.from).toBe('main');
     expect(sent.parts?.[0]?.text).toContain('14:00 compaction runs');
     expect(sent.parts?.[1]?.text).toBe('why 03:00?');
-    expect(text.startsWith('<selection from="main">\n'), 'the quote in front, as the TUI sends it').toBe(true);
-    expect(text).toContain('14:00 compaction runs');
-    expect(text).toContain('</selection>');
-    expect(text.trimEnd().endsWith('why 03:00?'), 'then his words').toBe(true);
+    // the window never writes the model's <selection> tag: the hub renders it from the parts (delta review D2)
+    expect(text, 'the text is his words alone').toBe('why 03:00?');
   } finally {
     await s.close();
   }

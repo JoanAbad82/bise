@@ -9,7 +9,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
-import { chipOf, clock, deliveryMark, lastOfRun, quotesOf, stripContext } from './entry';
+import { chipOf, clock, deliveryMark, lastOfRun, stripContext } from './entry';
 import { shownName } from '@/agents/model';
 import { saidFor, useSaidMs } from '@/voicemode';
 import type { RowCtx } from './rows';
@@ -73,12 +73,12 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   const [open, setOpen] = useFold(false, e.pos);
   // the fn context block the hub appended never shows: a chip from the typed context instead;
   // the quotes he sent in front of his words show first in his bubble, with their rail and source
-  // msg-parts: with typed parts, his message comes from them, never from Entry.text (the model's
-  // templated text): no tag shows; without (an older hub), the text as before
+  // msg-parts: his message comes from its typed parts, never from Entry.text (the model's templated
+  // text; the fold gives every 'you' entry its parts since msg-parts sha c). No parts (an older
+  // hub): the text drawn plain, never parsed for tags (architect's delta review D1)
   const view = e.parts != null && e.parts.length > 0 ? youView(e.parts) : null;
-  const old = view === null ? quotesOf(stripContext(e.text)) : null;
-  const quotes = view !== null ? view.quotes.map((q) => ({ source: q.from, text: q.text, about: q.file !== '' ? quoteAbout(q.from, q.text, q) : '' })) : (old?.quotes ?? []).map((q) => ({ ...q, about: '' }));
-  const text = view !== null ? view.words : (old?.words ?? '');
+  const quotes = view !== null ? view.quotes.map((q) => ({ source: q.from, text: q.text, about: q.file !== '' ? quoteAbout(q.from, q.text, q) : '' })) : [];
+  const text = view !== null ? view.words : stripContext(e.text);
   const fold = foldOf(text);
   const toggle = () => {
     setOpen((o) => !o);

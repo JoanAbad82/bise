@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, quotesOf, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -264,12 +264,7 @@ describe('messages-right v1: whose side a row is on', () => {
   });
 });
 
-describe('messages-right v1: a quote, a steer', () => {
-  it("reads the composer's quotes in front of his words, with their source", () => {
-    expect(quotesOf('<selection from="main">\nAgreed on the api.\n</selection>\nis that still true?')).toEqual({ quotes: [{ source: 'main', text: 'Agreed on the api.' }], words: 'is that still true?' });
-    expect(quotesOf('<selection from="perf vs main" file="src/q.rs" new="10-11">\nfn a() {}\n</selection>\nwhy?').quotes).toEqual([{ source: 'src/q.rs:10-11', text: 'fn a() {}' }]);
-    expect(quotesOf('no quote here')).toEqual({ quotes: [], words: 'no quote here' });
-  });
+describe('messages-right v1: a steer', () => {
   it("a steer shows where the agent read it: right before the first row past its receipt, bundled steers in their order", () => {
     // 1 his ask, 2 tools, 3 his steer (read at the receipt 5), 4 more tools, 6 the answer
     const at = new Map<number, number>([[3, 5]]);

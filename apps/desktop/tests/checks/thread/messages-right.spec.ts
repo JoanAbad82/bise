@@ -52,8 +52,18 @@ const world = () => [
       { pos: 11, at_ms: NOW - 5 * MIN, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 11, at_ms: NOW - 5 * MIN, text: 'pnpm bench', kind: 'run', state: 'ok', ms: 6000 }] } },
       { pos: 12, at_ms: NOW - 4 * MIN + 2000, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 12, at_ms: NOW - 4 * MIN + 2000, text: 'pnpm bench --webp', kind: 'run', state: 'ok', ms: 4000 }] } },
       { pos: 13, at_ms: NOW - 3 * MIN, kind: 'agent', text: 'webp saves another 30%, as you asked mid-way.' },
-      // a quote he sent (the composer's <selection>): first in his bubble, its rail and source
-      { pos: 14, at_ms: NOW - 2 * MIN, kind: 'you', text: '<selection from="main">\nwebp saves another 30%.\n</selection>\nis that on the tablets too?' },
+      // a quote he sent: first in his bubble, its rail and source, from its typed parts (the
+      // window never parses the text's <selection>, delta review D1)
+      {
+        pos: 14,
+        at_ms: NOW - 2 * MIN,
+        kind: 'you',
+        text: '<selection from="main">\nwebp saves another 30%.\n</selection>\nis that on the tablets too?',
+        parts: [
+          { kind: 'quote', from: 'main', text: 'webp saves another 30%.' },
+          { kind: 'text', text: 'is that on the tablets too?' },
+        ],
+      },
     ],
     before: null,
     more: false,
