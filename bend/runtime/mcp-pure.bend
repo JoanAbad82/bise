@@ -363,6 +363,12 @@ type Try is Data:
   TOk{ok: Bool, out: String}
   TFail{stage: Stage, why: Why}
 
+# a connector call with no Mistral key: said at once, nothing sent (an
+# empty bearer came back as the gateway's 'HTTP 401: Invalid API Key',
+# which read like a revoked key)
+def no_key_text() -> String:
+  "no Mistral key for connectors: run bise login mistral"
+
 # tries in total for one call (so at most 2 retries)
 def max_tries() -> Nat:
   3n
