@@ -34,7 +34,7 @@ import { standInPaths } from './userdata';
 import { themeSourceOf } from './theme';
 import { takeRoute, Updates, updateTarget } from './update/run';
 import { MainWindow } from './windows';
-import { fenceOffscreen, isOffscreen } from './offscreen';
+import { fenceOffscreen, isOffscreen, offscreenActivation } from './offscreen';
 import { Notifier } from './notify/run';
 import { langOf } from './notify/plan';
 
@@ -45,6 +45,15 @@ if (offscreen) {
   app.on('browser-window-created', (_e, win) => {
     fenceOffscreen(win);
   });
+  // never the front app, from the first line (amb-tools m_18713): no Dock icon, and if anything
+  // still activates it, it hides at once and his app is in front again
+  if (offscreenActivation(offscreen, process.platform) !== null) {
+    app.setActivationPolicy('accessory');
+    app.dock?.hide();
+    app.on('did-become-active', () => {
+      app.hide();
+    });
+  }
 }
 
 // a test run starts only in the throwaway home its harness made (testhome.ts):

@@ -368,6 +368,17 @@ def real_opens_with_nothing():
         shutil.rmtree(w, ignore_errors=True)
 
 
+def real_open_in_background_offscreen():
+    """--real with BISE_DESKTOP_OFFSCREEN=1 opens with 'open -g' (never in front, amb-tools m_18713);
+    his own --real opens as before."""
+    app = "/A/bise try.app"
+    check(T.real_open_cmd(app, [], {}) == ["open", "-n", "-a", app], "his --real: a plain open")
+    off = T.real_open_cmd(app, ["HOME=/g/h", "BISE_HOME=/g/h/.bise", "BISE_DESKTOP_OFFSCREEN=1"], {"BISE_DESKTOP_OFFSCREEN": "1"})
+    check(off[:5] == ["open", "-g", "-n", "-a", app], "the knob: open -g: %r" % off)
+    check(off[5:] == ["--env", "HOME=/g/h", "--env", "BISE_HOME=/g/h/.bise", "--env", "BISE_DESKTOP_OFFSCREEN=1"], "its env passes")
+    check(T.real_open_cmd(app, [], {"BISE_DESKTOP_OFFSCREEN": "0"})[1] == "-n", "'0' is not the knob")
+
+
 def real_stop_never_his_hubs():
     """bise-ambient --real --stop (ambient-lead m_18642): the bundle quits; on his own home his hubs
     are never touched; a stand-in outside ~/.bise/gate is refused; on a stand-in under it, its hubs
@@ -610,6 +621,7 @@ if __name__ == "__main__":
     legacy_old_retired()
     real_opens_with_nothing()
     real_stop_never_his_hubs()
+    real_open_in_background_offscreen()
     candidate_then_promote()
     if "--pure" not in sys.argv:
         hook_keeps_pid()

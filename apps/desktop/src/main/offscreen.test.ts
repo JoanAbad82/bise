@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isOffscreen, offscreenPlace, OFFSCREEN_ENV } from './offscreen';
+import { offscreenActivation } from './offscreen';
 import { OFF, OFF_DISPLAY } from './place';
 
 // BISE_DESKTOP_OFFSCREEN (ambient-lead m_18341): unset = today's behaviour,
@@ -23,5 +24,13 @@ describe('the off-screen knob', () => {
     const b = OFF_DISPLAY.bounds;
     expect(b.x + b.width).toBeLessThan(-10_000);
     expect(b.y + b.height).toBeLessThan(-10_000);
+  });
+});
+
+describe('offscreenActivation (amb-tools m_18713: never the front app under the knob)', () => {
+  it("'accessory' on macOS with the knob; nothing without it or elsewhere", () => {
+    expect(offscreenActivation(true, 'darwin')).toBe('accessory');
+    expect(offscreenActivation(false, 'darwin')).toBeNull();
+    expect(offscreenActivation(true, 'linux')).toBeNull();
   });
 });

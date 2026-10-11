@@ -863,6 +863,16 @@ def self_contained(app):
     return [n for n in SELF_CONTAINED if not os.path.exists(os.path.join(app, "Contents", "Resources", "bin", n))]
 
 
+def real_open_cmd(app, extra, environ):
+    """The 'open' of --real (pure). With BISE_DESKTOP_OFFSCREEN=1 (amb-tools' as-he-does runs) it adds
+    -g: LaunchServices never brings the app to the front (amb-tools m_18713: 'bise try' took his focus
+    for ~4 s); his own --real opens as any app does."""
+    cmd = ["open"] + (["-g"] if environ.get("BISE_DESKTOP_OFFSCREEN") == "1" else []) + ["-n", "-a", app]
+    for e in extra:
+        cmd += ["--env", e]
+    return cmd
+
+
 def open_real(real, tryh, paths, environ=None, timeout=20):
     """bise-ambient --real (ambient-lead m_18348): the promoted bundle on his real bise home, his
     running hubs; no build, no try world. Any open try is stopped and any instance of the bundle
@@ -889,10 +899,7 @@ def open_real(real, tryh, paths, environ=None, timeout=20):
             raise TryError("BISE_TRY_OPEN: for tests on a stand-in home under ~/.bise/gate only")
         run([hook, app] + extra, his_env(environ))
     else:
-        cmd = ["open", "-n", "-a", app]
-        for e in extra:
-            cmd += ["--env", e]
-        run(cmd, his_env(environ))
+        run(real_open_cmd(app, extra, environ), his_env(environ))
     t0, pids = time.time(), []
     while not pids and time.time() - t0 < timeout:
         pids = bundle_apps(app)

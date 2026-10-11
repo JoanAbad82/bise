@@ -38,3 +38,12 @@ export function fenceOffscreen(win: BrowserWindow): void {
     win.setPosition(OFF, OFF);
   });
 }
+
+/**
+ * The activation policy under the knob (amb-tools m_18713: a plain 'open' made the app the front one
+ * for ~4 s): 'accessory' from the first line, so LaunchServices' launch never brings it in front and
+ * it has no Dock icon; null otherwise (his app: a regular app). Pure.
+ */
+export function offscreenActivation(on: boolean, platform: string): 'accessory' | null {
+  return on && platform === 'darwin' ? 'accessory' : null;
+}
