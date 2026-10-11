@@ -15,9 +15,11 @@
   background: none; border: 0; resize: none;
 }
 .inbox-field:focus { outline: none; }
-/* R41: an image on his answer is the composer's chip: 16 px thumbnail, '[Image #n]' accent on accent-soft */
-.inbox-answer .b-chip.image { height: 20px; padding: 0 7px; margin-top: 1px; color: var(--c-accent); background: var(--c-accent-soft); }
-.inbox-answer .b-chip.image .thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; margin-right: -1px; }
+/* R41: an image on his answer is the composer's chip, the sent bubble's (designer m_18135): 1 px line,
+   r 9, 'image 1' in ink beside its 16 px thumbnail or the faint no-file glyph slot; never the accent */
+.inbox-answer .b-chip.image { gap: 5px; height: 20px; padding: 0 8px 0 3px; margin-top: 1px; color: var(--c-text); background: none; border: 1px solid var(--c-line); border-radius: 9px; }
+.inbox-answer .b-chip.image .thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; flex: none; }
+.inbox-answer .b-chip.image .thumb.none { display: inline-flex; color: var(--c-text-3); opacity: 0.7; }
 .inbox-acts { display: flex; justify-content: flex-end; margin-top: var(--s-2); }
 .inbox-acts button, .inbox-page {
   font: inherit; font-size: var(--t-12); color: var(--c-text-2); background: none; border: 0; padding: var(--s-1) var(--s-2);

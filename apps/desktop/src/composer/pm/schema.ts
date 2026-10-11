@@ -40,18 +40,51 @@ export function chipDom(c: Chip): HTMLElement {
   el.dataset.kind = c.kind;
   el.contentEditable = 'false';
   if (c.kind === 'image') {
+    // the sent bubble's chip (designer m_18135, signed 900f998e): the 16 px thumbnail (else the
+    // no-file glyph slot) and 'image 1' in ink; '[Image #1]' stays the copied text and the part's name
     el.title = c.name;
-    if (c.thumb !== undefined) {
-      const img = document.createElement('img');
-      img.className = 'thumb';
-      img.src = c.thumb;
-      img.alt = '';
-      img.draggable = false;
-      el.append(img);
-    }
+    el.append(c.thumb !== undefined ? thumbImg(c.thumb) : noFileGlyph());
+    el.append(imageChipWords(c.n));
+    return el;
   }
   el.append(chipLabel(c));
   return el;
+}
+
+/** An image chip's words on the input side: 'image 1', as his sent bubble shows it. Pure. */
+export const imageChipWords = (n: number): string => `image ${String(n)}`;
+
+function thumbImg(src: string): HTMLElement {
+  const img = document.createElement('img');
+  img.className = 'thumb';
+  img.src = src;
+  img.alt = '';
+  img.draggable = false;
+  return img;
+}
+
+/** The no-file glyph slot of the thread's Thumb (rows-cards.tsx): a faint image outline, 16 px. */
+function noFileGlyph(): HTMLElement {
+  const span = document.createElement('span');
+  span.className = 'thumb none';
+  span.setAttribute('aria-hidden', 'true');
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('width', '16');
+  svg.setAttribute('height', '16');
+  const shapes: [string, Record<string, string>][] = [
+    ['rect', { x: '2.5', y: '3.5', width: '11', height: '9', rx: '1.5', fill: 'none', stroke: 'currentColor' }],
+    ['circle', { cx: '6', cy: '6.5', r: '1', fill: 'currentColor' }],
+    ['path', { d: 'M3 11.5l3.5-3 2.5 2 2-1.5 2.5 2', fill: 'none', stroke: 'currentColor' }],
+  ];
+  for (const [tag, attrs] of shapes) {
+    const s = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs)) s.setAttribute(k, v);
+    svg.append(s);
+  }
+  span.append(svg);
+  return span;
 }
 
 export const ChipNode = Node.create({

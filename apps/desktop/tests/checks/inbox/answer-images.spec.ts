@@ -1,6 +1,6 @@
 // inbox/answer-images · R41 (ambient-lead m_13889; msg-parts m_18030, main 18a32ce3): he answers a card
 // with an image. Passes when, on the scripted core (FakeCore, fake data, a fixture PNG):
-//   - ⌘I: a PNG pasted in the item's answer field is a chip '[Image #1]'; his words + ⏎ send answer
+//   - ⌘I: a PNG pasted in the item's answer field is a chip 'image 1' (ink, 1 px line, r 9); his words + ⏎ send answer
 //     {reply '[Image #1] <words>', parts: [{kind:'image', name:'[Image #1]', source: its path in the
 //     test home's store}, {kind:'text', text: <words>}]}, no files;
 //   - an image alone (no words) + ⏎ answers with the image part only;
@@ -44,9 +44,10 @@ test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked 
 
     await test.step("⌘I: a pasted PNG is a chip; words + ⏎ send answer {parts: [image, text]}", async () => {
       await pasteImage(page, field, PNG);
-      // the composer's chip inside the field, before his words: thumbnail + '[Image #1]', no file name
+      // the composer's chip inside the field, before his words: thumbnail + 'image 1' in ink, the
+      // sent bubble's chip (designer m_18135), no file name, never the accent
       const chip = page.getByTestId('inbox.answer.image.1');
-      await expect(chip).toHaveText('[Image #1]', { timeout: 5000 });
+      await expect(chip).toHaveText('image 1', { timeout: 5000 });
       await expect(chip.locator('img.thumb'), 'a 16 px thumbnail').toHaveCount(1);
       await expect(page.getByTestId('inbox.answer.box').getByTestId('inbox.answer.image.1'), 'inside the field').toHaveCount(1);
       const look = await chip.evaluate((el) => {
@@ -60,10 +61,13 @@ test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked 
           d.remove();
           return c;
         };
-        return { color: cs.color, accent: probe(root.getPropertyValue('--c-accent')), bg: cs.backgroundColor, soft: probe(root.getPropertyValue('--c-accent-soft')), thumb: (el.querySelector('img.thumb') as HTMLElement).getBoundingClientRect().width };
+        return { color: cs.color, ink: probe(root.getPropertyValue('--c-text')), accent: probe(root.getPropertyValue('--c-accent')), bg: cs.backgroundColor, border: cs.borderTopWidth, radius: cs.borderTopLeftRadius, thumb: (el.querySelector('img.thumb') as HTMLElement).getBoundingClientRect().width };
       });
-      expect(look.color, 'accent words').toBe(look.accent);
-      expect(look.bg, 'on accent-soft').toBe(look.soft);
+      expect(look.color, 'ink words').toBe(look.ink);
+      expect(look.color, 'never the accent').not.toBe(look.accent);
+      expect(look.bg, 'no fill').toBe('rgba(0, 0, 0, 0)');
+      expect(look.border).toBe('1px');
+      expect(look.radius).toBe('9px');
       expect(look.thumb).toBe(16);
       await page.screenshot({ path: test.info().outputPath('inbox-image.png') });
       // ⌫ at the start of the words removes it, as the composer's ⌫ before a chip
@@ -116,7 +120,7 @@ test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked 
       await expect(page.getByTestId('inbox.block.open.1')).toBeVisible({ timeout: 3000 });
       const composer = '[data-testid="composer.field"]';
       await pasteImage(page, composer, PNG);
-      await expect(page.locator('[data-testid="composer"]')).toContainText('[Image #1]', { timeout: 5000 });
+      await expect(page.locator('[data-testid="composer"]')).toContainText('image 1', { timeout: 5000 });
       await page.locator(composer).first().click();
       await page.keyboard.press('End');
       await page.keyboard.type(' warm, like this');

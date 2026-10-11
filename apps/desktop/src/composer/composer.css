@@ -13,7 +13,7 @@
 .b-composer .in .b-field:focus-within { box-shadow: none; }
 .b-composer .b-field .p { margin: 0; }
 .b-composer .b-field-ph { position: absolute; inset: 3px auto auto 0; pointer-events: none; user-select: none; }
-.b-composer .b-chip.paste, .b-composer .b-chip.quote, .b-composer .b-chip.image, .b-composer .b-chip.artifact { height: 20px; padding: 0 7px; margin: 0 1px; vertical-align: 1px; color: var(--c-accent); background: var(--c-accent-soft); }
+.b-composer .b-chip.paste, .b-composer .b-chip.quote, .b-composer .b-chip.artifact { height: 20px; padding: 0 7px; margin: 0 1px; vertical-align: 1px; color: var(--c-accent); background: var(--c-accent-soft); }
 /* the TipTap field (pm/PmField.tsx, behind Composer.tsx ENGINE): its host adds no box; ProseMirror
    needs pre-wrap; the dictation's live words are dim with a pulsing dot, never a frame */
 .b-composer .b-field-host { display: contents; }
@@ -21,7 +21,11 @@
 .b-composer .b-field .b-dictation { color: var(--c-text-2); }
 .b-composer .b-field .b-dictation i { display: inline-block; width: 6px; height: 6px; margin: 0 5px 1px 1px; border-radius: 50%; background: var(--c-text-2); animation: b-blink 1s steps(1) infinite; }
 @media (prefers-reduced-motion: reduce) { .b-composer .b-field .b-dictation i { animation: none; } }
-.b-composer .b-chip.image .thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; margin-right: 5px; }
+/* an image chip is the sent bubble's (designer m_18135, signed 900f998e): 1 px line, r 9, 'image 1'
+   in ink beside its 16 px thumbnail or the faint no-file glyph slot; never the accent */
+.b-composer .b-chip.image { gap: 5px; height: 20px; padding: 0 8px 0 3px; margin: 0 1px; vertical-align: 1px; color: var(--c-text); background: none; border: 1px solid var(--c-line); border-radius: 9px; }
+.b-composer .b-chip.image .thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; flex: none; }
+.b-composer .b-chip.image .thumb.none { display: inline-flex; color: var(--c-text-3); opacity: 0.7; }
 .b-composer-strip { display: flex; flex-direction: column; gap: 2px; padding: 0 4px 6px; font: var(--t-12) var(--font-mono); color: var(--c-text-3); }
 .b-composer-strip .k { margin-left: 10px; }
 .b-composer-strip .n { color: var(--c-text-2); }

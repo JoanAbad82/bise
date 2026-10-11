@@ -265,13 +265,14 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
               }}
             >
               {takesWords(cur) && (
-                // the field's box holds the image chips (the composer's: thumbnail + '[Image #n]', accent
-                // on accent-soft, ⌫ at the start of his words removes the last) and then his words
+                // the field's box holds the image chips (the composer's, the sent bubble's: thumbnail or
+                // the no-file glyph + 'image n' in ink, designer m_18135; ⌫ at the start of his words
+                // removes the last) and then his words
                 <div className="inbox-answer" data-testid="inbox.answer.box">
                 {imagesOf(curKey).map((img, i) => (
                   <span key={img.path} className="b-chip image" data-kind="image" title={img.path} data-testid={`inbox.answer.image.${String(i + 1)}`}>
-                    {img.thumb !== undefined && <img className="thumb" src={img.thumb} alt="" />}
-                    {`[Image #${String(i + 1)}]`}
+                    {img.thumb !== undefined ? <img className="thumb" src={img.thumb} alt="" /> : <NoFileGlyph />}
+                    {`image ${String(i + 1)}`}
                   </span>
                 ))}
                 <textarea
@@ -360,4 +361,13 @@ export function keyOf(e: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'al
 function firstLine(q: string): string {
   const l = q.split('\n')[0] ?? '';
   return l.length > 80 ? `${l.slice(0, 79)}…` : l;
+}
+
+/** An image chip with no thumbnail: the thread's no-file glyph slot (rows-cards Thumb), 16 px, faint. */
+function NoFileGlyph() {
+  return (
+    <span className="thumb none" aria-hidden="true">
+      <svg viewBox="0 0 16 16" width="16" height="16"><rect x="2.5" y="3.5" width="11" height="9" rx="1.5" fill="none" stroke="currentColor" /><circle cx="6" cy="6.5" r="1" fill="currentColor" /><path d="M3 11.5l3.5-3 2.5 2 2-1.5 2.5 2" fill="none" stroke="currentColor" /></svg>
+    </span>
+  );
 }

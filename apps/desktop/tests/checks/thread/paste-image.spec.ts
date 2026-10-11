@@ -60,9 +60,38 @@ test("thread/paste-image: ⌘V of a PNG in bise main's composer is a chip, ⏎ s
     const chip = page.locator('[data-testid^="composer.chip."][data-kind="image"]');
     await expect(chip, 'the pasted PNG is an image chip').toHaveCount(1, { timeout: 5000 });
     expect(await chip.locator('img').first().evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0), 'its thumbnail is drawn').toBe(true);
+    // the sent bubble's chip (designer m_18135): 'image 1' in ink, 1 px line, r 9, no fill, never the accent
+    await expect(chip).toHaveText('image 1');
+    const look = await chip.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      const probe = (v: string): string => {
+        const d = document.createElement('i');
+        d.style.color = `var(${v})`;
+        document.body.append(d);
+        const c = getComputedStyle(d).color;
+        d.remove();
+        return c;
+      };
+      return { color: cs.color, ink: probe('--c-text'), accent: probe('--c-accent'), bg: cs.backgroundColor, border: cs.borderTopWidth, radius: cs.borderTopLeftRadius };
+    });
+    expect(look.color, 'ink words').toBe(look.ink);
+    expect(look.color, 'never the accent').not.toBe(look.accent);
+    expect(look.bg, 'no fill').toBe('rgba(0, 0, 0, 0)');
+    expect([look.border, look.radius]).toEqual(['1px', '9px']);
     await expect(page.locator('[data-testid^="composer.strip."]').filter({ hasText: '[Image #' }), "no '[Image #1] name' strip line in the window: the chip says it (designer m_13808)").toHaveCount(0);
     await page.keyboard.type('what is wrong in this');
     await page.screenshot({ path: test.info().outputPath('chip.png') });
+    // the same chip in dark, for designer's sheet (m_18135)
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.style.setProperty('color-scheme', 'dark');
+    });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: test.info().outputPath('chip-dark.png') });
+    await page.evaluate(() => {
+      document.documentElement.removeAttribute('data-theme');
+      document.documentElement.style.removeProperty('color-scheme');
+    });
 
     await page.keyboard.press('Enter');
     const sent = (await core.waitCmd((c) => c.cmd === 'send', 5000)) as Record<string, unknown>;
