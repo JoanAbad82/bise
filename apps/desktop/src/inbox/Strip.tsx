@@ -6,7 +6,7 @@
 // draws it from props; ThreadInbox (screen.tsx) is the one line the thread
 // mounts, fed by the store. Owner: amb-home.
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import type { Card } from '@/proto';
+import type { Card, Part } from '@/proto';
 import { Dot, Kbd } from '@/ds';
 import { age, dotOf, InboxCard, titleOf } from './InboxCard';
 import { cardKey } from './order';
@@ -14,7 +14,7 @@ import { STRIP_KEYS, stripKey, stripList, stripOpen, stripView, stripWords } fro
 import './inbox.css';
 
 export interface StripPorts {
-  answer: (project: string, card: number, reply: string, files?: readonly string[]) => void;
+  answer: (project: string, card: number, reply: string, parts?: readonly Part[]) => void;
   close: (project: string, card: number) => void;
   /** the whole inbox (⌘I) */
   openInbox: () => void;

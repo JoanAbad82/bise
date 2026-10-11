@@ -1,8 +1,9 @@
-// inbox/answer-images · R41 (ambient-lead m_13889, hub side amb-feed b4d4c5c0: HubCmd::Answer.files):
-// he answers a card with an image. Passes when, on the scripted core (FakeCore, fake data, a fixture PNG):
-//   - ⌘I: a PNG pasted in the item's answer field is a chip '[Image #1] checker.png'; his words + ⏎
-//     send answer {card 9, reply, files: [the image's path in the test home's store]};
-//   - an image alone (no words) + ⏎ answers with the image only (reply '');
+// inbox/answer-images · R41 (ambient-lead m_13889; msg-parts m_18030, main 18a32ce3): he answers a card
+// with an image. Passes when, on the scripted core (FakeCore, fake data, a fixture PNG):
+//   - ⌘I: a PNG pasted in the item's answer field is a chip '[Image #1]'; his words + ⏎ send answer
+//     {reply '[Image #1] <words>', parts: [{kind:'image', name:'[Image #1]', source: its path in the
+//     test home's store}, {kind:'text', text: <words>}]}, no files;
+//   - an image alone (no words) + ⏎ answers with the image part only;
 //   - the thread's docked answer: a PNG pasted in the composer goes with his words as answer
 //     {parts: [..., {kind:'image', source: its path}]}, no files (amb-win, main 18a32ce3).
 // That the asking agent's request carries the image block is the hub's (amb-feed's laws) and
@@ -30,10 +31,10 @@ const world = () => [
   { ev: 'agents', project: P, agents: [agent('main'), agent('perf')] },
   { ev: 'thread', project: P, agent: 'main', entries: [{ pos: 1, at_ms: 1791100001000, kind: 'agent', text: 'hello' }], before: null, more: false },
 ];
-type Cmd = { cmd?: string; card?: number; reply?: string; files?: string[]; parts?: { kind: string; source?: string }[] };
+type Cmd = { cmd?: string; card?: number; reply?: string; files?: string[]; parts?: { kind: string; source?: string; name?: string; text?: string }[] };
 const answers = (core: FakeCore) => core.cmds().filter((c) => (c as Cmd).cmd === 'answer') as Cmd[];
 
-test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked answer) goes with it as files', async () => {
+test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked answer) goes with it as a typed image part', async () => {
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: 'inbox' });
   const { page } = s;
@@ -41,7 +42,7 @@ test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked 
     const field = '[data-testid="inbox.answer"]';
     await expect(page.locator(field)).toBeVisible({ timeout: 10_000 });
 
-    await test.step("⌘I: a pasted PNG is a chip; words + ⏎ send answer {files}", async () => {
+    await test.step("⌘I: a pasted PNG is a chip; words + ⏎ send answer {parts: [image, text]}", async () => {
       await pasteImage(page, field, PNG);
       // the composer's chip inside the field, before his words: thumbnail + '[Image #1]', no file name
       const chip = page.getByTestId('inbox.answer.image.1');
@@ -85,9 +86,14 @@ test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked 
       await page.locator(field).press('Enter');
       await expect.poll(() => answers(core).length, { timeout: 3000 }).toBe(1);
       const a = answers(core)[0];
-      expect(a).toMatchObject({ card: answers(core)[0]?.card, reply: 'this one, see the shot' });
-      expect(a?.files?.length, 'one image').toBe(1);
-      expect(a?.files?.[0] ?? '', "the image's path in the test home's store").toMatch(/\/images\/[0-9a-f]+\.png$/);
+      // msg-parts (ambient-lead m_18030): the image as a typed part with its source, then his words;
+      // no files; the reply text keeps the label for older readers
+      expect(a).toMatchObject({ card: answers(core)[0]?.card, reply: '[Image #1] this one, see the shot' });
+      expect(a?.files, 'no files').toBeUndefined();
+      expect(a?.parts?.map((p) => p.kind)).toEqual(['image', 'text']);
+      expect(a?.parts?.[0]).toMatchObject({ kind: 'image', name: '[Image #1]' });
+      expect(a?.parts?.[0]?.source ?? '', "the image's path in the test home's store").toMatch(/\/images\/[0-9a-f]+\.png$/);
+      expect(a?.parts?.[1]).toMatchObject({ kind: 'text', text: 'this one, see the shot' });
     });
 
     await test.step('an image alone + ⏎ answers with the image only', async () => {
@@ -97,8 +103,9 @@ test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked 
       await expect(page.getByTestId('inbox.answer.image.1')).toBeVisible({ timeout: 5000 });
       await page.locator(field).press('Enter');
       await expect.poll(() => answers(core).length, { timeout: 3000 }).toBe(2);
-      expect(answers(core)[1]).toMatchObject({ card: 10, reply: '' });
-      expect(answers(core)[1]?.files?.length).toBe(1);
+      expect(answers(core)[1]).toMatchObject({ card: 10, reply: '[Image #1]' });
+      expect(answers(core)[1]?.files).toBeUndefined();
+      expect(answers(core)[1]?.parts?.map((p) => p.kind), 'the image alone').toEqual(['image']);
     });
 
     await test.step("the docked answer: a PNG pasted in the composer goes with his words", async () => {

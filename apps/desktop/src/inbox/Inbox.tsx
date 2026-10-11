@@ -12,7 +12,7 @@
 // close). The list's rows are memo'd: moving the keyboard re-renders the
 // two rows that change.
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import type { Card as CardRow } from '@/proto';
+import type { Card as CardRow, Part } from '@/proto';
 import { Empty, Head, Row } from '@/ds';
 import { dotOf, folds, InboxCard, titleOf } from './InboxCard';
 import { cardKey } from './order';
@@ -28,7 +28,8 @@ import './inbox.css';
 type AnswerImage = SavedImage & { readonly thumb?: string };
 
 export interface InboxPorts {
-  answer: (project: string, card: number, reply: string, files?: readonly string[]) => void;
+  /** his answer; with images, typed parts (the images, then his words) and the reply text with their labels */
+  answer: (project: string, card: number, reply: string, parts?: readonly Part[]) => void;
   /** close without answering (none: no close key, no button) */
   close?: (project: string, card: number) => void;
   /** esc: back where he was */
@@ -161,8 +162,16 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
   const run = (a: Act) => {
     if (a.t === 'answer') {
       const k = `${a.project}-${String(a.card)}`;
-      const files = imagesOf(k).map((i) => i.path);
-      ports.answer(a.project, a.card, a.reply, files);
+      // msg-parts (ambient-lead m_18030, as the composer's d68b4867): each image goes as a typed part
+      // with its source in the image store (the hub keeps it since main 18a32ce3), never as files; the
+      // reply text keeps the '[Image #n]' labels for older readers, the parts hold his words apart
+      const imgs = imagesOf(k);
+      if (imgs.length === 0) ports.answer(a.project, a.card, a.reply);
+      else {
+        const labels = imgs.map((_, i) => `[Image #${String(i + 1)}]`);
+        const parts: Part[] = [...imgs.map((im, i) => ({ kind: 'image' as const, name: labels[i] ?? '', source: im.path })), ...(a.reply.trim() === '' ? [] : [{ kind: 'text' as const, text: a.reply }])];
+        ports.answer(a.project, a.card, [...labels, a.reply].join(' ').trim(), parts);
+      }
       dropImages(k);
     }
     else if (a.t === 'close') ports.close?.(a.project, a.card);
