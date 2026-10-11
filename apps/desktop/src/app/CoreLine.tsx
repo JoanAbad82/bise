@@ -7,6 +7,7 @@
 // 'show the report' (the report main wrote, ~/.bise/reports; never sent anywhere).
 import { useEffect, useState } from 'react';
 import type { BiseApi, CoreExit, CoreState } from '@/shared/api';
+import { Button } from '@/ds';
 import { useCoreState } from '@/store';
 import { useRouter } from './router';
 
@@ -151,14 +152,14 @@ export function CoreLine() {
       {(v.start || (v.report && path !== null) || v.note !== undefined) && (
         <div className="app-core-row">
           {v.start && (
-            <button type="button" className="app-core-btn" data-testid="app.core.start" onClick={() => bise()?.core.start?.()}>
+            <Button size="sm" kind="ghost" testId="app.core.start" onClick={() => bise()?.core.start?.()}>
               start bise
-            </button>
+            </Button>
           )}
           {v.report && path !== null && (
-            <button type="button" className="app-core-btn" data-testid="app.core.report" onClick={() => { router.go({ screen: 'report' }); }}>
+            <Button size="sm" kind="ghost" testId="app.core.report" onClick={() => { router.go({ screen: 'report' }); }}>
               show the report
-            </button>
+            </Button>
           )}
           {v.note !== undefined && (
             <span className="app-core-note" data-testid="app.core.note">

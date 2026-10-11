@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import type { BiseApi, UpdateState } from '@/shared/api';
 import type { UpdateEv } from '@/proto';
+import { Button } from '@/ds';
 import { useHubUpdate, useProjects } from '@/store';
 import { useRoute } from './router';
 import { formatRoute } from './route';
@@ -58,13 +59,16 @@ export function UpdateLine() {
       if (!ok) setBusy(false);
     });
   };
+  // designer's raw-controls call (m_18343, his real-home screenshot showed a native button): the
+  // ds's small ghost Button; went_bad's words in the error tone with '▲', never pink
+  const bad = s.state === 'went_bad';
   return (
-    <div className="app-core app-update" role="status" data-testid="app.update" data-state={s.state}>
+    <div className={bad ? 'app-core app-update err' : 'app-core app-update'} role="status" data-testid="app.update" data-state={s.state}>
       <div className="app-core-head">
-        <span>{line.text}</span>
-        <button type="button" className="app-core-act" onClick={go} disabled={busy} data-testid={line.act === 'restart' ? 'app.update.restart' : 'app.update.back'}>
+        <span data-testid="app.update.text">{bad ? `▲ ${line.text}` : line.text}</span>
+        <Button size="sm" kind="ghost" onClick={go} disabled={busy} testId={line.act === 'restart' ? 'app.update.restart' : 'app.update.back'}>
           {busy ? (line.act === 'restart' ? 'restarting…' : 'going back…') : line.act}
-        </button>
+        </Button>
       </div>
     </div>
   );

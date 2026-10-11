@@ -15,6 +15,8 @@ export type DotState = "wk" | "nd" | "ok" | "er" | "off";
 export interface ButtonProps {
   children: ReactNode;
   kind?: "pri" | "ghost" | "danger";
+  /** sm: 26 px high, 10 px sides, t-13, for bars and lines (update line, core line, notify) */
+  size?: "sm";
   state?: UiState;
   disabled?: boolean;
   onClick?: MouseEventHandler<HTMLButtonElement>;
@@ -23,10 +25,10 @@ export interface ButtonProps {
   ref?: Ref<HTMLButtonElement>;
 }
 /** a button: a real <button>; `loading` hides its words under a spinner */
-export function Button({ children, kind, state, disabled, onClick, testId, title, ref }: ButtonProps) {
+export function Button({ children, kind, size, state, disabled, onClick, testId, title, ref }: ButtonProps) {
   const off = disabled || state === "disabled";
   return (
-    <button ref={ref} type="button" className={cx("b-btn", kind, st(state))} disabled={off} aria-busy={state === "loading" || undefined}
+    <button ref={ref} type="button" className={cx("b-btn", kind, size, st(state))} disabled={off} aria-busy={state === "loading" || undefined}
       onClick={onClick} data-testid={testId} title={title}>
       {children}
     </button>
