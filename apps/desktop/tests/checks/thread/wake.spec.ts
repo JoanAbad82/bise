@@ -102,6 +102,23 @@ test('thread/wake: an agent waiting for an event says what and how long; its wak
       await page.waitForTimeout(200);
       await page.screenshot({ path: test.info().outputPath(`wake-${t}-1100.png`) });
     }
+    // designer m_17827: (1) the composer's label follows the head, never 'idle'; (2) a turn that
+    // opens on its work keeps a new turn's gap under a wake line; (3) a blank row over the live line
+    await expect(page.locator('[data-testid="composer"] .end')).toHaveText(/… waiting · 2m/u);
+    await expect(page.locator('[data-testid="composer"] .end')).not.toHaveText(/idle/u);
+    const gaps = await page.evaluate(() => {
+      const txt = (id: string) => {
+        const el = document.querySelector(`[data-testid="${id}"]`);
+        if (el === null) return { top: 0, bottom: 0 };
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const b = range.getBoundingClientRect();
+        return { top: b.top, bottom: b.bottom };
+      };
+      return { underWake: txt('thread.who.8').top - txt('thread.wake.7').bottom, overLive: txt('thread.waiting').top - txt('thread.toolrow.8').bottom };
+    });
+    expect(gaps.underWake, "the next turn's name sits a turn's gap under the wake line").toBeGreaterThanOrEqual(10);
+    expect(gaps.overLive, 'a blank row over the live line').toBeGreaterThanOrEqual(14);
     // the fold opens the output, mono
     await page.getByTestId('thread.wake.3.fold').click();
     await expect(page.getByTestId('thread.wake.3').locator('.th-wake-out')).toHaveText('test cart::total ... FAILED\ntest result: FAILED. 210 passed; 2 failed');

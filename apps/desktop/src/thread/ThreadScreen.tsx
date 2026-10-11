@@ -33,6 +33,7 @@ import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
 import { composerWords, dividerEnd, emptyEnter, emptyEnterAct, usageLine } from './head';
+import { waitAge, waitSince, waitsEvent } from './wake';
 import { useNow } from '@/app/clock';
 import { SignInLine, useThreadSignIn } from './signin';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
@@ -104,7 +105,9 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
           modelLabel: models.find((m) => m.id === me.model)?.label,
           effort: me.effort,
           mode: approvals?.mode,
-          status: me.status,
+          // event-wake (designer m_17827): while it waits for an event the label follows the head
+          // ('… waiting · 2m'), never 'idle', the word he misread
+          status: waitsEvent(me) ? `… waiting · ${waitAge(now - (waitSince(me.watching) ?? now))}` : me.status,
           turnMs: me.status === 'working' ? (me.turn_ms ?? now - me.since_ms) : null,
           // named like the head's gauge ('context 42k · 17%'), none at 0% (designer m_14523: a bare
           // '15 · 0%' read as nothing)

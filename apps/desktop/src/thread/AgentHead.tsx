@@ -144,7 +144,7 @@ export function LiveLine({ a }: { a: Agent | undefined }) {
   // event-wake (designer's page): the thread ends on what it waits for, dim, never the accent
   if (a !== undefined && !a.archived && waitsEvent(a)) {
     return (
-      <div className="th-live" data-testid="thread.waiting" aria-live="polite">
+      <div className="th-live th-waiting" data-testid="thread.waiting" aria-live="polite">
         … {waitingFor(a.watching, now)}
       </div>
     );

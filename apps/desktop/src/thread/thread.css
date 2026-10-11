@@ -249,6 +249,13 @@
 .th-day + .th-row {
   padding-top: 10px;
 }
+/* a turn that opens on its work (its name line over a tool or a thinking row) keeps the gap of any
+   new turn: the virtual list wraps each row, so the sibling rule above never sees the row before
+   (designer m_17827 (2): 'perf 03:29' sat glued under '– stopped waiting for the reindex') */
+.th-row[data-head='true'][data-kind='tools'],
+.th-row[data-head='true'][data-kind='thinking'] {
+  padding-top: 10px;
+}
 
 /* a day ('today', 'yesterday', 'mon 6 oct') and 'session restored · 14:02': centred, thin rules */
 .th-day {
@@ -874,6 +881,10 @@ button.th-sched-head {
   color: var(--c-text-2);
   font: var(--t-13) var(--font-ui);
   padding: 6px 0 2px;
+}
+/* event-wake's live line: a blank row above it, as the terminal leaves (designer m_17827 (3)) */
+.th-live.th-waiting {
+  padding-top: 16px;
 }
 .th-handoff {
   display: block;
