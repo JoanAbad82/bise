@@ -821,13 +821,62 @@ def intent_line(+s: String) -> String:
 def call_intent(+args: String) -> String:
   intent_line(json_field.res(J.parse(args), "description", ""))
 
-def flat_in.pick(keep: Bool, +j: J.Json, +d: String, +dflt: String) -> String:
+def lone_str.kv(+k: String, v: J.Json, +rest: List<&2, String>) -> List<&2, String>:
+  match v:
+    case J.JStr{+s}:
+      Bool.pick(List<&2, String>, String.eq(k, "description"), rest, Con{s, rest})
+    case _:
+      rest
+
+def lone_str.go(kvs: List<&2, Sigma<&2, &2, String, _ => J.Json>>) -> List<&2, String>:
+  match kvs:
+    case Nil{}:
+      Nil{}
+    case Tuple{+k, +v} <> t:
+      lone_str.kv(k, v, lone_str.go(t))
+
+def lone_str.only(xs: List<&2, String>, +s: String, +dflt: String) -> String:
+  match xs:
+    case Nil{}:
+      s
+    case Con{_, _}:
+      dflt
+
+def lone_str.one(xs: List<&2, String>, +dflt: String) -> String:
+  match xs:
+    case Nil{}:
+      dflt
+    case Con{+s, t}:
+      lone_str.only(t, s, dflt)
+
+def lone_str(j: J.Json, +dflt: String) -> String:
+  match j:
+    case J.JObj{+kvs}:
+      lone_str.one(lone_str.go(kvs), dflt)
+    case _:
+      dflt
+
+# the flat "arg" of a call's JSON args; a bash call that renames it
+# (Mistral Large 4 sends {"command": ...} whatever the schema says) gets
+# its one string field other than "description"; dflt when neither. Only
+# bash: a structured input ({"code": ...}) rides as its JSON
+def flat_arg.of(m: Maybe<&2, String>, +bash: Bool, +j: J.Json, +dflt: String) -> String:
+  match m:
+    case Some{+s}:
+      s
+    case None{}:
+      Bool.pick(String, bash, lone_str(j, dflt), dflt)
+
+def flat_arg(+name: String, +j: J.Json, +dflt: String) -> String:
+  flat_arg.of(J.get_str(j, "arg"), String.eq(name, "bash"), j, dflt)
+
+def flat_in.pick(keep: Bool, +name: String, +j: J.Json, +d: String, +dflt: String) -> String:
   match keep:
     case True{}:
-      J.stringify(J.obj(Con{J.kv("arg", J.str(J.get_str_or(j, "arg", ""))),
+      J.stringify(J.obj(Con{J.kv("arg", J.str(flat_arg(name, j, ""))),
         Con{J.kv("description", J.str(d)), Nil{}}}))
     case False{}:
-      J.get_str_or(j, "arg", dflt)
+      flat_arg(name, j, dflt)
 
 # a flat call's input as the adapters read it: the "arg" string (dflt
 # when it has none), or for a bash call with a description, the
@@ -835,7 +884,7 @@ def flat_in.pick(keep: Bool, +j: J.Json, +d: String, +dflt: String) -> String:
 def flat_in(+name: String, +j: J.Json, +dflt: String) -> String:
   +d = intent_line(J.get_str_or(j, "description", ""))
   flat_in.pick(Bool.and(String.eq(name, "bash"),
-    Bool.not(String.is_empty(d))), j, d, dflt)
+    Bool.not(String.is_empty(d))), name, j, d, dflt)
 
 def flat_out.found(m: Maybe<&2, String>, +j: J.Json, +args: String) -> J.Json:
   match m:

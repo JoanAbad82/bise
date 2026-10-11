@@ -320,7 +320,9 @@ cache_read_price = 0.03
 name = "Mistral"
 hint = "Mistral's models, a free tier to start"
 keys_url = "https://console.mistral.ai/api-keys"
-model = "mistral-medium-latest"
+# Large 4: Mistral's best model (the user, 2026-10-11); mistral-large-latest
+# still points at Large 3 (2512), so the id names the version
+model = "mistral-large-4"
 api = "openai-chat"
 base_url = "https://api.mistral.ai/v1"
 key_env = "MISTRAL_API_KEY"

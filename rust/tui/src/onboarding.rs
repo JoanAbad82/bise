@@ -2539,7 +2539,7 @@ mod tests {
         o.on_key(key(KeyCode::Enter), 1, &e);
         // its models, the pick first and recommended
         let sc = screen(&o, 10, 110, 30);
-        assert!(sc.contains("which model?") && sc.contains("1 · mistral/mistral-medium-latest  recommended"), "{}", sc);
+        assert!(sc.contains("which model?") && sc.contains("1 · mistral/mistral-large-4  recommended"), "{}", sc);
         o.on_key(key(KeyCode::Enter), 1, &e);
         // the keys page, the field, where it goes
         let sc = screen(&o, 10, 110, 30);
@@ -2558,7 +2558,7 @@ mod tests {
         assert!(sc.contains("⏎ try again   tab another provider   esc back"), "{}", sc);
         assert!(!hm(&h).auth_file().exists() && !hm(&h).config_file().exists());
         o.on_key(key(KeyCode::Enter), 1, &e);
-        assert!(matches!(&o.sub, Sub::Paste(p, m, b) if p.id == "mistral" && m == "mistral/mistral-medium-latest" && b.is_empty()));
+        assert!(matches!(&o.sub, Sub::Paste(p, m, b) if p.id == "mistral" && m == "mistral/mistral-large-4" && b.is_empty()));
         // no credit: its own words; the key saved all the same (not the
         // model), enter checks it again
         type_key(&mut o, &e, "broke-key");
@@ -2583,7 +2583,7 @@ mod tests {
         assert!(sc.contains("add credit, then enter checks again.") && !sc.contains("i saved the key"), "{}", sc);
         // a key that can't use this model: pick another
         let paste = |o: &mut Onb, k: &str| {
-            o.sub = Sub::Paste(o.providers[mistral].clone(), "mistral/mistral-medium-latest".into(), String::new());
+            o.sub = Sub::Paste(o.providers[mistral].clone(), "mistral/mistral-large-4".into(), String::new());
             type_key(o, &e, k);
             // mistral has a key in auth.json: yes, replace it
             o.on_key(key(KeyCode::Enter), 1, &e);
@@ -2591,15 +2591,15 @@ mod tests {
         };
         paste(&mut o, "locked-key");
         let sc = screen(&o, 10, 110, 30);
-        assert!(sc.contains("✗ this key can't use mistral-medium-latest.") && sc.contains("Mistral said: \"not for you\""), "{}", sc);
+        assert!(sc.contains("✗ this key can't use mistral-large-4.") && sc.contains("Mistral said: \"not for you\""), "{}", sc);
         assert!(sc.contains("your account may not have access to this model yet.") && sc.contains("⏎ pick another model"), "{}", sc);
         o.on_key(key(KeyCode::Enter), 1, &e);
         assert!(matches!(&o.sub, Sub::Model(p, 0, _) if p.id == "mistral"));
         paste(&mut o, "good-key");
         // it works: the key in auth.json (0600), the model in config.toml
-        assert!(matches!(&o.sub, Sub::Works(_, m) if m == "mistral/mistral-medium-latest"));
+        assert!(matches!(&o.sub, Sub::Works(_, m) if m == "mistral/mistral-large-4"));
         let sc = screen(&o, 10, 110, 30);
-        assert!(sc.contains("it works: mistral-medium-latest answered.") && sc.contains("main uses mistral/mistral-medium-latest."), "{}", sc);
+        assert!(sc.contains("it works: mistral-large-4 answered.") && sc.contains("main uses mistral/mistral-large-4."), "{}", sc);
         // one key, every role: what runs the small jobs and auto's checker
         assert!(sc.contains("small jobs and auto's checker use mistral-small-latest."), "{}", sc);
         // a Mistral key runs the connectors and the voice input: no extras
@@ -2608,7 +2608,7 @@ mod tests {
         let f = hm(&h).auth_file();
         assert_eq!(bise_catalog::auth::Store::read(&f).unwrap().key("mistral"), Some("good-key"));
         assert_eq!(std::fs::metadata(&f).unwrap().permissions().mode() & 0o777, 0o600);
-        assert_eq!(o.model, "mistral/mistral-medium-latest");
+        assert_eq!(o.model, "mistral/mistral-large-4");
         assert!(!model_blocked(&o.setup, &o.found));
         assert!(!sc.contains("good-key"));
         o.on_key(key(KeyCode::Enter), 1, &e);
@@ -2715,7 +2715,7 @@ mod tests {
         ]));
         let mut o = Onb::new(&e);
         o.go(Step::Model, 0);
-        let sc = screen(&o, 10, 44, 30);
+        let sc = screen(&o, 10, 36, 30);
         let rows: Vec<&str> = sc.lines().collect();
         let i = rows.iter().position(|r| r.contains("Mistral. i'll use")).expect("the detail");
         // the wrapped row starts where the detail starts (same column)
@@ -2723,7 +2723,7 @@ mod tests {
         let start = col(rows[i], "Mistral").unwrap();
         let next: Vec<char> = rows[i + 1].chars().collect();
         assert!(next[start] != ' ' && next[start - 4..start].iter().all(|c| *c == ' '), "{}", sc);
-        assert!(sc.contains("mistral-medium-latest"), "{}", sc);
+        assert!(sc.contains("mistral-large-4"), "{}", sc);
     }
 
     #[test]
@@ -2809,7 +2809,7 @@ mod tests {
         let e = env_of(HashMap::from([
             ("HOME", h.to_string_lossy().to_string()),
             ("MISTRAL_API_KEY", "k".to_string()),
-            ("BISE_MODEL", "mistral/mistral-medium-latest".to_string()),
+            ("BISE_MODEL", "mistral/mistral-large-4".to_string()),
         ]));
         let mut o = Onb::new(&e);
         assert_eq!(o.steps(), vec![Step::Welcome, Step::Theme, Step::Lines]);

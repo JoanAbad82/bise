@@ -288,7 +288,7 @@ fn agents_pick_a_provider_then_a_model_then_its_effort() {
     assert!(sc.contains("agents · Mistral: which model?") && sc.contains("type to filter, or a model id that isn't listed."), "{sc}");
     let now = line_of(&sc, "mistral-small-latest");
     assert!(now.contains("›") && now.contains("✓ now") && !now.contains("mistral/"), "{sc}");
-    assert!(line_of(&sc, "mistral-medium-latest").contains("recommended"), "{sc}");
+    assert!(line_of(&sc, "mistral-large-4").contains("recommended"), "{sc}");
     // esc: back to the providers, on Mistral
     o.on_key(key(KeyCode::Esc), 1, &e);
     assert!(matches!(o.pick_rows("agents").get(o.sel), Some(PRow::Provider(p)) if p.id == "mistral"));

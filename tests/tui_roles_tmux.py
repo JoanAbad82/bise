@@ -125,7 +125,7 @@ def main():
         t.keys("Enter")
         sc = t.wait("voice · Mistral: which model?", 30)
         cap("05-voice-models")
-        assert "voxtral-transcribe-3" in sc and "mistral-medium-latest" not in sc, sc
+        assert "voxtral-transcribe-3" in sc and "mistral-large-4" not in sc, sc
         assert re.search(r"› voxtral-mini-latest +recommended", sc), sc
         # the model just checked: no second call
         n = len([r for r in E.fake_requests() if r.get("family") == "stt"])
@@ -156,7 +156,7 @@ def main():
         t.wait("› Mistral")
         t.keys("Enter")
         sc = t.wait("main · Mistral: which model?")
-        assert re.search(r"› mistral-medium-latest +recommended", sc), sc
+        assert re.search(r"› mistral-large-4 +recommended", sc), sc
         # an id it doesn't list
         t.typed("mistral-nova-1")
         sc = t.wait("+ use mistral/mistral-nova-1")
@@ -168,20 +168,20 @@ def main():
         t.keys("Enter")
         sc = t.wait("how hard should it think?")
         cap("10-main-effort")
-        assert "mistral-medium-latest for main" in sc, sc
+        assert "mistral-large-4 for main" in sc, sc
         t.keys("Enter")
-        sc = t.wait_re(r"main +Mistral +mistral-medium-latest")
+        sc = t.wait_re(r"main +Mistral +mistral-large-4")
         cap("11-models-mistral-twice")
         assert re.search(r"voice +Mistral +voxtral-mini-latest", sc), sc
-        assert re.search(r"agents +same as main · Mistral · mistral-medium-latest", sc), sc
+        assert re.search(r"agents +same as main · Mistral · mistral-large-4", sc), sc
         cfg = open(os.path.join(root, "config.toml")).read()
-        assert 'main = "mistral/mistral-medium-latest"' in cfg, cfg
+        assert 'main = "mistral/mistral-large-4"' in cfg, cfg
         # agents: same as main first
         t.keys("Down")
         t.keys("Enter")
         sc = t.wait("agents: which provider?")
         cap("12-agents-providers")
-        assert re.search(r"› same as main +Mistral · mistral-medium-latest · now", sc), sc
+        assert re.search(r"› same as main +Mistral · mistral-large-4 · now", sc), sc
         assert re.search(r"Mistral +✓ ready · main, small jobs, voice use it", sc), sc
         assert re.search(r"OpenAI +not set up", sc) and "more providers…" in sc, sc
         t.keys("Escape")
