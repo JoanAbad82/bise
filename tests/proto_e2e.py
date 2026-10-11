@@ -135,7 +135,13 @@ def parts_round(c, d, E, project, typed):
     c.wait_idle("main", timeout=90)
     e = [x for x in yous() if x.get("parts") == parts][-1]
     check(e["text"] == text, "the entry's text is the parts' template: %r" % e["text"][:200])
-    check(model_read(text), "the model read the parts' template: %r" % [r.get("user_tail") for r in E.fake_requests() if r.get("agent") == "main"][-2:])
+    # the fake provider logs a request after its reply's last byte, and a
+    # streamed reply ends the turn as soon as it is read: the log line can
+    # come after main is idle
+    try:
+        c.wait(lambda: model_read(text), 30, "the model read the parts' template")
+    except Exception:
+        check(False, "the model read the parts' template: %r" % [r.get("user_tail") for r in E.fake_requests() if r.get("agent") == "main"][-2:])
     tr = [l.split("\t", 1)[1] for l in open(os.path.join(E.state, "agents", "main", "transcript.log")).read().splitlines() if "\t" in l]
     check(any(l.startswith("sb you-parts : ") for l in tr), "the you-parts line is journaled")
     # both shapes: the same message as text alone (an older client) reads
@@ -145,6 +151,10 @@ def parts_round(c, d, E, project, typed):
     d.send({"cmd": "send", "project": project, "agent": "main", "text": text2, "mode": "now"})
     c.wait(lambda: any(x["text"] == text2 and x.get("parts") == parts2 for x in yous()), 60, "a text read back as its parts")
     c.wait_idle("main", timeout=90)
+    try:
+        c.wait(lambda: reads(text2) > 0, 30, "the text shape read")
+    except Exception:
+        pass
     n_reads = reads(text2)
     check(n_reads > 0, "the text shape read: %r" % [r.get("user_tail") for r in E.fake_requests() if r.get("agent") == "main"][-2:])
     d.send({"cmd": "send", "project": project, "agent": "main", "text": "", "parts": parts2, "mode": "now"})
