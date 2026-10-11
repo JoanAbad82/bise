@@ -78,8 +78,8 @@ impl Shell {
     }
 }
 
-/// The `partial` event (C2): `text` goes at `off` chars of the text so
-/// far (architect m_17813); "" at 0 when it ended.
+/// The `partial` event (C2): `text` goes at `off` (UTF-16 code units) of
+/// the text so far (architect m_17813, m_17866); "" at 0 when it ended.
 pub(super) fn partial_event(agent: &str, call: &str, off: usize, text: &str) -> Value {
     json!({"ev": "partial", "agent": agent, "call": call, "off": off, "text": text})
 }

@@ -37,15 +37,26 @@ def stream(c, agent="main"):
                 if e.get("method") in EVS and "id" not in e and (e.get("params") or {}).get("agent") == agent]
 
 
+def u16(s):
+    """The length of s in UTF-16 code units: the unit of a partial's off
+    (as JS indexes strings; architect m_17866)."""
+    return len(s.encode("utf-16-le")) // 2
+
+
 def fold(text, call, e):
     """One thread/partial onto the text so far (bise-proto's LiveText):
-    `text` goes at `off` chars; off 0 starts again; a gap empties it."""
+    `text` goes at `off` UTF-16 code units; off 0 starts again; a gap
+    (past the end, inside a surrogate pair, another call) empties it."""
     off = e.get("off", 0)
     if off == 0:
         return e["text"], e["call"]
-    if e["call"] != call or off > len(text):
+    if e["call"] != call or off > u16(text):
         return "", call
-    return text[:off] + e["text"], call
+    try:
+        head = text.encode("utf-16-le")[:off * 2].decode("utf-16-le")
+    except UnicodeDecodeError:
+        return "", call
+    return head + e["text"], call
 
 
 def partials(c, agent="main"):
@@ -135,9 +146,9 @@ def main():
         check(all(len(a) < len(b) for a, b in zip(live, live[1:])), "each partial grows")
         # deltas, never the whole text again (architect m_17813): the
         # events carry the answer once
-        sent = sum(len(p["delta"]) for p in ps)
-        check(sent == len(live[-1]), "the deltas add up to the text once: %d chars sent for %d" % (sent, len(live[-1])))
-        check(all(p["off"] == len(a) for p, a in zip(ps[1:], live) if p["delta"]), "each delta at the end of the text so far")
+        sent = sum(u16(p["delta"]) for p in ps)
+        check(sent == u16(live[-1]), "the deltas add up to the text once: %d units sent for %d" % (sent, u16(live[-1])))
+        check(all(p["off"] == u16(a) for p, a in zip(ps[1:], live) if p["delta"]), "each delta at the end of the text so far")
         check(len({p["call"] for p in ps}) == 1, "one call: %r" % {p["call"] for p in ps})
         check([p["text"] for p in ps].count("") == 1, "cleared once: %r" % [len(p["text"]) for p in ps])
         # the "" comes at the entry: no partial after it is non-empty

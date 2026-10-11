@@ -236,7 +236,7 @@ fn law_live_text_fold_is_the_hubs_text() {
             let n = (1 + next(5)).min(chars.len() - at).max(usize::from(chars.is_empty()));
             let chunk: String = chars[at..at + n.min(chars.len() - at)].iter().collect();
             if let PartialStep::Delta { off, text } = hub.step("1.0", at, &chunk) {
-                sent += text.chars().count();
+                sent += utf16_len(&text);
                 assert!(client.apply("1.0", off, &text));
                 let once = client.clone();
                 assert!(client.apply("1.0", off, &text), "a repeated event");
@@ -258,7 +258,7 @@ fn law_live_text_fold_is_the_hubs_text() {
             }
         }
         assert_eq!(hub.text(), unescape(&esc), "{esc:?}");
-        assert!(sent <= unescape(&esc).chars().count(), "each char sent once: {esc:?}");
+        assert!(sent <= utf16_len(&unescape(&esc)), "each char sent once: {esc:?}");
         if let Some(l) = late {
             // a late joiner ends with the same text (its whole text may
             // have carried the held `\` already)
@@ -275,6 +275,18 @@ fn law_live_text_fold_is_the_hubs_text() {
     c.apply("1.0", 0, "abcdé");
     c.apply("1.0", 2, "Z");
     assert_eq!(c.text, "abZ");
+    // off counts UTF-16 code units, as the desktop's JS does (architect
+    // m_17866): an astral char before the cut counts 2, a cut inside its
+    // surrogate pair is a gap
+    c.apply("1.0", 0, "a😀b");
+    assert!(c.apply("1.0", 4, "c"));
+    assert_eq!(c.text, "a😀bc");
+    assert!(c.apply("1.0", 3, "Z"));
+    assert_eq!(c.text, "a😀Z");
+    assert!(!c.apply("1.0", 2, "Z") && c.is_empty());
+    let mut h = Partial::default();
+    assert_eq!(h.step("1.0", 0, "日😀"), PartialStep::Delta { off: 0, text: "日😀".into() });
+    assert_eq!(h.step("1.0", 2, "x"), PartialStep::Delta { off: 3, text: "x".into() });
     // "" at 0 ends it
     c.apply("1.0", 0, "");
     assert!(c.is_empty());

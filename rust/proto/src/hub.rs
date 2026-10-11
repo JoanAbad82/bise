@@ -86,7 +86,8 @@ pub enum HubEv {
     Typing { project: Project, agent: String, text: String },
     /// a subscribed agent's answer as it streams in (at most ~4 a
     /// second): `call` its `<call>.<attempt>`, `text` what goes at `off`
-    /// (in chars, Unicode scalar values) of the text so far: the client
+    /// of the text so far, `off` in UTF-16 code units (as JS indexes a
+    /// string, like VoiceLit.said; architect m_17866): the client
     /// keeps `text[..off] + text` (thread::lines::LiveText, so a repeated
     /// event is harmless), never the whole text again (architect m_17813:
     /// whole texts were quadratic in the reply). Subscribe sends the

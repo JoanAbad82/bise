@@ -402,7 +402,8 @@ fn partial(r: &str) -> Option<Rec> {
 /// the next block (a new call, or offset 0), never a guess.
 ///
 /// It also keeps the unescaped text it sent, so each line goes out as a
-/// delta (`off` in chars of the unescaped text, architect m_17813), never
+/// delta (`off` in UTF-16 code units of the unescaped text, architect
+/// m_17813 and m_17866), never
 /// the whole text again: a trailing `\` is held back until the next
 /// delta says whether it starts a `\n`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -411,7 +412,8 @@ pub struct Partial {
     esc: String,
     len: usize,
     broken: bool,
-    /// the unescaped text sent so far, and its length in chars
+    /// the unescaped text sent so far, and its length in UTF-16 code
+    /// units (the unit of a delta's `off`)
     sent: String,
     sent_len: usize,
     /// the escaped text ends in a `\` not sent yet
@@ -471,7 +473,7 @@ impl Partial {
             return PartialStep::Drop;
         }
         self.sent.push_str(&delta);
-        self.sent_len += delta.chars().count();
+        self.sent_len += utf16_len(&delta);
         PartialStep::Delta { off: at, text: delta }
     }
 
@@ -484,17 +486,18 @@ impl Partial {
 }
 
 /// A client's live answer, folded from the `partial` events
-/// ([`PartialStep::Delta`]: `text` goes at `off` chars): the text keeps
-/// `text[..off]` and appends, so an event that comes twice changes
-/// nothing. Offset 0 starts again (a new subscriber gets the whole text
-/// that way); "" at 0 is the end. An offset past the text or another
-/// call's delta (a gap) empties it until the next offset 0: never a
-/// guess.
+/// ([`PartialStep::Delta`]: `text` goes at `off` UTF-16 code units): the
+/// text keeps `text[..off]` and appends, so an event that comes twice
+/// changes nothing. Offset 0 starts again (a new subscriber gets the
+/// whole text that way); "" at 0 is the end. An offset past the text,
+/// inside a surrogate pair, or another call's delta (a gap) empties it
+/// until the next offset 0: never a guess.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct LiveText {
     pub call: String,
     pub text: String,
-    chars: usize,
+    /// the text's length in UTF-16 code units (the unit of `off`)
+    units: usize,
 }
 
 impl LiveText {
@@ -503,25 +506,51 @@ impl LiveText {
         if off == 0 {
             self.call = call.to_string();
             self.text.clear();
-            self.chars = 0;
-        } else if call != self.call || off > self.chars {
-            self.text.clear();
-            self.chars = 0;
-            return false;
-        } else if off < self.chars {
-            let at = self.text.char_indices().nth(off).map_or(self.text.len(), |(i, _)| i);
+            self.units = 0;
+        } else if call != self.call || off > self.units {
+            return self.gap();
+        } else if off < self.units {
+            let Some(at) = utf16_byte_index(&self.text, off) else { return self.gap() };
             self.text.truncate(at);
-            self.chars = off;
+            self.units = off;
         }
         self.text.push_str(text);
-        self.chars += text.chars().count();
+        self.units += utf16_len(text);
         true
+    }
+
+    fn gap(&mut self) -> bool {
+        self.text.clear();
+        self.units = 0;
+        false
     }
 
     /// Nothing to show.
     pub fn is_empty(&self) -> bool {
         self.text.is_empty()
     }
+}
+
+/// The length of `s` in UTF-16 code units: the unit of a partial's `off`,
+/// as JS indexes strings (architect m_17866; VoiceLit.said too).
+pub fn utf16_len(s: &str) -> usize {
+    s.chars().map(char::len_utf16).sum()
+}
+
+/// The byte index of UTF-16 code unit `off` in `s`; None when `off` falls
+/// inside a surrogate pair or past the end.
+fn utf16_byte_index(s: &str, off: usize) -> Option<usize> {
+    let mut units = 0;
+    for (i, c) in s.char_indices() {
+        if units == off {
+            return Some(i);
+        }
+        if units > off {
+            return None;
+        }
+        units += c.len_utf16();
+    }
+    (units == off).then_some(s.len())
 }
 
 /// The lines that end a streamed attempt without its answer: a provider

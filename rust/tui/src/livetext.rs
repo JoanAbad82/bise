@@ -15,7 +15,8 @@ use ratatui::text::{Line, Span};
 /// One agent's answer so far (bise-proto's fold of the deltas).
 pub(crate) type Live = bise_proto::thread::lines::LiveText;
 
-/// The `partial` event: `text` goes at `off` chars of the answer so far;
+/// The `partial` event: `text` goes at `off` (UTF-16 code units) of the
+/// answer so far;
 /// "" at 0 ends it, a gap empties it until the next off 0.
 pub(crate) fn on_event(lives: &mut std::collections::HashMap<String, Live>, agent: &str, call: &str, off: usize, text: &str) {
     let live = lives.entry(agent.to_string()).or_default();
