@@ -112,3 +112,84 @@ def kvs(x: Link) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
 def json(x: Link) -> J.Json:
   J.obj(kvs(x))
 
+# ---- sb-core's answer: bise_proto::core::link::Answer (untagged: its keys
+# say which shape) ----
+
+type Answer is Data:
+  # step
+  AStep{fx: List<&2, J.Json>, dirty: Bool, view: J.Json}
+  # need
+  ANeed{need: J.Json}
+  # view
+  AView{view: J.Json}
+  # skipped
+  ASkipped{skipped: Bool}
+  # skipped_at
+  ASkippedAt{skipped: List<&2, Nat>}
+  # error
+  AError{error: String}
+  # done
+  ADone{}
+
+def AStep.of(+i: J.Json) -> Answer:
+  AStep{K.get_js(i, "fx"), K.get_b(i, "dirty"), K.get_j(i, "view")}
+
+def ANeed.of(+i: J.Json) -> Answer:
+  ANeed{K.get_j(i, "need")}
+
+def AView.of(+i: J.Json) -> Answer:
+  AView{K.get_j(i, "view")}
+
+def ASkipped.of(+i: J.Json) -> Answer:
+  ASkipped{K.get_b(i, "skipped")}
+
+def ASkippedAt.of(+i: J.Json) -> Answer:
+  ASkippedAt{K.get_ns(i, "skipped")}
+
+def AError.of(+i: J.Json) -> Answer:
+  AError{K.get_s(i, "error")}
+
+def ADone.of(i: J.Json) -> Answer:
+  ADone{}
+
+def answer_kvs(x: Answer) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match x:
+    case AStep{+fx, +dirty, +view}:
+      [J.kv("fx", J.JArr{fx}), J.kv("dirty", J.JBool{dirty}), J.kv("view", view)]
+    case ANeed{+need}:
+      [J.kv("need", need)]
+    case AView{+view}:
+      [J.kv("view", view)]
+    case ASkipped{+skipped}:
+      [J.kv("skipped", J.JBool{skipped})]
+    case ASkippedAt{+skipped}:
+      [J.kv("skipped", J.JArr{K.jnats(skipped)})]
+    case AError{+error}:
+      [J.kv("error", J.JStr{error})]
+    case ADone{}:
+      Nil{}
+
+def answer_json(x: Answer) -> J.Json:
+  J.obj(answer_kvs(x))
+
+def answer_step(+fx: List<&2, J.Json>, +dirty: Bool, +view: J.Json) -> J.Json:
+  answer_json(AStep{fx, dirty, view})
+
+def answer_need(+need: J.Json) -> J.Json:
+  answer_json(ANeed{need})
+
+def answer_view(+view: J.Json) -> J.Json:
+  answer_json(AView{view})
+
+def answer_skipped(+skipped: Bool) -> J.Json:
+  answer_json(ASkipped{skipped})
+
+def answer_skipped_at(+skipped: List<&2, Nat>) -> J.Json:
+  answer_json(ASkippedAt{skipped})
+
+def answer_error(+error: String) -> J.Json:
+  answer_json(AError{error})
+
+def answer_done() -> J.Json:
+  answer_json(ADone{})
+

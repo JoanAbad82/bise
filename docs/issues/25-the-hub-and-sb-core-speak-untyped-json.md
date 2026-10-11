@@ -108,3 +108,10 @@ values, the journal byte-equal on a replay, the e2e transcripts equal
   rust/proto/fixtures/legacy_lines.jsonl, 97 shapes. It ships in a release
   BEFORE sha 2 writes the new form, so a probation rollback always reads
   his transcripts (architect m_18679 Q3).
+- chunk B sha 1: `Answer` (link.rs), sb-core's answer line typed too
+  (architect m_18671): untagged, one shape per row of `link::ANSWER`
+  (`{fx, dirty, view}`, `{need}`, `{view}`, `{skipped: true}`,
+  `{skipped: [i]}`, `{error}`, `{}`), `Unknown` kept whole, an unknown
+  effect in `fx` an `Fx::Unknown`; its Bend encoders `answer_<shape>` in
+  gen/link.bend with a decode∘encode law each; fixture
+  core_answer.jsonl (one real sb-core answer per shape).

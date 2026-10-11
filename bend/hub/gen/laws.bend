@@ -1386,3 +1386,56 @@ law fx_FRenamed_round:
 def fx_FRenamed_round(old, new):
   {==}
 
+# ---- Answer ----
+
+law answer_step_round:
+  for fx: List<&2, J.Json>
+  for dirty: Bool
+  for view: J.Json
+  {LINK.AStep.of(LINK.answer_json(LINK.AStep{fx, dirty, view})) == LINK.AStep{fx, dirty, view} : LINK.Answer}
+
+def answer_step_round(fx, dirty, view):
+  {==}
+
+law answer_need_round:
+  for need: J.Json
+  {LINK.ANeed.of(LINK.answer_json(LINK.ANeed{need})) == LINK.ANeed{need} : LINK.Answer}
+
+def answer_need_round(need):
+  {==}
+
+law answer_view_round:
+  for view: J.Json
+  {LINK.AView.of(LINK.answer_json(LINK.AView{view})) == LINK.AView{view} : LINK.Answer}
+
+def answer_view_round(view):
+  {==}
+
+law answer_skipped_round:
+  for skipped: Bool
+  {LINK.ASkipped.of(LINK.answer_json(LINK.ASkipped{skipped})) == LINK.ASkipped{skipped} : LINK.Answer}
+
+def answer_skipped_round(skipped):
+  {==}
+
+law answer_skipped_at_round:
+  for skipped: List<&2, Nat>
+  {LINK.ASkippedAt.of(LINK.answer_json(LINK.ASkippedAt{skipped})) == LINK.ASkippedAt{skipped} : LINK.Answer}
+
+def answer_skipped_at_round(skipped):
+  %K.nats_round(skipped) : {LINK.ASkippedAt.of(LINK.answer_json(LINK.ASkippedAt{skipped})) == LINK.ASkippedAt{_} : LINK.Answer}
+  {==}
+
+law answer_error_round:
+  for error: String
+  {LINK.AError.of(LINK.answer_json(LINK.AError{error})) == LINK.AError{error} : LINK.Answer}
+
+def answer_error_round(error):
+  {==}
+
+law answer_done_round:
+  {LINK.ADone.of(LINK.answer_json(LINK.ADone{})) == LINK.ADone{} : LINK.Answer}
+
+def answer_done_round():
+  {==}
+

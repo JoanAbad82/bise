@@ -17,7 +17,10 @@
         the fixtures: core_in.jsonl (the steps, one per tag and shape, the
         smallest first), core_link.jsonl (the link's own requests, evs
         trimmed), core_fx.jsonl (the effects of the answers, likewise),
-        each path given replaced by its placeholder.
+        each path given replaced by its placeholder;
+    core_capture.py answers <real sb-core> <core_answer.jsonl>
+        one answer of each shape (sb-core's answer line, link::Answer):
+        the real sb-core's answers to ANSWER_SCRIPT on a fresh state.
 
 Throwaway hubs with the fake provider only (architect m_18326). When the
 hub kills the proxy (-9: core_restart.py), a watchdog kills the real one.
@@ -116,6 +119,39 @@ def drive(d):
         p.kill()
 
 
+# one request per shape of sb-core's answer (bise_proto::core::link::Answer)
+ANSWER_SCRIPT = [
+    '{"t": "init", "workspace": "<ws>"}',  # {}
+    '{"t": "ping"}',  # {}
+    '{"t": "replay", "ev": {"t": "weather"}}',  # skipped: true
+    '{"t": "replay_many", "evs": [{"t": "weather"}]}',  # skipped: [0]
+    '{"t": "view_all"}',  # view
+    '{"t": "tick", "now": 1, "git": false, "ans": []}',  # fx, dirty, view
+    # a task with its worktree, in a git repo: the git query first
+    '{"t": "new", "base": "b", "brief": "x", "brief_text": "x", "objective": "x", "worktree": true,'
+    ' "with_changes": false, "now": 2, "git": true, "ans": []}',  # need
+    'not json',  # error
+]
+
+
+def answers(real, out):
+    """core_answer.jsonl: the real sb-core's answer to each line of
+    ANSWER_SCRIPT, on a fresh state (fake data only)."""
+    port = free_port()
+    p = subprocess.Popen([real], env=dict(os.environ, SB_CORE_PORT=str(port)),
+                         stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+    try:
+        p.stdout.readline()
+        c = socket.create_connection(("127.0.0.1", port))
+        r = c.makefile("rb")
+        with open(out, "w") as f:
+            for line in ANSWER_SCRIPT:
+                c.sendall((line + "\n").encode())
+                f.write(json.dumps(json.loads(r.readline()), ensure_ascii=False) + "\n")
+    finally:
+        p.kill()
+
+
 LINK = {"init", "replay", "replay_many", "ping", "view_all"}
 ENVELOPE = ("now", "git", "ans")
 
@@ -186,6 +222,8 @@ def main():
         proxy(*sys.argv[2:4])
     elif cmd == "drive":
         drive(sys.argv[2])
+    elif cmd == "answers":
+        answers(sys.argv[2], sys.argv[3])
     elif cmd == "split":
         args = sys.argv[2:]
         pairs = []

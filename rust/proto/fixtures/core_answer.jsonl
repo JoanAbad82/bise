@@ -1,0 +1,8 @@
+{}
+{}
+{"skipped": true}
+{"skipped": [0]}
+{"view": {"agents": [{"name": "main", "dir": "main", "is_main": true, "parent": null, "brief": {"objective": "", "context": "", "constraints": [], "done_when": null, "report_format": null}, "created_ms": 0, "ws": {"mode": "shared", "path": "<ws>", "branch": null, "base_commit": null, "dropped": false}, "lifecycle": "active", "failure": null, "declared": null, "last_report": null, "aliases": [], "files": [], "snapshot_ref": null, "follow": false, "run": "down", "waiting": false, "waiting_on": null, "turn_ms": null, "turns": 0}], "all_agents": true, "msgs": [], "all_msgs": true, "next_msg": 1, "next_card": 1, "order": ["main"], "cards": [], "notes": [], "timers": [], "timers_ended": [], "wakes": [], "wakes_ended": []}}
+{"fx": [], "dirty": false, "view": {"agents": [], "all_agents": false, "msgs": [], "all_msgs": false, "next_msg": 1, "next_card": 1}}
+{"need": {"q": "worktree_create", "name": "b", "with_changes": false}}
+{"error": "json: invalid literal: expected null"}

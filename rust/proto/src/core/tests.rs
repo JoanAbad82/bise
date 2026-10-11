@@ -127,3 +127,44 @@ fn a_feed_record_is_one_line_with_its_kind_in_front() {
     }
     assert!(Feed::read_rest("card :: [1]").unwrap().1.is_err(), "not an object: the writer's bug, never a guess");
 }
+
+#[test]
+fn each_answer_shape_reads_as_its_row_and_writes_back() {
+    let kill = json!({"fx": "kill", "agent": "a"});
+    for k in link::ANSWER.kinds {
+        let mut m = Map::new();
+        for f in k.fields {
+            let v = match (k.tag, f.name) {
+                ("step", "fx") => json!([kill, {"fx": "dance", "x": 1}]),
+                _ => full(f.kind, f.name),
+            };
+            m.insert(f.name.into(), v);
+        }
+        let v = Value::Object(m);
+        let a: Answer = serde_json::from_value(v.clone()).unwrap();
+        let rust = match &a {
+            Answer::Step(_) => "Step",
+            Answer::Need(_) => "Need",
+            Answer::View(_) => "View",
+            Answer::Skipped(_) => "Skipped",
+            Answer::Error(_) => "Error",
+            Answer::Done(_) => "Done",
+            Answer::Unknown(_) => "Unknown",
+        };
+        assert_eq!(rust, k.rust, "{}: {v}", k.tag);
+        assert_eq!(a.to_value(), v, "{}", k.tag);
+    }
+}
+
+#[test]
+fn an_answer_keeps_what_it_does_not_know() {
+    let a = Answer::decode_line(r#"{"fx": [{"fx": "dance"}], "dirty": true, "view": {}}"#).unwrap();
+    let Answer::Step(s) = &a else { panic!("{a:?}") };
+    assert!(matches!(&s.fx[0], Fx::Unknown { tag, .. } if tag == "dance"), "an unknown effect, not a failed answer");
+    // an old sb-core's step without a view
+    assert!(matches!(Answer::decode_line(r#"{"fx": [], "dirty": false}"#).unwrap(), Answer::Step(_)));
+    let odd = json!({"weather": "blue"});
+    assert_eq!(serde_json::from_value::<Answer>(odd.clone()).unwrap(), Answer::Unknown(odd));
+    assert!(matches!(Answer::decode_line("{}").unwrap(), Answer::Done(_)));
+    assert!(Answer::decode_line("nope").is_err());
+}
