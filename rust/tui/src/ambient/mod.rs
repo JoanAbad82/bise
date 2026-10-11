@@ -287,6 +287,10 @@ pub fn core_main(
         core.set_setup(s);
         core.app_start();
     }
+    // one line per start in core.log, so an empty log never reads as a
+    // healthy core (ambient-lead m_18943: 0 bytes in both of his launches)
+    let exe = std::env::current_exe().map(|e| e.display().to_string()).unwrap_or_default();
+    eprintln!("ambient-core: up, {exe}, bise home {}", home.root().display());
     let mut out = io::stdout().lock();
     run(&mut core, rx, &mut out, &mut io::stderr(), fake_ev.into_iter().collect());
     0

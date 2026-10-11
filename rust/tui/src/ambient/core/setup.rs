@@ -317,7 +317,10 @@ impl Core {
                     }
                     (r, _) => r,
                 };
-                self.poll_projects(true);
+                if let Err(e) = &res {
+                    eprintln!("ambient-core: project_add {path}: {e}");
+                }
+                self.projects_now();
                 ("project_add", res)
             }
             AppCmd::ProjectRemove { project } => {

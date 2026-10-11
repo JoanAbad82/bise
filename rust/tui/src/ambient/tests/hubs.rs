@@ -417,6 +417,29 @@ fn a_core_without_projects_holds_nothing() {
     assert!(!has(&t.take(), "projects"));
 }
 
+/// ambient-lead m_18943: his add answers with the rows even before the
+/// window's first `shown` (realshape's no-env core asks before any), and a
+/// refused add says why; other news says nothing until `shown`.
+#[test]
+fn an_add_before_shown_answers_with_the_rows() {
+    let mut t = T::new();
+    t.ready();
+    let _w = world(&mut t);
+    super::setup::setup_ports(&mut t);
+    t.out.extend(t.core.take_out());
+    assert!(!has(&t.take(), "projects"), "no rows before shown");
+    t.cmd(Cmd::parse(r#"{"cmd":"project_add","path":"/p/blog"}"#).unwrap());
+    t.out.extend(t.core.take_out());
+    let out = t.take();
+    let rows = out.iter().find(|v| v["ev"] == "projects").expect("the add answers with the rows");
+    assert_eq!(rows["projects"].as_array().map(Vec::len), Some(4));
+    assert!(!has(&out, "error"));
+    t.cmd(Cmd::parse(r#"{"cmd":"project_add","path":"/p/home"}"#).unwrap());
+    t.out.extend(t.core.take_out());
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("a refused add says why");
+    assert_eq!((e["cmd"].as_str(), e["text"].as_str()), (Some("project_add"), Some("that's bise's home")));
+}
+
 #[test]
 fn a_command_is_written_at_most_once_and_ends_written_or_errored() {
     // architect m_8956: waiting never re-sends what a hub may already have

@@ -683,6 +683,21 @@ impl Core {
         self.emit_projects();
     }
 
+    /// His `project_add` answers with the rows whatever the window said:
+    /// the registry read again and `projects` sent even before `shown`
+    /// (ambient-lead m_18943: a core asked before any `shown`, as
+    /// realshape's no-env run does, added the folder and said nothing).
+    pub(super) fn projects_now(&mut self) {
+        if self.hubs.shown.is_some() {
+            return self.poll_projects(true);
+        }
+        let Some(p) = self.hubs.ports.as_ref() else { return };
+        self.hubs.rows = (p.facts.rows)();
+        self.hubs.git = self.hubs.rows.iter().map(|r| (r.id.clone(), (p.facts.git)(&r.path))).collect();
+        self.hold();
+        self.emit_rows();
+    }
+
     /// `projects` when the rows changed.
     pub(super) fn emit_projects(&mut self) {
         // no rows before the window says what it shows (home's early
@@ -690,6 +705,10 @@ impl Core {
         if self.hubs.shown.is_none() {
             return;
         }
+        self.emit_rows();
+    }
+
+    fn emit_rows(&mut self) {
         let Some(p) = self.hubs.ports.as_ref() else { return };
         let conns = &self.hubs.conns;
         let facts: Vec<Facts> = projects::facts(
