@@ -5,11 +5,7 @@
 /** bare controls per file (path under src/) */
 export const PENDING_RAW: Readonly<Record<string, number>> = {
   'agents/Tune.tsx': 8,
-  'app/Frame.tsx': 3,
   'app/Palette.tsx': 3,
-  'app/Panel.tsx': 1,
-  'app/Refused.tsx': 1,
-  'app/Sidebar.tsx': 3,
   'artifacts/List.tsx': 1,
   'artifacts/Screen.tsx': 2,
   'capsule/Capsule.tsx': 1,

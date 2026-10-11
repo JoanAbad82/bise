@@ -4,29 +4,37 @@
 /* IconButton: 28×28 (24 in bars), r-2, the glyph text-2, a 6% tint on hover, the ds focus ring */
 .b-ibtn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:28px;height:28px;padding:0;border:0;border-radius:var(--r-2);background:none;color:var(--c-text-2);font:var(--t-14)/1 var(--font-ui);cursor:default;transition:background var(--d-fast) var(--ease-out),color var(--d-fast) var(--ease-out)}
 .b-ibtn.bar{width:24px;height:24px;font-size:var(--t-13)}
+.b-ibtn.row{width:16px;height:20px;border-radius:var(--r-1);color:var(--c-text-3);font:inherit}
 .b-ibtn:hover,.b-ibtn.is-hover{background:var(--c-hover);color:var(--c-text)}
 .b-ibtn:active,.b-ibtn.is-active{background:var(--c-press)}
 .b-ibtn.on{background:var(--c-active);color:var(--c-text)}
 .b-ibtn:focus-visible,.b-ibtn.is-focus{outline:0;box-shadow:0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
 .b-ibtn:disabled,.b-ibtn.is-disabled{opacity:.4}
 
+/* SearchButton: the sidebar's search pill (⌕, words, key), opens the palette */
+.b-search{flex:none;display:flex;align-items:center;gap:7px;width:100%;height:30px;padding:0 9px;border:0;border-radius:var(--r-2);background:color-mix(in srgb,var(--c-text) 5%,transparent);color:var(--c-text-3);font:var(--t-13) var(--font-ui);text-align:left;cursor:default}
+.b-search:hover,.b-search.is-hover{background:var(--c-hover)}
+.b-search:focus-visible{outline:2px solid var(--c-focus);outline-offset:2px}
+.b-search .w{flex:1}
+
 /* Act: an inline text action, text-2, underlined on hover, a 1 px focus ring; err: the error tone */
-.b-act{display:inline;padding:0 1px;border:0;border-radius:var(--r-1);background:none;color:var(--c-text-2);font:inherit;text-underline-offset:2px;cursor:default;white-space:nowrap}
+.b-act{display:inline;padding:0 2px;border:0;border-radius:4px;background:none;color:var(--c-text-2);font:inherit;text-underline-offset:2px;cursor:default;white-space:nowrap}
 .b-act:hover,.b-act.is-hover{color:var(--c-text);text-decoration:underline}
-.b-act:focus-visible,.b-act.is-focus{outline:1px solid var(--c-focus);outline-offset:1px}
+.b-act:focus-visible,.b-act.is-focus{outline:1px solid var(--c-focus);outline-offset:0}
 .b-act.err{color:var(--c-err)}
 .b-act:disabled,.b-act.is-disabled{opacity:.5;text-decoration:none}
 
 /* TextArea: the Field's frame around a textarea that grows with its words to 40% of the window */
-.b-field.b-area{height:auto;align-items:stretch;padding:6px 10px}
-.b-field.b-area textarea{flex:1;min-width:0;min-height:calc(1.45em * 2);max-height:40vh;field-sizing:content;resize:none;overflow:auto;padding:0;border:0;outline:0;background:none;color:inherit;font:inherit;line-height:1.45}
+.b-field.b-area{width:100%;box-sizing:border-box;height:auto;align-items:stretch;padding:6px 10px}
+.b-field.b-area textarea{flex:1;width:100%;min-width:0;min-height:calc(1.45em * 2);max-height:40vh;field-sizing:content;resize:none;overflow:auto;padding:0;border:0;outline:0;background:none;color:inherit;font:inherit;line-height:1.45}
 .b-field.b-area textarea::placeholder{color:var(--c-text-3)}
 
-/* Select: a Field with '⌄' that opens the ds menu under it */
+/* Select: a Field with its chevron (12 px, text-2, centred) that opens the ds menu under it */
 .b-field.b-select{justify-content:space-between;width:100%;border:0;font-family:var(--font-ui);cursor:default;text-align:left}
 .b-field.b-select:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--c-focus),0 0 0 3px color-mix(in srgb,var(--c-focus) 25%,transparent)}
 .b-field.b-select[data-placeholder]{color:var(--c-text-3)}
-.b-field.b-select .chev{color:var(--c-text-3)}
+.b-field.b-select .chev{display:inline-flex;align-items:center;width:12px;height:12px;color:var(--c-text-2)}
+.b-field.b-select .chev svg{display:block}
 .b-field.b-select.is-disabled,.b-field.b-select[data-disabled]{opacity:.4}
 .b-select-menu{z-index:60;min-width:var(--radix-select-trigger-width);max-height:var(--radix-select-content-available-height);overflow:auto}
 .b-select-menu .b-mi{outline:0}
@@ -47,6 +55,6 @@
 
 /* Row as a button: the row's own look, full width, left-aligned, no native frame */
 .b-row.btn{width:100%;border:0;background:none;font:inherit;text-align:left;cursor:default}
-.b-row.btn:hover,.b-row.btn.is-hover{background:var(--c-hover)}
-.b-row.btn.on{background:var(--c-active)}
+.b-row.btn:hover,.b-row.btn.is-hover{background:color-mix(in srgb,var(--c-text) 6%,transparent)}
+.b-row.btn.on{background:color-mix(in srgb,var(--c-text) 9%,transparent)}
 .b-row.btn:focus-visible{outline:0;box-shadow:inset 0 0 0 2px var(--c-focus)}

@@ -66,7 +66,7 @@ export function UpdateLine() {
     <div className={bad ? 'app-core app-update err' : 'app-core app-update'} role="status" data-testid="app.update" data-state={s.state}>
       <div className="app-core-head">
         <span data-testid="app.update.text">{bad ? `▲ ${line.text}` : line.text}</span>
-        <Button size="sm" kind="ghost" onClick={go} disabled={busy} testId={line.act === 'restart' ? 'app.update.restart' : 'app.update.back'}>
+        <Button size="sm" onClick={go} disabled={busy} testId={line.act === 'restart' ? 'app.update.restart' : 'app.update.back'}>
           {busy ? (line.act === 'restart' ? 'restarting…' : 'going back…') : line.act}
         </Button>
       </div>

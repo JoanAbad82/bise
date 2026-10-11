@@ -17,8 +17,8 @@ export interface IconButtonProps {
   children: ReactNode;
   /** its key, shown in the tooltip ('⌘\\') */
   keys?: string;
-  /** "bar": 24 px, for the title bar and other bars; else 28 */
-  size?: "bar";
+  /** "bar": 24 px, for the title bar and other bars; "row": 16 wide, a list row's own buttons (text-3); else 28 */
+  size?: "bar" | "row";
   /** a toggle's state (aria-pressed): the panel button while the panel shows */
   pressed?: boolean;
   state?: UiState;
@@ -27,7 +27,7 @@ export interface IconButtonProps {
   testId?: string;
   ref?: Ref<HTMLButtonElement>;
 }
-/** a square button with a glyph: 28×28 (24 in bars), r-2, glyph text-2, a 6% tint on hover */
+/** a square button with a glyph: 28×28 (24 in bars, 16 wide in a row), r-2, glyph text-2, a 6% tint on hover */
 export function IconButton({ label, children, keys, size, pressed, state, disabled, onClick, testId, ref }: IconButtonProps) {
   const off = disabled || state === "disabled";
   return (
@@ -35,6 +35,25 @@ export function IconButton({ label, children, keys, size, pressed, state, disabl
       title={keys !== undefined && keys !== "" ? `${label}  ${keys}` : label} aria-pressed={pressed} disabled={off}
       onClick={onClick} data-testid={testId}>
       {children}
+    </button>
+  );
+}
+
+export interface SearchButtonProps {
+  /** its words ('search or jump') */
+  label: string;
+  /** its key at the right ('⌘K') */
+  keys?: string;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  testId?: string;
+}
+/** the sidebar's search: a Field-like pill that opens the palette (⌕, the words, the key at the right) */
+export function SearchButton({ label, keys, onClick, testId }: SearchButtonProps) {
+  return (
+    <button type="button" className="b-search" onClick={onClick} data-testid={testId}>
+      <span aria-hidden="true">⌕</span>
+      <span className="w">{label}</span>
+      {keys !== undefined && <span className="b-kbd">{keys}</span>}
     </button>
   );
 }
@@ -145,7 +164,9 @@ export function Select({ value, options, onChange, label, placeholder, state, te
     <RSelect.Root value={value} onValueChange={onChange} disabled={state === "disabled"}>
       <RSelect.Trigger className={cx("b-field", "b-select", st(state))} aria-label={label} data-testid={testId}>
         <RSelect.Value placeholder={placeholder} />
-        <RSelect.Icon className="chev">⌄</RSelect.Icon>
+        <RSelect.Icon className="chev">
+          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </RSelect.Icon>
       </RSelect.Trigger>
       <RSelect.Portal>
         <RSelect.Content className="b-menu b-select-menu" position="popper" sideOffset={4}>

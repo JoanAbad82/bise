@@ -10,6 +10,7 @@
 .b-btn.ghost:hover,.b-btn.ghost.is-hover{background:var(--c-hover);color:var(--c-text)}
 .b-btn.danger{color:var(--c-err)}
 .b-btn.sm{height:26px;padding:0 10px;font-size:var(--t-13)}
+.b-btn.on{background:var(--c-active);box-shadow:none}
 .b-btn.is-loading{color:transparent;position:relative}
 .b-btn.is-loading::after{content:"";position:absolute;width:12px;height:12px;border-radius:50%;border:1.5px solid var(--c-text-3);border-top-color:var(--c-text);animation:b-spin .8s linear infinite}
 .b-btn.pri.is-loading::after{border-color:color-mix(in srgb,var(--c-on-ink) 40%,transparent);border-top-color:var(--c-on-ink)}

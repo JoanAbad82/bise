@@ -3,6 +3,7 @@
 // instead of an endless 'connecting…' (lead m_11347). The project's welcome clears it in the
 // store. The words are the hub's; only the lead-in and the retry are ours. Owner: amb-win.
 import { useEffect, useState } from 'react';
+import { Act } from '@/ds';
 import { useHubRefused, useStore } from '@/store';
 
 /** How long 'retrying…' shows after his click before retry is offered again, if no answer came. */
@@ -42,19 +43,19 @@ export function RefusedLine({ project, name, testId, className }: { project: str
         {refusedLead(name)}
         {words.trim() === '' ? '' : ` · ${words.trim()}`}
       </span>
-      <button
-        type="button"
-        className="app-refused-retry"
-        disabled={retrying}
-        onClick={(e) => {
-          e.stopPropagation();
-          setRetried(words);
-          store.hubRetry(project);
-        }}
-        data-testid={`${testId}.retry`}
-      >
-        {retrying ? 'retrying…' : 'retry'}
-      </button>
+      <span className="app-refused-retry">
+        <Act
+          disabled={retrying}
+          onClick={(e) => {
+            e.stopPropagation();
+            setRetried(words);
+            store.hubRetry(project);
+          }}
+          testId={`${testId}.retry`}
+        >
+          {retrying ? 'retrying…' : 'retry'}
+        </Act>
+      </span>
     </div>
   );
 }

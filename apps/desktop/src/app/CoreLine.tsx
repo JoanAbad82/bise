@@ -159,12 +159,12 @@ export function CoreLine() {
       {(v.start || (v.report && path !== null) || v.note !== undefined) && (
         <div className="app-core-row">
           {v.start && (
-            <Button size="sm" kind="ghost" testId="app.core.start" onClick={() => bise()?.core.start?.()}>
+            <Button size="sm" testId="app.core.start" onClick={() => bise()?.core.start?.()}>
               start bise
             </Button>
           )}
           {v.report && path !== null && (
-            <Button size="sm" kind="ghost" testId="app.core.report" onClick={() => { router.go({ screen: 'report' }); }}>
+            <Button size="sm" testId="app.core.report" onClick={() => { router.go({ screen: 'report' }); }}>
               show the report
             </Button>
           )}

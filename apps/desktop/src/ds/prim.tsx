@@ -17,6 +17,8 @@ export interface ButtonProps {
   kind?: "pri" | "ghost" | "danger";
   /** sm: 26 px high, 10 px sides, t-13, for bars and lines (update line, core line, notify) */
   size?: "sm";
+  /** a toggle's state (aria-pressed), tinted while on: the title bar's '↗ artifacts' */
+  pressed?: boolean;
   state?: UiState;
   disabled?: boolean;
   onClick?: MouseEventHandler<HTMLButtonElement>;
@@ -25,10 +27,10 @@ export interface ButtonProps {
   ref?: Ref<HTMLButtonElement>;
 }
 /** a button: a real <button>; `loading` hides its words under a spinner */
-export function Button({ children, kind, size, state, disabled, onClick, testId, title, ref }: ButtonProps) {
+export function Button({ children, kind, size, pressed, state, disabled, onClick, testId, title, ref }: ButtonProps) {
   const off = disabled || state === "disabled";
   return (
-    <button ref={ref} type="button" className={cx("b-btn", kind, size, st(state))} disabled={off} aria-busy={state === "loading" || undefined}
+    <button ref={ref} type="button" className={cx("b-btn", kind, size, pressed && "on", st(state))} aria-pressed={pressed} disabled={off} aria-busy={state === "loading" || undefined}
       onClick={onClick} data-testid={testId} title={title}>
       {children}
     </button>

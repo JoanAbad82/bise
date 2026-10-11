@@ -97,7 +97,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
     <>
       <div className="g-row"><Button testId="ds.btn.default">default</Button><Button kind="pri">send</Button><Button kind="ghost">later</Button><Button kind="danger">stop it</Button></div>
       <div className="g-row"><Button state="hover">hover</Button><Button state="active">active</Button><Button state="focus">focus</Button><Button state="disabled">disabled</Button><Button kind="pri" state="loading">sending</Button></div>
-      <div className="g-row"><Button size="sm" testId="ds.btn.sm">sm</Button><Button size="sm" kind="ghost">restart</Button><Button size="sm" kind="ghost" state="hover">go back</Button><Button size="sm" kind="ghost" state="focus">start bise</Button><Button size="sm" kind="ghost" state="disabled">restarting…</Button></div>
+      <div className="g-row"><Button size="sm" testId="ds.btn.sm">restart</Button><Button size="sm" state="hover">go back</Button><Button size="sm" state="focus">start bise</Button><Button size="sm" state="disabled">restarting…</Button><Button size="sm" pressed>↗ artifacts · 5</Button><Button size="sm" kind="ghost">cancel</Button></div>
     </>
   ),
   chips: () => (

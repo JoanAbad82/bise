@@ -10,7 +10,7 @@
 // counts (numbers, so a snapshot never changes for nothing): a thread's
 // entries never re-render it.
 import { Fragment, memo, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Dot, Menu, MenuItem, MenuSep, Pearl, SectionHead, Side } from '@/ds';
+import { Dot, IconButton, Menu, MenuItem, MenuSep, Pearl, SearchButton, SectionHead, Side } from '@/ds';
 import type { Agent, Feature, ProjectRow } from '@/proto';
 import { useAgents, useComputerLive, useFeatures, useHubRefused, useProjects, useStore, type Store } from '@/store';
 import { RefusedLine } from './Refused';
@@ -232,11 +232,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
           thread's top, so a half-hidden row reads as 'more above' (designer m_15023). */}
       <div className={`app-side-top${full ? ' full' : ''}${scrolled ? ' scrolled' : ''}`} data-testid="app.sidebar.top" data-full={full} data-scrolled={scrolled}>
         <div className="b-lights" data-testid="app.sidebar.lights" />
-        <button type="button" className="app-search" onClick={onSearch} data-testid="app.sidebar.search">
-          <span aria-hidden="true">⌕</span>
-          <span className="app-search-w">search or jump</span>
-          <kbd>⌘K</kbd>
-        </button>
+        <SearchButton label="search or jump" keys="⌘K" onClick={onSearch} testId="app.sidebar.search" />
       </div>
       <SRow
         kind="top"
@@ -341,33 +337,35 @@ const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow;
         onClick={() => { router.go({ screen: 'thread', project: p.project, agent: MAIN }); }}
         testId={`app.sidebar.project.${p.project}`}
       >
-        <button
-          type="button"
-          className={open ? 'app-fold' : 'app-fold shut'}
-          aria-expanded={open}
-          aria-label={open ? `close ${p.name}` : `open ${p.name}`}
-          title={open ? 'close the folder' : 'open the folder'}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleFolder(p.project);
-          }}
-          data-testid={`app.sidebar.project.${p.project}.fold`}
-        >
-          {open ? '▾' : '▸'}
-        </button>
-        <button
-          type="button"
-          className={menu ? 'app-more on' : 'app-more'}
-          aria-label={`${p.name}: more`}
-          aria-expanded={menu}
-          onClick={(e) => {
-            e.stopPropagation();
-            setMenu((m) => !m);
-          }}
-          data-testid={`app.sidebar.project.${p.project}.menu`}
-        >
-          ⋯
-        </button>
+        {/* the folder and ⋯ buttons, the ds's row IconButtons: on hover or focus; a shut folder always shows */}
+        <span className={open ? 'app-fold' : 'app-fold shut'}>
+          <IconButton
+            size="row"
+            label={open ? `close ${p.name}` : `open ${p.name}`}
+            pressed={open}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFolder(p.project);
+            }}
+            testId={`app.sidebar.project.${p.project}.fold`}
+          >
+            {open ? '▾' : '▸'}
+          </IconButton>
+        </span>
+        <span className={menu ? 'app-more on' : 'app-more'}>
+          <IconButton
+            size="row"
+            label={`${p.name}: more`}
+            pressed={menu}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenu((m) => !m);
+            }}
+            testId={`app.sidebar.project.${p.project}.menu`}
+          >
+            ⋯
+          </IconButton>
+        </span>
       </SRow>
       {menu && <ProjectMenu p={p} onClose={() => { setMenu(false); }} />}
       {/* its hub refused this core: the hub's words and a retry, open or closed (lead m_11347) */}

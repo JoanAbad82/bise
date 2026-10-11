@@ -7,6 +7,7 @@
 // thread (App.tsx). Owner: amb-win (the frame); amb-kit (the rows).
 import { useSyncExternalStore } from 'react';
 import { ArtifactList } from '@/artifacts';
+import { Act } from '@/ds';
 import { ScheduledHere } from '@/scheduled';
 import { useStore, type Store } from '@/store';
 import { useRouter } from './router';
@@ -46,9 +47,9 @@ export function Panel({ project, name, over }: { project: string; name: string; 
       <div className="app-panel-head">
         <b>artifacts</b>
         <span className="app-panel-dim">· {name}</span>
-        <button type="button" className="app-panel-all" onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} data-testid="app.panel.all">
+        <Act onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} testId="app.panel.all">
           all ›
-        </button>
+        </Act>
       </div>
       <div className="app-panel-body">
         <ArtifactList project={project} onOpen={open} />

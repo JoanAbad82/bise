@@ -6,7 +6,7 @@
 // sidebar button (⌘\) and 'n waiting' in the accent), and which of the
 // sidebar and the right panel show. Owner: amb-win.
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Pearl } from '@/ds';
+import { Button, Chip, IconButton, Kbd, Pearl } from '@/ds';
 import { useProjects } from '@/store';
 import { keep } from './keep';
 import { useArtifactCount } from './Panel';
@@ -141,15 +141,14 @@ export function Titlebar({ frame }: { frame: FrameState }) {
       {!frame.side && (
         <>
           <span className="app-title-lights" />
-          <button type="button" className="app-title-tg" aria-label="show the sidebar" title="sidebar ⌘\" aria-expanded={frame.over === 'side'}
-            onClick={() => { frame.toggle('sidebar'); }} data-testid="app.title.sidebar">
-            <span />
-          </button>
+          <IconButton label="sidebar" keys="⌘\\" size="bar" pressed={frame.over === 'side'} onClick={() => { frame.toggle('sidebar'); }} testId="app.title.sidebar">
+            <span className="app-tg-glyph" aria-hidden="true"><span /></span>
+          </IconButton>
           {waits > 0 && (
-            <button type="button" className="app-title-wait" onClick={() => { frame.toggle('sidebar'); }} data-testid="app.title.waiting">
+            <Chip tone="acc" onClick={() => { frame.toggle('sidebar'); }} testId="app.title.waiting">
               <Pearl size={14} mood="need" />
               {waits} waiting
-            </button>
+            </Chip>
           )}
         </>
       )}
@@ -162,10 +161,9 @@ export function Titlebar({ frame }: { frame: FrameState }) {
         ))}
       </span>
       {frame.panel !== undefined && (
-        <button type="button" className={panelOn ? 'app-title-btn on' : 'app-title-btn'} aria-pressed={panelOn}
-          onClick={() => { frame.toggle('panel'); }} data-testid="app.title.panel">
-          ↗ {frame.width === 'narrow' ? String(count) : `artifacts · ${String(count)}`} <kbd>⌥⌘0</kbd>
-        </button>
+        <Button size="sm" pressed={panelOn} onClick={() => { frame.toggle('panel'); }} testId="app.title.panel">
+          ↗ {frame.width === 'narrow' ? String(count) : `artifacts · ${String(count)}`} <Kbd>⌥⌘0</Kbd>
+        </Button>
       )}
     </div>
   );
