@@ -498,12 +498,17 @@ isn't judging. A row marked ok names the shot that was looked at.
   - FOLDS2 was not reached on the rich world this run, because R41 pushed the fold rows up.
     thread/fold-hold is green.
   - **The hold, R41 (3)**: in run 1, the spotlight's image reached the model as '[image
-    unavailable: [Image #1] (not in the image store)]', both by ⌘V and by drop. A rerun on a
-    fresh world was all image/png. This is new code in this cut: amb-web's 7f029104 sends the
-    spotlight's image as a part with its store path only, with no b64. qa-native reads it as a
-    race between the spotlight's save to the store and the hub reading it. One silent loss of
-    his pasted image is exactly what he asked never to happen (R41, his words of 10-08), so it
-    cannot go to main as a watch item.
+    unavailable: [Image #1] (not in the image store)]', both by ⌘V and by drop. **Corrected
+    (amb-web m_18147, qa-native m_18159, index v2): it is not a race, and the rerun's green was
+    wrong.** bise main's own requests carried the image as image/png. bise had routed the ask to
+    shop, and shop main's request (<user_message via="bise">) had the marker, because the hub's
+    route forward keeps only the text (`bend/hub/core.bend` route_hold and route_fire). The gate
+    check took the last request with his words, shop's, and labelled it 'main'. The rerun passed
+    only because bise did not route that time. So every image ask that bise routes to a project
+    loses its image: the not-pass table's R41 (6), owned by the hub. qa-native's check now
+    follows every hop, names a routed one as such, and passes only if each hop carries the
+    image. One silent loss of his pasted image is exactly what he asked never to happen (R41,
+    his words of 10-08), so it cannot go to main as a watch item.
   - The fix: the send waits for the store write, or falls back to b64 when the file is not
     there yet (amb-web). The proof: gate/images R41 (3) green 3 runs in a row on the re-cut.
   - R41 (5) got no card because main answered gift-ui itself. That is the world, not the app.
