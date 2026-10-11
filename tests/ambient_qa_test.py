@@ -10,6 +10,7 @@ Run: python3 -u tests/ambient_qa_test.py
 import datetime
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -829,6 +830,29 @@ def real_shape_pure():
     check(rs.originator(line, 15030) == "osservice<com.apple.coreservices.launchservicesd>:378" and rs.originator(line, 1) is None,
           rs.originator(line, 15030))
     shutil.rmtree(d, ignore_errors=True)
+
+
+@test
+def as_he_does_scripts():
+    """the as-he-does run (dev/plugins/ambient-qa/as-he-does): its scripts parse, the driver never
+    touches the folder picker, the run kills on a TCC request from its pids, its world is under ~/.bise/gate"""
+    d = os.path.join(PLUGIN, "as-he-does")
+    for f in ("run.sh", "open-cdp.sh"):
+        r = subprocess.run(["bash", "-n", os.path.join(d, f)], capture_output=True, text=True)
+        check(r.returncode == 0 and os.access(os.path.join(d, f), os.X_OK), (f, r.stderr))
+    if shutil.which("node"):
+        r = subprocess.run(["node", "--check", os.path.join(d, "driver.mjs")], capture_output=True, text=True)
+        check(r.returncode == 0, r.stderr)
+    drv = open(os.path.join(d, "driver.mjs")).read()
+    code = "\n".join(l for l in drv.splitlines() if not l.lstrip().startswith("//"))
+    check("settings.add.choose" not in code and "settings.project.add" in code and "127.0.0.1" in code, "driver: no picker, its own add, localhost CDP")
+    run = open(os.path.join(d, "run.sh")).read()
+    check("function=TCCAccessRequest" in run and "bise-mac-helper" in run and "libsnap" in run and "front --out" in run, "run.sh: gates A, B, C")
+    hook = open(os.path.join(d, "open-cdp.sh")).read()
+    check("open -g -n -a" in hook and "--remote-debugging-address=127.0.0.1" in hook, "hook: background open, localhost only")
+    line = "sender_pid=26660, sender_uid=501, sender_auid=501, function=TCCAccessRequest, msgID=26660.1"
+    pat = re.search(r'grep -E "(sender_pid=\(\$pids\), \.\*function=TCCAccessRequest)"', run).group(1).replace("$pids", "1|26660")
+    check(re.search(pat, line) and not re.search(pat.replace("1|26660", "2"), line), "the TCC breach pattern")
 
 
 if __name__ == "__main__":

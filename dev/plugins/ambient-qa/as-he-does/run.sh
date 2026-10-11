@@ -1,0 +1,78 @@
+#!/bin/bash
+# The as-he-does proof (ambient-lead m_18707, m_18810, m_18918, m_18946): the PROMOTED bundle opened
+# by `scripts/desktop-try.sh --real` from ~/.bise/dev/try-src on the real-shaped world
+# (realshape.py build; HOME and BISE_HOME there, BISE_DESKTOP_OFFSCREEN=1, a localhost CDP port
+# through BISE_TRY_OPEN), a fake provider for the world's mains. Only on his go: it opens an app.
+# Gates first, each a kill at its first breach: A the front app (realshape.py front), B his Library
+# (realshape.py libsnap, before/after every step), C no bise-mac-helper process and no TCC request
+# from any of the run's pids (tccd's log, read live). Then two launches (first: the window passes,
+# driver.mjs; second: clean start), --real --stop after each, realshape core with no env.
+#   run.sh <out dir>
+set -u
+O=${1:?out dir}; mkdir -p "$O"
+P=${AS_HE_DOES_PYTHON:-$HOME/.pyenv/versions/3.11.13/bin/python3}
+HERE=$(cd "$(dirname "$0")" && pwd); T=$(cd "$HERE/../../../.." && pwd)
+RS="$P -B $HERE/../realshape.py"
+G=$HOME/.bise/gate/real-shape; H=$G/w/h
+SRC=${AS_HE_DOES_SRC:-$HOME/.bise/dev/try-src}
+A="$SRC/apps/desktop/dist/mac-arm64/bise try.app"
+export PW_FROM=$T/apps/desktop
+say() { echo "$(date +%T) $*"; }
+stopall() { (cd "$SRC" && BISE_TRY_REAL=$H/.bise scripts/desktop-try.sh --real --stop); sleep 2; say "left naming the world: $(ps -axo pid,command | grep -F "$G/w" | grep -v grep | wc -l)"; }
+endrun() { touch $O/stop; kill $TPID $CPID 2>/dev/null; kill $(cat $G/fake/fake.pid) 2>/dev/null; }
+breach() { [ -e $O/BREACH ] && { say "BREACH: $(cat $O/BREACH)"; stopall; endrun; exit 3; }; }
+libgate() { $RS libsnap --out $O/after-$1.json --diff $O/before.json || { echo "library $1" > $O/BREACH; breach; }; }
+case "$G" in "$HOME/.bise/gate/"*) ;; *) echo "the world must be under ~/.bise/gate"; exit 2;; esac
+rm -f $O/BREACH $O/stop $O/pids.txt
+$RS libsnap --out $O/before.json
+say "bundle: $(grep commit= "$A/Contents/Resources/bin/VERSION")"
+$RS build | tail -8; cat $H/.bise/prefs.json 2>/dev/null; echo
+mkdir -p $G/fake; ($P -u $T/tests/fake_provider.py 0 > $G/fake/fake.out 2> $G/fake/fake.err & echo $! > $G/fake/fake.pid)
+for i in $(seq 30); do grep -q PORT $G/fake/fake.out 2>/dev/null && break; sleep 0.3; done
+PORT=$(awk '/PORT/{print $2}' $G/fake/fake.out); say "fake provider port $PORT pid $(cat $G/fake/fake.pid)"
+cat >> $H/.bise/config.toml <<TOML
+[roles]
+main = "fake/mistral-small-latest"
+classify = "off"
+
+[providers.fake]
+name = "fake"
+api = "openai-chat"
+base_url = "http://127.0.0.1:$PORT/v1"
+key_env = "BISE_TRY_FAKE_KEY"
+key_command = "echo fake-key"
+small_model = "mistral-small-latest"
+TOML
+# gate C, live: tccd's log; every 0.3 s the run's pids (any process of the bundle, ever seen), a
+# bise-mac-helper process or a TCCAccessRequest whose sender is one of them is a breach
+log stream --style compact --predicate 'process == "tccd"' > $O/tccd.log 2>&1 & TPID=$!
+( while [ ! -e $O/stop ]; do
+    pgrep -f "$A/Contents/" >> $O/pids.txt 2>/dev/null
+    h=$(pgrep -f "$A/Contents/MacOS/bise-mac-helper")
+    [ -n "$h" ] && { echo "helper $h" > $O/BREACH; pkill -f "$A/Contents/"; }
+    pids=$(sort -u $O/pids.txt 2>/dev/null | paste -sd'|' -)
+    if [ -n "$pids" ] && grep -E "sender_pid=($pids), .*function=TCCAccessRequest" $O/tccd.log > $O/tcc-hits.txt 2>/dev/null; then
+      echo "tcc $(head -1 $O/tcc-hits.txt | cut -c1-200)" > $O/BREACH; pkill -f "$A/Contents/"
+    fi
+    sleep 0.3
+  done ) & CPID=$!
+$RS front --out $O/front.jsonl --stop-file $O/stop --bundle "$A" & FPID=$!
+sleep 1
+for n in first second; do
+  say "launch $n"
+  (cd "$SRC" && BISE_TRY_REAL=$H/.bise BISE_DESKTOP_OFFSCREEN=1 BISE_TRY_OPEN=$HERE/open-cdp.sh BISE_PROOF_CDP_PORT=9341 scripts/desktop-try.sh --real) 2>&1
+  breach; libgate $n-open
+  node $HERE/driver.mjs 9341 $O $n 2>&1 | tail -5
+  breach
+  L="$H/Library/Application Support/bise try/core.log"
+  say "core.log: $(wc -c < "$L") bytes, repl-live not found: $(grep -c 'repl-live not found' "$L")"; cp "$L" $O/core-$n.log
+  say "hubs: $(ls $H/.bise/hubs/ | tr '\n' ' ')"
+  stopall
+  breach; libgate $n-stop
+done
+touch $O/stop; wait $FPID; kill $TPID $CPID 2>/dev/null
+kill $(cat $G/fake/fake.pid) 2>/dev/null
+say "realshape core with no env"
+$RS core --bundle "$A" --out $O/core-noenv 2>&1 | tail -12
+ps -axo pid,command | grep -F "$G/w" | grep -v grep | awk '{print $1}' | xargs kill 2>/dev/null
+libgate final; say "done"
