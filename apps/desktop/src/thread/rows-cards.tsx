@@ -158,7 +158,8 @@ export function ApprovalRow({ e, next }: { e: Entry; next: Entry | undefined }) 
   // msg-parts: his answer's own parts (the note's), when the hub sent them: his words and images
   // from them, never from the templated text (no tag shows); the head stays the hub's words
   const view = e.parts != null && e.parts.length > 0 ? youView(e.parts) : null;
-  const images = view !== null ? view.images : (a.images ?? []);
+  // his images ride only in its parts since main 9ae8e01f (ApprovalFold.images is gone)
+  const images = view?.images ?? [];
   // the chips draw his images: their marks leave the words (once, never twice)
   const chips = images.length > 0;
   const say = (s: string): string => (chips ? withoutImageMarks(s).replace(/:$/u, '') : s);

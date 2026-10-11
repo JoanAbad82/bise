@@ -213,16 +213,7 @@ files?: Array<string>, };
  * `route` line, BISE-305/307), so a client that folded the answer
  * itself knows it is the same one.
  */
-export type ApprovalFold = { ok: boolean, text: string, note?: string, 
-/**
- * an answer's pasted images (`you answered gift-ui` + his words,
- * R41): each the window's chip, never a marker in `text`/`note`
- */
-images?: Array<ImageRef>, 
-/**
- * an answer's other files (absolute paths)
- */
-files?: Array<string>, card?: number | null, };
+export type ApprovalFold = { ok: boolean, text: string, note?: string, card?: number | null, };
 
 /**
  * A `scheduled` entry (batch 3b): a task set or ended (the hub's
