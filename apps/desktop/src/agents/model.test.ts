@@ -4,7 +4,7 @@ import { hub_ev } from '@/proto/fixtures.gen';
 import { ago, archivedOf, assign, dotOf, endOf, lineOf, liveOf, numbersOf } from './model';
 
 const T = 1_791_100_000_000;
-const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: false, status: 'idle', archived: false, title: '', purpose: '', since_ms: T, waits: 0, ...over });
+const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: false, status: 'idle', archived: false, title: '', purpose: '', since_ms: T, waits: 0, watching: [], ...over });
 
 describe('the agents list', () => {
   it("the fixture's agents: main first, then the hub's order", () => {

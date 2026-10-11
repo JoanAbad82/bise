@@ -3,7 +3,7 @@ import type { Agent, ProjectRow } from '@/proto';
 import { keyAction, type KeyCtx, type KeyLike } from './keys';
 
 const row = (project: string, name: string, order: number, home = false): ProjectRow => ({ project, name, path: `/${name}`, git: !home, home, order, agents: 1, working: 0, waits: 0, running: true });
-const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1, waits: 0, ...over });
+const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1, waits: 0, watching: [], ...over });
 const projects = [row('h', 'bise', 0, true), row('s', 'shop', 2), row('a', 'acme', 1)];
 const agents: Record<string, Agent[]> = {
   h: [ag('main')],

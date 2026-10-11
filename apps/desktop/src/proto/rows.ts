@@ -172,7 +172,15 @@ last_pos?: number | null,
  * turn's end): it compares it with what it saw (proto-lead m_14731).
  * Back to 0 when sb-core restarts: a lower count is a new baseline
  */
-turns?: number, };
+turns?: number, 
+/**
+ * event-wake (designer's waiting state): the events it waits for
+ * now (`sb wake`'s live watches, a backgrounded bash command's
+ * included), oldest first. A list of the snapshot: always written,
+ * empty included, so a client tells "no watch now" from an older
+ * hub (none)
+ */
+watching: Array<AgentWatch>, };
 
 /**
  * A numbered option of a card.
@@ -829,3 +837,33 @@ what?: string,
  * its source and where it applies: `from api · every project`
  */
 note?: string, };
+
+/**
+ * What a watch looks at (event-wake).
+ */
+export type WatchKind = "bg" | "pid" | "file" | "job" | "unknown";
+
+/**
+ * One event an agent waits for (event-wake): the panel's `…`, the live
+ * line `… waiting for cargo test · 2m`.
+ */
+export type AgentWatch = { 
+/**
+ * its id (`sb wake --stop <id>`)
+ */
+id: number, kind: WatchKind, 
+/**
+ * its name in designer's words (`cargo test`, `the build`, `pid
+ * 4242`, `build.rc`, `launchd job dev.x`): the hub's
+ * `wake::Spec::name`; [`crate::thread::words::waiting_for`] says it
+ */
+what: string, 
+/**
+ * when it was set (ms)
+ */
+since_ms: number, 
+/**
+ * `what` is the agent's note (`--note the reindex`): the note names
+ * the thing, a file's words add no `to appear` (designer m_17730)
+ */
+noted?: boolean, };

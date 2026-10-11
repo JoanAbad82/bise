@@ -3,9 +3,9 @@
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
 import type { FnContext } from './context';
-import type { Opt, ReportKind } from './rows';
+import type { Opt, ReportKind, WatchKind } from './rows';
 
-export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped" | "to_agent" | "thinking" | "compacting" | "compacted" | "notice" | "not_delivered" | "landed" | "pr" | "artifact" | "answered" | "approval" | "scheduled" | "turn_failed" | "unknown";
+export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped" | "to_agent" | "thinking" | "compacting" | "compacted" | "notice" | "not_delivered" | "landed" | "pr" | "artifact" | "answered" | "approval" | "scheduled" | "turn_failed" | "wake" | "unknown";
 
 /**
  * What a tool call did, for the counted summary.
@@ -240,6 +240,47 @@ export type Scheduled = { id: number, head: string, words?: string, };
 export type TurnFailed = { why: string, };
 
 /**
+ * How a watch ended, as its thread says it (event-wake).
+ */
+export type WakeEv = "ended" | "still" | "stopped" | "expired" | "unknown";
+
+/**
+ * A `wake` entry (event-wake): what ended and how; [`words::wake_head`]
+ * says it.
+ */
+export type WakeFold = { 
+/**
+ * the watch's id
+ */
+id: number, ev: WakeEv, kind: WatchKind, 
+/**
+ * its name (the agents row's `watching[].what`)
+ */
+what: string, 
+/**
+ * `what` is the agent's note (the row's `noted`)
+ */
+noted?: boolean, 
+/**
+ * its rc, when known (an ended bash command, a job, an rc file)
+ */
+rc?: number | null, 
+/**
+ * how long it waited
+ */
+after_ms: number, 
+/**
+ * the last lines of its output (at most 20, folded: `▸ its last 3
+ * lines`); empty: none or no output file
+ */
+tail?: Array<string>, 
+/**
+ * the id of bise's message that woke the agent (folded into this
+ * entry); none when nothing woke it
+ */
+msg?: number | null, };
+
+/**
  * One entry of a thread.
  */
 export type Entry = { 
@@ -301,7 +342,7 @@ msg?: number | null,
  * a `thinking` entry's, or an `agent` reply's own: the reasoning
  * before it ("thought for 3.2s", folded)
  */
-thinking?: Thinking | null, notice?: Notice | null, not_delivered?: NotDelivered | null, landed?: Landed | null, pr?: PrNews | null, made?: Made | null, answered?: Answered | null, approval?: ApprovalFold | null, scheduled?: Scheduled | null, turn_failed?: TurnFailed | null, 
+thinking?: Thinking | null, notice?: Notice | null, not_delivered?: NotDelivered | null, landed?: Landed | null, pr?: PrNews | null, made?: Made | null, answered?: Answered | null, approval?: ApprovalFold | null, scheduled?: Scheduled | null, turn_failed?: TurnFailed | null, wake?: WakeFold | null, 
 /**
  * the first entry after a `turn_started` line: a turn starts here
  * (the TUI's turn row; a reply's turn ends before the next start)

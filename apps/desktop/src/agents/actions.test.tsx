@@ -10,7 +10,7 @@ import { defaultWords, effortsFor, hasChanges, modelChoices, modelGroups, modelO
 import { AgentsScreen } from './AgentsScreen';
 
 const P = 'acme-1a2b3c4d';
-const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1, waits: 0, ...over });
+const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1, waits: 0, watching: [], ...over });
 const wt = (over: Partial<Worktree> = {}): Worktree => ({ path: '/p', branch: 'main', dirty: false, ahead: 0, behind: 0, ...over });
 
 describe('agent actions, pure', () => {

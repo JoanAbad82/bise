@@ -9,7 +9,7 @@ import { EntryRow, liveTime, type RowCtx } from './rows';
 afterEach(cleanup);
 
 const P = 'acme-1a2b3c4d';
-const ag = (status: Agent['status']): Agent => ({ name: 'perf', dir: 'perf', main: false, status, archived: false, title: '', purpose: '', since_ms: 1, waits: 0 });
+const ag = (status: Agent['status']): Agent => ({ name: 'perf', dir: 'perf', main: false, status, archived: false, title: '', purpose: '', since_ms: 1, waits: 0, watching: [] });
 const now = Date.now();
 const tools = {
   pos: 4,

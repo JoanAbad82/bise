@@ -22,7 +22,7 @@ vi.mock('@/composer', () => ({
 afterEach(cleanup);
 
 const P = 'acme-1a2b3c4d';
-const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1, waits: 0, ...over });
+const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1, waits: 0, watching: [], ...over });
 
 describe('thread parity rows (tui-parity M2 N11 M8 B15 B11 C47 W2 W5)', () => {
   it('N11: rows that came at the end while scrolled up, not an older page in front', () => {

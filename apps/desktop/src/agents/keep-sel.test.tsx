@@ -10,7 +10,7 @@ import { keep } from '@/app/keep';
 import { AgentsScreen } from './AgentsScreen';
 
 const P = 'acme-1a2b3c4d';
-const ag = (name: string): Agent => ({ name, dir: name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1, waits: 0 });
+const ag = (name: string): Agent => ({ name, dir: name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1, waits: 0, watching: [] });
 
 function screen() {
   const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };

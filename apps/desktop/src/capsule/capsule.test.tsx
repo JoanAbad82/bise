@@ -78,7 +78,7 @@ describe('the capsule machine', () => {
 });
 
 const P = (p: Partial<ProjectRow> & { project: string }): ProjectRow => ({ name: p.project, path: `/Users/me/${p.project}`, git: true, home: false, order: 0, agents: 0, working: 0, waits: 0, running: true, ...p });
-const A = (name: string, status: Agent['status']): Agent => ({ name, dir: name, main: false, status, archived: false, title: `${name} title`, purpose: '', since_ms: 0, waits: 0 });
+const A = (name: string, status: Agent['status']): Agent => ({ name, dir: name, main: false, status, archived: false, title: `${name} title`, purpose: '', since_ms: 0, waits: 0, watching: [] });
 const C = (id: number, approval: boolean): Card => ({ id, project: 'tel', kind: approval ? 'confirm' : 'question', agent: 'perf', question: 'go?', options: [], urgent: false, since_ms: 0, approval });
 
 describe('the store mapping', () => {
