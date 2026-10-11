@@ -223,7 +223,7 @@ fn find_is_fast_on_50k_events() {
     let mut events = Vec::with_capacity(50_000);
     for i in 0..50_000u32 {
         events.push(match i % 4 {
-            0 => Ev::You(format!("message {i}: please check the login flow and the signup page"), Mark::Sent, false, None),
+            0 => Ev::You(format!("message {i}: please check the login flow and the signup page").into(), Mark::Sent, false, None),
             1 => Ev::Assistant(format!("reply {i}: I checked the **login** flow; the signup page works. {}", "More words. ".repeat(20))),
             _ => tool(i, "run the build", &out),
         });
@@ -278,7 +278,7 @@ fn a_match_in_the_folded_part_of_your_message_opens_it() {
     // BISE-239: your long message shows 20 rows (BISE-262); find opens it on a match
     // in the hidden lines, esc folds it back
     let text = (1..=30).map(|n| if n == 27 { "the hidden zebra".to_string() } else { format!("line {n}") }).collect::<Vec<_>>().join("\n");
-    let mut app = app_with(vec![Ev::You(text, Mark::Sent, false, None)]);
+    let mut app = app_with(vec![Ev::You(text.into(), Mark::Sent, false, None)]);
     let s = screen(&draw(&mut app));
     assert!(!s.contains("zebra") && s.contains("more lines"), "{s}");
     press(&mut app, KeyCode::Char('f'), KeyModifiers::CONTROL);

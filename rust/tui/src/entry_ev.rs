@@ -42,7 +42,9 @@ fn kind_evs(e: &Entry) -> Vec<Ev> {
     };
     match e.kind {
         // G1: the mark the fold moved, by the TUI's own rule
-        EntryKind::You => vec![Ev::You(text, e.delivery.unwrap_or(Mark::Sent), false, e.msg_id)],
+        // msg-parts: drawn from its parts (none from an older hub: read
+        // back from its text, once)
+        EntryKind::You => vec![Ev::You(crate::said::Said::new(text, e.parts.clone()), e.delivery.unwrap_or(Mark::Sent), false, e.msg_id)],
         // G5: an agent writing to him, level 2
         EntryKind::Agent | EntryKind::FromAgent if e.to_you => vec![msg(e.from.clone().unwrap_or_default(), "you".into(), 2)],
         EntryKind::Agent => {
@@ -59,6 +61,23 @@ fn kind_evs(e: &Entry) -> Vec<Ev> {
         EntryKind::FromAgent => vec![msg(shown_name(e.from.as_deref().unwrap_or_default()), e.to.clone().unwrap_or_default(), 3)],
         EntryKind::ToAgent => vec![msg(String::new(), e.to.clone().unwrap_or_default(), 3)],
         EntryKind::Tools => e.tools.iter().flat_map(|t| t.items.iter().enumerate().map(|(i, it)| tool(i, it))).collect(),
+        // a message he routed by hand (`→ you → @docs : …`): its words
+        // from its parts, its chips as glyphs, never a tag (msg-parts)
+        EntryKind::Notice if !e.parts.is_empty() => e
+            .notice
+            .iter()
+            .map(|n| {
+                let mut n = n.clone();
+                if let Some((head, _)) = n.text.split_once(" : ") {
+                    // his parts keep the `@t3 ` he typed; the head names it
+                    let gist = crate::said::gist(&e.parts);
+                    let to = head.rsplit(' ').next().unwrap_or_default();
+                    let gist = gist.strip_prefix(to).filter(|_| to.starts_with('@')).map(str::trim_start).unwrap_or(&gist);
+                    n.text = format!("{head} : {gist}");
+                }
+                notice_ev(n)
+            })
+            .collect(),
         EntryKind::Notice => e.notice.iter().map(|n| notice_ev(n.clone())).collect(),
         // expired-ux (designer m_7456), as the line path's turn_done:
         // the TUI signs in again on ⏎, not the runtime's /provider
@@ -71,7 +90,11 @@ fn kind_evs(e: &Entry) -> Vec<Ev> {
         EntryKind::Pr => e.pr.iter().map(|p| Ev::Pr { tone: pr_look(p.state).into(), number: p.number, url: p.url.clone(), text: p.text.clone(), url_row: false }).collect(),
         EntryKind::Artifact => e.made.iter().map(|m| Ev::Made { id: m.id.clone(), agent: m.agent.clone(), title: m.title.clone(), kind: m.kind.clone(), v: m.v }).collect(),
         EntryKind::Answered => e.answered.iter().map(|a| Ev::Answered { agent: a.agent.clone(), question: a.question.clone(), answer: a.answer.clone(), why: a.why.clone(), open: false }).collect(),
-        EntryKind::Approval => e.approval.iter().map(|a| Ev::Approval { ok: a.ok, text: a.text.clone(), note: a.note.clone(), asked: String::new(), open: false }).collect(),
+        EntryKind::Approval => e
+            .approval
+            .iter()
+            .map(|a| Ev::Approval { ok: a.ok, text: a.text.clone(), note: a.note.clone(), parts: e.parts.clone(), asked: String::new(), open: false })
+            .collect(),
         EntryKind::Scheduled => e.scheduled.iter().map(|s| Ev::Scheduled { head: s.head.clone(), words: s.words.clone(), open: false }).collect(),
         // event-wake: a watch's end, its words bise-proto's
         EntryKind::Wake => e.wake.iter().map(wake_ev).collect(),

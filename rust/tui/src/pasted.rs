@@ -39,8 +39,6 @@ pub(crate) const MIN_CHARS: usize = 1200;
 /// How the label of a paste starts (`[Paste #2]`).
 pub(crate) const OPEN: &str = "[Paste #";
 
-const TAG_OPEN: &str = "<pasted n=\"";
-const TAG_CLOSE: &str = "</pasted>";
 
 /// The label of paste `n`.
 pub(crate) fn label(n: usize) -> String {
@@ -65,9 +63,8 @@ pub(crate) fn chips(text: &str) -> Vec<(usize, usize, usize)> {
 /// A `</pasted>` inside the text is broken (`</pasted >`) so the tag
 /// always ends where it should.
 pub(crate) fn tag(n: usize, text: &str) -> String {
-    let lines = crate::quote::line_count(text);
-    let text = text.replace(TAG_CLOSE, "</pasted >");
-    format!("{TAG_OPEN}{n}\" lines=\"{lines}\">\n{text}\n{TAG_CLOSE}")
+    // the one template (msg-parts): bise_proto's, the hub's and desktop's
+    bise_proto::parts::paste_tag(u32::try_from(n).unwrap_or(u32::MAX), text)
 }
 
 /// A paste read back from its tag.
@@ -77,80 +74,21 @@ pub(crate) struct Pasted {
     pub(crate) text: String,
 }
 
-/// The tag at the very start of `s`: the paste and the bytes it takes.
-fn parse_at(s: &str) -> Option<(Pasted, usize)> {
-    let rest = s.strip_prefix(TAG_OPEN)?;
-    let (n, rest) = rest.split_once('"')?;
-    let n = n.parse::<usize>().ok().filter(|_| n.len() <= 6)?;
-    let rest = rest.strip_prefix(" lines=\"")?;
-    let (lines, rest) = rest.split_once("\">\n")?;
-    if lines.is_empty() || !lines.bytes().all(|b| b.is_ascii_digit()) {
-        return None;
+/// Its tag read back (bise_proto's one read, msg-parts).
+fn parse_tag(s: &str) -> Option<Pasted> {
+    match bise_proto::parts::parse(s).as_slice() {
+        [bise_proto::parts::Part::Paste { n, text }] => Some(Pasted { n: *n as usize, text: text.clone() }),
+        _ => None,
     }
-    let (text, _) = rest.split_once(TAG_CLOSE)?;
-    let text = text.strip_suffix('\n').unwrap_or(text);
-    let used = s.len() - rest.len() + text.len() + usize::from(rest[text.len()..].starts_with('\n')) + TAG_CLOSE.len();
-    Some((Pasted { n, text: text.to_string() }, used))
-}
-
-/// A piece of a sent message: text, or a paste where its tag was.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Piece<'a> {
-    Text(&'a str),
-    Paste(Pasted),
-}
-
-/// `msg` cut at its paste tags, in order (one `Text` when it has none).
-pub(crate) fn split(msg: &str) -> Vec<Piece<'_>> {
-    let mut out = Vec::new();
-    let mut from = 0usize;
-    let mut scan = 0usize;
-    while let Some(i) = msg.get(scan..).and_then(|t| t.find(TAG_OPEN)) {
-        let at = scan + i;
-        match parse_at(&msg[at..]) {
-            Some((p, used)) => {
-                if at > from {
-                    out.push(Piece::Text(&msg[from..at]));
-                }
-                out.push(Piece::Paste(p));
-                from = at + used;
-                scan = from;
-            }
-            None => scan = at + 1,
-        }
-    }
-    if from < msg.len() || out.is_empty() {
-        out.push(Piece::Text(&msg[from..]));
-    }
-    out
 }
 
 // ---- the history (book §6): the chip in the line, a row under it ----
 
 /// A paste's chip in a history line: its number between two
-/// private-use chars ([`fold`]), drawn `▤ 1` by
+/// private-use chars (`said::view`), drawn `▤ 1` by
 /// [`crate::attach::chip_spans`]. Never typed, never sent.
 pub(crate) const MARK_OPEN: char = '\u{E000}';
 pub(crate) const MARK_CLOSE: char = '\u{E001}';
-
-/// `msg` as the history shows it: each paste tag becomes its chip mark
-/// (one line, where the chip was), the pastes in order.
-pub(crate) fn fold(msg: &str) -> (String, Vec<Pasted>) {
-    let mut body = String::with_capacity(msg.len().min(4096));
-    let mut pastes = Vec::new();
-    for piece in split(msg) {
-        match piece {
-            Piece::Text(t) => body.push_str(t),
-            Piece::Paste(p) => {
-                body.push(MARK_OPEN);
-                body.push_str(&p.n.to_string());
-                body.push(MARK_CLOSE);
-                pastes.push(p);
-            }
-        }
-    }
-    (body, pastes)
-}
 
 /// The chip marks in a history line: (byte start, byte past it, N).
 pub(crate) fn marks(line: &str) -> Vec<(usize, usize, usize)> {
@@ -213,7 +151,7 @@ pub(crate) fn of(a: &Attachment) -> Option<Pasted> {
     if !is_paste(&a.label) {
         return None;
     }
-    parse_at(&a.marker).map(|(p, _)| p)
+    parse_tag(&a.marker)
 }
 
 /// A long bracketed paste: the text in the composer, then its chip in
@@ -257,27 +195,20 @@ mod tests {
     fn a_tag_reads_back_and_a_close_tag_inside_is_broken() {
         let t = tag(3, "a\n</pasted>\nb");
         assert_eq!(t, "<pasted n=\"3\" lines=\"3\">\na\n</pasted >\nb\n</pasted>");
-        let (p, used) = parse_at(&t).unwrap();
-        assert_eq!(p, Pasted { n: 3, text: "a\n</pasted >\nb".into() });
-        assert_eq!(used, t.len());
+        assert_eq!(parse_tag(&t), Some(Pasted { n: 3, text: "a\n</pasted >\nb".into() }));
     }
 
+    /// A sent message's pastes in place, as the history reads them
+    /// (`said::view`, from its parts); a broken or typed tag is text.
     #[test]
-    fn split_finds_each_tag_in_place() {
+    fn the_history_finds_each_tag_in_place() {
         let msg = format!("look {} and {}\nok", tag(1, "a\nb"), tag(2, "c"));
-        assert_eq!(
-            split(&msg),
-            vec![
-                Piece::Text("look "),
-                Piece::Paste(Pasted { n: 1, text: "a\nb".into() }),
-                Piece::Text(" and "),
-                Piece::Paste(Pasted { n: 2, text: "c".into() }),
-                Piece::Text("\nok"),
-            ]
-        );
-        // a broken or typed tag is text
+        let v = crate::said::view(&crate::said::Said::from(msg.as_str()));
+        assert_eq!(v.body, format!("look {MARK_OPEN}1{MARK_CLOSE} and {MARK_OPEN}2{MARK_CLOSE}\nok"));
+        assert_eq!(v.pastes, vec![Pasted { n: 1, text: "a\nb".into() }, Pasted { n: 2, text: "c".into() }]);
         for s in ["<pasted n=\"1\">x</pasted>", "<pasted n=\"x\" lines=\"1\">\nx\n</pasted>", "plain", ""] {
-            assert_eq!(split(s), vec![Piece::Text(s)], "{s}");
+            let v = crate::said::view(&crate::said::Said::from(s));
+            assert_eq!((v.body.as_str(), v.pastes.len()), (s, 0), "{s}");
         }
     }
 
@@ -288,7 +219,8 @@ mod tests {
     #[test]
     fn the_history_folds_each_tag_to_its_chip_and_one_row() {
         let msg = format!("see {} ok", tag(2, &lines(240)));
-        let (body, pastes) = fold(&msg);
+        let v = crate::said::view(&crate::said::Said::from(msg.as_str()));
+        let (body, pastes) = (v.body, v.pastes);
         assert_eq!(body, "see \u{E000}2\u{E001} ok");
         assert_eq!(marks(&body), vec![(4, 4 + 3 + 1 + 3, 2)]);
         assert_eq!(pastes.len(), 1);

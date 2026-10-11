@@ -816,7 +816,15 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
                 app.follow = true;
             } else {
                 let v = app.ed.take().trim().to_string();
-                let v = if v.starts_with('/') { v } else { crate::attach::expand(app, &v) };
+                // msg-parts: his chips as typed parts, sent with the line
+                let v = match v.starts_with('/') {
+                    true => v,
+                    false => {
+                        let said = crate::attach::expand(app, &v);
+                        app.sb.parts_out = said.parts;
+                        said.text
+                    }
+                };
                 app.follow = true;
                 app.unseen = 0;
                 if !v.is_empty() {

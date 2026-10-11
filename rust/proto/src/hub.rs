@@ -7,6 +7,7 @@
 use crate::context::FnContext;
 use crate::diff::{DiffFile, DiffResult, DiffView};
 use crate::ops::{BranchRow, ReleaseEv, UpdateEv, VersionItem};
+use crate::parts::Part;
 use crate::rows::{Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, Merged, Model, Place, Pr, ScheduledTask, Worktree};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
@@ -470,6 +471,14 @@ pub enum HubCmd {
         /// to this connection only (never journaled: view state)
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cid: Option<u64>,
+        /// his message as typed parts (msg-parts, [`crate::parts`]): the
+        /// hub renders the model's text from them (`text` is then
+        /// ignored) and keeps them on his message, so every client draws
+        /// his quotes, pastes and images as chips. Empty: `text` (and
+        /// `files`) as before. Never with `files`; a part this hub
+        /// doesn't know is refused (it would drop words)
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        parts: Vec<Part>,
     },
     /// a card's answer: an option's number or words (approvals and merges
     /// included: the hub's one /answer path). `files`: what he pasted or
@@ -482,6 +491,9 @@ pub enum HubCmd {
         reply: String,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         files: Vec<String>,
+        /// his answer as typed parts, as `Send.parts` (`reply` then ignored)
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        parts: Vec<Part>,
     },
     /// close a card without answering it (the TUI's `/close N`): the
     /// hub's one close path (sb-core's `close`), a refusal as `error`
@@ -641,6 +653,11 @@ pub enum HubCmd {
         /// command is refused (a command never waits)
         #[serde(flatten)]
         opts: SendOpts,
+        /// his words' typed parts (msg-parts, as `Send.parts`): a line
+        /// that isn't a command takes `send`'s path with them (`line` is
+        /// then ignored); a command never has any
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        parts: Vec<Part>,
     },
     /// run scheduled task `id` now (the TUI's /scheduled `r`); an unknown
     /// or ended id is an `error`

@@ -127,6 +127,7 @@ impl T {
             focus: focus.into(),
             text: text.into(),
             queued: false,
+            parts: String::new(),
         })
     }
 
@@ -137,6 +138,19 @@ impl T {
             focus: focus.into(),
             text: text.into(),
             queued: true,
+            parts: String::new(),
+        })
+    }
+
+    /// His message with parts (msg-parts): `parts` as the hub's
+    /// `parts_in::said` makes them, `queued` the window's send queued.
+    fn user_parts(&mut self, focus: &str, text: &str, parts: &str, queued: bool) -> Vec<Effect> {
+        self.go(Input::ClientInput {
+            client: 1,
+            focus: focus.into(),
+            text: text.into(),
+            queued,
+            parts: parts.into(),
         })
     }
 
@@ -1731,7 +1745,7 @@ fn answering_mains_card_routes_it_and_notes_main() {
     t.req(MAIN, AgentReq::Card { text: "merge checkout into main?\n\n1. merge\n2. not yet".into(), for_msg: None });
     let card = *t.hub.st.cards.keys().next().unwrap();
     t.turn(MAIN, "J'ai demandé à l'utilisateur.");
-    let fx = t.go(Input::UserCmd { client: 1, focus: MAIN.into(), cmd: UserCmd::Answer { card, text: "this one\nand the second line".into() } });
+    let fx = t.go(Input::UserCmd { client: 1, focus: MAIN.into(), cmd: UserCmd::Answer { card, text: "this one\nand the second line".into(), parts: String::new() } });
     let recs: Vec<Hub> = lines_of(&fx, MAIN)
         .into_iter()
         .filter_map(|l| match lines::read(l) {
@@ -2705,6 +2719,7 @@ fn bench_step() {
         focus: MAIN.into(),
         text: "hello".into(),
         queued: false,
+        parts: String::new(),
     });
     let t0 = std::time::Instant::now();
     for _ in 0..10 {
@@ -4521,4 +4536,60 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     let (_, fx) = t.req(MAIN, AgentReq::Drop { agent: "perf".into() });
     assert!(fx.iter().any(|e| matches!(e, Effect::Journal(j) if j["type"] == "wake_end" && j["why"] == "gone")), "{fx:?}");
     assert!(wakes(&fx).is_empty(), "{fx:?}");
+}
+
+/// msg-parts (laws you_parts_follow_the_id, parts_never_change_text,
+/// no_parts_no_line): his parts ride on his message: sb-core writes them
+/// on a `you-parts` line right after its you-id, at the delivery (so a
+/// queued one gets them when it is said), the text the agent gets is the
+/// same as without them, and a message without parts writes no such line.
+#[test]
+fn his_parts_follow_his_message_at_its_delivery() {
+    let mut t = T::new();
+    t.spawn_task("a");
+    let parts = r#"[{"kind":"quote","from":"main","text":"q"},{"kind":"text","text":"why?"}]"#;
+    let text = "<selection from=\"main\">\nq\n</selection>\nwhy?";
+    // `a` is busy: queued, nothing written yet
+    let fx = t.user_parts("a", text, parts, true);
+    assert!(lines_of(&fx, "a").iter().all(|l| !l.starts_with("sb you")), "{:?}", fx);
+    let id = t.hub.st.msgs.values().find(|m| m.text == text).unwrap().id;
+    // the turn ends: said, his three lines in order
+    let fx = t.go(Input::ReplIdle { agent: "a".into(), leftover: false });
+    assert!(say_to(&fx, "a").is_some_and(|s| s.contains("<selection from=\"main\">")), "the model's text: {:?}", fx);
+    let ls = lines_of(&fx, "a");
+    let at = ls.iter().position(|l| l.starts_with("sb you : ")).expect("his line");
+    assert_eq!(ls[at + 1], format!("sb you-id : m_{id}"));
+    assert_eq!(ls[at + 2], format!("sb you-parts : {parts}"));
+    // without parts: the two lines it always was
+    let fx = t.turn("a", "ok");
+    let _ = fx;
+    let fx = t.user("a", "plain words");
+    let ls = lines_of(&fx, "a");
+    assert!(ls.contains(&"sb you : plain words"), "{ls:?}");
+    assert!(ls.iter().all(|l| !l.starts_with("sb you-parts")), "{ls:?}");
+}
+
+/// msg-parts (law route_parts_follow_the_route): his answer to a card
+/// with parts: main's route line ("you answered") then its parts, and
+/// the asker's message carries them too.
+#[test]
+fn his_card_answer_keeps_its_parts() {
+    let mut t = T::new();
+    t.spawn_task("docs");
+    let (_, _) = t.req(
+        "docs",
+        AgentReq::Send { to: MAIN.into(), text: "v1 ou v2 ?".into(), expect_reply: true, reply_to: None, queued: false, why: String::new(), switch: None },
+    );
+    let id = t.hub.st.msgs.values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
+    t.req(MAIN, AgentReq::Card { text: "La doc : v1 ou v2 ?".into(), for_msg: Some(id) });
+    t.turn(MAIN, "J'ai demandé à l'utilisateur.");
+    let card = *t.hub.st.cards.keys().next().unwrap();
+    let parts = r#"[{"kind":"quote","from":"main","text":"q"},{"kind":"text","text":"v2"}]"#;
+    let text = "<selection from=\"main\">\nq\n</selection>\nv2";
+    let fx = t.go(Input::UserCmd { client: 1, focus: MAIN.into(), cmd: UserCmd::Answer { card, text: text.into(), parts: parts.into() } });
+    let ls = lines_of(&fx, MAIN);
+    let at = ls.iter().position(|l| l.starts_with("sb route : you → @docs (answer to card #")).expect("the route line");
+    assert_eq!(ls[at + 1], format!("sb route-parts : {parts}"), "{ls:?}");
+    let answer = t.hub.st.msgs.values().find(|m| m.text == text).expect("the asker's message");
+    assert_eq!(answer.parts, parts);
 }

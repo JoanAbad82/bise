@@ -609,6 +609,14 @@ pub struct Entry {
     /// time) or one with no entry of its own to carry it
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turn_end_ms: Option<u64>,
+    /// his message as typed parts (msg-parts, [`crate::parts`]): on a
+    /// `you` entry, and on an `approval` entry that is his answer to a
+    /// card (the note's parts). From the `you-parts` / `route-parts` line
+    /// sb-core writes after it. When this is not empty, no client draws
+    /// his message from `text` (the model's templated text, kept for
+    /// older clients, search and copy)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parts: Vec<crate::parts::Part>,
 }
 
 impl Entry {
@@ -644,6 +652,7 @@ impl Entry {
             wake: None,
             turn_start: false,
             turn_end_ms: None,
+            parts: Vec::new(),
         }
     }
 

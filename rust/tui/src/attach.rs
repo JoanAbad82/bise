@@ -168,36 +168,54 @@ pub(crate) fn on_paste(app: &mut App, text: &str) -> Option<Result<Vec<String>, 
     Some(Ok(labels))
 }
 
-/// The text to send: each image label still present becomes its
-/// marker; each quote label leaves the text and its tag goes in front,
-/// one per line, in text order (quote.rs); the attachments start over.
-pub(crate) fn expand(app: &mut App, text: &str) -> String {
+/// The message to send, as typed parts (msg-parts) and their text
+/// (`parts::render`, the one template): each quote label leaves the
+/// words and its quote goes in front, in text order (quote.rs); each
+/// other chip still present (an image, a long paste) is its part where
+/// it was; the attachments start over.
+pub(crate) fn expand(app: &mut App, text: &str) -> crate::said::Said {
+    use bise_proto::parts::Part;
     let atts = std::mem::take(&mut app.attachments);
     let mut out = text.to_string();
     let mut quotes: Vec<(usize, &Attachment)> = Vec::new();
-    for a in &atts {
-        if crate::quote::is_quote(&a.label) {
-            if let Some(at) = text.find(&a.label) {
-                quotes.push((at, a));
-            }
-            // the label and one space after it (else before it) go
-            for pat in [format!("{} ", a.label), format!(" {}", a.label), a.label.clone()] {
-                out = out.replace(&pat, "");
-            }
-        } else {
-            out = out.replace(&a.label, &a.marker);
+    for a in atts.iter().filter(|a| crate::quote::is_quote(&a.label)) {
+        if let Some(at) = text.find(&a.label) {
+            quotes.push((at, a));
+        }
+        // the label and one space after it (else before it) go
+        for pat in [format!("{} ", a.label), format!(" {}", a.label), a.label.clone()] {
+            out = out.replace(&pat, "");
         }
     }
-    if quotes.is_empty() {
-        return out;
+    if !quotes.is_empty() {
+        out = out.trim().to_string();
     }
     quotes.sort_by_key(|(at, _)| *at);
-    let mut head: Vec<&str> = quotes.iter().map(|(_, a)| a.marker.as_str()).collect();
-    let rest = out.trim();
-    if !rest.is_empty() {
-        head.push(rest);
+    let mut parts: Vec<Part> = quotes.iter().map(|(_, a)| part_of(a)).collect();
+    // the words, cut at each other chip's label
+    let others: Vec<&Attachment> = atts.iter().filter(|a| !crate::quote::is_quote(&a.label)).collect();
+    let mut rest = out.as_str();
+    while let Some((at, a)) = others.iter().filter_map(|a| rest.find(&a.label).map(|at| (at, *a))).min_by_key(|(at, _)| *at) {
+        if at > 0 {
+            parts.push(Part::Text { text: rest[..at].to_string() });
+        }
+        parts.push(part_of(a));
+        rest = &rest[at + a.label.len()..];
     }
-    head.join("\n")
+    if !rest.is_empty() {
+        parts.push(Part::Text { text: rest.to_string() });
+    }
+    crate::said::Said::of_parts(parts)
+}
+
+/// The part an attachment's marker holds (a quote, a paste, an image);
+/// a marker that isn't one part (an artifact's link) stays its text.
+fn part_of(a: &Attachment) -> bise_proto::parts::Part {
+    use bise_proto::parts::Part;
+    match bise_proto::parts::parse(&a.marker).as_slice() {
+        [p] if !matches!(p, Part::Text { .. }) => p.clone(),
+        _ => Part::Text { text: a.marker.clone() },
+    }
 }
 
 /// The picked `@` entry is an image file: attach it (the `@token` goes).
@@ -482,7 +500,7 @@ pub(crate) fn chip_spans(text: &str, style: Style) -> Vec<Span<'static>> {
         out.extend(chip_spans(&text[b..], style));
         return out.into_iter().filter(|s| !s.content.is_empty()).collect();
     }
-    // a paste's chip mark (pasted::fold): `▤ 1`, accent
+    // a paste's chip mark (said::view): `▤ 1`, accent
     let marks = crate::pasted::marks(text);
     if marks.is_empty() {
         return image_spans(text, style);

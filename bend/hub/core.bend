@@ -22,7 +22,7 @@ import ./xhub.bend as XB
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
     reply_to: Maybe<&2, Nat>, plain: Bool, auto: Bool, queued: Bool,
-    via: Maybe<&2, String>}
+    via: Maybe<&2, String>, parts: String}
 
 type SendR is Data:
   SOk{m: M.Msg}
@@ -399,6 +399,17 @@ def out(-o: M.St, +cx: X.Cx<o>, +kvs: List<&2, Sigma<&2, &2, String, _ => J.Json
 def line(-o: M.St, +cx: X.Cx<o>, +agent: String, +kind: String, +text: String) -> X.Cx<o>:
   out(o, cx, [J.kv("fx", J.JStr{"line"}), J.kv("agent", J.JStr{agent}), J.kv("kind", J.JStr{kind}), J.kv("text", J.JStr{text})])
 
+# his message's parts after the line that shows it (msg-parts): `kind`
+# `you-parts` after his you-id, `route-parts` after a route line; none
+# when he sent none, so those lines are what they always were (law
+# no_parts_no_line)
+def parts_line(-o: M.St, +cx: X.Cx<o>, +agent: String, +kind: String, +parts: String) -> X.Cx<o>:
+  pick_lazy(X.Cx<o>, String.is_empty(parts), u => cx, u => line(o, cx, agent, kind, parts))
+
+# his route line in main's feed (`you → @asker …`), then its parts
+def route_line(-o: M.St, +cx: X.Cx<o>, +text: String, +parts: String) -> X.Cx<o>:
+  parts_line(o, line(o, cx, M.MAIN(), "route", text), M.MAIN(), "route-parts", parts)
+
 def reply(-o: M.St, +cx: X.Cx<o>, +token: Nat, +body: J.Json) -> X.Cx<o>:
   out(o, cx, [J.kv("fx", J.JStr{"reply"}), J.kv("token", J.JNum{token}), J.kv("body", body)])
 
@@ -677,9 +688,12 @@ def deliver.line(-o: M.St, again: Bool, you: Bool, +cx: X.Cx<o>, +name: String, 
     case True{} _:
       cx
     # his line, then its message id on the next one (the feed only: the
-    # clients key his entry by it, the steered receipt names it)
+    # clients key his entry by it, the steered receipt names it), then
+    # his parts when he sent some (msg-parts: written at the delivery, so
+    # a queued or steered message gets them when it is said)
     case False{} True{}:
-      line(o, line(o, cx, name, "you", M.Msg.text(m)), name, "you-id", mid(M.Msg.id(m)))
+      +cx2 = line(o, line(o, cx, name, "you", M.Msg.text(m)), name, "you-id", mid(M.Msg.id(m)))
+      parts_line(o, cx2, name, "you-parts", M.Msg.parts(m))
     case False{} False{}:
       line(o, cx, name, "msg-in", cat([M.Msg.from(m), " ", mid(M.Msg.id(m)), " : ", M.Msg.text(m)]))
 
@@ -795,10 +809,11 @@ def quiet_ok(a: Bool, e: Bool) -> {Bool.and(a, Bool.and(e, Bool.not(a))) == Fals
 
 def send.emit(-o: M.St, +cx: X.Cx<o>, +s: Snd, +thread: Nat) -> X.Cx<o> & SendR:
   match s:
-    case Snd{+from, +to, +text, +expect, +reply_to, +plain, +auto, +queued, +via}:
+    case Snd{+from, +to, +text, +expect, +reply_to, +plain, +auto, +queued, +via, +parts}:
       # an automatic reply never asks (law auto_never_asks); the id is the
-      # next free one (law msg_ids_fresh)
-      +m = {M.Msg{M.St.next_msg(st(o, cx)), thread, from, to, reply_to, Bool.and(expect, Bool.not(auto)), auto, text, now(o, cx), plain, queued, via} : M.Msg}
+      # next free one (law msg_ids_fresh); his parts kept as sent (law
+      # parts_never_change_text: the text is the same with or without them)
+      +m = {M.Msg{M.St.next_msg(st(o, cx)), thread, from, to, reply_to, Bool.and(expect, Bool.not(auto)), auto, text, now(o, cx), plain, queued, via, parts} : M.Msg}
       # a card is closed by the user's answer only (answer_card): no reply
       # here touches the user's inbox (BISE-299)
       +cx2 = emit(o, cx, M.EMsgSent{m}, {==}, quiet_ok(auto, expect), Unit{})
@@ -822,12 +837,12 @@ def send.thread(-o: M.St, reply_to: Maybe<&2, Nat>, +cx: X.Cx<o>, +s: Snd) -> X.
 
 def Snd.to(x: Snd) -> String:
   match x:
-    case Snd{_, +to, _, _, _, _, _, _, _}:
+    case Snd{_, +to, _, _, _, _, _, _, _, _}:
       to
 
 def Snd.reply_to(x: Snd) -> Maybe<&2, Nat>:
   match x:
-    case Snd{_, _, _, _, +reply_to, _, _, _, _}:
+    case Snd{_, _, _, _, +reply_to, _, _, _, _, _}:
       reply_to
 
 def send.revive(-o: M.St, ok: Bool, +cx: X.Cx<o>, +s: Snd, +why: String) -> X.Cx<o> & SendR:
@@ -884,7 +899,7 @@ def branch_label(b: J.Json) -> String:
 
 def Snd.from(x: Snd) -> String:
   match x:
-    case Snd{+from, _, _, _, _, _, _, _, _}:
+    case Snd{+from, _, _, _, _, _, _, _, _, _}:
       from
 
 def send.life(-o: M.St, life: M.Life, +cx: X.Cx<o>, +s: Snd, +a: M.Agent) -> X.Cx<o> & SendR:
@@ -914,13 +929,18 @@ def send.checked(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +s: Snd) -> X.C
 
 def Snd.text(x: Snd) -> String:
   match x:
-    case Snd{_, _, +text, _, _, _, _, _, _}:
+    case Snd{_, _, +text, _, _, _, _, _, _, _}:
       text
+
+def Snd.parts(x: Snd) -> String:
+  match x:
+    case Snd{_, _, _, _, _, _, _, _, _, +parts}:
+      parts
 
 def Snd.with_to(x: Snd, +v: String) -> Snd:
   match x:
-    case Snd{+from, _, +text, +expect, +reply_to, +plain, +auto, +queued, +via}:
-      Snd{from, v, text, expect, reply_to, plain, auto, queued, via}
+    case Snd{+from, _, +text, +expect, +reply_to, +plain, +auto, +queued, +via, +parts}:
+      Snd{from, v, text, expect, reply_to, plain, auto, queued, via, parts}
 
 def send.known(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
   match m:
@@ -1054,7 +1074,7 @@ def send(-o: M.St, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
   send_why(o, cx, s, "")
 
 def msg(+from: String, +to: String, +text: String, +expect: Bool, +reply_to: Maybe<&2, Nat>, +plain: Bool, +auto: Bool) -> Snd:
-  Snd{from, to, text, expect, reply_to, plain, auto, False{}, None{}}
+  Snd{from, to, text, expect, reply_to, plain, auto, False{}, None{}, ""}
 
 def fst(-o: M.St, p: X.Cx<o> & SendR) -> X.Cx<o>:
   match p:
@@ -1491,7 +1511,7 @@ def wake_end(-o: M.St, +cx: X.Cx<o>, +id: Nat, +why: String) -> X.Cx<o>:
 # a wake waits for the end of a busy turn (queued mode, never steered in:
 # the turn's work is not cut by it), and starts the next turn at its idle
 def wake_say(-o: M.St, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
-  fst(o, send(o, cx, Snd{M.HUB(), agent, text, False{}, None{}, False{}, False{}, True{}, None{}}))
+  fst(o, send(o, cx, Snd{M.HUB(), agent, text, False{}, None{}, False{}, False{}, True{}, None{}, ""}))
 
 def agent_active.go(m: Maybe<&2, M.Agent>) -> Bool:
   match m:
@@ -1968,14 +1988,14 @@ def close_card(-o: M.St, +cx: X.Cx<o>, +id: Nat, +res: String) -> X.Cx<o>:
   +cx2 = emit(o, cx, M.ECardClosed{id, res}, Unit{}, Unit{}, Unit{})
   line(o, cx2, M.MAIN(), "card-closed", cat(["#", ns(id), " ", res]))
 
-def answer.q.sent(-o: M.St, p: X.Cx<o> & SendR, +c: M.Card, +asker: String, +text: String) -> X.Cx<o>:
+def answer.q.sent(-o: M.St, p: X.Cx<o> & SendR, +c: M.Card, +asker: String, +text: String, +parts: String) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       notice(o, cx, e)
     case (+cx, SOk{_}):
       +id = M.Card.id(c)
       +cx2 = note_main(o, cx, cat(["the user answered card #", ns(id), " (@", asker, " asked: \"", M.one_line(M.Card.text(c)), "\"): \"", M.one_line(text), "\""]))
-      +cx3 = line(o, cx2, M.MAIN(), "route", cat(["you → @", asker, " (answer to card #", ns(id), ") : ", text]))
+      +cx3 = route_line(o, cx2, cat(["you → @", asker, " (answer to card #", ns(id), ") : ", text]), parts)
       close_card(o, cx3, id, "answered")
 
 # main's own card: the answer wakes main with a turn that holds it, like
@@ -1991,23 +2011,27 @@ def MAIN_ANSWER_HEAD() -> String:
 # The same route line as an agent's card (answer.q.sent), his answer whole:
 # the clients fold that line into the "you answered" row and drop the
 # notify's twin (lines.rs is_main_answer_note, its head MAIN_ANSWER_HEAD)
-def answer.q.main(-o: M.St, +cx: X.Cx<o>, +c: M.Card, +text: String) -> X.Cx<o>:
+def answer.q.main(-o: M.St, +cx: X.Cx<o>, +c: M.Card, +text: String, +parts: String) -> X.Cx<o>:
   +id = M.Card.id(c)
   +cx2 = notify_main(o, cx, cat([MAIN_ANSWER_HEAD(), ns(id), " (\"", M.one_line(M.Card.text(c)), "\"): \"", M.one_line(text), "\""]))
-  +cx3 = line(o, cx2, M.MAIN(), "route", cat(["you → @", M.MAIN(), " (answer to card #", ns(id), ") : ", text]))
+  +cx3 = route_line(o, cx2, cat(["you → @", M.MAIN(), " (answer to card #", ns(id), ") : ", text]), parts)
   close_card(o, cx3, id, "answered")
 
-def answer.q(-o: M.St, m: Maybe<&2, M.Msg>, +cx: X.Cx<o>, +c: M.Card, +text: String) -> X.Cx<o>:
+# his answer as a message to the asker, his parts with it
+def answer.snd(+to: String, +text: String, +reply_to: Maybe<&2, Nat>, +parts: String) -> Snd:
+  Snd{M.USER(), to, text, False{}, reply_to, False{}, False{}, False{}, None{}, parts}
+
+def answer.q(-o: M.St, m: Maybe<&2, M.Msg>, +cx: X.Cx<o>, +c: M.Card, +text: String, +parts: String) -> X.Cx<o>:
   match m:
     case Some{+q}:
-      answer.q.sent(o, send(o, cx, msg(M.USER(), M.Msg.from(q), text, False{}, Some{M.Msg.id(q)}, False{}, False{})), c, M.Msg.from(q), text)
+      answer.q.sent(o, send(o, cx, answer.snd(M.Msg.from(q), text, Some{M.Msg.id(q)}, parts)), c, M.Msg.from(q), text, parts)
     case None{}:
       # pr-news: a card the hub opened about an agent (checks that still
       # fail after two tries): the answer goes to that agent, main reads it
       +ag = M.Card.agent(c)
       pick_lazy(X.Cx<o>, Bool.not(String.eq(ag, M.MAIN())) && Maybe.is_some(&2, String, M.resolve(st(o, cx), ag)),
-        u => answer.q.sent(o, send(o, cx, msg(M.USER(), ag, text, False{}, None{}, False{}, False{})), c, ag, text),
-        u => answer.q.main(o, cx, c, text))
+        u => answer.q.sent(o, send(o, cx, answer.snd(ag, text, None{}, parts)), c, ag, text, parts),
+        u => answer.q.main(o, cx, c, text, parts))
 
 def answer.dropped(-o: M.St, p: X.Cx<o> & DropR, +c: M.Card) -> X.Cx<o>:
   match p:
@@ -2123,10 +2147,10 @@ def answer.choice(-o: M.St, num: Bool, +cx: X.Cx<o>, +c: M.Card, +text: String) 
     case False{}:
       words_refused(o, cx, c, "one of its numbers")
 
-def answer.kind(-o: M.St, k: CardK, +cx: X.Cx<o>, +c: M.Card, +text: String) -> X.Cx<o>:
+def answer.kind(-o: M.St, k: CardK, +cx: X.Cx<o>, +c: M.Card, +text: String, +parts: String) -> X.Cx<o>:
   match k:
     case KQuestion{}:
-      answer.q(o, for_msg_of(st(o, cx), M.Card.for_msg(c)), cx, c, text)
+      answer.q(o, for_msg_of(st(o, cx), M.Card.for_msg(c)), cx, c, text, parts)
     case KDrop{}:
       answer.drop(o, is_yes(text), cx, c)
     case KConfirm{}:
@@ -2136,15 +2160,17 @@ def answer.kind(-o: M.St, k: CardK, +cx: X.Cx<o>, +c: M.Card, +text: String) -> 
     case KOther{}:
       close_card(o, cx, M.Card.id(c), "vue")
 
-def answer.card(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat, +text: String) -> X.Cx<o>:
+def answer.card(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String) -> X.Cx<o>:
   match m:
     case None{}:
       notice(o, cx, String.append("no open card #", ns(id)))
     case Some{+c}:
-      answer.kind(o, card_kind(M.Card.kind(c)), cx, c, text)
+      answer.kind(o, card_kind(M.Card.kind(c)), cx, c, text, parts)
 
-def answer_card(-o: M.St, +cx: X.Cx<o>, +id: Nat, +text: String) -> X.Cx<o>:
-  answer.card(o, M.card_of(M.St.cards(st(o, cx)), id), cx, id, text)
+# his answer to card `id`; `parts`: his message's parts (msg-parts, ""
+# none), kept on the asker's message and written after the route line
+def answer_card(-o: M.St, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String) -> X.Cx<o>:
+  answer.card(o, M.card_of(M.St.cards(st(o, cx)), id), cx, id, text, parts)
 
 def asked_by(m: Maybe<&2, M.Msg>, +to: String) -> Bool:
   match m:
@@ -2170,19 +2196,20 @@ def says.sent(-o: M.St, p: X.Cx<o> & SendR, +to: String, +text: String) -> X.Cx<
     case (+cx, SOk{_}):
       pick_lazy(X.Cx<o>, String.eq(to, M.MAIN()), u => cx, u => user_sent(o, cx, text))
 
-def says.card(-o: M.St, card: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool) -> X.Cx<o>:
+def says.card(-o: M.St, card: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
   match card:
     case Some{+id}:
-      answer_card(o, user_sent(o, cx, text), id, text)
+      answer_card(o, user_sent(o, cx, text), id, text, parts)
     case None{}:
-      says.sent(o, send(o, cx, Snd{M.USER(), to, text, False{}, None{}, True{}, False{}, queued, None{}}), to, text)
+      says.sent(o, send(o, cx, Snd{M.USER(), to, text, False{}, None{}, True{}, False{}, queued, None{}, parts}), to, text)
 
 # plain text from the user to the agent in focus. `queued` (the window's
 # "send queued"): a queued-mode message, held while the agent is busy and
 # said at its turn's end (law user_queued_waits_for_turn_end); it never
-# answers a question card (law user_queued_never_answers_a_card)
-def user_says(-o: M.St, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool) -> X.Cx<o>:
-  says.card(o, Bool.pick(Maybe<&2, Nat>, queued || String.eq(to, M.MAIN()), None{}, question_card(M.St.cards(st(o, cx)), st(o, cx), to)), cx, to, text, queued)
+# answers a question card (law user_queued_never_answers_a_card).
+# `parts`: his message's parts (msg-parts, "" none), kept on the message
+def user_says(-o: M.St, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
+  says.card(o, Bool.pick(Maybe<&2, Nat>, queued || String.eq(to, M.MAIN()), None{}, question_card(M.St.cards(st(o, cx)), st(o, cx), to)), cx, to, text, queued, parts)
 
 def close_names(xs: List<&2, String>, +target: String) -> List<&2, String>:
   match xs:
@@ -2194,17 +2221,17 @@ def close_names(xs: List<&2, String>, +target: String) -> List<&2, String>:
       Bool.pick(List<&2, String>, Bool.not(String.eq(n, M.MAIN())) && (String.starts_with(n, Bool.pick(String, String.is_empty(first), "?", first)) || String.contains(n, target)),
         String.append("@", n) <> rest, rest)
 
-def route.sent(-o: M.St, p: X.Cx<o> & SendR, +name: String, +text: String, +focus: String) -> X.Cx<o>:
+def route.sent(-o: M.St, p: X.Cx<o> & SendR, +name: String, +text: String, +focus: String, +parts: String) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       undelivered.if(o, unavailable_err(e), notice(o, cx, e), focus, name, text)
     case (+cx, SOk{+m}):
-      +cx2 = line(o, cx, M.MAIN(), "route", cat(["you → @", name, " : ", text]))
+      +cx2 = route_line(o, cx, cat(["you → @", name, " : ", text]), parts)
       +cx3 = pick_lazy(X.Cx<o>, Bool.not(String.eq(focus, M.MAIN())) || Bool.not(String.eq(name, focus)),
         u => note_main(o, cx2, cat(["the user wrote directly to @", name, ": \"", M.one_line(text), "\""])), u => cx2)
       cx3
 
-def route.target(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool) -> X.Cx<o>:
+def route.target(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool, +parts: String) -> X.Cx<o>:
   match m:
     case None{}:
       +close = close_names(M.St.order(st(o, cx)), target)
@@ -2215,12 +2242,13 @@ def route.target(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +target: String, 
       # its answer comes back to that view
       +elsewhere = Bool.not(String.eq(name, focus))
       route.sent(o, send(o, cx, Snd{M.USER(), name, text, elsewhere, None{}, Bool.not(elsewhere), False{}, queued,
-        Bool.pick(Maybe<&2, String>, elsewhere, Some{focus}, None{})}), name, text, focus)
+        Bool.pick(Maybe<&2, String>, elsewhere, Some{focus}, None{}), parts}), name, text, focus, parts)
 
-# `@task text`: a direct message, without main; `queued` as user_says
-def route(-o: M.St, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool) -> X.Cx<o>:
-  pick_lazy(X.Cx<o>, String.eq(target, M.MAIN()), u => user_says(o, cx, M.MAIN(), text, queued),
-    u => route.target(o, M.resolve(st(o, cx), target), cx, target, text, focus, queued))
+# `@task text`: a direct message, without main; `queued` and `parts` as
+# user_says
+def route(-o: M.St, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool, +parts: String) -> X.Cx<o>:
+  pick_lazy(X.Cx<o>, String.eq(target, M.MAIN()), u => user_says(o, cx, M.MAIN(), text, queued, parts),
+    u => route.target(o, M.resolve(st(o, cx), target), cx, target, text, focus, queued, parts))
 
 def user_new.res(-o: M.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
   match p:
@@ -2522,10 +2550,10 @@ def route_behind(-o: M.St, +cx: X.Cx<o>, +text: String, +d: Nat) -> X.Cx<o>:
   +r = XB.new_route_at(xst(o, cx), tms(o, cx), text, "", "", "", "", d, "")
   aemit(o, xemit(o, cx, XH.XRouteHeld{r}), TM.ActSet{XB.route_act(r)})
 
-def user_input.behind(-o: M.St, m: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool) -> X.Cx<o>:
+def user_input.behind(-o: M.St, m: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
   match m:
     case None{}:
-      user_says(o, cx, to, text, queued)
+      user_says(o, cx, to, text, queued, parts)
     case Some{+d}:
       route_behind(o, cx, text, d)
 
@@ -2533,16 +2561,18 @@ def user_input.behind(-o: M.St, m: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +t
 # unclear route of his waits for the model's pick, held behind it, due at
 # the latest unclear due, so both reach main in order (law
 # route_plain_waits_behind_unclear); else user_says. A queued input waits
-# for main's turn end already: never held here.
-def user_input(-o: M.St, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool) -> X.Cx<o>:
-  user_input.behind(o, Bool.pick(Maybe<&2, Nat>, Bool.not(queued) && String.eq(to, M.MAIN()), XB.unclear_due(XH.Xs.routes(xst(o, cx))), None{}), cx, to, text, queued)
+# for main's turn end already: never held here. `parts`: his message's
+# parts (msg-parts, "" none; a held one is held as its text, the window's
+# routed words have none)
+def user_input(-o: M.St, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
+  user_input.behind(o, Bool.pick(Maybe<&2, Nat>, Bool.not(queued) && String.eq(to, M.MAIN()), XB.unclear_due(XH.Xs.routes(xst(o, cx))), None{}), cx, to, text, queued, parts)
 
 # an unclear route's act fired with no target: it ends, and his words
 # reach bise's main as a plain message (the cancel path, no route_done:
 # the window never saw it)
 def route_plain(-o: M.St, +cx: X.Cx<o>, +r: XH.Route) -> X.Cx<o>:
   +cx2 = xemit(o, cx, XH.XRoute{XH.Route.rid(r), XH.REnd{XH.RCancelled{}}})
-  says.sent(o, send(o, cx2, Snd{M.USER(), M.MAIN(), XH.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(XH.Route.via(r))}), M.MAIN(), XH.Route.text(r))
+  says.sent(o, send(o, cx2, Snd{M.USER(), M.MAIN(), XH.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(XH.Route.via(r)), ""}), M.MAIN(), XH.Route.text(r))
 
 def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: XH.Route, +id: Nat) -> X.Cx<o>:
   +cx2 = emit(o, mark_delivered(o, cx, id), M.ESettled{id}, Unit{}, Unit{}, Unit{})
@@ -2557,7 +2587,7 @@ def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: XH.Route, +id: Nat) -> X.Cx<o>:
 # send would pump main, a turn), no waiter, no card (law
 # route_fire_makes_no_turn)
 def route_said(-o: M.St, +cx: X.Cx<o>, +r: XH.Route) -> X.Cx<o>:
-  +msg = {M.Msg{M.St.next_msg(st(o, cx)), M.St.next_msg(st(o, cx)), M.USER(), M.MAIN(), None{}, False{}, False{}, XH.Route.text(r), now(o, cx), True{}, False{}, XB.via_of(XH.Route.via(r))} : M.Msg}
+  +msg = {M.Msg{M.St.next_msg(st(o, cx)), M.St.next_msg(st(o, cx)), M.USER(), M.MAIN(), None{}, False{}, False{}, XH.Route.text(r), now(o, cx), True{}, False{}, XB.via_of(XH.Route.via(r)), ""} : M.Msg}
   emit(o, cx, M.EMsgSent{msg}, {==}, quiet_ok(False{}, False{}), Unit{})
 
 # home: a held route's act fired: his message to main is created now (an
@@ -2583,7 +2613,7 @@ def route_cancel.go(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>, +rid: Nat) -
       +cx2 = aemit(o, cx, TM.ActDone{XH.Route.act(r)})
       +cx3 = xemit(o, cx2, XH.XRoute{rid, XH.REnd{XH.RCancelled{}}})
       +cx4 = route_done(o, cx3, rid, "cancelled", XH.Route.to(r), J.JNull{})
-      says.sent(o, send(o, cx4, Snd{M.USER(), M.MAIN(), XH.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(XH.Route.via(r))}), M.MAIN(), XH.Route.text(r))
+      says.sent(o, send(o, cx4, Snd{M.USER(), M.MAIN(), XH.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(XH.Route.via(r)), ""}), M.MAIN(), XH.Route.text(r))
 
 def route_cancel(-o: M.St, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
   route_cancel.go(o, XB.held(xst(o, cx), rid), cx, rid)
@@ -2666,11 +2696,11 @@ def xboot(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
 def xin.snd(k: XH.XKind, +text: String) -> Snd:
   match k:
     case XH.KInput{}:
-      Snd{M.USER(), M.MAIN(), text, True{}, None{}, False{}, False{}, False{}, Some{XB.VIA_BISE()}}
+      Snd{M.USER(), M.MAIN(), text, True{}, None{}, False{}, False{}, False{}, Some{XB.VIA_BISE()}, ""}
     case XH.KAsk{}:
-      Snd{XB.FROM_BISE(), M.MAIN(), text, True{}, None{}, False{}, False{}, False{}, None{}}
+      Snd{XB.FROM_BISE(), M.MAIN(), text, True{}, None{}, False{}, False{}, False{}, None{}, ""}
     case XH.KJobEnd{}:
-      Snd{XB.FROM_BISE(), M.MAIN(), text, False{}, None{}, False{}, False{}, False{}, None{}}
+      Snd{XB.FROM_BISE(), M.MAIN(), text, False{}, None{}, False{}, False{}, False{}, None{}, ""}
 
 def xin.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat, +k: XH.XKind) -> X.Cx<o>:
   match p:
@@ -2812,7 +2842,7 @@ def req_send.go(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) 
   # a plain message to an agent that asked us something answers it
   +reply_to = Maybe.or(&2, Nat, C.opt_nat(J.get(q, "reply_to")),
     Bool.pick(Maybe<&2, Nat>, expect, None{}, open_question(st(o, cx), to, from)))
-  req_send.res(o, send_why(o, cx, Snd{from, to, C.get_s(q, "text"), expect, reply_to, False{}, False{}, C.get_b(q, "queued"), None{}}, C.get_s(q, "why")), token)
+  req_send.res(o, send_why(o, cx, Snd{from, to, C.get_s(q, "text"), expect, reply_to, False{}, False{}, C.get_b(q, "queued"), None{}, ""}, C.get_s(q, "why")), token)
 
 
 # BISE-299: a question main escalated (`sb card --for`) is in the user's
@@ -3812,11 +3842,11 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
     case IBoot{}:
       xboot(o, boot(o, cx))
     case ISay{}:
-      user_input(o, cx, C.get_s(i, "focus"), C.get_s(i, "text"), C.get_b(i, "queued"))
+      user_input(o, cx, C.get_s(i, "focus"), C.get_s(i, "text"), C.get_b(i, "queued"), C.get_s(i, "parts"))
     case IRoute{}:
       pick_lazy(X.Cx<o>, String.eq(C.get_s(i, "target"), M.MAIN()),
-        u => user_input(o, cx, M.MAIN(), C.get_s(i, "text"), C.get_b(i, "queued")),
-        u => route(o, cx, C.get_s(i, "target"), C.get_s(i, "text"), C.get_s(i, "focus"), C.get_b(i, "queued")))
+        u => user_input(o, cx, M.MAIN(), C.get_s(i, "text"), C.get_b(i, "queued"), C.get_s(i, "parts")),
+        u => route(o, cx, C.get_s(i, "target"), C.get_s(i, "text"), C.get_s(i, "focus"), C.get_b(i, "queued"), C.get_s(i, "parts")))
     case INew{}:
       user_new.res(o, create_task(o, cx, new_task(M.USER(), i)))
     case IDrop{}:
@@ -3830,7 +3860,7 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
     case IRename{}:
       rename.old(o, M.resolve(st(o, cx), C.get_s(i, "name")), cx, C.get_s(i, "name"), C.get_s(i, "new_name"), C.get_b(i, "valid"))
     case IAnswer{}:
-      answer_card(o, cx, C.get_nat(i, "card"), C.get_s(i, "text"))
+      answer_card(o, cx, C.get_nat(i, "card"), C.get_s(i, "text"), C.get_s(i, "parts"))
     case IInterrupt{}:
       interrupt.go(o, M.resolve(st(o, cx), C.get_s(i, "agent")), cx)
     case IUnqueue{}:

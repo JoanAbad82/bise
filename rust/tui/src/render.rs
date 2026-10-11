@@ -5,7 +5,9 @@ use crate::code::*;
 use crate::markdown::*;
 use crate::theme::*;
 use crate::wire::*;
+use crate::said::Said;
 use crate::wrap_line;
+use bise_proto::parts::Part;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 
@@ -497,7 +499,7 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
         Ev::Pr { tone, number, url, text, url_row } => pr_lines(tone, *number, url, text, *url_row, width),
         Ev::Made { id, agent, title, kind, v } => made_lines(id, agent, title, kind, *v, width),
         Ev::Landed { agent, from, sha, files, add, del } => landed_lines(agent, from, sha, *files, *add, *del, width),
-        Ev::Approval { ok, text, note, asked, open } => answer_lines(*ok, text, note, asked, *open, width),
+        Ev::Approval { ok, text, note, parts, asked, open } => answer_lines(*ok, text, note, parts, asked, *open, width),
         Ev::Said { glyph, head, dim } => {
             // ✗ a failure (error); ? it needs you, ✓ it worked (accent)
             let calm = *glyph != "✗";
@@ -931,14 +933,18 @@ pub(crate) const YOU_ROWS: usize = 20;
 /// chip count one), or as many rows at 80 columns (one long paragraph).
 /// Width-free, so ctrl+o and find know it without the feed's width; at
 /// the feed's width a message that still fits shows whole.
-pub(crate) fn you_folds(msg: &str) -> bool {
+pub(crate) fn you_folds(msg: &Said) -> bool {
+    view_folds(&crate::said::view(msg))
+}
+
+/// [`you_folds`] of a message's view (msg-parts: its parts, never its
+/// text's tags).
+fn view_folds(v: &crate::said::View) -> bool {
     use unicode_width::UnicodeWidthStr;
-    let (quotes, body) = crate::quote::split(msg);
     // a long paste (BISE-240) is its chip in the line; it always
     // folds: its full text shows only open
-    let (body, pastes) = crate::pasted::fold(body);
-    let rows: usize = quotes.len() + body.split('\n').map(|l| l.width().div_ceil(77).max(1)).sum::<usize>();
-    !pastes.is_empty() || rows > YOU_ROWS
+    let rows: usize = v.quotes.len() + v.body.split('\n').map(|l| l.width().div_ceil(77).max(1)).sum::<usize>();
+    !v.pastes.is_empty() || rows > YOU_ROWS
 }
 
 /// The rows of your message's long pastes, under its text (behind its
@@ -951,22 +957,19 @@ fn paste_rows(pastes: &[crate::pasted::Pasted], open: bool, width: usize) -> Vec
 
 /// How many rows [`paste_rows`] takes in `msg` (feed::toggle_at: a
 /// click there opens or closes the message).
-pub(crate) fn you_paste_rows(msg: &str, open: bool, width: usize) -> usize {
-    let (_, body) = crate::quote::split(msg);
-    let (_, pastes) = crate::pasted::fold(body);
-    if pastes.is_empty() {
+pub(crate) fn you_paste_rows(msg: &Said, open: bool, width: usize) -> usize {
+    let v = crate::said::view(msg);
+    if v.pastes.is_empty() {
         return 0;
     }
-    paste_rows(&pastes, open, width).len()
+    paste_rows(&v.pastes, open, width).len()
 }
 
-pub(crate) fn user_block_lines(msg: &str, mark: Mark, open: bool, width: usize) -> Vec<Line<'static>> {
-    let style = Style::default().fg(text());
-    // BISE-134: the quotes in front (quote.rs), one dim line each:
-    // `❝ the selected words… · main · 3 lines`
-    let (quotes, body) = crate::quote::split(msg);
+/// His quotes (BISE-134), one dim line each: `❝ the selected words… ·
+/// main · 3 lines`.
+fn quote_lines(quotes: &[crate::quote::Quote], width: usize) -> Vec<Line<'static>> {
     let d = Style::default().fg(dim());
-    let quote_lines: Vec<Line<'static>> = quotes
+    quotes
         .iter()
         .map(|q| {
             let about = format!(" · {}", crate::quote::about(q));
@@ -974,13 +977,22 @@ pub(crate) fn user_block_lines(msg: &str, mark: Mark, open: bool, width: usize) 
             let g = crate::theme::glyph(crate::theme::G_QUOTE);
             Line::from(Span::styled(format!("{g} {}{about}", crate::quote::preview(&crate::quote::words(q), room)), d))
         })
-        .collect();
-    let folds = you_folds(msg);
+        .collect()
+}
+
+/// His message, drawn from its parts (msg-parts): the quotes in front,
+/// the words with their chips, the pastes' and images' rows under it.
+pub(crate) fn user_block_lines(said_msg: &Said, mark: Mark, open: bool, width: usize) -> Vec<Line<'static>> {
+    let style = Style::default().fg(text());
+    let d = Style::default().fg(dim());
+    let view = crate::said::view(said_msg);
+    let quote_lines = quote_lines(&view.quotes, width);
+    let folds = view_folds(&view);
     // voice mode (design §5): what you said, not typed, carries `said`
-    let said = crate::voicemode::live::was_said(msg);
+    let said = crate::voicemode::live::was_said(said_msg);
     // BISE-240: each long paste is its chip in the line (pasted.rs)
-    let (folded, pastes) = crate::pasted::fold(body);
-    let msg = folded.as_str();
+    let (quotes, pastes) = (&view.quotes, &view.pastes);
+    let msg = view.body.as_str();
     let mut lines: Vec<Line<'static>> = msg
         .split('\n')
         .map(|l| Line::from(crate::attach::chip_spans(l.trim_end_matches('\r'), style)))
@@ -1027,7 +1039,7 @@ pub(crate) fn user_block_lines(msg: &str, mark: Mark, open: bool, width: usize) 
         rows = hung_rows(&bar, &bar, all, width);
     }
     // its long pastes, one dim row each (the full text when open)
-    rows.extend(paste_rows(&pastes, open, width));
+    rows.extend(paste_rows(pastes, open, width));
     // the sizes of its images, dim, under it (still behind the bar)
     rows.extend(sizes_rows(msg, width));
     rows
@@ -1045,10 +1057,8 @@ fn sizes_rows(msg: &str, width: usize) -> Vec<Line<'static>> {
 /// How many rows the sizes of `msg`'s images take under it at `width`
 /// (feed::toggle_at: a click there does nothing; a few screenshots wrap
 /// to several rows, which hid the `▸ n more lines` row from the click).
-pub(crate) fn you_sizes_rows(msg: &str, width: usize) -> usize {
-    let (_, body) = crate::quote::split(msg);
-    let (folded, _) = crate::pasted::fold(body);
-    sizes_rows(&folded, width).len()
+pub(crate) fn you_sizes_rows(msg: &Said, width: usize) -> usize {
+    sizes_rows(&crate::said::view(msg).body, width).len()
 }
 
 // ---- an answer to an inbox item (BISE-307, designer) ----
@@ -1060,11 +1070,23 @@ const ANSWER_HEAD: usize = 77;
 /// Whether the line of an answer opens: its head is cut at 80 columns
 /// (the sentence and the question on one line), the question has more
 /// lines, or its words fold like a long message of yours.
-pub(crate) fn answer_opens(text: &str, note: &str, asked: &str) -> bool {
+pub(crate) fn answer_opens(text: &str, note: &str, parts: &[Part], asked: &str) -> bool {
     use unicode_width::UnicodeWidthStr;
     let asked = asked.trim();
     let head = text.width() + if asked.is_empty() { 0 } else { 3 + one_line(asked.lines().next().unwrap_or("")).width() };
-    head > ANSWER_HEAD || asked.contains('\n') || you_folds(note)
+    head > ANSWER_HEAD || asked.contains('\n') || view_folds(&answer_view(note, parts))
+}
+
+/// His answer's words as a message of his: from its parts when it has
+/// some (msg-parts; the words only when the note carries them, else they
+/// are on the head's line), else the note.
+fn answer_view(note: &str, parts: &[Part]) -> crate::said::View {
+    let mut v = crate::said::view_of(note, parts);
+    if note.trim().is_empty() {
+        v.body = String::new();
+    }
+    v.body = v.body.trim().to_string();
+    v
 }
 
 /// `s` on one line: runs of whitespace become one space.
@@ -1100,7 +1122,7 @@ fn cut_cols(s: &str, w: usize) -> String {
 /// from column 3, 20 rows then `▸ n more lines`). Open: `▾` at the
 /// head's end, the head whole, the full question hung at column 3, dim,
 /// the words whole.
-fn answer_lines(ok: bool, text: &str, note: &str, asked: &str, open: bool, width: usize) -> Vec<Line<'static>> {
+fn answer_lines(ok: bool, text: &str, note: &str, parts: &[Part], asked: &str, open: bool, width: usize) -> Vec<Line<'static>> {
     use unicode_width::UnicodeWidthStr;
     let d = Style::default().fg(dim());
     let text_st = Style::default().fg(crate::theme::text());
@@ -1111,7 +1133,7 @@ fn answer_lines(ok: bool, text: &str, note: &str, asked: &str, open: bool, width
     let mark = Span::styled(format!(" {} ", glyph(if ok { G_RECEIVED } else { G_FAILED })), mark_st);
     let pad = Span::raw("   ");
     let asked = asked.trim();
-    let opens = answer_opens(text, note, asked);
+    let opens = answer_opens(text, note, parts, asked);
     let mut rows = if open && opens {
         let head = Line::from(vec![Span::styled(text.to_string(), text_st), Span::styled(format!(" {}", glyph(G_OPEN)), d)]);
         let mut rows = hung_rows(&mark, &pad, [head], width);
@@ -1134,16 +1156,23 @@ fn answer_lines(ok: bool, text: &str, note: &str, asked: &str, open: bool, width
         }
         vec![Line::from(head)]
     };
-    if note.trim().is_empty() {
+    // your words, like a message of yours: from its parts (msg-parts),
+    // its quotes in front, its chips in the words, its pastes and
+    // images under them; never a tag
+    let view = answer_view(note, parts);
+    if view.body.is_empty() && view.quotes.is_empty() && view.pastes.is_empty() {
         return rows;
     }
-    // your words, like a message of yours
     let bar = Span::styled(format!("{}  ", user_bar()), Style::default().fg(accent()));
-    let units: Vec<Vec<Line<'static>>> = note
-        .trim()
-        .split('\n')
-        .map(|l| hung_rows(&bar, &bar, [Line::from(Span::styled(l.trim_end().to_string(), text_st))], width))
-        .collect();
+    let mut units: Vec<Vec<Line<'static>>> = quote_lines(&view.quotes, width).into_iter().map(|l| hung_rows(&bar, &bar, [l], width)).collect();
+    if !view.body.is_empty() {
+        units.extend(
+            view.body
+                .split('\n')
+                .map(|l| hung_rows(&bar, &bar, [Line::from(crate::attach::chip_spans(l.trim_end_matches('\r').trim_end(), text_st))], width)),
+        );
+    }
+    let under: Vec<Line<'static>> = paste_rows(&view.pastes, open, width).into_iter().chain(sizes_rows(&view.body, width)).collect();
     let total: usize = units.iter().map(Vec::len).sum();
     if !open && total > YOU_ROWS {
         let (mut words, mut shown) = (Vec::new(), 0);
@@ -1160,6 +1189,7 @@ fn answer_lines(ok: bool, text: &str, note: &str, asked: &str, open: bool, width
     } else {
         rows.extend(units.into_iter().flatten());
     }
+    rows.extend(under);
     rows
 }
 
@@ -1669,7 +1699,7 @@ mod multiline_tests {
     fn user_message_keeps_its_line_breaks() {
         let long = "word ".repeat(12);
         let text = format!("first line\nsecond line\n{}end", long);
-        let s = screen(Ev::You(text, crate::wire::Mark::Read, false, None), 30);
+        let s = screen(Ev::You(text.into(), crate::wire::Mark::Read, false, None), 30);
         // the bar on every row (BISE-90), every row's text at column 3
         assert_eq!(s[0].as_str(), "│  first line", "{s:#?}");
         assert_eq!(s[1].as_str(), "│  second line", "{s:#?}");
@@ -1683,8 +1713,49 @@ mod multiline_tests {
         assert!(!s.iter().any(|r| r.contains('\n')));
     }
 
+    /// msg-parts, his screenshot: a card answer with a quote of main
+    /// draws the quote as its chip line and his words, never the tag
+    /// (an old journal's text read back, and the hub's parts alike).
+    #[test]
+    fn his_card_answer_draws_its_quote_never_its_tag() {
+        use crate::said::Said;
+        let said = Said::from("<selection from=\"main\">\nle process\n</selection>\nSon process prenait tout mon CPU!");
+        for (note_words, width) in [(said.words(), 80u16), (format!("{}\n{}", said.words(), "et encore"), 80)] {
+            let (text, note) = bise_proto::thread::words::answered_split("main", note_words.trim(), &unicode_width::UnicodeWidthStr::width);
+            let ev = Ev::Approval { ok: true, text, note, parts: said.parts.clone(), asked: String::new(), open: false };
+            let s = screen(ev, width);
+            assert!(!s.iter().any(|r| r.contains("<selection") || r.contains("</selection>")), "{s:#?}");
+            assert!(s[0].contains("you answered main"), "{s:#?}");
+            assert!(s.iter().any(|r| r.contains("le process") && r.contains("main · 1 line")), "{s:#?}");
+            assert!(s.iter().filter(|r| r.contains("Son process prenait tout mon CPU!")).count() == 1, "{s:#?}");
+        }
+    }
+
+    /// msg-parts: his message with a quote and a long paste, from its
+    /// parts: the quote line, the words with the paste's chip, its row
+    /// under them; no tag on screen.
+    #[test]
+    fn his_message_draws_from_its_parts() {
+        use crate::said::Said;
+        use bise_proto::parts::Part;
+        let paste: String = (1..=14).map(|i| format!("line {i}\n")).collect();
+        let parts = vec![
+            Part::Quote { from: "t1".into(), text: "the selected words".into(), file: String::new(), new: String::new(), old: String::new() },
+            Part::Text { text: "why ".into() },
+            Part::Paste { n: 1, text: paste.trim_end().into() },
+            Part::Text { text: " fails?".into() },
+        ];
+        let said = Said::of_parts(parts);
+        assert!(said.text.starts_with("<selection from=\"t1\">"));
+        let s = screen(Ev::You(said, crate::wire::Mark::Read, false, None), 60);
+        assert!(!s.iter().any(|r| r.contains('<')), "{s:#?}");
+        assert!(s[0].contains("the selected words") && s[0].contains("t1 · 1 line"), "{s:#?}");
+        assert!(s.iter().any(|r| r.contains("why") && r.contains("fails?")), "{s:#?}");
+        assert!(s.iter().any(|r| r.contains("14 lines")), "{s:#?}");
+    }
+
     fn answer(ok: bool, text: &str, note: &str, asked: &str, open: bool) -> Ev {
-        Ev::Approval { ok, text: text.into(), note: note.into(), asked: asked.into(), open }
+        Ev::Approval { ok, text: text.into(), note: note.into(), parts: Vec::new(), asked: asked.into(), open }
     }
 
     /// BISE-307 (the user: « crop trop vite, et ne peuvent pas être

@@ -570,6 +570,7 @@ mod tests {
                 plain: false,
                 queued: false,
                 via: None,
+                parts: String::new(),
             },
         );
         let t = agent_threads(&st, 8);
@@ -595,6 +596,7 @@ mod tests {
             plain: false,
             queued,
             via: None,
+            parts: String::new(),
         }
     }
 

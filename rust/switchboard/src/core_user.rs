@@ -9,6 +9,7 @@
 use super::*;
 
 impl Hub {
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn user_input(
         &mut self,
         fx: &mut Fx,
@@ -17,6 +18,7 @@ impl Hub {
         focus: &str,
         text: &str,
         queued: bool,
+        parts: &str,
     ) {
         let focus = self.focus_of(client, focus);
         // only words wait for the turn's end: a command runs now
@@ -24,7 +26,7 @@ impl Hub {
         if queued && !matches!(cmd, UserCmd::Say(_) | UserCmd::To { .. }) {
             fx.push(notice(client, "commands run now, not queued"));
         }
-        self.user_cmd(fx, env, client, focus, cmd, queued);
+        self.user_cmd(fx, env, client, focus, cmd, queued, parts);
     }
 
     /// The agent `focus` names (main when none), now `client`'s focus.
@@ -39,19 +41,22 @@ impl Hub {
     }
 
     /// One command of `client`, for the agent `focus` (resolved).
-    pub(super) fn user_cmd(&mut self, fx: &mut Fx, env: &mut dyn Env, client: ClientId, focus: String, cmd: UserCmd, queued: bool) {
+    /// `parts`: the parts' JSON of his words (msg-parts, "" none): on a
+    /// say or a route, sb-core keeps them on the message.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn user_cmd(&mut self, fx: &mut Fx, env: &mut dyn Env, client: ClientId, focus: String, cmd: UserCmd, queued: bool, parts: &str) {
         let c = Some(client);
         match cmd {
             UserCmd::Say(t) => {
                 if !t.is_empty() {
-                    self.core(fx, env, c, json!({"t": "say", "focus": focus, "text": t, "queued": queued}));
+                    self.core(fx, env, c, with_parts(json!({"t": "say", "focus": focus, "text": t, "queued": queued}), parts));
                 }
             }
             UserCmd::To { target, text } => self.core(
                 fx,
                 env,
                 c,
-                json!({"t": "route", "target": target, "text": text, "focus": focus, "queued": queued}),
+                with_parts(json!({"t": "route", "target": target, "text": text, "focus": focus, "queued": queued}), parts),
             ),
             UserCmd::New {
                 name,
@@ -103,8 +108,8 @@ impl Hub {
                     json!({"t": "rename", "name": name, "new_name": new_name, "valid": valid}),
                 )
             }
-            UserCmd::Answer { card, text } => {
-                self.core(fx, env, c, json!({"t": "answer", "card": card, "text": text}))
+            UserCmd::Answer { card, text, parts } => {
+                self.core(fx, env, c, with_parts(json!({"t": "answer", "card": card, "text": text}), &parts))
             }
             UserCmd::Close { card } => {
                 self.core(fx, env, c, json!({"t": "close", "card": card}))
@@ -177,4 +182,13 @@ impl Hub {
             }
         }
     }
+}
+
+/// sb-core's input `i` with his parts' JSON (msg-parts), only when he sent
+/// some: an input without parts is the one it always was.
+fn with_parts(mut i: Value, parts: &str) -> Value {
+    if !parts.is_empty() {
+        i["parts"] = json!(parts);
+    }
+    i
 }

@@ -62,7 +62,10 @@ impl Shell {
             .filter(|c| !queued && *c != bise_proto::context::FnContext::default())
             .and_then(|c| serde_json::to_string(&c).ok())
             .map(|j| (self.hub.st.resolve(&focus).unwrap_or_else(|| MAIN.to_string()), j));
-        self.step(Input::ClientInput { client, focus, text, queued });
+        // msg-parts: his parts' JSON as the op carries it (proto_input),
+        // never on a slash command
+        let parts = v.get("parts").and_then(Value::as_str).filter(|_| !slash).unwrap_or_default().to_string();
+        self.step(Input::ClientInput { client, focus, text, queued, parts });
         self.fn_ctx = None;
     }
 

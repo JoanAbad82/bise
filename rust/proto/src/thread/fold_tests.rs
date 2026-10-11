@@ -68,7 +68,11 @@ fn an_answer_with_pasted_files_is_its_words_images_and_files() {
     assert_eq!((r.text.as_str(), r.note.as_str()), ("you answered gift-ui: the cart page", ""));
     assert_eq!((r.images.len(), r.files.as_slice()), (1, ["/w/notes.md".to_string()].as_slice()));
     let json = serde_json::to_string(&e[2]).unwrap();
-    assert!(!json.contains("<image") && !json.contains("b64"), "{json}");
+    assert!(!json.contains("<image"), "{json}");
+    // msg-parts: its parts (read back once): his words, then the image
+    // as its part (the store's b64 path rides only there, never data)
+    assert!(!serde_json::to_string(r).unwrap().contains("b64"), "{json}");
+    assert!(matches!(e[2].parts.as_slice(), [crate::parts::Part::Text { .. }, crate::parts::Part::Image { .. }]), "{json}");
 }
 
 #[test]
@@ -989,4 +993,80 @@ fn a_tail_never_starts_between_a_call_and_its_lines() {
     let e = fold(&done, &ctx_with(&[], &none));
     let info = e.iter().position(|x| x.pos == 4).unwrap();
     assert_eq!(tail_start(&done, &e, info), 4);
+}
+
+/// msg-parts (architect m_17621): his parts line goes on his entry, after
+/// its you-id (his context line may sit before the id), for a plain, a
+/// queued or a steered message alike (sb-core writes all three lines at
+/// the delivery); a route-parts line goes on the "you answered" entry its
+/// route line made; a stray or unreadable parts line attaches to nothing
+/// and makes no entry; an older transcript has no parts.
+#[test]
+fn his_parts_go_on_his_entry() {
+    use crate::parts::Part;
+    let none = |_: &str| None;
+    let ctx = ctx_with(&[], &none);
+    let l = |pos: u64, line: &str| (pos, pos, line.to_string());
+    let q = r#"[{"kind":"quote","from":"main","text":"a\nb"},{"kind":"text","text":"why?"}]"#;
+    let lines = vec![
+        l(1, "sb you : <selection from=\"main\">\\na\\nb\\n</selection>\\nwhy?"),
+        l(2, "sb you-id : m_3"),
+        l(3, &format!("sb you-parts : {q}")),
+        l(4, "sb you : with his screen"),
+        l(5, r#"sb context : {"app":"Safari"}"#),
+        l(6, "sb you-id : m_4"),
+        l(7, r#"sb you-parts : [{"kind":"text","text":"with his screen"}]"#),
+        l(8, "sb you : older"),
+        l(9, "sb you-id : m_5"),
+        l(10, "  obs: assistant: ok"),
+        l(11, r#"sb you-parts : [{"kind":"text","text":"stray"}]"#),
+        l(12, "sb route : you → @perf (answer to card #7) : <selection from=\"main\">\\nq\\n</selection>\\nboth"),
+        l(13, r#"sb route-parts : [{"kind":"quote","from":"main","text":"q"},{"kind":"text","text":"both"}]"#),
+        l(14, "sb you : bad parts"),
+        l(15, "sb you-id : m_6"),
+        l(16, "sb you-parts : {not json"),
+    ];
+    let e = fold(&lines, &ctx);
+    let kinds: Vec<EntryKind> = e.iter().map(|e| e.kind).collect();
+    assert_eq!(kinds, [EntryKind::You, EntryKind::You, EntryKind::You, EntryKind::Agent, EntryKind::Approval, EntryKind::You], "no entry of their own");
+    let quote = |t: &str| Part::Quote { from: "main".into(), text: t.into(), file: String::new(), new: String::new(), old: String::new() };
+    let text = |t: &str| Part::Text { text: t.into() };
+    assert_eq!(e[0].parts, [quote("a\nb"), text("why?")]);
+    assert_eq!(e[0].msg_id, Some(3));
+    assert_eq!(e[1].parts, [text("with his screen")]);
+    assert_eq!(e[1].context.as_ref().and_then(|c| c.app.as_deref()), Some("Safari"));
+    assert!(e[2].parts.is_empty() && e[3].parts.is_empty(), "the stray line attaches to nothing");
+    assert_eq!(e[4].parts, [quote("q"), text("both")]);
+    assert!(e[5].parts.is_empty(), "unreadable: nothing");
+    // the text the model got stays the entry's text
+    assert!(e[0].text.starts_with("<selection from=\"main\">"));
+}
+
+/// msg-parts (architect m_17749): an old journal's message of his (no
+/// parts line: before parts, or an older client) gets its parts read back
+/// from its text once, in the fold, so the TUI and the window draw the
+/// same chips: his message, his "you answered" row (his screenshot's
+/// case) and his message routed to another agent; a plain one stays
+/// drawn from its text (no parts).
+#[test]
+fn an_old_journals_messages_read_as_their_parts() {
+    use crate::parts::Part;
+    let none = |_: &str| None;
+    let ctx = ctx_with(&[], &none);
+    let l = |pos: u64, line: &str| (pos, pos, line.to_string());
+    let lines = vec![
+        l(1, "sb you : <selection from=\"main\">\\namb-core a été tué\\n</selection>\\nSon process prenait tout mon CPU!"),
+        l(2, "sb you : just words"),
+        l(3, "sb route : you → @main (answer to card #4) : <selection from=\"main\">\\nNouvel essai\\n</selection>\\nSon process"),
+        l(4, "sb route : you → @perf : look <pasted n=\"1\" lines=\"2\">\\na\\nb\\n</pasted> here"),
+    ];
+    let e = fold(&lines, &ctx);
+    let quote = |t: &str| Part::Quote { from: "main".into(), text: t.into(), file: String::new(), new: String::new(), old: String::new() };
+    let text = |t: &str| Part::Text { text: t.into() };
+    assert_eq!(e[0].parts, [quote("amb-core a été tué"), text("Son process prenait tout mon CPU!")]);
+    assert!(e[1].parts.is_empty(), "a plain message: its text");
+    assert_eq!(e[2].kind, EntryKind::Approval);
+    assert_eq!(e[2].parts, [quote("Nouvel essai"), text("Son process")]);
+    assert_eq!(e[3].kind, EntryKind::Notice, "a routed message stays the notice it was (the wire rule)");
+    assert_eq!(e[3].parts, [text("look "), Part::Paste { n: 1, text: "a\nb".into() }, text(" here")]);
 }
