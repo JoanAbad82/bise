@@ -481,6 +481,35 @@ isn't judging. A row marked ok names the shot that was looked at.
   list. amb-win is fixing it. The re-cut also carries the chip glyph 3c209f33 and "4 KB of 18 KB
   shown" 91af5059, and qa-native re-checks those rows.
 
+- **4543f8d3, the MERGE CANDIDATE: HOLD for main on one row, R41 (3)** (ambient-pm m_18139 to
+  ambient-lead, m_18140 to amb-web, from qa-native m_18129). The gate:
+  `~/.bise/gate/try-gate/4543f8d3/index.md`, the packed app, the rich world, FAKE_BODIES.
+  - Run 1 was 30/31 green, and the 31st was green on a rerun. I looked at sheet-R40 and
+    sheet-parts-wake myself.
+  - Green:
+    - **R40 streaming**: in the thread, the reply grows in place, a cut reply stays at 0.7 with
+      '▲ turn interrupted by main', and reduced motion is right. In the spotlight, only the new
+      words fade, nothing moves, and the cap scrolls;
+    - PARTS: the quote, paste, file and image chips, never a tag, with images as typed parts from
+      the composer, ⌘I, docked and the spotlight;
+    - LOG, KEYCHAIN, WAKE (only rc 101 is red), KEYS, S29, HEADFIT and the four marks;
+    - R45–R47, voice, the cut rows, INIT, LIGHTS and the inbox block;
+    - MSGRIGHT, INBOXDRAFT, STEERRX, TOOLCOUNT and P99ROW.
+  - FOLDS2 was not reached on the rich world this run, because R41 pushed the fold rows up.
+    thread/fold-hold is green.
+  - **The hold, R41 (3)**: in run 1, the spotlight's image reached the model as '[image
+    unavailable: [Image #1] (not in the image store)]', both by ⌘V and by drop. A rerun on a
+    fresh world was all image/png. This is new code in this cut: amb-web's 7f029104 sends the
+    spotlight's image as a part with its store path only, with no b64. qa-native reads it as a
+    race between the spotlight's save to the store and the hub reading it. One silent loss of
+    his pasted image is exactly what he asked never to happen (R41, his words of 10-08), so it
+    cannot go to main as a watch item.
+  - The fix: the send waits for the store write, or falls back to b64 when the file is not
+    there yet (amb-web). The proof: gate/images R41 (3) green 3 runs in a row on the re-cut.
+  - R41 (5) got no card because main answered gift-ui itself. That is the world, not the app.
+  - Everything else is GO from me. S.1's run 3 is running on this candidate's packed app
+    (amb-mac).
+
 - **d67ff9e3: GO for promote** (ambient-pm to ambient-lead m_17571, from qa-native m_17568).
   The gates are `~/.bise/gate/try-gate/e037c58a/index.md` and `…/d67ff9e3/index.md`.
   - e037c58a's main run is 8/8 green:
@@ -1090,7 +1119,8 @@ Still not pass:
 
 | row | status | owner | the check that would prove it |
 |---|---|---|---|
-| R40 streaming with the signed animation | **the bench passes now; waiting for architect's sign, the land, then a gate** (amb-core m_17563): with the fold fix, the stream adds +268 and +279 M instructions per 20k-char reply, against the +315 M bar (0.05 s). It was +507 M. Next: architect signs, it lands on the main side, the window side follows, and then qa-native shoots R40's frames on a packed try. The history follows. **Earlier: fail (bench, CPU), 10-10; the recount put it close** (amb-core m_17424, then m_17465): the window side is green in the harness (spotlight/streaming, thread/streaming). The first bench gave +0.44 s CPU against base; that was load noise from launchd time. The recount uses instructions (proc_pid_rusage, which load doesn't move), on 2 pairs of a 20k-char reply (about 1,667 SSE events). Base is 2,118 and 2,106 M instructions, and stream is 2,585 and 2,653 M: about +507 M, or **about +0.08 s CPU against a +0.05 s bar**. Over the wire it passes: 88.5 and 92.2 KB against 59.2 KB, inside 2x. RSS is the same. The cost is the fold per piece (cut, decode and parse each time), not IO and not O(n²). amb-core's fix keeps the raw pieces in a pending list and folds them only when an emit is due (at most 1 per 250 ms). sb/stream stays off the merge until a fix passes the same 3 pairs, then qa-native shoots R40 on a cut | amb-core (the per-partial path), then qa-native | the bench rerun green, then R40's frames on a packed try |
+| R41 (3) a spotlight image reaches the model | **fail, intermittent (merge-candidate gate 4543f8d3)**: in run 1, both the ⌘V and the drop image reached the model as '[image unavailable: [Image #1] (not in the image store)]', and a fresh-world rerun was all image/png. It is new in 7f029104, which sends the store path only. It looks like a race between the store write and the hub's read. This holds the merge (ambient-pm m_18139) | amb-web | the send waits for the write, or falls back to b64; then gate/images R41 (3) is green 3 runs in a row on the re-cut |
+| R40 streaming with the signed animation | **pass (merge-candidate gate 4543f8d3)**. In the thread, the reply grows in place; a cut reply stays at 0.7 with '▲ turn interrupted by main'; reduced motion is right. In the spotlight, only the new words fade, nothing moves, and the cap scrolls. I looked at sheet-R40. History: **the bench passed; it waited for architect's sign, the land, then a gate** (amb-core m_17563): with the fold fix, the stream adds +268 and +279 M instructions per 20k-char reply, against the +315 M bar (0.05 s). It was +507 M. Next: architect signs, it lands on the main side, the window side follows, and then qa-native shoots R40's frames on a packed try. The history follows. **Earlier: fail (bench, CPU), 10-10; the recount put it close** (amb-core m_17424, then m_17465): the window side is green in the harness (spotlight/streaming, thread/streaming). The first bench gave +0.44 s CPU against base; that was load noise from launchd time. The recount uses instructions (proc_pid_rusage, which load doesn't move), on 2 pairs of a 20k-char reply (about 1,667 SSE events). Base is 2,118 and 2,106 M instructions, and stream is 2,585 and 2,653 M: about +507 M, or **about +0.08 s CPU against a +0.05 s bar**. Over the wire it passes: 88.5 and 92.2 KB against 59.2 KB, inside 2x. RSS is the same. The cost is the fold per piece (cut, decode and parse each time), not IO and not O(n²). amb-core's fix keeps the raw pieces in a pending list and folds them only when an emit is due (at most 1 per 250 ms). sb/stream stays off the merge until a fix passes the same 3 pairs, then qa-native shoots R40 on a cut | amb-core (the per-partial path), then qa-native | the bench rerun green, then R40's frames on a packed try |
 | S29/L19 computer use on a gate | **pass (gate ea81cabc)**, with a900b528: driving, 'took the wheel' and 'give it back', peek, stopped, next to the TUI. It is also green on the real core (qa-flows 20c44bf9) | qa-flows, qa-native | none |
 | TP-R6 ⇧⇥ approvals mode, and TP-K7b ctrl+c stops a turn | **pass (gate ea81cabc)**: ⇧⇥ flashes 'auto · safe calls run…' with the mode in ink, and the divider follows. keys-real flips the hub's mode both ways, as the TUI does. ctrl+c (with no text selected) and esc stop a busy turn, and the draft stays; neither does it while text is selected | amb-web | none |
 | TP-N1 /keychain on, /keychain off | **pass (gate ea81cabc, scripted keychain)**: the models page's switch goes on, off and failed ('couldn't move chatgpt: the keychain is locked.'), in light and dark | amb-home | none |
