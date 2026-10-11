@@ -4,6 +4,7 @@
 
 export type * from './json';
 export type * from './context';
+export type * from './parts';
 export type * from './diff';
 export type * from './rows';
 export type * from './thread';

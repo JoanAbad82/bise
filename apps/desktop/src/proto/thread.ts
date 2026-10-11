@@ -3,6 +3,7 @@
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
 import type { FnContext } from './context';
+import type { Part } from './parts';
 import type { Opt, ReportKind, WatchKind } from './rows';
 
 export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped" | "to_agent" | "thinking" | "compacting" | "compacted" | "notice" | "not_delivered" | "landed" | "pr" | "artifact" | "answered" | "approval" | "scheduled" | "turn_failed" | "wake" | "unknown";
@@ -354,4 +355,13 @@ turn_start?: boolean,
  * the hover of the turn's replies); none for a replayed end (no
  * time) or one with no entry of its own to carry it
  */
-turn_end_ms?: number | null, };
+turn_end_ms?: number | null, 
+/**
+ * his message as typed parts (msg-parts, [`crate::parts`]): on a
+ * `you` entry, and on an `approval` entry that is his answer to a
+ * card (the note's parts). From the `you-parts` / `route-parts` line
+ * sb-core writes after it. When this is not empty, no client draws
+ * his message from `text` (the model's templated text, kept for
+ * older clients, search and copy)
+ */
+parts?: Array<Part>, };
