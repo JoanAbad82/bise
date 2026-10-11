@@ -90,7 +90,13 @@ def snapshot(out=SHAPE, home=None, bise_home=None):
         hubs.append({"name": d.rsplit("-", 1)[0], "live": bool(pid and _alive(pid)),
                      "agents": len(os.listdir(agents)) if os.path.isdir(agents) else 0})
     home_ws = os.path.join(home, "bise")
-    shape = {"v": 1, "at_ms": int(time.time() * 1000), "projects": projects, "hubs": hubs,
+    # his prefs.json: only whether he went through the onboarding (his first launch of 40d2f179's
+    # proof showed 'hi. i'm bise.' because the world had none); nothing else of his prefs is read
+    try:
+        onboarded = bool(json.load(open(os.path.join(bh, "prefs.json"))).get("onboarded"))
+    except (OSError, ValueError):
+        onboarded = False
+    shape = {"v": 1, "at_ms": int(time.time() * 1000), "projects": projects, "hubs": hubs, "onboarded": onboarded,
              "home_workspace": git_kind(home_ws) if os.path.isdir(home_ws) else None,
              "tree": tree_of(home)}
     os.makedirs(os.path.dirname(out), exist_ok=True)
@@ -178,6 +184,9 @@ def build(shape, root=None):
     os.makedirs(bh, exist_ok=True)
     with open(os.path.join(bh, "projects.json"), "w") as f:
         json.dump({"v": 1, "projects": rows}, f, indent=1)
+    if shape.get("onboarded"):
+        with open(os.path.join(bh, "prefs.json"), "w") as f:
+            json.dump({"onboarded": True}, f)
     if shape.get("home_workspace"):
         (_repo if shape["home_workspace"] == "repo" else os.makedirs)(os.path.join(home, "bise"))
     return {"home": home, "bise_home": bh, "projects": [r["path"] for r in rows]}
@@ -397,6 +406,130 @@ def report_text(r):
     return "\n".join(lines) + "\n"
 
 
+# ---------------------------------------------------------------- the as-he-does run's two gates
+# (ambient-lead m_18707, m_18810, m_18842): his Library untouched, nothing of ours comes front. Read only.
+
+def lib_snapshot(home=None):
+    """mtime+size of every entry the app could write in his Library: Application Support/{bise*,
+    Electron}, Caches/{bise*, dev.bise*}, Logs/bise*, Saved Application State/dev.bise*,
+    Preferences/dev.bise*; plus the names of his ~/.bise/hubs."""
+    home = home or os.path.expanduser("~")
+    picks = (("Library/Application Support", lambda n: n.lower().startswith("bise") or n == "Electron"),
+             ("Library/Caches", lambda n: n.lower().startswith("bise") or n.startswith("dev.bise")),
+             ("Library/Logs", lambda n: n.lower().startswith("bise")),
+             ("Library/Saved Application State", lambda n: n.startswith("dev.bise")),
+             ("Library/Preferences", lambda n: n.startswith("dev.bise")))
+    out = {}
+    for base, pick in picks:
+        d = os.path.join(home, base)
+        for n in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+            if not pick(n):
+                continue
+            r = os.path.join(d, n)
+            paths = [r]
+            if os.path.isdir(r) and not os.path.islink(r):
+                paths += [os.path.join(dp, x) for dp, dn, fn in os.walk(r) for x in dn + fn]
+            for p in paths:
+                try:
+                    s = os.lstat(p)
+                    out[p] = [s.st_mtime, s.st_size]
+                except OSError:
+                    pass
+    hubs = os.path.join(home, ".bise", "hubs")
+    out["~/.bise/hubs"] = sorted(os.listdir(hubs)) if os.path.isdir(hubs) else []
+    return out
+
+
+def lib_diff(before, after):
+    """The entries that differ (added, removed, changed). Pure."""
+    return sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
+
+
+# what may never come front during the run (anything started after the run began counts too)
+FRONT_BAD = ("bise try", "bise", "UserNotificationCenter", "System Settings", "SecurityAgent", "CoreServicesUIAgent")
+
+
+def front_info(text):
+    """lsappinfo info's name, pid and bundle id. Pure."""
+    g = lambda k: (re.search(r'"%s"="?([^"\n]*)"?' % k, text) or [None, None])[1]  # noqa: E731
+    pid = g("pid")
+    return {"name": g("LSDisplayName") or "?", "pid": int(pid.split()[0]) if pid and pid.split()[0].isdigit() else None,
+            "bundle": g("CFBundleIdentifier")}
+
+
+def originator(log_text, pid):
+    """Who asked for the app (pid) to come front, from runningboard's log lines: 'Acquiring
+    assertion targeting [...:<pid>] from originator [<who>]'. None when no line says. Pure."""
+    for line in log_text.splitlines():
+        if "originator" in line and (":%d]" % pid) in line and "targeting" in line:
+            m = re.search(r"from originator \[([^\]]*)\]", line)
+            if m:
+                return m.group(1)
+    return None
+
+
+def is_breach(info, started_after):
+    """A front change is a breach when it is one of FRONT_BAD or an app started after the run
+    began; any other app is his own switch (he works next to the run). Pure."""
+    return info["name"] in FRONT_BAD or bool(started_after)
+
+
+def _etime_s(pid):
+    r = subprocess.run(["ps", "-o", "etime=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+    if not r:
+        return None
+    days, _, rest = r.rpartition("-")
+    s = 0
+    for p in rest.split(":"):
+        s = s * 60 + int(p)
+    return s + (int(days) * 86400 if days else 0)
+
+
+def attribute(info, t_wall):
+    """Where a front app came from: its parent and who asked LaunchServices (the log's last 4 s)."""
+    pid = info["pid"]
+    if not pid:
+        return {}
+    ppid = subprocess.run(["ps", "-o", "ppid=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+    parent = subprocess.run(["ps", "-o", "command=", "-p", ppid], capture_output=True, text=True).stdout.strip() if ppid else ""
+    log = subprocess.run(["log", "show", "--style", "compact", "--start", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t_wall - 4)),
+                          "--predicate", 'eventMessage CONTAINS "originator" AND eventMessage CONTAINS ":%d]"' % pid],
+                         capture_output=True, text=True, timeout=30).stdout
+    return {"ppid": ppid, "parent": parent[:200], "asked_by": originator(log, pid)}
+
+
+def front_gate(out, stop_file, bundle, every=0.1):
+    """Gate A: the front app every `every` s until stop_file exists. Every change is logged with its
+    parent and who asked LaunchServices; a breach (is_breach) kills the bundle's processes at once
+    and writes <out dir>/BREACH. Returns the changes."""
+    t0 = time.time()
+    front = lambda: front_info(subprocess.run(  # noqa: E731
+        ["lsappinfo", "info", "-only", "name", "-only", "pid", "-only", "bundleID",
+         subprocess.run(["lsappinfo", "front"], capture_output=True, text=True).stdout.strip()],
+        capture_output=True, text=True).stdout)
+    last, n, changes = front(), 0, []
+    with open(out, "w") as f:
+        f.write(json.dumps(dict(last, t=0, base=True)) + "\n")
+        while not os.path.exists(stop_file):
+            cur, n = front(), n + 1
+            if (cur["name"], cur["pid"]) != (last["name"], last["pid"]):
+                age = _etime_s(cur["pid"]) if cur["pid"] else None
+                after = age is not None and age < time.time() - t0
+                row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after))
+                if row["breach"]:
+                    subprocess.run(["pkill", "-f", bundle + "/Contents/"])
+                    with open(os.path.join(os.path.dirname(out), "BREACH"), "w") as b:
+                        b.write("%s %s\n" % (cur["name"], cur["pid"]))
+                row.update(attribute(cur, time.time()))
+                f.write(json.dumps(row) + "\n")
+                f.flush()
+                changes.append(row)
+                last = cur
+            time.sleep(every)
+        f.write(json.dumps({"t": round(time.time() - t0, 2), "end": True, "samples": n}) + "\n")
+    return changes
+
+
 def asar_file(asar, path):
     """One file out of an Electron app.asar (its pickle header, then the files), as text."""
     import struct
@@ -438,7 +571,27 @@ def _cli(argv):
     c.add_argument("--env", action="append", default=[], help="an `open --env K=V` pair of his launch")
     bn = sub.add_parser("banner")
     bn.add_argument("--bundle", required=True)
+    ls = sub.add_parser("libsnap", help="gate B: mtime+size of his Library's bise entries to a file (read only)")
+    ls.add_argument("--out", required=True)
+    ls.add_argument("--diff", help="a snapshot to compare with: exits 1 when anything differs")
+    fr = sub.add_parser("front", help="gate A: the front app every 0.1 s until --stop-file exists")
+    fr.add_argument("--out", required=True)
+    fr.add_argument("--stop-file", required=True)
+    fr.add_argument("--bundle", required=True)
     a = ap.parse_args(argv)
+    if a.do == "libsnap":
+        snap = lib_snapshot()
+        with open(a.out, "w") as f:
+            json.dump(snap, f)
+        if a.diff:
+            d = lib_diff(json.load(open(a.diff)), snap)
+            print("LIBRARY DIFF %d" % len(d) + "".join("\n  %s" % k for k in d[:20]))
+            sys.exit(1 if d else 0)
+        print("%d entries -> %s" % (len(snap), a.out))
+        return
+    if a.do == "front":
+        front_gate(a.out, a.stop_file, a.bundle)
+        return
     if a.do == "snapshot":
         print(json.dumps(counts(snapshot()), indent=1))
     elif a.do == "banner":

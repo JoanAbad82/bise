@@ -800,6 +800,34 @@ def real_shape_pure():
           and os.path.isdir(os.path.join(w["home"], "bise")) and os.path.isdir(os.path.join(w["home"], "folder-01", ".git")), reg)
     red = {"log": {"repl_live_not_found": 8}, "scan": {"answered": False}, "add": {"answered": True, "ev": "projects"}}
     check(rs.verdicts(red) == {"repl_live_not_found": True, "scan_stuck": True, "add_does_nothing": False}, rs.verdicts(red))
+    # his onboarding is carried (40d2f179's run opened on 'hi. i'm bise.'), nothing else of his prefs
+    check(not os.path.exists(os.path.join(w["bise_home"], "prefs.json")), "no onboarded flag, no prefs.json")
+    w = rs.build(dict(shape, onboarded=True), os.path.join(d, "w"))
+    check(json.load(open(os.path.join(w["bise_home"], "prefs.json"))) == {"onboarded": True}, "onboarded world")
+    fake = os.path.join(d, "fakehome")
+    os.makedirs(os.path.join(fake, ".bise"))
+    json.dump({"onboarded": True, "theme": "x", "hints": {"a": 1}}, open(os.path.join(fake, ".bise", "prefs.json"), "w"))
+    json.dump({"v": 1, "projects": []}, open(os.path.join(fake, ".bise", "projects.json"), "w"))
+    sh = rs.snapshot(out=os.path.join(d, "shape.json"), home=fake)
+    check(sh["onboarded"] is True and "theme" not in json.dumps(sh), "snapshot reads only onboarded")
+    # gate B: the Library diff; gate A: the front app's parse, its breach rule, who asked for it
+    lib = os.path.join(fake, "Library", "Application Support", "bise try")
+    os.makedirs(lib)
+    open(os.path.join(lib, "keep-window.json"), "w").write("{}")
+    os.makedirs(os.path.join(fake, "Library", "Application Support", "Other"))
+    b = rs.lib_snapshot(fake)
+    check(any(k.endswith("keep-window.json") for k in b) and not any("Other" in k for k in b), b)
+    check(rs.lib_diff(b, rs.lib_snapshot(fake)) == [], "same Library, no diff")
+    open(os.path.join(lib, "DevToolsActivePort"), "w").write("9339")
+    nd = [k.rsplit("/", 1)[1] for k in rs.lib_diff(b, rs.lib_snapshot(fake))]
+    check("DevToolsActivePort" in nd and set(nd) <= {"DevToolsActivePort", "bise try"}, "a new file is a diff (its folder too): %s" % nd)
+    info = rs.front_info('"LSDisplayName"="UserNotificationCenter"\n"pid"=15030 \n"CFBundleIdentifier"="com.apple.UserNotificationCenter"')
+    check(info == {"name": "UserNotificationCenter", "pid": 15030, "bundle": "com.apple.UserNotificationCenter"}, info)
+    check(rs.is_breach(info, False) and rs.is_breach({"name": "Slack"}, True) and not rs.is_breach({"name": "Slack"}, False), "breach rule")
+    line = ("00:18:13.142 Df runningboardd[416:1cb202e] [com.apple.runningboard:ttl] Acquiring assertion targeting "
+            "[osservice<com.apple.UserNotificationCenterAgent(501)>:15030] from originator [osservice<com.apple.coreservices.launchservicesd>:378] with descript")
+    check(rs.originator(line, 15030) == "osservice<com.apple.coreservices.launchservicesd>:378" and rs.originator(line, 1) is None,
+          rs.originator(line, 15030))
     shutil.rmtree(d, ignore_errors=True)
 
 
