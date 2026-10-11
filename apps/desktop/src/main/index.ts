@@ -34,7 +34,7 @@ import { standInPaths } from './userdata';
 import { themeSourceOf } from './theme';
 import { takeRoute, Updates, updateTarget } from './update/run';
 import { MainWindow } from './windows';
-import { fenceOffscreen, isOffscreen, noAsks, offscreenActivation } from './offscreen';
+import { fenceOffscreen, isOffscreen, noAsks, OFFSCREEN_DISABLED_FEATURES, offscreenActivation } from './offscreen';
 import { Notifier } from './notify/run';
 import { langOf } from './notify/plan';
 
@@ -47,6 +47,8 @@ if (offscreen) {
   });
   // never the front app, from the first line (amb-tools m_18713): no Dock icon, and if anything
   // still activates it, it hides at once and his app is in front again
+  // no system key listener (media keys): no Input Monitoring check at launch (offscreen.ts)
+  app.commandLine.appendSwitch('disable-features', OFFSCREEN_DISABLED_FEATURES);
   if (offscreenActivation(offscreen, process.platform) !== null) {
     app.setActivationPolicy('accessory');
     app.dock?.hide();

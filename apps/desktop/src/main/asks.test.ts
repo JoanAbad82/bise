@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MIC_CMDS, noAsks, offscreenGrants } from './offscreen';
+import { MIC_CMDS, noAsks, OFFSCREEN_DISABLED_FEATURES, offscreenGrants } from './offscreen';
 
 const MAIN = __dirname;
 
@@ -43,7 +43,7 @@ function sites(token: string): Array<{ file: string; before: string }> {
 
 describe('an off-screen run asks him nothing (static)', () => {
   it('no main code asks macOS for a privacy permission directly', () => {
-    for (const api of ['askForMediaAccess', 'getMediaAccessStatus', 'isTrustedAccessibilityClient', 'desktopCapturer', 'systemPreferences.']) {
+    for (const api of ['askForMediaAccess', 'getMediaAccessStatus', 'isTrustedAccessibilityClient', 'desktopCapturer', 'systemPreferences.', 'globalShortcut', 'powerMonitor.getSystemIdle']) {
       expect(sites(api).map((s) => s.file), `${api} would ask him: put it behind noAsks first`).toEqual([]);
     }
   });
@@ -74,6 +74,20 @@ describe('an off-screen run asks him nothing (static)', () => {
     const drop = core.indexOf('MIC_CMDS.has(name)');
     expect(drop, 'core/ipc.ts drops the mic commands').toBeGreaterThan(-1);
     expect(drop < core.indexOf('dictations.sent(e.sender.id, cmd)')).toBe(true);
+  });
+});
+
+describe("Chromium's own key listeners (ambient-lead m_18944: ListenEvent preflight from main)", () => {
+  it('under the knob the media-key features are off, before ready, at the top of main', () => {
+    const index = ALL.find((s) => s.file === 'index.ts')?.text ?? '';
+    const sw = index.indexOf("app.commandLine.appendSwitch('disable-features', OFFSCREEN_DISABLED_FEATURES)");
+    expect(sw, 'index.ts turns them off').toBeGreaterThan(-1);
+    expect(index.slice(index.lastIndexOf('if (offscreen) {', sw), sw), 'inside the knob block').toMatch(/^if \(offscreen\) \{/);
+    expect(sw < index.indexOf('app.whenReady('), 'before ready').toBe(true);
+    expect(OFFSCREEN_DISABLED_FEATURES.split(',')).toEqual(['HardwareMediaKeyHandling', 'MediaSessionService']);
+  });
+  it('no other disable-features switch in main (a second one would replace this one)', () => {
+    expect(sites("appendSwitch('disable-features'").length).toBe(1);
   });
 });
 

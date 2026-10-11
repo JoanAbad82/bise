@@ -66,3 +66,12 @@ export const MIC_CMDS: ReadonlySet<string> = new Set(['dictate_start', 'voice_mo
 export function offscreenGrants(permission: string): boolean {
   return permission === 'clipboard-sanitized-write' || permission === 'clipboard-read';
 }
+
+/**
+ * Chromium's features that listen to his keys at the system level under the knob (ambient-lead
+ * m_18944: the main process sent TCCAccessRequest kTCCServiceListenEvent preflight=yes at launch,
+ * with no helper and no code of ours calling a TCC API; Electron Framework links IOHIDCheckAccess
+ * and CGEventTapCreate for the hardware media keys): off in an off-screen run, which has no use for
+ * play/pause keys. His run keeps them.
+ */
+export const OFFSCREEN_DISABLED_FEATURES = 'HardwareMediaKeyHandling,MediaSessionService';
