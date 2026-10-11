@@ -68,6 +68,7 @@ pub mod role;
 pub mod route;
 pub mod router;
 pub mod search;
+pub mod snapshot_rows;
 pub mod sweep;
 pub mod switch;
 pub mod tools_env;

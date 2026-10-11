@@ -143,7 +143,7 @@ impl Status {
 
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Agent {
     pub name: String,
     /// The name at creation: its directories never move on a rename.

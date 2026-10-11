@@ -45,7 +45,10 @@ def drain():
 
 threading.Thread(target=drain, daemon=True).start()
 t0 = time.time()
-batch = max(1, rate // 50)
+# paced: `rate` lines a second from the flood's start, written every 20 ms;
+# each line ends with its write time (` @<ms>`): the hub's transcript
+# stamps it with its own time, the difference is the hub's lag
+flood_t0 = None
 n = 0
 with open(wire, "a") as f:
     f.write("  obs: turn_started\n")
@@ -53,10 +56,14 @@ with open(wire, "a") as f:
     while not gone.is_set() and time.time() - t0 < life:
         # FLOOD_GO: no flood until that file exists (every REPL started)
         if not go or os.path.exists(go):
+            now = time.time()
+            if flood_t0 is None:
+                flood_t0 = now
+            due = int(rate * (now - flood_t0)) + 1
             lines = []
-            for _ in range(batch):
+            while n < due:
                 n += 1
-                lines.append("tool #%d bash : echo flood %d\n" % (n, n))
+                lines.append("tool #%d bash : echo flood %d @%d\n" % (n, n, int(now * 1000)))
             f.write("".join(lines))
             f.flush()
         time.sleep(0.02)

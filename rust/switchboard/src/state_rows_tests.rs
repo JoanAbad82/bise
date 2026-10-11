@@ -70,7 +70,7 @@ fn a_real_hub() -> (T, u64) {
 
 #[test]
 fn the_typed_state_rows_carry_everything_the_older_state_did() {
-    let (t, now) = a_real_hub();
+    let (mut t, now) = a_real_hub();
     let snap = t.hub.snapshot(now);
 
     // places: each key, its PR's too (review's `pending` is `none` +

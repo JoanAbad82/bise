@@ -31,6 +31,10 @@ TASKS = int(os.environ.get("FLOOD_TASKS", "30"))
 BACKLOG_LINES = 20000
 HELLO_MAX_S = 1.0
 STATE_WINDOW_S = 3.0
+# lag_and_burst: lines a second from all the REPLs, the window, the bound
+LAG_RATE = 400
+LAG_WINDOW_S = 10
+LAG_MAX_S = 1.0
 
 
 def app_root(tmp):
@@ -121,10 +125,82 @@ def main():
         print("hub/agents in %.0f s of flood: %d" % (STATE_WINDOW_S, states))
         check(states <= STATE_WINDOW_S * 10 + 5, "the state goes at most ~10 times a second: %d in %.0f s" % (states, STATE_WINDOW_S))
         check(states >= 1, "the state still goes while the REPLs flood")
-        print("PASS hub_flood_e2e")
+    finally:
+        E.close()
+
+
+def lags(state):
+    """Every stamped flood line the hub wrote to a transcript: the hub's
+    time minus the line's write time (s), from the line's `@<ms>` and the
+    transcript's `<ts>\t` (daemon/lines.rs)."""
+    out = []
+    d = os.path.join(state, "agents")
+    for a in os.listdir(d) if os.path.isdir(d) else []:
+        p = os.path.join(d, a, "transcript.log")
+        if not os.path.exists(p):
+            continue
+        for line in open(p, errors="replace"):
+            ts, _, text = line.rstrip("\n").partition("\t")
+            at = text.rsplit(" @", 1)
+            if ts.isdigit() and len(at) == 2 and at[1].isdigit() and "echo flood" in text:
+                out.append((int(at[1]), (int(ts) - int(at[1])) / 1000.0))
+    return out
+
+
+def by_second(stamped, t0):
+    """The worst lag of the lines written in each second from t0."""
+    worst = {}
+    for at, lag in stamped:
+        s = int(at / 1000.0 - t0)
+        worst[s] = max(worst.get(s, 0.0), lag)
+    return " ".join("%d:%.2f" % (s, worst[s]) for s in sorted(worst))
+
+
+def no_progress_lines(state):
+    """The hub's 'made no progress' starts (daemon/repl_starts.rs): a REPL
+    start that looked dead, in its logs or a thread."""
+    hits = []
+    for root, _, files in os.walk(state):
+        for f in files:
+            if f.endswith(".log"):
+                p = os.path.join(root, f)
+                for line in open(p, errors="replace"):
+                    if "made no progress" in line:
+                        hits.append("%s: %s" % (os.path.relpath(p, state), line.strip()[:160]))
+    return hits
+
+
+def lag_and_burst():
+    """hub-lag-7: 31 REPLs that start at once (the boot, as a switch
+    restarts ~20: the start limiter lets 4 at a time) and flood as each
+    connects, LAG_RATE lines a second in all: every start completes with
+    none 'made no progress', and the hub's lane never runs more than
+    LAG_MAX_S behind the lines (his hub ran 1-2 min behind on 2026-10-11)."""
+    E = Env()
+    try:
+        names = ["t%d" % i for i in range(TASKS)]
+        seed_tasks(E.state, E.ws, names)
+        E.env["BISE_APP_ROOT"] = app_root(E.tmp)
+        E.env["FLOOD_RATE"] = str(-(-LAG_RATE // (TASKS + 1)))
+        t0 = time.time()
+        E.start_hub()
+        wait.until(lambda: started(E.state) >= TASKS + 1, 120, "main and %d tasks started" % TASKS, poll=0.2)
+        print("%d REPL starts while the first ones flood: %.1f s" % (TASKS + 1, time.time() - t0))
+        time.sleep(LAG_WINDOW_S)
+        stamped = lags(E.state)
+        print("worst lag by second of writing (s from the hub's start): " + by_second(stamped, t0))
+        ls = sorted(lag for _, lag in stamped)
+        check(len(ls) >= LAG_RATE * LAG_WINDOW_S / 2, "the flood reached the transcripts: %d lines" % len(ls))
+        print("lane lag over %d lines at %d lines/s: median %.3f s, p99 %.3f s, max %.3f s"
+              % (len(ls), LAG_RATE, ls[len(ls) // 2], ls[int(len(ls) * 0.99)], ls[-1]))
+        check(ls[-1] < LAG_MAX_S, "the hub's lane stays under %.1f s behind the lines: max %.3f s" % (LAG_MAX_S, ls[-1]))
+        hits = no_progress_lines(E.state)
+        check(not hits, "no REPL start 'made no progress': %s" % hits[:3])
     finally:
         E.close()
 
 
 if __name__ == "__main__":
     main()
+    lag_and_burst()
+    print("PASS hub_flood_e2e")

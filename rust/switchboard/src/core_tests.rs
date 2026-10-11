@@ -402,14 +402,14 @@ fn a_waiting_agent_says_who_it_waits_on() {
             timeout_s: 20,
         },
     );
-    let agent = |t: &T, n: &str| {
+    let agent = |t: &mut T, n: &str| {
         let snap = t.hub.snapshot(0);
         snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == n).cloned().unwrap()
     };
-    let docs = agent(&t, "docs");
+    let docs = agent(&mut t, "docs");
     assert_eq!(docs["status"], "waiting");
     assert_eq!(docs["waiting_on"], MAIN, "{}", docs);
-    assert!(agent(&t, MAIN)["waiting_on"].is_null());
+    assert!(agent(&mut t, MAIN)["waiting_on"].is_null());
     let id = t.hub.st.msgs().values().find(|m| m.text == "v1 ou v2 ?").unwrap().id;
     let (_, fx) = t.req(
         MAIN,
@@ -424,7 +424,7 @@ fn a_waiting_agent_says_who_it_waits_on() {
         },
     );
     assert!(reply(&fx, tok).is_some(), "the wait ends");
-    assert!(agent(&t, "docs")["waiting_on"].is_null());
+    assert!(agent(&mut t, "docs")["waiting_on"].is_null());
 }
 
 #[test]
@@ -2452,7 +2452,7 @@ fn ask_role(fx: &[Effect]) -> Option<(String, String, String)> {
     })
 }
 
-fn role_of(t: &T, name: &str) -> String {
+fn role_of(t: &mut T, name: &str) -> String {
     let snap = t.hub.snapshot(t.env.now);
     let a = snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == name).unwrap().clone();
     a["role"].as_str().unwrap().to_string()
@@ -2465,8 +2465,8 @@ fn role_of(t: &T, name: &str) -> String {
 fn a_role_line_is_asked_once_per_changed_turn() {
     let mut t = T::new();
     t.spawn_task("docs");
-    assert_eq!(role_of(&t, "docs"), "objective of docs");
-    assert_eq!(role_of(&t, MAIN), "");
+    assert_eq!(role_of(&mut t, "docs"), "objective of docs");
+    assert_eq!(role_of(&mut t, MAIN), "");
     // main's turns never ask
     assert!(ask_role(&t.turn(MAIN, "hello")).is_none());
     // the task's first turn ends with a report: one call
@@ -2478,7 +2478,7 @@ fn a_role_line_is_asked_once_per_changed_turn() {
     assert!(ask_role(&fx).is_none(), "one call in flight at most: {:?}", fx);
     // ...but one when the first call is over (the inputs changed since)
     let fx = t.go(Input::RoleLine { dir: dir.clone(), key, line: Some("drafting the docs outline".into()) });
-    assert_eq!(role_of(&t, "docs"), "drafting the docs outline");
+    assert_eq!(role_of(&mut t, "docs"), "drafting the docs outline");
     assert!(fx.contains(&Effect::State), "the views get the new line: {:?}", fx);
     let (_, key2, request2) = ask_role(&fx).expect("the pending look");
     assert!(request2.contains("wrote chapter one"), "{}", request2);
@@ -2492,7 +2492,7 @@ fn a_role_line_is_asked_once_per_changed_turn() {
     let fx = t.turn("docs", "wrote chapter two");
     let (_, key3, _) = ask_role(&fx).unwrap();
     t.go(Input::RoleLine { dir: dir.clone(), key: key3, line: None });
-    assert_eq!(role_of(&t, "docs"), "writing chapter one");
+    assert_eq!(role_of(&mut t, "docs"), "writing chapter one");
     assert!(ask_role(&t.turn("docs", "wrote chapter three")).is_none());
     t.env.now += ROLE_RETRY_MS;
     assert!(ask_role(&t.turn("docs", "wrote chapter four")).is_some());
@@ -2508,7 +2508,7 @@ fn a_saved_role_line_is_kept() {
     let mut t2 = T::new();
     t2.spawn_task("docs");
     t2.hub.load_role(&dir, "drafting the outline".into(), key);
-    assert_eq!(role_of(&t2, "docs"), "drafting the outline");
+    assert_eq!(role_of(&mut t2, "docs"), "drafting the outline");
     assert!(ask_role(&t2.turn("docs", "drafted the outline")).is_none());
 }
 
@@ -2520,11 +2520,11 @@ fn a_saved_role_line_is_kept() {
 fn an_agent_says_where_it_works() {
     let mut t = T::new();
     t.spawn_task("docs");
-    let place = |t: &T| {
+    let place = |t: &mut T| {
         let snap = t.hub.snapshot(0);
         snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == "docs").unwrap()["place"].clone()
     };
-    assert!(place(&t).is_null());
+    assert!(place(&mut t).is_null());
     // the fallback: a linked worktree has a .git file
     let wt = std::env::temp_dir().join(format!("sb-place-{}", std::process::id()));
     std::fs::create_dir_all(&wt).unwrap();
@@ -2537,21 +2537,21 @@ fn an_agent_says_where_it_works() {
         })
     };
     bash(&mut t, "cd /tmp && ls");
-    assert!(place(&t).is_null(), "not a linked worktree");
+    assert!(place(&mut t).is_null(), "not a linked worktree");
     let fx = bash(&mut t, &format!("cd {} && cargo test", wt));
-    assert_eq!(place(&t), json!(wt));
+    assert_eq!(place(&mut t), json!(wt));
     assert!(fx.contains(&Effect::State), "the views learn it");
     // told: the fallback stops guessing
     let (tok, fx) = t.req("docs", AgentReq::Worktree { path: "/tmp/docs-wt".into() });
     assert!(fx.contains(&Effect::Reply { token: tok, body: json!({"ok": true, "path": "/tmp/docs-wt"}) }), "{:?}", fx);
-    assert_eq!(place(&t), json!("/tmp/docs-wt"));
+    assert_eq!(place(&mut t), json!("/tmp/docs-wt"));
     let (_, fx) = t.req(MAIN, AgentReq::Tasks);
     assert!(format!("{:?}", fx).contains("private worktree /tmp/docs-wt"), "{:?}", fx);
     bash(&mut t, &format!("cd {} && cargo test", wt));
-    assert_eq!(place(&t), json!("/tmp/docs-wt"));
+    assert_eq!(place(&mut t), json!("/tmp/docs-wt"));
     // none: its own workspace again
     t.req("docs", AgentReq::Worktree { path: String::new() });
-    assert!(place(&t).is_null());
+    assert!(place(&mut t).is_null());
     // the CLI's JSON: an absolute path or none
     let r = |p: &str| AgentReq::from_json(&json!({"cmd": "worktree", "path": p}));
     assert_eq!(r("none"), Ok(AgentReq::Worktree { path: String::new() }));
@@ -2580,15 +2580,15 @@ fn a_private_worktree_is_a_place() {
     for a in ["docs", "api"] {
         t.req(a, AgentReq::Worktree { path: "/p/docs-wt".into() });
     }
-    let view = |t: &T| {
+    let view = |t: &mut T| {
         let snap = t.hub.snapshot(0);
         snap["places"].as_array().unwrap().iter().find(|p| p["id"] == "pt:/p/docs-wt").cloned().unwrap_or(Value::Null)
     };
     let snap = t.hub.snapshot(0);
     let docs = snap["agents"].as_array().unwrap().iter().find(|a| a["name"] == "docs").unwrap().clone();
     assert_eq!(docs["place_id"], "pt:/p/docs-wt");
-    assert_eq!(view(&t)["agents"], json!(["docs", "api"]));
-    assert_eq!(view(&t)["branch"], Value::Null);
+    assert_eq!(view(&mut t)["agents"], json!(["docs", "api"]));
+    assert_eq!(view(&mut t)["branch"], Value::Null);
     let w = t.hub.pr_watches();
     assert_eq!(w.len(), 1, "{:?}", w);
     assert!(w[0].head && w[0].branch.is_empty() && w[0].path == "/p/docs-wt");
@@ -2597,13 +2597,13 @@ fn a_private_worktree_is_a_place() {
         Input::Prs(Report { at_ms: 1_000, prs: None, local, activity: Vec::new() })
     };
     t.go(read("", 2));
-    assert_eq!(view(&t)["lid"], "no PR yet · 2 commits");
+    assert_eq!(view(&mut t)["lid"], "no PR yet · 2 commits");
     t.go(read("", 0));
-    assert_eq!(view(&t)["lid"], Value::Null);
+    assert_eq!(view(&mut t)["lid"], Value::Null);
     // a branch checked out there: the place's name, the forge's question
     let fx = t.go(read("feat/x", 0));
     assert!(fx.contains(&Effect::State), "{:?}", fx);
-    assert_eq!(view(&t)["branch"], "feat/x");
+    assert_eq!(view(&mut t)["branch"], "feat/x");
     assert_eq!(t.hub.pr_watches()[0].branch, "feat/x");
     // merged: its agents stay
     let merged = PrSnapshot {
@@ -2620,12 +2620,12 @@ fn a_private_worktree_is_a_place() {
     let local = vec![Local { place: "pt:/p/docs-wt".into(), branch: "feat/x".into(), tip: Some("h".into()), commits: Some(0), dirty: Some(false) }];
     let fx = t.go(Input::Prs(Report { at_ms: 2_000, prs: Some(Ok(vec![merged])), local, activity: Vec::new() }));
     assert!(!format!("{:?}", fx).contains("\"drop\""), "{:?}", fx);
-    assert_eq!(view(&t)["agents"], json!(["docs", "api"]));
+    assert_eq!(view(&mut t)["agents"], json!(["docs", "api"]));
     // none: back in the shared folder, the place goes
     for a in ["docs", "api"] {
         t.req(a, AgentReq::Worktree { path: String::new() });
     }
-    assert_eq!(view(&t), Value::Null);
+    assert_eq!(view(&mut t), Value::Null);
 }
 
 
@@ -2747,6 +2747,43 @@ fn bench_step() {
     }
     let snap = t0.elapsed() / 10;
     eprintln!("snapshot alone: {:?}", snap);
+    {
+        // from nothing (every row built, as before snapshot_rows.rs), then
+        // the same snapshot again: byte for byte, and its JSON text
+        h.rows = Default::default();
+        let t0 = std::time::Instant::now();
+        let cold = h.snapshot(env.now);
+        let t_cold = t0.elapsed();
+        let built = h.rows.built;
+        let t0 = std::time::Instant::now();
+        let warm = h.snapshot(env.now);
+        let snap = t0.elapsed();
+        assert_eq!(cold, warm, "the kept rows are the built ones");
+        // what a kept snapshot still does: each agent's watches, the
+        // compare of each agent, the clone of each row
+        let agents: Vec<&Agent> = h.st.order.iter().filter_map(|n| h.st.agents.get(n)).collect();
+        let copies: Vec<Agent> = agents.iter().map(|a| (*a).clone()).collect();
+        let t0 = std::time::Instant::now();
+        let n: usize = agents.iter().map(|a| h.st.wakes.watching(&a.name).len()).sum();
+        let t_w = t0.elapsed();
+        let t0 = std::time::Instant::now();
+        let same = agents.iter().zip(&copies).filter(|(a, b)| **a == *b).count();
+        let t_eq = t0.elapsed();
+        let t0 = std::time::Instant::now();
+        let _rows = warm["agents"].clone();
+        eprintln!("  watching {:?} ({} watches), {} agents compared {:?}, rows cloned {:?}", t_w, n, same, t_eq, t0.elapsed());
+        let t0 = std::time::Instant::now();
+        let text = serde_json::to_string(&warm).unwrap();
+        eprintln!(
+            "  snapshot from nothing {:?} ({} rows built), kept {:?} ({} rows built again); its JSON text ({} bytes) {:?}",
+            t_cold,
+            built,
+            snap,
+            h.rows.built - built,
+            text.len(),
+            t0.elapsed()
+        );
+    }
     // hub-fifo: a flood of tool lines over the active agents, 1 ms apart.
     // Each one dirties the view (Effect::State): before the state gate
     // the shell built a snapshot for each; now at most one per 100 ms.
@@ -2962,7 +2999,7 @@ mod prs {
         Input::Prs(Report { at_ms: at, prs: Some(prs), local: local(dirty), activity: Vec::new() })
     }
 
-    fn place_view(t: &T, now: u64) -> Value {
+    fn place_view(t: &mut T, now: u64) -> Value {
         let snap = t.hub.snapshot(now);
         snap["places"].as_array().unwrap().iter().find(|p| p["id"] == "wt:dark").cloned().unwrap_or(Value::Null)
     }
@@ -2985,7 +3022,7 @@ mod prs {
         // no PR yet: the held line counts the commits
         let fx = t.go(report(1_000, Ok(vec![]), None));
         assert!(events(&fx).is_empty());
-        let v = place_view(&t, 1_000);
+        let v = place_view(&mut t, 1_000);
         assert_eq!(v["pr"], Value::Null);
         assert_eq!(v["lid"], "no PR yet · 2 commits");
         // opened: seen, journaled with its number; the lid goes
@@ -2993,7 +3030,7 @@ mod prs {
         assert_eq!(events(&fx), ["PR seen"]);
         assert!(fx.contains(&Effect::State));
         assert!(t.journal.borrow().iter().any(|j| j["type"] == "pr_seen" && j["number"] == 412 && j["place"] == "wt:dark"));
-        let v = place_view(&t, 2_000);
+        let v = place_view(&mut t, 2_000);
         assert_eq!(v["pr"]["number"], 412);
         assert_eq!(v["pr"]["state"], "open");
         assert_eq!(v["pr"]["checks"]["state"], "running");
@@ -3012,7 +3049,7 @@ mod prs {
         ] {
             let fx = t.go(report(4_000, Ok(vec![pr(412, PrState::Open, review, checks.clone())]), None));
             assert_eq!(events(&fx), ["PR changed"]);
-            let v = place_view(&t, 4_000);
+            let v = place_view(&mut t, 4_000);
             assert_eq!(v["pr"]["review"], want);
             assert_eq!(v["pr"]["checks"], serde_json::to_value(&checks).unwrap());
         }
@@ -3027,7 +3064,7 @@ mod prs {
         assert!(!has_line(&fx, MAIN, "work saved"), "no backup: {:?}", fx);
         assert!(has_line(&fx, MAIN, "@dark archived"), "{:?}", fx);
         // the place is gone, its PR with it
-        assert_eq!(place_view(&t, 6_000), Value::Null);
+        assert_eq!(place_view(&mut t, 6_000), Value::Null);
         assert!(t.hub.pr_watches().is_empty());
         t.go(report(6_000, Ok(vec![pr(412, PrState::Merged, Review::Approved, Checks::Pass)]), Some(false)));
         assert!(t.hub.prs.is_empty());
@@ -3107,8 +3144,8 @@ mod prs {
             fx
         );
         assert_eq!(merge_cards(&t).len(), 1);
-        let note = |t: &T| t.hub.snapshot(8_000)["cards"].as_array().unwrap().iter().find(|x| x["kind"] == "merge").map(|x| x["note"].clone());
-        assert_eq!(note(&t), Some(json!("merging…")));
+        let note = |t: &mut T| t.hub.snapshot(8_000)["cards"].as_array().unwrap().iter().find(|x| x["kind"] == "merge").map(|x| x["note"].clone());
+        assert_eq!(note(&mut t), Some(json!("merging…")));
         // twice: one merge
         let fx = t.user(MAIN, &format!("/answer {} 1", id));
         assert!(!fx.iter().any(|e| matches!(e, Effect::Merge { .. })));
@@ -3121,7 +3158,7 @@ mod prs {
         assert_eq!(closed_as(&t, id).as_deref(), Some("merge failed"));
         t.go(report(9_000, Ok(vec![ready_pr("tip2", &["alice", "bob"])]), None));
         let id = merge_cards(&t)[0].id;
-        assert_eq!(note(&t), Some(json!("gh couldn't merge it: Pull request is not mergeable")));
+        assert_eq!(note(&mut t), Some(json!("gh couldn't merge it: Pull request is not mergeable")));
         // merged: closed, main told; the forge's next answer archives the place
         t.user(MAIN, &format!("/answer {} 1", id));
         let fx = t.go(Input::Merged { card: id, place: "wt:dark".into(), number: 412, res: Ok(()) });
@@ -3196,8 +3233,8 @@ mod prs {
         assert!(fx.iter().any(|e| matches!(e, Effect::Update { id: r, version, .. } if r == "6" && version == "v2026.10.2-6")), "{:?}", fx);
         let fx = t.user(MAIN, &format!("/answer {} 1", id));
         assert!(!fx.iter().any(|e| matches!(e, Effect::Update { .. })));
-        let note = |t: &T| t.hub.snapshot(3_000)["cards"].as_array().unwrap().iter().find(|x| x["kind"] == "update").map(|x| x["note"].clone());
-        assert_eq!(note(&t), Some(json!("updating to v2026.10.2-6…")));
+        let note = |t: &mut T| t.hub.snapshot(3_000)["cards"].as_array().unwrap().iter().find(|x| x["kind"] == "update").map(|x| x["note"].clone());
+        assert_eq!(note(&mut t), Some(json!("updating to v2026.10.2-6…")));
         // failed: closed, main told, the running version stays
         let fx = t.go(Input::Updated { card: id, version: "v2026.10.2-6".into(), res: Err("cannot download the release.".into()) });
         assert!(
@@ -3254,7 +3291,7 @@ mod prs {
         let mut t = T::new();
         spawn_wt(&mut t, "dark");
         t.go(report(1_000, Ok(vec![pr(7, PrState::Draft, Review::None, Checks::None)]), None));
-        assert_eq!(place_view(&t, 1_000)["pr"]["state"], "draft");
+        assert_eq!(place_view(&mut t, 1_000)["pr"]["state"], "draft");
         for (i, e) in [
             ForgeError::Offline("error connecting to api.github.com".into()),
             ForgeError::Auth("HTTP 401: Bad credentials".into()),
@@ -3277,16 +3314,16 @@ mod prs {
             assert!(t.hub.st.cards.is_empty());
         }
         // the last state stays, with its age
-        let v = place_view(&t, 61_000);
+        let v = place_view(&mut t, 61_000);
         assert_eq!(v["pr"]["state"], "draft");
         assert_eq!(v["pr"]["stale_ms"], 60_000);
         // back: fresh again
         let fx = t.go(report(70_000, Ok(vec![pr(7, PrState::Draft, Review::None, Checks::None)]), None));
         assert!(fx.contains(&Effect::State));
-        assert_eq!(place_view(&t, 70_000)["pr"]["stale_ms"], Value::Null);
+        assert_eq!(place_view(&mut t, 70_000)["pr"]["stale_ms"], Value::Null);
         // no answer for a long time (no client: 5 min cadence, a hung gh)
         let late = 70_000 + PR_STALE_MS + 1;
-        assert_eq!(place_view(&t, late)["pr"]["stale_ms"], PR_STALE_MS + 1);
+        assert_eq!(place_view(&mut t, late)["pr"]["stale_ms"], PR_STALE_MS + 1);
     }
 
     #[test]
@@ -3301,7 +3338,7 @@ mod prs {
         assert!(skipped.is_empty(), "the hub's own lines never reach sb-core: {:?}", skipped);
         let fx = t2.go(report(2_000, Ok(vec![pr(412, PrState::Open, Review::None, Checks::None)]), None));
         assert!(events(&fx).is_empty(), "{:?}", events(&fx));
-        assert_eq!(place_view(&t2, 2_000)["pr"]["number"], 412);
+        assert_eq!(place_view(&mut t2, 2_000)["pr"]["number"], 412);
     }
 
     #[test]
@@ -3327,8 +3364,8 @@ mod prs {
         let fx = t.go(report(1_000, Ok(vec![old]), Some(false)));
         assert!(events(&fx).is_empty());
         assert_ne!(t.status("dark"), Status::Archived);
-        assert_eq!(place_view(&t, 1_000)["pr"], Value::Null);
-        assert_eq!(place_view(&t, 1_000)["lid"], "no PR yet · 2 commits");
+        assert_eq!(place_view(&mut t, 1_000)["pr"], Value::Null);
+        assert_eq!(place_view(&mut t, 1_000)["lid"], "no PR yet · 2 commits");
         let _ = PrEvent::Unreachable { error: ForgeError::Missing };
     }
 
@@ -3338,10 +3375,10 @@ mod prs {
         spawn_wt(&mut t, "dark");
         t.hub.flow = Some(crate::flow::FlowMode::Trunk);
         t.go(report(1_000, Ok(vec![]), None));
-        assert_eq!(place_view(&t, 1_000)["lid"], Value::Null);
+        assert_eq!(place_view(&mut t, 1_000)["lid"], Value::Null);
         // the land queue's line is the held line there
         t.hub.lids.insert("wt:dark".into(), "waits to land · 2nd".into());
-        assert_eq!(place_view(&t, 1_000)["lid"], "waits to land · 2nd");
+        assert_eq!(place_view(&mut t, 1_000)["lid"], "waits to land · 2nd");
     }
 
     /// The local git of the fake life: the branch's tip, fixed.
@@ -3422,7 +3459,7 @@ mod prs {
         // no PR yet
         std::fs::write(dir.join("answer"), r#"{"data":{"repository":{"b0":{"nodes":[]}}}}"#).unwrap();
         round(&mut w, &mut t, &mut now);
-        assert_eq!(place_view(&t, now)["lid"], "no PR yet · 2 commits");
+        assert_eq!(place_view(&mut t, now)["lid"], "no PR yet · 2 commits");
         let life: [(&str, bool, &str, &str, Value); 6] = [
             ("OPEN", true, "", "PENDING", json!({"state": "draft", "review": "none", "checks": {"state": "running"}})),
             ("OPEN", false, "CHANGES_REQUESTED", "SUCCESS", json!({"state": "open", "review": "changes_requested", "checks": {"state": "pass"}})),
@@ -3442,7 +3479,7 @@ mod prs {
                 assert!(has_line(&fx, MAIN, "@dark archived"), "{:?}", fx);
                 continue;
             }
-            let v = place_view(&t, now);
+            let v = place_view(&mut t, now);
             for k in ["state", "review", "checks"] {
                 assert_eq!(v["pr"][k], want[k], "{} after {} {}: {}", k, state, review, v);
             }
@@ -3477,7 +3514,7 @@ mod prs {
             let r = w.step(at).expect("asked");
             assert!(matches!(r.prs, Some(Err(_))), "{:?}", r.prs);
             t.go(Input::Prs(r));
-            let v = place_view(&t, at);
+            let v = place_view(&mut t, at);
             assert_eq!(v["pr"]["state"], "open", "the last state stays");
             assert_eq!(v["pr"]["stale_ms"], at - 1_000, "faint, with its age");
             // backing off: no ask before the back-off ends
@@ -3487,7 +3524,7 @@ mod prs {
         assert!(t.hub.st.cards.is_empty(), "never an inbox item");
         std::fs::remove_file(dir.join("stderr")).unwrap();
         t.go(Input::Prs(w.step(at).unwrap()));
-        assert_eq!(place_view(&t, at)["pr"]["stale_ms"], Value::Null);
+        assert_eq!(place_view(&mut t, at)["pr"]["stale_ms"], Value::Null);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -4493,7 +4530,7 @@ fn close_closes_every_kind_of_card() {
 fn an_agents_row_says_running_and_turns_from_one_source() {
     let mut t = T::new();
     t.spawn_task("a");
-    let row = |t: &T| -> (bool, u64) {
+    let row = |t: &mut T| -> (bool, u64) {
         let snap = t.hub.snapshot(t.env.now);
         let mut since = crate::proto_view::Since::new();
         let rows = crate::proto_view::agents(&snap, &mut since, t.env.now, crate::model::user_kind, &|_| None, &|_| None, &|_| None);
@@ -4507,43 +4544,43 @@ fn an_agents_row_says_running_and_turns_from_one_source() {
         t.go(Input::ReplIdle { agent: "a".into(), leftover: false });
     };
     // the brief's turn runs (spawn_task started it)
-    let base = row(&t).1;
-    assert_eq!(row(&t), (true, base));
+    let base = row(&mut t).1;
+    assert_eq!(row(&mut t), (true, base));
     // it ends: one step, both halves
     idle(&mut t);
-    assert_eq!(row(&t), (false, base + 1), "a quick turn ends");
+    assert_eq!(row(&mut t), (false, base + 1), "a quick turn ends");
     // a turn with no entry
     t.user("a", "go");
     line(&mut t, "  obs: turn_started");
-    assert_eq!(row(&t), (true, base + 1));
+    assert_eq!(row(&mut t), (true, base + 1));
     idle(&mut t);
-    assert_eq!(row(&t), (false, base + 2), "a turn with no entry");
+    assert_eq!(row(&mut t), (false, base + 2), "a turn with no entry");
     // an interrupted one: its turn_done line moves nothing, its idle does
     t.user("a", "long job");
     line(&mut t, "  obs: turn_started");
     line(&mut t, "  obs: turn_done: interrupted");
-    assert_eq!(row(&t), (true, base + 2), "the line alone never moves the count");
+    assert_eq!(row(&mut t), (true, base + 2), "the line alone never moves the count");
     idle(&mut t);
-    assert_eq!(row(&t), (false, base + 3), "an interrupted turn");
+    assert_eq!(row(&mut t), (false, base + 3), "an interrupted turn");
     // a failed one
     t.user("a", "try");
     line(&mut t, "  obs: turn_started");
     line(&mut t, "  obs: turn_done: failed: 500");
     idle(&mut t);
-    assert_eq!(row(&t), (false, base + 4), "a failed turn");
+    assert_eq!(row(&mut t), (false, base + 4), "a failed turn");
     // a queued message: the idle's pump starts its turn in the same step
     t.user("a", "first");
     line(&mut t, "  obs: turn_started");
     t.user_queued("a", "then this");
     idle(&mut t);
-    assert_eq!(row(&t), (true, base + 5), "ended and the next one started in one step");
+    assert_eq!(row(&mut t), (true, base + 5), "ended and the next one started in one step");
     idle(&mut t);
-    assert_eq!(row(&t), (false, base + 6));
+    assert_eq!(row(&mut t), (false, base + 6));
     // a crash mid-turn ends it too
     t.user("a", "crash");
     line(&mut t, "  obs: turn_started");
     t.go(Input::ReplExited { agent: "a".into(), crashed: true, reason: "test".into() });
-    assert_eq!(row(&t), (false, base + 7), "a crash mid-turn");
+    assert_eq!(row(&mut t), (false, base + 7), "a crash mid-turn");
 }
 
 /// No number a client sends panics the hub (core_num.rs).
@@ -4559,12 +4596,12 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     let mut t = T::new();
     t.spawn_task("perf");
     t.go(Input::ReplIdle { agent: "perf".into(), leftover: false });
-    let watching = |t: &T| t.hub.snapshot(t.env.now)["agents"].as_array().unwrap().iter().find(|a| a["name"] == "perf").unwrap()["watching"].clone();
-    assert_eq!(watching(&t), json!([]));
+    let watching = |t: &mut T| t.hub.snapshot(t.env.now)["agents"].as_array().unwrap().iter().find(|a| a["name"] == "perf").unwrap()["watching"].clone();
+    assert_eq!(watching(&mut t), json!([]));
     let spec = crate::wake::Spec { what: crate::wake::What::Pid { pid: 4242, start: String::new() }, tail: None, note: "the build".into() };
     let (tok, _) = t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.clone(), max_ms: crate::wake::MAX_DEFAULT_MS }));
     let _ = tok;
-    let w = watching(&t);
+    let w = watching(&mut t);
     assert_eq!((w[0]["what"].as_str(), w[0]["kind"].as_str()), (Some("the build"), Some("pid")), "{w}");
     let id = w[0]["id"].as_u64().unwrap();
     let wakes = |fx: &[Effect]| lines_of(fx, "perf").into_iter().filter(|l| l.starts_with("sb wake : ")).map(String::from).collect::<Vec<_>>();
@@ -4574,10 +4611,10 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     let l: bise_proto::thread::WakeFold = serde_json::from_str(ls[0].trim_start_matches("sb wake : ")).unwrap();
     let sent = t.journal.borrow().iter().rev().find(|j| j["type"] == "message_sent" && j["msg"]["to"] == "perf").map(|j| j["msg"]["id"].as_u64()).unwrap();
     assert_eq!((l.ev, l.what.as_str(), l.after_ms, l.msg), (bise_proto::thread::WakeEv::Ended, "the build", 5_000, sent));
-    assert_eq!(watching(&t), json!([]), "the hit ends it: the row moves");
+    assert_eq!(watching(&mut t), json!([]), "the hit ends it: the row moves");
     // a stop: one line, no message
     t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.clone(), max_ms: crate::wake::MAX_DEFAULT_MS }));
-    let id = watching(&t)[0]["id"].as_u64().unwrap();
+    let id = watching(&mut t)[0]["id"].as_u64().unwrap();
     let (_, fx) = t.req("perf", AgentReq::Wake(WakeReq::Stop(id)));
     let ls = wakes(&fx);
     assert_eq!(ls.len(), 1, "{fx:?}");

@@ -1106,6 +1106,9 @@ pub struct Hub {
     /// The agents' contexts, rebuilt where their inputs changed
     /// (contexts.rs).
     contexts: crate::contexts::Contexts,
+    /// The snapshot's agent rows, rebuilt where their inputs changed
+    /// (snapshot_rows.rs).
+    rows: crate::snapshot_rows::Rows,
     /// The last thing each agent did (from its REPL lines, for the views).
     activity: BTreeMap<String, (u64, String)>,
     /// The role line of each task, by dir (BISE-126).
@@ -1332,6 +1335,7 @@ impl Hub {
             next_confirm: 1,
             recent: BTreeMap::new(),
             contexts: Default::default(),
+            rows: Default::default(),
             activity: BTreeMap::new(),
             roles: BTreeMap::new(),
             timer_names: Default::default(),
@@ -2183,65 +2187,22 @@ impl Hub {
     }
 
     /// The client snapshot (agents, cards) for the views.
-    pub fn snapshot(&self, now: u64) -> Value {
-        let waiting = board::Waiting::of(&self.st);
-        let agents: Vec<Value> = self
-            .st
-            .order
-            .iter()
-            .filter_map(|n| self.st.agents.get(n))
-            .map(|a| {
-                json!({
-                    "name": a.name,
-                    "main": a.is_main,
-                    "status": a.status().as_str(),
-                    "objective": a.description(),
-                    // what it is doing now, one line (BISE-126); "" for main
-                    "role": self.role_line(a),
-                    "parent": a.parent,
-                    "mode": match a.ws.mode { Mode::Worktree => "worktree", Mode::Shared => "shared" },
-                    "path": a.ws.path,
-                    "branch": a.ws.branch,
-                    "dropped": a.ws.dropped,
-                    // BISE-136: a private worktree (gate.sh new), else null
-                    "place": a.place,
-                    // dev-flow §3.1: the id of the place it is in (`places`)
-                    // (BISE-136: its private worktree's, `pt:<path>`; a
-                    // feature's agent: its feature's, dev-flow §5.1)
-                    "place_id": crate::place::view_id(a),
-                    "created_ms": a.created_ms,
-                    // its folder under agents/ and its former names (S2 C:
-                    // view.json carries them for sb history --project)
-                    "dir": a.dir,
-                    "aliases": a.aliases,
-                    "note": a.declared.as_ref().map(|(_, n)| n.clone()).unwrap_or_default(),
-                    "report": a.last_report.as_ref().map(|r| clip(&one_line(&r.summary), 200)),
-                    // when it last reported (an archived task: about when it stopped)
-                    "report_ms": a.last_report.as_ref().map(|r| r.at_ms),
-                    // S10: followed, and its progress step (`--step n/m`)
-                    "follow": a.follow,
-                    "report_kind": a.last_report.as_ref().map(|r| r.kind.clone()),
-                    "step": a.last_report.as_ref().and_then(|r| r.step),
-                    "of": a.last_report.as_ref().and_then(|r| r.of),
-                    "queued": waiting.queued_count(&a.name),
-                    // the user's queued inputs waiting for the turn's end
-                    // (the window's "send queued"): [{id, text, created_ms}]
-                    "queued_inputs": waiting.queued_inputs(&a.name),
-                    // BISE-299: main's inbox, the agents' questions waiting
-                    // for main (the user sees a quiet count, never asked)
-                    "inbox": if a.is_main { waiting.unanswered(&a.name).len() } else { 0 },
-                    "turn_ms": a.turn_started_ms.map(|t| now.saturating_sub(t)),
-                    // issue 22: its ended turns, from the same sb-core
-                    // view as its status (the agents row's `turns`)
-                    "turns": a.turns_ended,
-                    // who it waits on (`sb wait` / `sb ask`), for `waits {name}`
-                    "waiting_on": a.waiting_on.as_ref().filter(|_| a.waiting),
-                    // event-wake: the events it waits for (the agents
-                    // row's `watching`, wake-ui)
-                    "watching": self.st.wakes.watching(&a.name),
-                })
-            })
-            .collect();
+    /// Its agent rows are kept from one snapshot to the next and rebuilt
+    /// only when their inputs changed (snapshot_rows.rs).
+    pub fn snapshot(&mut self, now: u64) -> Value {
+        self.rows.mail(&self.st);
+        let mut agents: Vec<Value> = Vec::with_capacity(self.st.order.len());
+        for a in self.st.order.iter().filter_map(|n| self.st.agents.get(n)) {
+            let role = self.roles.get(&a.dir).and_then(|r| r.line.as_deref());
+            let i = self.rows.input(a, role, now, self.st.wakes.watching(&a.name));
+            agents.push(self.rows.row(i));
+        }
+        self.rows.keep_only(self.st.agents.keys());
+        self.snapshot_with(agents, now)
+    }
+
+    /// The snapshot around its agent rows: the cards, the places, the flow.
+    fn snapshot_with(&self, agents: Vec<Value>, now: u64) -> Value {
         let cards: Vec<Value> = self
             .st
             .open_cards()
@@ -2308,13 +2269,7 @@ impl Hub {
     /// The role line the views show (BISE-126): the model's, else the
     /// objective's first sentence; none for main.
     pub fn role_line(&self, a: &Agent) -> String {
-        if a.is_main {
-            return String::new();
-        }
-        match self.roles.get(&a.dir).and_then(|r| r.line.clone()) {
-            Some(l) => l,
-            None => role::default_line(&a.brief.objective),
-        }
+        crate::snapshot_rows::role_of(a, self.roles.get(&a.dir).and_then(|r| r.line.as_deref()))
     }
 
     /// A line saved by an earlier hub (`<agent dir>/role.json`).
