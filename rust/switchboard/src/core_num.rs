@@ -40,7 +40,8 @@ mod tests {
 
     #[test]
     fn too_big_finds_a_number_over_max_anywhere() {
-        assert_eq!(too_big(&json!({"t": "close", "card": 999})), None);
+        let close = bise_proto::core::In::Close(bise_proto::core::input::Close { card: 999 });
+        assert_eq!(too_big(&close.to_value()), None);
         assert_eq!(too_big(&json!({"card": MAX})), None);
         assert_eq!(too_big(&json!({"card": MAX + 1})), Some(MAX + 1));
         assert_eq!(too_big(&json!({"req": {"ids": [1, u64::MAX]}})), Some(u64::MAX));

@@ -133,25 +133,23 @@ impl Hub {
     /// Open a hub item (`choice_kind`); its id.
     pub(super) fn open_card(&mut self, fx: &mut Fx, env: &mut dyn Env, item: HubItem) -> Option<u64> {
         let HubItem { kind, agent, text, place, pr } = item;
-        self.core(fx, env, None, json!({"t": "card_open", "kind": kind, "agent": agent, "text": text, "place": place, "pr": pr}));
+        let open = ci::CardOpen { kind: kind.into(), agent: agent.into(), text: text.into(), place: Some(place.into()), pr };
+        self.core(fx, env, None, In::CardOpen(open));
         self.st.open_cards().filter(|c| c.kind == kind && c.place.as_deref() == Some(place)).map(|c| c.id).max()
     }
 
     /// Close a hub item (done, or withdrawn): `res` is main's line.
     pub(super) fn close_card(&mut self, fx: &mut Fx, env: &mut dyn Env, card: u64, res: &str) {
-        self.core(fx, env, None, json!({"t": "card_close", "card": card, "res": res}));
+        self.core(fx, env, None, In::CardClose(ci::CardClose { card, res: res.into() }));
     }
 
     /// The user's digit on a hub item (sb-core's `card_choice`; words
     /// went to main). The item stays open until its kind's handler
     /// closes it.
-    pub(super) fn card_choice(&mut self, fx: &mut Fx, env: &mut dyn Env, f: &Value) {
-        let card = f["card"].as_u64().unwrap_or(0);
-        let place = f["place"].as_str().map(str::to_string);
-        let pr = f["pr"].as_u64();
-        let choice = jstr(f, "text");
+    pub(super) fn card_choice(&mut self, fx: &mut Fx, env: &mut dyn Env, f: bise_proto::core::fx::CardChoice) {
+        let bise_proto::core::fx::CardChoice { card, kind, place, pr, text: choice, .. } = f;
         // one arm per kind
-        match jstr(f, "kind").as_str() {
+        match kind.as_str() {
             "merge" => self.merge_choice(fx, env, card, place, pr, &choice),
             update_card::KIND => self.update_choice(fx, env, card, place, &choice),
             // dev-flow §5.1: a feature's try and merge items

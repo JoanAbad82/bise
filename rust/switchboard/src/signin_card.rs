@@ -127,7 +127,7 @@ impl Hub {
         }
         for agent in std::mem::take(&mut self.signin.stopped) {
             if agent == MAIN || self.st.agents.contains_key(&agent) {
-                self.core(fx, env, None, json!({"t": "hub_msg", "to": agent, "text": RESUME}));
+                self.core(fx, env, None, In::HubMsg(ci::HubMsg { to: agent, text: RESUME.into() }));
             }
         }
         self.dirty = true;

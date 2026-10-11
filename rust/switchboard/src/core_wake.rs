@@ -19,12 +19,8 @@ impl Hub {
     fn wake_set(&mut self, fx: &mut Fx, env: &mut dyn Env, agent: &str, spec: &Spec, max_ms: u64, quiet: bool) -> Option<u64> {
         let max_text = if quiet { String::new() } else { wake::max_text(spec, max_ms) };
         let k = fx.len();
-        self.core(
-            fx,
-            env,
-            None,
-            json!({"t": "wake_set", "agent": agent, "spec": spec.json(), "max_text": max_text, "max_ms": max_ms, "quiet": quiet}),
-        );
+        let set = ci::WakeSet { agent: agent.into(), spec: spec.json(), max_text, max_ms, quiet };
+        self.core(fx, env, None, In::WakeSet(set));
         fx[k..].iter().find_map(|e| match e {
             Effect::Journal(j) if j["type"] == "wake_set" => j["watch"]["id"].as_u64(),
             _ => None,
@@ -46,7 +42,7 @@ impl Hub {
                 if self.st.wakes.live.get(&id).is_none_or(|w| w.agent != by) {
                     return json!({"ok": false, "error": format!("no watch #{} of yours (`sb wake` lists them)", id)});
                 }
-                self.core(fx, env, None, json!({"t": "wake_stop", "id": id, "why": format!("stopped by {}", by)}));
+                self.core(fx, env, None, In::WakeStop(ci::WakeStop { id, why: format!("stopped by {}", by) }));
                 json!({"ok": true, "text": format!("watch #{} stopped", id)})
             }
             WakeReq::Add { spec, max_ms } => match self.wake_set(fx, env, &by, &spec, max_ms, false) {
@@ -73,7 +69,7 @@ impl Hub {
     /// and wakes its agent, once.
     pub(super) fn wake_hit(&mut self, fx: &mut Fx, env: &mut dyn Env, id: u64, text: &str, hit: wake::Hit) {
         let k = fx.len();
-        self.core(fx, env, None, json!({"t": "wake_hit", "id": id, "text": text}));
+        self.core(fx, env, None, In::WakeHit(ci::WakeHit { id, text: text.into() }));
         self.wake_lines(fx, k, Some(&hit));
     }
 

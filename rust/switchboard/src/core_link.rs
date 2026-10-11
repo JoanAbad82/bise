@@ -1,0 +1,197 @@
+//! One step of sb-core, typed (issue 25, chunk R): `Hub::core` sends an
+//! input as a `bise_proto::core::In` in its `Step` envelope (the hub's
+//! clock, git, the answers to its queries so far), answers sb-core's git
+//! queries, and runs the effects it returns, each read as a
+//! `bise_proto::core::Fx` through serde (core_fx.rs turns the plain ones
+//! into `Effect`s; the ones on the hub's state are here). An effect this
+//! hub does not know is skipped and logged, never a crash.
+
+use super::core_fx::{self, Plain};
+use super::*;
+use bise_proto::core::{fx as cfx, Fx as CoreFx, In};
+
+impl Hub {
+    /// Run one input in sb-core: answer its git queries (the input is
+    /// replayed with the answers), then apply the effects it returns.
+    pub(super) fn core(&mut self, fx: &mut Fx, env: &mut dyn Env, client: Option<ClientId>, input: In) {
+        // a number sb-core cannot read fails its whole input: refuse it
+        // here, naming it, to whoever sent it (crate::core_num)
+        if let Some(n) = crate::core_num::too_big(&input.to_value()) {
+            let e = format!("refused: {} is too large a number (at most {})", n, crate::core_num::MAX);
+            match (&input, client) {
+                (In::Req(r), _) => fx.push(Effect::Reply { token: r.token, body: json!({"ok": false, "error": e}) }),
+                (_, Some(c)) => fx.push(notice(c, &e)),
+                _ => fx.push(line(MAIN, "warn", &e)),
+            }
+            return;
+        }
+        // one now for the input and its re-sends (a need replays the step)
+        let now = env.now();
+        let mut step = input.step(now, env.is_git(), Vec::new());
+        let k0 = fx.len();
+        loop {
+            let out = self.call(&step.to_value());
+            for l in std::mem::take(&mut self.revived) {
+                fx.push(line(MAIN, "warn", &l));
+            }
+            let Some(out) = out else { return };
+            if let Some(q) = out.get("need") {
+                // sb every's wakes: their words and the local clock
+                let a = if q["q"] == "every_wake" { self.st.timers.wakes(q, now) } else { self.query(env, q) };
+                step.ans.push(a);
+                continue;
+            }
+            if let Some(e) = out.get("error") {
+                panic!("sb-core: {}", e);
+            }
+            if out.get("dirty").and_then(|d| d.as_bool()) == Some(true) {
+                self.dirty = true;
+            }
+            // the state after the step first: the deliveries render from it
+            self.load_view(&out["view"]);
+            for f in out.get("fx").and_then(|x| x.as_array()).into_iter().flatten() {
+                match core_fx::read(f) {
+                    Plain::Effect(e) => fx.push(e),
+                    Plain::Nothing => {}
+                    Plain::Hub(f) => self.effect(fx, env, client, f),
+                    Plain::Skip(why) => eprintln!("{}", why),
+                }
+            }
+            // event-wake: a watch that ended (but by a hit, whose facts
+            // its input carries: core_wake.rs) gets its thread's line
+            self.wake_lines(fx, k0, None);
+            // a timer without a name: its small-model call (every_name.rs)
+            if let Some((id, request)) = self.timer_names.next(&self.st.timers) {
+                fx.push(Effect::AskTimerName { id, request });
+            }
+            return;
+        }
+    }
+
+    /// A git query of sb-core (RFC 0002), on the workspace the mirror
+    /// knows for the task.
+    fn query(&mut self, env: &mut dyn Env, q: &Value) -> Value {
+        let name = jstr(q, "name");
+        let ws: Option<Workspace> = serde_json::from_value(q["ws"].clone()).ok();
+        let snap = q["snapshot_ref"].as_str().map(|x| x.to_string());
+        let res = |r: Result<Value, String>| match r {
+            Ok(v) => json!({"ok": v}),
+            Err(e) => json!({"err": e}),
+        };
+        match jstr(q, "q").as_str() {
+            "worktree_create" => {
+                let wc = q.get("with_changes").and_then(|x| x.as_bool()).unwrap_or(false);
+                res(env.worktree_create(&name, wc).map(|w| json!(w)))
+            }
+            "worktree_loss" => {
+                let l = ws.map(|w| env.worktree_loss(&w)).unwrap_or_default();
+                json!({"dirty": l.dirty, "unpushed": l.unpushed})
+            }
+            "worktree_drop" => {
+                let n = |k: &str| q.get(k).and_then(|x| x.as_u64()).unwrap_or(0) as usize;
+                let loss = Loss {
+                    dirty: n("dirty"),
+                    unpushed: n("unpushed"),
+                };
+                match ws {
+                    Some(w) => res(env.worktree_drop(&name, &w, &loss).map(|r| json!(r))),
+                    None => json!({"err": "no agent"}),
+                }
+            }
+            "worktree_restore" => match ws {
+                Some(w) => res(env
+                    .worktree_restore(&name, &w, snap.as_deref())
+                    .map(|w| json!(w))),
+                None => json!({"err": "no agent"}),
+            },
+            other => json!({"err": format!("unknown query: {}", other)}),
+        }
+    }
+
+    /// One effect of sb-core on the hub's state (the plain ones are
+    /// core_fx.rs's).
+    fn effect(&mut self, fx: &mut Fx, env: &mut dyn Env, client: Option<ClientId>, f: CoreFx) {
+        match f {
+            CoreFx::Journal(j) => {
+                assert!(j.ev.is_object(), "sb-core: bad event {}", j.ev);
+                fx.push(Effect::Journal(j.ev.clone()));
+                // a timer set or ended (sb every): its ◷ lines
+                self.timer_journal_lines(fx, &j.ev);
+            }
+            CoreFx::Interrupt(i) => {
+                let by = self.interrupt_by.clone().unwrap_or_else(|| "bise".into());
+                fx.push(Effect::Interrupt { agent: i.agent, by })
+            }
+            CoreFx::Reply(cfx::Reply { token, body }) => match self.spawn_asks.remove(&token) {
+                // issue #4: a spawn that asked for a model: the daemon
+                // picks it, writes the task's choice, then answers
+                Some(ask) if body["ok"] == json!(true) && body["name"].is_string() => {
+                    fx.push(Effect::SpawnModel { token, agent: jstr(&body, "name"), ask, body })
+                }
+                _ => fx.push(Effect::Reply { token, body }),
+            },
+            CoreFx::Deliver(d) => self.deliver(fx, env, d),
+            // the user's digit on a hub item (merge.rs)
+            CoreFx::CardChoice(c) => self.card_choice(fx, env, c),
+            CoreFx::Notice(n) => {
+                if let Some(c) = client {
+                    fx.push(notice(c, &n.text));
+                }
+            }
+            // the client's yes/no in the status row (a gate card's verdict
+            // is core_fx.rs's)
+            CoreFx::Confirm(q) => {
+                if let Some(c) = client {
+                    let id = self.next_confirm;
+                    self.next_confirm += 1;
+                    self.confirms.insert(id, (c, q.name.unwrap_or_default()));
+                    fx.push(Effect::ToClient {
+                        client: c,
+                        body: json!({"ev": "confirm", "id": id, "text": q.text}),
+                    });
+                }
+            }
+            CoreFx::FocusMain(m) => {
+                for (c, v) in self.clients.iter() {
+                    if v.focus == m.name {
+                        fx.push(Effect::ToClient {
+                            client: *c,
+                            body: json!({"ev": "focus", "focus": MAIN}),
+                        });
+                    }
+                }
+            }
+            CoreFx::UserSent(u) => {
+                if let Some(v) = client.and_then(|c| self.clients.get_mut(&c)) {
+                    v.sent.push(u.text);
+                }
+            }
+            CoreFx::Renamed(cfx::Renamed { old, new }) => {
+                for v in self.clients.values_mut().filter(|v| v.focus == old) {
+                    v.focus = new.clone();
+                }
+                fx.push(Effect::Renamed { old, new });
+            }
+            // core_fx::plain took the others
+            other => eprintln!("sb-core: effect {} not run here (skipped)", other.tag()),
+        }
+    }
+
+    /// The text a delivery puts in the agent's context (core_fx::delivery),
+    /// as a new turn or as steering.
+    fn deliver(&mut self, fx: &mut Fx, env: &mut dyn Env, d: cfx::Deliver) {
+        let status = d.status.then(|| board::status_block(&self.st, env.now()));
+        let msgs = d
+            .msgs
+            .iter()
+            .filter_map(|m| Some(prompts::tagged(self.st.msgs().get(&m.id)?, &m.rel, self.user_ids && d.agent == MAIN)))
+            .collect();
+        let text = core_fx::delivery(&d.notes, status, msgs);
+        let agent = d.agent;
+        if d.mode == "steer" {
+            fx.push(Effect::Steer { agent, text });
+        } else {
+            fx.push(Effect::Say { agent, text });
+        }
+    }
+}

@@ -49,15 +49,12 @@ impl Hub {
         match cmd {
             UserCmd::Say(t) => {
                 if !t.is_empty() {
-                    self.core(fx, env, c, with_parts(json!({"t": "say", "focus": focus, "text": t, "queued": queued}), parts));
+                    self.core(fx, env, c, In::Say(ci::Say { focus, text: t, queued, parts: parts.into() }));
                 }
             }
-            UserCmd::To { target, text } => self.core(
-                fx,
-                env,
-                c,
-                with_parts(json!({"t": "route", "target": target, "text": text, "focus": focus, "queued": queued}), parts),
-            ),
+            UserCmd::To { target, text } => {
+                self.core(fx, env, c, In::Route(ci::Route { target, text, focus, queued, parts: parts.into() }))
+            }
             UserCmd::New {
                 name,
                 brief,
@@ -74,10 +71,7 @@ impl Hub {
                     ..Brief::default()
                 };
                 match new_task(name.as_deref(), &b, worktree, with_changes) {
-                    Ok(mut v) => {
-                        v["t"] = json!("new");
-                        self.core(fx, env, c, v)
-                    }
+                    Ok(new) => self.core(fx, env, c, In::New(new)),
                     Err(e) => fx.push(notice(client, &e)),
                 }
             }
@@ -86,34 +80,16 @@ impl Hub {
                     client,
                     "usage: /archive <agent> (or /archive from the agent's view)",
                 )),
-                Some(name) => self.core(
-                    fx,
-                    env,
-                    c,
-                    json!({"t": "drop", "name": name, "force": force}),
-                ),
+                Some(name) => self.core(fx, env, c, In::Drop(ci::Drop { name, force })),
             },
-            UserCmd::Restore { name } => {
-                self.core(fx, env, c, json!({"t": "restore", "name": name}))
-            }
-            UserCmd::Isolate { name } => {
-                self.core(fx, env, c, json!({"t": "isolate", "name": name}))
-            }
+            UserCmd::Restore { name } => self.core(fx, env, c, In::Restore(ci::Restore { name })),
+            UserCmd::Isolate { name } => self.core(fx, env, c, In::Isolate(ci::Isolate { name })),
             UserCmd::Rename { name, new_name } => {
                 let valid = router::valid_name(&new_name);
-                self.core(
-                    fx,
-                    env,
-                    c,
-                    json!({"t": "rename", "name": name, "new_name": new_name, "valid": valid}),
-                )
+                self.core(fx, env, c, In::Rename(ci::Rename { name, new_name, valid }))
             }
-            UserCmd::Answer { card, text, parts } => {
-                self.core(fx, env, c, with_parts(json!({"t": "answer", "card": card, "text": text}), &parts))
-            }
-            UserCmd::Close { card } => {
-                self.core(fx, env, c, json!({"t": "close", "card": card}))
-            }
+            UserCmd::Answer { card, text, parts } => self.core(fx, env, c, In::Answer(ci::Answer { card, text, parts })),
+            UserCmd::Close { card } => self.core(fx, env, c, In::Close(ci::Close { card })),
             UserCmd::Tasks => fx.push(notice(client, &board::user_board(&self.st, env.now()))),
             UserCmd::Prs => {
                 // `prs`: the typed rows (bise-proto rows::Pr), the TUI
@@ -131,7 +107,7 @@ impl Hub {
             }
             UserCmd::Interrupt => {
                 self.interrupt_by = Some("user".into());
-                self.core(fx, env, c, json!({"t": "interrupt", "agent": focus}));
+                self.core(fx, env, c, In::Interrupt(ci::Interrupt { agent: focus }));
                 self.interrupt_by = None;
             }
             UserCmd::Passthrough(l) => {
@@ -143,12 +119,7 @@ impl Hub {
                     ));
                     return;
                 }
-                self.core(
-                    fx,
-                    env,
-                    c,
-                    json!({"t": "passthrough", "focus": focus, "line": l}),
-                )
+                self.core(fx, env, c, In::Passthrough(ci::Passthrough { focus, line: l }))
             }
             UserCmd::Model { model, default } => fx.push(Effect::Choose {
                 client,
@@ -182,13 +153,4 @@ impl Hub {
             }
         }
     }
-}
-
-/// sb-core's input `i` with his parts' JSON (msg-parts), only when he sent
-/// some: an input without parts is the one it always was.
-fn with_parts(mut i: Value, parts: &str) -> Value {
-    if !parts.is_empty() {
-        i["parts"] = json!(parts);
-    }
-    i
 }

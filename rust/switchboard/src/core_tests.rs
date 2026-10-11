@@ -4236,7 +4236,8 @@ fn open_card(t: &mut T, kind: &str, text: &str) -> u64 {
         }
         _ => {
             let mut fx = Vec::new();
-            t.hub.core(&mut fx, &mut t.env, None, json!({"t": "card_open", "kind": kind, "agent": MAIN, "text": text}));
+            let open = ci::CardOpen { kind: kind.into(), agent: MAIN.into(), text: text.into(), place: None, pr: None };
+            t.hub.core(&mut fx, &mut t.env, None, In::CardOpen(open));
             t.hub.view_all();
         }
     }

@@ -211,7 +211,7 @@ mod tests {
     fn a_stop_is_one_line_in_mains_feed() {
         let l = |v: Value| feed_line(&v);
         assert_eq!(
-            l(json!({"t": 1, "agent": "aa.api-v2", "name": "api-v2", "hub": "aa", "event": "stopped", "by": "you", "driving": "Chrome"})).as_deref(),
+            l(json!({"agent": "aa.api-v2", "t": 1, "name": "api-v2", "hub": "aa", "event": "stopped", "by": "you", "driving": "Chrome"})).as_deref(),
             Some("↖ api-v2 stopped driving Chrome · you stopped it")
         );
         assert_eq!(
