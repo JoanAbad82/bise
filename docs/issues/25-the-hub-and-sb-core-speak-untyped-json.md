@@ -131,4 +131,7 @@ values, the journal byte-equal on a replay, the e2e transcripts equal
   gen/link.bend (`tag_of` gone) and writes its answers with
   `answer_<shape>`. core.bend 4,008 → 3,849 lines. 6,058 captured lines
   (e2e + switchboard lib on main and on B) give equal answers from main's
-  and B's sb-core.
+  and B's sb-core. Its cost: the slowest PROOF shard went 70 → 82 s in the
+  same job (+17%), the generated codecs now being in every shard. If the
+  shards' total grows again with F's encoders, gen/laws.bend's per-record
+  laws move to their own shard (architect m_18807).
