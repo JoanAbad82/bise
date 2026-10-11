@@ -351,7 +351,7 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
         rows.push({ path: '(4) card answer (inbox block)', to: 'shop · gift-ui (asked)', how: 'paste', seen: await waitSeen(n), note });
       } else {
         await shot('R41-card');
-        rows.push({ path: '(4) card answer (inbox block)', to: 'shop · gift-ui (asked)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '' }, note });
+        rows.push({ path: '(4) card answer (inbox block)', to: 'shop · gift-ui (asked)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '', hops: [] }, note });
       }
     }
 
@@ -388,7 +388,7 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
         rows.push({ path: '(4b) docked choice card in the thread: words + image go as a plain message', to: 'shop · main', how: 'paste', seen, note });
       } else {
         await shot('R41-dock');
-        rows.push({ path: '(4b) docked answer in the thread', to: 'shop · the card\'s asker', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '' }, note: 'no strip row in shop\'s thread' });
+        rows.push({ path: '(4b) docked answer in the thread', to: 'shop · the card\'s asker', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '', hops: [] }, note: 'no strip row in shop\'s thread' });
       }
     }
 
@@ -428,7 +428,7 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
         rows.push({ path: '(5) escalated question (sb card --for), inbox block', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: await waitSeen(n, 60_000), note });
       } else {
         await shot('R41-escalated');
-        rows.push({ path: '(5) escalated question (sb card --for), inbox block', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '' }, note: `no card with '${k}-card' in the inbox block after 90 s (the script chain: shop main -> gift-ui -> main -> sb card --for)` });
+        rows.push({ path: '(5) escalated question (sb card --for), inbox block', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '', hops: [] }, note: `no card with '${k}-card' in the inbox block after 90 s (the script chain: shop main -> gift-ui -> main -> sb card --for)` });
       }
     }
 
