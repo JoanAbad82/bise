@@ -127,6 +127,8 @@ done
 L=$(find "$H" -name core.log -newer $O/before.json -not -path "*/.bise/hubs/*" -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1)
 if [ -n "$L" ]; then say "core.log at $L: $(wc -c < "$L") bytes, repl-live not found: $(grep -c 'repl-live not found' "$L")"; cp "$L" $O/core-first.log
 else say "core.log: none under $H"; fi
+# whether the world held a signed thought at all (else the BENDSIG row proves only the plain case)
+say "signed thoughts in the world's hubs: $(grep -rl 'BENDSIG::' $H/.bise/hubs 2>/dev/null | wc -l | tr -d ' ') files"
 say "hubs: $(ls $H/.bise/hubs/ | tr '\n' ' ')"
 stopcand; breach; libgate first-stop
 

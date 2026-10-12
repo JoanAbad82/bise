@@ -179,7 +179,9 @@ if (mode === 'cut') {
   await click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
   const html = "<html><body style='margin:0;background:#2e8b57'><h1 style='color:#fff;font:40px sans-serif'>proof html</h1></body></html>";
   const seed = [
-    'set up the proof rows',
+    // a thought on the seed's turn (the fake provider's [[think: …]]): the opened thought must never
+    // draw its signature (BENDSIG::…, c28260a9's window guard)
+    'set up the proof rows [[think: weighing the proof rows]]',
     '[[bash: echo one]]', '[[bash: echo two]]', '[[bash: echo three]]',
     "[[bash: sb spawn keeper --objective 'hold the proof']]",
     "[[bash: sb spawn gone --objective 'an old one']]",
@@ -191,6 +193,15 @@ if (mode === 'cut') {
     return t && /proof-html|artifact/i.test(t) ? t : null;
   }, ANSWER_MS, 2000) : null;
   await shot('seeded');
+  // every opened thought: no signature text (c28260a9's BENDSIG window guard)
+  const thoughts = page.locator('[data-testid^="thread.entry."][data-kind="thinking"]');
+  const nThoughts = await thoughts.count().catch(() => 0);
+  for (let i = 0; i < nThoughts; i++) await thoughts.nth(i).click({ timeout: 3000 }).catch(() => {});
+  if (nThoughts) await page.waitForTimeout(800);
+  const thoughtText = nThoughts ? await thoughts.evaluateAll((rs) => rs.map((r) => r.textContent ?? '').join('\n---\n')) : '';
+  const mainText = (await text('[data-testid="app.main"]')) ?? '';
+  await shot('thought-open');
+  step('no BENDSIG text in an opened thought', nThoughts > 0 && !/BENDSIG/.test(thoughtText) && !/BENDSIG/.test(mainText), { thoughts: nThoughts, text: thoughtText.slice(0, 300) });
   // 'gone' is dropped in a LATER turn, once it is idle (amb-home m_20141: a drop in the turn that
   // spawned it makes the hub ask a 'drop' card instead of archiving); a drop card that still comes
   // is answered yes, which also proves the card path (ambient-lead m_20143)
@@ -271,7 +282,12 @@ if (mode === 'cut') {
   await shot('ctrl-r');
   await page.keyboard.press('Escape');
   const after = (await text('[data-testid="composer"]')) ?? '';
-  step('ctrl+r from the thread starts dictation; esc ends it', !!line, { line: line?.slice(0, 300), after_esc: after.slice(0, 200) });
+  step('ctrl+r from the thread starts dictation; esc ends it', !!line && !/dictat|listen/i.test(after), { line: line?.slice(0, 300), after_esc: after.slice(0, 200) });
+  // every message of this mode was sent (seed, drop, /agents, /archived): none stays 'sending…'
+  // (c28260a9's sending-after-page-echo fix)
+  const stuck = await until(async () => { const t = (await text('[data-testid="app.main"]')) ?? ''; return /sending…|sending\.\.\./.test(t) ? null : true; }, 20000, 1000);
+  await shot('no-sending');
+  step("no message stays 'sending…'", !!stuck, stuck ? null : ((await text('[data-testid="app.main"]')) ?? '').match(/.{0,120}sending.{0,40}/s)?.[0]);
 }
 
 // the draft across a restart (ambient-lead m_19525): typed in harness' composer, never sent; after
