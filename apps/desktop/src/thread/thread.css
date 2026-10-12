@@ -870,6 +870,45 @@
   font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
   padding: 6px 0 2px;
 }
+/* the working row (designer's desktop-working page): the gust, 8 px, '<agent> is working · <action>
+   · <age>', 28 px high, 20 above (the thread's end); the action cuts with … first, the rest whole */
+.th-screen .th-live.th-working,
+.th-screen .th-live.th-starting {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  min-width: 0;
+  min-height: var(--h-row-tight);
+  /* the list's own end (--s-thread-end) is the 20 above; the thread's end gap is the 20 under it,
+     to the composer's label or the inbox box (designer m_20262 (2), the 931f5c94 rule) */
+  padding: 0;
+  margin-bottom: var(--s-thread-end);
+  white-space: nowrap;
+}
+.th-live.th-working {
+  cursor: default;
+}
+.th-live-words {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.th-live-name {
+  color: var(--c-text);
+  font-weight: 500;
+}
+.th-live-act {
+  color: var(--c-text-2);
+}
+.th-live-dot,
+.th-live-age {
+  color: var(--c-text-3);
+}
+.th-live-age {
+  flex: none;
+  margin-left: calc(-1 * var(--gap-inline));
+  white-space: pre;
+}
 /* the dim rows: folds (thinking, compaction) at --lh-row, a tool chip 8 px under what's above
    (designer m_19359: b-tool's 6 -> 8) */
 .th-screen .b-fold {

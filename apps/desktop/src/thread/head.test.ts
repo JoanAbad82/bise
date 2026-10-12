@@ -6,7 +6,7 @@ const MIN = 60_000;
 
 describe("the agent view's head (designer's desktop-screens v6)", () => {
   it("the state chip: working with its time, starting, waiting for you in accent, done, failed, idle", () => {
-    expect(stateChip({ status: 'working', since_ms: NOW - 14 * MIN, waits: 0 }, NOW)).toEqual({ text: '∿ working · 14 min', needs: false, live: true });
+    expect(stateChip({ status: 'working', since_ms: NOW - 14 * MIN, waits: 0 }, NOW)).toEqual({ text: 'working · 14 min', needs: false, live: true, breath: true });
     expect(stateChip({ status: 'working', since_ms: NOW - STARTING_MS + 1, waits: 0 }, NOW).text).toBe('starting');
     expect(stateChip({ status: 'working', since_ms: NOW - 2 * MIN, waits: 1 }, NOW)).toEqual({ text: '? waiting for you', needs: true, live: false });
     expect(stateChip({ status: 'blocked', since_ms: NOW, waits: 0 }, NOW).needs).toBe(true);

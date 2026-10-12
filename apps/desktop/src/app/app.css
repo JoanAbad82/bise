@@ -586,29 +586,6 @@ body:has(.app-shell) {
 .app-rb-row[aria-current='true'] {
   background: var(--c-hover);
 }
-/* the working '∿' (the DS's Dot): the hush out of step, the open row pulses, as the ds's .b-row
-   (until amb-web's breath lands: it drops these with the ds's own) */
-.app-rb-row:nth-child(3n + 2) .b-dot.wk {
-  animation-delay: -0.45s;
-}
-.app-rb-row:nth-child(3n) .b-dot.wk {
-  animation-delay: -0.9s;
-}
-.app-rb-row[aria-current='true'] .b-dot.wk {
-  color: var(--c-text);
-  animation: b-pulse 0.8s var(--ease-io) infinite alternate;
-  animation-delay: 0s;
-}
-:root[data-still] .app-rb-row[aria-current='true'] .b-dot.wk {
-  animation: none;
-  color: var(--c-text-2);
-}
-@media (prefers-reduced-motion: reduce) {
-  .app-rb-row[aria-current='true'] .b-dot.wk {
-    animation: none;
-    color: var(--c-text-2);
-  }
-}
 .app-rb-more {
   color: var(--c-text-3);
   font-size: var(--t-12);

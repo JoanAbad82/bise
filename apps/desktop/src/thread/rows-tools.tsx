@@ -8,6 +8,7 @@ import { useFold } from './folds';
 import { thinkingWords } from './thinking';
 import { toolLines, type ToolLine } from './entry';
 import type { RowCtx } from './rows';
+import { Pulse } from '@/working/Signs';
 /**
  * The line under a cut output (designer m_15928): '… 4 KB of 18 KB shown' when the hub knows the
  * whole size (bytes, the cap's unit; shown = the out's UTF-8 bytes), else '… cut after 4 KB'. Pure.
@@ -156,7 +157,7 @@ function ToolLineRow({ l, live, runFor, project, agent }: { l: ToolLine; live: b
             : undefined
         }
       >
-        <span className="th-tool-mark">{live ? '∿' : l.mark}</span>{' '}
+        <span className="th-tool-mark">{live ? <Pulse kind="tool" testId={`${id}.pulse`} /> : l.mark}</span>{' '}
         <span className="th-tool-text">{l.text}</span>
         {l.counts !== '' && (
           <span className="th-tool-count" data-testid={`${id}.count`}>

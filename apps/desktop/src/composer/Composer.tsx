@@ -156,12 +156,11 @@ export const Composer = memo(function Composer(
     <ComposerFrame
       testId={testId}
       to={
-        toEnd === undefined || to === undefined ? (
-          to
-        ) : (
+        // the label keeps its markup with or without a right side (the working row can empty the right)
+        to === undefined ? undefined : (
           <>
             <span className="lbl">{to}</span>
-            <span className="end">{toEnd}</span>
+            {toEnd !== undefined && <span className="end">{toEnd}</span>}
           </>
         )
       }

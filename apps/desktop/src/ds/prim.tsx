@@ -1,13 +1,15 @@
 // src/ds · primitives (desktop-ds v5: components/prim.html, css/prim.css): Button, Chip, Kbd, Seg,
 // Toggle, Field, Help, Dot, Pearl, Bar, Skel, Empty, Err.
 //
-// Every component is a pure render of its props: no state, no effect, the reference's class names.
+// Every component is a pure render of its props: no state, no effect, the reference's class names
+// (but the live pearl and Dot's working breath, which follow their own clocks).
 // What he can act on takes a `testId` (data-testid, `<area>.<thing>[.<id>]`, given by the screen)
 // and a handler. A `state` prop shows a state without a mouse (the gallery); live, :hover and
 // :focus-within do it (css/live.css).
 import type { InputHTMLAttributes, MouseEventHandler, ReactNode, Ref } from "react";
 import { cx, st, step5, sub, type UiState } from "./cx";
 import { LivePearl, MOODS, type Mood } from "@/pearl";
+import { Breath } from "@/working/Signs";
 
 export type Tone = "acc" | "err" | "ok";
 export type DotState = "wk" | "nd" | "ok" | "er" | "off";
@@ -149,6 +151,8 @@ export const DOT_WORDS: Record<DotState | "idle", string> = { wk: "working", nd:
  */
 export function Dot({ state, lg }: { state?: DotState | undefined; lg?: boolean }) {
   const word = DOT_WORDS[state ?? "idle"];
+  // working: the TUI's 1-cell breath on the window's one clock (designer's desktop-working page)
+  if (state === "wk") return <i className={cx("b-dot", state, lg && "lg")} role="img" aria-label={word} title={word}><Breath /></i>;
   return <i className={cx("b-dot", state, lg && "lg")} role="img" aria-label={word} title={word} />;
 }
 

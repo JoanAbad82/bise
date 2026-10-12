@@ -1,16 +1,17 @@
 // thread/agent-head · the agent view's head, rows and composer words (designer's desktop-screens
 // v6 (1), (2), (3), (4)). Passes when, in storefront with the scripted core (FakeCore, fake data):
-//   - perf's head is one row: 'perf' in 600, its role 'product page speed', the chip '∿ working ·
-//     14 min', at the right 'sb/perf' (opens the review), 'changes ⌘D', '⋯';
+//   - perf's head is one row: 'perf' in 600, its role 'product page speed', the chip '<breath> working ·
+//     14 min' (the TUI's 1-cell breath, designer's desktop-working page), at the right 'sb/perf' (opens the review), 'changes ⌘D', '⋯';
 //   - search, which waits on him, has the chip '? waiting for you' in the accent;
 //   - the project's bise reads 'bise · storefront' with its 14 px pearl and the chip '1 waiting
 //     for you', which opens the agents list;
 //   - perf's rows: its commands as mono lines with their length ('$ lighthouse …  38 s'), its edits
 //     ('± web/product/Hero.tsx  4 s'), the reads counted and folded, the artifact made as a chip
-//     that opens in the window, and the live line '∿ running the bench three more times · 14 min';
+//     that opens in the window, and the working row '<gust> perf is working · running the bench three
+//     more times · 14 min';
 //   - the project's bise shows its handoffs '→ perf · product page speed' (they open the agent);
-//   - checkout's empty thread: his first message, '· checkout is starting: its own folder,
-//     sb/checkout', the chip 'starting';
+//   - checkout's empty thread: his first message, '· checkout is starting · its own folder,
+//     sb/checkout' (the '·' pulsing), the chip 'starting';
 //   - the composer says 'to perf' and 'write to perf, then ⏎';
 //   - under 1000 px the head keeps the chip and the buttons, the name and role go (the titlebar's
 //     crumb says them).
@@ -152,7 +153,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     // (1) perf's head
     await expect(page.getByTestId('thread.head.name')).toHaveText('perf');
     await expect(page.getByTestId('thread.head.role')).toHaveText('product page speed');
-    await expect(page.getByTestId('thread.head.state')).toHaveText('∿ working · 14 min');
+    await expect(page.getByTestId('thread.head.state')).toHaveText(/^[·~∿≈] working · 14 min$/);
     await expect(page.getByTestId('thread.head.state')).toHaveAttribute('data-needs', 'false');
     await expect(page.getByTestId('thread.head.branch')).toHaveText('sb/perf');
     await expect(page.getByTestId('thread.head.changes')).toHaveText('changes ⌘D');
@@ -171,7 +172,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     expect(art.thumb, 'no empty thumbnail box').toBe(false);
     expect(art.h, 'one line').toBeLessThan(36);
     expect(art.w, 'fit-content').toBeLessThan(400);
-    await expect(page.getByTestId('thread.live')).toHaveText('∿ running the bench three more times · 14 min');
+    await expect(page.getByTestId('thread.live')).toHaveText(/perf is working · running the bench three more times · 14 min$/);
     // (4) the composer's words
     // the label's left (its right is the S40/W3 divider: 'working · 14 min')
     await expect(page.locator('.th-screen .b-composer .div .lbl')).toHaveText('to perf');
@@ -222,7 +223,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
           }
           if (label === 'checkout (empty)') {
             // (5) the empty thread: his first message, then the starting line; the chip says starting
-            await expect(page.getByTestId('thread.starting')).toHaveText('· checkout is starting: its own folder, sb/checkout');
+            await expect(page.getByTestId('thread.starting')).toHaveText(/^· ?checkout is starting · its own folder, sb\/checkout$/);
             await expect(page.getByTestId('thread.head.state')).toHaveText('starting');
             await expect(page.getByTestId('thread.live')).toHaveCount(0);
             // (3) the starting row on the column's edge, like every row

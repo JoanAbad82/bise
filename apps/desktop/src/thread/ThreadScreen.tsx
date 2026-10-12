@@ -33,7 +33,7 @@ import { InboxBlock, type Answering } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
-import { composerWords, dividerEnd, emptyEnter, emptyEnterAct, nothingOwnYet, usageLine } from './head';
+import { composerWords, dividerEnd, emptyEnter, emptyEnterAct, nothingOwnYet, usageLine, workingRowShows } from './head';
 import { waitAge, waitSince, waitsEvent } from './wake';
 import { useNow } from '@/app/clock';
 import { SignInLine, useThreadSignIn } from './signin';
@@ -99,22 +99,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   const approvals = useApprovals(project);
   const models = useModels(project);
   const now = useNow();
-  const divider =
-    me === undefined
-      ? ''
-      : dividerEnd({
-          model: me.model,
-          modelLabel: models.find((m) => m.id === me.model)?.label,
-          effort: me.effort,
-          mode: approvals?.mode,
-          // event-wake (designer m_17827): while it waits for an event the label follows the head
-          // ('… waiting · 2m'), never 'idle', the word he misread
-          status: waitsEvent(me) ? `… waiting · ${waitAge(now - (waitSince(me.watching) ?? now))}` : me.status,
-          turnMs: me.status === 'working' ? (me.turn_ms ?? now - me.since_ms) : null,
-          // named like the head's gauge ('context 42k · 17%'), none at 0% (designer m_14523: a bare
-          // '15 · 0%' read as nothing)
-          context: usageLine(me.usage?.words),
-        });
   // voice mode on this agent: its pane takes the composer's place (amb-home's src/voicemode)
   const voice = useVoiceHere(project, agent);
   const typing = useTyping(tkey);
@@ -325,6 +309,25 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   const [wrote, setWrote] = useState<string | null>(null);
   if (writing && wrote !== tkey) setWrote(tkey);
   const fresh = !bise && agent !== MAIN && me !== undefined && !me.archived && order.loaded && nothingOwnYet(order.order.map((pos) => store.entry(tkey, pos)?.kind)) && me.status === 'working' && me.waits === 0 && !writing && wrote !== tkey;
+  // the working row at the thread's end says 'working' and its age: the label drops its state then
+  // (designer m_20262 (1): one place only; the head chip keeps it)
+  const rowSays = !fresh && workingRowShows(me);
+  const divider =
+    me === undefined
+      ? ''
+      : dividerEnd({
+          model: me.model,
+          modelLabel: models.find((m) => m.id === me.model)?.label,
+          effort: me.effort,
+          mode: approvals?.mode,
+          // event-wake (designer m_17827): while it waits for an event the label follows the head
+          // ('… waiting · 2m'), never 'idle', the word he misread
+          status: rowSays ? null : waitsEvent(me) ? `… waiting · ${waitAge(now - (waitSince(me.watching) ?? now))}` : me.status,
+          turnMs: !rowSays && me.status === 'working' ? (me.turn_ms ?? now - me.since_ms) : null,
+          // named like the head's gauge ('context 42k · 17%'), none at 0% (designer m_14523: a bare
+          // '15 · 0%' read as nothing)
+          context: usageLine(me.usage?.words),
+        });
   // designer's desktop-screens v6 (1): '⋯' at the head's right (rename, model, reasoning)
   const more =
     me && !me.archived && !bise ? (
@@ -394,7 +397,17 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
           </div>
         )}
         {fresh && <StartingLine a={me} />}
-        {!bise && agent !== MAIN && !fresh && <LiveLine a={me} />}
+        {/* the working row (designer's desktop-working page): under the list, so it stays in view
+            when he reads up; a click brings the thread to its end. bise's own thread too ('bise is working') */}
+        {!fresh && (
+          <LiveLine
+            a={me}
+            name={title}
+            onJump={() => {
+              list.current?.scrollToEnd();
+            }}
+          />
+        )}
         {signIn.on && <SignInLine copied={signIn.copied} />}
         <TypingLine text={typing} />
         {/* W7/K24: the project's open items over the composer's divider (amb-home f44d082e) */}
