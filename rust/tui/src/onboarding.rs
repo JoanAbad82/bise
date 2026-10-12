@@ -1084,8 +1084,11 @@ const GLOSS_AT: u64 = KISS_AT + 900;
 const GLOSS_STEP: u64 = 300;
 const TAG_AT: u64 = GLOSS_AT + 3 * GLOSS_STEP + 1000;
 const PRESS_AT: u64 = TAG_AT + (TAGLINE.len() as u64 - 1) * 35 + 500;
-/// when the welcome is fully written
-pub(crate) const WELCOME_END: u64 = PRESS_AT + 9 * 30;
+/// when the welcome is fully written: the hint's last character drawn
+/// (`typed` shows n+1 characters after n steps), so a key read once the
+/// whole hint is on screen goes on (it was 30 ms later: a key in those
+/// 30 ms only showed it all, red under load in tui_subscriptions_tmux)
+pub(crate) const WELCOME_END: u64 = PRESS_AT + 8 * 30;
 /// the three lines of step 5 and the last hint appear one by one
 #[cfg(test)]
 pub(crate) const LINES_END: u64 = 400 + 3 * 900;
@@ -2354,6 +2357,8 @@ mod tests {
             assert_eq!(r.on_key(key(KeyCode::Char('y')), 20, &none), Out::Stay);
             assert_eq!(r.step, Step::Theme);
         }
+        // the hint whole is the welcome done: no key swallowed while it shows
+        assert!(typed(PRESS, PRESS_AT, 30, WELCOME_END) == PRESS && typed(PRESS, PRESS_AT, 30, WELCOME_END - 1) != PRESS);
         let mut r = onb(&h, "/w");
         assert_eq!(r.on_key(key(KeyCode::Char(' ')), WELCOME_END, &none), Out::Stay);
         assert_eq!(r.step, Step::Theme, "written: any key goes on, no enter needed");
