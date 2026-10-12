@@ -11,8 +11,8 @@
 1298 apps/desktop/src/composer/pm/PmField.tsx merge
 1193 apps/desktop/src/store/store.ts merge
 1305 apps/desktop/src/thread/rows.tsx merge
-6131 bend/LAWS.bend
-6275 bend/PROOF.bend
+6158 bend/LAWS.bend
+6287 bend/PROOF.bend
 1200 bend/core/wire.bend
 3923 bend/hub/core.bend
 1356 bend/runtime/provider-pure.bend
