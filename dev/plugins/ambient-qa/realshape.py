@@ -562,8 +562,9 @@ def tcc_verdict(req, run_pids):
 
 def tcc_gate(log, pids_file, stop_file, bundle, out_dir, every=0.3):
     """Gate C on tccd's live log: a request of the run's pids with preflight=no kills the bundle and
-    writes BREACH; a silent preflight is logged to tcc.jsonl with its attribution lines and a 1 s
-    `sample` of the asking process taken at once (for amb-mac). Until stop_file exists."""
+    writes BREACH; a silent preflight is only logged to tcc.jsonl with its attribution lines (its
+    source comes from the run's tccd ndjson stream, never a sample or a debugger attached to the app:
+    that can show a Developer Tools dialog on his screen, ambient-lead m_19246). Until stop_file exists."""
     seen = set()
     with open(os.path.join(out_dir, "tcc.jsonl"), "a") as f:
         while not os.path.exists(stop_file):
@@ -582,11 +583,8 @@ def tcc_gate(log, pids_file, stop_file, bundle, out_dir, every=0.3):
                     subprocess.run(["pkill", "-f", bundle + "/Contents/"])
                     with open(os.path.join(out_dir, "BREACH"), "w") as b:
                         b.write("tcc %s %s preflight=no pid %s\n" % (mid, req["service"], who))
-                else:
-                    smp = os.path.join(out_dir, "sample-%s.txt" % mid)
-                    subprocess.Popen(["sample", str(who), "1", "-file", smp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 f.write(json.dumps({"msgID": mid, "verdict": v, "service": req["service"], "pid": who, "t": time.strftime("%H:%M:%S"),
-                                    "sample": None if v == "kill" else smp, "lines": req["lines"]}) + "\n")
+                                    "lines": req["lines"]}) + "\n")
                 f.flush()
             time.sleep(every)
 
