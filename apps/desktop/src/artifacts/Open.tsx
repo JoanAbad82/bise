@@ -123,7 +123,9 @@ export function ArtifactOpen({ project, id, onClose, composer = true }: Artifact
   }, [store, project, agent]);
   const about = useMemo(() => (it === undefined ? undefined : { id: it.a.id, title: it.a.title, url: it.a.url }), [it]);
   const close = () => {
+    // ✕ and esc as ‹: back to the place before (designer's desktop-history); opened straight (a link) the list
     if (onClose !== undefined) onClose();
+    else if (router.canBack()) router.back();
     else router.go({ screen: 'artifacts', project: '' });
   };
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {

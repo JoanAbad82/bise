@@ -813,8 +813,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   /** the open card his words answer (the inbox block's, any project's), else none */
   answer: CardAt | null;
   onStop: () => void;
-  /** an esc the composer's lists didn't take (R18): the screen's (route_cancel, stop) */
-  onEscape?: () => void;
+  /** an esc the composer's lists didn't take (R18): the screen's (route_cancel, stop); false: nothing to do, the window may go up (esc-up.ts) */
+  onEscape?: () => boolean;
   quoting: boolean;
   onReady: (a: ComposerActions) => void;
   /** his send went (the demo tour's step) */

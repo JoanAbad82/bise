@@ -46,7 +46,7 @@ export interface ComposerProps {
   /** K2: ⏎ on an empty field: the screen's act (the TUI's: sign in again after expiry, ...) */
   readonly onEmptyEnter?: () => void;
   /** R18: an esc no list took, while busy or on a blank field: the screen's (stop the turn, ...). */
-  readonly onEscape?: () => void;
+  readonly onEscape?: () => boolean;
   /** TP-R6, ⇧⇥ (no list open): the screen's (the TUI's: switch the approvals mode yolo ↔ auto). */
   readonly onShiftTab?: () => void;
   /** a key hint at the label line's right ('esc write a plain message' while it answers a docked card) */
@@ -242,9 +242,7 @@ export const Composer = memo(function Composer(
         onEmptyEnter={() => {
           cb.current.onEmptyEnter?.();
         }}
-        onEscape={() => {
-          cb.current.onEscape?.();
-        }}
+        onEscape={() => cb.current.onEscape?.()}
         onShiftTab={
           props.onShiftTab === undefined
             ? undefined

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { bottomTarget, formatRoute, inboxAtOf, MAIN, parseRoute, projectOf, routeOfOpen, shownOf, startRouteOf, type Route } from './route';
-import { createRouter } from './router';
+import { bottomTarget, formatRoute, inboxAtOf, MAIN, parseRoute, projectOf, routeOfOpen, shownOf, startRouteOf, upOf, type Route } from './route';
+import { createRouter, restoreHistory, stepOf } from './router';
+import { escTarget } from './esc-up';
 
 const every: Route[] = [
   { screen: 'bise' },
@@ -84,6 +85,66 @@ describe('router', () => {
     expect(r.canBack()).toBe(false);
     r.back();
     expect(r.get()).toEqual({ screen: 'bise' });
+  });
+
+  const t = (agent: string): Route => ({ screen: 'thread', project: 'p', agent });
+  it("a settings section replaces its step; replace keeps what's ahead; 50 places at most", () => {
+    const r = createRouter({ screen: 'bise' });
+    r.go({ screen: 'settings' });
+    r.go({ screen: 'settings', page: 'keys' });
+    r.back();
+    expect(r.get(), 'one step for settings, whatever the section').toEqual({ screen: 'bise' });
+    r.go(t('a'));
+    r.go(t('b'));
+    r.back();
+    r.replace(t('c'));
+    expect(r.canForward(), 'replace keeps the forward places').toBe(true);
+    for (let i = 0; i < 80; i++) r.go(t(`x${String(i)}`));
+    expect(r.places('back', 100)).toHaveLength(50);
+  });
+  it('the ‹ › menu: places nearest first, a jump of n steps keeps the others on the far side', () => {
+    const r = createRouter(t('a'));
+    for (const x of ['b', 'c', 'd', 'e']) r.go(t(x));
+    expect(r.places('back', 10).map(formatRoute)).toEqual(['agent/p/d', 'agent/p/c', 'agent/p/b', 'agent/p/a']);
+    r.jump('back', 3);
+    expect(r.get()).toEqual(t('b'));
+    expect(r.places('forward', 10).map(formatRoute)).toEqual(['agent/p/c', 'agent/p/d', 'agent/p/e']);
+    expect(r.places('back', 10).map(formatRoute)).toEqual(['agent/p/a']);
+    r.jump('forward', 2);
+    expect(r.get()).toEqual(t('d'));
+    expect(r.places('back', 2).map(formatRoute)).toEqual(['agent/p/c', 'agent/p/b']);
+    r.jump('forward', 5);
+    expect(r.get(), 'too far: nothing').toEqual(t('d'));
+  });
+  it("a reload gives the stack back around keep's start route; another start route is a new step", () => {
+    const r = createRouter({ screen: 'bise' });
+    r.go(t('a'));
+    r.go(t('b'));
+    r.back();
+    const saved = r.saved();
+    expect(saved).toEqual({ past: ['bise'], now: 'agent/p/a', future: ['agent/p/b'] });
+    const same = createRouter(t('a'), saved);
+    expect(same.places('back', 10)).toEqual([{ screen: 'bise' }]);
+    expect(same.places('forward', 10)).toEqual([t('b')]);
+    const link = createRouter({ screen: 'changes', project: 'p' }, saved);
+    expect(link.places('back', 10).map(formatRoute)).toEqual(['agent/p/a', 'bise']);
+    expect(link.canForward()).toBe(false);
+    expect(restoreHistory({ screen: 'bise' }, { past: ['nope/x', 'lab/composer'], now: 'bise', future: [] })).toEqual({ past: [], future: [] });
+    expect(stepOf({ screen: 'bise' }, { screen: 'bise' })).toBe('none');
+  });
+});
+
+describe('esc up (designer desktop-history)', () => {
+  it('an agent → its main → bise; lists go back, or home with nothing behind; bise stays', () => {
+    expect(upOf({ screen: 'thread', project: 'p', agent: 'perf' })).toEqual({ screen: 'thread', project: 'p', agent: MAIN });
+    expect(upOf({ screen: 'thread', project: 'p', agent: MAIN })).toEqual({ screen: 'bise' });
+    expect(upOf({ screen: 'bise' })).toBeNull();
+    for (const s of ['agents/p', 'agents/p/archived', 'artifacts', 'scheduled', 'settings/keys', 'changes/p', 'log/p/a', 'report']) expect(upOf(parseRoute(s)), s).toBe('back');
+    const r = createRouter({ screen: 'changes', project: 'p' });
+    expect(escTarget(r)).toEqual({ screen: 'thread', project: 'p', agent: MAIN });
+    expect(escTarget(createRouter({ screen: 'settings' }))).toEqual({ screen: 'bise' });
+    r.go({ screen: 'settings' });
+    expect(escTarget(r)).toBe('back');
   });
 });
 

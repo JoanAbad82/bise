@@ -221,6 +221,32 @@ export function sameRoute(a: Route, b: Route): boolean {
 }
 
 /**
+ * Where esc goes up from `r` (designer's desktop-history, the esc list; esc-up.ts asks): an
+ * agent opened large → its project's main, a project's main → bise, a list or a tool screen
+ * (agents, archived, artifacts, scheduled, settings, changes, /log, the report…) → 'back',
+ * the place before (as ‹; with nothing behind, the project's main or bise). bise, the first
+ * run and the labs: null, esc does nothing. An open artifact is its view's own esc. Pure.
+ */
+export function upOf(r: Route): Route | 'back' | null {
+  switch (r.screen) {
+    case 'thread':
+      return r.agent === MAIN ? { screen: 'bise' } : { screen: 'thread', project: r.project, agent: MAIN };
+    case 'bise':
+    case 'onboarding':
+    case 'lab':
+      return null;
+    default:
+      return 'back';
+  }
+}
+
+/** Where 'back' lands with nothing behind: the route's project's main, else bise. Pure. */
+export function homeOf(r: Route): Route {
+  const p = projectOf(r);
+  return p === undefined || p === '' ? { screen: 'bise' } : { screen: 'thread', project: p, agent: MAIN };
+}
+
+/**
  * The start route of a test run ("show me desktop <route>", a check that
  * opens a screen directly): `#route=<route string>` in the page's hash
  * (amb-mac's main sets it from BISE_DESKTOP_ROUTE in test mode). None

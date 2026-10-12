@@ -7,7 +7,8 @@
 // through its own per-key hooks, so an event re-renders the rows it
 // touches, never the shell, the sidebar or the composer.
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { createRouter, RouterContext, useRoute, useRouter } from './router';
+import { createRouter, RouterContext, useRoute, useRouter, type SavedHistory } from './router';
+import { useHistoryWays } from './esc-up';
 import { bottomTarget, formatRoute, inboxAtOf, MAIN, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
 import { BottomBlock } from '@/thread/Bottom';
 import { askInbox, useInboxAsks } from './inboxAsk';
@@ -58,11 +59,17 @@ import '@/ds/index.css';
 import './app.css';
 
 export function App() {
-  const [router] = useState(() => createRouter(firstRoute()));
-  // the window reopens where he left it, after a reload, an update swap or the next day (m_11763)
+  const [router] = useState(() => createRouter(firstRoute(), sessionHistory()));
+  // the window reopens where he left it, after a reload, an update swap or the next day (m_11763);
+  // its back and forward places come back after a reload only (the window's session)
   useEffect(() => {
     const save = () => {
       keep.setView('route', formatRoute(router.get()));
+      try {
+        sessionStorage.setItem(HISTORY_KEY, JSON.stringify(router.saved()));
+      } catch {
+        // no session storage (a test's jsdom): the history lives until the reload
+      }
     };
     // the start route counts too (a deeplink, a test's start route): no move may follow
     save();
@@ -101,6 +108,21 @@ function firstRoute(): Route {
     return { screen: 'bise' };
   }
   return (testMode() ? startRouteOf(window.location.hash) : undefined) ?? keptRoute() ?? { screen: 'bise' };
+}
+
+const HISTORY_KEY = 'bise.history';
+
+/** The back and forward places of this window's session (a reload keeps them, a relaunch does not). */
+function sessionHistory(): SavedHistory | undefined {
+  try {
+    const v: unknown = JSON.parse(sessionStorage.getItem(HISTORY_KEY) ?? 'null');
+    if (typeof v !== 'object' || v === null) return undefined;
+    const { past, now, future } = v as Record<string, unknown>;
+    const strings = (x: unknown): x is string[] => Array.isArray(x) && x.every((s) => typeof s === 'string');
+    return strings(past) && typeof now === 'string' && strings(future) ? { past, now, future } : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Where he was when the window last closed (keep.ts), unless that was a test lab. */
@@ -144,7 +166,7 @@ function useStill(): void {
 }
 
 function Shell() {
-  useHistoryKeys();
+  useHistoryWays(useRouter());
   useStill();
   const [palette, setPalette] = usePaletteOpen();
   const [help, setHelp] = useState(false);
@@ -491,24 +513,6 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
 
 function inTerminal(el: Element | null): boolean {
   return el?.closest('[data-testid="terminal.panel"]') != null;
-}
-
-/** ⌘[ back, ⌘] forward (the menu items are amb-mac's; the keys work without them). */
-function useHistoryKeys() {
-  const router = useRouter();
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!e.metaKey || e.altKey || e.ctrlKey || e.shiftKey) return;
-      if (e.key === '[') router.back();
-      else if (e.key === ']') router.forward();
-      else return;
-      e.preventDefault();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [router]);
 }
 
 /** The add-a-project sheet, mounted once (ambient-lead m_18949): the sidebar's '+ add a project' and

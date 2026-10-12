@@ -88,6 +88,7 @@ import { emojiToken, typedEmoji } from "../emoji";
 import { dictated, HOLD_MS } from "../dictate";
 import { DOUBLE_CTRL_R_MS } from "@/voicemode/model";
 import { Picker } from "../Picker";
+import { freeEscape } from "../escape";
 import { FIELD_NODES } from "./schema";
 import { Colors } from "./colors";
 import {
@@ -129,7 +130,7 @@ export interface PmFieldProps {
    * keep his words with bise). Called here because ProseMirror preventDefaults every Escape
    * (captureKeyDown), so a screen's bubbling handler never sees it as free.
    */
-  readonly onEscape?: (() => void) | undefined;
+  readonly onEscape?: (() => boolean | undefined) | undefined;
   /** TP-R6, ⇧⇥ with no list open: the screen's act (switch the approvals mode); unset: the browser's. */
   readonly onShiftTab?: (() => void) | undefined;
 }
@@ -1099,10 +1100,13 @@ export function PmField(p: PmFieldProps): JSX.Element {
           return true;
         }
         // no list open: the screen's esc (stop the turn) while busy or on a blank field; else his
-        // words go to history (↑ brings them back)
+        // words go to history (↑ brings them back). A blank field the screen did nothing with
+        // leaves the esc free: the window goes up (esc-up.ts; ProseMirror prevents it anyway)
         e.preventDefault();
-        if (props.current.busy || blankNow()) props.current.onEscape?.();
-        else putAway();
+        if (props.current.busy) props.current.onEscape?.();
+        else if (blankNow()) {
+          if (props.current.onEscape?.() !== true) freeEscape(e);
+        } else putAway();
         return true;
       }
       case "ArrowUp": {

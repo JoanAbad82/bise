@@ -466,6 +466,36 @@ body:has(.app-shell) {
   margin: 0 7px;
   color: var(--c-text-3);
 }
+/* ‹ › right after the lights (designer's desktop-history): 28 px, 4 apart, the crumb at 8 (the
+   title's gap is 10, so the pair takes 2 back); nothing on a side: faint at 45%, no hover */
+.app-hist {
+  flex: none;
+  display: flex;
+  gap: var(--s-1);
+  margin-right: calc(var(--s-1) * -0.5);
+}
+.app-hist-arrow {
+  position: relative;
+  display: flex;
+}
+.app-hist .b-ibtn {
+  font-size: var(--t-17);
+}
+.app-hist .b-ibtn:disabled {
+  opacity: 0.45;
+  background: none;
+  color: var(--c-text-3);
+}
+.app-hist-menu {
+  position: absolute;
+  top: calc(100% + var(--s-1));
+  left: 0;
+  z-index: 40;
+  -webkit-app-region: no-drag;
+}
+.app-hist-menu .b-mi {
+  min-height: var(--h-row-tight);
+}
 /* the right panel, option A: 320 px, docked in the frame's third column or sliding over */
 .app-panel {
   box-sizing: border-box;
