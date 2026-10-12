@@ -129,7 +129,7 @@ fn step(st: &mut State, r: &mut Rng, now: &mut u64, models: &mut Models, n: &mut
             st.next_msg += 1;
             let thread = if id > 1 && r.below(2) == 0 { 1 + r.below(id as usize - 1) as u64 } else { id };
             let state = [MsgState::Delivered, MsgState::Queued { reason: "busy".into() }][r.below(2)].clone();
-            st.put_msg(msg(id, &from, &to, r.below(2) == 0, thread), Some(state), false);
+            st.put_msg_judged(msg(id, &from, &to, r.below(2) == 0, thread), Some(state), false);
         }
         10 => {
             // a queued one delivered, or a reply settles one
@@ -137,7 +137,7 @@ fn step(st: &mut State, r: &mut Rng, now: &mut u64, models: &mut Models, n: &mut
             if !ids.is_empty() {
                 let m = st.msgs()[&ids[r.below(ids.len())]].clone();
                 let settle = r.below(2) == 0;
-                st.put_msg(m, Some(MsgState::Delivered), settle);
+                st.put_msg_judged(m, Some(MsgState::Delivered), settle);
             }
         }
         11 => {
@@ -199,7 +199,7 @@ fn an_activity_rebuilds_main_only() {
     assert!(c.refresh(&st, 0, &models).is_empty());
     assert_eq!(c.keys, keys);
     // a question for b: b's context only
-    st.put_msg(msg(1, "a", "b", true, 1), Some(MsgState::Delivered), false);
+    st.put_msg_judged(msg(1, "a", "b", true, 1), Some(MsgState::Delivered), false);
     let changed: Vec<String> = c.refresh(&st, 0, &models).into_iter().map(|(n, _)| n).collect();
     assert_eq!(changed, ["b", MAIN], "main's agent_threads shows a ↔ b");
 }

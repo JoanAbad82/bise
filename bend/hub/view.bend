@@ -78,8 +78,11 @@ def agents_json(xs: List<&2, M.Agent>, +rts: List<&2, X.Rt>, +ws: List<&2, X.Wai
       agents_json.keep(all || M.str_in(names, M.Agent.name(a)),
         a, rts, ws, s, agents_json(t, rts, ws, s, all, names))
 
+# a message, its state, and what the steps' predicates (model.bend) say
+# of it: queued, or delivered owing a reply (the hub's Waiting reads them)
 def rec_json(+r: M.MRec) -> J.Json:
-  V.msg(C.msg_json(M.MRec.msg(r)), J.obj(C.mst_kvs(M.MRec.st(r))), M.MRec.settled(r))
+  +st = M.MRec.st(r)
+  V.msg(C.msg_json(M.MRec.msg(r)), J.obj(C.mst_kvs(st)), M.MRec.settled(r), M.is_queued(st), M.MRec.owes(r))
 
 # a match, not Bool.pick: pick would encode every message, kept or not
 def recs_json.keep(keep: Bool, +r: M.MRec, +rest: List<&2, J.Json>) -> List<&2, J.Json>:

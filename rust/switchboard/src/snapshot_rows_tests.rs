@@ -74,7 +74,7 @@ fn the_kept_rows_equal_fresh_rows_at_every_step() {
                     n += 1;
                     let (to, from) = ([a.as_str(), MAIN][r.below(2)], [USER, MAIN, a.as_str()][r.below(3)]);
                     let state = [MsgState::Delivered, MsgState::Queued { reason: "busy".into() }][r.below(2)].clone();
-                    st.put_msg(msg(n, from, to, r.below(2) == 0), Some(state), r.below(4) == 0);
+                    st.put_msg_judged(msg(n, from, to, r.below(2) == 0), Some(state), r.below(4) == 0);
                 }
                 5 => {
                     let w = AgentWatch { id: n, kind: bise_proto::rows::WatchKind::Pid, what: "the build".into(), since_ms: now, noted: false };
@@ -124,7 +124,7 @@ fn an_unchanged_row_is_not_rebuilt() {
     both(&mut rows, &st, &roles, &watches, 5_000);
     assert_eq!(rows.built, 5, "a's row only");
     // a message to b: b's queued count; the archived c is still kept
-    st.put_msg(msg(1, USER, "b", true), Some(MsgState::Queued { reason: "busy".into() }), false);
+    st.put_msg_judged(msg(1, USER, "b", true), Some(MsgState::Queued { reason: "busy".into() }), false);
     let (kept, _) = both(&mut rows, &st, &roles, &watches, 5_000);
     assert_eq!(rows.built, 6, "b's row only");
     assert_eq!(kept[2]["queued"], 1);

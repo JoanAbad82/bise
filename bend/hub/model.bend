@@ -785,13 +785,18 @@ def Msg.expect(x: Msg) -> Bool:
     case Msg{_, _, _, _, _, +expect, _, _, _, _, _, _, _}:
       expect
 
+# a delivered message that expects a reply its recipient has not given:
+# the steps (unanswered_in) and the view (view.bend rec_json) both read it
+def MRec.owes(+r: MRec) -> Bool:
+  Msg.expect(MRec.msg(r)) && Bool.not(MRec.settled(r)) && is_delivered(MRec.st(r))
+
 def unanswered_in(xs: List<&2, MRec>, +ns: List<&2, String>) -> List<&2, Msg>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+r, +t}:
       +rest = unanswered_in(t, ns)
-      Bool.pick(List<&2, Msg>, str_in(ns, Msg.to(MRec.msg(r))) && Msg.expect(MRec.msg(r)) && Bool.not(MRec.settled(r)) && is_delivered(MRec.st(r)), MRec.msg(r) <> rest, rest)
+      Bool.pick(List<&2, Msg>, str_in(ns, Msg.to(MRec.msg(r))) && MRec.owes(r), MRec.msg(r) <> rest, rest)
 
 # delivered messages to `n` that expect a reply it has not given
 def unanswered_for(+st: St, +n: String) -> List<&2, Msg>:

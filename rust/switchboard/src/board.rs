@@ -529,12 +529,12 @@ pub fn questions_for(unanswered: &[&Msg]) -> Vec<String> {
 
 /// Queued messages, for the board shown to the user.
 pub fn queued_count(st: &State, name: &str) -> usize {
-    st.msgs().values().filter(|m| m.to == name && st.is_queued(m)).count()
+    st.hot().filter(|(m, h)| h.queued && m.to == name).count()
 }
 
-/// What waits for each agent, from one pass over the messages: those
-/// queued for it, and the delivered ones it owes a reply to. Oldest
-/// first, as in `st.msgs()`.
+/// What waits for each agent, from one pass over the hot messages (what
+/// sb-core's view says of each, `State::hot`): those queued for it, and
+/// the delivered ones it owes a reply to. Oldest first, as in `st.msgs()`.
 pub struct Waiting<'a> {
     queued: BTreeMap<&'a str, Vec<&'a Msg>>,
     unanswered: BTreeMap<&'a str, Vec<&'a Msg>>,
@@ -543,11 +543,11 @@ pub struct Waiting<'a> {
 impl<'a> Waiting<'a> {
     pub fn of(st: &'a State) -> Waiting<'a> {
         let mut w = Waiting { queued: BTreeMap::new(), unanswered: BTreeMap::new() };
-        for m in st.msgs().values() {
-            if st.is_queued(m) {
+        for (m, h) in st.hot() {
+            if h.queued {
                 w.queued.entry(m.to.as_str()).or_default().push(m);
             }
-            if st.owes_reply(m) {
+            if h.owes {
                 w.unanswered.entry(m.to.as_str()).or_default().push(m);
             }
         }
@@ -637,7 +637,7 @@ mod tests {
     #[test]
     fn peer_threads_are_summarized_for_main() {
         let mut st = state();
-        st.put_msg(
+        st.put_msg_judged(
             Msg {
                 id: 1,
                 thread: 1,
@@ -729,14 +729,14 @@ mod tests {
             m.created_ms = id / 4; // equal times
             m.plain = id % 29 == 0;
             m.reply_to = (id > 10 && id % 7 == 0).then(|| id - 7);
-            st.put_msg(m.clone(), Some(MsgState::Delivered), false);
+            st.put_msg_judged(m.clone(), Some(MsgState::Delivered), false);
             if let Some(q) = m.reply_to {
                 // the view re-sends the question a reply settled
                 let q = st.msgs()[&q].clone();
-                st.put_msg(q, None, true);
+                st.put_msg_judged(q, None, true);
             }
             if id % 11 == 0 {
-                st.put_msg(m, None, false);
+                st.put_msg_judged(m, None, false);
             }
             check(&st);
         }
@@ -745,7 +745,7 @@ mod tests {
         // a row rewritten with another thread leaves the old one
         let mut m = st.msgs()[&40].clone();
         m.thread = 99;
-        st.put_msg(m, None, false);
+        st.put_msg_judged(m, None, false);
         check(&st);
         st.clear_msgs();
         assert_eq!(st.threads().newest(8).count(), 0);
@@ -763,7 +763,7 @@ mod tests {
         let names = [MAIN, "auth-fix", "docs", USER];
         for id in 1..=60u64 {
             let (from, to) = (names[(id % 4) as usize], names[((id + 1) % 4) as usize]);
-            st.put_msg(msg(id, from, to, id % 2 == 0, id % 5 == 0), Some(states[(id % 3) as usize].clone()), id == 4);
+            st.put_msg_judged(msg(id, from, to, id % 2 == 0, id % 5 == 0), Some(states[(id % 3) as usize].clone()), id == 4);
         }
         let w = Waiting::of(&st);
         for n in names {
@@ -787,7 +787,7 @@ mod tests {
     #[test]
     fn a_task_context_has_the_roster_it_sees_and_its_questions() {
         let mut st = state();
-        st.put_msg(msg(1, "auth-fix", "docs", true, false), Some(MsgState::Delivered), false);
+        st.put_msg_judged(msg(1, "auth-fix", "docs", true, false), Some(MsgState::Delivered), false);
         let c = task_context("docs", &Group::of(&st, 0, &Models::new()), &questions_for(Waiting::of(&st).unanswered("docs")));
         let mut want = String::from("<group>\n");
         for l in roster(&st, "docs", 0, &Models::new()) {

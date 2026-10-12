@@ -347,6 +347,10 @@ pub struct State {
     msgs_rev: u64,
     /// main's `<agent_threads>`, kept by the same writer (board::Threads)
     threads: crate::board::Threads,
+    /// the hot messages: what sb-core's view says of each (queued, or
+    /// owing a reply), only those with one of them: Waiting and
+    /// `unanswered_for` walk these, never every message
+    hot: BTreeMap<u64, Hot>,
     pub cards: BTreeMap<u64, Card>,
     pub main_notes: Vec<String>,
     pub next_msg: u64,
@@ -429,10 +433,15 @@ impl State {
         self.msgs_rev
     }
 
-    /// The one writer of a message: its row, its state (None: unchanged)
-    /// and whether a reply settled it.
-    pub fn put_msg(&mut self, m: Msg, state: Option<MsgState>, settled: bool) {
+    /// The one writer of a message: its row, its state (None: unchanged),
+    /// whether a reply settled it, and what sb-core says of it (`hot`).
+    pub fn put_msg(&mut self, m: Msg, state: Option<MsgState>, settled: bool, hot: Hot) {
         self.msgs_rev += 1;
+        if hot.queued || hot.owes {
+            self.hot.insert(m.id, hot);
+        } else {
+            self.hot.remove(&m.id);
+        }
         if let Some(state) = state {
             self.msg_state.insert(m.id, state);
         }
@@ -456,6 +465,25 @@ impl State {
         self.msg_state.clear();
         self.settled.clear();
         self.threads = Default::default();
+        self.hot.clear();
+    }
+
+    /// Tests only: put_msg with sb-core's facts as model.bend's
+    /// predicates give them (`is_queued`; delivered, expecting a reply,
+    /// not settled), the state kept when `state` is None.
+    #[cfg(test)]
+    pub fn put_msg_judged(&mut self, m: Msg, state: Option<MsgState>, settled: bool) {
+        let st = state.clone().or_else(|| self.msg_state.get(&m.id).cloned());
+        let hot = Hot {
+            queued: matches!(st, Some(MsgState::Queued { .. })),
+            owes: m.expect_reply && !settled && matches!(st, Some(MsgState::Delivered)),
+        };
+        self.put_msg(m, state, settled, hot);
+    }
+
+    /// The hot messages, oldest first, with what sb-core says of each.
+    pub fn hot(&self) -> impl Iterator<Item = (&Msg, Hot)> + '_ {
+        self.hot.iter().filter_map(|(id, h)| Some((self.msgs.get(id)?, *h)))
     }
 
     /// The threads of main's `<agent_threads>` (board::agent_threads).
@@ -507,22 +535,29 @@ impl State {
 
     /// Delivered messages to `name` that expect a reply it has not given.
     pub fn unanswered_for(&self, name: &str) -> Vec<&Msg> {
-        self.msgs.values().filter(|m| m.to == name && self.owes_reply(m)).collect()
+        self.hot().filter(|(m, h)| h.owes && m.to == name).map(|(m, _)| m).collect()
     }
 
     /// `m` was delivered, expects a reply, and its recipient has not
-    /// given it.
+    /// given it (sb-core's word, its view's `owes`).
     pub fn owes_reply(&self, m: &Msg) -> bool {
-        m.expect_reply
-            && !self.settled.contains(&m.id)
-            && matches!(self.msg_state.get(&m.id), Some(MsgState::Delivered))
+        self.hot.get(&m.id).is_some_and(|h| h.owes)
     }
 
-    /// `m` waits for delivery.
+    /// `m` waits for delivery (sb-core's word, its view's `queued`).
     pub fn is_queued(&self, m: &Msg) -> bool {
-        matches!(self.msg_state.get(&m.id), Some(MsgState::Queued { .. }))
+        self.hot.get(&m.id).is_some_and(|h| h.queued)
     }
+}
 
+/// What sb-core says of a message (its view's `ViewMsg.queued`, `owes`,
+/// hub/model.bend's predicates): the hub never decides it again.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Hot {
+    /// it waits for delivery
+    pub queued: bool,
+    /// it was delivered and expects a reply its recipient has not given
+    pub owes: bool,
 }
 
 #[cfg(test)]
