@@ -40,6 +40,7 @@ export const hub_ev: readonly HubEv[] = [
   {"agent":"perf","entry":{"at_ms":1791100033000,"kind":"scheduled","pos":33,"scheduled":{"head":"main scheduled #48 for perf · every 2m · 6 times · next 14:22","id":48,"words":"check the build"},"text":"main scheduled #48 for perf · every 2m · 6 times · next 14:22"},"ev":"entry","project":"acme-1a2b3c4d"},
   {"agent":"perf","entry":{"at_ms":1791100034000,"kind":"scheduled","pos":34,"scheduled":{"head":"scheduled #48 ended · stopped by you","id":48},"text":"scheduled #48 ended · stopped by you"},"ev":"entry","project":"acme-1a2b3c4d"},
   {"agent":"perf","entry":{"at_ms":1791100035000,"kind":"wake","pos":35,"text":"cargo test ended · rc 101 · after 3m10s","wake":{"after_ms":190000,"ev":"ended","id":3,"kind":"bg","msg":57,"rc":101,"tail":["test cart::total ... FAILED","test result: FAILED. 210 passed; 2 failed"],"what":"cargo test"}},"ev":"entry","project":"acme-1a2b3c4d"},
+  {"agent":"main","entry":{"at_ms":1791100035000,"kind":"wake","pos":36,"text":"cargo test ended · rc 101 · after 3m10s","wake":{"after_ms":190000,"agent":"perf","ev":"ended","id":3,"kind":"bg","msg":57,"rc":101,"tail":["test cart::total ... FAILED","test result: FAILED. 210 passed; 2 failed"],"what":"cargo test"}},"ev":"entry","project":"acme-1a2b3c4d"},
   {"agent":"perf","ev":"typing","project":"acme-1a2b3c4d","text":"running the tests"},
   {"agent":"perf","ev":"typing","project":"acme-1a2b3c4d","text":""},
   {"agent":"perf","call":"17.0","ev":"partial","off":0,"project":"acme-1a2b3c4d","text":"the tests pass:\n- one"},

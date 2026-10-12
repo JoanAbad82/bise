@@ -270,7 +270,14 @@ tail?: Array<string>,
  * the id of bise's message that woke the agent (folded into this
  * entry); none when nothing woke it
  */
-msg?: number | null, };
+msg?: number | null, 
+/**
+ * the agent the wake is for, when that is not this thread's own:
+ * another agent's wake shown in main's thread (the hub writes the
+ * same line there, core_wake.rs; the window folds it, tier 4). Empty:
+ * this thread's own wake (and every line written before the field)
+ */
+agent?: string, };
 
 /**
  * One entry of a thread.
