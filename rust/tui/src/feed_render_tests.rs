@@ -26,7 +26,7 @@ fn provider_retry_and_restart_render() {
 fn split_thinking_takes_every_span() {
     let t = "<think>a\\nBENDSIG::s1</think>\\n<think>b\\nBENDSIG::s2</think>\\nok";
     let (think, vis) = split_thinking(t).unwrap();
-    assert_eq!(think, "a\\nBENDSIG::s1\\nb\\nBENDSIG::s2");
+    assert_eq!(think, "a\\nb", "each span without its signature line");
     assert_eq!(vis, "ok");
     assert!(split_thinking("no markers").is_none());
     assert!(split_thinking("<think>open").is_none());

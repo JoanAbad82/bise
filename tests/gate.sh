@@ -5,13 +5,16 @@
 #                     warnings (next to the tests, in $target/clippy), the
 #                     tests of the changed crates and of the crates using them; if a .bend file of core/ hub/ vendor/
 #                     or of laws/ proofs/ changed: PROOF, every bend/proofs/*.bend
-#                     in parallel (tests/proof_run.py, 4 jobs).
+#                     in parallel (tests/proof_run.py, 4 jobs);
+#                     no changed source over 1,000 lines or its count in
+#                     tests/line_limits.txt (tests/line_gate.py, ~0.1 s).
 #                     The tests run bins.sh's cached sb-core of the tree's
 #                     hub/ vendor/ itself (SB_CORE_BIN = the cache file, one
 #                     compile per source hash for every worktree and the
 #                     full gate; never a copy of its own: the EDR deletes
 #                     fresh unsigned copies). The bend part runs next to cargo.
-#   gate.sh full      everything: cargo build, run_all.sh (it puts ./repl-live
+#   gate.sh full      everything: first tests/line_gate.py --all (the whole
+#                     tree vs tests/line_limits.txt, ~0.5 s), cargo build, run_all.sh (it puts ./repl-live
 #                     ./repl-scripted ./sb-core in place with bins.sh: a copy
 #                     from the cache, a compile when their sources changed;
 #                     never commit them) with FUZZ_RUNS=2000
@@ -443,6 +446,10 @@ if [ "$mode" = rerun ]; then
 fi
 if [ "$mode" = full ]; then
   s=$SECONDS
+  # the whole tree against tests/line_limits.txt (~0.5 s, first: a red here
+  # needs no build): an unlisted file over 1,000 lines or a count above its
+  # file's, which a commit without the quick gate can leave
+  python3 tests/line_gate.py --all || { echo "GATE full FAILED"; exit 1; }
   export FUZZ_RUNS="${FUZZ_RUNS:-2000}"
   rm -f "$red"; export SB_RED_FILE="$red"
   # the e2e/tmux tests this change can break (tests/test_map.py; the user's
@@ -503,6 +510,9 @@ python3 "$root/tests/conflict_markers.py" >/dev/null || { python3 "$root/tests/c
 python3 "$root/tests/test_map.py" --self-test >/dev/null || { python3 "$root/tests/test_map.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 # no new Bool.pick walk that never stops; the list of old ones only shrinks (tests/pick_gate.py)
 python3 "$root/tests/pick_gate.py" || { echo "GATE quick FAILED"; exit 1; }
+# no changed source file over 1,000 lines or past its count in the shrink-only
+# tests/line_limits.txt (tests/line_gate.py, architecture-principles.md rule 5)
+GATE_BASE="$base" python3 "$root/tests/line_gate.py" $changed || { echo "GATE quick FAILED"; exit 1; }
 cache="${CARGO_TARGET_DIR:-$root/rust/target}/gate-cache"
 # the proofs files are checked in a copy of bend/ in it (tests/proof_run.py:
 # bend refuses an import path with a dot, like ~/.bise/gate/...)

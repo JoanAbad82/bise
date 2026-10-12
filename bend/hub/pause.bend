@@ -69,7 +69,7 @@ def held.go(xs: List<&2, M.MRec>) -> Nat:
       Bool.pick(Nat, is_queued(M.MRec.st(r)), (1n + held.go(t) : Nat), held.go(t))
 
 def held(+s: M.St) -> Nat:
-  held.go(M.St.msgs(s))
+  held.go(M.St.hot(s))
 
 # ---- the words (the hub's notice; the clients draw `paused` typed) ----
 
@@ -90,7 +90,7 @@ def woken.go(xs: List<&2, M.MRec>, +acc: List<&2, String>) -> List<&2, String>:
       woken.go(t, Bool.pick(List<&2, String>, is_queued(M.MRec.st(r)) && Bool.not(str_in(acc, to)), to <> acc, acc))
 
 def woken(+s: M.St) -> Nat:
-  List.length(&2, String, woken.go(M.St.msgs(s), Nil{}))
+  List.length(&2, String, woken.go(M.St.hot(s), Nil{}))
 
 # the held messages that are not bise's own (its go-on notes)
 def his.go(xs: List<&2, M.MRec>) -> Nat:
@@ -101,7 +101,7 @@ def his.go(xs: List<&2, M.MRec>) -> Nat:
       Bool.pick(Nat, is_queued(M.MRec.st(r)) && Bool.not(String.eq(M.Msg.from(M.MRec.msg(r)), M.HUB())), (1n + his.go(t) : Nat), his.go(t))
 
 def his(+s: M.St) -> Nat:
-  his.go(M.St.msgs(s))
+  his.go(M.St.hot(s))
 
 # ---- the words (designer m_18789; the clients draw `paused` typed) ----
 

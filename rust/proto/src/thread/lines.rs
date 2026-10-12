@@ -135,7 +135,7 @@ pub fn split_thinking(s: &str) -> Option<(String, String)> {
         let after = &rest[start + THINK_START.len()..];
         let Some(end) = after.find(THINK_END) else { break };
         visible.push_str(&rest[..start]);
-        think.push(&after[..end]);
+        think.push(super::think::unsigned(&after[..end]));
         rest = &after[end + THINK_END.len()..];
         if let Some(r) = rest.strip_prefix("\\n") {
             rest = r;

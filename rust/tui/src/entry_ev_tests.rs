@@ -236,3 +236,20 @@ fn the_hubs_fold_draws_the_feed_the_lines_draw() {
     }
     assert!(report.is_empty(), "{}", report.join("\n"));
 }
+
+/// A signed thinking (the runtime's last `BENDSIG::` line, ambient-lead
+/// m_20137) opens to its words alone in the TUI: the rows the same as
+/// the unsigned span's, from split_thinking (bise_proto owns the rule).
+#[test]
+fn a_signed_thinking_opens_to_its_words_alone() {
+    let open = |t: &str| {
+        let (think, _) = crate::wire::split_thinking(t).expect("a thinking");
+        crate::render::thinking_lines(12_000, &think, true, WIDTH)
+            .iter()
+            .map(|l| l.spans.iter().map(|s| s.content.as_ref()).collect::<String>())
+            .collect::<Vec<_>>()
+    };
+    let signed = open("<think>weigh it\\nthen ask\\nBENDSIG::CAQSowk+/=</think>\\nok");
+    assert_eq!(signed, open("<think>weigh it\\nthen ask</think>\\nok"));
+    assert!(signed.iter().any(|r| r.contains("then ask")) && !signed.iter().any(|r| r.contains("BENDSIG")), "{signed:?}");
+}

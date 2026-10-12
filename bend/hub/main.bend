@@ -17,6 +17,7 @@ import Base
 import ../vendor/json.bend as J
 
 import ./model.bend as M
+import ./replay.bend as RP
 
 import ./codec.bend as C
 
@@ -81,8 +82,9 @@ def replay(+h: H.Hub, m: Maybe<&2, M.Ev>) -> H.Hub & String:
       (H.Hub{M.apply(H.Hub.d(h), e), H.Hub.r(h)}, J.stringify(L.answer_done()))
 
 # {"t":"replay_many","evs":[..]}: a batch of journal events at boot,
-# answered {"skipped":[<index in the batch>..]}. The messages stay newest
-# first through the batch (M.apply_rev): linear, where one `replay` per
+# answered {"skipped":[<index in the batch>..]}. St.hot is every message
+# at the end of the batch (M.hot_all). The messages stay newest
+# first through the batch (replay.bend's apply_rev): linear, where one `replay` per
 # event was quadratic in the messages (a 20k-event journal: ~18 s).
 def evs_of(evs: List<&2, J.Json>) -> List<&2, Maybe<&2, M.Ev>>:
   match evs:
@@ -98,15 +100,15 @@ def replay_many.go(ms: List<&2, Maybe<&2, M.Ev>>, +st: M.St, +i: Nat, +sk: List<
     case Con{None{}, +rest}:
       replay_many.go(rest, st, 1n+i, i <> sk)
     case Con{Some{+e}, +rest}:
-      replay_many.go(rest, M.apply_rev(e, st), 1n+i, sk)
+      replay_many.go(rest, RP.apply_rev(e, st), 1n+i, sk)
 
 def replay_many.done(p: M.St & List<&2, Nat>, +r: X.R) -> H.Hub & String:
   match p:
     case (+d, +sk):
-      (H.Hub{M.msgs_rev(d), r}, J.stringify(L.answer_skipped_at(sk)))
+      (H.Hub{M.hot_all(RP.msgs_rev(d)), r}, J.stringify(L.answer_skipped_at(sk)))
 
 def replay_many(+h: H.Hub, +evs: List<&2, J.Json>) -> H.Hub & String:
-  replay_many.done(replay_many.go(evs_of(evs), M.msgs_rev(H.Hub.d(h)), 0n, Nil{}), H.Hub.r(h))
+  replay_many.done(replay_many.go(evs_of(evs), RP.msgs_rev(H.Hub.d(h)), 0n, Nil{}), H.Hub.r(h))
 
 # the link's own requests (gen/link.bend, from bise_proto::core::Link);
 # any other tag is a step of sb-core

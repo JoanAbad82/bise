@@ -1,11 +1,12 @@
 # 21 · the hub's hot state carries every message and every agent it ever had
 
-Status: step 2 (the Rust mirror) done by hub-lag-7 (2026-10-11, see "Done"
-below); step 1's measure of sb-core done by hot-core (sha 0, "Measure"
-below: the boot's growth was the agent walks, fixed); chunk V (the Rust
-side of a step: the typed view, the hot sets, the caches) done by
-hot-view ("Done: chunk V" below); steps 3-4 next, retargeted on
-sb-core's share of a user line. Plan agreed by architect
+Status: done (2026-10-12, architect m_20128). Step 2 (the Rust mirror)
+by hub-lag-7 (2026-10-11, "Done" below); step 1's measure of sb-core by
+hot-core (sha 0, "Measure": the boot's growth was the agent walks,
+fixed); chunk V (the Rust side of a step: the typed view, the hot sets,
+the caches) by hot-view ("Done: chunk V" below); steps 3-4 as one index
+by hot-core (sha 1, design B, "sha 1" below): a user line 98 -> 9.9 ms.
+Plan agreed by architect
 (m_15238). Found by hub-fifo (2026-10-09). Label: hub, perf. Follows
 bcca8231 (one pass per step) and hub-fifo's inbox lanes and state throttle.
 
@@ -305,11 +306,81 @@ the snapshot (12 ms) is off the tick path, behind the state gate. Still
 reading cold messages on the Rust side, named in State's header: core_link
 `deliver`, `board::agent_threads`, `core.rs` `card_note`.
 
+## sha 1: the hot index (hot-core, design B, architect m_20063)
+
+**Profile first.** sb-core alone (python on its link, `{"t":"say"}` to
+main, median): 2.2 ms with the message events taken out of the
+journal, 15.4 ms with half, 17.1 ms with all. `sample`: term_drop 40 %,
+span_fade 13 %, recs_json 11 %, queued_in + str_in + String.cmp 21 %.
+The walks over 19k messages were the cost; a throwaway hack (walks read
+the last 200) took the fastest user line from 15.3 to 5.9 ms.
+
+**A or B.** A (A1: move cold messages out of `msgs` to an `old` list;
+A2: the same, newest first) changes what `msgs` means: the laws
+`msgs_unique` and `msgs_kept` ("a message once sent is never removed")
+would have to be restated over `hot ++ old`, and ~150 proof sites
+unfold `St.msgs`. B keeps `msgs` as every message and adds an index,
+`St.hot` (St's 11th field), inside the same owner, kept under a proven
+law. B was chosen: the msgs laws stay true in their plain meaning, and
+the walks get the same gain. A comes back only if the O(n) left per
+message event (below) matters against the stop rule.
+
+**What it is.** `MRec.is_hot` = queued, or owing a reply (`MRec.owes`,
+hot-view's 2b: one def for the steps and the view). `St.hot` is a part
+of `msgs`, in its order, with the same hot part:
+`hot_of(St.hot) == hot_of(St.msgs)`. A message event (sent, state,
+settled) sets it to exactly `hot_of(msgs)`; every other event leaves
+it. A boot replay (`replay_many`, apply_rev) does not keep it and ends
+each batch with `hot_all` (hot = every message): the first version
+recomputed it per batch of 100 (731 filters over up to 19k messages,
+boot +1.3 s of sb-core); now the first live message event narrows it.
+
+**Who reads it.** model `queued_for`, `unanswered_for` (and `stop_task`'s
+rejects through `queued_for`); pause `held`, `woken`, `his`; view
+`view_recs` (a step's changed messages: the hot list first, all
+messages if an id is missing from it, i.e. a message that just turned
+cold; `view_all` and `msgs_json` with `all` send every message, as
+before). Lookups by id (`rec_of`, `map_msg`, `reply_of`) still read
+`msgs`. The Rust side's 3 cold readers (core_link deliver, board
+agent_threads, core.rs card_note) get the same JSON: view_all still
+sends every message, a step's view every changed one.
+
+**Laws** (bend/laws/hub.bend, proved in bend/proofs/hub.bend, all
+general): `hot_is_the_hot_part` (every St, every event),
+`hot_at_init`, `hot_after_replay`, `hot_kept_by_run` (any sequence of
+inputs, through `hub_run_replays`), `hot_narrowed` (exact after a
+message event); one per walk, walk(hot) == walk(msgs) under the
+invariant: `hot_queued_for`, `hot_unanswered_for`, `hot_held`,
+`hot_woken`, `hot_his`. `stop_leaves_no_queue` takes the invariant as a
+hypothesis and says no message is queued for the stopped task among
+*all* messages (with `hot_queued_for`, `queued_for` says the same).
+
+**Numbers** (same run, load ~22, his journal copy, main's sb-core vs
+this one):
+
+| step | main | sha 1 |
+|---|---|---|
+| user line, sb-core alone (median) | 15.7 ms | 4.2 ms |
+| user line, bench (sb-core) | 22.1 ms (16.7) | 9.9 ms (4.9) |
+| tick, sb-core alone | 0.20 ms | 0.15 ms |
+| boot, sb-core CPU (boot_exp / bench) | 8.7 / 7.3 s | 7.3 / 7.9 s (noise) |
+
+`bench_byte_equal`: the same 5 digests (tick, hello, user line,
+archive, restore). `old_core_replay` both ways: the journal is
+unchanged.
+
+**Done-when: a user line under 5 ms. Reached 9.9 ms** in the hub
+(bench), from 98 ms when the slice began (chunk V's Rust work and these
+two shas). Why we stop there: what is left is ~4.9 ms in sb-core, mostly
+the O(n) `hot_of` over every message on each message event (under the
+stop rule: plan A would not gain 10 % of the step, so it stays out),
+and ~5 ms on the Rust side building main's context, which must be
+current on every user line.
+
 ## Risks
 
-- A cold message that turns hot again: none today (a delivered message
-  owing no reply has no further state); the law would catch a new one.
-- A reply to a very old message: the cold index keeps its thread and
-  asker, so routing is the same.
-- Boot: the replay moves messages as it goes, so a boot ends with the
-  small state (issue 15 gets faster too, not measured yet).
+- A cold message that turns hot again (a state event on it): the index
+  is recomputed from every message on each message event, so it is
+  found; the laws cover any event.
+- A reply to a very old message: `msgs` keeps every message, lookups by
+  id read it, so routing is the same.

@@ -60,14 +60,14 @@ def hub_nok_tr(-x: List<&2, List<&2, String>>, -y: List<&2, List<&2, String>>, e
 # new name) keeps the names of the agents apart
 def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e)) -> HI.NamesApart(HM.apply(s, e)):
   match s:
-    case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm, +xs, +pz}:
+    case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm, +xs, +pz, +ho}:
       match e:
         case HM.ETaskCreated{+n, pa, br, ws, at}:
           hub_nok_tr(HI.profile(HM.put_agent(ag, n, HM.new_agent(n, False{}, Some{pa}, ws, br, at))), HM.snoc(List<&2, String>, HI.profile(ag), [n]),
-            PL2.hub_put_absent(ag, n, HM.new_agent(n, False{}, Some{pa}, ws, br, at), PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz}, n, k)),
-            PL2.hub_nok_snoc(HI.profile(ag), [n], u, PL2.hub_allapart_new(HI.profile(ag), n, PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz}, n, k))))
+            PL2.hub_put_absent(ag, n, HM.new_agent(n, False{}, Some{pa}, ws, br, at), PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}, n, k)),
+            PL2.hub_nok_snoc(HI.profile(ag), [n], u, PL2.hub_allapart_new(HI.profile(ag), n, PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}, n, k))))
         case HM.ERenamed{old, +new}:
-          hub_nok_ren(ag, old, new, u, PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz}, new, k))
+          hub_nok_ren(ag, old, new, u, PL2.hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}, new, k))
         case HM.ELifecycle{+x, +l, +r}:
           hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OLife{l, r})), HI.profile(ag), PL2.hub_prof_map(ag, x, HM.OLife{l, r}, {==}), u)
         case HM.EWorkspace{+x, +w}:
@@ -226,7 +226,7 @@ def hub_keep_drop(+xs: List<&2, HTM.Timer>, +id: Nat, +rest: List<&2, Nat>)
 def hub_live_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat)
     -> {HTM.Tms.live(HM.St.tm(HM.apply(s, HM.ETimerStop{id, why, at}))) == HTM.drop(HTM.Tms.live(HM.St.tm(s)), id) : List<&2, HTM.Timer>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
       match tm:
         case HTM.Tms{l, e, li, ac, na, wk}:
           {==}
@@ -375,7 +375,7 @@ def hub_tnone_tr(-x: List<&2, HTM.Timer>, -y: List<&2, HTM.Timer>, -n: String, e
 def hub_live_wake(s: HM.St, +e: HWK.WkEv)
     -> {HTM.Tms.live(HM.St.tm(HM.apply(s, HM.EWake{e}))) == HTM.Tms.live(HM.St.tm(s)) : List<&2, HTM.Timer>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
       match tm:
         case HTM.Tms{l, en, li, ac, na, wk}:
           {==}
@@ -477,7 +477,7 @@ def hub_wk_keep_drop(+xs: List<&2, HWK.Watch>, +id: Nat, +rest: List<&2, Nat>)
 def hub_wk_live_end(s: HM.St, +id: Nat, +why: String, +at: Nat)
     -> {HWK.Wakes.live(HTM.Tms.wk(HM.St.tm(HM.apply(s, HM.EWake{HWK.WEnd{id, why, at}})))) == HWK.drop(HWK.Wakes.live(HTM.Tms.wk(HM.St.tm(s))), id) : List<&2, HWK.Watch>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
       match tm:
         case HTM.Tms{l, en, li, ac, na, wk}:
           match wk:
@@ -677,3 +677,91 @@ def hub_act_gone(+xs: List<&2, HTM.Act>, +id: Nat) -> {HTM.act_find(HTM.act_drop
       {==}
     case Con{h, t}:
       hub_act_gone.go(Nat.is_eq(HTM.Act.id(h), id), h, t, id, {==}, hub_act_gone(t, id))
+
+# ---- the hot messages (issue 21): St.hot, the walks' index ----
+
+# a cold message is not queued
+def hub_or_false_l(+x: Bool, -y: Bool, e: {Bool.or(x, y) == False{} : Bool}) -> {x == False{} : Bool}:
+  match x:
+    case False{}:
+      {==}
+    case True{}:
+      PL1.hub_absurd_eq(PL1.hub_ft_absurd(Equal.sym(Bool, True{}, False{}, e)), Bool, True{}, False{})
+
+def hub_and_false(+x: Bool) -> {Bool.and(x, False{}) == False{} : Bool}:
+  match x:
+    case False{}:
+      {==}
+    case True{}:
+      {==}
+
+# queued_in over every message == over the hot ones
+def hub_qi_hot.pick(c: Bool, +r: HM.MRec, +t: List<&2, HM.MRec>, +ns: List<&2, String>, +e: {HM.MRec.is_hot(r) == c : Bool},
+    ih: {HM.queued_in(t, ns) == HM.queued_in(HM.hot_of(t), ns) : List<&2, HM.Msg>})
+    -> {HM.queued_in(r <> t, ns) == HM.queued_in(Bool.pick(List<&2, HM.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HM.Msg>}:
+  match c:
+    case True{}:
+      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HM.queued_in(r <> t, ns) == HM.queued_in(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HM.Msg>}
+      Equal.cong(List<&2, HM.Msg>, List<&2, HM.Msg>,
+        x => Bool.pick(List<&2, HM.Msg>, Bool.and(HM.str_in(ns, HM.Msg.to(HM.MRec.msg(r))), HM.is_queued(HM.MRec.st(r))), HM.MRec.msg(r) <> x, x),
+        HM.queued_in(t, ns), HM.queued_in(HM.hot_of(t), ns), ih)
+    case False{}:
+      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HM.queued_in(r <> t, ns) == HM.queued_in(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)), ns) : List<&2, HM.Msg>}
+      %Equal.sym(Bool, HM.is_queued(HM.MRec.st(r)), False{}, hub_or_false_l(HM.is_queued(HM.MRec.st(r)), HM.MRec.owes(r), e)) : {Bool.pick(List<&2, HM.Msg>, Bool.and(HM.str_in(ns, HM.Msg.to(HM.MRec.msg(r))), _), HM.MRec.msg(r) <> HM.queued_in(t, ns), HM.queued_in(t, ns)) == HM.queued_in(HM.hot_of(t), ns) : List<&2, HM.Msg>}
+      %Equal.sym(Bool, Bool.and(HM.str_in(ns, HM.Msg.to(HM.MRec.msg(r))), False{}), False{}, hub_and_false(HM.str_in(ns, HM.Msg.to(HM.MRec.msg(r))))) : {Bool.pick(List<&2, HM.Msg>, _, HM.MRec.msg(r) <> HM.queued_in(t, ns), HM.queued_in(t, ns)) == HM.queued_in(HM.hot_of(t), ns) : List<&2, HM.Msg>}
+      ih
+
+def hub_qi_hot(+xs: List<&2, HM.MRec>, +ns: List<&2, String>) -> {HM.queued_in(xs, ns) == HM.queued_in(HM.hot_of(xs), ns) : List<&2, HM.Msg>}:
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{r, t}:
+      hub_qi_hot.pick(HM.MRec.is_hot(r), r, t, ns, {==}, hub_qi_hot(t, ns))
+
+# the hot part of the hot part is the hot part
+def hub_hot_idem.pick(c: Bool, +r: HM.MRec, +t: List<&2, HM.MRec>, +e: {HM.MRec.is_hot(r) == c : Bool},
+    ih: {HM.hot_of(HM.hot_of(t)) == HM.hot_of(t) : List<&2, HM.MRec>})
+    -> {HM.hot_of(Bool.pick(List<&2, HM.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t))) == Bool.pick(List<&2, HM.MRec>, HM.MRec.is_hot(r), r <> HM.hot_of(t), HM.hot_of(t)) : List<&2, HM.MRec>}:
+  match c:
+    case True{}:
+      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {HM.hot_of(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) == Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)) : List<&2, HM.MRec>}
+      %Equal.sym(Bool, HM.MRec.is_hot(r), True{}, e) : {Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(HM.hot_of(t)), HM.hot_of(HM.hot_of(t))) == r <> HM.hot_of(t) : List<&2, HM.MRec>}
+      Equal.cong(List<&2, HM.MRec>, List<&2, HM.MRec>, x => r <> x, HM.hot_of(HM.hot_of(t)), HM.hot_of(t), ih)
+    case False{}:
+      %Equal.sym(Bool, HM.MRec.is_hot(r), False{}, e) : {HM.hot_of(Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t))) == Bool.pick(List<&2, HM.MRec>, _, r <> HM.hot_of(t), HM.hot_of(t)) : List<&2, HM.MRec>}
+      ih
+
+def hub_hot_idem(+xs: List<&2, HM.MRec>) -> {HM.hot_of(HM.hot_of(xs)) == HM.hot_of(xs) : List<&2, HM.MRec>}:
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{r, t}:
+      hub_hot_idem.pick(HM.MRec.is_hot(r), r, t, {==}, hub_hot_idem(t))
+
+# a walk that reads the same over a list and its hot part reads the same
+# over two lists with one hot part
+def hub_via_hot(-A: Type, -f: List<&2, HM.MRec> -> A, -a: List<&2, HM.MRec>, -b: List<&2, HM.MRec>,
+    wa: {f(a) == f(HM.hot_of(a)) : A}, wb: {f(b) == f(HM.hot_of(b)) : A}, h: {HM.hot_of(a) == HM.hot_of(b) : List<&2, HM.MRec>})
+    -> {f(a) == f(b) : A}:
+  Equal.trans(A, f(a), f(HM.hot_of(a)), f(b), wa,
+    Equal.trans(A, f(HM.hot_of(a)), f(HM.hot_of(b)), f(b), Equal.cong(List<&2, HM.MRec>, A, f, HM.hot_of(a), HM.hot_of(b), h),
+      Equal.sym(A, f(b), f(HM.hot_of(b)), wb)))
+
+# a right index moves along an equality of states
+def hub_hot_tr(-a: HM.St, -b: HM.St, e: {a == b : HM.St}, k: {HM.hot_of(HM.St.hot(b)) == HM.hot_of(HM.St.msgs(b)) : List<&2, HM.MRec>})
+    -> {HM.hot_of(HM.St.hot(a)) == HM.hot_of(HM.St.msgs(a)) : List<&2, HM.MRec>}:
+  %Equal.sym(HM.St, a, b, e) : {HM.hot_of(HM.St.hot(_)) == HM.hot_of(HM.St.msgs(_)) : List<&2, HM.MRec>}
+  k
+
+# a lifecycle event keeps a right index right (it touches no message)
+def hub_hot_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>, k: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>})
+    -> {HM.hot_of(HM.St.hot(HM.apply(s, HM.ELifecycle{n, l, r}))) == HM.hot_of(HM.St.msgs(HM.apply(s, HM.ELifecycle{n, l, r}))) : List<&2, HM.MRec>}:
+  match s:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
+      k
+
+# with a right index, queued_for reads every message
+def hub_hot_qf(+s: HM.St, +n: String, h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>})
+    -> {HM.queued_for(s, n) == HM.queued_in(HM.St.msgs(s), HM.names_of(s, n)) : List<&2, HM.Msg>}:
+  hub_via_hot(List<&2, HM.Msg>, x => HM.queued_in(x, HM.names_of(s, n)), HM.St.hot(s), HM.St.msgs(s),
+    hub_qi_hot(HM.St.hot(s), HM.names_of(s, n)), hub_qi_hot(HM.St.msgs(s), HM.names_of(s, n)), h)

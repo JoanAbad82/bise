@@ -299,8 +299,10 @@ law delivered_once:
   HX.Deliv(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h))
 
 # LAW (L12): stopping or dropping a task, in any state where each message
-# is one record (every state the hub reaches: msgs_unique), leaves no
-# message queued for it (each got recipient_unavailable).
+# is one record (every state the hub reaches: msgs_unique) and the hot
+# index is right (hot_kept_by_run), leaves no message queued for it among
+# all its messages (each got recipient_unavailable). queued_for reads the
+# same (hot_queued_for).
 law stop_leaves_no_queue:
   for -o: HM.St
   for +cx: HX.Cx<o>
@@ -308,7 +310,8 @@ law stop_leaves_no_queue:
   for +life: HM.Life
   for +why: String
   for u: HI.Unique(HX.d(o, cx))
-  {HM.queued_for(HX.d(o, HC.stop_task(o, cx, n, life, why)), n) == Nil{} : List<&2, HM.Msg>}
+  for k: {HM.hot_of(HM.St.hot(HX.d(o, cx))) == HM.hot_of(HM.St.msgs(HX.d(o, cx))) : List<&2, HM.MRec>}
+  {HM.queued_in(HM.St.msgs(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.names_of(HX.d(o, HC.stop_task(o, cx, n, life, why)), n)) == Nil{} : List<&2, HM.Msg>}
 
 # ---- queued user input (the window's "send queued", bise desktop) ----
 # The user's `input {queued: true}` is a queued-mode message (Msg.queued),
@@ -746,3 +749,75 @@ law names_apart:
   for +h: HC.Hub
   for u: HI.NamesApart(HC.Hub.d(h))
   HI.NamesApart(HC.Hub.d(HC.RunR.hub(HC.run(ins, h))))
+
+# ---- the hot messages (issue 21): St.hot, the walks' index ----
+# St.msgs keeps every message (msgs_unique, msgs_kept unchanged); St.hot
+# is a part of it, in its order, with the same hot part (HM.MRec.is_hot:
+# queued, or owing a reply): exactly the hot messages after a message
+# event, every message after a boot replay (HM.hot_all). The walks read
+# St.hot; these laws say its hot part is always msgs', and that each
+# walk reads the same over it as over every message.
+
+# LAW: any event keeps the index: if a state's index has the hot part of
+# its messages, the state after the event's has too.
+law hot_is_the_hot_part:
+  for +s: HM.St
+  for +e: HM.Ev
+  for h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>}
+  {HM.hot_of(HM.St.hot(HM.apply(s, e))) == HM.hot_of(HM.St.msgs(HM.apply(s, e))) : List<&2, HM.MRec>}
+
+# LAW: a new hub's index is right...
+law hot_at_init:
+  for +w: String
+  {HM.hot_of(HM.St.hot(HM.init(w))) == HM.hot_of(HM.St.msgs(HM.init(w))) : List<&2, HM.MRec>}
+
+# ...a boot replay's too (apply_rev leaves it; replay_many sets it to
+# every message at the end of its batch)...
+law hot_after_replay:
+  for +s: HM.St
+  {HM.hot_of(HM.St.hot(HM.hot_all(s))) == HM.hot_of(HM.St.msgs(HM.hot_all(s))) : List<&2, HM.MRec>}
+
+# ...and any sequence of inputs keeps it right.
+law hot_kept_by_run:
+  for +ins: List<&2, J.Json>
+  for +h: HC.Hub
+  for u: {HM.hot_of(HM.St.hot(HC.Hub.d(h))) == HM.hot_of(HM.St.msgs(HC.Hub.d(h))) : List<&2, HM.MRec>}
+  {HM.hot_of(HM.St.hot(HC.Hub.d(HC.RunR.hub(HC.run(ins, h))))) == HM.hot_of(HM.St.msgs(HC.Hub.d(HC.RunR.hub(HC.run(ins, h))))) : List<&2, HM.MRec>}
+
+# LAW: a message event narrows the index to the hot messages exactly.
+law hot_narrowed:
+  for +s: HM.St
+  for +m: HM.Msg
+  {HM.St.hot(HM.apply(s, HM.EMsgSent{m})) == HM.hot_of(HM.St.msgs(HM.apply(s, HM.EMsgSent{m}))) : List<&2, HM.MRec>}
+
+# LAW: with a right index, each walk over the hot messages reads what it
+# would read over every message: the cold ones are inert. The queues...
+law hot_queued_for:
+  for +s: HM.St
+  for +n: String
+  for h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>}
+  {HM.queued_for(s, n) == HM.queued_in(HM.St.msgs(s), HM.names_of(s, n)) : List<&2, HM.Msg>}
+
+# ...the replies owed...
+law hot_unanswered_for:
+  for +s: HM.St
+  for +n: String
+  for h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>}
+  {HM.unanswered_for(s, n) == HM.unanswered_in(HM.St.msgs(s), HM.names_of(s, n)) : List<&2, HM.Msg>}
+
+# ...and the pause's counts: the messages held, the agents a resume
+# wakes, the held messages that are not bise's own.
+law hot_held:
+  for +s: HM.St
+  for h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>}
+  {HP.held(s) == HP.held.go(HM.St.msgs(s)) : Nat}
+
+law hot_woken:
+  for +s: HM.St
+  for h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>}
+  {HP.woken(s) == List.length(&2, String, HP.woken.go(HM.St.msgs(s), Nil{})) : Nat}
+
+law hot_his:
+  for +s: HM.St
+  for h: {HM.hot_of(HM.St.hot(s)) == HM.hot_of(HM.St.msgs(s)) : List<&2, HM.MRec>}
+  {HP.his(s) == HP.his.go(HM.St.msgs(s)) : Nat}

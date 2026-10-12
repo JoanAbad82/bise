@@ -195,12 +195,11 @@ pub(crate) fn thinking_lines(ms: u128, text: &str, open: bool, width: usize) -> 
         return vec![head];
     }
     let mut rows = vec![head];
-    // the BENDSIG line carries the provider signature (the signed
-    // thinking transport), never part of the reasoning itself
+    // the span comes without its signature line (bise_proto
+    // thread::think::unsigned, through split_thinking)
     let body = unescape_md(text);
     let lines = body
         .split('\n')
-        .filter(|l| !l.starts_with("BENDSIG::"))
         .map(|l| Line::from(Span::styled(l.to_string(), dim_st)));
     let bar = Span::styled(RAIL, Style::default().fg(rule()));
     rows.extend(barred_rows(&bar, lines, width));
