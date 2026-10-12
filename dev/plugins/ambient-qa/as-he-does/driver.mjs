@@ -183,7 +183,6 @@ if (mode === 'cut') {
     '[[bash: echo one]]', '[[bash: echo two]]', '[[bash: echo three]]',
     "[[bash: sb spawn keeper --objective 'hold the proof']]",
     "[[bash: sb spawn gone --objective 'an old one']]",
-    '[[bash: sb drop gone]]',
     `[[bash: printf "%s" "${html.replaceAll('"', "'")}" > proof.html && sb artifact add proof.html --title proof-html]]`,
   ].join(' ');
   const seeded = await say(seed);
@@ -192,6 +191,29 @@ if (mode === 'cut') {
     return t && /proof-html|artifact/i.test(t) ? t : null;
   }, ANSWER_MS, 2000) : null;
   await shot('seeded');
+  // 'gone' is dropped in a LATER turn, once it is idle (amb-home m_20141: a drop in the turn that
+  // spawned it makes the hub ask a 'drop' card instead of archiving); a drop card that still comes
+  // is answered yes, which also proves the card path (ambient-lead m_20143)
+  const goneIdle = await until(async () => {
+    const s = (await text('[data-testid="app.sidebar"]')) ?? '';
+    const i = s.indexOf('gone');
+    return i >= 0 && /idle|done/.test(s.slice(i, i + 40)) ? true : null;
+  }, ANSWER_MS, 2000);
+  step("'gone' idle before its drop", !!goneIdle, null);
+  await say('[[bash: sb drop gone]]');
+  const card = page.locator('[data-testid^="dock.opt"]').filter({ hasText: /yes|drop/i }).first();
+  const asked = await card.waitFor({ timeout: 20000 }).then(() => true, () => false);
+  let answered = null;
+  if (asked) {
+    await shot('drop-card');
+    answered = await click("answer the drop card 'yes'", card);
+    await page.locator('[data-testid^="dock.opt"]').first().waitFor({ state: 'detached', timeout: 20000 }).catch(() => {});
+  }
+  const dropped = await until(async () => {
+    const s = (await text('[data-testid="app.sidebar"]')) ?? '';
+    return /\bgone\b/.test(s) ? null : true;
+  }, 60000, 1000);
+  step("'gone' dropped (a drop card answered yes when asked)", !!dropped, { card: asked, answered });
   const kinds = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="thread.entry."]')].map((r) => r.getAttribute('data-kind')));
   step('the seed ran (runs, agents, artifact)', !!done, { kinds });
   step('the runs fold (tools rows, not one row per call)', kinds.filter((k) => k === 'tools').length >= 1 && kinds.filter((k) => k === 'tools').length < 6, kinds);
