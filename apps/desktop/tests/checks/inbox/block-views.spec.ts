@@ -314,3 +314,87 @@ for (const size of ['1400x820', '1100x820', '800x820'] as const) {
     }
   });
 }
+
+// one inbox, commit 1 (designer m_19631, page desktop-right-bar): the block's row is the same everywhere,
+// 'n ? agent question… <project> · <age>', bise's own items say 'bise'; the head counts the projects;
+// an item of another project opened from a project's thread names its agent and project in the composer.
+const T = 'telemetry-5e6f7a8b';
+const THREE = [
+  { id: 21, project: T, kind: 'question', rank: 0, agent: 'p99', question: 'which percentile goes on the dashboard?', options: two('p95', 'p99'), urgent: true, since_ms: NOW - 300_000 },
+  ...CARDS.slice(0, 2),
+  { id: 31, project: HOME, kind: 'question', rank: 3, agent: 'main', question: 'send the weekly update to the team?', options: two('send', 'not yet'), urgent: false, since_ms: NOW - 3_600_000 },
+];
+const threeWorld = () => [
+  prefs('light'),
+  {
+    ev: 'projects',
+    projects: [
+      { project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 1, running: true, cards: THREE.filter((c) => c.project === HOME) },
+      { project: P, name: 'acme', path: '/nowhere/acme', git: true, home: false, order: 1, agents: 3, working: 0, waits: 2, running: true, cards: THREE.filter((c) => c.project === P) },
+      { project: T, name: 'telemetry', path: '/nowhere/telemetry', git: true, home: false, order: 2, agents: 2, working: 1, waits: 1, running: true, cards: THREE.filter((c) => c.project === T) },
+    ],
+  },
+  ...world(THREE).slice(2),
+  { ev: 'welcome', project: T, proto: 1, workspace: '/nowhere/telemetry', name: 'telemetry' },
+  { ev: 'agents', project: T, agents: [ag('main'), ag('p99')] },
+];
+
+test("inbox/block-views: one inbox, 3 projects: the row says its project, the head counts them, another project's item names it in the composer", async () => {
+  const core = new FakeCore(threeWorld() as unknown as ConstructorParameters<typeof FakeCore>[0]);
+  const s = await launchDesktop({ core, route: `agent/${P}/perf`, size: '1100x820' });
+  try {
+    const { page } = s;
+    const block = page.getByTestId('inbox.block');
+    await expect(block).toBeVisible({ timeout: 10_000 });
+    await test.step("folded: 'inbox · 5 waiting · 3 projects', the first row ends 'telemetry · <age>'", async () => {
+      await expect(block).toContainText('5 waiting · 3 projects');
+      const row = page.getByTestId('inbox.block.row.1');
+      await expect(row.locator('.strip-who')).toHaveText('p99');
+      await expect(row.locator('.strip-what')).toContainText('which percentile');
+      await expect(row.locator('.end')).toHaveText(/^telemetry · /u);
+      await shoot(page, core, 'one-inbox-folded');
+    });
+    await test.step("opened from acme's thread: 'answering p99 · telemetry · …', the card's head says its project", async () => {
+      await page.getByTestId('inbox.block.row.1').click();
+      await expect(page.getByTestId(`inbox.block.card.${T}-21`)).toBeVisible({ timeout: 3000 });
+      await expect(page.getByTestId(`inbox.block.card.${T}-21.project`)).toHaveText('· telemetry');
+      await expect(composer(page)).toContainText('answering p99 · telemetry · which percentile');
+      await expect(composer(page)).toContainText('esc write to perf instead');
+      await shoot(page, core, 'one-inbox-other');
+      await field(page).click();
+      await page.keyboard.type('p99, with p95 under it');
+      await page.keyboard.press('Enter');
+      const a = (await core.waitCmd((c) => (c as Cmd).cmd === 'answer', 5000)) as Cmd & { project?: string };
+      expect(a).toMatchObject({ card: 21, reply: 'p99, with p95 under it' });
+    });
+  } finally {
+    await s.close();
+    core.dispose();
+  }
+});
+
+test("inbox/block-views: one inbox on bise's home: bise's own items say 'bise · <age>'", async () => {
+  const core = new FakeCore(threeWorld() as unknown as ConstructorParameters<typeof FakeCore>[0]);
+  const s = await launchDesktop({ core, route: `agent/${HOME}/main`, size: '1100x820' });
+  try {
+    const { page } = s;
+    const block = page.getByTestId('inbox.block');
+    await expect(block).toBeVisible({ timeout: 10_000 });
+    await expect(block).toContainText('3 projects');
+    // bise's own item, opened: its card's head says '· bise' like any project's (designer m_19631)
+    await page.getByTestId('inbox.block.more').click();
+    const home = page.getByTestId(`inbox.block.card.${HOME}-31`);
+    for (let i = 0; i < 5 && !(await home.isVisible()); i++) {
+      await page.keyboard.press('ArrowDown');
+      await page.waitForTimeout(150);
+    }
+    await expect(home).toBeVisible({ timeout: 3000 });
+    await expect(page.getByTestId(`inbox.block.card.${HOME}-31.project`)).toHaveText('· bise');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('inbox.block.row.1').locator('.end')).toHaveText(/^telemetry · /u);
+    await shoot(page, core, 'one-inbox-home');
+  } finally {
+    await s.close();
+    core.dispose();
+  }
+});

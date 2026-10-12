@@ -168,15 +168,35 @@ const cut = (s: string, max: number): string => {
   return Array.from(one).length > max ? `${Array.from(one).slice(0, max - 1).join('').trimEnd()}…` : one;
 };
 
-/** What his words do while `c` is open, seen from `here`. Pure. */
-export function answeringOf(c: Card, here: Here): Answering {
+/**
+ * What his words do while `c` is open, seen from `here`. An item of another project than the
+ * screen's names its agent and project (designer m_19631: 'answering p99 · telemetry · …', 'to p99
+ * · telemetry · the merge waits for 1 or 2'); the screen's own project and bise's view: as before.
+ * `pname`: the item's project as the block shows it (none: its id). Pure.
+ */
+export function answeringOf(c: Card, here: Here, pname?: string): Answering {
   const to = here.agent === null ? 'bise' : shownName(here.agent);
   // the permission ask is bise's own, never the hub's: only its two options answer it
   if (isNotify(c)) return { project: c.project, card: c.id, label: `to ${to} · bise's ask waits for 1 or 2`, answer: null };
+  const other = here.project !== null && here.project !== c.project ? `${shownName(c.agent)} · ${pname ?? c.project}` : null;
   if (takesWords(c)) {
-    return { project: c.project, card: c.id, label: `answering ${shownName(c.agent)} · ${cut(c.question, 40)}`, end: here.agent === null ? 'esc write a plain message' : `esc write to ${to} instead`, answer: c.id };
+    const label = `answering ${other ?? shownName(c.agent)} · ${cut(c.question, 40)}`;
+    return { project: c.project, card: c.id, label, end: here.agent === null ? 'esc write a plain message' : `esc write to ${to} instead`, answer: c.id };
   }
-  return { project: c.project, card: c.id, label: `to ${to} · ${pickWaits(c) ?? 'it waits for its options'}`, answer: null };
+  const waits = pickWaits(c) ?? 'it waits for its options';
+  if (other !== null) return { project: c.project, card: c.id, label: `to ${other} · ${waits}`, end: `esc write to ${to} instead`, answer: null };
+  return { project: c.project, card: c.id, label: `to ${to} · ${waits}`, answer: null };
+}
+
+/** An item's project as its row and its card say it: bise's home is 'bise', else its name. Pure. */
+export function projectWord(row: Pick<ProjectRow, 'name' | 'home'> | undefined, project: string): string {
+  return row?.home === true ? 'bise' : (row?.name ?? project);
+}
+
+/** The block's head: 'N waiting', ' · K projects' once more than one project waits. Pure. */
+export function headWords(list: readonly Pick<Card, 'project'>[]): string {
+  const projects = new Set(list.map((c) => c.project)).size;
+  return `${String(list.length)} waiting${projects > 1 ? ` · ${String(projects)} projects` : ''}`;
 }
 
 /** An item's sign on its line: '?' a question, '!' what only its options decide, else its dot. */
@@ -241,7 +261,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, reading = false }: Inb
 
   // what his words do: told on each change, and none once the block goes
   const { project: hp, agent: ha } = here;
-  const told = openCard === undefined ? null : answeringOf(openCard, { project: hp, agent: ha });
+  const told = openCard === undefined ? null : answeringOf(openCard, { project: hp, agent: ha }, projectWord(names.get(openCard.project), openCard.project));
   const tellKey = told === null ? '' : `${told.project}/${String(told.card)}/${told.label}/${told.end ?? ''}/${String(told.answer)}`;
   const tell = useRef(onAnswer);
   useEffect(() => {
@@ -381,7 +401,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, reading = false }: Inb
   return (
     <section className="inbox-strip inbox-block" aria-label="inbox" data-testid="inbox.block" data-open={openCard !== undefined || undefined}>
       <div className="strip-title">
-        inbox <span className="strip-count">{`${String(list.length)} waiting`}</span>
+        inbox <span className="strip-count">{headWords(list)}</span>
         {more > 0 && next !== undefined && (
           <Act
             onClick={() => {
@@ -410,8 +430,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, reading = false }: Inb
             <div key={cardKey(c)} className="inbox-block-open" data-testid={`inbox.block.open.${String(n)}`}>
               <InboxCard
                 card={c}
-                {...(row !== undefined ? { project: row.name } : {})}
-                {...(row?.home === true ? { home: true } : {})}
+                project={projectWord(row, c.project)}
                 now={now}
                 on={on}
                 full={whole === cardKey(c)}
@@ -446,10 +465,10 @@ export function InboxBlock({ here, onAnswer, now: pinned, reading = false }: Inb
             name={
               <>
                 <span className="strip-who">{shownName(who)}</span>
-                {what !== '' && <span className="strip-what">{` · ${what}`}</span>}
+                {what !== '' && <span className="strip-what">{what}</span>}
               </>
             }
-            end={`${row?.home === true ? '' : `${row?.name ?? c.project} · `}${age(now - c.since_ms)}`}
+            end={`${projectWord(row, c.project)} · ${age(now - c.since_ms)}`}
             onClick={() => {
               openTo(cardKey(c));
             }}

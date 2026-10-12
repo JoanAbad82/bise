@@ -8,7 +8,8 @@ import { core_ev } from '@/proto/fixtures.gen';
 import { replay, Store, StoreProvider } from '@/store';
 import { createRouter, RouterContext } from '@/app/router';
 import { emitAction } from '@/app/menu';
-import { asksNotify, InboxBlock, openInbox, type Answering, type Here } from './Block';
+import type { Card } from '@/proto';
+import { answeringOf, asksNotify, headWords, InboxBlock, openInbox, projectWord, type Answering, type Here } from './Block';
 import { PICKED_MS } from './InboxCard';
 
 afterEach(cleanup);
@@ -116,6 +117,57 @@ describe('the inbox block (b2)', () => {
     mount();
     fireEvent.keyDown(window, { key: '2', code: 'Digit2', ctrlKey: true });
     expect(screen.getByTestId('inbox.block.open.2')).toBeTruthy();
+  });
+
+  it("a row is 'n ? agent question… <project> · <age>'; the open card's head says its project too", () => {
+    mount();
+    // folded (H10): one line, the first item (perf's approval)
+    const row = screen.getByTestId('inbox.block.row.1');
+    expect(row.querySelector('.strip-who')?.textContent).toBe('perf');
+    expect(row.querySelector('.strip-what')?.textContent).toBe('run rm -rf target?');
+    expect(row.querySelector('.end')?.textContent).toMatch(/^acme · /u);
+    fireEvent.click(row);
+    expect(screen.getByTestId(`inbox.block.card.${P}-10.project`).textContent).toBe('· acme');
+  });
+});
+
+describe('one inbox (designer m_19631)', () => {
+  const opts = [
+    { label: 'yes', n: 1 },
+    { label: 'no', n: 2 },
+  ];
+  const card = (project: string, approval = false): Card =>
+    approval
+      ? { agent: 'perf', approval: true, id: 10, kind: 'confirm', options: opts, project, question: 'run rm -rf target?', rank: 0, since_ms: NOW, urgent: true }
+      : { agent: 'perf', id: 9, kind: 'question', options: opts, project, question: 'which bench?', rank: 1, since_ms: NOW, urgent: false };
+
+  it("the head says 'N waiting', and ' · K projects' once more than one project waits", () => {
+    expect(headWords([{ project: 'a' }, { project: 'a' }])).toBe('2 waiting');
+    expect(headWords([{ project: 'a' }, { project: 'b' }, { project: 'c' }, { project: 'a' }])).toBe('4 waiting · 3 projects');
+  });
+
+  it("bise's own cards say 'bise', the others their project's name, else its id", () => {
+    expect(projectWord({ name: 'home-1', home: true }, 'home-1')).toBe('bise');
+    expect(projectWord({ name: 'telemetry', home: false }, 't-1')).toBe('telemetry');
+    expect(projectWord(undefined, 't-1')).toBe('t-1');
+  });
+
+  it("answering another project than the screen's names the agent and the project", () => {
+    const here: Here = { project: P, agent: 'main' };
+    expect(answeringOf(card('t-1'), here, 'telemetry')).toEqual({ project: 't-1', card: 9, label: 'answering perf · telemetry · which bench?', end: 'esc write to bise instead', answer: 9 });
+    expect(answeringOf(card('t-1', true), here, 'telemetry')).toEqual({
+      project: 't-1',
+      card: 10,
+      label: 'to perf · telemetry · the approval waits for 1 or 2',
+      end: 'esc write to bise instead',
+      answer: null,
+    });
+  });
+
+  it("the screen's own project and bise's view: as before", () => {
+    expect(answeringOf(card(P), { project: P, agent: 'main' }, 'acme').label).toBe('answering perf · which bench?');
+    expect(answeringOf(card('t-1'), { project: null, agent: null }, 'telemetry')).toEqual({ project: 't-1', card: 9, label: 'answering perf · which bench?', end: 'esc write a plain message', answer: 9 });
+    expect(answeringOf(card('t-1', true), { project: null, agent: null }, 'telemetry').label).toBe('to bise · the approval waits for 1 or 2');
   });
 });
 
