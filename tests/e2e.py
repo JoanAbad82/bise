@@ -130,6 +130,15 @@ def feed_rec(line):
     kind, _, text = line[3:].partition(" : ")
     return kind, {"text": text}
 
+
+def line_has(line, needle):
+    """`needle` in a transcript line as written, or in one of its hub
+    record's string fields (`"` is `\\"` in the record's JSON)."""
+    if needle in line:
+        return True
+    rec = feed_rec(line)
+    return bool(rec) and any(isinstance(v, str) and needle in v for v in rec[1].values())
+
 class Env:
     def __init__(self, fake_env=None):
         self.tmp = tempfile.mkdtemp(prefix="sb-e2e-", dir=short_tmp())
@@ -478,7 +487,9 @@ class Client:
         return wait.until(pred, timeout, what)
 
     def wait_line(self, agent, needle, timeout=90):
-        self.wait(lambda: any(needle in l for l in self.lines(agent)), timeout, "%r in %s" % (needle, agent))
+        """A line of `agent`'s feed that has `needle`: as written, or in
+        one of its record's text fields (a record's JSON escapes quotes)."""
+        self.wait(lambda: any(line_has(l, needle) for l in self.lines(agent)), timeout, "%r in %s" % (needle, agent))
 
     def wait_status(self, name, statuses, timeout=90):
         if isinstance(statuses, str):
@@ -873,7 +884,7 @@ def t_main_controls(E, c):
     c.wait_idle("main")
     c.say('[[bash: sb card --withdraw %d "moot now"]]' % card["id"])
     c.wait(lambda: not c.cards(), 60, "card withdrawn by main")
-    c.wait_line("main", "#%d withdrawn by main: moot now" % card["id"], 30)
+    c.wait_feed("main", "card-closed", 30, id=card["id"], res="withdrawn by main: moot now")
     c.wait_idle("main")
     # main renames a task; the old name still works
     c.say("/new t5: {{bash: echo t5}}")
