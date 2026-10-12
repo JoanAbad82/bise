@@ -1,6 +1,8 @@
 # 15 · a hub's boot replays the whole journal
 
-Status: open. Found by `hub-boot-hang` (2026-10-07). Label: hub, boot.
+Status: done (hot-core, issue 21 sha 0, 2026-10-12): the boot grew with
+the agents, not with the runtime's age; fixed, see "Done" at the end.
+Found by `hub-boot-hang` (2026-10-07). Label: hub, boot.
 
 ## The problem
 
@@ -57,3 +59,32 @@ steady CPU. A snapshot alone does not cure the aging.
      snapshot;
    - `Revive` (BISE-292) restarts sb-core on the journal: from the
      snapshot too.
+
+## Done (hot-core, issue 21 sha 0, 2026-10-12)
+
+The growth was not the runtime: it was model.bend's `map_agent`,
+written with `Bool.pick`, which computes both branches. Each agent event
+of the replay (reported, declared, file_touched: 23k of his 73k events)
+ran its op on every agent (529: `OFile` walks each one's files) and
+walked to the end of the list. It now stops at the hit (`map_agent.go`).
+
+His journal copy (73,101 events, 529 agents, 19,474 messages), debug
+build:
+
+- `Hub::replay` (bench_step, load ~25): **72.8 s -> 11.2 s** (sb-core's
+  share 71.0 -> 10.0 s); the half journal took 19.9 s before.
+- At load ~16: `Hub::replay` 7.5 s (sb-core 6.6 s).
+- sb-core alone, CPU time of the same batches (load ~15): `replay_many`
+  43.6 s before, growing from 0.4 to 7.3 s per 5k events; after, 7.6 s,
+  0.3-0.6 s per 5k, flat. The same lines sent as `ping` (parse, nothing
+  applied): 6.4 s. **What is left of a boot is the JSON parse of the
+  journal**, linear: the replay costs no more than reading it.
+- The rest of a boot: `view_all` (the whole state for the Rust mirror,
+  19 MB on this copy: 1.05 s in sb-core, then its parse in the hub) and
+  the hub's ~1.2 s on its side. Issue 21's cold messages would shrink
+  `view_all` to the hot ones.
+
+So the "what to do" above is not needed now: no aging to find (1), and a
+snapshot (2) would save at most the parse, ~8 s of CPU on a 73k-event
+journal. Reopen if a journal grows past that.
+

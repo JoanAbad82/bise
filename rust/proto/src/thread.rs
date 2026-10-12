@@ -133,6 +133,40 @@ pub enum NoticeLevel {
 pub struct Notice {
     pub level: NoticeLevel,
     pub text: String,
+    /// H9 (ambient-lead m_19827, architect m_19836): a model call that
+    /// failed and waits to retry, as data. A run of them in one turn is one
+    /// entry, updated at its pos ([`lines::is_same_retry_run`])
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry: Option<Retry>,
+}
+
+/// A model call's retry (`provider_retry: 2/10 · <why> · retry in 4s`,
+/// [`lines::retry`]): the attempt that failed, out of how many, why, the
+/// wait before the next one, and how the run ended once it did.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Retry {
+    pub attempt: u32,
+    pub max: u32,
+    pub why: String,
+    pub wait_ms: u64,
+    /// set by the fold when the run ends (the entry is sent again at its
+    /// pos): the window dims a recovered run, never guessing from the rows
+    /// after it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end: Option<RetryEnd>,
+}
+
+/// How a run of retries ended: the agent's text, its thinking or a tool
+/// came in the same turn (recovered), or the turn failed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum RetryEnd {
+    Recovered,
+    Failed,
+    #[serde(other)]
+    Unknown,
 }
 
 /// A `not_delivered` entry: the agent his message didn't reach, and his

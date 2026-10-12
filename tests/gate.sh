@@ -469,7 +469,8 @@ if [ "$mode" = full ]; then
        sed 's/^# /  /' "$gdir/pick-$$.why"; pick_args=(--tests "$picked") ;;
   esac
   rm -f "$gdir/pick-$$.why"
-  tests/run_all.sh "${pick_args[@]}" & wait $!; rc=$?
+  # ${a[@]+...}: macOS /bin/bash 3.2 calls an empty array unbound under set -u
+  tests/run_all.sh ${pick_args[@]+"${pick_args[@]}"} & wait $!; rc=$?
   [ $rc = 0 ] || { [ -s "$red" ] && echo "only e2e/tmux tests failed: gate.sh rerun runs them alone on this tree"; }
   [ $rc = 0 ] || sbcore_gone "$root/sb-core"
   # apps/desktop/src/proto matches bise-proto every time (a generated file
@@ -499,6 +500,8 @@ python3 "$root/tests/bise_env.py" >/dev/null || { python3 "$root/tests/bise_env.
 python3 "$root/tests/conflict_markers.py" >/dev/null || { python3 "$root/tests/conflict_markers.py"; echo "GATE quick FAILED"; exit 1; }
 # the full gate's test map knows every test and every top-level path (tests/test_map.py)
 python3 "$root/tests/test_map.py" --self-test >/dev/null || { python3 "$root/tests/test_map.py" --self-test; echo "GATE quick FAILED"; exit 1; }
+# no new Bool.pick walk that never stops; the list of old ones only shrinks (tests/pick_gate.py)
+python3 "$root/tests/pick_gate.py" || { echo "GATE quick FAILED"; exit 1; }
 cache="${CARGO_TARGET_DIR:-$root/rust/target}/gate-cache"
 # the PROOF shards sit in a copy of bend/ in it and import it relatively
 # (bend refuses an absolute import path with a dot, like ~/.bise/gate/...)

@@ -853,6 +853,27 @@ pub fn is_hub_sender(from: &str) -> bool {
     from == "switchboard" || from == "bise"
 }
 
+/// H9: a model call's retry as data, from the runtime's
+/// `provider_retry: 2/10 · <why> · retry in 4s` body
+/// (bend/runtime/provider-pure.bend retry_line). The one reader of that
+/// text: [`super::words::provider_retry`] says it from this. The source
+/// is still the runtime's text obs line, the next untyped seam (runtime →
+/// transcript); a typed obs record would remove this parser. None: not
+/// that shape (the words then say the line as it came).
+pub fn retry(t: &str) -> Option<super::Retry> {
+    let [n, why, wait] = t.split(" · ").collect::<Vec<_>>()[..] else { return None };
+    let (a, b) = n.split_once('/')?;
+    let wait = wait.strip_prefix("retry in ")?.strip_suffix('s')?;
+    Some(super::Retry { attempt: a.parse().ok()?, max: b.parse().ok()?, why: why.to_string(), wait_ms: wait.parse::<u64>().ok()? * 1000, end: None })
+}
+
+/// H9: a retry joins the row of the one before it (one row, updated in
+/// place) when that one's run has not ended and no turn started between
+/// them. One rule for the fold and the TUI.
+pub fn is_same_retry_run(prev: Option<&super::Retry>, starts_turn: bool) -> bool {
+    !starts_turn && prev.is_some_and(|r| r.end.is_none())
+}
+
 /// A sender as people see it: the hub's id `switchboard` is `bise`.
 pub fn shown_name(name: &str) -> String {
     if name == "switchboard" { "bise".into() } else { name.to_string() }

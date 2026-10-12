@@ -457,6 +457,7 @@ fn tier_of(ev: &Ev) -> Option<Tier> {
         Ev::Tool(_)
         | Ev::Err(_)
         | Ev::Warn(_)
+        | Ev::Retry { .. }
         | Ev::Info(_)
         | Ev::Pr { .. }
         | Ev::Card { .. }
@@ -486,7 +487,7 @@ fn sig(ev: &Ev) -> u64 {
     let mix = |h: u64, x: usize| (h ^ x as u64).wrapping_mul(0x100_0000_01b3);
     let lens: [usize; 5] = match ev {
         Ev::You(t, ..) => [1, t.len(), 0, 0, 0],
-        Ev::Assistant(t) | Ev::Kept(t) | Ev::Err(t) | Ev::Warn(t) | Ev::Info(t) => [1, t.len(), 0, 0, 0],
+        Ev::Assistant(t) | Ev::Kept(t) | Ev::Err(t) | Ev::Warn(t) | Ev::Retry { text: t, .. } | Ev::Info(t) => [1, t.len(), 0, 0, 0],
         Ev::AgentMsg { text, .. } => [2, text.len(), 0, 0, 0],
         Ev::Answered { question, answer, why, .. } => [3, question.len(), answer.len(), why.len(), 0],
         Ev::Tool(td) => [
@@ -512,7 +513,7 @@ fn sig(ev: &Ev) -> u64 {
 fn haystack(ev: &Ev) -> String {
     let parts: Vec<&str> = match ev {
         Ev::You(t, ..) => vec![cap(t)],
-        Ev::Assistant(t) | Ev::Kept(t) | Ev::Err(t) | Ev::Warn(t) | Ev::Info(t) => vec![cap(t)],
+        Ev::Assistant(t) | Ev::Kept(t) | Ev::Err(t) | Ev::Warn(t) | Ev::Retry { text: t, .. } | Ev::Info(t) => vec![cap(t)],
         Ev::AgentMsg { text, .. } => vec![cap(text)],
         Ev::Answered { question, answer, why, .. } => vec![cap(question), cap(answer), cap(why)],
         Ev::Card { card, .. } => return cap(&card.text()).to_string(),

@@ -2705,28 +2705,47 @@ fn bench_step() {
         .map(|l| serde_json::from_str(l).unwrap())
         .collect();
     let mut h = Hub::new("/w");
-    let t0 = std::time::Instant::now();
+    // each line: wall time, and its split: sb-core (the wait for its
+    // answer, CoreLink::waited) and the Rust side (the rest)
+    let split = |what: &str, wall: std::time::Duration, core: std::time::Duration| {
+        eprintln!("{}: {:?} = sb-core {:?} + rust {:?}", what, wall, core, wall.saturating_sub(core));
+    };
+    let (t0, w0) = (std::time::Instant::now(), h.link.waited);
     h.replay(&events);
-    eprintln!("replay {} events: {:?}", events.len(), t0.elapsed());
+    split(&format!("boot (replay {} events)", events.len()), t0.elapsed(), h.link.waited - w0);
     let mut env = FakeEnv::new();
     env.now = 1_790_722_300_000;
     h.handle(Input::Tick, &mut env);
     let active: Vec<String> = h.st.agents.values().filter(|a| a.lifecycle == Lifecycle::Active).map(|a| a.name.clone()).collect();
-    eprintln!("agents {} active {}", h.st.agents.len(), active.len());
-    let time = |what: &str, h: &mut Hub, env: &mut FakeEnv, mk: &dyn Fn() -> Input| {
+    let hot = (h.st.msgs().values())
+        .filter(|m| {
+            matches!(h.st.msg_state().get(&m.id), Some(MsgState::Queued { .. })) || (m.expect_reply && !h.st.settled().contains(&m.id))
+        })
+        .count();
+    eprintln!("agents {} active {}; msgs {} hot {}", h.st.agents.len(), active.len(), h.st.msgs().len(), hot);
+    // the median of 10 runs (wall, and the sb-core share of that run)
+    let time = |what: &str, h: &mut Hub, env: &mut FakeEnv, mk: &dyn Fn(u32) -> Input| {
         let mut ts = Vec::new();
-        for _ in 0..10 {
+        for i in 0..10 {
             env.now += 500;
-            let t0 = std::time::Instant::now();
-            h.handle(mk(), env);
-            ts.push(t0.elapsed());
+            let (t0, w0) = (std::time::Instant::now(), h.link.waited);
+            h.handle(mk(i), env);
+            ts.push((t0.elapsed(), h.link.waited - w0));
         }
         ts.sort();
-        eprintln!("{}: median {:?} min {:?}", what, ts[5], ts[0]);
+        split(&format!("{} (median of 10)", what), ts[5].0, ts[5].1);
     };
-    time("tick", &mut h, &mut env, &|| Input::Tick);
-    h.handle(Input::ClientHello { client: 1 }, &mut env);
-    time("user line to main", &mut h, &mut env, &|| Input::ClientInput {
+    time("tick", &mut h, &mut env, &|_| Input::Tick);
+    let a = active.iter().find(|a| a.as_str() != MAIN).cloned().unwrap_or(MAIN.into());
+    time("REPL tool line", &mut h, &mut env, &|i| Input::ReplLine { agent: a.clone(), line: format!("tool #{} bash : echo {}", i, i) });
+    {
+        // hello: the client's input, then the snapshot the daemon sends it
+        let (t0, w0) = (std::time::Instant::now(), h.link.waited);
+        h.handle(Input::ClientHello { client: 1 }, &mut env);
+        let _ = h.snapshot(env.now);
+        split("hello + its snapshot", t0.elapsed(), h.link.waited - w0);
+    }
+    time("user line to main", &mut h, &mut env, &|_| Input::ClientInput {
         client: 1,
         focus: MAIN.into(),
         text: "hello".into(),
@@ -2816,6 +2835,62 @@ fn bench_step() {
         n,
         per_line + snap * (n / 100) / n
     );
+}
+
+/// BYTE-EQUAL (hot-state, issue 21): what the clients and the agents get
+/// from a real journal, after a tick, a hello, a user line, an archive and
+/// a restore: the snapshot JSON, every agent's context and every roster.
+/// Run it with two sb-cores on the same journal copy; the printed digests
+/// must be equal (the sb-core change moved no byte of the wire).
+/// SB_CORE_BIN=<sb-core> SB_BENCH_JOURNAL=<journal.jsonl> cargo test -p switchboard bench_byte_equal -- --ignored --nocapture
+#[test]
+#[ignore]
+fn bench_byte_equal() {
+    use std::hash::{Hash, Hasher};
+    let Some(path) = bise_home::env::test_setting("SB_BENCH_JOURNAL") else { return };
+    let events: Vec<Value> = (std::fs::read_to_string(path).unwrap().lines())
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    let mut h = Hub::new("/w");
+    h.replay(&events);
+    let mut env = FakeEnv::new();
+    env.now = 1_790_722_300_000;
+    // the digest of what the outside sees now (the same hasher, keys 0,
+    // in both runs: one test binary, only SB_CORE_BIN differs)
+    let seen = |what: &str, h: &mut Hub, now: u64| {
+        let snap = serde_json::to_string(&h.snapshot(now)).unwrap();
+        let mut parts = vec![snap];
+        for (n, text) in crate::contexts::fresh(&h.st, now, &h.models) {
+            parts.push(format!("context {n}\n{text}"));
+        }
+        for n in h.st.order.clone() {
+            parts.push(format!("roster {n}\n{}", crate::board::roster(&h.st, &n, now, &h.models).join("\n")));
+        }
+        let mut d = std::collections::hash_map::DefaultHasher::new();
+        parts.hash(&mut d);
+        let bytes: usize = parts.iter().map(|p| p.len()).sum();
+        eprintln!("byte-equal {what}: {} parts, {bytes} bytes, digest {:016x}", parts.len(), d.finish());
+    };
+    h.handle(Input::Tick, &mut env);
+    seen("tick", &mut h, env.now);
+    h.handle(Input::ClientHello { client: 1 }, &mut env);
+    seen("hello", &mut h, env.now);
+    env.now += 500;
+    let user = |text: &str| Input::ClientInput { client: 1, focus: MAIN.into(), text: text.into(), queued: false, parts: String::new() };
+    h.handle(user("hello"), &mut env);
+    seen("user line", &mut h, env.now);
+    let task = (h.st.order.iter())
+        .find(|n| h.st.agents.get(*n).is_some_and(|a| !a.is_main && a.lifecycle == Lifecycle::Active))
+        .cloned()
+        .expect("an active task");
+    env.now += 500;
+    h.handle(user(&format!("/archive {task} --force")), &mut env);
+    h.handle(Input::ReplExited { agent: task.clone(), crashed: false, reason: String::new() }, &mut env);
+    seen(&format!("archive {task}"), &mut h, env.now);
+    env.now += 500;
+    h.handle(user(&format!("/restore {task}")), &mut env);
+    seen(&format!("restore {task}"), &mut h, env.now);
 }
 
 /// hub-lag: a step's view carries the archived agents only when the step

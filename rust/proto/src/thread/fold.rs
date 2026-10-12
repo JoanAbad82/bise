@@ -6,7 +6,7 @@ use super::lines::{self, Delivered, Hub, Mark, Obs, Rec, ToolMove};
 use super::scheduled;
 use super::words::{self, one_line, summary};
 use super::{Answered, ApprovalFold, Ctx, Entry, EntryCard, EntryKind, Landed, Line, Made, NotDelivered, Notice, PageRef, PrNews, ReportRef, Scheduled, Thinking, ToolItem, ToolKind, Tools, WakeFold};
-use super::{cap, Delivery, FileCount, GateWait, ToolGate, ToolState, TurnFailed};
+use super::{cap, Delivery, FileCount, GateWait, RetryEnd, ToolGate, ToolState, TurnFailed};
 use crate::Pos;
 use crate::context::FnContext;
 use crate::parts::Part;
@@ -50,6 +50,16 @@ struct Fold<'a> {
 impl Fold<'_> {
     fn push(&mut self, mut e: Entry) -> usize {
         e.turn_start = std::mem::take(&mut self.starting);
+        // H9 (architect m_19836): what ends a run of retries says how it
+        // ended, on the run's entry (sent again at its pos)
+        let end = match e.kind {
+            EntryKind::Agent | EntryKind::Thinking | EntryKind::Tools => Some(RetryEnd::Recovered),
+            EntryKind::TurnFailed => Some(RetryEnd::Failed),
+            _ => None,
+        };
+        if let Some(end) = end.filter(|_| !e.turn_start) {
+            self.end_retries(end);
+        }
         self.out.push(e);
         self.out.len() - 1
     }
@@ -398,7 +408,36 @@ impl Fold<'_> {
         self.push(e);
     }
 
+    /// H9: the newest run of retries (the notices at the end of the
+    /// thread), if it has not ended yet, ends with `end`.
+    fn end_retries(&mut self, end: RetryEnd) {
+        let open = self
+            .out
+            .iter_mut()
+            .rev()
+            .take_while(|l| l.kind == EntryKind::Notice)
+            .filter_map(|l| l.notice.as_mut().and_then(|n| n.retry.as_mut()))
+            .next()
+            .filter(|r| r.end.is_none());
+        if let Some(r) = open {
+            r.end = Some(end);
+        }
+    }
+
+    /// A notice; a retry in the same run as the newest entry (itself a
+    /// retry) takes that entry's place at its pos (H9: one row per call's
+    /// retries, [`lines::is_same_retry_run`]).
     fn notice(&mut self, pos: u64, ms: u64, n: Notice) {
+        if n.retry.is_some() {
+            let prev = self.out.last().filter(|l| l.kind == EntryKind::Notice).and_then(|l| l.notice.as_ref()).and_then(|n| n.retry.as_ref());
+            if lines::is_same_retry_run(prev, self.starting) {
+                if let Some(last) = self.out.last_mut() {
+                    last.text = n.text.clone();
+                    last.notice = Some(n);
+                    return;
+                }
+            }
+        }
         let mut e = Entry::new(pos, ms, EntryKind::Notice, n.text.clone());
         e.notice = Some(n);
         self.push(e);

@@ -9,7 +9,8 @@ use unicode_width::UnicodeWidthStr;
 #[test]
 fn provider_retry_and_restart_render() {
     match parse_line("  obs: provider_retry: 2/10 · provider 529 (transient) · retry in 4s") {
-        Some(Ev::Warn(t)) => assert_eq!(
+        // H9: a warning that carries its data (one updating row per run)
+        Some(Ev::Retry { text: t, .. }) => assert_eq!(
             t,
             "model call failed (attempt 2/10): provider 529 (transient) · retry 3/10 in 4s"
         ),
@@ -2119,6 +2120,24 @@ fn the_chatgpt_plan_lines_are_a_warning_and_the_rest_a_failure() {
     let ev = parse_line("  obs: turn_done: failed: OpenAI refused the request (400).").expect("parse");
     assert!(matches!(&ev, Ev::Err(t) if t == "turn failed: OpenAI refused the request (400)."));
     assert!(rows_text(&ev_rows(&ev, 0, 200)).join("\n").starts_with(" ✗ "));
+}
+
+// H9 (architect m_19836, a terminal-visible change): a run of retries is
+// one ▲ row updated in place (the newest attempt), not one row per retry;
+// a retry after anything else starts a new row
+#[test]
+fn a_run_of_retries_is_one_updating_row() {
+    let r = |n: u32| parse_line(&format!("  obs: provider_retry: {n}/10 · provider 529 (transient) · retry in {n}s")).unwrap();
+    let (mut events, mut cache) = (Vec::new(), Vec::new());
+    for ev in [r(1), r(2), r(3)] {
+        crate::feed::push_event(&mut events, &mut cache, ev);
+    }
+    assert_eq!(events.len(), 1, "one row for the run");
+    let text = rows_text(&ev_rows(&events[0], 0, 200)).join(" ");
+    assert!(text.contains("▲") && text.contains("model call failed (attempt 3/10): provider 529 (transient) · retry 4/10 in 3s"), "{text}");
+    crate::feed::push_event(&mut events, &mut cache, Ev::Assistant("done".into()));
+    crate::feed::push_event(&mut events, &mut cache, r(1));
+    assert_eq!(events.len(), 3, "a retry after the reply is a new row");
 }
 
 // subscriptions: an expired sign-in shows once, at the turn's end, never

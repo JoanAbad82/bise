@@ -57,7 +57,7 @@ fn tui_words(ls: &[&str]) -> Vec<(EntryKind, String, String)> {
             // G5: an agent writing to him is the fold's agent entry with
             // to_you and who
             Some(Ev::AgentMsg { from, text, level: 2, .. }) => out.push((EntryKind::Agent, text, from)),
-            Some(Ev::Info(t) | Ev::Warn(t) | Ev::Err(t)) => out.push((EntryKind::Notice, t, String::new())),
+            Some(Ev::Info(t) | Ev::Warn(t) | Ev::Retry { text: t, .. } | Ev::Err(t)) => out.push((EntryKind::Notice, t, String::new())),
             Some(Ev::Undelivered { name, text, .. }) => out.push((EntryKind::NotDelivered, text, name)),
             _ => {}
         }
@@ -193,7 +193,7 @@ fn the_meter_from_the_agent_row_is_the_meter_the_lines_gave() {
 #[test]
 fn a_failed_turn_reads_through_the_shared_words() {
     assert!(matches!(parse_line("  obs: turn_done: failed: 500"), Some(Ev::Err(t)) if t == "turn failed: 500"));
-    assert!(matches!(parse_line("  obs: provider_retry: 2/10 · 529 · retry in 4s"), Some(Ev::Warn(t)) if t == words::provider_retry("2/10 · 529 · retry in 4s")));
+    assert!(matches!(parse_line("  obs: provider_retry: 2/10 · 529 · retry in 4s"), Some(Ev::Retry { text: t, retry }) if t == words::provider_retry("2/10 · 529 · retry in 4s") && retry.attempt == 2));
     assert!(matches!(parse_line("  obs: turn_done: failed: your ChatGPT sign-in expired. x"), Some(Ev::Warn(t)) if t == EXPIRED_TUI));
 }
 

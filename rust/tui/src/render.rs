@@ -481,7 +481,7 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
             ]);
             hung_rows(&first, &pad, [line], width)
         }
-        Ev::Warn(t) => glyph_line(G_INTERRUPTED, dim_st, t.clone(), text_st, width),
+        Ev::Warn(t) | Ev::Retry { text: t, .. } => glyph_line(G_INTERRUPTED, dim_st, t.clone(), text_st, width),
         // a model without vision refused an image: say so, and the way out
         Ev::Err(t) => match crate::attach::no_vision(t) {
             Some(mut spans) => {
