@@ -9,7 +9,7 @@
 //! the rest of the journal), the decision to fire (due, its agent idle,
 //! never a second wake while one from bise is queued), and a dropped
 //! agent's timers ending with it; laws fire_is_a_message,
-//! wake_never_stacked, times_bound, stop_leaves_no_timer in LAWS.bend.
+//! wake_never_stacked, times_bound, stop_leaves_no_timer in bend/laws/hub.bend.
 //!
 //! Here, pure: the parsing of `sb every`'s arguments (parse_dur,
 //! parse_hhmm, parse_until), the labels, `sb every`'s list and the wake

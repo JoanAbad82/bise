@@ -2,7 +2,7 @@
 # Bend, in one place.
 #
 # runtime/remote.bend prints the harness wire request (MODEL/TOOL/MSG/
-# CALL lines, pinned by LAWS.bend); core/wire.bend parses it; the
+# CALL lines, pinned by bend/laws/); core/wire.bend parses it; the
 # family of the model maps it to its JSON body and maps the provider
 # response back to the OK/CALL/END reply the Core parses:
 #   core/wire.bend       the wire, shared by every family

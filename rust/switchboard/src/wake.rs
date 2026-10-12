@@ -11,7 +11,7 @@
 //! active agent, one message from bise, queued while it is busy), the max
 //! at the tick, a dropped agent's watches ending with it; laws
 //! wake_hit_once, wake_gone_never_hits, wake_drop_ends, wake_max_once,
-//! wake_replay_keeps in LAWS.bend.
+//! wake_replay_keeps in bend/laws/hub.bend.
 //!
 //! Here, pure: what a watch looks at ([`Spec`], opaque to sb-core), the
 //! look over an injected [`Probe`] ([`look`]), the words (the hit line,

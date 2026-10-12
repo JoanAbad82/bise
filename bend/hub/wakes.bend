@@ -14,7 +14,7 @@
 # .rc); the words (Rust wake.rs: the hit line, the "still running" line
 # given at set as `max_text`); `spec` is the look's, opaque here; the steps
 # that send (core.bend's `---- watches ----` section: send is core's).
-# Laws: LAWS.bend wake_hit_once, wake_gone_never_hits, wake_drop_ends,
+# Laws: bend/laws/hub.bend wake_hit_once, wake_gone_never_hits, wake_drop_ends,
 # wake_max_once, wake_replay_keeps.
 import Base
 
@@ -195,7 +195,7 @@ def ids_of(xs: List<&2, Watch>, +ns: List<&2, String>) -> List<&2, Nat>:
     case Con{+h, +t}:
       Bool.pick(List<&2, Nat>, str_in(ns, Watch.agent(h)), Watch.id(h) <> ids_of(t, ns), ids_of(t, ns))
 
-# ---- for the law wake_drop_ends (PROOF.bend) ----
+# ---- for the law wake_drop_ends (bend/proofs/hub.bend) ----
 
 def nat_in(xs: List<&2, Nat>, +n: Nat) -> Bool:
   match xs:

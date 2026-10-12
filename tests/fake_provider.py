@@ -1588,7 +1588,7 @@ def serve(port=0):
 
 
 def bend_literal(text):
-    """a Bend string literal (LAWS fixtures): escapes like LAWS.bend's"""
+    """a Bend string literal (LAWS fixtures): escapes like bend/laws/'s"""
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("\r", "\\r").replace("\n", "\\n") + '"'
 
 

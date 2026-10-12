@@ -1,0 +1,562 @@
+# bend/laws/threads.bend: stopped turns, a task's thread, message parts, receipts, queued take-back, MCP failures, ended turns, live answers.
+# Open claims, each one closed by bend/proofs/threads.bend (moved from
+# LAWS.bend). The gate checks every bend/proofs/*.bend: a law here
+# with no proof there fails it.
+import Base
+import ../core/api.bend as Api
+import ../core/anth-stream.bend as As
+import ../runtime/provider-pure.bend as Pv
+import ../runtime/mcp-pure.bend as Mc
+import ../runtime/live-pure.bend as Lp
+import ../vendor/http/encoding/utf8.bend as U8
+import ../hub/model.bend as HM
+import ../hub/cx.bend as HX
+import ../hub/core.bend as HC
+import ../hub/gen/feed.bend as HFD
+
+# ---- a stopped turn is a typed fact (desktop reset, architect m_9650 D,
+# m_9693): sb-core, where the interrupt is decided, writes one 'stopped'
+# line in that agent's feed in the same step as fx interrupt ----
+
+# LAW: the window's or the TUI's interrupt of a running turn emits fx
+# interrupt and then exactly one 'stopped' line for that agent.
+law interrupt_says_stopped_once:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +n: String
+  for e: {HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))) == True{} : Bool}
+  {HC.interrupt.go(o, Some{n}, cx) == HC.feed(o, HC.interrupt.fx(o, cx, n), n, HFD.stopped("stopped")) : HX.Cx<o>}
+
+# LAW: with no turn running, the interrupt is only a notice: no fx
+# interrupt, no 'stopped' line.
+law interrupt_idle_says_nothing:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +n: String
+  for e: {HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))) == False{} : Bool}
+  {HC.interrupt.go(o, Some{n}, cx) == HC.notice(o, cx, "no turn in progress to interrupt") : HX.Cx<o>}
+
+# LAW: an agent's `sb interrupt` of a running turn says it the same way
+# (one 'stopped' line after fx interrupt), then answers ok.
+law req_interrupt_says_stopped_once:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +token: Nat
+  for +agent: String
+  for +n: String
+  for e: {HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))) == True{} : Bool}
+  {HC.req_interrupt(o, Some{n}, cx, token, agent) == HC.reply(o, HC.feed(o, HC.interrupt.fx(o, cx, n), n, HFD.stopped("stopped")), token, HC.ok_body(Nil{})) : HX.Cx<o>}
+
+# ---- what a task sent is a fact of its own thread (desktop bar A.3 and
+# S16, architect m_10203): sb-core writes one 'sent' line in the sender's
+# own feed for a task's message to another agent; main's feed keeps its
+# 'msg' lines, a message to the user stays 'msg-you'. A card main opens
+# for a task's message shows in that task's feed too. Views only ----
+
+# LAW: a task's message to another agent writes exactly one 'sent' record
+# in the task's feed: to, the message id, whether it waits for a reply,
+# text.
+law task_send_says_sent_once:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +m: HM.Msg
+  for e: {HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)) == True{} : Bool}
+  {HC.feed_sender(o, cx, m) == HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))) : HX.Cx<o>}
+
+# LAW: main's messages, the user's, a message to the user, and a message
+# from a name that isn't an agent of this hub write no 'sent' line.
+law other_send_says_no_sent:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +m: HM.Msg
+  for e: {HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)) == False{} : Bool}
+  {HC.feed_sender(o, cx, m) == cx : HX.Cx<o>}
+
+# LAW: a sender this hub has no agent of ('@bise', a cross-hub
+# delegation, or any unknown name) is never a task's send.
+law unknown_sender_is_no_task_send:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +from: String
+  for +to: String
+  for e: {HC.has_agent(o, cx, from) == False{} : Bool}
+  {HC.is_task_send(o, cx, from, to) == False{} : Bool}
+
+# LAW: a card opened for a task's message also writes its 'card' line in
+# that task's feed (main's own cards stay in main's feed only).
+law task_card_shows_in_its_feed:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +id: Nat
+  for +agent: String
+  for +text: String
+  for e: {HC.is_task_of(o, cx, agent) == True{} : Bool}
+  {HC.card_to_asker(o, cx, id, agent, text) == HC.feed(o, cx, agent, HFD.card(id, "question", agent, text)) : HX.Cx<o>}
+
+# LAW: a card whose agent isn't an agent of this hub (or is main) writes
+# no extra line.
+law other_card_no_extra_line:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +id: Nat
+  for +agent: String
+  for +text: String
+  for e: {HC.is_task_of(o, cx, agent) == False{} : Bool}
+  {HC.card_to_asker(o, cx, id, agent, text) == cx : HX.Cx<o>}
+
+# LAW: an agent this hub doesn't have is never a task of it.
+law unknown_agent_is_no_task:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +agent: String
+  for e: {HC.has_agent(o, cx, agent) == False{} : Bool}
+  {HC.is_task_of(o, cx, agent) == False{} : Bool}
+
+# LAW: the user answering one of main's own cards does three things, once
+# each and in this order: main's note (it still wakes main; its fixed head
+# is what the clients match to drop it), the same route line an agent's
+# card writes ('you → @main (answer to card #N) : <his answer, whole>',
+# the "you answered" row), and the card closed as answered.
+law main_card_answer_routes_once:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +c: HM.Card
+  for +text: String
+  for +parts: String
+  {HC.answer.q.main(o, cx, c, text, parts)
+    == HC.close_card(o,
+      HC.route_line(o,
+        HC.notify_main(o, cx, HC.cat([HC.MAIN_ANSWER_HEAD(), HC.ns(HM.Card.id(c)), " (\"", HM.one_line(HM.Card.text(c)), "\"): \"", HM.one_line(text), "\""])),
+        HM.MAIN(), Some{HM.Card.id(c)}, text, parts),
+      HM.Card.id(c), "answered") : HX.Cx<o>}
+
+# LAW: his message's feed line is followed, in the same step, by its id
+# ('sb you-id : m_N'): the clients key his entry by it (nothing else may
+# fall between them); the REPL and the model get the same delivery. A
+# message with no parts writes exactly these two lines (an older client's,
+# an agent-made one: the feed is what it always was).
+law you_line_carries_its_id:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +name: String
+  for +m: HM.Msg
+  for e: {String.is_empty(HM.Msg.parts(m)) == True{} : Bool}
+  {HC.deliver.line(o, False{}, True{}, cx, name, m)
+    == HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m))) : HX.Cx<o>}
+
+# ---- his message's parts (msg-parts) ----
+# The clients send his message as typed parts (bise_proto::parts: his
+# words, quotes, pastes, images, files) beside the text the model gets.
+# sb-core keeps them on the message, opaque (Msg.parts, "" none), and
+# writes them at the delivery, so the clients draw his message from them.
+
+# LAW: a message with parts writes them on one 'you-parts' line right
+# after its you-id (the clients put them on that entry); the you line
+# and its id come first, as always.
+law you_parts_follow_the_id:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +name: String
+  for +m: HM.Msg
+  for e: {String.is_empty(HM.Msg.parts(m)) == False{} : Bool}
+  {HC.deliver.line(o, False{}, True{}, cx, name, m)
+    == HC.feed(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m))), name, HFD.you_parts(HC.parts_json(HM.Msg.parts(m)))) : HX.Cx<o>}
+
+# LAW: parts never change what he said: the same message with or without
+# parts writes the same lines (his text, its id), the parts only after
+# them. The model reads the text; the parts are for the clients.
+law parts_never_change_text:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +name: String
+  for +m: HM.Msg
+  for +p: String
+  {HC.deliver.line(o, False{}, True{}, cx, name, HM.Msg.with_parts(m, p))
+    == HC.you_parts(o, HC.deliver.line(o, False{}, True{}, cx, name, HM.Msg.with_parts(m, "")), name, p) : HX.Cx<o>}
+
+# LAW: a line with no parts is no line: a route line (an answer to a card,
+# a message to another agent) with none is the route line alone.
+law no_parts_no_line:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +who: String
+  for +card: Maybe<&2, Nat>
+  for +said: String
+  {HC.route_line(o, cx, who, card, said, "") == HC.feed(o, cx, HM.MAIN(), HFD.route(who, card, said)) : HX.Cx<o>}
+
+# LAW: a route line with parts is followed by one 'route-parts' line.
+law route_parts_follow_the_route:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +who: String
+  for +card: Maybe<&2, Nat>
+  for +said: String
+  for +parts: String
+  for e: {String.is_empty(parts) == False{} : Bool}
+  {HC.route_line(o, cx, who, card, said, parts) == HC.feed(o, HC.feed(o, cx, HM.MAIN(), HFD.route(who, card, said)), HM.MAIN(), HFD.route_parts(HC.parts_json(parts))) : HX.Cx<o>}
+
+# LAW: his answer to a question card reaches the asker with his parts on
+# the message (the asker's thread draws it like any message of his).
+law answer_keeps_its_parts:
+  for +to: String
+  for +text: String
+  for +r: Maybe<&2, Nat>
+  for +parts: String
+  {HC.Snd.parts(HC.answer.snd(to, text, r, parts)) == parts : String}
+
+# LAW: a steered receipt names the steer-mode deliveries since the last
+# one, on one feed line at this point of the turn, and marks them seen.
+law steered_receipt_names_the_new_ones:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +agent: String
+  for +h: Nat
+  for +t: List<&2, Nat>
+  for +total: Nat
+  {HC.steer_receipt.go(o, h <> t, cx, agent, total)
+    == HC.feed(o, HC.set_r(o, cx, HX.R.with_steered(HC.rr(o, cx), HC.steer_mark(HX.R.steered(HC.rr(o, cx)), agent, total))),
+      agent, HFD.steered(h <> t)) : HX.Cx<o>}
+
+# LAW: a receipt once every steered id was seen (or with none) marks
+# nothing and writes nothing (a second receipt with no new steer).
+law steered_receipt_after_all_seen_is_nothing:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +agent: String
+  for +ids: List<&2, Nat>
+  for +total: Nat
+  {HC.steer_receipt.go(o, List.drop(&2, Nat, ids, List.length(&2, Nat, ids)), cx, agent, total) == cx : HX.Cx<o>}
+
+# LAW: a new steer keeps the cursor: the ids already reported stay
+# reported, the new ones come after them.
+law steer_add_keeps_seen:
+  for +xs: List<&2, HX.Steer>
+  for +n: String
+  for +ids: List<&2, Nat>
+  {HC.steer_seen(HC.steer_add(xs, n, ids), n) == HC.steer_seen(xs, n) : Nat}
+
+# ---- the received receipt (ISteerRx, the clients' ✓) ----
+# A second cursor, rx_seen, apart from steered's `seen`: the runtime
+# receives a steer before it reads it, but no order between the two
+# cursors is required (rx_seen <= seen is NOT a law: an older runtime may
+# send ISteered alone, and each receipt only names what it did not name).
+
+# LAW: a received receipt names the steer-mode deliveries since the last
+# one ('sb steer-rx : m_3 m_4') and moves rx_seen only (seen kept).
+law steer_rx_receipt_names_the_new_ones:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +agent: String
+  for +h: Nat
+  for +t: List<&2, Nat>
+  for +total: Nat
+  {HC.steer_rx_receipt.go(o, h <> t, cx, agent, total)
+    == HC.feed(o, HC.set_r(o, cx, HX.R.with_steered(HC.rr(o, cx), HC.steer_rx_mark(HX.R.steered(HC.rr(o, cx)), agent, total))),
+      agent, HFD.steer_rx(h <> t)) : HX.Cx<o>}
+
+# LAW: a received receipt with nothing new marks nothing and writes
+# nothing.
+law steer_rx_receipt_after_all_seen_is_nothing:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +agent: String
+  for +ids: List<&2, Nat>
+  for +total: Nat
+  {HC.steer_rx_receipt.go(o, List.drop(&2, Nat, ids, List.length(&2, Nat, ids)), cx, agent, total) == cx : HX.Cx<o>}
+
+# LAW: a new steer keeps the received cursor too (steer_rename keeps it by
+# construction, steer_del drops it with the agent's entry).
+law steer_add_keeps_rx_seen:
+  for +xs: List<&2, HX.Steer>
+  for +n: String
+  for +ids: List<&2, Nat>
+  {HC.steer_rx_seen(HC.steer_add(xs, n, ids), n) == HC.steer_rx_seen(xs, n) : Nat}
+
+# ---- his queued message taken back (HubCmd queued_take, issue 16) ----
+# No new state: a taken-back message is Rejected{"taken_back"}, the state
+# reject_ids already writes, so an older sb-core replays it as rejected and
+# never delivers it (no new journal kind, rollback-safe).
+
+# LAW: a queued message of his is taken back: one EMsgState, Rejected.
+law unqueue_takes_back_a_queued_one:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +q: String
+  for +id: Nat
+  for +to: String
+  {HC.unqueue.take(o, HM.Queued{q}, cx, id, to) == HC.emit(o, cx, HM.EMsgState{id, HM.Rejected{"taken_back"}}, Unit{}, Unit{}, Unit{}) : HX.Cx<o>}
+
+# LAW: a message already delivered is left as it is (a notice, the state
+# unchanged); so are one already rejected, one cancelled, an unknown id, and
+# a message that isn't his.
+law unqueue_leaves_a_delivered_one:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +id: Nat
+  for +to: String
+  {HX.d(o, HC.unqueue.take(o, HM.Delivered{}, cx, id, to)) == HX.d(o, cx) : HM.St}
+
+law unqueue_leaves_a_rejected_one:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +r: String
+  for +id: Nat
+  for +to: String
+  {HX.d(o, HC.unqueue.take(o, HM.Rejected{r}, cx, id, to)) == HX.d(o, cx) : HM.St}
+
+law unqueue_leaves_an_unknown_id:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +id: Nat
+  {HX.d(o, HC.unqueue.go(o, None{}, cx, id)) == HX.d(o, cx) : HM.St}
+
+law unqueue_never_takes_anothers:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +r: HM.MRec
+  for +id: Nat
+  for e: {String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.USER()) == False{} : Bool}
+  {HX.d(o, HC.unqueue.go(o, Some{r}, cx, id)) == HX.d(o, cx) : HM.St}
+
+# LAW: the queue after a take-back is the queue before minus that message:
+# its own record becomes Rejected{"taken_back"} (no longer queued, so the
+# pump never delivers it: delivered_once), and every other record is the
+# same. Read on the records (the taking back is map_msg with OSt).
+law unqueue_marks_its_own_record:
+  for +xs: List<&2, HM.MRec>
+  for +id: Nat
+  for +x: HM.MSt
+  {HM.state_of.go(HM.rec_of(HM.map_msg(xs, id, HM.OSt{x}), id)) == HC.st_after(HM.rec_of(xs, id), x) : Maybe<&2, HM.MSt>}
+
+law unqueue_keeps_every_other_record:
+  for +xs: List<&2, HM.MRec>
+  for +id: Nat
+  for +x: HM.MSt
+  for +y: Nat
+  for e: {Nat.is_eq(id, y) == False{} : Bool}
+  {HM.rec_of(HM.map_msg(xs, id, HM.OSt{x}), y) == HM.rec_of(xs, y) : Maybe<&2, HM.MRec>}
+
+# LAW (the race, unqueue vs the turn-end pump, both orders): sb-core steps
+# one input at a time. Taken back first: the record is Rejected
+# (unqueue_takes_back_a_queued_one, unqueue_marks_its_own_record), not
+# queued, so the pump never delivers it (queued_in, delivered_once).
+# Delivered first: the take-back leaves it delivered
+# (unqueue_leaves_a_delivered_one). So exactly one of delivered or
+# taken_back.
+
+# ---- MCP calls that fail (runtime/mcp-pure.bend) ----
+
+# LAW: a call is tried again (fresh initialize) only when it never
+# reached the tool and a new try may work: initialize got no answer or a
+# 5xx, the call could not connect, or the server lost the session. Once
+# tools/call may have run (no answer read, a timeout, a 5xx, an error it
+# answered) it is never sent again; an auth refusal is not retried.
+law mcp_retry_only_unsent:
+  {Bool.and(Mc.retry(Mc.SInit{}, Mc.WNet{Pv.NConnect{61, "refused"}}),
+    Bool.and(Mc.retry(Mc.SInit{}, Mc.WStatus{503, ""}),
+    Bool.and(Bool.not(Mc.retry(Mc.SInit{}, Mc.WStatus{401, ""})),
+    Bool.and(Mc.retry(Mc.SCall{}, Mc.WStatus{404, "unknown session"}),
+    Bool.and(Mc.retry(Mc.SCall{}, Mc.WNet{Pv.NConnect{61, "refused"}}),
+    Bool.and(Bool.not(Mc.retry(Mc.SCall{}, Mc.WNet{Pv.NRead{54, "reset"}})),
+    Bool.and(Bool.not(Mc.retry(Mc.SCall{}, Mc.WNet{Pv.NTimeout{}})),
+    Bool.and(Bool.not(Mc.retry(Mc.SCall{}, Mc.WStatus{502, ""})),
+      Bool.not(Mc.retry(Mc.SCall{}, Mc.WRpc{"-32602", "no such tool"})))))))))) == True{} : Bool}
+
+# LAW: the model reads the kind of failure, the server, the phase, the
+# cause, what bise tried, and whether calling again is safe - never just
+# "initialize failed".
+law mcp_fail_text_says_why_and_safety:
+  {Bool.and(String.eq(Mc.fail_text("web_search.web_search", "api.mistral.ai",
+      Mc.SInit{}, Mc.WNet{Pv.NDns{}}, 2n),
+      "mcp call failed (network): web_search.web_search (api.mistral.ai), initialize: cannot resolve api.mistral.ai (dns) — check your network or VPN. bise reconnected and retried 2 times. the call never reached the server: safe to call again."),
+    String.eq(Mc.fail_text("x.y", "h", Mc.SCall{}, Mc.WStatus{502, "{\"message\":\"bad gateway\"}"}, 0n),
+      "mcp call failed (server error): x.y (h), tools/call: h answered HTTP 502: bad gateway. not retried: the call may have run on the server, check before calling it again (safe if the tool only reads).")) == True{} : Bool}
+
+# ---- an agent's ended turns, counted where its run changes (issue 22,
+# architect m_16521): the agents row carries working and turns from one
+# source, sb-core's runtime state, so no row has one half without the
+# other. set_rt is the one writer of a runtime state ----
+
+# LAW: a run that leaves RBusy (to idle, down or starting) counts one
+# more ended turn.
+law hub_turns_counts_every_busy_exit:
+  for now: HM.Run
+  for +n: Nat
+  for e: {HC.is_busy(now) == False{} : Bool}
+  {HC.turns_after(HM.RBusy{}, now, n) == 1n+n : Nat}
+
+# LAW: any other run change (busy to busy, or from a run that was not
+# busy) leaves the count as it was.
+law hub_turns_never_moves_otherwise:
+  for was: HM.Run
+  for now: HM.Run
+  for +n: Nat
+  for e: {Bool.and(HC.is_busy(was), Bool.not(HC.is_busy(now))) == False{} : Bool}
+  {HC.turns_after(was, now, n) == n : Nat}
+
+# LAW: set_rt, every runtime change, stores the agent's ended turns as
+# its runtime before them moved by turns_after (whatever count the new
+# state carried): a step that ends a turn and starts the next one (the
+# idle's pump) goes through it twice, Busy -> Idle (+1), Idle -> Busy.
+law hub_set_rt_counts_turns:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +x: HX.Rt
+  {HX.Rt.turns(HC.rt(o, HC.set_rt(o, cx, x), HX.Rt.name(x)))
+    == HC.turns_after(HX.Rt.run(HC.rt(o, cx, HX.Rt.name(x))), HX.Rt.run(x), HX.Rt.turns(HC.rt(o, cx, HX.Rt.name(x)))) : Nat}
+
+# ---- the answer as it streams in (runtime/live-pure.bend) ----
+
+# LAW: pieces cut anywhere (an event split across pieces, the next
+# event's start inside a piece) give the same partial as one piece: the
+# text since the last one, at offset 0 of its block.
+law live_pieces_cut_anywhere_same_line:
+  {Con{Lp.emit_line(Lp.take(Lp.feeds(Con{"event: content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}
+event: content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"lo\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n)),
+    Con{Lp.emit_line(Lp.take(Lp.feeds(Con{"event: content_block_delta
+dat", Con{"a: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}
+event", Con{": content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"lo\"}}
+", Nil{}}}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n)), Nil{}}}
+    == Con{"partial #17.0 +0 : Hello", Con{"partial #17.0 +0 : Hello", Nil{}}} : List<&2, String>}
+
+# LAW: a call that is not the agent's answer (compaction, one-shot)
+# streams nothing: no text waits.
+law live_off_streams_nothing:
+  {Lp.has(Lp.feeds(Con{"event: content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}
+event: content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"lo\"}}
+", Nil{}}, Lp.lv0(False{}, "17.0", Api.Anthropic{}))) == False{} : Bool}
+
+# LAW: thinking never streams, only the answer's text.
+law live_thinking_never_streams:
+  {Lp.emit_line(Lp.take(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"hmm\"}}
+", Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ok\"}}
+", Nil{}}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n))
+    == "partial #17.0 +0 : ok" : String}
+
+# LAW: the offset counts what the block already sent (escaped); a new
+# block starts again at 0 (the hub replaces the text).
+law live_offset_per_block:
+  {Con{Lp.emit_line(Lp.take(Lp.feed(Lp.emit_lv(Lp.take(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ab\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n)), "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"c\"}}
+"), 300n)),
+    Con{Lp.emit_line(Lp.take(Lp.feed(Lp.emit_lv(Lp.take(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ab\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n)), "data: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"c\"}}
+"), 300n)), Nil{}}}
+    == Con{"partial #17.0 +2 : c", Con{"partial #17.0 +0 : c", Nil{}}} : List<&2, String>}
+
+# LAW: at most one partial per every_ms(): due only with text waiting
+# and the last one 400 ms old (designer m_17504).
+law live_throttle:
+  {Con{Lp.due(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"a\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 399n),
+    Con{Lp.due(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"a\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 400n),
+    Con{Lp.due(Lp.lv0(True{}, "17.0", Api.Anthropic{}), 900n), Nil{}}}}
+    == Con{False{}, Con{True{}, Con{False{}, Nil{}}}} : List<&2, Bool>}
+
+# the Messages API's text delta, up to its text's opening quote
+def live_pre() -> String:
+  "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\""
+
+# raw UTF-8 in the literal: an é (2 bytes) and an emoji (4 bytes)
+def live_l1() -> String:
+  String.concat([live_pre(), U8.utf8.encode("café 😀"), "\"}}
+"])
+
+# JSON escapes: a newline, quotes, \u00e9, a surrogate pair
+def live_l2() -> String:
+  String.concat([live_pre(), "a\\nb \\\"q\\\" \\u00e9 \\ud83d\\ude00\"}}
+"])
+
+def live_agrees(ls: List<&2, String>) -> List<&2, Bool>:
+  match ls:
+    case Nil{}:
+      Nil{}
+    case Con{+l, rest}:
+      Con{Lp.agree(Api.Anthropic{}, l), live_agrees(rest)}
+
+def live_fires(ls: List<&2, String>) -> List<&2, Bool>:
+  match ls:
+    case Nil{}:
+      Nil{}
+    case Con{+l, rest}:
+      Con{Lp.fires(Api.Anthropic{}, l), live_fires(rest)}
+
+# LAW: the fast path (a text delta read without J.parse) reads what
+# J.parse reads, on every line it takes, and takes only the exact shape:
+# a plain delta, escapes and a surrogate pair, raw UTF-8, index 12, an
+# empty delta, trailing blanks; never a leading zero, a space, an extra
+# field, a bad escape, junk after the object, a thinking delta, an
+# unterminated literal or a lone surrogate (those go to J.parse).
+law live_fast_reads_as_slow:
+  {Con{live_agrees(
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}",
+      Con{String.trim(live_l2()), Con{String.trim(live_l1()),
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}} \r",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":01,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\": 0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\",\"y\":1}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\q\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}x",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\ud83d\"}}",
+      Nil{}}}}}}}}}}}}}}}),
+    Con{live_fires(
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}",
+      Con{String.trim(live_l2()), Con{String.trim(live_l1()),
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}} \r",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":01,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\": 0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\",\"y\":1}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\q\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}x",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"x\"}}",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"x",
+      Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\ud83d\"}}",
+      Nil{}}}}}}}}}}}}}}}), Nil{}}}
+    == Con{[True{}, True{}, True{}, True{}, True{}, True{}, True{}, True{},
+        True{}, True{}, True{}, True{}, True{}, True{}],
+      Con{[True{}, True{}, True{}, True{}, True{}, True{}, False{}, False{},
+        False{}, False{}, False{}, False{}, False{}, False{}], Nil{}}}
+      : List<&2, List<&2, Bool>>}
+
+# LAW: streaming on agrees with streaming off. The same stream, its
+# pieces cut inside an emoji's bytes, a take after each group (a flush
+# with several parts waiting), gives partials whose text, joined, is the
+# final reply's text byte for byte (As.reply, the stream decoded whole);
+# fed as one piece it gives that text in one partial.
+law live_streamed_text_is_the_reply:
+  {Con{As.reply(U8.utf8.decode(String.concat([
+      "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}
+", live_l1(), live_l2(), live_pre(), "\"}}
+", live_pre(), "!\"}}
+", "data: {\"type\":\"content_block_stop\",\"index\":0}
+data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}
+"]))),
+    Con{String.join(Lp.runs([["event: content_block_delta
+", String.take(live_l1(), 91n)],
+      [String.drop(live_l1(), 91n), "event: content_block_delta
+", live_l2()],
+      [String.concat([live_pre(), "\"}}
+"]), String.concat([live_pre(), "!\"}}
+"])]], Lp.lv0(True{}, "17.0", Api.Anthropic{})), "|"),
+    Con{String.join(Lp.runs([[String.concat([live_l1(), live_l2(), live_pre(),
+      "\"}}
+", live_pre(), "!\"}}
+"])]], Lp.lv0(True{}, "17.0", Api.Anthropic{})), "|"), Nil{}}}}
+    == Con{"OK café 😀a\\nb \"q\" é 😀!
+END
+",
+      Con{"partial #17.0 +0 : café 😀a\\nb \"q\" é 😀|partial #17.0 +18 : !",
+      Con{"partial #17.0 +0 : café 😀a\\nb \"q\" é 😀!", Nil{}}}} : List<&2, String>}

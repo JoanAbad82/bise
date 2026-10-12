@@ -4,7 +4,7 @@
 # OpenAI-compatible chat-completions JSON body, and a provider response
 # back into the OK/CALL/END reply the Core parses (runtime/remote.bend
 # parse_reply). This is the port of what the Rust bridge used to do: the
-# mapping lives in pure Bend and is pinned by LAWS.bend.
+# mapping lives in pure Bend and is pinned by bend/laws/.
 #
 # Tool results pair with assistant calls FIFO on the ids ("call_<n>"),
 # exactly as the bridge did; GLM content arrives as an array of blocks

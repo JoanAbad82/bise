@@ -54,13 +54,13 @@ tui_onboarding_tmux tui_onboarding_links_tmux subscriptions_tui_tmux tui_stuck_s
 [ -n "$only" ] && TESTS="$only"
 [ "$picked" = 1 ] && TESTS="$pick"
 if [ -z "$(echo $TESTS)" ]; then echo "== no e2e/tmux test picked for this change"; exit 0; fi
-# PROOF.bend's whole run, cached by the content of the .bend files it reads
+# PROOF: every bend/proofs/*.bend (tests/proof_run.py), cached by the content of the .bend files it reads
 # and the bend version, for every worktree (a rerun of a red full gate, or
 # another task on the same hub/ core/: ~2-3 min of one core, skipped)
 proof_cache="${BISE_HOME:-$HOME/.bise}/gate/proof-cache"
-proof_key="whole-$( { find bend/core bend/hub bend/vendor bend/LAWS.bend bend/PROOF.bend -name '*.bend' -type f 2>/dev/null | sort | while read -r f; do echo "$f"; cat "$f"; done; } | shasum | cut -c1-16)-$(BEND_NO_TELEMETRY=1 bend version 2>/dev/null | tr -dc '0-9.')"
+proof_key="whole-$( { find bend/core bend/hub bend/vendor bend/runtime bend/laws bend/proofs -name '*.bend' -type f 2>/dev/null | sort | while read -r f; do echo "$f"; cat "$f"; done; } | shasum | cut -c1-16)-$(BEND_NO_TELEMETRY=1 bend version 2>/dev/null | tr -dc '0-9.')"
 mkdir -p "$proof_cache" 2>/dev/null
-echo "== E2E (real hub, REPLs, git; scripted provider), Bend laws (PROOF.bend), the TUI under tmux ($jobs jobs)"
+echo "== E2E (real hub, REPLs, git; scripted provider), Bend laws (bend/proofs), the TUI under tmux ($jobs jobs)"
 out="$(mktemp -d -t sb-run-all)"
 # every test's wall and CPU time (user + sys of it and what it waited for)
 # go to a history shared by every worktree (loop-speed.md §10): the slow
@@ -73,7 +73,8 @@ one() {  # <test>: its last line; its whole output kept on failure
   if [ "$1" = PROOF ] && [ -f "$proof_cache/$proof_key" ]; then
     echo "ok   PROOF (cached: these .bend files checked whole before)"; return 0
   elif [ "$1" = PROOF ]; then
-    /usr/bin/time -p -o "$out/$1.time" bend bend/PROOF.bend >"$out/$1.log" 2>&1 && grep -q "ALL PROOFS CHECK" "$out/$1.log" || rc=1
+    # 2 bend at once: PROOF is one job of the pool
+    /usr/bin/time -p -o "$out/$1.time" python3 tests/proof_run.py . 2 "$out/proof" >"$out/$1.log" 2>&1 || rc=1
   else
     /usr/bin/time -p -o "$out/$1.time" python3 -u "tests/$1.py" >"$out/$1.log" 2>&1 || rc=$?
   fi
