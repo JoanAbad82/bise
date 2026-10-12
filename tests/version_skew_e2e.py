@@ -57,8 +57,36 @@ def version_dir(tmp, vid):
 
 
 def env_of(E):
-    """E's env with no app root: each bise finds its own from its exe."""
-    return {k: val for k, val in E.env.items() if k != "BISE_APP_ROOT"}
+    """E's env with no app root (each bise finds its own from its exe) and
+    no SB_STATE_DIR: that one folder is every hub's, and the core opens two
+    (the project's and the home workspace's, its window's first row), so
+    whichever started first took the project's socket; when the home hub
+    won, the TUI attached to it and never saw the project's line (hot-core's
+    red gate). Each hub gets its own folder under the throwaway HOME."""
+    return {k: val for k, val in E.env.items() if k not in ("BISE_APP_ROOT", "SB_STATE_DIR")}
+
+
+def hub_dirs(E):
+    """Every hub folder under the throwaway HOME (bise and legacy layouts)."""
+    home = E.env["HOME"]
+    out = []
+    for base in (os.path.join(home, ".bise", "hubs"), os.path.join(home, ".local", "state", "switchboard")):
+        if os.path.isdir(base):
+            out += [os.path.join(base, d) for d in sorted(os.listdir(base)) if os.path.isdir(os.path.join(base, d))]
+    return out
+
+
+def project_hub(E):
+    """The project's hub folder (its hub.log starts with its workspace), or None."""
+    ws = os.path.realpath(E.ws)
+    for d in hub_dirs(E):
+        try:
+            first = open(os.path.join(d, "hub.log")).readline()
+        except OSError:
+            continue
+        if "workspace=%s" % ws in first and os.path.exists(os.path.join(d, "hub.sock")):
+            return d
+    return None
 
 
 class CoreOf(Core):
@@ -98,9 +126,10 @@ def tui_from(E, v, session):
 
 
 def hub_facts(E):
-    """(the hub's pid, the root it runs), from its state dir."""
-    pid = open(os.path.join(E.state, "hub.pid")).read().split()[0].strip()
-    root = open(os.path.join(E.state, "hub.root")).read().strip()
+    """(the project hub's pid, the root it runs), from its folder."""
+    d = wait.until(lambda: project_hub(E), 30, "the project's hub folder under %s" % E.env["HOME"], poll=0.05)
+    pid = open(os.path.join(d, "hub.pid")).read().split()[0].strip()
+    root = open(os.path.join(d, "hub.root")).read().strip()
     return pid, os.path.realpath(root)
 
 
@@ -112,14 +141,12 @@ def no_refusal(core):
 def one_order(name, first_tui):
     E = e2e.Env()
     a, b = version_dir(E.tmp, "skew-a"), version_dir(E.tmp, "skew-b")
-    sock = os.path.join(E.state, "hub.sock")
     session = "sbskew%s%d" % (name, os.getpid())
     core = None
     ok = False
     try:
         if first_tui:
             t = tui_from(E, a, session)
-            wait.until(lambda: os.path.exists(sock), 30, "the TUI's hub socket", poll=0.05)
             t.wait_re(MAIN_IDLE, 90)
             pid, root = hub_facts(E)
             check(root == os.path.realpath(a), "the TUI from A started the hub on A: %s" % root)
@@ -151,8 +178,10 @@ def one_order(name, first_tui):
         tmux("kill-session", "-t", session)
         if core:
             core.stop()
-        if os.path.exists(sock):
-            e2e.stop_hub(sock)
+        # every hub of this HOME: the project's and the core's home hub
+        for d in hub_dirs(E):
+            if os.path.exists(os.path.join(d, "hub.sock")):
+                e2e.stop_hub(os.path.join(d, "hub.sock"))
         if ok:
             E.close()
         else:
