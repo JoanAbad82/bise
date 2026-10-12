@@ -11,7 +11,7 @@ import { reasonOf } from './exit';
 import { writeReport } from './report';
 import { MIC_CMDS, noAsks } from '../offscreen';
 import { binPath } from '../paths';
-import { configOf } from './env';
+import { configOf, coreLogOf } from './env';
 import { Latest } from '../../shared/latest';
 import { CoreProcess } from './process';
 import { DictationRoutes, type Route } from './dictation';
@@ -109,7 +109,10 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
   ipcMain.handle(CORE_IPC.stateNow, (): CoreState => state);
   ipcMain.handle(CORE_IPC.snapshot, (): Record<string, unknown>[] => latest.snapshot());
   ipcMain.handle(CORE_IPC.exitNow, (): CoreExit | null => lastExit);
-  const logFile = join(app.getPath('userData'), 'core.log');
+  // read now, after index.ts set the stand-in's userData (userdata.ts): its path said once, so
+  // a run on a stand-in home never has to guess it (ambient-lead m_19260)
+  const logFile = coreLogOf(app.getPath('userData'));
+  log(`core: core.log at ${logFile}`);
   // a crash's report in Finder (test mode: a line, never Finder)
   ipcMain.on(CORE_IPC.revealLog, () => {
     if (env[TEST_ENV] === '1') process.stdout.write(`${CORE_REVEAL_LINE} ${logFile}${String.fromCharCode(10)}`);

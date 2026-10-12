@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { coreLogOf } from './core/env';
 import { standInPaths } from './userdata';
 
 const REAL = '/Users/gabriel';
@@ -34,6 +35,16 @@ describe('standInPaths (amb-tools m_18637: a stand-in HOME never writes his real
     expect(standInPaths({ BISE_HOME: `${REAL}/.bise` }, REAL, 'bise'), 'his own bise home: unchanged').toBeNull();
     expect(standInPaths({ BISE_HOME: `${REAL}/.bise/` }, REAL, 'bise')).toBeNull();
     expect(standInPaths({ BISE_HOME: 'rel' }, REAL, 'bise')).toBeNull();
+  });
+
+  it("core.log is in the stand-in's userData, the folder amb-tools' world home holds (ambient-lead m_19260)", () => {
+    const h = `${REAL}/.bise/gate/real-shape/w/h`;
+    const a = standInPaths({ HOME: h, BISE_HOME: `${h}/.bise` }, REAL, 'bise try');
+    expect(a && coreLogOf(a.userData)).toBe(`${h}/Library/Application Support/bise try/core.log`);
+    const t = `${REAL}/.bise/try/desktop`;
+    const b = standInPaths({ HOME: REAL, BISE_HOME: t }, REAL, 'bise try');
+    expect(b && coreLogOf(b.userData)).toBe(`${t}/dev/desktop/bise try/userdata/core.log`);
+    expect(coreLogOf(`${REAL}/Library/Application Support/bise`), 'his own run: Electron’s userData').toBe(`${REAL}/Library/Application Support/bise/core.log`);
   });
 
   it('nothing it gives is under his real Library, for any stand-in', () => {

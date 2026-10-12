@@ -3,6 +3,7 @@
 // --workspace <ws>`, or `--home` with no workspace; never PATH's `bise`
 // (a path or nothing: lead m_8079); a restart backoff that resets after a
 // healthy run. Its environment is ../childenv.ts's, shared with `bise pty`.
+import { join } from 'node:path';
 
 /**
  * The workspace the core runs on (set by the launcher, scripts/desktop.sh open, or the harness in
@@ -25,6 +26,15 @@ export interface CoreConfig {
 export function configOf(bise: string | null, env: Readonly<Record<string, string | undefined>>): CoreConfig | null {
   if (bise === null || !bise.includes('/')) return null;
   return { bise, workspace: env[WORKSPACE_ENV] ?? '' };
+}
+
+/**
+ * The core's stderr file: core.log in the app's userData as it is once the app has set it (a
+ * stand-in's, userdata.ts, or Electron's own), read at the core's start, never captured before
+ * (ambient-lead m_19260). The app logs this path once at start.
+ */
+export function coreLogOf(userData: string): string {
+  return join(userData, 'core.log');
 }
 
 export function coreArgs(workspace: string): string[] {
