@@ -233,10 +233,21 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
     fireEvent.click(v.getByTestId('thread.think.21.head'));
     expect(v.getByTestId('thread.think.21').textContent).toContain('the cold run is the slow one');
     cleanup();
-    // under 1 s nothing was thought worth a line (ambient m_11777 (c)): the reply alone
+    // a thought with words shows under 1 s too, as the TUI's '∴ thought for 0.9s ▸' (ambient-lead m_20357)
     const r = rowOf(store, 22);
-    expect(r.queryByTestId('thread.think.22.head')).toBeNull();
+    expect(r.getByTestId('thread.think.22.head').textContent).toContain('thought for 0.9s');
     expect(r.getByTestId('thread.entry.22').textContent).toContain('done.');
+    cleanup();
+    // under 1 s with no words nothing was thought (ambient m_11777 (c)): the reply alone, a lone row none
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 25, at_ms: 5, kind: 'agent', text: 'done.', thinking: { ms: 900, text: '' } } });
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 26, at_ms: 6, kind: 'thinking', text: 'thought for 0.0s', thinking: { ms: 40, text: 'weighing the p99 window' } } });
+    expect(rowOf(store, 25).queryByTestId('thread.think.25.head')).toBeNull();
+    cleanup();
+    // a fast '[[think: …]]' on the real core (qa-flows' rows-batch2): its row, open to its words
+    const f = rowOf(store, 26);
+    expect(f.getByTestId('thread.think.26.head').textContent).toContain('thought for 0.0s');
+    fireEvent.click(f.getByTestId('thread.think.26.head'));
+    expect(f.getByTestId('thread.think.26').textContent).toContain('weighing the p99 window');
     cleanup();
     store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 23, at_ms: 3, kind: 'agent', text: 'done.', thinking: { ms: 1200, text: 'check it twice' } } });
     store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 24, at_ms: 4, kind: 'thinking', text: 'thought for 0.0s', thinking: { ms: 0, text: '' } } });

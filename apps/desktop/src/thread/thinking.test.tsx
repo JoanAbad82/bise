@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Store, StoreProvider, threadKey } from '@/store';
 import { EntryRow, type RowCtx } from './rows';
 import { thinkingWords } from './thinking';
+import { thoughtShows } from './entry';
 
 afterEach(cleanup);
 
@@ -18,6 +19,17 @@ describe('a thinking never draws its signature', () => {
     expect(thinkingWords(`weigh ${SIG} it`)).toBe('weigh  it');
     expect(thinkingWords(SIG)).toBe('');
     expect(thinkingWords('the cold run\n\nis the slow one')).toBe('the cold run\n\nis the slow one');
+  });
+
+  it('a thought shows when it has words at any time, or from 1 s; a signature alone is no words (ambient-lead m_20357)', () => {
+    expect(thoughtShows({ ms: 0, text: 'weighing the p99 window' })).toBe(true);
+    expect(thoughtShows({ ms: 40, text: `weigh it
+${SIG}` })).toBe(true);
+    expect(thoughtShows({ ms: 1200, text: '' })).toBe(true);
+    expect(thoughtShows({ ms: 900, text: '' })).toBe(false);
+    expect(thoughtShows({ ms: 900, text: `  
+${SIG}` })).toBe(false);
+    expect(thoughtShows(undefined)).toBe(false);
   });
 
   it('an open thinking entry and a reply carrying one show their words, never BENDSIG::', () => {
