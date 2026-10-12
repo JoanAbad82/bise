@@ -8,7 +8,7 @@ free disk), HEAD 9b8ad22 (applied on 6bf6a86+), with other agents working at the
 
 1. Start a task with `tests/gate.sh new <name>` (from any tree; `<name>` defaults to `$SB_AGENT`): its folder `~/.bise/worktrees/<project-id>/<name>/` (BISE-230, like Codex's `~/.codex/worktrees`) holds a worktree of HEAD (`harness/`) and its own target (`target/`), an APFS clone of the warm seed for the current deps (~3-10 s, 0 bytes; the seed, `~/.bise/cache/gate-seed/<key>`, one at a time, ~7 GB of blocks the clones share, is built once per Cargo.lock/Cargo.toml/.cargo/config.toml/rustc change, ~2 min, by the first task that needs it). Run what it prints (`cd` + `export CARGO_TARGET_DIR`). End it with `gate.sh done <name>` (refused while the worktree has uncommitted changes or commits on no branch). The hub removes the folder too, at the task's /drop and, for an orphan (a task archived or unknown), at its start, never when the worktree has such work (it says so in main's thread). A task worktree the hub made (`<task dir>/<repo>` with `<task dir>/owner`, no `rust/target` yet) needs nothing: `gate.sh quick|full` use `<task dir>/target`, a clone of the seed, by themselves (§10). Never clone another task's target: they grow to 15 GB (see §8). Never share a CARGO_TARGET_DIR between worktrees either: a build of main there overwrote a branch's binary (proto-lead).
 2. Each commit: `tests/gate.sh` (quick), in the foreground. It runs clippy -D warnings (in `$CARGO_TARGET_DIR/clippy`, next to the tests) and the tests of the changed crates and their users; no `cargo build` any more (the full gate builds the binary). A change to a `.bend` file of core/ hub/ vendor/ or LAWS/PROOF runs PROOF.bend in 4 shards in parallel; the tests run `scripts/bins.sh path sb-core`, the cache file itself (SB_CORE_BIN; on a hub/ vendor/ change it compiles next to cargo, once per source hash for every worktree and the full gate). PROOF is cached by content in `$CARGO_TARGET_DIR/gate-cache`. An sb-core gone after its build (the EDR of a company Mac deletes fresh unsigned copies at their first spawn) is one line: `sb-core vanished after it was built: an antivirus (EDR) may have removed it`. Warm: **~5 s** for a Rust change, **~11 s** for a hub change, 16 s the first time in a new worktree with a cloned target.
-3. Once per task, on the last commit: `gate.sh full` (one at a time on the machine, rule 5; cargo build; ./repl-live ./repl-scripted ./sb-core put in place by `./bins.sh`, compiled when their sources changed; run_all.sh with FUZZ_RUNS=2000: every Rust test, the whole PROOF.bend, e2e and the 14 tmux tests, 4 jobs in parallel), ~55 s warm.
+3. Once per task, on the last commit: `gate.sh full` (the Rust part, then only the e2e/tmux tests your change can break, §11; `gate.sh full --all` for every one; a release always runs every one) (one at a time on the machine, rule 5; cargo build; ./repl-live ./repl-scripted ./sb-core put in place by `./bins.sh`, compiled when their sources changed; run_all.sh with FUZZ_RUNS=2000: every Rust test, the whole PROOF.bend, e2e and the 14 tmux tests, 4 jobs in parallel), ~55 s warm.
 4. Never `sleep N; tail log`. A gate the bash tool put in the background: `gate.sh wait <its .out file or pid>` (blocks until it ends, at most 25 s, then shows the result).
 5. One full gate at a time on the machine (BISE-244, §9): `gate.sh full` takes a lock; a second one prints `waiting for the gate: <agent>'s full gate runs` and sets your note to `waiting for the gate`, then runs. Do not kill it to retry, and do not run `run_all.sh` by hand to skip the queue: two full gates at once take as long as two in a row and load the machine for everyone. Quick gates never wait. Iterate with the quick gate; the full gate once, before the last commit. A full gate red only on e2e/tmux tests: `gate.sh rerun` runs those tests alone, one by one, on the same tree (it says which ones were flaky; §10); never a whole new full gate for a flake, never by hand.
 6. `run_all.sh --serial` runs e2e/tmux one by one (debugging a flake); `SB_TEST_JOBS=n` changes the parallelism; `FUZZ_RUNS=2000` for the long fuzz run.
@@ -450,4 +450,34 @@ What changed (no test dropped, no coverage lost):
 6. **heavy-run** (`~/.bise/run/heavy-run`, outside the repo): a `gate.sh
    full` job waits for the full-gate lock before it takes a slot, and every
    job logs its submit and start times to `~/.bise/run/heavy.log`.
+
+## 11. Change-based test selection (loop-speed-4, the user's yes on q1)
+
+`gate.sh full` runs the Rust part (build, every Rust test, clippy) always,
+then only the e2e/tmux tests the tree's change can break, vs its merge-base
+with main (`GATE_FULL_BASE`). `tests/test_map.py` decides, per changed path:
+docs/ site/ nix/ .github/ and the notices run no test unless a test names
+the very file; rust/tui/ and the crossterm patch run the 68 TUI tests (every
+`*_tmux`, and the tests naming tmux or the TUI crate); bend/PROOF.bend and
+LAWS.bend run PROOF; tests/<x>.py runs every test naming it, transitively
+(e2e.py: 110 tests); anything else (rust/ but the TUI, bend/, prompts/,
+plugins/, .agents/, scripts/, packaging/, kit/, the gate itself, an unknown
+path) runs all of them. Its self-test, in the quick gate, fails when
+run_all.sh names a test with no file or when the repo has a top-level path
+the map does not know.
+
+Every test still runs: `gate.sh full --all`, a release agent's full gate
+(SB_AGENT release*), main's tip (no change), and every night:
+`scripts/nightly_gate.sh` (launchd `dev.bise.nightly-gate`, 04:30, installed
+with `--install`) runs `gate.sh full --all` on main's tip in its own tree
+and writes `~/.bise/run/nightly/last`, and `red` only while main is red
+(main watches it: `sb wake --on-file ~/.bise/run/nightly/red`).
+
+Measured: a change to tests/every_e2e.py, full gate green in 285 s (1 test
+picked) instead of 743 s for all 118.
+
+Also learned: `launchctl submit` relaunches a job when it exits (end a job
+script with `launchctl remove <label>`); an edit in place of a script that
+jobs are waiting in breaks them (bash reads as it goes): heavy-run's body is
+now one function, read before it runs.
 
