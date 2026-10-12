@@ -1528,7 +1528,12 @@ impl Setup {
         if let Some(d) = path.parent() {
             std::fs::create_dir_all(d)?;
         }
-        let tmp: PathBuf = path.with_extension(format!("toml.{}.tmp", std::process::id()));
+        // one temp file per write, not per process: the hub writes it from
+        // several threads (a REPL start, its keys check, small jobs), and
+        // two writes on one temp name made one rename fail
+        static WRITES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let n = WRITES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let tmp: PathBuf = path.with_extension(format!("toml.{}.{}.tmp", std::process::id(), n));
         std::fs::write(&tmp, self.handoff_toml())?;
         std::fs::rename(&tmp, path).inspect_err(|_| {
             let _ = std::fs::remove_file(&tmp);
