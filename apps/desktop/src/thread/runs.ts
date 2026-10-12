@@ -1,15 +1,17 @@
-// Runs of agent-to-agent messages folded as the TUI does (tui-parity R13; rust/tui/src/feed.rs
-// folded_run, render.rs fold_line): more than FOLD_AFTER messages in a row between agents show as
-// one line '▸ 4 messages between 2 agents' that opens them in place. Owner: amb-win. Pure.
+// Runs of agent-to-agent messages folded (tui-parity R13; rust/tui/src/feed.rs folded_run, render.rs
+// fold_line): since designer's thread tiers (m_19387) a run of 2 or more messages between agents shows
+// as one line '▸ 4 messages between 2 agents' that opens them in place. Owner: amb-win. Pure.
 
-/** A run folds when it has more than this many messages (the TUI's FOLD_AFTER). */
-export const FOLD_AFTER = 3;
+/** A run folds when it has more than this many messages (2 and more: designer m_19387, tier 4). */
+export const FOLD_AFTER = 1;
 
 /** What a run needs of an entry. */
 export interface RunEntry {
   readonly kind: string;
   readonly from?: string | null;
   readonly to?: string | null;
+  /** a question that waits for the reply: never folded away */
+  readonly asks?: boolean | null;
 }
 
 export interface Run {
@@ -20,7 +22,8 @@ export interface Run {
   readonly agents: number;
 }
 
-const isAgentMsg = (e: RunEntry | undefined): e is RunEntry => e !== undefined && (e.kind === 'to_agent' || e.kind === 'from_agent');
+// a question that waits for its reply (asks) stays in view: it breaks a run
+const isAgentMsg = (e: RunEntry | undefined): e is RunEntry => e !== undefined && (e.kind === 'to_agent' || e.kind === 'from_agent') && e.asks !== true;
 
 /** The folded runs of a thread's entries in order (`agent`: whose thread it is). Pure. */
 export function foldedRuns(order: readonly number[], entry: (pos: number) => RunEntry | undefined, agent: string): Run[] {

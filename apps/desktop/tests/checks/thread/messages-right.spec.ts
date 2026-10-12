@@ -181,7 +181,16 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
       return a && b ? b.top - a.bottom : -1;
     });
     expect(Math.round(gap), "a run's bubbles 4 px apart").toBe(4);
-    // a steer: 'steered · bise read it mid-turn' under it (bise: this is shop's main, named bise)
+    // a steer: 'steered · bise read it mid-turn' under it (bise: this is shop's main, named bise);
+    // the list is virtual: walk it from the top down until its row is drawn (taller rows since the
+    // tiers' 20 px heads, it can be above or below what the checks before left in view)
+    for (let i = 0; i < 40 && (await page.getByTestId('thread.you.10').count()) === 0; i++) {
+      await page.evaluate((step) => {
+        const el = document.querySelector('.th-list [data-virtuoso-scroller="true"]');
+        if (el) el.scrollTop = step * 150;
+      }, i);
+      await page.waitForTimeout(100);
+    }
     await expect(page.getByTestId('thread.you.10.under')).toHaveText(/^steered · \S+ read it mid-turn$/u);
     // where the agent read it: after the first bench (tools 11), before the second (tools 12)
     // (the list is virtual: the steer is brought to the middle so both benches are drawn)

@@ -16,7 +16,9 @@ import { THOUGHT_MS, answeredCardOf, briefOf, clock, dayLabel, groupHead, lastOf
 import { useToday } from '@/app/clock';
 import { useIsCurrent } from './findmark';
 import { useVoiceLit } from '@/voicemode';
-import { AnsweredRow, ApprovalRow, CardAnsweredRow, CardRow, ToAgentRow } from './rows-cards';
+import { AgentNote, AnsweredRow, ApprovalRow, CardAnsweredRow, CardRow, ToAgentRow } from './rows-cards';
+import { shownName } from '@/agents/model';
+import { BODY_KINDS, ROW_KINDS } from './tiers';
 import { YouRow } from './rows-messages';
 import { ArtChip, BriefRow, CompactedRow, LandedRow, MadeRow, NotDeliveredRow, NOTICE_MARK, NoticeRow, PrRow, ScheduledRow, WakeRow } from './rows-news';
 import { ThinkingLine, thoughtFor, ToolsRow } from './rows-tools';
@@ -72,18 +74,15 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, sti
   );
 });
 
-/** The dim rows of a turn: its work (tool lines, a thinking), drawn at --lh-row. */
-const DIM_KINDS: ReadonlySet<string> = new Set(['tools', 'thinking']);
-
 /**
- * The room above a row inside one turn (designer m_19359): 'row' between two dim rows (8 px),
- * 'switch' from an answer's prose to a dim row or back (12 px), none otherwise. Pure.
+ * The room above a row inside one turn (designer m_19359, m_19387): 'row' between two dim rows
+ * (tiers 3 and 4: 8 px), 'switch' from body text to a dim row or back (12 px), none otherwise. Pure.
  */
 export function gapOf(prev: Pick<Entry, 'kind'>, e: Pick<Entry, 'kind'>): 'row' | 'switch' | undefined {
-  const a = DIM_KINDS.has(prev.kind);
-  const b = DIM_KINDS.has(e.kind);
+  const a = ROW_KINDS.has(prev.kind);
+  const b = ROW_KINDS.has(e.kind);
   if (a && b) return 'row';
-  if (a !== b && (a ? e.kind : prev.kind) === 'agent') return 'switch';
+  if (a !== b && BODY_KINDS.has(a ? e.kind : prev.kind)) return 'switch';
   return undefined;
 }
 
@@ -198,6 +197,21 @@ function EntryBody({ e, ctx, head, next, live, still }: { e: Entry; ctx: RowCtx;
     // event-wake: a watch's end, the hub's line with its folded output
     case 'wake':
       return <WakeRow e={e} />;
+    case 'from_agent': {
+      // tier 4 (designer m_19387): a message from another agent, never body prose; its report to
+      // this agent stays a status line (the default's report branch below)
+      const report = reportStatus(e.text);
+      const from = shownName(e.from ?? 'an agent');
+      if (report !== null) {
+        return (
+          <div className="th-report" data-waits={report.startsWith('blocked') || undefined} data-testid={`thread.report.${String(e.pos)}`}>
+            <Marker>{(e.from ?? ctx.agent) !== ctx.agent ? `${from}: ${report}` : report}</Marker>
+          </div>
+        );
+      }
+      const to = shownName(e.to != null && e.to !== '' ? e.to : ctx.agent);
+      return <AgentNote pos={e.pos} from={from} to={to} text={dropAuthor(e.text, e.from ?? '')} ctx={ctx} testId={`thread.from.${String(e.pos)}`} />;
+    }
     case 'unknown':
       // a kind from a newer hub: its words, plain and dim
       return (

@@ -173,11 +173,14 @@ test('thread/reading: one column, no raw context, no empty thinking, one restore
     await expect(page.getByTestId('thread.notice.6')).toHaveCount(0);
     await expect(page.getByTestId('thread.notice.7')).toHaveCount(0);
     await expect(page.getByTestId('thread.day.5')).toHaveText('today');
-    await expect(page.getByTestId('thread.entry.8')).toHaveAttribute('data-head', 'true');
-    await expect(page.getByTestId('thread.entry.9')).toHaveAttribute('data-head', 'false');
+    // designer's tiers (m_19387): perf's two messages to main fold to one dim row on the text column
+    await expect(page.getByTestId('thread.run.8')).toHaveText('▸ 2 messages between 2 agents');
+    await expect(page.getByTestId('thread.entry.8')).toHaveCount(0);
     await expect(page.getByTestId('thread.entry.10')).toHaveAttribute('data-head', 'true');
-    // ambient m_11934: one left edge (no indent for another agent's rows), no 'perf:' under 'perf'
-    await expect(page.getByTestId('thread.entry.8')).not.toContainText('perf:');
+    // open: no 'perf:' under 'perf' (ambient m_11934)
+    await page.getByTestId('thread.run.8').click();
+    await expect(page.getByTestId('thread.entry.8')).toHaveAttribute('data-head', 'true');
+    await expect(page.getByTestId('thread.from.8.text')).not.toContainText('perf:');
     const edges = await page.evaluate(() =>
       [8, 9, 10].map((n) => {
         const row = document.querySelector(`[data-testid="thread.entry.${String(n)}"]`)?.getBoundingClientRect();

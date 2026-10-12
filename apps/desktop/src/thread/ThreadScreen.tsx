@@ -43,6 +43,7 @@ import { ComputerLine, computerRowOf, computerState } from './ComputerLine';
 import { entryKey, pendingKey, placeSteered, posOfKey } from './entry';
 import { FindBar } from './FindBar';
 import { NoProject } from './NoProject';
+import { landedEchoes } from './tiers';
 import { foldedRuns, runKey, runWords, withRuns } from './runs';
 import { BisePearl } from '@/app/BisePearl';
 import { createFindMark, FindMarkContext } from './findmark';
@@ -504,7 +505,12 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBac
   const [openRuns, setOpenRuns] = useState<ReadonlySet<number>>(() => new Set());
   // a steer shows where the agent read it (its receipt's pos), not where it was written
   // (the store bumps the order when a steered_at comes, so this recomputes)
-  const shown = useMemo(() => placeSteered(view.order, (pos) => store.entry(tkey, pos)?.steered_at), [view, store, tkey]);
+  // one land per sha (designer m_19387): the hub's line that says again a typed land leaves the list
+  const shown = useMemo(() => {
+    const echoes = landedEchoes(view.order, (pos) => store.entry(tkey, pos));
+    const order = echoes.size === 0 ? view.order : view.order.filter((pos) => !echoes.has(pos));
+    return placeSteered(order, (pos) => store.entry(tkey, pos)?.steered_at);
+  }, [view, store, tkey]);
   const runs = useMemo(() => foldedRuns(shown, (pos) => store.entry(tkey, pos), agent), [shown, store, tkey, agent]);
   const listed = useMemo(() => withRuns(shown, runs, openRuns, entryKey), [shown, runs, openRuns]);
   // the reply being written (streaming): a live row at the end, drawn as the entry it becomes,

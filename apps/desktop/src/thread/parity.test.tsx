@@ -159,8 +159,9 @@ describe('code colors (tui-parity B15)', () => {
         <EntryRow ctx={ctx} pos={9} />
       </StoreProvider>,
     );
-    expect(v.getByTestId('thread.to.7').textContent).toContain('gift-ui → bise');
-    expect(v.getByTestId('thread.to.7').textContent).not.toContain('✉');
+    // designer's tiers (m_19387, tier 4): every message between agents is the ✉ chip 'sender → receiver'
+    expect(v.getByTestId('thread.to.7').textContent).toContain('✉ gift-ui → bise');
+    expect(v.getByTestId('thread.to.7').textContent).toContain('done: the balance label');
     expect(v.queryByTestId('thread.asks.7')).toBeNull();
     expect(v.getByTestId('thread.to.8').textContent).toContain('✉ gift-ui → bise');
     expect(v.getByTestId('thread.to.8').textContent).toContain(ask);

@@ -2,7 +2,7 @@
 // image chips, and one agent's message to another. Owner: amb-win. Split out of
 // rows.tsx (pure move).
 import { useState, type ReactNode } from 'react';
-import { Answered, CardLine, Marker, Msg } from '@/ds';
+import { Act, Answered, CardLine, Marker, Press } from '@/ds';
 import { openInbox } from '@/inbox/Block';
 import type { Entry } from '@/proto';
 import { useEntry, useThreadOrder } from '@/store';
@@ -212,22 +212,60 @@ export function ToAgentRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
     );
   }
   return (
-    <Msg
-      from="agent"
-      name={toAgentName(shownName(ctx.agent), shownName(to), e.asks === true)}
-      indent
-      time={clock(e.at_ms)}
+    <AgentNote
+      pos={e.pos}
+      from={shownName(ctx.agent)}
+      to={shownName(to)}
+      text={e.text}
+      ctx={ctx}
       testId={`thread.to.${String(e.pos)}`}
-      after={
+      tag={
         e.asks === true && !carded ? (
           <span className="th-waits main" data-testid={`thread.asks.${String(e.pos)}`}>
             waits for {shownName(to)}
           </span>
         ) : undefined
       }
-    >
-      <Markdown text={e.text} onLink={ctx.onLink} onPath={ctx.onPath} />
-    </Msg>
+    />
+  );
+}
+
+/** How many lines of an agent's message show folded (designer m_19387, tier 4). */
+const NOTE_LINES = 2;
+
+/**
+ * A message between agents (designer's thread tiers m_19387, tier 4): never body prose in the thread,
+ * whoever wrote it. One dim mono row: the ✉ chip 'sender → receiver' (the sender in ink, the rest
+ * text-3), then at most two rows of its words at +16 px, then '… ▸' when there is more; a click on
+ * the chip or on '… ▸' opens it whole (markdown), again folds it.
+ */
+export function AgentNote({ pos, from, to, text, ctx, testId, tag }: { pos: number; from: string; to: string; text: string; ctx: RowCtx; testId: string; tag?: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const lines = text.split('\n');
+  const more = lines.length > NOTE_LINES || text.length > 220;
+  const toggle = () => {
+    setOpen((o) => !o);
+  };
+  return (
+    <div className="th-note" data-open={open || undefined} data-testid={testId} data-pos={pos}>
+      <div className="th-note-head">
+        <Press look="th-note-chip" aria-expanded={open} onClick={toggle} data-testid={`${testId}.chip`}>
+          <span aria-hidden="true">✉ </span>
+          <span className="th-note-from">{from}</span> → {to}
+        </Press>
+        {tag}
+      </div>
+      {text !== '' && (
+        <div className="th-note-text" data-testid={`${testId}.text`}>
+          {open ? <Markdown text={text} onLink={ctx.onLink} onPath={ctx.onPath} /> : lines.slice(0, NOTE_LINES).join('\n')}
+        </div>
+      )}
+      {more && !open && (
+        <Act onClick={toggle} testId={`${testId}.more`}>
+          … ▸
+        </Act>
+      )}
+    </div>
   );
 }
 
