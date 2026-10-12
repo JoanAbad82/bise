@@ -28,12 +28,15 @@ export const ROW_KINDS: ReadonlySet<string> = new Set([
  */
 export const NAMELESS_KINDS: ReadonlySet<string> = new Set(['landed', 'pr', 'artifact', 'scheduled', 'stopped', 'wake', 'notice', 'compacting', 'compacted', 'unknown']);
 
+/** A report folded to one quiet row (H8: the message under it repeats it), for gapOf. */
+export const QUIET_REPORT = 'quiet-report';
+
 /**
  * The quiet rows (tui-parity H1, designer m_19832): news, wake, scheduled, a new agent, plumbing,
  * the fold of a run ('fold'). Two of them in a row touch (--gap-tight 4); a run of them sits
  * --gap-block 12 from a message or prose; tool rows keep their 8.
  */
-export const QUIET_KINDS: ReadonlySet<string> = new Set([...NAMELESS_KINDS, 'fold']);
+export const QUIET_KINDS: ReadonlySet<string> = new Set([...NAMELESS_KINDS, 'fold', QUIET_REPORT]);
 
 /** A message between agents (tier 4): its ✉ chip 'sender → receiver' and one row. */
 export const NOTE_KINDS: ReadonlySet<string> = new Set(['to_agent', 'from_agent']);

@@ -12,13 +12,13 @@ import { Marker, Msg } from '@/ds';
 import type { Entry } from '@/proto';
 import { useEntry } from '@/store';
 import { Answer } from './Markdown';
-import { GROUP_GAP_MS, THOUGHT_MS, answeredCardOf, briefOf, clock, dayLabel, groupHead, lastOfRun, sameDay, sideOf, dropAuthor, reportStatus, thoughtNothing, whoOf } from './entry';
+import { GROUP_GAP_MS, THOUGHT_MS, answeredCardOf, repeatedReport, briefOf, clock, dayLabel, groupHead, lastOfRun, sameDay, sideOf, dropAuthor, reportStatus, thoughtNothing, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useIsCurrent } from './findmark';
 import { useVoiceLit } from '@/voicemode';
 import { AgentNote, AnsweredRow, ApprovalRow, CardAnsweredRow, CardRow, ToAgentRow } from './rows-cards';
 import { shownName } from '@/agents/model';
-import { BODY_KINDS, NAMELESS_KINDS, NOTE_KINDS, QUIET_KINDS, ROW_KINDS, sameRoute } from './tiers';
+import { BODY_KINDS, NAMELESS_KINDS, NOTE_KINDS, QUIET_KINDS, QUIET_REPORT, ROW_KINDS, sameRoute } from './tiers';
 import { YouRow } from './rows-messages';
 import { ArtChip, BriefRow, CompactedRow, LandedRow, MadeRow, NotDeliveredRow, NOTICE_MARK, NoticeRow, PrRow, ReportRow, ScheduledRow, WakeRow } from './rows-news';
 import { ThinkingLine, thoughtFor, ToolsRow } from './rows-tools';
@@ -83,14 +83,18 @@ export const EntryRow = memo(function EntryRow({
   const day = e.at_ms > 0 && (p === undefined || !sameDay(p.at_ms, e.at_ms)) ? dayLabel(e.at_ms, today) : null;
   // a news or plumbing row has no name line: a new author there opens no group (designer m_19387);
   // nor does a message between agents right after another (an open run: 12 px apart, m_19784 (2))
-  const nameless = p !== undefined && (NAMELESS_KINDS.has(e.kind) || (NOTE_KINDS.has(e.kind) && NOTE_KINDS.has(p.kind)));
+  // a report the message under it repeats is a quiet row (H8): no group of its own, 4 px from quiet rows
+  const n0 = next === undefined ? undefined : afterIt;
+  const quietMe = repeatedReport(e, n0);
+  const quietPrev = p !== undefined && repeatedReport(p, e);
+  const nameless = p !== undefined && (quietMe || NAMELESS_KINDS.has(e.kind) || (NOTE_KINDS.has(e.kind) && NOTE_KINDS.has(p.kind)));
   const head = groupHead(p, e, ctx) && !nameless && !underFold;
   // same sender → same receiver as the message before: one chip for both (m_19784 (2))
   const chained = sameRoute(p, e, ctx.agent);
   // his on the right, the rest on the left (messages-right v1); a change of side opens more room
   const side = sideOf(e);
   const turn = p !== undefined && day === null && sideOf(p) !== side;
-  const gap = underFold ? 'row' : p === undefined || day !== null || turn || head ? undefined : gapOf(afterFold ? { kind: 'fold' } : p, e);
+  const gap = underFold ? 'row' : p === undefined || day !== null || turn || head ? undefined : gapOf(afterFold ? { kind: 'fold' } : quietPrev ? { kind: QUIET_REPORT } : p, quietMe ? { kind: QUIET_REPORT } : e);
   // H2: the name line opens an author's run on its first row that is not work; H12: after 5 min
   // of silence a faint '· 14:31 ·' (the TUI's), the times themselves on hover only
   const work = TOOL_KINDS.has(e.kind);

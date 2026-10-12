@@ -114,6 +114,11 @@ for (const theme of ['light', 'dark']) {
         await expect(page.getByTestId('thread.pause.8')).toHaveText(/^· \d{1,2}:\d{2}( [AP]M)? ·$/u);
         await expect(page.locator('[data-testid="thread.entry.8"] .b-who:not(.b-hover)')).toHaveCount(1);
         await page.screenshot({ path: test.info().outputPath(`hierarchy-${theme}-${String(w)}.png`) });
+        // H3's record for designer: the quiet rows with the scheduled one, close
+        if (w === 1100) {
+          const [a, b] = await Promise.all([page.getByTestId('thread.handoff.4').boundingBox(), page.getByTestId('thread.scheduled.7').boundingBox()]);
+          if (a !== null && b !== null) await page.screenshot({ path: test.info().outputPath(`hierarchy-${theme}-h3-scheduled.png`), clip: { x: a.x - 16, y: a.y - 12, width: 720, height: b.y + b.height - a.y + 24 } });
+        }
       }
       // H12: the time shows on hover, right-aligned, taking no room
       await page.setViewportSize({ width: 1400, height: 900 });
@@ -154,6 +159,8 @@ const perf = [
   { pos: 7, at_ms: at(17), kind: 'notice', text: tries(3, 4), notice: { level: 'warn', text: tries(3, 4) } },
   { pos: 8, at_ms: at(16), kind: 'agent', text: 'Still true at 500: the p99 holds at 290 ms.' },
   { pos: 9, at_ms: at(15), kind: 'notice', text: tries(10), notice: { level: 'warn', text: tries(10) } },
+  // H13: a long command is cut with …, its ✓ and time stay at its end
+  { pos: 10, at_ms: at(14), kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 10, at_ms: at(14), text: `bash /Users/someone/.bise/gate/w-tuiparity/rich/${'p99-ask-'.repeat(20)}.sh`, kind: 'run', state: 'ok', ms: 700 }] } },
 ];
 const world2 = (theme: string) => [...world(theme).filter((e) => e.ev !== 'agents'), { ev: 'agents', project: P, agents: [ag('main'), ag('perf', 'p99 latency')] }, { ev: 'thread', project: P, agent: 'perf', entries: perf, before: null, more: false }];
 
@@ -163,7 +170,7 @@ for (const theme of ['light', 'dark']) {
     const s = await launchDesktop({ core, route: `agent/${P}/perf`, size: '1100x900' });
     try {
       const { page } = s;
-      await expect(page.getByTestId('thread.entry.9')).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByTestId('thread.entry.10')).toBeVisible({ timeout: 10_000 });
       await page.mouse.move(1, 400);
       // H7: the quote, one dim line at the bubble's top, its words cut with …
       const q = page.getByTestId('thread.you.1.quote.1');
@@ -172,8 +179,13 @@ for (const theme of ['light', 'dark']) {
       const ql = await q.evaluate((el) => ({ h: el.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(el).lineHeight), size: getComputedStyle(el).fontSize }));
       expect(ql.h / ql.lh, 'H7: one line').toBeLessThan(1.6);
       expect(ql.size).toBe('13px');
-      // H8: the report the message under it repeats: one quiet row; the message stays
-      await expect(page.getByTestId('thread.report.2.fold')).toHaveText('✓ report ▸');
+      // H8: the report the message under it repeats: one quiet row that keeps its words
+      // ('✓ <summary>… ▸ report', sans 13 text-2, designer via ambient-lead m_20040); the message stays
+      await expect(page.getByTestId('thread.report.2.fold')).toHaveText(/^✓p99 rose because it averaged the slowest 10%.*▸ report$/u);
+      const fold = await page.getByTestId('thread.report.2.fold').evaluate((el) => ({ size: getComputedStyle(el).fontSize, font: getComputedStyle(el).fontFamily, h: el.getBoundingClientRect().height }));
+      expect(fold.size).toBe('13px');
+      expect(fold.font).not.toMatch(/mono/i);
+      expect(fold.h, 'one row').toBeLessThan(24);
       await expect(page.getByTestId('thread.entry.3')).toContainText('ready to merge');
       // a report alone: its one line, '▸ report' opens the rest in place
       await expect(page.locator('[data-testid="thread.report.4"] .b-marker')).toHaveText(/^✓ done · the batch test passes on 500 too\.?$/u);
@@ -194,6 +206,15 @@ for (const theme of ['light', 'dark']) {
       expect(await page.getByTestId('thread.notice.7.retry').evaluate((el) => getComputedStyle(el).color), 'not red while it retries').not.toBe(err);
       await expect(page.getByTestId('thread.notice.9.retry')).toHaveText('▲model call failed · try 10 of 10 failed ▸');
       expect(await page.getByTestId('thread.notice.9.retry').evaluate((el) => getComputedStyle(el).color), 'red once the last try failed').toBe(err);
+      // H13: the long command cut, its ✓ and '0.7 s' inside the row, at its end
+      const t13 = await page.evaluate(() => {
+        const line = document.querySelector('[data-testid="thread.tool.10"]')?.getBoundingClientRect();
+        const end = document.querySelector('[data-testid="thread.tool.10.end"]')?.getBoundingClientRect();
+        const text = document.querySelector('[data-testid="thread.tool.10"] .th-tool-text');
+        return { inside: line && end ? end.right <= line.right + 1 && end.width > 0 : false, cut: text instanceof HTMLElement ? text.scrollWidth > text.clientWidth : false };
+      });
+      expect(t13, 'H13: the command cut, its status kept').toEqual({ inside: true, cut: true });
+      await expect(page.getByTestId('thread.tool.10.end')).toContainText('0.7');
       await page.screenshot({ path: test.info().outputPath(`hierarchy-b-${theme}-folded.png`) });
       // open: the quote whole, the report's words, each try
       await q.click();

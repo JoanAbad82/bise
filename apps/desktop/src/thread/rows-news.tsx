@@ -379,11 +379,16 @@ export function ReportRow({ pos, line, text, next, ctx, waits }: { pos: number; 
     </div>
   );
   if (dup) {
+    // its words stay (designer, ambient-lead m_20040): '✓ <summary>… ▸ report', sans 13, text-2
     const mark = /^[✓✗] /u.exec(line)?.[0] ?? '· ';
     return (
       <div className="th-report" data-dup="true" data-testid={`thread.report.${String(pos)}`}>
         <Press look="th-report-fold" aria-expanded={open} onClick={toggle} data-testid={`thread.report.${String(pos)}.fold`}>
-          {mark}report {open ? '▾' : '▸'}
+          <span className="th-news-mark" aria-hidden="true">
+            {mark.trim()}
+          </span>
+          <span className="th-report-words">{body.split('\n')[0] ?? ''}</span>
+          <span className="th-report-more">{open ? '▾ report' : '▸ report'}</span>
         </Press>
         {whole}
       </div>

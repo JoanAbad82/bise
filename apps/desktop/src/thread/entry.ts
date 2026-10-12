@@ -297,6 +297,17 @@ export function repeatsReport(body: string, next: string): boolean {
   return first.length >= 12 && plain(next).includes(first);
 }
 
+/**
+ * A report the message right under it repeats (tui-parity H8): drawn as one quiet row
+ * '✓ <summary>… ▸ report', so the rows around it sit as quiet rows do (4 px). Pure.
+ */
+export function repeatedReport(e: Pick<Entry, 'kind' | 'text' | 'report'>, next: Pick<Entry, 'kind' | 'text'> | undefined): boolean {
+  if (next === undefined || !['report', 'from_agent', 'to_agent', 'agent'].includes(e.kind)) return false;
+  if (next.kind !== 'agent' && next.kind !== 'from_agent' && next.kind !== 'to_agent') return false;
+  if (reportStatus(e.text, e.kind === 'report' ? e.report?.kind : undefined) === null) return false;
+  return repeatsReport(reportBody(e.text), next.text);
+}
+
 /** A report's status line in a thread, with its kind's mark as the TUI's report line: '✓ done · …', '✗ failed · …' (designer: '✓ done · <summary>'); the spotlight's preview marks its own lines. Pure. */
 export function reportStatus(text: string, kind?: string | null): string | null {
   const line = reportLine(text, kind);

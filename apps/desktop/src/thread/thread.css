@@ -748,15 +748,29 @@
   flex-direction: column;
   gap: 2px;
 }
+/* one row: a long command is cut with …, its ✓ / ✗ and its time stay at its end (tui-parity H13,
+   the TUI keeps '✓ 0.7s') */
 .th-tool-line {
-  overflow: hidden;
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
   color: var(--c-text-2);
   font: var(--t-12) / var(--lh-row, 1.5) var(--font-mono);
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 .th-tool-mark {
+  flex: none;
+  margin-right: 1ch;
   color: var(--c-text-3);
+}
+.th-tool-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.th-tool-time,
+.th-tool-count {
+  flex: none;
 }
 .th-tool-time {
   margin-left: 12px;
@@ -1705,9 +1719,23 @@
   font: var(--t-13) var(--font-ui);
 }
 .th-report-fold {
+  display: flex;
+  gap: var(--gap-inline);
+  align-items: baseline;
+  max-width: 100%;
   color: var(--c-text-2);
   font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
+  white-space: nowrap;
   cursor: pointer;
+}
+.th-report-words {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.th-report-more {
+  flex: none;
+  color: var(--c-text-3);
 }
 .th-report-fold:hover {
   color: var(--c-text);

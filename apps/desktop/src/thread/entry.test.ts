@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, namedRows, pendingKey, repeatsReport, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, namedRows, pendingKey, repeatedReport, repeatsReport, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -333,5 +333,15 @@ describe('repeatsReport (tui-parity H8)', () => {
     expect(repeatsReport('p99 rose because it averaged the slowest 10%; it is the real percentile now', 'P99 rose because it averaged the slowest 10%; it is the real percentile now (src/latency.py). ready to merge.')).toBe(true);
     expect(repeatsReport('p99 rose because it averaged the slowest 10%', 'Asked main: today or after the batch test.')).toBe(false);
     expect(repeatsReport('ok', 'ok')).toBe(false);
+  });
+});
+
+describe('repeatedReport (H8: drawn as a quiet row)', () => {
+  it('a report whose next message says it again; not a report, not without a message under it', () => {
+    const rep = { kind: 'to_agent', text: '[report: done] p99 rose because it averaged the slowest 10%' } as unknown as Entry;
+    const msg = { kind: 'agent', text: 'P99 rose because it averaged the slowest 10%; ready to merge.' } as unknown as Entry;
+    expect(repeatedReport(rep, msg)).toBe(true);
+    expect(repeatedReport(rep, undefined)).toBe(false);
+    expect(repeatedReport(msg, msg)).toBe(false);
   });
 });
