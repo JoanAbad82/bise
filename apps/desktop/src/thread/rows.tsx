@@ -54,6 +54,7 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, sti
   // his on the right, the rest on the left (messages-right v1); a change of side opens more room
   const side = sideOf(e);
   const turn = p !== undefined && day === null && sideOf(p) !== side;
+  const gap = p === undefined || day !== null || turn || head ? undefined : gapOf(p, e);
   const n = next === undefined ? undefined : afterIt;
   return (
     <>
@@ -62,7 +63,7 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, sti
           <span>{day}</span>
         </div>
       )}
-      <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={live === undefined ? `thread.entry.${pos}` : 'thread.stream'} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head} data-side={side} data-turn={turn || undefined}>
+      <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={live === undefined ? `thread.entry.${pos}` : 'thread.stream'} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head} data-side={side} data-turn={turn || undefined} data-gap={gap}>
         {/* a turn that opens on its work (tools, a thinking) still shows who and when */}
         {head && (e.kind === 'tools' || (e.kind === 'thinking' && !thoughtNothing(e))) && <NameLine e={e} ctx={ctx} />}
         <EntryBody e={e} ctx={ctx} head={head} next={n} live={live !== undefined} still={still} />
@@ -70,6 +71,21 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, sti
     </>
   );
 });
+
+/** The dim rows of a turn: its work (tool lines, a thinking), drawn at --lh-row. */
+const DIM_KINDS: ReadonlySet<string> = new Set(['tools', 'thinking']);
+
+/**
+ * The room above a row inside one turn (designer m_19359): 'row' between two dim rows (8 px),
+ * 'switch' from an answer's prose to a dim row or back (12 px), none otherwise. Pure.
+ */
+export function gapOf(prev: Pick<Entry, 'kind'>, e: Pick<Entry, 'kind'>): 'row' | 'switch' | undefined {
+  const a = DIM_KINDS.has(prev.kind);
+  const b = DIM_KINDS.has(e.kind);
+  if (a && b) return 'row';
+  if (a !== b && (a ? e.kind : prev.kind) === 'agent') return 'switch';
+  return undefined;
+}
 
 /** The name line of a group that opens on its work: Msg's own line ('bise 09:46', the pearl at 14 px). */
 function NameLine({ e, ctx }: { e: Entry; ctx: RowCtx }) {

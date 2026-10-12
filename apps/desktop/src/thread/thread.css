@@ -50,7 +50,7 @@
 .th-md ul,
 .th-md ol,
 .th-md blockquote {
-  margin: 0 0 0.6em;
+  margin: 0 0 0.8em;
 }
 
 .th-md ul,
@@ -223,6 +223,17 @@
    composer share its width and its left edge. A row's time sits on its name line (ds). */
 .th-screen {
   --th-col: min(720px, calc(100% - 48px));
+  /* more air (his try a43609b2, designer m_19359): prose reads at 1.65, the dim rows (tool lines,
+     folds, the live line) at 1.5, and 20 px between the thread's last row and what sits under it
+     (the inbox box, the docked card or the composer's label), carried by the list itself; the
+     composer, the inbox box's inside and the sidebar keep --lh-ui */
+  --lh-read: 1.65;
+  --lh-row: 1.5;
+  --s-thread-end: 20px;
+}
+.th-screen .th-list {
+  /* each row ends with its own 2 px: the list adds the rest of the 20 */
+  padding-bottom: calc(var(--s-thread-end) - 2px);
 }
 .th-row,
 .th-day,
@@ -244,6 +255,8 @@
 .th-screen .b-composer {
   padding-left: 0;
   padding-right: 0;
+  /* the list's end carries the room above the to-line (designer m_19359) */
+  padding-top: 0;
 }
 .th-row + .th-row[data-head='true'],
 .th-day + .th-row {
@@ -737,7 +750,7 @@
 .th-tool-line {
   overflow: hidden;
   color: var(--c-text-2);
-  font: var(--t-12) / 1.6 var(--font-mono);
+  font: var(--t-12) / var(--lh-row, 1.5) var(--font-mono);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -839,8 +852,25 @@
 }
 .th-live {
   color: var(--c-text-2);
-  font: var(--t-13) var(--font-ui);
+  font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
   padding: 6px 0 2px;
+}
+/* the dim rows: folds (thinking, compaction) at --lh-row, a tool chip 8 px under what's above
+   (designer m_19359: b-tool's 6 -> 8) */
+.th-screen .b-fold {
+  line-height: var(--lh-row);
+}
+.th-screen .b-tool {
+  margin-top: 8px;
+  line-height: var(--lh-row);
+}
+/* between rows of one turn (rows.tsx gapOf): 8 px between two dim rows, 12 px from prose to a dim
+   row or back; each row already ends with its 2 px */
+.th-row[data-gap='row'] {
+  padding-top: 6px;
+}
+.th-row[data-gap='switch'] {
+  padding-top: 10px;
 }
 /* event-wake's live line: a blank row above it, as the terminal leaves (designer m_17827 (3)) */
 .th-live.th-waiting {

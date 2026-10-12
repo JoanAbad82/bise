@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay, threadKey } from '@/store';
-import { answeredMark, approvalParts, cutWords, EntryRow, type RowCtx, withoutImageMarks } from './rows';
+import { answeredMark, approvalParts, cutWords, EntryRow, gapOf, type RowCtx, withoutImageMarks } from './rows';
 import { aboutParts, ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
 
@@ -250,5 +250,16 @@ describe("an artifact's question with typed parts (delta review D2)", () => {
       { kind: 'text', text: 'about [Q3 plan](http://h/q3): why?' },
     ]);
     expect(aboutParts(a, [{ kind: 'paste', n: 1, text: 'x' }])).toEqual([{ kind: 'text', text: 'about [Q3 plan](http://h/q3): ' }, { kind: 'paste', n: 1, text: 'x' }]);
+  });
+});
+
+describe('gapOf (designer m_19359: more air inside a turn)', () => {
+  it('8 px between two dim rows, 12 px from prose to a dim row or back, nothing else', () => {
+    expect(gapOf({ kind: 'tools' }, { kind: 'tools' })).toBe('row');
+    expect(gapOf({ kind: 'thinking' }, { kind: 'tools' })).toBe('row');
+    expect(gapOf({ kind: 'agent' }, { kind: 'tools' })).toBe('switch');
+    expect(gapOf({ kind: 'tools' }, { kind: 'agent' })).toBe('switch');
+    expect(gapOf({ kind: 'agent' }, { kind: 'agent' })).toBeUndefined();
+    expect(gapOf({ kind: 'you' }, { kind: 'tools' })).toBeUndefined();
   });
 });
