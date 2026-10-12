@@ -125,7 +125,10 @@ def main():
         E.env["BISE_IDLE_EXIT"] = "off"
         c = E.start_hub()
         c.wait_idle("main", "t1", timeout=60)
-        check(len(repls(E.state)) >= 2, "the REPLs run")
+        # waited for: main and t1 read idle from the replayed journal at
+        # once, before their REPL processes are up (red under load: 'the
+        # REPLs run' read once right after the boot)
+        wait.until(lambda: len(repls(E.state)) >= 2, 60, lambda: "the REPLs run: %s" % repls(E.state))
         os.kill(E.hub.pid, signal.SIGKILL)
         E.hub.wait()
         E.hub = None
