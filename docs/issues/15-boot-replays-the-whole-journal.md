@@ -88,3 +88,13 @@ So the "what to do" above is not needed now: no aging to find (1), and a
 snapshot (2) would save at most the parse, ~8 s of CPU on a 73k-event
 journal. Reopen if a journal grows past that.
 
+
+### After issue 21 sha 1 (hot-core, 2026-10-12)
+
+The hot message index costs a boot nothing: `replay_many` ends each
+batch with `hot_all` (the index is every message until the first live
+message event; a filter per batch of 100 had cost +1.3 s and was
+dropped). Same journal copy, same run, load ~22, main's sb-core vs
+sha 1's: sb-core CPU of a boot 8.7 -> 7.3 s (boot_exp, flat 0.2-0.6 s
+per 5k events), `Hub::replay` 8.4 -> 8.9 s (bench: sb-core 7.3 -> 7.9
+s, run-to-run noise). Still parse-bound; no reason to reopen.

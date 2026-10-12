@@ -99,6 +99,28 @@ def recs_json(xs: List<&2, M.MRec>, +all: Bool, +ids: List<&2, Nat>) -> List<&2,
     case Con{+r, +t}:
       recs_json.keep(all || M.nat_in(ids, M.Msg.id(M.MRec.msg(r))), r, recs_json(t, all, ids))
 
+# every id of `ids` is a message of `xs`
+def ids_in(ids: List<&2, Nat>, +xs: List<&2, M.MRec>) -> Bool:
+  match ids:
+    case Nil{}:
+      True{}
+    case Con{+i, +t}:
+      Maybe.is_some(&2, M.MRec, M.rec_of(xs, i)) && ids_in(t, xs)
+
+# where the view finds the step's messages (issue 21): the hot ones when
+# they are all there (a message sent and still queued, or owing a reply);
+# a message the step just turned cold is in msgs only, and all of them
+# (view_all) are msgs
+def view_recs.go(every: Bool, +s: M.St) -> List<&2, M.MRec>:
+  match every:
+    case True{}:
+      M.St.msgs(s)
+    case False{}:
+      M.St.hot(s)
+
+def view_recs(+s: M.St, +all: Bool, +ids: List<&2, Nat>) -> List<&2, M.MRec>:
+  view_recs.go(all || Bool.not(ids_in(ids, M.St.hot(s))), s)
+
 # the messages of the view: no walk of every message when the step
 # touched none (an idle tick)
 def msgs_json(walk: Bool, +xs: List<&2, M.MRec>, +all: Bool, +ids: List<&2, Nat>) -> List<&2, J.Json>:
@@ -374,7 +396,7 @@ def wakes_ended(go: Bool, +s: M.St) -> Maybe<&2, List<&2, J.Json>>:
 # (null: it runs) in every view, a few bytes.
 def view.go(+s: M.St, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +all: Bool, +ids: List<&2, Nat>, +names: List<&2, String>, +durable: Bool, +timers: Bool, +ended: Bool, +wakes: Bool) -> J.Json:
   V.view(agents_json(M.St.agents(s), rts, ws, s, all, names), all,
-    msgs_json(all || Bool.not(List.is_empty(&2, Nat, ids)), M.St.msgs(s), all, ids), all,
+    msgs_json(all || Bool.not(List.is_empty(&2, Nat, ids)), view_recs(s, all, ids), all, ids), all,
     M.St.next_msg(s), M.St.next_card(s), M.St.paused(s),
     order_when(durable, s), cards_when(durable, s), notes_when(durable, s),
     timers_live(timers, s), timers_ended(ended, s), wakes_live(wakes, s), wakes_ended(wakes, s))
