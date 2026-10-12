@@ -9,7 +9,8 @@ import { Button, IconButton, Menu, MenuItem } from '@/ds';
 import { useRouter } from '@/app/router';
 import { useAgents, usePrefs, useStore } from '@/store';
 import { themeOf } from '@/theme';
-import { ThreadComposer } from '@/thread/ThreadScreen';
+import { answerOf, ThreadComposer } from '@/thread/ThreadScreen';
+import { InboxBlock, type Answering } from '@/inbox';
 import { useAllArtifacts } from './hooks';
 import { kindOf, pathOf, versions } from './model';
 import { putInDraft } from './put';
@@ -118,6 +119,7 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   const store = useStore();
   const put = usePutInMessage();
   const words = useAboutWords(project, id);
+  const [answering, setAnswering] = useState<Answering | null>(null);
   const agent = words?.agent ?? '';
   const busy = useAgents(project).find((x) => x.name === agent)?.status === 'working';
   const onStop = useCallback(() => {
@@ -215,16 +217,19 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
           <div className="art-empty">this kind opens in your browser: ↗ browser</div>
         )}
       </div>
-      {/* the screen's one composer, the maker's (maker.ts), when no thread sits beside the page */}
+      {/* the screen's one composer, the maker's (maker.ts), when no thread sits beside the page; the
+          maker's own question docks over it (designer m_20452: only the maker's, as in its thread) */}
       {composer && words !== undefined && (
-        <div className="art-open-composer" data-testid="artifact.composer">
+        <div className="art-open-composer th-screen" data-testid="artifact.composer" data-answering={answering !== null}>
+          <InboxBlock here={{ project, agent: a.agent }} only={(c) => c.project === project && c.agent === a.agent} onAnswer={setAnswering} />
           <ThreadComposer
             project={project}
             agent={words.agent}
             busy={busy}
-            to={words.to}
-            placeholder={words.placeholder}
-            answer={null}
+            to={answering?.label ?? words.to}
+            {...(answering?.end === undefined ? {} : { toEnd: answering.end })}
+            placeholder={answering?.answer != null ? 'your answer, then ⏎' : words.placeholder}
+            answer={answerOf(answering)}
             onStop={onStop}
             quoting={false}
             onReady={noop}
