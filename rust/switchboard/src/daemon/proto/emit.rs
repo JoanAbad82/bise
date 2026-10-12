@@ -164,7 +164,10 @@ impl Shell {
     pub(in crate::daemon) fn artifact_rows(&self, ev: &Value) -> Vec<bise_proto::rows::Artifact> {
         let pages = self.pg.pages.clone();
         let page_url = |id: &str| pages.as_ref().filter(|p| p.store.meta(id).is_some()).map(|p| p.url(id));
-        proto_view::artifacts(ev, page_url)
+        // a copied file framed by the page server (ambient-lead m_19544,
+        // architect m_19561): the window never frames file://
+        let base = pages.as_ref().map(|p| p.base());
+        proto_view::artifacts(ev, page_url, base.as_deref())
     }
 
     /// An event the hub broadcasts, for the typed connections: `state` →
