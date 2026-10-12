@@ -328,7 +328,16 @@ export function PmField(p: PmFieldProps): JSX.Element {
       paste: (e) => paste.current(e),
       ctrlR: (e) => ctrlR.current(e),
     });
+    // the app quits (or the window reloads) inside the draft's debounce: his last keys are written
+    // now, before the renderer goes and main's will-quit flushes the storage (ambient-lead m_19524)
+    const flushPending = (): void => {
+      if (timer.current !== null) writeNow();
+    };
+    window.addEventListener("pagehide", flushPending);
+    window.addEventListener("beforeunload", flushPending);
     return () => {
+      window.removeEventListener("pagehide", flushPending);
+      window.removeEventListener("beforeunload", flushPending);
       unGrab();
       writeNow(); // the screen goes: the draft is kept before the editor does
       editor.off("transaction", onTr);
