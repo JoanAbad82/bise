@@ -781,6 +781,7 @@ pub mod fold;
 pub mod legacy;
 pub mod lines;
 pub mod scheduled;
+pub mod think;
 pub mod when;
 pub mod words;
 pub use fold::{fold, mark_ahead, tail_start};
