@@ -150,7 +150,13 @@ export type NoticeLevel = "info" | "warn" | "err" | "unknown";
 /**
  * A `notice` entry: its level and its words ([`words::notice`]).
  */
-export type Notice = { level: NoticeLevel, text: string, };
+export type Notice = { level: NoticeLevel, text: string, 
+/**
+ * H9 (ambient-lead m_19827, architect m_19836): a model call that
+ * failed and waits to retry, as data. A run of them in one turn is one
+ * entry, updated at its pos ([`lines::is_same_retry_run`])
+ */
+retry?: Retry | null, };
 
 /**
  * A `not_delivered` entry: the agent his message didn't reach, and his
@@ -369,3 +375,22 @@ parts?: Array<Part>,
  * kept` line); drawn dim, the failure's notice after it
  */
 cut?: boolean, };
+
+/**
+ * How a run of retries ended: the agent's text, its thinking or a tool
+ * came in the same turn (recovered), or the turn failed.
+ */
+export type RetryEnd = "recovered" | "failed" | "unknown";
+
+/**
+ * A model call's retry (`provider_retry: 2/10 · <why> · retry in 4s`,
+ * [`lines::retry`]): the attempt that failed, out of how many, why, the
+ * wait before the next one, and how the run ended once it did.
+ */
+export type Retry = { attempt: number, max: number, why: string, wait_ms: number, 
+/**
+ * set by the fold when the run ends (the entry is sent again at its
+ * pos): the window dims a recovered run, never guessing from the rows
+ * after it
+ */
+end?: RetryEnd | null, };
