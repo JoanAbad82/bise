@@ -20,6 +20,8 @@ import { cardKey, sortCards } from './order';
 import { pickWaits, takesWords, withConfirmOptions } from './model';
 import { STRIP_KEYS, stripKey, stripWords } from './stripRows';
 import { cardKeyOf } from './Strip';
+import { pruneCardDrafts } from './drafts';
+import { keep } from '@/app/keep';
 import './inbox.css';
 
 /** What the composer under the block does with his words while an item is open. */
@@ -50,6 +52,12 @@ export interface InboxBlockProps {
    * ('inbox · 3 waiting · ? search · which sizes… ⌃1'); at the thread's bottom it is whole again.
    */
   readonly reading?: boolean;
+  /**
+   * Only these items (task-panel m_20455: the artifact view docks only its maker's questions). It
+   * filters the list before anything else (head count, ↑↓, ⌃n, the first item ⌘I opens), and bise's
+   * notifications ask stays out. Absent: every project's items.
+   */
+  readonly only?: (c: Card) => boolean;
 }
 
 // ---- openInbox: ⌘I and a notification click (amb-win's keys and router call it; no route change)
@@ -211,7 +219,7 @@ function typing(t: EventTarget | null): boolean {
   return t instanceof HTMLElement && t.isContentEditable && t.textContent.trim() !== '';
 }
 
-export function InboxBlock({ here, onAnswer, now: pinned, reading = false }: InboxBlockProps) {
+export function InboxBlock({ here, onAnswer, now: pinned, reading = false, only }: InboxBlockProps) {
   const rows = useProjects();
   const store = useStore();
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
@@ -219,12 +227,19 @@ export function InboxBlock({ here, onAnswer, now: pinned, reading = false }: Inb
   const [on, setOn] = useState<number | null>(null);
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
-  const real = useMemo(() => blockList(rows, gone), [rows, gone]);
+  const real = useMemo(() => (only === undefined ? blockList(rows, gone) : blockList(rows, gone).filter(only)), [rows, gone, only]);
   const notify = useNotifyRow(real.length);
   const home = rows.find((r) => r.home)?.project ?? '';
-  const list = useMemo(() => (notify.show ? [...real, notifyCard(home, opened)] : real), [real, notify.show, home, opened]);
+  const asks = notify.show && only === undefined;
+  const list = useMemo(() => (asks ? [...real, notifyCard(home, opened)] : real), [real, asks, home, opened]);
   const names = useMemo(() => new Map(rows.map((r) => [r.project, r])), [rows]);
   const openCard = list.find((c) => cardKey(c) === open);
+
+  // a card answered or closed anywhere takes its half answer with it (drafts.ts; 2b)
+  const liveKeys = rows.flatMap((r) => (r.cards ?? []).map(cardKey)).join(' ');
+  useEffect(() => {
+    pruneCardDrafts(keep, new Set(liveKeys === '' ? [] : liveKeys.split(' ')));
+  }, [liveKeys]);
 
   // bar N14 (moved here from the ⌘I screen, one inbox): his talk answered the open item (the card
   // in view the core decides on): its heard line shows on it for the event's ms (esc undoes,
@@ -409,7 +424,8 @@ export function InboxBlock({ here, onAnswer, now: pinned, reading = false }: Inb
   const openAt = openCard === undefined ? -1 : list.indexOf(openCard);
   const shown = list.filter((_, i) => i < BLOCK_ROWS || i === openAt);
   const more = list.length - shown.length;
-  const next = list.find((_, i) => i >= BLOCK_ROWS && i !== openAt);
+  // '+ N more' walks on past the open item, then wraps: never back and forth between two
+  const next = list.find((_, i) => i >= BLOCK_ROWS && i > openAt) ?? list.find((_, i) => i >= BLOCK_ROWS && i !== openAt);
   const keys = list.length > 1 ? `⌃1–${String(Math.min(list.length, STRIP_KEYS))}` : '⌃1';
   const first = list[0];
   // he reads up the thread (H10, designer m_19835): one 36 px line, the first item in it; a click opens it

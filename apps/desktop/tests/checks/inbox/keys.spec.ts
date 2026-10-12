@@ -1,68 +1,76 @@
-// inbox/keys · bar I3 (the walk: ↑↓ items, ←→ options, ctrl+n / ctrl+p as the TUI's card view) and
-// I8 (ctrl+o opens an item's folded lines), da90eaec / ambient-lead m_12176. Owner: qa-flows.
-// The NEW app on the REAL core over the throwaway world (../world.ts); shop's main adds two cards
-// (one with a 14-line question, so it folds), so ⌘I has at least 3 items. Passes when:
-//   - ↓ / ↑ on an empty field go to the next / previous item in the list's order;
-//   - → puts the first option on, ← takes it back;
-//   - ctrl+n / ctrl+p go to the next / previous item, with words in the field too (↓ does not);
-//   - the long item shows 6 lines and '… N more lines ctrl o'; ctrl+o opens it whole, again folds it;
-//   - the key list (⌘/) has ctrl+n, ctrl+p and ctrl+o.
+// inbox/keys · bar I3 (the walk: ↑↓ items, ←→ options, ⌃N an item wherever the focus is) and I8
+// (ctrl+o opens an item's folded lines), da90eaec / ambient-lead m_12176; one inbox commit 2b: the
+// walk is the block's, in place under the thread (the ⌘I screen and its ctrl+n / ctrl+p are gone,
+// designer m_19631). Owner: amb-home (qa-flows' first cut on the screen). The NEW app on the REAL
+// core over the throwaway world (../world.ts); shop's main adds two cards (one with a 14-line
+// question, so it folds), so ⌘I has at least 3 items. Passes when:
+//   - ⌘I opens the block on an item; ↓ / ↑ on an empty field go to the next / previous item;
+//   - → puts the open item's first option on, ← is noted;
+//   - with words in the field ↓ is his words' (the item stays), ⌃1 still opens item 1;
+//   - the long item shows 6 lines and '… N more lines ctrl o'; ctrl+o opens it whole, again folds it.
+import path from 'node:path';
 import { test, expect } from '../../harness';
-import { launchOn, realWorld, worldSay } from '../world';
+import { hubOf, launchOn, menuKey, realWorld, worldSay } from '../world';
 import type { Page } from '@playwright/test';
 
-const T = {
-  root: '[data-testid="inbox.root"]',
-  items: '[data-testid^="inbox.item."]',
-  answer: '[data-testid="inbox.answer"]',
-  help: '[data-testid="help.overlay"]',
-};
+const FIELD = '[data-testid="composer.field"]';
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-/** The open item's key ('<project>-<id>'), from its card's test id. */
-async function current(page: Page): Promise<string> {
-  const ids = await page.locator('[data-testid^="inbox.card."]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid') ?? ''));
-  return ids.map((x) => /^inbox\.card\.([^.]+)$/.exec(x)?.[1] ?? '').find((x) => x !== '') ?? '';
-}
-async function order(page: Page): Promise<string[]> {
-  const ids = await page.locator(T.items).evaluateAll((els) => els.map((e) => e.getAttribute('data-testid') ?? ''));
-  return ids.map((x) => /^inbox\.item\.([^.]+)$/.exec(x)?.[1] ?? '').filter((x) => x !== '');
+/** The open item: its place in the list (inbox.block.open.<n>) and its key ('<project>-<id>'). */
+async function current(page: Page): Promise<{ n: number; key: string }> {
+  const open = await page.locator('[data-testid^="inbox.block.open."]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid') ?? ''));
+  const n = Number(/^inbox\.block\.open\.(\d+)$/.exec(open[0] ?? '')?.[1] ?? '0');
+  const cards = await page.locator('[data-testid^="inbox.block.card."], [data-testid="inbox.block.notify"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid') ?? ''));
+  const key = cards.map((x) => (x === 'inbox.block.notify' ? 'notify' : (/^inbox\.block\.card\.([^.]+)$/.exec(x)?.[1] ?? ''))).find((x) => x !== '') ?? '';
+  return { n, key };
 }
 
-test('inbox/keys: ↑↓ ←→ ctrl+n ctrl+p walk the inbox, ctrl+o opens a folded item, the key list has them', async () => {
-  test.skip(true, "one inbox commit 2 (designer m_19631): the ⌘I screen whose walk this checks is gone; the block's keys (↑↓, 1-9, ←→ on the open item, ctrl+o) are inbox/block-views' and Block.test's; this real-core walk is ported to the block with commit 2b");
+/** The item whose words are `words`, open: its row's click, else '+ N more' until it is. */
+async function openOn(page: Page, words: string): Promise<void> {
+  const card = page.locator('[data-testid^="inbox.block.open."]', { hasText: words });
+  const row = page.locator('[data-testid^="inbox.block.row."]', { hasText: words }).first();
+  if (await row.isVisible()) await row.click();
+  for (let i = 0; i < 10 && !(await card.isVisible()); i++) {
+    await page.getByTestId('inbox.block.more').click({ timeout: 3000 }).catch(() => undefined);
+    await sleep(200);
+  }
+  await expect(card, `${words}: open in the block`).toBeVisible({ timeout: 5000 });
+}
+
+test('inbox/keys: ↑↓ ←→ ⌃N walk the inbox block, ctrl+o opens a folded item', async () => {
   test.setTimeout(240_000);
   const w = realWorld();
-  const n = `k${Date.now() % 1_000_000}`;
+  const n = `k${String(Date.now() % 1_000_000)}`;
   const long = Array.from({ length: 14 }, (_, i) => `line ${String(i + 1)} of the long ask ${n}`).join('\\n');
   worldSay('shop', `[[bash: sb card "$(printf '${long}')"]] asked`);
   worldSay('shop', `[[bash: sb card "short ask ${n}: cart page or checkout?"]] asked`);
-  const s = await launchOn(w, 'inbox', T.root);
+  // the window's project id is the hub's folder (as review/feature), not the world's name
+  const project = path.basename(path.dirname(hubOf(w, 'shop').sock));
+  const s = await launchOn(w, `agent/${project}/main`, FIELD);
   const { page } = s;
   const note = (type: string, v: unknown) => test.info().annotations.push({ type, description: typeof v === 'string' ? v : JSON.stringify(v) });
   try {
-    await expect(page.locator(T.root)).toBeVisible({ timeout: 15_000 });
-    await expect.poll(async () => (await order(page)).length, { timeout: 30_000, message: 'at least 3 items (the 2 new cards in)' }).toBeGreaterThanOrEqual(3);
-    await expect(page.getByText(`short ask ${n}`).first(), 'the new cards are in').toBeVisible({ timeout: 30_000 }).catch(() => undefined);
-    const items = await order(page);
-    note('order', items);
-    await page.locator(T.root).focus();
+    await expect(page.locator(FIELD).first(), "shop's thread with its composer").toBeVisible({ timeout: 15_000 });
+    await expect.poll(async () => (await page.getByTestId('inbox.block').textContent()) ?? '', { timeout: 30_000, message: 'the 2 new cards are in the block' }).toMatch(/[3-9]\d* waiting|\d{2,} waiting/);
+    expect(await menuKey(s, 'CmdOrCtrl+I'), 'the app menu has an item on ⌘I').not.toBe('');
+    await expect(page.locator('[data-testid^="inbox.block.open."]'), '⌘I opens an item in place').toBeVisible({ timeout: 5000 });
     await page.screenshot({ path: test.info().outputPath('opened.png') });
 
     await test.step('↓ / ↑ on an empty field', async () => {
+      await page.locator(FIELD).first().click();
       const a = await current(page);
-      const i = items.indexOf(a);
+      note('first', a);
       await page.keyboard.press('ArrowDown');
-      await expect.soft.poll(() => current(page), { timeout: 3000, message: '↓: the next item' }).toBe(items[Math.min(i + 1, items.length - 1)]);
+      await expect.soft.poll(async () => (await current(page)).n, { timeout: 3000, message: '↓: the next item' }).toBe(a.n + 1);
       await page.keyboard.press('ArrowUp');
-      await expect.soft.poll(() => current(page), { timeout: 3000, message: '↑: back' }).toBe(a);
+      await expect.soft.poll(async () => (await current(page)).key, { timeout: 3000, message: '↑: back' }).toBe(a.key);
     });
 
     await test.step('→ / ← the options', async () => {
-      const k = await current(page);
-      const opt1 = page.locator(`[data-testid="inbox.card.${k}.opt.1"]`);
+      const { key } = await current(page);
+      const opt1 = page.locator(`[data-testid="inbox.block.card.${key}.opt.1"]`);
       if ((await opt1.count()) === 0) {
-        note('options', `the open item ${k} has no options`);
+        note('options', `the open item ${key} has no options`);
         return;
       }
       await page.keyboard.press('ArrowRight');
@@ -72,62 +80,37 @@ test('inbox/keys: ↑↓ ←→ ctrl+n ctrl+p walk the inbox, ctrl+o opens a fol
       note('← after →: option 1 aria-selected', await opt1.getAttribute('aria-selected'));
     });
 
-    await test.step('ctrl+n / ctrl+p, with words in the field too', async () => {
-      const a = await current(page);
-      const i = items.indexOf(a);
-      await page.keyboard.press('Control+n');
-      await expect.soft.poll(() => current(page), { timeout: 3000, message: 'ctrl+n: the next item' }).toBe(items[Math.min(i + 1, items.length - 1)]);
-      await page.keyboard.press('Control+p');
-      await expect.soft.poll(() => current(page), { timeout: 3000, message: 'ctrl+p: back' }).toBe(a);
-      // a question: words in its field; ↓ is his words', ctrl+n still walks
-      const q = items.find((x) => x !== a) ?? a;
-      await page.locator(`[data-testid="inbox.item.${q}"]`).click();
-      // q is open before he types: a click on the field while the previous item's is still there put
-      // the words outside the new one (82b584d6's first run: ↓ then walked, the field being empty)
-      await expect.poll(() => current(page), { timeout: 3000, message: 'the clicked item is open' }).toBe(q);
-      const field = page.locator(T.answer);
-      if ((await field.count()) > 0) {
-        await field.click();
-        await page.keyboard.type(`half ${n}`);
-        await page.keyboard.press('ArrowDown');
-        await sleep(300);
-        expect.soft(await current(page), '↓ with words: stays').toBe(q);
-        await page.keyboard.press('Control+n');
-        await expect.soft.poll(() => current(page), { timeout: 3000, message: 'ctrl+n with words: walks' }).not.toBe(q);
-        await page.keyboard.press('Control+p');
-      } else {
-        note('words', `item ${q} takes no words`);
-      }
+    await test.step('words in the field: ↓ is his, ⌃1 still opens item 1', async () => {
+      await openOn(page, `short ask ${n}`);
+      const q = await current(page);
+      await page.locator(FIELD).first().click();
+      await page.keyboard.type(`half ${n}`);
+      await page.keyboard.press('ArrowDown');
+      await sleep(300);
+      expect.soft((await current(page)).key, '↓ with words: stays').toBe(q.key);
+      await page.keyboard.press('Control+Digit1');
+      await expect.soft.poll(async () => (await current(page)).n, { timeout: 3000, message: '⌃1 with words: item 1' }).toBe(1);
+      // back on the short ask, his half answer is its own (2b): clear it so the next step starts clean
+      await openOn(page, `short ask ${n}`);
+      await expect.soft(page.locator(FIELD).first(), 'back: its half answer').toHaveText(`half ${n}`, { timeout: 3000 });
+      await page.locator(FIELD).first().click();
+      await page.keyboard.press('Meta+a');
+      await page.keyboard.press('Backspace');
     });
 
     await test.step('ctrl+o opens the folded item, again folds it', async () => {
-      const item = page.locator(T.items, { hasText: `of the long ask ${n}` }).first();
-      await item.click({ timeout: 10_000 });
-      const k = await current(page);
-      const more = page.locator(`[data-testid="inbox.card.${k}.more"]`);
+      await openOn(page, `of the long ask ${n}`);
+      const { key } = await current(page);
+      const more = page.locator(`[data-testid="inbox.block.card.${key}.more"]`);
       await expect.soft(more, "folded: '… N more lines ctrl o'").toContainText('more lines', { timeout: 5000 });
-      await expect.soft(page.getByText(`line 14 of the long ask ${n}`), 'its last line folded away').toHaveCount(0);
-      await page.locator(T.root).focus();
+      // in the card: the thread's own `sb card "$(printf …)"` line has all 14 lines too
+      const last = page.getByTestId(`inbox.block.card.${key}`).getByText(`line 14 of the long ask ${n}`);
+      await expect.soft(last, 'its last line folded away').toHaveCount(0);
       await page.keyboard.press('Control+o');
-      await expect.soft(page.getByText(`line 14 of the long ask ${n}`).first(), 'ctrl+o: whole').toBeVisible({ timeout: 3000 });
+      await expect.soft(last.first(), 'ctrl+o: whole').toBeVisible({ timeout: 3000 });
       await page.screenshot({ path: test.info().outputPath('whole.png') });
       await page.keyboard.press('Control+o');
       await expect.soft(more, 'ctrl+o again: folded').toBeVisible({ timeout: 3000 });
-    });
-
-    await test.step('the key list has them', async () => {
-      await page.keyboard.press('Meta+/');
-      const help = page.locator(T.help);
-      await expect.soft(help, '⌘/ opens the key list').toBeVisible({ timeout: 3000 });
-      // ⌘/ opens on 'help' (a short list); tab goes to 'shortcuts', every key (as settings/keys)
-      const count = () => page.locator('[data-testid="help.row"]').count();
-      const onHelp = await count();
-      await page.keyboard.press('Tab');
-      await expect.soft.poll(count, { timeout: 3000, message: 'tab: the shortcuts page' }).toBeGreaterThan(onHelp);
-      const keys = await page.locator('[data-testid="help.row"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-keys') ?? ''));
-      note('keys', keys);
-      for (const k of ['ctrl+n', 'ctrl+p', 'ctrl+o']) expect.soft(keys.some((x) => x.toLowerCase().replace(/\s+/g, '').includes(k)), `the key list has ${k}`).toBe(true);
-      await page.keyboard.press('Escape');
     });
   } finally {
     await s.close();

@@ -10,7 +10,7 @@ export { InboxCard, kindTitle, titleOf, PICKED_MS, type InboxCardActs, type Inbo
 export { sortCards, cardKey } from './order';
 export { takesWords, pickWaits } from './model';
 export { InboxBlock, openInbox, answeringOf, blockList, useNotifyAuth, type Answering, type Here, type InboxBlockProps } from './Block';
-export { inboxDrafts, makeDrafts, type Drafts } from './drafts';
+export { cardDraftKey } from './drafts';
 export { ThreadInbox, inboxOf } from './screen';
 export { ConfirmBar } from './confirm';
 export { InboxStrip, useStripCard, type InboxStripProps, type StripPorts } from './Strip';

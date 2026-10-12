@@ -29,7 +29,7 @@ import { useTour } from '@/setup/useTour';
 import { takeQuotes } from '@/review/quote';
 import { copyText, QuotePop } from '@/quote/QuotePop';
 import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
-import { InboxBlock, openInbox, type Answering } from '@/inbox';
+import { cardDraftKey, InboxBlock, openInbox, type Answering } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
@@ -969,7 +969,10 @@ export const ThreadComposer = memo(function ThreadComposer({
     if (act.act === 'again') document.querySelector<HTMLButtonElement>(`[data-testid="thread.notdelivered.${String(act.pos)}.again"]`)?.click();
     else store.command(act.cmd);
   }, [cards, agent, store, project]);
-  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} {...(end === undefined ? {} : { toEnd: end })} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} {...(keys === undefined ? {} : { keys })} lead={lead} testId="composer" />;
+  // the open card that takes words keeps his half answer apart, the thread's draft never moves
+  // (amb-home 2b, amb-web's draftKey): the card's own key, the same wherever the block opens it
+  const draftKey = answer === null ? undefined : cardDraftKey(answer);
+  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} to={to} {...(end === undefined ? {} : { toEnd: end })} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} {...(keys === undefined ? {} : { keys })} lead={lead} testId="composer" />;
 });
 
 /** A message about an artifact: `about [its title](its url): his words` (the chip's own link form). Pure. */

@@ -213,34 +213,44 @@ test('app/keep-all: agents: Tune with a half-typed rename and model id, then the
   await second.dispose();
 });
 
-/** ⌘I on a card that takes words: the first may be an approval (options only); ↓ moves on. */
+/**
+ * The inbox block open on the first card that takes words (one inbox, 2b): its first row opens it in
+ * place, ↓ on the empty field walks past the approvals (options only) until the composer answers.
+ */
 async function toWords(page: Page): Promise<void> {
-  await expect(page.getByTestId('inbox.root')).toBeVisible({ timeout: 10_000 });
-  for (let i = 0; i < 5 && !(await page.getByTestId('inbox.answer').isVisible()); i++) {
-    await page.getByTestId('inbox.list').click({ position: { x: 4, y: 4 } }).catch(() => undefined);
+  const answering = page.locator('[data-testid="composer"] .lbl', { hasText: /^answering / });
+  if ((await page.locator('[data-testid^="inbox.block.open."]').count()) === 0) await page.getByTestId('inbox.block.row.1').click({ timeout: 10_000 });
+  await expect(page.locator('[data-testid^="inbox.block.open."]'), 'the block opens in place').toBeVisible({ timeout: 5000 });
+  for (let i = 0; i < 6 && !(await answering.isVisible()); i++) {
+    await page.locator('[data-testid="composer.field"]').first().click();
     await page.keyboard.press('ArrowDown');
     await page.waitForTimeout(150);
   }
+  await expect(answering, 'the composer answers a card').toBeVisible({ timeout: 3000 });
 }
 
 test('app/keep-all: ⌘I: a half-typed answer on a card', async () => {
-  test.skip(true, "one inbox commit 2 (designer m_19631): the ⌘I screen's answer field is gone; a card's half answer kept in the block's composer comes with commit 2b right after (ambient-lead m_20064), which ports this case");
   test.setTimeout(150_000);
   const WORDS = 'plutôt 15 min, mais';
+  const field = (page: Page) => page.locator('[data-testid="composer.field"]').first();
+  // the block's head ('3 waiting · 2 projects'): after a core restart the rows come back one by one,
+  // so the walk waits for every card the setup saw before it starts
+  const waiting = async (page: Page) => /(\d+) waiting/.exec((await page.getByTestId('inbox.block').textContent().catch(() => '')) ?? '')?.[1] ?? '';
+  let want = '';
   const { dispose } = await cycles({
-    route: 'inbox',
+    route: `agent/${ACME}/main`,
     setup: async ({ page }) => {
       await toWords(page);
-      const answer = page.getByTestId('inbox.answer');
-      await expect(answer, "⌘I's answer field").toBeVisible({ timeout: 10_000 });
-      await answer.click();
+      want = await waiting(page);
+      await field(page).click();
       await page.keyboard.type(WORDS);
     },
     check: async ({ page }, c) => {
-      await expect.soft(page.getByTestId('inbox.root'), `${c}: the inbox`).toBeVisible({ timeout: 10_000 });
+      await expect.soft(page.getByTestId('inbox.block'), `${c}: the inbox block`).toBeVisible({ timeout: 10_000 });
+      await expect.poll(() => waiting(page), { timeout: 15_000, message: `${c}: every card back in the block` }).toBe(want);
       await toWords(page);
-      await expect.soft(page.getByTestId('inbox.answer'), `${c}: his answer`).toHaveValue(WORDS, { timeout: 5000 });
-      if (await page.getByTestId('inbox.answer').isVisible()) await caretAtEnd(page, page.getByTestId('inbox.answer'), WORDS, `${c}, the answer`);
+      await expect.soft(field(page), `${c}: his answer, in the block's composer`).toHaveText(WORDS, { timeout: 5000 });
+      if (await field(page).isVisible()) await caretAtEnd(page, field(page), WORDS, `${c}, the answer`);
       await page.screenshot({ path: test.info().outputPath(`inbox-${c.replace(/\W+/g, '-')}.png`) });
     },
   });

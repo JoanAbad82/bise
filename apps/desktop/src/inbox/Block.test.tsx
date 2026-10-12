@@ -66,6 +66,24 @@ describe('the inbox block (b2)', () => {
     expect(told.at(-1)).toBeNull();
   });
 
+  it("'+ N more' walks on past the open item to the last, then wraps (never back and forth between two)", () => {
+    // a third card, a copy of card 9 with its own id and words
+    const three = core_ev.map((e) =>
+      e.ev !== 'projects'
+        ? e
+        : { ...e, projects: e.projects.map((r) => ({ ...r, cards: r.cards?.flatMap((c) => (c.id === 9 ? [c, { ...c, id: 11, question: 'which port?' }] : [c])) })) },
+    );
+    mount({ project: P, agent: 'perf' }, three);
+    expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 2 more');
+    const openN = () => screen.getByTestId('inbox.block').querySelector('[data-testid^="inbox.block.open."]')?.getAttribute('data-testid');
+    fireEvent.click(screen.getByTestId('inbox.block.more'));
+    expect(openN()).toBe('inbox.block.open.2');
+    fireEvent.click(screen.getByTestId('inbox.block.more'));
+    expect(openN()).toBe('inbox.block.open.3');
+    fireEvent.click(screen.getByTestId('inbox.block.more'));
+    expect(openN()).toBe('inbox.block.open.2');
+  });
+
   it('an approval: only its options decide; the composer says what it waits for and sends plain words', () => {
     const { hub, told } = mount({ project: null, agent: null });
     fireEvent.click(screen.getByTestId('inbox.block.row.1'));
@@ -128,6 +146,28 @@ describe('the inbox block (b2)', () => {
     expect(row.querySelector('.end')?.textContent).toMatch(/^acme · /u);
     fireEvent.click(row);
     expect(screen.getByTestId(`inbox.block.card.${P}-10.project`).textContent).toBe('· acme');
+  });
+});
+
+describe("'only' (task-panel m_20455: the artifact view docks its maker's questions)", () => {
+  it('filters before anything: the head counts, the rows and ⌘I see only those items', () => {
+    const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    const store = new Store(port);
+    replay(store, core_ev);
+    render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter({ screen: 'thread', project: P, agent: 'perf' })}>
+          <InboxBlock here={{ project: P, agent: 'perf' }} onAnswer={() => undefined} now={NOW} only={(c) => c.id === 9} />
+        </RouterContext>
+      </StoreProvider>,
+    );
+    expect(screen.getByTestId('inbox.block').textContent).toContain('1 waiting');
+    expect(screen.getByTestId('inbox.block.row.1').textContent).toContain('which bench?');
+    expect(screen.queryByText('run rm -rf target?')).toBeNull();
+    act(() => {
+      openInbox();
+    });
+    expect(screen.getByTestId('inbox.block.open.1').textContent).toContain('which bench?');
   });
 });
 

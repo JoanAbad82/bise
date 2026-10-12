@@ -34,7 +34,11 @@ const all = world === 'none' ? []
 const started = process.env.BISE_HARNESS_CORE_LOG ? `${process.env.BISE_HARNESS_CORE_LOG}.started` : null;
 const again = started !== null && existsSync(started);
 if (started !== null) writeFileSync(started, '');
-const start = again ? all.filter((l) => JSON.parse(l).ev !== 'confirm') : all;
+// Nor his voice answer (bar N14): a `voice_answer` is what the core heard once; the real core never
+// says it again after a restart, and the inbox block, still mounted, took the replayed one for a new
+// answer to card 9 and dropped it (app/keep-all's ⌘I case: '2 waiting' after the restart, not 3).
+const ONCE = new Set(['confirm', 'voice_answer']);
+const start = again ? all.filter((l) => !ONCE.has(JSON.parse(l).ev)) : all;
 
 // The world is written at spawn: the app's main keeps the newest state events and replays them to
 // a window that loads later (amb-core 162ec18b). A thread's lines aren't state: like the real core,

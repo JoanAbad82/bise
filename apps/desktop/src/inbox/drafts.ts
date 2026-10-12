@@ -1,65 +1,18 @@
-// Each inbox item's typed words (bar I6/B3, the TUI's per-card draft):
-// kept when he goes to another item or leaves the inbox and comes back,
-// dropped when the item is answered or closed, or when it is gone. Saved
-// on input into a plain map, so a key re-renders nothing. One map for the
-// window's life (makeDrafts gives a test its own). Owner: amb-home.
-import { keep, type Keep } from '@/app/keep';
+// A card's half answer (bar I6/B3, the TUI's per-card draft), one inbox commit 2b. The block's
+// composer keeps it: while the open card takes words, the composer's draft key is the card's own
+// (amb-web's draftKey, a3c7a5f9), so his words for that card swap in when it opens and out when it
+// folds, wherever the block opens it (any thread, bise's view). The thread's own draft never moves.
+// Kept in the window's keep through keptStorage, so it outlives a reload and a quit; a send from
+// the card blanks it (PmField). Cards answered or closed elsewhere leave their key behind: the
+// block prunes them here. Owner: amb-home.
+import type { Keep } from '@/app/keep';
 
-export interface Drafts {
-  /** the item's words ('' when none) */
-  get: (key: string) => string;
-  /** his words as they are now ('' forgets them) */
-  keep: (key: string, text: string) => void;
-  /** answered or closed: the words went with it */
-  drop: (key: string) => void;
-  /** only the items still open keep words */
-  prune: (open: ReadonlySet<string>) => void;
-}
+/** In every card draft key: the composer's store key ends with it, whatever prefix it adds. */
+const MARK = 'inbox#card:';
 
-export function makeDrafts(): Drafts {
-  const words = new Map<string, string>();
-  return {
-    get: (key) => words.get(key) ?? '',
-    keep: (key, text) => {
-      if (text === '') words.delete(key);
-      else words.set(key, text);
-    },
-    drop: (key) => {
-      words.delete(key);
-    },
-    prune: (open) => {
-      for (const k of [...words.keys()]) if (!open.has(k)) words.delete(k);
-    },
-  };
-}
-
-/**
- * Drafts kept in the window's keep (amb-win, keep.ts, lead m_11756): they outlive a reload, an
- * update swap and a core restart, under 'card:<project>-<id>' (his words until answered/closed).
- * A prune with no open item does nothing: an empty list right after a reload or a core
- * restart is the store refilling, not every card gone.
- */
-export function keptDrafts(k: Keep): Drafts {
-  const id = (key: string): string => `card:${key}`;
-  return {
-    get: (key) => k.text(id(key)),
-    keep: (key, text) => {
-      k.setText(id(key), text);
-    },
-    drop: (key) => {
-      k.dropText(id(key));
-    },
-    prune: (open) => {
-      if (open.size === 0) return;
-      // only within the projects whose cards are in the list: after a reload the projects' rows come
-      // one hub at a time, and home's cards alone must not take shop's drafts (qa-flows 82b584d6, I6)
-      const live = new Set([...open].map(projectOf));
-      k.pruneTexts('card:', (x) => {
-        const key = x.slice('card:'.length);
-        return open.has(key) || !live.has(projectOf(key));
-      });
-    },
-  };
+/** The composer's draft key while `c` is open and takes words. Pure. */
+export function cardDraftKey(c: { project: string; card: number }): string {
+  return `${MARK}${c.project}-${String(c.card)}`;
 }
 
 /** A card key's project ('shop-5e6f7a8b-12' -> 'shop-5e6f7a8b'). Pure. */
@@ -68,5 +21,25 @@ export function projectOf(key: string): string {
   return at < 0 ? key : key.slice(0, at);
 }
 
-/** The window's drafts: they outlive the inbox screen, and the window itself. */
-export const inboxDrafts = keptDrafts(keep);
+/**
+ * The card drafts that may go: a kept field whose card is not in `open`, within the projects whose
+ * cards are in `open` (after a reload the projects' rows come one hub at a time: home's cards alone
+ * must not take shop's drafts, qa-flows 82b584d6). An empty `open` (the store refilling) keeps all;
+ * an unreadable entry set aside ('.unread') always stays. Pure.
+ */
+export function deadDraft(open: ReadonlySet<string>): (id: string) => boolean {
+  const live = new Set([...open].map(projectOf));
+  return (id) => {
+    const at = id.indexOf(MARK);
+    if (open.size === 0 || at < 0) return false;
+    const key = id.slice(at + MARK.length);
+    if (key.includes('.')) return false;
+    return !open.has(key) && live.has(projectOf(key));
+  };
+}
+
+/** Drops the kept drafts of the cards gone from `open` (card keys, cardKey's form). */
+export function pruneCardDrafts(k: Keep, open: ReadonlySet<string>): void {
+  const dead = deadDraft(open);
+  k.pruneTexts('ls:', (id) => !dead(id));
+}

@@ -2,7 +2,7 @@
 // no age, the short bits 10 minutes, unreadable words read as empty.
 import { describe, expect, it } from 'vitest';
 import { createKeep, KEEP_KEY, parseKeep, SHORT_MS, WRITE_MS, type KeepStore } from './keep';
-import { keptDrafts } from '@/inbox/drafts';
+import { cardDraftKey, pruneCardDrafts } from '@/inbox/drafts';
 
 function mem(): KeepStore & { data: Map<string, string>; writes: number } {
   const data = new Map<string, string>();
@@ -103,25 +103,33 @@ describe('the keep', () => {
     expect(tomorrow.view('route')).toBeUndefined();
   });
 
-  it("⌘I's card answers live in the keep: back after a reload, gone when answered; an empty prune (the store refilling) drops nothing", () => {
+  it("a card's half answer lives in the keep: back after a reload, gone with its card; an empty prune (the store refilling) drops nothing", () => {
     const s = mem();
     const c = clock();
-    const d = keptDrafts(createKeep(s, c.now, c.later));
-    d.keep('shop-1', 'only at checkout');
-    d.keep('acme-2', 'v2');
+    const at = (k: string) => `ls:bise.composer.v1.${k}`;
+    const shop1 = at(cardDraftKey({ project: 'shop', card: 1 }));
+    const acme2 = at(cardDraftKey({ project: 'acme', card: 2 }));
+    const d = createKeep(s, c.now, c.later);
+    d.setText(shop1, 'only at checkout');
+    d.setText(acme2, 'v2');
+    d.setText(`${acme2}.unread`, '["{}"]');
+    d.setText(at('acme/main'), "the thread's own");
     c.tick(WRITE_MS);
-    const again = keptDrafts(createKeep(s, c.now, c.later));
-    expect(again.get('shop-1')).toBe('only at checkout');
-    again.prune(new Set());
-    expect(again.get('acme-2')).toBe('v2');
+    const again = createKeep(s, c.now, c.later);
+    expect(again.text(shop1)).toBe('only at checkout');
+    pruneCardDrafts(again, new Set());
+    expect(again.text(acme2)).toBe('v2');
     // a list with only shop's cards (acme's hub not back yet after the reload) keeps acme's draft
-    again.prune(new Set(['shop-1']));
-    expect(again.get('acme-2')).toBe('v2');
-    // acme's cards are in, and its card 2 is not: its draft goes
-    again.prune(new Set(['shop-1', 'acme-3']));
-    expect(again.get('acme-2')).toBe('');
-    again.drop('shop-1');
-    expect(keptDrafts(createKeep(s, c.now, c.later)).get('shop-1')).toBe('');
+    pruneCardDrafts(again, new Set(['shop-1']));
+    expect(again.text(acme2)).toBe('v2');
+    // acme's cards are in, and its card 2 is not: its draft goes; what is set aside and the thread's stay
+    pruneCardDrafts(again, new Set(['shop-1', 'acme-3']));
+    expect(again.text(acme2)).toBe('');
+    expect(again.text(`${acme2}.unread`)).toBe('["{}"]');
+    expect(again.text(at('acme/main'))).toBe("the thread's own");
+    expect(again.text(shop1)).toBe('only at checkout');
+    c.tick(WRITE_MS);
+    expect(createKeep(s, c.now, c.later).text(acme2)).toBe('');
   });
 
   it('anything unreadable reads as empty, never throws; a broken store keeps the text in memory', () => {
