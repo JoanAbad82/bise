@@ -498,7 +498,25 @@ def attribute(info, t_wall):
     return {"ppid": ppid, "parent": parent[:200], "asked_by": originator(log, pid)}
 
 
-def front_gate(out, stop_file, bundle, every=0.1):
+def kill_run(bundle, pids_file=None):
+    """A breach stops the run: SIGKILL to each pid the run recorded (pids_file: the candidate-only run,
+    ambient-lead m_20081: nothing by name or bundle id while his own app runs), else pkill by the
+    bundle's path. Never his app: the pids file holds only the run's bundle path's processes."""
+    if not pids_file:
+        subprocess.run(["pkill", "-f", bundle + "/Contents/"])
+        return
+    try:
+        pids = {int(x) for x in open(pids_file).read().split() if x.isdigit()}
+    except OSError:
+        pids = set()
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+
+
+def front_gate(out, stop_file, bundle, every=0.1, pids_file=None):
     """Gate A: the front app every `every` s until stop_file exists. Every change is logged with its
     parent and who asked LaunchServices; a breach (is_breach) kills the bundle's processes at once
     and writes <out dir>/BREACH. Returns the changes."""
@@ -517,7 +535,7 @@ def front_gate(out, stop_file, bundle, every=0.1):
                 after = age is not None and age < time.time() - t0
                 row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after))
                 if row["breach"]:
-                    subprocess.run(["pkill", "-f", bundle + "/Contents/"])
+                    kill_run(bundle, pids_file)
                     with open(os.path.join(os.path.dirname(out), "BREACH"), "w") as b:
                         b.write("%s %s\n" % (cur["name"], cur["pid"]))
                 row.update(attribute(cur, time.time()))
@@ -560,7 +578,7 @@ def tcc_verdict(req, run_pids):
     return "log" if req["preflight"] else "kill"
 
 
-def tcc_gate(log, pids_file, stop_file, bundle, out_dir, every=0.3):
+def tcc_gate(log, pids_file, stop_file, bundle, out_dir, every=0.3, by_pids=False):
     """Gate C on tccd's live log: a request of the run's pids with preflight=no kills the bundle and
     writes BREACH; a silent preflight is only logged to tcc.jsonl with its attribution lines (its
     source comes from the run's tccd ndjson stream, never a sample or a debugger attached to the app:
@@ -580,7 +598,7 @@ def tcc_gate(log, pids_file, stop_file, bundle, out_dir, every=0.3):
                 seen.add(mid)
                 who = req["sender"] if req["sender"] in pids else min(req["pids"] & pids)
                 if v == "kill":
-                    subprocess.run(["pkill", "-f", bundle + "/Contents/"])
+                    kill_run(bundle, pids_file if by_pids else None)
                     with open(os.path.join(out_dir, "BREACH"), "w") as b:
                         b.write("tcc %s %s preflight=no pid %s\n" % (mid, req["service"], who))
                 f.write(json.dumps({"msgID": mid, "verdict": v, "service": req["service"], "pid": who, "t": time.strftime("%H:%M:%S"),
@@ -637,15 +655,17 @@ def _cli(argv):
     fr.add_argument("--out", required=True)
     fr.add_argument("--stop-file", required=True)
     fr.add_argument("--bundle", required=True)
+    fr.add_argument("--pids", help="kill the pids in this file on a breach, never by name")
     tc = sub.add_parser("tcc", help="gate C: tccd's log against the run's pids (kill on preflight=no, log a silent preflight)")
     tc.add_argument("--log", required=True)
     tc.add_argument("--pids", required=True)
+    tc.add_argument("--kill-pids", action="store_true", help="kill the --pids on a breach, never by name")
     tc.add_argument("--stop-file", required=True)
     tc.add_argument("--bundle", required=True)
     tc.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     if a.do == "tcc":
-        tcc_gate(a.log, a.pids, a.stop_file, a.bundle, a.out)
+        tcc_gate(a.log, a.pids, a.stop_file, a.bundle, a.out, by_pids=a.kill_pids)
         return
     if a.do == "libsnap":
         snap = lib_snapshot()
@@ -658,7 +678,7 @@ def _cli(argv):
         print("%d entries -> %s" % (len(snap), a.out))
         return
     if a.do == "front":
-        front_gate(a.out, a.stop_file, a.bundle)
+        front_gate(a.out, a.stop_file, a.bundle, pids_file=a.pids)
         return
     if a.do == "snapshot":
         print(json.dumps(counts(snapshot()), indent=1))

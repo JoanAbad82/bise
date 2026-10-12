@@ -163,6 +163,95 @@ if (mode === 'first') {
   await shot('message');
   step("a message to a project's main gets its answer", !!answer, answer ?? (await text('[data-testid="app.main"]'))?.slice(-800));
 }
+// this cut's rows (ambient-lead m_20075), seeded by one message to harness' main (the fake provider
+// runs its [[bash: …]] calls): a turn of several runs, an agent kept and one dropped, a local .html
+// artifact. Then: the runs fold, /agents lists the kept one and not the dropped, /archived lists the
+// dropped, the artifact's frame has its pixels, the sidebar resizes by drag (its width kept for the
+// restart's check), ctrl+r from the thread starts dictation's line (no mic under the knob), esc ends it.
+if (mode === 'cut') {
+  const composerOf = () => page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
+  const say = async (words) => {
+    if (!(await click(`say ${words.slice(0, 30)}`, composerOf()))) return false;
+    await page.keyboard.type(words, { delay: 5 });
+    await page.keyboard.press('Enter');
+    return true;
+  };
+  await click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+  const html = "<html><body style='margin:0;background:#2e8b57'><h1 style='color:#fff;font:40px sans-serif'>proof html</h1></body></html>";
+  const seed = [
+    'set up the proof rows',
+    '[[bash: echo one]]', '[[bash: echo two]]', '[[bash: echo three]]',
+    "[[bash: sb spawn keeper --objective 'hold the proof']]",
+    "[[bash: sb spawn gone --objective 'an old one']]",
+    '[[bash: sb drop gone]]',
+    `[[bash: printf "%s" "${html.replaceAll('"', "'")}" > proof.html && sb artifact add proof.html --title proof-html]]`,
+  ].join(' ');
+  const seeded = await say(seed);
+  const done = seeded ? await until(async () => {
+    const t = await text('[data-testid="app.main"]');
+    return t && /proof-html|artifact/i.test(t) ? t : null;
+  }, ANSWER_MS, 2000) : null;
+  await shot('seeded');
+  const kinds = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="thread.entry."]')].map((r) => r.getAttribute('data-kind')));
+  step('the seed ran (runs, agents, artifact)', !!done, { kinds });
+  step('the runs fold (tools rows, not one row per call)', kinds.filter((k) => k === 'tools').length >= 1 && kinds.filter((k) => k === 'tools').length < 6, kinds);
+  // /agents and /archived
+  for (const [cmd, want, not] of [['/agents', 'keeper', 'gone'], ['/archived', 'gone', null]]) {
+    await click('back to harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+    await say(cmd);
+    const t = await until(async () => { const s = await text('[data-testid="app.main"]'); return s && s.includes(want) ? s : null; }, 20000, 1000);
+    await shot(cmd.slice(1));
+    const body = t ?? (await text('[data-testid="app.main"]')) ?? '';
+    step(`${cmd} lists ${want}${not ? ` and not ${not}` : ''}`, !!t && (!not || !new RegExp(`\\b${not}\\b`).test(body)), body.slice(0, 500));
+    await page.keyboard.press('Escape').catch(() => {});
+  }
+  // the local .html artifact's pixels
+  await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
+  const item = page.locator('[data-testid="artifacts.list"]').getByText('proof-html').first();
+  const opened = await click('open proof-html', item);
+  const frame = page.locator('iframe').first();
+  const fr = opened ? await frame.waitFor({ timeout: 15000 }).then(() => true, () => false) : false;
+  let green = 0;
+  if (fr) {
+    await page.waitForTimeout(1500);
+    const png = (await frame.screenshot({ timeout: 15000 }).catch(() => null))?.toString('base64');
+    green = png ? await page.evaluate(async (b64) => {
+      const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
+      const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - 46) < 12 && Math.abs(d[i + 1] - 139) < 12 && Math.abs(d[i + 2] - 87) < 12) n++;
+      return n / (d.length / 4);
+    }, png) : 0;
+  }
+  await shot('artifact-html');
+  step('a local .html artifact renders (its green pixels)', green > 0.3, { opened, frame: fr, green_share: Math.round(green * 100) / 100 });
+  // the sidebar resizes by drag; its width is kept for the restart's check
+  const split = page.locator('[data-testid="app.split.side"]').first();
+  const w0 = Number(await split.getAttribute('aria-valuenow').catch(() => null));
+  const box = await split.boundingBox().catch(() => null);
+  if (box) {
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2, { steps: 8 });
+    await page.mouse.up();
+  }
+  const w1 = Number(await split.getAttribute('aria-valuenow').catch(() => null));
+  fs.writeFileSync(path.join(out, 'side-width.txt'), String(w1));
+  await shot('resized');
+  step('the sidebar resizes by drag', !!box && w1 > w0, { before: w0, after: w1 });
+  // ctrl+r from the thread (not the field): dictation's line shows, esc ends it
+  await click('back to harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+  await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
+  const before = (await text('[data-testid="composer"]')) ?? '';
+  await page.keyboard.press('Control+r');
+  const line = await until(async () => { const t = (await text('[data-testid="composer"]')) ?? ''; return t !== before && /dictat|listen|mic|speak|voice/i.test(t) ? t : null; }, 8000, 500);
+  await shot('ctrl-r');
+  await page.keyboard.press('Escape');
+  const after = (await text('[data-testid="composer"]')) ?? '';
+  step('ctrl+r from the thread starts dictation; esc ends it', !!line, { line: line?.slice(0, 300), after_esc: after.slice(0, 200) });
+}
+
 // the draft across a restart (ambient-lead m_19525): typed in harness' composer, never sent; after
 // the restart the same composer must hold it again
 if (mode === 'draft-type' || mode === 'draft-check') {
@@ -180,6 +269,11 @@ if (mode === 'draft-type' || mode === 'draft-check') {
     const back = await until(async () => ((await holds()).includes(draft) ? await holds() : null), 20000, 500);
     await shot('draft-back');
     step('the draft is back in the composer after the restart', !!back, back ?? (await holds()).slice(0, 300));
+    const kept = fs.existsSync(path.join(out, 'side-width.txt')) ? Number(fs.readFileSync(path.join(out, 'side-width.txt'), 'utf8')) : null;
+    if (kept) {
+      const w = Number(await page.locator('[data-testid="app.split.side"]').first().getAttribute('aria-valuenow').catch(() => null));
+      step('the sidebar width is kept across the restart', w === kept, { kept, now: w });
+    }
   }
 }
 await browser.close().catch(() => {});
