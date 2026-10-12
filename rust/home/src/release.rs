@@ -271,8 +271,10 @@ pub fn is_update(release: &Release, current_id: &str, current_built: Option<&str
 /// release is never GitHub's 'latest' (that is [`DIST_URL`], every
 /// terminal's `bise update`), and `latest.json` never names the app.
 pub const DESKTOP_DIST_URL: &str = "https://github.com/gvergnaud/bise/releases/download/desktop-latest";
-/// Overrides the desktop channel (tests).
-pub const DESKTOP_DIST_URL_ENV: &str = "BISE_DESKTOP_DIST_URL";
+/// Overrides the desktop channel (tests). Never under `BISE_DESKTOP_`: the
+/// app keeps those names for itself and never hands one to the core
+/// (apps/desktop/src/main/childenv.ts), which is who reads this one.
+pub const DESKTOP_DIST_URL_ENV: &str = "BISE_DIST_URL_DESKTOP";
 /// The desktop manifest's name at its channel's base URL.
 pub const DESKTOP_MANIFEST: &str = "desktop.json";
 
@@ -324,7 +326,7 @@ pub fn parse_desktop(text: &str, target: &str) -> Result<DesktopRelease, String>
     })
 }
 
-/// The desktop channel: `BISE_DESKTOP_DIST_URL`, else [`DESKTOP_DIST_URL`]
+/// The desktop channel: `BISE_DIST_URL_DESKTOP`, else [`DESKTOP_DIST_URL`]
 /// (never the terminal's channel, nor an install's recorded one).
 pub fn desktop_dist_url(env: crate::Lookup) -> String {
     env(DESKTOP_DIST_URL_ENV)

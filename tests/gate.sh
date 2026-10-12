@@ -396,8 +396,16 @@ sbcore_gone() {  # <file>: say so and true when the sb-core that was built is go
 # (--frozen-lockfile, no Electron download: check needs no binary).
 desktop_check() {
   [ -d "$root/apps/desktop" ] || return 0
-  local miss=""
-  if ! command -v pnpm >/dev/null 2>&1; then miss="no pnpm on PATH"
+  local miss="" d
+  # a launchd job (the nightly, a gate run outside the bash tool's file cap)
+  # has no shell setup: its PATH lacks the node manager's bin. Its default
+  # node (fnm's, Volta's, pnpm's own home) has pnpm next to node
+  if ! command -v pnpm >/dev/null 2>&1; then
+    for d in "${FNM_DIR:-$HOME/.local/share/fnm}/aliases/default/bin" "$HOME/.volta/bin" "$HOME/Library/pnpm"; do
+      if [ -x "$d/pnpm" ]; then export PATH="$d:$PATH"; break; fi
+    done
+  fi
+  if ! command -v pnpm >/dev/null 2>&1; then miss="no pnpm on PATH (nor fnm's default, Volta's or ~/Library/pnpm)"
   elif [ ! -d "$root/apps/desktop/node_modules" ]; then
     if [ "${1:-}" = strict ]; then
       (cd "$root/apps/desktop" && ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm -s install --frozen-lockfile --prefer-offline) >"$run/desktop_install.log" 2>&1 \

@@ -65,7 +65,7 @@ fn rosetta_target(target: &str, rosetta: bool) -> String {
 /// the window's core: `SetupPorts::manifest`): `(desktop.json or why
 /// not, the channel's base URL, this Mac's target)`. Never `bise update`'s
 /// channel: the two cycles are apart (desktop-on-main), so this reads
-/// [`release::desktop_dist_url`] (`BISE_DESKTOP_DIST_URL`, else the
+/// [`release::desktop_dist_url`] (`BISE_DIST_URL_DESKTOP`, else the
 /// rolling `desktop-latest` tag).
 pub(crate) fn desktop_manifest() -> (Result<String, String>, String, String) {
     let base = release::desktop_dist_url(&env);
