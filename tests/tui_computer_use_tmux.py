@@ -172,22 +172,25 @@ def main():
             t.keys("Enter")
             t.wait("turn computer use on and set it up")
             t.keys("Enter")
-            sc = t.wait("Chrome isn't open. open it, i'll wait")
-            assert "computer use · agents can drive Chrome" in sc, sc
-            assert "? Chrome" in sc and "· Chrome extension    after Chrome" in sc and "· live test           last" in sc, sc
-            assert "⏎ open Chrome   ↑↓ step   esc later" in sc, sc
+            # the whole screen: the rows, the hub's approvals mode and the
+            # provider come from different states (red under load when it
+            # waited on the rows then asserted the mode line)
+            sc = t.wait_all(["Chrome isn't open. open it, i'll wait",
+                             "computer use · agents can drive Chrome",
+                             "? Chrome", "· Chrome extension    after Chrome", "· live test           last",
+                             "⏎ open Chrome   ↑↓ step   esc later",
+                             "in yolo, agents act without asking, purchases included. ⇧⇥ for auto.",
+                             "what the agents see goes only to their model:"])
             assert "for apps" not in sc and "accessibility" not in sc, sc
-            assert "in yolo, agents act without asking, purchases included. ⇧⇥ for auto." in sc, sc
-            assert "what the agents see goes only to their model:" in sc, sc
             shot(t, "chrome-not-open", sc)
             t.keys("Enter")
             called("open -a /Applications/Google Chrome.app")
             # Chrome open: the extension's steps
             check([row("browser", "done", "Chrome 154"), row("extension", "waits", "add bise to Chrome", "add_extension"), row("live_test", "not_yet")] + NO_HELPER)
-            sc = t.wait("3  i'll see it here, no key needed")
-            assert "✓ Chrome              Chrome 154" in sc and "? Chrome extension    add bise to Chrome" in sc, sc
-            assert "1  ⏎ opens chrome://extensions · turn on Developer mode, top right" in sc, sc
-            assert "⏎ open chrome://extensions" in sc, sc
+            sc = t.wait_all(["3  i'll see it here, no key needed",
+                             "✓ Chrome              Chrome 154", "? Chrome extension    add bise to Chrome",
+                             "1  ⏎ opens chrome://extensions · turn on Developer mode, top right",
+                             "⏎ open chrome://extensions"])
             shot(t, "extension-steps", sc)
             t.keys("Enter")
             sc = t.wait("opened · path copied")
@@ -203,29 +206,25 @@ def main():
             assert "path copied" not in sc, sc
             shot(t, "live-test-running", sc)
             check([row("browser", "done", "Chrome 154"), row("extension", "done", "v0.1.0"), row("live_test", "done", "ready")] + NO_HELPER)
-            sc = t.wait("✓ Chrome is ready. ask any agent to use it.", timeout=15)
-            assert "✓ live test           opened a tab, clicked a button. all set" in sc, sc
+            sc = t.wait_all(["✓ Chrome is ready. ask any agent to use it.",
+                             "✓ live test           opened a tab, clicked a button. all set"], timeout=15)
             assert "checks it again" not in sc, sc
             shot(t, "ready", sc)
             # the live test failed: try again (contractions)
             check([row("browser", "done", "Chrome 154"), row("extension", "done", "v0.1.0"), row("live_test", "failed", "the click did not land", "run_live_test")] + NO_HELPER)
-            sc = t.wait("✗ live test           the click didn't land")
-            assert "⏎ try again" in sc, sc
+            sc = t.wait_all(["✗ live test           the click didn't land", "⏎ try again"])
             shot(t, "live-test-failed", sc)
             # the helper installed: the apps rows after the live test
             web = [row("browser", "done", "Chrome 154"), row("extension", "done", "v0.1.0"), row("live_test", "done", "ready")]
             check(web + [row("accessibility", "waits", "", "request_accessibility"), row("screen_recording", "waits", "", "request_screen_recording")])
-            sc = t.wait("for apps")
-            assert "agents can drive your apps and Chrome" in sc, sc
+            t.wait_all(["for apps", "agents can drive your apps and Chrome"])
             t.wait("turn on bise Computer Use in the list. i'll see it")
-            sc = t.wait("⏎ open System Settings")
-            assert "? accessibility       bise can click and type in apps" in sc, sc
+            sc = t.wait_all(["⏎ open System Settings", "? accessibility       bise can click and type in apps"])
             shot(t, "apps-accessibility", sc)
             t.keys("Enter")
             called("request accessibility")
             check(web + [row("accessibility", "done"), row("screen_recording", "waits", "", "request_screen_recording")])
-            sc = t.wait("macOS reopens it, i'll wait")
-            assert "✓ accessibility       bise can click and type in apps" in sc, sc
+            sc = t.wait_all(["macOS reopens it, i'll wait", "✓ accessibility       bise can click and type in apps"])
             shot(t, "apps-screen-recording", sc)
             t.keys("Enter")
             called("request screen_recording")
@@ -238,15 +237,19 @@ def main():
             shot(t, "apps-done", sc)
             # an agent drives: its line, x stops them all
             state({"main": {"driving": "Chrome", "where": "amazon.fr", "since_ms": 1, "paused": False, "stopped": False}})
-            sc = t.wait("↖ main drives Chrome")
-            assert "x stop all" in sc, sc
+            sc = t.wait_all(["↖ main drives Chrome", "x stop all"])
             shot(t, "stop-all", sc)
             t.typed("x")
             called("stop --all")
             t.keys("Escape")
             t.wait_gone("computer use · agents can drive")
             # ---- the marks ----
-            sc = t.wait(" · ↖ Chrome")
+            # the divider's mark and the panel row's ↖ (one state, maybe
+            # two frames)
+            def marks(sc):
+                return " · ↖ Chrome" in sc and any(l.rstrip(" │").endswith("↖") for l in sc.split("\n") if " main " in l and ":*" in l and "│" in l)
+            marks.__doc__ = "the divider's ↖ Chrome and main's ↖ in the panel"
+            sc = t.wait_any([marks])[1]
             div = [l for l in sc.split("\n") if "you → main" in l][-1]
             assert div.rstrip().endswith("↖ Chrome ─────────────────────────────────────────────────────────┤") or "↖ Chrome" in div, div
             mrow = [l for l in sc.split("\n") if " main " in l and ":*" in l and "│" in l]
@@ -271,8 +274,10 @@ def main():
                 # feeds main only its own hub's)
                 f.write(json.dumps({"t": 1, "agent": "%s.main" % hub[0], "name": "main", "hub": hub[0], "event": "stopped", "by": "you", "driving": "Chrome"}) + "\n")
             state({"main": {"driving": None, "where": None, "paused": False, "stopped": True}})
-            sc = t.wait("↖ main stopped driving Chrome · you stopped it", timeout=15)
-            assert " · ↖ Chrome" not in sc, sc
+            def stopped(sc):
+                return "↖ main stopped driving Chrome · you stopped it" in sc and " · ↖ Chrome" not in sc
+            stopped.__doc__ = "the stopped line, the divider's ↖ Chrome gone"
+            sc = t.wait_any([stopped], 15)[1]
             # one line only (m_3904): no echo of /stop, no "no turn to interrupt"
             assert "stopped main:" not in sc and "no turn in progress" not in sc, sc
             shot(t, "stopped-feed-line", sc)
