@@ -468,6 +468,18 @@ def launch_watch_cards_may_be_a_teammates_question():
 
 
 @test
+def approval_no_in_both_forms():
+    """the world's approval wait reads main's 'no' as core-f's record (322a1ce0) or the older text line (tui-parity m_19755)"""
+    import world_seed as ws
+    rec = 'sb approval :: {"how":"no","who":"release","what":"git push --force","note":"put it on a branch"}'
+    check(ws.approval_said_no(rec, "release"), "the record")
+    check(not ws.approval_said_no(rec, "other"), "another agent's record")
+    check(not ws.approval_said_no(rec.replace('"no"', '"yes"'), "release"), "a yes")
+    check(ws.approval_said_no("sb approval : no : release · git push --force", "release"), "the older line")
+    check(not ws.approval_said_no("sb approval :: {not json", "release"), "a broken record")
+
+
+@test
 def real_home_env_finds_its_hub_by_his_rules():
     """a throwaway home's hub env (world.py): the isolated HOME and none of the overrides that would tell it where its state is; the home has ~/.bise/migrated.json like his Mac"""
     home = tempfile.mkdtemp(prefix="rh-")

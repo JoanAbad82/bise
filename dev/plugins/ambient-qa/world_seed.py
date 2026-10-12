@@ -453,12 +453,26 @@ def approval_seed(c, home, spec, timeout, scripts=None):
                       timeout, "the approval card for %s" % spec["agent"])
         c.say("/answer %d no: %s" % (card["id"], spec["note"]))
         c.wait(lambda: not any(cd.get("id") == card["id"] for cd in c.cards()), timeout, "the approval card closed")
-        c.wait_line("main", "sb approval : no : %s" % spec["agent"], timeout)
+        c.wait(lambda: any(approval_said_no(line, spec["agent"]) for line in c.lines("main")), timeout,
+               "main's line: the approval for %s said no" % spec["agent"])
     finally:
         last.clear()
         c.hub.pop("hub/approvals", None)
         set_mode("yolo")
         c.wait(lambda: mode() == "yolo", timeout, "the hub back in yolo")
+
+
+def approval_said_no(line, agent):
+    """main's feed line for his 'no' on `agent`'s approval, in either form: the record core-f wrote
+    since 322a1ce0, 'sb approval :: {"how": "no", "who": <agent>, …}', or the older text line
+    'sb approval : no : <agent>' (tests/e2e.py feed_rec reads both the same way). Pure."""
+    if line.startswith("sb approval :: "):
+        try:
+            rec = json.loads(line[len("sb approval :: "):])
+        except ValueError:
+            return False
+        return isinstance(rec, dict) and rec.get("how") == "no" and rec.get("who") == agent
+    return ("sb approval : no : %s" % agent) in line
 
 
 def seed_words(project, rich):
