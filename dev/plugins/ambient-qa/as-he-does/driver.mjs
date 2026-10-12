@@ -143,12 +143,20 @@ if (mode === 'first') {
     await page.keyboard.type(MESSAGE, { delay: 15 });
     await page.keyboard.press('Enter');
   }
-  const answer = typed ? await until(async () => {
-    const body = await text('[data-testid="app.main"]');
-    if (!body || !body.includes(MESSAGE)) return null;
-    const after = body.split(MESSAGE).pop().trim();
-    return after.length > 0 && !/^(sending|queued)/i.test(after) ? after.slice(0, 400) : null;
-  }, ANSWER_MS, 2000) : null;
+  // the answer: a thread row (thread.entry.<pos>, rows.tsx) after his row with the message, whose
+  // kind isn't 'you' and that has words (a tools or thinking row alone isn't an answer). Never the
+  // text after the message in the page: his row's own '11:47 ✓✓' read as an answer in run 3
+  const answer = typed ? await until(() => page.evaluate((msg) => {
+    const rows = [...document.querySelectorAll('[data-testid^="thread.entry."]')];
+    const mine = rows.findIndex((r) => r.getAttribute('data-kind') === 'you' && (r.textContent ?? '').includes(msg));
+    if (mine < 0) return null;
+    for (const r of rows.slice(mine + 1)) {
+      const kind = r.getAttribute('data-kind') ?? '';
+      const words = (r.textContent ?? '').trim();
+      if (kind !== 'you' && kind !== 'tools' && kind !== 'thinking' && words.length > 0) return `${kind}: ${words.slice(0, 400)}`;
+    }
+    return null;
+  }, MESSAGE), ANSWER_MS, 2000) : null;
   await shot('message');
   step("a message to a project's main gets its answer", !!answer, answer ?? (await text('[data-testid="app.main"]'))?.slice(-800));
 }
