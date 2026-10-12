@@ -165,6 +165,18 @@ tui_queue_tmux, tui_archived_tmux.
 - Still per line: main's context.txt write (its activity changes at
   every tool line; the file must be current at the REPL's call), ~4 %.
 
+## Not in this slice
+
+- **The sb CLI ↔ hub seam (agent.sock) is untyped too** (architect
+  m_19661, found by hot-view's sha 1): `AgentReq::from_json`
+  (rust/switchboard/src/core.rs 294-495 at f9f0ff3b) parses every `sb`
+  subcommand by key, 79 string-keyed reads of 50 distinct keys over 28
+  commands, and each new `sb` subcommand copies it. The next
+  typed-seam candidate: cli.rs's requests and `AgentReq` declared in
+  `bise_proto`. The done-when grep of this issue is about sb-core's view
+  only ("no string-keyed read of sb-core's view"): those reads are this
+  other seam's.
+
 ## Risks
 
 - A cold message that turns hot again: none today (a delivered message
