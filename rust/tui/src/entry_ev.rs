@@ -82,7 +82,7 @@ fn kind_evs(e: &Entry) -> Vec<Ev> {
         // expired-ux (designer m_7456), as the line path's turn_done:
         // the TUI signs in again on ⏎, not the runtime's /provider
         EntryKind::TurnFailed if bise_proto::thread::words::is_expired_line(&text) => vec![Ev::Warn(crate::wire::EXPIRED_TUI.into())],
-        EntryKind::TurnFailed => vec![notice_ev(pthread::Notice { level: NoticeLevel::Err, text })],
+        EntryKind::TurnFailed => vec![notice_ev(pthread::Notice { level: NoticeLevel::Err, text, retry: None })],
         EntryKind::NotDelivered => e.not_delivered.iter().map(|n| Ev::Undelivered { name: n.to.clone(), text: n.text.clone(), open: true }).collect(),
         EntryKind::Compacting => vec![Ev::Compact],
         EntryKind::Compacted => vec![Ev::Compacted { text, open: false }],

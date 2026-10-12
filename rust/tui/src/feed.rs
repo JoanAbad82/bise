@@ -360,6 +360,7 @@ pub(crate) fn is_notice(ev: &Ev) -> bool {
     matches!(
         ev,
         Ev::Warn(_)
+            | Ev::Retry { .. }
             | Ev::Card { .. }
             | Ev::Err(_)
             | Ev::Info(_)
@@ -572,6 +573,23 @@ pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>
                 }
                 return false;
             }
+        }
+    }
+    // H9 (architect m_19836): a retry in the same run as the newest
+    // event, itself a retry, takes its row (one updating row per call's
+    // retries, as the window's fold does)
+    if let Ev::Retry { .. } = &ev {
+        let prev = match events.last() {
+            Some(Ev::Retry { retry, .. }) => Some(retry),
+            _ => None,
+        };
+        if bise_proto::thread::lines::is_same_retry_run(prev, false) {
+            let i = events.len() - 1;
+            events[i] = ev;
+            if let Some(c) = cache.get_mut(i) {
+                *c = None;
+            }
+            return false;
         }
     }
     // his message's id (`sb you-id`, written by sb-core right after his

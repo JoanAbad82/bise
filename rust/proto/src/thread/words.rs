@@ -3,7 +3,7 @@
 //! a row's text. Pure std; a word that needs something outside this
 //! crate (a provider's long name) takes it from the caller.
 
-use super::lines::{Hub, Obs, TurnEnd};
+use super::lines::{self, Hub, Obs, TurnEnd};
 use super::{Notice, NoticeLevel, ToolItem, ToolKind};
 
 /// How long the model thought before a reply: the time since the line
@@ -44,7 +44,7 @@ pub fn thought_for(ms: u64) -> String {
 }
 
 fn notice(level: NoticeLevel, text: String) -> Option<Notice> {
-    Some(Notice { level, text })
+    Some(Notice { level, text, retry: None })
 }
 
 /// A runtime observation as the line he reads (info, warn, err), or None
@@ -57,7 +57,8 @@ pub fn obs_notice(o: &Obs, name: &dyn Fn(&str, &str) -> String) -> Option<Notice
     match o {
         Obs::NotificationReceived(t) => notice(Info, format!("notification : {t}")),
         Obs::NotificationDelivered(t) => notice(Info, format!("notification delivered to the model: {t}")),
-        Obs::ProviderRetry(t) => notice(Warn, provider_retry(t)),
+        // H9: its data rides on the notice (one row per run of them)
+        Obs::ProviderRetry(t) => Some(Notice { level: Warn, text: provider_retry(t), retry: lines::retry(t) }),
         Obs::HarnessRestarted(t) => notice(
             Err,
             format!("the harness crashed ({t}) and restarted — the current turn is interrupted, the history is restored up to the last model call"),
@@ -82,11 +83,11 @@ pub fn obs_notice(o: &Obs, name: &dyn Fn(&str, &str) -> String) -> Option<Notice
 /// that says what to do, a missing key says which, else a ✗ with why.
 pub fn turn_failed(why: &str, name: &dyn Fn(&str, &str) -> String) -> Notice {
     if is_plan_line(why) {
-        return Notice { level: NoticeLevel::Warn, text: why.to_string() };
+        return Notice { level: NoticeLevel::Warn, text: why.to_string(), retry: None };
     }
     match no_key(why, name) {
-        Some(line) => Notice { level: NoticeLevel::Err, text: line },
-        None => Notice { level: NoticeLevel::Err, text: format!("turn failed: {why}") },
+        Some(line) => Notice { level: NoticeLevel::Err, text: line, retry: None },
+        None => Notice { level: NoticeLevel::Err, text: format!("turn failed: {why}"), retry: None },
     }
 }
 
@@ -95,13 +96,13 @@ pub fn turn_failed(why: &str, name: &dyn Fn(&str, &str) -> String) -> Notice {
 /// info); anything else is an error.
 pub fn rejected(r: &str) -> Notice {
     if r == "no pending completion" || r == "no pending tool result" {
-        return Notice { level: NoticeLevel::Info, text: "in-flight response dropped (turn interrupted)".into() };
+        return Notice { level: NoticeLevel::Info, text: "in-flight response dropped (turn interrupted)".into(), retry: None };
     }
     // his queued message, taken back before delivery (sb-core's unqueue)
     if r == "taken_back" {
-        return Notice { level: NoticeLevel::Info, text: "taken back".into() };
+        return Notice { level: NoticeLevel::Info, text: "taken back".into(), retry: None };
     }
-    Notice { level: NoticeLevel::Err, text: r.to_string() }
+    Notice { level: NoticeLevel::Err, text: r.to_string(), retry: None }
 }
 
 /// A hub line that reads as a notice: a warning, a spawn (`✚`), computer
@@ -397,18 +398,17 @@ pub fn summary(items: &[ToolItem]) -> String {
 /// provider 529 (transient) · retry in 4s`), as the user reads it while
 /// the call waits.
 pub fn provider_retry(t: &str) -> String {
-    let parts: Vec<&str> = t.split(" · ").collect();
-    match parts.as_slice() {
-        // "2/10" failed: the plan is attempt 3/10 after the pause
-        [n, why, wait] => {
-            let next = n
-                .split_once('/')
-                .and_then(|(a, b)| Some((a.parse::<u32>().ok()? + 1, b)))
-                .map(|(a, b)| format!("retry {}/{}", a, b))
-                .unwrap_or_else(|| "retry".into());
-            format!("model call failed (attempt {}): {} · {} in {}", n, why, next, wait.trim_start_matches("retry in "))
-        }
-        _ => format!("model call failed: {}", t),
+    match lines::retry(t) {
+        // 2/10 failed: the plan is attempt 3/10 after the pause
+        Some(r) => format!(
+            "model call failed (attempt {a}/{m}): {why} · retry {n}/{m} in {s}s",
+            a = r.attempt,
+            m = r.max,
+            why = r.why,
+            n = r.attempt.saturating_add(1),
+            s = r.wait_ms / 1000
+        ),
+        None => format!("model call failed: {}", t),
     }
 }
 
@@ -578,6 +578,18 @@ mod tests {
     fn a_retry_says_the_next_attempt() {
         assert_eq!(provider_retry("2/10 · provider 529 (transient) · retry in 4s"), "model call failed (attempt 2/10): provider 529 (transient) · retry 3/10 in 4s");
         assert_eq!(provider_retry("odd"), "model call failed: odd");
+        // H9: the words now come from lines::retry's struct; the runtime's
+        // own line (bend LAWS provider_retry_line) reads as it did before
+        assert_eq!(provider_retry("1/10 · provider 529 (transient) · retry in 1s"), "model call failed (attempt 1/10): provider 529 (transient) · retry 2/10 in 1s");
+        let r = lines::retry("1/10 · provider 529 (transient) · retry in 1s").unwrap();
+        assert_eq!((r.attempt, r.max, r.why.as_str(), r.wait_ms, r.end), (1, 10, "provider 529 (transient)", 1_000, None));
+        // not that shape: no data, the words say the line as it came
+        for odd in ["odd", "2/10 · a · b · retry in 4s", "x/10 · 529 · retry in 4s", "2/10 · 529 · retry soon"] {
+            assert_eq!(lines::retry(odd), None, "{odd}");
+            assert_eq!(provider_retry(odd), format!("model call failed: {odd}"));
+        }
+        let n = obs_notice(&lines::Obs::ProviderRetry("2/10 · 529 · retry in 4s".into()), &|_, k| k.to_string()).unwrap();
+        assert_eq!(n.retry.map(|r| r.attempt), Some(2), "the notice carries its data");
     }
 
     #[test]

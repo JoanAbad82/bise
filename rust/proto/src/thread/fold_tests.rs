@@ -179,6 +179,54 @@ fn another_agents_wake_in_mains_thread_is_one_typed_entry() {
     assert!(serde_json::to_string(&e[0]).unwrap().contains(r#""agent":"mcp-errors""#));
 }
 
+/// H9 (ambient-lead m_19827, architect m_19836): a run of retries in one
+/// turn is one notice entry at the first one's pos, its words and data the
+/// latest; what ends the run says how on that entry (recovered: the
+/// agent's text, its thinking or a tool; failed: the turn failed); a retry
+/// after anything else, or in a new turn, starts a new row.
+#[test]
+fn a_run_of_retries_is_one_row_that_says_how_it_ended() {
+    let none = |_: &str| None;
+    let r = |pos: u64, n: u32| (pos, 1_000 + pos, format!("  obs: provider_retry: {n}/10 · provider 529 (transient) · retry in {n}s"));
+    let retry_of = |e: &Entry| e.notice.as_ref().and_then(|n| n.retry.clone()).unwrap();
+    // three retries, then the reply: one row, recovered
+    let ls = vec![(1, 1_001, "sb you : go".to_string()), (2, 1_002, "  obs: turn_started".to_string()), r(3, 1), r(4, 2), r(5, 3), (6, 1_006, "  obs: assistant: done".to_string())];
+    let e = fold(&ls, &ctx_with(&[], &none));
+    use EntryKind::*;
+    assert_eq!(e.iter().map(|e| e.kind).collect::<Vec<_>>(), [You, Notice, Agent]);
+    assert_eq!(e[1].pos, 3, "the run keeps its first line's pos: the client replaces that row");
+    assert_eq!(e[1].text, "model call failed (attempt 3/10): provider 529 (transient) · retry 4/10 in 3s");
+    let got = retry_of(&e[1]);
+    assert_eq!((got.attempt, got.max, got.why.as_str(), got.wait_ms, got.end), (3, 10, "provider 529 (transient)", 3_000, Some(RetryEnd::Recovered)));
+    assert!(e.iter().all(|e| e.payload_matches_kind()));
+    let mut seen = std::collections::BTreeSet::new();
+    assert!(e.iter().all(|e| seen.insert(e.pos)), "pos stays unique");
+    // still waiting: no end yet
+    let e = fold(&ls[..4], &ctx_with(&[], &none));
+    assert_eq!((e.len(), retry_of(&e[1]).end), (2, None));
+    // a tool ends it too (recovered); a retry after the tool is a new row
+    let ls = vec![
+        (2, 1_002, "  obs: turn_started".to_string()),
+        r(3, 1),
+        (4, 1_004, "  obs: tool_started #1".to_string()),
+        (5, 1_005, "  obs: tool_finished #1 ok".to_string()),
+        r(6, 1),
+        r(7, 2),
+        (8, 1_008, "  obs: turn_done: failed: provider failed after 3 attempts: provider 529 (transient)".to_string()),
+    ];
+    let e = fold(&ls, &ctx_with(&[], &none));
+    assert_eq!(e.iter().map(|e| e.kind).collect::<Vec<_>>(), [Notice, Tools, Notice, TurnFailed]);
+    assert_eq!(retry_of(&e[0]).end, Some(RetryEnd::Recovered));
+    let last = retry_of(&e[2]);
+    assert_eq!((e[2].pos, last.attempt, last.end), (6, 2, Some(RetryEnd::Failed)), "the turn failed: the run says so");
+    // a new turn's retry never joins the last turn's row
+    let ls = vec![(2, 1_002, "  obs: turn_started".to_string()), r(3, 1), (4, 1_004, "  obs: turn_started".to_string()), r(5, 1)];
+    let e = fold(&ls, &ctx_with(&[], &none));
+    assert_eq!(e.iter().map(|e| (e.kind, e.pos)).collect::<Vec<_>>(), [(Notice, 3), (Notice, 5)]);
+    // on the wire: end once set, never before
+    assert!(serde_json::to_string(&e[1]).unwrap().contains(r#""retry":{"attempt":1,"max":10,"why":"provider 529 (transient)","wait_ms":1000}"#));
+}
+
 /// A failed turn's kept text (the hub's `sb kept` line, written right
 /// before the failure) is an `agent` entry, cut, the failure's notice
 /// after it (designer m_13334: text he read never vanishes).

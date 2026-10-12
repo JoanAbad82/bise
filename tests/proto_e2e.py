@@ -1074,6 +1074,25 @@ def main():
         f = failed_entries()[-1]
         check(f["turn_failed"]["why"] and f["text"] and "notice" not in f, "the turn_failed entry: %r" % f)
         c.wait_idle("main", timeout=90)
+
+        # H9 (architect m_19836): two overloaded calls then the answer: ONE
+        # retry row (the same pos, sent again), its end 'recovered' once
+        # the reply came
+        def retry_rows():
+            last = {}
+            for x in typed(d, "entry"):
+                e = x["entry"]
+                if x["agent"] == "main" and e["kind"] == "notice" and (e.get("notice") or {}).get("retry"):
+                    last[e["pos"]] = e
+            return list(last.values())
+
+        nr = len(retry_rows())
+        c.say("[[error: overloaded x2]] the retry check")
+        c.wait(lambda: any((r["notice"]["retry"].get("end") == "recovered") for r in retry_rows()[nr:]), 90, "a recovered retry row")
+        rows = retry_rows()[nr:]
+        rr = rows[-1]["notice"]["retry"]
+        check(len(rows) == 1 and rr["attempt"] == 2 and rr["max"] > 2 and "attempt 2/" in rows[-1]["text"], "one retry row for the run: %r" % rows)
+        c.wait_idle("main", timeout=90)
         d.send({"cmd": "unsubscribe", "project": project, "agent": "main"})
 
         # every typed event has the frozen keys of the fixtures

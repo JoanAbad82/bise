@@ -194,6 +194,13 @@ pub(crate) enum Ev {
     Warn(String),
     Err(String),
     Info(String),
+    // H9: a model call that failed and waits to retry, drawn as a warn;
+    // a run of them is one row, updated in place (feed.rs push_event,
+    // lines::is_same_retry_run)
+    Retry {
+        text: String,
+        retry: bise_proto::thread::Retry,
+    },
     // pr-news (pr-design §4, main's feed): a PR's news, `↑ #412 changes
     // asked · dark-mode is on it`; the number links to the PR. `tone`:
     // plain, dim (merged, closed) or red (checks fail; bold on NO_COLOR).
@@ -459,6 +466,9 @@ fn obs_ev(o: Obs) -> Option<Ev> {
 
 /// A notice (bise-proto's words) as the TUI's line of its level.
 pub(crate) fn notice_ev(n: Notice) -> Ev {
+    if let Some(retry) = n.retry {
+        return Ev::Retry { text: n.text, retry };
+    }
     match n.level {
         NoticeLevel::Warn => Ev::Warn(n.text),
         NoticeLevel::Err => Ev::Err(n.text),
