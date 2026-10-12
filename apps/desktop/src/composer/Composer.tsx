@@ -36,6 +36,11 @@ import type { Store } from "./drafts";
 export interface ComposerProps {
   /** Whose composer this is (`<project>/<agent>`): its draft, history and queue are kept per target. */
   readonly target: string;
+  /**
+   * Where the draft is kept, when not with the target's (an inbox card's half answer: its own key
+   * while the card is open, unset when it closes). The send still goes to `target`.
+   */
+  readonly draftKey?: string;
   /** A turn runs: tab queues, ⏎ steers, the send button stops. */
   readonly busy?: boolean;
   readonly sources?: ComposerSources;
@@ -221,6 +226,7 @@ export const Composer = memo(function Composer(
     >
       <PmField
         target={target}
+        draftKey={props.draftKey}
         busy={busy}
         sources={sources}
         store={store}

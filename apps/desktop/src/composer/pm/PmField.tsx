@@ -112,6 +112,12 @@ import {
 
 export interface PmFieldProps {
   readonly target: string;
+  /**
+   * Where the draft is kept, when not with the target's (an inbox card's half answer, amb-home
+   * m_20065): a change writes the old key's draft at once and loads the new one. History and
+   * queue stay the target's. Unset: the target.
+   */
+  readonly draftKey?: string | undefined;
   readonly busy: boolean;
   readonly sources: ComposerSources;
   readonly store: Store;
@@ -241,11 +247,16 @@ export function PmField(p: PmFieldProps): JSX.Element {
     timer.current = null;
     const st = state();
     if (st === null) return;
-    saved.current = {
-      ...saved.current,
-      draft: isBlank(st.doc) ? null : entryOf(segmentsOf(st.doc)),
-    };
-    save(props.current.store, props.current.target, saved.current);
+    const q = props.current;
+    const draft = isBlank(st.doc) ? null : entryOf(segmentsOf(st.doc));
+    const key = q.draftKey ?? q.target;
+    if (key === q.target) {
+      saved.current = { ...saved.current, draft };
+      save(q.store, q.target, saved.current);
+    } else {
+      save(q.store, key, { ...load(q.store, key), draft });
+      save(q.store, q.target, saved.current); // its history and queue; its own draft stays as it was
+    }
   };
 
   /** The field's content replaced by an entry (or emptied), the caret at its end; undoable.
@@ -358,9 +369,11 @@ export function PmField(p: PmFieldProps): JSX.Element {
   useEffect(() => {
     saved.current = load(p.store, p.target);
     browsing.current = -1;
-    const draft = saved.current.draft;
+    const key = p.draftKey ?? p.target;
+    const draft =
+      key === p.target ? saved.current.draft : load(p.store, key).draft;
     if (!setContent(draft) && draft !== null) {
-      keepUnread(p.store, p.target, draft); // never dropped: its raw JSON stays aside
+      keepUnread(p.store, key, draft); // never dropped: its raw JSON stays aside
       setContent(null);
     }
     forget(); // another target's text never comes back
@@ -368,8 +381,8 @@ export function PmField(p: PmFieldProps): JSX.Element {
     return () => {
       writeNow(); // the target changes or the screen goes: the draft is kept at once
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the editor's content follows the target only
-  }, [p.target, p.store]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the editor's content follows the target and the draft key only
+  }, [p.target, p.store, p.draftKey]);
 
   // ---- the picker ----
   const [trigger, setTrigger] = useState<Trigger | null>(null);
