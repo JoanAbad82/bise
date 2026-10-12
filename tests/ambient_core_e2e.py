@@ -25,9 +25,11 @@ class Core:
     notifications, kept here as the {ev, ...} events the window's store
     reads."""
 
-    def __init__(self, E):
-        self.err = open(os.path.join(E.tmp, "core.stderr"), "a")
-        self.p = subprocess.Popen([EXE, "ambient-core", "--workspace", E.ws], cwd=ROOT, env=E.env,
+    def __init__(self, E, exe=EXE, cwd=ROOT, env=None, err="core.stderr"):
+        """`exe`, `cwd`, `env`: another bise's core (version_skew_e2e runs
+        a version dir's); the handshake below is the same for every one."""
+        self.err = open(os.path.join(E.tmp, err), "a")
+        self.p = subprocess.Popen([exe, "ambient-core", "--workspace", E.ws], cwd=cwd, env=E.env if env is None else env,
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.err, text=True)
         self.evs = []
         self.answers = {}

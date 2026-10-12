@@ -90,17 +90,13 @@ def project_hub(E):
 
 
 class CoreOf(Core):
-    """ambient_core_e2e's Core, run as the version dir `v`'s bise."""
+    """ambient_core_e2e's Core (its start and handshake, as the app does
+    it), run as the version dir `v`'s bise."""
 
     def __init__(self, E, v):
-        self.err = open(os.path.join(E.tmp, "core-%s.stderr" % os.path.basename(v)), "a")
         bise_env.refuse_real_home(E.env)
-        self.p = subprocess.Popen([os.path.join(v, "bise"), "ambient-core", "--workspace", E.ws], cwd=v, env=env_of(E),
-                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.err, text=True)
-        import threading
-        self.evs = []
-        self.lock = threading.Lock()
-        threading.Thread(target=self._read, daemon=True).start()
+        super().__init__(E, exe=os.path.join(v, "bise"), cwd=v, env=env_of(E),
+                         err="core-%s.stderr" % os.path.basename(v))
 
     def stop(self):
         try:
