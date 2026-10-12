@@ -176,7 +176,7 @@ def main():
         return 1
     port_file = os.path.join(tmp, "port")
     srv = subprocess.Popen([sys.executable, os.path.join(HERE, "fake_mcp_http.py"), "--mode", "streamable",
-                            "--port-file", port_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            "--error-tools", "--port-file", port_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         port = int(wait.until(lambda: open(port_file).read().strip(), 10, "the fake server's port file"))
         return run(exe, tmp, port)

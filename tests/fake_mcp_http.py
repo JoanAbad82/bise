@@ -54,10 +54,11 @@ Control (no auth): POST /control {"action": ...}
   fail_call         {"count": N, "status": S, "body": B} or {"count": N,
                     "rpc": {code, message, data}}: the next N tools/call
                     answer HTTP S with body B, or that JSON-RPC error
-Tools that fail as a gateway that masks its errors does (isError, the
-words "Error calling tool '<name>'" and nothing else): search {query?,
-page_size?} and get_file {file_id} (strict schemas); fail_text {text}
-answers isError with that text.
+--error-tools adds tools that fail as a gateway that masks its errors
+does (isError, the words "Error calling tool '<name>'" and nothing else):
+search {query?, page_size?} and get_file {file_id} (strict schemas);
+fail_text {text} answers isError with that text. Off by default: the
+plugins tests count the 3 tools above (rust/plugins/tests).
 """
 
 import argparse
@@ -77,6 +78,7 @@ ap.add_argument("--port-file", required=True)
 ap.add_argument("--require-header", default="")
 ap.add_argument("--page-size", type=int, default=0)
 ap.add_argument("--sse-answers", action="store_true")
+ap.add_argument("--error-tools", action="store_true")
 ap.add_argument("--oauth", action="store_true")
 ap.add_argument("--no-dcr", action="store_true")
 ap.add_argument("--token-ttl", type=int, default=3600)
@@ -92,6 +94,8 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}}}},
     {"name": "slow", "description": "Sleep, then answer.",
      "inputSchema": {"type": "object", "properties": {"secs": {"type": "number"}}}},
+]
+ERROR_TOOLS = [
     {"name": "search", "description": "Search files (fails, masked).",
      "inputSchema": {"type": "object", "additionalProperties": False, "properties": {
          "query": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "The search query."},
@@ -102,6 +106,8 @@ TOOLS = [
     {"name": "fail_text", "description": "Answer isError with a text.",
      "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}}}},
 ]
+if args.error_tools:
+    TOOLS += ERROR_TOOLS
 SESSIONS = set()
 # open event streams: (session or None, queue of SSE frames, a closer)
 STREAMS = []
@@ -165,9 +171,9 @@ def call(name, arguments, headers):
         return {"content": [{"type": "text", "text": "added-tool:%s" % name}]}
     if name == "admin":
         return {"content": [{"type": "text", "text": "admin ok"}]}
-    if name in ("search", "get_file"):
+    if args.error_tools and name in ("search", "get_file"):
         return {"content": [{"type": "text", "text": "Error calling tool %r" % name}], "isError": True}
-    if name == "fail_text":
+    if args.error_tools and name == "fail_text":
         return {"content": [{"type": "text", "text": arguments.get("text", "")}], "isError": True}
     if name == "slow":
         import time
