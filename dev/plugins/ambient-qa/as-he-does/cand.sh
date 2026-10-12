@@ -46,7 +46,10 @@ stopcand() {
   w=$(pidsunder "$G/w"); [ -n "$w" ] && { sleep 2; SIG=KILL killpids $w; sleep 1; }
   local lc lw; lc=$(ours | wc -l | tr -d ' '); lw=$(pidsunder "$G/w" | wc -l | tr -d ' ')
   say "stopped: left under the candidate $lc, naming the world $lw"
-  [ "$lc" = 0 ] && [ "$lw" = 0 ] || { echo "the stop left $lc + $lw processes" > $O/BREACH; return 1; }
+  [ "$lc" = 0 ] && [ "$lw" = 0 ] || {
+    # which ones (c28260a9's first run left 1 + 1 that were gone a minute later: say what they were)
+    { echo "the stop left $lc + $lw processes"; ps -o pid=,ppid=,stat=,etime=,command= -p "$(echo $(ours) $(pidsunder "$G/w") | tr ' ' ',')" 2>/dev/null | cut -c1-240; } > $O/BREACH
+    cat $O/BREACH; return 1; }
 }
 opencand() {
   open -g -n -a "$A" --env HOME=$H --env BISE_HOME=$H/.bise --env BISE_DESKTOP_OFFSCREEN=1 \
@@ -77,7 +80,7 @@ libgate() {
   fi
   echo "library $1" > $O/BREACH; breach
 }
-drive() { AS_HE_DOES_TAG=${TAG:-} node $HERE/driver.mjs $PORT_CDP $O "$@" 2>&1 | tail -4; breach; }
+drive() { AS_HE_DOES_TAG=${TAG:-} node $HERE/driver.mjs $PORT_CDP $O "$@" > $O/driver-$1${TAG:+-$TAG}.log 2>&1; tail -4 $O/driver-$1${TAG:+-$TAG}.log; breach; }
 
 rm -f $O/BREACH $O/stop $O/pids.txt
 say "his app before: $(hispids)" | tee $O/his.txt

@@ -26,7 +26,16 @@ const save = () => fs.writeFileSync(path.join(out, `${mode}${tag}.json`), JSON.s
 const step = (name, ok, info) => { res.steps.push({ name, ok, info: info ?? null }); save(); };
 setTimeout(() => { step('driver watchdog', false, `${WATCHDOG_MS / 1000} s`); process.exit(2); }, WATCHDOG_MS).unref();
 
-const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 20000 });
+// the app's CDP port answers some seconds after the open (c28260a9's first run: 3 drives refused at
+// once, ECONNREFUSED): retried for up to 90 s, then a failed step, never an uncaught error
+let browser;
+for (const t0 = Date.now(); !browser;) {
+  browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 10000 }).catch((e) => {
+    if (Date.now() - t0 > 90000) { step('connect to the app (CDP)', false, String(e).slice(0, 300)); process.exit(1); }
+    return null;
+  });
+  if (!browser) await new Promise((r) => setTimeout(r, 1000));
+}
 let page;
 for (let i = 0; i < 100 && !page; i++) {
   for (const c of browser.contexts()) for (const p of c.pages()) {
