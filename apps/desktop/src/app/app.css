@@ -511,40 +511,135 @@ body:has(.app-shell) {
 .app-panel.over {
   background: var(--c-solid);
 }
-.app-panel-head {
+/* the right bar (designer's desktop-right-bar v5): 320 px, its head 44 high with 16 of padding,
+   four sections 16 apart, a section's head 4 above its first row, rows 32 high with 8 of padding,
+   the words 16 from the edge; pink only for '?' and 'waits' */
+.app-panel.app-rb {
+  padding: 0;
+}
+.app-rb-top {
   flex: none;
   display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 4px 6px 8px;
+  align-items: center;
+  gap: var(--gap-inline);
+  min-height: var(--h-head);
+  padding: 0 var(--s-4);
+  border-bottom: 1px solid var(--c-line);
 }
-.app-panel-dim {
+.app-rb-dim {
   color: var(--c-text-2);
 }
-.app-panel-head .b-act {
+.app-rb-key {
   margin-left: auto;
+  color: var(--c-text-3);
+  font: var(--t-11) var(--font-mono);
 }
-.app-panel-body {
+.app-rb-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  padding: var(--s-2);
 }
-.app-panel-keys {
-  flex: none;
+.app-rb-sec + .app-rb-sec {
+  margin-top: var(--gap-section);
+}
+.app-rb-head {
   display: flex;
-  gap: var(--s-4);
-  padding: 8px 6px 10px;
-  border-top: 1px solid var(--c-line);
-  color: var(--c-text-3);
-  font-size: 11.5px;
+  align-items: baseline;
+  gap: var(--gap-inline);
+  min-width: 0;
+  padding: 0 var(--s-2);
+  margin-bottom: var(--gap-tight);
+  white-space: nowrap;
 }
-.app-panel-keys kbd {
-  margin-right: 4px;
-  font-family: var(--font-mono);
-  background: none;
-  border: 0;
-  padding: 0;
-  color: var(--c-text-2);
+.app-rb-title {
+  flex: none;
+  color: var(--c-text-3);
+  font: 600 var(--t-11) var(--font-ui);
+  letter-spacing: 0.04em;
+}
+.app-rb-sum {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c-text-3);
+  font-size: var(--t-12);
+}
+.app-rb-head .b-act {
+  margin-left: auto;
+  color: var(--c-text-3);
+  font-size: var(--t-12);
+}
+.app-rb-rows {
+  display: flex;
+  flex-direction: column;
+}
+.app-rb-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  width: 100%;
+  min-height: var(--h-row);
+  padding: 0 var(--s-2);
+  border-radius: var(--r-2);
+  white-space: nowrap;
+  text-align: left;
+  cursor: pointer;
+}
+.app-rb-row:hover,
+.app-rb-row[aria-current='true'] {
+  background: var(--c-hover);
+}
+.app-rb-more {
+  color: var(--c-text-3);
+  font-size: var(--t-12);
+}
+.app-rb-g {
+  flex: none;
+  width: 2.2ch;
+  font: var(--t-12) var(--font-mono);
+  text-align: center;
+}
+.app-rb-g.ink {
+  color: var(--c-text);
+}
+.app-rb-g.acc {
+  color: var(--c-accent);
+}
+.app-rb-g.err {
+  color: var(--c-err);
+}
+.app-rb-g.dim {
+  color: var(--c-text-3);
+}
+.app-rb-name {
+  flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c-text);
+}
+.app-rb-sub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c-text-3);
+  font-size: var(--t-12);
+}
+.app-rb-end {
+  flex: none;
+  margin-left: auto;
+  color: var(--c-text-3);
+  font-size: var(--t-12);
+}
+.app-rb-end.ink {
+  color: var(--c-text);
+}
+.app-rb-end.acc {
+  color: var(--c-accent);
+}
+.app-rb-end.err {
+  color: var(--c-err);
 }
 
 /* what slides over the window (under 1000 px): the sidebar from the left, the panel from the

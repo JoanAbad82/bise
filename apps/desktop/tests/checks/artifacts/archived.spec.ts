@@ -4,8 +4,8 @@
 //     says 'a archived';
 //   - a shows the archived ones alone ('artifacts · archived', 'esc back to the list'); esc goes
 //     back; a click on the row does the same as a;
-//   - panel A on storefront's thread: its live one, the faint '2 archived' row; a click shows them
-//     under the others.
+//   - the right bar on storefront's thread (it took panel A's place): its ARTIFACTS section lists the
+//     live one only.
 // Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
@@ -71,14 +71,12 @@ test("artifacts/archived: archived ones behind a faint 'N archived' row, a shows
     await expect(rows()).toHaveCount(2);
     await page.keyboard.press('Escape');
 
-    // panel A on storefront's thread
+    // the right bar on storefront's thread (it took panel A's place, designer's desktop-right-bar
+    // v5): its ARTIFACTS section lists the live ones only; the archived wait on the artifacts screen
     await page.getByTestId(`app.sidebar.project.${SHOP}`).click();
-    const panel = page.getByTestId('artifacts.panel');
-    await expect(panel.locator('[role=option]')).toHaveCount(1, { timeout: 5000 });
-    await expect(page.getByTestId('artifacts.panel.archived')).toHaveText('2 archived');
-    await page.getByTestId('artifacts.panel.archived').click();
-    await expect(panel.locator('[role=option]')).toHaveCount(3);
-    await expect(page.getByTestId('artifacts.panel.archived')).toHaveText('hide the archived ones');
+    const section = page.getByTestId('app.right.artifacts');
+    await expect(section.locator('[data-testid^="app.right.artifact."]')).toHaveCount(1, { timeout: 5000 });
+    await expect(section.getByTestId('app.right.artifacts.head')).toHaveText('ARTIFACTS · 1');
   } finally {
     await s.close();
     core.dispose();

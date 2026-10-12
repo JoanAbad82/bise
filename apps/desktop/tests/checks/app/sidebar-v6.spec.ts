@@ -95,10 +95,11 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(btn).toContainText('artifacts · 1');
     await expect(btn).toHaveAttribute('aria-pressed', 'true');
     const panel = page.getByTestId('app.panel');
-    await expect(panel).toContainText('artifacts· storefront');
+    // the right bar took panel A's place (designer's desktop-right-bar v5): its head, its sections
+    await expect(page.getByTestId('app.right.top')).toContainText('storefront');
+    await expect(page.getByTestId('app.right.top')).toContainText('⌥⌘0');
     expect(Math.round((await panel.boundingBox())?.width ?? 0), 'the panel is 320 px').toBe(320);
-    await expect(panel.getByTestId('scheduled.here'), "then 'scheduled here'").toContainText('check the deploy');
-    await expect(page.getByTestId('app.panel.keys')).toHaveText(/⏎\s*open\s*space\s*quick look\s*⌥⌘0\s*hide/);
+    await expect(page.getByTestId('app.right.scheduled'), 'its scheduled tasks').toContainText('check the deploy');
     await page.mouse.move(1, 400);
     await page.screenshot({ path: shot('w1400-light') });
     await core.send(prefs('dark') as never);

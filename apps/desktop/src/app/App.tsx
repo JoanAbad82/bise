@@ -35,7 +35,7 @@ import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
 import { Sidebar, useClosedFolders } from './Sidebar';
 import { Over, Titlebar, useFrame } from './Frame';
-import { Panel } from './Panel';
+import { RightBar } from './RightBar';
 import { numbersOf } from '@/agents/model';
 import { CoreLine } from './CoreLine';
 import { HubUpdateLine, UpdateLine } from './UpdateLine';
@@ -231,7 +231,7 @@ function Shell() {
           <Win
             side={frame.side ? <Sidebar onSearch={openPalette} /> : null}
             main={<Current top={<Titlebar frame={frame} />} />}
-            aside={frame.panel?.docked === true ? <Panel project={frame.panel.project} name={frame.panel.name} /> : undefined}
+            aside={frame.panel?.docked === true ? <RightBar project={frame.panel.project} name={frame.panel.name} /> : undefined}
           />
           {/* his try a43609b2: both side columns resize by their border (designer m_19374); a folded
               sidebar opens again by a drag from the window's left edge */}
@@ -271,7 +271,7 @@ function Shell() {
           )}
           {frame.over === 'panel' && frame.panel !== undefined && (
             <Over side="right" onClose={frame.close}>
-              <Panel project={frame.panel.project} name={frame.panel.name} over />
+              <RightBar project={frame.panel.project} name={frame.panel.name} over />
             </Over>
           )}
         </>

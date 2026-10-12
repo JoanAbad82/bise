@@ -1,0 +1,246 @@
+// The right bar (designer's desktop-right-bar v5, ambient-lead m_20085/m_20087): what happens in the
+// place shown, as the terminal's panel: four foldable sections in his order, AGENTS (start order,
+// ⌥N = the TUI's), ARCHIVED, ARTIFACTS, SCHEDULED & WAITING. 320 px, it takes panel A's slots
+// (docked from 1000 px, sliding over under it, ⌥⌘0). On bise's thread the same sections cover every
+// project, the project's name in place of the role. A click opens the agent full in the centre (his
+// pick), an artifact its view, a task the scheduled screen; 'all ›' the full list in the centre.
+// Owner: amb-win. The rows' words are pure (barrows.ts).
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Act, Press } from '@/ds';
+import type { Agent } from '@/proto';
+import { useAllArtifacts } from '@/artifacts';
+import { useAllScheduled } from '@/scheduled';
+import { useStore, type Store } from '@/store';
+import { useNow } from './clock';
+import { keep } from './keep';
+import { useRoute, useRouter } from './router';
+import { agentRows, archivedRows, artifactRows, capRows, scheduledRows, waitingRows, type BarRow, type ProjAgent } from './barrows';
+
+const lastAgents = new Map<string, { from: readonly (readonly Agent[])[]; items: readonly ProjAgent[] }>();
+
+/** The agents of one project, or of every project ('' = bise's thread), with a stable snapshot. */
+export function useBarAgents(project: string): readonly ProjAgent[] {
+  const store = useStore();
+  const ids = (s: Store) => (project === '' ? s.projects().map((p) => p.project) : [project]);
+  return useSyncExternalStore(
+    (cb) => {
+      const offs = ids(store).map((p) => store.subscribe(`agents:${p}`, cb));
+      offs.push(store.subscribe('projects', cb));
+      return () => {
+        for (const off of offs) off();
+      };
+    },
+    () => {
+      const list = ids(store);
+      const names = list.map((p) => {
+        const row = store.projects().find((x) => x.project === p);
+        return row !== undefined && row.name !== '' ? row.name : p;
+      });
+      const from = list.map((p) => store.agents(p));
+      const key = `${project}\u0000${names.join('\n')}`;
+      const was = lastAgents.get(key);
+      if (was !== undefined && was.from.length === from.length && was.from.every((x, i) => x === from[i])) return was.items;
+      const items: ProjAgent[] = [];
+      list.forEach((p, i) => {
+        for (const a of from[i] ?? []) items.push({ project: p, projectName: names[i] ?? p, a });
+      });
+      lastAgents.set(key, { from, items });
+      return items;
+    },
+  );
+}
+
+/** ⌥ held: the agents' rows show ⌥1-⌥9 (designer: '⌥ tenu'). */
+function useAltHeld(): boolean {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      setHeld(e.altKey && !e.metaKey && !e.ctrlKey);
+    };
+    const off = () => {
+      setHeld(false);
+    };
+    window.addEventListener('keydown', on);
+    window.addEventListener('keyup', on);
+    window.addEventListener('blur', off);
+    return () => {
+      window.removeEventListener('keydown', on);
+      window.removeEventListener('keyup', on);
+      window.removeEventListener('blur', off);
+    };
+  }, []);
+  return held;
+}
+
+/** A section folded or not, kept per window (designer: 'L'état replié est gardé par fenêtre'). */
+function useFolded(key: string): readonly [boolean, () => void] {
+  const [v, set] = useState<boolean>(() => keep.view(`frame.rb.${key}`) === true);
+  return [
+    v,
+    () => {
+      keep.setView(`frame.rb.${key}`, !v);
+      set(!v);
+    },
+  ];
+}
+
+type SectionId = 'agents' | 'archived' | 'artifacts' | 'scheduled';
+
+function Section({
+  id,
+  title,
+  rows,
+  cap,
+  summary,
+  noFold = false,
+  onAll,
+  children,
+}: {
+  id: SectionId;
+  title: string;
+  rows: readonly BarRow[];
+  cap: number;
+  summary: string;
+  noFold?: boolean;
+  onAll: () => void;
+  children: (r: BarRow) => ReactNode;
+}) {
+  const [folded, toggle] = useFolded(id);
+  const [more, setMore] = useState(false);
+  const shut = folded && !noFold;
+  const { shown, hidden } = capRows(rows, more ? Number.POSITIVE_INFINITY : cap);
+  return (
+    <section className="app-rb-sec" data-testid={`app.right.${id}`} data-folded={shut || undefined}>
+      <div className="app-rb-head">
+        <Press look="app-rb-title" aria-expanded={!shut} onClick={noFold ? undefined : toggle} data-testid={`app.right.${id}.head`}>
+          {title} · {String(rows.length)}
+        </Press>
+        {shut && summary !== '' && (
+          <span className="app-rb-sum" data-testid={`app.right.${id}.summary`}>
+            {summary}
+          </span>
+        )}
+        <Act onClick={onAll} testId={`app.right.${id}.all`}>
+          all ›
+        </Act>
+      </div>
+      {!shut && rows.length > 0 && (
+        <div className="app-rb-rows">
+          {shown.map(children)}
+          {hidden > 0 && (
+            <Press
+              look="app-rb-row app-rb-more"
+              onClick={() => {
+                setMore(true);
+              }}
+              data-testid={`app.right.${id}.more`}
+            >
+              + {String(hidden)} more
+            </Press>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Row({ r, onOpen, on }: { r: BarRow; onOpen: () => void; on?: boolean }) {
+  return (
+    <Press look="app-rb-row" aria-current={on === true || undefined} title={r.title} onClick={onOpen} data-testid={r.testId}>
+      <span className={`app-rb-g ${r.tone}`}>{r.glyph}</span>
+      <span className="app-rb-name">{r.name}</span>
+      {r.sub !== '' && <span className="app-rb-sub">{r.sub}</span>}
+      <span className={`app-rb-end ${r.endTone}`}>{r.end}</span>
+    </Press>
+  );
+}
+
+export function RightBar({ project, name, over }: { project: string; name: string; over?: boolean }) {
+  const router = useRouter();
+  const route = useRoute();
+  const now = useNow();
+  const alt = useAltHeld();
+  const all = project === '';
+  const agents = useBarAgents(project);
+  const artifacts = useAllArtifacts(all ? undefined : project);
+  const tasks = useAllScheduled(all ? undefined : project);
+  const live = agentRows(agents, now, all, alt);
+  const archived = archivedRows(agents, now, all);
+  const made = artifactRows(artifacts, now);
+  const later = [...scheduledRows(tasks, now), ...waitingRows(agents, now, all)];
+  const working = agents.filter((x) => !x.a.archived && !x.a.main && x.a.status === 'working').length;
+  const waits = live.some((r) => r.waits);
+  const openAgent = (p: string, agent: string) => {
+    router.go({ screen: 'thread', project: p, agent });
+  };
+  const here = (p: string, agent: string) => route.screen === 'thread' && route.project === p && route.agent === agent;
+  return (
+    <aside className={over === true ? 'app-panel app-rb over' : 'app-panel app-rb'} data-testid="app.panel" aria-label={`what happens in ${name}`}>
+      <div className="app-rb-top" data-testid="app.right.top">
+        <b>{name}</b>
+        {working > 0 && <span className="app-rb-dim">{String(working)} working</span>}
+        <kbd className="app-rb-key">⌥⌘0</kbd>
+      </div>
+      <div className="app-rb-body">
+        <Section
+          id="agents"
+          title="AGENTS"
+          rows={live}
+          cap={8}
+          summary={live.length === 0 ? '' : `${String(working)} working`}
+          noFold={waits}
+          onAll={() => {
+            router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
+          }}
+        >
+          {(r) => <Row key={r.key} r={r} on={here(r.project, r.agent ?? '')} onOpen={() => { openAgent(r.project, r.agent ?? ''); }} />}
+        </Section>
+        <Section
+          id="archived"
+          title="ARCHIVED"
+          rows={archived}
+          cap={5}
+          summary={archived[0] === undefined ? '' : `${archived[0].glyph} ${archived[0].name}`}
+          onAll={() => {
+            if (!all) router.go({ screen: 'agents', project, archived: true });
+          }}
+        >
+          {(r) => <Row key={r.key} r={r} onOpen={() => { openAgent(r.project, r.agent ?? ''); }} />}
+        </Section>
+        <Section
+          id="artifacts"
+          title="ARTIFACTS"
+          rows={made}
+          cap={5}
+          summary={made.some((r) => r.end === 'new') ? `${String(made.filter((r) => r.end === 'new').length)} new` : ''}
+          onAll={() => {
+            router.go({ screen: 'artifacts', project });
+          }}
+        >
+          {(r) => <Row key={r.key} r={r} onOpen={() => { router.go({ screen: 'artifacts', project: r.project, id: r.id ?? '' }); }} />}
+        </Section>
+        <Section
+          id="scheduled"
+          title="SCHEDULED & WAITING"
+          rows={later}
+          cap={5}
+          summary={later[0] === undefined ? '' : `${later[0].glyph} ${later[0].end}`}
+          onAll={() => {
+            router.go({ screen: 'scheduled' });
+          }}
+        >
+          {(r) => (
+            <Row
+              key={r.key}
+              r={r}
+              onOpen={() => {
+                if (r.agent !== undefined) openAgent(r.project, r.agent);
+                else router.go({ screen: 'scheduled' });
+              }}
+            />
+          )}
+        </Section>
+      </div>
+    </aside>
+  );
+}
