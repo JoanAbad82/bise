@@ -446,6 +446,21 @@ body:has(.app-shell) {
   width: 1.5px;
   background: currentColor;
 }
+.app-tg-glyph.right span {
+  left: auto;
+  right: 5px;
+}
+.app-rtg {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.app-rtg-n {
+  color: var(--c-accent);
+  font-size: var(--t-12);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .app-crumb {
   flex: 1;
   min-width: 0;

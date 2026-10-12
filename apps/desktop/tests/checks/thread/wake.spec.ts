@@ -1,6 +1,6 @@
 // thread/wake · event-wake in the window (designer's page event-wake, ambient-lead m_17770; hub
 // side wake-ui, TS bedb99c2). On the REAL screens (FakeCore): perf ran a command in the background
-// and waits for it, so it doesn't look idle: its sidebar row says '…' in ink and '2m' on the right;
+// and waits for it, so it doesn't look idle: its right bar row says '…' in ink and '2 min' on the right;
 // its head a dim chip '… waiting for cargo bench · 2m' instead of 'idle'; its thread ends on the same
 // live line. Earlier watches' ends are the hub's wake lines: 'cargo test ended · rc 101 · after
 // 3m10s' with only 'rc 101' in the error tone, '▸ its last 2 lines' folded (a click opens them),
@@ -80,7 +80,7 @@ test('thread/wake: an agent waiting for an event says what and how long; its wak
       // the sidebar: '…' in ink, its wait's age on the right, what it waits for on hover
       const row = page.getByTestId('app.right.agent.perf');
       await expect(row.locator('.app-rb-g')).toHaveText('…');
-      await expect(row.locator('.app-rb-end')).toHaveText('2m');
+      await expect(row.locator('.app-rb-end')).toHaveText('2 min');
       await expect(row).toHaveAttribute('title', /^waiting for cargo bench · 2m · /u);
       expect(await color('[data-testid="app.right.agent.perf"] .app-rb-g'), `${t}: '…' in ink`).toBe(await token('--c-text'));
       expect(await color('[data-testid="app.right.agent.perf"] .app-rb-g'), `${t}: never the accent`).not.toBe(accent);

@@ -124,9 +124,12 @@ function Section({
             {summary}
           </span>
         )}
-        <Act onClick={onAll} testId={`app.right.${id}.all`}>
-          all ›
-        </Act>
+        {/* nothing to open at 0: the head stays, 'all ›' goes (designer m_20272 (4)) */}
+        {rows.length > 0 && (
+          <Act onClick={onAll} testId={`app.right.${id}.all`}>
+            all ›
+          </Act>
+        )}
       </div>
       {!shut && rows.length > 0 && (
         <div className="app-rb-rows">

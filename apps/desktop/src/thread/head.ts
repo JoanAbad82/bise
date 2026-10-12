@@ -30,7 +30,7 @@ export function nothingOwnYet(kinds: readonly (EntryKind | undefined)[]): boolea
 export const STARTING_MS = 20_000;
 
 /** An agent's state chip at `now`. Pure. */
-export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits' | 'waiting_on'> & { watching?: Agent['watching'] }, now: number): StateChip {
+export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits' | 'waiting_on'> & { watching?: Agent['watching']; turn_ms?: Agent['turn_ms'] }, now: number): StateChip {
   // R9/S3: whom it waits on, the hub's own fact (the TUI's panel reads the same field)
   if (a.waits > 0 || a.waiting_on?.who === 'you') return { text: '? waiting for you', needs: true, live: false };
   if (a.waiting_on?.who === 'agent') return { text: `⋯ waiting on ${shownName(a.waiting_on.name)}`, needs: false, live: false };
@@ -41,7 +41,8 @@ export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits' | 'wait
     case 'working': {
       const since = now - a.since_ms;
       if (a.since_ms > 0 && since < STARTING_MS) return { text: 'starting', needs: false, live: true };
-      const t = ago(a.since_ms, now);
+      // the current turn's age, the one the composer's label and the right bar say (designer m_20272 (1))
+      const t = ago(a.turn_ms != null ? now - a.turn_ms : a.since_ms, now);
       return { text: t === 'now' ? 'working' : `working · ${t}`, needs: false, live: true, breath: true };
     }
     case 'done':
