@@ -127,6 +127,7 @@ dependencies = [
  "cpal",
  "crossterm",
  "ignore",
+ "libc",
  "memchr",
  "nucleo-matcher",
  "portable-pty",

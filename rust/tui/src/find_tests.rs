@@ -237,9 +237,9 @@ fn find_is_fast_on_50k_events() {
     f.ed.set("zebra", 5);
     f.restart();
     while f.busy() {
-        let t = Instant::now();
+        let t = cpu_time();
         f.scan(&events, budget);
-        slow = slow.max(t.elapsed());
+        slow = slow.max(cpu_time() - t);
         steps += 1;
     }
     let first = t0.elapsed();
@@ -252,9 +252,9 @@ fn find_is_fast_on_50k_events() {
     let mut steps2 = 0;
     let mut found_at = None;
     while f.busy() {
-        let t = Instant::now();
+        let t = cpu_time();
         f.scan(&events, budget);
-        slow = slow.max(t.elapsed());
+        slow = slow.max(cpu_time() - t);
         steps2 += 1;
         if found_at.is_none() && f.cur.is_some() {
             found_at = Some(steps2);
@@ -269,8 +269,29 @@ fn find_is_fast_on_50k_events() {
         first, steps, second, steps2, slow
     );
     // a slice stops at the budget (checked every 64 events); generous
-    // for a debug build on a busy machine
+    // for a debug build. Its cost is this thread's CPU time: the scan
+    // stops on the wall clock, so a slice never works longer than the
+    // budget plus 64 events, but on a loaded machine the wall time of
+    // that same work also counts the waits for a core (red at load ~30
+    // in a full gate)
     assert!(slow < budget + Duration::from_millis(150), "slowest slice {:?}", slow);
+}
+
+/// This thread's CPU time (the wall clock where there is no such clock).
+fn cpu_time() -> Duration {
+    #[cfg(unix)]
+    {
+        let mut ts = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+        // SAFETY: an out pointer to a timespec of this stack frame
+        unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut ts) };
+        Duration::new(ts.tv_sec as u64, ts.tv_nsec as u32)
+    }
+    #[cfg(not(unix))]
+    {
+        use std::sync::OnceLock;
+        static T0: OnceLock<Instant> = OnceLock::new();
+        T0.get_or_init(Instant::now).elapsed()
+    }
 }
 
 #[test]
