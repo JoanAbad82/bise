@@ -631,20 +631,20 @@ body:has(.app-shell) {
   touch-action: none;
 }
 .app-split.side {
-  left: calc(var(--side-w, 240px) - 4px);
+  left: calc(var(--side-w) - var(--s-1));
 }
 .app-shell.no-side .app-split.side {
   left: 0;
 }
 .app-split.panel {
-  right: calc(var(--panel-w, 320px) - 4px);
+  right: calc(var(--panel-w) - var(--s-1));
 }
 .app-split::after {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 3px;
+  left: calc(50% - 1px);
   width: 2px;
   background: transparent;
 }
