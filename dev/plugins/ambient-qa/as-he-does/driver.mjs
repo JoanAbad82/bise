@@ -98,29 +98,43 @@ if (mode === 'first') {
   step('the scan answers with its count', !!ft, (ft ?? (await text('[data-testid="settings.add"]')) ?? '').slice(0, 800));
   // designer's final sign (ambient-lead m_19035): the sheet open after the scan answered, light
   if (ft) {
+    // back to the scheme the page had, said explicitly: emulateMedia(null) can leave it on the other one
+    const was = await page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')).catch(() => null);
     await page.emulateMedia({ colorScheme: 'light' }).catch(() => {});
     await page.waitForTimeout(400);
     await shot('add-sheet-light');
-    await page.emulateMedia({ colorScheme: null }).catch(() => {});
+    if (was !== 'light') await page.emulateMedia({ colorScheme: was ?? null }).catch(() => {});
   }
-  // one found repo, then add
-  const rows = page.locator('[data-testid^="settings.add.found."]');
-  const count = await rows.count().catch(() => 0);
+  // one found repo, then add. a found row is `settings.add.found.<path>` (the Group's row, its text does
+  // nothing); its tick box is the role=checkbox `settings.add.found.<name>` inside it (AddSheet.tsx)
+  const boxes = page.locator('[role="checkbox"][data-testid^="settings.add.found."]');
+  const count = await boxes.count().catch(() => 0);
   let picked = null;
+  let ticked = false;
   if (count > 0) {
-    picked = await rows.first().getAttribute('data-testid').catch(() => null);
-    await click('pick a found repo', rows.first());
+    const box = boxes.first();
+    picked = await box.getAttribute('data-testid').catch(() => null);
+    await click('tick a found repo', box);
+    ticked = (await until(async () => (await box.getAttribute('aria-checked').catch(() => null)) === 'true' || null, 5000, 250)) === true;
   }
   const go = page.locator('[data-testid="settings.add.go"]').first();
-  const goOn = await go.isEnabled({ timeout: 3000 }).catch(() => false);
+  const goOn = await until(async () => (await go.isEnabled({ timeout: 1000 }).catch(() => false)) || null, 5000, 250) === true;
+  const say = async () => await text('[data-testid="settings.add.say"]');
   if (goOn) await click('add', go);
   const grew = goOn ? await until(async () => {
     const s = await text('[data-testid="app.sidebar"]');
     return s && s !== side ? s : null;
   }, 60000) : null;
+  const why = grew ? null : await say();
   await shot('added');
-  step("'add a project' adds one (the sidebar shows it) or says why", goOn ? !!grew : false,
-    { found_rows: count, picked, go_enabled: goOn, sidebar_after: grew, sheet: await text('[data-testid="settings.add"]') });
+  step("'add a project' adds one (the sidebar shows it) or says why", goOn ? !!grew || !!why : false,
+    { found_rows: count, picked, ticked, go_enabled: goOn, sidebar_after: grew, said: why, sheet: await text('[data-testid="settings.add"]') });
+  // the sheet must not stay over the window: an open sheet takes the clicks the message step needs
+  const still = await page.locator('[data-testid="settings.add"]').first().isVisible().catch(() => false);
+  if (still) {
+    await click('cancel the add sheet', page.locator('[data-testid="settings.add.cancel"]').first());
+    await page.locator('[data-testid="settings.add"]').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+  }
   // a message to a project's main, and its answer
   await click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
   const composer = page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
