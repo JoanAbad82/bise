@@ -1,9 +1,11 @@
 // The as-he-does run's window reader (ambient-lead m_18718, m_18946): the promoted app on the
 // real-shaped world, read over CDP on 127.0.0.1 only, page events only. Never a native panel:
 // settings.add.choose (the folder picker) is never touched.
-//   node driver.mjs <cdp port> <out dir> <first|second>
+//   node driver.mjs <cdp port> <out dir> <first|second|draft-type|draft-check> [<draft text>]
 // first: the open frame, the banner, settings › projects, the add sheet's scan and one add, a
 // message to a project's main and its answer. second: the open frame and the banner.
+// draft-type: harness' composer gets <draft text>, never sent (ambient-lead m_19525); draft-check,
+// after the restart: the same composer holds it again. Each writes <out>/<mode>[-<tag>].json.
 // Writes <out>/<mode>.json ({steps: [{name, ok, info}], shots}) and <out>/<mode>-N-*.png.
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -13,13 +15,14 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DESKTOP = process.env.PW_FROM ?? path.join(HERE, '..', '..', '..', '..', 'apps', 'desktop');
 const { chromium } = createRequire(path.join(DESKTOP, 'package.json'))('@playwright/test');
-const [port, out, mode] = process.argv.slice(2);
+const [port, out, mode, draft] = process.argv.slice(2);
+const tag = process.env.AS_HE_DOES_TAG ? `-${process.env.AS_HE_DOES_TAG}` : '';
 const WATCHDOG_MS = Number(process.env.AS_HE_DOES_WATCHDOG_MS ?? 600000);
 const ANSWER_MS = Number(process.env.AS_HE_DOES_ANSWER_MS ?? 240000);
 const MESSAGE = 'hello from the as-he-does proof';
 
 const res = { mode, steps: [], shots: [] };
-const save = () => fs.writeFileSync(path.join(out, `${mode}.json`), JSON.stringify(res, null, 1));
+const save = () => fs.writeFileSync(path.join(out, `${mode}${tag}.json`), JSON.stringify(res, null, 1));
 const step = (name, ok, info) => { res.steps.push({ name, ok, info: info ?? null }); save(); };
 setTimeout(() => { step('driver watchdog', false, `${WATCHDOG_MS / 1000} s`); process.exit(2); }, WATCHDOG_MS).unref();
 
@@ -36,7 +39,7 @@ if (!page) { step('the window page', false, res.pages); process.exit(1); }
 
 let n = 0;
 const shot = async (name) => {
-  const f = path.join(out, `${mode}-${++n}-${name}.png`);
+  const f = path.join(out, `${mode}${tag}-${++n}-${name}.png`);
   try { await page.screenshot({ path: f, timeout: 15000 }); }
   catch {
     try {
@@ -159,5 +162,24 @@ if (mode === 'first') {
   }, MESSAGE), ANSWER_MS, 2000) : null;
   await shot('message');
   step("a message to a project's main gets its answer", !!answer, answer ?? (await text('[data-testid="app.main"]'))?.slice(-800));
+}
+// the draft across a restart (ambient-lead m_19525): typed in harness' composer, never sent; after
+// the restart the same composer must hold it again
+if (mode === 'draft-type' || mode === 'draft-check') {
+  await click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+  const composer = page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
+  await composer.waitFor({ timeout: 15000 }).catch(() => {});
+  const holds = async () => ((await composer.innerText({ timeout: 2000 }).catch(() => '')) || (await composer.inputValue({ timeout: 500 }).catch(() => ''))).trim();
+  if (mode === 'draft-type') {
+    const typed = await click('the composer', composer);
+    if (typed) await page.keyboard.type(draft, { delay: 15 });
+    await shot('draft');
+    const now = await holds();
+    step('the draft is in the composer, not sent', now.includes(draft), now.slice(0, 300));
+  } else {
+    const back = await until(async () => ((await holds()).includes(draft) ? await holds() : null), 20000, 500);
+    await shot('draft-back');
+    step('the draft is back in the composer after the restart', !!back, back ?? (await holds()).slice(0, 300));
+  }
 }
 await browser.close().catch(() => {});

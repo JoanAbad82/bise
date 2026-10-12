@@ -22,6 +22,41 @@ stopall() { (cd "$SRC" && BISE_TRY_REAL=$H/.bise scripts/desktop-try.sh --real -
 endrun() { touch $O/stop; kill $TPID $NPID $CPID $CCPID 2>/dev/null; kill $(cat $G/fake/fake.pid) 2>/dev/null; }
 breach() { [ -e $O/BREACH ] && { say "BREACH: $(cat $O/BREACH)"; stopall; endrun; exit 3; }; }
 libgate() { $RS libsnap --out $O/after-$1.json --diff $O/before.json || { echo "library $1" > $O/BREACH; breach; }; }
+# the draft across a restart (ambient-lead m_19525): a draft typed in harness' composer, never sent,
+# then the restart exactly as main does it (its launchd one-shot, restart-cmd.txt: bise-ambient --real
+# from a launchd job that removes itself) on the stand-in (BISE_TRY_REAL, BISE_DESKTOP_OFFSCREEN,
+# BISE_TRY_OPEN as for the launches), then the same composer must hold it. <tag> <pause s before>
+# The quit's Apple Event (quit_bundle: osascript 'tell application id … to quit') is logged: every
+# kTCCServiceAppleEvents line of the TCC debug stream from the restart on.
+draftcase() {
+  local tag=$1 pause=$2 text="draft kept across a restart ($1)" d=$O/restart-$1 lbl=amb-tools.restart-proof
+  mkdir -p $d; rm -f $d/rc
+  AS_HE_DOES_TAG=$tag node $HERE/driver.mjs 9341 $O draft-type "$text" 2>&1 | tail -3
+  breach
+  [ "$pause" -gt 0 ] && sleep "$pause"
+  local t0; t0=$(date '+%Y-%m-%d %H:%M:%S')
+  say "restart $tag (draft typed, ${pause} s pause)"
+  launchctl remove $lbl 2>/dev/null
+  launchctl submit -l $lbl -- /bin/sh -c "cd '$SRC' && /usr/bin/env BISE_TRY_REAL='$H/.bise' BISE_DESKTOP_OFFSCREEN=1 BISE_TRY_OPEN='$HERE/open-cdp.sh' BISE_PROOF_CDP_PORT=9341 BISE_TRY_CHECKOUT='$SRC' $HOME/.local/bin/bise-ambient --real > '$d/log' 2>&1; echo \$? > '$d/rc'; launchctl remove $lbl"
+  for i in $(seq 900); do [ -e $d/rc ] && break; [ -e $O/BREACH ] && break; sleep 0.5; done
+  say "restart $tag: rc $(cat $d/rc 2>/dev/null || echo none): $(tail -2 $d/log 2>/dev/null | tr '\n' ' ' | cut -c1-300)"
+  breach; libgate restart-$tag
+  AS_HE_DOES_TAG=$tag node $HERE/driver.mjs 9341 $O draft-check "$text" 2>&1 | tail -3
+  breach
+  $P - "$O/tcc-debug.ndjson" "$t0" > $d/tcc-appleevents.txt <<'PY'
+import json, sys
+path, t0 = sys.argv[1], sys.argv[2]
+for line in open(path, errors="replace"):
+    try:
+        e = json.loads(line)
+    except ValueError:
+        continue
+    m = e.get("eventMessage", "")
+    if e.get("timestamp", "")[:19] >= t0 and "AppleEvents" in m:
+        print(e["timestamp"][11:23], e.get("processImagePath", "").split("/")[-1], m[:400].replace("\n", " "))
+PY
+  say "restart $tag: AppleEvents TCC lines: $(wc -l < $d/tcc-appleevents.txt | tr -d ' '), preflight=no: $(grep -c 'preflight=no' $d/tcc-appleevents.txt)"
+}
 case "$G" in "$HOME/.bise/gate/"*) ;; *) echo "the world must be under ~/.bise/gate"; exit 2;; esac
 rm -f $O/BREACH $O/stop $O/pids.txt
 $RS libsnap --out $O/before.json
@@ -67,6 +102,7 @@ for n in first second; do
   breach; libgate $n-open
   node $HERE/driver.mjs 9341 $O $n 2>&1 | tail -5
   breach
+  if [ $n = first ]; then draftcase pause 5; draftcase atonce 0; fi
   # the app's core.log is in its actual userData, wherever the stand-in put it (amb-core's caveat,
   # ambient-lead m_19049): the newest core.log under the world's home written during this run
   # -print0 / -0: the stand-in's path has spaces ('Application Support', 'bise try'), plain xargs
