@@ -215,6 +215,33 @@ law race_cancel_is_its_own:
     Con{Rc.cancelled(None{}, "1700-0"), Con{Rc.cancelled(Some{""}, "1700-0"), Nil{}}}}}
     == Con{True{}, Con{False{}, Con{False{}, Con{False{}, Nil{}}}}} : List<&2, Bool>}
 
+# ---- a program's inner call, recorded for the re-run (main-pure) ----
+
+# LAW: a success is recorded as its text, stop or not (a result that is
+# in wins, as race_result_wins).
+law prog_success_is_recorded:
+  for +out: String
+  for stop: Bool
+  {Rt.prog_after(True{}, out, stop) == Rt.PRecord{J.JStr{out}} : Rt.ProgStep}
+
+# LAW: a failure (a tool error, a gate denial with its note) is recorded
+# whole as {error: text}: the program goes on, that call's promise
+# rejects with the text (rust/jsrt's ToolError).
+law prog_failure_rejects_whole:
+  for +out: String
+  {Rt.prog_after(False{}, out, False{})
+    == Rt.PRecord{J.JObj{[Tuple{"error", J.JStr{out}}]}} : Rt.ProgStep}
+
+law prog_denial_rejects_with_its_note:
+  {Rt.prog_after(False{}, "denied by the user: not on main", False{})
+    == Rt.PRecord{J.JObj{[Tuple{"error", J.JStr{"denied by the user: not on main"}}]}} : Rt.ProgStep}
+
+# LAW: a failure with a stop in ends the program with its text.
+law prog_stop_ends_the_program:
+  for +out: String
+  {Rt.prog_after(False{}, out, True{})
+    == Rt.PEnd{String.append("program call failed: ", out)} : Rt.ProgStep}
+
 law race_cancel_path_is_per_port:
   {Rc.cancel_path_of("/h/agents/a/run", "7702")
     == "/h/agents/a/run/bend-cancel-7702.txt" : String}

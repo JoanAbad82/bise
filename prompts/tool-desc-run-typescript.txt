@@ -52,7 +52,7 @@ TRAP: `typeof fetch` still prints "function" because unresolved identifiers fall
 
 ## Error handling
 
-- A tool call that fails does NOT throw: the error string becomes the awaited value. Check results before using them, and use try/catch around local code.
+- A tool call that fails (an error, or a call the user denied, with his note) REJECTS its promise with an Error (`name` 'ToolError', `tool` the function) whose message is the whole failure text. Catch it with try/catch, or use `Promise.allSettled` to keep the other calls' results; the program goes on. Uncaught, it ends the program with "program call failed: <text>". A stop (the user interrupts) ends the program whatever it catches.
 - If `main` throws or rejects, the tool fails with the error message (the model can read it and retry).
 - A syntax error in the TypeScript fails the whole call with "SyntaxError: ...".
 

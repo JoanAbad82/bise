@@ -12,6 +12,9 @@
 //     tool and re-runs with the extended results — replay by
 //     re-execution, the same durable-boundary semantics as the in-house
 //     interpreter
+//   - a recorded failure ({"error": text}) rejects that call's promise
+//     with a ToolError: the program can catch it and go on; uncaught, it
+//     fails the program with "program call failed: <text>"
 //   - the final value prints to stdout and exits 0; errors go to stderr
 //     and exit 1 so the model can read them and retry
 
@@ -56,13 +59,24 @@ fn transpile(code: &str) -> Result<String, String> {
         .map_err(|error| error.to_string())
 }
 
+// a recorded result is the tool's text (a string), or {error: text} for a
+// call that failed: that call's promise rejects with a ToolError carrying
+// the whole text, so try/catch and Promise.allSettled see it and the
+// program goes on. The failure is in the results file: every re-run
+// rejects the same way at the same position (replay stays by position).
 const PRELUDE: &str = r#"
 const __RESULTS = __RESULTS_PLACEHOLDER__;
 let __i = 0;
+class ToolError extends Error {
+  constructor(tool, message) { super(message); this.name = 'ToolError'; this.tool = tool; }
+}
 function __tool(name, args) {
   if (name.startsWith('tools.')) name = name.slice(6);
   if (__i < __RESULTS.length) {
     const r = __RESULTS[__i]; __i++;
+    if (r !== null && typeof r === 'object' && typeof r.error === 'string') {
+      return Promise.reject(new ToolError(name, r.error));
+    }
     try { return JSON.parse(r); } catch (e) { return r; }
   }
   const payload = args === undefined || args === null
@@ -132,7 +146,9 @@ const __finish = (p) => Promise.resolve(p).then(
   (v) => __done(typeof v === 'string' ? v
     : (Array.isArray(v) && v.length > 0 && v.every(__isBlock)) ? __blocks(v)
     : JSON.stringify(v === undefined ? '' : v)),
-  (e) => __fail(JSON.stringify(String((e && e.message) || e)))
+  (e) => __fail(JSON.stringify(e instanceof ToolError
+    ? 'program call failed: ' + e.message
+    : String((e && e.message) || e)))
 );
 __COMPUTER_SDK__
 const __out = (async function () {
