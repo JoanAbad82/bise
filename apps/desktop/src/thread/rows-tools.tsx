@@ -5,6 +5,7 @@ import { Fold, Tool } from '@/ds';
 import type { Entry } from '@/proto';
 import { useAgents, useStore, useThreadOrder, useToolOut } from '@/store';
 import { useFold } from './folds';
+import { thinkingWords } from './thinking';
 import { toolLines, type ToolLine } from './entry';
 import type { RowCtx } from './rows';
 /**
@@ -27,7 +28,8 @@ export function thoughtFor(ms: number): string {
 }
 
 /** What the model thought: one folded line, open to its words (⌘E opens them all). */
-export function ThinkingLine({ pos, head, body }: { pos: number; head: string; body: string }) {
+export function ThinkingLine({ pos, head, body: raw }: { pos: number; head: string; body: string }) {
+  const body = thinkingWords(raw);
   const [open, setOpen] = useFold(false, pos);
   const toggle = () => {
     setOpen((o) => !o);
