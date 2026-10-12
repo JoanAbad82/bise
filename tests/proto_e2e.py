@@ -204,6 +204,25 @@ def parts_round(c, d, E, project, typed):
     check(len([r for r in E.fake_requests() if r.get("agent") == "main" and r.get("images")]) > n_img
           and any(i.startswith("data:image/png;base64,") for i in [r for r in E.fake_requests() if r.get("agent") == "main" and r.get("images")][-1]["images"]),
           "main's model got the image sent by its source: %r" % [[i[:40] for i in r.get("images", [])] for r in E.fake_requests() if r.get("agent") == "main"][-2:])
+    # his image message's parts are the same values all the way (architect
+    # m_19059): sb-core keeps them as a string on the message and parses
+    # them into its you-parts record (core.bend parts_json), so the parts
+    # journaled on his message, the transcript's you-parts record and his
+    # entry's parts must be equal as JSON values (key order and number
+    # format may differ, never a value)
+    def has_shot(ps):
+        return any(isinstance(p, dict) and p.get("kind") == "image" and p.get("source") == shot for p in ps or [])
+    journaled = []
+    for l in open(os.path.join(E.state, "journal.jsonl")):
+        ev = json.loads(l)
+        if ev.get("type") == "message_sent" and isinstance(ev.get("msg", {}).get("parts"), str) and shot in ev["msg"]["parts"]:
+            journaled.append(json.loads(ev["msg"]["parts"]))
+    tr = [l.split("\t", 1)[1] for l in open(os.path.join(E.state, "agents", "main", "transcript.log")).read().splitlines() if "\t" in l]
+    recs = [r for r in (e2e.feed_rec(l) for l in tr) if r and r[0] == "you-parts" and has_shot(r[1].get("parts"))]
+    entry = [x.get("parts") for x in yous() if has_shot(x.get("parts"))][-1]
+    check(len(journaled) == 1 and len(recs) == 1, "one journaled message and one you-parts record with the image: %d, %d" % (len(journaled), len(recs)))
+    check(journaled[-1] == recs[-1][1]["parts"] == entry,
+          "the image message's parts are the same values journaled, in the feed record and on his entry: %r / %r / %r" % (journaled[-1:], recs[-1:], entry))
     d.send({"cmd": "send", "project": project, "agent": "main", "text": "", "parts": [{"kind": "text", "text": "relative "}, {"kind": "image", "name": "[Image #1]", "source": "by-source.png"}], "mode": "now", "cid": 74})
     c.wait(lambda: any(x.get("cid") == 74 for x in typed(d, "error")), 20, "a relative image source refused")
     check("absolute" in [x for x in typed(d, "error") if x.get("cid") == 74][-1]["text"], "the refusal says why: %r" % typed(d, "error")[-1])
