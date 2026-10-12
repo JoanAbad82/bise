@@ -5,6 +5,10 @@
 //      lab and the ds gallery);
 //   2. every class a .tsx names (className literals, cx(...) words) has a rule in some .css file:
 //      a class with no rule draws the browser's own control (his real-home screenshot's 'go back').
+// And the spacing law on the CSS (designer's page desktop-spacing, m_19568, ambient-lead m_19569):
+//   3. a margin, padding, gap, inset, top, right, bottom or left is 0, a token (--s-*, --gap-*,
+//      --pad-*, --h-*) or a calc() of them, and a control's or a row's height is an --h-*:
+//      looseSpacing lists the lengths written by hand instead (a ratchet: spacing.pending.ts).
 // Pure: the test reads the files and hands their text here.
 
 /** The bare controls a source writes: one per JSX tag. */
@@ -63,6 +67,49 @@ function literals(expr: string): string[] {
   for (const m of e.matchAll(/`([^`]*)`/g)) {
     const t = m[1] ?? "";
     out.push(t.replace(/\S*\$\{[^}]*\}\S*/g, " "));
+  }
+  return out;
+}
+
+/** A length written by hand where the spacing law wants a token: its line, property and value. */
+export interface LooseSpace {
+  line: number;
+  prop: string;
+  value: string;
+}
+
+/** the properties that space things: margin*, padding*, inset*, gap*, top, right, bottom, left */
+const SPACE_PROP = /^(?:(?:margin|padding|inset)(?:-[a-z]+)*|gap|row-gap|column-gap|top|right|bottom|left)$/;
+/** the heights a control or a row has (28 to 48 px on the page): checked from 20 to 56 px */
+const HEIGHT_PROP = /^(?:min-|max-)?(?:height|block-size)$/;
+const LENGTH = /(-?\d*\.?\d+)(px|r?em)\b/g;
+
+/**
+ * The lengths a stylesheet writes by hand in its spacing properties, one per length: not 0, not a
+ * token (a var() or a calc() of them has no length of its own), not a 1 px stroke's offset; and
+ * the px heights from 20 to 56 (a control's or a row's, which is an --h-*). Custom properties are
+ * not read: tokens.css defines them.
+ */
+export function looseSpacing(css: string): LooseSpace[] {
+  // comments blanked with their newlines kept, so a line is the file's
+  const body = css.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
+  const out: LooseSpace[] = [];
+  for (const m of body.matchAll(/(^|[{;])(\s*)([a-z-]+)(\s*:\s*)([^;{}]+)/g)) {
+    const prop = m[3] ?? "";
+    const value = (m[5] ?? "").trim();
+    const space = SPACE_PROP.test(prop);
+    const height = HEIGHT_PROP.test(prop);
+    if (!space && !height) continue;
+    const at = m.index + (m[1] ?? "").length + (m[2] ?? "").length;
+    const line = body.slice(0, at).split("\n").length;
+    for (const l of value.matchAll(LENGTH)) {
+      const n = Math.abs(Number(l[1]));
+      const px = l[2] === "px";
+      if (n === 0) continue;
+      if (space && px && n === 1) continue;
+      if (height && (!px || n < 20 || n > 56)) continue;
+      out.push({ line, prop, value });
+    }
   }
   return out;
 }

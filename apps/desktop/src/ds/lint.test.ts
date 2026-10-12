@@ -5,8 +5,9 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { classesOf, cssClasses, rawControls } from './lint';
+import { classesOf, cssClasses, looseSpacing, rawControls } from './lint';
 import { PENDING_CLASSES, PENDING_RAW } from './lint.pending';
+import { PENDING_SPACING } from './spacing.pending';
 
 const SRC = join(__dirname, '..');
 const walk = (dir: string): string[] =>
@@ -50,5 +51,30 @@ describe('the ds laws (designer m_18343)', () => {
     expect(fresh, 'a class with no CSS rule: give it one, or use a data-testid for a test hook').toEqual([]);
     const done = PENDING_CLASSES.filter((c) => !missing.has(c));
     expect(done, 'lint.pending.ts lists a class that has its rule now: drop it').toEqual([]);
+  });
+});
+
+describe('the spacing law (designer desktop-spacing m_19568, ambient-lead m_19569)', () => {
+  it('reads the lengths written by hand, and only those', () => {
+    const css = ['/* top: 9px */', '.a{margin:0;padding:6px 10px}', '.b{gap:var(--s-2);top:-1px;height:28px;max-height:320px;left:calc(var(--s-4) + 3px)}', '@media (max-width: 800px){.c{margin-top:.5em;--x:6px;width:30px}}'].join('\n');
+    expect(looseSpacing(css).map((l) => `${String(l.line)} ${l.prop}: ${l.value}`)).toEqual([
+      '2 padding: 6px 10px',
+      '2 padding: 6px 10px',
+      '3 height: 28px',
+      '3 left: calc(var(--s-4) + 3px)',
+      '4 margin-top: .5em',
+    ]);
+  });
+
+  it("no stylesheet writes more spacing by hand than when the law came in (spacing.pending.ts, a ratchet)", () => {
+    const grown: string[] = [];
+    for (const p of files.filter((f) => f.endsWith('.css'))) {
+      const r = rel(p);
+      if (r === 'ds/tokens.css' || r === 'ds/md-tokens.css') continue;
+      const loose = looseSpacing(readFileSync(p, 'utf8'));
+      const was = PENDING_SPACING[r] ?? 0;
+      if (loose.length > was) grown.push(`${r}: ${String(loose.length)} (was ${String(was)}): ${loose.map((l) => `${String(l.line)} ${l.prop}: ${l.value}`).join(' | ')}`);
+    }
+    expect(grown, 'a margin, padding, gap or inset is 0, a --s-*/--gap-*/--pad-* token or a calc() of them; a control or row height is an --h-* (src/ds/tokens.css)').toEqual([]);
   });
 });

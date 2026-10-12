@@ -36,15 +36,52 @@
   --c-shadow: color-mix(in srgb, var(--p-shadow) 55%, transparent);
   --t-11: .71875rem; /* the floor: 11.5 px, nothing smaller (ambient m_8298) */ --t-12: .75rem; --t-13: .8125rem; --t-14: .875rem; --t-15: .9375rem; --t-17: 1.0625rem; --t-22: 1.375rem; --t-30: 1.875rem;
   --lh-ui: 1.35; --lh-read: 1.55;
-  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
   --r-1: 6px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 22px; --r-pill: 999px;
-  --row: 32px; --row-tight: 28px; --sidebar: 240px; --board: 260px;
+  --sidebar: 240px; --board: 260px;
   --e-1: 0 0 0 1px var(--c-line), 0 1px 2px var(--c-shadow);
   --e-2: 0 0 0 1px var(--c-line), 0 8px 24px var(--c-shadow);
   --e-3: 0 0 0 1px var(--c-line), 0 24px 64px var(--c-shadow);
   --glass: blur(30px) saturate(1.4);
   --d-press: 80ms; --d-fast: 140ms; --d-base: 220ms; --d-slow: 360ms; --d-mood: 900ms;
   --ease-out: cubic-bezier(.2, 0, 0, 1); --ease-io: cubic-bezier(.4, 0, .2, 1); --ease-pop: cubic-bezier(.34, 1.4, .64, 1);
+}
+/* spacing (designer's page desktop-spacing, m_19568: rules, not taste). A 4 px grid: a margin,
+   padding, gap or inset is 0, one of these tokens, or a calc() of them; a control's or a row's
+   height is an --h-*; 1 px is a stroke's only. Pick the named token that says the relation first
+   (--gap-*, --pad-*), the --s-* step only when none does. They don't change with the theme, so
+   they are set once here and inherited. src/ds/lint.ts counts the hand-written px left. */
+:root {
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
+  --s-10: 40px; --s-12: 48px; --s-16: 64px;
+  /* between things */
+  --gap-tight: var(--s-1);    /* a label over its control; a section head and its first row */
+  --gap-inline: var(--s-2);   /* an icon and its text, a name and its meta, two buttons or chips side by side */
+  --gap-rows: var(--s-2);     /* two dim lines that follow in the thread */
+  --gap-block: var(--s-3);    /* two paragraphs, prose to a dim line and back, inside a card */
+  --gap-section: var(--s-4);  /* two sections of a panel, two groups of settings */
+  --gap-turn: var(--s-5);     /* a new author or his bubble in the thread; the thread's end before the inbox or composer */
+  --gap-page: var(--s-8);     /* a screen's title and its content, the onboarding's blocks */
+  /* inside things */
+  --pad-row-x: var(--s-2);    /* a list row's sides; rows touch (gap 0), the rounded hover parts them */
+  --pad-list: var(--s-2);     /* a list from its panel's edge (its text falls at 16 px) */
+  --pad-control-x: var(--s-3);    /* a button's or a field's sides */
+  --pad-control-x-sm: var(--s-2); /* the same at size sm */
+  --pad-card-y: var(--s-3); --pad-card-x: var(--s-4);
+  --pad-card: var(--pad-card-y) var(--pad-card-x); /* a card, the docked inbox, a bubble */
+  --pad-panel: var(--s-4);    /* side panels' heads and content */
+  --pad-column: var(--s-6);   /* the thread's column, each side */
+  --pad-sheet: var(--s-6);    /* a modal sheet; its groups --gap-section apart, its foot 24 */
+  /* heights: the text is centered in them, never placed with a vertical padding */
+  --h-control-sm: 28px;  /* bar and row buttons, the title's controls */
+  --h-control: 32px;     /* buttons, fields, menus */
+  --h-control-lg: 40px;  /* the onboarding's main button */
+  --h-row-tight: 28px;   /* a sidebar row */
+  --h-row: 32px;         /* a list row */
+  --h-bar: 40px;         /* the window's title bar */
+  --h-head: 44px;        /* a panel's or a screen's head */
+  --h-composer: 48px;    /* the composer on one line */
+  /* the old names, kept working */
+  --row: var(--h-row); --row-tight: var(--h-row-tight);
 }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
   --p-bg: #fdfbf7; --p-text: #1b1917; --p-dim: #6b645a; --p-faint: #7d766c; --p-rule: #cfc8bd;
@@ -87,9 +124,8 @@
   --c-shadow: color-mix(in srgb, var(--p-shadow) 55%, transparent);
   --t-11: .71875rem; /* the floor: 11.5 px, nothing smaller (ambient m_8298) */ --t-12: .75rem; --t-13: .8125rem; --t-14: .875rem; --t-15: .9375rem; --t-17: 1.0625rem; --t-22: 1.375rem; --t-30: 1.875rem;
   --lh-ui: 1.35; --lh-read: 1.55;
-  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
   --r-1: 6px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 22px; --r-pill: 999px;
-  --row: 32px; --row-tight: 28px; --sidebar: 240px; --board: 260px;
+  --sidebar: 240px; --board: 260px;
   --e-1: 0 0 0 1px var(--c-line), 0 1px 2px var(--c-shadow);
   --e-2: 0 0 0 1px var(--c-line), 0 8px 24px var(--c-shadow);
   --e-3: 0 0 0 1px var(--c-line), 0 24px 64px var(--c-shadow);
