@@ -334,10 +334,19 @@ pub struct State {
     /// [`State::put_msg`] and [`State::clear_msgs`], which bump
     /// `msgs_rev`, so a cache of what is built from them (contexts.rs)
     /// knows when it is stale. Read with [`State::msgs`] and siblings.
+    ///
+    /// Every message stays here, delivered and owing nothing included:
+    /// three readers still ask for such a cold one (issue 21): the
+    /// delivery's text (core_link.rs `deliver`, the step's messages after
+    /// the view that turned them cold), main's `<agent_threads>`
+    /// (board.rs, through `threads`) and a question card's note
+    /// (core.rs `card_note`, main's messages since the card).
     msgs: BTreeMap<u64, Msg>,
     msg_state: BTreeMap<u64, MsgState>,
     settled: BTreeSet<u64>,
     msgs_rev: u64,
+    /// main's `<agent_threads>`, kept by the same writer (board::Threads)
+    threads: crate::board::Threads,
     pub cards: BTreeMap<u64, Card>,
     pub main_notes: Vec<String>,
     pub next_msg: u64,
@@ -432,7 +441,12 @@ impl State {
         } else {
             self.settled.remove(&m.id);
         }
-        self.msgs.insert(m.id, m);
+        let (id, thread) = (m.id, m.thread);
+        let was = self.msgs.insert(id, m).map(|o| o.thread);
+        if let Some(old) = was.filter(|t| *t != thread) {
+            self.threads.take(&self.msgs, old, id);
+        }
+        self.threads.put(&self.msgs, thread, id);
     }
 
     /// Forget every message (a view that carries them all).
@@ -441,6 +455,12 @@ impl State {
         self.msgs.clear();
         self.msg_state.clear();
         self.settled.clear();
+        self.threads = Default::default();
+    }
+
+    /// The threads of main's `<agent_threads>` (board::agent_threads).
+    pub fn threads(&self) -> &crate::board::Threads {
+        &self.threads
     }
 
     /// The canonical name of an agent: itself, or the task an alias

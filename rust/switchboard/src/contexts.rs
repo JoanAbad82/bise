@@ -9,10 +9,12 @@
 //! every context at each input took 29 ms, 26 of them in the two walks of
 //! every message (main's `<agent_threads>`, everyone's questions), though
 //! a REPL tool line changes no message. Here:
-//! - the message-derived parts (the threads, each agent's questions) are
-//!   kept until `State::msgs_rev` moves. They read the messages, their
-//!   states and the settled set, nothing of the agents (names are the
-//!   messages' own `from`/`to`), so the revision is their whole key;
+//! - main's `<agent_threads>` are not kept here: State keeps them as the
+//!   messages arrive (board::Threads, hot-view sha 2a), a read is cheap;
+//! - each agent's questions are kept until `State::msgs_rev` moves. They
+//!   read the messages, their states and the settled set, nothing of the
+//!   agents (names are the messages' own `from`/`to`), so the revision is
+//!   their whole key;
 //! - a task's context is rebuilt only when the roster rows (with their
 //!   ages, so the bytes equal a fresh build at any instant), its parent or
 //!   the messages changed: those are all [`board::task_context`] reads;
@@ -34,10 +36,9 @@ type Row = (String, Option<String>, String);
 pub struct Contexts {
     /// What each agent's REPL has: the last text pushed.
     texts: BTreeMap<String, String>,
-    /// The revision of the messages `threads` and `questions` were built
-    /// from (None: never built).
+    /// The revision of the messages `questions` were built from (None:
+    /// never built).
     msgs_rev: Option<u64>,
-    threads: Vec<String>,
     questions: BTreeMap<String, Vec<String>>,
     /// The roster rows of the last input.
     rows: Vec<Row>,
@@ -51,10 +52,11 @@ impl Contexts {
     pub fn refresh(&mut self, st: &State, now: u64, models: &Models) -> Vec<(String, String)> {
         let rev = st.msgs_rev();
         if self.msgs_rev != Some(rev) {
-            self.threads = board::agent_threads(st, 8);
             self.questions = Waiting::of(st).questions();
             self.msgs_rev = Some(rev);
         }
+        // kept by State's writer (board::Threads): no cache here
+        let threads = board::agent_threads(st, 8);
         let group = Group::of(st, now, models);
         let rows = group.rows();
         let same_rows = rows == self.rows;
@@ -65,7 +67,7 @@ impl Contexts {
         for a in st.agents.values().filter(|a| a.lifecycle == Lifecycle::Active) {
             let questions = self.questions.get(&a.name).map_or(&[][..], Vec::as_slice);
             let text = if a.name == MAIN {
-                board::main_context(st, now, &self.threads, questions)
+                board::main_context(st, now, &threads, questions)
             } else {
                 let key = (a.parent.clone(), rev);
                 if same_rows && self.keys.get(&a.name) == Some(&key) {
