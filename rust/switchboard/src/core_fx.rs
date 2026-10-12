@@ -154,8 +154,8 @@ mod tests {
         let new = eff(json!({"fx": "feed", "agent": "a", "rec": {"sb": "dance", "text": "hi"}}));
         assert_eq!(new, Effect::Line { agent: "a".into(), line: r#"sb dance :: {"text":"hi"}"#.into() });
         // a known kind whose fields don't fit: skipped and logged, never a guess
-        assert!(matches!(read(&json!({"fx": "feed", "agent": "a", "rec": {"sb": "card", "id": "x"}})), Plain::Skip(_)));
-        assert!(matches!(read(&json!({"fx": "line", "agent": "a", "kind": "you", "text": "go"})), Plain::Skip(_)), "the old line effect is gone");
+        assert!(matches!(rd(&json!({"fx": "feed", "agent": "a", "rec": {"sb": "card", "id": "x"}})), Plain::Skip(_)));
+        assert!(matches!(rd(&json!({"fx": "line", "agent": "a", "kind": "you", "text": "go"})), Plain::Skip(_)), "the old line effect is gone");
     }
 
     #[test]

@@ -797,10 +797,10 @@ def main():
         # mid-turn: the hub asks before archiving it
         c.say("[[slow: 60]] long turn", focus="tq")
         c.wait_status("tq", "working", 30)
-        asked = lambda: [e for e in w.events if e.get("ev") == "confirm"]
+        confirms = lambda: [e for e in w.events if e.get("ev") == "confirm"]
         w.send({"cmd": "archive", "project": project, "agent": "tq", "force": False})
-        w.wait(lambda: asked(), 20, "the typed confirm in the asking window")
-        q = asked()[-1]
+        w.wait(lambda: confirms(), 20, "the typed confirm in the asking window")
+        q = confirms()[-1]
         check(q["project"] == project and "archive @tq" in q["text"], "the question: %r" % q)
         check(not any(e.get("ev") == "confirm" for e in d.events), "the other window got no confirm")
         w.send({"cmd": "confirm", "project": project, "id": q["id"], "yes": False})
@@ -808,8 +808,8 @@ def main():
         check(not any(e.get("ev") == "error" and e.get("cmd") == "confirm" for e in w.events), "a no is not an error")
         check(c.agent("tq")["status"] != "archived", "no kept tq: %r" % c.agent("tq"))
         w.send({"cmd": "archive", "project": project, "agent": "tq", "force": False})
-        w.wait(lambda: len(asked()) >= 2, 20, "asked again")
-        w.send({"cmd": "confirm", "project": project, "id": asked()[-1]["id"], "yes": True})
+        w.wait(lambda: len(confirms()) >= 2, 20, "asked again")
+        w.send({"cmd": "confirm", "project": project, "id": confirms()[-1]["id"], "yes": True})
         c.wait(lambda: c.agent("tq")["status"] == "archived", 60, "yes archived tq")
 
         # bar V8/W21: approvals typed, from the TUI's own event. hello gave
