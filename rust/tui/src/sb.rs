@@ -1192,7 +1192,11 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
         // desktop thread keeps its Stopped entry (bise-proto's fold)
         Hub::Stopped(_) => return None,
         // event-wake: a watch ended (its JSON, the fold's WakeFold)
-        Hub::Wake(json) => return serde_json::from_str(&json).ok().map(|w| crate::entry_ev::wake_ev(&w)),
+        // another agent's wake in main's thread (its `agent` set): the
+        // terminal keeps showing bise's message to that agent, as before
+        Hub::Wake(json) => {
+            return serde_json::from_str::<bise_proto::thread::WakeFold>(&json).ok().filter(|w| w.agent.is_empty()).map(|w| crate::entry_ev::wake_ev(&w))
+        }
         // a failed turn's text so far, dim above its failure (the reply's
         // escape: the same renderer reads it)
         Hub::Kept(text) => Ev::Kept(text.replace('\n', "\\n")),
@@ -1304,6 +1308,17 @@ mod hub_line_tests {
         assert_eq!(p("msg : switchboard-ui → main : hi"), Some(msg("switchboard-ui", "main", "hi", 3, "")));
         let rows = draw(&[parse_hub_line("msg : switchboard → answer-line m_9 : timer #48").unwrap()]);
         assert!(rows.contains("bise → answer-line") && !rows.contains("switchboard"), "{rows}");
+    }
+
+    /// ambient-lead m_19783: another agent's wake in main's thread (its
+    /// `agent` set) draws nothing more in the terminal, which keeps bise's
+    /// message to that agent as before; a thread's own wake still draws.
+    #[test]
+    fn another_agents_wake_draws_nothing_more() {
+        let own = r#"wake : {"id":4,"ev":"ended","kind":"bg","what":"cargo test","rc":0,"after_ms":61000,"msg":7}"#;
+        assert!(parse_hub_line(own).is_some(), "its own wake draws");
+        let other = r#"wake : {"id":4,"ev":"ended","kind":"bg","what":"cargo test","rc":0,"after_ms":61000,"msg":7,"agent":"perf"}"#;
+        assert!(parse_hub_line(other).is_none(), "main's copy of perf's wake draws nothing");
     }
 
     /// An old (v1) transcript still parses to what it drew before.

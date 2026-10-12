@@ -516,6 +516,8 @@ pub fn end_line(w: &Watch, why: &str, at: u64, hit: Option<&Hit>, msg: Option<u6
         after_ms,
         tail: hit.map(|h| h.tail.clone()).unwrap_or_default(),
         msg,
+        // its own thread's line; core_wake.rs sets it on main's copy
+        agent: String::new(),
     })
 }
 

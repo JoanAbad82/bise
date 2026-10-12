@@ -4583,6 +4583,13 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     let l: bise_proto::thread::WakeFold = serde_json::from_value(w.watch).unwrap();
     let sent = t.journal.borrow().iter().rev().find(|j| j["type"] == "message_sent" && j["msg"]["to"] == "perf").map(|j| j["msg"]["id"].as_u64()).unwrap();
     assert_eq!((l.ev, l.what.as_str(), l.after_ms, l.msg), (bise_proto::thread::WakeEv::Ended, "the build", 5_000, sent));
+    assert!(l.agent.is_empty() && !ls[0].contains("\"agent\""), "its own thread's line names no one: {}", ls[0]);
+    // ambient-lead m_19783: main's thread gets the same line, for perf
+    let in_main = lines_of(&fx, MAIN).into_iter().filter(|l| l.starts_with("sb wake :: ")).map(String::from).collect::<Vec<_>>();
+    assert_eq!(in_main.len(), 1, "{fx:?}");
+    let Ok(bise_proto::core::Feed::Wake(m)) = bise_proto::core::Feed::read_rest(&in_main[0][3..]).unwrap().1 else { panic!("{}", in_main[0]) };
+    let m: bise_proto::thread::WakeFold = serde_json::from_value(m.watch).unwrap();
+    assert_eq!(m, bise_proto::thread::WakeFold { agent: "perf".into(), ..l });
     assert_eq!(watching(&mut t), json!([]), "the hit ends it: the row moves");
     // a stop: one line, no message
     t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.clone(), max_ms: crate::wake::MAX_DEFAULT_MS }));

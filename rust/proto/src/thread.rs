@@ -319,6 +319,12 @@ pub struct WakeFold {
     /// entry); none when nothing woke it
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub msg: Option<u64>,
+    /// the agent the wake is for, when that is not this thread's own:
+    /// another agent's wake shown in main's thread (the hub writes the
+    /// same line there, core_wake.rs; the window folds it, tier 4). Empty:
+    /// this thread's own wake (and every line written before the field)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub agent: String,
 }
 
 /// Where a tool call is: running, done, failed (R11, amb-win S9).

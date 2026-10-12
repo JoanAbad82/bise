@@ -26,6 +26,7 @@
 {"ev":"entry","project":"acme-1a2b3c4d","agent":"perf","entry":{"pos":33,"at_ms":1791100033000,"kind":"scheduled","text":"main scheduled #48 for perf · every 2m · 6 times · next 14:22","scheduled":{"id":48,"head":"main scheduled #48 for perf · every 2m · 6 times · next 14:22","words":"check the build"}}}
 {"ev":"entry","project":"acme-1a2b3c4d","agent":"perf","entry":{"pos":34,"at_ms":1791100034000,"kind":"scheduled","text":"scheduled #48 ended · stopped by you","scheduled":{"id":48,"head":"scheduled #48 ended · stopped by you"}}}
 {"ev":"entry","project":"acme-1a2b3c4d","agent":"perf","entry":{"pos":35,"at_ms":1791100035000,"kind":"wake","text":"cargo test ended · rc 101 · after 3m10s","wake":{"id":3,"ev":"ended","kind":"bg","what":"cargo test","rc":101,"after_ms":190000,"tail":["test cart::total ... FAILED","test result: FAILED. 210 passed; 2 failed"],"msg":57}}}
+{"ev":"entry","project":"acme-1a2b3c4d","agent":"main","entry":{"pos":36,"at_ms":1791100035000,"kind":"wake","text":"cargo test ended · rc 101 · after 3m10s","wake":{"id":3,"ev":"ended","kind":"bg","what":"cargo test","rc":101,"after_ms":190000,"tail":["test cart::total ... FAILED","test result: FAILED. 210 passed; 2 failed"],"msg":57,"agent":"perf"}}}
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":"running the tests"}
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":""}
 {"ev":"partial","project":"acme-1a2b3c4d","agent":"perf","call":"17.0","off":0,"text":"the tests pass:\n- one"}

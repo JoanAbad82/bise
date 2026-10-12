@@ -623,6 +623,11 @@ impl Fold<'_> {
                 }
                 self.route = self.out.len().checked_sub(1);
             }
+            // another agent's wake in main's thread (ambient-lead m_19783):
+            // its typed `wake` line came first and took this message's
+            // place (by its id); the message itself makes nothing
+            Hub::Msg { from, id, .. }
+                if lines::is_hub_sender(&from) && id.strip_prefix("m_").and_then(|n| n.parse().ok()).is_some_and(|n: u64| self.woke.contains(&n)) => {}
             // agent to agent in main's thread (the window groups the run);
             // the hub's own timer wakes and stop notes are the agents'
             Hub::Msg { from, to, id, body } => {

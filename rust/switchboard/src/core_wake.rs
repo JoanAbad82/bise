@@ -99,6 +99,14 @@ impl Hub {
             if let Some(l) = wake::end_line(&e.watch, &why, e.at, hit, msg) {
                 let watch = serde_json::to_value(&l).unwrap_or_default();
                 fx.push(feed(agent, Feed::Wake(feed_rec::Wake { v: 1, watch })));
+                // ambient-lead m_19783 (designer's thread tiers): main's
+                // thread sees another agent's wake as bise's message to it;
+                // the same line there, with `agent` (who it is for), types
+                // that row (the fold takes the message's place by its id)
+                if agent != crate::model::MAIN {
+                    let watch = serde_json::to_value(bise_proto::thread::WakeFold { agent: agent.clone(), ..l }).unwrap_or_default();
+                    fx.push(feed(crate::model::MAIN, Feed::Wake(feed_rec::Wake { v: 1, watch })));
+                }
             }
         }
     }
