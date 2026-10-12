@@ -1689,6 +1689,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* a run that went through: one dim line */
+.th-retry[data-done] .th-retry-line {
+  color: var(--c-text-3);
+}
+/* another agent's wake in main's thread: tier 4, dim (amb-feed 11e5fbbc) */
+.th-wake[data-for] {
+  color: var(--c-text-3);
+}
 .th-retry[data-failed] .th-retry-line,
 .th-retry[data-failed] .th-news-mark {
   color: var(--c-err);

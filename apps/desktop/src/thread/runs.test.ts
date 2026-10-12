@@ -47,3 +47,14 @@ describe('a report breaks a run (tier 2: for him)', () => {
     expect(foldedRuns([1, 2, 3], (p) => list[p], 'perf')).toEqual([]);
   });
 });
+
+describe("main's copy of another agent's wake (amb-feed 11e5fbbc)", () => {
+  it('folds with the messages around it; its own wake never does', () => {
+    const list: Record<number, RunEntry> = {
+      1: { kind: 'to_agent', to: 'perf', text: 'run the tests' },
+      2: { kind: 'wake', wake: { agent: 'perf' } },
+      3: { kind: 'wake', wake: {} },
+    };
+    expect(foldedRuns([1, 2, 3], (p) => list[p], 'main')).toEqual([{ start: 1, members: [1, 2], agents: 2 }]);
+  });
+});

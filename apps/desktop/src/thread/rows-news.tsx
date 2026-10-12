@@ -11,7 +11,7 @@ import { clock, handoffOf, repeatsReport, reportBody, schedHead } from './entry'
 import { wakeLine, wakeTail } from './wake';
 import { useRouter } from '@/app/router';
 import type { RowCtx } from './rows';
-import { retryOf, retryWords, type Retry } from './tiers';
+import { retryOf, retryWords, typedRetry, type Retry } from './tiers';
 /** A news line's mark: what it means, never its color alone. */
 export function NewsLine({ mark, tone, testId, children }: { mark: string; tone: 'ok' | 'err' | 'plain' | 'dim'; testId: string; children: ReactNode }) {
   return (
@@ -199,13 +199,18 @@ export function CompactedRow({ e }: { e: Entry }) {
  * after 3m10s'), dim, only a non-zero rc in the error tone; '–' when he stopped waiting; its last
  * output lines folded ('▸ its last 3 lines', ⌘E / a click opens them, mono).
  */
-export function WakeRow({ e }: { e: Entry }) {
+export function WakeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const [open, setOpen] = useFold(false, e.pos);
-  const { mark, parts } = wakeLine(e);
+  const line = wakeLine(e);
+  // another agent's wake, main's copy of it (amb-feed 11e5fbbc wake.agent): tier 4, dim, never red,
+  // named for whom (designer m_19383: nothing addressed to another agent in ink)
+  const other = e.wake?.agent != null && e.wake.agent !== '' && e.wake.agent !== ctx.agent ? e.wake.agent : null;
+  const mark = line.mark;
+  const parts = other === null ? line.parts : [{ text: `${other}'s ${line.parts[0]?.text ?? ''}`, err: false }, ...line.parts.slice(1).map((p) => ({ ...p, err: false }))];
   const tail = e.wake?.tail ?? [];
   const words = wakeTail(tail.length);
   return (
-    <div className="th-wake" data-testid={`thread.wake.${String(e.pos)}`}>
+    <div className="th-wake" data-for={other ?? undefined} data-testid={`thread.wake.${String(e.pos)}`}>
       <div className="th-wake-head">
         <span className="th-wake-mark" aria-hidden="true">
           {mark}
@@ -240,7 +245,8 @@ export const NOTICE_MARK = { info: '·', warn: '▲', err: '✗', unknown: '·' 
 export function NoticeRow({ e, ctx, retries }: { e: Entry; ctx: RowCtx; retries?: readonly string[] | undefined }) {
   const level = e.notice?.level ?? 'info';
   const text = e.notice?.text ?? e.text;
-  const retry = retryOf(text);
+  // the hub's typed retry first (dd17152f), else its words (an older hub)
+  const retry = e.notice?.retry != null ? typedRetry(e.notice.retry) : retryOf(text);
   if (retry !== null) return <RetryRow pos={e.pos} retry={retry} tries={retries ?? [text]} />;
   // a main's handoff (designer's v6 (3)): '→ perf · product page speed', opens its thread
   const handoff = level === 'info' ? handoffOf(text) : null;
@@ -416,9 +422,11 @@ export function ReportRow({ pos, line, text, next, ctx, waits }: { pos: number; 
  */
 function RetryRow({ pos, retry, tries }: { pos: number; retry: Retry; tries: readonly string[] }) {
   const [open, setOpen] = useFold(false, pos);
-  const failed = retry.next === undefined;
+  // red only once the last try failed; a run that went through dims (amb-feed: end 'recovered')
+  const done = retry.end === 'recovered' || retry.end === 'unknown';
+  const failed = !done && retry.next === undefined;
   return (
-    <div className="th-retry" data-failed={failed || undefined} data-testid={`thread.notice.${String(pos)}`}>
+    <div className="th-retry" data-failed={failed || undefined} data-done={done || undefined} data-testid={`thread.notice.${String(pos)}`}>
       <Press
         look="th-retry-line"
         aria-expanded={open}

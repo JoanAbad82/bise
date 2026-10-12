@@ -244,7 +244,7 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
       return <ScheduledRow e={e} ctx={ctx} />;
     // event-wake: a watch's end, the hub's line with its folded output
     case 'wake':
-      return <WakeRow e={e} />;
+      return <WakeRow e={e} ctx={ctx} />;
     case 'from_agent': {
       // tier 4 (designer m_19387): a message from another agent, never body prose; its report to
       // this agent stays a status line (the default's report branch below)

@@ -14,7 +14,12 @@ export interface RunEntry {
   readonly asks?: boolean | null;
   /** its words: a report ('[report: done] …') is for him, never folded away */
   readonly text?: string;
+  /** a wake: main's copy of another agent's wake folds with the messages (amb-feed 11e5fbbc) */
+  readonly wake?: { readonly agent?: string | null } | null;
 }
+
+/** main's copy of another agent's wake (amb-feed 11e5fbbc): tier 4, between agents. Pure. */
+const wakeFor = (e: RunEntry, agent: string): string | null => (e.kind === 'wake' && e.wake?.agent != null && e.wake.agent !== '' && e.wake.agent !== agent ? e.wake.agent : null);
 
 export interface Run {
   /** its first message's pos (the fold's place and key) */
@@ -26,7 +31,8 @@ export interface Run {
 
 // a question that waits for its reply (asks) stays in view: it breaks a run
 // and a report (tier 2, designer m_19387: reports on his requests are for him) stays in view too
-const isAgentMsg = (e: RunEntry | undefined): e is RunEntry => e !== undefined && (e.kind === 'to_agent' || e.kind === 'from_agent') && e.asks !== true && !/^\s*\[report:/u.test(e.text ?? '');
+const isAgentMsg = (e: RunEntry | undefined, agent = ''): e is RunEntry =>
+  e !== undefined && (((e.kind === 'to_agent' || e.kind === 'from_agent') && e.asks !== true && !/^\s*\[report:/u.test(e.text ?? '')) || wakeFor(e, agent) !== null);
 
 /** The folded runs of a thread's entries in order (`agent`: whose thread it is). Pure. */
 export function foldedRuns(order: readonly number[], entry: (pos: number) => RunEntry | undefined, agent: string): Run[] {
@@ -40,13 +46,14 @@ export function foldedRuns(order: readonly number[], entry: (pos: number) => Run
   };
   for (const pos of order) {
     const e = entry(pos);
-    if (!isAgentMsg(e)) {
+    if (!isAgentMsg(e, agent)) {
       close();
       continue;
     }
     members.push(pos);
-    const from = e.kind === 'to_agent' ? agent : (e.from ?? '');
-    const to = e.kind === 'to_agent' ? (e.to ?? '') : (e.to ?? agent);
+    const woke = wakeFor(e, agent);
+    const from = e.kind === 'to_agent' || woke !== null ? agent : (e.from ?? '');
+    const to = woke ?? (e.kind === 'to_agent' ? (e.to ?? '') : (e.to ?? agent));
     if (from !== '') names.add(from);
     if (to !== '') names.add(to);
   }

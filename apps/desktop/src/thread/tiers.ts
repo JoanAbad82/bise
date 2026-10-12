@@ -99,6 +99,16 @@ export interface Retry {
   readonly why: string;
   /** the next try: 'retry 3/10 in 4s'; none when this try was the last */
   readonly next?: { readonly attempt: number; readonly wait: string };
+  /** how the run ended, when the hub says it (amb-feed's typed Notice.retry, dd17152f) */
+  readonly end?: 'recovered' | 'failed' | 'unknown';
+}
+
+/** The hub's typed retry (Notice.retry: one entry per run, sent again at its pos) as a Retry. Pure. */
+export function typedRetry(r: { attempt: number; max: number; why: string; wait_ms: number; end?: 'recovered' | 'failed' | 'unknown' | null }): Retry {
+  const base = { attempt: r.attempt, of: r.max, why: r.why };
+  if (r.end != null) return { ...base, end: r.end };
+  const s = r.wait_ms / 1000;
+  return { ...base, next: { attempt: r.attempt + 1, wait: `${Number.isInteger(s) ? String(s) : s.toFixed(1)}s` } };
 }
 
 const RETRY = /^model call failed \(attempt (\d+)\/(\d+)\): ([\s\S]*?)(?: · retry (\d+)\/\d+ in (\S+))?$/u;
@@ -153,6 +163,8 @@ export function retryRuns(order: readonly number[], entry: (pos: number) => Retr
 
 /** The retry row's words: 'model call failed · retry 3 of 10 in 4 s', or '… · try 10 of 10 failed' at the end. Pure. */
 export function retryWords(r: Retry): string {
+  // the hub says the run ended and the call went through: one dim line that says so
+  if (r.end === 'recovered' || r.end === 'unknown') return `model call failed ${String(r.attempt)} ${r.attempt === 1 ? 'time' : 'times'} · went through`;
   if (r.next === undefined) return `model call failed · try ${String(r.attempt)} of ${String(r.of)} failed`;
   return `model call failed · retry ${String(r.next.attempt)} of ${String(r.of)} in ${r.next.wait.replace(/^(\d+(?:\.\d+)?)([a-z]+)$/u, '$1 $2')}`;
 }

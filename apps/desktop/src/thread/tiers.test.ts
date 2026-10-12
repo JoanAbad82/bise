@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BODY_KINDS, landedEchoes, NAMELESS_KINDS, retryOf, retryRuns, retryWords, ROW_KINDS, sameRoute, type TierEntry } from './tiers';
+import { BODY_KINDS, landedEchoes, NAMELESS_KINDS, retryOf, retryRuns, retryWords, ROW_KINDS, typedRetry, sameRoute, type TierEntry } from './tiers';
 
 describe('sameRoute (designer m_19784 (2): one chip for a run of the same sender → receiver)', () => {
   it('two messages bise → perf share it; a reply or another receiver does not', () => {
@@ -60,5 +60,14 @@ describe('retries (tui-parity H9, designer m_19832)', () => {
     expect([...hidden]).toEqual([1, 2]);
     expect(runs.get(3)).toEqual([r(1, 2), r(2, 3), r(3, 4)]);
     expect(runs.get(5)).toEqual([r(1, 2)]);
+  });
+});
+
+describe("the hub's typed retry (amb-feed dd17152f)", () => {
+  it('waiting: the next try; recovered: one dim line; failed: the last try', () => {
+    expect(retryWords(typedRetry({ attempt: 2, max: 10, why: 'provider 529', wait_ms: 4000 }))).toBe('model call failed · retry 3 of 10 in 4 s');
+    expect(retryWords(typedRetry({ attempt: 2, max: 10, why: 'provider 529', wait_ms: 1500 }))).toBe('model call failed · retry 3 of 10 in 1.5 s');
+    expect(retryWords(typedRetry({ attempt: 2, max: 10, why: 'provider 529', wait_ms: 4000, end: 'recovered' }))).toBe('model call failed 2 times · went through');
+    expect(retryWords(typedRetry({ attempt: 10, max: 10, why: 'provider 529', wait_ms: 0, end: 'failed' }))).toBe('model call failed · try 10 of 10 failed');
   });
 });

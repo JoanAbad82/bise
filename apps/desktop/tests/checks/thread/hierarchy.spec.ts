@@ -34,6 +34,8 @@ const thread = [
   { pos: 6, at_ms: at(37), kind: 'wake', text: 'cargo test ended · rc 0 · after 1m02s', wake: { after_ms: 62000, ev: 'ended', id: 2, kind: 'bg', rc: 0, tail: ['test result: ok. 212 passed'], what: 'cargo test' } },
   { pos: 7, at_ms: at(36), kind: 'scheduled', text: 'main scheduled the p99 check · every 30 min · next 20:11', scheduled: { id: 5, head: 'main scheduled the p99 check · every 30 min · next 20:11', words: 'check the p99 of the checkout' } },
   { pos: 8, at_ms: at(24), kind: 'agent', text: 'The p99 is back under 300 ms.' },
+  // main's copy of docs-line's wake (amb-feed 11e5fbbc wake.agent): tier 4, dim, never red
+  { pos: 9, at_ms: at(23), kind: 'wake', text: 'cargo test ended · rc 101 · after 3m10s', wake: { after_ms: 190000, agent: 'docs-line', ev: 'ended', id: 3, kind: 'bg', rc: 101, tail: ['test result: FAILED. 210 passed; 2 failed'], what: 'cargo test' } },
 ];
 const world = (theme: string) => [
   prefs(theme),
@@ -113,6 +115,11 @@ for (const theme of ['light', 'dark']) {
         // H12: after 12 min of silence, a faint '· 14:31 ·' and a new head
         await expect(page.getByTestId('thread.pause.8')).toHaveText(/^· \d{1,2}:\d{2}( [AP]M)? ·$/u);
         await expect(page.locator('[data-testid="thread.entry.8"] .b-who:not(.b-hover)')).toHaveCount(1);
+        // another agent's wake in main's thread: dim (text-3), named for whom, its rc never red
+        const wf = page.getByTestId('thread.wake.9');
+        await expect(wf).toHaveAttribute('data-for', 'docs-line');
+        await expect(wf).toContainText("docs-line's cargo test ended");
+        await expect(page.locator('[data-testid="thread.wake.9"] [data-err]')).toHaveCount(0);
         await page.screenshot({ path: test.info().outputPath(`hierarchy-${theme}-${String(w)}.png`) });
         // H3's record for designer: the quiet rows with the scheduled one, close
         if (w === 1100) {
@@ -161,6 +168,9 @@ const perf = [
   { pos: 9, at_ms: at(15), kind: 'notice', text: tries(10), notice: { level: 'warn', text: tries(10) } },
   // H13: a long command is cut with …, its ✓ and time stay at its end
   { pos: 10, at_ms: at(14), kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 10, at_ms: at(14), text: `bash /Users/someone/.bise/gate/w-tuiparity/rich/${'p99-ask-'.repeat(20)}.sh`, kind: 'run', state: 'ok', ms: 700 }] } },
+  { pos: 11, at_ms: at(14), kind: 'agent', text: 'Trying again.' },
+  // the hub's typed retry (amb-feed dd17152f): one entry per run, ended 'recovered': one dim line
+  { pos: 12, at_ms: at(13), kind: 'notice', text: tries(2, 3), notice: { level: 'warn', text: tries(2, 3), retry: { attempt: 2, max: 10, why: 'no answer in 90 s (timeout)', wait_ms: 4000, end: 'recovered' } } },
 ];
 const world2 = (theme: string) => [...world(theme).filter((e) => e.ev !== 'agents'), { ev: 'agents', project: P, agents: [ag('main'), ag('perf', 'p99 latency')] }, { ev: 'thread', project: P, agent: 'perf', entries: perf, before: null, more: false }];
 
@@ -170,7 +180,7 @@ for (const theme of ['light', 'dark']) {
     const s = await launchDesktop({ core, route: `agent/${P}/perf`, size: '1100x900' });
     try {
       const { page } = s;
-      await expect(page.getByTestId('thread.entry.10')).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByTestId('thread.entry.12')).toBeVisible({ timeout: 10_000 });
       await page.mouse.move(1, 400);
       // H7: the quote, one dim line at the bubble's top, its words cut with …
       const q = page.getByTestId('thread.you.1.quote.1');
@@ -215,6 +225,9 @@ for (const theme of ['light', 'dark']) {
       });
       expect(t13, 'H13: the command cut, its status kept').toEqual({ inside: true, cut: true });
       await expect(page.getByTestId('thread.tool.10.end')).toContainText('0.7');
+      // the typed run that went through: one dim line
+      await expect(page.getByTestId('thread.notice.12.retry')).toHaveText('▲model call failed 2 times · went through ▸');
+      await expect(page.getByTestId('thread.notice.12')).toHaveAttribute('data-done', 'true');
       await page.screenshot({ path: test.info().outputPath(`hierarchy-b-${theme}-folded.png`) });
       // open: the quote whole, the report's words, each try
       await q.click();
