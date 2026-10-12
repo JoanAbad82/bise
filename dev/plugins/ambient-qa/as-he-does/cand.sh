@@ -130,6 +130,7 @@ sleep 1
 say "launch first"; opencand; breach; libgate first-open
 drive first
 drive cut
+drive rows2
 for c in pause atonce; do
   TAG=$c drive draft-type "draft kept across a restart ($c)"
   [ $c = pause ] && sleep 5

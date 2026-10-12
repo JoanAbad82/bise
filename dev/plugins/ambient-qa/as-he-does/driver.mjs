@@ -298,6 +298,120 @@ if (mode === 'cut') {
   step("no message stays 'sending…'", !!stuck, stuck ? null : ((await text('[data-testid="app.main"]')) ?? '').match(/.{0,120}sending.{0,40}/s)?.[0]);
 }
 
+// the first cut from main (ambient-lead m_20586): the right bar, an artifact opened from it, back /
+// forward, the working row, the inbox block with another project's item, a short thought's words
+if (mode === 'rows2') {
+  const composerOf = () => page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
+  const say = async (words) => {
+    if (!(await click(`say ${words.slice(0, 30)}`, composerOf()))) return false;
+    await page.keyboard.type(words, { delay: 5 });
+    await page.keyboard.press('Enter');
+    return true;
+  };
+  const harness = () => click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+  await harness();
+  // the right bar: its four sections in order; the left bar holds places only
+  const panel = page.locator('[data-testid="app.panel"]').first();
+  const shown = await panel.waitFor({ timeout: 10000 }).then(() => true, () => false);
+  const order = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.right."]')]
+    .map((e) => e.getAttribute('data-testid')).filter((t) => /^app\.right\.(agents|archived|artifacts|scheduled)$/.test(t)));
+  await shot('right-bar');
+  step('the right bar: agents, archived, artifacts, scheduled', shown && order.join(',') === 'app.right.agents,app.right.archived,app.right.artifacts,app.right.scheduled', order);
+  const agentsText = (await text('[data-testid="app.right.agents"]')) ?? '';
+  step('the right bar lists agents in start order (main, then keeper)', /bise|main/.test(agentsText) && agentsText.indexOf('keeper') > 0, agentsText.slice(0, 300));
+  const leftAgents = await page.locator('[data-testid="app.sidebar"] [data-testid*=".agent."]').count().catch(() => 0);
+  step('the left bar holds places only (no agent rows)', leftAgents === 0 && !/\bkeeper\b/.test((await text('[data-testid="app.sidebar"]')) ?? ''), { agent_rows: leftAgents });
+  // ⌥⌘0 and the title bar's toggle hide and bring back the right bar
+  await page.keyboard.press('Alt+Meta+0');
+  const hid = await until(async () => ((await panel.count()) === 0 || !(await panel.isVisible().catch(() => false)) ? true : null), 5000, 300);
+  await shot('right-bar-hidden');
+  await page.keyboard.press('Alt+Meta+0');
+  const back = await panel.waitFor({ timeout: 5000 }).then(() => true, () => false);
+  step('⌥⌘0 hides and brings back the right bar', !!hid && back, { hid: !!hid, back });
+  const tog = page.locator('[data-testid="app.title.panel"]').first();
+  let togOk = false;
+  if (await click('the title bar toggle', tog)) {
+    const h2 = await until(async () => ((await panel.count()) === 0 || !(await panel.isVisible().catch(() => false)) ? true : null), 5000, 300);
+    await click('the title bar toggle again', tog);
+    togOk = !!h2 && await panel.waitFor({ timeout: 5000 }).then(() => true, () => false);
+  }
+  step("the title bar's toggle hides and brings back the right bar", togOk, null);
+  // an artifact from the right bar: the 3-column view, its page drawn in the frame; ✕ and esc back
+  const row = page.locator('[data-testid="app.right.artifacts"] [data-testid*="proof-html"], [data-testid="app.right.artifacts"] button, [data-testid="app.right.artifacts"] [role="button"]').filter({ hasText: 'proof-html' }).first();
+  const opened = await click('proof-html from the right bar', row);
+  const pageEl = page.locator('[data-testid="artifact.page"]').first();
+  const drawn = opened && await pageEl.waitFor({ timeout: 15000 }).then(() => true, () => false);
+  let green = 0;
+  if (drawn) {
+    await page.waitForTimeout(1500);
+    const png = (await pageEl.screenshot({ timeout: 15000 }).catch(() => null))?.toString('base64');
+    green = png ? await page.evaluate(async (b64) => {
+      const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
+      const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data; let n = 0;
+      for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - 46) < 12 && Math.abs(d[i + 1] - 139) < 12 && Math.abs(d[i + 2] - 87) < 12) n++;
+      return n / (d.length / 4);
+    }, png) : 0;
+  }
+  const cols = await page.evaluate(() => ({ left: !!document.querySelector('[data-testid="app.sidebar"]'), right: !!document.querySelector('[data-testid="app.panel"]') }));
+  await shot('artifact-from-right-bar');
+  step('an artifact from the right bar: 3 columns, its page drawn (green pixels)', drawn && green > 0.3 && cols.left && cols.right, { opened, drawn, green: Math.round(green * 100) / 100, cols });
+  const closed = await click('✕', page.locator('[data-testid="artifact.close"]').first());
+  const gone1 = closed && await pageEl.waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
+  await click('proof-html again', row);
+  await pageEl.waitFor({ timeout: 10000 }).catch(() => {});
+  await page.keyboard.press('Escape');
+  const gone2 = await pageEl.waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
+  step('✕ and esc close the artifact', gone1 && gone2, { x: gone1, esc: gone2 });
+  // back / forward: harness -> artifacts -> ⌘[ harness -> ⌘] artifacts; esc from harness' main goes up to bise
+  await harness();
+  await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
+  await page.locator('[data-testid="artifacts.list"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+  await page.keyboard.press('Meta+BracketLeft');
+  const wentBack = await until(async () => ((await page.locator('[data-testid="artifacts.list"]').count()) === 0 && /harness/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), 5000, 300);
+  await page.keyboard.press('Meta+BracketRight');
+  const wentFwd = await page.locator('[data-testid="artifacts.list"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+  step('⌘[ goes back, ⌘] forward', !!wentBack && wentFwd, { back: !!wentBack, forward: wentFwd });
+  await harness();
+  await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
+  await page.keyboard.press('Escape');
+  const upToBise = await until(async () => (/every project|to bise\s*$/m.test((await text('[data-testid="app.main"]')) ?? '') || (await page.locator('[data-testid="app.sidebar.bise"][aria-current]').count()) > 0 ? true : null), 5000, 300);
+  await shot('esc-up');
+  step("esc from a project's main goes up to bise", !!upToBise, ((await text('[data-testid="app.main"]')) ?? '').slice(0, 200));
+  // the working row while an agent works (a slow turn), then a short thought with its words
+  await harness();
+  await say('take a moment [[slow: 8]]');
+  const working = await until(async () => (/working/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), 8000, 400);
+  await shot('working-row');
+  step('the working row shows while main works', !!working, null);
+  await until(async () => (/ack: take a moment/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), ANSWER_MS, 1000);
+  await say('one quick thought [[think: weighing the proof rows]]');
+  const words = await until(async () => (/weighing the proof rows/.test(await page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid^="thread.entry."][data-kind="thinking"]')].map((r) => r.textContent ?? '').join(' '))) ? true : null), ANSWER_MS, 1000);
+  await shot('short-thought');
+  step('a short thought shows its words', !!words, null);
+  // the inbox block in bise's thread: another project's item answered there; ⌘I opens it in place
+  await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  const block = page.locator('[data-testid^="inbox.block"]').first();
+  const hasBlock = await block.waitFor({ timeout: 15000 }).then(() => true, () => false);
+  const blockText = hasBlock ? ((await block.innerText().catch(() => '')) ?? '') : '';
+  await shot('inbox-block');
+  step("bise's thread shows the inbox block with another project's item", hasBlock && /shop|telemetry|docs|ai-docs|folder/.test(blockText), blockText.slice(0, 300));
+  await page.keyboard.press('Meta+i');
+  const inPlace = await until(async () => ((await page.locator('[data-testid^="dock.opt"]').count()) > 0 ? true : null), 8000, 400);
+  await shot('inbox-cmd-i');
+  step('⌘I opens the item in place (its options in the dock)', !!inPlace, ((await text('[data-testid="app.main"]')) ?? '').slice(-300));
+  if (inPlace) {
+    const opt = page.locator('[data-testid^="dock.opt"]').first();
+    const label = await opt.innerText().catch(() => '');
+    await click('answer it there', opt);
+    const answered = await until(async () => ((await page.locator('[data-testid^="dock.opt"]').count()) === 0 ? true : null), 15000, 500);
+    await shot('inbox-answered');
+    step("another project's item answered from bise's thread", !!answered, { option: label.slice(0, 80) });
+  }
+}
+
 // the draft across a restart (ambient-lead m_19525): typed in harness' composer, never sent; after
 // the restart the same composer must hold it again
 if (mode === 'draft-type' || mode === 'draft-check') {
