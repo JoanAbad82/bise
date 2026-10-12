@@ -482,3 +482,65 @@ test("composer/dictate-anywhere: with the terminal panel focused, ctrl+r is the 
     await s.close();
   }
 });
+
+// ambient-lead m_20100, amb-tools' as-he-does run on the cut (real core, no mic): ctrl+r from the
+// thread showed 'listening…', esc did NOT end it, and his next words went after it. The core never
+// answered that dictation (its mic stuck opening). Here the scripted core never answers either:
+// esc ends the dictation at once in the window; a stop ends it after the wait, with a note.
+test("composer/dictate-anywhere: a core that never answers: esc still ends the dictation at once, a stop ends it after the wait", async () => {
+  test.setTimeout(60_000);
+  const core = new FakeCore(world("light") as never);
+  const s = await launchDesktop({
+    helper: new FakeHelper(),
+    core,
+    route: `agent/${P}/main`,
+    size: "1100x760",
+  });
+  try {
+    const { page } = s;
+    await expect(page.getByTestId("thread.screen")).toHaveAttribute(
+      "data-agent",
+      "main",
+      { timeout: 10_000 },
+    );
+    await away(page, "main");
+    await page.keyboard.press("Control+r");
+    await expect.poll(() => mic(page)).toBe("recording");
+    await core.waitCmd((c) => c.cmd === "dictate_start");
+    await expect(dictation(page), "listening… shows").toHaveCount(1);
+    const seen = cancels(core);
+    await page.keyboard.press("Escape");
+    await expect
+      .poll(() => mic(page), {
+        message: "esc: the mic is off with no answer from the core",
+        timeout: 1000,
+      })
+      .toBe("off");
+    await expect(dictation(page), "esc: listening… is gone").toHaveCount(0);
+    expect(cancels(core), "the core is still told").toBe(seen + 1);
+    await page.keyboard.type("his words");
+    await expect(
+      field(page),
+      "his next words are alone in the field",
+    ).toHaveText("his words");
+
+    // a stop (a key) the core never answers: listening… goes after the wait, his words stay
+    await page.keyboard.press("Control+r");
+    await expect.poll(() => mic(page)).toBe("recording");
+    await page.keyboard.type(" more");
+    await expect(
+      dictation(page),
+      "stopped: waiting for the last words",
+    ).toHaveCount(1);
+    await expect(dictation(page), "the wait ends it").toHaveCount(0, {
+      timeout: 8000,
+    });
+    expect(await mic(page)).toBe("off");
+    await expect(page.getByTestId("composer.note")).toContainText(
+      "didn't answer",
+    );
+    await expect(field(page)).toHaveText("his words more");
+  } finally {
+    await s.close();
+  }
+});

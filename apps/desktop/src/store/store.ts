@@ -18,11 +18,73 @@
 // runtime: only the tags of TAGS are applied, and TAGS is checked complete
 // against the generated unions at compile time. The store's shapes, TAGS and
 // its key and compare helpers live in types.ts (re-exported here).
-import type { Account, Card, ComputerAgent, Agent, Artifact, DevServer, Entry, Found, IndexRow, Job, JsonValue, Feature, Merged, Mode, Model, Part, PickCommand, RoleRow, PickSkill, Plugin, ProjectRow, ScheduledTask, Worktree, FlowMode, ReleaseEv, UpdateEv } from '@/proto';
-import type { CoreCmd, CorePort, CoreState } from '@/shared/api';
-import { type Away, type BranchesList, type Confirm, type Dictation, type Diff, diffKey, type Ev, type EvOf, type FilesAnswer, type HubLine, type PagesList, type Pending, type PrsList, type QueuedTake, sameJson, sameOrder, sameStrings, sentParts, sentWords, takeKey, threadKey, type ThreadOrder, type ToolOut, toolOutKey, typed, type VersionsList, type VoiceModeState } from './types';
-const EMPTY_ORDER: ThreadOrder = { order: [], before: null, more: false, loaded: false };
+import type {
+  Account,
+  Card,
+  ComputerAgent,
+  Agent,
+  Artifact,
+  DevServer,
+  Entry,
+  Found,
+  IndexRow,
+  Job,
+  JsonValue,
+  Feature,
+  Merged,
+  Mode,
+  Model,
+  Part,
+  PickCommand,
+  RoleRow,
+  PickSkill,
+  Plugin,
+  ProjectRow,
+  ScheduledTask,
+  Worktree,
+  FlowMode,
+  ReleaseEv,
+  UpdateEv,
+} from "@/proto";
+import type { CoreCmd, CorePort, CoreState } from "@/shared/api";
+import {
+  type Away,
+  type BranchesList,
+  type Confirm,
+  type Dictation,
+  type Diff,
+  diffKey,
+  type Ev,
+  type EvOf,
+  type FilesAnswer,
+  type HubLine,
+  type PagesList,
+  type Pending,
+  type PrsList,
+  type QueuedTake,
+  sameJson,
+  sameOrder,
+  sameStrings,
+  sentParts,
+  sentWords,
+  takeKey,
+  threadKey,
+  type ThreadOrder,
+  type ToolOut,
+  toolOutKey,
+  typed,
+  type VersionsList,
+  type VoiceModeState,
+} from "./types";
+const EMPTY_ORDER: ThreadOrder = {
+  order: [],
+  before: null,
+  more: false,
+  loaded: false,
+};
 const EMPTY: readonly never[] = [];
+/** A stopped dictation's final is the core's within its FINAL_WAIT (1.5 s, core.rs); past this, the window ends it. */
+export const DICTATE_STOP_WAIT_MS = 5000;
 
 interface Thread {
   view: ThreadOrder;
@@ -42,7 +104,7 @@ export class Store {
   private readonly threads = new Map<string, Thread>();
   private readonly slices = new Map<string, unknown>();
   private readonly evListeners = new Set<(ev: Ev) => void>();
-  private coreState: CoreState = 'down';
+  private coreState: CoreState = "down";
   private cid = 0;
   /** R8: when this window last sent a /model (a setup_first after it is his; a replayed one isn't) */
   private modelSentAt = Number.NEGATIVE_INFINITY;
@@ -61,18 +123,24 @@ export class Store {
   private readonly dictating = new Set<string>();
   /** the `@` queries on their way: rid -> its project and resolve; each project's newest rid */
   private rid = 0;
-  private readonly asked = new Map<number, { project: string; resolve: (a: FilesAnswer | null) => void }>();
+  private readonly asked = new Map<
+    number,
+    { project: string; resolve: (a: FilesAnswer | null) => void }
+  >();
   private readonly newestRid = new Map<string, number>();
   /** commands asked from this core (said again when a core comes up) */
   private commandsAsked = false;
   /** the last shown set sent (null: none yet); said again to a core that comes back up */
   private shownSet: readonly string[] | null = null;
   /** the threads this window follows (subscribeThread), said again to a core that comes back up */
-  private readonly subs = new Map<string, { project: string; agent: string; limit: number | undefined }>();
+  private readonly subs = new Map<
+    string,
+    { project: string; agent: string; limit: number | undefined }
+  >();
   private readonly now: () => number;
 
   constructor(
-    private readonly port: Pick<CorePort, 'send'> | null = null,
+    private readonly port: Pick<CorePort, "send"> | null = null,
     opts: StoreOptions = {},
   ) {
     this.now = opts.now ?? Date.now;
@@ -118,7 +186,7 @@ export class Store {
   // ---- reads (stable references between changes)
 
   projects(): readonly ProjectRow[] {
-    return this.slice('projects', EMPTY);
+    return this.slice("projects", EMPTY);
   }
   agents(project: string): readonly Agent[] {
     return this.slice(`agents:${project}`, EMPTY);
@@ -128,12 +196,16 @@ export class Store {
     return this.slice(`cards:${project}`, EMPTY);
   }
   /** the last answer by voice the core heard (bar N14), null: none */
-  voiceAnswer(): EvOf<'voice_answer'> | null {
-    return this.slice<EvOf<'voice_answer'> | null>('voice_answer', null);
+  voiceAnswer(): EvOf<"voice_answer"> | null {
+    return this.slice<EvOf<"voice_answer"> | null>("voice_answer", null);
   }
   /** The card in front of him in this focused window (bar N14), or none: fn's talk can answer it by voice. */
   cardInView(project: string | null, card: number | null): void {
-    this.command(project === null || card === null ? { cmd: 'card_in_view' } : { cmd: 'card_in_view', project, card });
+    this.command(
+      project === null || card === null
+        ? { cmd: "card_in_view" }
+        : { cmd: "card_in_view", project, card },
+    );
   }
   /** the hub's open yes/no questions to this window, oldest first */
   confirms(project: string): readonly Confirm[] {
@@ -144,37 +216,49 @@ export class Store {
     return this.slice<HubLine | null>(`notice:${project}`, null);
   }
   /** how tool calls are approved on this machine and the repo's saved rules (bar V8/W21); null until the hub said */
-  approvals(project: string): EvOf<'approvals'> | null {
-    return this.slice<EvOf<'approvals'> | null>(`approvals:${project}`, null);
+  approvals(project: string): EvOf<"approvals"> | null {
+    return this.slice<EvOf<"approvals"> | null>(`approvals:${project}`, null);
   }
   prefs(): JsonValue | null {
-    return this.slice<JsonValue | null>('prefs', null);
+    return this.slice<JsonValue | null>("prefs", null);
   }
   /** V14: the sign-in open in his browser (its link, to copy), until its end (accounts or error). */
   signing(): { readonly id: string; readonly url: string } | null {
-    return this.slice<{ readonly id: string; readonly url: string } | null>('signing', null);
+    return this.slice<{ readonly id: string; readonly url: string } | null>(
+      "signing",
+      null,
+    );
   }
   accounts(): readonly Account[] {
-    return this.slice('accounts', EMPTY);
+    return this.slice("accounts", EMPTY);
   }
   found(): readonly Found[] {
-    return this.slice('found', EMPTY);
+    return this.slice("found", EMPTY);
   }
   /** computer use's state (P.2); null until the core sent it */
-  computerUse(): EvOf<'computer_use'> | null {
-    return this.slice<EvOf<'computer_use'> | null>('computer_use', null);
+  computerUse(): EvOf<"computer_use"> | null {
+    return this.slice<EvOf<"computer_use"> | null>("computer_use", null);
   }
   /** S29: every agent using computer use now (each with its project when it is one of his) */
   computerLive(): readonly ComputerAgent[] {
-    return this.slice('computer_live', EMPTY);
+    return this.slice("computer_live", EMPTY);
   }
   /** S29: the latest peek answer for an agent's key (a still, or why none); null before one */
-  peek(key: string): EvOf<'computer_peek'> | null {
-    return this.slice<EvOf<'computer_peek'> | null>(`peek:${key}`, null);
+  peek(key: string): EvOf<"computer_peek"> | null {
+    return this.slice<EvOf<"computer_peek"> | null>(`peek:${key}`, null);
   }
   /** S29: his act on an agent's computer use by its key (take, hand_back, stop, peek); the rows follow state.json, never optimistic */
-  computer(act: 'take' | 'hand_back' | 'stop' | 'peek', key: string, maxWidth?: number): void {
-    this.command({ cmd: 'computer', act, key, ...(maxWidth === undefined ? {} : { max_width: maxWidth }) });
+  computer(
+    act: "take" | "hand_back" | "stop" | "peek",
+    key: string,
+    maxWidth?: number,
+  ): void {
+    this.command({
+      cmd: "computer",
+      act,
+      key,
+      ...(maxWidth === undefined ? {} : { max_width: maxWidth }),
+    });
   }
   /** S29: forgets an agent's last still (its row unmounted: no image kept) */
   dropPeek(key: string): void {
@@ -182,7 +266,10 @@ export class Store {
   }
   /** a workspace's agent plugins (none: bise's home's); null until the core sent them */
   plugins(project?: string): readonly Plugin[] | null {
-    return this.slice<readonly Plugin[] | null>(`plugins:${project ?? ''}`, null);
+    return this.slice<readonly Plugin[] | null>(
+      `plugins:${project ?? ""}`,
+      null,
+    );
   }
   artifacts(project: string): readonly Artifact[] {
     return this.slice(`artifacts:${project}`, EMPTY);
@@ -235,11 +322,11 @@ export class Store {
   }
   /** ask a project's branches (the answer: branches) */
   askBranches(project: string): void {
-    this.command({ cmd: 'branches', project });
+    this.command({ cmd: "branches", project });
   }
   /** ask bise's versions again (the answer: versions) */
   askVersions(project: string): void {
-    this.command({ cmd: 'versions', project });
+    this.command({ cmd: "versions", project });
   }
   prs(project: string): PrsList | null {
     return this.slice<PrsList | null>(`prs:${project}`, null);
@@ -261,7 +348,7 @@ export class Store {
     if (this.slices.get(key) != null || this.toolAsks.has(key)) return;
     this.toolAsks.add(key);
     this.toolAsk.set(project, key);
-    this.port?.send({ cmd: 'tool_out', project, agent, pos });
+    this.port?.send({ cmd: "tool_out", project, agent, pos });
   }
   /** His queued message taken back (queued_take): its words, or the hub's refusal; null until then. */
   queuedTaken(project: string, agent: string, id: number): QueuedTake | null {
@@ -277,14 +364,14 @@ export class Store {
     const key = takeKey(project, agent, id);
     if (this.slices.get(key) != null) this.put(key, null);
     this.takeAsk.set(project, key);
-    this.command({ cmd: 'queued_take', project, agent, id });
+    this.command({ cmd: "queued_take", project, agent, id });
   }
   /** The latest diff of an agent's change, or of one commit (`commit`). */
   diff(project: string, agent: string, commit?: string): Diff | null {
     return this.slice<Diff | null>(diffKey(project, agent, commit), null);
   }
   away(): Away | null {
-    return this.slice<Away | null>('away', null);
+    return this.slice<Away | null>("away", null);
   }
   core(): CoreState {
     return this.coreState;
@@ -296,7 +383,7 @@ export class Store {
     return this.threads.get(key)?.byPos.get(pos);
   }
   typing(key: string): string {
-    return this.threads.get(key)?.typing ?? '';
+    return this.threads.get(key)?.typing ?? "";
   }
   pending(key: string): readonly Pending[] {
     return this.threads.get(key)?.pending ?? EMPTY;
@@ -315,28 +402,31 @@ export class Store {
 
   private applyTyped(ev: Ev): void {
     switch (ev.ev) {
-      case 'projects':
-        this.put('projects', ev.projects);
+      case "projects":
+        this.put("projects", ev.projects);
         for (const row of ev.projects) {
-          if (row.cards !== undefined && !this.slices.has(`hubcards:${row.project}`)) {
+          if (
+            row.cards !== undefined &&
+            !this.slices.has(`hubcards:${row.project}`)
+          ) {
             this.put(`cards:${row.project}`, row.cards);
           }
         }
         return;
-      case 'agents':
+      case "agents":
         this.put(`agents:${ev.project}`, ev.agents);
         return;
-      case 'cards':
+      case "cards":
         this.slices.set(`hubcards:${ev.project}`, true);
         this.put(`cards:${ev.project}`, ev.cards);
         return;
-      case 'thread':
+      case "thread":
         this.page(ev);
         return;
-      case 'entry':
+      case "entry":
         this.entryEv(ev);
         return;
-      case 'typing': {
+      case "typing": {
         const key = threadKey(ev.project, ev.agent);
         const t = this.thread(key);
         if (t.typing === ev.text) return;
@@ -344,51 +434,71 @@ export class Store {
         this.emit(`typing:${key}`);
         return;
       }
-      case 'artifacts':
-      case 'scheduled':
-      case 'worktrees':
-      case 'dev_servers':
-      case 'merged':
-      case 'features':
-      case 'models':
-      case 'jobs':
+      case "artifacts":
+      case "scheduled":
+      case "worktrees":
+      case "dev_servers":
+      case "merged":
+      case "features":
+      case "models":
+      case "jobs":
         this.put(`${ev.ev}:${ev.project}`, ev.items);
         return;
-      case 'branches':
+      case "branches":
         // the answer to branches (scanned on a thread): the review's branch picker
-        this.put(`branches:${ev.project}`, { base: ev.base, rows: ev.rows } satisfies BranchesList);
+        this.put(`branches:${ev.project}`, {
+          base: ev.base,
+          rows: ev.rows,
+        } satisfies BranchesList);
         return;
-      case 'versions':
-        this.put(`versions:${ev.project}`, { current: ev.current, dev: ev.dev === true, installed: ev.installed === true, items: ev.items } satisfies VersionsList);
+      case "versions":
+        this.put(`versions:${ev.project}`, {
+          current: ev.current,
+          dev: ev.dev === true,
+          installed: ev.installed === true,
+          items: ev.items,
+        } satisfies VersionsList);
         return;
-      case 'flow':
+      case "flow":
         // the repo's [flow] mode; none = not set
         this.put(`flow:${ev.project}`, ev.flow ?? null);
         return;
-      case 'pages':
-        this.put(`pages:${ev.project}`, { items: ev.items, overdue: ev.overdue } satisfies PagesList);
+      case "pages":
+        this.put(`pages:${ev.project}`, {
+          items: ev.items,
+          overdue: ev.overdue,
+        } satisfies PagesList);
         return;
-      case 'release':
-      case 'update':
+      case "release":
+      case "update":
         // a /release-bise run (dev builds) or /update's build: its latest step, whole each time
         this.put(`${ev.ev}:${ev.project}`, ev);
         return;
-      case 'prs':
-        this.put(`prs:${ev.project}`, { head: ev.head, items: ev.items, none: ev.none ?? null } satisfies PrsList);
+      case "prs":
+        this.put(`prs:${ev.project}`, {
+          head: ev.head,
+          items: ev.items,
+          none: ev.none ?? null,
+        } satisfies PrsList);
         return;
-      case 'tool_out': {
+      case "tool_out": {
         const key = toolOutKey(ev.project, ev.agent, ev.pos);
         this.toolAsks.delete(key);
-        this.put(key, { out: ev.out, cut: ev.cut, ...(ev.total == null ? {} : { total: ev.total }) } satisfies ToolOut);
+        this.put(key, {
+          out: ev.out,
+          cut: ev.cut,
+          ...(ev.total == null ? {} : { total: ev.total }),
+        } satisfies ToolOut);
         return;
       }
-      case 'queued_taken': {
+      case "queued_taken": {
         const key = takeKey(ev.project, ev.agent, ev.id);
-        if (this.takeAsk.get(ev.project) === key) this.takeAsk.delete(ev.project);
+        if (this.takeAsk.get(ev.project) === key)
+          this.takeAsk.delete(ev.project);
         this.put(key, { text: ev.text } satisfies QueuedTake);
         return;
       }
-      case 'diff':
+      case "diff":
         // an answer to someone else's `req` (a terminal's /diff) never lands on this window's views
         if (ev.req != null) {
           if (!this.diffReqs.has(ev.req)) return;
@@ -396,82 +506,92 @@ export class Store {
         }
         this.put(diffKey(ev.project, ev.agent, ev.commit ?? undefined), ev);
         return;
-      case 'prefs':
-        this.put('prefs', ev.prefs);
+      case "prefs":
+        this.put("prefs", ev.prefs);
         return;
-      case 'accounts':
-        this.put('accounts', ev.items);
+      case "accounts":
+        this.put("accounts", ev.items);
         // a sign-in's end: its link is no longer open
-        if (this.signing() !== null) this.put('signing', null);
+        if (this.signing() !== null) this.put("signing", null);
         return;
-      case 'signing':
-        this.put('signing', { id: ev.id, url: ev.url });
+      case "signing":
+        this.put("signing", { id: ev.id, url: ev.url });
         return;
-      case 'found':
-        this.put('found', ev.items);
+      case "found":
+        this.put("found", ev.items);
         return;
-      case 'plugins':
-        this.put(`plugins:${ev.project ?? ''}`, ev.items);
+      case "plugins":
+        this.put(`plugins:${ev.project ?? ""}`, ev.items);
         return;
-      case 'computer_use':
-        this.put('computer_use', ev);
+      case "computer_use":
+        this.put("computer_use", ev);
         return;
-      case 'computer_live':
+      case "computer_live":
         // S29: every agent using computer use now, whole each time
-        this.put('computer_live', ev.items);
+        this.put("computer_live", ev.items);
         return;
-      case 'computer_peek':
+      case "computer_peek":
         // S29: the latest still of that agent replaces the last (memory only)
         this.put(`peek:${ev.key}`, ev);
         return;
-      case 'away_summary':
-        this.put('away', ev);
+      case "away_summary":
+        this.put("away", ev);
         return;
-      case 'commands':
-        this.put('commands', ev.items);
+      case "commands":
+        this.put("commands", ev.items);
         return;
-      case 'roles':
-        this.put('roles', ev.items);
+      case "roles":
+        this.put("roles", ev.items);
         return;
-      case 'skills':
+      case "skills":
         this.put(`skills:${ev.project}`, ev.items);
         return;
-      case 'files':
+      case "files":
         this.filesAnswer(ev);
         return;
-      case 'heard':
+      case "heard":
         // fn's talk: the whole text so far, then all of it (final); the capsule's talk view draws it
-        this.put('heard', { text: ev.text, final: ev.final });
+        this.put("heard", { text: ev.text, final: ev.final });
         return;
-      case 'level':
+      case "level":
         // a meter's input (~30 Hz): only who reads that voice re-renders
-        if (this.slices.get(`level:${ev.who}`) !== ev.v) this.put(`level:${ev.who}`, ev.v);
+        if (this.slices.get(`level:${ev.who}`) !== ev.v)
+          this.put(`level:${ev.who}`, ev.v);
         return;
-      case 'voice_answer':
+      case "voice_answer":
         // bar N14: his talk answered a card in view; the inbox shows it, then answers
-        this.put('voice_answer', ev);
+        this.put("voice_answer", ev);
         return;
-      case 'voice_mode':
+      case "voice_mode":
         // only the window that turned it on gets it (main's routes); its
         // last (on: false) stays until he turns it on again
-        this.put('voice_mode', ev);
+        this.put("voice_mode", ev);
         return;
-      case 'dictation':
+      case "dictation":
         // only the window that started it gets it (main's routes); an id
         // this store never started, or one already over, is ignored
         if (!this.dictating.has(ev.id)) return;
         if (ev.final) this.dictating.delete(ev.id);
-        this.put(`dictation:${ev.id}`, { text: ev.text, final: ev.final, cancelled: ev.cancelled ?? false, error: ev.error ?? null } satisfies Dictation);
+        this.put(`dictation:${ev.id}`, {
+          text: ev.text,
+          final: ev.final,
+          cancelled: ev.cancelled ?? false,
+          error: ev.error ?? null,
+        } satisfies Dictation);
         return;
-      case 'error':
-        if (ev.cmd === 'sign_in' && this.signing() !== null) this.put('signing', null);
+      case "error":
+        if (ev.cmd === "sign_in" && this.signing() !== null)
+          this.put("signing", null);
         // a typed line the hub's router refused (HubCmd slash): his words to fix, as an error line
-        if (ev.cmd === 'slash' && ev.project != null) {
-          this.put(`notice:${ev.project}`, { text: ev.text, level: 'error' } satisfies HubLine);
+        if (ev.cmd === "slash" && ev.project != null) {
+          this.put(`notice:${ev.project}`, {
+            text: ev.text,
+            level: "error",
+          } satisfies HubLine);
           return;
         }
         // a queued message he took back had gone already (delivered, no longer waiting): the hub's words on its row
-        if (ev.cmd === 'queued_take' && ev.project != null) {
+        if (ev.cmd === "queued_take" && ev.project != null) {
           const key = this.takeAsk.get(ev.project);
           if (key !== undefined) {
             this.takeAsk.delete(ev.project);
@@ -480,7 +600,7 @@ export class Store {
           }
         }
         // the hub found no such call or no result yet: that project's last ask says so (asked again on the next open)
-        if (ev.cmd === 'tool_out' && ev.project != null) {
+        if (ev.cmd === "tool_out" && ev.project != null) {
           const key = this.toolAsk.get(ev.project);
           if (key !== undefined) {
             this.toolAsks.delete(key);
@@ -488,62 +608,71 @@ export class Store {
           }
           return;
         }
-        if (ev.cmd !== 'send') return;
+        if (ev.cmd !== "send") return;
         // G: exactly the row with this cid; with no cid (an older core or
         // hub) the oldest sending row of that project, as before
-        if (ev.cid !== undefined && ev.cid !== null) this.failCid(ev.cid, ev.reason ?? 'refused', ev.text);
+        if (ev.cid !== undefined && ev.cid !== null)
+          this.failCid(ev.cid, ev.reason ?? "refused", ev.text);
         else this.failOldest(ev.project ?? null, ev.text);
         return;
-      case 'confirm':
+      case "confirm":
         // a question belongs to the connection that asked: only this window gets it
-        this.put(`confirms:${ev.project}`, [...this.confirms(ev.project).filter((c) => c.id !== ev.id), { project: ev.project, id: ev.id, text: ev.text }]);
+        this.put(`confirms:${ev.project}`, [
+          ...this.confirms(ev.project).filter((c) => c.id !== ev.id),
+          { project: ev.project, id: ev.id, text: ev.text },
+        ]);
         return;
-      case 'notice':
-        this.put(`notice:${ev.project}`, { text: ev.text, level: 'note' } satisfies HubLine);
+      case "notice":
+        this.put(`notice:${ev.project}`, {
+          text: ev.text,
+          level: "note",
+        } satisfies HubLine);
         return;
-      case 'approvals':
+      case "approvals":
         // bar V8/W21: the mode, the checker and the rules, whole each time
         this.put(`approvals:${ev.project}`, ev);
         return;
-      case 'refused':
+      case "refused":
         // a hub's own refusal of a connection: the core reads it and says
         // hub_refused; it never reaches a window as is
         return;
-      case 'index':
+      case "index":
         // ⌘K's index: the projects the core doesn't hold, from their files
-        this.put('index', ev.projects);
+        this.put("index", ev.projects);
         return;
-      case 'setup_first':
+      case "setup_first":
         // R8: his /model needs that provider's setup first (the core holds the line)
-        this.put('setup_first', ev);
+        this.put("setup_first", ev);
         return;
-      case 'keychain':
+      case "keychain":
         // N1: where his keys and sign-ins are kept, and the last /keychain move's lines
-        this.put('keychain', ev);
+        this.put("keychain", ev);
         return;
-      case 'hub_refused':
+      case "hub_refused":
         // a project's hub refused this core: its words until he retries
         this.put(`hub_refused:${ev.project}`, ev.error);
         return;
-      case 'broken':
+      case "broken":
         // this core can start no hub (its runtime is missing): why, for this core's life
-        this.put('broken', ev.reason);
+        this.put("broken", ev.reason);
         return;
-      case 'welcome':
+      case "welcome":
         // its hub took this core (again): no refusal holds
-        if (this.slices.get(`hub_refused:${ev.project}`) != null) this.put(`hub_refused:${ev.project}`, null);
+        if (this.slices.get(`hub_refused:${ev.project}`) != null)
+          this.put(`hub_refused:${ev.project}`, null);
         // a new hello: the hub tied the open questions to a connection
         // that is gone (the core reconnected), so none can be answered
-        if (this.confirms(ev.project).length > 0) this.put(`confirms:${ev.project}`, EMPTY);
+        if (this.confirms(ev.project).length > 0)
+          this.put(`confirms:${ev.project}`, EMPTY);
         return;
-      case 'route':
-      case 'route_done':
-      case 'job_end':
-      case 'followed_end':
-      case 'open':
-      case 'page_changed':
-      case 'card_open':
-      case 'focused':
+      case "route":
+      case "route_done":
+      case "job_end":
+      case "followed_end":
+      case "open":
+      case "page_changed":
+      case "card_open":
+      case "focused":
         // one-shot: read through onEvent (page_changed: a 'v2 published' moment before the next
         // pages; card_open: open that card in the inbox; focused: this connection's thread moved)
         return;
@@ -554,16 +683,18 @@ export class Store {
   setCore(state: CoreState): void {
     if (state === this.coreState) return;
     this.coreState = state;
-    this.emit('core');
+    this.emit("core");
     // a new core knows nothing of the window: what it shows is said again
-    if (state === 'up') this.sayAgain();
-    if (state !== 'down') return;
+    if (state === "up") this.sayAgain();
+    if (state !== "down") return;
     this.commandsAsked = false;
     for (const a of this.asked.values()) a.resolve(null);
     this.asked.clear();
     for (const [key, t] of this.threads) {
-      if (!t.pending.some((p) => p.state === 'sending')) continue;
-      t.pending = t.pending.map((p) => (p.state === 'sending' ? { ...p, state: 'failed', why: 'not sent' } : p));
+      if (!t.pending.some((p) => p.state === "sending")) continue;
+      t.pending = t.pending.map((p) =>
+        p.state === "sending" ? { ...p, state: "failed", why: "not sent" } : p,
+      );
       this.emit(`pending:${key}`);
     }
   }
@@ -574,33 +705,51 @@ export class Store {
    * and merge: an entry already held is replaced only if it changed).
    */
   private sayAgain(): void {
-    if (this.shownSet !== null) this.command({ cmd: 'shown', projects: [...this.shownSet] });
-    if (this.slices.has('commands') || this.commandsAsked) {
+    if (this.shownSet !== null)
+      this.command({ cmd: "shown", projects: [...this.shownSet] });
+    if (this.slices.has("commands") || this.commandsAsked) {
       this.commandsAsked = false;
       this.askCommands();
     }
     for (const s of this.subs.values()) {
-      this.command({ cmd: 'subscribe', project: s.project, agent: s.agent, ...(s.limit === undefined ? {} : { limit: s.limit }) });
+      this.command({
+        cmd: "subscribe",
+        project: s.project,
+        agent: s.agent,
+        ...(s.limit === undefined ? {} : { limit: s.limit }),
+      });
     }
   }
 
   private thread(key: string): Thread {
     let t = this.threads.get(key);
     if (t === undefined) {
-      t = { view: EMPTY_ORDER, byPos: new Map(), typing: '', pending: EMPTY };
+      t = { view: EMPTY_ORDER, byPos: new Map(), typing: "", pending: EMPTY };
       this.threads.set(key, t);
     }
     return t;
   }
 
-  private setOrder(key: string, t: Thread, order: readonly number[], before: number | null, more: boolean): void {
+  private setOrder(
+    key: string,
+    t: Thread,
+    order: readonly number[],
+    before: number | null,
+    more: boolean,
+  ): void {
     const v = t.view;
-    if (v.loaded && v.before === before && v.more === more && sameOrder(v.order, order)) return;
+    if (
+      v.loaded &&
+      v.before === before &&
+      v.more === more &&
+      sameOrder(v.order, order)
+    )
+      return;
     t.view = { order, before, more, loaded: true };
     this.emit(`order:${key}`);
   }
 
-  private page(ev: EvOf<'thread'>): void {
+  private page(ev: EvOf<"thread">): void {
     const key = threadKey(ev.project, ev.agent);
     const t = this.thread(key);
     for (const e of ev.entries) this.putEntry(key, t, e);
@@ -608,14 +757,17 @@ export class Store {
     for (const e of ev.entries) all.add(e.pos);
     const order = [...all].sort((a, b) => a - b);
     // a page of older entries keeps the newer ones; its before/more are the oldest page's
-    const oldest = ev.entries.length === 0 || (t.view.order.length > 0 && (ev.entries[0]?.pos ?? 0) < (t.view.order[0] ?? 0));
+    const oldest =
+      ev.entries.length === 0 ||
+      (t.view.order.length > 0 &&
+        (ev.entries[0]?.pos ?? 0) < (t.view.order[0] ?? 0));
     const fresh = !t.view.loaded;
     const before = fresh || oldest ? ev.before : t.view.before;
     const more = fresh || oldest ? ev.more : t.view.more;
     this.setOrder(key, t, order, before, more);
   }
 
-  private entryEv(ev: EvOf<'entry'>): void {
+  private entryEv(ev: EvOf<"entry">): void {
     const key = threadKey(ev.project, ev.agent);
     const t = this.thread(key);
     const known = t.byPos.has(ev.entry.pos);
@@ -624,7 +776,7 @@ export class Store {
       const order = [...t.view.order, ev.entry.pos].sort((a, b) => a - b);
       this.setOrder(key, t, order, t.view.before, t.view.more);
     }
-    if (ev.entry.kind === 'you') this.landed(key, t, ev.entry);
+    if (ev.entry.kind === "you") this.landed(key, t, ev.entry);
   }
 
   private putEntry(key: string, t: Thread, e: Entry): void {
@@ -634,7 +786,11 @@ export class Store {
     this.emit(`entry:${key}:${String(e.pos)}`);
     // a steer's receipt came (amb-feed 9633cd2a: the entry is re-sent with steered_at): the rows
     // move (the window shows it where the agent read it), so the order's readers recompute
-    if (old !== undefined && t.view.loaded && (old.steered_at ?? null) !== (e.steered_at ?? null)) {
+    if (
+      old !== undefined &&
+      t.view.loaded &&
+      (old.steered_at ?? null) !== (e.steered_at ?? null)
+    ) {
       t.view = { ...t.view };
       this.emit(`order:${key}`);
     }
@@ -645,9 +801,14 @@ export class Store {
     // msg-parts: a send with typed parts comes back with them (the hub's text is the model's
     // template, never the window's): compared by parts; else by words, the hub's image markers
     // ('<image name="[Image #1]" …>') left out (qa-native R41). architect's A1 matches by id later.
-    const typed = e.parts != null && e.parts.length > 0 ? sentParts(e.parts) : null;
+    const typed =
+      e.parts != null && e.parts.length > 0 ? sentParts(e.parts) : null;
     const said = sentWords(e.text);
-    const i = t.pending.findIndex((p) => (typed !== null && p.parts !== undefined ? sentParts(p.parts) === typed : sentWords(p.text) === said));
+    const i = t.pending.findIndex((p) =>
+      typed !== null && p.parts !== undefined
+        ? sentParts(p.parts) === typed
+        : sentWords(p.text) === said,
+    );
     if (i < 0) return;
     t.pending = t.pending.filter((_, j) => j !== i);
     this.emit(`pending:${key}`);
@@ -662,9 +823,11 @@ export class Store {
     for (const [key, t] of this.threads) {
       if (!t.pending.some((p) => p.cid === cid)) continue;
       t.pending =
-        reason === 'undelivered'
+        reason === "undelivered"
           ? t.pending.filter((p) => p.cid !== cid)
-          : t.pending.map((p) => (p.cid === cid ? { ...p, state: 'failed', why } : p));
+          : t.pending.map((p) =>
+              p.cid === cid ? { ...p, state: "failed", why } : p,
+            );
       this.emit(`pending:${key}`);
       return;
     }
@@ -674,13 +837,19 @@ export class Store {
     let oldest: { key: string; t: Thread; p: Pending } | null = null;
     for (const [key, t] of this.threads) {
       for (const p of t.pending) {
-        if (p.state !== 'sending' || (project !== null && p.project !== project)) continue;
+        if (
+          p.state !== "sending" ||
+          (project !== null && p.project !== project)
+        )
+          continue;
         if (oldest === null || p.cid < oldest.p.cid) oldest = { key, t, p };
       }
     }
     if (oldest === null) return;
     const { key, t, p } = oldest;
-    t.pending = t.pending.map((x) => (x.cid === p.cid ? { ...x, state: 'failed', why } : x));
+    t.pending = t.pending.map((x) =>
+      x.cid === p.cid ? { ...x, state: "failed", why } : x,
+    );
     this.emit(`pending:${key}`);
   }
 
@@ -688,8 +857,10 @@ export class Store {
 
   command(cmd: CoreCmd): void {
     // a new talk starts with nothing heard
-    if (cmd.cmd === 'talk_start' && this.slices.get('heard') != null) this.put('heard', null);
-    if (cmd.cmd === 'slash' && cmd.line.trim().startsWith('/model ')) this.modelSentAt = this.now();
+    if (cmd.cmd === "talk_start" && this.slices.get("heard") != null)
+      this.put("heard", null);
+    if (cmd.cmd === "slash" && cmd.line.trim().startsWith("/model "))
+      this.modelSentAt = this.now();
     this.port?.send(cmd);
   }
 
@@ -706,23 +877,23 @@ export class Store {
 
   /** Each role's model and effort (V17; set with command({cmd: 'role_set', role, model?, effort?})). */
   roles(): readonly RoleRow[] {
-    return this.slice('roles', EMPTY);
+    return this.slice("roles", EMPTY);
   }
   /** The `/` list (the TUI's commands.rs), asked once from each core. */
   commands(): readonly PickCommand[] {
-    return this.slice('commands', EMPTY);
+    return this.slice("commands", EMPTY);
   }
   askCommands(): void {
     if (this.commandsAsked) return;
     this.commandsAsked = true;
-    this.command({ cmd: 'commands' });
+    this.command({ cmd: "commands" });
   }
   /** A workspace's `$` list (the TUI's skills.rs); askSkills reads it again. */
   skills(project: string): readonly PickSkill[] {
     return this.slice(`skills:${project}`, EMPTY);
   }
   askSkills(project: string): void {
-    this.command({ cmd: 'skills', project });
+    this.command({ cmd: "skills", project });
   }
   /**
    * An `@` query's rows, ranked by the core (the TUI's files.rs). Resolves
@@ -730,27 +901,35 @@ export class Store {
    * then lands in useFiles(project)), or null when a newer query of the
    * project replaced it or the core went down.
    */
-  files(project: string, q: string, limit?: number): Promise<FilesAnswer | null> {
+  files(
+    project: string,
+    q: string,
+    limit?: number,
+  ): Promise<FilesAnswer | null> {
     return this.askFiles(project, q, limit);
   }
   /** R14: he took `path` (as `files` answered it; a file, never a folder he browsed) from `project`'s @ list: it ranks first in that list's next answers. */
   filePicked(project: string, path: string): void {
-    this.command({ cmd: 'file_picked', project, path });
+    this.command({ cmd: "file_picked", project, path });
   }
   /** R8: the last /model the core holds until its provider works (amb-home's setup opens on it), or null. */
-  setupFirst(): EvOf<'setup_first'> | null {
-    return this.slice<EvOf<'setup_first'> | null>('setup_first', null);
+  setupFirst(): EvOf<"setup_first"> | null {
+    return this.slice<EvOf<"setup_first"> | null>("setup_first", null);
   }
   /** Why this core can start no hub (CoreEv broken: its runtime is missing); null: it can. */
   broken(): string | null {
-    return this.slice<string | null>('broken', null);
+    return this.slice<string | null>("broken", null);
   }
 
   /** N1: where his keys and sign-ins are (the core's keychain event); none yet: null */
-  keychain(): EvOf<'keychain'> | null {
-    return this.slice<EvOf<'keychain'> | null>('keychain', null);
+  keychain(): EvOf<"keychain"> | null {
+    return this.slice<EvOf<"keychain"> | null>("keychain", null);
   }
-  private askFiles(project: string, q: string, limit?: number): Promise<FilesAnswer | null> {
+  private askFiles(
+    project: string,
+    q: string,
+    limit?: number,
+  ): Promise<FilesAnswer | null> {
     this.rid += 1;
     const rid = this.rid;
     for (const [r, a] of this.asked) {
@@ -761,7 +940,13 @@ export class Store {
     this.newestRid.set(project, rid);
     return new Promise((resolve) => {
       this.asked.set(rid, { project, resolve });
-      this.command({ cmd: 'files', project, q, rid, ...(limit === undefined ? {} : { limit }) });
+      this.command({
+        cmd: "files",
+        project,
+        q,
+        rid,
+        ...(limit === undefined ? {} : { limit }),
+      });
     });
   }
   /** The newest `@` answer of a project (a partial one, then the full one). */
@@ -769,10 +954,15 @@ export class Store {
     return this.slice<FilesAnswer | null>(`files:${project}`, null);
   }
 
-  private filesAnswer(ev: EvOf<'files'>): void {
+  private filesAnswer(ev: EvOf<"files">): void {
     // an older query's late answer never replaces a newer one's
     if (ev.rid !== this.newestRid.get(ev.project)) return;
-    const a: FilesAnswer = { q: ev.q, items: ev.items, folder: ev.folder ?? null, partial: ev.partial ?? false };
+    const a: FilesAnswer = {
+      q: ev.q,
+      items: ev.items,
+      folder: ev.folder ?? null,
+      partial: ev.partial ?? false,
+    };
     this.put(`files:${ev.project}`, a);
     const asked = this.asked.get(ev.rid);
     if (asked === undefined) return;
@@ -787,23 +977,23 @@ export class Store {
    * state has on: false and the note).
    */
   voiceMode(project: string, agent: string, on: boolean): void {
-    this.command({ cmd: 'voice_mode', project, agent, on });
+    this.command({ cmd: "voice_mode", project, agent, on });
   }
   /** His mic off (m) or on again; the agent still speaks. */
   voiceMute(on: boolean): void {
-    this.command({ cmd: 'voice_mute', on });
+    this.command({ cmd: "voice_mute", on });
   }
   /** He types (tab): the mic waits; his normal send to that agent gets its answer said. */
   voiceType(on: boolean): void {
-    this.command({ cmd: 'voice_type', on });
+    this.command({ cmd: "voice_type", on });
   }
   /** What he said goes now (the TUI's space tap). */
   voiceSend(): void {
-    this.command({ cmd: 'voice_send' });
+    this.command({ cmd: "voice_send" });
   }
   /** Cut the agent off: its voice stops, its running turn is stopped. */
   voiceCut(): void {
-    this.command({ cmd: 'voice_cut' });
+    this.command({ cmd: "voice_cut" });
   }
   /**
    * ⌘K's index (core/index.rs): every project the core doesn't hold now,
@@ -812,10 +1002,10 @@ export class Store {
    * change, at most every 5 s.
    */
   index(): readonly IndexRow[] {
-    return this.slice('index', EMPTY);
+    return this.slice("index", EMPTY);
   }
   askIndex(): void {
-    this.command({ cmd: 'index' });
+    this.command({ cmd: "index" });
   }
   /** Why a project's hub refused this core (its words), or null. */
   hubRefused(project: string): string | null {
@@ -823,30 +1013,63 @@ export class Store {
   }
   /** Try a refused project's hub again (his click): the core connects once more. */
   hubRetry(project: string): void {
-    this.command({ cmd: 'hub_retry', project });
+    this.command({ cmd: "hub_retry", project });
   }
   voiceModeNow(): VoiceModeState | null {
-    return this.slice<VoiceModeState | null>('voice_mode', null);
+    return this.slice<VoiceModeState | null>("voice_mode", null);
   }
 
   dictateStart(): string {
     this.cid += 1;
     const id = `d${String(this.cid)}-${String(this.now())}`;
     this.dictating.add(id);
-    this.put(`dictation:${id}`, { text: '', final: false, cancelled: false, error: null } satisfies Dictation);
-    this.command({ cmd: 'dictate_start', id });
+    this.put(`dictation:${id}`, {
+      text: "",
+      final: false,
+      cancelled: false,
+      error: null,
+    } satisfies Dictation);
+    this.command({ cmd: "dictate_start", id });
     return id;
   }
-  /** The mic off; the final words come in one last `dictation`. */
+  /**
+   * The mic off; the final words come in one last `dictation`. A core that never answers (its mic
+   * stuck opening, the start lost) never leaves 'listening…' up: after DICTATE_STOP_WAIT_MS the
+   * dictation ends here with the words it has and a note (amb-tools' run on the cut, m_20100).
+   */
   dictateStop(id: string): void {
-    if (this.dictating.has(id)) this.command({ cmd: 'dictate_stop', id });
+    if (!this.dictating.has(id)) return;
+    this.command({ cmd: "dictate_stop", id });
+    setTimeout(() => {
+      if (!this.dictating.has(id)) return;
+      this.dictating.delete(id);
+      this.put(`dictation:${id}`, {
+        text: this.dictation(id)?.text ?? "",
+        final: true,
+        cancelled: false,
+        error: "the mic didn't answer.",
+      } satisfies Dictation);
+    }, DICTATE_STOP_WAIT_MS);
   }
+  /** esc: the dictation is over at once, here; the core is told, its late answer is ignored
+   *  (a core that never answers leaves nothing up). */
   dictateCancel(id: string): void {
-    if (this.dictating.has(id)) this.command({ cmd: 'dictate_cancel', id });
+    if (!this.dictating.has(id)) return;
+    this.command({ cmd: "dictate_cancel", id });
+    this.dictating.delete(id);
+    this.put(`dictation:${id}`, {
+      text: "",
+      final: true,
+      cancelled: true,
+      error: null,
+    } satisfies Dictation);
   }
   /** fn's talk: what bise heard so far (the whole text; final once the talk ended), null before a talk. */
   heard(): { readonly text: string; readonly final: boolean } | null {
-    return this.slice<{ readonly text: string; readonly final: boolean } | null>('heard', null);
+    return this.slice<{
+      readonly text: string;
+      readonly final: boolean;
+    } | null>("heard", null);
   }
   /** A voice's loudness now, 0..1: 'you' (the mic), 'main' (its spoken answer). */
   level(who: string): number {
@@ -861,14 +1084,23 @@ export class Store {
    * files: absolute paths he attached; the hub renders them once after his
    * words (an image as one the model sees, any other file by its path).
    */
-  send(a: { project: string; agent: string; text: string; mode?: Mode; files?: readonly string[]; parts?: readonly Part[] }): number {
+  send(a: {
+    project: string;
+    agent: string;
+    text: string;
+    mode?: Mode;
+    files?: readonly string[];
+    parts?: readonly Part[];
+  }): number {
     const key = threadKey(a.project, a.agent);
     const t = this.thread(key);
     this.cid += 1;
-    const mode = a.mode ?? 'now';
-    const files = a.files !== undefined && a.files.length > 0 ? [...a.files] : undefined;
+    const mode = a.mode ?? "now";
+    const files =
+      a.files !== undefined && a.files.length > 0 ? [...a.files] : undefined;
     // msg-parts: his message typed (quotes, words, pastes); the hub renders the model's text from them
-    const parts = a.parts !== undefined && a.parts.length > 0 ? [...a.parts] : undefined;
+    const parts =
+      a.parts !== undefined && a.parts.length > 0 ? [...a.parts] : undefined;
     const p: Pending = {
       cid: this.cid,
       project: a.project,
@@ -878,27 +1110,43 @@ export class Store {
       ...(files === undefined ? {} : { files }),
       ...(parts === undefined ? {} : { parts }),
       at_ms: this.now(),
-      state: 'sending',
+      state: "sending",
     };
     t.pending = [...t.pending, p];
     this.emit(`pending:${key}`);
-    if (this.coreState === 'down') {
-      this.failOldest(a.project, 'not sent');
+    if (this.coreState === "down") {
+      this.failOldest(a.project, "not sent");
       return p.cid;
     }
     // G: the cid goes along; the core or the hub echoes it on this send's error
-    this.command({ cmd: 'send', project: a.project, agent: a.agent, text: a.text, mode, ...(files === undefined ? {} : { files }), ...(parts === undefined ? {} : { parts }), cid: p.cid });
+    this.command({
+      cmd: "send",
+      project: a.project,
+      agent: a.agent,
+      text: a.text,
+      mode,
+      ...(files === undefined ? {} : { files }),
+      ...(parts === undefined ? {} : { parts }),
+      cid: p.cid,
+    });
     return p.cid;
   }
 
   /** A failed send goes again (same words, same mode), as a new pending row. */
   retry(key: string, cid: number): void {
     const t = this.threads.get(key);
-    const p = t?.pending.find((x) => x.cid === cid && x.state === 'failed');
+    const p = t?.pending.find((x) => x.cid === cid && x.state === "failed");
     if (t === undefined || p === undefined) return;
     t.pending = t.pending.filter((x) => x.cid !== cid);
     this.emit(`pending:${key}`);
-    this.send({ project: p.project, agent: p.agent, text: p.text, mode: p.mode, ...(p.files === undefined ? {} : { files: p.files }), ...(p.parts === undefined ? {} : { parts: p.parts }) });
+    this.send({
+      project: p.project,
+      agent: p.agent,
+      text: p.text,
+      mode: p.mode,
+      ...(p.files === undefined ? {} : { files: p.files }),
+      ...(p.parts === undefined ? {} : { parts: p.parts }),
+    });
   }
 
   /** Drops a failed send (he gave up on it). */
@@ -918,32 +1166,56 @@ export class Store {
     const set = [...new Set(projects)];
     if (this.shownSet !== null && sameStrings(this.shownSet, set)) return;
     this.shownSet = set;
-    this.command({ cmd: 'shown', projects: set });
+    this.command({ cmd: "shown", projects: set });
   }
 
   /** A thread's newest page then its live entries; kept, and asked again of a core that comes back up. */
   subscribeThread(project: string, agent: string, limit?: number): void {
     this.subs.set(threadKey(project, agent), { project, agent, limit });
-    this.command({ cmd: 'subscribe', project, agent, ...(limit === undefined ? {} : { limit }) });
+    this.command({
+      cmd: "subscribe",
+      project,
+      agent,
+      ...(limit === undefined ? {} : { limit }),
+    });
   }
   unsubscribeThread(project: string, agent: string): void {
     this.subs.delete(threadKey(project, agent));
-    this.command({ cmd: 'unsubscribe', project, agent });
+    this.command({ cmd: "unsubscribe", project, agent });
   }
   /** The page before the oldest entry held (nothing when there is no more). */
   olderPage(project: string, agent: string, limit?: number): void {
     const v = this.threadOrder(threadKey(project, agent));
     if (!v.more || v.before === null) return;
-    this.command({ cmd: 'page', project, agent, before: v.before, ...(limit === undefined ? {} : { limit }) });
+    this.command({
+      cmd: "page",
+      project,
+      agent,
+      before: v.before,
+      ...(limit === undefined ? {} : { limit }),
+    });
   }
   /** His answer to card `card`: its words, and the images he pasted or dropped (R41: absolute paths, as a send's files). */
-  answer(project: string, card: number, reply: string, files?: readonly string[], parts?: readonly Part[]): void {
-    this.command({ cmd: 'answer', project, card, reply, ...(files !== undefined && files.length > 0 ? { files: [...files] } : {}), ...(parts !== undefined && parts.length > 0 ? { parts: [...parts] } : {}) });
+  answer(
+    project: string,
+    card: number,
+    reply: string,
+    files?: readonly string[],
+    parts?: readonly Part[],
+  ): void {
+    this.command({
+      cmd: "answer",
+      project,
+      card,
+      reply,
+      ...(files !== undefined && files.length > 0 ? { files: [...files] } : {}),
+      ...(parts !== undefined && parts.length > 0 ? { parts: [...parts] } : {}),
+    });
   }
   /** His answer to the hub's yes/no question (a no's line comes back as a notice). */
   confirm(project: string, id: number, yes: boolean): void {
     this.dropConfirm(project, id);
-    this.command({ cmd: 'confirm', project, id, yes });
+    this.command({ cmd: "confirm", project, id, yes });
   }
   /** Put off (esc): the question leaves the window; the hub holds nothing for it, a later command asks again. */
   putOff(project: string, id: number): void {
@@ -951,17 +1223,49 @@ export class Store {
   }
   private dropConfirm(project: string, id: number): void {
     const now = this.confirms(project);
-    if (now.some((c) => c.id === id)) this.put(`confirms:${project}`, now.filter((c) => c.id !== id));
+    if (now.some((c) => c.id === id))
+      this.put(
+        `confirms:${project}`,
+        now.filter((c) => c.id !== id),
+      );
   }
   /** Close a card without answering it (the TUI's /close N). */
   close(project: string, card: number): void {
-    this.command({ cmd: 'close', project, card });
+    this.command({ cmd: "close", project, card });
   }
   stop(project: string, agent: string): void {
-    this.command({ cmd: 'stop', project, agent });
+    this.command({ cmd: "stop", project, agent });
   }
 }
 
 // the store's shapes and helpers live in types.ts; importers keep reading them here
-export { TAGS, diffKey, sentParts, sentWords, takeKey, threadKey, toolOutKey, typed } from './types';
-export type { Away, AwayProject, BranchesList, Confirm, Dictation, Diff, Ev, EvOf, FilesAnswer, HubLine, PagesList, Pending, PrsList, QueuedTake, ThreadOrder, ToolOut, VersionsList, VoiceModeState } from './types';
+export {
+  TAGS,
+  diffKey,
+  sentParts,
+  sentWords,
+  takeKey,
+  threadKey,
+  toolOutKey,
+  typed,
+} from "./types";
+export type {
+  Away,
+  AwayProject,
+  BranchesList,
+  Confirm,
+  Dictation,
+  Diff,
+  Ev,
+  EvOf,
+  FilesAnswer,
+  HubLine,
+  PagesList,
+  Pending,
+  PrsList,
+  QueuedTake,
+  ThreadOrder,
+  ToolOut,
+  VersionsList,
+  VoiceModeState,
+} from "./types";
