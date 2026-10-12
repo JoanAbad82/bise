@@ -44,6 +44,12 @@ def main():
         c.wait_status("main", "idle", 60)
         c.say('[[bash: sb spawn t1 --objective "stay"]]')
         c.wait(lambda: c.agent("t1") is not None, 60, "t1 exists")
+        # t1's automatic reply in main's thread, and main idle after it:
+        # an idle main and t1 can come before that reply reaches main
+        # (core-r m_19094, red 2 of 3 alone): the say below then steered
+        # main's turn on it and the fake model answered the reply, never
+        # running the sb every line
+        c.wait(lambda: any(l.startswith("sb msg-in : t1 ") for l in c.lines("main")), 60, "t1's reply in main")
         c.wait_idle("main", "t1")
         # a one-shot timer for t1, due after the restart: sb-core holds it
         # (core-timers), so it must come back from the journal and fire once
@@ -84,6 +90,9 @@ def main():
         ok = True
         print("PASS core_restart")
     finally:
+        if not ok:
+            # a red run keeps its hub (main's transcript says what ran)
+            os.environ["SB_KEEP"] = "1"
         if not ok and E.hub:
             print(open(os.path.join(E.tmp, "hub.stderr")).read()[-2000:])
         E.close()
