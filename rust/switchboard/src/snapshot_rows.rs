@@ -67,10 +67,10 @@ impl Kept {
 
 /// What the rows read of the messages, by agent: queued count, the
 /// user's queued inputs, the questions waiting for it. Built from one
-/// [`Waiting`] when `State::msgs_rev` moves (like contexts.rs).
+/// [`Waiting`] at each snapshot: it walks the hot messages only (0.11 ms
+/// on his journal copy, hot-view sha 2c), no longer worth keeping.
 #[derive(Debug, Default)]
 struct Mail {
-    rev: Option<u64>,
     queued: BTreeMap<String, usize>,
     inputs: BTreeMap<String, Vec<Value>>,
     unanswered: BTreeMap<String, usize>,
@@ -86,13 +86,10 @@ pub struct Rows {
 }
 
 impl Rows {
-    /// Bring the messages' part up to `st` (one pass when they changed).
+    /// Bring the messages' part up to `st` (one pass over the hot ones).
     pub fn mail(&mut self, st: &State) {
-        if self.mail.rev == Some(st.msgs_rev()) {
-            return;
-        }
         let w = Waiting::of(st);
-        let mut m = Mail { rev: Some(st.msgs_rev()), ..Mail::default() };
+        let mut m = Mail::default();
         for a in st.agents.keys() {
             let (q, i, u) = (w.queued_count(a), w.queued_inputs(a), w.unanswered(a).len());
             if q > 0 {

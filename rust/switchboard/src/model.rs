@@ -331,9 +331,9 @@ pub struct State {
     pub agents: BTreeMap<String, Agent>,
     pub order: Vec<String>,
     /// The messages, their states and the settled ones: written only by
-    /// [`State::put_msg`] and [`State::clear_msgs`], which bump
-    /// `msgs_rev`, so a cache of what is built from them (contexts.rs)
-    /// knows when it is stale. Read with [`State::msgs`] and siblings.
+    /// [`State::put_msg`] and [`State::clear_msgs`], which keep the
+    /// indexes built from them (`threads`, `hot`). Read with
+    /// [`State::msgs`] and siblings.
     ///
     /// Every message stays here, delivered and owing nothing included:
     /// three readers still ask for such a cold one (issue 21): the
@@ -344,7 +344,6 @@ pub struct State {
     msgs: BTreeMap<u64, Msg>,
     msg_state: BTreeMap<u64, MsgState>,
     settled: BTreeSet<u64>,
-    msgs_rev: u64,
     /// main's `<agent_threads>`, kept by the same writer (board::Threads)
     threads: crate::board::Threads,
     /// the hot messages: what sb-core's view says of each (queued, or
@@ -427,16 +426,9 @@ impl State {
         &self.settled
     }
 
-    /// Bumped at each write of the messages: equal revisions, equal
-    /// messages, states and settled set.
-    pub fn msgs_rev(&self) -> u64 {
-        self.msgs_rev
-    }
-
     /// The one writer of a message: its row, its state (None: unchanged),
     /// whether a reply settled it, and what sb-core says of it (`hot`).
     pub fn put_msg(&mut self, m: Msg, state: Option<MsgState>, settled: bool, hot: Hot) {
-        self.msgs_rev += 1;
         if hot.queued || hot.owes {
             self.hot.insert(m.id, hot);
         } else {
@@ -460,7 +452,6 @@ impl State {
 
     /// Forget every message (a view that carries them all).
     pub fn clear_msgs(&mut self) {
-        self.msgs_rev += 1;
         self.msgs.clear();
         self.msg_state.clear();
         self.settled.clear();

@@ -9,15 +9,16 @@
 //! every context at each input took 29 ms, 26 of them in the two walks of
 //! every message (main's `<agent_threads>`, everyone's questions), though
 //! a REPL tool line changes no message. Here:
-//! - main's `<agent_threads>` are not kept here: State keeps them as the
-//!   messages arrive (board::Threads, hot-view sha 2a), a read is cheap;
-//! - each agent's questions are kept until `State::msgs_rev` moves. They
-//!   read the messages, their states and the settled set, nothing of the
-//!   agents (names are the messages' own `from`/`to`), so the revision is
-//!   their whole key;
+//! - the message-derived parts are no longer kept here (hot-view sha 2a,
+//!   2b, 2c): main's `<agent_threads>` are kept by State's writer
+//!   (board::Threads), each agent's questions come from the hot messages
+//!   only (sb-core's view says which, board::Waiting); both are built at
+//!   each refresh, under 1 ms together on his journal copy;
 //! - a task's context is rebuilt only when the roster rows (with their
 //!   ages, so the bytes equal a fresh build at any instant), its parent or
-//!   the messages changed: those are all [`board::task_context`] reads;
+//!   its questions changed: those are all [`board::task_context`] reads.
+//!   This part still pays: every context from nothing is 3.7 ms on his
+//!   copy (34 active of 529 agents);
 //! - main's is rebuilt at each input (it shows each task's activity, which
 //!   every tool line changes), from the kept threads and questions.
 //!
@@ -36,26 +37,20 @@ type Row = (String, Option<String>, String);
 pub struct Contexts {
     /// What each agent's REPL has: the last text pushed.
     texts: BTreeMap<String, String>,
-    /// The revision of the messages `questions` were built from (None:
-    /// never built).
-    msgs_rev: Option<u64>,
-    questions: BTreeMap<String, Vec<String>>,
     /// The roster rows of the last input.
     rows: Vec<Row>,
-    /// Each task's parent and messages' revision at its last build.
-    keys: BTreeMap<String, (Option<String>, u64)>,
+    /// Each task's parent and questions at its last build.
+    keys: BTreeMap<String, (Option<String>, Vec<String>)>,
 }
 
 impl Contexts {
     /// The contexts this state changes, (agent, its new text) each, in
     /// the agents' name order; they are kept as what the REPLs have.
     pub fn refresh(&mut self, st: &State, now: u64, models: &Models) -> Vec<(String, String)> {
-        let rev = st.msgs_rev();
-        if self.msgs_rev != Some(rev) {
-            self.questions = Waiting::of(st).questions();
-            self.msgs_rev = Some(rev);
-        }
-        // kept by State's writer (board::Threads): no cache here
+        // both built fresh: Waiting walks the hot messages only, the
+        // threads are kept by State's writer (0.55 and 0.41 ms on his
+        // journal copy, hot-view sha 2c)
+        let questions_of = Waiting::of(st).questions();
         let threads = board::agent_threads(st, 8);
         let group = Group::of(st, now, models);
         let rows = group.rows();
@@ -65,11 +60,11 @@ impl Contexts {
         }
         let mut changed = Vec::new();
         for a in st.agents.values().filter(|a| a.lifecycle == Lifecycle::Active) {
-            let questions = self.questions.get(&a.name).map_or(&[][..], Vec::as_slice);
+            let questions = questions_of.get(&a.name).map_or(&[][..], Vec::as_slice);
             let text = if a.name == MAIN {
                 board::main_context(st, now, &threads, questions)
             } else {
-                let key = (a.parent.clone(), rev);
+                let key = (a.parent.clone(), questions.to_vec());
                 if same_rows && self.keys.get(&a.name) == Some(&key) {
                     continue;
                 }
