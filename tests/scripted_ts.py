@@ -50,8 +50,7 @@ def jsrt_env():
                        capture_output=True, text=True)
     p = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ""
     if r.returncode != 0 or not os.path.exists(p):
-        sys.exit("FAIL no bend-jsrt of this tree: scripts/bins.sh path bend-jsrt said
-" + r.stderr[-2000:])
+        sys.exit("FAIL no bend-jsrt of this tree: scripts/bins.sh path bend-jsrt said: " + r.stderr[-2000:])
     return {"BEND_JSRT_BIN": p}
 
 # the calling agent's variables (its run/ and tmp/bg too: its REPL's
