@@ -76,7 +76,8 @@ HISDATA="$HOME/Library/Application Support/bise try"
 libgate() {
   local out; out=$($RS libsnap --out $O/after-$1.json --diff $O/before.json) && return 0
   echo "$out"
-  local other; other=$(echo "$out" | sed -n 's/^  //p' | grep -vF "$HISDATA/" | grep -v '^$')
+  # (the folder's own line counts as his userData too: run 4 stopped on it)
+  local other; other=$(echo "$out" | sed -n 's/^  //p' | grep -vF "$HISDATA/" | grep -vxF "$HISDATA" | grep -v '^$')
   if [ -z "$other" ] && [ -n "$(hispids)" ]; then
     local pids; pids=$(sort -u $O/pids.txt | tr '\n' ',' | sed 's/,$//')
     local ourfd; ourfd=$([ -n "$pids" ] && lsof -n -P -Fn -p "$pids" 2>/dev/null | sed -n 's/^n//p' | grep -F "$HISDATA/")
