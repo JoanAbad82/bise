@@ -20,7 +20,7 @@
 //! `cargo test -p bise-proto --test core_gen` fails when a file is stale;
 //! `BISE_PROTO_BLESS=1` writes them.
 
-use bise_proto::core::{fx, link, Feed, FieldKind, Fx, In, Kind, Link, Step, Table};
+use bise_proto::core::{fx, link, Feed, FieldKind, Fx, In, Kind, Link, Step, Table, VIEW};
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -100,8 +100,22 @@ fn bend_ty(k: FieldKind) -> &'static str {
         Strs => "List<&2, String>",
         OptStrsOmit => "Maybe<&2, List<&2, String>>",
         Nats => "List<&2, Nat>",
-        Jsons => "List<&2, J.Json>",
+        Jsons | Recs(_) => "List<&2, J.Json>",
         Msgs => "List<&2, K.Delivered>",
+        OptJsonsOmit => "Maybe<&2, List<&2, J.Json>>",
+    }
+}
+
+/// sb-core decodes only fields whose kind's default is theirs: a declared
+/// default (`= 1`) or a kind made for the view has no Bend decode.
+fn decodable(k: &Kind) {
+    for f in k.fields {
+        assert!(
+            f.default.is_none() && !matches!(f.kind, FieldKind::Recs(_) | FieldKind::OptJsonsOmit),
+            "{}.{}: no Bend decode for this field",
+            k.rust,
+            f.name
+        );
     }
 }
 
@@ -120,6 +134,7 @@ fn decode(k: FieldKind, name: &str) -> String {
         Nats => format!("K.get_ns(i, \"{name}\")"),
         Jsons => format!("K.get_js(i, \"{name}\")"),
         Msgs => format!("K.get_ms(i, \"{name}\")"),
+        Recs(_) | OptJsonsOmit => unreachable!("{name}: a view field, never decoded (decodable)"),
     }
 }
 
@@ -134,6 +149,7 @@ fn default(k: FieldKind) -> &'static str {
         OptStr | OptStrOmit | OptNat | OptNatOmit | OptStrsOmit => "None{}",
         Json => "J.JNull{}",
         Strs | Nats | Jsons | Msgs => "Nil{}",
+        Recs(_) | OptJsonsOmit => unreachable!("a view field, never decoded (decodable)"),
     }
 }
 
@@ -154,8 +170,9 @@ fn encode(k: FieldKind, name: &str, v: &str) -> Result<String, String> {
         Json => Ok(format!("J.kv(\"{name}\", {v})")),
         Strs => Ok(format!("J.kv(\"{name}\", J.JArr{{K.jstrs({v})}})")),
         Nats => Ok(format!("J.kv(\"{name}\", J.JArr{{K.jnats({v})}})")),
-        Jsons => Ok(format!("J.kv(\"{name}\", J.JArr{{{v}}})")),
+        Jsons | Recs(_) => Ok(format!("J.kv(\"{name}\", J.JArr{{{v}}})")),
         Msgs => Ok(format!("J.kv(\"{name}\", J.JArr{{K.jmsgs({v})}})")),
+        OptJsonsOmit => Err(format!("K.omit_mjs(\"{name}\", {v})")),
     }
 }
 
@@ -241,6 +258,7 @@ fn codec(g: &Gen) -> String {
     header(&mut s, &format!("{}: bise_proto::core::{} (tag \"{}\"), its decode and encode.", g.file, t.name, t.tag_key));
     writeln!(s, "\nimport ./kit.bend as K\n").unwrap();
     let recs = records(t);
+    recs.iter().for_each(|k| decodable(k));
     writeln!(s, "type {} is Data:", g.ty).unwrap();
     for k in &recs {
         let fs: Vec<String> = k.fields.iter().map(|f| format!("{}: {}", var(f.name), bend_ty(f.kind))).collect();
@@ -327,6 +345,7 @@ fn codec(g: &Gen) -> String {
 /// laws) and its encoder `answer_<tag>`, the object main.bend writes.
 fn answer(s: &mut String) {
     let t = &link::ANSWER;
+    t.kinds.iter().for_each(decodable);
     writeln!(s, "# ---- sb-core's answer: bise_proto::core::link::Answer (untagged: its keys").unwrap();
     writeln!(s, "# say which shape) ----\n").unwrap();
     writeln!(s, "type Answer is Data:").unwrap();
@@ -374,6 +393,27 @@ fn feed_codec() -> String {
             format!("K.cat([{}])", parts.join(", "))
         };
         writeln!(s, "def {}({}) -> J.Json:\n  J.obj({body})\n", k.tag.replace('-', "_"), ps.join(", ")).unwrap();
+    }
+    s
+}
+
+/// `view.bend`: one encoder per record of sb-core's view (`VIEW`,
+/// untagged), its JSON object in wire order; a `Recs` field takes the
+/// items its record's encoder built. No decoder, no law: sb-core never
+/// reads a view (proven Rust-side, src/core/tests.rs).
+fn view_codec() -> String {
+    let t = VIEW;
+    let mut s = String::new();
+    header(&mut s, "view: bise_proto::core::view (untagged), one encoder per record of sb-core's view.");
+    writeln!(s, "
+import ./kit.bend as K
+").unwrap();
+    for k in t.kinds {
+        let ps: Vec<String> = k.fields.iter().map(|f| format!("+{}: {}", var(f.name), bend_ty(f.kind))).collect();
+        writeln!(s, "# {} ({})", k.rust, k.bend).unwrap();
+        writeln!(s, "def {}({}) -> J.Json:
+  J.obj({})
+", k.tag, ps.join(", "), kv_fields(None, k)).unwrap();
     }
     s
 }
@@ -538,6 +578,13 @@ def omit_mss(+k: String, m: Maybe<&2, List<&2, String>>) -> List<&2, Sigma<&2, &
       Nil{}
     case Some{+xs}:
       [J.kv(k, J.JArr{jstrs(xs)})]
+
+def omit_mjs(+k: String, m: Maybe<&2, List<&2, J.Json>>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match m:
+    case None{}:
+      Nil{}
+    case Some{+xs}:
+      [J.kv(k, J.JArr{xs})]
 
 def cat(xss: List<&2, List<&2, Sigma<&2, &2, String, _ => J.Json>>>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   match xss:
@@ -726,6 +773,7 @@ fn files() -> BTreeMap<String, String> {
         out.insert(format!("bend/hub/gen/{}.bend", g.file), codec(&g));
     }
     out.insert("bend/hub/gen/feed.bend".into(), feed_codec());
+    out.insert("bend/hub/gen/view.bend".into(), view_codec());
     out.insert("bend/hub/gen/laws.bend".into(), laws());
     out
 }

@@ -8,7 +8,7 @@
 
 use super::core_fx::{self, Plain};
 use super::*;
-use bise_proto::core::link::{ANeed, Answer};
+use bise_proto::core::link::{ANeed, AStep, Answer};
 use bise_proto::core::{fx as cfx, Fx as CoreFx, In};
 
 impl Hub {
@@ -48,27 +48,33 @@ impl Hub {
                 // not a step's answer (a newer sb-core?): nothing applied
                 other => return eprintln!("sb-core: not a step's answer (skipped): {}", other.to_value()),
             };
-            if s.dirty {
-                self.dirty = true;
+            return self.apply_step(fx, env, client, k0, s);
+        }
+    }
+
+    /// A committed step's answer: its view into the mirror, then its
+    /// effects. A view that doesn't decode is logged (load_view): the
+    /// effects still run, the journal's included.
+    pub(super) fn apply_step(&mut self, fx: &mut Fx, env: &mut dyn Env, client: Option<ClientId>, k0: usize, s: AStep) {
+        if s.dirty {
+            self.dirty = true;
+        }
+        // the state after the step first: the deliveries render from it
+        self.load_view(&s.view);
+        for f in s.fx {
+            match core_fx::read(f) {
+                Plain::Effect(e) => fx.push(e),
+                Plain::Nothing => {}
+                Plain::Hub(f) => self.effect(fx, env, client, f),
+                Plain::Skip(why) => eprintln!("{}", why),
             }
-            // the state after the step first: the deliveries render from it
-            self.load_view(&s.view);
-            for f in s.fx {
-                match core_fx::read(f) {
-                    Plain::Effect(e) => fx.push(e),
-                    Plain::Nothing => {}
-                    Plain::Hub(f) => self.effect(fx, env, client, f),
-                    Plain::Skip(why) => eprintln!("{}", why),
-                }
-            }
-            // event-wake: a watch that ended (but by a hit, whose facts
-            // its input carries: core_wake.rs) gets its thread's line
-            self.wake_lines(fx, k0, None);
-            // a timer without a name: its small-model call (every_name.rs)
-            if let Some((id, request)) = self.timer_names.next(&self.st.timers) {
-                fx.push(Effect::AskTimerName { id, request });
-            }
-            return;
+        }
+        // event-wake: a watch that ended (but by a hit, whose facts
+        // its input carries: core_wake.rs) gets its thread's line
+        self.wake_lines(fx, k0, None);
+        // a timer without a name: its small-model call (every_name.rs)
+        if let Some((id, request)) = self.timer_names.next(&self.st.timers) {
+            fx.push(Effect::AskTimerName { id, request });
         }
     }
 

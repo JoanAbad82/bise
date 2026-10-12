@@ -22,7 +22,7 @@ use crate::role;
 use crate::router::{self, UserCmd};
 use crate::util::{clip, clip_tail, one_line};
 use crate::wire::{self, Wire};
-use bise_proto::core::{input as ci, link as cl, In, Link};
+use bise_proto::core::{input as ci, link as cl, In, Link, View};
 use bise_proto::core::feed as feed_rec;
 use bise_proto::core::Feed;
 use serde_json::{json, Value};
@@ -1289,15 +1289,6 @@ fn parse<T: serde::de::DeserializeOwned>(x: &Value) -> Option<T> {
     T::deserialize(x).ok()
 }
 
-fn run_of(s: &str) -> Run {
-    match s {
-        "starting" => Run::Starting,
-        "idle" => Run::Idle,
-        "busy" => Run::Busy,
-        _ => Run::Down,
-    }
-}
-
 /// sb-core's `force_run` input: an agent's REPL state (a restarted
 /// sb-core gets it bare, without the step's envelope).
 fn force_run_input(agent: &str, run: Run) -> Value {
@@ -1524,103 +1515,6 @@ impl Hub {
             "sb-core, the hub's state machine, stopped ({}): restarted, its state rebuilt from the journal. the agents kept running",
             why
         ));
-    }
-
-    /// Store the state sb-core sent (it is the only source of truth).
-    fn load_view(&mut self, v: &Value) {
-        let mut agents = BTreeMap::new();
-        for a in v["agents"].as_array().into_iter().flatten() {
-            let name = jstr(a, "name");
-            let declared = a["declared"]
-                .as_object()
-                .and_then(|d| parse(&d["status"]).map(|st| (st, jstr(&a["declared"], "note"))));
-            let agent = Agent {
-                name: name.clone(),
-                dir: jstr(a, "dir"),
-                is_main: a["is_main"].as_bool().unwrap_or(false),
-                parent: a["parent"].as_str().map(|x| x.to_string()),
-                brief: parse(&a["brief"]).unwrap_or_default(),
-                created_ms: a["created_ms"].as_u64().unwrap_or(0),
-                ws: parse(&a["ws"]).unwrap_or_else(|| panic!("sb-core: bad ws {}", a["ws"])),
-                lifecycle: parse(&a["lifecycle"]).unwrap_or(Lifecycle::Active),
-                failure: a["failure"].as_str().map(|x| x.to_string()),
-                declared,
-                last_report: parse(&a["last_report"]),
-                aliases: parse(&a["aliases"]).unwrap_or_default(),
-                files: parse(&a["files"]).unwrap_or_default(),
-                snapshot_ref: a["snapshot_ref"].as_str().map(|x| x.to_string()),
-                follow: a["follow"].as_bool().unwrap_or(false),
-                run: run_of(&jstr(a, "run")),
-                waiting: a["waiting"].as_bool().unwrap_or(false),
-                waiting_on: a["waiting_on"].as_str().map(|x| x.to_string()),
-                turn_started_ms: a["turn_ms"].as_u64(),
-                turns_ended: a["turns"].as_u64().unwrap_or(0),
-                activity: self.activity.get(&name).cloned(),
-                place: None,
-                place_branch: None,
-            };
-            let mut agent = agent;
-            agent.place = self.place_of(&agent);
-            agent.place_branch = self.place_branch_of(&agent);
-            if self.on_you.contains(&agent.name) {
-                agent.waiting = true;
-                agent.waiting_on = Some("you".into());
-            }
-            agents.insert(name, agent);
-        }
-        // idle-cpu: the order, the cards and the notes change only by an
-        // event: a step with none leaves them out (view.bend `durable_kvs`)
-        if let Some(order) = v.get("order") {
-            self.st.order = parse(order).unwrap_or_default();
-        }
-        // hub-lag, idle-cpu: a step's view leaves out the agents it did
-        // not change (view.bend `changed`; an idle tick sends none): keep
-        // them as they are, minus the ones gone from the order (a rename)
-        if v["all_agents"].as_bool() == Some(false) {
-            let order: BTreeSet<&String> = self.st.order.iter().collect();
-            for (name, a) in std::mem::take(&mut self.st.agents) {
-                if order.contains(&name) && !agents.contains_key(&name) {
-                    agents.insert(name, a);
-                }
-            }
-        }
-        self.st.agents = agents;
-        if v["all_msgs"].as_bool() == Some(true) {
-            self.st.clear_msgs();
-        }
-        for r in v["msgs"].as_array().into_iter().flatten() {
-            let Some(m) = parse(&r["msg"]) else { continue };
-            let m: Msg = m;
-            self.st.put_msg(m, parse(&r["state"]), r["settled"].as_bool() == Some(true));
-        }
-        if let Some(cards) = v.get("cards") {
-            self.st.cards = cards
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(|c| parse(c).map(|c: Card| (c.id, c)))
-                .collect();
-        }
-        if let Some(notes) = v.get("notes") {
-            self.st.main_notes = parse(notes).unwrap_or_default();
-        }
-        // sb every's timers: only in a view whose step changed them
-        if let Some(t) = v.get("timers") {
-            self.st.timers.load_live(t);
-        }
-        if let Some(t) = v.get("timers_ended") {
-            self.st.timers.load_ended(t);
-        }
-        // sb wake's watches: likewise
-        if let Some(w) = v.get("wakes") {
-            self.st.wakes.load_live(w);
-        }
-        if let Some(w) = v.get("wakes_ended") {
-            self.st.wakes.load_ended(w);
-        }
-        self.st.next_msg = v["next_msg"].as_u64().unwrap_or(1);
-        self.st.next_card = v["next_card"].as_u64().unwrap_or(1);
-        self.st.paused = v["paused"].as_u64();
     }
 
     /// The agent's last activity, for the views (not a decision).
@@ -2949,6 +2843,9 @@ mod link;
 #[path = "core_fx.rs"]
 mod core_fx;
 
+#[path = "core_view.rs"]
+mod view;
+
 #[path = "core_user.rs"]
 mod user;
 
@@ -2967,3 +2864,7 @@ pub mod signin_card;
 #[cfg(test)]
 #[path = "core_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "core_view_tests.rs"]
+mod view_tests;

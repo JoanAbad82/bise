@@ -165,6 +165,13 @@ def omit_mss(+k: String, m: Maybe<&2, List<&2, String>>) -> List<&2, Sigma<&2, &
     case Some{+xs}:
       [J.kv(k, J.JArr{jstrs(xs)})]
 
+def omit_mjs(+k: String, m: Maybe<&2, List<&2, J.Json>>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match m:
+    case None{}:
+      Nil{}
+    case Some{+xs}:
+      [J.kv(k, J.JArr{xs})]
+
 def cat(xss: List<&2, List<&2, Sigma<&2, &2, String, _ => J.Json>>>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   match xss:
     case Nil{}:

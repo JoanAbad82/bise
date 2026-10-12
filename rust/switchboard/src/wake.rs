@@ -220,15 +220,13 @@ pub struct Wakes {
 }
 
 impl Wakes {
-    pub fn load_live(&mut self, v: &Value) {
-        self.live = v.as_array().into_iter().flatten().filter_map(Watch::from_view).map(|w| (w.id, w)).collect();
+    pub fn load_live(&mut self, v: &[Value]) {
+        self.live = v.iter().filter_map(Watch::from_view).map(|w| (w.id, w)).collect();
     }
 
-    pub fn load_ended(&mut self, v: &Value) {
+    pub fn load_ended(&mut self, v: &[Value]) {
         self.ended = v
-            .as_array()
-            .into_iter()
-            .flatten()
+            .iter()
             .filter_map(|e| {
                 Some(Ended {
                     watch: Watch::from_view(e)?,

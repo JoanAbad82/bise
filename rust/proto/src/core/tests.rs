@@ -31,7 +31,15 @@ fn full(k: FieldKind, name: &str) -> Value {
         Jsons => json!([{"type": "x"}, 7]),
         Msgs => json!([{"id": 9, "rel": "peer"}]),
         Ver => json!(2),
+        Recs(r) => json!([full_rec(&VIEW, r)]),
+        OptJsonsOmit => json!([{"id": 4}, "x"]),
     }
+}
+
+/// A record of a table with every field set (a `Recs` field: one item).
+fn full_rec(t: &Table, rust: &str) -> Value {
+    let k = t.kinds.iter().find(|k| k.rust == rust).unwrap_or_else(|| panic!("{}: no record {rust}", t.name));
+    Value::Object(k.fields.iter().map(|f| (f.name.to_string(), full(f.kind, f.name))).collect())
 }
 
 /// What a missing field writes back: None when absent.
@@ -42,9 +50,17 @@ fn empty(k: FieldKind) -> Option<Value> {
         Nat => Some(json!(0)),
         Bool => Some(json!(false)),
         OptStr | OptNat | Json => Some(Value::Null),
-        Strs | Nats | Jsons | Msgs => Some(json!([])),
+        Strs | Nats | Jsons | Msgs | Recs(_) => Some(json!([])),
         Ver => Some(json!(1)),
-        StrOmit | OptStrOmit | OptNatOmit | OptStrsOmit => None,
+        StrOmit | OptStrOmit | OptNatOmit | OptStrsOmit | OptJsonsOmit => None,
+    }
+}
+
+/// What a missing field writes back: its declared default, else its kind's.
+fn empty_field(f: &Field) -> Option<Value> {
+    match f.default {
+        Some(d) => Some(serde_json::from_str(d).expect("a default is JSON")),
+        None => empty(f.kind),
     }
 }
 
@@ -63,7 +79,7 @@ fn every_tables_kinds_match_what_serde_writes() {
             let mut want = Map::new();
             want.insert(t.tag_key.into(), json!(k.tag));
             for f in k.fields {
-                if let Some(e) = empty(f.kind) {
+                if let Some(e) = empty_field(f) {
                     want.insert(f.name.into(), e);
                 }
             }
@@ -194,4 +210,43 @@ fn a_bad_effect_costs_only_itself() {
     let kills: Vec<&str> = s.fx.iter().filter_map(|f| if let Fx::Kill(k) = f { Some(k.agent.as_str()) } else { None }).collect();
     assert_eq!(kills, ["a", "c"], "both good effects, in order");
     assert!(matches!(&s.fx[1], Fx::Unknown { tag, raw } if tag == "rt" && raw["turns"] == "many"), "the bad one kept whole");
+}
+
+/// The view's records, read and written by serde as VIEW says: with every
+/// field set, and from `{}` (each field's declared default).
+#[test]
+fn the_view_table_is_what_serde_writes() {
+    type Rw = fn(Value) -> Value;
+    let rws: [(&str, Rw); 3] = [
+        ("ViewAgent", |v| serde_json::to_value(serde_json::from_value::<ViewAgent>(v).unwrap()).unwrap()),
+        ("ViewMsg", |v| serde_json::to_value(serde_json::from_value::<ViewMsg>(v).unwrap()).unwrap()),
+        ("View", |v| View::decode(&v).unwrap().to_value()),
+    ];
+    assert_eq!(VIEW.kinds.len(), rws.len());
+    for (rust, rw) in rws {
+        let k = VIEW.kinds.iter().find(|k| k.rust == rust).unwrap();
+        let v = full_rec(&VIEW, rust);
+        assert_eq!(rw(v.clone()), v, "{rust} with every field set");
+        let want: Map<String, Value> = k.fields.iter().filter_map(|f| empty_field(f).map(|e| (f.name.to_string(), e))).collect();
+        assert_eq!(rw(json!({})), Value::Object(want), "{rust} from nothing");
+    }
+    // today's defaults of the keys sb-core always writes
+    let bare = View::decode(&json!({})).unwrap();
+    assert_eq!((bare.all_agents, bare.next_msg, bare.next_card, bare.all_msgs), (true, 1, 1, false));
+    assert!(View::decode(&json!({"agents": 3})).is_err(), "a view that doesn't fit is an error, never a guess");
+}
+
+/// One real view per shape (fixtures/core_view.jsonl, sb-core's answers
+/// on a throwaway hub with the fake provider): each reads and writes back
+/// equal as a JSON value.
+#[test]
+fn every_captured_view_reads_and_writes_back() {
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/core_view.jsonl")).unwrap();
+    let mut n = 0;
+    for l in text.lines().filter(|l| !l.starts_with('#') && !l.trim().is_empty()) {
+        let v: Value = serde_json::from_str(l).unwrap();
+        assert_eq!(View::decode(&v).unwrap().to_value(), v, "{l}");
+        n += 1;
+    }
+    assert!(n >= 4, "one view per shape: {n}");
 }
