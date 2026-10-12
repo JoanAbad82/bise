@@ -188,6 +188,35 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
       test.info().attachments.push({ name: 'tui-shop-nd', contentType: 'text/plain', body: Buffer.from(ts.screen()) });
       await page.screenshot({ path: test.info().outputPath('sent-again.png') });
     });
+
+    await test.step('a non-zero gauge (shop/search)', async () => {
+      // amb-tools 55fd5c44: shop/search's brief ends with [[usage: 43800]], so its calls report
+      // 43 800 input tokens: its right-bar row carries the TUI panel's percent (non-zero), and its
+      // head says the hub's words
+      const sts = ts as Tui;
+      const panel = flat(sts.screen()).match(/agents .*? inbox/)?.[0] ?? '';
+      const tuiPct = /\bsearch\b[^%]*?(\d+%)/.exec(panel)?.[1] ?? '';
+      const agents: (Awaited<ReturnType<typeof hubAgents>>[number] & { usage?: { words?: string } })[] = await hubAgents(w, 'shop');
+      const hubWords = agents.find((a) => a.name === 'search')?.usage?.words ?? '';
+      const gauge = page.locator('[data-testid="app.right.agent.search.gauge"]');
+      await expect.soft(gauge, "search's right-bar row carries its gauge").toBeVisible({ timeout: 10_000 });
+      const got = ((await gauge.textContent().catch(() => '')) ?? '').trim();
+      test.info().annotations.push({ type: 'usage-search', description: JSON.stringify({ window: got, tuiPanel: tuiPct, hub: hubWords }) });
+      expect.soft(tuiPct, "the TUI's panel says search is above 0%").toMatch(/^[1-9]\d*%$/);
+      expect.soft(got, "the window's gauge is the TUI panel's").toBe(tuiPct);
+      await page.locator('[data-testid="app.right.agent.search"]').click({ timeout: 5000 });
+      // the agent head shows each meta item whole or not at all (69192579): search's long purpose
+      // line fills it, so its gauge goes; the composer's label line ('… · context 44k · 17%') keeps it
+      const head = page.locator(T.usage);
+      const label = page.locator('[data-testid="composer"] .div .end');
+      await expect.soft(label, "search's label line").toBeVisible({ timeout: 10_000 });
+      const inHead = await head.isVisible();
+      const where = inHead ? head : label;
+      const words = ((await where.textContent().catch(() => '')) ?? '').trim();
+      test.info().annotations.push({ type: 'usage-search-head', description: JSON.stringify({ inHead, words }) });
+      expect.soft(words, "search's head or label line says the hub's words").toContain(hubWords || tuiPct);
+      await page.screenshot({ path: test.info().outputPath('usage-search.png') });
+    });
   } finally {
     for (const [name, x] of [['tui-bise', t], ['tui-shop', ts]] as const) {
       if (x) {
