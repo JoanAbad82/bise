@@ -3,7 +3,8 @@
 // @media (prefers-contrast: more) block, Dot's aria-label). Passes when, on the built app with the
 // scripted core (FakeCore, fake data) and prefers-contrast: more emulated:
 //   - storefront's thread: the sidebar's working dot and the inbox block's done and failed dots each
-//     carry their own glyph (∿ working, ✓ done, ! error), and every dot says its state in words;
+//     carry their own glyph (∿ working, ✓ done, ! error), and every dot says its state in words (the
+//     block shows one item at rest since H10: the failed one, then the done one once it is gone);
 //   - settings › models: the '✓ signed in' chip carries its ✓ stand-in;
 //   - without increase contrast, the dots keep their words (the glyphs are the media's).
 // src/ds/check.mjs's law checks the CSS covers every colored tone; this checks the screens use it.
@@ -15,18 +16,19 @@ const HOME = 'bise-home-00000000';
 const P = 'storefront-1a2b3c4d';
 const card = (id: number, kind: string, question: string) => ({ id, project: P, kind, rank: id, agent: 'perf', question, options: [], urgent: false, since_ms: 1791100100000 + id });
 const agent = (name: string, status: string) => ({ name, main: name === 'main', status, archived: false, title: '', purpose: '', since_ms: 1791100000000, waits: 0 });
+const FAILED = card(1, 'failed', 'the e2e run failed twice: out of disk');
+const DONE = card(2, 'done', 'the product page bench is done: p95 180 ms');
+const projects = (cards: readonly ReturnType<typeof card>[]) => ({
+  ev: 'projects',
+  projects: [
+    { project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true },
+    { project: P, name: 'storefront', path: '/nowhere/storefront', git: true, home: false, order: 1, agents: 2, working: 1, waits: cards.length, running: true, cards },
+  ],
+});
 const world = () => [
   { ev: 'prefs', prefs: { onboarded: true, theme: 'light' } },
-  {
-    ev: 'projects',
-    projects: [
-      { project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true },
-      {
-        project: P, name: 'storefront', path: '/nowhere/storefront', git: true, home: false, order: 1, agents: 2, working: 1, waits: 2, running: true,
-        cards: [card(1, 'done', 'the product page bench is done: p95 180 ms'), card(2, 'failed', 'the e2e run failed twice: out of disk')],
-      },
-    ],
-  },
+  // the block shows one item at rest (H10): the failed one first; the done one once it is gone
+  projects([FAILED, DONE]),
   { ev: 'welcome', project: P, proto: 1, workspace: '/nowhere/storefront', name: 'storefront' },
   { ev: 'agents', project: P, agents: [agent('main', 'idle'), agent('perf', 'working')] },
   { ev: 'thread', project: P, agent: 'main', entries: [{ pos: 1, at_ms: 1791100001000, kind: 'agent', text: 'perf is on the bench.' }], before: null, more: false },
@@ -71,7 +73,12 @@ test('ds/contrast: with increase contrast every state reads by a glyph or a word
     await test.step('increase contrast, the thread: the working, done and failed dots carry ∿ ✓ !', async () => {
       await page.emulateMedia({ contrast: 'more' });
       await page.waitForTimeout(150);
-      const { dots } = await cues(page);
+      const atRest = await cues(page);
+      await page.screenshot({ path: test.info().outputPath('thread-contrast-failed.png') });
+      // H10: the folded block shows its first item only; the failed one leaves, the done one shows
+      await core.send(projects([DONE]) as unknown as Parameters<FakeCore['send']>[0]);
+      await expect(page.locator('[data-testid="inbox.block"] .b-dot.ok')).toBeVisible({ timeout: 5000 });
+      const dots = [...atRest.dots, ...(await cues(page)).dots];
       const by = (st: string) => dots.filter((d) => d.state === st);
       expect(by('wk').length, "the sidebar's working dot").toBeGreaterThan(0);
       expect(by('ok').length, "the inbox's done dot").toBeGreaterThan(0);
