@@ -2,6 +2,7 @@
 // image chips, and one agent's message to another. Owner: amb-win. Split out of
 // rows.tsx (pure move).
 import { useState, type ReactNode } from 'react';
+import { useFold } from './folds';
 import { Act, Answered, CardLine, Marker, Press } from '@/ds';
 import { openInbox } from '@/inbox/Block';
 import type { Entry } from '@/proto';
@@ -227,8 +228,10 @@ export function ToAgentRow({ e, ctx, chained = false }: { e: Entry; ctx: RowCtx;
   );
 }
 
-/** How many lines of an agent's message show folded (designer m_19387, tier 4). */
-const NOTE_LINES = 1;
+/** How many lines of an agent's message show folded (designer's desktop-notices (a): 2). */
+const NOTE_LINES = 2;
+/** Past this many characters the two folded lines are likely cut: '… ▸' says there is more. */
+const NOTE_CHARS = 160;
 
 /**
  * A message between agents (designer's thread tiers m_19387, tier 4): never body prose in the thread,
@@ -238,9 +241,10 @@ const NOTE_LINES = 1;
  * went the same way and its chip says it for both (designer m_19784 (2)); the words still open it.
  */
 export function AgentNote({ pos, from, to, text, ctx, testId, tag, chip = true }: { pos: number; from: string; to: string; text: string; ctx: RowCtx; testId: string; tag?: ReactNode; chip?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const lines = text.split('\n');
-  const more = lines.length > NOTE_LINES || text.length > 90;
+  // ctrl+o / ⌘E open and close it with every fold; a click opens it in place (desktop-notices (c))
+  const [open, setOpen] = useFold(false, pos);
+  const lines = text.split('\n').filter((l) => l.trim() !== '');
+  const more = lines.length > NOTE_LINES || text.length > NOTE_CHARS;
   const toggle = () => {
     setOpen((o) => !o);
   };
@@ -250,14 +254,19 @@ export function AgentNote({ pos, from, to, text, ctx, testId, tag, chip = true }
         <div className="th-note-head">
           {chip && (
             <Press look="th-note-chip" aria-expanded={open} onClick={toggle} data-testid={`${testId}.chip`}>
-              <span aria-hidden="true">✉ </span>
-              <span className="th-note-from">{from}</span> → {to}
+              {/* the spaces read in its text; the flex gap draws them */}
+              <span className="th-note-faint" aria-hidden="true">
+                ✉
+              </span>{' '}
+              <span className="th-note-from">{from}</span>{' '}
+              <span className="th-note-faint">→</span>{' '}
+              <span className="th-note-to">{to}</span>
             </Press>
           )}
           {tag}
         </div>
       )}
-      {/* H4 (designer m_19832): its words sans, one line at +16, then '▸' when there's more */}
+      {/* desktop-notices (a): its words sans 13 text-3 at +16, two lines, then '… ▸' when there's more */}
       {text !== '' &&
         (open ? (
           <div className="th-note-text" data-testid={`${testId}.text`}>
@@ -266,11 +275,11 @@ export function AgentNote({ pos, from, to, text, ctx, testId, tag, chip = true }
         ) : (
           <div className="th-note-line">
             <span className="th-note-text" data-testid={`${testId}.text`}>
-              {lines.slice(0, NOTE_LINES).join(' ')}
+              {lines.slice(0, NOTE_LINES).join('\n')}
             </span>
             {more && (
               <Act onClick={toggle} testId={`${testId}.more`}>
-                ▸
+                … ▸
               </Act>
             )}
           </div>

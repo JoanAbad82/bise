@@ -7,7 +7,7 @@
 // when its keys change (an entry or a send comes or goes); each row reads
 // its own data; the composer is memo'd with stable props, so neither an
 // entry, a step nor a send ever re-renders it.
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { Button, Head, Marker, Press } from '@/ds';
 import { Composer, flashWords, useApprovalsFlash, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer';
@@ -365,14 +365,14 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
     <FindMarkContext value={mark}>
     <OpenArtifactContext value={artifact?.id}>
       <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} data-reading={reading} data-about={artifact !== undefined || undefined} data-dim={(artifact !== undefined && me?.archived === true) || undefined} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
-        {bise || !me || me.archived ? (
+        {artifact !== undefined && me?.archived === true && agent !== MAIN ? (
+          <AgentHead project={project} a={me} restore={<RestoreButton project={project} agent={agent} />} />
+        ) : bise || !me || me.archived ? (
           <Head
             title={headTitle}
             sub={sub}
             lead={bise ? <BisePearl size={14} /> : undefined}
             dot={bise || !me ? undefined : dotOf(me.status)}
-            // an archived maker beside its artifact: its own thread, dim, restored from its head (designer m_20453)
-            end={artifact !== undefined && me?.archived === true ? <RestoreButton project={project} agent={agent} /> : undefined}
           />
         ) : agent === MAIN ? (
           <BiseHead project={project} name={projectName ?? project} more={more} />
@@ -547,7 +547,18 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBac
   // entries only: his sends not landed yet are the list's tail, outside the
   // virtual list, so his row is drawn in ⏎'s own frame (bar ⛔3: < 100 ms)
   // R13: more than 3 agent-to-agent messages in a row fold into '▸ 4 messages between 2 agents'
-  const [openRuns, setOpenRuns] = useState<ReadonlySet<number>>(() => new Set());
+  // ctrl+o / ⌘E open and close every fold, the runs of messages between agents too (designer's
+  // desktop-notices (c)): a press (its version) sets them all; a click still opens one in place
+  const folds = useContext(FoldsContext);
+  const foldAll = useSyncExternalStore(
+    (l) => folds.subscribe(l),
+    () => folds.get(),
+  );
+  const [runsOpen, setRunsOpen] = useState<{ open: ReadonlySet<number>; v: number }>(() => ({ open: new Set(), v: foldAll.v }));
+  const openRuns = runsOpen.open;
+  const setOpenRuns = useCallback((f: (s: ReadonlySet<number>) => ReadonlySet<number>) => {
+    setRunsOpen((x) => ({ open: f(x.open), v: x.v }));
+  }, []);
   // a steer shows where the agent read it (its receipt's pos), not where it was written
   // (the store bumps the order when a steered_at comes, so this recomputes)
   // one land per sha (designer m_19387): the hub's line that says again a typed land leaves the list
@@ -561,6 +572,8 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBac
   const retries = useMemo(() => retryRuns(placed, (pos) => store.entry(tkey, pos)), [placed, store, tkey]);
   const shown = useMemo(() => (retries.hidden.size === 0 ? placed : placed.filter((pos) => !retries.hidden.has(pos))), [placed, retries]);
   const runs = useMemo(() => foldedRuns(shown, (pos) => store.entry(tkey, pos), agent), [shown, store, tkey, agent]);
+  // a press since the last render: every run listed now opens, or every one folds
+  if (runsOpen.v !== foldAll.v) setRunsOpen({ open: foldAll.open ? new Set(runs.map((r) => r.start)) : new Set(), v: foldAll.v });
   const listed = useMemo(() => withRuns(shown, runs, openRuns, entryKey), [shown, runs, openRuns]);
   // the reply being written (streaming): a live row at the end, drawn as the entry it becomes,
   // which takes its place with the same key (live.ts, text-appearing v2)
@@ -655,7 +668,7 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBac
       const pos = posOfKey(key);
       return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} next={nextOf.get(pos)} still={still} named={heads.named.has(pos)} afterFold={afterFold.has(pos)} underFold={underFold.has(pos)} retries={retries.runs.get(pos)} />;
     },
-    [ctx, prevOf, nextOf, runs, openRuns, live.entry, lastPos, still, heads, afterFold, underFold, foldGap, retries],
+    [ctx, prevOf, nextOf, runs, openRuns, setOpenRuns, live.entry, lastPos, still, heads, afterFold, underFold, foldGap, retries],
   );
   const onOlder = useCallback(() => {
     store.olderPage(project, agent);

@@ -218,6 +218,12 @@ for (const theme of ['light', 'dark']) {
       await expect(screen, "perf's own thread in the centre").toHaveAttribute('data-agent', 'perf');
       await expect(screen, 'dim').toHaveAttribute('data-dim', 'true');
       await expect(page.getByTestId('thread.head.restore')).toHaveText('↺ restore');
+      // the live head, one line (designer m_20525): 'perf  perf's job', 'archived' where its state sits,
+      // '↺ restore' in place of 'changes ⌘D'
+      await expect(page.getByTestId('thread.head.name')).toHaveText('perf');
+      await expect(page.getByTestId('thread.head.state')).toHaveText('archived');
+      await expect(page.getByTestId('thread.head.changes')).toHaveCount(0);
+      expect(await widthOf(page, '[data-testid="thread.head"]') > 0 && Math.round((await page.getByTestId('thread.head').boundingBox())?.height ?? 0), 'one line, 44 px').toBe(44);
       await expect(page.getByTestId('thread.archived'), 'no history foot: the one composer is there').toHaveCount(0);
       await expect(page.locator('.th-screen .b-composer .div .lbl'), 'the composer goes to the project\'s main').toContainText('to main · about');
       await expect(page.locator('.b-head, .ah').first(), 'never a workspace id in a head').not.toContainText(P);

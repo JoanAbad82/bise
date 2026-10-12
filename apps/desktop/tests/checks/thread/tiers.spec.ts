@@ -130,13 +130,28 @@ for (const theme of ['light', 'dark']) {
         expect(look.color, 'in --c-text-3').toBe(dim);
         const text = page.getByTestId('thread.to.4.text');
         const rows = await text.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
-        expect(rows, 'one row of its words').toBeLessThanOrEqual(1);
-        await expect(page.getByTestId('thread.to.4.more')).toHaveText('▸');
+        // designer's desktop-notices (a): two rows of its words, then '… ▸'
+        expect(rows, 'two rows of its words').toBeLessThanOrEqual(2);
+        await expect(page.getByTestId('thread.to.4.more')).toHaveText('… ▸');
+        // (b) the chip: a 6% ink tint, r 6, 20 high, 8 px in
+        const chipLook = await page.getByTestId('thread.to.4.chip').evaluate((el) => {
+          const c = getComputedStyle(el);
+          return { bg: c.backgroundColor, h: Math.round(el.getBoundingClientRect().height), r: c.borderTopLeftRadius, pad: c.paddingLeft };
+        });
+        expect(chipLook.bg, 'the chip is tinted').not.toBe('rgba(0, 0, 0, 0)');
+        expect(chipLook.h, '20 high').toBe(20);
+        expect(chipLook.r).toBe('6px');
+        expect(chipLook.pad).toBe('8px');
         expect(Math.abs((await leftOf(page, '[data-testid="thread.to.4"]')) - prose), `${String(w)}: the notes on the text column`).toBeLessThanOrEqual(1);
         await page.mouse.move(1, 400);
         await page.screenshot({ path: test.info().outputPath(`tiers-${theme}-${String(w)}-open.png`) });
         await run.click();
         await expect(page.getByTestId('thread.to.4')).toHaveCount(0);
+        // (c) ctrl+o opens every fold, the run of messages too, and closes them again
+        await page.keyboard.press('Control+o');
+        await expect(page.getByTestId('thread.to.4'), 'ctrl+o opens the run').toBeVisible();
+        await page.keyboard.press('Control+o');
+        await expect(page.getByTestId('thread.to.4'), 'ctrl+o again folds it').toHaveCount(0);
       }
 
       // perf's own thread: its wake is one news row

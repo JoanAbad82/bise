@@ -63,7 +63,7 @@ function useHeadFit(ref: RefObject<HTMLDivElement | null>, words: string): 0 | 1
 }
 
 /** An agent's head (`starting`: its thread has nothing of its own yet). `more` is the '⋯' button (rename, model; the screen owns its panel); `note` a quiet word after the chip ('voice mode'); its context gauge after it. */
-export function AgentHead({ project, a, more, note, starting = false }: { project: string; a: Agent; more?: ReactNode; note?: string | undefined; starting?: boolean }) {
+export function AgentHead({ project, a, more, note, starting = false, restore }: { project: string; a: Agent; more?: ReactNode; note?: string | undefined; starting?: boolean; restore?: ReactNode }) {
   const usage = usageLine(a.usage?.words);
   const now = useNow();
   const router = useRouter();
@@ -88,7 +88,15 @@ export function AgentHead({ project, a, more, note, starting = false }: { projec
           </span>
         )}
       </span>
-      <Chip chip={starting && a.waits === 0 ? { text: 'starting', needs: false, live: true } : held ? HELD : stateChip(a, now)} testId="thread.head.state" />
+      {/* an archived maker beside its artifact (designer m_20525): the same one-line head, 'archived'
+          where its state sits, '↺ restore' in place of 'changes ⌘D' */}
+      {restore !== undefined ? (
+        <span className="ah-chip ah-archived" data-testid="thread.head.state">
+          archived
+        </span>
+      ) : (
+        <Chip chip={starting && a.waits === 0 ? { text: 'starting', needs: false, live: true } : held ? HELD : stateChip(a, now)} testId="thread.head.state" />
+      )}
       {note !== undefined && (
         <span className="ah-note" data-testid="thread.voice">
           {note}
@@ -103,15 +111,18 @@ export function AgentHead({ project, a, more, note, starting = false }: { projec
         </span>
       )}
       <span className="ah-end">
-        {branch !== '' && (
+        {restore}
+        {restore === undefined && branch !== '' && (
           <Press look={drop >= 2 ? 'ah-quiet ah-gone' : 'ah-quiet'} onClick={review} data-testid="thread.head.branch" title="its changes" tabIndex={drop >= 2 ? -1 : undefined} aria-hidden={drop >= 2 || undefined}>
             {branch}
           </Press>
         )}
-        <Press look="ah-btn" onClick={review} data-testid="thread.head.changes">
-          changes <kbd>⌘D</kbd>
-        </Press>
-        {more}
+        {restore === undefined && (
+          <Press look="ah-btn" onClick={review} data-testid="thread.head.changes">
+            changes <kbd>⌘D</kbd>
+          </Press>
+        )}
+        {restore === undefined && more}
       </span>
     </div>
   );
