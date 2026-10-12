@@ -92,10 +92,15 @@ pub(crate) fn exit_code(td: &ToolData) -> Option<String> {
     bise_proto::thread::lines::exit_code(r).map(|code| format!("exit {}", code))
 }
 
+/// A call /pause cut, on the right of its row (designer m_19111): a
+/// pause isn't a failure, so dim, no ✗.
+pub(crate) const PAUSE_CUT: &str = "– stopped by the pause";
+
 /// The state on the right of a row, and its style.
 pub(crate) fn state_spans(td: &ToolData, tick: u32) -> Vec<Span<'static>> {
     let dim_st = Style::default().fg(dim());
     match td.state {
+        _ if td.paused => vec![Span::styled(PAUSE_CUT, dim_st)],
         // approvals-design.md §3.1, §10: the gate holds it
         ToolState::Run if matches!(td.gate, Some((crate::wire::Gate::Card, _))) => {
             vec![Span::styled("? ", Style::default().fg(accent())), Span::styled("waiting for you", dim_st)]
@@ -224,7 +229,8 @@ pub(crate) fn row_line(td: &ToolData, tick: u32, width: usize) -> Line<'static> 
 /// first word that reads like an error (`UnicodeDecodeError: …`), else
 /// all of it.
 pub(crate) fn error_line(td: &ToolData) -> Option<String> {
-    if !matches!(td.state, ToolState::Fail) {
+    // a call /pause cut didn't fail: no error row (designer m_19111)
+    if !matches!(td.state, ToolState::Fail) || td.paused {
         return None;
     }
     // bise_proto's reading, the one the hub's typed tool items carry

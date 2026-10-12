@@ -634,6 +634,9 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
     if crate::scheduled_screen::on_key(app, k) {
         return false;
     }
+    if crate::usage_screen::on_key(app, k) {
+        return false;
+    }
     if crate::computer_use::on_key(app, k) {
         return false;
     }

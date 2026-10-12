@@ -20,6 +20,8 @@ pub(crate) struct App {
     pub(crate) artifacts: Option<crate::artifacts_screen::Screen>,
     /// `/scheduled`, the full screen of the scheduled tasks, when open
     pub(crate) scheduled: Option<crate::scheduled_screen::Screen>,
+    /// `/usage`, the full screen of what the calls cost, when open
+    pub(crate) usage: Option<crate::usage_screen::Screen>,
     /// the diff panel (ctrl+g, `/diff`, `± 3 files`), when open
     pub(crate) diff: Option<crate::diffview::Panel>,
     // the /computer-use screen, when open (computer_use.rs)
@@ -296,6 +298,7 @@ impl App {
             logview: None,
             artifacts: None,
             scheduled: None,
+            usage: None,
             diff: None,
             computer_use: None,
             debug,

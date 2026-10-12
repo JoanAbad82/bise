@@ -1635,6 +1635,7 @@ impl Hub {
         }
         self.st.next_msg = v["next_msg"].as_u64().unwrap_or(1);
         self.st.next_card = v["next_card"].as_u64().unwrap_or(1);
+        self.st.paused = v["paused"].as_u64();
     }
 
     /// The agent's last activity, for the views (not a decision).

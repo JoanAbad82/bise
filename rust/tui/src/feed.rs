@@ -501,6 +501,44 @@ fn made_run_pad(events: &[Ev], i: usize) -> usize {
     back.chain(fwd).max().unwrap_or(0)
 }
 
+/// The REPL's own lines for an interrupted turn: its discarded candidate,
+/// `turn interrupted`, the dropped in-flight response.
+pub(crate) fn is_cut_noise(ev: &Ev) -> bool {
+    match ev {
+        Ev::Warn(t) => t == "candidate discarded: interrupt" || t == "turn interrupted" || t.starts_with("turn interrupted by "),
+        Ev::Info(t) => t == "in-flight response dropped (turn interrupted)",
+        _ => false,
+    }
+}
+
+/// The calls of a turn cut by /pause (designer m_19111): nothing live
+/// draws while paused (a call still running there is the one the pause
+/// stops), and the call the pause stopped reads `– stopped by the
+/// pause`, without its error row (toolrow::error_line). The flag stays on
+/// the event when its end merges in (push_event's running-line rewrite).
+pub(crate) fn pause_cut_tools(evs: &mut [Ev]) {
+    for ev in evs.iter_mut() {
+        if let Ev::Tool(td) = ev {
+            let cut = td.result.as_ref().is_some_and(|(_, r)| r.contains("interrupted by bise"));
+            if matches!(td.state, ToolState::Run) || (matches!(td.state, ToolState::Fail) && cut) {
+                td.paused = true;
+            }
+        }
+    }
+}
+
+/// sb-core's `‖ paused · its turn stopped` line is among the last events,
+/// with no message of his since: the turn was cut by /pause, nothing went
+/// wrong. Not "no turn since": the REPL may write the cut turn's start
+/// after the paused line (a turn asked just before /pause).
+pub(crate) fn after_pause_cut(events: &[Ev]) -> bool {
+    events
+        .iter()
+        .rev()
+        .take_while(|e| !matches!(e, Ev::You(..)))
+        .any(|e| matches!(e, Ev::Info(t) if t.ends_with("paused · its turn stopped")))
+}
+
 pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>>, ev: Ev) -> bool {
     // a new ↗ line may widen its run: the run's rows are built again
     if matches!(ev, Ev::Made { .. }) {
@@ -515,6 +553,11 @@ pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>
     }
     if let Some(appended) = merge_report_and_card(events, cache, &ev) {
         return appended;
+    }
+    // cost-pause (designer m_18932): a turn cut by /pause shows only its
+    // `‖ paused` line; the REPL's interrupt lines after it are dropped
+    if is_cut_noise(&ev) && after_pause_cut(events) {
+        return false;
     }
     // BISE-293: a turn that fails for the reason its candidate was
     // discarded says it once: the failure takes the warning's place

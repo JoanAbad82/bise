@@ -47,6 +47,7 @@ import ./hub/wakes.bend as HWK
 import ./hub/xhub-model.bend as HXH
 import ./hub/xhub.bend as HXB
 import ./hub/codec.bend as HCo
+import ./hub/pause.bend as HP
 
 # LAW: a checkpoint restores to exactly the session it exported.
 law checkpoint_roundtrip:
@@ -4430,6 +4431,76 @@ law stop_leaves_no_timer:
   for +n: String
   for +why: String
   HI.TimerNoneOf(HTM.Tms.live(HM.St.tm(HX.d(o, HC.stop_task(o, cx, n, HM.LArchived{}, why)))), n)
+
+# ---- the project's pause (cost-pause, hub/pause.bend) ----
+# Its lines (paused, resumed) are events like the others: the replay laws
+# (hub_run_replays, replay_reproduces) cover them, so a restarted hub is
+# still paused; pause_line_keeps pins the line itself. LOCAL laws, on the
+# steps of core.bend's pause section and its gates.
+
+# LAW: a paused project delivers nothing: pump (every message's way to an
+# agent: his, an agent's, bise's timer and event wakes, a card's answer,
+# another hub's) leaves the step as it was; the message stays queued.
+law paused_delivers_nothing:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +n: String
+  for q: {HP.is_paused(HX.d(o, cx)) == True{} : Bool}
+  {HC.pump(o, cx, n) == cx : HX.Cx<o>}
+
+# LAW: a paused project fires no timer: a due one waits for /resume.
+law timer_held_while_paused:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +t: HTM.Timer
+  for +due: Bool
+  for q: {HP.is_paused(HX.d(o, cx)) == True{} : Bool}
+  {HC.timer_may(o, cx, t, due) == False{} : Bool}
+
+# LAW: pause is idempotent: a second /pause only says so (no line, no
+# interrupt); /resume of a running project likewise.
+law pause_idempotent:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for q: {HP.is_paused(HX.d(o, cx)) == True{} : Bool}
+  {HC.pause(o, cx) == HC.notice(o, cx, HP.ALREADY()) : HX.Cx<o>}
+
+law resume_idempotent:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for q: {HP.is_paused(HX.d(o, cx)) == False{} : Bool}
+  {HC.resume(o, cx) == HC.notice(o, cx, HP.NOT_PAUSED()) : HX.Cx<o>}
+
+# LAW: the paused line pauses, the resumed line resumes, and neither
+# touches a message: the queue's order is the same before and after.
+law paused_line_pauses:
+  for +s: HM.St
+  for +at: Nat
+  {HM.St.paused(HM.apply(s, HM.EPaused{at})) == Some{at} : Maybe<&2, Nat>}
+
+law resumed_line_resumes:
+  for +s: HM.St
+  for +at: Nat
+  {HM.St.paused(HM.apply(s, HM.EResumed{at})) == None{} : Maybe<&2, Nat>}
+
+law pause_keeps_order:
+  for +s: HM.St
+  for +at: Nat
+  {HM.St.msgs(HM.apply(s, HM.EPaused{at})) == HM.St.msgs(s) : List<&2, HM.MRec>}
+
+law resume_keeps_order:
+  for +s: HM.St
+  for +at: Nat
+  {HM.St.msgs(HM.apply(s, HM.EResumed{at})) == HM.St.msgs(s) : List<&2, HM.MRec>}
+
+# LAW: the journal line reads back as the same event (a restart keeps it).
+law pause_line_keeps:
+  for +at: Nat
+  {HCo.ev_of(HCo.ev_json(HM.EPaused{at})) == Some{HM.EPaused{at}} : Maybe<&2, HM.Ev>}
+
+law resume_line_keeps:
+  for +at: Nat
+  {HCo.ev_of(HCo.ev_json(HM.EResumed{at})) == Some{HM.EResumed{at}} : Maybe<&2, HM.Ev>}
 
 # ---- the watches of `sb wake` (event-wake, hub/wakes.bend) ----
 # Their lines (wake_set, wake_end) are events like the others: the replay

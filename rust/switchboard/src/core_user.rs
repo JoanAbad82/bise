@@ -110,6 +110,8 @@ impl Hub {
                 self.core(fx, env, c, In::Interrupt(ci::Interrupt { agent: focus }));
                 self.interrupt_by = None;
             }
+            UserCmd::Pause => self.core(fx, env, c, In::Pause(ci::Pause {})),
+            UserCmd::Resume => self.core(fx, env, c, In::Resume(ci::Resume {})),
             UserCmd::Passthrough(l) => {
                 let first = l.split_whitespace().next().unwrap_or("");
                 if first != "/compact" {

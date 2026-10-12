@@ -181,6 +181,7 @@ fn apply(app: &mut App, n: &Notification) {
         HubEv::Cards { cards: his, others, .. } => cards(app, his, others),
         HubEv::Scheduled { items, ended, .. } => app.sb.timers = items.iter().chain(ended).map(super::state_rows::task_of_row).collect(),
         HubEv::Flow { flow, .. } => app.sb.flow = super::state_rows::flow_word(*flow),
+        HubEv::Paused { paused, since_ms, .. } => app.sb.paused = paused.then(|| since_ms.unwrap_or(0)),
         HubEv::Notice { text, .. } => notice(app, text),
         // update-card: `/update` with a newer release opens its item here
         HubEv::CardOpen { id, .. } => cards::open_view(app, Some(*id)),

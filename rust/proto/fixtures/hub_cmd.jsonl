@@ -73,3 +73,6 @@
 {"cmd":"page_voice","project":"acme-1a2b3c4d","page":"weekly-update","phase":"heard","text":"make the intro shorter"}
 {"cmd":"log","project":"acme-1a2b3c4d","agent":"perf"}
 {"cmd":"log","project":"acme-1a2b3c4d","agent":"perf","before":212}
+{"cmd":"usage","project":"acme-1a2b3c4d"}
+{"cmd":"pause","project":"acme-1a2b3c4d"}
+{"cmd":"resume","project":"acme-1a2b3c4d"}

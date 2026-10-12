@@ -200,6 +200,13 @@ impl Shell {
                     self.proto.flow = f;
                     self.proto_note(&ids, &flow);
                 }
+                // cost-pause: the project's pause, when it changed
+                let paused = self.paused_ev();
+                let p = paused.encode();
+                if p != self.proto.paused {
+                    self.proto.paused = p;
+                    self.proto_note(&ids, &paused);
+                }
                 // S10: the followed jobs, when they changed
                 let jobs = HubEv::Jobs { project: self.project(), items: proto_view::jobs(v) };
                 let j = jobs.encode();
@@ -349,6 +356,17 @@ impl Shell {
             crate::flow::FlowMode::Trunk => FlowMode::Trunk,
         });
         HubEv::Flow { project: self.project(), flow }
+    }
+
+    /// cost-pause: the project's pause as the typed `paused`
+    /// (`hub/paused`), from sb-core's view; `held` its queued messages.
+    pub(in crate::daemon) fn paused_ev(&self) -> HubEv {
+        let st = &self.hub.st;
+        let held = match st.paused {
+            Some(_) => st.msg_state().values().filter(|s| matches!(s, crate::model::MsgState::Queued { .. })).count() as u64,
+            None => 0,
+        };
+        HubEv::Paused { project: self.project(), paused: st.paused.is_some(), since_ms: st.paused, held }
     }
 
     /// P4b: an agent's live line for its head (`last_pos`, heads.rs): a

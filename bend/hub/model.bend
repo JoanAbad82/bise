@@ -104,6 +104,11 @@ type Ev is Data:
   # event-wake: the watches of `sb wake` (wakes.bend), wake_set and
   # wake_end (an older sb-core reads them as unknown: skipped)
   EWake{e: WK.WkEv}
+  # cost-pause (hub/pause.bend): the project paused at `at`, resumed at
+  # `at`. An older sb-core reads them as unknown, skipped: after a
+  # rollback the project comes back unpaused
+  EPaused{at: Nat}
+  EResumed{at: Nat}
 
 type AgentOp is Data:
   OLife{life: Life, reason: Maybe<&2, String>}
@@ -601,6 +606,10 @@ def apply(+st: St, e: Ev) -> St:
           St{map_agent(agents, name, OFollow{None{}}), order, msgs, cards, notes, nm, nc, tm, xs, pz}
         case EWake{+we}:
           St{agents, order, msgs, cards, notes, nm, nc, TM.wk_apply(tm, we), xs, pz}
+        case EPaused{+at}:
+          St{agents, order, msgs, cards, notes, nm, nc, tm, xs, Some{at}}
+        case EResumed{_}:
+          St{agents, order, msgs, cards, notes, nm, nc, tm, xs, None{}}
 
 # the state after a journal: the replay of a list of events
 def apply_all(evs: List<&2, Ev>, +st: St) -> St:

@@ -8,7 +8,7 @@ use crate::context::FnContext;
 use crate::diff::{DiffFile, DiffResult, DiffView};
 use crate::ops::{BranchRow, ReleaseEv, UpdateEv, VersionItem};
 use crate::parts::Part;
-use crate::rows::{Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, Merged, Model, Place, Pr, ScheduledTask, Worktree};
+use crate::rows::{Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, Merged, Model, Place, Pr, ScheduledTask, UsageRow, Worktree};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
@@ -269,6 +269,36 @@ pub enum HubEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         flow: Option<crate::rows::FlowMode>,
     },
+    /// the project's pause (cost-pause, `/pause`): at hello and on
+    /// change. While `paused`, no agent's turn runs: every message, timer
+    /// wake and event wake is held, queued in order, and delivered at
+    /// `resume`. Background commands and `sb wake` watches keep running
+    /// (their wake waits too); the REPLs stay up, idle. `since_ms`: when
+    /// it was paused. One hub: a desktop's "pause everything" pauses each
+    Paused {
+        project: Project,
+        paused: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        since_ms: Option<u64>,
+        /// the messages held so far (queued for an agent, not delivered)
+        #[serde(default, skip_serializing_if = "crate::rows::is_zero_u64")]
+        held: u64,
+    },
+    /// what the project's model calls cost (`usage/read`, an answer only:
+    /// never pushed). `counting`: the hub is still reading the
+    /// transcripts (its first read): the sums are not complete yet, ask
+    /// again. `all` the whole project (name ""), `agents` and `models`
+    /// sorted by the week's cost. Today = since the hub's local midnight
+    /// (its UTC offset), week = the last 7 local days, today included
+    Usage {
+        project: Project,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        counting: bool,
+        /// boxed: HubEv stays small (hub::size)
+        all: Box<UsageRow>,
+        agents: Vec<UsageRow>,
+        models: Vec<UsageRow>,
+    },
     /// the hub's bise pages, newest first (docs/ambient-pages.md §2.3),
     /// and `overdue` his late promises across them (checklist rows of his
     /// past their data-due: the morning page's and the menu bar's count,
@@ -357,7 +387,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "pages", "page_changed", "card_open", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "paused", "usage", "pages", "page_changed", "card_open", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -595,6 +625,15 @@ pub enum HubCmd {
     Prs { project: Project },
     /// the scheduled tasks asked for: `scheduled` comes again
     Scheduled { project: Project },
+    /// what the project's calls cost: answered by `usage`
+    Usage { project: Project },
+    /// pause the whole project (his only, never an agent's): every busy
+    /// turn stops, messages, timers and wakes are held (`paused` comes
+    /// to every client). Already paused: nothing changes
+    Pause { project: Project },
+    /// resume a paused project: the held messages are delivered in their
+    /// order, the due timers fire. Not paused: nothing changes
+    Resume { project: Project },
     /// stop scheduled task `id` (his, like the TUI's /scheduled stop: its
     /// agent hears it, its line says `stopped by you`); an unknown or
     /// ended id is an `error`
@@ -743,7 +782,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "scheduled", "scheduled_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "scheduled", "scheduled_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -786,6 +825,9 @@ impl HubCmd {
             | HubCmd::Features { project }
             | HubCmd::Prs { project }
             | HubCmd::Scheduled { project }
+            | HubCmd::Usage { project }
+            | HubCmd::Pause { project }
+            | HubCmd::Resume { project }
             | HubCmd::ScheduledStop { project, .. }
             | HubCmd::Models { project }
             | HubCmd::New { project, .. }

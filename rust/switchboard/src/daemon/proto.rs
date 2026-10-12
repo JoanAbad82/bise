@@ -71,6 +71,8 @@ pub(super) struct Proto {
     heads: proto_view::heads::Heads,
     /// P4b: the last `flow` sent (sent again only when changed)
     flow: String,
+    /// cost-pause: the last `paused` sent (likewise)
+    paused: String,
 }
 
 /// G: the typed command being stepped (its connection, its tag, a send's
@@ -181,6 +183,17 @@ impl Shell {
     /// `error {cmd, text}`, so a command that does nothing says why.
     fn step_typed(&mut self, id: ClientId, cmd: &str, input: Input) {
         self.stepping(id, cmd, None, |sh| sh.step(input));
+    }
+
+    /// A user command whose words are its result, not an error
+    /// (cost-pause's project/pause, project/resume: `rpc::OWN_RESULTS`).
+    fn said_step(&mut self, id: ClientId, cmd: &str, user: crate::router::UserCmd) {
+        self.stepping(id, cmd, None, |sh| {
+            if let Some(s) = sh.proto.stepping.as_mut() {
+                s.as_notice = true;
+            }
+            sh.step(Input::UserCmd { client: id, focus: MAIN.into(), cmd: user });
+        });
     }
 
     /// Runs `f` (one step of a typed command) with its notices kept and
@@ -334,6 +347,8 @@ impl Shell {
             self.proto_send(id, &appr);
             let flow = self.flow_ev();
             self.proto_send(id, &flow);
+            let paused = self.paused_ev();
+            self.proto_send(id, &paused);
             // the released core's home connection (no typed_only): its
             // older start, one release (daemon/rpc.rs DOOR_EVENTS)
             if self.door_events(id) {

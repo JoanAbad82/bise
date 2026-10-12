@@ -97,6 +97,7 @@ pub(crate) fn title_status(app: &App) -> crate::termtitle::Status {
         inbox: sb.sorted_cards().len(),
         // event-wake: an agent waiting on an event is not idle
         running: sb.agents.iter().filter(|a| !a.main && (a.busy() || a.waits_event())).count(),
+        paused: sb.paused.is_some(),
     }
 }
 
@@ -218,6 +219,9 @@ pub(super) struct Sb {
     /// The repo's flow, `pr` or `trunk` ("" until the hub says): the
     /// header's held `lands via PRs` (dev-flow §7).
     flow: String,
+    /// cost-pause: since when the project is paused (the hub's typed
+    /// `paused`); None: it runs. The header and the tab title say it.
+    pub(crate) paused: Option<u64>,
     cards: Vec<Card>,
     /// msg-parts: the typed parts of the message the composer is sending
     /// (`attach::expand`), taken by the next line that is their text
@@ -848,6 +852,11 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
             crate::scheduled_screen::open(app);
             return out;
         }
+        // cost-pause: what the calls cost, full screen
+        Some("/usage") => {
+            crate::usage_screen::open(app);
+            return out;
+        }
         // bise_proto::slash reads it, as the hub reads the window's line
         Some("/artifacts") => {
             use bise_proto::slash::{artifacts, Artifacts, ARTIFACTS_ADD};
@@ -983,6 +992,12 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
             out.push(Ev::Warn(archived_warn(&sb.focus)));
         }
         _ => {
+            // cost-pause (designer m_18932): a paused project holds it; his
+            // row shows dim with why until /resume delivers it (the hub's
+            // `you` line then takes the row's place, push_event)
+            if sb.paused.is_some() && !typed.starts_with('/') {
+                out.push(Ev::Held(typed.clone().into()));
+            }
             sb.send_input(typed);
             // BISE-61: a hint goes away after the next user message
             crate::hints::user_message();

@@ -342,6 +342,9 @@ pub struct State {
     pub main_notes: Vec<String>,
     pub next_msg: u64,
     pub next_card: u64,
+    /// cost-pause: since when the project is paused (sb-core's view
+    /// `paused`, hub/pause.bend); None: it runs
+    pub paused: Option<u64>,
     /// `sb every`'s timers (sb-core's view `timers`, `timers_ended`)
     pub timers: crate::every::Timers,
     /// `sb wake`'s watches (sb-core's view `wakes`, `wakes_ended`)

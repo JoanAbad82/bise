@@ -368,6 +368,9 @@ def view(+s: M.St, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +all: Bool, +i
       J.kv("all_agents", J.JBool{all}),
       J.kv("msgs", J.JArr{msgs_json(all || Bool.not(List.is_empty(&2, Nat, ids)), M.St.msgs(s), all, ids)}),
       J.kv("all_msgs", J.JBool{all}),
-      J.kv("next_msg", J.JNum{M.St.next_msg(s)}), J.kv("next_card", J.JNum{M.St.next_card(s)})],
+      J.kv("next_msg", J.JNum{M.St.next_msg(s)}), J.kv("next_card", J.JNum{M.St.next_card(s)}),
+      # cost-pause: since when the project is paused (null: it runs),
+      # in every view (a few bytes): the hub's typed `paused` reads it
+      J.kv("paused", C.jmaybe_nat(M.St.paused(s)))],
     durable_kvs(all || Bool.not(List.is_empty(&2, M.Ev, evs)), s),
     timers_kvs(all, evs, s), wakes_kvs(all, evs, s)]))

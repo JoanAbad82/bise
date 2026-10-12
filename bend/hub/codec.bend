@@ -203,6 +203,11 @@ def ev_json(e: M.Ev) -> J.Json:
     # event-wake (an older sb-core reads these as unknown: skipped)
     case M.EWake{+we}:
       WK.ev_json(we)
+    # cost-pause (an older sb-core reads these as unknown: skipped)
+    case M.EPaused{+at}:
+      J.obj([ty("paused"), J.kv("at", J.JNum{at})])
+    case M.EResumed{+at}:
+      J.obj([ty("resumed"), J.kv("at", J.JNum{at})])
 
 # ---- decoding (the journal replayed at boot) ----
 
@@ -298,6 +303,8 @@ type EvK is Data:
   KJobEnd{}
   KWakeSet{}
   KWakeEnd{}
+  KPaused{}
+  KResumed{}
   KUnknown{}
 
 def ev_kind.x(+t: String) -> EvK:
@@ -317,7 +324,9 @@ def ev_kind.x(+t: String) -> EvK:
   Bool.pick(EvK, String.eq(t, "job_end"), KJobEnd{},
   Bool.pick(EvK, String.eq(t, "wake_set"), KWakeSet{},
   Bool.pick(EvK, String.eq(t, "wake_end"), KWakeEnd{},
-  KUnknown{}))))))))))))))))
+  Bool.pick(EvK, String.eq(t, "paused"), KPaused{},
+  Bool.pick(EvK, String.eq(t, "resumed"), KResumed{},
+  KUnknown{}))))))))))))))))))
 
 def ev_kind(+t: String) -> EvK:
   Bool.pick(EvK, String.eq(t, "task_created"), KTaskCreated{},
@@ -458,6 +467,10 @@ def ev_of.kind(k: EvK, +j: J.Json, +n: String) -> Maybe<&2, M.Ev>:
       Some{M.EX{XH.XRoute{get_nat(j, "rid"), XH.REnd{XH.RSent{}}}}}
     case KRouteCancelled{}:
       Some{M.EX{XH.XRoute{get_nat(j, "rid"), XH.REnd{XH.RCancelled{}}}}}
+    case KPaused{}:
+      Some{M.EPaused{get_nat(j, "at")}}
+    case KResumed{}:
+      Some{M.EResumed{get_nat(j, "at")}}
     case KUnknown{}:
       None{}
 

@@ -105,6 +105,10 @@ core_kinds! {
         WakeSet = "wake_set" => IWakeSet { agent: Str, spec: Json, max_text: Str, max_ms: Nat, quiet: Bool },
         WakeStop = "wake_stop" => IWakeStop { id: Nat, why: Str },
         WakeHit = "wake_hit" => IWakeHit { id: Nat, text: Str },
+        /// cost-pause: his pause and resume of the whole project
+        /// (hub/pause.bend; the client socket only)
+        Pause = "pause" => IPause {},
+        Resume = "resume" => IResume {},
     }
 }
 

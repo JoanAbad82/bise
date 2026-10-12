@@ -38,6 +38,8 @@ import ./hub/gen/fx.bend as HF
 
 import ./core/api.bend as Api
 
+import ./hub/pause.bend as HP
+
 import ./LAWS.bend as Laws
 
 def Laws.checkpoint_roundtrip(s):
@@ -2003,6 +2005,10 @@ def hub_apply_unique(s: HM.St, e: HM.Ev, u: HI.Unique(s), k: HX.FreshEv(s, e)) -
           u
         case HM.EWake{a}:
           u
+        case HM.EPaused{a}:
+          u
+        case HM.EResumed{a}:
+          u
 
 def hub_apply_all_unique(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.Unique(s), f: HX.Fresh(evs, s)) -> HI.Unique(HM.apply_all(evs, s)):
   match evs:
@@ -2125,6 +2131,10 @@ def hub_apply_kept(s: HM.St, e: HM.Ev) -> HI.Kept(s, HM.apply(s, e)):
         case HM.EJobEnd{a, b}:
           hub_prefix_refl(HI.ids(ms))
         case HM.EWake{a}:
+          hub_prefix_refl(HI.ids(ms))
+        case HM.EPaused{a}:
+          hub_prefix_refl(HI.ids(ms))
+        case HM.EResumed{a}:
           hub_prefix_refl(HI.ids(ms))
 
 def hub_apply_all_kept(+evs: List<&2, HM.Ev>, +s: HM.St) -> HI.Kept(s, HM.apply_all(evs, s)):
@@ -3082,6 +3092,10 @@ def hub_apply_ucards(s: HM.St, e: HM.Ev, u: HI.UniqueCards(s), k: HX.FreshEv(s, 
           u
         case HM.EWake{a}:
           u
+        case HM.EPaused{a}:
+          u
+        case HM.EResumed{a}:
+          u
 
 def hub_apply_all_ucards(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.UniqueCards(s), f: HX.Fresh(evs, s)) -> HI.UniqueCards(HM.apply_all(evs, s)):
   match evs:
@@ -3237,6 +3251,65 @@ def hub_ag_deliver(-o: HM.St, +b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +name: String
         Equal.trans(List<&2, HM.Agent>, hub_ag(o, cx3), hub_ag(o, cx2), hub_ag(o, cx),
           Equal.cong(HM.St, List<&2, HM.Agent>, s2 => HM.St.agents(s2), HX.d(o, cx3), HX.d(o, cx2), hub_d_dline(o, again, you, cx2, name, m)),
           hub_ag_mark(o, cx, HM.Msg.id(m))))
+
+# ---- cost-pause: a delivery keeps the pause (L4 support) ----
+
+def hub_pz(-o: HM.St, +cx: HX.Cx<o>) -> Maybe<&2, Nat>:
+  HM.St.paused(HX.d(o, cx))
+
+def hub_pz_notes(s: HM.St) -> {HM.St.paused(HM.apply(s, HM.ENotesFlushed{})) == HM.St.paused(s) : Maybe<&2, Nat>}:
+  match s:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz}:
+      {==}
+
+def hub_pz_state(s: HM.St, +id: Nat, +x: HM.MSt) -> {HM.St.paused(HM.apply(s, HM.EMsgState{id, x})) == HM.St.paused(s) : Maybe<&2, Nat>}:
+  match s:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz}:
+      {==}
+
+def hub_pz_flush(-o: HM.St, f: Bool, +cx: HX.Cx<o>) -> {hub_pz(o, HC.pump.flush(o, f, cx)) == hub_pz(o, cx) : Maybe<&2, Nat>}:
+  match f:
+    case True{}:
+      Equal.trans(Maybe<&2, Nat>, hub_pz(o, HC.pump.flush(o, True{}, cx)), HM.St.paused(HM.apply(HX.d(o, cx), HM.ENotesFlushed{})), hub_pz(o, cx),
+        Equal.cong(HM.St, Maybe<&2, Nat>, s => HM.St.paused(s), HX.d(o, HC.pump.flush(o, True{}, cx)), HM.apply(HX.d(o, cx), HM.ENotesFlushed{}),
+          hub_d_emit(o, cx, HM.ENotesFlushed{}, Unit{}, Unit{}, Unit{})),
+        hub_pz_notes(HX.d(o, cx)))
+    case False{}:
+      {==}
+
+def hub_pz_mark.go(-o: HM.St, +cx: HX.Cx<o>, +id: Nat, c: Bool, +e: {HX.queued_at(HX.d(o, cx), id) == c : Bool})
+    -> {hub_pz(o, HC.mark_delivered.go(o, cx, id, c, e)) == hub_pz(o, cx) : Maybe<&2, Nat>}:
+  match c:
+    case True{}:
+      Equal.trans(Maybe<&2, Nat>, hub_pz(o, HC.mark_delivered.go(o, cx, id, True{}, e)), HM.St.paused(HM.apply(HX.d(o, cx), HM.EMsgState{id, HM.Delivered{}})), hub_pz(o, cx),
+        Equal.cong(HM.St, Maybe<&2, Nat>, s => HM.St.paused(s), HX.d(o, HC.mark_delivered.go(o, cx, id, True{}, e)), HM.apply(HX.d(o, cx), HM.EMsgState{id, HM.Delivered{}}),
+          hub_d_emit(o, cx, HM.EMsgState{id, HM.Delivered{}}, Unit{}, Unit{}, e)),
+        hub_pz_state(HX.d(o, cx), id, HM.Delivered{}))
+    case False{}:
+      {==}
+
+def hub_pz_mark(-o: HM.St, +cx: HX.Cx<o>, +id: Nat) -> {hub_pz(o, HC.mark_delivered(o, cx, id)) == hub_pz(o, cx) : Maybe<&2, Nat>}:
+  hub_pz_mark.go(o, cx, id, HX.queued_at(HX.d(o, cx), id), {==})
+
+# delivering a batch keeps the pause
+def hub_pz_deliver(-o: HM.St, +b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +name: String, +acc: List<&2, HK.Delivered>)
+    -> {hub_pz(o, hub_p1(o, HC.deliver_each(o, b, cx, name, acc))) == hub_pz(o, cx) : Maybe<&2, Nat>}:
+  match b:
+    case Nil{}:
+      {==}
+    case Con{m, rest}:
+      +cx2 = HC.mark_delivered(o, cx, HM.Msg.id(m))
+      +s = HC.st(o, cx)
+      +again = HC.leftover_at(s, HM.Msg.id(m))
+      +you = HM.Msg.plain(m) || Maybe.is_some(&2, String, HM.Msg.via(m))
+      +cx3 = HC.deliver.line(o, again, you, cx2, name, m)
+      +rel = HC.relation(HM.Msg.from(m), HM.Msg.to(m), HC.parent_of(HM.get_agent(s, HM.Msg.from(m))), HC.parent_of(HM.get_agent(s, HM.Msg.to(m))))
+      Equal.trans(Maybe<&2, Nat>, hub_pz(o, hub_p1(o, HC.deliver_each(o, rest, cx3, name, HM.snoc(HK.Delivered, acc, HK.Delivered{HM.Msg.id(m), rel})))),
+        hub_pz(o, cx3), hub_pz(o, cx),
+        hub_pz_deliver(o, rest, cx3, name, HM.snoc(HK.Delivered, acc, HK.Delivered{HM.Msg.id(m), rel})),
+        Equal.trans(Maybe<&2, Nat>, hub_pz(o, cx3), hub_pz(o, cx2), hub_pz(o, cx),
+          Equal.cong(HM.St, Maybe<&2, Nat>, s2 => HM.St.paused(s2), HX.d(o, cx3), HX.d(o, cx2), hub_d_dline(o, again, you, cx2, name, m)),
+          hub_pz_mark(o, cx, HM.Msg.id(m))))
 
 def hub_rts(-o: HM.St, +cx: HX.Cx<o>) -> List<&2, HX.Rt>:
   HX.R.rts(HX.Cx.r(o, cx))
@@ -3440,8 +3513,8 @@ def hub_pw.idle.nil(-o: HM.St, +a: HM.Agent, +cx: HX.Cx<o>, +n: String,
     e: {HM.get_agent(HX.d(o, cx), n) == Some{a} : Maybe<&2, HM.Agent>}, ec: {HC.is_active(HM.Agent.life(a)) == True{} : Bool},
     eq: {HM.queued_for(HX.d(o, cx), n) == Nil{} : List<&2, HM.Msg>}) -> {HI.stuck.agent(HM.get_agent(HX.d(o, cx), n), HX.d(o, cx), n) == False{} : Bool}:
   %Equal.sym(Maybe<&2, HM.Agent>, HM.get_agent(HX.d(o, cx), n), Some{a}, e) : {HI.stuck.agent(_, HX.d(o, cx), n) == False{} : Bool}
-  %Equal.sym(Bool, HC.is_active(HM.Agent.life(a)), True{}, ec) : {Bool.and(_, Bool.not(List.is_empty(&2, HM.Msg, HM.queued_for(HX.d(o, cx), n)))) == False{} : Bool}
-  %Equal.sym(List<&2, HM.Msg>, HM.queued_for(HX.d(o, cx), n), Nil{}, eq) : {Bool.and(True{}, Bool.not(List.is_empty(&2, HM.Msg, _))) == False{} : Bool}
+  %Equal.sym(Bool, HC.is_active(HM.Agent.life(a)), True{}, ec) : {Bool.and(_, Bool.and(Bool.not(List.is_empty(&2, HM.Msg, HM.queued_for(HX.d(o, cx), n))), Bool.not(HP.is_paused(HX.d(o, cx))))) == False{} : Bool}
+  %Equal.sym(List<&2, HM.Msg>, HM.queued_for(HX.d(o, cx), n), Nil{}, eq) : {Bool.and(True{}, Bool.and(Bool.not(List.is_empty(&2, HM.Msg, _)), Bool.not(HP.is_paused(HX.d(o, cx))))) == False{} : Bool}
   {==}
 
 def hub_has_some(-o: HM.St, -a: HM.Agent, +cx: HX.Cx<o>, +n: String, e: {HM.get_agent(HX.d(o, cx), n) == Some{a} : Maybe<&2, HM.Agent>})
@@ -3481,7 +3554,7 @@ def hub_pw.run(-o: HM.St, r: HM.Run, +a: HM.Agent, +cx: HX.Cx<o>, +n: String,
 def hub_pw.inactive(-o: HM.St, +a: HM.Agent, +cx: HX.Cx<o>, +n: String,
     e: {HM.get_agent(HX.d(o, cx), n) == Some{a} : Maybe<&2, HM.Agent>}, ec: {HC.is_active(HM.Agent.life(a)) == False{} : Bool}) -> {HI.stuck.agent(HM.get_agent(HX.d(o, cx), n), HX.d(o, cx), n) == False{} : Bool}:
   %Equal.sym(Maybe<&2, HM.Agent>, HM.get_agent(HX.d(o, cx), n), Some{a}, e) : {HI.stuck.agent(_, HX.d(o, cx), n) == False{} : Bool}
-  %Equal.sym(Bool, HC.is_active(HM.Agent.life(a)), False{}, ec) : {Bool.and(_, Bool.not(List.is_empty(&2, HM.Msg, HM.queued_for(HX.d(o, cx), n)))) == False{} : Bool}
+  %Equal.sym(Bool, HC.is_active(HM.Agent.life(a)), False{}, ec) : {Bool.and(_, Bool.and(Bool.not(List.is_empty(&2, HM.Msg, HM.queued_for(HX.d(o, cx), n))), Bool.not(HP.is_paused(HX.d(o, cx))))) == False{} : Bool}
   {==}
 
 def hub_pw.active(-o: HM.St, c: Bool, +a: HM.Agent, +cx: HX.Cx<o>, +n: String,
@@ -3505,9 +3578,38 @@ def hub_pw.agent(-o: HM.St, m: Maybe<&2, HM.Agent>, +cx: HX.Cx<o>, +n: String, +
     case Some{+a}:
       hub_pw.active(o, HC.is_active(HM.Agent.life(a)), a, cx, n, e, {==})
 
+def hub_and3_false(a: Bool, b: Bool) -> {Bool.and(a, Bool.and(b, False{})) == False{} : Bool}:
+  match a b:
+    case True{} True{}:
+      {==}
+    case True{} False{}:
+      {==}
+    case False{} _:
+      {==}
+
+# a paused project holds its queues on purpose: not stuck (cost-pause)
+def hub_pw.held(-o: HM.St, m: Maybe<&2, HM.Agent>, +cx: HX.Cx<o>, +n: String,
+    +em: {HM.get_agent(HX.d(o, cx), n) == m : Maybe<&2, HM.Agent>}, +e: {HP.is_paused(HX.d(o, cx)) == True{} : Bool})
+    -> {HI.stuck.agent(HM.get_agent(HX.d(o, cx), n), HX.d(o, cx), n) == False{} : Bool}:
+  match m:
+    case None{}:
+      hub_pw.none(o, cx, n, em)
+    case Some{+a}:
+      %Equal.sym(Maybe<&2, HM.Agent>, HM.get_agent(HX.d(o, cx), n), Some{a}, em) : {HI.stuck.agent(_, HX.d(o, cx), n) == False{} : Bool}
+      %Equal.sym(Bool, HP.is_paused(HX.d(o, cx)), True{}, e) : {Bool.and(HC.is_active(HM.Agent.life(a)), Bool.and(Bool.not(List.is_empty(&2, HM.Msg, HM.queued_for(HX.d(o, cx), n))), Bool.not(_))) == False{} : Bool}
+      hub_and3_false(HC.is_active(HM.Agent.life(a)), Bool.not(List.is_empty(&2, HM.Msg, HM.queued_for(HX.d(o, cx), n))))
+
+def hub_pw.paused(-o: HM.St, p: Bool, +cx: HX.Cx<o>, +n: String, +e: {HP.is_paused(HX.d(o, cx)) == p : Bool})
+    -> {HI.stuck(HX.d(o, HC.pump.paused(o, p, cx, n)), hub_rts(o, HC.pump.paused(o, p, cx, n)), n) == False{} : Bool}:
+  match p:
+    case False{}:
+      hub_pw.agent(o, HM.get_agent(HX.d(o, cx), n), cx, n, {==})
+    case True{}:
+      hub_stuck_agent(HX.d(o, cx), hub_rts(o, cx), n, hub_pw.held(o, HM.get_agent(HX.d(o, cx), n), cx, n, {==}, e))
+
 # a delivery attempt never leaves its agent idle with queued messages
 def hub_pump_wakes(-o: HM.St, +cx: HX.Cx<o>, +n: String) -> {HI.stuck(HX.d(o, HC.pump(o, cx, n)), hub_rts(o, HC.pump(o, cx, n)), n) == False{} : Bool}:
-  hub_pw.agent(o, HM.get_agent(HX.d(o, cx), n), cx, n, {==})
+  hub_pw.paused(o, HP.is_paused(HX.d(o, cx)), cx, n, {==})
 
 
 # ---- L4 support: string equality is sound (equal strings are the same) ----
@@ -3738,49 +3840,65 @@ def hub_sa.e1(x: Bool, -y: Bool, e: {x == True{} : Bool}, h: {Bool.and(x, y) == 
     case False{}:
       hub_absurd_eq(hub_ft_absurd(e), Bool, y, False{})
 
-def hub_sa.act(b: Bool, +a: HM.Agent, +s1: HM.St, +s2: HM.St, +n: String, +eb: {HC.is_active(HM.Agent.life(a)) == b : Bool},
-    e1: {Bool.and(HC.is_active(HM.Agent.life(a)), Bool.not(hub_q(s1, n))) == False{} : Bool}, qi: {hub_qimp(s1, s2, n) == True{} : Bool})
-    -> {Bool.and(HC.is_active(HM.Agent.life(a)), Bool.not(hub_q(s2, n))) == False{} : Bool}:
+# not(q1) && p is false and q1 => q2: not(q2) && p is false
+def hub_sa.q2(q1: Bool, +q2: Bool, p: Bool, h: {Bool.and(Bool.not(q1), p) == False{} : Bool}, qi: {Bool.or(Bool.not(q1), q2) == True{} : Bool})
+    -> {Bool.and(Bool.not(q2), p) == False{} : Bool}:
+  match q1 p:
+    case _ False{}:
+      hub_and_false_r(Bool.not(q2))
+    case True{} True{}:
+      %Equal.sym(Bool, Bool.not(q2), False{}, hub_not_true(q2, qi)) : {Bool.and(_, True{}) == False{} : Bool}
+      {==}
+    case False{} True{}:
+      hub_absurd_eq(hub_tf_absurd(h), Bool, Bool.and(Bool.not(q2), True{}), False{})
+
+def hub_sa.act(b: Bool, +a: HM.Agent, +s1: HM.St, +s2: HM.St, +n: String, +eb: {HC.is_active(HM.Agent.life(a)) == b : Bool}, +p: Bool,
+    e1: {Bool.and(HC.is_active(HM.Agent.life(a)), Bool.and(Bool.not(hub_q(s1, n)), p)) == False{} : Bool}, qi: {hub_qimp(s1, s2, n) == True{} : Bool})
+    -> {Bool.and(HC.is_active(HM.Agent.life(a)), Bool.and(Bool.not(hub_q(s2, n)), p)) == False{} : Bool}:
   match b:
     case False{}:
-      %Equal.sym(Bool, HC.is_active(HM.Agent.life(a)), False{}, eb) : {Bool.and(_, Bool.not(hub_q(s2, n))) == False{} : Bool}
+      %Equal.sym(Bool, HC.is_active(HM.Agent.life(a)), False{}, eb) : {Bool.and(_, Bool.and(Bool.not(hub_q(s2, n)), p)) == False{} : Bool}
       {==}
     case True{}:
-      %Equal.sym(Bool, HC.is_active(HM.Agent.life(a)), True{}, eb) : {Bool.and(_, Bool.not(hub_q(s2, n))) == False{} : Bool}
-      hub_sa.q(hub_q(s1, n), hub_q(s2, n), {==}, hub_sa.e1(HC.is_active(HM.Agent.life(a)), Bool.not(hub_q(s1, n)), eb, e1), qi)
+      %Equal.sym(Bool, HC.is_active(HM.Agent.life(a)), True{}, eb) : {Bool.and(_, Bool.and(Bool.not(hub_q(s2, n)), p)) == False{} : Bool}
+      hub_sa.q2(hub_q(s1, n), hub_q(s2, n), p, hub_sa.e1(HC.is_active(HM.Agent.life(a)), Bool.and(Bool.not(hub_q(s1, n)), p), eb, e1), qi)
 
 # an agent not stuck by its record in s1 is not in s2, when its queue can
-# only have emptied
+# only have emptied and the pause is the same
 def hub_sa(m: Maybe<&2, HM.Agent>, +s1: HM.St, +s2: HM.St, +n: String,
-    e1: {HI.stuck.agent(m, s1, n) == False{} : Bool}, qi: {hub_qimp(s1, s2, n) == True{} : Bool})
+    e1: {HI.stuck.agent(m, s1, n) == False{} : Bool}, qi: {hub_qimp(s1, s2, n) == True{} : Bool},
+    ep: {HM.St.paused(s2) == HM.St.paused(s1) : Maybe<&2, Nat>})
     -> {HI.stuck.agent(m, s2, n) == False{} : Bool}:
   match m:
     case None{}:
       {==}
     case Some{+a}:
-      hub_sa.act(HC.is_active(HM.Agent.life(a)), a, s1, s2, n, {==}, e1, qi)
+      %Equal.sym(Maybe<&2, Nat>, HM.St.paused(s2), HM.St.paused(s1), ep) : {Bool.and(HC.is_active(HM.Agent.life(a)), Bool.and(Bool.not(hub_q(s2, n)), Bool.not(Maybe.is_some(&2, Nat, _)))) == False{} : Bool}
+      hub_sa.act(HC.is_active(HM.Agent.life(a)), a, s1, s2, n, {==}, Bool.not(Maybe.is_some(&2, Nat, HM.St.paused(s1))), e1, qi)
 
 def hub_frame.idle(b: Bool, +r: HM.Run, m: Maybe<&2, HM.Agent>, +s1: HM.St, +s2: HM.St, +n: String,
     +eb: {HC.is_idle(r) == b : Bool}, h: {Bool.and(HC.is_idle(r), HI.stuck.agent(m, s1, n)) == False{} : Bool},
-    qi: {hub_qimp(s1, s2, n) == True{} : Bool}) -> {Bool.and(HC.is_idle(r), HI.stuck.agent(m, s2, n)) == False{} : Bool}:
+    qi: {hub_qimp(s1, s2, n) == True{} : Bool}, ep: {HM.St.paused(s2) == HM.St.paused(s1) : Maybe<&2, Nat>})
+    -> {Bool.and(HC.is_idle(r), HI.stuck.agent(m, s2, n)) == False{} : Bool}:
   match b:
     case False{}:
       %Equal.sym(Bool, HC.is_idle(r), False{}, eb) : {Bool.and(_, HI.stuck.agent(m, s2, n)) == False{} : Bool}
       {==}
     case True{}:
       %Equal.sym(Bool, HC.is_idle(r), True{}, eb) : {Bool.and(_, HI.stuck.agent(m, s2, n)) == False{} : Bool}
-      hub_sa(m, s1, s2, n, hub_sa.e1(HC.is_idle(r), HI.stuck.agent(m, s1, n), eb, h), qi)
+      hub_sa(m, s1, s2, n, hub_sa.e1(HC.is_idle(r), HI.stuck.agent(m, s1, n), eb, h), qi, ep)
 
-# an agent not stuck stays so when its run and record are unchanged and
-# its queue can only have emptied
+# an agent not stuck stays so when its run and record are unchanged, its
+# queue can only have emptied and the pause is the same
 def hub_frame(+s1: HM.St, +rts1: List<&2, HX.Rt>, +s2: HM.St, +rts2: List<&2, HX.Rt>, +n: String,
     er: {HX.Rt.run(HC.rt_find(rts2, n)) == HX.Rt.run(HC.rt_find(rts1, n)) : HM.Run},
     ea: {HM.get_agent(s2, n) == HM.get_agent(s1, n) : Maybe<&2, HM.Agent>},
-    qi: {hub_qimp(s1, s2, n) == True{} : Bool}, h: {HI.stuck(s1, rts1, n) == False{} : Bool})
+    qi: {hub_qimp(s1, s2, n) == True{} : Bool}, ep: {HM.St.paused(s2) == HM.St.paused(s1) : Maybe<&2, Nat>},
+    h: {HI.stuck(s1, rts1, n) == False{} : Bool})
     -> {HI.stuck(s2, rts2, n) == False{} : Bool}:
   %Equal.sym(HM.Run, HX.Rt.run(HC.rt_find(rts2, n)), HX.Rt.run(HC.rt_find(rts1, n)), er) : {Bool.and(HC.is_idle(_), HI.stuck.agent(HM.get_agent(s2, n), s2, n)) == False{} : Bool}
   %Equal.sym(Maybe<&2, HM.Agent>, HM.get_agent(s2, n), HM.get_agent(s1, n), ea) : {Bool.and(HC.is_idle(HX.Rt.run(HC.rt_find(rts1, n))), HI.stuck.agent(_, s2, n)) == False{} : Bool}
-  hub_frame.idle(HC.is_idle(HX.Rt.run(HC.rt_find(rts1, n))), HX.Rt.run(HC.rt_find(rts1, n)), HM.get_agent(s1, n), s1, s2, n, {==}, h, qi)
+  hub_frame.idle(HC.is_idle(HX.Rt.run(HC.rt_find(rts1, n))), HX.Rt.run(HC.rt_find(rts1, n)), HM.get_agent(s1, n), s1, s2, n, {==}, h, qi, ep)
 
 
 # ---- L4 support: a delivery only empties queues ----
@@ -4039,6 +4157,10 @@ def hub_pb_frame(-o: HM.St, +busy: Bool, b: List<&2, HM.Msg>, +cx: HX.Cx<o>, +a:
           hub_qimp_trans(HX.d(o, cx2), HX.d(o, p1), HX.d(o, fin), n,
             hub_qimp_deliver(o, bb, cx2, a, Nil{}, n),
             hub_qimp_eq(HX.d(o, p1), HX.d(o, fin), n, edf))),
+        Equal.trans(Maybe<&2, Nat>, hub_pz(o, fin), hub_pz(o, p1), hub_pz(o, cx),
+          Equal.cong(HM.St, Maybe<&2, Nat>, s => HM.St.paused(s), HX.d(o, fin), HX.d(o, p1), edf),
+          Equal.trans(Maybe<&2, Nat>, hub_pz(o, p1), hub_pz(o, cx2), hub_pz(o, cx),
+            hub_pz_deliver(o, bb, cx2, a, Nil{}), hub_pz_flush(o, f, cx))),
         h)
 
 def hub_pf.run(-o: HM.St, r: HM.Run, +cx: HX.Cx<o>, +a: String, +q: List<&2, HM.Msg>, +im: Bool, +n: String,
@@ -4072,11 +4194,21 @@ def hub_pf.agent(-o: HM.St, m: Maybe<&2, HM.Agent>, +cx: HX.Cx<o>, +a: String, +
     case Some{+ag}:
       hub_pf.active(o, HC.is_active(HM.Agent.life(ag)), cx, a, HM.Agent.is_main(ag), n, ne, h)
 
+# paused: the pump changes nothing (cost-pause)
+def hub_pf.paused(-o: HM.St, p: Bool, +cx: HX.Cx<o>, +a: String, +n: String,
+    +ne: {String.eq(a, n) == False{} : Bool}, +h: {HI.stuck(HX.d(o, cx), hub_rts(o, cx), n) == False{} : Bool})
+    -> {HI.stuck(HX.d(o, HC.pump.paused(o, p, cx, a)), hub_rts(o, HC.pump.paused(o, p, cx, a)), n) == False{} : Bool}:
+  match p:
+    case True{}:
+      h
+    case False{}:
+      hub_pf.agent(o, HM.get_agent(HC.st(o, cx), a), cx, a, n, ne, h)
+
 # a delivery attempt for A never makes another agent stuck
 def hub_pump_frame(-o: HM.St, +cx: HX.Cx<o>, +a: String, +n: String,
     +ne: {String.eq(a, n) == False{} : Bool}, +h: {HI.stuck(HX.d(o, cx), hub_rts(o, cx), n) == False{} : Bool})
     -> {HI.stuck(HX.d(o, HC.pump(o, cx, a)), hub_rts(o, HC.pump(o, cx, a)), n) == False{} : Bool}:
-  hub_pf.agent(o, HM.get_agent(HC.st(o, cx), a), cx, a, n, ne, h)
+  hub_pf.paused(o, HP.is_paused(HX.d(o, cx)), cx, a, n, ne, h)
 
 
 # ---- L4: no agent stuck, except the listed ones ----
@@ -4487,6 +4619,10 @@ def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e
           hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OFollow{None{}})), HI.profile(ag), hub_prof_map(ag, x, HM.OFollow{None{}}, {==}), u)
         case HM.EWake{a}:
           u
+        case HM.EPaused{a}:
+          u
+        case HM.EResumed{a}:
+          u
 
 def hub_apply_all_names(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.NamesApart(s), f: HX.Fresh(evs, s)) -> HI.NamesApart(HM.apply_all(evs, s)):
   match evs:
@@ -4509,50 +4645,6 @@ def Laws.names_apart(ins, h, u):
     Laws.hub_run_replays(ins, h),
     hub_apply_all_names(HC.RunR.journal(HC.run(ins, h)), HC.Hub.d(h), u, Laws.msg_ids_fresh(ins, h)))
 
-
-# ---- L4: the frame of an agent, by its activity and its queue ----
-
-def hub_act(m: Maybe<&2, HM.Agent>) -> Bool:
-  match m:
-    case None{}:
-      False{}
-    case Some{a}:
-      HC.is_active(HM.Agent.life(a))
-
-def hub_sa_act(m: Maybe<&2, HM.Agent>, +s: HM.St, +n: String) -> {HI.stuck.agent(m, s, n) == Bool.and(hub_act(m), Bool.not(hub_q(s, n))) : Bool}:
-  match m:
-    case None{}:
-      {==}
-    case Some{a}:
-      {==}
-
-# the state part of an agent's frame: same activity, a queue that can only empty
-def hub_sf(+s1: HM.St, +s2: HM.St, +n: String) -> Data:
-  HX.Both<{hub_act(HM.get_agent(s2, n)) == hub_act(HM.get_agent(s1, n)) : Bool}, {hub_qimp(s1, s2, n) == True{} : Bool}>
-
-def hub_frame2.q(a: Bool, +q1: Bool, +q2: Bool, h: {Bool.and(a, Bool.not(q1)) == False{} : Bool}, qi: {Bool.or(Bool.not(q1), q2) == True{} : Bool})
-    -> {Bool.and(a, Bool.not(q2)) == False{} : Bool}:
-  match a:
-    case False{}:
-      {==}
-    case True{}:
-      hub_sa.q(q1, q2, {==}, h, qi)
-
-def hub_frame2.h(m: Maybe<&2, HM.Agent>, +s: HM.St, +n: String, h: {HI.stuck.agent(m, s, n) == False{} : Bool}) -> {Bool.and(hub_act(m), Bool.not(hub_q(s, n))) == False{} : Bool}:
-  match m:
-    case None{}:
-      {==}
-    case Some{a}:
-      h
-
-def hub_frame2.sa(+s1: HM.St, +s2: HM.St, +n: String, sf: hub_sf(s1, s2, n), h: {HI.stuck.agent(HM.get_agent(s1, n), s1, n) == False{} : Bool})
-    -> {HI.stuck.agent(HM.get_agent(s2, n), s2, n) == False{} : Bool}:
-  match sf:
-    case HX.Both{ea, qi}:
-      %Equal.sym(Bool, HI.stuck.agent(HM.get_agent(s2, n), s2, n), Bool.and(hub_act(HM.get_agent(s2, n)), Bool.not(hub_q(s2, n))), hub_sa_act(HM.get_agent(s2, n), s2, n)) : {_ == False{} : Bool}
-      %Equal.sym(Bool, hub_act(HM.get_agent(s2, n)), hub_act(HM.get_agent(s1, n)), ea) : {Bool.and(_, Bool.not(hub_q(s2, n))) == False{} : Bool}
-      hub_frame2.q(hub_act(HM.get_agent(s1, n)), hub_q(s1, n), hub_q(s2, n),
-        hub_frame2.h(HM.get_agent(s1, n), s1, n, h), qi)
 
 def Laws.image_split_marker():
   {==}
@@ -5058,7 +5150,8 @@ def Laws.fire_is_a_message(o, p, t, due, next):
       hub_count_journal(o, due, cx, t, next)
 
 def Laws.wake_never_stacked(o, cx, t, text, due, next, q):
-  %Equal.sym(Bool, HC.bise_queued(HX.d(o, cx), HTM.Timer.agent(t)), True{}, q) : {HC.timer_fire.go(o, HTM.may_fire(_, due, t, HC.timer_ready(o, cx, HTM.Timer.agent(t)), HC.now(o, cx)), cx, t, text, due, next) == cx : HX.Cx<o>}
+  %Equal.sym(Bool, HC.bise_queued(HX.d(o, cx), HTM.Timer.agent(t)), True{}, q) : {HC.timer_fire.go(o, Bool.and(Bool.not(HP.is_paused(HX.d(o, cx))), HTM.may_fire(_, due, t, HC.timer_ready(o, cx, HTM.Timer.agent(t)), HC.now(o, cx))), cx, t, text, due, next) == cx : HX.Cx<o>}
+  %Equal.sym(Bool, Bool.and(Bool.not(HP.is_paused(HX.d(o, cx))), False{}), False{}, hub_and_false_r(Bool.not(HP.is_paused(HX.d(o, cx))))) : {HC.timer_fire.go(o, _, cx, t, text, due, next) == cx : HX.Cx<o>}
   {==}
 
 # a < b is not b <= a
@@ -5096,6 +5189,50 @@ def Laws.named_announces_once(t, name):
   match t:
     case HTM.Timer{id, ag, by, tx, sc, nx, un, tms, fd, pg, ls, rs, nm, hd}:
       {==}
+
+# ---- the project's pause (cost-pause) ----
+
+def Laws.paused_delivers_nothing(o, cx, n, q):
+  %Equal.sym(Bool, HP.is_paused(HX.d(o, cx)), True{}, q) : {HC.pump.paused(o, _, cx, n) == cx : HX.Cx<o>}
+  {==}
+
+def Laws.timer_held_while_paused(o, cx, t, due, q):
+  %Equal.sym(Bool, HP.is_paused(HX.d(o, cx)), True{}, q) : {Bool.and(Bool.not(_), HTM.may_fire(HC.bise_queued(HX.d(o, cx), HTM.Timer.agent(t)), due, t, HC.timer_ready(o, cx, HTM.Timer.agent(t)), HC.now(o, cx))) == False{} : Bool}
+  {==}
+
+def Laws.pause_idempotent(o, cx, q):
+  %Equal.sym(Bool, HP.is_paused(HX.d(o, cx)), True{}, q) : {HC.pause.go(o, _, cx) == HC.notice(o, cx, HP.ALREADY()) : HX.Cx<o>}
+  {==}
+
+def Laws.resume_idempotent(o, cx, q):
+  %Equal.sym(Bool, HP.is_paused(HX.d(o, cx)), False{}, q) : {HC.resume.go(o, _, cx) == HC.notice(o, cx, HP.NOT_PAUSED()) : HX.Cx<o>}
+  {==}
+
+def Laws.paused_line_pauses(s, at):
+  match s:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz}:
+      {==}
+
+def Laws.resumed_line_resumes(s, at):
+  match s:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz}:
+      {==}
+
+def Laws.pause_keeps_order(s, at):
+  match s:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz}:
+      {==}
+
+def Laws.resume_keeps_order(s, at):
+  match s:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz}:
+      {==}
+
+def Laws.pause_line_keeps(at):
+  {==}
+
+def Laws.resume_line_keeps(at):
+  {==}
 
 # ---- stop_leaves_no_timer: a drop's stops leave no timer of the agent ----
 

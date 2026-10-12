@@ -47,6 +47,7 @@ mod dispatch;
 mod inbox;
 mod merged;
 mod state_gate;
+mod usage;
 mod wakes;
 mod worktrees;
 mod xhub;
@@ -198,6 +199,8 @@ enum Msg {
         line: Option<String>,
     },
     /// A timer-name call is over (every_name.rs).
+    /// `/usage`'s first read counted the transcripts (daemon/usage.rs).
+    UsageCounted(Box<crate::usage_ledger::Ledger>),
     TimerName {
         id: u64,
         reply: Option<String>,
@@ -360,6 +363,8 @@ struct Shell {
     /// What each live REPL read since it started: an aged one restarts
     /// at idle (daemon/recycling.rs, a workaround for the Bend allocator).
     recycle: recycling::Recycle,
+    /// What the project's calls cost, per agent and model (daemon/usage.rs).
+    usage: usage::Usage,
     /// The last plugins check (every 2 s on the tick).
     plugins_checked: Option<std::time::Instant>,
     /// The small model failed and agent_model answered: role lines use
@@ -1630,6 +1635,7 @@ impl Shell {
             return;
         }
         self.recycle_line(dir, line);
+        self.usage_line(&name, line);
         // the answer as it streams in: memory and clients, never the feed
         if line.starts_with("partial #") {
             return self.on_partial(&name, line);
@@ -2072,6 +2078,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         spawn_plugins: BTreeMap::new(),
         plugins_checked: None,
         recycle: recycling::Recycle::from_env(),
+        usage: Default::default(),
         small_broken: Default::default(),
         setup: None,
         config_path: None,

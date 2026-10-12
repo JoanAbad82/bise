@@ -8,6 +8,8 @@ import ./cx.bend as X
 
 import ./core.bend as H
 
+import ./pause.bend as P
+
 import ./timers.bend as TM
 
 import ./wakes.bend as WK
@@ -75,10 +77,11 @@ def stuck.agent(m: Maybe<&2, M.Agent>, +s: M.St, +n: String) -> Bool:
     case None{}:
       False{}
     case Some{+a}:
-      Bool.and(H.is_active(M.Agent.life(a)), Bool.not(List.is_empty(&2, M.Msg, M.queued_for(s, n))))
+      Bool.and(H.is_active(M.Agent.life(a)), Bool.and(Bool.not(List.is_empty(&2, M.Msg, M.queued_for(s, n))), Bool.not(P.is_paused(s))))
 
 # law L4: agent `n` is idle, active, and has messages queued (a message
-# stuck: nothing would ever deliver it)
+# stuck: nothing would ever deliver it). A paused project holds them on
+# purpose (cost-pause): /resume delivers them, so they are not stuck
 def stuck(+s: M.St, +rts: List<&2, X.Rt>, +n: String) -> Bool:
   Bool.and(H.is_idle(X.Rt.run(H.rt_find(rts, n))), stuck.agent(M.get_agent(s, n), s, n))
 

@@ -74,6 +74,7 @@ pub mod switch;
 pub mod tools_env;
 pub mod transcript;
 pub mod trunk;
+pub mod usage_ledger;
 pub mod util;
 pub mod view;
 pub mod wake;

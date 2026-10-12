@@ -48,3 +48,5 @@ follow IFollow
 wake_set IWakeSet
 wake_stop IWakeStop
 wake_hit IWakeHit
+pause IPause
+resume IResume
