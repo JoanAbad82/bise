@@ -72,6 +72,9 @@ for (const route of [`project/${P}`, 'bise']) {
           win?.setContentSize(ww, hh);
         }, [w, h] as const);
         await expect.poll(() => page.evaluate(() => window.innerWidth), { message: `the window is ${size}` }).toBe(w);
+        // the frame follows the resize on its next render: read the panel (and press ⌥⌘0) after it,
+        // never in between (under load the key reached the old frame: a slide-over opened at 800)
+        await page.evaluate(() => new Promise<void>((done) => { requestAnimationFrame(() => { requestAnimationFrame(() => { done(); }); }); }));
         const panel = page.getByTestId('app.panel');
         for (const open of [true, false]) {
           // panel A: open or shut as asked (under 1000 px it's a slide-over: shut only)
