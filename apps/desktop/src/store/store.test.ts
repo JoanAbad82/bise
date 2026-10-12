@@ -329,6 +329,35 @@ describe("store", () => {
     expect(store.pending(K)).toHaveLength(1);
   });
 
+  it("a send goes when its echo comes in a page too; an older entry with the same words never takes it (ambient-lead m_20138)", () => {
+    const sent: CoreCmd[] = [];
+    let now = 100_000;
+    const store = new Store({ send: (c) => sent.push(c) }, { now: () => now });
+    store.setCore("up");
+    const you = (pos: number, at_ms: number, text: string, more: Partial<Entry> = {}): Entry => ({ pos, at_ms, kind: "you", text, ...more });
+    store.send({ project: P, agent: "perf", text: "ok" });
+    // the thread opened after the send: a page with an old 'ok' only, then one with his echo
+    store.apply({ ev: "thread", project: P, agent: "perf", entries: [you(3, 20_000, "ok")], before: null, more: false });
+    expect(store.pending(K).map((p) => p.text)).toEqual(["ok"]);
+    // the old one sent again with its steered_at (an entry event) still is not his new one
+    store.apply({ ev: "entry", project: P, agent: "perf", entry: you(3, 20_000, "ok", { steered_at: 4, msg_id: 7, delivery: "read" }) });
+    expect(store.pending(K)).toHaveLength(1);
+    store.apply({ ev: "thread", project: P, agent: "perf", entries: [you(3, 20_000, "ok"), you(9, 100_400, "ok", { msg_id: 12 })], before: null, more: false });
+    expect(store.pending(K)).toEqual([]);
+    // a steered one: its echo is an entry, re-sent with its marks (received, then read + steered_at)
+    now = 200_000;
+    store.send({ project: P, agent: "perf", text: "also try webp" });
+    store.apply({ ev: "entry", project: P, agent: "perf", entry: you(11, 200_100, "also try webp", { msg_id: 13, delivery: "sent" }) });
+    expect(store.pending(K)).toEqual([]);
+    store.apply({ ev: "entry", project: P, agent: "perf", entry: you(11, 200_100, "also try webp", { msg_id: 13, delivery: "read", steered_at: 12 }) });
+    expect(store.pending(K)).toEqual([]);
+    // a queued one: its echo is written when it is said, later, and still takes it
+    now = 300_000;
+    store.send({ project: P, agent: "perf", text: "and the changelog", mode: "queued" });
+    store.apply({ ev: "entry", project: P, agent: "perf", entry: you(20, 360_000, "and the changelog", { msg_id: 14 }) });
+    expect(store.pending(K)).toEqual([]);
+  });
+
   it("a send with an image goes when its echo lands with the hub's marker before his words (qa-native R41)", () => {
     const { store } = fake();
     store.send({

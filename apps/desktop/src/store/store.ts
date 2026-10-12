@@ -86,6 +86,12 @@ const EMPTY: readonly never[] = [];
 /** A stopped dictation's final is the core's within its FINAL_WAIT (1.5 s, core.rs); past this, the window ends it. */
 export const DICTATE_STOP_WAIT_MS = 5000;
 
+/**
+ * How much earlier than his send its echo (the hub's 'you' entry) may say it was written: the
+ * window's clock and the hub's line times are the same machine's, read a few ms apart.
+ */
+export const ECHO_SLACK_MS = 5000;
+
 interface Thread {
   view: ThreadOrder;
   byPos: Map<number, Entry>;
@@ -753,6 +759,11 @@ export class Store {
     const key = threadKey(ev.project, ev.agent);
     const t = this.thread(key);
     for (const e of ev.entries) this.putEntry(key, t, e);
+    // his message can come back in a page, not as an entry event: a thread he opened after
+    // sending (from the bar, the spotlight), or the page a reconnection sends. Its pending row
+    // goes the same way (ambient-lead m_20138: it stayed 'sending…' after main answered)
+    if (t.pending.length > 0)
+      for (const e of ev.entries) if (e.kind === "you") this.landed(key, t, e);
     const all = new Set(t.view.order);
     for (const e of ev.entries) all.add(e.pos);
     const order = [...all].sort((a, b) => a - b);
@@ -801,13 +812,17 @@ export class Store {
     // msg-parts: a send with typed parts comes back with them (the hub's text is the model's
     // template, never the window's): compared by parts; else by words, the hub's image markers
     // ('<image name="[Image #1]" …>') left out (qa-native R41). architect's A1 matches by id later.
+    // Only an entry written after the send can be its echo: an older one with the same words (a
+    // page, or an old entry sent again with its steered_at) never takes a new send's row.
     const typed =
       e.parts != null && e.parts.length > 0 ? sentParts(e.parts) : null;
     const said = sentWords(e.text);
-    const i = t.pending.findIndex((p) =>
-      typed !== null && p.parts !== undefined
-        ? sentParts(p.parts) === typed
-        : sentWords(p.text) === said,
+    const i = t.pending.findIndex(
+      (p) =>
+        e.at_ms >= p.at_ms - ECHO_SLACK_MS &&
+        (typed !== null && p.parts !== undefined
+          ? sentParts(p.parts) === typed
+          : sentWords(p.text) === said),
     );
     if (i < 0) return;
     t.pending = t.pending.filter((_, j) => j !== i);
