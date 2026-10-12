@@ -1,6 +1,7 @@
 // What a thread row shows of an entry (the hub folds the transcript; this
 // only picks words and the ds part). Owner: amb-win. Pure.
 import type { Entry } from '@/proto';
+import { NAMELESS_KINDS } from './tiers';
 
 /** A row's key in the thread list: an entry by its pos, a send not confirmed by its cid. */
 export const entryKey = (pos: number) => `e:${pos}`;
@@ -134,6 +135,39 @@ export function groupHead(prev: Entry | undefined, e: Entry, ctx: { agent: strin
   if (authorOf(prev, ctx) !== a) return true;
   if (e.at_ms > 0 && prev.at_ms > 0 && e.at_ms - prev.at_ms > GROUP_GAP_MS) return true;
   return !sameDay(prev.at_ms, e.at_ms, tz);
+}
+
+/**
+ * The rows whose name line shows (tui-parity H2, designer m_19832): one head per run of the same
+ * author, opened by a new author, his message or 5 min of silence; never on a tool or a thinking
+ * row: a turn that opens on its work gets its head on its first row that is not work, a turn of
+ * work only gets none. `carry`: the last turn opened on its work and still owes its head (the live
+ * row takes it). News and plumbing rows draw no name and close a run. Pure.
+ */
+export function namedRows(
+  order: readonly number[],
+  entry: (pos: number) => Entry | undefined,
+  ctx: { agent: string; bise: boolean },
+  tz?: string,
+): { named: Set<number>; carry: boolean } {
+  const named = new Set<number>();
+  let prev: Entry | undefined;
+  let carry = false;
+  for (const pos of order) {
+    const e = entry(pos);
+    if (e === undefined) continue;
+    const opens = groupHead(prev, e, ctx, tz);
+    if (e.kind === 'tools' || e.kind === 'thinking') {
+      if (opens) carry = true;
+    } else if (NAMELESS_KINDS.has(e.kind)) {
+      carry = false;
+    } else if (opens || carry) {
+      named.add(pos);
+      carry = false;
+    }
+    prev = e;
+  }
+  return { named, carry };
 }
 
 const CONTEXT_BLOCK = /\n*<screen_context\b[^>]*>[\s\S]*?<\/screen_context>\s*/g;

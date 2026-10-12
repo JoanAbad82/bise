@@ -5,10 +5,11 @@
 // land the hub said twice (a '·' notice line, then the typed row), a PR, a scheduled run (tier 3),
 // a card (tier 1). Passes when, at 1400 / 1100 / 800, light and dark:
 //   - the run folds to '▸ 3 messages between 2 agents' whose left edge is the prose's (±1 px);
-//   - nothing addressed to another agent is sans or ink: open, the notes are mono in --c-text-3,
-//     the sender in ink 600, at most 2 rows of words before '… ▸';
+//   - nothing addressed to another agent is ink: open, the notes are sans 13 in --c-text-3 (H4,
+//     designer m_19832), the sender in ink 600, one row of words before '▸';
 //   - one land per sha: no '· ✓ flake-roots landed …' line, the typed row once;
-//   - the news rows are mono and never wrap; the card's line is sans 14 in ink;
+//   - the news rows are sans 13, 4 px apart (H1), never wrap; the landed row in text-2 with its sha
+//     mono, not underlined (H5); the card's line is sans 14 in ink;
 // and perf's own thread draws its wake as one news row. Frames: tiers-<theme>-<width>-{folded,open}.png
 // and tiers-<theme>-wake.png. Owner: amb-win.
 import type { Page } from '@playwright/test';
@@ -78,18 +79,25 @@ for (const theme of ['light', 'dark']) {
         // one land per sha, no stray '·' line
         await expect(page.getByTestId('thread.notice.7')).toHaveCount(0);
         await expect(page.getByTestId('thread.landed.8')).toHaveCount(1);
-        // news: mono, one row
+        // news: quiet rows, sans 13 (designer m_19832: mono only for the sha), one row
         for (const id of ['thread.landed.8', 'thread.pr.9']) {
-          const n = await page.getByTestId(id).evaluate((el) => ({ font: getComputedStyle(el).fontFamily, ws: getComputedStyle(el).whiteSpace, h: el.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(el).lineHeight) }));
-          expect(n.font, `${id}: mono`).toMatch(/mono/i);
+          const n = await page.getByTestId(id).evaluate((el) => ({ font: getComputedStyle(el).fontFamily, size: getComputedStyle(el).fontSize, ws: getComputedStyle(el).whiteSpace, h: el.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(el).lineHeight) }));
+          expect(n.font, `${id}: sans`).not.toMatch(/mono/i);
+          expect(n.size, `${id}: 13 px`).toBe('13px');
           expect(n.ws, `${id}: never wraps`).toBe('nowrap');
           expect(n.h, `${id}: one row`).toBeLessThan(n.lh * 1.6);
         }
-        // no name line, so a new author opens no 20 px group: 8 px between two news rows
+        // H1: two quiet rows touch, 4 px apart (--gap-tight)
         const [landedBox, prBox] = await Promise.all(['thread.landed.8', 'thread.pr.9'].map((id) => page.getByTestId(id).boundingBox()));
         const between = Math.round((prBox?.y ?? 0) - ((landedBox?.y ?? 0) + (landedBox?.height ?? 0)));
-        expect(between, `8 px between the landed and the PR rows (${String(between)})`).toBeGreaterThanOrEqual(6);
-        expect(between, `8 px between the landed and the PR rows (${String(between)})`).toBeLessThanOrEqual(10);
+        expect(between, `4 px between the landed and the PR rows (${String(between)})`).toBeGreaterThanOrEqual(2);
+        expect(between, `4 px between the landed and the PR rows (${String(between)})`).toBeLessThanOrEqual(6);
+        // H5: the landed row as quiet as a wake: no green mark, the sha mono and not underlined at rest
+        const sha = await page.getByTestId('thread.landed.8.sha').evaluate((el) => ({ font: getComputedStyle(el.querySelector('.th-mono') ?? el).fontFamily, line: getComputedStyle(el).textDecorationLine }));
+        expect(sha.font, 'the sha: mono').toMatch(/mono/i);
+        expect(sha.line, 'the sha: no underline at rest').toBe('none');
+        const marks = await page.evaluate(() => ['thread.landed.8', 'thread.pr.9'].map((id) => (() => { const el = document.querySelector(`[data-testid="${id}"]`); return el === null ? '' : getComputedStyle(el).color; })()));
+        expect(marks[0], 'landed: text-2 like the PR row').toBe(marks[1]);
         // tier 1: the card's one line, sans 14 in ink
         const card = await page.getByTestId('thread.card.1').evaluate((el) => ({ size: getComputedStyle(el).fontSize, font: getComputedStyle(el).fontFamily }));
         expect(card.size).toBe('14px');
@@ -97,12 +105,12 @@ for (const theme of ['light', 'dark']) {
         await page.mouse.move(1, 400);
         await page.screenshot({ path: test.info().outputPath(`tiers-${theme}-${String(w)}-folded.png`) });
 
-        // open: the notes are dim mono, the sender in ink, at most 2 rows of words then '… ▸'
+        // open: the notes are dim sans 13 (H4), the sender in ink, one row of words then '▸'
         await run.click();
         const note = page.getByTestId('thread.to.4');
         await expect(note).toBeVisible();
         const look = await note.evaluate((el) => ({ font: getComputedStyle(el).fontFamily, color: getComputedStyle(el).color }));
-        expect(look.font, 'nothing addressed to another agent is sans').toMatch(/mono/i);
+        expect(look.font, 'a note between agents: its words sans').not.toMatch(/mono/i);
         const dim = await page.evaluate(() => {
           const p = document.createElement('span');
           p.style.color = 'var(--c-text-3)';
@@ -114,8 +122,8 @@ for (const theme of ['light', 'dark']) {
         expect(look.color, 'in --c-text-3').toBe(dim);
         const text = page.getByTestId('thread.to.4.text');
         const rows = await text.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
-        expect(rows, 'at most 2 rows of its words').toBeLessThanOrEqual(2);
-        await expect(page.getByTestId('thread.to.4.more')).toHaveText('… ▸');
+        expect(rows, 'one row of its words').toBeLessThanOrEqual(1);
+        await expect(page.getByTestId('thread.to.4.more')).toHaveText('▸');
         expect(Math.abs((await leftOf(page, '[data-testid="thread.to.4"]')) - prose), `${String(w)}: the notes on the text column`).toBeLessThanOrEqual(1);
         await page.mouse.move(1, 400);
         await page.screenshot({ path: test.info().outputPath(`tiers-${theme}-${String(w)}-open.png`) });

@@ -214,8 +214,8 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
             await expect(page.locator('[data-testid="thread.head"] .b-pearl.s14')).toHaveCount(1);
             await expect(page.getByTestId('thread.head.state')).toHaveText('1 waiting for you');
             // (3) its handoffs
-            await expect(page.getByTestId('thread.handoff.3')).toHaveText('→ perf · product page speed');
-            await expect(page.getByTestId('thread.handoff.4')).toHaveText('→ search · size filter on search');
+            await expect(page.getByTestId('thread.handoff.3')).toHaveText('✚new agent perf · product page speed');
+            await expect(page.getByTestId('thread.handoff.4')).toHaveText('✚new agent search · size filter on search');
             // (1) bise's name line carries its 14 px pearl
             await expect(page.locator('[data-testid="thread.entry.2"] .b-who .b-pearl.s14')).toHaveCount(1);
           }
@@ -250,7 +250,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     // a handoff opens its agent's thread
     await size(1400, 900);
     await go(`app.sidebar.project.${P}`);
-    await page.getByTestId('thread.handoff.3').click();
+    await page.getByTestId('thread.handoff.3.name').click();
     await expect(page.getByTestId('thread.head.name')).toHaveText('perf');
     // bise's chip opens the agents list
     await size(1400, 900);

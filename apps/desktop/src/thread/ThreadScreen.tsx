@@ -38,9 +38,9 @@ import { waitAge, waitSince, waitsEvent } from './wake';
 import { useNow } from '@/app/clock';
 import { SignInLine, useThreadSignIn } from './signin';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
-import { EntryRow, PendingRow, QueuedRow, TypingLine, type RowCtx } from './rows';
+import { EntryRow, PendingRow, QueuedRow, TypingLine, gapOf, type RowCtx } from './rows';
 import { ComputerLine, computerRowOf, computerState } from './ComputerLine';
-import { entryKey, pendingKey, placeSteered, posOfKey } from './entry';
+import { entryKey, namedRows, pendingKey, placeSteered, posOfKey } from './entry';
 import { FindBar } from './FindBar';
 import { NoProject } from './NoProject';
 import { landedEchoes } from './tiers';
@@ -555,6 +555,27 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBac
   const prevOf = useMemo(() => new Map(shown.map((p, i) => [p, shown[i - 1]])), [shown]);
   // and the one after it: his last bubble of a run shows its time (messages-right v1)
   const nextOf = useMemo(() => new Map(shown.map((p, i) => [p, shown[i + 1]])), [shown]);
+  // H2: one name line per author run, never on a tool row (entry.ts namedRows)
+  const heads = useMemo(() => namedRows(shown, (pos) => store.entry(tkey, pos), { agent, bise }), [shown, store, tkey, agent, bise]);
+  // H1: the row under a folded run follows the fold's quiet row
+  const afterFold = useMemo(() => {
+    const out = new Set<number>();
+    for (const r of runs) {
+      const last = r.members.at(-1);
+      const after = openRuns.has(r.start) || last === undefined ? undefined : nextOf.get(last);
+      if (after !== undefined) out.add(after);
+    }
+    return out;
+  }, [runs, openRuns, nextOf]);
+  // H1: the fold is a quiet row: 4 px under another, 12 under a message or prose
+  const foldGap = useCallback(
+    (start: number) => {
+      const before = prevOf.get(start);
+      const p = before === undefined ? undefined : store.entry(tkey, before);
+      return p === undefined ? undefined : gapOf(p, { kind: 'fold' });
+    },
+    [prevOf, store, tkey],
+  );
   const row = useCallback(
     (key: string) => {
       const run = key.startsWith('r:') ? runs.find((r) => runKey(r.start) === key) : undefined;
@@ -573,16 +594,17 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBac
               });
             }}
             data-testid={`thread.run.${String(run.start)}`}
+            data-gap={foldGap(run.start)}
           >
             {runWords(run, open)}
           </Press>
         );
       }
-      if (key === LIVE) return live.entry === null ? null : <EntryRow ctx={ctx} pos={-1} prev={lastPos < 0 ? undefined : lastPos} live={live.entry} still={still} />;
+      if (key === LIVE) return live.entry === null ? null : <EntryRow ctx={ctx} pos={-1} prev={lastPos < 0 ? undefined : lastPos} live={live.entry} still={still} carry={heads.carry} />;
       const pos = posOfKey(key);
-      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} next={nextOf.get(pos)} still={still} />;
+      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} next={nextOf.get(pos)} still={still} named={heads.named.has(pos)} afterFold={afterFold.has(pos)} />;
     },
-    [ctx, prevOf, nextOf, runs, openRuns, live.entry, lastPos, still],
+    [ctx, prevOf, nextOf, runs, openRuns, live.entry, lastPos, still, heads, afterFold, foldGap],
   );
   const onOlder = useCallback(() => {
     store.olderPage(project, agent);

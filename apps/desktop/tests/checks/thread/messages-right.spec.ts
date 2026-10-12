@@ -3,8 +3,8 @@
 // what he said sits on the right of the 720 px column in a soft bubble (at most 75% of the column,
 // 85% under 640 px with 48 px kept on the left), no 'you' line; what agents said stays on the left,
 // full column. His answer to a card goes right with its dim '✓ you answered …' head; a message to
-// someone else than the thread's owner gets a dim 'to perf'; the time shows under the last bubble
-// of a 2 min run, on hover for the others. Checked at 1100 and 600 px, light and dark. Owner: amb-win.
+// someone else than the thread's owner gets a dim 'to perf'; the time shows on hover only (H12).
+// Checked at 1100 and 600 px, light and dark. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
 const HOME = 'bise-home-00000000';
@@ -35,7 +35,7 @@ const world = () => [
     entries: [
       { pos: 1, at_ms: NOW - 30 * MIN, kind: 'you', text: 'the checkout gets slower every friday afternoon. can you find why? it was fine last month, and nothing in the cart code changed since.' },
       { pos: 2, at_ms: NOW - 28 * MIN, kind: 'agent', text: "the image pipeline ships 2 MB thumbnails to phones since tuesday's change. the cache is fine." },
-      // a run of two within 2 min: the time under the second only
+      // a run of two within 2 min: their times on hover only (H12)
       { pos: 3, at_ms: NOW - 20 * MIN, kind: 'you', text: 'cap them at 400 KB' },
       { pos: 4, at_ms: NOW - 19 * MIN, kind: 'you', text: 'and show me before / after on a phone and a tablet' },
       { pos: 5, at_ms: NOW - 15 * MIN, kind: 'agent', text: 'perf and search are both on storefront.' },
@@ -157,12 +157,14 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
     await core.send(prefs('dark') as never);
     await page.waitForTimeout(300);
     await page.screenshot({ path: test.info().outputPath('cases-dark-1100.png') });
-    // the time: under the last bubble of a 2 min run; on hover for the one before
+    // the time (H12, designer m_19832): never under his bubbles, the last of a run included; on hover only
     const op = (id: string) => page.getByTestId(id).evaluate((e) => Number(getComputedStyle(e).opacity));
-    expect(await op('thread.you.4.under'), 'the last of the run shows its time').toBe(1);
+    expect(await op('thread.you.4.under'), 'the last of the run: its time waits for a hover too').toBe(0);
     expect(await op('thread.you.3.under'), 'inside a run, the time waits for a hover').toBe(0);
     await page.getByTestId('thread.you.3').hover();
     await expect.poll(() => op('thread.you.3.under'), { timeout: 2000 }).toBe(1);
+    await page.getByTestId('thread.you.4').hover();
+    await expect.poll(() => op('thread.you.4.under'), { timeout: 2000 }).toBe(1);
     // to someone else than the thread's owner: 'to perf'; to the owner: nothing
     await expect(page.getByTestId('thread.you.6.head')).toHaveText('to perf');
     await expect(page.getByTestId('thread.you.1.head')).toHaveCount(0);

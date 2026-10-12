@@ -115,9 +115,10 @@ test('thread/wake: an agent waiting for an event says what and how long; its wak
         const b = range.getBoundingClientRect();
         return { top: b.top, bottom: b.bottom };
       };
-      return { underWake: txt('thread.who.8').top - txt('thread.wake.7').bottom, overLive: txt('thread.waiting').top - txt('thread.toolrow.8').bottom };
+      // H2 (designer m_19832): no name line over a tool row any more, the turn's gap stays
+      return { underWake: txt('thread.toolrow.8').top - txt('thread.wake.7').bottom, overLive: txt('thread.waiting').top - txt('thread.toolrow.8').bottom };
     });
-    expect(gaps.underWake, "the next turn's name sits a turn's gap under the wake line").toBeGreaterThanOrEqual(10);
+    expect(gaps.underWake, "the next turn's first row sits a turn's gap under the wake line").toBeGreaterThanOrEqual(10);
     expect(gaps.overLive, 'a blank row over the live line').toBeGreaterThanOrEqual(14);
     // the fold opens the output, mono
     await page.getByTestId('thread.wake.3.fold').click();

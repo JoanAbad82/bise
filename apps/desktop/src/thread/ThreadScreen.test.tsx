@@ -96,7 +96,7 @@ describe('the thread screen', () => {
     );
     const set = v.getByTestId('thread.scheduled.33');
     expect(set.textContent).toContain('◷');
-    expect(set.textContent).toBe('◷main scheduled perf · every 2m · 6 times · next 14:22');
+    expect(set.textContent).toBe('◷main scheduled perf · every 2m · 6 times · next 14:22 ▸');
     expect(set.dataset.id).toBe('48');
     expect(v.queryByTestId('thread.scheduled.33.words')).toBeNull();
     fireEvent.click(v.getByTestId('thread.scheduled.33.head'));
@@ -259,7 +259,15 @@ describe('gapOf (designer m_19359: more air inside a turn)', () => {
     expect(gapOf({ kind: 'thinking' }, { kind: 'tools' })).toBe('row');
     expect(gapOf({ kind: 'agent' }, { kind: 'tools' })).toBe('switch');
     expect(gapOf({ kind: 'tools' }, { kind: 'agent' })).toBe('switch');
-    expect(gapOf({ kind: 'agent' }, { kind: 'agent' })).toBeUndefined();
+    expect(gapOf({ kind: 'agent' }, { kind: 'agent' })).toBe('block');
     expect(gapOf({ kind: 'you' }, { kind: 'tools' })).toBeUndefined();
+  });
+  it('H1: quiet rows touch (4), a run of them 12 from a message or prose, 8 from tool rows', () => {
+    expect(gapOf({ kind: 'landed' }, { kind: 'pr' })).toBe('tight');
+    expect(gapOf({ kind: 'wake' }, { kind: 'fold' })).toBe('tight');
+    expect(gapOf({ kind: 'fold' }, { kind: 'scheduled' })).toBe('tight');
+    expect(gapOf({ kind: 'agent' }, { kind: 'landed' })).toBe('switch');
+    expect(gapOf({ kind: 'from_agent' }, { kind: 'notice' })).toBe('switch');
+    expect(gapOf({ kind: 'tools' }, { kind: 'wake' })).toBe('row');
   });
 });

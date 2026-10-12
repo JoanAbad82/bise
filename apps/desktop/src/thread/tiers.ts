@@ -28,7 +28,14 @@ export const ROW_KINDS: ReadonlySet<string> = new Set([
  */
 export const NAMELESS_KINDS: ReadonlySet<string> = new Set(['landed', 'pr', 'artifact', 'scheduled', 'stopped', 'wake', 'notice', 'compacting', 'compacted', 'unknown']);
 
-/** A message between agents (tier 4): its ✉ chip 'sender → receiver' and at most two rows. */
+/**
+ * The quiet rows (tui-parity H1, designer m_19832): news, wake, scheduled, a new agent, plumbing,
+ * the fold of a run ('fold'). Two of them in a row touch (--gap-tight 4); a run of them sits
+ * --gap-block 12 from a message or prose; tool rows keep their 8.
+ */
+export const QUIET_KINDS: ReadonlySet<string> = new Set([...NAMELESS_KINDS, 'fold']);
+
+/** A message between agents (tier 4): its ✉ chip 'sender → receiver' and one row. */
 export const NOTE_KINDS: ReadonlySet<string> = new Set(['to_agent', 'from_agent']);
 
 /** A message's route 'sender→receiver' in `agent`'s thread (to_agent: from it; from_agent: to it unless said). Pure. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, namedRows, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -307,5 +307,23 @@ describe("an edit's line counts on its tool line (designer m_12065, hub-rows Too
       ['±', lines[1]?.text ?? '', ''],
       ['$', 'cargo test', ''],
     ]);
+  });
+});
+
+describe('namedRows (tui-parity H2, designer m_19832)', () => {
+  const ctx = { agent: 'main', bise: false };
+  const mk = (pos: number, kind: string, min: number) => ({ pos, kind, text: 'x', at_ms: 1_000_000_000_000 + min * 60_000 }) as unknown as Entry;
+  it('one head per author run, never on a tool row; a turn opening on tools names its first text row', () => {
+    const list = [mk(1, 'you', 0), mk(2, 'tools', 1), mk(3, 'agent', 1), mk(4, 'agent', 2), mk(5, 'you', 3), mk(6, 'tools', 3), mk(7, 'landed', 4), mk(8, 'agent', 4), mk(9, 'agent', 12)];
+    const m = new Map(list.map((e) => [e.pos, e]));
+    const { named, carry } = namedRows([...m.keys()], (p) => m.get(p), ctx);
+    // 1 his, 3 (after tools), 5 his; 6 a tools-only turn closed by a land: none; 8 after the land; 9 after 8 min
+    expect([...named]).toEqual([1, 3, 5, 8, 9]);
+    expect(carry).toBe(false);
+  });
+  it('a turn of work still open owes its head to the live row', () => {
+    const list = [mk(1, 'you', 0), mk(2, 'tools', 1)];
+    const m = new Map(list.map((e) => [e.pos, e]));
+    expect(namedRows([1, 2], (p) => m.get(p), ctx).carry).toBe(true);
   });
 });

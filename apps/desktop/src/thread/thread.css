@@ -870,6 +870,10 @@
 .th-row[data-gap='row'] {
   padding-top: 6px;
 }
+/* two quiet rows touch: 4 px (--gap-tight, tui-parity H1, designer m_19832) */
+.th-row[data-gap='tight'] {
+  padding-top: calc(var(--gap-tight) - 2px);
+}
 .th-row[data-gap='switch'] {
   padding-top: 10px;
 }
@@ -1304,9 +1308,12 @@
   align-items: baseline;
   column-gap: 0;
 }
+/* the glyph's lead column, the news rows' own (1em + 8 px) */
 .th-wake-mark {
-  width: 1.2em;
+  width: 1em;
+  margin-right: var(--gap-inline);
   flex: none;
+  text-align: center;
 }
 .th-wake-err {
   color: var(--c-err);
@@ -1315,7 +1322,7 @@
   margin-left: 12px;
 }
 .th-wake-out {
-  margin: 6px 0 0 1.2em;
+  margin: 6px 0 0 calc(1em + var(--gap-inline));
   padding: 8px 10px;
   border: 1px solid var(--c-line);
   border-radius: var(--r-2);
@@ -1449,31 +1456,76 @@
 }
 
 /* the thread's hierarchy (designer's thread tiers m_19387, http://127.0.0.1:47438/p/thread-tiers).
-   tier 3, news: one mono 12 row in --c-text-2, its glyph in a lead column, never wraps */
+   tier 3, quiet rows (m_19832): one sans 13 row in --c-text-2, its glyph in a lead column, cut
+   with …; mono only for the machine's own text (a sha, a +12 −2) */
 .th-news,
 .th-sched,
 .th-stopped .b-marker,
-.th-compact .b-marker {
-  font: var(--t-12) / var(--lh-row, 1.5) var(--font-mono);
+.th-compact .b-marker,
+.th-compact .b-fold {
+  font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
   color: var(--c-text-2);
 }
 .th-news {
   white-space: nowrap;
   overflow: hidden;
 }
+.th-mono {
+  font: var(--t-12) var(--font-mono);
+}
+/* the sha and the agent's name: text-2 like the row, underlined on hover only (H5) */
+.th-news .b-act.ref {
+  color: inherit;
+  text-decoration: none;
+}
+.th-news .b-act.ref:hover {
+  color: var(--c-text);
+  text-decoration: underline;
+}
+.th-sched {
+  display: block;
+}
+.th-sched-line {
+  display: flex;
+  gap: var(--gap-inline);
+  align-items: baseline;
+  min-width: 0;
+  white-space: nowrap;
+}
+.th-sched-line .b-sched-head {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.th-sched-chev {
+  color: var(--c-text-3);
+}
+/* after 5 min of silence: a faint '· 14:31 ·' on the column, as the TUI's (H12) */
+.th-pause {
+  box-sizing: border-box;
+  width: var(--th-col);
+  margin: 0 auto;
+  padding-top: var(--gap-block);
+  color: var(--c-text-3);
+  font: var(--t-12) var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  opacity: 0.7;
+}
 .th-news-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* tier 4, ignorable: dim mono, no body; a notice that is plumbing ('·') too */
+/* tier 4, ignorable: dim sans 13, no body; a notice that is plumbing ('·') too */
 .th-notice.info {
-  font: var(--t-12) / var(--lh-row, 1.5) var(--font-mono);
+  font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
   color: var(--c-text-3);
 }
-/* a message between agents: the ✉ chip 'sender → receiver', at most two rows at +16 px, '… ▸' */
+/* a message between agents (H4, designer m_19832): the ✉ chip 'sender → receiver', one sans row at
+   +16 px, '▸' when there's more */
 .th-note {
-  font: var(--t-12) / var(--lh-row, 1.5) var(--font-mono);
+  font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
   color: var(--c-text-3);
 }
 .th-note-head {
@@ -1494,22 +1546,22 @@
   font-weight: 600;
   color: var(--c-text);
 }
-.th-note-text {
-  padding-left: 16px;
-  white-space: pre-wrap;
+.th-note[data-open] .th-note-text {
+  padding-left: var(--s-4);
   overflow-wrap: anywhere;
 }
-.th-note:not([data-open]) .th-note-text {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+.th-note-line {
+  display: flex;
+  gap: var(--gap-inline);
+  align-items: baseline;
+  min-width: 0;
+  padding-left: var(--s-4);
+  white-space: nowrap;
+}
+.th-note-line .th-note-text {
+  min-width: 0;
   overflow: hidden;
-}
-.th-note[data-open] .th-note-text {
-  white-space: normal;
-}
-.th-note > .b-act {
-  margin-left: 16px;
+  text-overflow: ellipsis;
 }
 /* the fold of a run sits on the text column: its left edge is the prose's */
 .th-screen .th-run {
@@ -1526,6 +1578,51 @@
 .th-screen .th-run:hover {
   background: none;
   color: var(--c-text-2);
+}
+/* the fold is a quiet row (H1): 4 px under another, 12 under a message or prose */
+.th-screen .th-run[data-gap='tight'] {
+  padding-top: calc(var(--gap-tight) - 2px);
+}
+.th-screen .th-run[data-gap='switch'] {
+  padding-top: calc(var(--gap-block) - 2px);
+}
+/* H12 (designer m_19832): no time on a head or under a bubble; on hover, right-aligned and dim,
+   taking no room */
+.th-screen .b-msg {
+  position: relative;
+}
+.th-screen .b-who .b-time,
+.th-screen .b-who.b-hover {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-height: 0;
+  opacity: 0;
+  transition: opacity var(--d-fast) var(--ease-out);
+}
+.th-screen .b-msg:hover .b-who .b-time,
+.th-screen .b-msg:hover .b-who.b-hover {
+  opacity: 1;
+}
+.th-you-under:not(.th-hover) .th-you-time {
+  opacity: 0;
+  transition: opacity var(--d-fast) var(--ease-out);
+}
+.th-row:hover .th-you-under .th-you-time {
+  opacity: 1;
+}
+/* H6: a reply's headings never louder than its agent's head: h1 17, h2 and h3 at body size, 600;
+   20 above, 4 below (.b-md: over the ds's md.css weight 700) */
+.th-md.b-md :is(h1, h2, h3, h4) {
+  margin: var(--gap-turn) 0 var(--gap-tight);
+  font-weight: 600;
+  line-height: 1.35;
+}
+.th-md.b-md h1 {
+  font-size: var(--t-17);
+}
+.th-md.b-md :is(h2, h3, h4) {
+  font-size: var(--t-15);
 }
 /* tier 2: a report on his request reads as body (sans 14 ink); only what waits on him is the accent */
 .th-report .b-marker {

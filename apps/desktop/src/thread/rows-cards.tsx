@@ -232,7 +232,7 @@ export function ToAgentRow({ e, ctx, chained = false }: { e: Entry; ctx: RowCtx;
 }
 
 /** How many lines of an agent's message show folded (designer m_19387, tier 4). */
-const NOTE_LINES = 2;
+const NOTE_LINES = 1;
 
 /**
  * A message between agents (designer's thread tiers m_19387, tier 4): never body prose in the thread,
@@ -244,7 +244,7 @@ const NOTE_LINES = 2;
 export function AgentNote({ pos, from, to, text, ctx, testId, tag, chip = true }: { pos: number; from: string; to: string; text: string; ctx: RowCtx; testId: string; tag?: ReactNode; chip?: boolean }) {
   const [open, setOpen] = useState(false);
   const lines = text.split('\n');
-  const more = lines.length > NOTE_LINES || text.length > 220;
+  const more = lines.length > NOTE_LINES || text.length > 90;
   const toggle = () => {
     setOpen((o) => !o);
   };
@@ -261,16 +261,24 @@ export function AgentNote({ pos, from, to, text, ctx, testId, tag, chip = true }
           {tag}
         </div>
       )}
-      {text !== '' && (
-        <div className="th-note-text" data-testid={`${testId}.text`}>
-          {open ? <Markdown text={text} onLink={ctx.onLink} onPath={ctx.onPath} /> : lines.slice(0, NOTE_LINES).join('\n')}
-        </div>
-      )}
-      {more && !open && (
-        <Act onClick={toggle} testId={`${testId}.more`}>
-          … ▸
-        </Act>
-      )}
+      {/* H4 (designer m_19832): its words sans, one line at +16, then '▸' when there's more */}
+      {text !== '' &&
+        (open ? (
+          <div className="th-note-text" data-testid={`${testId}.text`}>
+            <Markdown text={text} onLink={ctx.onLink} onPath={ctx.onPath} />
+          </div>
+        ) : (
+          <div className="th-note-line">
+            <span className="th-note-text" data-testid={`${testId}.text`}>
+              {lines.slice(0, NOTE_LINES).join(' ')}
+            </span>
+            {more && (
+              <Act onClick={toggle} testId={`${testId}.more`}>
+                ▸
+              </Act>
+            )}
+          </div>
+        ))}
     </div>
   );
 }

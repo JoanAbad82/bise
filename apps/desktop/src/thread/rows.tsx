@@ -8,17 +8,17 @@
 // calls, thinking), rows-cards (cards, approvals, answers, agent-to-agent),
 // rows-news (landed, PRs, artifacts, scheduled, notices, briefs, not delivered).
 import { memo } from 'react';
-import { Marker, Msg, Pearl } from '@/ds';
+import { Marker, Msg } from '@/ds';
 import type { Entry } from '@/proto';
 import { useEntry } from '@/store';
 import { Answer } from './Markdown';
-import { THOUGHT_MS, answeredCardOf, briefOf, clock, dayLabel, groupHead, lastOfRun, sameDay, sideOf, dropAuthor, reportStatus, thoughtNothing, whoOf } from './entry';
+import { GROUP_GAP_MS, THOUGHT_MS, answeredCardOf, briefOf, clock, dayLabel, groupHead, lastOfRun, sameDay, sideOf, dropAuthor, reportStatus, thoughtNothing, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useIsCurrent } from './findmark';
 import { useVoiceLit } from '@/voicemode';
 import { AgentNote, AnsweredRow, ApprovalRow, CardAnsweredRow, CardRow, ToAgentRow } from './rows-cards';
 import { shownName } from '@/agents/model';
-import { BODY_KINDS, NAMELESS_KINDS, NOTE_KINDS, ROW_KINDS, sameRoute } from './tiers';
+import { BODY_KINDS, NAMELESS_KINDS, NOTE_KINDS, QUIET_KINDS, ROW_KINDS, sameRoute } from './tiers';
 import { YouRow } from './rows-messages';
 import { ArtChip, BriefRow, CompactedRow, LandedRow, MadeRow, NotDeliveredRow, NOTICE_MARK, NoticeRow, PrRow, ScheduledRow, WakeRow } from './rows-news';
 import { ThinkingLine, thoughtFor, ToolsRow } from './rows-tools';
@@ -36,7 +36,30 @@ export interface RowCtx {
   readonly onTakeBack?: (text: string) => void;
 }
 
-export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, still = false }: { ctx: RowCtx; pos: number; prev?: number | undefined; next?: number | undefined; live?: Entry | undefined; still?: boolean }) {
+export const EntryRow = memo(function EntryRow({
+  ctx,
+  pos,
+  prev,
+  next,
+  live,
+  still = false,
+  named,
+  carry = false,
+  afterFold = false,
+}: {
+  ctx: RowCtx;
+  pos: number;
+  prev?: number | undefined;
+  next?: number | undefined;
+  live?: Entry | undefined;
+  still?: boolean;
+  /** its name line shows (entry.ts namedRows: one head per author run, never on a tool row, H2) */
+  named?: boolean | undefined;
+  /** the live row: a turn that opened on its work still owes its name (namedRows' carry) */
+  carry?: boolean;
+  /** the row right under a folded run: it follows the fold's quiet row, not the hidden note (H1) */
+  afterFold?: boolean;
+}) {
   // the live row (live.ts) is this same row drawing the entry it becomes, so
   // the entry takes its place with nothing unmounted (text-appearing v2 (4))
   const stored = useEntry(ctx.tkey, pos);
@@ -61,7 +84,12 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, sti
   // his on the right, the rest on the left (messages-right v1); a change of side opens more room
   const side = sideOf(e);
   const turn = p !== undefined && day === null && sideOf(p) !== side;
-  const gap = p === undefined || day !== null || turn || head ? undefined : gapOf(p, e);
+  const gap = p === undefined || day !== null || turn || head ? undefined : gapOf(afterFold ? { kind: 'fold' } : p, e);
+  // H2: the name line opens an author's run on its first row that is not work; H12: after 5 min
+  // of silence a faint '· 14:31 ·' (the TUI's), the times themselves on hover only
+  const work = TOOL_KINDS.has(e.kind);
+  const shown = !work && (named ?? (head || carry));
+  const pause = day === null && pauseOf(p, e);
   const n = next === undefined ? undefined : afterIt;
   return (
     <>
@@ -70,39 +98,46 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, sti
           <span>{day}</span>
         </div>
       )}
+      {pause && (
+        <div className="th-pause" data-testid={`thread.pause.${pos}`}>
+          · {clock(e.at_ms)} ·
+        </div>
+      )}
       <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={live === undefined ? `thread.entry.${pos}` : 'thread.stream'} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head} data-side={side} data-turn={turn || undefined} data-gap={gap}>
-        {/* a turn that opens on its work (tools, a thinking) still shows who and when */}
-        {head && (e.kind === 'tools' || (e.kind === 'thinking' && !thoughtNothing(e))) && <NameLine e={e} ctx={ctx} />}
-        <EntryBody e={e} ctx={ctx} head={head} next={n} live={live !== undefined} still={still} chained={chained} />
+        <EntryBody e={e} ctx={ctx} head={shown} next={n} live={live !== undefined} still={still} chained={chained} />
       </div>
     </>
   );
 });
 
 /**
- * The room above a row inside one turn (designer m_19359, m_19387): 'row' between two dim rows
- * (tiers 3 and 4: 8 px), 'block' between two messages of an open run (12 px, m_19784 (2)), 'switch'
- * from body text to a dim row or back (12 px), none otherwise. Pure.
+ * The room above a row inside one turn (designer m_19359, m_19387, m_19832 H1): 'tight' between two
+ * quiet rows (news, wake, scheduled, new agent, the fold: 4 px), 'row' between tool rows or a tool
+ * row and a quiet one (8 px), 'block' between two messages of an open run or two of its replies
+ * (12 px), 'switch' from body text or a message to a dim row or back (12 px), none otherwise. Pure.
  */
-export function gapOf(prev: Pick<Entry, 'kind'>, e: Pick<Entry, 'kind'>): 'row' | 'block' | 'switch' | undefined {
+export function gapOf(prev: { readonly kind: string }, e: { readonly kind: string }): 'tight' | 'row' | 'block' | 'switch' | undefined {
   if (NOTE_KINDS.has(prev.kind) && NOTE_KINDS.has(e.kind)) return 'block';
+  const qa = QUIET_KINDS.has(prev.kind);
+  const qb = QUIET_KINDS.has(e.kind);
+  if (qa && qb) return 'tight';
+  // a run of quiet rows: 12 from a message or prose, 8 from the tool rows of its turn
+  if (qa !== qb) return TOOL_KINDS.has(qa ? e.kind : prev.kind) ? 'row' : 'switch';
   const a = ROW_KINDS.has(prev.kind);
   const b = ROW_KINDS.has(e.kind);
   if (a && b) return 'row';
   if (a !== b && BODY_KINDS.has(a ? e.kind : prev.kind)) return 'switch';
+  // two replies of one run (no name line, no hover line any more: H12): 12 apart
+  if (prev.kind === 'agent' && e.kind === 'agent') return 'block';
   return undefined;
 }
 
-/** The name line of a group that opens on its work: Msg's own line ('bise 09:46', the pearl at 14 px). */
-function NameLine({ e, ctx }: { e: Entry; ctx: RowCtx }) {
-  const who = whoOf(e, ctx);
-  return (
-    <div className="b-who" data-testid={`thread.who.${String(e.pos)}`}>
-      {who.from === 'bise' && <Pearl size={14} />}
-      <b>{who.name}</b>
-      {e.at_ms > 0 && <span className="b-time">{clock(e.at_ms)}</span>}
-    </div>
-  );
+/** The rows of a turn's work: never a name line over them (H2). */
+const TOOL_KINDS: ReadonlySet<string> = new Set(['tools', 'thinking']);
+
+/** The faint mark after 5 min of silence, as the TUI's ('· 14:31 ·', H12). Pure. */
+export function pauseOf(prev: Pick<Entry, 'at_ms'> | undefined, e: Pick<Entry, 'at_ms'>): boolean {
+  return prev !== undefined && prev.at_ms > 0 && e.at_ms > 0 && e.at_ms - prev.at_ms > GROUP_GAP_MS;
 }
 
 function EntryBody({ e, ctx, head, next, live, still, chained = false }: { e: Entry; ctx: RowCtx; head: boolean; next: Entry | undefined; live: boolean; still: boolean; chained?: boolean }) {

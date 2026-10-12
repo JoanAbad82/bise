@@ -94,7 +94,17 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   // the delivery mark after the time or the 'said' line (designer's messages-right v3); a steered
   // one's 'steered · … read it mid-turn' line is its ✓✓, so it gets none
   const mark = steered ? null : deliveryMark(e.delivery, shownName(to !== undefined && e.to != null ? e.to : ctx.agent));
-  const lead = steered ? `steered · ${shownName(ctx.agent)} read it mid-turn` : saidMs !== null ? saidFor(saidMs) : e.at_ms > 0 ? clock(e.at_ms) : undefined;
+  // H12 (designer m_19832): no time under his bubbles, only on hover; the steer, the said line and
+  // the delivery mark stay
+  const words = steered ? `steered · ${shownName(ctx.agent)} read it mid-turn` : saidMs !== null ? saidFor(saidMs) : undefined;
+  const lead =
+    words !== undefined ? (
+      words
+    ) : e.at_ms > 0 ? (
+      <span className="th-you-time" data-testid={`thread.you.${String(e.pos)}.time`}>
+        {clock(e.at_ms)}
+      </span>
+    ) : undefined;
   const under =
     mark === null ? (
       lead
@@ -108,7 +118,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
       </>
     );
   return (
-    <YouBubble head={to} under={under} timeAlways={steered || saidMs !== null || lastOfRun(e, next)} testId={`thread.you.${String(e.pos)}`}>
+    <YouBubble head={to} under={under} timeAlways={words !== undefined || (mark !== null && lastOfRun(e, next))} testId={`thread.you.${String(e.pos)}`}>
       {quotes.map((q, i) => (
         <blockquote key={i} className="th-you-quote" data-testid={`thread.you.${String(e.pos)}.quote.${String(i + 1)}`}>
           {q.source !== '' && <span className="th-you-quote-src">{q.about !== '' ? q.about : shownName(q.source)}</span>}

@@ -2,7 +2,7 @@
 // notices, a task's brief, a handoff, a message not delivered. Owner: amb-win.
 // Split out of rows.tsx (pure move).
 import { useState, type ReactNode } from 'react';
-import { Act, BriefLine, Button, Fold, Marker, Press, Route, SchedHead } from '@/ds';
+import { Act, BriefLine, Button, Fold, Marker, Press, SchedHead } from '@/ds';
 import type { Entry } from '@/proto';
 import { useAgents, useStore } from '@/store';
 import { useFold } from './folds';
@@ -23,13 +23,45 @@ export function NewsLine({ mark, tone, testId, children }: { mark: string; tone:
   );
 }
 
-/** 'perf landed on main · a1b2c3d · 3 files +42 −18': the sha opens the commit. */
+/** The machine's own bits of a line in mono (designer m_19832: a sha, a path, a number pair like '+12 −2'), the words sans. Pure. */
+export function machineParts(text: string): { text: string; mono: boolean }[] {
+  const out: { text: string; mono: boolean }[] = [];
+  const re = /[+−-]\d+(?:\s+[+−-]\d+)*/gu;
+  let at = 0;
+  for (const m of text.matchAll(re)) {
+    const i = m.index;
+    if (i > at) out.push({ text: text.slice(at, i), mono: false });
+    out.push({ text: m[0], mono: true });
+    at = i + m[0].length;
+  }
+  if (at < text.length) out.push({ text: text.slice(at), mono: false });
+  return out;
+}
+
+/** Words with their machine bits in mono. */
+function Machine({ text }: { text: string }) {
+  return (
+    <>
+      {machineParts(text).map((p, i) =>
+        p.mono ? (
+          <span key={i} className="th-mono">
+            {p.text}
+          </span>
+        ) : (
+          p.text
+        ),
+      )}
+    </>
+  );
+}
+
+/** '✓ perf landed on main · a1b2c3d · 3 files +42 −18', quiet as a wake (H5): the sha opens the commit. */
 export function LandedRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const router = useRouter();
   const l = e.landed;
   if (l == null) return <Marker>{e.text}</Marker>;
   return (
-    <NewsLine mark="✓" tone="ok" testId={`thread.landed.${e.pos}`}>
+    <NewsLine mark="✓" tone="plain" testId={`thread.landed.${e.pos}`}>
       {l.agent} landed on {l.target} ·{' '}
       <Act
         kind="ref"
@@ -38,9 +70,14 @@ export function LandedRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
         }}
         testId={`thread.landed.${e.pos}.sha`}
       >
-        {l.sha.slice(0, 7)}
+        <span className="th-mono">{l.sha.slice(0, 7)}</span>
       </Act>
-      {e.text !== '' ? ` · ${e.text}` : ''}
+      {e.text !== '' && (
+        <>
+          {' · '}
+          <Machine text={e.text} />
+        </>
+      )}
     </NewsLine>
   );
 }
@@ -107,25 +144,31 @@ export function ScheduledRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const s = e.scheduled;
   const head = s?.head ?? e.text;
   const words = s?.words ?? '';
+  // one line (H3, designer m_19832): '◷ main scheduled the p99 check · every 30 min · next 20:11 ▸',
+  // cut with …; '▸' only when it has words to open
   return (
     <div className="th-sched" data-testid={`thread.scheduled.${e.pos}`} data-id={s?.id}>
-      <span className="th-news-mark" aria-hidden="true">
-        ◷
-      </span>
-      {words === '' ? (
-        <SchedHead>{schedHead(head, ctx.agent === 'main' ? null : ctx.agent)}</SchedHead>
-      ) : (
-        // its words open on a click, with no chevron (designer N2: '◷ main scheduled dashboards · every 30m · next 16:56')
-        <SchedHead
-          open={open}
-          onClick={() => {
-            setOpen((o) => !o);
-          }}
-          testId={`thread.scheduled.${e.pos}.head`}
-        >
-          {schedHead(head, ctx.agent === 'main' ? null : ctx.agent)}
-        </SchedHead>
-      )}
+      <div className="th-sched-line">
+        <span className="th-news-mark" aria-hidden="true">
+          ◷
+        </span>
+        {words === '' ? (
+          <SchedHead>{schedHead(head, ctx.agent === 'main' ? null : ctx.agent)}</SchedHead>
+        ) : (
+          <SchedHead
+            open={open}
+            onClick={() => {
+              setOpen((o) => !o);
+            }}
+            testId={`thread.scheduled.${e.pos}.head`}
+          >
+            {schedHead(head, ctx.agent === 'main' ? null : ctx.agent)}
+            <span className="th-sched-chev" aria-hidden="true">
+              {open ? ' ▾' : ' ▸'}
+            </span>
+          </SchedHead>
+        )}
+      </div>
       {open && words !== '' && (
         <div className="th-sched-words" data-testid={`thread.scheduled.${e.pos}.words`}>
           {words}
@@ -243,21 +286,25 @@ export function BriefRow({ pos, name, objective, body, ctx }: { pos: number; nam
   );
 }
 
-/** '→ perf · product page speed': who a main handed a job to, its role (else the brief); a click opens its thread. */
+/** '✚ new agent perf · product page speed' (H11, designer m_19832): a quiet row, its role (else the brief); its name opens its thread. */
 function HandoffRow({ pos, to, brief, ctx }: { pos: number; to: string; brief: string; ctx: RowCtx }) {
   const router = useRouter();
   const a = useAgents(ctx.project).find((x) => x.name === to);
   const role = a !== undefined && a.purpose !== '' ? a.purpose : brief;
   return (
-    <Route
-      kind="handoff"
-      to={to}
-      role={role}
-      onClick={() => {
-        router.go({ screen: 'thread', project: ctx.project, agent: to });
-      }}
-      testId={`thread.handoff.${String(pos)}`}
-    />
+    <NewsLine mark="✚" tone="plain" testId={`thread.handoff.${String(pos)}`}>
+      new agent{' '}
+      <Act
+        kind="ref"
+        onClick={() => {
+          router.go({ screen: 'thread', project: ctx.project, agent: to });
+        }}
+        testId={`thread.handoff.${String(pos)}.name`}
+      >
+        {to}
+      </Act>
+      {role !== '' && ` · ${role}`}
+    </NewsLine>
   );
 }
 
