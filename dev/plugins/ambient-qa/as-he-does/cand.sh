@@ -44,11 +44,20 @@ stopcand() {
   local w; w=$(pidsunder "$G/w")
   [ -n "$w" ] && killpids $w; sleep 1
   w=$(pidsunder "$G/w"); [ -n "$w" ] && { sleep 2; SIG=KILL killpids $w; sleep 1; }
-  local lc lw; lc=$(ours | wc -l | tr -d ' '); lw=$(pidsunder "$G/w" | wc -l | tr -d ' ')
+  # a process seen in the count can be gone a moment later (c28260a9's runs: 1 + 1 left, nothing
+  # by the time ps named them): counted again for up to 10 s, named at the first nonzero count
+  local lc lw left=""
+  for i in $(seq 20); do
+    lc=$(ours | wc -l | tr -d ' '); lw=$(pidsunder "$G/w" | wc -l | tr -d ' ')
+    [ "$lc" = 0 ] && [ "$lw" = 0 ] && break
+    [ -z "$left" ] && left=$(ps -o pid=,ppid=,stat=,etime=,command= -p "$(echo $(ours) $(pidsunder "$G/w") | tr ' ' ',')" 2>/dev/null | cut -c1-240)
+    sleep 0.5
+  done
+  [ -n "$left" ] && echo "$left" > $O/left-$(date +%H%M%S).txt
   say "stopped: left under the candidate $lc, naming the world $lw"
   [ "$lc" = 0 ] && [ "$lw" = 0 ] || {
     # which ones (c28260a9's first run left 1 + 1 that were gone a minute later: say what they were)
-    { echo "the stop left $lc + $lw processes"; ps -o pid=,ppid=,stat=,etime=,command= -p "$(echo $(ours) $(pidsunder "$G/w") | tr ' ' ',')" 2>/dev/null | cut -c1-240; } > $O/BREACH
+    { echo "the stop left $lc + $lw processes (10 s after)"; echo "$left"; ps -o pid=,ppid=,stat=,etime=,command= -p "$(echo $(ours) $(pidsunder "$G/w") | tr ' ' ',')" 2>/dev/null | cut -c1-240; } > $O/BREACH
     cat $O/BREACH; return 1; }
 }
 opencand() {

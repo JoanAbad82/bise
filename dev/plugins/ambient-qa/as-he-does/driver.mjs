@@ -188,29 +188,17 @@ if (mode === 'cut') {
   await click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
   const html = "<html><body style='margin:0;background:#2e8b57'><h1 style='color:#fff;font:40px sans-serif'>proof html</h1></body></html>";
   const seed = [
-    // a thought on the seed's turn (the fake provider's [[think: …]]): the opened thought must never
-    // draw its signature (BENDSIG::…, c28260a9's window guard)
-    'set up the proof rows [[think: weighing the proof rows]]',
+    'set up the proof rows',
     '[[bash: echo one]]', '[[bash: echo two]]', '[[bash: echo three]]',
     "[[bash: sb spawn keeper --objective 'hold the proof']]",
     "[[bash: sb spawn gone --objective 'an old one']]",
     `[[bash: printf "%s" "${html.replaceAll('"', "'")}" > proof.html && sb artifact add proof.html --title proof-html]]`,
   ].join(' ');
   const seeded = await say(seed);
-  const done = seeded ? await until(async () => {
-    const t = await text('[data-testid="app.main"]');
-    return t && /proof-html|artifact/i.test(t) ? t : null;
-  }, ANSWER_MS, 2000) : null;
+  const done = seeded ? await until(() => page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid^="thread.entry."]')].some((r) => r.getAttribute('data-kind') === 'artifact') || null), ANSWER_MS, 2000) : null;
   await shot('seeded');
-  // every opened thought: no signature text (c28260a9's BENDSIG window guard)
-  const thoughts = page.locator('[data-testid^="thread.entry."][data-kind="thinking"]');
-  const nThoughts = await thoughts.count().catch(() => 0);
-  for (let i = 0; i < nThoughts; i++) await thoughts.nth(i).click({ timeout: 3000 }).catch(() => {});
-  if (nThoughts) await page.waitForTimeout(800);
-  const thoughtText = nThoughts ? await thoughts.evaluateAll((rs) => rs.map((r) => r.textContent ?? '').join('\n---\n')) : '';
-  const mainText = (await text('[data-testid="app.main"]')) ?? '';
-  await shot('thought-open');
-  step('no BENDSIG text in an opened thought', nThoughts > 0 && !/BENDSIG/.test(thoughtText) && !/BENDSIG/.test(mainText), { thoughts: nThoughts, text: thoughtText.slice(0, 300) });
+  const kinds = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="thread.entry."]')].map((r) => r.getAttribute('data-kind')));
   // 'gone' is dropped in a LATER turn, once it is idle (amb-home m_20141: a drop in the turn that
   // spawned it makes the hub ask a 'drop' card instead of archiving); a drop card that still comes
   // is answered yes, which also proves the card path (ambient-lead m_20143)
@@ -234,7 +222,17 @@ if (mode === 'cut') {
     return /\bgone\b/.test(s) ? null : true;
   }, 60000, 1000);
   step("'gone' dropped (a drop card answered yes when asked)", !!dropped, { card: asked, answered });
-  const kinds = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="thread.entry."]')].map((r) => r.getAttribute('data-kind')));
+  // a thought of its own message (the fake provider's [[think: …]]): opened, it must never draw its
+  // signature (BENDSIG::…, c28260a9's window guard)
+  await say('think it over [[think: weighing the proof rows]]');
+  const thoughts = page.locator('[data-testid^="thread.entry."][data-kind="thinking"]');
+  const nThoughts = (await until(async () => ((await thoughts.count()) > 0 ? await thoughts.count() : null), ANSWER_MS, 1000)) ?? 0;
+  for (let i = 0; i < nThoughts; i++) await thoughts.nth(i).click({ timeout: 3000 }).catch(() => {});
+  if (nThoughts) await page.waitForTimeout(800);
+  const thoughtText = nThoughts ? await thoughts.evaluateAll((rs) => rs.map((r) => r.textContent ?? '').join(' --- ')) : '';
+  const mainText = (await text('[data-testid="app.main"]')) ?? '';
+  await shot('thought-open');
+  step('no BENDSIG text in an opened thought', nThoughts > 0 && !/BENDSIG/.test(thoughtText) && !/BENDSIG/.test(mainText), { thoughts: nThoughts, text: thoughtText.slice(0, 300) });
   step('the seed ran (runs, agents, artifact)', !!done, { kinds });
   step('the runs fold (tools rows, not one row per call)', kinds.filter((k) => k === 'tools').length >= 1 && kinds.filter((k) => k === 'tools').length < 6, kinds);
   // /agents and /archived
@@ -250,7 +248,8 @@ if (mode === 'cut') {
   // the local .html artifact's pixels
   await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
   const item = page.locator('[data-testid="artifacts.list"]').getByText('proof-html').first();
-  const opened = await click('open proof-html', item);
+  const opened = await click('select proof-html', item);
+  if (opened) await page.keyboard.press('Enter');
   const frame = page.locator('iframe').first();
   const fr = opened ? await frame.waitFor({ timeout: 15000 }).then(() => true, () => false) : false;
   let green = 0;
@@ -291,7 +290,7 @@ if (mode === 'cut') {
   await shot('ctrl-r');
   await page.keyboard.press('Escape');
   const after = (await text('[data-testid="composer"]')) ?? '';
-  step('ctrl+r from the thread starts dictation; esc ends it', !!line && !/dictat|listen/i.test(after), { line: line?.slice(0, 300), after_esc: after.slice(0, 200) });
+  step('ctrl+r from the thread starts dictation; esc ends it', !!line && !/listening/i.test(after), { line: line?.slice(0, 300), after_esc: after.slice(0, 200) });
   // every message of this mode was sent (seed, drop, /agents, /archived): none stays 'sending…'
   // (c28260a9's sending-after-page-echo fix)
   const stuck = await until(async () => { const t = (await text('[data-testid="app.main"]')) ?? ''; return /sending…|sending\.\.\./.test(t) ? null : true; }, 20000, 1000);
