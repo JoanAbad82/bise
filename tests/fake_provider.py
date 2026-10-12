@@ -320,7 +320,10 @@ def steered_mid_turn(conv, i):
         if is_real_user(conv[j]):
             return False
         if conv[j]["role"] == "tool":
-            return True
+            # a call stopped by an interrupt ends its turn: the message
+            # after it starts a new one, the batch's next call never runs
+            # (interrupt_e2e C/D: 'hello again' ran 'echo second-call')
+            return "interrupted by" not in conv[j]["text"]
         if conv[j]["role"] == "assistant":
             return False
     return False
