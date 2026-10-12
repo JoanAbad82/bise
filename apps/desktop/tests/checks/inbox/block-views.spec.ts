@@ -276,6 +276,26 @@ for (const size of ['1400x820', '1100x820', '800x820'] as const) {
         await expect(page.getByTestId('inbox.block.line')).toBeVisible({ timeout: 3000 });
         await expect(page.getByTestId('inbox.block.line')).toContainText('5 waiting');
         await expect(page.getByTestId('composer.keys')).toBeHidden();
+        // the wheel is a smooth scroll (~370 ms, longer under load) that goes on after the line shows,
+        // and Virtuoso fixes the heights of the rows above as it draws them: y is read once the list
+        // stops (the same scrollTop over 3 frames); what must not come after is a move of its own
+        await page.evaluate(
+          () =>
+            new Promise<void>((done) => {
+              const s = document.querySelector<HTMLElement>('[data-virtuoso-scroller]');
+              let last = Number.NaN;
+              let same = 0;
+              const t0 = performance.now();
+              const f = () => {
+                const t = s?.scrollTop ?? 0;
+                same = t === last ? same + 1 : 0;
+                last = t;
+                if (same >= 3 || performance.now() - t0 > 3000) done();
+                else requestAnimationFrame(f);
+              };
+              requestAnimationFrame(f);
+            }),
+        );
         const note = page.getByText('bench note 40:');
         const y = await note.evaluate((e) => e.getBoundingClientRect().top).catch(() => null);
         await page.waitForTimeout(400);
