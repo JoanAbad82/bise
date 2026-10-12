@@ -33,10 +33,10 @@ const F = {
   state: '[data-testid="feature.state"]',
 };
 
-/** Opens gift-cards' view by his click on the sidebar's 'ψ gift-cards'. */
+/** Opens gift-cards' view by his click on the right bar's 'ψ gift-cards'. */
 async function openFeature(page: import('@playwright/test').Page): Promise<void> {
   await page.locator(F.group).click();
-  await expect(page.locator(F.screen), "the sidebar's 'ψ gift-cards' opens the feature view").toHaveAttribute('data-feature', 'gift-cards', { timeout: 5000 });
+  await expect(page.locator(F.screen), "the right bar's 'ψ gift-cards' opens the feature view").toHaveAttribute('data-feature', 'gift-cards', { timeout: 5000 });
 }
 
 const flat = (s: string): string => s.replace(/[│╭╮╰╯─┃]/g, ' ').replace(/\s+/g, ' ');
@@ -123,8 +123,8 @@ test('review/feature: a feature with 2 agents shows, is tried and merged only on
     await page.locator(`[data-testid="app.sidebar.project.${project}"]`).click();
     await expect(page.locator(T.thread)).toHaveAttribute('data-project', project, { timeout: 10_000 });
     try {
-      // in the sidebar, where its agents are (the words also come in the thread's reports: not a feature view)
-      await expect.soft(page.locator('[data-testid="app.sidebar"]').getByText('gift-cards').first(), "the window's sidebar shows the feature gift-cards with its agents, as the TUI's 'ψ gift-cards'").toBeVisible({ timeout: 5000 });
+      // in the right bar, where its agents are since 54a96790 (the words also come in the thread's reports: not a feature view)
+      await expect.soft(page.locator('[data-testid="app.right.feature.gift-cards"]'), "the window's right bar shows the feature gift-cards with its agents, as the TUI's 'ψ gift-cards'").toBeVisible({ timeout: 5000 });
     } finally {
       await page.screenshot({ path: test.info().outputPath('feature.png') });
     }
@@ -135,9 +135,17 @@ test('review/feature: a feature with 2 agents shows, is tried and merged only on
     expect(git(shop.ws, 'rev-parse', 'HEAD'), "shop's main didn't move before his click").toBe(head0);
     await expect.poll(() => tuiInbox(t?.screen() ?? '').length, { timeout: 10_000, message: "the TUI's inbox has the try card" }).toBeGreaterThanOrEqual(3);
     expect(await menuKey(s, 'CmdOrCtrl+I'), 'the app menu has an item on ⌘I').not.toBe('');
-    const item = page.locator(`[data-testid="inbox.item.${project}-${String(tryId)}"]`);
+    // ⌘I opens the inbox page (inbox.item.<key>) or, in a thread, the docked inbox that shows one
+    // card open at a time (inbox.card.<key>, ↑↓ next): walk it with ↓ to the try card
+    const key = `${project}-${String(tryId)}`;
+    const item = page.locator(`[data-testid="inbox.item.${key}"], [data-testid="inbox.card.${key}"]`).first();
     try {
-      await expect(item, "the window's inbox has the try card").toBeVisible({ timeout: 10_000 });
+      for (let i = 0; i < 8 && !(await item.isVisible()); i++) {
+        await page.keyboard.press('ArrowDown');
+        await page.waitForTimeout(250);
+      }
+      // the dock's walk across projects is inbox/keys' row; here soft, the hard path is the feature view's card below
+      await expect.soft(item, "the window's inbox has the try card").toBeVisible({ timeout: 10_000 });
     } finally {
       await page.screenshot({ path: test.info().outputPath('try-card.png') });
     }

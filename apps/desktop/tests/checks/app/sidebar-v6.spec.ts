@@ -91,7 +91,10 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     // the titlebar and panel A
     await expect(page.getByTestId('app.title.crumb')).toHaveText('storefront›perf');
     const btn = page.getByTestId('app.title.panel');
-    await expect(btn).toContainText('artifacts · 1');
+    // the right bar's toggle (designer m_20275): the panel icon, 'right bar ⌥⌘0' on hover, the accent
+    // count of what waits in storefront (1)
+    await expect(btn).toHaveAttribute('aria-label', /right bar/u);
+    await expect(page.getByTestId('app.title.panel.waits')).toHaveText('1');
     await expect(btn).toHaveAttribute('aria-pressed', 'true');
     const panel = page.getByTestId('app.panel');
     // the right bar took panel A's place (designer's desktop-right-bar v5): its head, its sections

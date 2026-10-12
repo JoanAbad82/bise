@@ -1,6 +1,7 @@
 // A thread's news rows: landed, PRs, artifacts, scheduled tasks, compaction,
 // notices, a task's brief, a handoff, a message not delivered. Owner: amb-win.
 // Split out of rows.tsx (pure move).
+import { useOpenArtifact } from './openArtifact';
 import { useState, type ReactNode } from 'react';
 import { Act, BriefLine, Button, Fold, Marker, Press, SchedHead } from '@/ds';
 import type { Entry } from '@/proto';
@@ -110,10 +111,12 @@ export function PrRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 /** What an agent made: a card that opens it (its page, else the project's artifacts). */
 export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const router = useRouter();
+  const openId = useOpenArtifact();
   const m = e.made;
   if (m == null) return <Marker>{e.text}</Marker>;
   return (
     <ArtChip
+      open={openId === m.id}
       title={m.title}
       meta={[m.kind_word, m.v > 1 ? `v${String(m.v)}` : ''].filter(Boolean).join(' · ')}
       onOpen={() => {
@@ -126,11 +129,13 @@ export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 }
 
 /** An artifact or a page as one line (designer m_12065 (2)): '↗ product page, before / after   page · v2', 1 px line, r 9, fit-content, no thumbnail box. */
-export function ArtChip({ title, meta, onOpen, testId }: { title: string; meta: string; onOpen: () => void; testId: string }) {
+export function ArtChip({ title, meta, onOpen, testId, open = false }: { title: string; meta: string; onOpen: () => void; testId: string; open?: boolean }) {
   return (
-    <Press look="th-art" onClick={onOpen} data-testid={testId}>
+    <Press look={open ? 'th-art open' : 'th-art'} onClick={onOpen} data-testid={testId} data-open={open || undefined}>
       <span className="th-art-title">↗ {title}</span>
       {meta !== '' && <span className="th-art-meta">{meta}</span>}
+      {/* the artifact open beside the thread (designer's artifact-open page): 'open', an ink outline */}
+      {open && <span className="th-art-open">open</span>}
     </Press>
   );
 }

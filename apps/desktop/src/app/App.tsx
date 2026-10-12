@@ -35,6 +35,7 @@ import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
 import { Sidebar } from './Sidebar';
 import { Over, Titlebar, useFrame } from './Frame';
+import { ART_FOLD_PX, ArtifactCentre, ArtifactColumn, artOf, artWidth, useArtPct, useInnerWidth } from './ArtifactView';
 import { RightBar } from './RightBar';
 import { numbersOf } from '@/agents/model';
 import { CoreLine } from './CoreLine';
@@ -214,10 +215,18 @@ function Shell() {
   // his theme pref on <html data-theme> (amb-web's src/theme)
   useTheme();
   useShown();
+  // an artifact open (designer's artifact-open page): it takes the right column, widened to its share
+  // of the window; under 1200 px the left bar folds; under 1000 px it takes the centre (ArtifactCentre)
+  const winW = useInnerWidth();
+  const [artShare, setArtShare] = useArtPct();
+  const art = artOf(route);
+  const artDocked = art !== undefined && frame.width !== 'narrow';
+  const side = frame.side && !(artDocked && winW < ART_FOLD_PX);
+  const artW = artDocked ? artWidth(winW, side ? frame.sideW : 0, artShare) : 0;
   return (
     <div
-      className={`app-shell b-ui w-${frame.width}${frame.side ? '' : ' no-side'}`}
-      style={{ '--side-w': `${String(frame.sideW)}px`, '--panel-w': `${String(frame.panelW)}px` } as CSSProperties}
+      className={`app-shell b-ui w-${frame.width}${side ? '' : ' no-side'}`}
+      style={{ '--side-w': `${String(frame.sideW)}px`, '--panel-w': `${String(artDocked ? artW : frame.panelW)}px` } as CSSProperties}
       data-testid="app.root"
     >
       {/* setup is the window itself, never a window drawn inside it (his try round 3) */}
@@ -229,16 +238,22 @@ function Shell() {
       ) : (
         <>
           <Win
-            side={frame.side ? <Sidebar onSearch={openPalette} /> : null}
+            side={side ? <Sidebar onSearch={openPalette} /> : null}
             main={<Current top={<Titlebar frame={frame} />} />}
-            aside={frame.panel?.docked === true ? <RightBar project={frame.panel.project} name={frame.panel.name} /> : undefined}
+            aside={
+              artDocked ? (
+                <ArtifactColumn project={art.project} id={art.id} />
+              ) : frame.panel?.docked === true ? (
+                <RightBar project={frame.panel.project} name={frame.panel.name} />
+              ) : undefined
+            }
           />
           {/* his try a43609b2: both side columns resize by their border (designer m_19374); a folded
               sidebar opens again by a drag from the window's left edge */}
           {frame.width !== 'narrow' && (
             <Splitter
               edge="side"
-              width={frame.side ? frame.sideW : 0}
+              width={side ? frame.sideW : 0}
               onWidth={(w) => {
                 frame.resize('side', w);
               }}
@@ -249,7 +264,21 @@ function Shell() {
               testId="app.split.side"
             />
           )}
-          {frame.panel?.docked === true && (
+          {artDocked && (
+            <Splitter
+              edge="panel"
+              width={artW}
+              onWidth={(w) => {
+                setArtShare(w / winW);
+              }}
+              onReset={() => {
+                setArtShare(0.55);
+              }}
+              label="artifact width"
+              testId="app.split.art"
+            />
+          )}
+          {!artDocked && frame.panel?.docked === true && (
             <Splitter
               edge="panel"
               width={frame.panelW}
@@ -333,6 +362,8 @@ function RouteConfirm({ route }: { route: Route }) {
  */
 function RouteBottom({ route }: { route: Route }) {
   const home = useProjects().find((p) => p.home)?.project;
+  // an artifact open has its one composer, the maker's (beside it, or under the page under 1000 px)
+  if (artOf(route) !== undefined) return null;
   const t = bottomTarget(route, home);
   return t === null ? null : <BottomBlock key={`${t.project}/${t.agent}`} project={t.project} agent={t.agent} />;
 }
@@ -373,7 +404,10 @@ function ScreenOf({ route }: { route: Route }) {
       return <Known project={route.project}>{() => <EnvironmentsScreen project={route.project} />}</Known>;
     case 'artifacts':
       // every project's (project ''), one project's, or one artifact open (amb-kit's src/artifacts)
-      return route.id === undefined ? <ArtifactsScreen project={route.project} /> : <ArtifactOpen project={route.project} id={route.id} />;
+      // a project's artifact by id: the maker's thread in the centre, the artifact in the right column
+      // (App's shell), or the artifact alone under 1000 px (ArtifactView.tsx)
+      if (route.id === undefined) return <ArtifactsScreen project={route.project} />;
+      return route.project === '' ? <ArtifactOpen project={route.project} id={route.id} /> : <ArtifactCentre project={route.project} id={route.id} />;
     case 'scheduled':
       // every project's live scheduled tasks (amb-kit's src/scheduled)
       return <ScheduledScreen />;

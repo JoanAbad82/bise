@@ -6,7 +6,7 @@ import { glyphOf } from '@/artifacts/model';
 import type { Task } from '@/scheduled/model';
 import { howOften, nextWords } from '@/scheduled/model';
 import { shortAge } from '@/agents/model';
-import { waitAge, waitingFor, waitSince, waitsEvent } from '@/thread/wake';
+import { waitingFor, waitSince, waitsEvent } from '@/thread/wake';
 import type { Agent, ComputerAgent, Feature } from '@/proto';
 import { groupsOf } from '@/review/feature';
 import { computerDot, gaugeSays, signOf, type Tone } from './side';
@@ -201,7 +201,7 @@ export function waitingRows(agents: readonly ProjAgent[], now: number, all: bool
       tone: 'ink',
       name: x.a.name,
       sub: x.a.watching[0]?.what ?? '',
-      end: waitAge(now - (waitSince(x.a.watching) ?? now)),
+      end: shortAge(now - (waitSince(x.a.watching) ?? now)),
       endTone: 'dim',
       title: waitingFor(x.a.watching, now) ?? 'waiting',
       testId: `app.right.waiting.${idOf(all, x.project, x.a.name)}`,

@@ -1,12 +1,13 @@
 // app/keep-scroll · lead m_12068 / m_12126, keep's known gap: a list's scroll comes back after a
 // reload (keep.ts useKeptScroll: the sidebar, the agents list, changes, PRs, a feature, a review,
-// environments). Passes when, with a long sidebar (22 projects of 6 agents), he scrolls it down,
+// environments). Passes when, with a long sidebar (44 projects: places only since the right bar,
+// so its length is its projects), he scrolls it down,
 // the page reloads, and the sidebar is back at the same place (within 2 px); scrolled back to the
 // top, a reload keeps the top. The scripted core (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
 const HOME = 'bise-home-00000000';
-const ids = 'abcdefghijklmnopqrstuv'.split('').map((x) => `${x}proj-1a2b3c4${x}`);
+const ids = [...'abcdefghijklmnopqrstuv'.split('').map((x) => `${x}proj-1a2b3c4${x}`), ...'abcdefghijklmnopqrstuv'.split('').map((x) => `${x}more-1a2b3c4${x}`)];
 const agent = (name: string) => ({ name, main: name === 'main', status: 'working', archived: false, title: '', purpose: '', since_ms: Date.now() - 60_000, waits: 0 });
 const world = () => [
   {
@@ -29,7 +30,7 @@ test('app/keep-scroll: the sidebar comes back where he scrolled it after a reloa
   try {
     const { page } = s;
     const side = page.getByTestId('app.sidebar');
-    await expect(page.getByTestId(`app.sidebar.project.${ids[21] ?? ''}`)).toBeAttached({ timeout: 10_000 });
+    await expect(page.getByTestId(`app.sidebar.project.${ids[43] ?? ''}`)).toBeAttached({ timeout: 10_000 });
     const top = () => side.evaluate((el) => el.scrollTop);
     await side.evaluate((el) => {
       el.scrollTop = 600;
@@ -40,7 +41,7 @@ test('app/keep-scroll: the sidebar comes back where he scrolled it after a reloa
     // past the keep's 300 ms write
     await page.waitForTimeout(600);
     await page.reload();
-    await expect(page.getByTestId(`app.sidebar.project.${ids[21] ?? ''}`)).toBeAttached({ timeout: 10_000 });
+    await expect(page.getByTestId(`app.sidebar.project.${ids[43] ?? ''}`)).toBeAttached({ timeout: 10_000 });
     await expect.poll(top, { timeout: 3000, message: 'back where he was' }).toBeGreaterThan(was - 3);
     expect(await top()).toBeLessThan(was + 3);
 
@@ -50,7 +51,7 @@ test('app/keep-scroll: the sidebar comes back where he scrolled it after a reloa
     });
     await page.waitForTimeout(600);
     await page.reload();
-    await expect(page.getByTestId(`app.sidebar.project.${ids[21] ?? ''}`)).toBeAttached({ timeout: 10_000 });
+    await expect(page.getByTestId(`app.sidebar.project.${ids[43] ?? ''}`)).toBeAttached({ timeout: 10_000 });
     await page.waitForTimeout(500);
     expect(await top(), 'the top stays the top').toBe(0);
   } finally {

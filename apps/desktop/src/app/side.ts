@@ -7,7 +7,7 @@
 import type { Agent, ComputerAgent, ProjectRow } from '@/proto';
 import { MAIN, type Route } from './route';
 import { shortAge, shownName } from '@/agents/model';
-import { waitAge, waitingFor, waitSince, waitsEvent } from '@/thread/wake';
+import { waitingFor, waitSince, waitsEvent } from '@/thread/wake';
 
 /** A sign's tone: ink (at work), accent (asks him), err (failed), dim (the rest). */
 export type Tone = 'ink' | 'acc' | 'err' | 'dim';
@@ -52,7 +52,8 @@ export function signOf(a: Agent, now: number, wake?: number): Sign {
   // it waits on the right, what it waits for on hover; never the accent (it doesn't wait on him)
   if (waitsEvent(a)) {
     const since = waitSince(a.watching) ?? now;
-    return { g: '…', tone: 'ink', end: waitAge(now - since), endTone: 'dim', count: 0, title: `${waitingFor(a.watching, now) ?? 'waiting'} · ${what}` };
+    // the end in the bar's one age form ('2 min', designer m_20272 (3)); the TUI's words on hover
+    return { g: '…', tone: 'ink', end: shortAge(now - since), endTone: 'dim', count: 0, title: `${waitingFor(a.watching, now) ?? 'waiting'} · ${what}` };
   }
   switch (a.status) {
     case 'working':

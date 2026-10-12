@@ -2,6 +2,7 @@
 // only picks words and the ds part). Owner: amb-win. Pure.
 import type { Entry } from '@/proto';
 import { NAMELESS_KINDS } from './tiers';
+import { thinkingWords } from './thinking';
 
 /** A row's key in the thread list: an entry by its pos, a send not confirmed by its cid. */
 export const entryKey = (pos: number) => `e:${pos}`;
@@ -92,9 +93,20 @@ export function dayLabel(ms: number, now: number, tz?: string): string {
 /** Under this a thinking shows nothing (ambient m_11777 (c), the TUI's: nothing was thought). */
 export const THOUGHT_MS = 1000;
 
-/** A thinking row with nothing in it: under 1 s, no words of its own (or the hub's 'thought for 0.0s'). Pure. */
+/**
+ * Whether a thought shows a line, as the TUI draws one: always when it has words (once its
+ * signature is cut), at any time ('∴ thought for 0.0s ▸' after a fast '[[think: …]]', qa-flows'
+ * rows-batch2 on the real core, ambient-lead m_20357); without words only from 1 s (m_11777 (c):
+ * nothing was thought). Pure.
+ */
+export function thoughtShows(t: { ms: number; text: string } | null | undefined): boolean {
+  if (t == null) return false;
+  return t.ms >= THOUGHT_MS || thinkingWords(t.text).trim() !== '';
+}
+
+/** A thinking row with nothing in it: under 1 s, no words thought and no head words of its own (or only the hub's 'thought for 0.0s'). Pure. */
 export function thoughtNothing(e: Entry): boolean {
-  return e.kind === 'thinking' && (e.thinking?.ms ?? 0) < THOUGHT_MS && (e.text === '' || /^thought for 0(\.\d+)?s$/.test(e.text));
+  return e.kind === 'thinking' && !thoughtShows(e.thinking ?? { ms: 0, text: '' }) && (e.text === '' || /^thought for 0(\.\d+)?s$/.test(e.text));
 }
 
 /** Who a row is by, for its group: his words, another agent's, the agent's own words and work; none: a line of the thread's own (a notice, a news line, a separator, a hidden thinking) that opens nothing, so the next message shows its name. */

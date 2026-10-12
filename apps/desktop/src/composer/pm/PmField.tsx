@@ -87,6 +87,7 @@ import {
 import { emojiToken, typedEmoji } from "../emoji";
 import { dictated, HOLD_MS } from "../dictate";
 import { DOUBLE_CTRL_R_MS } from "@/voicemode/model";
+import { typed } from "@/working/clock";
 import { Picker } from "../Picker";
 import { freeEscape } from "../escape";
 import { FIELD_NODES } from "./schema";
@@ -312,7 +313,11 @@ export function PmField(p: PmFieldProps): JSX.Element {
           role: "textbox",
           spellcheck: "true",
         },
-        handleKeyDown: (_v, e) => keys.current(e),
+        handleKeyDown: (_v, e) => {
+          // he types: the working signs go calm / hush for 1.5 s (designer's desktop-working page)
+          typed();
+          return keys.current(e);
+        },
         handlePaste: (_v, e) => paste.current(e),
         handleDrop: (_v, e) => drop.current(e),
         handleDOMEvents: {

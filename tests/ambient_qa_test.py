@@ -885,6 +885,22 @@ def as_he_does_scripts():
     check(rs.tcc_verdict(reqs["500.1"], {88579}) is None, "another app's request is not ours")
 
 
+@test
+def usage_marker_gives_a_nonzero_gauge():
+    """[[usage: N]]: every reply to that message reports N input tokens; the plain world's shop/search brief carries one"""
+    sys.path.insert(0, HERE)
+    import fake_provider as fp
+    conv = [{"role": "system", "text": "# Your role: task `search`", "calls": 0},
+            {"role": "user", "text": "search doesn't find tshirt [[usage: 43800]]", "calls": 0}]
+    t = fp.reply_for(conv)
+    check(fp.usage_of(t)["input"] == 43800 and fp.whole_openai_chat(t, "m")["usage"]["prompt_tokens"] == 43800, fp.usage_of(t))
+    conv[1]["text"] = "plain"
+    check(fp.usage_of(fp.reply_for(conv))["input"] == fp.USAGE["input"], "no marker: the default")
+    import world_fixtures as wf
+    search = [a for p in wf.PROJECTS if p["name"] == "shop" for a in p["agents"] if a["name"] == "search"][0]
+    check(search.get("usage") == 43800, search)
+
+
 if __name__ == "__main__":
     print("%d failed" % len(failures) if failures else "all ambient-qa tests pass")
     sys.exit(1 if failures else 0)

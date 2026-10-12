@@ -6,13 +6,14 @@
 //     the TUI shows one (on the world's Mistral fake neither does: the reasoning isn't kept), and
 //     then it opens to what it thought;
 //   - a failed turn ('[[error: badname]]': the API's final 400) is a notice with its why (✗, err);
-//   - usage: the thread head's gauge words are the TUI's footer gauge words;
+//   - usage (designer D12/D7b: the window hides a gauge at 0%): bise's main at 0% (the TUI's footer
+//     says '· 0%') has no gauge in the window's head; the echo fake can't raise it above 0%;
 //   - /compact (the TUI's, on bise's main): 'compacting…' then a folded 'context compacted' that
 //     opens to its summary;
 //   - not delivered: in shop's main thread, '@receipts …' after the TUI archived receipts (its
 //     worktree goes with it) is '✗ not delivered to receipts' with his words; esc drops it from
 //     view; ⏎ send again, after the TUI's /restore, reaches receipts (his words never lost);
-//     shop's agents carry their gauge in the sidebar, as the TUI's panel does.
+//     shop's agents at 0% carry no gauge in the right bar (any shown is the TUI panel's).
 import path from 'node:path';
 import { test, expect } from '../../harness';
 import { hubAgents, hubOf, launchReal, realWorld, transcriptHas, tui, tuiReady, tuiSay, type Tui } from '../world';
@@ -64,6 +65,7 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
       await expect(list.getByText(`ack:`).last(), 'the answer came').toBeVisible({ timeout: 20_000 });
       await sleep(1500);
       const tuiThought = /thought/.test(flat(t?.screen() ?? ''));
+      test.info().attachments.push({ name: 'tui-thinking', contentType: 'text/plain', body: Buffer.from(t?.screen() ?? '') });
       const head = list.locator(T.think).last();
       const winThought = (await head.count()) > 0;
       test.info().annotations.push({ type: 'thinking', description: JSON.stringify({ tui: tuiThought, window: winThought }) });
@@ -78,9 +80,10 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
 
     await test.step('a failed turn', async () => {
       await say(`[[error: badname]] this turn fails ${n}`);
-      const notice = list.locator(T.notice).last();
-      await expect.soft(notice, 'a notice for the failed turn').toBeVisible({ timeout: 30_000 });
-      await expect.soft(notice, 'its level is an error').toHaveAttribute('data-level', 'err');
+      // the turn's end is its own row now (thread.failed.<pos>, level err), after the attempt's
+      // 'candidate discarded' notice (level warn): the failed turn is the err one
+      const notice = list.locator(`${T.notice}[data-level="err"], [data-testid^="thread.failed."][data-level="err"]`).last();
+      await expect.soft(notice, 'an error row for the failed turn').toBeVisible({ timeout: 30_000 });
       const words = ((await notice.textContent().catch(() => '')) ?? '').trim();
       test.info().annotations.push({ type: 'notice', description: words });
       expect.soft(words.length, 'it says why').toBeGreaterThan(8);
@@ -88,12 +91,16 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
     });
 
     await test.step('usage', async () => {
-      const usage = page.locator(T.usage);
-      await expect.soft(usage, "the head's gauge").toBeVisible({ timeout: 15_000 });
-      const words = ((await usage.textContent().catch(() => '')) ?? '').replace(/^[\s·]+/, '').trim();
-      test.info().annotations.push({ type: 'usage', description: JSON.stringify({ window: words, tui: flat(t?.screen() ?? '').match(/you → main[^╯]*/)?.[0]?.slice(0, 200) }) });
-      expect.soft(words, 'gauge words').not.toBe('');
-      expect.soft(flat(t?.screen() ?? ''), "the TUI's gauge has the same words").toContain(words);
+      // designer's rule (D12/D7b, ambient-lead m_20365): the window hides a gauge that says 0%, the
+      // TUI's footer always says it. bise's main is at 0% here: no gauge in the window
+      const footer = flat(t?.screen() ?? '').match(/you → main[^╯]*/)?.[0] ?? '';
+      const zero = /\b\d+ · 0%/.test(footer);
+      test.info().annotations.push({ type: 'usage-main', description: JSON.stringify({ zero, tui: footer.slice(0, 200) }) });
+      if (zero) await expect.soft(page.locator(T.usage), "at 0% the window's head has no gauge").toBeHidden({ timeout: 3000 });
+      // non-zero: real.sh's world is not rich, so every hub runs the echo fake, whose calls always
+      // report 10 input tokens (tests/fake_provider.py USAGE): no turn there can raise a gauge above
+      // 0%. A non-zero gauge needs a usage marker in the fake or a rich world (asked via ambient-lead).
+      await expect(page.locator(T.field).first(), "bise's thread again").toBeVisible({ timeout: 10_000 });
     });
 
     await test.step('compaction', async () => {
@@ -134,23 +141,34 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
       await tuiReady(ts);
       // receipts: its own worktree goes with the archive, so nothing revives it (a shared-folder
       // agent like search is revived by a message: the hub delivers it, no row)
-      const live = async () => (await hubAgents(w, 'shop')).some((a) => a.name === AG && a.status !== 'archived' && !a.dropped);
+      // archived: its status, dropped, an archived flag, or out of the hub's agents (the TUI says
+      // '@receipts archived — work saved (/restore)' and moves it under '▸ 1 archived')
+      const raw = async () => (await hubAgents(w, 'shop')).find((a) => a.name === AG);
+      const live = async () => {
+        const a = await raw();
+        return a !== undefined && a.status !== 'archived' && !a.dropped && !JSON.stringify(a).includes('"archived":true');
+      };
       tuiSay(ts, `/archive ${AG}`);
       await sleep(1500);
       if (/\[y\/N\]/.test(flat(ts.screen()))) tuiSay(ts, 'y');
-      await expect.poll(live, { timeout: 15_000, message: `${AG} archived (the TUI)` }).toBe(false);
+      try {
+        await expect.poll(live, { timeout: 15_000, message: `${AG} archived (the TUI)` }).toBe(false);
+      } finally {
+        test.info().attachments.push({ name: 'tui-archive', contentType: 'text/plain', body: Buffer.from(ts.screen()) });
+        test.info().attachments.push({ name: 'hub-receipts', contentType: 'application/json', body: Buffer.from(JSON.stringify((await raw().catch(() => undefined)) ?? null)) });
+      }
       await page.locator(T.project(shop)).click({ timeout: 10_000 });
       await expect(page.locator(T.thread)).toHaveAttribute('data-project', shop, { timeout: 5000 });
-      await expect.soft(page.locator(T.gauges).first(), "shop's agents carry their gauge in the sidebar").toBeVisible({ timeout: 10_000 });
+      // shop's agents at 0% in the TUI's panel carry no gauge in the right bar (designer D12/D7b);
+      // any gauge shown is the TUI panel's percent ('<n> <glyph> <name> … <pct>%'), never 0%
       const gauges = await page.locator(T.gauges).evaluateAll((els) =>
-        els.map((e) => ({ agent: (e.getAttribute('data-testid') ?? '').replace(/^app\.sidebar\.agent\./, '').replace(/\.gauge$/, ''), words: e.textContent.trim() })));
+        els.map((e) => ({ agent: (e.getAttribute('data-testid') ?? '').replace(/^app\.right\.agent\./, '').replace(/\.gauge$/, ''), words: e.textContent.trim() })));
       const panel = flat(ts.screen()).match(/agents .*? inbox/)?.[0] ?? '';
-      test.info().annotations.push({ type: 'sidebar-gauges', description: JSON.stringify({ window: gauges, tuiPanel: panel }) });
-      expect.soft(gauges.length, "shop's agents carry their gauge in the sidebar").toBeGreaterThan(0);
-      // each one is the TUI panel's: '<n> <glyph> <name> … <pct>%'
+      test.info().annotations.push({ type: 'right-bar-gauges', description: JSON.stringify({ window: gauges, tuiPanel: panel }) });
       for (const g of gauges) {
         const tuiPct = new RegExp(`\\b${g.agent}\\b[^%]*?(\\d+%)`).exec(panel)?.[1] ?? '';
         expect.soft(g.words, `${g.agent}'s gauge is the TUI panel's ${tuiPct}`).toBe(tuiPct);
+        expect.soft(g.words, `${g.agent}: a gauge at 0% is hidden`).not.toBe('0%');
       }
       await say(`@${AG} first try ${n}`);
       const first = list.locator(T.nd, { hasText: `first try ${n}` }).last();
@@ -169,6 +187,35 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
       await expect.soft.poll(() => transcriptHas(w, 'shop', AG, `second try ${n}`), { timeout: 15_000, message: `send again reaches ${AG}: his words never lost` }).toBe(true);
       test.info().attachments.push({ name: 'tui-shop-nd', contentType: 'text/plain', body: Buffer.from(ts.screen()) });
       await page.screenshot({ path: test.info().outputPath('sent-again.png') });
+    });
+
+    await test.step('a non-zero gauge (shop/search)', async () => {
+      // amb-tools 55fd5c44: shop/search's brief ends with [[usage: 43800]], so its calls report
+      // 43 800 input tokens: its right-bar row carries the TUI panel's percent (non-zero), and its
+      // head says the hub's words
+      const sts = ts as Tui;
+      const panel = flat(sts.screen()).match(/agents .*? inbox/)?.[0] ?? '';
+      const tuiPct = /\bsearch\b[^%]*?(\d+%)/.exec(panel)?.[1] ?? '';
+      const agents: (Awaited<ReturnType<typeof hubAgents>>[number] & { usage?: { words?: string } })[] = await hubAgents(w, 'shop');
+      const hubWords = agents.find((a) => a.name === 'search')?.usage?.words ?? '';
+      const gauge = page.locator('[data-testid="app.right.agent.search.gauge"]');
+      await expect.soft(gauge, "search's right-bar row carries its gauge").toBeVisible({ timeout: 10_000 });
+      const got = ((await gauge.textContent().catch(() => '')) ?? '').trim();
+      test.info().annotations.push({ type: 'usage-search', description: JSON.stringify({ window: got, tuiPanel: tuiPct, hub: hubWords }) });
+      expect.soft(tuiPct, "the TUI's panel says search is above 0%").toMatch(/^[1-9]\d*%$/);
+      expect.soft(got, "the window's gauge is the TUI panel's").toBe(tuiPct);
+      await page.locator('[data-testid="app.right.agent.search"]').click({ timeout: 5000 });
+      // the agent head shows each meta item whole or not at all (69192579): search's long purpose
+      // line fills it, so its gauge goes; the composer's label line ('… · context 44k · 17%') keeps it
+      const head = page.locator(T.usage);
+      const label = page.locator('[data-testid="composer"] .div .end');
+      await expect.soft(label, "search's label line").toBeVisible({ timeout: 10_000 });
+      const inHead = await head.isVisible();
+      const where = inHead ? head : label;
+      const words = ((await where.textContent().catch(() => '')) ?? '').trim();
+      test.info().annotations.push({ type: 'usage-search-head', description: JSON.stringify({ inHead, words }) });
+      expect.soft(words, "search's head or label line says the hub's words").toContain(hubWords || tuiPct);
+      await page.screenshot({ path: test.info().outputPath('usage-search.png') });
     });
   } finally {
     for (const [name, x] of [['tui-bise', t], ['tui-shop', ts]] as const) {

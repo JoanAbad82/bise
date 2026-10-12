@@ -12,10 +12,9 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { Button, Chip, IconButton, Kbd, Menu, MenuItem, Pearl } from "@/ds";
+import { Chip, IconButton, Menu, MenuItem, Pearl } from "@/ds";
 import { useProjects } from "@/store";
 import { keep } from "./keep";
-import { useArtifactCount } from "./Panel";
 import { formatRoute } from "./route";
 import { type Side, useRoute, useRouter } from "./router";
 import {
@@ -32,7 +31,6 @@ import {
   PANEL_OPEN_PX,
   panelAt,
   panelProject,
-  panelWords,
 } from "./side";
 import { useWaitingTotal } from "./Sidebar";
 
@@ -217,10 +215,13 @@ export function Over({
   side,
   onClose,
   children,
+  thread = false,
 }: {
   side: "left" | "right";
   onClose: () => void;
   children: ReactNode;
+  /** an artifact's maker thread sliding over the page under 1000 px (78% of the width) */
+  thread?: boolean;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -237,7 +238,7 @@ export function Over({
   return (
     <>
       <div className={`app-scrim ${side}`} onClick={onClose} data-testid="app.scrim" />
-      <div className={`app-over ${side}`} data-testid={`app.over.${side}`}>
+      <div className={`app-over ${side}${thread ? " thread" : ""}`} data-testid={`app.over.${side}`}>
         {children}
       </div>
     </>
@@ -361,7 +362,9 @@ export function Titlebar({ frame }: { frame: FrameState }) {
   const route = useRoute();
   const rows = useProjects();
   const waits = useWaitingTotal();
-  const count = useArtifactCount(frame.panel?.project);
+  // what waits on him in the right bar's place: one project's, or every project's on bise's thread
+  const placeWaits =
+    frame.panel === undefined ? 0 : frame.panel.project === "" ? waits : (rows.find((r) => r.project === frame.panel?.project)?.waits ?? 0);
   const name = (p: string) => rows.find((r) => r.project === p)?.name ?? p;
   const crumb = crumbOf(route, name);
   const panelOn =
@@ -414,17 +417,30 @@ export function Titlebar({ frame }: { frame: FrameState }) {
           </span>
         ))}
       </span>
+      {/* the right bar's toggle (designer m_20274/m_20275): the left toggle's panel icon mirrored,
+          pressed while the bar is open; the accent count of what waits on him in its place, none at 0 */}
       {frame.panel !== undefined && (
-        <Button
-          size="sm"
-          pressed={panelOn}
-          onClick={() => {
-            frame.toggle("panel");
-          }}
-          testId="app.title.panel"
-        >
-          ↗ {panelWords(frame.width === "narrow", count)} <Kbd>⌥⌘0</Kbd>
-        </Button>
+        <span className="app-rtg">
+          <IconButton
+            label="right bar"
+            keys="⌥⌘0"
+            size="bar"
+            pressed={panelOn}
+            onClick={() => {
+              frame.toggle("panel");
+            }}
+            testId="app.title.panel"
+          >
+            <span className="app-tg-glyph right" aria-hidden="true">
+              <span />
+            </span>
+          </IconButton>
+          {placeWaits > 0 && (
+            <span className="app-rtg-n" data-testid="app.title.panel.waits">
+              {placeWaits}
+            </span>
+          )}
+        </span>
       )}
     </div>
   );

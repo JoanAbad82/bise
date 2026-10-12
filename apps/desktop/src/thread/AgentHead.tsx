@@ -8,10 +8,11 @@ import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } fro
 import type { Agent } from '@/proto';
 import { useAgents, useComputerLive, useDiff } from '@/store';
 import { useNow } from '@/app/clock';
-import { ago } from '@/agents/model';
+import { Breath, Gust, Pulse } from '@/working/Signs';
+import { turnAge } from '@/working/gust';
 import { useRouter } from '@/app/router';
 import { BisePearl } from '@/app/BisePearl';
-import { biseChip, branchLine, dropsFor, roleOf, stateChip, usageLine, type StateChip } from './head';
+import { biseChip, branchLine, dropsFor, roleOf, stateChip, usageLine, workingRowShows, type StateChip } from './head';
 import { waitingFor, waitsEvent } from './wake';
 import { Press } from '@/ds';
 
@@ -21,6 +22,11 @@ const HELD: StateChip = { text: '? waiting for you', needs: true, live: false };
 function Chip({ chip, testId }: { chip: StateChip; testId: string }) {
   return (
     <span className={chip.needs ? 'ah-chip needs' : chip.live ? 'ah-chip live' : 'ah-chip'} data-testid={testId} data-needs={chip.needs}>
+      {chip.breath === true && (
+        <>
+          <Breath testId={`${testId}.breath`} />{' '}
+        </>
+      )}
       {chip.text}
     </span>
   );
@@ -138,8 +144,15 @@ export function BiseHead({ project, name, more }: { project: string; name: strin
   );
 }
 
-/** The live line at the thread's end while it works (v6 (2)): '∿ running the bench three more times · 1 min'. */
-export function LiveLine({ a }: { a: Agent | undefined }) {
+/**
+ * The working row at the thread's end (designer's desktop-working page): the TUI's gust, then
+ * '<agent> is working · <the core's action text> · <turn age>'; no action yet, the name and the
+ * age alone (never invented words). The action cuts with … first, the rest stays whole. It sits
+ * under the list, so it stays in view when he reads up; a click brings the thread to its end.
+ * role=status: the gust and the age are aria-hidden, so only a new action is announced.
+ * An agent waiting on an event keeps event-wake's '… waiting for …' row, no gust.
+ */
+export function LiveLine({ a, name, onJump }: { a: Agent | undefined; name?: string; onJump?: () => void }) {
   const now = useNow();
   // event-wake (designer's page): the thread ends on what it waits for, dim, never the accent
   if (a !== undefined && !a.archived && waitsEvent(a)) {
@@ -149,22 +162,44 @@ export function LiveLine({ a }: { a: Agent | undefined }) {
       </div>
     );
   }
-  if (a === undefined || a.archived || a.status !== 'working' || a.title === '') return null;
-  const t = ago(a.since_ms, now);
+  // waiting on him (a question, an approval): the row goes, the card docks over the composer
+  if (a === undefined || !workingRowShows(a)) return null;
+  const age = a.since_ms > 0 ? turnAge(now - a.since_ms) : '';
   return (
-    <div className="th-live" data-testid="thread.live" aria-live="polite">
-      ∿ {a.title}
-      {t !== 'now' ? ` · ${t}` : ''}
+    <div className="th-live th-working" role="status" data-testid="thread.live" onClick={onJump}>
+      <Gust testId="thread.live.gust" />
+      <span className="th-live-words">
+        <b className="th-live-name">{name ?? a.name}</b> is working
+        {a.title !== '' && (
+          <>
+            <span className="th-live-dot"> · </span>
+            <span className="th-live-act" data-testid="thread.live.act">
+              {a.title}
+            </span>
+          </>
+        )}
+      </span>
+      {age !== '' && (
+        <span className="th-live-age" aria-hidden="true" data-testid="thread.live.age">
+          {' · '}
+          {age}
+        </span>
+      )}
     </div>
   );
 }
 
-/** The empty thread (v6 (5)): under his first message, '· checkout is starting: its own folder, sb/checkout'. */
+/** The empty thread (v6 (5), the working page): '· checkout is starting · its own folder, sb/checkout', the '·' pulsing. */
 export function StartingLine({ a }: { a: Agent }) {
   const where = a.branch != null && a.branch !== '' ? `its own folder, ${a.branch}` : "the project's folder";
   return (
-    <div className="th-starting" data-testid="thread.starting">
-      · {a.name} is starting: {where}
+    <div className="th-live th-starting" role="status" data-testid="thread.starting">
+      <Pulse kind="starting" />
+      <span className="th-live-words">
+        <b className="th-live-name">{a.name}</b> is starting
+        <span className="th-live-dot"> · </span>
+        <span className="th-live-act">{where}</span>
+      </span>
     </div>
   );
 }

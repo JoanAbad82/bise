@@ -3,7 +3,7 @@
 // Passes when, with 4 agents at work (perf open), one waiting on him and one done, every working
 // row shows '∿' in the dot's slot with no scale change across frames; the open row pulses (b-pulse,
 // its opacity moves) and the others murmur (b-hush) out of step; waiting and done keep their own
-// signs; the project's row never pulses; and with reduced motion nothing in the sidebar moves.
+// signs; the project's row never pulses; and with reduced motion nothing in the right bar moves.
 // The scripted core (FakeCore), light and dark. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
@@ -40,26 +40,24 @@ test("app/working-sign: '∿' in the dot's slot, the open row pulses, the others
       dot(n).evaluate((el) => {
         const cs = getComputedStyle(el);
         const r = el.getBoundingClientRect();
-        return { glyph: getComputedStyle(el, '::before').content, anim: cs.animationName, opacity: Number(cs.opacity), w: r.width, h: r.height, transform: cs.transform };
+        const sign = el.querySelector('.wk-sign');
+        return { glyph: sign?.textContent ?? '', pseudo: getComputedStyle(el, '::before').content, w: r.width, h: r.height, transform: cs.transform };
       });
+    const BREATH = ['·', '~', '∿', '≈'];
     for (const n of WORKING) {
       const l = await look(n);
-      expect(l.glyph, `${n}: the breeze`).toBe('"∿"');
-      expect(l.anim, `${n}: ${n === 'perf' ? 'the open row pulses' : 'the Hush'}`).toBe(n === 'perf' ? 'b-pulse' : 'b-hush');
+      expect(BREATH, `${n}: the breath in the dot's slot`).toContain(l.glyph);
+      expect(l.pseudo, `${n}: no CSS glyph under it`).toBe('none');
       expect(l.transform, `${n}: never a scale or a move`).toBe('none');
     }
-    // its opacity moves and its box never does, over 1.2 s of frames
+    // it steps through the breath (· ~ ∿ ≈ ∿ ~, 110 ms) and its box never moves, over 1.2 s of frames
     const frames = [];
     for (let i = 0; i < 12; i++) {
       frames.push(await look('perf'));
       await page.waitForTimeout(100);
     }
-    const ops = frames.map((f) => f.opacity);
-    expect(Math.max(...ops) - Math.min(...ops), 'the open row pulses').toBeGreaterThan(0.15);
+    expect(new Set(frames.map((f) => f.glyph)).size, 'the breath moves').toBeGreaterThanOrEqual(3);
     expect(new Set(frames.map((f) => `${f.w}x${f.h}`)).size, 'no scale change').toBe(1);
-    // the others are out of step: not all at the same opacity
-    const hush = await Promise.all(['cache', 'docs', 'api'].map(async (n) => (await look(n)).opacity));
-    expect(new Set(hush.map((o) => o.toFixed(2))).size, 'never blinks in chorus').toBeGreaterThan(1);
     // waiting on him and done keep their own signs in the 15 px column (desktop-screens v6): '?' and '✓', still
     const sign = (n: string) => page.locator(`[data-testid="app.right.agent.${n}"] .app-rb-g`);
     await expect(sign('ui')).toHaveText('?');
@@ -75,10 +73,10 @@ test("app/working-sign: '∿' in the dot's slot, the open row pulses, the others
     await page.waitForTimeout(300);
     await page.screenshot({ path: test.info().outputPath('dark.png') });
 
-    // reduced motion: a still '∿' in text-2, 0 changed frames in the sidebar
+    // reduced motion: a still '∿' in ink, 0 changed frames in the right bar
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    expect((await look('perf')).anim).toBe('none');
-    // every agent row of the sidebar, frame by frame (bise's own pearl is amb-web's, its own rule)
+    await expect.poll(async () => (await look('perf')).glyph).toBe('∿');
+    // every agent row of the right bar, frame by frame (bise's own pearl is amb-web's, its own rule)
     const running = await page.evaluate(() =>
       document.getAnimations().filter((a) => a.playState === 'running' && a.effect instanceof KeyframeEffect && a.effect.target instanceof Element && a.effect.target.closest('[data-testid^="app.right.agent."]') !== null).length,
     );

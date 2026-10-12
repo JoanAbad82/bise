@@ -12,7 +12,7 @@ import { Marker, Msg } from '@/ds';
 import type { Entry } from '@/proto';
 import { useEntry } from '@/store';
 import { Answer } from './Markdown';
-import { GROUP_GAP_MS, THOUGHT_MS, answeredCardOf, repeatedReport, briefOf, clock, dayLabel, groupHead, lastOfRun, sameDay, sideOf, dropAuthor, reportStatus, thoughtNothing, whoOf } from './entry';
+import { GROUP_GAP_MS, THOUGHT_MS, answeredCardOf, repeatedReport, briefOf, clock, dayLabel, groupHead, lastOfRun, sameDay, sideOf, dropAuthor, reportStatus, thoughtNothing, thoughtShows, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useIsCurrent } from './findmark';
 import { useVoiceLit } from '@/voicemode';
@@ -289,7 +289,7 @@ function AgentMsg({ e, ctx, who, head, live, still }: { e: Entry; ctx: RowCtx; w
     );
   return (
     <Msg from={who.from} name={who.name} indent={who.indent} time={clock(e.at_ms)} head={head} after={mark}>
-      {e.thinking != null && e.thinking.ms >= THOUGHT_MS && <ThinkingLine pos={e.pos} head={thoughtFor(e.thinking.ms)} body={e.thinking.text} />}
+      {e.thinking != null && thoughtShows(e.thinking) && <ThinkingLine pos={e.pos} head={thoughtFor(e.thinking.ms)} body={e.thinking.text} />}
       {lit !== null && lit.unsaid !== '' ? (
         <div className="b-text vm-lit" data-testid={`thread.lit.${String(e.pos)}`}>
           <span className="vm-said">{lit.said}</span>

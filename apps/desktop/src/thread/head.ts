@@ -5,13 +5,15 @@ import type { Agent, EntryKind } from '@/proto';
 import { ago, shortAge, shownName } from '@/agents/model';
 import { waitingFor, waitsEvent } from './wake';
 
-/** The state chip: '∿ working · 14 min', 'starting', '? waiting for you' (accent). */
+/** The state chip: '<breath> working · 14 min', 'starting', '? waiting for you' (accent). */
 export interface StateChip {
   readonly text: string;
   /** what waits on him: accent on accent 13% */
   readonly needs: boolean;
-  /** working: its ∿ breathes */
+  /** working or starting */
   readonly live: boolean;
+  /** working: the TUI's 1-cell breath before its words (designer's desktop-working page) */
+  readonly breath?: boolean;
 }
 
 /**
@@ -28,7 +30,7 @@ export function nothingOwnYet(kinds: readonly (EntryKind | undefined)[]): boolea
 export const STARTING_MS = 20_000;
 
 /** An agent's state chip at `now`. Pure. */
-export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits' | 'waiting_on'> & { watching?: Agent['watching'] }, now: number): StateChip {
+export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits' | 'waiting_on'> & { watching?: Agent['watching']; turn_ms?: Agent['turn_ms'] }, now: number): StateChip {
   // R9/S3: whom it waits on, the hub's own fact (the TUI's panel reads the same field)
   if (a.waits > 0 || a.waiting_on?.who === 'you') return { text: '? waiting for you', needs: true, live: false };
   if (a.waiting_on?.who === 'agent') return { text: `⋯ waiting on ${shownName(a.waiting_on.name)}`, needs: false, live: false };
@@ -39,8 +41,9 @@ export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits' | 'wait
     case 'working': {
       const since = now - a.since_ms;
       if (a.since_ms > 0 && since < STARTING_MS) return { text: 'starting', needs: false, live: true };
-      const t = ago(a.since_ms, now);
-      return { text: t === 'now' ? '∿ working' : `∿ working · ${t}`, needs: false, live: true };
+      // the current turn's age, the one the composer's label and the right bar say (designer m_20272 (1))
+      const t = ago(a.turn_ms != null ? now - a.turn_ms : a.since_ms, now);
+      return { text: t === 'now' ? 'working' : `working · ${t}`, needs: false, live: true, breath: true };
     }
     case 'done':
       return { text: '✓ done', needs: false, live: false };
@@ -83,6 +86,14 @@ export function biseChip(agents: readonly Pick<Agent, 'main' | 'archived' | 'sta
 }
 
 /** The composer's label and placeholder: 'to perf' / 'write to perf, then ⏎'. */
+/**
+ * The working row shows at the thread's end (designer's desktop-working page): the agent works and
+ * nothing waits on him (no question, no approval) nor on an event (event-wake keeps its own row). Pure.
+ */
+export function workingRowShows(a: Agent | undefined): boolean {
+  return a !== undefined && !a.archived && !waitsEvent(a) && a.status === 'working' && a.waits === 0 && a.waiting_on?.who !== 'you';
+}
+
 /**
  * S40/W3, the TUI's divider (`you → main · model · effort · approvals mode · state · context`,
  * chrome.rs + sb/panel.rs status_state): what the composer's label line says on its right. The
