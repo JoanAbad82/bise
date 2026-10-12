@@ -51,6 +51,13 @@ Control (no auth): POST /control {"action": ...}
                     session forgotten (404 unknown session)
   drop_call         {"count": N}: the next N tools/call run, then the
                     connection closes with no answer
+  fail_call         {"count": N, "status": S, "body": B} or {"count": N,
+                    "rpc": {code, message, data}}: the next N tools/call
+                    answer HTTP S with body B, or that JSON-RPC error
+Tools that fail as a gateway that masks its errors does (isError, the
+words "Error calling tool '<name>'" and nothing else): search {query?,
+page_size?} and get_file {file_id} (strict schemas); fail_text {text}
+answers isError with that text.
 """
 
 import argparse
@@ -85,6 +92,15 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}}}},
     {"name": "slow", "description": "Sleep, then answer.",
      "inputSchema": {"type": "object", "properties": {"secs": {"type": "number"}}}},
+    {"name": "search", "description": "Search files (fails, masked).",
+     "inputSchema": {"type": "object", "additionalProperties": False, "properties": {
+         "query": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "The search query."},
+         "page_size": {"anyOf": [{"type": "integer"}, {"type": "null"}]}}}},
+    {"name": "get_file", "description": "Read a file (fails, masked).",
+     "inputSchema": {"type": "object", "additionalProperties": False, "required": ["file_id"],
+                     "properties": {"file_id": {"type": "string", "description": "The file's id."}}}},
+    {"name": "fail_text", "description": "Answer isError with a text.",
+     "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}}}},
 ]
 SESSIONS = set()
 # open event streams: (session or None, queue of SSE frames, a closer)
@@ -99,7 +115,8 @@ REFRESH = {}   # refresh token -> client_id
 DENY = [False]
 TOKEN_DOWN = [False]
 # failures to come (control: fail_init, lose_session, drop_call)
-FAULTS = {"fail_init": 0, "fail_init_how": "drop", "lose_session": 0, "drop_call": 0}
+FAULTS = {"fail_init": 0, "fail_init_how": "drop", "lose_session": 0, "drop_call": 0,
+          "fail_call": 0, "fail_call_how": {}}
 
 
 def take_fault(name):
@@ -148,6 +165,10 @@ def call(name, arguments, headers):
         return {"content": [{"type": "text", "text": "added-tool:%s" % name}]}
     if name == "admin":
         return {"content": [{"type": "text", "text": "admin ok"}]}
+    if name in ("search", "get_file"):
+        return {"content": [{"type": "text", "text": "Error calling tool %r" % name}], "isError": True}
+    if name == "fail_text":
+        return {"content": [{"type": "text", "text": arguments.get("text", "")}], "isError": True}
     if name == "slow":
         import time
         time.sleep(float(arguments.get("secs", 1)))
@@ -398,11 +419,13 @@ class H(BaseHTTPRequestHandler):
             DENY[0] = True
         elif act in ("token_down", "token_up"):
             TOKEN_DOWN[0] = act == "token_down"
-        elif act in ("fail_init", "lose_session", "drop_call"):
+        elif act in ("fail_init", "lose_session", "drop_call", "fail_call"):
             with LOCK:
                 FAULTS[act] = int(req.get("count", 1))
                 if act == "fail_init":
                     FAULTS["fail_init_how"] = req.get("how", "drop")
+                if act == "fail_call":
+                    FAULTS["fail_call_how"] = req
         elif act == "log":
             with LOCK:
                 return self.send(200, json.dumps(LOG).encode())
@@ -515,6 +538,12 @@ class H(BaseHTTPRequestHandler):
                 return self.send(403, b'{"error":"insufficient_scope"}', extra=[(
                     "WWW-Authenticate", 'Bearer error="insufficient_scope", scope="mcp.admin", '
                     'resource_metadata="http://%s/.well-known/oauth-protected-resource/mcp"' % self.headers.get("Host"))])
+        if msg.get("method") == "tools/call" and take_fault("fail_call"):
+            how = FAULTS["fail_call_how"]
+            if "rpc" in how:
+                return self.send(200, json.dumps({"jsonrpc": "2.0", "id": msg.get("id"), "error": how["rpc"]}).encode(),
+                                 extra=extra)
+            return self.send(int(how.get("status", 500)), how.get("body", "").encode(), extra=extra)
         reply = answer(msg, self.headers, sid)
         if reply is None:
             return self.send(202, extra=extra)

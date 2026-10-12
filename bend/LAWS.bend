@@ -5929,17 +5929,17 @@ law mcp_retry_only_unsent:
     Bool.and(Bool.not(Mc.retry(Mc.SCall{}, Mc.WNet{Pv.NRead{54, "reset"}})),
     Bool.and(Bool.not(Mc.retry(Mc.SCall{}, Mc.WNet{Pv.NTimeout{}})),
     Bool.and(Bool.not(Mc.retry(Mc.SCall{}, Mc.WStatus{502, ""})),
-      Bool.not(Mc.retry(Mc.SCall{}, Mc.WRpc{"no such tool"})))))))))) == True{} : Bool}
+      Bool.not(Mc.retry(Mc.SCall{}, Mc.WRpc{"-32602", "no such tool"})))))))))) == True{} : Bool}
 
-# LAW: the model reads the server, the phase, the cause, what bise
-# tried, and whether calling again is safe - never just "initialize
-# failed".
+# LAW: the model reads the kind of failure, the server, the phase, the
+# cause, what bise tried, and whether calling again is safe - never just
+# "initialize failed".
 law mcp_fail_text_says_why_and_safety:
   {Bool.and(String.eq(Mc.fail_text("web_search.web_search", "api.mistral.ai",
       Mc.SInit{}, Mc.WNet{Pv.NDns{}}, 2n),
-      "mcp call failed: web_search.web_search (api.mistral.ai), initialize: cannot resolve api.mistral.ai (dns) — check your network or VPN. bise reconnected and retried 2 times. the call never reached the server: safe to call again."),
+      "mcp call failed (network): web_search.web_search (api.mistral.ai), initialize: cannot resolve api.mistral.ai (dns) — check your network or VPN. bise reconnected and retried 2 times. the call never reached the server: safe to call again."),
     String.eq(Mc.fail_text("x.y", "h", Mc.SCall{}, Mc.WStatus{502, "{\"message\":\"bad gateway\"}"}, 0n),
-      "mcp call failed: x.y (h), tools/call: h answered HTTP 502: bad gateway. not retried: the call may have run on the server, check before calling it again (safe if the tool only reads).")) == True{} : Bool}
+      "mcp call failed (server error): x.y (h), tools/call: h answered HTTP 502: bad gateway. not retried: the call may have run on the server, check before calling it again (safe if the tool only reads).")) == True{} : Bool}
 
 # ---- an agent's ended turns, counted where its run changes (issue 22,
 # architect m_16521): the agents row carries working and turns from one
