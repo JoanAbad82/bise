@@ -215,6 +215,33 @@ law race_cancel_is_its_own:
     Con{Rc.cancelled(None{}, "1700-0"), Con{Rc.cancelled(Some{""}, "1700-0"), Nil{}}}}}
     == Con{True{}, Con{False{}, Con{False{}, Con{False{}, Nil{}}}}} : List<&2, Bool>}
 
+# ---- a program's inner call, recorded for the re-run (main-pure) ----
+
+# LAW: a success is recorded as its text, stop or not (a result that is
+# in wins, as race_result_wins).
+law prog_success_is_recorded:
+  for +out: String
+  for stop: Bool
+  {Rt.prog_after(True{}, out, stop) == Rt.PRecord{J.JStr{out}} : Rt.ProgStep}
+
+# LAW: a failure (a tool error, a gate denial with its note) is recorded
+# whole as {error: text}: the program goes on, that call's promise
+# rejects with the text (rust/jsrt's ToolError).
+law prog_failure_rejects_whole:
+  for +out: String
+  {Rt.prog_after(False{}, out, False{})
+    == Rt.PRecord{J.JObj{[Tuple{"error", J.JStr{out}}]}} : Rt.ProgStep}
+
+law prog_denial_rejects_with_its_note:
+  {Rt.prog_after(False{}, "denied by the user: not on main", False{})
+    == Rt.PRecord{J.JObj{[Tuple{"error", J.JStr{"denied by the user: not on main"}}]}} : Rt.ProgStep}
+
+# LAW: a failure with a stop in ends the program with its text.
+law prog_stop_ends_the_program:
+  for +out: String
+  {Rt.prog_after(False{}, out, True{})
+    == Rt.PEnd{String.append("program call failed: ", out)} : Rt.ProgStep}
+
 law race_cancel_path_is_per_port:
   {Rc.cancel_path_of("/h/agents/a/run", "7702")
     == "/h/agents/a/run/bend-cancel-7702.txt" : String}
@@ -5929,17 +5956,17 @@ law mcp_retry_only_unsent:
     Bool.and(Bool.not(Mc.retry(Mc.SCall{}, Mc.WNet{Pv.NRead{54, "reset"}})),
     Bool.and(Bool.not(Mc.retry(Mc.SCall{}, Mc.WNet{Pv.NTimeout{}})),
     Bool.and(Bool.not(Mc.retry(Mc.SCall{}, Mc.WStatus{502, ""})),
-      Bool.not(Mc.retry(Mc.SCall{}, Mc.WRpc{"no such tool"})))))))))) == True{} : Bool}
+      Bool.not(Mc.retry(Mc.SCall{}, Mc.WRpc{"-32602", "no such tool"})))))))))) == True{} : Bool}
 
-# LAW: the model reads the server, the phase, the cause, what bise
-# tried, and whether calling again is safe - never just "initialize
-# failed".
+# LAW: the model reads the kind of failure, the server, the phase, the
+# cause, what bise tried, and whether calling again is safe - never just
+# "initialize failed".
 law mcp_fail_text_says_why_and_safety:
   {Bool.and(String.eq(Mc.fail_text("web_search.web_search", "api.mistral.ai",
       Mc.SInit{}, Mc.WNet{Pv.NDns{}}, 2n),
-      "mcp call failed: web_search.web_search (api.mistral.ai), initialize: cannot resolve api.mistral.ai (dns) — check your network or VPN. bise reconnected and retried 2 times. the call never reached the server: safe to call again."),
+      "mcp call failed (network): web_search.web_search (api.mistral.ai), initialize: cannot resolve api.mistral.ai (dns) — check your network or VPN. bise reconnected and retried 2 times. the call never reached the server: safe to call again."),
     String.eq(Mc.fail_text("x.y", "h", Mc.SCall{}, Mc.WStatus{502, "{\"message\":\"bad gateway\"}"}, 0n),
-      "mcp call failed: x.y (h), tools/call: h answered HTTP 502: bad gateway. not retried: the call may have run on the server, check before calling it again (safe if the tool only reads).")) == True{} : Bool}
+      "mcp call failed (server error): x.y (h), tools/call: h answered HTTP 502: bad gateway. not retried: the call may have run on the server, check before calling it again (safe if the tool only reads).")) == True{} : Bool}
 
 # ---- an agent's ended turns, counted where its run changes (issue 22,
 # architect m_16521): the agents row carries working and turns from one

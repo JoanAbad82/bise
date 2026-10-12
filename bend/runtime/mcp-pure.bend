@@ -352,11 +352,25 @@ type Stage is Data:
   SCall{}
 
 # why a try stopped: no answer at all, an HTTP status (with its raw
-# body), or a JSON-RPC error the server answered
+# body), or a JSON-RPC error the server answered (its code as the JSON
+# text, "" when absent; its message, with its data when it has some)
 type Why is Data:
   WNet{e: Pvp.NetErr}
   WStatus{code: U32, body: String}
-  WRpc{said: String}
+  WRpc{code: String, said: String}
+
+# what kind of failure, so the model knows what to fix: its arguments,
+# a login, the tool's name, a pause, or nothing it can fix (the server,
+# the network)
+type Cause is Data:
+  KArgs{}
+  KAuth{}
+  KMissing{}
+  KRate{}
+  KServer{}
+  KTimeout{}
+  KNet{}
+  KTool{}
 
 # one try: the tool's answer, or where and why it stopped
 type Try is Data:
@@ -395,7 +409,7 @@ def session_gone(w: Why, +st: Stage) -> Bool:
     case WStatus{+code, +body}:
       Bool.and(is_call(st), Bool.or(U32.is_eq(code, 404),
         Bool.and(U32.is_eq(code, 400), session_words(body))))
-    case WRpc{+said}:
+    case WRpc{_, +said}:
       session_words(said)
 
 # a transport failure of tools/call: could the request have reached the
@@ -422,7 +436,7 @@ def reached.call(w: Why) -> Bool:
       net_sent(e)
     case WStatus{+code, _}:
       U32.is_le(500, code)
-    case WRpc{+said}:
+    case WRpc{_, +said}:
       Bool.not(session_words(said))
 
 # may the tool have run? never when initialize is what failed
@@ -449,7 +463,7 @@ def transient(w: Why, +st: Stage) -> Bool:
       net_transient(e)
     case WStatus{+code, +body}:
       Bool.or(Pvp.retryable_status(code), session_gone(WStatus{code, body}, st))
-    case WRpc{+said}:
+    case WRpc{_, +said}:
       session_words(said)
 
 def retry(+st: Stage, +w: Why) -> Bool:
@@ -465,15 +479,179 @@ def again(t: Try) -> Bool:
 
 # ---- the words ----
 
+# the server's own words reach the model whole up to this bound (a
+# validation error lists every bad field; 200 cut them)
 def said_max() -> Nat:
-  200n
+  1500n
 
 def clip(+s: String) -> String:
   Bool.pick(String, Nat.is_lt(said_max(), String.length(s)),
     String.append(String.take(s, said_max()), "…"), s)
 
+# ---- secrets out of the server's words ----
+# A server may echo a header or a URL back: the word after "Bearer", the
+# value of a key=, token=, secret= or password= pair, and a word that
+# looks like a provider key (sk-, ghp_, xoxb-, ya29., AKIA...) become
+# [redacted]. The words are already squeezed (one space between them).
+
+def has_any(+s: String, ws: List<&2, String>) -> Bool:
+  match ws:
+    case Nil{}:
+      False{}
+    case Con{+w, rest}:
+      Bool.or(String.contains(s, w), has_any(s, rest))
+
+def starts_any(+s: String, ws: List<&2, String>) -> Bool:
+  match ws:
+    case Nil{}:
+      False{}
+    case Con{+w, rest}:
+      Bool.or(String.starts_with(s, w), starts_any(s, rest))
+
+def redact.kv.at(m: Maybe<&2, Nat>, +w: String) -> String:
+  match m:
+    case None{}:
+      "[redacted]"
+    case Some{+i}:
+      String.append(String.take(w, Nat.add(i, 1n)), "[redacted]")
+
+def redact.key_like(+w: String) -> Bool:
+  Bool.and(Nat.is_le(20n, String.length(w)),
+    starts_any(w, ["sk-", "ghp_", "gho_", "ghs_", "github_pat_", "xoxb-",
+      "xoxp-", "ya29.", "AKIA"]))
+
+def redact.word.plain(+w: String) -> String:
+  Bool.pick(String, has_any(String.to_lower(w), ["token=", "key=",
+      "secret=", "password=", "signature="]),
+    redact.kv.at(Tx.find(w, "=", 0n), w),
+    Bool.pick(String, redact.key_like(w), "[redacted]", w))
+
+def redact.word(after_bearer: Bool, +w: String) -> String:
+  match after_bearer:
+    case True{}:
+      "[redacted]"
+    case False{}:
+      redact.word.plain(w)
+
+def redact.go(ws: List<&2, String>, after_bearer: Bool) -> List<&2, String>:
+  match ws:
+    case Nil{}:
+      Nil{}
+    case Con{+w, rest}:
+      Con{redact.word(after_bearer, w),
+        redact.go(rest, String.eq(String.to_lower(w), "bearer"))}
+
+def redact(+s: String) -> String:
+  String.join(redact.go(String.split(s, ' '), False{}), " ")
+
+# what the model reads of the server's words: one line, no secret,
+# bounded
+def said_text(+s: String) -> String:
+  clip(redact(W.squeeze(s)))
+
 def said_part(+said: String) -> String:
-  Bool.pick(String, String.is_empty(said), "", String.append(": ", clip(said)))
+  Bool.pick(String, String.is_empty(said), "",
+    String.append(": ", said_text(said)))
+
+# ---- the kind of a failure ----
+
+def kind_name(k: Cause) -> String:
+  match k:
+    case KArgs{}:
+      "bad arguments"
+    case KAuth{}:
+      "auth"
+    case KMissing{}:
+      "not found"
+    case KRate{}:
+      "rate limit"
+    case KServer{}:
+      "server error"
+    case KTimeout{}:
+      "timeout"
+    case KNet{}:
+      "network"
+    case KTool{}:
+      "tool error"
+
+# a kind told by the server's words, else dflt (rate before auth: "quota
+# exceeded for this token"; auth before arguments: "invalid_token")
+def words_kind.l(+l: String, dflt: Cause) -> Cause:
+  Bool.pick(Cause, has_any(l, ["rate limit", "rate_limit", "ratelimit",
+      "too many requests", "quota"]), KRate{},
+    Bool.pick(Cause, has_any(l, ["unauthorized", "unauthenticated",
+        "forbidden", "permission", "invalid_token", "invalid token",
+        "access denied", "not authorized", "token expired", "expired token",
+        "credentials", "log in", "login"]), KAuth{},
+      Bool.pick(Cause, has_any(l, ["timed out", "timeout",
+          "deadline exceeded"]), KTimeout{},
+        Bool.pick(Cause, has_any(l, ["not found", "no such", "does not exist",
+            "unknown tool"]), KMissing{},
+          Bool.pick(Cause, has_any(l, ["invalid", "validation", "required",
+              "missing", "argument", "parameter", "unexpected keyword",
+              "must be", "malformed", "bad request", "schema"]), KArgs{},
+            dflt)))))
+
+def words_kind(+s: String, dflt: Cause) -> Cause:
+  words_kind.l(String.to_lower(s), dflt)
+
+# arguments are only the model's fault once they were sent (tools/call)
+def args_or(+st: Stage, dflt: Cause) -> Cause:
+  Bool.pick(Cause, is_call(st), KArgs{}, dflt)
+
+def status_kind(+code: U32, +body: String, +st: Stage) -> Cause:
+  Bool.pick(Cause, Bool.or(U32.is_eq(code, 401), U32.is_eq(code, 403)),
+      KAuth{},
+    Bool.pick(Cause, U32.is_eq(code, 429), KRate{},
+      Bool.pick(Cause, Bool.or(U32.is_eq(code, 408), U32.is_eq(code, 504)),
+          KTimeout{},
+        Bool.pick(Cause, session_gone(WStatus{code, body}, st), KServer{},
+          Bool.pick(Cause, U32.is_eq(code, 404), KMissing{},
+            Bool.pick(Cause, Bool.or(U32.is_eq(code, 400),
+                U32.is_eq(code, 422)),
+              words_kind(body, args_or(st, KServer{})), KServer{}))))))
+
+# JSON-RPC: -32602 invalid params (also MCP's answer to an unknown tool,
+# so its words go first), -32700 a body that is not JSON (the arguments
+# are put in raw), -32601 no such method or tool, -32001 the MCP SDKs'
+# request timeout; else the words
+def rpc_kind(+code: String, +said: String, +st: Stage) -> Cause:
+  Bool.pick(Cause, Bool.or(String.eq(code, "-32602"),
+      String.eq(code, "-32700")), words_kind(said, args_or(st, KServer{})),
+    Bool.pick(Cause, String.eq(code, "-32601"), KMissing{},
+      Bool.pick(Cause, String.eq(code, "-32001"), KTimeout{},
+        words_kind(said, KServer{}))))
+
+def net_kind(e: Pvp.NetErr) -> Cause:
+  match e:
+    case Pvp.NTimeout{}:
+      KTimeout{}
+    case _:
+      KNet{}
+
+def kind_of(+st: Stage, w: Why) -> Cause:
+  match w:
+    case WNet{e}:
+      net_kind(e)
+    case WStatus{+code, +body}:
+      status_kind(code, body, st)
+    case WRpc{+code, +said}:
+      rpc_kind(code, said, st)
+
+# the kinds where the model's arguments may be the cause: it gets the
+# tool's parameters and a check of what it sent (runtime/mcp-args.bend)
+def wants_schema(k: Cause) -> Bool:
+  match k:
+    case KArgs{}:
+      True{}
+    case KTool{}:
+      True{}
+    case _:
+      False{}
+
+def rpc_code_part(+code: String) -> String:
+  Bool.pick(String, String.is_empty(code), "",
+    String.concat([" (code ", code, ")"]))
 
 def is_url_err(e: Pvp.NetErr) -> Bool:
   match e:
@@ -500,10 +678,10 @@ def why_text(+host: String, w: Why) -> String:
       net_text(host, e)
     case WStatus{+code, +body}:
       String.concat([host, " answered HTTP ", U32.show(code),
-        said_part(W.err_said(body))])
-    case WRpc{+said}:
-      String.concat([host, " answered an error",
-        said_part(W.squeeze(said))])
+        said_part(W.err_text(body))])
+    case WRpc{+code, +said}:
+      String.concat([host, " answered an error", rpc_code_part(code),
+        said_part(said)])
 
 def phase.pick(st: Stage, gone: Bool) -> String:
   match st:
@@ -537,13 +715,24 @@ def safety(+st: Stage, +w: Why) -> String:
 def why_line(+host: String, +st: Stage, +w: Why) -> String:
   String.concat([phase(st, w), ": ", why_text(host, w)])
 
-# what the model reads when a call fails for good: the tool and its
-# server, the phase, the cause, the retries, and whether it is safe to
-# call again. n = the retries already made.
+# what the model reads when a call fails for good: the kind, the tool
+# and its server, the phase, the cause in the server's own words, the
+# retries, and whether it is safe to call again. n = the retries already
+# made. (A bad-arguments failure gets the tool's parameters after it:
+# runtime/mcp-args.bend.)
 def fail_text(+name: String, +host: String, +st: Stage, +w: Why, +n: Nat)
     -> String:
-  String.concat(["mcp call failed: ", name, " (", host, "), ",
-    why_line(host, st, w), ".", retried_text(n), safety(st, w)])
+  String.concat(["mcp call failed (", kind_name(kind_of(st, w)), "): ", name,
+    " (", host, "), ", why_line(host, st, w), ".", retried_text(n),
+    safety(st, w)])
+
+# what the model reads when the tool ran and answered an error
+# (isError): the kind, the tool and its server, and its words
+def tool_text(+name: String, +host: String, k: Cause, +said: String)
+    -> String:
+  String.concat(["mcp tool error (", kind_name(k), "): ", name, " (", host,
+    ") answered: ", Bool.pick(String, String.is_empty(String.trim(said)),
+      "(no text)", said_text(said)), "."])
 
 # a JSON-RPC answer may come as an event stream (Accept lists both):
 # then its last "data:" line is the answer

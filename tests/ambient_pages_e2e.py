@@ -13,6 +13,7 @@ Run: python3 -u tests/ambient_pages_e2e.py
 import http.client
 import json
 import os
+import re
 import sys
 import threading
 
@@ -802,7 +803,13 @@ def main():
         t.start()
         # a failed publish says which one and why (amb-core m_5830)
         c.say('[[bash: n=0; for i in $(seq 2 21); do out=$(sb page publish %s --id busy-watch 2>&1) && n=$((n+1)) || echo "FAILED $i: $out"; done; echo "republished $n"]]' % busy)
-        c.wait_line("main", "republished", 180)
+        # the loop's end, its output 'republished <n>': the word alone was
+        # already in main's feed, in the echo of this very command ('sb
+        # you : ... echo "republished $n"'), so the wait returned at once,
+        # the poller stopped after the reads of that instant and the 20
+        # republishes ran unread ('4 reads during the republishes' when
+        # that instant was short, under load)
+        c.wait(lambda: any(re.search(r"republished \d+", l) for l in c.lines("main")), 180, "the republish loop's end")
         stop.set()
         t.join(20)
         last = lambda: json.loads(request(port, "GET", "/p/busy-watch/meta")[2])["versions"][-1]["n"]

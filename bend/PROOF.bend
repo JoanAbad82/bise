@@ -854,6 +854,18 @@ def Laws.race_ticker_ends_on_close():
 def Laws.race_cancel_is_its_own():
   {==}
 
+def Laws.prog_success_is_recorded(out, stop):
+  {==}
+
+def Laws.prog_failure_rejects_whole(out):
+  {==}
+
+def Laws.prog_denial_rejects_with_its_note():
+  {==}
+
+def Laws.prog_stop_ends_the_program(out):
+  {==}
+
 def Laws.race_cancel_path_is_per_port():
   {==}
 

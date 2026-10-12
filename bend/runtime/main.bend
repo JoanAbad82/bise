@@ -214,20 +214,10 @@ type NR is Data:
   NRReq{name: String, args: String}
   NRErr{why: String}
 
-# the recorded results travel as a JSON array of strings
-def res_val.go(results: List<&2, String>, +acc: List<&2, J.Json>)
-    -> List<&2, J.Json>:
-  match results:
-    case Nil{}:
-      List.reverse(&2, J.Json, acc)
-    case Con{+r, +rest}:
-      res_val.go(rest, Con{J.JStr{r}, acc})
-
-def res_val(results: List<&2, String>) -> J.Json:
-  J.JArr{res_val.go(results, Nil{})}
-
-def results_json(results: List<&2, String>) -> String:
-  J.stringify(res_val(results))
+# the recorded results travel as a JSON array: a success is its text (a
+# string), a failure {error: text} (Rtp.prog_after)
+def results_json(results: List<&2, J.Json>) -> String:
+  J.stringify(J.JArr{results})
 
 # the request's args render as raw tool-arg text
 def args_raw.str(+v: J.Json) -> String:
@@ -320,7 +310,7 @@ def node_cmd(+path: String, +res_path: String, +err_path: String) -> String:
       String.append(" ", String.append(res_path,
         String.append(" 2>", err_path)))))
 
-def node_run.go(+prog: String, +results: List<&2, String>, +path: String,
+def node_run.go(+prog: String, +results: List<&2, J.Json>, +path: String,
     +res_path: String, +err_path: String) -> IO(NR):
   do IO<NR>:
     u : Unit <- P.write_file(path, prog)
@@ -329,7 +319,7 @@ def node_run.go(+prog: String, +results: List<&2, String>, +path: String,
       Con{node_cmd(path, res_path, err_path), Nil{}}}})
     IO.pure(NR, node_split(Tx.find(out, "\n", 0n), out))
 
-def node_run(+prog: String, +results: List<&2, String>, +port: String)
+def node_run(+prog: String, +results: List<&2, J.Json>, +port: String)
     -> IO(NR):
   do IO<NR>:
     +d : String <- P.side_dir()
@@ -343,21 +333,38 @@ def node_run(+prog: String, +results: List<&2, String>, +port: String)
 type EpNext is Data:
   EpDone{out: String}
   EpFail{why: String}
-  EpRe{results: List<&2, String>}
+  EpRe{results: List<&2, J.Json>}
 
 type EpAct is Data:
   EpRun{}
   EpNext{nx: EpNext}
 
-def exec_program.decide(r: Xp.ExecRes, +results: List<&2, String>)
+# live only: is a stop in? (scripted runs never read the flag)
+def exec_program.stopped(live: Bool) -> IO(Bool):
+  match live:
+    case True{}:
+      do IO<Bool>:
+        +ip : String <- Pv.interrupt_path()
+        m : Maybe<&2, String> <- P.read_file(ip)
+        IO.pure(Bool, Pvp.interrupt_flag(m))
+    case False{}:
+      IO.pure(Bool, False{})
+
+def exec_program.decide.step(s: Rtp.ProgStep, +results: List<&2, J.Json>)
+    -> EpNext:
+  match s:
+    case Rtp.PRecord{+e}:
+      EpRe{List.append(&2, J.Json, results, Con{e, Nil{}})}
+    case Rtp.PEnd{+why}:
+      EpFail{why}
+
+# a failed call is recorded and the program re-runs (its promise
+# rejects); a stop ends the program (Rtp.prog_after)
+def exec_program.decide(r: Xp.ExecRes, +results: List<&2, J.Json>, stop: Bool)
     -> EpNext:
   match r:
     case Xp.Ex{+ok, +out}:
-      match ok:
-        case True{}:
-          EpRe{List.append(&2, String, results, Con{out, Nil{}})}
-        case False{}:
-          EpFail{String.append("program call failed: ", out)}
+      exec_program.decide.step(Rtp.prog_after(ok, out, stop), results)
 
 def exec_program.call.node(is_node: Bool, +name: String, +args: String,
     +live: Bool) -> IO(Xp.ExecRes):
@@ -537,13 +544,13 @@ def exec_program.call.ungated(out: Pv.Out, +name: String, +args: String, +live: 
 
 # consume the call pair once: the handle rides beside the next step
 def exec_program.nr.done(pr: Pv.Out & (Sfp.Def & Xp.ExecRes),
-    +results: List<&2, String>) -> Pv.Out & (Sfp.Def & EpNext):
+    +results: List<&2, J.Json>, stop: Bool) -> Pv.Out & (Sfp.Def & EpNext):
   match pr:
     case (out2, (d2, r)):
-      (out2, (d2, exec_program.decide(r, results)))
+      (out2, (d2, exec_program.decide(r, results, stop)))
 
 def exec_program.nr(out: Pv.Out, nr: NR, +prog: String,
-    +results: List<&2, String>, +live: Bool, +d: Sfp.Def)
+    +results: List<&2, J.Json>, +live: Bool, +d: Sfp.Def)
     -> IO(Pv.Out & (Sfp.Def & EpNext)):
   match nr:
     case NRDone{+o}:
@@ -554,10 +561,11 @@ def exec_program.nr(out: Pv.Out, nr: NR, +prog: String,
       do IO<Pv.Out & (Sfp.Def & EpNext)>:
         pr : Pv.Out & (Sfp.Def & Xp.ExecRes) <- exec_program.call(out, name, args,
           live, d)
-        IO.pure(Pv.Out & (Sfp.Def & EpNext), exec_program.nr.done(pr, results))
+        stop : Bool <- exec_program.stopped(live)
+        IO.pure(Pv.Out & (Sfp.Def & EpNext), exec_program.nr.done(pr, results, stop))
 
 def exec_program.step(pr: Pv.Out & (Sfp.Def & EpNext), k: Nat, +prog: String,
-    +results: List<&2, String>, +live: Bool,
+    +results: List<&2, J.Json>, +live: Bool,
     next: Nat -> Pv.Out -> Sfp.Def -> EpNext -> IO(Pv.Out & Xp.ExecRes))
     -> IO(Pv.Out & Xp.ExecRes):
   match pr:
@@ -575,7 +583,7 @@ def exec_program.fail(d: Sfp.Def, +why: String) -> Xp.ExecRes:
 
 @unsafe
 def exec_program.go(fuel: Nat, out: Pv.Out, d: Sfp.Def, act: EpAct, +prog: String,
-    +results: List<&2, String>, +live: Bool) -> IO(Pv.Out & Xp.ExecRes):
+    +results: List<&2, J.Json>, +live: Bool) -> IO(Pv.Out & Xp.ExecRes):
   match fuel:
     case 0n:
       IO.pure(Pv.Out & Xp.ExecRes,
@@ -604,7 +612,7 @@ def exec_program.go(fuel: Nat, out: Pv.Out, d: Sfp.Def, act: EpAct, +prog: Strin
 # @unsafe: the loop recurses through the step continuation closure
 @unsafe
 def exec_program(fuel: Nat, pr0: Pv.Out & (Sfp.Def & EpAct), +prog: String,
-    +results: List<&2, String>, +live: Bool) -> IO(Pv.Out & Xp.ExecRes):
+    +results: List<&2, J.Json>, +live: Bool) -> IO(Pv.Out & Xp.ExecRes):
   match pr0:
     case (out, (d, act)):
       exec_program.go(fuel, out, d, act, prog, results, live)

@@ -56,6 +56,18 @@ def has(sc, *words):
         assert w in sc or w in flat(sc), "missing %r\n%s" % (w, sc)
 
 
+def wait_has(t, *words, timeout=30):
+    """The screen once every one of `words` is on it (as `has`: a line
+    wrapped at 80 columns counts): a step's lines are drawn from more than
+    one frame, and a screen read when its first line showed missed the
+    rest under load ('▲ ChatGPT signed you in but didn't let bise use your'
+    with the line's end not drawn yet)."""
+    def every(sc):
+        return all(w in sc or w in flat(sc) for w in words)
+    every.__doc__ = "all of %r" % (words,)
+    return t.wait_any([every], timeout)[1]
+
+
 def no_secret(sc):
     # a JWT (the fake's tokens), an OpenRouter key: never drawn
     assert not re.search(r"eyJ[A-Za-z0-9_-]{10,}|sk-or-", sc), sc
@@ -129,7 +141,7 @@ def to_pay_step(t):
     t.keys("Enter")
     # the whole step drawn: its key bar is the last row
     t.wait(PAY)
-    return t.wait("↑↓ choose   ⏎ go   esc back")
+    return t.wait_all([PAY, "↑↓ choose   ⏎ go   esc back"])
 
 
 def main():
@@ -149,8 +161,8 @@ def main():
         E = e2e.Env()
         root, clip, line = setup(E, auth, after=3)
         with tui_session(150, 40, line, E=E) as t:
-            sc = to_pay_step(t)
-            has(sc, "a plan you already have, or a key. you can add more later in /provider.",
+            to_pay_step(t)
+            sc = wait_has(t, "a plan you already have, or a key. you can add more later in /provider.",
                 "› Continue with ChatGPT      " + CODEX,
                 "  OpenRouter                 sign in, or paste its key",
                 "  an API key                 Anthropic, OpenAI, Google, Mistral…",
@@ -158,15 +170,13 @@ def main():
                 CLAUDE, "↑↓ choose   ⏎ go   esc back")
             shot("1-pay-150", sc)
             t.keys("Enter")
-            sc = t.wait(WAITING, 20)
-            has(sc, "c copy the link   esc cancel")
+            sc = wait_has(t, WAITING, "c copy the link   esc cancel", timeout=20)
             t.keys("c")
             sc = t.wait("c copied   esc cancel")
             shot("2-waiting-150", sc)
             link = open(clip).read()
             assert link.startswith(auth + "/api/accounts/authorize?"), link
-            sc = t.wait("main and your agents use", 30)
-            has(sc, SIGNED, "now, on your plan.", "⏎ go on")
+            sc = wait_has(t, "main and your agents use", SIGNED, "now, on your plan.", "⏎ go on")
             no_secret(sc)
             shot("3-signed-in-150", sc)
             # the sign-in is saved (never a token on screen), main runs on the plan
@@ -185,14 +195,12 @@ def main():
         E = e2e.Env()
         root, clip, line = setup(E, auth, after=1)
         with tui_session(80, 30, line, E=E) as t:
-            sc = to_pay_step(t)
-            has(sc, "Continue with ChatGPT", "use your Plus or Pro plan", "you use it in Codex already", CLAUDE)
+            to_pay_step(t)
+            sc = wait_has(t, "Continue with ChatGPT", "use your Plus or Pro plan", "you use it in Codex already", CLAUDE)
             shot("4-pay-80", sc)
             control(auth, action="deny_next")
             t.keys("Enter")
-            sc = t.wait("didn't let bise", 30)
-            has(sc, DENIED)
-            assert PAY in sc, sc
+            sc = wait_has(t, DENIED, PAY)
             shot("5-refused-80", sc)
             # a browser that never comes back: esc stops waiting
             t.start(80, 30, line.replace(browser(E.tmp, 1), browser(E.tmp, 999)))
@@ -206,8 +214,7 @@ def main():
             port = int(urllib.parse.urlparse(q["redirect_uri"][0]).port)
             socket.create_connection(("127.0.0.1", port), timeout=2).close()   # listening
             t.keys("Escape")
-            sc = t.wait("wasn't finished", 10)
-            has(sc, UNFINISHED, PAY)
+            sc = wait_has(t, UNFINISHED, PAY, timeout=10)
             shot("6-unfinished-80", sc)
             def closed():
                 try:

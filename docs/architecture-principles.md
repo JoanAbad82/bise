@@ -28,7 +28,11 @@ Crates: `home` (every path) ← `session`, `plugins`, `images` ← `catalog` ←
   JSON input per line; sb-core answers `{fx, dirty}`, or `{need}` for a git
   query (the hub runs it through `Env` and sends the input again with the
   answer). The laws in `bend/LAWS.bend` cover it; `PROOF.bend` runs in the
-  gate.
+  gate. Every kind that crosses it is declared once in `bise_proto::core`
+  (`In`, `Link`, `Fx`, `Answer`, and `Feed` for the transcript records
+  `sb <kind> :: <json>`); the Rust types are serde, sb-core's codecs are
+  generated into `bend/hub/gen/` (`BISE_PROTO_BLESS=1 cargo test -p
+  bise-proto --test core_gen`), never written by hand (issue 25).
 - **hub ↔ REPL**: `say`/`interrupt` on TCP, steer and interrupt files; the
   events come back through `wire.log` + `wire.offset`; `repl.json` lets a new
   hub adopt a running REPL.
@@ -122,6 +126,12 @@ Who gets woken, told or queued is a decision.
 ### 4. Structure across a seam, text only for people
 
 - Good: sb-core's protocol: one JSON line in, `{fx}` or `{need}` out.
+- Rule: a new sb-core input, effect or feed kind is declared in
+  `bise_proto::core`; its Bend codec and Rust type are generated. What you
+  write by hand is the decision in sb-core and its law. Old transcript line
+  shapes are read in one place, `thread/legacy.rs`, and never written again.
+  A conflict in `bend/hub/gen/` is never merged by hand: take either side,
+  then bless again (the generator rewrites the tag lookup whole).
 - Bad: the TUI finds cards in feed text:
   `line.starts_with("sb card : ")` (`tui/src/sb.rs`, `ingest_for`), and
   `strip_prefix("sb route : ")` next to it. A wording change in the hub breaks

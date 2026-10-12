@@ -301,7 +301,55 @@ def last_user(conv):
             m = conv[i]
             if m["role"] == "user" and not m["text"].lstrip().startswith(("<bise_state>", NUDGE)):
                 return i
+    # a message steered into a turn of tool calls (it follows a tool
+    # result) does not end the script the turn runs: a real model goes on
+    # with its plan and answers it after (the hub's nudge then asks).
+    # While the message that started the turn has markers left, it is the
+    # one to follow (tui_demo_tips: pm's reply came in after its spawn and
+    # the third spawn, dev-api's, never ran)
+    while idx is not None and steered_mid_turn(conv, idx):
+        start = turn_start(conv, idx)
+        if start is None or not markers_left(conv, start):
+            break
+        idx = start
     return idx
+
+
+def is_real_user(m):
+    return m["role"] == "user" and not m["text"].lstrip().startswith("<bise_state>")
+
+
+def steered_mid_turn(conv, i):
+    """conv[i], a user message, came after a tool result (state blocks
+    aside): steering into a running turn of tool calls."""
+    for j in range(i - 1, -1, -1):
+        if is_real_user(conv[j]):
+            return False
+        if conv[j]["role"] == "tool":
+            # a call stopped by an interrupt ends its turn: the message
+            # after it starts a new one, the batch's next call never runs
+            # (interrupt_e2e C/D: 'hello again' ran 'echo second-call')
+            return "interrupted by" not in conv[j]["text"]
+        if conv[j]["role"] == "assistant":
+            return False
+    return False
+
+
+def turn_start(conv, i):
+    """The real user message before conv[i] that started its turn."""
+    for j in range(i - 1, -1, -1):
+        if is_real_user(conv[j]):
+            return j
+    return None
+
+
+def markers_left(conv, i):
+    """The script of conv[i] has calls not made yet in the turn after it."""
+    user = script_of(conv[i]["text"])
+    sc = scripted(user)
+    n = len(sc.get("calls", [])) if sc else len(MARK.findall(user) or INNER.findall(user))
+    done = sum(m["calls"] for m in conv[i + 1:] if m["role"] == "assistant")
+    return done < n
 
 
 # ------------------------------------------------------------------ script

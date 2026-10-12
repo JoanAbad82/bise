@@ -494,6 +494,30 @@ def prog_sleep.secs(m: Maybe<&2, J.Json>, +args: String) -> U32:
 def prog_sleep.bounds(+secs: U32) -> Bool:
   Bool.and(U32.is_lt(0, secs), U32.is_lt(secs, 20))
 
+# ---- a program's inner call, recorded for the re-run ----
+# A success is recorded as its text (a JSON string); a failure (a tool
+# error, a gate denial with its note) as {error: text}: the re-run
+# rejects that call's promise with the whole text (rust/jsrt's
+# ToolError), so the program can catch it and go on. Only a stop (the
+# interrupt flag is set) ends the program, with the failure's text.
+type ProgStep is Data:
+  PRecord{entry: J.Json}
+  PEnd{why: String}
+
+def prog_after.failed(stop: Bool, +out: String) -> ProgStep:
+  match stop:
+    case True{}:
+      PEnd{String.append("program call failed: ", out)}
+    case False{}:
+      PRecord{J.JObj{[Tuple{"error", J.JStr{out}}]}}
+
+def prog_after(ok: Bool, +out: String, stop: Bool) -> ProgStep:
+  match ok:
+    case True{}:
+      PRecord{J.JStr{out}}
+    case False{}:
+      prog_after.failed(stop, out)
+
 # the sub-call line renders in the TUI feed (live only): one line per
 # tool the program called, with the outcome. Out is Type-kind: every
 # emit writes the same connection, so the emitter param is shared and

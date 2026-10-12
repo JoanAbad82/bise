@@ -18,9 +18,7 @@
 //!   prints ALL PROOFS CHECK.
 //!
 //! `cargo test -p bise-proto --test core_gen` fails when a file is stale;
-//! `BISE_PROTO_BLESS=1` writes them. The tag-table test also compares the
-//! `In` table with today's `in_tag` (fixtures/core_in_tags.txt, from
-//! core.bend at 84ddc10d, and core.bend's own while it still has one).
+//! `BISE_PROTO_BLESS=1` writes them.
 
 use bise_proto::core::{fx, link, Feed, FieldKind, Fx, In, Kind, Link, Step, Table};
 use std::collections::BTreeMap;
@@ -748,37 +746,3 @@ fn the_bend_codecs_are_fresh() {
     assert!(stale.is_empty(), "stale: {stale:?}; {BLESS}=1 cargo test -p bise-proto --test core_gen writes them");
 }
 
-/// `in_tag`'s table: (tag, constructor) per `String.eq(t, "<tag>"), <Ctor>{}`.
-fn in_tag_table(src: &str) -> Vec<(String, String)> {
-    let Some(at) = src.find("def in_tag(") else { return Vec::new() };
-    let body = &src[at..];
-    let end = body.find("\ndef ").map_or(body.len(), |e| e.min(body.len()));
-    let mut out = Vec::new();
-    for l in body[..end].lines() {
-        let Some(r) = l.split_once("String.eq(t, \"").map(|(_, r)| r) else { continue };
-        let Some((tag, r)) = r.split_once("\"), ") else { continue };
-        let ctor = r.split('{').next().unwrap_or("").trim();
-        out.push((tag.to_string(), ctor.to_string()));
-    }
-    out
-}
-
-#[test]
-fn the_in_table_is_in_tags_tag_for_tag() {
-    let ours: Vec<(String, String)> = In::TABLE.kinds.iter().map(|k| (k.tag.to_string(), k.bend.to_string())).collect();
-    let frozen = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/core_in_tags.txt")).unwrap();
-    let frozen: Vec<(String, String)> = frozen
-        .lines()
-        .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
-        .map(|l| {
-            let (t, c) = l.split_once(' ').unwrap();
-            (t.to_string(), c.trim().to_string())
-        })
-        .collect();
-    assert_eq!(ours, frozen, "fixtures/core_in_tags.txt is in_tag at 84ddc10d");
-    // core.bend's own, while it has one (chunk B replaces it with gen/in.bend)
-    let live = in_tag_table(&std::fs::read_to_string(root().join("bend/hub/core.bend")).unwrap());
-    if !live.is_empty() {
-        assert_eq!(ours, live, "core.bend's in_tag");
-    }
-}

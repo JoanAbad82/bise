@@ -83,7 +83,6 @@ fn tags_are_unique_and_the_table_is_the_enums() {
         assert_eq!(tags.len(), n, "{}: a tag twice", t.name);
     }
     assert_eq!(In::TAGS.len(), In::TABLE.kinds.len());
-    assert_eq!(In::TAGS.len(), 51, "today's in_tag has 51 tags");
     // two tags share a Bend constructor only when their fields are the same
     for t in [In::TABLE, Link::TABLE, Fx::TABLE, Feed::TABLE] {
         for a in t.kinds {

@@ -2,7 +2,7 @@
 //! every kind that crosses it is declared once, here.
 //!
 //! - [`In`] (tag `"t"`): one variant per input sb-core's dispatch knows
-//!   (today's `in_tag` in bend/hub/core.bend, tag for tag), and [`Step`],
+//!   (its codec generated into bend/hub/gen/in.bend), and [`Step`],
 //!   the envelope the hub adds to each (`now`, `git`, `ans`);
 //! - [`Link`] (tag `"t"`): the link's own requests that main.bend answers
 //!   before any dispatch (`init`, `replay`, `replay_many`, `ping`,
@@ -90,7 +90,7 @@ pub struct Field {
 }
 
 /// One kind: its tag, its Rust variant, its Bend constructor (two tags
-/// may share one: `card_close` is `IConfirmClose`, as in `in_tag`), its
+/// may share one: `card_close` is `IConfirmClose`), its
 /// fields in wire order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Kind {

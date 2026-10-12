@@ -132,14 +132,22 @@ def main():
             # at most KEYS keys: the composer shows 11 rows, 419 ' k' at
             # 150x42, and past that the visible count can't reach i (a fast
             # moment typed more than that in 12 s: a red in the full gate)
+            gap, last = 0.0, time.time()
             while time.time() - t0 < 12 and i < KEYS:
                 # a key, then the next once it is drawn: a typist's pace
                 i += 1
                 t.typed(" k")
                 sc = t.wait_any([lambda s, i=i: composer(s).count(" k") >= i], 10)[1]
                 noted = noted or WAIT_NOTE in sc
-            # the cap never lets it pass with almost no keys during the hold
-            assert i >= 100, "only %d keys went in while the reload waited" % i
+                gap, last = max(gap, time.time() - last), time.time()
+            # the hold is tested only if the keys never paused for the
+            # TUI's quiet time (reload_wait::QUIET, 3 s) and kept coming
+            # for the whole window: the key count depends on the load
+            # (it was 'i >= 100': 66 keys in 12 s under load, red with the
+            # hold itself right)
+            assert gap < 3, "a %.1f s pause between two keys: the reload could go (QUIET 3 s)" % gap
+            assert i == KEYS or time.time() - t0 >= 12, "keys for %.1f s only" % (time.time() - t0)
+            assert i >= 20, "only %d keys went in while the reload waited" % i
             assert tui_starts() == n, "reloaded while keys were arriving"
             assert noted, "never said: %s\n%s" % (WAIT_NOTE, t.screen())
             # the keys stop: the reload goes within a few seconds
