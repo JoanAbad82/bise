@@ -836,6 +836,10 @@ def real_shape_pure():
     info = rs.front_info('"LSDisplayName"="UserNotificationCenter"\n"pid"=15030 \n"CFBundleIdentifier"="com.apple.UserNotificationCenter"')
     check(info == {"name": "UserNotificationCenter", "pid": 15030, "bundle": "com.apple.UserNotificationCenter"}, info)
     check(rs.is_breach(info, False) and rs.is_breach({"name": "Slack"}, True) and not rs.is_breach({"name": "Slack"}, False), "breach rule")
+    # his own promoted 'bise try' (same name and bundle as the candidate, there before the run) is his switch;
+    # the candidate's own pid named 'bise try' is still a breach
+    his, ours = {"name": "bise try", "pid": 70859}, {"name": "bise try", "pid": 56174}
+    check(not rs.is_breach(his, False, {56174}) and rs.is_breach(ours, False, {56174}) and rs.is_breach(his, True, {56174}), "his app vs ours")
     line = ("00:18:13.142 Df runningboardd[416:1cb202e] [com.apple.runningboard:ttl] Acquiring assertion targeting "
             "[osservice<com.apple.UserNotificationCenterAgent(501)>:15030] from originator [osservice<com.apple.coreservices.launchservicesd>:378] with descript")
     check(rs.originator(line, 15030) == "osservice<com.apple.coreservices.launchservicesd>:378" and rs.originator(line, 1) is None,

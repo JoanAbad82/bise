@@ -27,8 +27,9 @@ case "$A" in "$HIS"|"$HIS/"*) echo "that's his promoted app, not a candidate"; e
 case "$G" in "$HOME/.bise/gate/"*) ;; *) echo "the world must be under ~/.bise/gate"; exit 2;; esac
 HISR=$(cd "$HIS" 2>/dev/null && pwd -P || echo "$HIS")
 # pids by fixed strings on the process table (no regex on a path with spaces and dots)
-# (the awk itself carries the string: skipped)
-pidsunder() { ps -axo pid=,command= | awk -v p="$1" 'index($0, p) && index($0, "awk -v p=") == 0 { print $1 }'; }
+# (the awk itself carries the string: skipped; ps shows it as 'awk -v p <path>', no '=': every
+# 'stop left 1 + 1' of c28260a9's runs was this awk counting itself)
+pidsunder() { ps -axo pid=,command= | awk -v p="$1" 'index($0, p) && index($0, "awk -v p") == 0 { print $1 }'; }
 hispids() { { pidsunder "$HIS/Contents/"; pidsunder "$HISR/Contents/"; } | sort -nu | tr '\n' ' '; }
 ours() { pidsunder "$A/Contents/" | sort -nu; }
 mainpid() { ps -axo pid=,command= | awk -v m="$MAIN" '{ pid = $1; sub(/^ *[0-9]+ /, ""); if ($0 == m || index($0, m " ") == 1) { print pid; exit } }'; }

@@ -468,9 +468,14 @@ def originator(log_text, pid):
     return None
 
 
-def is_breach(info, started_after):
+def is_breach(info, started_after, run_pids=None):
     """A front change is a breach when it is one of FRONT_BAD or an app started after the run
-    began; any other app is his own switch (he works next to the run). Pure."""
+    began; any other app is his own switch (he works next to the run). With the run's pids known,
+    an app that is not one of them and was there before the run is his own too, even named like
+    ours: his promoted 'bise try' has the candidate's name and bundle id (c28260a9's run 3 stopped
+    when he brought his app to the front). Pure."""
+    if run_pids is not None and info.get("pid") and int(info["pid"]) not in run_pids and not started_after:
+        return False
     return info["name"] in FRONT_BAD or bool(started_after)
 
 
@@ -533,7 +538,11 @@ def front_gate(out, stop_file, bundle, every=0.1, pids_file=None):
             if (cur["name"], cur["pid"]) != (last["name"], last["pid"]):
                 age = _etime_s(cur["pid"]) if cur["pid"] else None
                 after = age is not None and age < time.time() - t0
-                row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after))
+                try:
+                    run_pids = {int(x) for x in open(pids_file).read().split() if x.isdigit()} if pids_file else None
+                except OSError:
+                    run_pids = None
+                row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after, run_pids))
                 if row["breach"]:
                     kill_run(bundle, pids_file)
                     with open(os.path.join(os.path.dirname(out), "BREACH"), "w") as b:
