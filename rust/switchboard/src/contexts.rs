@@ -4,76 +4,35 @@
 //! its text changes (the REPL re-reads `BEND_CONTEXT_FILE` before every
 //! model call, so the file must be current at all times).
 //!
-//! Built at each input, but only where its inputs changed (issue 21, step
-//! 2, item 5b). On his journal (514 agents, 14k+ messages) rebuilding
-//! every context at each input took 29 ms, 26 of them in the two walks of
-//! every message (main's `<agent_threads>`, everyone's questions), though
-//! a REPL tool line changes no message. Here:
-//! - the message-derived parts are no longer kept here (hot-view sha 2a,
-//!   2b, 2c): main's `<agent_threads>` are kept by State's writer
-//!   (board::Threads), each agent's questions come from the hot messages
-//!   only (sb-core's view says which, board::Waiting); both are built at
-//!   each refresh, under 1 ms together on his journal copy;
-//! - a task's context is rebuilt only when the roster rows (with their
-//!   ages, so the bytes equal a fresh build at any instant), its parent or
-//!   its questions changed: those are all [`board::task_context`] reads.
-//!   This part still pays: every context from nothing is 3.7 ms on his
-//!   copy (34 active of 529 agents);
-//! - main's is rebuilt at each input (it shows each task's activity, which
-//!   every tool line changes), from the kept threads and questions.
-//!
-//! A stopgap: once sb-core gives a typed hot view (issue 21 step 3, target
-//! T3), what changed comes with the step, and this cache goes. Do not build
-//! on it as the final home of the contexts.
+//! Every active agent's context is built fresh at each input; only the
+//! texts that changed are pushed. Nothing else is kept: what made a fresh
+//! build slow (main's `<agent_threads>` and everyone's questions walked
+//! every message) is now O(hot) or kept by State's writer (issue 21,
+//! hot-view sha 2a-2c), and on his journal copy (529 agents, 34 active,
+//! 19,474 messages) a fresh build of every context is 5.34 ms (median of
+//! 30 tool lines) against 5.56 ms for the per-task cache that was here
+//! (sha 2d, rule 7).
 
 use crate::board::{self, Group, Models, Waiting};
 use crate::model::{Lifecycle, State, MAIN};
 use std::collections::BTreeMap;
 
-/// A row of the roster: an agent, its parent, its row past the relation.
-type Row = (String, Option<String>, String);
-
 #[derive(Debug, Default)]
 pub struct Contexts {
     /// What each agent's REPL has: the last text pushed.
     texts: BTreeMap<String, String>,
-    /// The roster rows of the last input.
-    rows: Vec<Row>,
-    /// Each task's parent and questions at its last build.
-    keys: BTreeMap<String, (Option<String>, Vec<String>)>,
 }
 
 impl Contexts {
     /// The contexts this state changes, (agent, its new text) each, in
-    /// the agents' name order; they are kept as what the REPLs have.
+    /// the agents' name order: every context built fresh, only the texts
+    /// that differ from what the REPLs have are pushed (and kept).
     pub fn refresh(&mut self, st: &State, now: u64, models: &Models) -> Vec<(String, String)> {
-        // both built fresh: Waiting walks the hot messages only, the
-        // threads are kept by State's writer (0.55 and 0.41 ms on his
-        // journal copy, hot-view sha 2c)
-        let questions_of = Waiting::of(st).questions();
-        let threads = board::agent_threads(st, 8);
-        let group = Group::of(st, now, models);
-        let rows = group.rows();
-        let same_rows = rows == self.rows;
-        if !same_rows {
-            self.rows = rows;
-        }
         let mut changed = Vec::new();
-        for a in st.agents.values().filter(|a| a.lifecycle == Lifecycle::Active) {
-            let questions = questions_of.get(&a.name).map_or(&[][..], Vec::as_slice);
-            let text = if a.name == MAIN {
-                board::main_context(st, now, &threads, questions)
-            } else {
-                let key = (a.parent.clone(), questions.to_vec());
-                if same_rows && self.keys.get(&a.name) == Some(&key) {
-                    continue;
-                }
-                self.keys.insert(a.name.clone(), key);
-                board::task_context(&a.name, &group, questions)
-            };
-            if self.texts.get(&a.name) != Some(&text) {
-                self.texts.insert(a.name.clone(), text.clone());
-                changed.push((a.name.clone(), text));
+        for (name, text) in fresh(st, now, models) {
+            if self.texts.get(&name) != Some(&text) {
+                self.texts.insert(name.clone(), text.clone());
+                changed.push((name, text));
             }
         }
         changed
@@ -85,8 +44,7 @@ impl Contexts {
     }
 }
 
-/// Every active agent's context built from nothing, as before the cache:
-/// the reference the cache must equal byte for byte.
+/// Every active agent's context built from nothing, by name.
 pub fn fresh(st: &State, now: u64, models: &Models) -> BTreeMap<String, String> {
     let waiting = Waiting::of(st);
     let group = Group::of(st, now, models);

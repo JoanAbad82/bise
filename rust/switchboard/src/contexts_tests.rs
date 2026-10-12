@@ -34,7 +34,7 @@ impl Rng {
     }
 }
 
-/// What the REPLs have after `refresh`: the cache's texts of the active
+/// What the REPLs have after `refresh`: the pushed texts of the active
 /// agents.
 fn pushed(c: &Contexts, st: &State) -> BTreeMap<String, String> {
     st.agents
@@ -152,11 +152,12 @@ fn step(st: &mut State, r: &mut Rng, now: &mut u64, models: &mut Models, n: &mut
     }
 }
 
-/// The cache pushes, at each step, exactly the texts a fresh build gives
-/// (byte for byte), for histories that rename, archive, restore, add,
-/// message and age: what each REPL has is always today's context.
+/// What is pushed equals, at each step, the texts a fresh build gives
+/// (byte for byte), and only the changed ones are pushed, for histories
+/// that rename, archive, restore, add, message and age: what each REPL has
+/// is always today's context.
 #[test]
-fn the_kept_contexts_equal_a_fresh_build_at_every_step() {
+fn the_pushed_contexts_equal_a_fresh_build_at_every_step() {
     for seed in 1..=40u64 {
         let mut r = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15));
         let mut st = State::new("/w");
@@ -178,9 +179,9 @@ fn the_kept_contexts_equal_a_fresh_build_at_every_step() {
 }
 
 /// A tool line of one task (its activity) changes main's context and no
-/// task's: the tasks' are not even rebuilt.
+/// task's: only main's is pushed.
 #[test]
-fn an_activity_rebuilds_main_only() {
+fn an_activity_pushes_main_only() {
     let mut st = State::new("/w");
     for t in ["a", "b", "c"] {
         st.test_task(t, "x");
@@ -194,10 +195,8 @@ fn an_activity_rebuilds_main_only() {
     st.agents.get_mut("a").unwrap().activity = Some((0, "tool #1 bash : ls".into()));
     let changed: Vec<String> = c.refresh(&st, 0, &models).into_iter().map(|(n, _)| n).collect();
     assert_eq!(changed, [MAIN]);
-    // nothing changed: nothing rebuilt, nothing pushed
-    let keys = c.keys.clone();
+    // nothing changed: nothing pushed
     assert!(c.refresh(&st, 0, &models).is_empty());
-    assert_eq!(c.keys, keys);
     // a question for b: b's context only
     st.put_msg_judged(msg(1, "a", "b", true, 1), Some(MsgState::Delivered), false);
     let changed: Vec<String> = c.refresh(&st, 0, &models).into_iter().map(|(n, _)| n).collect();
