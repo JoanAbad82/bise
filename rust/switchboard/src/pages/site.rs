@@ -83,6 +83,18 @@ pub fn copy_href(id: &str, v: u64, copy: &str) -> String {
     format!("/a/{}/{}/{}", id, v, file_of(copy))
 }
 
+/// Whether the page server serves an artifact from its kept copy at
+/// [`copy_href`] (server.rs `artifact_file`): any artifact but a bise page
+/// (`by` page: served at /p/), with a copy, that is a folder (its
+/// index.html) or a file of a type the server sends ([`ctype`]). The one
+/// rule for the server's route and the typed row's `frame_url`
+/// (proto_view::artifacts; ambient-lead m_20287: the route served sites
+/// only, so a copied .html file's frame_url said 'no such artifact').
+pub fn serves_copy(by: &str, copy: &str) -> bool {
+    let file = file_of(copy);
+    by != "page" && !copy.is_empty() && (file.is_empty() || ctype(&file).is_some())
+}
+
 /// The file a copy opens on: a copied file's name (`v2/plan.html` →
 /// `plan.html`), nothing for a folder (its index.html).
 fn file_of(copy: &str) -> String {
