@@ -914,11 +914,21 @@ fn judge_is_fast() {
         .map(|m| call("bash", json!({"arg": m})))
         .collect();
     let (rules, cache) = (Rules::default(), Cache::default());
+    // this thread's CPU time, not the wall clock: the judge's own cost
+    // (pure, no I/O with LexicalFs). Wall time also counted the waits
+    // for a core on a loaded machine: p99 13.7 ms at load 22 on 12
+    // cores, red in a full gate, while the judge did the same work
+    fn cpu_ns() -> u128 {
+        let mut ts = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+        // SAFETY: an out pointer to a timespec of this stack frame
+        unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut ts) };
+        ts.tv_sec as u128 * 1_000_000_000 + ts.tv_nsec as u128
+    }
     let mut times: Vec<u128> = (0..400)
         .map(|i| {
-            let t = std::time::Instant::now();
+            let t = cpu_ns();
             let _ = judge_with(&c[i % c.len()], &rules, &cache, false, &LexicalFs);
-            t.elapsed().as_nanos()
+            cpu_ns() - t
         })
         .collect();
     times.sort();
