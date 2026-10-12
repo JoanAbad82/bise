@@ -304,13 +304,15 @@ fn home(pages: &Pages) -> String {
     shell(pages, "for you", head, "id=\"bise-home\" data-home", &format!("{aside}{inner}"))
 }
 
-/// A site artifact's file, from bise's copy (`/a/<id>/<v>/<path>`), in its sandbox (site.rs).
+/// An artifact's file, from bise's copy (`/a/<id>/<v>/<path>`), in its
+/// sandbox (site.rs): a site folder, or a copied file the server sends
+/// (site::serves_copy, the same rule as the typed row's frame_url).
 fn artifact_file(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Response {
     let state = pages.store.dir.parent().unwrap_or(&pages.store.dir);
     let store = crate::artifacts::Store::new(state);
-    let Some(m) = store.get(id).filter(|m| m.kind == "site" && m.by != "page") else { return Response::err(404, "no such artifact") };
+    let Some(m) = store.get(id).filter(|m| m.by != "page") else { return Response::err(404, "no such artifact") };
     let Some(ver) = v.parse::<u64>().ok().and_then(|n| m.versions.iter().find(|x| x.v == n)) else { return Response::err(404, "no such version") };
-    let Some(copy) = &ver.copy else { return Response::err(404, "no copy of it") };
+    let Some(copy) = ver.copy.as_ref().filter(|c| super::site::serves_copy(&m.by, c)) else { return Response::err(404, "no copy of it") };
     let base = state.join("artifacts").join(&m.id).join(copy);
     let rest: Vec<&str> = rest.iter().copied().filter(|s| !s.is_empty()).collect();
     let path = if base.is_file() {
@@ -682,6 +684,42 @@ mod tests {
         assert_eq!(text(&post(&p, "/api/p/w/send", Some(&tok), Some(origin), json!({}))), "{\"sent\":0}");
         assert!(rx.try_recv().is_err());
         assert_eq!(get(&p, "/api/p/w/send").status, 405);
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    /// ambient-lead m_20287: 'sb artifact add proof.html' then GET its
+    /// frame_url gives the file (the route served sites only, so the
+    /// window's frame said 'no such artifact'); a type the server never
+    /// sends gets no frame_url and no file; a bise page and a link none.
+    #[test]
+    fn a_copied_file_is_served_at_its_frame_url() {
+        let (p, d) = pages();
+        let work = d.join("work");
+        std::fs::create_dir_all(&work).unwrap();
+        std::fs::write(work.join("proof.html"), b"<h1>proof</h1>").unwrap();
+        std::fs::write(work.join("notes.pdf"), b"%PDF-1.4").unwrap();
+        let arts = crate::artifacts::Store::new(&d);
+        let add = |target: &str| {
+            let a = crate::artifacts::Add { target: target.into(), title: None, kind: None, agent: "main".into(), by: "main".into(), cwd: work.to_string_lossy().to_string() };
+            arts.add(&a, 10).unwrap()
+        };
+        add("proof.html");
+        add("notes.pdf");
+        add("https://bise.dev/docs");
+        let rows = arts.rows(&|a: &str| Some((a.to_string(), false)), work.to_str().unwrap());
+        let ev = json!({"ev": "artifacts", "rows": rows, "seen_ms": 0});
+        let base = format!("http://127.0.0.1:{}", p.port);
+        let items = crate::proto_view::artifacts(&ev, |_| None, Some(&base));
+        let html = items.iter().find(|a| a.title.contains("proof")).expect("the html artifact");
+        let url = html.frame_url.clone().expect("a copied .html file has a frame_url");
+        let r = get(&p, url.strip_prefix(&base).unwrap());
+        assert_eq!((r.status, text(&r).as_str()), (200, "<h1>proof</h1>"), "{url}");
+        assert_eq!(r.csp, super::super::site::ARTIFACT_CSP, "in its sandbox");
+        for a in items.iter().filter(|a| a.id != html.id) {
+            assert_eq!(a.frame_url, None, "{} has no frame_url", a.id);
+        }
+        let pdf = items.iter().find(|a| a.title.contains("notes")).expect("the pdf");
+        assert_eq!(get(&p, &crate::pages::site::copy_href(&pdf.id, 1, pdf.copy.as_deref().unwrap_or(""))).status, 404, "a type it never sends");
         let _ = std::fs::remove_dir_all(d);
     }
 

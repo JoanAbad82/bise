@@ -320,7 +320,7 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>, frame_ba
             let path = Some(target.clone()).filter(|t| s(r, "by") != "page" && !crate::artifacts::is_link(t) && Path::new(t).is_absolute());
             let version = r.get("v").and_then(Value::as_u64).unwrap_or(0);
             let frame_url = frame_base
-                .filter(|_| s(r, "by") != "page" && !crate::artifacts::is_link(&target) && !s(r, "copy").is_empty())
+                .filter(|_| !crate::artifacts::is_link(&target) && crate::pages::site::serves_copy(&s(r, "by"), &s(r, "copy")))
                 .map(|b| format!("{b}{}", crate::pages::site::copy_href(&id, version, &s(r, "copy"))));
             let versions = r.get("versions").and_then(Value::as_array).map_or_else(Vec::new, |vs| {
                 vs.iter()
