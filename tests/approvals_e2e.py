@@ -103,13 +103,13 @@ def main():
         check("always:" not in card["question"], "a hard rule offers no always: %r" % card["question"])
         c.wait(lambda: c.agent("t6")["status"] == "waiting" and c.agent("t6")["waiting_on"] == "you", 30,
                "t6 waits on you: %r" % c.agent("t6"))
-        c.wait(lambda: any(l.startswith("sb gate : card ") for l in c.lines("t6")), 10, "the gate line in t6's feed")
+        c.wait_feed("t6", "gate", 10, step="card")
         c.say("/answer %d no: use a branch" % card["id"])
         c.wait(lambda: not confirm_cards(c), 30, "the card closed")
         c.wait_idle("t6")
         check("the user said no: use a branch" in tool_results(E, "t6"), "t6 read the note")
         for who in ("t6", "main"):
-            c.wait_line(who, "sb approval : no : t6 : git push origin main --force : use a branch", 10)
+            c.wait_feed(who, "approval", 10, how="no", who="t6", what="git push origin main --force", note="use a branch")
 
         # 7. a card, then ctrl+c on the agent: the call does not run
         out7 = os.path.join(home, "outside7.txt")
@@ -120,7 +120,7 @@ def main():
         c.wait(lambda: not confirm_cards(c), 30, "the card closed by the interrupt")
         c.wait_idle("t7")
         check(not os.path.exists(out7), "the interrupted call did not run")
-        c.wait_line("t7", "sb gate : done ", 10)
+        c.wait_feed("t7", "gate", 10, step="done")
 
         # 8. always allow npm run build here: saved; the next one asks nothing
         c.say("/new t8: {{bash: npm run build; echo one > t8a.txt}} {{bash: npm run build; echo two > t8b.txt}}")
@@ -147,7 +147,7 @@ def main():
         c.say("/answer %d 1" % card["id"])  # 1 allow
         c.wait_idle("t10a", "t10b")
         check(open(out10).read() == "y\ny\n", "one answer ran both calls")
-        c.wait_line("main", "sb approval : allowed : t10a, t10b : " + cmd, 10)
+        c.wait_feed("main", "approval", 10, how="allowed", who="t10a, t10b", what=cmd)
         ok = True
         print("approvals modes, gate and cards: ok")
     finally:

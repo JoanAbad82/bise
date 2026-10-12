@@ -49,7 +49,7 @@ def main():
         # (core-r m_19094, red 2 of 3 alone): the say below then steered
         # main's turn on it and the fake model answered the reply, never
         # running the sb every line
-        c.wait(lambda: any(l.startswith("sb msg-in : t1 ") for l in c.lines("main")), 60, "t1's reply in main")
+        c.wait(lambda: any(r.get("from") == "t1" for r in c.feed("main", "msg-in")), 60, "t1's reply in main")
         c.wait_idle("main", "t1")
         # a one-shot timer for t1, due after the restart: sb-core holds it
         # (core-timers), so it must come back from the journal and fire once

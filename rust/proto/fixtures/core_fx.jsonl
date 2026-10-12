@@ -11,8 +11,6 @@
 {"fx": "job_end", "agent": "perf", "state": "done", "label": "objective of perf", "summary": "p99 down 31%", "key": 1000000, "hub": "home-1"}
 {"fx": "journal", "ev": {"type": "act_done", "id": 1}}
 {"fx": "kill", "agent": "g"}
-{"fx": "line", "agent": "a", "kind": "sent", "fields": ["b", "m_4", "0", "0"]}
-{"fx": "line", "agent": "a", "kind": "you", "text": "go"}
 {"fx": "notice", "text": "no open card #999"}
 {"fx": "passthrough", "agent": "main", "line": "/status"}
 {"fx": "renamed", "old": "t9", "new": "t9b"}
@@ -31,3 +29,4 @@
 {"fx": "xdeliver", "xid": 1, "project": "shop-1", "kind": "ask", "msg": 0, "text": "status?", "context": ""}
 {"fx": "xdeliver", "xid": 1, "project": "shop-1", "kind": "input", "msg": 1, "text": "why does p99 rise", "context": "{\"app\":\"Safari\",\"url\":\"https://grafana.shop.test/d/p99\"}"}
 {"fx": "xreply", "hub": "home-1", "xid": 8, "text": "green"}
+{"fx": "feed", "agent": "t1", "rec": {"sb": "card-closed", "id": 4, "res": "accepted"}}

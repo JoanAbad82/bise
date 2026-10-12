@@ -132,18 +132,19 @@ def main():
         c.wait_line("main", "door says hi", 60)
         home.wait(lambda g: any(v.get("ev") == "line" and v.get("agent") == "main" and "door says hi" in v.get("line", "") for v in g[n:]), "main's line on the home connection")
         c.wait_idle("main")
-        # steered (architect m_16497 (ii)): sb-core's `sb you-id : m_N` line
-        # (and `sb steered : …`) reaches the home connection with main's
-        # other lines, and the released cores' capsule shows nothing for
-        # it: their main_line (rust/tui/src/ambient/core.rs at
-        # v2026.10.2-28 and -29) reads only `sb you : ` (his message),
-        # `  obs: ` (turn start/end, steering) and parse_line's assistant
-        # and tool rows; their fold's hub_notice gives no entry for an
-        # unknown kind. So each such line must match none of those.
-        homes = [v["line"] for v in home.got()[n:] if v.get("ev") == "line" and v.get("agent") == "main"]
-        ids = [l for l in homes if l.startswith(("sb you-id : ", "sb steered : ", "sb steer-rx : "))]
-        check(ids and re.fullmatch(r"sb you-id : m_\d+", ids[0]), "main's id line on the home connection: %r" % homes[:8])
-        check(not any(l.startswith(("sb you : ", "  obs: ", "tool", "  tool")) for l in ids), "an id line an older core would read: %r" % ids)
+        # issue 25 (architect m_19065): the hub writes Feed records
+        # (`sb <kind> :: <json>`); the released cores' capsule reads only
+        # `sb you : ` (main_line, his message) and `sb msg-you : ` in the
+        # old text form, `  obs: ` and the tool rows (rust/tui/src/ambient/
+        # core.rs at v2026.10.2-28 and -29). So the door sends his message
+        # in its old form (thread::legacy::older_line), drops every other
+        # record (sb-core's you-id, steered, ...: that core never read them)
+        # and never sends a new-form line raw.
+        homes = [v["line"] for v in home.got() if v.get("ev") == "line"]
+        check("sb you : door says hi" in homes, "his message in the old form on the home connection: %r" % homes[-8:])
+        check(not any(re.match(r"sb [a-z-]+ :: ", l) for l in homes), "no new-form line on the home connection: %r" % [l for l in homes if " :: " in l][:4])
+        mains = [l for l in c.lines("main") if l.startswith("sb ")]
+        check(any(e2e.feed_rec(l) == ("you", {"text": "door says hi"}) and " :: " in l for l in mains), "main's own feed has the record: %r" % mains[-4:])
 
         # a page: its older page line on the home connection
         with open(os.path.join(E.tmp, "door-page.html"), "w") as f:

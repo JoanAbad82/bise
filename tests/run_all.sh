@@ -9,18 +9,21 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.bend/bin:$HOME/.cargo/bin:$PATH"
-live=0 jobs="${SB_TEST_JOBS:-4}" only=""
+live=0 jobs="${SB_TEST_JOBS:-4}" only="" picked=0 pick=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --live) live=1 ;;
     --serial) jobs=1 ;;
     --only) only="${2:?--only <tests>}"; shift ;;
-    *) echo "usage: run_all.sh [--serial] [--live] [--only '<e2e/tmux tests>']" >&2; exit 2 ;;
+    --tests) picked=1 pick="${2-}"; shift ;;
+    *) echo "usage: run_all.sh [--serial] [--live] [--only '<e2e/tmux tests>'] [--tests '<e2e/tmux tests>']" >&2; exit 2 ;;
   esac
   shift
 done
 # --only: those e2e/tmux tests alone, nothing else (gate.sh rerun: the
-# tests a red full gate failed, on the same tree, its Rust part green)
+# tests a red full gate failed, on the same tree, its Rust part green).
+# --tests: the Rust part, then only those e2e/tmux tests (gate.sh full's
+# selection, tests/test_map.py; "" = none of them)
 if [ -z "$only" ]; then
 echo "== No blind sleep in tests/ (tests/sleep_check.py: wait for a state with tests/wait.py)"
 python3 tests/sleep_check.py --self-test && python3 tests/sleep_check.py || exit 1
@@ -49,6 +52,8 @@ TESTS="e2e subscriptions_e2e agents_md_e2e images_mem_e2e agent_tmp_e2e foundry_
 tui_images_tmux tui_card_image_tmux tui_paste_tmux tui_clear_tmux tui_archived_tmux tui_waits_tmux tui_undelivered_tmux tui_queue_tmux tui_computer_use_tmux
 tui_onboarding_tmux tui_onboarding_links_tmux subscriptions_tui_tmux tui_stuck_start_tmux tui_keys_tmux tui_subscriptions_tmux tui_provider_tmux tui_panel_click_tmux tui_drafts_tmux tui_reload_tmux tui_keep_state_tmux tui_links_tmux tui_tool_rows_tmux tui_tabs_tmux tui_select_popup_tmux tui_quote_keys_tmux tui_release_tmux tui_update_tmux tui_cards_tmux tui_close_number_tmux tui_approvals_tmux tui_inbox_split_tmux tui_find_tmux tui_term_select_tmux tui_palette_tmux tui_file_links_tmux tui_cmd_a_tmux tui_cmd_arrows_tmux tui_composer_scroll_tmux tui_turn_time_tmux tui_markdown_tmux tui_code_blocks_tmux tui_demo_tips_tmux tui_text_layer_tmux tui_tool_names_tmux tui_openai_responses_tmux tui_voice_tmux tui_voice_keys_tmux tui_voice_mute_tmux tui_you_fold_click_tmux tui_mcp_login_tmux tui_log_tmux interrupt_e2e partial_e2e tui_live_text_tmux"
 [ -n "$only" ] && TESTS="$only"
+[ "$picked" = 1 ] && TESTS="$pick"
+if [ -z "$(echo $TESTS)" ]; then echo "== no e2e/tmux test picked for this change"; exit 0; fi
 # PROOF.bend's whole run, cached by the content of the .bend files it reads
 # and the bend version, for every worktree (a rerun of a red full gate, or
 # another task on the same hub/ core/: ~2-3 min of one core, skipped)

@@ -6,8 +6,9 @@ use super::{log_line, Msg, Shell};
 use crate::core::{ClientId, Input};
 use bise_home::release::{root_kind, Install, RootKind};
 use crate::model::MAIN;
+use bise_proto::core::Feed;
 use crate::paths::Paths;
-use crate::util::{clip, wire_escape};
+use crate::util::clip;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -522,10 +523,7 @@ impl Shell {
                 if !self.building.insert(to.clone()) {
                     return format!("{} is already being built", to);
                 }
-                self.feed(
-                    MAIN,
-                    &format!("sb info : {}", wire_escape(&format!("version {}: building…", to))),
-                );
+                self.feed_rec(MAIN, Feed::info(format!("version {}: building…", to)));
                 self.broadcast_versions();
                 let exe = self.opts.exe.clone();
                 let tx = self.tx.clone();
@@ -759,7 +757,7 @@ impl Shell {
             "bise {} is installed and ready: /restart switches this hub to it, and so does launching bise again (agents kept)",
             crate::switch::id_of(&cur)
         );
-        self.feed(MAIN, &format!("sb info : {}", wire_escape(&text)));
+        self.feed_rec(MAIN, Feed::info(text));
         self.broadcast_versions();
     }
 

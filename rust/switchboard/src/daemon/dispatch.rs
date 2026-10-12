@@ -7,6 +7,7 @@ use super::repl::kill_pid;
 use super::{log_line, version_allowed, write_json, Msg, Repl, Shell, RESUME_TEXT};
 use crate::core::Input;
 use crate::model::MAIN;
+use bise_proto::core::Feed;
 use crate::util::{now_ms, wire_escape};
 use serde_json::json;
 use std::io::Write;
@@ -75,7 +76,7 @@ impl Shell {
                     self.idle_check();
                     // computer use (design §7.3): each stop, one line in main's feed
                     for l in self.cu.poll() {
-                        self.feed(crate::model::MAIN, &format!("sb computer : {}", crate::util::wire_escape(&l)));
+                        self.feed_rec(crate::model::MAIN, Feed::Computer(bise_proto::core::feed::Computer { text: l }));
                     }
                 }
             }
@@ -131,10 +132,7 @@ impl Shell {
                             .write_all(format!("say {}\n", wire_escape(RESUME_TEXT)).as_bytes());
                     }
                     if let Some(name) = self.agent_by_dir(&dir).map(|a| a.name.clone()) {
-                        self.feed(
-                            &name,
-                            "sb info : its turn was interrupted by a restart — it continues where it left off",
-                        );
+                        self.feed_rec(&name, Feed::info("its turn was interrupted by a restart — it continues where it left off"));
                     }
                 }
                 if let Some(name) = self.agent_by_dir(&dir).map(|a| a.name.clone()) {
@@ -256,8 +254,7 @@ impl Shell {
                 }
             }
             Msg::Notice { kind, text } => {
-                let kind = if kind == "warn" { "warn" } else { "info" };
-                self.feed(MAIN, &format!("sb {} : {}", kind, wire_escape(&text)));
+                self.feed_rec(MAIN, if kind == "warn" { Feed::warn(text) } else { Feed::info(text) });
                 self.broadcast_versions();
             }
             Msg::Release { client, v } => self.release_event(client, v),
@@ -273,11 +270,12 @@ impl Shell {
                 self.broadcast_versions();
             }
             Msg::Land { line } => {
-                if let Some((kind, text)) = line {
-                    self.feed(MAIN, &format!("sb {} : {}", kind, wire_escape(&text)));
+                if let Some(rec) = line {
+                    let landed = matches!(rec, Feed::Landed(_));
+                    self.feed_rec(MAIN, rec);
                     // a land moved main or a feature: the features' facts again
                     self.refresh_features();
-                    if kind == "landed" {
+                    if landed {
                         self.merged_all();
                     }
                 }

@@ -14,8 +14,9 @@ scripted provider (e2e.Env, 10 input tokens a call); budget 150 tokens:
      answered exactly once;
   3. the background job started before the recycle is still readable by
      the new process; its end wakes main once, after the recycle (the job
-     lasts 20 s so its wake, queued for the end of a turn, never lands
-     before the message of 2.);
+     ends when the test creates its go file, once the message of 2. is
+     answered: a fixed 20 s ended before the 25 calls under load, its
+     wake came first and the message of 2. came in as steering);
   4. the transcript has every step once, no reload line, no history
      replayed; the session log has no reload event;
   5. no second recycle while the new process reads less than the budget.
@@ -61,10 +62,19 @@ def main():
         pid0 = pid()
         port0 = json.load(open(os.path.join(adir, "repl.json")))["port"]
         # 1. 25 calls: a job past the 2 s window (its slot: tmp/bg/0), 23 echoes
-        steps = ["sleep 20; echo bg-job-done"] + ["echo step-%02d" % i for i in range(23)]
+        go = os.path.join(E.tmp, "bg-go")
+        steps = ["while [ ! -e %s ]; do sleep 0.2; done; echo bg-job-done" % go] + ["echo step-%02d" % i for i in range(23)]
         c.say(" ".join("[[bash: %s]]" % s for s in steps))
-        c.wait_line("main", "done: tool bash ok: step-22", 120)
-        rss0 = rss_kb(pid0)
+        # the old process's RSS, read while its turn runs (its peak): read
+        # after the turn's last line it was 0 under load, the hub already
+        # recycling the process at the turn's end (the next idle)
+        peak = [0]
+
+        def done_sampling():
+            peak[0] = max(peak[0], rss_kb(pid0))
+            return any("done: tool bash ok: step-22" in l for l in c.lines("main"))
+        c.wait(done_sampling, 120, "'done: tool bash ok: step-22' in main")
+        rss0 = peak[0]
         # 2. a message at once: it lands while the hub recycles the REPL
         c.say("after the recycle")
         c.wait(lambda: recycles(), 30, "the hub recycles main's REPL")
@@ -93,7 +103,8 @@ def main():
         check(len(acks) == 1, "the message sent during the recycle is answered once: %r" % acks)
         asked = [r for r in E.fake_requests() if r.get("user") == "after the recycle"]
         check(len(asked) == 1, "one model call for it: %d" % len(asked))
-        # 3. the job of the old process, read by the new one
+        # 3. the job of the old process, read by the new one: it ends now
+        open(go, "w").close()
         slot = os.path.join(adir, "tmp", "bg", "0.out")
         c.wait(lambda: os.path.exists(slot) and "bg-job-done" in open(slot).read(), 30, "the job's output in its slot")
         # its end wakes main (one turn); wait for that turn before the next message

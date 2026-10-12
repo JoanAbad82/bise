@@ -211,7 +211,7 @@ def main():
         check([e["kind"] for e in new_entries[:ki]] == ["you"], "the kept text right under his message: %r"
               % [e["kind"] for e in new_entries[:ki]])
         tr = transcript(E)
-        kis = [i for i, l in enumerate(tr) if l.startswith("sb kept : ")]
+        kis = [i for i, l in enumerate(tr) if (e2e.feed_rec(l) or ("",))[0] == "kept"]
         check(kis, "an sb kept line in the transcript")
         check("provider_retry:" in tr[kis[-1] + 1], "the kept line right before the retry: %r" % tr[kis[-1]:kis[-1] + 2])
 

@@ -481,11 +481,12 @@ impl Partial {
         PartialStep::Delta { off: at, text: delta }
     }
 
-    /// The `sb kept : <text>` line that keeps the text so far in the
-    /// thread (a failed turn, [`keeps_partial`]); None when there is
-    /// nothing to keep (no text, or a block dropped on a bad offset).
+    /// The `kept` record's line that keeps the text so far in the thread
+    /// (a failed turn, [`keeps_partial`]); None when there is nothing to
+    /// keep (no text, or a block dropped on a bad offset).
     pub fn kept_line(&self) -> Option<String> {
-        (!self.broken && !self.esc.trim().is_empty()).then(|| format!("sb kept : {}", self.esc))
+        let text = unescape(&self.esc);
+        (!self.broken && !self.esc.trim().is_empty()).then(|| Feed::Kept(crate::core::feed::Kept { text }).line())
     }
 }
 
@@ -772,6 +773,9 @@ pub fn view(f: Feed) -> Hub {
         Feed::Warn(r) => Hub::Warn(r.text),
         Feed::Scheduled(r) => Hub::Scheduled(r.timer.to_string()),
         Feed::Stopped(r) => Hub::Stopped(r.text),
+        // the TUI reads it as an info line (feed.rs after_pause_cut), as
+        // the unknown kind it was before it had a record
+        Feed::Paused(r) => other("paused", r.text),
         Feed::Wake(r) => Hub::Wake(r.watch.to_string()),
         Feed::Kept(r) => Hub::Kept(r.text),
         // a newer hub's kind: its text when it has one, else its JSON

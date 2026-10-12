@@ -342,7 +342,7 @@ fn partial_kept_when_an_attempt_ends_without_its_answer() {
     }
 }
 
-// the kept line carries the text as escaped on the wire, read back whole;
+// the kept record carries the text whole (a new line), read back whole;
 // nothing to keep: no line
 #[test]
 fn partial_kept_line_round_trips() {
@@ -351,6 +351,7 @@ fn partial_kept_line_round_trips() {
     p.step("1.0", 0, "first\\nsecond");
     p.step("1.0", 13, " and more");
     let l = p.kept_line().expect("a kept line");
+    assert!(l.starts_with("sb kept :: {"), "{l}");
     assert_eq!(read(&l), Rec::Hub(Hub::Kept("first
 second and more".into())));
     // a new attempt's first delta replaces the text
@@ -362,4 +363,27 @@ second and more".into())));
     let mut blank = Partial::default();
     blank.step("2.0", 0, "  ");
     assert_eq!(blank.kept_line(), None);
+}
+
+// a real line break in a record's text reads as the old line's escaped
+// one did (the TUI splits it into rows the same way); his typed
+// backslash-n is his words: the record keeps the two characters, where
+// the old line turned them into a line break the agent never got
+#[test]
+fn a_records_line_break_reads_as_the_old_lines() {
+    for (old, rec) in [
+        ("sb you : a\\nb", r#"sb you :: {"text":"a\nb"}"#),
+        ("sb msg-in : docs m_3 : a\\nb", r#"sb msg-in :: {"body":"a\nb","from":"docs","id":3}"#),
+        ("sb msg : perf → docs m_7 : a\\nb", r#"sb msg :: {"body":"a\nb","from":"perf","id":7,"to":"docs"}"#),
+        ("sb msg-you : docs : a\\nb", r#"sb msg-you :: {"body":"a\nb","from":"docs"}"#),
+        ("sb sent : main : m_9 : 1 : a\\nb", r#"sb sent :: {"ask":true,"body":"a\nb","id":9,"to":"main"}"#),
+        ("sb answered : docs : q\\nr : a\\nb : why", r#"sb answered :: {"agent":"docs","answer":"a\nb","question":"q\nr","why":"why"}"#),
+        ("sb card : #2 question @ui : pick\\n1. a", r#"sb card :: {"agent":"ui","body":"pick\n1. a","id":2,"kind":"question","v":1}"#),
+        ("sb route : you → @docs (answer to card #40) : a\\nb", r#"sb route :: {"card":40,"said":"a\nb","who":"docs"}"#),
+        ("sb undelivered : fix : a\\nb", r#"sb undelivered :: {"text":"a\nb","to":"fix"}"#),
+    ] {
+        assert_eq!(read(rec), read(old), "{rec}");
+        assert!(format!("{:?}", read(rec)).contains("a\\nb") || format!("{:?}", read(rec)).contains("pick\\n1. a"), "{rec}: a real line break");
+    }
+    assert_eq!(read(r#"sb you :: {"text":"a\\nb"}"#), Rec::Hub(Hub::You("a\\nb".into())), "a typed backslash-n, as typed");
 }

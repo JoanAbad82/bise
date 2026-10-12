@@ -22,7 +22,7 @@ impl Hub {
             match (&input, client) {
                 (In::Req(r), _) => fx.push(Effect::Reply { token: r.token, body: json!({"ok": false, "error": e}) }),
                 (_, Some(c)) => fx.push(notice(c, &e)),
-                _ => fx.push(line(MAIN, "warn", &e)),
+                _ => fx.push(feed(MAIN, Feed::warn(e))),
             }
             return;
         }
@@ -33,7 +33,7 @@ impl Hub {
         loop {
             let out = self.call(&step.to_value());
             for l in std::mem::take(&mut self.revived) {
-                fx.push(line(MAIN, "warn", &l));
+                fx.push(feed(MAIN, Feed::warn(l)));
             }
             let Some(out) = out else { return };
             let s = match core_fx::answer(&out) {

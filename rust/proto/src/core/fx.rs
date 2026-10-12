@@ -3,10 +3,11 @@
 //! writes their keys (bend/hub/core.bend's `out` calls, main.bend's
 //! `fx_json` for `journal`).
 //!
-//! Two tags have two shapes on the wire, one variant each here with the
-//! shape's fields optional, and one Bend encoder per shape ([`SHAPES`]):
-//! `line` (a text, or a multi-field line's `fields`) and `confirm` (the
-//! gate card's verdict to its agent, or a client's yes/no on a drop).
+//! One tag has two shapes on the wire, one variant here with the shape's
+//! fields optional, and one Bend encoder per shape ([`SHAPES`]): `confirm`
+//! (the gate card's verdict to its agent, or a client's yes/no on a drop).
+//! A line of an agent's feed is `feed`, its record a `Feed` (issue 25:
+//! the old text `line` effect is gone).
 
 use super::core_kinds;
 
@@ -24,9 +25,9 @@ core_kinds! {
         Say = "say" => FSay { agent: Str, text: Str },
         Passthrough = "passthrough" => FPassthrough { agent: Str, line: Str },
         Interrupt = "interrupt" => FInterrupt { agent: Str },
-        /// a line of an agent's feed: `text`, or `fields` (C2's
-        /// multi-field lines, each field's ` : ` escaped by the hub)
-        Line = "line" => FLine { agent: Str, kind: Str, text: OptStrOmit, fields: OptStrsOmit },
+        /// a record of an agent's feed (issue 25): `rec` is a `Feed` value
+        /// with its `sb` tag, written as `sb <kind> :: <json>`
+        Feed = "feed" => FFeed { agent: Str, rec: Json },
         /// the answer to an agent's request
         Reply = "reply" => FReply { token: Nat, body: Json },
         /// a notice to the client that typed the input
@@ -65,8 +66,6 @@ core_kinds! {
 /// the other fields of the kind are absent. Every other kind has one
 /// encoder with all its fields.
 pub const SHAPES: &[(&str, &str, &[&str])] = &[
-    ("line", "line", &["agent", "kind", "text"]),
-    ("line_fields", "line", &["agent", "kind", "fields"]),
     ("confirm_card", "confirm", &["card", "agent", "text"]),
     ("confirm_name", "confirm", &["name", "text"]),
 ];

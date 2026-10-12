@@ -21,6 +21,12 @@
 #                     (~60 s warm; e2e + tmux tests in parallel, SB_TEST_JOBS),
 #                     then no binary built needs a macOS newer than the
 #                     target (./bins.sh minos, BISE-164).
+#   gate.sh full --all  every e2e/tmux test, whatever changed: a release
+#                     (SB_AGENT release*: always), the nightly run. Without it
+#                     the full gate runs the Rust part and the e2e/tmux tests
+#                     tests/test_map.py picks for the tree's changes vs its
+#                     merge-base with main (GATE_FULL_BASE); main's tip, shared
+#                     code or an unknown path: all of them.
 #   gate.sh rerun     after a full gate red only on e2e/tmux tests: those
 #                     tests alone, one by one, on the same tree (HEAD + diff +
 #                     untracked; <gate dir>/red-<state>), instead of a whole
@@ -427,7 +433,26 @@ if [ "$mode" = full ]; then
   s=$SECONDS
   export FUZZ_RUNS="${FUZZ_RUNS:-2000}"
   rm -f "$red"; export SB_RED_FILE="$red"
-  tests/run_all.sh & wait $!; rc=$?
+  # the e2e/tmux tests this change can break (tests/test_map.py; the user's
+  # yes, 2026-10-12): the change = this tree vs its merge-base with main.
+  # Everything: --all, a release agent, the nightly run, no branch change
+  # (main's tip), shared code or a path no rule knows. The Rust part always.
+  pick_args=() picked=""
+  if [ "${2:-}" = --all ] || [ "${GATE_ALL:-}" = 1 ]; then picked="ALL --all"
+  elif case "${SB_AGENT:-}" in release*) true ;; *) false ;; esac; then picked="ALL a release's gate"
+  elif ! fb="$(git merge-base HEAD "${GATE_FULL_BASE:-main}" 2>/dev/null)"; then picked="ALL no merge-base with ${GATE_FULL_BASE:-main}"
+  else
+    fchanged="$( { git diff --name-only "$fb"; git ls-files --others --exclude-standard; } | sort -u)"
+    if [ -z "$fchanged" ]; then picked="ALL no change vs ${GATE_FULL_BASE:-main}"
+    else picked="$(python3 tests/test_map.py select $fchanged 2>"$gdir/pick-$$.why")" || picked="ALL test_map.py failed"; fi
+  fi
+  case "$picked" in
+    ALL*) echo "e2e/tmux tests: all (${picked#ALL })" ;;
+    *) echo "e2e/tmux tests: $(echo $picked | wc -w | tr -d ' ') picked for this change (tests/test_map.py; all of them run nightly and in a release):"
+       sed 's/^# /  /' "$gdir/pick-$$.why"; pick_args=(--tests "$picked") ;;
+  esac
+  rm -f "$gdir/pick-$$.why"
+  tests/run_all.sh "${pick_args[@]}" & wait $!; rc=$?
   [ $rc = 0 ] || { [ -s "$red" ] && echo "only e2e/tmux tests failed: gate.sh rerun runs them alone on this tree"; }
   [ $rc = 0 ] || sbcore_gone "$root/sb-core"
   # apps/desktop/src/proto matches bise-proto every time (a generated file
@@ -440,7 +465,7 @@ if [ "$mode" = full ]; then
   bins=(./repl-live ./repl-scripted ./sb-core "${CARGO_TARGET_DIR:-rust/target}/debug/bise")
   for f in ./harness-demo rust/jsrt/target/debug/bend-jsrt; do [ -e "$f" ] && bins+=("$f"); done
   if [ $rc = 0 ]; then scripts/bins.sh minos "${bins[@]}" || rc=1; fi
-  [ $rc = 0 ] && echo "GATE full GREEN ($((SECONDS - s))s)" || echo "GATE full FAILED"
+  [ $rc = 0 ] && echo "GATE full GREEN ($((SECONDS - s))s)$([ ${#pick_args[@]} = 0 ] || echo ": $(echo $picked | wc -w | tr -d ' ') e2e/tmux tests picked")" || echo "GATE full FAILED"
   exit $rc
 fi
 
@@ -455,6 +480,8 @@ python3 "$root/tests/sleep_check.py" --self-test >/dev/null && python3 "$root/te
 python3 "$root/tests/bise_env.py" >/dev/null || { python3 "$root/tests/bise_env.py"; echo "GATE quick FAILED"; exit 1; }
 # no merge or stash conflict marker in a tracked file (2393001f landed stash markers)
 python3 "$root/tests/conflict_markers.py" >/dev/null || { python3 "$root/tests/conflict_markers.py"; echo "GATE quick FAILED"; exit 1; }
+# the full gate's test map knows every test and every top-level path (tests/test_map.py)
+python3 "$root/tests/test_map.py" --self-test >/dev/null || { python3 "$root/tests/test_map.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 cache="${CARGO_TARGET_DIR:-$root/rust/target}/gate-cache"
 # the PROOF shards sit in a copy of bend/ in it and import it relatively
 # (bend refuses an absolute import path with a dot, like ~/.bise/gate/...)

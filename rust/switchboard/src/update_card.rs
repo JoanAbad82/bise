@@ -238,12 +238,12 @@ impl Hub {
     pub(super) fn updated(&mut self, fx: &mut Fx, env: &mut dyn Env, card: u64, version: &str, res: Result<(), String>) {
         self.dirty = true;
         match res {
-            Ok(()) => fx.push(line(MAIN, "info", &format!("updated to {version}. switching now, your agents keep running."))),
+            Ok(()) => fx.push(feed(MAIN, Feed::info(format!("updated to {version}. switching now, your agents keep running.")))),
             Err(e) => {
                 self.updates.running.remove(&card);
                 let on = self.updates.news.as_ref().map(|n| shown(&n.running)).unwrap_or_else(|| "the same version".into());
                 // designer: the reason last, so its cut never breaks the sentence
-                fx.push(line(MAIN, "warn", &format!("couldn't update to {version}, you're still on {on}: {}", reason(&e))));
+                fx.push(feed(MAIN, Feed::warn(format!("couldn't update to {version}, you're still on {on}: {}", reason(&e)))));
                 self.close_card(fx, env, card, "update failed");
             }
         }

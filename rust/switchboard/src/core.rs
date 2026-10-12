@@ -20,9 +20,11 @@ use crate::model::*;
 use crate::prompts;
 use crate::role;
 use crate::router::{self, UserCmd};
-use crate::util::{clip, clip_tail, one_line, wire_escape};
+use crate::util::{clip, clip_tail, one_line};
 use crate::wire::{self, Wire};
 use bise_proto::core::{input as ci, link as cl, In, Link};
+use bise_proto::core::feed as feed_rec;
+use bise_proto::core::Feed;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::{BufRead, BufReader, Write};
@@ -972,8 +974,8 @@ pub struct FeatureDone {
     /// Close the feature's open items (with this result).
     pub close: Option<String>,
     pub archive: Vec<String>,
-    /// (kind, text) for main's feed: `info`, `warn`.
-    pub line: Option<(String, String)>,
+    /// a record for main's feed (`info`, `warn`).
+    pub line: Option<Feed>,
 }
 
 /// The sb-core executable when the app root has none: `sb-core` next to
@@ -1270,27 +1272,10 @@ struct Role {
 /// After a failed role-line call, the next one waits this long.
 const ROLE_RETRY_MS: u64 = 5 * 60 * 1000;
 
-fn line(agent: &str, kind: &str, text: &str) -> Effect {
-    Effect::Line {
-        agent: agent.to_string(),
-        line: format!("sb {} : {}", kind, wire_escape(text)),
-    }
-}
-
-/// The separator of the fields of a hub line (C2: `answered`).
-pub const FIELD_SEP: &str = " : ";
-
-/// A field of a multi-field hub line: a `" : "` inside it becomes
-/// `" \\: "`, so the reader splits on the real separators only (the TUI's
-/// `parse_hub_line` undoes it).
-pub fn field_escape(s: &str) -> String {
-    s.replace(FIELD_SEP, " \\: ")
-}
-
-/// The text of a hub line made of fields (C2 `answered`: agent,
-/// question, answer, why).
-pub fn join_fields(fields: &[String]) -> String {
-    fields.iter().map(|f| field_escape(f)).collect::<Vec<_>>().join(FIELD_SEP)
+/// A record of an agent's feed, as its line (`sb <kind> :: <json>`,
+/// issue 25): every line the hub writes itself.
+pub fn feed(agent: &str, rec: bise_proto::core::Feed) -> Effect {
+    Effect::Line { agent: agent.to_string(), line: rec.line() }
 }
 
 fn notice(client: ClientId, text: &str) -> Effect {
@@ -1711,8 +1696,8 @@ impl Hub {
         for a in &d.archive {
             self.core(fx, env, None, In::Drop(ci::Drop { name: a.to_string(), force: true }));
         }
-        if let Some((kind, text)) = &d.line {
-            fx.push(line(MAIN, kind, text));
+        if let Some(rec) = d.line.clone() {
+            fx.push(feed(MAIN, rec));
         }
         // the merge reached the trunk: the changes tab's merged today again
         if d.close.as_deref() == Some("merged") {
@@ -1865,17 +1850,18 @@ impl Hub {
         }
     }
 
-    /// A timer's line in the feeds (`sb scheduled : <json>`, the TUI's ◷
+    /// A timer's line in the feeds (the `scheduled` record, the TUI's ◷
     /// line): its agent's feed, and main's when main set it for another
     /// agent (main's thread shows the timers main sets, never another
     /// agent's wakes). `ev`: the timer's state json with `ev` set/end.
     fn timer_lines(&self, fx: &mut Fx, agent: &str, by: &str, ev: &Value) {
-        fx.push(line(agent, "scheduled", &ev.to_string()));
+        let rec = |timer: Value| Feed::Scheduled(feed_rec::Scheduled { v: 1, timer });
+        fx.push(feed(agent, rec(ev.clone())));
         if by == MAIN && agent != MAIN {
             // main's copy says so: its ended line names the agent
             let mut m = ev.clone();
             m["in"] = json!(MAIN);
-            fx.push(line(MAIN, "scheduled", &m.to_string()));
+            fx.push(feed(MAIN, rec(m)));
         }
     }
 
@@ -1896,7 +1882,7 @@ impl Hub {
             Some("every_fired") if ev["undelivered"] == true => {
                 if let Some(t) = self.st.timers.map.get(&id) {
                     let w = format!("timer #{id}: its wake did not reach @{}; tried again in a minute", t.agent);
-                    fx.push(line(MAIN, "warn", &w));
+                    fx.push(feed(MAIN, Feed::warn(w)));
                 }
                 return;
             }
@@ -2118,19 +2104,17 @@ impl Hub {
     }
 
     /// pr-news' decisions, carried out: a message from `github` (sb-core's
-    /// `forge`, a pseudo sender like a peer), a line in main's feed (`sb
-    /// pr : tone : number : url : text`), a question card for the user
+    /// `forge`, a pseudo sender like a peer), a `pr` record in main's
+    /// feed, a question card for the user
     /// (`forge_card`: its answer goes to the agent), a journal line.
     fn news_out(&mut self, fx: &mut Fx, env: &mut dyn Env, outs: Vec<crate::forge::news::Out>) {
         use crate::forge::news::Out;
         for o in outs {
             match o {
                 Out::Tell { to, text } => self.core(fx, env, None, In::Forge(ci::Forge { to, text })),
-                Out::Line { tone, number, url, text } => fx.push(line(
-                    MAIN,
-                    "pr",
-                    &join_fields(&[tone.as_str().to_string(), number.to_string(), url, text]),
-                )),
+                Out::Line { tone, number, url, text } => {
+                    fx.push(feed(MAIN, Feed::Pr(feed_rec::Pr { v: 1, state: tone.state().into(), number, url, text })))
+                }
                 Out::Card { agent, text } => {
                     self.core(fx, env, None, In::ForgeCard(ci::ForgeCard { agent, text }))
                 }
@@ -2160,13 +2144,12 @@ impl Hub {
         if dirty || l.tip.as_deref() != Some(pr.head_oid.as_str()) {
             if !agents.is_empty() {
                 let why = if dirty { "changed files" } else { "commits after the PR's head" };
-                fx.push(line(
+                fx.push(feed(
                     MAIN,
-                    "warn",
-                    &format!(
+                    Feed::warn(format!(
                         "#{} ({}) is merged, but its worktree has {}: {} stays. /archive it when its work is not needed",
                         pr.number, l.branch, why, names
-                    ),
+                    )),
                 ));
             }
             return;

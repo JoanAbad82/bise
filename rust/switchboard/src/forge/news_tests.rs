@@ -49,7 +49,7 @@ fn tells(out: &[Out]) -> Vec<(String, String)> {
 fn lines(out: &[Out]) -> Vec<String> {
     out.iter()
         .filter_map(|o| match o {
-            Out::Line { tone, number, text, .. } => Some(format!("{} #{} {}", tone.as_str(), number, text)),
+            Out::Line { tone, number, text, .. } => Some(format!("{} #{} {}", tone.state(), number, text)),
             _ => None,
         })
         .collect()
@@ -165,7 +165,7 @@ fn failing_checks_two_tries_then_the_user() {
     assert_eq!(t.len(), 1);
     assert!(t[0].1.contains("Checks fail on aaaaaaa: e2e (try 1 of 2)."));
     assert!(t[0].1.contains("e2e https://ci/e2e\nthe log's last lines:\n```\nline 1\nassert failed\n```"));
-    assert_eq!(lines(&out), ["red #412 checks fail: e2e · dark-mode is on it"]);
+    assert_eq!(lines(&out), ["failing #412 checks fail: e2e · dark-mode is on it"]);
     // the same head again (a comment moved updatedAt): nothing new
     assert!(n.activity(&at(&a), &red("aaaaaaa1"), &act, &[]).is_empty());
     // try 2
@@ -173,7 +173,7 @@ fn failing_checks_two_tries_then_the_user() {
     assert!(t[0].1.contains("(try 2 of 2)"));
     // a third head still failing: the user is asked, once
     let out = n.activity(&at(&a), &red("ccccccc3"), &act, &[]);
-    assert_eq!(lines(&out), ["red #412 checks still fail: e2e after 2 tries · you're asked"]);
+    assert_eq!(lines(&out), ["failing #412 checks still fail: e2e after 2 tries · you're asked"]);
     assert!(out.iter().any(|o| matches!(o, Out::Card { agent, text } if agent == "dark-mode" && text.starts_with("#412 (sb/dark-mode): e2e still fails after 2 fixes by dark-mode."))));
     assert!(tells(&out)[0].1.contains("don't push for it until the answer comes"));
     let out = n.activity(&at(&a), &red("ddddddd4"), &act, &[]);
@@ -192,32 +192,32 @@ fn main_s_feed_lines() {
     let mut n = News::default();
     let open = pr("h1", Review::None, Checks::Running);
     let seen = n.event(&PrEvent::Seen { place: "wt:dark-mode".into(), pr: open.clone() }, Some(&at(&a)), false);
-    assert_eq!(lines(&seen), ["plain #412 opened · sb/dark-mode · dark-mode"]);
+    assert_eq!(lines(&seen), ["news #412 opened · sb/dark-mode · dark-mode"]);
     let asked = pr("h1", Review::ChangesRequested, Checks::Pass);
     let out = n.event(&PrEvent::Changed { place: "wt:dark-mode".into(), from: open.clone(), to: asked.clone() }, Some(&at(&a)), false);
-    assert_eq!(lines(&out), ["plain #412 changes asked · dark-mode is on it"]);
+    assert_eq!(lines(&out), ["news #412 changes asked · dark-mode is on it"]);
     // the agent pushed a fix: back in review, once per head
     let fixed = pr("abcdef0123", Review::ChangesRequested, Checks::Running);
     let ch = PrEvent::Changed { place: "wt:dark-mode".into(), from: asked.clone(), to: fixed.clone() };
-    assert_eq!(lines(&n.event(&ch, Some(&at(&a)), false)), ["plain #412 back in review · dark-mode pushed abcdef0"]);
+    assert_eq!(lines(&n.event(&ch, Some(&at(&a)), false)), ["news #412 back in review · dark-mode pushed abcdef0"]);
     assert!(n.event(&ch, Some(&at(&a)), false).is_empty());
     // a draft made ready
     let mut draft = open.clone();
     draft.state = PrState::Draft;
     let out = n.event(&PrEvent::Changed { place: "wt:dark-mode".into(), from: draft, to: open.clone() }, Some(&at(&a)), false);
-    assert_eq!(lines(&out), ["plain #412 ready for review"]);
+    assert_eq!(lines(&out), ["news #412 ready for review"]);
     let mut merged = open.clone();
     merged.state = PrState::Merged;
-    assert_eq!(lines(&n.event(&PrEvent::Merged { place: "wt:dark-mode".into(), pr: merged }, Some(&at(&a)), false)), ["dim #412 merged · sb/dark-mode"]);
+    assert_eq!(lines(&n.event(&PrEvent::Merged { place: "wt:dark-mode".into(), pr: merged }, Some(&at(&a)), false)), ["done #412 merged · sb/dark-mode"]);
     let mut closed = open.clone();
     closed.state = PrState::Closed;
     assert_eq!(
         lines(&n.event(&PrEvent::Closed { place: "wt:dark-mode".into(), pr: closed }, Some(&at(&a)), false)),
-        ["dim #412 closed without merging · dark-mode stays"]
+        ["done #412 closed without merging · dark-mode stays"]
     );
     // no agent left
     let out = n.event(&PrEvent::Changed { place: "wt:dark-mode".into(), from: open, to: asked }, Some(&at(&[])), false);
-    assert_eq!(lines(&out), ["plain #412 changes asked · no agent on it: main picks"]);
+    assert_eq!(lines(&out), ["news #412 changes asked · no agent on it: main picks"]);
 }
 
 #[test]
@@ -293,15 +293,16 @@ fn prs_are_typed_rows_and_the_text_is_made_from_them() {
     }
 }
 
-/// Law (architect m_11122): every tone the hub writes on a `pr` line reads
-/// as what it means in bise_proto (no color on the wire): plain is news,
-/// dim done, red failing; none is Unknown.
+/// Law (architect m_11122): every tone the hub writes on a `pr` record
+/// reads as what it means in bise_proto (no color on the wire): plain is
+/// news, dim done, red failing; none is Unknown.
 #[test]
 fn every_pr_tone_reads_as_its_state() {
+    use bise_proto::core::{feed, Feed};
     use bise_proto::thread::{lines, PrNewsState};
     let want = [(Tone::Plain, PrNewsState::News), (Tone::Dim, PrNewsState::Done), (Tone::Red, PrNewsState::Failing)];
     for (tone, state) in want {
-        let line = format!("sb pr : {} : 7 : https://x/7 : hi", tone.as_str());
+        let line = Feed::Pr(feed::Pr { v: 1, state: tone.state().into(), number: 7, url: "https://x/7".into(), text: "hi".into() }).line();
         assert!(matches!(lines::read(&line), lines::Rec::Hub(lines::Hub::Pr { state: s, number: 7, .. }) if s == state), "{line}");
     }
 }

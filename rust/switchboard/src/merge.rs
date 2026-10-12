@@ -200,16 +200,16 @@ impl Hub {
         self.dirty = true;
         match res {
             Ok(()) => {
-                // pr-news's PR line: tone, number, link, words
+                // pr-news's PR line: nothing for him to do, the PR, its words
                 let url = self.prs.get(place).map(|p| p.url.clone()).unwrap_or_default();
-                let fields = ["dim".to_string(), number.to_string(), url, "you merged it".to_string()];
-                fx.push(line(MAIN, "pr", &join_fields(&fields)));
+                let rec = feed_rec::Pr { v: 1, state: "done".into(), number, url, text: "you merged it".into() };
+                fx.push(feed(MAIN, Feed::Pr(rec)));
                 self.close_card(fx, env, card, "merged");
             }
             Err(e) => {
                 let e = clip(&one_line(&e), 160);
                 self.merges.failed.insert(place.to_string(), format!("gh couldn't merge it: {}", e));
-                fx.push(line(MAIN, "warn", &format!("gh couldn't merge #{}: {}", number, e)));
+                fx.push(feed(MAIN, Feed::warn(format!("gh couldn't merge #{}: {}", number, e))));
                 self.close_card(fx, env, card, "merge failed");
             }
         }
@@ -270,10 +270,9 @@ impl Hub {
             return;
         }
         self.merges.gh_off_said = true;
-        fx.push(line(
+        fx.push(feed(
             MAIN,
-            "warn",
-            &format!("i can't follow the PRs: {}. run `gh auth login` once (or set GITHUB_TOKEN) and their state shows here", what),
+            Feed::warn(format!("i can't follow the PRs: {}. run `gh auth login` once (or set GITHUB_TOKEN) and their state shows here", what)),
         ));
     }
 

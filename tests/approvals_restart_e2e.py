@@ -87,7 +87,7 @@ def main():
         c.wait(lambda: os.path.exists(out), 60, "the call ran after the restart")
         c.wait_idle("tr")
         check(open(out).read() == "r\n", "it ran once")
-        c.wait_line("main", "sb approval : allowed : tr : echo r >> " + out, 10)
+        c.wait_feed("main", "approval", 10, how="allowed", who="tr", what="echo r >> " + out)
         rules = open(os.path.join(bise, "approvals.toml")).read()
         check('from = "card #%d, tr"' % card["id"] in rules, "the rule says where it came from: %r" % rules)
 

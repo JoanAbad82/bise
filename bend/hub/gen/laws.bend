@@ -1037,10 +1037,10 @@ law fx_interrupt_bare:
 def fx_interrupt_bare():
   {==}
 
-law fx_line_bare:
-  {FX.of(J.obj([J.kv("fx", J.JStr{"line"})])) == FX.FLine{"", "", None{}, None{}} : FX.Fx}
+law fx_feed_bare:
+  {FX.of(J.obj([J.kv("fx", J.JStr{"feed"})])) == FX.FFeed{"", J.JNull{}} : FX.Fx}
 
-def fx_line_bare():
+def fx_feed_bare():
   {==}
 
 law fx_reply_bare:
@@ -1210,25 +1210,13 @@ law fx_FInterrupt_round:
 def fx_FInterrupt_round(agent):
   {==}
 
-law fx_FLine_round:
+law fx_FFeed_round:
   for agent: String
-  for kind: String
-  for text: Maybe<&2, String>
-  for fields: Maybe<&2, List<&2, String>>
-  {FX.of(FX.json(FX.FLine{agent, kind, text, fields})) == FX.FLine{agent, kind, text, fields} : FX.Fx}
+  for rec: J.Json
+  {FX.of(FX.json(FX.FFeed{agent, rec})) == FX.FFeed{agent, rec} : FX.Fx}
 
-def fx_FLine_round(agent, kind, text, fields):
-  match text fields:
-    case None{} None{}:
-      {==}
-    case None{} Some{x_fields}:
-      %K.strs_round(x_fields) : {FX.of(FX.json(FX.FLine{agent, kind, None{}, Some{x_fields}})) == FX.FLine{agent, kind, None{}, Some{_}} : FX.Fx}
-      {==}
-    case Some{x_text} None{}:
-      {==}
-    case Some{x_text} Some{x_fields}:
-      %K.strs_round(x_fields) : {FX.of(FX.json(FX.FLine{agent, kind, Some{x_text}, Some{x_fields}})) == FX.FLine{agent, kind, Some{x_text}, Some{_}} : FX.Fx}
-      {==}
+def fx_FFeed_round(agent, rec):
+  {==}
 
 law fx_FReply_round:
   for token: Nat

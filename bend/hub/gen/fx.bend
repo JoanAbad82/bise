@@ -22,8 +22,8 @@ type Fx is Data:
   FPassthrough{agent: String, line: String}
   # interrupt
   FInterrupt{agent: String}
-  # line
-  FLine{agent: String, kind: String, text: Maybe<&2, String>, fields: Maybe<&2, List<&2, String>>}
+  # feed
+  FFeed{agent: String, rec: J.Json}
   # reply
   FReply{token: Nat, body: J.Json}
   # notice
@@ -80,8 +80,8 @@ def FPassthrough.of(+i: J.Json) -> Fx:
 def FInterrupt.of(+i: J.Json) -> Fx:
   FInterrupt{K.get_s(i, "agent")}
 
-def FLine.of(+i: J.Json) -> Fx:
-  FLine{K.get_s(i, "agent"), K.get_s(i, "kind"), K.opt_s(J.get(i, "text")), K.opt_ss(J.get(i, "fields"))}
+def FFeed.of(+i: J.Json) -> Fx:
+  FFeed{K.get_s(i, "agent"), K.get_j(i, "rec")}
 
 def FReply.of(+i: J.Json) -> Fx:
   FReply{K.get_n(i, "token"), K.get_j(i, "body")}
@@ -151,16 +151,16 @@ def of.t3(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case LT{}:
       FNone{}
     case EQ{}:
-      FFocusMain.of(i)
+      FFeed.of(i)
     case GT{}:
       FNone{}
 
 def of.t4(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t3(String.order(t, "focus_main"), t, i)
+      of.t3(String.order(t, "feed"), t, i)
     case EQ{}:
-      FFollowedEnd.of(i)
+      FFocusMain.of(i)
     case GT{}:
       FNone{}
 
@@ -171,23 +171,23 @@ def of.t2(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case EQ{}:
       FDeliver.of(i)
     case GT{}:
-      of.t4(String.order(t, "followed_end"), t, i)
+      of.t4(String.order(t, "focus_main"), t, i)
 
 def of.t6(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       FNone{}
     case EQ{}:
-      FJobEnd.of(i)
+      FInterrupt.of(i)
     case GT{}:
       FNone{}
 
 def of.t7(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t6(String.order(t, "job_end"), t, i)
+      of.t6(String.order(t, "interrupt"), t, i)
     case EQ{}:
-      FJournal.of(i)
+      FJobEnd.of(i)
     case GT{}:
       FNone{}
 
@@ -196,14 +196,14 @@ def of.t9(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case LT{}:
       FNone{}
     case EQ{}:
-      FLine.of(i)
+      FKill.of(i)
     case GT{}:
       FNone{}
 
 def of.t10(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t9(String.order(t, "line"), t, i)
+      of.t9(String.order(t, "kill"), t, i)
     case EQ{}:
       FNotice.of(i)
     case GT{}:
@@ -212,9 +212,9 @@ def of.t10(c: Cmp, +t: String, +i: J.Json) -> Fx:
 def of.t8(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t7(String.order(t, "journal"), t, i)
+      of.t7(String.order(t, "job_end"), t, i)
     case EQ{}:
-      FKill.of(i)
+      FJournal.of(i)
     case GT{}:
       of.t10(String.order(t, "notice"), t, i)
 
@@ -223,9 +223,9 @@ def of.t5(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case LT{}:
       of.t2(String.order(t, "deliver"), t, i)
     case EQ{}:
-      FInterrupt.of(i)
+      FFollowedEnd.of(i)
     case GT{}:
-      of.t8(String.order(t, "kill"), t, i)
+      of.t8(String.order(t, "journal"), t, i)
 
 def of.t12(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
@@ -329,7 +329,7 @@ def of.t17(c: Cmp, +t: String, +i: J.Json) -> Fx:
 def of.t11(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t5(String.order(t, "interrupt"), t, i)
+      of.t5(String.order(t, "followed_end"), t, i)
     case EQ{}:
       FPassthrough.of(i)
     case GT{}:
@@ -362,8 +362,8 @@ def kvs(x: Fx) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("fx", J.JStr{"passthrough"}), J.kv("agent", J.JStr{agent}), J.kv("line", J.JStr{line})]
     case FInterrupt{+agent}:
       [J.kv("fx", J.JStr{"interrupt"}), J.kv("agent", J.JStr{agent})]
-    case FLine{+agent, +kind, +text, +fields}:
-      K.cat([[J.kv("fx", J.JStr{"line"}), J.kv("agent", J.JStr{agent}), J.kv("kind", J.JStr{kind})], K.omit_ms("text", text), K.omit_mss("fields", fields)])
+    case FFeed{+agent, +rec}:
+      [J.kv("fx", J.JStr{"feed"}), J.kv("agent", J.JStr{agent}), J.kv("rec", rec)]
     case FReply{+token, +body}:
       [J.kv("fx", J.JStr{"reply"}), J.kv("token", J.JNum{token}), J.kv("body", body)]
     case FNotice{+text}:
@@ -424,11 +424,8 @@ def passthrough(+agent: String, +line: String) -> List<&2, Sigma<&2, &2, String,
 def interrupt(+agent: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   kvs(FInterrupt{agent})
 
-def line(+agent: String, +kind: String, +text: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  kvs(FLine{agent, kind, Some{text}, None{}})
-
-def line_fields(+agent: String, +kind: String, +fields: List<&2, String>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  kvs(FLine{agent, kind, None{}, Some{fields}})
+def feed(+agent: String, +rec: J.Json) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  kvs(FFeed{agent, rec})
 
 def reply(+token: Nat, +body: J.Json) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   kvs(FReply{token, body})

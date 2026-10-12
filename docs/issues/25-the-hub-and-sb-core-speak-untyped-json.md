@@ -153,3 +153,22 @@ values, the journal byte-equal on a replay, the e2e transcripts equal
 - R's done-when: `rg 'json!\(\{"t"' rust/switchboard/src --glob
   '!*tests*'` → 0, `rg 'jstr\(f, "fx"\)' rust/switchboard` → 0; core.rs
   3,366 → 2,985 lines.
+- chunk F sha 2 (the writers, landed 322a1ce0 after release -31 shipped
+  sha 1): every feed line is a `Feed` record, `sb <kind> :: <json>`. The
+  Rust side writes through `core::feed` / `Shell::feed_rec`; sb-core
+  emits `F.feed(agent, FD.<kind>(…))` (gen/feed.bend, core-b's Bend
+  part) and the hub turns it into a line through the one `Fx::Feed` arm.
+  `Fx::Line`, core.bend's `line()`/`line_fields()` and core.rs's
+  `line()`, `field_escape`, `join_fields` are gone. cost-pause's `paused`
+  kind is a record too. An older door client (-28/-29 capsule) gets only
+  his `you` and `msg-you` lines, in the old text form
+  (`legacy::older_line`, TODO(client-protocol)). Tests read hub lines
+  through tests/e2e.py `feed_rec`/`Client.feed`/`wait_feed`. One visible
+  change: a typed `\n` is drawn as typed, as the agent got it (the old
+  line turned it into a line break); a real line break draws as before
+  (tui-parity: SAME otherwise, 2 runs per tree). core-b's capture compare:
+  10,380 inputs, 0 different outside the feed, 4,188 old lines = 4,188
+  records. F's done-when: lines.rs reads no `sb <kind> : ` prefix (the old
+  shapes are in thread/legacy.rs only); core.rs 2,969 lines; core.bend
+  3,923 (3,849 after B, +74 with cost-pause's pause rows); PROOF not
+  re-timed (cached in this gate; B's slowest shard was 82 s).

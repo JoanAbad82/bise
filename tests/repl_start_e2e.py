@@ -32,9 +32,13 @@ def log_lines(E):
 
 def most_at_once(lines):
     """The most REPLs between 'switching the REPL of X' and its
-    'switched the REPL of X' (or its failed start) at one time."""
+    'switched the REPL of X' (or its failed start) at one time, per hub:
+    a hub that stops ends its switches in flight (the next one starts
+    those REPLs again)."""
     open_, most = set(), 0
     for l in lines:
+        if re.search(r" hub start pid=", l):
+            open_ = set()
         m = re.search(r"switching the REPL of (\S+) to", l)
         if m:
             open_.add(m.group(1))
@@ -43,6 +47,19 @@ def most_at_once(lines):
         if m:
             open_.discard(m.group(1))
     return most
+
+
+def repl_pids(E):
+    """Each agent's REPL pid (its repl.pid), alive ones only."""
+    got = {}
+    for name in ["main"] + TASKS:
+        try:
+            pid = int(open(os.path.join(E.state, "agents", name, "repl.pid")).read().strip())
+            os.kill(pid, 0)
+        except (OSError, ValueError):
+            continue
+        got[name] = pid
+    return got
 
 
 def hub_pid(E):
@@ -93,6 +110,8 @@ def main():
             check(c.agent(t) is not None, "%s spawned" % t)
         c.wait_idle("main", *TASKS, timeout=180)
         n0 = len(log_lines(E))
+        before = repl_pids(E)
+        check(set(before) == set(TASKS) | {"main"}, "every REPL runs before the reload: %s" % before)
 
         # 1. a slow but healthy reload
         open(slow, "w").write("8000")
@@ -101,10 +120,22 @@ def main():
         c = follow(E, c, pid0)
         c.wait(lambda: any(re.search(r"switch: \S+ (good|failed)", l) for l in log_lines(E)[n0:]), 300,
                "the reload's probation ends")
+
+        def switched():
+            """The agents whose REPL is a new process, alive: switched by
+            the new hub ('switched the REPL of X'), or, when the old hub
+            had begun to switch it right before it stopped (a key change
+            in the reload's last 0.3 s, kept hub of a red run), started
+            again by the new one (no switch line for a REPL it found
+            gone)."""
+            now = repl_pids(E)
+            return {n for n, p in now.items() if before.get(n) != p}
+        # every REPL switches, waited for: the probation is a fixed 120 s,
+        # and 4 at a time at 8 s a start the last batch can end after it
+        # under load (switched only main + 4 at its end, loop-speed-4)
+        c.wait(lambda: switched() >= set(TASKS) | {"main"}, 300, lambda: "every REPL switched: %s" % sorted(switched()))
         after = log_lines(E)[n0:]
         check(not any(" failed" in l and "switch:" in l for l in after), "no rollback: %s" % [l for l in after if "switch:" in l])
-        switched = {m.group(1) for l in after for m in [re.search(r"switched the REPL of (\S+)$", l)] if m}
-        check(switched >= set(TASKS) | {"main"}, "every REPL switched: %s" % sorted(switched))
         most = most_at_once(after)
         check(0 < most <= 4, "at most 4 starts at once: %d" % most)
 
@@ -122,6 +153,10 @@ def main():
         after = log_lines(E)[n1:]
         check(any("rollback to" in l for l in after), "a rollback: %s" % [l for l in after if "switch:" in l])
         print("repl starts: ok (%d at once at most; a never-starting version rolled back)" % most)
+    except BaseException:
+        # a red run keeps its hub (hub.log says which REPL never switched)
+        os.environ["SB_KEEP"] = "1"
+        raise
     finally:
         E.close()
 

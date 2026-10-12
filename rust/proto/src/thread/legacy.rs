@@ -22,6 +22,23 @@ pub fn upgrade(line: &str) -> Option<Feed> {
     of(kind, raw)
 }
 
+/// A record as the old text line the released desktop cores read
+/// (v2026.10.2-28/-29's capsule: its `main_line` reads only `sb you : `,
+/// its line event `sb msg-you : `), for the older door's `line` events
+/// only; None for every other kind (that capsule never read them). The old
+/// form can't carry a carriage return or a literal backslash-n: it never
+/// could.
+// TODO(client-protocol, the plan's 'after the release' step): goes with
+// the older door (daemon/rpc.rs DOOR_EVENTS), its only caller.
+pub fn older_line(rec: &Feed) -> Option<String> {
+    let esc = |s: &str| s.replace('\r', "").replace('\n', "\\n");
+    match rec {
+        Feed::You(r) => Some(format!("sb you : {}", esc(&r.text))),
+        Feed::MsgYou(r) => Some(format!("sb msg-you : {}", esc(&format!("{} : {}", r.from, r.body)))),
+        _ => None,
+    }
+}
+
 /// An older hub line after its `sb `, for [`crate::thread::lines::hub`]:
 /// its record's view, else its kind and unescaped text (`Hub::Other`).
 pub(crate) fn hub(rest: &str) -> Hub {
@@ -158,6 +175,7 @@ fn of(kind: &str, raw: &str) -> Option<Feed> {
         "warn" => Feed::Warn(feed::Warn { text }),
         "scheduled" => Feed::Scheduled(feed::Scheduled { v: 1, timer: json(&text) }),
         "stopped" => Feed::Stopped(feed::Stopped { text }),
+        "paused" => Feed::Paused(feed::Paused { text }),
         "wake" => Feed::Wake(feed::Wake { v: 1, watch: json(&text) }),
         "kept" => Feed::Kept(feed::Kept { text }),
         _ => return None,

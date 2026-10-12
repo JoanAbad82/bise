@@ -111,6 +111,34 @@ def own_side_channels(tmp):
     }
 
 
+
+def feed_rec(line):
+    """A transcript line's hub record, in either form (issue 25): (kind,
+    fields) for `sb <kind> :: <json>` (a bise_proto::core::Feed record);
+    (kind, {"text": <its text>}) for an older `sb <kind> : <text>` line;
+    None for any other line. The one place the tests read hub lines: a
+    format change is here."""
+    if not line.startswith("sb "):
+        return None
+    kind, sep, rest = line[3:].partition(" :: ")
+    if sep and kind and " " not in kind:
+        try:
+            r = json.loads(rest)
+        except ValueError:
+            r = None
+        return kind, r if isinstance(r, dict) else {}
+    kind, _, text = line[3:].partition(" : ")
+    return kind, {"text": text}
+
+
+def line_has(line, needle):
+    """`needle` in a transcript line as written, or in one of its hub
+    record's string fields (`"` is `\\"` in the record's JSON)."""
+    if needle in line:
+        return True
+    rec = feed_rec(line)
+    return bool(rec) and any(isinstance(v, str) and needle in v for v in rec[1].values())
+
 class Env:
     def __init__(self, fake_env=None):
         self.tmp = tempfile.mkdtemp(prefix="sb-e2e-", dir=short_tmp())
@@ -409,6 +437,19 @@ class Client:
             self._tails[path] = (at + len(got), lines, rest)
         return lines
 
+    def feed(self, agent, kind):
+        """`agent`'s hub records of one kind, in order (feed_rec)."""
+        return [r for k, r in filter(None, map(feed_rec, self.lines(agent))) if k == kind]
+
+    def wait_feed(self, agent, kind, timeout=90, /, **want):
+        """Wait for a record of `kind` in `agent`'s feed whose fields are
+        `want` (`text_has=` a part of its text); the record. Positional
+        only: a record has fields named agent, kind, who."""
+        def hit(r):
+            return all((v in r.get("text", "")) if k == "text_has" else r.get(k) == v for k, v in want.items())
+        return self.wait(lambda: next((r for r in self.feed(agent, kind) if hit(r)), None), timeout,
+                         "%s %r in %s" % (kind, want, agent))
+
     def lines(self, agent=None):
         """`agent`'s transcript lines (every agent's with none), as the
         hub wrote them."""
@@ -446,7 +487,9 @@ class Client:
         return wait.until(pred, timeout, what)
 
     def wait_line(self, agent, needle, timeout=90):
-        self.wait(lambda: any(needle in l for l in self.lines(agent)), timeout, "%r in %s" % (needle, agent))
+        """A line of `agent`'s feed that has `needle`: as written, or in
+        one of its record's text fields (a record's JSON escapes quotes)."""
+        self.wait(lambda: any(line_has(l, needle) for l in self.lines(agent)), timeout, "%r in %s" % (needle, agent))
 
     def wait_status(self, name, statuses, timeout=90):
         if isinstance(statuses, str):
@@ -487,7 +530,7 @@ def t_spawn_and_auto_reply(E, c):
     c.wait(lambda: os.path.exists(os.path.join(E.ws, "t1.txt")), 90, "t1.txt written in the workspace")
     check(open(os.path.join(E.ws, "t1.txt")).read().strip() == "hello-from-t1", "t1.txt content")
     # t1's turn ends: its reply comes back to main automatically
-    c.wait_line("main", "sb msg-in : t1 m_", 90)
+    c.wait_feed("main", "msg-in", 90, **{"from": "t1"})
     c.wait_idle("main", "t1")
     # main's turn on the reply may start after the idle seen above (the
     # msg-in line comes first): wait for its model call
@@ -514,11 +557,11 @@ def t_direct_message_and_note(E, c):
     c.wait_idle("main", "t1")
     check(c.rpc("client/focus", {"project": c.project(), "focus": "t1"}).get("result") == {}, "focus answered")
     c.say("parle-moi directement", focus="t1")
-    c.wait_line("t1", "sb you : parle-moi directement")
+    c.wait_feed("t1", "you", 90, text="parle-moi directement")
     c.wait_line("t1", "ack: parle-moi directement")
     c.wait_idle("t1")
     check(c.rpc("client/focus", {"project": c.project(), "focus": "main"}).get("result") == {}, "focus answered")
-    c.wait_line("main", "sb direct : You talked to @t1 (1 message)")
+    c.wait_feed("main", "direct", 90, text="You talked to @t1 (1 message)")
     c.say("et alors ?")
     c.wait(lambda: any(r["agent"] == "main" and r["user"].endswith("et alors ?") for r in E.fake_requests()), 60,
            "main's request with the new message")
@@ -529,7 +572,7 @@ def t_direct_message_and_note(E, c):
     c.wait_idle("main")
     before = len([r for r in E.fake_requests() if r["agent"] == "main"])
     c.say("@t1 route explicite")
-    c.wait_line("main", "sb route : you → @t1 : route explicite")
+    c.wait_feed("main", "route", 90, who="t1", said="route explicite")
     # from main's view the task reads it tagged (RFC 0003 §5.1)
     c.wait_line("t1", 'ack: <user_message via="main"> route explicite')
     c.wait_idle("t1")
@@ -555,7 +598,7 @@ def t_escalation_card(E, c):
     c.say('/new t3: {{bash: sb send main --expect-reply "v1 ou v2 ?"}}')
     c.say('/new t3b: {{bash: sb send main --expect-reply "t3b asks main" && sb status blocked --note "t3b needs a key" && sb report blocked "t3b is stuck"}}')
     c.wait(lambda: c.agent("t3") is not None and c.agent("t3b") is not None, 60, "t3 and t3b")
-    c.wait(lambda: seen.append(len(c.cards())) or (any(l.startswith("sb msg-in : t3 ") for l in c.lines("main"))
+    c.wait(lambda: seen.append(len(c.cards())) or (any(r["from"] == "t3" for r in c.feed("main", "msg-in"))
                    and any("[report: blocked] t3b is stuck" in l for l in c.lines("main"))), 90 * 2,
            "both agents' messages in main's feed")
     c.wait_idle("main", "t3", "t3b")
@@ -569,9 +612,9 @@ def t_escalation_card(E, c):
               for r in E.fake_requests()),
           "the blocked status went to main")
     msg_id = None
-    for l in c.lines("main"):
-        if l.startswith("sb msg-in : t3 m_") and "v1 ou v2" in l:
-            msg_id = l.split()[4]
+    for r in c.feed("main", "msg-in"):
+        if r.get("from") == "t3" and "v1 ou v2" in r.get("body", "") and r.get("id"):
+            msg_id = "m_%d" % r["id"]
     check(msg_id, "the question id")
     c.say("[[bash: sb card --for %s \"v1 ou v2 ?\"]]" % msg_id)
     c.wait(lambda: any(cd["kind"] == "question" for cd in c.cards()), 60, "a question card")
@@ -841,7 +884,7 @@ def t_main_controls(E, c):
     c.wait_idle("main")
     c.say('[[bash: sb card --withdraw %d "moot now"]]' % card["id"])
     c.wait(lambda: not c.cards(), 60, "card withdrawn by main")
-    c.wait_line("main", "#%d withdrawn by main: moot now" % card["id"], 30)
+    c.wait_feed("main", "card-closed", 30, id=card["id"], res="withdrawn by main: moot now")
     c.wait_idle("main")
     # main renames a task; the old name still works
     c.say("/new t5: {{bash: echo t5}}")
@@ -877,7 +920,7 @@ def t_crash_status_and_tasks(E, c):
     # a task crashes: main hears it from the hub
     pid = open(os.path.join(E.state, "agents", "t1", "repl.pid")).read().strip()
     os.kill(int(pid), 9)
-    c.wait_line("main", "sb msg-in : switchboard", 60)
+    c.wait_feed("main", "msg-in", 60, **{"from": "switchboard"})
     c.wait(lambda: any(r["agent"] == "main" and "agent @t1 crashed" in r["user"] for r in E.fake_requests()), 60,
            "main's model got the crash notification")
     c.wait_status("t1", ["idle", "done", "blocked"], 60)

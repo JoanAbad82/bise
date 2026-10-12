@@ -765,17 +765,16 @@ pub fn matches(m: &Meta, words: &str) -> bool {
     words.split_whitespace().all(|w| hay.contains(&w.to_lowercase()))
 }
 
-/// The thread line of an add (`sb artifact : id : agent : title : kind :
-/// v`), for the maker's thread and main's.
-pub fn thread_line(m: &Meta) -> String {
-    let fields: Vec<String> = vec![
-        m.id.clone(),
-        m.agent.clone(),
-        m.title.clone(),
-        m.kind.clone(),
-        m.current().map_or(1, |v| v.v).to_string(),
-    ];
-    crate::core::join_fields(&fields)
+/// The thread record of an add (its id, agent, title, kind, version), for
+/// the maker's thread and main's.
+pub fn thread_rec(m: &Meta) -> bise_proto::core::Feed {
+    bise_proto::core::Feed::Artifact(bise_proto::core::feed::Artifact {
+        id: m.id.clone(),
+        agent: m.agent.clone(),
+        title: m.title.clone(),
+        kind: m.kind.clone(),
+        version: m.current().map_or(1, |v| v.v),
+    })
 }
 
 /// What the adder reads: `added pricing-plans.xlsx (sheet) · v1 · link it

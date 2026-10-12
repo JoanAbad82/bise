@@ -10,7 +10,10 @@
 //! keychain password (one item) and v2026.10.2-28's items. Before any
 //! `security` call, [`Keychains::ready`] reads both states with no
 //! window ([`crate::status`]) and does what [`crate::ready::next_step`]
-//! says: never a call on a locked keychain, so never a dialog.
+//! says: never a call on a locked keychain, so never a dialog. bise's
+//! keychain read unreadable or locked waits for its maker's lock first
+//! (`<file>.lock`, held while [`Keychains`] makes it): a keychain half
+//! made by another thread or process is not one that can't be read.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -160,7 +163,18 @@ impl Keychains {
     /// for a read when it doesn't exist. Never runs `security` on a locked
     /// keychain ([`crate::ready`]).
     pub fn ready(&self, intent: Intent) -> Result<Option<&Keychain>, ReadError> {
-        let (b, l) = self.states();
+        let (mut b, mut l) = self.states();
+        if matches!(b, Status::Unreadable | Status::Locked) {
+            // a keychain being made (another thread's or process's first
+            // write, [`Self::create`]) reads unreadable or locked until
+            // `create-keychain` is done: wait for its maker, then look
+            // again (red under load: 'bise's keychain can't be read here'
+            // in a parallel test). No maker lock (the sandbox can't write
+            // it): the states stand.
+            if let Ok(_maker) = self.maker_lock() {
+                (b, l) = self.states();
+            }
+        }
         match ready::next_step(intent, b, l) {
             Step::Go => Ok(Some(&self.bise)),
             Step::Absent => Ok(None),
@@ -194,6 +208,16 @@ impl Keychains {
         self.bise.file().unwrap_or(Path::new(FILE))
     }
 
+    /// The maker's lock of bise's keychain (`<file>.lock`, held while
+    /// [`Self::create`] makes it), taken: released when dropped.
+    fn maker_lock(&self) -> std::io::Result<std::fs::File> {
+        let mut lock = self.bise_file().as_os_str().to_owned();
+        lock.push(".lock");
+        let f = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(&lock)?;
+        f.lock()?;
+        Ok(f)
+    }
+
     /// Make bise's keychain: a random password, written to the login
     /// keychain and read back first (never a keychain whose password is
     /// lost), then the file, unlocked, with no lock timeout and no lock
@@ -207,10 +231,7 @@ impl Keychains {
         }
         // one maker at a time (two processes' first write): the second
         // finds it made
-        let mut lock = file.as_os_str().to_owned();
-        lock.push(".lock");
-        let lock = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(&lock).map_err(ReadError::Io)?;
-        lock.lock().map_err(ReadError::Io)?;
+        let _maker = self.maker_lock().map_err(ReadError::Io)?;
         if status::status(Some(file)) == Status::Unlocked {
             return Ok(());
         }
