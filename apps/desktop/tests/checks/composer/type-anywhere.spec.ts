@@ -138,11 +138,30 @@ test('composer/type-anywhere: a key or a paste with no field focused lands in th
     // textContent, like toHaveText reads it (innerText adds the chip's line breaks)
     const before = (await field(page).textContent()) ?? '';
 
-    // never: arrows, esc, enter
+    // never: arrows, enter
     await away(page, 'main');
-    for (const k of ['ArrowDown', 'ArrowUp', 'Escape', 'Enter']) await page.keyboard.press(k);
-    expect(await fieldFocused(page), 'arrows, esc and enter leave the focus where it is').toBe(false);
+    for (const k of ['ArrowDown', 'ArrowUp', 'Enter']) await page.keyboard.press(k);
+    expect(await fieldFocused(page), 'arrows and enter leave the focus where it is').toBe(false);
     await expect(field(page)).toHaveText(before);
+    // never esc either: with no field focused it goes up the hierarchy (main → bise, the
+    // desktop-history page, src/app/esc-up.ts); ⌘[ comes back to main's composer, its words kept
+    // what the arrows and enter opened in the thread takes the first escs (its esc ladder); the
+    // next goes up. None of them lands in the composer.
+    // where the window is: the thread's project (bise is the home project's main, so its
+    // thread.screen says data-agent="main" too, and both composers read 'write to bise')
+    const screen = page.getByTestId('thread.screen');
+    const inP = async () => (await screen.getAttribute('data-project')) === P;
+    for (let i = 0; i < 4 && (await inP()); i += 1) {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(150);
+      expect(await fieldFocused(page), 'an esc gives the composer no focus').toBe(false);
+      if (await inP()) await expect(field(page), "an esc puts nothing in main's composer").toHaveText(before);
+    }
+    await expect(screen, 'esc goes up to bise, not into the composer').toHaveAttribute('data-project', HOME, { timeout: 3000 });
+    await page.keyboard.press('Meta+BracketLeft');
+    await expect(screen, '⌘[ back to main').toHaveAttribute('data-project', P, { timeout: 3000 });
+    await expect(field(page), "main's words stay, the esc took none").toHaveText(before);
+    expect(await fieldFocused(page), 'esc and ⌘[ give the composer no focus').toBe(false);
 
     // never ⌘K: the palette opens and its own field gets the next key
     await page.keyboard.press('Meta+K');
