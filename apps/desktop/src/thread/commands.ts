@@ -62,9 +62,11 @@ export function windowRun(name: string, args: string, at: { project: string; age
   const arg = at0(args);
   const go = (r: Route): WindowRun => ({ go: r });
   switch (name.replace(/^\//, '')) {
+    // as the TUI: /agents lists the live ones, /archived only the archived ones
     case 'agents':
-    case 'archived':
       return go({ screen: 'agents', project: at.project });
+    case 'archived':
+      return go({ screen: 'agents', project: at.project, archived: true });
     case 'switch':
       return go(arg === '' ? { screen: 'agents', project: at.project } : { screen: 'thread', project: at.project, agent: arg });
     case 'diff': {

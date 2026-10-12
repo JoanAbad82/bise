@@ -8,7 +8,8 @@
 //   bise                       bise's own thread (the home project's main)
 //   project/<p>                a project's main thread
 //   agent/<p>/<a>              one agent's thread
-//   agents/<p>                 a project's agents list
+//   agents/<p>                 a project's agents list (its live ones)
+//   agents/<p>/archived        its archived agents (/archived)
 //   changes/<p>                a project's changes (branches, merged today)
 //   review/<p>/<a>             an agent's change, to review and merge
 //   log/<p>/<a>                an agent's raw session, read-only (/log, amb-web's src/log)
@@ -26,7 +27,8 @@
 export type Route =
   | { screen: 'bise' }
   | { screen: 'thread'; project: string; agent: string }
-  | { screen: 'agents'; project: string }
+  /** its live agents (/agents); `archived`: only its archived ones (/archived, as the TUI) */
+  | { screen: 'agents'; project: string; archived?: true }
   | { screen: 'changes'; project: string }
   | { screen: 'prs'; project: string }
   | { screen: 'review'; project: string; agent: string }
@@ -72,6 +74,7 @@ export function formatRoute(r: Route): string {
     case 'thread':
       return r.agent === MAIN ? `project/${r.project}` : `agent/${r.project}/${r.agent}`;
     case 'agents':
+      return r.archived === true ? `agents/${r.project}/archived` : `agents/${r.project}`;
     case 'changes':
     case 'prs':
     case 'environments':
@@ -121,6 +124,8 @@ export function parseRoute(path: string): Route {
     case 'agent':
       return a !== undefined && b !== undefined ? { screen: 'thread', project: a, agent: b } : nf;
     case 'agents':
+      if (a !== undefined && b === 'archived') return { screen: 'agents', project: a, archived: true };
+      return one !== undefined ? { screen: 'agents', project: one } : nf;
     case 'changes':
     case 'prs':
     case 'environments':

@@ -7,6 +7,7 @@ const every: Route[] = [
   { screen: 'thread', project: 'shop-ab9f3c3b', agent: MAIN },
   { screen: 'thread', project: 'shop-ab9f3c3b', agent: 'perf' },
   { screen: 'agents', project: 'p' },
+  { screen: 'agents', project: 'p', archived: true },
   { screen: 'changes', project: 'p' },
   { screen: 'review', project: 'p', agent: 'perf' },
   { screen: 'commit', project: 'p', sha: '155ffb0' },

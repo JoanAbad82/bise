@@ -34,6 +34,11 @@ test('agents/lifecycle: stop, archive and restore from the window act as in the 
   const status = async () => (await live()).find((a) => a.name === AG)?.status;
   let t: Tui | undefined;
   const s = await launchOn(w, `agents/${project}`, T.screen);
+  // a route main sends the window (a deep link): /archived's list, then the live one back
+  const go = (route: string) =>
+    s.app.evaluate(({ BrowserWindow }, r) => {
+      for (const b of BrowserWindow.getAllWindows()) b.webContents.send('bise:route', r);
+    }, route);
   try {
     const { page } = s;
     t = tui(w, 'shop');
@@ -72,9 +77,10 @@ test('agents/lifecycle: stop, archive and restore from the window act as in the 
     await expect.poll(async () => (await live()).some((a) => a.name === AG), { timeout: 10_000, message: `${AG} leaves the hub's live agents` }).toBe(false);
     await expect.poll(() => tuiAgents(t?.screen() ?? '').some((a) => a.name === AG), { timeout: 5000, message: "it leaves the TUI's panel" }).toBe(false);
     await expect(page.locator(`${T.screen} ${T.row(AG)}`), 'it leaves the live list').toHaveCount(0, { timeout: 5000 });
-    await expect(page.locator(T.archived), "the window lists it under 'archived'").toBeVisible({ timeout: 5000 });
-    await page.locator(T.archived).click();
-    await expect(page.locator(T.restore(AG))).toBeVisible({ timeout: 3000 });
+    // as the TUI: /agents lists only the live ones, /archived the archived ones (his try on a43609b2)
+    await expect(page.locator(T.archived), 'no archived row on the live list').toHaveCount(0);
+    await go(`agents/${project}/archived`);
+    await expect(page.locator(T.restore(AG)), "the window's /archived lists it").toBeVisible({ timeout: 5000 });
     await page.screenshot({ path: test.info().outputPath('archived.png') });
     tuiSay(t, '/archived');
     await expect.poll(() => flat(t?.screen() ?? ''), { timeout: 5000, message: "the TUI's /archived lists it" }).toMatch(new RegExp(`\\b${AG}\\b`));
@@ -83,7 +89,8 @@ test('agents/lifecycle: stop, archive and restore from the window act as in the 
     await expect.poll(async () => (await live()).some((a) => a.name === AG), { timeout: 10_000, message: `${AG} is back in the hub` }).toBe(true);
     await expect.poll(() => tuiAgents(t?.screen() ?? '').some((a) => a.name === AG), { timeout: 5000, message: "it is back in the TUI's panel" }).toBe(true);
     await expect(page.locator(T.restore(AG)), 'it leaves the archived list').toHaveCount(0, { timeout: 5000 });
-    await expect(page.locator(T.row(AG)), 'it is back in the live list').toBeVisible();
+    await go(`agents/${project}`);
+    await expect(page.locator(T.row(AG)), 'it is back in the live list').toBeVisible({ timeout: 5000 });
     await page.screenshot({ path: test.info().outputPath('restored.png') });
   } finally {
     if (t) {

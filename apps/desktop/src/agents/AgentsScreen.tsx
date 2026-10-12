@@ -1,12 +1,12 @@
 // A project's agents (bar A.2-A.4): the live ones as the TUI's panel
 // shows them (status, what it does, age, its last report), each opening
 // its thread; stop and archive where the hub has a typed command; the
-// archived ones below with restore; '+ new agent' (A.1) and each agent's
+// archived ones on their own list (/archived) with restore; '+ new agent' (A.1) and each agent's
 // '…' (rename, model, reasoning: A.5) through amb-feed's typed commands
 // (actions.ts). Owner: amb-win.
 import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Peek } from './Peek';
-import { Button, Empty, Head, Row, SectionHead } from '@/ds';
+import { Button, Empty, Head, Row } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAgents, useStore } from '@/store';
 import { useRouter } from '@/app/router';
@@ -36,12 +36,16 @@ export function listKey(key: string, order: readonly string[], sel: string | nul
   }
 }
 
-export function AgentsScreen({ project, projectName }: { project: string; projectName?: string }) {
-  useKeptScroll(`agents:${project}`, () => document.querySelector<HTMLElement>('[data-testid="agents.screen"] .ag-body'));
+/**
+ * As the TUI (his try on a43609b2): /agents lists the live agents only, /archived (`archived`)
+ * only the archived ones, each with restore. No archived row on the live list (designer's v6:
+ * the archived ones are under /archived and the project's ⋯ menu).
+ */
+export function AgentsScreen({ project, projectName, archived: showArchived = false }: { project: string; projectName?: string; archived?: boolean }) {
+  useKeptScroll(`agents:${project}${showArchived ? ':archived' : ''}`, () => document.querySelector<HTMLElement>('[data-testid="agents.screen"] .ag-body'));
   const agents = useAgents(project);
   const live = liveOf(agents);
   const archived = archivedOf(agents);
-  const [showArchived, setShowArchived] = useState(false);
   // the new-agent sheet stays open across a reload (keep.ts: an open panel, no age)
   const addKey = `new.open:${project}`;
   const [adding, setAddingState] = useState(() => keep.view(addKey) === true);
@@ -65,7 +69,8 @@ export function AgentsScreen({ project, projectName }: { project: string; projec
     setSelState(name);
   };
   const [peek, setPeek] = useState<string | null>(null);
-  const order = [...live, ...(showArchived ? archived : [])].map((a) => a.name);
+  const shown = showArchived ? archived : live;
+  const order = shown.map((a) => a.name);
   const section = useRef<HTMLElement>(null);
   useEffect(() => {
     // the list takes the keys when nothing else has the focus
@@ -83,12 +88,12 @@ export function AgentsScreen({ project, projectName }: { project: string; projec
     if (next.open !== undefined) router.go({ screen: 'thread', project, agent: next.open });
   };
   return (
-    <section ref={section} tabIndex={-1} onKeyDown={onKeyDown} className="ag-screen" data-testid="agents.screen" data-project={project}>
+    <section ref={section} tabIndex={-1} onKeyDown={onKeyDown} className="ag-screen" data-testid="agents.screen" data-project={project} data-archived={showArchived ? 'true' : undefined}>
       <Head
-        title="agents"
-        sub={`${projectName ?? project} · ${live.length} live`}
+        title={showArchived ? 'archived' : 'agents'}
+        sub={showArchived ? `${projectName ?? project} · ${archived.length} archived` : `${projectName ?? project} · ${live.length} live`}
         end={
-          <Button
+          !showArchived && <Button
             kind="ghost"
             onClick={() => {
               setAdding((x) => !x);
@@ -108,30 +113,10 @@ export function AgentsScreen({ project, projectName }: { project: string; projec
             }}
           />
         )}
-        {live.length === 0 && <Empty title="no agents yet" />}
-        {live.map((a) => (
+        {shown.length === 0 && <Empty title={showArchived ? 'no archived agent' : 'no agents yet'} />}
+        {shown.map((a) => (
           <AgentItem key={a.name} project={project} a={a} sel={sel === a.name} peek={peek === a.name} />
         ))}
-        {archived.length > 0 && (
-          <>
-            <SectionHead>
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  setShowArchived((x) => !x);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') setShowArchived((x) => !x);
-                }}
-                data-testid="agents.archived"
-              >
-                {showArchived ? '▾' : '▸'} archived · {archived.length}
-              </span>
-            </SectionHead>
-            {showArchived && archived.map((a) => <AgentItem key={a.name} project={project} a={a} sel={sel === a.name} peek={peek === a.name} />)}
-          </>
-        )}
       </div>
     </section>
   );

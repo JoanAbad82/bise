@@ -107,6 +107,8 @@ describe('the window /commands (bar 2.1, A.2)', () => {
     expect(windowCommands.map((c) => c.name)).toContain('agents');
     expect(runWindowCommand('agents', '', { project: P, agent: 'main' })).toEqual({ screen: 'agents', project: P });
     expect(runWindowCommand('/agents', '', { project: P, agent: 'main' })).toEqual({ screen: 'agents', project: P });
+    // as the TUI: the archived agents only under /archived, never in /agents
+    expect(runWindowCommand('/archived', '', { project: P, agent: 'main' })).toEqual({ screen: 'agents', project: P, archived: true });
     expect(runWindowCommand('diff', '', { project: P, agent: 'main' })).toEqual({ screen: 'changes', project: P });
     expect(runWindowCommand('diff', 'perf', { project: P, agent: 'main' })).toEqual({ screen: 'review', project: P, agent: 'perf' });
     expect(runWindowCommand('switch', 'perf', { project: P, agent: 'main' })).toEqual({ screen: 'thread', project: P, agent: 'perf' });

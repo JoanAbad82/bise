@@ -94,9 +94,14 @@ test('agents/archived: history only in the window, a line refused in the TUI, re
     await expect(page.locator(T.row(AG))).toBeVisible({ timeout: 15_000 });
     await page.locator(T.archive(AG)).click({ timeout: 10_000 });
     await expect.poll(async () => (await live()).some((a) => a.name === AG), { timeout: 10_000, message: `${AG} archived in the hub` }).toBe(false);
-    // the window: its thread from the archived list is history only
-    await expect(page.locator(T.archived)).toBeVisible({ timeout: 5000 });
-    await page.locator(T.archived).click({ timeout: 10_000 });
+    // the window: its thread from the archived list (/archived, as the TUI; /agents lists only the
+    // live ones) is history only
+    await expect(page.locator(`${T.screen} ${T.row(AG)}`), 'it leaves the live list').toHaveCount(0, { timeout: 5000 });
+    await expect(page.locator(T.archived), 'no archived row on the live list').toHaveCount(0);
+    await s.app.evaluate(({ BrowserWindow }, r) => {
+      for (const b of BrowserWindow.getAllWindows()) b.webContents.send('bise:route', r);
+    }, `agents/${project}/archived`);
+    await expect(page.locator(`${T.screen}[data-archived="true"] ${T.row(AG)}`), "on /archived's list").toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: test.info().outputPath('archived-list.png') });
     await page.locator(T.open(AG)).click({ timeout: 10_000 });
     await expect(page.locator(T.history), "its thread says it's history only").toContainText('history only', { timeout: 10_000 });
