@@ -11,14 +11,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
 import type { NotifyAuth } from '@/shared/api';
-import { Act, Button, Dot, Kbd, Row } from '@/ds';
+import { Act, Dot, Kbd, Row } from '@/ds';
 import { useProjects, useStore } from '@/store';
 import { shownName } from '@/agents/model';
 import { age, dotOf, folds, InboxCard } from './InboxCard';
 import { useMenuAction } from '@/app/menu';
 import { cardKey, sortCards } from './order';
 import { pickWaits, takesWords, withConfirmOptions } from './model';
-import { STRIP_KEYS, STRIP_ROWS, stripKey, stripWords } from './stripRows';
+import { STRIP_KEYS, stripKey, stripWords } from './stripRows';
 import { cardKeyOf } from './Strip';
 import './inbox.css';
 
@@ -45,6 +45,11 @@ export interface InboxBlockProps {
   readonly onAnswer: (a: Answering | null) => void;
   /** now, for the ages (a test pins it) */
   readonly now?: number;
+  /**
+   * He scrolled the thread up to read (H10, designer m_19835): folded, the block is one 36 px line
+   * ('inbox · 3 waiting · ? search · which sizes… ⌃1'); at the thread's bottom it is whole again.
+   */
+  readonly reading?: boolean;
 }
 
 // ---- openInbox: ⌘I and a notification click (amb-win's keys and router call it; no route change)
@@ -104,16 +109,41 @@ export function useNotifyAuth(): [NotifyAuth | null, (s: NotifyAuth) => void] {
   return [auth, setAuth];
 }
 
+/**
+ * The permission ask is one ordinary item from bise (H10, designer m_19835: every question for him
+ * stays above the composer, and it never has a line of its own): '? bise · let questions reach you as
+ * macOS notifications?', 1 turn on · 2 not now. Asked once: either answer and it is gone. Never the hub's.
+ */
+export const NOTIFY_ID = -1;
+export function notifyCard(home: string, since: number): Card {
+  return {
+    id: NOTIFY_ID,
+    project: home,
+    kind: 'question',
+    agent: 'bise',
+    question: 'let questions reach you as macOS notifications?',
+    options: [
+      { n: 1, label: 'turn on' },
+      { n: 2, label: 'not now' },
+    ],
+    urgent: false,
+    since_ms: since,
+  };
+}
+const isNotify = (c: Card): boolean => c.id === NOTIFY_ID;
+
 function useNotifyRow(items: number): { show: boolean; on: () => void; later: () => void } {
   const [auth, setAuth] = useNotifyAuth();
   const [said, setSaid] = useState(() => sessionStorage.getItem(NOT_NOW_LAUNCH) === '1');
   return {
     show: asksNotify(auth, items, notNowCount(), said),
     on: () => {
+      setSaid(true);
       void notifyApi()?.ask().then(setAuth);
     },
+    // asked once (designer m_19835): 'not now' is for good
     later: () => {
-      localStorage.setItem(NOT_NOW_KEY, String(notNowCount() + 1));
+      localStorage.setItem(NOT_NOW_KEY, '2');
       sessionStorage.setItem(NOT_NOW_LAUNCH, '1');
       setSaid(true);
     },
@@ -127,6 +157,12 @@ export function blockList(rows: readonly ProjectRow[], gone: ReadonlySet<string>
   return sortCards(rows.flatMap((r) => (r.cards ?? []).map(withConfirmOptions))).filter((c) => !gone.has(cardKey(c)));
 }
 
+/**
+ * Folded, the block is its head and this many item lines (H10, tui-parity's thread-hierarchy: it took
+ * ~40% of a thread's height with the composer, the TUI's ~10%); the rest is '+ N more' in the head.
+ */
+export const BLOCK_ROWS = 1;
+
 const cut = (s: string, max: number): string => {
   const one = s.replace(/\s+/gu, ' ').trim();
   return Array.from(one).length > max ? `${Array.from(one).slice(0, max - 1).join('').trimEnd()}…` : one;
@@ -135,6 +171,8 @@ const cut = (s: string, max: number): string => {
 /** What his words do while `c` is open, seen from `here`. Pure. */
 export function answeringOf(c: Card, here: Here): Answering {
   const to = here.agent === null ? 'bise' : shownName(here.agent);
+  // the permission ask is bise's own, never the hub's: only its two options answer it
+  if (isNotify(c)) return { project: c.project, card: c.id, label: `to ${to} · bise's ask waits for 1 or 2`, answer: null };
   if (takesWords(c)) {
     return { project: c.project, card: c.id, label: `answering ${shownName(c.agent)} · ${cut(c.question, 40)}`, end: here.agent === null ? 'esc write a plain message' : `esc write to ${to} instead`, answer: c.id };
   }
@@ -153,7 +191,7 @@ function typing(t: EventTarget | null): boolean {
   return t instanceof HTMLElement && t.isContentEditable && t.textContent.trim() !== '';
 }
 
-export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
+export function InboxBlock({ here, onAnswer, now: pinned, reading = false }: InboxBlockProps) {
   const rows = useProjects();
   const store = useStore();
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
@@ -161,7 +199,10 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
   const [on, setOn] = useState<number | null>(null);
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
-  const list = useMemo(() => blockList(rows, gone), [rows, gone]);
+  const real = useMemo(() => blockList(rows, gone), [rows, gone]);
+  const notify = useNotifyRow(real.length);
+  const home = rows.find((r) => r.home)?.project ?? '';
+  const list = useMemo(() => (notify.show ? [...real, notifyCard(home, opened)] : real), [real, notify.show, home, opened]);
   const names = useMemo(() => new Map(rows.map((r) => [r.project, r])), [rows]);
   const openCard = list.find((c) => cardKey(c) === open);
 
@@ -219,8 +260,8 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
   );
 
   // bar N14: the open item is the card in front of him (fn's talk answers it)
-  const openProject = openCard?.project ?? null;
-  const openId = openCard?.id ?? null;
+  const openProject = openCard === undefined || isNotify(openCard) ? null : openCard.project;
+  const openId = openCard === undefined || isNotify(openCard) ? null : openCard.id;
   useEffect(() => {
     store.cardInView(openProject !== null && openId !== null && document.hasFocus() ? openProject : null, openProject !== null && openId !== null && document.hasFocus() ? openId : null);
     return () => {
@@ -235,10 +276,21 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
     openTo(null);
   };
   const pick = (c: Card, n: number) => {
+    if (isNotify(c)) {
+      openTo(null);
+      if (n === 1) notify.on();
+      else notify.later();
+      return;
+    }
     leave(c);
     store.answer(c.project, c.id, String(n));
   };
   const close = (c: Card) => {
+    if (isNotify(c)) {
+      openTo(null);
+      notify.later();
+      return;
+    }
     leave(c);
     store.close(c.project, c.id);
   };
@@ -294,17 +346,50 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
     };
   });
 
-  const notify = useNotifyRow(list.length);
   if (list.length === 0) return null;
   const openAt = openCard === undefined ? -1 : list.indexOf(openCard);
-  const shown = list.filter((_, i) => i < STRIP_ROWS || i === openAt);
+  const shown = list.filter((_, i) => i < BLOCK_ROWS || i === openAt);
   const more = list.length - shown.length;
-  const next = list.find((_, i) => i >= STRIP_ROWS && i !== openAt);
+  const next = list.find((_, i) => i >= BLOCK_ROWS && i !== openAt);
   const keys = list.length > 1 ? `⌃1–${String(Math.min(list.length, STRIP_KEYS))}` : '⌃1';
+  const first = list[0];
+  // he reads up the thread (H10, designer m_19835): one 36 px line, the first item in it; a click opens it
+  if (reading && openCard === undefined && first !== undefined) {
+    const { who, what } = stripWords(first);
+    const sign = signOf(first);
+    return (
+      <section className="inbox-strip inbox-block is-reading" aria-label="inbox" data-testid="inbox.block" data-reading="true">
+        <Row
+          name={
+            <>
+              <span className="strip-title-words">inbox</span>
+              <span className="strip-count">{` · ${String(list.length)} waiting · `}</span>
+              {sign !== null && <span className="ib-sign">{sign}</span>}
+              <span className="strip-who">{shownName(who)}</span>
+              {what !== '' && <span className="strip-what">{` · ${what}`}</span>}
+            </>
+          }
+          end={<Kbd>⌃1</Kbd>}
+          onClick={() => {
+            openTo(cardKey(first));
+          }}
+          testId="inbox.block.line"
+        />
+      </section>
+    );
+  }
   return (
     <section className="inbox-strip inbox-block" aria-label="inbox" data-testid="inbox.block" data-open={openCard !== undefined || undefined}>
       <div className="strip-title">
         inbox <span className="strip-count">{`${String(list.length)} waiting`}</span>
+        {more > 0 && next !== undefined && (
+          <Act
+            onClick={() => {
+              openTo(cardKey(next));
+            }}
+            testId="inbox.block.more"
+          >{`+ ${String(more)} more`}</Act>
+        )}
         <span className="strip-keys" data-testid="inbox.block.keys">
           {openCard !== undefined ? (
             <>
@@ -317,17 +402,6 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
           )}
         </span>
       </div>
-      {notify.show && (
-        <div className="ib-notify" data-testid="inbox.block.notify">
-          <span className="ib-notify-words">questions can reach you when bise isn't in front, as macOS notifications.</span>
-          <Button size="sm" onClick={notify.on} testId="inbox.block.notify.on">
-            turn on
-          </Button>
-          <Act onClick={notify.later} testId="inbox.block.notify.later">
-            not now
-          </Act>
-        </div>
-      )}
       {shown.map((c) => {
         const n = list.indexOf(c) + 1;
         const row = names.get(c.project);
@@ -352,7 +426,7 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
                     openTo(null);
                   },
                 }}
-                testId={`inbox.block.card.${cardKey(c)}`}
+                testId={isNotify(c) ? 'inbox.block.notify' : `inbox.block.card.${cardKey(c)}`}
               />
             </div>
           );
@@ -383,15 +457,6 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
           />
         );
       })}
-      {more > 0 && next !== undefined && (
-        <Row
-          name={<span className="strip-more">{`+ ${String(more)} more`}</span>}
-          onClick={() => {
-            openTo(cardKey(next));
-          }}
-          testId="inbox.block.more"
-        />
-      )}
     </section>
   );
 }

@@ -1,15 +1,19 @@
 // inbox/block-views · b2 (his card #476 'b + la notification native'; designer's inbox-native v2, mock b;
 // ambient-lead m_15241 / m_15246, designer m_15245): the ONE inbox block over every composer, on the real
 // shell with the scripted core (FakeCore, fake data), at 1100 px, light and dark. Passes when:
-//   - on perf's thread, 4 waiting items fold into 3 lines + '+ 1 more' (who, what, project · age);
+//   - on perf's thread, 4 waiting items fold into the head + one line (who, what, project · age), the rest
+//     '+ 3 more' in the head (H10, tui-parity's thread-hierarchy: under 90 px, was ~200);
 //   - a click opens the question IN PLACE (its options in the block, nothing floats) and the composer says
 //     'answering perf · which bench?' + 'esc write to perf instead'; his words + ⏎ answer it (answer {card 9});
 //   - the merge item opened says 'to perf · the merge waits for 1 or 2': his words go as a plain message
 //     (send, never an answer), its 2 picks it (answer {card 10, reply '2'}); esc folds the block;
 //   - on settings (the bottom block), ⌘I (the app menu's CmdOrCtrl+I) opens the first item in place;
 //   - a window opened on 'inbox?card=<project>/<id>' (a notification's click) has that card open in place;
-//   - the permission row ('questions can reach you…', macOS never asked in a fresh test home): 'turn on'
-//     asks (the test answers 'on') and the row goes.
+//   - the permission ask (macOS never asked in a fresh test home) is an ordinary item from bise, the last
+//     one (H10, designer m_19835: '? bise · let questions reach you as macOS notifications?', 1 turn on ·
+//     2 not now): its 1 asks (the test answers 'on') and it goes;
+//   - H10 at 1400/1100/800 x 820: ≤ 180 px under the thread at rest, one 36 px line and no keys line
+//     (≤ 120 px: designer's 110 with D18's 52 px box) scrolled up, the rows he reads stay put, back at the bottom the last row whole.
 // Shots (looked at, for designer): folded, question opened, merge opened, ⌘I from settings, each light + dark.
 // Owner: amb-home.
 import type { Page } from '@playwright/test';
@@ -94,12 +98,16 @@ test("inbox/block-views: on perf's thread the block folds 4 items, opens a quest
     const block = page.getByTestId('inbox.block');
     await expect(block).toBeVisible({ timeout: 10_000 });
 
-    await test.step('folded: 3 lines + 1 more, the keys', async () => {
-      await expect(block).toContainText('4 waiting');
-      for (const n of [1, 2, 3]) await expect(page.getByTestId(`inbox.block.row.${String(n)}`)).toBeVisible();
+    // a fresh test home: macOS never asked, so bise's notifications ask is the 5th item (H10)
+    await test.step("folded (H10): the head and one line, '+ 4 more' in the head, the keys", async () => {
+      await expect(block).toContainText('5 waiting');
+      await expect(page.getByTestId('inbox.block.row.1')).toBeVisible();
+      for (const n of [2, 3]) await expect(page.getByTestId(`inbox.block.row.${String(n)}`)).toHaveCount(0);
       await expect(page.getByTestId('inbox.block.row.1')).toContainText('which bench?');
-      await expect(page.getByTestId('inbox.block.more')).toContainText('+ 1 more');
-      await expect(page.getByTestId('inbox.block.keys')).toContainText('⌃1–4');
+      await expect(page.getByTestId('inbox.block.more')).toContainText('+ 4 more');
+      const h = await block.evaluate((e) => e.getBoundingClientRect().height);
+      expect(h, 'folded, the block is two lines high, not five').toBeLessThan(90);
+      await expect(page.getByTestId('inbox.block.keys')).toContainText('⌃1–5');
       expect(await page.getByTestId('inbox.block').count(), 'one block, never two').toBe(1);
       await shoot(page, core, 'folded');
     });
@@ -220,13 +228,89 @@ test("inbox/block-views: the permission row asks macOS once ('turn on'), then go
   const s = await launchDesktop({ core, route: `agent/${P}/perf`, size: '1100x720' });
   try {
     const { page } = s;
+    // H10 (designer m_19835): an ordinary item from bise, the last one ('+ 4 more': 4 cards + the ask)
+    await expect(page.getByTestId('inbox.block.more'), 'a fresh home: macOS never asked').toContainText('+ 4 more', { timeout: 10_000 });
+    await page.keyboard.press('Control+5');
     const row = page.getByTestId('inbox.block.notify');
-    await expect(row, 'a fresh home: macOS never asked').toBeVisible({ timeout: 10_000 });
-    await expect(row).toContainText("questions can reach you when bise isn't in front, as macOS notifications.");
-    await page.getByTestId('inbox.block.notify.on').click();
-    await expect(row, "the test's answer is 'on': the row goes").toHaveCount(0, { timeout: 5000 });
+    await expect(row).toBeVisible({ timeout: 3000 });
+    await expect(row).toContainText('let questions reach you as macOS notifications?');
+    await expect(page.getByTestId('inbox.block.notify.opt.1')).toContainText('turn on');
+    await page.getByTestId('inbox.block.notify.opt.1').click();
+    await expect(row, "the test's answer is 'on': it goes").toHaveCount(0, { timeout: 5000 });
+    await expect(page.getByTestId('inbox.block.more')).toContainText('+ 3 more');
   } finally {
     await s.close();
     core.dispose();
   }
 });
+
+// H10 (tui-parity's thread-hierarchy, ambient-lead m_19826, designer m_19835): at 820 high the block +
+// the composer take ≤ 180 px at rest (the thread's bottom), ≤ 120 px while he reads scrolled up: the
+// block is one 36 px line then, the composer's keys line hides, and the rows he reads don't move; back
+// at the bottom both come back and the last row shows whole. Frames at 1400, 1100 and 800, light + dark.
+const LONG = Array.from({ length: 60 }, (_, i) => ({ pos: i + 1, at_ms: NOW - 3_600_000 + i * 1000, kind: 'agent', text: `bench note ${String(i + 1)}: p95 moved by ${String(i % 7)} ms on the cold path, nothing else changed.` }));
+const longWorld = () => world().map((e) => ((e as { ev: string; agent?: string }).ev === 'thread' && (e as { agent?: string }).agent === 'perf' ? { ...e, entries: LONG } : e));
+/** the inbox block's top to the window's bottom: the block, the composer and its lines */
+const bottomPart = (page: Page) => page.evaluate(() => window.innerHeight - (document.querySelector('[data-testid="inbox.block"]')?.getBoundingClientRect().top ?? window.innerHeight));
+
+for (const size of ['1400x820', '1100x820', '800x820'] as const) {
+  test(`inbox/block-views: H10 at ${size}: the head + one line at rest, one line while he reads`, async () => {
+    const core = new FakeCore(longWorld() as unknown as ConstructorParameters<typeof FakeCore>[0]);
+    const s = await launchDesktop({ core, route: `agent/${P}/perf`, size });
+    const w = size.split('x')[0] ?? size;
+    try {
+      const { page } = s;
+      const block = page.getByTestId('inbox.block');
+      await expect(block).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText('bench note 60:')).toBeVisible({ timeout: 5000 });
+      await test.step('at rest: the head + one line, the composer whole, ≤ 180 px', async () => {
+        await expect(page.getByTestId('inbox.block.row.1')).toBeVisible();
+        expect(await block.evaluate((e) => e.getBoundingClientRect().height), 'the head + one line').toBeLessThan(90);
+        expect(await bottomPart(page), 'the block + the composer at rest').toBeLessThanOrEqual(180);
+        await expect(page.getByTestId('composer.keys')).toBeVisible();
+        await shoot(page, core, `h10-${w}-rest`);
+      });
+      await test.step('scrolled up: one line, no keys line, ≤ 110 px, the rows he reads stay put', async () => {
+        await page.getByTestId('thread.list').hover();
+        await page.mouse.wheel(0, -900);
+        await expect(page.getByTestId('inbox.block.line')).toBeVisible({ timeout: 3000 });
+        await expect(page.getByTestId('inbox.block.line')).toContainText('5 waiting');
+        await expect(page.getByTestId('composer.keys')).toBeHidden();
+        const note = page.getByText('bench note 40:');
+        const y = await note.evaluate((e) => e.getBoundingClientRect().top).catch(() => null);
+        await page.waitForTimeout(400);
+        const y2 = await note.evaluate((e) => e.getBoundingClientRect().top).catch(() => null);
+        if (y !== null && y2 !== null) expect(Math.abs(y2 - y), 'the rows he reads stay put').toBeLessThan(1);
+        expect(await page.getByTestId('inbox.block').evaluate((e) => e.getBoundingClientRect().height), 'one 36 px line').toBeLessThanOrEqual(37);
+        const parts = await page.evaluate(() => {
+          const r = (q: string) => {
+            const e = document.querySelector(q);
+            if (e === null) return `${q}:none`;
+            const b = e.getBoundingClientRect();
+            return `${q}:${String(Math.round(b.top))}+${String(Math.round(b.height))}`;
+          };
+          const c = document.querySelector('.b-composer');
+          const kids = c === null ? '' : Array.from(c.children).map((k) => `${k.className}:${String(Math.round(k.getBoundingClientRect().height))}`).join(',');
+          return [r('[data-testid="inbox.block"]'), r('.b-composer'), kids, String(window.innerHeight)].join(' ');
+        });
+        // designer's 110 counted a 48 px box; D18's box is 52: line 36 + 4 + label 20 + box 52 + 8 = 120
+        expect(await bottomPart(page), `the block + the composer while he reads (${parts})`).toBeLessThanOrEqual(120);
+        await page.mouse.move(1, 300);
+        await shoot(page, core, `h10-${w}-reading`);
+      });
+      await test.step('back at the bottom: the block and the keys line come back, the last row whole', async () => {
+        await page.getByTestId('thread.list').hover();
+        await page.mouse.wheel(0, 20_000);
+        await expect(page.getByTestId('inbox.block.row.1')).toBeVisible({ timeout: 3000 });
+        await expect(page.getByTestId('composer.keys')).toBeVisible();
+        await page.waitForTimeout(300);
+        const last = await page.getByText('bench note 60:').evaluate((e) => e.getBoundingClientRect().bottom);
+        const top = await page.getByTestId('inbox.block').evaluate((e) => e.getBoundingClientRect().top);
+        expect(last, 'the last row shows whole above the block').toBeLessThanOrEqual(top);
+      });
+    } finally {
+      await s.close();
+      core.dispose();
+    }
+  });
+}

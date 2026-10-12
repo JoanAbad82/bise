@@ -62,6 +62,11 @@ export interface ThreadListProps {
   holdPart?: string;
   /** a row's React key when not its own (the live row and the entry that takes its place share one) */
   reactKey?: (key: string) => string;
+  /**
+   * He scrolled up to read (H10, amb-home: the inbox block folds to one line, the composer's keys
+   * line hides), or he is back at the end. Told on each change.
+   */
+  onReading?: (reading: boolean) => void;
 }
 
 /**
@@ -102,7 +107,7 @@ export function newAtEnd(last: string | undefined, keys: readonly string[]): num
   return i < 0 ? 0 : keys.length - 1 - i;
 }
 
-export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, keepKey, holdPart, reactKey }: ThreadListProps) {
+export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, keepKey, holdPart, reactKey, onReading }: ThreadListProps) {
   const virtuoso = useRef<VirtuosoHandle>(null);
   // the anchor of firstItemIndex, moved during render (React's
   // "state from the previous render" pattern): no effect, no extra frame
@@ -282,6 +287,40 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
     else if (stick.current) toEndNow();
     else hold();
   }, [toEndNow, hold]);
+
+  // H10: reading = he scrolled up himself (the same as the 'back to the bottom' bar). What is under
+  // the list (the inbox block) shrinks then: scrollTop stays, so the rows he reads don't move; back at
+  // the end it grows again, and the list's box gets shorter: while it sticks, it goes back to the end.
+  const readingUp = !atBottom && !stuck;
+  const tellReading = useRef(onReading);
+  useEffect(() => {
+    tellReading.current = onReading;
+  });
+  useEffect(() => {
+    tellReading.current?.(readingUp);
+  }, [readingUp]);
+  useEffect(
+    () => () => {
+      tellReading.current?.(false);
+    },
+    [],
+  );
+  // the scroller is Virtuoso's: it exists once the first rows are drawn
+  const drawn = keys.length > 0;
+  useEffect(() => {
+    const el = scroller.current;
+    if (!drawn || el === null) return;
+    let h = el.clientHeight;
+    const ro = new ResizeObserver(() => {
+      const now = el.clientHeight;
+      if (now < h && stick.current && held.current?.click !== true) toEndNow();
+      h = now;
+    });
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, [toEndNow, drawn]);
 
   useLayoutEffect(() => {
     if (opened.current || keys.length === 0) return;

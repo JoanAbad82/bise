@@ -1631,3 +1631,10 @@
 .th-report:not([data-waits]) .b-marker {
   color: var(--c-text);
 }
+/* H10 (designer m_19835): scrolled up to read, the composer's keys line hides; at the end it is back */
+.th-screen[data-reading='true'] .b-composer > .keys {
+  display: none;
+}
+.th-screen[data-reading='true'] .b-composer {
+  padding-bottom: var(--s-2);
+}

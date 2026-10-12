@@ -133,6 +133,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   const [mark] = useState(createFindMark);
   const [folds] = useState(() => createFolds(`${project}/${agent}`));
   const list = useRef<ThreadListHandle>(null);
+  // H10 (designer m_19835): scrolled up to read, the inbox block is one line and the composer's keys line hides
+  const [reading, setReading] = useState(false);
   // his bug 3: a selection in the thread, then a key, quotes it in the composer
   const section = useRef<HTMLElement>(null);
   const composer = useRef<ComposerActions | null>(null);
@@ -340,7 +342,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   return (
     <FoldsContext value={folds}>
     <FindMarkContext value={mark}>
-      <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
+      <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} data-reading={reading} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
         {bise || !me || me.archived ? (
           <Head title={headTitle} sub={sub} lead={bise ? <BisePearl size={14} /> : undefined} dot={bise || !me ? undefined : dotOf(me.status)} />
         ) : agent === MAIN ? (
@@ -382,7 +384,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         {/* the list and, over an empty one, the first-run block centred in the column (his try:
             it sat bottom-left at the column's edge) */}
         <div className="th-main">
-          <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} onTakeBack={takeBack} />
+          <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} onTakeBack={takeBack} onReading={setReading} />
           {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} bise={bise} />}
         </div>
         {/* in the thread's column like the lines under it (amb-web m_17316: it sat flush left) */}
@@ -400,7 +402,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         <RefusedLine project={project} name={bise ? 'bise' : (projectName ?? project)} className="app-refused th-refused" testId="thread.refused" />
         <CardHint project={project} />
         {/* b1/b2: every project's open items, one opened in place (amb-home's InboxBlock, eb3da983) */}
-        <InboxBlock here={bise ? HERE_BISE : { project, agent }} onAnswer={setAnswering} />
+        <InboxBlock here={bise ? HERE_BISE : { project, agent }} onAnswer={setAnswering} reading={reading} />
         {me?.archived === true ? (
           <History project={project} agent={agent} />
         ) : voice === 'pane' ? (
@@ -495,7 +497,7 @@ function FirstRunSlot({ tkey, project, composer, bise }: { tkey: string; project
   );
 }
 
-const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBack }: { tkey: string; project: string; agent: string; bise: boolean; listRef: RefObject<ThreadListHandle | null>; onTakeBack?: (text: string) => void }) {
+const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBack, onReading }: { tkey: string; project: string; agent: string; bise: boolean; listRef: RefObject<ThreadListHandle | null>; onTakeBack?: (text: string) => void; onReading?: (reading: boolean) => void }) {
   const store = useStore();
   const view = useThreadOrder(tkey);
   const pending = usePending(tkey);
@@ -630,7 +632,7 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBac
     </div>
   );
   if (!view.loaded && keys.length === 0 && tail === undefined) return <div className="th-list th-loading" data-testid="thread.loading" />;
-  return <ThreadList ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} tail={tail} testId="thread.list" keepKey={tkey} holdPart=".th-row" reactKey={reactKey} />;
+  return <ThreadList ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} tail={tail} testId="thread.list" keepKey={tkey} holdPart=".th-row" reactKey={reactKey} {...(onReading === undefined ? {} : { onReading })} />;
 });
 
 /** "3 agents · 1 at work · 2 waiting": a project's live agents (main out). Pure. */

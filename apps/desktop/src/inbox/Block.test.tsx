@@ -9,6 +9,7 @@ import { replay, Store, StoreProvider } from '@/store';
 import { createRouter, RouterContext } from '@/app/router';
 import { emitAction } from '@/app/menu';
 import { asksNotify, InboxBlock, openInbox, type Answering, type Here } from './Block';
+import { PICKED_MS } from './InboxCard';
 
 afterEach(cleanup);
 
@@ -23,7 +24,7 @@ const withLong = (lines: number): typeof core_ev =>
       : { ...e, projects: e.projects.map((r) => ({ ...r, cards: r.cards?.map((c) => (c.id === 9 ? { ...c, question: Array.from({ length: lines }, (_, i) => `line ${String(i + 1)} of the long ask`).join(String.fromCharCode(10)) } : c)) })) },
   );
 
-const mount = (here: Here = { project: P, agent: 'perf' }, events: typeof core_ev = core_ev) => {
+const mount = (here: Here = { project: P, agent: 'perf' }, events: typeof core_ev = core_ev, reading = false) => {
   const sent: CoreCmd[] = [];
   const port: CorePort = { send: (c) => sent.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
   const store = new Store(port);
@@ -32,7 +33,7 @@ const mount = (here: Here = { project: P, agent: 'perf' }, events: typeof core_e
   render(
     <StoreProvider store={store}>
       <RouterContext value={createRouter({ screen: 'thread', project: P, agent: 'perf' })}>
-        <InboxBlock here={here} onAnswer={(a) => told.push(a)} now={NOW} />
+        <InboxBlock here={here} onAnswer={(a) => told.push(a)} now={NOW} reading={reading} />
       </RouterContext>
     </StoreProvider>,
   );
@@ -46,13 +47,15 @@ describe('the inbox block (b2)', () => {
     expect(screen.getByTestId('inbox.block').textContent).toContain('2 waiting');
     expect(screen.getByTestId('inbox.block.keys').textContent).toContain('⌃1–2');
     expect(screen.getByTestId('inbox.block.row.1').textContent).toContain('run rm -rf target?');
-    expect(screen.getByTestId('inbox.block.row.2').textContent).toContain('which bench?');
+    // H10: folded, one item line; the rest is '+ N more' in the head
+    expect(screen.queryByTestId('inbox.block.row.2')).toBeNull();
+    expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 1 more');
     expect(told.filter((a) => a !== null)).toEqual([]);
   });
 
   it('a question opens in place: its options, and the composer answers it; a digit picks, the line leaves', () => {
     const { hub, told } = mount();
-    fireEvent.click(screen.getByTestId('inbox.block.row.2'));
+    fireEvent.click(screen.getByTestId('inbox.block.more'));
     expect(screen.getByTestId('inbox.block.open.2')).toBeTruthy();
     expect(screen.getByTestId('inbox.block.keys').textContent).toContain('esc');
     expect(told.at(-1)).toEqual({ project: P, card: 9, label: 'answering perf · which bench?', end: 'esc write to perf instead', answer: 9 });
@@ -74,7 +77,7 @@ describe('the inbox block (b2)', () => {
 
   it("ctrl+o (the window's 'fold-all'), focus anywhere, opens the open item's long ask whole, again folds it (I8, qa-native f640424d)", () => {
     mount({ project: P, agent: 'perf' }, withLong(16));
-    fireEvent.click(screen.getByTestId('inbox.block.row.2'));
+    fireEvent.click(screen.getByTestId('inbox.block.more'));
     const card = () => screen.getByTestId('inbox.block.open.2').textContent;
     expect(card()).not.toContain('line 14 of the long ask');
     act(() => {
@@ -116,6 +119,18 @@ describe('the inbox block (b2)', () => {
   });
 });
 
+describe('H10: scrolled up to read, the block is one line', () => {
+  it("'inbox · 2 waiting · ? agent · question' and ⌃1; a click opens the first item whole", () => {
+    mount(undefined, core_ev, true);
+    const line = screen.getByTestId('inbox.block.line');
+    expect(line.textContent).toContain('inbox · 2 waiting · ');
+    expect(line.textContent).toContain('⌃1');
+    expect(screen.queryByTestId('inbox.block.row.1')).toBeNull();
+    fireEvent.click(line);
+    expect(screen.getByTestId('inbox.block.open.1')).toBeTruthy();
+  });
+});
+
 describe("the notifications' permission row (amb-mac's notify.ask)", () => {
   it("shows while macOS was never asked and an item waits; 'not now' once a launch, twice for good", () => {
     expect(asksNotify('never', 1, 0, false)).toBe(true);
@@ -135,28 +150,37 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     g.bise = { notify: { state: () => Promise.resolve('never'), onState: () => () => undefined, ask: () => { asked += 1; return Promise.resolve('on'); } } };
     try {
       mount();
-      expect(await screen.findByTestId('inbox.block.notify')).toBeTruthy();
+      // H10 (designer m_19835): an ordinary item from bise, the last one, never a line of its own
+      expect(await screen.findByText('+ 2 more')).toBeTruthy();
+      fireEvent.keyDown(window, { key: '3', code: 'Digit3', ctrlKey: true });
+      expect(screen.getByTestId('inbox.block.notify').textContent).toContain('let questions reach you as macOS notifications?');
       await act(async () => {
-        fireEvent.click(screen.getByTestId('inbox.block.notify.on'));
-        await Promise.resolve();
+        fireEvent.click(screen.getByTestId('inbox.block.notify.opt.1'));
+        // a clicked option shows picked for PICKED_MS (InboxCard), then picks
+        await new Promise((r) => setTimeout(r, PICKED_MS + 50));
       });
       expect(asked).toBe(1);
       expect(screen.queryByTestId('inbox.block.notify')).toBeNull();
+      expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 1 more');
     } finally {
       delete g.bise;
     }
   });
 
-  it("'not now' hides it for this launch", async () => {
+  it("'not now' (its 2) and it is gone for good: asked once; its words never reach the hub", async () => {
     localStorage.clear();
     sessionStorage.clear();
     const g = globalThis as { bise?: unknown };
     g.bise = { notify: { state: () => Promise.resolve('never'), onState: () => () => undefined, ask: () => Promise.resolve('on') } };
     try {
-      mount();
-      fireEvent.click(await screen.findByTestId('inbox.block.notify.later'));
+      const { hub, told } = mount();
+      expect(await screen.findByText('+ 2 more')).toBeTruthy();
+      fireEvent.keyDown(window, { key: '3', code: 'Digit3', ctrlKey: true });
+      expect(told.at(-1)).toMatchObject({ answer: null });
+      fireEvent.keyDown(window, { key: '2' });
       expect(screen.queryByTestId('inbox.block.notify')).toBeNull();
-      expect(localStorage.getItem('bise.notify.notnow')).toBe('1');
+      expect(hub()).toEqual([]);
+      expect(localStorage.getItem('bise.notify.notnow')).toBe('2');
     } finally {
       delete g.bise;
     }
