@@ -21,6 +21,13 @@ pub struct Artifact {
     /// Sent on the client socket only, never to an agent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// where a window frames it: the hub's page server serving the
+    /// current version's copy (`http://127.0.0.1:<port>/a/<id>/<v>/<file>`,
+    /// the pages' own artifact links), only for a file the store copied;
+    /// none for a link or a page (`url` is the page), or with no page
+    /// server. `url` keeps its meaning: what the terminal opens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame_url: Option<String>,
     /// every version the store keeps, oldest first: the store's whole
     /// list, no cap (the versions popover); left out when empty (a row
     /// from before it, an older hub)

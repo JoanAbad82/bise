@@ -302,7 +302,10 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
 /// (`page_url`), else its link or its file (its kept copy first); `new`:
 /// not his own, changed since he last looked; the rest of each row as
 /// the store gave it (the terminal's /artifacts reads it all).
-pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>) -> Vec<Artifact> {
+/// `frame_base`: the page server's base (`http://127.0.0.1:<port>`, None
+/// with no server): a copied file's `frame_url` is it plus the pages' own
+/// artifact link (pages::site::copy_href); a link or a page gets none.
+pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>, frame_base: Option<&str>) -> Vec<Artifact> {
     let seen = ev.get("seen_ms").and_then(Value::as_u64).unwrap_or(0);
     let rows = ev.get("rows").and_then(Value::as_array).cloned().unwrap_or_default();
     rows.iter()
@@ -315,6 +318,10 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>) -> Vec<A
             };
             let target = s(r, "target");
             let path = Some(target.clone()).filter(|t| s(r, "by") != "page" && !crate::artifacts::is_link(t) && Path::new(t).is_absolute());
+            let version = r.get("v").and_then(Value::as_u64).unwrap_or(0);
+            let frame_url = frame_base
+                .filter(|_| s(r, "by") != "page" && !crate::artifacts::is_link(&target) && !s(r, "copy").is_empty())
+                .map(|b| format!("{b}{}", crate::pages::site::copy_href(&id, version, &s(r, "copy"))));
             let versions = r.get("versions").and_then(Value::as_array).map_or_else(Vec::new, |vs| {
                 vs.iter()
                     .map(|v| ArtifactVersion {
@@ -329,10 +336,11 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>) -> Vec<A
             let pr = r.get("pr").filter(|p| p.is_object()).map(|p| ArtifactPr { repo: s(p, "repo"), number: p.get("number").and_then(Value::as_u64).unwrap_or(0) });
             Artifact {
                 path,
+                frame_url,
                 versions,
                 title: s(r, "title"),
                 agent: s(r, "agent"),
-                version: r.get("v").and_then(Value::as_u64).unwrap_or(0) as u32,
+                version: version as u32,
                 new: s(r, "by") != "you" && at_ms > seen,
                 at_ms,
                 url,
@@ -694,7 +702,7 @@ mod tests {
              "target": "https://x.dev", "copy": "/st/art/site/3"},
             {"id": "mine", "kind": "file", "title": "Mine", "agent": "main", "by": "you", "ts_ms": 300, "v": 1,
              "target": "/w/m.txt", "copy": null}]});
-        let a = artifacts(&ev, |id| (id == "perf-notes").then(|| "http://127.0.0.1:1/p/perf-notes".to_string()));
+        let a = artifacts(&ev, |id| (id == "perf-notes").then(|| "http://127.0.0.1:1/p/perf-notes".to_string()), None);
         let row = |i: usize| (a[i].id.as_str(), a[i].url.as_str(), a[i].version, a[i].new);
         assert_eq!(row(0), ("perf-notes", "http://127.0.0.1:1/p/perf-notes", 2, true), "a page: its server url");
         assert_eq!(row(1), ("deck", "/st/art/deck/1.pdf", 2, false), "a file: its kept copy, seen before");

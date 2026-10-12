@@ -58,7 +58,7 @@ pub fn items(pages: &[PageMeta], arts: &[ArtMeta]) -> Vec<Item> {
         let (href, outside) = if is_link(&cur.target) {
             (cur.target.clone(), true)
         } else if let Some(copy) = &cur.copy {
-            (format!("/a/{}/{}/{}", a.id, cur.v, file_of(copy)), false)
+            (copy_href(&a.id, cur.v, copy), false)
         } else {
             continue;
         };
@@ -74,6 +74,13 @@ pub fn items(pages: &[PageMeta], arts: &[ArtMeta]) -> Vec<Item> {
     }
     out.sort_by(|a, b| b.at_ms.cmp(&a.at_ms).then(a.title.cmp(&b.title)));
     out
+}
+
+/// Where the page server serves version `v` of artifact `id` from bise's
+/// copy (server.rs `/a/<id>/<v>/<file>`): the one rule for the pages'
+/// artifact links and the typed row's `frame_url` (proto_view::artifacts).
+pub fn copy_href(id: &str, v: u64, copy: &str) -> String {
+    format!("/a/{}/{}/{}", id, v, file_of(copy))
 }
 
 /// The file a copy opens on: a copied file's name (`v2/plan.html` →
