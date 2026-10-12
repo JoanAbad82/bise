@@ -424,7 +424,10 @@ export class Store {
         return;
       case "cards":
         this.slices.set(`hubcards:${ev.project}`, true);
-        this.put(`cards:${ev.project}`, ev.cards);
+        // his cards and bise's own (`others`: a drop asking him, a done, a merge...) in one
+        // list by id, as the TUI's inbox (state_rows::cards_of_rows): a drop of an agent
+        // mid-turn is a question for him, and only `others` carries it
+        this.put(`cards:${ev.project}`, (ev.others ?? []).length === 0 ? ev.cards : [...ev.cards, ...(ev.others ?? [])].sort((a, b) => a.id - b.id));
         return;
       case "thread":
         this.page(ev);

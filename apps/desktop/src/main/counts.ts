@@ -35,7 +35,8 @@ export class CountKeeper {
       }
       this.rows = rows;
     } else if (ev['ev'] === 'cards' && typeof ev['project'] === 'string' && Array.isArray(ev['cards'])) {
-      this.hubCards.set(ev['project'], ev['cards'].length);
+      // his cards and bise's own (`others`: a drop asking him...), as the inbox lists them
+      this.hubCards.set(ev['project'], ev['cards'].length + (Array.isArray(ev['others']) ? ev['others'].length : 0));
     } else {
       return null;
     }

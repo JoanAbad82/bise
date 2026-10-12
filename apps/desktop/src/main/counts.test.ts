@@ -25,6 +25,11 @@ describe('CountKeeper', () => {
     expect(k.apply({ ev: 'cards', project: 'home', cards: [] })).toEqual({ waiting: 0, working: 1 });
   });
 
+  it("bise's own cards (`others`: a drop asking him) count with his, as the inbox lists them", () => {
+    const k = new CountKeeper();
+    expect(k.apply({ ev: 'cards', project: 'home', cards: [card(1)], others: [card(2)] })).toEqual({ waiting: 2, working: 0 });
+  });
+
   it('null when nothing changed or the event is not a count', () => {
     const k = new CountKeeper();
     expect(k.apply({ ev: 'projects', projects: [] })).toBeNull();

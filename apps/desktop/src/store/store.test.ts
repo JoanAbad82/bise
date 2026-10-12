@@ -585,6 +585,20 @@ what is in this picture?`,
     expect(store.agents(P)).toBe(store.agents(P));
   });
 
+  it("cards: bise's own (`others`: a drop of an agent mid-turn) join his, by id, as the TUI's inbox", () => {
+    const { store } = fake();
+    const ask = "main suggests: archive @gone? the agent is mid-turn. (answer yes or no)";
+    const q = { agent: "perf", id: 3, kind: "question", options: [], project: P, question: "which bench?", rank: 1, since_ms: 1, text: "which bench?", urgent: false };
+    const drop = { agent: "gone", id: 2, kind: "drop", options: [], project: P, question: ask, rank: 4, since_ms: 2, text: ask, urgent: false };
+    store.apply({ ev: "cards", project: P, cards: [q], others: [drop] });
+    expect(store.cards(P).map((c) => [c.id, c.kind])).toEqual([
+      [2, "drop"],
+      [3, "question"],
+    ]);
+    store.apply({ ev: "cards", project: P, cards: [q] });
+    expect(store.cards(P).map((c) => c.id)).toEqual([3]);
+  });
+
   it("diffs are kept per agent and per commit; jobs, merged, worktrees per project", () => {
     const { store } = fake();
     // the terminal's /diff answers (a req) left out: the review's diffs only

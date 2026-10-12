@@ -245,6 +245,19 @@ pub fn branch_of_head(head: &str) -> Option<String> {
     head.trim().strip_prefix("ref: refs/heads/").map(str::to_string).filter(|b| !b.is_empty())
 }
 
+/// A project's inbox: hub/cards' his cards and bise's own (`others`: a
+/// drop asking him, a done, a merge...) in one list by id, as the TUI's
+/// (state_rows::cards_of_rows). The window lists them all (ambient-lead
+/// m_20217); the capsule keeps its own no-drop filter (home.rs).
+fn inbox_cards(cards: Vec<Card>, others: Vec<Card>) -> Vec<Card> {
+    if others.is_empty() {
+        return cards;
+    }
+    let mut all: Vec<Card> = cards.into_iter().chain(others).collect();
+    all.sort_by_key(|c| c.id);
+    all
+}
+
 /// A held hub's own rows as a view (the sidebar's counts).
 fn live_view(project: &str, agents: &[Agent], cards: &[Card]) -> ProjectView {
     ProjectView { v: 1, project: project.into(), written_ms: 0, stopped_ms: None, last_activity_ms: 0, agents: agents.to_vec(), cards: cards.to_vec(), artifacts: vec![], artifacts_total: 0, scheduled: vec![] }
@@ -648,9 +661,9 @@ impl Core {
                 let cards = c.rows.take().map(|r| r.1).unwrap_or_default();
                 c.rows = Some((agents, cards));
             }
-            HubEv::Cards { cards, .. } => {
+            HubEv::Cards { cards, others, .. } => {
                 let agents = c.rows.take().map(|r| r.0).unwrap_or_default();
-                c.rows = Some((agents, cards));
+                c.rows = Some((agents, inbox_cards(cards, others)));
             }
             _ => {}
         }
@@ -776,6 +789,16 @@ mod tests {
 
     fn row(id: &str, home: bool) -> Row {
         Row { path: PathBuf::from(format!("/p/{id}")), name: id.into(), id: id.into(), home, added_ms: 0 }
+    }
+
+    #[test]
+    fn a_projects_inbox_is_his_cards_and_bises_own_by_id_as_the_tuis() {
+        let card = |id: u64, kind: &str| -> Card {
+            serde_json::from_value(serde_json::json!({"id": id, "kind": kind, "agent": "gone", "project": "t", "question": "q", "text": "q", "options": [], "rank": 1, "since_ms": 0, "urgent": false})).unwrap()
+        };
+        let got = inbox_cards(vec![card(3, "question"), card(5, "confirm")], vec![card(4, "drop"), card(1, "done")]);
+        assert_eq!(got.iter().map(|c| (c.id, c.kind.as_str())).collect::<Vec<_>>(), [(1, "done"), (3, "question"), (4, "drop"), (5, "confirm")]);
+        assert_eq!(inbox_cards(vec![card(2, "question")], vec![]).len(), 1, "no others: his cards as they came");
     }
 
     #[test]
