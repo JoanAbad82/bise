@@ -18,7 +18,7 @@ import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { ThreadScreen } from '@/thread/ThreadScreen';
 import { useProjects, useStore } from '@/store';
 import { useFnVoice } from '@/voicemode';
-import { ConfirmBar, InboxScreen } from '@/inbox';
+import { ConfirmBar } from '@/inbox';
 import { SettingsScreen } from '@/settings';
 import { useSetupFirstOpens } from '@/settings/setup-first';
 import { OnboardingScreen, useFirstLaunch } from '@/setup';
@@ -93,8 +93,9 @@ function firstRoute(): Route {
     panel.show();
     return { screen: 'bise' };
   }
-  // the window opened by a notification's click ('inbox?card=…') or ⌘I: bise's view, the card
-  // open in its inbox block (b1/b2: the inbox is a block, never a screen of its own)
+  // the window opened by a notification's click ('inbox?card=…'), ⌘I or the capsule's menu: his
+  // kept screen (else bise's), the card open in its inbox block (one inbox: the block at the bottom
+  // of every view, never a screen of its own; designer m_19631)
   const m = /^#?route=(.*)$/u.exec(window.location.hash);
   let start = '';
   try {
@@ -103,10 +104,9 @@ function firstRoute(): Route {
     // a broken escape: not an inbox ask
   }
   const inbox = inboxAtOf(start);
-  // a test run's plain '#route=inbox' still asks for the ⌘I screen itself (its checks)
-  if (inbox !== undefined && (inbox.at !== undefined || !testMode())) {
+  if (inbox !== undefined) {
     askInbox(inbox.at);
-    return { screen: 'bise' };
+    return keptRoute() ?? { screen: 'bise' };
   }
   return (testMode() ? startRouteOf(window.location.hash) : undefined) ?? keptRoute() ?? { screen: 'bise' };
 }
@@ -414,8 +414,6 @@ function ScreenOf({ route }: { route: Route }) {
     case 'report':
       // the last crash report (CoreLine's 'show the report')
       return <ReportScreen />;
-    case 'inbox':
-      return <InboxScreen />;
     case 'settings':
       return <SettingsScreen page={route.page} />;
     case 'onboarding':

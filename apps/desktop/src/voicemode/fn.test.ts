@@ -25,13 +25,13 @@ describe('fnVoiceOf', () => {
   });
 
   it("no thread in view: bise's own thread opens and voice starts there (never off)", () => {
-    for (const r of [{ screen: 'inbox' }, { screen: 'settings' }, { screen: 'artifacts', project: 'shop' }, { screen: 'agents', project: 'shop' }] as const) {
+    for (const r of [{ screen: 'scheduled' }, { screen: 'settings' }, { screen: 'artifacts', project: 'shop' }, { screen: 'agents', project: 'shop' }] as const) {
       expect(fnVoiceOf(r, 'home-1', vm(true, 'home-1', 'main'))).toEqual({ go: { screen: 'bise' }, project: 'home-1', agent: 'main', on: true });
     }
   });
 
   it('no thread and no home known yet: nothing', () => {
-    expect(fnVoiceOf({ screen: 'inbox' }, undefined, null)).toBeNull();
+    expect(fnVoiceOf({ screen: 'scheduled' }, undefined, null)).toBeNull();
     expect(fnVoiceOf({ screen: 'bise' }, undefined, null)).toBeNull();
   });
 });

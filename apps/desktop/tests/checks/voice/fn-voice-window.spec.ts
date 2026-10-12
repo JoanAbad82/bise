@@ -82,11 +82,13 @@ test('voice/fn-voice-window: fn fn toggles voice mode with the thread in view, l
 test("voice/fn-voice-window: fn fn with no thread in view opens bise's own thread and starts voice mode there", async () => {
   test.setTimeout(90_000);
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
-  const s = await launchDesktop({ core, route: 'inbox' });
+  // a screen with no thread (one inbox: 'inbox' is no screen any more, designer m_19631)
+  const s = await launchDesktop({ core, route: 'scheduled' });
   try {
     const { page } = s;
     await expect(page.getByTestId('app.root')).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('[data-testid="composer.field"]')).toHaveCount(0);
+    // no thread in view (its bottom block has a composer: every screen has one, App.tsx RouteBottom)
+    await expect(page.locator('[data-testid="thread.screen"]')).toHaveCount(0);
     await fnFn(s);
     await expect.poll(() => voiceCmds(core), { timeout: 3000 }).toHaveLength(1);
     expect(voiceCmds(core)[0]).toMatchObject({ project: HOME, agent: 'main', on: true });
@@ -95,7 +97,7 @@ test("voice/fn-voice-window: fn fn with no thread in view opens bise's own threa
     await core.send(vm(HOME, 'main', true) as never);
     await expect(page.getByTestId('voice.pane')).toBeVisible({ timeout: 3000 });
     await expect(page.getByTestId('voice.label')).toHaveText('voice mode · with bise'); // labelOf: the home's main is 'bise'
-    await page.screenshot({ path: test.info().outputPath('2-fn-fn-from-inbox-bise.png') });
+    await page.screenshot({ path: test.info().outputPath('2-fn-fn-from-scheduled-bise.png') });
   } finally {
     await s.close();
     core.dispose();

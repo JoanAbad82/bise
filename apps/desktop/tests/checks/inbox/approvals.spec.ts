@@ -15,14 +15,20 @@ import { test, expect } from '../../harness';
 import { hubCall, hubOf, hubState, launchOn, realWorld, worldSay } from '../world';
 import type { Page } from '@playwright/test';
 
+// one inbox (designer m_19631): no ⌘I screen; the block at the bottom of the view opens items in place
 const T = {
-  root: '[data-testid="inbox.root"]',
-  items: '[data-testid^="inbox.item."]',
+  root: '[data-testid="inbox.block"]',
 };
 
-async function current(page: Page): Promise<string> {
-  const ids = await page.locator('[data-testid^="inbox.card."]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid') ?? ''));
-  return ids.map((x) => /^inbox\.card\.([^.]+)$/.exec(x)?.[1] ?? '').find((x) => x !== '') ?? '';
+/** Open that card in the block: its row is listed by rank, ↓ walks the open item to it. */
+async function openCard(page: Page, key: string): Promise<void> {
+  const card = page.getByTestId(`inbox.block.card.${key}`);
+  if (!(await page.locator('[data-testid^="inbox.block.open."]').isVisible())) await page.getByTestId('inbox.block.row.1').click({ timeout: 15_000 });
+  for (let i = 0; i < 10 && !(await card.isVisible()); i++) {
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(150);
+  }
+  await expect.soft(card, 'the card is in the inbox').toBeVisible({ timeout: 5000 });
 }
 
 test('inbox/approvals: a gated call is a card in ⌘I; allow lets main go on, no stops the call', async () => {
@@ -37,7 +43,7 @@ test('inbox/approvals: a gated call is a card in ⌘I; allow lets main go on, no
   const gated = async (tag: string) => (await cards()).find((c) => `${c.text ?? ''}${c.question ?? ''}`.includes(tag));
   const note = (type: string, v: unknown) => test.info().annotations.push({ type, description: typeof v === 'string' ? v : JSON.stringify(v) });
   await hubCall(shop.sock, 'approvals/set', { mode: 'auto' });
-  const s = await launchOn(w, 'inbox', T.root);
+  const s = await launchOn(w, `project/${project}`, T.root);
   const { page } = s;
   try {
     await expect(page.locator(T.root)).toBeVisible({ timeout: 15_000 });
@@ -49,15 +55,13 @@ test('inbox/approvals: a gated call is a card in ⌘I; allow lets main go on, no
       const c = await gated(tag);
       note('allow-card', c);
       // its row shows the card's first line ('wants to run'), not the command: found by its id
-      const item = page.locator(`[data-testid="inbox.item.${project}-${String(c?.id ?? 0)}"]`);
-      await expect.soft(item, 'the card is in ⌘I').toBeVisible({ timeout: 15_000 });
-      await item.click({ timeout: 10_000 });
-      const k = await current(page);
-      const opts = await page.locator(`[data-testid^="inbox.card.${k}.opt."]`).allTextContents();
+      const k = `${project}-${String(c?.id ?? 0)}`;
+      await openCard(page, k);
+      const opts = await page.locator(`[data-testid^="inbox.block.card.${k}.opt."]`).allTextContents();
       note('allow-options', opts);
       expect.soft(opts.join(' ').toLowerCase(), 'its options: allow … no').toMatch(/allow[\s\S]*no/);
       await page.screenshot({ path: test.info().outputPath('card.png') });
-      await page.locator(`[data-testid="inbox.card.${k}.opt.1"]`).click({ timeout: 5000 });
+      await page.locator(`[data-testid="inbox.block.card.${k}.opt.1"]`).click({ timeout: 5000 });
       await expect.soft.poll(async () => (await gated(tag)) === undefined, { timeout: 15_000, message: 'allow: the card closes' }).toBe(true);
       await expect.soft.poll(() => /qa-allow-[\s\S]*(does not appear|not a git repository|fatal|No such file)/i.test(transcript().slice(transcript().lastIndexOf(`qa-allow-${n}`) - 400)), { timeout: 30_000, message: 'main goes on: the call ran (the push fails on a missing path)' }).toBe(true);
     });
@@ -68,11 +72,9 @@ test('inbox/approvals: a gated call is a card in ⌘I; allow lets main go on, no
       await expect.poll(async () => (await gated(tag)) !== undefined, { timeout: 60_000, message: 'the second call is a card' }).toBe(true);
       const d = await gated(tag);
       note('deny-card', d);
-      const item = page.locator(`[data-testid="inbox.item.${project}-${String(d?.id ?? 0)}"]`);
-      await expect.soft(item, 'in ⌘I').toBeVisible({ timeout: 15_000 });
-      await item.click({ timeout: 10_000 });
-      const k = await current(page);
-      const no = page.locator(`[data-testid^="inbox.card.${k}.opt."]`, { hasText: /^\s*\d?\s*no\b/i }).first();
+      const k = `${project}-${String(d?.id ?? 0)}`;
+      await openCard(page, k);
+      const no = page.locator(`[data-testid^="inbox.block.card.${k}.opt."]`, { hasText: /^\s*\d?\s*no\b/i }).first();
       await no.click({ timeout: 5000 });
       await expect.soft.poll(async () => (await gated(tag)) === undefined, { timeout: 15_000, message: 'no: the card closes' }).toBe(true);
       await page.waitForTimeout(3000);

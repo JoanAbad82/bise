@@ -1,9 +1,9 @@
 // inbox/approvals-cmd-i · O.1 (docs/desktop-bar.md): approve and deny from ⌘I on a typed approval
 // card. Passes when, with the scripted core (FakeCore, fake data) holding two approval cards
 // (approval: true, the hub's options '1 allow · 2 always · 3 no'):
-//   - the inbox (⌘I's screen) lists both, the approval first, with its options and no field for
-//     words (an approval takes its options, never words: core_tests
-//     an_approval_card_takes_its_options_never_words);
+//   - the inbox block (one inbox, designer m_19631: no ⌘I screen) lists both; the first opens in
+//     place with its options, and the composer never says 'answering' (an approval takes its
+//     options, never words: core_tests an_approval_card_takes_its_options_never_words);
 //   - the key 1 approves the current one: HubCmd answer {card, reply: '1'};
 //   - a click on the next one's 'no' denies it: HubCmd answer {card, reply: '3'};
 //   - typed words never answer an approval (no answer goes out for them).
@@ -61,32 +61,39 @@ type Cmd = { cmd?: string; project?: string; card?: number; reply?: string };
 
 test('inbox/approvals-cmd-i: 1 approves the typed approval card, a click on no denies the next, words never answer one', async () => {
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
-  const s = await launchDesktop({ core, route: 'inbox' });
+  // one inbox (designer m_19631): ⌘I opens the block in place on the screen he is on
+  const s = await launchDesktop({ core, route: `project/${P}` });
   try {
     const { page } = s;
-    const root = page.getByTestId('inbox.root');
-    await expect(root).toBeVisible({ timeout: 10_000 });
-    const first = page.getByTestId(`inbox.card.${P}-21`);
-    await expect(first).toContainText('perf wants to run rm -rf target');
-    await expect(page.getByTestId(`inbox.item.${P}-22`)).toBeVisible();
-    await expect(page.getByTestId('inbox.answer'), 'an approval has no field for words').toHaveCount(0);
-    for (const o of OPTS) await expect(page.getByTestId(`inbox.card.${P}-21.opt.${String(o.n)}`)).toContainText(o.label);
+    const block = page.getByTestId('inbox.block');
+    await expect(block).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('inbox.block.row.1')).toContainText('rm -rf target');
+    await page.getByTestId('inbox.block.row.1').click();
+    const first = page.getByTestId(`inbox.block.card.${P}-21`);
+    await expect(first).toContainText('perf wants to run rm -rf target', { timeout: 3000 });
+    for (const o of OPTS) await expect(page.getByTestId(`inbox.block.card.${P}-21.opt.${String(o.n)}`)).toContainText(o.label);
+    await expect(page.getByTestId('composer').first(), 'an approval takes no words: the composer writes to the agent').not.toContainText('answering');
     await page.screenshot({ path: test.info().outputPath('approvals.png') });
 
-    // words never answer an approval
-    await root.focus();
+    // words never answer an approval: they go as a message
+    await page.locator('[data-testid="composer.field"]').first().click();
     await page.keyboard.type('yes');
+    await page.keyboard.press('Enter');
     await page.waitForTimeout(400);
     expect(core.cmds().filter((c) => c.cmd === 'answer'), 'typed words answer nothing').toEqual([]);
 
-    // 1 approves the current one
-    await root.focus();
+    // 1 approves the open one
+    await block.click({ position: { x: 4, y: 4 } });
     await page.keyboard.press('1');
     expect(await core.waitCmd((c) => c.cmd === 'answer' && (c as Cmd).card === 21, 3000)).toMatchObject({ project: P, card: 21, reply: '1' });
 
     // a click on the next one's 'no' denies it
     await core.send({ ev: 'cards', project: P, cards: [CARDS[1]] } as never);
-    const no = page.getByTestId(`inbox.card.${P}-22.opt.3`);
+    // the block reads the projects rows' cards: the first one answered, only the second waits
+    const rows = (world()[1] as { projects: Record<string, unknown>[] }).projects;
+    await core.send({ ev: 'projects', projects: rows.map((r) => (r.project === P ? { ...r, waits: 1, cards: [CARDS[1]] } : r)) } as never);
+    await page.getByTestId('inbox.block.row.1').click();
+    const no = page.getByTestId(`inbox.block.card.${P}-22.opt.3`);
     await expect(no).toBeVisible({ timeout: 3000 });
     await no.click();
     expect(await core.waitCmd((c) => c.cmd === 'answer' && (c as Cmd).card === 22, 3000)).toMatchObject({ project: P, card: 22, reply: '3' });

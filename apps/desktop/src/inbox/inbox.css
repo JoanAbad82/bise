@@ -1,28 +1,5 @@
-/* the ⌘I inbox (src/inbox, amb-home): the list left, the current item right; ds tokens only */
-.inbox { display: flex; flex-direction: column; min-height: 0; height: 100%; outline: none; }
-.inbox-body { display: grid; grid-template-columns: minmax(220px, 34%) 1fr; gap: var(--s-4); min-height: 0; flex: 1; padding: var(--s-3) var(--s-4); }
-.inbox-list { overflow-y: auto; min-height: 0; }
-.inbox-open { min-width: 0; overflow-y: auto; }
-/* the answer field: its box holds the image chips, then his words (the textarea draws no box) */
-.inbox-answer {
-  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; box-sizing: border-box; margin-top: var(--s-3); padding: var(--s-2) var(--s-3);
-  background: var(--c-sunken); border-radius: var(--r-2); box-shadow: 0 0 0 1px var(--c-line);
-}
-.inbox-answer:focus-within { box-shadow: 0 0 0 1px var(--c-focus); }
-/* his words: the ds TextArea, its frame given to the box above (the chips sit in the same frame) */
-.inbox-answer .b-field.b-area { flex: 1 1 160px; min-width: 0; padding: 0; background: none; box-shadow: none; font-size: var(--t-14); }
-.inbox-answer .b-field.b-area textarea { line-height: var(--lh-read); }
-/* R41: an image on his answer is the composer's chip, the sent bubble's (designer m_18135): 1 px line,
-   r 9, 'image 1' in ink beside its 16 px thumbnail or the faint no-file glyph slot; never the accent */
-.inbox-answer .b-chip.image { gap: 5px; height: 20px; padding: 0 8px 0 3px; margin-top: 1px; color: var(--c-text); background: none; border: 1px solid var(--c-line); border-radius: 9px; }
-.inbox-answer .b-chip.image .thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; flex: none; }
-.inbox-answer .b-chip.image .thumb.none { display: inline-flex; color: var(--c-text-3); opacity: 0.7; }
-.inbox-acts { display: flex; justify-content: flex-end; margin-top: var(--s-2); }
-.inbox-acts button, .inbox-page {
-  font: inherit; font-size: var(--t-12); color: var(--c-text-2); background: none; border: 0; padding: var(--s-1) var(--s-2);
-  border-radius: var(--r-1); cursor: pointer;
-}
-.inbox-acts button:hover, .inbox-page:hover { background: var(--c-hover); color: var(--c-text); }
+/* src/inbox (amb-home): one inbox, the block at the bottom of every view (no ⌘I screen since
+   designer m_19631); ds tokens only */
 /* the hub's yes/no question over the composer (confirm.tsx, bar I9) */
 .confirm-bar {
   display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); margin: 0 var(--s-4) var(--s-2);
@@ -33,7 +10,10 @@
 .confirm-bar .q { flex: 1; min-width: 0; }
 .confirm-bar.note { color: var(--c-text-2); }
 .confirm-bar.error { color: var(--c-err); }
-/* bar N14: what the core heard, on the card until the answer goes */
+/* answering an open item (designer m_20053): the way back on the right ('esc write to perf instead')
+   always shows whole; the label ('answering p99 · telemetry · <question>') is cut with … instead */
+.th-screen[data-answering='true'] .b-composer .div .lbl { flex: 0 1 auto; }
+/* bar N14: what the core heard, on the open card until the answer goes */
 .inbox-heard { color: var(--c-text); }
 /* the thread's inbox strip (Strip.tsx, bar W7/K24): its own box above the divider, rows numbered for ctrl+1-9 */
 .inbox-strip {
@@ -118,8 +98,8 @@
 .inbox-block.is-reading .ib-sign { margin-right: var(--s-1); }
 /* one inbox (designer m_19631, page desktop-right-bar): the row is the same everywhere: n, the
    sign, the agent in 500, the question dim cut with …, then '<project> · <age>' mono t-12 faint */
-/* no height here: the row keeps H10's (the folded block is 70 px, signed m_19997) */
-.inbox-block > .b-row { padding: 0 var(--pad-row-x); gap: var(--gap-inline); }
+/* the same 28 px row in the block and the capsule (designer m_20053) */
+.inbox-block > .b-row { height: var(--h-row-tight); padding: 0 var(--pad-row-x); gap: var(--gap-inline); }
 .inbox-block > .b-row .nm { display: flex; gap: var(--gap-inline); flex: 1; min-width: 0; }
 .inbox-block .strip-who { font-weight: 500; }
 .inbox-block > .b-row .end { flex: none; font: var(--t-12) var(--font-mono); color: var(--c-text-3); }

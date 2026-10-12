@@ -21,8 +21,8 @@ import { hubOf, hubState, launchReal, realWorld, transcriptHas, type World } fro
 const T = {
   field: '[data-testid="composer.field"]',
   setupSkip: '[data-testid="setup.skip"]',
-  inbox: '[data-testid="inbox.root"]',
-  item: '[data-testid^="inbox.item."]',
+  // one inbox (designer m_19631): ⌘I opens the block's first item in place, esc folds it
+  inbox: '[data-testid^="inbox.block.open."]',
   heard: '[data-testid="inbox.heard"]',
 };
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -93,6 +93,10 @@ test('voice/answer-card (real core): his talk answers the card in view as the TU
 
     // 2. esc within the heard time undoes it
     const mid = await openCards(w);
+    // the answer folded the block (one inbox: he is back in his thread); ⌘I opens the next card
+    await expect(page.locator(T.inbox), 'the answer folds the block').toBeHidden({ timeout: 3000 });
+    await openInbox(s);
+    await sleep(800);
     await talk(helper, voice, 'the first one');
     await expect(heard, 'the heard line on the next card').toBeVisible({ timeout: 5000 });
     await page.keyboard.press('Escape');

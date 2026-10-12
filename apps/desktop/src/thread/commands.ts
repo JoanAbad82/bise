@@ -28,7 +28,7 @@ export const windowCommands: readonly PickCommand[] = [
  * one of the core's own commands (the one settings sends for the same
  * switch: /plugins disable x, /theme light, /computer-use off), or quit.
  */
-export type WindowRun = { readonly go: Route } | { readonly help: true } | { readonly app: AppCmd } | { readonly quit: true };
+export type WindowRun = { readonly go: Route } | { readonly inbox: true } | { readonly help: true } | { readonly app: AppCmd } | { readonly quit: true };
 
 const at0 = (args: string): string => args.trim().split(/\s+/)[0] ?? '';
 const at1 = (args: string): string => args.trim().split(/\s+/)[1] ?? '';
@@ -84,7 +84,8 @@ export function windowRun(name: string, args: string, at: { project: string; age
     case 'artifacts':
       return arg === '' ? go({ screen: 'artifacts', project: at.project }) : undefined;
     case 'inbox':
-      return go({ screen: 'inbox' });
+      // one inbox (designer m_19631): /inbox opens the block in place, as ⌘I
+      return { inbox: true };
     case 'help':
     case 'shortcuts':
       return { help: true };

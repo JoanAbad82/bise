@@ -224,6 +224,7 @@ async function toWords(page: Page): Promise<void> {
 }
 
 test('app/keep-all: ⌘I: a half-typed answer on a card', async () => {
+  test.skip(true, "one inbox commit 2 (designer m_19631): the ⌘I screen's answer field is gone; a card's half answer kept in the block's composer comes with commit 2b right after (ambient-lead m_20064), which ports this case");
   test.setTimeout(150_000);
   const WORDS = 'plutôt 15 min, mais';
   const { dispose } = await cycles({

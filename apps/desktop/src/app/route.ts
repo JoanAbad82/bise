@@ -19,7 +19,9 @@
 //   branch/<p>/<branch>        a branch's diff by its name ('/diff sb/x'; the branch keeps its slashes)
 //   artifacts/<p>[/<id>]       a project's artifacts (one opened)
 //   environments/<p>           its worktrees and dev servers
-//   inbox | settings[/<page>] | onboarding    amb-home's screens
+//   settings[/<page>] | onboarding    amb-home's screens
+//   (no 'inbox' screen: one inbox, the block at the bottom of every view; 'inbox' and
+//   'inbox?card=<p>/<id>' are asks to open it in place, read by inboxAtOf, never routes)
 //   lab/<composer|spotlight|pearl>             amb-web's labs, test mode only
 // Anything else parses to `notfound` with the string kept, never to bise:
 // a wrong link says so.
@@ -39,7 +41,6 @@ export type Route =
   | { screen: 'branch'; project: string; branch: string }
   | { screen: 'artifacts'; project: string; id?: string }
   | { screen: 'environments'; project: string }
-  | { screen: 'inbox' }
   | { screen: 'scheduled' }
   /** the last crash report, opened in the window (designer's voice-window part 2) */
   | { screen: 'report' }
@@ -66,7 +67,6 @@ const NAME = /^[^/\s]+$/;
 export function formatRoute(r: Route): string {
   switch (r.screen) {
     case 'bise':
-    case 'inbox':
     case 'scheduled':
     case 'report':
     case 'onboarding':
@@ -114,7 +114,6 @@ export function parseRoute(path: string): Route {
   const [a, b] = take(2) ?? [];
   switch (head) {
     case 'bise':
-    case 'inbox':
     case 'scheduled':
     case 'report':
     case 'onboarding':
@@ -179,14 +178,12 @@ export function projectOf(r: Route): string | undefined {
  * whom the shell's bottom block writes to on a screen with no composer of its own. A thread (and
  * bise's) has its own; the first launch and the labs none. An agent's review writes to that agent;
  * a project's screen (agents, changes, a feature, its artifacts…) to its main; a screen of no
- * project (settings, scheduled, every project's artifacts, ⌘I, not found) to bise's main. Pure.
+ * project (settings, scheduled, every project's artifacts, not found) to bise's main. Pure.
  */
 export function bottomTarget(r: Route, home: string | undefined): { project: string; agent: string } | null {
-  // the ⌘I screen is the inbox whole, with its own answer field: no second inbox under it
   switch (r.screen) {
     case 'thread':
     case 'bise':
-    case 'inbox':
     case 'onboarding':
     case 'lab':
       return null;

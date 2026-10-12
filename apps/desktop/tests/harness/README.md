@@ -31,7 +31,7 @@ Run: `pnpm test:e2e` (self-tests + `tests/checks/**`), one worker. Ask amb-tools
 | fake microphone | `launch*({ micWav: 'x.wav' })` (Chromium's fake capture device) |
 | the scripted core | `launchDesktop({ core: new FakeCore() })`: its start world is every fixture of `rust/proto/fixtures` (or `new FakeCore([...events])`, or `'none'`). `core.send(ev)` sends more events, and `core.cmds()` / `core.waitCmd(pred)` read what the app sent the core (`fakes/core-stub.mjs`). Without it, the core stays `down`. |
 | the scripted Mac helper | `launchDesktop({ helper: new FakeHelper() })`: hello at start. `helper.send({ev:'fn',act:'talk_start',by:'fn'})` sends events, and `helper.cmds()` / `waitCmd` read the app's commands (`fakes/helper-stub.mjs`). Without it, there is no helper. |
-| a start screen | `launchDesktop({ route: 'inbox' })` (BISE_DESKTOP_ROUTE, read by amb-mac's main in test mode) |
+| a start screen | `launchDesktop({ route: 'settings' })` (BISE_DESKTOP_ROUTE, read by amb-mac's main in test mode); `'inbox'` / `'inbox?card=<p>/<id>'` open the inbox block in place on the kept screen (there is no inbox screen) |
 
 The session's `page` is the app's main window (`window.bise.surface === 'window'`). Use `surfacePage(app, 'capsule')` for the capsule; any window is in `session.app.windows()`.
 `session.blocked()` lists what the guards stopped: new windows, navigations, windows that weren't offscreen.
@@ -74,7 +74,7 @@ Checks find things only by `data-testid`. In components, pass the id as the `tes
 in one state, out of his sight. It writes `shot.png` and `meta.json` (with the proof), and with `--frames` also every
 drawn frame (`frames/NNNN.png`, `frames.json`: times and change per frame).
 - `desktop [route]`: the app from `out/` (`pnpm build` first), on the scripted core (the fixture world) and
-  the scripted helper, opened on that route (`agent/acme-1a2b3c4d/perf`, `inbox`, ...).
+  the scripted helper, opened on that route (`agent/acme-1a2b3c4d/perf`, `settings`, ...).
 - `<file.html> [query]`: any page.
 
 ## Coming

@@ -30,6 +30,7 @@ async function order(page: Page): Promise<string[]> {
 }
 
 test('inbox/keys: ↑↓ ←→ ctrl+n ctrl+p walk the inbox, ctrl+o opens a folded item, the key list has them', async () => {
+  test.skip(true, "one inbox commit 2 (designer m_19631): the ⌘I screen whose walk this checks is gone; the block's keys (↑↓, 1-9, ←→ on the open item, ctrl+o) are inbox/block-views' and Block.test's; this real-core walk is ported to the block with commit 2b");
   test.setTimeout(240_000);
   const w = realWorld();
   const n = `k${Date.now() % 1_000_000}`;

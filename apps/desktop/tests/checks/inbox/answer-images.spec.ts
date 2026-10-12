@@ -1,11 +1,9 @@
 // inbox/answer-images · R41 (ambient-lead m_13889; msg-parts m_18030, main 18a32ce3): he answers a card
 // with an image. Passes when, on the scripted core (FakeCore, fake data, a fixture PNG):
-//   - ⌘I: a PNG pasted in the item's answer field is a chip 'image 1' (ink, 1 px line, r 9); his words + ⏎ send answer
-//     {reply '[Image #1] <words>', parts: [{kind:'image', name:'[Image #1]', source: its path in the
-//     test home's store}, {kind:'text', text: <words>}]}, no files;
-//   - an image alone (no words) + ⏎ answers with the image part only;
-//   - the thread's docked answer: a PNG pasted in the composer goes with his words as answer
-//     {parts: [..., {kind:'image', source: its path}]}, no files (amb-win, main 18a32ce3).
+//   - the block's answer (one inbox, designer m_19631: the ⌘I screen and its own answer field are
+//     gone): a PNG pasted in the composer while a card is open goes with his words as answer
+//     {parts: [..., {kind:'image', source: its path}]}, no files (amb-win, main 18a32ce3). The
+//     composer's chip look is thread/paste-image's.
 // That the asking agent's request carries the image block is the hub's (amb-feed's laws) and
 // qa-native's R41 (4)(5) on FAKE_BODIES. Owner: amb-home.
 import path from 'node:path';
@@ -34,88 +32,13 @@ const world = () => [
 type Cmd = { cmd?: string; card?: number; reply?: string; files?: string[]; parts?: { kind: string; source?: string; name?: string; text?: string }[] };
 const answers = (core: FakeCore) => core.cmds().filter((c) => (c as Cmd).cmd === 'answer') as Cmd[];
 
-test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked answer) goes with it as a typed image part', async () => {
+test("inbox/answer-images: an image pasted on a card's answer (the block's, in the composer) goes with it as a typed image part", async () => {
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
-  const s = await launchDesktop({ core, route: 'inbox' });
+  const s = await launchDesktop({ core, route: `project/${P}` });
   const { page } = s;
   try {
-    const field = '[data-testid="inbox.answer"]';
-    await expect(page.locator(field)).toBeVisible({ timeout: 10_000 });
-
-    await test.step("⌘I: a pasted PNG is a chip; words + ⏎ send answer {parts: [image, text]}", async () => {
-      await pasteImage(page, field, PNG);
-      // the composer's chip inside the field, before his words: thumbnail + 'image 1' in ink, the
-      // sent bubble's chip (designer m_18135), no file name, never the accent
-      const chip = page.getByTestId('inbox.answer.image.1');
-      await expect(chip).toHaveText('image 1', { timeout: 5000 });
-      await expect(chip.locator('img.thumb'), 'a 16 px thumbnail').toHaveCount(1);
-      await expect(page.getByTestId('inbox.answer.box').getByTestId('inbox.answer.image.1'), 'inside the field').toHaveCount(1);
-      const look = await chip.evaluate((el) => {
-        const cs = getComputedStyle(el);
-        const root = getComputedStyle(document.documentElement);
-        const probe = (v: string): string => {
-          const d = document.createElement('i');
-          d.style.color = v;
-          document.body.append(d);
-          const c = getComputedStyle(d).color;
-          d.remove();
-          return c;
-        };
-        return { color: cs.color, ink: probe(root.getPropertyValue('--c-text')), accent: probe(root.getPropertyValue('--c-accent')), bg: cs.backgroundColor, border: cs.borderTopWidth, radius: cs.borderTopLeftRadius, thumb: (el.querySelector('img.thumb') as HTMLElement).getBoundingClientRect().width };
-      });
-      expect(look.color, 'ink words').toBe(look.ink);
-      expect(look.color, 'never the accent').not.toBe(look.accent);
-      expect(look.bg, 'no fill').toBe('rgba(0, 0, 0, 0)');
-      expect(look.border).toBe('1px');
-      expect(look.radius).toBe('9px');
-      expect(look.thumb).toBe(16);
-      await page.screenshot({ path: test.info().outputPath('inbox-image.png') });
-      // ⌫ at the start of the words removes it, as the composer's ⌫ before a chip
-      await page.locator(field).press('Backspace');
-      await expect(chip).toHaveCount(0);
-      await pasteImage(page, field, PNG);
-      await expect(page.getByTestId('inbox.answer.image.1')).toBeVisible({ timeout: 5000 });
-      await page.evaluate(() => {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        document.documentElement.style.setProperty('color-scheme', 'dark');
-      });
-      await page.waitForTimeout(400);
-      await page.screenshot({ path: test.info().outputPath('inbox-image-dark.png') });
-      await page.evaluate(() => {
-        document.documentElement.setAttribute('data-theme', 'light');
-        document.documentElement.style.setProperty('color-scheme', 'light');
-      });
-      await page.waitForTimeout(300);
-      await page.locator(field).fill('this one, see the shot');
-      await page.locator(field).press('Enter');
-      await expect.poll(() => answers(core).length, { timeout: 3000 }).toBe(1);
-      const a = answers(core)[0];
-      // msg-parts (ambient-lead m_18030): the image as a typed part with its source, then his words;
-      // no files; the reply text keeps the label for older readers
-      expect(a).toMatchObject({ card: answers(core)[0]?.card, reply: '[Image #1] this one, see the shot' });
-      expect(a?.files, 'no files').toBeUndefined();
-      expect(a?.parts?.map((p) => p.kind)).toEqual(['image', 'text']);
-      expect(a?.parts?.[0]).toMatchObject({ kind: 'image', name: '[Image #1]' });
-      expect(a?.parts?.[0]?.source ?? '', "the image's path in the test home's store").toMatch(/\/images\/[0-9a-f]+\.png$/);
-      expect(a?.parts?.[1]).toMatchObject({ kind: 'text', text: 'this one, see the shot' });
-    });
-
-    await test.step('an image alone + ⏎ answers with the image only', async () => {
-      await core.send(projects([card(10, 'which page?')]) as never);
-      await expect(page.locator(field)).toBeVisible({ timeout: 3000 });
-      await pasteImage(page, field, PNG);
-      await expect(page.getByTestId('inbox.answer.image.1')).toBeVisible({ timeout: 5000 });
-      await page.locator(field).press('Enter');
-      await expect.poll(() => answers(core).length, { timeout: 3000 }).toBe(2);
-      expect(answers(core)[1]).toMatchObject({ card: 10, reply: '[Image #1]' });
-      expect(answers(core)[1]?.files).toBeUndefined();
-      expect(answers(core)[1]?.parts?.map((p) => p.kind), 'the image alone').toEqual(['image']);
-    });
-
-    await test.step("the docked answer: a PNG pasted in the composer goes with his words", async () => {
-      await core.send(projects([card(9, 'which bench?')]) as never);
-      await page.getByTestId(`app.sidebar.project.${P}`).click();
-      await expect(page.getByTestId('inbox.block.row.1')).toBeVisible({ timeout: 5000 });
+    await test.step("the block's answer: a PNG pasted in the composer goes with his words", async () => {
+      await expect(page.getByTestId('inbox.block.row.1')).toBeVisible({ timeout: 10_000 });
       await page.getByTestId('inbox.block.row.1').click();
       await expect(page.getByTestId('inbox.block.open.1')).toBeVisible({ timeout: 3000 });
       const composer = '[data-testid="composer.field"]';
@@ -125,8 +48,9 @@ test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked 
       await page.keyboard.press('End');
       await page.keyboard.type(' warm, like this');
       await page.keyboard.press('Enter');
-      await expect.poll(() => answers(core).length, { timeout: 3000 }).toBe(3);
-      const a = answers(core)[2];
+      await expect.poll(() => answers(core).length, { timeout: 3000 }).toBe(1);
+      const a = answers(core)[0];
+      // the first row: both rank 1, the older first (order.ts sortCards), so 9
       expect(a).toMatchObject({ card: 9 });
       expect(a?.reply ?? '').toContain('warm, like this');
       // the thread's composer sends its image as a typed part with its source (main 18a32ce3,

@@ -23,7 +23,16 @@ const world = () => [
       shots_keep_days: 7,
     },
   },
-  { ev: 'projects', projects: [{ project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 2, working: 0, waits: 0, running: true }] },
+  // one card waits, so /inbox has an item to open in place (one inbox: no screen when nothing waits either)
+  {
+    ev: 'projects',
+    projects: [
+      {
+        project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 2, working: 0, waits: 1, running: true,
+        cards: [{ id: 1, project: HOME, kind: 'question', rank: 1, agent: 'perf', question: 'which bench first?', options: [], urgent: false, since_ms: 1791100100001 }],
+      },
+    ],
+  },
   { ev: 'welcome', project: HOME, proto: 1, workspace: '/nowhere', name: 'bise' },
   { ev: 'agents', project: HOME, agents: [agent('main'), agent('perf')] },
   { ev: 'thread', project: HOME, agent: 'main', entries: [{ pos: 1, at_ms: 1791100001000, kind: 'agent', text: 'hello' }], before: null, more: false },
@@ -117,7 +126,8 @@ test("thread/composer-sources: the real thread's /, @ and $ list the core's comm
     await field.click();
     await page.keyboard.type('/inbox');
     await page.keyboard.press('Enter');
-    await expect(page.getByTestId('inbox.root'), '/inbox opens the inbox').toBeVisible({ timeout: 2000 });
+    // one inbox (designer m_19631): /inbox opens the block's first item in place, as ⌘I
+    await expect(page.locator('[data-testid^="inbox.block.open."]'), '/inbox opens the inbox block in place').toBeVisible({ timeout: 2000 });
   } finally {
     await s.close();
     core.dispose();

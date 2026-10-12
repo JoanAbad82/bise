@@ -310,7 +310,9 @@ test('composer/lists-real: real core: a /command runs, and a send with an @ path
     await page.keyboard.type('/inbox');
     await expect(picker.locator(T.pickerRow).first()).toContainText('/inbox', { timeout: 3000 });
     await press(page, 'Enter');
-    await expect(page.getByTestId('inbox.root'), "'/inbox' opens the inbox").toBeVisible({ timeout: 3000 });
+    // one inbox (designer m_19631): the block opens in place, on its first item when one waits
+    await expect(page.getByTestId('inbox.block'), "'/inbox' opens the inbox block in place").toBeVisible({ timeout: 3000 });
+    await expect(page.getByTestId('thread.screen'), 'he stays on the thread').toBeVisible();
   } finally {
     await close();
   }

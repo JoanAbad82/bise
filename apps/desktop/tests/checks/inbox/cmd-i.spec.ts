@@ -98,7 +98,14 @@ test('inbox/cmd-i: ⌘I opens the inbox block in place on its first item, counti
     } finally {
       await page.screenshot({ path: test.info().outputPath('inbox.png') });
     }
-    await expect(inbox, 'the block counts every hub card').toContainText(`${String(total)} waiting`);
+    // one inbox: bise's own notifications ask is an item too, the last one (Block.tsx asksNotify:
+    // macOS never asked, not said 'not now' twice nor this launch); never in the way of a hub card
+    const asked = await page.evaluate(async () => {
+      const n = (window as unknown as { bise?: { notify?: { state: () => Promise<string> } } }).bise?.notify;
+      const st = n === undefined ? null : await n.state();
+      return st === 'never' && Number(localStorage.getItem('bise.notify.notnow') ?? '0') < 2 && sessionStorage.getItem('bise.notify.notnow.launch') !== '1';
+    });
+    await expect(inbox, `the block counts every hub card${asked ? ", and bise's notifications ask" : ''}`).toContainText(`${String(total + (asked ? 1 : 0))} waiting`);
     // its first item is the first card of the TUI's inbox on one of the hubs
     const first = await open.innerText();
     expect(want.some((p) => p.cards[0] !== undefined && first.includes(p.cards[0])), `the open item is a hub's first card: ${first}`).toBe(true);

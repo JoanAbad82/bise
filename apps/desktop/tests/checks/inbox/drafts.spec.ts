@@ -20,6 +20,7 @@ async function openItem(page: Page, words: string): Promise<void> {
 }
 
 test('inbox/drafts: each item keeps its own half answer, across items and a reopen', async () => {
+  test.skip(true, "one inbox commit 2 (designer m_19631): the ⌘I screen and its per-item answer field are gone; per-item drafts in the block's composer come with commit 2b right after (ambient-lead m_20064), which ports this check");
   test.setTimeout(240_000);
   const w = realWorld();
   const n = `d${Date.now() % 1_000_000}`;

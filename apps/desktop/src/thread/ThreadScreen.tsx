@@ -29,7 +29,7 @@ import { useTour } from '@/setup/useTour';
 import { takeQuotes } from '@/review/quote';
 import { copyText, QuotePop } from '@/quote/QuotePop';
 import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
-import { InboxBlock, type Answering } from '@/inbox';
+import { InboxBlock, openInbox, type Answering } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
@@ -904,6 +904,7 @@ export const ThreadComposer = memo(function ThreadComposer({
       const w = windowRun(name, args, at);
       if (w !== undefined) {
         if ('go' in w) router.go(w.go);
+        else if ('inbox' in w) openInbox();
         else if ('app' in w) store.command(w.app);
         else if ('quit' in w) window.bise.quit();
         else window.dispatchEvent(new Event(HELP_EVENT));

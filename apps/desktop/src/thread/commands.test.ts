@@ -43,7 +43,7 @@ describe("the / list: the TUI's commands in its order, never a silent gap", () =
 
 describe('a command line runs as the TUI runs it', () => {
   it('window commands open their screens, /help the key list', () => {
-    expect(windowRun('/inbox', '', at)).toEqual({ go: { screen: 'inbox' } });
+    expect(windowRun('/inbox', '', at)).toEqual({ inbox: true });
     expect(windowRun('/help', '', at)).toEqual({ help: true });
     expect(windowRun('/shortcuts', '', at)).toEqual({ help: true });
     expect(windowRun('/plugins', '', at)).toEqual({ go: { screen: 'settings', page: 'plugins' } });

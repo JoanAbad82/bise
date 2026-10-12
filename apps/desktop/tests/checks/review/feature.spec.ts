@@ -135,17 +135,16 @@ test('review/feature: a feature with 2 agents shows, is tried and merged only on
     expect(git(shop.ws, 'rev-parse', 'HEAD'), "shop's main didn't move before his click").toBe(head0);
     await expect.poll(() => tuiInbox(t?.screen() ?? '').length, { timeout: 10_000, message: "the TUI's inbox has the try card" }).toBeGreaterThanOrEqual(3);
     expect(await menuKey(s, 'CmdOrCtrl+I'), 'the app menu has an item on ⌘I').not.toBe('');
-    // ⌘I opens the inbox page (inbox.item.<key>) or, in a thread, the docked inbox that shows one
-    // card open at a time (inbox.card.<key>, ↑↓ next): walk it with ↓ to the try card
-    const key = `${project}-${String(tryId)}`;
-    const item = page.locator(`[data-testid="inbox.item.${key}"], [data-testid="inbox.card.${key}"]`).first();
+    // one inbox (designer m_19631): ⌘I opens the block's first real item in place (bise's notifications
+    // ask is last, never in the way: qa-flows m_20359); ↓ walks every item to the try card
+    const item = page.locator(`[data-testid="inbox.block.card.${project}-${String(tryId)}"]`);
     try {
+      await expect(page.locator('[data-testid^="inbox.block.open."]')).toBeVisible({ timeout: 10_000 });
       for (let i = 0; i < 8 && !(await item.isVisible()); i++) {
         await page.keyboard.press('ArrowDown');
         await page.waitForTimeout(250);
       }
-      // the dock's walk across projects is inbox/keys' row; here soft, the hard path is the feature view's card below
-      await expect.soft(item, "the window's inbox has the try card").toBeVisible({ timeout: 10_000 });
+      await expect(item, "the window's inbox has the try card").toBeVisible({ timeout: 10_000 });
     } finally {
       await page.screenshot({ path: test.info().outputPath('try-card.png') });
     }

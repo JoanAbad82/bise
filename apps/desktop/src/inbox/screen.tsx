@@ -1,17 +1,17 @@
-// The ⌘I inbox as the shell mounts it (route `inbox`): Inbox fed by the
-// store. Every project's open cards come from the core's projects rows
-// (a held hub's own cards, else its view.json's), so one list holds what
-// waits on him everywhere; an answer is the hub's one /answer path
-// (store.answer), a close the hub's one close path (store.close, the
-// typed HubCmd close). ThreadInbox: the thread's inbox strip (Strip.tsx)
-// fed the same way, for one project. Both show the demo tour's 'card' tip
-// (bar L25, useTour) above the item that waits. Owner: amb-home.
+// One inbox (designer m_19631): there is no ⌘I screen any more, the block at
+// the bottom of every view (Block.tsx) holds what waits on him everywhere.
+// inboxOf reads every project's open cards from the core's projects rows (a
+// held hub's own cards, else its view.json's). ThreadInbox: the thread's
+// inbox strip (Strip.tsx) fed from the store for one project; an answer is
+// the hub's one /answer path (store.answer), a close the hub's one close path
+// (store.close); its 'open the inbox' opens the block in place. It shows the
+// demo tour's 'card' tip (bar L25, useTour) above the item that waits.
+// Owner: amb-home.
 import { useCallback, useMemo } from 'react';
 import type { ProjectRow } from '@/proto';
-import { useProjects, useStore, useVoiceAnswer } from '@/store';
-import { useRouter } from '@/app/router';
-import { Inbox } from './Inbox';
+import { useProjects, useStore } from '@/store';
 import { InboxStrip } from './Strip';
+import { openInbox } from './Block';
 import { withConfirmOptions } from './model';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
@@ -26,49 +26,10 @@ export function inboxOf(rows: readonly ProjectRow[]) {
   };
 }
 
-export function InboxScreen() {
-  const rows = useProjects();
-  const store = useStore();
-  const router = useRouter();
-  const { cards, names, homes } = useMemo(() => inboxOf(rows), [rows]);
-  const voice = useVoiceAnswer();
-  const inView = useCallback(
-    (c: { project: string; card: number } | null) => {
-      store.cardInView(c?.project ?? null, c?.card ?? null);
-    },
-    [store],
-  );
-  return (
-    <Inbox
-      cards={cards}
-      names={names}
-      homes={homes}
-      voice={voice}
-      tipOf={(c) => <CardTip project={c.project} />}
-      ports={{
-        inView,
-        answer: (project, card, reply, parts) => {
-          store.answer(project, card, reply, undefined, parts);
-        },
-        close: (project, card) => {
-          store.close(project, card);
-        },
-        back: () => {
-          router.back();
-        },
-        openPage: (url) => {
-          void window.bise.openExternal(url);
-        },
-      }}
-    />
-  );
-}
-
 /** The strip as the thread mounts it: the project's open items from the store. */
 export function ThreadInbox({ project }: { project: string }) {
   const rows = useProjects();
   const store = useStore();
-  const router = useRouter();
   const row = rows.find((r) => r.project === project);
   const cards = useMemo(() => (row?.cards ?? []).map(withConfirmOptions), [row]);
   const inView = useCallback(
@@ -91,7 +52,7 @@ export function ThreadInbox({ project }: { project: string }) {
           store.close(p, card);
         },
         openInbox: () => {
-          router.go({ screen: 'inbox' });
+          openInbox();
         },
         typeAt: () => {
           document.querySelector<HTMLElement>('[data-testid="composer.field"]')?.focus();

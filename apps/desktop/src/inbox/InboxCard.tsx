@@ -179,10 +179,10 @@ export function pickKeys(n: number): string {
   return n === 1 ? '1' : n === 2 ? '1 2' : `1–${String(n)}`;
 }
 
-/** '!' an approval, an item only its options decide (a merge, a try…), or an urgent one; '?' the rest
- * (the block's folded line says the same, designer m_15412). */
+/** '!' an approval or an item only its options decide (a merge, a try…); '?' the rest, an urgent
+ * question too: a question is '?' in its row and its card head alike (designer m_15412, m_20053). */
 export function glyphOf(c: CardRow): string {
-  return c.approval === true || c.urgent || !takesWords(c) ? '!' : '?';
+  return c.approval === true || !takesWords(c) ? '!' : '?';
 }
 
 /** A long question's first lines (bar I8): more than FOLD_AT lines show

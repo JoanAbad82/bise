@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
 import type { NotifyAuth } from '@/shared/api';
 import { Act, Dot, Kbd, Row } from '@/ds';
-import { useProjects, useStore } from '@/store';
+import { useProjects, useStore, useVoiceAnswer } from '@/store';
 import { shownName } from '@/agents/model';
 import { age, dotOf, folds, InboxCard } from './InboxCard';
 import { useMenuAction } from '@/app/menu';
@@ -226,6 +226,39 @@ export function InboxBlock({ here, onAnswer, now: pinned, reading = false }: Inb
   const names = useMemo(() => new Map(rows.map((r) => [r.project, r])), [rows]);
   const openCard = list.find((c) => cardKey(c) === open);
 
+  // bar N14 (moved here from the ⌘I screen, one inbox): his talk answered the open item (the card
+  // in view the core decides on): its heard line shows on it for the event's ms (esc undoes,
+  // nothing sent), then the answer goes as the digit key's would. `done`: the event answered or
+  // undone (none shows again); the one already there when the block mounts is old, never acted on.
+  const voice = useVoiceAnswer();
+  const [done, setDone] = useState(() => voice);
+  const heard = voice !== null && voice !== done && openCard !== undefined && openCard.project === voice.project && openCard.id === voice.card ? voice : null;
+  const answerHeard = useRef<(project: string, card: number, n: number) => void>(() => undefined);
+  useEffect(() => {
+    if (heard === null) return;
+    const t = setTimeout(() => {
+      setDone(heard);
+      answerHeard.current(heard.project, heard.card, heard.n);
+    }, heard.ms);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [heard]);
+  useEffect(() => {
+    if (heard === null) return;
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setDone(heard);
+    };
+    // first in line: esc undoes the heard answer before it folds the block
+    window.addEventListener('keydown', esc, true);
+    return () => {
+      window.removeEventListener('keydown', esc, true);
+    };
+  }, [heard]);
+
   // ctrl+o (and ⌘E), focus anywhere, the composer's too: the window's capture listener sends
   // 'fold-all' (app/keys.ts, the TUI's ctrl+o); the open item's folded lines open whole, again fold
   // them (bar I8, qa-native f640424d); another item opens folded
@@ -314,6 +347,12 @@ export function InboxBlock({ here, onAnswer, now: pinned, reading = false }: Inb
     leave(c);
     store.close(c.project, c.id);
   };
+  useEffect(() => {
+    answerHeard.current = (project, card, n) => {
+      const c = list.find((x) => x.project === project && x.id === card);
+      if (c !== undefined) pick(c, n);
+    };
+  });
 
   // ⌃1-9 open item n wherever the focus is; the open item has the keys while no words are typed
   // (1-9, ←→, ⌘⌫, esc, ↑↓); ⌘⏎ picks the option the keys are on even with words typed
@@ -405,6 +444,9 @@ export function InboxBlock({ here, onAnswer, now: pinned, reading = false }: Inb
         {more > 0 && next !== undefined && (
           <Act
             onClick={() => {
+              // the walk's keys (↑↓) are the block's, not this link's: it never keeps a focus ring
+              // after the click (designer m_20053: plain text-2 everywhere, bise's view too)
+              if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
               openTo(cardKey(next));
             }}
             testId="inbox.block.more"
@@ -434,6 +476,15 @@ export function InboxBlock({ here, onAnswer, now: pinned, reading = false }: Inb
                 now={now}
                 on={on}
                 full={whole === cardKey(c)}
+                {...(heard !== null && heard.project === c.project && heard.card === c.id
+                  ? {
+                      note: (
+                        <span className="inbox-heard" data-testid="inbox.heard">
+                          {heard.line} · esc undoes
+                        </span>
+                      ),
+                    }
+                  : {})}
                 acts={{
                   pick: (o) => {
                     pick(c, o);

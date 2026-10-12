@@ -15,7 +15,7 @@ const every: Route[] = [
   { screen: 'artifacts', project: 'p' },
   { screen: 'artifacts', project: 'p', id: 'a-1' },
   { screen: 'environments', project: 'p' },
-  { screen: 'inbox' },
+  { screen: 'scheduled' },
   { screen: 'settings' },
   { screen: 'settings', page: 'projects' },
   { screen: 'onboarding' },
@@ -42,7 +42,7 @@ describe('routes', () => {
 
   it('the project of a route', () => {
     expect(projectOf({ screen: 'review', project: 'p', agent: 'a' })).toBe('p');
-    expect(projectOf({ screen: 'inbox' })).toBeUndefined();
+    expect(projectOf({ screen: 'scheduled' })).toBeUndefined();
   });
 
   it("the core's open becomes a route", () => {
@@ -68,12 +68,12 @@ describe('router', () => {
     const r = createRouter({ screen: 'bise' });
     let calls = 0;
     r.subscribe(() => calls++);
-    r.go({ screen: 'inbox' });
-    r.go({ screen: 'inbox' });
+    r.go({ screen: 'scheduled' });
+    r.go({ screen: 'scheduled' });
     expect(calls).toBe(1);
     r.go({ screen: 'agents', project: 'p' });
     r.back();
-    expect(r.get()).toEqual({ screen: 'inbox' });
+    expect(r.get()).toEqual({ screen: 'scheduled' });
     r.forward();
     expect(r.get()).toEqual({ screen: 'agents', project: 'p' });
     r.back();
@@ -220,7 +220,7 @@ describe("the projects the window shows (the core's 'shown')", () => {
     expect(shownOf(undefined, { screen: 'review', project: 'shop', agent: 'a' })).toEqual(['shop']);
     // the sidebar's open folders show their agents (R26): their running hubs too, once each
     expect(shownOf('home-1', { screen: 'thread', project: 'shop', agent: 'perf' }, ['shop', 'docs'])).toEqual(['home-1', 'shop', 'docs']);
-    expect(shownOf(undefined, { screen: 'inbox' })).toEqual([]);
+    expect(shownOf(undefined, { screen: 'scheduled' })).toEqual([]);
   });
 });
 
@@ -251,7 +251,7 @@ describe('inboxAtOf (b1/b2: ⌘I and a notification open the block in place, nev
     expect(inboxAtOf('inbox?card=shop')).toBeUndefined();
     expect(inboxAtOf('settings/general')).toBeUndefined();
   });
-  it('gives the ⌘I screen no second inbox under it', () => {
-    expect(bottomTarget({ screen: 'inbox' }, 'home-1')).toBeNull();
+  it("one inbox: 'inbox' is no screen of its own, a link to it is not found (the window reads the ask first)", () => {
+    expect(parseRoute('inbox')).toEqual({ screen: 'notfound', path: 'inbox' });
   });
 });

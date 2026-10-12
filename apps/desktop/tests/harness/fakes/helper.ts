@@ -3,7 +3,7 @@
 // fixtures in '@/proto/fixtures.gen'), never hand-written shapes.
 //   const helper = new FakeHelper();                 // bise-mac-helper (helper-stub.mjs)
 //   const core = new FakeCore();                     // bise ambient-core (core-stub.mjs), fixture world
-//   const s = await launchDesktop({ helper, core, route: 'inbox' });
+//   const s = await launchDesktop({ helper, core, route: 'settings' });
 //   await helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' });          // a fn press
 //   await core.waitCmd((c) => c.cmd === 'send');                           // the app really sent it
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

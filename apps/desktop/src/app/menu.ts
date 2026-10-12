@@ -2,7 +2,7 @@
 // src/main/menu.ts sends them through window.bise.onMenu). Owner: amb-win.
 //
 // One subscription to the preload for the whole window (useMenuRouting,
-// in the shell); 'inbox' and 'settings' are routes, anything else goes to
+// in the shell); 'settings' is a route, 'inbox' opens the block in place, anything else goes to
 // the screens that listen for it (useMenuAction: the thread's ⌘F).
 import { useEffect, useRef } from 'react';
 import type { MenuAction } from '@/shared/api';
@@ -24,8 +24,8 @@ export function emitAction(action: AppAction): void {
 }
 
 /** The route a menu action opens, if it is one. Pure. */
-export function routeOfMenu(action: MenuAction): 'inbox' | 'settings' | undefined {
-  return action === 'inbox' || action === 'settings' ? action : undefined;
+export function routeOfMenu(action: MenuAction): 'settings' | undefined {
+  return action === 'settings' ? action : undefined;
 }
 
 /** In the shell: the menu's routes go to the router, the rest to the screens. */
