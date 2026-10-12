@@ -80,6 +80,8 @@ core_kinds! {
         Scheduled = "scheduled" => RScheduled { v: Ver, timer: Json },
         /// an interrupt (sb-core writes it in the interrupt's step)
         Stopped = "stopped" => RStopped { text: Str },
+        /// a turn /pause cut (cost-pause, pause.bend): `‖ paused · its turn stopped`
+        Paused = "paused" => RPaused { text: Str },
         /// event-wake: a watch ended (`thread::WakeFold`'s JSON)
         Wake = "wake" => RWake { v: Ver, watch: Json },
         /// the answer he had read as it streamed in, when its turn failed

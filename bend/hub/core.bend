@@ -2320,7 +2320,7 @@ def pause.stop(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
     case Con{+n, +rest}:
       # its thread says why (designer m_18789), and bise's go-on note
       # waits in its queue for /resume (held like the rest)
-      +cx2 = line(o, stopped(o, interrupt.fx(o, cx, n), n), n, "paused", "‖ paused · its turn stopped")
+      +cx2 = feed(o, stopped(o, interrupt.fx(o, cx, n), n), n, FD.paused("‖ paused · its turn stopped"))
       pause.stop(o, rest, fst(o, send(o, cx2, msg(M.HUB(), n, P.GO_ON(), False{}, None{}, False{}, False{}))))
 
 # `/pause`: journaled, then every busy turn stops; already paused:

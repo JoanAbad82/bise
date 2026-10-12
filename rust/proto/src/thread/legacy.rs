@@ -175,6 +175,7 @@ fn of(kind: &str, raw: &str) -> Option<Feed> {
         "warn" => Feed::Warn(feed::Warn { text }),
         "scheduled" => Feed::Scheduled(feed::Scheduled { v: 1, timer: json(&text) }),
         "stopped" => Feed::Stopped(feed::Stopped { text }),
+        "paused" => Feed::Paused(feed::Paused { text }),
         "wake" => Feed::Wake(feed::Wake { v: 1, watch: json(&text) }),
         "kept" => Feed::Kept(feed::Kept { text }),
         _ => return None,

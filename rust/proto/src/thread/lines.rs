@@ -773,6 +773,9 @@ pub fn view(f: Feed) -> Hub {
         Feed::Warn(r) => Hub::Warn(r.text),
         Feed::Scheduled(r) => Hub::Scheduled(r.timer.to_string()),
         Feed::Stopped(r) => Hub::Stopped(r.text),
+        // the TUI reads it as an info line (feed.rs after_pause_cut), as
+        // the unknown kind it was before it had a record
+        Feed::Paused(r) => other("paused", r.text),
         Feed::Wake(r) => Hub::Wake(r.watch.to_string()),
         Feed::Kept(r) => Hub::Kept(r.text),
         // a newer hub's kind: its text when it has one, else its JSON

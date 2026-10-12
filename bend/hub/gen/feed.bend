@@ -91,6 +91,9 @@ def scheduled(+timer: J.Json) -> J.Json:
 def stopped(+text: String) -> J.Json:
   J.obj([J.kv("sb", J.JStr{"stopped"}), J.kv("text", J.JStr{text})])
 
+def paused(+text: String) -> J.Json:
+  J.obj([J.kv("sb", J.JStr{"paused"}), J.kv("text", J.JStr{text})])
+
 def wake(+watch: J.Json) -> J.Json:
   J.obj([J.kv("sb", J.JStr{"wake"}), J.kv("v", J.JNum{1n}), J.kv("watch", watch)])
 

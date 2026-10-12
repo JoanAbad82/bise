@@ -1712,6 +1712,26 @@ mod multiline_tests {
             .collect()
     }
 
+    /// his row as the TUI draws it from one transcript line (an old
+    /// `sb you : ` line or a record)
+    fn you_screen(line: &str, width: u16) -> Vec<String> {
+        let h = bise_proto::thread::lines::hub(line.strip_prefix("sb ").unwrap());
+        screen(crate::sb::hub_ev(h).unwrap(), width)
+    }
+
+    // issue 25 F: a real line break draws the same rows from a record as
+    // from the old line; a typed backslash-n is drawn as typed, as the
+    // agent got it (the old line turned it into a break)
+    #[test]
+    fn his_line_breaks_draw_the_same_from_a_record() {
+        let old = you_screen("sb you : first: pick one\\n1. alpha\\n2. beta", 30);
+        let rec = you_screen(r#"sb you :: {"text":"first: pick one\n1. alpha\n2. beta"}"#, 30);
+        assert_eq!(rec, old);
+        assert_eq!(rec[..3], ["│  first: pick one", "│  1. alpha", "│  2. beta ·"], "{rec:#?}");
+        let typed = you_screen(r#"sb you :: {"text":"first\\n1. alpha"}"#, 30);
+        assert_eq!(typed, ["│  first\\n1. alpha ·"], "{typed:#?}");
+    }
+
     #[test]
     fn user_message_keeps_its_line_breaks() {
         let long = "word ".repeat(12);
