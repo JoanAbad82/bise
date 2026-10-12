@@ -7,15 +7,31 @@
 //
 // Mounted once per screen (React never re-creates the editor: the initial config is read once,
 // the callbacks go through refs). The frame around it is amb-kit's ComposerFrame.
-import { memo, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react';
-import { ComposerFrame, Press } from '@/ds';
-import './composer.css';
-import type { ComposerActions, FieldBar } from './actions';
-import { PmField } from './pm/PmField';
-import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, type TipClock } from './keybar';
-import type { Outgoing } from './message';
-import { NO_SOURCES, type ComposerSources, type DictatePort } from './sources';
-import type { Store } from './drafts';
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type JSX,
+  type ReactNode,
+} from "react";
+import { ComposerFrame, Press } from "@/ds";
+import "./composer.css";
+import type { ComposerActions, FieldBar } from "./actions";
+import { PmField } from "./pm/PmField";
+import {
+  barMode,
+  barPairs,
+  startTip,
+  tickTip,
+  tipShown,
+  TIPS,
+  type TipClock,
+} from "./keybar";
+import type { Outgoing } from "./message";
+import { NO_SOURCES, type ComposerSources, type DictatePort } from "./sources";
+import type { Store } from "./drafts";
 
 export interface ComposerProps {
   /** Whose composer this is (`<project>/<agent>`): its draft, history and queue are kept per target. */
@@ -39,7 +55,7 @@ export interface ComposerProps {
   /** A fixed key bar (a screen of its own); unset: the bar follows the composer's mode (W9). */
   readonly keys?: string;
   /** Voice in this composer: recording, then transcribing (the key bar's voice keys). */
-  readonly voice?: 'recording' | 'transcribing' | null;
+  readonly voice?: "recording" | "transcribing" | null;
   /** Text is selected in the thread: typing asks about it (the key bar says so). */
   readonly quoting?: boolean;
   readonly onSend: (out: Outgoing) => void;
@@ -56,16 +72,33 @@ export interface ComposerProps {
 
 /** 'write to perf' under 'you → perf' (ambient m_10689); 'write to bise' with no target line. */
 export function writeTo(to: string | undefined): string {
-  const name = /→\s*([^·]+)/u.exec(to ?? '')?.[1]?.trim();
-  return `write to ${name !== undefined && name !== '' ? name : 'bise'}`;
+  const name = /→\s*([^·]+)/u.exec(to ?? "")?.[1]?.trim();
+  return `write to ${name !== undefined && name !== "" ? name : "bise"}`;
 }
 
 /** The last tip shown (keybar.rs keeps it in the `tip` preference): the next session starts after it. */
-const TIP_KEY = 'bise.composer.v1.tip';
+const TIP_KEY = "bise.composer.v1.tip";
 
-export const Composer = memo(function Composer(props: ComposerProps): JSX.Element {
-  const { target, busy = false, sources = NO_SOURCES, to, toEnd, placeholder = writeTo(to), keys, voice = null, quoting = false, lead, testId = 'composer' } = props;
-  const store = useMemo<Store>(() => props.store ?? window.localStorage, [props.store]);
+export const Composer = memo(function Composer(
+  props: ComposerProps,
+): JSX.Element {
+  const {
+    target,
+    busy = false,
+    sources = NO_SOURCES,
+    to,
+    toEnd,
+    placeholder = writeTo(to),
+    keys,
+    voice = null,
+    quoting = false,
+    lead,
+    testId = "composer",
+  } = props;
+  const store = useMemo<Store>(
+    () => props.store ?? window.localStorage,
+    [props.store],
+  );
   // the latest callbacks, read by the editor's handlers without re-creating them
   const cb = useRef(props);
   useEffect(() => {
@@ -74,7 +107,13 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
   const actions = useRef<ComposerActions | null>(null);
   const [canSend, setCanSend] = useState(false);
   const [strip, setStrip] = useState<JSX.Element | null>(null);
-  const [field, setField] = useState<FieldBar>({ fileList: false, selected: false, images: false, typing: false, dictating: null });
+  const [field, setField] = useState<FieldBar>({
+    fileList: false,
+    selected: false,
+    images: false,
+    typing: false,
+    dictating: null,
+  });
   const dictating = field.dictating;
   const mode = barMode({ ...field, voice: voice ?? dictating, quoting, busy });
 
@@ -105,7 +144,8 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
       window.clearInterval(timer);
     };
   }, [store]);
-  const tipText = tip !== null && tipShown(mode, field.typing) ? TIPS[tip.index] : undefined;
+  const tipText =
+    tip !== null && tipShown(mode, field.typing) ? TIPS[tip.index] : undefined;
 
   return (
     <ComposerFrame
@@ -153,11 +193,15 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
               <span className="kk">∿</span> voice
             </Press>
           )}
-          <span className="pairs" data-testid={`${testId}.keys`} data-mode={keys === undefined ? mode : 'fixed'}>
+          <span
+            className="pairs"
+            data-testid={`${testId}.keys`}
+            data-mode={keys === undefined ? mode : "fixed"}
+          >
             {keys ??
               barPairs(mode, field.typing).map(([k, l]) => (
                 <span key={k + l} className="pair">
-                  {k !== '' && <span className="kk">{k}</span>} {l}
+                  {k !== "" && <span className="kk">{k}</span>} {l}
                 </span>
               ))}
           </span>
@@ -169,7 +213,7 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
         </>
       }
       quote={strip}
-      send={busy && !canSend ? 'stop' : canSend ? 'on' : 'off'}
+      send={busy && !canSend ? "stop" : canSend ? "on" : "off"}
       onSend={() => {
         if (busy && !canSend) cb.current.onStop?.();
         else actions.current?.submit();
@@ -213,31 +257,42 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
   );
 });
 
-/** The mic control in the key line (bar I): its key at rest; while the mic is on, a meter and
- *  'listening…'; then '…' while the last words come. Its own state only: the field never re-renders. */
-function Mic({ state, level, onClick, testId }: { state: 'recording' | 'transcribing' | null; level: DictatePort['level']; onClick: () => void; testId: string }): JSX.Element {
+/** The mic control in the key line (bar I): its key at rest; while the mic is on, the meter alone
+ *  ('listening…' is the field's, designer m_19439: never twice); then '…' while the last words
+ *  come. Its own state only: the field never re-renders. */
+function Mic({
+  state,
+  level,
+  onClick,
+  testId,
+}: {
+  state: "recording" | "transcribing" | null;
+  level: DictatePort["level"];
+  onClick: () => void;
+  testId: string;
+}): JSX.Element {
   return (
     <Press
-      look={`mic${state === null ? '' : ` ${state}`}`}
+      look={`mic${state === null ? "" : ` ${state}`}`}
       onMouseDown={(e) => {
         e.preventDefault(); // the field keeps the caret
       }}
       onClick={onClick}
-      aria-pressed={state === 'recording'}
-      aria-label={state === 'recording' ? 'stop dictating' : 'dictate'}
+      aria-pressed={state === "recording"}
+      aria-label={state === "recording" ? "stop dictating" : "dictate"}
       data-testid={`${testId}.mic`}
-      data-state={state ?? 'off'}
+      data-state={state ?? "off"}
     >
       {state === null ? (
         <>
           <span className="kk">⌃R</span> dictate
         </>
-      ) : state === 'recording' ? (
+      ) : state === "recording" ? (
         <>
-          <Meter level={level} testId={testId} /> listening…
+          <Meter level={level} testId={testId} />
         </>
       ) : (
-        '…'
+        "…"
       )}
     </Press>
   );
@@ -251,22 +306,36 @@ export const meterLevel = (v: number, reduced: boolean): number => {
 };
 
 /** Five bars that follow his voice level (the core's level {who: 'you'}). */
-function Meter({ level, testId }: { level: DictatePort['level']; testId: string }): JSX.Element {
+function Meter({
+  level,
+  testId,
+}: {
+  level: DictatePort["level"];
+  testId: string;
+}): JSX.Element {
   const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     const el = box.current;
     if (level === undefined || el === null) return;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     // each sample writes one CSS variable and one attribute (the checks read it), no React render
     return level((v) => {
       const h = String(meterLevel(v, reduced));
       if (el.dataset.level === h) return;
       el.dataset.level = h;
-      el.style.setProperty('--lvl', h);
+      el.style.setProperty("--lvl", h);
     });
   }, [level]);
   return (
-    <span ref={box} className="meter" data-testid={`${testId}.meter`} data-level="0" aria-hidden>
+    <span
+      ref={box}
+      className="meter"
+      data-testid={`${testId}.meter`}
+      data-level="0"
+      aria-hidden
+    >
       <i />
       <i />
       <i />

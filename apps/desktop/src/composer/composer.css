@@ -1,64 +1,235 @@
 /* The composer's own parts inside amb-kit's ComposerFrame: the field, its placeholder, the chips,
    the strip above the box and the @ $ / list. Tokens only (src/ds/tokens.css). */
-.b-composer .in { position: relative; }
+.b-composer .in {
+  position: relative;
+}
 /* one line high when empty (designer's try gate D18): the frame's min-height 48 px is the box's
    whole height (border-box: as content-box it made a 72 px box with the line at its bottom), and
    the field's line gets 3 px above and below so one line is the send button's 28 px: empty or one
    line, the text sits in the middle of a 52 px box; longer drafts grow with send at the bottom */
-.b-composer .box { box-sizing: border-box; }
-.b-composer .box .in { padding-block: 3px; }
+.b-composer .box {
+  box-sizing: border-box;
+}
+.b-composer .box .in {
+  padding-block: 3px;
+}
 /* one frame (ambient m_10689): the box is the frame, the field inside it is borderless (not the
    design system's .b-field input frame) */
-.b-composer .in .b-field { display: block; height: auto; min-height: 1.45em; max-height: 40vh; overflow-y: auto; padding: 0; border-radius: 0; background: none; box-shadow: none; font: inherit; outline: 0; }
-.b-composer .in .b-field:focus-within { box-shadow: none; }
-.b-composer .b-field .p { margin: 0; }
-.b-composer .b-field-ph { position: absolute; inset: 3px auto auto 0; pointer-events: none; user-select: none; }
-.b-composer .b-chip.paste, .b-composer .b-chip.quote, .b-composer .b-chip.artifact { height: 20px; padding: 0 7px; margin: 0 1px; vertical-align: 1px; color: var(--c-accent); background: var(--c-accent-soft); }
+.b-composer .in .b-field {
+  display: block;
+  height: auto;
+  min-height: 1.45em;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  outline: 0;
+}
+.b-composer .in .b-field:focus-within {
+  box-shadow: none;
+}
+.b-composer .b-field .p {
+  margin: 0;
+}
+.b-composer .b-field-ph {
+  position: absolute;
+  inset: 3px auto auto 0;
+  pointer-events: none;
+  user-select: none;
+}
+.b-composer .b-chip.paste,
+.b-composer .b-chip.quote,
+.b-composer .b-chip.artifact {
+  height: 20px;
+  padding: 0 7px;
+  margin: 0 1px;
+  vertical-align: 1px;
+  color: var(--c-accent);
+  background: var(--c-accent-soft);
+}
 /* the TipTap field (pm/PmField.tsx, behind Composer.tsx ENGINE): its host adds no box; ProseMirror
    needs pre-wrap; the dictation's live words are dim with a pulsing dot, never a frame */
-.b-composer .b-field-host { display: contents; }
-.b-composer .b-field.ProseMirror { white-space: pre-wrap; overflow-wrap: break-word; font-variant-ligatures: none; }
-.b-composer .b-field .b-dictation { color: var(--c-text-2); }
-.b-composer .b-field .b-dictation i { display: inline-block; width: 6px; height: 6px; margin: 0 5px 1px 1px; border-radius: 50%; background: var(--c-text-2); animation: b-blink 1s steps(1) infinite; }
-@media (prefers-reduced-motion: reduce) { .b-composer .b-field .b-dictation i { animation: none; } }
+.b-composer .b-field-host {
+  display: contents;
+}
+.b-composer .b-field.ProseMirror {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-variant-ligatures: none;
+}
+.b-composer .b-field .b-dictation {
+  color: var(--c-text-2);
+}
+.b-composer .b-field .b-dictation i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 5px 1px 1px;
+  border-radius: 50%;
+  background: var(--c-text-2);
+  animation: b-blink 1s steps(1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .b-composer .b-field .b-dictation i {
+    animation: none;
+  }
+}
 /* an image chip is the sent bubble's (designer m_18135, signed 900f998e): 1 px line, r 9, 'image 1'
    in ink beside its 16 px thumbnail or the faint no-file glyph slot; never the accent */
-.b-composer .b-chip.image { gap: 5px; height: 20px; padding: 0 8px 0 3px; margin: 0 1px; vertical-align: 1px; color: var(--c-text); background: none; border: 1px solid var(--c-line); border-radius: 9px; }
-.b-composer .b-chip.image .thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; flex: none; }
-.b-composer .b-chip.image .thumb.none { display: inline-flex; color: var(--c-text-3); opacity: 0.7; }
-.b-composer-strip { display: flex; flex-direction: column; gap: 2px; padding: 0 4px 6px; font: var(--t-12) var(--font-mono); color: var(--c-text-3); }
-.b-composer-strip .k { margin-left: 10px; }
-.b-composer-strip .n { color: var(--c-text-2); }
-.b-composer-pick { position: absolute; left: 22px; bottom: calc(100% - 6px); z-index: 10; max-height: 280px; overflow-y: auto; }
-.b-composer-pick .b-menu { width: min(520px, 90vw); }
-.b-composer-pick .b-mi .k { overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
-.b-composer { position: relative; }
+.b-composer .b-chip.image {
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px 0 3px;
+  margin: 0 1px;
+  vertical-align: 1px;
+  color: var(--c-text);
+  background: none;
+  border: 1px solid var(--c-line);
+  border-radius: 9px;
+}
+.b-composer .b-chip.image .thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex: none;
+}
+.b-composer .b-chip.image .thumb.none {
+  display: inline-flex;
+  color: var(--c-text-3);
+  opacity: 0.7;
+}
+.b-composer-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 4px 6px;
+  font: var(--t-12) var(--font-mono);
+  color: var(--c-text-3);
+}
+.b-composer-strip .k {
+  margin-left: 10px;
+}
+.b-composer-strip .n {
+  color: var(--c-text-2);
+}
+.b-composer-pick {
+  position: absolute;
+  left: 22px;
+  bottom: calc(100% - 6px);
+  z-index: 10;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.b-composer-pick .b-menu {
+  width: min(520px, 90vw);
+}
+.b-composer-pick .b-mi .k {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+}
+.b-composer {
+  position: relative;
+}
 /* the key bar (keybar.ts): keys in the text color, what they do dim, 3 spaces between pairs; the tip dim on the right */
 /* never a word cut (designer's try gate D6): the row is one line high and wraps whole items, so
    what doesn't fit goes to a hidden second line: the tip first (it is last), then whole pairs
    from the end; a key never leaves its words (each pair is one item, white-space: pre) */
-.b-composer .keys { display: flex; flex-wrap: wrap; column-gap: 3ch; row-gap: 0; align-items: center; box-sizing: border-box; height: calc(7px + 1lh); overflow: hidden; }
-.b-composer .keys .pairs { display: contents; }
-.b-composer .keys .pair { flex: none; }
-.b-composer .keys .kk { color: var(--c-text-2); }
-.b-composer .keys .tip { flex: none; margin-left: auto; }
-/* the mic control (bar I): its key at rest, a meter and 'listening…' while on; fixed width, so the
+.b-composer .keys {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 3ch;
+  row-gap: 0;
+  align-items: center;
+  box-sizing: border-box;
+  height: calc(7px + 1lh);
+  overflow: hidden;
+}
+.b-composer .keys .pairs {
+  display: contents;
+}
+.b-composer .keys .pair {
+  flex: none;
+}
+.b-composer .keys .kk {
+  color: var(--c-text-2);
+}
+.b-composer .keys .tip {
+  flex: none;
+  margin-left: auto;
+}
+/* the mic control (bar I): its key at rest, the meter alone while on ('listening…' is the field's); fixed width, so the
    key line never moves when it changes */
-.b-composer .keys .mic { flex: none; display: inline-flex; align-items: center; gap: 6px; min-width: 15ch; padding: 1px 4px; margin: -1px -4px; border: 0; border-radius: var(--r-2); background: none; font: inherit; color: inherit; cursor: default; transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out); }
-.b-composer .keys .mic.recording { color: var(--c-text); }
+.b-composer .keys .mic {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 15ch;
+  padding: 1px 4px;
+  margin: -1px -4px;
+  border: 0;
+  border-radius: var(--r-2);
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+  transition:
+    background var(--d-fast) var(--ease-out),
+    color var(--d-fast) var(--ease-out);
+}
+.b-composer .keys .mic.recording {
+  color: var(--c-text);
+}
 /* hover (bar O.6): every composer control shows the pointer is on it, the ds ghost button's
    hover (prim.css .b-btn.ghost); the padding sits in a negative margin, so the key line never moves */
-.b-composer .keys .mic:hover { background: var(--c-hover); color: var(--c-text); }
+.b-composer .keys .mic:hover {
+  background: var(--c-hover);
+  color: var(--c-text);
+}
 /* the ds send has no hover of its own: the ds primary button's (prim.css .b-btn.pri:hover) */
-.b-composer .send { transition: background var(--d-fast) var(--ease-out); }
-.b-composer .send:not(:disabled):not(.off):hover { background: color-mix(in srgb, var(--c-ink) 88%, var(--c-solid)); }
+.b-composer .send {
+  transition: background var(--d-fast) var(--ease-out);
+}
+.b-composer .send:not(:disabled):not(.off):hover {
+  background: color-mix(in srgb, var(--c-ink) 88%, var(--c-solid));
+}
 /* the @ $ / list: the row under the pointer (the picked one keeps its ink) */
-.b-composer-pick .b-mi:not(.on):not(.dis):hover { background: var(--c-hover); }
-.b-composer .keys .mic .meter { display: inline-flex; align-items: center; gap: 2px; height: 10px; }
-.b-composer .keys .mic .meter i { width: 2px; height: calc(3px + 7px * var(--lvl, 0)); border-radius: 1px; background: var(--c-text-2); transition: height 60ms linear; }
-.b-composer .keys .mic .meter i:nth-child(2), .b-composer .keys .mic .meter i:nth-child(4) { height: calc(3px + 5px * var(--lvl, 0)); }
-@media (prefers-reduced-motion: reduce) { .b-composer .keys .mic .meter i { transition: none; } }
+.b-composer-pick .b-mi:not(.on):not(.dis):hover {
+  background: var(--c-hover);
+}
+.b-composer .keys .mic .meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 10px;
+}
+.b-composer .keys .mic .meter i {
+  width: 2px;
+  height: calc(3px + 7px * var(--lvl, 0));
+  border-radius: 1px;
+  background: var(--c-text-2);
+  transition: height 60ms linear;
+}
+.b-composer .keys .mic .meter i:nth-child(2),
+.b-composer .keys .mic .meter i:nth-child(4) {
+  height: calc(3px + 5px * var(--lvl, 0));
+}
+@media (prefers-reduced-motion: reduce) {
+  .b-composer .keys .mic .meter i {
+    transition: none;
+  }
+}
 /* voice mode's ∿ (designer's voice-window page (1)): next to dictate, as wide as its words */
-.b-composer .keys .mic.voice { min-width: 0; }
+.b-composer .keys .mic.voice {
+  min-width: 0;
+}
 /* TP-R6: the 3 s flash of an approvals switch on the label line, its mode word in accent (keybar.rs) */
-.b-composer .flash-word { color: var(--c-text); font-weight: 600; }
+.b-composer .flash-word {
+  color: var(--c-text);
+  font-weight: 600;
+}

@@ -8,29 +8,88 @@
 // The editor is created once per mount on a host element React never renders into: his typing
 // goes keyboard -> contenteditable -> ProseMirror, and nothing writes it back. React state here
 // (the picker, the placeholder) changes on transitions only, never per keystroke.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { Editor } from '@tiptap/core';
-import { UndoRedo } from '@tiptap/extensions';
-import { closeHistory, undo, undoDepth } from '@tiptap/pm/history';
-import { EditorState, TextSelection, type Transaction } from '@tiptap/pm/state';
-import type { EditorView } from '@tiptap/pm/view';
-import type { Slice } from '@tiptap/pm/model';
-import type { ComposerActions, FieldBar } from '../actions';
-import { enterMakesNewline, indent, newline, outdentAtStart, subwordLeft, subwordRight, NO_UNDO, type Op } from '../mdlive';
-import { buildMessage, chipLabel, chipStrip, isLongPaste, nextChipNumber, noVisionLine, preview, type Chip, type Outgoing, type Segment } from '../message';
-import { enqueue, historyAt, keepUnread, load, popNewest, remember, save, takeOldest, type Saved, type Store } from '../drafts';
-import { entryOf, entrySegments } from '../entry';
-import { agentRows, argRows, artifactRows, commandLine, commandRows, completion, emojiRows, enterSends, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from '../pick';
-import { isImagePath, type ComposerSources, type PickFile } from '../sources';
-import { thumbnail } from '../attach';
-import { registerGrab } from '../grab';
-import { argAt, browseText, parentQuery, triggerAt, type Trigger } from '../tokens';
-import { emojiToken, typedEmoji } from '../emoji';
-import { dictated, HOLD_MS } from '../dictate';
-import { DOUBLE_CTRL_R_MS } from '@/voicemode/model';
-import { Picker } from '../Picker';
-import { FIELD_NODES } from './schema';
-import { Colors } from './colors';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type JSX,
+} from "react";
+import { Editor } from "@tiptap/core";
+import { UndoRedo } from "@tiptap/extensions";
+import { closeHistory, undo, undoDepth } from "@tiptap/pm/history";
+import { EditorState, TextSelection, type Transaction } from "@tiptap/pm/state";
+import type { EditorView } from "@tiptap/pm/view";
+import type { Slice } from "@tiptap/pm/model";
+import type { ComposerActions, FieldBar } from "../actions";
+import {
+  enterMakesNewline,
+  indent,
+  newline,
+  outdentAtStart,
+  subwordLeft,
+  subwordRight,
+  NO_UNDO,
+  type Op,
+} from "../mdlive";
+import {
+  buildMessage,
+  chipLabel,
+  chipStrip,
+  isLongPaste,
+  nextChipNumber,
+  noVisionLine,
+  preview,
+  type Chip,
+  type Outgoing,
+  type Segment,
+} from "../message";
+import {
+  enqueue,
+  historyAt,
+  keepUnread,
+  load,
+  popNewest,
+  remember,
+  save,
+  takeOldest,
+  type Saved,
+  type Store,
+} from "../drafts";
+import { entryOf, entrySegments } from "../entry";
+import {
+  agentRows,
+  argRows,
+  artifactRows,
+  commandLine,
+  commandRows,
+  completion,
+  emojiRows,
+  enterSends,
+  fileRows,
+  move,
+  skillRows,
+  MAX_ROWS,
+  type Pick,
+  type Row,
+} from "../pick";
+import { isImagePath, type ComposerSources, type PickFile } from "../sources";
+import { thumbnail } from "../attach";
+import { registerGrab } from "../grab";
+import {
+  argAt,
+  browseText,
+  parentQuery,
+  triggerAt,
+  type Trigger,
+} from "../tokens";
+import { emojiToken, typedEmoji } from "../emoji";
+import { dictated, HOLD_MS } from "../dictate";
+import { DOUBLE_CTRL_R_MS } from "@/voicemode/model";
+import { Picker } from "../Picker";
+import { FIELD_NODES } from "./schema";
+import { Colors } from "./colors";
 import {
   applyOp,
   beforeCaret,
@@ -48,7 +107,7 @@ import {
   posOf,
   segmentsOf,
   selectRange,
-} from './pmtext';
+} from "./pmtext";
 
 export interface PmFieldProps {
   readonly target: string;
@@ -78,22 +137,34 @@ export interface PmFieldProps {
 /** The draft is written this long after the last change (never on each key of a burst). */
 const DRAFT_DEBOUNCE_MS = 400;
 
-const triggerKey = (t: Trigger | null): string => (t === null ? '' : `${t.kind}:${t.start}:${t.quoted ? 'q' : ''}:${t.query}`);
+const triggerKey = (t: Trigger | null): string =>
+  t === null ? "" : `${t.kind}:${t.start}:${t.quoted ? "q" : ""}:${t.query}`;
 
 /** On a command line, the argument being typed (its popup), before any @ or $ in it. */
-function slotOf(text: string, messageStart: boolean, sources: ComposerSources): Trigger | null {
-  const find = (name: string) => sources.commands.find((c) => `/${c.name.replace(/^\//u, '')}` === name);
+function slotOf(
+  text: string,
+  messageStart: boolean,
+  sources: ComposerSources,
+): Trigger | null {
+  const find = (name: string) =>
+    sources.commands.find((c) => `/${c.name.replace(/^\//u, "")}` === name);
   return argAt(
     text,
     messageStart,
     (name) => find(name) !== undefined,
-    (name, i) => find(name)?.argKinds?.[i] === 'text',
+    (name, i) => find(name)?.argKinds?.[i] === "text",
   );
 }
 
 /** What the clipboard reads of a selection: chips as their labels, a newline '\n', no dictation. */
 export function clipboardText(slice: Slice): string {
-  return slice.content.textBetween(0, slice.content.size, '\n', (n) => (n.type.name === 'hardBreak' ? '\n' : n.type.name === 'chip' ? chipLabel(n.attrs.chip as Chip) : ''));
+  return slice.content.textBetween(0, slice.content.size, "\n", (n) =>
+    n.type.name === "hardBreak"
+      ? "\n"
+      : n.type.name === "chip"
+        ? chipLabel(n.attrs.chip as Chip)
+        : "",
+  );
 }
 
 /** The state's selection made the DOM's before a key reads the caret. ProseMirror reads a native
@@ -101,20 +172,29 @@ export function clipboardText(slice: Slice): string {
  *  (qa-type's list-indent: ← then ⌫ outdented nothing, the native ⌫ ate the space). */
 function syncSelection(v: EditorView): void {
   const ds = v.dom.ownerDocument.getSelection();
-  if (ds?.anchorNode == null || ds.focusNode == null || !v.dom.contains(ds.anchorNode) || !v.dom.contains(ds.focusNode)) return;
+  if (
+    ds?.anchorNode == null ||
+    ds.focusNode == null ||
+    !v.dom.contains(ds.anchorNode) ||
+    !v.dom.contains(ds.focusNode)
+  )
+    return;
   try {
     const anchor = v.posAtDOM(ds.anchorNode, ds.anchorOffset);
     const head = v.posAtDOM(ds.focusNode, ds.focusOffset);
     const s = v.state.selection;
     if (s.anchor === anchor && s.head === head) return;
-    v.dispatch(v.state.tr.setSelection(TextSelection.create(v.state.doc, anchor, head)));
+    v.dispatch(
+      v.state.tr.setSelection(TextSelection.create(v.state.doc, anchor, head)),
+    );
   } catch {
     // a DOM place ProseMirror can't map (inside a chip's view): its own selection stays
   }
 }
 
 /** A transaction kept out of the undo history (the dictation's live node). */
-const offHistory = (tr: Transaction): Transaction => tr.setMeta('addToHistory', false);
+const offHistory = (tr: Transaction): Transaction =>
+  tr.setMeta("addToHistory", false);
 
 export function PmField(p: PmFieldProps): JSX.Element {
   const props = useRef(p);
@@ -126,11 +206,15 @@ export function PmField(p: PmFieldProps): JSX.Element {
   // he put a caret in the field once: a quote from outside goes at that caret, else at the end
   const hadFocus = useRef(false);
   const [blank, setBlank] = useState(true);
+  // a dictation node in the field: the placeholder hides, one line shows ('listening…' or his
+  // words), never both on top of each other (his try a43609b2, ambient-lead m_19364)
+  const [dictShown, setDictShown] = useState(false);
   // the editor's handlers read the latest closures through these (set after each render)
   const changed = useRef<(tr: Transaction | null) => void>(() => undefined);
   const keys = useRef<(e: KeyboardEvent) => boolean>(() => false);
   const paste = useRef<(e: ClipboardEvent) => boolean>(() => false);
   const drop = useRef<(e: DragEvent) => boolean>(() => false);
+  const ctrlR = useRef<(e: KeyboardEvent) => boolean>(() => false);
 
   const view = (): EditorView | null => ed.current?.view ?? null;
   const state = (): EditorState | null => ed.current?.state ?? null;
@@ -156,7 +240,10 @@ export function PmField(p: PmFieldProps): JSX.Element {
     timer.current = null;
     const st = state();
     if (st === null) return;
-    saved.current = { ...saved.current, draft: isBlank(st.doc) ? null : entryOf(segmentsOf(st.doc)) };
+    saved.current = {
+      ...saved.current,
+      draft: isBlank(st.doc) ? null : entryOf(segmentsOf(st.doc)),
+    };
     save(props.current.store, props.current.target, saved.current);
   };
 
@@ -179,7 +266,13 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const v = view();
     if (v === null) return;
     const st = v.state;
-    v.updateState(EditorState.create({ doc: st.doc, selection: st.selection, plugins: st.plugins }));
+    v.updateState(
+      EditorState.create({
+        doc: st.doc,
+        selection: st.selection,
+        plugins: st.plugins,
+      }),
+    );
   };
 
   // ---- the editor: created once, on a host React never renders into ----
@@ -189,19 +282,23 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const ph = props.current.placeholder;
     const editor = new Editor({
       element: el,
-      extensions: [...FIELD_NODES, Colors, UndoRedo.configure({ depth: 100, newGroupDelay: 500 })],
+      extensions: [
+        ...FIELD_NODES,
+        Colors,
+        UndoRedo.configure({ depth: 100, newGroupDelay: 500 }),
+      ],
       injectCSS: false,
       enableInputRules: false,
       enablePasteRules: false,
       editorProps: {
         attributes: {
-          class: 'b-field',
-          'data-testid': `${props.current.testId}.field`,
-          'aria-label': ph,
-          'aria-multiline': 'true',
-          'aria-placeholder': ph,
-          role: 'textbox',
-          spellcheck: 'true',
+          class: "b-field",
+          "data-testid": `${props.current.testId}.field`,
+          "aria-label": ph,
+          "aria-multiline": "true",
+          "aria-placeholder": ph,
+          role: "textbox",
+          spellcheck: "true",
         },
         handleKeyDown: (_v, e) => keys.current(e),
         handlePaste: (_v, e) => paste.current(e),
@@ -219,7 +316,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const onTr = ({ transaction }: { transaction: Transaction }): void => {
       changed.current(transaction);
     };
-    editor.on('transaction', onTr);
+    editor.on("transaction", onTr);
     // a key or a paste with nothing focused comes here, the caret at the end (grab.ts, main m_16044)
     const unGrab = registerGrab({
       el: editor.view.dom,
@@ -229,11 +326,12 @@ export function PmField(p: PmFieldProps): JSX.Element {
         v.focus();
       },
       paste: (e) => paste.current(e),
+      ctrlR: (e) => ctrlR.current(e),
     });
     return () => {
       unGrab();
       writeNow(); // the screen goes: the draft is kept before the editor does
-      editor.off('transaction', onTr);
+      editor.off("transaction", onTr);
       editor.destroy();
       ed.current = null;
     };
@@ -243,8 +341,8 @@ export function PmField(p: PmFieldProps): JSX.Element {
   // the field's label follows the placeholder (the target's name)
   useEffect(() => {
     const dom = view()?.dom;
-    dom?.setAttribute('aria-label', p.placeholder);
-    dom?.setAttribute('aria-placeholder', p.placeholder);
+    dom?.setAttribute("aria-label", p.placeholder);
+    dom?.setAttribute("aria-placeholder", p.placeholder);
   }, [p.placeholder]);
 
   useEffect(() => {
@@ -266,13 +364,16 @@ export function PmField(p: PmFieldProps): JSX.Element {
   // ---- the picker ----
   const [trigger, setTrigger] = useState<Trigger | null>(null);
   const [openedAt, setOpenedAt] = useState(0);
-  const [files, setFiles] = useState<{ key: string; items: readonly PickFile[] }>({ key: '', items: [] });
-  const [sel, setSel] = useState({ key: '', i: 0 });
-  const [dismissed, setDismissed] = useState('');
+  const [files, setFiles] = useState<{
+    key: string;
+    items: readonly PickFile[];
+  }>({ key: "", items: [] });
+  const [sel, setSel] = useState({ key: "", i: 0 });
+  const [dismissed, setDismissed] = useState("");
   const tkey = triggerKey(trigger);
 
   useEffect(() => {
-    if (trigger?.kind !== 'at') return;
+    if (trigger?.kind !== "at") return;
     let live = true;
     const key = tkey;
     void p.sources.files(trigger.query).then((items) => {
@@ -286,26 +387,41 @@ export function PmField(p: PmFieldProps): JSX.Element {
   const rows = useMemo<Row[]>(() => {
     if (trigger === null) return [];
     const all =
-      trigger.kind === 'at'
-        ? [...agentRows(trigger, p.sources.agents), ...artifactRows(trigger, p.sources.artifacts ?? [], openedAt), ...(files.key === tkey ? fileRows(files.items) : [])]
-        : trigger.kind === 'skill'
+      trigger.kind === "at"
+        ? [
+            ...agentRows(trigger, p.sources.agents),
+            ...artifactRows(trigger, p.sources.artifacts ?? [], openedAt),
+            ...(files.key === tkey ? fileRows(files.items) : []),
+          ]
+        : trigger.kind === "skill"
           ? skillRows(trigger, p.sources.skills)
-          : trigger.kind === 'arg'
+          : trigger.kind === "arg"
             ? argRows(trigger, p.sources.commands, p.sources)
-            : trigger.kind === 'emoji'
+            : trigger.kind === "emoji"
               ? emojiRows(trigger)
               : commandRows(trigger, p.sources.commands);
     return all.slice(0, MAX_ROWS);
   }, [trigger, tkey, files, p.sources, openedAt]);
 
-  const open = trigger !== null && rows.length > 0 && dismissed !== `${trigger.kind}:${trigger.start}`;
+  const open =
+    trigger !== null &&
+    rows.length > 0 &&
+    dismissed !== `${trigger.kind}:${trigger.start}`;
   // after ← / ⌫ up a folder the keyboard's row is the folder he came from (→ goes back in), as a
   // file browser does: derived in the same render as the rows, so a quick → never lands on row 0
   const [left, setLeft] = useState<string | null>(null);
-  const leftIndex = left === null || trigger?.kind !== 'at' ? -1 : rows.findIndex((r) => r.id === `file.${left}` || r.id === `file.${left}/`);
-  const index = sel.key === tkey ? Math.min(sel.i, Math.max(0, rows.length - 1)) : Math.max(0, leftIndex);
+  const leftIndex =
+    left === null || trigger?.kind !== "at"
+      ? -1
+      : rows.findIndex(
+          (r) => r.id === `file.${left}` || r.id === `file.${left}/`,
+        );
+  const index =
+    sel.key === tkey
+      ? Math.min(sel.i, Math.max(0, rows.length - 1))
+      : Math.max(0, leftIndex);
   const live = useRef({ open, rows, index, trigger, tkey });
-  const fileList = open && trigger.kind === 'at';
+  const fileList = open && trigger.kind === "at";
   useEffect(() => {
     live.current = { open, rows, index, trigger, tkey };
   });
@@ -323,15 +439,24 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const st = state();
     if (st === null) return;
     const segs = segmentsOf(st.doc);
-    if (segs.length === 0 || segs.every((s) => s.kind === 'text' && s.text.trim() === '')) {
+    if (
+      segs.length === 0 ||
+      segs.every((s) => s.kind === "text" && s.text.trim() === "")
+    ) {
       props.current.onEmptyEnter?.();
       return;
     }
     const entry = entryOf(segs);
-    const only = segs.length === 1 && segs[0]?.kind === 'text' ? segs[0].text : null;
-    const cmd = only === null ? null : commandLine(only, props.current.sources.commands);
+    const only =
+      segs.length === 1 && segs[0]?.kind === "text" ? segs[0].text : null;
+    const cmd =
+      only === null ? null : commandLine(only, props.current.sources.commands);
     const model = props.current.sources.noVision;
-    if (cmd === null && model !== undefined && segs.some((s) => s.kind === 'chip' && s.chip.kind === 'image')) {
+    if (
+      cmd === null &&
+      model !== undefined &&
+      segs.some((s) => s.kind === "chip" && s.chip.kind === "image")
+    ) {
       say(noVisionLine(model)); // K4: nothing sent, the draft and its chips stay
       return;
     }
@@ -352,17 +477,26 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const st = state();
     const at = st === null ? null : caretOf(st);
     if (st === null || at === null) return;
-    dispatch(applyOp(st, { from: at - count, to: at, insert: text, caret: at - count + text.length }));
+    dispatch(
+      applyOp(st, {
+        from: at - count,
+        to: at,
+        insert: text,
+        caret: at - count + text.length,
+      }),
+    );
   };
 
   const apply = (pick: Pick): void => {
     const t = live.current.trigger;
     if (t === null) return;
-    if (pick.kind === 'run') {
-      const cmd = props.current.sources.commands.find((c) => `/${c.name.replace(/^\//u, '')}` === pick.name);
+    if (pick.kind === "run") {
+      const cmd = props.current.sources.commands.find(
+        (c) => `/${c.name.replace(/^\//u, "")}` === pick.name,
+      );
       if (cmd?.ready !== true) return;
       saved.current = remember(saved.current, entryNow());
-      props.current.command(pick.name, '');
+      props.current.command(pick.name, "");
       clear();
       forget();
       writeNow();
@@ -372,14 +506,24 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const before = st === null ? null : beforeCaret(st);
     if (st === null || before === null) return;
     const word = before.text.slice(t.start).length;
-    if (pick.kind === 'artifact') {
+    if (pick.kind === "artifact") {
       // W11: the @word goes, the artifact's chip comes (attach.rs insert_artifact)
-      replaceBefore(word, '');
+      replaceBefore(word, "");
       const now = state();
-      if (now !== null) dispatch(insertChip(now, { kind: 'artifact', n: nextChipNumber(segmentsOf(now.doc)), id: pick.id, title: pick.title, url: pick.url }));
+      if (now !== null)
+        dispatch(
+          insertChip(now, {
+            kind: "artifact",
+            n: nextChipNumber(segmentsOf(now.doc)),
+            id: pick.id,
+            title: pick.title,
+            url: pick.url,
+          }),
+        );
       return;
     }
-    if (pick.path !== undefined && !pick.browse) props.current.sources.filePicked?.(pick.path); // B8/R14: the core's memory
+    if (pick.path !== undefined && !pick.browse)
+      props.current.sources.filePicked?.(pick.path); // B8/R14: the core's memory
     replaceBefore(word, pick.text);
   };
 
@@ -389,7 +533,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const before = st === null ? null : beforeCaret(st);
     if (before === null) return false;
     const t = triggerAt(before.text, before.messageStart);
-    if (t?.kind !== 'at') return false;
+    if (t?.kind !== "at") return false;
     const up = parentQuery(t.query);
     if (up === null) return false;
     setLeft(t.query.slice(0, -1));
@@ -412,34 +556,52 @@ export function PmField(p: PmFieldProps): JSX.Element {
 
   const addChip = (make: (n: number) => Chip): void => {
     const st = state();
-    if (st !== null) dispatch(insertChip(st, make(nextChipNumber(segmentsOf(st.doc)))));
+    if (st !== null)
+      dispatch(insertChip(st, make(nextChipNumber(segmentsOf(st.doc)))));
   };
 
   const addImages = (list: readonly File[]): void => {
     for (const f of list) {
-      void Promise.all([props.current.sources.saveImage(f), thumbnail(f)]).then(([img, thumb]) => {
-        if (img !== null) addChip((n) => ({ kind: 'image', n, path: img.path, name: img.name, ...(thumb === null ? {} : { thumb }) }));
-      });
+      void Promise.all([props.current.sources.saveImage(f), thumbnail(f)]).then(
+        ([img, thumb]) => {
+          if (img !== null)
+            addChip((n) => ({
+              kind: "image",
+              n,
+              path: img.path,
+              name: img.name,
+              ...(thumb === null ? {} : { thumb }),
+            }));
+        },
+      );
     }
   };
 
   /** A long paste: inline first, then its chip in a second undo step (⌘Z puts it back inline). */
   const longPaste = (raw: string): void => {
-    const text = raw.replace(/\r\n?/gu, '\n');
+    const text = raw.replace(/\r\n?/gu, "\n");
     const st = state();
     if (st === null) return;
     const start = st.selection.from;
-    dispatch(closeHistory(insertText(st, text).setMeta('paste', true)));
+    dispatch(closeHistory(insertText(st, text).setMeta("paste", true)));
     const now = state();
     if (now === null) return;
-    const chip: Chip = { kind: 'paste', n: nextChipNumber(segmentsOf(now.doc)), text };
-    const tr = now.tr.replaceWith(start, start + text.length, nodeType(now.schema, 'chip').create({ chip }));
+    const chip: Chip = {
+      kind: "paste",
+      n: nextChipNumber(segmentsOf(now.doc)),
+      text,
+    };
+    const tr = now.tr.replaceWith(
+      start,
+      start + text.length,
+      nodeType(now.schema, "chip").create({ chip }),
+    );
     tr.setSelection(TextSelection.create(tr.doc, start + 1));
     dispatch(closeHistory(tr));
   };
 
   // ---- the strip above the box: the chips and the queue, re-drawn only when they change ----
-  const lastStrip = useRef('');
+  const lastStrip = useRef("");
   const note = useRef<string | null>(null);
   const pushStrip = (chips: readonly Chip[]): void => {
     const q = saved.current.queue;
@@ -449,7 +611,14 @@ export function PmField(p: PmFieldProps): JSX.Element {
     lastStrip.current = key;
     props.current.onStrip(
       chips.length === 0 && q.length === 0 && n === null ? null : (
-        <Strip chips={chips} queued={q.map((e) => preview(buildMessage(entrySegments(e) ?? []).text, 48))} note={n} testId={props.current.testId} />
+        <Strip
+          chips={chips}
+          queued={q.map((e) =>
+            preview(buildMessage(entrySegments(e) ?? []).text, 48),
+          )}
+          note={n}
+          testId={props.current.testId}
+        />
       ),
     );
   };
@@ -463,8 +632,14 @@ export function PmField(p: PmFieldProps): JSX.Element {
   };
 
   // ---- the key bar's mode: reported when it changes, never per keystroke ----
-  const bar = useRef<FieldBar>({ fileList: false, selected: false, images: false, typing: false, dictating: null });
-  const lastBar = useRef('');
+  const bar = useRef<FieldBar>({
+    fileList: false,
+    selected: false,
+    images: false,
+    typing: false,
+    dictating: null,
+  });
+  const lastBar = useRef("");
   const pushBar = (part: Partial<FieldBar>): void => {
     bar.current = { ...bar.current, ...part };
     const key = JSON.stringify(bar.current);
@@ -481,7 +656,12 @@ export function PmField(p: PmFieldProps): JSX.Element {
   // one undo step. Esc cancels it: the node goes, the text around it stays ----
   /** the last ctrl+r's time (the double press is voice mode) */
   const lastR = useRef(Number.NEGATIVE_INFINITY);
-  const dict = useRef<{ id: string; mic: boolean; downAt: number; off: () => void } | null>(null);
+  const dict = useRef<{
+    id: string;
+    mic: boolean;
+    downAt: number;
+    off: () => void;
+  } | null>(null);
   const dictUpdate = (): void => {
     const d = dict.current;
     const port = props.current.sources.dictate;
@@ -493,7 +673,15 @@ export function PmField(p: PmFieldProps): JSX.Element {
     if (!s.final) {
       if (at !== null && !s.cancelled) {
         const node = st.doc.nodeAt(posOf(at));
-        if (node !== null && node.attrs.text !== s.text) dispatch(offHistory(st.tr.setNodeMarkup(posOf(at), undefined, { ...node.attrs, text: s.text })));
+        if (node !== null && node.attrs.text !== s.text)
+          dispatch(
+            offHistory(
+              st.tr.setNodeMarkup(posOf(at), undefined, {
+                ...node.attrs,
+                text: s.text,
+              }),
+            ),
+          );
       }
       return;
     }
@@ -506,13 +694,24 @@ export function PmField(p: PmFieldProps): JSX.Element {
       const caretAfter = st.selection.from > posOf(at);
       const rm = offHistory(st.tr.delete(posOf(at), posOf(at) + 1));
       dispatch(rm);
-      const words = s.cancelled ? '' : dictated(s.text, before);
+      const words = s.cancelled ? "" : dictated(s.text, before);
       const now = state();
-      if (now !== null && words !== '') {
+      if (now !== null && words !== "") {
         const keep = now.selection;
-        const tr = now.tr.replaceWith(posOf(at), posOf(at), now.schema.text(words));
+        const tr = now.tr.replaceWith(
+          posOf(at),
+          posOf(at),
+          now.schema.text(words),
+        );
         // the caret: after his words when it was after the node, else where it was
-        tr.setSelection(caretAfter || keep.from === posOf(at) ? TextSelection.create(tr.doc, posOf(at) + words.length + (keep.from - posOf(at))) : keep.map(tr.doc, tr.mapping));
+        tr.setSelection(
+          caretAfter || keep.from === posOf(at)
+            ? TextSelection.create(
+                tr.doc,
+                posOf(at) + words.length + (keep.from - posOf(at)),
+              )
+            : keep.map(tr.doc, tr.mapping),
+        );
         dispatch(closeHistory(tr));
       }
     }
@@ -522,14 +721,23 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const port = props.current.sources.dictate;
     const st = state();
     if (port === undefined || dict.current !== null || st === null) return;
-    const d = { id: '', mic: true, downAt, off: (): void => undefined };
+    const d = { id: "", mic: true, downAt, off: (): void => undefined };
     dict.current = d;
     const { from, to } = st.selection;
-    const lead = dictated('x', plainText(st.doc).slice(0, offsetOf(from))).startsWith(' ') ? ' ' : '';
-    const tr = st.tr.replaceWith(from, to, nodeType(st.schema, 'dictation').create({ text: '', lead }));
+    const lead = dictated(
+      "x",
+      plainText(st.doc).slice(0, offsetOf(from)),
+    ).startsWith(" ")
+      ? " "
+      : "";
+    const tr = st.tr.replaceWith(
+      from,
+      to,
+      nodeType(st.schema, "dictation").create({ text: "", lead }),
+    );
     tr.setSelection(TextSelection.create(tr.doc, from + 1));
     dispatch(offHistory(tr));
-    pushBar({ dictating: 'recording' });
+    pushBar({ dictating: "recording" });
     d.id = port.start();
     d.off = port.subscribe(d.id, dictUpdate);
     dictUpdate(); // a refusal comes at once ('the mic is busy.')
@@ -539,21 +747,56 @@ export function PmField(p: PmFieldProps): JSX.Element {
     if (d === null || !d.mic) return;
     d.mic = false;
     props.current.sources.dictate?.stop(d.id);
-    if (dict.current !== null) pushBar({ dictating: 'transcribing' });
+    if (dict.current !== null) pushBar({ dictating: "transcribing" });
   };
   const dictCancel = (): void => {
     const d = dict.current;
     if (d !== null) props.current.sources.dictate?.cancel(d.id);
   };
+  /** ctrl+r: the mic on (held: push-to-talk; pressed: on until a key), again: off; twice within
+   *  DOUBLE_CTRL_R_MS (the TUI's): voice mode. In the field, or anywhere in the window through
+   *  grab.ts (his try a43609b2): the same press count either way. False: not this key. */
+  const onCtrlR = (e: KeyboardEvent): boolean => {
+    if (
+      !e.ctrlKey ||
+      e.metaKey ||
+      e.altKey ||
+      e.shiftKey ||
+      e.key.toLowerCase() !== "r" ||
+      props.current.sources.dictate === undefined
+    )
+      return false;
+    e.preventDefault();
+    if (e.repeat) return true;
+    // the first press's dictation cancelled (amb-home's src/voicemode; one ctrl+r stays dictation)
+    const voice = props.current.sources.voice;
+    const twice =
+      voice !== undefined && e.timeStamp - lastR.current < DOUBLE_CTRL_R_MS;
+    lastR.current = e.timeStamp;
+    if (twice) {
+      lastR.current = Number.NEGATIVE_INFINITY;
+      if (dict.current !== null) dictCancel();
+      voice();
+      return true;
+    }
+    if (dict.current === null) dictStart(e.timeStamp);
+    else if (dict.current.mic) dictStop();
+    return true;
+  };
   useEffect(() => {
     const up = (e: KeyboardEvent): void => {
       const d = dict.current;
-      if (d === null || !d.mic || (e.key.toLowerCase() !== 'r' && e.key !== 'Control')) return;
+      if (
+        d === null ||
+        !d.mic ||
+        (e.key.toLowerCase() !== "r" && e.key !== "Control")
+      )
+        return;
       if (e.timeStamp - d.downAt >= HOLD_MS) dictStop();
     };
-    window.addEventListener('keyup', up, true);
+    window.addEventListener("keyup", up, true);
     return () => {
-      window.removeEventListener('keyup', up, true);
+      window.removeEventListener("keyup", up, true);
       dictCancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- registered once; reads refs
@@ -572,7 +815,11 @@ export function PmField(p: PmFieldProps): JSX.Element {
     fill: (text) => {
       const st = state();
       if (st === null) return;
-      const tr = st.tr.replaceWith(0, st.doc.content.size, docOf(st.schema, [{ kind: 'text', text }]).content);
+      const tr = st.tr.replaceWith(
+        0,
+        st.doc.content.size,
+        docOf(st.schema, [{ kind: "text", text }]).content,
+      );
       tr.setSelection(TextSelection.create(tr.doc, 1, tr.doc.content.size - 1));
       dispatch(tr);
       view()?.focus();
@@ -587,14 +834,22 @@ export function PmField(p: PmFieldProps): JSX.Element {
       v.focus();
     },
     quote: (text, from, at) => {
-      if (text.trim() === '') return;
+      if (text.trim() === "") return;
       const st = state();
       if (st === null) return;
       // at his caret (kept while the field is blurred), after his selected words if any; a field
       // he never put a caret in: at the draft's end (lead m_11968). The caret goes after the chip.
-      const chip: Chip = { kind: 'quote', n: nextChipNumber(segmentsOf(st.doc)), text, from, ...(at === undefined ? {} : { at }) };
-      const pos = hadFocus.current ? st.selection.to : TextSelection.atEnd(st.doc).from;
-      const node = nodeType(st.schema, 'chip').create({ chip });
+      const chip: Chip = {
+        kind: "quote",
+        n: nextChipNumber(segmentsOf(st.doc)),
+        text,
+        from,
+        ...(at === undefined ? {} : { at }),
+      };
+      const pos = hadFocus.current
+        ? st.selection.to
+        : TextSelection.atEnd(st.doc).from;
+      const node = nodeType(st.schema, "chip").create({ chip });
       const tr = st.tr.insert(pos, node);
       tr.setSelection(TextSelection.create(tr.doc, pos + node.nodeSize));
       dispatch(tr);
@@ -606,16 +861,24 @@ export function PmField(p: PmFieldProps): JSX.Element {
   });
 
   // ---- each transaction: what he typed, read (never written back) ----
-  const lastTrigger = useRef('');
+  const lastTrigger = useRef("");
   const lastBefore = useRef<string | null>(null);
   const onChange = (tr: Transaction | null): void => {
     const st = state();
     if (st === null) return;
     const b = isBlank(st.doc);
+    setDictShown(dictationAt(st.doc) !== null);
     const before = beforeCaret(st);
     const segs = segmentsOf(st.doc);
     const typedColon =
-      tr !== null && tr.docChanged && before !== null && lastBefore.current !== null && before.text === `${lastBefore.current}:` && tr.getMeta('history$') === undefined && tr.getMeta('paste') !== true && tr.getMeta('uiEvent') !== 'paste';
+      tr !== null &&
+      tr.docChanged &&
+      before !== null &&
+      lastBefore.current !== null &&
+      before.text === `${lastBefore.current}:` &&
+      tr.getMeta("history$") === undefined &&
+      tr.getMeta("paste") !== true &&
+      tr.getMeta("uiEvent") !== "paste";
     lastBefore.current = before?.text ?? null;
     const em = typedColon ? typedEmoji(before.text) : null;
     if (em !== null && before !== null) {
@@ -627,19 +890,31 @@ export function PmField(p: PmFieldProps): JSX.Element {
     }
     setBlank(b);
     props.current.onCanSend(!b);
-    pushBar({ selected: !st.selection.empty, typing: !b, images: segs.some((x) => x.kind === 'chip' && x.chip.kind === 'image') });
+    pushBar({
+      selected: !st.selection.empty,
+      typing: !b,
+      images: segs.some((x) => x.kind === "chip" && x.chip.kind === "image"),
+    });
     const emojiTrigger = (text: string): Trigger | null => {
       const e = emojiToken(text);
-      return e === null ? null : { kind: 'emoji', query: e.query, start: e.start, quoted: false };
+      return e === null
+        ? null
+        : { kind: "emoji", query: e.query, start: e.start, quoted: false };
     };
-    const t = before === null ? null : (slotOf(before.text, before.messageStart, props.current.sources) ?? triggerAt(before.text, before.messageStart) ?? emojiTrigger(before.text));
+    const t =
+      before === null
+        ? null
+        : (slotOf(before.text, before.messageStart, props.current.sources) ??
+          triggerAt(before.text, before.messageStart) ??
+          emojiTrigger(before.text));
     const k = triggerKey(t);
     if (k !== lastTrigger.current) {
       lastTrigger.current = k;
       setTrigger(t);
       setOpenedAt(Date.now());
     }
-    const edited = tr?.docChanged === true && tr.getMeta('addToHistory') !== false;
+    const edited =
+      tr?.docChanged === true && tr.getMeta("addToHistory") !== false;
     if (edited) note.current = null;
     pushStrip(chipsOf(st.doc));
     if (edited) {
@@ -669,74 +944,88 @@ export function PmField(p: PmFieldProps): JSX.Element {
     };
     const k = e.key;
     const plain = !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey;
-    // ctrl+r: the mic on (held: push-to-talk; pressed: on until a key), again: off
-    if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && k.toLowerCase() === 'r' && props.current.sources.dictate !== undefined) {
-      e.preventDefault();
-      if (e.repeat) return true;
-      // ctrl+r twice within DOUBLE_CTRL_R_MS (the TUI's): voice mode, the first press's
-      // dictation cancelled (amb-home's src/voicemode; one ctrl+r stays dictation)
-      const voice = props.current.sources.voice;
-      const twice = voice !== undefined && e.timeStamp - lastR.current < DOUBLE_CTRL_R_MS;
-      lastR.current = e.timeStamp;
-      if (twice) {
-        lastR.current = Number.NEGATIVE_INFINITY;
-        if (dict.current !== null) dictCancel();
-        voice();
-        return true;
-      }
-      if (dict.current === null) dictStart(e.timeStamp);
-      else if (dict.current.mic) dictStop();
-      return true;
-    }
-    if (dict.current !== null && k === 'Enter') {
+    if (onCtrlR(e)) return true;
+    // another key between two ctrl+r: not a double press (esc, his words, then ctrl+r is dictation)
+    if (k !== "Control" && k !== "Shift" && k !== "Alt" && k !== "Meta")
+      lastR.current = Number.NEGATIVE_INFINITY;
+    if (dict.current !== null && k === "Enter") {
       // never send half a dictation: ⏎ turns the mic off, the words come in to read
       e.preventDefault();
       dictStop();
       return true;
     }
-    if (dict.current !== null && k === 'Escape') {
+    if (dict.current !== null && k === "Escape") {
       e.preventDefault();
       dictCancel();
       return true;
     }
-    if (dict.current?.mic === true && !['Control', 'Shift', 'Alt', 'Meta', 'Escape', 'CapsLock'].includes(k)) dictStop();
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && k.toLowerCase() === 'z') {
+    if (
+      dict.current?.mic === true &&
+      !["Control", "Shift", "Alt", "Meta", "Escape", "CapsLock"].includes(k)
+    )
+      dictStop();
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      !e.shiftKey &&
+      !e.altKey &&
+      k.toLowerCase() === "z"
+    ) {
       e.preventDefault();
       if (undoDepth(st) > 0) undo(st, v.dispatch);
       else say(NO_UNDO);
       return true;
     }
-    if (e.ctrlKey && e.altKey && !e.metaKey && (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'Backspace' || k === 'Delete')) {
+    if (
+      e.ctrlKey &&
+      e.altKey &&
+      !e.metaKey &&
+      (k === "ArrowLeft" ||
+        k === "ArrowRight" ||
+        k === "Backspace" ||
+        k === "Delete")
+    ) {
       const a = at();
       if (a === null) return false;
       e.preventDefault();
-      const left = k === 'ArrowLeft' || k === 'Backspace';
-      const to = left ? subwordLeft(a.text, a.caret) : subwordRight(a.text, a.caret);
-      if (k === 'ArrowLeft' || k === 'ArrowRight') dispatch(selectRange(st, to, to));
-      else dispatch(applyOp(st, { from: Math.min(to, a.caret), to: Math.max(to, a.caret), insert: '', caret: Math.min(to, a.caret) }));
+      const left = k === "ArrowLeft" || k === "Backspace";
+      const to = left
+        ? subwordLeft(a.text, a.caret)
+        : subwordRight(a.text, a.caret);
+      if (k === "ArrowLeft" || k === "ArrowRight")
+        dispatch(selectRange(st, to, to));
+      else
+        dispatch(
+          applyOp(st, {
+            from: Math.min(to, a.caret),
+            to: Math.max(to, a.caret),
+            insert: "",
+            caret: Math.min(to, a.caret),
+          }),
+        );
       return true;
     }
     const l = live.current;
     switch (k) {
-      case 'Backspace':
+      case "Backspace":
         if (!plain) return false;
         if (folderUp()) {
           e.preventDefault();
           return true;
         }
         return run(outdentAtStart);
-      case 'ArrowRight': {
+      case "ArrowRight": {
         const row = l.rows[l.index];
-        if (!l.open || l.trigger?.kind !== 'at' || row?.tag !== 'dir' || !plain) return false;
+        if (!l.open || l.trigger?.kind !== "at" || row?.tag !== "dir" || !plain)
+          return false;
         e.preventDefault();
         apply(row.pick);
         return true;
       }
-      case 'ArrowLeft':
+      case "ArrowLeft":
         if (!plain || !folderUp()) return false;
         e.preventDefault();
         return true;
-      case 'Enter': {
+      case "Enter": {
         if (e.metaKey && !l.open) {
           e.preventDefault();
           submit();
@@ -754,14 +1043,14 @@ export function PmField(p: PmFieldProps): JSX.Element {
           // ⇧⏎ a new line, a list item continued; ⏎ in a ``` block a new line too (mdlive.rs)
           if (run(newline)) return true;
           e.preventDefault();
-          dispatch(insertText(v.state, '\n'));
+          dispatch(insertText(v.state, "\n"));
           return true;
         }
         e.preventDefault();
         submit();
         return true;
       }
-      case 'Tab': {
+      case "Tab": {
         if (l.open) {
           e.preventDefault();
           const row = l.rows[l.index];
@@ -770,7 +1059,13 @@ export function PmField(p: PmFieldProps): JSX.Element {
         }
         // approvals-design.md §8.1 (the TUI's input.rs): in the composer shift+tab always switches
         // yolo ↔ auto (a list item outdents with backspace)
-        if (e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && props.current.onShiftTab !== undefined) {
+        if (
+          e.shiftKey &&
+          !e.altKey &&
+          !e.metaKey &&
+          !e.ctrlKey &&
+          props.current.onShiftTab !== undefined
+        ) {
           e.preventDefault();
           props.current.onShiftTab();
           return true;
@@ -783,10 +1078,10 @@ export function PmField(p: PmFieldProps): JSX.Element {
         }
         return false;
       }
-      case 'Escape': {
+      case "Escape": {
         if (l.open && l.trigger !== null) {
           e.preventDefault();
-          if (l.trigger.kind === 'slash') {
+          if (l.trigger.kind === "slash") {
             clear();
             writeNow();
             return true;
@@ -801,7 +1096,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
         else putAway();
         return true;
       }
-      case 'ArrowUp': {
+      case "ArrowUp": {
         if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false;
         if (l.open) {
           e.preventDefault();
@@ -817,7 +1112,10 @@ export function PmField(p: PmFieldProps): JSX.Element {
             return true;
           }
         }
-        if (blankNow() || (browsing.current >= 0 && caretOnFirstLine(v.state))) {
+        if (
+          blankNow() ||
+          (browsing.current >= 0 && caretOnFirstLine(v.state))
+        ) {
           const entry = historyAt(saved.current, browsing.current + 1);
           if (entry === null) {
             if (blankNow()) e.preventDefault();
@@ -830,7 +1128,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
         }
         return false;
       }
-      case 'ArrowDown': {
+      case "ArrowDown": {
         if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false;
         if (l.open) {
           e.preventDefault();
@@ -840,7 +1138,11 @@ export function PmField(p: PmFieldProps): JSX.Element {
         if (browsing.current < 0) return false;
         e.preventDefault();
         browsing.current -= 1;
-        setContent(browsing.current < 0 ? null : historyAt(saved.current, browsing.current));
+        setContent(
+          browsing.current < 0
+            ? null
+            : historyAt(saved.current, browsing.current),
+        );
         return true;
       }
       default:
@@ -852,24 +1154,31 @@ export function PmField(p: PmFieldProps): JSX.Element {
   const onPaste = (e: ClipboardEvent): boolean => {
     const data = e.clipboardData;
     if (data === null) return false;
-    const images = Array.from(data.files).filter((f) => f.type.startsWith('image/'));
+    const images = Array.from(data.files).filter((f) =>
+      f.type.startsWith("image/"),
+    );
     if (images.length > 0) {
       e.preventDefault();
       addImages(images);
       return true;
     }
-    const text = data.getData('text/plain');
+    const text = data.getData("text/plain");
     e.preventDefault();
     if (isLongPaste(text)) {
       longPaste(text);
       return true;
     }
     const st = state();
-    if (st !== null && text !== '') dispatch(insertText(st, text.replace(/\r\n?/gu, '\n')).setMeta('paste', true));
+    if (st !== null && text !== "")
+      dispatch(
+        insertText(st, text.replace(/\r\n?/gu, "\n")).setMeta("paste", true),
+      );
     return true;
   };
   const onDropHere = (e: DragEvent): boolean => {
-    const images = Array.from(e.dataTransfer?.files ?? []).filter((f) => f.type.startsWith('image/') || isImagePath(f.name));
+    const images = Array.from(e.dataTransfer?.files ?? []).filter(
+      (f) => f.type.startsWith("image/") || isImagePath(f.name),
+    );
     if (images.length === 0) return false;
     e.preventDefault();
     addImages(images);
@@ -881,6 +1190,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
     keys.current = onKey;
     paste.current = onPaste;
     drop.current = onDropHere;
+    ctrlR.current = onCtrlR;
   });
 
   // ---- a file dropped anywhere in the window is the composer's, never a navigation ----
@@ -891,14 +1201,16 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const onDrop = (e: DragEvent): void => {
       e.preventDefault();
       if (view()?.dom.contains(e.target as Node) === true) return; // handleDrop has it
-      const images = Array.from(e.dataTransfer?.files ?? []).filter((f) => f.type.startsWith('image/') || isImagePath(f.name));
+      const images = Array.from(e.dataTransfer?.files ?? []).filter(
+        (f) => f.type.startsWith("image/") || isImagePath(f.name),
+      );
       if (images.length > 0) addImages(images);
     };
-    window.addEventListener('dragover', over);
-    window.addEventListener('drop', onDrop);
+    window.addEventListener("dragover", over);
+    window.addEventListener("drop", onDrop);
     return () => {
-      window.removeEventListener('dragover', over);
-      window.removeEventListener('drop', onDrop);
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("drop", onDrop);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- registered once; reads refs
   }, []);
@@ -922,7 +1234,9 @@ export function PmField(p: PmFieldProps): JSX.Element {
   return (
     <>
       <div ref={host} className="b-field-host" />
-      {blank && <span className="ph b-field-ph">{p.placeholder}</span>}
+      {blank && !dictShown && (
+        <span className="ph b-field-ph">{p.placeholder}</span>
+      )}
       {open && (
         <Picker
           rows={rows}
@@ -940,7 +1254,17 @@ export function PmField(p: PmFieldProps): JSX.Element {
 }
 
 /** Above the box: the chips' strip (`▤ 1 “first words…”  240 lines · 9.8 kB`) and the queue. */
-function Strip({ chips, queued, note, testId }: { chips: readonly Chip[]; queued: readonly string[]; note: string | null; testId: string }): JSX.Element {
+function Strip({
+  chips,
+  queued,
+  note,
+  testId,
+}: {
+  chips: readonly Chip[];
+  queued: readonly string[];
+  note: string | null;
+  testId: string;
+}): JSX.Element {
   return (
     <div className="b-composer-strip" data-testid={`${testId}.strip`}>
       {note !== null && (
@@ -949,18 +1273,24 @@ function Strip({ chips, queued, note, testId }: { chips: readonly Chip[]; queued
         </div>
       )}
       {queued.map((q, i) => (
-        <div key={`q${i}`} className="q" data-testid={`${testId}.queued.${i + 1}`}>
+        <div
+          key={`q${i}`}
+          className="q"
+          data-testid={`${testId}.queued.${i + 1}`}
+        >
           {q}
           <span className="k">queued · sent when this turn ends · ↑ edit</span>
         </div>
       ))}
       {/* an image has no strip line in the window: its chip and thumbnail say it (designer m_13808;
           the TUI keeps its '[Image #1] name' line, it has no thumbnail) */}
-      {chips.filter((c) => c.kind !== 'image').map((c) => (
-        <div key={c.n} className="c" data-testid={`${testId}.strip.${c.n}`}>
-          {chipStrip(c)}
-        </div>
-      ))}
+      {chips
+        .filter((c) => c.kind !== "image")
+        .map((c) => (
+          <div key={c.n} className="c" data-testid={`${testId}.strip.${c.n}`}>
+            {chipStrip(c)}
+          </div>
+        ))}
     </div>
   );
 }

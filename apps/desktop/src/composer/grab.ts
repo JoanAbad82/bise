@@ -24,13 +24,14 @@ export interface GrabKey {
 
 /** A key that types text into the field once it has the focus. Pure. */
 export function grabsKey(e: GrabKey): boolean {
-  if (e.defaultPrevented || e.isComposing || e.metaKey || e.ctrlKey) return false;
+  if (e.defaultPrevented || e.isComposing || e.metaKey || e.ctrlKey)
+    return false;
   // `key` is sometimes missing (le-chat-web); 'Dead' starts an accent, 'Process' an IME
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above
-  const key = e.key ?? '';
+  const key = e.key ?? "";
   // one code point: 'é', '€', 'a' (a named key, 'Enter', 'ArrowUp', is longer)
-  const text = /^.$/u.test(key) || key === 'Dead' || key === 'Process';
-  if (!text || key === ' ') return false;
+  const text = /^.$/u.test(key) || key === "Dead" || key === "Process";
+  if (!text || key === " ") return false;
   if (e.altKey && /^(Digit|Numpad)[0-9]$/.test(e.code)) return false;
   return true;
 }
@@ -39,22 +40,29 @@ export function grabsKey(e: GrabKey): boolean {
 export function editable(el: Element | null): boolean {
   if (el === null) return false;
   const tag = el.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
   if (el instanceof HTMLElement && el.isContentEditable) return true;
-  return el.getAttribute('role') === 'textbox';
+  return el.getAttribute("role") === "textbox";
 }
 
 /** A picker, a menu or a dialog has the focus, or is open over the window. */
 function overlaid(active: Element | null, field: HTMLElement): boolean {
-  if (active?.closest('[role="dialog"],[role="menu"],[role="menubar"],[role="listbox"],[aria-modal="true"]') != null) return true;
-  const open = document.querySelector('[role="dialog"],[role="menu"],[aria-modal="true"]');
+  if (
+    active?.closest(
+      '[role="dialog"],[role="menu"],[role="menubar"],[role="listbox"],[aria-modal="true"]',
+    ) != null
+  )
+    return true;
+  const open = document.querySelector(
+    '[role="dialog"],[role="menu"],[aria-modal="true"]',
+  );
   return open !== null && !open.contains(field);
 }
 
 /** He selected words outside the field: a key never takes the focus away from them. */
 function selectingOutside(field: HTMLElement): boolean {
   const s = document.getSelection();
-  if (s === null || s.isCollapsed || s.toString() === '') return false;
+  if (s === null || s.isCollapsed || s.toString() === "") return false;
   return s.anchorNode === null || !field.contains(s.anchorNode);
 }
 
@@ -65,6 +73,8 @@ export interface GrabField {
   readonly take: () => void;
   /** the paste, as if it had come to the field */
   readonly paste: (e: ClipboardEvent) => boolean;
+  /** ctrl+r made outside any text field: the field's own ctrl+r (dictation, twice voice mode) */
+  readonly ctrlR?: (e: KeyboardEvent) => boolean;
 }
 
 const fields: GrabField[] = [];
@@ -74,17 +84,70 @@ function target(): GrabField | undefined {
   for (let i = fields.length - 1; i >= 0; i--) {
     const f = fields[i];
     if (f === undefined) continue;
-    if (f.el.isConnected && f.el.getClientRects().length > 0 && f.el.closest('[inert],[aria-hidden="true"]') === null) return f;
+    if (
+      f.el.isConnected &&
+      f.el.getClientRects().length > 0 &&
+      f.el.closest('[inert],[aria-hidden="true"]') === null
+    )
+      return f;
   }
   return undefined;
 }
 
+/** ctrl+r alone (dictation's key), as the field reads it. Pure. */
+export function isCtrlR(e: GrabKey & { readonly shiftKey: boolean }): boolean {
+  return (
+    e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey &&
+    !e.shiftKey &&
+    !e.defaultPrevented &&
+    !e.isComposing &&
+    e.key.toLowerCase() === "r"
+  );
+}
+
+/** A sheet, a dialog or a menu is open or has the focus (a focused list is fine: ctrl+r is no list key). */
+function sheetOver(active: Element | null, field: HTMLElement): boolean {
+  if (
+    active?.closest(
+      '[role="dialog"],[role="alertdialog"],[role="menu"],[role="menubar"],[aria-modal="true"]',
+    ) != null
+  )
+    return true;
+  const open = document.querySelector(
+    '[role="dialog"],[role="alertdialog"],[role="menu"],[aria-modal="true"]',
+  );
+  return open !== null && !open.contains(field);
+}
+
+/** ctrl+r anywhere in the window (the thread, the sidebar, a list): the composer takes the focus,
+ *  its caret at the end, and dictation starts at once, the same press as in the field (a second
+ *  one soon after is voice mode). Never from another text field or the terminal panel (xterm's
+ *  textarea: the shell's reverse search), never under a sheet. His try a43609b2, ambient-lead m_19364. */
+function onCtrlR(e: KeyboardEvent): boolean {
+  if (!isCtrlR(e)) return false;
+  const active = document.activeElement;
+  if (editable(active)) return false;
+  const f = target();
+  if (f?.ctrlR === undefined || sheetOver(active, f.el)) return false;
+  f.take();
+  return f.ctrlR(e);
+}
+
 function onKey(e: KeyboardEvent): void {
+  if (onCtrlR(e)) return;
   if (!grabsKey(e)) return;
   const active = document.activeElement;
   if (editable(active)) return;
   const f = target();
-  if (f === undefined || f.el.contains(active) || overlaid(active, f.el) || selectingOutside(f.el)) return;
+  if (
+    f === undefined ||
+    f.el.contains(active) ||
+    overlaid(active, f.el) ||
+    selectingOutside(f.el)
+  )
+    return;
   // no preventDefault: the key goes on to the field that has the focus now
   f.take();
 }
@@ -94,7 +157,8 @@ function onPaste(e: ClipboardEvent): void {
   const active = document.activeElement;
   if (editable(active)) return;
   const f = target();
-  if (f === undefined || f.el.contains(active) || overlaid(active, f.el)) return;
+  if (f === undefined || f.el.contains(active) || overlaid(active, f.el))
+    return;
   f.take();
   if (f.paste(e)) e.stopPropagation();
 }
@@ -102,16 +166,16 @@ function onPaste(e: ClipboardEvent): void {
 /** Registers a field; the returned function unregisters it. One listener pair for every field. */
 export function registerGrab(f: GrabField): () => void {
   if (fields.length === 0) {
-    document.addEventListener('keydown', onKey, true);
-    document.addEventListener('paste', onPaste, true);
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("paste", onPaste, true);
   }
   fields.push(f);
   return () => {
     const i = fields.indexOf(f);
     if (i >= 0) fields.splice(i, 1);
     if (fields.length === 0) {
-      document.removeEventListener('keydown', onKey, true);
-      document.removeEventListener('paste', onPaste, true);
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("paste", onPaste, true);
     }
   };
 }
