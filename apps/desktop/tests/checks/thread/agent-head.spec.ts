@@ -179,7 +179,8 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     await expect(page.locator('[data-testid="composer.field"][aria-placeholder]')).toHaveAttribute('aria-placeholder', 'write to perf, then ⏎');
     // the artifact opens in the window
     await page.getByTestId('thread.artifact.10').click();
-    await expect(page.getByTestId('thread.head')).toBeHidden();
+    // designer's artifact-open page: the artifact takes the right column, the maker's thread stays
+    await expect(page.getByTestId('app.art')).toBeVisible();
     // the artifact's screen has no right bar: back to perf's thread, ⌘[
     await page.keyboard.press('Meta+BracketLeft');
     // the branch opens the review

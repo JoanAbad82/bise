@@ -217,10 +217,13 @@ export function Over({
   side,
   onClose,
   children,
+  thread = false,
 }: {
   side: "left" | "right";
   onClose: () => void;
   children: ReactNode;
+  /** an artifact's maker thread sliding over the page under 1000 px (78% of the width) */
+  thread?: boolean;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -237,7 +240,7 @@ export function Over({
   return (
     <>
       <div className={`app-scrim ${side}`} onClick={onClose} data-testid="app.scrim" />
-      <div className={`app-over ${side}`} data-testid={`app.over.${side}`}>
+      <div className={`app-over ${side}${thread ? " thread" : ""}`} data-testid={`app.over.${side}`}>
         {children}
       </div>
     </>

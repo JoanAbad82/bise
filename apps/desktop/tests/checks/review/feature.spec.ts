@@ -33,10 +33,10 @@ const F = {
   state: '[data-testid="feature.state"]',
 };
 
-/** Opens gift-cards' view by his click on the sidebar's 'ψ gift-cards'. */
+/** Opens gift-cards' view by his click on the right bar's 'ψ gift-cards'. */
 async function openFeature(page: import('@playwright/test').Page): Promise<void> {
   await page.locator(F.group).click();
-  await expect(page.locator(F.screen), "the sidebar's 'ψ gift-cards' opens the feature view").toHaveAttribute('data-feature', 'gift-cards', { timeout: 5000 });
+  await expect(page.locator(F.screen), "the right bar's 'ψ gift-cards' opens the feature view").toHaveAttribute('data-feature', 'gift-cards', { timeout: 5000 });
 }
 
 const flat = (s: string): string => s.replace(/[│╭╮╰╯─┃]/g, ' ').replace(/\s+/g, ' ');

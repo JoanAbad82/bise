@@ -4,7 +4,7 @@
 // head (title, version menu, '↗ browser', ⋯, ✕), then the page from the pages server, 16 px in on
 // a 3% backdrop. A link inside the page goes to his browser (the shell's guard). The composer's
 // words come from maker.ts. Owner: amb-kit (the list, the model); task-panel (the open view).
-import { useCallback, useMemo, useState, type KeyboardEvent } from 'react';
+import { useCallback, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Button, IconButton, Menu, MenuItem } from '@/ds';
 import { useRouter } from '@/app/router';
 import { useAgents, usePrefs, useStore } from '@/store';
@@ -93,6 +93,8 @@ export interface ArtifactOpenProps {
   onClose?: () => void;
   /** the maker's composer under the page: on when the frame has no thread beside it (under 1000 px, or the centre route) */
   composer?: boolean;
+  /** before the title in its head: under 1000 px the frame's '◧ <maker>' that slides the maker's thread over (amb-win) */
+  lead?: ReactNode;
 }
 
 /**
@@ -104,7 +106,7 @@ export interface ArtifactOpenProps {
  * (maker.ts: the project's main when the maker is archived); the frame draws it under the
  * maker's thread, so here only with `composer`.
  */
-export function ArtifactOpen({ project, id, onClose, composer = true }: ArtifactOpenProps) {
+export function ArtifactOpen({ project, id, onClose, composer = true, lead }: ArtifactOpenProps) {
   const router = useRouter();
   const it = useAllArtifacts(project).find((x) => x.a.id === id);
   // 'v' on a row of the list opens it with its versions shown
@@ -166,6 +168,7 @@ export function ArtifactOpen({ project, id, onClose, composer = true }: Artifact
   return (
     <section className="art-open" data-testid="artifact.open" data-agent={a.agent} onKeyDown={onKeyDown}>
       <div className="art-open-head" data-testid="artifact.head">
+        {lead}
         <span className="art-open-title" data-testid="artifact.title" title={a.title}>{a.title}</span>
         <span className="art-open-end">
           <span className="art-drop">

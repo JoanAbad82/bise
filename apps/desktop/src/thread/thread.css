@@ -853,6 +853,13 @@
   white-space: nowrap;
   cursor: pointer;
 }
+.th-art.open {
+  border-color: var(--c-text);
+}
+.th-art-open {
+  color: var(--c-text-2);
+  font-size: var(--t-11);
+}
 .th-art:hover {
   background: var(--c-hover);
 }

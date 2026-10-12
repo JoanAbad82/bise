@@ -49,6 +49,7 @@ import { BisePearl } from '@/app/BisePearl';
 import { createFindMark, FindMarkContext } from './findmark';
 import { trackRoutes, useHeld } from './routes';
 import { absolute } from './paths';
+import { OpenArtifactContext } from './openArtifact';
 import { createFolds, FoldsContext } from './folds';
 import { ThreadVoice, TYPING_END, typingLabelOf, useVoiceHere, VoiceTypePearl, VOICE_TYPING_KEYS } from '@/voicemode';
 
@@ -59,6 +60,11 @@ export interface ThreadScreenProps {
   bise?: boolean;
   /** the project's name for the head and the composer's 'you → …' */
   projectName?: string;
+  /**
+   * The artifact open beside this thread (designer's artifact-open page): its row is marked 'open',
+   * the one composer is about it ('to perf · about “…”'), main's inbox is not on this screen.
+   */
+  artifact?: { id: string; title: string; url: string; to: string; placeholder: string };
 }
 
 /** The agent's folder: its worktree, else its project's checkout; none until the rows come. */
@@ -74,7 +80,7 @@ function openLink(url: string) {
   void bise?.openExternal(url);
 }
 
-export function ThreadScreen({ project, agent, bise = false, projectName }: ThreadScreenProps) {
+export function ThreadScreen({ project, agent, bise = false, projectName, artifact }: ThreadScreenProps) {
   const store = useStore();
   const tkey = threadKey(project, agent);
 
@@ -345,6 +351,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   return (
     <FoldsContext value={folds}>
     <FindMarkContext value={mark}>
+    <OpenArtifactContext value={artifact?.id}>
       <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} data-reading={reading} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
         {bise || !me || me.archived ? (
           <Head title={headTitle} sub={sub} lead={bise ? <BisePearl size={14} /> : undefined} dot={bise || !me ? undefined : dotOf(me.status)} />
@@ -415,7 +422,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         <RefusedLine project={project} name={bise ? 'bise' : (projectName ?? project)} className="app-refused th-refused" testId="thread.refused" />
         <CardHint project={project} />
         {/* b1/b2: every project's open items, one opened in place (amb-home's InboxBlock, eb3da983) */}
-        <InboxBlock here={bise ? HERE_BISE : { project, agent }} onAnswer={setAnswering} reading={reading} />
+        {/* beside an open artifact the one composer is the maker's: main's inbox is not on this screen */}
+        {artifact === undefined && <InboxBlock here={bise ? HERE_BISE : { project, agent }} onAnswer={setAnswering} reading={reading} />}
         {me?.archived === true ? (
           <History project={project} agent={agent} />
         ) : voice === 'pane' ? (
@@ -430,11 +438,12 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
             // an open item: the block's words (a question's 'answering perf · …', or an approval's
             // 'to bise · the merge waits for 1 or 2' where his words stay a plain message, ambient m_8773);
             // voice mode while he types: 'to perf · voice paused', 'tab back to voice' (designer's voice-window (1))
-            to={voice === 'typing' ? typingLabelOf(agent) : answering !== null ? answering.label : composerWords(title).label}
+            to={voice === 'typing' ? typingLabelOf(agent) : answering !== null ? answering.label : artifact !== undefined ? artifact.to : composerWords(title).label}
             toEnd={voice === 'typing' ? TYPING_END : (answering?.end ?? (divider === '' ? undefined : divider))}
             keys={voice === 'typing' ? VOICE_TYPING_KEYS : undefined}
             lead={voice === 'typing' ? <VoiceTypePearl /> : undefined}
-            placeholder={answering?.answer != null ? 'your answer, then ⏎' : composerWords(title).placeholder}
+            placeholder={answering?.answer != null ? 'your answer, then ⏎' : artifact !== undefined ? artifact.placeholder : composerWords(title).placeholder}
+            {...(artifact === undefined ? {} : { about: { id: artifact.id, title: artifact.title, url: artifact.url } })}
             answer={answerOf(answering)}
             onStop={stop}
             onEscape={escape}
@@ -450,6 +459,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
           </span>
         )}
       </section>
+    </OpenArtifactContext>
     </FindMarkContext>
     </FoldsContext>
   );
