@@ -10,7 +10,7 @@
 //! agent, a long-lived hub (470 agents, 14,500 messages) spent its whole
 //! loop there and a client's hello never got its turn.
 
-use crate::model::{Agent, Mode, Msg, State, Status, MAIN, USER};
+use crate::model::{Agent, Lifecycle, Mode, Msg, State, Status, MAIN, USER};
 use crate::prompts::relation;
 use crate::util::{age, clip, one_line};
 use std::collections::BTreeMap;
@@ -70,11 +70,18 @@ pub fn task_line(a: &Agent, now: u64) -> String {
     s
 }
 
-/// `/agents`: the board of the agents the user reads, then the open cards.
+/// `/agents`: the board of the live agents the user reads (an archived
+/// one stays under `/archived`, with one line that says how many), then
+/// the open cards.
 pub fn user_board(st: &State, now: u64) -> String {
-    let mut lines: Vec<String> = st.tasks().map(|a| task_line(a, now)).collect();
+    let (live, archived): (Vec<&Agent>, Vec<&Agent>) =
+        st.tasks().partition(|a| a.lifecycle != Lifecycle::Archived);
+    let mut lines: Vec<String> = live.iter().map(|a| task_line(a, now)).collect();
     if lines.is_empty() {
-        lines.push("no agents yet".into());
+        lines.push(if archived.is_empty() { "no agents yet" } else { "no live agents" }.into());
+    }
+    if !archived.is_empty() {
+        lines.push(format!("{} archived: /archived", archived.len()));
     }
     lines.extend(st.open_cards().map(|c| {
         format!("card #{} {} @{}: {}", c.id, c.kind, c.agent, clip(&one_line(&c.text), 100))
@@ -560,6 +567,28 @@ mod tests {
         assert!(c.contains("\"Doc API v2\""), "{}", c);
         assert!(c.contains("12m"), "{}", c);
         assert!(c.starts_with("<bise_state>") && c.ends_with("</bise_state>"));
+    }
+
+    #[test]
+    fn user_board_lists_live_agents_only() {
+        use crate::model::{Declared, Lifecycle};
+        let mut st = state();
+        st.test_task("old", "Ancienne tâche");
+        st.test_task("kid", "Sous-tâche vivante");
+        st.agents.get_mut("old").unwrap().lifecycle = Lifecycle::Archived;
+        st.agents.get_mut("kid").unwrap().parent = Some("old".into());
+        st.agents.get_mut("docs").unwrap().declared = Some((Declared::Done, String::new()));
+        let b = user_board(&st, 60_000);
+        assert!(!b.contains("old ") && !b.contains("Ancienne"), "{}", b);
+        assert!(b.contains("auth-fix") && b.contains("docs") && b.contains("kid"), "{}", b);
+        assert!(b.contains("1 archived: /archived"), "{}", b);
+        // only archived ones: none live, the count still says where they are
+        for n in ["auth-fix", "docs", "kid"] {
+            st.agents.get_mut(n).unwrap().lifecycle = Lifecycle::Archived;
+        }
+        let b = user_board(&st, 60_000);
+        assert!(b.starts_with("no live agents\n4 archived: /archived"), "{}", b);
+        assert_eq!(user_board(&State::new("/w"), 0), "no agents yet");
     }
 
     #[test]

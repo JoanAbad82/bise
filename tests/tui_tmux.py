@@ -353,6 +353,11 @@ def main():
         t.typed("y")
         t.wait("@t1 archived", 20)
         t.wait("1 archived")
+        # /agents lists live agents only: t1 now under /archived
+        t.typed("/agents")
+        t.keys("Enter")
+        t.wait("no live agents")
+        t.wait("1 archived: /archived")
         print(t.screen())
     print("PASS tui")
 
