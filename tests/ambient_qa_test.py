@@ -10,7 +10,6 @@ Run: python3 -u tests/ambient_qa_test.py
 import datetime
 import json
 import os
-import re
 import shutil
 import socket
 import subprocess
@@ -850,9 +849,24 @@ def as_he_does_scripts():
     check("function=TCCAccessRequest" in run and "bise-mac-helper" in run and "libsnap" in run and "front --out" in run, "run.sh: gates A, B, C")
     hook = open(os.path.join(d, "open-cdp.sh")).read()
     check("open -g -n -a" in hook and "--remote-debugging-address=127.0.0.1" in hook, "hook: background open, localhost only")
-    line = "sender_pid=26660, sender_uid=501, sender_auid=501, function=TCCAccessRequest, msgID=26660.1"
-    pat = re.search(r'grep -E "(sender_pid=\(\$pids\), \.\*function=TCCAccessRequest)"', run).group(1).replace("$pids", "1|26660")
-    check(re.search(pat, line) and not re.search(pat.replace("1|26660", "2"), line), "the TCC breach pattern")
+    check("realshape.py tcc" in run or "$RS tcc" in run, "run.sh: gate C through realshape.py tcc")
+    # gate C's rule (ambient-lead m_19243), on a43609b2's own tccd lines: a silent preflight is
+    # logged, a request that can show something kills, another app's request is not ours
+    import realshape as rs
+    log = "\n".join([
+        "08:21:08.050 Df tccd[410:1] [com.apple.TCC:access] REQUEST: tccd_uid=0, sender_pid=88579, sender_uid=501, sender_auid=501, function=TCCAccessRequest, msgID=88579.1",
+        "08:21:08.050 Df tccd[410:1] [com.apple.TCC:access] AUTHREQ_CTX: msgID=88579.1, function=<private>, service=kTCCServiceListenEvent, preflight=yes, query=1, client_dict=(null)",
+        "08:21:08.050 Df tccd[410:1] [com.apple.TCC:access] AUTHREQ_ATTRIBUTION: msgID=88579.1, attribution={requesting={TCCDProcess: identifier=dev.bise.desktop.try, pid=88579, auid=501}}",
+        "08:21:08.052 Df tccd[410:1] [com.apple.TCC:access] REQUEST: tccd_uid=0, sender_pid=409, sender_uid=88, sender_auid=-1, function=TCCAccessRequest, msgID=409.14278",
+        "08:21:08.052 Df tccd[410:1] [com.apple.TCC:access] AUTHREQ_CTX: msgID=409.14278, function=<private>, service=kTCCServiceListenEvent, preflight=no, query=1",
+        "08:21:08.052 Df tccd[410:1] [com.apple.TCC:access] AUTHREQ_ATTRIBUTION: msgID=409.14278, attribution={accessing={TCCDProcess: identifier=dev.bise.desktop.try, pid=88579}}",
+        "08:21:09.000 Df tccd[410:1] [com.apple.TCC:access] REQUEST: tccd_uid=0, sender_pid=500, sender_uid=501, function=TCCAccessRequest, msgID=500.1",
+        "08:21:09.000 Df tccd[410:1] [com.apple.TCC:access] AUTHREQ_CTX: msgID=500.1, function=<private>, service=kTCCServiceMicrophone, preflight=no, query=1",
+    ])
+    reqs = rs.tcc_requests(log)
+    check(rs.tcc_verdict(reqs["88579.1"], {88579}) == "log", reqs["88579.1"])
+    check(rs.tcc_verdict(reqs["409.14278"], {88579}) == "kill", "WindowServer asking on the app's behalf, preflight=no")
+    check(rs.tcc_verdict(reqs["500.1"], {88579}) is None, "another app's request is not ours")
 
 
 if __name__ == "__main__":

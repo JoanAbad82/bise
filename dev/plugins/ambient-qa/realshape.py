@@ -530,6 +530,67 @@ def front_gate(out, stop_file, bundle, every=0.1):
     return changes
 
 
+def tcc_requests(log_text):
+    """tccd's log lines grouped by request: msgID -> {sender, service, preflight, pids (every pid=
+    named in its attribution: requesting, accessing, responsible), lines}. Pure."""
+    reqs = {}
+    for line in log_text.splitlines():
+        m = re.search(r"msgID=([0-9]+\.[0-9]+)", line)
+        if not m:
+            continue
+        r = reqs.setdefault(m.group(1), {"sender": None, "service": None, "preflight": None, "pids": set(), "lines": []})
+        r["lines"].append(line.strip()[:400])
+        s = re.search(r"sender_pid=(\d+)", line)
+        if s and "REQUEST:" in line:
+            r["sender"] = int(s.group(1))
+        c = re.search(r"service=(\w+), preflight=(yes|no)", line)
+        if c:
+            r["service"], r["preflight"] = c.group(1), c.group(2) == "yes"
+        if "AUTHREQ_ATTRIBUTION" in line:
+            r["pids"].update(int(p) for p in re.findall(r"\bpid=(\d+)", line))
+    return reqs
+
+
+def tcc_verdict(req, run_pids):
+    """One request against the run's pids: None (not ours, or not complete yet), 'kill' (it can show
+    something: preflight=no), 'log' (a silent preflight). (ambient-lead m_19243.) Pure."""
+    ours = (req["sender"] in run_pids) or bool(req["pids"] & set(run_pids))
+    if not ours or req["preflight"] is None:
+        return None
+    return "log" if req["preflight"] else "kill"
+
+
+def tcc_gate(log, pids_file, stop_file, bundle, out_dir, every=0.3):
+    """Gate C on tccd's live log: a request of the run's pids with preflight=no kills the bundle and
+    writes BREACH; a silent preflight is logged to tcc.jsonl with its attribution lines and a 1 s
+    `sample` of the asking process taken at once (for amb-mac). Until stop_file exists."""
+    seen = set()
+    with open(os.path.join(out_dir, "tcc.jsonl"), "a") as f:
+        while not os.path.exists(stop_file):
+            try:
+                pids = {int(x) for x in open(pids_file).read().split() if x.isdigit()}
+                text = open(log, errors="replace").read()
+            except OSError:
+                pids, text = set(), ""
+            for mid, req in tcc_requests(text).items():
+                v = tcc_verdict(req, pids)
+                if v is None or mid in seen:
+                    continue
+                seen.add(mid)
+                who = req["sender"] if req["sender"] in pids else min(req["pids"] & pids)
+                if v == "kill":
+                    subprocess.run(["pkill", "-f", bundle + "/Contents/"])
+                    with open(os.path.join(out_dir, "BREACH"), "w") as b:
+                        b.write("tcc %s %s preflight=no pid %s\n" % (mid, req["service"], who))
+                else:
+                    smp = os.path.join(out_dir, "sample-%s.txt" % mid)
+                    subprocess.Popen(["sample", str(who), "1", "-file", smp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                f.write(json.dumps({"msgID": mid, "verdict": v, "service": req["service"], "pid": who, "t": time.strftime("%H:%M:%S"),
+                                    "sample": None if v == "kill" else smp, "lines": req["lines"]}) + "\n")
+                f.flush()
+            time.sleep(every)
+
+
 def asar_file(asar, path):
     """One file out of an Electron app.asar (its pickle header, then the files), as text."""
     import struct
@@ -578,7 +639,16 @@ def _cli(argv):
     fr.add_argument("--out", required=True)
     fr.add_argument("--stop-file", required=True)
     fr.add_argument("--bundle", required=True)
+    tc = sub.add_parser("tcc", help="gate C: tccd's log against the run's pids (kill on preflight=no, log a silent preflight)")
+    tc.add_argument("--log", required=True)
+    tc.add_argument("--pids", required=True)
+    tc.add_argument("--stop-file", required=True)
+    tc.add_argument("--bundle", required=True)
+    tc.add_argument("--out", required=True)
     a = ap.parse_args(argv)
+    if a.do == "tcc":
+        tcc_gate(a.log, a.pids, a.stop_file, a.bundle, a.out)
+        return
     if a.do == "libsnap":
         snap = lib_snapshot()
         with open(a.out, "w") as f:

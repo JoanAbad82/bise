@@ -19,7 +19,7 @@ A="$SRC/apps/desktop/dist/mac-arm64/bise try.app"
 export PW_FROM=$T/apps/desktop
 say() { echo "$(date +%T) $*"; }
 stopall() { (cd "$SRC" && BISE_TRY_REAL=$H/.bise scripts/desktop-try.sh --real --stop); sleep 2; say "left naming the world: $(ps -axo pid,command | grep -F "$G/w" | grep -v grep | wc -l)"; }
-endrun() { touch $O/stop; kill $TPID $CPID 2>/dev/null; kill $(cat $G/fake/fake.pid) 2>/dev/null; }
+endrun() { touch $O/stop; kill $TPID $CPID $CCPID 2>/dev/null; kill $(cat $G/fake/fake.pid) 2>/dev/null; }
 breach() { [ -e $O/BREACH ] && { say "BREACH: $(cat $O/BREACH)"; stopall; endrun; exit 3; }; }
 libgate() { $RS libsnap --out $O/after-$1.json --diff $O/before.json || { echo "library $1" > $O/BREACH; breach; }; }
 case "$G" in "$HOME/.bise/gate/"*) ;; *) echo "the world must be under ~/.bise/gate"; exit 2;; esac
@@ -43,19 +43,19 @@ key_env = "BISE_TRY_FAKE_KEY"
 key_command = "echo fake-key"
 small_model = "mistral-small-latest"
 TOML
-# gate C, live: tccd's log; every 0.3 s the run's pids (any process of the bundle, ever seen), a
-# bise-mac-helper process or a TCCAccessRequest whose sender is one of them is a breach
+# gate C, live (ambient-lead m_19243): every 0.3 s the run's pids (any process of the bundle, ever
+# seen) and no bise-mac-helper process; tccd's log read by realshape.py tcc: a request of the run's
+# pids that can show something (preflight=no, function=TCCAccessRequest) kills the run, a silent
+# preflight (preflight=yes) is logged to tcc.jsonl with its attribution and a 1 s sample of the asker
 log stream --style compact --predicate 'process == "tccd"' > $O/tccd.log 2>&1 & TPID=$!
+touch $O/pids.txt
 ( while [ ! -e $O/stop ]; do
     pgrep -f "$A/Contents/" >> $O/pids.txt 2>/dev/null
     h=$(pgrep -f "$A/Contents/MacOS/bise-mac-helper")
     [ -n "$h" ] && { echo "helper $h" > $O/BREACH; pkill -f "$A/Contents/"; }
-    pids=$(sort -u $O/pids.txt 2>/dev/null | paste -sd'|' -)
-    if [ -n "$pids" ] && grep -E "sender_pid=($pids), .*function=TCCAccessRequest" $O/tccd.log > $O/tcc-hits.txt 2>/dev/null; then
-      echo "tcc $(head -1 $O/tcc-hits.txt | cut -c1-200)" > $O/BREACH; pkill -f "$A/Contents/"
-    fi
     sleep 0.3
   done ) & CPID=$!
+$RS tcc --log $O/tccd.log --pids $O/pids.txt --stop-file $O/stop --bundle "$A" --out $O & CCPID=$!
 $RS front --out $O/front.jsonl --stop-file $O/stop --bundle "$A" & FPID=$!
 sleep 1
 for n in first second; do
@@ -76,7 +76,7 @@ for n in first second; do
   stopall
   breach; libgate $n-stop
 done
-touch $O/stop; wait $FPID; kill $TPID $CPID 2>/dev/null
+touch $O/stop; wait $FPID $CCPID; kill $TPID $CPID 2>/dev/null
 kill $(cat $G/fake/fake.pid) 2>/dev/null
 say "realshape core with no env"
 $RS core --bundle "$A" --out $O/core-noenv 2>&1 | tail -12
