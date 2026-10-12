@@ -1006,6 +1006,10 @@ pub struct CoreLink {
     _out: BufReader<ChildStdout>,
     w: TcpStream,
     r: BufReader<TcpStream>,
+    /// Tests only (bench_step): the time spent waiting for sb-core's
+    /// answers, from the line sent to the line read (its share of a step).
+    #[cfg(test)]
+    pub waited: std::time::Duration,
 }
 
 impl CoreLink {
@@ -1058,6 +1062,8 @@ impl CoreLink {
             _out: out,
             w,
             r,
+            #[cfg(test)]
+            waited: std::time::Duration::ZERO,
         })
     }
 
@@ -1066,10 +1072,16 @@ impl CoreLink {
     pub fn call(&mut self, v: &Value) -> std::io::Result<Value> {
         let mut line = v.to_string();
         line.push('\n');
+        #[cfg(test)]
+        let t0 = std::time::Instant::now();
         self.w.write_all(line.as_bytes())?;
         let mut back = String::new();
         if self.r.read_line(&mut back)? == 0 {
             return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "its connection closed"));
+        }
+        #[cfg(test)]
+        {
+            self.waited += t0.elapsed();
         }
         serde_json::from_str(&back)
             .map_err(|e| std::io::Error::other(format!("a bad answer {:?}: {}", clip(&back, 200), e)))

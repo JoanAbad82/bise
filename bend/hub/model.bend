@@ -439,13 +439,30 @@ def agent_op(+a: Agent, op: AgentOp) -> Agent:
         case OFollow{+f}:
           Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, f}
 
-# apply an operation to the agent named `n` (no agent: nothing changes)
-def map_agent(xs: List<&2, Agent>, +n: String, +op: AgentOp) -> List<&2, Agent>:
+# the head of `xs` is the agent named `n`
+def name_at(xs: List<&2, Agent>, +n: String) -> Bool:
   match xs:
     case Nil{}:
+      False{}
+    case Con{+h, _}:
+      String.eq(Agent.name(h), n)
+
+# map_agent's walk: it stops at the agent (`hit`: name_at(xs, n)). Not
+# Bool.pick, which computes both branches: the op ran on every agent and
+# the walk went to the end of the list, at each agent event of a step and
+# of the boot's replay.
+def map_agent.go(xs: List<&2, Agent>, +hit: Bool, +n: String, +op: AgentOp) -> List<&2, Agent>:
+  match xs hit:
+    case Nil{} _:
       Nil{}
-    case Con{+h, +t}:
-      Bool.pick(List<&2, Agent>, String.eq(Agent.name(h), n), agent_op(h, op) <> t, h <> map_agent(t, n, op))
+    case Con{+h, +t} True{}:
+      agent_op(h, op) <> t
+    case Con{+h, +t} False{}:
+      h <> map_agent.go(t, name_at(t, n), n, op)
+
+# apply an operation to the agent named `n` (no agent: nothing changes)
+def map_agent(+xs: List<&2, Agent>, +n: String, +op: AgentOp) -> List<&2, Agent>:
+  map_agent.go(xs, name_at(xs, n), n, op)
 
 def rec_op(+r: MRec, op: MsgOp) -> MRec:
   match r:

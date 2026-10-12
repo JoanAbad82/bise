@@ -4277,13 +4277,13 @@ def hub_names_op(h: HM.Agent, op: HM.AgentOp, nr: {hub_is_rename(op) == False{} 
 
 def hub_prof_map.pick(c: Bool, +h: HM.Agent, +t: List<&2, HM.Agent>, +n: String, +op: HM.AgentOp, +e: {String.eq(HM.Agent.name(h), n) == c : Bool},
     +nr: {hub_is_rename(op) == False{} : Bool}, ih: {HI.profile(HM.map_agent(t, n, op)) == HI.profile(t) : List<&2, List<&2, String>>})
-    -> {HI.profile(Bool.pick(List<&2, HM.Agent>, String.eq(HM.Agent.name(h), n), HM.agent_op(h, op) <> t, h <> HM.map_agent(t, n, op))) == HI.profile(h <> t) : List<&2, List<&2, String>>}:
+    -> {HI.profile(HM.map_agent.go(h <> t, String.eq(HM.Agent.name(h), n), n, op)) == HI.profile(h <> t) : List<&2, List<&2, String>>}:
   match c:
     case True{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), n), True{}, e) : {HI.profile(Bool.pick(List<&2, HM.Agent>, _, HM.agent_op(h, op) <> t, h <> HM.map_agent(t, n, op))) == HI.profile(h <> t) : List<&2, List<&2, String>>}
+      %Equal.sym(Bool, String.eq(HM.Agent.name(h), n), True{}, e) : {HI.profile(HM.map_agent.go(h <> t, _, n, op)) == HI.profile(h <> t) : List<&2, List<&2, String>>}
       Equal.cong(List<&2, String>, List<&2, List<&2, String>>, x => x <> HI.profile(t), HI.names(HM.agent_op(h, op)), HI.names(h), hub_names_op(h, op, nr))
     case False{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), n), False{}, e) : {HI.profile(Bool.pick(List<&2, HM.Agent>, _, HM.agent_op(h, op) <> t, h <> HM.map_agent(t, n, op))) == HI.profile(h <> t) : List<&2, List<&2, String>>}
+      %Equal.sym(Bool, String.eq(HM.Agent.name(h), n), False{}, e) : {HI.profile(HM.map_agent.go(h <> t, _, n, op)) == HI.profile(h <> t) : List<&2, List<&2, String>>}
       Equal.cong(List<&2, List<&2, String>>, List<&2, List<&2, String>>, x => HI.names(h) <> x, HI.profile(HM.map_agent(t, n, op)), HI.profile(t), ih)
 
 # an operation that is not a rename keeps every agent's names
@@ -4522,13 +4522,13 @@ def hub_aa_map_ren.top(+x: List<&2, String>, h: HM.Agent, +t: List<&2, HM.Agent>
 def hub_aa_map_ren.pick(c: Bool, +x: List<&2, String>, +h: HM.Agent, +t: List<&2, HM.Agent>, +old: String, +new: String, +e: {String.eq(HM.Agent.name(h), old) == c : Bool},
     ah: HI.Apart(x, HI.names(h)), +fx: {HM.str_in(x, new) == False{} : Bool},
     at: HI.ApartAll(x, HI.profile(t)), ih: HI.ApartAll(x, HI.profile(HM.map_agent(t, old, HM.ORename{new}))))
-    -> HI.ApartAll(x, HI.profile(Bool.pick(List<&2, HM.Agent>, String.eq(HM.Agent.name(h), old), HM.agent_op(h, HM.ORename{new}) <> t, h <> HM.map_agent(t, old, HM.ORename{new})))):
+    -> HI.ApartAll(x, HI.profile(HM.map_agent.go(h <> t, String.eq(HM.Agent.name(h), old), old, HM.ORename{new}))):
   match c:
     case True{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), old), True{}, e) : HI.ApartAll(x, HI.profile(Bool.pick(List<&2, HM.Agent>, _, HM.agent_op(h, HM.ORename{new}) <> t, h <> HM.map_agent(t, old, HM.ORename{new}))))
+      %Equal.sym(Bool, String.eq(HM.Agent.name(h), old), True{}, e) : HI.ApartAll(x, HI.profile(HM.map_agent.go(h <> t, _, old, HM.ORename{new})))
       hub_aa_map_ren.top(x, h, t, new, ah, fx, at)
     case False{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), old), False{}, e) : HI.ApartAll(x, HI.profile(Bool.pick(List<&2, HM.Agent>, _, HM.agent_op(h, HM.ORename{new}) <> t, h <> HM.map_agent(t, old, HM.ORename{new}))))
+      %Equal.sym(Bool, String.eq(HM.Agent.name(h), old), False{}, e) : HI.ApartAll(x, HI.profile(HM.map_agent.go(h <> t, _, old, HM.ORename{new})))
       HX.Both{ah, ih}
 
 # entries listed before a renamed one stay apart from the renamed list
@@ -4551,13 +4551,13 @@ def hub_nok_ren.top(h: HM.Agent, +t: List<&2, HM.Agent>, +new: String, a1: HI.Ap
 def hub_nok_ren.pick(c: Bool, +h: HM.Agent, +t: List<&2, HM.Agent>, +old: String, +new: String, +e: {String.eq(HM.Agent.name(h), old) == c : Bool},
     a1: HI.ApartAll(HI.names(h), HI.profile(t)), nt: HI.NamesOK(HI.profile(t)), +fh: {HM.str_in(HI.names(h), new) == False{} : Bool},
     ft: hub_free(HI.profile(t), new), ih: HI.NamesOK(HI.profile(HM.map_agent(t, old, HM.ORename{new}))))
-    -> HI.NamesOK(HI.profile(Bool.pick(List<&2, HM.Agent>, String.eq(HM.Agent.name(h), old), HM.agent_op(h, HM.ORename{new}) <> t, h <> HM.map_agent(t, old, HM.ORename{new})))):
+    -> HI.NamesOK(HI.profile(HM.map_agent.go(h <> t, String.eq(HM.Agent.name(h), old), old, HM.ORename{new}))):
   match c:
     case True{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), old), True{}, e) : HI.NamesOK(HI.profile(Bool.pick(List<&2, HM.Agent>, _, HM.agent_op(h, HM.ORename{new}) <> t, h <> HM.map_agent(t, old, HM.ORename{new}))))
+      %Equal.sym(Bool, String.eq(HM.Agent.name(h), old), True{}, e) : HI.NamesOK(HI.profile(HM.map_agent.go(h <> t, _, old, HM.ORename{new})))
       hub_nok_ren.top(h, t, new, a1, ft, nt)
     case False{}:
-      %Equal.sym(Bool, String.eq(HM.Agent.name(h), old), False{}, e) : HI.NamesOK(HI.profile(Bool.pick(List<&2, HM.Agent>, _, HM.agent_op(h, HM.ORename{new}) <> t, h <> HM.map_agent(t, old, HM.ORename{new}))))
+      %Equal.sym(Bool, String.eq(HM.Agent.name(h), old), False{}, e) : HI.NamesOK(HI.profile(HM.map_agent.go(h <> t, _, old, HM.ORename{new})))
       HX.Both{hub_aa_map_ren(HI.names(h), t, old, new, a1, fh), ih}
 
 # a rename to a free name keeps every agent's names apart
