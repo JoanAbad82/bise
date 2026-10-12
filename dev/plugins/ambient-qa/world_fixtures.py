@@ -61,7 +61,9 @@ PROJECTS = [
                     {"write": "checkout/codes.py", "text": "CODES = {'SPRING10': 0.10}\n"},
                     {"commit": "checkout: discount codes (SPRING10) applied to the total"},
                     {"report": "done", "text": "discount codes work at checkout (checkout/cart.py, checkout/codes.py). waiting for your merge."}]},
-         {"name": "search", "place": "", "objective": "search doesn't find tshirt",
+         # a non-zero context gauge in the plain world (qa-flows m_20438): its brief's [[usage: N]]
+         # makes every call of its turn report N input tokens
+         {"name": "search", "place": "", "objective": "search doesn't find tshirt", "usage": 43800,
           "steps": [{"report": "blocked", "text": "search ne trouve pas tshirt: the index matches whole names only. fuzzy match or a synonym list?"}]},
          # a worktree agent with a draft PR, checks running (#415 below)
          {"name": "receipts", "place": "new", "objective": "email the receipt after checkout",

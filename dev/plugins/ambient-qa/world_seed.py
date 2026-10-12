@@ -344,6 +344,8 @@ def main_script(world, project, rich=False):
     for a in project["agents"]:
         script = os.path.join(world, "seed", project["name"], a["name"] + ".sh")
         brief = a["objective"] if rich else "%s {{bash: bash %s}}" % (a["objective"], script)
+        if a.get("usage") and not rich:
+            brief += " [[usage: %d]]" % a["usage"]
         where = " --feature %s" % shlex.quote(a["feature"]) if a.get("feature") else (" --place %s" % a["place"] if a.get("place") else "")
         out.append("sb spawn %s%s --objective %s" % (a["name"], where, shlex.quote(brief)))
     for c in project["cards"]:

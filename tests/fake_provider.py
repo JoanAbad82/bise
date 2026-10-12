@@ -28,6 +28,8 @@ the injected <bise_state> block is not one):
   `]]`);
 - `[[say: TEXT]]`: every tool-call reply to that message starts with
   TEXT (text, then the call, in one reply);
+- `[[usage: N]]`: every reply to that message reports N input tokens
+  (a non-zero context gauge without $FAKE_SCRIPTS; qa-flows m_20438);
 - `[[think: TEXT]]`: every reply to that message starts with reasoning
   TEXT (Anthropic thinking + signature, reasoning_content, a Responses
   reasoning item, Gemini thought parts + thoughtSignature);
@@ -115,6 +117,7 @@ DRIP = re.compile(r"\[\[drip: (\d+) ([\d.]+)\]\]")
 SPLIT = re.compile(r"\[\[split: ([\d.]+)\]\]")
 PIECES = re.compile(r"\[\[pieces: (\d+) ([\d.]+)\]\]")
 PLAN = re.compile(r"\[\[plan: ([\w-]+)(?: x(\d+))?\]\]")
+USAGE_MARK = re.compile(r"\[\[usage: (\d+)\]\]")
 USAGE = {"input": 10, "cached": 2, "output": 5, "reasoning": 3}
 
 
@@ -486,6 +489,9 @@ def reply_for(conv, seen=0):
         return turn
     think = THINK.search(user)
     turn["reasoning"] = think.group(1).strip() if think else ""
+    um = USAGE_MARK.search(user)
+    if um:
+        turn["usage"] = {"input": int(um.group(1))}
     after = conv[idx + 1:]
     calls_done = sum(m["calls"] for m in after if m["role"] == "assistant")
     sc = scripted(user)
