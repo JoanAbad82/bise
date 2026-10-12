@@ -7,10 +7,11 @@ import type { Entry } from '@/proto';
 import { useAgents, useStore } from '@/store';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
-import { clock, handoffOf, schedHead } from './entry';
+import { clock, handoffOf, repeatsReport, reportBody, schedHead } from './entry';
 import { wakeLine, wakeTail } from './wake';
 import { useRouter } from '@/app/router';
 import type { RowCtx } from './rows';
+import { retryOf, retryWords, type Retry } from './tiers';
 /** A news line's mark: what it means, never its color alone. */
 export function NewsLine({ mark, tone, testId, children }: { mark: string; tone: 'ok' | 'err' | 'plain' | 'dim'; testId: string; children: ReactNode }) {
   return (
@@ -236,9 +237,11 @@ export function WakeRow({ e }: { e: Entry }) {
 /** A notice's mark by level (the TUI's: info dim, warn ▲, err ✗): the tone is said in a glyph and words, never by color alone. */
 export const NOTICE_MARK = { info: '·', warn: '▲', err: '✗', unknown: '·' } as const;
 
-export function NoticeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+export function NoticeRow({ e, ctx, retries }: { e: Entry; ctx: RowCtx; retries?: readonly string[] | undefined }) {
   const level = e.notice?.level ?? 'info';
   const text = e.notice?.text ?? e.text;
+  const retry = retryOf(text);
+  if (retry !== null) return <RetryRow pos={e.pos} retry={retry} tries={retries ?? [text]} />;
   // a main's handoff (designer's v6 (3)): '→ perf · product page speed', opens its thread
   const handoff = level === 'info' ? handoffOf(text) : null;
   if (handoff !== null) return <HandoffRow pos={e.pos} to={handoff.agent} brief={handoff.brief} ctx={ctx} />;
@@ -352,6 +355,87 @@ export function NotDeliveredRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
             esc drop
           </Button>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * An agent's report (tui-parity H8, designer m_19832): one line, never two loud copies. When the
+ * message under it says the same words, one quiet row '✓ report ▸' (the message stays the reply);
+ * else its status line, cut with …, and '▸ report' when it has more to read. Either opens in place.
+ */
+export function ReportRow({ pos, line, text, next, ctx, waits }: { pos: number; line: string; text: string; next: Entry | undefined; ctx: RowCtx; waits: boolean }) {
+  const [open, setOpen] = useFold(false, pos);
+  const body = reportBody(text);
+  const dup = next !== undefined && (next.kind === 'agent' || next.kind === 'from_agent' || next.kind === 'to_agent') && repeatsReport(body, next.text);
+  const more = dup || body.includes('\n');
+  const toggle = () => {
+    setOpen((o) => !o);
+  };
+  const whole = open && body !== '' && (
+    <div className="th-report-body" data-testid={`thread.report.${String(pos)}.body`}>
+      <Markdown text={body} onLink={ctx.onLink} onPath={ctx.onPath} />
+    </div>
+  );
+  if (dup) {
+    const mark = /^[✓✗] /u.exec(line)?.[0] ?? '· ';
+    return (
+      <div className="th-report" data-dup="true" data-testid={`thread.report.${String(pos)}`}>
+        <Press look="th-report-fold" aria-expanded={open} onClick={toggle} data-testid={`thread.report.${String(pos)}.fold`}>
+          {mark}report {open ? '▾' : '▸'}
+        </Press>
+        {whole}
+      </div>
+    );
+  }
+  return (
+    <div className="th-report" data-waits={waits || undefined} data-testid={`thread.report.${String(pos)}`}>
+      <div className="th-report-line">
+        <Marker>{line}</Marker>
+        {more && (
+          <Act onClick={toggle} testId={`thread.report.${String(pos)}.more`}>
+            {open ? '▾ report' : '▸ report'}
+          </Act>
+        )}
+      </div>
+      {whole}
+    </div>
+  );
+}
+
+/**
+ * A model call's retries as one row that updates in place (tui-parity H9, designer m_19832): '▲ model
+ * call failed · retry 3 of 10 in 4 s ▸', the ▲ dim and the words text-2; in --c-err only when the last
+ * try failed. Each try's full words open under its ▸.
+ */
+function RetryRow({ pos, retry, tries }: { pos: number; retry: Retry; tries: readonly string[] }) {
+  const [open, setOpen] = useFold(false, pos);
+  const failed = retry.next === undefined;
+  return (
+    <div className="th-retry" data-failed={failed || undefined} data-testid={`thread.notice.${String(pos)}`}>
+      <Press
+        look="th-retry-line"
+        aria-expanded={open}
+        onClick={() => {
+          setOpen((o) => !o);
+        }}
+        data-testid={`thread.notice.${String(pos)}.retry`}
+      >
+        <span className="th-news-mark" aria-label={failed ? 'error' : 'warning'}>
+          ▲
+        </span>
+        <span className="th-retry-words">{retryWords(retry)}</span>
+        <span className="th-sched-chev" aria-hidden="true">
+          {open ? ' ▾' : ' ▸'}
+        </span>
+      </Press>
+      {open && (
+        <ol className="th-retry-tries" data-testid={`thread.notice.${String(pos)}.tries`}>
+          {tries.map((t, i) => (
+            <li key={i}>{t}</li>
+          ))}
+        </ol>
       )}
     </div>
   );

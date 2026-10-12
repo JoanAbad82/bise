@@ -179,7 +179,9 @@ test('thread/reading: one column, no raw context, no empty thinking, one restore
     await expect(page.getByTestId('thread.entry.10')).toHaveAttribute('data-head', 'true');
     // open: no 'perf:' under 'perf' (ambient m_11934)
     await page.getByTestId('thread.run.8').click();
-    await expect(page.getByTestId('thread.entry.8')).toHaveAttribute('data-head', 'true');
+    // the first message of an open run sits 8 px under its fold row, no new group (designer m_19912 (2))
+    await expect(page.getByTestId('thread.entry.8')).toHaveAttribute('data-head', 'false');
+    await expect(page.getByTestId('thread.entry.8')).toHaveAttribute('data-gap', 'row');
     await expect(page.getByTestId('thread.from.8.text')).not.toContainText('perf:');
     const edges = await page.evaluate(() =>
       [8, 9, 10].map((n) => {

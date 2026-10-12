@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, namedRows, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, namedRows, pendingKey, repeatsReport, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -325,5 +325,13 @@ describe('namedRows (tui-parity H2, designer m_19832)', () => {
     const list = [mk(1, 'you', 0), mk(2, 'tools', 1)];
     const m = new Map(list.map((e) => [e.pos, e]));
     expect(namedRows([1, 2], (p) => m.get(p), ctx).carry).toBe(true);
+  });
+});
+
+describe('repeatsReport (tui-parity H8)', () => {
+  it('the message under a report says its first line: folded; other words: kept', () => {
+    expect(repeatsReport('p99 rose because it averaged the slowest 10%; it is the real percentile now', 'P99 rose because it averaged the slowest 10%; it is the real percentile now (src/latency.py). ready to merge.')).toBe(true);
+    expect(repeatsReport('p99 rose because it averaged the slowest 10%', 'Asked main: today or after the batch test.')).toBe(false);
+    expect(repeatsReport('ok', 'ok')).toBe(false);
   });
 });

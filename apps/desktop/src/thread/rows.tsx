@@ -20,7 +20,7 @@ import { AgentNote, AnsweredRow, ApprovalRow, CardAnsweredRow, CardRow, ToAgentR
 import { shownName } from '@/agents/model';
 import { BODY_KINDS, NAMELESS_KINDS, NOTE_KINDS, QUIET_KINDS, ROW_KINDS, sameRoute } from './tiers';
 import { YouRow } from './rows-messages';
-import { ArtChip, BriefRow, CompactedRow, LandedRow, MadeRow, NotDeliveredRow, NOTICE_MARK, NoticeRow, PrRow, ScheduledRow, WakeRow } from './rows-news';
+import { ArtChip, BriefRow, CompactedRow, LandedRow, MadeRow, NotDeliveredRow, NOTICE_MARK, NoticeRow, PrRow, ReportRow, ScheduledRow, WakeRow } from './rows-news';
 import { ThinkingLine, thoughtFor, ToolsRow } from './rows-tools';
 /** What a row needs of its thread. */
 export interface RowCtx {
@@ -46,6 +46,8 @@ export const EntryRow = memo(function EntryRow({
   named,
   carry = false,
   afterFold = false,
+  underFold = false,
+  retries,
 }: {
   ctx: RowCtx;
   pos: number;
@@ -59,6 +61,10 @@ export const EntryRow = memo(function EntryRow({
   carry?: boolean;
   /** the row right under a folded run: it follows the fold's quiet row, not the hidden note (H1) */
   afterFold?: boolean;
+  /** the first message of an open run: 8 px under its fold row, never a new group's 20 (designer m_19912 (2)) */
+  underFold?: boolean;
+  /** a retry notice that ends a run of them: each try's words, oldest first (H9, tiers.ts retryRuns) */
+  retries?: readonly string[] | undefined;
 }) {
   // the live row (live.ts) is this same row drawing the entry it becomes, so
   // the entry takes its place with nothing unmounted (text-appearing v2 (4))
@@ -78,13 +84,13 @@ export const EntryRow = memo(function EntryRow({
   // a news or plumbing row has no name line: a new author there opens no group (designer m_19387);
   // nor does a message between agents right after another (an open run: 12 px apart, m_19784 (2))
   const nameless = p !== undefined && (NAMELESS_KINDS.has(e.kind) || (NOTE_KINDS.has(e.kind) && NOTE_KINDS.has(p.kind)));
-  const head = groupHead(p, e, ctx) && !nameless;
+  const head = groupHead(p, e, ctx) && !nameless && !underFold;
   // same sender → same receiver as the message before: one chip for both (m_19784 (2))
   const chained = sameRoute(p, e, ctx.agent);
   // his on the right, the rest on the left (messages-right v1); a change of side opens more room
   const side = sideOf(e);
   const turn = p !== undefined && day === null && sideOf(p) !== side;
-  const gap = p === undefined || day !== null || turn || head ? undefined : gapOf(afterFold ? { kind: 'fold' } : p, e);
+  const gap = underFold ? 'row' : p === undefined || day !== null || turn || head ? undefined : gapOf(afterFold ? { kind: 'fold' } : p, e);
   // H2: the name line opens an author's run on its first row that is not work; H12: after 5 min
   // of silence a faint '· 14:31 ·' (the TUI's), the times themselves on hover only
   const work = TOOL_KINDS.has(e.kind);
@@ -104,7 +110,7 @@ export const EntryRow = memo(function EntryRow({
         </div>
       )}
       <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={live === undefined ? `thread.entry.${pos}` : 'thread.stream'} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head} data-side={side} data-turn={turn || undefined} data-gap={gap}>
-        <EntryBody e={e} ctx={ctx} head={shown} next={n} live={live !== undefined} still={still} chained={chained} />
+        <EntryBody e={e} ctx={ctx} head={shown} next={n} live={live !== undefined} still={still} chained={chained} retries={retries} />
       </div>
     </>
   );
@@ -140,7 +146,7 @@ export function pauseOf(prev: Pick<Entry, 'at_ms'> | undefined, e: Pick<Entry, '
   return prev !== undefined && prev.at_ms > 0 && e.at_ms > 0 && e.at_ms - prev.at_ms > GROUP_GAP_MS;
 }
 
-function EntryBody({ e, ctx, head, next, live, still, chained = false }: { e: Entry; ctx: RowCtx; head: boolean; next: Entry | undefined; live: boolean; still: boolean; chained?: boolean }) {
+function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }: { e: Entry; ctx: RowCtx; head: boolean; next: Entry | undefined; live: boolean; still: boolean; chained?: boolean; retries?: readonly string[] | undefined }) {
   // the hub's brief opens a task's thread: one quiet row, the brief folded under it (designer; the TUI's is_brief)
   const brief = e.kind === 'you' || e.kind === 'from_agent' || e.kind === 'agent' ? briefOf(e.text) : null;
   if (brief !== null) return <BriefRow pos={e.pos} name={brief.name} objective={brief.objective} body={brief.body} ctx={ctx} />;
@@ -181,11 +187,7 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false }: { e: En
     {
       const line = reportStatus(e.text, e.report?.kind) ?? e.text;
       // only what waits on him takes the accent: every done or failed line is dim (designer m_13926)
-      return (
-        <div className="th-report" data-waits={line.startsWith('blocked') || undefined} data-testid={`thread.report.${String(e.pos)}`}>
-          <Marker>{line}</Marker>
-        </div>
-      );
+      return <ReportRow pos={e.pos} line={line} text={e.text} next={next} ctx={ctx} waits={line.startsWith('blocked')} />;
     }
     case 'you':
       return <YouRow e={e} ctx={ctx} next={next} />;
@@ -219,7 +221,7 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false }: { e: En
       );
     }
     case 'notice':
-      return <NoticeRow e={e} ctx={ctx} />;
+      return <NoticeRow e={e} ctx={ctx} retries={retries} />;
     case 'not_delivered':
       return <NotDeliveredRow e={e} ctx={ctx} />;
     // amb-feed's batch 3a (5d4189cb): the hub's news lines, typed
@@ -245,11 +247,7 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false }: { e: En
       const report = reportStatus(e.text);
       const from = shownName(e.from ?? 'an agent');
       if (report !== null) {
-        return (
-          <div className="th-report" data-waits={report.startsWith('blocked') || undefined} data-testid={`thread.report.${String(e.pos)}`}>
-            <Marker>{(e.from ?? ctx.agent) !== ctx.agent ? `${from}: ${report}` : report}</Marker>
-          </div>
-        );
+        return <ReportRow pos={e.pos} line={(e.from ?? ctx.agent) !== ctx.agent ? `${from}: ${report}` : report} text={e.text} next={next} ctx={ctx} waits={report.startsWith('blocked')} />;
       }
       const to = shownName(e.to != null && e.to !== '' ? e.to : ctx.agent);
       return <AgentNote pos={e.pos} from={from} to={to} text={dropAuthor(e.text, e.from ?? '')} ctx={ctx} testId={`thread.from.${String(e.pos)}`} chip={!chained} />;
@@ -266,11 +264,7 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false }: { e: En
       // an agent's '[report: blocked] …' message: its status line (designer D14, the TUI's report_parts)
       const report = reportStatus(e.text);
       if (report !== null) {
-        return (
-          <div className="th-report" data-waits={report.startsWith('blocked') || undefined} data-testid={`thread.report.${String(e.pos)}`}>
-            <Marker>{who.from === 'agent' && (e.from ?? ctx.agent) !== ctx.agent ? `${who.name}: ${report}` : report}</Marker>
-          </div>
-        );
+        return <ReportRow pos={e.pos} line={who.from === 'agent' && (e.from ?? ctx.agent) !== ctx.agent ? `${who.name}: ${report}` : report} text={e.text} next={next} ctx={ctx} waits={report.startsWith('blocked')} />;
       }
       return <AgentMsg e={e} ctx={ctx} who={who} head={head} live={live} still={still} />;
     }

@@ -1439,20 +1439,41 @@
   }
 }
 /* a quote he sent: first in his bubble, its rail and its source, then his words */
+/* a quote he sent (H7, designer m_19832): one line at his bubble's top, '❝ words… · main · 1 line',
+   text-2, the words cut with …; a click opens it in place */
 .th-you-quote {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin: 0 0 8px;
-  padding: 0 0 0 10px;
-  border-left: 2px solid var(--c-line-strong, var(--c-line));
+  gap: var(--gap-tight);
+  max-width: 100%;
+  margin: 0 0 var(--gap-inline);
   color: var(--c-text-2);
-  font: var(--t-13)/1.45 var(--font-read);
-  white-space: pre-wrap;
+  font: var(--t-13) / 1.45 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.th-you-quote:hover {
+  color: var(--c-text);
+}
+.th-you-quote-line {
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+}
+.th-you-quote-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .th-you-quote-src {
-  font: var(--t-12) var(--font-ui);
+  flex: none;
   color: var(--c-text-3);
+}
+.th-you-quote-whole {
+  padding-left: var(--s-3);
+  border-left: 2px solid var(--c-line-strong, var(--c-line));
+  font-family: var(--font-read);
+  white-space: pre-wrap;
 }
 
 /* the thread's hierarchy (designer's thread tiers m_19387, http://127.0.0.1:47438/p/thread-tiers).
@@ -1618,11 +1639,84 @@
   font-weight: 600;
   line-height: 1.35;
 }
+/* a heading that opens a reply: no 20 above, the head's 4 is enough (designer m_19912 (1)) */
+.th-md.b-md > :is(h1, h2, h3, h4):first-child {
+  margin-top: 0;
+}
+/* the head to the reply's first block, whatever it is: --gap-tight 4 */
+.th-screen .b-msg > .b-who:not(.b-hover) {
+  margin-bottom: var(--gap-tight);
+}
 .th-md.b-md h1 {
   font-size: var(--t-17);
 }
 .th-md.b-md :is(h2, h3, h4) {
   font-size: var(--t-15);
+}
+/* H9: a model call's retries, one quiet row that updates in place: the ▲ dim, the words text-2, in
+   --c-err only when the last try failed; each try's words under its ▸ */
+.th-retry {
+  color: var(--c-text-2);
+  font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
+}
+.th-retry-line {
+  display: flex;
+  gap: var(--gap-inline);
+  align-items: baseline;
+  max-width: 100%;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.th-retry-line .th-news-mark {
+  color: var(--c-text-3);
+}
+.th-retry-words {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.th-retry[data-failed] .th-retry-line,
+.th-retry[data-failed] .th-news-mark {
+  color: var(--c-err);
+}
+.th-retry-tries {
+  margin: var(--gap-tight) 0 0 calc(1em + var(--gap-inline));
+  padding: 0;
+  list-style: none;
+  color: var(--c-text-3);
+  overflow-wrap: anywhere;
+}
+/* H8: a report the message under it repeats: one quiet row '✓ report ▸'; else its one line */
+.th-report-line {
+  display: flex;
+  gap: var(--gap-inline);
+  align-items: baseline;
+  min-width: 0;
+  white-space: nowrap;
+}
+.th-report-line .b-marker {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.th-report-line > .b-act {
+  flex: none;
+  color: var(--c-text-3);
+  font: var(--t-13) var(--font-ui);
+}
+.th-report-fold {
+  color: var(--c-text-2);
+  font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
+  cursor: pointer;
+}
+.th-report-fold:hover {
+  color: var(--c-text);
+}
+.th-report-body {
+  margin-top: var(--gap-tight);
+  padding-left: var(--s-3);
+  border-left: 2px solid var(--c-line);
+  color: var(--c-text-2);
 }
 /* tier 2: a report on his request reads as body (sans 14 ink); only what waits on him is the accent */
 .th-report .b-marker {

@@ -281,6 +281,22 @@ export function reportLine(text: string, kind?: string | null): string | null {
   return words === '' ? k : `${k} · ${words}`;
 }
 
+/** A report's words without its '[report: kind]' tag (the whole of them, every line). Pure. */
+export function reportBody(text: string): string {
+  return text.trim().replace(/^\[report:\s*[^\]]+\]\s*/, '').trim();
+}
+
+const plain = (t: string) => t.toLowerCase().replace(/[`*_>#]/g, '').replace(/\s+/g, ' ').replace(/[.\s]+$/, '').trim();
+
+/**
+ * The message under a report says the same words (tui-parity H8: the TUI folds the report to one
+ * line, the app drew both loud): its first line is in the message. Pure.
+ */
+export function repeatsReport(body: string, next: string): boolean {
+  const first = plain(body.split('\n')[0] ?? '');
+  return first.length >= 12 && plain(next).includes(first);
+}
+
 /** A report's status line in a thread, with its kind's mark as the TUI's report line: '✓ done · …', '✗ failed · …' (designer: '✓ done · <summary>'); the spotlight's preview marks its own lines. Pure. */
 export function reportStatus(text: string, kind?: string | null): string | null {
   const line = reportLine(text, kind);

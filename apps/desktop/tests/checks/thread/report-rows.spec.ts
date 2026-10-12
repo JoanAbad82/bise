@@ -24,7 +24,9 @@ test('thread/report-rows: an agent\'s reports to bise read as status lines in it
     await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'perf', { timeout: 10_000 });
     await core.send({ ev: 'thread', project: ACME, agent: 'perf', entries, before: null, more: false } as never);
     await expect(page.getByTestId('thread.report.3')).toHaveText('blocked · waiting for your answer', { timeout: 3000 });
-    await expect(page.getByTestId('thread.report.4')).toHaveText('✓ done · p95 at 180 ms, nothing to fix.');
+    // H8 (amb-win, designer m_19832): one line, '▸ report' opens the rest
+    await expect(page.locator('[data-testid="thread.report.4"] .b-marker')).toHaveText('✓ done · p95 at 180 ms, nothing to fix.');
+    await expect(page.getByTestId('thread.report.4.more')).toHaveText('▸ report');
     await expect(page.getByTestId('thread.to.2')).toContainText('i measured it');
     const all = (await page.getByTestId('thread.screen').innerText()).replace(/\s+/g, ' ');
     expect(all, 'no raw report tag').not.toContain('[report:');
@@ -38,7 +40,8 @@ test('thread/report-rows: an agent\'s reports to bise read as status lines in it
       document.documentElement.style.setProperty('color-scheme', 'dark');
     });
     // the option chips and the send button transition their colours: shoot once they end, never mid-way
-    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))));
+    // (finite ones only: a looping one, like a working agent's ∿, never finishes)
+    await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))));
     await page.waitForTimeout(250);
     await page.screenshot({ path: test.info().outputPath('report-rows-dark.png') });
   } finally {

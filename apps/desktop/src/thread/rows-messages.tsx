@@ -69,6 +69,39 @@ export function YouBubble({
   );
 }
 
+/** What a quote line says after its words: '· main · 1 line', or a diff quote's place. Pure. */
+export function quoteMeta(source: string, about: string, text: string): string {
+  if (about !== '') return about;
+  const n = text.split('\n').length;
+  return [source === '' ? '' : shownName(source), `${String(n)} line${n === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
+}
+
+/**
+ * A quote in his bubble (tui-parity H7, designer m_19832): one line at the bubble's top, '❝ Agreed on
+ * the api… · main · 1 line' in text-2, its words cut with …; a click opens it in place.
+ */
+function QuoteLine({ source, about, text, testId }: { source: string; about: string; text: string; testId: string }) {
+  const [open, setOpen] = useState(false);
+  const meta = quoteMeta(source, about, text);
+  return (
+    <Press
+      look="th-you-quote"
+      data-open={open || undefined}
+      aria-expanded={open}
+      onClick={() => {
+        setOpen((o) => !o);
+      }}
+      data-testid={testId}
+    >
+      <span className="th-you-quote-line">
+        <span className="th-you-quote-text">❝ {open ? meta : (text.split('\n')[0] ?? '')}</span>
+        {!open && <span className="th-you-quote-src"> · {meta}</span>}
+      </span>
+      {open && <span className="th-you-quote-whole">{text}</span>}
+    </Press>
+  );
+}
+
 export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | undefined }) {
   const [open, setOpen] = useFold(false, e.pos);
   // the fn context block the hub appended never shows: a chip from the typed context instead;
@@ -120,10 +153,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   return (
     <YouBubble head={to} under={under} timeAlways={words !== undefined || (mark !== null && lastOfRun(e, next))} testId={`thread.you.${String(e.pos)}`}>
       {quotes.map((q, i) => (
-        <blockquote key={i} className="th-you-quote" data-testid={`thread.you.${String(e.pos)}.quote.${String(i + 1)}`}>
-          {q.source !== '' && <span className="th-you-quote-src">{q.about !== '' ? q.about : shownName(q.source)}</span>}
-          <span className="th-you-quote-text">{q.text}</span>
-        </blockquote>
+        <QuoteLine key={i} source={q.source} about={q.about} text={q.text} testId={`thread.you.${String(e.pos)}.quote.${String(i + 1)}`} />
       ))}
       {text !== '' && <Markdown text={fold === undefined || open ? text : fold.head} onLink={ctx.onLink} onPath={ctx.onPath} breaks />}
       {fold !== undefined && (

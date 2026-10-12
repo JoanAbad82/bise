@@ -36,3 +36,14 @@ describe('agent-to-agent runs', () => {
     expect(foldedRuns([1, 2, 3], (p) => Q[p], 'gift-ui')).toEqual([]);
   });
 });
+
+describe('a report breaks a run (tier 2: for him)', () => {
+  it('never folds a report away', () => {
+    const list: Record<number, RunEntry> = {
+      1: { kind: 'to_agent', to: 'main', text: 'i measured it' },
+      2: { kind: 'to_agent', to: 'main', text: '[report: done] p95 at 180 ms' },
+      3: { kind: 'from_agent', from: 'main', text: 'thanks' },
+    };
+    expect(foldedRuns([1, 2, 3], (p) => list[p], 'perf')).toEqual([]);
+  });
+});

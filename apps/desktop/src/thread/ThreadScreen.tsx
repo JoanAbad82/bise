@@ -43,7 +43,7 @@ import { ComputerLine, computerRowOf, computerState } from './ComputerLine';
 import { entryKey, namedRows, pendingKey, placeSteered, posOfKey } from './entry';
 import { FindBar } from './FindBar';
 import { NoProject } from './NoProject';
-import { landedEchoes } from './tiers';
+import { landedEchoes, retryRuns } from './tiers';
 import { foldedRuns, runKey, runWords, withRuns } from './runs';
 import { BisePearl } from '@/app/BisePearl';
 import { createFindMark, FindMarkContext } from './findmark';
@@ -508,11 +508,15 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBac
   // a steer shows where the agent read it (its receipt's pos), not where it was written
   // (the store bumps the order when a steered_at comes, so this recomputes)
   // one land per sha (designer m_19387): the hub's line that says again a typed land leaves the list
-  const shown = useMemo(() => {
+  const placed = useMemo(() => {
     const echoes = landedEchoes(view.order, (pos) => store.entry(tkey, pos));
     const order = echoes.size === 0 ? view.order : view.order.filter((pos) => !echoes.has(pos));
     return placeSteered(order, (pos) => store.entry(tkey, pos)?.steered_at);
   }, [view, store, tkey]);
+  // H9 (designer m_19832): a model call's retries, one row that updates in place; the tries before
+  // the last leave the list, their words open under its ▸
+  const retries = useMemo(() => retryRuns(placed, (pos) => store.entry(tkey, pos)), [placed, store, tkey]);
+  const shown = useMemo(() => (retries.hidden.size === 0 ? placed : placed.filter((pos) => !retries.hidden.has(pos))), [placed, retries]);
   const runs = useMemo(() => foldedRuns(shown, (pos) => store.entry(tkey, pos), agent), [shown, store, tkey, agent]);
   const listed = useMemo(() => withRuns(shown, runs, openRuns, entryKey), [shown, runs, openRuns]);
   // the reply being written (streaming): a live row at the end, drawn as the entry it becomes,
@@ -569,6 +573,8 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBac
     }
     return out;
   }, [runs, openRuns, nextOf]);
+  // the first message of an open run sits 8 px under its fold row (designer m_19912 (2))
+  const underFold = useMemo(() => new Set(runs.filter((r) => openRuns.has(r.start)).map((r) => r.start)), [runs, openRuns]);
   // H1: the fold is a quiet row: 4 px under another, 12 under a message or prose
   const foldGap = useCallback(
     (start: number) => {
@@ -604,9 +610,9 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBac
       }
       if (key === LIVE) return live.entry === null ? null : <EntryRow ctx={ctx} pos={-1} prev={lastPos < 0 ? undefined : lastPos} live={live.entry} still={still} carry={heads.carry} />;
       const pos = posOfKey(key);
-      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} next={nextOf.get(pos)} still={still} named={heads.named.has(pos)} afterFold={afterFold.has(pos)} />;
+      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} next={nextOf.get(pos)} still={still} named={heads.named.has(pos)} afterFold={afterFold.has(pos)} underFold={underFold.has(pos)} retries={retries.runs.get(pos)} />;
     },
-    [ctx, prevOf, nextOf, runs, openRuns, live.entry, lastPos, still, heads, afterFold, foldGap],
+    [ctx, prevOf, nextOf, runs, openRuns, live.entry, lastPos, still, heads, afterFold, underFold, foldGap, retries],
   );
   const onOlder = useCallback(() => {
     store.olderPage(project, agent);

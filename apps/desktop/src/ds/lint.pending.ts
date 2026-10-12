@@ -33,6 +33,5 @@ export const PENDING_CLASSES: readonly string[] = [
   'th-tail',
   'th-tool',
   'th-voice',
-  'th-you-quote-text',
   'vm-said',
 ];

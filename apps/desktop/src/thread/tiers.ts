@@ -88,3 +88,68 @@ export function landedEchoes(order: readonly number[], entry: (pos: number) => T
   }
   return out;
 }
+
+/** A model call's retry notice, as the hub words it (proto words.rs provider_retry). */
+export interface Retry {
+  readonly attempt: number;
+  readonly of: number;
+  readonly why: string;
+  /** the next try: 'retry 3/10 in 4s'; none when this try was the last */
+  readonly next?: { readonly attempt: number; readonly wait: string };
+}
+
+const RETRY = /^model call failed \(attempt (\d+)\/(\d+)\): ([\s\S]*?)(?: · retry (\d+)\/\d+ in (\S+))?$/u;
+
+/** 'model call failed (attempt 2/10): provider 529 (transient) · retry 3/10 in 4s' read; null for any other words. Pure. */
+export function retryOf(text: string): Retry | null {
+  const m = RETRY.exec(text.trim());
+  if (m === null) return null;
+  const base = { attempt: Number(m[1]), of: Number(m[2]), why: m[3] ?? '' };
+  return m[4] === undefined ? base : { ...base, next: { attempt: Number(m[4]), wait: m[5] ?? '' } };
+}
+
+/** What a retry run needs of an entry. */
+export interface RetryEntry {
+  readonly kind: string;
+  readonly text: string;
+  readonly notice?: { readonly text: string } | null;
+}
+
+/**
+ * Consecutive retry notices of one model call (tui-parity H9, designer m_19832): one row that
+ * updates in place. `hidden`: every notice of a run but its last; `runs`: the last's pos -> the
+ * words of each try, oldest first (the full errors under its ▸). Pure.
+ */
+export function retryRuns(order: readonly number[], entry: (pos: number) => RetryEntry | undefined): { hidden: Set<number>; runs: Map<number, string[]> } {
+  const hidden = new Set<number>();
+  const runs = new Map<number, string[]>();
+  let run: { pos: number; text: string }[] = [];
+  const close = () => {
+    const last = run.at(-1);
+    if (last !== undefined) {
+      for (const r of run.slice(0, -1)) hidden.add(r.pos);
+      runs.set(
+        last.pos,
+        run.map((r) => r.text),
+      );
+    }
+    run = [];
+  };
+  for (const pos of order) {
+    const e = entry(pos);
+    const text = e?.kind === 'notice' ? (e.notice?.text ?? e.text) : '';
+    if (e === undefined || text === '' || retryOf(text) === null) {
+      close();
+      continue;
+    }
+    run.push({ pos, text });
+  }
+  close();
+  return { hidden, runs };
+}
+
+/** The retry row's words: 'model call failed · retry 3 of 10 in 4 s', or '… · try 10 of 10 failed' at the end. Pure. */
+export function retryWords(r: Retry): string {
+  if (r.next === undefined) return `model call failed · try ${String(r.attempt)} of ${String(r.of)} failed`;
+  return `model call failed · retry ${String(r.next.attempt)} of ${String(r.of)} in ${r.next.wait.replace(/^(\d+(?:\.\d+)?)([a-z]+)$/u, '$1 $2')}`;
+}

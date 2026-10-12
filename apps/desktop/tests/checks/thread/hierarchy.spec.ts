@@ -73,6 +73,14 @@ for (const theme of ['light', 'dark']) {
         await expect(page.locator('[data-testid="thread.entry.3"] .b-who b')).toHaveText('bise');
         // H12: its time hidden at rest
         await expect(page.locator('[data-testid="thread.entry.3"] .b-who .b-time')).toHaveCSS('opacity', '0');
+        // designer m_19912 (1): the head to its reply's first block (a heading here) is 4 px
+        const headGap = await page.evaluate(() => {
+          const who = document.querySelector('[data-testid="thread.entry.3"] .b-who:not(.b-hover)')?.getBoundingClientRect();
+          const h = document.querySelector('[data-testid="thread.entry.3"] h2')?.getBoundingClientRect();
+          return who && h ? Math.round(h.top - who.bottom) : -1;
+        });
+        expect(headGap, `the head to the heading under it: 4 px (${String(headGap)})`).toBeGreaterThanOrEqual(2);
+        expect(headGap, `the head to the heading under it: 4 px (${String(headGap)})`).toBeLessThanOrEqual(6);
         // H6: the h2 at body size, 600
         const h2 = await page.locator('[data-testid="thread.entry.3"] h2').evaluate((el) => ({ size: getComputedStyle(el).fontSize, weight: getComputedStyle(el).fontWeight }));
         expect(h2, 'H6: the heading at body size').toEqual({ size: '15px', weight: '600' });
@@ -117,6 +125,85 @@ for (const theme of ['light', 'dark']) {
       const [tb, mb] = await Promise.all([time.boundingBox(), msg.boundingBox()]);
       expect(Math.abs((tb?.x ?? 0) + (tb?.width ?? 0) - ((mb?.x ?? 0) + (mb?.width ?? 0))), 'right-aligned').toBeLessThanOrEqual(1);
       await page.screenshot({ path: test.info().outputPath(`hierarchy-${theme}-hover.png`) });
+    } finally {
+      await s.close();
+    }
+  });
+}
+
+// H7 H8 H9 (commit B): perf's own thread. His message quoting main; a report the message under it
+// repeats, another that stands alone; a model call's 3 tries then an answer.
+const RPT = 'p99 rose because it averaged the slowest 10%; it is the real percentile now';
+const tries = (n: number, next?: number) => `model call failed (attempt ${String(n)}/10): no answer from 127.0.0.1:51072 in 90 s (timeout)${next === undefined ? '' : ` · retry ${String(next)}/10 in 4s`}`;
+const perf = [
+  {
+    pos: 1,
+    at_ms: at(20),
+    kind: 'you',
+    text: 'is that still true now that the batch size is back to 500?',
+    parts: [
+      { kind: 'quote', from: 'main', text: "Agreed on the api: it's the shared batch size, not one noisy host. Here is the whole picture, with the numbers per host." },
+      { kind: 'text', text: 'is that still true now that the batch size is back to 500?' },
+    ],
+  },
+  { pos: 2, at_ms: at(19), kind: 'to_agent', to: 'main', text: `[report: done] ${RPT}` },
+  { pos: 3, at_ms: at(19), kind: 'agent', text: `P99 rose because it averaged the slowest 10%; it is the real percentile now (src/latency.py). ready to merge.` },
+  { pos: 4, at_ms: at(18), kind: 'to_agent', to: 'main', text: '[report: done] the batch test passes on 500 too.\n- 3 runs, p99 280-300 ms' },
+  { pos: 5, at_ms: at(17), kind: 'notice', text: tries(1, 2), notice: { level: 'warn', text: tries(1, 2) } },
+  { pos: 6, at_ms: at(17), kind: 'notice', text: tries(2, 3), notice: { level: 'warn', text: tries(2, 3) } },
+  { pos: 7, at_ms: at(17), kind: 'notice', text: tries(3, 4), notice: { level: 'warn', text: tries(3, 4) } },
+  { pos: 8, at_ms: at(16), kind: 'agent', text: 'Still true at 500: the p99 holds at 290 ms.' },
+  { pos: 9, at_ms: at(15), kind: 'notice', text: tries(10), notice: { level: 'warn', text: tries(10) } },
+];
+const world2 = (theme: string) => [...world(theme).filter((e) => e.ev !== 'agents'), { ev: 'agents', project: P, agents: [ag('main'), ag('perf', 'p99 latency')] }, { ev: 'thread', project: P, agent: 'perf', entries: perf, before: null, more: false }];
+
+for (const theme of ['light', 'dark']) {
+  test(`thread/hierarchy: a quote on one line, a repeated report folded, retries on one updating row (${theme})`, async () => {
+    const core = new FakeCore(world2(theme) as unknown as ConstructorParameters<typeof FakeCore>[0]);
+    const s = await launchDesktop({ core, route: `agent/${P}/perf`, size: '1100x900' });
+    try {
+      const { page } = s;
+      await expect(page.getByTestId('thread.entry.9')).toBeVisible({ timeout: 10_000 });
+      await page.mouse.move(1, 400);
+      // H7: the quote, one dim line at the bubble's top, its words cut with …
+      const q = page.getByTestId('thread.you.1.quote.1');
+      await expect(q).toContainText('❝ Agreed on the api');
+      await expect(q).toContainText('· bise · 1 line');
+      const ql = await q.evaluate((el) => ({ h: el.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(el).lineHeight), size: getComputedStyle(el).fontSize }));
+      expect(ql.h / ql.lh, 'H7: one line').toBeLessThan(1.6);
+      expect(ql.size).toBe('13px');
+      // H8: the report the message under it repeats: one quiet row; the message stays
+      await expect(page.getByTestId('thread.report.2.fold')).toHaveText('✓ report ▸');
+      await expect(page.getByTestId('thread.entry.3')).toContainText('ready to merge');
+      // a report alone: its one line, '▸ report' opens the rest in place
+      await expect(page.locator('[data-testid="thread.report.4"] .b-marker')).toHaveText(/^✓ done · the batch test passes on 500 too\.?$/u);
+      const one = await page.getByTestId('thread.report.4').evaluate((el) => el.getBoundingClientRect().height);
+      expect(one, 'H8: one line').toBeLessThan(30);
+      // H9: three tries, one row with the last words; the ▲ dim until the last try fails
+      await expect(page.getByTestId('thread.notice.5')).toHaveCount(0);
+      await expect(page.getByTestId('thread.notice.6')).toHaveCount(0);
+      await expect(page.getByTestId('thread.notice.7.retry')).toHaveText('▲model call failed · retry 4 of 10 in 4 s ▸');
+      const err = await page.evaluate(() => {
+        const p = document.createElement('span');
+        p.style.color = 'var(--c-err)';
+        document.body.appendChild(p);
+        const c = getComputedStyle(p).color;
+        p.remove();
+        return c;
+      });
+      expect(await page.getByTestId('thread.notice.7.retry').evaluate((el) => getComputedStyle(el).color), 'not red while it retries').not.toBe(err);
+      await expect(page.getByTestId('thread.notice.9.retry')).toHaveText('▲model call failed · try 10 of 10 failed ▸');
+      expect(await page.getByTestId('thread.notice.9.retry').evaluate((el) => getComputedStyle(el).color), 'red once the last try failed').toBe(err);
+      await page.screenshot({ path: test.info().outputPath(`hierarchy-b-${theme}-folded.png`) });
+      // open: the quote whole, the report's words, each try
+      await q.click();
+      await expect(q).toContainText('with the numbers per host.');
+      await page.getByTestId('thread.report.2.fold').click();
+      await expect(page.getByTestId('thread.report.2.body')).toContainText('real percentile now');
+      await page.getByTestId('thread.notice.7.retry').click();
+      await expect(page.locator('[data-testid="thread.notice.7.tries"] li')).toHaveCount(3);
+      await page.mouse.move(1, 400);
+      await page.screenshot({ path: test.info().outputPath(`hierarchy-b-${theme}-open.png`) });
     } finally {
       await s.close();
     }

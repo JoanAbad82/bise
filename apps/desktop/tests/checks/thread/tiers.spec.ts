@@ -109,6 +109,14 @@ for (const theme of ['light', 'dark']) {
         await run.click();
         const note = page.getByTestId('thread.to.4');
         await expect(note).toBeVisible();
+        // designer m_19912 (2): the first message 8 px under its fold row
+        const under = await page.evaluate(() => {
+          const f = document.querySelector('[data-testid="thread.run.4"]')?.getBoundingClientRect();
+          const n = document.querySelector('[data-testid="thread.to.4"]')?.getBoundingClientRect();
+          return f && n ? Math.round(n.top - f.bottom) : -1;
+        });
+        expect(under, `the first message 8 px under the open fold (${String(under)})`).toBeGreaterThanOrEqual(6);
+        expect(under, `the first message 8 px under the open fold (${String(under)})`).toBeLessThanOrEqual(10);
         const look = await note.evaluate((el) => ({ font: getComputedStyle(el).fontFamily, color: getComputedStyle(el).color }));
         expect(look.font, 'a note between agents: its words sans').not.toMatch(/mono/i);
         const dim = await page.evaluate(() => {

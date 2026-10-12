@@ -12,6 +12,8 @@ export interface RunEntry {
   readonly to?: string | null;
   /** a question that waits for the reply: never folded away */
   readonly asks?: boolean | null;
+  /** its words: a report ('[report: done] …') is for him, never folded away */
+  readonly text?: string;
 }
 
 export interface Run {
@@ -23,7 +25,8 @@ export interface Run {
 }
 
 // a question that waits for its reply (asks) stays in view: it breaks a run
-const isAgentMsg = (e: RunEntry | undefined): e is RunEntry => e !== undefined && (e.kind === 'to_agent' || e.kind === 'from_agent') && e.asks !== true;
+// and a report (tier 2, designer m_19387: reports on his requests are for him) stays in view too
+const isAgentMsg = (e: RunEntry | undefined): e is RunEntry => e !== undefined && (e.kind === 'to_agent' || e.kind === 'from_agent') && e.asks !== true && !/^\s*\[report:/u.test(e.text ?? '');
 
 /** The folded runs of a thread's entries in order (`agent`: whose thread it is). Pure. */
 export function foldedRuns(order: readonly number[], entry: (pos: number) => RunEntry | undefined, agent: string): Run[] {

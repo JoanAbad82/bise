@@ -10,7 +10,7 @@ import { Markdown } from './Markdown';
 import { clock, lastOfRun, reportStatus } from './entry';
 import { shownName } from '@/agents/model';
 import { YouBubble } from './rows-messages';
-import { NewsLine } from './rows-news';
+import { NewsLine, ReportRow } from './rows-news';
 import type { RowCtx } from './rows';
 import { youView } from './parts';
 /** Main answered an agent's question for him: the question, the answer, and why, dim. */
@@ -205,11 +205,7 @@ export function ToAgentRow({ e, ctx, chained = false }: { e: Entry; ctx: RowCtx;
   const report = reportStatus(e.text);
   if (report !== null) {
     if (carded) return null;
-    return (
-      <div className="th-report" data-waits={report.startsWith('blocked') || undefined} data-testid={`thread.report.${String(e.pos)}`}>
-        <Marker>{report}</Marker>
-      </div>
-    );
+    return <ReportRow pos={e.pos} line={report} text={e.text} next={next} ctx={ctx} waits={report.startsWith('blocked')} />;
   }
   return (
     <AgentNote
