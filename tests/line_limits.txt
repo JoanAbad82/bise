@@ -1,26 +1,23 @@
 # The files over 1,000 lines (docs/architecture-principles.md rule 5), a shrink-only ratchet:
 # "<lines> <path>", sorted by path. A listed file never grows past its count; a shrink lowers
 # its count in the same commit; at 1,000 or under, its line goes. Checked by tests/line_gate.py
-# (gate.sh quick). Never add a line: split the file instead.
-# Eleven lines carry the counts desktop-on-main's merge of the desktop app (ambient-app e59361bc and
-# sb/ambient-lead 2f3f47c4) will give, so it passes as is: main's count plus the branch's growth since
-# its merge-base. Not on main yet: apps/desktop/src/composer/pm/PmField.tsx, apps/desktop/src/store/store.ts,
-# apps/desktop/src/thread/rows.tsx, dev/plugins/ambient-qa/qa.py and world.py, tests/ambient_qa_test.py,
-# scripts/desktop_try.py. Above main's count: tests/fake_provider.py (1667 on main), rust/tui/src/sb/cards.rs
-# (1525), rust/harness/src/main.rs (1250), rust/tui/src/ambient/tests.rs (1021). The merge sets them to
-# what it brings; a change to one of them before it lowers its line, like any shrink.
-1298 apps/desktop/src/composer/pm/PmField.tsx
-1193 apps/desktop/src/store/store.ts
-1305 apps/desktop/src/thread/rows.tsx
+# (gate.sh quick on the changed files, gate.sh full on the whole tree). Never add a line: split
+# the file instead.
+# The 11 lines marked "merge" carry the counts the desktop app's merge brings (ambient-app
+# e59361bc, sb/ambient-lead 2f3f47c4: main's count plus the branch's growth since its merge-base),
+# so it passes as is. Until it lands they may sit above their file's count (fake_provider.py is
+# 1667 on main, cards.rs 1525, harness main.rs 1250, ambient/tests.rs 1021) or name a file not on
+# main yet; the merge sets them to the real counts and drops the marks (gate.sh full says so).
+1298 apps/desktop/src/composer/pm/PmField.tsx merge
+1193 apps/desktop/src/store/store.ts merge
+1305 apps/desktop/src/thread/rows.tsx merge
 6131 bend/LAWS.bend
 6275 bend/PROOF.bend
 1200 bend/core/wire.bend
 3923 bend/hub/core.bend
 1356 bend/runtime/provider-pure.bend
-3066 bend/vendor/http/http.bend
-1966 bend/vendor/json.bend
-2454 dev/plugins/ambient-qa/qa.py
-1558 dev/plugins/ambient-qa/world.py
+2454 dev/plugins/ambient-qa/qa.py merge
+1558 dev/plugins/ambient-qa/world.py merge
 1319 docs/brand/design-system/content.py
 1387 docs/brand/readme/make.py
 1335 rust/catalog/src/auth_cli.rs
@@ -29,7 +26,7 @@
 1251 rust/catalog/src/tests.rs
 1015 rust/computer-use/src/e2e.rs
 1112 rust/harness/src/doctor.rs
-1252 rust/harness/src/main.rs
+1252 rust/harness/src/main.rs merge
 1052 rust/plugins/src/resolve.rs
 1096 rust/proto/src/thread/fold_tests.rs
 1111 rust/proto/src/thread/lines.rs
@@ -40,7 +37,7 @@
 2452 rust/switchboard/src/daemon.rs
 1188 rust/switchboard/src/daemon/gate.rs
 1207 rust/switchboard/src/daemon/versions.rs
-1033 rust/tui/src/ambient/tests.rs
+1033 rust/tui/src/ambient/tests.rs merge
 1404 rust/tui/src/attach.rs
 1029 rust/tui/src/ctrlhint.rs
 1191 rust/tui/src/diffview.rs
@@ -54,16 +51,14 @@
 1023 rust/tui/src/run.rs
 1710 rust/tui/src/sb.rs
 1007 rust/tui/src/sb/card_draw.rs
-1527 rust/tui/src/sb/cards.rs
+1527 rust/tui/src/sb/cards.rs merge
 2859 rust/tui/src/sb/panel.rs
 1036 rust/tui/src/term.rs
 1110 rust/tui/src/theme.rs
 1114 rust/tui/src/ui.rs
 1154 rust/tui/src/voicemode/speak.rs
 1232 rust/tui/src/voicemode/turn.rs
-1326 rust/vendor/crossterm/src/event.rs
-1598 rust/vendor/crossterm/src/event/sys/unix/parse.rs
-1142 scripts/desktop_try.py
-1078 tests/ambient_qa_test.py
-1781 tests/fake_provider.py
+1142 scripts/desktop_try.py merge
+1078 tests/ambient_qa_test.py merge
+1781 tests/fake_provider.py merge
 1092 tests/proto_e2e.py

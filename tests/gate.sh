@@ -13,7 +13,8 @@
 #                     compile per source hash for every worktree and the
 #                     full gate; never a copy of its own: the EDR deletes
 #                     fresh unsigned copies). The bend part runs next to cargo.
-#   gate.sh full      everything: cargo build, run_all.sh (it puts ./repl-live
+#   gate.sh full      everything: first tests/line_gate.py --all (the whole
+#                     tree vs tests/line_limits.txt, ~0.5 s), cargo build, run_all.sh (it puts ./repl-live
 #                     ./repl-scripted ./sb-core in place with bins.sh: a copy
 #                     from the cache, a compile when their sources changed;
 #                     never commit them) with FUZZ_RUNS=2000
@@ -445,6 +446,10 @@ if [ "$mode" = rerun ]; then
 fi
 if [ "$mode" = full ]; then
   s=$SECONDS
+  # the whole tree against tests/line_limits.txt (~0.5 s, first: a red here
+  # needs no build): an unlisted file over 1,000 lines or a count above its
+  # file's, which a commit without the quick gate can leave
+  python3 tests/line_gate.py --all || { echo "GATE full FAILED"; exit 1; }
   export FUZZ_RUNS="${FUZZ_RUNS:-2000}"
   rm -f "$red"; export SB_RED_FILE="$red"
   # the e2e/tmux tests this change can break (tests/test_map.py; the user's
