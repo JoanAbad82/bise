@@ -130,6 +130,8 @@ Who gets woken, told or queued is a decision.
   `bise_proto::core`; its Bend codec and Rust type are generated. What you
   write by hand is the decision in sb-core and its law. Old transcript line
   shapes are read in one place, `thread/legacy.rs`, and never written again.
+  A conflict in `bend/hub/gen/` is never merged by hand: take either side,
+  then bless again (the generator rewrites the tag lookup whole).
 - Bad: the TUI finds cards in feed text:
   `line.starts_with("sb card : ")` (`tui/src/sb.rs`, `ingest_for`), and
   `strip_prefix("sb route : ")` next to it. A wording change in the hub breaks
