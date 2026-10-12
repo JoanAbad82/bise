@@ -34,10 +34,14 @@ export function ahead(ms: number, now: number): string {
   return `the ${ordinal(new Date(ms).getDate())}, ${hm(ms)}`;
 }
 
-/** 'every 5m', 'every day 07:30'. */
+/** A rhythm in the window's one age form (designer m_20461 (2)): '10m' '10 min', '2h' '2 h'. Pure. */
+export const rhythmWords = (e: string): string =>
+  e.replace(/\b(\d+)\s*m\b/gu, '$1 min').replace(/\b(\d+)\s*h\b/gu, '$1 h').replace(/\b(\d+)\s*s\b/gu, '$1 s');
+
+/** 'every 5 min', 'every day 07:30'. */
 export const howOften = (t: ScheduledTask): string => {
-  const e = t.every.trim();
-  // the hub may already say it ('every 5m'): never 'every every 5m' (designer D11)
+  const e = rhythmWords(t.every.trim());
+  // the hub may already say it ('every 5m'): never 'every every 5 min' (designer D11)
   return /^every\b/iu.test(e) ? e : `every ${e}`;
 };
 

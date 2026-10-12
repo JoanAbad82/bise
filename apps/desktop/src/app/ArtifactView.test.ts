@@ -23,3 +23,15 @@ describe("an artifact open in the window (designer's artifact-open page)", () =>
     expect(artWidth(1100, 240, 0.7)).toBe(480);
   });
 });
+
+import { initialsOf } from './SideRail';
+
+describe("the rail's project initials (designer m_20435 (f))", () => {
+  it("two words: their first letters; one word: its first letter; capitals", () => {
+    expect(initialsOf('storefront')).toBe('S');
+    expect(initialsOf('gift-cards')).toBe('GC');
+    expect(initialsOf('my shop app')).toBe('MS');
+    expect(initialsOf('élan')).toBe('É');
+    expect(initialsOf('')).toBe('');
+  });
+});

@@ -9,6 +9,7 @@
 import { useState, useSyncExternalStore } from 'react';
 import { Button } from '@/ds';
 import { ArtifactOpen, useAboutWords, useAllArtifacts } from '@/artifacts';
+import { useProjects } from '@/store';
 import { ThreadScreen } from '@/thread/ThreadScreen';
 import { keep } from './keep';
 import { MAIN, type Route } from './route';
@@ -79,13 +80,19 @@ function useClose(project: string, maker: string | undefined): () => void {
 export function ArtifactThread({ project, id }: { project: string; id: string }) {
   const it = useAllArtifacts(project).find((x) => x.a.id === id);
   const words = useAboutWords(project, id);
+  // the project's name in a head, never its workspace id (designer m_20453)
+  const name = useProjects().find((p) => p.project === project)?.name;
   if (it === undefined || words === undefined) return <div className="app-art-wait" data-testid="artifact.thread.wait" />;
+  // the maker's own thread, archived or not (dim then, '↺ restore' in its head); only the composer
+  // goes to the project's main when the maker is archived (words.agent)
+  const maker = it.a.agent;
   return (
     <ThreadScreen
-      key={`${project}/${words.agent}/${id}`}
+      key={`${project}/${maker}/${id}`}
       project={project}
-      agent={words.agent}
-      artifact={{ id, title: it.a.title, url: it.a.url, to: words.to, placeholder: words.placeholder }}
+      agent={maker}
+      {...(name === undefined ? {} : { projectName: name })}
+      artifact={{ id, title: it.a.title, url: it.a.url, to: words.to, placeholder: words.placeholder, agent: words.agent }}
     />
   );
 }
@@ -103,11 +110,11 @@ export function ArtifactColumn({ project, id }: { project: string; id: string })
 
 /** Under 1000 px: the artifact takes the width, the maker's composer under it, '◧ <maker>' slides the thread over. */
 export function ArtifactNarrow({ project, id }: { project: string; id: string }) {
-  const words = useAboutWords(project, id);
   const maker = useAllArtifacts(project).find((x) => x.a.id === id)?.a.agent;
   const close = useClose(project, maker);
   const [over, setOver] = useState(false);
-  const who = words?.agent ?? maker ?? MAIN;
+  // the maker's name, archived or not: the button opens its own thread (designer m_20453)
+  const who = maker ?? MAIN;
   return (
     <div className="app-art-narrow" data-testid="app.art">
       <ArtifactOpen

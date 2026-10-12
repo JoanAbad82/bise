@@ -738,6 +738,11 @@
   .ah:not(.ah-bise) .ah-who {
     display: none;
   }
+  /* the maker's thread sliding over its artifact keeps its name and role ('perf  perf's job',
+     designer m_20435 (b)) */
+  .app-over.thread .ah:not(.ah-bise) .ah-who {
+    display: flex;
+  }
 }
 
 /* the agent view's rows (designer's desktop-screens v6 (2); amb-home): its commands and edits as
@@ -853,11 +858,13 @@
   white-space: nowrap;
   cursor: pointer;
 }
+/* the artifact open beside this thread (designer m_20435 (c)): a 9% text tint, its line stays
+   --c-line, 'open' text-3; never an ink outline */
 .th-art.open {
-  border-color: var(--c-text);
+  background: color-mix(in srgb, var(--c-text) 9%, transparent);
 }
 .th-art-open {
-  color: var(--c-text-2);
+  color: var(--c-text-3);
   font-size: var(--t-11);
 }
 .th-art:hover {
@@ -995,6 +1002,20 @@
   color: var(--c-text-3);
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* the composer about an open artifact (designer m_20435 (d)): 'to perf · about “…”' gives way,
+   cut with …, and the state on the right ('idle') keeps its words */
+.th-screen[data-about='true'] .b-composer .div .lbl {
+  flex: 0 1 auto;
+}
+.th-screen[data-about='true'] .b-composer .div .end {
+  flex: none;
+}
+/* an archived maker beside its artifact (designer m_20453): its own thread, dim; '↺ restore' in
+   its head; the composer goes to the project's main */
+.th-screen[data-dim='true'] .th-main {
+  opacity: 0.55;
 }
 
 /* bise's own thread before any project (designer's 'no project yet', m_12093): centred, its

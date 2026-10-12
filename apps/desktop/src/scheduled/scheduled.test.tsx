@@ -43,7 +43,7 @@ describe('the scheduled screen', () => {
     expect([...rows].map((r) => r.getAttribute('data-testid'))).toEqual(['scheduled.row.4', 'scheduled.row.9']);
     expect(rows[0]?.textContent).toContain('deploy-watch · storefront');
     // 'how often' holds only the rhythm; the count is the pane's 'its runs' (designer m_12105)
-    expect(rows[0]?.textContent).toContain('every 5m');
+    expect(rows[0]?.textContent).toContain('every 5 min');
     expect(rows[0]?.textContent).not.toContain('6 of 24');
     expect(screen.getByTestId('scheduled.count').textContent).toBe('active · 2');
     const root = screen.getByTestId('scheduled.screen');
@@ -82,7 +82,7 @@ describe('scheduled here (panel A)', () => {
     const rows = screen.getByTestId('scheduled.here').querySelectorAll('button');
     expect([...rows].map((r) => r.dataset['testid'])).toEqual(['scheduled.here.row.4', 'scheduled.here.row.7']);
     expect(rows[0]?.textContent).toContain('check the deploy of storefront');
-    expect(rows[0]?.textContent).toContain('deploy-watch · every 5m');
+    expect(rows[0]?.textContent).toContain('deploy-watch · every 5 min');
     fireEvent.click(screen.getByTestId('scheduled.here.row.7'));
     expect(opened).toBe(1);
     cleanup();
@@ -104,8 +104,8 @@ describe('scheduled here (panel A)', () => {
 
 describe('how often', () => {
   it("says 'every' once, whether or not the hub's rhythm already has it (designer D11)", () => {
-    expect(howOften(task(1, { every: '5m' }))).toBe('every 5m');
+    expect(howOften(task(1, { every: '5m' }))).toBe('every 5 min');
     expect(howOften(task(1, { every: 'every day 07:30' }))).toBe('every day 07:30');
-    expect(howOften(task(1, { every: 'Every 10m' }))).toBe('Every 10m');
+    expect(howOften(task(1, { every: 'Every 10m' }))).toBe('Every 10 min');
   });
 });

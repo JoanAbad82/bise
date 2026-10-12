@@ -34,6 +34,7 @@ import { EnvironmentsScreen } from '@/review/EnvironmentsScreen';
 import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
 import { Sidebar } from './Sidebar';
+import { RAIL_PX, SideRail } from './SideRail';
 import { Over, Titlebar, useFrame } from './Frame';
 import { ART_FOLD_PX, ArtifactCentre, ArtifactColumn, artOf, artWidth, useArtPct, useInnerWidth } from './ArtifactView';
 import { RightBar } from './RightBar';
@@ -221,12 +222,30 @@ function Shell() {
   const [artShare, setArtShare] = useArtPct();
   const art = artOf(route);
   const artDocked = art !== undefined && frame.width !== 'narrow';
-  const side = frame.side && !(artDocked && winW < ART_FOLD_PX);
-  const artW = artDocked ? artWidth(winW, side ? frame.sideW : 0, artShare) : 0;
+  // under 1200 px the left bar folds to its 56 px icon rail; the title bar's sidebar button slides
+  // the whole bar back over it (designer m_20435 (f))
+  const rail = frame.side && artDocked && winW < ART_FOLD_PX;
+  const side = frame.side && !rail;
+  const at = formatRoute(route);
+  const [railAt, setRailAt] = useState<string | null>(null);
+  const railOver = rail && railAt === at;
+  const shown = rail
+    ? {
+        ...frame,
+        side: false,
+        over: railOver ? ('side' as const) : frame.over,
+        toggle: (what: 'sidebar' | 'panel') => {
+          if (what === 'sidebar') setRailAt(railOver ? null : at);
+          else frame.toggle(what);
+        },
+      }
+    : frame;
+  const leftW = rail ? RAIL_PX : side ? frame.sideW : 0;
+  const artW = artDocked ? artWidth(winW, leftW, artShare) : 0;
   return (
     <div
-      className={`app-shell b-ui w-${frame.width}${side ? '' : ' no-side'}`}
-      style={{ '--side-w': `${String(frame.sideW)}px`, '--panel-w': `${String(artDocked ? artW : frame.panelW)}px` } as CSSProperties}
+      className={`app-shell b-ui w-${frame.width}${side ? '' : rail ? ' rail' : ' no-side'}`}
+      style={{ '--side-w': `${String(rail ? RAIL_PX : frame.sideW)}px`, '--side-full': `${String(frame.sideW)}px`, '--panel-w': `${String(artDocked ? artW : frame.panelW)}px` } as CSSProperties}
       data-testid="app.root"
     >
       {/* setup is the window itself, never a window drawn inside it (his try round 3) */}
@@ -238,8 +257,8 @@ function Shell() {
       ) : (
         <>
           <Win
-            side={side ? <Sidebar onSearch={openPalette} /> : null}
-            main={<Current top={<Titlebar frame={frame} />} />}
+            side={side ? <Sidebar onSearch={openPalette} /> : rail ? <SideRail /> : null}
+            main={<Current top={<Titlebar frame={shown} />} />}
             aside={
               artDocked ? (
                 <ArtifactColumn project={art.project} id={art.id} />
@@ -250,7 +269,7 @@ function Shell() {
           />
           {/* his try a43609b2: both side columns resize by their border (designer m_19374); a folded
               sidebar opens again by a drag from the window's left edge */}
-          {frame.width !== 'narrow' && (
+          {frame.width !== 'narrow' && !rail && (
             <Splitter
               edge="side"
               width={side ? frame.sideW : 0}
@@ -293,6 +312,16 @@ function Shell() {
             />
           )}
           {/* under 1000 px (or hidden by ⌘\) the sidebar slides over; the panel too under 1000 px */}
+          {railOver && (
+            <Over
+              side="left"
+              onClose={() => {
+                setRailAt(null);
+              }}
+            >
+              <Sidebar onSearch={openPalette} />
+            </Over>
+          )}
           {frame.over === 'side' && (
             <Over side="left" onClose={frame.close}>
               <Sidebar onSearch={openPalette} />

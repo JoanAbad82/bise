@@ -64,7 +64,19 @@ export interface ThreadScreenProps {
    * The artifact open beside this thread (designer's artifact-open page): its row is marked 'open',
    * the one composer is about it ('to perf · about “…”'), main's inbox is not on this screen.
    */
-  artifact?: { id: string; title: string; url: string; to: string; placeholder: string };
+  artifact?: {
+    id: string;
+    title: string;
+    url: string;
+    to: string;
+    placeholder: string;
+    /**
+     * whom the one composer writes to: the maker (this thread's agent), or the project's main when
+     * the maker is archived (designer m_20453: its own thread stays in the centre, dim, '↺ restore'
+     * in its head; only the composer goes to main)
+     */
+    agent?: string;
+  };
 }
 
 /** The agent's folder: its worktree, else its project's checkout; none until the rows come. */
@@ -352,9 +364,16 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
     <FoldsContext value={folds}>
     <FindMarkContext value={mark}>
     <OpenArtifactContext value={artifact?.id}>
-      <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} data-reading={reading} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
+      <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} data-reading={reading} data-about={artifact !== undefined || undefined} data-dim={(artifact !== undefined && me?.archived === true) || undefined} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
         {bise || !me || me.archived ? (
-          <Head title={headTitle} sub={sub} lead={bise ? <BisePearl size={14} /> : undefined} dot={bise || !me ? undefined : dotOf(me.status)} />
+          <Head
+            title={headTitle}
+            sub={sub}
+            lead={bise ? <BisePearl size={14} /> : undefined}
+            dot={bise || !me ? undefined : dotOf(me.status)}
+            // an archived maker beside its artifact: its own thread, dim, restored from its head (designer m_20453)
+            end={artifact !== undefined && me?.archived === true ? <RestoreButton project={project} agent={agent} /> : undefined}
+          />
         ) : agent === MAIN ? (
           <BiseHead project={project} name={projectName ?? project} more={more} />
         ) : (
@@ -422,9 +441,10 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
         <RefusedLine project={project} name={bise ? 'bise' : (projectName ?? project)} className="app-refused th-refused" testId="thread.refused" />
         <CardHint project={project} />
         {/* b1/b2: every project's open items, one opened in place (amb-home's InboxBlock, eb3da983) */}
-        {/* beside an open artifact the one composer is the maker's: main's inbox is not on this screen */}
+        {/* beside an open artifact the one composer is the maker's: main's inbox is not on this screen
+            (the maker's own question docks here with amb-home's InboxBlock 'only', after its 2b) */}
         {artifact === undefined && <InboxBlock here={bise ? HERE_BISE : { project, agent }} onAnswer={setAnswering} reading={reading} />}
-        {me?.archived === true ? (
+        {me?.archived === true && artifact === undefined ? (
           <History project={project} agent={agent} />
         ) : voice === 'pane' ? (
           <ThreadVoice project={project} agent={agent} />
@@ -433,7 +453,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
           {voice === 'typing' && <ThreadVoice project={project} agent={agent} />}
           <ThreadComposer
             project={project}
-            agent={agent}
+            agent={artifact?.agent ?? agent}
             busy={busy}
             // an open item: the block's words (a question's 'answering perf · …', or an approval's
             // 'to bise · the merge waits for 1 or 2' where his words stay a plain message, ambient m_8773);
@@ -671,6 +691,22 @@ export function countsOf(agents: readonly { main: boolean; archived: boolean; st
   const work = live.filter((a) => a.status === 'working').length;
   const waits = agents.reduce((n, a) => n + a.waits, 0);
   return [`${String(live.length)} ${live.length === 1 ? 'agent' : 'agents'}`, work > 0 ? `${String(work)} at work` : '', waits > 0 ? `${String(waits)} waiting for you` : ''].filter(Boolean).join(' · ');
+}
+
+/** '↺ restore' in an archived maker's head, beside its artifact (designer m_20453). */
+function RestoreButton({ project, agent }: { project: string; agent: string }) {
+  const store = useStore();
+  return (
+    <Button
+      size="sm"
+      onClick={() => {
+        store.command({ cmd: 'unarchive', project, agent });
+      }}
+      testId="thread.head.restore"
+    >
+      ↺ restore
+    </Button>
+  );
 }
 
 /** An archived agent's thread is history only (tui-parity C47): no composer, a way to restore it. */

@@ -135,10 +135,11 @@ test('scheduled/screens: the list and one task, light and dark, 1400 and 800', a
     await expect(page.getByTestId('scheduled.pane.title')).toHaveText('deploy watchdeploy-watch · storefront');
     await expect(page.getByTestId('scheduled.stop')).toHaveText('stop x');
 
-    // panel A's 'scheduled here' on storefront's thread, and a ⌘K hit on a task's name, each light and dark
+    // the right bar's SCHEDULED section on storefront's thread (it replaced panel A's 'scheduled
+    // here', amb-win f35dfb09), and a ⌘K hit on a task's name, each light and dark
     await page.getByTestId(`app.sidebar.project.${SHOP}`).click();
-    const here = page.getByTestId('scheduled.here');
-    await expect(here, "storefront's panel lists its tasks").toBeVisible({ timeout: 5000 });
+    const here = page.getByTestId('app.panel');
+    await expect(here, "storefront's right bar lists its tasks").toBeVisible({ timeout: 5000 });
     await expect(here).toContainText('deploy watch');
     for (const t of ['light', 'dark'] as const) {
       await theme(t);

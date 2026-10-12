@@ -164,7 +164,8 @@ export function LiveLine({ a, name, onJump }: { a: Agent | undefined; name?: str
   }
   // waiting on him (a question, an approval): the row goes, the card docks over the composer
   if (a === undefined || !workingRowShows(a)) return null;
-  const age = a.since_ms > 0 ? turnAge(now - a.since_ms) : '';
+  // one turn age with the head chip and the right bar (designer m_20461 (1)): the turn's, else since its start
+  const age = a.turn_ms != null ? turnAge(a.turn_ms) : a.since_ms > 0 ? turnAge(now - a.since_ms) : '';
   return (
     <div className="th-live th-working" role="status" data-testid="thread.live" onClick={onJump}>
       <Gust testId="thread.live.gust" />

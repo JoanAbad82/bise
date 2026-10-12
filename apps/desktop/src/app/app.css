@@ -424,6 +424,44 @@ body:has(.app-shell) {
 .app-title.away {
   padding-left: 0;
 }
+/* the left bar folded to its icon rail while an artifact is open under 1200 px (designer
+   m_20435 (f)): 56 px, the lights' room on top, bise, ↗, ◷, then each project's initials */
+.app-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: var(--s-3);
+  border-right: 1px solid var(--c-line);
+  background: var(--c-sidebar);
+}
+.app-rail-lights {
+  flex: none;
+  height: 44px;
+  -webkit-app-region: drag;
+}
+.app-rail-sep {
+  flex: none;
+  width: 24px;
+  height: 1px;
+  margin: var(--s-1) 0;
+  background: var(--c-line);
+}
+.app-rail-g {
+  color: var(--c-text-2);
+  font-size: var(--t-14);
+}
+.app-rail-init {
+  color: var(--c-text-2);
+  font: 600 var(--t-11) var(--font-ui);
+  letter-spacing: 0.02em;
+}
+/* the rail sits under the lights already: the title bar keeps no room of its own for them */
+.app-shell.rail .app-title-lights {
+  width: 20px;
+}
 /* macOS's own lights sit here when the sidebar is away */
 .app-title-lights {
   flex: none;
@@ -692,7 +730,8 @@ body:has(.app-shell) {
 }
 .app-over.left {
   left: 0;
-  width: var(--side-w, 240px);
+  /* the whole bar, also when it slides over its 56 px rail (--side-w is the rail's then) */
+  width: var(--side-full, var(--side-w, 240px));
 }
 .app-over.left .b-side {
   flex: 1;
@@ -707,6 +746,8 @@ body:has(.app-shell) {
 }
 /* an artifact's maker thread over the page under 1000 px (designer's artifact-open: 78% wide) */
 .app-over.left.thread {
+  /* under the title bar and its 1 px line (designer m_20435 (b)) */
+  top: 37px;
   width: 78%;
 }
 .app-over.left.thread > .th-screen {
