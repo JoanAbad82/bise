@@ -516,8 +516,8 @@ def main():
         d.send({"cmd": "subscribe", "project": project, "agent": "t3"})
         c.wait(lambda: len(typed(d, "thread")) > n, 20, "t3's thread")
         t3 = typed(d, "thread")[-1]["entries"]
-        asked = [x for x in t3 if x["kind"] == "to_agent"]
-        check(asked and asked[0]["to"] == "main" and asked[0]["asks"] and asked[0]["msg"] == int(msg_id[2:]) and asked[0]["text"] == "v1 ou v2 ?",
+        to_main = [x for x in t3 if x["kind"] == "to_agent"]
+        check(to_main and to_main[0]["to"] == "main" and to_main[0]["asks"] and to_main[0]["msg"] == int(msg_id[2:]) and to_main[0]["text"] == "v1 ou v2 ?",
               "t3's question as its own entry: %r" % t3)
         cards3 = [x for x in t3 if x["kind"] == "card"]
         check(cards3 and cards3[0]["card"]["id"] == card["id"] and not cards3[0]["card"]["answered"], "its card in its thread, open: %r" % cards3)
