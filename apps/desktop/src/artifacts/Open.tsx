@@ -1,17 +1,19 @@
-// One artifact open in the window (desktop-screens v6, designer m_11837; route
-// artifacts/<p>/<id>): the head ('‹ artifacts', its title, 'page · by perf in storefront · 14:02';
-// the version menu, 'open in browser ↗', '⋯'), then the page itself from the pages server, on
-// paper, max 680 wide, centred on a lightly tinted backdrop. A link inside the page goes to his
-// browser (the shell's guard). Owner: amb-kit.
-import { useCallback, useMemo, useState } from 'react';
-import { Button, Menu, MenuItem } from '@/ds';
+// One artifact open (designer's artifact-open v2; amb-win's seam m_19613): ArtifactOpen fills the
+// box the frame gives it, the right column at 55% beside its maker's thread (or the whole width
+// under 1000 px, and the centre route artifacts/<p>/<id> until the frame wires the column). Its
+// head (title, version menu, '↗ browser', ⋯, ✕), then the page from the pages server, 16 px in on
+// a 3% backdrop. A link inside the page goes to his browser (the shell's guard). The composer's
+// words come from maker.ts. Owner: amb-kit (the list, the model); task-panel (the open view).
+import { useCallback, useMemo, useState, type KeyboardEvent } from 'react';
+import { Button, IconButton, Menu, MenuItem } from '@/ds';
 import { useRouter } from '@/app/router';
 import { useAgents, usePrefs, useStore } from '@/store';
 import { themeOf } from '@/theme';
 import { ThreadComposer } from '@/thread/ThreadScreen';
 import { useAllArtifacts } from './hooks';
-import { kindOf, pathOf, versions, whenWords } from './model';
+import { kindOf, pathOf, versions } from './model';
 import { putInDraft } from './put';
+import { useAboutWords } from './maker';
 import './artifacts.css';
 
 /** What the window's bridge offers here (each one absent in a plain browser or a test: its item hides). */
@@ -70,7 +72,25 @@ export function themedUrl(url: string, theme: 'light' | 'dark' | null): string {
   return hash === undefined ? q : `${q}#${hash}`;
 }
 
-export function ArtifactOpen({ project, id }: { project: string; id: string }) {
+export interface ArtifactOpenProps {
+  project: string;
+  id: string;
+  /** ✕ and esc: the frame's way back (the right bar as it was); none: the artifacts list */
+  onClose?: () => void;
+  /** the maker's composer under the page: on when the frame has no thread beside it (under 1000 px, or the centre route) */
+  composer?: boolean;
+}
+
+/**
+ * One artifact open (designer's artifact-open v2, amb-win's seam m_19613): it fills the box the
+ * frame gives it (the right column at 55%, or the whole width under 1000 px) and reads no route.
+ * Its head, 44 high: the title, 'page · v2 ⌄', '↗ browser', ⋯ (Finder, copy link, put it in a
+ * message), ✕; esc closes a menu first, then the artifact, unless a field inside has his caret.
+ * The page sits 16 px in on a 3% backdrop, r 12. The screen's ONE composer is the maker's
+ * (maker.ts: the project's main when the maker is archived); the frame draws it under the
+ * maker's thread, so here only with `composer`.
+ */
+export function ArtifactOpen({ project, id, onClose, composer = true }: ArtifactOpenProps) {
   const router = useRouter();
   const it = useAllArtifacts(project).find((x) => x.a.id === id);
   // 'v' on a row of the list opens it with its versions shown
@@ -81,20 +101,41 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
   const bise = bridge();
   const store = useStore();
   const put = usePutInMessage();
-  const agent = it?.a.agent ?? '';
+  const words = useAboutWords(project, id);
+  const agent = words?.agent ?? '';
   const busy = useAgents(project).find((x) => x.name === agent)?.status === 'working';
   const onStop = useCallback(() => {
     store.stop(project, agent);
   }, [store, project, agent]);
   const about = useMemo(() => (it === undefined ? undefined : { id: it.a.id, title: it.a.title, url: it.a.url }), [it]);
-  const back = () => {
-    router.go({ screen: 'artifacts', project: '' });
+  const close = () => {
+    if (onClose !== undefined) onClose();
+    else router.go({ screen: 'artifacts', project: '' });
   };
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    if (menu !== null) {
+      e.preventDefault();
+      setMenu(null);
+      return;
+    }
+    // his caret in a field inside (the composer): the field's esc, never a close
+    const t = e.target;
+    if (t instanceof HTMLElement && t.closest('input, textarea, [contenteditable="true"]') !== null) return;
+    e.preventDefault();
+    close();
+  };
+  const x = (
+    <IconButton label="close" keys="esc" size="bar" onClick={close} testId="artifact.close">
+      ✕
+    </IconButton>
+  );
   if (it === undefined) {
     return (
-      <section className="art-open" data-testid="artifact.open">
+      <section className="art-open" data-testid="artifact.open" onKeyDown={onKeyDown}>
         <div className="art-open-head">
-          <Button kind="ghost" onClick={back} testId="artifact.back">‹ artifacts</Button>
+          <span className="art-open-title" />
+          <span className="art-open-end">{x}</span>
         </div>
         <div className="art-empty" data-testid="artifact.missing">this artifact isn't in the list any more.</div>
       </section>
@@ -107,43 +148,31 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
   const path = pathOf(a);
   const finder = path !== null && bise?.showInFinder !== undefined ? bise.showInFinder : undefined;
   return (
-    <section className="art-open" data-testid="artifact.open"
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && menu !== null) {
-          e.preventDefault();
-          setMenu(null);
-        }
-      }}>
-      <div className="art-open-head">
-        <Button kind="ghost" onClick={back} testId="artifact.back">‹ artifacts</Button>
-        <span className="art-open-t">
-          <span className="art-open-title" data-testid="artifact.title">{a.title}</span>
-          <span className="art-open-sub">{`${kindOf(a.kind)} · by ${a.agent} in ${it.projectName} · ${whenWords(a.at_ms, now)}`}</span>
-        </span>
+    <section className="art-open" data-testid="artifact.open" data-agent={a.agent} onKeyDown={onKeyDown}>
+      <div className="art-open-head" data-testid="artifact.head">
+        <span className="art-open-title" data-testid="artifact.title" title={a.title}>{a.title}</span>
         <span className="art-open-end">
           <span className="art-drop">
-            <Button kind="ghost" onClick={() => { setMenu(menu === 'versions' ? null : 'versions'); }} testId="artifact.version">
-              {`v${String(shown)}`}
-              <span className="art-wide">{` · ${shown === a.version ? 'the current one' : 'an older one'}`}</span>
-              {' ⌄'}
+            <Button kind="ghost" size="sm" onClick={() => { setMenu(menu === 'versions' ? null : 'versions'); }} testId="artifact.version" title={shown === a.version ? 'the current version' : 'an older version'}>
+              {`${kindOf(a.kind)} · v${String(shown)} ⌄`}
             </Button>
             {menu === 'versions' && (
               <Menu testId="artifact.versions">
-                {versions(a, now).map((x) => (
-                  <MenuItem key={x.v} on={x.v === shown} onClick={() => { setV(x.v); setMenu(null); }} testId={`artifact.versions.v${String(x.v)}`}>
-                    <span className="art-v">{`v${String(x.v)}`}</span>
-                    <span className="art-v-words">{x.words}</span>
-                    {x.when !== undefined && <span className="art-v-when">{x.when}</span>}
+                {versions(a, now).map((r) => (
+                  <MenuItem key={r.v} on={r.v === shown} onClick={() => { setV(r.v); setMenu(null); }} testId={`artifact.versions.v${String(r.v)}`}>
+                    <span className="art-v">{`v${String(r.v)}`}</span>
+                    <span className="art-v-words">{r.words}</span>
+                    {r.when !== undefined && <span className="art-v-when">{r.when}</span>}
                   </MenuItem>
                 ))}
               </Menu>
             )}
           </span>
-          <Button kind="ghost" onClick={() => { void bise?.openExternal?.(url); }} testId="artifact.browser" title="open in browser">
-            <span className="art-wide">open in browser </span>↗
+          <Button kind="ghost" size="sm" onClick={() => { void bise?.openExternal?.(url); }} testId="artifact.browser" title="open in browser">
+            ↗ browser
           </Button>
           <span className="art-drop">
-            <Button kind="ghost" onClick={() => { setMenu(menu === 'more' ? null : 'more'); }} testId="artifact.more">⋯</Button>
+            <IconButton label="more" size="bar" pressed={menu === 'more'} onClick={() => { setMenu(menu === 'more' ? null : 'more'); }} testId="artifact.more">⋯</IconButton>
             {menu === 'more' && (
               <Menu testId="artifact.more.menu">
                 {finder !== undefined && path !== null && (
@@ -154,6 +183,7 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
               </Menu>
             )}
           </span>
+          {x}
         </span>
       </div>
       <div className="art-open-body">
@@ -163,25 +193,27 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
           <iframe className="art-paper" src={themedUrl(url, theme)} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             data-testid="artifact.page" />
         ) : (
-          <div className="art-empty">this kind opens in your browser: open in browser ↗</div>
+          <div className="art-empty">this kind opens in your browser: ↗ browser</div>
         )}
       </div>
-      {/* his words about it go to the agent that made it (the thread's composer, its own drafts) */}
-      <div className="art-open-composer" data-testid="artifact.composer">
-        <ThreadComposer
-          project={project}
-          agent={a.agent}
-          busy={busy}
-          to={`about “${a.title}” · to ${a.agent}`}
-          placeholder={`ask ${a.agent} about it, then ⏎`}
-          answer={null}
-          onStop={onStop}
-          quoting={false}
-          onReady={noop}
-          onSent={noop}
-          {...(about === undefined ? {} : { about })}
-        />
-      </div>
+      {/* the screen's one composer, the maker's (maker.ts), when no thread sits beside the page */}
+      {composer && words !== undefined && (
+        <div className="art-open-composer" data-testid="artifact.composer">
+          <ThreadComposer
+            project={project}
+            agent={words.agent}
+            busy={busy}
+            to={words.to}
+            placeholder={words.placeholder}
+            answer={null}
+            onStop={onStop}
+            quoting={false}
+            onReady={noop}
+            onSent={noop}
+            {...(about === undefined ? {} : { about })}
+          />
+        </div>
+      )}
     </section>
   );
 }

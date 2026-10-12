@@ -7,7 +7,7 @@ import { RouterContext, createRouter } from '@/app/router';
 import type { Route } from '@/app/route';
 import { formatRoute, parseRoute } from '@/app/route';
 import { byDay, dayWords, filterItems, glyphOf, kindWords, ALL, splitArchived, timeOf, versions, whenWords, type Item } from './model';
-import { ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
+import { aboutWords, ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
 import { putInDraft } from './put';
 import { themedUrl } from './Open';
 import { aboutText } from '@/thread/ThreadScreen';
@@ -105,24 +105,47 @@ describe('artifacts screens', () => {
     expect(screen.getByTestId('artifacts.panel.empty').textContent).toContain('nothing yet. when an agent makes a page');
   });
 
-  it('one artifact open: its head, the version menu points the page at an older version, back to the list', () => {
+  it('one artifact open: its head, the version menu points the page at an older version, ✕ back to the list', () => {
     const router = mount(<ArtifactOpen project="shop-1" id="notes" />, { screen: 'artifacts', project: 'shop-1', id: 'notes' });
     expect(screen.getByTestId('artifact.title').textContent).toBe('product page, before / after');
-    expect(screen.getByTestId('artifact.open').textContent).toContain('page · by perf in storefront');
-    expect(screen.getByTestId('artifact.version').textContent).toContain('v2 · the current one');
+    expect(screen.getByTestId('artifact.version').textContent).toBe('page · v2 ⌄');
+    expect(screen.getByTestId('artifact.browser').textContent).toBe('↗ browser');
     fireEvent.click(screen.getByTestId('artifact.version'));
     fireEvent.click(screen.getByTestId('artifact.versions.v1'));
     expect(screen.getByTestId('artifact.page').getAttribute('src')).toBe('http://127.0.0.1:47123/p/notes/v/1');
-    fireEvent.click(screen.getByTestId('artifact.back'));
+    expect(screen.getByTestId('artifact.version').textContent).toBe('page · v1 ⌄');
+    fireEvent.click(screen.getByTestId('artifact.close'));
     expect(router.get()).toEqual({ screen: 'artifacts', project: '' });
   });
 
-  it("under the page, the composer asks the agent that made it: 'about “…” · to perf'", () => {
+  it("in the frame's column: ✕ and esc are the frame's way back; esc closes a menu first, never from a field", () => {
+    let closed = 0;
+    mount(<ArtifactOpen project="shop-1" id="notes" composer={false} onClose={() => { closed += 1; }} />, { screen: 'artifacts', project: 'shop-1', id: 'notes' });
+    expect(screen.queryByTestId('artifact.composer')).toBeNull();
+    const open = screen.getByTestId('artifact.open');
+    fireEvent.click(screen.getByTestId('artifact.more'));
+    fireEvent.keyDown(open, { key: 'Escape' });
+    expect(screen.queryByTestId('artifact.more.menu')).toBeNull();
+    expect(closed).toBe(0);
+    fireEvent.keyDown(open, { key: 'Escape' });
+    expect(closed).toBe(1);
+    fireEvent.click(screen.getByTestId('artifact.close'));
+    expect(closed).toBe(2);
+  });
+
+  it("under the page, the one composer asks the agent that made it: 'to perf · about “…”'", () => {
     mount(<ArtifactOpen project="shop-1" id="notes" />, { screen: 'artifacts', project: 'shop-1', id: 'notes' });
     const c = screen.getByTestId('artifact.composer');
-    expect(c.textContent).toContain('about “product page, before / after” · to perf');
+    expect(c.textContent).toContain('to perf · about “product page, before / after”');
     expect(c.innerHTML).toContain('ask perf about it, then ⏎');
     expect(aboutText({ title: 'Q3 [plan]', url: 'http://h/p/q3' }, 'why v2?')).toBe('about [Q3 plan](http://h/p/q3): why v2?');
+  });
+
+  it("the maker's words: its own, or the project's main when it is archived", () => {
+    expect(aboutWords('perf', 'speed', { archived: false })).toEqual({ agent: 'perf', archived: false, to: 'to perf · about “speed”', placeholder: 'ask perf about it, then ⏎' });
+    expect(aboutWords('perf', 'speed', { archived: true })).toEqual({ agent: 'main', archived: true, to: 'to main · about “speed”', placeholder: 'ask main about it, then ⏎' });
+    // not listed yet (the agents event may come later): its own name
+    expect(aboutWords('perf', 'speed', undefined).agent).toBe('perf');
   });
 
   it("⋯ puts it in a message: a chip at the end of perf's draft, then perf's thread; show in Finder only with a file and the bridge", () => {
