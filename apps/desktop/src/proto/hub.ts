@@ -7,7 +7,7 @@ import type { DiffFile, DiffResult } from './diff';
 import type { LogItem } from './log';
 import type { BranchRow, ReleaseEv, UpdateEv, VersionItem } from './ops';
 import type { Part } from './parts';
-import type { Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, FlowMode, Merged, Model, Page, Place, Pr, ScheduledTask, Worktree } from './rows';
+import type { Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, FlowMode, Merged, Model, Page, Place, Pr, ScheduledTask, UsageRow, Worktree } from './rows';
 import type { Entry } from './thread';
 
 export type JobState = "running" | "done" | "failed";
@@ -59,7 +59,15 @@ note?: string | null, title?: string | null, req?: number | null, commits?: numb
  * as in bise's followed_end of it: a window shows one line per
  * (project, agent, key)
  */
-key?: number | null, } | { "ev": "followed_end", project: string, agent: string, key: number, state: JobState, label: string, summary: string, } | { "ev": "confirm", project: string, id: number, text: string, } | { "ev": "flow", project: string, flow?: FlowMode | null, } | { "ev": "pages", project: string, items: Array<Page>, overdue: number, } | { "ev": "page_changed", project: string, id: string, title: string, agent: string, version: number, url: string, at_ms: number, state: string, 
+key?: number | null, } | { "ev": "followed_end", project: string, agent: string, key: number, state: JobState, label: string, summary: string, } | { "ev": "confirm", project: string, id: number, text: string, } | { "ev": "flow", project: string, flow?: FlowMode | null, } | { "ev": "paused", project: string, paused: boolean, since_ms?: number | null, 
+/**
+ * the messages held so far (queued for an agent, not delivered)
+ */
+held?: number, } | { "ev": "usage", project: string, counting?: boolean, 
+/**
+ * boxed: HubEv stays small (hub::size)
+ */
+all: UsageRow, agents: Array<UsageRow>, models: Array<UsageRow>, } | { "ev": "pages", project: string, items: Array<Page>, overdue: number, } | { "ev": "page_changed", project: string, id: string, title: string, agent: string, version: number, url: string, at_ms: number, state: string, 
 /**
  * his notes not answered yet
  */
@@ -159,7 +167,7 @@ parts?: Array<Part>, mode?: Mode | null, context?: FnContext | null, files?: Arr
 /**
  * his answer as typed parts, as `Send.parts` (`reply` then ignored)
  */
-parts?: Array<Part>, } | { "cmd": "close", project: string, card: number, } | { "cmd": "confirm", project: string, id: number, yes: boolean, } | { "cmd": "approvals", project: string, mode?: string | null, } | { "cmd": "remove_rule", project: string, rule: ApprovalRule, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, at_ms?: number | null, } | { "cmd": "diff", project: string, agent?: string | null, commit?: string | null, branch?: string | null, pr?: number | null, range?: string | null, req?: number | null, } | { "cmd": "tool_out", project: string, agent: string, pos: number, } | { "cmd": "log", project: string, agent: string, before?: number, } | { "cmd": "queued_take", project: string, agent: string, id: number, } | { "cmd": "branches", project: string, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "features", project: string, } | { "cmd": "prs", project: string, } | { "cmd": "scheduled", project: string, } | { "cmd": "scheduled_stop", project: string, id: number, } | { "cmd": "models", project: string, } | { "cmd": "new", project: string, name?: string | null, brief: string, worktree?: boolean, with_changes?: boolean, } | { "cmd": "rename", project: string, agent: string, to: string, } | { "cmd": "model", project: string, agent: string, model: string, default?: boolean, } | { "cmd": "effort", project: string, agent: string, effort: string, } | { "cmd": "route_correct", project: string, rid: number, to: string, } | { "cmd": "route_cancel", project: string, rid: number, } | { "cmd": "follow", project: string, agent: string, on: boolean, } | { "cmd": "slash", project: string, agent: string, line: string, cid?: number | null, 
+parts?: Array<Part>, } | { "cmd": "close", project: string, card: number, } | { "cmd": "confirm", project: string, id: number, yes: boolean, } | { "cmd": "approvals", project: string, mode?: string | null, } | { "cmd": "remove_rule", project: string, rule: ApprovalRule, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, at_ms?: number | null, } | { "cmd": "diff", project: string, agent?: string | null, commit?: string | null, branch?: string | null, pr?: number | null, range?: string | null, req?: number | null, } | { "cmd": "tool_out", project: string, agent: string, pos: number, } | { "cmd": "log", project: string, agent: string, before?: number, } | { "cmd": "queued_take", project: string, agent: string, id: number, } | { "cmd": "branches", project: string, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "features", project: string, } | { "cmd": "prs", project: string, } | { "cmd": "scheduled", project: string, } | { "cmd": "usage", project: string, } | { "cmd": "pause", project: string, } | { "cmd": "resume", project: string, } | { "cmd": "scheduled_stop", project: string, id: number, } | { "cmd": "models", project: string, } | { "cmd": "new", project: string, name?: string | null, brief: string, worktree?: boolean, with_changes?: boolean, } | { "cmd": "rename", project: string, agent: string, to: string, } | { "cmd": "model", project: string, agent: string, model: string, default?: boolean, } | { "cmd": "effort", project: string, agent: string, effort: string, } | { "cmd": "route_correct", project: string, rid: number, to: string, } | { "cmd": "route_cancel", project: string, rid: number, } | { "cmd": "follow", project: string, agent: string, on: boolean, } | { "cmd": "slash", project: string, agent: string, line: string, cid?: number | null, 
 /**
  * his words' typed parts (msg-parts, as `Send.parts`): a line
  * that isn't a command takes `send`'s path with them (`line` is

@@ -867,3 +867,64 @@ since_ms: number,
  * the thing, a file's words add no `to appear` (designer m_17730)
  */
 noted?: boolean, };
+
+/**
+ * Tokens of some calls and what they cost.
+ */
+export type UsageSum = { 
+/**
+ * every input token, the cached ones included
+ */
+input: number, output: number, 
+/**
+ * input tokens read back from the provider's cache
+ */
+cache_read: number, 
+/**
+ * input tokens written to the provider's cache
+ */
+cache_write: number, 
+/**
+ * the model calls counted
+ */
+calls: number, 
+/**
+ * USD of the calls whose model has prices in the hub's catalog (an
+ * estimate: models.toml's prices)
+ */
+cost_usd: number, 
+/**
+ * the calls left out of `cost_usd` (no prices for their model)
+ */
+unpriced: number, 
+/**
+ * the calls on a plan (the ChatGPT sign-in): tokens, no money
+ */
+plan: number, 
+/**
+ * "~$1.23 · 1.2M", "— · 40k" when nothing is priced, "your ChatGPT
+ * plan · 40k" when all ran on a plan (`words::usage_words`)
+ */
+words: string, };
+
+/**
+ * One row: an agent, a model, or the whole project.
+ */
+export type UsageRow = { 
+/**
+ * the agent's name, the model's `provider/model` id, or "" for the
+ * whole project
+ */
+name: string, 
+/**
+ * an agent's row: the models it called this week, joined by ", "
+ */
+models?: string, 
+/**
+ * since the hub's local midnight
+ */
+today: UsageSum, 
+/**
+ * the last 7 local days, today included
+ */
+week: UsageSum, };

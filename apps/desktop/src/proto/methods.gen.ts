@@ -54,6 +54,9 @@ export const METHODS = {
   "release/run": { cmd: "release_run", result: null },
   "hub/stop": { cmd: "stop_hub", result: null },
   "page/voice": { cmd: "page_voice", result: null },
+  "usage/read": { cmd: "usage", result: "usage" },
+  "project/pause": { cmd: "pause", result: null },
+  "project/resume": { cmd: "resume", result: null },
 } as const;
 
 export const NOTIFICATIONS = {
@@ -70,6 +73,7 @@ export const NOTIFICATIONS = {
   "hub/models": { ev: "models", scope: "hub" },
   "hub/approvals": { ev: "approvals", scope: "hub" },
   "hub/flow": { ev: "flow", scope: "hub" },
+  "hub/paused": { ev: "paused", scope: "hub" },
   "job/end": { ev: "job_end", scope: "hub" },
   "job/followedEnd": { ev: "followed_end", scope: "hub" },
   "thread/entry": { ev: "entry", scope: "thread" },
@@ -99,4 +103,6 @@ export const RESULTS = {
   "version/switch": "CommandRunResult",
   "version/rollback": "CommandRunResult",
   "version/restart": "CommandRunResult",
+  "project/pause": "CommandRunResult",
+  "project/resume": "CommandRunResult",
 } as const;

@@ -91,6 +91,8 @@ export const hub_ev: readonly HubEv[] = [
   {"ev":"pages","items":[{"agent":"main","asking":true,"at_ms":1791100050000,"id":"weekly-update","kicker":"week 41","open_notes":2,"opened_version":2,"state":"ready","title":"Weekly update","url":"http://127.0.0.1:47123/p/weekly-update","version":3,"waiting":1},{"agent":"pm","at_ms":1791100010000,"id":"q3-plan","state":"ready","title":"q3 plan","url":"http://127.0.0.1:47123/p/q3-plan","version":1}],"overdue":1,"project":"acme-1a2b3c4d"},
   {"agent":"main","at_ms":1791100050000,"ev":"page_changed","id":"weekly-update","project":"acme-1a2b3c4d","state":"updating","title":"Weekly update","url":"http://127.0.0.1:47123/p/weekly-update","version":3},
   {"agent":"perf","ev":"log","items":[{"body":{"kind":"md","text":"You are a precise assistant."},"estimated":true,"head":"system prompt · 42 lines","role":"system","seq":0,"tokens":9},{"at_ms":1791100012000,"head":"","role":"event","rule":"turn 7 · 14:02 · user · 8.4k in · 1.1k out","seq":212,"turn":7},{"at_ms":1791100013000,"body":{"kind":"md","text":"make the e2e fast"},"head":"make the e2e fast","role":"you","seq":213,"turn":7},{"at_ms":1791100014000,"body":{"kind":"md","text":"the hub waits on the lock"},"head":"the hub waits on the lock","role":"thinking","seq":214,"turn":7},{"at_ms":1791100014000,"body":{"kind":"code","lang":"bash","text":"cargo test -q"},"head":"$ cargo test -q","role":"call","seq":214,"tool":"bash","turn":7},{"at_ms":1791100015000,"body":{"cut":true,"kind":"plain","text":"running 40 tests\ntest query::slow ... FAILED"},"head":"test query::slow ... FAILED","meta":"call_3 failed · exit 101 · 4.2 s","ok":false,"role":"result","seq":215,"tool":"bash","turn":7},{"at_ms":1791100016000,"body":{"kind":"md","text":"found it: the sort"},"head":"found it: the sort","role":"assistant","seq":216,"turn":7}],"more":true,"project":"acme-1a2b3c4d"},
+  {"ev":"paused","held":3,"paused":true,"project":"acme-1a2b3c4d","since_ms":1791748738602},
+  {"agents":[{"models":"foundry/claude-opus-5-5","name":"main","today":{"cache_read":30000,"cache_write":2000,"calls":3,"cost_usd":0.12,"input":40000,"output":500,"plan":0,"unpriced":0,"words":"~$0.12 · 40k"},"week":{"cache_read":30000,"cache_write":2000,"calls":3,"cost_usd":0.12,"input":40000,"output":500,"plan":0,"unpriced":0,"words":"~$0.12 · 40k"}}],"all":{"name":"","today":{"cache_read":30000,"cache_write":2000,"calls":3,"cost_usd":0.12,"input":40000,"output":500,"plan":0,"unpriced":0,"words":"~$0.12 · 40k"},"week":{"cache_read":30000,"cache_write":2000,"calls":3,"cost_usd":0.12,"input":40000,"output":500,"plan":0,"unpriced":0,"words":"~$0.12 · 40k"}},"counting":true,"ev":"usage","models":[{"name":"foundry/claude-opus-5-5","today":{"cache_read":30000,"cache_write":2000,"calls":3,"cost_usd":0.12,"input":40000,"output":500,"plan":0,"unpriced":0,"words":"~$0.12 · 40k"},"week":{"cache_read":30000,"cache_write":2000,"calls":3,"cost_usd":0.12,"input":40000,"output":500,"plan":0,"unpriced":0,"words":"~$0.12 · 40k"}}],"project":"acme-1a2b3c4d"},
 ];
 
 /** rust/proto/fixtures/hub_cmd.jsonl */
@@ -170,6 +172,9 @@ export const hub_cmd: readonly HubCmd[] = [
   {"cmd":"page_voice","page":"weekly-update","phase":"heard","project":"acme-1a2b3c4d","text":"make the intro shorter"},
   {"agent":"perf","cmd":"log","project":"acme-1a2b3c4d"},
   {"agent":"perf","before":212,"cmd":"log","project":"acme-1a2b3c4d"},
+  {"cmd":"usage","project":"acme-1a2b3c4d"},
+  {"cmd":"pause","project":"acme-1a2b3c4d"},
+  {"cmd":"resume","project":"acme-1a2b3c4d"},
 ];
 
 /** rust/proto/fixtures/core_ev.jsonl */

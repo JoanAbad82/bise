@@ -77,6 +77,10 @@ export const TAGS = {
   release: true,
   update: true,
   versions: true,
+  // cost-pause (main 09b6d551): the hub's pause state and its usage sums; recognised only, the
+  // settings pause/usage screen draws them later (amb-home)
+  paused: true,
+  usage: true,
   // the core can't start any hub (its runtime is missing): Rust's words, drawn by CoreLine
   broken: true,
 } as const satisfies Record<Ev['ev'], true>;
