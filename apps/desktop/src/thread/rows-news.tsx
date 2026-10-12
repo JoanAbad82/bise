@@ -49,7 +49,10 @@ export function LandedRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 export function PrRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const p = e.pr;
   if (p == null) return <Marker>{e.text}</Marker>;
-  const [mark, tone] = p.state === 'failing' ? (['▲', 'err'] as const) : p.state === 'done' ? (['✓', 'dim'] as const) : (['•', 'plain'] as const);
+  // the TUI's PR mark (theme::G_PR '↑', render.rs pr_lines), toned by its state: failing in the
+  // error tone, done dim (designer m_19784 (3)); the words after it say the checks, never color alone
+  const tone = p.state === 'failing' ? 'err' : p.state === 'done' ? 'dim' : 'plain';
+  const mark = '↑';
   return (
     <NewsLine mark={mark} tone={tone} testId={`thread.pr.${e.pos}`}>
       <Act

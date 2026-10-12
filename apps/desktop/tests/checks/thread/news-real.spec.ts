@@ -4,7 +4,7 @@
 // Owner: qa-flows. shop's main thread; each row a soft step, the TUI's line the reference:
 //   - landed: the seed's 'gift-api landed 1 commit on gift-cards (<sha>)' is a landed row with the
 //     same sha, and its sha opens that commit's review;
-//   - pr: '#412 checks fail: e2e' is a pr row, failing said by '▲' and the hub's words (data-tone
+//   - pr: '#412 checks fail: e2e' is a pr row, the TUI's '↑', failing said by the hub's words (data-tone
 //     err, never color alone), its number opens the PR (main's test-mode stdout line);
 //   - artifact: main's 'sb artifact add <url> --title …' is an artifact card with its title;
 //   - answered / approval: his answer to gift-ui's card #2 from the TUI, '/answer 2 no: <note>'
@@ -140,7 +140,7 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       // redraws around find (12a9efbf: its text read empty); assertions retry, no one-shot read
       const rowId = (await row.getAttribute('data-testid', { timeout: 5000 }).catch(() => null)) ?? '';
       const pr = rowId !== '' ? page.locator(`[data-testid="${rowId}"]`) : row;
-      await expect.soft(pr, "failing said by '▲', never color alone").toContainText('▲', { timeout: 5000 });
+      await expect.soft(pr, "the TUI's PR mark '↑' (designer m_19784 (3))").toContainText('↑', { timeout: 5000 });
       await expect.soft(pr, "the hub's words, as the TUI").toContainText('checks fail', { timeout: 5000 });
       await expect.soft(pr, 'failing: an err tone').toHaveAttribute('data-tone', 'err', { timeout: 5000 });
       const words = ((await pr.textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();

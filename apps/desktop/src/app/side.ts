@@ -67,7 +67,9 @@ export function signOf(a: Agent, now: number, wake?: number): Sign {
   }
   if (wake !== undefined) return { g: '◷', tone: 'dim', end: hm(wake), endTone: 'dim', count: 0, title: `wakes at ${hm(wake)} · ${what}` };
   if (a.status === 'done') return { g: '✓', tone: 'dim', end: 'done', endTone: 'dim', count: 0, title: `done · ${what}` };
-  return { g: '–', tone: 'dim', end: 'stopped', endTone: 'dim', count: 0, title: `stopped · ${what}` };
+  // at rest: the hub's word, the one the agent's head chip says too (designer m_19784 (5): '– stopped'
+  // here and 'idle' there disagreed); the TUI's ○ for idle
+  return { g: '○', tone: 'dim', end: 'idle', endTone: 'dim', count: 0, title: `idle · ${what}` };
 }
 
 /**

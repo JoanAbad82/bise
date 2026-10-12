@@ -18,7 +18,7 @@ import { useIsCurrent } from './findmark';
 import { useVoiceLit } from '@/voicemode';
 import { AgentNote, AnsweredRow, ApprovalRow, CardAnsweredRow, CardRow, ToAgentRow } from './rows-cards';
 import { shownName } from '@/agents/model';
-import { BODY_KINDS, ROW_KINDS } from './tiers';
+import { BODY_KINDS, NAMELESS_KINDS, NOTE_KINDS, ROW_KINDS, sameRoute } from './tiers';
 import { YouRow } from './rows-messages';
 import { ArtChip, BriefRow, CompactedRow, LandedRow, MadeRow, NotDeliveredRow, NOTICE_MARK, NoticeRow, PrRow, ScheduledRow, WakeRow } from './rows-news';
 import { ThinkingLine, thoughtFor, ToolsRow } from './rows-tools';
@@ -52,7 +52,12 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, sti
   // ambient m_11777: a day separator between days; a name line opens a group (a new author, 5
   // min of silence); the rows inside show their time on hover in its place
   const day = e.at_ms > 0 && (p === undefined || !sameDay(p.at_ms, e.at_ms)) ? dayLabel(e.at_ms, today) : null;
-  const head = groupHead(p, e, ctx);
+  // a news or plumbing row has no name line: a new author there opens no group (designer m_19387);
+  // nor does a message between agents right after another (an open run: 12 px apart, m_19784 (2))
+  const nameless = p !== undefined && (NAMELESS_KINDS.has(e.kind) || (NOTE_KINDS.has(e.kind) && NOTE_KINDS.has(p.kind)));
+  const head = groupHead(p, e, ctx) && !nameless;
+  // same sender → same receiver as the message before: one chip for both (m_19784 (2))
+  const chained = sameRoute(p, e, ctx.agent);
   // his on the right, the rest on the left (messages-right v1); a change of side opens more room
   const side = sideOf(e);
   const turn = p !== undefined && day === null && sideOf(p) !== side;
@@ -68,7 +73,7 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, sti
       <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={live === undefined ? `thread.entry.${pos}` : 'thread.stream'} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head} data-side={side} data-turn={turn || undefined} data-gap={gap}>
         {/* a turn that opens on its work (tools, a thinking) still shows who and when */}
         {head && (e.kind === 'tools' || (e.kind === 'thinking' && !thoughtNothing(e))) && <NameLine e={e} ctx={ctx} />}
-        <EntryBody e={e} ctx={ctx} head={head} next={n} live={live !== undefined} still={still} />
+        <EntryBody e={e} ctx={ctx} head={head} next={n} live={live !== undefined} still={still} chained={chained} />
       </div>
     </>
   );
@@ -76,9 +81,11 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev, next, live, sti
 
 /**
  * The room above a row inside one turn (designer m_19359, m_19387): 'row' between two dim rows
- * (tiers 3 and 4: 8 px), 'switch' from body text to a dim row or back (12 px), none otherwise. Pure.
+ * (tiers 3 and 4: 8 px), 'block' between two messages of an open run (12 px, m_19784 (2)), 'switch'
+ * from body text to a dim row or back (12 px), none otherwise. Pure.
  */
-export function gapOf(prev: Pick<Entry, 'kind'>, e: Pick<Entry, 'kind'>): 'row' | 'switch' | undefined {
+export function gapOf(prev: Pick<Entry, 'kind'>, e: Pick<Entry, 'kind'>): 'row' | 'block' | 'switch' | undefined {
+  if (NOTE_KINDS.has(prev.kind) && NOTE_KINDS.has(e.kind)) return 'block';
   const a = ROW_KINDS.has(prev.kind);
   const b = ROW_KINDS.has(e.kind);
   if (a && b) return 'row';
@@ -98,7 +105,7 @@ function NameLine({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   );
 }
 
-function EntryBody({ e, ctx, head, next, live, still }: { e: Entry; ctx: RowCtx; head: boolean; next: Entry | undefined; live: boolean; still: boolean }) {
+function EntryBody({ e, ctx, head, next, live, still, chained = false }: { e: Entry; ctx: RowCtx; head: boolean; next: Entry | undefined; live: boolean; still: boolean; chained?: boolean }) {
   // the hub's brief opens a task's thread: one quiet row, the brief folded under it (designer; the TUI's is_brief)
   const brief = e.kind === 'you' || e.kind === 'from_agent' || e.kind === 'agent' ? briefOf(e.text) : null;
   if (brief !== null) return <BriefRow pos={e.pos} name={brief.name} objective={brief.objective} body={brief.body} ctx={ctx} />;
@@ -148,7 +155,7 @@ function EntryBody({ e, ctx, head, next, live, still }: { e: Entry; ctx: RowCtx;
     case 'you':
       return <YouRow e={e} ctx={ctx} next={next} />;
     case 'to_agent':
-      return <ToAgentRow e={e} ctx={ctx} />;
+      return <ToAgentRow e={e} ctx={ctx} chained={chained} />;
     // amb-feed's batch 2 (b8cb4b1e): the lines the hub's fold used to drop
     case 'thinking':
       // nothing thought under 1 s shows nothing (ambient m_11777, the TUI's)
@@ -210,7 +217,7 @@ function EntryBody({ e, ctx, head, next, live, still }: { e: Entry; ctx: RowCtx;
         );
       }
       const to = shownName(e.to != null && e.to !== '' ? e.to : ctx.agent);
-      return <AgentNote pos={e.pos} from={from} to={to} text={dropAuthor(e.text, e.from ?? '')} ctx={ctx} testId={`thread.from.${String(e.pos)}`} />;
+      return <AgentNote pos={e.pos} from={from} to={to} text={dropAuthor(e.text, e.from ?? '')} ctx={ctx} testId={`thread.from.${String(e.pos)}`} chip={!chained} />;
     }
     case 'unknown':
       // a kind from a newer hub: its words, plain and dim

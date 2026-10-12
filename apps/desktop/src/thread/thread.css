@@ -261,21 +261,21 @@
 .th-row + .th-row[data-head='true'],
 .th-day + .th-row,
 .th-row[data-head='true'] {
-  padding-top: 20px;
+  padding-top: var(--gap-turn);
 }
 /* a turn that opens on its work (its name line over a tool or a thinking row) keeps the gap of any
    new turn: the virtual list wraps each row, so the sibling rule above never sees the row before
    (designer m_17827 (2): 'perf 03:29' sat glued under '– stopped waiting for the reindex') */
 .th-row[data-head='true'][data-kind='tools'],
 .th-row[data-head='true'][data-kind='thinking'] {
-  padding-top: 20px;
+  padding-top: var(--gap-turn);
 }
 
 /* a day ('today', 'yesterday', 'mon 6 oct') and 'session restored · 14:02': centred, thin rules */
 .th-day {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--s-3);
   padding: 14px 0 8px;
   color: var(--c-text-3);
   font: var(--t-12) var(--font-ui);
@@ -398,7 +398,7 @@
 .th-history {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap-inline);
   padding: 10px 16px;
   border-top: 1px solid var(--c-line);
   color: var(--c-text-2);
@@ -467,7 +467,7 @@
 }
 .th-notice {
   display: flex;
-  gap: 8px;
+  gap: var(--gap-inline);
   align-items: baseline;
 }
 .th-notice.info,
@@ -493,7 +493,7 @@
    says what it means, the words; tone by the mark and its words, never color alone */
 .th-news {
   display: flex;
-  gap: 8px;
+  gap: var(--gap-inline);
   align-items: baseline;
   color: var(--c-text-2);
 }
@@ -873,6 +873,10 @@
 .th-row[data-gap='switch'] {
   padding-top: 10px;
 }
+/* an open run's messages stack 12 px apart (--gap-block, designer m_19784 (2)) */
+.th-row[data-gap='block'] {
+  padding-top: 10px;
+}
 /* event-wake's live line: a blank row above it, as the terminal leaves (designer m_17827 (3)) */
 .th-live.th-waiting {
   padding-top: 16px;
@@ -1195,10 +1199,10 @@
 /* 16 px when the side changes, 4 px between his bubbles in a run */
 /* 16 px in all: his row ends on 4 px, an agent's on 2 px */
 .th-row[data-turn='true'][data-side='you'] {
-  padding-top: 20px;
+  padding-top: var(--gap-turn);
 }
 .th-row[data-turn='true'][data-side='them'] {
-  padding-top: 20px;
+  padding-top: var(--gap-turn);
 }
 .th-row[data-side='you'][data-head='true']:not([data-turn='true']) {
   padding-top: 0;
@@ -1288,6 +1292,8 @@
 }
 /* event-wake (designer's page): a watch's end, dim, on the column's edge; only a non-zero rc in
    the error tone; its folded output in mono, like a tool row's opened box */
+/* a quiet row: its words sans, mono only for the machine's own text (designer m_19832 withdrew
+   m_19784 (4)) */
 .th-wake {
   color: var(--c-text-2);
   font: var(--t-13) var(--font-ui);
@@ -1510,7 +1516,9 @@
   box-sizing: border-box;
   width: var(--th-col);
   margin: 0 auto;
-  padding: 2px 0;
+  /* a dim row among dim rows: 8 px above it (--gap-rows, designer m_19784 (1)), the row before
+     ends on its 2 px */
+  padding: 6px 0 2px;
   border-radius: 0;
   font: var(--t-12) / var(--lh-row, 1.5) var(--font-mono);
   color: var(--c-text-3);

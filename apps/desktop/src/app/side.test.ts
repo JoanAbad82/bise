@@ -25,11 +25,11 @@ describe('an agent sign', () => {
     expect(w.title).toBe('waiting · product page speed');
     expect(signOf(agent('ci-fix', 'failed'), NOW)).toMatchObject({ g: '✗', tone: 'err', end: 'failed', endTone: 'err' });
   });
-  it('a next wake: ◷ and its time; done: ✓ done in text-2; at rest: – stopped', () => {
+  it('a next wake: ◷ and its time; done: ✓ done in text-2; at rest: ○ idle, the head chip\'s word', () => {
     const wake = new Date(2026, 9, 7, 14, 20).getTime();
     expect(signOf(agent('deploy-watch', 'idle'), NOW, wake)).toMatchObject({ g: '◷', end: '14:20' });
     expect(signOf(agent('size-filter', 'done'), NOW)).toMatchObject({ g: '✓', tone: 'dim', end: 'done' });
-    expect(signOf(agent('x', 'idle'), NOW)).toMatchObject({ g: '–', end: 'stopped' });
+    expect(signOf(agent('x', 'idle'), NOW)).toMatchObject({ g: '○', end: 'idle' });
   });
   it('turn words are short', () => {
     expect([turnShort(40_000), turnShort(6 * 60_000), turnShort(72 * 60_000), turnShort(120 * 60_000), turnShort(84 * 3_600_000)]).toEqual(['now', '6 min', '1 h', '2 h', '3 d']);

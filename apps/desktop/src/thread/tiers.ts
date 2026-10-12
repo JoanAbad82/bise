@@ -22,6 +22,30 @@ export const ROW_KINDS: ReadonlySet<string> = new Set([
   'unknown',
 ]);
 
+/**
+ * The rows with no name line (tier 3 news and the plumbing of tier 4): a new author there opens no
+ * 20 px group, it sits 8 px under the row before (designer m_19387: 'no name line, 8 px between rows').
+ */
+export const NAMELESS_KINDS: ReadonlySet<string> = new Set(['landed', 'pr', 'artifact', 'scheduled', 'stopped', 'wake', 'notice', 'compacting', 'compacted', 'unknown']);
+
+/** A message between agents (tier 4): its ✉ chip 'sender → receiver' and at most two rows. */
+export const NOTE_KINDS: ReadonlySet<string> = new Set(['to_agent', 'from_agent']);
+
+/** A message's route 'sender→receiver' in `agent`'s thread (to_agent: from it; from_agent: to it unless said). Pure. */
+export function routeOf(e: { readonly kind: string; readonly from?: string | null; readonly to?: string | null }, agent: string): string {
+  const from = e.kind === 'to_agent' ? agent : (e.from ?? '');
+  const to = e.kind === 'to_agent' ? (e.to ?? 'main') : e.to != null && e.to !== '' ? e.to : agent;
+  return `${from}→${to}`;
+}
+
+/**
+ * The message right before this one went the same way (designer m_19784 (2): same sender → same
+ * receiver in a row share one chip): this one shows no chip of its own. Pure.
+ */
+export function sameRoute(prev: Parameters<typeof routeOf>[0] | undefined, e: Parameters<typeof routeOf>[0], agent: string): boolean {
+  return prev !== undefined && NOTE_KINDS.has(prev.kind) && NOTE_KINDS.has(e.kind) && routeOf(prev, agent) === routeOf(e, agent);
+}
+
 /** The kinds drawn as body text (tier 2): 12 px between one of them and a dim row. */
 export const BODY_KINDS: ReadonlySet<string> = new Set(['agent', 'answered', 'turn_failed', 'page', 'report']);
 

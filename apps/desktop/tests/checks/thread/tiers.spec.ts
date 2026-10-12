@@ -85,6 +85,11 @@ for (const theme of ['light', 'dark']) {
           expect(n.ws, `${id}: never wraps`).toBe('nowrap');
           expect(n.h, `${id}: one row`).toBeLessThan(n.lh * 1.6);
         }
+        // no name line, so a new author opens no 20 px group: 8 px between two news rows
+        const [landedBox, prBox] = await Promise.all(['thread.landed.8', 'thread.pr.9'].map((id) => page.getByTestId(id).boundingBox()));
+        const between = Math.round((prBox?.y ?? 0) - ((landedBox?.y ?? 0) + (landedBox?.height ?? 0)));
+        expect(between, `8 px between the landed and the PR rows (${String(between)})`).toBeGreaterThanOrEqual(6);
+        expect(between, `8 px between the landed and the PR rows (${String(between)})`).toBeLessThanOrEqual(10);
         // tier 1: the card's one line, sans 14 in ink
         const card = await page.getByTestId('thread.card.1').evaluate((el) => ({ size: getComputedStyle(el).fontSize, font: getComputedStyle(el).fontFamily }));
         expect(card.size).toBe('14px');
@@ -122,6 +127,12 @@ for (const theme of ['light', 'dark']) {
       await page.setViewportSize({ width: 1100, height: 900 });
       await page.getByTestId('app.sidebar.agent.perf').click();
       await expect(page.getByTestId('thread.entry.2')).toBeVisible({ timeout: 10_000 });
+      // its own wake is a quiet row: its words sans, mono only for the machine's text (designer m_19832)
+      const wake = await page.getByTestId('thread.wake.2').evaluate((el) => getComputedStyle(el).fontFamily);
+      expect(wake, 'its wake: sans').not.toMatch(/mono/i);
+      // one state: the sidebar says the head chip's word (designer m_19784 (5))
+      await expect(page.getByTestId('thread.head.state')).toHaveText('idle');
+      await expect(page.getByTestId('app.sidebar.agent.perf')).toContainText('idle');
       await page.mouse.move(1, 400);
       await page.screenshot({ path: test.info().outputPath(`tiers-${theme}-wake.png`) });
     } finally {

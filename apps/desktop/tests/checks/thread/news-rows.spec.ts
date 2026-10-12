@@ -2,7 +2,7 @@
 // Passes when, on the scripted core's fixtures (hub_ev pos 27-32), main's thread shows perf's
 // landing with its sha (a click opens that commit), the logo artifact as a card, main's answer
 // for docs with its why, and perf's message to docs named 'perf → docs'; perf's thread shows its
-// PR's failing checks with the ▲ mark (never color alone) and his 'no' to an approval with his
+// PR's failing checks with the TUI's ↑ mark in the err tone and the hub's words (never color alone) and his 'no' to an approval with his
 // note, and the scheduled task's ◷ lines (batch 3b, pos 33-34) with its words under the set one. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
@@ -28,7 +28,8 @@ test('thread/news-rows: landed, PR news, artifact, answered, approval and agent-
     const pr = page.getByTestId('thread.pr.28');
     await expect(pr, "perf's PR news").toContainText('PR #412', { timeout: 10_000 });
     await expect(pr).toHaveAttribute('data-tone', 'err');
-    await expect(pr).toContainText('▲');
+    // the TUI's PR mark '↑' (designer m_19784 (3)), failing said by the err tone and the hub's words
+    await expect(pr).toContainText('↑');
     const ap = page.getByTestId('thread.approval.31');
     await expect(ap).toContainText('you said no to perf: rm -rf target');
     await expect(ap).toContainText('not that');

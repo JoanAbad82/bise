@@ -141,7 +141,7 @@ body:has(.app-shell) {
 
 .app-core-head {
   display: flex;
-  gap: 12px;
+  gap: var(--s-3);
   align-items: baseline;
 }
 
@@ -155,7 +155,7 @@ body:has(.app-shell) {
 .app-core-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--gap-inline);
   align-items: center;
   margin-top: 6px;
 }
@@ -186,7 +186,7 @@ body:has(.app-shell) {
   font-size: var(--t-12);
 }
 .app-refused.th-refused {
-  margin: 0 16px 8px;
+  margin: 0 var(--s-4) var(--s-2);
   padding: 6px 10px;
   border: 1px solid var(--c-line);
   border-radius: var(--r-2, 6px);
@@ -502,7 +502,7 @@ body:has(.app-shell) {
 .app-panel-keys {
   flex: none;
   display: flex;
-  gap: 16px;
+  gap: var(--s-4);
   padding: 8px 6px 10px;
   border-top: 1px solid var(--c-line);
   color: var(--c-text-3);
@@ -599,7 +599,7 @@ body:has(.app-shell) {
 }
 .app-report .b-head .end {
   display: flex;
-  gap: 8px;
+  gap: var(--gap-inline);
 }
 .app-report-body {
   flex: 1 1 auto;

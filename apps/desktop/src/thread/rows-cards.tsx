@@ -196,7 +196,7 @@ export function ApprovalRow({ e, next }: { e: Entry; next: Entry | undefined }) 
  * that card follows with only its options and says it waits for him; with
  * no card, the question waits for main (ambient m_10689: one copy of it).
  */
-export function ToAgentRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+export function ToAgentRow({ e, ctx, chained = false }: { e: Entry; ctx: RowCtx; chained?: boolean }) {
   const to = e.to ?? 'main';
   const next = useNeighbor(ctx.tkey, e.pos, 1);
   const carded = e.asks === true && next !== undefined && cardFollows(e, next);
@@ -219,6 +219,7 @@ export function ToAgentRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       text={e.text}
       ctx={ctx}
       testId={`thread.to.${String(e.pos)}`}
+      chip={!chained || e.asks === true}
       tag={
         e.asks === true && !carded ? (
           <span className="th-waits main" data-testid={`thread.asks.${String(e.pos)}`}>
@@ -237,9 +238,10 @@ const NOTE_LINES = 2;
  * A message between agents (designer's thread tiers m_19387, tier 4): never body prose in the thread,
  * whoever wrote it. One dim mono row: the ✉ chip 'sender → receiver' (the sender in ink, the rest
  * text-3), then at most two rows of its words at +16 px, then '… ▸' when there is more; a click on
- * the chip or on '… ▸' opens it whole (markdown), again folds it.
+ * the chip or on '… ▸' opens it whole (markdown), again folds it. `chip` false: the message before
+ * went the same way and its chip says it for both (designer m_19784 (2)); the words still open it.
  */
-export function AgentNote({ pos, from, to, text, ctx, testId, tag }: { pos: number; from: string; to: string; text: string; ctx: RowCtx; testId: string; tag?: ReactNode }) {
+export function AgentNote({ pos, from, to, text, ctx, testId, tag, chip = true }: { pos: number; from: string; to: string; text: string; ctx: RowCtx; testId: string; tag?: ReactNode; chip?: boolean }) {
   const [open, setOpen] = useState(false);
   const lines = text.split('\n');
   const more = lines.length > NOTE_LINES || text.length > 220;
@@ -248,13 +250,17 @@ export function AgentNote({ pos, from, to, text, ctx, testId, tag }: { pos: numb
   };
   return (
     <div className="th-note" data-open={open || undefined} data-testid={testId} data-pos={pos}>
-      <div className="th-note-head">
-        <Press look="th-note-chip" aria-expanded={open} onClick={toggle} data-testid={`${testId}.chip`}>
-          <span aria-hidden="true">✉ </span>
-          <span className="th-note-from">{from}</span> → {to}
-        </Press>
-        {tag}
-      </div>
+      {(chip || tag !== undefined) && (
+        <div className="th-note-head">
+          {chip && (
+            <Press look="th-note-chip" aria-expanded={open} onClick={toggle} data-testid={`${testId}.chip`}>
+              <span aria-hidden="true">✉ </span>
+              <span className="th-note-from">{from}</span> → {to}
+            </Press>
+          )}
+          {tag}
+        </div>
+      )}
       {text !== '' && (
         <div className="th-note-text" data-testid={`${testId}.text`}>
           {open ? <Markdown text={text} onLink={ctx.onLink} onPath={ctx.onPath} /> : lines.slice(0, NOTE_LINES).join('\n')}
