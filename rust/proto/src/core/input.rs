@@ -3,9 +3,9 @@
 //! (its clock, whether the workspace is git, the answers to the step's
 //! queries so far).
 //!
-//! One variant per tag of sb-core's dispatch (`in_tag` in
-//! bend/hub/core.bend at 84ddc10d, tag for tag: `card_close` is its own
-//! tag and the Bend constructor `IConfirmClose`, as there). Fields are
+//! One variant per tag of sb-core's dispatch (`dispatch` in
+//! bend/hub/core.bend, through the generated gen/in.bend: `card_close` is
+//! its own tag and the Bend constructor `IConfirmClose`). Fields are
 //! today's: a field sb-core reads with `C.get_s` is `Str` (missing reads
 //! ""), `C.get_nat` `Nat`, `C.get_b` `Bool`, `C.opt_str`/`C.opt_nat`
 //! `OptStr`/`OptNat` (or their `Omit` twins when the hub writes nothing
