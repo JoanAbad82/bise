@@ -237,7 +237,7 @@ body:has(.app-shell) {
 /* The sidebar (designer's desktop-screens v6/v7): 240 px, rows 28 px, radius 6, a 15 px mono
    sign column; agents indented 23 px; the pink only for what waits on him */
 .app-shell .b-win > .cols {
-  grid-template-columns: 240px minmax(0, 1fr) auto;
+  grid-template-columns: var(--side-w, 240px) minmax(0, 1fr) auto;
 }
 .app-shell.no-side .b-win > .cols {
   grid-template-columns: minmax(0, 1fr) auto;
@@ -469,7 +469,7 @@ body:has(.app-shell) {
 /* the right panel, option A: 320 px, docked in the frame's third column or sliding over */
 .app-panel {
   box-sizing: border-box;
-  width: 320px;
+  width: var(--panel-w, 320px);
   min-height: 0;
   height: 100%;
   display: flex;
@@ -536,7 +536,7 @@ body:has(.app-shell) {
 }
 .app-over.left {
   left: 0;
-  width: 240px;
+  width: var(--side-w, 240px);
 }
 .app-over.left .b-side {
   flex: 1;
@@ -615,4 +615,48 @@ body:has(.app-shell) {
   max-width: var(--th-col, 720px);
   margin: 24px auto 0;
   color: var(--c-text-3);
+}
+
+/* the side columns' borders he drags (designer m_19374): an 8 px hit area centred on the border, no
+   handle at rest; after 120 ms of hover a 2 px --c-text-3 line and col-resize; dragging 2 px
+   --c-text-2 and col-resize over the whole window; a folded sidebar's at the window's left edge */
+.app-split {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 30;
+  width: 8px;
+  cursor: col-resize;
+  outline: 0;
+  touch-action: none;
+}
+.app-split.side {
+  left: calc(var(--side-w, 240px) - 4px);
+}
+.app-shell.no-side .app-split.side {
+  left: 0;
+}
+.app-split.panel {
+  right: calc(var(--panel-w, 320px) - 4px);
+}
+.app-split::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+}
+.app-split.is-hot::after,
+.app-split:focus-visible::after {
+  background: var(--c-text-3);
+}
+.app-split.is-drag::after {
+  background: var(--c-text-2);
+}
+:root.app-resizing,
+:root.app-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }

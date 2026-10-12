@@ -12,6 +12,7 @@ import { keep } from './keep';
 import { useArtifactCount } from './Panel';
 import { formatRoute } from './route';
 import { useRoute } from './router';
+import { keptWidth, PANEL, panelWidthOf, SIDE, sideWidthOf, UNFOLD_PX } from './resize';
 import { crumbOf, NARROW_PX, PANEL_OPEN_PX, panelAt, panelProject, panelWords } from './side';
 import { useWaitingTotal } from './Sidebar';
 
@@ -59,6 +60,23 @@ export interface FrameState {
   readonly panel: { readonly project: string; readonly name: string; readonly docked: boolean } | undefined;
   readonly toggle: (what: 'sidebar' | 'panel') => void;
   readonly close: () => void;
+  /** the sidebar's and the panel's widths (kept), and what a drag on their border does */
+  readonly sideW: number;
+  readonly panelW: number;
+  readonly resize: (what: 'side' | 'panel', want: number) => void;
+  readonly reset: (what: 'side' | 'panel') => void;
+}
+
+/** A kept width of the frame, in its limits. */
+function useKeptWidth(key: string, lo: number, hi: number, def: number): readonly [number, (v: number) => void] {
+  const [v, set] = useState<number>(() => keptWidth(keep.view(key), lo, hi, def));
+  return [
+    v,
+    (next: number) => {
+      keep.setView(key, next);
+      set(next);
+    },
+  ];
 }
 
 /** Which of the sidebar and the right panel show, from the width, his kept choices and the route. */
@@ -81,6 +99,8 @@ export function useFrame(): FrameState {
   const project = panelProject(route, home, rows.filter((p) => !p.home).length);
   const row = rows.find((p) => p.project === project);
   const at = panelAt(WIDE_PX[width], kept);
+  const [sideW, setSideW] = useKeptWidth('frame.side.w', SIDE.min, SIDE.max, SIDE.def);
+  const [panelW, setPanelW] = useKeptWidth('frame.panel.w', PANEL.min, 4000, PANEL.def);
   const panel = project === undefined ? undefined : { project, name: project === '' ? 'all projects' : (row?.name ?? project), docked: at.docked && at.open };
   return {
     width,
@@ -99,6 +119,32 @@ export function useFrame(): FrameState {
     },
     close: () => {
       setSlid(null);
+    },
+    sideW,
+    panelW,
+    resize: (what, want) => {
+      const win = window.innerWidth;
+      const shownPanel = at.docked && at.open && project !== undefined ? panelW : 0;
+      if (what === 'side') {
+        // folded (⌘\ or a drag under 160): a drag out of the fold opens it at 200
+        if (!side) {
+          if (want >= UNFOLD_PX) {
+            setSideW(Math.max(sideW, SIDE.reopen));
+            setHidden(false);
+          }
+          return;
+        }
+        const w = sideWidthOf(want, win, shownPanel);
+        if (w === 'fold') setHidden(true);
+        else if (w !== sideW) setSideW(w);
+        return;
+      }
+      const w = panelWidthOf(want, win, side ? sideW : 0);
+      if (w !== panelW) setPanelW(w);
+    },
+    reset: (what) => {
+      if (what === 'side') setSideW(SIDE.def);
+      else setPanelW(PANEL.def);
     },
   };
 }

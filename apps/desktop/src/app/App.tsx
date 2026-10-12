@@ -6,7 +6,7 @@
 // re-renders only when the route changes. Every list below reads the store
 // through its own per-key hooks, so an event re-renders the rows it
 // touches, never the shell, the sidebar or the composer.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
 import { bottomTarget, formatRoute, inboxAtOf, MAIN, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
 import { BottomBlock } from '@/thread/Bottom';
@@ -49,6 +49,7 @@ import { TerminalPanel } from '@/terminal/Terminal';
 import { AddSheetHost } from '@/settings/AddSheet';
 import { pickerPort } from '@/settings/picker';
 import { addProject } from './addProject';
+import { Splitter } from './Splitter';
 import { isToggleKey, shellProject, shellTakes } from '@/terminal/model';
 import { panel } from '@/terminal/panel';
 import { ArtifactOpen, ArtifactsScreen } from '@/artifacts';
@@ -192,7 +193,11 @@ function Shell() {
   useTheme();
   useShown();
   return (
-    <div className={`app-shell b-ui w-${frame.width}${frame.side ? '' : ' no-side'}`} data-testid="app.root">
+    <div
+      className={`app-shell b-ui w-${frame.width}${frame.side ? '' : ' no-side'}`}
+      style={{ '--side-w': `${String(frame.sideW)}px`, '--panel-w': `${String(frame.panelW)}px` } as CSSProperties}
+      data-testid="app.root"
+    >
       {/* setup is the window itself, never a window drawn inside it (his try round 3) */}
       {route.screen === 'onboarding' ? (
         <div className="app-setup">
@@ -206,6 +211,36 @@ function Shell() {
             main={<Current top={<Titlebar frame={frame} />} />}
             aside={frame.panel?.docked === true ? <Panel project={frame.panel.project} name={frame.panel.name} /> : undefined}
           />
+          {/* his try a43609b2: both side columns resize by their border (designer m_19374); a folded
+              sidebar opens again by a drag from the window's left edge */}
+          {frame.width !== 'narrow' && (
+            <Splitter
+              edge="side"
+              width={frame.side ? frame.sideW : 0}
+              onWidth={(w) => {
+                frame.resize('side', w);
+              }}
+              onReset={() => {
+                frame.reset('side');
+              }}
+              label="sidebar width"
+              testId="app.split.side"
+            />
+          )}
+          {frame.panel?.docked === true && (
+            <Splitter
+              edge="panel"
+              width={frame.panelW}
+              onWidth={(w) => {
+                frame.resize('panel', w);
+              }}
+              onReset={() => {
+                frame.reset('panel');
+              }}
+              label="panel width"
+              testId="app.split.panel"
+            />
+          )}
           {/* under 1000 px (or hidden by ⌘\) the sidebar slides over; the panel too under 1000 px */}
           {frame.over === 'side' && (
             <Over side="left" onClose={frame.close}>
