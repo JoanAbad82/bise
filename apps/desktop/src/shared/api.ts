@@ -14,6 +14,8 @@ export interface BiseApi {
    * in a test run), for showing paths as ~/… (amb-win's shortPath).
    */
   readonly home: string;
+  /** Only in an off-screen run (OFFSCREEN_ARG): what a page must not do there (offscreen.ts). Absent in his run. */
+  readonly offscreen?: true;
   /** True when the app runs in test mode (BISE_DESKTOP_TEST=1): off-display window, no Dock icon. */
   readonly test: boolean;
   /**
@@ -366,6 +368,13 @@ export const SURFACE_ARG = '--bise-surface=';
 
 /** The preload's argument with his home folder (main's os.homedir(): the test home under test): `--bise-home=<path>`. */
 export const HOME_ARG = '--bise-home=';
+
+/**
+ * The preload's argument under BISE_DESKTOP_OFFSCREEN only (amb-tools' as-he-does runs): the pages
+ * then see window.bise.offscreen = true. His own run never gets it, so his window.bise has no
+ * 'offscreen' at all.
+ */
+export const OFFSCREEN_ARG = '--bise-offscreen';
 
 /** Test mode: the main window's first screen (amb-tools' 'show me', the checks). */
 export const ROUTE_ENV = 'BISE_DESKTOP_ROUTE';

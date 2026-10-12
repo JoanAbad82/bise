@@ -75,3 +75,10 @@ export function offscreenGrants(permission: string): boolean {
  * play/pause keys. His run keeps them.
  */
 export const OFFSCREEN_DISABLED_FEATURES = 'HardwareMediaKeyHandling,MediaSessionService';
+
+/**
+ * The page APIs that reach HID-class devices through IOHIDManager (keyboards included, which is
+ * Input Monitoring's ground): off under the knob (ambient-lead m_19249, SHA A). Our pages use none
+ * of them; this is a guard, not a fix for a known caller.
+ */
+export const OFFSCREEN_DISABLED_BLINK = 'WebHID,Serial,WebUSB';

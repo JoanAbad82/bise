@@ -5,7 +5,7 @@
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
-import { HOME_ARG, IPC, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type NotifyAuth, type Surface, type TermOpened, type UpdateState } from '../shared/api';
+import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type NotifyAuth, type Surface, type TermOpened, type UpdateState } from '../shared/api';
 import { argValue } from './args';
 import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
 import { coreBridge } from './core/bridge';
@@ -59,6 +59,8 @@ if (fence !== null) {
 const api: BiseApi = {
   platform: process.platform,
   home,
+  // only in an off-screen run: his window.bise has no 'offscreen' key at all
+  ...(process.argv.includes(OFFSCREEN_ARG) ? { offscreen: true as const } : {}),
   test,
   update: {
     now: () => ipcRenderer.invoke(IPC.updateNow) as Promise<UpdateState>,

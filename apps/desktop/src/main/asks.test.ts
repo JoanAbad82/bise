@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MIC_CMDS, noAsks, OFFSCREEN_DISABLED_FEATURES, offscreenGrants } from './offscreen';
+import { MIC_CMDS, noAsks, OFFSCREEN_DISABLED_BLINK, OFFSCREEN_DISABLED_FEATURES, offscreenGrants } from './offscreen';
 
 const MAIN = __dirname;
 
@@ -88,6 +88,33 @@ describe("Chromium's own key listeners (ambient-lead m_18944: ListenEvent prefli
   });
   it('no other disable-features switch in main (a second one would replace this one)', () => {
     expect(sites("appendSwitch('disable-features'").length).toBe(1);
+  });
+});
+
+describe('SHA A (ambient-lead m_19249): knob-only guards, his run byte-identical', () => {
+  const read = (rel: string): string => readFileSync(join(MAIN, rel), 'utf8');
+  it("the pages get OFFSCREEN_ARG only under the knob; his window.bise has no 'offscreen' key", () => {
+    const win = read('windows.ts');
+    expect(win).toContain("additionalArguments: [`${SURFACE_ARG}${surface}`, `${HOME_ARG}${homedir()}`, ...(isOffscreen(process.env, testMode) ? [OFFSCREEN_ARG] : [])]");
+    expect(read('preload.ts')).toContain('...(process.argv.includes(OFFSCREEN_ARG) ? { offscreen: true as const } : {})');
+    expect(sites('OFFSCREEN_ARG').map((x) => x.file).sort()).toEqual(['preload.ts', 'preload.ts', 'windows.ts', 'windows.ts']);
+  });
+  it('the device APIs (WebHID, Serial, WebUSB) are off inside the knob block, before ready, once', () => {
+    const index = read('index.ts');
+    const sw = index.indexOf("app.commandLine.appendSwitch('disable-blink-features', OFFSCREEN_DISABLED_BLINK)");
+    expect(sw).toBeGreaterThan(-1);
+    expect(index.slice(index.lastIndexOf('if (offscreen) {', sw), sw)).toMatch(/^if \(offscreen\) \{/);
+    expect(sw < index.indexOf('app.whenReady(')).toBe(true);
+    expect(sites("appendSwitch('disable-blink-features'").length).toBe(1);
+    expect(OFFSCREEN_DISABLED_BLINK.split(',')).toEqual(['WebHID', 'Serial', 'WebUSB']);
+  });
+  it('the composer never takes the focus by itself (no autofocus to guard: only his key or click focuses it)', () => {
+    const dir = join(MAIN, '..', 'composer');
+    const texts = readdirSync(dir, { recursive: true })
+      .map(String)
+      .filter((f) => /\.tsx?$/.test(f) && !/\.test\./.test(f))
+      .map((f) => readFileSync(join(dir, f), 'utf8'));
+    for (const t of texts) expect(t).not.toMatch(/autoFocus|autofocus: true/);
   });
 });
 

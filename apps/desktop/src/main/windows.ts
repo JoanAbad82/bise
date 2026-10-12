@@ -14,9 +14,10 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { app, BrowserWindow, type BrowserWindowConstructorOptions } from 'electron';
-import { HOME_ARG, IPC, READY_LINE, ROUTE_ENV, SURFACE_ARG, type Surface } from '../shared/api';
+import { HOME_ARG, IPC, OFFSCREEN_ARG, READY_LINE, ROUTE_ENV, SURFACE_ARG, type Surface } from '../shared/api';
 import { glassOf } from './glass';
 import { MAIN_SIZE } from './mainsize';
+import { isOffscreen } from './offscreen';
 import { OFF } from './place';
 
 // -30000: off every display (place.ts, read by offscreen.ts too without Electron)
@@ -32,7 +33,8 @@ export function webPreferences(surface: Surface, testMode: boolean): BrowserWind
     contextIsolation: true,
     sandbox: true,
     nodeIntegration: false,
-    additionalArguments: [`${SURFACE_ARG}${surface}`, `${HOME_ARG}${homedir()}`],
+    // the knob's argument only under BISE_DESKTOP_OFFSCREEN: his run's two arguments are unchanged
+    additionalArguments: [`${SURFACE_ARG}${surface}`, `${HOME_ARG}${homedir()}`, ...(isOffscreen(process.env, testMode) ? [OFFSCREEN_ARG] : [])],
     ...(testMode ? { offscreen: true } : {}),
   };
 }
