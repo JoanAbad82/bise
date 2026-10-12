@@ -72,6 +72,20 @@ export function themedUrl(url: string, theme: 'light' | 'dark' | null): string {
   return hash === undefined ? q : `${q}#${hash}`;
 }
 
+/**
+ * What the open view frames at version `shown`, or null (no frame: the 'opens in your browser'
+ * line, never a white box). Pure. The hub's frame_url first: a local file's copy on the pages
+ * server (amb-feed c5caeffd, architect m_19561), the one origin the shell's guard lets a subframe
+ * show; it names the current version only. Else a page's http(s) url (an older version at /v/<n>).
+ * A bare local path from an older hub frames nothing: the guard blocks file:// (ambient-lead m_19544).
+ */
+export function frameSrc(a: { kind: string; url: string; version: number; frame_url?: string | null }, shown: number, theme: 'light' | 'dark' | null): string | null {
+  const local = a.frame_url ?? '';
+  if (shown === a.version && local !== '') return themedUrl(local, theme);
+  if (kindOf(a.kind) !== 'page' || !/^https?:\/\//i.test(a.url)) return null;
+  return themedUrl(versionUrl(a.url, a.version, shown), theme);
+}
+
 export interface ArtifactOpenProps {
   project: string;
   id: string;
@@ -144,7 +158,7 @@ export function ArtifactOpen({ project, id, onClose, composer = true }: Artifact
   const a = it.a;
   const shown = v ?? a.version;
   const url = versionUrl(a.url, a.version, shown);
-  const page = kindOf(a.kind) === 'page';
+  const src = frameSrc(a, shown, theme);
   const path = pathOf(a);
   const finder = path !== null && bise?.showInFinder !== undefined ? bise.showInFinder : undefined;
   return (
@@ -187,10 +201,10 @@ export function ArtifactOpen({ project, id, onClose, composer = true }: Artifact
         </span>
       </div>
       <div className="art-open-body">
-        {page ? (
+        {src !== null ? (
           // the page follows his theme: opened with ?theme=<his pref>, the kit wears it (kit.js puts
           // it on <html data-theme>); with no pref, the system's
-          <iframe className="art-paper" src={themedUrl(url, theme)} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          <iframe className="art-paper" src={src} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             data-testid="artifact.page" />
         ) : (
           <div className="art-empty">this kind opens in your browser: ↗ browser</div>

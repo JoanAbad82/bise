@@ -9,7 +9,7 @@ import { formatRoute, parseRoute } from '@/app/route';
 import { byDay, dayWords, filterItems, glyphOf, kindWords, ALL, splitArchived, timeOf, versions, whenWords, type Item } from './model';
 import { aboutWords, ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
 import { putInDraft } from './put';
-import { themedUrl } from './Open';
+import { frameSrc, themedUrl } from './Open';
 import { aboutText } from '@/thread/ThreadScreen';
 import { load } from '@/composer/drafts';
 import { entryOf, entrySegments } from '@/composer/entry';
@@ -235,6 +235,22 @@ describe('artifacts screens', () => {
     store.apply({ ev: 'prefs', prefs: { theme: 'dark' } });
     render(<StoreProvider store={store}><RouterContext.Provider value={createRouter({ screen: 'artifacts', project: 'shop-1', id: 'notes' })}><ArtifactOpen project="shop-1" id="notes" /></RouterContext.Provider></StoreProvider>);
     expect(screen.getByTestId('artifact.page').getAttribute('src')).toBe('http://127.0.0.1:47123/p/notes?theme=dark');
+  });
+
+  it("a local file frames from the hub's frame_url; an older hub's bare path frames nothing, never file:// (ambient-lead m_19544)", () => {
+    const file = { kind: 'page', url: '/Users/x/.bise/hubs/h/artifacts/proto/v2/proto.html', version: 2 };
+    const framed = { ...file, frame_url: 'http://127.0.0.1:47123/a/proto/2/proto.html' };
+    expect(frameSrc(framed, 2, 'dark')).toBe('http://127.0.0.1:47123/a/proto/2/proto.html?theme=dark');
+    expect(frameSrc({ ...framed, kind: 'file' }, 2, null)).toBe('http://127.0.0.1:47123/a/proto/2/proto.html');
+    // frame_url names the current version only: an older one has no frame
+    expect(frameSrc(framed, 1, null)).toBeNull();
+    // an older hub (no frame_url): no white box
+    expect(frameSrc(file, 2, 'light')).toBeNull();
+    expect(frameSrc({ ...file, frame_url: null }, 2, 'light')).toBeNull();
+    // a bise page as before, a link too; a file with no frame_url, nothing
+    expect(frameSrc({ kind: 'page', url: 'http://127.0.0.1:47123/p/notes', version: 3 }, 1, 'light')).toBe('http://127.0.0.1:47123/p/notes/v/1?theme=light');
+    expect(frameSrc({ kind: 'link', url: 'https://example.com/a', version: 1 }, 1, null)).toBe('https://example.com/a');
+    expect(frameSrc({ kind: 'file', url: 'http://127.0.0.1:47123/x.csv', version: 1 }, 1, null)).toBeNull();
   });
 });
 
