@@ -191,6 +191,15 @@ pub const COMMANDS: &[Cmd] = &[
         client: true,
     },
     Cmd { name: "/compact", desc: "compact the conversation of the agent in view", args: &[], client: false },
+    // cost-pause: the whole project's pause (his only), and its cost
+    Cmd {
+        name: "/pause",
+        desc: "pause the whole project: every turn stops, messages and timers wait, nothing is lost",
+        args: &[],
+        client: false,
+    },
+    Cmd { name: "/resume", desc: "resume a paused project: what waited is delivered", args: &[], client: false },
+    Cmd { name: "/usage", desc: "what the agents and models cost, today and this week", args: &[], client: true },
     Cmd {
         name: "/theme",
         desc: "light, dark, or auto (your terminal's background): /theme [auto|light|dark]",
@@ -292,18 +301,18 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// Law: 34 commands, each name once and a slash word; 19 the
-    /// client's own, the 15 others the hub's router parses.
+    /// Law: 37 commands, each name once and a slash word; 20 the
+    /// client's own, the 17 others the hub's router parses.
     #[test]
-    fn the_catalog_holds_34_commands_19_of_them_the_clients() {
-        assert_eq!(COMMANDS.len(), 34);
-        assert_eq!(COMMANDS.iter().filter(|c| c.client).count(), 19);
+    fn the_catalog_holds_37_commands_20_of_them_the_clients() {
+        assert_eq!(COMMANDS.len(), 37);
+        assert_eq!(COMMANDS.iter().filter(|c| c.client).count(), 20);
         let hub: Vec<&str> = COMMANDS.iter().filter(|c| !c.client).map(|c| c.name).collect();
         assert_eq!(
             hub,
             [
                 "/restart", "/update", "/version", "/new", "/archive", "/restore", "/isolate", "/rename", "/answer", "/close", "/model",
-                "/reasoning", "/interrupt", "/stop", "/compact",
+                "/reasoning", "/interrupt", "/stop", "/compact", "/pause", "/resume",
             ]
         );
         for (i, c) in COMMANDS.iter().enumerate() {

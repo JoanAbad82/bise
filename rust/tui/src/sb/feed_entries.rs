@@ -188,6 +188,17 @@ fn place(app: &mut App, agent: &str, e: &Entry) {
         return;
     }
     let mut evs = ev_of(e);
+    // a turn cut by /pause: only its `‖ paused` line (designer m_18932);
+    // here too, as a changed entry comes again through `replace`: read
+    // what comes before the entry's place, not the feed's end
+    let at = match app.win.spans.contains_key(&pos) {
+        true => app.win.marks.iter().find(|(_, p)| *p >= pos).map_or(app.events.len(), |&(i, _)| i),
+        false => app.events.len(),
+    };
+    if crate::feed::after_pause_cut(&app.events[..at.min(app.events.len())]) {
+        evs.retain(|ev| !crate::feed::is_cut_noise(ev));
+        crate::feed::pause_cut_tools(&mut evs);
+    }
     for ev in evs.iter_mut() {
         if let Ev::Thinking { open, .. } = ev {
             *open = app.show_thinking;
@@ -203,6 +214,11 @@ fn place(app: &mut App, agent: &str, e: &Entry) {
         }
         app.last_ts = Some(e.at_ms);
     }
+    for ev in &evs {
+        if let Ev::You(t, ..) = ev {
+            drop_held(app, t.as_str());
+        }
+    }
     let n0 = app.events.len();
     for ev in evs {
         push_event(&mut app.events, &mut app.cache, ev);
@@ -210,6 +226,25 @@ fn place(app: &mut App, agent: &str, e: &Entry) {
     let n = app.events.len() - n0;
     app.win.spans.insert(pos, n);
     seen_at(app, Some(pos), n0);
+}
+
+/// cost-pause (designer m_18932): his message held by the pause is
+/// delivered (its `you` entry came): the held row (`Ev::Held`, local, in
+/// no entry) goes, his row comes where it was delivered, as any message.
+fn drop_held(app: &mut App, text: &str) {
+    let Some(i) = app.events.iter().rposition(|e| matches!(e, Ev::Held(h) if h.as_str() == text)) else { return };
+    app.events.remove(i);
+    if i < app.cache.len() {
+        app.cache.remove(i);
+    }
+    for j in [i.checked_sub(1), Some(i)].into_iter().flatten() {
+        if let Some(c) = app.cache.get_mut(j) {
+            *c = None;
+        }
+    }
+    for m in app.win.marks.iter_mut().filter(|(k, _)| *k > i) {
+        m.0 -= 1;
+    }
 }
 
 /// The `n` events of entry `pos` become `evs`: spliced in place, the rows

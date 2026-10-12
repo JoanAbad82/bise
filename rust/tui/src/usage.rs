@@ -55,7 +55,7 @@ impl Usage {
     /// The feed's usage line: `usage: 42k / 200k tokens · 21% (in 42000
     /// · out 500 · $0.0132)`, the cost when it is known.
     pub fn line(&self) -> String {
-        let cost = self.cost().map(|c| format!(" · {}", crate::models::fmt_cost(c))).unwrap_or_default();
+        let cost = self.cost().map(|c| format!(" · {}", words::usd(c))).unwrap_or_default();
         format!("  usage: {} (in {} · out {}{})", self.label(), self.input, self.output, cost)
     }
 }
@@ -98,8 +98,11 @@ mod tests {
 
     #[test]
     fn the_usage_line_shows_the_cost_when_prices_are_known() {
-        let u = Usage { model: "anthropic/claude-haiku-4-5".into(), input: 10_000, output: 1_000, ..Default::default() };
-        assert_eq!(u.line(), "  usage: 11k / 200k tokens · 6% (in 10000 · out 1000 · $0.0150)");
+        let u = Usage { model: "anthropic/claude-haiku-4-5".into(), input: 10_000, output: 2_000, ..Default::default() };
+        assert_eq!(u.line(), "  usage: 12k / 200k tokens · 6% (in 10000 · out 2000 · $0.02)");
+        // under a cent (designer m_18932)
+        let c = Usage { model: "anthropic/claude-haiku-4-5".into(), input: 1_000, output: 100, ..Default::default() };
+        assert!(c.line().ends_with("· <$0.01)"), "{}", c.line());
         // no price listed: no cost
         let f = Usage { model: "fireworks/accounts/fireworks/models/glm-5p3".into(), input: 10_000, output: 1_000, ..Default::default() };
         assert_eq!(f.line(), "  usage: 11k / 1M tokens · 1% (in 10000 · out 1000)");

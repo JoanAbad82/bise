@@ -40,6 +40,8 @@ pub(crate) enum Then {
     /// nothing but its refusal, shown like a notice (an action whose
     /// change comes in the hub's events)
     Shown,
+    /// `usage/read` (`/usage`): the screen's numbers (usage_screen.rs)
+    Usage,
     /// `/approvals`' read (approvals/set without a mode): the mode, the
     /// checker and the rules, and its screen opens
     Approvals,
@@ -171,6 +173,11 @@ fn run(app: &mut App, then: Then, r: Response) {
         (_, Err(e)) => refused(app, &e),
         (Then::HubRead, Ok(v)) => hub_reads::reread(app, v),
         (Then::Shown | Then::RuleRemoved, Ok(_)) => {}
+        (Then::Usage, Ok(v)) => {
+            if let Ok(Some(ev)) = bise_proto::rpc::ev_of_result("usage/read", v) {
+                crate::usage_screen::answered(app, ev);
+            }
+        }
         (Then::Approvals, Ok(v)) => {
             if let Ok(Some(ev)) = bise_proto::rpc::ev_of_result("approvals/set", v) {
                 hub_reads::approvals(app, &ev, true);

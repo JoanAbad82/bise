@@ -109,6 +109,10 @@ pub const METHODS: &[MethodRow] = &[
     m("hub/stop", "stop_hub", None),
     // a note talk's words to its page (the desktop core's voice)
     m("page/voice", "page_voice", None),
+    // cost-pause: the project's cost, its pause and resume (his only)
+    m("usage/read", "usage", Some("usage")),
+    m("project/pause", "pause", None),
+    m("project/resume", "resume", None),
 ];
 
 /// The protocol's own methods (no [`HubCmd`]).
@@ -135,6 +139,9 @@ pub const OWN_RESULTS: &[(&str, &str)] = &[
     ("version/switch", "CommandRunResult"),
     ("version/rollback", "CommandRunResult"),
     ("version/restart", "CommandRunResult"),
+    // cost-pause: what the pause or resume did ('paused: 2 turns stopped…')
+    ("project/pause", "CommandRunResult"),
+    ("project/resume", "CommandRunResult"),
 ];
 
 /// A command whose method answers the hub's words ([`CommandRunResult`]):
@@ -183,6 +190,7 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("hub/models", "models", Scope::Hub),
     n("hub/approvals", "approvals", Scope::Hub),
     n("hub/flow", "flow", Scope::Hub),
+    n("hub/paused", "paused", Scope::Hub),
     n("job/end", "job_end", Scope::Hub),
     n("job/followedEnd", "followed_end", Scope::Hub),
     n("thread/entry", "entry", Scope::Thread),

@@ -56,7 +56,10 @@ make_identity() {
     say "$DIR exists without sign.keychain-db and pass: left as is"; return 2
   fi
   mkdir -p "$DIR"; chmod 700 "$DIR"
-  LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 32 > "$DIR/pass" || true
+  # a bounded read: with SIGPIPE ignored (GitHub's macOS runners) BSD tr
+  # never stops on an endless /dev/urandom once head has gone (v2026.10.2-31's
+  # CI hung 1h40m here)
+  head -c 4096 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | head -c 32 > "$DIR/pass" || true
   chmod 600 "$DIR/pass"
   local pw; pw="$(cat "$DIR/pass")"
   printf '[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=%s\n[ext]\nbasicConstraints=critical,CA:false\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=critical,codeSigning\n' "$NAME" > "$DIR/cs.cnf"

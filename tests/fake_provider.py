@@ -279,12 +279,28 @@ def agent_of(conv):
     return "?"
 
 
+NUDGE = "[bise] The message(s) just above arrived while you were writing your last answer"
+
+
 def last_user(conv):
-    """index of the last real user message (the state block is not one)"""
+    """index of the last real user message (the state block is not one).
+    The hub's nudge after a steered turn ("[bise] The message(s) just
+    above arrived ...", sb-core's fx say) is not the message to answer:
+    a real model answers the messages above it, so this is the last real
+    user message before it (the steered one, which the REPL puts before
+    or after the answer it came during: its script runs, as if it had
+    come at idle). A test's say that lands while main answers another
+    message (a task's reply, a job's wake) is then still run, whatever
+    the load (core_restart, repl_recycle_e2e)."""
     idx = None
     for i, m in enumerate(conv):
         if m["role"] == "user" and not m["text"].lstrip().startswith("<bise_state>"):
             idx = i
+    if idx is not None and conv[idx]["text"].lstrip().startswith(NUDGE):
+        for i in range(idx - 1, -1, -1):
+            m = conv[i]
+            if m["role"] == "user" and not m["text"].lstrip().startswith(("<bise_state>", NUDGE)):
+                return i
     return idx
 
 

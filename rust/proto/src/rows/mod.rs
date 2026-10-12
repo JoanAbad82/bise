@@ -11,6 +11,7 @@ mod models;
 mod pages;
 mod places;
 mod scheduled;
+mod usage;
 
 pub use agents::*;
 pub use approvals::*;
@@ -20,8 +21,9 @@ pub use models::*;
 pub use pages::*;
 pub use places::*;
 pub use scheduled::*;
+pub use usage::*;
 
-fn is_zero_u64(n: &u64) -> bool {
+pub(crate) fn is_zero_u64(n: &u64) -> bool {
     *n == 0
 }
 

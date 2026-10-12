@@ -119,6 +119,7 @@ pub(super) fn new_sb(writer: std::sync::Arc<std::sync::Mutex<UnixStream>>, works
         agents: Vec::new(),
         places: Vec::new(),
         flow: String::new(),
+        paused: None,
         cards: Vec::new(),
         parts_out: Vec::new(),
         feature_drop_ask: None,

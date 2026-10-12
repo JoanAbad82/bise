@@ -28,6 +28,8 @@ import ./gen/fx.bend as F
 
 import ./gen/kit.bend as K
 
+import ./pause.bend as P
+
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
     reply_to: Maybe<&2, Nat>, plain: Bool, auto: Bool, queued: Bool,
@@ -724,9 +726,17 @@ def pump.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String) -> 
     case Some{+a}:
       pump.active(o, is_active(M.Agent.life(a)), cx, name, M.Agent.is_main(a))
 
-# deliver what is queued for `name`, when its state allows it
+def pump.paused(-o: M.St, paused: Bool, +cx: X.Cx<o>, +name: String) -> X.Cx<o>:
+  match paused:
+    case True{}:
+      cx
+    case False{}:
+      pump.agent(o, M.get_agent(st(o, cx), name), cx, name)
+
+# deliver what is queued for `name`, when its state allows it; a paused
+# project delivers nothing (law paused_delivers_nothing): it stays queued
 def pump(-o: M.St, +cx: X.Cx<o>, +name: String) -> X.Cx<o>:
-  pump.agent(o, M.get_agent(st(o, cx), name), cx, name)
+  pump.paused(o, P.is_paused(st(o, cx)), cx, name)
 
 # ---- messages (RFC 0003) ----
 
@@ -763,7 +773,8 @@ def send.emit(-o: M.St, +cx: X.Cx<o>, +s: Snd, +thread: Nat) -> X.Cx<o> & SendR:
       # a card is closed by the user's answer only (answer_card): no reply
       # here touches the user's inbox (BISE-299)
       +cx2 = emit(o, cx, M.EMsgSent{m}, {==}, quiet_ok(auto, expect), Unit{})
-      +w = Bool.pick(Maybe<&2, X.Waiter>, queued, None{},
+      # paused: no waiter gets it either (it would wake an agent): queued
+      +w = Bool.pick(Maybe<&2, X.Waiter>, queued || P.is_paused(st(o, cx2)), None{},
         waiter_pick(X.R.waiters(rr(o, cx2)), to, reply_to, expect && Bool.not(plain) && Bool.not(String.eq(from, M.USER()))))
       send.waiter(o, w, cx2, m)
 
@@ -1212,8 +1223,10 @@ def gone.go(m: Maybe<&2, M.Agent>) -> Bool:
 def timer_gone(+s: M.St, +n: String) -> Bool:
   gone.go(timer_agent(s, n))
 
+# a paused project fires no timer (law timer_held_while_paused): a due
+# one fires at the first tick after /resume
 def timer_may(-o: M.St, +cx: X.Cx<o>, +t: TM.Timer, +due: Bool) -> Bool:
-  TM.may_fire(bise_queued(st(o, cx), TM.Timer.agent(t)), due, t, timer_ready(o, cx, TM.Timer.agent(t)), now(o, cx))
+  Bool.not(P.is_paused(st(o, cx))) && TM.may_fire(bise_queued(st(o, cx), TM.Timer.agent(t)), due, t, timer_ready(o, cx, TM.Timer.agent(t)), now(o, cx))
 
 def timer_spent(-o: M.St, spent: Bool, +cx: X.Cx<o>, +id: Nat, +at: Nat) -> X.Cx<o>:
   match spent:
@@ -2281,6 +2294,55 @@ def interrupt.go(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
         u => notice(o, cx, "no turn in progress to interrupt"))
     case None{}:
       notice(o, cx, "no turn in progress to interrupt")
+
+# ---- the project's pause (cost-pause, hub/pause.bend) ----
+
+# each busy turn stops: the interrupt and its 'stopped' line
+def pause.stop(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
+  match ns:
+    case Nil{}:
+      cx
+    case Con{+n, +rest}:
+      # its thread says why (designer m_18789), and bise's go-on note
+      # waits in its queue for /resume (held like the rest)
+      +cx2 = line(o, stopped(o, interrupt.fx(o, cx, n), n), n, "paused", "‖ paused · its turn stopped")
+      pause.stop(o, rest, fst(o, send(o, cx2, msg(M.HUB(), n, P.GO_ON(), False{}, None{}, False{}, False{}))))
+
+# `/pause`: journaled, then every busy turn stops; already paused:
+# nothing changes (law pause_idempotent)
+def pause.go(-o: M.St, already: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
+  match already:
+    case True{}:
+      notice(o, cx, P.ALREADY())
+    case False{}:
+      +ns = P.busy(st(o, cx), X.R.rts(rr(o, cx)))
+      +cx2 = emit(o, cx, M.EPaused{now(o, cx)}, Unit{}, Unit{}, Unit{})
+      notice(o, dirty(o, pause.stop(o, ns, cx2)), P.paused_text(List.length(&2, String, ns)))
+
+def pause(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+  pause.go(o, P.is_paused(st(o, cx)), cx)
+
+def resume.pump(-o: M.St, ns: List<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
+  match ns:
+    case Nil{}:
+      cx
+    case Con{+n, +rest}:
+      resume.pump(o, rest, pump(o, cx, n))
+
+# `/resume`: journaled, then every agent gets what was held, in the hub's
+# order (law resume_delivers_held); not paused: nothing changes
+def resume.go(-o: M.St, paused: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
+  match paused:
+    case False{}:
+      notice(o, cx, P.NOT_PAUSED())
+    case True{}:
+      +agents = P.woken(st(o, cx))
+      +his = P.his(st(o, cx))
+      +cx2 = emit(o, cx, M.EResumed{now(o, cx)}, Unit{}, Unit{}, Unit{})
+      notice(o, dirty(o, resume.pump(o, M.St.order(st(o, cx2)), cx2)), P.resumed_text(agents, his))
+
+def resume(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+  resume.go(o, P.is_paused(st(o, cx)), cx)
 
 # his message `id`, still queued, taken back: Rejected{"taken_back"},
 # never delivered (an older sb-core replays it so); the queue loses it
@@ -3624,7 +3686,7 @@ def idle.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +agent: String, +l
       +cx4 = pick_lazy(X.Cx<o>, held, u => cx3, u => auto_replies(o, qs, cx3, agent, body))
       # RFC 0001 §7.2: the automatic report (board only)
       +cx5 = idle.report(o, Bool.not(M.Agent.is_main(a)) && Bool.not(M.trim_is_empty(text)) && Bool.not(held), cx4, agent, text)
-      +cx6 = idle.nudge(o, unread && List.is_empty(&2, M.Msg, M.queued_for(st(o, cx5), agent)), cx5, agent)
+      +cx6 = idle.nudge(o, unread && List.is_empty(&2, M.Msg, M.queued_for(st(o, cx5), agent)) && Bool.not(P.is_paused(st(o, cx5))), cx5, agent)
       pump(o, cx6, agent)
 
 def repl_idle(-o: M.St, +cx: X.Cx<o>, +agent: String, +leftover: Bool, +held: Bool) -> X.Cx<o>:
@@ -3769,6 +3831,10 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       wake_stop.found(o, WK.hit(wks(o, cx), id), cx, why)
     case GI.IWakeHit{+id, +text}:
       wake_hit(o, cx, id, text)
+    case GI.IPause{}:
+      pause(o, cx)
+    case GI.IResume{}:
+      resume(o, cx)
     case GI.INone{}:
       cx
 

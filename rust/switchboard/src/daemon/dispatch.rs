@@ -265,6 +265,7 @@ impl Shell {
             Msg::Changes { name, v } => self.on_changes(name, v),
             Msg::RoutePick { rid, pick } => self.route_picked(rid, pick),
             Msg::RoleLine { dir, key, line } => self.step(Input::RoleLine { dir, key, line }),
+            Msg::UsageCounted(l) => self.usage_counted(*l),
             Msg::TimerName { id, reply } => self.step(Input::TimerName { id, reply }),
             Msg::GateChecked { dir, n, req, out } => self.on_checked(&dir, &n, *req, out),
             Msg::BuildEnded { rev } => {

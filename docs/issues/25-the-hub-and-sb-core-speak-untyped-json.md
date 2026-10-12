@@ -135,3 +135,21 @@ values, the journal byte-equal on a replay, the e2e transcripts equal
   same job (+17%), the generated codecs now being in every shard. If the
   shards' total grows again with F's encoders, gen/laws.bend's per-record
   laws move to their own shard (architect m_18807).
+- chunk R sha 1 (948dbb48): every sb-core input the hub sends is a typed
+  `In` (`Link` for the link's own requests; a restarted sb-core's
+  `force_run` bare), every effect is read as an `Fx`; `Hub::core`,
+  `query`, `effect`, `deliver` moved to core_link.rs, the pure part to
+  core_fx.rs (`plain`, `delivery`). A known effect whose fields don't
+  decode is skipped and logged ('bad effect'), no longer read with
+  defaults. Proof: a capture of the link (switchboard lib + proto, route,
+  wake, core_restart e2e) at bf6be4a6 and at R, the same keys and value
+  types per tag (51 input tags, 22 effect tags), the same journal event
+  shapes, no skipped effect in R's hub logs (architect m_18931).
+- chunk R sha 2: sb-core's answers are read as `Answer` (core_fx::answer,
+  view_of, skipped_of); a non-step answer to a step is logged and nothing
+  applied (it used to load a null view: an empty mirror). No
+  string-keyed read of an answer or an effect is left in the hub
+  (architect m_19081).
+- R's done-when: `rg 'json!\(\{"t"' rust/switchboard/src --glob
+  '!*tests*'` → 0, `rg 'jstr\(f, "fx"\)' rust/switchboard` → 0; core.rs
+  3,366 → 2,985 lines.

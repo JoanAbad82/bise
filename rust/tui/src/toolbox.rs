@@ -99,6 +99,10 @@ pub(crate) fn box_top(td: &ToolData, tick: u32, width: usize) -> Line<'static> {
     ];
     let dim_st = Style::default().fg(dim());
     match td.state {
+        _ if td.paused => {
+            spans.push(Span::raw(" "));
+            spans.extend(crate::toolrow::state_spans(td, tick));
+        }
         ToolState::Run => {
             let (p, c) = working_frame(tick);
             spans.push(Span::styled(format!(" {}", p), Style::default().fg(c)));

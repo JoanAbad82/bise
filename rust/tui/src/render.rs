@@ -378,6 +378,15 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
         Ev::Kept(t) => crate::livetext::kept_rows(t, 0, width),
         // an image marker is an accent chip `▣ login.png` (book §14)
         Ev::You(t, mark, open, _) => user_block_lines(t, *mark, *open, width),
+        // a message held by the pause: his row, dim, and why under it
+        Ev::Held(t) => {
+            let mut rows: Vec<Line<'static>> = user_block_lines(t, Mark::Sent, false, width)
+                .into_iter()
+                .map(|l| Line::from(l.spans.into_iter().map(|s| Span::styled(s.content, s.style.fg(dim()))).collect::<Vec<_>>()))
+                .collect();
+            rows.extend(glyph_line(G_NOTE, Style::default().fg(faint()), "held until /resume".into(), dim_st, width));
+            rows
+        }
         Ev::MarkYou { .. } | Ev::YouId(_) => vec![],
         // BISE-86 (book §13, §17): `✗ not delivered: {name} stopped.`, and
         // while it waits for an answer `⏎ send again · esc drop`
@@ -1321,6 +1330,8 @@ pub(crate) fn tool_head(td: &ToolData, tick: u32, name: &str, args: &str) -> Lin
         Span::styled(label.to_string(), dim_st),
     ];
     match td.state {
+        // cut by /pause: nothing went wrong (designer m_19111)
+        _ if td.paused => row.push(Span::styled(format!(" {}", crate::toolrow::PAUSE_CUT), dim_st)),
         ToolState::Run => {
             let (g, c) = working_frame(tick);
             row.push(Span::styled(format!(" {}", g), Style::default().fg(c)));

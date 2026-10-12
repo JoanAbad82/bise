@@ -54,6 +54,9 @@ pub(crate) struct ToolData {
     pub(crate) fold_open: bool,
     // how long it took, frozen at finish (the fold's total)
     pub(crate) took: Option<std::time::Duration>,
+    // in memory only (cost-pause, designer m_19111): a call /pause cut:
+    // its row reads `– stopped by the pause`, dim, no ✗, no output
+    pub(crate) paused: bool,
 }
 
 impl ToolData {
@@ -83,6 +86,7 @@ impl ToolData {
             fold_open: false,
             gate: None,
             took,
+            paused: false,
         }
     }
 }
@@ -113,6 +117,11 @@ pub(crate) enum Ev {
     // transcript before 9633cd2a, or not yet read)
     // msg-parts: its text and typed parts (drawn from the parts)
     You(crate::said::Said, Mark, bool, Option<u64>),
+    // in memory only (cost-pause, designer m_18932): his message typed
+    // while the project is paused, his row dim with `held until /resume`
+    // under it; the hub's `you` line at delivery takes its place (no new
+    // row)
+    Held(crate::said::Said),
     // in memory only: the id of your message right before it (`sb you-id
     // : m_N`); push_event sets it on that message, never appended
     YouId(u64),

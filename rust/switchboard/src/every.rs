@@ -19,6 +19,7 @@
 //! ◷ lines and `sb every`. The clock and the view come from the hub
 //! (`core.rs`).
 
+use bise_proto::core::In;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
@@ -77,23 +78,24 @@ pub struct New {
 impl New {
     /// sb-core's `every_set` input: today's line without its id (sb-core
     /// gives it), the first wake on the hub's clock.
-    pub fn input(&self, now: u64) -> Value {
-        let mut v = json!({"t": "every_set", "agent": self.agent, "by": self.by, "text": self.text,
-                           "next_ms": self.sched.first(now)});
-        if let Some(n) = self.name.as_deref().map(bise_proto::thread::words::name_fit).filter(|n| !n.is_empty()) {
-            v["name"] = json!(n);
-        }
-        match self.sched {
-            Sched::Every(p) => v["every_ms"] = json!(p),
-            Sched::Daily(m) => v["daily_min"] = json!(m),
-        }
-        for (k, o) in [("until_ms", self.until_ms.map(|u| json!(u))), ("times", self.times.map(|t| json!(t))),
-                       ("page", self.page.as_ref().map(|p| json!(p)))] {
-            if let Some(o) = o {
-                v[k] = o;
-            }
-        }
-        v
+    pub fn input(&self, now: u64) -> In {
+        let (every_ms, daily_min) = match self.sched {
+            Sched::Every(p) => (Some(p), None),
+            Sched::Daily(m) => (None, Some(u64::from(m))),
+        };
+        In::EverySet(bise_proto::core::input::EverySet {
+            agent: self.agent.clone(),
+            by: self.by.clone(),
+            text: self.text.clone(),
+            next_ms: self.sched.first(now),
+            // only when given (StrOmit: "" is absent)
+            name: self.name.as_deref().map(bise_proto::thread::words::name_fit).unwrap_or_default(),
+            every_ms,
+            daily_min,
+            until_ms: self.until_ms,
+            times: self.times,
+            page: self.page.clone(),
+        })
     }
 }
 

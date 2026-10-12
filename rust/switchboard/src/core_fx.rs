@@ -1,0 +1,257 @@
+//! sb-core's answers and effects, typed (issue 25, chunk R): an answer
+//! line is read as a `bise_proto::core::link::Answer` ([`answer`], its
+//! [`view_of`], [`skipped_of`]); a step's `fx` items come as
+//! `bise_proto::core::Fx` through serde ([`read`] logs and skips the ones
+//! this hub can't run), and
+//! [`plain`] turns the ones that need nothing of the hub's state into the
+//! hub's [`Effect`] at once; the others (the journal, a reply, a delivery,
+//! the client's effects, ...) go back to `Hub::effect` (core_link.rs).
+//! [`delivery`] writes the text a delivery puts in the agent's context.
+//! Pure: no I/O, no hub.
+
+use super::{join_fields, line, Effect};
+use bise_proto::core::link::{ASkipped, Answer, Skipped};
+use bise_proto::core::Fx as CoreFx;
+use serde::Deserialize;
+use serde_json::Value;
+
+/// One effect of sb-core, read.
+#[derive(Debug, PartialEq)]
+pub(super) enum Plain {
+    /// the hub's effect, nothing else to do
+    Effect(Effect),
+    /// nothing to do (`rt`: the runtime state comes with the view)
+    Nothing,
+    /// an effect on the hub's state: `Hub::effect` runs it
+    Hub(CoreFx),
+    /// not an effect this hub runs: skipped, with the log line that says
+    /// why (a newer sb-core, a version switch in flight: never a crash)
+    Skip(String),
+}
+
+/// sb-core's answer line, read (any object is an answer: `Unknown` at
+/// worst, never an error).
+pub(super) fn answer(out: &Value) -> Answer {
+    Answer::deserialize(out).unwrap_or_else(|_| Answer::Unknown(out.clone()))
+}
+
+/// The view an answer carries (a step's, `view_all`'s).
+pub(super) fn view_of(a: &Answer) -> Option<&Value> {
+    match a {
+        Answer::Step(s) => Some(&s.view),
+        Answer::View(v) => Some(&v.view),
+        _ => None,
+    }
+}
+
+/// The indexes of a `replay_many` batch sb-core did not apply.
+pub(super) fn skipped_of(a: &Answer) -> Vec<u64> {
+    match a {
+        Answer::Skipped(ASkipped { skipped: Skipped::At(ix) }) => ix.clone(),
+        _ => Vec::new(),
+    }
+}
+
+/// One item of a step's `fx` list (its `Unknown`: a tag this hub doesn't
+/// know, or a known tag whose fields don't decode, or no tag).
+pub(super) fn read(f: CoreFx) -> Plain {
+    match f {
+        CoreFx::Unknown { tag, raw } if CoreFx::TAGS.contains(&tag.as_str()) => {
+            Plain::Skip(format!("sb-core: bad effect {} (its fields don't decode, skipped): {}", tag, raw))
+        }
+        CoreFx::Unknown { tag, raw } => Plain::Skip(format!("sb-core: unknown effect {} (skipped): {}", tag, raw)),
+        fx => plain(fx),
+    }
+}
+
+/// The hub's effect of `f` when it needs nothing of the hub's state.
+pub(super) fn plain(f: CoreFx) -> Plain {
+    let e = match f {
+        CoreFx::Rt(_) => return Plain::Nothing,
+        CoreFx::Spawn(s) => Effect::Spawn { agent: s.agent, resume: s.resume, crash_note: s.crash_note },
+        CoreFx::Kill(k) => Effect::Kill { agent: k.agent },
+        CoreFx::Say(s) => Effect::Say { agent: s.agent, text: s.text },
+        CoreFx::Passthrough(p) => Effect::Passthrough { agent: p.agent, line: p.line },
+        // C2: a multi-field line (`answered`) comes as `fields`
+        CoreFx::Line(l) => {
+            let text = match l.fields {
+                Some(fields) => join_fields(&fields),
+                None => l.text.unwrap_or_default(),
+            };
+            line(&l.agent, &l.kind, &text)
+        }
+        CoreFx::XDeliver(x) => Effect::XDeliver { xid: x.xid, project: x.project, kind: x.kind, text: x.text, context: x.context, parts: x.parts },
+        CoreFx::XReply(x) => Effect::XReply { hub: x.hub, xid: x.xid, text: x.text },
+        CoreFx::Route(r) => Effect::Route { rid: r.rid, to: r.to, name: r.name, text: r.text, due_ms: r.due_ms, why: r.why },
+        CoreFx::RouteAsk(r) => Effect::RouteAsk { rid: r.rid, text: r.text },
+        CoreFx::RouteDone(r) => Effect::RouteDone { rid: r.rid, state: r.state, to: r.to, xid: r.xid },
+        CoreFx::JobEnd(j) => Effect::JobEnd { agent: j.agent, state: j.state, label: j.label, summary: j.summary, key: j.key },
+        CoreFx::FollowedEnd(j) => Effect::FollowedEnd {
+            project: j.project,
+            agent: j.agent,
+            key: j.key,
+            state: j.state,
+            label: j.label,
+            summary: j.summary,
+        },
+        // a gate card's verdict (approvals), not the client's yes/no
+        CoreFx::Confirm(c) if c.card.is_some() => Effect::Confirm {
+            card: c.card.unwrap_or(0),
+            agent: c.agent.unwrap_or_default(),
+            text: c.text,
+        },
+        other => return Plain::Hub(other),
+    };
+    Plain::Effect(e)
+}
+
+/// The text a delivery puts in the agent's context: main's `notes`, the
+/// task `status` block (None or "": none), then each message as the
+/// recipient reads it.
+pub(super) fn delivery(notes: &[String], status: Option<String>, msgs: Vec<String>) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if !notes.is_empty() {
+        let mut t = String::from("<bise_notes>\n");
+        for n in notes {
+            t.push_str(&format!("- {}\n", n));
+        }
+        t.push_str("</bise_notes>");
+        parts.push(t);
+    }
+    parts.extend(status.filter(|s| !s.is_empty()));
+    parts.extend(msgs);
+    parts.join("\n\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// One effect as a step's answer carries it.
+    fn of(v: &Value) -> CoreFx {
+        match answer(&json!({"fx": [v], "dirty": false, "view": {}})) {
+            Answer::Step(mut s) => s.fx.remove(0),
+            a => panic!("not a step: {:?}", a),
+        }
+    }
+
+    fn rd(v: &Value) -> Plain {
+        read(of(v))
+    }
+
+    fn eff(v: Value) -> Effect {
+        match rd(&v) {
+            Plain::Effect(e) => e,
+            p => panic!("not a plain effect: {:?}", p),
+        }
+    }
+
+    #[test]
+    fn a_line_is_its_text_or_its_fields() {
+        let text = eff(json!({"fx": "line", "agent": "a", "kind": "you", "text": "go"}));
+        assert_eq!(text, line("a", "you", "go"));
+        let fields = eff(json!({"fx": "line", "agent": "a", "kind": "sent", "fields": ["b", "x : y", "0"]}));
+        assert_eq!(fields, line("a", "sent", "b : x \\: y : 0"));
+    }
+
+    #[test]
+    fn plain_effects_keep_every_field() {
+        assert_eq!(
+            eff(json!({"fx": "spawn", "agent": "a", "resume": true, "crash_note": "boom"})),
+            Effect::Spawn { agent: "a".into(), resume: true, crash_note: Some("boom".into()) }
+        );
+        assert_eq!(
+            eff(json!({"fx": "spawn", "agent": "w", "resume": false, "crash_note": null})),
+            Effect::Spawn { agent: "w".into(), resume: false, crash_note: None }
+        );
+        assert_eq!(
+            eff(json!({"fx": "route_done", "rid": 1, "state": "cancelled", "to": "shop-1", "xid": null})),
+            Effect::RouteDone { rid: 1, state: "cancelled".into(), to: "shop-1".into(), xid: None }
+        );
+        assert_eq!(
+            eff(json!({"fx": "xdeliver", "xid": 1, "project": "p", "kind": "ask", "msg": 0, "text": "t", "context": ""})),
+            Effect::XDeliver { xid: 1, project: "p".into(), kind: "ask".into(), text: "t".into(), context: "".into(), parts: "".into() }
+        );
+        assert_eq!(
+            eff(json!({"fx": "job_end", "agent": "perf", "state": "done", "label": "l", "summary": "s", "key": 7, "hub": "h"})),
+            Effect::JobEnd { agent: "perf".into(), state: "done".into(), label: "l".into(), summary: "s".into(), key: 7 }
+        );
+    }
+
+    #[test]
+    fn a_confirm_with_a_card_is_the_gates_the_other_the_clients() {
+        assert_eq!(
+            eff(json!({"fx": "confirm", "card": 3, "agent": "t8", "text": "2"})),
+            Effect::Confirm { card: 3, agent: "t8".into(), text: "2".into() }
+        );
+        assert!(matches!(rd(&json!({"fx": "confirm", "name": "tq", "text": "archive?"})), Plain::Hub(CoreFx::Confirm(_))));
+    }
+
+    #[test]
+    fn hub_effects_go_back_rt_is_nothing() {
+        for v in [
+            json!({"fx": "journal", "ev": {"type": "act_done", "id": 1}}),
+            json!({"fx": "reply", "token": 1, "body": {"ok": true}}),
+            json!({"fx": "deliver", "mode": "say", "agent": "w", "notes": [], "status": false, "msgs": [{"id": 2, "rel": "hub"}]}),
+            json!({"fx": "interrupt", "agent": "t7"}),
+            json!({"fx": "notice", "text": "x"}),
+            json!({"fx": "focus_main", "name": "g"}),
+            json!({"fx": "renamed", "old": "a", "new": "b"}),
+        ] {
+            assert!(matches!(rd(&v), Plain::Hub(_)), "{v}");
+        }
+        assert_eq!(rd(&json!({"fx": "rt", "agent": "w", "run": "idle", "waiting": false, "turn_ms": null, "turns": 0})), Plain::Nothing);
+    }
+
+    /// Every effect sb-core was seen to send (chunk 0's capture) is run:
+    /// none is skipped (a known tag whose fields don't decode would be).
+    #[test]
+    fn every_captured_effect_is_read() {
+        let fixtures = include_str!("../../proto/fixtures/core_fx.jsonl");
+        let mut n = 0;
+        for l in fixtures.lines().filter(|l| !l.trim().is_empty()) {
+            let v: Value = serde_json::from_str(l).unwrap();
+            assert!(!matches!(rd(&v), Plain::Skip(_)), "skipped: {l}");
+            n += 1;
+        }
+        assert!(n >= CoreFx::TAGS.len(), "{n} lines");
+    }
+
+    #[test]
+    fn an_unknown_or_bad_effect_is_skipped_never_a_crash() {
+        let unknown = json!({"fx": "teleport", "agent": "a"});
+        assert_eq!(rd(&unknown), Plain::Skip(format!("sb-core: unknown effect teleport (skipped): {}", unknown)));
+        assert!(matches!(rd(&json!({"agent": "a"})), Plain::Skip(_)));
+        let bad = json!({"fx": "kill", "agent": 3});
+        assert_eq!(rd(&bad), Plain::Skip(format!("sb-core: bad effect kill (its fields don't decode, skipped): {}", bad)));
+    }
+
+    /// Every answer shape sb-core writes (rust/proto's fixture) reads as
+    /// what the hub takes from it: a step's or view_all's view, a batch's
+    /// skipped indexes.
+    #[test]
+    fn answers_give_their_view_and_skips() {
+        let fixtures = include_str!("../../proto/fixtures/core_answer.jsonl");
+        for l in fixtures.lines().filter(|l| !l.trim().is_empty()) {
+            let v: Value = serde_json::from_str(l).unwrap();
+            let a = answer(&v);
+            assert!(!matches!(a, Answer::Unknown(_)), "unknown: {l}");
+            assert_eq!(view_of(&a), v.get("view").filter(|_| v.get("need").is_none()), "{l}");
+        }
+        assert_eq!(skipped_of(&answer(&json!({"skipped": [0, 3]}))), vec![0, 3]);
+        assert_eq!(skipped_of(&answer(&json!({"skipped": true}))), Vec::<u64>::new());
+        assert_eq!(skipped_of(&answer(&json!({}))), Vec::<u64>::new());
+        assert!(matches!(answer(&json!({"what": 1})), Answer::Unknown(_)));
+    }
+
+    #[test]
+    fn a_delivery_is_notes_then_status_then_messages() {
+        assert_eq!(delivery(&[], None, vec!["m".into()]), "m");
+        assert_eq!(delivery(&[], Some(String::new()), vec![]), "");
+        assert_eq!(
+            delivery(&["n1".into(), "n2".into()], Some("S".into()), vec!["a".into(), "b".into()]),
+            "<bise_notes>\n- n1\n- n2\n</bise_notes>\n\nS\n\na\n\nb"
+        );
+    }
+}

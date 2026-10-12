@@ -63,6 +63,15 @@ def main():
                          for p in ("src/a.ts", "src/b.ts", "README.md")))
         t.keys("Enter")
         sc = t.wait_re(r"± ▸ 3 files · a\.ts, b\.ts, README\.md +✓ \+9", 60)
+        # the turn's end first (the fake's `done: <result>`, then main
+        # idle): ctrl+o opens what is closed then; pressed while the turn
+        # still ran (the fold row and even the done line come before its
+        # end, under load seconds before), what the turn's end added came
+        # in closed after it and the second ctrl+o opened it instead of
+        # closing everything
+        t.wait("done: tool write_file ok", 30)
+        t.wait_re(MAIN_IDLE, 30)
+        sc = t.screen()
         print("---- edits fold ----\n%s" % sc)
         assert "± write src/a.ts" not in sc, sc
         t.keys("C-o")

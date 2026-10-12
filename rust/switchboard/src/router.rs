@@ -54,6 +54,10 @@ pub enum UserCmd {
     Prs,
     /// `/interrupt`: the agent in focus stops its turn.
     Interrupt,
+    /// `/pause`, `/resume` (cost-pause): the whole project (sb-core's
+    /// hub/pause.bend). His only: the client socket.
+    Pause,
+    Resume,
     /// Any other `/command`: for the REPL of the agent in focus
     /// (`/compact`, `/status`...).
     Passthrough(String),
@@ -287,6 +291,8 @@ pub fn parse(line: &str, focus: &str) -> UserCmd {
         "/agents" | "/tasks" => UserCmd::Tasks,
         "/prs" => UserCmd::Prs,
         "/interrupt" => UserCmd::Interrupt,
+        "/pause" => UserCmd::Pause,
+        "/resume" => UserCmd::Resume,
         "/model" => {
             let default = words.contains(&"default");
             let rest: Vec<&str> = words.iter().copied().filter(|w| *w != "default").collect();

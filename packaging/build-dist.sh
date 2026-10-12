@@ -44,6 +44,11 @@ elif [ -e "$HOME/.bise/migrated.json" ]; then STATE="$HOME/.bise/dev"
 else STATE="$HOME/.local/state/switchboard"; fi
 BUILD="${SB_BUILD_DIR:-$STATE/build}"
 export PATH="$HOME/.cargo/bin:$HOME/.bend/bin:$PATH"
+# a release is ad hoc signed, a plain bise in its app root: never the dev
+# identity nor its bise.app (dev-sign.sh is for this Mac's dev builds; a
+# release bundle needs a Developer ID, docs/issues/15-tcc-one-grant.md).
+# Without this, CI's first versions.sh made a keychain on the runner.
+export SB_DEV_SIGN=0
 
 rev=HEAD
 out=/tmp/bise-dist

@@ -1,7 +1,9 @@
 //! The hub's decisions now run in Bend (`hub/*.bend`, the `sb-core`
 //! process): this module is the Rust side of the link. `Hub::handle`
-//! turns one input into a JSON line for sb-core, answers its git queries
-//! through `Env`, and turns the effects it returns into `Effect`s. It
+//! turns one input into a `bise_proto::core::In` for sb-core (issue 25:
+//! the seam is declared once there); `Hub::core` (core_link.rs) sends it,
+//! answers its git queries through `Env`, and reads the effects it returns
+//! as `bise_proto::core::Fx` into `Effect`s (core_fx.rs, pure). It
 //! keeps a read-only mirror of the durable state (for the views: board,
 //! snapshot, contexts, prompts), fed only by the journal events and the
 //! runtime changes sb-core emits.
@@ -20,6 +22,7 @@ use crate::role;
 use crate::router::{self, UserCmd};
 use crate::util::{clip, clip_tail, one_line, wire_escape};
 use crate::wire::{self, Wire};
+use bise_proto::core::{input as ci, link as cl, In, Link};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::{BufRead, BufReader, Write};
@@ -1310,6 +1313,18 @@ fn run_of(s: &str) -> Run {
     }
 }
 
+/// sb-core's `force_run` input: an agent's REPL state (a restarted
+/// sb-core gets it bare, without the step's envelope).
+fn force_run_input(agent: &str, run: Run) -> Value {
+    let run = match run {
+        Run::Down => "down",
+        Run::Starting => "starting",
+        Run::Idle => "idle",
+        Run::Busy => "busy",
+    };
+    In::ForceRun(ci::ForceRun { agent: agent.into(), run: run.into() }).to_value()
+}
+
 impl Hub {
     /// The tests' hub: their sb-core is the test setting `SB_CORE_BIN`
     /// (the gate's cache file), else [`default_core_bin`].
@@ -1326,7 +1341,7 @@ impl Hub {
         let mut link = CoreLink::start(&core_bin).unwrap_or_else(|e| {
             panic!("sb-core not found ({}): {}", core_bin.display(), e)
         });
-        link.call(&json!({"t": "init", "workspace": workspace}))
+        link.call(&Link::Init(cl::Init { workspace: workspace.into() }).to_value())
             .unwrap_or_else(|e| panic!("sb-core: {}", e));
         let mut hub = Hub {
             st: State::new(workspace),
@@ -1376,14 +1391,8 @@ impl Hub {
     /// the daemon).
     #[cfg(test)]
     pub fn force_run(&mut self, agent: &str, run: Run) {
-        let r = match run {
-            Run::Down => "down",
-            Run::Starting => "starting",
-            Run::Idle => "idle",
-            Run::Busy => "busy",
-        };
-        if let Some(out) = self.call(&json!({"t": "force_run", "agent": agent, "run": r})) {
-            self.load_view(&out["view"]);
+        if let Some(out) = self.call(&force_run_input(agent, run)) {
+            self.load_answer_view(&out);
         }
     }
 
@@ -1414,8 +1423,9 @@ impl Hub {
         }
         let (mut done, total) = (0, core.len());
         for batch in core.chunks(REPLAY_BATCH) {
-            let out = self.raw(&json!({"t": "replay_many", "evs": batch}));
-            for i in out["skipped"].as_array().into_iter().flatten().filter_map(Value::as_u64) {
+            let evs = batch.iter().map(|ev| (*ev).clone()).collect();
+            let out = self.raw(&Link::ReplayMany(cl::ReplayMany { evs }).to_value());
+            for i in core_fx::skipped_of(&core_fx::answer(&out)) {
                 if let Some(ev) = batch.get(i as usize) {
                     skipped.push((*ev).clone());
                 }
@@ -1428,8 +1438,17 @@ impl Hub {
     }
 
     fn view_all(&mut self) {
-        if let Some(out) = self.call(&json!({"t": "view_all"})) {
-            self.load_view(&out["view"]);
+        if let Some(out) = self.call(&Link::ViewAll(cl::ViewAll {}).to_value()) {
+            self.load_answer_view(&out);
+        }
+    }
+
+    /// The view an answer of sb-core carries (core_fx::view_of), loaded;
+    /// none (a newer sb-core's shape): the mirror stays as it is.
+    fn load_answer_view(&mut self, out: &Value) {
+        match core_fx::view_of(&core_fx::answer(out)) {
+            Some(v) => self.load_view(v),
+            None => eprintln!("sb-core: an answer without a view (skipped): {}", out),
         }
     }
 
@@ -1506,19 +1525,13 @@ impl Hub {
             .filter(|a| a.run != Run::Down)
             .map(|a| (a.name.clone(), a.run))
             .collect();
-        self.raw(&json!({"t": "init", "workspace": self.workspace}));
+        self.raw(&Link::Init(cl::Init { workspace: self.workspace.clone() }).to_value());
         let skipped = self.replay(&events).len();
         for (agent, run) in runs {
-            let r = match run {
-                Run::Down => "down",
-                Run::Starting => "starting",
-                Run::Idle => "idle",
-                Run::Busy => "busy",
-            };
-            self.raw(&json!({"t": "force_run", "agent": agent, "run": r}));
+            self.raw(&force_run_input(&agent, run));
         }
-        let out = self.raw(&json!({"t": "view_all"}));
-        self.load_view(&out["view"]);
+        let out = self.raw(&Link::ViewAll(cl::ViewAll {}).to_value());
+        self.load_answer_view(&out);
         if let Some(r) = self.revive.as_ref() {
             (r.log)(&format!("sb-core restarted: {} journal events replayed ({} skipped)", events.len(), skipped));
         }
@@ -1622,6 +1635,7 @@ impl Hub {
         }
         self.st.next_msg = v["next_msg"].as_u64().unwrap_or(1);
         self.st.next_card = v["next_card"].as_u64().unwrap_or(1);
+        self.st.paused = v["paused"].as_u64();
     }
 
     /// The agent's last activity, for the views (not a decision).
@@ -1695,7 +1709,7 @@ impl Hub {
             );
         }
         for a in &d.archive {
-            self.core(fx, env, None, json!({"t": "drop", "name": a, "force": true}));
+            self.core(fx, env, None, In::Drop(ci::Drop { name: a.to_string(), force: true }));
         }
         if let Some((kind, text)) = &d.line {
             fx.push(line(MAIN, kind, text));
@@ -1748,7 +1762,7 @@ impl Hub {
         if self.flow == Some(crate::flow::FlowMode::Pr) {
             return Err("this repo ships through pull requests: a feature is a PR's branch here (`--place new`)".into());
         }
-        let base = new_task(name, brief, true, false)?["base"].as_str().unwrap_or_default().to_string();
+        let base = new_task(name, brief, true, false)?.base;
         let free = unique_name(&self.st, &base);
         env.worktree_feature(&free, feature)
     }
@@ -1809,7 +1823,8 @@ impl Hub {
                 if !self.st.timers.map.contains_key(&id) {
                     return no;
                 }
-                self.core(fx, env, None, json!({"t": "every_stop", "id": id, "why": format!("stopped by {}", by), "wake": ""}));
+                let why = format!("stopped by {}", by);
+                self.core(fx, env, None, In::EveryStop(ci::EveryStop { id, why, wake: String::new() }));
                 if self.st.timers.map.contains_key(&id) {
                     return no;
                 }
@@ -1896,7 +1911,7 @@ impl Hub {
     fn timer_stop_by_user(&mut self, fx: &mut Fx, env: &mut dyn Env, id: u64, why: &str) {
         let Some(t) = self.st.timers.map.get(&id) else { return };
         let wake = crate::every::stop_note(id, &t.text, why);
-        self.core(fx, env, None, json!({"t": "every_stop", "id": id, "why": "stopped by the user", "wake": wake}));
+        self.core(fx, env, None, In::EveryStop(ci::EveryStop { id, why: "stopped by the user".into(), wake }));
     }
 
     /// `/scheduled`'s run now: one wake of timer `id` at once, outside its
@@ -1904,7 +1919,7 @@ impl Hub {
     /// wake while one from bise is queued).
     fn timer_run_now(&mut self, fx: &mut Fx, env: &mut dyn Env, id: u64) {
         if let Some(text) = self.st.timers.run_text(id, env.now()) {
-            self.core(fx, env, None, json!({"t": "every_run", "id": id, "text": text}));
+            self.core(fx, env, None, In::EveryRun(ci::EveryRun { id, text }));
         }
     }
 
@@ -2110,14 +2125,14 @@ impl Hub {
         use crate::forge::news::Out;
         for o in outs {
             match o {
-                Out::Tell { to, text } => self.core(fx, env, None, json!({"t": "forge", "to": to, "text": text})),
+                Out::Tell { to, text } => self.core(fx, env, None, In::Forge(ci::Forge { to, text })),
                 Out::Line { tone, number, url, text } => fx.push(line(
                     MAIN,
                     "pr",
                     &join_fields(&[tone.as_str().to_string(), number.to_string(), url, text]),
                 )),
                 Out::Card { agent, text } => {
-                    self.core(fx, env, None, json!({"t": "forge_card", "agent": agent, "text": text}))
+                    self.core(fx, env, None, In::ForgeCard(ci::ForgeCard { agent, text }))
                 }
                 Out::Journal(j) => fx.push(Effect::Journal(j)),
             }
@@ -2158,7 +2173,7 @@ impl Hub {
         }
         env.pr_merged(&l.branch, &pr.head_oid);
         for a in agents {
-            self.core(fx, env, None, json!({"t": "drop", "name": a, "force": true}));
+            self.core(fx, env, None, In::Drop(ci::Drop { name: a.to_string(), force: true }));
         }
     }
 
@@ -2334,23 +2349,16 @@ impl Hub {
     pub fn handle(&mut self, input: Input, env: &mut dyn Env) -> Fx {
         let mut fx = Fx::new();
         match input {
-            Input::Boot => self.core(&mut fx, env, None, json!({"t": "boot"})),
-            Input::ReplReady { agent } => {
-                self.core(&mut fx, env, None, json!({"t": "ready", "agent": agent}))
-            }
+            Input::Boot => self.core(&mut fx, env, None, In::Boot(ci::Boot {})),
+            Input::ReplReady { agent } => self.core(&mut fx, env, None, In::Ready(ci::Ready { agent })),
             Input::ReplLine { agent, line } => self.repl_line(&mut fx, env, &agent, &line),
             Input::ReplIdle { agent, leftover } => {
-                self.core(
-                    &mut fx,
-                    env,
-                    None,
-                    // expired-ux: a turn that stopped on the expired
-                    // ChatGPT sign-in is held, not over: no automatic
-                    // reply (`(no written reply…)` woke its parent, on the
-                    // same plan, into a turn that failed too)
-                    json!({"t": "idle", "agent": agent, "leftover": leftover,
-                        "held": self.signin.stopped.contains(&agent)}),
-                );
+                // expired-ux: a turn that stopped on the expired ChatGPT
+                // sign-in is held, not over: no automatic reply (`(no
+                // written reply…)` woke its parent, on the same plan, into
+                // a turn that failed too)
+                let held = self.signin.stopped.contains(&agent);
+                self.core(&mut fx, env, None, In::Idle(ci::Idle { agent: agent.clone(), leftover, held }));
                 self.ask_role(&mut fx, env.now(), &agent);
             }
             Input::RoleLine { dir, key, line } => self.role_answer(&mut fx, env.now(), &dir, key, line),
@@ -2358,21 +2366,14 @@ impl Hub {
                 self.timer_names.done(id);
                 if let Some(t) = self.st.timers.map.get(&id) {
                     let name = crate::every_name::name_of(reply.as_deref(), &t.text, &t.agent);
-                    self.core(&mut fx, env, None, json!({"t": "every_name", "id": id, "name": name}));
+                    self.core(&mut fx, env, None, In::EveryName(ci::EveryName { id, name }));
                 }
             }
             Input::Prs(r) => self.prs_in(&mut fx, env, r),
             Input::Feature(d) => self.feature_done(&mut fx, env, d),
-            Input::ReplExited {
-                agent,
-                crashed,
-                reason,
-            } => self.core(
-                &mut fx,
-                env,
-                None,
-                json!({"t": "exited", "agent": agent, "crashed": crashed, "reason": reason}),
-            ),
+            Input::ReplExited { agent, crashed, reason } => {
+                self.core(&mut fx, env, None, In::Exited(ci::Exited { agent, crashed, reason }))
+            }
             Input::ClientHello { client } => {
                 self.clients.insert(
                     client,
@@ -2402,54 +2403,38 @@ impl Hub {
             Input::ClientConfirm { client, id, yes } => self.confirm(&mut fx, env, client, id, yes),
             Input::ClientInterrupt { client, agent } => {
                 self.interrupt_by = Some("user".into());
-                self.core(&mut fx, env, Some(client), json!({"t": "interrupt", "agent": agent}));
+                self.core(&mut fx, env, Some(client), In::Interrupt(ci::Interrupt { agent }));
                 self.interrupt_by = None;
             }
-            Input::ClientUnqueue { client, id } => self.core(&mut fx, env, Some(client), json!({"t": "unqueue", "id": id})),
+            Input::ClientUnqueue { client, id } => self.core(&mut fx, env, Some(client), In::Unqueue(ci::Unqueue { id })),
             Input::Agent { token, from, req } => self.agent_req(&mut fx, env, token, &from, req),
             // the waits' timeouts, then sb every's timers (sb-core decides)
-            Input::Tick => self.core(&mut fx, env, None, json!({"t": "tick"})),
+            Input::Tick => self.core(&mut fx, env, None, In::Tick(ci::Tick {})),
             Input::EveryStop { id, why } => self.timer_stop_by_user(&mut fx, env, id, &why),
             Input::EveryRun { id } => self.timer_run_now(&mut fx, env, id),
             Input::WakeHit { id, text, rc, tail, after_ms } => self.wake_hit(&mut fx, env, id, &text, crate::wake::Hit { rc, tail, after_ms }),
-            Input::ConfirmOpen { agent, text } => {
-                self.core(&mut fx, env, None, json!({"t": "confirm_open", "agent": agent, "text": text}))
-            }
-            Input::ConfirmClose { card, res } => {
-                self.core(&mut fx, env, None, json!({"t": "confirm_close", "card": card, "res": res}))
-            }
+            Input::ConfirmOpen { agent, text } => self.core(&mut fx, env, None, In::ConfirmOpen(ci::ConfirmOpen { agent, text })),
+            Input::ConfirmClose { card, res } => self.core(&mut fx, env, None, In::ConfirmClose(ci::ConfirmClose { card, res })),
             Input::Merged { card, place, number, res } => self.merged(&mut fx, env, card, &place, number, res),
             Input::Release(c) => self.release_in(&mut fx, env, c),
             Input::SignedIn => self.signed_in(&mut fx, env),
             Input::Updated { card, version, res } => self.updated(&mut fx, env, card, &version, res),
             Input::XIn { token, hub, xid, kind, text, name, parts } => {
-                let mut i = json!({"t": "x_in", "token": token, "hub": hub, "xid": xid, "kind": kind, "text": text, "name": name});
-                if !parts.is_empty() {
-                    i["parts"] = json!(parts);
-                }
-                self.core(&mut fx, env, None, i)
+                self.core(&mut fx, env, None, In::XIn(ci::XIn { token, hub, xid, kind, text, name, parts }))
             }
-            Input::XAck { xid } => self.core(&mut fx, env, None, json!({"t": "x_ack", "xid": xid})),
-            Input::XFail { xid } => self.core(&mut fx, env, None, json!({"t": "x_fail", "xid": xid})),
-            Input::XReply { xid, name, text } => {
-                self.core(&mut fx, env, None, json!({"t": "x_reply", "xid": xid, "name": name, "text": text}))
-            }
+            Input::XAck { xid } => self.core(&mut fx, env, None, In::XAck(ci::XAck { xid })),
+            Input::XFail { xid } => self.core(&mut fx, env, None, In::XFail(ci::XFail { xid })),
+            Input::XReply { xid, name, text } => self.core(&mut fx, env, None, In::XReply(ci::XReply { xid, name, text })),
             Input::RouteHold { text, via, to, name, why, context, parts } => {
                 let context = context.filter(|c| !c.is_null()).map_or(String::new(), |c| c.to_string());
-                let mut i = json!({"t": "route_hold", "text": text, "via": via, "to": to, "name": name, "why": why, "context": context});
-                if !parts.is_empty() {
-                    i["parts"] = json!(parts);
-                }
-                self.core(&mut fx, env, None, i)
+                self.core(&mut fx, env, None, In::RouteHold(ci::RouteHold { text, via, to, name, why, context, parts }))
             }
             Input::RouteCorrect { client, rid, to, name } => {
-                self.core(&mut fx, env, client, json!({"t": "route_correct", "rid": rid, "to": to, "name": name}))
+                self.core(&mut fx, env, client, In::RouteCorrect(ci::RouteCorrect { rid, to, name }))
             }
-            Input::RouteCancel { client, rid } => self.core(&mut fx, env, client, json!({"t": "route_cancel", "rid": rid})),
-            Input::RoutePick { rid, to, name, why } => {
-                self.core(&mut fx, env, None, json!({"t": "route_pick", "rid": rid, "to": to, "name": name, "why": why}))
-            }
-            Input::Follow { client, agent, on } => self.core(&mut fx, env, client, json!({"t": "follow", "agent": agent, "on": on})),
+            Input::RouteCancel { client, rid } => self.core(&mut fx, env, client, In::RouteCancel(ci::RouteCancel { rid })),
+            Input::RoutePick { rid, to, name, why } => self.core(&mut fx, env, None, In::RoutePick(ci::RoutePick { rid, to, name, why })),
+            Input::Follow { client, agent, on } => self.core(&mut fx, env, client, In::Follow(ci::Follow { agent, on })),
         }
         self.refresh_contexts(&mut fx, env.now());
         if self.dirty {
@@ -2459,300 +2444,13 @@ impl Hub {
         fx
     }
 
-    /// Run one input in sb-core: answer its git queries (the input is
-    /// replayed with the answers), then apply the effects it returns.
-    fn core(&mut self, fx: &mut Fx, env: &mut dyn Env, client: Option<ClientId>, input: Value) {
-        let mut input = input;
-        // a number sb-core cannot read fails its whole input: refuse it
-        // here, naming it, to whoever sent it (crate::core_num)
-        if let Some(n) = crate::core_num::too_big(&input) {
-            let e = format!("refused: {} is too large a number (at most {})", n, crate::core_num::MAX);
-            match (input["t"].as_str(), input["token"].as_u64(), client) {
-                (Some("req"), Some(token), _) => fx.push(Effect::Reply { token, body: json!({"ok": false, "error": e}) }),
-                (_, _, Some(c)) => fx.push(notice(c, &e)),
-                _ => fx.push(line(MAIN, "warn", &e)),
-            }
-            return;
-        }
-        // one now for the input and its re-sends (a need replays the step)
-        let now = env.now();
-        input["now"] = json!(now);
-        input["git"] = json!(env.is_git());
-        let k0 = fx.len();
-        let mut ans: Vec<Value> = Vec::new();
-        loop {
-            input["ans"] = Value::Array(ans.clone());
-            let out = self.call(&input);
-            for l in std::mem::take(&mut self.revived) {
-                fx.push(line(MAIN, "warn", &l));
-            }
-            let Some(out) = out else { return };
-            if let Some(q) = out.get("need") {
-                // sb every's wakes: their words and the local clock
-                if q["q"] == "every_wake" {
-                    ans.push(self.st.timers.wakes(q, now));
-                    continue;
-                }
-                let a = self.query(env, q);
-                ans.push(a);
-                continue;
-            }
-            if let Some(e) = out.get("error") {
-                panic!("sb-core: {}", e);
-            }
-            if out.get("dirty").and_then(|d| d.as_bool()) == Some(true) {
-                self.dirty = true;
-            }
-            // the state after the step first: the deliveries render from it
-            self.load_view(&out["view"]);
-            for f in out.get("fx").and_then(|x| x.as_array()).into_iter().flatten() {
-                self.effect(fx, env, client, f);
-            }
-            // event-wake: a watch that ended (but by a hit, whose facts
-            // its input carries: core_wake.rs) gets its thread's line
-            self.wake_lines(fx, k0, None);
-            // a timer without a name: its small-model call (every_name.rs)
-            if let Some((id, request)) = self.timer_names.next(&self.st.timers) {
-                fx.push(Effect::AskTimerName { id, request });
-            }
-            return;
-        }
-    }
-
-    /// A git query of sb-core (RFC 0002), on the workspace the mirror
-    /// knows for the task.
-    fn query(&mut self, env: &mut dyn Env, q: &Value) -> Value {
-        let name = jstr(q, "name");
-        let ws: Option<Workspace> = serde_json::from_value(q["ws"].clone()).ok();
-        let snap = q["snapshot_ref"].as_str().map(|x| x.to_string());
-        let res = |r: Result<Value, String>| match r {
-            Ok(v) => json!({"ok": v}),
-            Err(e) => json!({"err": e}),
-        };
-        match jstr(q, "q").as_str() {
-            "worktree_create" => {
-                let wc = q.get("with_changes").and_then(|x| x.as_bool()).unwrap_or(false);
-                res(env.worktree_create(&name, wc).map(|w| json!(w)))
-            }
-            "worktree_loss" => {
-                let l = ws.map(|w| env.worktree_loss(&w)).unwrap_or_default();
-                json!({"dirty": l.dirty, "unpushed": l.unpushed})
-            }
-            "worktree_drop" => {
-                let n = |k: &str| q.get(k).and_then(|x| x.as_u64()).unwrap_or(0) as usize;
-                let loss = Loss {
-                    dirty: n("dirty"),
-                    unpushed: n("unpushed"),
-                };
-                match ws {
-                    Some(w) => res(env.worktree_drop(&name, &w, &loss).map(|r| json!(r))),
-                    None => json!({"err": "no agent"}),
-                }
-            }
-            "worktree_restore" => match ws {
-                Some(w) => res(env
-                    .worktree_restore(&name, &w, snap.as_deref())
-                    .map(|w| json!(w))),
-                None => json!({"err": "no agent"}),
-            },
-            other => json!({"err": format!("unknown query: {}", other)}),
-        }
-    }
-
-    /// One effect of sb-core.
-    fn effect(&mut self, fx: &mut Fx, env: &mut dyn Env, client: Option<ClientId>, f: &Value) {
-        let agent = jstr(f, "agent");
-        match jstr(f, "fx").as_str() {
-            "journal" => {
-                assert!(f["ev"].is_object(), "sb-core: bad event {}", f["ev"]);
-                fx.push(Effect::Journal(f["ev"].clone()));
-                // a timer set or ended (sb every): its ◷ lines
-                self.timer_journal_lines(fx, &f["ev"]);
-            }
-            // the runtime state comes with the view
-            "rt" => {}
-            "spawn" => fx.push(Effect::Spawn {
-                agent,
-                resume: f["resume"].as_bool().unwrap_or(false),
-                crash_note: f["crash_note"].as_str().map(|x| x.to_string()),
-            }),
-            "kill" => fx.push(Effect::Kill { agent }),
-            "say" => fx.push(Effect::Say {
-                agent,
-                text: jstr(f, "text"),
-            }),
-            "passthrough" => fx.push(Effect::Passthrough {
-                agent,
-                line: jstr(f, "line"),
-            }),
-            "interrupt" => {
-                let by = self.interrupt_by.clone().unwrap_or_else(|| "bise".into());
-                fx.push(Effect::Interrupt { agent, by })
-            }
-            "line" => {
-                // C2: a multi-field line (`answered`) comes as `fields`
-                let text = match f.get("fields") {
-                    Some(_) => join_fields(&jstrs(f, "fields")),
-                    None => jstr(f, "text"),
-                };
-                fx.push(line(&agent, &jstr(f, "kind"), &text))
-            }
-            "reply" => {
-                let token = f["token"].as_u64().unwrap_or(0);
-                let body = f["body"].clone();
-                match self.spawn_asks.remove(&token) {
-                    // issue #4: a spawn that asked for a model: the daemon
-                    // picks it, writes the task's choice, then answers
-                    Some(ask) if body["ok"] == json!(true) && body["name"].is_string() => {
-                        fx.push(Effect::SpawnModel { token, agent: jstr(&body, "name"), ask, body })
-                    }
-                    _ => fx.push(Effect::Reply { token, body }),
-                }
-            }
-            "deliver" => self.deliver(fx, env, f),
-            "xdeliver" => fx.push(Effect::XDeliver {
-                xid: f["xid"].as_u64().unwrap_or(0),
-                project: jstr(f, "project"),
-                kind: jstr(f, "kind"),
-                text: jstr(f, "text"),
-                context: jstr(f, "context"),
-                parts: jstr(f, "parts"),
-            }),
-            "xreply" => fx.push(Effect::XReply { hub: jstr(f, "hub"), xid: f["xid"].as_u64().unwrap_or(0), text: jstr(f, "text") }),
-            "route" => fx.push(Effect::Route {
-                rid: f["rid"].as_u64().unwrap_or(0),
-                to: jstr(f, "to"),
-                name: jstr(f, "name"),
-                text: jstr(f, "text"),
-                due_ms: f["due_ms"].as_u64().unwrap_or(0),
-                why: jstr(f, "why"),
-            }),
-            "route_ask" => fx.push(Effect::RouteAsk { rid: f["rid"].as_u64().unwrap_or(0), text: jstr(f, "text") }),
-            "job_end" => fx.push(Effect::JobEnd {
-                agent: jstr(f, "agent"),
-                state: jstr(f, "state"),
-                label: jstr(f, "label"),
-                summary: jstr(f, "summary"),
-                key: f["key"].as_u64().unwrap_or(0),
-            }),
-            "followed_end" => fx.push(Effect::FollowedEnd {
-                project: jstr(f, "project"),
-                agent: jstr(f, "agent"),
-                key: f["key"].as_u64().unwrap_or(0),
-                state: jstr(f, "state"),
-                label: jstr(f, "label"),
-                summary: jstr(f, "summary"),
-            }),
-            "route_done" => fx.push(Effect::RouteDone {
-                rid: f["rid"].as_u64().unwrap_or(0),
-                state: jstr(f, "state"),
-                to: jstr(f, "to"),
-                xid: f["xid"].as_u64(),
-            }),
-            // not the client's `confirm` (a yes/no in the status row): a card's
-            // the user's digit on a hub item (merge.rs)
-            "card_choice" => self.card_choice(fx, env, f),
-            "confirm" if f.get("card").is_some() => fx.push(Effect::Confirm {
-                card: f["card"].as_u64().unwrap_or(0),
-                agent,
-                text: jstr(f, "text"),
-            }),
-            other => self.client_effect(fx, client, other, f),
-        }
-    }
-
-    /// The effects on the client that typed the input.
-    fn client_effect(&mut self, fx: &mut Fx, client: Option<ClientId>, kind: &str, f: &Value) {
-        match kind {
-            "notice" => {
-                if let Some(c) = client {
-                    fx.push(notice(c, &jstr(f, "text")));
-                }
-            }
-            "confirm" => {
-                if let Some(c) = client {
-                    let id = self.next_confirm;
-                    self.next_confirm += 1;
-                    self.confirms.insert(id, (c, jstr(f, "name")));
-                    fx.push(Effect::ToClient {
-                        client: c,
-                        body: json!({"ev": "confirm", "id": id, "text": jstr(f, "text")}),
-                    });
-                }
-            }
-            "focus_main" => {
-                let name = jstr(f, "name");
-                for (c, v) in self.clients.iter() {
-                    if v.focus == name {
-                        fx.push(Effect::ToClient {
-                            client: *c,
-                            body: json!({"ev": "focus", "focus": MAIN}),
-                        });
-                    }
-                }
-            }
-            "user_sent" => {
-                if let Some(v) = client.and_then(|c| self.clients.get_mut(&c)) {
-                    v.sent.push(jstr(f, "text"));
-                }
-            }
-            "renamed" => {
-                let (old, new) = (jstr(f, "old"), jstr(f, "new"));
-                for v in self.clients.values_mut().filter(|v| v.focus == old) {
-                    v.focus = new.clone();
-                }
-                fx.push(Effect::Renamed { old, new });
-            }
-            // a newer sb-core (a version switch in flight) may know
-            // effects this hub does not: skipped and logged, never a crash
-            other => eprintln!("sb-core: unknown effect {} (skipped): {}", other, f),
-        }
-    }
-
-    /// The text a delivery puts in the agent's context: main's notes, the
-    /// task status block, then each message as the recipient reads it.
-    fn deliver(&mut self, fx: &mut Fx, env: &mut dyn Env, f: &Value) {
-        let agent = jstr(f, "agent");
-        let mut parts: Vec<String> = Vec::new();
-        let notes: Vec<String> = f["notes"]
-            .as_array()
-            .map(|a| a.iter().filter_map(|x| x.as_str().map(|x| x.to_string())).collect())
-            .unwrap_or_default();
-        if !notes.is_empty() {
-            let mut t = String::from("<bise_notes>\n");
-            for n in &notes {
-                t.push_str(&format!("- {}\n", n));
-            }
-            t.push_str("</bise_notes>");
-            parts.push(t);
-        }
-        if f["status"].as_bool() == Some(true) {
-            let status = board::status_block(&self.st, env.now());
-            if !status.is_empty() {
-                parts.push(status);
-            }
-        }
-        for m in f["msgs"].as_array().into_iter().flatten() {
-            let id = m["id"].as_u64().unwrap_or(0);
-            if let Some(msg) = self.st.msgs().get(&id) {
-                parts.push(prompts::tagged(msg, &jstr(m, "rel"), self.user_ids && agent == MAIN));
-            }
-        }
-        let text = parts.join("\n\n");
-        if jstr(f, "mode") == "steer" {
-            fx.push(Effect::Steer { agent, text });
-        } else {
-            fx.push(Effect::Say { agent, text });
-        }
-    }
-
     fn repl_line(&mut self, fx: &mut Fx, env: &mut dyn Env, agent: &str, raw: &str) {
         let now = env.now();
-        let t = |kind: &str| json!({"t": kind, "agent": agent});
+        let agent_s = agent.to_string();
         match wire::parse(raw) {
-            Wire::TurnStarted => self.core(fx, env, None, t("turn_started")),
-            Wire::SteeringReceived => self.core(fx, env, None, t("steer_rx")),
-            Wire::Steered => self.core(fx, env, None, t("steered")),
+            Wire::TurnStarted => self.core(fx, env, None, In::TurnStarted(ci::TurnStarted { agent: agent_s })),
+            Wire::SteeringReceived => self.core(fx, env, None, In::SteerRx(ci::SteerRx { agent: agent_s })),
+            Wire::Steered => self.core(fx, env, None, In::Steered(ci::Steered { agent: agent_s })),
             Wire::Assistant(text) if !text.is_empty() => {
                 self.set_activity(agent, now, format!("wrote: {}", clip(&one_line(&text), 160)));
                 let r = self.recent.entry(agent.to_string()).or_default();
@@ -2760,12 +2458,7 @@ impl Hub {
                 if r.len() > 20 {
                     r.pop_front();
                 }
-                self.core(
-                    fx,
-                    env,
-                    None,
-                    json!({"t": "assistant", "agent": agent, "text": text}),
-                );
+                self.core(fx, env, None, In::Assistant(ci::Assistant { agent: agent_s, text }));
             }
             Wire::Tool { name, args } if name == "edit" || name == "write_file" => {
                 // Vibe's edit tools: the runtime's feed line carries
@@ -2777,7 +2470,7 @@ impl Hub {
                     self.dirty = true;
                 }
                 if let Some(path) = path {
-                    self.core(fx, env, None, json!({"t": "touch", "agent": agent, "path": path}));
+                    self.core(fx, env, None, In::Touch(ci::Touch { agent: agent_s, path }));
                 }
             }
             Wire::Tool { name, args } if name != "apply_patch" => {
@@ -2803,12 +2496,7 @@ impl Hub {
                     self.dirty = true;
                 }
                 for path in files {
-                    self.core(
-                        fx,
-                        env,
-                        None,
-                        json!({"t": "touch", "agent": agent, "path": path}),
-                    );
+                    self.core(fx, env, None, In::Touch(ci::Touch { agent: agent_s.clone(), path }));
                 }
             }
             // BR-007: a task whose turn failed (network down, provider
@@ -2837,12 +2525,7 @@ impl Hub {
                             "summary": summary, "decisions": []});
                         // token 0: no connection waits for this reply
                         // (connection tokens start at 1)
-                        self.core(
-                            fx,
-                            env,
-                            None,
-                            json!({"t": "req", "token": 0, "from": agent, "req": q}),
-                        );
+                        self.core(fx, env, None, In::Req(ci::Req { token: 0, from: agent_s, req: q }));
                     }
                 }
             }
@@ -2863,7 +2546,7 @@ impl Hub {
                 sent: Vec::new(),
             },
         );
-        let mut input = json!({"t": "focus", "focus": focus, "note": null, "direct": ""});
+        let mut input = ci::Focus { focus: focus.to_string(), note: None, direct: String::new() };
         if prev.focus != MAIN && prev.focus != focus && !prev.sent.is_empty() {
             // RFC 0001 §7.4: main learns what the user decided directly
             let reply: String = self
@@ -2878,10 +2561,9 @@ impl Hub {
                 })
                 .unwrap_or_default();
             let (note, direct) = direct_exchange(&prev.focus, &prev.sent, &reply);
-            input["note"] = json!(note);
-            input["direct"] = json!(direct);
+            (input.note, input.direct) = (Some(note), direct);
         }
-        self.core(fx, env, Some(client), input);
+        self.core(fx, env, Some(client), In::Focus(input));
     }
 
     fn confirm(&mut self, fx: &mut Fx, env: &mut dyn Env, client: ClientId, id: u64, yes: bool) {
@@ -2892,7 +2574,7 @@ impl Hub {
             fx.push(notice(client, &format!("drop of @{} cancelled", name)));
             return;
         }
-        self.core(fx, env, Some(client), json!({"t": "confirm_drop", "name": name}));
+        self.core(fx, env, Some(client), In::ConfirmDrop(ci::ConfirmDrop { name }));
     }
 
     /// At every input: the contexts whose inputs changed (contexts.rs).
@@ -3056,7 +2738,7 @@ impl Hub {
                     ("" | "new" | crate::place::SHARED, _) => Ok(None),
                     (p, _) => crate::place::find_worktree(&self.st, p).map(Some),
                 };
-                match join.and_then(|j| new_task(name, &brief, worktree || place == "new", with_changes).map(|v| (j, v))) {
+                match join.and_then(|j| new_task(name, &brief, worktree || place == "new", with_changes).map(|v| (j, json!(v)))) {
                     Ok((join, mut v)) => {
                         v["cmd"] = json!("spawn");
                         if let Some(ws) = join {
@@ -3138,12 +2820,7 @@ impl Hub {
                 Err(e) => json!({"cmd": "project_ask", "pre_err": e}),
             },
         };
-        self.core(
-            fx,
-            env,
-            None,
-            json!({"t": "req", "token": token, "from": from, "req": q}),
-        );
+        self.core(fx, env, None, In::Req(ci::Req { token, from: from.to_string(), req: q }));
     }
 }
 
@@ -3243,7 +2920,7 @@ pub(crate) fn not_in_a_repo(cmd: &str) -> String {
     format!("sb {}: not in a repo (this workspace has no git): files stay as you saved them, nothing to land", cmd)
 }
 
-fn new_task(name: Option<&str>, brief: &Brief, worktree: bool, with_changes: bool) -> Result<Value, String> {
+fn new_task(name: Option<&str>, brief: &Brief, worktree: bool, with_changes: bool) -> Result<ci::New, String> {
     if brief.objective.trim().is_empty() {
         return Err("empty objective".into());
     }
@@ -3256,8 +2933,14 @@ fn new_task(name: Option<&str>, brief: &Brief, worktree: bool, with_changes: boo
         }
         _ => router::slug(&brief.objective),
     };
-    Ok(json!({"base": base, "brief": brief, "brief_text": prompts::brief_body(brief), "objective": brief.objective,
-              "worktree": worktree, "with_changes": with_changes}))
+    Ok(ci::New {
+        base,
+        brief: json!(brief),
+        brief_text: prompts::brief_body(brief),
+        objective: brief.objective.clone(),
+        worktree,
+        with_changes,
+    })
 }
 
 
@@ -3276,6 +2959,12 @@ plain text        message to the agent in view (main by default)
 /model [m] [default]  the model of the agent in view (default: also config.toml's)
 /flow [pr|trunk]  how this repo ships code (PRs or straight to main), why, and switch it
 /reasoning [effort]   its reasoning effort (none, low, medium, high, max...)";
+
+#[path = "core_link.rs"]
+mod link;
+
+#[path = "core_fx.rs"]
+mod core_fx;
 
 #[path = "core_user.rs"]
 mod user;

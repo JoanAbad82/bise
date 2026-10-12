@@ -309,6 +309,18 @@ law in_wake_hit_bare:
 def in_wake_hit_bare():
   {==}
 
+law in_pause_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"pause"})])) == IN.IPause{} : IN.In}
+
+def in_pause_bare():
+  {==}
+
+law in_resume_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"resume"})])) == IN.IResume{} : IN.In}
+
+def in_resume_bare():
+  {==}
+
 law in_unknown_tag:
   {IN.of(J.obj([J.kv("t", J.JStr{"weather"})])) == IN.INone{} : IN.In}
 
@@ -890,6 +902,18 @@ law in_IWakeHit_round:
   {IN.of(IN.json(IN.IWakeHit{id, text})) == IN.IWakeHit{id, text} : IN.In}
 
 def in_IWakeHit_round(id, text):
+  {==}
+
+law in_IPause_round:
+  {IN.of(IN.json(IN.IPause{})) == IN.IPause{} : IN.In}
+
+def in_IPause_round():
+  {==}
+
+law in_IResume_round:
+  {IN.of(IN.json(IN.IResume{})) == IN.IResume{} : IN.In}
+
+def in_IResume_round():
   {==}
 
 # ---- Link ----

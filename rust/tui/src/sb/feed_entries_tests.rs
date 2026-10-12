@@ -200,3 +200,69 @@ fn the_first_row_fires_nothing() {
     agent_row(&mut app, "main", false, 4);
     assert!(!app.pending);
 }
+
+/// cost-pause (designer m_18932): a turn cut by /pause shows only its
+/// `‖ paused` line, and his message held by the pause shows once: dim
+/// with `held until /resume`, then his row when delivered.
+#[test]
+fn a_pause_cut_and_a_held_message_show_once() {
+    let ls = [
+        "sb you : [[bash: sleep 30; echo late]]",
+        "sb you-id : m_2",
+        "sb stopped : stopped",
+        "sb paused : ‖ paused · its turn stopped",
+        "  obs: turn_started",
+        "  obs: assistant: ",
+        "  obs: tool_started #3",
+        "tool #3 bash : sleep 30; echo late",
+        "tool_code #3 : sleep 30; echo late",
+        "tool_result #3 fail : exit 130: [bash: interrupted by bise: the command was stopped (TERM to its process group, then KILL); its output so far is above. Check what it changed before you run it again] ",
+        "  obs: tool_finished #3 failed",
+        "  obs: tool_result_committed #3",
+        "  obs: candidate_discarded: interrupt",
+        "  obs: turn_done: interrupted",
+        "--- idle",
+        "sb msg-in : switchboard m_3 : the project was paused. go on where your turn stopped.",
+        "sb you : still there?",
+        "sb you-id : m_4",
+        "  obs: turn_started",
+        "  obs: assistant: ack",
+        "  obs: turn_done: completed",
+    ];
+    let mut app = subscribed("main");
+    page(&mut app, "main", None, entries(&ls[..1]), false);
+    let held_at = 13;
+    // the hub sends each entry again as it changes: every prefix's entries
+    for k in 2..=ls.len() {
+        if k == held_at + 1 {
+            push_event(&mut app.events, &mut app.cache, Ev::Held("still there?".into()));
+        }
+        for e in entries(&ls[..k]) {
+            entry(&mut app, "main", &e);
+        }
+    }
+    let texts: Vec<String> = app
+        .events
+        .iter()
+        .filter_map(|e| match e {
+            Ev::You(t, ..) => Some(format!("you {}", t.as_str())),
+            Ev::Held(t) => Some(format!("held {}", t.as_str())),
+            Ev::Warn(t) | Ev::Info(t) => Some(t.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts.iter().filter(|t| *t == "you still there?").count(), 1, "{texts:#?}");
+    assert!(!texts.iter().any(|t| t.starts_with("held ")), "{texts:#?}");
+    assert!(!texts.iter().any(|t| t.contains("interrupt")), "{texts:#?}");
+    // the call the pause cut: `– stopped by the pause`, no output, no ✗
+    // (designer m_19111); none left running
+    let tools: Vec<&crate::wire::ToolData> = app.events.iter().filter_map(|e| if let Ev::Tool(td) = e { Some(td) } else { None }).collect();
+    assert_eq!(tools.len(), 1);
+    assert!(tools[0].paused);
+    let drawn: String = (0..app.events.len())
+        .flat_map(|i| crate::feed::build_rows(&app.events, i, false, 80, 0))
+        .map(|l| l.spans.iter().map(|s| s.content.as_ref()).collect::<String>() + "\n")
+        .collect();
+    assert!(drawn.contains("stopped by the pause") && drawn.contains("sleep 30"), "{drawn}");
+    assert_eq!(app.events.len(), app.cache.len());
+}

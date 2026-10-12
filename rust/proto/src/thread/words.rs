@@ -171,6 +171,36 @@ pub fn context_words(used: u64, window: Option<u64>) -> String {
     }
 }
 
+/// Money spent in USD, the one way bise says it: `$4.12`, two decimals;
+/// `<$0.01` under a cent, never `$0.0000` (designer m_18932; the TUI's
+/// usage line, `/usage`, the desktop's settings). Nothing spent: `$0.00`.
+pub fn usd(v: f64) -> String {
+    if v > 0.0 && v < 0.005 { "<$0.01".to_string() } else { format!("${:.2}", v) }
+}
+
+/// An estimate from catalog prices: `~$4.12`; under a cent `<$0.01`
+/// (already a bound, no `~`). `/usage`'s cells and title.
+pub fn usd_estimate(v: f64) -> String {
+    let m = usd(v);
+    if m.starts_with('<') { m } else { format!("~{m}") }
+}
+
+/// A usage sum's words (`/usage`, `usage/read`, designer m_18789):
+/// `~$1.23 · 1.2M` (an estimate; tokens in + out); `— · 40k` when none of
+/// its calls is priced; `your ChatGPT plan · 40k` when they all ran on a
+/// plan; `—` for no call at all. A sum partly priced says its priced part.
+pub fn usage_words(cost_usd: f64, priced: bool, plan_only: bool, input: u64, output: u64, calls: u64) -> String {
+    if calls == 0 {
+        return "—".to_string();
+    }
+    let money = match (priced, plan_only) {
+        (true, _) => usd_estimate(cost_usd),
+        (false, true) => "your ChatGPT plan".to_string(),
+        (false, false) => "—".to_string(),
+    };
+    format!("{money} · {}", tokens(input.saturating_add(output)))
+}
+
 /// `1 file`, `9 files` (the TUI's diff view, a landed row).
 pub fn files_word(n: u64) -> String {
     if n == 1 { "1 file".to_string() } else { format!("{n} files") }

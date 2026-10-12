@@ -39,6 +39,8 @@ pub(crate) struct Status {
     /// The agents at work (working, waiting on an agent or an event),
     /// main left out.
     pub(crate) running: usize,
+    /// cost-pause: the project is paused: `‖` (`||` in ASCII) first.
+    pub(crate) paused: bool,
 }
 
 /// The title's text; "" when there is nothing to say yet (no folder and
@@ -46,6 +48,9 @@ pub(crate) struct Status {
 pub(crate) fn text(s: &Status, ascii: bool) -> String {
     let (agent, dot) = if ascii { ("*", "-") } else { ("↻", "·") };
     let mut parts: Vec<String> = Vec::new();
+    if s.paused {
+        parts.push(if ascii { "||" } else { "‖" }.to_string());
+    }
     if s.inbox > 0 {
         parts.push(format!("?{}", s.inbox));
     }
@@ -177,7 +182,14 @@ mod tests {
     use super::*;
 
     fn st(repo: &str, inbox: usize, running: usize) -> Status {
-        Status { repo: repo.into(), inbox, running }
+        Status { repo: repo.into(), inbox, running, paused: false }
+    }
+
+    #[test]
+    fn a_paused_project_says_so_first() {
+        let s = Status { paused: true, ..st("harness", 2, 0) };
+        assert_eq!(text(&s, false), "‖ ?2 bise · harness");
+        assert_eq!(text(&s, true), "|| ?2 bise - harness");
     }
 
     #[test]

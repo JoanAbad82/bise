@@ -287,6 +287,15 @@ fn agent_row(app: &App, sb: &Sb, a: &Agent, i: usize, num: Option<usize>, w: usi
     } else {
         glyph(&a.status, app.tick, app.motion_away)
     };
+    // cost-pause (designer m_18789): a paused project's glyphs go faint, a
+    // working one reads ‖; a row waiting on him keeps its ?
+    let g = match sb.paused {
+        Some(_) if !(!a.main && needs_you(sb, a)) => {
+            let mark = if a.status == "working" { paused_mark() } else { g.0 };
+            (mark, faint())
+        }
+        _ => g,
+    };
     let name_style = if focused {
         Style::default().fg(accent()).add_modifier(Modifier::BOLD)
     } else {
@@ -429,6 +438,24 @@ fn fit_counts(n: [usize; 6], short: bool, room: usize, gust: &[Span<'static>]) -
     Vec::new()
 }
 
+/// cost-pause: the header's pause mark, `‖ paused · /resume` (`||` in
+/// ASCII), in ink: nothing runs until he resumes.
+pub(crate) fn paused_spans() -> Vec<Span<'static>> {
+    // designer m_18789: he chose it, nobody asks him anything: bold ink,
+    // never the accent
+    vec![
+        Span::styled(format!("{} ", paused_mark()), Style::default().fg(text())),
+        Span::styled("paused", Style::default().fg(text()).add_modifier(Modifier::BOLD)),
+        Span::styled(" · /resume", Style::default().fg(dim())),
+    ]
+}
+
+/// The pause's glyph: `‖` (`⏸` is emoji-wide in many terminals), `||` in
+/// ASCII.
+pub(crate) fn paused_mark() -> &'static str {
+    if crate::theme::ascii_mode() { "||" } else { "‖" }
+}
+
 impl Sb {
     /// The header row (book §8): `bise :*` on the left; on the right the
     /// non-zero counts `∿ 3 working · … 1 waiting · ? 1 needs you · ✓ 1
@@ -496,6 +523,20 @@ impl Sb {
         // event-wake: the agent in view waits for an event: `… waiting
         // for cargo test · 2m`, dim, before the counts (when it fits)
         let waiting = self.waiting_words(crate::when::now_ms());
+        // cost-pause: a paused project says so first, in accent, whatever
+        // the room (the counts give way)
+        let paused = self.paused.map(|_| paused_spans());
+        let pw: usize = paused.iter().flatten().map(|s| s.content.width()).sum();
+        let counts = |r: usize| {
+            let Some(p) = &paused else { return counts(r) };
+            let c = counts(r.saturating_sub(pw + 3));
+            let mut out = p.clone();
+            if !c.is_empty() {
+                out.push(Span::styled(" · ", Style::default().fg(dim())));
+                out.extend(c);
+            }
+            out
+        };
         let counts = |r: usize| {
             let c = counts(r);
             let Some(w) = &waiting else { return c };
@@ -1296,7 +1337,9 @@ pub(crate) fn key_mode(app: &App) -> crate::keybar::Mode {
         Mode::Selected
     } else if sb.focus_archived() {
         Mode::Archived
-    } else if app.pending {
+    } else if app.pending && sb.paused.is_none() {
+        // paused: no turn runs, nothing to interrupt or steer (designer
+        // m_18932): the composer's usual keys
         Mode::Steer
     } else {
         Mode::Default

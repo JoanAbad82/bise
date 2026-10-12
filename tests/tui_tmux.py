@@ -88,6 +88,16 @@ class Tui:
         """Wait for the text `needle` on the screen; return the screen."""
         return self.wait_any([needle], timeout)[1]
 
+    def wait_all(self, needles, timeout=40):
+        """Wait until every text of `needles` is on one screen; return it.
+        For a screen drawn from several states (the hub's mode, the
+        provider, a later event): a wait on one of them then asserts on
+        the others reads the screen before the rest arrived, under load."""
+        def every(sc):
+            return all(n in sc for n in needles)
+        every.__doc__ = "all of %r" % (needles,)
+        return self.wait_any([every], timeout)[1]
+
     def wait_re(self, pattern, timeout=40):
         """Wait for the regex `pattern` on the screen (multiline)."""
         return self.wait_any([re.compile(pattern, re.M)], timeout)[1]
@@ -288,9 +298,10 @@ def start_tui(E, cols, rows, extra_env, session):
 
 def main():
     with tui_session(150, 42) as t:
-        sc = t.wait("bise :*")
+        # the keybar is on the screen once main's view is drawn whole: the
+        # first frame with "bise :*" can come before it (red under load)
+        t.wait_all(["bise :*", "@ file   $ skills   / commands"])
         t.wait_re(in_view("main"))
-        assert "@ file   $ skills   / commands" in sc, sc
         t.wait_re(MAIN_IDLE)
         t.typed('crée [[bash: sb spawn t1 --objective "écris {{bash: echo hi-t1}}"]]')
         t.keys("Enter")
@@ -330,7 +341,11 @@ def main():
         t.typed("/agents")
         t.keys("Enter")
         t.wait("écris {{bash: echo hi-t1}}")
-        # archive from the panel with D: it asks first (BISE-43), y archives
+        # archive from the panel with D: it asks first (BISE-43), y archives.
+        # t1 idle first (its turn on "salut t1" ended: ○ in the panel):
+        # archived mid-turn, the hub asks again ("the agent is mid-turn.
+        # [y/N]", y then ⏎) and the archive never came, red under load
+        t.wait_re(r"\b1 ○ t1\b", 60)
         t.keys("M-Down")
         t.keys("M-Down")
         t.typed("D")

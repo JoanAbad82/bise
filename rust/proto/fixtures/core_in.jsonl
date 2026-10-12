@@ -67,3 +67,5 @@
 {"ans": [], "git": true, "hub": "home-ws-5289a80a", "kind": "input", "name": "bise", "now": 1791747858278, "parts": "[{\"kind\":\"text\",\"text\":\"look at the shelf on shop \"},{\"kind\":\"image\",\"name\":\"[Image #1]\",\"source\":\"/tmp/sb-e2e-46cghvnl/shelf.png\",\"mime\":\"image/png\",\"b64_file\":\"/tmp/sb-e2e-46cghvnl/images/8255e79eca89d38d621e8d9ad3dd0e42.b64\"}]", "t": "x_in", "text": "look at the shelf on shop <image name=\"[Image #1]\" path=\"/tmp/sb-e2e-46cghvnl/shelf.png\" mime=\"image/png\" b64=\"/tmp/sb-e2e-46cghvnl/images/8255e79eca89d38d621e8d9ad3dd0e42.b64\">", "token": 3, "xid": 4}
 {"ans": [], "git": true, "hub": "home-ws-ad8cde35", "kind": "ask", "name": "bise", "now": 1791748144845, "t": "x_in", "text": "is the login fixed?", "token": 2, "xid": 2}
 {"ans": [], "git": true, "name": "shop", "now": 1066100, "t": "x_reply", "text": "again", "xid": 1}
+{"ans": [], "git": true, "now": 1000000, "t": "pause"}
+{"ans": [], "git": true, "now": 1000500, "t": "resume"}

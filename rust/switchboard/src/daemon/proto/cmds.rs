@@ -283,6 +283,16 @@ impl Shell {
                 let prs = self.prs_ev();
                 self.proto_send(id, &prs);
             }
+            // cost-pause: what the calls cost (daemon/usage.rs: the first
+            // read counts the transcripts on a thread, `counting` meanwhile)
+            HubCmd::Usage { .. } => {
+                let ev = self.usage_ev();
+                self.proto_send(id, &ev);
+            }
+            // cost-pause: his pause and resume of the whole project; what it
+            // did ('paused: 2 turns stopped…') is the result, not an error
+            HubCmd::Pause { .. } => self.said_step(id, &tag, UserCmd::Pause),
+            HubCmd::Resume { .. } => self.said_step(id, &tag, UserCmd::Resume),
             // the live timers, from the hub's state (no line read)
             HubCmd::Scheduled { .. } => {
                 let sched = self.scheduled_ev();
