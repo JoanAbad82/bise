@@ -142,6 +142,8 @@ pub mod ambient;
 // `bise pty`: the desktop's terminal panel, one shell per process
 pub mod pty;
 #[cfg(test)]
+mod ambient_seam_tests;
+#[cfg(test)]
 mod voice_ui_tests;
 #[cfg(test)]
 mod composer_wrap_tests;

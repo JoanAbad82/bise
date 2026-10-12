@@ -534,7 +534,7 @@ fn app_version_reads_the_channel_and_a_newer_app_is_said_once_per_asking() {
     let w = setup(&mut t);
     let sha = "ab".repeat(32);
     let feed = |id: &str, built: &str| {
-        format!(r#"{{"desktop":{{"darwin-arm64":{{"version":"v-{id}","id":"{id}","url":"bise-desktop.zip","sha256":"{sha}","built":"{built}"}}}}}}"#)
+        format!(r#"{{"kind":"desktop","targets":{{"darwin-arm64":{{"version":"v-{id}","id":"{id}","url":"bise-desktop.zip","sha256":"{sha}","built":"{built}"}}}}}}"#)
     };
     app(&mut t, r#"{"cmd":"app_version","id":"d25","built":"2026-10-07T10:00:00Z"}"#);
     app(&mut t, r#"{"cmd":"app_version","id":"d25","built":"2026-10-07T10:00:00Z"}"#);

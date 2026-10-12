@@ -382,6 +382,43 @@ sbcore_gone() {  # <file>: say so and true when the sb-core that was built is go
   echo "FAIL sb-core vanished after it was built: an antivirus (EDR) may have removed it ($1)"
 }
 
+# bise desktop's own checks (architect's merge review B3): typecheck, eslint,
+# vitest and its build (`pnpm check`, no Playwright), so a proto change
+# that breaks apps/desktop is red here. Run only when tests/test_map.py
+# desktop says the change reaches it (a desktop path or a seam it reads),
+# and always with full --all. A tree without apps/desktop: nothing.
+# Without pnpm: 'skipped' in quick, red in full (strict). Without
+# node_modules: quick skips; full installs them from the lockfile
+# (--frozen-lockfile, no Electron download: check needs no binary).
+desktop_check() {
+  [ -d "$root/apps/desktop" ] || return 0
+  local miss=""
+  if ! command -v pnpm >/dev/null 2>&1; then miss="no pnpm on PATH"
+  elif [ ! -d "$root/apps/desktop/node_modules" ]; then
+    if [ "${1:-}" = strict ]; then
+      (cd "$root/apps/desktop" && ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm -s install --frozen-lockfile --prefer-offline) >"$run/desktop_install.log" 2>&1 \
+        || miss="pnpm install failed ($(tail -1 "$run/desktop_install.log"))"
+    else miss="no node_modules; run pnpm -C apps/desktop install"; fi
+  fi
+  if [ -n "$miss" ]; then
+    if [ "${1:-}" = strict ]; then echo "FAIL desktop_check: $miss"; return 1; fi
+    echo "skipped desktop_check: $miss"; return 0
+  fi
+  local s=$SECONDS log="$run/desktop_check.log"
+  if (cd "$root/apps/desktop" && pnpm -s check) >"$log" 2>&1; then echo "ok   desktop_check ($((SECONDS - s))s)"; return 0; fi
+  echo "FAIL desktop_check"
+  grep -E "error|Error|FAIL|✗|×" "$log" | head -30
+  cp "$log" "$gdir/sb-gate-desktop_check.log"; echo "log: $gdir/sb-gate-desktop_check.log"
+  return 1
+}
+# whether this change runs desktop_check (tests/test_map.py desktop): its
+# why on stdout, nothing when it doesn't
+desktop_why() {  # <changed path>...
+  [ -d "$root/apps/desktop" ] || return 0
+  local w; w="$(python3 "$root/tests/test_map.py" desktop "$@")" || w="desktop test_map.py failed"
+  [ "$w" = none ] || echo "${w#desktop }"
+}
+
 # the tree's state (HEAD, the diff, the untracked files): a red full gate
 # leaves the e2e/tmux tests it failed in <gate dir>/red-<state>, for
 # gate.sh rerun on exactly this tree
@@ -411,15 +448,21 @@ if [ "$mode" = full ]; then
   # yes, 2026-10-12): the change = this tree vs its merge-base with main.
   # Everything: --all, a release agent, the nightly run, no branch change
   # (main's tip), shared code or a path no rule knows. The Rust part always.
-  pick_args=() picked=""
+  pick_args=() picked="" dwhy="" fchanged=""
   if [ "${2:-}" = --all ] || [ "${GATE_ALL:-}" = 1 ]; then picked="ALL --all"
   elif case "${SB_AGENT:-}" in release*) true ;; *) false ;; esac; then picked="ALL a release's gate"
   elif ! fb="$(git merge-base HEAD "${GATE_FULL_BASE:-main}" 2>/dev/null)"; then picked="ALL no merge-base with ${GATE_FULL_BASE:-main}"
   else
     fchanged="$( { git diff --name-only "$fb"; git ls-files --others --exclude-standard; } | sort -u)"
     if [ -z "$fchanged" ]; then picked="ALL no change vs ${GATE_FULL_BASE:-main}"
-    else picked="$(python3 tests/test_map.py select $fchanged 2>"$gdir/pick-$$.why")" || picked="ALL test_map.py failed"; fi
+    else
+      picked="$(python3 tests/test_map.py select $fchanged 2>"$gdir/pick-$$.why")" || picked="ALL test_map.py failed"
+      dwhy="$(desktop_why $fchanged)"
+    fi
   fi
+  # the desktop's checks: with every test, or when the change reaches it
+  if [ "${picked#ALL}" != "$picked" ] && [ -z "$fchanged" ]; then dwhy="${picked#ALL }"; fi
+  [ -d apps/desktop ] && echo "desktop checks: ${dwhy:-not run, the change does not reach apps/desktop (tests/test_map.py desktop)}"
   case "$picked" in
     ALL*) echo "e2e/tmux tests: all (${picked#ALL })" ;;
     *) echo "e2e/tmux tests: $(echo $picked | wc -w | tr -d ' ') picked for this change (tests/test_map.py; all of them run nightly and in a release):"
@@ -432,6 +475,8 @@ if [ "$mode" = full ]; then
   # apps/desktop/src/proto matches bise-proto every time (a generated file
   # changed by a merge or a rebase can't slip through; quick runs it on a change)
   if [ $rc = 0 ]; then (cd rust && cargo test --offline -q -p bise-proto --features ts --test ts) || { echo "FAIL proto_ts"; rc=1; }; fi
+  # and the desktop itself builds and passes its checks on those types (B3)
+  if [ $rc = 0 ] && [ -n "$dwhy" ]; then desktop_check strict || rc=1; fi
   # every binary built runs on the macOS target (BISE-164): the Bend ones,
   # bise, and the engine when this tree has one
   bins=(./repl-live ./repl-scripted ./sb-core "${CARGO_TARGET_DIR:-rust/target}/debug/bise")
@@ -577,6 +622,8 @@ fi
 # bise desktop's TS types (apps/desktop/src/proto) are bise-proto's, generated:
 # a stale or hand-edited file is red (BISE_PROTO_BLESS=1 on that test rewrites them)
 [ "${proto_ts:-0}" = 1 ] && step proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"
+# then the desktop's own checks, when the change reaches it (tests/test_map.py desktop)
+if [ -n "$changed" ] && [ -n "$(desktop_why $changed)" ]; then desktop_check || exit 1; fi
 wait "$clippy_pid"
 [ "$(cat "$out/clippy.rc")" = 0 ] || fail clippy "$out/clippy.log"
 cat "$out/clippy.res"

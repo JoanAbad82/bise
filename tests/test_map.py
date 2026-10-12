@@ -16,6 +16,10 @@ The rules, per changed path, the union of all:
   - rust/tui/, rust/vendor/crossterm/: the TUI. Every *_tmux test, and every
     other test that names tmux or the TUI crate.
   - bend/PROOF.bend, bend/LAWS.bend: PROOF.
+  - apps/desktop/, dev/ (the desktop's QA plugin), scripts/desktop*,
+    tests/desktop_*, tests/ambient_qa*: the desktop app's own. No terminal
+    e2e/tmux test (but one that names the very file); the gate runs the
+    desktop's checks instead (`desktop` below).
   - tests/<file>: that test if it is one, and every test whose file names it
     (an import, a path it runs: fake_provider.py), transitively through the
     helpers. tests/fixtures/<x>: the tests that name x.
@@ -24,6 +28,16 @@ The rules, per changed path, the union of all:
     rule knows): ALL. Shared code runs everything.
 The self-test makes every top-level path of the repo known here, so a new
 one is a decision, not a silent ALL or a silent nothing.
+
+  python3 tests/test_map.py desktop <changed path>...  # "desktop <why>" or "none"
+
+Whether a change runs the desktop app's checks (gate.sh desktop_check:
+`pnpm check` in apps/desktop): a desktop path above, the gate itself, or
+a seam the desktop reads: the crate of each generator a generated file
+under apps/desktop names in its header (`*.gen.ts`, a law of the
+self-test), and the core the app runs (rust/tui/src/ambient, rust/harness's
+ambient.rs, approot.rs, update.rs). The terminal's tests of a seam run as
+for any path; a desktop path never runs them.
 """
 import os
 import re
@@ -49,8 +63,15 @@ TOP = {
     "default.nix": "none", ".gitignore": "none",
     "rust": "mixed", "bend": "mixed", "tests": "mixed",
     "kit": "all", "prompts": "all", "plugins": "all", ".agents": "all", "scripts": "all",
-    "packaging": "all", "computer-use": "all", "run.sh": "all", "apps": "all",
+    "packaging": "all", "computer-use": "all", "run.sh": "all", "apps": "mixed", "dev": "desktop",
 }
+# the desktop app's own paths: its checks, no terminal test
+DESKTOP_PREFIXES = ("apps/desktop/", "dev/", "scripts/desktop", "tests/desktop_", "tests/ambient_qa")
+# what the desktop's checks read besides its own tree (architect m_19472):
+# the generators' crates (pinned by gen_seams_law) and the core the app runs
+DESKTOP_SEAMS = ("rust/proto/", "rust/home/", "rust/tui/src/ambient/", "rust/harness/src/ambient.rs",
+                 "rust/harness/src/approot.rs", "rust/harness/src/update.rs")
+GEN_SUFFIX = ".gen.ts"
 TUI_WORDS = re.compile(r"tmux|rust/tui|bend[-_]tui")
 
 
@@ -104,6 +125,10 @@ def select(changed, tests, txt):
             named = {s for s in naming(p, txt) if s in tset}
             picked |= named
             whys.append("%s: %s" % (p, "named by %s" % " ".join(sorted(named)) if named else "no test"))
+        elif p.startswith(DESKTOP_PREFIXES):
+            named = {s for s in naming(p, txt) if s in tset}
+            picked |= named
+            whys.append("%s: the desktop's (its checks)%s" % (p, ", named by %s" % " ".join(sorted(named)) if named else ""))
         elif p.startswith(TUI_PREFIXES):
             tui = {t for t in tests if t.endswith("_tmux") or (t in txt and TUI_WORDS.search(txt[t]))}
             picked |= tui
@@ -126,6 +151,52 @@ def select(changed, tests, txt):
         else:
             return None, "%s (shared code or no rule)" % p
     return picked, whys
+
+
+def desktop(changed):
+    """Why the desktop's checks run for this change, or None."""
+    for p in changed:
+        p = p.strip()
+        if p.startswith(DESKTOP_PREFIXES):
+            return "%s (the desktop's)" % p
+        if p.startswith(DESKTOP_SEAMS):
+            return "%s (a seam the desktop reads)" % p
+        if p in GATE_FILES:
+            return "%s (the gate itself)" % p
+    return None
+
+
+def generators(header):
+    """The repo files a generated file's header names as its generator:
+    the `rust/....rs` paths in its first lines."""
+    return re.findall(r"\b(rust/[\w./-]+\.rs)\b", header)
+
+
+def gen_seams_law(gen_files):
+    """Every generated file under apps/desktop names its generator, and the
+    generator's crate (rust/<crate>/) is a desktop seam: a change there
+    reruns the checks that read its output. [(path, header)] -> faults."""
+    faults = []
+    for path, header in gen_files:
+        gens = generators(header)
+        if not gens:
+            faults.append("%s names no generator (rust/<crate>/....rs) in its first lines" % path)
+        for g in gens:
+            crate = "/".join(g.split("/")[:2]) + "/"
+            if not crate.startswith(DESKTOP_SEAMS):
+                faults.append("%s: its generator %s (crate %s) is not in DESKTOP_SEAMS" % (path, g, crate))
+    return faults
+
+
+def gen_files(root=ROOT):
+    """(path, first lines) of every *.gen.ts git knows under apps/desktop."""
+    out = subprocess.run(["git", "ls-files", "apps/desktop"], cwd=root, capture_output=True, text=True).stdout.split()
+    got = []
+    for p in out:
+        if p.endswith(GEN_SUFFIX):
+            with open(os.path.join(root, p), errors="replace") as fh:
+                got.append((p, "".join(fh.readline() for _ in range(4))))
+    return got
 
 
 def git_tops(root=ROOT):
@@ -163,14 +234,37 @@ def self_test():
     # the union
     sel, _ = select(["docs/a.md", "bend/PROOF.bend", "rust/tui/src/feed.rs"], tests, txt)
     assert "PROOF" in sel and "tui_tmux" in sel
+    # the desktop's paths: no terminal test, its checks; a seam: both
+    for p in ("apps/desktop/src/thread/rows.tsx", "dev/plugins/ambient-qa/plugin.json", "scripts/desktop_try.py",
+              "tests/desktop_try_test.py", "tests/ambient_qa_test.py"):
+        assert select([p], tests, txt)[0] == set(), p
+        assert desktop([p]), p
+    for p in ("rust/proto/src/draft.rs", "rust/home/src/env.rs", "rust/harness/src/update.rs"):
+        assert select([p], tests, txt)[0] is None and desktop([p]), p
+    sel, _ = select(["rust/tui/src/ambient/core/hubs.rs"], tests, txt)
+    assert "tui_tmux" in sel and desktop(["rust/tui/src/ambient/core/hubs.rs"])
+    for p in ("rust/tui/src/feed.rs", "rust/switchboard/src/core.rs", "bend/hub/core.bend", "docs/a.md",
+              "scripts/versions.sh", "apps/other/x"):
+        assert desktop([p]) is None, p
+    assert select(["apps/other/x"], tests, txt)[0] is None
+    # every generated file under apps/desktop names a generator in a seam
+    assert gen_seams_law([("apps/desktop/src/x.gen.ts", "// generated by bise-proto (rust/proto/tests/ts.rs)\n")]) == []
+    assert gen_seams_law([("a.gen.ts", "// generated from VARS (rust/switchboard/src/x.rs)\n")])
+    assert gen_seams_law([("a.gen.ts", "// hand-written\n")])
+    faults = gen_seams_law(gen_files())
+    assert not faults, "\n".join(faults)
     print("test_map self-test: ok (%d tests, %d in the TUI group)" % (len(tests), len(select(["rust/tui/x"], tests, txt)[0])))
 
 
 def main(argv):
     if argv[1:2] == ["--self-test"]:
         return self_test()
+    if argv[1:2] == ["desktop"]:
+        why = desktop(argv[2:])
+        print("desktop " + why if why else "none")
+        return None
     if argv[1:2] != ["select"]:
-        sys.exit("usage: test_map.py select <changed path>... | --self-test")
+        sys.exit("usage: test_map.py select|desktop <changed path>... | --self-test")
     tests, txt = run_all_tests(), texts()
     sel, why = select(argv[2:], tests, txt)
     if sel is None:

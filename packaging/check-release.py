@@ -16,10 +16,22 @@ read:
     ("<sha256>  <file>");
   - install.sh: packaging/install.sh with DIST_URL_DEFAULT='<channel>';
   - the release's files (--assets, default: the files of <dir>) are exactly
-    install.sh, latest.json, the tarballs and their .sha256.
+    install.sh, latest.json, the tarballs and their .sha256;
+  - the terminal's release never carries the desktop app (desktop-on-main:
+    two cycles): no `desktop` key in latest.json, and no tarball holds
+    apps/, node_modules or Electron (DESKTOP_WORDS). The app ships on its
+    own channel (desktop.json, the desktop-release workflow).
 Exit 1 with one line per problem.
 """
-import argparse, hashlib, json, os, re, sys
+import argparse, hashlib, json, os, re, sys, tarfile
+
+# a tarball member with one of these in its path is the desktop app's
+DESKTOP_WORDS = re.compile(r"(^|/)(apps/desktop|node_modules)(/|$)|[Ee]lectron")
+
+
+def desktop_members(names):
+    """The members of a terminal tarball that belong to the desktop app."""
+    return [n for n in names if DESKTOP_WORDS.search(n)]
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENTRY = ["url", "file", "sha256", "size", "macos", "id", "commit", "built"]
@@ -47,6 +59,8 @@ def main():
             bad.append(f"latest.json has no {k}")
     if a.version is not None and m.get("version") != a.version:
         bad.append(f"latest.json version {m.get('version')!r}, not {a.version!r}")
+    if "desktop" in m:
+        bad.append("latest.json names the desktop app (desktop): it ships on its own channel, desktop.json")
     if a.commit and m.get("commit") != a.commit:
         bad.append(f"latest.json commit {m.get('commit')!r}, not {a.commit!r}")
     targets = m.get("targets") if isinstance(m.get("targets"), dict) else {}
@@ -75,6 +89,13 @@ def main():
                 bad.append(f"{name}: sha256 {h}, latest.json says {sha}")
             if os.path.getsize(p) != e.get("size"):
                 bad.append(f"{name}: {os.path.getsize(p)} bytes, latest.json says {e.get('size')}")
+            try:
+                with tarfile.open(p) as tf:
+                    leak = desktop_members(tf.getnames())
+                if leak:
+                    bad.append(f"{name} holds the desktop app: {', '.join(leak[:3])}{' ...' if len(leak) > 3 else ''}")
+            except (OSError, tarfile.TarError) as err:
+                bad.append(f"{name}: not a readable tarball ({err})")
             try:
                 s = open(p + ".sha256").read()
             except OSError:
