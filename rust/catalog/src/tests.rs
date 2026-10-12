@@ -416,6 +416,35 @@ fn write_handoff_is_atomic_and_export_falls_back() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// The hub writes the handoff from several threads at once (a REPL
+/// start, the keys check, small jobs): every write lands in the cache,
+/// none falls back to the temp dir. 2026-10-12: two writes shared one
+/// temp name, a rename failed, the fallback path read as a key change
+/// and all 26 REPLs of his hub relaunched.
+#[test]
+fn writes_at_once_all_land_in_the_cache() {
+    let dir = std::env::temp_dir().join(format!("bise-catalog-race-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let cfg = dir.join("config.toml");
+    std::fs::write(&cfg, "model = \"openai/gpt-5\"\n").unwrap();
+    let cache = dir.join("cache");
+    let paths: Vec<PathBuf> = std::thread::scope(|s| {
+        let hs: Vec<_> = (0..16)
+            .map(|_| s.spawn(|| (0..20).map(|_| export_handoff(&cfg, &cache, &no_env).unwrap()).collect::<Vec<_>>()))
+            .collect();
+        hs.into_iter().flat_map(|h| h.join().unwrap()).collect()
+    });
+    let fell_back: Vec<_> = paths.iter().filter(|p| **p != cache.join("models.toml")).collect();
+    for p in &fell_back {
+        let _ = std::fs::remove_file(p);
+    }
+    assert!(fell_back.is_empty(), "{} of {} writes fell back", fell_back.len(), paths.len());
+    let left: Vec<_> = std::fs::read_dir(&cache).unwrap().map(|e| e.unwrap().file_name()).collect();
+    assert_eq!(left.len(), 1, "{left:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn the_listing_shows_keys_choices_and_warnings() {
     let s = setup("model = \"anthropic/claude-sonnet-5-5\"\nagent_model = \"work/x\"\n[providers.work]\nbase_url = \"http://w\"\n[models.\"z\"]\n");

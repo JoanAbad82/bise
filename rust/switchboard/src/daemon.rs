@@ -45,6 +45,8 @@ mod versions;
 mod dev_servers;
 mod dispatch;
 mod inbox;
+mod keys;
+use keys::hash_keys;
 mod merged;
 mod state_gate;
 mod usage;
@@ -2355,13 +2357,6 @@ fn plugins_fingerprint(ws: &Path) -> u64 {
 /// hub's environment, or a `debug-requests` file in its state folder).
 fn debug_requests(state: &std::path::Path) -> bool {
     std::env::var("BISE_DEBUG_REQUESTS").is_ok_and(|v| !v.is_empty() && v != "0") || state.join("debug-requests").exists()
-}
-
-fn hash_keys(keys: &[(String, Option<String>)]) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    keys.hash(&mut h);
-    h.finish()
 }
 
 #[cfg(test)]
