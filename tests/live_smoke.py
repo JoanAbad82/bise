@@ -43,7 +43,7 @@ def main():
         print("spawned:", c.agent("hello"), flush=True)
         c.wait(lambda: os.path.exists(os.path.join(ws, "hello.txt")), 400, "hello.txt")
         print("file:", open(os.path.join(ws, "hello.txt")).read().strip(), flush=True)
-        c.wait_line("main", "sb msg-in : hello", 400)
+        c.wait_feed("main", "msg-in", 400, **{"from": "hello"})
         c.wait_idle("main", "hello", timeout=400)
         texts = [l for l in c.lines("main") if "obs: assistant:" in l]
         print("main said:", texts[-1][:400] if texts else None, flush=True)

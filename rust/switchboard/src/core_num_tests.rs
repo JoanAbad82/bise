@@ -18,7 +18,7 @@ fn notices(fx: &[Effect]) -> Vec<String> {
 fn still_up(t: &mut T) {
     let (_, card) = docs_question_card(t);
     let fx = t.user(MAIN, &format!("/close {}", card));
-    assert!(has_line(&fx, MAIN, &format!("#{} closed", card)), "{:?}", fx);
+    assert!(has_rec(&fx, MAIN, json!({"sb": "card-closed", "id": card, "res": "closed"})), "{:?}", fx);
 }
 
 #[test]

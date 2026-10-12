@@ -9,8 +9,9 @@
 //! [`delivery`] writes the text a delivery puts in the agent's context.
 //! Pure: no I/O, no hub.
 
-use super::{join_fields, line, Effect};
+use super::{feed, Effect};
 use bise_proto::core::link::{ASkipped, Answer, Skipped};
+use bise_proto::core::Feed;
 use bise_proto::core::Fx as CoreFx;
 use serde::Deserialize;
 use serde_json::Value;
@@ -72,14 +73,12 @@ pub(super) fn plain(f: CoreFx) -> Plain {
         CoreFx::Kill(k) => Effect::Kill { agent: k.agent },
         CoreFx::Say(s) => Effect::Say { agent: s.agent, text: s.text },
         CoreFx::Passthrough(p) => Effect::Passthrough { agent: p.agent, line: p.line },
-        // C2: a multi-field line (`answered`) comes as `fields`
-        CoreFx::Line(l) => {
-            let text = match l.fields {
-                Some(fields) => join_fields(&fields),
-                None => l.text.unwrap_or_default(),
-            };
-            line(&l.agent, &l.kind, &text)
-        }
+        // a record of an agent's feed, written `sb <kind> :: <json>` (a
+        // kind this hub doesn't know too: the reader shows its text)
+        CoreFx::Feed(f) => match Feed::decode(f.rec.clone()) {
+            Ok(rec) => feed(&f.agent, rec),
+            Err(e) => return Plain::Skip(format!("sb-core: bad feed record ({}, skipped): {}", e, f.rec)),
+        },
         CoreFx::XDeliver(x) => Effect::XDeliver { xid: x.xid, project: x.project, kind: x.kind, text: x.text, context: x.context, parts: x.parts },
         CoreFx::XReply(x) => Effect::XReply { hub: x.hub, xid: x.xid, text: x.text },
         CoreFx::Route(r) => Effect::Route { rid: r.rid, to: r.to, name: r.name, text: r.text, due_ms: r.due_ms, why: r.why },
@@ -148,11 +147,15 @@ mod tests {
     }
 
     #[test]
-    fn a_line_is_its_text_or_its_fields() {
-        let text = eff(json!({"fx": "line", "agent": "a", "kind": "you", "text": "go"}));
-        assert_eq!(text, line("a", "you", "go"));
-        let fields = eff(json!({"fx": "line", "agent": "a", "kind": "sent", "fields": ["b", "x : y", "0"]}));
-        assert_eq!(fields, line("a", "sent", "b : x \\: y : 0"));
+    fn a_feed_record_is_its_line_and_a_bad_one_is_skipped() {
+        let sent = eff(json!({"fx": "feed", "agent": "a", "rec": {"sb": "sent", "to": "b", "id": 3, "ask": false, "body": "x : y"}}));
+        assert_eq!(sent, Effect::Line { agent: "a".into(), line: r#"sb sent :: {"ask":false,"body":"x : y","id":3,"to":"b"}"#.into() });
+        // a newer sb-core's kind: written as it came, the reader shows its text
+        let new = eff(json!({"fx": "feed", "agent": "a", "rec": {"sb": "dance", "text": "hi"}}));
+        assert_eq!(new, Effect::Line { agent: "a".into(), line: r#"sb dance :: {"text":"hi"}"#.into() });
+        // a known kind whose fields don't fit: skipped and logged, never a guess
+        assert!(matches!(read(&json!({"fx": "feed", "agent": "a", "rec": {"sb": "card", "id": "x"}})), Plain::Skip(_)));
+        assert!(matches!(read(&json!({"fx": "line", "agent": "a", "kind": "you", "text": "go"})), Plain::Skip(_)), "the old line effect is gone");
     }
 
     #[test]

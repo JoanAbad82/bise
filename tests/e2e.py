@@ -519,7 +519,7 @@ def t_spawn_and_auto_reply(E, c):
     c.wait(lambda: os.path.exists(os.path.join(E.ws, "t1.txt")), 90, "t1.txt written in the workspace")
     check(open(os.path.join(E.ws, "t1.txt")).read().strip() == "hello-from-t1", "t1.txt content")
     # t1's turn ends: its reply comes back to main automatically
-    c.wait_line("main", "sb msg-in : t1 m_", 90)
+    c.wait_feed("main", "msg-in", 90, **{"from": "t1"})
     c.wait_idle("main", "t1")
     # main's turn on the reply may start after the idle seen above (the
     # msg-in line comes first): wait for its model call
@@ -546,11 +546,11 @@ def t_direct_message_and_note(E, c):
     c.wait_idle("main", "t1")
     check(c.rpc("client/focus", {"project": c.project(), "focus": "t1"}).get("result") == {}, "focus answered")
     c.say("parle-moi directement", focus="t1")
-    c.wait_line("t1", "sb you : parle-moi directement")
+    c.wait_feed("t1", "you", 90, text="parle-moi directement")
     c.wait_line("t1", "ack: parle-moi directement")
     c.wait_idle("t1")
     check(c.rpc("client/focus", {"project": c.project(), "focus": "main"}).get("result") == {}, "focus answered")
-    c.wait_line("main", "sb direct : You talked to @t1 (1 message)")
+    c.wait_feed("main", "direct", 90, text="You talked to @t1 (1 message)")
     c.say("et alors ?")
     c.wait(lambda: any(r["agent"] == "main" and r["user"].endswith("et alors ?") for r in E.fake_requests()), 60,
            "main's request with the new message")
@@ -561,7 +561,7 @@ def t_direct_message_and_note(E, c):
     c.wait_idle("main")
     before = len([r for r in E.fake_requests() if r["agent"] == "main"])
     c.say("@t1 route explicite")
-    c.wait_line("main", "sb route : you → @t1 : route explicite")
+    c.wait_feed("main", "route", 90, who="t1", said="route explicite")
     # from main's view the task reads it tagged (RFC 0003 §5.1)
     c.wait_line("t1", 'ack: <user_message via="main"> route explicite')
     c.wait_idle("t1")
@@ -587,7 +587,7 @@ def t_escalation_card(E, c):
     c.say('/new t3: {{bash: sb send main --expect-reply "v1 ou v2 ?"}}')
     c.say('/new t3b: {{bash: sb send main --expect-reply "t3b asks main" && sb status blocked --note "t3b needs a key" && sb report blocked "t3b is stuck"}}')
     c.wait(lambda: c.agent("t3") is not None and c.agent("t3b") is not None, 60, "t3 and t3b")
-    c.wait(lambda: seen.append(len(c.cards())) or (any(l.startswith("sb msg-in : t3 ") for l in c.lines("main"))
+    c.wait(lambda: seen.append(len(c.cards())) or (any(r["from"] == "t3" for r in c.feed("main", "msg-in"))
                    and any("[report: blocked] t3b is stuck" in l for l in c.lines("main"))), 90 * 2,
            "both agents' messages in main's feed")
     c.wait_idle("main", "t3", "t3b")
@@ -601,9 +601,9 @@ def t_escalation_card(E, c):
               for r in E.fake_requests()),
           "the blocked status went to main")
     msg_id = None
-    for l in c.lines("main"):
-        if l.startswith("sb msg-in : t3 m_") and "v1 ou v2" in l:
-            msg_id = l.split()[4]
+    for r in c.feed("main", "msg-in"):
+        if r.get("from") == "t3" and "v1 ou v2" in r.get("body", "") and r.get("id"):
+            msg_id = "m_%d" % r["id"]
     check(msg_id, "the question id")
     c.say("[[bash: sb card --for %s \"v1 ou v2 ?\"]]" % msg_id)
     c.wait(lambda: any(cd["kind"] == "question" for cd in c.cards()), 60, "a question card")
@@ -909,7 +909,7 @@ def t_crash_status_and_tasks(E, c):
     # a task crashes: main hears it from the hub
     pid = open(os.path.join(E.state, "agents", "t1", "repl.pid")).read().strip()
     os.kill(int(pid), 9)
-    c.wait_line("main", "sb msg-in : switchboard", 60)
+    c.wait_feed("main", "msg-in", 60, **{"from": "switchboard"})
     c.wait(lambda: any(r["agent"] == "main" and "agent @t1 crashed" in r["user"] for r in E.fake_requests()), 60,
            "main's model got the crash notification")
     c.wait_status("t1", ["idle", "done", "blocked"], 60)

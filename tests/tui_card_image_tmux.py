@@ -108,8 +108,8 @@ def main():
             # 2. a card answer: t3 asks main, main escalates it to the user
             c = e2e.Client(os.path.join(E.state, "hub.sock"))
             c.say('/new t3: {{bash: sb send main --expect-reply "which logo, the red or the blue?"}}')
-            c.wait(lambda: any(l.startswith("sb msg-in : t3 m_") for l in c.lines("main")), 120, "t3's question in main")
-            msg = next(l.split()[4] for l in c.lines("main") if l.startswith("sb msg-in : t3 m_"))
+            q = c.wait_feed("main", "msg-in", 120, **{"from": "t3"})
+            msg = "m_%d" % q["id"]
             c.wait_idle("main", "t3")
             c.say('[[bash: sb card --for %s "which logo, the red or the blue?"]]' % msg)
             c.wait(lambda: any(cd["kind"] == "question" and cd["agent"] == "t3" for cd in c.cards()), 60, "t3's card")

@@ -10,6 +10,7 @@
 
 use super::{log_line, write_json, Msg, Shell};
 use crate::core::{FeatureDone, Input, Token};
+use bise_proto::core::Feed;
 use crate::feature::{self, Facts, Registry};
 use crate::flow::{FlowConfig, FlowMode};
 use crate::proto_view;
@@ -223,7 +224,7 @@ impl Shell {
                         write_json(s, &json!({"ok": false, "error": e}));
                     }
                     // the user's answer failed: main hears it, the item waits
-                    let line = (!job.asked).then(|| ("warn".to_string(), format!("{}: {} did not go through: {}", job.name, job.op, e)));
+                    let line = (!job.asked).then(|| Feed::warn(format!("{}: {} did not go through: {}", job.name, job.op, e)));
                     FeatureDone { name: job.name.clone(), line, ..FeatureDone::default() }
                 }
             };
@@ -373,7 +374,7 @@ fn step(job: &Job) -> Out {
             });
             let mut d = done();
             d.open = Some((feature::MERGE.into(), feature::merge_text(name, &f, &main, &tried, checked)));
-            d.line = Some(("info".into(), format!("{} is built to try ({}): in another terminal, {}{}", name, tried.sha, tried.run, synced)));
+            d.line = Some(Feed::info(format!("{} is built to try ({}): in another terminal, {}{}", name, tried.sha, tried.run, synced)));
             Ok((format!("built {}: {}", tried.sha, tried.run), d))
         }
         "diff" => {
@@ -381,17 +382,14 @@ fn step(job: &Job) -> Out {
             feature::write_diff(&job.shared, name, &file)?;
             let f = facts(&job.features).unwrap_or_default();
             let mut d = done();
-            d.line = Some((
-                "info".into(),
-                format!(
-                    "the diff of {}: {} commits, +{} −{} · {}",
-                    name,
-                    f.ahead,
-                    feature::thousands(f.adds),
-                    feature::thousands(f.dels),
-                    feature::home_short(&file.to_string_lossy())
-                ),
-            ));
+            d.line = Some(Feed::info(format!(
+                "the diff of {}: {} commits, +{} −{} · {}",
+                name,
+                f.ahead,
+                feature::thousands(f.adds),
+                feature::thousands(f.dels),
+                feature::home_short(&file.to_string_lossy())
+            )));
             Ok((format!("written to {}", file.display()), d))
         }
         "later" => {
@@ -403,7 +401,7 @@ fn step(job: &Job) -> Out {
             job.features.update(&job.state, name, |f| f.trial = false);
             let mut d = done();
             d.close = Some("keep working".into());
-            d.line = Some(("info".into(), format!("{} stays on its branch: its agents keep working ({}).", name, agents_line(&job.agents))));
+            d.line = Some(Feed::info(format!("{} stays on its branch: its agents keep working ({}).", name, agents_line(&job.agents))));
             Ok(("the trial is over; the branch stays.".into(), d))
         }
         "merge" => {
@@ -421,7 +419,7 @@ fn step(job: &Job) -> Out {
             let mut d = done();
             d.close = Some("merged".into());
             d.archive = job.agents.iter().map(|(a, _)| a.clone()).collect();
-            d.line = Some(("info".into(), line.clone()));
+            d.line = Some(Feed::info(line.clone()));
             Ok((format!("{} (the branch's tip kept in {})", line, kept), d))
         }
         "drop" => {
@@ -444,7 +442,7 @@ fn step(job: &Job) -> Out {
             let mut d = done();
             d.close = Some("dropped".into());
             d.archive = job.agents.iter().map(|(a, _)| a.clone()).collect();
-            d.line = Some(("info".into(), line.clone()));
+            d.line = Some(Feed::info(line.clone()));
             Ok((line, d))
         }
         op => Err(format!("unknown feature step: {}", op)),

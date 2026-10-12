@@ -114,6 +114,24 @@ const DOOR_OPS: &[DoorOp] = &[
 // with DOOR_OPS and DOOR_CMDS (no older event to anyone)
 pub(super) const DOOR_EVENTS: &[&str] = &["state", "ready", "page", "line"];
 
+/// An older event as the released core reads it: a feed line written as a
+/// `Feed` record (issue 25) goes in its old text form when that core read
+/// its kind (his message, an agent's words to him:
+/// `thread::legacy::older_line`), and not at all otherwise (that core
+/// never read the others; it must never see the new form raw); any other
+/// event or line as it is.
+// TODO(client-protocol, the plan's 'after the release' step): goes with
+// DOOR_EVENTS.
+fn door_line(v: &Value) -> Option<Value> {
+    let line = v.get("line").and_then(Value::as_str).filter(|_| v["ev"] == "line");
+    let Some(rest) = line.and_then(|l| l.strip_prefix("sb ")) else { return Some(v.clone()) };
+    let Some((_, rec)) = bise_proto::core::Feed::read_rest(rest) else { return Some(v.clone()) };
+    let old = bise_proto::thread::legacy::older_line(&rec.ok()?)?;
+    let mut v = v.clone();
+    v["line"] = Value::String(old);
+    Some(v)
+}
+
 /// Line `v` of the released door as its typed command (`project` this
 /// hub's); Err: what it was, refused.
 fn door_cmd(v: &Value, project: &str) -> Result<Value, String> {
@@ -237,6 +255,7 @@ impl Shell {
         if !v.get("ev").and_then(Value::as_str).is_some_and(|e| DOOR_EVENTS.contains(&e)) {
             return;
         }
+        let Some(v) = door_line(v) else { return };
         let ids: Vec<ClientId> = self.clients.keys().copied().filter(|id| self.door_events(*id)).collect();
         if ids.is_empty() {
             return;
@@ -258,8 +277,10 @@ impl Shell {
         let mut out = format!("{}\n", self.snapshot());
         for name in &self.hub.st.order {
             for (pos, ts, l) in self.buffers.get(name).into_iter().flatten() {
-                out.push_str(&super::line_event(name, *pos, *ts, l).to_string());
-                out.push('\n');
+                if let Some(v) = door_line(&super::line_event(name, *pos, *ts, l)) {
+                    out.push_str(&v.to_string());
+                    out.push('\n');
+                }
             }
         }
         out.push_str(&json!({"ev": "ready"}).to_string());
@@ -526,6 +547,24 @@ impl Shell {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Issue 25 + the older door (architect m_19065): a Feed record the
+    /// released capsule read goes in its old text form, one it never read
+    /// does not go, and every other line or event goes as it is; never a
+    /// new-form line raw.
+    #[test]
+    fn the_door_gets_his_words_in_the_old_form_and_no_record_raw() {
+        use bise_proto::core::{feed, Feed};
+        let ev = |l: &str| json!({"ev": "line", "agent": "main", "line": l, "pos": 3});
+        let you = Feed::You(feed::You { text: "a\nb".into() }).line();
+        assert_eq!(door_line(&ev(&you)), Some(ev("sb you : a\\nb")));
+        let words = Feed::MsgYou(feed::MsgYou { from: "docs".into(), body: "done".into() }).line();
+        assert_eq!(door_line(&ev(&words)), Some(ev("sb msg-you : docs : done")));
+        assert_eq!(door_line(&ev(&Feed::info("x").line())), None);
+        for same in [ev("  obs: turn_started"), ev("sb you : an old line"), json!({"ev": "state", "line": "sb x :: {}"})] {
+            assert_eq!(door_line(&same), Some(same.clone()));
+        }
+    }
 
     /// Client-protocol step 5: no older notice line is written at all
     /// (architect m_14727's one writer is gone with it): a connection

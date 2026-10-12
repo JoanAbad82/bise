@@ -106,8 +106,8 @@ def main():
         core.wait(lambda e: e.get("ev") == "state" and any(a["name"] == "t1" for a in e["agents"]), 60, "t1 in the list")
 
         # a question card, answered by digit from the capsule
-        msg = wait.until(lambda: next((l.split()[4] for l in c.lines("main") if l.startswith("sb msg-in : t1 m_") and "banner" in l), None),
-                         90, "t1's question reached main")
+        msg = "m_%d" % wait.until(lambda: next((r for r in c.feed("main", "msg-in") if r.get("from") == "t1" and "banner" in r.get("body", "")), None),
+                                  90, "t1's question reached main")["id"]
         c.wait_idle("main", "t1")
         # main's turn on t1's message is not for the user: no words in the
         # capsule (ambient's review m_4672)

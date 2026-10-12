@@ -270,10 +270,9 @@ impl Hub {
             return;
         }
         self.merges.gh_off_said = true;
-        fx.push(line(
+        fx.push(feed(
             MAIN,
-            "warn",
-            &format!("i can't follow the PRs: {}. run `gh auth login` once (or set GITHUB_TOKEN) and their state shows here", what),
+            Feed::warn(format!("i can't follow the PRs: {}. run `gh auth login` once (or set GITHUB_TOKEN) and their state shows here", what)),
         ));
     }
 

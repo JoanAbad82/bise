@@ -20,7 +20,7 @@ use crate::model::*;
 use crate::prompts;
 use crate::role;
 use crate::router::{self, UserCmd};
-use crate::util::{clip, clip_tail, one_line, wire_escape};
+use crate::util::{clip, clip_tail, one_line};
 use crate::wire::{self, Wire};
 use bise_proto::core::{input as ci, link as cl, In, Link};
 use bise_proto::core::feed as feed_rec;
@@ -974,8 +974,8 @@ pub struct FeatureDone {
     /// Close the feature's open items (with this result).
     pub close: Option<String>,
     pub archive: Vec<String>,
-    /// (kind, text) for main's feed: `info`, `warn`.
-    pub line: Option<(String, String)>,
+    /// a record for main's feed (`info`, `warn`).
+    pub line: Option<Feed>,
 }
 
 /// The sb-core executable when the app root has none: `sb-core` next to
@@ -1276,31 +1276,6 @@ const ROLE_RETRY_MS: u64 = 5 * 60 * 1000;
 /// issue 25): every line the hub writes itself.
 pub fn feed(agent: &str, rec: bise_proto::core::Feed) -> Effect {
     Effect::Line { agent: agent.to_string(), line: rec.line() }
-}
-
-/// sb-core's `line` effect as its line (`sb <kind> : <text>`): its older
-/// text form, until sb-core writes `Feed` records (issue 25 chunk F).
-fn line(agent: &str, kind: &str, text: &str) -> Effect {
-    Effect::Line {
-        agent: agent.to_string(),
-        line: format!("sb {} : {}", kind, wire_escape(text)),
-    }
-}
-
-/// The separator of the fields of a hub line (C2: `answered`).
-pub const FIELD_SEP: &str = " : ";
-
-/// A field of a multi-field hub line: a `" : "` inside it becomes
-/// `" \\: "`, so the reader splits on the real separators only (the TUI's
-/// `parse_hub_line` undoes it).
-pub fn field_escape(s: &str) -> String {
-    s.replace(FIELD_SEP, " \\: ")
-}
-
-/// The text of a hub line made of fields (C2 `answered`: agent,
-/// question, answer, why).
-pub fn join_fields(fields: &[String]) -> String {
-    fields.iter().map(|f| field_escape(f)).collect::<Vec<_>>().join(FIELD_SEP)
 }
 
 fn notice(client: ClientId, text: &str) -> Effect {
@@ -1721,8 +1696,8 @@ impl Hub {
         for a in &d.archive {
             self.core(fx, env, None, In::Drop(ci::Drop { name: a.to_string(), force: true }));
         }
-        if let Some((kind, text)) = &d.line {
-            fx.push(line(MAIN, kind, text));
+        if let Some(rec) = d.line.clone() {
+            fx.push(feed(MAIN, rec));
         }
         // the merge reached the trunk: the changes tab's merged today again
         if d.close.as_deref() == Some("merged") {
@@ -2169,13 +2144,12 @@ impl Hub {
         if dirty || l.tip.as_deref() != Some(pr.head_oid.as_str()) {
             if !agents.is_empty() {
                 let why = if dirty { "changed files" } else { "commits after the PR's head" };
-                fx.push(line(
+                fx.push(feed(
                     MAIN,
-                    "warn",
-                    &format!(
+                    Feed::warn(format!(
                         "#{} ({}) is merged, but its worktree has {}: {} stays. /archive it when its work is not needed",
                         pr.number, l.branch, why, names
-                    ),
+                    )),
                 ));
             }
             return;

@@ -162,7 +162,7 @@ def main():
         c.say('[[bash: sb spawn t9 --objective "{{bash: sb feature merge hand; echo rc=$?}}"]]')
         c.wait_line("t9", "sb feature merge is main's", 60)
         # t9's reply reaches main: let main answer it first
-        c.wait_line("main", "sb msg-in : t9", 60)
+        c.wait_feed("main", "msg-in", 60, **{"from": "t9"})
         c.wait_idle("t9", "main")
         # a spawn on an unknown feature is refused
         c.say('[[bash: sb spawn t8 --feature nope --objective "x"]]')

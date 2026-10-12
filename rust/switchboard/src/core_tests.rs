@@ -237,12 +237,32 @@ fn has_line(fx: &[Effect], agent: &str, needle: &str) -> bool {
     )
 }
 
+/// `agent`'s feed records in `fx`, each its JSON with its `sb` tag.
+fn recs(fx: &[Effect], agent: &str) -> Vec<Value> {
+    lines_of(fx, agent)
+        .into_iter()
+        .filter_map(|l| bise_proto::core::Feed::read_rest(l.strip_prefix("sb ")?))
+        .filter_map(|(_, r)| r.ok())
+        .map(|r| r.to_value())
+        .collect()
+}
+
+/// A record of `agent` with every field of `want` (its others any).
+fn has_rec(fx: &[Effect], agent: &str, want: Value) -> bool {
+    recs(fx, agent).iter().any(|r| want.as_object().is_some_and(|w| w.iter().all(|(k, v)| &r[k] == v)))
+}
+
+/// `agent`'s records of one kind.
+fn recs_of(fx: &[Effect], agent: &str, kind: &str) -> Vec<Value> {
+    recs(fx, agent).into_iter().filter(|r| r["sb"] == kind).collect()
+}
+
 #[test]
 fn the_user_talks_to_main_by_default() {
     let mut t = T::new();
     let fx = t.user(MAIN, "bonjour");
     assert_eq!(say_to(&fx, MAIN).as_deref(), Some("bonjour"));
-    assert!(has_line(&fx, MAIN, "sb you : bonjour"));
+    assert!(has_rec(&fx, MAIN, json!({"sb": "you", "text": "bonjour"})));
     assert_eq!(t.status(MAIN), Status::Working);
     // main is busy: the next message steers the running turn
     let fx = t.user(MAIN, "et aussi");
@@ -527,11 +547,11 @@ fn at_task_from_main_view_answers_there_and_notes_main() {
         s,
         "<user_message via=\"main\">\nv1 ou v2 ?\n</user_message>"
     );
-    assert!(has_line(&fx, "docs", "sb you : v1 ou v2 ?"), "{:?}", fx);
+    assert!(has_rec(&fx, "docs", json!({"sb": "you", "text": "v1 ou v2 ?"})), "{:?}", fx);
     // its end-of-turn answer comes back to main's view, main not woken
     let fx = t.turn("docs", "la v2");
     // C2 `msg-you`: an agent writing to the user
-    assert!(has_line(&fx, MAIN, "sb msg-you : docs : la v2"), "{:?}", fx);
+    assert!(has_rec(&fx, MAIN, json!({"sb": "msg-you", "from": "docs", "body": "la v2"})), "{:?}", fx);
     assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none());
     assert!(t.hub.st.unanswered_for("docs").is_empty());
     // main's next turn carries the exchange
@@ -547,7 +567,7 @@ fn at_task_from_main_view_answers_there_and_notes_main() {
     let fx = t.user("docs", "@docs merci");
     assert_eq!(say_to(&fx, "docs").as_deref(), Some("merci"));
     let fx = t.turn("docs", "de rien");
-    assert!(!has_line(&fx, MAIN, "@docs : de rien"));
+    assert!(!lines_of(&fx, MAIN).iter().any(|l| l.contains("de rien")), "{:?}", fx);
 }
 
 #[test]
@@ -566,7 +586,7 @@ fn at_task_to_a_busy_task_steers_and_answers_at_turn_end() {
         agent: "docs".into(),
         leftover: false,
     });
-    assert!(has_line(&fx, MAIN, "sb msg-you : docs : à mi-chemin"), "{:?}", fx);
+    assert!(has_rec(&fx, MAIN, json!({"sb": "msg-you", "from": "docs", "body": "à mi-chemin"})), "{:?}", fx);
     // main still gets its own automatic reply to the brief
     assert!(t.hub.st.unanswered_for("docs").is_empty());
 }
@@ -578,7 +598,7 @@ fn there_is_no_undo_a_route_stays_sent() {
     // docs never started its REPL again: simulate it down
     t.hub.force_run("docs", Run::Starting);
     let fx = t.user(MAIN, "@docs change de plan");
-    assert!(has_line(&fx, MAIN, "you → @docs : change de plan"));
+    assert!(has_rec(&fx, MAIN, json!({"sb": "route", "who": "docs", "said": "change de plan"})), "{:?}", fx);
     // book §13: no undo, the user says the change to main instead
     let fx = t.user(MAIN, "/cancel");
     assert!(fx.iter().any(|e| matches!(e, Effect::ToClient { body, .. } if body["text"].as_str().unwrap_or("").starts_with("no undo"))), "{:?}", fx);
@@ -736,7 +756,7 @@ fn an_escalated_question_is_answered_by_the_user() {
         },
     );
     assert!(
-        has_line(&fx, MAIN, "sb card : #1 question @docs"),
+        has_rec(&fx, MAIN, json!({"sb": "card", "id": 1, "kind": "question", "agent": "docs"})),
         "{:?}",
         fx
     );
@@ -1681,7 +1701,7 @@ fn main_withdraws_its_own_card_with_a_why() {
     let (tok, fx) = t.req(MAIN, AgentReq::Withdraw { card, why: "the user answered in chat: v2".into() });
     assert_eq!(reply(&fx, tok).unwrap()["ok"], true);
     assert!(t.hub.st.cards.is_empty());
-    assert!(has_line(&fx, MAIN, &format!("#{} withdrawn by main: the user answered in chat: v2", card)), "{:?}", fx);
+    assert!(has_rec(&fx, MAIN, json!({"sb": "card-closed", "id": card, "res": "withdrawn by main: the user answered in chat: v2"})), "{:?}", fx);
     let (tok, fx) = t.req(
         MAIN,
         AgentReq::Send {
@@ -1704,7 +1724,7 @@ fn the_user_closes_a_card_without_answering() {
     let fx = t.user(MAIN, &format!("/close {}", card));
     assert!(t.hub.st.cards.is_empty());
     assert!(say_to(&fx, "docs").is_none());
-    assert!(has_line(&fx, MAIN, &format!("#{} closed", card)), "{:?}", fx);
+    assert!(has_rec(&fx, MAIN, json!({"sb": "card-closed", "id": card, "res": "closed"})), "{:?}", fx);
 }
 
 /// card-wake: answering main's own card (no --for) starts a main turn
@@ -2237,7 +2257,7 @@ fn an_interrupt_writes_a_stopped_line_in_the_same_step() {
     t.spawn_task("net"); // its first turn is running
     let stopped = |fx: &[Effect]| {
         fx.iter()
-            .filter(|e| matches!(e, Effect::Line { agent, line } if agent == "net" && line == "sb stopped : stopped"))
+            .filter(|e| matches!(e, Effect::Line { agent, line } if agent == "net" && line == r#"sb stopped :: {"text":"stopped"}"#))
             .count()
     };
     let fx = t.go(Input::ClientInterrupt { client: 1, agent: "net".into() });
@@ -2287,12 +2307,12 @@ fn peer_traffic_reaches_mains_feed() {
     t.spawn_task("b");
     let fx = send_v2(&mut t, "a", "b", "can you check logout?\nafter the fix", false, None, "");
     assert!(
-        lines_of(&fx, MAIN).iter().any(|l| l.starts_with("sb msg : a → b m_") && l.ends_with(" : can you check logout?\\nafter the fix")),
+        recs_of(&fx, MAIN, "msg").iter().any(|r| r["from"] == "a" && r["to"] == "b" && r["id"].is_u64() && r["body"] == "can you check logout?\nafter the fix"),
         "{:?}",
         fx
     );
     // the recipient's own feed still reads it as `msg-in`
-    assert!(has_line(&fx, "b", "sb msg-in : a m_"), "{:?}", fx);
+    assert!(recs_of(&fx, "b", "msg-in").iter().any(|r| r["from"] == "a" && r["id"].is_u64()), "{:?}", fx);
 }
 
 /// Main writing to a task shows in main's feed too; a message TO main
@@ -2306,12 +2326,11 @@ fn main_traffic_in_mains_feed_once() {
         leftover: false,
     });
     let fx = send_v2(&mut t, MAIN, "docs", "use v2", false, None, "");
-    assert!(lines_of(&fx, MAIN).iter().any(|l| l.starts_with("sb msg : main → docs m_") && l.ends_with(" : use v2")), "{:?}", fx);
+    assert!(recs_of(&fx, MAIN, "msg").iter().any(|r| r["from"] == MAIN && r["to"] == "docs" && r["id"].is_u64() && r["body"] == "use v2"), "{:?}", fx);
     t.turn(MAIN, "ok");
     let fx = send_v2(&mut t, "docs", MAIN, "done", false, None, "");
-    let main = lines_of(&fx, MAIN);
-    assert!(!main.iter().any(|l| l.starts_with("sb msg : ")), "{:?}", main);
-    assert!(main.iter().any(|l| l.starts_with("sb msg-in : docs m_") && l.ends_with(" : done")), "{:?}", main);
+    assert!(recs_of(&fx, MAIN, "msg").is_empty(), "{:?}", fx);
+    assert!(recs_of(&fx, MAIN, "msg-in").iter().any(|r| r["from"] == "docs" && r["id"].is_u64() && r["body"] == "done"), "{:?}", fx);
 }
 
 /// qa-explore bug A: a message steered into a turn that never read it
@@ -2324,14 +2343,14 @@ fn a_steer_leftover_shows_once_in_the_feed() {
     t.user(MAIN, "go");
     let fx = send_v2(&mut t, "talk", MAIN, "two", false, None, "");
     assert!(steer_to(&fx, MAIN).is_some(), "{:?}", fx);
-    let first: Vec<_> = lines_of(&fx, MAIN).into_iter().filter(|l| l.starts_with("sb msg-in : talk m_")).collect();
+    let first: Vec<_> = recs_of(&fx, MAIN, "msg-in").into_iter().filter(|r| r["from"] == "talk" && r["id"].is_u64()).collect();
     assert_eq!(first.len(), 1, "{:?}", fx);
     let fx = t.go(Input::ReplIdle {
         agent: MAIN.into(),
         leftover: true,
     });
     assert!(say_to(&fx, MAIN).is_some_and(|s| s.contains("two")), "sent again: {:?}", fx);
-    assert!(!has_line(&fx, MAIN, "sb msg-in : "), "no second msg-in line: {:?}", fx);
+    assert!(recs_of(&fx, MAIN, "msg-in").is_empty(), "no second msg-in line: {:?}", fx);
 }
 
 /// Main answering a task's question: `answered : agent : question :
@@ -2358,13 +2377,12 @@ fn main_answering_a_question_is_answered() {
     let q = t.hub.st.msgs().values().find(|m| m.from == "docs" && m.to == MAIN).map(|m| m.id).expect("the question");
     let _ = tok;
     let fx = send_v2(&mut t, MAIN, "docs", "v2", false, Some(q), "the brief says v2");
-    let main = lines_of(&fx, MAIN);
     assert!(
-        main.contains(&"sb answered : docs : v1 or v2 \\: which one? : v2 : the brief says v2"),
+        has_rec(&fx, MAIN, json!({"sb": "answered", "agent": "docs", "question": "v1 or v2 : which one?", "answer": "v2", "why": "the brief says v2"})),
         "{:?}",
-        main
+        fx
     );
-    assert!(!main.iter().any(|l| l.starts_with("sb msg : ")), "{:?}", main);
+    assert!(recs_of(&fx, MAIN, "msg").is_empty(), "{:?}", fx);
     // without --why the field is there, empty
     let (_, _) = t.req(
         "docs",
@@ -2380,7 +2398,7 @@ fn main_answering_a_question_is_answered() {
     );
     let q2 = t.hub.st.msgs().values().filter(|m| m.from == "docs" && m.to == MAIN).map(|m| m.id).max().unwrap();
     let fx = send_v2(&mut t, MAIN, "docs", "keep it", false, Some(q2), "");
-    assert!(lines_of(&fx, MAIN).contains(&"sb answered : docs : and the title? : keep it : "), "{:?}", fx);
+    assert!(has_rec(&fx, MAIN, json!({"sb": "answered", "agent": "docs", "question": "and the title?", "answer": "keep it", "why": ""})), "{:?}", fx);
 }
 
 /// A reply of main to a task message that did not ask anything stays a
@@ -2394,13 +2412,7 @@ fn main_replying_to_a_non_question_is_msg() {
     t.turn(MAIN, "noted");
     let id = t.hub.st.msgs().values().filter(|m| m.from == "docs").map(|m| m.id).max().unwrap();
     let fx = send_v2(&mut t, MAIN, "docs", "thanks", false, Some(id), "");
-    assert!(lines_of(&fx, MAIN).iter().any(|l| l.starts_with("sb msg : main → docs m_") && l.ends_with(" : thanks")), "{:?}", fx);
-}
-
-#[test]
-fn fields_escape_the_separator() {
-    assert_eq!(field_escape("a : b"), "a \\: b");
-    assert_eq!(join_fields(&["docs".into(), "x : y".into(), "z".into(), "".into()]), "docs : x \\: y : z : ");
+    assert!(recs_of(&fx, MAIN, "msg").iter().any(|r| r["from"] == MAIN && r["to"] == "docs" && r["id"].is_u64() && r["body"] == "thanks"), "{:?}", fx);
 }
 
 /// A message from the user that cannot reach its agent (C2 amendment,
@@ -2414,20 +2426,20 @@ fn a_message_the_user_cannot_deliver_says_so() {
     t.user(MAIN, "/new -w fix: corrige le bug");
     // not ready yet: the user's message waits in the queue
     let fx = t.user("fix", "d'abord : les tests");
-    assert!(lines_of(&fx, "fix").iter().all(|l| !l.starts_with("sb undelivered")), "{:?}", fx);
+    assert!(recs_of(&fx, "fix", "undelivered").is_empty(), "{:?}", fx);
     let fx = t.user(MAIN, "/archive fix");
     assert_eq!(t.status("fix"), Status::Archived, "{:?}", fx);
     assert!(
-        lines_of(&fx, "fix").contains(&"sb undelivered : fix : d'abord \\: les tests"),
+        has_rec(&fx, "fix", json!({"sb": "undelivered", "to": "fix", "text": "d'abord : les tests"})),
         "{:?}",
         fx
     );
     // the worktree is gone: nothing revives it
     let fx = t.user("fix", "encore");
-    assert!(lines_of(&fx, "fix").contains(&"sb undelivered : fix : encore"), "{:?}", fx);
+    assert!(has_rec(&fx, "fix", json!({"sb": "undelivered", "to": "fix", "text": "encore"})), "{:?}", fx);
     // from main's view: the line goes to main's feed
     let fx = t.user(MAIN, "@fix et là ?");
-    assert!(lines_of(&fx, MAIN).contains(&"sb undelivered : fix : et là ?"), "{:?}", fx);
+    assert!(has_rec(&fx, MAIN, json!({"sb": "undelivered", "to": "fix", "text": "et là ?"})), "{:?}", fx);
     assert!(lines_of(&fx, "fix").is_empty(), "{:?}", fx);
     // an agent sending to it gets its error, no undelivered line
     let (_, fx) = t.req(
@@ -4362,7 +4374,7 @@ fn a_feature_merge_refreshes_merged_today() {
     let done = |close: Option<&str>| FeatureDone {
         name: "cu".into(),
         close: close.map(String::from),
-        line: Some(("info".into(), "✓ cu merged into main".into())),
+        line: Some(bise_proto::core::Feed::info("✓ cu merged into main")),
         ..FeatureDone::default()
     };
     let fx = t.go(Input::Feature(done(Some("merged"))));
@@ -4654,22 +4666,21 @@ fn his_parts_follow_his_message_at_its_delivery() {
     let text = "<selection from=\"main\">\nq\n</selection>\nwhy?";
     // `a` is busy: queued, nothing written yet
     let fx = t.user_parts("a", text, parts, true);
-    assert!(lines_of(&fx, "a").iter().all(|l| !l.starts_with("sb you")), "{:?}", fx);
+    assert!(recs(&fx, "a").iter().all(|r| !r["sb"].as_str().unwrap_or("").starts_with("you")), "{:?}", fx);
     let id = t.hub.st.msgs().values().find(|m| m.text == text).unwrap().id;
     // the turn ends: said, his three lines in order
     let fx = t.go(Input::ReplIdle { agent: "a".into(), leftover: false });
     assert!(say_to(&fx, "a").is_some_and(|s| s.contains("<selection from=\"main\">")), "the model's text: {:?}", fx);
-    let ls = lines_of(&fx, "a");
-    let at = ls.iter().position(|l| l.starts_with("sb you : ")).expect("his line");
-    assert_eq!(ls[at + 1], format!("sb you-id : m_{id}"));
-    assert_eq!(ls[at + 2], format!("sb you-parts : {parts}"));
+    let ls = recs(&fx, "a");
+    let at = ls.iter().position(|r| r["sb"] == "you").expect("his line");
+    assert_eq!(ls[at + 1], json!({"sb": "you-id", "id": id}));
+    assert_eq!(ls[at + 2], json!({"sb": "you-parts", "parts": serde_json::from_str::<Value>(parts).unwrap()}));
     // without parts: the two lines it always was
     let fx = t.turn("a", "ok");
     let _ = fx;
     let fx = t.user("a", "plain words");
-    let ls = lines_of(&fx, "a");
-    assert!(ls.contains(&"sb you : plain words"), "{ls:?}");
-    assert!(ls.iter().all(|l| !l.starts_with("sb you-parts")), "{ls:?}");
+    assert!(has_rec(&fx, "a", json!({"sb": "you", "text": "plain words"})), "{fx:?}");
+    assert!(recs_of(&fx, "a", "you-parts").is_empty(), "{fx:?}");
 }
 
 /// msg-parts (law route_parts_follow_the_route): his answer to a card
@@ -4690,9 +4701,9 @@ fn his_card_answer_keeps_its_parts() {
     let parts = r#"[{"kind":"quote","from":"main","text":"q"},{"kind":"text","text":"v2"}]"#;
     let text = "<selection from=\"main\">\nq\n</selection>\nv2";
     let fx = t.go(Input::UserCmd { client: 1, focus: MAIN.into(), cmd: UserCmd::Answer { card, text: text.into(), parts: parts.into() } });
-    let ls = lines_of(&fx, MAIN);
-    let at = ls.iter().position(|l| l.starts_with("sb route : you → @docs (answer to card #")).expect("the route line");
-    assert_eq!(ls[at + 1], format!("sb route-parts : {parts}"), "{ls:?}");
+    let ls = recs(&fx, MAIN);
+    let at = ls.iter().position(|r| r["sb"] == "route" && r["who"] == "docs" && r["card"] == card).expect("the route line");
+    assert_eq!(ls[at + 1], json!({"sb": "route-parts", "parts": serde_json::from_str::<Value>(parts).unwrap()}), "{ls:?}");
     let answer = t.hub.st.msgs().values().find(|m| m.text == text).expect("the asker's message");
     assert_eq!(answer.parts, parts);
 }

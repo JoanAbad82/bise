@@ -22,6 +22,12 @@ import e2e  # noqa: E402
 import wait  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
+
+def asked(c, who, words, what):
+    """The id (`m_<n>`) of `who`'s message in main's feed with `words`."""
+    r = c.wait(lambda: next((r for r in c.feed("main", "msg-in") if r.get("from") == who and words in r.get("body", "") and r.get("id")), None), 120, what)
+    return "m_%d" % r["id"]
+
 TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "diff", "jobs", "job_end", "error", "notice", "approvals")
 FIXTURES = os.path.join(e2e.ROOT, "rust", "proto", "fixtures", "hub_ev.jsonl")
 
@@ -143,7 +149,7 @@ def parts_round(c, d, E, project, typed):
     except Exception:
         check(False, "the model read the parts' template: %r" % [r.get("user_tail") for r in E.fake_requests() if r.get("agent") == "main"][-2:])
     tr = [l.split("\t", 1)[1] for l in open(os.path.join(E.state, "agents", "main", "transcript.log")).read().splitlines() if "\t" in l]
-    check(any(l.startswith("sb you-parts : ") for l in tr), "the you-parts line is journaled")
+    check(any((e2e.feed_rec(l) or ("",))[0] == "you-parts" for l in tr), "the you-parts line is journaled")
     # both shapes: the same message as text alone (an older client) reads
     # back as the same parts, and the model reads the same bytes
     parts2 = [{"kind": "quote", "from": "t1", "text": "le process"}, {"kind": "text", "text": "Son process prenait tout mon CPU!"}]
@@ -203,9 +209,8 @@ def parts_round(c, d, E, project, typed):
     check("absolute" in [x for x in typed(d, "error") if x.get("cid") == 74][-1]["text"], "the refusal says why: %r" % typed(d, "error")[-1])
     # his screenshot: a card answer with a quote of main
     c.say('[[bash: sb send main --expect-reply "quel process ?"]]', focus="t3")
-    c.wait(lambda: any(l.startswith("sb msg-in : t3 m_") and "quel process" in l for l in c.lines("main")), 120, "t3 asks main (parts)")
+    mid = asked(c, "t3", "quel process", "t3 asks main (parts)")
     c.wait_idle("main", "t3", timeout=120)
-    mid = [l.split()[4] for l in c.lines("main") if l.startswith("sb msg-in : t3 m_") and "quel process" in l][0]
     c.say('[[bash: sb card --for %s "quel process ?"]]' % mid)
     c.wait(lambda: any(x["kind"] == "question" for x in c.cards()), 60, "the parts card")
     card = [x for x in c.cards() if x["kind"] == "question"][0]
@@ -371,19 +376,20 @@ def main():
             check(len({g["steered_at"] for g in got}) == 1, "one receipt, one pos: %r" % got)
             check(len({g["msg_id"] for g in got} | {b["msg_id"]}) == len(got) + 1, "distinct ids: %r" % got)
             tr = transcript()
+            recs = [e2e.feed_rec(l) or ("", {}) for l in tr]
             for g in got:
-                i = tr.index("sb you : " + g["text"])
-                check(tr[i + 1] == "sb you-id : m_%d" % g["msg_id"], "the id line right after his: %r" % tr[i : i + 2])
-            receipt = [l for l in tr if l.startswith("sb steered : ")]
-            want = "sb steered : " + " ".join("m_%d" % g["msg_id"] for g in got)
+                i = recs.index(("you", {"text": g["text"]}))
+                check(recs[i + 1] == ("you-id", {"id": g["msg_id"]}), "the id line right after his: %r" % tr[i : i + 2])
+            receipt = [r["ids"] for k, r in recs if k == "steered"]
+            want = [g["msg_id"] for g in got]
             check(want in receipt, "the receipt names them: %r not in %r" % (want, receipt))
             # the received receipt (architect m_16963): `sb steer-rx` names
             # the same ids before `sb steered` does; the fold's delivery
             # comes from the two receipts by id (✓ then ✓✓): read at the end
-            ids = {"m_%d" % g["msg_id"] for g in got}
-            rxs = [i for i, l in enumerate(tr) if l.startswith("sb steer-rx : ") and ids & set(l[len("sb steer-rx : "):].split())]
-            check(rxs and set().union(*(set(tr[i][len("sb steer-rx : "):].split()) for i in rxs)) >= ids, "steer-rx names them: %r" % [tr[i] for i in rxs])
-            check(rxs and max(rxs) < tr.index(want), "steer-rx before steered: %r, %r" % ([tr[i] for i in rxs], want))
+            ids = {g["msg_id"] for g in got}
+            rxs = [i for i, (k, r) in enumerate(recs) if k == "steer-rx" and ids & set(r["ids"])]
+            check(rxs and set().union(*(set(recs[i][1]["ids"]) for i in rxs)) >= ids, "steer-rx names them: %r" % [tr[i] for i in rxs])
+            check(rxs and max(rxs) < recs.index(("steered", {"ids": want})), "steer-rx before steered: %r, %r" % ([tr[i] for i in rxs], want))
             check(all(last_you(s).get("delivery") == "read" for s in steers), "read by the receipts: %r" % [last_you(s) for s in steers])
             # the receipt and the id lines make no entry of their own
             check(not any(x["text"].startswith(("m_", "steered")) for x in entries("notice")), "no notice for them: %r" % entries("notice"))
@@ -476,14 +482,14 @@ def main():
         check(got["id"] == row["id"] and got["agent"] == "main" and got["text"] == "take me back", "queued_taken: %r" % got)
         c.wait(lambda: queued_row("take me back") is None, 20, "the row gone")
         c.wait_idle("main", timeout=90)
-        check(not any(l == "sb you : take me back" for l in c.lines("main")), "a message taken back never reaches main")
+        check(not any(r.get("text") == "take me back" for r in c.feed("main", "you")), "a message taken back never reaches main")
         check("take me back" not in json.dumps([r for r in E.fake_requests() if r.get("agent") == "main"]), "the model never got it")
         # a take of a delivered one (his earlier queued send, by the
         # 'sb you-id' line right after its 'you' line in main's feed)
-        ls = c.lines("main")
-        i = ls.index("sb you : queued from the window")
-        check(ls[i + 1].startswith("sb you-id : m_"), "its id line: %r" % ls[i : i + 2])
-        delivered_id = int(ls[i + 1][len("sb you-id : m_"):])
+        ls = [e2e.feed_rec(l) or ("", {}) for l in c.lines("main")]
+        i = ls.index(("you", {"text": "queued from the window"}))
+        check(ls[i + 1][0] == "you-id", "its id line: %r" % ls[i : i + 2])
+        delivered_id = ls[i + 1][1]["id"]
         r = c.rpc("turn/unqueue", {"project": project, "agent": "main", "id": delivered_id})
         check("result" not in r and "already reached @main" in r.get("error", {}).get("message", ""), "the refusal says why: %r" % r)
         check(not any(l.startswith("sb ") and "taken" in l for l in c.lines("main")), "nothing taken: %r" % c.lines("main")[-5:])
@@ -492,9 +498,8 @@ def main():
         # newline, a leading '/' and ' --force' reaches the card's agent
         # whole, never another command
         c.say('/new t3: {{bash: sb send main --expect-reply "v1 ou v2 ?"}}')
-        c.wait(lambda: any(l.startswith("sb msg-in : t3 m_") and "v1 ou v2" in l for l in c.lines("main")), 120, "t3 asks main")
+        msg_id = asked(c, "t3", "v1 ou v2", "t3 asks main")
         c.wait_idle("main", "t3", timeout=120)
-        msg_id = [l.split()[4] for l in c.lines("main") if l.startswith("sb msg-in : t3 m_") and "v1 ou v2" in l][0]
         c.say('[[bash: sb card --for %s "v1 ou v2 ?"]]' % msg_id)
         c.wait(lambda: any(x["kind"] == "question" for x in c.cards()), 60, "a question card")
         card = [x for x in c.cards() if x["kind"] == "question"][0]
@@ -503,8 +508,10 @@ def main():
         # bar A.3 (architect m_10203): t3's own question and the card main
         # opened for it are facts of t3's own thread (sb-core's 'sent' and
         # 'card' lines in t3's feed), typed as to_agent and card entries
-        c.wait(lambda: any(l.startswith("sb sent : main : %s : 1 : v1 ou v2" % msg_id) for l in c.lines("t3")), 30, "t3's sent line")
-        c.wait(lambda: any(l.startswith("sb card : #%d question @t3 : v1 ou v2" % card["id"]) for l in c.lines("t3")), 30, "the card in t3's feed")
+        c.wait(lambda: any(r.get("to") == "main" and "m_%d" % r.get("id", 0) == msg_id and r.get("ask") and r.get("body", "").startswith("v1 ou v2")
+                           for r in c.feed("t3", "sent")), 30, "t3's sent line")
+        c.wait(lambda: any(r.get("id") == card["id"] and r.get("kind") == "question" and r.get("agent") == "t3" and r.get("body", "").startswith("v1 ou v2")
+                           for r in c.feed("t3", "card")), 30, "the card in t3's feed")
         n = len(typed(d, "thread"))
         d.send({"cmd": "subscribe", "project": project, "agent": "t3"})
         c.wait(lambda: len(typed(d, "thread")) > n, 20, "t3's thread")
@@ -532,9 +539,8 @@ def main():
         with open(png, "wb") as f:
             f.write(e2e.tiny_png())
         c.say('[[bash: sb send main --expect-reply "which screenshot?"]]', focus="t3")
-        c.wait(lambda: any(l.startswith("sb msg-in : t3 m_") and "which screenshot" in l for l in c.lines("main")), 120, "t3 asks main again")
+        msg2 = asked(c, "t3", "which screenshot", "t3 asks main again")
         c.wait_idle("main", "t3", timeout=120)
-        msg2 = [l.split()[4] for l in c.lines("main") if l.startswith("sb msg-in : t3 m_") and "which screenshot" in l][0]
         c.say('[[bash: sb card --for %s "which screenshot?"]]' % msg2)
         c.wait(lambda: any(x["kind"] == "question" for x in c.cards()), 60, "the screenshot card")
         card2 = [x for x in c.cards() if x["kind"] == "question"][0]
