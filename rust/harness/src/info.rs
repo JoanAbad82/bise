@@ -46,7 +46,7 @@ impl HarnessInfo {
 mod harness_info_tests {
     use super::HarnessInfo;
 
-    // the exact string LAWS.bend pins for Rt.info_line (law
+    // the exact string bend/laws/streams.bend pins for Rt.info_line (law
     // info_line_format): the two sides of the contract agree
     const BEND_LINE: &str = "harness-info model=claude-opus-5-5 threshold=800000 steer=/tmp/bend-steer-7.txt interrupt=/tmp/bend-interrupt-7.txt";
 

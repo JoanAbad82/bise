@@ -177,7 +177,7 @@ def within_budget(+budget: Nat, +ms: List<&2, T.Msg>) -> Bool:
   Bool.or(Nat.is_le(E.msgs_tokens(ms), budget),
     Nat.is_le(List.length(&2, T.Msg, ms), 1n))
 
-# ---- the commit convention (pinned by LAWS.bend) ----
+# ---- the commit convention (pinned by bend/laws/) ----
 # canonical history is OLDEST-FIRST: a commit lands at the tail, never
 # at the head (a live run once caught commits prepending, which the
 # scripted scenarios masked).

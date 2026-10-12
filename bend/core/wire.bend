@@ -7,7 +7,7 @@
 # ids, the tool schemas, the think-span markers of the history, and the
 # JSON / reply helpers. One module per family maps a WReq to its JSON
 # body and its reply back (core/oai-chat.bend, core/anthropic.bend);
-# core/api.bend dispatches on the family. All pure, pinned by LAWS.bend.
+# core/api.bend dispatches on the family. All pure, pinned by bend/laws/.
 
 import Base
 import ./compaction.bend as C

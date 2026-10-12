@@ -12,7 +12,8 @@ each from this repo. It is short. The architect agent keeps it current.
 ## Before you touch an area, read
 
 - the hub's decisions (messages, cards, waits, delivery): `bend/hub/core.bend`,
-  `bend/LAWS.bend`, `docs/bend-laws-report.md`;
+  `bend/laws/hub.bend` (its proofs: `bend/proofs/hub.bend`, the shared
+  helpers in `bend/proofs/lib/`), `docs/bend-laws-report.md`;
 - the hub shell: the `//!` headers of `rust/switchboard/src/lib.rs`,
   `daemon.rs`, `core.rs`;
 - the TUI: `rust/tui/src/lib.rs`, `sb.rs`, and the module you change;

@@ -1,5 +1,6 @@
 # hub/inv.bend — the invariants the laws state about the hub's state
-# (LAWS.bend). Definitions only: the proofs are in PROOF.bend.
+# (bend/laws/hub.bend). Definitions only: the proofs are in bend/proofs/hub.bend
+# and bend/proofs/lib/.
 import Base
 
 import ./model.bend as M

@@ -12,8 +12,8 @@ def agent(+name: String, +dir: String, +is_main: Bool, +parent: Maybe<&2, String
   J.obj([J.kv("name", J.JStr{name}), J.kv("dir", J.JStr{dir}), J.kv("is_main", J.JBool{is_main}), J.kv("parent", K.jmaybe_s(parent)), J.kv("brief", brief), J.kv("created_ms", J.JNum{created_ms}), J.kv("ws", ws), J.kv("lifecycle", J.JStr{lifecycle}), J.kv("failure", K.jmaybe_s(failure)), J.kv("declared", declared), J.kv("last_report", last_report), J.kv("aliases", J.JArr{K.jstrs(aliases)}), J.kv("files", J.JArr{K.jstrs(files)}), J.kv("snapshot_ref", K.jmaybe_s(snapshot_ref)), J.kv("follow", J.JBool{follow}), J.kv("run", J.JStr{run}), J.kv("waiting", J.JBool{waiting}), J.kv("waiting_on", K.jmaybe_s(waiting_on)), J.kv("turn_ms", K.jmaybe_n(turn_ms)), J.kv("turns", J.JNum{turns})])
 
 # ViewMsg (VMsg)
-def msg(+msg: J.Json, +state: J.Json, +settled: Bool) -> J.Json:
-  J.obj([J.kv("msg", msg), J.kv("state", state), J.kv("settled", J.JBool{settled})])
+def msg(+msg: J.Json, +state: J.Json, +settled: Bool, +queued: Bool, +owes: Bool) -> J.Json:
+  J.obj([J.kv("msg", msg), J.kv("state", state), J.kv("settled", J.JBool{settled}), J.kv("queued", J.JBool{queued}), J.kv("owes", J.JBool{owes})])
 
 # View (VView)
 def view(+agents: List<&2, J.Json>, +all_agents: Bool, +msgs: List<&2, J.Json>, +all_msgs: Bool, +next_msg: Nat, +next_card: Nat, +paused: Maybe<&2, Nat>, +order: Maybe<&2, List<&2, String>>, +cards: Maybe<&2, List<&2, J.Json>>, +notes: Maybe<&2, List<&2, String>>, +timers: Maybe<&2, List<&2, J.Json>>, +timers_ended: Maybe<&2, List<&2, J.Json>>, +wakes: Maybe<&2, List<&2, J.Json>>, +wakes_ended: Maybe<&2, List<&2, J.Json>>) -> J.Json:

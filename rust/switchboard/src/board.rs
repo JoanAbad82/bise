@@ -13,7 +13,8 @@
 use crate::model::{Agent, Lifecycle, Mode, Msg, State, Status, MAIN, USER};
 use crate::prompts::relation;
 use crate::util::{age, clip, one_line};
-use std::collections::BTreeMap;
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Each agent's model (issue #4), by name: its short tag (`opus·hi`, the
 /// TUI panel's) for `sb list` and the roster, and its `model:` line for
@@ -90,33 +91,14 @@ pub fn user_board(st: &State, now: u64) -> String {
 }
 
 /// Threads between agents that the user is not part of, most recent
-/// first (RFC 0003 §9).
+/// first (RFC 0003 §9): the `limit` newest of [`Threads`], rendered.
 pub fn agent_threads(st: &State, limit: usize) -> Vec<String> {
-    let mut threads: BTreeMap<u64, Vec<&crate::model::Msg>> = BTreeMap::new();
-    for m in st.msgs().values() {
-        threads.entry(m.thread).or_default().push(m);
-    }
-    let mut shown: Vec<(u64, u64, Vec<&crate::model::Msg>, Vec<&str>)> = threads
-        .into_iter()
-        .filter(|(_, ms)| !ms.iter().any(|m| m.from == USER || m.to == USER || m.plain))
-        .map(|(t, ms)| {
+    st.threads()
+        .newest(limit)
+        .map(|(t, ids)| {
+            let ms: Vec<&Msg> = ids.iter().filter_map(|id| st.msgs().get(id)).collect();
             let parties = parties_of(&ms);
-            let last = ms.last().map(|m| m.created_ms).unwrap_or(0);
-            (last, t, ms, parties)
-        })
-        // main's own conversations are already in its thread
-        .filter(|(_, _, _, p)| !(p.contains(&MAIN) && p.len() == 2))
-        .collect();
-    // stable: equal times keep the thread order; only the shown ones
-    // are rendered
-    shown.sort_by_key(|x| std::cmp::Reverse(x.0));
-    shown
-        .into_iter()
-        .take(limit)
-        .map(|(_, t, ms, parties)| {
-            let open = ms
-                .iter()
-                .any(|m| m.expect_reply && !st.settled().contains(&m.id));
+            let open = ms.iter().any(|m| m.expect_reply && !st.settled().contains(&m.id));
             format!(
                 "t_{} {}  {} message{}  {}  \"{}\"",
                 t,
@@ -129,6 +111,67 @@ pub fn agent_threads(st: &State, limit: usize) -> Vec<String> {
             )
         })
         .collect()
+}
+
+/// The threads of main's `<agent_threads>`, kept as the messages arrive
+/// (issue 21, hot-view sha 2a): [`State::put_msg`] calls [`Threads::put`]
+/// with each message, so [`agent_threads`] reads the newest few instead
+/// of grouping every message at each build (31.6 ms per user line on his
+/// journal copy: 19,474 messages in 16,243 threads).
+///
+/// A thread is shown when no message of it is the user's (from or to) or
+/// plain, and its parties are not just main and one other (main's own
+/// conversations are in its thread already); newest first by its last
+/// message's time, equal times by thread id.
+#[derive(Clone, Debug, Default)]
+pub struct Threads {
+    /// each thread's message ids, oldest first
+    ids: BTreeMap<u64, Vec<u64>>,
+    /// the shown threads, newest first
+    shown: BTreeSet<(Reverse<u64>, u64)>,
+    /// a shown thread's place in `shown`
+    key: BTreeMap<u64, Reverse<u64>>,
+}
+
+impl Threads {
+    /// Message `id` of `thread` was written (`msgs`: every message, it
+    /// included): the thread is judged again from its messages.
+    pub fn put(&mut self, msgs: &BTreeMap<u64, Msg>, thread: u64, id: u64) {
+        let ids = self.ids.entry(thread).or_default();
+        if let Err(at) = ids.binary_search(&id) {
+            ids.insert(at, id);
+        }
+        self.judge(msgs, thread);
+    }
+
+    /// Message `id` left `thread` (a row rewritten with another thread).
+    pub fn take(&mut self, msgs: &BTreeMap<u64, Msg>, thread: u64, id: u64) {
+        if let Some(ids) = self.ids.get_mut(&thread) {
+            ids.retain(|x| *x != id);
+        }
+        self.judge(msgs, thread);
+    }
+
+    fn judge(&mut self, msgs: &BTreeMap<u64, Msg>, thread: u64) {
+        if let Some(k) = self.key.remove(&thread) {
+            self.shown.remove(&(k, thread));
+        }
+        let ms: Vec<&Msg> = self.ids.get(&thread).into_iter().flatten().filter_map(|id| msgs.get(id)).collect();
+        let Some(last) = ms.last() else { return };
+        let users = ms.iter().any(|m| m.from == USER || m.to == USER || m.plain);
+        let parties = parties_of(&ms);
+        if users || (parties.contains(&MAIN) && parties.len() == 2) {
+            return;
+        }
+        let k = Reverse(last.created_ms);
+        self.shown.insert((k, thread));
+        self.key.insert(thread, k);
+    }
+
+    /// The `limit` newest shown threads: (thread, its message ids).
+    pub fn newest(&self, limit: usize) -> impl Iterator<Item = (u64, &[u64])> + '_ {
+        self.shown.iter().take(limit).map(|(_, t)| (*t, self.ids[t].as_slice()))
+    }
 }
 
 /// The senders and recipients of a thread, in order of appearance.
@@ -486,12 +529,12 @@ pub fn questions_for(unanswered: &[&Msg]) -> Vec<String> {
 
 /// Queued messages, for the board shown to the user.
 pub fn queued_count(st: &State, name: &str) -> usize {
-    st.msgs().values().filter(|m| m.to == name && st.is_queued(m)).count()
+    st.hot().filter(|(m, h)| h.queued && m.to == name).count()
 }
 
-/// What waits for each agent, from one pass over the messages: those
-/// queued for it, and the delivered ones it owes a reply to. Oldest
-/// first, as in `st.msgs()`.
+/// What waits for each agent, from one pass over the hot messages (what
+/// sb-core's view says of each, `State::hot`): those queued for it, and
+/// the delivered ones it owes a reply to. Oldest first, as in `st.msgs()`.
 pub struct Waiting<'a> {
     queued: BTreeMap<&'a str, Vec<&'a Msg>>,
     unanswered: BTreeMap<&'a str, Vec<&'a Msg>>,
@@ -500,11 +543,11 @@ pub struct Waiting<'a> {
 impl<'a> Waiting<'a> {
     pub fn of(st: &'a State) -> Waiting<'a> {
         let mut w = Waiting { queued: BTreeMap::new(), unanswered: BTreeMap::new() };
-        for m in st.msgs().values() {
-            if st.is_queued(m) {
+        for (m, h) in st.hot() {
+            if h.queued {
                 w.queued.entry(m.to.as_str()).or_default().push(m);
             }
-            if st.owes_reply(m) {
+            if h.owes {
                 w.unanswered.entry(m.to.as_str()).or_default().push(m);
             }
         }
@@ -594,7 +637,7 @@ mod tests {
     #[test]
     fn peer_threads_are_summarized_for_main() {
         let mut st = state();
-        st.put_msg(
+        st.put_msg_judged(
             Msg {
                 id: 1,
                 thread: 1,
@@ -640,6 +683,75 @@ mod tests {
         }
     }
 
+    /// The walk agent_threads made before [`Threads`]: every message
+    /// grouped by thread at each call (the reference the index equals).
+    fn threads_walk(st: &State, limit: usize) -> Vec<(u64, Vec<u64>)> {
+        let mut threads: BTreeMap<u64, Vec<&Msg>> = BTreeMap::new();
+        for m in st.msgs().values() {
+            threads.entry(m.thread).or_default().push(m);
+        }
+        let mut shown: Vec<(u64, u64, Vec<u64>)> = threads
+            .into_iter()
+            .filter(|(_, ms)| !ms.iter().any(|m| m.from == USER || m.to == USER || m.plain))
+            .filter(|(_, ms)| {
+                let p = parties_of(ms);
+                !(p.contains(&MAIN) && p.len() == 2)
+            })
+            .map(|(t, ms)| (ms.last().unwrap().created_ms, t, ms.iter().map(|m| m.id).collect()))
+            .collect();
+        shown.sort_by_key(|x| std::cmp::Reverse(x.0));
+        shown.into_iter().take(limit).map(|(_, t, ids)| (t, ids)).collect()
+    }
+
+    /// hot-view sha 2a: the kept threads are the full walk's, message by
+    /// message: agents' threads, the user's and plain ones (never shown),
+    /// main's own pairs (never shown), a third party joining main's pair
+    /// (shown), equal times (thread order), a question settled by a reply
+    /// re-sent with the reply (`reply_to`), a row re-sent unchanged, and a
+    /// clear (a full view).
+    #[test]
+    fn the_kept_threads_are_the_full_walk() {
+        let mut st = state();
+        let names = [MAIN, "auth-fix", "docs", "perf"];
+        let check = |st: &State| {
+            for limit in [0, 1, 3, 8, 100] {
+                let kept: Vec<(u64, Vec<u64>)> = st.threads().newest(limit).map(|(t, ids)| (t, ids.to_vec())).collect();
+                assert_eq!(kept, threads_walk(st, limit), "limit {limit}");
+            }
+        };
+        for id in 1..=120u64 {
+            let (from, mut to) = (names[(id % 4) as usize], names[((id * 3 + 1) % 4) as usize]);
+            if id % 23 == 0 {
+                to = USER;
+            }
+            let mut m = msg(id, from, to, id % 3 == 0, false);
+            m.thread = id % 17 + 1;
+            m.created_ms = id / 4; // equal times
+            m.plain = id % 29 == 0;
+            m.reply_to = (id > 10 && id % 7 == 0).then(|| id - 7);
+            st.put_msg_judged(m.clone(), Some(MsgState::Delivered), false);
+            if let Some(q) = m.reply_to {
+                // the view re-sends the question a reply settled
+                let q = st.msgs()[&q].clone();
+                st.put_msg_judged(q, None, true);
+            }
+            if id % 11 == 0 {
+                st.put_msg_judged(m, None, false);
+            }
+            check(&st);
+        }
+        assert!(st.threads().newest(100).count() > 3, "some threads are shown");
+        assert!(st.threads().newest(100).count() < 17, "some are not");
+        // a row rewritten with another thread leaves the old one
+        let mut m = st.msgs()[&40].clone();
+        m.thread = 99;
+        st.put_msg_judged(m, None, false);
+        check(&st);
+        st.clear_msgs();
+        assert_eq!(st.threads().newest(8).count(), 0);
+        check(&st);
+    }
+
     #[test]
     fn waiting_is_the_per_agent_scans_in_one_pass() {
         let mut st = state();
@@ -651,7 +763,7 @@ mod tests {
         let names = [MAIN, "auth-fix", "docs", USER];
         for id in 1..=60u64 {
             let (from, to) = (names[(id % 4) as usize], names[((id + 1) % 4) as usize]);
-            st.put_msg(msg(id, from, to, id % 2 == 0, id % 5 == 0), Some(states[(id % 3) as usize].clone()), id == 4);
+            st.put_msg_judged(msg(id, from, to, id % 2 == 0, id % 5 == 0), Some(states[(id % 3) as usize].clone()), id == 4);
         }
         let w = Waiting::of(&st);
         for n in names {
@@ -675,7 +787,7 @@ mod tests {
     #[test]
     fn a_task_context_has_the_roster_it_sees_and_its_questions() {
         let mut st = state();
-        st.put_msg(msg(1, "auth-fix", "docs", true, false), Some(MsgState::Delivered), false);
+        st.put_msg_judged(msg(1, "auth-fix", "docs", true, false), Some(MsgState::Delivered), false);
         let c = task_context("docs", &Group::of(&st, 0, &Models::new()), &questions_for(Waiting::of(&st).unanswered("docs")));
         let mut want = String::from("<group>\n");
         for l in roster(&st, "docs", 0, &Models::new()) {

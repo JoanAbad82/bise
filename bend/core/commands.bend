@@ -7,7 +7,7 @@
 #     the harness protocol
 #   - raw protocol words (say, steer, notify, compact, interrupt, quit,
 #     reload, help) pass through untouched
-# LAWS.bend pins this contract law by law.
+# bend/laws/ pins this contract law by law.
 import Base
 import ./types.bend as T
 import ./text.bend as Tx

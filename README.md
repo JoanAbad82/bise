@@ -249,7 +249,7 @@ git clone https://github.com/gvergnaud/bise && cd bise
 ## what's in here
 
 - [`rust/`](rust/) · the app: the terminal UI, the agent harness, plugins, sessions
-- [`bend/`](bend/) · the agent runtime and the Switchboard hub, written in [Bend](https://github.com/HigherOrderCO/Bend), and their laws (`LAWS.bend`, `PROOF.bend`)
+- [`bend/`](bend/) · the agent runtime and the Switchboard hub, written in [Bend](https://github.com/HigherOrderCO/Bend), and their laws (`bend/laws/`, proved in `bend/proofs/`)
 - [`prompts/`](prompts/) · the system prompts and tool descriptions the agents read
 - [`scripts/`](scripts/) · dev scripts: build the Bend binaries, build and switch versions
 - [`docs/`](docs/) · design docs, RFCs, the implementation notes

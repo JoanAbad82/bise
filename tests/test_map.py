@@ -15,7 +15,7 @@ The rules, per changed path, the union of all:
     opens) runs.
   - rust/tui/, rust/vendor/crossterm/: the TUI. Every *_tmux test, and every
     other test that names tmux or the TUI crate.
-  - bend/PROOF.bend, bend/LAWS.bend: PROOF.
+  - bend/laws/, bend/proofs/: PROOF.
   - apps/desktop/, dev/ (the desktop's QA plugin), scripts/desktop*,
     tests/desktop_*, tests/ambient_qa*: the desktop app's own. No terminal
     e2e/tmux test (but one that names the very file); the gate runs the
@@ -52,7 +52,7 @@ NONE_PREFIXES = ("docs/", "site/", "nix/", ".github/")
 NONE_FILES = {"LICENSE", "NOTICE", "THIRD_PARTY_NOTICES", "README.md", "flake.nix", "flake.lock",
               "default.nix", ".gitignore"}
 TUI_PREFIXES = ("rust/tui/", "rust/vendor/crossterm/")
-PROOF_FILES = {"bend/PROOF.bend", "bend/LAWS.bend"}
+PROOF_PREFIXES = ("bend/laws/", "bend/proofs/")
 # the gate's own files: a change to them runs everything
 GATE_FILES = {"tests/gate.sh", "tests/run_all.sh", "tests/slow_first.py", "tests/test_map.py"}
 # every top-level entry of the repo, and what it is: none, tui, mixed (some
@@ -133,7 +133,7 @@ def select(changed, tests, txt):
             tui = {t for t in tests if t.endswith("_tmux") or (t in txt and TUI_WORDS.search(txt[t]))}
             picked |= tui
             whys.append("%s: the TUI's tests" % p)
-        elif p in PROOF_FILES:
+        elif p.startswith(PROOF_PREFIXES):
             picked.add("PROOF")
             whys.append("%s: PROOF" % p)
         elif top == "tests" and p.endswith(".py") and "/" not in p[len("tests/"):]:
@@ -226,13 +226,14 @@ def self_test():
     sel, _ = select(["tests/every_e2e.py"], tests, txt)
     assert "every_e2e" in sel and "tui_tmux" not in sel, sorted(sel)
     # the laws: PROOF
-    assert select(["bend/LAWS.bend"], tests, txt)[0] == {"PROOF"}
+    assert select(["bend/laws/hub.bend"], tests, txt)[0] == {"PROOF"}
+    assert select(["bend/proofs/lib/hub-1.bend"], tests, txt)[0] == {"PROOF"}
     # shared code and the unknown: everything
     for p in ("bend/hub/core.bend", "rust/switchboard/src/core.rs", "prompts/prompt-bise.txt",
               "tests/run_all.sh", "newdir/x"):
         assert select([p], tests, txt)[0] is None, p
     # the union
-    sel, _ = select(["docs/a.md", "bend/PROOF.bend", "rust/tui/src/feed.rs"], tests, txt)
+    sel, _ = select(["docs/a.md", "bend/proofs/hub.bend", "rust/tui/src/feed.rs"], tests, txt)
     assert "PROOF" in sel and "tui_tmux" in sel
     # the desktop's paths: no terminal test, its checks; a seam: both
     for p in ("apps/desktop/src/thread/rows.tsx", "dev/plugins/ambient-qa/plugin.json", "scripts/desktop_try.py",

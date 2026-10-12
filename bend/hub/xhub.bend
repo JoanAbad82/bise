@@ -3,7 +3,7 @@
 # failure or an answer, the retry backoff, which inbox record an answer
 # goes back for. core.bend's `---- cross-hub (S2) ----` section runs them
 # through emit/send/out (it decides nothing itself); the state and its
-# journal kinds are xhub-model.bend's. Laws: LAWS.bend `xhub_*`.
+# journal kinds are xhub-model.bend's. Laws: bend/laws/hub.bend `xhub_*`.
 #
 # Two kinds (architect's B): his own words, forwarded by reference only
 # (`sb project send <p> --input m_<n>`: sb-core checks m_<n> is a message

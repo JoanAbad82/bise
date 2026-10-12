@@ -13,7 +13,7 @@
 # (their wake message waits in the queue); the REPLs stay up, idle.
 #
 # Here: the decisions over the state and the words. core.bend's pause
-# section runs them (it holds pump and the interrupt). Laws in LAWS.bend:
+# section runs them (it holds pump and the interrupt). Laws in bend/laws/hub.bend:
 # paused_delivers_nothing, pause_stops_every_turn, resume_delivers_held,
 # pause_idempotent, pause_keeps_order, pause_replays, timer_held_while_paused.
 import Base

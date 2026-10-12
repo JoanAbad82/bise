@@ -2,8 +2,10 @@
 
 Status: step 2 (the Rust mirror) done by hub-lag-7 (2026-10-11, see "Done"
 below); step 1's measure of sb-core done by hot-core (sha 0, "Measure"
-below: the boot's growth was the agent walks, fixed); steps 3-4 next,
-retargeted on a user line. Plan agreed by architect
+below: the boot's growth was the agent walks, fixed); chunk V (the Rust
+side of a step: the typed view, the hot sets, the caches) done by
+hot-view ("Done: chunk V" below); steps 3-4 next, retargeted on
+sb-core's share of a user line. Plan agreed by architect
 (m_15238). Found by hub-fifo (2026-10-09). Label: hub, perf. Follows
 bcca8231 (one pass per step) and hub-fifo's inbox lanes and state throttle.
 
@@ -253,6 +255,55 @@ over a list that grows.
 | xhub-model (8 walks) | cross-hub routes and messages | no (2 on his hub) |
 | vendor json `get_kv`, `set_kv`, `remove_kv`, `insert_kv_go` | one object's keys | no (short, but everywhere: the codecs) |
 | core/image, core/wire, runtime/gate-pure, vendor/http (6) | REPL-side, short | no |
+
+## Done: chunk V (hot-view, 2026-10-12)
+
+The Rust side of a step, on the same journal copy (529 agents, 19,474
+messages, 8 hot). Each sha: bench_step before/after, `bench_byte_equal`
+(the same digests with old and new code), quick gate; signed by
+architect.
+
+- **sha 1 (c0e44eba): sb-core's view is typed.** `bise_proto::core::view`
+  (View, ViewAgent, ViewMsg, declared with `core_records!`) generates
+  `bend/hub/gen/view.bend`; `load_view` (core_view.rs) decodes it once.
+  No string-keyed read of the view is left. A view that does not decode
+  is logged and the step's effects still run.
+- **sha 2a (06598d81): `board::Threads`**, kept by `State::put_msg`
+  (one writer): `agent_threads` 31.6 -> 0.41 ms.
+- **sha 2b (fba1f7d5): sb-core says which messages are hot.** ViewMsg
+  gains `queued` and `owes`; view.bend calls `M.is_queued` and
+  `MRec.owes`, the one def the steps' `unanswered_in` calls too, so the
+  rule cannot drift. The Rust predicates are gone; `Waiting` walks the
+  hot set (`State::hot()`): 9.4 -> 0.55 ms.
+- **sha 2c (1c5b87ce): caches deleted where fresh is cheap.** contexts.rs's
+  questions cache, snapshot_rows' message part and `State::msgs_rev`
+  (hub-lag-7's 5b keyed on it): each built fresh is under 1 ms.
+- **sha 2d (this one): contexts.rs's per-task cache goes.** `refresh`
+  builds every context fresh and pushes the texts that changed. Same
+  inputs, 30 activities: cached 5.56 ms median, fresh 5.34 ms.
+
+| step | before V (hot-core sha 0 bench) | after 2d |
+|---|---|---|
+| tick | 10.0 ms (Rust 9.5) | 6.3 ms (Rust 5.6) |
+| REPL tool line | 7.7 ms | 4.5 ms |
+| hello + its snapshot | 184.6 ms | 67.5 ms |
+| user line to main | 98.3 ms (sb-core 24.7 + Rust 73.6) | 22.2 ms (sb-core 15.8 + Rust 6.4) |
+| contexts from nothing | 45.3 ms | 4.0 ms |
+| snapshot alone (kept rows) | 14.5 ms | 12.2 ms |
+
+(Debug build, `heavy-run --alone`, machine load ~30: Rust numbers move
+20-30 % between runs. A flood of 1000 tool lines: 4.2 ms per line.)
+PROOF shards alone, main vs 2b: 21/15/9/31 s vs 22/12/10/25 s (the
+122 s of one quick gate was load).
+
+**Done-when "<5 ms per input":** met for a REPL tool line (4.5 ms). Not
+met for a tick (Rust 5.6 ms) nor a user line, whose 15.8 ms is sb-core's
+(steps 3-4, hot-core's profile). **Why V stops here:** what is left of
+the Rust side per input is main's context (`status_block` ~1 ms,
+`Group::of` ~0.9 ms), each under 10 % of a tick (architect's stop rule);
+the snapshot (12 ms) is off the tick path, behind the state gate. Still
+reading cold messages on the Rust side, named in State's header: core_link
+`deliver`, `board::agent_threads`, `core.rs` `card_note`.
 
 ## Risks
 

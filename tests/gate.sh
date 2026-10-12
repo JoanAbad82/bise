@@ -4,7 +4,8 @@
 #   gate.sh [quick]   what the tree's changes touch, ~5-10 s warm: clippy -D
 #                     warnings (next to the tests, in $target/clippy), the
 #                     tests of the changed crates and of the crates using them; if a .bend file of core/ hub/ vendor/
-#                     or LAWS/PROOF changed: PROOF.bend (4 shards in parallel).
+#                     or of laws/ proofs/ changed: PROOF, every bend/proofs/*.bend
+#                     in parallel (tests/proof_run.py, 4 jobs).
 #                     The tests run bins.sh's cached sb-core of the tree's
 #                     hub/ vendor/ itself (SB_CORE_BIN = the cache file, one
 #                     compile per source hash for every worktree and the
@@ -367,7 +368,7 @@ base="${GATE_BASE:-HEAD}"
 changed="$( { git diff --name-only "$base"; git ls-files --others --exclude-standard; } | sort -u)"
 hub_changed=0 bend_changed=0
 printf '%s\n' "$changed" | grep -qE '^bend/(hub|vendor)/' && hub_changed=1
-printf '%s\n' "$changed" | grep -qE '^bend/((core|hub|vendor)/.*|LAWS|PROOF)\.bend$' && bend_changed=1
+printf '%s\n' "$changed" | grep -qE '^bend/(core|hub|vendor|laws|proofs)/.*\.bend$' && bend_changed=1
 # ./sb-core (not in git, BISE-114): the build of this tree's hub/ vendor/,
 # from bins.sh's cache shared by every worktree (a copy; ~15 s on a miss).
 # quick with a hub/ change: bins.sh compiles it in the background (below)
@@ -503,8 +504,8 @@ python3 "$root/tests/test_map.py" --self-test >/dev/null || { python3 "$root/tes
 # no new Bool.pick walk that never stops; the list of old ones only shrinks (tests/pick_gate.py)
 python3 "$root/tests/pick_gate.py" || { echo "GATE quick FAILED"; exit 1; }
 cache="${CARGO_TARGET_DIR:-$root/rust/target}/gate-cache"
-# the PROOF shards sit in a copy of bend/ in it and import it relatively
-# (bend refuses an absolute import path with a dot, like ~/.bise/gate/...)
+# the proofs files are checked in a copy of bend/ in it (tests/proof_run.py:
+# bend refuses an import path with a dot, like ~/.bise/gate/...)
 out="$(mktemp -d "${TMPDIR:-/tmp}/sbgateXXXXXX")"
 mkdir -p "$cache"
 fail() {  # <name> <log>: the failures, the log kept
@@ -522,20 +523,14 @@ hash_of() {  # <dirs/files...>: one hash of the .bend files' names and contents
 # the bend part, in the background (it takes longer than cargo)
 proof_job() {
   # keyed by the bend version too: a new checker rechecks the same files
-  local h; h="$(hash_of bend/core bend/hub bend/vendor bend/LAWS.bend bend/PROOF.bend)-$(BEND_NO_TELEMETRY=1 bend version 2>/dev/null | tr -dc '0-9.')"
+  local h; h="$(hash_of bend/core bend/hub bend/vendor bend/runtime bend/laws bend/proofs)-$(BEND_NO_TELEMETRY=1 bend version 2>/dev/null | tr -dc '0-9.')"
   [ -f "$cache/proof-ok-$h" ] && { echo "ok   PROOF (cached)"; return 0; }
-  local d="$out/proof" n=4 s=$SECONDS i pids=()
+  local d="$out/proof"
   mkdir -p "$d"
-  python3 tests/proof_shards.py "$root/bend" $n "$d" || { echo "FAIL PROOF (split)"; return 1; }
-  for i in $(seq 0 $((n - 1))); do bend "$d/P$i.bend" --check-only >"$d/P$i.log" 2>&1 & pids+=($!); done
-  wait "${pids[@]}"
-  for i in $(seq 0 $((n - 1))); do
-    grep -q "ALL PROOFS CHECK" "$d/P$i.log" && continue
-    grep -qx "Error: $(cat "$d/P$i.expect") TODOs found." "$d/P$i.log" && continue
-    echo "FAIL PROOF ($((SECONDS - s))s): shard $i of $n"; grep -v '^- ' "$d/P$i.log" | head -20
-    echo "(rerun whole: bend bend/PROOF.bend)"; return 1
-  done
-  touch "$cache/proof-ok-$h"; echo "ok   PROOF ($((SECONDS - s))s, $n shards)"
+  # every bend/proofs/*.bend, 4 at once: one line per failing file, the last
+  # line ok/FAIL with the wall and CPU time
+  python3 tests/proof_run.py "$root" 4 "$d" >"$d/run.log" 2>&1 || { grep -v '^ok  ' "$d/run.log" | head -40; return 1; }
+  touch "$cache/proof-ok-$h"; tail -1 "$d/run.log"
 }
 # the sb-core of the tests: bins.sh's cache file of this tree's hub/ vendor/
 # (keyed by their content), run in place, never copied. It used to be a

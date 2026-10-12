@@ -56,8 +56,13 @@ core_records! {
             turn_ms: OptNat,
             turns: Nat,
         },
-        /// One message with its state, and whether its question is settled.
-        ViewMsg = "msg" => VMsg { msg: Json, state: Json, settled: Bool },
+        /// One message with its state, whether its question is settled,
+        /// and what sb-core says of it (model.bend's predicates, the ones
+        /// its steps use): `queued` waits for delivery, `owes` was
+        /// delivered and expects a reply not given yet. The hub's
+        /// Waiting reads these, never a predicate of its own (hot-view
+        /// sha 2b).
+        ViewMsg = "msg" => VMsg { msg: Json, state: Json, settled: Bool, queued: Bool, owes: Bool },
         /// The view. A missing `all_agents` reads true (every agent), a
         /// missing `next_msg`/`next_card` 1, as the hub read them before.
         View = "view" => VView {

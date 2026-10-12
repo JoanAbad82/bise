@@ -27,8 +27,9 @@ Crates: `home` (every path) ← `session`, `plugins`, `images` ← `catalog` ←
 - **Rust ↔ sb-core** (`switchboard/src/core.rs` ↔ `bend/hub/main.bend`): one
   JSON input per line; sb-core answers `{fx, dirty}`, or `{need}` for a git
   query (the hub runs it through `Env` and sends the input again with the
-  answer). The laws in `bend/LAWS.bend` cover it; `PROOF.bend` runs in the
-  gate. Every kind that crosses it is declared once in `bise_proto::core`
+  answer). The laws in `bend/laws/*.bend` cover it (the hub's in
+  `bend/laws/hub.bend`); each is closed by its `bend/proofs/<area>.bend`,
+  every one checked in the gate (`tests/proof_run.py`). Every kind that crosses it is declared once in `bise_proto::core`
   (`In`, `Link`, `Fx`, `Answer`, and `Feed` for the transcript records
   `sb <kind> :: <json>`); the Rust types are serde, sb-core's codecs are
   generated into `bend/hub/gen/` (`BISE_PROTO_BLESS=1 cargo test -p
@@ -64,7 +65,7 @@ Crates: `home` (every path) ← `session`, `plugins`, `images` ← `catalog` ←
 ## Where does this go
 
 - **It decides who gets woken, told, queued, or what a message/card/wait
-  becomes** → sb-core (`bend/hub/core.bend`), with a law in `LAWS.bend` when
+  becomes** → sb-core (`bend/hub/core.bend`), with a law in `bend/laws/hub.bend` when
   it changes an invariant. Not in `daemon.rs`, not in a Rust module beside the
   core.
 - **It runs a process, touches git, a file, a socket or the network** → the
@@ -117,8 +118,8 @@ Before you add a field, name who owns it.
 
 Who gets woken, told or queued is a decision.
 
-- Good: `stop_leaves_no_waiter`, `delivered_once` in `bend/LAWS.bend`,
-  checked by `PROOF.bend` in every gate.
+- Good: `stop_leaves_no_waiter`, `delivered_once` in `bend/laws/hub.bend`,
+  proved in `bend/proofs/hub.bend`, checked in every gate.
 - Bad: timer wakes in `every.rs` ("a wake while busy waits, never stacked",
   retried after a minute): sb-core's queued-message logic written again in
   Rust, with no law.

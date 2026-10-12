@@ -291,7 +291,7 @@ description, not a removed one).
   `run_typescript`.
 - `tests/plugins_sb_live.py` (live model): the
   same from a Switchboard task on a throwaway hub.
-- `bend PROOF.bend`, the scripted e2e suite and the TUI tmux suite stay
+- the laws (`tests/proof_run.py`: every `bend/proofs/*.bend`), the scripted e2e suite and the TUI tmux suite stay
   green (scripted runs never start the bridge).
 
 ### Remote servers (Streamable HTTP, SSE)

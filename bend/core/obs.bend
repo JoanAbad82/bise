@@ -1,7 +1,7 @@
 # core/obs.bend — observation rendering, pure.
 #
 # Every obs renders as ONE line with the "  obs: " prefix: the wire
-# contract every client (TUI, nc) parses. LAWS.bend pins the format.
+# contract every client (TUI, nc) parses. bend/laws/ pins the format.
 import Base
 import ./types.bend as T
 import ./wire.bend as W

@@ -13,7 +13,7 @@
 # Bend has no import cycles: this module is imported by model.bend, so
 # it imports neither model nor core); the clock (Rust: the tick's `now`,
 # every::next_daily for a daily timer); the words (Rust every.rs: labels,
-# the list, the wake texts). The laws: LAWS.bend fire_is_a_message,
+# the list, the wake texts). The laws: bend/laws/hub.bend fire_is_a_message,
 # wake_never_stacked, times_bound, stop_leaves_no_timer.
 import Base
 
@@ -328,7 +328,7 @@ def ids_in(xs: List<&2, Timer>, +ns: List<&2, String>) -> List<&2, Nat>:
     case Con{+h, +t}:
       Bool.pick(List<&2, Nat>, str_in(ns, Timer.agent(h)), Timer.id(h) <> ids_in(t, ns), ids_in(t, ns))
 
-# ---- for the law stop_leaves_no_timer (PROOF.bend) ----
+# ---- for the law stop_leaves_no_timer (bend/proofs/hub.bend) ----
 
 def nat_in(xs: List<&2, Nat>, +n: Nat) -> Bool:
   match xs:

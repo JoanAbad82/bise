@@ -48,7 +48,7 @@ For anything beyond the basics, read `reference/client-api.md` (full client API 
 Separate a harness bug from an environment/model flake — run the deterministic gates from the repo root:
 
 ```sh
-~/.bend/bin/bend bend/PROOF.bend     # laws (NEVER `bend update`: pin 2.0.27)
+python3 tests/proof_run.py . 4 "$TMPDIR/proofs"   # laws: every bend/proofs/*.bend (NEVER `bend update`: pin 2.0.27)
 bend bend/runtime/demo.bend -o harness-demo && ./harness-demo > /tmp/demo-a.txt && ./harness-demo > /tmp/demo-b.txt && diff /tmp/demo-a.txt /tmp/demo-b.txt   # deterministic
 ~/.bend/bin/bend bend/tests/test-bg.bend -o /tmp/bg-suite && rm -rf /tmp/bgtest && BEND_BG_ROOT=/tmp/bgtest BEND_BG_AFTER=2 /tmp/bg-suite
 ```
@@ -71,7 +71,7 @@ Write reports as markdown (scratchpad or the file the user asked for), one repor
 
 - Session checkpoints: `/tmp/bend-sessions/session-<port>.txt` (client-spawned) or `~/.bend-harness/sessions/` (binary-spawned). Format: the checkpoint text protocol (core/checkpoint.bend).
 - The harness can test ITSELF: via `say()`, ask the live agent to exercise its own tools (bash, background slots, skills, programmatic calling) and return a structured report — it knows its own contract. That is the QA-round pattern; parse its final answer for findings.
-- Tool routing: `bend/runtime/main.bend` (`exec_pick` top-level, `exec_program.call` from the sandbox). Pure contracts are pinned in `bend/LAWS.bend`, closed by `bend/PROOF.bend`.
+- Tool routing: `bend/runtime/main.bend` (`exec_pick` top-level, `exec_program.call` from the sandbox). Pure contracts are pinned in `bend/laws/*.bend`, each closed by its `bend/proofs/*.bend`.
 - MCP index `~/.bend-harness/mcp-index.txt`, skills index `~/.bend-harness/skills-index.txt`.
 
 ## Gotchas

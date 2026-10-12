@@ -2,7 +2,7 @@
 #
 # A command runs inside a generated /bin/sh wrapper: a sync window, then
 # a background handoff with a file contract (slot dir, out, rc, stdin
-# fifo). The contract text is pure and pinned by LAWS.bend; bash_exec
+# fifo). The contract text is pure and pinned by bend/laws/; bash_exec
 # is the one effect.
 import Base
 import ../core/text.bend as Tx

@@ -4,7 +4,7 @@
 # the projected model input to this line format, and core/api.bend
 # parses it back in the same process to build the provider JSON. The
 # reply takes the same detour (api.bend renders OK/CALL/END lines,
-# parse_reply reads them). LAWS.bend pins both directions.
+# parse_reply reads them). bend/laws/ pins both directions.
 #
 # Request (newline-separated):
 #   MODEL default

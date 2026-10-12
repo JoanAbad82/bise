@@ -82,7 +82,7 @@ impl Hub {
         }
         for r in v.msgs {
             let Some(m) = parse::<Msg>(&r.msg) else { continue };
-            self.st.put_msg(m, parse(&r.state), r.settled);
+            self.st.put_msg(m, parse(&r.state), r.settled, Hot { queued: r.queued, owes: r.owes });
         }
         if let Some(cards) = v.cards {
             self.st.cards = cards.iter().filter_map(|c| parse(c).map(|c: Card| (c.id, c))).collect();

@@ -43,7 +43,7 @@ changes, so no-strip costs little. (The versions dirs today hold the
 110 MB *debug* jsrt: shipping the release one is already a big saving.)
 
 **Not needed at run time**: the Bend compiler, cargo, the `.bend` sources,
-`LAWS.bend`/`PROOF.bend`. The Bend outputs are plain native executables.
+`bend/laws/`, `bend/proofs/`. The Bend outputs are plain native executables.
 Without sources, `/reload` restarts the REPL on the shipped binary (the
 recompile step logs "source not found, keeping the binary") — fine.
 
