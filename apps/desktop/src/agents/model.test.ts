@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { ago, archivedOf, assign, dotOf, endOf, lineOf, liveOf, numbersOf } from './model';
+import { ago, archivedEnd, archivedOf, assign, dotOf, endOf, lineOf, liveOf, numbersOf } from './model';
 
 const T = 1_791_100_000_000;
 const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: false, status: 'idle', archived: false, title: '', purpose: '', since_ms: T, waits: 0, watching: [], ...over });
@@ -38,6 +38,10 @@ describe('the agents list', () => {
     expect(endOf(ag('a', { waits: 3 }), T)).toEqual({ text: '3', needs: true });
     expect(endOf(ag('a', { status: 'working' }), T + 12 * 60_000)).toEqual({ text: '12 min', needs: false });
     expect(endOf(ag('a', { status: 'done' }), T)).toEqual({ text: 'done', needs: false });
+    // an archived one on /archived (designer m_19489): how it ended, then how long ago
+    expect(archivedEnd(ag('a', { archived: true, status: 'done' }), T + 50 * 3_600_000)).toBe('✓ done · 2 d');
+    expect(archivedEnd(ag('a', { archived: true, status: 'idle' }), T + 3 * 3_600_000)).toBe('– stopped · 3 h');
+    expect(archivedEnd(ag('a', { archived: true, status: 'failed' }), T)).toBe('– stopped · now');
     expect(ago(T, T + 30_000)).toBe('now');
     expect(ago(T, T + 3 * 3_600_000)).toBe('3 h');
     expect(ago(T, T + 50 * 3_600_000)).toBe('2 d');

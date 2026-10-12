@@ -6,13 +6,13 @@
 // (actions.ts). Owner: amb-win.
 import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Peek } from './Peek';
-import { Button, Empty, Head, Row } from '@/ds';
+import { Act, Button, cx, Empty, Head, IconButton, Row } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAgents, useStore } from '@/store';
 import { useRouter } from '@/app/router';
 import { useNow } from '@/app/clock';
 import { keep, useKeptScroll } from '@/app/keep';
-import { archivedOf, dotOf, endOf, lineOf, liveOf } from './model';
+import { archivedEnd, archivedOf, dotOf, endOf, lineOf, liveOf } from './model';
 import { NewAgentSheet, Tune } from './Tune';
 import './agents.css';
 
@@ -140,107 +140,99 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: 
   };
   return (
     <div className={sel ? 'ag-item is-sel' : 'ag-item'} data-testid={`agents.row.${id}`} data-status={a.status} data-sel={sel || undefined} aria-selected={sel}>
-      <Row
-        kind={a.archived ? 'arch' : 'ag'}
-        name={a.main ? 'bise' : a.name}
-        dot={a.archived ? undefined : dotOf(a.status)}
-        // R9/S3: one that waits on someone starts with the sidebar's sign, not its status dot (designer m_14246)
-        {...(!a.archived && a.waits === 0 && a.waiting_on?.who === 'agent' ? { lead: <span className="app-sign dim" aria-label="waiting">⋯</span> } : {})}
-        {...(!a.archived && a.waits === 0 && a.waiting_on?.who === 'you' ? { lead: <span className="app-sign acc" aria-label="asks you">?</span> } : {})}
-        end={end.text}
-        needs={end.needs}
-        onClick={() => {
-          router.go({ screen: 'thread', project, agent: a.name });
-        }}
-        testId={`agents.open.${id}`}
-      />
-      {/* one line each, full words on hover, and the report's line always there (empty until one
-          comes): words that come or change never move the buttons under them (qa-flows' app/clicks:
-          a report arriving mid-click put the click on its words) */}
-      <p className="ag-line" title={lineOf(a)}>
-        {lineOf(a)}
-      </p>
-      {a.report != null ? (
-        <p className="ag-report" title={`${a.report.kind} · ${a.report.text}`} data-testid={`agents.report.${id}`}>
-          {a.report.kind} · {a.report.text}
-        </p>
-      ) : (
-        !a.main && !a.archived && <p className="ag-report" aria-hidden="true" />
-      )}
-      {!a.main && (
-        <div className="ag-acts">
-          {a.archived ? (
-            <Button
-              kind="ghost"
+      {/* one row (designer m_19489): its sign, its name, then at its right its acts (shown on
+          hover, on the ↑↓-selected row and with the focus in it; an archived one's restore always)
+          and its end, so a row is one line high. bise's own row has no acts. */}
+      <div className="ag-top">
+        <Row
+          kind={a.archived ? 'arch' : 'ag'}
+          name={a.main ? 'bise' : a.name}
+          dot={a.archived || a.status === 'done' ? undefined : dotOf(a.status)}
+          // a finished one is a dim ✓, never green (designer m_19489: done lines are dim)
+          {...(!a.archived && a.status === 'done' && a.waits === 0 && a.waiting_on == null ? { lead: <span className="app-sign dim" aria-label="done">✓</span> } : {})}
+          // R9/S3: one that waits on someone starts with the sidebar's sign, not its status dot (designer m_14246)
+          {...(!a.archived && a.waits === 0 && a.waiting_on?.who === 'agent' ? { lead: <span className="app-sign dim" aria-label="waiting">⋯</span> } : {})}
+          {...(!a.archived && a.waits === 0 && a.waiting_on?.who === 'you' ? { lead: <span className="app-sign acc" aria-label="asks you">?</span> } : {})}
+          onClick={() => {
+            router.go({ screen: 'thread', project, agent: a.name });
+          }}
+          testId={`agents.open.${id}`}
+        />
+        {a.archived ? (
+          <span className="ag-ra is-on">
+            <Act
               onClick={() => {
                 store.command({ cmd: 'unarchive', project, agent: a.name });
               }}
               testId={`agents.restore.${id}`}
             >
               restore
-            </Button>
-          ) : (
-            <>
-              <Button
-                kind="ghost"
-                onClick={() => {
-                  store.command({ cmd: 'archive', project, agent: a.name, force: a.status === 'working' });
-                }}
-                testId={`agents.archive.${id}`}
-              >
-                archive
-              </Button>
-              <Button
-                kind="ghost"
-                title="rename, model, reasoning"
-                onClick={() => {
-                  setTuning((x) => !x);
-                }}
-                testId={`agents.more.${id}`}
-              >
-                …
-              </Button>
-              {a.branch != null && (
-                <Button
-                  kind="ghost"
-                  onClick={() => {
-                    router.go({ screen: 'review', project, agent: a.name });
-                  }}
-                  testId={`agents.review.${id}`}
-                >
-                  review
-                </Button>
-              )}
-              {/* last: it comes and goes with the turn, and never moves the buttons before it (a click
-                  aimed at archive stays on archive when it starts; qa-flows' app/clicks) */}
+            </Act>
+          </span>
+        ) : (
+          !a.main && (
+            <span className="ag-ra">
+              {/* first: it comes and goes with the turn, and the acts are right-aligned, so it
+                  never moves the ones after it (a click aimed at archive stays on archive when a
+                  turn starts; qa-flows' app/clicks) */}
               {a.status === 'working' && (
-                <Button
-                  kind="ghost"
+                <Act
                   onClick={() => {
                     store.stop(project, a.name);
                   }}
                   testId={`agents.stop.${id}`}
                 >
                   stop
-                </Button>
+                </Act>
               )}
-            </>
-          )}
-        </div>
+              {a.branch != null && (
+                <Act
+                  onClick={() => {
+                    router.go({ screen: 'review', project, agent: a.name });
+                  }}
+                  testId={`agents.review.${id}`}
+                >
+                  review
+                </Act>
+              )}
+              <Act
+                onClick={() => {
+                  store.command({ cmd: 'archive', project, agent: a.name, force: a.status === 'working' });
+                }}
+                testId={`agents.archive.${id}`}
+              >
+                archive
+              </Act>
+              <IconButton
+                size="row"
+                label="rename, model, reasoning"
+                pressed={tuning}
+                onClick={() => {
+                  setTuning((x) => !x);
+                }}
+                testId={`agents.more.${id}`}
+              >
+                ⋯
+              </IconButton>
+            </span>
+          )
+        )}
+        <span className={cx('ag-end', !a.archived && end.needs && 'nd')} data-testid={`agents.end.${id}`}>
+          {a.archived ? archivedEnd(a, now) : end.text}
+        </span>
+      </div>
+      {/* one line each, full words on hover, and only when there are words: the acts sit on the
+          row's own line now, so a line or a report that comes never moves them (qa-flows'
+          app/clicks), and an agent with neither stays one line high (designer m_19489) */}
+      {lineOf(a) !== '' && (
+        <p className="ag-line" title={lineOf(a)}>
+          {lineOf(a)}
+        </p>
       )}
-      {a.main && !a.archived && (
-        <div className="ag-acts">
-          <Button
-            kind="ghost"
-            title="model, reasoning"
-            onClick={() => {
-              setTuning((x) => !x);
-            }}
-            testId={`agents.more.${id}`}
-          >
-            …
-          </Button>
-        </div>
+      {a.report != null && (
+        <p className="ag-report" title={`${a.report.kind} · ${a.report.text}`} data-testid={`agents.report.${id}`}>
+          {a.report.kind} · {a.report.text}
+        </p>
       )}
       {peek && <Peek project={project} agent={a.name} />}
       {tuning && !a.archived && (

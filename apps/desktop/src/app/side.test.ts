@@ -83,6 +83,9 @@ describe('the frame', () => {
     expect(crumbOf({ screen: 'thread', project: 'p', agent: 'perf' }, name)).toEqual(['storefront', 'perf']);
     expect(crumbOf({ screen: 'thread', project: 'p', agent: 'main' }, name)).toEqual(['storefront']);
     expect(crumbOf({ screen: 'scheduled' }, name)).toEqual(['scheduled']);
+    // /agents and /archived are two lists, each its own crumb (designer m_19489)
+    expect(crumbOf({ screen: 'agents', project: 'p' }, name)).toEqual(['storefront', 'agents']);
+    expect(crumbOf({ screen: 'agents', project: 'p', archived: true }, name)).toEqual(['storefront', 'archived']);
   });
   it('the keys: ⌘\\ the sidebar, ⌥⌘0 the panel, ⌘N add a project, ⌘, settings', () => {
     const k = (code: string, m: Partial<KeyLike> = {}): KeyLike => ({ key: '', code, metaKey: true, altKey: false, ctrlKey: false, shiftKey: false, ...m });

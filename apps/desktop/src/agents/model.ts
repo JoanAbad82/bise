@@ -61,6 +61,14 @@ export function endOf(a: Agent, now: number): { text: string; needs: boolean } {
 }
 
 /**
+ * An archived agent's end on /archived, dim (designer m_19489): how it ended, then how long ago:
+ * '✓ done · 2 d' for one that finished, '– stopped · 3 h' for any other. Pure.
+ */
+export function archivedEnd(a: Agent, now: number): string {
+  return `${a.status === 'done' ? '✓ done' : '– stopped'} · ${ago(a.since_ms, now)}`;
+}
+
+/**
  * The live list in the TUI's panel order (qa-flows 5ee10a00): main first,
  * then the hub's order, which is start order; a status never moves a row
  * (the dot and the end say what needs him). Archived agents are not in it

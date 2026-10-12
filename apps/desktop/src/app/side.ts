@@ -143,6 +143,8 @@ export function crumbOf(route: Route, name: (project: string) => string): string
     case 'thread':
       return route.agent === MAIN ? [name(route.project)] : [name(route.project), route.agent];
     case 'agents':
+      // /archived is its own list, its crumb says so (designer m_19489)
+      return [name(route.project), route.archived === true ? 'archived' : 'agents'];
     case 'changes':
     case 'prs':
     case 'environments':

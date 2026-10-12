@@ -65,7 +65,54 @@ test('agents/archived-list: /agents lists only the live agents, /archived only t
     await expect(live.locator(T.row('old')), 'the archived agent is not in /agents').toHaveCount(0);
     await expect(page.locator('[data-testid="agents.archived"]'), 'no archived row on the live list').toHaveCount(0);
     await expect(live).toContainText('3 live');
-    await page.screenshot({ path: test.info().outputPath('agents.png') });
+    await expect(page.getByTestId('app.title.crumb'), "the crumb: 'acme › agents'").toHaveText(/acme\s*›\s*agents/);
+
+    // the rows (designer m_19489): one line each, the acts on the row at its right before the
+    // end; bise's row has none; a finished one is a dim ✓, no dot
+    const box = async (sel: string) => {
+      const b = await page.locator(sel).boundingBox();
+      if (b === null) throw new Error(`${sel} has no box`);
+      return b;
+    };
+    const top = (n: string) => `${T.row(n)} .ag-top`;
+    await page.locator(top('perf')).hover();
+    for (const act of ['agents.stop.perf', 'agents.archive.perf', 'agents.more.perf']) {
+      const r = await box(top('perf'));
+      const a = await box(`[data-testid="${act}"]`);
+      const mid = a.y + a.height / 2;
+      expect(mid > r.y && mid < r.y + r.height, `${act} sits on perf's row, not on a line of its own`).toBe(true);
+      const end = await box('[data-testid="agents.end.perf"]');
+      expect(a.x + a.width <= end.x, `${act} is before the end`).toBe(true);
+    }
+    const rowH = (await box(top('perf'))).height;
+    expect(rowH, 'a row is one line high').toBeLessThan(40);
+    await expect(page.getByTestId('agents.more.main'), "bise's row has no acts").toHaveCount(0);
+    await expect(page.locator(`${T.row('main')} .ag-ra`), "bise's row has no acts").toHaveCount(0);
+    await expect(page.locator(`${T.row('docs')} .b-dot`), 'docs (done) has no dot').toHaveCount(0);
+    await expect(page.locator(`${T.row('docs')} [aria-label="done"]`), 'docs is a dim ✓').toHaveText('✓');
+
+    // frames for designer: light and dark at 1100, perf hovered so its acts show
+    const size = async (w: number, h: number) => {
+      await s.app.evaluate(({ BrowserWindow }, [w, h]) => {
+        const win = BrowserWindow.getAllWindows().sort((a, b) => (b.getSize()[0] ?? 0) - (a.getSize()[0] ?? 0))[0];
+        win?.setContentSize(w, h);
+      }, [w, h] as const);
+      await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(w);
+    };
+    const theme = async (t: 'light' | 'dark') => {
+      const p = world()[0] as { ev: string; prefs: Record<string, unknown> };
+      await core.send({ ev: 'prefs', prefs: { ...p.prefs, theme: t } } as never);
+      await expect.poll(() => page.evaluate(() => document.documentElement.dataset['theme']), { timeout: 5000 }).toBe(t);
+    };
+    const frames = async (name: string, hover: string) => {
+      await size(1100, 720);
+      for (const t of ['light', 'dark'] as const) {
+        await theme(t);
+        await page.locator(hover).hover();
+        await page.screenshot({ path: test.info().outputPath(`${name}-${t}-1100.png`) });
+      }
+    };
+    await frames('agents', top('perf'));
 
     // back to main's thread, then /archived, as he would type it
     await page.locator(`[data-testid="app.sidebar.project.${P}"]`).click();
@@ -78,7 +125,15 @@ test('agents/archived-list: /agents lists only the live agents, /archived only t
     for (const n of ['main', 'perf', 'docs']) await expect(arch.locator(T.row(n)), `${n} is not archived`).toHaveCount(0);
     await expect(page.getByTestId('agents.new'), "no '+ new agent' on the archived list").toHaveCount(0);
     await expect(arch).toContainText('1 archived');
-    await page.screenshot({ path: test.info().outputPath('archived.png') });
+    await expect(page.getByTestId('app.title.crumb'), "the crumb: 'acme › archived'").toHaveText(/acme\s*›\s*archived/);
+    // an archived row: its name, restore on the same row, then its end dim: '✓ done · <age>'
+    await expect(page.getByTestId('agents.end.old')).toHaveText(/^✓ done · /);
+    {
+      const r = await box(top('old'));
+      const a = await box(T.restore('old'));
+      expect(a.y + a.height / 2 > r.y && a.y + a.height / 2 < r.y + r.height, 'restore sits on its row').toBe(true);
+    }
+    await frames('archived', top('old'));
   } finally {
     await s.close();
     core.dispose();

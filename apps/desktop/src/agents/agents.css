@@ -26,6 +26,57 @@
   background: var(--c-hover, transparent);
 }
 
+/* one row (designer m_19489): the Row, then its acts and its end on the same line; the whole
+   line takes the row's 6% hover, not just the Row's button */
+.ag-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 8px;
+  border-radius: var(--r-2);
+  transition: background var(--d-fast) var(--ease-out);
+}
+.ag-top:hover {
+  background: var(--c-hover);
+}
+.ag-top > .b-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ag-top > .b-row.btn:hover {
+  background: none;
+}
+/* the acts: on hover, on the ↑↓-selected row, with the focus in it; an archived row's restore
+   always. Hidden by opacity, so they keep their room and nothing moves when they show. */
+.ag-ra {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  opacity: 0;
+  transition: opacity var(--d-fast) var(--ease-out);
+}
+.ag-item:hover .ag-ra,
+.ag-item.is-sel .ag-ra,
+.ag-top:focus-within .ag-ra,
+.ag-ra.is-on {
+  opacity: 1;
+}
+/* the end: the Row's own end look (mono 11, text-3; what needs him in the accent) */
+.ag-end {
+  flex: none;
+  font-size: var(--t-11);
+  color: var(--c-text-3);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.ag-end.nd {
+  color: var(--c-accent);
+  font-family: var(--font-ui);
+  font-weight: 650;
+  font-size: var(--t-12);
+}
+
 /* its feed in place, read only */
 .ag-peek {
   margin: 8px 0 4px 24px;
@@ -51,11 +102,6 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-/* no report yet: its line is kept, so one that comes doesn't push the buttons down */
-.ag-report:empty {
-  min-height: 1lh;
-}
-
 .ag-acts {
   display: flex;
   gap: 6px;
