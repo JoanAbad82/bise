@@ -148,6 +148,35 @@ fn a_wake_line_takes_its_message_in_by_id() {
     ];
     let e = fold(&ls, &ctx_with(&[], &page));
     assert_eq!(e.iter().map(|e| e.kind).collect::<Vec<_>>(), [EntryKind::Wake]);
+    // a line written before `agent` came: the thread's own wake
+    assert_eq!(e[0].wake.as_ref().map(|w| w.agent.as_str()), Some(""));
+}
+
+/// Another agent's wake in main's thread (ambient-lead m_19783, designer
+/// m_19383's tiers): bise's message to that agent and the typed `wake`
+/// line (its `agent` set) make one wake entry, in either order, at the
+/// message's place; the window reads who it is for.
+#[test]
+fn another_agents_wake_in_mains_thread_is_one_typed_entry() {
+    let page = |_: &str| None;
+    let w = r#"{"id":4,"ev":"ended","kind":"bg","what":"cargo test","rc":0,"after_ms":61000,"msg":7,"agent":"mcp-errors"}"#;
+    let ls = vec![
+        (1, 1001, "sb you : go".to_string()),
+        (2, 1002, "sb msg : switchboard → mcp-errors m_7 : background 4 ended · rc 0".to_string()),
+        (3, 1003, format!("sb wake : {w}")),
+        (4, 1004, "sb msg : perf → docs m_8 : the numbers are in".to_string()),
+    ];
+    let e = fold(&ls, &ctx_with(&[], &page));
+    assert_eq!(e.iter().map(|e| e.kind).collect::<Vec<_>>(), [EntryKind::You, EntryKind::Wake, EntryKind::FromAgent]);
+    assert_eq!((e[1].pos, e[1].text.as_str()), (2, "cargo test ended · rc 0 · after 1m01s"));
+    assert_eq!(e[1].wake.as_ref().map(|w| w.agent.as_str()), Some("mcp-errors"));
+    assert!(e.iter().all(|e| e.payload_matches_kind()));
+    // the typed line first: the message after it makes nothing
+    let ls = vec![(1, 1003, format!("sb wake : {w}")), (2, 1004, "sb msg : switchboard → mcp-errors m_7 : background 4 ended · rc 0".to_string())];
+    let e = fold(&ls, &ctx_with(&[], &page));
+    assert_eq!(e.iter().map(|e| e.kind).collect::<Vec<_>>(), [EntryKind::Wake]);
+    assert_eq!(e[0].wake.as_ref().map(|w| w.agent.as_str()), Some("mcp-errors"));
+    assert!(serde_json::to_string(&e[0]).unwrap().contains(r#""agent":"mcp-errors""#));
 }
 
 /// A failed turn's kept text (the hub's `sb kept` line, written right

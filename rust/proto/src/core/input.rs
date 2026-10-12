@@ -130,9 +130,9 @@ pub struct Step {
 impl Step {
     /// The envelope fields, in the order the hub writes them.
     pub const FIELDS: &'static [super::Field] = &[
-        super::Field { name: "now", kind: super::FieldKind::Nat },
-        super::Field { name: "git", kind: super::FieldKind::Bool },
-        super::Field { name: "ans", kind: super::FieldKind::Jsons },
+        super::Field::new("now", super::FieldKind::Nat),
+        super::Field::new("git", super::FieldKind::Bool),
+        super::Field::new("ans", super::FieldKind::Jsons),
     ];
 
     /// The input's object with the envelope's fields set.

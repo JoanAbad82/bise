@@ -356,6 +356,26 @@ the default paths.
 User decision: the releases are GitHub Releases of `gvergnaud/bise`; the
 repo stays private for now (friends are collaborators), public later.
 
+**Two release cycles from one main** (desktop-on-main, architect
+m_19472). The desktop app's code (`apps/desktop`) lives on main, but it
+releases apart from the terminal:
+
+| | terminal (`bise`) | desktop app |
+|---|---|---|
+| tags | `vYYYY.M.D-N` (`v*`) | `desktop-vYYYY.M.N` |
+| workflow | `release.yml` | `desktop-release.yml`, OFF until the repo variable `DESKTOP_RELEASE` is `on` |
+| channel | `releases/latest/download/latest.json` | `releases/download/desktop-latest/desktop.json` (a rolling tag) |
+| reader | `bise update`, the hub's hourly check | the desktop core (`app_update`), `release::parse_desktop` |
+
+The rules (`tests/release_split_test.py`, `check-release.py`, the
+`release.rs` tests): the terminal's app root and tarball never hold
+`apps/`, `dev/`, `node_modules` or Electron; `latest.json` never has a
+`desktop` key; a desktop release is a draft and never GitHub's 'latest'
+(that would move every terminal's channel); `desktop.json` has `kind:
+desktop` and names the terminal version of the runtime it carries
+(`runtime_id`). A terminal release never waits on the desktop app, and
+the desktop app ships only when the user says so.
+
 - **The channel** is the latest release's download URL,
   `https://github.com/gvergnaud/bise/releases/latest/download` (the
   Rust const `release::DIST_URL`, stamped into install.sh by

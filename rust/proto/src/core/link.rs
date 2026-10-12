@@ -140,12 +140,12 @@ pub const ANSWER: Table = Table {
     name: "Answer",
     tag_key: "",
     kinds: &[
-        Kind { tag: "step", rust: "Step", bend: "AStep", fields: &[Field { name: "fx", kind: FieldKind::Jsons }, Field { name: "dirty", kind: FieldKind::Bool }, Field { name: "view", kind: FieldKind::Json }] },
-        Kind { tag: "need", rust: "Need", bend: "ANeed", fields: &[Field { name: "need", kind: FieldKind::Json }] },
-        Kind { tag: "view", rust: "View", bend: "AView", fields: &[Field { name: "view", kind: FieldKind::Json }] },
-        Kind { tag: "skipped", rust: "Skipped", bend: "ASkipped", fields: &[Field { name: "skipped", kind: FieldKind::Bool }] },
-        Kind { tag: "skipped_at", rust: "Skipped", bend: "ASkippedAt", fields: &[Field { name: "skipped", kind: FieldKind::Nats }] },
-        Kind { tag: "error", rust: "Error", bend: "AError", fields: &[Field { name: "error", kind: FieldKind::Str }] },
+        Kind { tag: "step", rust: "Step", bend: "AStep", fields: &[Field::new("fx", FieldKind::Jsons), Field::new("dirty", FieldKind::Bool), Field::new("view", FieldKind::Json)] },
+        Kind { tag: "need", rust: "Need", bend: "ANeed", fields: &[Field::new("need", FieldKind::Json)] },
+        Kind { tag: "view", rust: "View", bend: "AView", fields: &[Field::new("view", FieldKind::Json)] },
+        Kind { tag: "skipped", rust: "Skipped", bend: "ASkipped", fields: &[Field::new("skipped", FieldKind::Bool)] },
+        Kind { tag: "skipped_at", rust: "Skipped", bend: "ASkippedAt", fields: &[Field::new("skipped", FieldKind::Nats)] },
+        Kind { tag: "error", rust: "Error", bend: "AError", fields: &[Field::new("error", FieldKind::Str)] },
         Kind { tag: "done", rust: "Done", bend: "ADone", fields: &[] },
     ],
 };

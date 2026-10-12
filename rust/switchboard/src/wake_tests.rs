@@ -167,11 +167,11 @@ fn the_list_shows_the_agents_own_watches() {
     let mut w = Wakes::default();
     let spec = Spec { what: What::Pid { pid: 42, start: String::new() }, tail: None, note: String::new() };
     let v = |id: u64, agent: &str| json!({"id": id, "agent": agent, "spec": spec.json(), "set_at": 0, "max_at": 3_600_000, "quiet": false});
-    w.load_live(&json!([v(1, "a"), v(2, "b")]));
+    w.load_live(&[v(1, "a"), v(2, "b")]);
     let mut e = v(3, "a");
     e["ended_at"] = json!(1000);
     e["why"] = json!("hit");
-    w.load_ended(&json!([e]));
+    w.load_ended(&[e]);
     let l = w.list("a", 60_000);
     assert_eq!(l, "#1 pid 42 · set 1m00s ago · still running at 59m00s\nended:\n  #3 pid 42 · woke you 59s ago");
     assert!(w.list("c", 0).starts_with("no watch"));

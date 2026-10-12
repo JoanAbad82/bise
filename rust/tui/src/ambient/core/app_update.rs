@@ -1,6 +1,8 @@
 //! The desktop app's updates, core side (bar S.6; architect m_11169):
 //! the app says its own build (`app_version {id, built?}`, its VERSION),
-//! the core reads bise's release channel (`latest.json`, through
+//! the core reads the desktop's own release channel (`desktop.json` on
+//! the `desktop-latest` tag, never the terminal's `latest.json`: the two
+//! cycles are apart; through
 //! [`crate::ambient::setup::SetupPorts::manifest`] on its own thread) at
 //! once and every [`RECHECK`], and when bise_home::release says the
 //! channel's desktop build replaces the running one it sends the app
@@ -94,7 +96,7 @@ mod tests {
     fn manifest(id: &str, built: &str) -> String {
         // the build times are only compared in their one form
         let built = if built.len() == 10 { format!("{built}T10:00:00Z") } else { built.to_string() };
-        format!(r#"{{"desktop":{{"darwin-arm64":{{"version":"v-{id}","id":"{id}","url":"app.zip","sha256":"{SHA}","built":"{built}"}}}}}}"#)
+        format!(r#"{{"kind":"desktop","targets":{{"darwin-arm64":{{"version":"v-{id}","id":"{id}","url":"app.zip","sha256":"{SHA}","built":"{built}"}}}}}}"#)
     }
 
     #[test]

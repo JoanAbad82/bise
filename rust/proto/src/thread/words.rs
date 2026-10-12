@@ -548,7 +548,7 @@ mod tests {
         let two = [w(4, WatchKind::File, "build.rc", 50_000), w(3, WatchKind::Bg, "cargo test", 1_000)];
         assert_eq!(waiting_for(&two, 121_000).as_deref(), Some("waiting for cargo test and 1 more · 2m"));
         assert_eq!(waiting_for(&two[..1], 60_000).as_deref(), Some("waiting for build.rc to appear · 10s"));
-        let f = |ev, kind, what: &str, rc, after_ms| WakeFold { id: 1, ev, kind, what: what.into(), noted: false, rc, after_ms, tail: Vec::new(), msg: None };
+        let f = |ev, kind, what: &str, rc, after_ms| WakeFold { id: 1, ev, kind, what: what.into(), noted: false, rc, after_ms, tail: Vec::new(), msg: None, agent: String::new() };
         // a file watch with a note: the note names it (designer m_17730)
         let noted = AgentWatch { noted: true, ..w(5, WatchKind::File, "the reindex", 60_000) };
         assert_eq!(waiting_for(&[noted], 60_000).as_deref(), Some("waiting for the reindex · 0s"));

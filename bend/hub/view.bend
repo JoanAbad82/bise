@@ -1,9 +1,12 @@
 # hub/view.bend — the state the Rust views read (board, snapshot,
 # contexts, prompts), as JSON: sb-core is the only source of truth, the
-# daemon stores this as is.
+# daemon stores this as is. Its shape is declared in bise_proto::core::view
+# (View, ViewAgent, ViewMsg); the encoders are generated (gen/view.bend).
 import Base
 
 import ../vendor/json.bend as J
+
+import ./gen/view.bend as V
 
 import ./model.bend as M
 
@@ -23,38 +26,30 @@ def jdecl(d: Maybe<&2, M.Decl>, +note: String) -> J.Json:
     case Some{+x}:
       J.obj([J.kv("status", J.JStr{C.decl_str(x)}), J.kv("note", J.JStr{note})])
 
-# the recipient of a message (null: unknown message)
-def waits_to(m: Maybe<&2, M.Msg>) -> J.Json:
+# the recipient of a message (none: unknown message)
+def waits_to(m: Maybe<&2, M.Msg>) -> Maybe<&2, String>:
   match m:
     case None{}:
-      J.JNull{}
+      None{}
     case Some{+x}:
-      J.JStr{M.Msg.to(x)}
+      Some{M.Msg.to(x)}
 
 # who `n` waits on: the recipient of the message its first `sb wait` (or
-# `sb ask`) waits for the reply to; null when it waits on no one
-def waits_on(+ws: List<&2, X.Waiter>, +s: M.St, +n: String) -> J.Json:
+# `sb ask`) waits for the reply to; none when it waits on no one
+def waits_on(+ws: List<&2, X.Waiter>, +s: M.St, +n: String) -> Maybe<&2, String>:
   match ws:
     case Nil{}:
-      J.JNull{}
+      None{}
     case Con{+w, +t}:
-      Bool.pick(J.Json, String.eq(X.Waiter.agent(w), n),
+      Bool.pick(Maybe<&2, String>, String.eq(X.Waiter.agent(w), n),
         waits_to(M.msg_of(s, X.Waiter.msg(w))), waits_on(t, s, n))
 
-def agent_json(+a: M.Agent, +x: X.Rt, +wo: J.Json) -> J.Json:
-  J.obj([J.kv("name", J.JStr{M.Agent.name(a)}), J.kv("dir", J.JStr{M.Agent.dir(a)}),
-    J.kv("is_main", J.JBool{M.Agent.is_main(a)}), J.kv("parent", C.jmaybe_str(M.Agent.parent(a))),
-    J.kv("brief", M.Agent.brief(a)), J.kv("created_ms", J.JNum{M.Agent.created(a)}),
-    J.kv("ws", M.Agent.ws(a)), J.kv("lifecycle", J.JStr{C.life_str(M.Agent.life(a))}),
-    J.kv("failure", C.jmaybe_str(M.Agent.failure(a))),
-    J.kv("declared", jdecl(M.Agent.declared(a), M.Agent.note(a))),
-    J.kv("last_report", M.Agent.report(a)),
-    J.kv("aliases", J.JArr{H.jstrs(M.Agent.aliases(a))}), J.kv("files", J.JArr{H.jstrs(M.Agent.files(a))}),
-    J.kv("snapshot_ref", C.jmaybe_str(M.Agent.snap(a))),
-    J.kv("follow", J.JBool{M.Agent.follow(a)}),
-    J.kv("run", J.JStr{H.run_str(X.Rt.run(x))}), J.kv("waiting", J.JBool{X.Rt.waiting(x)}),
-    J.kv("waiting_on", wo),
-    J.kv("turn_ms", C.jmaybe_nat(X.Rt.turn(x))), J.kv("turns", J.JNum{X.Rt.turns(x)})])
+def agent_json(+a: M.Agent, +x: X.Rt, +wo: Maybe<&2, String>) -> J.Json:
+  V.agent(M.Agent.name(a), M.Agent.dir(a), M.Agent.is_main(a), M.Agent.parent(a),
+    M.Agent.brief(a), M.Agent.created(a), M.Agent.ws(a), C.life_str(M.Agent.life(a)),
+    M.Agent.failure(a), jdecl(M.Agent.declared(a), M.Agent.note(a)), M.Agent.report(a),
+    M.Agent.aliases(a), M.Agent.files(a), M.Agent.snap(a), M.Agent.follow(a),
+    H.run_str(X.Rt.run(x)), X.Rt.waiting(x), wo, X.Rt.turn(x), X.Rt.turns(x))
 
 def is_archived(l: M.Life) -> Bool:
   match l:
@@ -84,8 +79,7 @@ def agents_json(xs: List<&2, M.Agent>, +rts: List<&2, X.Rt>, +ws: List<&2, X.Wai
         a, rts, ws, s, agents_json(t, rts, ws, s, all, names))
 
 def rec_json(+r: M.MRec) -> J.Json:
-  J.obj([J.kv("msg", C.msg_json(M.MRec.msg(r))), J.kv("state", J.obj(C.mst_kvs(M.MRec.st(r)))),
-    J.kv("settled", J.JBool{M.MRec.settled(r)})])
+  V.msg(C.msg_json(M.MRec.msg(r)), J.obj(C.mst_kvs(M.MRec.st(r))), M.MRec.settled(r))
 
 # a match, not Bool.pick: pick would encode every message, kept or not
 def recs_json.keep(keep: Bool, +r: M.MRec, +rest: List<&2, J.Json>) -> List<&2, J.Json>:
@@ -283,15 +277,28 @@ def changed(+evs: List<&2, M.Ev>, +before: List<&2, Mark>, +rts: List<&2, X.Rt>,
 
 # the order, the cards and the notes change only by an event (model.bend
 # `apply`): a view with none (`durable` False) leaves them out, the
-# daemon keeps its own
-def durable_kvs(durable: Bool, +s: M.St) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+# daemon keeps its own. A match each, not Bool.pick: pick would encode
+# them, sent or not.
+def order_when(durable: Bool, +s: M.St) -> Maybe<&2, List<&2, String>>:
   match durable:
     case True{}:
-      [J.kv("order", J.JArr{H.jstrs(M.St.order(s))}),
-        J.kv("cards", J.JArr{cards_json(M.St.cards(s))}),
-        J.kv("notes", J.JArr{H.jstrs(M.St.notes(s))})]
+      Some{M.St.order(s)}
     case False{}:
-      Nil{}
+      None{}
+
+def cards_when(durable: Bool, +s: M.St) -> Maybe<&2, List<&2, J.Json>>:
+  match durable:
+    case True{}:
+      Some{cards_json(M.St.cards(s))}
+    case False{}:
+      None{}
+
+def notes_when(durable: Bool, +s: M.St) -> Maybe<&2, List<&2, String>>:
+  match durable:
+    case True{}:
+      Some{M.St.notes(s)}
+    case False{}:
+      None{}
 
 # an event of the timers (`ended`: one that ends a timer)
 def timer_ev(+ended: Bool, e: M.Ev) -> Bool:
@@ -316,25 +323,21 @@ def timer_evs(+ended: Bool, evs: List<&2, M.Ev>) -> Bool:
     case Con{+e, +t}:
       timer_ev(ended, e) || timer_evs(ended, t)
 
-def timers_live(go: Bool, +s: M.St) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  match go:
-    case True{}:
-      [J.kv("timers", J.JArr{TM.live_json(TM.Tms.live(M.St.tm(s)))})]
-    case False{}:
-      Nil{}
-
-def timers_ended(go: Bool, +s: M.St) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  match go:
-    case True{}:
-      [J.kv("timers_ended", J.JArr{TM.ended_list_json(TM.Tms.ended(M.St.tm(s)))})]
-    case False{}:
-      Nil{}
-
 # the timers (`sb every`) only when a step changed them: an idle tick
 # carries none (idle-cpu), a fire no ended ones
-def timers_kvs(+all: Bool, +evs: List<&2, M.Ev>, +s: M.St) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  List.append(&2, Sigma<&2, &2, String, _ => J.Json>,
-    timers_live(all || timer_evs(False{}, evs), s), timers_ended(all || timer_evs(True{}, evs), s))
+def timers_live(go: Bool, +s: M.St) -> Maybe<&2, List<&2, J.Json>>:
+  match go:
+    case True{}:
+      Some{TM.live_json(TM.Tms.live(M.St.tm(s)))}
+    case False{}:
+      None{}
+
+def timers_ended(go: Bool, +s: M.St) -> Maybe<&2, List<&2, J.Json>>:
+  match go:
+    case True{}:
+      Some{TM.ended_list_json(TM.Tms.ended(M.St.tm(s)))}
+    case False{}:
+      None{}
 
 def wake_evs(evs: List<&2, M.Ev>) -> Bool:
   match evs:
@@ -345,32 +348,34 @@ def wake_evs(evs: List<&2, M.Ev>) -> Bool:
     case Con{_, +t}:
       wake_evs(t)
 
-def wakes_go(go: Bool, +s: M.St) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  match go:
-    case True{}:
-      +wk = TM.Tms.wk(M.St.tm(s))
-      [J.kv("wakes", J.JArr{WK.live_json(WK.Wakes.live(wk))}),
-        J.kv("wakes_ended", J.JArr{WK.ended_list_json(WK.Wakes.ended(wk))})]
-    case False{}:
-      Nil{}
-
 # the watches (`sb wake`, wakes.bend) only when a step changed them, or
 # all: an idle tick carries none (idle-cpu)
-def wakes_kvs(+all: Bool, +evs: List<&2, M.Ev>, +s: M.St) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  wakes_go(all || wake_evs(evs), s)
+def wakes_live(go: Bool, +s: M.St) -> Maybe<&2, List<&2, J.Json>>:
+  match go:
+    case True{}:
+      Some{WK.live_json(WK.Wakes.live(TM.Tms.wk(M.St.tm(s))))}
+    case False{}:
+      None{}
+
+def wakes_ended(go: Bool, +s: M.St) -> Maybe<&2, List<&2, J.Json>>:
+  match go:
+    case True{}:
+      Some{WK.ended_list_json(WK.Wakes.ended(TM.Tms.wk(M.St.tm(s))))}
+    case False{}:
+      None{}
 
 # the view: the agents in `names` (or all), the messages in `ids` (or
-# all); the order, cards and notes when `durable` (or all); the timers
-# when an event of `evs` (the step's journal) changed them (or all)
+# all); the order, cards and notes when an event of `evs` (the step's
+# journal) changed the durable state (or all); the timers and the
+# watches when an event changed them (or all). cost-pause: `paused`
+# (null: it runs) in every view, a few bytes.
+def view.go(+s: M.St, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +all: Bool, +ids: List<&2, Nat>, +names: List<&2, String>, +durable: Bool, +timers: Bool, +ended: Bool, +wakes: Bool) -> J.Json:
+  V.view(agents_json(M.St.agents(s), rts, ws, s, all, names), all,
+    msgs_json(all || Bool.not(List.is_empty(&2, Nat, ids)), M.St.msgs(s), all, ids), all,
+    M.St.next_msg(s), M.St.next_card(s), M.St.paused(s),
+    order_when(durable, s), cards_when(durable, s), notes_when(durable, s),
+    timers_live(timers, s), timers_ended(ended, s), wakes_live(wakes, s), wakes_ended(wakes, s))
+
 def view(+s: M.St, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +all: Bool, +ids: List<&2, Nat>, +names: List<&2, String>, +evs: List<&2, M.Ev>) -> J.Json:
-  J.obj(List.concat(&2, Sigma<&2, &2, String, _ => J.Json>,
-    [[J.kv("agents", J.JArr{agents_json(M.St.agents(s), rts, ws, s, all, names)}),
-      J.kv("all_agents", J.JBool{all}),
-      J.kv("msgs", J.JArr{msgs_json(all || Bool.not(List.is_empty(&2, Nat, ids)), M.St.msgs(s), all, ids)}),
-      J.kv("all_msgs", J.JBool{all}),
-      J.kv("next_msg", J.JNum{M.St.next_msg(s)}), J.kv("next_card", J.JNum{M.St.next_card(s)}),
-      # cost-pause: since when the project is paused (null: it runs),
-      # in every view (a few bytes): the hub's typed `paused` reads it
-      J.kv("paused", C.jmaybe_nat(M.St.paused(s)))],
-    durable_kvs(all || Bool.not(List.is_empty(&2, M.Ev, evs)), s),
-    timers_kvs(all, evs, s), wakes_kvs(all, evs, s)]))
+  view.go(s, rts, ws, all, ids, names, all || Bool.not(List.is_empty(&2, M.Ev, evs)),
+    all || timer_evs(False{}, evs), all || timer_evs(True{}, evs), all || wake_evs(evs))

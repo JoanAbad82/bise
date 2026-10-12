@@ -36,11 +36,13 @@ pub mod feed;
 pub mod fx;
 pub mod input;
 pub mod link;
+pub mod view;
 
 pub use feed::Feed;
 pub use fx::Fx;
 pub use input::{In, Step};
 pub use link::{Answer, Link};
+pub use view::{View, ViewAgent, ViewMsg, VIEW};
 
 use serde::{Deserialize, Serialize};
 
@@ -80,6 +82,13 @@ pub enum FieldKind {
     /// `u32`, the version of a record whose shape may change; always
     /// written, missing reads 1.
     Ver,
+    /// `Vec<T>` of the named record of the same table (the view's agents
+    /// and messages), always written; missing reads empty. Bend builds
+    /// each item with that record's encoder: a `List<&2, J.Json>`.
+    Recs(&'static str),
+    /// `Option<Vec<Value>>`, absent when none (the view's parts a step
+    /// did not change).
+    OptJsonsOmit,
 }
 
 /// One field of a kind.
@@ -87,6 +96,17 @@ pub enum FieldKind {
 pub struct Field {
     pub name: &'static str,
     pub kind: FieldKind,
+    /// what a missing field reads, as JSON text, when it is not its
+    /// kind's own default (`next_msg: Nat = 1` reads 1); serde reads the
+    /// same (core_fields!'s `= 1`, `= true`)
+    pub default: Option<&'static str>,
+}
+
+impl Field {
+    /// A field that reads its kind's own default when missing.
+    pub const fn new(name: &'static str, kind: FieldKind) -> Field {
+        Field { name, kind, default: None }
+    }
 }
 
 /// One kind: its tag, its Rust variant, its Bend constructor (two tags
@@ -129,6 +149,16 @@ pub struct Delivered {
 /// serde's default of a [`FieldKind::Ver`] field.
 pub fn v1() -> u32 {
     1
+}
+
+/// serde's default of a `Nat = 1` field.
+pub fn one() -> u64 {
+    1
+}
+
+/// serde's default of a `Bool = true` field.
+pub fn yes() -> bool {
+    true
 }
 
 /// Declares one enum of the seam: the serde enum (tag `$tag_key`, one
@@ -188,7 +218,7 @@ macro_rules! core_kinds {
                         tag: $tag,
                         rust: stringify!($Var),
                         bend: stringify!($bend),
-                        fields: &[$( $crate::core::Field { name: stringify!($f), kind: $crate::core::FieldKind::$k } ),*],
+                        fields: &[$( $crate::core::Field::new(stringify!($f), $crate::core::FieldKind::$k) ),*],
                     }
                 ),*],
             };
@@ -287,9 +317,98 @@ macro_rules! core_fields {
     (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : Ver $(, $($rest:tt)*)?) => {
         $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default = "crate::core::v1")] pub $f: u32,] $($($rest)*)?);
     };
+    (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : Recs($t:ident) $(, $($rest:tt)*)?) => {
+        $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default)] pub $f: Vec<$t>,] $($($rest)*)?);
+    };
+    (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : OptJsonsOmit $(, $($rest:tt)*)?) => {
+        $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default, skip_serializing_if = "Option::is_none")] pub $f: Option<Vec<serde_json::Value>>,] $($($rest)*)?);
+    };
+    (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : Nat = 1 $(, $($rest:tt)*)?) => {
+        $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default = "crate::core::one")] pub $f: u64,] $($($rest)*)?);
+    };
+    (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : Bool = true $(, $($rest:tt)*)?) => {
+        $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default = "crate::core::yes")] pub $f: bool,] $($($rest)*)?);
+    };
 }
 
 pub(crate) use core_fields;
+
+/// Declares a table of untagged records (the view: its keys say what
+/// it is, no tag on the wire): one struct per record (core_fields!) and
+/// the [`Table`] with each field's kind and default.
+///
+/// ```text
+/// core_records! {
+///     /// docs
+///     pub const VIEW = "View" {
+///         /// docs
+///         ViewMsg = "msg" => VMsg { msg: Json, settled: Bool },
+///         View = "view" => VView { msgs: Recs(ViewMsg), next_msg: Nat = 1 },
+///     }
+/// }
+/// ```
+///
+/// A field may be `Recs(<record>)`, and `Nat = 1` / `Bool = true` when a
+/// missing one reads that instead of its kind's default.
+macro_rules! core_records {
+    (
+        $(#[$tm:meta])*
+        pub const $T:ident = $name:literal {
+            $(
+                $(#[$vm:meta])*
+                $Var:ident = $tag:literal => $bend:ident { $( $(#[$fm:meta])* $f:ident : $k:ident $(($a:ident))? $(= $d:tt)? ),* $(,)? }
+            ),* $(,)?
+        }
+    ) => {
+        $(
+            $crate::core::core_fields! { [$(#[$vm])*] $Var { $( $(#[$fm])* $f : $k $(($a))? $(= $d)? ),* } }
+        )*
+
+        $(#[$tm])*
+        pub const $T: $crate::core::Table = $crate::core::Table {
+            name: $name,
+            tag_key: "",
+            kinds: &[$(
+                $crate::core::Kind {
+                    tag: $tag,
+                    rust: stringify!($Var),
+                    bend: stringify!($bend),
+                    fields: &[$( $crate::core::Field {
+                        name: stringify!($f),
+                        kind: $crate::core::field_kind!($k $(($a))?),
+                        default: $crate::core::field_default!($($d)?),
+                    } ),*],
+                }
+            ),*],
+        };
+    };
+}
+
+pub(crate) use core_records;
+
+/// A field's [`FieldKind`] from its declaration (`Recs(T)` names T).
+macro_rules! field_kind {
+    (Recs($a:ident)) => {
+        $crate::core::FieldKind::Recs(stringify!($a))
+    };
+    ($k:ident) => {
+        $crate::core::FieldKind::$k
+    };
+}
+
+pub(crate) use field_kind;
+
+/// A field's default from its declaration (`= 1`), as JSON text.
+macro_rules! field_default {
+    () => {
+        None
+    };
+    ($d:tt) => {
+        Some(stringify!($d))
+    };
+}
+
+pub(crate) use field_default;
 
 #[cfg(test)]
 mod tests;

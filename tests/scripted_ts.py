@@ -19,19 +19,39 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 EXE = os.path.join(os.path.abspath(os.environ.get("CARGO_TARGET_DIR") or os.path.join(ROOT, "rust", "target")),
                    "debug", "bise")
 
+# what the engine is built from (run.sh's freshness list)
+JSRT_SRC = ("rust/jsrt/src", "rust/jsrt/Cargo.toml", "rust/jsrt/Cargo.lock",
+            "rust/images/src", "rust/images/Cargo.toml", "rust/.cargo/config.toml")
+
+def jsrt_fresh(path):
+    """This tree's debug engine, if no source of it is newer (run.sh's rule)."""
+    if not os.path.exists(path):
+        return False
+    built = os.path.getmtime(path)
+    for rel in JSRT_SRC:
+        top = os.path.join(ROOT, rel)
+        for d, _, files in (os.walk(top) if os.path.isdir(top) else [(os.path.dirname(top), [], [os.path.basename(top)])]):
+            for f in files:
+                p = os.path.join(d, f)
+                if os.path.exists(p) and os.path.getmtime(p) > built:
+                    return False
+    return True
+
 def jsrt_env():
-    """The harness finds this tree's rust/jsrt build; a fresh worktree has
-    none: take the main tree's (the engine rarely changes)."""
-    if os.path.exists(os.path.join(ROOT, "rust/jsrt/target/debug/bend-jsrt")):
+    """The engine of THIS tree's sources: the runtime and the engine speak
+    one protocol (a failed call's {error} entry, 5d6c08df), so another
+    tree's engine is never taken (main's stale debug build answered
+    {error} as a value). This tree's debug build when fresh, else the
+    build keyed by the sources' content (scripts/bins.sh path bend-jsrt:
+    a cache hit is a copy, a miss a cargo build)."""
+    if jsrt_fresh(os.path.join(ROOT, "rust/jsrt/target/debug/bend-jsrt")):
         return {}
-    wl = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=ROOT,
-                        capture_output=True, text=True).stdout
-    main = wl.splitlines()[0].split(" ", 1)[1] if wl else ROOT
-    for rel in ("rust/jsrt/target/debug/bend-jsrt", "rust/jsrt/target/release/bend-jsrt", "bend-jsrt"):
-        p = os.path.join(main, rel)
-        if os.path.exists(p):
-            return {"BEND_JSRT_BIN": p}
-    sys.exit("FAIL no bend-jsrt: build it with ./run.sh (or cd rust/jsrt && cargo build)")
+    r = subprocess.run([os.path.join(ROOT, "scripts", "bins.sh"), "path", "bend-jsrt"], cwd=ROOT,
+                       capture_output=True, text=True)
+    p = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ""
+    if r.returncode != 0 or not os.path.exists(p):
+        sys.exit("FAIL no bend-jsrt of this tree: scripts/bins.sh path bend-jsrt said: " + r.stderr[-2000:])
+    return {"BEND_JSRT_BIN": p}
 
 # the calling agent's variables (its run/ and tmp/bg too: its REPL's
 # files went to the live agent's run/): bise's internal and test ones

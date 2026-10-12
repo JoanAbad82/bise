@@ -220,15 +220,13 @@ pub struct Wakes {
 }
 
 impl Wakes {
-    pub fn load_live(&mut self, v: &Value) {
-        self.live = v.as_array().into_iter().flatten().filter_map(Watch::from_view).map(|w| (w.id, w)).collect();
+    pub fn load_live(&mut self, v: &[Value]) {
+        self.live = v.iter().filter_map(Watch::from_view).map(|w| (w.id, w)).collect();
     }
 
-    pub fn load_ended(&mut self, v: &Value) {
+    pub fn load_ended(&mut self, v: &[Value]) {
         self.ended = v
-            .as_array()
-            .into_iter()
-            .flatten()
+            .iter()
             .filter_map(|e| {
                 Some(Ended {
                     watch: Watch::from_view(e)?,
@@ -518,6 +516,8 @@ pub fn end_line(w: &Watch, why: &str, at: u64, hit: Option<&Hit>, msg: Option<u6
         after_ms,
         tail: hit.map(|h| h.tail.clone()).unwrap_or_default(),
         msg,
+        // its own thread's line; core_wake.rs sets it on main's copy
+        agent: String::new(),
     })
 }
 

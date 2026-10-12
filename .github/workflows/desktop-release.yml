@@ -1,0 +1,49 @@
+# The desktop app's own release (apps/desktop), apart from the terminal's
+# (release.yml, v* tags, latest.json): desktop-on-main, architect m_19472.
+#
+# OFF until the user says the desktop app is ready: every job runs only
+# when the repository variable DESKTOP_RELEASE is 'on' (Settings >
+# Secrets and variables > Actions > Variables). Unset: a run does nothing.
+#
+# Its scheme: tags desktop-vYYYY.M.N (its own counter, never a terminal
+# 2026.10.2-N). Its channel: desktop.json on the rolling tag
+# desktop-latest (bise_home::release::DESKTOP_DIST_URL), pointing at the
+# immutable assets of a desktop-v* release. Its rules, pinned by
+# tests/release_split_test.py:
+#   - a desktop release is a DRAFT, and never GitHub's 'latest'
+#     (--latest=false): 'latest' is every terminal's bise update channel;
+#   - it never uploads latest.json, install.sh or a bise-*.tar.gz;
+#   - release.yml's tag filter (v*) never matches desktop-v*.
+#
+# The build (Electron app + its runtime, signed, zipped) is not wired yet
+# (owner: the desktop lead, when the app is ready): the build job says so
+# and fails, so even with the variable on nothing half-made ships.
+name: desktop-release
+
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build the desktop app
+    if: ${{ vars.DESKTOP_RELEASE == 'on' }}
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: not wired yet
+        run: |
+          echo "desktop-release: the desktop app's build isn't wired yet (apps/desktop, electron-builder + its runtime)."
+          echo "Nothing is built or published. Wire it, then the draft step below, when the user says the app is ready."
+          exit 1
+  # the draft, once the build makes its zip (left for the build's owner):
+  #   gh release create "$tag" --draft --latest=false <zip> <zip>.sha256
+  #   then desktop.json {kind: desktop, version, runtime_id, targets} on desktop-latest

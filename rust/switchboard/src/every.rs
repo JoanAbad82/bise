@@ -243,16 +243,14 @@ impl Ended {
 
 impl Timers {
     /// The live timers of sb-core's view (`timers`), in id order.
-    pub fn load_live(&mut self, v: &Value) {
-        self.map = v.as_array().into_iter().flatten().filter_map(Timer::from_view).map(|t| (t.id, t)).collect();
+    pub fn load_live(&mut self, v: &[Value]) {
+        self.map = v.iter().filter_map(Timer::from_view).map(|t| (t.id, t)).collect();
     }
 
     /// The ended timers of sb-core's view (`timers_ended`), oldest first.
-    pub fn load_ended(&mut self, v: &Value) {
+    pub fn load_ended(&mut self, v: &[Value]) {
         self.ended = v
-            .as_array()
-            .into_iter()
-            .flatten()
+            .iter()
             .filter_map(|e| {
                 Some(Ended {
                     timer: Timer::from_view(e)?,
