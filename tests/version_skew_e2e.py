@@ -86,7 +86,10 @@ def tui_from(E, v, session):
     """The TUI as version dir `v`'s bise, in its own tmux session."""
     bise_env.refuse_real_home(E.env)
     env = env_of(E)
-    envs = " ".join("%s=%s" % (k, shlex.quote(val)) for k, val in pane_env(env).items())
+    # pane_env names this tree as the root unless told otherwise: here the
+    # version dir's own (its VERSION next to its bise) must win
+    pane = {k: val for k, val in pane_env(env).items() if k != "BISE_APP_ROOT"}
+    envs = " ".join("%s=%s" % (k, shlex.quote(val)) for k, val in pane.items())
     unset = " ".join("-u " + k for k in pane_unset(env) + ["BISE_APP_ROOT"])
     cmd = "cd %s && env %s %s %s switchboard --workspace %s; echo \"[switchboard exited: $?]\"; sleep 600" % (
         shlex.quote(e2e.ROOT), unset, envs, shlex.quote(os.path.join(v, "bise")), shlex.quote(E.ws))
