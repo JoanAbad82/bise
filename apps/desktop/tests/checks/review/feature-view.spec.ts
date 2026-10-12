@@ -17,8 +17,8 @@ const T = {
   thread: '[data-testid="thread.screen"]',
   field: '[data-testid="composer.field"]',
   setupSkip: '[data-testid="setup.skip"]',
-  group: '[data-testid="app.sidebar.feature.gift-cards"]',
-  agent: (a: string) => `[data-testid="app.sidebar.agent.${a}"]`,
+  group: '[data-testid="app.right.feature.gift-cards"]',
+  agent: (a: string) => `[data-testid="app.right.agent.${a}"]`,
   screen: '[data-testid="feature.screen"]',
   changes: '[data-testid="changes.screen"]',
 };
@@ -44,7 +44,7 @@ test("review/feature-view: shop's gift-cards in the sidebar as the TUI groups it
     // the group, then its agents right under it, as the TUI's 'ψ gift-cards'
     await expect(page.locator(T.group), "shop's sidebar has the feature's group").toBeVisible({ timeout: 15_000 });
     await expect(page.locator(T.group)).toContainText('ψ gift-cards');
-    const order = await page.locator('[data-testid^="app.sidebar.agent."], [data-testid^="app.sidebar.feature."]').evaluateAll((els) =>
+    const order = await page.locator('[data-testid^="app.right.agent."], [data-testid^="app.right.feature."]').evaluateAll((els) =>
       els.map((e) => (e.getAttribute('data-testid') ?? '').replace(/^app\.sidebar\.(agent|feature)\./, '')),
     );
     const at = order.indexOf('gift-cards');

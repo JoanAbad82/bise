@@ -156,7 +156,7 @@ test('composer/type-anywhere: a key or a paste with no field focused lands in th
     await expect(pal).toHaveCount(0);
 
     // never a focused settings field: alpha's rename keeps its keys
-    await page.getByTestId('app.sidebar.agent.alpha').click();
+    await page.getByTestId('app.right.agent.alpha').click();
     await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'alpha', { timeout: 5000 });
     await page.getByTestId('thread.more').click();
     const rename = page.locator('[data-testid="agents.rename.alpha"]');

@@ -179,16 +179,17 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     // the artifact opens in the window
     await page.getByTestId('thread.artifact.10').click();
     await expect(page.getByTestId('thread.head')).toBeHidden();
-    await go('app.sidebar.agent.perf');
+    // the artifact's screen has no right bar: back to perf's thread, ⌘[
+    await page.keyboard.press('Meta+BracketLeft');
     // the branch opens the review
     await page.getByTestId('thread.head.branch').click();
     expect(await core.waitCmd((c) => c.cmd === 'diff', 3000)).toMatchObject({ project: P, agent: 'perf' });
 
     const views: readonly [string, string][] = [
-      ['perf', 'app.sidebar.agent.perf'],
-      ['search', 'app.sidebar.agent.search'],
+      ['perf', 'app.right.agent.perf'],
+      ['search', 'app.right.agent.search'],
       ['bise · storefront', `app.sidebar.project.${P}`],
-      ['checkout (empty)', 'app.sidebar.agent.checkout'],
+      ['checkout (empty)', 'app.right.agent.checkout'],
     ];
     for (const t of ['light', 'dark'] as const) {
       await theme(t);

@@ -1,9 +1,9 @@
 // app/sidebar-v6 · designer's desktop-screens v6/v7, signed (m_11834, lead m_11830): the sidebar,
 // the titlebar, the right panel A's frame, and under 1000 px the slide-over. Passes when, at 1400
 // px on perf's thread: the sidebar is 240 px with 'search or jump ⌘K', bise with his pink count,
-// '↗ artifacts 1 new', '◷ scheduled 1', 'projects', storefront's row '∿ 2' + 1, no 'main' row,
-// each agent's sign in its 15 px column (∿ ? ✗ ◷ ✓), three done agents quiet for hours folded into
-// '3 more today' (a click unfolds them), the titlebar 'storefront › perf' and '↗ artifacts · 1
+// '↗ artifacts 1 new', '◷ scheduled 1', 'projects', storefront's row '∿ 2' + 1, places only: no
+// agent row in the sidebar (designer's desktop-right-bar v5: the agents are in the right bar, each
+// with its sign ∿ ? ✗ ◷ ✓, never a 'main' row, 8 then '+ 1 more'), the titlebar 'storefront › perf' and '↗ artifacts · 1
 // ⌥⌘0' tinted with the panel open (artifacts · storefront, all ›), ⌥⌘0 hides it and is kept, ⌘\
 // hides the sidebar; at 800 px the sidebar and panel are away, the titlebar shows the sidebar
 // button and '2 waiting', ⌘\ slides the sidebar over a scrim and esc closes it. Shots light and
@@ -21,9 +21,7 @@ const prefs = (theme: string) => ({
   ev: 'prefs',
   prefs: { onboarded: true, theme, context: { shot: true, url: true, file: true, window_text: false }, excluded_apps: [], quiet: { call: true, share: true, fullscreen: true, focus: true, batch_min: 20, away_card: true }, voice: { fn_hold: true, fn_twice: 'spotlight', language: 'auto' }, shots_keep_days: 7 },
 });
-// the quiet ones are done 5 h ago: always past the 1 h fold, at any hour (just after midnight they
-// fall on yesterday and the row reads '3 more' rather than '3 more today': both are expected; a
-// clamp to 00:01 left them unfolded then, amb-home m_13988)
+// the quiet ones are done 5 h ago
 const early = NOW - 5 * 3_600_000;
 const world = () => [
   prefs('light'),
@@ -66,7 +64,7 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
   try {
     const { page } = s;
     const side = page.getByTestId('app.sidebar');
-    await expect(page.getByTestId('app.sidebar.agent.perf')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('app.right.agent.perf')).toBeVisible({ timeout: 10_000 });
     expect(Math.round((await side.boundingBox())?.width ?? 0), 'the sidebar is 240 px').toBe(240);
     await expect(page.getByTestId('app.sidebar.search')).toContainText('search or jump');
     await expect(page.getByTestId('app.sidebar.bise').locator('.app-cnt'), "bise's pink count").toHaveText('2');
@@ -75,20 +73,21 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(page.getByTestId('app.sidebar.artifacts')).toContainText('1 new · perf');
     await expect(page.getByTestId('app.sidebar.scheduled')).toContainText('1');
     await expect(page.getByTestId(`app.sidebar.project.${P}`)).toContainText('∿ 2');
-    await expect(page.getByTestId('app.sidebar.agent.main'), "never a 'main' row").toHaveCount(0);
-    const sign = (n: string) => page.locator(`[data-testid="app.sidebar.agent.${n}"] .app-g`);
+    // places only: the agents are in the right bar (designer's desktop-right-bar v5)
+    await expect(side.locator('[data-testid^="app.sidebar.agent."]'), 'no agent row in the sidebar').toHaveCount(0);
+    await expect(page.getByTestId('app.right.agent.main'), "never a 'main' row").toHaveCount(0);
+    const sign = (n: string) => page.locator(`[data-testid="app.right.agent.${n}"] .app-rb-g`);
     await expect(sign('search')).toHaveText('?');
-    await expect(page.getByTestId('app.sidebar.agent.search').locator('.app-cnt')).toHaveText('1');
+    await expect(page.getByTestId('app.right.agent.search')).toContainText('waits');
     await expect(sign('ci-fix')).toHaveText('✗');
-    await expect(page.getByTestId('app.sidebar.agent.ci-fix')).toContainText('failed');
+    await expect(page.getByTestId('app.right.agent.ci-fix')).toContainText('failed');
     await expect(sign('deploy-watch')).toHaveText('◷');
     await expect(sign('size-filter')).toHaveText('✓');
-    await expect(page.getByTestId('app.sidebar.agent.perf')).toContainText('14 min');
-    expect(Math.round((await sign('perf').boundingBox())?.width ?? 0), 'the sign column is 15 px').toBe(15);
-    // done for hours: folded
-    const more = page.getByTestId(`app.sidebar.project.${P}.more`);
-    await expect(more).toHaveText(/3 more( today)?/);
-    await expect(page.getByTestId('app.sidebar.agent.lint')).toHaveCount(0);
+    await expect(page.getByTestId('app.right.agent.perf')).toContainText('14 min');
+    // 9 live agents: 8 then '+ 1 more'
+    const more = page.getByTestId('app.right.agents.more');
+    await expect(more).toHaveText('+ 1 more');
+    await expect(page.getByTestId('app.right.agent.old-ui')).toHaveCount(0);
     // the titlebar and panel A
     await expect(page.getByTestId('app.title.crumb')).toHaveText('storefront›perf');
     const btn = page.getByTestId('app.title.panel');
@@ -108,7 +107,7 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await core.send(prefs('light') as never);
 
     await more.click();
-    await expect(page.getByTestId('app.sidebar.agent.lint'), 'a click unfolds them').toBeVisible();
+    await expect(page.getByTestId('app.right.agent.old-ui'), 'a click unfolds them').toBeVisible();
     await page.keyboard.press('Meta+Alt+Digit0');
     await expect(panel, '⌥⌘0 hides the panel').toHaveCount(0);
     await expect(btn).toHaveAttribute('aria-pressed', 'false');

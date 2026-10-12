@@ -29,7 +29,7 @@ const T = {
   compacted: '[data-testid^="thread.compacted."][data-testid$=".head"]',
   nd: '[data-testid^="thread.notdelivered."]:not([data-testid$=".again"]):not([data-testid$=".drop"])',
   project: (p: string) => `[data-testid="app.sidebar.project.${p}"]`,
-  gauges: '[data-testid^="app.sidebar.agent."][data-testid$=".gauge"]',
+  gauges: '[data-testid^="app.right.agent."][data-testid$=".gauge"]',
 };
 const AG = 'receipts';
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));

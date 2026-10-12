@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Agent } from '@/proto';
+import type { Agent, Feature } from '@/proto';
 import { agentRows, archivedRows, capRows, type ProjAgent } from './barrows';
 
 const NOW = 1_791_100_000_000;
@@ -21,6 +21,20 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
       ['⌥1', 'storefront', 'app.right.agent.shop.perf'],
       ['⌥2', 'storefront', 'app.right.agent.shop.docs'],
     ]);
+  });
+  it("a project's features: its solo agents, then each 'ψ' head with its agents, as the TUI's panel; ⌥N skips the heads", () => {
+    const f = { name: 'gift-cards', branch: 'feature/gift-cards', agents: ['gift-ui'], ahead: 2, building: false, trial: false } as unknown as Feature;
+    const rows = agentRows([ag('gift-ui'), ag('perf', { status: 'working' })], NOW, false, true, { features: [f] });
+    expect(rows.map((r) => [r.glyph, r.name])).toEqual([['⌥1', 'perf'], ['ψ', 'gift-cards'], ['⌥2', 'gift-ui']]);
+    expect(rows[1]).toMatchObject({ feature: 'gift-cards', end: '2 ahead', testId: 'app.right.feature.gift-cards' });
+  });
+  it('at work: the breeze dot; a next wake: ◷; a gauge only when it says something', () => {
+    const rows = agentRows([ag('perf', { status: 'working', usage: { short: '42k · 17%' } } as Partial<Agent>), ag('watch', { usage: { short: '0%' } } as Partial<Agent>)], NOW, false, false, {
+      wakes: new Map([['shop/watch', NOW + 600_000]]),
+    });
+    expect(rows[0]).toMatchObject({ working: true, gauge: '42k · 17%' });
+    expect(rows[1]?.glyph).toBe('◷');
+    expect(rows[1]?.gauge).toBeUndefined();
   });
   it("ARCHIVED: ✓ done / – stopped with its age", () => {
     const rows = archivedRows([ag('a', { archived: true, status: 'done', since_ms: NOW - 2 * 3_600_000 }), ag('b', { archived: true, since_ms: NOW - 2 * 86_400_000 })], NOW, false);

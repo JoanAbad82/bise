@@ -83,6 +83,12 @@ export function computerDot(r: ComputerAgent | undefined): { g: string; tone: To
   return { g: r.mark, tone, title: r.words };
 }
 
+/** A gauge worth its place: some words, and not an empty context ('0%'). Pure. */
+export function gaugeSays(short: string | null | undefined): boolean {
+  const w = (short ?? '').trim();
+  return w !== '' && !/(^|\s)0%$/.test(w);
+}
+
 /** How long a done agent stays in the sidebar before it folds. */
 export const FOLD_AFTER_MS = 3_600_000;
 

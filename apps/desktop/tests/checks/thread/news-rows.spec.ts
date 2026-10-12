@@ -24,7 +24,7 @@ test('thread/news-rows: landed, PR news, artifact, answered, approval and agent-
     await page.getByTestId('thread.landed.27.sha').click();
     await expect(page.getByTestId('review.screen'), 'the sha opens the commit').toBeVisible({ timeout: 5000 });
 
-    await page.getByTestId('app.sidebar.agent.perf').click();
+    await page.getByTestId('app.right.agent.perf').click();
     const pr = page.getByTestId('thread.pr.28');
     await expect(pr, "perf's PR news").toContainText('PR #412', { timeout: 10_000 });
     await expect(pr).toHaveAttribute('data-tone', 'err');

@@ -47,7 +47,7 @@ test('thread/hints: the first agent and first card hints show once, are marked i
     const agentHint = page.getByTestId('app.hint.first_agent');
     await expect(agentHint, "the first agent's hint").toBeVisible({ timeout: 10_000 });
     await expect(agentHint).toContainText('new: your agents');
-    const row = (await page.getByTestId('app.sidebar.agent.perf').boundingBox()) ?? { y: 0, height: 0 };
+    const row = (await page.getByTestId('app.right.agent.perf').boundingBox()) ?? { y: 0, height: 0 };
     expect(((await agentHint.boundingBox()) ?? { y: -1 }).y, 'under its row').toBeGreaterThanOrEqual(row.y + row.height - 1);
     await core.waitCmd(marks('first_agent'));
     const cardHint = page.getByTestId('app.hint.first_card');
@@ -60,7 +60,7 @@ test('thread/hints: the first agent and first card hints show once, are marked i
     await core.send(world({ first_agent: true, first_card: true })[0] as never);
     await page.waitForTimeout(300);
     await expect(agentHint, 'still up after its mark').toBeVisible();
-    await page.getByTestId('app.sidebar.agent.perf').click();
+    await page.getByTestId('app.right.agent.perf').click();
     await expect(agentHint, 'used: looked into the agent').toHaveCount(0);
   } finally {
     await s.close();
@@ -73,7 +73,7 @@ test('thread/hints: the first agent and first card hints show once, are marked i
   try {
     const { page } = s2;
     await expect(page.getByTestId('inbox.block')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId('app.sidebar.agent.perf')).toBeVisible();
+    await expect(page.getByTestId('app.right.agent.perf')).toBeVisible();
     await page.waitForTimeout(300);
     await expect(page.getByTestId('app.hint.first_agent')).toHaveCount(0);
     await expect(page.getByTestId('app.hint.first_card')).toHaveCount(0);

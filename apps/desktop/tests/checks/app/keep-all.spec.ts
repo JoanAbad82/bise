@@ -114,7 +114,7 @@ test("app/keep-all: threads: two targets' drafts, ⌘F, an open row, the termina
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'main', { timeout: 5000 });
       await field(page).click();
       await page.keyboard.type(MAIN);
-      await page.getByTestId('app.sidebar.agent.perf').click();
+      await page.getByTestId('app.right.agent.perf').click();
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'perf', { timeout: 5000 });
       await page.getByTestId('thread.tools.17').click();
       await expect(page.getByTestId('thread.tools.17')).toHaveAttribute('aria-expanded', 'true');
@@ -135,7 +135,7 @@ test("app/keep-all: threads: two targets' drafts, ⌘F, an open row, the termina
       // the other target's draft: acme main's
       await page.getByTestId(`app.sidebar.project.${ACME}`).click();
       await expect.soft(field(page), `${c}: acme main's words`).toContainText(MAIN, { timeout: 5000 });
-      await page.getByTestId('app.sidebar.agent.perf').click();
+      await page.getByTestId('app.right.agent.perf').click();
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'perf', { timeout: 5000 });
     },
   });

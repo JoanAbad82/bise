@@ -60,7 +60,7 @@ test('ds/contrast: with increase contrast every state reads by a glyph or a word
   const { page } = s;
   try {
     await expect(page.getByTestId('inbox.block')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId('app.sidebar.agent.perf')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('app.right.agent.perf')).toBeVisible({ timeout: 5000 });
 
     await test.step('without increase contrast: every dot says its state in words', async () => {
       const { dots } = await cues(page);

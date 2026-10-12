@@ -28,7 +28,7 @@ const T = {
 
 /** The feature view (amb-win efe231a3): its screen, state line, cards and answers. */
 const F = {
-  group: '[data-testid="app.sidebar.feature.gift-cards"]',
+  group: '[data-testid="app.right.feature.gift-cards"]',
   screen: '[data-testid="feature.screen"]',
   state: '[data-testid="feature.state"]',
 };

@@ -18,7 +18,7 @@ const T = {
   thread: '[data-testid="thread.screen"]',
   field: '[data-testid="composer.field"]',
   setupSkip: '[data-testid="setup.skip"]',
-  group: '[data-testid="app.sidebar.feature.gift-cards"]',
+  group: '[data-testid="app.right.feature.gift-cards"]',
   screen: '[data-testid="feature.screen"]',
   card: (id: number) => `[data-testid="feature.card.${String(id)}"]`,
   opt: (n: number) => `[data-testid="feature.opt.${String(n)}"]`,

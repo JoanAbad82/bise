@@ -1,29 +1,23 @@
 // The sidebar (designer's desktop-screens v6/v7, signed): 'search or jump
 // ⌘K', bise, '↗ artifacts' and '◷ scheduled' for every project at once,
 // then his projects, each with its pearl (its bise: a click opens 'bise ·
-// storefront') and its agents, one sign each in a mono column (side.ts),
-// never a 'main' row; done agents quiet for an hour fold into 'n more
-// today'; the archived ones are in the project's ⋯ menu; '+ add a project'
-// and settings at the foot. Owner: amb-win.
+// storefront'), what works in it and his pink count; the archived agents
+// are in the project's ⋯ menu; '+ add a project' and settings at the foot.
+// Places only (designer's desktop-right-bar v5, ambient-lead m_20087): the
+// agents of the place shown are in the right bar (RightBar.tsx). Owner: amb-win.
 //
-// It reads only projects, the route, the agents of each open folder and
-// counts (numbers, so a snapshot never changes for nothing): a thread's
-// entries never re-render it.
-import { Fragment, memo, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Dot, IconButton, Menu, MenuItem, MenuSep, Pearl, SearchButton, SectionHead, Side } from '@/ds';
-import type { Agent, Feature, ProjectRow } from '@/proto';
-import { useAgents, useComputerLive, useFeatures, useHubRefused, useProjects, useStore, type Store } from '@/store';
+// It reads only projects, the route and counts (numbers, so a snapshot never
+// changes for nothing): a thread's entries never re-render it.
+import { memo, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { IconButton, Menu, MenuItem, MenuSep, Pearl, SearchButton, SectionHead, Side } from '@/ds';
+import type { ProjectRow } from '@/proto';
+import { useAgents, useHubRefused, useProjects, useStore, type Store } from '@/store';
 import { RefusedLine } from './Refused';
-import { groupsOf } from '@/review/feature';
-import { archivedOf, liveOf } from '@/agents/model';
+import { archivedOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
 import { addProject } from './addProject';
 import { useRoute, useRouter } from './router';
-import { useNow } from './clock';
-import { Tip } from '@/setup';
-import { useTour } from '@/setup/useTour';
-import { Hint, hintUsed, useHint } from './hints';
-import { computerDot, folds, moreWords, projectSide, signOf } from './side';
+import { projectSide } from './side';
 import { useKeptScroll } from './keep';
 import { BisePearl } from './BisePearl';
 
@@ -76,12 +70,6 @@ export function newWords(fresh: number, makers: readonly string[]): string {
   return makers.length === 1 ? `${String(fresh)} new · ${makers[0] ?? ''}` : `${String(fresh)} new`;
 }
 
-/** A gauge worth its place: some words, and not an empty context ('0%'). Pure. */
-export function gaugeSays(short: string | null | undefined): boolean {
-  const w = (short ?? '').trim();
-  return w !== '' && !/(^|\s)0%$/.test(w);
-}
-
 /** '2 new · designer': the 'n new' part in the accent, as the artifacts' own 'new' chip (amb-kit, try gate D4); its words say it without the color. */
 function NewEnd({ words }: { words: string }) {
   if (words === '') return null;
@@ -92,24 +80,6 @@ function NewEnd({ words }: { words: string }) {
       {at < 0 ? '' : words.slice(at)}
     </>
   );
-}
-
-/** Each agent's next wake in a project (its scheduled tasks' soonest run), as 'agent ms' lines. */
-function useWakes(project: string): ReadonlyMap<string, number> {
-  const store = useStore();
-  const lines = useSyncExternalStore(
-    (cb) => store.subscribe(`scheduled:${project}`, cb),
-    () => {
-      const soonest = new Map<string, number>();
-      for (const t of store.scheduled(project)) {
-        if (t.next_ms == null) continue;
-        const was = soonest.get(t.agent);
-        if (was === undefined || t.next_ms < was) soonest.set(t.agent, t.next_ms);
-      }
-      return [...soonest].map(([a, ms]) => `${a} ${String(ms)}`).join('\n');
-    },
-  );
-  return useMemo(() => new Map(lines === '' ? [] : lines.split('\n').map((l) => [l.slice(0, l.lastIndexOf(' ')), Number(l.slice(l.lastIndexOf(' ') + 1))] as const)), [lines]);
 }
 
 /** One sidebar row: a lead (pearl or sign), the name, its end words, his pink count. */
@@ -250,7 +220,6 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} testId="app.sidebar.artifacts" />
       <SRow kind="top" lead="◷" name="scheduled" end={scheduled > 0 ? String(scheduled) : ''} on={route.screen === 'scheduled'}
         onClick={() => { router.go({ screen: 'scheduled' }); }} testId="app.sidebar.scheduled" />
-      {home !== undefined && inView === home.project && <Agents project={home.project} route={route} expect={Math.max(0, home.agents - 1)} />}
       <SectionHead>projects</SectionHead>
       {projects.length === 0 && <SRow kind="more" lead="+" name="add a project" end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.empty-add" />}
       {projects.map((p) => (
@@ -260,69 +229,10 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
   );
 }
 
-// A project's folder (his try round 2, ambient-lead m_11456 item 3): open by default, his close
-// remembered per project for the next launches (localStorage, this window's own).
-const CLOSED_KEY = 'bise.sidebar.closed';
-let closed: ReadonlySet<string> = readClosed();
-const closedSubs = new Set<() => void>();
-
-function readClosed(): ReadonlySet<string> {
-  try {
-    const v: unknown = JSON.parse(globalThis.localStorage.getItem(CLOSED_KEY) ?? '[]');
-    return new Set(Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
-  } catch {
-    return new Set();
-  }
-}
-
-/** Opens or closes a project's folder, and remembers it. */
-export function toggleFolder(project: string): void {
-  const next = new Set(closed);
-  if (next.has(project)) next.delete(project);
-  else next.add(project);
-  closed = next;
-  try {
-    globalThis.localStorage.setItem(CLOSED_KEY, JSON.stringify([...next]));
-  } catch {
-    // no storage (a unit test's DOM): kept for this session only
-  }
-  for (const f of closedSubs) f();
-}
-
-/**
- * The projects whose folder he closed (the rest are open: R26, folders open
- * by default). The window shows the open ones' running hubs to the core, so
- * their agents come and their folders aren't empty (App.tsx useShown).
- */
-export function useClosedFolders(): ReadonlySet<string> {
-  return useSyncExternalStore(
-    (f) => {
-      closedSubs.add(f);
-      return () => {
-        closedSubs.delete(f);
-      };
-    },
-    () => closed,
-  );
-}
-
-function useFolderOpen(project: string): boolean {
-  return useSyncExternalStore(
-    (f) => {
-      closedSubs.add(f);
-      return () => {
-        closedSubs.delete(f);
-      };
-    },
-    () => !closed.has(project),
-  );
-}
-
 const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow; on: boolean; route: Route }) {
   const router = useRouter();
   const refused = useHubRefused(p.project) !== null;
   const side = projectSide(p, refused);
-  const open = useFolderOpen(p.project);
   const [menu, setMenu] = useState(false);
   return (
     <>
@@ -338,21 +248,7 @@ const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow;
         onClick={() => { router.go({ screen: 'thread', project: p.project, agent: MAIN }); }}
         testId={`app.sidebar.project.${p.project}`}
       >
-        {/* the folder and ⋯ buttons, the ds's row IconButtons: on hover or focus; a shut folder always shows */}
-        <span className={open ? 'app-fold' : 'app-fold shut'}>
-          <IconButton
-            size="row"
-            label={open ? `close ${p.name}` : `open ${p.name}`}
-            pressed={open}
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleFolder(p.project);
-            }}
-            testId={`app.sidebar.project.${p.project}.fold`}
-          >
-            {open ? '▾' : '▸'}
-          </IconButton>
-        </span>
+        {/* ⋯, the ds's row IconButton: on hover or focus */}
         <span className={menu ? 'app-more on' : 'app-more'}>
           <IconButton
             size="row"
@@ -371,7 +267,6 @@ const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow;
       {menu && <ProjectMenu p={p} onClose={() => { setMenu(false); }} />}
       {/* its hub refused this core: the hub's words and a retry, open or closed (lead m_11347) */}
       <RefusedLine project={p.project} name={p.name} className="app-refused" testId={`app.sidebar.project.${p.project}.refused`} />
-      {open && <Agents project={p.project} route={route} expect={Math.max(0, p.agents - 1)} />}
     </>
   );
 });
@@ -414,137 +309,5 @@ function ProjectMenu({ p, onClose }: { p: ProjectRow; onClose: () => void }) {
         )}
       </Menu>
     </div>
-  );
-}
-
-/**
- * A project's live agents, main out (it is the project's row), in the TUI
- * panel's order (⌥1-9 follow it): the ones in no feature, then each
- * feature's head ('ψ gift-cards', opens the feature) with its agents. Done
- * agents quiet for an hour fold into 'n more today' (one at rest stays).
- */
-function Agents({ project, route, expect = 0 }: { project: string; route: Route; expect?: number }) {
-  const router = useRouter();
-  const all = useAgents(project);
-  const features = useFeatures(project);
-  const wakes = useWakes(project);
-  const now = useNow();
-  const [unfolded, setUnfolded] = useState(false);
-  const live = liveOf(all).filter((a) => !a.main);
-  const folded = live.filter((a) => folds(a, now, wakes.get(a.name)) && !(route.screen === 'thread' && route.project === project && route.agent === a.name));
-  const shown = unfolded ? live : live.filter((a) => !folded.includes(a));
-  const { solo, groups } = groupsOf(shown, features);
-  // L25: the demo's 'start' tip under the first demo agent, 'steer' under the one that waits for him
-  const tour = useTour(project);
-  const liveDemo = tour.snap.members.filter((m) => !m.archived);
-  const tipAt = tour.tip === 'start' ? liveDemo[0]?.name : tour.tip === 'steer' ? liveDemo.at(-1)?.name : undefined;
-  // S36: the first agent's one-time hint under the first agent's row (a demo tip there wins)
-  const first = solo[0]?.name ?? groups[0]?.agents[0]?.name;
-  const hint = useHint('first_agent', first !== undefined && tour.tip === null);
-  const inAgent = route.screen === 'thread' && route.project === project && route.agent !== MAIN;
-  useEffect(() => {
-    if (inAgent) hintUsed('first_agent');
-  }, [inAgent]);
-  const row = (a: Agent) => {
-    const r = <AgentRow key={a.name} project={project} a={a} route={route} now={now} wake={wakes.get(a.name)} />;
-    if (tipAt === a.name && tour.tip !== null)
-      return (
-        <Fragment key={a.name}>
-          {r}
-          <div className="app-tip">
-            <Tip tip={tour.tip} snap={tour.snap} />
-          </div>
-        </Fragment>
-      );
-    if (hint && first === a.name)
-      return (
-        <Fragment key={a.name}>
-          {r}
-          <div className="app-tip">
-            <Hint name="first_agent" />
-          </div>
-        </Fragment>
-      );
-    return r;
-  };
-  // its agents not come yet (the hub's first agents event): their places, kept, so the rows under
-  // them never move when they come (qa-flows' app/clicks: shop's head moved under the pointer)
-  if (all.length === 0 && expect > 0)
-    return (
-      <>
-        {Array.from({ length: expect }, (_, i) => (
-          <div key={i} className="app-r ag app-skel" aria-hidden="true" data-testid={`app.sidebar.project.${project}.skel`}>
-            <span className="app-skel-bar" />
-          </div>
-        ))}
-      </>
-    );
-  return (
-    <>
-      {solo.map(row)}
-      {groups.map((g) => (
-        <Fragment key={`ψ ${g.feature.name}`}>
-          <SRow
-            kind="ag"
-            lead="ψ"
-            name={g.feature.name}
-            end={distanceShort(g.feature)}
-            on={route.screen === 'feature' && route.project === project && route.name === g.feature.name}
-            onClick={() => { router.go({ screen: 'feature', project, name: g.feature.name }); }}
-            testId={`app.sidebar.feature.${g.feature.name}`}
-          />
-          {g.agents.map(row)}
-        </Fragment>
-      ))}
-      {folded.length > 0 && (
-        <SRow kind="more" lead="" name={unfolded ? 'fold the quiet ones' : moreWords(folded, now)} title={folded.map((a) => a.name).join(', ')}
-          onClick={() => { setUnfolded((u) => !u); }} testId={`app.sidebar.project.${project}.more`} />
-      )}
-    </>
-  );
-}
-
-/** A feature's end in the sidebar: what it waits for, else how far it is. */
-function distanceShort(f: Feature): string {
-  if (f.building) return 'building';
-  if (f.trial) return 'on trial';
-  return `${String(f.ahead)} ahead`;
-}
-
-function AgentRow({ project, a, route, now, wake }: { project: string; a: Agent; route: Route; now: number; wake: number | undefined }) {
-  const router = useRouter();
-  const sign = signOf(a, now, wake);
-  // S29/L19 W3: it uses his computer (rows of another bise have no project: never matched)
-  const cu = computerDot(useComputerLive().find((r) => r.project === project && r.agent === a.name));
-  return (
-    <SRow
-      kind="ag"
-      // at work: the DS's breeze '∿' (it pulses on the open row, murmurs on the others, still with reduced motion)
-      lead={a.status === 'working' && sign.g === '∿' ? <Dot state="wk" /> : <span className={`app-sign ${sign.tone}`}>{sign.g}</span>}
-      name={
-        <>
-          {a.name}
-          {cu !== null && (
-            <span className={`app-cu ${cu.tone}`} title={cu.title} data-testid={`app.sidebar.agent.${a.name}.computer`}>
-              {cu.g}
-            </span>
-          )}
-          {/* its context gauge, the TUI panel's short form as the hub sends it (amb-feed c317fc32) */}
-          {/* only when it says something: an empty context ('0%') takes no place (designer D12) */}
-          {a.usage != null && gaugeSays(a.usage.short) && (
-            <span className="app-gauge" data-testid={`app.sidebar.agent.${a.name}.gauge`}>
-              {a.usage.short}
-            </span>
-          )}
-        </>
-      }
-      end={sign.end}
-      endErr={sign.endTone === 'err'}
-      count={sign.count}
-      title={sign.title}
-      on={route.screen === 'thread' && route.project === project && route.agent === a.name}
-      onClick={() => { router.go({ screen: 'thread', project, agent: a.name }); }}
-      testId={`app.sidebar.agent.${a.name}`}
-    />
   );
 }

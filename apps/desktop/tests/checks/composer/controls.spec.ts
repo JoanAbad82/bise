@@ -82,7 +82,7 @@ test('composer/controls: every composer control is hit at its center and hovers,
     await page.getByTestId(`app.sidebar.project.${P}`).click();
     await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-project', P, { timeout: 5000 });
     // its late controls are in: its agents in the sidebar, before the composer in the page
-    await expect(page.getByTestId('app.sidebar.agent.p99')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('app.right.agent.p99')).toBeVisible({ timeout: 5000 });
     seen['telemetry thread'] = [await probe(page, mic)];
 
     await page.getByTestId('composer.field').click();

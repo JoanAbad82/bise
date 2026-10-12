@@ -78,12 +78,12 @@ test('thread/wake: an agent waiting for an event says what and how long; its wak
       await expect.poll(() => page.evaluate(() => document.documentElement.dataset['theme']), { timeout: 5000 }).toBe(t);
       const accent = await token('--c-accent');
       // the sidebar: '…' in ink, its wait's age on the right, what it waits for on hover
-      const row = page.getByTestId('app.sidebar.agent.perf');
-      await expect(row.locator('.app-g')).toHaveText('…');
-      await expect(row.locator('.app-m')).toHaveText('2m');
+      const row = page.getByTestId('app.right.agent.perf');
+      await expect(row.locator('.app-rb-g')).toHaveText('…');
+      await expect(row.locator('.app-rb-end')).toHaveText('2m');
       await expect(row).toHaveAttribute('title', /^waiting for cargo bench · 2m · /u);
-      expect(await color('[data-testid="app.sidebar.agent.perf"] .app-sign'), `${t}: '…' in ink`).toBe(await token('--c-text'));
-      expect(await color('[data-testid="app.sidebar.agent.perf"] .app-sign'), `${t}: never the accent`).not.toBe(accent);
+      expect(await color('[data-testid="app.right.agent.perf"] .app-rb-g'), `${t}: '…' in ink`).toBe(await token('--c-text'));
+      expect(await color('[data-testid="app.right.agent.perf"] .app-rb-g'), `${t}: never the accent`).not.toBe(accent);
       // the head: a dim chip with what and how long, not 'idle'
       await expect(page.getByTestId('thread.head.state')).toHaveText('… waiting for cargo bench · 2m');
       // the thread's end: the same live line, dim

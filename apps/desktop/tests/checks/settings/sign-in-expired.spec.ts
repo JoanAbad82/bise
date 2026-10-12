@@ -82,8 +82,8 @@ test('settings/sign-in-expired: the expired sign-in says who waits, signs in aga
       await expect(row).not.toContainText('expired');
       await expect(page.getByTestId('inbox.block')).toHaveCount(0);
       await page.getByTestId(`app.sidebar.project.${P}`).click();
-      await expect(page.getByTestId('app.sidebar.agent.perf')).toBeVisible({ timeout: 5000 });
-      await expect(page.getByTestId('app.sidebar.agent.perf')).not.toContainText('?');
+      await expect(page.getByTestId('app.right.agent.perf')).toBeVisible({ timeout: 5000 });
+      await expect(page.getByTestId('app.right.agent.perf')).not.toContainText('?');
       await page.screenshot({ path: test.info().outputPath('signed-in.png') });
     });
   } finally {

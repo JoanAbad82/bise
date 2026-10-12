@@ -7,8 +7,9 @@ import type { Task } from '@/scheduled/model';
 import { howOften, nextWords } from '@/scheduled/model';
 import { shortAge } from '@/agents/model';
 import { waitAge, waitingFor, waitSince, waitsEvent } from '@/thread/wake';
-import type { Agent } from '@/proto';
-import { signOf } from './side';
+import type { Agent, ComputerAgent, Feature } from '@/proto';
+import { groupsOf } from '@/review/feature';
+import { computerDot, gaugeSays, signOf, type Tone } from './side';
 
 /** One agent with its project, across the projects shown. */
 export interface ProjAgent {
@@ -34,37 +35,89 @@ export interface BarRow {
   readonly testId: string;
   /** it waits on him: never hidden by a cap (designer v5) */
   readonly waits: boolean;
+  /** the feature it opens (its 'ψ' head in AGENTS) */
+  readonly feature?: string;
+  /** at work: the DS's breeze '∿' (a Dot) in the glyph's place */
+  readonly working?: boolean;
+  /** it uses his computer: the core's mark after its name (S29/L19 W3) */
+  readonly cu?: { readonly g: string; readonly tone: Tone; readonly title: string };
+  /** its context gauge, the hub's short words, only when it says something (designer D12) */
+  readonly gauge?: string;
+}
+
+/** What AGENTS reads besides the agents: their next wakes ('<project>/<agent>' -> ms), the project's features, the computer rows. */
+export interface AgentExtras {
+  readonly wakes?: ReadonlyMap<string, number>;
+  readonly features?: readonly Feature[];
+  readonly computer?: readonly ComputerAgent[];
+}
+
+/** A feature's end: what it waits for, else how far it is. Pure. */
+export function featureEnd(f: Feature): string {
+  if (f.building) return 'building';
+  if (f.trial) return 'on trial';
+  return `${String(f.ahead)} ahead`;
 }
 
 const idOf = (all: boolean, project: string, name: string) => (all ? `${project}.${name}` : name);
 
 /**
  * AGENTS: the live ones but main, in start order (the TUI panel's: ⌥N = the TUI's, ambient-lead
- * m_20087); what waits on him says it with '?' and 'waits' in the accent, never by moving. `alt`:
- * ⌥ held, the glyph becomes ⌥1-⌥9. Pure.
+ * m_20087): the ones in no feature, then each feature's head ('ψ gift-cards', opens the feature)
+ * with its agents, as the TUI's panel. What waits on him says it with '?' and 'waits' in the accent,
+ * never by moving. `alt`: ⌥ held, the agents' glyphs become ⌥1-⌥9 (heads take no number). Pure.
  */
-export function agentRows(agents: readonly ProjAgent[], now: number, all: boolean, alt = false): BarRow[] {
-  return agents
-    .filter((x) => !x.a.archived && !x.a.main)
-    .map((x, i) => {
-      const s = signOf(x.a, now);
-      const waits = s.g === '?';
-      const role = x.a.title !== '' ? x.a.title : x.a.purpose;
+export function agentRows(agents: readonly ProjAgent[], now: number, all: boolean, alt = false, extras: AgentExtras = {}): BarRow[] {
+  const live = agents.filter((x) => !x.a.archived && !x.a.main);
+  const byName = new Map(live.map((x) => [x.a.name, x] as const));
+  const pick = (list: readonly Agent[]) => list.flatMap((a) => byName.get(a.name) ?? []);
+  // features are a project's: on bise's thread (every project) the agents stay in start order
+  const { solo, groups } = all ? { solo: live.map((x) => x.a), groups: [] } : groupsOf(live.map((x) => x.a), extras.features ?? []);
+  const seq: (ProjAgent | Feature)[] = [...pick(solo), ...groups.flatMap((g) => [g.feature, ...pick(g.agents)])];
+  let n = 0;
+  return seq.map((x): BarRow => {
+    if (!('a' in x)) {
+      const project = agents[0]?.project ?? '';
       return {
-        key: `a:${x.project}/${x.a.name}`,
-        project: x.project,
-        agent: x.a.name,
-        glyph: alt && i < 9 ? `⌥${String(i + 1)}` : s.g,
-        tone: alt && i < 9 ? 'dim' : s.tone,
-        name: x.a.name,
-        sub: all ? x.projectName : role,
-        end: waits ? 'waits' : s.end,
-        endTone: waits ? 'acc' : s.endTone,
-        title: s.title,
-        testId: `app.right.agent.${idOf(all, x.project, x.a.name)}`,
-        waits,
+        key: `ψ:${project}/${x.name}`,
+        project,
+        feature: x.name,
+        glyph: 'ψ',
+        tone: 'dim',
+        name: x.name,
+        sub: '',
+        end: featureEnd(x),
+        endTone: 'dim',
+        title: `feature ${x.name} · ${x.branch}`,
+        testId: `app.right.feature.${x.name}`,
+        waits: false,
       };
-    });
+    }
+    const i = n++;
+    const s = signOf(x.a, now, extras.wakes?.get(`${x.project}/${x.a.name}`));
+    const waits = s.g === '?';
+    const role = x.a.title !== '' ? x.a.title : x.a.purpose;
+    const numbered = alt && i < 9;
+    const cu = computerDot(extras.computer?.find((r) => r.project === x.project && r.agent === x.a.name));
+    const short = x.a.usage?.short;
+    return {
+      key: `a:${x.project}/${x.a.name}`,
+      project: x.project,
+      agent: x.a.name,
+      glyph: numbered ? `⌥${String(i + 1)}` : s.g,
+      tone: numbered ? 'dim' : s.tone,
+      name: x.a.name,
+      sub: all ? x.projectName : role,
+      end: waits ? 'waits' : s.end,
+      endTone: waits ? 'acc' : s.endTone,
+      title: s.title,
+      testId: `app.right.agent.${idOf(all, x.project, x.a.name)}`,
+      waits,
+      ...(!numbered && x.a.status === 'working' && s.g === '∿' ? { working: true } : {}),
+      ...(cu === null ? {} : { cu }),
+      ...(short != null && gaugeSays(short) ? { gauge: short } : {}),
+    };
+  });
 }
 
 /** ARCHIVED: ✓ done or – stopped, dim, newest first: 'done · 2 h'. Pure. */

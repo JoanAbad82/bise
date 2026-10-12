@@ -323,7 +323,7 @@ test("composer/dictate-anywhere: ctrl+r from the thread or a sidebar row takes t
     );
 
     // a sidebar row selected (alpha's): alpha's composer takes it
-    await page.getByTestId("app.sidebar.agent.alpha").click();
+    await page.getByTestId("app.right.agent.alpha").click();
     await expect(page.getByTestId("thread.screen")).toHaveAttribute(
       "data-agent",
       "alpha",

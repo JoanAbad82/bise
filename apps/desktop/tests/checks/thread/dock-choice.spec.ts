@@ -58,7 +58,7 @@ test('thread/dock-choice: a docked merge is decided only by 1/2; typed words go 
 
     await test.step("a long question docked: the label is one line, 'esc write a plain message' whole", async () => {
       await core.send(projects([long]) as never);
-      await page.getByTestId('app.sidebar.agent.perf').click();
+      await page.getByTestId('app.right.agent.perf').click();
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'perf', { timeout: 5000 });
       await page.getByTestId('inbox.block.row.1').click();
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-answering', 'true', { timeout: 3000 });

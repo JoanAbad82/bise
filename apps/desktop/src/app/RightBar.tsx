@@ -5,12 +5,16 @@
 // project, the project's name in place of the role. A click opens the agent full in the centre (his
 // pick), an artifact its view, a task the scheduled screen; 'all ›' the full list in the centre.
 // Owner: amb-win. The rows' words are pure (barrows.ts).
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Act, Press } from '@/ds';
+import { Fragment, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Act, Dot, Press } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAllArtifacts } from '@/artifacts';
 import { useAllScheduled } from '@/scheduled';
-import { useStore, type Store } from '@/store';
+import { useComputerLive, useFeatures, useStore, type Store } from '@/store';
+import { Tip } from '@/setup';
+import { useTour } from '@/setup/useTour';
+import { Hint, hintUsed, useHint } from './hints';
+import { MAIN } from './route';
 import { useNow } from './clock';
 import { keep } from './keep';
 import { useRoute, useRouter } from './router';
@@ -147,12 +151,76 @@ function Section({
 function Row({ r, onOpen, on }: { r: BarRow; onOpen: () => void; on?: boolean }) {
   return (
     <Press look="app-rb-row" aria-current={on === true || undefined} title={r.title} onClick={onOpen} data-testid={r.testId}>
-      <span className={`app-rb-g ${r.tone}`}>{r.glyph}</span>
+      {/* at work: the DS's breeze '∿' (it pulses on the open row, murmurs on the others, still with reduced motion) */}
+      <span className={`app-rb-g ${r.tone}`}>{r.working === true ? <Dot state="wk" /> : r.glyph}</span>
       <span className="app-rb-name">{r.name}</span>
+      {r.cu !== undefined && (
+        <span className={`app-cu ${r.cu.tone}`} title={r.cu.title} data-testid={`${r.testId}.computer`}>
+          {r.cu.g}
+        </span>
+      )}
+      {r.gauge !== undefined && (
+        <span className="app-gauge" data-testid={`${r.testId}.gauge`}>
+          {r.gauge}
+        </span>
+      )}
       {r.sub !== '' && <span className="app-rb-sub">{r.sub}</span>}
-      <span className={`app-rb-end ${r.endTone}`}>{r.end}</span>
+      {/* a new artifact: the signed 'new' chip (designer m_20132: 1 px line, r 9, ink, t-11) */}
+      {r.end === 'new' && r.id !== undefined ? (
+        <span className="app-rb-end">
+          <span className="app-rb-new" data-testid={`${r.testId}.new`}>
+            new
+          </span>
+        </span>
+      ) : (
+        <span className={`app-rb-end ${r.endTone}`}>{r.end}</span>
+      )}
     </Press>
   );
+}
+
+/** Each agent's next wake (its scheduled tasks' soonest run), '<project>/<agent>' -> ms. Pure. */
+export function wakesOf(tasks: readonly { project: string; t: { agent: string; next_ms?: number | null } }[]): Map<string, number> {
+  const soonest = new Map<string, number>();
+  for (const x of tasks) {
+    if (x.t.next_ms == null) continue;
+    const k = `${x.project}/${x.t.agent}`;
+    const was = soonest.get(k);
+    if (was === undefined || x.t.next_ms < was) soonest.set(k, x.t.next_ms);
+  }
+  return soonest;
+}
+
+/**
+ * The tip under an agent's row: the demo tour's (L25: 'start' under the first demo agent, 'steer'
+ * under the one that waits for him), else the first agent's one-time hint (S36). They lived under
+ * the sidebar's agent rows; the agents are here now.
+ */
+function useAgentTip(project: string, rows: readonly BarRow[], route: ReturnType<typeof useRoute>): (agent: string) => ReactNode {
+  const tour = useTour(project);
+  const liveDemo = tour.snap.members.filter((m) => !m.archived);
+  const tipAt = tour.tip === 'start' ? liveDemo[0]?.name : tour.tip === 'steer' ? liveDemo.at(-1)?.name : undefined;
+  const first = rows.find((r) => r.agent !== undefined)?.agent;
+  const hint = useHint('first_agent', first !== undefined && tour.tip === null);
+  const inAgent = route.screen === 'thread' && route.project === project && route.agent !== MAIN;
+  useEffect(() => {
+    if (inAgent) hintUsed('first_agent');
+  }, [inAgent]);
+  return (agent) => {
+    if (tipAt === agent && tour.tip !== null)
+      return (
+        <div className="app-tip">
+          <Tip tip={tour.tip} snap={tour.snap} />
+        </div>
+      );
+    if (hint && first === agent)
+      return (
+        <div className="app-tip">
+          <Hint name="first_agent" />
+        </div>
+      );
+    return null;
+  };
 }
 
 export function RightBar({ project, name, over }: { project: string; name: string; over?: boolean }) {
@@ -164,7 +232,11 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   const agents = useBarAgents(project);
   const artifacts = useAllArtifacts(all ? undefined : project);
   const tasks = useAllScheduled(all ? undefined : project);
-  const live = agentRows(agents, now, all, alt);
+  const features = useFeatures(project);
+  const computer = useComputerLive();
+  const wakes = useMemo(() => wakesOf(tasks), [tasks]);
+  const live = agentRows(agents, now, all, alt, { wakes, features, computer });
+  const tipOf = useAgentTip(project, live, route);
   const archived = archivedRows(agents, now, all);
   const made = artifactRows(artifacts, now);
   const later = [...scheduledRows(tasks, now), ...waitingRows(agents, now, all)];
@@ -193,7 +265,21 @@ export function RightBar({ project, name, over }: { project: string; name: strin
             router.go(all ? { screen: 'bise' } : { screen: 'agents', project });
           }}
         >
-          {(r) => <Row key={r.key} r={r} on={here(r.project, r.agent ?? '')} onOpen={() => { openAgent(r.project, r.agent ?? ''); }} />}
+          {(r) =>
+            r.feature !== undefined ? (
+              <Row
+                key={r.key}
+                r={r}
+                on={route.screen === 'feature' && route.project === r.project && route.name === r.feature}
+                onOpen={() => { router.go({ screen: 'feature', project: r.project, name: r.feature ?? '' }); }}
+              />
+            ) : (
+              <Fragment key={r.key}>
+                <Row r={r} on={here(r.project, r.agent ?? '')} onOpen={() => { openAgent(r.project, r.agent ?? ''); }} />
+                {tipOf(r.agent ?? '')}
+              </Fragment>
+            )
+          }
         </Section>
         <Section
           id="archived"

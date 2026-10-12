@@ -30,7 +30,7 @@ const T = {
   stop: '[data-testid="thread.computer.stop"]',
   back: '[data-testid="thread.computer.back"]',
   peek: '[data-testid="thread.computer.peek"]',
-  mark: '[data-testid="app.sidebar.agent.checkout.computer"]',
+  mark: '[data-testid="app.right.agent.checkout.computer"]',
 };
 const AGENT = 'checkout';
 const PLACE = 'Chrome · amazon.fr';

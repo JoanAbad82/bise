@@ -87,7 +87,8 @@ test('settings/setup-first: a /model the core holds opens its provider setup; th
       await core.send({ ...first, cid: 13 } as never);
       await expect(page.getByTestId('settings.models.want')).toBeVisible({ timeout: 3000 });
       expect(cancels()).toEqual([]);
-      await page.getByTestId('app.sidebar.agent.perf').click();
+      // settings has no right bar (places only on the left): back to perf's thread, ⌘[
+      await page.keyboard.press('Meta+BracketLeft');
       await expect(thread).toHaveAttribute('data-agent', 'perf', { timeout: 3000 });
       await core.waitCmd((c) => (c as Cmd).cmd === 'setup_first_cancel', 3000);
       await sleep(300);

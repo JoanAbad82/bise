@@ -47,12 +47,12 @@ test('thread/demo-tour: the demo team brings the start tip, its thread the insid
     await expect(start).toContainText('looks inside designer');
     await expect(start).toContainText('⌥1');
     // it sits right under designer's row in the sidebar
-    const row = (await page.getByTestId('app.sidebar.agent.designer').boundingBox()) ?? { y: 0, height: 0 };
+    const row = (await page.getByTestId('app.right.agent.designer').boundingBox()) ?? { y: 0, height: 0 };
     const tip = (await start.boundingBox()) ?? { y: -1 };
     expect(tip.y, 'under its row').toBeGreaterThanOrEqual(row.y + row.height - 1);
     await page.screenshot({ path: test.info().outputPath('start.png') });
 
-    await page.getByTestId('app.sidebar.agent.designer').click();
+    await page.getByTestId('app.right.agent.designer').click();
     const inside = page.getByTestId('setup.tip.inside');
     await expect(inside, "the inside tip in designer's thread").toBeVisible({ timeout: 5000 });
     await expect(inside).toContainText("this is designer's own thread");

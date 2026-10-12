@@ -30,7 +30,7 @@ test('agents/write-to-one: a line sent from an agent\'s view reaches that agent,
     const row = page.locator(`[data-testid="app.sidebar.project.${project}"]`);
     await expect(row, 'the sidebar lists telemetry').toBeVisible({ timeout: 10_000 });
     await row.click();
-    const agent = page.locator('[data-testid="app.sidebar.agent.alerts"]');
+    const agent = page.locator('[data-testid="app.right.agent.alerts"]');
     await expect(agent, "telemetry's agents show under it").toBeVisible({ timeout: 5000 });
     await agent.click();
     const screen = page.locator(T.screen);

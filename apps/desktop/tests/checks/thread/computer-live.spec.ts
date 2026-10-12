@@ -89,7 +89,7 @@ test('thread/computer-live: the live line under the head, its acts with the key,
     await expect(page.getByTestId('thread.head')).toBeVisible({ timeout: 10_000 });
     const line = page.getByTestId('thread.computer');
     const words = page.getByTestId('thread.computer.words');
-    const mark = page.getByTestId('app.sidebar.agent.perf.computer');
+    const mark = page.getByTestId('app.right.agent.perf.computer');
 
     // no row, or another bise's row: nothing
     await live([other]);

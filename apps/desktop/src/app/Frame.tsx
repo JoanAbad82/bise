@@ -236,7 +236,7 @@ export function Over({
   }, [onClose]);
   return (
     <>
-      <div className="app-scrim" onClick={onClose} data-testid="app.scrim" />
+      <div className={`app-scrim ${side}`} onClick={onClose} data-testid="app.scrim" />
       <div className={`app-over ${side}`} data-testid={`app.over.${side}`}>
         {children}
       </div>

@@ -141,14 +141,14 @@ for (const theme of ['light', 'dark']) {
 
       // perf's own thread: its wake is one news row
       await page.setViewportSize({ width: 1100, height: 900 });
-      await page.getByTestId('app.sidebar.agent.perf').click();
+      await page.getByTestId('app.right.agent.perf').click();
       await expect(page.getByTestId('thread.entry.2')).toBeVisible({ timeout: 10_000 });
       // its own wake is a quiet row: its words sans, mono only for the machine's text (designer m_19832)
       const wake = await page.getByTestId('thread.wake.2').evaluate((el) => getComputedStyle(el).fontFamily);
       expect(wake, 'its wake: sans').not.toMatch(/mono/i);
       // one state: the sidebar says the head chip's word (designer m_19784 (5))
       await expect(page.getByTestId('thread.head.state')).toHaveText('idle');
-      await expect(page.getByTestId('app.sidebar.agent.perf')).toContainText('idle');
+      await expect(page.getByTestId('app.right.agent.perf')).toContainText('idle');
       await page.mouse.move(1, 400);
       await page.screenshot({ path: test.info().outputPath(`tiers-${theme}-wake.png`) });
     } finally {

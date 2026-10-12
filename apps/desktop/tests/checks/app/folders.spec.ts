@@ -1,9 +1,9 @@
-// app/folders · his try round 2 item 3 (ambient-lead m_11456, m_11618): a project's folder in the
-// sidebar is open by default and his close is remembered per project. Passes when, on the bise
-// view, acme (a project the window has agents of) lists its agents under its row, shop (no agents
-// known: its hub isn't held for the sidebar) says '∿ 2' and his pink count 1 on its row, a
-// click on acme's ▾ closes it (its agents leave, the row stays, nothing navigates) and is kept in
-// the window's storage, and ▸ opens it again. The scripted core (FakeCore). Owner: amb-win.
+// app/folders · designer's desktop-right-bar v5 (ambient-lead m_20087 commit 2/3): the sidebar
+// keeps places only. A project's row says what works in it and his pink count; its agents are not
+// under it any more (no folder, no ▾): they are in the right bar, which on bise's view covers every
+// project whose hub runs (acme's perf and docs, named with their project). Before, a project's
+// folder opened under its row (his try round 2 item 3, ambient-lead m_11456). The scripted core
+// (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
 const HOME = 'bise-home-00000000';
@@ -27,26 +27,25 @@ const world = () => [
   { ev: 'agents', project: ACME, agents: [agent('main'), agent('perf', 'working'), agent('docs')] },
 ];
 
-test("app/folders: every project's folder opens by default; a close is his, remembered; a project without agents says its counts on its row", async () => {
+test("app/folders: places only: a project's row says its counts, its agents are in the right bar, every project's on bise's view", async () => {
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: 'bise' });
   try {
     const { page } = s;
-    await expect(page.getByTestId('app.sidebar.agent.perf'), "acme's agents, open by default").toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId('app.sidebar.agent.docs')).toBeVisible();
+    await expect(page.getByTestId(`app.right.agent.${ACME}.perf`), "acme's agents, in the right bar").toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId(`app.right.agent.${ACME}.docs`)).toContainText('acme');
     // desktop-screens v6: the row says it, '∿ 2' and his pink count (no counts line under it)
     await expect(page.getByTestId(`app.sidebar.project.${SHOP}`), "shop's row").toContainText('∿ 2');
     await expect(page.getByTestId(`app.sidebar.project.${SHOP}`).locator('.app-cnt'), 'his pink count').toHaveText('1');
-    await expect(page.getByTestId(`app.sidebar.project.${ACME}.fold`)).toHaveAttribute('aria-expanded', 'true');
-    await page.screenshot({ path: test.info().outputPath('open.png') });
-
-    await page.getByTestId(`app.sidebar.project.${ACME}.fold`).click();
-    await expect(page.getByTestId('app.sidebar.agent.perf'), 'closed: its agents leave').toHaveCount(0);
-    await expect(page.getByTestId(`app.sidebar.project.${ACME}`), 'the row stays').toBeVisible();
-    await expect(page.getByTestId('thread.screen'), 'nothing navigated: still bise').toHaveAttribute('data-project', HOME);
-    expect(await page.evaluate(() => localStorage.getItem('bise.sidebar.closed')), 'his close is kept').toBe(JSON.stringify([ACME]));
-    await page.getByTestId(`app.sidebar.project.${ACME}.fold`).click();
-    await expect(page.getByTestId('app.sidebar.agent.perf'), 'open again').toBeVisible();
+    const side = page.getByTestId('app.sidebar');
+    await expect(side.locator('[data-testid^="app.sidebar.agent."]'), 'no agent row in the sidebar').toHaveCount(0);
+    await expect(page.getByTestId(`app.sidebar.project.${ACME}.fold`), 'no folder').toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath('places.png') });
+    // a project's row opens its main; the right bar shows that project alone
+    await page.getByTestId(`app.sidebar.project.${ACME}`).click();
+    await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-project', ACME);
+    await expect(page.getByTestId('app.right.agent.perf')).toBeVisible();
+    await expect(page.getByTestId('app.right.top')).toContainText('acme');
   } finally {
     await s.close();
     core.dispose();

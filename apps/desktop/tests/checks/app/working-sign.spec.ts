@@ -34,7 +34,7 @@ test("app/working-sign: '∿' in the dot's slot, the open row pulses, the others
   const s = await launchDesktop({ core, route: `agent/${P}/perf` });
   try {
     const { page } = s;
-    const dot = (n: string) => page.locator(`[data-testid="app.sidebar.agent.${n}"] .b-dot`);
+    const dot = (n: string) => page.locator(`[data-testid="app.right.agent.${n}"] .b-dot`);
     await expect(dot('perf')).toBeVisible({ timeout: 10_000 });
     const look = (n: string) =>
       dot(n).evaluate((el) => {
@@ -61,7 +61,7 @@ test("app/working-sign: '∿' in the dot's slot, the open row pulses, the others
     const hush = await Promise.all(['cache', 'docs', 'api'].map(async (n) => (await look(n)).opacity));
     expect(new Set(hush.map((o) => o.toFixed(2))).size, 'never blinks in chorus').toBeGreaterThan(1);
     // waiting on him and done keep their own signs in the 15 px column (desktop-screens v6): '?' and '✓', still
-    const sign = (n: string) => page.locator(`[data-testid="app.sidebar.agent.${n}"] .app-g`);
+    const sign = (n: string) => page.locator(`[data-testid="app.right.agent.${n}"] .app-rb-g`);
     await expect(sign('ui')).toHaveText('?');
     await expect(sign('lint')).toHaveText('✓');
     for (const n of ['ui', 'lint']) {
@@ -80,11 +80,11 @@ test("app/working-sign: '∿' in the dot's slot, the open row pulses, the others
     expect((await look('perf')).anim).toBe('none');
     // every agent row of the sidebar, frame by frame (bise's own pearl is amb-web's, its own rule)
     const running = await page.evaluate(() =>
-      document.getAnimations().filter((a) => a.playState === 'running' && a.effect instanceof KeyframeEffect && a.effect.target instanceof Element && a.effect.target.closest('[data-testid^="app.sidebar.agent."]') !== null).length,
+      document.getAnimations().filter((a) => a.playState === 'running' && a.effect instanceof KeyframeEffect && a.effect.target instanceof Element && a.effect.target.closest('[data-testid^="app.right.agent."]') !== null).length,
     );
     expect(running, 'no animation runs in an agent row').toBe(0);
     for (const n of WORKING) {
-      const row = page.getByTestId(`app.sidebar.agent.${n}`);
+      const row = page.getByTestId(`app.right.agent.${n}`);
       const a = await row.screenshot({ animations: 'allow' });
       await page.waitForTimeout(400);
       const b = await row.screenshot({ animations: 'allow' });

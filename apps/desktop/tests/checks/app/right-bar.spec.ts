@@ -101,7 +101,8 @@ for (const theme of ['light', 'dark']) {
       await page.keyboard.down('Alt');
       await expect(page.getByTestId('app.right.agent.perf').locator('.app-rb-g')).toHaveText('⌥1');
       await page.keyboard.up('Alt');
-      await expect(page.getByTestId('app.right.agent.perf').locator('.app-rb-g')).toHaveText('∿');
+      // perf works: the DS's breeze '∿' (a Dot) back in its place
+      await expect(page.getByTestId('app.right.agent.perf').locator('.app-rb-g .b-dot.wk')).toBeVisible();
       // a click opens the agent full in the centre
       await page.getByTestId('app.right.agent.checkout').click();
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'checkout');
