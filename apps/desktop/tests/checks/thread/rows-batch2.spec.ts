@@ -64,6 +64,7 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
       await expect(list.getByText(`ack:`).last(), 'the answer came').toBeVisible({ timeout: 20_000 });
       await sleep(1500);
       const tuiThought = /thought/.test(flat(t?.screen() ?? ''));
+      test.info().attachments.push({ name: 'tui-thinking', contentType: 'text/plain', body: Buffer.from(t?.screen() ?? '') });
       const head = list.locator(T.think).last();
       const winThought = (await head.count()) > 0;
       test.info().annotations.push({ type: 'thinking', description: JSON.stringify({ tui: tuiThought, window: winThought }) });
@@ -78,9 +79,10 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
 
     await test.step('a failed turn', async () => {
       await say(`[[error: badname]] this turn fails ${n}`);
-      const notice = list.locator(T.notice).last();
-      await expect.soft(notice, 'a notice for the failed turn').toBeVisible({ timeout: 30_000 });
-      await expect.soft(notice, 'its level is an error').toHaveAttribute('data-level', 'err');
+      // the turn's end is its own row now (thread.failed.<pos>, level err), after the attempt's
+      // 'candidate discarded' notice (level warn): the failed turn is the err one
+      const notice = list.locator(`${T.notice}[data-level="err"], [data-testid^="thread.failed."][data-level="err"]`).last();
+      await expect.soft(notice, 'an error row for the failed turn').toBeVisible({ timeout: 30_000 });
       const words = ((await notice.textContent().catch(() => '')) ?? '').trim();
       test.info().annotations.push({ type: 'notice', description: words });
       expect.soft(words.length, 'it says why').toBeGreaterThan(8);
@@ -134,11 +136,22 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
       await tuiReady(ts);
       // receipts: its own worktree goes with the archive, so nothing revives it (a shared-folder
       // agent like search is revived by a message: the hub delivers it, no row)
-      const live = async () => (await hubAgents(w, 'shop')).some((a) => a.name === AG && a.status !== 'archived' && !a.dropped);
+      // archived: its status, dropped, an archived flag, or out of the hub's agents (the TUI says
+      // '@receipts archived — work saved (/restore)' and moves it under '▸ 1 archived')
+      const raw = async () => (await hubAgents(w, 'shop')).find((a) => a.name === AG);
+      const live = async () => {
+        const a = await raw();
+        return a !== undefined && a.status !== 'archived' && !a.dropped && !JSON.stringify(a).includes('"archived":true');
+      };
       tuiSay(ts, `/archive ${AG}`);
       await sleep(1500);
       if (/\[y\/N\]/.test(flat(ts.screen()))) tuiSay(ts, 'y');
-      await expect.poll(live, { timeout: 15_000, message: `${AG} archived (the TUI)` }).toBe(false);
+      try {
+        await expect.poll(live, { timeout: 15_000, message: `${AG} archived (the TUI)` }).toBe(false);
+      } finally {
+        test.info().attachments.push({ name: 'tui-archive', contentType: 'text/plain', body: Buffer.from(ts.screen()) });
+        test.info().attachments.push({ name: 'hub-receipts', contentType: 'application/json', body: Buffer.from(JSON.stringify((await raw().catch(() => undefined)) ?? null)) });
+      }
       await page.locator(T.project(shop)).click({ timeout: 10_000 });
       await expect(page.locator(T.thread)).toHaveAttribute('data-project', shop, { timeout: 5000 });
       await expect.soft(page.locator(T.gauges).first(), "shop's agents carry their gauge in the sidebar").toBeVisible({ timeout: 10_000 });

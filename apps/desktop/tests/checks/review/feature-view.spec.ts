@@ -43,9 +43,10 @@ test("review/feature-view: shop's gift-cards in the sidebar as the TUI groups it
 
     // the group, then its agents right under it, as the TUI's 'ψ gift-cards'
     await expect(page.locator(T.group), "shop's sidebar has the feature's group").toBeVisible({ timeout: 15_000 });
-    await expect(page.locator(T.group)).toContainText('ψ gift-cards');
+    // the glyph and the name are two spans (54a96790): their text has no space between them
+    await expect(page.locator(T.group)).toContainText(/ψ\s*gift-cards/);
     const order = await page.locator('[data-testid^="app.right.agent."], [data-testid^="app.right.feature."]').evaluateAll((els) =>
-      els.map((e) => (e.getAttribute('data-testid') ?? '').replace(/^app\.sidebar\.(agent|feature)\./, '')),
+      els.map((e) => (e.getAttribute('data-testid') ?? '').replace(/^app\.right\.(agent|feature)\./, '')),
     );
     const at = order.indexOf('gift-cards');
     expect(order.slice(at + 1, at + 3).sort(), `its agents come under it (${order.join(', ')})`).toEqual(['gift-api', 'gift-ui']);
