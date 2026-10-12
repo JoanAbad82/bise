@@ -6,13 +6,14 @@
 //     the TUI shows one (on the world's Mistral fake neither does: the reasoning isn't kept), and
 //     then it opens to what it thought;
 //   - a failed turn ('[[error: badname]]': the API's final 400) is a notice with its why (✗, err);
-//   - usage: the thread head's gauge words are the TUI's footer gauge words;
+//   - usage (designer D12/D7b: the window hides a gauge at 0%): bise's main at 0% (the TUI's footer
+//     says '· 0%') has no gauge in the window's head; the echo fake can't raise it above 0%;
 //   - /compact (the TUI's, on bise's main): 'compacting…' then a folded 'context compacted' that
 //     opens to its summary;
 //   - not delivered: in shop's main thread, '@receipts …' after the TUI archived receipts (its
 //     worktree goes with it) is '✗ not delivered to receipts' with his words; esc drops it from
 //     view; ⏎ send again, after the TUI's /restore, reaches receipts (his words never lost);
-//     shop's agents carry their gauge in the sidebar, as the TUI's panel does.
+//     shop's agents at 0% carry no gauge in the right bar (any shown is the TUI panel's).
 import path from 'node:path';
 import { test, expect } from '../../harness';
 import { hubAgents, hubOf, launchReal, realWorld, transcriptHas, tui, tuiReady, tuiSay, type Tui } from '../world';
@@ -90,12 +91,16 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
     });
 
     await test.step('usage', async () => {
-      const usage = page.locator(T.usage);
-      await expect.soft(usage, "the head's gauge").toBeVisible({ timeout: 15_000 });
-      const words = ((await usage.textContent().catch(() => '')) ?? '').replace(/^[\s·]+/, '').trim();
-      test.info().annotations.push({ type: 'usage', description: JSON.stringify({ window: words, tui: flat(t?.screen() ?? '').match(/you → main[^╯]*/)?.[0]?.slice(0, 200) }) });
-      expect.soft(words, 'gauge words').not.toBe('');
-      expect.soft(flat(t?.screen() ?? ''), "the TUI's gauge has the same words").toContain(words);
+      // designer's rule (D12/D7b, ambient-lead m_20365): the window hides a gauge that says 0%, the
+      // TUI's footer always says it. bise's main is at 0% here: no gauge in the window
+      const footer = flat(t?.screen() ?? '').match(/you → main[^╯]*/)?.[0] ?? '';
+      const zero = /\b\d+ · 0%/.test(footer);
+      test.info().annotations.push({ type: 'usage-main', description: JSON.stringify({ zero, tui: footer.slice(0, 200) }) });
+      if (zero) await expect.soft(page.locator(T.usage), "at 0% the window's head has no gauge").toBeHidden({ timeout: 3000 });
+      // non-zero: real.sh's world is not rich, so every hub runs the echo fake, whose calls always
+      // report 10 input tokens (tests/fake_provider.py USAGE): no turn there can raise a gauge above
+      // 0%. A non-zero gauge needs a usage marker in the fake or a rich world (asked via ambient-lead).
+      await expect(page.locator(T.field).first(), "bise's thread again").toBeVisible({ timeout: 10_000 });
     });
 
     await test.step('compaction', async () => {
@@ -154,16 +159,16 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
       }
       await page.locator(T.project(shop)).click({ timeout: 10_000 });
       await expect(page.locator(T.thread)).toHaveAttribute('data-project', shop, { timeout: 5000 });
-      await expect.soft(page.locator(T.gauges).first(), "shop's agents carry their gauge in the sidebar").toBeVisible({ timeout: 10_000 });
+      // shop's agents at 0% in the TUI's panel carry no gauge in the right bar (designer D12/D7b);
+      // any gauge shown is the TUI panel's percent ('<n> <glyph> <name> … <pct>%'), never 0%
       const gauges = await page.locator(T.gauges).evaluateAll((els) =>
-        els.map((e) => ({ agent: (e.getAttribute('data-testid') ?? '').replace(/^app\.sidebar\.agent\./, '').replace(/\.gauge$/, ''), words: e.textContent.trim() })));
+        els.map((e) => ({ agent: (e.getAttribute('data-testid') ?? '').replace(/^app\.right\.agent\./, '').replace(/\.gauge$/, ''), words: e.textContent.trim() })));
       const panel = flat(ts.screen()).match(/agents .*? inbox/)?.[0] ?? '';
-      test.info().annotations.push({ type: 'sidebar-gauges', description: JSON.stringify({ window: gauges, tuiPanel: panel }) });
-      expect.soft(gauges.length, "shop's agents carry their gauge in the sidebar").toBeGreaterThan(0);
-      // each one is the TUI panel's: '<n> <glyph> <name> … <pct>%'
+      test.info().annotations.push({ type: 'right-bar-gauges', description: JSON.stringify({ window: gauges, tuiPanel: panel }) });
       for (const g of gauges) {
         const tuiPct = new RegExp(`\\b${g.agent}\\b[^%]*?(\\d+%)`).exec(panel)?.[1] ?? '';
         expect.soft(g.words, `${g.agent}'s gauge is the TUI panel's ${tuiPct}`).toBe(tuiPct);
+        expect.soft(g.words, `${g.agent}: a gauge at 0% is hidden`).not.toBe('0%');
       }
       await say(`@${AG} first try ${n}`);
       const first = list.locator(T.nd, { hasText: `first try ${n}` }).last();
