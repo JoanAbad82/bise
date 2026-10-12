@@ -562,7 +562,11 @@ def t_escalation_card(E, c):
     check(not c.cards() and not any(seen), "no card in the user's inbox: %r / %r" % (c.cards(), seen))
     # hub/agents leaves a 0 count out
     check(isinstance(c.agent("main").get("inbox", 0), int), "main's inbox count in the state: %r" % c.agent("main"))
-    check(any(r["agent"] == "main" and "@t3b is blocked: t3b needs a key" in r["user"] for r in E.fake_requests()),
+    # as a new turn's message, or (a fast hub) steered into main's turn
+    # mid-way: then it is an earlier message of the next request
+    blocked = "@t3b is blocked: t3b needs a key"
+    check(any(r["agent"] == "main" and (blocked in r["user"] or any(blocked in u for u in r.get("users") or []))
+              for r in E.fake_requests()),
           "the blocked status went to main")
     msg_id = None
     for l in c.lines("main"):
