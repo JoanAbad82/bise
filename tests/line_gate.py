@@ -38,7 +38,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LIST = "tests/line_limits.txt"
 LIMIT = 1000
 EXTS = (".rs", ".bend", ".ts", ".tsx", ".py")
-RULE = "docs/architecture-principles.md rule 5: split it first"
+RULE = "split it: move a block to its own file (docs/architecture-principles.md rule 5)"
+# where a block of a big file goes when it has a decided home (architect m_19722)
+HOMES = {"bend/LAWS.bend": "bend/laws/", "bend/PROOF.bend": "bend/laws/"}
+
+
+def split_hint(path):
+    """What the refusal tells to do for this path. Pure."""
+    home = HOMES.get(path)
+    return "split it: move a block to its own file in %s (docs/architecture-principles.md rule 5)" % home if home else RULE
 EXEMPT_PREFIXES = ("bend/vendor/", "rust/vendor/")
 # in the tree once the desktop app's merge has landed: the " merge" marks end there
 MERGED_WHEN = "apps/desktop/"
@@ -85,9 +93,9 @@ def check_files(counts, caps, headroom=frozenset()):
                 out.append("%s: gone: remove its line from %s" % (path, LIST))
         elif cap is None:
             if n > LIMIT:
-                out.append("%s: %d lines, over %d (%s)" % (path, n, LIMIT, RULE))
+                out.append("%s: %d lines, over %d: %s" % (path, n, LIMIT, split_hint(path)))
         elif n > cap:
-            out.append("%s: %d lines, over its listed %d in %s (%s)" % (path, n, cap, LIST, RULE))
+            out.append("%s: %d lines, over its listed %d in %s: %s" % (path, n, cap, LIST, split_hint(path)))
         elif n <= LIMIT:
             out.append("%s: %d lines, at %d or under now: remove its line from %s" % (path, n, LIMIT, LIST))
         elif n < cap:
@@ -102,14 +110,14 @@ def check_list(caps, base):
     out = []
     for path in sorted(caps):
         if path in base and caps[path] > base[path]:
-            out.append("%s: %s raised from %d to %d: the list only shrinks (%s)" % (LIST, path, base[path], caps[path], RULE))
+            out.append("%s: %s raised from %d to %d: the list only shrinks: %s" % (LIST, path, base[path], caps[path], split_hint(path)))
     # a new path is a rename when a path that left the list had at least as many lines
     left = sorted((base[p] for p in base if p not in caps), reverse=True)
     for path in sorted((p for p in caps if p not in base), key=lambda p: -caps[p]):
         if left and left[0] >= caps[path]:
             left.pop(0)
         else:
-            out.append("%s: %s is new in the list: the list only shrinks (%s)" % (LIST, path, RULE))
+            out.append("%s: %s is new in the list: the list only shrinks: %s" % (LIST, path, split_hint(path)))
     return out
 
 
@@ -198,6 +206,10 @@ def self_test():
     want("headroom grew", len(check_files({"big.rs": 1201}, caps, mark)), 1)
     want("headroom at limit", len(check_files({"big.rs": 1000}, caps, mark)), 1)
     want("headroom other file", len(check_files({"a.rs": 1100}, {"a.rs": 1200}, mark)), 1)
+    want("hint", split_hint("rust/a.rs"), RULE)
+    want("hint laws", "bend/laws/" in split_hint("bend/LAWS.bend") and "bend/laws/" in split_hint("bend/PROOF.bend"), True)
+    want("hint in refusal", check_files({"bend/LAWS.bend": 2}, {}) == [] and
+         "bend/laws/" in check_files({"bend/LAWS.bend": 6200}, {"bend/LAWS.bend": 6158})[0], True)
     want("marks before merge", check_marks({"big.rs"}, False), [])
     want("marks after merge", len(check_marks({"big.rs"}, True)), 1)
     base = {"a.rs": 1500, "b.rs": 1100}
