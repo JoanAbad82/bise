@@ -1681,14 +1681,31 @@
   margin-top: var(--gap-tight);
   padding-left: var(--s-4);
 }
-.th-note-line .th-note-text {
+/* one folded row of its words; the last one ends with '… ▸' on the same line (designer
+   m_20621 (2)) */
+.th-note-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-1);
+  max-width: 100%;
+  min-width: 0;
+}
+.th-note-row .th-note-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* a single paragraph wraps on two lines; '… ▸' after its second */
+.th-note-row.para .th-note-text {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  min-width: 0;
-  overflow: hidden;
-  white-space: pre-line;
+  white-space: normal;
   overflow-wrap: anywhere;
+}
+.th-note-row .b-act {
+  flex: none;
 }
 /* the fold of a run sits on the text column: its left edge is the prose's */
 .th-screen .th-run {
@@ -1699,12 +1716,14 @@
      ends on its 2 px */
   padding: 6px 0 2px;
   border-radius: 0;
-  font: var(--t-12) / var(--lh-row, 1.5) var(--font-mono);
-  color: var(--c-text-3);
+  /* a quiet row like the news under it: sans 13 text-2, mono only for the machine's own text
+     (designer m_20621 (1)) */
+  font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
+  color: var(--c-text-2);
 }
 .th-screen .th-run:hover {
   background: none;
-  color: var(--c-text-2);
+  color: var(--c-text);
 }
 /* the fold is a quiet row (H1): 4 px under another, 12 under a message or prose */
 .th-screen .th-run[data-gap='tight'] {

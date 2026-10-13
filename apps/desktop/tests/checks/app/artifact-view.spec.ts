@@ -33,14 +33,15 @@ const prefs = (theme: string) => ({
 });
 const agent = (name: string, status: string, archived = false) => ({ name, main: name === 'main', status, archived, title: '', purpose: `${name}'s job`, since_ms: NOW - 14 * MIN, waits: 0, watching: [] });
 // a page the pages server draws: a paper, a heading, its words
-const PAGE = `<!doctype html><html><head><meta charset="utf-8"><style>
-html,body{margin:0;height:100%;background:#f4efe6;color:#1d1b18;font:17px/1.55 -apple-system,sans-serif}
+// it wears the theme the window asks for (?theme=, amb-kit's 215cb47e rule): dark paper in a dark window
+const PAGE = (dark: boolean) => `<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;height:100%;background:${dark ? '#1f1d1a' : '#f4efe6'};color:${dark ? '#ece7de' : '#1d1b18'};font:17px/1.55 -apple-system,sans-serif}
 body{padding:40px 48px;box-sizing:border-box}h1{font-size:28px;margin:0 0 12px}
 </style></head><body><h1>product page, before / after</h1><p>before: 2.4 MB hero, 3.1 s to paint. after: 180 KB, 0.9 s.</p></body></html>`;
 async function pagesServer(): Promise<{ url: string; server: Server }> {
-  const server = createServer((_req, res) => {
+  const server = createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(PAGE);
+    res.end(PAGE(/[?&]theme=dark\b/u.test(req.url ?? '')));
   });
   await new Promise<void>((ok) => server.listen(0, '127.0.0.1', ok));
   return { url: `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`, server };
@@ -113,6 +114,7 @@ for (const theme of ['light', 'dark']) {
       await expect(page.locator('[data-testid="composer.field"]'), 'one composer on the screen').toHaveCount(1);
       // the page itself, drawn by the pages server
       await expect(page.frameLocator('[data-testid="artifact.page"]').locator('h1'), 'the page is drawn').toHaveText('product page, before / after', { timeout: 10_000 });
+      await expect(page.getByTestId('artifact.page'), "the page opens in the window's theme").toHaveAttribute('src', new RegExp(`[?&]theme=${theme}\\b`, 'u'));
       // only the maker's own question, docked over its one composer (designer's artifact-open (g))
       const block = page.getByTestId('inbox.block');
       await expect(block, "perf's question over its composer").toContainText('keep the webp next to the avif?');

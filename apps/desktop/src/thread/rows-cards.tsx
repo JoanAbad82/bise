@@ -273,15 +273,19 @@ export function AgentNote({ pos, from, to, text, ctx, testId, tag, chip = true }
             <Markdown text={text} onLink={ctx.onLink} onPath={ctx.onPath} />
           </div>
         ) : (
-          <div className="th-note-line">
-            <span className="th-note-text" data-testid={`${testId}.text`}>
-              {lines.slice(0, NOTE_LINES).join('\n')}
-            </span>
-            {more && (
-              <Act onClick={toggle} testId={`${testId}.more`}>
-                … ▸
-              </Act>
-            )}
+          <div className="th-note-line" data-testid={`${testId}.text`}>
+            {/* explicit lines: one row each, cut with …; a single paragraph: two wrapped lines. The
+                last row ends with '… ▸' when there is more (designer m_20621 (2)) */}
+            {(lines.length <= 1 ? [lines[0] ?? text] : lines.slice(0, NOTE_LINES)).map((l, i, shown) => (
+              <div key={i} className={lines.length <= 1 ? 'th-note-row para' : 'th-note-row'}>
+                <span className="th-note-text">{l}</span>
+                {more && i === shown.length - 1 && (
+                  <Act onClick={toggle} testId={`${testId}.more`}>
+                    … ▸
+                  </Act>
+                )}
+              </div>
+            ))}
           </div>
         ))}
     </div>

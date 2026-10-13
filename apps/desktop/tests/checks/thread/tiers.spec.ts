@@ -76,6 +76,8 @@ for (const theme of ['light', 'dark']) {
         const prose = await leftOf(page, '[data-testid="thread.entry.2"] .th-md p');
         expect(Math.abs((await leftOf(page, '[data-testid="thread.run.4"]')) - prose), `${String(w)}: the fold on the text column`).toBeLessThanOrEqual(1);
         await expect(page.getByTestId('thread.to.4'), 'folded: its messages are hidden').toHaveCount(0);
+        // the fold row is a quiet row: sans, never mono (designer m_20621 (1))
+        expect(await run.evaluate((el) => getComputedStyle(el).fontFamily), 'the fold row: sans').not.toMatch(/mono/i);
         // one land per sha, no stray '·' line
         await expect(page.getByTestId('thread.notice.7')).toHaveCount(0);
         await expect(page.getByTestId('thread.landed.8')).toHaveCount(1);
@@ -133,6 +135,10 @@ for (const theme of ['light', 'dark']) {
         // designer's desktop-notices (a): two rows of its words, then '… ▸'
         expect(rows, 'two rows of its words').toBeLessThanOrEqual(2);
         await expect(page.getByTestId('thread.to.4.more')).toHaveText('… ▸');
+        // '… ▸' ends the 2nd line, never a 3rd (designer m_20621 (2))
+        const [tb, mb] = await Promise.all([text.boundingBox(), page.getByTestId('thread.to.4.more').boundingBox()]);
+        expect((mb?.y ?? 0) + (mb?.height ?? 0), "'… ▸' inside the two lines").toBeLessThanOrEqual((tb?.y ?? 0) + (tb?.height ?? 0) + 0.5);
+        expect(mb?.y ?? 0, "'… ▸' on the 2nd line").toBeGreaterThan((tb?.y ?? 0) + (tb?.height ?? 0) / 2 - 2);
         // (b) the chip: a 6% ink tint, r 6, 20 high, 8 px in
         const chipLook = await page.getByTestId('thread.to.4.chip').evaluate((el) => {
           const c = getComputedStyle(el);
