@@ -6,9 +6,14 @@
 //     composer's chip look is thread/paste-image's.
 // That the asking agent's request carries the image block is the hub's (amb-feed's laws) and
 // qa-native's R41 (4)(5) on FAKE_BODIES. Owner: amb-home.
+//   - a non-image file dropped there (file-chips, main 7a0ad800; ambient-lead m_21977) is a file
+//     chip in the composer and goes as {kind:'file', name:'[File #1]', path: <absolute>} beside his
+//     words, no files; his answer as the hub keeps it draws the file chip in perf's thread.
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
-import { pasteImage } from '../../harness/inputs';
+import { dropFiles, pasteImage } from '../../harness/inputs';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
@@ -63,5 +68,47 @@ test("inbox/answer-images: an image pasted on a card's answer (the block's, in t
   } finally {
     await s.close().catch(() => undefined);
     core.dispose();
+  }
+});
+
+test("inbox/answer-images: a file dropped on a card's answer is a file chip and goes as a file part, its chip in his bubble", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'answer-files-'));
+  const csv = path.join(root, 'bench.csv');
+  writeFileSync(csv, 'run,ms\ncold,412\n');
+  const perfThread = { ev: 'thread', project: P, agent: 'perf', entries: [{ pos: 1, at_ms: 1791100002000, kind: 'agent', text: 'which bench?' }], before: null, more: false };
+  const core = new FakeCore([...world(), perfThread] as unknown as ConstructorParameters<typeof FakeCore>[0]);
+  const s = await launchDesktop({ core, route: `agent/${P}/perf` });
+  const { page } = s;
+  try {
+    await expect(page.getByTestId('inbox.block.row.1')).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId('inbox.block.row.1').click();
+    await expect(page.getByTestId('inbox.block.open.1')).toBeVisible({ timeout: 3000 });
+    const composer = '[data-testid="composer.field"]';
+    await page.locator(composer).first().click();
+    await page.keyboard.type('cold, see ');
+    await dropFiles(page, composer, [csv]);
+    const chip = page.locator('[data-testid^="composer.chip."][data-kind="file"]');
+    await expect(chip, 'a file chip, as the composer makes one').toHaveCount(1, { timeout: 5000 });
+    await expect(chip).toContainText('bench.csv');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => answers(core).length, { timeout: 3000 }).toBe(1);
+    const a = answers(core)[0] as Cmd & { parts?: { kind: string; name?: string; path?: string; text?: string }[] };
+    expect(a).toMatchObject({ card: 9 });
+    expect(a.files, 'no files beside parts').toBeUndefined();
+    const parts = a.parts ?? [];
+    expect(parts[0], 'his words first').toEqual({ kind: 'text', text: 'cold, see ' });
+    expect(parts.filter((p) => p.kind === 'file'), 'the file part where its chip was').toEqual([{ kind: 'file', name: '[File #1]', path: csv }]);
+    expect(a.reply ?? '', 'his words in the reply').toContain('cold, see');
+    // his answer as the hub keeps it: the file chip in his bubble (amb-win's AttachChip)
+    const text = `cold, see <file name="[File #1]" path="${csv}">`;
+    await core.send({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 2, at_ms: Date.now(), kind: 'you', text, parts } } as never);
+    const bubble = page.getByTestId('thread.you.2.parts');
+    await expect(bubble, 'his bubble draws the parts').toBeVisible({ timeout: 5000 });
+    await expect(bubble.locator('[data-kind="file"]'), 'the file chip in his bubble').toHaveCount(1);
+    await expect(bubble.locator('[data-kind="file"]')).toContainText('bench.csv');
+  } finally {
+    await s.close().catch(() => undefined);
+    core.dispose();
+    rmSync(root, { recursive: true, force: true });
   }
 });
