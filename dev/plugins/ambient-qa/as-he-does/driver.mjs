@@ -177,6 +177,14 @@ if (mode === 'first') {
 // artifact. Then: the runs fold, /agents lists the kept one and not the dropped, /archived lists the
 // dropped, the artifact's frame has its pixels, the sidebar resizes by drag (its width kept for the
 // restart's check), ctrl+r from the thread starts dictation's line (no mic under the knob), esc ends it.
+// an open artifact's 3-column view folds the left bar under 1200 px: close it before the next pass
+const closeArtifact = async () => {
+  const pg = page.locator('[data-testid="artifact.page"]').first();
+  if (!(await pg.count().catch(() => 0))) return;
+  await page.locator('[data-testid="artifact.close"]').first().click({ timeout: 3000 }).catch(() => page.keyboard.press('Escape'));
+  await pg.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+};
+
 if (mode === 'cut') {
   const composerOf = () => page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
   const say = async (words) => {
@@ -227,11 +235,16 @@ if (mode === 'cut') {
   await say('think it over [[think: weighing the proof rows]]');
   const thoughts = page.locator('[data-testid^="thread.entry."][data-kind="thinking"]');
   const nThoughts = (await until(async () => ((await thoughts.count()) > 0 ? await thoughts.count() : null), ANSWER_MS, 1000)) ?? 0;
-  for (let i = 0; i < nThoughts; i++) await thoughts.nth(i).click({ timeout: 3000 }).catch(() => {});
+  for (let i = 0; i < nThoughts; i++) {
+    const t = thoughts.nth(i);
+    await t.getByText(/thought for/).first().click({ timeout: 3000 }).catch(() => t.click({ timeout: 3000 }).catch(() => {}));
+  }
   if (nThoughts) await page.waitForTimeout(800);
   const thoughtText = nThoughts ? await thoughts.evaluateAll((rs) => rs.map((r) => r.textContent ?? '').join(' --- ')) : '';
   const mainText = (await text('[data-testid="app.main"]')) ?? '';
   await shot('thought-open');
+  // the TUI folds a thought too ('∴ thought for 0.0s ▸', words on open): the row is there and opens to its words
+  step('a short thought: its row is there and opens to its words', nThoughts > 0 && /weighing the proof rows/.test(thoughtText), { thoughts: nThoughts, text: thoughtText.slice(0, 200) });
   step('no BENDSIG text in an opened thought', nThoughts > 0 && !/BENDSIG/.test(thoughtText) && !/BENDSIG/.test(mainText), { thoughts: nThoughts, text: thoughtText.slice(0, 300) });
   step('the seed ran (runs, agents, artifact)', !!done, { kinds });
   step('the runs fold (tools rows, not one row per call)', kinds.filter((k) => k === 'tools').length >= 1 && kinds.filter((k) => k === 'tools').length < 6, kinds);
@@ -245,7 +258,15 @@ if (mode === 'cut') {
     step(`${cmd} lists ${want}${not ? ` and not ${not}` : ''}`, !!t && (!not || !new RegExp(`\\b${not}\\b`).test(body)), body.slice(0, 500));
     await page.keyboard.press('Escape').catch(() => {});
   }
-  // the local .html artifact's pixels
+  // the local .html artifact's pixels, and what its frame loads (ambient-lead m_20609: for amb-web +
+  // task-panel when it is blank): every request, response, failure and console line from here
+  const net = [];
+  const onReq = (r) => net.push({ ev: 'request', url: r.url().slice(0, 300), type: r.resourceType(), frame: r.frame()?.url().slice(0, 200) });
+  const onRes = (r) => net.push({ ev: 'response', url: r.url().slice(0, 300), status: r.status(), type: r.headers()['content-type'] ?? '' });
+  const onFail = (r) => net.push({ ev: 'failed', url: r.url().slice(0, 300), error: r.failure()?.errorText ?? '' });
+  const onCon = (m) => net.push({ ev: 'console', type: m.type(), text: m.text().slice(0, 300), url: m.location()?.url?.slice(0, 200) });
+  const onPerr = (e) => net.push({ ev: 'pageerror', text: String(e).slice(0, 300) });
+  page.on('request', onReq); page.on('response', onRes); page.on('requestfailed', onFail); page.on('console', onCon); page.on('pageerror', onPerr);
   await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
   const item = page.locator('[data-testid="artifacts.list"]').getByText('proof-html').first();
   const opened = await click('select proof-html', item);
@@ -265,8 +286,18 @@ if (mode === 'cut') {
       return n / (d.length / 4);
     }, png) : 0;
   }
+  const frames = await page.evaluate(() => [...document.querySelectorAll('iframe, webview, object, embed')].map((f) => ({
+    tag: f.tagName.toLowerCase(), src: f.getAttribute('src'), srcdoc: (f.getAttribute('srcdoc') ?? '').slice(0, 200), sandbox: f.getAttribute('sandbox'),
+    w: f.clientWidth, h: f.clientHeight })));
+  const docs = [];
+  for (const f of page.frames()) {
+    if (f === page.mainFrame()) continue;
+    docs.push({ url: f.url().slice(0, 300), body: (await f.evaluate(() => document.documentElement?.outerHTML?.slice(0, 300) ?? '').catch((e) => `unreadable: ${String(e).slice(0, 120)}`)) });
+  }
+  page.off('request', onReq); page.off('response', onRes); page.off('requestfailed', onFail); page.off('console', onCon); page.off('pageerror', onPerr);
+  fs.writeFileSync(path.join(out, `${mode}-artifact-frame.json`), JSON.stringify({ frames, docs, net }, null, 1));
   await shot('artifact-html');
-  step('a local .html artifact renders (its green pixels)', green > 0.3, { opened, frame: fr, green_share: Math.round(green * 100) / 100 });
+  step('a local .html artifact renders (its green pixels)', green > 0.3, { opened, frame: fr, green_share: Math.round(green * 100) / 100, frames, docs: docs.slice(0, 3), net_lines: net.length });
   // the sidebar resizes by drag; its width is kept for the restart's check
   const split = page.locator('[data-testid="app.split.side"]').first();
   const w0 = Number(await split.getAttribute('aria-valuenow').catch(() => null));
@@ -296,6 +327,7 @@ if (mode === 'cut') {
   const stuck = await until(async () => { const t = (await text('[data-testid="app.main"]')) ?? ''; return /sending…|sending\.\.\./.test(t) ? null : true; }, 20000, 1000);
   await shot('no-sending');
   step("no message stays 'sending…'", !!stuck, stuck ? null : ((await text('[data-testid="app.main"]')) ?? '').match(/.{0,120}sending.{0,40}/s)?.[0]);
+  await closeArtifact();
 }
 
 // the first cut from main (ambient-lead m_20586): the right bar, an artifact opened from it, back /
@@ -309,6 +341,12 @@ if (mode === 'rows2') {
     return true;
   };
   const harness = () => click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+  await closeArtifact();
+  // one waiting item in another project: ai-docs' main opens a card for him (for bise's inbox block)
+  await click('open ai-docs', page.locator('[data-testid="app.sidebar"]').getByText('ai-docs', { exact: true }).first());
+  await say("[[bash: sb card 'publish the ai-docs guide now?\n1. publish\n2. later']]");
+  const carded = await until(async () => (/done: tool bash ok/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), ANSWER_MS, 1000);
+  step("ai-docs' main opened a card for him (the inbox item)", !!carded, ((await text('[data-testid="app.main"]')) ?? '').slice(-300));
   await harness();
   // the right bar: its four sections in order; the left bar holds places only
   const panel = page.locator('[data-testid="app.panel"]').first();
@@ -387,10 +425,14 @@ if (mode === 'rows2') {
   step('the working row shows while main works', !!working, null);
   await until(async () => (/ack: take a moment/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), ANSWER_MS, 1000);
   await say('one quick thought [[think: weighing the proof rows]]');
-  const words = await until(async () => (/weighing the proof rows/.test(await page.evaluate(() =>
-    [...document.querySelectorAll('[data-testid^="thread.entry."][data-kind="thinking"]')].map((r) => r.textContent ?? '').join(' '))) ? true : null), ANSWER_MS, 1000);
+  // the TUI folds a thought too (ambient-lead m_20609): the row is there, then opens to its words
+  const rows = page.locator('[data-testid^="thread.entry."][data-kind="thinking"]');
+  const nRows = (await until(async () => ((await rows.count()) > 0 ? await rows.count() : null), ANSWER_MS, 1000)) ?? 0;
+  const last = rows.nth(Math.max(0, nRows - 1));
+  if (nRows) await last.getByText(/thought for/).first().click({ timeout: 3000 }).catch(() => last.click({ timeout: 3000 }).catch(() => {}));
+  const words = nRows ? await until(async () => (/weighing the proof rows/.test((await last.textContent().catch(() => '')) ?? '') ? true : null), 5000, 300) : null;
   await shot('short-thought');
-  step('a short thought shows its words', !!words, null);
+  step('a short thought: its row is there and opens to its words', !!words, { rows: nRows, text: nRows ? ((await last.textContent().catch(() => '')) ?? '').slice(0, 200) : '' });
   // the inbox block in bise's thread: another project's item answered there; ⌘I opens it in place
   await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
   const block = page.locator('[data-testid^="inbox.block"]').first();
