@@ -20,7 +20,7 @@
 .inbox-heard { color: var(--c-text); }
 /* the thread's inbox strip (Strip.tsx, bar W7/K24): its own box above the divider, rows numbered for ctrl+1-9 */
 .inbox-strip {
-  display: flex; flex-direction: column; gap: 2px; margin: 0 var(--s-4) var(--s-2); padding: var(--s-2);
+  display: flex; flex-direction: column; gap: 0; margin: 0 var(--s-4) var(--s-2); padding: var(--s-2);
   border-radius: var(--r-2); box-shadow: 0 0 0 1px var(--c-line); background: var(--c-raised);
 }
 .strip-title { display: flex; align-items: baseline; gap: var(--s-2); padding: 0 var(--s-2) var(--s-1); font-size: var(--t-12); color: var(--c-text-2); }
@@ -32,7 +32,7 @@
 .strip-more { color: var(--c-text-3); font-size: var(--t-12); }
 /* inbox card v2 (InboxCard.tsx; ambient m_11273, its mock's values): opaque, docked in the flow; pink is the glyph and the numbers only */
 .ic {
-  box-sizing: border-box; display: flex; flex-direction: column; width: 100%; max-height: 55vh; padding: 12px 14px 10px;
+  box-sizing: border-box; display: flex; flex-direction: column; width: 100%; max-height: 55vh; padding: var(--pad-card);
   color: var(--c-text); background: color-mix(in srgb, var(--p-raised) 100%, var(--p-bg)); border-radius: 14px;
   box-shadow: 0 0 0 1px var(--c-line), 0 6px 18px color-mix(in srgb, var(--p-shadow) 14%, transparent);
 }
@@ -41,17 +41,20 @@
    gives it that room, and a question longer than that scrolls inside the card; folded again, the
    cap is back (qa-native 9108fdae: the 16 lines were in the DOM, the card stayed 396 px) */
 .ic.whole { max-height: calc(100vh - 260px); }
-.ic-h { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: var(--t-12); color: var(--c-text-2); flex: none; }
+.ic-h { display: flex; align-items: baseline; gap: var(--gap-inline); min-width: 0; font-size: var(--t-12); color: var(--c-text-2); flex: none; }
 .ic-g { flex: none; font: 600 12px var(--font-mono); color: var(--c-accent); }
 .ic-h b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--c-text); }
 .ic-p { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ic-k { flex: none; margin-left: auto; color: var(--c-text-3); }
 /* over 55vh the question gives way first (it scrolls), then the options (they scroll); the header and the footer always show */
-.ic-q { flex: 0 1000 auto; margin: 6px 0 10px; min-height: 0; overflow-y: auto; font: 15px/1.45 var(--font-read); white-space: pre-wrap; overflow-wrap: anywhere; }
-.ic-opts { display: flex; flex-direction: column; gap: 4px; flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+.ic-q { flex: 0 1000 auto; margin: var(--gap-tight) 0 var(--gap-block); min-height: 0; overflow-y: auto; font: 15px/1.45 var(--font-read); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ic-opts { display: flex; flex-direction: column; gap: var(--gap-tight); flex: 0 1 auto; min-height: 0; overflow-y: auto; }
 .ic-opt { flex: none; }
 .ic-opt {
-  display: grid; grid-template-columns: 22px 1fr; align-items: baseline; gap: 6px; padding: 7px 12px 7px 10px; border-radius: 9px;
+  /* a control's height (--h-control 32, designer m_21156), the words centred in it; a long option
+     that wraps grows, its lines a step from the edges */
+  display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: var(--gap-inline); min-height: var(--h-control); box-sizing: border-box;
+  padding: var(--s-1) var(--s-3) var(--s-1) var(--s-2); border-radius: 9px;
   background: var(--c-solid); box-shadow: inset 0 0 0 1px var(--c-line); font-size: 13.5px; line-height: 1.4; text-align: left;
   overflow-wrap: anywhere; cursor: default; transition: background var(--d-fast) var(--ease-out);
 }
@@ -63,26 +66,26 @@
 .ic-n { font: 600 12px var(--font-mono); color: var(--c-accent); text-align: center; }
 .ic-l { min-width: 0; }
 .ic .inbox-answer { flex: none; }
-.ic-note { flex: none; margin-top: 8px; font-size: var(--t-12); }
+.ic-note { flex: none; margin-top: var(--s-2); font-size: var(--t-12); }
 .ic-foot {
-  display: flex; flex-wrap: wrap; gap: 2px 18px; flex: none; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--c-line);
+  display: flex; flex-wrap: wrap; gap: 0 var(--s-4); flex: none; margin-top: var(--gap-block); padding-top: var(--s-2); border-top: 1px solid var(--c-line);
   font: 11.5px var(--font-ui); color: var(--c-text-3);
 }
 /* each pair is the ds Act, kept in the foot's dim tone; 'esc later' sits at the right end */
 .ic-foot .b-act { color: inherit; }
 .ic-foot .b-act:hover { color: var(--c-text-2); }
 .ic-foot-end { margin-left: auto; }
-.ic-foot .b-kbd, .ic-foot kbd { font: 600 11px var(--font-mono); color: var(--c-text-2); margin-right: 5px; background: none; box-shadow: none; padding: 0; }
+.ic-foot .b-kbd, .ic-foot kbd { font: 600 11px var(--font-mono); color: var(--c-text-2); margin-right: var(--s-1); background: none; box-shadow: none; padding: 0; }
 /* the capsule's card keeps its glass (the capsule draws the surface) */
 .ic.glass { background: transparent; box-shadow: none; border-radius: 0; max-height: none; }
 /* the strip's open item: docked between the thread and the composer's label, the composer's edges */
-.inbox-dock { margin: 0 16px 10px; flex: none; }
+.inbox-dock { margin: 0 var(--s-4) var(--s-2); flex: none; }
 
 /* b2: the inbox block (Block.tsx) reuses the strip's look; an item's sign on its line, and the open
    item in place where its line was (the block grows, nothing floats) */
 .inbox-block .ib-sign { flex: none; width: 1em; text-align: center; font: 600 var(--t-12) var(--font-mono); color: var(--c-accent); }
 .inbox-block .ib-sign.acc { color: var(--c-accent); }
-.inbox-block-open { margin: 4px 0; }
+.inbox-block-open { margin: var(--gap-tight) 0; }
 /* H10 (tui-parity's thread-hierarchy, designer m_19835): folded at the thread's bottom, the block is
    its head (28) and one item line (32): the rest is '+ N more' in the head. The notifications' ask is
    an ordinary item from bise (Block.tsx notifyCard), never a line of its own. */
