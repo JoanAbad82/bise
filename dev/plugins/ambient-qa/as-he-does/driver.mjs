@@ -468,7 +468,9 @@ if (mode === 'rows2') {
   // the menu, so off-screen it can't be pressed. ⌃1 (the block's own key) opens the same item in place.
   await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
   await page.keyboard.press('Control+1');
-  const inPlace = await until(async () => ((await page.locator('[data-testid^="dock.opt"]').count()) > 0 ? true : null), 8000, 400);
+  // the dock's options carry the composer's id (composer.opt.<n>, ds/composer.tsx); dock.opt before 6ac92eb4
+  const OPT = '[data-testid^="composer.opt"], [data-testid^="dock.opt"]';
+  const inPlace = await until(async () => ((await page.locator(OPT).count()) > 0 ? true : null), 8000, 400);
   await shot('inbox-ctrl-1');
   step('⌃1 opens the item in place (its options in the dock; ⌘I = native menu, not reachable by CDP)', !!inPlace, ((await text('[data-testid="app.main"]')) ?? '').slice(-300));
   if (inPlace) {
