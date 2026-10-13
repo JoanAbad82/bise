@@ -10,7 +10,7 @@ import { byDay, dayWords, filterItems, glyphOf, kindWords, ALL, splitArchived, t
 import { aboutWords, ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
 import { putInDraft } from './put';
 import { frameSrc, themedUrl } from './Open';
-import { aboutText } from '@/thread/ThreadScreen';
+import { aboutText } from '@/thread/ThreadComposer';
 import { load } from '@/composer/drafts';
 import { entryOf, entrySegments } from '@/composer/entry';
 

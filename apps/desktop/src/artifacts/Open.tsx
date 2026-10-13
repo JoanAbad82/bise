@@ -9,7 +9,7 @@ import { Button, IconButton, Menu, MenuItem } from '@/ds';
 import { useRouter } from '@/app/router';
 import { useAgents, usePrefs, useStore } from '@/store';
 import { themeOf } from '@/theme';
-import { answerOf, ThreadComposer } from '@/thread/ThreadScreen';
+import { answerOf, ThreadComposer } from '@/thread/ThreadComposer';
 import { InboxBlock, type Answering } from '@/inbox';
 import { useAllArtifacts } from './hooks';
 import { kindOf, pathOf, versions } from './model';

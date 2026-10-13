@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay, threadKey } from '@/store';
 import { answeredMark, approvalParts, cutWords, EntryRow, gapOf, type RowCtx, withoutImageMarks } from './rows';
-import { aboutParts, ThreadScreen } from './ThreadScreen';
+import { ThreadScreen } from './ThreadScreen';
+import { aboutParts } from './ThreadComposer';
 import { createRouter, RouterContext } from '@/app/router';
 
 // the composer is amb-web's: here a stand-in that counts its renders

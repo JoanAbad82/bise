@@ -10,7 +10,7 @@ import { InboxBlock, type Answering } from '@/inbox';
 import { shownName } from '@/agents/model';
 import { useAgents, useProjects, useStore } from '@/store';
 import { MAIN } from '@/app/route';
-import { answerOf, HERE_BISE, ThreadComposer } from './ThreadScreen';
+import { answerOf, HERE_BISE, ThreadComposer } from './ThreadComposer';
 import { composerWords } from './head';
 
 const NOOP = (): void => undefined;

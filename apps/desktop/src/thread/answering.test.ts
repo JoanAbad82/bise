@@ -1,6 +1,6 @@
 // inbox card v2 item 7: the composer's label while it answers the docked card.
 import { describe, expect, it } from 'vitest';
-import { answeringLabel } from './ThreadScreen';
+import { answeringLabel } from './ThreadComposer';
 
 describe('answering a docked card', () => {
   it("names who asks (main is bise) and cuts the question to one short line", () => {

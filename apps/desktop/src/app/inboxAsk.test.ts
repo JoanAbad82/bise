@@ -1,7 +1,7 @@
 // b1/b2: a notification's card opens once the core's rows list it; the composer answers the open card's project.
 import { describe, expect, it } from 'vitest';
 import { listsCard } from './inboxAsk';
-import { answerOf } from '@/thread/ThreadScreen';
+import { answerOf } from '@/thread/ThreadComposer';
 import type { ProjectRow } from '@/proto';
 
 const row = (project: string, ids: number[]) => ({ project, cards: ids.map((id) => ({ id })) }) as unknown as ProjectRow;

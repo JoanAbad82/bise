@@ -6,7 +6,6 @@
 1329 apps/desktop/src/composer/pm/PmField.tsx
 1198 apps/desktop/src/store/store.test.ts
 1289 apps/desktop/src/store/store.ts
-1010 apps/desktop/src/thread/ThreadScreen.tsx
 1200 bend/core/wire.bend
 3891 bend/hub/core.bend
 1356 bend/runtime/provider-pure.bend
