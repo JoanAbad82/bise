@@ -657,9 +657,11 @@ body:has(.app-shell) {
   color: var(--c-text-3);
   line-height: var(--h-row-tight);
 }
+/* each part of a head sits in the head's own 28 px line, so its text is centred in the hover box
+   (his m_22731: the label's 'font' shorthand reset its line to normal: the text sat at the box's top) */
 .app-rb-label {
   flex: none;
-  font: 600 var(--t-11) var(--font-ui);
+  font: 600 var(--t-11) / var(--h-row-tight) var(--font-ui);
   letter-spacing: 0.04em;
 }
 .app-rb-head[data-folds] .app-rb-title {
@@ -692,6 +694,7 @@ body:has(.app-shell) {
 }
 .app-rb-sum {
   min-width: 0;
+  line-height: var(--h-row-tight);
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--c-text-3);
@@ -699,6 +702,7 @@ body:has(.app-shell) {
 }
 .app-rb-head .b-act {
   flex: none;
+  line-height: var(--h-row-tight);
   margin-right: var(--pad-row-x);
   color: var(--c-text-3);
   font-size: var(--t-12);
