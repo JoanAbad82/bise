@@ -226,12 +226,21 @@ if (mode === 'cut') {
   const composerOf = () => page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
   const say = async (words) => {
     if (!(await click(`say ${words.slice(0, 30)}`, composerOf()))) return false;
+    // b51422c0: a '/diff' left in the composer took the next message ('/diff[[bash: …'): start empty
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
     const parts = words.split('\n');
     for (let i = 0; i < parts.length; i++) {
       if (i) await page.keyboard.press('Shift+Enter');
       await page.keyboard.type(parts[i], { delay: 5 });
     }
     await page.keyboard.press('Enter');
+    // a slash command with args (/diff) spends the first Enter on the slash menu: send it with a second
+    if (words.startsWith('/')) {
+      await page.waitForTimeout(400);
+      const left = ((await composerOf().innerText().catch(() => '')) ?? '').trim();
+      if (left.startsWith('/')) await page.keyboard.press('Enter');
+    }
     return true;
   };
   await click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
@@ -379,12 +388,21 @@ if (mode === 'rows2') {
   const composerOf = () => page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
   const say = async (words) => {
     if (!(await click(`say ${words.slice(0, 30)}`, composerOf()))) return false;
+    // b51422c0: a '/diff' left in the composer took the next message ('/diff[[bash: …'): start empty
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
     const parts = words.split('\n');
     for (let i = 0; i < parts.length; i++) {
       if (i) await page.keyboard.press('Shift+Enter');
       await page.keyboard.type(parts[i], { delay: 5 });
     }
     await page.keyboard.press('Enter');
+    // a slash command with args (/diff) spends the first Enter on the slash menu: send it with a second
+    if (words.startsWith('/')) {
+      await page.waitForTimeout(400);
+      const left = ((await composerOf().innerText().catch(() => '')) ?? '').trim();
+      if (left.startsWith('/')) await page.keyboard.press('Enter');
+    }
     return true;
   };
   const harness = () => click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
@@ -499,7 +517,9 @@ if (mode === 'rows2') {
   // b4a25acb: the item opens as the inbox card in the strip's dock, its options strip.card.<key>.opt.<n> (InboxCard.tsx)
   // b51422c0: in bise's thread the item opens in the inbox block itself (Block.tsx's InboxCard,
   // default id inbox.card.<project>-<id>, options inbox.card.<project>-<id>.opt.<n>)
-  const OPT = '[data-testid^="strip.card"][data-testid*=".opt."], [data-testid^="inbox.card"][data-testid*=".opt."], [data-testid^="composer.opt"], [data-testid^="dock.opt"]';
+  // b51422c0 run: Block.tsx passes testId inbox.block.card.<key> (inbox.block.notify for a notice),
+  // so the options there are inbox.block.card.<key>.opt.<n>
+  const OPT = '[data-testid^="strip.card"][data-testid*=".opt."], [data-testid^="inbox.card"][data-testid*=".opt."], [data-testid^="inbox.block.card"][data-testid*=".opt."], [data-testid^="inbox.block.notify.opt."], [data-testid^="composer.opt"], [data-testid^="dock.opt"]';
   const inPlace = await until(async () => ((await page.locator(OPT).count()) > 0 ? true : null), 8000, 400);
   await shot('inbox-ctrl-1');
   step('⌃1 opens the item in place (its options in the dock; ⌘I = native menu, not reachable by CDP)', !!inPlace, ((await text('[data-testid="app.main"]')) ?? '').slice(-300));
@@ -570,7 +590,8 @@ if (mode === 'rows2') {
   await screen1100('artifacts', () => click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first()), '[data-testid="artifacts.screen"]');
   await screen1100('scheduled', () => click('scheduled', page.locator('[data-testid="app.sidebar.scheduled"]').first()), null);
   await screen1100('log', async () => { await harness(); await say('/log'); }, '[data-testid="log.list"]');
-  await screen1100('changes', async () => { await harness(); await say('/diff'); }, null);
+  await screen1100('changes', async () => { await harness(); await say('/diff'); }, '[data-testid="changes.screen"], [data-testid="review.screen"]');
+  await page.keyboard.press('Escape');
   await screen1100('palette', async () => { await harness(); await page.keyboard.press('Meta+k'); }, '[data-testid="app.palette"]');
   await page.keyboard.press('Escape');
   await screen1100('settings', () => click('settings', page.locator('[data-testid="app.sidebar.settings"]').first()), '[data-testid="settings.root"]');
@@ -580,8 +601,12 @@ if (mode === 'rows2') {
   await page.keyboard.press('Escape');
   // b51422c0's batch (ambient-lead m_21481): settings' key field and its caption, the terminal
   // panel, a thread with a tool row and a code block, the selection tint and a quote chip
+  // the key row lives on the keys page (accounts.tsx), not the page settings opens on
+  await click('settings', page.locator('[data-testid="app.sidebar.settings"]').first());
+  const keysNav = page.locator('[data-testid="settings.nav.keys"]').first();
+  if (await keysNav.waitFor({ timeout: 5000 }).then(() => true, () => false)) await click('settings keys', keysNav);
   const keyAdd = page.locator('[data-testid="settings.key.add"]').first();
-  if ((await keyAdd.count()) > 0) {
+  if (await keyAdd.waitFor({ timeout: 5000 }).then(() => true, () => false)) {
     await screen1100('settings-key', () => click('add a key', keyAdd), '[data-testid="settings.key.field"]');
     await page.keyboard.press('Escape');
   } else at1100['settings-key'] = { overflow: false, there: false, why: 'no settings.key.add on this world' };
