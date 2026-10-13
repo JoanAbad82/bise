@@ -19,6 +19,9 @@ test('composer/typing: caret, 0 replaced nodes, nothing changes outside the fiel
     const field = page.locator(T.field);
     await field.click();
     await page.keyboard.type('s'); // the first letter may switch the send button on: allowed
+    // the lab runs with no core: 2 s after launch (CoreLine QUIET_START_MS) the status line says
+    // 'starting bise…' under the title bar and moves the screen; the window's start, not typing
+    await page.getByTestId('app.core').waitFor({ state: 'visible', timeout: 4000 }).catch(() => undefined);
     await page.waitForTimeout(300);
     const box = await field.boundingBox();
     expect(box, 'the field is on the page').not.toBeNull();

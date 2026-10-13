@@ -230,7 +230,12 @@ test('composer/type-anywhere: with the thread scrolled up, a key and a paste lan
     const mid = await top();
     expect(mid, 'the thread scrolls up').toBeLessThan(end - 300);
     expect(mid, 'not at the top either').toBeGreaterThan(0);
-    await expect(page.getByTestId('thread.entry.80'), 'scrolled up: the last line is out of view').not.toBeInViewport();
+    try {
+      await expect(page.getByTestId('thread.entry.80'), 'scrolled up: the last line is out of view').not.toBeInViewport();
+    } finally {
+      // where the list is when it's read: back at its end (the list re-stuck) or where the wheel left it
+      test.info().annotations.push({ type: 'scroll', description: JSON.stringify({ end, mid, now: await top() }) });
+    }
     // the row he reads: the one in the middle of the list, and its y on screen
     const reading = () =>
       page.evaluate(() => {
