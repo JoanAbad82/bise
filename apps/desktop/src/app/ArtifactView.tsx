@@ -6,6 +6,7 @@
 // the width with the maker's composer under the page, and '◧ <maker>' slides the thread over it from
 // the left. ✕ or esc go back where he was. The route drives it (artifacts/<project>/<id>), so back
 // and forward fit. The artifact itself is task-panel's ArtifactOpen. Owner: amb-win.
+import { takeZoomKey } from '@/artifacts/zoomKeys';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Button } from '@/ds';
 import { ArtifactOpen, useAboutWords, useAllArtifacts } from '@/artifacts';
@@ -92,6 +93,8 @@ export function useEscClosesArtifact(close: () => void, on: boolean): void {
       if (popupOpen() || overOpen() || inFind(document.activeElement)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
+      // a zoomed image goes back to fit first; the next esc closes (zoomKeys.ts)
+      if (takeZoomKey(e)) return;
       close();
     };
     const onMessage = (e: MessageEvent) => {

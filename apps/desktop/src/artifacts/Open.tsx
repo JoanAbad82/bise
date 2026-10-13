@@ -4,6 +4,8 @@
 // head (title, version menu, '↗ browser', ⋯, ✕), then the page from the pages server, 16 px in on
 // a 3% backdrop. A link inside the page goes to his browser (the shell's guard). The composer's
 // words come from maker.ts. Owner: amb-kit (the list, the model); task-panel (the open view).
+import { ImageView } from './ImageView';
+import { isImageSrc } from './zoom';
 import { useCallback, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Button, IconButton, Menu, MenuItem } from '@/ds';
 import { useRouter } from '@/app/router';
@@ -211,7 +213,9 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
         {/* the page follows his theme: opened with ?theme=<his pref>, the kit wears it (kit.js puts
             it on <html data-theme>); with no pref, the system's. A browser-only kind never gets
             here from a list (leave.ts opens his browser): no 'opens in your browser' panel (designer m_21714) */}
-        {src !== null && (
+        {/* one image file: drawn here, zoomable (a pinch, two fingers, a double-click; his m_22822) */}
+        {src !== null && isImageSrc(src) && <ImageView src={src} alt={a.title} />}
+        {src !== null && !isImageSrc(src) && (
           <iframe className="art-paper" src={src} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             data-testid="artifact.page" />
         )}

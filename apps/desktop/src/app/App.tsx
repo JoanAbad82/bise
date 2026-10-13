@@ -6,6 +6,7 @@
 // re-renders only when the route changes. Every list below reads the store
 // through its own per-key hooks, so an event re-renders the rows it
 // touches, never the shell, the sidebar or the composer.
+import { takeZoomKey } from '@/artifacts/zoomKeys';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter, type SavedHistory } from './router';
 import { useHistoryWays } from './esc-up';
@@ -542,6 +543,12 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
         return;
       }
       if (e.defaultPrevented) return;
+      // a zoomed image artifact: its ⌘0 is back to fit, never 'bise' (zoomKeys.ts)
+      if (takeZoomKey(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       // the shell has the focus: every key but ⌘ ones is its own (⌥1, ctrl+y, End...)
       if (inTerminal(document.activeElement) && shellTakes(e)) return;
       const act = keyAction(e, {
