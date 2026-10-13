@@ -3,14 +3,14 @@
 // rows.tsx (pure move).
 import { useState, type ReactNode } from 'react';
 import { useFold } from './folds';
-import { Act, Answered, CardLine, Marker, Press } from '@/ds';
+import { Act, Answered, CardLine, Chip, Marker, Press } from '@/ds';
 import { openInbox } from '@/inbox/Block';
 import type { Entry } from '@/proto';
 import { useEntry, useThreadOrder } from '@/store';
 import { Markdown } from './Markdown';
 import { clock, lastOfRun, reportStatus } from './entry';
 import { shownName } from '@/agents/model';
-import { YouBubble } from './rows-messages';
+import { partImageWords, YouBubble } from './rows-messages';
 import { NewsLine, ReportRow } from './rows-news';
 import type { RowCtx } from './rows';
 import { drawnParts, pageAnswer, pageOf, youView } from './parts';
@@ -18,12 +18,14 @@ import { drawnParts, pageAnswer, pageOf, youView } from './parts';
 export function AnsweredRow({ e }: { e: Entry }) {
   const a = e.answered;
   if (a == null) return <Marker>{e.text}</Marker>;
+  // the hub's why 'he answered': his own answer, never 'he' (designer m_21561): 'you answered <agent>'
+  const mine = a.why === 'he answered';
   return (
     <div className="th-answered" data-testid={`thread.answered.${e.pos}`}>
       <NewsLine mark="↳" tone="plain" testId={`thread.answered.${e.pos}.head`}>
-        answered {a.agent} for you: {a.question} → <b>{a.answer}</b>
+        {mine ? 'you answered' : 'answered'} {a.agent}{mine ? '' : ' for you'}: {a.question} → <b>{a.answer}</b>
       </NewsLine>
-      {a.why !== '' && <div className="th-news-note">{a.why}</div>}
+      {a.why !== '' && !mine && <div className="th-news-note">{a.why}</div>}
       <ImageChips images={a.images ?? []} testId={`thread.answered.${e.pos}`} />
     </div>
   );
@@ -39,14 +41,23 @@ export function ImageChips({ images, testId }: { images: readonly { name: string
   return (
     <div className="th-images">
       {images.map((img, i) => (
-        <span key={`${img.path}#${String(i)}`} className="b-chip image" data-kind="image" data-testid={`${testId}.image.${String(i + 1)}`}>
-          <Thumb path={img.path} />
-          {/* designer's R36 rule: always '[Image #n]' (its order in this message), never the
-              store's file name (a sha .png on real data) */}
-          <span className="lbl">{imageLabel(i)}</span>
-        </span>
+        <ImageChip key={`${img.path}#${String(i)}`} path={img.path} i={i} testId={`${testId}.image.${String(i + 1)}`} />
       ))}
     </div>
+  );
+}
+
+/**
+ * One image he sent, the signed part chip everywhere (his bubble's, the composer's, the spotlight's;
+ * designer m_18135, m_21561): 'image 1' in ink, 1 px line, its 16 px thumbnail or the no-file glyph;
+ * never the '[Image #n]' tag in the accent.
+ */
+export function ImageChip({ path, i, testId }: { path?: string; i: number; testId: string }) {
+  // 'image <n>', its order in this answer: never the store's file name (a sha .png on real data, R36)
+  return (
+    <Chip kind="part" of="image" {...(path === undefined ? {} : { title: path })} thumb={<Thumb {...(path === undefined ? {} : { path })} />} testId={testId}>
+      {partImageWords('', i)}
+    </Chip>
   );
 }
 
@@ -101,10 +112,7 @@ export function CardAnsweredRow({ pos, a, at, timeAlways }: { pos: number; a: { 
             {images.length > 0 && (
               <div className="th-images">
                 {images.map((_, i) => (
-                  <span key={i} className="b-chip image" data-kind="image" data-testid={`${id}.image.${String(i + 1)}`}>
-                    <Thumb />
-                    <span className="lbl">{imageLabel(i)}</span>
-                  </span>
+                  <ImageChip key={i} i={i} testId={`${id}.image.${String(i + 1)}`} />
                 ))}
               </div>
             )}

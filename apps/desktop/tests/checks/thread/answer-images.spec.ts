@@ -1,12 +1,12 @@
 // thread/answer-images · R36 (ambient-lead m_14252 / m_14267; amb-feed's 037c83ca: Answered and
 // ApprovalFold carry images: ImageRef {name, path} apart from his words). On the REAL thread screen
 // (FakeCore; his images ride in Entry.parts since msg-parts sha d, a4babf54): his answer to gift-ui's card with a pasted image reads 'you answered gift-ui' and his
-// words, then the window's one image chip ('[Image #1]' with its 16 px thumbnail drawn from his
+// words, then the window's one image chip ('image 1' with its 16 px thumbnail drawn from his
 // source path, accent on accent-soft); an answer bise gave for him ('answered … for you') shows its
 // chip the same way. Never the hub's marker ('<image', 'b64'), never a path in the row's text.
 // Shots light and dark. Owner: amb-win.
 // Real-shaped data too (designer's R36 red on 387ad740): the store names a pasted image by its sha
-// ('bd913dd2…6569.png'); the chip still reads '[Image #1]' and stays inside the column.
+// ('bd913dd2…6569.png'); the chip still reads 'image 1' and stays inside the column.
 import { copyFileSync, mkdtempSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -63,7 +63,7 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
     await expect(row).toContainText('you answered gift-ui', { timeout: 10_000 });
     await expect(row).toContainText('the balance on the cart page');
     const chip = page.getByTestId('thread.approval.2.image.1');
-    await expect(chip).toHaveText('[Image #1]');
+    await expect(chip).toHaveText('image 1');
     const thumb = chip.locator('img.thumb');
     await expect.poll(() => thumb.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0), { message: 'its thumbnail is drawn from his path' }).toBe(true);
     expect(Math.round((await thumb.boundingBox())?.width ?? 0), 'a 16 px thumbnail').toBe(16);
@@ -73,12 +73,12 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
       expect(text, `${id}: never a b64 path`).not.toContain('b64');
       expect(text, `${id}: never his path`).not.toContain(PNG);
     }
-    await expect(page.getByTestId('thread.answered.3.image.1'), "bise's answer for him: the same chip").toHaveText('[Image #1]');
+    await expect(page.getByTestId('thread.answered.3.image.1'), "bise's answer for him: the same chip").toHaveText('image 1');
     // main's own card answered: the '✓ you answered' row with the chip, never the hub's raw line
     // the same order as the rows above (designer m_15420): what was asked, his words, the chip
     await expect(page.getByTestId('thread.cardanswer.4.head')).toHaveText('✓you answered bise · merge checkout into main? (2 files, tests pass)');
     await expect(page.getByTestId('thread.cardanswer.4.words')).toHaveText('this one');
-    await expect(page.getByTestId('thread.cardanswer.4.image.1')).toHaveText('[Image #1]');
+    await expect(page.getByTestId('thread.cardanswer.4.image.1')).toHaveText('image 1');
     // the raw line names no file: the chip keeps its 16 px slot with a faint image glyph (designer m_15943)
     const slot = await page.getByTestId('thread.cardanswer.4.image.1').locator('.thumb').boundingBox();
     expect(Math.round(slot?.width ?? 0), 'the same 16 px slot as the chips with a thumbnail').toBe(16);
@@ -89,8 +89,8 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
     // messages-right v1: his side, '✓ you answered main' dim over his words in the bubble
     await expect(page.getByTestId('thread.approval.5.head')).toHaveText('✓you answered main');
     await expect(page.getByTestId('thread.approval.5.words')).toHaveText('this one');
-    await expect(page.getByTestId('thread.approval.5.image.1')).toHaveText('[Image #1]');
-    expect(await page.getByTestId('thread.approval.5').innerText(), 'the mark once: the chip').toMatch(/^[^[]*\[Image #1\][^[]*$/u);
+    await expect(page.getByTestId('thread.approval.5.image.1')).toHaveText('image 1');
+    expect(await page.getByTestId('thread.approval.5').innerText(), "the chip is the image: no '[Image #1]' tag anywhere (designer m_21561)").not.toContain('[Image #');
     const all = await page.getByTestId('thread.list').innerText();
     expect(all, 'never the raw line').not.toContain('the user answered card');
     expect(all, 'never the old product name').not.toContain('switchboard');
@@ -104,18 +104,21 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
       expect(fit.right, `${id}: the chip ends inside the column`).toBeLessThanOrEqual(fit.colRight + 0.5);
       expect(fit.over, `${id}: its words fit the chip`).toBeLessThanOrEqual(1);
     }
-    // the chip's colours are the accent on its soft fill, as everywhere
+    // the signed part chip, as in his bubble (designer m_18135, m_21561): 'image 1' in ink, a 1 px
+    // --c-line, no fill; never the accent on its soft fill
     const look = await chip.evaluate((el) => {
       const probe = document.createElement('span');
-      probe.style.color = 'var(--c-accent)';
-      probe.style.background = 'var(--c-accent-soft)';
+      probe.style.color = 'var(--c-text)';
+      probe.style.borderColor = 'var(--c-line)';
       el.parentElement?.appendChild(probe);
-      const want = { c: getComputedStyle(probe).color, b: getComputedStyle(probe).backgroundColor };
+      const want = { ink: getComputedStyle(probe).color, line: getComputedStyle(probe).borderTopColor };
       probe.remove();
-      return { c: getComputedStyle(el).color, b: getComputedStyle(el).backgroundColor, want };
+      const words = el.querySelector('.ink') ?? el;
+      return { ink: getComputedStyle(words).color, line: getComputedStyle(el).borderTopColor, b: getComputedStyle(el).backgroundColor, want };
     });
-    expect(look.c).toBe(look.want.c);
-    expect(look.b).toBe(look.want.b);
+    expect(look.ink, "'image 1' in ink").toBe(look.want.ink);
+    expect(look.line, 'a 1 px --c-line').toBe(look.want.line);
+    expect(look.b, 'no fill').toBe('rgba(0, 0, 0, 0)');
     await page.mouse.move(1, 300);
     await page.screenshot({ path: test.info().outputPath('answer-image-light.png') });
     await core.send(prefs('dark') as never);
