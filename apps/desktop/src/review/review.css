@@ -1,4 +1,6 @@
-/* The review and changes screens (amb-win): a head, then a scrolling body. */
+/* The review and changes screens (amb-win): a head, then a scrolling body. One left edge
+   (designer's desktop-spacing): the body's content sits on the head's title edge, a row's tint
+   and hover hang --pad-row-x out on both sides. */
 .rv-screen {
   display: flex;
   flex-direction: column;
@@ -10,53 +12,79 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 8px 16px 24px;
+  padding: var(--s-2) var(--pad-panel) var(--s-6);
+}
+
+/* the region that has the keys shows no ring: the key line says it (designer m_21379 (5)) */
+.rv-body:focus {
+  outline: none;
+}
+
+/* a row's right-hand facts are words, sans 13 text-3 like the right bar's; only the machine's own
+   text (a sha, a branch, a url) is mono (designer m_21379 (4)) */
+.rv-body .b-row .end {
+  font: var(--t-13) var(--font-ui);
+}
+.rv-mono {
+  font-family: var(--font-mono);
+  font-size: var(--t-12);
+}
+
+/* 'back to its thread': the ds link, in ink */
+.rv-foot .b-act {
+  color: var(--c-text);
 }
 
 .rv-file {
-  margin-bottom: 14px;
+  margin: 0 var(--pad-row-x) var(--gap-section);
 }
 
 /* the diff on its way: its words, dim, never a bare bar (designer m_15244) */
 .rv-wait {
   /* the same left edge as the head's title above it (designer's pixel nit on 5f70331d) */
-  margin: 8px 0 8px 6px;
+  margin: var(--s-2) var(--pad-row-x);
   color: var(--c-text-3);
 }
 
 .rv-note,
 .rv-foot {
   color: var(--c-text-2);
-  margin: 4px 0;
+  margin: var(--gap-tight) var(--pad-row-x);
+}
+/* a file's note is in the file's own column, already on the edge */
+.rv-file > .rv-note {
+  margin-inline: 0;
 }
 
 /* a feature's card (FeatureScreen): its question, then its answers as buttons */
 .ft-card {
-  margin: 12px 0 16px;
-  padding: 12px 14px;
+  margin: var(--gap-block) var(--pad-row-x) var(--gap-section);
+  padding: var(--pad-card);
   border: 1px solid var(--c-line-strong);
   border-radius: 10px;
   background: var(--c-raised);
 }
 
 .ft-q {
-  margin: 0 0 10px;
+  margin: 0 0 var(--gap-block);
   color: var(--c-text);
 }
 
 .ft-acts {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--gap-inline);
 }
 
-/* a PR row (PrsScreen): dot, number, branch · agents, its state in words at the end */
+/* a PR row (PrsScreen): dot, number, branch · agents, its state in words at the end; one list
+   row high, its words on the content edge, its tint 8 px out */
 .pr-row {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  gap: var(--gap-inline);
   width: 100%;
-  padding: 8px 10px;
+  min-height: var(--h-row);
+  padding: 0 var(--pad-row-x);
   border: none;
   border-radius: 8px;
   background: none;

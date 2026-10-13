@@ -2,7 +2,7 @@
 // his others) and what reached main today. Owner: amb-win. Each agent's
 // branch opens its review; a merged commit opens read-only.
 import { useEffect } from 'react';
-import { Empty, Head, Row, SectionHead } from '@/ds';
+import { Act, Empty, Head, Row, SectionHead } from '@/ds';
 import { useFeatures, useMerged, usePrs, useStore, useWorktrees } from '@/store';
 import { distance, stateWords } from './feature';
 import { useRouter } from '@/app/router';
@@ -36,7 +36,6 @@ export function ChangesScreen({ project }: { project: string }) {
       <Head title="changes" sub={`${branches.length} branches · ${merged.length} merged today`} />
       <div className="rv-body">
         <Row
-          kind="ag"
           // its open PRs (bar A.7, the TUI's /prs): the count, the list one click away
           name="pull requests"
           end={prs === null ? '…' : prs.items.length === 0 ? 'none open' : prs.head}
@@ -49,7 +48,6 @@ export function ChangesScreen({ project }: { project: string }) {
         {features.map((f) => (
           <Row
             key={f.name}
-            kind="ag"
             // a feature: its branch, its agents' work merged into it, tried and merged as one
             name={`ψ ${f.name}`}
             end={`${stateWords(f)} · ${distance(f)}`}
@@ -66,7 +64,6 @@ export function ChangesScreen({ project }: { project: string }) {
           return (
             <Row
               key={w.path}
-              kind="ag"
               // the branch as the TUI names it ('sb/checkout'), whose worktree it is at the end
               name={w.branch === '' ? 'detached' : w.branch}
               end={`${agent ?? 'yours'} · ${branchEnd(w)}`}
@@ -87,7 +84,16 @@ export function ChangesScreen({ project }: { project: string }) {
           <Row
             key={m.sha}
             name={m.title}
-            end={[m.sha.slice(0, 7), m.by ?? '', clock(m.at_ms)].filter(Boolean).join(' · ')}
+            // the sha is the machine's text (mono), the rest words (designer m_21379 (4))
+            end={
+              <>
+                <span className="rv-mono">{m.sha.slice(0, 7)}</span>
+                {[m.by ?? '', clock(m.at_ms)]
+                  .filter(Boolean)
+                  .map((w) => ` · ${w}`)
+                  .join('')}
+              </>
+            }
             onClick={() => {
               router.go({ screen: 'commit', project, sha: m.sha });
             }}
@@ -95,16 +101,14 @@ export function ChangesScreen({ project }: { project: string }) {
           />
         ))}
         <p className="rv-foot">
-          <a
-            href="#main"
-            onClick={(e) => {
-              e.preventDefault();
+          <Act
+            onClick={() => {
               router.go({ screen: 'thread', project, agent: MAIN });
             }}
-            data-testid="changes.thread"
+            testId="changes.thread"
           >
             back to its thread
-          </a>
+          </Act>
         </p>
       </div>
     </section>

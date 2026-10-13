@@ -72,10 +72,10 @@ export function EnvironmentsScreen({ project }: { project: string }) {
             {p.agents.map((a) => (
               <Row
                 key={a.name}
-                kind="ag"
+                // a place's agents and servers are siblings: one edge, each its sign slot (designer m_21379 (2))
                 name={a.name}
                 dot={dotOf(a.status)}
-                end={a.branch ?? ''}
+                end={a.branch == null || a.branch === '' ? '' : <span className="rv-mono">{a.branch}</span>}
                 onClick={() => {
                   router.go({ screen: 'thread', project, agent: a.name });
                 }}
@@ -88,7 +88,7 @@ export function EnvironmentsScreen({ project }: { project: string }) {
                 name={s.name ?? s.cmd}
                 sub={s.cmd}
                 dot={s.up ? 'ok' : 'off'}
-                end={s.url ?? (s.port == null ? '' : `:${String(s.port)}`)}
+                end={s.url == null && s.port == null ? '' : <span className="rv-mono">{s.url ?? `:${String(s.port)}`}</span>}
                 onClick={
                   s.url == null
                     ? undefined
