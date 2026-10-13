@@ -46,6 +46,7 @@ for (let i = 0; i < 100 && !page; i++) {
 res.pages = browser.contexts().flatMap((c) => c.pages().map((p) => p.url()));
 if (!page) { step('the window page', false, res.pages); process.exit(1); }
 
+page.on('close', () => closed());
 let n = 0;
 const shot = async (name) => {
   const f = path.join(out, `${mode}${tag}-${++n}-${name}.png`);
@@ -64,13 +65,20 @@ const click = async (name, loc) => {
   try { await loc.click({ timeout: 8000 }); return true; }
   catch (e) { step(name, false, String(e).slice(0, 240)); return false; }
 };
+// the window can go away under a pass (7e691aef's rerun: the candidate quit at 07:48:09, rows2 then
+// crashed in page.waitForTimeout): say it as a red step and end the pass, never an uncaught error
+const closed = () => {
+  step('the window stayed open through the pass', false, 'the page closed');
+  process.exit(3);
+};
 const until = async (fn, ms, every = 1000) => {
   const t0 = Date.now();
   for (;;) {
+    if (page.isClosed()) closed();
     const v = await fn().catch(() => null);
     if (v) return v;
     if (Date.now() - t0 > ms) return null;
-    await page.waitForTimeout(every);
+    await new Promise((r) => setTimeout(r, every));
   }
 };
 

@@ -25,6 +25,11 @@ say() { echo "$(date +%T) $*"; }
 case "$A" in "$HIS"|"$HIS/"*) echo "that's his promoted app, not a candidate"; exit 2;; esac
 [ -x "$MAIN" ] || { echo "no $MAIN"; exit 2; }
 case "$G" in "$HOME/.bise/gate/"*) ;; *) echo "the world must be under ~/.bise/gate"; exit 2;; esac
+# its own bundle id (ambient-lead m_20669): with his app's id, LaunchServices can route a quit,
+# activate or open between his app and ours (7e691aef's rerun: his quit took the candidate too)
+CAND_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$A/Contents/Info.plist" 2>/dev/null)
+HIS_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$HIS/Contents/Info.plist" 2>/dev/null)
+[ -n "$CAND_ID" ] && [ "$CAND_ID" != "$HIS_ID" ] || { echo "the candidate's bundle id ($CAND_ID) is his app's ($HIS_ID): build it with its own id"; exit 2; }
 HISR=$(cd "$HIS" 2>/dev/null && pwd -P || echo "$HIS")
 # pids by fixed strings on the process table (no regex on a path with spaces and dots)
 # (the awk itself carries the string: skipped; ps shows it as 'awk -v p <path>', no '=': every
@@ -134,7 +139,9 @@ drive rows2
 for c in pause atonce; do
   TAG=$c drive draft-type "draft kept across a restart ($c)"
   [ $c = pause ] && sleep 5
-  say "restart $c (SIGTERM to $(mainpid), then open)"; t0=$(date '+%Y-%m-%d %H:%M:%S')
+  m=$(mainpid)
+  [ -z "$m" ] && { say "CANDIDATE GONE: its main process ended before the restart $c"; echo "restart-$c" >> $O/candidate-gone.txt; }
+  say "restart $c (SIGTERM to ${m:-nothing}, then open)"; t0=$(date '+%Y-%m-%d %H:%M:%S')
   stopcand; breach; libgate restart-$c-stop
   opencand; breach; libgate restart-$c-open
   TAG=$c drive draft-check "draft kept across a restart ($c)"

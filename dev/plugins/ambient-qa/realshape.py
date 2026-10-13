@@ -468,12 +468,16 @@ def originator(log_text, pid):
     return None
 
 
-def is_breach(info, started_after, run_pids=None):
+def is_breach(info, started_after, run_pids=None, cand_bundle=None):
     """A front change is a breach when it is one of FRONT_BAD or an app started after the run
     began; any other app is his own switch (he works next to the run). With the run's pids known,
     an app that is not one of them and was there before the run is his own too, even named like
     ours: his promoted 'bise try' has the candidate's name and bundle id (c28260a9's run 3 stopped
-    when he brought his app to the front). Pure."""
+    when he brought his app to the front). With the candidate's own bundle id (ambient-lead m_20669:
+    candidates are built as dev.bise.desktop.cand, never his app's id), that id in front is ours,
+    whatever its pid. Pure."""
+    if cand_bundle and info.get("bundle") == cand_bundle:
+        return True
     if run_pids is not None and info.get("pid") and int(info["pid"]) not in run_pids and not started_after:
         return False
     return info["name"] in FRONT_BAD or bool(started_after)
@@ -521,11 +525,22 @@ def kill_run(bundle, pids_file=None):
             pass
 
 
+def bundle_id(app):
+    """An app bundle's CFBundleIdentifier, or None."""
+    import plistlib
+    try:
+        with open(os.path.join(app, "Contents", "Info.plist"), "rb") as f:
+            return plistlib.load(f).get("CFBundleIdentifier")
+    except (OSError, ValueError):
+        return None
+
+
 def front_gate(out, stop_file, bundle, every=0.1, pids_file=None):
     """Gate A: the front app every `every` s until stop_file exists. Every change is logged with its
     parent and who asked LaunchServices; a breach (is_breach) kills the bundle's processes at once
     and writes <out dir>/BREACH. Returns the changes."""
     t0 = time.time()
+    cand_bundle = bundle_id(bundle)
     front = lambda: front_info(subprocess.run(  # noqa: E731
         ["lsappinfo", "info", "-only", "name", "-only", "pid", "-only", "bundleID",
          subprocess.run(["lsappinfo", "front"], capture_output=True, text=True).stdout.strip()],
@@ -542,7 +557,7 @@ def front_gate(out, stop_file, bundle, every=0.1, pids_file=None):
                     run_pids = {int(x) for x in open(pids_file).read().split() if x.isdigit()} if pids_file else None
                 except OSError:
                     run_pids = None
-                row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after, run_pids))
+                row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after, run_pids, cand_bundle))
                 if row["breach"]:
                     kill_run(bundle, pids_file)
                     with open(os.path.join(os.path.dirname(out), "BREACH"), "w") as b:
