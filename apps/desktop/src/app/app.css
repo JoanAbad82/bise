@@ -165,6 +165,15 @@ body:has(.app-shell) {
   white-space: nowrap;
 }
 
+/* bise's version switch (ReloadLine, amb-home): '✓ reloaded' folds after its 3 s (FOLD_MS 220) */
+.app-reload {
+  transition: opacity 220ms ease;
+}
+
+.app-reload.fold {
+  opacity: 0;
+}
+
 /* the core's last stderr line, dim mono under the words */
 .app-core-last {
   margin-top: 2px;

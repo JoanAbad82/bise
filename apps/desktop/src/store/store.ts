@@ -20,6 +20,7 @@
 // its key and compare helpers live in types.ts (re-exported here).
 import type {
   Account,
+  SwitchRow,
   Card,
   ComputerAgent,
   Agent,
@@ -314,6 +315,10 @@ export class Store {
   flow(project: string): FlowMode | null {
     return this.slice<FlowMode | null>(`flow:${project}`, null);
   }
+  /** the hub's newest version switch (its phase, to/from, why it rolled back, at_ms); null: none said */
+  switchRow(project: string): SwitchRow | null {
+    return this.slice<SwitchRow | null>(`switch:${project}`, null);
+  }
   /** his pages and the late promises' count; null before the hub said */
   pages(project: string): PagesList | null {
     return this.slice<PagesList | null>(`pages:${project}`, null);
@@ -471,6 +476,10 @@ export class Store {
       case "flow":
         // the repo's [flow] mode; none = not set
         this.put(`flow:${ev.project}`, ev.flow ?? null);
+        return;
+      case "switch":
+        // where the hub's version switch is (/reload, /restart): at hello and when it moved; none = no switch yet
+        this.put(`switch:${ev.project}`, ev.switch ?? null);
         return;
       case "pages":
         this.put(`pages:${ev.project}`, {

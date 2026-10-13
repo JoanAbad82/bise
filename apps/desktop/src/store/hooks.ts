@@ -4,7 +4,7 @@
 // The store comes from StoreContext: the app's one store (bound to
 // window.bise.core) by default, a test's own store through the provider.
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import type { Account, Agent, FlowMode, ReleaseEv, UpdateEv, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
+import type { Account, Agent, FlowMode, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
 import { diffKey, takeKey, toolOutKey, Store, type QueuedTake, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadOrder, type VoiceModeState } from './store';
 
@@ -93,6 +93,8 @@ export const useFlow = (project: string): FlowMode | null => useSlice(`flow:${pr
 export const usePages = (project: string): PagesList | null => useSlice(`pages:${project}`, (s) => s.pages(project));
 /** /update's build in bise's source tree (amb-feed m_16785): 'updating bise…', then its end */
 export const useHubUpdate = (project: string): UpdateEv | null => useSlice(`update:${project}`, (s) => s.hubUpdate(project));
+/** the hub's newest version switch (/reload, /restart, /version): null before the hub said one */
+export const useHubSwitch = (project: string): SwitchRow | null => useSlice(`switch:${project}`, (s) => s.switchRow(project));
 export const useRelease = (project: string): ReleaseEv | null => useSlice(`release:${project}`, (s) => s.release(project));
 export const usePrs = (project: string): PrsList | null => useSlice(`prs:${project}`, (s) => s.prs(project));
 export const useModels = (project: string): readonly Model[] => useSlice(`models:${project}`, (s) => s.models(project));
