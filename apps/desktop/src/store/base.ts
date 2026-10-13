@@ -1,0 +1,127 @@
+// The store's base (store.ts's split, ambient-lead m_22445): its slices, threads and listeners,
+// the core's port, and the one way out to the core (command). Reads in reads.ts, voice in voice.ts,
+// the events and his actions in store.ts.
+import type { Entry } from "@/proto";
+import type { CoreCmd, CorePort, CoreState } from "@/shared/api";
+import type { Ev, FilesAnswer, Pending, ThreadOrder } from "./types";
+
+export const EMPTY: readonly never[] = [];
+
+export interface Thread {
+  view: ThreadOrder;
+  byPos: Map<number, Entry>;
+  typing: string;
+  pending: readonly Pending[];
+  landedIds?: readonly number[]; // A1: his ids that landed before their send's answer (echo.ts)
+}
+
+export type Listener = () => void;
+
+export interface StoreOptions {
+  readonly now?: () => number;
+}
+
+export class StoreBase {
+  protected readonly listeners = new Map<string, Set<Listener>>();
+  protected readonly threads = new Map<string, Thread>();
+  /** @internal for apply.ts */ readonly slices = new Map<string, unknown>();
+  protected readonly evListeners = new Set<(ev: Ev) => void>();
+  protected coreState: CoreState = "down";
+  protected cid = 0;
+  /** R8: when this window last sent a /model (a setup_first after it is his; a replayed one isn't) */
+  protected modelSentAt = Number.NEGATIVE_INFINITY;
+  /** tool_out asks in flight (by key), and each project's last one (an error names no call) */
+  /** @internal for apply.ts */ readonly toolAsks = new Set<string>();
+  /** @internal for apply.ts */ readonly toolAsk = new Map<string, string>();
+  /** each project's last queued_take (its error carries no id: it answers that one) */
+  /** @internal for apply.ts */ readonly takeAsk = new Map<string, string>();
+  /**
+   * the diff asks this window sent with a `req` (none today: the review asks without one); a diff
+   * that answers another `req` (a terminal's `/diff` the hub broadcasts) is for the view that
+   * asked, never the review's diff of the same agent (lead m_16528)
+   */
+  /** @internal for apply.ts */ readonly diffReqs = new Set<number>();
+  /** the dictations this window started and not over yet (bar I) */
+  /** @internal for apply.ts */ readonly dictating = new Set<string>();
+  /** the `@` queries on their way: rid -> its project and resolve; each project's newest rid */
+  protected rid = 0;
+  protected readonly asked = new Map<
+    number,
+    { project: string; resolve: (a: FilesAnswer | null) => void }
+  >();
+  protected readonly newestRid = new Map<string, number>();
+  /** commands asked from this core (said again when a core comes up) */
+  protected commandsAsked = false;
+  /** the last shown set sent (null: none yet); said again to a core that comes back up */
+  protected shownSet: readonly string[] | null = null;
+  /** the threads this window follows (subscribeThread), said again to a core that comes back up */
+  protected readonly subs = new Map<
+    string,
+    { project: string; agent: string; limit: number | undefined }
+  >();
+  protected readonly now: () => number;
+
+  constructor(
+    protected readonly port: Pick<CorePort, "send"> | null = null,
+    opts: StoreOptions = {},
+  ) {
+    this.now = opts.now ?? Date.now;
+  }
+
+  // ---- subscriptions
+
+  subscribe(key: string, fn: Listener): () => void {
+    let set = this.listeners.get(key);
+    if (set === undefined) {
+      set = new Set();
+      this.listeners.set(key, set);
+    }
+    set.add(fn);
+    return () => {
+      set.delete(fn);
+    };
+  }
+
+  /** Every applied event, after the store changed (one-shot things: open, route, job_end, error). */
+  onEvent(fn: (ev: Ev) => void): () => void {
+    this.evListeners.add(fn);
+    return () => {
+      this.evListeners.delete(fn);
+    };
+  }
+
+  /** @internal for apply.ts */ emit(key: string): void {
+    const set = this.listeners.get(key);
+    if (set === undefined) return;
+    for (const fn of [...set]) fn();
+  }
+
+  /** @internal for apply.ts */ put(key: string, value: unknown): void {
+    this.slices.set(key, value);
+    this.emit(key);
+  }
+
+  protected slice<T>(key: string, empty: T): T {
+    return (this.slices.get(key) as T | undefined) ?? empty;
+  }
+
+  // ---- actions (typed commands to the core)
+
+  command(cmd: CoreCmd): void {
+    // a new talk starts with nothing heard and no still
+    if (cmd.cmd === "talk_start" && this.slices.get("heard") != null)
+      this.put("heard", null);
+    if (cmd.cmd === "talk_start" && this.slices.get("shot") != null)
+      this.put("shot", null);
+    if (cmd.cmd === "slash" && cmd.line.trim().startsWith("/model "))
+      this.modelSentAt = this.now();
+    this.port?.send(cmd);
+  }
+
+  /** R8: this window sent a /model in the last `ms` (then forgets it: one setup_first per send). */
+  takeModelSent(ms: number): boolean {
+    const mine = this.now() - this.modelSentAt <= ms;
+    this.modelSentAt = Number.NEGATIVE_INFINITY;
+    return mine;
+  }
+}

@@ -1,0 +1,340 @@
+// Every read of the store (store.ts's split, ambient-lead m_22445): stable references between
+// changes, one slice each.
+import type {
+  Account,
+  SwitchRow,
+  Card,
+  ComputerAgent,
+  Agent,
+  Artifact,
+  DevServer,
+  Entry,
+  Found,
+  IndexRow,
+  Job,
+  JsonValue,
+  Feature,
+  Merged,
+  Model,
+  PickCommand,
+  RoleRow,
+  PickSkill,
+  Plugin,
+  ProjectRow,
+  ScheduledTask,
+  Worktree,
+  FlowMode,
+  ReleaseEv,
+  UpdateEv,
+} from "@/proto";
+import type { CoreState } from "@/shared/api";
+import {
+  type Away,
+  type BranchesList,
+  type Confirm,
+  type Dictation,
+  type Diff,
+  diffKey,
+  type EvOf,
+  type HubLine,
+  type PagesList,
+  type Pending,
+  type PrsList,
+  type QueuedTake,
+  type TalkShot,
+  takeKey,
+  EMPTY_ORDER,
+  type ThreadOrder,
+  type ToolOut,
+  toolOutKey,
+  type VersionsList,
+  type VoiceModeState,
+} from "./types";
+import { EMPTY, StoreBase } from "./base";
+
+export class StoreReads extends StoreBase {
+  // ---- reads (stable references between changes)
+
+  projects(): readonly ProjectRow[] {
+    return this.slice("projects", EMPTY);
+  }
+  agents(project: string): readonly Agent[] {
+    return this.slice(`agents:${project}`, EMPTY);
+  }
+  /** The hub's cards when it sent them, else the projects row's. */
+  cards(project: string): readonly Card[] {
+    return this.slice(`cards:${project}`, EMPTY);
+  }
+  /** the last answer by voice the core heard (bar N14), null: none */
+  voiceAnswer(): EvOf<"voice_answer"> | null {
+    return this.slice<EvOf<"voice_answer"> | null>("voice_answer", null);
+  }
+  /** The card in front of him in this focused window (bar N14), or none: fn's talk can answer it by voice. */
+  cardInView(project: string | null, card: number | null): void {
+    this.command(
+      project === null || card === null
+        ? { cmd: "card_in_view" }
+        : { cmd: "card_in_view", project, card },
+    );
+  }
+  /** the hub's open yes/no questions to this window, oldest first */
+  confirms(project: string): readonly Confirm[] {
+    return this.slice(`confirms:${project}`, EMPTY);
+  }
+  /** the hub's last line to this window: a notice (a no's 'drop of @x cancelled', /flow) or a refused slash line */
+  notice(project: string): HubLine | null {
+    return this.slice<HubLine | null>(`notice:${project}`, null);
+  }
+  /** how tool calls are approved on this machine and the repo's saved rules (bar V8/W21); null until the hub said */
+  approvals(project: string): EvOf<"approvals"> | null {
+    return this.slice<EvOf<"approvals"> | null>(`approvals:${project}`, null);
+  }
+  prefs(): JsonValue | null {
+    return this.slice<JsonValue | null>("prefs", null);
+  }
+  /** V14: the sign-in open in his browser (its link, to copy), until its end (accounts or error). */
+  signing(): { readonly id: string; readonly url: string } | null {
+    return this.slice<{ readonly id: string; readonly url: string } | null>(
+      "signing",
+      null,
+    );
+  }
+  accounts(): readonly Account[] {
+    return this.slice("accounts", EMPTY);
+  }
+  found(): readonly Found[] {
+    return this.slice("found", EMPTY);
+  }
+  /** computer use's state (P.2); null until the core sent it */
+  computerUse(): EvOf<"computer_use"> | null {
+    return this.slice<EvOf<"computer_use"> | null>("computer_use", null);
+  }
+  /** S29: every agent using computer use now (each with its project when it is one of his) */
+  computerLive(): readonly ComputerAgent[] {
+    return this.slice("computer_live", EMPTY);
+  }
+  /** S29: the latest peek answer for an agent's key (a still, or why none); null before one */
+  peek(key: string): EvOf<"computer_peek"> | null {
+    return this.slice<EvOf<"computer_peek"> | null>(`peek:${key}`, null);
+  }
+  /** S29: his act on an agent's computer use by its key (take, hand_back, stop, peek); the rows follow state.json, never optimistic */
+  computer(
+    act: "take" | "hand_back" | "stop" | "peek",
+    key: string,
+    maxWidth?: number,
+  ): void {
+    this.command({
+      cmd: "computer",
+      act,
+      key,
+      ...(maxWidth === undefined ? {} : { max_width: maxWidth }),
+    });
+  }
+  /** S29: forgets an agent's last still (its row unmounted: no image kept) */
+  dropPeek(key: string): void {
+    if (this.slices.get(`peek:${key}`) != null) this.put(`peek:${key}`, null);
+  }
+  /** a workspace's agent plugins (none: bise's home's); null until the core sent them */
+  plugins(project?: string): readonly Plugin[] | null {
+    return this.slice<readonly Plugin[] | null>(
+      `plugins:${project ?? ""}`,
+      null,
+    );
+  }
+  artifacts(project: string): readonly Artifact[] {
+    return this.slice(`artifacts:${project}`, EMPTY);
+  }
+  worktrees(project: string): readonly Worktree[] {
+    return this.slice(`worktrees:${project}`, EMPTY);
+  }
+  /** the project's live scheduled tasks (sb every), whole each time; none until the hub said */
+  scheduled(project: string): readonly ScheduledTask[] {
+    return this.slice(`scheduled:${project}`, EMPTY);
+  }
+  devServers(project: string): readonly DevServer[] {
+    return this.slice(`dev_servers:${project}`, EMPTY);
+  }
+  merged(project: string): readonly Merged[] {
+    return this.slice(`merged:${project}`, EMPTY);
+  }
+  /** a project's features (amb-feed 5f436473: at hello, on change, on HubCmd features) */
+  features(project: string): readonly Feature[] {
+    return this.slice(`features:${project}`, EMPTY);
+  }
+  /** the models a project's agents can run, the TUI's /model list (amb-feed 7dfd1c74) */
+  models(project: string): readonly Model[] {
+    return this.slice(`models:${project}`, EMPTY);
+  }
+  /** a project's open PRs as the TUI's /prs (amb-feed 66faffe3): its head, rows, and the 'none' words; null until the hub sent them */
+  /** a project's branches (the answer to branches); null before one */
+  branches(project: string): BranchesList | null {
+    return this.slice<BranchesList | null>(`branches:${project}`, null);
+  }
+  /** bise's versions (state at hello, again after versions) */
+  versions(project: string): VersionsList | null {
+    return this.slice<VersionsList | null>(`versions:${project}`, null);
+  }
+  /** the repo's flow mode: null before the hub said, or when it is not set */
+  flow(project: string): FlowMode | null {
+    return this.slice<FlowMode | null>(`flow:${project}`, null);
+  }
+  /** the hub's newest version switch (its phase, to/from, why it rolled back, at_ms); null: none said */
+  switchRow(project: string): SwitchRow | null {
+    return this.slice<SwitchRow | null>(`switch:${project}`, null);
+  }
+  /** his pages and the late promises' count; null before the hub said */
+  pages(project: string): PagesList | null {
+    return this.slice<PagesList | null>(`pages:${project}`, null);
+  }
+  /** /update's build in bise's source tree, its latest step; null when none ran */
+  hubUpdate(project: string): UpdateEv | null {
+    return this.slice<UpdateEv | null>(`update:${project}`, null);
+  }
+  /** a /release-bise run (dev builds), its latest step; null when none ran */
+  release(project: string): ReleaseEv | null {
+    return this.slice<ReleaseEv | null>(`release:${project}`, null);
+  }
+  /** ask a project's branches (the answer: branches) */
+  askBranches(project: string): void {
+    this.command({ cmd: "branches", project });
+  }
+  /** ask bise's versions again (the answer: versions) */
+  askVersions(project: string): void {
+    this.command({ cmd: "versions", project });
+  }
+  prs(project: string): PrsList | null {
+    return this.slice<PrsList | null>(`prs:${project}`, null);
+  }
+  jobs(project: string): readonly Job[] {
+    return this.slice(`jobs:${project}`, EMPTY);
+  }
+  /**
+   * A tool call's real output (amb-feed dece0fe9: up to 4 KB from the session log, `cut` when
+   * longer or only the 200-char preview was found), or the hub's refusal; null until asked and
+   * answered. Ask with askToolOut on open: the answer goes to the asking connection only.
+   */
+  toolOut(project: string, agent: string, pos: number): ToolOut | null {
+    return this.slice<ToolOut | null>(toolOutKey(project, agent, pos), null);
+  }
+  /** Ask the hub for a call's output once (an open row asks; a second open reads what came). */
+  askToolOut(project: string, agent: string, pos: number): void {
+    const key = toolOutKey(project, agent, pos);
+    if (this.slices.get(key) != null || this.toolAsks.has(key)) return;
+    this.toolAsks.add(key);
+    this.toolAsk.set(project, key);
+    this.port?.send({ cmd: "tool_out", project, agent, pos });
+  }
+  /** His queued message taken back (queued_take): its words, or the hub's refusal; null until then. */
+  queuedTaken(project: string, agent: string, id: number): QueuedTake | null {
+    return this.slice<QueuedTake | null>(takeKey(project, agent, id), null);
+  }
+  /**
+   * Take back a message the hub holds until the agent's turn ends (amb-feed 34c35175: 'edit' =
+   * take + his words back in the composer, 'drop' = take). The answer is queued_taken (its words),
+   * or an error with the hub's words (already delivered, no longer waiting); the row leaves
+   * Agent.queued at the next agents event.
+   */
+  queuedTake(project: string, agent: string, id: number): void {
+    const key = takeKey(project, agent, id);
+    if (this.slices.get(key) != null) this.put(key, null);
+    this.takeAsk.set(project, key);
+    this.command({ cmd: "queued_take", project, agent, id });
+  }
+  /** The latest diff of an agent's change, or of one commit (`commit`). */
+  diff(project: string, agent: string, commit?: string): Diff | null {
+    return this.slice<Diff | null>(diffKey(project, agent, commit), null);
+  }
+  away(): Away | null {
+    return this.slice<Away | null>("away", null);
+  }
+  core(): CoreState {
+    return this.coreState;
+  }
+  threadOrder(key: string): ThreadOrder {
+    return this.threads.get(key)?.view ?? EMPTY_ORDER;
+  }
+  entry(key: string, pos: number): Entry | undefined {
+    return this.threads.get(key)?.byPos.get(pos);
+  }
+  typing(key: string): string {
+    return this.threads.get(key)?.typing ?? "";
+  }
+  pending(key: string): readonly Pending[] {
+    return this.threads.get(key)?.pending ?? EMPTY;
+  }
+
+  /** Each role's model and effort (V17; set with command({cmd: 'role_set', role, model?, effort?})). */
+  roles(): readonly RoleRow[] {
+    return this.slice("roles", EMPTY);
+  }
+  /** The `/` list (the TUI's commands.rs), asked once from each core. */
+  commands(): readonly PickCommand[] {
+    return this.slice("commands", EMPTY);
+  }
+  askCommands(): void {
+    if (this.commandsAsked) return;
+    this.commandsAsked = true;
+    this.command({ cmd: "commands" });
+  }
+  /** A workspace's `$` list (the TUI's skills.rs); askSkills reads it again. */
+  skills(project: string): readonly PickSkill[] {
+    return this.slice(`skills:${project}`, EMPTY);
+  }
+  askSkills(project: string): void {
+    this.command({ cmd: "skills", project });
+  }
+  /** R8: the last /model the core holds until its provider works (amb-home's setup opens on it), or null. */
+  setupFirst(): EvOf<"setup_first"> | null {
+    return this.slice<EvOf<"setup_first"> | null>("setup_first", null);
+  }
+  /** Why this core can start no hub (CoreEv broken: its runtime is missing); null: it can. */
+  broken(): string | null {
+    return this.slice<string | null>("broken", null);
+  }
+
+  /** N1: where his keys and sign-ins are (the core's keychain event); none yet: null */
+  keychain(): EvOf<"keychain"> | null {
+    return this.slice<EvOf<"keychain"> | null>("keychain", null);
+  }
+  /**
+   * ⌘K's index (core/index.rs): every project the core doesn't hold now,
+   * from its view.json (agents, the newest artifacts and their total), as of
+   * written_ms, with up (its hub runs). askIndex() once; it comes again on
+   * change, at most every 5 s.
+   */
+  index(): readonly IndexRow[] {
+    return this.slice("index", EMPTY);
+  }
+  askIndex(): void {
+    this.command({ cmd: "index" });
+  }
+  /** Why a project's hub refused this core (its words), or null. */
+  hubRefused(project: string): string | null {
+    return this.slice<string | null>(`hub_refused:${project}`, null);
+  }
+  /** Try a refused project's hub again (his click): the core connects once more. */
+  hubRetry(project: string): void {
+    this.command({ cmd: "hub_retry", project });
+  }
+  voiceModeNow(): VoiceModeState | null {
+    return this.slice<VoiceModeState | null>("voice_mode", null);
+  }
+  /** fn's talk: what bise heard so far (the whole text; final once the talk ended), null before a talk. */
+  heard(): { readonly text: string; readonly final: boolean } | null {
+    return this.slice<{
+      readonly text: string;
+      readonly final: boolean;
+    } | null>("heard", null);
+  }
+  /** fn's talk: the still of his front window it will send (its stored file), null: none or gone. */
+  shot(): TalkShot | null {
+    return this.slice<TalkShot | null>("shot", null);
+  }
+  /** A voice's loudness now, 0..1: 'you' (the mic), 'main' (its spoken answer). */
+  level(who: string): number {
+    return this.slice(`level:${who}`, 0);
+  }
+  dictation(id: string): Dictation | null {
+    return this.slice<Dictation | null>(`dictation:${id}`, null);
+  }
+}
