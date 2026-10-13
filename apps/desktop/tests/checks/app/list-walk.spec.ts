@@ -136,6 +136,13 @@ test('app/list-walk: every list page walks with the TUI list keys', async () => 
       await expect(page.locator(w.ready).first(), `${name}: the list shows`).toBeVisible({ timeout: 10_000 });
       const rows = await walk(s, name, w);
       await page.screenshot({ path: test.info().outputPath(`${name}.png`) });
+      if (name === 'approvals') {
+        // the DS list row tints for designer's sign-off: the same selected row, dark
+        await core.send({ ev: 'prefs', prefs: { onboarded: true, theme: 'dark' } } as never);
+        await expect.poll(() => page.evaluate(() => document.documentElement.dataset['theme']), { timeout: 5000 }).toBe('dark');
+        await page.waitForTimeout(200);
+        await page.screenshot({ path: test.info().outputPath('approvals-dark.png') });
+      }
       if (name === 'artifacts') {
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('Enter');
@@ -176,7 +183,13 @@ test('app/list-walk: every list page walks with the TUI list keys', async () => 
     expect(await menuKey(s, 'CmdOrCtrl+I'), '⌘I is in the menu').not.toBe('');
     await expect.poll(open, { timeout: 5000, message: '⌘I opens item 1' }).toBe('inbox.block.open.1');
     await page.locator('body').focus();
+    // ↑↓ walk only out of a field (Block.tsx typing()): an open ask can take the focus into its
+    // field, so each arrow starts from the body; ctrl+p goes back even from the field. Each key
+    // waits two frames after the last move: the block's key listener is re-made by an effect after
+    // each render, and a key 10 ms after the move hit the old one (seen here; told amb-home)
     const key = async (k: string, want: string | null, why: string) => {
+      if (k.startsWith('Arrow')) await page.evaluate(() => { (document.activeElement as HTMLElement | null)?.blur(); });
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
       await page.keyboard.press(k);
       await expect.poll(open, { timeout: 3000, message: `⌘I: ${why}` }).toBe(want);
     };
@@ -196,6 +209,8 @@ test('app/list-walk: every list page walks with the TUI list keys', async () => 
     await key('ArrowDown', 'inbox.block.open.2', '↓ the next item');
     await key('ArrowUp', 'inbox.block.open.1', '↑ back one');
     await key('ArrowUp', 'inbox.block.open.1', '↑ at the top stays');
+    await key('Control+n', 'inbox.block.open.2', 'ctrl+n the next item');
+    await key('Control+p', 'inbox.block.open.1', 'ctrl+p back one');
     await page.screenshot({ path: test.info().outputPath('cmd-i.png') });
     await key('Escape', null, 'esc closes the item');
   } finally {

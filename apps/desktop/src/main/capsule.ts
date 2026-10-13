@@ -20,6 +20,10 @@ import { capsuleBounds, fitBounds, OFF_DISPLAY, pinnedBounds, pinOf, type Anchor
 import { loadRenderer, OFF, webPreferences } from './windows';
 
 const START = { width: 640, height: 120 };
+/** a corner card's way out: the window's alpha 1 → 0, paired with the page's
+ *  CORNER_OUT_MS fade (capsule/machine.ts), since the native glass doesn't fade with the page */
+const CORNER_FADE_MS = 120;
+const FADE_STEPS = 8;
 
 export class Capsule {
   private readonly win: BrowserWindow;
@@ -30,6 +34,8 @@ export class Capsule {
   /** this show grows down from a pinned top-left (the voice view) */
   private fit: CapsuleFit | null = null;
   private state: CapsuleState = { shown: false, at: 'bottom', keys: false, why: 'asked' };
+  /** a corner hide's alpha fade, still running (a show cancels it) */
+  private fading: ReturnType<typeof setInterval> | null = null;
   tray: Tray | null = null;
 
   /** `offscreen`: BISE_DESKTOP_OFFSCREEN (offscreen.ts): placed off every display, never shown */
@@ -83,6 +89,7 @@ export class Capsule {
     // placed (and kept inside the screen) once, here; then pinned
     this.pin = null;
     this.fit = at === 'bottom' ? fit : null;
+    this.stopFade();
     this.place();
     if (this.testMode) {
       process.stdout.write(`${CAPSULE_LINE} show ${at}${keys ? ' keys' : ''}\n`);
@@ -99,11 +106,34 @@ export class Capsule {
 
   hide(why: CapsuleState['why'] = 'asked'): void {
     if (!this.state.shown) return;
+    const corner = this.state.at === 'corner';
     this.state = { ...this.state, shown: false, keys: false, why };
     this.pin = null;
     if (this.testMode) process.stdout.write(`${CAPSULE_LINE} hide\n`);
+    else if (corner && !this.offscreen) this.fadeOut();
     else this.win.hide();
     this.tell();
+  }
+
+  /** the corner card goes out with its page: alpha 1 → 0 in CORNER_FADE_MS, then hidden at 1 again */
+  private fadeOut(): void {
+    this.stopFade();
+    let n = 0;
+    this.fading = setInterval(() => {
+      n += 1;
+      if (this.win.isDestroyed()) return this.stopFade();
+      if (n < FADE_STEPS) return this.win.setOpacity(1 - n / FADE_STEPS);
+      this.stopFade();
+      this.win.hide();
+    }, CORNER_FADE_MS / FADE_STEPS);
+  }
+
+  /** a running fade ends (a show, or its last step): the window back at alpha 1 */
+  private stopFade(): void {
+    if (this.fading === null) return;
+    clearInterval(this.fading);
+    this.fading = null;
+    if (!this.win.isDestroyed()) this.win.setOpacity(1);
   }
 
   resize(width: number, height: number, glass?: Rect): void {
