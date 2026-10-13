@@ -84,6 +84,16 @@ test("composer/question-space: '?' starts a message, focused or not; ⌘/ opens 
     await away(page);
     await page.keyboard.press('Meta+Slash');
     await expect(help, '⌘/ opens the keys').toBeVisible();
+    // designer m_22179: the sheet is opaque (the ds sheet's paint), its caps ink like ⌘K's, ⌘K's words
+    const look = await page.locator('.help-box').evaluate((b) => {
+      const cs = getComputedStyle(b);
+      const ret = (k: string) => getComputedStyle(b.querySelector(`[data-keys="${k}"] .b-kbd`) as Element).color;
+      return { bg: cs.backgroundImage, ret: ret('⏎'), cmdk: ret('⌘K'), text: getComputedStyle(b.querySelector('[data-keys="⌘K"] .a') as Element).color };
+    });
+    expect(look.bg, 'opaque: a solid under the raised tint').toContain('gradient');
+    expect(look.ret, "⏎'s cap in ink, as ⌘K's").toBe(look.cmdk);
+    expect(look.ret, 'ink').toBe(look.text);
+    await expect(page.locator('[data-keys="⌘K"] .a')).toHaveText('find an agent, a page or an artifact');
     await page.mouse.move(1, 300);
     await page.screenshot({ path: test.info().outputPath('help-light-1100.png') });
     // one esc closes it (its filter is empty); a second would be the window's 'back'

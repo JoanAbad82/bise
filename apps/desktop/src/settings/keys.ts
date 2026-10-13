@@ -34,7 +34,7 @@ export const KEY_SECTIONS: readonly KeySection[] = [
       { keys: '⌘0', action: 'bise' },
       { keys: '⌘1 … ⌘9', action: 'a project, in the order of settings · projects' },
       { keys: '⌥0 / ⌥1 … ⌥9', action: "the project's main / an agent", tui: '⌥ + 0…9' },
-      { keys: '⌘K', action: 'find an agent by its name' },
+      { keys: '⌘K', action: 'find an agent, a page or an artifact' },
       { keys: '⌘[ / ⌘]', action: 'back / forward' },
       { keys: '⌘I', action: 'the inbox: what waits for you, most blocking first', tui: '/inbox, ctrl+1-9' },
       { keys: '⌘F', action: 'find in the thread', tui: 'ctrl+f' },
