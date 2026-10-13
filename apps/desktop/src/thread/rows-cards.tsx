@@ -85,11 +85,12 @@ export function CardAnsweredRow({ pos, a, at, timeAlways }: { pos: number; a: { 
   const images = a.words.match(/\[Image #\d+\]/gu) ?? [];
   const words = withoutImageMarks(a.words);
   const id = `thread.cardanswer.${String(pos)}`;
-  // something he said: on his side, '✓ you answered: <question>' dim over his bubble (messages-right)
+  // something he said: on his side, '✓ you answered main · <question>' dim over his bubble
+  // (messages-right); one head for every answered card, terminal and window (designer m_20985)
   return (
     <div className="th-approval" data-card={a.card}>
       <YouBubble
-        head={<AnsweredHead ok>{`you answered: ${a.question}`}</AnsweredHead>}
+        head={<AnsweredHead ok>{`you answered main · ${a.question}`}</AnsweredHead>}
         under={at > 0 ? clock(at) : undefined}
         timeAlways={timeAlways}
         testId={id}

@@ -9,8 +9,8 @@ JSON, the '[from the page: …]' line):
    words, not twice (the card's own fold, the hub's entry skipped);
 2. he picks on the page itself (the page's answer API): the same row,
    with what the card asked;
-3. he sends a note on the page: 'you answered main on <title>' and his
-   note under it.
+3. he sends a note on the page: 'you sent main a note on ↗ <title>' and
+   his note under it (designer m_20985: a note is not an answer).
 At 150 and 80 columns.
 
 python3 -u tests/tui_page_answer_tmux.py
@@ -108,7 +108,7 @@ def one(t, cols, rows):
         assert st == 200, (st, body)
         st, body = request(port, "POST", "/api/p/plan/send", {}, hdr)
         assert st == 200, (st, body)
-        t.wait("you answered main on the plan")
+        t.wait("you sent main a note on ↗ the plan")
         sc = t.wait("make it shorter")
         clean(sc)
         print(sc)

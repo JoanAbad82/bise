@@ -76,7 +76,7 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
     await expect(page.getByTestId('thread.answered.3.image.1'), "bise's answer for him: the same chip").toHaveText('[Image #1]');
     // main's own card answered: the '✓ you answered' row with the chip, never the hub's raw line
     // the same order as the rows above (designer m_15420): what was asked, his words, the chip
-    await expect(page.getByTestId('thread.cardanswer.4.head')).toHaveText('✓you answered: merge checkout into main? (2 files, tests pass)');
+    await expect(page.getByTestId('thread.cardanswer.4.head')).toHaveText('✓you answered main · merge checkout into main? (2 files, tests pass)');
     await expect(page.getByTestId('thread.cardanswer.4.words')).toHaveText('this one');
     await expect(page.getByTestId('thread.cardanswer.4.image.1')).toHaveText('[Image #1]');
     // the raw line names no file: the chip keeps its 16 px slot with a faint image glyph (designer m_15943)

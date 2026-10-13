@@ -272,9 +272,12 @@ pub fn page_answer(p: &crate::parts::PageSaid<'_>, width: &dyn Fn(&str) -> usize
             return (head, n.asked.trim().to_string(), note);
         }
     }
-    let head = match notes.iter().all(|n| n.kind == "start") {
-        true => format!("you asked {to} for an agent on {title}"),
-        false => format!("you answered {to} on {title}"),
+    // a note is not an answer (designer m_20985): what he sent, the page
+    // as its ↗ link
+    let head = match (notes.iter().all(|n| n.kind == "start"), notes.len()) {
+        (true, _) => format!("you asked {to} for an agent on ↗ {title}"),
+        (false, 1) => format!("you sent {to} a note on ↗ {title}"),
+        (false, n) => format!("you sent {to} {n} notes on ↗ {title}"),
     };
     let lines: Vec<String> = notes.iter().map(|n| page_note_words(n, true)).filter(|l| !l.is_empty()).collect();
     (head, String::new(), lines.join("\n"))
@@ -610,9 +613,10 @@ mod tests {
         assert_eq!(said(&[short]).0, "you answered main: xhigh");
         // a note, a tick, an edit, a keep: the page named, his words one per line
         let notes = [note("note", "shorter", "Revenue grew"), note("tick", "done", ""), note("edit", "Q3", "Q2"), note("keep", "", "")];
-        assert_eq!(said(&notes), ("you answered main on efforts".into(), String::new(), "\"Revenue grew\": shorter\n✓ done\n\"Q2\" → \"Q3\"\n♡ keep".into()));
+        assert_eq!(said(&notes[..1]).0, "you sent main a note on ↗ efforts");
+        assert_eq!(said(&notes), ("you sent main 4 notes on ↗ efforts".into(), String::new(), "\"Revenue grew\": shorter\n✓ done\n\"Q2\" → \"Q3\"\n♡ keep".into()));
         // a start: he asked for an agent
-        assert_eq!(said(&[note("start", "do it", "ideas")]).0, "you asked main for an agent on efforts");
+        assert_eq!(said(&[note("start", "do it", "ideas")]).0, "you asked main for an agent on ↗ efforts");
         // never the hub's template
         assert!(!said(&notes).2.contains("sb page publish"));
     }

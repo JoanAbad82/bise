@@ -228,7 +228,7 @@ fn his_page_answer_is_one_answer_row() {
     let note = entry(serde_json::json!({"pos": 10, "at_ms": 0, "kind": "you", "text": "you sent 1 note…", "parts": [{"kind": "page", "text": "you sent 1 note…", "to": "t1", "page": "w", "title": "plan", "version": 1, "notes": [{"block": "p1", "kind": "note", "text": "shorter"}]}]}));
     assert_eq!(answers(&note), None);
     let evs = crate::entry_ev::ev_of(&note);
-    assert!(matches!(evs.as_slice(), [Ev::Approval { text, note, .. }] if text == "you answered t1 on plan" && note == "shorter"), "a note's row");
+    assert!(matches!(evs.as_slice(), [Ev::Approval { text, note, .. }] if text == "you sent t1 a note on ↗ plan" && note == "shorter"), "a note's row");
 }
 
 /// Read 6: The queue: at a turn's end the oldest queued message goes, once

@@ -65,9 +65,11 @@ describe('his answer on a page (page part)', () => {
         { block: 'k', kind: 'keep' },
       ]),
     ]);
-    expect(p === null ? null : pageAnswer(p)).toEqual({ head: 'you answered main on efforts', asked: '', words: '"Revenue grew": shorter\n✓ done\n"Q2" → "Q3"\n♡ keep' });
+    expect(p === null ? null : pageAnswer(p)).toEqual({ head: 'you sent main 4 notes on ↗ efforts', asked: '', words: '"Revenue grew": shorter\n✓ done\n"Q2" → "Q3"\n♡ keep' });
     const start = pageOf([page([{ block: 'ideas', kind: 'start', text: 'go' }])]);
-    expect(start === null ? '' : pageAnswer(start).head).toBe('you asked main for an agent on efforts');
+    expect(start === null ? '' : pageAnswer(start).head).toBe('you asked main for an agent on ↗ efforts');
+    const one = pageOf([page([{ block: 'p1', kind: 'note', text: 'shorter' }])]);
+    expect(one === null ? '' : pageAnswer(one).head).toBe('you sent main a note on ↗ efforts');
   });
   it('a part kind this window does not know: the entry draws from its text', () => {
     expect(drawnParts([text('a'), { kind: 'voice', secs: 3 } as unknown as Part])).toBeNull();

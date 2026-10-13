@@ -134,7 +134,13 @@ export function pageAnswer(p: PagePart): { head: string; asked: string; words: s
     const short = !w.includes('\n') && [...w].length <= ON_THE_LINE;
     return short ? { head: `you answered ${p.to}: ${w}`, asked: (only.asked ?? '').trim(), words: '' } : { head: `you answered ${p.to}`, asked: (only.asked ?? '').trim(), words: w };
   }
-  const head = p.notes.every((n) => n.kind === 'start') ? `you asked ${p.to} for an agent on ${title}` : `you answered ${p.to} on ${title}`;
+  // a note is not an answer (designer m_20985): what he sent, the page as its ↗ link
+  const n = p.notes.length;
+  const head = p.notes.every((x) => x.kind === 'start')
+    ? `you asked ${p.to} for an agent on ↗ ${title}`
+    : n === 1
+      ? `you sent ${p.to} a note on ↗ ${title}`
+      : `you sent ${p.to} ${String(n)} notes on ↗ ${title}`;
   return {
     head,
     asked: '',
