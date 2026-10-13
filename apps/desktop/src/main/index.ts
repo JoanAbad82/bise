@@ -9,7 +9,7 @@
 // Dock icon, userData is BISE_DESKTOP_USER_DATA or a temp folder (never his
 // Application Support), and main prints READY_LINE on stdout once the page
 // has loaded.
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -23,6 +23,7 @@ import { adoptLoginEnv } from './loginenv';
 import { appName } from './appname';
 import { onCoreEvent, sendToCore, startCore, stopCore } from './core/ipc';
 import { configOfPrefs } from './helper/config';
+import { Shots } from './helper/shot';
 import { installIpc, sendClip, sendMenu, setProjectRoots } from './ipc';
 import { installKeepIpc } from './keep';
 import { projectRoots } from './reveal';
@@ -124,8 +125,24 @@ void app.whenReady().then(() => {
   const helper = startHelper(testMode);
   // his prefs (excluded apps...) reach the helper now and on every change
   if (helper !== null) {
+    // the fn talk's still of the front window, handed to the core (helper/shot.ts)
+    const shots = new Shots({
+      helper: (c) => {
+        helper.send(c);
+      },
+      core: sendToCore,
+      drop: (p) => {
+        rmSync(p, { force: true });
+      },
+      dir: join(app.getPath('userData'), 'shots'),
+    });
+    helper.on((ev) => {
+      shots.helperEv(ev);
+    });
     onCoreEvent((ev) => {
-      if (ev['ev'] === 'prefs') helper.config(configOfPrefs(ev['prefs']));
+      if (ev['ev'] !== 'prefs') return;
+      helper.config(configOfPrefs(ev['prefs']));
+      shots.prefsChanged(ev['prefs']);
     });
   }
   // his project folders: where quickLook / showInFinder may look (reveal.ts)

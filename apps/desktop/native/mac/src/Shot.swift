@@ -5,6 +5,7 @@
 // says so.
 
 import AppKit
+import Carbon.HIToolbox
 import ScreenCaptureKit
 import CoreGraphics
 import ImageIO
@@ -24,10 +25,14 @@ struct ShotResult {
 enum Shot {
     static var allowed: Bool { CGPreflightScreenCaptureAccess() }
 
-    // the front app's frontmost normal window, from the window list (front to back)
-    private static func frontWindow() -> (app: NSRunningApplication, id: CGWindowID, bounds: CGRect, name: String)? {
+    // the long side of a shot, in pixels (designer m_21901)
+    static let longSide: CGFloat = 1600
+
+    // the front app's frontmost normal window, from the window list (front to back); never bise's
+    // own: the helper, and Electron's main (its parent), which owns every bise window
+    private static func frontWindow() -> (app: NSRunningApplication, id: CGWindowID, bounds: CGRect, name: String, shareable: Bool)? {
         guard let app = NSWorkspace.shared.frontmostApplication,
-              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              app.processIdentifier != getpid(), app.processIdentifier != getppid(),
               let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
         else { return nil }
         for w in list {
@@ -38,7 +43,9 @@ enum Shot {
                   let bd = w[kCGWindowBounds as String] as? NSDictionary,
                   let b = CGRect(dictionaryRepresentation: bd), b.width >= 60, b.height >= 40
             else { continue }
-            return (app, id, b, w[kCGWindowName as String] as? String ?? "")
+            // kCGWindowSharingNone: its app marks it not shareable (NSWindow.sharingType = .none)
+            let sharing = (w[kCGWindowSharingState as String] as? NSNumber)?.uint32Value ?? CGWindowSharingType.readOnly.rawValue
+            return (app, id, b, w[kCGWindowName as String] as? String ?? "", sharing != CGWindowSharingType.none.rawValue)
         }
         return nil
     }
@@ -48,6 +55,11 @@ enum Shot {
         guard let front = frontWindow() else { return nil }
         let appName = front.app.localizedName ?? front.app.bundleIdentifier ?? "?"
         guard allowed else { return nil }
+        // a password field has the keys (secure input on), or the window says not shareable:
+        // nothing is captured, nothing said (designer m_21901)
+        if IsSecureEventInputEnabled() || !front.shareable {
+            return ShotResult(app: appName, title: "", skipped: true, path: nil, bounds: front.bounds)
+        }
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
             guard let win = content.windows.first(where: { $0.windowID == front.id }) else { return nil }
@@ -57,10 +69,10 @@ enum Shot {
             }
             let filter = SCContentFilter(desktopIndependentWindow: win)
             let conf = SCStreamConfiguration()
-            // the window at its pixel size, the long side at most 2000 px
+            // the window at its pixel size, the long side at most longSide
             let scale = CGFloat(filter.pointPixelScale)
             var w = win.frame.width * scale, h = win.frame.height * scale
-            let k = min(1, 2000 / max(w, h))
+            let k = min(1, longSide / max(w, h))
             w *= k; h *= k
             conf.width = Int(w.rounded())
             conf.height = Int(h.rounded())
