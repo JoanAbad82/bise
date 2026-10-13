@@ -4,7 +4,8 @@
 // agent, a land, a wake and a scheduled run in a row, 12 min of silence, another answer. Passes when,
 // at 1400 / 1100 / 800, light and dark:
 //   H1  the quiet rows touch (4 px), their run sits 12 px under the prose;
-//   H2  no name line over the tool row: the turn's head is on its first text row, one per run;
+//   H2  one head per run, on its first row, a tool row too (designer m_21404 (3): a run never
+//       shows rows before its author), 4 px over that row;
 //   H3  the scheduled row is one line, '▸' at its end when it has words;
 //   H6  the reply's h2 is 15 px 600 (body size), never bigger than the head;
 //   H11 the new agent is its own quiet row '✚ new agent docs-line · add a notes line';
@@ -68,21 +69,22 @@ for (const theme of ['light', 'dark']) {
         await page.setViewportSize({ width: w, height: 900 });
         await page.waitForTimeout(250);
         await page.mouse.move(1, 400);
-        // H2: no name line over the tool row; the turn's head is on its first text row
-        await expect(page.locator('[data-testid="thread.entry.2"] .b-who')).toHaveCount(0);
-        await expect(page.locator('[data-testid="thread.entry.3"] .b-who:not(.b-hover)')).toHaveCount(1);
+        // H2 (designer m_21404 (3)): the run's head sits over its first row, the tool row; none on
+        // the answer under it (same run)
+        await expect(page.locator('[data-testid="thread.entry.2"] .b-who:not(.b-hover)')).toHaveCount(1);
+        await expect(page.locator('[data-testid="thread.entry.3"] .b-who:not(.b-hover)')).toHaveCount(0);
         // a project's main is named bise (the user's decision)
-        await expect(page.locator('[data-testid="thread.entry.3"] .b-who b')).toHaveText('bise');
+        await expect(page.locator('[data-testid="thread.entry.2"] .b-who b')).toHaveText('bise');
         // H12: its time hidden at rest
-        await expect(page.locator('[data-testid="thread.entry.3"] .b-who .b-time')).toHaveCSS('opacity', '0');
-        // designer m_19912 (1): the head to its reply's first block (a heading here) is 4 px
+        await expect(page.locator('[data-testid="thread.entry.2"] .b-who .b-time')).toHaveCSS('opacity', '0');
+        // the head to its run's first row (the tool row here) is 4 px
         const headGap = await page.evaluate(() => {
-          const who = document.querySelector('[data-testid="thread.entry.3"] .b-who:not(.b-hover)')?.getBoundingClientRect();
-          const h = document.querySelector('[data-testid="thread.entry.3"] h2')?.getBoundingClientRect();
-          return who && h ? Math.round(h.top - who.bottom) : -1;
+          const who = document.querySelector('[data-testid="thread.entry.2"] .b-who:not(.b-hover)')?.getBoundingClientRect();
+          const t = document.querySelector('[data-testid="thread.entry.2"] .th-tools')?.getBoundingClientRect();
+          return who && t ? Math.round(t.top - who.bottom) : -1;
         });
-        expect(headGap, `the head to the heading under it: 4 px (${String(headGap)})`).toBeGreaterThanOrEqual(2);
-        expect(headGap, `the head to the heading under it: 4 px (${String(headGap)})`).toBeLessThanOrEqual(6);
+        expect(headGap, `the head to the row under it: 4 px (${String(headGap)})`).toBeGreaterThanOrEqual(2);
+        expect(headGap, `the head to the row under it: 4 px (${String(headGap)})`).toBeLessThanOrEqual(6);
         // H6: the h2 at body size, 600
         const h2 = await page.locator('[data-testid="thread.entry.3"] h2').evaluate((el) => ({ size: getComputedStyle(el).fontSize, weight: getComputedStyle(el).fontWeight }));
         expect(h2, 'H6: the heading at body size').toEqual({ size: '15px', weight: '600' });
@@ -130,9 +132,10 @@ for (const theme of ['light', 'dark']) {
       // H12: the time shows on hover, right-aligned, taking no room
       await page.setViewportSize({ width: 1400, height: 900 });
       await page.waitForTimeout(250);
-      const msg = page.locator('[data-testid="thread.entry.3"] .b-msg');
+      // (the run's head is over its first row, the tool row: m_21404 (3))
+      const msg = page.locator('[data-testid="thread.entry.2"] .b-msg');
       await msg.hover();
-      const time = page.locator('[data-testid="thread.entry.3"] .b-who .b-time');
+      const time = page.locator('[data-testid="thread.entry.2"] .b-who .b-time');
       await expect(time).toHaveCSS('opacity', '1');
       const [tb, mb] = await Promise.all([time.boundingBox(), msg.boundingBox()]);
       expect(Math.abs((tb?.x ?? 0) + (tb?.width ?? 0) - ((mb?.x ?? 0) + (mb?.width ?? 0))), 'right-aligned').toBeLessThanOrEqual(1);

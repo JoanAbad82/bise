@@ -313,18 +313,20 @@ describe("an edit's line counts on its tool line (designer m_12065, hub-rows Too
 describe('namedRows (tui-parity H2, designer m_19832)', () => {
   const ctx = { agent: 'main', bise: false };
   const mk = (pos: number, kind: string, min: number) => ({ pos, kind, text: 'x', at_ms: 1_000_000_000_000 + min * 60_000 }) as unknown as Entry;
-  it('one head per author run, never on a tool row; a turn opening on tools names its first text row', () => {
+  it('one head per author run, on its first row, a tool row too (designer m_21404 (3))', () => {
     const list = [mk(1, 'you', 0), mk(2, 'tools', 1), mk(3, 'agent', 1), mk(4, 'agent', 2), mk(5, 'you', 3), mk(6, 'tools', 3), mk(7, 'landed', 4), mk(8, 'agent', 4), mk(9, 'agent', 12)];
     const m = new Map(list.map((e) => [e.pos, e]));
     const { named, carry } = namedRows([...m.keys()], (p) => m.get(p), ctx);
-    // 1 his, 3 (after tools), 5 his; 6 a tools-only turn closed by a land: none; 8 after the land; 9 after 8 min
-    expect([...named]).toEqual([1, 3, 5, 8, 9]);
+    // 1 his, 2 the run's first row (tools), 5 his, 6 a tools-only turn's own head; 8 after the land; 9 after 8 min
+    expect([...named]).toEqual([1, 2, 5, 6, 8, 9]);
     expect(carry).toBe(false);
   });
-  it('a turn of work still open owes its head to the live row', () => {
+  it('a turn of work still open has its head already: the live row owes none', () => {
     const list = [mk(1, 'you', 0), mk(2, 'tools', 1)];
     const m = new Map(list.map((e) => [e.pos, e]));
-    expect(namedRows([1, 2], (p) => m.get(p), ctx).carry).toBe(true);
+    const r = namedRows([1, 2], (p) => m.get(p), ctx);
+    expect([...r.named]).toEqual([1, 2]);
+    expect(r.carry).toBe(false);
   });
 });
 

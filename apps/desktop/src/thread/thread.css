@@ -2,6 +2,12 @@
    markdown inside desktop-ds's .b-text. Type sizes and colors are the ds
    tokens (src/ds/tokens.css); the body stays at the ds's reading size
    (bar ⛔4: never under 13 pt). */
+/* each thread row ends with its own 2 px, half the tight gap: two quiet rows' halves meet at
+   --gap-tight, and the gaps between rows (data-gap) are the token less this end */
+.th-list,
+.th-screen {
+  --th-row-end: calc(var(--s-1) / 2);
+}
 .th-list {
   position: relative;
   display: flex;
@@ -26,9 +32,9 @@
 .th-to-end {
   position: absolute;
   left: 50%;
-  bottom: 10px;
+  bottom: var(--s-3);
   transform: translateX(-50%);
-  padding: 4px 12px;
+  padding: var(--s-1) var(--pad-control-x);
   border: 1px solid var(--c-line);
   border-radius: 999px;
   background: var(--c-window, var(--paper));
@@ -50,12 +56,12 @@
 .th-md ul,
 .th-md ol,
 .th-md blockquote {
-  margin: 0 0 0.8em;
+  margin: 0 0 var(--gap-block);
 }
 
 .th-md ul,
 .th-md ol {
-  padding-left: 1.4em;
+  padding-left: var(--s-5);
 }
 
 /* the markdown's colors are the ds's (src/ds/css/md.css, the TUI's): only layout here */
@@ -65,14 +71,14 @@
 
 /* a code block: its language and copy on top (copy shows on hover) */
 .th-code {
-  margin: 0 0 0.6em;
+  margin: 0 0 var(--gap-block);
 }
 
 .th-code-head {
   display: flex;
   justify-content: space-between;
   min-height: 18px;
-  padding: 0 4px;
+  padding: 0 var(--s-1);
   color: var(--c-text-2);
   font-size: 11px;
 }
@@ -94,7 +100,8 @@
 /* a block keeps its shape: no wrap, its own scroll, selectable for ⌘C */
 .th-pre {
   margin: 0;
-  padding: 10px 12px;
+  /* the thread's one code box (the log's too): 8·12 */
+  padding: var(--s-2) var(--s-3);
   border-radius: 8px;
   background: var(--c-sunken);
   overflow-x: auto;
@@ -109,7 +116,7 @@
 
 .th-table {
   overflow-x: auto;
-  margin: 0 0 0.6em;
+  margin: 0 0 var(--gap-block);
 }
 
 .th-table table {
@@ -118,13 +125,13 @@
 
 .th-table th,
 .th-table td {
-  padding: 3px 10px;
+  padding: var(--s-1) var(--s-3);
   border-bottom: 1px solid var(--c-line, rgba(127, 127, 127, 0.2));
   text-align: left;
 }
 
 .th-md blockquote {
-  padding-left: 10px;
+  padding-left: var(--s-3);
 }
 
 .th-img {
@@ -142,13 +149,13 @@
 /* S36: the first card's one-time hint, over the inbox strip */
 .th-hint {
   flex: 0 0 auto;
-  padding: 4px 24px;
+  padding: var(--s-1) var(--pad-column);
 }
 
 /* the demo tour's tip at the thread's top (L25: 'inside', 'end') */
 .th-tip {
   flex: 0 0 auto;
-  padding: 8px 24px 0;
+  padding: var(--s-2) var(--pad-column) 0;
 }
 
 .th-loading {
@@ -189,7 +196,7 @@
 }
 .th-first .setup-firstrun {
   max-width: var(--th-col);
-  padding: 0 24px;
+  padding: 0 var(--pad-column);
   text-align: center;
   /* lines split evenly when they wrap (designer m_13749) */
   text-wrap: balance;
@@ -205,7 +212,7 @@
   flex: 0 1 auto;
   min-height: 0;
   width: var(--th-col);
-  margin: 0 auto 8px;
+  margin: 0 auto var(--s-2);
 }
 .th-first.after .setup-firstrun {
   max-width: none;
@@ -213,9 +220,10 @@
   text-align: left;
 }
 
+/* each row ends with half the tight gap (2 px): two quiet rows' own halves meet at --gap-tight */
 .th-row {
   position: relative;
-  padding: 0 0 2px;
+  padding: 0 0 var(--th-row-end);
 }
 
 /* ambient m_11777 (a): one reading column, 720 px at most, centred, 24 px each side when
@@ -229,11 +237,14 @@
      composer, the inbox box's inside and the sidebar keep --lh-ui */
   --lh-read: 1.65;
   --lh-row: 1.5;
-  --s-thread-end: 20px;
+  --s-thread-end: var(--gap-turn);
+  /* a quiet row's lead mark column (✓ ↗ ◷ ■), one em of its text: what sits under such a row
+     (its note, its images, a schedule's words) starts after it, on the words */
+  --th-mark: 1em;
 }
 .th-screen .th-list {
   /* each row ends with its own 2 px: the list adds the rest of the 20 */
-  padding-bottom: calc(var(--s-thread-end) - 2px);
+  padding-bottom: calc(var(--s-thread-end) - var(--th-row-end));
 }
 .th-row,
 .th-day,
@@ -276,7 +287,7 @@
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  padding: 14px 0 8px;
+  padding: var(--gap-section) 0 var(--s-2);
   color: var(--c-text-3);
   font: var(--t-12) var(--font-ui);
   font-variant-numeric: tabular-nums;
@@ -342,16 +353,10 @@
   opacity: 1;
 }
 
-.th-failed-acts {
-  display: flex;
-  gap: 6px;
-  padding-left: 40px;
-}
-
 /* a folded steps pill, open: its rows as the tool lines, on the column's edge, no box (designer
    m_14269: not a filled box of bullets) */
 .th-tools .b-out {
-  margin: 2px 0 0;
+  margin: var(--th-row-end) 0 0;
   padding: 0;
   border: 0;
   background: none;
@@ -359,7 +364,8 @@
 .th-steps {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  /* the rows' own 2 px, as between the thread's rows */
+  gap: var(--th-row-end);
   /* what an open fold shows sits at +16, the thread's one indent (designer m_21012) */
   padding-left: var(--s-4);
 }
@@ -367,8 +373,9 @@
 .th-find {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: var(--gap-inline);
+  min-height: var(--h-row);
+  padding: 0 var(--pad-control-x);
   border-bottom: 1px solid var(--c-line);
 }
 
@@ -383,8 +390,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  padding-left: 40px;
+  gap: var(--gap-inline);
+  padding-left: var(--s-10);
 }
 
 .th-hold-to {
@@ -401,7 +408,7 @@
   display: flex;
   align-items: center;
   gap: var(--gap-inline);
-  padding: 10px 16px;
+  padding: var(--s-3) var(--pad-panel);
   border-top: 1px solid var(--c-line);
   color: var(--c-text-2);
 }
@@ -443,7 +450,7 @@
 /* who a question waits for (ambient m_10689): him in pink, main dim */
 .th-waits {
   display: inline-block;
-  margin-top: 4px;
+  margin-top: var(--gap-tight);
   font-size: 12px;
 }
 
@@ -462,7 +469,7 @@
   margin-left: 0;
 }
 .th-think-body {
-  margin: 4px 0 8px var(--s-4);
+  margin: var(--gap-tight) 0 var(--s-2) var(--s-4);
   color: var(--c-text-2);
   white-space: pre-wrap;
   font-size: 13px;
@@ -514,24 +521,25 @@
   color: var(--c-text-3);
 }
 .th-news-note {
-  margin: 2px 0 0 calc(1em + 8px);
+  margin: var(--gap-tight) 0 0 calc(var(--th-mark) + var(--gap-inline));
   color: var(--c-text-3);
 }
 /* R36: an answer's pasted images, the window's one image chip each, under its words */
 .th-images {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--gap-inline);
   min-width: 0;
   max-width: 100%;
-  margin: 4px 0 0 calc(1em + 8px);
+  margin: var(--gap-tight) 0 0 calc(var(--th-mark) + var(--gap-inline));
 }
 /* a chip never wider than the column (designer's R36 read): its words cut with … */
 .th-images .b-chip.image {
   min-width: 0;
   max-width: 100%;
-  height: 20px;
-  padding: 0 7px;
+  /* the part chip's 20 (designer's signed image chip; no --h- for a chip) */
+  height: var(--s-5);
+  padding: 0 var(--s-2);
   overflow: hidden;
   color: var(--c-accent);
   background: var(--c-accent-soft);
@@ -545,7 +553,7 @@
 .th-images .b-chip.image .thumb {
   width: 16px;
   height: 16px;
-  margin-right: 5px;
+  margin-right: var(--s-1);
   border-radius: 3px;
   object-fit: cover;
 }
@@ -561,13 +569,13 @@
 .th-sched {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--gap-inline);
   align-items: baseline;
   color: var(--c-text-3);
 }
 .th-sched-words {
   flex-basis: 100%;
-  margin: 2px 0 0 calc(1em + 8px);
+  margin: var(--gap-tight) 0 0 calc(var(--th-mark) + var(--gap-inline));
   color: var(--c-text-2);
   white-space: pre-wrap;
 }
@@ -588,7 +596,7 @@
 }
 /* 8 px above it, as the wake line: it never touches a cut reply's last list item (designer m_18098) */
 .th-notice.interrupted {
-  margin-top: 8px;
+  margin-top: var(--s-2);
 }
 .th-notdelivered {
   outline: none;
@@ -597,12 +605,12 @@
   color: var(--c-text-2);
 }
 .th-notdelivered-text {
-  margin: 2px 0 4px;
+  margin: var(--gap-tight) 0;
   white-space: pre-wrap;
 }
 .th-notdelivered-acts {
   display: flex;
-  gap: 8px;
+  gap: var(--gap-inline);
 }
 
 /* the agent view's head (designer's desktop-screens v6 (1), (3); amb-home): one row, 16 px sides;
@@ -614,9 +622,10 @@
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 8px 16px;
+  gap: var(--gap-inline);
+  min-height: var(--h-head);
+  /* the column's sides, as the rows under it (designer m_21404 (1)) */
+  padding: 0 var(--pad-column);
   white-space: nowrap;
   font: var(--t-13) var(--font-ui);
 }
@@ -624,13 +633,13 @@
   display: flex;
   flex: 0 1 auto;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--gap-inline);
   min-width: 0;
   overflow: hidden;
 }
 .ah-bise .ah-who {
   align-items: center;
-  gap: 6px;
+  gap: var(--gap-inline);
 }
 .ah-name {
   color: var(--c-text);
@@ -652,7 +661,7 @@
 }
 .ah-chip {
   flex: none;
-  padding: 2px 8px;
+  padding: var(--th-row-end) var(--s-2);
   border-radius: 999px;
   background: color-mix(in srgb, var(--c-text) 7%, transparent);
   color: var(--c-text-2);
@@ -706,7 +715,7 @@
   display: flex;
   flex: 0 1 auto;
   align-items: center;
-  gap: 6px;
+  gap: var(--gap-inline);
   min-width: 0;
   margin-left: auto;
 }
@@ -716,7 +725,7 @@
 }
 .ah-quiet,
 .ah-btn {
-  padding: 3px 8px;
+  padding: var(--s-1) var(--pad-control-x-sm);
   border: 0;
   border-radius: var(--r-2);
   background: none;
@@ -753,7 +762,7 @@
 .th-tools {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--th-row-end);
 }
 /* one row: a long command is cut with …, its ✓ / ✗ and its time stay at its end (tui-parity H13,
    the TUI keeps '✓ 0.7s') */
@@ -780,12 +789,12 @@
   flex: none;
 }
 .th-tool-time {
-  margin-left: 12px;
+  margin-left: var(--s-3);
   color: var(--c-text-3);
 }
 /* an edit's line counts after its file, dim like the TUI's tool row (designer m_12065: '± Hero.tsx  +18 −6') */
 .th-tool-count {
-  margin-left: 8px;
+  margin-left: var(--s-2);
   color: var(--c-text-3);
 }
 /* R11/S9: a failed call's '✗ exit 1 · 2.1 s' and its first error line in the error tone (the ✗ and
@@ -815,9 +824,9 @@
 }
 .th-tool-open {
   /* at +16 like everything an open row shows (designer m_21012); the thread's code block box
-     (.th-pre: 10/12 px, r 8) */
-  margin: 2px 0 6px var(--s-4);
-  padding: 10px 12px;
+     (.th-pre: 8·12, r 8) */
+  margin: var(--th-row-end) 0 var(--s-2) var(--s-4);
+  padding: var(--s-2) var(--s-3);
   border: 1px solid var(--c-line);
   border-radius: 8px;
   max-height: 320px;
@@ -836,23 +845,23 @@
 }
 /* under a call's output: it was cut at 4 KB, or the hub had none (amb-feed dece0fe9) */
 .th-tool-cut {
-  margin-top: 4px;
+  margin-top: var(--gap-tight);
   color: var(--c-text-3);
   font: var(--t-11) / 1.4 var(--font-mono);
 }
 .th-tool-code + .th-tool-out {
-  margin-top: 6px;
-  padding-top: 6px;
+  margin-top: var(--s-2);
+  padding-top: var(--s-2);
   border-top: 1px solid var(--c-line);
 }
 .th-art {
   display: inline-flex;
   align-items: baseline;
-  gap: 12px;
+  gap: var(--s-3);
   width: fit-content;
   max-width: 100%;
-  margin-top: 6px;
-  padding: 5px 10px;
+  margin-top: var(--s-2);
+  padding: var(--s-1) var(--s-3);
   border: 1px solid var(--c-line);
   border-radius: 9px;
   background: none;
@@ -885,7 +894,7 @@
 .th-live {
   color: var(--c-text-2);
   font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
-  padding: 6px 0 2px;
+  padding: var(--s-2) 0 var(--th-row-end);
 }
 /* the working row (designer's desktop-working page): the gust, 8 px, '<agent> is working · <action>
    · <age>', 28 px high, 20 above (the thread's end); the action cuts with … first, the rest whole */
@@ -932,7 +941,7 @@
   line-height: var(--lh-row);
 }
 .th-screen .b-tool {
-  margin-top: 8px;
+  margin-top: var(--s-2);
   line-height: var(--lh-row);
 }
 /* a quiet fold row is plain text at rest, like the thinking row; the tint only on hover or focus,
@@ -948,35 +957,35 @@
 /* between rows of one turn (rows.tsx gapOf): 8 px between two dim rows, 12 px from prose to a dim
    row or back; each row already ends with its 2 px */
 .th-row[data-gap='row'] {
-  padding-top: 6px;
+  padding-top: calc(var(--gap-rows) - var(--th-row-end));
 }
 /* two quiet rows touch: 4 px (--gap-tight, tui-parity H1, designer m_19832) */
 .th-row[data-gap='tight'] {
-  padding-top: calc(var(--gap-tight) - 2px);
+  padding-top: calc(var(--gap-tight) - var(--th-row-end));
 }
 .th-row[data-gap='switch'] {
-  padding-top: 10px;
+  padding-top: calc(var(--gap-block) - var(--th-row-end));
 }
 /* an open run's messages stack 12 px apart (--gap-block, designer m_19784 (2)) */
 .th-row[data-gap='block'] {
-  padding-top: 10px;
+  padding-top: calc(var(--gap-block) - var(--th-row-end));
 }
 /* event-wake's live line: a blank row above it, as the terminal leaves (designer m_17827 (3)) */
 .th-live.th-waiting {
-  padding-top: 16px;
+  padding-top: var(--s-4);
 }
 /* the hub's brief (designer): one dim row 'bise started gift-ui · <objective>', cut with …; open, the
    whole brief under a thin rail, dim, its markdown at reading size without big headings */
-.th-brief { padding: 2px 0; }
-.th-brief-body { margin: 6px 0 2px 3px; padding-left: 12px; border-left: 1px solid var(--c-line); color: var(--c-text-2); font-size: var(--t-14); }
+.th-brief { padding: var(--th-row-end) 0; }
+.th-brief-body { margin: var(--s-2) 0 var(--th-row-end) var(--s-1); padding-left: var(--s-3); border-left: 1px solid var(--c-line); color: var(--c-text-2); font-size: var(--t-14); }
 /* bise's note to the agent, not the conversation: its words in --c-text-2 too (the markdown's own text colour) */
 .th-brief-body, .th-brief-body .b-md { --md-text: var(--c-text-2); }
-.th-brief-body :is(h1, h2, h3, h4) { font-size: var(--t-14); font-weight: 600; margin: 8px 0 4px; }
+.th-brief-body :is(h1, h2, h3, h4) { font-size: var(--t-14); font-weight: 600; margin: var(--s-2) 0 var(--gap-tight); }
 /* the empty thread (v6 (5)): his first message, then '· checkout is starting: …' text-2 */
 .th-starting {
   color: var(--c-text-2);
   font: var(--t-13) var(--font-ui);
-  padding: 6px 0 2px;
+  padding: var(--s-2) 0 var(--th-row-end);
 }
 
 /* his words answer the docked card (designer's v6 s-wait): the label line in the accent, the way
@@ -1011,7 +1020,7 @@
   min-width: 0;
   overflow: hidden;
   margin-left: auto;
-  padding-left: 12px;
+  padding-left: var(--s-3);
   color: var(--c-text-3);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -1040,17 +1049,18 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap-inline);
   margin: auto;
-  padding: 48px 24px;
+  padding: var(--s-12) var(--pad-column);
   text-align: center;
 }
 .th-noproj-pearl .b-pearl {
   width: 28px;
-  height: 28px;
+  height: auto;
+  aspect-ratio: 1;
 }
 .th-noproj-t {
-  margin: 6px 0 0;
+  margin: var(--s-1) 0 0;
   font-size: var(--t-17, 17px);
   font-weight: 600;
   color: var(--c-text);
@@ -1063,11 +1073,11 @@
 .th-noproj-acts {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-top: 10px;
+  gap: var(--gap-section);
+  margin-top: var(--s-2);
 }
 .th-noproj-acts kbd {
-  margin-left: 6px;
+  margin-left: var(--gap-inline);
   font-family: var(--font-mono);
   font-size: 11px;
   opacity: 0.7;
@@ -1102,12 +1112,12 @@
 
 /* S29/L19 W1: it drives his computer: one line under the head, its acts at the end; W4 the still */
 .th-cu {
-  padding: 0 16px 6px;
+  padding: 0 var(--pad-panel) var(--s-2);
 }
 .th-cu-line {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--gap-block);
   min-width: 0;
   font: var(--t-13) var(--font-ui);
 }
@@ -1157,7 +1167,7 @@
 .th-cu-peek {
   display: block;
   max-width: 480px;
-  margin-top: 6px;
+  margin-top: var(--s-2);
   padding: 0;
   border: 1px solid var(--c-line, var(--c-text-3));
   border-radius: 6px;
@@ -1171,20 +1181,20 @@
   height: auto;
 }
 .th-cu-key {
-  margin-left: 4px;
+  margin-left: var(--s-1);
   color: var(--c-text-3);
   font: var(--t-12) var(--font-mono);
 }
 .th-cu-cap {
   display: block;
-  padding: 6px 10px;
+  padding: var(--s-2) var(--s-3);
   color: var(--c-text-3);
   font: var(--t-12) var(--font-ui);
   text-align: left;
 }
 .th-cu-none {
   display: block;
-  padding: 10px 14px;
+  padding: var(--pad-card);
   color: var(--c-text-3);
   font: var(--t-12) var(--font-ui);
 }
@@ -1192,8 +1202,8 @@
 /* R15: he signs in again in his browser (the TUI's key bar words) */
 .th-signin {
   display: flex;
-  gap: 16px;
-  padding: 6px 0 2px;
+  gap: var(--gap-section);
+  padding: var(--s-2) 0 var(--th-row-end);
   color: var(--c-text-2);
   font: var(--t-13) var(--font-ui);
 }
@@ -1207,8 +1217,8 @@
 /* a folded run of agent-to-agent messages (tui-parity R13): one dim line, a click opens it */
 .th-run {
   display: block;
-  margin: 2px 0 6px;
-  padding: 2px 6px;
+  margin: var(--th-row-end) 0 calc(var(--gap-rows) - var(--th-row-end));
+  padding: var(--th-row-end) var(--s-1);
   border: 0;
   border-radius: 4px;
   background: none;
@@ -1244,7 +1254,7 @@
   animation: th-in 180ms ease-out both;
 }
 .th-answer .th-wave {
-  margin-left: 0.3em;
+  margin-left: var(--s-1);
   color: var(--c-text-2);
   animation: b-pulse 0.9s ease-in-out infinite alternate;
 }
@@ -1288,7 +1298,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  padding-bottom: 4px;
+  padding-bottom: var(--gap-tight);
 }
 /* an answer's wrapper takes the whole column, so its bubble's 75% / 85% is the column's */
 .th-row[data-side='you'] > .th-approval {
@@ -1316,13 +1326,13 @@
   max-width: 75%;
 }
 .th-you-head {
-  margin: 0 2px 3px;
+  margin: 0 var(--th-row-end) var(--gap-tight);
   font: var(--t-12) var(--font-ui);
   color: var(--c-text-3);
   text-align: right;
 }
 .th-you-mark {
-  margin-right: 5px;
+  margin-right: var(--s-1);
 }
 .th-you-mark.ok {
   color: var(--c-ok, var(--c-text-2));
@@ -1331,7 +1341,8 @@
   box-sizing: border-box;
   max-width: 100%;
   min-width: 0;
-  padding: 8px 14px;
+  /* a bubble pads as a card (desktop-spacing's --pad-card: 12·16) */
+  padding: var(--pad-card);
   border: 1px solid var(--c-line);
   border-radius: 16px 16px 6px 16px;
   background: var(--c-raised);
@@ -1352,19 +1363,19 @@
 }
 /* inside: a quote first, then image chips, then his words */
 .th-bubble .b-quote {
-  margin: 0 0 6px;
+  margin: 0 0 var(--s-2);
 }
 .th-bubble .th-images {
-  margin: 6px 0 0;
+  margin: var(--s-2) 0 0;
 }
 .th-bubble .b-ctx {
-  margin-top: 6px;
+  margin-top: var(--s-2);
 }
 .th-you-words {
   white-space: pre-wrap;
 }
 .th-you-under {
-  margin: 3px 2px 0;
+  margin: var(--gap-tight) var(--th-row-end) 0;
   font: var(--t-12) var(--font-ui);
   color: var(--c-text-3);
   font-variant-numeric: tabular-nums;
@@ -1376,13 +1387,13 @@
 .th-parts {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
+  gap: var(--gap-inline);
+  margin-top: var(--s-2);
   min-width: 0;
 }
 .th-part-paste {
-  margin: 6px 0 0;
-  padding: 8px 10px;
+  margin: var(--s-2) 0 0;
+  padding: var(--s-2) var(--s-3);
   border: 1px solid var(--c-line);
   border-radius: var(--r-2);
   font: var(--t-12) / 1.5 var(--font-mono);
@@ -1416,11 +1427,11 @@
   color: var(--c-err);
 }
 .th-wake .b-fold {
-  margin-left: 12px;
+  margin-left: var(--s-3);
 }
 .th-wake-out {
-  margin: 6px 0 0 calc(1em + var(--gap-inline));
-  padding: 8px 10px;
+  margin: var(--s-2) 0 0 calc(var(--th-mark) + var(--gap-inline));
+  padding: var(--s-2) var(--s-3);
   border: 1px solid var(--c-line);
   border-radius: var(--r-2);
   font: var(--t-12) / 1.5 var(--font-mono);
@@ -1451,7 +1462,7 @@
 }
 /* a queued bubble's 'edit · drop' after its words (designer's messages-right; amb-feed 34c35175) */
 .th-queued-acts {
-  margin-left: 10px;
+  margin-left: var(--s-2);
 }
 .th-queued-act {
   padding: 0;
@@ -1477,15 +1488,15 @@
 }
 /* the hub's refusal (already delivered, no longer waiting): its words, right under the bubble */
 .th-queued-err {
-  margin-top: 2px;
+  margin-top: var(--th-row-end);
   color: var(--c-err, var(--c-accent));
   font: var(--t-12) var(--font-ui);
   text-align: right;
 }
 .th-you-under.th-hover {
   position: absolute;
-  right: calc(100% + 8px);
-  bottom: 2px;
+  right: calc(100% + var(--s-2));
+  bottom: var(--th-row-end);
   margin: 0;
   white-space: nowrap;
   opacity: 0;
@@ -1505,7 +1516,7 @@
 }
 .th-you-fail {
   display: inline-flex;
-  gap: 10px;
+  gap: var(--gap-inline);
   align-items: baseline;
 }
 .th-you-err {
@@ -1649,7 +1660,7 @@
 .th-note-head {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--gap-inline);
   min-width: 0;
 }
 /* the chip (designer's desktop-notices (b)): a 6% ink tint, r 6, 20 high, 8 px in; ✉ and → faint,
@@ -1727,7 +1738,7 @@
   margin: 0 auto;
   /* a dim row among dim rows: 8 px above it (--gap-rows, designer m_19784 (1)), the row before
      ends on its 2 px */
-  padding: 6px 0 2px;
+  padding: calc(var(--gap-rows) - var(--th-row-end)) 0 var(--th-row-end);
   border-radius: 0;
   /* a quiet row like the news under it: sans 13 text-2, mono only for the machine's own text
      (designer m_20621 (1)) */
@@ -1740,10 +1751,10 @@
 }
 /* the fold is a quiet row (H1): 4 px under another, 12 under a message or prose */
 .th-screen .th-run[data-gap='tight'] {
-  padding-top: calc(var(--gap-tight) - 2px);
+  padding-top: calc(var(--gap-tight) - var(--th-row-end));
 }
 .th-screen .th-run[data-gap='switch'] {
-  padding-top: calc(var(--gap-block) - 2px);
+  padding-top: calc(var(--gap-block) - var(--th-row-end));
 }
 /* H12 (designer m_19832): no time on a head or under a bubble; on hover, right-aligned and dim,
    taking no room */
@@ -1826,7 +1837,7 @@
   color: var(--c-err);
 }
 .th-retry-tries {
-  margin: var(--gap-tight) 0 0 calc(1em + var(--gap-inline));
+  margin: var(--gap-tight) 0 0 calc(var(--th-mark) + var(--gap-inline));
   padding: 0;
   list-style: none;
   color: var(--c-text-3);

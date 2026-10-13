@@ -115,7 +115,8 @@ test('thread/wake: an agent waiting for an event says what and how long; its wak
         const b = range.getBoundingClientRect();
         return { top: b.top, bottom: b.bottom };
       };
-      // H2 (designer m_19832): no name line over a tool row any more, the turn's gap stays
+      // H2 (designer m_21404 (3)): a turn that opens on a tool row has its name line over it; the
+      // turn's gap stays under the wake line either way
       return { underWake: txt('thread.toolrow.8').top - txt('thread.wake.7').bottom, overLive: txt('thread.waiting').top - txt('thread.toolrow.8').bottom };
     });
     expect(gaps.underWake, "the next turn's first row sits a turn's gap under the wake line").toBeGreaterThanOrEqual(10);

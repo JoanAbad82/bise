@@ -111,7 +111,8 @@ test('thread/parts: his message, his card answer from their typed parts, never a
       await expect(page.getByTestId('thread.you.2.image.1')).toHaveText('image 1');
       await expect(page.getByTestId('thread.you.2.file')).toHaveText('notes.md');
       // designer m_17969: the parts in one row (paste, file, image), the artifact chip's look:
-      // a 1 px line, r 9, 6 px apart, never the accent (pink is for what waits on him)
+      // a 1 px line, r 9, --gap-inline (8) apart as every chip row since desktop-spacing (was 6),
+      // never the accent (pink is for what waits on him)
       const chips = await page.getByTestId('thread.you.2.parts').evaluate((row) =>
         Array.from(row.children).map((c) => {
           const s = getComputedStyle(c);
@@ -125,7 +126,7 @@ test('thread/parts: his message, his card answer from their typed parts, never a
         expect(c.border, `${t}: a 1 px line`).toBe('1px');
         expect(c.radius, `${t}: r 9`).toBe('9px');
       }
-      for (let i = 1; i < chips.length; i++) expect(Math.round((chips[i]?.left ?? 0) - (chips[i - 1]?.right ?? 0)), `${t}: 6 px apart`).toBe(6);
+      for (let i = 1; i < chips.length; i++) expect(Math.round((chips[i]?.left ?? 0) - (chips[i - 1]?.right ?? 0)), `${t}: 8 px apart`).toBe(8);
       const accent = await page.evaluate(() => {
         const probe = document.createElement('span');
         probe.style.color = 'var(--c-accent)';

@@ -95,7 +95,8 @@ function QuoteLine({ source, about, text, testId }: { source: string; about: str
     >
       <span className="th-you-quote-line">
         <span className="th-you-quote-text">❝ {open ? meta : (text.split('\n')[0] ?? '')}</span>
-        {!open && <span className="th-you-quote-src"> · {meta}</span>}
+        {/* a flex item drops its leading space: a no-break one keeps '30%. · bise' apart (designer m_21404 (2)) */}
+        {!open && <span className="th-you-quote-src">{`\u00a0· ${meta}`}</span>}
       </span>
       {open && <span className="th-you-quote-whole">{text}</span>}
     </Press>

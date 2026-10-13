@@ -7,7 +7,7 @@
 // rows-messages (his bubbles, sends, queued, the route hold), rows-tools (tool
 // calls, thinking), rows-cards (cards, approvals, answers, agent-to-agent),
 // rows-news (landed, PRs, artifacts, scheduled, notices, briefs, not delivered).
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import { Marker, Msg } from '@/ds';
 import type { Entry } from '@/proto';
 import { useEntry } from '@/store';
@@ -96,10 +96,10 @@ export const EntryRow = memo(function EntryRow({
   const side = sideOf(e);
   const turn = p !== undefined && day === null && sideOf(p) !== side;
   const gap = underFold ? 'row' : p === undefined || day !== null || turn || head ? undefined : gapOf(afterFold ? { kind: 'fold' } : quietPrev ? { kind: QUIET_REPORT } : p, quietMe ? { kind: QUIET_REPORT } : e);
-  // H2: the name line opens an author's run on its first row that is not work; H12: after 5 min
-  // of silence a faint '· 14:31 ·' (the TUI's), the times themselves on hover only
-  const work = TOOL_KINDS.has(e.kind);
-  const shown = !work && (named ?? (head || carry));
+  // H2: the name line opens an author's run on its first row, a tool or a thinking row too
+  // (designer m_21404 (3)); H12: after 5 min of silence a faint '· 14:31 ·' (the TUI's), the
+  // times themselves on hover only
+  const shown = named ?? (head || carry);
   const pause = day === null && pauseOf(p, e);
   const n = next === undefined ? undefined : afterIt;
   return (
@@ -161,7 +161,11 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
   if (answeredCard !== null) return <CardAnsweredRow pos={e.pos} a={answeredCard} at={e.at_ms} timeAlways={lastOfRun(e, next)} />;
   switch (e.kind) {
     case 'tools':
-      return <ToolsRow e={e} ctx={ctx} />;
+      return (
+        <WorkHead e={e} ctx={ctx} head={head}>
+          <ToolsRow e={e} ctx={ctx} />
+        </WorkHead>
+      );
     case 'card':
       return <CardRow e={e} ctx={ctx} />;
     case 'page':
@@ -204,7 +208,11 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
       // nothing thought under 1 s shows nothing (ambient m_11777, the TUI's)
       // (the hub's own head words 'thought for 0.0s' too)
       if (thoughtNothing(e)) return null;
-      return <ThinkingLine pos={e.pos} head={e.text === '' ? thoughtFor(e.thinking?.ms ?? 0) : e.text} body={e.thinking?.text ?? ''} />;
+      return (
+        <WorkHead e={e} ctx={ctx} head={head}>
+          <ThinkingLine pos={e.pos} head={e.text === '' ? thoughtFor(e.thinking?.ms ?? 0) : e.text} body={e.thinking?.text ?? ''} />
+        </WorkHead>
+      );
     case 'compacting':
       return (
         <div className="th-compact" data-testid={`thread.compacting.${e.pos}`}>
@@ -275,6 +283,18 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
       return <AgentMsg e={e} ctx={ctx} who={who} head={head} live={live} still={still} />;
     }
   }
+}
+
+/** A run that opens on its work (a tool or a thinking row): its author's name line above that first
+ *  row, as over a message (designer m_21404 (3)); with no head, the row alone. */
+function WorkHead({ e, ctx, head, children }: { e: Entry; ctx: RowCtx; head: boolean; children: ReactNode }) {
+  if (!head) return children;
+  const who = whoOf(e, ctx);
+  return (
+    <Msg from={who.from} name={who.name} indent={who.indent} time={clock(e.at_ms)} head>
+      {children}
+    </Msg>
+  );
 }
 
 /** An agent's message; while voice mode says it aloud (designer's voice-window page (1)): the

@@ -151,10 +151,11 @@ export function groupHead(prev: Entry | undefined, e: Entry, ctx: { agent: strin
 
 /**
  * The rows whose name line shows (tui-parity H2, designer m_19832): one head per run of the same
- * author, opened by a new author, his message or 5 min of silence; never on a tool or a thinking
- * row: a turn that opens on its work gets its head on its first row that is not work, a turn of
- * work only gets none. `carry`: the last turn opened on its work and still owes its head (the live
- * row takes it). News and plumbing rows draw no name and close a run. Pure.
+ * author, opened by a new author, his message or 5 min of silence; on the run's first row, a tool or
+ * a thinking row too (designer m_21404 (3): a run never shows rows before its author; this replaces
+ * m_19832's 'first row that is not work'). `carry`: kept for the live row's API, now always false
+ * at the end (no run owes its head any more). News and plumbing rows draw no name and close a run.
+ * Pure.
  */
 export function namedRows(
   order: readonly number[],
@@ -164,22 +165,13 @@ export function namedRows(
 ): { named: Set<number>; carry: boolean } {
   const named = new Set<number>();
   let prev: Entry | undefined;
-  let carry = false;
   for (const pos of order) {
     const e = entry(pos);
     if (e === undefined) continue;
-    const opens = groupHead(prev, e, ctx, tz);
-    if (e.kind === 'tools' || e.kind === 'thinking') {
-      if (opens) carry = true;
-    } else if (NAMELESS_KINDS.has(e.kind)) {
-      carry = false;
-    } else if (opens || carry) {
-      named.add(pos);
-      carry = false;
-    }
+    if (!NAMELESS_KINDS.has(e.kind) && groupHead(prev, e, ctx, tz)) named.add(pos);
     prev = e;
   }
-  return { named, carry };
+  return { named, carry: false };
 }
 
 const CONTEXT_BLOCK = /\n*<screen_context\b[^>]*>[\s\S]*?<\/screen_context>\s*/g;
