@@ -16,10 +16,10 @@ python3 -u tests/tui_file_chips_tmux.py
 import base64
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
+import wait  # noqa: E402
 from tui_tmux import tui_session, run, tmux, wait_until, MAIN_IDLE  # noqa: E402
 from tui_composer_tmux import composer  # noqa: E402
 
@@ -128,8 +128,10 @@ def main():
         t.wait("⌥ click show in Finder")
         click(t, x, y)
         wait_until(lambda: ("preview " + paths["deck.pptx"]) in recorded(rec), 10, lambda: "no preview: %r" % recorded(rec))
-        # past the double-click's time (a second click there selects a word)
-        time.sleep(0.8)
+        # past the double-click's time (a second click there selects a word):
+        # that one click previewed once, and nothing more comes of it
+        once = recorded(rec)
+        wait.holds(lambda: recorded(rec) == once, 0.8, lambda: "a second open after one click: %r" % recorded(rec))
         click(t, x, y, alt=True)
         wait_until(lambda: ("reveal " + paths["deck.pptx"]) in recorded(rec), 10, lambda: "no reveal: %r" % recorded(rec))
         # the image's chip previews too (Benjamin's ask)
