@@ -41,6 +41,32 @@ hispids() { { pidsunder "$HIS/Contents/"; pidsunder "$HISR/Contents/"; } | sort 
 ours() { pidsunder "$A/Contents/" | sort -nu; }
 mainpid() { ps -axo pid=,command= | awk -v m="$MAIN" '{ pid = $1; sub(/^ *[0-9]+ /, ""); if ($0 == m || index($0, m " ") == 1) { print pid; exit } }'; }
 killpids() { for p in "$@"; do kill -"${SIG:-TERM}" "$p" 2>/dev/null; done; }
+# hubs outside the app (amb-mac e043678b, ambient-lead m_21810 (a)): every hub, REPL and plugin bridge
+# the candidate starts runs from <prefix>/versions/<id>/bise, never from inside the bundle; only its
+# main, its Electron helpers and ambient-core do. After the app quits: nothing from the bundle, its
+# hubs live on. Read only (ps); one step per check in $O/hubs-steps.jsonl, hubs-outside.json at the end.
+hubstep() { jq -cn --arg n "$1" --argjson ok "$2" --arg i "$3" '{name: $n, ok: $ok, info: $i}' >> $O/hubs-steps.jsonl; }
+psall() { ps -axww -o pid=,command= | awk -v p="$1" 'index($0, p) && index($0, "awk -v p") == 0' | cut -c1-400; }
+hubsnow() { # <when>: while the app runs
+  local b other hubs bad good repls
+  b=$(psall "$A/Contents/")
+  other=$(echo "$b" | grep -v '^$' | grep -vF "$A/Contents/MacOS/" | grep -vF "$A/Contents/Frameworks/" | grep -vF " ambient-core")
+  hubs=$(psall "$G/w" | grep -F ' sbd --workspace ')
+  bad=$(echo "$hubs" | grep -F "$A/Contents/")
+  good=$(echo "$hubs" | grep -F '/versions/' | grep -vF "$A/Contents/")
+  repls=$(ps -axww -o pid=,command= | grep -F 'repl-live' | grep -v grep | cut -c1-300)
+  { echo "== $1 $(date +%T)"; echo "-- from the bundle:"; echo "$b"; echo "-- world hubs:"; echo "$hubs"; echo "-- repl-live:"; echo "$repls"; } >> $O/hubs-outside.txt
+  hubstep "$1: only main, its helpers and ambient-core run from the bundle (no hub, REPL or plugin bridge)" "$([ -z "$other" ] && echo true || echo false)" "$(echo "$b" | grep -vc '^$') from the bundle; others: ${other:-none}"
+  hubstep "$1: the candidate's hubs run from versions/<id>/bise (at least one, none from the bundle)" "$([ -z "$bad" ] && [ -n "$good" ] && echo true || echo false)" "from versions: $(echo "$good" | grep -vc '^$'); from the bundle: $(echo "$bad" | grep -vc '^$'); exes: $(echo "$hubs" | sed -n 's/^ *[0-9]* \(.*\) sbd --workspace .*/\1/p' | sort | uniq -c | tr '
+' ';')"
+  hubstep "$1: no repl-live from the bundle" "$(echo "$repls" | grep -qF "$A/Contents/" && echo false || echo true)" "$(echo "$repls" | grep -vc '^$') repl-live in all; from the bundle: $(echo "$repls" | grep -cF "$A/Contents/")"
+}
+hubsafter() { # <when>: the app's processes just ended, the world's not yet stopped
+  local b hubs
+  b=$(psall "$A/Contents/"); hubs=$(psall "$G/w" | grep -F ' sbd --workspace ' | grep -F '/versions/')
+  { echo "== $1 after quit $(date +%T)"; echo "-- from the bundle:"; echo "$b"; echo "-- world hubs from versions:"; echo "$hubs"; } >> $O/hubs-outside.txt
+  hubstep "$1: after the app quit, 0 processes from the bundle while its hubs live on" "$([ -z "$b" ] && [ -n "$hubs" ] && echo true || echo false)" "from the bundle: $(echo "$b" | grep -vc '^$'); its hubs alive: $(echo "$hubs" | grep -vc '^$')"
+}
 # stop: SIGTERM to the candidate's main process (Electron: app.quit -> will-quit, as an Apple Event
 # quit), wait for every process under its path to go, then SIGTERM, then SIGKILL what stays; then the
 # world's own processes (its hubs), by pid
@@ -48,6 +74,8 @@ stopcand() {
   local m; m=$(mainpid)
   [ -n "$m" ] && kill -TERM "$m" 2>/dev/null
   for i in $(seq 60); do [ -z "$(ours)" ] && break; sleep 0.5; done
+  # (a): the app is gone, its hubs not yet stopped
+  [ -z "$(ours)" ] && hubsafter "stop ${STOPN:=0}" && STOPN=$((STOPN + 1))
   killpids $(ours); sleep 2; SIG=KILL killpids $(ours)
   local w; w=$(pidsunder "$G/w")
   [ -n "$w" ] && killpids $w; sleep 1
@@ -111,7 +139,7 @@ libgate() {
 # the candidate's userData in the world (userdata.ts standInPaths: HOME is the world's): window-frame.json
 drive() { AS_HE_DOES_USERDATA="$H/Library/Application Support/$(basename "$A" .app)" AS_HE_DOES_TAG=${TAG:-} node $HERE/driver.mjs $PORT_CDP $O "$@" > $O/driver-$1${TAG:+-$TAG}.log 2>&1; tail -4 $O/driver-$1${TAG:+-$TAG}.log; breach; }
 
-rm -f $O/BREACH $O/stop $O/pids.txt
+rm -f $O/BREACH $O/stop $O/pids.txt $O/hubs-steps.jsonl $O/hubs-outside.txt
 say "his app before: $(hispids)" | tee $O/his.txt
 $RS libsnap --out $O/before.json
 $RS build | tail -8
@@ -149,6 +177,7 @@ say "launch first"; opencand; breach; libgate first-open
 drive first
 drive cut
 drive rows2
+hubsnow "after rows2"
 for c in pause atonce; do
   TAG=$c drive draft-type "draft kept across a restart ($c)"
   [ $c = pause ] && sleep 5
@@ -189,5 +218,6 @@ if [ -e "$CANDPREF" ] && [ "$(plutil -p "$CANDPREF" 2>/dev/null | tr -d '[:space
 fi
 grep 'cand prefs:' $O/run.out 2>/dev/null >> $O/cand-prefs.txt
 libgate final
+[ -s $O/hubs-steps.jsonl ] && jq -s '{mode: "hubs-outside", steps: .}' $O/hubs-steps.jsonl > $O/hubs-outside.json
 say "his app after: $(hispids)" | tee -a $O/his.txt
 say "done"

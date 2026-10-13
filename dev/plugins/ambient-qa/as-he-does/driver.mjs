@@ -459,6 +459,12 @@ if (mode === 'rows2') {
   const carded = await until(async () => (/done: tool bash ok/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), ANSWER_MS, 1000);
   step("ai-docs' main opened a card for him (the inbox item)", !!carded, ((await text('[data-testid="app.main"]')) ?? '').slice(-300));
   await harness();
+  // (g)'s maker (ambient-lead m_21810): an agent with a long name and purpose makes an artifact from
+  // its own brief ({{bash: …}}: the fake provider runs those when the message has no [[…]] marker),
+  // dropped at the end of this pass. Its page has no quote in it (the brief is in double quotes).
+  const MAKER = 'release-ts-pattern';
+  const makerHtml = '<html><body style=margin:0;background:#2e8b57><h1>release notes</h1></body></html>';
+  await say(`[[bash: sb spawn ${MAKER} --objective "Release ts-pattern on npm: the changelog, the tag, the GitHub release notes and the docs site {{bash: printf '%s' '${makerHtml}' > rel-ts.html && sb artifact add rel-ts.html --title rel-ts-notes}}"]]`);
   // the right bar: its four sections in order; the left bar holds places only
   const panel = page.locator('[data-testid="app.panel"]').first();
   const shown = await panel.waitFor({ timeout: 10000 }).then(() => true, () => false);
@@ -599,11 +605,40 @@ if (mode === 'rows2') {
   await shot('esc-up');
   step("esc from a project's main goes up to bise", !!upToBise, ((await text('[data-testid="app.main"]')) ?? '').slice(0, 200));
   // the working row while an agent works (a slow turn), then a short thought with its words
+  // 96750f52 (ambient-lead m_21810 (b)): the working mark, the TUI's gust after 'to main' on the
+  // composer's label line; no 'is working' row in the thread (thread.live / thread.waiting are gone),
+  // and nothing in the thread moves with the gust's frames (sampled every 110 ms, its frame step)
   await harness();
-  await say('take a moment [[slow: 8]]');
-  const working = await until(async () => (/working/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), 8000, 400);
-  await shot('working-row');
-  step('the working row shows while main works', !!working, null);
+  await say('take a moment [[slow: 12]]');
+  const mark = page.locator('[data-testid="thread.mark"][data-state="working"]').first();
+  const marked = await mark.waitFor({ timeout: 10000 }).then(() => true, () => false);
+  const wk = { mark: marked };
+  if (marked) {
+    wk.label = await lbl();
+    const geo = () => page.evaluate(() => {
+      const r = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return [b.left, b.top, b.width, b.height].map(Math.round).join(','); };
+      const sc = document.querySelector('[data-testid="thread.list"] [data-virtuoso-scroller]') ?? document.querySelector('[data-testid="thread.list"]');
+      return { list: r('[data-testid="thread.list"]'), mark: r('[data-testid="thread.mark"]'), composer: r('[data-testid="composer"]'), scroll: sc ? `${Math.round(sc.scrollTop)},${sc.scrollHeight}` : null, gust: document.querySelector('[data-testid="thread.mark.gust"]')?.textContent ?? null };
+    }).catch(() => null);
+    const g = [];
+    for (let i = 0; i < 16; i++) { g.push(await geo()); await page.waitForTimeout(110); }
+    const same = (k) => new Set(g.map((x) => x?.[k] ?? null)).size === 1;
+    wk.gust_frames = new Set(g.map((x) => x?.gust ?? null)).size;
+    wk.still = { list: same('list'), scroll: same('scroll'), composer: same('composer'), mark_box: same('mark') };
+    wk.first = g[0];
+    wk.old_rows = await page.locator('[data-testid="thread.live"], [data-testid="thread.waiting"]').count();
+    wk.is_working_text = /is working/.test((await text('[data-testid="thread.list"]')) ?? '');
+    const lb = await page.locator('.b-composer .lbl:visible').first().boundingBox().catch(() => null);
+    const mb = await mark.boundingBox().catch(() => null);
+    wk.on_label_line = !!lb && !!mb && Math.abs((lb.y + lb.height / 2) - (mb.y + mb.height / 2)) <= 6;
+    await shot('working-mark');
+    await mark.hover({ timeout: 2000 }).catch(() => {});
+    wk.tip = await page.locator('[data-testid="thread.mark.tip"]').first().innerText({ timeout: 2000 }).catch(() => null);
+    await shot('working-mark-tip');
+    await page.mouse.move(1, 400);
+  }
+  step("the working mark: a gust after 'to main' while main works, no 'is working' row, the thread still under its frames",
+    marked && /to main/.test(wk.label ?? '') && wk.on_label_line && wk.old_rows === 0 && !wk.is_working_text && wk.gust_frames >= 2 && Object.values(wk.still).every(Boolean), wk);
   await until(async () => (/ack: take a moment/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), ANSWER_MS, 1000);
   await say('one quick thought [[think: weighing the proof rows]]');
   // the TUI folds a thought too (ambient-lead m_20609): the row is there, then opens to its words
@@ -644,16 +679,74 @@ if (mode === 'rows2') {
     if (lb) await page.mouse.move(lb.x + lb.width / 2, lb.y + lb.height * 0.7);
     const hs = [];
     const tops = [];
+    // 8b00ed2b (ambient-lead m_21810 (c), as thread/steady-bottom.spec): the composer, its keys line
+    // and the inbox block keep their boxes while the thread scrolls, moving and stopped
+    const bottom = () => page.evaluate(() => {
+      const at = (sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round).join(','); };
+      return { composer: at('.th-screen .b-composer') ?? at('[data-testid="composer"]'), keys: at('[data-testid="composer.keys"]'), block: at('[data-testid="inbox.block"]') };
+    }).catch(() => null);
+    const rest = await bottom();
+    const moving = [];
+    const stopped = [];
     for (const dy of [-200, -200, -200, -200, 200, 200, 800]) {
       await page.mouse.wheel(0, dy);
+      moving.push(await bottom());
       await page.waitForTimeout(150);
       hs.push(await blockH());
       tops.push(await listTop());
+      await page.waitForTimeout(250);
+      stopped.push(await bottom());
     }
     await shot('inbox-block-scrolled');
     const moved = tops.some((t) => t !== null && t !== top0);
     step('the inbox block keeps its height on scroll', h0 !== null && moved && hs.every((x) => x !== null && Math.abs(x - h0) <= 1), { height: h0, during: hs, scroll_top: [top0, ...tops], thread_scrolled: moved });
+    const key = (b) => JSON.stringify(b);
+    const off = [...moving, ...stopped].map((b, i) => (key(b) === key(rest) ? null : { at: i < moving.length ? `moving ${i}` : `stopped ${i - moving.length}`, box: b })).filter(Boolean);
+    step('steady bottom: wheel up and down on a long thread, the composer, keys line and inbox block boxes unchanged',
+      !!rest && !!rest.composer && !!rest.keys && !!rest.block && moved && off.length === 0, { rest, thread_scrolled: moved, changed: off.slice(0, 6) });
   } else step('the inbox block keeps its height on scroll', false, 'no inbox block');
+  // 82cd5263 + a6efc5cb (ambient-lead m_21810 (d), as app/cmd-hints.spec): ⌘ held alone 400 ms shows
+  // the keys where they act: bise's '0', each project's digit in place of its count, ⌘[ under ‹ (a
+  // place behind), ⌘] under › (one ahead), ⌘I on the inbox head; released, all gone. A quick ⌘: none.
+  const hintsNow = () => page.evaluate(() => {
+    const t = (s) => document.querySelector(s)?.textContent?.trim() ?? null;
+    const rows = [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')].filter((r) => /^app\.sidebar\.project\.[^.]+$/.test(r.getAttribute('data-testid')));
+    return {
+      n: document.querySelectorAll('.app-keyhint').length,
+      bise: t('[data-testid="app.sidebar.bise.hint"]'),
+      projects: rows.map((r) => ({ name: (r.textContent ?? '').trim().slice(0, 24), hint: r.querySelector('.app-keyhint')?.textContent?.trim() ?? null, count: !!r.querySelector('.app-cnt') })),
+      back: t('[data-testid="app.title.back.hint"]'), forward: t('[data-testid="app.title.forward.hint"]'), inbox: t('[data-testid="inbox.block.hint"]'),
+    };
+  }).catch(() => null);
+  const holdCmd = async (name) => {
+    await page.keyboard.down('Meta');
+    await page.waitForTimeout(700);
+    const held = await hintsNow();
+    await shot(name);
+    await page.keyboard.up('Meta');
+    await page.waitForTimeout(300);
+    return { held, released: await hintsNow() };
+  };
+  await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
+  await page.keyboard.down('Meta');
+  await page.waitForTimeout(150);
+  const quick = await hintsNow();
+  await page.keyboard.up('Meta');
+  await page.waitForTimeout(400);
+  const onBise = await holdCmd('cmd-held-bise');
+  const ph = onBise.held?.projects ?? [];
+  const digitsOk = ph.length > 0 && ph.slice(0, 9).every((p, i) => p.hint === String(i + 1) && !p.count);
+  step('hold ⌘ 400 ms on bise: digits on bise and the projects, ⌘[ on the back arrow, ⌘I on the inbox head; all gone on release',
+    !!onBise.held && quick?.n === 0 && onBise.held.bise === '0' && digitsOk && onBise.held.back === '⌘[' && onBise.held.inbox === '⌘I' && onBise.released?.n === 0,
+    { quick_cmd_hints: quick?.n ?? null, ...onBise });
+  // one place back (harness), so › has a place ahead: ⌘] under it; then ⌘] to bise again
+  await page.keyboard.press('Meta+BracketLeft');
+  await page.waitForTimeout(800);
+  const behind = await holdCmd('cmd-held-forward');
+  step('hold ⌘ after ⌘[: ⌘] on the forward arrow, gone on release', behind.held?.forward === '⌘]' && behind.released?.n === 0, behind);
+  await page.keyboard.press('Meta+BracketRight');
+  await page.waitForTimeout(800);
+  if (!(await page.locator('[data-testid="app.sidebar.bise"][aria-current]').count())) await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
   // ⌘I is the native menu's accelerator (src/main/menu.ts): CDP keys go to the page and never reach
   // the menu, so off-screen it can't be pressed. ⌃1 (the block's own key) opens the same item in place.
   await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
@@ -907,6 +1000,137 @@ if (mode === 'rows2') {
     narrowed && vw === 1100 && agents && Object.values(at1100).every((s) => !s.overflow), { width: vw, ...at1100 });
   // the tray menu is native (Electron Tray in the main process): CDP reaches the renderer only
   step('the tray menu\'s inbox rows: not reachable off-screen (native menu, no CDP)', true, 'not proven here');
+  // (e) and (f) seeds (ambient-lead m_21810): five more artifacts so ARTIFACTS passes its cap of 5,
+  // and a PR artifact whose url is 'http://': browser-only for the window (models.ts leaves: a PR,
+  // an http url) but refused by main's externalUrl (no host: new URL throws), so his browser can't open
+  await harness();
+  await say("[[bash: for i in 1 2 3 4 5; do printf 'more %s' $i > more-$i.md && sb artifact add more-$i.md --title more-$i; done; sb artifact add http:// --kind pr --title pr-proof]]");
+  const rb = page.locator('[data-testid="app.panel"]').first();
+  if (!(await rb.isVisible().catch(() => false))) await click('right bar', page.locator('[data-testid="app.title.panel"]').first());
+  const moreBtn = page.locator('[data-testid="app.right.artifacts.more"]').first();
+  const capped = await moreBtn.waitFor({ timeout: 60000 }).then(() => true, () => false);
+  // (e) 8027d979: every head that folds is a row: pointer; hovered, the rows' tint and its '▾'
+  const look = (id) => page.locator(`[data-testid="app.right.${id}.head"]`).first().evaluate((el) => {
+    const label = el.querySelector('.app-rb-label');
+    const row = el.parentElement;
+    return { cursor: getComputedStyle(el).cursor, tint: row ? getComputedStyle(row).backgroundColor : '', chevron: label ? getComputedStyle(label, '::after').content : '', shown: label ? getComputedStyle(label, '::after').visibility : '' };
+  }).catch(() => null);
+  const heads = {};
+  for (const id of ['agents', 'archived', 'artifacts', 'scheduled']) {
+    await page.mouse.move(1, 400);
+    await page.waitForTimeout(150);
+    const rest = await look(id);
+    await page.locator(`[data-testid="app.right.${id}.head"]`).first().hover({ timeout: 2000 }).catch(() => {});
+    await page.waitForTimeout(250);
+    heads[id] = { rest, hover: await look(id) };
+    if (id === 'artifacts') await shot('right-head-hover');
+  }
+  await page.mouse.move(1, 400);
+  const folding = ['archived', 'artifacts', 'scheduled'].filter((id) => heads[id].rest);
+  step('right bar: the section heads that fold show a pointer and tint on hover',
+    folding.length > 0 && folding.every((id) => heads[id].rest.cursor === 'pointer' && heads[id].hover?.tint !== heads[id].rest.tint), heads);
+  const artRows = () => page.locator('[data-testid="app.right.artifacts"] [data-testid^="app.right.artifact."]').evaluateAll((es) => es.filter((e) => !/\.leaves$/.test(e.getAttribute('data-testid'))).length).catch(() => null);
+  let ml = { capped };
+  if (capped) {
+    ml.more_text = (await moreBtn.innerText().catch(() => '')).trim();
+    ml.rows_capped = await artRows();
+    await click("'+ N more'", moreBtn);
+    const less = page.locator('[data-testid="app.right.artifacts.less"]').first();
+    ml.less_text = await less.innerText({ timeout: 3000 }).then((t) => t.trim(), () => null);
+    ml.rows_open = await artRows();
+    ml.more_gone = (await page.locator('[data-testid="app.right.artifacts.more"]').count()) === 0;
+    await shot('right-show-less');
+    await click("'show less'", less);
+    await page.waitForTimeout(300);
+    ml.rows_back = await artRows();
+    ml.more_back = (await moreBtn.innerText({ timeout: 3000 }).catch(() => '')).trim();
+    ml.head_in_view = await page.locator('[data-testid="app.right.artifacts.head"]').first().isVisible().catch(() => false);
+  }
+  step("right bar: '+ N more' -> every row and 'show less' -> back at the cap", capped && /^\+ \d+ more$/.test(ml.more_text) && ml.less_text === 'show less' && ml.more_gone && ml.rows_open > ml.rows_capped && ml.rows_back === ml.rows_capped && ml.more_back === ml.more_text, ml);
+  // (f) 1a79de8a: a PR artifact's click calls window.bise.openExternal and opens no panel. Seen
+  // from a logpoint on the preload's openExternal (CDP Debugger, a condition that logs and never
+  // pauses); the url is refused in main, so nothing reaches his browser (gate A watches anyway)
+  const prRow = page.locator('[data-testid^="app.right.artifact."][data-testid$=".pr-proof"]').first();
+  const prThere = await prRow.waitFor({ timeout: 20000 }).then(() => true, () => false);
+  const dbg = await page.context().newCDPSession(page).catch(() => null);
+  const ext = [];
+  let bp = null;
+  if (dbg && prThere) {
+    const scripts = [];
+    dbg.on('Debugger.scriptParsed', (e) => scripts.push(e));
+    dbg.on('Runtime.consoleAPICalled', (e) => { const v = e.args?.[0]?.value; if (typeof v === 'string' && v.startsWith('AHD-EXT ')) ext.push(v.slice(8)); });
+    await dbg.send('Runtime.enable').catch(() => {});
+    await dbg.send('Debugger.enable').catch(() => {});
+    await page.waitForTimeout(800);
+    for (const s of scripts) {
+      if (bp) break;
+      const src = (await dbg.send('Debugger.getScriptSource', { scriptId: s.scriptId }).catch(() => null))?.scriptSource ?? '';
+      const m = /openExternal:\s*async\s*\(?(\w+)\)?\s*=>\s*/.exec(src);
+      if (!m) continue;
+      const at = m.index + m[0].length;
+      const head = src.slice(0, at);
+      const line = head.split('\n').length - 1;
+      const col = at - (head.lastIndexOf('\n') + 1);
+      bp = await dbg.send('Debugger.setBreakpoint', {
+        location: { scriptId: s.scriptId, lineNumber: line + (s.startLine ?? 0), columnNumber: col + (line === 0 ? (s.startColumn ?? 0) : 0) },
+        condition: `console.log('AHD-EXT ' + String(${m[1]})), false`,
+      }).then((r) => ({ id: r.breakpointId, url: s.url, param: m[1] }), (e) => ({ error: String(e).slice(0, 200) }));
+    }
+  }
+  let pr = { row: prThere, logpoint: bp };
+  if (prThere) {
+    pr.leaves = await page.locator('[data-testid^="app.right.artifact."][data-testid$=".pr-proof.leaves"]').first().innerText({ timeout: 2000 }).catch(() => null);
+    const screenBefore = await page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent').catch(() => null);
+    await click('the PR artifact in the right bar', prRow);
+    await page.waitForTimeout(1500);
+    pr = { ...pr, external_calls: [...ext], panel: await page.locator('[data-testid="artifact.open"], [data-testid="artifact.page"], [data-testid="app.art"]').count(), thread_before: screenBefore,
+      thread_after: await page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent').catch(() => null) };
+    await shot('pr-artifact-click');
+  }
+  if (dbg) {
+    if (bp?.id) await dbg.send('Debugger.removeBreakpoint', { breakpointId: bp.id }).catch(() => {});
+    await dbg.send('Debugger.disable').catch(() => {});
+    await dbg.detach().catch(() => {});
+  }
+  const called = !!bp?.id && pr.external_calls?.length === 1 && pr.external_calls[0] === 'http://';
+  step('a PR artifact: a click calls openExternal (seen in the preload) and opens no panel', called && pr.panel === 0 && pr.thread_after === pr.thread_before, pr);
+  // (g) bae706f4: the maker dropped (its own artifact made), the artifact opened from the right bar,
+  // the maker's head beside it at 1100: it ends at its column, never under the panel, restore whole
+  // inside it, one line
+  const makerArt = page.locator('[data-testid^="app.right.artifact."][data-testid$=".rel-ts-notes"]').first();
+  const made = await makerArt.waitFor({ timeout: 60000 }).then(() => true, () => false);
+  await say(`[[bash: sb drop ${MAKER}]]`);
+  const dropCard = page.locator('[data-testid^="dock.opt"], [data-testid^="composer.opt"]').filter({ hasText: /yes|drop/i }).first();
+  const dropAsked = await dropCard.waitFor({ timeout: 20000 }).then(() => true, () => false);
+  if (dropAsked) await click(`answer ${MAKER}'s drop card 'yes'`, dropCard);
+  const archived = await until(async () => (/release-ts/.test((await text('[data-testid="app.right.archived"]')) ?? '') && !/release-ts/.test((await text('[data-testid="app.right.agents"]')) ?? '') ? true : null), 60000, 1000);
+  let gh = { made, drop_card: dropAsked, archived: !!archived };
+  if (made && archived) {
+    await click(`${MAKER}'s artifact from the right bar`, makerArt);
+    const open = await page.locator('[data-testid="app.art"]').first().waitFor({ timeout: 15000 }).then(() => true, () => false);
+    const vh2 = await page.evaluate(() => window.innerHeight);
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1100, height: vh2, deviceScaleFactor: 0, mobile: false }).catch(() => {});
+    await page.waitForTimeout(800);
+    await page.mouse.move(1, 400);
+    gh = { ...gh, open, ...(await page.evaluate(() => {
+      const b = (s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.x), right: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height) }; };
+      const head = document.querySelector('[data-testid="thread.head"]');
+      const restore = document.querySelector('[data-testid="thread.head.restore"]');
+      return {
+        agent: document.querySelector('[data-testid="thread.screen"]')?.getAttribute('data-agent') ?? null,
+        head: b('[data-testid="thread.head"]'), column_right: head?.parentElement ? Math.round(head.parentElement.getBoundingClientRect().right) : null,
+        art: b('[data-testid="app.art"]'), restore: b('[data-testid="thread.head.restore"]'), restore_text: restore?.textContent?.trim() ?? null,
+        restore_cut: restore ? restore.scrollWidth > restore.clientWidth : null, width: window.innerWidth,
+      };
+    })) };
+    await shot('archived-maker-head-1100');
+    await page.locator('[data-testid="thread.head"]').first().screenshot({ path: path.join(out, `${mode}${tag}-${++n}-archived-maker-head.png`), timeout: 5000 }).then(() => res.shots.push(path.join(out, `${mode}${tag}-${n}-archived-maker-head.png`)), () => {});
+    await cdp.send('Emulation.clearDeviceMetricsOverride').catch(() => {});
+    await closeArtifact();
+  }
+  const fits = !!gh.head && !!gh.restore && gh.column_right !== null && gh.head.right <= gh.column_right + 1
+    && (!gh.art || gh.art.x <= gh.head.x || gh.head.right <= gh.art.x + 1) && gh.restore.right <= gh.head.right + 1 && gh.restore_cut === false && gh.head.h === 44;
+  step("an archived maker's head beside its artifact at 1100: restore inside its column", gh.agent === MAKER && gh.width === 1100 && fits, gh);
   await harness();
 }
 
