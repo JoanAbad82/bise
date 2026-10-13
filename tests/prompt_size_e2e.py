@@ -26,9 +26,15 @@ FULL = open(os.path.join(ROOT, "prompts", "tool-desc-run-typescript.txt")).read(
 # (page 1135, taste 324, people 279, report +209, every +97) and +2184 for
 # main (the same plus follow 140), measured row by row between main
 # 28cd0f46's rendered main role and today's (rust/switchboard/src/testdata/
-# prompts), each row with its newline
+# prompts), each row with its newline. Then main's role rows that grew
+# without the budget (issue 26, architect m_23084: a later prompt-diet
+# weighs them), measured on main_role_desktop.txt at each sha: the sb every
+# rule's estimate-low words +229 (f0c1b04f) and its wake words +34
+# (f681138e), sb artifact archive|unarchive +216 (ae7fcca8), the sb wake
+# row +548 (338dd46c) and its --then | --alarm +327 (df1bacdf), sb feature
+# retire +154 (d7e20a63): +1508
 TASK_BUDGET = 27000 + 2044
-MAIN_BUDGET = 38500 + 2184
+MAIN_BUDGET = 38500 + 2184 + 229 + 34 + 216 + 548 + 327 + 154
 fails = []
 
 
