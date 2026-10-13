@@ -622,6 +622,9 @@ if (mode === 'rows2') {
       const sc = document.querySelector('[data-testid="thread.list"] [data-virtuoso-scroller]') ?? document.querySelector('[data-testid="thread.list"]');
       return { list: r('[data-testid="thread.list"]'), mark: r('[data-testid="thread.mark"]'), composer: r('[data-testid="composer"]'), scroll: sc ? `${Math.round(sc.scrollTop)},${sc.scrollHeight}` : null, gust: document.querySelector('[data-testid="thread.mark.gust"]')?.textContent ?? null };
     }).catch(() => null);
+    // 96db3e08 run: one 18 px scrollTop move right after the send (the send's bottom settle, not
+    // the gust?). Let the send settle 500 ms before sampling, so a move left is the gust's (ambient-lead m_22035)
+    await page.waitForTimeout(500);
     const g = [];
     for (let i = 0; i < 16; i++) { g.push(await geo()); await page.waitForTimeout(110); }
     const same = (k) => new Set(g.map((x) => x?.[k] ?? null)).size === 1;
