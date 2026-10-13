@@ -42,6 +42,11 @@ pub enum Answer {
 
 /// A committed step: its effects in order, whether the durable state
 /// changed (the hub saves it), the view of what the step changed.
+/// `msg`: the id of his message the step made (core.bend's `said`: an
+/// input of his makes it when it arrives, queued too), the id his
+/// you-id line carries when it is delivered (A1, architect m_21450:
+/// `turn/send`'s result hands it to the asker); none when the step made
+/// none, and from an older sb-core.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AStep {
     #[serde(with = "fx_list")]
@@ -50,6 +55,8 @@ pub struct AStep {
     pub dirty: bool,
     #[serde(default)]
     pub view: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub msg: Option<u64>,
 }
 
 /// A git answer is missing: the hub runs the query and sends the same
@@ -140,7 +147,7 @@ pub const ANSWER: Table = Table {
     name: "Answer",
     tag_key: "",
     kinds: &[
-        Kind { tag: "step", rust: "Step", bend: "AStep", fields: &[Field::new("fx", FieldKind::Jsons), Field::new("dirty", FieldKind::Bool), Field::new("view", FieldKind::Json)] },
+        Kind { tag: "step", rust: "Step", bend: "AStep", fields: &[Field::new("fx", FieldKind::Jsons), Field::new("dirty", FieldKind::Bool), Field::new("view", FieldKind::Json), Field::new("msg", FieldKind::OptNatOmit)] },
         Kind { tag: "need", rust: "Need", bend: "ANeed", fields: &[Field::new("need", FieldKind::Json)] },
         Kind { tag: "view", rust: "View", bend: "AView", fields: &[Field::new("view", FieldKind::Json)] },
         Kind { tag: "skipped", rust: "Skipped", bend: "ASkipped", fields: &[Field::new("skipped", FieldKind::Bool)] },

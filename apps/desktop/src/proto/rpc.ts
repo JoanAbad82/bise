@@ -104,3 +104,12 @@ export type CommandsList = { commands: Array<CommandRow>, };
  * notifications.
  */
 export type CommandRunResult = { notice?: string | null, };
+
+/**
+ * `turn/send`'s result (A1, architect m_21450): `msg_id` the id sb-core
+ * gave his message when it arrived (queued too), the `msg_id` of the
+ * 'you' entry it becomes, so the sender matches his pending row by id.
+ * None: no message was made (an answered card, a held route, an older
+ * hub): match by the words, as before.
+ */
+export type SendResult = { msg_id?: number | null, };

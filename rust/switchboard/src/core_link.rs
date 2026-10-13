@@ -52,6 +52,26 @@ impl Hub {
         }
     }
 
+    /// One call to sb-core. It died: restart it on the journal and run
+    /// the input again, once; dead again on it, the input is dropped
+    /// (None) and sb-core restarted once more (BISE-292).
+    pub(super) fn call(&mut self, v: &Value) -> Option<Value> {
+        let e = match self.link.call(v) {
+            Ok(out) => return Some(out),
+            Err(e) => e,
+        };
+        self.restart_core(&e.to_string());
+        match self.link.call(v) {
+            Ok(out) => Some(out),
+            Err(e) => {
+                let what = v["t"].as_str().unwrap_or("?").to_string();
+                self.restart_core(&e.to_string());
+                self.revived.push(format!("sb-core stopped twice on the same input ({}): that input was dropped", what));
+                None
+            }
+        }
+    }
+
     /// A committed step's answer: its view into the mirror, then its
     /// effects. A view that doesn't decode is logged (load_view): the
     /// effects still run, the journal's included.
@@ -59,6 +79,8 @@ impl Hub {
         if s.dirty {
             self.dirty = true;
         }
+        // his message's id, typed by sb-core (A1): the first one counts
+        self.said = self.said.or(s.msg);
         // the state after the step first: the deliveries render from it
         self.load_view(&s.view);
         for f in s.fx {

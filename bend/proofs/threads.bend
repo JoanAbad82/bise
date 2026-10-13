@@ -7,6 +7,7 @@ import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/keyed.bend as HKL
 import ../hub/gen/feed.bend as HFD
+import ../hub/said.bend as HSD
 import ./lib/hub-1.bend as PL1
 import ./lib/hub-2.bend as PL2
 import ../laws/threads.bend as Laws
@@ -353,4 +354,35 @@ def Laws.live_fast_reads_as_slow():
   {==}
 
 def Laws.live_streamed_text_is_the_reply():
+  {==}
+
+# ---- his send answered with its message's id (A1) ----
+
+# one more event before the journal keeps what the tail's said is
+def said_weak(-e: HM.Ev, +t: List<&2, HM.Ev>, s: Maybe<&2, HM.Msg>) -> Laws.SaidIn(t, s) -> Laws.SaidIn(e <> t, s):
+  match s:
+    case None{}:
+      p => Unit{}
+    case Some{m}:
+      p => Inr{p}
+
+# the head's own message (h: what HSD.his_msg says of it), or the tail's
+def said_at(-e: HM.Ev, +t: List<&2, HM.Ev>, h: Maybe<&2, HM.Msg>) -> {HSD.his_msg(e) == h : Maybe<&2, HM.Msg>} -> Laws.SaidIn(t, HSD.said(t)) -> Laws.SaidIn(e <> t, HSD.said.of(h, HSD.said(t))):
+  match h:
+    case None{}:
+      q => ih => said_weak(e, t, HSD.said(t))(ih)
+    case Some{m}:
+      q => ih => Inl{q}
+
+def Laws.said_is_his(evs):
+  match evs:
+    case Nil{}:
+      Unit{}
+    case Con{e, t}:
+      said_at(e, t, HSD.his_msg(e))({==})(Laws.said_is_his(t))
+
+def Laws.said_you_id(o, cx, name, m):
+  {==}
+
+def Laws.said_id_is_the_msg_id(m):
   {==}

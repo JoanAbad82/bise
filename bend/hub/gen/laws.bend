@@ -1435,10 +1435,15 @@ law answer_step_round:
   for fx: List<&2, J.Json>
   for dirty: Bool
   for view: J.Json
-  {LINK.AStep.of(LINK.answer_json(LINK.AStep{fx, dirty, view})) == LINK.AStep{fx, dirty, view} : LINK.Answer}
+  for msg: Maybe<&2, Nat>
+  {LINK.AStep.of(LINK.answer_json(LINK.AStep{fx, dirty, view, msg})) == LINK.AStep{fx, dirty, view, msg} : LINK.Answer}
 
-def answer_step_round(fx, dirty, view):
-  {==}
+def answer_step_round(fx, dirty, view, msg):
+  match msg:
+    case None{}:
+      {==}
+    case Some{x_msg}:
+      {==}
 
 law answer_need_round:
   for need: J.Json

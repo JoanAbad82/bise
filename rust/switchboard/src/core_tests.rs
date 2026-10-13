@@ -2921,29 +2921,6 @@ fn a_step_keeps_the_archived_agents_it_does_not_send() {
     assert_eq!(t.hub.st.agents["b"].lifecycle, Lifecycle::Active);
 }
 
-/// hot-view: a step whose view doesn't decode (a bug of sb-core's
-/// encoder) still applies its effects, the journal's included; the
-/// mirror stays as the last good view left it.
-#[test]
-fn a_step_whose_view_does_not_decode_still_applies_its_effects() {
-    use bise_proto::core::{fx as cfx, link::AStep, Fx as CoreFx};
-    let mut t = T::new();
-    let (agents, order) = (t.hub.st.agents.clone(), t.hub.st.order.clone());
-    let s = AStep {
-        fx: vec![
-            CoreFx::Journal(cfx::Journal { ev: json!({"type": "main_note", "text": "fake", "at_ms": 1}) }),
-            CoreFx::Kill(cfx::Kill { agent: "fake".into() }),
-        ],
-        dirty: true,
-        view: json!({"agents": 3, "order": "not a list"}),
-    };
-    let mut fx = Vec::new();
-    t.hub.apply_step(&mut fx, &mut t.env, None, 0, s);
-    assert!(fx.contains(&Effect::Kill { agent: "fake".into() }), "{:?}", fx);
-    assert!(fx.iter().any(|e| matches!(e, Effect::Journal(ev) if ev["text"] == "fake")), "{:?}", fx);
-    assert_eq!((&t.hub.st.agents, &t.hub.st.order), (&agents, &order), "the mirror kept");
-}
-
 /// BISE-292: sb-core dies under the hub: the next input restarts it on
 /// the journal, the state and the REPL states are back, the input runs,
 /// and main's feed says what happened. No panic.
@@ -4632,6 +4609,9 @@ fn an_agents_row_says_running_and_turns_from_one_source() {
 /// No number a client sends panics the hub (core_num.rs).
 #[path = "core_num_tests.rs"]
 mod core_num_tests;
+
+#[path = "core_step_tests.rs"]
+mod core_step_tests;
 
 /// wake-ui (architect m_17633): a watch's end is one `sb wake` line in
 /// its agent's thread, its wake's message id on it; a replay writes

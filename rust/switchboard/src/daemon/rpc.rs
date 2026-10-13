@@ -159,6 +159,9 @@ pub(super) struct Rpcs {
     wm: Watermark,
     /// the last hub-wide event of each [`SCANNED`] kind
     scanned: BTreeMap<String, HubEv>,
+    /// the running action's own result (`turn/send`'s [`rpc::SendResult`]),
+    /// set by its arm; none: `{}`
+    result: Option<Value>,
 }
 
 #[derive(Default)]
@@ -223,6 +226,12 @@ impl Shell {
         self.clients.insert(id, stream);
         self.step(Input::ClientHello { client: id });
         self.rpc_line(id, v);
+    }
+
+    /// The running action's own result, its `{}` otherwise (A1:
+    /// `turn/send` answers the id of the message sb-core made).
+    pub(super) fn rpc_set_result(&mut self, v: Value) {
+        self.rpc.result = Some(v);
     }
 
     /// An older client's hello connection (the stub): [`DOOR_OPS`] and
@@ -333,12 +342,15 @@ impl Shell {
         c.pending.push(Pending { id: rid.clone(), cmd: row.cmd, result: row.result });
         c.hold = Some(Vec::new());
         let project = self.project();
+        self.rpc.result = None;
         self.proto_run(id, row.cmd, project, cmd);
-        // done: an action's `{}` (a read answered already, a thread's
-        // answer comes later), then what was held
+        // done: an action's `{}`, or its own result (turn/send's msg_id),
+        // (a read answered already, a thread's answer comes later), then
+        // what was held
+        let result = self.rpc.result.take().unwrap_or_else(|| Value::Object(Default::default()));
         if !LATER.contains(&row.method) {
             if let Some(p) = self.rpc_pending(id, |p| p.id == rid) {
-                self.rpc_respond(id, Response::ok(p.id, Value::Object(Default::default())));
+                self.rpc_respond(id, Response::ok(p.id, result));
             }
         }
         let held = self.rpc.conns.get_mut(&id).and_then(|c| c.hold.take()).unwrap_or_default();

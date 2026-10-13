@@ -8,7 +8,7 @@ import type { AppCmd, CoreEv, DraftHubCmd, ProjectView } from './draft';
 import type { HelperCmd, HelperEv } from './helper';
 import type { HubCmd, HubEv } from './hub';
 import type { PtyCmd, PtyEv } from './pty';
-import type { CommandRunResult } from './rpc';
+import type { CommandRunResult, SendResult } from './rpc';
 
 /** rust/proto/fixtures/hub_ev.jsonl */
 export const hub_ev: readonly HubEv[] = [
@@ -379,4 +379,10 @@ export const command_run_result: readonly CommandRunResult[] = [
   {},
   {"notice":"flow: features on (/flow off: everything lands on main)"},
   {"notice":"↗ added: Q3 deck"},
+];
+
+/** rust/proto/fixtures/send_result.jsonl */
+export const send_result: readonly SendResult[] = [
+  {"msg_id":7},
+  {},
 ];

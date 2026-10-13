@@ -106,4 +106,5 @@ export const RESULTS = {
   "version/restart": "CommandRunResult",
   "project/pause": "CommandRunResult",
   "project/resume": "CommandRunResult",
+  "turn/send": "SendResult",
 } as const;

@@ -27,6 +27,9 @@ import ./core.bend as H
 
 import ./view.bend as V
 
+# his message a step made (A1: AStep.msg)
+import ./said.bend as SD
+
 # the link's requests and answers, generated from bise_proto::core
 import ./gen/link.bend as L
 
@@ -57,7 +60,8 @@ def fxs_json(xs: List<&2, X.Fx>) -> List<&2, J.Json>:
 
 # `before`: the runtime and wait marks before the step (V.changed). The
 # view carries only what the step changed: an idle tick answers a few
-# hundred bytes, whatever the history (idle-cpu)
+# hundred bytes, whatever the history (idle-cpu). `msg`: the id of his
+# message the step made (SD.said), for the asker's send result (A1)
 def answer.go(need: Maybe<&2, J.Json>, +h: H.Hub, +fx: List<&2, X.Fx>, +before: List<&2, V.Mark>) -> H.Hub & String:
   match need:
     case Some{+q}:
@@ -66,7 +70,8 @@ def answer.go(need: Maybe<&2, J.Json>, +h: H.Hub, +fx: List<&2, X.Fx>, +before: 
       (h, J.stringify(L.answer_step(fxs_json(fx), X.R.dirty(H.Hub.r(h)),
         V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), False{}, V.touched(X.journal(fx)),
           V.changed(X.journal(fx), before, X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h))),
-          X.journal(fx)))))
+          X.journal(fx)),
+        SD.said_id(SD.said(X.journal(fx))))))
 
 # the answer line of a committed step (H.commit, the law run_replays)
 def answer(+before: List<&2, V.Mark>, +o: H.Out) -> H.Hub & String:

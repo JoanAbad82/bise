@@ -141,12 +141,40 @@ def main():
         sub = r.call("thread/subscribe", {"project": project, "agent": "main"})["result"]
         check(sub["agent"] == "main" and isinstance(sub["entries"], list) and "ev" not in sub, "thread/subscribe's result: %r" % {k: sub[k] for k in sub if k != "entries"})
 
-        # an action: {} first, then what it moves, numbered
+        # his 'you' entry of `text` in the thread/entry notifications: its
+        # msg_id once it has one (the entry comes on his line, its id on
+        # the next, the you-id line: the same pos again)
+        def you_id(text):
+            got = None
+            for n in r.notes("thread/entry"):
+                stack = [n["params"]]
+                while stack:
+                    v = stack.pop()
+                    if isinstance(v, dict):
+                        if v.get("kind") == "you" and v.get("text") == text and v.get("msg_id") is not None:
+                            got = v["msg_id"]
+                        stack.extend(v.values())
+                    elif isinstance(v, list):
+                        stack.extend(v)
+            return got
+
+        # an action: its result first (turn/send: the id sb-core gave his
+        # message, A1), then what it moves, numbered
         sent = r.request("turn/send", {"project": project, "agent": "main", "text": "hello over json-rpc", "mode": "now"})
         resp = r.response(sent)
-        check(resp.get("result") == {}, "turn/send's result: %r" % resp)
+        msg_id = resp.get("result", {}).get("msg_id")
+        check(isinstance(msg_id, int) and set(resp["result"]) == {"msg_id"}, "turn/send's result: %r" % resp)
         r_wait = lambda pred, what: wait.until(pred, 90, what)  # noqa: E731
-        r_wait(lambda: any("hello over json-rpc" in json.dumps(n["params"]) for n in r.notes("thread/entry")), "his entry, live")
+        r_wait(lambda: you_id("hello over json-rpc") is not None, "his entry, live")
+        # the law on a real hub: the answered id is the id his entry carries
+        check(you_id("hello over json-rpc") == msg_id, "his entry's msg_id %r, the send answered %r" % (you_id("hello over json-rpc"), msg_id))
+        c.wait_status("main", ["idle", "done"], 120)
+        # a queued send answers its id at arrival too, a fresh one
+        qsent = r.call("turn/send", {"project": project, "agent": "main", "text": "queued over json-rpc", "mode": "queued"})
+        q_id = qsent.get("result", {}).get("msg_id")
+        check(isinstance(q_id, int) and q_id > msg_id, "a queued turn/send's result: %r" % qsent)
+        r_wait(lambda: you_id("queued over json-rpc") is not None, "his queued entry, live")
+        check(you_id("queued over json-rpc") == q_id, "his queued entry's msg_id %r, the send answered %r" % (you_id("queued over json-rpc"), q_id))
         c.wait_status("main", ["idle", "done"], 120)
         r_wait(lambda: len(r.notes("hub/agents")) >= 2, "agents moved twice (working, idle)")
         with r.lock:

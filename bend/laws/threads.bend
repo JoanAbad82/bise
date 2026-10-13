@@ -14,6 +14,7 @@ import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/keyed.bend as HKL
 import ../hub/gen/feed.bend as HFD
+import ../hub/said.bend as HSD
 
 # ---- a stopped turn is a typed fact (desktop reset, architect m_9650 D,
 # m_9693): sb-core, where the interrupt is decided, writes one 'stopped'
@@ -344,6 +345,49 @@ law unqueue_keeps_every_other_record:
 # Delivered first: the take-back leaves it delivered
 # (unqueue_leaves_a_delivered_one). So exactly one of delivered or
 # taken_back.
+
+# ---- his send answered with its message's id (A1, architect m_21450) ----
+# sb-core makes his message (m_N) when his input arrives, queued too, and
+# answers its id with the step (AStep.msg = HSD.said_id(HSD.said(journal))):
+# the window's turn/send result carries it, and the window matches his
+# pending row to the 'you' entry whose you-id line carries the same id.
+
+# m is a message of his that an event of the journal names (HSD.his_msg:
+# its EMsgSent, sent by the user)
+def HisIn(evs: List<&2, HM.Ev>, +m: HM.Msg) -> Data:
+  match evs:
+    case Nil{}:
+      Empty
+    case Con{+e, +t}:
+      Either<&2, &2, {HSD.his_msg(e) == Some{m} : Maybe<&2, HM.Msg>}, HisIn(t, m)>
+
+def SaidIn(evs: List<&2, HM.Ev>, s: Maybe<&2, HM.Msg>) -> Data:
+  match s:
+    case None{}:
+      Unit
+    case Some{+m}:
+      HisIn(evs, m)
+
+# LAW: the message a step answers (HSD.said) is one of his that the step's
+# journal sent: never another agent's, never one the step did not make.
+law said_is_his:
+  for +evs: List<&2, HM.Ev>
+  SaidIn(evs, HSD.said(evs))
+
+# LAW: his delivered message's you-id line carries that message's own id
+# (HM.Msg.id), the id HSD.said_id answered for it: the answered id is the
+# id the you-id line carries later.
+law said_you_id:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +name: String
+  for +m: HM.Msg
+  {HC.deliver.line(o, False{}, True{}, cx, name, m)
+    == HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m))), name, HM.Msg.parts(m)) : HX.Cx<o>}
+
+law said_id_is_the_msg_id:
+  for +m: HM.Msg
+  {HSD.said_id(Some{m}) == Some{HM.Msg.id(m)} : Maybe<&2, Nat>}
 
 # ---- MCP calls that fail (runtime/mcp-pure.bend) ----
 

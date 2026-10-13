@@ -117,7 +117,7 @@ def json(x: Link) -> J.Json:
 
 type Answer is Data:
   # step
-  AStep{fx: List<&2, J.Json>, dirty: Bool, view: J.Json}
+  AStep{fx: List<&2, J.Json>, dirty: Bool, view: J.Json, msg: Maybe<&2, Nat>}
   # need
   ANeed{need: J.Json}
   # view
@@ -132,7 +132,7 @@ type Answer is Data:
   ADone{}
 
 def AStep.of(+i: J.Json) -> Answer:
-  AStep{K.get_js(i, "fx"), K.get_b(i, "dirty"), K.get_j(i, "view")}
+  AStep{K.get_js(i, "fx"), K.get_b(i, "dirty"), K.get_j(i, "view"), K.opt_n(J.get(i, "msg"))}
 
 def ANeed.of(+i: J.Json) -> Answer:
   ANeed{K.get_j(i, "need")}
@@ -154,8 +154,8 @@ def ADone.of(i: J.Json) -> Answer:
 
 def answer_kvs(x: Answer) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   match x:
-    case AStep{+fx, +dirty, +view}:
-      [J.kv("fx", J.JArr{fx}), J.kv("dirty", J.JBool{dirty}), J.kv("view", view)]
+    case AStep{+fx, +dirty, +view, +msg}:
+      K.cat([[J.kv("fx", J.JArr{fx}), J.kv("dirty", J.JBool{dirty}), J.kv("view", view)], K.omit_mn("msg", msg)])
     case ANeed{+need}:
       [J.kv("need", need)]
     case AView{+view}:
@@ -172,8 +172,8 @@ def answer_kvs(x: Answer) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
 def answer_json(x: Answer) -> J.Json:
   J.obj(answer_kvs(x))
 
-def answer_step(+fx: List<&2, J.Json>, +dirty: Bool, +view: J.Json) -> J.Json:
-  answer_json(AStep{fx, dirty, view})
+def answer_step(+fx: List<&2, J.Json>, +dirty: Bool, +view: J.Json, +msg: Maybe<&2, Nat>) -> J.Json:
+  answer_json(AStep{fx, dirty, view, msg})
 
 def answer_need(+need: J.Json) -> J.Json:
   answer_json(ANeed{need})

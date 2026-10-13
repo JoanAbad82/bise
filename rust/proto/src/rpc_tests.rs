@@ -235,6 +235,18 @@ fn command_run_results_round_trip() {
     assert_eq!(serde_json::from_value::<CommandsList>(list).unwrap(), CommandsList::now());
 }
 
+/// turn/send's result (A1): its fixtures read back as themselves, and
+/// `{}` (an older hub's, a send that made no message) is no id.
+#[test]
+fn send_results_round_trip() {
+    for v in fixture("send_result.jsonl") {
+        let r: SendResult = serde_json::from_value(v.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&r).unwrap(), v);
+    }
+    assert_eq!(serde_json::from_value::<SendResult>(serde_json::json!({})).unwrap().msg_id, None);
+    assert!(OWN_RESULTS.contains(&("turn/send", "SendResult")));
+}
+
 #[test]
 fn initialize_lists_every_method_and_notification() {
     let ms = methods();

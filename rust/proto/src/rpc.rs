@@ -142,6 +142,8 @@ pub const OWN_RESULTS: &[(&str, &str)] = &[
     // cost-pause: what the pause or resume did ('paused: 2 turns stopped…')
     ("project/pause", "CommandRunResult"),
     ("project/resume", "CommandRunResult"),
+    // A1 (architect m_21450): his message's id, for his pending row
+    ("turn/send", "SendResult"),
 ];
 
 /// A command whose method answers the hub's words ([`CommandRunResult`]):
@@ -393,6 +395,18 @@ impl CommandsList {
 pub struct CommandRunResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notice: Option<String>,
+}
+
+/// `turn/send`'s result (A1, architect m_21450): `msg_id` the id sb-core
+/// gave his message when it arrived (queued too), the `msg_id` of the
+/// 'you' entry it becomes, so the sender matches his pending row by id.
+/// None: no message was made (an answered card, a held route, an older
+/// hub): match by the words, as before.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct SendResult {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub msg_id: Option<u64>,
 }
 
 // ---- initialize ----

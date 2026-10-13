@@ -473,10 +473,18 @@ impl Shell {
         // this message does; then the input handler (daemon/capsule.rs:
         // a page's answer, a step, a route or a plain input). The wire's
         // `input` op is gone (client-protocol P3b): this is its one door
+        // A1: the id sb-core gives his message comes back typed with its
+        // step (AStep.msg -> Hub::said), never read from a line; a send
+        // answers it as its result (`command/run` answers its words)
+        self.hub.said = None;
         self.stepping(id, tag, cid, |sh| {
             sh.keys_changed();
             sh.input(id, &op);
         });
+        if let Some(msg_id) = self.hub.said.take().filter(|_| tag == "send") {
+            let r = bise_proto::rpc::SendResult { msg_id: Some(msg_id) };
+            self.rpc_set_result(serde_json::to_value(r).unwrap_or_default());
+        }
     }
 
     /// `/version`, `/restart`, `/update` (a `slash` line or their own

@@ -1196,6 +1196,8 @@ pub struct Hub {
     revive: Option<Revive>,
     /// Lines for main's feed from a revival, out at the next input.
     revived: Vec<String>,
+    /// A1: his message's id from a step's answer (`msg`), for `turn/send`
+    pub said: Option<u64>,
     /// Who asked for the interrupt sb-core is deciding on (the user, an
     /// agent); none: the hub's own (`Effect::Interrupt::by`).
     interrupt_by: Option<String>,
@@ -1373,6 +1375,7 @@ impl Hub {
             core_bin,
             revive: None,
             revived: Vec::new(),
+            said: None,
             interrupt_by: None,
             models: BTreeMap::new(),
             model_trial: BTreeSet::new(),
@@ -1473,26 +1476,6 @@ impl Hub {
     /// One call to sb-core, with no revival: its death panics.
     fn raw(&mut self, v: &Value) -> Value {
         self.link.call(v).unwrap_or_else(|e| panic!("sb-core: {}", e))
-    }
-
-    /// One call to sb-core. It died: restart it on the journal and run
-    /// the input again, once; dead again on it, the input is dropped
-    /// (None) and sb-core restarted once more (BISE-292).
-    fn call(&mut self, v: &Value) -> Option<Value> {
-        let e = match self.link.call(v) {
-            Ok(out) => return Some(out),
-            Err(e) => e,
-        };
-        self.restart_core(&e.to_string());
-        match self.link.call(v) {
-            Ok(out) => Some(out),
-            Err(e) => {
-                let what = v["t"].as_str().unwrap_or("?").to_string();
-                self.restart_core(&e.to_string());
-                self.revived.push(format!("sb-core stopped twice on the same input ({}): that input was dropped", what));
-                None
-            }
-        }
     }
 
     /// A new sb-core with the durable state of the journal and the REPL
