@@ -8,7 +8,7 @@
 //     send, not the draft), replaced by the words when the last ones come.
 // The node views are plain DOM (no React portal), drawn once per node: typing never renders React.
 import { Node } from '@tiptap/core';
-import { chipLabel, type Chip } from '../message';
+import { chipLabel, fileName, type Chip } from '../message';
 
 export const Doc = Node.create({ name: 'doc', topNode: true, content: 'paragraph' });
 
@@ -47,8 +47,25 @@ export function chipDom(c: Chip): HTMLElement {
     el.append(imageChipWords(c.n));
     return el;
   }
+  if (c.kind === 'file') {
+    // file-chips (designer m_21765): the image chip's look, the file's 16 px system icon where the
+    // image has its thumbnail (▯ when there is none), and its name; '[File #2]' is the copied text
+    el.title = c.path;
+    el.append(c.icon !== undefined ? thumbImg(c.icon) : fileGlyph());
+    el.append(fileName(c.path));
+    return el;
+  }
   el.append(chipLabel(c));
   return el;
+}
+
+/** A file chip's glyph slot when the system gives no icon: ▯, 16 px (the TUI's G_FILE). */
+export function fileGlyph(): HTMLElement {
+  const span = document.createElement('span');
+  span.className = 'thumb file';
+  span.setAttribute('aria-hidden', 'true');
+  span.textContent = '▯';
+  return span;
 }
 
 /** An image chip's words on the input side: 'image 1', as his sent bubble shows it. Pure. */

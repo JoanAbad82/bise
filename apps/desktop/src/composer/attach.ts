@@ -1,7 +1,8 @@
 // What he pastes or drops that isn't words (R41: the model sees the images he pastes): an image
 // goes to bise's image store through main (window.bise.saveImage, src/main/images.ts) and its
-// absolute path rides the send's files; any other dropped or Finder-copied file goes by its own
-// path. Shared by the window's composer and the spotlight, so both attach the same way.
+// absolute path rides the send's image part; any other dropped or Finder-copied file goes by its
+// own path as a file part (file-chips). Shared by the window's composer and the spotlight, so both
+// attach the same way.
 import { isImagePath, type SavedImage } from './sources';
 
 /** window.bise when the page runs in bise's windows (unit tests have none). */
@@ -21,6 +22,13 @@ export async function saveImageFile(f: File): Promise<SavedImage | null> {
 /** A dropped or Finder-copied file's absolute path ('' when it has none: made in the page). */
 export function filePathOf(f: File): string {
   return bise()?.filePath(f) ?? '';
+}
+
+/** A file's 16 px system icon as a data URL (main's window.bise.fileIcon); null: none (▯). */
+export async function fileIconOf(path: string): Promise<string | null> {
+  const api = bise();
+  if (api?.fileIcon === undefined) return null;
+  return api.fileIcon(path);
 }
 
 /** A small thumbnail of an image as a data URL (48 px on its long side); null when it doesn't decode. */

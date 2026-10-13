@@ -58,7 +58,8 @@ import {
   type Pick,
   type Row,
 } from "../pick";
-import type { ComposerSources, PickFile } from "../sources";
+import { isDocPath, type ComposerSources, type PickFile } from "../sources";
+import { fileIconOf } from "../attach";
 import { registerGrab } from "../grab";
 import {
   argAt,
@@ -491,6 +492,26 @@ export function PmField(p: PmFieldProps): JSX.Element {
     }
     if (pick.path !== undefined && !pick.browse)
       props.current.sources.filePicked?.(pick.path); // B8/R14: the core's memory
+    // file-chips: a document (bise_proto::parts' table) becomes a file chip by its absolute
+    // path, as in the TUI; code stays its @path text
+    const root = props.current.sources.root;
+    if (pick.path !== undefined && !pick.browse && root !== undefined && isDocPath(pick.path)) {
+      const path = `${root.replace(/\/+$/u, "")}/${pick.path}`;
+      replaceBefore(word, "");
+      void fileIconOf(path).then((icon) => {
+        const now = state();
+        if (now !== null)
+          dispatch(
+            insertChip(now, {
+              kind: "file",
+              n: nextChipNumber(segmentsOf(now.doc)),
+              path,
+              ...(icon === null ? {} : { icon }),
+            }),
+          );
+      });
+      return;
+    }
     replaceBefore(word, pick.text);
   };
 

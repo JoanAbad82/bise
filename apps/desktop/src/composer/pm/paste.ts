@@ -1,5 +1,6 @@
 // The field's paste, drop and clipboard, out of PmField.tsx: images as chips (pasted, dropped on
-// the field or anywhere in the window), a long text as a chip after it lands inline (⌘Z puts it
+// the field or anywhere in the window), any other file on disk as a file chip by its path
+// (file-chips), a long text as a chip after it lands inline (⌘Z puts it
 // back inline), any other text as plain text; a copy reads chips as their labels.
 import { useEffect, useEffectEvent } from "react";
 import { closeHistory } from "@tiptap/pm/history";
@@ -11,8 +12,8 @@ import {
 import type { EditorView } from "@tiptap/pm/view";
 import type { Slice } from "@tiptap/pm/model";
 import { chipLabel, isLongPaste, nextChipNumber, type Chip } from "../message";
-import { isImagePath, type ComposerSources } from "../sources";
-import { thumbnail } from "../attach";
+import { type ComposerSources } from "../sources";
+import { fileIconOf, filePathOf, isImageFile, thumbnail } from "../attach";
 import { insertChip, insertText, nodeType, segmentsOf } from "./pmtext";
 
 /** What paste and drop need of the field: read at each use (the editor and props live in refs). */
@@ -40,27 +41,59 @@ const addChip = (c: PasteCtx, make: (n: number) => Chip): void => {
     c.dispatch(insertChip(st, make(nextChipNumber(segmentsOf(st.doc)))));
 };
 
-const addImages = (c: PasteCtx, list: readonly File[]): void => {
-  for (const f of list) {
-    void Promise.all([c.sources().saveImage(f), thumbnail(f)]).then(
-      ([img, thumb]) => {
-        if (img !== null)
-          addChip(c, (n) => ({
-            kind: "image",
-            n,
-            path: img.path,
-            name: img.name,
-            ...(thumb === null ? {} : { thumb }),
-          }));
-      },
-    );
-  }
+/** An image's chip: the image in the store, its thumbnail; null when the store refuses it. */
+const imageChip = async (
+  c: PasteCtx,
+  f: File,
+): Promise<((n: number) => Chip) | null> => {
+  const [img, thumb] = await Promise.all([
+    c.sources().saveImage(f),
+    thumbnail(f),
+  ]);
+  if (img === null) return null;
+  return (n) => ({
+    kind: "image",
+    n,
+    path: img.path,
+    name: img.name,
+    ...(thumb === null ? {} : { thumb }),
+  });
 };
 
-const droppedImages = (e: DragEvent): File[] =>
-  Array.from(e.dataTransfer?.files ?? []).filter(
-    (f) => f.type.startsWith("image/") || isImagePath(f.name),
-  );
+/** A file that isn't an image, as a file chip by its absolute path (file-chips): its system icon
+ *  when main gives one, else ▯. One with no path (made in the page) is left out. */
+const fileChip = async (f: File): Promise<((n: number) => Chip) | null> => {
+  const path = filePathOf(f);
+  if (path === "") return null;
+  const icon = await fileIconOf(path);
+  return (n) => ({
+    kind: "file",
+    n,
+    path,
+    bytes: f.size,
+    ...(icon === null ? {} : { icon }),
+  });
+};
+
+/** Files as the composer takes them, in their order (each chip where the one before it ended,
+ *  numbered in that order, one space between two: chips are words in his text, designer
+ *  m_21957): images to the store, any other file a file chip. */
+const addAll = (c: PasteCtx, list: readonly File[]): void => {
+  void (async () => {
+    let added = false;
+    for (const f of list) {
+      const make = isImageFile(f) ? await imageChip(c, f) : await fileChip(f);
+      if (make === null) continue;
+      const st = c.state();
+      if (added && st !== null) c.dispatch(insertText(st, " "));
+      addChip(c, make);
+      added = true;
+    }
+  })();
+};
+
+const droppedFiles = (e: DragEvent): File[] =>
+  Array.from(e.dataTransfer?.files ?? []);
 
 /** A long paste: inline first, then its chip in a second undo step (⌘Z puts it back inline). */
 const longPaste = (c: PasteCtx, raw: string): void => {
@@ -89,12 +122,13 @@ const longPaste = (c: PasteCtx, raw: string): void => {
 export function pasteInto(c: PasteCtx, e: ClipboardEvent): boolean {
   const data = e.clipboardData;
   if (data === null) return false;
-  const images = Array.from(data.files).filter((f) =>
-    f.type.startsWith("image/"),
+  // a pasted image, or files copied in Finder (each by its path: a file chip, an image chip)
+  const files = Array.from(data.files).filter(
+    (f) => f.type.startsWith("image/") || filePathOf(f) !== "",
   );
-  if (images.length > 0) {
+  if (files.length > 0) {
     e.preventDefault();
-    addImages(c, images);
+    addAll(c, files);
     return true;
   }
   const text = data.getData("text/plain");
@@ -111,12 +145,12 @@ export function pasteInto(c: PasteCtx, e: ClipboardEvent): boolean {
   return true;
 }
 
-/** A drop on the field: its images as chips; false (anything else): ProseMirror's own. */
+/** A drop on the field: its images and files as chips; false (no file): ProseMirror's own. */
 export function dropInto(c: PasteCtx, e: DragEvent): boolean {
-  const images = droppedImages(e);
-  if (images.length === 0) return false;
+  const files = droppedFiles(e);
+  if (files.length === 0) return false;
   e.preventDefault();
-  addImages(c, images);
+  addAll(c, files);
   return true;
 }
 
@@ -126,8 +160,8 @@ export function useDropAnywhere(c: PasteCtx): void {
   const drop = useEffectEvent((e: DragEvent): void => {
     e.preventDefault();
     if (c.view()?.dom.contains(e.target as Node) === true) return; // handleDrop has it
-    const images = droppedImages(e);
-    if (images.length > 0) addImages(c, images);
+    const files = droppedFiles(e);
+    if (files.length > 0) addAll(c, files);
   });
   useEffect(() => {
     const over = (e: DragEvent): void => {

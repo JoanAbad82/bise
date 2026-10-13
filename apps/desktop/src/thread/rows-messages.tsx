@@ -14,6 +14,7 @@ import { shownName } from '@/agents/model';
 import { saidFor, useSaidMs } from '@/voicemode';
 import type { RowCtx } from './rows';
 import { Thumb } from './rows-cards';
+import { AttachChip, FileThumb } from './AttachChip';
 import { drawnParts, youView, type YouView } from './parts';
 import { lineCount, quoteAbout } from '@/composer/message';
 /** A message of his longer than this folds to its first lines (tui-parity B11, the TUI's You(_, _, open)). */
@@ -203,26 +204,34 @@ function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos: number
             ▤ {p.n} · {lineCount(p.text)} lines
           </Chip>
         ))}
-        {view.files.map((f) => (
-          <Chip
-            key={f}
-            kind="part"
-            of="file"
-            title={f}
-            onClick={() => {
-              if (ctx.onPath !== undefined) ctx.onPath(f);
-              else void (window as Partial<Window>).bise?.openPath(f, {});
-            }}
-            testId={`${id}.file`}
-          >
-            {f.split('/').at(-1) ?? f}
-          </Chip>
-        ))}
+        {/* his images and files (file-chips): a click previews, a right-click shows it in Finder */}
         {view.images.map((img, i) => (
-          <Chip key={`${img.path}#${String(i)}`} kind="part" of="image" title={img.path} thumb={<Thumb path={img.path} />} testId={`${id}.image.${String(i + 1)}`}>
+          <AttachChip key={`${img.path}#${String(i)}`} of="image" path={img.path} missing={false} thumb={<Thumb path={img.path} />} testId={`${id}.image.${String(i + 1)}`}>
             {partImageWords(img.name, i)}
-          </Chip>
+          </AttachChip>
         ))}
+        {view.files.map((f, i) =>
+          f.name === '' ? (
+            // a file of an older files list: in his editor, as before
+            <Chip
+              key={`${f.path}#${String(i)}`}
+              kind="part"
+              of="file"
+              title={f.path}
+              onClick={() => {
+                if (ctx.onPath !== undefined) ctx.onPath(f.path);
+                else void (window as Partial<Window>).bise?.openPath(f.path, {});
+              }}
+              testId={`${id}.file`}
+            >
+              {f.path.split('/').at(-1) ?? f.path}
+            </Chip>
+          ) : (
+            <AttachChip key={`${f.path}#${String(i)}`} of="file" path={f.path} missing={f.missing} thumb={<FileThumb path={f.path} />} testId={`${id}.file.${String(i + 1)}`}>
+              {f.path.split('/').at(-1) ?? f.path}
+            </AttachChip>
+          ),
+        )}
       </div>
       {paste !== undefined && (
         <pre className="th-part-paste" data-testid={`${id}.paste.${String(paste.n)}.text`}>

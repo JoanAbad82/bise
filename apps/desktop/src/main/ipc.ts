@@ -11,7 +11,7 @@ import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
 import { menuTarget } from './menu';
 import { externalUrl } from './external';
-import { noAsks, offscreenGrants } from './offscreen';
+import { isOffscreen, noAsks, offscreenGrants } from './offscreen';
 import { imageDir, saveImage } from './images';
 import { pickedInTest } from './pick';
 import { allowedPath } from './reveal';
@@ -131,6 +131,7 @@ export function installIpc(testMode: boolean): void {
   ipcMain.handle(IPC.openPath, (_e, raw: unknown, opts: unknown): Promise<boolean> => openFile(raw, opts, testMode));
   ipcMain.handle(IPC.quickLook, (e, raw: unknown): boolean => quickLook(BrowserWindow.fromWebContents(e.sender), raw, testMode));
   ipcMain.handle(IPC.showInFinder, (_e, raw: unknown): boolean => showInFinder(raw, testMode));
+  ipcMain.handle(IPC.fileIcon, (_e, raw: unknown): Promise<string | null> => fileIcon(raw, testMode));
   // a window's full screen now (window.bise.onFullScreen's first call)
   ipcMain.handle(IPC.fullScreen, (e): boolean => BrowserWindow.fromWebContents(e.sender)?.isFullScreen() ?? false);
   ipcMain.handle(IPC.pickFolder, (e): Promise<string | null> => pickFolder(BrowserWindow.fromWebContents(e.sender), testMode));
@@ -218,6 +219,21 @@ export function showInFinder(raw: unknown, testMode: boolean): boolean {
   }
   shell.showItemInFolder(p);
   return true;
+}
+
+/** window.bise.fileIcon: the file's small system icon as a data URL; null in test mode and
+ *  off-screen (no TCC call there, amb-mac m_21862: getFileIcon reads the file), out of the fence,
+ *  or when the system has none (the chip draws its ▯ glyph). Only his own attachments ask. */
+export async function fileIcon(raw: unknown, testMode: boolean): Promise<string | null> {
+  if (testMode || isOffscreen(process.env, testMode)) return null;
+  const p = lookable(raw);
+  if (p === null) return null;
+  try {
+    const img = await app.getFileIcon(p, { size: 'small' });
+    return img.isEmpty() ? null : img.toDataURL();
+  } catch {
+    return null;
+  }
 }
 
 /**

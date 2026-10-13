@@ -25,8 +25,16 @@ export interface YouView {
   readonly pastes: readonly { readonly n: number; readonly text: string }[];
   /** his images: their label ('[Image #2]') and where he took them from (the thumbnail) */
   readonly images: readonly { readonly name: string; readonly path: string }[];
-  /** his other files (absolute paths) */
-  readonly files: readonly string[];
+  /** his files (file-chips): each by its absolute path, its chip's label ('[File #2]'; '' a file
+   *  of an older files list) and whether the hub found it gone when he sent it */
+  readonly files: readonly YouFile[];
+}
+
+/** A file he attached, as his bubble draws it (bise_proto::parts Part::File). */
+export interface YouFile {
+  readonly name: string;
+  readonly path: string;
+  readonly missing: boolean;
 }
 
 /** The bubble's view of `parts` (the TUI's view_of). Pure. */
@@ -34,7 +42,7 @@ export function youView(parts: readonly Part[]): YouView {
   const quotes: PartQuote[] = [];
   const pastes: { n: number; text: string }[] = [];
   const images: { name: string; path: string }[] = [];
-  const files: string[] = [];
+  const files: YouFile[] = [];
   let words = '';
   for (const p of parts) {
     switch (p.kind) {
@@ -52,7 +60,7 @@ export function youView(parts: readonly Part[]): YouView {
         images.push({ name: p.name, path: p.source });
         break;
       case 'file':
-        files.push(p.path);
+        files.push({ name: p.name ?? '', path: p.path, missing: p.missing === true });
         break;
       case 'page':
         // what he did on a page: its own row (pageAnswer), never the hub's template
@@ -79,6 +87,7 @@ export function partsGist(parts: readonly Part[]): string {
       const file = p.source.split('/').at(-1) ?? '';
       words += `▣ ${p.name.startsWith('[') || file === '' ? p.name : file}`;
     } else if (p.kind === 'page') words += p.notes.map((n) => pageNoteWords(n, true)).join(' · ');
+    else if (p.name !== undefined && p.name !== '') words += `▯ ${p.path.split('/').at(-1) ?? p.path}`;
     else words += ` ${p.path}`;
   }
   return [...quotes, words.split(/\s+/u).filter((w) => w !== '').join(' ')].filter((s) => s !== '').join(' ');

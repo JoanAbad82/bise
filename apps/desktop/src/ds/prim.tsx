@@ -56,17 +56,19 @@ export interface ChipProps {
   state?: "hover";
   /** a real button when set */
   onClick?: MouseEventHandler<HTMLButtonElement>;
+  /** a right-click (an attachment's 'show in Finder', file-chips) */
+  onContextMenu?: MouseEventHandler<HTMLElement>;
   testId?: string;
 }
 /** a chip: a small label; a real button when it has onClick */
-export function Chip({ children, tone, kind, thumb, of, title, expanded, state, onClick, testId }: ChipProps) {
+export function Chip({ children, tone, kind, thumb, of, title, expanded, state, onClick, onContextMenu, testId }: ChipProps) {
   const cls = cx("b-chip", tone, kind, state === "hover" && "is-hover");
   const words = thumb === undefined ? children : <>{thumb}<span className="ink">{children}</span></>;
   if (onClick === undefined) {
-    return <span className={cls} data-kind={of} title={title} data-testid={testId}>{words}</span>;
+    return <span className={cls} data-kind={of} title={title} onContextMenu={onContextMenu} data-testid={testId}>{words}</span>;
   }
   return (
-    <button type="button" className={cls} data-kind={of} title={title} aria-expanded={expanded} onClick={onClick} data-testid={testId}>
+    <button type="button" className={cls} data-kind={of} title={title} aria-expanded={expanded} onClick={onClick} onContextMenu={onContextMenu} data-testid={testId}>
       {words}
     </button>
   );

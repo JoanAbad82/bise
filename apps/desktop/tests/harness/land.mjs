@@ -21,6 +21,8 @@ export const LAND = [
   'checks/thread/esc-order.spec.ts',
   'checks/thread/first-run.spec.ts',
   'checks/composer/at-files.spec.ts',
+  // any file a chip like an image's, in place in the parts, the bubble opens it (file-chips)
+  'checks/thread/file-chips.spec.ts',
   'checks/spotlight/streaming.spec.ts',
   // the real pages server's CSP in the artifact view (ambient-lead m_20610, architect m_20628)
   'checks/artifacts/frame-csp.spec.ts',

@@ -72,6 +72,10 @@ const api: BiseApi = {
   openPath: async (path, opts) => (await ipcRenderer.invoke(IPC.openPath, path, opts)) === true,
   quickLook: async (path) => (await ipcRenderer.invoke(IPC.quickLook, path)) === true,
   showInFinder: async (path) => (await ipcRenderer.invoke(IPC.showInFinder, path)) === true,
+  fileIcon: async (path) => {
+    const u: unknown = await ipcRenderer.invoke(IPC.fileIcon, path);
+    return typeof u === 'string' ? u : null;
+  },
   saveImage: async (bytes) => {
     const p: unknown = await ipcRenderer.invoke(IPC.saveImage, bytes);
     return typeof p === 'string' ? p : null;

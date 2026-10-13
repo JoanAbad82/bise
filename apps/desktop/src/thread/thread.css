@@ -1475,6 +1475,25 @@
   margin-top: var(--s-2);
   min-width: 0;
 }
+/* file-chips (designer m_21765): a file's chip is the image's, its system icon or ▯ in the
+   thumbnail's slot; gone: '· missing', only 'missing' in the err tone, the chip stays ink */
+.th-parts .thumb.file {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--c-text-3);
+  font-size: 13px;
+  line-height: 16px;
+  flex: none;
+}
+.th-attach-sep {
+  color: var(--c-text-3);
+}
+.th-attach-missing {
+  color: var(--c-err);
+}
 .th-part-paste {
   margin: var(--s-2) 0 0;
   padding: var(--s-2) var(--s-3);

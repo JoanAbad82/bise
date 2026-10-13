@@ -26,7 +26,7 @@ describe('his message from its parts (msg-parts)', () => {
     expect(v.words).toBe('what does ▤ 1 mean? and this');
     expect(v.pastes).toEqual([{ n: 1, text: 'line 1\nline 2' }]);
     expect(v.images).toEqual([{ name: '[Image #2]', path: '/Users/me/shot.png' }]);
-    expect(v.files).toEqual(['/Users/me/notes.md']);
+    expect(v.files).toEqual([{ name: '', path: '/Users/me/notes.md', missing: false }]);
     // never a tag in what is drawn
     expect(JSON.stringify(v)).not.toMatch(/<selection|<pasted|<image/u);
   });

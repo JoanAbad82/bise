@@ -159,7 +159,8 @@ fn the_terminal_gets_only_urls_the_os_can_open() {
     assert_eq!(out("artifact:page").as_deref(), Some("http://127.0.0.1:47438/p/page"));
     assert_eq!(out("artifact:doc@v2").as_deref(), Some("file:///w/docs/q3%20plan.md"));
     // a file not here, an unknown artifact, bise's own panels: no OSC 8
-    for u in ["artifact:gone", "artifact:nope", "bise-diff:pr/412", "bise-artifacts:open"] {
+    // a file chip's `bise-file:` too: its click is bise's (open_file.rs), never the terminal's
+    for u in ["artifact:gone", "artifact:nope", "bise-diff:pr/412", "bise-artifacts:open", "bise-file:/w/docs/deck.pptx"] {
         assert_eq!(out(u), None, "{u}");
     }
 }

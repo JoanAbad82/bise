@@ -52,7 +52,7 @@ export interface SpotFile {
 
 /** A chip's words: an image as the composer's '[Image #n]', a file by its name. */
 export const spotFileLabel = (f: SpotFile): string =>
-  f.image ? `[Image #${String(f.n)}]` : f.name;
+  f.image ? `[Image #${String(f.n)}]` : `[File #${String(f.n)}]`;
 
 /** A chip's words on screen, as the sent bubble's chip (amb-win 900f998e, designer m_18136): an
  *  image reads 'image n' in ink, never its '[Image #n]' tag; a file by its name. */
@@ -95,7 +95,8 @@ export function spotAsk(
   const parts: Part[] = files.map((f) =>
     f.image
       ? { kind: "image", name: spotFileLabel(f), source: f.path }
-      : { kind: "file", path: f.path },
+      : // file-chips: a file chip by its path, in order (the hub marks it missing when gone)
+        { kind: "file", name: spotFileLabel(f), path: f.path },
   );
   if (words !== "") parts.push({ kind: "text", text: words });
   return {

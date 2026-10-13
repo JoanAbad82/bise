@@ -7,6 +7,7 @@ import TUI_EMOJI from '../../../../rust/tui/src/emoji.tsv?raw';
 import DESKTOP_EMOJI from './emoji.tsv?raw';
 import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, TIP_EVERY_MS } from './keybar';
 import { noVisionLine } from './message';
+import { isDocPath, isImagePath } from './sources';
 import { codeRuns, colorLines, proseRuns } from './mdcolor';
 import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Chip, type Segment } from './message';
 import { enqueue, load, popNewest, remember, save, takeOldest, HISTORY_MAX, type Store } from './drafts';
@@ -84,6 +85,29 @@ describe('the send', () => {
     expect(isLongPaste('x\n'.repeat(12))).toBe(true);
     expect(isLongPaste('é'.repeat(1200))).toBe(true);
     expect(lineCount('a\nb\n')).toBe(2);
+  });
+  it('file-chips: a file chip is a file part where it was, next to an image, by its absolute path', () => {
+    const seg: Segment[] = [
+      { kind: 'text', text: "ajouter l'image" },
+      { kind: 'chip', chip: { kind: 'image', n: 1, path: '/h/images/logo.png', name: 'logo.png' } },
+      { kind: 'text', text: 'dans la presentation powerpoint' },
+      { kind: 'chip', chip: { kind: 'file', n: 2, path: '/Users/me/Desktop/deck.pptx', bytes: 2_100_000 } },
+    ];
+    const out = buildMessage(seg);
+    expect(out.files).toEqual([]);
+    expect(out.parts).toEqual([
+      { kind: 'text', text: "ajouter l'image " },
+      { kind: 'image', name: '[Image #1]', source: '/h/images/logo.png' },
+      { kind: 'text', text: ' dans la presentation powerpoint ' },
+      { kind: 'file', name: '[File #2]', path: '/Users/me/Desktop/deck.pptx' },
+    ]);
+    expect(out.text).toBe("ajouter l'image [Image #1] dans la presentation powerpoint [File #2]");
+    expect(chipStrip({ kind: 'file', n: 2, path: '/Users/me/Desktop/deck.pptx', bytes: 2_100_000 })).toBe('▯ 2  deck.pptx  2.1 MB');
+  });
+  it('the one chip table (bise_proto::parts): images by extension, @ picks of documents only', () => {
+    expect(['a.png', 'b.JPG', 'c.webp'].every(isImagePath)).toBe(true);
+    expect(['q3.pdf', 'data.csv', 'plan.xlsx', 'brief.docx', 'deck.pptx'].every(isDocPath)).toBe(true);
+    expect(['src/main.rs', 'notes.md', '.pdf', 'Makefile'].some(isDocPath)).toBe(false);
   });
   it('the strip says what a chip holds', () => {
     expect(chipStrip({ kind: 'quote', n: 1, text: 'one\ntwo\nthree', from: 'main' })).toBe('❝ 1 “one two three”  bise · 3 lines');

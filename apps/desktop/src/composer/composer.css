@@ -84,6 +84,8 @@
 }
 /* an image chip is the sent bubble's (designer m_18135, signed 900f998e): 1 px line, r 9, 'image 1'
    in ink beside its 16 px thumbnail or the faint no-file glyph slot; never the accent */
+/* a file chip is the image chip's look (file-chips, designer m_21765): its system icon or ▯, its name */
+.b-composer .b-chip.file,
 .b-composer .b-chip.image {
   gap: var(--s-1);
   height: var(--s-5);
@@ -95,12 +97,21 @@
   border: 1px solid var(--c-line);
   border-radius: 9px;
 }
+.b-composer .b-chip.file .thumb,
 .b-composer .b-chip.image .thumb {
   width: 16px;
   height: 16px;
   border-radius: 3px;
   object-fit: cover;
   flex: none;
+}
+.b-composer .b-chip.file .thumb.file {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text-3);
+  font-size: 13px;
+  line-height: 16px;
 }
 .b-composer .b-chip.image .thumb.none {
   display: inline-flex;

@@ -33,8 +33,9 @@ export function Strip({
       ))}
       {/* an image has no strip line in the window: its chip and thumbnail say it (designer m_13808;
           the TUI keeps its '[Image #1] name' line, it has no thumbnail) */}
+      {/* nor a file (file-chips, designer m_21765): its chip has its icon and name, like an image's */}
       {chips
-        .filter((c) => c.kind !== "image")
+        .filter((c) => c.kind !== "image" && c.kind !== "file")
         .map((c) => (
           <div key={c.n} className="c" data-testid={`${testId}.strip.${c.n}`}>
             {chipStrip(c)}

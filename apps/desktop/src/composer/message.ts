@@ -16,6 +16,7 @@ export type Chip =
   | { readonly kind: 'image'; readonly n: number; readonly path: string; readonly name: string; readonly thumb?: string }
   | { readonly kind: 'paste'; readonly n: number; readonly text: string }
   | { readonly kind: 'quote'; readonly n: number; readonly text: string; readonly from: string; readonly at?: QuoteAt }
+  | { readonly kind: 'file'; readonly n: number; readonly path: string; readonly bytes?: number; readonly icon?: string }
   | { readonly kind: 'artifact'; readonly n: number; readonly id: string; readonly title: string; readonly url: string };
 
 /** Where in a diff a quote comes from (quote.rs Where): the file, its lines in the new file and the old one ('12-14'; '' none). */
@@ -77,9 +78,21 @@ export function chipLabel(c: Chip): string {
       return `▤ ${c.n}`;
     case 'quote':
       return `❝ ${c.n}`;
+    case 'file':
+      return `[File #${String(c.n)}]`;
     case 'artifact':
       return `↗ ${c.title}`;
   }
+}
+
+/** A path's last segment, the file chip's words: 'deck.pptx' (bise_proto::parts file_name). */
+export const fileName = (path: string): string => path.replace(/\/+$/u, '').split('/').at(-1) ?? path;
+
+/** `310 kB`, `2.1 MB`, decimal like Finder (the TUI's attach.rs size_text). */
+export function sizeText(bytes: number): string {
+  if (bytes < 1000) return `${String(bytes)} B`;
+  if (bytes < 999_500) return `${String(Math.round(bytes / 1000))} kB`;
+  return `${(Math.round(bytes / 100_000) / 10).toFixed(1)} MB`;
 }
 
 /** The start of a text on one line: newlines as spaces, at most `max` characters, `…` when cut. */
@@ -100,6 +113,8 @@ export function chipStrip(c: Chip): string {
     }
     case 'quote':
       return `${chipLabel(c)} “${preview(c.text, 32)}”  ${quoteAbout(c.from, c.text, c.at)}`;
+    case 'file':
+      return `▯ ${String(c.n)}  ${fileName(c.path)}${c.bytes === undefined ? '' : `  ${sizeText(c.bytes)}`}`;
     case 'artifact':
       return `${chipLabel(c)}  ${c.url}`;
   }
@@ -156,6 +171,10 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
     if (c.kind === 'image') {
       say(pad);
       bodyParts.push({ kind: 'image', name: label, source: c.path });
+    } else if (c.kind === 'file') {
+      // file-chips: by its absolute path where the chip was (the hub marks it missing when gone)
+      say(pad);
+      bodyParts.push({ kind: 'file', name: label, path: c.path });
     } else say(pad + label);
     spaceNext = true;
   }

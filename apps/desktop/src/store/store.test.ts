@@ -401,6 +401,15 @@ what is in this picture?`,
         '<image name="[Image #2]" path="a b.png" mime="image/png" b64="x">  hi\n there',
       ),
     ).toBe("hi there");
+    // file-chips: a file's marker (missing or not) and its '[File #n]' label go the same way
+    expect(
+      sentWords(
+        'add <image name="[Image #1]" path="/u/a.png" mime="image/png" b64=""> to <file name="[File #2]" path="/u/deck.pptx"> and <file name="[File #3]" path="/u/q3.pdf" missing="true">',
+      ),
+    ).toBe("add to and");
+    expect(sentWords("add [Image #1] to [File #2] and [File #3]")).toBe(
+      "add to and",
+    );
   });
 
   it("a typed send matches its echo by parts, not by the hub's template text (delta review D2)", () => {

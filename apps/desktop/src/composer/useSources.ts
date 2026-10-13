@@ -3,7 +3,7 @@
 // number. Files, skills and commands come from the core once amb-core's step 4 generates their
 // events (until then their lists are empty: the pickers show nothing, never a guess).
 import { useMemo } from 'react';
-import { useAgents, useArtifacts, useCards, useStore } from '@/store';
+import { useAgents, useArtifacts, useCards, useProjects, useStore } from '@/store';
 import { prefixFirst } from './tokens';
 import { saveImageFile } from './attach';
 import { NO_SOURCES, type Choice, type ComposerSources, type DictatePort } from './sources';
@@ -15,6 +15,7 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
   const agents = useAgents(project);
   const cards = useCards(project);
   const made = useArtifacts(project);
+  const root = useProjects().find((p) => p.project === project)?.path;
   const store = useStore();
   // the mic through the store (bar I): only this window gets its words, a reload cancels
   const dictate = useMemo<DictatePort>(
@@ -60,6 +61,8 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
       filePicked: (path) => {
         store.filePicked(project, path);
       },
+      // file-chips: an @ pick of a document is a chip by its absolute path
+      ...(root === undefined ? {} : { root }),
       // R41: a pasted or dropped image goes to bise's image store through main, its path in the send's files
       saveImage: saveImage ?? saveImageFile,
       ...(noVision === undefined ? {} : { noVision }),
@@ -67,5 +70,5 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
       ...(voice === undefined ? {} : { voice }),
       choices: (kind, query) => (kind === 'agent' || kind === 'archived' || kind === 'card' ? prefixFirst(lists[kind], query, (c) => c.value) : []),
     };
-  }, [agents, cards, made, files, skills, commands, saveImage, inView, dictate, voice, project, store]);
+  }, [agents, cards, made, files, skills, commands, saveImage, inView, dictate, voice, project, store, root]);
 }

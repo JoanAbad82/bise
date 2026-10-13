@@ -4,6 +4,8 @@
 // bise-proto (amb-core's step 4: files, skills, commands); this file never names a protocol
 // message, so the composer doesn't change when the protocol does.
 
+import { DOC_EXTS, IMAGE_EXTS } from '@/proto/chips.gen';
+
 export interface PickAgent {
   readonly name: string;
   readonly desc?: string;
@@ -79,6 +81,9 @@ export interface ComposerSources {
   /** He picked this file in the `@` list (never a folder he browsed): the core remembers it per
    *  project and ranks it first in its tier on the next `files` answer (B8/R14, files::picked). */
   readonly filePicked?: (path: string) => void;
+  /** The workspace's absolute path: an `@` pick of a document becomes a file chip by its
+   *  absolute path (file-chips); none: the pick stays its `@path` text. */
+  readonly root?: string;
   /** A pasted or dropped image saved to a file the core can send; null when it can't be. */
   readonly saveImage: (file: File) => Promise<SavedImage | null>;
   /** The model in view reads no images (its name, for the refusal line); unset: it does or we
@@ -126,5 +131,15 @@ export const NO_SOURCES: ComposerSources = {
   saveImage: () => Promise.resolve(null),
 };
 
-/** A file's path is an image the model can read (docs/images.md). */
-export const isImagePath = (path: string): boolean => /\.(png|jpe?g|gif|webp)$/iu.test(path);
+/** A path's extension, lower case ('' none; a dot file has none): bise_proto::parts ext_of. */
+const extOf = (path: string): string => {
+  const name = path.split('/').at(-1) ?? path;
+  const dot = name.lastIndexOf('.');
+  return dot <= 0 ? '' : name.slice(dot + 1).toLowerCase();
+};
+
+/** A file's path is an image the model can read (docs/images.md; bise_proto::parts' one table). */
+export const isImagePath = (path: string): boolean => (IMAGE_EXTS as readonly string[]).includes(extOf(path));
+
+/** An `@` pick of this path is a file chip (a document, not code: bise_proto::parts pick_kind). */
+export const isDocPath = (path: string): boolean => (DOC_EXTS as readonly string[]).includes(extOf(path));
