@@ -9,7 +9,7 @@ import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron';
 import { CORE_CRASH_NOTE_LINE, CORE_IPC, CORE_REVEAL_LINE, TEST_ENV, type CoreExit, type CoreState, type CrashReport } from '../../shared/api';
 import { reasonOf } from './exit';
 import { writeReport } from './report';
-import { MIC_CMDS, noAsks } from '../offscreen';
+import { MIC_CMDS, micCmdsPass, micDropAnswer, noAsks } from '../offscreen';
 import { binPath } from '../paths';
 import { configOf, coreLogOf } from './env';
 import { Latest } from '../../shared/latest';
@@ -98,12 +98,17 @@ function log(line: string): void {
  */
 export function startCore(env: Readonly<Record<string, string | undefined>> = process.env): void {
   const quiet = noAsks(env, env[TEST_ENV] === '1');
+  const micPass = micCmdsPass(env, quiet);
   let state: CoreState = 'down';
   ipcMain.on(CORE_IPC.cmd, (e, cmd: unknown) => {
     const name = (cmd as { cmd?: unknown } | null)?.cmd;
-    // an off-screen run never opens his mic: macOS would ask him for 'bise try' (offscreen.ts)
-    if (quiet && typeof name === 'string' && MIC_CMDS.has(name)) {
+    // an off-screen run never opens his mic: macOS would ask him for 'bise try' (offscreen.ts);
+    // the fake voice's mic opens nothing, so it passes. A dropped one is answered at once: a take
+    // never sits on 'transcribing…' (ambient-lead m_22461)
+    if (!micPass && typeof name === 'string' && MIC_CMDS.has(name)) {
       log(`core: ${name} dropped (off-screen run: no mic)`);
+      const answer = micDropAnswer(cmd as Record<string, unknown>);
+      if (answer !== null && !e.sender.isDestroyed()) e.sender.send(CORE_IPC.ev, answer);
       return;
     }
     dictations.sent(e.sender.id, cmd);

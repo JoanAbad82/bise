@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MIC_CMDS, noAsks, OFFSCREEN_DISABLED_BLINK, OFFSCREEN_DISABLED_FEATURES, offscreenGrants } from './offscreen';
+import { MIC_CMDS, micCmdsPass, micDropAnswer, noAsks, OFFSCREEN_DISABLED_BLINK, OFFSCREEN_DISABLED_FEATURES, offscreenGrants } from './offscreen';
 
 const MAIN = __dirname;
 
@@ -130,5 +130,33 @@ describe('the knob\'s rules (pure)', () => {
   });
   it('the commands that open the mic in the core', () => {
     expect([...MIC_CMDS].sort()).toEqual(['dictate_start', 'talk_start', 'voice_mode']);
+  });
+  // ambient-lead m_22461: the fake voice's mic opens nothing, so its takes run off-screen; the
+  // core's own rule (fake.rs words_file): an isolated BISE_HOME, else it would open his mic
+  it('the mic commands pass in his run, and off-screen only with the fake voice on an isolated home', () => {
+    const fake = { BISE_AMBIENT_FAKE_VOICE: '/w/voice.txt', HOME: '/Users/g' };
+    expect(micCmdsPass({}, false)).toBe(true);
+    expect(micCmdsPass({}, true)).toBe(false);
+    expect(micCmdsPass({ ...fake, BISE_HOME: '/Users/g/.bise/hubs/x/world/.bise' }, true)).toBe(true);
+    expect(micCmdsPass({ ...fake, BISE_HOME: '/Users/g/.bise/gate/w/.bise', HOME: '/Users/g/.bise/gate/w' }, true)).toBe(true);
+    expect(micCmdsPass({ ...fake, BISE_HOME: '/Users/g/.bise' }, true)).toBe(false);
+    expect(micCmdsPass({ ...fake, BISE_HOME: '/Users/g/.bise/' }, true)).toBe(false);
+    expect(micCmdsPass({ ...fake }, true)).toBe(false);
+    expect(micCmdsPass({ ...fake, BISE_AMBIENT_FAKE_VOICE: ' ', BISE_HOME: '/w/.bise' }, true)).toBe(false);
+    expect(micCmdsPass({ BISE_AMBIENT_FAKE_VOICE: '/w/v.txt', BISE_HOME: '/w/.bise' }, true)).toBe(false);
+  });
+  // amb-tools m_22460: a dropped dictate_start left the field on 'transcribing…' forever
+  it('a dropped mic command is answered at once: a take always gets its final', () => {
+    const why = 'no mic in an off-screen run.';
+    expect(micDropAnswer({ cmd: 'dictate_start', id: 'd1' })).toEqual({ ev: 'dictation', id: 'd1', text: '', final: true, error: why });
+    expect(micDropAnswer({ cmd: 'talk_start' })).toEqual({ ev: 'error', cmd: 'talk_start', text: why });
+    expect(micDropAnswer({ cmd: 'voice_mode', project: 'p', agent: 'main', on: true })).toEqual({ ev: 'error', cmd: 'voice_mode', text: why });
+    expect(micDropAnswer({ cmd: 'voice_mode', project: 'p', agent: 'main', on: false })).toBeNull();
+    for (const c of MIC_CMDS) if (c !== 'voice_mode') expect(micDropAnswer({ cmd: c }), c).not.toBeNull();
+  });
+  it('core/ipc.ts answers the sender before it drops the command', () => {
+    const core = readFileSync(join(MAIN, 'core', 'ipc.ts'), 'utf8');
+    expect(core).toMatch(/MIC_CMDS\.has\(name\)\) \{[\s\S]*?micDropAnswer\(cmd[\s\S]*?e\.sender\.send\(CORE_IPC\.ev, answer\);\s*return;/);
+    expect(core).toMatch(/const micPass = micCmdsPass\(env, quiet\);/);
   });
 });
