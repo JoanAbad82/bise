@@ -47,11 +47,11 @@
 
 .lg-tabs {
   display: inline-flex;
-  gap: 2px;
+  gap: var(--s-1);
   font-size: var(--t-12);
 }
 .lg-tab {
-  padding: 3px 9px;
+  padding: var(--s-1) var(--pad-control-x-sm);
   border-radius: var(--r-pill);
   color: var(--c-text-3);
 }
@@ -66,13 +66,13 @@
 .lg-filter {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 16px;
+  gap: var(--gap-inline);
+  padding: var(--s-2) var(--pad-column);
   border-bottom: 1px solid var(--c-line);
 }
 .lg-chip {
   font: 500 var(--t-12) / 1 var(--font-mono);
-  padding: 4px 8px;
+  padding: var(--s-1) var(--s-2);
   border-radius: var(--r-pill);
   border: 1px solid var(--c-line);
   background: transparent;
@@ -88,13 +88,13 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 10px 16px 24px;
+  padding: var(--s-2) var(--pad-panel) var(--s-6);
   font: 400 var(--t-12) / 1.6 var(--font-mono);
   color: var(--c-text);
 }
 
 .lg-note {
-  margin: 8px 6px;
+  margin: var(--s-2) var(--pad-row-x);
   color: var(--c-text-3);
   font-family: var(--font-ui);
 }
@@ -102,14 +102,14 @@
   color: var(--c-err);
 }
 .lg-more {
-  margin: 0 0 10px;
+  margin: 0 0 var(--s-2);
   color: var(--c-text-3);
   text-align: center;
 }
 
-/* one blank row between entries */
+/* one blank row between entries (--s-5, a 12 px mono line and its leading) */
 .lg-e {
-  margin-bottom: 1.6em;
+  margin-bottom: var(--s-5);
   border-radius: var(--r-1);
 }
 .lg-e.at > .lg-h {
@@ -132,10 +132,11 @@
   white-space: nowrap;
   cursor: default;
   border-radius: var(--r-1);
+  padding: 0 var(--pad-row-x);
 }
+/* no cursor gutter in the window (the tint is the cursor): '#301' starts on the column's edge */
 .lg-h .seq {
   color: var(--c-text-3);
-  text-align: right;
 }
 .lg-h .time {
   color: var(--c-text-3);
@@ -163,13 +164,13 @@
 }
 .lg-h .size {
   color: var(--c-text-3);
-  padding-right: 4px;
 }
 
-/* the body under its header, indented 4ch, on a 1 px rail in the kind's colour */
+/* the body under its header on a 1 px rail in the kind's colour: the rail +16 from the column's
+   edge, the text and boxes 12 after it, as an open fold in the thread; they end on the right edge */
 .lg-b {
-  margin: 4px 0 0 4ch;
-  padding-left: 12px;
+  margin: var(--gap-tight) var(--pad-row-x) 0 calc(var(--pad-row-x) + var(--s-4));
+  padding-left: calc(var(--s-3) - 1px);
   border-left: 1px solid var(--lg-k);
 }
 .k-event > .lg-b {
@@ -198,9 +199,9 @@
 }
 
 .lg-code {
-  margin: 2px 0;
+  margin: var(--s-1) 0;
   max-width: 100ch;
-  padding: 8px 10px;
+  padding: var(--s-2) var(--s-3);
   border-radius: var(--r-2);
   background: var(--c-sunken);
   font: 400 var(--t-12) / 1.55 var(--font-mono);
@@ -210,16 +211,16 @@
 
 /* an edit: the thread's − / + lines (ds .b-dl tints), sign then text, no numbers, no file head */
 .lg-diff {
-  margin: 2px 0;
+  margin: var(--s-1) 0;
   max-width: 100ch;
   box-shadow: none;
   background: var(--c-sunken);
   border-radius: var(--r-2);
-  padding: 6px 0;
+  padding: var(--s-2) 0;
 }
 .lg-diff .b-dl {
   grid-template-columns: 2.4ch minmax(0, 1fr);
-  padding-right: 10px;
+  padding-right: var(--s-3);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -232,7 +233,7 @@
 }
 
 .lg-fold {
-  margin: 2px 0 0 4ch;
+  margin: var(--gap-tight) 0 0 calc(var(--pad-row-x) + var(--s-4));
   padding: 0;
   border: 0;
   background: none;
@@ -249,7 +250,7 @@
   display: flex;
   align-items: center;
   gap: 1ch;
-  margin: 0 0 1.6em;
+  margin: 0 var(--pad-row-x) var(--s-5);
   color: var(--c-text-3);
   white-space: nowrap;
 }
@@ -271,9 +272,9 @@
 .lg-keys {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 34px;
-  padding: 6px 16px;
+  gap: var(--gap-block);
+  min-height: var(--h-row);
+  padding: 0 var(--pad-column);
   border-top: 1px solid var(--c-line);
   font: 400 var(--t-12) / 1.3 var(--font-ui);
   color: var(--c-text-3);
@@ -286,14 +287,14 @@
   display: flex;
   flex: 0 1 auto;
   flex-wrap: wrap;
-  column-gap: 14px;
+  column-gap: var(--s-4);
   min-width: 0;
   height: 1.3em;
   overflow: hidden;
 }
 .lg-k.esc {
   flex: none;
-  margin-left: 2px;
+  margin-left: 0;
 }
 .lg-k kbd {
   font: 500 var(--t-12) / 1 var(--font-mono);
@@ -302,7 +303,7 @@
 .lg-find {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap-inline);
   flex: 1 1 auto;
 }
 .lg-find .w {
