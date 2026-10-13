@@ -73,6 +73,11 @@ const COMMANDS = [
   ["interrupt", "interrupt the turn", false, true],
   ["stop", "stop an agent", true, true],
   ["compact", "compact the thread", false, true],
+  // proto's cost-pause rows and its /log (rust/proto/src/commands.rs; qa-flows m_21320)
+  ["pause", "pause the whole project: every turn stops, messages and timers wait, nothing is lost", false, true],
+  ["resume", "resume a paused project: what waited is delivered", false, true],
+  ["usage", "what the agents and models cost, today and this week", false, false],
+  ["log", "the raw session of the agent in view: /log [<request>]", false, true],
   ["quit", "quit the app (the agents keep running)", false, true],
   ["restart", "restart the core, nothing lost", false, true],
   ["update", "update bise", false, true],
