@@ -316,6 +316,10 @@ export function CapsuleRoot(): JSX.Element {
       else if (fx.fx === "hide") bise?.capsule.hide();
       else if (fx.fx === "mic") bise?.helper({ cmd: "own_mic", open: fx.open });
       else if (fx.fx === "talk") {
+        // the sender of each talk command in app.log, next to core.log (the core can't tell who
+        // sent it: amb-core m_22290, a talk that never ended refused every ctrl+r)
+        const v = viewRef.current;
+        bise?.voice.log?.(`capsule ${fx.cmd} (view ${v.kind}${v.kind === "talk" ? ` ${v.phase}` : ""})`);
         store.command({ cmd: fx.cmd });
         // what he said goes to bise's main through the core: its reply is the answer view's,
         // as a typed ask's is (without this the talk never reached its answer)

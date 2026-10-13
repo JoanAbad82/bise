@@ -42,6 +42,12 @@ export type View =
 
 export interface State {
   readonly view: View;
+  /**
+   * the core's talk this capsule started and hasn't ended yet ('hold': fn held, 'free': fn fn),
+   * whatever the view now: a view that replaced the talk before fn up (the spotlight, a card)
+   * never keeps the core listening (amb-core m_22290: every ctrl+r was refused 'the mic is busy.')
+   */
+  readonly talk: 'hold' | 'free' | null;
 }
 
 export type CapEvent =
@@ -81,7 +87,7 @@ export interface Step {
 }
 
 export const NONE: View = { kind: 'none' };
-export const START: State = { view: NONE };
+export const START: State = { view: NONE, talk: null };
 
 const talking = (v: View): boolean => v.kind === 'talk' && v.phase === 'listen';
 
@@ -90,11 +96,20 @@ function go(s: State, view: View, ...fx: Fx[]): Step {
   const out: Fx[] = [...fx];
   if (talking(s.view) && !talking(view)) out.push({ fx: 'mic', open: false });
   if (!talking(s.view) && talking(view)) out.push({ fx: 'mic', open: true });
-  return { state: { ...s, view }, fx: out };
+  // the core's talk follows what was sent: open at talk_start, over at talk_end or talk_cancel
+  let talk = s.talk;
+  for (const f of fx) {
+    if (f.fx !== 'talk') continue;
+    talk = f.cmd === 'talk_start' ? (view.kind === 'talk' && view.handsFree ? 'free' : 'hold') : null;
+  }
+  return { state: { ...s, view, talk }, fx: out };
 }
 
+/** fn up (or the hands-free tap) while the talk this capsule started is open but its view was replaced: the end still goes to the core, the view stays */
+const endUnseen = (s: State): Step => ({ state: { ...s, talk: null }, fx: [{ fx: 'talk', cmd: 'talk_end' }] });
+
 const stay = (s: State): Step => ({ state: s, fx: [] });
-const cancelTalk = (s: State): Step => go(s, NONE, { fx: 'hide' }, ...(talking(s.view) ? [{ fx: 'talk', cmd: 'talk_cancel' } as const] : []));
+const cancelTalk = (s: State): Step => go(s, NONE, { fx: 'hide' }, ...(talking(s.view) || s.talk !== null ? [{ fx: 'talk', cmd: 'talk_cancel' } as const] : []));
 const close = (s: State): Step => (s.view.kind === 'none' ? stay(s) : go(s, NONE, { fx: 'hide' }));
 /** a card goes back to the list it was opened from (the spotlight or the tray menu); any other view closes */
 const back = (s: State): Step => (s.view.kind === 'card' ? go(s, s.view.from === 'menu' ? { kind: 'menu' } : { kind: 'spot' }) : close(s));
@@ -113,11 +128,15 @@ export function step(s: State, e: CapEvent): Step {
         case 'double':
           return go(s, { kind: 'talk', phase: 'listen', handsFree: true }, { fx: 'show', at: 'bottom', keys: false, fit: TALK_FIT }, { fx: 'talk', cmd: 'talk_start' });
         case 'talk_end':
-          return v.kind === 'talk' && v.phase === 'listen' ? go(s, { kind: 'talk', phase: 'think', handsFree: v.handsFree }, { fx: 'talk', cmd: 'talk_end' }) : stay(s);
+          if (v.kind === 'talk' && v.phase === 'listen') return go(s, { kind: 'talk', phase: 'think', handsFree: v.handsFree }, { fx: 'talk', cmd: 'talk_end' });
+          return s.talk !== null ? endUnseen(s) : stay(s);
         case 'tap':
-          return v.kind === 'talk' && v.handsFree && v.phase === 'listen' ? go(s, { kind: 'talk', phase: 'think', handsFree: true }, { fx: 'talk', cmd: 'talk_end' }) : stay(s);
+          if (v.kind === 'talk' && v.handsFree && v.phase === 'listen') return go(s, { kind: 'talk', phase: 'think', handsFree: true }, { fx: 'talk', cmd: 'talk_end' });
+          return s.talk === 'free' ? endUnseen(s) : stay(s);
         case 'cancel':
-          return v.kind === 'talk' ? cancelTalk(s) : stay(s);
+          if (v.kind === 'talk') return cancelTalk(s);
+          // fn cancelled while another view replaced the talk: the core's talk goes, the view stays
+          return s.talk !== null ? { state: { ...s, talk: null }, fx: [{ fx: 'talk', cmd: 'talk_cancel' }] } : stay(s);
         case 'esc':
           return talking(v) ? cancelTalk(s) : back(s);
       }
@@ -131,7 +150,7 @@ export function step(s: State, e: CapEvent): Step {
     case 'talk_over':
       // at fn down (no key, no mic) or after his release: the mic closes, the core's talk is already over
       if (v.kind !== 'talk' || (v.phase !== 'listen' && v.phase !== 'think')) return stay(s);
-      return go(s, { kind: 'talk', phase: 'over', handsFree: v.handsFree, said: e.said, ...(e.link ? { link: e.link } : {}), ...(e.fades ? { fades: true } : {}) });
+      return go({ ...s, talk: null }, { kind: 'talk', phase: 'over', handsFree: v.handsFree, said: e.said, ...(e.link ? { link: e.link } : {}), ...(e.fades ? { fades: true } : {}) });
     case 'over_gone':
       return v.kind === 'talk' && v.phase === 'over' && v.fades === true ? go(s, NONE, { fx: 'hide' }) : stay(s);
     case 'card_done':

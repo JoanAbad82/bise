@@ -75,6 +75,26 @@ describe('the capsule machine', () => {
     // the talk and the answer stay up when a card is answered elsewhere
     expect(run([{ ev: 'fn', act: 'talk_start' }, { ev: 'card_done', id: 'p.1' }]).view).toMatchObject({ kind: 'talk' });
   });
+  it("fn up ends the core's talk even when another view replaced it (amb-core m_22290: a talk never ended refused every ctrl+r)", () => {
+    const ends = (evs: CapEvent[]): number => run(evs).fx.filter((f) => (f as { fx?: string; cmd?: string }).fx === 'talk' && (f as { cmd?: string }).cmd === 'talk_end').length;
+    // held, then the spotlight (fn space) before fn up: the end still goes, the spotlight stays
+    const spot = run([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'key', key: 'space' }, { ev: 'fn', act: 'talk_end' }]);
+    expect(spot.view).toEqual({ kind: 'spot' });
+    expect(spot.fx.at(-1)).toEqual({ fx: 'talk', cmd: 'talk_end' });
+    // the window hidden (a blur) before fn up
+    expect(ends([{ ev: 'fn', act: 'talk_start' }, { ev: 'window', shown: false, why: 'blur' }, { ev: 'fn', act: 'talk_end' }])).toBe(1);
+    // a card opened from the spotlight meanwhile
+    expect(ends([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'key', key: 'space' }, { ev: 'open_card', id: 'p.1' }, { ev: 'fn', act: 'talk_end' }])).toBe(1);
+    // hands-free: the next tap ends it, whatever the view
+    expect(ends([{ ev: 'fn', act: 'double' }, { ev: 'fn', act: 'key', key: 'space' }, { ev: 'fn', act: 'tap' }])).toBe(1);
+    // once only: a second fn up, an up after the core ended it, or an up with no talk sends nothing
+    expect(ends([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'talk_end' }, { ev: 'fn', act: 'talk_end' }])).toBe(1);
+    expect(ends([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'key', key: 'space' }, { ev: 'fn', act: 'talk_end' }, { ev: 'fn', act: 'talk_end' }])).toBe(1);
+    expect(ends([{ ev: 'fn', act: 'talk_start' }, { ev: 'talk_over', said: 'no mic' }, { ev: 'fn', act: 'key', key: 'space' }, { ev: 'fn', act: 'talk_end' }])).toBe(0);
+    expect(ends([{ ev: 'fn', act: 'talk_end' }])).toBe(0);
+    // fn cancelled while replaced: the core's talk is cancelled
+    expect(run([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'key', key: 'space' }, { ev: 'fn', act: 'cancel' }]).fx.at(-1)).toEqual({ fx: 'talk', cmd: 'talk_cancel' });
+  });
   it('fn fn talks hands-free until the next tap', () => {
     const r = run([{ ev: 'fn', act: 'double' }]);
     expect(r.view).toEqual({ kind: 'talk', phase: 'listen', handsFree: true });
