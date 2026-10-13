@@ -145,6 +145,10 @@ export interface Confirm {
 export interface HubLine {
   readonly text: string;
   readonly level: 'note' | 'error';
+  /** the answer to this window's own /restart (its cid): the row adds the app's version when it is not the hub's */
+  readonly restart?: true;
+  /** a /restart's line once the hub said hello again: its words are over, only the app's staged build still shows */
+  readonly back?: true;
 }
 
 /** His send, shown at once, until its 'you' entry lands (FIFO by text) or it fails. */

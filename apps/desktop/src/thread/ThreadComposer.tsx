@@ -203,6 +203,12 @@ export const ThreadComposer = memo(function ThreadComposer({
       store.computer('hand_back', cu.key);
       return;
     }
+    // his /restart's row says a newer app is staged: ⏎ restarts the app (amb-home, ambient-lead m_22833)
+    const swap = document.querySelector<HTMLButtonElement>('[data-testid="confirm.notice.swap"]');
+    if (swap !== null) {
+      swap.click();
+      return;
+    }
     // the thread's last row, read at ⏎ (never subscribed: a new entry must not re-render the composer)
     const key = threadKey(project, agent);
     const lastPos = store.threadOrder(key).order.at(-1);

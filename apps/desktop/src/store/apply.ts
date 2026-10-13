@@ -260,12 +260,16 @@ export function applyTyped(s: Store, ev: Ev): void {
         { project: ev.project, id: ev.id, text: ev.text },
       ]);
       return;
-    case "notice":
+    case "notice": {
+      // the answer to his own /restart (its cid): the row says the app's version too
+      const restart = ev.cid != null && s.restartCids.delete(ev.cid);
       s.put(`notice:${ev.project}`, {
         text: ev.text,
         level: "note",
+        ...(restart ? { restart: true } : {}),
       } satisfies HubLine);
       return;
+    }
     case "approvals":
       // bar V8/W21: the mode, the checker and the rules, whole each time
       s.put(`approvals:${ev.project}`, ev);
@@ -305,9 +309,12 @@ export function applyTyped(s: Store, ev: Ev): void {
       // the hub's last plain line was said on the connection before this hello: a /restart's
       // 'restarting the hub …' is over once the hub says hello again, so it goes (his m_22835:
       // it stayed 40 min after the hub came back; designer m_22843: no past line). A refused line
-      // (his words to fix) stays.
-      if (s.notice(ev.project)?.level === "note")
-        s.put(`notice:${ev.project}`, null);
+      // (his words to fix) stays. A restart's keeps its mark: the app's staged build still shows.
+      {
+        const line = s.notice(ev.project);
+        if (line?.level === "note" && line.back !== true)
+          s.put(`notice:${ev.project}`, line.restart === true ? { ...line, back: true } : null);
+      }
       return;
     case "route":
     case "route_done":

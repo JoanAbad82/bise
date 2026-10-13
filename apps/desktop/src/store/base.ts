@@ -40,6 +40,8 @@ export class StoreBase {
   protected cid = 0;
   /** R8: when this window last sent a /model (a setup_first after it is his; a replayed one isn't) */
   protected modelSentAt = Number.NEGATIVE_INFINITY;
+  /** the cids of this window's /restart lines: the hub's notice that answers one is a restart's */
+  /** @internal for apply.ts */ readonly restartCids = new Set<number>();
   /** tool_out asks in flight (by key), and each project's last one (an error names no call) */
   /** @internal for apply.ts */ readonly toolAsks = new Set<string>();
   /** @internal for apply.ts */ readonly toolAsk = new Map<string, string>();
@@ -127,6 +129,15 @@ export class StoreBase {
       this.put("shot", null);
     if (cmd.cmd === "slash" && cmd.line.trim().startsWith("/model "))
       this.modelSentAt = this.now();
+    // his own /restart: its cid comes back on the hub's line, so the row knows it answers a restart
+    // (ambient-lead m_22833) without reading the hub's words
+    if (cmd.cmd === "slash" && /^\/restart(\s|$)/u.test(cmd.line.trim())) {
+      this.cid += 1;
+      const cid = cmd.cid ?? this.cid;
+      this.restartCids.add(cid);
+      this.port?.send({ ...cmd, cid });
+      return;
+    }
     this.port?.send(cmd);
   }
 

@@ -9,9 +9,12 @@
 // any other command); the same command asks again. The bar takes the keys
 // while it shows, then gives them back. amb-win mounts it in the thread
 // over the composer. Owner: amb-home.
-import { useEffect, useRef, type KeyboardEvent } from 'react';
+import { useContext, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { formatRoute } from '@/app/route';
+import { RouterContext } from '@/app/router';
 import { Act, Button, Kbd } from '@/ds';
-import { useConfirms, useNotice, useStore } from '@/store';
+import { useConfirms, useNotice, useStore, useVersions } from '@/store';
+import { appBuild, appSwap, restartTail, tailWords, type AppBuild, type RestartTail } from './restart';
 import './inbox.css';
 
 /** The hub's question without its '(y/n)' / '[y/N]': the keycaps say it. Pure. */
@@ -27,14 +30,67 @@ export function confirmWords(text: string): string {
  */
 export function HubNoteRow({ project }: { project: string }) {
   const notice = useNotice(project);
+  const tail = useRestartTail(project, notice?.restart === true);
   if (notice === null || notice.level === 'error') return null;
+  // the hub is back (its hello): a restart's words are over; only a staged app still shows
+  if (notice.back === true && tail?.kind !== 'staged') return null;
+  const words = notice.back === true ? '' : notice.text;
   return (
-    <div className="th-notice info th-hubnote" role="status" data-level="info" data-testid="confirm.notice">
+    <div className="th-notice info th-hubnote" role="status" data-level="info" data-testid="confirm.notice" data-app={tail?.kind}>
       <span className="th-notice-mark" aria-label="note">
         ·
       </span>{' '}
-      {notice.text}
+      <span>
+        {words}
+        {tail !== null && (
+          <span data-testid="confirm.notice.app">
+            {words === '' ? '' : ' · '}
+            {tailWords(tail)}
+          </span>
+        )}
+        {tail?.kind === 'staged' && <SwapAct />}
+      </span>
     </div>
+  );
+}
+
+/** The restart row's app part: this app's build against the hub's version, read once per restart line. */
+function useRestartTail(project: string, restart: boolean): RestartTail | null {
+  const store = useStore();
+  const hub = useVersions(project)?.current ?? null;
+  const [app, setApp] = useState<AppBuild | null>(null);
+  useEffect(() => {
+    if (!restart) return;
+    let live = true;
+    void appBuild().then((b) => {
+      if (live) setApp(b);
+    });
+    // the hub's version: the versions' current, asked when this window never had them
+    if (store.versions(project) === null) store.askVersions(project);
+    return () => {
+      live = false;
+    };
+  }, [restart, project, store]);
+  return restart ? restartTail(app, hub) : null;
+}
+
+/** '⏎ restart to update' (the settings update row's words, designer m_22982): the staged build in place of this one, here again (amb-mac's swap). */
+function SwapAct() {
+  // the screen he is on, read at his click (the swapped app reopens it)
+  const router = useContext(RouterContext);
+  const [why, setWhy] = useState<string | null>(null);
+  const swap = () => {
+    const at = router?.get();
+    void appSwap(at === undefined ? undefined : formatRoute(at)).then(setWhy);
+  };
+  return (
+    <>
+      {' '}
+      <Act onClick={swap} testId="confirm.notice.swap">
+        <Kbd>⏎</Kbd> restart to update
+      </Act>
+      {why !== null && <span className="th-hubnote-why"> · {why}</span>}
+    </>
   );
 }
 
