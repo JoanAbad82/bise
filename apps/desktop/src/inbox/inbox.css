@@ -105,4 +105,5 @@
 .inbox-block > .b-row { height: var(--h-row-tight); padding: 0 var(--pad-row-x); gap: var(--gap-inline); }
 .inbox-block > .b-row .nm { display: flex; gap: var(--gap-inline); flex: 1; min-width: 0; }
 .inbox-block .strip-who { font-weight: 500; }
-.inbox-block > .b-row .end { flex: none; font: var(--t-12) var(--font-mono); color: var(--c-text-3); }
+/* the project tag ('bise', 'shop · 5 min'): words, not machine text, so sans (designer m_20986) */
+.inbox-block > .b-row .end { flex: none; font: var(--t-13) var(--font-ui); color: var(--c-text-3); }

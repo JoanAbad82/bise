@@ -30,3 +30,5 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
 .b-cap-rows .b-row .nm { display: flex; gap: var(--s-1); min-width: 0; }
 .b-cap-rows .ib-sign { flex: none; width: 1em; text-align: center; font: 600 var(--t-12) var(--font-mono); color: var(--c-accent); }
 .b-cap-rows .strip-who { font-weight: 500; }
+/* the project tag at the row's end: sans t-13 text-3, as the block's (designer m_20986) */
+.b-cap-rows .b-row .end { flex: none; font: var(--t-13) var(--font-ui); color: var(--c-text-3); }
