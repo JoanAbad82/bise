@@ -9,7 +9,7 @@ import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron';
 import { CORE_CRASH_NOTE_LINE, CORE_IPC, CORE_REVEAL_LINE, TEST_ENV, type CoreExit, type CoreState, type CrashReport } from '../../shared/api';
 import { reasonOf } from './exit';
 import { writeReport } from './report';
-import { MIC_CMDS, micCmdsPass, micDropAnswer, noAsks } from '../offscreen';
+import { noAsks } from '../offscreen';
 import { binPath } from '../paths';
 import { configOf, coreLogOf } from './env';
 import { Latest } from '../../shared/latest';
@@ -97,20 +97,13 @@ function log(line: string): void {
  * handlers. No bise: the state stays 'down' and the reason is logged once.
  */
 export function startCore(env: Readonly<Record<string, string | undefined>> = process.env): void {
+  // an off-screen run never opens his mic (macOS would ask him for 'bise try'): the core is told at
+  // spawn (--offscreen) and owns the rule, fake voice or no mic; every command goes to it, so each
+  // mic command gets its answer from there (architect m_22483)
   const quiet = noAsks(env, env[TEST_ENV] === '1');
-  const micPass = micCmdsPass(env, quiet);
   let state: CoreState = 'down';
   ipcMain.on(CORE_IPC.cmd, (e, cmd: unknown) => {
     const name = (cmd as { cmd?: unknown } | null)?.cmd;
-    // an off-screen run never opens his mic: macOS would ask him for 'bise try' (offscreen.ts);
-    // the fake voice's mic opens nothing, so it passes. A dropped one is answered at once: a take
-    // never sits on 'transcribing…' (ambient-lead m_22461)
-    if (!micPass && typeof name === 'string' && MIC_CMDS.has(name)) {
-      log(`core: ${name} dropped (off-screen run: no mic)`);
-      const answer = micDropAnswer(cmd as Record<string, unknown>);
-      if (answer !== null && !e.sender.isDestroyed()) e.sender.send(CORE_IPC.ev, answer);
-      return;
-    }
     dictations.sent(e.sender.id, cmd);
     const sk = typeof cmd === 'object' && cmd !== null ? sendKey(cmd as Record<string, unknown>) : null;
     if (sk !== null) sends.set(sk, e.sender.id);
@@ -170,7 +163,7 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
     n.show();
   };
   core = new CoreProcess(
-    { config, logFile, env, test },
+    { config, logFile, env, test, offscreen: quiet },
     {
       report: (e, tail) => {
         lastReport = writeReport(

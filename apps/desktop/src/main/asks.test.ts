@@ -6,7 +6,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MIC_CMDS, micCmdsPass, micDropAnswer, noAsks, OFFSCREEN_DISABLED_BLINK, OFFSCREEN_DISABLED_FEATURES, offscreenGrants } from './offscreen';
+import { coreArgs } from './core/env';
+import { noAsks, OFFSCREEN_DISABLED_BLINK, OFFSCREEN_DISABLED_FEATURES, offscreenGrants } from './offscreen';
 
 const MAIN = __dirname;
 
@@ -69,11 +70,18 @@ describe('an off-screen run asks him nothing (static)', () => {
     expect(ipc).toMatch(/if \(noAsks\(process\.env, testMode\)\) \{[\s\S]*setPermissionCheckHandler\(\(_wc, permission\) => offscreenGrants\(permission\)\)[\s\S]*done\(offscreenGrants\(permission\)\)/);
   });
 
-  it('the core never gets a mic command under the knob, before anything else sees it', () => {
+  // architect m_22483: the core owns the off-screen mic rule; main forwards every command (a drop
+  // here would be silent: a take stuck on 'transcribing…', amb-tools m_22460)
+  it('under the knob the core starts with --offscreen, and main never drops a command', () => {
     const core = ALL.find((s) => s.file === join('core', 'ipc.ts'))?.text ?? '';
-    const drop = core.indexOf('MIC_CMDS.has(name)');
-    expect(drop, 'core/ipc.ts drops the mic commands').toBeGreaterThan(-1);
-    expect(drop < core.indexOf('dictations.sent(e.sender.id, cmd)')).toBe(true);
+    expect(core).toMatch(/const quiet = noAsks\(env, env\[TEST_ENV\] === '1'\);/);
+    expect(core).toMatch(/new CoreProcess\(\s*\{[^}]*offscreen: quiet[^}]*\}/);
+    const at = core.indexOf('ipcMain.on(CORE_IPC.cmd,');
+    const handler = core.slice(at, core.indexOf('\n  });', at));
+    expect(handler, 'the cmd handler').toContain('core?.send(c)');
+    expect(handler, 'no return before the core gets it').not.toMatch(/\breturn\b/);
+    const proc = ALL.find((s) => s.file === join('core', 'process.ts'))?.text ?? '';
+    expect(proc).toContain('coreArgs(config.workspace, this.opts.offscreen === true)');
   });
 });
 
@@ -128,35 +136,11 @@ describe('the knob\'s rules (pure)', () => {
     for (const p of ['clipboard-sanitized-write', 'clipboard-read']) expect(offscreenGrants(p)).toBe(true);
     for (const p of ['media', 'display-capture', 'notifications', 'geolocation', 'midi', 'speaker-selection']) expect(offscreenGrants(p)).toBe(false);
   });
-  it('the commands that open the mic in the core', () => {
-    expect([...MIC_CMDS].sort()).toEqual(['dictate_start', 'talk_start', 'voice_mode']);
-  });
-  // ambient-lead m_22461: the fake voice's mic opens nothing, so its takes run off-screen; the
-  // core's own rule (fake.rs words_file): an isolated BISE_HOME, else it would open his mic
-  it('the mic commands pass in his run, and off-screen only with the fake voice on an isolated home', () => {
-    const fake = { BISE_AMBIENT_FAKE_VOICE: '/w/voice.txt', HOME: '/Users/g' };
-    expect(micCmdsPass({}, false)).toBe(true);
-    expect(micCmdsPass({}, true)).toBe(false);
-    expect(micCmdsPass({ ...fake, BISE_HOME: '/Users/g/.bise/hubs/x/world/.bise' }, true)).toBe(true);
-    expect(micCmdsPass({ ...fake, BISE_HOME: '/Users/g/.bise/gate/w/.bise', HOME: '/Users/g/.bise/gate/w' }, true)).toBe(true);
-    expect(micCmdsPass({ ...fake, BISE_HOME: '/Users/g/.bise' }, true)).toBe(false);
-    expect(micCmdsPass({ ...fake, BISE_HOME: '/Users/g/.bise/' }, true)).toBe(false);
-    expect(micCmdsPass({ ...fake }, true)).toBe(false);
-    expect(micCmdsPass({ ...fake, BISE_AMBIENT_FAKE_VOICE: ' ', BISE_HOME: '/w/.bise' }, true)).toBe(false);
-    expect(micCmdsPass({ BISE_AMBIENT_FAKE_VOICE: '/w/v.txt', BISE_HOME: '/w/.bise' }, true)).toBe(false);
-  });
-  // amb-tools m_22460: a dropped dictate_start left the field on 'transcribing…' forever
-  it('a dropped mic command is answered at once: a take always gets its final', () => {
-    const why = 'no mic in an off-screen run.';
-    expect(micDropAnswer({ cmd: 'dictate_start', id: 'd1' })).toEqual({ ev: 'dictation', id: 'd1', text: '', final: true, error: why });
-    expect(micDropAnswer({ cmd: 'talk_start' })).toEqual({ ev: 'error', cmd: 'talk_start', text: why });
-    expect(micDropAnswer({ cmd: 'voice_mode', project: 'p', agent: 'main', on: true })).toEqual({ ev: 'error', cmd: 'voice_mode', text: why });
-    expect(micDropAnswer({ cmd: 'voice_mode', project: 'p', agent: 'main', on: false })).toBeNull();
-    for (const c of MIC_CMDS) if (c !== 'voice_mode') expect(micDropAnswer({ cmd: c }), c).not.toBeNull();
-  });
-  it('core/ipc.ts answers the sender before it drops the command', () => {
-    const core = readFileSync(join(MAIN, 'core', 'ipc.ts'), 'utf8');
-    expect(core).toMatch(/MIC_CMDS\.has\(name\)\) \{[\s\S]*?micDropAnswer\(cmd[\s\S]*?e\.sender\.send\(CORE_IPC\.ev, answer\);\s*return;/);
-    expect(core).toMatch(/const micPass = micCmdsPass\(env, quiet\);/);
+  // amb-tools m_22460: a dropped dictate_start left the field on 'transcribing…' forever; the core
+  // owns the off-screen mic rule (architect m_22483): it gets --offscreen and every command
+  it('an off-screen core is told so at spawn', () => {
+    expect(coreArgs('', true)).toEqual(['ambient-core', '--home', '--offscreen']);
+    expect(coreArgs('/w', true)).toEqual(['ambient-core', '--workspace', '/w', '--offscreen']);
+    expect(coreArgs('/w')).toEqual(['ambient-core', '--workspace', '/w']);
   });
 });

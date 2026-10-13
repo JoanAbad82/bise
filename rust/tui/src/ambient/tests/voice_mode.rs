@@ -284,3 +284,23 @@ fn the_core_stopping_ends_voice_mode() {
     assert_eq!(last["on"], false);
     assert!(last["note"].as_str().is_some_and(|n| n.ends_with("bise stopped")), "{last}");
 }
+
+/// An off-screen run with no fake voice (architect m_22483): the app
+/// forwards every mic command, the core answers each at once with
+/// NO_MIC, and no mic ever opens (neither the core's nor voice mode's).
+#[test]
+fn off_screen_with_no_fake_voice_every_mic_command_is_refused_at_once() {
+    let mut t = T::off_screen();
+    let _w = shop(&mut t);
+    typed(&mut t, json!({"cmd": "dictate_start", "id": "d1"}));
+    let out = t.take();
+    assert!(out.contains(&json!({"ev": "dictation", "id": "d1", "text": "", "final": true, "error": crate::ambient::NO_MIC})), "{out:#?}");
+    t.cmd(Cmd::TalkStart);
+    let out = t.take();
+    assert!(out.contains(&json!({"ev": "error", "text": crate::ambient::NO_MIC})), "{out:#?}");
+    typed(&mut t, json!({"cmd": "voice_mode", "project": "shop", "agent": "perf", "on": true}));
+    let out = t.take();
+    assert!(out.contains(&json!({"ev": "error", "cmd": "voice_mode", "text": format!("voice mode: {}", crate::ambient::NO_MIC)})), "{out:#?}");
+    assert_eq!(t.fakes.mic.lock().unwrap().opened, 0, "the core's mic");
+    assert_eq!(t.vf.mic.lock().unwrap().opened, 0, "voice mode's mic");
+}

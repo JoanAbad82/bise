@@ -137,22 +137,71 @@ fn fake_ports(user_kind: fn(&str) -> bool, words: fake::Words) -> Ports {
     }
 }
 
+/// What a mic command gets in an off-screen run with no fake voice: the
+/// app forwards every command, the core refuses these with these words
+/// (ambient-lead m_22461, architect m_22483).
+pub const NO_MIC: &str = "no mic in an off-screen run.";
+
+/// The voice of a run (architect m_22483: the core is the one owner of
+/// the rule, with its canonicalized paths; the app only says it runs
+/// off-screen). Off-screen, never the real mic: the fake voice or none.
+#[derive(Debug, PartialEq)]
+enum Voice {
+    Fake(std::path::PathBuf),
+    NoMic,
+    Live,
+}
+
+/// `fake`: fake::words_file's answer; `offscreen`: the app's
+/// `--offscreen` (an off-screen run: macOS must never ask him). Pure.
+fn voice_of(fake: Result<Option<std::path::PathBuf>, String>, offscreen: bool) -> Voice {
+    match fake {
+        Ok(Some(file)) => Voice::Fake(file),
+        _ if offscreen => Voice::NoMic,
+        _ => Voice::Live,
+    }
+}
+
+/// The refusing mic of an off-screen run with no fake voice.
+struct NoMicHere;
+
+impl crate::voicemode::Mic for NoMicHere {
+    fn open(&mut self, _blocks: mpsc::Sender<crate::voicemode::MicBlock>) -> Result<Box<dyn crate::voicemode::MicStream>, String> {
+        Err(NO_MIC.into())
+    }
+}
+
+/// `ports` with every way to the mic refused with [`NO_MIC`]: a take's
+/// final, a talk's error and voice mode's error say it at once, and no
+/// device opens (the listener's job is asked first: refused too).
+fn no_mic(mut ports: Ports) -> Ports {
+    ports.mic = Box::new(NoMicHere);
+    ports.listen_job = Box::new(|| Err(NO_MIC.into()));
+    ports.voice_mode = Box::new(|| Err(NO_MIC.into()));
+    ports
+}
+
 /// The ports of this run: harness A's fake voice when its env asks for
-/// it and BISE_HOME is isolated (fake::words_file), else the real ones;
-/// the event that says which (the app forwards talks only to a fake).
-fn ports_for_env(user_kind: fn(&str) -> bool) -> (Ports, Option<serde_json::Value>) {
+/// it and BISE_HOME is isolated (fake::words_file), else, off-screen, no
+/// mic at all, else the real ones; the event that says which (the app
+/// forwards talks only to a fake).
+fn ports_for_env(user_kind: fn(&str) -> bool, offscreen: bool) -> (Ports, Option<serde_json::Value>) {
     let file = bise_home::env::test_setting("BISE_AMBIENT_FAKE_VOICE");
-    match fake::words_file(file, &|k| std::env::var(k).ok()) {
-        Ok(Some(file)) => {
+    let fake = fake::words_file(file, &|k| std::env::var(k).ok());
+    if let Err(e) = &fake {
+        eprintln!("ambient-core: {e}");
+    }
+    match voice_of(fake, offscreen) {
+        Voice::Fake(file) => {
             eprintln!("ambient-core: fake voice on: words from {} (or fake_words), no mic, no sound", file.display());
             let ev = serde_json::json!({"ev": "fake_voice", "on": true, "words": file.to_string_lossy()});
             (fake_ports(user_kind, fake::Words::new(file)), Some(ev))
         }
-        Ok(None) => (live_ports(user_kind), None),
-        Err(e) => {
-            eprintln!("ambient-core: {e}");
-            (live_ports(user_kind), None)
+        Voice::NoMic => {
+            eprintln!("ambient-core: off-screen run: no mic (takes, fn talks and voice mode are refused)");
+            (no_mic(live_ports(user_kind)), None)
         }
+        Voice::Live => (live_ports(user_kind), None),
     }
 }
 
@@ -240,6 +289,9 @@ pub type ConnectFor = Box<dyn Fn(&std::path::Path) -> Connect>;
 /// `broken`: this core can't start any hub (no runtime), why in plain
 /// words: it still answers, says `broken` once, and its connectors fail
 /// with those words (every hub's row says them).
+/// `offscreen`: the app's `--offscreen` (an off-screen run): never the
+/// real mic, the fake voice or none ([`voice_of`]).
+#[allow(clippy::too_many_arguments)]
 pub fn core_main(
     workspace: String,
     connect: Connect,
@@ -248,6 +300,7 @@ pub fn core_main(
     setup: Option<setup::SetupPorts>,
     home_move: Option<HomeMove>,
     broken: Option<String>,
+    offscreen: bool,
 ) -> i32 {
     let (tx, rx) = mpsc::channel::<In>();
     let hub = Hub::start(connect, tx.clone(), In::Hub, RETRY);
@@ -278,7 +331,7 @@ pub fn core_main(
             return 3;
         }
     }
-    let (ports, fake_ev) = ports_for_env(user_kind);
+    let (ports, fake_ev) = ports_for_env(user_kind, offscreen);
     let mut core = Core::new(workspace, hub, ports);
     if let Some(reason) = broken {
         core.broken(reason);

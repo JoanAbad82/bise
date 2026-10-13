@@ -40,6 +40,8 @@ export interface CoreOptions {
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** test mode: the core gets the test settings of main's env too (childenv.ts) */
   readonly test?: boolean;
+  /** an off-screen run (offscreen.ts noAsks): the core gets --offscreen, never opens his mic */
+  readonly offscreen?: boolean;
   /** the delay before a restart, in ms (tests shorten it) */
   readonly scale?: number;
   /** the app's version, said in initialize */
@@ -203,7 +205,7 @@ export class CoreProcess {
     this.setState('starting');
     let child: ChildProcessWithoutNullStreams;
     try {
-      child = spawn(config.bise, coreArgs(config.workspace), {
+      child = spawn(config.bise, coreArgs(config.workspace, this.opts.offscreen === true), {
         env: childEnv(this.opts.env ?? process.env, this.opts.test === true),
         ...(config.workspace === '' ? {} : { cwd: config.workspace }),
         stdio: ['pipe', 'pipe', err],

@@ -31,7 +31,10 @@ pub fn core(args: &[String]) -> std::io::Result<i32> {
             (projects, None, ambient_connector(paths, Connector::Broken(why.clone()), true), Some(why))
         }
     };
-    Ok(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects), Some(ambient_setup()), home_move, broken))
+    // the app's off-screen run (its offscreen.ts noAsks): the core never
+    // opens the real mic, it decides fake or none (architect m_22483)
+    let offscreen = args.iter().any(|a| a == "--offscreen");
+    Ok(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects), Some(ambient_setup()), home_move, broken, offscreen))
 }
 
 /// How the core reaches a hub: through `client::open` with this bise

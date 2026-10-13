@@ -37,8 +37,13 @@ export function coreLogOf(userData: string): string {
   return join(userData, 'core.log');
 }
 
-export function coreArgs(workspace: string): string[] {
-  return workspace === '' ? ['ambient-core', '--home'] : ['ambient-core', '--workspace', workspace];
+/**
+ * `offscreen`: an off-screen run (offscreen.ts noAsks): the core never opens his mic, it decides
+ * fake voice or none and answers each mic command itself (architect m_22483).
+ */
+export function coreArgs(workspace: string, offscreen = false): string[] {
+  const at = workspace === '' ? ['--home'] : ['--workspace', workspace];
+  return ['ambient-core', ...at, ...(offscreen ? ['--offscreen'] : [])];
 }
 
 /** The restart delay (seconds): 0.5 doubling to 30, back to 0.5 after a run of 60 s or more. */

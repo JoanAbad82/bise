@@ -52,49 +52,12 @@ export function offscreenActivation(on: boolean, platform: string): 'accessory' 
  * Under the knob nothing may ask him anything or post to him (amb-tools m_18837: a macOS alert for
  * 'bise try' came front for ~6 s during an as-he-does run): no helper (its fn tap, Input Monitoring,
  * Accessibility, screen and mic preflights), no TCC request from a page (media, screen, notifications:
- * denied before macOS sees them), no notification posted, and no command that opens the mic in the
- * core. Same as isOffscreen; its own name so each call site says why. Pure.
+ * denied before macOS sees them), no notification posted, and a core started with --offscreen
+ * (core/env.ts coreArgs): it never opens his mic, it answers each mic command with the fake voice or
+ * a refusal (architect m_22483). Same as isOffscreen; its own name so each call site says why. Pure.
  */
 export function noAsks(env: Readonly<Record<string, string | undefined>>, testMode: boolean): boolean {
   return isOffscreen(env, testMode);
-}
-
-/** The core commands that open his mic (the core is the app's child: macOS asks for 'bise try'). */
-export const MIC_CMDS: ReadonlySet<string> = new Set(['dictate_start', 'voice_mode', 'talk_start']);
-
-/** The core's fake voice (rust ambient/fake.rs): its mic opens no device. */
-export const FAKE_VOICE_ENV = 'BISE_AMBIENT_FAKE_VOICE';
-
-/**
- * The mic commands reach the core in this run (ambient-lead m_22461): always in his run; under the
- * knob only with the core's fake voice, whose mic opens nothing, so amb-tools' ctrl+r takes run in
- * the packed app off-screen. The same rule as the core's (fake.rs words_file): the variable set and
- * an isolated BISE_HOME (a gate home, or not HOME's .bise); the core refusing the fake voice would
- * open the real mic, and macOS would ask him. Pure.
- */
-export function micCmdsPass(env: Readonly<Record<string, string | undefined>>, quiet: boolean): boolean {
-  if (!quiet) return true;
-  const val = (k: string): string | null => {
-    const v = (env[k] ?? '').trim();
-    return v === '' ? null : v.replace(/\/+$/, '');
-  };
-  const home = val('BISE_HOME');
-  if (val(FAKE_VOICE_ENV) === null || home === null) return false;
-  const his = val('HOME');
-  return home.includes('/.bise/gate/') || (his !== null && home !== `${his}/.bise`);
-}
-
-/**
- * What the window gets at once for a mic command main dropped: a take never sits on 'transcribing…'
- * (amb-tools m_22460). dictate_start: its final with the reason; talk_start or voice mode on: the
- * core's error for that command; anything else (voice mode off): nothing to answer. Pure.
- */
-export function micDropAnswer(cmd: Readonly<Record<string, unknown>>): Record<string, unknown> | null {
-  const text = 'no mic in an off-screen run.';
-  if (cmd['cmd'] === 'dictate_start') return { ev: 'dictation', id: cmd['id'], text: '', final: true, error: text };
-  if (cmd['cmd'] === 'talk_start') return { ev: 'error', cmd: 'talk_start', text };
-  if (cmd['cmd'] === 'voice_mode' && cmd['on'] === true) return { ev: 'error', cmd: 'voice_mode', text };
-  return null;
 }
 
 /** The page permissions an off-screen run still grants (no TCC behind them): the clipboard only. */

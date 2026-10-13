@@ -25,7 +25,6 @@
 2451 rust/switchboard/src/daemon.rs
 1188 rust/switchboard/src/daemon/gate.rs
 1207 rust/switchboard/src/daemon/versions.rs
-1033 rust/tui/src/ambient/tests.rs
 1391 rust/tui/src/attach.rs
 1029 rust/tui/src/ctrlhint.rs
 1191 rust/tui/src/diffview.rs
