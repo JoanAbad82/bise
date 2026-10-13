@@ -1281,7 +1281,8 @@ async function newRows(harness, say) {
     await page.keyboard.press('Enter');
     // the bubble: before, the quote, after, in that order
     const bubble = await until(async () => page.evaluate(() => {
-      const mine = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.entry."]')].filter((r) => (r.textContent ?? '').includes('before') && (r.textContent ?? '').includes('after'));
+      // his bubble, never bise's ack that echoes 'before … after' (cand-e91f98d7 run): it holds the chip
+      const mine = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.entry."]')].filter((r) => (r.textContent ?? '').includes('before') && (r.textContent ?? '').includes('after') && /[❝“]/.test(r.textContent ?? ''));
       const b = mine.at(-1);
       if (!b) return null;
       const t = b.textContent ?? '';
@@ -1371,7 +1372,12 @@ async function newRows(harness, say) {
       } catch (e) { frame = { error: String(e).slice(0, 200) }; }
       try { await cp.screenshot({ path: path.join(out, `${mode}${tag}-corner-card.png`) }); res.shots.push(path.join(out, `${mode}${tag}-corner-card.png`)); save(); } catch { /* the steps say enough */ }
     }
-    step('the fn talk corner card: his words and the answer', !!seen, seen ?? { capsule: !!cp });
+    // the talk itself, without the card: his words reach the model (the capsule enters a talk only
+    // from the helper's fn, machine.ts, and off-screen runs no helper, offscreen.ts)
+    const LOG = process.env.AS_HE_DOES_FAKE_LOG;
+    const heard = LOG && fs.existsSync(LOG) ? fs.readFileSync(LOG, 'utf8').includes('what time is it') : null;
+    step("the fn talk's words reach main's model (core talk_start/talk_end)", heard === true, { log: LOG ?? 'AS_HE_DOES_FAKE_LOG not set', heard });
+    step('the fn talk corner card: his words and the answer', !!seen, seen ?? { capsule: !!cp, why: 'off-screen has no helper: the capsule never enters a talk from a core talk_start alone' });
     // off-screen rule (offscreen.ts): every window at -30000, never on a screen
     const off = !!frame?.bounds && (frame.bounds.left <= -20000 || frame.bounds.top <= -20000 || frame.bounds.windowState === 'minimized');
     step('its window frame is off every screen (the off-screen rule: -30000)', off, frame);
