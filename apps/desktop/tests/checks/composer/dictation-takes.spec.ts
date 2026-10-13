@@ -64,7 +64,7 @@ type Take = {
   /** the words that must reach the field, one list per dictation of the take */
   words: string[];
   /** a take whose press may be refused returns where and how fast the field said why */
-  keys: (k: Keys) => Promise<Why | undefined>;
+  keys: (k: Keys) => Promise<Why | undefined> | Promise<void>;
   /** the words a fn talk hears before the take: a take during a talk ends the talk as at fn up and
    * gets the mic (amb-core m_22241, ambient-lead m_22267), so the take's words must land and the
    * talk's words are heard (recorded as talkHeard). Every refusal is red, a note only too. */
@@ -265,6 +265,10 @@ type TakeOut = {
   talkHeard: boolean | null;
   /** a capsule talk: how many talk_end lines the core logged in the take (must be 1) */
   talkEnds: number | null;
+  /** a take that ends a fn talk: the talk's words were sent to main (null: no such talk) */
+  talkSent: boolean | null;
+  /** the notices the window showed during the take */
+  notices: string[];
   /** the core's new core.log lines during the take (ambient-core / talk / dictate: no words) */
   core: string[];
   /** the window's new app.log lines during the take (dictation / mic / talk decisions) */

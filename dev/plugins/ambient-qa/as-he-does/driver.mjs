@@ -740,8 +740,9 @@ if (mode === 'rows2') {
     return { held, released: await hintsNow() };
   };
   await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
+  // e4394a9e: the hints show after 150 ms (the TUI's ctrl hint delay), so a quick ⌘ is 60 ms
   await page.keyboard.down('Meta');
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(60);
   const quick = await hintsNow();
   await page.keyboard.up('Meta');
   await page.waitForTimeout(400);
@@ -1152,6 +1153,324 @@ if (mode === 'rows2') {
   step("an archived maker's head beside its artifact at 1100: restore inside its column", gh.agent === MAKER && gh.width === 1100 && fits, gh);
   await harness();
   await fileChips(harness);
+  await quickRows(harness, say);
+}
+
+// quick: the quick rows alone, a follow-up pass on a candidate (cand.sh AS_HE_DOES_ONLY=quick)
+if (mode === 'quick') {
+  const composerOf = () => page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
+  const say = async (words) => {
+    if (!(await click(`say ${words.slice(0, 30)}`, composerOf()))) return false;
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type(words, { delay: 5 });
+    await page.keyboard.press('Enter');
+    return true;
+  };
+  const harness = () => click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
+  await closeArtifact();
+  await quickRows(harness, say);
+  await newRows(harness, say);
+}
+
+// d0d45f92's rows (ambient-lead m_22519): the help sheet opaque, esc never stops a turn and ctrl+c
+// does (f8a5b459), a quote chip mid-sentence stays at its place in the bubble and the model's
+// request (8ed6bf27), settings › approvals walks with the list keys (dda351fc) and ⌘I, the fn
+// talk's corner card (666d9549) with its window frame under the off-screen rule. Each row is its
+// own try: a row that throws is a red step, the next rows still run.
+async function newRows(harness, say) {
+  const row = async (name, fn) => {
+    try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
+  };
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const clear = async () => {
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+  };
+  const body = async () => (await page.evaluate(() => document.body.innerText).catch(() => '')) ?? '';
+
+  await row('help sheet', async () => {
+    await harness();
+    await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
+    await page.keyboard.press('Meta+/');
+    const over = page.locator('[data-testid="help.overlay"]').first();
+    const open = await over.waitFor({ timeout: 4000 }).then(() => true, () => false);
+    // the sheet: the overlay's first descendant drawn with a background; opaque = alpha 1
+    const bg = open ? await over.evaluate((o) => {
+      const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c); if (!m) return 0; const p = m[1].split(',').map((x) => parseFloat(x)); return p.length > 3 ? p[3] : 1; };
+      for (const el of o.querySelectorAll('*')) {
+        const c = getComputedStyle(el).backgroundColor;
+        if (alpha(c) > 0 && el.getBoundingClientRect().width > 200) return { cls: el.className, color: c, alpha: alpha(c) };
+      }
+      return null;
+    }) : null;
+    await shot('help-sheet');
+    step('the help sheet (⌘/) is opaque on the scrim', open && bg !== null && bg.alpha === 1, { open, bg });
+    if (open) await page.keyboard.press('Escape');
+  });
+
+  await row('esc / ctrl+c during a turn', async () => {
+    await harness();
+    await clear();
+    await say('[[slow: 40]] a long turn to stop');
+    const keyLine = async () => /ctrl\+c stop/.test(await body());
+    const working = await until(async () => ((await keyLine()) ? true : null), 20000, 500);
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.type('garde ça', { delay: 10 });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(2500);
+    const afterEsc = { keyLine: await keyLine(), stopping: (await page.locator('[data-testid="thread.stopping"]').count()) > 0 };
+    step('esc during a turn does not stop it (the turn still runs 2.5 s later)', !!working && afterEsc.keyLine && !afterEsc.stopping, { working: !!working, afterEsc });
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('End');
+    await page.keyboard.press('Control+c');
+    const stopping = await until(async () => {
+      const s = (await page.locator('[data-testid="thread.stopping"]').count()) > 0;
+      const gone = !(await keyLine());
+      return s || gone ? { stopping: s, keyLineGone: gone } : null;
+    }, 15000, 300);
+    const draft = ((await field.innerText({ timeout: 2000 }).catch(() => '')) ?? '').trim();
+    await shot('ctrl-c-stopped');
+    step('ctrl+c stops the turn; the draft stays', !!stopping && draft.includes('garde ça'), { stopping, draft });
+    await clear();
+  });
+
+  await row('quote mid-sentence', async () => {
+    await harness();
+    await clear();
+    await say('[[reply: QUOTE_SRC]] please answer');
+    // the fake provider answers 'QUOTE_SRC' as a path it can't read: any words of the last answer do
+    const src = await until(async () => page.evaluate(() => {
+      const rows = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.entry."]')].filter((r) => r.getAttribute('data-side') !== 'me' && r.getAttribute('data-kind') !== 'tool');
+      const last = rows.at(-1);
+      const w = last ? document.createTreeWalker(last, NodeFilter.SHOW_TEXT) : null;
+      while (w?.nextNode()) { const t = w.currentNode.textContent.trim(); if (t.split(/\s+/).length >= 3) return t.split(/\s+/).slice(0, 3).join(' '); }
+      return null;
+    }), 30000, 1000);
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.type('before ', { delay: 10 });
+    let pop = false;
+    if (src) {
+      await page.evaluate((words) => {
+        const list = document.querySelector('[data-testid="thread.list"]');
+        const w = document.createTreeWalker(list ?? document.body, NodeFilter.SHOW_TEXT);
+        let n = null;
+        while (w.nextNode()) if (w.currentNode.textContent.includes(words)) n = w.currentNode;
+        if (!n) return;
+        const i = n.textContent.indexOf(words);
+        const r = document.createRange();
+        r.setStart(n, i);
+        r.setEnd(n, i + words.length);
+        const s = window.getSelection();
+        s.removeAllRanges();
+        s.addRange(r);
+        n.parentElement.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      }, src);
+      pop = await page.locator('[data-testid="thread.quote.pop"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+      if (pop) await page.locator('[data-testid="thread.quote.pop.ask"]').first().click({ timeout: 3000 }).catch(() => {});
+    }
+    // the caret after the chip: his words go on after it
+    await page.waitForTimeout(400);
+    await page.keyboard.type(' after', { delay: 10 });
+    const chip = (await field.locator('[data-kind="quote"]').count()) > 0;
+    const inField = ((await field.innerText({ timeout: 2000 }).catch(() => '')) ?? '').replace(/\s+/g, ' ');
+    await shot('quote-mid-sentence-field');
+    await page.keyboard.press('Enter');
+    // the bubble: before, the quote, after, in that order
+    const bubble = await until(async () => page.evaluate(() => {
+      const mine = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.entry."]')].filter((r) => (r.textContent ?? '').includes('before') && (r.textContent ?? '').includes('after'));
+      const b = mine.at(-1);
+      if (!b) return null;
+      const t = b.textContent ?? '';
+      const q = b.querySelector('[data-kind="quote"], [class*="quote"]');
+      return { text: t.slice(0, 300), quote: q ? (q.textContent ?? '').slice(0, 120) : null, order: q ? [t.indexOf('before'), t.indexOf(q.textContent ?? '\u0000'), t.indexOf('after')] : null };
+    }), 10000, 500);
+    await shot('quote-mid-sentence-bubble');
+    const inPlace = (o) => !!o && o[0] >= 0 && o[1] > o[0] && o[2] > o[1];
+    step('a quote chip mid-sentence stays at its place in the bubble (before, the quote, after)', pop && chip && !!bubble && inPlace(bubble.order), { src, pop, chip, inField: inField.slice(0, 200), bubble });
+    // the model's request: the user message holds before, the quoted words, after, in that order
+    const LOG = process.env.AS_HE_DOES_FAKE_LOG;
+    const req = await until(async () => {
+      if (!LOG || !fs.existsSync(LOG)) return null;
+      const lines = fs.readFileSync(LOG, 'utf8').split('\n').filter((l) => l.includes('before') && l.includes('after'));
+      if (lines.length === 0) return null;
+      const j = JSON.parse(lines.at(-1));
+      const u = typeof j.user === 'string' ? j.user : JSON.stringify(j.user ?? j.last_user ?? j);
+      return { user: u.slice(0, 400), order: [u.indexOf('before'), src ? u.indexOf(src) : -1, u.indexOf('after')] };
+    }, 30000, 1000);
+    step("the quote sits at its place in the model's request too (before, the quote, after)", !!req && inPlace(req.order), req ?? { log: LOG ?? 'AS_HE_DOES_FAKE_LOG not set' });
+    await clear();
+  });
+
+  await row('approvals walk', async () => {
+    await click('settings', page.locator('[data-testid="app.sidebar"]').getByText('settings', { exact: true }).first());
+    const nav = page.locator('[data-testid="settings.nav.approvals"]').first();
+    if (!(await nav.count())) await page.getByText('approvals', { exact: true }).first().click({ timeout: 5000 }).catch(() => {});
+    else await nav.click({ timeout: 5000 }).catch(() => {});
+    const rows = page.locator('[data-testid="settings.approvals.rules"] .b-gi');
+    const n = await until(async () => { const c = await rows.count(); return c >= 3 ? c : null; }, 8000, 400);
+    const sel = () => page.evaluate(() => {
+      const all = [...document.querySelectorAll('[data-testid="settings.approvals.rules"] .b-gi')];
+      return all.findIndex((r) => r.classList.contains('is-sel'));
+    });
+    await page.evaluate(() => { document.querySelector('.settings-approvals')?.focus(); });
+    const s0 = await sel();
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(150);
+    const s1 = await sel();
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(150);
+    const s2 = await sel();
+    await page.keyboard.press('ArrowUp');
+    await page.waitForTimeout(150);
+    const s3 = await sel();
+    await shot('approvals-walk');
+    // ↓ selects (or moves), ↓ moves one down, ↑ comes back
+    step('settings › approvals walks with ↓↓↑ (3 saved rules)', !!n && s1 >= 0 && s2 === s1 + 1 && s3 === s1, { n, s0, s1, s2, s3 });
+    // ⌘I: the inbox (a native menu accelerator in the packed app: CDP keys may not reach it)
+    await page.keyboard.press('Meta+i');
+    await page.waitForTimeout(800);
+    const inbox = await page.evaluate(() => !!document.querySelector('[data-testid^="inbox"], [data-testid="app.inbox"]'));
+    await shot('cmd-i');
+    step('⌘I opens the inbox (CDP key; a native menu accelerator would not get it)', inbox, { inbox });
+    await page.keyboard.press('Escape');
+  });
+
+  await row('corner card', async () => {
+    const VOICE = process.env.AS_HE_DOES_VOICE;
+    if (!VOICE) { step('the fn talk corner card', false, 'no fake voice (AS_HE_DOES_VOICE)'); return; }
+    await harness();
+    fs.writeFileSync(VOICE, 'what time is it');
+    // no helper off-screen: the talk starts and ends as the capsule's fn would send them
+    await page.evaluate(() => window.bise.core.send({ cmd: 'talk_start' }));
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => window.bise.core.send({ cmd: 'talk_end' }));
+    const capPage = () => browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().includes('surface=capsule'));
+    const seen = await until(async () => {
+      const cp = capPage();
+      if (!cp) return null;
+      const r = await cp.evaluate(() => ({
+        card: !!document.querySelector('[data-testid="capsule.card"]'),
+        talk: document.querySelector('[data-testid="capsule.talk.words"]')?.textContent ?? null,
+        answer: document.querySelector('[data-testid="capsule.answer"]')?.textContent?.slice(0, 200) ?? null,
+      }));
+      return r.card && r.answer ? r : null;
+    }, 30000, 500);
+    let frame = null;
+    const cp = capPage();
+    if (cp) {
+      try {
+        const s = await cp.context().newCDPSession(cp);
+        const { targetInfo } = await s.send('Target.getTargetInfo');
+        const b = await browser.newBrowserCDPSession();
+        const w = await b.send('Browser.getWindowForTarget', { targetId: targetInfo.targetId });
+        frame = { bounds: w.bounds, screen: await cp.evaluate(() => ({ w: window.screen.width, h: window.screen.height })) };
+      } catch (e) { frame = { error: String(e).slice(0, 200) }; }
+      try { await cp.screenshot({ path: path.join(out, `${mode}${tag}-corner-card.png`) }); res.shots.push(path.join(out, `${mode}${tag}-corner-card.png`)); save(); } catch { /* the steps say enough */ }
+    }
+    step('the fn talk corner card: his words and the answer', !!seen, seen ?? { capsule: !!cp });
+    // off-screen rule (offscreen.ts): every window at -30000, never on a screen
+    const off = !!frame?.bounds && (frame.bounds.left <= -20000 || frame.bounds.top <= -20000 || frame.bounds.windowState === 'minimized');
+    step('its window frame is off every screen (the off-screen rule: -30000)', off, frame);
+    const t0 = Date.now();
+    const closed = await until(async () => {
+      const r = await capPage()?.evaluate(() => !document.querySelector('[data-testid="capsule.card"]')).catch(() => null);
+      return r ? Date.now() - t0 : null;
+    }, 20000, 500);
+    step('the corner card closes by itself (8 s linger)', closed !== null && closed <= 14000, { closedAfterMs: closed });
+  });
+}
+
+// 276074b2's quick rows (ambient-lead m_22369), in harness' thread: '?' and space type (281879ed),
+// an opened run_typescript box shows its source (1f5819a7), ⌘ hints at 150 ms (e4394a9e), and
+// /artifacts ↓↓⏎ (f3fa6edb's list keys)
+async function quickRows(harness, say) {
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const fieldText = async () => ((await field.innerText({ timeout: 2000 }).catch(() => null)) ?? '').trim();
+  const clear = async () => {
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+  };
+  await harness();
+  // '?' is his to type: a message may start with it, no help sheet
+  await clear();
+  await page.keyboard.type('?ok', { delay: 20 });
+  await page.waitForTimeout(400);
+  const q = { field: await fieldText(), help: (await page.locator('[data-testid="help.overlay"]').count()) > 0 };
+  step("'?' types into the composer (no help sheet)", q.field.startsWith('?ok') && !q.help, q);
+  if (q.help) await page.keyboard.press('Escape');
+  // space with nothing focused types into the composer
+  await clear();
+  await page.keyboard.type('abc', { delay: 20 });
+  await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
+  await page.waitForTimeout(200);
+  const blurred = await page.evaluate(() => document.activeElement === document.body);
+  await page.keyboard.press('Space');
+  await page.keyboard.type('d');
+  await page.waitForTimeout(400);
+  const sp = { blurred, field: await fieldText() };
+  step('space with nothing focused types into the composer', sp.field === 'abc d', sp);
+  await clear();
+  // a run_typescript call, opened: the program it ran, never its args' JSON, and the TUI's 'ƒ' sign
+  const before = await page.locator('[data-testid^="thread.tool."][role="button"]').count();
+  await say('[[ts: const answer = 40 + 2; return answer;]]');
+  const tool = await until(async () => {
+    const n = await page.locator('[data-testid^="thread.tool."][role="button"]').count();
+    return n > before ? page.locator('[data-testid^="thread.tool."][role="button"]').last() : null;
+  }, 60000, 1000);
+  let ts = { row: null, code: null, opened: false };
+  if (tool) {
+    const id = await tool.getAttribute('data-testid');
+    ts.row = ((await tool.innerText().catch(() => '')) ?? '').slice(0, 200);
+    await tool.scrollIntoViewIfNeeded().catch(() => {});
+    await tool.click({ timeout: 3000 }).catch(() => {});
+    const code = page.locator(`[data-testid="${id}.code"]`).first();
+    ts.opened = await code.waitFor({ timeout: 8000 }).then(() => true, () => false);
+    ts.code = ts.opened ? ((await code.innerText().catch(() => '')) ?? '').slice(0, 300) : null;
+    await shot('run-typescript-open');
+  }
+  step('an opened run_typescript box shows the program it ran (not its JSON), its row signed ƒ',
+    ts.opened && /const answer = 40 \+ 2/.test(ts.code ?? '') && !/"code"\s*:/.test(ts.code ?? '') && /ƒ/.test(ts.row ?? ''), ts);
+  // ⌘ hints: none at 60 ms, there at 250 ms (150 ms delay), gone on release
+  const hintN = () => page.evaluate(() => document.querySelectorAll('.app-keyhint').length);
+  await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
+  await page.keyboard.down('Meta');
+  await page.waitForTimeout(60);
+  const at60 = await hintN();
+  await page.waitForTimeout(190);
+  const at250 = await hintN();
+  await page.keyboard.up('Meta');
+  await page.waitForTimeout(200);
+  const after = await hintN();
+  step('⌘ hints show after 150 ms: none at 60 ms, there at 250 ms, gone on release', at60 === 0 && at250 > 0 && after === 0, { at60, at250, after });
+  // /artifacts: the first row selected on open, ↓↓ moves to the third, ⏎ opens it
+  await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
+  const rows = page.locator('[data-testid^="artifacts.list.row."]');
+  await rows.first().waitFor({ timeout: 8000 }).catch(() => {});
+  const selected = () => page.evaluate(() => {
+    const all = [...document.querySelectorAll('[data-testid^="artifacts.list.row."]')];
+    return { n: all.length, at: all.findIndex((r) => r.getAttribute('aria-selected') === 'true'), title: all.find((r) => r.getAttribute('aria-selected') === 'true')?.textContent?.trim().slice(0, 60) ?? null };
+  });
+  await page.evaluate(() => { document.querySelector('[data-testid="artifacts.screen"]')?.focus(); });
+  const s0 = await selected();
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(150);
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(150);
+  const s2 = await selected();
+  await page.keyboard.press('Enter');
+  const opened = await page.locator('[data-testid="app.art"], [data-testid="artifact.page"]').first().waitFor({ timeout: 8000 }).then(() => true, () => false);
+  await shot('artifacts-down-down-enter');
+  // the selection comes back for 10 minutes (listkeys keepAs 'artifacts.sel:<project>'): an earlier
+  // pass that opened an artifact leaves its row selected, so ↓↓ is read from wherever it starts
+  // (cand-2760: 16 → 18 of 19); the first row on a fresh open is artifacts.test.tsx's
+  // a quick world may hold fewer than 3 artifacts (cand-2760q: 1): ↓↓ stops on the last row there
+  const want = Math.min(s0.at + 2, s0.n - 1);
+  step(`/artifacts: a row selected on open (the first, or the one kept), ↓↓ moves two down${s0.n < 3 ? ` (only ${String(s0.n)} row(s): stops on the last)` : ''}, ⏎ opens it`, s0.n >= 1 && s0.at >= 0 && s2.at === want && opened, { first: s0, after_down_down: s2, want, opened });
+  await closeArtifact();
+  await harness();
 }
 
 // (f1) ad753852's file chips (ambient-lead m_22068): a Finder drop (CDP's drag, the desktop checks'
@@ -1319,9 +1638,13 @@ async function fileChips(harness) {
     const chip = await until(async () => ((await fileChip.count()) === 1 && /bench-zq\.csv/.test(await fileChip.first().innerText().catch(() => '')) ? true : null), 8000, 300);
     await shot('file-chip-card-answer');
     await page.keyboard.press('Enter');
-    const got = await until(async () => journal('bench-zq.csv').find((r) => r.parts?.some((p) => p.kind === 'file' && p.path === csv)) ?? null, 30000, 1000);
-    ans = { ...ans, chip: !!chip, entry: got ? { ...got, parts: got.parts.map((p) => ({ kind: p.kind, name: p.name, path: p.path ? path.basename(p.path) : undefined, text: p.text })) } : journal('bench-zq.csv').slice(0, 2) };
-    ans.ok = !!chip && !!got && got.parts[0]?.kind === 'text' && /cold, see/.test(got.parts[0]?.text ?? '');
+    // an answer reaches main as the hub's own words ('the user answered card #N (…): "…"'), the file
+    // in them as its <file … path=…> tag where he dropped it (cand-2760), or as a file part
+    const asPart = (r) => r.parts?.some((p) => p.kind === 'file' && p.path === csv);
+    const asTag = (r) => /answered card/.test(r.text) && r.text.includes(`cold, see <file name="[File #1]" path="${csv}"`);
+    const got = await until(async () => journal('bench-zq.csv').find((r) => asPart(r) || asTag(r)) ?? null, 30000, 1000);
+    ans = { ...ans, chip: !!chip, entry: got ? { ...got, parts: got.parts?.map((p) => ({ kind: p.kind, name: p.name, path: p.path ? path.basename(p.path) : undefined, text: p.text })) ?? null } : journal('bench-zq.csv').slice(0, 2) };
+    ans.ok = !!chip && !!got && (asTag(got) || (got.parts[0]?.kind === 'text' && /cold, see/.test(got.parts[0]?.text ?? '')));
   }
   step("(f1) a csv dropped while answering a card: a file chip, sent as a file part where it was", !!ans.ok, ans);
   await harness();

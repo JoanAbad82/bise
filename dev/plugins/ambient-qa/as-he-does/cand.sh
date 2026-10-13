@@ -17,6 +17,10 @@ P=${AS_HE_DOES_PYTHON:-$HOME/.pyenv/versions/3.11.13/bin/python3}
 HERE=$(cd "$(dirname "$0")" && pwd); T=$(cd "$HERE/../../../.." && pwd)
 RS="$P -B $HERE/../realshape.py"
 G=$HOME/.bise/gate/real-shape; H=$G/w/h
+# AS_HE_DOES_FAKE_VOICE=1: the candidate's core hears the words written to $VOICE (fake.rs: its
+# BISE_HOME is under ~/.bise/gate, never his), for dict1.mjs' ctrl+r take
+VOICE=$G/voice-cand.txt; FV=()
+[ "${AS_HE_DOES_FAKE_VOICE:-}" = 1 ] && { : > "$VOICE"; FV=(--env "BISE_AMBIENT_FAKE_VOICE=$VOICE"); export AS_HE_DOES_VOICE=$VOICE; }
 HIS="$HOME/.bise/dev/try-src/apps/desktop/dist/mac-arm64/bise try.app"
 # its main executable from its own Info.plist (amb-mac fb2e544f: candidates are "bise cand.app")
 EXE=$([ -f "$A/Contents/Info.plist" ] && /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$A/Contents/Info.plist" 2>/dev/null)
@@ -98,7 +102,7 @@ stopcand() {
     cat $O/BREACH; return 1; }
 }
 opencand() {
-  open -g -n -a "$A" --env HOME=$H --env BISE_HOME=$H/.bise --env BISE_DESKTOP_OFFSCREEN=1 \
+  open -g -n -a "$A" --env HOME=$H --env BISE_HOME=$H/.bise --env BISE_DESKTOP_OFFSCREEN=1 ${FV[@]+"${FV[@]}"} \
     --args --remote-debugging-address=127.0.0.1 --remote-debugging-port=$PORT_CDP
   for i in $(seq 120); do [ -n "$(mainpid)" ] && break; sleep 0.25; done
   say "open: $A ($(grep commit= "$A/Contents/Resources/bin/VERSION")), pid $(mainpid), home $H/.bise"
@@ -144,7 +148,9 @@ rm -f $O/BREACH $O/stop $O/pids.txt $O/hubs-steps.jsonl $O/hubs-outside.txt
 say "his app before: $(hispids)" | tee $O/his.txt
 $RS libsnap --out $O/before.json
 $RS build | tail -8
-mkdir -p $G/fake; ($P -u $T/tests/fake_provider.py 0 > $G/fake/fake.out 2> $G/fake/fake.err & echo $! > $G/fake/fake.pid)
+# every model request in a line (the quote row reads it), in the world, never /tmp's default
+export FAKE_LOG=$G/fake/requests.jsonl AS_HE_DOES_FAKE_LOG=$G/fake/requests.jsonl
+mkdir -p $G/fake; : > $FAKE_LOG; ($P -u $T/tests/fake_provider.py 0 > $G/fake/fake.out 2> $G/fake/fake.err & echo $! > $G/fake/fake.pid)
 for i in $(seq 30); do grep -q PORT $G/fake/fake.out 2>/dev/null && break; sleep 0.3; done
 PORT=$(awk '/PORT/{print $2}' $G/fake/fake.out); say "fake provider port $PORT"
 cat >> $H/.bise/config.toml <<TOML
@@ -159,6 +165,20 @@ base_url = "http://127.0.0.1:$PORT/v1"
 key_env = "BISE_TRY_FAKE_KEY"
 key_command = "echo fake-key"
 small_model = "mistral-small-latest"
+TOML
+# three saved rules, so settings › approvals has a list to walk (d0d45f92's rows; rules.rs's format)
+[ -e $H/.bise/approvals.toml ] || cat > $H/.bise/approvals.toml <<TOML
+[[allow]]
+tool = "bash"
+pattern = "cargo test *"
+
+[[allow]]
+tool = "bash"
+pattern = "pnpm check"
+
+[[allow]]
+tool = "bash"
+pattern = "ls *"
 TOML
 log stream --style compact --predicate 'process == "tccd"' > $O/tccd.log 2>&1 & TPID=$!
 log stream --level debug --style ndjson --predicate 'process == "tccd" OR subsystem == "com.apple.TCC"' > $O/tcc-debug.ndjson 2>&1 & NPID=$!
@@ -175,6 +195,20 @@ sleep 1
 
 # first launch: the passes, this cut's rows, then the draft across two restarts (SIGTERM)
 say "launch first"; opencand; breach; libgate first-open
+if [ "${AS_HE_DOES_ONLY:-}" = quick ]; then
+  # a follow-up pass (ambient-lead m_22430): the quick rows, then one real ctrl+r take with the
+  # fake voice (AS_HE_DOES_FAKE_VOICE=1), then the usual stop and gates
+  drive quick
+  if [ -n "${FV:-}" ]; then
+    AS_HE_DOES_VOICE=$VOICE node $HERE/dict1.mjs $PORT_CDP $O > $O/driver-dict1.log 2>&1; tail -4 $O/driver-dict1.log; breach
+  fi
+  L=$(find "$H" -name core.log -newer $O/before.json -not -path "*/.bise/hubs/*" -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1)
+  [ -n "$L" ] && cp "$L" $O/core-first.log
+  stopcand; breach; libgate first-stop
+  touch $O/stop; wait $FPID $CCPID; kill $TPID $NPID $CPID 2>/dev/null
+  kill $(cat $G/fake/fake.pid) 2>/dev/null
+  say "done (quick)"; exit 0
+fi
 drive first
 drive cut
 drive rows2
