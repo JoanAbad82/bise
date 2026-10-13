@@ -17,7 +17,9 @@
 //! its steps and replay lines, never its heartbeats); a switch kills a
 //! hub that stops moving, a rollback leaves it booting (it stops itself
 //! when stuck). A probation without
-//! failure marks the version good. `versions.json` in the state dir holds
+//! failure marks the version good, with no line in main's thread: its
+//! start and end are the switch row's (`notice` kind `switch`) and
+//! hub.log's (designer m_23091). `versions.json` in the state dir holds
 //! `current`, `good` and `previous` (version dirs).
 
 use crate::client;
@@ -117,6 +119,16 @@ fn ping(paths: &Paths) -> bool {
     )
     .is_ok()
 }
+
+/// The switch's phase moved in versions.json: the hub sends its switch
+/// row to every client, and writes no line in main's thread (a `notice`
+/// of kind `switch`, daemon::dispatch).
+fn phase_moved(paths: &Paths) {
+    notice(paths, SWITCH_KIND, "");
+}
+
+/// The notice kind that only marks a switch phase (no thread line).
+pub const SWITCH_KIND: &str = "switch";
 
 /// A line in main's thread (and every client), through the hub.
 pub fn notice(paths: &Paths, kind: &str, text: &str) {
@@ -588,11 +600,10 @@ fn run_locked(paths: &Paths, to: &Path, period: Duration, restart: bool, reload:
     } else {
         format!("switching to version {} (from {})", to_id, from_id)
     };
-    notice(
-        paths,
-        "info",
-        &format!("{}{}{}", what, if reload { "" } else { " — the agents keep running" }, saved),
-    );
+    // in hub.log, not main's thread: the switch row says it while it runs,
+    // and a line in the thread would stay after the hub is back (designer
+    // m_22843: a restart that went well leaves no line)
+    log(paths, &format!("{}{}{}", what, if reload { "" } else { " · the agents keep running" }, saved));
     let _ = std::fs::remove_file(fail_file(paths));
     if from != to {
         st["previous"] = json!(from.to_string_lossy());
@@ -607,6 +618,8 @@ fn run_locked(paths: &Paths, to: &Path, period: Duration, restart: bool, reload:
     if reload {
         let _ = std::fs::write(reload_file(paths), now_ms().to_string());
     }
+    // the phase is written: the hub sends its switch row ('reloading')
+    phase_moved(paths);
 
     let outcome = replace_hub(paths, &to, from == to, Late::Kill).and_then(|_| probation(paths, period));
     let mut st = read_state(paths);
@@ -617,17 +630,8 @@ fn run_locked(paths: &Paths, to: &Path, period: Duration, restart: bool, reload:
             set_phase(&mut st, "passed", &to_id, &from_id, None);
             write_state(paths, &st);
             log(paths, &format!("{} good", to_id));
-            notice(
-                paths,
-                "info",
-                &if reload {
-                    format!("bise reloaded on version {} (probation passed)", to_id)
-                } else if from == to {
-                    format!("hub restarted on version {} (probation passed)", to_id)
-                } else {
-                    format!("version {} validated (probation passed)", to_id)
-                },
-            );
+            // no thread line either: the switch row says '✓ reloaded'
+            phase_moved(paths);
             0
         }
         Err(reason) => {

@@ -254,7 +254,10 @@ impl Shell {
                 }
             }
             Msg::Notice { kind, text } => {
-                self.feed_rec(MAIN, if kind == "warn" { Feed::warn(text) } else { Feed::info(text) });
+                // a switch phase alone (its start, its probation passed): the switch row says it, no thread line
+                if kind != crate::switch::SWITCH_KIND {
+                    self.feed_rec(MAIN, if kind == "warn" { Feed::warn(text) } else { Feed::info(text) });
+                }
                 self.broadcast_versions();
                 // the switcher's notices mark its phases (versions.json)
                 self.switch_moved();

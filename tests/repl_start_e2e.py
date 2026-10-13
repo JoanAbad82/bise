@@ -168,6 +168,12 @@ def main():
         # the reload's row (architect m_20576): the new hub says it passed
         sw = (switch_ev(E) or {}).get("switch") or {}
         check(sw.get("phase") == "passed" and sw.get("to") and sw.get("at_ms"), "the switch row says passed: %r" % sw)
+        # a switch that went well leaves no line in main's thread (designer
+        # m_23091): its start and its probation are the row's and hub.log's
+        said = [r.get("text", "") for k in ("info", "warn") for r in c.feed("main", k)]
+        switcher = [t for t in said if re.search(r"reloading bise|restarting the hub|switching to version|state backed up|probation passed", t)]
+        check(not switcher, "no switcher line in main's thread after a good reload: %r" % switcher)
+        check(any("state backed up" in l for l in log_lines(E)[n0:]), "the backup dir in hub.log")
 
         # 2. a version whose REPLs never start rolls back
         c.wait_idle("main", *TASKS, timeout=120)
@@ -191,6 +197,9 @@ def main():
             return sw.get("phase") == "rolled_back"
         c.wait(rolled_back, 120, lambda: "the switch row says rolled_back: %r" % seen[-1:])
         check("no progress" in (seen[-1].get("reason") or ""), "the rollback's reason on the row: %r" % seen[-1])
+        # a rollback still writes its ▲ line in main's thread
+        c.wait(lambda: any("rollback to version" in r.get("text", "") for r in c.feed("main", "warn")), 60,
+               "the rollback's warn line in main's thread")
         print("repl starts: ok (%d at once at most; a never-starting version rolled back)" % most)
     except BaseException:
         # a red run keeps its hub (hub.log says which REPL never switched)

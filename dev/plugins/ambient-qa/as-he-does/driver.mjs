@@ -1787,14 +1787,12 @@ async function rows25(harness, say) {
     const afterReload = await page.locator(N).count();
     await shot('restart-after-reload');
     step('after a reload: no restart row', afterReload === 0, { count: afterReload });
-    // the switcher's own line (switch.rs notice: 'reloading bise on version … · state backed up: …') is a
-    // thread entry, not the transient row: said as it stands after the hello and the reload (a finding
-    // for ambient-lead, not this row's pass: his m_22835 'ne disparaît jamais' may be this one)
+    // the switcher writes no line in the thread for a switch that goes well (designer m_23091: its start
+    // and its probation are the switch row's and hub.log's; his m_22835 'ne disparaît jamais')
     const listed = await page.evaluate(() => [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.notice."]')]
       .map((e) => ({ id: e.getAttribute('data-testid'), text: e.textContent.replace(/\s+/g, ' ').trim().slice(0, 200), left: Math.round(e.getBoundingClientRect().left * 10) / 10 }))
-      .filter((e) => /restarting the hub|reloading bise/.test(e.text)));
-    const col = await page.evaluate(() => { const ps = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.entry."] .th-md p')]; return ps.length ? Math.round(ps.at(-1).getBoundingClientRect().left * 10) / 10 : null; });
-    step("after the hello and a reload: the switcher's restart line in the thread's list (info: stays, on the column)", true, { listed, col });
+      .filter((e) => /restarting the hub|reloading bise|state backed up|probation passed/.test(e.text)));
+    step("after the hello and a reload: no switcher line in the thread's list", listed.length === 0, { listed });
   });
 
   for (const scr of ['artifacts', 'scheduled']) {
