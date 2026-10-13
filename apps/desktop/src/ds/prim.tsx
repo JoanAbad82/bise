@@ -11,7 +11,8 @@ import { cx, st, step5, sub, type UiState } from "./cx";
 import { LivePearl, MOODS, type Mood } from "@/pearl";
 import { Breath } from "@/working/Signs";
 
-export type Tone = "acc" | "err" | "ok";
+/** acc: what waits on him; new: ink on a 1 px line, no fill (designer m_21383) */
+export type Tone = "acc" | "new" | "err" | "ok";
 export type DotState = "wk" | "nd" | "ok" | "er" | "off";
 
 export interface ButtonProps {

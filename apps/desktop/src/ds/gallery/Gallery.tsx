@@ -101,7 +101,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
     </>
   ),
   chips: () => (
-    <div className="g-row"><Chip>main.rs</Chip><Chip tone="acc">new</Chip><Chip tone="err">failed</Chip><Chip tone="ok">merged</Chip><Kbd>⌘I</Kbd><Kbd>esc</Kbd></div>
+    <div className="g-row"><Chip>main.rs</Chip><Chip tone="new">new</Chip><Chip tone="err">failed</Chip><Chip tone="ok">merged</Chip><Kbd>⌘I</Kbd><Kbd>esc</Kbd></div>
   ),
   seg: () => (
     <div className="g-col">

@@ -237,7 +237,7 @@ export function Art({ title, meta, isNew, thumb, state, onClick, testId }: ArtPr
     <div className={cx("b-art", st(state))} onClick={onClick} role={onClick ? "button" : undefined} data-testid={testId}>
       <span className="th">{thumb}</span>
       <span>
-        <span className="an">{title}</span>{isNew && <> <Chip tone="acc">new</Chip></>}
+        <span className="an">{title}</span>{isNew && <> <Chip tone="new">new</Chip></>}
         {meta != null && <span className="am">{meta}</span>}
       </span>
     </div>

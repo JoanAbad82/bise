@@ -1,9 +1,9 @@
 /* bise desktop window · menus */
-.b-menu{width:240px;padding:5px;border-radius:var(--r-3);background:var(--c-overlay);backdrop-filter:var(--glass);box-shadow:var(--e-2);font-size:var(--t-13)}
-.b-mi{display:flex;align-items:center;gap:8px;height:28px;padding:0 9px;border-radius:6px;white-space:nowrap}
+.b-menu{width:240px;padding:var(--s-1);border-radius:var(--r-3);background:var(--c-overlay);backdrop-filter:var(--glass);box-shadow:var(--e-2);font-size:var(--t-13)}
+.b-mi{display:flex;align-items:center;gap:var(--gap-inline);height:var(--h-row-tight);padding:0 var(--pad-row-x);border-radius:6px;white-space:nowrap}
 .b-mi .k{margin-left:auto;font:var(--t-11) var(--font-mono);color:var(--c-text-3)}
-.b-mi.on{background:var(--c-ink);color:var(--c-on-ink)}
-.b-mi.on .k{color:color-mix(in srgb,var(--c-on-ink) 70%,transparent)}
+/* the highlighted item: the selected-row tint (9% text), the text stays ink; a danger item keeps its err text (designer m_21383) */
+.b-mi.on{background:color-mix(in srgb,var(--c-text) 9%,transparent)}
 .b-mi.dis{color:var(--c-text-3)}
 .b-mi.danger{color:var(--c-err)}
-.b-sep{height:1px;margin:5px 9px;background:var(--c-line)}
+.b-sep{height:1px;margin:var(--s-1) var(--pad-row-x);background:var(--c-line)}
