@@ -612,6 +612,57 @@ fn talk(t: &mut T, words: &str) {
     t.take();
 }
 
+/// m_22120 (architect m_22168): fn up, a batch listener's words come at
+/// its flush, after an HTTP request. 10 s later (the old wait was 1.5 s)
+/// they still go to main; a request that never answers is said, never a
+/// silent idle.
+#[test]
+fn a_slow_transcription_after_fn_up_still_sends_his_words() {
+    let mut t = T::new();
+    t.ready();
+    t.cmd(Cmd::TalkStart);
+    let heard = t.fakes.listen.lock().unwrap().last().unwrap().heard.clone();
+    let Some(ago) = Instant::now().checked_sub(Duration::from_secs(10)) else { return };
+    t.core.cmd(Cmd::TalkEnd, ago);
+    for _ in 0..20 {
+        t.until(|_| true);
+    }
+    assert!(!has(&t.out, "sent") && !phase_is(&t.out, "idle"), "the talk ended before its words: {:#?}", t.out);
+    heard.send(Heard::Text(" is the build green".into())).unwrap();
+    heard.send(Heard::Flushed).unwrap();
+    t.until(|o| has(o, "sent"));
+    assert_eq!(t.hub.next()["text"], "is the build green");
+    t.take();
+    // never answers: past TRANSCRIBE_TIMEOUT, said as a failure
+    t.cmd(Cmd::TalkStart);
+    let Some(long_ago) = Instant::now().checked_sub(crate::voice::TRANSCRIBE_TIMEOUT + Duration::from_secs(1)) else { return };
+    t.core.cmd(Cmd::TalkEnd, long_ago);
+    t.until(|o| phase_is(o, "failed"));
+    let out = t.take();
+    assert!(out.iter().any(|v| v["ev"] == "error" && v["text"] == "the transcription timed out."), "{out:#?}");
+}
+
+/// A fn talk with no talk_end (fn up missed, the capsule hidden) stopped
+/// nothing: it kept the mic and refused every dictation after it
+/// (ambient-lead m_22196). Past the mic's time limit it ends as at fn up.
+#[test]
+fn a_talk_never_ended_stops_at_the_time_limit_and_sends_his_words() {
+    let mut t = T::new();
+    t.ready();
+    let Some(long_ago) = Instant::now().checked_sub(super::core::DICTATE_MAX + Duration::from_secs(1)) else { return };
+    t.core.cmd(Cmd::TalkStart, long_ago);
+    let (heard, audio) = {
+        let l = t.fakes.listen.lock().unwrap();
+        (l.last().unwrap().heard.clone(), l.len() - 1)
+    };
+    let listen = t.fakes.listen.clone();
+    t.until(move |_| listen.lock().unwrap()[audio].audio.try_iter().any(|m| m == ListenMsg::Flush));
+    heard.send(Heard::Text(" left held".into())).unwrap();
+    heard.send(Heard::Flushed).unwrap();
+    t.until(|o| has(o, "sent"));
+    assert_eq!(t.hub.next()["text"], "left held");
+}
+
 #[test]
 fn a_failed_turn_is_phase_failed_with_its_line() {
     let mut t = T::new();

@@ -98,12 +98,22 @@ impl Mic for FakeMic {
 }
 
 /// The listener: the talk's words, one every [`WORD_EVERY`] while fn is
-/// held, the rest at the flush (fn up).
-pub struct FakeListener(pub Words);
+/// held, the rest at the flush (fn up), `.1` after it: a batch request's
+/// time (BISE_VOICE_FAKE_HEARD_MS, [`flush_wait`]). Cancelled meanwhile,
+/// it drops them, as the real listener does.
+pub struct FakeListener(pub Words, pub Duration);
+
+/// BISE_VOICE_FAKE_HEARD_MS: how long the fake listener's flush takes
+/// (the dictation repro, m_22120: a transcription slower than 1.5 s lost
+/// his words). Unset or not a number: at once.
+pub fn flush_wait(setting: Option<String>) -> Duration {
+    Duration::from_millis(setting.and_then(|v| v.trim().parse().ok()).unwrap_or(0))
+}
 
 impl Listener for FakeListener {
     fn start(&self, _job: ListenJob, audio: Receiver<ListenMsg>, events: Sender<Heard>, cancel: Arc<AtomicBool>) {
         let text = self.0.take();
+        let wait = self.1;
         std::thread::spawn(move || {
             let mut words = text.split_whitespace().map(|w| format!(" {w}")).collect::<std::collections::VecDeque<_>>();
             loop {
@@ -112,6 +122,16 @@ impl Listener for FakeListener {
                 }
                 match audio.recv_timeout(WORD_EVERY) {
                     Ok(ListenMsg::Flush) => {
+                        let until = Instant::now() + wait;
+                        while Instant::now() < until {
+                            if cancel.load(Ordering::SeqCst) {
+                                return;
+                            }
+                            std::thread::sleep(Duration::from_millis(10));
+                        }
+                        if cancel.load(Ordering::SeqCst) {
+                            return;
+                        }
                         let rest: String = words.drain(..).collect();
                         if !rest.is_empty() && events.send(Heard::Text(rest)).is_err() {
                             return;

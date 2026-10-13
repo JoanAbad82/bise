@@ -2,6 +2,7 @@
 //! (the mic to the listener, its words, the speaker's words and levels).
 
 use super::*;
+use crate::voice::TRANSCRIBE_TIMEOUT;
 
 impl Core {
     /// Main's message aloud. False: no voice (no TTS, no speaker,
@@ -54,6 +55,14 @@ impl Core {
     }
 
     fn tick_talk(&mut self, now: Instant) {
+        // a talk still listening with no talk_end (fn up missed, the
+        // capsule hidden): its mic would refuse every dictation after it
+        // (ambient-lead m_22196). Past the mic's time limit it ends like
+        // fn up: his words go, the mic is free.
+        if self.talk.as_ref().is_some_and(|t| t.ending.is_none() && now.duration_since(t.started) >= DICTATE_MAX) {
+            eprintln!("ambient-core: talk: the time limit, no talk_end in {} s", DICTATE_MAX.as_secs());
+            self.talk_end(now);
+        }
         let Some(t) = self.talk.as_mut() else { return };
         while let Ok(b) = t.blocks.try_recv() {
             let _ = t.audio.send(ListenMsg::Audio(b.pcm));
@@ -89,7 +98,12 @@ impl Core {
         if let Some(s) = &t.stream {
             evs.push(json!({"ev": "level", "who": "you", "v": s.level()}));
         }
-        let late = t.ending.is_some_and(|e| now.duration_since(e) >= FINAL_WAIT);
+        // fn up: his words come at the listener's flush, however long a
+        // batch request takes (the TUI's wait; it was 1.5 s and a slower
+        // request lost them, m_22120); past it, what was heard goes, and
+        // nothing heard is said as a failure, never a silent idle
+        let late = t.ending.is_some_and(|e| now.duration_since(e) >= TRANSCRIBE_TIMEOUT);
+        let timed_out = late && !flushed && failed.is_none() && t.text.trim().is_empty();
         let ending = t.ending.is_some();
         let page = t.page.clone();
         // a note talk's words so far, live on the page
@@ -98,6 +112,7 @@ impl Core {
             self.home_call("page/voice", json!({"page": p, "phase": "heard", "text": text}));
         }
         self.out.extend(evs);
+        let failed = failed.or_else(|| timed_out.then(|| "the transcription timed out.".to_string()));
         if let Some(e) = failed {
             eprintln!("ambient-core: talk: the listener: {e}");
             self.talk = None;
@@ -162,14 +177,20 @@ impl Core {
         }
     }
 
-    pub(super) fn talk_start(&mut self, page: Option<String>) {
+    pub(super) fn talk_start(&mut self, page: Option<String>, now: Instant) {
         // each fn talk on receipt, in core.log (ambient-lead m_21884: did it reach the core?)
         eprintln!("ambient-core: talk_start{}", page.as_deref().map(|p| format!(" (note on page {p})")).unwrap_or_default());
         // a home hub the connector gave up restarting is tried again now
         super::super::talked();
         if let Some(t) = &self.talk {
             // never silent in core.log (his fn stuck on 'thinking…', main m_21882)
-            eprintln!("ambient-core: talk: talk_start while a talk runs ({}): ignored", if t.ending.is_some() { "ending" } else { "listening" });
+            // its age says a double fn down (ms) from a lost talk_end (s)
+            // (ambient-lead m_22266); the sender is only known in the app
+            eprintln!(
+                "ambient-core: talk: talk_start while a talk runs ({}, started {} ms ago): ignored",
+                if t.ending.is_some() { "ending" } else { "listening" },
+                now.duration_since(t.started).as_millis()
+            );
             return;
         }
         // one mic owner: voice mode has it (ambient-lead m_11168)
@@ -202,7 +223,7 @@ impl Core {
         let (htx, heard) = mpsc::channel();
         let cancel = Arc::new(AtomicBool::new(false));
         (self.ports.listener)(&job).start(job, arx, htx, cancel.clone());
-        self.talk = Some(Talk { stream: Some(stream), blocks, audio, heard, cancel, text: String::new(), ending: None, page: page.clone() });
+        self.talk = Some(Talk { stream: Some(stream), blocks, audio, heard, cancel, text: String::new(), started: now, ending: None, page: page.clone() });
         let Some(id) = page else { return self.set_phase(Phase::Listening, None) };
         // a note talk: the page shows the words at its mouse, the
         // capsule says where they go

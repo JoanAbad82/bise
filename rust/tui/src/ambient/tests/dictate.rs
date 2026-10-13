@@ -5,6 +5,7 @@
 
 use super::*;
 use super::super::core::DICTATE_MAX;
+use crate::voice::TRANSCRIBE_TIMEOUT;
 
 fn dictations(out: &[Value]) -> Vec<Value> {
     out.iter().filter(|v| v["ev"] == "dictation").cloned().collect()
@@ -101,14 +102,25 @@ fn dictation_cancel_is_one_cancelled_final_and_the_mic_off() {
 fn one_mic_user_and_fn_wins_over_a_dictation() {
     let mut t = T::new();
     t.ready();
-    // a talk holds the mic: a dictation is refused
+    // a talk still listening (fn up missed): his press in the window ends
+    // it as at fn up (its words go to main) and the take gets the mic,
+    // never 'the mic is busy.' (amb-tools' repro, m_22196)
     t.cmd(Cmd::TalkStart);
+    let talk = t.fakes.listen.lock().unwrap().last().unwrap().heard.clone();
     t.take();
-    t.cmd(Cmd::DictateStart { id: "d1".into() });
+    let heard = start(&mut t, "d0");
     let out = t.take();
-    assert!(out.contains(&json!({"ev": "dictation", "id": "d1", "text": "", "final": true, "error": "the mic is busy."})), "{out:#?}");
-    t.cmd(Cmd::TalkCancel);
-    t.take();
+    assert!(!dictations(&out).iter().any(|v| v["final"] == true), "{out:#?}");
+    assert_eq!(t.fakes.mic.lock().unwrap().opened, 2);
+    talk.send(Heard::Text(" is it green".into())).unwrap();
+    talk.send(Heard::Flushed).unwrap();
+    t.until(|o| has(o, "sent"));
+    assert_eq!(t.hub.next()["text"], "is it green");
+    heard.send(Heard::Text(" the take".into())).unwrap();
+    t.cmd(Cmd::DictateStop { id: "d0".into() });
+    heard.send(Heard::Flushed).unwrap();
+    t.until(|o| dictations(o).iter().any(|v| v["final"] == true));
+    assert_eq!(dictations(&t.take()).last().unwrap(), &json!({"ev": "dictation", "id": "d0", "text": "the take", "final": true}));
     // a dictation holds it: a second one is refused
     let heard = start(&mut t, "d1");
     t.cmd(Cmd::DictateStart { id: "d2".into() });
@@ -144,6 +156,87 @@ fn a_forgotten_dictation_stops_by_itself() {
     let d = dictations(&t.take());
     assert_eq!(d.last().unwrap(), &json!({"ev": "dictation", "id": "d1", "text": "left on", "final": true}));
     assert_eq!(d.iter().filter(|v| v["final"] == true).count(), 1);
+}
+
+/// His hot cut (m_22120): a batch listener sends every word at the flush,
+/// after an HTTP request. A flush slower than the old 1.5 s (FINAL_WAIT)
+/// ended the take with '' and the listener threw the words away. Now the
+/// final waits for the words, however long the request takes.
+#[test]
+fn a_slow_transcription_keeps_its_words() {
+    let mut t = T::new();
+    t.ready();
+    let heard = start(&mut t, "d1");
+    // stopped 10 s ago: far past the old 1.5 s, the request still running
+    let Some(ago) = Instant::now().checked_sub(Duration::from_secs(10)) else { return };
+    t.core.cmd(Cmd::DictateStop { id: "d1".into() }, ago);
+    for _ in 0..20 {
+        t.until(|_| true);
+    }
+    assert!(dictations(&t.take()).is_empty(), "a final before the words came");
+    heard.send(Heard::Text(" ship the login fix".into())).unwrap();
+    heard.send(Heard::Flushed).unwrap();
+    t.until(|o| dictations(o).iter().any(|v| v["final"] == true));
+    assert_eq!(dictations(&t.take()), vec![json!({"ev": "dictation", "id": "d1", "text": "ship the login fix", "final": true})]);
+}
+
+/// A take still transcribing no longer holds the mic: the next take
+/// starts at once (never 'the mic is busy.'), and both finals come, each
+/// with its own words.
+#[test]
+fn a_take_started_while_the_last_one_transcribes_gets_the_mic_and_both_keep_their_words() {
+    let mut t = T::new();
+    t.ready();
+    let one = start(&mut t, "d1");
+    t.cmd(Cmd::DictateStop { id: "d1".into() });
+    let two = start(&mut t, "d2");
+    assert_eq!(t.fakes.mic.lock().unwrap().opened, 2);
+    assert!(!dictations(&t.take()).iter().any(|v| v["error"].is_string()), "the second take was refused");
+    two.send(Heard::Text(" and the tests".into())).unwrap();
+    t.until(|o| dictations(o).iter().any(|v| v["id"] == "d2" && v["text"] == "and the tests"));
+    one.send(Heard::Text(" fix the login".into())).unwrap();
+    one.send(Heard::Flushed).unwrap();
+    t.until(|o| dictations(o).iter().any(|v| v["id"] == "d1" && v["final"] == true));
+    // d1's stop again, or its late words, change nothing
+    t.cmd(Cmd::DictateStop { id: "d1".into() });
+    t.cmd(Cmd::DictateStop { id: "d2".into() });
+    two.send(Heard::Flushed).unwrap();
+    t.until(|o| dictations(o).iter().any(|v| v["id"] == "d2" && v["final"] == true));
+    let d = dictations(&t.take());
+    let finals: Vec<&Value> = d.iter().filter(|v| v["final"] == true).collect();
+    assert_eq!(
+        finals,
+        [
+            &json!({"ev": "dictation", "id": "d1", "text": "fix the login", "final": true}),
+            &json!({"ev": "dictation", "id": "d2", "text": "and the tests", "final": true}),
+        ]
+    );
+    // fn during a flush: the flushing take goes on, fn gets the mic
+    let three = start(&mut t, "d3");
+    t.cmd(Cmd::DictateStop { id: "d3".into() });
+    t.cmd(Cmd::TalkStart);
+    assert!(!dictations(&t.take()).iter().any(|v| v["id"] == "d3"), "fn ended a take that no longer had the mic");
+    three.send(Heard::Text(" later".into())).unwrap();
+    three.send(Heard::Flushed).unwrap();
+    t.until(|o| dictations(o).iter().any(|v| v["id"] == "d3" && v["final"] == true && v["text"] == "later"));
+}
+
+/// A request that never answers: the take ends after TRANSCRIBE_TIMEOUT
+/// with an error (said in his composer), never a silent ''.
+#[test]
+fn a_transcription_that_never_answers_ends_with_an_error() {
+    let mut t = T::new();
+    t.ready();
+    start(&mut t, "d1");
+    let Some(ago) = Instant::now().checked_sub(TRANSCRIBE_TIMEOUT + Duration::from_secs(1)) else { return };
+    t.core.cmd(Cmd::DictateStop { id: "d1".into() }, ago);
+    t.until(|o| dictations(o).iter().any(|v| v["final"] == true));
+    assert_eq!(dictations(&t.take()), vec![json!({"ev": "dictation", "id": "d1", "text": "", "final": true, "error": "the transcription timed out."})]);
+    // a cancel of a take still transcribing: one cancelled final
+    start(&mut t, "d2");
+    t.cmd(Cmd::DictateStop { id: "d2".into() });
+    t.cmd(Cmd::DictateCancel { id: "d2".into() });
+    assert_eq!(dictations(&t.take()), vec![json!({"ev": "dictation", "id": "d2", "text": "", "final": true, "cancelled": true})]);
 }
 
 #[test]

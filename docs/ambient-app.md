@@ -79,7 +79,8 @@ Why this split:
 
 - **Talk.** fn down → app: `shot` (ScreenCaptureKit, front window of its screen, skip list) +
   `talk_start` to the core; the core opens the mic and the listener, streams `heard` partials and
-  `level`. fn up → `talk_end`: the core waits for the final words (≤ 1.5 s), sends
+  `level`. fn up → `talk_end`: the core waits for the final words (the listener's flush, ≤ the TUI's 120 s
+  TRANSCRIBE_TIMEOUT; nothing by then is said as a failure), sends
   `{"op":"input","focus":"main","text": words + image marker}` to the hub, remembers "voice out".
 - **Main answers.** The core follows main's feed (`line` events, `wire::parse`): `obs: turn_started`
   → phase `working`; tool intents → `working` with a line; `obs: assistant:` → `main` text;

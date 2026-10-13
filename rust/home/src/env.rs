@@ -177,6 +177,7 @@ pub const VARS: &[Var] = &[
     user("BISE_VOICE_DEBUG", "the voice mode's debug log"),
     test("BISE_VOICE_FAKE", "the voice mode's fake (tests)"),
     test("BISE_VOICE_FAKE_HEARD", "what the voice fake hears (tests)"),
+    test("BISE_VOICE_FAKE_HEARD_MS", "how long the ambient core's fake listener takes to flush, a batch request's time (the dictation repro)"),
     user("BISE_VOICE_MODEL", "the voice model"),
     internal("SB_AGENT", "an agent's name, for its sb"),
     test_input("SB_BENCH_JOURNAL", "a journal to bench (an ignored test)"),

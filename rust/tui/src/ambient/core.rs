@@ -27,7 +27,6 @@ pub use self::hubs::{branch_of_head, ProjectFacts, ProjectPorts, Spawn};
 pub use self::voice_mode::OpenVoiceMode;
 #[cfg(test)]
 pub use self::hubs::{HUB_OLDER, LINGER, START};
-#[cfg(test)]
 pub use self::dictate::DICTATE_MAX;
 #[cfg(test)]
 pub use self::home::{MAIN_PAGE, QUIET_PAGE};
@@ -40,10 +39,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-
-/// After fn up, the listener's last words wait at most this long; then
-/// what was heard goes.
-pub const FINAL_WAIT: Duration = Duration::from_millis(1500);
 
 /// The hub's marker on what reaches main from a page (switchboard's
 /// daemon PAGE_HINT): that turn's words stay on the page.
@@ -127,6 +122,9 @@ struct Talk {
     heard: Receiver<Heard>,
     cancel: Arc<AtomicBool>,
     text: String,
+    /// fn down at: a talk never ended (a lost talk_end) stops at
+    /// DICTATE_MAX, never a mic held forever
+    started: Instant,
     /// fn up at
     ending: Option<Instant>,
     /// a note talk: the page its words go to (never main)
@@ -233,6 +231,9 @@ pub struct Core {
     talk: Option<Talk>,
     /// the composer's mic (bar I, core/dictate.rs)
     dictation: Option<dictate::Dictation>,
+    /// stopped takes, mic off, waiting for their words (each its own
+    /// listener; the mic is free for the next take)
+    dictations_ending: Vec<dictate::Dictation>,
     /// voice mode with the agent in view (core/voice_mode.rs)
     voice_on: Option<voice_mode::VoiceOn>,
     /// the composer's `@` answers on their way (core/picks.rs)
@@ -317,6 +318,7 @@ impl Core {
             voice_out: None,
             talk: None,
             dictation: None,
+            dictations_ending: Vec::new(),
             voice_on: None,
             picks: picks::Picks::default(),
             index: index::Index::default(),
@@ -377,8 +379,8 @@ impl Core {
 
     pub fn cmd(&mut self, c: Cmd, now: Instant) {
         match c {
-            Cmd::TalkStart => self.talk_start(None),
-            Cmd::PageTalk { page } => self.talk_start(Some(page)),
+            Cmd::TalkStart => self.talk_start(None, now),
+            Cmd::PageTalk { page } => self.talk_start(Some(page), now),
             Cmd::TalkEnd => self.talk_end(now),
             Cmd::TalkCancel => self.talk_cancel(),
             Cmd::ShotDrop => self.drop_shot(),

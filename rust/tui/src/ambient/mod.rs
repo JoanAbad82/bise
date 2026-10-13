@@ -120,9 +120,10 @@ fn live_ports(user_kind: fn(&str) -> bool) -> Ports {
 /// opens a device or reaches the network.
 fn fake_ports(user_kind: fn(&str) -> bool, words: fake::Words) -> Ports {
     let w = words.clone();
+    let wait = fake::flush_wait(bise_home::env::test_setting("BISE_VOICE_FAKE_HEARD_MS"));
     Ports {
         mic: Box::new(fake::FakeMic),
-        listener: Box::new(move |_| Box::new(fake::FakeListener(w.clone()))),
+        listener: Box::new(move |_| Box::new(fake::FakeListener(w.clone(), wait))),
         synth: Box::new(fake::SilentSynth),
         open_speaker: Box::new(|| Ok(Box::new(fake::FakeSpeaker::new()) as Box<dyn crate::voicemode::Speaker>)),
         listen_job: Box::new(|| Ok(fake::listen_job())),

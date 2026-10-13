@@ -34,8 +34,10 @@ use std::time::{Duration, Instant};
 
 pub const SAMPLE_RATE: u32 = 16_000;
 /// The request: a 5-minute clip takes Voxtral ~10-20 s; past this the
-/// transcription failed.
-const TRANSCRIBE_TIMEOUT: Duration = Duration::from_secs(120);
+/// transcription failed. The one wait for a stopped take's words, in the
+/// TUI and in the ambient core (its dictation and fn's talk, architect
+/// m_22168).
+pub(crate) const TRANSCRIBE_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_DURATION: Duration = Duration::from_secs(300);
 /// Shorter than this, a recording has no audio blocks yet: silence then
 /// means "stopped too early", not "the microphone is muted".
