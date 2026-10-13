@@ -661,6 +661,10 @@ fn a_talk_never_ended_stops_at_the_time_limit_and_sends_his_words() {
     heard.send(Heard::Flushed).unwrap();
     t.until(|o| has(o, "sent"));
     assert_eq!(t.hub.next()["text"], "left held");
+    // never silent: one notice in the window says why (architect m_22291)
+    let notices: Vec<Value> = t.take().into_iter().filter(|v| v["ev"] == "notice").collect();
+    assert_eq!(notices.len(), 1, "{notices:#?}");
+    assert_eq!(notices[0]["text"], "fn talk sent to main after 2 min with no fn up");
 }
 
 #[test]

@@ -20,6 +20,8 @@ pub enum Cmd {
     DictateStart { id: String },
     DictateStop { id: String },
     DictateCancel { id: String },
+    /// a kept take's sound transcribed again (core/dictate.rs)
+    DictateRetry { id: String },
     /// bar N14 (core/voice_answer.rs): the card in front of him in the
     /// focused window, or none.
     CardInView { project: Option<String>, card: Option<u64> },
@@ -123,10 +125,11 @@ impl Cmd {
                 bise_proto::draft::AppCmd::ShotDrop => Cmd::ShotDrop,
                 other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
-            "dictate_start" | "dictate_stop" | "dictate_cancel" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+            "dictate_start" | "dictate_stop" | "dictate_cancel" | "dictate_retry" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
                 bise_proto::draft::AppCmd::DictateStart { id } if !id.trim().is_empty() => Cmd::DictateStart { id },
                 bise_proto::draft::AppCmd::DictateStop { id } if !id.trim().is_empty() => Cmd::DictateStop { id },
                 bise_proto::draft::AppCmd::DictateCancel { id } if !id.trim().is_empty() => Cmd::DictateCancel { id },
+                bise_proto::draft::AppCmd::DictateRetry { id } if !id.trim().is_empty() => Cmd::DictateRetry { id },
                 _ => return Err(format!("{cmd}: no id")),
             },
             "voice_mode" | "voice_mute" | "voice_type" | "voice_send" | "voice_cut" => {

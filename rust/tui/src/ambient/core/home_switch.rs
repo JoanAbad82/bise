@@ -112,7 +112,7 @@ impl Core {
         });
     }
 
-    fn home_project(&self) -> String {
+    pub(super) fn home_project(&self) -> String {
         bise_home::hub_id(Path::new(&self.workspace))
     }
 

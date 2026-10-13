@@ -116,6 +116,10 @@ fn one_mic_user_and_fn_wins_over_a_dictation() {
     talk.send(Heard::Flushed).unwrap();
     t.until(|o| has(o, "sent"));
     assert_eq!(t.hub.next()["text"], "is it green");
+    // never silent: one notice in the window says why (architect m_22291)
+    let notices: Vec<Value> = t.take().into_iter().filter(|v| v["ev"] == "notice").collect();
+    assert_eq!(notices.len(), 1, "{notices:#?}");
+    assert_eq!(notices[0]["text"], "fn talk sent to main: the mic went to dictation");
     heard.send(Heard::Text(" the take".into())).unwrap();
     t.cmd(Cmd::DictateStop { id: "d0".into() });
     heard.send(Heard::Flushed).unwrap();
@@ -244,6 +248,95 @@ fn dictate_cmds_need_an_id() {
     assert_eq!(Cmd::parse(r#"{"cmd":"dictate_start","id":"w1-3"}"#), Ok(Cmd::DictateStart { id: "w1-3".into() }));
     assert_eq!(Cmd::parse(r#"{"cmd":"dictate_stop","id":"w1-3"}"#), Ok(Cmd::DictateStop { id: "w1-3".into() }));
     assert_eq!(Cmd::parse(r#"{"cmd":"dictate_cancel","id":"w1-3"}"#), Ok(Cmd::DictateCancel { id: "w1-3".into() }));
+    assert_eq!(Cmd::parse(r#"{"cmd":"dictate_retry","id":"w1-3"}"#), Ok(Cmd::DictateRetry { id: "w1-3".into() }));
+    assert!(Cmd::parse(r#"{"cmd":"dictate_retry"}"#).is_err());
     assert!(Cmd::parse(r#"{"cmd":"dictate_start","id":" "}"#).is_err());
     assert!(Cmd::parse(r#"{"cmd":"dictate_start"}"#).is_err());
+}
+
+/// His mic gives `n` samples to the take holding it.
+fn sound(t: &mut T, n: usize) {
+    let s = t.fakes.mic.lock().unwrap();
+    s.blocks.as_ref().unwrap().send(crate::voicemode::MicBlock { pcm: vec![7; n], at: Instant::now() }).unwrap();
+}
+
+/// What a listener got: its samples and whether it was flushed.
+fn fed(t: &T, i: usize) -> (usize, bool) {
+    let msgs: Vec<ListenMsg> = t.fakes.listen.lock().unwrap()[i].audio.try_iter().collect();
+    let n = msgs.iter().map(|m| if let ListenMsg::Audio(p) = m { p.len() } else { 0 }).sum();
+    (n, msgs.last() == Some(&ListenMsg::Flush))
+}
+
+/// Fix 2 (architect m_22168): a take whose final has no words keeps its
+/// sound; dictate_retry sends it to a fresh listener and gives one final,
+/// no partials; a retry with words frees it ('nothing to try again.').
+#[test]
+fn a_failed_take_keeps_its_sound_and_a_retry_gives_one_final() {
+    let mut t = T::new();
+    t.ready();
+    let heard = start(&mut t, "d1");
+    sound(&mut t, 4000);
+    t.cmd(Cmd::DictateStop { id: "d1".into() });
+    heard.send(Heard::Failed("the listener: 503".into())).unwrap();
+    t.until(|o| dictations(o).iter().any(|v| v["final"] == true));
+    assert_eq!(dictations(&t.take()), vec![json!({"ev": "dictation", "id": "d1", "text": "", "final": true, "error": "the listener: 503", "kept": true})]);
+    let n = t.fakes.listen.lock().unwrap().len();
+    t.cmd(Cmd::DictateRetry { id: "d1".into() });
+    assert_eq!(t.fakes.listen.lock().unwrap().len(), n + 1, "a retry has a fresh listener");
+    assert_eq!(fed(&t, n), (4000, true), "the whole sound, then the flush");
+    assert_eq!(t.fakes.mic.lock().unwrap().opened, 1, "a retry opens no mic");
+    let again = t.fakes.listen.lock().unwrap()[n].heard.clone();
+    again.send(Heard::Text(" found".into())).unwrap();
+    again.send(Heard::Text(" it".into())).unwrap();
+    again.send(Heard::Flushed).unwrap();
+    t.until(|o| dictations(o).iter().any(|v| v["final"] == true));
+    assert_eq!(dictations(&t.take()), vec![json!({"ev": "dictation", "id": "d1", "text": "found it", "final": true})]);
+    t.cmd(Cmd::DictateRetry { id: "d1".into() });
+    assert_eq!(dictations(&t.take()), vec![json!({"ev": "dictation", "id": "d1", "text": "", "final": true, "error": "nothing to try again."})]);
+    hub_quiet(&mut t);
+}
+
+/// An empty final keeps the sound too, a retry that fails keeps it again,
+/// and his cancel drops it. An id never kept: 'nothing to try again.'.
+#[test]
+fn an_empty_take_is_kept_until_he_cancels_it() {
+    let mut t = T::new();
+    t.ready();
+    t.cmd(Cmd::DictateRetry { id: "nope".into() });
+    assert_eq!(dictations(&t.take()), vec![json!({"ev": "dictation", "id": "nope", "text": "", "final": true, "error": "nothing to try again."})]);
+    let heard = start(&mut t, "d2");
+    sound(&mut t, 1600);
+    t.cmd(Cmd::DictateStop { id: "d2".into() });
+    heard.send(Heard::Flushed).unwrap();
+    t.until(|o| dictations(o).iter().any(|v| v["final"] == true));
+    assert_eq!(dictations(&t.take()), vec![json!({"ev": "dictation", "id": "d2", "text": "", "final": true, "kept": true})]);
+    let n = t.fakes.listen.lock().unwrap().len();
+    t.cmd(Cmd::DictateRetry { id: "d2".into() });
+    t.fakes.listen.lock().unwrap()[n].heard.send(Heard::Failed("offline".into())).unwrap();
+    t.until(|o| dictations(o).iter().any(|v| v["final"] == true));
+    assert_eq!(dictations(&t.take()), vec![json!({"ev": "dictation", "id": "d2", "text": "", "final": true, "error": "offline", "kept": true})]);
+    t.cmd(Cmd::DictateCancel { id: "d2".into() });
+    t.take();
+    t.cmd(Cmd::DictateRetry { id: "d2".into() });
+    assert_eq!(dictations(&t.take()).last().unwrap()["error"], "nothing to try again.");
+}
+
+/// Memory only, the newest three takes: a fourth drops the oldest.
+#[test]
+fn the_core_keeps_the_last_three_takes() {
+    let mut t = T::new();
+    t.ready();
+    for id in ["k1", "k2", "k3", "k4"] {
+        let heard = start(&mut t, id);
+        sound(&mut t, 800);
+        t.cmd(Cmd::DictateStop { id: id.into() });
+        heard.send(Heard::Failed("down".into())).unwrap();
+        t.until(|o| dictations(o).iter().any(|v| v["id"] == id && v["kept"] == true));
+    }
+    t.take();
+    t.cmd(Cmd::DictateRetry { id: "k1".into() });
+    assert_eq!(dictations(&t.take()).last().unwrap()["error"], "nothing to try again.");
+    let n = t.fakes.listen.lock().unwrap().len();
+    t.cmd(Cmd::DictateRetry { id: "k2".into() });
+    assert_eq!(t.fakes.listen.lock().unwrap().len(), n + 1, "k2 is still kept");
 }

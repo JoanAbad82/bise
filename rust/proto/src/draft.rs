@@ -538,6 +538,11 @@ pub enum CoreEv {
         cancelled: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         error: Option<String>,
+        /// on a final that failed, timed out or came back empty: the core
+        /// keeps this take's sound (memory only, its last 3 takes, 10 min
+        /// each) and `dictate_retry {id}` transcribes it again
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        kept: bool,
     },
     /// bar S.6: a newer desktop app on bise's release channel than the one
     /// running (`app_version`), read from `latest.json` by
@@ -741,6 +746,10 @@ pub enum AppCmd {
     DictateStop { id: String },
     /// dropped: the mic goes off, one final `dictation` with `cancelled`
     DictateCancel { id: String },
+    /// a `kept` take transcribed again from its sound, with a fresh
+    /// listener: one final `dictation` for that id, no partials; an id
+    /// the core no longer keeps: a final with error 'nothing to try again.'
+    DictateRetry { id: String },
     /// voice mode (draft, the TUI's ctrl+r twice): `on` with `agent` of
     /// `project`: the core opens the mic and the speaker (voicemode's own
     /// controller), his turns go to that agent (never main unless main is
@@ -854,6 +863,7 @@ impl AppCmd {
         "dictate_start",
         "dictate_stop",
         "dictate_cancel",
+        "dictate_retry",
         "voice_mode",
         "voice_mute",
         "voice_type",

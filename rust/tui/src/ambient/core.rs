@@ -127,8 +127,17 @@ struct Talk {
     started: Instant,
     /// fn up at
     ending: Option<Instant>,
+    /// what ended it: anything but fn up gets a notice in the window
+    ended_by: voice::TalkEnd,
     /// a note talk: the page its words go to (never main)
     page: Option<String>,
+}
+
+impl Talk {
+    /// (listening, fn down at), for [`voice::talk_rule`]
+    fn state(&self) -> (bool, Instant) {
+        (self.ending.is_none(), self.started)
+    }
 }
 
 impl Drop for Talk {
@@ -234,6 +243,9 @@ pub struct Core {
     /// stopped takes, mic off, waiting for their words (each its own
     /// listener; the mic is free for the next take)
     dictations_ending: Vec<dictate::Dictation>,
+    /// the sound of takes whose final failed or came back empty, for
+    /// `dictate_retry` (memory only, the last [`dictate::KEPT_TAKES`])
+    dictations_kept: Vec<dictate::Kept>,
     /// voice mode with the agent in view (core/voice_mode.rs)
     voice_on: Option<voice_mode::VoiceOn>,
     /// the composer's `@` answers on their way (core/picks.rs)
@@ -319,6 +331,7 @@ impl Core {
             talk: None,
             dictation: None,
             dictations_ending: Vec::new(),
+            dictations_kept: Vec::new(),
             voice_on: None,
             picks: picks::Picks::default(),
             index: index::Index::default(),
@@ -387,6 +400,7 @@ impl Core {
             Cmd::DictateStart { id } => self.dictate_start(id, now),
             Cmd::DictateStop { id } => self.dictate_stop(&id, now),
             Cmd::DictateCancel { id } => self.dictate_cancel(&id),
+            Cmd::DictateRetry { id } => self.dictate_retry(id, now),
             Cmd::VoiceMode(c) => self.voice_mode_cmd(c, now),
             Cmd::HubRetry { project } => self.hub_retry(&project),
             Cmd::CardInView { project, card } => self.in_view = project.zip(card),
