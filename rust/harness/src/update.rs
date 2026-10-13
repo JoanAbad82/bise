@@ -321,6 +321,8 @@ fn place(versions: &Path, id: &str, from: &Path, copy: bool) -> Result<PathBuf, 
 
 /// The one VERSION id two builds shared: every desktop_try candidate before
 /// 0d546db5 (cand_paths named its root `root`).
+// TODO(amb-mac): drop LEGACY_ID and its branch in place() once no bundle packed
+// before 0d546db5 can still run: the release after his next app update.
 const LEGACY_ID: &str = "root";
 
 /// A root's build as an error names it: `id=<id> commit=<commit12>`.
