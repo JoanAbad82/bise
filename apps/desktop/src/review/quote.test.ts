@@ -47,8 +47,8 @@ describe('quote diff lines', () => {
     expect(chipStrip(chip)).toContain('src/a "b".rs:12-14 · 3 lines');
     // typed: the hub renders quote.rs's tag from the part (delta review D2)
     expect(buildMessage([{ kind: 'chip', chip }, { kind: 'text', text: 'why?' }]).parts).toEqual([
-      { kind: 'quote', from: 'perf vs main', text: ' a\n-b\n+c', file: 'src/a "b".rs', new: '12-14', old: '11' },
-      { kind: 'text', text: 'why?' },
+      { kind: 'quote', from: 'perf vs main', text: ' a\n-b\n+c', file: 'src/a "b".rs', new: '12-14', old: '11', n: 1 },
+      { kind: 'text', text: ' why?' },
     ]);
   });
 

@@ -34,6 +34,13 @@ describe('his message from its parts (msg-parts)', () => {
     expect(JSON.stringify(v)).not.toMatch(/<selection|<pasted|<image/u);
   });
 
+  it("a numbered quote (his m_22231): its label '❝ 1' at its place in his words, its line keeps the number", () => {
+    const v = youView([text('regarding '), { kind: 'image', name: '[Image #1]', source: '/a.png' }, text(' and '), { kind: 'quote', from: 'main', text: 'q', n: 2 }, text(', which?')]);
+    expect(v.words).toBe('regarding and ❝ 2, which?');
+    expect(v.quotes).toEqual([{ from: 'main', text: 'q', file: '', new: '', old: '', n: 2 }]);
+    expect(partsGist([text('see '), { kind: 'quote', from: 'main', text: 'q', n: 1 }, text(' and '), quote('perf', 'r')])).toBe('❝ perf see ❝ 1 and');
+  });
+
   it('plain words are his words; a part from a newer client draws nothing', () => {
     expect(youView([text('ship it')])).toEqual({ quotes: [], words: 'ship it', pastes: [], images: [], files: [] });
     expect(youView([text('a'), { kind: 'video', url: 'x' } as unknown as Part]).words).toBe('a');

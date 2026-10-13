@@ -47,7 +47,53 @@ describe('triggers (the TUI rules)', () => {
 });
 
 describe('the send', () => {
-  it('a quote, a paste or an image: typed parts (quotes in front, pastes and images in place, an image by its source), the text his words with labels, never a template or files', () => {
+  it("his m_22231: 'regarding [Image #1] and [Image #2] and ❝ 3' keeps its order in the parts", () => {
+    const out = buildMessage([
+      { kind: 'text', text: 'regarding ' },
+      { kind: 'chip', chip: { kind: 'image', n: 1, path: '/i/a.png', name: 'a.png' } },
+      { kind: 'text', text: ' and ' },
+      { kind: 'chip', chip: { kind: 'image', n: 2, path: '/i/b.png', name: 'b.png' } },
+      { kind: 'text', text: ' and ' },
+      { kind: 'chip', chip: { kind: 'quote', n: 3, text: 'the cache is warm', from: 'main' } },
+      { kind: 'text', text: ', which is right?' },
+    ]);
+    expect(out.text).toBe('regarding [Image #1] and [Image #2] and ❝ 3, which is right?');
+    expect(out.parts?.map((p) => (p.kind === 'text' ? p.text : p.kind === 'image' ? p.name : p.kind === 'quote' ? `q${String(p.n)}` : p.kind))).toEqual([
+      'regarding ',
+      '[Image #1]',
+      ' and ',
+      '[Image #2]',
+      ' and ',
+      'q3',
+      ', which is right?',
+    ]);
+  });
+
+  it("one counter (architect m_22248 (3)): a message's chip numbers are unique across quotes, pastes, images and files", () => {
+    let segs: Segment[] = [];
+    const kinds = ['quote', 'paste', 'image', 'file', 'quote', 'image', 'paste', 'file'] as const;
+    for (const k of kinds) {
+      const n = nextChipNumber(segs);
+      const chip =
+        k === 'quote'
+          ? ({ kind: 'quote', n, text: `q${String(n)}`, from: 'main' } as const)
+          : k === 'paste'
+            ? ({ kind: 'paste', n, text: `p${String(n)}` } as const)
+            : k === 'image'
+              ? ({ kind: 'image', n, path: `/i/${String(n)}.png`, name: `${String(n)}.png` } as const)
+              : ({ kind: 'file', n, path: `/f/${String(n)}.md`, name: `${String(n)}.md` } as const);
+      segs = [...segs, { kind: 'text', text: ' x ' }, { kind: 'chip', chip }];
+    }
+    const ns = (buildMessage(segs).parts ?? []).flatMap((p) => {
+      if (p.kind === 'quote' || p.kind === 'paste') return p.n === undefined ? [] : [String(p.n)];
+      if (p.kind === 'image' || p.kind === 'file') return [/#(\d+)/u.exec(p.name ?? '')?.[1] ?? ''];
+      return [];
+    });
+    expect(ns).toHaveLength(kinds.length);
+    expect(new Set(ns).size).toBe(ns.length);
+  });
+
+  it('a quote, a paste or an image: typed parts, each at its place (a quote with its number, his m_22231; an image by its source), the text his words with labels, never a template or files', () => {
     const segs: Segment[] = [
       { kind: 'text', text: '  what about ' },
       { kind: 'chip', chip: { kind: 'paste', n: 2, text: 'a\nb' } },
@@ -58,14 +104,15 @@ describe('the send', () => {
     ];
     expect(buildMessage(segs)).toEqual({
       // the text: his words with the chips' labels, never the model's template (delta review D2)
-      text: 'what about ▤ 2 and [Image #3]?',
+      text: 'what about ▤ 2 and [Image #3] ❝ 1?',
       files: [],
       parts: [
-        { kind: 'quote', from: 'main', text: 'fn main()' },
         { kind: 'text', text: 'what about ' },
         { kind: 'paste', n: 2, text: 'a\nb' },
         { kind: 'text', text: ' and ' },
         { kind: 'image', name: '[Image #3]', source: '/tmp/x.png' },
+        { kind: 'text', text: ' ' },
+        { kind: 'quote', from: 'main', text: 'fn main()', n: 1 },
         { kind: 'text', text: '?' },
       ],
     });

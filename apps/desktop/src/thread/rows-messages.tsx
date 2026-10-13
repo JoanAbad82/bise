@@ -81,7 +81,7 @@ export function quoteMeta(source: string, about: string, text: string): string {
  * A quote in his bubble (tui-parity H7, designer m_19832): one line at the bubble's top, '❝ Agreed on
  * the api… · main · 1 line' in text-2, its words cut with …; a click opens it in place.
  */
-function QuoteLine({ source, about, text, testId }: { source: string; about: string; text: string; testId: string }) {
+function QuoteLine({ source, about, text, n, testId }: { source: string; about: string; text: string; n: number | undefined; testId: string }) {
   const [open, setOpen] = useState(false);
   const meta = quoteMeta(source, about, text);
   return (
@@ -95,7 +95,11 @@ function QuoteLine({ source, about, text, testId }: { source: string; about: str
       data-testid={testId}
     >
       <span className="th-you-quote-line">
-        <span className="th-you-quote-text">❝ {open ? meta : (text.split('\n')[0] ?? '')}</span>
+        {/* a quote he put in his words: its number, the one his words show at its place (his m_22231) */}
+        <span className="th-you-quote-text">
+          ❝ {n === undefined ? '' : `${String(n)} `}
+          {open ? meta : (text.split('\n')[0] ?? '')}
+        </span>
         {/* a flex item drops its leading space: a no-break one keeps '30%. · bise' apart (designer m_21404 (2)) */}
         {!open && <span className="th-you-quote-src">{`\u00a0· ${meta}`}</span>}
       </span>
@@ -114,7 +118,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   // a part of a kind this window doesn't know (a newer hub's): drawn from its text, never empty
   const drawn = drawnParts(e.parts);
   const view = drawn !== null ? youView(drawn) : null;
-  const quotes = view !== null ? view.quotes.map((q) => ({ source: q.from, text: q.text, about: q.file !== '' ? quoteAbout(q.from, q.text, q) : '' })) : [];
+  const quotes = view !== null ? view.quotes.map((q) => ({ source: q.from, text: q.text, n: q.n, about: q.file !== '' ? quoteAbout(q.from, q.text, q) : '' })) : [];
   const text = view !== null ? view.words : stripContext(e.text);
   const fold = foldOf(text);
   const toggle = () => {
@@ -157,7 +161,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   return (
     <YouBubble head={to} under={under} timeAlways={words !== undefined || (mark !== null && lastOfRun(e, next))} testId={`thread.you.${String(e.pos)}`}>
       {quotes.map((q, i) => (
-        <QuoteLine key={i} source={q.source} about={q.about} text={q.text} testId={`thread.you.${String(e.pos)}.quote.${String(i + 1)}`} />
+        <QuoteLine key={i} source={q.source} about={q.about} text={q.text} n={q.n} testId={`thread.you.${String(e.pos)}.quote.${String(i + 1)}`} />
       ))}
       {text !== '' && <Markdown text={fold === undefined || open ? text : fold.head} onLink={ctx.onLink} onPath={ctx.onPath} breaks />}
       {fold !== undefined && (

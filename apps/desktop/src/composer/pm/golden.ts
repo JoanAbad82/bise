@@ -28,10 +28,11 @@ export const CASES: readonly { name: string; content: Content; golden: Outgoing 
     name: 'a quote of diff lines',
     content: [[quote, 'why this order?']],
     golden: {
-      text: 'why this order?',
+      text: '❝ 3 why this order?',
       files: [],
-      // msg-parts: the message typed; the hub renders the model's text from it, the window never
-      parts: [{ kind: 'quote', from: 'perf vs main', text: 'fn a() {}\nfn b() {}', file: 'src/q.rs', new: '10-11' }, { kind: 'text', text: 'why this order?' }],
+      // msg-parts: the message typed; the hub renders the model's text from it, the window never;
+      // the quote where its chip was, with its number (his m_22231)
+      parts: [{ kind: 'quote', from: 'perf vs main', text: 'fn a() {}\nfn b() {}', file: 'src/q.rs', new: '10-11', n: 3 }, { kind: 'text', text: ' why this order?' }],
     },
   },
   { name: 'an artifact', content: [['read ', artifact]], golden: { text: 'read [Q3 plan](https://bise.dev/m/q3)', files: [] } },

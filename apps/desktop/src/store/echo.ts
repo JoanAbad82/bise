@@ -4,6 +4,12 @@
 import type { Entry } from "@/proto";
 import { sentParts, sentWords, type Pending } from "./types";
 
+/**
+ * How much earlier than his send its echo (the hub's 'you' entry) may say it was written: the
+ * window's clock and the hub's line times are the same machine's, read a few ms apart.
+ */
+export const ECHO_SLACK_MS = 5000;
+
 /** The window-local 'sent' (never a hub event): the send `cid` of this window was answered with
  *  its message id; null: a hub that answers {} (older), the words match it instead. */
 export interface Sent {

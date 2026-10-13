@@ -12,11 +12,14 @@ export interface PartQuote {
   readonly file: string;
   readonly new: string;
   readonly old: string;
+  /** its chip's number when he put it in his words ('❝ 1' sits there, his m_22231); none: a quote
+   *  in front (an older client) */
+  readonly n?: number;
 }
 
 /** His message as the bubble draws it. */
 export interface YouView {
-  /** the quotes, first in the bubble */
+  /** the quotes, first in the bubble; a numbered one's label '❝ 1' is also in the words, at its place */
   readonly quotes: readonly PartQuote[];
   /** his words (markdown), a long paste's chip label '▤ 1' where it was; an image's label is not
    *  in the words: its chip under them is the image (designer m_15891) */
@@ -48,7 +51,9 @@ export function youView(parts: readonly Part[]): YouView {
   for (const p of parts) {
     switch (p.kind) {
       case 'quote':
-        quotes.push({ from: p.from, text: p.text, file: p.file ?? '', new: p.new ?? '', old: p.old ?? '' });
+        quotes.push({ from: p.from, text: p.text, file: p.file ?? '', new: p.new ?? '', old: p.old ?? '', ...(p.n == null ? {} : { n: p.n }) });
+        // his m_22231: a quote he put in his words keeps its place there, its label like a paste's
+        if (p.n != null) words += `❝ ${String(p.n)}`;
         break;
       case 'text':
         words += p.text;
@@ -81,7 +86,8 @@ export function partsGist(parts: readonly Part[]): string {
   const quotes: string[] = [];
   let words = '';
   for (const p of parts) {
-    if (p.kind === 'quote') quotes.push(`❝ ${p.from === 'main' ? 'bise' : p.from}`);
+    if (p.kind === 'quote' && p.n != null) words += `❝ ${String(p.n)}`;
+    else if (p.kind === 'quote') quotes.push(`❝ ${p.from === 'main' ? 'bise' : p.from}`);
     else if (p.kind === 'text') words += p.text;
     else if (p.kind === 'paste') words += `▤ ${String(p.n)}`;
     else if (p.kind === 'image') {

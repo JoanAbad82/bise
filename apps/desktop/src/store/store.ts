@@ -69,6 +69,7 @@ import {
   sameStrings,
   takeKey,
   threadKey,
+  EMPTY_ORDER,
   type ThreadOrder,
   type ToolOut,
   toolOutKey,
@@ -77,24 +78,12 @@ import {
   type VoiceModeState,
 } from "./types";
 import { applyTyped } from "./apply";
-import { answered, echoOf, keepLanded, sentOf, type Sent } from "./echo";
-const EMPTY_ORDER: ThreadOrder = {
-  order: [],
-  before: null,
-  more: false,
-  loaded: false,
-};
+import { answered, echoOf, keepLanded, sentOf, ECHO_SLACK_MS, type Sent } from "./echo";
 const EMPTY: readonly never[] = [];
 /** A stopped dictation's final is the core's once its listener flushed, up to DICTATE_FLUSH_MAX
  *  (120 s, amb-core m_22162: a batch listener gives every word then); past this, the window ends
  *  it. Never shorter than the core's wait: a 5 s cut threw his words away (ambient-lead m_22121). */
 export const DICTATE_STOP_WAIT_MS = 125_000;
-
-/**
- * How much earlier than his send its echo (the hub's 'you' entry) may say it was written: the
- * window's clock and the hub's line times are the same machine's, read a few ms apart.
- */
-export const ECHO_SLACK_MS = 5000;
 
 interface Thread {
   view: ThreadOrder;
@@ -880,12 +869,12 @@ export class Store {
       this.failOldest(a.project, "not sent");
       return p.cid;
     }
-    // G: the cid goes along; the core or the hub echoes it on this send's error
+    // G: the cid goes along (echoed on its error); with parts, no text: the hub renders it (m_22248)
     this.command({
       cmd: "send",
       project: a.project,
       agent: a.agent,
-      text: a.text,
+      text: parts === undefined ? a.text : "",
       mode,
       ...(files === undefined ? {} : { files }),
       ...(parts === undefined ? {} : { parts }),

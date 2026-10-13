@@ -175,6 +175,14 @@ export interface ThreadOrder {
   readonly loaded: boolean;
 }
 
+/** A thread not loaded yet. */
+export const EMPTY_ORDER: ThreadOrder = {
+  order: [],
+  before: null,
+  more: false,
+  loaded: false,
+};
+
 export type Diff = EvOf<'diff'>;
 export type Away = EvOf<'away_summary'>;
 /** An `@` query's answer (core/picks.rs, the TUI's files.rs ranking). */

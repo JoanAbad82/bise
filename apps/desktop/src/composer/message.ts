@@ -122,14 +122,15 @@ export function chipStrip(c: Chip): string {
 
 /** The send for these segments (architect's delta review D2: the window never templates; the hub
  *  renders the model's text from the parts, bise_proto::parts::render). A message of words alone
- *  goes as its text; one with a quote, a paste or an image goes as typed parts: the quotes in front
- *  (at most QUOTE_MAX, each cut at QUOTE_MAX_CHARS), the words with the pastes and images in place
- *  (an image with its source alone: the hub stores it, main 18a32ce3). `text` is then his words
- *  with the chips' labels ('▤ 1', '[Image #1]'), for the hub's older readers, the composer's strip
- *  and the pending row's match, never the model's template. Empty: nothing to send. */
+ *  goes as its text; one with a quote, a paste or an image goes as typed parts, each chip at its
+ *  place: a quote with its chip's number (his m_22231; at most QUOTE_MAX, each cut at
+ *  QUOTE_MAX_CHARS), the pastes, images and files (an image with its source alone: the hub stores
+ *  it, main 18a32ce3). `text` is then his words with the chips' labels ('❝ 1', '▤ 1', '[Image #1]')
+ *  for the composer's own rows (its strip, the pending row): the store sends none beside parts,
+ *  the hub's text is render(parts) alone (architect m_22248). Empty: nothing to send. */
 export function buildMessage(segments: readonly Segment[]): Outgoing {
   const files: string[] = [];
-  const quoteParts: Part[] = [];
+  let quotes = 0;
   const bodyParts: Part[] = [];
   const say = (t: string): void => {
     const last = bodyParts.at(-1);
@@ -153,10 +154,16 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
     }
     const c = s.chip;
     if (c.kind === 'quote') {
-      if (quoteParts.length < QUOTE_MAX) {
-        const at = c.at === undefined ? {} : Object.fromEntries((['file', 'new', 'old'] as const).filter((k) => c.at?.[k] !== '').map((k) => [k, c.at?.[k] ?? '']));
-        quoteParts.push({ kind: 'quote', from: c.from, text: chars(c.text).slice(0, QUOTE_MAX_CHARS).join(''), ...at });
-      }
+      // his m_22231: a quote sits at its place with its chip's number (`❝ 1`), so 'regarding ❝ 1 …'
+      // reads to the model where he put it (bise_proto parts: an `n` quote renders in his words)
+      if (quotes >= QUOTE_MAX) continue;
+      quotes += 1;
+      const at = c.at === undefined ? {} : Object.fromEntries((['file', 'new', 'old'] as const).filter((k) => c.at?.[k] !== '').map((k) => [k, c.at?.[k] ?? '']));
+      const pad = /\S$/u.test(body) ? ' ' : '';
+      body += pad + chipLabel(c);
+      say(pad);
+      bodyParts.push({ kind: 'quote', from: c.from, text: chars(c.text).slice(0, QUOTE_MAX_CHARS).join(''), ...at, n: c.n });
+      spaceNext = true;
       continue;
     }
     if (c.kind === 'paste') {
@@ -181,8 +188,8 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
   // `say …` and `steer …` go out without their word (sb.rs, C45)
   const text = body.trim().replace(/^(?:steer|say) /u, '').trim();
   // parts only when they say more than words (the TUI's of_parts); words alone stay text
-  const typed = quoteParts.length > 0 || bodyParts.some((p) => p.kind !== 'text');
-  return typed ? { text, files, parts: [...quoteParts, ...trimParts(bodyParts)] } : { text, files };
+  const typed = bodyParts.some((p) => p.kind !== 'text');
+  return typed ? { text, files, parts: trimParts(bodyParts) } : { text, files };
 }
 
 /** The words' parts trimmed like the text (both ends, and `say ` / `steer ` in front), empty text parts dropped. */
