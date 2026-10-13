@@ -74,6 +74,9 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
       expect(text, `${id}: never his path`).not.toContain(PNG);
     }
     await expect(page.getByTestId('thread.answered.3.image.1'), "bise's answer for him: the same chip").toHaveText('image 1');
+    // its author named, and him as 'you' (designer m_21658)
+    await expect(page.getByTestId('thread.answered.3')).toContainText('bise answered gift-ui for you');
+    await expect(page.getByTestId('thread.answered.3')).toContainText('you showed it');
     // main's own card answered: the '✓ you answered' row with the chip, never the hub's raw line
     // the same order as the rows above (designer m_15420): what was asked, his words, the chip
     await expect(page.getByTestId('thread.cardanswer.4.head')).toHaveText('✓you answered bise · merge checkout into main? (2 files, tests pass)');
@@ -86,8 +89,9 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
     expect(ys[0] ?? 0, 'his words under the question').toBeLessThan(ys[1] ?? 0);
     expect(ys[1] ?? 0, 'the chip under his words').toBeLessThan(ys[2] ?? 0);
     // a newer hub's typed row: the chip is the image, so his words never say '[Image #1]' too (designer m_15891)
-    // messages-right v1: his side, '✓ you answered main' dim over his words in the bubble
-    await expect(page.getByTestId('thread.approval.5.head')).toHaveText('✓you answered main');
+    // messages-right v1: his side, '✓ you answered bise' dim over his words in the bubble (the name the
+    // thread draws, designer m_21658)
+    await expect(page.getByTestId('thread.approval.5.head')).toHaveText('✓you answered bise');
     await expect(page.getByTestId('thread.approval.5.words')).toHaveText('this one');
     await expect(page.getByTestId('thread.approval.5.image.1')).toHaveText('image 1');
     expect(await page.getByTestId('thread.approval.5').innerText(), "the chip is the image: no '[Image #1]' tag anywhere (designer m_21561)").not.toContain('[Image #');

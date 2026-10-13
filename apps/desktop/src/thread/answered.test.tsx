@@ -3,7 +3,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
-import { AnsweredRow } from './rows-cards';
+import { AnsweredRow, shownHead, toYou } from './rows-cards';
 
 const row = (why: string): Entry => ({
   pos: 31,
@@ -28,7 +28,17 @@ describe('an answered row', () => {
   it("bise's answer for him keeps its words and its why", () => {
     render(<AnsweredRow e={row('the brief says v2')} />);
     const r = screen.getByTestId('thread.answered.31');
-    expect(r.textContent).toContain('answered gift-ui for you: which balance?');
+    expect(r.textContent).toContain('bise answered gift-ui for you: which balance?');
     expect(r.textContent).toContain('the brief says v2');
+  });
+});
+
+describe("the hub's words, said to him (designer m_21658)", () => {
+  it("'he showed it' -> 'you showed it'; 'you answered main' -> 'you answered bise'", () => {
+    expect(toYou('he showed it')).toBe('you showed it');
+    expect(toYou('He picked his own, the shell asked him')).toBe('You picked your own, the shell asked you');
+    expect(toYou('the brief says v2')).toBe('the brief says v2');
+    expect(shownHead('you answered main')).toBe('you answered bise');
+    expect(shownHead('you answered gift-ui')).toBe('you answered gift-ui');
   });
 });

@@ -14,6 +14,11 @@ import { partImageWords, YouBubble } from './rows-messages';
 import { NewsLine, ReportRow } from './rows-news';
 import type { RowCtx } from './rows';
 import { drawnParts, pageAnswer, pageOf, youView } from './parts';
+/** The hub's words about him in the 3rd person, said to him: 'he showed it' -> 'you showed it'. Pure. */
+export function toYou(words: string): string {
+  return words.replace(/\bhe\b/gu, 'you').replace(/\bHe\b/gu, 'You').replace(/\bhis\b/gu, 'your').replace(/\bhim\b/gu, 'you');
+}
+
 /** Main answered an agent's question for him: the question, the answer, and why, dim. */
 export function AnsweredRow({ e }: { e: Entry }) {
   const a = e.answered;
@@ -23,9 +28,9 @@ export function AnsweredRow({ e }: { e: Entry }) {
   return (
     <div className="th-answered" data-testid={`thread.answered.${e.pos}`}>
       <NewsLine mark="↳" tone="plain" testId={`thread.answered.${e.pos}.head`}>
-        {mine ? 'you answered' : 'answered'} {a.agent}{mine ? '' : ' for you'}: {a.question} → <b>{a.answer}</b>
+        {mine ? 'you answered' : `${shownName('main')} answered`} {a.agent}{mine ? '' : ' for you'}: {a.question} → <b>{a.answer}</b>
       </NewsLine>
-      {a.why !== '' && !mine && <div className="th-news-note">{a.why}</div>}
+      {a.why !== '' && !mine && <div className="th-news-note">{toYou(a.why)}</div>}
       <ImageChips images={a.images ?? []} testId={`thread.answered.${e.pos}`} />
     </div>
   );
@@ -179,6 +184,11 @@ export function approvalParts(text: string): { head: string; words: string } {
   return { head: (m[1] ?? '').trim(), words: (m[2] ?? '').trim() };
 }
 
+/** The head with the name the thread draws: 'you answered main' -> 'you answered bise' (designer m_21658). Pure. */
+export function shownHead(head: string): string {
+  return head.replace(/^(you answered )(\S+)/u, (_, lead: string, who: string) => lead + shownName(who));
+}
+
 /**
  * His words without the '[Image #n]' marks the hub kept in them: the chips under the row are the
  * images, so the words never say them a second time (designer m_15891). Pure.
@@ -208,7 +218,7 @@ export function ApprovalRow({ e, next }: { e: Entry; next: Entry | undefined }) 
   return (
     <div className="th-approval" data-ok={a.ok}>
       <YouBubble
-        head={<AnsweredHead ok={a.ok}>{parts.head}</AnsweredHead>}
+        head={<AnsweredHead ok={a.ok}>{shownHead(parts.head)}</AnsweredHead>}
         under={e.at_ms > 0 ? clock(e.at_ms) : undefined}
         timeAlways={lastOfRun(e, next)}
         testId={`thread.approval.${e.pos}`}
