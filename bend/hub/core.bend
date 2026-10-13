@@ -1903,17 +1903,17 @@ def close_card(-o: M.St, +cx: X.Cx<o>, +id: Nat, +res: String) -> X.Cx<o>:
 def is_option(+card: String, +t: String) -> Bool:
   PK.is_option(card, t)
 
-# his answer to card `c` as its route line (inbox picks, architect
-# m_22243): `said` as he said it, `msg` the message it became (the
-# asker's thread folds that message into this row), his pick when he
-# picked one of the card's options by its number
-def answer_rec(+who: String, +c: M.Card, +said: String, +msg: Maybe<&2, Nat>) -> J.Json:
-  +p = PK.option_pick(M.Card.text(c), said)
-  FD.route(who, Some{M.Card.id(c)}, said, msg, PK.pick_n(p), PK.pick_words(p))
+# his answer `a` as its route line (inbox picks, architect m_22243): what
+# he said as he said it, `msg` the message it became (the asker's thread
+# folds it into this row), his pick when he picked an option by its number
+def answer_rec(+a: PK.Ans, +msg: Maybe<&2, Nat>) -> J.Json:
+  FD.route(PK.ans_who(a), Some{PK.ans_card(a)}, PK.ans_said(a), msg, PK.pick_n(PK.ans_pick(a)), PK.pick_words(PK.ans_pick(a)))
 
-# that route line in `agent`'s feed, then its parts
+# that route line in `agent`'s feed, then its parts; the step's answer
+# names the same answer (X.answered: inbox picks (3), architect m_22636)
 def answer_line(-o: M.St, +cx: X.Cx<o>, +agent: String, +who: String, +c: M.Card, +said: String, +parts: String, +msg: Maybe<&2, Nat>) -> X.Cx<o>:
-  +cx2 = feed(o, cx, agent, answer_rec(who, c, said, msg))
+  +a = PK.ans(M.Card.id(c), M.Card.text(c), who, said)
+  +cx2 = feed(o, X.answered(o, cx, a), agent, answer_rec(a, msg))
   pick_lazy(X.Cx<o>, String.is_empty(parts), u => cx2, u => feed(o, cx2, agent, FD.route_parts(parts_json(parts))))
 
 # the same line in the asker's own feed (inbox picks (2)): an agent's
@@ -3296,13 +3296,13 @@ def Hub.r(x: Hub) -> X.R:
       r
 
 def hub_new(+workspace: String) -> Hub:
-  Hub{M.init(workspace), X.R{Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, workspace, False{}, 0n, False{}, Nil{}, None{}}}
+  Hub{M.init(workspace), X.R{Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, workspace, False{}, 0n, False{}, Nil{}, None{}, None{}}}
 
 # the context of one input over the hub
 def start(+h: Hub, +i: J.Json) -> X.Cx<Hub.d(h)>:
   +r = Hub.r(h)
-  +r2 = X.R.with_need(X.R.with_ans(X.R.with_git(X.R.with_now(X.R.with_dirty(r, False{}), C.get_nat(i, "now")), C.get_b(i, "git")),
-    Maybe.default(&2, List<&2, J.Json>, J.get_arr(i, "ans"), Nil{})), None{})
+  +r2 = X.R.with_answered(X.R.with_need(X.R.with_ans(X.R.with_git(X.R.with_now(X.R.with_dirty(r, False{}), C.get_nat(i, "now")), C.get_b(i, "git")),
+    Maybe.default(&2, List<&2, J.Json>, J.get_arr(i, "ans"), Nil{})), None{}), None{})
   X.Cx{X.core_start(Hub.d(h)), r2}
 
 def agent_decl(m: Maybe<&2, M.Agent>) -> Maybe<&2, M.Decl>:

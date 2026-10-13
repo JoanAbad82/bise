@@ -47,7 +47,7 @@ def hub_rts_set_rt(-o: HM.St, cx: HX.Cx<o>, +x: HX.Rt) -> {hub_rts(o, HC.set_rt(
   match cx:
     case HX.Cx{c, r}:
       match r:
-        case HX.R{a, b, c2, d, e, f, g, h, i, j, k, l}:
+        case HX.R{a, b, c2, d, e, f, g, h, i, j, k, l, m}:
           {==}
 
 def Laws.interrupt_says_stopped_once(o, cx, n, e):
@@ -134,6 +134,52 @@ def Laws.pick_both_or_neither(p):
 
 def Laws.the_answer_line_keeps_said(who, c, said, msg):
   {==}
+
+def Laws.answer_who_with_its_card(m):
+  match m:
+    case None{}:
+      {==}
+    case Some{a}:
+      {==}
+
+def Laws.answer_said_with_its_card(m):
+  match m:
+    case None{}:
+      {==}
+    case Some{a}:
+      {==}
+
+def Laws.answer_ask_with_its_card(m):
+  match m:
+    case None{}:
+      {==}
+    case Some{a}:
+      {==}
+
+def Laws.answer_pick_needs_the_card(m):
+  match m:
+    case None{}:
+      {==}
+    case Some{a}:
+      match a:
+        case HPK.Ans{c, w, s, q, p}:
+          match p:
+            case None{}:
+              {==}
+            case Some{k}:
+              match k:
+                case HPK.Pick{n, x}:
+                  {==}
+
+def Laws.the_steps_pick_is_the_route_lines(c, who, said):
+  {==}
+
+def Laws.the_noted_answer_is_read_back(o, cx, a):
+  match cx:
+    case HX.Cx{k, r}:
+      match r:
+        case HX.R{a1, b, c2, d, e, f, g, h, i, j, k2, l, m}:
+          {==}
 
 def Laws.an_agents_answer_is_in_the_askers_feed(o, cx, asker, c, said, parts, msg, e):
   +ln = HC.answer_line(o, cx, asker, asker, c, said, parts, msg)

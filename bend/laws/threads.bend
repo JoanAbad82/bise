@@ -227,7 +227,41 @@ law the_answer_line_keeps_said:
   for +c: HM.Card
   for +said: String
   for +msg: Maybe<&2, Nat>
-  {HC.answer_rec(who, c, said, msg) == HFD.route(who, Some{HM.Card.id(c)}, said, msg, HPK.pick_n(HPK.option_pick(HM.Card.text(c), said)), HPK.pick_words(HPK.option_pick(HM.Card.text(c), said))) : J.Json}
+  {HC.answer_rec(HPK.ans(HM.Card.id(c), HM.Card.text(c), who, said), msg) == HFD.route(who, Some{HM.Card.id(c)}, said, msg, HPK.pick_n(HPK.option_pick(HM.Card.text(c), said)), HPK.pick_words(HPK.option_pick(HM.Card.text(c), said))) : J.Json}
+
+# LAW: the step's answer (inbox picks (3), link.rs AStep ans_*): the card,
+# who asked, what he said and the question are all there or all absent...
+law answer_who_with_its_card:
+  for m: Maybe<&2, HPK.Ans>
+  {Maybe.is_some(&2, Nat, HPK.card_of(m)) == Maybe.is_some(&2, String, HPK.who_of(m)) : Bool}
+
+law answer_said_with_its_card:
+  for m: Maybe<&2, HPK.Ans>
+  {Maybe.is_some(&2, Nat, HPK.card_of(m)) == Maybe.is_some(&2, String, HPK.said_of(m)) : Bool}
+
+law answer_ask_with_its_card:
+  for m: Maybe<&2, HPK.Ans>
+  {Maybe.is_some(&2, Nat, HPK.card_of(m)) == Maybe.is_some(&2, String, HPK.ask_of(m)) : Bool}
+
+# LAW: ...a pick only when they are there...
+law answer_pick_needs_the_card:
+  for m: Maybe<&2, HPK.Ans>
+  {Bool.and(Maybe.is_some(&2, String, HPK.pick_of_ans(m)), Bool.not(Maybe.is_some(&2, Nat, HPK.card_of(m)))) == False{} : Bool}
+
+# LAW: ...and the step's pick is the route line's pick: both come from the
+# one answer that answer_line notes (X.answered) and writes (answer_rec)
+law the_steps_pick_is_the_route_lines:
+  for +c: HM.Card
+  for +who: String
+  for +said: String
+  {HPK.pick_of_ans(Some{HPK.ans(HM.Card.id(c), HM.Card.text(c), who, said)}) == HPK.pick_words(HPK.option_pick(HM.Card.text(c), said)) : Maybe<&2, String>}
+
+# LAW: the answer noted in a step is the one the step's answer reads
+law the_noted_answer_is_read_back:
+  for -o: HM.St
+  for cx: HX.Cx<o>
+  for +a: HPK.Ans
+  {HX.R.answered(HX.Cx.r(o, HX.answered(o, cx, a))) == Some{a} : Maybe<&2, HPK.Ans>}
 
 # LAW: an agent's card: his answer's route line goes in the asker's feed
 # too (inbox picks (2); its fold makes the asker's msg-in that row).
