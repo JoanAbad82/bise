@@ -72,6 +72,17 @@ export function restartDelay(crashes: readonly number[], now: number): number | 
   return 1000 * 2 ** recent;
 }
 
+/**
+ * Whether a talk is open after `ev` (fn talk_start or fn fn opens one; talk_end or cancel ends it).
+ * A helper that dies mid-talk sends neither: run.ts ends it for the windows (amb-core m_22285).
+ */
+export function talkOpen(open: boolean, ev: HelperEv): boolean {
+  if (ev.ev !== 'fn') return open;
+  if (ev.act === 'talk_start' || ev.act === 'double') return true;
+  if (ev.act === 'talk_end' || ev.act === 'cancel') return false;
+  return open;
+}
+
 /** The last state event of each kind, replayed in order to a window that opens. */
 export class HelperState {
   private last = new Map<HelperEv['ev'], HelperEv>();

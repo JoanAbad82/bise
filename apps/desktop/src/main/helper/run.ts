@@ -20,7 +20,7 @@ import type { HelperCmd, HelperEv } from '../../proto';
 import { IPC, TEST_ENV } from '../../shared/api';
 import { fnToWindow } from './fnroute';
 import type { HelperConfig } from './config';
-import { decodeEv, encodeCmd, HelperState, LineSplitter, restartDelay, windowMaySend } from './lines';
+import { decodeEv, encodeCmd, HelperState, LineSplitter, restartDelay, talkOpen, windowMaySend } from './lines';
 import { noAsks } from '../offscreen';
 
 export const HELPER_ENV = 'BISE_DESKTOP_HELPER';
@@ -44,6 +44,8 @@ export class Helper {
   private readonly crashes: number[] = [];
   private readonly listeners = new Set<Listener>();
   private quitting = false;
+  // a talk the helper opened and has not ended yet
+  private talking = false;
   // his prefs as the helper's config: sent at every hello (a restarted helper
   // starts from nothing) and whenever they change (qa-native m_9724); none
   // before his prefs are known (the helper keeps its built-in floor until then)
@@ -77,6 +79,9 @@ export class Helper {
     child.on('exit', (code, signal) => {
       if (this.child === child) this.child = null;
       this.state.clear();
+      // it died mid-talk: its release never comes, so the talk is cancelled here, else the
+      // capsule stays in 'listen' and the next hold opens a second talk (amb-core m_22285)
+      if (this.talking) this.deliver({ ev: 'fn', act: 'cancel' });
       if (this.quitting) return;
       const now = Date.now();
       const wait = restartDelay(this.crashes, now);
@@ -116,14 +121,19 @@ export class Helper {
     }
     this.state.take(d.ev);
     if (d.ev.ev === 'hello' && this.conf !== null) this.send(this.conf);
-    for (const l of this.listeners) l(d.ev);
+    this.deliver(d.ev);
+  }
+
+  private deliver(ev: HelperEv): void {
+    for (const l of this.listeners) l(ev);
     // fn fn with bise's window in front: voice mode there, never the capsule's talk (fnroute.ts)
     const front = frontWindow();
-    if (front !== null && fnToWindow(d.ev, true)) {
+    if (front !== null && fnToWindow(ev, true)) {
       front.webContents.send(IPC.fnVoice, null);
       return;
     }
-    for (const w of BrowserWindow.getAllWindows()) w.webContents.send(IPC.helperEv, d.ev);
+    this.talking = talkOpen(this.talking, ev);
+    for (const w of BrowserWindow.getAllWindows()) w.webContents.send(IPC.helperEv, ev);
   }
 }
 

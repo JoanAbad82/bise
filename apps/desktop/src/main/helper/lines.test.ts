@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { helper_cmd, helper_ev } from '../../proto/fixtures.gen';
-import { decodeEv, encodeCmd, HelperState, LineSplitter, restartDelay, windowMaySend } from './lines';
+import { decodeEv, encodeCmd, HelperState, LineSplitter, restartDelay, talkOpen, windowMaySend } from './lines';
 
 describe("the helper's lines (bise_proto::helper fixtures)", () => {
   it('decodes every fixture event line as itself', () => {
@@ -63,5 +63,18 @@ describe('HelperState', () => {
     expect(s.snapshot().find((e) => e.ev === 'quiet')).toEqual({ ev: 'quiet', on: false, why: '' });
     s.clear();
     expect(s.snapshot()).toEqual([]);
+  });
+});
+
+describe('talkOpen', () => {
+  it('a hold or fn fn opens a talk, its end or a cancel closes it; other fn acts and other events leave it (amb-core m_22285)', () => {
+    const fn = (act: 'talk_start' | 'talk_end' | 'cancel' | 'tap' | 'double' | 'key') => ({ ev: 'fn', act }) as const;
+    expect(talkOpen(false, fn('talk_start'))).toBe(true);
+    expect(talkOpen(false, fn('double'))).toBe(true);
+    expect(talkOpen(true, fn('talk_end'))).toBe(false);
+    expect(talkOpen(true, fn('cancel'))).toBe(false);
+    expect(talkOpen(true, fn('key'))).toBe(true);
+    expect(talkOpen(false, fn('tap'))).toBe(false);
+    expect(talkOpen(true, { ev: 'quiet', on: false } as never)).toBe(true);
   });
 });

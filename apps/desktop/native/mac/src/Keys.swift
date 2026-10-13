@@ -71,6 +71,18 @@ final class Keys {
     // after a wake: the tap may have been disabled while asleep
     func reenable() {
         if let t = tap { CGEvent.tapEnable(tap: t, enable: true) } else if Keys.trusted { start() }
+        resync()
+    }
+
+    // the tap was off for a while (a timeout, a sleep): a fn up in the gap never came, so the
+    // machine would hold the talk open until his next press ends it (amb-core m_22285). The real
+    // fn bit says whether it is still down
+    private func resync() {
+        let down = CGEventSource.flagsState(.combinedSessionState).contains(.maskSecondaryFn)
+        if machine.fnIsDown && !down {
+            Log.say("keys: fn up missed while the tap was off")
+            _ = feed(.fnUp)
+        }
     }
 
     func stop() {
@@ -87,6 +99,7 @@ final class Keys {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             if let t = tap { CGEvent.tapEnable(tap: t, enable: true) }
             Log.say("keys: tap re-enabled (\(type == .tapDisabledByTimeout ? "timeout" : "user input"))")
+            resync()
             return false
         case .flagsChanged:
             let code = e.getIntegerValueField(.keyboardEventKeycode)
