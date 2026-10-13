@@ -1,41 +1,52 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentWatch, WatchKind } from '@/proto';
-import { waitAge, waitingFor, waitingLine, waitsEvent, waitWhen, wakeLine, wakeTail, watchLabel } from './wake';
+import type { Agent, AgentWatch } from '@/proto';
+import { alarms, clockAhead, clockPast, paused, pauseLine, waitLen, wakeLine, wakeTail, watchEvent } from './wake';
 import WAIT_WORDS from '../../../../rust/proto/fixtures/wait_words.json';
 
-// bise-proto's own examples (rust/proto/src/thread/words.rs the_waiting_words_are_designers): the
-// window says the TUI's words
-const w = (id: number, kind: WatchKind, what: string, since_ms: number, noted = false): AgentWatch => ({ id, kind, what, since_ms, noted });
+// An agent row from the fixture's few fields, the rest an idle agent's (words.rs does the same).
+type FxAgent = { name: string; status?: string; since_ms?: number; waiting_on?: unknown; watching?: unknown[] };
+const agent = (x: FxAgent): Pick<Agent, 'name' | 'status' | 'since_ms' | 'waiting_on'> & { watching: AgentWatch[] } => ({
+  name: x.name,
+  status: (x.status ?? 'idle') as Agent['status'],
+  since_ms: x.since_ms ?? 0,
+  waiting_on: (x.waiting_on ?? null) as Agent['waiting_on'],
+  watching: (x.watching ?? []) as AgentWatch[],
+});
 
-describe('event-wake words (designer page event-wake, words.rs)', () => {
-  it('waiting for: the oldest watch, how many more, its age', () => {
-    expect(waitingFor([], 0)).toBeNull();
-    const one = [w(3, 'bg', 'cargo test', 1_000)];
-    expect(waitingFor(one, 121_000)).toBe('waiting for cargo test · 2m');
-    const two = [w(4, 'file', 'build.rc', 50_000), w(3, 'bg', 'cargo test', 1_000)];
-    expect(waitingFor(two, 121_000)).toBe('waiting for cargo test and 1 more · 2m');
-    expect(waitingFor(two.slice(0, 1), 60_000)).toBe('waiting for build.rc to appear · 10s');
-    // a file watch with a note: the note names it (designer m_17730)
-    expect(waitingFor([w(5, 'file', 'the reindex', 60_000, true)], 60_000)).toBe('waiting for the reindex · 0s');
+describe("agent-waiting-states A: the wait words, words.rs's (wait_words.json)", () => {
+  it('a duration for what runs now', () => {
+    for (const c of WAIT_WORDS.len) {
+      expect(waitLen(c.ms), String(c.ms)).toBe(c.long);
+      expect(waitLen(c.ms, true), String(c.ms)).toBe(c.short);
+    }
   });
 
-  it("a wait's age and a watch's label", () => {
-    expect([waitAge(40_000), waitAge(121_000), waitAge(3 * 3_600_000), waitAge(2 * 86_400_000)]).toEqual(['40s', '2m', '3h', '2d']);
-    expect(watchLabel('file', 'build.rc', false)).toBe('build.rc to appear');
-    expect(watchLabel('file', 'the reindex', true)).toBe('the reindex');
-    expect(watchLabel('pid', 'pid 4242', false)).toBe('pid 4242');
+  it("a clock for what's ahead, a relative one for what's past; each instant its own offset", () => {
+    for (const c of WAIT_WORDS.ahead) expect(clockAhead(c.at_ms, c.at_off_s, c.now_ms, c.now_off_s), c.why).toBe(c.clock);
+    for (const c of WAIT_WORDS.past) expect(clockPast(c.at_ms, c.at_off_s, c.now_ms, c.now_off_s), c.why).toBe(c.clock);
   });
 
-  it('it waits for an event only while it has no turn running (the TUI waits_event)', () => {
-    const watching = [w(3, 'bg', 'cargo test', 1_000)];
-    expect(waitsEvent({ status: 'idle', watching })).toBe(true);
-    expect(waitsEvent({ status: 'done', watching })).toBe(false);
-    expect(waitsEvent({ status: 'working', watching })).toBe(false);
-    expect(waitsEvent({ status: 'idle', watching: [] })).toBe(false);
-    expect(waitsEvent({ status: 'idle' })).toBe(false);
+  it('a pause: continues when, the event, a duration; an alarm is no pause', () => {
+    for (const c of WAIT_WORDS.pauses) {
+      const a = agent(c.agent);
+      expect(pauseLine(a, c.now_ms, c.short), c.why).toEqual(c.want);
+      expect(paused(a), c.why).toBe(c.want !== null);
+    }
   });
 
-  it("the wake line: the hub's head, only a non-zero rc red, '–' when he stopped waiting; its folded output", () => {
+  it('an alarm: if the event, until a clock ahead, the hover says when it was set', () => {
+    for (const c of WAIT_WORDS.alarms) expect(alarms(agent(c.agent as FxAgent), c.now_ms, () => c.off_s), c.why).toEqual(c.want);
+  });
+
+  it("a watch's event", () => {
+    expect(watchEvent('bg', 'cargo bench', false)).toBe('cargo bench ends');
+    expect(watchEvent('file', 'build.rc', false)).toBe('build.rc appears');
+    expect(watchEvent('file', 'the nightly gate goes red', true)).toBe('the nightly gate goes red');
+  });
+});
+
+describe('event-wake: the wake line (designer page event-wake, words.rs)', () => {
+  it("the hub's head, only a non-zero rc red, '–' when he stopped waiting; its folded output", () => {
     const ended = (rc: number | null, text: string) => wakeLine({ text, wake: { id: 1, ev: 'ended', kind: 'bg', what: 'cargo test', rc, after_ms: 1 } });
     expect(ended(101, 'cargo test ended · rc 101 · after 3m10s')).toEqual({
       mark: '·',
@@ -50,18 +61,5 @@ describe('event-wake words (designer page event-wake, words.rs)', () => {
     expect(wakeLine({ text: 'stopped waiting for npm run dev after 24h', wake: { id: 1, ev: 'expired', kind: 'bg', what: 'npm run dev', after_ms: 86_400_000 } }).mark).toBe('–');
     expect(wakeLine({ text: 'the reindex still running after 1h00m', wake: { id: 1, ev: 'still', kind: 'pid', what: 'the reindex', after_ms: 3_600_000 } }).mark).toBe('·');
     expect([wakeTail(0), wakeTail(1), wakeTail(3)]).toEqual([null, 'its last line', 'its last 3 lines']);
-  });
-
-  // desktop-status-line: the fixture words.rs reads too (wait_words_follow_the_fixture, architect m_22744)
-  it('wait_words.json: the when, each instant with its own offset, and the line', () => {
-    for (const c of WAIT_WORDS.when) {
-      expect(waitWhen(c.since_ms, c.since_off_s, c.now_ms, c.now_off_s, false), c.why).toBe(c.long);
-      expect(waitWhen(c.since_ms, c.since_off_s, c.now_ms, c.now_off_s, true), c.why).toBe(c.short);
-    }
-    for (const c of WAIT_WORDS.lines) {
-      const ws = c.watching.map((x) => w(x.id, x.kind as WatchKind, x.what, x.since_ms, x.noted));
-      expect(waitingLine(ws, c.now_ms, c.short, () => c.off_s), c.why).toEqual({ state: c.state, note: c.note, more: c.more, title: c.title });
-    }
-    expect(waitingLine([], 0)).toBeNull();
   });
 });

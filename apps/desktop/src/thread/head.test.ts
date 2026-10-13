@@ -77,9 +77,9 @@ describe('D7: the context gauge in the head is named, an empty one goes', () => 
 
 describe('R9/S3: whom it waits on, in the state chip', () => {
   const NOW2 = 1_791_100_000_000;
-  it("'waiting on bise' dim for another agent (main is bise), '? waiting for you' in accent for him", () => {
-    expect(stateChip({ status: 'working', since_ms: NOW2 - 600_000, waits: 0, waiting_on: { who: 'agent', name: 'main' } }, NOW2)).toEqual({ text: '⋯ waiting on bise', needs: false, live: false });
-    expect(stateChip({ status: 'waiting', since_ms: NOW2, waits: 0, waiting_on: { who: 'agent', name: 'docs' } }, NOW2).text).toBe('⋯ waiting on docs');
+  it("another agent's reply: a pause, '… waiting · 10 min' dim (agent-waiting-states A); '? waiting for you' in accent for him", () => {
+    expect(stateChip({ status: 'waiting', since_ms: NOW2 - 600_000, waits: 0, waiting_on: { who: 'agent', name: 'main' } }, NOW2)).toEqual({ text: '… waiting · 10 min', needs: false, live: false });
+    expect(stateChip({ status: 'waiting', since_ms: NOW2, waits: 0, waiting_on: { who: 'agent', name: 'docs' } }, NOW2).text).toBe('… waiting · 0 s');
     expect(stateChip({ status: 'working', since_ms: NOW2, waits: 0, waiting_on: { who: 'you' } }, NOW2)).toEqual({ text: '? waiting for you', needs: true, live: false });
   });
   it('a kind this window does not know changes nothing', () => {
@@ -121,5 +121,15 @@ describe("'starting' = nothing of its own yet (designer m_18624, amb-home m_1862
     expect(nothingOwnYet([undefined])).toBe(false);
     expect(nothingOwnYet(['you', 'agent'])).toBe(false);
     expect(nothingOwnYet(['from_agent', 'you'])).toBe(false);
+  });
+});
+
+describe('agent-waiting-states A: the head chip of a pause, none for an alarm', () => {
+  const NOW3 = 1_791_100_000_000;
+  it("a pause: '… waiting · 3 min'; an alarm: idle (it is free)", () => {
+    const bench = { id: 7, kind: 'bg' as const, what: 'cargo bench', since_ms: NOW3 - 180_000, resumes: true };
+    const gate = { id: 4, kind: 'file' as const, what: 'the nightly gate goes red', noted: true, since_ms: NOW3 - 16 * 3_600_000 };
+    expect(stateChip({ status: 'idle', since_ms: NOW3, waits: 0, watching: [bench] }, NOW3).text).toBe('… waiting · 3 min');
+    expect(stateChip({ status: 'idle', since_ms: NOW3, waits: 0, watching: [gate] }, NOW3).text).toBe('idle');
   });
 });

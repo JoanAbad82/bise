@@ -1044,8 +1044,8 @@
   overflow: hidden;
   white-space: nowrap;
 }
-/* desktop-status-line A: the state whole in text-2, the note in text-3 (cut on a word in JS),
-   the digits mono */
+/* agent-waiting-states A: 'continues when' whole in text-2, the rest in text-3 (the event cut on a
+   word in JS; ' · running for 3 min' whole), the digits mono */
 .th-wait-state,
 .th-wait-sep,
 .th-wait-more {
@@ -1060,6 +1060,18 @@
 }
 .th-wait-note {
   min-width: 0;
+}
+/* the agent a pause waits on: its name opens it, the line's own color until hovered */
+.th-wait-who {
+  all: unset;
+  cursor: pointer;
+  color: inherit;
+}
+.th-wait-who:hover,
+.th-wait-who:focus-visible {
+  color: var(--c-text-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .th-wait-num {
   font-family: var(--font-mono);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent, Feature } from '@/proto';
-import { agentRows, archivedRows, capRows, roleWords, type ProjAgent } from './barrows';
+import { agentRows, archivedRows, capRows, roleWords, watchRows, type ProjAgent } from './barrows';
 
 const NOW = 1_791_100_000_000;
 const ag = (name: string, over: Partial<Agent> = {}): ProjAgent => ({
@@ -35,6 +35,25 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
     expect(rows[0]).toMatchObject({ working: true, gauge: '42k · 17%' });
     expect(rows[1]?.glyph).toBe('◷');
     expect(rows[1]?.gauge).toBeUndefined();
+  });
+  it("SCHEDULED & WATCHING: an alarm, '◌', its agent, 'if …', until a clock ahead; a pause is no row here", () => {
+    const off = () => 7200;
+    const now = 1791843420000; // tue 13 oct 00:17 (+02:00), the fixture's capture
+    const gate = { id: 4, kind: 'file' as const, what: 'the nightly gate goes red', noted: true, since_ms: 1791785220000, until_ms: 1791871620000 };
+    const bench = { id: 7, kind: 'bg' as const, what: 'cargo bench', since_ms: now - 180_000, resumes: true };
+    const rows = watchRows([ag('main', { watching: [gate] }), ag('perf', { watching: [bench] }), ag('old', { archived: true, watching: [gate] })], now, false, off);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      glyph: '◌',
+      tone: 'dim',
+      name: 'main',
+      sub: 'if the nightly gate goes red',
+      fit: true,
+      end: 'until 08:07',
+      title: 'bise wakes main if the nightly gate goes red · set yesterday 08:07 · stops watching at 08:07',
+      testId: 'app.right.watching.main.4',
+      watch: 4,
+    });
   });
   it("ARCHIVED: ✓ done / – stopped with its age", () => {
     const rows = archivedRows([ag('a', { archived: true, status: 'done', since_ms: NOW - 2 * 3_600_000 }), ag('b', { archived: true, since_ms: NOW - 2 * 86_400_000 })], NOW, false);

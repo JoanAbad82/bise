@@ -6,8 +6,8 @@
 // Sidebar.tsx and App.tsx draw these.
 import type { Agent, ComputerAgent, ProjectRow } from '@/proto';
 import { MAIN, type Route } from './route';
-import { shortAge, shownName } from '@/agents/model';
-import { waitEnd, waitingLine, waitsEvent, waitWords } from '@/thread/wake';
+import { shortAge } from '@/agents/model';
+import { pauseLine } from '@/thread/wake';
 
 /** A sign's tone: ink (at work), accent (asks him), err (failed), dim (the rest). */
 export type Tone = 'ink' | 'acc' | 'err' | 'dim';
@@ -47,15 +47,11 @@ export function signOf(a: Agent, now: number, wake?: number): Sign {
   if (a.waits > 0) return { g: '?', tone: 'acc', end: '', endTone: 'dim', count: a.waits, title: `asks you · ${what}` };
   // R9/S3: whom it waits on, typed by the hub (the TUI's panel: ? when it is him, … another agent)
   if (a.waiting_on?.who === 'you') return { g: '?', tone: 'acc', end: '', endTone: 'dim', count: 0, title: `asks you · ${what}` };
-  if (a.waiting_on?.who === 'agent') return { g: '⋯', tone: 'dim', end: 'waiting', endTone: 'dim', count: 0, title: `waiting on ${shownName(a.waiting_on.name)} · ${what}` };
-  // event-wake (designer's page event-wake): it waits for an event, not idle: '…' in ink, how long
-  // it waits on the right, what it waits for on hover; never the accent (it doesn't wait on him)
-  const line = waitsEvent(a) ? waitingLine(a.watching, now) : null;
-  if (line !== null) {
-    // the end in the status line's time words ('for 12 min', 'since 04:12', never a bare '14 h':
-    // desktop-status-line A), the line's words on hover
-    return { g: '…', tone: 'ink', end: waitEnd(line), endTone: 'dim', count: 0, title: `${waitWords(line)} · ${what}` };
-  }
+  // a pause (agent-waiting-states A): it continues when a command ends or another agent answers:
+  // '…' in ink, how long on the right ('3 min'), the pause line on hover; never the accent (it
+  // doesn't wait on him). An alarm leaves it idle: it is free.
+  const pause = pauseLine(a, now);
+  if (pause !== null) return { g: '…', tone: 'ink', end: pause.len, endTone: 'dim', count: 0, title: `${pause.title} · ${what}` };
   switch (a.status) {
     case 'working':
       return { g: '∿', tone: 'ink', end: turnShort(a.turn_ms ?? now - a.since_ms), endTone: 'dim', count: 0, title: `working · ${what}` };

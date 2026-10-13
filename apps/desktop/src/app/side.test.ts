@@ -107,9 +107,20 @@ describe("the artifacts row's new ones (tui-parity R17)", () => {
 });
 
 describe('R9/S3: an agent waiting on someone, in the sidebar (the TUI panel)', () => {
-  it("another agent: ⋯ dim, 'waiting on <who>' on hover; him: ? in the accent", () => {
-    expect(signOf(agent('perf', 'working', { waiting_on: { who: 'agent', name: 'main' } }), NOW)).toMatchObject({ g: '⋯', tone: 'dim', end: 'waiting', count: 0, title: 'waiting on bise · product page speed' });
+  it("another agent: a pause, '…' and how long, 'continues when <who> answers' on hover; him: ? in the accent", () => {
+    expect(signOf(agent('search', 'waiting', { waiting_on: { who: 'agent', name: 'perf' } }), NOW)).toMatchObject({ g: '…', tone: 'ink', end: '1 min', count: 0, title: 'continues when perf answers · 1 min · product page speed' });
     expect(signOf(agent('perf', 'idle', { waiting_on: { who: 'you' } }), NOW)).toMatchObject({ g: '?', tone: 'acc', count: 0, title: 'asks you · product page speed' });
+  });
+});
+
+describe('agent-waiting-states A: a pause in AGENTS, an alarm leaves it idle', () => {
+  const bench = { id: 7, kind: 'bg' as const, what: 'cargo bench', since_ms: NOW - 180_000, resumes: true };
+  const gate = { id: 4, kind: 'file' as const, what: 'the nightly gate goes red', noted: true, since_ms: NOW - 16 * 3_600_000, until_ms: NOW + 8 * 3_600_000 };
+  it("a pause: '…' in ink, its duration at the end, the line on hover", () => {
+    expect(signOf(agent('perf', 'idle', { watching: [bench] }), NOW)).toMatchObject({ g: '…', tone: 'ink', end: '3 min', title: 'continues when cargo bench ends · running for 3 min · product page speed' });
+  });
+  it('an alarm: ○ idle, never waiting', () => {
+    expect(signOf(agent('main', 'idle', { watching: [gate] }), NOW)).toMatchObject({ g: '○', end: 'idle' });
   });
 });
 

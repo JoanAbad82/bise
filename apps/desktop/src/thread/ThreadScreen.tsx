@@ -27,11 +27,11 @@ import { HubNoteRow, InboxBlock, type Answering } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, StartingLine } from './AgentHead';
-import { WaitingLine } from './WaitingLine';
+import { PauseLine } from './PauseLine';
 import { LabelMark } from './LabelMark';
 import { StepLine } from './live-step';
 import { composerWords, dividerParts, emptyEnter, nothingOwnYet, usageLine, workingRowShows } from './head';
-import { waitsEvent } from './wake';
+import { paused } from './wake';
 import { SignInLine, useThreadSignIn } from './signin';
 import { type ThreadListHandle } from './ThreadList';
 import { ComputerLine } from './ComputerLine';
@@ -355,9 +355,9 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
           modelLabel: models.find((m) => m.id === me.model)?.label,
           effort: me.effort,
           mode: approvals?.mode,
-          // event-wake: while it waits for an event the line over the composer says it, never this
+          // a pause (agent-waiting-states A): the line over the composer says it, never this
           // row (desktop-status-line A: no double), and never 'idle', the word he misread
-          status: rowSays || waitsEvent(me) ? null : me.status,
+          status: rowSays || paused(me) ? null : me.status,
           // named like the head's gauge ('context 42k · 17%'), none at 0% (designer m_14523: a bare
           // '15 · 0%' read as nothing)
           context: usageLine(me.usage?.words),
@@ -443,9 +443,9 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
           </div>
         )}
         {fresh && <StartingLine a={me} />}
-        {/* event-wake's '… waiting for …' row; working, only the gust beside the label says it
+        {/* a pause's 'continues when …' line (agent-waiting-states A); working, only the gust beside the label says it
             (designer's desktop-working v2, his m_21668: the working row went) */}
-        {!fresh && <WaitingLine a={me} />}
+        {!fresh && <PauseLine a={me} project={project} />}
         {/* a typed command's result (the hub's plain line): one quiet row, never under the composer (amb-home) */}
         <HubNoteRow project={project} />
         {signIn.on && <SignInLine copied={signIn.copied} />}

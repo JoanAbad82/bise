@@ -1,6 +1,6 @@
 // app/right-bar · designer's desktop-right-bar v5 (ambient-lead m_20085/m_20087/m_20091): the right
-// bar takes panel A's place. Storefront on FakeCore: 12 live agents (the 10th waits on him) and bench, live and waiting for an event, 2
-// archived, 2 artifacts, a scheduled task and an agent waiting for an event. Passes when:
+// bar takes panel A's place. Storefront on FakeCore: 12 live agents (the 10th waits on him) and bench, idle with an alarm set, 2
+// archived, 2 artifacts, a scheduled task and bench's alarm (agent-waiting-states A). Passes when:
 //   - the column is 320 px with its head 'storefront · N working ⌥⌘0' and four sections in his
 //     order, each head 'NAME · count' with 'all ›';
 //   - AGENTS keeps start order, shows 8 rows plus the waiting 10th in its place, '+ 4 more' unfolds
@@ -72,7 +72,7 @@ for (const theme of ['light', 'dark']) {
       await expect(page.getByTestId('app.right.top')).toHaveText(/^storefront\s*2 working\s*⌥⌘0$/u);
       // four sections in his order
       const heads = await page.locator('[data-testid^="app.right."][data-testid$=".head"]').allTextContents();
-      expect(heads).toEqual(['AGENTS · 13', 'ARCHIVED · 2', 'ARTIFACTS · 2', 'SCHEDULED & WAITING · 2']);
+      expect(heads).toEqual(['AGENTS · 13', 'ARCHIVED · 2', 'ARTIFACTS · 2', 'SCHEDULED & WATCHING · 2']);
       // AGENTS: start order, 8 rows + the waiting 10th in its place, '+ 4 more'
       const names = async () => page.locator('[data-testid="app.right.agents"] [data-testid^="app.right.agent."]').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')?.replace('app.right.agent.', '')));
       expect(await names()).toEqual([...NAMES.slice(0, 8), 'search']);
@@ -96,7 +96,8 @@ for (const theme of ['light', 'dark']) {
       // the rest of the sections
       await expect(page.getByTestId(`app.right.artifact.${P}.product-page`)).toContainText('new');
       await expect(page.getByTestId(`app.right.scheduled.${P}.4`)).toContainText('nightly replay');
-      await expect(page.getByTestId('app.right.waiting.bench')).toContainText('cargo bench');
+      // bench's alarm (agent-waiting-states A): '◌', 'if …', its agent idle
+      await expect(page.getByTestId('app.right.watching.bench.9')).toContainText('if cargo bench ends');
       // ⌥ held: ⌥1-⌥9 on the agents
       await page.keyboard.down('Alt');
       await expect(page.getByTestId('app.right.agent.perf').locator('.app-rb-g')).toHaveText('⌥1');

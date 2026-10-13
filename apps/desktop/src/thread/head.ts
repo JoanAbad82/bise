@@ -2,8 +2,8 @@
 // role line, the branch line, the composer's label and placeholder. Pure: AgentHead.tsx draws
 // them. The words are the TUI's. Owner: amb-home.
 import type { Agent, EntryKind } from '@/proto';
-import { ago, shownName } from '@/agents/model';
-import { waitingLine, waitsEvent } from './wake';
+import { ago } from '@/agents/model';
+import { paused, pauseLine } from './wake';
 
 /** The state chip: '<breath> working · 14 min', 'starting', '? waiting for you' (accent). */
 export interface StateChip {
@@ -33,10 +33,11 @@ export const STARTING_MS = 20_000;
 export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits' | 'waiting_on'> & { watching?: Agent['watching']; turn_ms?: Agent['turn_ms'] }, now: number): StateChip {
   // R9/S3: whom it waits on, the hub's own fact (the TUI's panel reads the same field)
   if (a.waits > 0 || a.waiting_on?.who === 'you') return { text: '? waiting for you', needs: true, live: false };
-  if (a.waiting_on?.who === 'agent') return { text: `⋯ waiting on ${shownName(a.waiting_on.name)}`, needs: false, live: false };
-  // event-wake (designer's page): it waits for an event, a dim chip, not 'idle'; since when in the
-  // status line's words ('… waiting since 04:12', desktop-status-line), what for in the line itself
-  if (waitsEvent(a) && a.watching !== undefined) return { text: `… ${waitingLine(a.watching, now)?.state ?? 'waiting'}`, needs: false, live: false };
+  // a pause (agent-waiting-states A): it continues when a command ends or another agent answers, a
+  // dim chip with how long ('… waiting · 3 min'); what for in the line over the composer. An alarm
+  // leaves it idle: it is free.
+  const pause = pauseLine(a, now);
+  if (pause !== null) return { text: `… waiting · ${pause.len}`, needs: false, live: false };
   if (a.status === 'waiting' || a.status === 'blocked') return { text: '? waiting for you', needs: true, live: false };
   switch (a.status) {
     case 'working': {
@@ -89,10 +90,10 @@ export function biseChip(agents: readonly Pick<Agent, 'main' | 'archived' | 'sta
 /** The composer's label and placeholder: 'to perf' / 'write to perf, then ⏎'. */
 /**
  * The working row shows at the thread's end (designer's desktop-working page): the agent works and
- * nothing waits on him (no question, no approval) nor on an event (event-wake keeps its own row). Pure.
+ * nothing waits on him (no question, no approval) nor is it paused (a pause keeps its own line). Pure.
  */
 export function workingRowShows(a: Agent | undefined): boolean {
-  return a !== undefined && !a.archived && !waitsEvent(a) && a.status === 'working' && a.waits === 0 && a.waiting_on?.who !== 'you';
+  return a !== undefined && !a.archived && !paused(a) && a.status === 'working' && a.waits === 0 && a.waiting_on?.who !== 'you';
 }
 
 /**

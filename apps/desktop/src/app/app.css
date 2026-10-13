@@ -788,6 +788,24 @@ body:has(.app-shell) {
 .app-rb-end.err {
   color: var(--c-err);
 }
+/* an alarm's detail under its row (agent-waiting-states A): its words one a line in text-3, then
+   'open <agent>' and 'stop watching' */
+.app-rb-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-1) var(--s-2) var(--s-2) calc(var(--s-2) + 15px + var(--gap-inline));
+  color: var(--c-text-3);
+  font-size: var(--t-12);
+}
+.app-rb-detail-words {
+  display: flex;
+  flex-direction: column;
+}
+.app-rb-detail-acts {
+  display: flex;
+  gap: var(--s-3);
+}
 
 /* what slides over the window (under 1000 px): the sidebar from the left, the panel from the
    right, over a 45% scrim of the window's paper; esc or a click on the scrim closes it */

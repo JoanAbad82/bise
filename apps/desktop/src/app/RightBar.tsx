@@ -1,6 +1,6 @@
 // The right bar (designer's desktop-right-bar v5, ambient-lead m_20085/m_20087): what happens in the
 // place shown, as the terminal's panel: four foldable sections in his order, AGENTS (start order,
-// ⌥N = the TUI's), ARCHIVED, ARTIFACTS, SCHEDULED & WAITING. 320 px, it takes panel A's slots
+// ⌥N = the TUI's), ARCHIVED, ARTIFACTS, SCHEDULED & WATCHING (an alarm: agent-waiting-states A). 320 px, it takes panel A's slots
 // (docked from 1000 px, sliding over under it, ⌥⌘0). On bise's thread the same sections cover every
 // project, the project's name in place of the role. A click opens the agent full in the centre (his
 // pick), an artifact its view, a task the scheduled screen; 'all ›' the full list in the centre.
@@ -20,7 +20,8 @@ import { MAIN } from './route';
 import { useNow } from './clock';
 import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
-import { agentRows, archivedRows, artifactRows, capRows, scheduledRows, waitingRows, type BarRow, type ProjAgent } from './barrows';
+import { agentRows, archivedRows, artifactRows, capRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
+import { FitWords } from './FitWords';
 
 const lastAgents = new Map<string, { from: readonly (readonly Agent[])[]; items: readonly ProjAgent[] }>();
 
@@ -173,7 +174,7 @@ function Row({ r, onOpen, on }: { r: BarRow; onOpen: () => void; on?: boolean })
           {r.gauge}
         </span>
       )}
-      {r.sub !== '' && <span className="app-rb-sub">{r.sub}</span>}
+      {r.sub !== '' && (r.fit === true ? <FitWords className="app-rb-sub" text={r.sub} testId={`${r.testId}.sub`} /> : <span className="app-rb-sub">{r.sub}</span>)}
       {/* a new artifact: the signed 'new' chip (designer m_20132: 1 px line, r 9, ink, t-11) */}
       {r.end === 'new' && r.id !== undefined ? (
         <span className="app-rb-end">
@@ -185,6 +186,33 @@ function Row({ r, onOpen, on }: { r: BarRow; onOpen: () => void; on?: boolean })
         <span className={`app-rb-end ${r.endTone}`}>{r.end}</span>
       )}
     </Press>
+  );
+}
+
+/**
+ * An alarm's detail, under its row (agent-waiting-states A): the hover's words one a line ('bise
+ * wakes main if the nightly gate goes red', 'set yesterday 08:07', 'stops watching at 08:07'), its
+ * agent's name opens it, and 'stop watching' (HubCmd wake_stop: the same as sb wake --stop).
+ */
+function WatchDetail({ r, onStop, onAgent }: { r: BarRow; onStop: () => void; onAgent: () => void }) {
+  const [head = '', ...rest] = r.title.split(' · ');
+  return (
+    <div className="app-rb-detail" data-testid={`${r.testId}.detail`}>
+      <div className="app-rb-detail-words">
+        <span>{head}</span>
+        {rest.map((x) => (
+          <span key={x}>{x}</span>
+        ))}
+      </div>
+      <div className="app-rb-detail-acts">
+        <Act onClick={onAgent} testId={`${r.testId}.open`}>
+          open {r.name}
+        </Act>
+        <Act onClick={onStop} testId={`${r.testId}.stop`}>
+          stop watching
+        </Act>
+      </div>
+    </div>
   );
 }
 
@@ -253,7 +281,10 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   const tipOf = useAgentTip(project, live, route);
   const archived = archivedRows(agents, now, all);
   const made = artifactRows(artifacts, now);
-  const later = [...scheduledRows(tasks, now), ...waitingRows(agents, now, all)];
+  const later = [...scheduledRows(tasks, now), ...watchRows(agents, now, all)];
+  const store = useStore();
+  // the alarm whose detail is open (one at a time; a click on its row again closes it)
+  const [watchOpen, setWatchOpen] = useState<string | null>(null);
   const working = agents.filter((x) => !x.a.archived && !x.a.main && x.a.status === 'working').length;
   const waits = live.some((r) => r.waits);
   const openAgent = (p: string, agent: string) => {
@@ -321,7 +352,7 @@ export function RightBar({ project, name, over }: { project: string; name: strin
         </Section>
         <Section
           id="scheduled"
-          title="SCHEDULED & WAITING"
+          title="SCHEDULED & WATCHING"
           rows={later}
           cap={5}
           summary={later[0] === undefined ? '' : `${later[0].glyph} ${later[0].end}`}
@@ -329,16 +360,40 @@ export function RightBar({ project, name, over }: { project: string; name: strin
             router.go({ screen: 'scheduled' });
           }}
         >
-          {(r) => (
-            <Row
-              key={r.key}
-              r={r}
-              onOpen={() => {
-                if (r.agent !== undefined) openAgent(r.project, r.agent);
-                else router.go({ screen: 'scheduled' });
-              }}
-            />
-          )}
+          {(r) =>
+            r.watch !== undefined ? (
+              <Fragment key={r.key}>
+                <Row
+                  r={r}
+                  on={watchOpen === r.key}
+                  onOpen={() => {
+                    setWatchOpen((k) => (k === r.key ? null : r.key));
+                  }}
+                />
+                {watchOpen === r.key && (
+                  <WatchDetail
+                    r={r}
+                    onStop={() => {
+                      store.command({ cmd: 'wake_stop', project: r.project, id: r.watch } as never);
+                      setWatchOpen(null);
+                    }}
+                    onAgent={() => {
+                      openAgent(r.project, r.agent ?? '');
+                    }}
+                  />
+                )}
+              </Fragment>
+            ) : (
+              <Row
+                key={r.key}
+                r={r}
+                onOpen={() => {
+                  if (r.agent !== undefined) openAgent(r.project, r.agent);
+                  else router.go({ screen: 'scheduled' });
+                }}
+              />
+            )
+          }
         </Section>
       </div>
     </aside>

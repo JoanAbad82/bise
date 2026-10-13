@@ -6,7 +6,7 @@ import { glyphOf, leaves } from '@/artifacts/model';
 import type { Task } from '@/scheduled/model';
 import { howOften, nextWords } from '@/scheduled/model';
 import { shortAge } from '@/agents/model';
-import { waitEnd, waitingLine, waitsEvent, waitWords } from '@/thread/wake';
+import { alarms } from '@/thread/wake';
 import type { Agent, ComputerAgent, Feature } from '@/proto';
 import { groupsOf } from '@/review/feature';
 import { computerDot, gaugeSays, signOf, type Tone } from './side';
@@ -45,6 +45,10 @@ export interface BarRow {
   readonly gauge?: string;
   /** a browser-only artifact: '↗' 4 px after its title, text-3 (designer m_21742) */
   readonly leaves?: boolean;
+  /** its sub cuts after a whole word with '…' (an alarm's note, agent-waiting-states A) */
+  readonly fit?: boolean;
+  /** an alarm: its watch's id; the row opens its detail (stop watching) */
+  readonly watch?: number;
 }
 
 /** What AGENTS reads besides the agents: their next wakes ('<project>/<agent>' -> ms), the project's features, the computer rows. */
@@ -201,26 +205,33 @@ export function scheduledRows(tasks: readonly Task[], now: number): BarRow[] {
   }));
 }
 
-/** WAITING: an agent that waits for an event, '…', what it waits for, for how long. Pure. */
-export function waitingRows(agents: readonly ProjAgent[], now: number, all: boolean): BarRow[] {
+/**
+ * WATCHING (agent-waiting-states A): an alarm, its agent free; '◌' (set, not at work), its agent,
+ * what wakes it ('if the nightly gate goes red', cut on a word), when it stops watching ('until
+ * 08:07', a clock ahead); the hover says who bise wakes, when it was set, when it stops. A pause is
+ * no row here: it shows over its composer and in AGENTS. `off`: each instant's offset. Pure.
+ */
+export function watchRows(agents: readonly ProjAgent[], now: number, all: boolean, off?: (ms: number) => number): BarRow[] {
   return agents
-    .filter((x) => !x.a.archived && waitsEvent(x.a))
-    .map((x) => ({ ...x, line: waitingLine(x.a.watching, now) }))
-    .map((x) => ({
-      key: `w:${x.project}/${x.a.name}`,
-      project: x.project,
-      agent: x.a.name,
-      glyph: '…',
-      tone: 'ink',
-      name: x.a.name,
-      sub: x.a.watching[0]?.what ?? '',
-      // the status line's time words, never a bare '14 h' (desktop-status-line A)
-      end: x.line === null ? '' : waitEnd(x.line),
-      endTone: 'dim',
-      title: x.line === null ? 'waiting' : waitWords(x.line),
-      testId: `app.right.waiting.${idOf(all, x.project, x.a.name)}`,
-      waits: false,
-    }));
+    .filter((x) => !x.a.archived)
+    .flatMap((x) =>
+      alarms(x.a, now, off).map((al) => ({
+        key: `w:${x.project}/${String(al.id)}`,
+        project: x.project,
+        agent: x.a.name,
+        glyph: '◌',
+        tone: 'dim' as const,
+        name: x.a.name,
+        sub: al.note,
+        fit: true,
+        end: al.end === '' ? '' : `until ${al.end}`,
+        endTone: 'dim' as const,
+        title: al.title,
+        testId: `app.right.watching.${idOf(all, x.project, x.a.name)}.${String(al.id)}`,
+        waits: false,
+        watch: al.id,
+      })),
+    );
 }
 
 /**

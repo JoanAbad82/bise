@@ -33,7 +33,7 @@ const world = () => [
     agents: [
       ag('main'),
       // waits for its background bench since 2 min: not idle
-      ag('perf', { purpose: 'product page speed', watching: [{ id: 9, kind: 'bg', what: 'cargo bench', since_ms: NOW - 2 * MIN - 5000 }] }),
+      ag('perf', { purpose: 'product page speed', watching: [{ id: 9, kind: 'bg', what: 'cargo bench', since_ms: NOW - 2 * MIN - 5000, resumes: true }] }),
       ag('search', { status: 'working', title: 'reindexing', since_ms: NOW - 4 * MIN }),
     ],
   },
@@ -80,15 +80,15 @@ test('thread/wake: an agent waiting for an event says what and how long; its wak
       // the sidebar: '…' in ink, its wait's age on the right, what it waits for on hover
       const row = page.getByTestId('app.right.agent.perf');
       await expect(row.locator('.app-rb-g')).toHaveText('…');
-      await expect(row.locator('.app-rb-end')).toHaveText('for 2 min');
-      await expect(row).toHaveAttribute('title', /^waiting for 2 min · cargo bench · /u);
+      await expect(row.locator('.app-rb-end')).toHaveText('2 min');
+      await expect(row).toHaveAttribute('title', /^continues when cargo bench ends · running for 2 min · /u);
       expect(await color('[data-testid="app.right.agent.perf"] .app-rb-g'), `${t}: '…' in ink`).toBe(await token('--c-text'));
       expect(await color('[data-testid="app.right.agent.perf"] .app-rb-g'), `${t}: never the accent`).not.toBe(accent);
       // the head: a dim chip, since when, not 'idle'
-      await expect(page.getByTestId('thread.head.state')).toHaveText('… waiting for 2 min');
+      await expect(page.getByTestId('thread.head.state')).toHaveText('… waiting · 2 min');
       // the thread's end: the state first, then what for, dim
-      await expect(page.getByTestId('thread.waiting')).toHaveText('waiting for 2 min · cargo bench');
-      await expect(page.getByTestId('thread.waiting')).toHaveAttribute('title', 'cargo bench · for 2 min');
+      await expect(page.getByTestId('thread.waiting')).toHaveText('continues when cargo bench ends · running for 2 min');
+      await expect(page.getByTestId('thread.waiting')).toHaveAttribute('title', 'continues when cargo bench ends · running for 2 min');
       expect(await color('[data-testid="thread.waiting"]'), `${t}: the live line dim`).toBe(await token('--c-text-2'));
       // the wake lines: the hub's words, only a non-zero rc in the error tone
       await expect(page.getByTestId('thread.wake.3')).toContainText('cargo test ended · rc 101 · after 3m10s');
