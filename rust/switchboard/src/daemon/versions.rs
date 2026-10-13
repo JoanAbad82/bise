@@ -449,7 +449,7 @@ impl Shell {
                 if same {
                     spawn_switcher(&paths, &self.opts.exe, &cur, Switcher::Restart);
                     return format!(
-                        "restarting the hub on the current version {} — the agents keep running",
+                        "restarting the hub on {} · the agents keep running",
                         me.get("id").and_then(|x| x.as_str()).unwrap_or("(dev tree)")
                     );
                 }
