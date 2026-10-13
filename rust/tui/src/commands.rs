@@ -351,6 +351,8 @@ fn effort_choices(app: &App, q: &str) -> Vec<Choice> {
         return out;
     }
     let default = crate::models::efforts(&model).1;
+    // the hints in one column, as /model's (designer m_21142)
+    let col = efforts.iter().map(|e| unicode_width::UnicodeWidthStr::width(e.as_str())).max().unwrap_or(0) + 2;
     for e in efforts.iter().filter(|e| matches(q, &[e])) {
         let mut desc = effort_hint(e).to_string();
         if *e == default {
@@ -358,7 +360,7 @@ fn effort_choices(app: &App, q: &str) -> Vec<Choice> {
         }
         out.push(Choice {
             value: e.clone(),
-            label: e.clone(),
+            label: format!("{e}{}", " ".repeat(col - unicode_width::UnicodeWidthStr::width(e.as_str()))),
             desc,
             mark: (*e == current).then(|| ("✓", theme::accent())),
         });
@@ -851,10 +853,11 @@ mod arg_tests {
         crate::models::TEST_READY.with(|r| *r.borrow_mut() = None);
         let r = items(&mut app, "/reasoning ");
         // effort-table: Opus 5.5 takes Claude's xhigh, high stays its default
-        assert_eq!(labels(&r), ["reasoning for auth-fix", "none", "low", "medium", "high", "xhigh", "max"]);
-        let high = r.iter().find(|i| i.label == "high").unwrap();
+        // the hints in one column: each name padded to the widest + 2 (designer m_21142)
+        assert_eq!(labels(&r), ["reasoning for auth-fix", "none    ", "low     ", "medium  ", "high    ", "xhigh   ", "max     "]);
+        let high = r.iter().find(|i| i.label.trim_end() == "high").unwrap();
         assert_eq!((high.mark.map(|x| x.0), high.desc.as_str()), (Some("✓"), "deeper, slower · default"));
-        let desc = |l: &str| r.iter().find(|i| i.label == l).unwrap().desc.clone();
+        let desc = |l: &str| r.iter().find(|i| i.label.trim_end() == l).unwrap().desc.clone();
         assert_eq!((desc("xhigh"), desc("max")), ("deeper still".to_string(), "the hard stuff".to_string()));
         assert_eq!(items(&mut app, "/reasoning lo")[1].run.as_deref(), Some("/reasoning low"));
         // main, on a model with two words; one without reasoning
@@ -862,7 +865,7 @@ mod arg_tests {
         app.sb.focus = "main".into();
         set_model(&mut app, "main", "mistral/zai-glm-5-3", "none");
         let r = items(&mut app, "/reasoning ");
-        assert_eq!(labels(&r), ["reasoning for main", "none", "high"]);
+        assert_eq!(labels(&r), ["reasoning for main", "none  ", "high  "]);
         assert_eq!(r[1].mark.map(|x| x.0), Some("✓"));
         set_model(&mut app, "main", "mistral/mistral-large-latest", "");
         let r = items(&mut app, "/reasoning ");
