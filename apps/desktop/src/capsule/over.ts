@@ -2,10 +2,24 @@
 // stuck on 'bise is thinking…'), from the core's events. Pure: CapsuleRoot dispatches the result.
 
 import { W } from "./Capsule";
-import type { CapEvent } from "./machine";
+import { CORNER_LINGER_MS, type CapEvent, type View } from "./machine";
 
 /** the 'over' line of a card his words answered stays this long, then the capsule goes */
 export const OVER_FADE_MS = 1500;
+/** 'i didn't hear anything' and the plain errors stay this long (designer m_22394) */
+export const OVER_PLAIN_MS = 4000;
+
+/**
+ * How long the corner card stays before it goes by itself, the time held while the pointer is on
+ * it (designer m_22394): an ended answer and a line with an action ('settings › voice')
+ * CORNER_LINGER_MS, a plain 'over' line OVER_PLAIN_MS; null: it stays (a live talk, a streaming
+ * answer) or has its own time (a card answered, OVER_FADE_MS). Pure.
+ */
+export function lingerOf(v: View, answerDone: boolean): number | null {
+  if (v.kind === "answer") return answerDone ? CORNER_LINGER_MS : null;
+  if (v.kind !== "talk" || v.phase !== "over" || v.fades === true) return null;
+  return v.link !== undefined ? CORNER_LINGER_MS : OVER_PLAIN_MS;
+}
 
 /**
  * The core's own errors the capsule says in the app's words (designer m_21945: the capsule isn't

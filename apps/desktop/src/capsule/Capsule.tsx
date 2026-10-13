@@ -270,6 +270,9 @@ export function Capsule(p: CapsuleProps): JSX.Element {
   );
 }
 
+/** The corner answer's scrollbar stays this long after the last scroll, then goes. */
+export const SCROLLBAR_LINGER_MS = 700;
+
 function Answer({
   answer,
   onOpen,
@@ -284,6 +287,15 @@ function Answer({
   const box = useRef<HTMLDivElement>(null);
   const atEnd = useRef(true);
   const [over, setOver] = useState(false);
+  // the overlay scrollbar shows only while he scrolls (designer m_22394): data-scrolling, gone
+  // SCROLLBAR_LINGER_MS after the last scroll
+  const scrolling = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (scrolling.current !== null) window.clearTimeout(scrolling.current);
+    },
+    [],
+  );
   useLayoutEffect(() => {
     const el = box.current;
     if (el === null) return;
@@ -294,13 +306,20 @@ function Answer({
     <div className="b-cap-answer" data-testid="capsule.answer" aria-live="polite" data-glass>
       <div
         ref={box}
-        className="t"
+        // b-md: the thread's markdown colors (ds md.css: code green, bold pale pink; designer m_22394)
+        className="t b-md"
         data-testid="capsule.answer.scroll"
         onScroll={(e) => {
           const el = e.currentTarget;
           atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
           // scrolled: the top line fades out over 16 px instead of being cut (capsule.css)
           el.toggleAttribute("data-scrolled", el.scrollTop > 0);
+          el.toggleAttribute("data-scrolling", true);
+          if (scrolling.current !== null) window.clearTimeout(scrolling.current);
+          scrolling.current = window.setTimeout(() => {
+            el.toggleAttribute("data-scrolling", false);
+            scrolling.current = null;
+          }, SCROLLBAR_LINGER_MS);
         }}
       >
         <LiveText

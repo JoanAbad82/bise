@@ -91,6 +91,18 @@ test('voice/corner-card: the talk and its answer in the corner card, 320 wide, 3
       const answer = cap.getByTestId('capsule.answer');
       await expect(answer, `${t}: the answer in the corner card`).toBeVisible({ timeout: 5000 });
       await expect(cap.getByTestId('capsule.answer.keys')).toHaveText('⏎ open in bise · esc close');
+      // its inline code in the thread's markdown colors (ds md.css: green), no chip fill (designer m_22394)
+      const code = await answer.locator('code').first().evaluate((e) => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--md-code)';
+        e.parentElement?.appendChild(probe);
+        const want = getComputedStyle(probe).color;
+        probe.remove();
+        const s = getComputedStyle(e);
+        return { color: s.color, want, fill: s.backgroundColor };
+      });
+      expect.soft(code.color, `${t}: inline code is the thread's code color`).toBe(code.want);
+      expect.soft(code.fill, `${t}: inline code has no fill`).toBe('rgba(0, 0, 0, 0)');
       await sleep(400);
       shots.push({ label: `${t} · answering`, png: await glassShot(cap, 'capsule.answer') });
       if (t === 'light') shots.push({ label: `${t} · answering, Dock on the right`, png: await glassShot(cap, 'capsule.answer'), dock: 'right' });

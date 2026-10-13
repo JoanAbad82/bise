@@ -24,10 +24,10 @@ import { W } from "@/spotlight/words";
 import { useTheme } from "@/theme";
 import "@/ds/index.css";
 import { Capsule, isCorner, menuCards } from "./Capsule";
-import { answeredOver, errorOver, heardOver, OVER_FADE_MS } from "./over";
+import { answeredOver, errorOver, heardOver, lingerOf, OVER_FADE_MS } from "./over";
 import { asksForScreen, shotOf, shotPref } from "./shot";
 import { useAgentPreview, useSpotData } from "./data";
-import { CORNER_LINGER_MS, CORNER_OUT_MS, START, step, type CapEvent, type Fx, type State, type View } from "./machine";
+import { CORNER_OUT_MS, START, step, type CapEvent, type Fx, type State, type View } from "./machine";
 
 interface Model {
   readonly state: State;
@@ -313,9 +313,10 @@ export function CapsuleRoot(): JSX.Element {
     setRoute({ ...r, to, name });
   };
 
-  // the corner card closes CORNER_LINGER_MS after the answer ends or an 'over' line shows, the
-  // time held while the pointer is on it (designer m_22118); a fading 'over' has its own time
-  // (the hover is of the view it was on: a card that went never holds the next one)
+  // the corner card goes by itself after the answer ends or an 'over' line shows (over.ts
+  // lingerOf: 8 s, a plain line 4 s), the time held while the pointer is on it (designer m_22118,
+  // m_22394); a fading 'over' has its own time (the hover is of the view it was on: a card that
+  // went never holds the next one)
   const [hoverOn, setHoverOn] = useState<View | null>(null);
   const hovered = hoverOn === view;
   const onHover = useCallback(
@@ -324,14 +325,12 @@ export function CapsuleRoot(): JSX.Element {
     },
     [view],
   );
-  const lingers =
-    (view.kind === "answer" && last?.done === true) ||
-    (view.kind === "talk" && view.phase === "over" && view.fades !== true);
+  const lingers = lingerOf(view, last?.done === true);
   useEffect(() => {
-    if (!lingers || hovered) return undefined;
+    if (lingers === null || hovered) return undefined;
     const t = window.setTimeout(() => {
       dispatch({ ev: "linger_gone" });
-    }, CORNER_LINGER_MS);
+    }, lingers);
     return () => {
       window.clearTimeout(t);
     };
@@ -378,6 +377,11 @@ export function CapsuleRoot(): JSX.Element {
         // fn+n on the tray menu answers its row n in place (one-inbox 3)
         const c = menuRef.current[Number(ev.key) - 1];
         if (c !== undefined) dispatch({ ev: "open_card", id: c.id });
+      } else if (ev.ev === "fn" && ev.act === "key" && ev.key === "enter" && viewRef.current.kind === "answer") {
+        // fn ⏎ on the corner answer: open in bise (the card has no keys; the helper swallows it,
+        // amb-mac m_22395); esc closes through the machine (back)
+        bise.openWindow("bise");
+        dispatch({ ev: "close" });
       } else if (ev.ev === "fn" && ev.act === "key" && ev.key === "delete") {
         // fn ⌫ while he talks: the still goes, the talk goes on (designer m_21903)
         const v = viewRef.current;
