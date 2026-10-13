@@ -113,7 +113,9 @@ def subscribed(E, name):
 
 def send(c, text):
     r = c.rpc("turn/send", {"project": c.project(), "agent": "main", "text": text, "mode": "now"})
-    check(r.get("result") == {}, "turn/send: %r" % r)
+    # the result carries the id sb-core gave his message (f4c033f6)
+    res = r.get("result") or {}
+    check(set(res) == {"msg_id"} and isinstance(res["msg_id"], int), "turn/send: %r" % r)
 
 
 def settled(c):
