@@ -180,10 +180,17 @@ pub(super) fn entry(app: &mut App, agent: &str, e: &Entry) {
 fn place(app: &mut App, agent: &str, e: &Entry) {
     let pos = e.pos as usize;
     if crate::entry_reads::skip(app, agent, e) {
-        if !app.win.spans.contains_key(&pos) {
-            let n0 = app.events.len();
-            app.win.spans.insert(pos, 0);
-            seen_at(app, Some(pos), n0);
+        match app.win.spans.get(&pos) {
+            // drawn before it was known as his answer (his page answer's
+            // 'you' line comes before its page part: page-answer-row):
+            // what it drew goes, the card's fold here says it
+            Some(&n) if n > 0 => replace(app, pos, n, Vec::new()),
+            Some(_) => {}
+            None => {
+                let n0 = app.events.len();
+                app.win.spans.insert(pos, 0);
+                seen_at(app, Some(pos), n0);
+            }
         }
         return;
     }

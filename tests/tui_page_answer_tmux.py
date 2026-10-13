@@ -34,7 +34,7 @@ PAGE = (
 )
 
 # what only the agent gets: never on his screen
-TEMPLATE = ["you sent 1 note", "answer with:", "sb page publish", "page-notes", "[from the page", "--notes-done"]
+TEMPLATE = ["you sent 1 note", "answer with:", "sb page publish <file>", "page-notes", "[from the page", "--notes-done"]
 
 
 def request(port, method, path, body=None, headers=None):
@@ -51,8 +51,24 @@ def request(port, method, path, body=None, headers=None):
     return out
 
 
+def his_rows(sc):
+    """The screen without the agent's replies: the fake provider answers
+    `ack: <what it got>`, the template whole; that is the agent's words,
+    not his row. A reply runs from its `ack:` line to the next blank row."""
+    out, reply = [], False
+    for row in sc.splitlines():
+        body = row.split("│")[1] if row.count("│") >= 2 else row
+        if "ack: " in body:
+            reply = True
+        elif not body.strip():
+            reply = False
+        if not reply:
+            out.append(row)
+    return "\n".join(out)
+
+
 def clean(sc):
-    bad = [w for w in TEMPLATE if w in sc]
+    bad = [w for w in TEMPLATE if w in his_rows(sc)]
     assert not bad, "the agent's template on his screen %r:\n%s" % (bad, sc)
 
 

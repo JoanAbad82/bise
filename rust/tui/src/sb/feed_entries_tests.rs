@@ -266,3 +266,22 @@ fn a_pause_cut_and_a_held_message_show_once() {
     assert!(drawn.contains("stopped by the pause") && drawn.contains("sleep 30"), "{drawn}");
     assert_eq!(app.events.len(), app.cache.len());
 }
+
+/// page-answer-row: his page answer's 'you' entry comes first without its
+/// page part (sb-core writes the part on the next line); answered here
+/// (the card's fold is drawn), the entry again with its part takes the
+/// raw text away: nothing of the agent's template stays in the feed.
+#[test]
+fn his_page_answer_folded_here_leaves_no_raw_text() {
+    let mut app = subscribed("main");
+    let text = "you sent 1 note on your page \"plan\" (plan v1, http://x):\n1. on q1: pick: the effort table now\nanswer with: sb page publish <file> --id plan --notes-done n1";
+    let raw: Entry = serde_json::from_value(serde_json::json!({"pos": 5, "at_ms": 0, "kind": "you", "text": text})).unwrap();
+    entry(&mut app, "main", &raw);
+    assert_eq!(kinds(&app), ["you"]);
+    app.sb.fold_here(1, "main");
+    let parts = serde_json::json!([{"kind": "page", "text": text, "to": "main", "page": "plan", "title": "plan", "version": 1,
+        "notes": [{"block": "q1", "kind": "pick", "text": "the effort table now", "card": 1, "asked": "which table first?"}]}]);
+    let typed: Entry = serde_json::from_value(serde_json::json!({"pos": 5, "at_ms": 0, "kind": "you", "text": text, "parts": parts})).unwrap();
+    entry(&mut app, "main", &typed);
+    assert!(kinds(&app).is_empty(), "{:?}", kinds(&app));
+}
