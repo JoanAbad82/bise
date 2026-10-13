@@ -246,7 +246,7 @@ wait $r
 s=$?
 if [ ! -d /tmp/bend-bg-0 ]; then echo \"background: the bg dir vanished before the exit code was recorded: /tmp/bend-bg-0\"; rm -f \"$0\"; exit 1; fi
 if [ ! -f /tmp/bend-bg-0/$i.out ]; then echo \"background: could not write /tmp/bend-bg-0/$i.out (disk full?)\"; fi
-n=$(wc -c < $BG/$i.out 2>/dev/null); n=$((${n:-0}+0)); if [ $n -gt 1048576 ]; then echo \"[bash: the output is $n bytes; only its first 1048576 follow. The rest is lost: redirect a big output to a file and read it in parts]\"; head -c 1048576 $BG/$i.out; echo; tail -c 1024 $BG/$i.out | grep -a -E '^\\[bash: (stopped:|killed) '; else cat $BG/$i.out 2>/dev/null; fi
+n=$(wc -c < $BG/$i.out 2>/dev/null); n=$((${n:-0}+0)); if [ $n -gt 1048576 ]; then echo \"[bash: the output is $n bytes; only its first 1048576 follow. The rest is lost: redirect a big output to a file and read it in parts]\"; tail -c 1024 $BG/$i.out | grep -a -E '^\\[bash: (stopped:|killed) '; head -c 1048576 $BG/$i.out; echo; else cat $BG/$i.out 2>/dev/null; fi
 if [ ! -s /tmp/bend-bg-0/$i.rc ]; then echo \"background: could not write /tmp/bend-bg-0/$i.rc (disk full?) - the output above may be incomplete\"; fi
 if [ -n \"$x\" ]; then echo \"[bash: interrupted by $x: the command was stopped (TERM to its process group, then KILL); its output so far is above. Check what it changed before you run it again]\"; s=130; fi
 rm -f $BG/$i.in $BG/$i.out $BG/$i.pid $BG/$i.cmd $BG/$i.rc 2>/dev/null

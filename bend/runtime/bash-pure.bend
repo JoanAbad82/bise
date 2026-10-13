@@ -433,8 +433,10 @@ def bg_slot_skip() -> String:
 # model sees (Xp.cap_out, 20000 chars); a 100 MiB output crashes it
 # (measured: 75 MB passes, 100 MiB is "bend: memory fault"). The
 # wrapper hands back at most bg_out_max() bytes, after a line that says
-# how big the output was, and then the watchdog's line when it stopped
-# the command (it is at the end of the .out, past the first MiB).
+# how big the output was and the watchdog's line when it stopped the
+# command: that line is at the end of the .out, past the first MiB, and
+# the REPL keeps only a result's first 20000 chars (Xp.cap_out), so it
+# goes on top.
 def bg_out_max() -> String:
   "1048576"
 
@@ -443,8 +445,8 @@ def bg_cat_out(+bg: String) -> String:
     String.append(bg_out_max(),
       String.append(" ]; then echo \"[bash: the output is $n bytes; only its first ",
         String.append(bg_out_max(),
-          String.append(" follow. The rest is lost: redirect a big output to a file and read it in parts]\"; head -c ",
-            String.append(bg_out_max(), " $BG/$i.out; echo; tail -c 1024 $BG/$i.out | grep -a -E '^\\[bash: (stopped:|killed) '; else cat $BG/$i.out 2>/dev/null; fi"))))))
+          String.append(" follow. The rest is lost: redirect a big output to a file and read it in parts]\"; tail -c 1024 $BG/$i.out | grep -a -E '^\\[bash: (stopped:|killed) '; head -c ",
+            String.append(bg_out_max(), " $BG/$i.out; echo; else cat $BG/$i.out 2>/dev/null; fi"))))))
 
 # ---- no command can eat the machine's memory ----
 # 2026-10-01: two `vercel deploy` runs an agent piped into `grep -m1`
