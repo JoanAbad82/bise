@@ -33,7 +33,7 @@ const MODELS = {
   ev: 'models',
   project: HOME,
   items: [
-    { id: 'anthropic/claude-opus-5-5', label: 'opus 5.5', provider: 'Anthropic', short: '1M', context: 1000000, vision: true, efforts: ['low', 'medium', 'high', 'max'], default_effort: 'high', default_for: ['main', 'agents'] },
+    { id: 'anthropic/claude-opus-5-5', label: 'opus 5.5', provider: 'Anthropic', short: '1M', context: 1000000, vision: true, efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], default_effort: 'high', default_for: ['main', 'agents'] },
     { id: 'mistral/devstral-medium-latest', label: 'devstral medium', provider: 'Mistral', short: '128k · config.toml', context: 128000, config: true, vision: false },
     { id: 'opus', label: 'opus', provider: '', short: '= anthropic/claude-opus-5-5', alias_of: 'anthropic/claude-opus-5-5' },
   ],
@@ -90,6 +90,10 @@ test('agents/tune: + new agent starts one; … renames it, sets its reasoning an
     await expect(page.getByTestId('agents.effort.p99.none'), 'a model with no reasoning setting says so').toHaveText('devstral medium has no reasoning setting');
     await page.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5').click();
     await expect(page.getByTestId('agents.effort.p99.max'), "opus 5.5's own efforts").toBeVisible();
+    // effort-table: Claude's xhigh, its own hint, the six on one row at this width
+    await expect(page.getByTestId('agents.effort.p99.xhigh')).toHaveAttribute('title', 'deeper still');
+    const tops = await page.locator('[data-testid^="agents.effort.p99."]').evaluateAll((es) => es.map((e) => Math.round(e.getBoundingClientRect().top)));
+    expect(new Set(tops).size, `the efforts on one row: ${tops.join(',')}`).toBe(1);
     await page.screenshot({ path: test.info().outputPath('models.png') });
     // a model set elsewhere (the TUI's /model): only the hub's agents event, no pick here; the mark follows it
     await core.send({ ev: 'agents', project: HOME, agents: [agent('main'), agent('p99', { model: 'opus', effort: 'high' }), agent('cart', { status: 'working' })] } as unknown as Ev);
