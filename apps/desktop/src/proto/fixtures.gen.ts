@@ -304,7 +304,7 @@ export const project_view: readonly ProjectView[] = [
 
 /** rust/proto/fixtures/context.jsonl */
 export const context: readonly FnContext[] = [
-  {"app":"Safari","selection":"the card number field loses focus","shot":"/Users/u/.bise/run/shots/fn-1791100400000.png","title":"checkout: fix the card field on Safari #42","url":"https://github.com/acme/checkout/pull/42","window_text":"Conversation 3  Commits 2  Files changed 4"},
+  {"app":"Safari","selection":"the card number field loses focus","title":"checkout: fix the card field on Safari #42","url":"https://github.com/acme/checkout/pull/42","window_text":"Conversation 3  Commits 2  Files changed 4"},
   {"app":"Code","file":"/Users/u/w/telemetry/src/main.rs","title":"main.rs — telemetry"},
   {},
 ];

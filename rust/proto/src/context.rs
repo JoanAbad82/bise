@@ -28,8 +28,7 @@ pub struct FnContext {
     /// the window's visible text (Accessibility), cut by the app
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window_text: Option<String>,
-    /// the screen capture taken at fn: a path to the PNG the shell wrote
-    /// (the window draws it as a thumbnail on his message, amb-win m_8492)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub shot: Option<String>,
+    // no `shot`: the talk's still goes as a captioned Part::Image of his
+    // message (architect m_22000/m_22053). An older core's `shot` key is an
+    // unknown field, ignored (no deny_unknown_fields).
 }

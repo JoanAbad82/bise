@@ -116,6 +116,9 @@ fn the_fn_context_round_trips() {
     }
     let c: FnContext = serde_json::from_str(r#"{"app":"Mail","later":"a field of a newer app"}"#).unwrap();
     assert_eq!(c, FnContext { app: Some("Mail".into()), ..Default::default() });
+    // an older core's `shot` (dropped, architect m_22053) still parses, ignored
+    let c: FnContext = serde_json::from_str(r#"{"app":"Safari","shot":"/Users/u/.bise/run/shots/fn-1.png"}"#).unwrap();
+    assert_eq!(c, FnContext { app: Some("Safari".into()), ..Default::default() });
 }
 
 /// bise-mac-helper's lines (architect m_9461): every line of both

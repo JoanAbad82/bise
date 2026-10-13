@@ -9,8 +9,8 @@
 //! One render, one call on the input path (daemon.rs's input arm); a
 //! routed message carries the struct to the project's hub, which renders
 //! it there with the same fn (amb-hub's xin). The route guess reads the
-//! struct and never renders. `context.shot` is not rendered: the ambient
-//! core turns a shot inside the image store into the image marker itself.
+//! struct and never renders. The talk's still is not in the context: the
+//! ambient core sends it as a captioned image part of his message.
 
 use bise_proto::context::FnContext;
 
@@ -141,7 +141,7 @@ mod tests {
     #[test]
     fn nothing_to_show_is_no_block() {
         assert_eq!(render(&FnContext::default()), None);
-        assert_eq!(render(&FnContext { shot: Some("/tmp/a.png".into()), selection: Some("  ".into()), ..FnContext::default() }), None);
+        assert_eq!(render(&FnContext { selection: Some("  ".into()), ..FnContext::default() }), None);
         assert_eq!(with_context("hi", &FnContext::default()), "hi");
         assert_eq!(strip_block("sb you : hi"), None);
     }

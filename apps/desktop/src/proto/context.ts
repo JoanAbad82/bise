@@ -26,9 +26,4 @@ selection?: string | null,
 /**
  * the window's visible text (Accessibility), cut by the app
  */
-window_text?: string | null, 
-/**
- * the screen capture taken at fn: a path to the PNG the shell wrote
- * (the window draws it as a thumbnail on his message, amb-win m_8492)
- */
-shot?: string | null, };
+window_text?: string | null, };

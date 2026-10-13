@@ -1494,11 +1494,13 @@
 .th-attach-missing {
   color: var(--c-err);
 }
-/* an image's caption (the talk's still: 'Safari · cold bench'), under the chips, dim, one line */
+/* an image's caption (the talk's still: 'Safari · cold bench'), designer m_22052: 4 px under the
+   chip row (--gap-tight), on the chips' left edge, t-12 text-3 (the ' · ' too), one line cut with … */
 .th-part-caption {
-  margin: var(--s-1) 0 0;
+  margin: var(--gap-tight) 0 0;
+  min-width: 0;
   color: var(--c-text-3);
-  font-size: 12px;
+  font: var(--t-12) var(--font-ui);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
