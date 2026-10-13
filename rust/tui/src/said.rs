@@ -108,9 +108,14 @@ pub(crate) fn view_of(text: &str, parts: &[Part]) -> View {
     let mut files: Vec<&str> = Vec::new();
     for p in parts {
         match p {
-            Part::Quote { from, text, file, new, old } => {
+            Part::Quote { from, text, file, new, old, n } => {
                 let at = Where { file: file.clone(), new: new.clone(), old: old.clone() };
                 v.quotes.push(Quote { from: from.clone(), text: text.clone(), at });
+                // another client's quote at its place (his m_22231): its
+                // chip's number where he put it, the block above as ever
+                if let Some(n) = n {
+                    v.body.push_str(&format!("❝ {n}"));
+                }
             }
             Part::Text { text } => v.body.push_str(text),
             Part::Paste { n, text } => {
@@ -150,6 +155,7 @@ pub(crate) fn gist(parts: &[Part]) -> String {
     let mut words = String::new();
     for p in parts {
         match p {
+            Part::Quote { n: Some(n), .. } => words.push_str(&format!("❝ {n}")),
             Part::Quote { from, .. } => quotes.push(format!("❝ {from}")),
             Part::Text { text } => words.push_str(text),
             Part::Paste { n, .. } => words.push_str(&format!("▤ {n}")),

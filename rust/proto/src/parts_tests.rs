@@ -9,7 +9,12 @@ fn t(s: &str) -> Part {
 }
 
 fn q(from: &str, text: &str) -> Part {
-    Part::Quote { from: from.into(), text: text.into(), file: String::new(), new: String::new(), old: String::new() }
+    Part::Quote { from: from.into(), text: text.into(), file: String::new(), new: String::new(), old: String::new(), n: None }
+}
+
+/// A quote at its place, its chip's number `n` (his m_22231).
+fn qn(n: u32, from: &str, text: &str) -> Part {
+    Part::Quote { from: from.into(), text: text.into(), file: String::new(), new: String::new(), old: String::new(), n: Some(n) }
 }
 
 /// A file from a `files` list (no chip): the list after his words.
@@ -36,10 +41,10 @@ fn render_is_the_composers_template() {
     // quote.rs: a quote then his words
     assert_eq!(render(&[q("you", "q"), t("look here")]), "<selection from=\"you\">\nq\n</selection>\nlook here");
     // quote.rs (diff quote): from, file, new, old; a quote in the from
-    let d = Part::Quote { from: "t1 vs main".into(), text: " fn a() {\n-    x\n+    y".into(), file: "src/a \"b\".rs".into(), new: "12-14".into(), old: "11".into() };
+    let d = Part::Quote { from: "t1 vs main".into(), text: " fn a() {\n-    x\n+    y".into(), file: "src/a \"b\".rs".into(), new: "12-14".into(), old: "11".into(), n: None };
     assert_eq!(render(&[d]), "<selection from=\"t1 vs main\" file=\"src/a 'b'.rs\" new=\"12-14\" old=\"11\">\n fn a() {\n-    x\n+    y\n</selection>");
     // only new lines
-    let d = Part::Quote { from: "PR #7".into(), text: "x".into(), file: "x.rs".into(), new: "3".into(), old: String::new() };
+    let d = Part::Quote { from: "PR #7".into(), text: "x".into(), file: "x.rs".into(), new: "3".into(), old: String::new(), n: None };
     assert!(render(&[d]).starts_with("<selection from=\"PR #7\" file=\"x.rs\" new=\"3\">\n"));
     // a closing tag inside a quote is broken
     assert_eq!(render(&[q("main", "a </selection> b")]), "<selection from=\"main\">\na </selection > b\n</selection>");
@@ -125,7 +130,7 @@ impl Rng {
     }
 }
 
-const BITS: &[&str] = &["", "a", "é", "\n", " ", "\"", ">", "</selection>", "</pasted>", "<selection from=\"", "<pasted n=\"", "<image name=\"", "\" caption=\"", "[files he attached:]", "/x", "two words", "\n\n"];
+const BITS: &[&str] = &["", "a", "é", "\n", " ", "\"", ">", "</selection>", "</pasted>", "<selection from=\"", "\" n=\"", "\" n=\"1\">\n", "<pasted n=\"", "<image name=\"", "\" caption=\"", "[files he attached:]", "/x", "two words", "\n\n"];
 
 fn word(r: &mut Rng) -> String {
     (0..r.next(4)).map(|_| r.pick(BITS)).collect()
@@ -137,8 +142,10 @@ fn gen_parts(r: &mut Rng) -> Vec<Part> {
         out.push(q(&word(r), &word(r)));
     }
     for _ in 0..r.next(5) {
-        out.push(match r.next(4) {
+        out.push(match r.next(5) {
             0 => t(&word(r)),
+            // a quote at its place (his m_22231), next to the others
+            4 => qn(r.next(20) as u32, &word(r), &word(r)),
             1 => Part::Paste { n: r.next(20) as u32, text: word(r) },
             2 => chip(&format!("[File #{}{}]", r.next(9), word(r)), &word(r), r.next(2) == 1),
             _ => Part::Image { name: word(r), source: word(r), mime: "image/png".into(), b64_file: word(r), caption: word(r) },
@@ -159,7 +166,8 @@ fn composer_like(parts: Vec<Part>) -> Vec<Part> {
     parts
         .into_iter()
         .map(|p| match p {
-            Part::Quote { from, text, .. } => q(&clean(&from), text.trim_end_matches('\n')),
+            Part::Quote { from, text, n: None, .. } => q(&clean(&from), text.trim_end_matches('\n')),
+            Part::Quote { from, text, n: Some(n), .. } => qn(n, &clean(&from), text.trim_end_matches('\n')),
             Part::Paste { n, text } => Part::Paste { n, text: text.trim_end_matches('\n').to_string() },
             Part::Image { name, source, mime, b64_file, caption } => Part::Image { name: clean(&name), source: clean(&source), mime, b64_file: clean(&b64_file), caption: clean(&caption) },
             // a chip's name is never empty (empty: a listed file)
@@ -193,8 +201,8 @@ fn parse_reads_render_back() {
             Part::Quote { text, .. } | Part::Paste { text, .. } => !text.contains("\n</selection>") && !text.contains("\n</pasted>") && !text.ends_with('\n'),
             _ => true,
         });
-        let has_body = parts.iter().any(|p| matches!(p, Part::Text { text } if !text.is_empty()) || matches!(p, Part::Paste { .. } | Part::Image { .. }) || matches!(p, Part::File { name, .. } if !name.is_empty()));
-        let quotes = parts.iter().any(|p| matches!(p, Part::Quote { .. }));
+        let has_body = parts.iter().any(|p| matches!(p, Part::Text { text } if !text.is_empty()) || matches!(p, Part::Paste { .. } | Part::Image { .. } | Part::Quote { n: Some(_), .. }) || matches!(p, Part::File { name, .. } if !name.is_empty()));
+        let quotes = parts.iter().any(|p| matches!(p, Part::Quote { n: None, .. }));
         let files = parts.iter().any(|p| matches!(p, Part::File { name, .. } if name.is_empty()));
         // a quote with no words but files: the list's blank line reads as words
         if plain_words && quotes_plain && !(quotes && files && !has_body) {
@@ -335,4 +343,31 @@ fn which_paths_become_a_chip() {
     }
     assert_eq!(file_label(2), "[File #2]");
     assert_eq!(file_name("/u/Desktop/deck.pptx"), "deck.pptx");
+}
+
+/// his m_22231: a quote with its chip's number sits at its place in his
+/// words, in the header quote's grammar plus `n`; one without stays in
+/// front, byte for byte as before; both read back as themselves.
+#[test]
+fn a_numbered_quote_sits_at_its_place() {
+    let parts = [t("regarding "), img("[Image #1]"), t(" and "), qn(3, "main", "Contacte le service"), t(" then ▯ "), Part::Paste { n: 2, text: "a\nb".into() }];
+    let text = render(&parts);
+    assert_eq!(
+        text,
+        "regarding <image name=\"[Image #1]\" path=\"/Users/ana/Desktop/shot.png\" mime=\"image/png\" b64=\"/h/images/ab12.b64\"> and <selection from=\"main\" n=\"3\">\nContacte le service\n</selection> then ▯ <pasted n=\"2\" lines=\"2\">\na\nb\n</pasted>"
+    );
+    assert_eq!(parse(&text), parts.to_vec(), "read back in place");
+    // the header one: unchanged bytes, in front
+    let old = [q("main", "x"), t("look")];
+    assert_eq!(render(&old), "<selection from=\"main\">\nx\n</selection>\nlook");
+    // both, a header then an inline one first in the words
+    let both = [q("you", "head"), qn(1, "main", "in place"), t(" ok")];
+    let text = render(&both);
+    assert_eq!(text, "<selection from=\"you\">\nhead\n</selection>\n<selection from=\"main\" n=\"1\">\nin place\n</selection> ok");
+    assert_eq!(parse(&text), both.to_vec());
+    // its closing tag inside the text is broken by the paste's rule
+    assert_eq!(render(&[qn(1, "main", "a </selection> b")]), "<selection from=\"main\" n=\"1\">\na </selection > b\n</selection>");
+    // on the wire: n only when set
+    assert_eq!(serde_json::to_value(qn(4, "main", "x")).unwrap(), serde_json::json!({"kind": "quote", "from": "main", "text": "x", "n": 4}));
+    assert!(serde_json::to_value(q("main", "x")).unwrap().get("n").is_none());
 }

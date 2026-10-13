@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from e2e import EXE, check  # noqa: E402
+from proto_parts import positional_round, render  # noqa: E402
 
 
 def asked(c, who, words, what):
@@ -85,22 +86,6 @@ def required_keys():
             k = set(v) - optional
             keys[v["ev"]] = keys.get(v["ev"], k) & k
     return keys
-
-
-def quote_tag(frm, text):
-    return '<selection from="%s">\n%s\n</selection>' % (frm, text)
-
-
-def paste_tag(n, text):
-    return '<pasted n="%d" lines="%d">\n%s\n</pasted>' % (n, max(1, len(text.rstrip("\n").split("\n"))), text)
-
-
-def render(parts):
-    """bise_proto::parts::render for quotes, words and pastes: the quotes
-    in front one per line, then the words with the pastes in place."""
-    head = [quote_tag(p["from"], p["text"]) for p in parts if p["kind"] == "quote"]
-    body = "".join(p["text"] if p["kind"] == "text" else paste_tag(p["n"], p["text"]) for p in parts if p["kind"] in ("text", "paste"))
-    return "\n".join(head + ([body] if body else []))
 
 
 def parts_round(c, d, E, project, typed):
@@ -226,6 +211,7 @@ def parts_round(c, d, E, project, typed):
     d.send({"cmd": "send", "project": project, "agent": "main", "text": "", "parts": [{"kind": "text", "text": "relative "}, {"kind": "image", "name": "[Image #1]", "source": "by-source.png"}], "mode": "now", "cid": 74})
     c.wait(lambda: any(x.get("cid") == 74 for x in typed(d, "error")), 20, "a relative image source refused")
     check("absolute" in [x for x in typed(d, "error") if x.get("cid") == 74][-1]["text"], "the refusal says why: %r" % typed(d, "error")[-1])
+    positional_round(c, d, E, project, typed, yous, shot)
     # his screenshot: a card answer with a quote of main
     c.say('[[bash: sb send main --expect-reply "quel process ?"]]', focus="t3")
     mid = asked(c, "t3", "quel process", "t3 asks main (parts)")

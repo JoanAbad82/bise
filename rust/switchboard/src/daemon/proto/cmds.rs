@@ -29,6 +29,22 @@ const QUEUED_COMMAND: &str = "a command can't wait in the queue: send it now";
 /// model would read and what clients draw would differ.
 const PARTS_NOT_THE_LINE: &str = "this line isn't its parts' text: update bise";
 
+/// A send's text beside its parts that isn't their render: the parts win,
+/// the model reads parts::render alone (architect m_22248 (2)), and the
+/// hub writes one log line (its tag, cid, the two lengths; never the
+/// words). A released window (before 5440a964) sends his words with the
+/// chips' labels beside the parts, and the app and the hubs update apart
+/// (architect m_22341).
+/// TODO(parts-text): refuse it with its cid ("this message's text isn't
+/// its parts' text: update bise") the release after the window that
+/// sends no text beside parts ships.
+fn text_beside_parts(tag: &str, cid: Option<u64>, text: &str, parts: &[bise_proto::parts::Part]) {
+    let model = bise_proto::parts::render(parts);
+    if !text.is_empty() && text != model {
+        eprintln!("sbd: {tag} cid {cid:?}: a text beside its parts that isn't theirs ({} vs {} bytes): the parts win", text.len(), model.len());
+    }
+}
+
 fn lines_of(raw: Vec<(usize, Option<u64>, String)>) -> Vec<Line> {
     raw.into_iter().map(|(pos, ts, l)| (pos as u64, ts.unwrap_or(0), l)).collect()
 }
@@ -97,10 +113,13 @@ impl Shell {
             HubCmd::Send { agent, text, opts, cid, parts, .. } if parts.is_empty() => self.proto_input(id, &tag, agent, text, opts, cid, String::new()),
             // msg-parts: the model's text from his parts, the parts kept
             // on his message (a part this hub doesn't know: refused)
-            HubCmd::Send { agent, opts, cid, parts, .. } => match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image, &crate::daemon::fn_context::file_exists) {
-                Ok(s) => self.proto_input(id, &tag, agent, s.text, opts, cid, s.parts),
-                Err(e) => self.proto_error_cid(id, &tag, &e, cid, cid.map(|_| "refused")),
-            },
+            HubCmd::Send { agent, text, opts, cid, parts, .. } => {
+                text_beside_parts(&tag, cid, &text, &parts);
+                match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image, &crate::daemon::fn_context::file_exists) {
+                    Ok(s) => self.proto_input(id, &tag, agent, s.text, opts, cid, s.parts),
+                    Err(e) => self.proto_error_cid(id, &tag, &e, cid, cid.map(|_| "refused")),
+                }
+            }
             HubCmd::Answer { card, reply, files, parts, .. } => {
                 let (reply, parts) = match parts.is_empty() {
                     true => (reply, String::new()),

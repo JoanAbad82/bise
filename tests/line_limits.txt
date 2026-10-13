@@ -49,4 +49,4 @@
 1232 rust/tui/src/voicemode/turn.rs
 1054 scripts/desktop_try.py
 1787 tests/fake_provider.py
-1111 tests/proto_e2e.py
+1097 tests/proto_e2e.py

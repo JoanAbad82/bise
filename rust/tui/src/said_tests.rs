@@ -5,7 +5,7 @@ fn text(t: &str) -> Part {
 }
 
 fn quote(from: &str, t: &str) -> Part {
-    Part::Quote { from: from.into(), text: t.into(), file: String::new(), new: String::new(), old: String::new() }
+    Part::Quote { from: from.into(), text: t.into(), file: String::new(), new: String::new(), old: String::new(), n: None }
 }
 
 #[test]
@@ -62,4 +62,19 @@ fn words_alone_make_no_parts_and_a_view_reads_the_hubs_parts_as_sent() {
     let s = Said::new("anything".into(), vec![quote("t1", "q"), text("w")]);
     assert_eq!(view(&s).quotes[0].from, "t1");
     assert_eq!(view(&s).body, "w");
+}
+
+// his m_22231, from the window: a numbered quote sits at its place,
+// its chip's number in his words, its block above as ever (architect
+// m_22248 (4): the TUI draws another client's inline quote)
+#[test]
+fn a_numbered_quote_from_the_window_sits_at_its_place() {
+    let q = Part::Quote { from: "main".into(), text: "the cache".into(), file: String::new(), new: String::new(), old: String::new(), n: Some(3) };
+    let s = Said::of_parts(vec![text("regarding "), q, text(", which?")]);
+    assert_eq!(s.text, parts::render(&s.parts));
+    assert!(s.text.starts_with("regarding <selection from=\"main\" n=\"3\">"));
+    let v = view(&s);
+    assert_eq!(v.body, "regarding ❝ 3, which?");
+    assert_eq!(v.quotes.len(), 1);
+    assert_eq!(gist(&s.parts), "regarding ❝ 3, which?");
 }

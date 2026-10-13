@@ -16,4 +16,4 @@ export type PageNote = { block: string, kind: string, text?: string, quote?: str
 /**
  * One piece of his message.
  */
-export type Part = { "kind": "text", text: string, } | { "kind": "quote", from: string, text: string, file?: string, new?: string, old?: string, } | { "kind": "paste", n: number, text: string, } | { "kind": "image", name: string, source: string, mime?: string, b64_file?: string, caption?: string, } | { "kind": "file", path: string, name?: string, missing?: boolean, } | { "kind": "page", text: string, to: string, page: string, title?: string, version: number, notes: Array<PageNote>, };
+export type Part = { "kind": "text", text: string, } | { "kind": "quote", from: string, text: string, file?: string, new?: string, old?: string, n?: number | null, } | { "kind": "paste", n: number, text: string, } | { "kind": "image", name: string, source: string, mime?: string, b64_file?: string, caption?: string, } | { "kind": "file", path: string, name?: string, missing?: boolean, } | { "kind": "page", text: string, to: string, page: string, title?: string, version: number, notes: Array<PageNote>, };

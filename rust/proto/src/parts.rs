@@ -53,7 +53,10 @@ pub enum Part {
     Text { text: String },
     /// a selection he quoted: who wrote it (`main`, `you`, `t1 vs main`)
     /// and, from a diff, where (`file`, the lines `new` / `old`:
-    /// `12-14`; empty: none)
+    /// `12-14`; empty: none). `n`: its chip's number (`❝ 1`, the one
+    /// sequence of Paste.n, `[Image #n]`, `[File #n]`), and then it sits
+    /// at its place in his words (his m_22231: "regarding ❝ 1 …"); none
+    /// (an old journal, a client that puts quotes first): in front
     Quote {
         from: String,
         text: String,
@@ -63,6 +66,8 @@ pub enum Part {
         new: String,
         #[serde(default, skip_serializing_if = "String::is_empty")]
         old: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        n: Option<u32>,
     },
     /// a long paste, its chip number `n` (`▤ 1`) and its whole text
     Paste { n: u32, text: String },
@@ -252,7 +257,8 @@ pub fn render(parts: &[Part]) -> String {
     let mut files: Vec<&str> = Vec::new();
     for p in parts {
         match p {
-            Part::Quote { from, text, file, new, old } => head.push(quote_tag(from, file, new, old, text)),
+            Part::Quote { from, text, file, new, old, n: None } => head.push(quote_tag(from, file, new, old, None, text)),
+            Part::Quote { from, text, file, new, old, n: Some(n) } => body.push_str(&quote_tag(from, file, new, old, Some(*n), text)),
             Part::Text { text } => body.push_str(text),
             Part::Paste { n, text } => body.push_str(&paste_tag(*n, text)),
             Part::Image { name, source, mime, b64_file, caption } => body.push_str(&image_marker(name, source, mime, b64_file, caption)),
@@ -285,28 +291,39 @@ pub fn line_count(text: &str) -> usize {
     text.trim_end_matches('\n').split('\n').count().max(1)
 }
 
-/// A quote's tag: `<selection from="t1 vs main" file="src/a.rs"
-/// new="12-14" old="11">`, an attribute only when it has a value; a
-/// `</selection>` inside the text is broken (`</selection >`) so the tag
-/// ends where it should, a `"` or newline in an attribute becomes `'` or
-/// a space.
-pub fn quote_tag(from: &str, file: &str, new: &str, old: &str, text: &str) -> String {
+/// A quote's tag: `<selection from="t1 vs main" n="1" file="src/a.rs"
+/// new="12-14" old="11">`, an attribute only when it has a value (`n`:
+/// an inline quote, at its place); a `</selection>` inside the text is
+/// broken ([`unclosed`]) so the tag ends where it should, a `"` or
+/// newline in an attribute becomes `'` or a space. The header quote and
+/// the inline one share this grammar: only `n` tells them apart.
+pub fn quote_tag(from: &str, file: &str, new: &str, old: &str, n: Option<u32>, text: &str) -> String {
     let attr = |s: &str| s.replace('"', "'").replace('\n', " ");
     let mut head = format!("{QUOTE_OPEN}{}\"", attr(from));
+    if let Some(n) = n {
+        head.push_str(&format!(" n=\"{n}\""));
+    }
     for (k, v) in [("file", file), ("new", new), ("old", old)] {
         if !v.is_empty() {
             head.push_str(&format!(" {k}=\"{}\"", attr(v)));
         }
     }
-    let text = text.replace(QUOTE_CLOSE, "</selection >");
+    let text = unclosed(text, QUOTE_CLOSE);
     format!("{head}>\n{text}\n{QUOTE_CLOSE}")
+}
+
+/// A block's text with its closing tag broken (`</pasted>` becomes
+/// `</pasted >`), so the block ends where its own closing tag is: the
+/// one rule of the paste and quote blocks (architect m_22248).
+fn unclosed(text: &str, close: &str) -> String {
+    text.replace(close, &format!("{} >", &close[..close.len() - 1]))
 }
 
 /// A paste's tag: `<pasted n="1" lines="240">\n{text}\n</pasted>`; a
 /// `</pasted>` inside the text is broken (`</pasted >`).
 pub fn paste_tag(n: u32, text: &str) -> String {
     let lines = line_count(text);
-    let text = text.replace(PASTE_CLOSE, "</pasted >");
+    let text = unclosed(text, PASTE_CLOSE);
     format!("{PASTE_OPEN}{n}\" lines=\"{lines}\">\n{text}\n{PASTE_CLOSE}")
 }
 
@@ -406,20 +423,31 @@ fn split_files(text: &str) -> (&str, Vec<String>) {
 }
 
 /// The quote tags in front of `text`, one per line, and the words after
-/// them (the newline after the last tag taken).
+/// them (the newline after the last tag taken). A header quote has no
+/// `n`; one with `n` is inline, read with the words.
 fn split_quotes(text: &str) -> (Vec<Part>, &str) {
     let mut out = Vec::new();
     let mut rest = text;
-    while let Some((q, used)) = quote_at(rest) {
+    while let Some((q, used)) = header_quote_at(rest) {
         out.push(q);
         rest = &rest[used..];
         match rest.strip_prefix('\n') {
-            Some(r) if r.starts_with(QUOTE_OPEN) && quote_at(r).is_some() => rest = r,
+            Some(r) if r.starts_with(QUOTE_OPEN) && header_quote_at(r).is_some() => rest = r,
             Some(r) if !r.is_empty() => return (out, r),
             _ => return (out, rest),
         }
     }
     (out, rest)
+}
+
+/// A header quote (no `n`) at the very start of `s`.
+fn header_quote_at(s: &str) -> Option<(Part, usize)> {
+    quote_at(s).filter(|(q, _)| matches!(q, Part::Quote { n: None, .. }))
+}
+
+/// An inline quote (with `n`) at the very start of `s`.
+fn inline_quote_at(s: &str) -> Option<(Part, usize)> {
+    quote_at(s).filter(|(q, _)| matches!(q, Part::Quote { n: Some(_), .. }))
 }
 
 /// The quote tag at the very start of `s`, when it renders back to the
@@ -432,10 +460,12 @@ fn quote_at(s: &str) -> Option<(Part, usize)> {
     }
     let (from, mut attrs) = head.split_once('"').unwrap_or((head, ""));
     let (mut file, mut new, mut old) = (String::new(), String::new(), String::new());
+    let mut n: Option<u32> = None;
     while !attrs.is_empty() {
         let (k, v) = attrs.strip_prefix(' ')?.split_once("=\"")?;
         let (v, more) = v.split_once('"').unwrap_or((v, ""));
         match k {
+            "n" if v.len() <= 9 && !v.is_empty() && v.bytes().all(|b| b.is_ascii_digit()) => n = Some(v.parse().ok()?),
             "file" => file = v.to_string(),
             "new" => new = v.to_string(),
             "old" => old = v.to_string(),
@@ -445,11 +475,11 @@ fn quote_at(s: &str) -> Option<(Part, usize)> {
     }
     let end = rest.find(&format!("\n{QUOTE_CLOSE}"))?;
     let text = &rest[..end];
-    let tag = quote_tag(from, &file, &new, &old, text);
+    let tag = quote_tag(from, &file, &new, &old, n, text);
     if !s.starts_with(&tag) {
         return None;
     }
-    let q = Part::Quote { from: from.to_string(), text: text.to_string(), file, new, old };
+    let q = Part::Quote { from: from.to_string(), text: text.to_string(), file, new, old, n };
     Some((q, tag.len()))
 }
 
@@ -460,7 +490,7 @@ fn words_parts(body: &str) -> Vec<Part> {
     let mut from = 0usize;
     let mut scan = 0usize;
     while let Some(at) = next_tag(body, scan) {
-        match paste_at(&body[at..]).or_else(|| image_at(&body[at..])).or_else(|| file_marker_at(&body[at..])) {
+        match paste_at(&body[at..]).or_else(|| image_at(&body[at..])).or_else(|| file_marker_at(&body[at..])).or_else(|| inline_quote_at(&body[at..])) {
             Some((p, used)) => {
                 if at > from {
                     out.push(Part::Text { text: body[from..at].to_string() });
@@ -478,10 +508,11 @@ fn words_parts(body: &str) -> Vec<Part> {
     out
 }
 
-/// The byte where the next paste tag or image marker may start.
+/// The byte where the next paste tag, image or file marker or inline
+/// quote may start.
 fn next_tag(s: &str, from: usize) -> Option<usize> {
     let rest = s.get(from..)?;
-    [rest.find(PASTE_OPEN), rest.find(IMAGE_OPEN), rest.find(FILE_OPEN)].into_iter().flatten().min().map(|i| from + i)
+    [rest.find(PASTE_OPEN), rest.find(IMAGE_OPEN), rest.find(FILE_OPEN), rest.find(QUOTE_OPEN)].into_iter().flatten().min().map(|i| from + i)
 }
 
 /// The file marker at the very start of `s`, when it renders back the
@@ -567,11 +598,11 @@ pub fn canonical(parts: &[Part]) -> Vec<Part> {
     let mut out: Vec<Part> = Vec::new();
     for p in parts {
         let p = match p {
-            Part::Quote { from, text, file, new, old } => {
+            Part::Quote { from, text, file, new, old, n } => {
                 let a = |s: &str| s.replace('"', "'").replace('\n', " ");
-                Part::Quote { from: a(from), text: text.replace(QUOTE_CLOSE, "</selection >"), file: a(file), new: a(new), old: a(old) }
+                Part::Quote { from: a(from), text: unclosed(text, QUOTE_CLOSE), file: a(file), new: a(new), old: a(old), n: *n }
             }
-            Part::Paste { n, text } => Part::Paste { n: *n, text: text.replace(PASTE_CLOSE, "</pasted >") },
+            Part::Paste { n, text } => Part::Paste { n: *n, text: unclosed(text, PASTE_CLOSE) },
             Part::Text { text } if text.is_empty() => continue,
             Part::Unknown(_) => continue,
             p => p.clone(),

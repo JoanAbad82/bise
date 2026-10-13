@@ -1130,7 +1130,7 @@ fn his_parts_go_on_his_entry() {
     let e = fold(&lines, &ctx);
     let kinds: Vec<EntryKind> = e.iter().map(|e| e.kind).collect();
     assert_eq!(kinds, [EntryKind::You, EntryKind::You, EntryKind::You, EntryKind::Agent, EntryKind::Approval, EntryKind::You], "no entry of their own");
-    let quote = |t: &str| Part::Quote { from: "main".into(), text: t.into(), file: String::new(), new: String::new(), old: String::new() };
+    let quote = |t: &str| Part::Quote { from: "main".into(), text: t.into(), file: String::new(), new: String::new(), old: String::new(), n: None };
     let text = |t: &str| Part::Text { text: t.into() };
     assert_eq!(e[0].parts, [quote("a\nb"), text("why?")]);
     assert_eq!(e[0].msg_id, Some(3));
@@ -1162,7 +1162,7 @@ fn an_old_journals_messages_read_as_their_parts() {
         l(4, "sb route : you → @perf : look <pasted n=\"1\" lines=\"2\">\\na\\nb\\n</pasted> here"),
     ];
     let e = fold(&lines, &ctx);
-    let quote = |t: &str| Part::Quote { from: "main".into(), text: t.into(), file: String::new(), new: String::new(), old: String::new() };
+    let quote = |t: &str| Part::Quote { from: "main".into(), text: t.into(), file: String::new(), new: String::new(), old: String::new(), n: None };
     let text = |t: &str| Part::Text { text: t.into() };
     assert_eq!(e[0].parts, [quote("amb-core a été tué"), text("Son process prenait tout mon CPU!")]);
     assert!(e[1].parts.is_empty(), "a plain message: its text");

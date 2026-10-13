@@ -295,7 +295,7 @@ mod tests {
 
     #[test]
     fn parts_render_the_models_text_and_keep_their_json() {
-        let ps = [Part::Quote { from: "main".into(), text: "q".into(), file: String::new(), new: String::new(), old: String::new() }, t("why?")];
+        let ps = [Part::Quote { from: "main".into(), text: "q".into(), file: String::new(), new: String::new(), old: String::new(), n: None }, t("why?")];
         let s = said(&ps, &[], Path::new("/h/images"), &none, &yes).unwrap();
         assert_eq!(s.text, "<selection from=\"main\">\nq\n</selection>\nwhy?");
         let back: Vec<Part> = serde_json::from_str(&s.parts).unwrap();

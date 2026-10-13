@@ -1,0 +1,80 @@
+"""bise_proto::parts in Python for proto_e2e: the model's text of his
+typed parts, and the check that a window-shaped message keeps its order
+(his m_22231, architect m_22248)."""
+
+import os
+
+from e2e import check
+
+
+def quote_tag(frm, text, n=None):
+    at = ' n="%d"' % n if n is not None else ""
+    return '<selection from="%s"%s>\n%s\n</selection>' % (frm, at, text)
+
+
+def paste_tag(n, text):
+    return '<pasted n="%d" lines="%d">\n%s\n</pasted>' % (n, max(1, len(text.rstrip("\n").split("\n"))), text)
+
+
+def render(parts):
+    """bise_proto::parts::render for quotes, words and pastes: the quotes
+    without a number in front one per line, then the words with the
+    pastes and the numbered quotes in place."""
+    head = [quote_tag(p["from"], p["text"]) for p in parts if p["kind"] == "quote" and "n" not in p]
+
+    def inline(p):
+        if p["kind"] == "text":
+            return p["text"]
+        if p["kind"] == "paste":
+            return paste_tag(p["n"], p["text"])
+        return quote_tag(p["from"], p["text"], p["n"])
+    body = "".join(inline(p) for p in parts if p["kind"] in ("text", "paste") or (p["kind"] == "quote" and "n" in p))
+    return "\n".join(head + ([body] if body else []))
+
+
+def positional_round(c, d, E, project, typed, yous, shot):
+    """His m_22231: 'regarding [Image #1] and [Image #2] and ❝ 3, …' as
+    the window sends it (parts, no text). His entry keeps the parts in
+    their order, the model reads the quote at its place, after both
+    images. The released window's shape (his words with the chips'
+    labels beside the parts, not their render) is taken: the parts win,
+    the model reads their render, the hub logs one line without the
+    words (architect m_22341, TODO(parts-text))."""
+    quote = {"kind": "quote", "from": "main", "text": "the cache is warm", "n": 3}
+    parts = [
+        {"kind": "text", "text": "regarding "},
+        {"kind": "image", "name": "[Image #1]", "source": shot},
+        {"kind": "text", "text": " and "},
+        {"kind": "image", "name": "[Image #2]", "source": shot},
+        {"kind": "text", "text": " and "},
+        quote,
+        {"kind": "text", "text": ", which is right?"},
+    ]
+    d.send({"cmd": "send", "project": project, "agent": "main", "text": "", "parts": parts, "mode": "now", "cid": 81})
+    try:
+        c.wait(lambda: any(any(p.get("n") == 3 for p in x.get("parts", [])) for x in yous()), 60, "the numbered quote on his entry")
+    except AssertionError:
+        print("errors: %r" % [x for x in typed(d, "error")][-3:], flush=True)
+        print("last yous: %r" % [(x.get("text", "")[:120], x.get("parts")) for x in yous()][-2:], flush=True)
+        raise
+    e = [x for x in yous() if any(p.get("n") == 3 for p in x.get("parts", []))][-1]
+    shape = [p["text"] if p["kind"] == "text" else p.get("name", "q%s" % p.get("n")) for p in e["parts"]]
+    check(shape == ["regarding ", "[Image #1]", " and ", "[Image #2]", " and ", "q3", ", which is right?"], "his entry's parts keep his order: %r" % shape)
+    tag = quote_tag("main", quote["text"], 3)
+    check(e["text"].count("<selection") == 1 and e["text"].index("[Image #2]") < e["text"].index(tag) and e["text"].endswith(tag + ", which is right?"),
+          "the entry's text has the quote at its place: %r" % e["text"][-300:])
+    c.wait_idle("main", timeout=90)
+    tail = " and " + tag + ", which is right?"
+    reqs = [r for r in E.fake_requests() if r.get("agent") == "main"]
+    check(any(tail in r.get("user_tail", "") + r.get("user", "") for r in reqs), "the model read the quote after both images: %r" % [r.get("user_tail") for r in reqs][-2:])
+    nerr = len(typed(d, "error"))
+    old = [{"kind": "quote", "from": "main", "text": "the released app"}, {"kind": "text", "text": "sent its words too"}]
+    d.send({"cmd": "send", "project": project, "agent": "main", "text": "sent its words too", "parts": old, "mode": "now", "cid": 82})
+    c.wait(lambda: any(x.get("parts") == old for x in yous()), 60, "the released window's send taken")
+    check(not any(x.get("cid") == 82 for x in typed(d, "error")[nerr:]), "no error for it: %r" % typed(d, "error")[nerr:])
+    check([x for x in yous() if x.get("parts") == old][-1]["text"] == render(old), "its entry's text is the parts' render")
+    c.wait_idle("main", timeout=90)
+    tail = render(old)[-60:]
+    check(any(tail in r.get("user_tail", "") + r.get("user", "") for r in E.fake_requests() if r.get("agent") == "main"), "the model read the parts' render")
+    log = open(os.path.join(E.tmp, "hub.stderr")).read()
+    check("cid Some(82)" in log and "the parts win" in log and "sent its words too" not in log, "one log line, without the words")

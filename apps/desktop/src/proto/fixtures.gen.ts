@@ -111,6 +111,7 @@ export const hub_cmd: readonly HubCmd[] = [
   {"agent":"main","cmd":"send","mode":"queued","project":"acme-1a2b3c4d","text":"then the warm one"},
   {"agent":"main","cmd":"send","context":{"app":"Safari","title":"p99 latency","url":"https://grafana.acme.test/d/p99"},"mode":"now","project":"acme-1a2b3c4d","text":"why is this slow?"},
   {"agent":"main","cmd":"send","files":["/Users/ana/notes/q3-notes.md","/Users/ana/Desktop/shot.png"],"mode":"now","project":"acme-1a2b3c4d","text":"what stands out here"},
+  {"agent":"main","cid":13,"cmd":"send","mode":"now","parts":[{"kind":"text","text":"regarding "},{"kind":"image","name":"[Image #1]","source":"/Users/ana/Desktop/a.png"},{"kind":"text","text":" and "},{"from":"main","kind":"quote","n":2,"text":"the cache is warm"},{"kind":"text","text":", which is right?"}],"project":"acme-1a2b3c4d","text":""},
   {"card":9,"cmd":"answer","project":"acme-1a2b3c4d","reply":"1"},
   {"card":10,"cmd":"answer","project":"acme-1a2b3c4d","reply":"yes"},
   {"card":11,"cmd":"answer","files":["/Users/ana/Desktop/shot.png"],"project":"acme-1a2b3c4d","reply":"this one"},

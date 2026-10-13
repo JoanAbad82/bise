@@ -1776,7 +1776,7 @@ mod multiline_tests {
         use bise_proto::parts::Part;
         let paste: String = (1..=14).map(|i| format!("line {i}\n")).collect();
         let parts = vec![
-            Part::Quote { from: "t1".into(), text: "the selected words".into(), file: String::new(), new: String::new(), old: String::new() },
+            Part::Quote { from: "t1".into(), text: "the selected words".into(), file: String::new(), new: String::new(), old: String::new(), n: None },
             Part::Text { text: "why ".into() },
             Part::Paste { n: 1, text: paste.trim_end().into() },
             Part::Text { text: " fails?".into() },

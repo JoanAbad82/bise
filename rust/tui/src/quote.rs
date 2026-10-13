@@ -73,7 +73,7 @@ pub(crate) struct Where {
 /// it has a value.
 pub(crate) fn tag_at(from: &str, at: &Where, text: &str) -> String {
     // the one template (msg-parts): bise_proto's, the hub's and desktop's
-    bise_proto::parts::quote_tag(from, &at.file, &at.new, &at.old, text)
+    bise_proto::parts::quote_tag(from, &at.file, &at.new, &at.old, None, text)
 }
 
 /// A quote read back from its tag.
@@ -141,7 +141,7 @@ pub(crate) fn of(a: &Attachment) -> Option<Quote> {
     }
     // its tag read back as its part (msg-parts: bise_proto's one read)
     match bise_proto::parts::parse(&a.marker).as_slice() {
-        [bise_proto::parts::Part::Quote { from, text, file, new, old }] => {
+        [bise_proto::parts::Part::Quote { from, text, file, new, old, .. }] => {
             Some(Quote { from: from.clone(), text: text.clone(), at: Where { file: file.clone(), new: new.clone(), old: old.clone() } })
         }
         _ => None,
