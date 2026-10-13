@@ -19,7 +19,8 @@ RS="$P -B $HERE/../realshape.py"
 G=$HOME/.bise/gate/real-shape; H=$G/w/h
 HIS="$HOME/.bise/dev/try-src/apps/desktop/dist/mac-arm64/bise try.app"
 # its main executable from its own Info.plist (amb-mac fb2e544f: candidates are "bise cand.app")
-MAIN="$A/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$A/Contents/Info.plist" 2>/dev/null || echo "bise try")"
+EXE=$([ -f "$A/Contents/Info.plist" ] && /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$A/Contents/Info.plist" 2>/dev/null)
+MAIN="$A/Contents/MacOS/${EXE:-bise try}"
 PORT_CDP=9341
 export PW_FROM=$T/apps/desktop
 say() { echo "$(date +%T) $*"; }
@@ -28,8 +29,8 @@ case "$A" in "$HIS"|"$HIS/"*) echo "that's his promoted app, not a candidate"; e
 case "$G" in "$HOME/.bise/gate/"*) ;; *) echo "the world must be under ~/.bise/gate"; exit 2;; esac
 # its own bundle id (ambient-lead m_20669): with his app's id, LaunchServices can route a quit,
 # activate or open between his app and ours (7e691aef's rerun: his quit took the candidate too)
-CAND_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$A/Contents/Info.plist" 2>/dev/null)
-HIS_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$HIS/Contents/Info.plist" 2>/dev/null)
+CAND_ID=$([ -f "$A/Contents/Info.plist" ] && /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$A/Contents/Info.plist" 2>/dev/null)
+HIS_ID=$([ -f "$HIS/Contents/Info.plist" ] && /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$HIS/Contents/Info.plist" 2>/dev/null)
 [ -n "$CAND_ID" ] && [ "$CAND_ID" != "$HIS_ID" ] || { echo "the candidate's bundle id ($CAND_ID) is his app's ($HIS_ID): build it with its own id"; exit 2; }
 HISR=$(cd "$HIS" 2>/dev/null && pwd -P || echo "$HIS")
 # pids by fixed strings on the process table (no regex on a path with spaces and dots)
