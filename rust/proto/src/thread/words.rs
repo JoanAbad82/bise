@@ -454,6 +454,21 @@ pub fn no_key(why: &str, name: &dyn Fn(&str, &str) -> String) -> Option<String> 
 // event-wake). Its live line, its row's age, and the line of a watch's
 // end; never the accent, only a non-zero rc in red.
 
+/// A version switch's status line (the window's one line under its title
+/// bar, architect m_20569): `reloading bise on <to>` while it runs, `✓
+/// reloaded on <to>` once the new hub is up (and when its probation
+/// passed), `▲ couldn't reload: <why>` when it rolled back. None: a phase
+/// this version doesn't know. The window decides how long it shows.
+pub fn switch_line(r: &crate::rows::SwitchRow) -> Option<(String, NoticeLevel)> {
+    use crate::rows::SwitchPhase::*;
+    Some(match r.phase {
+        Reloading => (format!("reloading bise on {}", r.to), NoticeLevel::Info),
+        Up | Passed => (format!("✓ reloaded on {}", r.to), NoticeLevel::Info),
+        RolledBack => (format!("▲ couldn't reload: {}", r.reason.as_deref().unwrap_or("the new version failed")), NoticeLevel::Warn),
+        Unknown => return None,
+    })
+}
+
 /// A wait's age, as the panel's time column and the live line say it:
 /// `40s`, `2m`, `3h`, `2d`.
 pub fn wait_age(ms: u64) -> String {
@@ -573,6 +588,19 @@ mod tests {
     }
 
     use super::*;
+
+    /// The switch's status line per phase (architect m_20569, amb-home
+    /// m_20570): the window draws these words, never its own.
+    #[test]
+    fn a_switch_says_one_line_per_phase() {
+        use crate::rows::{SwitchPhase::*, SwitchRow};
+        let r = |phase, reason: Option<&str>| SwitchRow { phase, to: "f7178b72".into(), from: Some("2065c746".into()), reason: reason.map(String::from), at_ms: 1 };
+        assert_eq!(switch_line(&r(Reloading, None)), Some(("reloading bise on f7178b72".into(), NoticeLevel::Info)));
+        assert_eq!(switch_line(&r(Up, None)), Some(("✓ reloaded on f7178b72".into(), NoticeLevel::Info)));
+        assert_eq!(switch_line(&r(Passed, None)), Some(("✓ reloaded on f7178b72".into(), NoticeLevel::Info)));
+        assert_eq!(switch_line(&r(RolledBack, Some("the hub died"))), Some(("▲ couldn't reload: the hub died".into(), NoticeLevel::Warn)));
+        assert_eq!(switch_line(&r(Unknown, None)), None);
+    }
 
     #[test]
     fn a_retry_says_the_next_attempt() {

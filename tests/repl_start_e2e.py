@@ -30,6 +30,33 @@ def log_lines(E):
         return []
 
 
+def switch_ev(E, timeout=20):
+    """The hub's typed `switch` event (architect m_20576), as a window
+    gets it at hello: `{"op":"hello"}`, then `{"cmd":"hello","proto":1}`
+    on the same connection, read until the `switch` line."""
+    import json
+    import socket
+    import time
+    s = socket.socket(socket.AF_UNIX)
+    s.settimeout(timeout)
+    s.connect(os.path.join(E.state, "hub.sock"))
+    try:
+        s.sendall(b'{"op":"hello"}\n{"cmd":"hello","proto":1}\n')
+        end = time.time() + timeout
+        for line in s.makefile("r"):
+            try:
+                v = json.loads(line)
+            except ValueError:
+                continue
+            if v.get("ev") == "switch":
+                return v
+            if time.time() > end:
+                break
+    finally:
+        s.close()
+    return None
+
+
 def most_at_once(lines):
     """The most REPLs between 'switching the REPL of X' and its
     'switched the REPL of X' (or its failed start) at one time, per hub:
@@ -138,6 +165,9 @@ def main():
         check(not any(" failed" in l and "switch:" in l for l in after), "no rollback: %s" % [l for l in after if "switch:" in l])
         most = most_at_once(after)
         check(0 < most <= 4, "at most 4 starts at once: %d" % most)
+        # the reload's row (architect m_20576): the new hub says it passed
+        sw = (switch_ev(E) or {}).get("switch") or {}
+        check(sw.get("phase") == "passed" and sw.get("to") and sw.get("at_ms"), "the switch row says passed: %r" % sw)
 
         # 2. a version whose REPLs never start rolls back
         c.wait_idle("main", *TASKS, timeout=120)
@@ -152,6 +182,15 @@ def main():
         open(slow, "w").write("0")
         after = log_lines(E)[n1:]
         check(any("rollback to" in l for l in after), "a rollback: %s" % [l for l in after if "switch:" in l])
+        # the rolled-back hub says why, at hello (a window reconnecting)
+        seen = []
+
+        def rolled_back():
+            sw = (switch_ev(E) or {}).get("switch") or {}
+            seen.append(sw)
+            return sw.get("phase") == "rolled_back"
+        c.wait(rolled_back, 120, lambda: "the switch row says rolled_back: %r" % seen[-1:])
+        check("no progress" in (seen[-1].get("reason") or ""), "the rollback's reason on the row: %r" % seen[-1])
         print("repl starts: ok (%d at once at most; a never-starting version rolled back)" % most)
     except BaseException:
         # a red run keeps its hub (hub.log says which REPL never switched)

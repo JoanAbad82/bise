@@ -73,6 +73,8 @@ pub(super) struct Proto {
     flow: String,
     /// cost-pause: the last `paused` sent (likewise)
     paused: String,
+    /// the last `switch` sent (likewise; switch.rs's own facts)
+    switch: String,
 }
 
 /// G: the typed command being stepped (its connection, its tag, a send's
@@ -349,6 +351,8 @@ impl Shell {
             self.proto_send(id, &flow);
             let paused = self.paused_ev();
             self.proto_send(id, &paused);
+            let switch = self.switch_ev();
+            self.proto_send(id, &switch);
             // the released core's home connection (no typed_only): its
             // older start, one release (daemon/rpc.rs DOOR_EVENTS)
             if self.door_events(id) {

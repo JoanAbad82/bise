@@ -256,6 +256,8 @@ impl Shell {
             Msg::Notice { kind, text } => {
                 self.feed_rec(MAIN, if kind == "warn" { Feed::warn(text) } else { Feed::info(text) });
                 self.broadcast_versions();
+                // the switcher's notices mark its phases (versions.json)
+                self.switch_moved();
             }
             Msg::Release { client, v } => self.release_event(client, v),
             Msg::Update(v) => self.update_event(v),

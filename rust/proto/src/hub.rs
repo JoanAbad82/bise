@@ -284,6 +284,15 @@ pub enum HubEv {
         #[serde(default, skip_serializing_if = "crate::rows::is_zero_u64")]
         held: u64,
     },
+    /// the hub's newest version switch (`/reload`, `/restart`,
+    /// `/version`; architect m_20576): at hello and when its phase moves.
+    /// None: no switch known. Every hub says it again at hello, so a
+    /// window that reconnects through the switch still reads where it is
+    Switch {
+        project: Project,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        switch: Option<crate::rows::SwitchRow>,
+    },
     /// what the project's model calls cost (`usage/read`, an answer only:
     /// never pushed). `counting`: the hub is still reading the
     /// transcripts (its first read): the sums are not complete yet, ask
@@ -387,7 +396,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "paused", "usage", "pages", "page_changed", "card_open", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "paused", "switch", "usage", "pages", "page_changed", "card_open", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)

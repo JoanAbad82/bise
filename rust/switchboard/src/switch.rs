@@ -496,6 +496,12 @@ pub fn versions_script(repo: &Path) -> Option<PathBuf> {
     ["scripts/versions.sh", "versions.sh"].iter().map(|p| repo.join(p)).find(|p| p.is_file())
 }
 
+// the newest switch's facts (versions.json `switch`) and its row
+// (`hub/switch`, architect m_20576)
+mod row;
+pub use row::row;
+use row::set_phase;
+
 /// Left by a reload's switcher for the hub it starts (BISE-131): that hub
 /// reloads every REPL it adopts and tells the TUIs to re-exec. It holds
 /// the reload's id (ms), the hub takes it at boot.
@@ -596,6 +602,7 @@ fn run_locked(paths: &Paths, to: &Path, period: Duration, restart: bool, reload:
         st["good"] = json!(from.to_string_lossy());
     }
     st["probation_until"] = json!(now_ms() + period.as_millis() as u64);
+    set_phase(&mut st, "reloading", &to_id, &from_id, None);
     write_state(paths, &st);
     if reload {
         let _ = std::fs::write(reload_file(paths), now_ms().to_string());
@@ -607,6 +614,7 @@ fn run_locked(paths: &Paths, to: &Path, period: Duration, restart: bool, reload:
     match outcome {
         Ok(()) => {
             st["good"] = json!(to.to_string_lossy());
+            set_phase(&mut st, "passed", &to_id, &from_id, None);
             write_state(paths, &st);
             log(paths, &format!("{} good", to_id));
             notice(
@@ -645,6 +653,7 @@ fn run_locked(paths: &Paths, to: &Path, period: Duration, restart: bool, reload:
             }
             st["failed"] =
                 json!({"version": to.to_string_lossy(), "reason": reason, "at": now_ms()});
+            set_phase(&mut st, "rolled_back", &to_id, &from_id, Some(&reason));
             write_state(paths, &st);
             let _ = std::fs::remove_file(fail_file(paths));
             let back = replace_hub(paths, &from, from == to, Late::Leave);

@@ -11,6 +11,7 @@ mod models;
 mod pages;
 mod places;
 mod scheduled;
+mod switch;
 mod usage;
 
 pub use agents::*;
@@ -21,6 +22,7 @@ pub use models::*;
 pub use pages::*;
 pub use places::*;
 pub use scheduled::*;
+pub use switch::*;
 pub use usage::*;
 
 pub(crate) fn is_zero_u64(n: &u64) -> bool {

@@ -74,6 +74,7 @@ export const NOTIFICATIONS = {
   "hub/approvals": { ev: "approvals", scope: "hub" },
   "hub/flow": { ev: "flow", scope: "hub" },
   "hub/paused": { ev: "paused", scope: "hub" },
+  "hub/switch": { ev: "switch", scope: "hub" },
   "job/end": { ev: "job_end", scope: "hub" },
   "job/followedEnd": { ev: "followed_end", scope: "hub" },
   "thread/entry": { ev: "entry", scope: "thread" },

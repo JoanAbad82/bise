@@ -372,6 +372,27 @@ impl Shell {
         HubEv::Paused { project: self.project(), paused: st.paused.is_some(), since_ms: st.paused, held }
     }
 
+    /// The hub's newest version switch as the typed `switch`
+    /// (`hub/switch`), from switch.rs's own facts in versions.json
+    /// (switch::row: a 'reloading' to this hub's own version reads 'up').
+    pub(in crate::daemon) fn switch_ev(&self) -> HubEv {
+        let st = crate::switch::read_state(&self.opts.paths);
+        let mine = crate::switch::id_of(&self.opts.app_root);
+        HubEv::Switch { project: self.project(), switch: crate::switch::row(&st, &mine) }
+    }
+
+    /// The switch row to every connection, when it moved (the switcher's
+    /// notices: its start, its probation passed, its rollback).
+    pub(in crate::daemon) fn switch_moved(&mut self) {
+        let ev = self.switch_ev();
+        let e = ev.encode();
+        if e != self.proto.switch {
+            self.proto.switch = e;
+            let ids: Vec<ClientId> = self.proto.conns.keys().copied().collect();
+            self.proto_note(&ids, &ev);
+        }
+    }
+
     /// P4b: an agent's live line for its head (`last_pos`, heads.rs): a
     /// subscribed thread's live fold gives its newest pos, else the
     /// head's tail is folded. True when its newest entry moved.

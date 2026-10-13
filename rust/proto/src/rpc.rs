@@ -191,6 +191,7 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("hub/approvals", "approvals", Scope::Hub),
     n("hub/flow", "flow", Scope::Hub),
     n("hub/paused", "paused", Scope::Hub),
+    n("hub/switch", "switch", Scope::Hub),
     n("job/end", "job_end", Scope::Hub),
     n("job/followedEnd", "followed_end", Scope::Hub),
     n("thread/entry", "entry", Scope::Thread),

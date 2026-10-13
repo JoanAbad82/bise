@@ -936,3 +936,23 @@ today: UsageSum,
  * the last 7 local days, today included
  */
 week: UsageSum, };
+
+/**
+ * Where a switch is.
+ */
+export type SwitchPhase = "reloading" | "up" | "passed" | "rolled_back" | "unknown";
+
+/**
+ * The newest switch of this hub: its phase, the version it went to (and
+ * from), why it rolled back, and when that phase began (`at_ms`: the
+ * window's fade reads it, so an old switch never shows as new).
+ */
+export type SwitchRow = { phase: SwitchPhase, 
+/**
+ * the version id it switched to
+ */
+to: string, from?: string, 
+/**
+ * rolled_back: why the new version failed
+ */
+reason?: string, at_ms: number, };

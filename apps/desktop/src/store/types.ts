@@ -81,6 +81,9 @@ export const TAGS = {
   // settings pause/usage screen draws them later (amb-home)
   paused: true,
   usage: true,
+  // the hub's version switch (/reload, /restart; architect m_20576): one status line under the
+  // title bar, words from Rust's switch_line (amb-home draws it)
+  switch: true,
   // the core can't start any hub (its runtime is missing): Rust's words, drawn by CoreLine
   broken: true,
 } as const satisfies Record<Ev['ev'], true>;

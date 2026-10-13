@@ -389,7 +389,7 @@ impl Shell {
         let appr = self.approvals_ev(false);
         let appr = self.proto_approvals(&appr);
         let pages = self.pages_ev(&snap);
-        let mut evs = vec![agents, cards, jobs, arts, self.features_ev(), self.prs_ev(), self.scheduled_ev(), self.models_ev(), appr, self.flow_ev(), self.paused_ev(), pages];
+        let mut evs = vec![agents, cards, jobs, arts, self.features_ev(), self.prs_ev(), self.scheduled_ev(), self.models_ev(), appr, self.flow_ev(), self.paused_ev(), self.switch_ev(), pages];
         // the versions (`dev`: the terminal's /release-bise, the /version
         // picker), as the older hello's burst carried them
         if let Some(v) = self.typed_of(&self.version_items()) {
@@ -620,6 +620,7 @@ mod tests {
             ("approvals", "approvals_ev"),
             ("flow", "flow_ev"),
             ("paused", "paused_ev"),
+            ("switch", "switch_ev"),
             ("pages", "pages_ev"),
             ("versions", "version_items"),
             ("release", "in_progress"),
