@@ -101,9 +101,9 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
   // the TUI's ctrl+o (ctrlhint.rs: open everything closed, else close what is open), the composer
   // focused or not: the window's capture listener takes it before the field (macOS's 'open line')
   if (only('ctrl') && e.code === 'KeyO') return { screen: 'fold-all' };
-  // the key list over the window (amb-web 1e60fbd6, src/help): ⌘/, or ? when not typing
-  if (only('meta') && e.code === 'Slash') return { help: true };
-  if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey && !c.typing) return { help: true };
+  // the key list over the window (amb-web 1e60fbd6, src/help): ⌘/ only; '?' is his to type, a
+  // message may start with it (main m_22096)
+  if ((only('meta') || only('meta', true)) && e.code === 'Slash') return { help: true }; // ⌘/, ⌘? (designer m_22100)
   if (only('meta') && e.code === 'Period') return { screen: 'stop' };
   if (only('ctrl') && e.code === 'KeyY') return { screen: 'copy-code' };
   if (only('none') && e.key === 'End' && !c.typing) return { screen: 'to-end' };

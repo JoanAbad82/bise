@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { editable, grabsKey, isCtrlR, type GrabKey } from "./grab";
+import { editable, grabsKey, isCtrlR, spaceFree, type GrabKey } from "./grab";
 
 const k = (key: string, more: Partial<GrabKey> = {}): GrabKey => ({
   key,
@@ -23,7 +23,36 @@ describe("a stray key goes to the composer (grab.ts, main m_16044)", () => {
     expect(grabsKey(k("{", { altKey: true, code: "Digit5" }))).toBe(false);
     expect(grabsKey(k("¡", { altKey: true, code: "Digit1" }))).toBe(false);
   });
-  it("never ⌘/ctrl shortcuts, arrows, esc, enter, tab, space, a key already taken, a composition", () => {
+  it("space types a space (main m_22096); never ⌥space or ⌘space", () => {
+    expect(grabsKey(k(" ", { code: "Space" }))).toBe(true);
+    expect(grabsKey(k("\u00a0", { altKey: true, code: "Space" }))).toBe(false);
+    expect(grabsKey(k(" ", { metaKey: true, code: "Space" }))).toBe(false);
+    expect(grabsKey(k(" ", { ctrlKey: true, code: "Space" }))).toBe(false);
+  });
+  it("space only where the focus does nothing with it: no focus, the thread; a button, a list row or a focused screen keeps it", () => {
+    expect(spaceFree(null)).toBe(true);
+    expect(spaceFree(document.body)).toBe(true);
+    const list = document.createElement("div");
+    list.dataset["testid"] = "thread.list";
+    const row = document.createElement("div");
+    const b = document.createElement("button");
+    list.append(row, b);
+    const screen = document.createElement("div");
+    screen.tabIndex = 0;
+    const opt = document.createElement("div");
+    opt.setAttribute("role", "option");
+    const inner = document.createElement("span");
+    opt.append(inner);
+    document.body.append(list, screen, opt);
+    expect(spaceFree(row), "a thread row").toBe(true);
+    expect(spaceFree(b), "a button in the thread").toBe(false);
+    expect(spaceFree(screen), "a screen that walks its rows").toBe(false);
+    expect(spaceFree(inner), "a list row").toBe(false);
+    list.remove();
+    screen.remove();
+    opt.remove();
+  });
+  it("never ⌘/ctrl shortcuts, arrows, esc, enter, tab, a key already taken, a composition", () => {
     expect(grabsKey(k("k", { metaKey: true }))).toBe(false);
     expect(grabsKey(k("v", { metaKey: true }))).toBe(false);
     expect(grabsKey(k("c", { ctrlKey: true }))).toBe(false);
@@ -33,7 +62,6 @@ describe("a stray key goes to the composer (grab.ts, main m_16044)", () => {
       "Escape",
       "Enter",
       "Tab",
-      " ",
       "Backspace",
       "Shift",
       "F5",

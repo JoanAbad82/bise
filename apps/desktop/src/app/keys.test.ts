@@ -57,9 +57,11 @@ describe("the window's keys", () => {
 });
 
 describe('the key list (amb-web 1e60fbd6)', () => {
-  it('? opens it when not typing, never in a field with text', () => {
+  it("'?' never opens it: a message may start with it (main m_22096); ⌘/ and ⌘? do", () => {
+    const c = { route: { screen: 'bise' as const }, projects: [], agents: () => [], typing: false };
     const q = { key: '?', code: 'Slash', metaKey: false, altKey: false, ctrlKey: false, shiftKey: true };
-    expect(keyAction(q, { route: { screen: 'bise' }, projects: [], agents: () => [], typing: false })).toEqual({ help: true });
-    expect(keyAction(q, { route: { screen: 'bise' }, projects: [], agents: () => [], typing: true })).toBeUndefined();
+    expect(keyAction(q, c)).toBeUndefined();
+    expect(keyAction({ ...q, key: '/', metaKey: true, shiftKey: false }, c)).toEqual({ help: true });
+    expect(keyAction({ ...q, metaKey: true }, c)).toEqual({ help: true });
   });
 });

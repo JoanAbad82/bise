@@ -1,4 +1,4 @@
-// ⌘/ (and ? outside a field): the key list as an overlay (tui-parity V3; the
+// ⌘/: the key list as an overlay (tui-parity V3; the
 // TUI's /help and /shortcuts, rust/tui/src/help.rs). Its own field: typing
 // filters, tab / shift+tab switch help and shortcuts, ↑↓ pgup pgdn scroll,
 // esc clears the filter then closes, ctrl+c closes. The composer keeps its

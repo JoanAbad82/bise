@@ -1,7 +1,7 @@
 // Type anywhere, it lands in the composer (the user, main m_16044: « quand je tape sur mon keyboard
 // ou quand je paste quelque chose, ça sélectionne l'input tout seul », as Slack and Vibe Desktop do).
 // The rules come from le-chat-web's src/app/(app)/chat/_hooks/use-auto-focus-message-input.ts:
-// a one-character key, no ⌘/ctrl, not composing, not space, nothing input-like focused (input,
+// a one-character key, no ⌘/ctrl, not composing, nothing input-like focused (input,
 // textarea, contenteditable, role=textbox); a paste with nothing input-like focused, taken in the
 // capture phase. Two changes: le-chat-web prevents the key and appends event.key; here the field
 // takes the focus (caret at the end) and the key goes on to it, so a dead key (^ then e), an IME
@@ -9,7 +9,8 @@
 // (⌥e é on a US layout, ⌥( { on a French one): kept, but ⌥ digits stay the window's (⌥0-9).
 // Never taken: a key the window or a screen already took (they listen on window in the capture
 // phase, this on document, so they run first and preventDefault), a picker, menu or dialog, a
-// selection he made outside the field, arrows, esc, enter, tab, space.
+// selection he made outside the field, arrows, esc, enter, tab; space only where the focus does
+// nothing with it (spaceFree: no focus, the thread), never ⌥space.
 
 /** The keyboard event's fields the rule reads (a DOM KeyboardEvent fits). */
 export interface GrabKey {
@@ -31,7 +32,9 @@ export function grabsKey(e: GrabKey): boolean {
   const key = e.key ?? "";
   // one code point: 'é', '€', 'a' (a named key, 'Enter', 'ArrowUp', is longer)
   const text = /^.$/u.test(key) || key === "Dead" || key === "Process";
-  if (!text || key === " ") return false;
+  if (!text) return false;
+  // space types a space too (his ask, main m_22096), but ⌥space (a no-break space) stays out
+  if (e.altKey && (e.code === "Space" || key === " ")) return false;
   if (e.altKey && /^(Digit|Numpad)[0-9]$/.test(e.code)) return false;
   return true;
 }
@@ -43,6 +46,20 @@ export function editable(el: Element | null): boolean {
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
   if (el instanceof HTMLElement && el.isContentEditable) return true;
   return el.getAttribute("role") === "textbox";
+}
+
+/** Space is his to type only when what has the focus does nothing with it: no focus (the body), or
+ *  the thread's list and its rows. Anything else that holds the focus keeps its own space: a button,
+ *  a switch, a list or a screen that walks its rows (quick look, a preview, a fold). Main m_22096,
+ *  designer m_22100. */
+export function spaceFree(el: Element | null): boolean {
+  if (el === null || el === document.body || el === document.documentElement) return true;
+  if (el.closest('[data-testid="thread.list"]') === null) return false;
+  return (
+    el.closest(
+      'button,a[href],summary,select,[role="button"],[role="option"],[role="listbox"],[role="tab"],[role="menuitem"],[role="checkbox"],[role="switch"],[role="radio"],[role="treeitem"],[role="gridcell"],[role="slider"]',
+    ) === null
+  );
 }
 
 /** A picker, a menu or a dialog has the focus, or is open over the window. */
@@ -140,6 +157,7 @@ function onKey(e: KeyboardEvent): void {
   if (!grabsKey(e)) return;
   const active = document.activeElement;
   if (editable(active)) return;
+  if (e.key === " " && !spaceFree(active)) return;
   const f = target();
   if (
     f === undefined ||
