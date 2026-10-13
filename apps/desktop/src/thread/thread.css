@@ -27,6 +27,19 @@
   pointer-events: none;
   background: linear-gradient(var(--c-window, var(--paper)), transparent);
 }
+/* and at the bottom edge, over the inbox block and the composer, the same 16 px (designer m_21505 (2)):
+   at the end it lies on the list's own bottom space, never on the last row */
+.th-list::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 16px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(transparent, var(--c-window, var(--paper)));
+}
 
 /* scrolled up: back to the newest, with what came meanwhile */
 .th-to-end {
@@ -34,6 +47,8 @@
   left: 50%;
   bottom: var(--s-3);
   transform: translateX(-50%);
+  /* over the bottom fade */
+  z-index: 2;
   padding: var(--s-1) var(--pad-control-x);
   border: 1px solid var(--c-line);
   border-radius: 999px;
@@ -1965,10 +1980,5 @@
 .th-report:not([data-waits]) .b-marker {
   color: var(--c-text);
 }
-/* H10 (designer m_19835): scrolled up to read, the composer's keys line hides; at the end it is back */
-.th-screen[data-reading='true'] .b-composer > .keys {
-  display: none;
-}
-.th-screen[data-reading='true'] .b-composer {
-  padding-bottom: var(--s-2);
-}
+/* scrolling moves only the thread (his feedback main m_21487, designer m_21505 (2)): the composer and
+   its keys line keep their place and height whether he reads up or sits at the end */
