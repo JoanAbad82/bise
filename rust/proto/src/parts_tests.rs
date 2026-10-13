@@ -12,6 +12,16 @@ fn q(from: &str, text: &str) -> Part {
     Part::Quote { from: from.into(), text: text.into(), file: String::new(), new: String::new(), old: String::new() }
 }
 
+/// A file from a `files` list (no chip): the list after his words.
+fn listed(path: &str) -> Part {
+    Part::File { path: path.into(), name: String::new(), missing: false }
+}
+
+/// A file chip, in place.
+fn chip(name: &str, path: &str, missing: bool) -> Part {
+    Part::File { path: path.into(), name: name.into(), missing }
+}
+
 fn img(name: &str) -> Part {
     Part::Image { name: name.into(), source: "/Users/ana/Desktop/shot.png".into(), mime: "image/png".into(), b64_file: "/h/images/ab12.b64".into() }
 }
@@ -45,8 +55,8 @@ fn render_is_the_composers_template() {
         "look <image name=\"[Image #1]\" path=\"/Users/ana/Desktop/shot.png\" mime=\"image/png\" b64=\"/h/images/ab12.b64\"> here"
     );
     // the hub's attached::render list: after a blank line, or alone
-    assert_eq!(render(&[t("v2"), Part::File { path: "/w/notes.md".into() }, Part::File { path: "/w/q3.pdf".into() }]), "v2\n\n[files he attached:]\n/w/notes.md\n/w/q3.pdf");
-    assert_eq!(render(&[Part::File { path: "/w/notes.md".into() }]), "[files he attached:]\n/w/notes.md");
+    assert_eq!(render(&[t("v2"), listed("/w/notes.md"), listed("/w/q3.pdf")]), "v2\n\n[files he attached:]\n/w/notes.md\n/w/q3.pdf");
+    assert_eq!(render(&[listed("/w/notes.md")]), "[files he attached:]\n/w/notes.md");
     // several quotes, one per line, in order; no words
     assert_eq!(render(&[q("main", "a"), q("perf", "b")]), "<selection from=\"main\">\na\n</selection>\n<selection from=\"perf\">\nb\n</selection>");
     // nothing
@@ -127,14 +137,15 @@ fn gen_parts(r: &mut Rng) -> Vec<Part> {
         out.push(q(&word(r), &word(r)));
     }
     for _ in 0..r.next(5) {
-        out.push(match r.next(3) {
+        out.push(match r.next(4) {
             0 => t(&word(r)),
             1 => Part::Paste { n: r.next(20) as u32, text: word(r) },
+            2 => chip(&format!("[File #{}{}]", r.next(9), word(r)), &word(r), r.next(2) == 1),
             _ => Part::Image { name: word(r), source: word(r), mime: "image/png".into(), b64_file: word(r) },
         });
     }
     for _ in 0..r.next(2) {
-        out.push(Part::File { path: format!("/w/{}", r.pick(&["a.md", "b c.pdf", "é.txt"])) });
+        out.push(listed(&format!("/w/{}", r.pick(&["a.md", "b c.pdf", "é.txt"]))));
     }
     out
 }
@@ -151,6 +162,8 @@ fn composer_like(parts: Vec<Part>) -> Vec<Part> {
             Part::Quote { from, text, .. } => q(&clean(&from), text.trim_end_matches('\n')),
             Part::Paste { n, text } => Part::Paste { n, text: text.trim_end_matches('\n').to_string() },
             Part::Image { name, source, mime, b64_file } => Part::Image { name: clean(&name), source: clean(&source), mime, b64_file: clean(&b64_file) },
+            // a chip's name is never empty (empty: a listed file)
+            Part::File { path, name, missing } if !name.is_empty() => chip(&clean(&name), &clean(&path), missing),
             p => p,
         })
         .collect()
@@ -174,14 +187,15 @@ fn parse_reads_render_back() {
             && !words.contains("<selection from=\"")
             && !words.contains("<pasted n=\"")
             && !words.contains("<image name=\"")
+            && !words.contains("<file name=\"")
             && !words.ends_with('\n');
         let quotes_plain = parts.iter().all(|p| match p {
             Part::Quote { text, .. } | Part::Paste { text, .. } => !text.contains("\n</selection>") && !text.contains("\n</pasted>") && !text.ends_with('\n'),
             _ => true,
         });
-        let has_body = parts.iter().any(|p| matches!(p, Part::Text { text } if !text.is_empty()) || matches!(p, Part::Paste { .. } | Part::Image { .. }));
+        let has_body = parts.iter().any(|p| matches!(p, Part::Text { text } if !text.is_empty()) || matches!(p, Part::Paste { .. } | Part::Image { .. }) || matches!(p, Part::File { name, .. } if !name.is_empty()));
         let quotes = parts.iter().any(|p| matches!(p, Part::Quote { .. }));
-        let files = parts.iter().any(|p| matches!(p, Part::File { .. }));
+        let files = parts.iter().any(|p| matches!(p, Part::File { name, .. } if name.is_empty()));
         // a quote with no words but files: the list's blank line reads as words
         if plain_words && quotes_plain && !(quotes && files && !has_body) {
             assert_eq!(parse(&text), canonical(&parts), "{text:?}");
@@ -212,8 +226,19 @@ fn an_old_tui_message_reads_as_its_parts() {
 /// kind kept whole (a newer client's part survives an older reader).
 #[test]
 fn parts_on_the_wire() {
-    let v = serde_json::to_value([q("main", "a"), t("b"), Part::File { path: "/f".into() }]).unwrap();
-    assert_eq!(v, serde_json::json!([{"kind": "quote", "from": "main", "text": "a"}, {"kind": "text", "text": "b"}, {"kind": "file", "path": "/f"}]));
+    let v = serde_json::to_value([q("main", "a"), t("b"), listed("/f"), chip("[File #2]", "/g.pdf", false), chip("[File #3]", "/h.csv", true)]).unwrap();
+    assert_eq!(
+        v,
+        serde_json::json!([
+            {"kind": "quote", "from": "main", "text": "a"},
+            {"kind": "text", "text": "b"},
+            {"kind": "file", "path": "/f"},
+            {"kind": "file", "path": "/g.pdf", "name": "[File #2]"},
+            {"kind": "file", "path": "/h.csv", "name": "[File #3]", "missing": true}
+        ])
+    );
+    // an old journal's file part (path only) reads as a listed file
+    assert_eq!(serde_json::from_value::<Part>(serde_json::json!({"kind": "file", "path": "/f"})).unwrap(), listed("/f"));
     let back: Vec<Part> = serde_json::from_value(serde_json::json!([{"kind": "voice", "secs": 3}, {"kind": "text", "text": "b"}])).unwrap();
     assert!(matches!(&back[0], Part::Unknown(v) if v["kind"] == "voice"));
     assert_eq!(back[1], t("b"));
@@ -241,4 +266,52 @@ fn a_page_part_renders_as_the_hubs_text() {
     let s = page_of(std::slice::from_ref(&p)).unwrap();
     assert_eq!((s.to, s.title, s.notes), ("main", "efforts", &[note][..]));
     assert!(page_of(&[t("x")]).is_none());
+}
+
+/// file-chips (architect m_21764): a named file renders as its marker
+/// where its chip was, in the image marker's grammar, `missing="true"`
+/// when the hub found no file; it reads back as itself; an unnamed one
+/// stays in the list after his words, byte for byte the old text.
+#[test]
+fn a_file_chip_is_a_marker_in_place() {
+    let logo = Part::Image { name: "[Image #1]".into(), source: "/u/logo.png".into(), mime: "image/png".into(), b64_file: "/h/images/1.b64".into() };
+    let parts = vec![t("ajouter l'image "), logo, t(" dans la presentation powerpoint "), chip("[File #2]", "/u/deck.pptx", false)];
+    let text = render(&parts);
+    assert_eq!(
+        text,
+        "ajouter l'image <image name=\"[Image #1]\" path=\"/u/logo.png\" mime=\"image/png\" b64=\"/h/images/1.b64\"> dans la presentation powerpoint <file name=\"[File #2]\" path=\"/u/deck.pptx\">"
+    );
+    assert_eq!(parse(&text), parts);
+    let gone = [t("see "), chip("[File #1]", "/u/q3 \"final\".csv", true), t(" now")];
+    assert_eq!(render(&gone), "see <file name=\"[File #1]\" path=\"/u/q3 'final'.csv\" missing=\"true\"> now");
+    assert_eq!(render(&parse(&render(&gone))), render(&gone));
+    // a chip and a listed file: the chip in place, the list after
+    assert_eq!(render(&[chip("[File #1]", "/a.pdf", false), t(" x"), listed("/b.md")]), "<file name=\"[File #1]\" path=\"/a.pdf\"> x\n\n[files he attached:]\n/b.md");
+    // look-alikes stay text
+    for c in ["<file name=\"[File #1]\" path=\"/a.pdf\" missing=\"no\">", "<file name=\"x\" path=\"/a\"", "<file name=\"a\">"] {
+        assert_eq!(render(&parse(c)), c, "{c:?}");
+        assert!(parse(c).iter().all(|p| matches!(p, Part::Text { .. })), "{c:?}");
+    }
+    assert_eq!(words(&parts), "ajouter l'image  dans la presentation powerpoint ");
+}
+
+/// architect m_21764 B: the one table of what a path becomes.
+#[test]
+fn which_paths_become_a_chip() {
+    for (p, pick, drop) in [
+        ("/u/shot.PNG", ChipKind::Image, ChipKind::Image),
+        ("docs/deck.pptx", ChipKind::File, ChipKind::File),
+        ("/u/q3.xlsx", ChipKind::File, ChipKind::File),
+        ("a.pdf", ChipKind::File, ChipKind::File),
+        ("data.csv", ChipKind::File, ChipKind::File),
+        ("Brief.DOCX", ChipKind::File, ChipKind::File),
+        ("src/main.rs", ChipKind::Text, ChipKind::File),
+        ("notes.md", ChipKind::Text, ChipKind::File),
+        ("Makefile", ChipKind::Text, ChipKind::File),
+        ("/u/.pdf", ChipKind::Text, ChipKind::File),
+    ] {
+        assert_eq!((pick_kind(p), drop_kind(p)), (pick, drop), "{p}");
+    }
+    assert_eq!(file_label(2), "[File #2]");
+    assert_eq!(file_name("/u/Desktop/deck.pptx"), "deck.pptx");
 }

@@ -128,10 +128,12 @@ export type Mode = "now" | "queued";
  * is now; `context` what was on his screen at fn (S9): the hub frames it
  * after his words for the model (switchboard's fn_context::render) and
  * keeps it on his thread entry; `files` what he attached or dropped
- * (absolute paths): the hub renders them once after his words
- * (switchboard's attached::render), an image as an image-store marker
- * the model sees, any other file by its path, a path that isn't absolute
- * or doesn't exist left out, never on a slash command; `voice` said in
+ * (absolute paths, an older desktop's: TODO(file-chips) goes one release
+ * after the desktop sends file parts): the hub makes them his parts once
+ * (switchboard's parts_in::of_files), an image as an image-store marker
+ * the model sees, any other file in the list after his words, a path
+ * that isn't absolute or doesn't exist left out, never on a slash
+ * command; `voice` said in
  * voice mode; `via` the client part that sent it (`capsule`,
  * `capsule-start`, `ambient`: the capsule's hint for main).
  */

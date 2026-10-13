@@ -237,7 +237,21 @@ fn render_all() -> BTreeMap<String, String> {
     out.insert("fixtures.gen.ts".to_string(), render_fixtures());
     out.insert("app_methods.gen.ts".to_string(), render_app_methods());
     out.insert("methods.gen.ts".to_string(), render_methods());
+    out.insert("chips.gen.ts".to_string(), render_chips());
     out
+}
+
+/// bise_proto::parts' table of what a path becomes (architect m_21764 B):
+/// the window reads these, never a list of its own.
+fn render_chips() -> String {
+    let list = |xs: &[&str]| xs.iter().map(|x| format!("{x:?}")).collect::<Vec<_>>().join(", ");
+    let mut s = String::new();
+    header(&mut s);
+    writeln!(s, "// bise_proto::parts' chip table: an image chip by these extensions; an @ pick makes a file chip of a document's only, a drop or a paste of any file.").unwrap();
+    writeln!(s).unwrap();
+    writeln!(s, "export const IMAGE_EXTS = [{}] as const;", list(parts::IMAGE_EXTS)).unwrap();
+    writeln!(s, "export const DOC_EXTS = [{}] as const;", list(parts::DOC_EXTS)).unwrap();
+    s
 }
 
 #[test]

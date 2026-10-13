@@ -27,8 +27,8 @@ impl Shell {
             let text = match page {
                 Page::Reply(reply) => reply,
                 _ => {
-                    // his attached files, rendered once (item H)
-                    let said = fn_context::with_files(v, s("text"));
+                    // his attached files are his parts already (proto_input)
+                    let said = s("text");
                     // bise's home hub: words about a project go there (daemon/routing.rs)
                     // his parts (msg-parts) go with his routed words (R41 (6))
                     if self.route_input(&s("focus"), &s("text"), &said, &s("via"), queued, v.get("context"), &s("parts")) {

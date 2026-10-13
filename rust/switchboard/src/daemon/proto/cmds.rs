@@ -97,14 +97,14 @@ impl Shell {
             HubCmd::Send { agent, text, opts, cid, parts, .. } if parts.is_empty() => self.proto_input(id, &tag, agent, text, opts, cid, String::new()),
             // msg-parts: the model's text from his parts, the parts kept
             // on his message (a part this hub doesn't know: refused)
-            HubCmd::Send { agent, opts, cid, parts, .. } => match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image) {
+            HubCmd::Send { agent, opts, cid, parts, .. } => match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image, &crate::daemon::fn_context::file_exists) {
                 Ok(s) => self.proto_input(id, &tag, agent, s.text, opts, cid, s.parts),
                 Err(e) => self.proto_error_cid(id, &tag, &e, cid, cid.map(|_| "refused")),
             },
             HubCmd::Answer { card, reply, files, parts, .. } => {
                 let (reply, parts) = match parts.is_empty() {
                     true => (reply, String::new()),
-                    false => match crate::parts_in::said(&parts, &files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image) {
+                    false => match crate::parts_in::said(&parts, &files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image, &crate::daemon::fn_context::file_exists) {
                         Ok(s) => (s.text, s.parts),
                         Err(e) => return self.proto_error(id, &tag, &e),
                     },
@@ -127,10 +127,17 @@ impl Shell {
                 if text.is_empty() && files.is_empty() {
                     return self.proto_error(id, &tag, "an answer needs words or an option's number");
                 }
-                // R41 (architect m_13737): what he pasted with it, rendered
-                // after his words by the send path's one render, so an
-                // image reaches the asking agent's model as an image
-                let text = if files.is_empty() { text } else { super::fn_context::render_files(&text, &files) };
+                // R41 (architect m_13737): what he pasted with it (an older
+                // desktop's files list, TODO(file-chips) one release) as
+                // his parts, so an image reaches the asking agent's model as
+                // an image and his thread draws the chips
+                let (text, parts) = match files.is_empty() {
+                    true => (text, parts),
+                    false => {
+                        let s = super::fn_context::files_said(&text, &files);
+                        (s.text, s.parts)
+                    }
+                };
                 self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd: UserCmd::Answer { card, text, parts } });
                 self.page_answers();
             }
@@ -413,7 +420,7 @@ impl Shell {
                 // before; a line that isn't refuses (never a command)
                 if !parts.is_empty() {
                     let refused = cid.map(|_| "refused");
-                    return match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image) {
+                    return match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image, &crate::daemon::fn_context::file_exists) {
                         Ok(s) => match line.strip_suffix(s.text.as_str()) {
                             Some("" | "say " | "steer ") if !line.trim_start().starts_with('/') => {
                                 self.proto_input(id, &tag, agent, line.clone(), opts, cid, s.parts)
@@ -441,7 +448,18 @@ impl Shell {
     /// `parts`: his parts' JSON (msg-parts, `parts_in::said`; "" none),
     /// carried on the op to sb-core's message.
     #[allow(clippy::too_many_arguments)]
-    fn proto_input(&mut self, id: ClientId, tag: &str, agent: String, text: String, opts: SendOpts, cid: Option<u64>, parts: String) {
+    fn proto_input(&mut self, id: ClientId, tag: &str, agent: String, text: String, mut opts: SendOpts, cid: Option<u64>, parts: String) {
+        // an older desktop's files list (TODO(file-chips): Send.files goes
+        // one release after the desktop sends file parts) as his parts,
+        // once, before routing (architect m_21764 A); never on a command
+        let files = std::mem::take(&mut opts.files);
+        let (text, parts) = match files.is_empty() || !parts.is_empty() || text.trim_start().starts_with('/') {
+            true => (text, parts),
+            false => {
+                let s = super::fn_context::files_said(&text, &files);
+                (s.text, s.parts)
+            }
+        };
         if !self.hub.st.agents.contains_key(&agent) {
             return self.proto_error_cid(id, tag, &format!("no agent {agent}"), cid, cid.map(|_| "refused"));
         }
@@ -456,10 +474,9 @@ impl Shell {
         }
         // S9: the fn context as a field of the input op, never
         // rendered here (the input arm's one render)
-        // item H: his files as a field too, rendered by the same input arm
         // G: its notices (an agent gone: BISE-86's undelivered
         // line) come back with its cid
-        let mut op = json!({"op": "input", "focus": agent, "text": text, "queued": queued, "context": opts.context, "files": opts.files});
+        let mut op = json!({"op": "input", "focus": agent, "text": text, "queued": queued, "context": opts.context});
         if opts.voice {
             op["voice"] = json!(true);
         }

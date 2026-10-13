@@ -39,13 +39,21 @@ pub struct Stored {
 /// and mime fill the part once, then the kept parts and the rendered text
 /// are both made from that one list (they name the same file). Err: the
 /// words of the refusal (the client's error), nothing delivered.
-pub fn said(parts: &[Part], files: &[String], store: &Path, put: &dyn Fn(&Path) -> Result<Stored, String>) -> Result<Said, String> {
+pub fn said(parts: &[Part], files: &[String], store: &Path, put: &dyn Fn(&Path) -> Result<Stored, String>, exists: &dyn Fn(&Path) -> bool) -> Result<Said, String> {
     if !files.is_empty() {
         return Err("a message's files go as its parts, not beside them".into());
     }
     let mut parts = parts.to_vec();
     for p in &mut parts {
         match p {
+            // file-chips: a file goes by its absolute path, never read or
+            // copied; gone at send time: said on its chip and to the model
+            Part::File { path, name, missing } if !name.is_empty() => {
+                if !Path::new(path.as_str()).is_absolute() {
+                    return Err(format!("a file part needs an absolute path: {path}"));
+                }
+                *missing = !exists(Path::new(path.as_str()));
+            }
             Part::Unknown(v) => {
                 let kind = v.get("kind").and_then(|k| k.as_str()).unwrap_or("?");
                 return Err(format!("this bise doesn't know part {kind}: update bise"));
@@ -66,6 +74,57 @@ pub fn said(parts: &[Part], files: &[String], store: &Path, put: &dyn Fn(&Path) 
     let text = parts::render(&parts);
     let json = serde_json::to_string(&parts).map_err(|e| format!("parts: {e}"))?;
     Ok(Said { text, parts: json })
+}
+
+/// What a path of a `files` list turned out to be (the shell looks: the
+/// file system and the image store).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Look {
+    /// an image now in the store: its `.b64` file and mime
+    Image(Stored),
+    /// a file, not an image
+    File,
+    /// not absolute, gone, or not a file (the shell logs it)
+    Skip,
+}
+
+/// A `files` list (`HubCmd::Send.files` / `Answer.files`, an older
+/// desktop: TODO(file-chips) both fields go one release after the desktop
+/// sends file parts) as his parts (architect m_21764 A, one owner of the
+/// list: [`parts::render`]): his words, then each image by its file name
+/// one per line after a blank line, then the other files unnamed, so the
+/// render is the old `attached::render` text byte for byte. Every path
+/// once; a relative path is never looked at.
+pub fn of_files(text: &str, files: &[String], look: &mut dyn FnMut(&str) -> Look) -> Vec<Part> {
+    let mut images: Vec<Part> = Vec::new();
+    let mut listed: Vec<Part> = Vec::new();
+    let mut seen: Vec<&str> = Vec::new();
+    for f in files {
+        let f = f.trim();
+        if f.is_empty() || !f.starts_with('/') || seen.contains(&f) {
+            continue;
+        }
+        seen.push(f);
+        match look(f) {
+            Look::Image(s) => images.push(Part::Image { name: parts::file_name(f).to_string(), source: f.to_string(), mime: s.mime, b64_file: s.b64 }),
+            Look::File => listed.push(Part::File { path: f.to_string(), name: String::new(), missing: false }),
+            Look::Skip => {}
+        }
+    }
+    let mut out = Vec::new();
+    if !text.trim().is_empty() {
+        out.push(Part::Text { text: text.to_string() });
+    }
+    for (i, img) in images.into_iter().enumerate() {
+        match (i, out.is_empty()) {
+            (0, true) => {}
+            (0, false) => out.push(Part::Text { text: "\n\n".into() }),
+            _ => out.push(Part::Text { text: "\n".into() }),
+        }
+        out.push(img);
+    }
+    out.extend(listed);
+    out
 }
 
 /// A routed message as the project hub delivers it (R41 (6)): the text its
@@ -165,6 +224,32 @@ mod tests {
         Part::Image { name: "[Image #1]".into(), source: "/d/s.png".into(), mime: "image/png".into(), b64_file: b64.into() }
     }
 
+    /// every file is there
+    fn yes(_: &Path) -> bool {
+        true
+    }
+
+    /// file-chips (architect m_21764): a file chip goes by its absolute
+    /// path, never read; one that is not there at send time is kept,
+    /// marked missing on the kept part and in the model's text; a
+    /// relative path refuses the message; a listed file is not looked at.
+    #[test]
+    fn a_file_chip_is_kept_by_its_path_and_marked_when_gone() {
+        let file = |name: &str, path: &str| Part::File { path: path.into(), name: name.into(), missing: false };
+        let there = |p: &Path| p == Path::new("/u/deck.pptx");
+        let ps = [t("ajouter "), img("/h/images/ab12.b64"), t(" dans "), file("[File #2]", "/u/deck.pptx"), t(" et "), file("[File #3]", "/u/gone.csv")];
+        let s = said(&ps, &[], Path::new("/h/images"), &none, &there).unwrap();
+        let back: Vec<Part> = serde_json::from_str(&s.parts).unwrap();
+        assert_eq!(back[3], file("[File #2]", "/u/deck.pptx"));
+        assert_eq!(back[5], Part::File { path: "/u/gone.csv".into(), name: "[File #3]".into(), missing: true });
+        assert!(s.text.ends_with(" dans <file name=\"[File #2]\" path=\"/u/deck.pptx\"> et <file name=\"[File #3]\" path=\"/u/gone.csv\" missing=\"true\">"), "{}", s.text);
+        assert_eq!(s.text, parts::render(&back));
+        assert_eq!(said(&[file("[File #1]", "deck.pptx")], &[], Path::new("/h/images"), &none, &yes), Err("a file part needs an absolute path: deck.pptx".into()));
+        let listed = Part::File { path: "/u/gone.md".into(), name: String::new(), missing: false };
+        let s = said(std::slice::from_ref(&listed), &[], Path::new("/h/images"), &none, &|_| false).unwrap();
+        assert_eq!(serde_json::from_str::<Vec<Part>>(&s.parts).unwrap(), vec![listed]);
+    }
+
     /// a store that takes nothing (the tests whose parts need none)
     fn none(_: &Path) -> Result<Stored, String> {
         Err("no store here".into())
@@ -191,7 +276,7 @@ mod tests {
             calls.set(calls.get() + 1);
             fake(p)
         };
-        let s = said(&[t("look"), img("")], &[], store, &counted).unwrap();
+        let s = said(&[t("look"), img("")], &[], store, &counted, &yes).unwrap();
         assert_eq!(calls.get(), 1, "one store call");
         let back: Vec<Part> = serde_json::from_str(&s.parts).unwrap();
         assert_eq!(back[1], Part::Image { name: "[Image #1]".into(), source: "/d/s.png".into(), mime: "image/jpeg".into(), b64_file: "/h/images/f00d.b64".into() });
@@ -199,19 +284,19 @@ mod tests {
         assert_eq!(s.text, parts::render(&back), "the text is the kept parts' render");
         // a stored one: untouched, no store call
         calls.set(0);
-        assert!(said(&[img("/h/images/ab12.b64")], &[], store, &counted).is_ok());
+        assert!(said(&[img("/h/images/ab12.b64")], &[], store, &counted, &yes).is_ok());
         assert_eq!(calls.get(), 0);
         // refused, with the store's words
         let bad = Part::Image { name: "[Image #1]".into(), source: "/d/notes.txt".into(), mime: String::new(), b64_file: String::new() };
-        assert_eq!(said(&[t("a"), bad], &[], store, &fake), Err("image /d/notes.txt: not a PNG, JPEG, GIF or WebP image".into()));
+        assert_eq!(said(&[t("a"), bad], &[], store, &fake, &yes), Err("image /d/notes.txt: not a PNG, JPEG, GIF or WebP image".into()));
         let rel = Part::Image { name: "[Image #1]".into(), source: "shot.png".into(), mime: String::new(), b64_file: String::new() };
-        assert_eq!(said(&[rel], &[], store, &fake), Err("an image part needs an absolute source: shot.png".into()));
+        assert_eq!(said(&[rel], &[], store, &fake, &yes), Err("an image part needs an absolute source: shot.png".into()));
     }
 
     #[test]
     fn parts_render_the_models_text_and_keep_their_json() {
         let ps = [Part::Quote { from: "main".into(), text: "q".into(), file: String::new(), new: String::new(), old: String::new() }, t("why?")];
-        let s = said(&ps, &[], Path::new("/h/images"), &none).unwrap();
+        let s = said(&ps, &[], Path::new("/h/images"), &none, &yes).unwrap();
         assert_eq!(s.text, "<selection from=\"main\">\nq\n</selection>\nwhy?");
         let back: Vec<Part> = serde_json::from_str(&s.parts).unwrap();
         assert_eq!(back, ps);
@@ -222,17 +307,17 @@ mod tests {
     #[test]
     fn an_unknown_part_is_refused() {
         let ps = [t("a"), Part::Unknown(serde_json::json!({"kind": "voice", "secs": 3}))];
-        assert_eq!(said(&ps, &[], Path::new("/h/images"), &none), Err("this bise doesn't know part voice: update bise".into()));
+        assert_eq!(said(&ps, &[], Path::new("/h/images"), &none, &yes), Err("this bise doesn't know part voice: update bise".into()));
     }
 
     /// architect m_17621 Q2: b64_file only inside the image store.
     #[test]
     fn an_image_outside_the_store_is_refused() {
         let store = Path::new("/h/images");
-        assert!(said(&[img("/h/images/ab12.b64")], &[], store, &none).is_ok());
-        assert!(said(&[img("")], &[], store, &fake).is_ok(), "no b64 yet: stored by the hub");
+        assert!(said(&[img("/h/images/ab12.b64")], &[], store, &none, &yes).is_ok());
+        assert!(said(&[img("")], &[], store, &fake, &yes).is_ok(), "no b64 yet: stored by the hub");
         for bad in ["/etc/passwd", "/h/images/../secrets/k.b64", "/h/images/sub/a.b64", "rel/a.b64", "/h/images/a.png", "/h/imagesx/a.b64"] {
-            assert!(said(&[img(bad)], &[], store, &fake).is_err(), "{bad}");
+            assert!(said(&[img(bad)], &[], store, &fake, &yes).is_err(), "{bad}");
         }
     }
 
@@ -254,9 +339,9 @@ mod tests {
         let dangling = store.join("gone.b64");
         let _ = std::fs::remove_file(&dangling);
         std::os::unix::fs::symlink(root.join("nothing"), &dangling).unwrap();
-        assert!(said(&[img(real.to_str().unwrap())], &[], &store, &none).is_ok());
-        assert!(said(&[img(link.to_str().unwrap())], &[], &store, &none).is_err(), "a link out");
-        assert!(said(&[img(dangling.to_str().unwrap())], &[], &store, &none).is_err(), "a dangling link");
+        assert!(said(&[img(real.to_str().unwrap())], &[], &store, &none, &yes).is_ok());
+        assert!(said(&[img(link.to_str().unwrap())], &[], &store, &none, &yes).is_err(), "a link out");
+        assert!(said(&[img(dangling.to_str().unwrap())], &[], &store, &none, &yes).is_err(), "a dangling link");
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -317,6 +402,6 @@ mod tests {
 
     #[test]
     fn parts_and_files_together_are_refused() {
-        assert!(said(&[t("a")], &["/w/a.md".into()], Path::new("/h/images"), &none).is_err());
+        assert!(said(&[t("a")], &["/w/a.md".into()], Path::new("/h/images"), &none, &yes).is_err());
     }
 }

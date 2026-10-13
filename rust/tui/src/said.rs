@@ -120,7 +120,10 @@ pub(crate) fn view_of(text: &str, parts: &[Part]) -> View {
                 v.pastes.push(Pasted { n: *n as usize, text: text.clone() });
             }
             Part::Image { name, source, mime, b64_file } => v.body.push_str(&parts::image_marker(name, source, mime, b64_file)),
-            Part::File { path } => files.push(path),
+            // a file chip in place, as its marker (`▯ deck.pptx`,
+            // attach::chip_spans); a listed file in the list after
+            Part::File { path, name, missing } if !name.is_empty() => v.body.push_str(&parts::file_marker(name, path, *missing)),
+            Part::File { path, .. } => files.push(path),
             // his notes on a page, never the hub's template
             Part::Page { notes, .. } => v.body.push_str(&page_words(notes, "\n")),
             Part::Unknown(_) => {}
@@ -154,7 +157,8 @@ pub(crate) fn gist(parts: &[Part]) -> String {
                 let shown = std::path::Path::new(source).file_name().and_then(|f| f.to_str()).filter(|_| !name.starts_with('[')).unwrap_or(name);
                 words.push_str(&format!("▣ {shown}"));
             }
-            Part::File { path } => words.push_str(&format!(" {path}")),
+            Part::File { path, name, .. } if !name.is_empty() => words.push_str(&format!("▯ {}", parts::file_name(path))),
+            Part::File { path, .. } => words.push_str(&format!(" {path}")),
             Part::Page { notes, .. } => words.push_str(&page_words(notes, " · ")),
             Part::Unknown(_) => {}
         }

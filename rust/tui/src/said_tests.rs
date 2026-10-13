@@ -47,9 +47,10 @@ fn a_paste_is_its_chip_mark_and_an_image_its_marker() {
 
 #[test]
 fn his_files_list_after_his_words() {
-    let s = Said::of_parts(vec![text("see"), Part::File { path: "/u/notes.md".into() }]);
+    let listed = |p: &str| Part::File { path: p.into(), name: String::new(), missing: false };
+    let s = Said::of_parts(vec![text("see"), listed("/u/notes.md")]);
     assert_eq!(view(&s).body, format!("see\n\n{}\n/u/notes.md", parts::FILES_HEADER));
-    let only = Said::of_parts(vec![Part::File { path: "/u/a.md".into() }]);
+    let only = Said::of_parts(vec![listed("/u/a.md")]);
     assert_eq!(view(&only).body, format!("{}\n/u/a.md", parts::FILES_HEADER));
 }
 

@@ -18,13 +18,20 @@
 //!   what does <pasted n="1" lines="240">
 //!   …
 //!   </pasted> mean? <image name="[Image #2]" path="…" mime="image/png" b64="…">
+//!   in <file name="[File #3]" path="/Users/ana/deck.pptx">
 //!
 //!   [files he attached:]
 //!   /Users/ana/notes.md
 //!   ```
 //!
-//!   the quotes in front (one per line), then the words with the pastes
-//!   and the images where they were, then his other files' list.
+//!   the quotes in front (one per line), then the words with the pastes,
+//!   the images and the file chips where they were (file-chips, architect
+//!   m_21764: a file by its path, ` missing="true"` when the hub found
+//!   none at send time), then the list of his files that have no chip (a
+//!   `files` list, an old journal).
+//! - [`pick_kind`] / [`drop_kind`]: the one table of what a path he
+//!   attaches becomes (an image chip, a file chip, text), with
+//!   [`IMAGE_EXTS`] / [`DOC_EXTS`] (the window reads them generated).
 //! - [`parse`]: an old text read back (an old journal, an older client
 //!   that sends text only). Lossless: `render(&parse(t)) == t` for every
 //!   text, because a tag is a part only when rendering that part again
@@ -71,8 +78,19 @@ pub enum Part {
         #[serde(default, skip_serializing_if = "String::is_empty")]
         b64_file: String,
     },
-    /// another file he attached (an absolute path)
-    File { path: String },
+    /// a file he attached by its absolute path (file-chips, architect
+    /// m_21764): the model reads it with its own tools, never a copy.
+    /// `name`: its chip's label (`[File #2]`, the images' number
+    /// sequence), rendered in place as its marker; "" (an old journal, a
+    /// `files` list): in the list after his words. `missing`: the hub
+    /// found no file there when he sent it.
+    File {
+        path: String,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        name: String,
+        #[serde(default, skip_serializing_if = "is_false")]
+        missing: bool,
+    },
     /// what he did on a page (page-answer-row, architect m_20833): his
     /// notes, picks, ticks or starts on page `page`, as the hub sends
     /// them to an agent. `text` is the model's text whole (the hub's
@@ -123,6 +141,74 @@ fn is_zero(n: &u64) -> bool {
     *n == 0
 }
 
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
+// ---- which paths become a chip ----
+
+/// What a path he attaches becomes (architect m_21764 B: the one table
+/// both composers read; the TS gets it as `chips.gen.ts`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChipKind {
+    /// an image chip (`[Image #N]`)
+    Image,
+    /// a file chip (`[File #N]`)
+    File,
+    /// stays text (an `@path` he picked: code the agent reads itself)
+    Text,
+}
+
+/// The extensions of an image chip (bend_images' `has_image_ext`).
+pub const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp"];
+
+/// The extensions an `@` pick makes a file chip of: documents, not code.
+/// A dropped or pasted file is a chip whatever its extension.
+pub const DOC_EXTS: &[&str] = &[
+    "pdf", "csv", "tsv", "xls", "xlsx", "xlsm", "doc", "docx", "ppt", "pptx", "key", "numbers", "pages", "odt", "ods", "odp", "rtf", "epub",
+];
+
+/// A path's extension, lower case ("" none).
+fn ext_of(path: &str) -> String {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    match name.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() => ext.to_ascii_lowercase(),
+        _ => String::new(),
+    }
+}
+
+/// What an `@` pick of `path` becomes: an image, a document's file chip,
+/// or its `@path` text.
+pub fn pick_kind(path: &str) -> ChipKind {
+    let ext = ext_of(path);
+    if IMAGE_EXTS.contains(&ext.as_str()) {
+        ChipKind::Image
+    } else if DOC_EXTS.contains(&ext.as_str()) {
+        ChipKind::File
+    } else {
+        ChipKind::Text
+    }
+}
+
+/// What a dropped or pasted file becomes: an image by its extension,
+/// else a file chip (never text: he dropped it to attach it).
+pub fn drop_kind(path: &str) -> ChipKind {
+    match pick_kind(path) {
+        ChipKind::Image => ChipKind::Image,
+        _ => ChipKind::File,
+    }
+}
+
+/// A file chip's label: `[File #2]`.
+pub fn file_label(n: usize) -> String {
+    format!("[File #{n}]")
+}
+
+/// The last segment of a path (the chip's words): `deck.pptx`.
+pub fn file_name(path: &str) -> &str {
+    path.trim_end_matches('/').rsplit('/').next().unwrap_or(path)
+}
+
 /// The page part of a message, when it has one (a message the hub wrote
 /// from a page): who it went to, the page's title (its id when it has
 /// none) and his notes.
@@ -150,6 +236,7 @@ const QUOTE_CLOSE: &str = "</selection>";
 const PASTE_OPEN: &str = "<pasted n=\"";
 const PASTE_CLOSE: &str = "</pasted>";
 const IMAGE_OPEN: &str = "<image name=\"";
+const FILE_OPEN: &str = "<file name=\"";
 
 // ---- render ----
 
@@ -164,7 +251,8 @@ pub fn render(parts: &[Part]) -> String {
             Part::Text { text } => body.push_str(text),
             Part::Paste { n, text } => body.push_str(&paste_tag(*n, text)),
             Part::Image { name, source, mime, b64_file } => body.push_str(&image_marker(name, source, mime, b64_file)),
-            Part::File { path } => files.push(path),
+            Part::File { path, name, missing } if !name.is_empty() => body.push_str(&file_marker(name, path, *missing)),
+            Part::File { path, .. } => files.push(path),
             Part::Page { text, .. } => body.push_str(text),
             Part::Unknown(_) => {}
         }
@@ -220,17 +308,28 @@ pub fn paste_tag(n: u32, text: &str) -> String {
 /// An image's marker, the image store's format (`bend_images::marker`):
 /// a `"` becomes `'`, a `>` `)`, a newline a space.
 pub fn image_marker(name: &str, source: &str, mime: &str, b64_file: &str) -> String {
-    let attr = |s: &str| -> String {
-        s.chars()
-            .map(|c| match c {
-                '"' => '\'',
-                '>' => ')',
-                '\n' | '\r' => ' ',
-                c => c,
-            })
-            .collect()
-    };
-    format!("{IMAGE_OPEN}{}\" path=\"{}\" mime=\"{}\" b64=\"{}\">", attr(name), attr(source), attr(mime), attr(b64_file))
+    format!("{IMAGE_OPEN}{}\" path=\"{}\" mime=\"{}\" b64=\"{}\">", marker_attr(name), marker_attr(source), marker_attr(mime), marker_attr(b64_file))
+}
+
+/// A named file's marker, in place in his words, in the image marker's
+/// grammar (architect m_21764 C): `<file name="[File #2]"
+/// path="/u/deck.pptx">`, ` missing="true"` added when the hub found no
+/// file there.
+pub fn file_marker(name: &str, path: &str, missing: bool) -> String {
+    let gone = if missing { " missing=\"true\"" } else { "" };
+    format!("{FILE_OPEN}{}\" path=\"{}\"{gone}>", marker_attr(name), marker_attr(path))
+}
+
+/// A marker's attribute: a `"` becomes `'`, a `>` `)`, a newline a space.
+fn marker_attr(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '"' => '\'',
+            '>' => ')',
+            '\n' | '\r' => ' ',
+            c => c,
+        })
+        .collect()
 }
 
 // ---- parse ----
@@ -265,7 +364,7 @@ fn parse_all(text: &str) -> Vec<Part> {
     let (head, files) = split_files(text);
     let (mut out, body) = split_quotes(head);
     out.extend(words_parts(body));
-    out.extend(files.into_iter().map(|path| Part::File { path }));
+    out.extend(files.into_iter().map(|path| Part::File { path, name: String::new(), missing: false }));
     out
 }
 
@@ -346,7 +445,7 @@ fn words_parts(body: &str) -> Vec<Part> {
     let mut from = 0usize;
     let mut scan = 0usize;
     while let Some(at) = next_tag(body, scan) {
-        match paste_at(&body[at..]).or_else(|| image_at(&body[at..])) {
+        match paste_at(&body[at..]).or_else(|| image_at(&body[at..])).or_else(|| file_at(&body[at..])) {
             Some((p, used)) => {
                 if at > from {
                     out.push(Part::Text { text: body[from..at].to_string() });
@@ -367,7 +466,21 @@ fn words_parts(body: &str) -> Vec<Part> {
 /// The byte where the next paste tag or image marker may start.
 fn next_tag(s: &str, from: usize) -> Option<usize> {
     let rest = s.get(from..)?;
-    [rest.find(PASTE_OPEN), rest.find(IMAGE_OPEN)].into_iter().flatten().min().map(|i| from + i)
+    [rest.find(PASTE_OPEN), rest.find(IMAGE_OPEN), rest.find(FILE_OPEN)].into_iter().flatten().min().map(|i| from + i)
+}
+
+/// The file marker at the very start of `s`, when it renders back the
+/// same.
+fn file_at(s: &str) -> Option<(Part, usize)> {
+    let rest = s.strip_prefix(FILE_OPEN)?;
+    let (name, rest) = rest.split_once("\" path=\"")?;
+    let (path, tail) = rest.split_once('"')?;
+    let missing = tail.starts_with(" missing=\"true\">");
+    let m = file_marker(name, path, missing);
+    if !s.starts_with(&m) {
+        return None;
+    }
+    Some((Part::File { path: path.into(), name: name.into(), missing }, m.len()))
 }
 
 /// The paste tag at the very start of `s`, when it renders back the same.

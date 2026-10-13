@@ -5,22 +5,33 @@
 
 use super::*;
 
-/// What an attached path is, for `crate::attached::render`: an image put in
-/// the image store (its marker), another file, or left out (logged).
-fn look_file(path: &str) -> crate::attached::Look {
-    use crate::attached::Look;
+/// What an attached path is, for `crate::parts_in::of_files`: an image put
+/// in the image store, another file, or left out (logged).
+fn look_file(path: &str) -> crate::parts_in::Look {
+    use crate::parts_in::Look;
     let p = std::path::Path::new(path);
     if !p.is_absolute() || !p.is_file() {
         eprintln!("sbd: attached file left out (not an absolute path to a file): {path}");
         return Look::Skip;
     }
-    match bend_images::store_file(p) {
-        Ok(stored) => {
-            let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-            Look::Image(bend_images::marker(&name, path, &stored))
-        }
+    match store_image(p) {
+        Ok(stored) => Look::Image(stored),
         Err(_) => Look::File,
     }
+}
+
+/// Whether a file part's path is a file now (`crate::parts_in::said`).
+pub(super) fn file_exists(p: &std::path::Path) -> bool {
+    p.is_file()
+}
+
+/// His words and a `files` list (an older desktop's `Send.files` /
+/// `Answer.files`) as his parts (`crate::parts_in::of_files` with the
+/// image store): the model's text and the parts' JSON kept on his
+/// message, the one render's (`bise_proto::parts::render`).
+pub(super) fn files_said(text: &str, files: &[String]) -> crate::parts_in::Said {
+    let parts = crate::parts_in::of_files(text, files, &mut look_file);
+    crate::parts_in::Said { text: bise_proto::parts::render(&parts), parts: serde_json::to_string(&parts).unwrap_or_default() }
 }
 
 /// An image part sent with its source only, put in the image store by the
@@ -41,26 +52,6 @@ pub(super) fn store_b64(p: &std::path::Path) -> Result<crate::parts_in::Stored, 
     Ok(crate::parts_in::Stored { b64: stored.b64.to_string_lossy().into_owned(), mime: stored.kind.mime().into() })
 }
 
-/// His words with the input op's attached files rendered after them (item
-/// H), once, before routing: a routed send carries the same text to the
-/// other project (image-store markers are global to every hub). Never on a
-/// slash command.
-pub(super) fn with_files(v: &Value, text: String) -> String {
-    match v.get("files").and_then(Value::as_array).filter(|_| !text.trim_start().starts_with('/')) {
-        Some(files) => {
-            let files: Vec<String> = files.iter().filter_map(Value::as_str).map(str::to_string).collect();
-            render_files(&text, &files)
-        }
-        None => text,
-    }
-}
-
-/// `text` with `files` rendered after it by the one render
-/// (`crate::attached::render` with the image store): a send's input
-/// ([`with_files`]) and a card's answer (`HubCmd::Answer.files`, R41).
-pub(super) fn render_files(text: &str, files: &[String]) -> String {
-    crate::attached::render(text, files, &mut look_file)
-}
 
 impl Shell {
     /// His input stepped into sb-core, with its fn context when the op
