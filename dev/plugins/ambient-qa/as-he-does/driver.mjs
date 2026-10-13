@@ -517,6 +517,45 @@ if (mode === 'rows2') {
   await page.keyboard.press('Escape');
   const gone2 = await pageEl.waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
   step('✕ and esc close the artifact', gone1 && gone2, { x: gone1, esc: gone2 });
+  // e5759db9 (his ask, main m_21531): with an artifact open, esc from his composer closes the
+  // artifact first, his words and the composer's mode (its label: answering a card, or to main) kept;
+  // a second esc does today's thing (a composer holding words takes it: no move up, nothing reopens)
+  const ESC_WORDS = 'half a thought kept through esc';
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const lbl = () => page.locator('.b-composer .lbl:visible').first().innerText({ timeout: 1000 }).catch(() => null);
+  const fieldText = async () => ((await field.innerText({ timeout: 1000 }).catch(() => '')) ?? '').trim();
+  await click('proof-html for the esc row', row);
+  const reopened = await pageEl.waitFor({ timeout: 10000 }).then(() => true, () => false);
+  let escRow = { reopened };
+  if (reopened && await click('the composer beside the artifact', field)) {
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type(ESC_WORDS, { delay: 5 });
+    const label0 = await lbl();
+    await page.keyboard.press('Escape');
+    const closed1 = await pageEl.waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
+    await page.waitForTimeout(300);
+    const words1 = await fieldText();
+    const label1 = await lbl();
+    await shot('esc-artifact-words-kept');
+    escRow = { reopened, closed: closed1, words: words1, label_before: label0, label_after: label1, answering: /answering/.test(label0 ?? '') ? 'proven' : 'no docked card in harness: the label kept is to main' };
+    step("esc with an artifact open closes it first; his words and the composer's mode stay", closed1 && words1 === ESC_WORDS && label0 !== null && label0 === label1, escRow);
+    await field.click({ timeout: 2000 }).catch(() => {});
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(800);
+    const second = {
+      artifact_reopened: (await pageEl.count()) > 0,
+      went_up_to_bise: (await page.locator('[data-testid="app.sidebar.bise"][aria-current]').count()) > 0,
+      words: await fieldText(),
+      label: await lbl(),
+    };
+    await shot('esc-artifact-second-esc');
+    step("a second esc does today's thing (a composer with words keeps it: no move, nothing reopens)", !second.artifact_reopened && !second.went_up_to_bise, second);
+    await field.click({ timeout: 2000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+  } else step("esc with an artifact open closes it first; his words and the composer's mode stay", false, escRow);
+  await closeArtifact();
   // back / forward: harness -> artifacts -> ⌘[ harness -> ⌘] artifacts; esc from harness' main goes up to bise
   await harness();
   await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
@@ -555,6 +594,32 @@ if (mode === 'rows2') {
   const blockText = hasBlock ? ((await block.innerText().catch(() => '')) ?? '') : '';
   await shot('inbox-block');
   step("bise's thread shows the inbox block with another project's item", hasBlock && /shop|telemetry|docs|ai-docs|folder/.test(blockText), blockText.slice(0, 300));
+  // f29e895c (designer m_21505): the block never folds or changes height when the thread scrolls
+  const blockH = () => page.locator('[data-testid="inbox.block"]').first().boundingBox({ timeout: 2000 }).then((b) => (b ? Math.round(b.height) : null), () => null);
+  const listTop = () => page.evaluate(() => {
+    const list = document.querySelector('[data-testid="thread.list"]');
+    const scrolls = (x) => x.scrollHeight > x.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(x).overflowY);
+    let e = list && [list, ...list.querySelectorAll('*')].find(scrolls);
+    if (!e) { e = list; while (e && !scrolls(e)) e = e.parentElement; }
+    return e ? Math.round(e.scrollTop) : null;
+  }).catch(() => null);
+  if (hasBlock) {
+    const h0 = await blockH();
+    const top0 = await listTop();
+    const lb = await page.locator('[data-testid="thread.list"]').first().boundingBox({ timeout: 3000 }).catch(() => null);
+    if (lb) await page.mouse.move(lb.x + lb.width / 2, lb.y + lb.height * 0.7);
+    const hs = [];
+    const tops = [];
+    for (const dy of [-200, -200, -200, -200, 200, 200, 800]) {
+      await page.mouse.wheel(0, dy);
+      await page.waitForTimeout(150);
+      hs.push(await blockH());
+      tops.push(await listTop());
+    }
+    await shot('inbox-block-scrolled');
+    const moved = tops.some((t) => t !== null && t !== top0);
+    step('the inbox block keeps its height on scroll', h0 !== null && moved && hs.every((x) => x !== null && Math.abs(x - h0) <= 1), { height: h0, during: hs, scroll_top: [top0, ...tops], thread_scrolled: moved });
+  } else step('the inbox block keeps its height on scroll', false, 'no inbox block');
   // ⌘I is the native menu's accelerator (src/main/menu.ts): CDP keys go to the page and never reach
   // the menu, so off-screen it can't be pressed. ⌃1 (the block's own key) opens the same item in place.
   await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
@@ -577,6 +642,48 @@ if (mode === 'rows2') {
     await shot('inbox-answered');
     step("another project's item answered from bise's thread", !!answered, { option: label.slice(0, 80) });
   }
+  // 1c5659b8 + the hub's 5b19b586 (main m_21514): his free words on another project's docked drafts
+  // card, from bise's thread, show the hub's notice as one row above the composer (composer.answer.note).
+  // Seeded as amb-core's answer-drafts-real check does: harness' main publishes a page of two drafted
+  // mails, so its hub opens one batch card. Never '1. review' (it opens the page in a browser).
+  const DRAFTS = 'release replies proof';
+  const em = (i, to) => `<section data-kit="email" data-id="${i}" data-verb="draft"><p data-field="to">${to}</p><p data-field="subject">v5.9.1</p><p>x</p></section>`;
+  const draftsHtml = '<section data-kit="checklist" data-id="plan" data-plan><ol>'
+    + '<li data-id="b1" data-who="bise" data-did="drafted" data-draft="mail-lucas">reply to Lucas</li>'
+    + '<li data-id="b2" data-who="bise" data-did="drafted" data-draft="mail-marc">reply to Marc</li></ol></section>'
+    + em('mail-lucas', 'lucas@acme.test') + em('mail-marc', 'marc@acme.test');
+  await harness();
+  await say(`[[bash: printf '%s' '${draftsHtml}' > rel-proof.html && sb page publish rel-proof.html --id rel-proof --title '${DRAFTS}']]`);
+  await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  const draftsRow = page.locator('[data-testid^="inbox.block.row."]', { hasText: DRAFTS }).first();
+  const draftsCard = page.locator('[data-testid^="inbox.block.card."]', { hasText: /drafts?/ }).filter({ hasText: DRAFTS }).first();
+  const answeringIt = async () => /answering/.test(((await page.locator('[data-testid="composer"]').first().innerText({ timeout: 1000 }).catch(() => '')) ?? ''));
+  // the card is there within 90 s; then its row's click, else '+ N more' in turn, until it is the open one
+  const listed = await until(async () => ((await draftsRow.isVisible().catch(() => false)) || (await draftsCard.isVisible().catch(() => false)) || /release replies proof|2 drafts/.test(((await text('[data-testid="inbox.block"]')) ?? '')) ? true : null), 90000, 1000);
+  for (let i = 0; listed && i < 40 && !(await draftsCard.isVisible().catch(() => false)); i++) {
+    if (await draftsRow.isVisible().catch(() => false)) await draftsRow.click({ timeout: 2000 }).catch(() => {});
+    else await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 2000 }).catch(() => {});
+    await page.waitForTimeout(500);
+  }
+  const docked = await draftsCard.isVisible().catch(() => false);
+  const answering = docked && await answeringIt();
+  await shot('drafts-card-docked');
+  let note = null;
+  if (docked && answering) {
+    const f = page.locator('[data-testid="composer.field"]:visible').first();
+    await f.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('where are the drafts?', { delay: 10 });
+    await page.keyboard.press('Enter');
+    note = await until(async () => {
+      const n = page.locator('[data-testid="composer.answer.note"]').first();
+      if (!(await n.isVisible().catch(() => false))) return null;
+      return { level: await n.getAttribute('data-level').catch(() => null), text: ((await n.innerText().catch(() => '')) ?? '').slice(0, 300) };
+    }, 30000, 500);
+    await shot('drafts-card-notice');
+  }
+  step("free words on a docked drafts card: the hub's notice row above the composer", !!note && note.level !== 'err' && /sent to/.test(note.text), { listed: !!listed, docked, answering, note, block: ((await text('[data-testid="inbox.block"]')) ?? '').slice(0, 300) });
   // the two-finger swipe (swipe.ts reads the renderer's wheel events): a horizontal wheel stream
   // through CDP, fingers right (deltaX < 0) walks back, fingers left forward. Events 20 ms apart
   // stay one gesture (GAP_MS 220); 8 x 30 px passes THRESHOLD_PX 140.
@@ -596,6 +703,32 @@ if (mode === 'rows2') {
   const swFwd = await page.locator('[data-testid="artifacts.list"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
   await shot('swipe-forward');
   step('two-finger swipe (CDP wheel deltaX): back, then forward', onList && !!swBack && swFwd, { on_list: onList, back: !!swBack, forward: swFwd });
+  // 3f58f843 (ambient-lead m_21499): ⌘K finds pages by name: 'set' shows the pages group, and ⏎ on
+  // its row opens settings (the selection walked down to it with ↓, as he would)
+  await harness();
+  await page.keyboard.press('Meta+k');
+  const pal = await page.locator('[data-testid="app.palette"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+  let kRow = { palette: pal };
+  if (pal) {
+    await page.keyboard.type('set', { delay: 40 });
+    const groups = await until(async () => {
+      const g = await page.locator('[data-testid^="app.palette.group."]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid').slice('app.palette.group.'.length)));
+      return g.includes('pages') ? g : null;
+    }, 5000, 300);
+    const at = await page.evaluate(() => {
+      const num = (e) => (e ? Number(e.getAttribute('data-testid').split('.').pop()) : null);
+      const first = document.querySelector('[data-testid="app.palette.group.pages"] [data-testid^="app.palette.item."]');
+      return { want: num(first), cur: num(document.querySelector('[data-testid^="app.palette.item."][aria-selected="true"]')), name: first?.textContent?.slice(0, 80) ?? null };
+    });
+    await shot('palette-set');
+    if (at.want !== null) for (let i = at.cur ?? 0; i < at.want; i++) await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    const settings = await page.locator('[data-testid="settings.root"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+    await shot('palette-set-enter');
+    kRow = { palette: pal, groups, row: at, settings };
+  }
+  step("⌘K with 'set' shows the pages group, ⏎ opens settings", !!kRow.groups && !!kRow.settings, kRow);
+  if (pal && !kRow.settings) await page.keyboard.press('Escape');
   // spacing (designer's desktop-spacing, steps 1-4): a frame per screen at 1100 wide. The viewport
   // is narrowed by CDP emulation, the native window doesn't move or resize.
   const cdp = await page.context().newCDPSession(page);
@@ -750,6 +883,25 @@ if (mode === 'draft-type' || mode === 'draft-check') {
   const composer = page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
   await composer.waitFor({ timeout: 15000 }).catch(() => {});
   const holds = async () => ((await composer.innerText({ timeout: 2000 }).catch(() => '')) || (await composer.inputValue({ timeout: 500 }).catch(() => ''))).trim();
+  // 516a4e79: the terminal panel left open across a restart starts its shell, never 'no folder for
+  // this project' (it waits for the core's projects rows). Opened in the pause pass, read after it.
+  const term = page.locator('[data-testid="terminal.panel"]').first();
+  const termMark = path.join(out, 'term-open.json');
+  if (mode === 'draft-type' && !tag.endsWith('atonce')) {
+    if (!(await term.isVisible().catch(() => false))) await page.keyboard.press('Control+Backquote');
+    const open = await term.waitFor({ timeout: 8000 }).then(() => true, () => false);
+    const state = open ? await until(async () => { const s = await page.locator('[data-testid="terminal.screen"]').first().getAttribute('data-state').catch(() => null); return s && s !== 'opening' ? s : null; }, 10000, 300) : null;
+    if (open) fs.writeFileSync(termMark, JSON.stringify({ state }));
+    await shot('terminal-open-before-restart');
+    step('the terminal panel is open before the restart (⌃`)', open, { state });
+  }
+  if (mode === 'draft-check' && fs.existsSync(termMark) && !tag.endsWith('atonce')) {
+    const shown = await term.waitFor({ timeout: 15000 }).then(() => true, () => false);
+    const state = shown ? await until(async () => { const s = await page.locator('[data-testid="terminal.screen"]').first().getAttribute('data-state').catch(() => null); return s && s !== 'opening' ? s : null; }, 20000, 300) : null;
+    const failed = ((await text('[data-testid="terminal.failed"]')) ?? '').slice(0, 200);
+    await shot('terminal-after-restart');
+    step("the terminal panel kept open across the restart starts its shell (no 'no folder')", shown && state === 'live' && !/no folder/.test(failed), { shown, state, failed: failed || null });
+  }
   if (mode === 'draft-type') {
     const typed = await click('the composer', composer);
     // the last pass's draft is still there (kept across its restart) and a click lands mid-text:
