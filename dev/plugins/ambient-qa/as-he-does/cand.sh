@@ -175,10 +175,18 @@ kill $(cat $G/fake/fake.pid) 2>/dev/null
 say "realshape core with no env"
 $RS core --bundle "$A" --out $O/core-noenv 2>&1 | tail -10
 w=$(ps -axo pid=,command= | grep -F "$G/w" | grep -v grep | awk '{print $1}'); [ -n "$w" ] && killpids $w
-# the candidate's own preferences domain goes through cfprefsd, never rm (it caches and writes back)
+# the candidate's own preferences domain goes through cfprefsd first (it caches and writes back)
 defaults delete "$CAND_ID" > $O/cand-prefs-delete.txt 2>&1; echo "rc=$?" >> $O/cand-prefs-delete.txt
 if [ -e "$CANDPREF" ]; then say "cand prefs: 'defaults delete $CAND_ID' done, the file is still there ($(stat -f %z "$CANDPREF") bytes, $(plutil -p "$CANDPREF" 2>/dev/null | tr -d '\n '))"
 else say "cand prefs: 'defaults delete $CAND_ID' done, the file is gone"; fi
+# an emptied domain can leave its file as '{}' (run 40fc444d): only then rm it, and check after ~5 s
+# that cfprefsd didn't write it back. cfprefsd itself is never touched (ambient-lead m_20883)
+if [ -e "$CANDPREF" ] && [ "$(plutil -p "$CANDPREF" 2>/dev/null | tr -d '[:space:]')" = "{}" ]; then
+  rm -f "$CANDPREF"; sleep 5
+  if [ -e "$CANDPREF" ]; then say "cand prefs: the empty $CANDPREF came back after rm: left, logged"
+  else say "cand prefs: empty after the delete: rm'd, still gone after 5 s"; fi
+fi
+grep 'cand prefs:' $O/run.out 2>/dev/null >> $O/cand-prefs.txt
 libgate final
 say "his app after: $(hispids)" | tee -a $O/his.txt
 say "done"

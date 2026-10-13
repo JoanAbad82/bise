@@ -229,7 +229,7 @@ if (mode === 'cut') {
     const i = s.indexOf('gone');
     return i >= 0 && /idle|done/.test(s.slice(i, i + 40)) ? true : null;
   }, ANSWER_MS, 2000);
-  step("'gone' idle before its drop", !!goneIdle, null);
+  // its idle state is only noted: a drop that archives anyway (or asks its card) is the proof
   await say('[[bash: sb drop gone]]');
   const card = page.locator('[data-testid^="dock.opt"]').filter({ hasText: /yes|drop/i }).first();
   const asked = await card.waitFor({ timeout: 20000 }).then(() => true, () => false);
@@ -243,7 +243,7 @@ if (mode === 'cut') {
     const s = (await text('[data-testid="app.sidebar"]')) ?? '';
     return /\bgone\b/.test(s) ? null : true;
   }, 60000, 1000);
-  step("'gone' dropped (a drop card answered yes when asked)", !!dropped, { card: asked, answered });
+  step("'gone' dropped (a drop card answered yes when asked)", !!dropped, { idle_first: !!goneIdle, card: asked, answered });
   // a thought of its own message (the fake provider's [[think: …]]): opened, it must never draw its
   // signature (BENDSIG::…, c28260a9's window guard)
   await say('think it over [[think: weighing the proof rows]]');
@@ -312,7 +312,9 @@ if (mode === 'cut') {
   fs.writeFileSync(path.join(out, `${mode}-artifact-frame.json`), JSON.stringify({ frames, docs, net }, null, 1));
   await shot('artifact-html');
   step('a local .html artifact renders (its green pixels)', green > 0.3, { opened, frame: fr, green_share: Math.round(green * 100) / 100, frames, docs: docs.slice(0, 3), net_lines: net.length });
-  // the sidebar resizes by drag; its width is kept for the restart's check
+  // the sidebar resizes by drag; its width is kept for the restart's check. The open artifact folds
+  // the left bar to a rail (no split, no 'harness' label): close it first (run 40fc444d's 2 reds)
+  await closeArtifact();
   const split = page.locator('[data-testid="app.split.side"]').first();
   const w0 = Number(await split.getAttribute('aria-valuenow').catch(() => null));
   const box = await split.boundingBox().catch(() => null);
@@ -462,10 +464,13 @@ if (mode === 'rows2') {
   const blockText = hasBlock ? ((await block.innerText().catch(() => '')) ?? '') : '';
   await shot('inbox-block');
   step("bise's thread shows the inbox block with another project's item", hasBlock && /shop|telemetry|docs|ai-docs|folder/.test(blockText), blockText.slice(0, 300));
-  await page.keyboard.press('Meta+i');
+  // ⌘I is the native menu's accelerator (src/main/menu.ts): CDP keys go to the page and never reach
+  // the menu, so off-screen it can't be pressed. ⌃1 (the block's own key) opens the same item in place.
+  await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
+  await page.keyboard.press('Control+1');
   const inPlace = await until(async () => ((await page.locator('[data-testid^="dock.opt"]').count()) > 0 ? true : null), 8000, 400);
-  await shot('inbox-cmd-i');
-  step('⌘I opens the item in place (its options in the dock)', !!inPlace, ((await text('[data-testid="app.main"]')) ?? '').slice(-300));
+  await shot('inbox-ctrl-1');
+  step('⌃1 opens the item in place (its options in the dock; ⌘I = native menu, not reachable by CDP)', !!inPlace, ((await text('[data-testid="app.main"]')) ?? '').slice(-300));
   if (inPlace) {
     const opt = page.locator('[data-testid^="dock.opt"]').first();
     const label = await opt.innerText().catch(() => '');
@@ -485,12 +490,18 @@ if (mode === 'draft-type' || mode === 'draft-check') {
   const holds = async () => ((await composer.innerText({ timeout: 2000 }).catch(() => '')) || (await composer.inputValue({ timeout: 500 }).catch(() => ''))).trim();
   if (mode === 'draft-type') {
     const typed = await click('the composer', composer);
-    if (typed) await page.keyboard.type(draft, { delay: 15 });
+    // the last pass's draft is still there (kept across its restart) and a click lands mid-text:
+    // empty it first, so each pass holds exactly its own words (run 40fc444d merged two drafts)
+    if (typed) {
+      await page.keyboard.press('Meta+a');
+      await page.keyboard.press('Backspace');
+      await page.keyboard.type(draft, { delay: 15 });
+    }
     await shot('draft');
     const now = await holds();
-    step('the draft is in the composer, not sent', now.includes(draft), now.slice(0, 300));
+    step('the draft is in the composer, not sent', now === draft, now.slice(0, 300));
   } else {
-    const back = await until(async () => ((await holds()).includes(draft) ? await holds() : null), 20000, 500);
+    const back = await until(async () => ((await holds()) === draft ? draft : null), 20000, 500);
     await shot('draft-back');
     step('the draft is back in the composer after the restart', !!back, back ?? (await holds()).slice(0, 300));
     const kept = fs.existsSync(path.join(out, 'side-width.txt')) ? Number(fs.readFileSync(path.join(out, 'side-width.txt'), 'utf8')) : null;
