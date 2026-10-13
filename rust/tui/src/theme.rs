@@ -339,7 +339,8 @@ pub(crate) const G_SCHEDULED: &str = "◷"; // a scheduled task (sb every), its 
 // agent status
 pub(crate) const G_STARTING: &str = "·"; // dim, pulsing
 pub(crate) const G_WORKING: &str = "∿"; // pulsing: a breeze
-pub(crate) const G_WAITING: &str = "…"; // waiting on another agent
+pub(crate) const G_WAITING: &str = "…"; // waiting on another agent, or paused on an event
+pub(crate) const G_WATCHING: &str = "◌"; // an alarm: bise wakes the agent if an event comes (faint; agent-waiting-states A)
 pub(crate) const G_NEEDS_YOU: &str = "?"; // accent
 pub(crate) const G_DONE: &str = "✓"; // accent (BISE-100, was ♡); draw it with [`done_glyph`]
 pub(crate) const G_FAILED: &str = "✗"; // error
@@ -423,7 +424,8 @@ pub(crate) const LEGEND: &[Symbol] = &[
     sym(AGENTS, G_MAIN, Tone::Accent, "main, the agent you talk to"),
     sym(AGENTS, G_WORKING, Tone::Text, "working (it moves)"),
     sym(AGENTS, G_STARTING, Tone::Dim, "starting"),
-    sym(AGENTS, G_WAITING, Tone::Text, "waiting on another agent"),
+    sym(AGENTS, G_WAITING, Tone::Text, "waiting on another agent, or paused until a command ends"),
+    sym(AGENTS, G_WATCHING, Tone::Faint, "watching: bise wakes the agent if something happens (/scheduled)"),
     sym(AGENTS, G_NEEDS_YOU, Tone::Accent, "needs you: a card in your inbox (dim: a blocked task, main's to handle)"),
     Symbol { group: AGENTS, glyph: G_DONE, tone: Tone::Accent, ascii: "*", meaning: "done" },
     sym(AGENTS, G_FAILED, Tone::Error, "failed"),
@@ -510,6 +512,7 @@ pub(crate) const ASCII: &[(&str, &str)] = &[
     ("…", ";"),
     ("✗", "x"),
     ("○", "o"),
+    ("◌", "O"),
     ("–", "_"),
     ("✓✓", "vv"),
     ("✓", "v"),

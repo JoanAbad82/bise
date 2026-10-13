@@ -38,7 +38,7 @@
 1725 rust/tui/src/sb.rs
 1007 rust/tui/src/sb/card_draw.rs
 1438 rust/tui/src/sb/cards.rs
-2854 rust/tui/src/sb/panel.rs
+2836 rust/tui/src/sb/panel.rs
 1036 rust/tui/src/term.rs
 1114 rust/tui/src/ui.rs
 1154 rust/tui/src/voicemode/speak.rs

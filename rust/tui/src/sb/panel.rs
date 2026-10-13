@@ -101,8 +101,8 @@ fn state_word(sb: &Sb, a: &Agent) -> (String, Color) {
     if needs_you(sb, a) {
         return ("asks you".into(), accent());
     }
-    // event-wake: what it waits for, cut to the column (`cargo t…`)
-    if let Some(w) = a.watching.first().filter(|_| a.waits_event()) {
+    // event-wake: what it pauses on, cut to the column (`cargo b…`)
+    if let Some(w) = a.watching.iter().find(|w| w.resumes).filter(|_| a.waits_event()) {
         return (fit(&w.what, STATE_W), dim());
     }
     let w = if a.status.is_empty() { "idle" } else { a.status.as_str() };
@@ -138,7 +138,7 @@ fn columns(app: &App, sb: &Sb, a: &Agent, boxed: bool, drop: usize) -> Vec<Span<
         };
         vec![Span::styled(format!(" {:>STATE_W$}", w), Style::default().fg(c))]
     } else {
-        // event-wake: waiting, the time column says since when
+        // event-wake: paused, the time column says for how long
         let waited = a.wait_since().filter(|_| a.waits_event()).map(|s| short_age(crate::when::now_ms().saturating_sub(s)));
         let time = a.turn_ms.filter(|_| a.status == "working").map(short_age).or(waited).unwrap_or_default();
         let fill = sb.usage_of(&a.name).map(|u| u.short.clone()).unwrap_or_default();
@@ -664,6 +664,7 @@ pub(crate) fn draw_panel(app: &App, frame: &mut Frame, area: Rect) {
     }
     let live = i;
     cards_lines(app, w, &mut lines, &mut owners, &mut sel_row);
+    super::waiting::watching_lines(sb, w, &mut lines, &mut owners);
     archived_lines(sb, live, w, &mut lines, &mut owners, &mut sel_row);
     // the body under the title: scrolled to keep the selection in view,
     // or where the wheel or a `↑`/`↓` row put it (sidebar-more); what
@@ -681,7 +682,7 @@ pub(crate) fn draw_panel(app: &App, frame: &mut Frame, area: Rect) {
                 failed: a.is_some_and(|a| a.status == "failed") as usize,
             }
         }
-        Hit::Card(_) => Hidden { n: 1, ..Hidden::default() },
+        Hit::Card(_) | Hit::Watch(Some(_)) => Hidden { n: 1, ..Hidden::default() },
         Hit::Archived if !sb.archived_open => Hidden { n: archived, ..Hidden::default() },
         _ => Hidden::default(),
     };
@@ -995,6 +996,8 @@ pub(crate) enum Hit {
     Down,
     /// A shared worktree's label `ψ sculpt`: its branch's diff.
     Place(String),
+    /// An alarm of `watching` (None: its title): /scheduled on it.
+    Watch(Option<u64>),
 }
 
 /// The panel's window as the last frame drew it (sidebar-more): its
@@ -1105,6 +1108,10 @@ pub(crate) fn panel_mouse(app: &mut App, m: &crossterm::event::MouseEvent) -> bo
     if m.kind != MouseEventKind::Down(MouseButton::Left) {
         return false;
     }
+    // no panel: the composer rule's `◌ 1 watching` stands for it
+    if crate::scheduled_watch::click(app, m) {
+        return true;
+    }
     let sb = &app.sb;
     let (target, right) = {
         let Ok(hits) = sb.panel_hits.try_borrow() else { return false };
@@ -1132,6 +1139,7 @@ pub(crate) fn panel_mouse(app: &mut App, m: &crossterm::event::MouseEvent) -> bo
         Some(Hit::Card(id)) => super::cards::open_view(app, Some(id)),
         Some(Hit::Cards) if app.sb.card.open => super::cards::close_view(app),
         Some(Hit::Cards) => super::cards::open_view(app, None),
+        Some(Hit::Watch(id)) => crate::scheduled_watch::open_on(app, id),
         // a page that way, less one row: the last row you saw stays in
         // view (designer)
         Some(Hit::Up | Hit::Down) => {
@@ -1659,32 +1667,6 @@ mod tests {
         let y = t.iter().position(|r| r.contains("docs")).unwrap();
         assert_eq!(term.backend().buffer()[(32, y as u16)].fg, accent(), "{:?}", t[y]);
     }
-
-    /// event-wake (designer's page): an idle agent with a live watch
-    /// reads `…` in text, its wait in the time column; ctrl held, what it
-    /// waits for, cut to the column; no watch: `○` again.
-    #[test]
-    fn an_agent_waiting_on_an_event_is_not_idle() {
-        use crate::ctrlhint::{Held, Hold};
-        let mut app = bench::test_app_drained();
-        let since = crate::when::now_ms().saturating_sub(125_000);
-        let w = bise_proto::rows::AgentWatch { id: 3, kind: bise_proto::rows::WatchKind::Bg, what: "cargo test".into(), since_ms: since, noted: false, resumes: false, until_ms: None };
-        app.sb.agents = vec![Agent { main: true, ..agent("main", "idle") }, Agent { watching: vec![w], ..agent("perf", "idle") }];
-        let t = trimmed(&panel_rows(&app, 40, 6));
-        let row = t.iter().find(|r| r.contains("perf")).cloned().unwrap_or_default();
-        assert!(row.contains(&format!("{} perf", G_WAITING)) && row.contains("2m"), "{row:?}");
-        assert_eq!(crate::sb::title_status(&app).running, 1, "it counts in the tab title");
-        app.hold = Hold::of(Held::Ctrl, std::time::Instant::now() - std::time::Duration::from_secs(2));
-        let t = trimmed(&panel_rows(&app, 40, 6));
-        let row = t.iter().find(|r| r.contains("perf")).cloned().unwrap_or_default();
-        assert!(row.ends_with("cargo t…"), "{row:?}");
-        app.hold = Hold::default();
-        app.sb.agents[1].watching.clear();
-        let t = trimmed(&panel_rows(&app, 40, 6));
-        let row = t.iter().find(|r| r.contains("perf")).cloned().unwrap_or_default();
-        assert!(row.contains(&format!("{} perf", G_IDLE)), "{row:?}");
-    }
-
 
     /// BISE-135: the model and effort are on the divider (no tag in the
     /// panel since BISE-303).

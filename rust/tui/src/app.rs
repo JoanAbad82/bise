@@ -69,6 +69,9 @@ pub(crate) struct App {
     pub(crate) unseen: usize,
     pub(crate) tail_visible: bool,
     pub(crate) bottom_bar_rect: Option<ratatui::layout::Rect>,
+    /// the composer rule's `◌ 1 watching` (no panel): a click opens
+    /// /scheduled on the alarms
+    pub(crate) watching_rect: Option<ratatui::layout::Rect>,
     /// the first-run text's `show me what you can do`, where it was
     /// drawn: a click fills the composer with it (BISE-284)
     pub(crate) demo_rect: Option<ratatui::layout::Rect>,
@@ -320,6 +323,7 @@ impl App {
             unseen: 0,
             tail_visible: true,
             bottom_bar_rect: None,
+            watching_rect: None,
             demo_rect: None,
             demo_after_onboarding: false,
             hold: Default::default(),

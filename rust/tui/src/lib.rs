@@ -116,6 +116,7 @@ mod artifacts;
 mod artifacts_screen;
 mod scheduled;
 mod scheduled_screen;
+mod scheduled_watch;
 mod usage_screen;
 mod diffbranches;
 mod diffquote;

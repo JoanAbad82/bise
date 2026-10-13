@@ -1,20 +1,22 @@
-"""An agent waiting on an event, in the TUI (wake-ui, designer's page
-event-wake), through the real binaries: a throwaway hub on the fake
-provider, tmux at 150 and 80 columns, dark and light.
+"""An agent waiting on an event, in the TUI (agent-waiting-states A,
+designer m_22899/m_22934), through the real binaries: a throwaway hub on
+the fake provider, tmux at 150 and 80 columns, dark and light.
 
   perf's brief backgrounds `cargo test -p storefront --release` (a fake
       cargo that sleeps, then prints 3 lines; BEND_BG_AFTER 2 s) and its
-      turn ends: its panel row says `…` with its wait in the time column,
-      never `○`; its view's top edge and the line under its thread say
-      `… waiting for cargo test · <age>`
+      turn ends: a PAUSE. Its panel row says `…` with its age in the time
+      column, never `○`; its view's top edge and the line under its
+      thread say `… continues when cargo test ends · <age>`
   the command ends: the live line goes, its thread says `· cargo test
       ended · rc 0 · after …  ▸ its last 3 lines`, never bise's message
       (`background 0 ended`); ctrl+o opens the lines
-  `sb wake --on-file` with a note: `… waiting for the reindex`; a rc file
-      with 101: `the reindex ended · rc 101` with the rc in red (a note
-      names the thing: no `to appear`, no `appeared`)
-  `sb wake --stop`: `– stopped waiting for the reindex`, the row `○` again
-  the same at 80 columns and in the light palette
+  `sb wake --on-file` with a note: an ALARM. perf stays `○`, no live
+      line; the panel's `watching` says `◌ perf  if the reindex  →<clock>`;
+      its rc file with 101: `the reindex ended · rc 101`, the rc in red
+  the same with `--then`: a pause, `… continues when the reindex`;
+      `sb wake --stop`: `– stopped waiting for the reindex`, `○` again
+  at 80 columns (no panel) the alarm is `◌ 1 watching` on the composer
+      rule, and the same in the light palette
 
 WAKE_SHOTS=<dir> keeps the captures (.txt and .ansi) for the designer.
 
@@ -31,7 +33,7 @@ from tui_tmux import tui_session, run, in_view, MAIN_IDLE  # noqa: E402
 
 SHOTS = os.environ.get("WAKE_SHOTS")
 SECS = int(os.environ.get("WAKE_TUI_SECS", "25"))
-WAITING = re.compile(r"… waiting for cargo test · \d+[sm]")
+WAITING = re.compile(r"… continues when cargo test ends · \d+[sm]")
 
 
 def shot(t, name):
@@ -109,14 +111,16 @@ def wide(t, E, bin_dir):
     # echoes its words, `ack: <agent_message …> background 0 ended`)
     assert "✉︎ bise" not in sc and "✉ bise" not in sc, "bise's wake folds into the line: " + sc
     assert not any(r.strip("│ ").startswith("background 0 ended") for r in sc.splitlines()), sc
-    t.wait_gone("waiting for cargo test", 20)
+    t.wait_gone("continues when cargo test", 20)
     shot(t, "150-ended")
-    # a watch with a note, then its rc file with 101: red
+    # a file with a note: an alarm. perf is free (○, no live line); the
+    # panel's `watching` has it with its end
     rc = os.path.join(E.tmp, "reindex.rc")
     sb(E, "perf", "wake", "--on-file", rc, "--note", "the reindex")
-    sc = t.wait("… waiting for the reindex", 30)
-    assert "… perf" in row(sc, "perf"), row(sc, "perf")
-    shot(t, "150-waiting-note")
+    sc = t.wait_re(r"◌ perf\s+if the reindex\s+→", 30)
+    assert "○ perf" in row(sc, "perf"), row(sc, "perf")
+    assert "continues when" not in sc, sc
+    shot(t, "150-alarm")
     with open(rc, "w") as f:
         f.write("101\n")
     # a note names the thing (designer m_17730): `ended`, no `appeared`
@@ -124,12 +128,15 @@ def wide(t, E, bin_dir):
     ansi = t.screen(colors=True)
     assert re.search(r"\x1b\[[0-9;]*m\s*rc 101", ansi), "the rc in its own color"
     shot(t, "150-failed")
-    # stopped by the agent: faint, the row back to ○
-    sb(E, "perf", "wake", "--on-file", rc + ".2", "--note", "the reindex")
-    t.wait("… waiting for the reindex", 30)
+    t.wait_gone("◌ perf", 20)
+    # the same with --then: a pause; stopped by the agent: faint, ○ again
+    sb(E, "perf", "wake", "--then", "--on-file", rc + ".2", "--note", "the reindex")
+    sc = t.wait("… continues when the reindex", 30)
+    assert "… perf" in row(sc, "perf"), row(sc, "perf")
+    shot(t, "150-pause-note")
     sb(E, "perf", "wake", "--stop", watch_id(E, "the reindex"))
     sc = t.wait("– stopped waiting for the reindex", 30)
-    t.wait_gone("… waiting for the reindex", 20)
+    t.wait_gone("… continues when the reindex", 20)
     t.wait_re(r"\b\d+ ○ perf\b", 20)
     shot(t, "150-stopped")
 
@@ -140,14 +147,18 @@ def narrow(t, E):
     view(t, "perf")
     t.wait("cargo test ended · rc 0")
     sb(E, "perf", "wake", "--on-file", os.path.join(E.tmp, "x.rc"), "--note", "the reindex")
-    sc = t.wait("… waiting for the reindex", 30)
+    sc = t.wait_re(r"you → perf .*◌ 1 watching", 30)
     for line in sc.splitlines():
         assert len(line) <= 80, line
-    shot(t, "80-waiting")
+    assert "continues when" not in sc, sc
+    shot(t, "80-alarm")
+    sb(E, "perf", "wake", "--then", "--on-file", os.path.join(E.tmp, "y.rc"), "--note", "the reindex ends")
+    t.wait("… continues when the reindex ends", 30)
+    shot(t, "80-pause")
     t.typed("/theme light")
     t.keys("Enter")
-    t.wait("… waiting for the reindex")
-    shot(t, "80-waiting-light")
+    t.wait("… continues when the reindex ends")
+    shot(t, "80-pause-light")
     t.typed("/theme dark")
     t.keys("Enter")
 

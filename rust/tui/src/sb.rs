@@ -28,6 +28,7 @@ mod card_draw;
 pub(super) use card_draw::{box_height, card_frame, BoxFit, card_view_open, divider_label as card_divider_label, draw_box, draw_view as draw_card_view, fit_pairs as fit_card_pairs, key_pairs as card_key_pairs};
 mod panel;
 mod waiting;
+pub(crate) use waiting::{end_short, rule_states as watching_rule, Watch};
 pub(crate) mod places;
 #[cfg(test)]
 mod tour_tests;
@@ -191,16 +192,15 @@ impl Agent {
         self.status == "working" || self.status == "waiting"
     }
 
-    /// event-wake (designer's page): its turn ended and it waits for an
-    /// event (a live watch): `…` instead of `○`, the live line. A turn
-    /// that runs, or a state of its own (blocked, failed...), says itself.
+    /// agent-waiting-states A: idle and a watch `resumes` it: `…`, the live
+    /// line (an alarm alone: idle; a turn or a state says itself).
     fn waits_event(&self) -> bool {
-        !self.watching.is_empty() && matches!(self.status.as_str(), "idle" | "")
+        self.watching.iter().any(|w| w.resumes) && matches!(self.status.as_str(), "idle" | "")
     }
 
-    /// Since when it waits (its oldest watch's set, ms).
+    /// Since when it pauses (its oldest pause's set, ms).
     fn wait_since(&self) -> Option<u64> {
-        self.watching.iter().map(|w| w.since_ms).min()
+        self.watching.iter().filter(|w| w.resumes).map(|w| w.since_ms).min()
     }
 }
 
@@ -746,8 +746,8 @@ pub(crate) fn tour_snap(app: &App) -> crate::tour::Snap {
     crate::tour::Snap { members, focus: sb.focus.clone(), card, palette: app.palette.is_some(), no_ctrl_digits: !app.ctrl_digits }
 }
 
-/// Change the feed in focus (checkout / return).
-pub(super) fn focus(app: &mut App, name: &str) {
+/// Change the feed in focus (checkout / return; /scheduled's ⏎ on an alarm).
+pub(crate) fn focus(app: &mut App, name: &str) {
     // the card view goes: the thread you go to takes its place
     cards::close_view(app);
     let sb = &mut app.sb;

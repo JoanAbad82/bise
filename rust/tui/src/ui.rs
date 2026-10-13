@@ -284,10 +284,10 @@ fn draw_bise(app: &mut App, frame: &mut Frame, area: Rect, cols: crate::layout::
     let (name, state) = divider_text(app);
     let working = sb::viewed_working(app);
     let who = sb::viewed_who(app);
-    let state = if rows.keys_in_divider {
-        vec![crate::keybar::line(app, chrome::divider_room(area.width, cols, &name, &who, working.as_ref())).spans]
+    let (state, watching) = if rows.keys_in_divider {
+        (vec![crate::keybar::line(app, chrome::divider_room(area.width, cols, &name, &who, working.as_ref())).spans], 0)
     } else {
-        state
+        sb::watching_rule(&app.sb, cols.panel.is_none(), state)
     };
     // the card view: `you → ? perf · your answer`, then a fresh note
     // (`✓ copied 9 chars`: the card's text copies too, BISE-290/302)
@@ -308,6 +308,7 @@ fn draw_bise(app: &mut App, frame: &mut Frame, area: Rect, cols: crate::layout::
     // BISE-290: the divider's words (who, the notes) select and copy
     crate::textlayer::text(Rect { y: divider_y, height: 1, ..area }.intersection(area));
     app.bottom_bar_rect = (!app.tail_visible && !rows.keys_in_divider).then_some(state_rect);
+    crate::scheduled_watch::place_count(app, watching, state_rect);
     if let Some(r) = app.bottom_bar_rect {
         crate::pointer::region(r, crate::pointer::Shape::Pointer);
     }
@@ -437,10 +438,9 @@ fn draw_feed(app: &mut App, frame: &mut Frame, area: Rect, bar: Option<Rect>) {
     // column is the scrollbar's
     let feed_w = (area.width as usize).saturating_sub(usize::from(bar.is_none())).max(1);
     let area_w = feed_w;
-    // event-wake (designer's page): the agent in view waits for an event:
-    // one live dim line under its last row, `… waiting 2m · cargo test`
-    // (its own row, kept off the feed's rows), a blank row above it
-    // (designer m_17730); `… ` in the glyph column, the words after it
+    // agent-waiting-states A: the agent in view pauses, one live dim line
+    // under its last row, `… continues when cargo bench ends · 3m` (its own
+    // row, a blank row above it); `… ` in the glyph column, the words after
     let waiting = app.sb.waiting_words(crate::when::now_ms(), (area.width as usize).saturating_sub(3)).filter(|_| area.height > 3);
     let area_h = (area.height as usize).saturating_sub(if waiting.is_some() { 2 } else { 0 });
     let text_area = Rect {
