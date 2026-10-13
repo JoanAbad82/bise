@@ -10,9 +10,17 @@ import { T, fieldText, onTarget } from './target';
 const REPO = path.resolve(__dirname, '../../../../..');
 /** bar 2.1's rule: every TUI command that acts on bise; /version (a dev tool) stays out */
 const LEFT_OUT = new Set(['/version']);
-const terminal = [...readFileSync(path.join(REPO, 'rust/tui/src/commands.rs'), 'utf8').matchAll(/name: "(\/[a-z-]+)"/g)]
-  .map((m) => m[1] ?? '')
-  .filter((n) => !LEFT_OUT.has(n));
+// the list moved to bise-proto (rust/proto/src/commands.rs, one table for the TUI and the window);
+// tui/src/commands.rs no longer names them: read both, proto first, and keep what is there
+const terminal = ['rust/proto/src/commands.rs', 'rust/tui/src/commands.rs']
+  .flatMap((f) => {
+    try {
+      return [...readFileSync(path.join(REPO, f), 'utf8').matchAll(/name: "(\/[a-z-]+)"/g)].map((m) => m[1] ?? '');
+    } catch {
+      return [];
+    }
+  })
+  .filter((n, i, all) => n !== '' && all.indexOf(n) === i && !LEFT_OUT.has(n));
 
 test("composer/slash: / lists the terminal's commands, filters, tab completes", async () => {
   expect(terminal.length, "the terminal's command list was read").toBeGreaterThan(20);
