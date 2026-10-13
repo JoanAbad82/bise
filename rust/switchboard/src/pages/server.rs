@@ -115,6 +115,12 @@ impl Response {
     fn err(status: u16, why: &str) -> Response {
         Response::json(status, &json!({"error": why}))
     }
+    /// A missing file a page links (/kit, /a/, page.css): 404 text/plain, never
+    /// JSON, which a browser reports as a stylesheet of the wrong MIME type
+    /// (Benjamin's -31: "MIME type ('application/json')", the kit missing).
+    fn missing(why: &str) -> Response {
+        Response { status: 404, ctype: "text/plain; charset=utf-8", body: why.as_bytes().to_vec(), csp: CSP }
+    }
 
     pub fn bytes(&self) -> Vec<u8> {
         let mut out = format!(
@@ -216,7 +222,7 @@ pub fn route(pages: &Pages, req: &Request) -> Response {
         ["p", id, "versions"] if valid_id(id) => versions(pages, id),
         ["p", id, "v", n] if valid_id(id) => n.parse().map_or_else(|_| Response::err(404, "no such version"), |n| page(pages, id, Some(n), false)),
         ["p", id, "v", n, "body"] if valid_id(id) => n.parse().map_or_else(|_| Response::err(404, "no such version"), |n| page(pages, id, Some(n), true)),
-        ["p", id, "v", n, "page.css"] if valid_id(id) => n.parse().map_or_else(|_| Response::err(404, "no such version"), |n| page_css(pages, id, n)),
+        ["p", id, "v", n, "page.css"] if valid_id(id) => n.parse().map_or_else(|_| Response::missing(&format!("no such version: p/{id}/v/{n}")), |n| page_css(pages, id, n)),
         _ => Response::err(404, "no such page"),
     }
 }
@@ -310,28 +316,30 @@ fn home(pages: &Pages) -> String {
 fn artifact_file(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Response {
     let state = pages.store.dir.parent().unwrap_or(&pages.store.dir);
     let store = crate::artifacts::Store::new(state);
-    let Some(m) = store.get(id).filter(|m| m.by != "page") else { return Response::err(404, "no such artifact") };
-    let Some(ver) = v.parse::<u64>().ok().and_then(|n| m.versions.iter().find(|x| x.v == n)) else { return Response::err(404, "no such version") };
-    let Some(copy) = ver.copy.as_ref().filter(|c| super::site::serves_copy(&m.by, c)) else { return Response::err(404, "no copy of it") };
+    // what is missing, by its place under /a/ (never a path on his machine)
+    let at = format!("a/{id}/{v}/{}", rest.join("/"));
+    let Some(m) = store.get(id).filter(|m| m.by != "page") else { return Response::missing(&format!("no such artifact: {at}")) };
+    let Some(ver) = v.parse::<u64>().ok().and_then(|n| m.versions.iter().find(|x| x.v == n)) else { return Response::missing(&format!("no such version: {at}")) };
+    let Some(copy) = ver.copy.as_ref().filter(|c| super::site::serves_copy(&m.by, c)) else { return Response::missing(&format!("no copy of it: {at}")) };
     let base = state.join("artifacts").join(&m.id).join(copy);
     let rest: Vec<&str> = rest.iter().copied().filter(|s| !s.is_empty()).collect();
     let path = if base.is_file() {
         // a copied file: only itself, by its name (or no name)
         let name = base.file_name().and_then(|n| n.to_str()).unwrap_or("");
         if !(rest.is_empty() || rest == [name]) {
-            return Response::err(404, "no such file");
+            return Response::missing(&format!("no such file: {at}"));
         }
         base.clone()
     } else {
         let Some(rel) = super::site::safe_rel(&rest) else {
-            return if rest.is_empty() { artifact_file(pages, id, v, &["index.html"]) } else { Response::err(404, "no such file") };
+            return if rest.is_empty() { artifact_file(pages, id, v, &["index.html"]) } else { Response::missing(&format!("no such file: {at}")) };
         };
         base.join(rel)
     };
-    let Some(ctype) = super::site::ctype(&path.to_string_lossy()) else { return Response::err(404, "not served") };
+    let Some(ctype) = super::site::ctype(&path.to_string_lossy()) else { return Response::missing(&format!("not served: {at}")) };
     match std::fs::read(&path) {
         Ok(body) => Response { status: 200, ctype, body, csp: super::site::ARTIFACT_CSP },
-        Err(_) => Response::err(404, "no such file"),
+        Err(_) => Response::missing(&format!("no such file: {at}")),
     }
 }
 
@@ -394,7 +402,7 @@ fn page_css(pages: &Pages, id: &str, n: u64) -> Response {
     let html = match pages.store.html(id, n) {
         Some(h) => h,
         None if n == 0 && pages.store.meta(id).is_some() => String::new(),
-        None => return Response::err(404, "no such version"),
+        None => return Response::missing(&format!("no such version: p/{id}/v/{n}/page.css")),
     };
     Response { status: 200, ctype: "text/css; charset=utf-8", body: super::ui::page_css(&html).into_bytes(), csp: CSP }
 }
@@ -403,7 +411,7 @@ fn kit_file(pages: &Pages, rel: &str) -> Response {
     let ok = !rel.split('/').any(|s| s.is_empty() || s.starts_with('.'))
         && rel.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_' | b'/'));
     if !ok {
-        return Response::err(404, "no such file");
+        return Response::missing("no such file");
     }
     let ctype = match rel.rsplit('.').next() {
         Some("css") => "text/css; charset=utf-8",
@@ -413,11 +421,11 @@ fn kit_file(pages: &Pages, rel: &str) -> Response {
         Some("woff2") => "font/woff2",
         Some("json") => "application/json",
         Some("html") => "text/html; charset=utf-8",
-        _ => return Response::err(404, "no such file"),
+        _ => return Response::missing(&format!("not served: kit/{rel}")),
     };
     match std::fs::read(pages.kit_dir.join(rel)) {
         Ok(body) => Response { status: 200, ctype, body, csp: CSP },
-        Err(_) => Response::err(404, "no such file"),
+        Err(_) => Response::missing(&format!("no such file: kit/{rel}")),
     }
 }
 
@@ -647,6 +655,15 @@ mod tests {
         assert_eq!(text(&get(&p, "/kit/kit.css")), "main{}");
         assert_eq!(get(&p, "/kit/../meta.json").status, 404);
         assert_eq!(get(&p, "/kit/.hidden.css").status, 404);
+        // a missing file a page links: 404 text/plain, never JSON (a browser
+        // reports a JSON stylesheet as the wrong MIME type, Benjamin's -31)
+        // and it names what is missing by its place, never a path on his machine
+        for path in ["/kit/tokens.css", "/kit/nope.js", "/p/w/v/9/page.css", "/p/w/v/x/page.css", "/a/nope/1/s.css"] {
+            let r = get(&p, path);
+            assert_eq!((r.status, r.ctype), (404, "text/plain; charset=utf-8"), "{path}");
+            let why = text(&r);
+            assert!(why.contains(&path[1..].replace("/page.css", "")) && !why.contains(&*d.to_string_lossy()), "{path}: {why}");
+        }
         // another Host: refused
         let r = route(&p, &Request { method: "GET".into(), path: "/".into(), headers: vec![("Host".into(), "evil.example:47123".into())], body: vec![] });
         assert_eq!(r.status, 403);

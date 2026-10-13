@@ -194,8 +194,10 @@ for f in bise bend-harness sb repl-live repl-scripted sb-core "$jsrt_at" \
 done
 # ... and its pages serve their kit: the hub of this app root, started on
 # a throwaway HOME, answers every stylesheet and script a page links with
-# 200 and its type (a commit with kit/ at the root, the page server's)
-if [ -n "$kit" ]; then
+# 200 and its type (a commit with kit/ at the root, the page server's: a
+# release without app/kit fails here, whatever the version dir holds)
+if git cat-file -e "$commit:kit/kit.css" 2>/dev/null; then
+  [ -n "$kit" ] && [ -e "$app/kit/kit.css" ] || { say "INCOMPLETE: app/kit missing (the commit has kit/)"; exit 1; }
   "$HERE/check-dist-pages.sh" "$app" || { say "INCOMPLETE: the pages do not serve their kit"; exit 1; }
 fi
 # ... and no binary needs a macOS newer than the target (a version dir
