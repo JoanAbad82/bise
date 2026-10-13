@@ -1,170 +1,117 @@
 {
- "about": "bise_proto::thread::words::wait_when and waiting_line, read by rust/proto (words_tests) and apps/desktop (thread/wake.test.ts) (architect m_22744)",
- "when": [
-  {
-   "why": "40 s ago",
-   "since_ms": 1791791960000,
-   "since_off_s": 7200,
-   "now_ms": 1791792000000,
-   "now_off_s": 7200,
-   "long": "for 40 s",
-   "short": "40s"
-  },
-  {
-   "why": "12 min ago",
-   "since_ms": 1791791275000,
-   "since_off_s": 7200,
-   "now_ms": 1791792000000,
-   "now_off_s": 7200,
-   "long": "for 12 min",
-   "short": "12m"
-  },
-  {
-   "why": "59 min 59 s: still a duration",
-   "since_ms": 1791788401000,
-   "since_off_s": 7200,
-   "now_ms": 1791792000000,
-   "now_off_s": 7200,
-   "long": "for 59 min",
-   "short": "59m"
-  },
-  {
-   "why": "exactly 60 min: the clock",
-   "since_ms": 1791788400000,
-   "since_off_s": 7200,
-   "now_ms": 1791792000000,
-   "now_off_s": 7200,
-   "long": "since 09:00",
-   "short": "since 09:00"
-  },
-  {
-   "why": "the same local day",
-   "since_ms": 1791771120000,
-   "since_off_s": 7200,
-   "now_ms": 1791792000000,
-   "now_off_s": 7200,
-   "long": "since 04:12",
-   "short": "since 04:12"
-  },
-  {
-   "why": "local midnight: 00:00 is today",
-   "since_ms": 1791756000000,
-   "since_off_s": 7200,
-   "now_ms": 1791792000000,
-   "now_off_s": 7200,
-   "long": "since 00:00",
-   "short": "since 00:00"
-  },
-  {
-   "why": "23:59 is yesterday: its weekday",
-   "since_ms": 1791755940000,
-   "since_off_s": 7200,
-   "now_ms": 1791792000000,
-   "now_off_s": 7200,
-   "long": "since sun 23:59",
-   "short": "since sun 23:59"
-  },
-  {
-   "why": "6 days back: its weekday",
-   "since_ms": 1791321000000,
-   "since_off_s": 7200,
-   "now_ms": 1791792000000,
-   "now_off_s": 7200,
-   "long": "since tue 23:10",
-   "short": "since tue 23:10"
-  },
-  {
-   "why": "7 days back: its date",
-   "since_ms": 1791234600000,
-   "since_off_s": 7200,
-   "now_ms": 1791792000000,
-   "now_off_s": 7200,
-   "long": "since 5 oct 23:10",
-   "short": "since 5 oct 23:10"
-  },
-  {
-   "why": "a since in the future (clock skew): never negative",
-   "since_ms": 1791792005000,
-   "since_off_s": 7200,
-   "now_ms": 1791792000000,
-   "now_off_s": 7200,
-   "long": "for 0 s",
-   "short": "0s"
-  },
-  {
-   "why": "DST end: each instant its own offset, the same local day",
-   "since_ms": 1792881000000,
-   "since_off_s": 7200,
-   "now_ms": 1792965600000,
-   "now_off_s": 3600,
-   "long": "since 00:30",
-   "short": "since 00:30"
-  }
+ "about": "bise_proto::thread::words wait_len, clock_ahead, clock_past, pause_line and alarms (designer's agent-waiting-states, his pick A), read by rust/proto (words_tests) and apps/desktop (thread/wake.test.ts). Now: mon 12 oct 2026 10:00 (+02:00) unless a case says.",
+ "len": [
+  { "ms": 0, "long": "0 s", "short": "0s" },
+  { "ms": 40000, "long": "40 s", "short": "40s" },
+  { "ms": 180000, "long": "3 min", "short": "3m" },
+  { "ms": 3599000, "long": "59 min", "short": "59m" },
+  { "ms": 3600000, "long": "1 h", "short": "1h" },
+  { "ms": 7500000, "long": "2 h", "short": "2h" },
+  { "ms": 86399000, "long": "23 h", "short": "23h" },
+  { "ms": 172800000, "long": "2 d", "short": "2d" }
  ],
- "lines": [
+ "ahead": [
+  { "why": "later today: the clock alone", "at_ms": 1791839400000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "23:10" },
+  { "why": "local midnight is tomorrow", "at_ms": 1791842400000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "tomorrow 00:00" },
+  { "why": "tomorrow", "at_ms": 1791871620000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "tomorrow 08:07" },
+  { "why": "within 6 days: its weekday", "at_ms": 1792130820000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "fri 08:07" },
+  { "why": "6 days ahead: still its weekday", "at_ms": 1792303620000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "sun 08:07" },
+  { "why": "7 days ahead: its date, day then month", "at_ms": 1792390020000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "19 oct 08:07" },
+  { "why": "DST end: each instant its own offset", "at_ms": 1792912020000, "at_off_s": 3600, "now_ms": 1792875600000, "now_off_s": 7200, "clock": "tomorrow 08:07" },
+  { "why": "already past (a late tick): today's clock", "at_ms": 1791788400000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "09:00" }
+ ],
+ "past": [
+  { "why": "today", "at_ms": 1791771120000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "today 04:12" },
+  { "why": "local midnight is today", "at_ms": 1791756000000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "today 00:00" },
+  { "why": "23:59 is yesterday", "at_ms": 1791755940000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "yesterday 23:59" },
+  { "why": "yesterday", "at_ms": 1791698820000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "yesterday 08:07" },
+  { "why": "6 days back: its weekday", "at_ms": 1791321000000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "tue 23:10" },
+  { "why": "7 days back: its date", "at_ms": 1791234600000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "5 oct 23:10" },
+  { "why": "in the future (clock skew): today", "at_ms": 1791792005000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "today 10:00" }
+ ],
+ "pauses": [
   {
-   "why": "one watch",
+   "why": "perf paused on a command: running for 3 min",
    "now_ms": 1791792000000,
-   "off_s": 7200,
    "short": false,
-   "watching": [
-    {
-     "id": 1,
-     "kind": "bg",
-     "what": "nightly full gate (all tests, main's tip)",
-     "noted": true,
-     "since_ms": 1791771120000
-    }
-   ],
-   "state": "waiting since 04:12",
-   "note": "nightly full gate (all tests, main's tip)",
-   "more": "",
-   "title": "nightly full gate (all tests, main's tip) · since 04:12"
-  },
-  {
-   "why": "two watches: the oldest, and 1 more; the title lists both",
-   "now_ms": 1791792000000,
-   "off_s": 7200,
-   "short": false,
-   "watching": [
-    {
-     "id": 2,
-     "kind": "bg",
-     "what": "cargo test",
-     "noted": false,
-     "since_ms": 1791791960000
-    },
-    {
-     "id": 1,
-     "kind": "file",
-     "what": "build.rc",
-     "noted": false,
-     "since_ms": 1791791280000
-    }
-   ],
-   "state": "waiting for 12 min",
-   "note": "build.rc to appear",
-   "more": " and 1 more",
-   "title": "build.rc to appear · for 12 min\ncargo test · for 40 s"
+   "agent": { "name": "perf", "watching": [{ "id": 7, "kind": "bg", "what": "cargo bench", "since_ms": 1791791820000, "resumes": true }] },
+   "want": { "state": "continues when", "note": "cargo bench ends", "who": "", "more": "", "dur": "running for 3 min", "len": "3 min", "title": "continues when cargo bench ends · running for 3 min" }
   },
   {
    "why": "the TUI's short ages",
    "now_ms": 1791792000000,
-   "off_s": 7200,
    "short": true,
-   "watching": [
-    {
-     "id": 1,
-     "kind": "bg",
-     "what": "cargo bench",
-     "noted": false,
-     "since_ms": 1791791280000
-    }
-   ],
-   "state": "waiting 12m",
-   "note": "cargo bench",
-   "more": "",
-   "title": "cargo bench · 12m"
+   "agent": { "name": "perf", "watching": [{ "id": 7, "kind": "bg", "what": "cargo bench", "since_ms": 1791791820000, "resumes": true }] },
+   "want": { "state": "continues when", "note": "cargo bench ends", "who": "", "more": "", "dur": "3m", "len": "3m", "title": "continues when cargo bench ends · 3m" }
+  },
+  {
+   "why": "a long pause is still a duration, never a start",
+   "now_ms": 1791792000000,
+   "short": false,
+   "agent": { "name": "perf", "watching": [{ "id": 7, "kind": "pid", "what": "the reindex", "noted": true, "since_ms": 1791781200000, "resumes": true }] },
+   "want": { "state": "continues when", "note": "the reindex", "who": "", "more": "", "dur": "running for 3 h", "len": "3 h", "title": "continues when the reindex · running for 3 h" }
+  },
+  {
+   "why": "search waits on perf's reply: the name, a bare duration since its status",
+   "now_ms": 1791792000000,
+   "short": false,
+   "agent": { "name": "search", "status": "waiting", "since_ms": 1791791940000, "waiting_on": { "who": "agent", "name": "perf" } },
+   "want": { "state": "continues when", "note": "perf answers", "who": "perf", "more": "", "dur": "1 min", "len": "1 min", "title": "continues when perf answers · 1 min" }
+  },
+  {
+   "why": "two pauses and an alarm: the oldest pause, 1 more; the alarm says nothing here",
+   "now_ms": 1791792000000,
+   "short": false,
+   "agent": { "name": "perf", "watching": [
+    { "id": 2, "kind": "bg", "what": "cargo test", "since_ms": 1791791960000, "resumes": true },
+    { "id": 1, "kind": "file", "what": "build.rc", "since_ms": 1791791280000, "resumes": true },
+    { "id": 3, "kind": "job", "what": "launchd job dev.x", "since_ms": 1791700000000 }
+   ] },
+   "want": { "state": "continues when", "note": "build.rc appears", "who": "", "more": " and 1 more", "dur": "for 12 min", "len": "12 min", "title": "continues when build.rc appears · for 12 min\ncontinues when cargo test ends · running for 40 s" }
+  },
+  {
+   "why": "an alarm alone is no pause",
+   "now_ms": 1791792000000,
+   "short": false,
+   "agent": { "name": "main", "watching": [{ "id": 4, "kind": "file", "what": "the nightly gate goes red", "noted": true, "since_ms": 1791698820000 }] },
+   "want": null
+  },
+  {
+   "why": "a working agent continues nothing: it works",
+   "now_ms": 1791792000000,
+   "short": false,
+   "agent": { "name": "perf", "status": "working", "watching": [{ "id": 7, "kind": "bg", "what": "cargo bench", "since_ms": 1791791820000, "resumes": true }] },
+   "want": null
+  }
+ ],
+ "alarms": [
+  {
+   "why": "his capture: main's alarm, set yesterday, ends today (now tue 13 oct 00:17)",
+   "now_ms": 1791843420000,
+   "off_s": 7200,
+   "agent": { "name": "main", "watching": [{ "id": 4, "kind": "file", "what": "the nightly gate goes red", "noted": true, "since_ms": 1791785220000, "until_ms": 1791871620000 }] },
+   "want": [{ "id": 4, "note": "if the nightly gate goes red", "end": "08:07", "title": "bise wakes main if the nightly gate goes red · set yesterday 08:07 · stops watching at 08:07" }]
+  },
+  {
+   "why": "ends tomorrow, then on a weekday; oldest first; a pause is no alarm",
+   "now_ms": 1791792000000,
+   "off_s": 7200,
+   "agent": { "name": "main", "status": "working", "watching": [
+    { "id": 9, "kind": "file", "what": "build.rc", "since_ms": 1791792000000, "until_ms": 1792130820000 },
+    { "id": 5, "kind": "job", "what": "launchd job dev.x", "since_ms": 1791788400000, "until_ms": 1791874800000 },
+    { "id": 7, "kind": "bg", "what": "cargo bench", "since_ms": 1791791820000, "resumes": true }
+   ] },
+   "want": [
+    { "id": 5, "note": "if launchd job dev.x ends", "end": "tomorrow 09:00", "title": "bise wakes main if launchd job dev.x ends · set today 09:00 · stops watching tomorrow 09:00" },
+    { "id": 9, "note": "if build.rc appears", "end": "fri 08:07", "title": "bise wakes main if build.rc appears · set today 10:00 · stops watching on fri 08:07" }
+   ]
+  },
+  {
+   "why": "an older hub says no end: no until, no stops watching",
+   "now_ms": 1791792000000,
+   "off_s": 7200,
+   "agent": { "name": "main", "watching": [{ "id": 4, "kind": "pid", "what": "pid 4242", "since_ms": 1791788400000 }] },
+   "want": [{ "id": 4, "note": "if pid 4242 ends", "end": "", "title": "bise wakes main if pid 4242 ends · set today 09:00" }]
   }
  ]
 }

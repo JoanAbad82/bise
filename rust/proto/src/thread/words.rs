@@ -515,16 +515,20 @@ pub fn switch_line(r: &crate::rows::SwitchRow) -> Option<(String, NoticeLevel)> 
     })
 }
 
-/// A wait's age, as the panel's time column and the live line say it:
-/// `40s`, `2m`, `3h`, `2d`.
-pub fn wait_age(ms: u64) -> String {
+/// How long something that runs now has run (designer's
+/// agent-waiting-states, the time rule: what runs now is a duration,
+/// never a start on the clock): `40 s`, `3 min`, `2 h`, `2 d`; `short`
+/// (the TUI's): `40s`, `3m`, `2h`, `2d`. Callers add their own `for` /
+/// `running for`.
+pub fn wait_len(ms: u64, short: bool) -> String {
     let s = ms / 1000;
-    match s {
-        0..=59 => format!("{}s", s),
-        60..=3599 => format!("{}m", s / 60),
-        3600..=86_399 => format!("{}h", s / 3600),
-        _ => format!("{}d", s / 86_400),
-    }
+    let (n, unit, tight) = match s {
+        0..=59 => (s, "s", "s"),
+        60..=3599 => (s / 60, "min", "m"),
+        3600..=86_399 => (s / 3600, "h", "h"),
+        _ => (s / 86_400, "d", "d"),
+    };
+    if short { format!("{n}{tight}") } else { format!("{n} {unit}") }
 }
 
 /// How long a watch waited, in its end's line: `45s`, `2m04s`, `1h00m`,
@@ -549,54 +553,65 @@ pub fn watch_label(kind: crate::rows::WatchKind, what: &str, noted: bool) -> Str
     }
 }
 
-/// The live line of an agent that waits (without its `…`): `waiting for
-/// cargo test · 2m`, `waiting for cargo test and 1 more · 2m`; the age
-/// since the oldest watch. None: it waits for nothing.
-pub fn waiting_for(watching: &[crate::rows::AgentWatch], now_ms: u64) -> Option<String> {
-    let first = watching.iter().min_by_key(|w| (w.since_ms, w.id))?;
-    let more = match watching.len() - 1 {
-        0 => String::new(),
-        n => format!(" and {} more", n),
-    };
-    // TODO(rule 7): goes once the sidebar row and the head chip read waiting_line (designer's
-    // desktop-status-line, architect m_22744); no third form meanwhile.
-    Some(format!("waiting for {}{} · {}", watch_label(first.kind, &first.what, first.noted), more, wait_age(now_ms.saturating_sub(first.since_ms))))
+/// What a watch waits for, as the end of `continues when …` or `if …`
+/// (agent-waiting-states): `cargo bench ends`, `build.rc appears`; a
+/// note says the event itself (`the nightly gate goes red`).
+pub fn watch_event(kind: crate::rows::WatchKind, what: &str, noted: bool) -> String {
+    match kind {
+        _ if noted => what.to_string(),
+        crate::rows::WatchKind::File => format!("{} appears", what),
+        _ => format!("{} ends", what),
+    }
 }
 
 const WEEKDAYS: [&str; 7] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const MONTHS: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
-/// How long, or since when, a wait runs (designer's desktop-status-line,
-/// architect m_22744): under an hour its length, `for 40 s`, `for 12 min`
-/// (`short`, the TUI's: `40s`, `12m`); from an hour on its start on the
-/// clock, `since 04:12` the same local day, `since mon 23:10` within 6
-/// days, `since 5 oct 23:10` before (the house date: day,
-/// then month, designer m_22812). Each instant brings its own offset
-/// (seconds east of UTC), so a DST change between them never moves the
-/// day. A since after now (clock skew) is `for 0 s`, never negative.
-/// Its TS twin is apps/desktop/src/thread/wake.ts `waitWhen`; both read
-/// fixtures/wait_words.json.
-pub fn wait_when(since_ms: u64, since_off_s: i32, now_ms: u64, now_off_s: i32, short: bool) -> String {
-    let d = now_ms.saturating_sub(since_ms) / 1000;
-    if d < 60 {
-        return if short { format!("{}s", d) } else { format!("for {} s", d) };
-    }
-    if d < 3600 {
-        return if short { format!("{}m", d / 60) } else { format!("for {} min", d / 60) };
-    }
-    let local = |ms: u64, off: i32| (ms / 1000) as i64 + i64::from(off);
-    let (s, n) = (local(since_ms, since_off_s), local(now_ms, now_off_s));
-    let (sd, nd) = (s.div_euclid(86_400), n.div_euclid(86_400));
-    let hm = format!("{:02}:{:02}", s.rem_euclid(86_400) / 3600, s.rem_euclid(3600) / 60);
-    if sd == nd {
-        return format!("since {}", hm);
-    }
-    if nd - sd <= 6 {
+/// An instant on the local clock: its day number and `08:07`. `off`: its
+/// own offset (seconds east of UTC), so a DST change between two instants
+/// never moves a day.
+fn local_day(ms: u64, off: i32) -> (i64, String) {
+    let s = (ms / 1000) as i64 + i64::from(off);
+    (s.div_euclid(86_400), format!("{:02}:{:02}", s.rem_euclid(86_400) / 3600, s.rem_euclid(3600) / 60))
+}
+
+/// A day out of the near ones: its weekday within 6 days (`fri 08:07`),
+/// else its date, day then month (`5 oct 08:07`, designer m_22812).
+fn far_day(day: i64, gap: i64, hm: &str) -> String {
+    if gap <= 6 {
         // day 0 (1970-01-01) was a thursday
-        return format!("since {} {}", WEEKDAYS[(sd + 4).rem_euclid(7) as usize], hm);
+        return format!("{} {}", WEEKDAYS[(day + 4).rem_euclid(7) as usize], hm);
     }
-    let (_, m, day) = civil(sd);
-    format!("since {} {} {}", day, MONTHS[(m - 1) as usize], hm)
+    let (_, m, d) = civil(day);
+    format!("{} {} {}", d, MONTHS[(m - 1) as usize], hm)
+}
+
+/// What's ahead, on the clock (agent-waiting-states, the time rule): the
+/// clock part alone, the caller says `until` / `next` / `→`: `08:07`
+/// today, `tomorrow 08:07`, `fri 08:07` within 6 days, `5 oct 08:07`
+/// beyond. An instant already past reads as today's clock. Its TS twin is
+/// apps/desktop/src/thread/wake.ts `clockAhead`; both read
+/// fixtures/wait_words.json.
+pub fn clock_ahead(at_ms: u64, at_off_s: i32, now_ms: u64, now_off_s: i32) -> String {
+    let ((ad, hm), (nd, _)) = (local_day(at_ms, at_off_s), local_day(now_ms, now_off_s));
+    match ad - nd {
+        gap if gap <= 0 => hm,
+        1 => format!("tomorrow {}", hm),
+        gap => far_day(ad, gap, &hm),
+    }
+}
+
+/// A clock that's past, only in a hover or a detail and always relative
+/// (`set yesterday 08:07`, never `tue 08:07` alone): `today 08:07`,
+/// `yesterday 08:07`, `tue 08:07` within 6 days, `5 oct 08:07` beyond.
+/// TS twin: wake.ts `clockPast`.
+pub fn clock_past(at_ms: u64, at_off_s: i32, now_ms: u64, now_off_s: i32) -> String {
+    let ((ad, hm), (nd, _)) = (local_day(at_ms, at_off_s), local_day(now_ms, now_off_s));
+    match nd - ad {
+        gap if gap <= 0 => format!("today {}", hm),
+        1 => format!("yesterday {}", hm),
+        gap => far_day(ad, gap, &hm),
+    }
 }
 
 /// A day number (days since 1970-01-01) as its year, month (1-12) and day
@@ -613,32 +628,102 @@ fn civil(z: i64) -> (i64, i64, i64) {
     (yoe + era * 400 + i64::from(m <= 2), m, d)
 }
 
-/// The line of an agent that waits for events, in parts: its state, whole
-/// (`waiting since 04:12`, `waiting for 12 min`, the TUI's `waiting 12m`),
-/// then ` · ` and the oldest watch's note (the only part a surface cuts,
-/// on a word, with `…`), ` and 1 more` after it when there are several;
-/// the title lists every watch, oldest first (`<note> · <when>`, one a
-/// line). `off` gives each instant's offset (seconds east of UTC).
+/// A pause's line (agent-waiting-states, his pick A): its turn ended, it
+/// continues when an event comes (a watch it set with `resumes`) or
+/// another agent answers. In parts: `state` (`continues when`, whole),
+/// `note` (`cargo bench ends`, `search answers`: the only part a surface
+/// cuts, on a word, with `…`), `who` (the agent it waits on, its name
+/// opens it; empty for a watch), `more` (` and 1 more`), then ` · ` and
+/// `dur`, whole (`running for 3 min` for a command or a pid, `1 min` for a
+/// reply, `for 3 min` else; the TUI's `3m`). `len` is the bare duration
+/// the head chip and the right bar's row end on (`3 min`, `3m`). `title`
+/// lists every pause, oldest first, one a line. What runs now is a
+/// duration, never a start on the clock.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct WaitLine {
+pub struct PauseLine {
     pub state: String,
     pub note: String,
+    pub who: String,
     pub more: String,
+    pub dur: String,
+    pub len: String,
     pub title: String,
 }
 
-pub fn waiting_line(watching: &[crate::rows::AgentWatch], now_ms: u64, off: &dyn Fn(u64) -> i32, short: bool) -> Option<WaitLine> {
-    let mut ws: Vec<&crate::rows::AgentWatch> = watching.iter().collect();
+/// An agent's pause line at `now_ms`; None: nothing it continues on (an
+/// alarm is no pause and says nothing here, see [`alarms`]). A reply it
+/// waits on (`waiting_on` an agent) runs since its status; its watches
+/// that resume it count only while it is idle. TS twin: wake.ts
+/// `pauseLine`; both read fixtures/wait_words.json.
+pub fn pause_line(a: &crate::rows::Agent, now_ms: u64, short: bool) -> Option<PauseLine> {
+    use crate::rows::{AgentWatch, Status, WaitingOn, WatchKind};
+    let state = "continues when".to_string();
+    if let Some(WaitingOn::Agent { name }) = &a.waiting_on {
+        let len = wait_len(now_ms.saturating_sub(a.since_ms), short);
+        let note = format!("{} answers", name);
+        let title = format!("{} {} · {}", state, note, len);
+        return Some(PauseLine { state, note, who: name.clone(), more: String::new(), dur: len.clone(), len, title });
+    }
+    if a.status != Status::Idle {
+        return None;
+    }
+    let mut ws: Vec<&AgentWatch> = a.watching.iter().filter(|w| w.resumes).collect();
     ws.sort_by_key(|w| (w.since_ms, w.id));
-    let first = ws.first()?;
-    let when = |w: &crate::rows::AgentWatch| wait_when(w.since_ms, off(w.since_ms), now_ms, off(now_ms), short);
-    let state = format!("waiting {}", when(first));
+    let first = *ws.first()?;
+    let len = |w: &AgentWatch| wait_len(now_ms.saturating_sub(w.since_ms), short);
+    let dur = |w: &AgentWatch| match w.kind {
+        _ if short => len(w),
+        WatchKind::Bg | WatchKind::Pid => format!("running for {}", len(w)),
+        _ => format!("for {}", len(w)),
+    };
+    let event = |w: &AgentWatch| watch_event(w.kind, &w.what, w.noted);
     let more = match ws.len() - 1 {
         0 => String::new(),
         n => format!(" and {} more", n),
     };
-    let title = ws.iter().map(|w| format!("{} · {}", watch_label(w.kind, &w.what, w.noted), when(w))).collect::<Vec<_>>().join("\n");
-    Some(WaitLine { state, note: watch_label(first.kind, &first.what, first.noted), more, title })
+    let title = ws.iter().map(|w| format!("{} {} · {}", state, event(w), dur(w))).collect::<Vec<_>>().join("\n");
+    Some(PauseLine { note: event(first), who: String::new(), more, dur: dur(first), len: len(first), title, state })
+}
+
+/// An alarm in the right bar's `scheduled & watching` (agent-waiting-states
+/// A): its agent is free, bise wakes it if the event comes. `note`: `if
+/// the nightly gate goes red` (a surface cuts it on a word); `end`: when
+/// it stops watching, the clock part alone (`08:07`, `tomorrow 08:07`; the
+/// desktop says `until 08:07`, the TUI `→08:07`), empty when the hub
+/// doesn't say; `title`, the hover: `bise wakes main if <event> · set
+/// yesterday 08:07 · stops watching at 08:07`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Alarm {
+    pub id: u64,
+    pub note: String,
+    pub end: String,
+    pub title: String,
+}
+
+/// An agent's alarms (its watches that don't resume it), oldest first,
+/// whatever its status. `off` gives each instant's offset (seconds east
+/// of UTC). TS twin: wake.ts `alarms`.
+pub fn alarms(a: &crate::rows::Agent, now_ms: u64, off: &dyn Fn(u64) -> i32) -> Vec<Alarm> {
+    let mut ws: Vec<&crate::rows::AgentWatch> = a.watching.iter().filter(|w| !w.resumes).collect();
+    ws.sort_by_key(|w| (w.since_ms, w.id));
+    ws.into_iter()
+        .map(|w| {
+            let event = watch_event(w.kind, &w.what, w.noted);
+            let set = clock_past(w.since_ms, off(w.since_ms), now_ms, off(now_ms));
+            let end = w.until_ms.map(|u| clock_ahead(u, off(u), now_ms, off(now_ms))).unwrap_or_default();
+            let mut title = format!("bise wakes {} if {} · set {}", a.name, event, set);
+            if !end.is_empty() {
+                // `at 08:07` today, `tomorrow 08:07`, `on fri 08:07`
+                let at = match end.split(' ').count() {
+                    1 => "at ",
+                    _ if end.starts_with("tomorrow ") => "",
+                    _ => "on ",
+                };
+                title.push_str(&format!(" · stops watching {}{}", at, end));
+            }
+            Alarm { id: w.id, note: format!("if {}", event), end, title }
+        })
+        .collect()
 }
 
 /// What bise tells an agent when the user stopped its watch (the
@@ -711,19 +796,13 @@ mod tests {
     #[test]
     fn the_waiting_words_are_designers() {
         use super::*;
-        use crate::rows::{AgentWatch, WatchKind};
+        use crate::rows::WatchKind;
         use crate::thread::{WakeEv, WakeFold};
-        let w = |id, kind, what: &str, since_ms| AgentWatch { id, kind, what: what.into(), since_ms, noted: false, resumes: false, until_ms: None };
-        assert_eq!(waiting_for(&[], 0), None);
-        let one = [w(3, WatchKind::Bg, "cargo test", 1_000)];
-        assert_eq!(waiting_for(&one, 121_000).as_deref(), Some("waiting for cargo test · 2m"));
-        let two = [w(4, WatchKind::File, "build.rc", 50_000), w(3, WatchKind::Bg, "cargo test", 1_000)];
-        assert_eq!(waiting_for(&two, 121_000).as_deref(), Some("waiting for cargo test and 1 more · 2m"));
-        assert_eq!(waiting_for(&two[..1], 60_000).as_deref(), Some("waiting for build.rc to appear · 10s"));
+        // what a watch waits for, after `continues when` / `if`; a note says it itself
+        assert_eq!(watch_event(WatchKind::Bg, "cargo bench", false), "cargo bench ends");
+        assert_eq!(watch_event(WatchKind::File, "build.rc", false), "build.rc appears");
+        assert_eq!(watch_event(WatchKind::File, "the nightly gate goes red", true), "the nightly gate goes red");
         let f = |ev, kind, what: &str, rc, after_ms| WakeFold { id: 1, ev, kind, what: what.into(), noted: false, rc, after_ms, tail: Vec::new(), msg: None, agent: String::new() };
-        // a file watch with a note: the note names it (designer m_17730)
-        let noted = AgentWatch { noted: true, ..w(5, WatchKind::File, "the reindex", 60_000) };
-        assert_eq!(waiting_for(&[noted], 60_000).as_deref(), Some("waiting for the reindex · 0s"));
         let n = |ev| WakeFold { noted: true, ..f(ev, WatchKind::File, "the reindex", Some(101), 0) };
         let head_n = |x: &WakeFold| wake_head(x).into_iter().map(|(t, _)| t).collect::<Vec<_>>().join(" · ");
         assert_eq!(head_n(&n(WakeEv::Ended)), "the reindex ended · rc 101 · after 0s");
@@ -845,19 +924,37 @@ mod tests {
         let fx: serde_json::Value = serde_json::from_str(include_str!("../../fixtures/wait_words.json")).unwrap();
         let n = |v: &serde_json::Value, k: &str| v[k].as_u64().unwrap();
         let o = |v: &serde_json::Value, k: &str| v[k].as_i64().unwrap() as i32;
-        for c in fx["when"].as_array().unwrap() {
-            for (short, key) in [(false, "long"), (true, "short")] {
-                let got = wait_when(n(c, "since_ms"), o(c, "since_off_s"), n(c, "now_ms"), o(c, "now_off_s"), short);
-                assert_eq!(got, c[key].as_str().unwrap(), "{} ({})", c["why"], key);
+        let s = |v: &serde_json::Value, k: &str| v[k].as_str().unwrap().to_string();
+        for c in fx["len"].as_array().unwrap() {
+            assert_eq!(wait_len(n(c, "ms"), false), s(c, "long"), "{}", c["ms"]);
+            assert_eq!(wait_len(n(c, "ms"), true), s(c, "short"), "{}", c["ms"]);
+        }
+        for (key, f) in [("ahead", clock_ahead as fn(u64, i32, u64, i32) -> String), ("past", clock_past)] {
+            for c in fx[key].as_array().unwrap() {
+                assert_eq!(f(n(c, "at_ms"), o(c, "at_off_s"), n(c, "now_ms"), o(c, "now_off_s")), s(c, "clock"), "{key}: {}", c["why"]);
             }
         }
-        for c in fx["lines"].as_array().unwrap() {
-            let ws: Vec<crate::rows::AgentWatch> = serde_json::from_value(c["watching"].clone()).unwrap();
-            let off = o(c, "off_s");
-            let got = waiting_line(&ws, n(c, "now_ms"), &|_| off, c["short"].as_bool().unwrap()).unwrap();
-            let want = |k: &str| c[k].as_str().unwrap().to_string();
-            assert_eq!(got, WaitLine { state: want("state"), note: want("note"), more: want("more"), title: want("title") }, "{}", c["why"]);
+        // an agent row from the fixture's few fields, the rest an idle agent's
+        let agent = |v: &serde_json::Value| -> crate::rows::Agent {
+            let mut a = serde_json::json!({"name": "main", "main": false, "status": "idle", "archived": false, "title": "", "purpose": "", "since_ms": 0, "waits": 0, "watching": []});
+            for (k, x) in v.as_object().unwrap() {
+                a[k] = x.clone();
+            }
+            serde_json::from_value(a).unwrap()
+        };
+        for c in fx["pauses"].as_array().unwrap() {
+            let got = pause_line(&agent(&c["agent"]), n(c, "now_ms"), c["short"].as_bool().unwrap());
+            let want = (!c["want"].is_null()).then(|| {
+                let w = &c["want"];
+                PauseLine { state: s(w, "state"), note: s(w, "note"), who: s(w, "who"), more: s(w, "more"), dur: s(w, "dur"), len: s(w, "len"), title: s(w, "title") }
+            });
+            assert_eq!(got, want, "{}", c["why"]);
         }
-        assert_eq!(waiting_line(&[], 0, &|_| 0, false), None);
+        for c in fx["alarms"].as_array().unwrap() {
+            let off = o(c, "off_s");
+            let got = alarms(&agent(&c["agent"]), n(c, "now_ms"), &|_| off);
+            let want: Vec<Alarm> = c["want"].as_array().unwrap().iter().map(|w| Alarm { id: n(w, "id"), note: s(w, "note"), end: s(w, "end"), title: s(w, "title") }).collect();
+            assert_eq!(got, want, "{}", c["why"]);
+        }
     }
 }
