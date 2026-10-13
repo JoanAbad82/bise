@@ -90,7 +90,7 @@ export function CardAnsweredRow({ pos, a, at, timeAlways }: { pos: number; a: { 
   return (
     <div className="th-approval" data-card={a.card}>
       <YouBubble
-        head={<AnsweredHead ok>{`you answered main · ${a.question}`}</AnsweredHead>}
+        head={<AnsweredHead ok>{`you answered ${shownName('main')} · ${a.question}`}</AnsweredHead>}
         under={at > 0 ? clock(at) : undefined}
         timeAlways={timeAlways}
         testId={id}
@@ -123,7 +123,8 @@ export function CardAnsweredRow({ pos, a, at, timeAlways }: { pos: number; a: { 
 export function PageAnswerRow({ e, next }: { e: Entry; next: Entry | undefined }) {
   const p = pageOf(e.parts);
   if (p === null) return <Marker>{e.text}</Marker>;
-  const a = pageAnswer(p);
+  // the agent's name as the thread draws its author (a project's main is 'bise'; designer m_21035)
+  const a = pageAnswer({ ...p, to: shownName(p.to) });
   const head = a.asked !== '' ? `${a.head} · ${a.asked}` : a.head;
   return (
     <div className="th-approval" data-ok>

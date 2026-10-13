@@ -1,8 +1,8 @@
 // thread/page-answers · page-answer-row (architect m_20833, designer m_20985). What he did on a page
 // reaches the page's agent as the hub's template, with a typed page part; the window draws the row
 // from that part, never the template: his pick on a question that had a card is '✓ you answered
-// main · <question>' with his words; a note is '✓ you sent main a note on ↗ <title>' with his note
-// under it; three notes 'you sent main 3 notes on ↗ <title>', one per line. Never 'answer with:',
+// bise · <question>' (the thread's name for main) with his words; a note is '✓ you sent bise a note on ↗ <title>' with his note
+// under it; three notes 'you sent bise 3 notes on ↗ <title>', one per line (designer m_21035). Never 'answer with:',
 // '<page-notes', '[from the page'. A light 1100 shot for designer. Owner: page-answer-row.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
@@ -64,11 +64,11 @@ test("thread/page-answers: his answers on a page are rows of his words, never th
   try {
     const { page } = s;
     const pick = page.getByTestId('thread.pageanswer.2');
-    await expect(pick).toContainText("you answered main · read the lists from the providers' APIs?", { timeout: 10_000 });
+    await expect(pick).toContainText("you answered bise · read the lists from the providers' APIs?", { timeout: 10_000 });
     await expect(page.getByTestId('thread.pageanswer.2.words')).toHaveText("the table now, the API's lists right after");
-    await expect(page.getByTestId('thread.pageanswer.4')).toContainText('you sent main a note on ↗ the plan');
+    await expect(page.getByTestId('thread.pageanswer.4')).toContainText('you sent bise a note on ↗ the plan');
     await expect(page.getByTestId('thread.pageanswer.4.words')).toHaveText('"the plan: ship the table": make it shorter');
-    await expect(page.getByTestId('thread.pageanswer.5')).toContainText('you sent main 3 notes on ↗ the plan');
+    await expect(page.getByTestId('thread.pageanswer.5')).toContainText('you sent bise 3 notes on ↗ the plan');
     await expect(page.getByTestId('thread.pageanswer.5.words')).toContainText('✓ done');
     await expect(page.getByTestId('thread.pageanswer.5.words')).toContainText('"Q2" → "Q3"');
     const all = await page.locator('body').innerText();
