@@ -570,7 +570,8 @@ const MONTHS: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "au
 /// architect m_22744): under an hour its length, `for 40 s`, `for 12 min`
 /// (`short`, the TUI's: `40s`, `12m`); from an hour on its start on the
 /// clock, `since 04:12` the same local day, `since mon 23:10` within 6
-/// days, `since oct 5 23:10` before. Each instant brings its own offset
+/// days, `since 5 oct 23:10` before (the house date: day,
+/// then month, designer m_22812). Each instant brings its own offset
 /// (seconds east of UTC), so a DST change between them never moves the
 /// day. A since after now (clock skew) is `for 0 s`, never negative.
 /// Its TS twin is apps/desktop/src/thread/wake.ts `waitWhen`; both read
@@ -595,7 +596,7 @@ pub fn wait_when(since_ms: u64, since_off_s: i32, now_ms: u64, now_off_s: i32, s
         return format!("since {} {}", WEEKDAYS[(sd + 4).rem_euclid(7) as usize], hm);
     }
     let (_, m, day) = civil(sd);
-    format!("since {} {} {}", MONTHS[(m - 1) as usize], day, hm)
+    format!("since {} {} {}", day, MONTHS[(m - 1) as usize], hm)
 }
 
 /// A day number (days since 1970-01-01) as its year, month (1-12) and day

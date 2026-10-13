@@ -45,7 +45,7 @@ export const localOffset = (ms: number): number => -new Date(ms).getTimezoneOffs
 /**
  * How long, or since when, a wait runs (words::wait_when): under an hour 'for 40 s', 'for 12 min'
  * (short: '40s', '12m'); then 'since 04:12' the same local day, 'since mon 23:10' within 6 days,
- * 'since oct 5 23:10' before. A since after now is 'for 0 s'.
+ * 'since 5 oct 23:10' before (day, then month). A since after now is 'for 0 s'.
  */
 export function waitWhen(sinceMs: number, sinceOff: number, nowMs: number, nowOff: number, short: boolean): string {
   const d = Math.floor(Math.max(0, nowMs - sinceMs) / 1000);
@@ -61,7 +61,7 @@ export function waitWhen(sinceMs: number, sinceOff: number, nowMs: number, nowOf
   // day 0 (1970-01-01) was a thursday
   if (nd - sd <= 6) return `since ${WEEKDAYS[(((sd + 4) % 7) + 7) % 7] ?? ''} ${hm}`;
   const day = new Date(sd * 86_400_000);
-  return `since ${MONTHS[day.getUTCMonth()] ?? ''} ${String(day.getUTCDate())} ${hm}`;
+  return `since ${String(day.getUTCDate())} ${MONTHS[day.getUTCMonth()] ?? ''} ${hm}`;
 }
 
 /** The waiting line in parts (words::waiting_line): its state, the oldest note, ' and N more', the title (every watch). */

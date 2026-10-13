@@ -79,8 +79,8 @@
    "since_off_s": 7200,
    "now_ms": 1791792000000,
    "now_off_s": 7200,
-   "long": "since oct 5 23:10",
-   "short": "since oct 5 23:10"
+   "long": "since 5 oct 23:10",
+   "short": "since 5 oct 23:10"
   },
   {
    "why": "a since in the future (clock skew): never negative",
