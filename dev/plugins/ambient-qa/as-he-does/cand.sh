@@ -26,7 +26,9 @@ HIS="$HOME/.bise/dev/try-src/apps/desktop/dist/mac-arm64/bise try.app"
 EXE=$([ -f "$A/Contents/Info.plist" ] && /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$A/Contents/Info.plist" 2>/dev/null)
 MAIN="$A/Contents/MacOS/${EXE:-bise try}"
 PORT_CDP=9341
-export PW_FROM=$T/apps/desktop
+# PW_FROM: a checkout whose apps/desktop has node_modules (@playwright/test, pngjs); the workspace's
+# may have none (try-gate-25e5's first runs: every drive 'Cannot find module')
+export PW_FROM=${PW_FROM:-$T/apps/desktop}
 say() { echo "$(date +%T) $*"; }
 case "$A" in "$HIS"|"$HIS/"*) echo "that's his promoted app, not a candidate"; exit 2;; esac
 [ -x "$MAIN" ] || { echo "no $MAIN"; exit 2; }

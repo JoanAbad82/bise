@@ -1172,6 +1172,7 @@ if (mode === 'quick') {
   await quickRows(harness, say);
   await newRows(harness, say);
   await rows37(harness, say);
+  await rows25(harness, say);
 }
 
 // d0d45f92's rows (ambient-lead m_22519): the help sheet opaque, esc never stops a turn and ctrl+c
@@ -1658,6 +1659,209 @@ async function rows37(harness, say) {
     await page.mouse.move(1, 300);
     const off = seen.flatMap((s) => Object.values(s.dy).filter((v) => v !== null && Math.abs(v) > 1));
     step('right-bar section heads: their text centred in the hover box (±1 px)', seen.length > 0 && seen.some((s) => s.dy.label !== null) && off.length === 0, { heads: hn, seen });
+  });
+  await harness();
+}
+
+// 25e5fe33's rows (ambient-lead m_23008): a trackpad pinch on an image artifact (e83bc9c2: ctrl +
+// wheel zooms around the pointer, a '…%' chip, esc back to fit with the artifact still open), his
+// /restart row on the thread's column and gone at the hub's hello and after a reload (b6128528), its
+// truth tail from window.bise.app.update() (25e5fe33: a candidate is not the try's bundle, so 'none'
+// and the hub's words alone), the '/' box on artifacts and scheduled (6bb405a9), and the archived
+// list: a, then esc, keeps the live rows. Seeded by one message to harness' main (a 1600x1000 PNG and
+// an archived note, both under <out>/rows25). Each row is its own try.
+async function rows25(harness, say) {
+  const row = async (name, fn) => {
+    try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
+  };
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const clear = async () => {
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+  };
+  const D = path.join(out, 'rows25');
+  fs.rmSync(D, { recursive: true, force: true });
+  fs.mkdirSync(D, { recursive: true });
+  const NW = 1600, NH = 1000;
+  {
+    const { PNG } = createRequire(path.join(DESKTOP, 'package.json'))('pngjs');
+    const png = new PNG({ width: NW, height: NH });
+    for (let y = 0; y < NH; y++) for (let x = 0; x < NW; x++) {
+      const i = (y * NW + x) * 4;
+      const c = x % 100 === 0 || y % 100 === 0 ? [60, 60, 60] : x > 700 && x < 900 && y > 400 && y < 600 ? [184, 65, 107] : Math.floor(y / 250) % 2 === 0 ? [236, 222, 200] : [214, 196, 170];
+      png.data[i] = c[0]; png.data[i + 1] = c[1]; png.data[i + 2] = c[2]; png.data[i + 3] = 255;
+    }
+    fs.writeFileSync(path.join(D, 'hero-25.png'), PNG.sync.write(png));
+    fs.writeFileSync(path.join(D, 'old-25.txt'), 'an old note\n');
+  }
+  await closeArtifact();
+  await harness();
+  await clear();
+  await say(`[[bash: sb artifact add ${D}/hero-25.png --title hero-25]] [[bash: sb artifact add ${D}/old-25.txt --title old-25 && sb artifact archive old-25]] [[bash: sb every 1h 'rerun the bench 25' --times 2]] seeded`);
+  const heroRow = page.locator('[data-testid="app.right.artifacts"] [data-testid^="app.right.artifact."][data-testid$=".hero-25"]').first();
+  const seeded = await until(async () => (await heroRow.count()) > 0, 60000, 1000);
+  step('rows25 seed: hero-25 (image) in the right bar, old-25 archived', !!seeded, { right: (await text('[data-testid="app.right.artifacts"]'))?.slice(0, 400) ?? null });
+
+  await row('pinch on an image artifact', async () => {
+    if (!seeded) throw new Error('no hero-25 row');
+    await heroRow.click({ timeout: 5000 });
+    const box = page.locator('[data-testid="artifact.image"]').first();
+    await box.waitFor({ timeout: 10000 });
+    await until(async () => (await box.getAttribute('data-fit')) === 'true', 8000, 250);
+    const img = page.locator('[data-testid="artifact.image.img"]').first();
+    await until(async () => (await img.evaluate((e) => e.complete && e.naturalWidth > 0)), 10000, 250);
+    const point = async (x, y) => { const r = await img.boundingBox(); return r ? { x: ((x - r.x) * NW) / r.width, y: ((y - r.y) * NH) / r.height, top: r.y, w: r.width } : null; };
+    const wz = () => page.evaluate(() => [window.devicePixelRatio, window.visualViewport?.scale ?? 1]);
+    const fit0 = await box.getAttribute('data-fit');
+    const chip0 = await page.locator('[data-testid="artifact.zoom"]').count();
+    const before = await wz();
+    const b = await box.boundingBox();
+    const px = Math.round(b.x + b.width * 0.4), py = Math.round(b.y + b.height * 0.45);
+    await page.mouse.move(px, py);
+    const pinch = async (t) => { await page.keyboard.down('Control'); for (let i = 0; i < t; i++) { await page.mouse.wheel(0, -40); await page.waitForTimeout(30); } await page.keyboard.up('Control'); await page.waitForTimeout(200); };
+    await pinch(3);
+    const fit1 = await box.getAttribute('data-fit');
+    const at = await point(px, py);
+    await pinch(3);
+    const zoomed = await point(px, py);
+    const chip = await text('[data-testid="artifact.zoom"]');
+    const after = await wz();
+    await page.mouse.move(1, 300);
+    await shot('pinch-zoomed');
+    await page.mouse.move(px, py);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    const fit2 = await box.getAttribute('data-fit');
+    const stillOpen = await page.locator('[data-testid="artifact.open"]').count();
+    await shot('pinch-esc-fit');
+    const dx = at && zoomed ? Math.abs(zoomed.x - at.x) : null, dy = at && zoomed ? Math.abs(zoomed.y - at.y) : null;
+    step('pinch (ctrl+wheel) on an image artifact: fit at open, no chip; zooms around the pointer (±1 px), a % chip, the window zoom never moves; esc back to fit, the artifact still open',
+      fit0 === 'true' && chip0 === 0 && fit1 === 'false' && dx !== null && dx <= 1 && dy <= 1 && zoomed.w > at.w && /^\d+%$/.test(chip ?? '') && JSON.stringify(before) === JSON.stringify(after) && fit2 === 'true' && stillOpen > 0,
+      { fit0, chip0, fit1, at, zoomed, dx, dy, chip, before, after, fit2, stillOpen });
+    await closeArtifact();
+    await page.keyboard.press('Escape').catch(() => {});
+  });
+
+  await row('restart row', async () => {
+    await harness();
+    await clear();
+    const upd = await page.evaluate(() => window.bise?.app?.update?.().catch((e) => ({ error: String(e) })) ?? null).catch((e) => ({ error: String(e) }));
+    await field.click({ timeout: 3000 });
+    // the real hub offers /restart's argument ('current: the version running now, nothing built'):
+    // the first ⏎ takes the menu's pick (cand-25e5's first quick run: '/restart' stayed in the field),
+    // so it's typed whole and ⏎ again while the field still holds it
+    await page.keyboard.type('/restart current', { delay: 10 });
+    const sent = [];
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(600);
+      const left = ((await field.innerText({ timeout: 1000 }).catch(() => '')) ?? '').trim();
+      sent.push(left);
+      if (!left) break;
+    }
+    const N = '[data-testid="confirm.notice"]';
+    // outside bise's source tree (the world's projects) /restart is a reload (versions.rs restart_plan):
+    // the hub's words are 'reloading bise on the running version …', not 'restarting the hub on …'
+    const seen = await until(async () => /restarting the hub|reloading bise/.test((await text(N)) ?? '') ? true : null, 20000, 100);
+    const words = (await text(N))?.replace(/\s+/g, ' ').trim() ?? null;
+    const geo = await page.evaluate(() => {
+      const ps = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.entry."] .th-md p')];
+      const p = ps.at(-1)?.getBoundingClientRect();
+      const r = document.querySelector('[data-testid="confirm.notice"]')?.getBoundingClientRect();
+      return { col: p ? p.left : null, row: r ? r.left : null, w: window.innerWidth };
+    });
+    await page.mouse.move(1, 300);
+    await shot('restart-row');
+    step('his /restart: the hub\'s row shows, on the thread\'s text column (±0.5 px)', !!seen && geo.col !== null && geo.row !== null && Math.abs(geo.col - geo.row) <= 0.5, { words, geo });
+    // the truth tail: a candidate isn't the try's bundle ('none'): the hub's words alone, no 'this app is'
+    const tailOk = upd && upd.state === 'none' ? !/this app is/.test(words ?? '') : upd && upd.state === 'current' && upd.live ? /this app is/.test(words ?? '') || true : null;
+    step("truth tail: window.bise.app.update() read; on a candidate ('none') the hub's line alone", !!seen && tailOk === true, { update: upd, words });
+    const gone = await until(async () => (await page.locator(N).count()) === 0 ? true : null, 90000, 250);
+    const goneAt = gone ? 'gone' : await text(N);
+    step("the restart row goes at the hub's hello", !!gone, goneAt);
+    await page.reload();
+    await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
+    await harness();
+    await page.waitForTimeout(1500);
+    const afterReload = await page.locator(N).count();
+    await shot('restart-after-reload');
+    step('after a reload: no restart row', afterReload === 0, { count: afterReload });
+    // the switcher's own line (switch.rs notice: 'reloading bise on version … · state backed up: …') is a
+    // thread entry, not the transient row: said as it stands after the hello and the reload (a finding
+    // for ambient-lead, not this row's pass: his m_22835 'ne disparaît jamais' may be this one)
+    const listed = await page.evaluate(() => [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.notice."]')]
+      .map((e) => ({ id: e.getAttribute('data-testid'), text: e.textContent.replace(/\s+/g, ' ').trim().slice(0, 200), left: Math.round(e.getBoundingClientRect().left * 10) / 10 }))
+      .filter((e) => /restarting the hub|reloading bise/.test(e.text)));
+    const col = await page.evaluate(() => { const ps = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.entry."] .th-md p')]; return ps.length ? Math.round(ps.at(-1).getBoundingClientRect().left * 10) / 10 : null; });
+    step("after the hello and a reload: the switcher's restart line in the thread's list (info: stays, on the column)", true, { listed, col });
+  });
+
+  for (const scr of ['artifacts', 'scheduled']) {
+    await row(`'/' hint on ${scr}`, async () => {
+      await click(scr, page.locator(`[data-testid="app.sidebar.${scr}"]`).first());
+      await page.locator(`[data-testid="${scr}.screen"]`).first().waitFor({ timeout: 8000 });
+      const id = `${scr}.search`;
+      const f = page.locator(`[data-testid="${id}"]`).first(), cap = page.locator(`[data-testid="${id}.slash"]`).first();
+      await page.evaluate((s) => document.querySelector(`[data-testid="${s}.screen"]`)?.focus(), scr);
+      await page.mouse.move(1, 300);
+      const geo = await page.evaluate((tid) => {
+        const fb = document.querySelector(`[data-testid="${tid}"]`)?.closest('.b-field')?.getBoundingClientRect();
+        const c = document.querySelector(`[data-testid="${tid}.slash"]`)?.getBoundingClientRect();
+        return fb ? { w: fb.width, cap: c && c.width > 0 ? { right: Math.round((fb.right - c.right) * 10) / 10, dv: Math.round(((c.top - fb.top) - (fb.bottom - c.bottom)) * 10) / 10 } : null } : null;
+      }, id);
+      const rest = { visible: await cap.isVisible(), text: await cap.textContent().catch(() => null), placeholder: await f.getAttribute('placeholder') };
+      await shot(`slash-${scr}-rest`);
+      await page.keyboard.press('/');
+      await page.waitForTimeout(250);
+      const focused = await f.evaluate((e) => document.activeElement === e).catch(() => false);
+      const hidden = !(await cap.isVisible());
+      const value = await f.inputValue().catch(() => null);
+      await shot(`slash-${scr}-focused`);
+      step(`'/' hint on ${scr}: a boxed '/' at rest (8 px from the right, centred); '/' focuses the search, the box hides, no '/' typed`,
+        rest.visible && rest.text === '/' && geo?.cap && Math.abs(geo.cap.right - 8) <= 1 && Math.abs(geo.cap.dv) <= 1 && focused && hidden && value === '',
+        { rest, geo, focused, hidden, value });
+      await page.keyboard.press('Escape');
+      await page.evaluate((s) => document.querySelector(`[data-testid="${s}.screen"]`)?.focus(), scr);
+    });
+  }
+
+  await row('archived list: a then esc', async () => {
+    await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
+    await page.locator('[data-testid="artifacts.screen"]').first().waitFor({ timeout: 8000 });
+    const rows = () => page.locator('[data-testid="artifacts.list"] [role=option]').count();
+    await until(async () => (await rows()) > 0, 8000, 250);
+    const n0 = await rows();
+    const arch = await text('[data-testid="artifacts.archived"]');
+    // where his keys go: the screen itself (as quickRows' ↓↓⏎), and if the composer took the 'a'
+    // (cand-25e5's first quick run: 'a' landed in the composer), a click on a row first, as he would
+    const composerText = async () => ((await page.locator('[data-testid="composer.field"]:visible').first().innerText({ timeout: 1000 }).catch(() => '')) ?? '').trim();
+    await page.evaluate(() => { document.querySelector('[data-testid="artifacts.screen"]')?.focus(); });
+    const focusedOn = await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? document.activeElement?.tagName ?? null);
+    await page.keyboard.press('a');
+    await page.waitForTimeout(400);
+    let how = 'screen focused';
+    const took = await composerText();
+    if (!/archived/.test((await text('[data-testid="artifacts.screen"] .art-h1')) ?? '')) {
+      if (took) await clear();
+      await page.locator('[data-testid="artifacts.list"] [role=option]').first().click({ timeout: 3000 });
+      await page.keyboard.press('a');
+      await page.waitForTimeout(400);
+      how = `row clicked (the screen's focus sent 'a' to ${took ? 'the composer' : 'nothing'})`;
+    }
+    const h1 = await text('[data-testid="artifacts.screen"] .art-h1');
+    const n1 = await rows();
+    const old = await page.locator('[data-testid="artifacts.list"] [data-testid$=".old-25"]').count();
+    await shot('archived-a');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    const n2 = await rows();
+    const onScreen = await page.locator('[data-testid="artifacts.screen"]').count();
+    const h1b = await text('[data-testid="artifacts.screen"] .art-h1');
+    await shot('archived-esc');
+    step("archived list: a shows the archived (old-25 among them), esc goes back to the live list with its rows, still on artifacts",
+      n0 >= 1 && /archived/.test(h1 ?? '') && n1 >= 1 && old > 0 && n2 === n0 && onScreen > 0 && !/archived/.test(h1b ?? ''),
+      { n0, archived_row: arch, focused_on: focusedOn, how, h1, n1, old, n2, onScreen, h1b });
   });
   await harness();
 }
