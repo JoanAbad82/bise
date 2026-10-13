@@ -85,6 +85,33 @@ const until = async (fn, ms, every = 1000) => {
 };
 
 await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
+// the status pill (e41cd3c2): 'starting bise…' and the core's words sit IN the title bar, no row
+// under it, nothing below moves when it shows or goes. 5 s of samples from the window's first draw.
+{
+  const seen = { samples: 0, pill: 0, outside: 0, words: [], mainTops: [] };
+  for (let i = 0; i < 20; i++) {
+    const s = await page.evaluate(() => {
+      const r = (sel) => document.querySelector(sel)?.getBoundingClientRect() ?? null;
+      const p = r('[data-testid="app.core"]');
+      const bar = r('[data-testid="app.title.panel"]') ?? r('[data-testid="app.title.sidebar"]');
+      const m = r('[data-testid="app.main"]');
+      return { p: p && p.width > 0 ? { top: p.top, bottom: p.bottom } : null, barBottom: bar ? bar.bottom : null, mainTop: m ? Math.round(m.top) : null,
+        words: document.querySelector('[data-testid="app.core"]')?.textContent?.trim().slice(0, 80) ?? null };
+    }).catch(() => null);
+    if (s) {
+      seen.samples++;
+      if (s.mainTop !== null && !seen.mainTops.includes(s.mainTop)) seen.mainTops.push(s.mainTop);
+      if (s.p) {
+        seen.pill++;
+        if (s.words && !seen.words.includes(s.words)) seen.words.push(s.words);
+        if (s.barBottom !== null && s.p.top > s.barBottom + 4) seen.outside++;
+      }
+    }
+    if (i === 1) await shot('launch-pill');
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  step('the status pill sits in the title bar; nothing moves under it (5 s from first draw)', seen.outside === 0 && seen.mainTops.length <= 1, seen);
+}
 await shot('open');
 const upd = await text('[data-testid="app.update.text"]');
 step("no 'didn't start right' banner", !(upd ?? '').includes("didn't start right"), upd);
@@ -529,7 +556,46 @@ if (mode === 'rows2') {
   await page.waitForTimeout(600);
   await shot('w1100-agents');
   at1100.agents = { overflow: await overflow(), screen: agents };
+  // b4a25acb's spacing batch: artifacts, scheduled, /log, /diff (changes), ⌘K, settings and a menu
+  const screen1100 = async (name, open, sel) => {
+    await open();
+    const there = sel ? await page.locator(sel).first().waitFor({ timeout: 10000 }).then(() => true, () => false) : true;
+    await page.waitForTimeout(600);
+    await shot(`w1100-${name}`);
+    at1100[name] = { overflow: await overflow(), there };
+  };
+  await screen1100('artifacts', () => click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first()), '[data-testid="artifacts.screen"]');
+  await screen1100('scheduled', () => click('scheduled', page.locator('[data-testid="app.sidebar.scheduled"]').first()), null);
+  await screen1100('log', async () => { await harness(); await say('/log'); }, '[data-testid="log.list"]');
+  await screen1100('changes', async () => { await harness(); await say('/diff'); }, null);
+  await screen1100('palette', async () => { await harness(); await page.keyboard.press('Meta+k'); }, '[data-testid="app.palette"]');
+  await page.keyboard.press('Escape');
+  await screen1100('settings', () => click('settings', page.locator('[data-testid="app.sidebar.settings"]').first()), '[data-testid="settings.root"]');
+  const menuBtn = page.locator('[data-testid="settings.root"] [aria-haspopup]').first();
+  const hasMenu = (await menuBtn.count()) > 0;
+  if (hasMenu) await screen1100('settings-menu', () => click('a settings menu', menuBtn), '[role="menu"], [role="listbox"]');
+  await page.keyboard.press('Escape');
   await cdp.send('Emulation.clearDeviceMetricsOverride').catch(() => {});
+  // scroll up right after a thread opens stays up (dae80774: the list goes to its end once, then
+  // leaves him where he scrolled)
+  await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
+  await page.waitForTimeout(500);
+  await harness();
+  const listBox = await page.locator('[data-testid="thread.list"]').first().boundingBox({ timeout: 5000 }).catch(() => null);
+  if (listBox) await page.mouse.move(listBox.x + listBox.width / 2, listBox.y + listBox.height / 2);
+  await page.waitForTimeout(150);
+  for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, -150); await new Promise((r) => setTimeout(r, 30)); }
+  const fromEnd = () => page.evaluate(() => {
+    let e = document.querySelector('[data-testid="thread.list"]');
+    while (e && !(e.scrollHeight > e.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(e).overflowY))) e = e.parentElement;
+    return e ? { fromEnd: Math.round(e.scrollHeight - e.scrollTop - e.clientHeight), height: e.scrollHeight } : null;
+  });
+  const up0 = await fromEnd();
+  await page.waitForTimeout(3000);
+  const up1 = await fromEnd();
+  await shot('scrolled-up-stays');
+  step('scroll up right after a thread opens stays up (3 s later)', !!up0 && !!up1 && up0.fromEnd > 100 && up1.fromEnd > 100, { right_after: up0, three_s_later: up1 });
+  step('the spotlight at 1100: not run (it opens a floating window over his screen)', true, 'not proven here');
   step('a frame per screen at 1100 wide (thread, frame, inbox, agents), nothing wider than the window',
     narrowed && vw === 1100 && agents && Object.values(at1100).every((s) => !s.overflow), { width: vw, ...at1100 });
   // the tray menu is native (Electron Tray in the main process): CDP reaches the renderer only
