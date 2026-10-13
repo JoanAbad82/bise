@@ -71,7 +71,7 @@ import {
 import { emojiToken, typedEmoji } from "../emoji";
 import { typed } from "@/working/clock";
 import { Picker } from "../Picker";
-import { FIELD_NODES } from "./schema";
+import { FIELD_NODES, fitFailedIn } from "./schema";
 import { Colors } from "./colors";
 import {
   applyOp,
@@ -302,6 +302,19 @@ export function PmField(p: PmFieldProps): JSX.Element {
       ed.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- created once per mount; writeNow reads refs
+  }, []);
+
+  // a failed take's line stays one line at every width of the field (designer m_22494)
+  useEffect(() => {
+    const dom = view()?.dom;
+    if (dom === undefined || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      fitFailedIn(dom);
+    });
+    ro.observe(dom);
+    return () => {
+      ro.disconnect();
+    };
   }, []);
 
   // the field's label follows the placeholder (the target's name)
@@ -682,7 +695,12 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const b = isBlank(st.doc);
     setDictShown(dictationAt(st.doc) !== null);
     // a failed take whose 'try again' line he deleted or sent: the core drops it
-    if (tr === null || tr.docChanged) dictation.sweep();
+    if (tr === null || tr.docChanged) {
+      dictation.sweep();
+      // the words typed before a failed line move it: fitted again where it sits
+      const dom = view()?.dom;
+      if (dom !== undefined) fitFailedIn(dom);
+    }
     const before = beforeCaret(st);
     const segs = segmentsOf(st.doc);
     const typedColon =

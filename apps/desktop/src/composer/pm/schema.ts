@@ -149,7 +149,13 @@ const el = (tag: string, cls: string, text: string): HTMLElement => {
 function failedLine(dom: HTMLElement, id: string, lead: string, reason: string | null): void {
   const parts: (HTMLElement | string)[] = [lead];
   if (reason !== null) parts.push(el('span', 'warn', '▲'), ' ');
-  parts.push(el('span', 'w', reason === null ? FAILED.noWords : FAILED.error(reason)), ' · ');
+  parts.push(el('span', 'w', reason === null ? FAILED.noWords : FAILED.error('')));
+  if (reason !== null && reason !== '') {
+    // the reason is the part that cuts (fitFailed): '(the transcription ti…)', then none
+    const why = el('span', 'why', ` (${reason})`);
+    why.dataset.full = reason;
+    parts.push(why);
+  }
   const retry = el('span', 'retry', FAILED.retry);
   retry.setAttribute('role', 'button');
   retry.dataset.testid = 'composer.dictation.retry';
@@ -161,9 +167,42 @@ function failedLine(dom: HTMLElement, id: string, lead: string, reason: string |
     e.preventDefault();
     retry.dispatchEvent(new CustomEvent(RETRY_EVENT, { bubbles: true, detail: id }));
   });
-  parts.push(retry, ' ', el('span', 'k', FAILED.retryKey), ' · ', el('span', 'k-what', FAILED.drop));
+  // '· try again ⌥⏎ · esc drops it' never cuts or wraps (designer m_22494)
+  const tail = el('span', 'tail', ' · ');
+  tail.append(retry, ' ', el('span', 'k', FAILED.retryKey), ' · ', el('span', 'k-what', FAILED.drop));
+  parts.push(tail);
   dom.replaceChildren(...parts);
 }
+
+/** A failed take's line stays one line (designer m_22494): its reason cuts with … first, then
+ *  drops whole. Measured where it sits (the words typed before it move it), so after each change
+ *  of the field and each change of its width. No layout (jsdom): left whole. */
+export function fitFailed(dom: HTMLElement): void {
+  const why = dom.querySelector<HTMLElement>('.why');
+  const full = why?.dataset.full;
+  if (why === null || full === undefined) return;
+  const fits = (): boolean => dom.getClientRects().length <= 1;
+  const cut = (n: number): string => ` (${full.slice(0, n).trimEnd()}…)`;
+  why.textContent = ` (${full})`;
+  if (fits()) return;
+  // the longest cut that fits (at least one letter), else no reason at all
+  let lo = 1;
+  let hi = full.length - 1;
+  let best = 0;
+  while (lo <= hi) {
+    const n = Math.floor((lo + hi) / 2);
+    why.textContent = cut(n);
+    if (fits()) {
+      best = n;
+      lo = n + 1;
+    } else hi = n - 1;
+  }
+  why.textContent = best > 0 ? cut(best) : '';
+}
+/** Every failed line in the field, fitted again. */
+export const fitFailedIn = (root: HTMLElement): void => {
+  root.querySelectorAll<HTMLElement>('.b-dictation[data-failed]').forEach(fitFailed);
+};
 
 export const DictationNode = Node.create({
   name: 'dictation',
@@ -200,7 +239,13 @@ export const DictationNode = Node.create({
       const draw = (n: typeof node): void => {
         failed = n.attrs.failed === true;
         dom.toggleAttribute('data-failed', failed);
-        if (failed) failedLine(dom, n.attrs.id as string, n.attrs.lead as string, n.attrs.reason === '' ? null : (n.attrs.reason as string));
+        if (failed) {
+          failedLine(dom, n.attrs.id as string, n.attrs.lead as string, n.attrs.reason === '' ? null : (n.attrs.reason as string));
+          // in the page by the next frame: fitted where it sits
+          requestAnimationFrame(() => {
+            fitFailed(dom);
+          });
+        }
         else {
           words.textContent = labelOf(n);
           dom.replaceChildren(dot, words);

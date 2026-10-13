@@ -94,7 +94,9 @@ test("composer/dictation-retry: a kept take with no words or an error offers 'tr
 
     // it fails again, with an error: the same line, its reason; a click tries again
     await core.send({ ev: "dictation", id, text: "", final: true, error: "the transcription timed out.", kept: true } as never);
-    await expect(line(page)).toHaveText("▲ couldn't transcribe it (the transcription timed out) · try again ⌥⏎ · esc drops it");
+    // one line (designer m_22494): the reason cuts with … first (or drops whole), the rest never
+    await expect(line(page)).toHaveText(/^▲ couldn't transcribe it( \(the transcription ti[^)]*\))? · try again ⌥⏎ · esc drops it$/u);
+    await expect.poll(() => line(page).evaluate((e) => e.getClientRects().length), { message: "the error line is one line" }).toBe(1);
     await shot(page, "02-an-error.png");
     await page.getByTestId("composer.dictation.retry").hover();
     await shot(page, "03-an-error-try-again-hovered.png");
