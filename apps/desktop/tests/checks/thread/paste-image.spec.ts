@@ -60,8 +60,10 @@ test("thread/paste-image: ⌘V of a PNG in bise main's composer is a chip, ⏎ s
     const chip = page.locator('[data-testid^="composer.chip."][data-kind="image"]');
     await expect(chip, 'the pasted PNG is an image chip').toHaveCount(1, { timeout: 5000 });
     expect(await chip.locator('img').first().evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0), 'its thumbnail is drawn').toBe(true);
-    // the sent bubble's chip (designer m_18135): 'image 1' in ink, 1 px line, r 9, no fill, never the accent
-    await expect(chip).toHaveText('image 1');
+    // in the text the chip says its number beside its thumbnail; its name is the attachment list's row
+    // (designer's composer-attachments A); ink, 1 px line, r 9, no fill, never the accent
+    await expect(chip).toHaveText('1');
+    await expect(page.getByTestId('composer.attach.1'), 'its row in the box').toBeVisible();
     const look = await chip.evaluate((el) => {
       const cs = getComputedStyle(el);
       const probe = (v: string): string => {

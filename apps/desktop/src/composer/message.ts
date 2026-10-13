@@ -121,6 +121,29 @@ export function chipStrip(c: Chip): string {
   }
 }
 
+/** A row of the attachment list in the composer's box (designer's composer-attachments A): its
+ *  name (a quote's or a paste's first words) and its facts in text-3; null for a chip with no row
+ *  (an artifact: a link in his words). The number is the chip's own `n`, never its place. Pure. */
+export function attachRow(c: Chip, home = ''): { readonly name: string; readonly info: string } | null {
+  switch (c.kind) {
+    case 'quote':
+      return { name: `“${preview(c.text, 60)}”`, info: quoteAbout(c.from, c.text, c.at) };
+    case 'paste': {
+      const kb = new TextEncoder().encode(c.text).length / 1000;
+      return { name: `“${preview(c.text, 60)}”`, info: `${String(lineCount(c.text))} lines · ${kb.toFixed(1)} kB` };
+    }
+    case 'image':
+      return { name: c.name !== '' && !/^\[Image #\d+\]$/u.test(c.name) ? c.name : fileName(c.path), info: '' };
+    case 'file': {
+      const dir = c.path.replace(/\/+$/u, '').split('/').slice(0, -1).join('/');
+      const where = home !== '' && (dir === home || dir.startsWith(`${home}/`)) ? `~${dir.slice(home.length)}` : dir;
+      return { name: fileName(c.path), info: [c.bytes === undefined ? '' : sizeText(c.bytes), where].filter((s) => s !== '').join(' · ') };
+    }
+    case 'artifact':
+      return null;
+  }
+}
+
 /** The send for these segments (architect's delta review D2: the window never templates; the hub
  *  renders the model's text from the parts, bise_proto::parts::render). A message of words alone
  *  goes as its text; one with a quote, a paste or an image goes as typed parts, each chip at its
