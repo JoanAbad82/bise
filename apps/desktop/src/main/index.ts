@@ -173,7 +173,8 @@ void app.whenReady().then(() => {
       }),
     ),
   );
-  const main = new MainWindow(testMode, offscreen);
+  // its frame kept in userData (windows.ts FRAMES_FILE): a test's or a stand-in's, never his under a test
+  const main = new MainWindow(testMode, offscreen, app.getPath('userData'));
   const capsule = new Capsule(testMode, offscreen);
   installCapsuleIpc(capsule);
   ipcMain.on(IPC.quit, () => {

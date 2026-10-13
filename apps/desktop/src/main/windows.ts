@@ -13,12 +13,13 @@
 // READY_LINE once the main window's page has loaded.
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { app, BrowserWindow, type BrowserWindowConstructorOptions } from 'electron';
+import { app, BrowserWindow, screen, type BrowserWindowConstructorOptions } from 'electron';
 import { HOME_ARG, IPC, OFFSCREEN_ARG, READY_LINE, ROUTE_ENV, SURFACE_ARG, type Surface } from '../shared/api';
 import { glassOf } from './glass';
-import { MAIN_SIZE } from './mainsize';
+import { readKeep, writeKeep } from './keep';
+import { framesText, keepFrame, MAIN_SIZE, openFrame, parseFrames, type Screen } from './mainsize';
 import { isOffscreen } from './offscreen';
-import { OFF } from './place';
+import { OFF, OFF_DISPLAY, type Rect } from './place';
 
 // -30000: off every display (place.ts, read by offscreen.ts too without Electron)
 export { OFF };
@@ -57,15 +58,59 @@ export function loadRenderer(win: BrowserWindow, surface: Surface, route: string
   }
 }
 
+/** The main window's kept frames, in userData (mainsize.ts Frames). Owner: amb-mac. */
+export const FRAMES_FILE = 'window-frame.json';
+
+/** The off-screen runs' only screen (test mode, BISE_DESKTOP_OFFSCREEN): place.ts's OFF_DISPLAY, never a real one. */
+const OFF_SCREEN: Screen = { id: 'off', ...OFF_DISPLAY };
+
 export class MainWindow {
   private win: BrowserWindow | null = null;
   private title = 'bise';
+  private keepTimer: NodeJS.Timeout | null = null;
 
-  /** `offscreen`: BISE_DESKTOP_OFFSCREEN (offscreen.ts): placed off every display, never shown or focused */
+  /**
+   * `offscreen`: BISE_DESKTOP_OFFSCREEN (offscreen.ts): placed off every display, never shown or focused.
+   * `dir`: userData, where its frame is kept (FRAMES_FILE); null keeps none.
+   */
   constructor(
     private readonly testMode: boolean,
     private readonly offscreen = false,
+    private readonly dir: string | null = null,
   ) {}
+
+  /** The screens, and the one the pointer is on; an off-screen run has only OFF_SCREEN. */
+  private screens(): { all: Screen[]; pointer: Screen } {
+    if (this.testMode || this.offscreen) return { all: [OFF_SCREEN], pointer: OFF_SCREEN };
+    const all = screen.getAllDisplays().map((d) => ({ id: String(d.id), bounds: d.bounds, workArea: d.workArea }));
+    const at = String(screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).id);
+    return { all, pointer: all.find((s) => s.id === at) ?? all[0] ?? OFF_SCREEN };
+  }
+
+  /** Where it opens (mainsize.ts openFrame): his kept frame, else 1280 x 720 centred on the pointer's screen. */
+  private openAt(): Rect {
+    const { all, pointer } = this.screens();
+    const kept = this.dir === null ? parseFrames(null) : parseFrames(readKeep(join(this.dir, FRAMES_FILE)));
+    return openFrame(kept, all, pointer);
+  }
+
+  /** Keeps its frame as his last one on the display it is on (not while full screen: its normal frame then). */
+  private keepFrame(win: BrowserWindow): void {
+    if (this.dir === null || win.isDestroyed()) return;
+    const f = win.getNormalBounds();
+    const id = this.testMode || this.offscreen ? OFF_SCREEN.id : String(screen.getDisplayMatching(f).id);
+    const file = join(this.dir, FRAMES_FILE);
+    writeKeep(file, framesText(keepFrame(parseFrames(readKeep(file)), id, f)));
+  }
+
+  /** A move or a resize, kept once it settles (a drag sends many). */
+  private keepSoon(win: BrowserWindow): void {
+    if (this.keepTimer !== null) clearTimeout(this.keepTimer);
+    this.keepTimer = setTimeout(() => {
+      this.keepTimer = null;
+      if (!win.isDestroyed() && !win.isFullScreen()) this.keepFrame(win);
+    }, 300);
+  }
 
   get window(): BrowserWindow | null {
     return this.win;
@@ -80,14 +125,14 @@ export class MainWindow {
   create(route?: string): BrowserWindow {
     const test = this.testMode;
     const win = new BrowserWindow({
-      // its narrowest fits the sidebar and one column (mainsize.ts)
-      width: MAIN_SIZE.width,
-      height: MAIN_SIZE.height,
+      // his kept frame, else 1280 x 720 centred on the pointer's screen; an off-screen
+      // run's on OFF_DISPLAY only; its narrowest fits the sidebar and one column (mainsize.ts)
+      ...this.openAt(),
       minWidth: MAIN_SIZE.minWidth,
       show: false,
       // focusable false: a stray focus() can never activate the app over his;
       // the harness draws the caret with CDP focus emulation.
-      ...(test ? { x: OFF, y: OFF, focusable: false } : this.offscreen ? { x: OFF, y: OFF } : {}),
+      ...(test ? { focusable: false } : {}),
       title: this.title,
       // one set of controls (his try round 3): macOS's lights over the
       // sidebar's top room, no title bar and no title text; the page's
@@ -103,6 +148,18 @@ export class MainWindow {
     });
     win.on('closed', () => {
       if (this.win === win) this.win = null;
+    });
+    // where he leaves it, kept for the next launch (per display: mainsize.ts)
+    win.on('move', () => {
+      this.keepSoon(win);
+    });
+    win.on('resize', () => {
+      this.keepSoon(win);
+    });
+    win.on('close', () => {
+      if (this.keepTimer !== null) clearTimeout(this.keepTimer);
+      this.keepTimer = null;
+      this.keepFrame(win);
     });
     // macOS full screen hides the lights: the page drops their room (lead m_15020, amb-win)
     win.on('enter-full-screen', () => {
