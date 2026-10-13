@@ -251,6 +251,9 @@ fn render_chips() -> String {
     writeln!(s).unwrap();
     writeln!(s, "export const IMAGE_EXTS = [{}] as const;", list(parts::IMAGE_EXTS)).unwrap();
     writeln!(s, "export const DOC_EXTS = [{}] as const;", list(parts::DOC_EXTS)).unwrap();
+    let marks = parts::NO_SPACE_BEFORE.iter().map(|c| format!("{:?}", c.to_string())).collect::<Vec<_>>().join(", ");
+    writeln!(s, "// the marks that take no space after a chip ('❝ 1, which?')").unwrap();
+    writeln!(s, "export const NO_SPACE_BEFORE = [{marks}] as const;").unwrap();
     s
 }
 

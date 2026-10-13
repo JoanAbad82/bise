@@ -11,6 +11,7 @@
 // One number sequence per draft for images, pastes and quotes (a number points at one chip).
 
 import type { Part } from '@/proto';
+import { NO_SPACE_BEFORE } from '@/proto/chips.gen';
 
 export type Chip =
   | { readonly kind: 'image'; readonly n: number; readonly path: string; readonly name: string; readonly thumb?: string }
@@ -128,6 +129,10 @@ export function chipStrip(c: Chip): string {
  *  it, main 18a32ce3). `text` is then his words with the chips' labels ('❝ 1', '▤ 1', '[Image #1]')
  *  for the composer's own rows (its strip, the pending row): the store sends none beside parts,
  *  the hub's text is render(parts) alone (architect m_22248). Empty: nothing to send. */
+/** A word comes next (not a space, not a mark of NO_SPACE_BEFORE, bise_proto::parts' one list):
+ *  the chip before it gets one space; before a mark, none ('❝ 1, which?'). */
+const wordFollows = (t: string): boolean => t !== '' && !/^\s/u.test(t) && !(NO_SPACE_BEFORE as readonly string[]).includes(t.charAt(0));
+
 export function buildMessage(segments: readonly Segment[]): Outgoing {
   const files: string[] = [];
   let quotes = 0;
@@ -143,7 +148,7 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
   let spaceNext = false;
   for (const s of segments) {
     if (s.kind === 'text') {
-      if (spaceNext && /^[^\s.,;:!?)\]]/u.test(s.text)) {
+      if (spaceNext && wordFollows(s.text)) {
         body += ' ';
         say(' ');
       }
