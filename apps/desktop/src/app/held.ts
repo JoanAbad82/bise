@@ -5,8 +5,9 @@
 // window losing focus hides them all at once, no fade. Owner: amb-win.
 import { useEffect, useState } from 'react';
 
-/** How long the modifier is held alone before its keys show (designer m_21507: 400 ms). */
-export const HINT_HOLD_MS = 400;
+/** How long the modifier is held alone before its keys show: the terminal app's delay for its ctrl
+ *  hints (rust/tui/src/ctrlhint.rs:43, DELAY 150 ms; his ask main m_22199), one for ⌘, ⌥ and ctrl. */
+export const HINT_HOLD_MS = 150;
 
 export type Mod = 'Alt' | 'Meta';
 

@@ -2,7 +2,7 @@
 // holding ⌘ alone shows the keys where they act. On FakeCore, bise + 3 projects, at 1100 light.
 // Passes when:
 //   - ⌘1 opens the first project's main, ⌘2 the second, ⌘0 bise (keys.ts's order, the sidebar's);
-//   - ⌘ held alone 400 ms: bise's row shows a 16 px kbd '0' and each project its digit in place of
+//   - ⌘ held alone 150 ms (the TUI's ctrl hint delay, ctrlhint.rs:43): bise's row shows a 16 px kbd '0' and each project its digit in place of
 //     its count, ‹ shows ⌘[ under it once there is a place behind, the inbox's head ⌘I;
 //   - released, or any other key while held: every hint goes at once;
 //   - a quick ⌘ (under the delay) shows nothing.
@@ -62,7 +62,7 @@ test('app/cmd-hints: ⌘1-9 picks a project; ⌘ held alone shows the places\' d
     const hints = page.locator('.app-keyhint');
     // a quick ⌘ shows nothing
     await page.keyboard.down('Meta');
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(60);
     await page.keyboard.up('Meta');
     await page.waitForTimeout(400);
     await expect(hints, 'a quick ⌘: no hint').toHaveCount(0);
