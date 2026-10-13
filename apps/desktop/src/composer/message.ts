@@ -14,7 +14,7 @@ import type { Part } from '@/proto';
 import { NO_SPACE_BEFORE } from '@/proto/chips.gen';
 
 export type Chip =
-  | { readonly kind: 'image'; readonly n: number; readonly path: string; readonly name: string; readonly thumb?: string }
+  | { readonly kind: 'image'; readonly n: number; readonly path: string; readonly name: string; readonly thumb?: string; readonly w?: number; readonly h?: number; readonly bytes?: number }
   | { readonly kind: 'paste'; readonly n: number; readonly text: string }
   | { readonly kind: 'quote'; readonly n: number; readonly text: string; readonly from: string; readonly at?: QuoteAt }
   | { readonly kind: 'file'; readonly n: number; readonly path: string; readonly bytes?: number; readonly icon?: string }
@@ -132,8 +132,12 @@ export function attachRow(c: Chip, home = ''): { readonly name: string; readonly
       const kb = new TextEncoder().encode(c.text).length / 1000;
       return { name: `“${preview(c.text, 60)}”`, info: `${String(lineCount(c.text))} lines · ${kb.toFixed(1)} kB` };
     }
-    case 'image':
-      return { name: c.name !== '' && !/^\[Image #\d+\]$/u.test(c.name) ? c.name : fileName(c.path), info: '' };
+    case 'image': {
+      // its pixels and its size, text-3, like a file's (designer m_22673): '1200×630 · 84 kB'
+      const dims = c.w !== undefined && c.h !== undefined ? `${String(c.w)}×${String(c.h)}` : '';
+      const info = [dims, c.bytes === undefined ? '' : sizeText(c.bytes)].filter((x) => x !== '').join(' · ');
+      return { name: c.name !== '' && !/^\[Image #\d+\]$/u.test(c.name) ? c.name : fileName(c.path), info };
+    }
     case 'file': {
       const dir = c.path.replace(/\/+$/u, '').split('/').slice(0, -1).join('/');
       const where = home !== '' && (dir === home || dir.startsWith(`${home}/`)) ? `~${dir.slice(home.length)}` : dir;

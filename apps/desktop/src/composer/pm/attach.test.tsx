@@ -15,8 +15,10 @@ describe('attachRow', () => {
   it('a quote: its first words and where it came from, the thread\'s name for main', () => {
     expect(attachRow(quote)).toEqual({ name: '“Contacte le service crédit immobilier, par le lien de conta…”', info: 'bise · 1 line' });
   });
-  it('an image: its file name, never the [Image #n] tag', () => {
+  it('an image: its file name, never the [Image #n] tag; its pixels and size as its facts', () => {
     expect(attachRow(img)?.name).toBe('logo.png');
+    expect(attachRow(img)?.info).toBe('');
+    expect(attachRow({ ...img, w: 1200, h: 630, bytes: 84_000 })?.info).toBe('1200×630 · 84 kB');
   });
   it('a file: its name, its size and its folder under ~', () => {
     expect(attachRow(file, '/Users/g')).toEqual({ name: 'deck.pptx', info: '2.1 MB · ~/Desktop' });

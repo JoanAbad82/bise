@@ -111,6 +111,7 @@ for (const size of ['1100x720', '800x720']) {
         expect(ns, "each row says its chip's number").toEqual(['1', '2', '3', '4']);
         await expect(page.locator('[data-testid="composer.chip.3"]'), "the document's chip says ▯ and its number").toHaveText('▯3');
         await expect(page.getByTestId('composer.attach.3')).toContainText('deck.pptx');
+        await expect(page.getByTestId('composer.attach.2').locator('.in3'), "an image row's facts: its pixels and size").toHaveText(/^\d+×\d+ · \d+ (B|kB)$/u);
         await expect(page.locator('[data-testid^="composer.strip."]'), "no strip line above 'to bise'").toHaveCount(0);
         await expect(page.getByTestId('composer.tip')).toHaveText('backspace on a chip removes it');
 
