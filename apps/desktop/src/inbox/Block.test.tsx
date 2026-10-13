@@ -140,6 +140,16 @@ describe('the inbox block (b2)', () => {
     field.remove();
   });
 
+  it('a key before the next render sees the last key’s move: ↓ then ctrl+p, no render between, is back on item 1 (amb-mac m_22532)', () => {
+    mount();
+    fireEvent.click(screen.getByTestId('inbox.block.row.1'));
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true, bubbles: true }));
+    });
+    expect(screen.getByTestId('inbox.block.open.1')).toBeTruthy();
+  });
+
   it('⌘I (openInbox) opens the first item; a notification click (openInbox at a card) that card', () => {
     mount();
     act(() => {

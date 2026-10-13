@@ -225,6 +225,9 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
   const [open, setOpen] = useState<string | null>(null);
   const [on, setOn] = useState<number | null>(null);
+  // the keys read the open item and the option they're on from here, written at once by each key:
+  // a second key before React renders (a fast repeat, a quick ↓↑) sees the first one's move (amb-mac m_22532)
+  const keyAt = useRef<{ open: string | null; on: number | null }>({ open, on });
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const real = useMemo(() => (only === undefined ? blockList(rows, gone) : blockList(rows, gone).filter(only)), [rows, gone, only]);
@@ -283,9 +286,14 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
   });
 
   const openTo = (k: string | null) => {
+    keyAt.current = { open: k, on: null };
     setOpen(k);
     setOn(null);
     setWhole(null);
+  };
+  const onTo = (n: number) => {
+    keyAt.current = { ...keyAt.current, on: n };
+    setOn(n);
   };
 
   // ⌘I and a notification click: that card, else the first item
@@ -298,6 +306,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
       const l = latest.current;
       const want = at !== undefined ? l.find((c) => c.project === at.project && c.id === at.card) : l[0];
       if (want === undefined) return;
+      keyAt.current = { open: cardKey(want), on: null };
       setOpen(cardKey(want));
       setOn(null);
     };
@@ -377,8 +386,11 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
 
   // ⌃1-9 open item n wherever the focus is; the open item has the keys while no words are typed
   // (1-9, ←→, ⌘⌫, esc, ↑↓); ⌘⏎ picks the option the keys are on even with words typed
+  // one listener for the block's life: it calls the last render's handler, which reads the open item
+  // and the option from `keyAt` (a key before the next render sees the last key's move, amb-mac m_22532)
+  const keyNow = useRef<(e: KeyboardEvent) => void>(() => undefined);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    keyNow.current = (e: KeyboardEvent) => {
       const n = stripKey(e);
       if (n !== undefined) {
         const c = n <= STRIP_KEYS ? list[n - 1] : undefined;
@@ -388,6 +400,8 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
         openTo(cardKey(c));
         return;
       }
+      const { open, on } = keyAt.current;
+      const openCard = list.find((c) => cardKey(c) === open);
       if (openCard === undefined) return;
       if (e.key === 'Enter' && e.metaKey && !e.ctrlKey && !e.altKey && on !== null) {
         e.preventDefault();
@@ -427,15 +441,20 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
       e.preventDefault();
       e.stopPropagation();
       if (k.t === 'later') openTo(null);
-      else if (k.t === 'on') setOn(k.n);
+      else if (k.t === 'on') onTo(k.n);
       else if (k.t === 'pick') pick(openCard, k.n);
       else close(openCard);
+    };
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      keyNow.current(e);
     };
     window.addEventListener('keydown', onKey, true);
     return () => {
       window.removeEventListener('keydown', onKey, true);
     };
-  });
+  }, []);
 
   if (list.length === 0) return null;
   const openAt = openCard === undefined ? -1 : list.indexOf(openCard);
