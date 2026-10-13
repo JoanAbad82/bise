@@ -2,7 +2,7 @@
 // caret shows his words as they come; nothing reads it (not the send, not the draft); his last
 // words replace it as text, one undo step. Esc cancels it: the node goes, the text around it
 // stays. ctrl+r turns the mic on (held: push-to-talk), again off; twice quickly: voice mode.
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useEffectEvent, useRef, type RefObject } from "react";
 import { closeHistory } from "@tiptap/pm/history";
 import {
   TextSelection,
@@ -174,23 +174,24 @@ export function useDictation(c: DictationCtx): Dictation {
     else if (dict.current.mic) stop();
     return true;
   };
+  // registered once; the events see this render's stop and cancel
+  const up = useEffectEvent((e: KeyboardEvent): void => {
+    const d = dict.current;
+    if (d === null || !d.mic || (e.key.toLowerCase() !== "r" && e.key !== "Control")) return;
+    if (e.timeStamp - d.downAt >= HOLD_MS) stop();
+  });
+  const gone = useEffectEvent((): void => {
+    cancel();
+  });
   useEffect(() => {
-    const up = (e: KeyboardEvent): void => {
-      const d = dict.current;
-      if (
-        d === null ||
-        !d.mic ||
-        (e.key.toLowerCase() !== "r" && e.key !== "Control")
-      )
-        return;
-      if (e.timeStamp - d.downAt >= HOLD_MS) stop();
+    const onUp = (e: KeyboardEvent): void => {
+      up(e);
     };
-    window.addEventListener("keyup", up, true);
+    window.addEventListener("keyup", onUp, true);
     return () => {
-      window.removeEventListener("keyup", up, true);
-      cancel();
+      window.removeEventListener("keyup", onUp, true);
+      gone();
     };
-    // registered once: stop and cancel read refs
   }, []);
   return { dict, lastR, start, stop, cancel, onCtrlR };
 }

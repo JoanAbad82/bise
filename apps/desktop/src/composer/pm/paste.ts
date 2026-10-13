@@ -1,7 +1,7 @@
 // The field's paste, drop and clipboard, out of PmField.tsx: images as chips (pasted, dropped on
 // the field or anywhere in the window), a long text as a chip after it lands inline (⌘Z puts it
 // back inline), any other text as plain text; a copy reads chips as their labels.
-import { useEffect } from "react";
+import { useEffect, useEffectEvent } from "react";
 import { closeHistory } from "@tiptap/pm/history";
 import {
   TextSelection,
@@ -122,15 +122,19 @@ export function dropInto(c: PasteCtx, e: DragEvent): boolean {
 
 /** A file dropped anywhere in the window is the composer's, never a navigation. */
 export function useDropAnywhere(c: PasteCtx): void {
+  // registered once; the drop sees this render's context
+  const drop = useEffectEvent((e: DragEvent): void => {
+    e.preventDefault();
+    if (c.view()?.dom.contains(e.target as Node) === true) return; // handleDrop has it
+    const images = droppedImages(e);
+    if (images.length > 0) addImages(c, images);
+  });
   useEffect(() => {
     const over = (e: DragEvent): void => {
       e.preventDefault();
     };
     const onDrop = (e: DragEvent): void => {
-      e.preventDefault();
-      if (c.view()?.dom.contains(e.target as Node) === true) return; // handleDrop has it
-      const images = droppedImages(e);
-      if (images.length > 0) addImages(c, images);
+      drop(e);
     };
     window.addEventListener("dragover", over);
     window.addEventListener("drop", onDrop);
@@ -138,6 +142,5 @@ export function useDropAnywhere(c: PasteCtx): void {
       window.removeEventListener("dragover", over);
       window.removeEventListener("drop", onDrop);
     };
-    // registered once: the context reads refs
   }, []);
 }

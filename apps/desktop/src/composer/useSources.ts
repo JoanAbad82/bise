@@ -67,5 +67,5 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
       ...(voice === undefined ? {} : { voice }),
       choices: (kind, query) => (kind === 'agent' || kind === 'archived' || kind === 'card' ? prefixFirst(lists[kind], query, (c) => c.value) : []),
     };
-  }, [agents, cards, made, files, skills, commands, saveImage, inView, dictate, voice]);
+  }, [agents, cards, made, files, skills, commands, saveImage, inView, dictate, voice, project, store]);
 }
