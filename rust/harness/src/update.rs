@@ -266,13 +266,18 @@ fn place(versions: &Path, id: &str, from: &Path, copy: bool) -> Result<PathBuf, 
             return Ok(dir);
         }
         // that id names another build (or a half one): never handed out,
-        // never written over (a hub may run from it). An app's runtime goes
-        // to <id>-<commit12> (ambient-lead m_21844: every candidate said
-        // id=root and his 8b00ed2b hubs ran b4a25acb's dir)
+        // never written over (a hub may run from it). One naming rule: a
+        // VERSION id names one build (releases: the version; desktop_try:
+        // root-<head8>[-<changes8>]-<recipe6>, root-<sha12> for a candidate),
+        // so a clash is an error that names both builds. One exception: the
+        // bundles packed before 0d546db5 all say id=root (ambient-lead
+        // m_21844), so an app's 'root' runtime goes to root-<commit12>, the
+        // name its build would have today, rather than leave that app without
+        // hubs (architect m_21930)
         let commit = release::read_version(from).get("commit").cloned().unwrap_or_default();
-        let ok = copy && commit.len() >= 12 && commit.chars().all(|c| c.is_ascii_alphanumeric());
-        if !ok {
-            return Err(format!("{} holds another build than {}", dir.display(), from.display()));
+        let legacy = copy && id == LEGACY_ID && commit.len() >= 12 && commit.chars().all(|c| c.is_ascii_alphanumeric());
+        if !legacy {
+            return Err(format!("{} holds another build ({}) than {} ({}): one VERSION id, two builds", dir.display(), build_of(&dir), from.display(), build_of(from)));
         }
         return place(versions, &format!("{}-{}", id, &commit[..12]), from, copy);
     }
@@ -312,6 +317,17 @@ fn place(versions: &Path, id: &str, from: &Path, copy: bool) -> Result<PathBuf, 
             Err(format!("{}: {}", dir.display(), e))
         }
     }
+}
+
+/// The one VERSION id two builds shared: every desktop_try candidate before
+/// 0d546db5 (cand_paths named its root `root`).
+const LEGACY_ID: &str = "root";
+
+/// A root's build as an error names it: `id=<id> commit=<commit12>`.
+fn build_of(dir: &Path) -> String {
+    let v = release::read_version(dir);
+    let commit = v.get("commit").map(String::as_str).unwrap_or("?");
+    format!("id={} commit={}", v.get("id").map(String::as_str).unwrap_or("?"), commit.get(..12).unwrap_or(commit))
 }
 
 /// `dir` is the build `from` holds, whole: every REQUIRED file there and
@@ -682,15 +698,60 @@ mod tests {
         assert_eq!(std::fs::read_to_string(dir_a.join("bise")).unwrap(), a, "A's dir untouched");
         assert_eq!(place(&versions, "root", &app("b", b), true).unwrap(), dir_b, "B again: its dir");
         assert_eq!(place(&versions, "root", &app("a", a), true).unwrap(), dir_a, "A again: its dir");
-        // a half dir under B's own id: never handed out, B goes beside it
+        // one naming rule (architect m_21930): any other id that names two
+        // builds, or a half dir under it, is an error naming both, never a
+        // second name
         std::fs::create_dir_all(versions.join("v2")).unwrap();
         std::fs::write(versions.join("v2/bise"), "x").unwrap();
         let c = app("c", b);
         std::fs::write(c.join("VERSION"), format!("id=v2{}commit={b}{}", '\n', '\n')).unwrap();
-        assert_eq!(place(&versions, "v2", &c, true).unwrap(), versions.join("v2-8b00ed2b0123"));
-        // a release (moved, its dir is current's target) never goes beside: why
+        let e = place(&versions, "v2", &c, true).unwrap_err();
+        assert!(e.contains("holds another build (id=? commit=?)") && e.contains("(id=v2 commit=8b00ed2b0123)"), "{e}");
+        assert!(!versions.join("v2-8b00ed2b0123").exists(), "no second name");
+        // a release (moved, its dir is current's target) never goes beside, even as root
         let e = place(&versions, "root", &app("r", "ffffffffffffffffffffffff"), false).unwrap_err();
-        assert!(e.contains("holds another build"), "{e}");
+        assert!(e.contains("holds another build (id=root commit=b4a25acbc155)"), "{e}");
+        let _ = std::fs::remove_dir_all(&t);
+    }
+
+    /// A legacy root's second dir (root-<commit12>) is a version like the
+    /// others: installed() lists it, and prune keeps it only while it is
+    /// among the newest, current or run from (architect m_21930: ~100 MB each).
+    #[test]
+    fn a_legacy_roots_second_dir_is_listed_and_pruned_like_the_others() {
+        let t = std::env::temp_dir().join(format!("bise-prune-legacy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&t);
+        let versions = t.join("prefix/versions");
+        let mk = |dir: &str, id: &str, day: u32| {
+            let d = versions.join(dir);
+            std::fs::create_dir_all(&d).unwrap();
+            for f in REQUIRED {
+                std::fs::write(d.join(f), "x").unwrap();
+            }
+            let nl = char::from(10u8);
+            std::fs::write(d.join("VERSION"), format!("id={id}{nl}built=2026-10-{day:02}T00:00:00Z{nl}")).unwrap();
+        };
+        mk("root", "root", 1);
+        mk("root-8b00ed2b0123", "root", 2);
+        mk("v3", "v3", 3);
+        mk("v4", "v4", 4);
+        std::os::unix::fs::symlink("versions/v4", t.join("prefix/current")).unwrap();
+        let versions = versions.canonicalize().unwrap();
+        let inst = Install::of_root(&versions.join("v4")).unwrap();
+        let all = inst.installed();
+        let dirs: Vec<PathBuf> = all.iter().map(|i| i.dir.clone()).collect();
+        assert!(dirs.contains(&versions.join("root-8b00ed2b0123")) && dirs.contains(&versions.join("root")), "{dirs:?}");
+        // past KEEP=2: both roots go
+        let gone = to_prune(&all, 2, Some(&versions.join("v4")), "");
+        assert_eq!(gone.len(), 2, "{gone:?}");
+        assert!(gone.contains(&versions.join("root-8b00ed2b0123")) && gone.contains(&versions.join("root")), "{gone:?}");
+        // a hub runs from it: kept
+        let ps = format!("{}/bise sbd --workspace /w{}", versions.join("root-8b00ed2b0123").display(), char::from(10u8));
+        let gone = to_prune(&all, 2, Some(&versions.join("v4")), &ps);
+        assert_eq!(gone, [versions.join("root")]);
+        // current: kept
+        let gone = to_prune(&all, 2, Some(&versions.join("root-8b00ed2b0123")), "");
+        assert_eq!(gone, [versions.join("root")]);
         let _ = std::fs::remove_dir_all(&t);
     }
 

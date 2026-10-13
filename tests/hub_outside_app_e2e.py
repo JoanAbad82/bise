@@ -29,7 +29,10 @@ from e2e import EXE, ROOT, check  # noqa: E402
 
 # the runtime the desktop pack puts next to bise (electron-builder.mjs, BISE_PACK_ROOT)
 RUNTIME = ("repl-live", "repl-scripted", "sb-core", "prompts", "kit", "plugins", "computer-use")
-ID = "app-hub-outside-%d" % os.getpid()
+# the id every candidate packed before 0d546db5 said (ambient-lead m_21844): the one id place()
+# still lets two builds share (an app's legacy root goes to root-<commit12>); any other clash is
+# an error (architect m_21930)
+ID = "root"
 A, B = "a1" * 20, "b2" * 20
 
 
@@ -67,10 +70,9 @@ def turns(c, name):
     return (a.get("turns") or 0) if a.get("status") == "idle" else 0
 
 
-def hub_exe(E):
-    hubs = [(p, c) for p, c in procs() if " sbd --workspace " in c and c.endswith(E.ws)]
-    check(len(hubs) == 1, "one hub for the workspace: %r" % hubs)
-    return hubs[0][1].split(" sbd --workspace ")[0] if hubs else ""
+def hubs_in(versions):
+    """The hubs that run from that versions dir (whatever their workspace)."""
+    return [c for _, c in procs() if " sbd --workspace " in c and c.startswith(versions)]
 
 
 def zombies(parent):
@@ -92,6 +94,10 @@ def main():
     app, bin_dir = bundle(E.tmp, "bise a", A)
     inside = os.path.join(app, "Contents") + "/"
     app_b, bin_b = bundle(E.tmp, "bise b", B)
+    # the throwaway home's versions dir: every hub an app starts runs from there. The core starts
+    # the home hub and the workspace's, and SB_STATE_DIR gives both one socket: whichever wins
+    # holds it (the other one exits), so the laws below are about the one hub on that dir
+    versions = [os.path.join(E.env["HOME"], ".local", "share", "bise", "versions") + "/"]
     try:
         core = Core(E, exe=os.path.join(bin_dir, "bise"), cwd=E.tmp, env=E.env)
         core.wait(lambda e: e.get("ev") == "hub" and e.get("up") is True, 60, "hub up")
@@ -106,13 +112,14 @@ def main():
         c.say("/new t1: say hi")
         c.wait_status("t1", ["idle", "done", "blocked"], 120)
 
-        exe = hub_exe(E)
+        wait.until(lambda: len(hubs_in(versions[0])) == 1, 30, "one hub on " + versions[0])
+        exe = hubs_in(versions[0])[0].split(" sbd --workspace ")[0]
         dir_a = os.path.dirname(exe)
         check(exe.endswith(os.path.join("versions", ID, "bise")), "the hub runs from the installed runtime: %s" % exe)
         check(not exe.startswith(inside), "never from inside the bundle: %s" % exe)
         repls = [c for _, c in procs() if c.startswith(dir_a + "/repl-live")]
         check(len(repls) >= 2, "main's and t1's REPLs run from %s: %r" % (dir_a, repls))
-        mine = [(p, c) for p, c in procs() if ID in c or c.startswith(inside)]
+        mine = [(p, c) for p, c in procs() if c.startswith(versions[0]) or c.startswith(inside)]
         check(all(not c.startswith(inside) for _, c in mine if "ambient-core" not in c),
               "only the core runs from the bundle: %r" % [m for m in mine if m[1].startswith(inside)])
 
@@ -139,14 +146,15 @@ def main():
         core = None
         left = [(p, c) for p, c in procs() if c.startswith(inside)]
         check(left == [], "after the app quit nothing runs from the bundle: %r" % left)
-        check(any(" sbd --workspace " in c and c.endswith(E.ws) for _, c in procs()), "its hub lives on")
+        check(hubs_in(versions[0]) != [], "its hub lives on")
 
         # app B, same id, another build: its new hub runs B's runtime, never A's dir
         e2e.stop_hub(os.path.join(E.state, "hub.sock"), False)
-        wait.until(lambda: not any(" sbd --workspace " in c and c.endswith(E.ws) for _, c in procs()), 30, "A's hub gone")
+        wait.until(lambda: hubs_in(versions[0]) == [], 30, "A's hub gone")
         core = Core(E, exe=os.path.join(bin_b, "bise"), cwd=E.tmp, env=E.env, err="core-b.stderr")
         core.wait(lambda e: e.get("ev") == "hub" and e.get("up") is True, 60, "B's hub up")
-        exe_b = hub_exe(E)
+        wait.until(lambda: len(hubs_in(versions[0])) == 1, 30, "one hub on " + versions[0])
+        exe_b = hubs_in(versions[0])[0].split(" sbd --workspace ")[0]
         check(exe_b.endswith(os.path.join("versions", "%s-%s" % (ID, B[:12]), "bise")), "B's hub runs B's own dir: %s" % exe_b)
         ver = open(os.path.join(os.path.dirname(exe_b), "VERSION")).read()
         check("commit=" + B in ver, "that dir is B's build: %r" % ver)
@@ -163,7 +171,7 @@ def main():
         if core is not None:
             core.p.kill()
         e2e.stop_hub(os.path.join(E.state, "hub.sock"), False)
-        wait.until(lambda: not any(c.startswith(E.tmp) or ID in c for _, c in procs()), 30,
+        wait.until(lambda: not any(c.startswith(E.tmp) or (versions[0] and c.startswith(versions[0])) for _, c in procs()), 30,
                    "the hub's tree gone", poll=0.2)
         E.close()
     print("hub_outside_app_e2e: ok")
