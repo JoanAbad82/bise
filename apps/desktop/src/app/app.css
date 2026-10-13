@@ -26,14 +26,16 @@ body:has(.app-shell) {
   box-shadow: none;
 }
 .app-shell .b-lights {
-  height: 36px;
+  /* the window's title bar (--h-bar 40, designer's desktop-spacing): macOS's lights sit in it
+     (src/main/windows.ts LIGHTS) */
+  height: var(--h-bar);
   padding: 0;
   -webkit-app-region: drag;
 }
 .app-shell .b-lights i {
   display: none;
 }
-/* the sidebar's top: macOS's lights' 36 px room and the search field, put at the top of the
+/* the sidebar's top: macOS's lights' --h-bar room and the search field, put at the top of the
    sidebar's scroll (his shot, ambient-lead m_14497: a long sidebar scrolled the field up under
    the lights). Opaque, so the rows scrolling under it never show through */
 .app-side-top {
@@ -43,9 +45,15 @@ body:has(.app-shell) {
   flex: none;
   display: flex;
   flex-direction: column;
-  margin: 0 -8px;
-  padding: 0 8px;
+  margin: 0 calc(-1 * var(--pad-list));
+  padding: 0 var(--pad-list) var(--gap-tight);
   background: linear-gradient(var(--c-sidebar), var(--c-sidebar)), var(--c-solid);
+}
+/* the field: a bar control (--h-control-sm 28), 4 px under the lights' band, the rows 4 px under
+   it (designer m_21057: field 44-72, bise from 76) */
+.app-side-top .b-search {
+  height: var(--h-control-sm);
+  margin-top: var(--gap-tight);
 }
 /* full screen: no lights, so no room for them; a little air above the field */
 .app-side-top.full .b-lights {
@@ -90,7 +98,7 @@ body:has(.app-shell) {
 }
 .app-drag {
   flex: none;
-  height: 36px;
+  height: var(--h-bar);
   -webkit-app-region: drag;
 }
 
@@ -118,7 +126,7 @@ body:has(.app-shell) {
 .app-bottom.th-screen {
   flex: none;
   height: auto;
-  padding: 8px 0 0;
+  padding: var(--s-2) 0 0;
   border-top: 1px solid var(--c-line);
 }
 
@@ -134,7 +142,7 @@ body:has(.app-shell) {
 
 /* bise's core can't be reached (CoreLine): one line over the screen */
 .app-core {
-  padding: 6px 16px;
+  padding: var(--s-2) var(--pad-panel);
   border-bottom: 1px solid var(--c-line);
   color: var(--c-text-2);
 }
@@ -157,7 +165,7 @@ body:has(.app-shell) {
   flex-wrap: wrap;
   gap: var(--gap-inline);
   align-items: center;
-  margin-top: 6px;
+  margin-top: var(--s-2);
 }
 
 .app-core-note {
@@ -173,7 +181,7 @@ body:has(.app-shell) {
   display: flex;
   align-items: center;
   min-height: var(--h-row);
-  padding: 0 16px;
+  padding: 0 var(--pad-panel);
 }
 
 .app-reload .app-core-head {
@@ -200,7 +208,7 @@ body:has(.app-shell) {
 
 /* the core's last stderr line, dim mono under the words */
 .app-core-last {
-  margin-top: 2px;
+  margin-top: var(--gap-tight);
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--c-text-3, var(--c-text-2));
@@ -213,14 +221,14 @@ body:has(.app-shell) {
 .app-refused {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  padding: 2px 12px 6px 40px;
+  gap: var(--gap-inline);
+  padding: var(--s-1) var(--s-3) var(--s-2) var(--s-10);
   color: var(--c-text-2);
   font-size: var(--t-12);
 }
 .app-refused.th-refused {
   margin: 0 var(--s-4) var(--s-2);
-  padding: 6px 10px;
+  padding: var(--s-2) var(--s-3);
   border: 1px solid var(--c-line);
   border-radius: var(--r-2, 6px);
   font-size: var(--t-13, 13px);
@@ -240,7 +248,7 @@ body:has(.app-shell) {
 
 /* S29/L19 W3: it uses his computer: the core's mark, ink while it drives, accent when he took the wheel, dim stopped */
 .app-cu {
-  margin-left: 6px;
+  margin-left: var(--gap-inline);
   font-family: var(--font-mono);
   font-size: 11px;
 }
@@ -256,7 +264,7 @@ body:has(.app-shell) {
 
 /* an agent's context gauge in the right bar, the hub's words ('42k · 17%') */
 .app-gauge {
-  margin-left: 6px;
+  margin-left: var(--gap-inline);
   color: var(--c-text-2);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -264,7 +272,7 @@ body:has(.app-shell) {
 
 /* the demo tour's tip under an agent's row in the right bar (L25: 'start', 'steer') */
 .app-tip {
-  padding: 2px 8px 6px 20px;
+  padding: var(--s-1) var(--s-2) var(--s-2) var(--s-5);
 }
 
 /* The sidebar (designer's desktop-screens v6/v7): 240 px, rows 28 px, radius 6, a 15 px mono
@@ -276,7 +284,9 @@ body:has(.app-shell) {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 .app-shell .b-side {
-  padding: 0 8px 0;
+  /* rows touch, 28 apart: the rounded hover parts them (--pad-row-x) */
+  gap: 0;
+  padding: 0 var(--pad-list) 0;
   border-right: 1px solid var(--c-line);
 }
 .app-r kbd,
@@ -291,9 +301,9 @@ body:has(.app-shell) {
 .app-r {
   flex: none;
   position: relative;
-  height: 28px;
-  gap: 7px;
-  padding: 0 8px;
+  height: var(--h-row-tight);
+  gap: var(--gap-inline);
+  padding: 0 var(--pad-row-x);
   border-radius: 6px;
   cursor: pointer;
 }
@@ -308,11 +318,11 @@ body:has(.app-shell) {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 7px;
+  gap: var(--gap-inline);
   min-width: 56px;
 }
 .app-r.ag {
-  padding-left: 23px;
+  padding-left: var(--s-6);
   color: var(--c-text);
 }
 .app-r.pj .nm,
@@ -324,7 +334,7 @@ body:has(.app-shell) {
   color: var(--c-text-3);
 }
 .app-r.more {
-  padding-left: 23px;
+  padding-left: var(--s-6);
 }
 .app-r.ft:hover,
 .app-r.more:hover {
@@ -367,7 +377,7 @@ body:has(.app-shell) {
   justify-content: center;
   min-width: 18px;
   height: 18px;
-  padding: 0 5px;
+  padding: 0 var(--s-1);
   border-radius: 9px;
   background: var(--c-accent);
   color: var(--c-solid, #fff);
@@ -393,8 +403,10 @@ body:has(.app-shell) {
 }
 /* the head 'projects': 11.5 px, 600, text-3, no capitals */
 .app-shell .b-side .b-sh {
-  padding: 14px 8px 4px;
+  /* 16 above, a 16 px line, 4 below: the rows under it start on the 4 px grid */
+  padding: var(--s-4) var(--pad-row-x) var(--gap-tight);
   font-size: 11.5px;
+  line-height: var(--s-4);
   font-weight: 600;
   letter-spacing: 0.01em;
   text-transform: none;
@@ -413,7 +425,7 @@ body:has(.app-shell) {
 .app-menu {
   position: relative;
   z-index: 5;
-  margin: 2px 0 4px 23px;
+  margin: 0 0 var(--s-1) var(--s-6);
 }
 /* the foot: '+ add a project ⌘N', '⚙ settings ⌘,', on top of the scrolled rows, hit at their
    centre and changing on hover (qa-flows' O.6 clicks audit) */
@@ -429,7 +441,7 @@ body:has(.app-shell) {
   flex-direction: column;
   gap: 1px;
   margin-top: auto;
-  padding: 6px 0 8px;
+  padding: var(--s-2) 0;
   border-top: 1px solid var(--c-line);
   /* the sidebar's tint on an opaque base: --c-sidebar is see-through (the window's vibrancy), and
      rows scrolled under the foot showed through it (try gate R31, 30 agents) */
@@ -439,14 +451,14 @@ body:has(.app-shell) {
   background: var(--c-hover);
 }
 
-/* the titlebar over the main column: 36 px, the window's drag region */
+/* the titlebar over the main column: --h-bar, the window's drag region */
 .app-title {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 36px;
-  padding: 0 12px 0 18px;
+  gap: var(--gap-inline);
+  height: var(--h-bar);
+  padding: 0 var(--s-3) 0 var(--s-4);
   border-bottom: 1px solid var(--c-line);
   -webkit-app-region: drag;
   white-space: nowrap;
@@ -472,7 +484,7 @@ body:has(.app-shell) {
 }
 .app-rail-lights {
   flex: none;
-  height: 44px;
+  height: var(--h-bar);
   -webkit-app-region: drag;
 }
 .app-rail-sep {
@@ -509,17 +521,18 @@ body:has(.app-shell) {
   border-radius: 3px;
   box-shadow: inset 0 0 0 1.5px currentColor;
 }
+/* a glyph, drawn: its line a step in from the box's side, half a step from its top and bottom */
 .app-tg-glyph span {
   position: absolute;
-  left: 5px;
-  top: 2px;
-  bottom: 2px;
+  left: var(--s-1);
+  top: calc(var(--s-1) / 2);
+  bottom: calc(var(--s-1) / 2);
   width: 1.5px;
   background: currentColor;
 }
 .app-tg-glyph.right span {
   left: auto;
-  right: 5px;
+  right: var(--s-1);
 }
 .app-rtg {
   display: inline-flex;
@@ -545,7 +558,7 @@ body:has(.app-shell) {
   font-weight: 600;
 }
 .app-crumb-sep {
-  margin: 0 7px;
+  margin: 0 var(--s-2);
   color: var(--c-text-3);
 }
 /* ‹ › right after the lights (designer's desktop-history): 28 px, 4 apart, the crumb at 8 (the
@@ -586,7 +599,7 @@ body:has(.app-shell) {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 8px 8px 0;
+  padding: var(--pad-list) var(--pad-list) 0;
   border-left: 1px solid var(--c-line);
   background: var(--c-surface);
 }
@@ -620,7 +633,9 @@ body:has(.app-shell) {
   display: flex;
   align-items: center;
   gap: var(--gap-inline);
-  min-height: var(--h-head);
+  /* in the title bar's band: its rule is the title bar's, one line across the columns (designer
+     m_21057) */
+  min-height: var(--h-bar);
   padding: 0 var(--s-4);
   border-bottom: 1px solid var(--c-line);
 }
@@ -775,12 +790,12 @@ body:has(.app-shell) {
 }
 .app-over.right {
   right: 0;
-  top: 36px;
+  top: var(--h-bar);
 }
 /* an artifact's maker thread over the page under 1000 px (designer's artifact-open: 78% wide) */
 .app-over.left.thread {
   /* under the title bar and its 1 px line (designer m_20435 (b)) */
-  top: 37px;
+  top: calc(var(--h-bar) + 1px);
   width: 78%;
 }
 .app-over.left.thread > .th-screen {
@@ -840,7 +855,7 @@ body:has(.app-shell) {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 8px 16px 24px;
+  padding: var(--s-2) var(--pad-panel) var(--s-6);
 }
 .app-report-text {
   max-width: var(--th-col, 720px);
@@ -848,7 +863,7 @@ body:has(.app-shell) {
 }
 .app-report-body > .app-dim {
   max-width: var(--th-col, 720px);
-  margin: 24px auto 0;
+  margin: var(--s-6) auto 0;
   color: var(--c-text-3);
 }
 

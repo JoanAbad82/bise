@@ -125,7 +125,7 @@ export interface BiseApi {
   readonly onRoute: (listener: (route: string) => void) => () => void;
   /**
    * This window in macOS full screen or not: called at once with the state now, then on every
-   * enter / leave (lead m_15020: macOS hides the lights in full screen, so the sidebar's 36 px
+   * enter / leave (lead m_15020: macOS hides the lights in full screen, so the sidebar's 40 px
    * room for them goes). Returns the unsubscribe.
    */
   readonly onFullScreen: (listener: (full: boolean) => void) => () => void;

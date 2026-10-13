@@ -197,7 +197,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
       }
     >
       {/* his shot (ambient-lead m_14497): in a long sidebar the whole column scrolled, so the
-          search field rode up under macOS's lights. The lights' 36 px room and the field stay put
+          search field rode up under macOS's lights. The lights' 40 px room and the field stay put
           at the top; only the rows scroll under them. In full screen there are no lights: no room
           (amb-me's onFullScreen). Scrolled, the edge under the field fades over 16 px like the
           thread's top, so a half-hidden row reads as 'more above' (designer m_15023). */}

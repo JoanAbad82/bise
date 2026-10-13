@@ -67,6 +67,32 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(page.getByTestId('app.right.agent.perf')).toBeVisible({ timeout: 10_000 });
     expect(Math.round((await side.boundingBox())?.width ?? 0), 'the sidebar is 240 px').toBe(240);
     await expect(page.getByTestId('app.sidebar.search')).toContainText('search or jump');
+    // the grid (designer m_21057, desktop-spacing): the title bar's band 40; the field 28 px, 4 under
+    // it (44-72); the place rows on 28 from 76; 'projects' 16 above, a 16 px line, 4 below; the
+    // first project at 196; the right bar's rule is the title bar's (one line across the columns)
+    const box = async (id: string) => {
+      const b = await page.getByTestId(id).boundingBox();
+      return { top: Math.round(b?.y ?? -1), bottom: Math.round((b?.y ?? -1) + (b?.height ?? 0)) };
+    };
+    expect(await box('app.sidebar.search'), 'the field: 28 px, 4 under the lights band').toEqual({ top: 44, bottom: 72 });
+    expect((await box('app.sidebar.bise')).top, 'bise at 76').toBe(76);
+    expect((await box('app.sidebar.artifacts')).top, 'artifacts at 104').toBe(104);
+    expect((await box('app.sidebar.scheduled')).top, 'scheduled at 132').toBe(132);
+    const head = await side.locator('.b-sh').first().evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      return { textTop: Math.round(r.top + parseFloat(cs.paddingTop)), line: cs.lineHeight };
+    });
+    expect(head, "'projects': 16 above (176), a 16 px line").toEqual({ textTop: 176, line: '16px' });
+    expect((await box(`app.sidebar.project.${P}`)).top, 'the first project at 196').toBe(196);
+    const rules = await page.evaluate(() => {
+      const bottom = (sel: string) => {
+        const el = document.querySelector(sel);
+        return el === null ? -1 : Math.round(el.getBoundingClientRect().bottom);
+      };
+      return { title: bottom('[data-testid="app.title"]'), right: bottom('[data-testid="app.right.top"]') };
+    });
+    expect(rules.right, "the right bar's rule on the title bar's").toBe(rules.title);
     await expect(page.getByTestId('app.sidebar.bise').locator('.app-cnt'), "bise's pink count").toHaveText('2');
     await expect(page.getByTestId('app.sidebar.bise').getByTestId('bise.pearl.rest'), 'something waits: the live pink pearl').toHaveCount(0);
     // tui-parity R17: who made it, until he opens the artifacts

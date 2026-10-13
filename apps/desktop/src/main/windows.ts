@@ -23,8 +23,8 @@ import { OFF } from './place';
 // -30000: off every display (place.ts, read by offscreen.ts too without Electron)
 export { OFF };
 
-/** macOS's window buttons in the sidebar's 36 px top room (app.css .b-lights). */
-export const LIGHTS = { x: 16, y: 13 } as const;
+/** macOS's window buttons in the sidebar's top room, the title bar's --h-bar 40 (app.css .b-lights). */
+export const LIGHTS = { x: 16, y: 15 } as const;
 
 /** The webPreferences every bise window shares. */
 export function webPreferences(surface: Surface, testMode: boolean): BrowserWindowConstructorOptions['webPreferences'] {
