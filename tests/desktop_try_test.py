@@ -17,6 +17,7 @@ Never his ~/.bise, never an app (an app on the try home is the off-screen harnes
 """
 import json
 import os
+import plistlib
 import shlex
 import shutil
 import subprocess
@@ -564,21 +565,31 @@ def candidate_then_promote():
     open(os.path.join(old_root, "repl-live"), "w").close()
     T.write_stamp(paths, {"head": a, "changes": "", "recipe": "r", "where": "live", "root": old_root})
     before = open(T.stamp_path(paths)).read()
-    builds = []
+    builds, fail_next = [], []
     real_run, real_say = T.subprocess.run, T.say
 
     def fake_run(cmd, *k, **kw):
         if cmd and cmd[-3:-1] == ["/bin/bash", "-c"]:
             script = cmd[-1]
             builds.append(script)
+            if fail_next:
+                fail_next.pop()
+                return subprocess.CompletedProcess(cmd, 1)
             out = shlex.split(re.search(r"BISE_PACK_OUT=(\S+)", script).group(1))[0]
-            root = shlex.split(re.findall(r"rm -rf \S+ && mv \S+ (\S+)", script)[-1])[0]
-            app = os.path.join(out, paths["arch"], T.APP_NAME + ".app")
-            for p in (T.packed_bise(app), os.path.join(root, "repl-live"), paths["bise"], paths["helper"]):
+            name = shlex.split(re.search(r"BISE_PACK_NAME=('[^']*'|\S+)", script).group(1))[0]
+            app_id = re.search(r"BISE_PACK_APP_ID=(\S+)", script).group(1)
+            app = os.path.join(out, paths["arch"], name + ".app")
+            made = [T.packed_bise(app)]
+            roots = re.findall(r"rm -rf \S+ && mv \S+ (\S+)", script)
+            if roots:   # a full build (the candidate's): its root, the try bise and helper too
+                made += [os.path.join(shlex.split(roots[-1])[0], "repl-live"), paths["bise"], paths["helper"]]
+            for p in made:
                 os.makedirs(os.path.dirname(p), exist_ok=True)
                 open(p, "w").close()
+            with open(os.path.join(app, "Contents", "Info.plist"), "wb") as f:
+                plistlib.dump({"CFBundleIdentifier": app_id, "CFBundleName": name}, f)
             with open(os.path.join(app, "Contents", "build.txt"), "w") as f:
-                f.write("candidate %d" % len(builds))
+                f.write("build %d %s" % (len(builds), app_id))
             return subprocess.CompletedProcess(cmd, 0)
         return real_run(cmd, *k, **kw)
     T.subprocess.run, T.say = fake_run, (lambda *x: None)
@@ -594,14 +605,49 @@ def candidate_then_promote():
         check(json.load(open(c["json"]))["root"] == c["root"], "cand.json says where the root is")
         T.candidate(env, paths, b, repo=repo)
         check(len(builds) == 1, "built once: %d builds" % len(builds))
+        # ambient-lead m_20670: a candidate is its own bundle, never his id (LaunchServices mixed them)
+        check(c["app"].endswith("/bise cand.app") and T.bundle_id(c["app"]) == T.CAND_ID == "dev.bise.desktop.cand",
+              "the candidate's Info.plist has the candidate's id: %s" % T.bundle_id(c["app"]))
+        check("BISE_PACK_NAME='bise cand' BISE_PACK_APP_ID=dev.bise.desktop.cand " in builds[0] and "desktop.try" not in builds[0],
+              "the candidate is packed as 'bise cand' (its own userData): %s" % builds[0])
+        check(T.CAND_ID != T.APP_ID and T.CAND_NAME != T.APP_NAME, "candidate and try never share an id or a name")
+        plist = os.path.join(c["app"], "Contents", "Info.plist")
+        good = open(plist, "rb").read()
+        with open(plist, "wb") as f:
+            plistlib.dump({"CFBundleIdentifier": T.APP_ID}, f)
+        check(not T.cand_built(c), "a candidate with his id (built before m_20670) is not built: it builds again")
+        with open(plist, "wb") as f:
+            f.write(good)
+
+        # a failed repack moves nothing
+        fail_next.append(1)
+        try:
+            T.promote(env, b, repo=repo)
+            check(False, "a failed repack promotes")
+        except T.TryError:
+            pass
+        check(git("rev-parse", "HEAD", cwd=trysrc) == a and open(T.stamp_path(paths)).read() == before and T.cand_built(c),
+              "a failed repack leaves the try checkout, stamp and candidate as they were")
+        builds.pop()
 
         stamp = T.promote(env, b, repo=repo)
         m = T.try_module(trysrc)
         tp = m.try_paths(env)
-        check(len(builds) == 1, "promote never builds")
+        check(len(builds) == 2, "promote repacks once: %d" % len(builds))
+        rp = builds[1]
+        check(all(x not in rp for x in ("cargo build", "pnpm install", "pnpm build", "bins.sh")) and "pnpm dist" in rp
+              and "cd %s" % shlex.quote(os.path.join(c["src"], "apps", "desktop")) in rp,
+              "the repack is electron-builder only, in the candidate's worktree: %s" % rp)
+        check("BISE_PACK_NAME='bise try' BISE_PACK_APP_ID=dev.bise.desktop.try " in rp
+              and "BISE_PACK_BISE=%s" % shlex.quote(T.packed_bise(c["app"])) in rp
+              and "BISE_PACK_HELPER=%s" % shlex.quote(os.path.join(c["app"], "Contents", "MacOS", "bise-mac-helper")) in rp
+              and "BISE_PACK_ROOT=%s" % shlex.quote(c["root"]) in rp,
+              "repacked as his try from the candidate's own bise, helper and root: %s" % rp)
         check(git("rev-parse", "HEAD", cwd=trysrc) == b, "the try checkout moved to b")
         check(stamp["head"] == b and stamp["where"] == "live" and stamp.get("old_root") == old_root, "live now (no try open): %s" % stamp)
-        check(open(os.path.join(tp["app"], "Contents", "build.txt")).read() == "candidate 1", "the candidate's bundle is the try's app")
+        check(open(os.path.join(tp["app"], "Contents", "build.txt")).read() == "build 2 dev.bise.desktop.try"
+              and T.bundle_id(tp["app"]) == T.APP_ID == "dev.bise.desktop.try",
+              "the promoted bundle is the repack, with his try's id: %s" % T.bundle_id(tp["app"]))
         check(m.up_to_date(m.build_stamp(env, tp, None), m.read_stamp(tp), tp), "his next --try is up to date: no rebuild")
         check(not os.path.exists(c["dir"]) and c["src"] not in git("worktree", "list"), "the candidate dir and worktree are gone")
         try:

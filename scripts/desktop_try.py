@@ -11,9 +11,12 @@
   scripts/desktop-try.sh --candidate <sha>           a gate candidate in its own dir (<build>/desktop-cand/<sha12>),
                                                      never the try checkout, stamp or staged dir; prints cand.json
                                                      (app, root, bise) for the gate's off-screen launcher
-                                                     (or BISE_TRY_CANDIDATE=<sha>)
-  scripts/desktop-try.sh --promote <sha>             the gate passed: the try checkout moves to <sha> and the
-                                                     candidate's bundle + root become the try's build (no rebuild)
+                                                     (or BISE_TRY_CANDIDATE=<sha>). Its own bundle 'bise cand'
+                                                     (dev.bise.desktop.cand), so its own userData: never his id
+  scripts/desktop-try.sh --promote <sha>             the gate passed: the candidate's build is repacked as 'bise
+                                                     try' (dev.bise.desktop.try: electron-builder --dir only, no
+                                                     rebuild), the try checkout moves to <sha>, and that bundle
+                                                     + the root become the try's build
 
 (~/.local/bin/bise-ambient execs scripts/desktop-try.sh, which runs this.)
 
@@ -65,6 +68,11 @@ DESKTOP = os.path.join(REPO, "apps", "desktop")
 # Support/bise try) and TCC grants, never his app's; 'open -n -a <path>' opens that exact copy
 APP_NAME = "bise try"
 APP_ID = "dev.bise.desktop.try"
+# a gate candidate's own bundle (ambient-lead m_20670, amb-tools' incident m_20662: a candidate
+# with his id made LaunchServices quit his promoted app): its own id, name and so userData
+# (~/Library/Application Support/bise cand); --promote repacks it with his (repack_script)
+CAND_NAME = "bise cand"
+CAND_ID = "dev.bise.desktop.cand"
 sys.path.insert(0, os.path.join(REPO, "tests"))
 from bise_env import NOT_INHERITED, OWN_PATHS  # noqa: E402  (the one list, never copied)
 
@@ -255,12 +263,13 @@ def try_paths(env, desktop=DESKTOP):
             "staged_dir": staged, "staged": os.path.join(staged, arch, APP_NAME + ".app")}
 
 
-def build_script(paths, sign_dir=None, out=None, root=None, repo=REPO):
+def build_script(paths, sign_dir=None, out=None, root=None, repo=REPO, name=APP_NAME, app_id=APP_ID):
     """The one build, run under the heavy lock: bise and its helpers for the try home (repl-live,
     repl-scripted, sb-core next to the checkout `repo`), the snapshot app root `root` (root_script), the
     native helper, then the new app (apps/desktop: pnpm install --frozen-lockfile, build, dist =
     electron-builder --mac --dir, the try's bise packed inside it), into apps/desktop/dist, or into
-    `out` (BISE_PACK_OUT: the staging dir, a candidate's dir). Pure."""
+    `out` (BISE_PACK_OUT: the staging dir, a candidate's dir), as the bundle `name` with id `app_id`
+    (his try's, or a candidate's CAND_NAME/CAND_ID). Pure."""
     q = shlex.quote
     desktop = os.path.join(repo, "apps", "desktop")
     lines = ["set -euo pipefail",
@@ -277,7 +286,7 @@ def build_script(paths, sign_dir=None, out=None, root=None, repo=REPO):
              # BISE_PACK_ROOT: the snapshot goes inside the bundle (Contents/Resources/bin), so the
              # app opens with no env (architect m_18354); its core installs it as a version dir
              "BISE_PACK_NAME=%s BISE_PACK_APP_ID=%s BISE_PACK_BISE=%s BISE_PACK_HELPER=%s%s%s%s pnpm dist"
-             % (q(APP_NAME), q(APP_ID), q(paths["bise"]), q(paths["helper"]), " BISE_PACK_ROOT=%s" % q(root) if root else "",
+             % (q(name), q(app_id), q(paths["bise"]), q(paths["helper"]), " BISE_PACK_ROOT=%s" % q(root) if root else "",
                 " BISE_PACK_SIGN_DIR=%s" % q(sign_dir) if sign_dir else "", " BISE_PACK_OUT=%s" % q(out) if out else "")]
     if out:
         # a fresh staging dir: a half-written bundle from a failed build never gets swapped in
@@ -558,12 +567,15 @@ def swap_staged(paths):
 
 # ---------------------------------------------------------------- candidates (ambient-lead m_14320)
 # A gate candidate is built for one sha in its own dir, <build>/desktop-cand/<sha12>: a detached
-# worktree of that sha (src/), its packed app (dist/<arch>/bise try.app, bise inside), its snapshot
-# app root (root/) and cand.json. Building one never touches the try checkout (try-src), the try
-# stamp or the staged dir, so his next --try still opens what the gate passed. qa-native's gate
-# launcher opens cand.json's app off-screen with BISE_APP_ROOT=its root. Once the gate passes,
-# --promote <sha> moves the try checkout to that sha and the built bundle and root into the try's
-# staged place (no rebuild): they go live at once when no try is open, else at his next --try.
+# worktree of that sha (src/), its packed app (dist/<arch>/bise cand.app, bise inside, its own id
+# dev.bise.desktop.cand and so its own userData: LaunchServices never mixes it with his app,
+# ambient-lead m_20670), its snapshot app root (root/) and cand.json. Building one never touches the
+# try checkout (try-src), the try stamp or the staged dir, so his next --try still opens what the
+# gate passed. qa-native's gate launcher opens cand.json's app off-screen with BISE_APP_ROOT=its
+# root. Once the gate passes, --promote <sha> repacks that build as his 'bise try' (repack_script:
+# electron-builder --dir on the candidate's own out/, bise, helper and root; no rebuild), moves the
+# try checkout to that sha and the bundle and root into the try's staged place: they go live at
+# once when no try is open, else at his next --try.
 
 
 def try_checkout(env):
@@ -581,12 +593,42 @@ def resolve_sha(sha, env, repo=REPO):
 def cand_paths(paths, sha):
     d = os.path.join(paths["cand"], sha[:12])
     return {"dir": d, "src": os.path.join(d, "src"), "dist": os.path.join(d, "dist"), "root": os.path.join(d, "root"),
-            "json": os.path.join(d, "cand.json"), "app": os.path.join(d, "dist", paths["arch"], APP_NAME + ".app")}
+            "json": os.path.join(d, "cand.json"), "app": os.path.join(d, "dist", paths["arch"], CAND_NAME + ".app"),
+            # --promote's repack with his try's name and id, before it moves into the try's staged place
+            "promoted_dir": os.path.join(d, "promoted"), "promoted": os.path.join(d, "promoted", paths["arch"], APP_NAME + ".app")}
+
+
+def bundle_id(app):
+    """The bundle's CFBundleIdentifier (Contents/Info.plist), or None."""
+    import plistlib
+    try:
+        with open(os.path.join(app, "Contents", "Info.plist"), "rb") as f:
+            return plistlib.load(f).get("CFBundleIdentifier")
+    except (OSError, ValueError, plistlib.InvalidFileException):
+        return None
 
 
 def cand_built(c):
-    """The candidate's bundle (with its bise inside) and its root are there."""
-    return all(os.path.exists(p) for p in (c["app"], packed_bise(c["app"]), os.path.join(c["root"], "repl-live")))
+    """The candidate's bundle (with its bise inside, and the candidate's own id: one built before
+    m_20670 had his and builds again) and its root are there."""
+    return (all(os.path.exists(p) for p in (c["app"], packed_bise(c["app"]), os.path.join(c["root"], "repl-live")))
+            and bundle_id(c["app"]) == CAND_ID)
+
+
+def repack_script(c, sign_dir=None):
+    """--promote's repack (ambient-lead m_20670): the candidate's gated build packed again as his
+    try's bundle (APP_NAME, APP_ID), from what the candidate built and nothing else: its worktree's
+    apps/desktop out/ and node_modules (no install, no build), the bise and native helper inside its
+    bundle, its root; electron-builder --dir only, into c["promoted_dir"]. Pure."""
+    q = shlex.quote
+    app = c["app"]
+    return "\n".join([
+        "set -euo pipefail",
+        "cd %s" % q(os.path.join(c["src"], "apps", "desktop")),
+        "rm -rf %s" % q(c["promoted_dir"]),
+        "BISE_PACK_NAME=%s BISE_PACK_APP_ID=%s BISE_PACK_BISE=%s BISE_PACK_HELPER=%s BISE_PACK_ROOT=%s%s BISE_PACK_OUT=%s pnpm dist"
+        % (q(APP_NAME), q(APP_ID), q(packed_bise(app)), q(os.path.join(app, "Contents", "MacOS", "bise-mac-helper")), q(c["root"]),
+           " BISE_PACK_SIGN_DIR=%s" % q(sign_dir) if sign_dir else "", q(c["promoted_dir"]))]) + "\n"
 
 
 def candidate(env, paths, sha, repo=REPO, sign=None):
@@ -606,13 +648,13 @@ def candidate(env, paths, sha, repo=REPO, sign=None):
         say("candidate %s is built: %s" % (sha[:8], c["app"]))
         return dict(json.load(open(c["json"])), **info)
     say("building candidate %s into %s (waits for a heavy slot)…" % (sha[:8], c["dir"]))
-    script = build_script(paths, sign, out=c["dist"], root=c["root"], repo=c["src"])
+    script = build_script(paths, sign, out=c["dist"], root=c["root"], repo=c["src"], name=CAND_NAME, app_id=CAND_ID)
     lock = os.path.expanduser("~/.bise/run/heavy.lock")
     r = subprocess.run(heavy_argv(["/bin/bash", "-c", script], lock), env=env)
     if r.returncode != 0:
         raise TryError("the candidate build failed (exit %d)" % r.returncode)
     if not cand_built(c):
-        raise TryError("no packed app or root in %s after the build" % c["dir"])
+        raise TryError("no packed app with id %s, or no root, in %s after the build (id: %s)" % (CAND_ID, c["dir"], bundle_id(c["app"])))
     info["built_ms"] = int(time.time() * 1000)
     with open(c["json"] + ".tmp", "w") as f:
         json.dump(info, f, indent=1)
@@ -644,10 +686,19 @@ def promote(env, sha, checkout=None, repo=REPO):
     dirty = run(["git", "-C", checkout, "status", "--porcelain", "--untracked-files=no"], env).stdout.strip()
     if dirty:
         raise TryError("the try checkout %s has changes: never moved over them" % checkout)
+    # his try's identity back on the gated build (m_20670): repacked before anything moves, so a
+    # failed repack leaves the try checkout, stamp and staged dir as they were
+    sign_dir = try_paths(env)["sign"]
+    sign = os.environ.get("BISE_TRY_SIGN_DIR") or (sign_dir if os.path.isdir(sign_dir) else None)
+    say("repacking candidate %s as %s (%s; waits for a heavy slot)…" % (sha[:8], APP_NAME, APP_ID))
+    r = subprocess.run(heavy_argv(["/bin/bash", "-c", repack_script(probe, sign)], os.path.expanduser("~/.bise/run/heavy.lock")), env=env)
+    if r.returncode != 0:
+        raise TryError("the repack as %s failed (exit %d)" % (APP_ID, r.returncode))
+    if bundle_id(probe["promoted"]) != APP_ID or not os.path.exists(packed_bise(probe["promoted"])):
+        raise TryError("the repack in %s is not %s with its bise inside (id: %s)" % (probe["promoted_dir"], APP_ID, bundle_id(probe["promoted"])))
     run(["git", "-C", checkout, "checkout", "-q", "--detach", sha], env)
     m = try_module(checkout)
     tp = m.try_paths(env)
-    sign = os.environ.get("BISE_TRY_SIGN_DIR") or (tp["sign"] if os.path.isdir(tp["sign"]) else None)
     stamp = m.build_stamp(env, tp, sign)
     if stamp["head"] != sha or stamp["changes"]:
         raise TryError("the try checkout is not clean at %s after the move" % sha[:8])
@@ -656,7 +707,7 @@ def promote(env, sha, checkout=None, repo=REPO):
     root = root_path(tp, stamp)
     if live_root and os.path.realpath(root) == os.path.realpath(live_root):
         root = "%s-%d" % (root, int(time.time()))
-    for src, dst in ((probe["root"], root), (probe["app"], tp["staged"])):
+    for src, dst in ((probe["root"], root), (probe["promoted"], tp["staged"])):
         if os.path.exists(dst):
             shutil.rmtree(dst)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
@@ -818,11 +869,12 @@ def bundle_apps(app):
 
 def quit_bundle(app, timeout=10):
     """Every instance of the bundle quits (one app holds fn and the menu bar): an Apple Event
-    quit by the bundle id, then SIGTERM to each checked pid, never by name. Returns the pids."""
+    quit by the bundle's own id (its Info.plist, so a candidate's quit never reaches his app), then
+    SIGTERM to each checked pid, never by name. Returns the pids."""
     pids = bundle_apps(app)
     if not pids:
         return []
-    subprocess.run(["osascript", "-e", 'tell application id "%s" to quit' % APP_ID], capture_output=True, timeout=15)
+    subprocess.run(["osascript", "-e", 'tell application id "%s" to quit' % (bundle_id(app) or APP_ID)], capture_output=True, timeout=15)
     for sig in (None, signal.SIGTERM, signal.SIGKILL):
         if sig is not None:
             for pid in [p for p in pids if pid_alive(p)]:
@@ -964,8 +1016,9 @@ def quit_app(app, tryh, timeout=10):
     if not pid:
         return None
     # an Apple Event quit (app.quit: will-quit stops its core and shells, the helper quits), by the
-    # try's own bundle id; SIGTERM to the checked pid if it doesn't go, never pkill by name
-    subprocess.run(["osascript", "-e", 'tell application id "%s" to quit' % APP_ID], capture_output=True, timeout=15)
+    # bundle's own id (Info.plist: a candidate's never names his); SIGTERM to the checked pid if it
+    # doesn't go, never pkill by name
+    subprocess.run(["osascript", "-e", 'tell application id "%s" to quit' % (bundle_id(app) or APP_ID)], capture_output=True, timeout=15)
     t0 = time.time()
     while pid_alive(pid) and time.time() - t0 < timeout:
         time.sleep(0.2)
