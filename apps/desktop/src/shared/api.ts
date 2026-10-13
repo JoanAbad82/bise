@@ -261,9 +261,12 @@ export type Surface = 'window' | 'capsule';
 
 /**
  * Where the capsule shows: 'top' (the spotlight he opened), 'bottom' (what
- * bise brings: a card, the talk, an answer), 'menu' (under the tray's pearl).
+ * bise brings: a card, the talk, an answer), 'menu' (under the tray's pearl),
+ * 'corner' (the fn talk, his pick C, designer m_22119: bottom-right of the
+ * pointer's screen, 16 px off the edge and the Dock; never the keys; it grows
+ * upward and keeps its right edge and its bottom).
  */
-export type CapsuleAt = 'top' | 'bottom' | 'menu';
+export type CapsuleAt = 'top' | 'bottom' | 'menu' | 'corner';
 
 /** How a shown capsule grows (CapsuleApi.show): 'down' from a pinned top-left, its glass at most `maxHeight` px. */
 export interface CapsuleFit {

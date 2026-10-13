@@ -156,7 +156,7 @@ export class Capsule {
 
 /** The capsule's IPC: any window may show, hide or size it. */
 export function installCapsuleIpc(c: Capsule): void {
-  const ats: ReadonlySet<string> = new Set(['top', 'bottom', 'menu']);
+  const ats: ReadonlySet<string> = new Set(['top', 'bottom', 'menu', 'corner']);
   ipcMain.on(IPC.capsuleShow, (_e, at: unknown, keys: unknown, fit: unknown) => {
     if (typeof at === 'string' && ats.has(at)) c.show(at as CapsuleAt, keys === true, 'asked', isFit(fit) ? fit : null);
   });

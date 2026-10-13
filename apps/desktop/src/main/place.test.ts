@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOTTOM, capsuleBounds, fitBounds, MENU_GAP, OFF_DISPLAY, pinnedBounds, pinOf, TOP, type DisplayBox } from './place';
+import { BOTTOM, capsuleBounds, CORNER, fitBounds, MENU_GAP, OFF_DISPLAY, pinnedBounds, pinOf, TOP, type DisplayBox } from './place';
 
 // a 1512x982 MacBook display: the menu bar 33 px, the Dock 70 px
 const mac: DisplayBox = {
@@ -106,5 +106,52 @@ describe('the voice view: placed once for its max height, then its top-left stay
   it('a max taller than the work area still starts inside it', () => {
     const b = fitBounds({ width: 700, height: 80 }, mac, undefined, 5000);
     expect(b.y).toBe(mac.workArea.y);
+  });
+});
+
+describe('corner: the fn talk, his pick C (designer m_22119)', () => {
+  const card = { width: 320, height: 96 };
+  const glassBR = (b: { x: number; y: number }, g: { x: number; y: number; width: number; height: number }) => [b.x + g.x + g.width, b.y + g.y + g.height];
+
+  it('Dock at the bottom: its glass 16 px from the right edge and 16 px above the Dock', () => {
+    const b = capsuleBounds(card, mac, { at: 'corner' });
+    expect([b.x + b.width, b.y + b.height]).toEqual([1512 - CORNER, 33 + 879 - CORNER]);
+    expect(b.width).toBe(320);
+  });
+
+  it('Dock on the right: 16 px left of it, 16 px from the bottom', () => {
+    const right: DisplayBox = { bounds: mac.bounds, workArea: { x: 0, y: 33, width: 1440, height: 949 } };
+    const b = capsuleBounds(card, right, { at: 'corner' });
+    expect([b.x + b.width, b.y + b.height]).toEqual([1440 - CORNER, 982 - CORNER]);
+  });
+
+  it('a hidden Dock (a 4 px strip): 16 px from the display bottom', () => {
+    const hidden: DisplayBox = { bounds: mac.bounds, workArea: { x: 0, y: 33, width: 1512, height: 945 } };
+    const b = capsuleBounds(card, hidden, { at: 'corner' });
+    expect(b.y + b.height).toBe(982 - CORNER);
+  });
+
+  it("on a second screen: that screen's corner", () => {
+    const ext: DisplayBox = { bounds: { x: 1512, y: -200, width: 2560, height: 1440 }, workArea: { x: 1512, y: -175, width: 2560, height: 1415 } };
+    const b = capsuleBounds(card, ext, { at: 'corner' });
+    expect([b.x + b.width, b.y + b.height]).toEqual([1512 + 2560 - CORNER, -200 + 1440 - CORNER]);
+  });
+
+  it('a glass inside a transparent margin is what sits in the corner', () => {
+    const g = { x: 24, y: 24, width: 320, height: 96 };
+    const b = capsuleBounds({ width: 368, height: 144 }, mac, { at: 'corner' }, g);
+    expect(glassBR(b, g)).toEqual([1512 - CORNER, 33 + 879 - CORNER]);
+  });
+
+  it('the answer grows upward to half the screen: its glass keeps its right edge and its bottom', () => {
+    const g0 = { x: 24, y: 24, width: 320, height: 96 };
+    const b0 = capsuleBounds({ width: 368, height: 144 }, mac, { at: 'corner' }, g0);
+    const pin = pinOf(b0, { width: 368, height: 144 }, { at: 'corner' }, g0);
+    for (let i = 0; i < 20; i++) {
+      const g = { x: 24, y: 24, width: 320, height: 96 + i * 20 };
+      const b = pinnedBounds({ width: 368, height: g.height + 48 }, pin, g);
+      expect(glassBR(b, g)).toEqual(glassBR(b0, g0));
+      expect(b.y + g.y).toBeGreaterThanOrEqual(mac.workArea.y);
+    }
   });
 });

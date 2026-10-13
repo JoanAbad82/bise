@@ -6,6 +6,10 @@
 //           96 px above the work area's bottom (the Dock), centred; it grows upward
 //   menu    the tray's dropdown: the glass's top 6 px under the tray icon,
 //           centred on it
+//   corner  the fn talk (his pick C, designer m_22119): the glass's bottom-right
+//           16 px from the right edge and 16 px above the Dock (a Dock on the
+//           right: 16 px left of it; a hidden Dock: 16 px from the bottom); it
+//           grows upward and keeps its right edge
 // Never outside the work area (no menu bar, no Dock), checked once, at show.
 // While shown it never re-centres or climbs (lead m_11455: the input must not
 // move while he types): `pinned` notes where its glass sits at show, and each
@@ -30,11 +34,25 @@ export interface DisplayBox {
   readonly workArea: Rect;
 }
 
-export type Anchor = { readonly at: 'top' } | { readonly at: 'bottom' } | { readonly at: 'menu'; readonly icon: Rect };
+export type Anchor = { readonly at: 'top' } | { readonly at: 'bottom' } | { readonly at: 'corner' } | { readonly at: 'menu'; readonly icon: Rect };
 
 export const TOP = 170;
 export const BOTTOM = 96;
 export const MENU_GAP = 6;
+export const CORNER = 16;
+/** a work area edge this close to the display's is no Dock (a hidden Dock leaves a few px): the display's edge counts */
+const NO_DOCK = 8;
+
+/** The corner's bottom-right: CORNER px inside the Dock's side of the work area, or of the display where no Dock is. */
+function cornerOf(d: DisplayBox): { right: number; bottom: number } {
+  const b = d.bounds;
+  const wa = d.workArea;
+  const waRight = wa.x + wa.width;
+  const waBottom = wa.y + wa.height;
+  const right = b.x + b.width - waRight < NO_DOCK ? b.x + b.width : waRight;
+  const bottom = b.y + b.height - waBottom < NO_DOCK ? b.y + b.height : waBottom;
+  return { right: right - CORNER, bottom: bottom - CORNER };
+}
 
 /** Where a window goes to be on no display (test mode, BISE_DESKTOP_OFFSCREEN): far from every real one. */
 export const OFF = -30000;
@@ -68,30 +86,50 @@ export function capsuleBounds(size: { width: number; height: number }, d: Displa
       x = anchor.icon.x + anchor.icon.width / 2 - gMidX;
       y = Math.max(anchor.icon.y + anchor.icon.height, wa.y) + MENU_GAP - g.y;
       break;
+    case 'corner': {
+      const c = cornerOf(d);
+      x = c.right - (g.x + g.width);
+      y = c.bottom - (g.y + g.height);
+      break;
+    }
   }
-  x = Math.min(Math.max(x, wa.x), wa.x + wa.width - w);
-  y = Math.min(Math.max(y, wa.y), wa.y + wa.height - h);
+  if (anchor.at === 'corner') {
+    // the glass is placed exactly (it may sit in the strip a hidden Dock leaves);
+    // only a transparent margin wider than CORNER goes past; a glass taller or wider than the screen keeps its top-left in
+    x = Math.max(x, wa.x);
+    y = Math.max(y, wa.y);
+  } else {
+    x = Math.min(Math.max(x, wa.x), wa.x + wa.width - w);
+    y = Math.min(Math.max(y, wa.y), wa.y + wa.height - h);
+  }
   return { x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) };
 }
 
-/** Where the glass was pinned at show: its left edge, and its anchored edge's y (top, or bottom for 'bottom'). */
+/**
+ * Where the glass was pinned at show: its anchored side's x (left, or right
+ * for 'corner') and its anchored edge's y (top, or bottom for 'bottom' and 'corner').
+ */
 export interface Pin {
   readonly x: number;
   readonly y: number;
   readonly edge: 'top' | 'bottom';
+  readonly side: 'left' | 'right';
 }
 
 /** The pin of a capsule placed at `b` (capsuleBounds) with this glass. */
 export function pinOf(b: Rect, size: { width: number; height: number }, anchor: Anchor, glass?: Rect): Pin {
   const g = glass ?? { x: 0, y: 0, width: size.width, height: size.height };
-  return anchor.at === 'bottom' ? { x: b.x + g.x, y: b.y + g.y + g.height, edge: 'bottom' } : { x: b.x + g.x, y: b.y + g.y, edge: 'top' };
+  const bottom = b.y + g.y + g.height;
+  if (anchor.at === 'corner') return { x: b.x + g.x + g.width, y: bottom, edge: 'bottom', side: 'right' };
+  return anchor.at === 'bottom' ? { x: b.x + g.x, y: bottom, edge: 'bottom', side: 'left' } : { x: b.x + g.x, y: b.y + g.y, edge: 'top', side: 'left' };
 }
 
-/** The window's bounds for a new size while shown: the glass's left edge and pinned edge stay put; no centring, no clamp. */
+/** The window's bounds for a new size while shown: the glass's pinned side and pinned edge stay put; no centring, no clamp. */
 export function pinnedBounds(size: { width: number; height: number }, pin: Pin, glass?: Rect): Rect {
   const g = glass ?? { x: 0, y: 0, width: size.width, height: size.height };
+  const x = pin.side === 'left' ? pin.x - g.x : pin.x - (g.x + g.width);
   const y = pin.edge === 'top' ? pin.y - g.y : pin.y - (g.y + g.height);
-  return { x: Math.round(pin.x - g.x), y: Math.round(y), width: Math.round(size.width), height: Math.round(size.height) };
+  return { x: Math.round(x), y: Math.round(y), width: Math.round(size.width), height: Math.round(size.height) };
 }
 
 /**
