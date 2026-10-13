@@ -840,6 +840,23 @@ def real_shape_pure():
     # the candidate's own pid named 'bise try' is still a breach
     his, ours = {"name": "bise try", "pid": 70859}, {"name": "bise try", "pid": 56174}
     check(not rs.is_breach(his, False, {56174}) and rs.is_breach(ours, False, {56174}) and rs.is_breach(his, True, {56174}), "his app vs ours")
+    # an app he starts during the run (b4a25acb: Vibe from Raycast) is his switch only when its chain starts
+    # at one of his launchers and holds nothing of ours; any bise app front is a breach whatever its launcher
+    check(rs.parent_asn('"LSParentASN"=ASN:0x0-0x3d03d:') == "ASN:0x0-0x3d03d" and rs.parent_asn('"LSParentASN"=[ NULL ] ') is None, "parentASN")
+    raycast = [{"name": "Raycast", "pid": 2026, "bundle": "com.raycast.macos"}, {"name": "loginwindow", "pid": 412, "bundle": "com.apple.loginwindow"}]
+    vibe = {"name": "Vibe", "pid": 36147, "bundle": "ai.mistral.lechat.desktop"}
+    cand = "dev.bise.desktop.cand"
+    check(not rs.is_breach(vibe, True, {17193}, cand, raycast), "Vibe via Raycast = his switch")
+    check(rs.is_breach({"name": "bise dev", "pid": 900, "bundle": "dev.bise.desktop.dev"}, True, {17193}, cand, raycast)
+          and rs.is_breach({"name": "bise try", "pid": 901, "bundle": "x"}, True, {17193}, cand, raycast), "a bise app via Raycast = breach")
+    check(rs.is_breach(vibe, True, {17193}, cand, [{"name": "bise cand", "pid": 17193, "bundle": cand}])
+          and rs.is_breach(vibe, True, {17193}, cand, [{"name": "Raycast", "pid": 2026, "bundle": "com.raycast.macos"},
+                                                         {"name": "bise cand", "pid": 17193, "bundle": cand}])
+          and rs.is_breach(vibe, True, {17193}, cand, [{"name": "Finder", "pid": 600, "bundle": cand}]), "candidate in the chain = breach")
+    check(rs.is_breach(vibe, True, {17193}, cand, None) and rs.is_breach(vibe, True, {17193}, cand, [])
+          and rs.is_breach(vibe, True, {17193}, cand, [{"name": "node", "pid": 777, "bundle": None}]), "unknown chain = breach")
+    check(rs.is_breach({"name": "System Settings", "pid": 902, "bundle": "com.apple.systempreferences"}, True, {17193}, cand, raycast)
+          and rs.is_breach(dict(vibe, pid=17193), True, {17193}, cand, raycast), "FRONT_BAD or a pid of ours via Raycast = breach")
     line = ("00:18:13.142 Df runningboardd[416:1cb202e] [com.apple.runningboard:ttl] Acquiring assertion targeting "
             "[osservice<com.apple.UserNotificationCenterAgent(501)>:15030] from originator [osservice<com.apple.coreservices.launchservicesd>:378] with descript")
     check(rs.originator(line, 15030) == "osservice<com.apple.coreservices.launchservicesd>:378" and rs.originator(line, 1) is None,

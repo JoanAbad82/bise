@@ -468,17 +468,67 @@ def originator(log_text, pid):
     return None
 
 
-def is_breach(info, started_after, run_pids=None, cand_bundle=None):
+# who may launch an app of his during the run (b4a25acb's run stopped when he opened Vibe from Raycast)
+HIS_LAUNCHERS = ("Raycast", "Dock", "Finder", "Spotlight", "loginwindow")
+
+
+def parent_asn(text):
+    """lsappinfo info -only parentASN's ASN, or None at the top ('[ NULL ]'). Pure."""
+    m = re.search(r'"LSParentASN"=(ASN:[0-9a-fx-]+)', text)
+    return m.group(1) if m else None
+
+
+def his_launch(chain, run_pids=None, cand_bundle=None):
+    """An app started during the run is his when its launch chain (its parent app first, then the
+    parent's parent..., plus its ps parents; each {name, pid, bundle}) starts at one of HIS_LAUNCHERS
+    and holds no pid of the run and not the candidate's bundle id (ambient-lead m_21420). Anything
+    else, an empty or unknown chain included, is not his. Pure."""
+    if not chain or chain[0].get("name") not in HIS_LAUNCHERS:
+        return False
+    for link in chain:
+        if run_pids and link.get("pid") in run_pids:
+            return False
+        if cand_bundle and link.get("bundle") == cand_bundle:
+            return False
+    return True
+
+
+def launch_chain(pid):
+    """The front app's launch chain for his_launch: the LaunchServices parents (lsappinfo parentASN up
+    to the top), then the ps parents up to launchd. Empty when lsappinfo doesn't know the pid."""
+    run = lambda *a: subprocess.run(list(a), capture_output=True, text=True).stdout  # noqa: E731
+    chain, asn = [], parent_asn(run("lsappinfo", "info", "-only", "parentASN", str(pid)))
+    while asn and len(chain) < 10:
+        chain.append(front_info(run("lsappinfo", "info", "-only", "name", "-only", "pid", "-only", "bundleID", asn)))
+        asn = parent_asn(run("lsappinfo", "info", "-only", "parentASN", asn))
+    p = pid
+    for _ in range(20):
+        p = run("ps", "-o", "ppid=", "-p", str(p)).strip()
+        if not p.isdigit() or int(p) <= 1:
+            break
+        p = int(p)
+        chain.append({"name": run("ps", "-o", "comm=", "-p", str(p)).strip().rsplit("/", 1)[-1], "pid": p, "bundle": None})
+    return chain
+
+
+def is_breach(info, started_after, run_pids=None, cand_bundle=None, chain=None):
     """A front change is a breach when it is one of FRONT_BAD or an app started after the run
     began; any other app is his own switch (he works next to the run). With the run's pids known,
     an app that is not one of them and was there before the run is his own too, even named like
     ours: his promoted 'bise try' has the candidate's name and bundle id (c28260a9's run 3 stopped
     when he brought his app to the front). With the candidate's own bundle id (ambient-lead m_20669:
     candidates are built as dev.bise.desktop.cand, never his app's id), that id in front is ours,
-    whatever its pid. Pure."""
+    whatever its pid. An app started after the run began that he launched (his_launch on its chain)
+    is his switch too, unless it is one of FRONT_BAD or a pid of ours. Pure."""
     if cand_bundle and info.get("bundle") == cand_bundle:
         return True
     if run_pids is not None and info.get("pid") and int(info["pid"]) not in run_pids and not started_after:
+        return False
+    # any bise app (dev.bise.*, 'bise try', 'bise cand') coming front during a run, whatever its
+    # launcher, is a breach (main m_21421); his own app there before the run is handled just above
+    bise_app = (info.get("bundle") or "").startswith("dev.bise.") or info["name"] in ("bise", "bise try", "bise cand")
+    if (started_after and not bise_app and info["name"] not in FRONT_BAD and not (run_pids and info.get("pid") in run_pids)
+            and his_launch(chain, run_pids, cand_bundle)):
         return False
     return info["name"] in FRONT_BAD or bool(started_after)
 
@@ -557,7 +607,14 @@ def front_gate(out, stop_file, bundle, every=0.1, pids_file=None):
                     run_pids = {int(x) for x in open(pids_file).read().split() if x.isdigit()} if pids_file else None
                 except OSError:
                     run_pids = None
-                row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after, run_pids, cand_bundle))
+                chain = launch_chain(cur["pid"]) if after and cur["pid"] else None
+                row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after, run_pids, cand_bundle, chain))
+                if chain is not None:
+                    row["chain"] = chain
+                    row["his_launch"] = not row["breach"]
+                    if row["his_launch"]:
+                        print("%s his switch: %s (%s), launched by %s" % (time.strftime("%H:%M:%S"), cur["name"], cur.get("bundle"),
+                              chain[0].get("name") if chain else "?"), flush=True)
                 if row["breach"]:
                     kill_run(bundle, pids_file)
                     with open(os.path.join(os.path.dirname(out), "BREACH"), "w") as b:
