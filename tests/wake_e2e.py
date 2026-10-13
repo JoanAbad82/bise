@@ -6,7 +6,8 @@ A real hub (bise sbd, scripted model), a throwaway home:
   t1 once, with its rc and its last lines, within ~2 s of its end;
 - `sb wake --on-exit <pid>`: the end of a process wakes t1 the same way;
 - `sb wake --on-file <path>`: the file appearing wakes t1, with its rc,
-  and a t1 busy at that moment gets it after its turn, never mid-turn;
+  and a t1 busy at that moment gets it in that turn, steered
+  (wake-deliver: a wake reaches a busy agent mid-turn);
 - a watch survives a hub restart; one wake per event (the watch ends);
 - a dropped task's watches end with it (wake_end `gone` in the journal).
 
@@ -86,7 +87,7 @@ def main():
         check(late <= LATE, "--on-exit: woken %.2f s after the end" % late)
         print("pid: woken %.2f s after the end" % late)
 
-        # 3. --on-file, the agent busy when it appears: after its turn
+        # 3. --on-file, the agent busy when it appears: in that turn
         rc = os.path.join(E.tmp, "rc")
         c.wait_idle("t1")
         c.say("[[bash: sb wake --on-file %s --note FILE-NOTE]]" % rc, focus="t1")
@@ -101,11 +102,11 @@ def main():
         arrival(c, "t1", "FILE-NOTE", 30)
         w = wakes(c, "t1", "FILE-NOTE")[0]
         check("rc 3" in w, "the rc file's rc: %r" % w)
-        # never steered into the busy turn: the wake comes after that turn's end
+        # steered into the busy turn: the wake comes before that turn's end
         ls = c.lines("t1")
         k_sleep = max(i for i, l in enumerate(ls) if l.startswith("tool #") and l.endswith("bash : sleep 6"))
         k_done = next(i for i in range(k_sleep, len(ls)) if ls[i].strip().startswith("obs: turn_done"))
-        check(ls.index(w) > k_done, "the wake after the busy turn's end (wake #%d, turn_done #%d)" % (ls.index(w), k_done))
+        check(k_sleep < ls.index(w) < k_done, "the wake inside the busy turn (wake #%d, sleep #%d, turn_done #%d)" % (ls.index(w), k_sleep, k_done))
 
         # 4. a restart keeps a watch
         rc2 = os.path.join(E.tmp, "rc2")

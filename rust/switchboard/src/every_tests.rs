@@ -40,27 +40,28 @@ fn hub() -> T {
 }
 
 #[test]
-fn a_timer_fires_when_due_and_its_agent_is_idle_never_stacked() {
+fn a_timer_fires_when_due_idle_or_busy_never_stacked() {
     let mut t = hub();
     let id = every(&mut t, MAIN, "w", Sched::Every(10 * MIN_MS), None, None);
     assert_eq!(id, 1);
     assert!(say_to(&tick(&mut t, N + MIN_MS), "w").is_none(), "not due yet");
-    // due while busy: nothing, however long it stays busy
+    // due while busy: steered into the turn at once (wake-deliver, law
+    // timer_fires_busy), the next one a period later
     t.hub.force_run("w", Run::Busy);
-    for k in 0..30 {
-        let fx = tick(&mut t, N + (10 + k) * MIN_MS);
-        assert!(journal(&fx, "every_fired").is_empty() && say_to(&fx, "w").is_none());
+    let fx = tick(&mut t, N + 10 * MIN_MS);
+    let text = steer_to(&fx, "w").expect("the wake, steered");
+    assert!(say_to(&fx, "w").is_none() && text.contains("timer #1 (every 10m, set by main): check HN"), "{}", text);
+    assert_eq!(journal(&fx, "every_fired")[0]["next_ms"], N + 20 * MIN_MS);
+    assert!(journal(&tick(&mut t, N + 11 * MIN_MS), "every_fired").is_empty(), "once per period");
+    // starting (no REPL to reach): it waits, however long, then one wake
+    t.hub.force_run("w", Run::Starting);
+    for k in 0..20 {
+        assert!(journal(&tick(&mut t, N + (20 + k) * MIN_MS), "every_fired").is_empty(), "no REPL: it waits");
     }
-    // idle again: one wake, the next one a period later (no catch-up)
     t.hub.force_run("w", Run::Idle);
     let fx = tick(&mut t, N + 40 * MIN_MS);
-    let text = say_to(&fx, "w").expect("the wake");
-    // due at +10m, busy until +40m: it says how long it waited
-    assert!(text.contains("timer #1 (every 10m, waited 30m for w to finish, set by main): check HN"), "{}", text);
+    assert!(say_to(&fx, "w").is_some_and(|x| x.contains("waited 20m for w to finish")), "{:?}", say_to(&fx, "w"));
     assert_eq!(journal(&fx, "every_fired")[0]["next_ms"], N + 50 * MIN_MS);
-    t.hub.force_run("w", Run::Idle);
-    assert!(say_to(&tick(&mut t, N + 41 * MIN_MS), "w").is_none());
-    assert!(say_to(&tick(&mut t, N + 50 * MIN_MS), "w").is_some());
 }
 
 #[test]
@@ -123,13 +124,13 @@ fn a_one_shot_timer_is_spent_only_by_a_delivered_wake() {
     let mut t = hub();
     let id = every(&mut t, MAIN, "w", Sched::Daily(7 * 60 + 30), None, Some(1));
     let due = t.hub.timers().map[&id].next_ms;
+    t.hub.force_run("w", Run::Down);
+    assert!(journal(&tick(&mut t, due), "every_fired").is_empty(), "down: not spent, not counted");
     t.hub.force_run("w", Run::Busy);
-    assert!(journal(&tick(&mut t, due), "every_fired").is_empty(), "busy: not spent, not counted");
-    t.hub.force_run("w", Run::Idle);
     let fx = tick(&mut t, due + 1000);
     let at = |kind: &str| fx.iter().position(|e| matches!(e, Effect::Journal(j) if j["type"] == kind)).unwrap();
     assert!(at("message_sent") < at("every_fired") && at("every_fired") < at("every_stop"), "{:?}", fx);
-    assert!(say_to(&fx, "w").unwrap().contains("1/1"));
+    assert!(steer_to(&fx, "w").unwrap().contains("1/1"), "busy: steered into its turn");
     assert!(t.hub.timers().map.is_empty());
     // an agent with a wake from bise still queued (a busy one gets it as
     // a steer at once; a starting one keeps it queued): no second one
@@ -148,8 +149,8 @@ fn a_one_shot_timer_is_spent_only_by_a_delivered_wake() {
 fn ended_timers_runs_and_run_now() {
     let mut t = hub();
     let id = every(&mut t, MAIN, "w", Sched::Every(2 * MIN_MS), None, Some(6));
-    // due at +2m, its agent busy until +6m: one wake that waited 4m
-    t.hub.force_run("w", Run::Busy);
+    // due at +2m, its agent down until +6m: one wake that waited 4m
+    t.hub.force_run("w", Run::Down);
     assert!(say_to(&tick(&mut t, N + 5 * MIN_MS), "w").is_none());
     t.hub.force_run("w", Run::Idle);
     let text = say_to(&tick(&mut t, N + 6 * MIN_MS), "w").unwrap();

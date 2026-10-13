@@ -501,7 +501,8 @@ def may_fire.go(due: Bool, +x: Timer, +ready: Bool, +now: Nat) -> Bool:
 
 # the guard of every wake (law wake_never_stacked): its agent has no wake
 # from bise still queued; a due wake also needs the timer due and under
-# its times, and its agent active and idle (a busy one: at its next idle)
+# its times, and its agent active and reachable (idle: a turn; busy:
+# steered into its turn; core.bend timer_ready, law timer_fires_busy)
 def may_fire(+bise_queued: Bool, +due: Bool, +x: Timer, +ready: Bool, +now: Nat) -> Bool:
   Bool.not(bise_queued) && may_fire.go(due, x, ready, now)
 

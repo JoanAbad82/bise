@@ -3,8 +3,8 @@
 A real hub (bise sbd, scripted model): main sets a timer that wakes a
 task every second (SB_EVERY_MIN_MS lowers the 1-minute minimum for the
 test); the task gets the wakes from `bise`; each wake keeps it busy 4 s:
-no wake reaches it mid-turn and only one waits for its idle (never
-stacked: a few wakes in 12 s, not one per second); `sb every` lists it,
+the next ones reach it mid-turn, steered (wake-deliver), one per period
+at most; `sb every` lists it,
 `sb every --stop` ends it; a daily timer (`sb every day 07:30`) and a
 short one show in `sb tasks`, come back after a hub restart and the
 short one fires again; a dropped task's timers stop with it.
@@ -77,13 +77,13 @@ def main():
         check(SET_LINE.search(r) is not None and "sb every --stop 1" in r, "the set line: %r" % r)
         c.wait(lambda: len(wakes(c)) >= 1, 30, "a first wake")
         t0 = time.time()
-        # three wakes (about 8 s when each keeps t1 busy 4 s), then the
-        # same bound on the rate over the time they took: one per second
-        # reaches 3 in ~2 s, past the bound
-        n = len(wait.until(lambda: (lambda w: len(w) >= 3 and w)(wakes(c)), 20, "3 wakes of timer #1"))
-        spent = time.time() - t0 + 5
-        check(2 <= n <= spent / 4 + 1, "busy 4 s per wake: %d wakes in %.0f s, never one per second" % (n, spent))
-        check(not any("steer" in l and WAKE in l for l in c.lines("t1")), "no wake mid-turn")
+        # busy 4 s per wake, the next wakes reach t1 in its turn, steered
+        # (wake-deliver), never more than one per period
+        n = len(wait.until(lambda: (lambda w: len(w) >= 4 and w)(wakes(c)), 20, "4 wakes of timer #1"))
+        spent = time.time() - t0 + 1
+        check(n <= spent + 2, "one per period at most: %d wakes in %.0f s" % (n, spent))
+        # the runtime reads them after the running tool call (its steer-rx)
+        c.wait(lambda: any(l.startswith("sb steer-rx") for l in c.lines("t1")), 15, "wakes steered into a busy turn")
 
         r = main_says(c, "sb every", "@t1")
         check(SET_LINE.search(r) is not None, "sb every lists it: %r" % r)

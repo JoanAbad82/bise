@@ -29,6 +29,7 @@ import ./gen/fx.bend as F
 import ./gen/kit.bend as K
 
 import ./pause.bend as P
+import ./reach.bend as R
 import ./gen/feed.bend as FD
 import ./keyed.bend as KL
 import ./feature.bend as FT
@@ -1125,27 +1126,9 @@ def tms(-o: M.St, +cx: X.Cx<o>) -> TM.Tms:
 def live(-o: M.St, +cx: X.Cx<o>) -> List<&2, TM.Timer>:
   TM.Tms.live(tms(o, cx))
 
-def from_bise(xs: List<&2, M.Msg>) -> Bool:
-  match xs:
-    case Nil{}:
-      False{}
-    case Con{+h, +t}:
-      String.eq(M.Msg.from(h), M.HUB()) || from_bise(t)
-
 # a message from bise is queued for `n` (a wake not delivered yet)
 def bise_queued(+s: M.St, +n: String) -> Bool:
-  from_bise(M.queued_for(s, n))
-
-def timer_agent.go(+s: M.St, m: Maybe<&2, String>) -> Maybe<&2, M.Agent>:
-  match m:
-    case None{}:
-      None{}
-    case Some{+n}:
-      M.get_agent(s, n)
-
-# the agent of a timer (by its name or an old one)
-def timer_agent(+s: M.St, +n: String) -> Maybe<&2, M.Agent>:
-  timer_agent.go(s, M.resolve(s, n))
+  R.from_bise(M.queued_for(s, n))
 
 def life_gone(l: M.Life) -> Bool:
   match l:
@@ -1159,11 +1142,12 @@ def ready.go(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>) -> Bool:
     case None{}:
       False{}
     case Some{+a}:
-      is_active(M.Agent.life(a)) && is_idle(X.Rt.run(rt(o, cx, M.Agent.name(a))))
+      is_active(M.Agent.life(a)) && R.reachable(X.Rt.run(rt(o, cx, M.Agent.name(a))))
 
-# active and idle: a wake reaches it now
+# active, idle or busy: a wake reaches it now (a turn, or steered into its
+# turn: law timer_reaches_busy); starting or down: it waits
 def timer_ready(-o: M.St, +cx: X.Cx<o>, +n: String) -> Bool:
-  ready.go(o, timer_agent(st(o, cx), n), cx)
+  ready.go(o, R.agent_of(st(o, cx), n), cx)
 
 def gone.go(m: Maybe<&2, M.Agent>) -> Bool:
   match m:
@@ -1174,7 +1158,7 @@ def gone.go(m: Maybe<&2, M.Agent>) -> Bool:
 
 # unknown or archived: its timers end
 def timer_gone(+s: M.St, +n: String) -> Bool:
-  gone.go(timer_agent(s, n))
+  gone.go(R.agent_of(s, n))
 
 # a paused project fires no timer (law timer_held_while_paused): a due
 # one fires at the first tick after /resume
@@ -1264,7 +1248,7 @@ def timer_set.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +sc: Maybe<&2
 
 # `i`: the input, its IEverySet record
 def timer_set(-o: M.St, +cx: X.Cx<o>, +agent: String, +every_ms: Maybe<&2, Nat>, +daily_min: Maybe<&2, Nat>, +i: GI.In) -> X.Cx<o>:
-  timer_set.agent(o, timer_agent(st(o, cx), agent), cx, C.sched_of(every_ms, daily_min), i)
+  timer_set.agent(o, R.agent_of(st(o, cx), agent), cx, C.sched_of(every_ms, daily_min), i)
 
 # {"t":"every_stop"}: `sb every --stop`, /scheduled's x; `wake` (the
 # user's stop): what bise tells its agent, in the same step
@@ -1401,8 +1385,8 @@ def timers_tick.go(-o: M.St, work: Bool, +cx: X.Cx<o>) -> X.Cx<o>:
     case True{}:
       timers_tick.ask(o, wake_qs(o, live(o, cx), cx), cx, live(o, cx))
 
-# the timers due now wake their idle agents (a busy one: at its next
-# idle), the ended ones stop. A tick with none due or past its end does
+# the timers due now wake their agents (a busy one in its turn, steered:
+# law timer_fires_busy), the ended ones stop. A tick with none due or past its end does
 # nothing (idle-cpu)
 def timers_tick(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
   timers_tick.go(o, TM.any_work(live(o, cx), now(o, cx)), cx)
@@ -1417,25 +1401,17 @@ def wks(-o: M.St, +cx: X.Cx<o>) -> WK.Wakes:
 def wake_end(-o: M.St, +cx: X.Cx<o>, +id: Nat, +why: String) -> X.Cx<o>:
   emit(o, cx, M.EWake{WK.WEnd{id, why, now(o, cx)}}, Unit{}, Unit{}, Unit{})
 
-# a wake waits for the end of a busy turn (queued mode, never steered in:
-# the turn's work is not cut by it), and starts the next turn at its idle
+# a watch's wake from bise: never queued mode, so an idle agent starts a
+# turn and a busy one gets it in its turn, steered (law wake_steers_busy)
+def wake_snd(+agent: String, +text: String) -> Snd:
+  Snd{M.HUB(), agent, text, False{}, None{}, False{}, False{}, False{}, None{}, ""}
+
 def wake_say(-o: M.St, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
-  fst(o, send(o, cx, Snd{M.HUB(), agent, text, False{}, None{}, False{}, False{}, True{}, None{}, ""}))
-
-def agent_active.go(m: Maybe<&2, M.Agent>) -> Bool:
-  match m:
-    case None{}:
-      False{}
-    case Some{+a}:
-      is_active(M.Agent.life(a))
-
-# known (by its name or an old one) and active
-def agent_active(+s: M.St, +n: String) -> Bool:
-  agent_active.go(timer_agent(s, n))
+  fst(o, send(o, cx, wake_snd(agent, text)))
 
 # {"t":"wake_hit"}: the look saw it happen. A live watch of an active
 # agent ends and its agent gets ONE message from bise in the same step
-# (queued while it is busy: delivered at its idle). Ended or unknown:
+# (a busy one in its turn, steered). Ended or unknown:
 # nothing (laws wake_hit_once, wake_gone_never_hits); a stopped agent's
 # watch waits for it.
 def wake_hit.found(-o: M.St, m: Maybe<&2, WK.Watch>, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
@@ -1443,7 +1419,7 @@ def wake_hit.found(-o: M.St, m: Maybe<&2, WK.Watch>, +cx: X.Cx<o>, +text: String
     case None{}:
       cx
     case Some{+w}:
-      pick_lazy(X.Cx<o>, agent_active(st(o, cx), WK.Watch.agent(w)),
+      pick_lazy(X.Cx<o>, R.agent_active(st(o, cx), WK.Watch.agent(w)),
         u => wake_say(o, wake_end(o, cx, WK.Watch.id(w), "hit"), WK.Watch.agent(w), text),
         u => cx)
 
@@ -1465,7 +1441,7 @@ def wake_set(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +spec: J.Json, +max_t
     case None{}:
       cx
     case Some{+n}:
-      wake_set.agent(o, agent_active(st(o, cx), n), cx, n, spec, max_text, max_ms, quiet)
+      wake_set.agent(o, R.agent_active(st(o, cx), n), cx, n, spec, max_text, max_ms, quiet)
 
 # {"t":"wake_stop"}: `sb wake --stop`; ended or unknown: nothing
 def wake_stop.found(-o: M.St, m: Maybe<&2, WK.Watch>, +cx: X.Cx<o>, +why: String) -> X.Cx<o>:
@@ -1485,7 +1461,7 @@ def wakes_tick.each(-o: M.St, ws: List<&2, WK.Watch>, +cx: X.Cx<o>) -> X.Cx<o>:
       cx
     case Con{+w, +rest}:
       +cx2 = wake_end(o, cx, WK.Watch.id(w), "max")
-      +cx3 = pick_lazy(X.Cx<o>, WK.max_says(w, agent_active(st(o, cx2), WK.Watch.agent(w))),
+      +cx3 = pick_lazy(X.Cx<o>, WK.max_says(w, R.agent_active(st(o, cx2), WK.Watch.agent(w))),
         u => wake_say(o, cx2, WK.Watch.agent(w), WK.Watch.max_text(w)), u => cx2)
       wakes_tick.each(o, rest, cx3)
 
@@ -3695,6 +3671,20 @@ def confirm_close(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat, +res: 
     case Some{_}:
       close_card(o, cx, id, res)
 
+# {"t":"page_answered"}: a page question answered (`to`: the agent its
+# pick went to); its card closes, and its asker hears it when that is
+# another agent (law page_answer_tells_asker)
+def page_answered.tell(-o: M.St, tell: Bool, +cx: X.Cx<o>, +c: M.Card, +to: String, +page: String, +text: String) -> X.Cx<o>:
+  pick_lazy(X.Cx<o>, tell, u => fst(o, send(o, cx, msg(M.HUB(), M.Card.agent(c), R.answer_words(M.Card.id(c), page, to, text), False{}, None{}, False{}, False{}))), u => cx)
+
+def page_answered(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +to: String, +page: String, +text: String) -> X.Cx<o>:
+  match m:
+    case None{}:
+      cx
+    case Some{+c}:
+      +cx2 = close_card(o, cx, M.Card.id(c), "answered")
+      page_answered.tell(o, R.tells_asker(M.resolve(st(o, cx2), M.Card.agent(c)), M.resolve(st(o, cx2), to)), cx2, c, to, page, text)
+
 def force_run_of(+r: String) -> M.Run:
   Bool.pick(M.Run, String.eq(r, "starting"), M.RStarting{},
     Bool.pick(M.Run, String.eq(r, "idle"), M.RIdle{},
@@ -3767,6 +3757,8 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       open_confirm(o, cx, agent, text)
     case GI.IConfirmClose{+card, +res}:
       confirm_close(o, M.card_of(M.St.cards(st(o, cx)), card), cx, card, res)
+    case GI.IPageAnswered{+card, +agent, +page, +text}:
+      page_answered(o, M.card_of(M.St.cards(st(o, cx)), card), cx, agent, page, text)
     case GI.IForge{+to, +text}:
       fst(o, send(o, cx, msg(M.GITHUB(), to, text, False{}, None{}, False{}, False{})))
     case GI.IForgeCard{+agent, +text}:

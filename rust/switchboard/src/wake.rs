@@ -8,7 +8,8 @@
 //! The watches themselves are sb-core's (bend/hub/wakes.bend and
 //! core.bend's watches section): their state, their journal lines
 //! (`wake_set`, `wake_end`), the decision to wake (a live watch of an
-//! active agent, one message from bise, queued while it is busy), the max
+//! active agent, one message from bise, steered into its turn when it is
+//! busy: laws wake_steers_busy, busy_steers_now), the max
 //! at the tick, a dropped agent's watches ending with it; laws
 //! wake_hit_once, wake_gone_never_hits, wake_drop_ends, wake_max_once,
 //! wake_replay_keeps in bend/laws/hub.bend.

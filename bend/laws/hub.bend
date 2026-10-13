@@ -15,6 +15,7 @@ import ../hub/xhub.bend as HXB
 import ../hub/codec.bend as HCo
 import ../hub/pause.bend as HP
 import ../hub/feature.bend as HFT
+import ../hub/reach.bend as HR
 
 # ---- Switchboard hub (hub/*.bend, the sb-core process) ----
 # The laws quantify over EVERY hub state, EVERY input (any JSON line the
@@ -265,6 +266,115 @@ law wake_max_once:
 law wake_replay_keeps:
   for +x: HWK.Watch
   {HWK.watch_of(HWK.watch_json(x)) == x : HWK.Watch}
+
+# ---- who a wake reaches, and when (wake-deliver, hub/reach.bend) ----
+# His rule: his message, his card answer, a watch's wake and a timer's
+# fire reach an active agent NOW. Idle: a turn starts. Busy: it is steered
+# into the turn (pump's steer, as `sb send`'s default --mode steer).
+# Starting or down: it waits in the queue. Paused: nothing is delivered
+# or steered (paused_delivers_nothing, timer_held_while_paused,
+# paused_steers_nothing). wake_never_stacked is unchanged.
+# CHANGED (wake-deliver): a watch's wake was queued mode (held until the
+# busy turn's end) and a due timer fired only for an idle agent (a busy
+# one at its next idle); now both reach a busy agent in its turn.
+
+# LAW: a watch's wake (its hit, its max) is a message from bise that is
+# never queued mode: an idle agent starts a turn, a busy one gets it in
+# its turn (busy_steers_now).
+law wake_steers_busy:
+  for +a: String
+  for +text: String
+  {HC.wake_snd(a, text) == HC.Snd{HM.HUB(), a, text, False{}, None{}, False{}, False{}, False{}, None{}, ""} : HC.Snd}
+
+# LAW: a busy agent's pump steers every queued message that is not queued
+# mode (a wake, a timer's fire, his message, an agent's): in order, now.
+law busy_steers_now:
+  for +m: HM.Msg
+  for +rest: List<&2, HM.Msg>
+  for q: {HM.Msg.queued(m) == False{} : Bool}
+  {HC.not_queued_mode(m <> rest) == m <> HC.not_queued_mode(rest) : List<&2, HM.Msg>}
+
+# LAW: a timer reaches an active agent that is busy (before: idle only).
+law timer_reaches_busy:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +a: HM.Agent
+  for p: {HC.is_active(HM.Agent.life(a)) == True{} : Bool}
+  for q: {HX.Rt.run(HC.rt(o, cx, HM.Agent.name(a))) == HM.RBusy{} : HM.Run}
+  {HC.ready.go(o, Some{a}, cx) == True{} : Bool}
+
+# LAW: a due wake of a timer whose agent it reaches (idle or busy:
+# timer_reaches_busy), in a project not paused, with no wake from bise
+# still queued for it, fires on the timer's own terms only: due and under
+# its times.
+law timer_fires_busy:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +t: HTM.Timer
+  for p: {HP.is_paused(HX.d(o, cx)) == False{} : Bool}
+  for q: {HC.bise_queued(HX.d(o, cx), HTM.Timer.agent(t)) == False{} : Bool}
+  for r: {HC.timer_ready(o, cx, HTM.Timer.agent(t)) == True{} : Bool}
+  {HC.timer_may(o, cx, t, True{}) == HTM.may_fire.go(True{}, t, True{}, HC.now(o, cx)) : Bool}
+
+# LAW: a paused project steers nothing into a busy agent's turn either:
+# pump (the only step that steers: pump.send.go's "steer") leaves the
+# step as it was; the wake stays queued for /resume.
+law paused_steers_nothing:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +n: String
+  for q: {HP.is_paused(HX.d(o, cx)) == True{} : Bool}
+  for r: {HX.Rt.run(HC.rt(o, cx, n)) == HM.RBusy{} : HM.Run}
+  {HC.pump(o, cx, n) == cx : HX.Cx<o>}
+
+# LAW: a page question answered on its page: its card closes, then the
+# card's asker is told or not (page_answer_tells_asker below).
+law page_answer_closes:
+  for -o: HM.St
+  for +c: HM.Card
+  for +cx: HX.Cx<o>
+  for +to: String
+  for +page: String
+  for +text: String
+  {HC.page_answered(o, Some{c}, cx, to, page, text) == HC.page_answered.tell(o, HR.tells_asker(HM.resolve(HX.d(o, HC.close_card(o, cx, HM.Card.id(c), "answered")), HM.Card.agent(c)), HM.resolve(HX.d(o, HC.close_card(o, cx, HM.Card.id(c), "answered")), to)), HC.close_card(o, cx, HM.Card.id(c), "answered"), c, to, page, text) : HX.Cx<o>}
+
+# LAW: the asker told: exactly one message from bise to the card's asker,
+# with his answer; not told: nothing more than the close.
+law page_answer_tells_asker:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +c: HM.Card
+  for +to: String
+  for +page: String
+  for +text: String
+  {HC.page_answered.tell(o, True{}, cx, c, to, page, text) == HC.fst(o, HC.send(o, cx, HC.msg(HM.HUB(), HM.Card.agent(c), HR.answer_words(HM.Card.id(c), page, to, text), False{}, None{}, False{}, False{}))) : HX.Cx<o>}
+
+law page_answer_quiet:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +c: HM.Card
+  for +to: String
+  for +page: String
+  for +text: String
+  {HC.page_answered.tell(o, False{}, cx, c, to, page, text) == cx : HX.Cx<o>}
+
+# LAW: who is told: the asker when it is another agent than the one the
+# pick went to; never the same agent twice, never an unknown asker.
+law page_asker_other:
+  for +x: String
+  for +y: String
+  for q: {String.eq(x, y) == False{} : Bool}
+  {HR.tells_asker(Some{x}, Some{y}) == True{} : Bool}
+
+law page_asker_same:
+  for +x: String
+  for +y: String
+  for q: {String.eq(x, y) == True{} : Bool}
+  {HR.tells_asker(Some{x}, Some{y}) == False{} : Bool}
+
+law page_asker_unknown:
+  for to: Maybe<&2, String>
+  {HR.tells_asker(None{}, to) == False{} : Bool}
 
 # LAW (L2, no message lost or doubled): a new hub keeps each message as
 # ONE record — its text and its single delivery state; no state exists

@@ -7,7 +7,7 @@
 1198 apps/desktop/src/store/store.test.ts
 1024 apps/desktop/src/store/store.ts
 1200 bend/core/wire.bend
-3891 bend/hub/core.bend
+3883 bend/hub/core.bend
 1356 bend/runtime/provider-pure.bend
 1319 docs/brand/design-system/content.py
 1387 docs/brand/readme/make.py

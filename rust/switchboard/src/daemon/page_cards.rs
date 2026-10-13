@@ -606,7 +606,9 @@ impl Shell {
     /// page): the card closes, and the answer takes the page's path: the
     /// page hears `answered`, the page's agent gets it as a pick note
     /// (main when it is gone). sb-core's question path would send it to
-    /// main, the card's asker (pm's 25: a task's page).
+    /// main, the card's asker (pm's 25: a task's page); sb-core's
+    /// `page_answered` closes it and tells the asker in one message when
+    /// the pick went to another agent (wake-deliver).
     pub(super) fn page_question_answer(&mut self, id: &str, block: &str, card: u64, reply: &str) -> bool {
         let Some(pages) = self.pg.pages.clone() else { return false };
         let reply = reply.trim();
@@ -619,9 +621,11 @@ impl Shell {
             return false;
         }
         self.page_cards().remove(&card);
-        if self.hub.st.open_cards().any(|c| c.id == card) {
-            self.step(Input::ConfirmClose { card, res: "answered".into() });
-        }
+        // the card closes; sb-core tells its asker too when that is not
+        // the agent the pick goes to (wake-deliver: main never heard #513)
+        let agent = pages.store.meta(id).map(|m| m.agent).unwrap_or_default();
+        let to = if self.page_agent_gone(&agent) { MAIN.to_string() } else { agent };
+        self.step(Input::PageAnswered { card, agent: to, page: id.to_string(), text: words.clone() });
         self.page_answer_without_card(id, block, &words);
         true
     }

@@ -219,6 +219,12 @@ law in_hub_msg_bare:
 def in_hub_msg_bare():
   {==}
 
+law in_page_answered_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"page_answered"})])) == IN.IPageAnswered{0n, "", "", ""} : IN.In}
+
+def in_page_answered_bare():
+  {==}
+
 law in_every_set_bare:
   {IN.of(J.obj([J.kv("t", J.JStr{"every_set"})])) == IN.IEverySet{"", "", "", 0n, "", None{}, None{}, None{}, None{}, None{}} : IN.In}
 
@@ -630,6 +636,16 @@ law in_IHubMsg_round:
   {IN.of(IN.json(IN.IHubMsg{to, text})) == IN.IHubMsg{to, text} : IN.In}
 
 def in_IHubMsg_round(to, text):
+  {==}
+
+law in_IPageAnswered_round:
+  for card: Nat
+  for agent: String
+  for page: String
+  for text: String
+  {IN.of(IN.json(IN.IPageAnswered{card, agent, page, text})) == IN.IPageAnswered{card, agent, page, text} : IN.In}
+
+def in_IPageAnswered_round(card, agent, page, text):
   {==}
 
 law in_IEverySet_round:

@@ -83,6 +83,10 @@ core_kinds! {
         CardClose = "card_close" => IConfirmClose { card: Nat, res: Str },
         /// a message of the hub itself (from `bise`) to an agent
         HubMsg = "hub_msg" => IHubMsg { to: Str, text: Str },
+        /// a page question's card answered on its page (wake-deliver): the
+        /// card closes `answered`; its asker hears it when that is not
+        /// `agent`, the agent the pick went to (reach.bend)
+        PageAnswered = "page_answered" => IPageAnswered { card: Nat, agent: Str, page: Str, text: Str },
         /// `sb every`: the hub checked the request and computed `next_ms`;
         /// one of `every_ms`, `daily_min`; `name` only when given
         EverySet = "every_set" => IEverySet {

@@ -14,6 +14,7 @@ import ../hub/xhub-model.bend as HXH
 import ../hub/xhub.bend as HXB
 import ../hub/pause.bend as HP
 import ../hub/feature.bend as HFT
+import ../hub/reach.bend as HR
 import ./lib/hub-1.bend as PL1
 import ./lib/hub-2.bend as PL2
 import ./lib/hub-3.bend as PL3
@@ -323,6 +324,49 @@ def Laws.wake_replay_keeps(x):
   match x:
     case HWK.Watch{i, a, s, m, sa, ma, q}:
       {==}
+
+# ---- who a wake reaches (wake-deliver) ----
+
+def Laws.wake_steers_busy(a, text):
+  {==}
+
+def Laws.busy_steers_now(m, rest, q):
+  %Equal.sym(Bool, HM.Msg.queued(m), False{}, q) : {Bool.pick(List<&2, HM.Msg>, _, HC.not_queued_mode(rest), m <> HC.not_queued_mode(rest)) == m <> HC.not_queued_mode(rest) : List<&2, HM.Msg>}
+  {==}
+
+def Laws.timer_reaches_busy(o, cx, a, p, q):
+  %Equal.sym(Bool, HC.is_active(HM.Agent.life(a)), True{}, p) : {Bool.and(_, HR.reachable(HX.Rt.run(HC.rt(o, cx, HM.Agent.name(a))))) == True{} : Bool}
+  %Equal.sym(HM.Run, HX.Rt.run(HC.rt(o, cx, HM.Agent.name(a))), HM.RBusy{}, q) : {Bool.and(True{}, HR.reachable(_)) == True{} : Bool}
+  {==}
+
+def Laws.timer_fires_busy(o, cx, t, p, q, r):
+  %Equal.sym(Bool, HP.is_paused(HX.d(o, cx)), False{}, p) : {Bool.and(Bool.not(_), HTM.may_fire(HC.bise_queued(HX.d(o, cx), HTM.Timer.agent(t)), True{}, t, HC.timer_ready(o, cx, HTM.Timer.agent(t)), HC.now(o, cx))) == HTM.may_fire.go(True{}, t, True{}, HC.now(o, cx)) : Bool}
+  %Equal.sym(Bool, HC.bise_queued(HX.d(o, cx), HTM.Timer.agent(t)), False{}, q) : {Bool.and(True{}, HTM.may_fire(_, True{}, t, HC.timer_ready(o, cx, HTM.Timer.agent(t)), HC.now(o, cx))) == HTM.may_fire.go(True{}, t, True{}, HC.now(o, cx)) : Bool}
+  %Equal.sym(Bool, HC.timer_ready(o, cx, HTM.Timer.agent(t)), True{}, r) : {Bool.and(True{}, HTM.may_fire(False{}, True{}, t, _, HC.now(o, cx))) == HTM.may_fire.go(True{}, t, True{}, HC.now(o, cx)) : Bool}
+  {==}
+
+def Laws.paused_steers_nothing(o, cx, n, q, r):
+  Laws.paused_delivers_nothing(o, cx, n, q)
+
+def Laws.page_answer_closes(o, c, cx, to, page, text):
+  {==}
+
+def Laws.page_answer_tells_asker(o, cx, c, to, page, text):
+  {==}
+
+def Laws.page_answer_quiet(o, cx, c, to, page, text):
+  {==}
+
+def Laws.page_asker_other(x, y, q):
+  %Equal.sym(Bool, String.eq(x, y), False{}, q) : {Bool.and(True{}, Bool.not(_)) == True{} : Bool}
+  {==}
+
+def Laws.page_asker_same(x, y, q):
+  %Equal.sym(Bool, String.eq(x, y), True{}, q) : {Bool.and(True{}, Bool.not(_)) == False{} : Bool}
+  {==}
+
+def Laws.page_asker_unknown(to):
+  {==}
 
 def Laws.wake_max_once(xs, id, now):
   match xs:
