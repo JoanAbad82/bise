@@ -81,7 +81,7 @@ test('spotlight/preview: the selected agent row shows its last actions in its ri
       '$ cargo test -p ingest',
       '› the cache is warm now: p99 went from 41 ms to 12 ms',
     ]);
-    await expect(acts.locator('.a.new .tm'), 'the newest line has its time').toHaveText('2m');
+    await expect(acts.locator('.a.new .tm'), 'the newest line has its time').toHaveText('2 min');
     await expect(row, 'the objective gave its place').not.toContainText('find why the ingest p99 doubled');
     // the actions sit in the objective's column (x of the right column), not under the name
     const xs = await row.evaluate((el: Element) => {

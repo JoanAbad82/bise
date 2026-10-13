@@ -46,8 +46,8 @@ describe('previewLines', () => {
 describe('actionTime', () => {
   it("'now' under a minute, minutes within the hour, else the clock", () => {
     expect(actionTime(NOW - 20_000, NOW)).toBe('now');
-    expect(actionTime(at(2), NOW)).toBe('2m');
-    expect(actionTime(at(59), NOW)).toBe('59m');
+    expect(actionTime(at(2), NOW)).toBe('2 min');
+    expect(actionTime(at(59), NOW)).toBe('59 min');
     expect(actionTime(at(58 + 60), NOW)).toBe('13:02');
     expect(actionTime(0, NOW)).toBe('');
   });

@@ -12,7 +12,7 @@ export const PREVIEW_LINES = 4;
 export interface PreviewLine {
   readonly key: string;
   readonly text: string;
-  /** '2m', '14:02'; '' when the entry has no time */
+  /** '2 min', '14:02'; '' when the entry has no time */
   readonly time: string;
   /** it waits on him: a question still open */
   readonly ask: boolean;
@@ -27,12 +27,13 @@ function firstLine(text: string): string {
   return line.replace(/^(#{1,6}\s+|[-*]\s+|>\s+)/u, '').replace(/[*_`]+/gu, '').trim();
 }
 
-/** '2m' within the hour ('now' under a minute), else the clock time '14:02'. */
+/** '2 min' within the hour, as the app writes ages everywhere (designer m_21313); 'now' under a
+ *  minute, else the clock time '14:02'. */
 export function actionTime(at: number, now: number): string {
   if (at <= 0) return '';
   const min = Math.floor((now - at) / 60_000);
   if (min < 1) return 'now';
-  if (min < 60) return `${String(min)}m`;
+  if (min < 60) return `${String(min)} min`;
   const d = new Date(at);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
