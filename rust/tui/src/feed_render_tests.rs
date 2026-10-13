@@ -2175,7 +2175,7 @@ fn your_file_chips_draw_by_name_in_place() {
     use bise_proto::parts::Part;
     let parts = vec![
         Part::Text { text: "ajouter l'image ".into() },
-        Part::Image { name: "[Image #1]".into(), source: "/u/logo.png".into(), mime: "image/png".into(), b64_file: "/nowhere/1.b64".into() },
+        Part::Image { name: "[Image #1]".into(), source: "/u/logo.png".into(), mime: "image/png".into(), b64_file: "/nowhere/1.b64".into(), caption: String::new() },
         Part::Text { text: " dans ".into() },
         Part::File { path: "/u/My Desktop/deck.pptx".into(), name: "[File #2]".into(), missing: false },
         Part::Text { text: " et ".into() },
@@ -2197,7 +2197,7 @@ fn many_file_chips_draw_at_every_width() {
     let t = |s: &str| Part::Text { text: s.into() };
     let parts = vec![
         t("ajouter l'image "),
-        Part::Image { name: "[Image #1]".into(), source: "/tmp/sb-e2e-x/My Desktop/logo.png".into(), mime: "image/png".into(), b64_file: "/nowhere/1.b64".into() },
+        Part::Image { name: "[Image #1]".into(), source: "/tmp/sb-e2e-x/My Desktop/logo.png".into(), mime: "image/png".into(), b64_file: "/nowhere/1.b64".into(), caption: String::new() },
         t(" dans la presentation powerpoint "),
         f(2, "deck.pptx", false),
         t(" avec "),

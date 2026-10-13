@@ -233,6 +233,15 @@ function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos: number
           ),
         )}
       </div>
+      {/* an image's caption under the chips, a fact about it, never his words: the talk's still says
+          the app and window it shows (architect m_22000) */}
+      {view.images.map((img, i) =>
+        img.caption === '' ? null : (
+          <p key={`c${String(i)}`} className="th-part-caption" data-testid={`${id}.image.${String(i + 1)}.caption`}>
+            {img.caption}
+          </p>
+        ),
+      )}
       {paste !== undefined && (
         <pre className="th-part-paste" data-testid={`${id}.paste.${String(paste.n)}.text`}>
           {paste.text}

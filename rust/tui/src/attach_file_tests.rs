@@ -49,7 +49,7 @@ fn the_sentence_keeps_each_chip_at_its_place() {
     let mut app = composer("ajouter l'image ", 16);
     app.attachments.push(Attachment {
         label: "[Image #1]".into(),
-        marker: parts::image_marker("[Image #1]", "/u/logo.png", "image/png", "/h/images/1.b64"),
+        marker: parts::image_marker("[Image #1]", "/u/logo.png", "image/png", "/h/images/1.b64", ""),
         info: Info::default(),
     });
     attach::insert_chip(&mut app.ed, "[Image #1]");
@@ -64,7 +64,7 @@ fn the_sentence_keeps_each_chip_at_its_place() {
         said.parts,
         vec![
             Part::Text { text: "ajouter l'image ".into() },
-            Part::Image { name: "[Image #1]".into(), source: "/u/logo.png".into(), mime: "image/png".into(), b64_file: "/h/images/1.b64".into() },
+            Part::Image { name: "[Image #1]".into(), source: "/u/logo.png".into(), mime: "image/png".into(), b64_file: "/h/images/1.b64".into(), caption: String::new() },
             Part::Text { text: " dans la presentation powerpoint ".into() },
             Part::File { path: deck.clone(), name: "[File #2]".into(), missing: false },
             Part::Text { text: " ".into() },

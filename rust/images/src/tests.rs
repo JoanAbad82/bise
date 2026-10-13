@@ -82,6 +82,16 @@ fn markers_never_panic_on_odd_text() {
     assert_eq!(ms.len(), 1);
 }
 
+/// A marker with a caption (its optional last attribute, architect
+/// m_22000) is still a marker, its `.b64` without the caption.
+#[test]
+fn a_captioned_marker_is_a_marker() {
+    let t = "x <image name=\"[Image #1]\" path=\"/s/a.png\" mime=\"image/png\" b64=\"/s/a.b64\" caption=\"Safari · bench\"> y";
+    let ms = markers(t);
+    assert_eq!((ms.len(), ms[0].b64.as_str(), &t[ms[0].end..]), (1, "/s/a.b64", " y"));
+    assert_eq!(display(t), "x [Image #1 /s/a.png] y");
+}
+
 #[test]
 fn pasted_paths_forms() {
     let d = tmpdir("paste");

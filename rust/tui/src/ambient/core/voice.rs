@@ -281,7 +281,7 @@ impl Core {
         let _ = std::fs::remove_file(path);
         match stored {
             Ok(stored) => {
-                if let Some(old) = self.shot.replace(Shot { stored, app, title, reached: false }) {
+                if let Some(old) = self.shot.replace(Shot { stored, app, title }) {
                     self.forget(vec![old]);
                 }
                 let ev = shot_ev(self.shot.as_ref());

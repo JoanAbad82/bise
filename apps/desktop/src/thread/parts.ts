@@ -23,8 +23,9 @@ export interface YouView {
   readonly words: string;
   /** his long pastes, by number (each opens from its chip) */
   readonly pastes: readonly { readonly n: number; readonly text: string }[];
-  /** his images: their label ('[Image #2]') and where he took them from (the thumbnail) */
-  readonly images: readonly { readonly name: string; readonly path: string }[];
+  /** his images: their label ('[Image #2]'), where he took them from (the thumbnail) and their
+   *  caption, a fact about the image ('Safari · cold bench', the talk's still), '' for none */
+  readonly images: readonly { readonly name: string; readonly path: string; readonly caption: string }[];
   /** his files (file-chips): each by its absolute path, its chip's label ('[File #2]'; '' a file
    *  of an older files list) and whether the hub found it gone when he sent it */
   readonly files: readonly YouFile[];
@@ -41,7 +42,7 @@ export interface YouFile {
 export function youView(parts: readonly Part[]): YouView {
   const quotes: PartQuote[] = [];
   const pastes: { n: number; text: string }[] = [];
-  const images: { name: string; path: string }[] = [];
+  const images: { name: string; path: string; caption: string }[] = [];
   const files: YouFile[] = [];
   let words = '';
   for (const p of parts) {
@@ -57,7 +58,7 @@ export function youView(parts: readonly Part[]): YouView {
         pastes.push({ n: p.n, text: p.text });
         break;
       case 'image':
-        images.push({ name: p.name, path: p.source });
+        images.push({ name: p.name, path: p.source, caption: p.caption ?? '' });
         break;
       case 'file':
         files.push({ name: p.name ?? '', path: p.path, missing: p.missing === true });

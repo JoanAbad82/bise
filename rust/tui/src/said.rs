@@ -119,7 +119,7 @@ pub(crate) fn view_of(text: &str, parts: &[Part]) -> View {
                 v.body.push(MARK_CLOSE);
                 v.pastes.push(Pasted { n: *n as usize, text: text.clone() });
             }
-            Part::Image { name, source, mime, b64_file } => v.body.push_str(&parts::image_marker(name, source, mime, b64_file)),
+            Part::Image { name, source, mime, b64_file, caption } => v.body.push_str(&parts::image_marker(name, source, mime, b64_file, caption)),
             // a file chip in place, as its marker (`▯ deck.pptx`,
             // attach::chip_spans); a listed file in the list after
             Part::File { path, name, missing } if !name.is_empty() => v.body.push_str(&parts::file_marker(name, path, *missing)),

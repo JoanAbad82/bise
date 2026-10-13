@@ -35,11 +35,11 @@ fn an_old_text_reads_as_its_parts_and_draws_without_a_tag() {
 
 #[test]
 fn a_paste_is_its_chip_mark_and_an_image_its_marker() {
-    let img = Part::Image { name: "[Image #2]".into(), source: "/a/b.png".into(), mime: "image/png".into(), b64_file: "/s/x.b64".into() };
+    let img = Part::Image { name: "[Image #2]".into(), source: "/a/b.png".into(), mime: "image/png".into(), b64_file: "/s/x.b64".into(), caption: String::new() };
     let s = Said::of_parts(vec![text("look "), Part::Paste { n: 1, text: "a\nb".into() }, text(" and "), img.clone()]);
     assert_eq!(s.text, parts::render(&s.parts));
     let v = view(&s);
-    assert_eq!(v.body, format!("look {MARK_OPEN}1{MARK_CLOSE} and {}", parts::image_marker("[Image #2]", "/a/b.png", "image/png", "/s/x.b64")));
+    assert_eq!(v.body, format!("look {MARK_OPEN}1{MARK_CLOSE} and {}", parts::image_marker("[Image #2]", "/a/b.png", "image/png", "/s/x.b64", "")));
     assert_eq!(v.pastes, vec![Pasted { n: 1, text: "a\nb".into() }]);
     assert!(v.quotes.is_empty());
     assert_eq!(s.words(), "look  and ");

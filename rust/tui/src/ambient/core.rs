@@ -56,9 +56,8 @@ fn send_word(words: &str) -> bool {
     matches!(w.as_str(), "send" | "send it" | "envoie" | "envoyer" | "envoie-le" | "envoie le")
 }
 
-/// The composer label of the shot's marker (the terminal shows
-/// `[Screen <app> · <title>]` in main's thread).
-const SHOT_NAME: &str = "[Screen]";
+/// The label of the talk's still: his message's first and only image.
+const SHOT_NAME: &str = "[Image #1]";
 
 /// The listener for the voice role's job (`listen::listener_for`).
 pub type ListenerFor = Box<dyn Fn(&ListenJob) -> Box<dyn Listener>>;
@@ -145,18 +144,20 @@ struct Shot {
     stored: bend_images::Stored,
     app: String,
     title: String,
-    /// main's turn has it (started after it was sent, or steered into it)
-    reached: bool,
 }
 
 impl Shot {
-    fn marker(&self) -> String {
-        let source = match (self.app.trim(), self.title.trim()) {
+    /// His message's image part (architect m_22000, the spotlight's
+    /// shape): the stored PNG as its source (the hub fills its `.b64`),
+    /// the app and window as its caption, a fact about the image and
+    /// never his words.
+    fn part(&self) -> bise_proto::parts::Part {
+        let caption = match (self.app.trim(), self.title.trim()) {
             ("", t) => t.to_string(),
             (a, "") => a.to_string(),
             (a, t) => format!("{a} · {t}"),
         };
-        bend_images::marker(SHOT_NAME, &source, &self.stored)
+        bise_proto::parts::Part::Image { name: SHOT_NAME.into(), source: self.stored.file.display().to_string(), mime: String::new(), b64_file: String::new(), caption }
     }
 
     fn files(&self) -> [&Path; 2] {
@@ -245,10 +246,12 @@ pub struct Core {
     next_utt: UttId,
     /// the shot for the next message
     shot: Option<Shot>,
-    /// the fn context for the next message (S9): its `shot` filled from
-    /// the shot at send
+    /// the fn context for the next message (S9); the shot goes as an
+    /// image part, never in it
     fn_ctx: Option<bise_proto::context::FnContext>,
-    /// shots sent, forgotten (deleted) at the end of main's turn
+    /// shots sent: kept with his message (its chip and the model's image
+    /// read them), so never deleted here, nor a dropped still with the
+    /// same file. The image store has no retention yet (architect's debt).
     sent_shots: Vec<Shot>,
     /// the pages of the last state: (id, title)
     page_titles: Vec<(String, String)>,
@@ -500,25 +503,37 @@ impl Core {
     /// [`send_via`] with his files (absolute paths) as the input's `files`.
     fn send_input(&mut self, words: String, voice: bool, via: &str, files: Vec<String>) {
         let shot = self.shot.take();
-        let text = match &shot {
-            Some(s) if words.is_empty() => s.marker(),
-            Some(s) => format!("{words}\n\n{}", s.marker()),
-            None => words.clone(),
-        };
         // S9: the fn context goes as a field (the hub frames it after his
-        // words, its one render); its shot is the stored file, a path in
-        // the image store (the window's thumbnail), never the app's PNG
-        let ctx = self.fn_ctx.take().map(|mut c| {
-            c.shot = shot.as_ref().map(|s| s.stored.file.display().to_string());
-            c
-        });
+        // words, its one render); the shot goes as an image part, not in it
+        let ctx = self.fn_ctx.take();
         // via: the hub tells main it came from the capsule (one short line back)
-        let mut input = json!({"agent": "main", "text": text, "via": via});
+        let mut input = json!({"agent": "main", "text": words, "via": via});
         if let Some(c) = ctx {
             input["context"] = json!(c);
         }
         if !files.is_empty() {
             input["files"] = json!(files);
+        }
+        // the talk's still is his message's image part, its caption the app
+        // and window (architect m_22000; the spotlight's parts, 7f029104):
+        // the text is the label and his words for older readers, the hub
+        // renders the model's text from the parts. Parts never go beside
+        // files (the hub refuses them): a send with files leaves it unsent.
+        let shot = match (shot, files.is_empty()) {
+            (Some(s), false) => {
+                self.forget(vec![s]);
+                self.emit(voice::shot_ev(None));
+                None
+            }
+            (shot, _) => shot,
+        };
+        if let Some(s) = &shot {
+            let mut parts = vec![s.part()];
+            if !words.is_empty() {
+                parts.push(bise_proto::parts::Part::Text { text: words.clone() });
+            }
+            input["text"] = json!(format!("{SHOT_NAME} {words}").trim_end());
+            input["parts"] = json!(parts);
         }
         if shot.is_some() {
             // the still leaves the talk either way: sent, or forgotten below
@@ -584,9 +599,10 @@ impl Core {
         true
     }
 
-    /// Delete the shots' stored files (SPEC §5.1: not kept after main's
-    /// turn), but a file another live shot still uses (two shots of an
-    /// unchanged window are the same bytes, the same store file).
+    /// Delete unsent shots' stored files (dropped, cancelled, failed), but
+    /// a file another shot still uses, pending or sent (two shots of an
+    /// unchanged window are the same bytes, the same store file). A sent
+    /// shot is his message's image: never deleted here (architect m_22000).
     fn forget(&mut self, shots: Vec<Shot>) {
         let live: Vec<PathBuf> = self
             .shot
@@ -603,15 +619,15 @@ impl Core {
         }
     }
 
-    /// Stdin closed: the app is gone. Nothing of the shots stays.
+    /// Stdin closed: the app is gone. The unsent still goes; the sent ones
+    /// stay with his messages.
     pub fn shutdown(&mut self) {
         self.voice_mode_off(Instant::now(), Some("bise stopped"));
         self.close_projects();
         self.stop_voice();
         self.talk = None;
-        let mut all: Vec<Shot> = self.sent_shots.drain(..).collect();
-        all.extend(self.shot.take());
-        self.forget(all);
+        let unsent: Vec<Shot> = self.shot.take().into_iter().collect();
+        self.forget(unsent);
     }
 
     /// This core can't start any hub (`bise ambient-core` without its
@@ -655,11 +671,8 @@ impl Core {
         }
     }
 
-    /// Main's turn has the message sent last: its shots and its voice.
+    /// Main's turn has the message sent last: its voice.
     fn reached(&mut self) {
-        for s in &mut self.sent_shots {
-            s.reached = true;
-        }
         if self.voice_out == Some(false) {
             self.voice_out = Some(true);
         }
@@ -667,10 +680,6 @@ impl Core {
 
     /// Main's turn ended (`fail`: why, when it didn't complete).
     fn turn_done(&mut self, fail: Option<String>, for_user: bool) {
-        // the shots main's turn had are forgotten now
-        let (done, keep): (Vec<Shot>, Vec<Shot>) = self.sent_shots.drain(..).partition(|s| s.reached);
-        self.sent_shots = keep;
-        self.forget(done);
         if !for_user {
             // a turn for an agent: the capsule keeps its status line
             if self.voice_out == Some(true) {

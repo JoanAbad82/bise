@@ -32,7 +32,8 @@ fn talk_start_heard_talk_end_is_one_input_and_main_answers_aloud() {
     t.until(|o| has(o, "sent"));
     let req = t.hub.next();
     let text = req["text"].as_str().unwrap();
-    assert!(text.starts_with("is the build green?\n\n<image name=\"[Screen]\" path=\"Chrome · the build\""), "{text}");
+    assert_eq!(text, "[Image #1] is the build green?");
+    assert_eq!((req["parts"][0]["caption"].as_str(), req["parts"][1]["text"].as_str()), (Some("Chrome · the build"), Some("is the build green?")), "{req}");
     let out = t.take();
     assert!(out.contains(&json!({"ev": "heard", "text": "is the build green?", "final": true})));
     assert!(out.contains(&json!({"ev": "sent", "text": "is the build green?", "voice": true, "shot": true})));

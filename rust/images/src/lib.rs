@@ -372,7 +372,9 @@ fn marker_at(text: &str, start: usize) -> Option<Marker> {
     let (path, rest) = rest.split_once("\" mime=\"")?;
     let (mime, rest) = rest.split_once("\" b64=\"")?;
     let (b64, rest) = rest.split_once("\">")?;
-    if [name, path, mime, b64].iter().any(|v| !attr_safe(v)) {
+    // a caption, the optional last attribute (bise_proto::parts::image_marker)
+    let (b64, caption) = b64.split_once("\" caption=\"").unwrap_or((b64, ""));
+    if [name, path, mime, b64, caption].iter().any(|v| !attr_safe(v)) {
         return None;
     }
     let end = text.len() - rest.len();

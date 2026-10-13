@@ -10,6 +10,12 @@ import ../laws/models.bend as Laws
 def Laws.image_split_marker():
   {==}
 
+def Laws.image_split_caption():
+  {==}
+
+def Laws.image_frame_caption():
+  {==}
+
 def Laws.image_split_refuses_bad_marker():
   {==}
 

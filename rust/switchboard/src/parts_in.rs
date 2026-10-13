@@ -106,7 +106,7 @@ pub fn of_files(text: &str, files: &[String], look: &mut dyn FnMut(&str) -> Look
         }
         seen.push(f);
         match look(f) {
-            Look::Image(s) => images.push(Part::Image { name: parts::file_name(f).to_string(), source: f.to_string(), mime: s.mime, b64_file: s.b64 }),
+            Look::Image(s) => images.push(Part::Image { name: parts::file_name(f).to_string(), source: f.to_string(), mime: s.mime, b64_file: s.b64, caption: String::new() }),
             Look::File => listed.push(Part::File { path: f.to_string(), name: String::new(), missing: false }),
             Look::Skip => {}
         }
@@ -164,7 +164,7 @@ pub fn restored(text: &str, parts: &str, store: &Path, put_file: &dyn Fn(&Path) 
     let mut changed = false;
     let mut notes = Vec::new();
     for p in &mut list {
-        let Part::Image { name, source, mime, b64_file } = p else { continue };
+        let Part::Image { name, source, mime, b64_file, .. } = p else { continue };
         if !b64_file.is_empty() && Path::new(b64_file.as_str()).is_file() && in_store(b64_file, store) {
             continue;
         }
@@ -221,7 +221,7 @@ mod tests {
     }
 
     fn img(b64: &str) -> Part {
-        Part::Image { name: "[Image #1]".into(), source: "/d/s.png".into(), mime: "image/png".into(), b64_file: b64.into() }
+        Part::Image { name: "[Image #1]".into(), source: "/d/s.png".into(), mime: "image/png".into(), b64_file: b64.into(), caption: String::new() }
     }
 
     /// every file is there
@@ -279,7 +279,7 @@ mod tests {
         let s = said(&[t("look"), img("")], &[], store, &counted, &yes).unwrap();
         assert_eq!(calls.get(), 1, "one store call");
         let back: Vec<Part> = serde_json::from_str(&s.parts).unwrap();
-        assert_eq!(back[1], Part::Image { name: "[Image #1]".into(), source: "/d/s.png".into(), mime: "image/jpeg".into(), b64_file: "/h/images/f00d.b64".into() });
+        assert_eq!(back[1], Part::Image { name: "[Image #1]".into(), source: "/d/s.png".into(), mime: "image/jpeg".into(), b64_file: "/h/images/f00d.b64".into(), caption: String::new() });
         assert!(s.text.contains("b64=\"/h/images/f00d.b64\"") && s.text.contains("mime=\"image/jpeg\""), "{}", s.text);
         assert_eq!(s.text, parts::render(&back), "the text is the kept parts' render");
         // a stored one: untouched, no store call
@@ -287,9 +287,9 @@ mod tests {
         assert!(said(&[img("/h/images/ab12.b64")], &[], store, &counted, &yes).is_ok());
         assert_eq!(calls.get(), 0);
         // refused, with the store's words
-        let bad = Part::Image { name: "[Image #1]".into(), source: "/d/notes.txt".into(), mime: String::new(), b64_file: String::new() };
+        let bad = Part::Image { name: "[Image #1]".into(), source: "/d/notes.txt".into(), mime: String::new(), b64_file: String::new(), caption: String::new() };
         assert_eq!(said(&[t("a"), bad], &[], store, &fake, &yes), Err("image /d/notes.txt: not a PNG, JPEG, GIF or WebP image".into()));
-        let rel = Part::Image { name: "[Image #1]".into(), source: "shot.png".into(), mime: String::new(), b64_file: String::new() };
+        let rel = Part::Image { name: "[Image #1]".into(), source: "shot.png".into(), mime: String::new(), b64_file: String::new(), caption: String::new() };
         assert_eq!(said(&[rel], &[], store, &fake, &yes), Err("an image part needs an absolute source: shot.png".into()));
     }
 
@@ -367,7 +367,7 @@ mod tests {
             move |_: &Path| -> Result<Stored, String> { Ok(Stored { b64: store.join(format!("{dir}.b64")).to_string_lossy().into(), mime: "image/png".into() }) }
         };
         let (by_file, by_b64) = (put("from-file"), put("from-b64"));
-        let image = |source: &Path, b64: &Path| Part::Image { name: "[Image #1]".into(), source: source.to_string_lossy().into(), mime: "image/png".into(), b64_file: b64.to_string_lossy().into() };
+        let image = |source: &Path, b64: &Path| Part::Image { name: "[Image #1]".into(), source: source.to_string_lossy().into(), mime: "image/png".into(), b64_file: b64.to_string_lossy().into(), caption: String::new() };
         let json = |ps: &[Part]| serde_json::to_string(ps).unwrap();
         // in this store: kept, no store call, text = render
         let ps = vec![t("look "), image(&src, &shared)];

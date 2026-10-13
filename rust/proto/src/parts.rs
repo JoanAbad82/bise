@@ -69,7 +69,10 @@ pub enum Part {
     /// an image: its label (`[Image #2]`, or its file name), where he
     /// took it from (`source`, the chip's thumbnail), its mime and the
     /// image store's base64 file the model's marker points at (the hub
-    /// accepts it only inside its store)
+    /// accepts it only inside its store). `caption`: a fact about the
+    /// image, never his words (the talk's still: `Safari · cold bench`,
+    /// architect m_22000): in the marker and the model's frame, drawn
+    /// under the chip; "" (every pasted image) leaves the marker as before
     Image {
         name: String,
         source: String,
@@ -77,6 +80,8 @@ pub enum Part {
         mime: String,
         #[serde(default, skip_serializing_if = "String::is_empty")]
         b64_file: String,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        caption: String,
     },
     /// a file he attached by its absolute path (file-chips, architect
     /// m_21764): the model reads it with its own tools, never a copy.
@@ -250,7 +255,7 @@ pub fn render(parts: &[Part]) -> String {
             Part::Quote { from, text, file, new, old } => head.push(quote_tag(from, file, new, old, text)),
             Part::Text { text } => body.push_str(text),
             Part::Paste { n, text } => body.push_str(&paste_tag(*n, text)),
-            Part::Image { name, source, mime, b64_file } => body.push_str(&image_marker(name, source, mime, b64_file)),
+            Part::Image { name, source, mime, b64_file, caption } => body.push_str(&image_marker(name, source, mime, b64_file, caption)),
             Part::File { path, name, missing } if !name.is_empty() => body.push_str(&file_marker(name, path, *missing)),
             Part::File { path, .. } => files.push(path),
             Part::Page { text, .. } => body.push_str(text),
@@ -306,10 +311,20 @@ pub fn paste_tag(n: u32, text: &str) -> String {
 }
 
 /// An image's marker, the image store's format (`bend_images::marker`):
-/// a `"` becomes `'`, a `>` `)`, a newline a space.
-pub fn image_marker(name: &str, source: &str, mime: &str, b64_file: &str) -> String {
-    format!("{IMAGE_OPEN}{}\" path=\"{}\" mime=\"{}\" b64=\"{}\">", marker_attr(name), marker_attr(source), marker_attr(mime), marker_attr(b64_file))
+/// a `"` becomes `'`, a `>` `)`, a newline a space. A caption comes last,
+/// ` caption="…"`, only when there is one: an image without one has the
+/// marker it always had, byte for byte.
+pub fn image_marker(name: &str, source: &str, mime: &str, b64_file: &str, caption: &str) -> String {
+    let caption = match caption.is_empty() {
+        true => String::new(),
+        false => format!("{CAPTION_ATTR}{}", marker_attr(caption)),
+    };
+    format!("{IMAGE_OPEN}{}\" path=\"{}\" mime=\"{}\" b64=\"{}{caption}\">", marker_attr(name), marker_attr(source), marker_attr(mime), marker_attr(b64_file))
 }
+
+/// The optional last attribute of an image marker (bend/core/image.bend
+/// reads the same).
+const CAPTION_ATTR: &str = "\" caption=\"";
 
 /// A named file's marker, in place in his words, in the image marker's
 /// grammar (architect m_21764 C): `<file name="[File #2]"
@@ -511,11 +526,12 @@ fn image_at(s: &str) -> Option<(Part, usize)> {
     let (source, rest) = rest.split_once("\" mime=\"")?;
     let (mime, rest) = rest.split_once("\" b64=\"")?;
     let (b64, _) = rest.split_once("\">")?;
-    let m = image_marker(name, source, mime, b64);
+    let (b64, caption) = b64.split_once(CAPTION_ATTR).unwrap_or((b64, ""));
+    let m = image_marker(name, source, mime, b64, caption);
     if !s.starts_with(&m) {
         return None;
     }
-    Some((Part::Image { name: name.into(), source: source.into(), mime: mime.into(), b64_file: b64.into() }, m.len()))
+    Some((Part::Image { name: name.into(), source: source.into(), mime: mime.into(), b64_file: b64.into(), caption: caption.into() }, m.len()))
 }
 
 // ---- reading parts ----

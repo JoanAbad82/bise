@@ -402,7 +402,7 @@ fn a_hub_item_digit_goes_as_the_digit() {
 }
 
 #[test]
-fn send_goes_to_main_with_the_shot_marker_and_the_png_is_deleted() {
+fn send_goes_to_main_with_the_shot_as_a_captioned_image_part_kept_after_the_turn() {
     let mut t = T::new();
     t.ready();
     let png = t.dir.join("front.png");
@@ -413,26 +413,36 @@ fn send_goes_to_main_with_the_shot_marker_and_the_png_is_deleted() {
     let req = t.hub.next();
     assert_eq!(req["cmd"], "send");
     assert_eq!(req["agent"], "main");
-    let text = req["text"].as_str().unwrap();
-    assert!(text.starts_with("why is this red?\n\n<image name=\"[Screen]\" path=\"Chrome · localhost:4801/settings\" mime=\"image/png\" b64=\""), "{text}");
-    let ms = bend_images::markers(text);
-    assert_eq!(ms.len(), 1);
-    let b64 = PathBuf::from(&ms[0].b64);
-    assert!(b64.exists());
+    // architect m_22000: an image part, its caption the app and window
+    // (never his words), then his words; the text: the label and his words
+    assert_eq!(req["text"], "[Image #1] why is this red?");
+    let parts: Vec<bise_proto::parts::Part> = serde_json::from_value(req["parts"].clone()).expect("parts");
+    let bise_proto::parts::Part::Image { name, source, caption, b64_file, .. } = &parts[0] else { panic!("{parts:?}") };
+    assert_eq!((name.as_str(), caption.as_str(), b64_file.as_str()), ("[Image #1]", "Chrome · localhost:4801/settings", ""));
+    assert_eq!(parts[1], bise_proto::parts::Part::Text { text: "why is this red?".into() });
+    assert!(req.get("context").is_none() && !req["text"].as_str().unwrap().contains("<image"));
+    // its source: the stored PNG (the hub stores it and fills its .b64)
+    let b64 = PathBuf::from(source);
+    assert!(b64.exists() && !source.ends_with("front.png"), "{source}");
     let out = t.take();
     assert!(out.contains(&json!({"ev": "sent", "text": "why is this red?", "voice": false, "shot": true})), "{out:?}");
     assert!(phase_is(&out, "sending"));
     // the next message has no shot
     t.cmd(Cmd::Send { text: "and this?".into() });
     assert_eq!(t.hub.next()["text"], "and this?");
-    // kept while main's turn reads it, forgotten at its end
+    // his message's image: kept after main's turn (its chip reads it)
     t.hub.line("main", "  obs: turn_started");
     t.until(|o| phase_is(o, "working"));
-    assert!(b64.exists());
     t.hub.line("main", "  obs: assistant: it's the CSS.");
     t.hub.line("main", "  obs: turn_done: completed");
     t.until(|o| phase_is(o, "done"));
-    assert!(!b64.exists(), "the stored shot is not kept after main's turn");
+    assert!(b64.exists(), "a sent still stays with his message");
+    // and a dropped still of the same window (the same store file) leaves it
+    let png = t.dir.join("front.png");
+    std::fs::write(&png, b"\x89PNG fake").unwrap();
+    t.cmd(Cmd::Shot { path: png, app: "Chrome".into(), title: "localhost:4801/settings".into() });
+    t.cmd(Cmd::ShotDrop);
+    assert!(b64.exists(), "a dropped still never deletes a sent one's file");
 }
 
 /// The talk's still, told to the app (ambient-lead m_21912): `shot` with
@@ -472,7 +482,7 @@ fn the_talks_still_is_told_to_the_app_and_his_drop_forgets_it() {
 
 /// S9 (amb-mac m_9035): the latest fn_context rides the next message to
 /// main as the input op's `context` field (never rendered by the core),
-/// its shot is the stored file in the image store, and it's gone after
+/// the shot an image part beside it (never in it), and it's gone after
 /// that message; an excluded app's `{}` clears it; a cancelled talk drops
 /// it.
 #[test]
@@ -489,15 +499,13 @@ fn the_fn_context_rides_the_next_message_once() {
     t.cmd(Cmd::Send { text: "why is this slow?".into() });
     let req = t.hub.next();
     let text = req["text"].as_str().unwrap();
-    assert!(text.starts_with("why is this slow?\n\n<image name=\"[Screen]\""), "the core never renders the context: {text}");
-    assert!(!text.contains("screen_context") && !text.contains("grafana"), "{text}");
+    assert_eq!(text, "[Image #1] why is this slow?", "the core never renders the context");
+    assert!(!req["parts"].to_string().contains("grafana"), "{req}");
+    // the shot is his message's image part (architect m_22000), never in
+    // the context
     let ctx: FnContext = serde_json::from_value(req["context"].clone()).unwrap();
-    let shot = ctx.shot.clone().expect("the shot's stored file");
-    // the stored file (the app's PNG is gone), beside the marker's b64
-    assert!(std::path::Path::new(&shot).exists() && !shot.ends_with("front.png"), "{shot}");
-    let b64 = PathBuf::from(&bend_images::markers(text)[0].b64);
-    assert_eq!(std::path::Path::new(&shot).parent(), b64.parent(), "{shot}");
-    assert_eq!(FnContext { shot: None, ..ctx }, safari);
+    assert_eq!(ctx, safari);
+    assert_eq!(req["parts"][0]["caption"], "Safari · p99");
     // once
     t.cmd(Cmd::Send { text: "and this?".into() });
     assert!(t.hub.next().get("context").is_none());
@@ -544,7 +552,7 @@ fn a_dropped_file_reaches_main_with_his_words() {
 }
 
 #[test]
-fn a_shot_steered_into_a_running_turn_is_forgotten_at_its_end() {
+fn a_shot_steered_into_a_running_turn_stays_after_its_end() {
     let mut t = T::new();
     t.hub.say(json!({"ev": "state", "agents": [{"name": "main", "main": true, "status": "working"}], "cards": []}));
     t.hub.line("main", "  obs: turn_started");
@@ -553,20 +561,21 @@ fn a_shot_steered_into_a_running_turn_is_forgotten_at_its_end() {
     std::fs::write(&png, b"shot-a").unwrap();
     t.cmd(Cmd::Shot { path: png, app: "Notes".into(), title: String::new() });
     t.cmd(Cmd::Send { text: String::new() });
-    let text = t.hub.next()["text"].as_str().unwrap().to_string();
-    assert!(text.starts_with("<image name=\"[Screen]\" path=\"Notes\""), "{text}");
-    let b64 = PathBuf::from(&bend_images::markers(&text)[0].b64);
+    let req = t.hub.next();
+    let text = req["text"].as_str().unwrap().to_string();
+    // no words: the image part alone, the text its label
+    assert_eq!((text.as_str(), req["parts"][0]["caption"].as_str(), req["parts"].as_array().map(Vec::len)), ("[Image #1]", Some("Notes"), Some(1)));
+    let b64 = PathBuf::from(req["parts"][0]["source"].as_str().unwrap());
     // steered into the running turn (a report's): from then on it is the
-    // user's, main works for them, then done; the shot goes at its end
+    // user's, main works for them, then done; the shot stays, his message's
     assert!(phase_is(&t.take(), "sending"));
     t.sync();
     assert!(!has(&t.take(), "phase"), "nothing yet: the turn is an agent's");
     t.hub.line("main", &format!("  obs: steering_received: {text}"));
     t.until(|o| phase_is(o, "working"));
-    assert!(b64.exists());
     t.hub.line("main", "  obs: turn_done: completed");
     t.until(|o| phase_is(o, "done"));
-    assert!(!b64.exists());
+    assert!(b64.exists(), "a sent still stays with his message");
 }
 
 #[test]

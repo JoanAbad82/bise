@@ -23,7 +23,7 @@ fn chip(name: &str, path: &str, missing: bool) -> Part {
 }
 
 fn img(name: &str) -> Part {
-    Part::Image { name: name.into(), source: "/Users/ana/Desktop/shot.png".into(), mime: "image/png".into(), b64_file: "/h/images/ab12.b64".into() }
+    Part::Image { name: name.into(), source: "/Users/ana/Desktop/shot.png".into(), mime: "image/png".into(), b64_file: "/h/images/ab12.b64".into(), caption: String::new() }
 }
 
 /// Law 1: render writes what the composers wrote (the cases of the TUI's
@@ -125,7 +125,7 @@ impl Rng {
     }
 }
 
-const BITS: &[&str] = &["", "a", "é", "\n", " ", "\"", ">", "</selection>", "</pasted>", "<selection from=\"", "<pasted n=\"", "<image name=\"", "[files he attached:]", "/x", "two words", "\n\n"];
+const BITS: &[&str] = &["", "a", "é", "\n", " ", "\"", ">", "</selection>", "</pasted>", "<selection from=\"", "<pasted n=\"", "<image name=\"", "\" caption=\"", "[files he attached:]", "/x", "two words", "\n\n"];
 
 fn word(r: &mut Rng) -> String {
     (0..r.next(4)).map(|_| r.pick(BITS)).collect()
@@ -141,7 +141,7 @@ fn gen_parts(r: &mut Rng) -> Vec<Part> {
             0 => t(&word(r)),
             1 => Part::Paste { n: r.next(20) as u32, text: word(r) },
             2 => chip(&format!("[File #{}{}]", r.next(9), word(r)), &word(r), r.next(2) == 1),
-            _ => Part::Image { name: word(r), source: word(r), mime: "image/png".into(), b64_file: word(r) },
+            _ => Part::Image { name: word(r), source: word(r), mime: "image/png".into(), b64_file: word(r), caption: word(r) },
         });
     }
     for _ in 0..r.next(2) {
@@ -161,7 +161,7 @@ fn composer_like(parts: Vec<Part>) -> Vec<Part> {
         .map(|p| match p {
             Part::Quote { from, text, .. } => q(&clean(&from), text.trim_end_matches('\n')),
             Part::Paste { n, text } => Part::Paste { n, text: text.trim_end_matches('\n').to_string() },
-            Part::Image { name, source, mime, b64_file } => Part::Image { name: clean(&name), source: clean(&source), mime, b64_file: clean(&b64_file) },
+            Part::Image { name, source, mime, b64_file, caption } => Part::Image { name: clean(&name), source: clean(&source), mime, b64_file: clean(&b64_file), caption: clean(&caption) },
             // a chip's name is never empty (empty: a listed file)
             Part::File { path, name, missing } if !name.is_empty() => chip(&clean(&name), &clean(&path), missing),
             p => p,
@@ -217,7 +217,7 @@ fn an_old_tui_message_reads_as_its_parts() {
             t("ah ça a "),
             Part::Paste { n: 2, text: "x\ny".into() },
             t(" et "),
-            Part::Image { name: "[Image #3]".into(), source: "/d/s.png".into(), mime: "image/png".into(), b64_file: "/i/3.b64".into() },
+            Part::Image { name: "[Image #3]".into(), source: "/d/s.png".into(), mime: "image/png".into(), b64_file: "/i/3.b64".into(), caption: String::new() },
         ]
     );
 }
@@ -274,7 +274,7 @@ fn a_page_part_renders_as_the_hubs_text() {
 /// stays in the list after his words, byte for byte the old text.
 #[test]
 fn a_file_chip_is_a_marker_in_place() {
-    let logo = Part::Image { name: "[Image #1]".into(), source: "/u/logo.png".into(), mime: "image/png".into(), b64_file: "/h/images/1.b64".into() };
+    let logo = Part::Image { name: "[Image #1]".into(), source: "/u/logo.png".into(), mime: "image/png".into(), b64_file: "/h/images/1.b64".into(), caption: String::new() };
     let parts = vec![t("ajouter l'image "), logo, t(" dans la presentation powerpoint "), chip("[File #2]", "/u/deck.pptx", false)];
     let text = render(&parts);
     assert_eq!(
@@ -293,6 +293,27 @@ fn a_file_chip_is_a_marker_in_place() {
         assert!(parse(c).iter().all(|p| matches!(p, Part::Text { .. })), "{c:?}");
     }
     assert_eq!(words(&parts), "ajouter l'image  dans la presentation powerpoint ");
+}
+
+/// architect m_22000: a caption is a fact about the image, the marker's
+/// last attribute, quoted like the others; it reads back as itself, is
+/// never his words, and an image without one keeps its old marker.
+#[test]
+fn an_images_caption_is_its_markers_last_attribute() {
+    let still = Part::Image { name: "[Image #1]".into(), source: "/h/images/ab.png".into(), mime: "image/png".into(), b64_file: "/h/images/ab.b64".into(), caption: "Safari · \"cold\" bench".into() };
+    let parts = vec![still, t("what's wrong here")];
+    let text = render(&parts);
+    assert_eq!(text, "<image name=\"[Image #1]\" path=\"/h/images/ab.png\" mime=\"image/png\" b64=\"/h/images/ab.b64\" caption=\"Safari · 'cold' bench\">what's wrong here");
+    let back = parse(&text);
+    assert!(matches!(&back[0], Part::Image { caption, b64_file, .. } if caption == "Safari · 'cold' bench" && b64_file == "/h/images/ab.b64"), "{back:?}");
+    assert_eq!(render(&back), text);
+    assert_eq!(words(&parts), "what's wrong here");
+    // no caption: the marker it always had, and no caption key on the wire
+    assert_eq!(render(&[img("[Image #1]")]), "<image name=\"[Image #1]\" path=\"/Users/ana/Desktop/shot.png\" mime=\"image/png\" b64=\"/h/images/ab12.b64\">");
+    assert!(!serde_json::to_string(&img("[Image #1]")).unwrap().contains("caption"));
+    // an old part (no caption key) reads as an image without one
+    let old: Part = serde_json::from_str(r#"{"kind":"image","name":"[Image #1]","source":"/a.png"}"#).unwrap();
+    assert!(matches!(old, Part::Image { caption, .. } if caption.is_empty()));
 }
 
 /// architect m_21764 B: the one table of what a path becomes.

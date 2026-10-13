@@ -25,7 +25,10 @@ describe('his message from its parts (msg-parts)', () => {
     ]);
     expect(v.words).toBe('what does ▤ 1 mean? and this');
     expect(v.pastes).toEqual([{ n: 1, text: 'line 1\nline 2' }]);
-    expect(v.images).toEqual([{ name: '[Image #2]', path: '/Users/me/shot.png' }]);
+    expect(v.images).toEqual([{ name: '[Image #2]', path: '/Users/me/shot.png', caption: '' }]);
+    // the talk's still: its caption is a fact about the image, never his words (architect m_22000)
+    const still = youView([{ kind: 'image', name: '[Image #1]', source: '/h/images/ab.png', caption: 'Safari · cold bench' }, text('why is it slow?')]);
+    expect([still.words, still.images[0]?.caption]).toEqual(['why is it slow?', 'Safari · cold bench']);
     expect(v.files).toEqual([{ name: '', path: '/Users/me/notes.md', missing: false }]);
     // never a tag in what is drawn
     expect(JSON.stringify(v)).not.toMatch(/<selection|<pasted|<image/u);

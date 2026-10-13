@@ -21,9 +21,22 @@ import ../runtime/provider-pure.bend as Pv
 # LAW: a text splits into its text parts and its image markers, in order.
 law image_split_marker:
   {Im.img_split("a <image name=\"[Image #1]\" path=\"p.png\" mime=\"image/png\" b64=\"/s/x.b64\"> b")
-    == Con{Im.IText{"a "}, Con{Im.IImg{"[Image #1]", "p.png", "image/png", "/s/x.b64"},
+    == Con{Im.IText{"a "}, Con{Im.IImg{"[Image #1]", "p.png", "image/png", "/s/x.b64", ""},
       Con{Im.IText{" b"}, Nil{}}}}
     : List<&2, Im.IPart>}
+
+# LAW: a caption, the marker's optional last attribute (architect
+# m_22000), is read apart from the b64 file.
+law image_split_caption:
+  {Im.img_split("<image name=\"[Image #1]\" path=\"p.png\" mime=\"image/png\" b64=\"/s/x.b64\" caption=\"Safari · bench\">")
+    == Con{Im.IImg{"[Image #1]", "p.png", "image/png", "/s/x.b64", "Safari · bench"}, Nil{}}
+    : List<&2, Im.IPart>}
+
+# LAW: the model's frame of a captioned image says its caption, after
+# its name; an image without one keeps the frame it had.
+law image_frame_caption:
+  {Im.img_open_text("[Image #1]", "Safari · bench", "p.png")
+    == "<image name=[Image #1] caption=\"Safari · bench\" path=\"p.png\">" : String}
 
 # LAW: a marker that does not name a .b64 file is no image.
 law image_split_refuses_bad_marker:

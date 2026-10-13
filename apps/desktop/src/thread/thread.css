@@ -1494,6 +1494,15 @@
 .th-attach-missing {
   color: var(--c-err);
 }
+/* an image's caption (the talk's still: 'Safari · cold bench'), under the chips, dim, one line */
+.th-part-caption {
+  margin: var(--s-1) 0 0;
+  color: var(--c-text-3);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .th-part-paste {
   margin: var(--s-2) 0 0;
   padding: var(--s-2) var(--s-3);
