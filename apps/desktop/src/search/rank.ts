@@ -11,6 +11,8 @@
 // The inputs are this module's own view types: the screen maps the store's (generated) shapes to
 // them, so a protocol change doesn't reach the rules.
 
+import { ago } from '@/agents/model';
+
 export type AgentStatus = 'waiting' | 'blocked' | 'working' | 'idle' | 'done' | 'failed';
 
 export interface SearchProject {
@@ -230,15 +232,9 @@ export function artifactGlyph(kind: string): string {
 
 const one = (s: string): string => s.replace(/\s+/gu, ' ').trim();
 
-/** '6m', '2h', 'yesterday', '3 days': how long ago, short (the sidebar's words). */
+/** '14 min', '2 h', '9 d': how long ago, the app's short form (shortAge; designer m_21344). */
 export function since(ms: number, now: number): string {
-  const m = Math.max(0, Math.floor((now - ms) / 60_000));
-  if (m < 1) return 'now';
-  if (m < 60) return `${String(m)}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${String(h)}h`;
-  const d = Math.floor(h / 24);
-  return d === 1 ? 'yesterday' : `${String(d)} days`;
+  return ago(ms, now);
 }
 
 /** '14:02' today, 'yesterday', 'mon' this week, else '12 oct'. */

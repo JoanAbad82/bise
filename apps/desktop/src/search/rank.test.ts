@@ -47,8 +47,8 @@ describe('search: one ranking for ⌘K and the spotlight', () => {
     expect(v1?.archived).toBe(true);
     expect(v1?.glyph).toBe('–');
     expect(v1?.detail).toBe('archived · first stripe flow');
-    expect(v1?.when).toBe('3 days');
-    expect(l.groups[0]?.hits[0]).toMatchObject({ glyph: '∿', tone: 'ink', detail: 'apple pay on checkout', where: 'storefront', when: 'working · 6m' });
+    expect(v1?.when).toBe('3 d');
+    expect(l.groups[0]?.hits[0]).toMatchObject({ glyph: '∿', tone: 'ink', detail: 'apple pay on checkout', where: 'storefront', when: 'working · 6 min' });
     expect(l.groups[1]?.hits[0]).toMatchObject({ glyph: '◫', name: 'checkout on mobile', detail: '2 shots', where: 'checkout · storefront' });
     expect(l.groups[2]?.hits[0]).toMatchObject({ glyph: '◷', where: 'checkout · storefront', when: 'every 30 min' });
     expect(marks('checkout-v1', 'che')).toEqual([[0, 3]]);
@@ -76,7 +76,7 @@ describe('search: one ranking for ⌘K and the spotlight', () => {
     const l = searchList(D, '', 'all', NOW, 'UTC');
     expect(l.mode).toBe('start');
     expect(l.groups.map((g) => g.label)).toEqual(['waiting for you', 'recent']);
-    expect(l.groups[0]?.hits).toMatchObject([{ name: 'search', glyph: '?', tone: 'acc', detail: 'rebuild the search index tonight?', when: '2m', waiting: true }]);
+    expect(l.groups[0]?.hits).toMatchObject([{ name: 'search', glyph: '?', tone: 'acc', detail: 'rebuild the search index tonight?', when: '2 min', waiting: true }]);
     const recent = l.groups[1]?.hits.map((h) => h.name) ?? [];
     expect(recent.slice(0, 4)).toEqual(['bise · storefront', 'checkout', 'perf', 'product page, before / after']);
     expect(recent.at(-1)).toBe('checkout-v1');
