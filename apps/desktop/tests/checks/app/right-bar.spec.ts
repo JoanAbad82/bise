@@ -133,4 +133,84 @@ for (const theme of ['light', 'dark']) {
       await s.close();
     }
   });
+
+  // his right-bar feedback (main m_21628), designer m_21633: a head that folds looks clickable, and
+  // what '+ N more' opened, 'show less' folds back, in the same row
+  test(`app/right-bar: a head that folds is a row (pointer, tint, chevron), 'show less' folds back to the cap (${theme})`, async () => {
+    const core = new FakeCore(world(theme) as unknown as ConstructorParameters<typeof FakeCore>[0]);
+    const s = await launchDesktop({ core, route: `project/${P}`, size: '1100x900' });
+    try {
+      const { page } = s;
+      const bar = page.getByTestId('app.panel');
+      await expect(page.getByTestId('app.right.agent.perf')).toBeVisible({ timeout: 10_000 });
+      const look = (id: string) =>
+        page.getByTestId(`app.right.${id}.head`).evaluate((el) => {
+          const label = el.querySelector('.app-rb-label');
+          const row = el.parentElement;
+          return {
+            cursor: getComputedStyle(el).cursor,
+            tint: row === null ? '' : getComputedStyle(row).backgroundColor,
+            chevron: label === null ? '' : getComputedStyle(label, '::after').content,
+            shown: label === null ? '' : getComputedStyle(label, '::after').visibility,
+            h: Math.round(row?.getBoundingClientRect().height ?? 0),
+          };
+        });
+      const clear = 'rgba(0, 0, 0, 0)';
+      // every head that folds: pointer, 28 px; at rest no tint and no chevron, hovered both
+      for (const id of ['archived', 'artifacts', 'scheduled']) {
+        await page.mouse.move(1, 400);
+        const rest = await look(id);
+        expect(rest, `${id} at rest`).toMatchObject({ cursor: 'pointer', tint: clear, chevron: '"▾"', shown: 'hidden', h: 28 });
+        await page.getByTestId(`app.right.${id}.head`).hover();
+        const on = await look(id);
+        expect(on.tint, `${id} hovered: the rows' tint`).not.toBe(clear);
+        expect(on.shown, `${id} hovered: '▾'`).toBe('visible');
+      }
+      // 'all ›' is its own target: no row tint under it
+      await page.getByTestId('app.right.artifacts.all').hover();
+      expect((await look('artifacts')).tint, "'all ›' hovered").toBe(clear);
+      // AGENTS can't fold while one waits: a plain title, no pointer, no tint, no chevron
+      await page.getByTestId('app.right.agents.head').hover();
+      expect(await look('agents'), 'agents (one waits)').toMatchObject({ cursor: 'default', tint: clear, chevron: 'none' });
+      // the head at rest, hovered, folded ('▸' at rest)
+      await page.mouse.move(1, 400);
+      await page.screenshot({ path: test.info().outputPath(`heads-${theme}-rest.png`) });
+      await page.getByTestId('app.right.archived.head').hover();
+      await page.screenshot({ path: test.info().outputPath(`heads-${theme}-hover.png`) });
+      await page.getByTestId('app.right.archived.head').click();
+      await page.mouse.move(1, 400);
+      expect(await look('archived'), 'folded').toMatchObject({ chevron: '"▸"', shown: 'visible' });
+      await expect(page.getByTestId('app.right.archived.summary')).toHaveText('✓ hero-img');
+      await page.screenshot({ path: test.info().outputPath(`heads-${theme}-folded.png`) });
+      // space folds it open again from the keyboard
+      await page.getByTestId('app.right.archived.head').focus();
+      await page.keyboard.press('Space');
+      await expect(page.getByTestId('app.right.archived.hero-img')).toBeVisible();
+      // '+ 4 more' -> every agent, 'show less' in the same row -> back at the cap
+      const names = async () => page.locator('[data-testid="app.right.agents"] [data-testid^="app.right.agent."]').count();
+      const more = page.getByTestId('app.right.agents.more');
+      await expect(more).toHaveText('+ 4 more');
+      const at = await more.boundingBox();
+      await more.click();
+      expect(await names()).toBe(13);
+      await expect(more).toHaveCount(0);
+      const less = page.getByTestId('app.right.agents.less');
+      await expect(less).toHaveText('show less');
+      expect(Math.round((await less.boundingBox())?.height ?? 0), "'show less' is 28 px, as '+ N more'").toBe(Math.round(at?.height ?? 0));
+      await less.hover();
+      await page.screenshot({ path: test.info().outputPath(`heads-${theme}-less.png`) });
+      // scrolled down to it, 'show less' brings the list back to its cap with the head in view
+      await bar.locator('.app-rb-body').evaluate((el) => { el.scrollTop = el.scrollHeight; });
+      await less.click();
+      expect(await names()).toBe(9);
+      await expect(more).toHaveText('+ 4 more');
+      await expect(less).toHaveCount(0);
+      await expect(page.getByTestId('app.right.agents.head')).toBeInViewport();
+      // a section under its cap has neither
+      await expect(page.getByTestId('app.right.artifacts.more')).toHaveCount(0);
+      await expect(page.getByTestId('app.right.artifacts.less')).toHaveCount(0);
+    } finally {
+      await s.close();
+    }
+  });
 }

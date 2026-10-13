@@ -5,7 +5,7 @@
 // project, the project's name in place of the role. A click opens the agent full in the centre (his
 // pick), an artifact its view, a task the scheduled screen; 'all ›' the full list in the centre.
 // Owner: amb-win. The rows' words are pure (barrows.ts).
-import { Fragment, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Act, Dot, Press } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAllArtifacts } from '@/artifacts';
@@ -111,19 +111,25 @@ function Section({
 }) {
   const [folded, toggle] = useFolded(id);
   const [more, setMore] = useState(false);
+  const head = useRef<HTMLDivElement>(null);
   const shut = folded && !noFold;
   const { shown, hidden } = capRows(rows, more ? Number.POSITIVE_INFINITY : cap);
+  const capped = capRows(rows, cap).hidden > 0;
+  // a head that folds is a row: pointer, the rows' hover tint, a chevron ('▾' on hover while open,
+  // '▸' always while folded); one that can't fold looks like a plain title (designer m_21633)
   return (
     <section className="app-rb-sec" data-testid={`app.right.${id}`} data-folded={shut || undefined}>
-      <div className="app-rb-head">
+      <div className="app-rb-head" ref={head} data-folds={!noFold || undefined}>
         <Press look="app-rb-title" aria-expanded={!shut} onClick={noFold ? undefined : toggle} data-testid={`app.right.${id}.head`}>
-          {title} · {String(rows.length)}
-        </Press>
-        {shut && summary !== '' && (
-          <span className="app-rb-sum" data-testid={`app.right.${id}.summary`}>
-            {summary}
+          <span className="app-rb-label">
+            {title} · {String(rows.length)}
           </span>
-        )}
+          {shut && summary !== '' && (
+            <span className="app-rb-sum" data-testid={`app.right.${id}.summary`}>
+              {summary}
+            </span>
+          )}
+        </Press>
         {/* nothing to open at 0: the head stays, 'all ›' goes (designer m_20272 (4)) */}
         {rows.length > 0 && (
           <Act onClick={onAll} testId={`app.right.${id}.all`}>
@@ -143,6 +149,21 @@ function Section({
               data-testid={`app.right.${id}.more`}
             >
               + {String(hidden)} more
+            </Press>
+          )}
+          {/* opened: 'show less' in the very row '+ N more' used, back to the cap, the head in view */}
+          {more && capped && (
+            <Press
+              look="app-rb-row app-rb-more"
+              onClick={() => {
+                setMore(false);
+                requestAnimationFrame(() => {
+                  head.current?.scrollIntoView({ block: 'nearest' });
+                });
+              }}
+              data-testid={`app.right.${id}.less`}
+            >
+              show less
             </Press>
           )}
         </div>

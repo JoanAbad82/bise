@@ -613,20 +613,59 @@ body:has(.app-shell) {
 .app-rb-sec + .app-rb-sec {
   margin-top: var(--gap-section);
 }
+/* a head that folds is a row (designer m_21633): 28 px, the whole width, pointer, the rows' hover
+   tint, the label text-3 -> text-2, a chevron after the count; 'all ›' stays its own target */
 .app-rb-head {
   display: flex;
   align-items: baseline;
-  gap: var(--gap-inline);
   min-width: 0;
-  padding: 0 var(--s-2);
+  min-height: var(--h-row-tight);
   margin-bottom: var(--gap-tight);
+  border-radius: var(--r-2);
   white-space: nowrap;
 }
 .app-rb-title {
-  flex: none;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  gap: var(--gap-inline);
+  min-width: 0;
+  padding: 0 var(--pad-row-x);
   color: var(--c-text-3);
+  line-height: var(--h-row-tight);
+}
+.app-rb-label {
+  flex: none;
   font: 600 var(--t-11) var(--font-ui);
   letter-spacing: 0.04em;
+}
+.app-rb-head[data-folds] .app-rb-title {
+  cursor: pointer;
+}
+.app-rb-head[data-folds] .app-rb-label::after {
+  content: '▾';
+  margin-left: var(--s-2);
+  visibility: hidden;
+}
+.app-rb-head[data-folds] .app-rb-title[aria-expanded='false'] .app-rb-label::after {
+  content: '▸';
+  visibility: visible;
+}
+.app-rb-head[data-folds]:has(.app-rb-title:hover) {
+  background: var(--c-hover);
+}
+.app-rb-head[data-folds] .app-rb-title:hover {
+  color: var(--c-text-2);
+}
+.app-rb-head[data-folds] .app-rb-title:hover .app-rb-label::after {
+  visibility: visible;
+}
+.app-rb-title:focus-visible {
+  outline: none;
+}
+.app-rb-head:has(.app-rb-title:focus-visible) {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
 }
 .app-rb-sum {
   min-width: 0;
@@ -636,9 +675,13 @@ body:has(.app-shell) {
   font-size: var(--t-12);
 }
 .app-rb-head .b-act {
-  margin-left: auto;
+  flex: none;
+  margin-right: var(--pad-row-x);
   color: var(--c-text-3);
   font-size: var(--t-12);
+}
+.app-rb-head .b-act:hover {
+  color: var(--c-text);
 }
 .app-rb-rows {
   display: flex;
@@ -661,6 +704,7 @@ body:has(.app-shell) {
   background: var(--c-hover);
 }
 .app-rb-more {
+  min-height: var(--h-row-tight);
   color: var(--c-text-3);
   font-size: var(--t-12);
 }
