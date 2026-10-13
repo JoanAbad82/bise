@@ -505,8 +505,12 @@ if (mode === 'rows2') {
   }
   const cols = await page.evaluate(() => {
     const vis = (sel) => { const e = document.querySelector(sel); if (!e) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-    const rail = document.elementFromPoint(50, 110);
-    return { rail: !!rail && rail.getBoundingClientRect().right < 160, thread: vis('[data-testid="app.main"]'), page: vis('[data-testid="artifact.page"]') };
+    // the left bar: shown, and left of the thread (1c5659b8 run: the dragged sidebar is ~240 px, a
+    // fixed 160 px rail check read it as missing)
+    const side = document.querySelector('[data-testid="app.sidebar"]')?.getBoundingClientRect();
+    const main = document.querySelector('[data-testid="app.main"]')?.getBoundingClientRect();
+    const rail = !!side && side.width > 0 && side.left < 20 && (!main || side.right <= main.left + 2);
+    return { rail, rail_w: side ? Math.round(side.width) : null, thread: vis('[data-testid="app.main"]'), page: vis('[data-testid="artifact.page"]') };
   });
   await shot('artifact-from-right-bar');
   step('an artifact from the right bar: 3 columns, its page drawn (green pixels)', drawn && green > 0.3 && cols.rail && cols.thread && cols.page, { opened, drawn, green: Math.round(green * 100) / 100, cols });
@@ -517,30 +521,47 @@ if (mode === 'rows2') {
   await page.keyboard.press('Escape');
   const gone2 = await pageEl.waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
   step('✕ and esc close the artifact', gone1 && gone2, { x: gone1, esc: gone2 });
-  // e5759db9 (his ask, main m_21531): with an artifact open, esc from his composer closes the
-  // artifact first, his words and the composer's mode (its label: answering a card, or to main) kept;
-  // a second esc does today's thing (a composer holding words takes it: no move up, nothing reopens)
-  const ESC_WORDS = 'half a thought kept through esc';
+  // e5759db9 (his ask, main m_21531), as app/artifact-view.spec checks it: words in harness' main
+  // composer, then the artifact open and words in the composer beside it ('about' the page). One esc
+  // closes the artifact: main's words and label as he left them; back on the artifact, its words and
+  // label too. A second esc does today's thing (a composer with words keeps it: no move, nothing reopens).
+  const MAIN_WORDS = 'half a thought for main';
+  const ART_WORDS = 'and the green, is it on brand?';
   const field = page.locator('[data-testid="composer.field"]:visible').first();
   const lbl = () => page.locator('.b-composer .lbl:visible').first().innerText({ timeout: 1000 }).catch(() => null);
   const fieldText = async () => ((await field.innerText({ timeout: 1000 }).catch(() => '')) ?? '').trim();
-  await click('proof-html for the esc row', row);
-  const reopened = await pageEl.waitFor({ timeout: 10000 }).then(() => true, () => false);
-  let escRow = { reopened };
-  if (reopened && await click('the composer beside the artifact', field)) {
+  const typeIn = async (words) => {
+    if (!(await click('the composer', field))) return false;
     await page.keyboard.press('Meta+a');
     await page.keyboard.press('Backspace');
-    await page.keyboard.type(ESC_WORDS, { delay: 5 });
-    const label0 = await lbl();
+    await page.keyboard.type(words, { delay: 5 });
+    return true;
+  };
+  await harness();
+  const mainTyped = await typeIn(MAIN_WORDS);
+  const mainLabel = await lbl();
+  await click('proof-html for the esc row', row);
+  const reopened = await pageEl.waitFor({ timeout: 10000 }).then(() => true, () => false);
+  let escRow = { main_typed: mainTyped, reopened };
+  if (mainTyped && reopened && await typeIn(ART_WORDS)) {
+    const artLabel = await lbl();
     await page.keyboard.press('Escape');
     const closed1 = await pageEl.waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
     await page.waitForTimeout(300);
-    const words1 = await fieldText();
-    const label1 = await lbl();
-    await shot('esc-artifact-words-kept');
-    escRow = { reopened, closed: closed1, words: words1, label_before: label0, label_after: label1, answering: /answering/.test(label0 ?? '') ? 'proven' : 'no docked card in harness: the label kept is to main' };
-    step("esc with an artifact open closes it first; his words and the composer's mode stay", closed1 && words1 === ESC_WORDS && label0 !== null && label0 === label1, escRow);
-    await field.click({ timeout: 2000 }).catch(() => {});
+    const back = { words: await fieldText(), label: await lbl() };
+    await shot('esc-artifact-main-kept');
+    await click('proof-html again', row);
+    const again = await pageEl.waitFor({ timeout: 10000 }).then(() => true, () => false);
+    const onArt = again ? await until(async () => ((await fieldText()) === ART_WORDS ? { words: ART_WORDS, label: await lbl() } : null), 5000, 300) : null;
+    await shot('esc-artifact-words-back');
+    escRow = { closed: closed1, main: { before: { words: MAIN_WORDS, label: mainLabel }, after: back }, artifact: { before: { words: ART_WORDS, label: artLabel }, after: onArt ?? { words: await fieldText(), label: await lbl() } }, answering: /answering/.test(artLabel ?? '') ? 'proven' : 'no docked card in harness: the labels kept are to main / about the page' };
+    step("esc with an artifact open closes it first; his words and the composer's mode stay (main's, and the artifact's on reopen)",
+      closed1 && back.words === MAIN_WORDS && back.label === mainLabel && !!onArt && onArt.label === artLabel, escRow);
+    // close it again (esc from the artifact's composer), then a second esc on harness' main with words
+    await click('the composer beside the artifact', field);
+    await page.keyboard.press('Escape');
+    await pageEl.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+    await click('the composer', field);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(800);
     const second = {
@@ -551,10 +572,16 @@ if (mode === 'rows2') {
     };
     await shot('esc-artifact-second-esc');
     step("a second esc does today's thing (a composer with words keeps it: no move, nothing reopens)", !second.artifact_reopened && !second.went_up_to_bise, second);
-    await field.click({ timeout: 2000 }).catch(() => {});
+  } else step("esc with an artifact open closes it first; his words and the composer's mode stay (main's, and the artifact's on reopen)", false, escRow);
+  // both composers emptied, so the next rows start clean
+  await closeArtifact();
+  await harness();
+  if (await click('the composer', field)) { await page.keyboard.press('Meta+a'); await page.keyboard.press('Backspace'); }
+  await click('proof-html to empty its composer', row);
+  if (await pageEl.waitFor({ timeout: 10000 }).then(() => true, () => false) && await click('the composer beside the artifact', field)) {
     await page.keyboard.press('Meta+a');
     await page.keyboard.press('Backspace');
-  } else step("esc with an artifact open closes it first; his words and the composer's mode stay", false, escRow);
+  }
   await closeArtifact();
   // back / forward: harness -> artifacts -> ⌘[ harness -> ⌘] artifacts; esc from harness' main goes up to bise
   await harness();
@@ -589,6 +616,13 @@ if (mode === 'rows2') {
   step('a short thought: its row is there and opens to its words', !!words, { rows: nRows, text: nRows ? ((await last.textContent().catch(() => '')) ?? '').slice(0, 200) : '' });
   // the inbox block in bise's thread: another project's item answered there; ⌘I opens it in place
   await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  // a long reply in bise's own thread, so it scrolls for the block's height row (1c5659b8 run: the
+  // thread was empty, nothing scrolled)
+  const longMd = path.join(out, 'long-reply.md');
+  fs.writeFileSync(longMd, Array.from({ length: 60 }, (_, i) => `scroll line ${i + 1}: a long reply so bise's thread scrolls.`).join('\n\n') + '\n');
+  await say(`a long one please [[reply: ${longMd}]]`);
+  const longIn = await until(async () => (/scroll line 60/.test((await text('[data-testid="thread.list"]')) ?? '') ? true : null), ANSWER_MS, 1000);
+  step("a long reply in bise's thread (so it scrolls)", !!longIn, null);
   const block = page.locator('[data-testid^="inbox.block"]').first();
   const hasBlock = await block.waitFor({ timeout: 15000 }).then(() => true, () => false);
   const blockText = hasBlock ? ((await block.innerText().catch(() => '')) ?? '') : '';
