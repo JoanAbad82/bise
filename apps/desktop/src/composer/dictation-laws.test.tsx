@@ -122,11 +122,11 @@ describe('dictation: a take is never lost to a key', () => {
     expect(f.voice).not.toHaveBeenCalled();
   });
 
-  it("H1: the stopped take's node says 'transcribing…' until its final, however long", async () => {
+  it("H1: the stopped take's chip says transcribing (∿) until its final, however long", async () => {
     const f = await mount();
     await f.press(0);
     await f.press(3000);
-    expect(f.getByTestId('composer.dictation').textContent).toBe('transcribing…');
+    expect(f.getByTestId('composer.dictation.meter').dataset.phase).toBe('transcribing');
   });
 
   it('H2: a quick r with ctrl let go late is a toggle: the mic stays on', async () => {
@@ -201,7 +201,7 @@ describe("dictation: a take with no words or an error, kept by the core, offers 
     expect(f.mode(), 'the mic is off').toBe('off');
     await altEnter(f);
     expect(f.mic.calls).toEqual(['start d1', 'stop d1', 'retry d1']);
-    expect(f.getByTestId('composer.dictation').textContent, 'back to transcribing').toBe('transcribing…');
+    expect(f.getByTestId('composer.dictation.meter').dataset.phase, 'back to transcribing').toBe('transcribing');
     expect(f.mode()).toBe('transcribing');
     await f.say('d1', { text: 'there it is', final: true });
     expect(f.field.textContent).toBe('there it is');

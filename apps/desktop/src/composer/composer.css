@@ -55,7 +55,7 @@
   border-radius: 9px;
 }
 /* the TipTap field (pm/PmField.tsx, behind Composer.tsx ENGINE): its host adds no box; ProseMirror
-   needs pre-wrap; the dictation's live words are dim with a pulsing dot, never a frame */
+   needs pre-wrap; the dictation's live words are dim after the take's chip */
 .b-composer .b-field-host {
   display: contents;
 }
@@ -67,18 +67,87 @@
 .b-composer .b-field .b-dictation {
   color: var(--c-text-2);
 }
-.b-composer .b-field .b-dictation i {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin: 0 var(--s-1) 0 0;
+/* the take's chip, the TUI's voice chip (pm/meter.ts, designer m_22700): the quote and image chips'
+   drawing (1 px line, r 9, no fill), 8 px padding and 8 px between its parts. Listening: '●' in
+   accent blinking 600 ms on / 600 ms off, 6 accent bars (his last levels, the newest on the
+   right), the time mono text-2. Transcribing: a steady '∿' in accent, the bars text-3 rolling a
+   wave, the time held. One width in every state: nothing moves. Reduced motion: the ● stays lit
+   (the wave holds still in schema.ts). His live words, if any, follow it in text-2. */
+.b-composer .b-field .b-dictation .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--s-5);
+  padding: 0 var(--s-2);
+  margin: 0 1px;
   vertical-align: 1px;
-  border-radius: 50%;
-  background: var(--c-text-2);
-  animation: b-blink 1s steps(1) infinite;
+  border: 1px solid var(--c-line);
+  border-radius: 9px;
+  line-height: 1;
+}
+.b-composer .b-field .b-dictation .sign {
+  display: inline-block;
+  width: 1em;
+  text-align: center;
+  font-style: normal;
+  color: var(--c-accent);
+}
+.b-composer .b-field .b-dictation .chip[data-phase="listening"] .sign::before {
+  content: "●";
+  font-size: 0.75em;
+}
+.b-composer .b-field .b-dictation .chip[data-phase="listening"] .sign {
+  animation: b-blink 1.2s steps(1) infinite;
+}
+/* the ∿ is a thin stroke: heavier, so it reads the full accent as the ● does (designer m_22785) */
+.b-composer .b-field .b-dictation .chip[data-phase="transcribing"] .sign::before {
+  content: "∿";
+  font-weight: 700;
+  font-size: 1.15em;
+}
+/* a bar per level, 8 steps from 3 to 14 px (▁ to █), 3 px wide, 2 px apart: the meter is a glyph */
+.b-composer .b-field .b-dictation .mt {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: calc(var(--s-1) / 2);
+  height: 14px;
+}
+.b-composer .b-field .b-dictation .mt i {
+  width: 3px;
+  height: calc(3px + 11px * var(--h, 0) / 7);
+  border-radius: 1px;
+  background: var(--c-accent);
+}
+.b-composer .b-field .b-dictation .mt[data-phase="transcribing"] i {
+  background: var(--c-text-3);
+}
+.b-composer .b-field .b-dictation .t::before {
+  content: attr(data-t);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text-2);
+}
+/* narrow (fitFor): less than 160 px of free text, the time drops, then 3 bars (listening: the
+   newest 3; transcribing: the first 3) */
+.b-composer .b-field .b-dictation .chip:not([data-fit="full"]) .t,
+.b-composer .b-field .b-dictation .chip[data-fit="three"][data-phase="listening"] .mt i:nth-child(-n + 3),
+.b-composer .b-field .b-dictation .chip[data-fit="three"][data-phase="transcribing"] .mt i:nth-child(n + 4) {
+  display: none;
+}
+.b-composer .b-field .b-dictation .chip:not([data-fit]) .t {
+  display: inline;
+}
+/* his live words (designer m_22720): text-3, provisional (the final lands in ink); one space after
+   the chip, a CSS content (the node's text is his words alone); they wrap like his text, a new
+   partial swaps them in place, no fade */
+.b-composer .b-field .b-dictation .w {
+  color: var(--c-text-3);
+}
+.b-composer .b-field .b-dictation .w:not(:empty)::before {
+  content: " ";
 }
 @media (prefers-reduced-motion: reduce) {
-  .b-composer .b-field .b-dictation i {
+  .b-composer .b-field .b-dictation .chip[data-phase] .sign {
     animation: none;
   }
 }
@@ -305,8 +374,9 @@
     background var(--d-fast) var(--ease-out),
     color var(--d-fast) var(--ease-out);
 }
-.b-composer .keys .mic.recording {
-  color: var(--c-text);
+/* while a take runs, the field's chip is the mic (designer m_22700): the key line has no meter */
+.b-composer .keys .mic[hidden] {
+  display: none;
 }
 /* hover (bar O.6): every composer control shows the pointer is on it, the ds ghost button's
    hover (prim.css .b-btn.ghost); the padding sits in a negative margin, so the key line never moves */
@@ -324,29 +394,6 @@
 /* the @ $ / list: the row under the pointer (the picked one keeps its ink) */
 .b-composer-pick .b-mi:not(.on):not(.dis):hover {
   background: var(--c-hover);
-}
-.b-composer .keys .mic .meter {
-  display: inline-flex;
-  align-items: center;
-  /* the meter is a glyph: its bars' pitch is half a step, not a spacing */
-  gap: calc(var(--s-1) / 2);
-  height: 10px;
-}
-.b-composer .keys .mic .meter i {
-  width: 2px;
-  height: calc(3px + 7px * var(--lvl, 0));
-  border-radius: 1px;
-  background: var(--c-text-2);
-  transition: height 60ms linear;
-}
-.b-composer .keys .mic .meter i:nth-child(2),
-.b-composer .keys .mic .meter i:nth-child(4) {
-  height: calc(3px + 5px * var(--lvl, 0));
-}
-@media (prefers-reduced-motion: reduce) {
-  .b-composer .keys .mic .meter i {
-    transition: none;
-  }
 }
 /* voice mode's ∿ (designer's voice-window page (1)): next to dictate, as wide as its words */
 .b-composer .keys .mic.voice {

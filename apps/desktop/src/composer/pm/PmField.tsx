@@ -71,7 +71,7 @@ import {
 import { emojiToken, typedEmoji } from "../emoji";
 import { typed } from "@/working/clock";
 import { Picker } from "../Picker";
-import { FIELD_NODES, fitFailedIn } from "./schema";
+import { fieldNodes, fitFailedIn } from "./schema";
 import { Colors } from "./colors";
 import {
   applyOp,
@@ -155,7 +155,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
   // he put a caret in the field once: a quote from outside goes at that caret, else at the end
   const hadFocus = useRef(false);
   const [blank, setBlank] = useState(true);
-  // a dictation node in the field: the placeholder hides, one line shows ('listening…' or his
+  // a dictation node in the field: the placeholder hides, one line shows (the take's chip and his
   // words), never both on top of each other (his try a43609b2, ambient-lead m_19364)
   const [dictShown, setDictShown] = useState(false);
   // the attachment list in the box (designer's composer-attachments A): the draft's chips, the one
@@ -243,7 +243,8 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const editor = new Editor({
       element: el,
       extensions: [
-        ...FIELD_NODES,
+        // the dictation's meter reads his voice level from the sources of the moment
+        ...fieldNodes(() => props.current.sources.dictate?.level),
         Colors,
         UndoRedo.configure({ depth: 100, newGroupDelay: 500 }),
       ],

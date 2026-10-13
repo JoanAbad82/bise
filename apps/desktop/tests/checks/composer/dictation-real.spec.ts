@@ -16,7 +16,8 @@ import { fieldText } from './target';
 const S = {
   field: '[data-testid="composer.field"]',
   mic: '[data-testid="composer.mic"]',
-  meter: '[data-testid="composer.meter"]',
+  /** the take's chip's bars in the field (designer m_22700), data-bars the 6 steps */
+  meter: '[data-testid="composer.dictation.meter"]',
   setupSkip: '[data-testid="setup.skip"]',
 };
 const HELD = 'bonjour Ã  tous, on garde la file';
@@ -48,7 +49,7 @@ test('composer/dictation (real core): ctrl+r held in the real thread, the coreâ€
     await expect.poll(mic, { message: 'held: the mic is on (the core opened it)' }).toBe('recording');
     const levels = new Set<string>();
     for (let i = 0; i < 12; i++) {
-      levels.add((await page.locator(S.meter).getAttribute('data-level').catch(() => null)) ?? '');
+      levels.add((await page.locator(S.meter).getAttribute('data-bars').catch(() => null)) ?? '');
       await page.waitForTimeout(100);
     }
     await page.keyboard.up('r');

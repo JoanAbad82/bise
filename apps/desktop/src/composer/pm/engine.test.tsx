@@ -218,6 +218,7 @@ describe("(3) the live dictation is in nothing he keeps or sends", () => {
       await Promise.resolve();
     });
     // he sees the words live, in the field
+    // (its lead, then the take's chip, then the words; the chip has no text)
     expect(getByTestId("composer.dictation").textContent).toBe(
       " on garde la file",
     );

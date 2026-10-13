@@ -30,7 +30,7 @@ import {
   type TipClock,
 } from "./keybar";
 import type { Outgoing } from "./message";
-import { NO_SOURCES, type ComposerSources, type DictatePort } from "./sources";
+import { NO_SOURCES, type ComposerSources } from "./sources";
 import type { Store } from "./drafts";
 
 export interface ComposerProps {
@@ -194,7 +194,6 @@ export const Composer = memo(function Composer(
           {sources.dictate !== undefined && (
             <Mic
               state={dictating}
-              level={sources.dictate.level}
               onClick={() => {
                 actions.current?.dictate();
                 actions.current?.focus();
@@ -212,6 +211,8 @@ export const Composer = memo(function Composer(
               onClick={sources.voice}
               aria-label="voice mode"
               title="voice mode · ⌃R ⌃R"
+              // while a take runs the key line is only its keys (designer m_22785)
+              hidden={dictating !== null}
               data-testid={`${testId}.voice`}
             >
               <span className="kk">∿</span> voice
@@ -288,90 +289,31 @@ export const Composer = memo(function Composer(
   );
 });
 
-/** The mic control in the key line (bar I): its key at rest; while the mic is on, the meter alone
- *  ('listening…' is the field's, designer m_19439: never twice); then '…' while the last words
- *  come. Its own state only: the field never re-renders. */
+/** The mic control in the key line (bar I): its key at rest. While a take runs it hides: the take's
+ *  chip in the field shows the voice, the key line says 'any key stop · esc cancel' (designer
+ *  m_22700: never twice). Its own state only: the field never re-renders. */
 function Mic({
   state,
-  level,
   onClick,
   testId,
 }: {
   state: "recording" | "transcribing" | null;
-  level: DictatePort["level"];
   onClick: () => void;
   testId: string;
 }): JSX.Element {
   return (
     <Press
-      look={`mic${state === null ? "" : ` ${state}`}`}
+      look="mic"
       onMouseDown={(e) => {
         e.preventDefault(); // the field keeps the caret
       }}
       onClick={onClick}
-      aria-pressed={state === "recording"}
-      aria-label={state === "recording" ? "stop dictating" : "dictate"}
+      aria-label="dictate"
+      hidden={state !== null}
       data-testid={`${testId}.mic`}
       data-state={state ?? "off"}
     >
-      {state === null ? (
-        <>
-          <span className="kk">⌃R</span> dictate
-        </>
-      ) : state === "recording" ? (
-        <>
-          <Meter level={level} testId={testId} />
-        </>
-      ) : (
-        "…"
-      )}
+      <span className="kk">⌃R</span> dictate
     </Press>
-  );
-}
-
-/** The meter's height for a level: the level itself, or under reduced motion only voice / no voice
- *  (two still heights, so the bars never move with each sample). */
-export const meterLevel = (v: number, reduced: boolean): number => {
-  const c = Math.max(0, Math.min(1, v));
-  return reduced ? (c > 0.05 ? 0.6 : 0.15) : Math.round(c * 100) / 100;
-};
-
-/** Five bars that follow his voice level (the core's level {who: 'you'}). */
-function Meter({
-  level,
-  testId,
-}: {
-  level: DictatePort["level"];
-  testId: string;
-}): JSX.Element {
-  const box = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    const el = box.current;
-    if (level === undefined || el === null) return;
-    const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    // each sample writes one CSS variable and one attribute (the checks read it), no React render
-    return level((v) => {
-      const h = String(meterLevel(v, reduced));
-      if (el.dataset.level === h) return;
-      el.dataset.level = h;
-      el.style.setProperty("--lvl", h);
-    });
-  }, [level]);
-  return (
-    <span
-      ref={box}
-      className="meter"
-      data-testid={`${testId}.meter`}
-      data-level="0"
-      aria-hidden
-    >
-      <i />
-      <i />
-      <i />
-      <i />
-      <i />
-    </span>
   );
 }

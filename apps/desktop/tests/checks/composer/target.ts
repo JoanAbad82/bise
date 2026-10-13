@@ -41,9 +41,10 @@ export const T = {
   keys: '[data-testid="composer.keys"]',
   vision: '[data-testid="lab.vision"]',
   voiceMode: '[data-testid="lab.voice"]',
-  /** the mic in the key line (data-state off|recording|transcribing), its meter, the lab's 'mic busy' box */
+  /** the mic in the key line (data-state off|recording|transcribing; hidden while a take runs), the
+   *  take's chip's bars in the field (data-bars, designer m_22700), the lab's 'mic busy' box */
   mic: '[data-testid="composer.mic"]',
-  meter: '[data-testid="composer.meter"]',
+  meter: '[data-testid="composer.dictation.meter"]',
   micBusy: '[data-testid="lab.micBusy"]',
   /** what the lab's fake mic says (Lab.tsx LAB_SAID), a word every 250 ms */
   labSaid: "on garde la file d'attente",

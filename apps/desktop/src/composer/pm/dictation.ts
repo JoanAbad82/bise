@@ -198,7 +198,7 @@ export function useDictation(c: DictationCtx): Dictation {
     if (t === null || !t.mic) return;
     t.mic = false;
     t.stoppedAt = now();
-    // its node says 'transcribing…' until the final, for as long as it takes
+    // its chip says transcribing (∿) until the final, for as long as it takes
     const st = c.state();
     const at = st === null ? null : dictationAt(st.doc, t.id);
     const node = at === null || st === null ? null : st.doc.nodeAt(posOf(at));
@@ -226,7 +226,7 @@ export function useDictation(c: DictationCtx): Dictation {
     for (const id of Array.from(failed.current)) dropOne(id, "esc");
   };
   /** 'try again' (⌥⏎ or its click): the take the core kept is transcribed once more; its line
-   *  goes back to 'transcribing…' (designer m_22396). No id: the newest failed take. */
+   *  goes back to its transcribing chip (designer m_22396). No id: the newest failed take. */
   const retry = (id?: string): void => {
     const port = c.sources().dictate;
     const which = id ?? Array.from(failed.current).at(-1);

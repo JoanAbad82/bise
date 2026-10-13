@@ -2,7 +2,7 @@
 // back with no words or an error, the core keeping its sound, stays in the field as one line
 //   no words: 'didn't catch any words · try again ⌥⏎ · esc drops it'
 //   an error: '▲ couldn't transcribe it (<reason>) · try again ⌥⏎ · esc drops it'
-// ⌥⏎ or a click on 'try again' sends dictate_retry and the line says 'transcribing…' again; its
+// ⌥⏎ or a click on 'try again' sends dictate_retry and the take's chip says transcribing (∿) again; its
 // words land in its place; a second failure shows the same line; esc drops it (dictate_cancel).
 // One 1100 light crop of each state for designer. The real thread screen on the scripted core.
 // Owner: amb-web (src/composer/pm/dictation.ts, pm/schema.ts).
@@ -89,7 +89,8 @@ test("composer/dictation-retry: a kept take with no words or an error offers 'tr
     // ⌥⏎: transcribed once more, the line back to 'transcribing…'
     await page.keyboard.press("Alt+Enter");
     await expect.poll(() => cmdsOf(core, "dictate_retry")).toEqual([id]);
-    await expect(line(page)).toHaveText("transcribing…");
+    await expect(line(page).locator(".chip")).toHaveAttribute("data-phase", "transcribing");
+    await expect(line(page)).toHaveText("");
     await shot(page, "01-trying-again.png");
 
     // it fails again, with an error: the same line, its reason; a click tries again

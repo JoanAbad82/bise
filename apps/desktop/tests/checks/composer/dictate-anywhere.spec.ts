@@ -1,6 +1,6 @@
 // composer/dictate-anywhere · his try a43609b2 (ambient-lead m_19364, main m_19363), two items:
 // (1) « le listening qu'on écrit et le placeholder de l'input sont superposés »: while he dictates,
-//     the field's placeholder is hidden; one line shows ('listening…' or his words), never two
+//     the field's placeholder is hidden; one line shows (the take's chip and his words), never two
 //     texts on top of each other. Empty and non-empty composer, light and dark at 1100.
 // (2) « j'ai essayé de faire Ctrl+R alors que je n'avais pas le focus dans l'input et il ne s'est
 //     rien passé »: ctrl+r anywhere in the window (a thread row clicked, a sidebar row selected)
@@ -225,9 +225,10 @@ for (const theme of ["light", "dark"] as const) {
       await expect
         .poll(() => mic(page), { message: "ctrl+r: the mic is on" })
         .toBe("recording");
-      await expect(dictation(page), "'listening…' in the field").toHaveText(
-        /listening…/,
-      );
+      await expect(
+        dictation(page).locator(".chip"),
+        "the take's chip (listening) in the field",
+      ).toHaveAttribute("data-phase", "listening");
       expect(
         await placeholders(page),
         "dictating in an empty composer: no placeholder",
@@ -247,7 +248,7 @@ for (const theme of ["light", "dark"] as const) {
       await expect(field(page), "his words, then the live part").toContainText(
         "note: the tablets",
       );
-      await expect(dictation(page)).toHaveText(/listening…/);
+      await expect(dictation(page).locator(".chip")).toHaveAttribute("data-phase", "listening");
       expect(
         await placeholders(page),
         "dictating after his words: no placeholder",
@@ -538,9 +539,8 @@ test("composer/dictate-anywhere: a core that never answers: esc still ends the d
     await page.waitForTimeout(6000);
     await expect(dictation(page), "still waiting past the old 5 s cut").toHaveCount(1);
     expect(await mic(page)).toBe("transcribing");
-    await expect(field(page), "his words stay around the waiting take").toHaveText(
-      "his words transcribing… more",
-    );
+    await expect(dictation(page).locator(".chip"), "its chip says transcribing (∿)").toHaveAttribute("data-phase", "transcribing");
+    await expect(field(page), "his words stay around the waiting take").toHaveText(/^his words\s+more$/u);
     await page.keyboard.press("Escape");
     await expect(dictation(page), "esc ends the wait at once").toHaveCount(0, {
       timeout: 1000,

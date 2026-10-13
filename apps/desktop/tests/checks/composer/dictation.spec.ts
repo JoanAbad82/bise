@@ -32,10 +32,10 @@ test('composer/dictation: ctrl+r held, French words land at the caret, no flash,
     await page.keyboard.down('Control');
     await page.keyboard.down('r');
     await expect.poll(() => micState(page), { message: 'held: the mic is on' }).toBe('recording');
-    // the meter follows the voice (amb-web df7472f6: composer.meter data-level, the core's level)
+    // the take's chip's bars follow the voice (designer m_22700: data-bars, the core's level)
     const levels = new Set<string>();
     for (let i = 0; i < 19; i++) { // six words, one every 250 ms
-      levels.add((await page.locator(T.meter).getAttribute('data-level').catch(() => null)) ?? '');
+      levels.add((await page.locator(T.meter).getAttribute('data-bars').catch(() => null)) ?? '');
       await page.waitForTimeout(100);
     }
     levels.delete('');
@@ -85,13 +85,16 @@ test('composer/dictation: ⏎ stops the mic without sending; the next ⏎ sends'
   });
 });
 
-test('composer/dictation: the mic button and any key stop a tapped mic', async () => {
+test('composer/dictation: the mic button starts it, then leaves the key line to the chip; any key stops a tapped mic', async () => {
   await onTarget(async ({ page }) => {
     await page.locator(T.field).click();
-    await press(page, 'Control+r');
-    await expect.poll(() => micState(page)).toBe('recording');
     await page.locator(T.mic).click();
-    await expect.poll(() => micState(page), { message: 'the mic button stops it' }).toBe('off');
+    await expect.poll(() => micState(page), { message: 'the mic button starts it' }).toBe('recording');
+    // the field's chip is the meter now (designer m_22700): no mic on the key line while it listens
+    await expect(page.locator(T.mic)).toBeHidden();
+    await press(page, 'Escape');
+    await expect.poll(() => micState(page)).toBe('off');
+    await expect(page.locator(T.mic)).toBeVisible();
     await page.locator(T.field).click();
     await press(page, 'Meta+a');
     await press(page, 'Backspace');
