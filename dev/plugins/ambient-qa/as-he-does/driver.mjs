@@ -1290,7 +1290,10 @@ async function newRows(harness, say) {
       // the bubble's own words (its text parts, not the quote card above them): before, the chip, after
       const parts = b.querySelector('[data-testid$=".parts"]') ?? b;
       const words = (parts.textContent ?? '').replace(/\s+/g, ' ');
-      const chip = words.search(/[❝“"]\s*1/);
+      // the chip after 'before': the quote card above the words starts with its own '❝ 1' (cand-37fa)
+      const b0 = words.indexOf('before');
+      const m = /[❝“"]\s*1/.exec(words.slice(Math.max(b0, 0)));
+      const chip = m ? Math.max(b0, 0) + m.index : -1;
       return { text: t.slice(0, 300), words: words.slice(0, 200), order: [words.indexOf('before'), chip, words.indexOf('after', Math.max(chip, 0))] };
     }), 10000, 500);
     await shot('quote-mid-sentence-bubble');
@@ -1691,11 +1694,14 @@ async function quickRows(harness, say) {
   step('space with nothing focused types into the composer', sp.field === 'abc d', sp);
   await clear();
   // a run_typescript call, opened: the program it ran, never its args' JSON, and the TUI's 'ƒ' sign
-  const before = await page.locator('[data-testid^="thread.tool."][role="button"]').count();
+  // a new tool row by its testid, never by the count: a long thread draws only its last rows, so
+  // the count stays put as one comes in (red on every full pass: cand-2760, d0d4, 37fa)
+  const toolIds = () => page.locator('[data-testid^="thread.tool."][role="button"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
+  const before = new Set(await toolIds().catch(() => []));
   await say('[[ts: const answer = 40 + 2; return answer;]]');
   const tool = await until(async () => {
-    const n = await page.locator('[data-testid^="thread.tool."][role="button"]').count();
-    return n > before ? page.locator('[data-testid^="thread.tool."][role="button"]').last() : null;
+    const id = (await toolIds()).filter((x) => !before.has(x)).at(-1);
+    return id ? page.locator(`[data-testid="${id}"]`).first() : null;
   }, 60000, 1000);
   let ts = { row: null, code: null, opened: false };
   if (tool) {
@@ -1809,7 +1815,9 @@ async function fileChips(harness) {
   await fresh('here are the files zqfiles ');
   const dropped = await drop('[data-testid="composer.field"]:visible', DOCS.map(at));
   const five = await until(async () => ((await fileChip.count()) === DOCS.length ? true : null), 8000, 300);
-  const names = (await fileChip.allInnerTexts().catch(() => [])).map((t) => t.replace('▯', '').trim());
+  // b46e1fbd: a chip in the text shows its number; its name is in the attachment list's row
+  const listNames = () => page.locator('[data-testid="composer"] [data-testid$=".attach"] [role="listitem"][data-kind="file"] .nm').allInnerTexts().catch(() => []);
+  const names = (await listNames()).map((t) => t.trim());
   await shot('file-chips-composer');
   step('(f1) a drop of a pdf, csv, xlsx, docx and pptx on the composer: one data-kind=file chip each, in order', dropped && !!five && JSON.stringify(names) === JSON.stringify(DOCS), { dropped, names, fenced, app_home: appHome });
 
@@ -1912,7 +1920,7 @@ async function fileChips(harness) {
   if (answering) {
     await fresh('cold, see ');
     await drop('[data-testid="composer.field"]:visible', [csv]);
-    const chip = await until(async () => ((await fileChip.count()) === 1 && /bench-zq\.csv/.test(await fileChip.first().innerText().catch(() => '')) ? true : null), 8000, 300);
+    const chip = await until(async () => ((await fileChip.count()) === 1 && (await listNames()).join() === 'bench-zq.csv' ? true : null), 8000, 300);
     await shot('file-chip-card-answer');
     await page.keyboard.press('Enter');
     // an answer reaches main as the hub's own words ('the user answered card #N (…): "…"'), the file

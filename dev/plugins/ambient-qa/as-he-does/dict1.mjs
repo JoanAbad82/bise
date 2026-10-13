@@ -75,6 +75,22 @@ await field.click({ timeout: 5000 }).catch(() => {});
 await field.fill('').catch(() => {});
 fs.writeFileSync(VOICE, WORDS);
 const mic = [];
+// the fake voice's final comes some ms after the stop (cand-37fa: recording -> off, the 100 ms poll
+// never saw 'transcribing'): an observer in the page keeps every meter change as it happens
+await page.evaluate(() => {
+  const log = [];
+  window.__ahdMeter = log;
+  const t0 = performance.now();
+  const rec = () => {
+    const m = document.querySelector('[data-testid="composer.dictation.meter"]');
+    if (!m) return;
+    const s = m.closest('.chip')?.querySelector('.sign');
+    const e = { ms: Math.round(performance.now() - t0), phase: m.getAttribute('data-phase'), bars: m.getAttribute('data-bars'), sign: s ? getComputedStyle(s, '::before').content : null };
+    const l = log.at(-1);
+    if (!l || l.phase !== e.phase || l.bars !== e.bars) log.push(e);
+  };
+  new MutationObserver(rec).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-phase', 'data-bars'] });
+}).catch(() => {});
 const t0 = Date.now();
 await tap();
 for (let i = 0; i < 24; i++) { const r = await read(); if (r && mic.at(-1)?.s !== r.mic) mic.push({ ms: Date.now() - t0, s: r.mic }); sample(r, Date.now() - t0); await wait(50); }
@@ -96,14 +112,17 @@ const landed = `${got?.value ?? ''} ${got?.field ?? ''}`.includes(WORDS);
 step('one ctrl+r take: the fake voice words reach the field', landed, { words: WORDS, got, mic, ms: Date.now() - t0 });
 // the meter (c2331eb3): listening bars from his voice's levels, flat (all 0) in silence; while
 // transcribing the rolling wave ▂▃▅▆▅▃ (1,2,4,5,4,2 rolled) and the sign ∿. The fake voice sends
-// no levels (the core's fake listener): moving bars can't show here, flat ones must.
-const listen = meter.filter((m) => m.phase === 'listening');
-const trans = meter.filter((m) => m.phase === 'transcribing');
+// levels (cand-37fa: 0 → 3-4 within 130 ms): the take opens flat (silence before his first level),
+// then the bars follow the levels.
+const seenIn = await page.evaluate(() => window.__ahdMeter ?? null).catch(() => null);
+const all = seenIn?.length ? seenIn : meter;
+const listen = all.filter((m) => m.phase === 'listening');
+const trans = all.filter((m) => m.phase === 'transcribing');
 const WAVE = [1, 2, 4, 5, 4, 2];
 const isWave = (b) => { const a = b.split(',').map(Number); return WAVE.some((_, k) => [...WAVE.slice(k), ...WAVE.slice(0, k)].join() === a.join()); };
-step('the meter while listening: 6 bars; all flat with the fake voice (no levels: silence)', listen.length > 0 && listen.every((m) => m.bars.split(',').length === 6 && m.bars.split(',').every((v) => v === '0')), { listening: listen.slice(0, 8) });
-step('the bars move with his voice (needs levels: the fake voice sends none)', listen.some((m) => m.bars.split(',').some((v) => v !== '0')), { distinct: [...new Set(listen.map((m) => m.bars))], harness_limit: 'the fake voice sends no level events' });
-step('while transcribing: the ∿ sign and the rolling wave', trans.length > 0 && trans.every((m) => isWave(m.bars)) && trans.some((m) => /∿/.test(m.sign ?? '')), { transcribing: trans.slice(0, 8), frames: new Set(trans.map((m) => m.bars)).size });
+step('the meter opens flat: 6 bars at the lowest step (silence before his voice)', listen.length > 0 && listen[0].bars === '0,0,0,0,0,0' && listen.every((m) => m.bars.split(',').length === 6), { first: listen[0] ?? null, from: seenIn?.length ? 'observer' : 'poll' });
+step('the bars move with his voice (the fake voice levels)', new Set(listen.map((m) => m.bars)).size > 2, { distinct: [...new Set(listen.map((m) => m.bars))].slice(0, 12) });
+step('while transcribing: the ∿ sign and the rolling wave', trans.length > 0 && trans.every((m) => isWave(m.bars)) && trans.some((m) => /∿/.test(m.sign ?? '')), { transcribing: trans.slice(0, 8), frames: new Set(trans.map((m) => m.bars)).size, from: seenIn?.length ? 'observer' : 'poll' });
 await field.fill('').catch(() => {});
 await browser.close().catch(() => {});
 process.exit(0);
