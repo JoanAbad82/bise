@@ -681,10 +681,13 @@ fn connectors_and_never_gated_tools() {
     ] {
         assert_eq!(j(call(t, json!({}))), Verdict::Allow { tier: 1 }, "{t}");
     }
+    // a send is a card (connector_tests.rs); a name that says neither
+    // read nor write asks the checker
     assert!(matches!(
         j(call("gmail.send_email", json!({"to": "x"}))),
-        Verdict::Check { .. }
+        Verdict::Card { .. }
     ));
+    assert!(matches!(j(call("hn.story", json!({}))), Verdict::Check { .. }));
     let rules = rules::parse("[[allow]]\ntool = \"gmail.send_email\"\n").unwrap();
     assert_eq!(
         judge_with(

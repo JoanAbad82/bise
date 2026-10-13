@@ -7,13 +7,18 @@
 //! - `tiers`: what each part is: hard rule, allowed, open; risk classes;
 //! - `paths`: the roots, protected and secret paths (§7);
 //! - `arity`: the "always" pattern (§5.4);
-//! - `rules`: `~/.bise/approvals.toml`.
+//! - `rules`: `~/.bise/approvals.toml`;
+//! - `connector`: what a connector call does (write, read, neither): a
+//!   write on his accounts is always a card in `auto`, a read runs.
 
 pub mod arity;
 pub mod check;
 pub mod checker;
 #[cfg(test)]
 mod checker_tests;
+pub mod connector;
+#[cfg(test)]
+mod connector_tests;
 pub mod mode;
 pub mod parse;
 pub mod paths;
@@ -214,18 +219,6 @@ pub fn makes_a_draft(tool: &str) -> bool {
     draft && makes && !leaves
 }
 
-/// Where a draft tool puts it, for the card: `gmail.create_draft` → Gmail.
-fn draft_place(tool: &str) -> String {
-    let svc = tool.split('.').next().unwrap_or(tool);
-    match svc.to_ascii_lowercase().as_str() {
-        "gmail" => "Gmail".into(),
-        "outlook" | "outlook_mail" => "Outlook".into(),
-        "kit" => "Kit".into(),
-        "slack" => "Slack".into(),
-        s => s.to_string(),
-    }
-}
-
 /// The checker is off: an open part is a card (design §3).
 pub const CHECKER_OFF: &str = "the checker is off, so commands ask first.";
 
@@ -250,7 +243,7 @@ pub fn judge_with(
         return match &call.pending_review {
             None => Verdict::Allow { tier: 1 },
             Some(page) => Verdict::Card {
-                reason: format!("{} wants to put drafts in {} before you reviewed {page}", call.agent, draft_place(tool)),
+                reason: format!("{} wants to put drafts in {} before you reviewed {page}", call.agent, connector::service(tool)),
                 always: None,
             },
         };
@@ -534,11 +527,24 @@ fn judge_edit(
     }
 }
 
-/// A connector call: a saved rule for the whole tool, the cache by exact
-/// arguments, else the checker.
+/// A connector call: a saved rule for the whole tool; else a write on his
+/// accounts is a card, never the checker's nor the cache's (the gateway
+/// runs whatever it gets: in `auto` nothing writes without his word); a
+/// read runs; a name that says neither: the cache by exact arguments,
+/// else the checker.
 fn judge_connector(call: &Call, rules: &Rules, cache: &Cache) -> Verdict {
     if rules.allows_tool(&call.repo, &call.tool) {
         return Verdict::Allow { tier: 2 };
+    }
+    match connector::act(&call.tool) {
+        connector::Act::Write(w) => {
+            return Verdict::Card {
+                reason: connector::reason(&call.tool, w),
+                always: Some(vec![call.tool.clone()]),
+            }
+        }
+        connector::Act::Read => return Verdict::Allow { tier: 1 },
+        connector::Act::Unknown => {}
     }
     let key = CacheKey::Exact(format!("{} {}", call.tool, call.args));
     if cache.allows(&key) {

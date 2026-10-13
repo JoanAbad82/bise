@@ -41,7 +41,7 @@
 1023 rust/tui/src/run.rs
 1725 rust/tui/src/sb.rs
 1007 rust/tui/src/sb/card_draw.rs
-1527 rust/tui/src/sb/cards.rs
+1438 rust/tui/src/sb/cards.rs
 2859 rust/tui/src/sb/panel.rs
 1036 rust/tui/src/term.rs
 1110 rust/tui/src/theme.rs

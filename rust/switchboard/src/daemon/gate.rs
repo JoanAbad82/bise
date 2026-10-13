@@ -299,7 +299,7 @@ fn bash_cmd(args: &Value) -> String {
 
 /// The card's text (design §9), line by line so the TUI draws it and
 /// main's board reads it: the title, `| ` the lines that need you, `= `
-/// the parts already allowed (dim), `reason: `, one `always: ` per rule.
+/// the parts already allowed (dim), `reason: ` (`warn: ` if it deletes, ▲), one `always: ` per rule.
 pub(super) fn card_text(call: &Call, needs: &[Part], reason: &str, always: Option<&[String]>) -> String {
     let mut out: Vec<String> = Vec::new();
     let body: Vec<String> = match call.tool.as_str() {
@@ -340,7 +340,7 @@ pub(super) fn card_text(call: &Call, needs: &[Part], reason: &str, always: Optio
     if body.len() > 40 {
         out.push(format!("| … {} more lines", body.len() - 40));
     }
-    out.push(format!("reason: {reason}"));
+    out.push(format!("{}: {reason}", if approvals::connector::warns(&call.tool) { "warn" } else { "reason" }));
     for r in always.into_iter().flatten() {
         out.push(format!("always: {r}"));
     }
