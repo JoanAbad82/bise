@@ -576,6 +576,69 @@ if (mode === 'rows2') {
   const hasMenu = (await menuBtn.count()) > 0;
   if (hasMenu) await screen1100('settings-menu', () => click('a settings menu', menuBtn), '[role="menu"], [role="listbox"]');
   await page.keyboard.press('Escape');
+  // b51422c0's batch (ambient-lead m_21481): settings' key field and its caption, the terminal
+  // panel, a thread with a tool row and a code block, the selection tint and a quote chip
+  const keyAdd = page.locator('[data-testid="settings.key.add"]').first();
+  if ((await keyAdd.count()) > 0) {
+    await screen1100('settings-key', () => click('add a key', keyAdd), '[data-testid="settings.key.field"]');
+    await page.keyboard.press('Escape');
+  } else at1100['settings-key'] = { overflow: false, there: false, why: 'no settings.key.add on this world' };
+  await screen1100('terminal', async () => { await harness(); await page.keyboard.press('Control+Backquote'); }, '[data-testid="terminal.panel"]');
+  if (at1100.terminal.there) {
+    await page.keyboard.press('Control+Backquote');
+    if (await page.locator('[data-testid="terminal.panel"]').first().isVisible().catch(() => false)) await click('hide the terminal', page.locator('[data-testid="terminal.hide"]').first());
+  }
+  step('the terminal panel opens at 1100 (⌃`)', at1100.terminal.there && !at1100.terminal.overflow, at1100.terminal);
+  const md = path.join(out, 'code-reply.md');
+  fs.writeFileSync(md, 'here is the proof, quote me if you like.\n\n```sh\necho proof-code\nls -la | head -3\n```\n\nthat was the code block.\n');
+  await harness();
+  await say(`[[bash: echo tool-row-proof]] [[reply: ${md}]]`);
+  const coded = await until(async () => page.evaluate(() => {
+    const list = document.querySelector('[data-testid="thread.list"]');
+    const pre = [...(list?.querySelectorAll('pre') ?? [])].some((p) => p.textContent.includes('proof-code'));
+    const tool = (list?.querySelectorAll('[data-testid^="thread.toolrow"]').length ?? 0) > 0;
+    return pre && tool ? { pre, tool } : null;
+  }), ANSWER_MS, 1000);
+  await page.waitForTimeout(600);
+  await shot('w1100-thread-code');
+  at1100['thread-code'] = { overflow: await overflow(), there: !!coded };
+  step('a thread with a tool row and a code block (the thread pass at 1100)', !!coded && !at1100['thread-code'].overflow, coded ?? 'no pre with proof-code, or no tool row');
+  // select words of the reply: the tint is the theme's (no system blue), the pop offers the quote
+  const tint = await page.evaluate(() => {
+    const list = document.querySelector('[data-testid="thread.list"]');
+    const w = document.createTreeWalker(list ?? document.body, NodeFilter.SHOW_TEXT);
+    let n = null;
+    while (w.nextNode()) if (w.currentNode.textContent.includes('quote me if you like')) n = w.currentNode;
+    if (!n) return null;
+    const i = n.textContent.indexOf('quote me');
+    const r = document.createRange();
+    r.setStart(n, i);
+    r.setEnd(n, i + 'quote me if you like'.length);
+    const s = window.getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+    n.parentElement.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    return { bg: getComputedStyle(n.parentElement, '::selection').backgroundColor, text: s.toString() };
+  });
+  const pop = await page.locator('[data-testid="thread.quote.pop"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+  await shot('w1100-selection');
+  step('the selection tint on thread text is the theme\'s, not the system blue', !!tint && !/rgba?\(0, 9\d, 2\d\d/.test(tint.bg) && tint.bg !== 'rgba(0, 0, 0, 0)', tint);
+  let chip = null;
+  if (pop) {
+    await click('quote it', page.locator('[data-testid="thread.quote.pop.ask"]').first());
+    chip = await until(async () => page.evaluate(() => {
+      const c = document.querySelector('[data-testid="composer"]');
+      const q = c?.querySelector('[data-testid*="quote"], .b-quote, [class*="quote"]');
+      return q ? (q.textContent || '').slice(0, 120) : null;
+    }), 5000, 300);
+  }
+  await page.waitForTimeout(400);
+  await shot('w1100-quote-chip');
+  at1100['quote-chip'] = { overflow: await overflow(), there: !!chip };
+  step('selected words go to the composer as a quote chip', pop && !!chip, { pop, chip });
+  await page.locator('[data-testid="composer"] [contenteditable="true"]').first().click().catch(() => {});
+  await page.keyboard.press('Meta+a');
+  await page.keyboard.press('Backspace');
   await cdp.send('Emulation.clearDeviceMetricsOverride').catch(() => {});
   // scroll up right after a thread opens stays up (dae80774: the list goes to its end once, then
   // leaves him where he scrolled)
