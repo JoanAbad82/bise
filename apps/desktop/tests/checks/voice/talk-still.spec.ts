@@ -110,6 +110,20 @@ test("voice/talk-still: the still's chip under his words, ✕ and fn ⌫ drop it
     const ask = cap.getByTestId('capsule.ask');
     await expect(ask, 'the ask under his words').toBeVisible({ timeout: 3000 });
     await expect(ask).toContainText("bise can see the window you're on when you talk. it needs Screen Recording for that.");
+    // its sentence is t-13 text-2, like the capsule's other lines (designer m_22031)
+    const look = await ask.locator('.t').evaluate((el) => {
+      const probe = document.createElement('span');
+      probe.style.cssText = 'font-size: var(--t-13); color: var(--c-text-2)';
+      document.body.append(probe);
+      const want = getComputedStyle(probe);
+      const got = getComputedStyle(el);
+      const r = { size: got.fontSize, color: got.color, wantSize: want.fontSize, wantColor: want.color };
+      probe.remove();
+      return r;
+    });
+    expect(look.size, "the ask's sentence is t-13").toBe(look.wantSize);
+    expect(look.size).toBe('13px');
+    expect(look.color, "the ask's sentence is text-2").toBe(look.wantColor);
     await sleep(250);
     shots.push({ label: 'light · the ask', png: await cap.screenshot() });
     await cap.getByTestId('capsule.ask.later').click();
