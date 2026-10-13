@@ -496,15 +496,16 @@ if (mode === 'rows2') {
   await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
   await page.keyboard.press('Control+1');
   // the dock's options carry the composer's id (composer.opt.<n>, ds/composer.tsx); dock.opt before 6ac92eb4
-  const OPT = '[data-testid^="composer.opt"], [data-testid^="dock.opt"]';
+  // b4a25acb: the item opens as the inbox card in the strip's dock, its options strip.card.<key>.opt.<n> (InboxCard.tsx)
+  const OPT = '[data-testid^="strip.card"][data-testid*=".opt."], [data-testid^="composer.opt"], [data-testid^="dock.opt"]';
   const inPlace = await until(async () => ((await page.locator(OPT).count()) > 0 ? true : null), 8000, 400);
   await shot('inbox-ctrl-1');
   step('⌃1 opens the item in place (its options in the dock; ⌘I = native menu, not reachable by CDP)', !!inPlace, ((await text('[data-testid="app.main"]')) ?? '').slice(-300));
   if (inPlace) {
-    const opt = page.locator('[data-testid^="dock.opt"]').first();
+    const opt = page.locator(OPT).first();
     const label = await opt.innerText().catch(() => '');
     await click('answer it there', opt);
-    const answered = await until(async () => ((await page.locator('[data-testid^="dock.opt"]').count()) === 0 ? true : null), 15000, 500);
+    const answered = await until(async () => ((await page.locator(OPT).count()) === 0 ? true : null), 15000, 500);
     await shot('inbox-answered');
     step("another project's item answered from bise's thread", !!answered, { option: label.slice(0, 80) });
   }
@@ -586,8 +587,11 @@ if (mode === 'rows2') {
   await page.waitForTimeout(150);
   for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, -150); await new Promise((r) => setTimeout(r, 30)); }
   const fromEnd = () => page.evaluate(() => {
-    let e = document.querySelector('[data-testid="thread.list"]');
-    while (e && !(e.scrollHeight > e.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(e).overflowY))) e = e.parentElement;
+    // the scroller is inside thread.list (ThreadList's scrollerRef, b4a25acb), on older builds around it
+    const list = document.querySelector('[data-testid="thread.list"]');
+    const scrolls = (x) => x.scrollHeight > x.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(x).overflowY);
+    let e = list && [list, ...list.querySelectorAll('*')].find(scrolls);
+    if (!e) { e = list; while (e && !scrolls(e)) e = e.parentElement; }
     return e ? { fromEnd: Math.round(e.scrollHeight - e.scrollTop - e.clientHeight), height: e.scrollHeight } : null;
   });
   const up0 = await fromEnd();
