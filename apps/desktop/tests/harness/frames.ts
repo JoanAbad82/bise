@@ -19,7 +19,9 @@ export type Box = { x: number; y: number; width: number; height: number };
 export type Frame = { t: number; png: PNG; scale: number; masks?: Box[] };
 
 /** Where the page draws a pearl: the ds Pearl slot and every live pearl canvas (the capsule's, the spotlight's). */
-export const PEARL_SELECTOR = '[data-bise-pearl], canvas.b-live-pearl';
+// the title bar's status pill is intended motion too: its breath runs while bise starts or reloads
+// (designer's desktop-notices v2), and it never moves anything around it
+export const PEARL_SELECTOR = '[data-bise-pearl], canvas.b-live-pearl, [data-testid="app.title.status"]';
 
 /** The boxes of every pearl on the page, in CSS pixels (empty when the page has none). */
 export async function pearlBoxes(page: Page): Promise<Box[]> {

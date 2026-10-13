@@ -61,7 +61,8 @@ test('app/reload-line: reloading, then ✓ reloaded that folds; a stale one says
         words: text === null ? '' : getComputedStyle(text).fontFamily,
       };
     });
-    expect(look.h, 'the line is one list row (32 px)').toBe(32);
+    expect(look.h, "the pill is the title bar's control height (24 px, desktop-notices v2)").toBe(24);
+    expect(await line.evaluate((el) => el.parentElement?.dataset.testid), 'in the title bar, not under it').toBe('app.title.status');
     expect(look.sha, 'the sha is machine text').not.toBe(look.words);
     await page.screenshot({ path: test.info().outputPath('reloading.png') });
     // up: ✓, then it folds and goes
@@ -72,11 +73,88 @@ test('app/reload-line: reloading, then ✓ reloaded that folds; a stale one says
     // rolled back: stays, retry sends main /version <to>, ✕ folds it
     await core.send(sw('rolled_back', { reason: 'the hub died during its probation' }));
     await expect(page.getByTestId('app.reload.text')).toHaveText("▲ couldn't reload: the new version stopped right after it started. you're still on 2065c746.", { timeout: 3000 });
-    expect(await line.evaluate((el) => el.getBoundingClientRect().height), 'with retry and ✕, still one row').toBe(32);
+    expect(await line.evaluate((el) => el.getBoundingClientRect().height), 'with retry and ✕, still 24 px').toBe(24);
     await expect(line).toHaveAttribute('role', 'alert');
     await page.waitForTimeout(3600);
     await expect(line, 'a failure stays').toBeVisible();
     await page.screenshot({ path: test.info().outputPath('rolled-back.png') });
+    // a click on the words: the 320 px popover with the whole words, retry and ✕; a click away closes it
+    await page.getByTestId('app.reload.open').click();
+    const pop = page.getByTestId('app.reload.pop');
+    await expect(pop).toContainText("you're still on 2065c746.");
+    expect(await pop.evaluate((el) => el.getBoundingClientRect().width), 'the popover is 320 px').toBe(320);
+    await expect(page.getByTestId('app.reload.pop.retry')).toBeVisible();
+    await expect(page.getByTestId('app.reload.pop.close')).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('rolled-back-pop.png') });
+    await page.getByTestId('app.main').click({ position: { x: 300, y: 300 } });
+    await expect(pop, 'a click away closes it').toHaveCount(0);
+    // narrower: the pill never cuts the crumb; under 160 px of room (the slot's data-narrow) only the
+    // short words show, and a click still opens the whole words
+    for (const w of [800, 680]) {
+      await s.app.evaluate(({ BrowserWindow }, ww) => {
+        const win = BrowserWindow.getAllWindows().sort((a, b) => (b.getSize()[0] ?? 0) - (a.getSize()[0] ?? 0))[0];
+        win?.setContentSize(ww, 700);
+      }, w);
+      await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(w);
+      await page.waitForTimeout(200);
+      const room = await page.getByTestId('app.title.status').evaluate((el) => ({ w: el.clientWidth, narrow: el.dataset.narrow === 'true' }));
+      test.info().annotations.push({ type: 'room', description: `${String(w)} wide: ${String(room.w)} px, narrow ${String(room.narrow)}` });
+      const pill = await line.evaluate((el) => {
+        const crumb = document.querySelector<HTMLElement>('[data-testid="app.title.crumb"]');
+        return { right: el.getBoundingClientRect().right, crumbWhole: crumb !== null && crumb.scrollWidth <= crumb.clientWidth };
+      });
+      expect(pill.crumbWhole, `${String(w)}: the crumb is never cut for it`).toBe(true);
+      if (room.narrow) {
+        await expect(page.getByTestId('app.reload.short'), `${String(w)}: the short words`).toHaveText("▲ couldn't reload");
+        await expect(page.getByTestId('app.reload.text'), `${String(w)}: no long words`).toBeHidden();
+        await expect(page.getByTestId('app.reload.retry'), `${String(w)}: the actions are in the popover`).toBeHidden();
+        await page.getByTestId('app.reload.open').click();
+        await expect(page.getByTestId('app.reload.pop.retry')).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(pop).toHaveCount(0);
+      } else {
+        await expect(page.getByTestId('app.reload.text'), `${String(w)}: the words, cut with … if need be`).toBeVisible();
+        await expect(page.getByTestId('app.reload.short')).toBeHidden();
+      }
+      await page.screenshot({ path: test.info().outputPath(`rolled-back-${String(w)}.png`) });
+      if (w === 800) {
+        await page.emulateMedia({ colorScheme: 'dark' });
+        await page.waitForTimeout(200);
+        await page.screenshot({ path: test.info().outputPath('rolled-back-800-dark.png') });
+        await page.emulateMedia({ colorScheme: 'light' });
+      }
+    }
+    // 680 is the window's least width and still leaves ~440 px: a long crumb takes the room under 160 px
+    const LONG = ' › a very long agent name that takes nearly all of the title bar';
+    await page.getByTestId('app.title.crumb').evaluate((el, t) => {
+      const s = document.createElement('span');
+      s.dataset['zz'] = 'long';
+      s.textContent = t;
+      el.appendChild(s);
+    }, LONG);
+    await expect(page.getByTestId('app.title.status')).toHaveAttribute('data-narrow', 'true');
+    const narrowRoom = await page.getByTestId('app.title.status').evaluate((el) => el.clientWidth);
+    test.info().annotations.push({ type: 'room', description: `680 wide, long crumb: ${String(narrowRoom)} px, narrow true` });
+    expect(
+      await page.getByTestId('app.title.crumb').evaluate((el) => el.scrollWidth <= el.clientWidth),
+      'narrow: the crumb is never cut for it',
+    ).toBe(true);
+    await expect(page.getByTestId('app.reload.short'), 'narrow: the short words').toHaveText("▲ couldn't reload");
+    await expect(page.getByTestId('app.reload.text'), 'narrow: no long words').toBeHidden();
+    await expect(page.getByTestId('app.reload.retry'), 'narrow: the actions are in the popover').toBeHidden();
+    await page.screenshot({ path: test.info().outputPath('rolled-back-narrow.png') });
+    await page.getByTestId('app.reload.open').click();
+    await expect(page.getByTestId('app.reload.pop.retry')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(pop).toHaveCount(0);
+    await page.locator('[data-zz="long"]').evaluate((el) => {
+      el.remove();
+    });
+    await expect(page.getByTestId('app.title.status')).toHaveAttribute('data-narrow', 'false');
+    await s.app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().sort((a, b) => (b.getSize()[0] ?? 0) - (a.getSize()[0] ?? 0))[0];
+      win?.setContentSize(1100, 720);
+    });
     await page.getByTestId('app.reload.retry').click();
     const cmd = await core.waitCmd((c) => c.cmd === 'slash', 3000);
     expect(cmd).toMatchObject({ project: HOME, agent: 'main', line: `/version ${TO}` });

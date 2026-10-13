@@ -17,6 +17,7 @@ import { useProjects } from "@/store";
 import { keep } from "./keep";
 import { formatRoute } from "./route";
 import { type Side, useRoute, useRouter } from "./router";
+import { TitleStatus } from "./TitleStatus";
 import {
   keptWidth,
   PANEL,
@@ -450,7 +451,9 @@ export function Titlebar({ frame }: { frame: FrameState }) {
           </span>
         ))}
       </span>
-      <StatusSlot />
+      <StatusSlot>
+        <TitleStatus />
+      </StatusSlot>
       {/* the right bar's toggle (designer m_20274/m_20275): the left toggle's panel icon mirrored,
           pressed while the bar is open; the accent count of what waits on him in its place, none at 0 */}
       {frame.panel !== undefined && (

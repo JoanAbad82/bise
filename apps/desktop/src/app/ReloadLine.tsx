@@ -1,16 +1,14 @@
-// bise's version switch (/reload, /restart, /version) on the window's one status line (designer's
-// desktop-notices page (1), architect m_20576): the hub keeps where the switch is and says it at
+// bise's version switch (/reload, /restart, /version) in the window's one status pill (designer's
+// desktop-notices page v2, architect m_20576): the hub keeps where the switch is and says it at
 // every hello and when it moves (the typed `switch` row, amb-feed 8e5ce0e4), so a window that
 // reconnects mid-reload still reads it. The words are Rust's switch_line. 'reloading' runs;
-// '✓ reloaded' shows dim 3 s from the row's at_ms (the hub's clock, so a stale row at hello never
+// '✓ reloaded' shows 3 s from the row's at_ms (the hub's clock, so a stale row at hello never
 // shows as new), then folds; '▲ couldn't reload' stays until his retry or ✕. Owner: amb-home.
 import { useEffect, useState } from 'react';
 import type { SwitchRow } from '@/proto';
-import { Button, IconButton } from '@/ds';
 import { useHubSwitch, useProjects, useStore } from '@/store';
 import { slashOf } from '@/thread/commands';
 import { turnAge } from '@/working/gust';
-import { Breath } from '@/working/Signs';
 import { RANK, type StatusPart } from './status';
 
 /** How long '✓ reloaded' shows, from the row's at_ms. */
@@ -57,7 +55,7 @@ export function reloadView(r: SwitchRow | null, now: number): ReloadView | null 
 }
 
 /** `text` with its shas in mono (designer: shas are machine text). */
-function Words({ text, shas }: { text: string; shas: readonly string[] }) {
+export function ShaWords({ text, shas }: { text: string; shas: readonly string[] }) {
   const live = shas.filter((s) => s !== '');
   if (live.length === 0) return <>{text}</>;
   const esc = live.map((s) => s.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'));
@@ -118,33 +116,27 @@ export function useReloadLine(): StatusPart | null {
   const retry = () => {
     store.command(slashOf('version', row.to, { project: home, agent: 'main' }));
   };
-  const cls = ['app-core', 'app-reload', failed && 'err', v.fold && 'fold'].filter(Boolean).join(' ');
   return {
     rank: failed ? RANK.failed : v.tone === 'running' ? RANK.running : RANK.done,
-    node: (
-      <div className={cls} role={failed ? 'alert' : 'status'} data-testid="app.reload" data-phase={row.phase}>
-        <div className="app-core-head">
-          {v.tone === 'running' && <Breath testId="app.reload.breath" />}
-          <span data-testid="app.reload.text">
-            <Words text={v.text} shas={v.shas} />
-          </span>
-          {v.elapsed !== undefined && (
-            <span className="app-reload-age" data-testid="app.reload.age">
-              {v.elapsed}
-            </span>
-          )}
-          {failed && (
-            <>
-              <Button size="sm" onClick={retry} testId="app.reload.retry">
-                retry
-              </Button>
-              <IconButton label="close" size="row" onClick={() => { setClosed(row.at_ms); }} testId="app.reload.close">
-                ✕
-              </IconButton>
-            </>
-          )}
-        </div>
-      </div>
-    ),
+    testId: 'app.reload',
+    state: row.phase,
+    tone: v.tone === 'failed' ? 'err' : v.tone,
+    words: <ShaWords text={v.text} shas={v.shas} />,
+    short: shortWords(v.tone),
+    ...(v.elapsed !== undefined ? { age: v.elapsed } : {}),
+    fold: v.fold,
+    ...(failed
+      ? {
+          acts: [{ id: 'retry', text: 'retry', onClick: retry }],
+          close: () => {
+            setClosed(row.at_ms);
+          },
+        }
+      : {}),
   };
+}
+
+/** Under 160 px of room: the sign and short words (designer m_21067). Pure. */
+export function shortWords(tone: ReloadView['tone']): string {
+  return tone === 'running' ? 'reloading…' : tone === 'done' ? '✓ reloaded' : "▲ couldn't reload";
 }

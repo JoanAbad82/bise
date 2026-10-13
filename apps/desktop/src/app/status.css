@@ -1,0 +1,128 @@
+/* The window's one status pill in the title bar's own row (TitleStatus.tsx, designer's
+   desktop-notices page v2, m_21067). amb-win's slot (.app-title-status) places it: right-aligned,
+   8 px before the right bar's toggle, at most the room the crumb leaves, no-drag. Owner: amb-home. */
+
+/* 24 px high, r 6, 0 8 padding, 8 gap, text 6%; sans t-13 text-2 */
+.app-ts {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  max-width: 100%;
+  height: calc(var(--h-control-sm) - var(--s-1)); /* 24: the title bar's own controls' height */
+  padding: 0 var(--s-2);
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--c-text) 6%, transparent);
+  color: var(--c-text-2);
+  font: var(--t-13) var(--font-ui);
+  -webkit-app-region: no-drag;
+  transition: opacity 220ms ease;
+}
+
+/* failed or down: --c-err 8%, its words in --c-err */
+.app-ts.err {
+  background: color-mix(in srgb, var(--c-err) 8%, transparent);
+  color: var(--c-err);
+}
+
+/* '✓ …' 3 s, then a 220 ms fade; none under reduced motion */
+.app-ts.fold {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-ts {
+    transition: none;
+  }
+}
+
+/* the words: a click opens the popover; the reason cuts with … (the crumb never cuts for it) */
+.app-ts-open {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+.app-ts-words {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* shas are machine text: mono, the rest sans */
+.app-ts .app-reload-sha,
+.app-ts-pop .app-reload-sha {
+  font-family: var(--font-mono);
+}
+
+/* running: how long, text-3 at the end */
+.app-ts-age {
+  flex: none;
+  color: var(--c-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-ts-acts {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.app-ts-acts:empty {
+  display: none;
+}
+
+/* under 160 px of room (the slot's data-narrow): the sign and short words only */
+.app-ts-short {
+  display: none;
+  white-space: nowrap;
+}
+.app-title-status[data-narrow="true"] .app-ts-short {
+  display: inline;
+}
+.app-title-status[data-narrow="true"] .app-ts-words,
+.app-title-status[data-narrow="true"] .app-ts-age,
+.app-title-status[data-narrow="true"] .app-ts-acts {
+  display: none;
+}
+
+/* a click: 320 px, the whole words, the dim lines, the actions and ✕ */
+.app-ts-pop {
+  position: absolute;
+  top: calc(100% + var(--s-1));
+  right: 0;
+  z-index: 30;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  width: 320px;
+  padding: var(--s-3);
+  border-radius: var(--r-3);
+  background: var(--c-overlay);
+  backdrop-filter: var(--glass);
+  box-shadow: var(--e-2);
+  color: var(--c-text);
+  font: var(--t-13) var(--font-ui);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.app-ts.err .app-ts-pop-words {
+  color: var(--c-err);
+}
+.app-ts-pop-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.app-ts-pop-acts .b-ibtn {
+  margin-left: auto;
+}

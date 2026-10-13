@@ -102,6 +102,8 @@ test("setup/offline: while the core is down the line shows the core's last log l
       for (const p of corePids(pid)) { try { process.kill(p, 'SIGKILL'); } catch { /* gone */ } }
       if (await line.isVisible()) {
         if (seen.length === 0) await s.page.screenshot({ path: test.info().outputPath('offline-line.png') }); // the frame for the report
+        // the last log line is in the pill's popover (designer's desktop-notices v2): open it once
+        if ((await s.page.getByTestId('app.core.pop').count()) === 0) await s.page.getByTestId('app.core.open').click({ timeout: 500 }).catch(() => undefined);
         seen.push(await line.innerText());
       }
       await sleep(100);

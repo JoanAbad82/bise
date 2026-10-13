@@ -39,7 +39,6 @@ import { Over, Titlebar, useFrame } from './Frame';
 import { ART_FOLD_PX, ArtifactCentre, ArtifactColumn, artOf, artWidth, useArtPct, useInnerWidth } from './ArtifactView';
 import { RightBar } from './RightBar';
 import { numbersOf } from '@/agents/model';
-import { StatusLine } from './StatusLine';
 import { HubMoments } from './HubMoments';
 import { ReportScreen } from './ReportScreen';
 import { Palette, usePaletteOpen } from './Palette';
@@ -358,7 +357,6 @@ function Current({ top }: { top: ReactNode }) {
   return (
     <Main testId="app.main">
       {top}
-      <StatusLine />
       <HubMoments />
       <AddHost />
       <div className="app-screen">

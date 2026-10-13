@@ -7,8 +7,8 @@
 import { useEffect, useState } from 'react';
 import type { BiseApi, UpdateState } from '@/shared/api';
 import type { UpdateEv } from '@/proto';
-import { Button } from '@/ds';
 import { useHubUpdate, useProjects } from '@/store';
+import { ShaWords } from './ReloadLine';
 import { useRoute } from './router';
 import { formatRoute } from './route';
 import { RANK, type StatusPart } from './status';
@@ -45,11 +45,6 @@ function useUpdate(): UpdateState {
   return s;
 }
 
-/** The window's one status line draws this (StatusLine.tsx, amb-home). */
-export function UpdateLine() {
-  return useUpdateLine()?.node ?? null;
-}
-
 /** The app update's candidate for the one status line: 'ready' stays until his click, went_bad is a failure. */
 export function useUpdateLine(): StatusPart | null {
   const s = useUpdate();
@@ -66,19 +61,25 @@ export function useUpdateLine(): StatusPart | null {
       if (!ok) setBusy(false);
     });
   };
-  // designer's raw-controls call (m_18343, his real-home screenshot showed a native button): the
-  // ds's small ghost Button; went_bad's words in the error tone with '▲', never pink
+  // went_bad's words in the error tone with '▲', never pink; its one action in the pill (amb-home's
+  // TitleStatus draws it, designer m_21067)
   const bad = s.state === 'went_bad';
-  return { rank: bad ? RANK.failed : RANK.ready, node: (
-    <div className={bad ? 'app-core app-update err' : 'app-core app-update'} role="status" data-testid="app.update" data-state={s.state}>
-      <div className="app-core-head">
-        <span data-testid="app.update.text">{bad ? `▲ ${line.text}` : line.text}</span>
-        <Button size="sm" onClick={go} disabled={busy} testId={line.act === 'restart' ? 'app.update.restart' : 'app.update.back'}>
-          {busy ? (line.act === 'restart' ? 'restarting…' : 'going back…') : line.act}
-        </Button>
-      </div>
-    </div>
-  ) };
+  return {
+    rank: bad ? RANK.failed : RANK.ready,
+    testId: 'app.update',
+    state: s.state,
+    tone: bad ? 'err' : 'quiet',
+    words: bad ? `▲ ${line.text}` : line.text,
+    short: bad ? "▲ bise didn't start right" : 'update ready',
+    acts: [
+      {
+        id: line.act === 'restart' ? 'restart' : 'back',
+        text: busy ? (line.act === 'restart' ? 'restarting…' : 'going back…') : line.act,
+        onClick: go,
+        disabled: busy,
+      },
+    ],
+  };
 }
 
 /**
@@ -98,25 +99,27 @@ export function hubUpdateLine(u: UpdateEv | null): { text: string; tail: readonl
 }
 
 /** The window's one status line draws this (StatusLine.tsx, amb-home). */
-export function HubUpdateLine() {
-  return useHubUpdateLine()?.node ?? null;
-}
-
-/** /update's build as a candidate for the one status line: building runs, failed is a failure. */
+/** /update's build as a candidate for the one status pill: building runs, failed is a failure (the build's last lines in its popover). */
 export function useHubUpdateLine(): StatusPart | null {
   const home = useProjects().find((p) => p.home)?.project ?? '';
-  const line = hubUpdateLine(useHubUpdate(home));
-  if (line === null) return null;
-  return { rank: line.failed ? RANK.failed : RANK.running, node: (
-    <div className="app-core app-update" role="status" data-testid="app.hubupdate" data-state={line.failed ? 'failed' : 'building'}>
-      <div className="app-core-head">
-        <span>{line.text}</span>
-      </div>
-      {line.tail.length > 0 && (
-        <div className="app-core-last" data-testid="app.hubupdate.tail">
-          {line.tail.join('\n')}
-        </div>
-      )}
-    </div>
-  ) };
+  const u = useHubUpdate(home);
+  const line = hubUpdateLine(u);
+  if (line === null || u === null) return null;
+  return {
+    rank: line.failed ? RANK.failed : RANK.running,
+    testId: 'app.hubupdate',
+    state: line.failed ? 'failed' : 'building',
+    tone: line.failed ? 'err' : 'running',
+    words: <ShaWords text={line.text} shas={[u.rev]} />,
+    short: line.failed ? "▲ couldn't update" : 'updating…',
+    ...(line.tail.length > 0
+      ? {
+          more: (
+            <div className="app-core-last" data-testid="app.hubupdate.tail">
+              {line.tail.join('\n')}
+            </div>
+          ),
+        }
+      : {}),
+  };
 }

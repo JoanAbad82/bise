@@ -70,10 +70,12 @@ test('app/hub-moments: focused moves the open thread, card_open opens the card i
     // update: building, failed, built
     const line = page.getByTestId('app.hubupdate');
     await core.send({ ev: 'update', project: HOME, state: 'building', rev: '1152b33', elapsed: 130 } as never);
-    await expect(line).toHaveText('updating bise · 1152b33 · 2 min');
+    await expect(page.getByTestId('app.hubupdate.text')).toHaveText('updating bise · 1152b33 · 2 min');
     await page.screenshot({ path: test.info().outputPath('update-building.png') });
     await core.send({ ev: 'update', project: HOME, state: 'failed', rev: '1152b33', text: "couldn't build 1152b33, you're still on 9f0e2aa", tail: ['error[E0425]: cannot find value `x`', 'error: could not compile `bise`'] } as never);
-    await expect(line).toContainText("▲ couldn't build 1152b33, you're still on 9f0e2aa");
+    await expect(page.getByTestId('app.hubupdate.text')).toHaveText("▲ couldn't build 1152b33, you're still on 9f0e2aa");
+    // the build's last lines are in the pill's popover (designer's desktop-notices v2)
+    await page.getByTestId('app.hubupdate.open').click();
     await expect(page.getByTestId('app.hubupdate.tail')).toContainText('error: could not compile `bise`');
     await page.screenshot({ path: test.info().outputPath('update-failed.png') });
     await core.send({ ev: 'update', project: HOME, state: 'built', rev: '1152b33' } as never);

@@ -53,7 +53,11 @@ test('native/crash: a crash that comes back asks nothing; 3 in 10 min stop the r
     crash();
     const text = page.getByTestId('app.core.text');
     await expect(text).toHaveText('▲ bise keeps crashing: 3 times in 10 min, the last one: core exited with signal 11.', { timeout: 3000 });
+    // the dim line is in the pill's popover (designer's desktop-notices v2); esc closes it
+    await page.getByTestId('app.core.open').click();
     await expect(page.getByTestId('app.core.note')).toHaveText('it stopped trying');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('app.core.pop'), 'esc closes the popover').toHaveCount(0);
     await expect(page.getByTestId('app.core.start')).toHaveText('start bise');
     await expect(page.getByTestId('app.core.report')).toHaveText('show the report');
     const tone = await line.evaluate((el) => ({ color: getComputedStyle(el).color, err: getComputedStyle(document.documentElement).getPropertyValue('--c-err').trim() }));

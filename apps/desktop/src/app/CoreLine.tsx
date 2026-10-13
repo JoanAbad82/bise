@@ -7,7 +7,6 @@
 // 'show the report' (the report main wrote, ~/.bise/reports; never sent anywhere).
 import { useEffect, useRef, useState } from 'react';
 import type { BiseApi, CoreExit, CoreState } from '@/shared/api';
-import { Button } from '@/ds';
 import { useBroken, useCoreState } from '@/store';
 import { useRouter } from './router';
 import { RANK, type StatusPart } from './status';
@@ -102,11 +101,6 @@ function useCoreExit(): CoreExit | null {
   return exit;
 }
 
-/** The window's one status line draws this (StatusLine.tsx, amb-home): down or broken over the rest. */
-export function CoreLine() {
-  return useCoreLine()?.node ?? null;
-}
-
 /** The core's candidate for the one status line: a dim 'starting'/'stopped' runs, 'is back' is done, ▲ is down. */
 export function useCoreLine(): StatusPart | null {
   const router = useRouter();
@@ -188,32 +182,48 @@ export function useCoreLine(): StatusPart | null {
   const v = coreView(state, { wasUp, slow, exit, crashed, long, back, broken });
   if (v === undefined) return null;
   const path = exit?.report ?? null;
-  const rank = v.tone === 'err' ? RANK.down : state === 'up' ? RANK.done : RANK.running;
-  return { rank, node: (
-    <div className={`app-core${v.tone === 'err' ? ' err' : ''}`} role="status" data-testid="app.core" data-state={state}>
-      <div className="app-core-head">
-        <span data-testid="app.core.text">{v.text}</span>
-      </div>
-      {/* designer m_16922: the actions on their own row under the words, as buttons, then the note */}
-      {(v.start || (v.report && path !== null) || v.note !== undefined) && (
-        <div className="app-core-row">
-          {v.start && (
-            <Button size="sm" testId="app.core.start" onClick={() => bise()?.core.start?.()}>
-              start bise
-            </Button>
-          )}
-          {v.report && path !== null && (
-            <Button size="sm" testId="app.core.report" onClick={() => { router.go({ screen: 'report' }); }}>
-              show the report
-            </Button>
-          )}
-          {v.note !== undefined && (
-            <span className="app-core-note" data-testid="app.core.note">
+  const err = v.tone === 'err';
+  const rank = err ? RANK.down : state === 'up' ? RANK.done : RANK.running;
+  // in amb-home's status pill (designer m_21067): 'start bise' and 'show the report' are its
+  // actions; the note (the core's last log line, or 'it stopped trying') shows in its popover
+  return {
+    rank,
+    testId: 'app.core',
+    state,
+    tone: err ? 'err' : state === 'up' ? 'done' : 'running',
+    words: v.text,
+    short: coreShort(v.text, err),
+    acts: [
+      ...(v.start ? [{ id: 'start', text: 'start bise', onClick: () => {
+              bise()?.core.start?.();
+            } }] : []),
+      ...(v.report && path !== null
+        ? [
+            {
+              id: 'report',
+              text: 'show the report',
+              onClick: () => {
+                router.go({ screen: 'report' });
+              },
+            },
+          ]
+        : []),
+    ],
+    ...(v.note !== undefined
+      ? {
+          more: (
+            <div className="app-core-last" data-testid="app.core.note">
               {v.note}
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  ) };
+            </div>
+          ),
+        }
+      : {}),
+  };
+}
+
+/** Under 160 px of room: the sign and short words ('bise stopped…', designer m_21067). Pure. */
+export function coreShort(text: string, err: boolean): string {
+  if (err) return text.startsWith("▲ bise can't start your projects") ? "▲ bise can't start" : '▲ bise stopped';
+  if (text === 'bise is back.') return 'bise is back';
+  return text.startsWith('starting') ? 'starting bise…' : 'bise stopped…';
 }

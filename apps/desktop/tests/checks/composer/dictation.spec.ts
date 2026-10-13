@@ -18,8 +18,8 @@ test('composer/dictation: ctrl+r held, French words land at the caret, no flash,
     const field = page.locator(T.field);
     await field.click();
     await page.keyboard.type('note: ');
-    // the lab runs with no core: 2 s after launch (CoreLine QUIET_START_MS) the window's status line
-    // says 'starting bise…' under the title bar and pushes the screen down 30 px. That's the
+    // the lab runs with no core: 2 s after launch (CoreLine QUIET_START_MS) the title bar's status
+    // pill says 'starting bise…' with its breath (masked by the recorder, frames.ts). That's the
     // window's start, not dictation: wait for it before measuring and recording
     await page.getByTestId('app.core').waitFor({ state: 'visible', timeout: 4000 }).catch(() => undefined);
     await page.waitForTimeout(300);

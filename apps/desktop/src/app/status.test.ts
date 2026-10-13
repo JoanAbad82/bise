@@ -1,15 +1,18 @@
-// The one status line's pick (designer's desktop-notices page (1)): the worst wins, the rest wait.
+// The one status pill's pick (designer's desktop-notices page v2, m_21067): the worst wins, the rest wait.
 import { describe, expect, it } from 'vitest';
-import { RANK, worst } from './status';
+import { RANK, worst, type StatusPart } from './status';
 
-describe('the one status line', () => {
-  it('down > failed > in progress > ready or done; the first of equals; none shows nothing', () => {
-    const p = (rank: number, node: string) => ({ rank, node });
+describe('the one status pill', () => {
+  it('core down > failed > update > reload > done; the first of equals; none shows nothing', () => {
+    const p = (rank: number, testId: string): StatusPart => ({ rank, testId, tone: 'quiet', words: testId, short: testId });
     expect(worst([])).toBeNull();
     expect(worst([null, null])).toBeNull();
-    expect(worst([p(RANK.ready, 'ready'), p(RANK.running, 'reloading'), null])?.node).toBe('reloading');
-    expect(worst([p(RANK.running, 'build'), p(RANK.failed, 'went bad'), p(RANK.down, 'core down')])?.node).toBe('core down');
-    expect(worst([p(RANK.failed, 'first'), p(RANK.failed, 'second')])?.node).toBe('first');
-    expect(worst([p(RANK.done, 'back'), p(RANK.ready, 'ready')])?.node).toBe('back');
+    // the callers' order puts the update before the reload: an update ready wins a reload running
+    expect(worst([p(RANK.ready, 'update'), p(RANK.running, 'reloading'), null])?.testId).toBe('update');
+    expect(worst([p(RANK.done, 'reloaded'), p(RANK.running, 'reloading')])?.testId).toBe('reloading');
+    expect(worst([p(RANK.ready, 'update'), p(RANK.failed, 'reload failed')])?.testId).toBe('reload failed');
+    expect(worst([p(RANK.running, 'build'), p(RANK.failed, 'went bad'), p(RANK.down, 'core down')])?.testId).toBe('core down');
+    expect(worst([p(RANK.failed, 'first'), p(RANK.failed, 'second')])?.testId).toBe('first');
+    expect(worst([p(RANK.done, 'back'), p(RANK.ready, 'ready')])?.testId).toBe('ready');
   });
 });

@@ -1,15 +1,46 @@
-// The window's one status line (designer's desktop-notices page (1), approved by main m_20156):
-// what bise does by itself (core down or restarted, an update ready, /update's build, a reload)
-// says so on ONE line under the title bar, never under the composer. One at a time: the worst
-// wins (down > failed > in progress > ready or done), the others wait behind it. Pure; the
-// line itself is StatusLine.tsx. Owner: amb-home.
+// The window's one status (designer's desktop-notices page v2, m_21067): what bise does by itself
+// (core down or restarted, an update ready, /update's build, a reload) says so in ONE pill in the
+// title bar's own row, never under the composer, and nothing moves under it. One at a time: the
+// worst wins (core down > failed > update > reload > done), the others wait behind it. Pure; the
+// pill itself is TitleStatus.tsx. Owner: amb-home.
 import type { ReactNode } from 'react';
 
-/** How bad a line is: the higher wins the one line. */
-export const RANK = { done: 1, ready: 1, running: 2, failed: 3, down: 4 } as const;
+/** How bad a status is: the higher wins the pill. An update ready ties a reload running; the callers' order puts the update first. */
+export const RANK = { done: 1, ready: 2, running: 2, failed: 3, down: 4 } as const;
 
-/** One candidate for the line: its rank and what it draws (its own test ids). */
-export type StatusPart = { readonly rank: number; readonly node: ReactNode };
+/** One of its actions: in the pill when there is room (test id `<testId>.<id>`), and in its popover (`<testId>.pop.<id>`). */
+export type StatusAct = {
+  readonly id: string;
+  readonly text: string;
+  readonly onClick: () => void;
+  readonly disabled?: boolean;
+};
+
+/**
+ * One candidate for the pill: its rank, and what the pill and its popover draw. Each candidate keeps
+ * its own test ids: the pill is `<testId>` (data-state `state`), its words `<testId>.text`, the
+ * breath `<testId>.breath`, the age `<testId>.age`, the ✕ `<testId>.close`.
+ */
+export type StatusPart = {
+  readonly rank: number;
+  readonly testId: string;
+  readonly state?: string;
+  /** running: the breath first; done: '✓ …' then it folds; err: --c-err 8%, its words in --c-err */
+  readonly tone: 'running' | 'done' | 'quiet' | 'err';
+  /** the whole words (shas in mono): the pill cuts them with …, the popover shows them whole */
+  readonly words: ReactNode;
+  /** under 160 px of room: the sign and short words ('reloading…', '▲ couldn't reload') */
+  readonly short: string;
+  /** running: how long it has run ('12 s'), text-3 at the pill's end */
+  readonly age?: string;
+  /** done, past its 3 s: the pill fades (220 ms) */
+  readonly fold?: boolean;
+  readonly acts?: readonly StatusAct[];
+  /** ✕: a failure he closes */
+  readonly close?: () => void;
+  /** dim lines only the popover shows (the core's last log line, the build's last lines), with their own test ids */
+  readonly more?: ReactNode;
+};
 
 /** The line to show: the highest rank, the first of equals (the callers' order). Pure. */
 export function worst(parts: readonly (StatusPart | null)[]): StatusPart | null {
