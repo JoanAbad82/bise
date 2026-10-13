@@ -152,7 +152,10 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: 
           {...(!a.archived && a.status === 'done' && a.waits === 0 && a.waiting_on == null ? { lead: <span className="app-sign dim" aria-label="done">✓</span> } : {})}
           // R9/S3: one that waits on someone starts with the sidebar's sign, not its status dot (designer m_14246)
           {...(!a.archived && a.waits === 0 && a.waiting_on?.who === 'agent' ? { lead: <span className="app-sign dim" aria-label="waiting">⋯</span> } : {})}
-          {...(!a.archived && a.waits === 0 && a.waiting_on?.who === 'you' ? { lead: <span className="app-sign acc" aria-label="asks you">?</span> } : {})}
+          // what waits on him (a card, or the hub's waiting_on him): the accent '?' in the dot's place, as the right bar
+          {...(!a.archived && (a.waits > 0 || a.waiting_on?.who === 'you') ? { lead: <span className="app-sign acc" aria-label="asks you">?</span> } : {})}
+          // an archived one keeps the sign's slot empty, so its name starts where the others' do
+          {...(a.archived ? { lead: <span className="ag-slot" aria-hidden="true" /> } : {})}
           onClick={() => {
             router.go({ screen: 'thread', project, agent: a.name });
           }}

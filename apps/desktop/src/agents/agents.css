@@ -11,18 +11,18 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 8px 16px 24px;
+  padding: var(--s-2) var(--pad-panel) var(--s-6);
 }
 
 .ag-item {
-  padding: 4px 0 10px;
+  padding: var(--s-1) 0 var(--s-2);
   border-bottom: 1px solid var(--c-line);
 }
 
 /* W6/K18: the agent ↑↓ selected (space previews it) */
 .ag-screen:focus { outline: 0; }
 .ag-item.is-sel {
-  box-shadow: inset 2px 0 0 var(--c-text);
+  /* the tint alone, like every selected row (sidebar, right bar; designer m_21173) */
   background: var(--c-hover, transparent);
 }
 
@@ -31,8 +31,8 @@
 .ag-top {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-right: 8px;
+  gap: var(--gap-inline);
+  padding-right: var(--pad-row-x);
   border-radius: var(--r-2);
   transition: background var(--d-fast) var(--ease-out);
 }
@@ -43,6 +43,22 @@
   flex: 1 1 auto;
   min-width: 0;
 }
+/* one left edge (designer m_21173): the rules and the hover run 8 px out (--pad-row-x), the sign
+   sits on the title's edge in a 16 px slot, the name 8 after it, so the name and everything under
+   the row start at +24 */
+.ag-top > .b-row.ag,
+.ag-top > .b-row.arch {
+  display: grid;
+  grid-template-columns: var(--s-4) minmax(0, 1fr);
+  column-gap: var(--gap-inline);
+  padding-left: var(--pad-row-x);
+}
+.ag-top > .b-row > :first-child {
+  justify-self: center;
+}
+.ag-slot {
+  display: block;
+}
 .ag-top > .b-row.btn:hover {
   background: none;
 }
@@ -51,7 +67,7 @@
 .ag-ra {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--gap-inline);
   flex: none;
   opacity: 0;
   transition: opacity var(--d-fast) var(--ease-out);
@@ -79,8 +95,8 @@
 
 /* its feed in place, read only */
 .ag-peek {
-  margin: 8px 0 4px 24px;
-  padding: 6px 12px;
+  margin: var(--s-2) var(--pad-row-x) var(--s-1) calc(var(--pad-row-x) + var(--s-6));
+  padding: var(--s-2) var(--s-3);
   max-height: 320px;
   overflow: auto;
   border-radius: var(--r-2);
@@ -89,14 +105,14 @@
 
 .ag-peek-none,
 .ag-peek-keys {
-  margin: 4px 0;
+  margin: var(--gap-tight) 0;
   color: var(--c-text-3);
   font-size: var(--t-12);
 }
 
 .ag-line,
 .ag-report {
-  margin: 2px 0 0 28px;
+  margin: 0 0 0 calc(var(--pad-row-x) + var(--s-6));
   color: var(--c-text-2);
   overflow: hidden;
   white-space: nowrap;
@@ -104,8 +120,8 @@
 }
 .ag-acts {
   display: flex;
-  gap: 6px;
-  margin: 6px 0 0 24px;
+  gap: var(--gap-inline);
+  margin: var(--s-2) 0 0 calc(var(--pad-row-x) + var(--s-6));
 }
 
 /* an agent's name, model and reasoning (Tune), and the '+ new agent' sheet */
@@ -113,16 +129,16 @@
 .ag-sheet {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 8px 0 8px 24px;
-  padding: 10px 12px;
+  gap: var(--s-2);
+  margin: var(--s-2) var(--pad-row-x) var(--s-2) calc(var(--pad-row-x) + var(--s-6));
+  padding: var(--pad-card);
   border: 1px solid var(--c-line-strong);
   border-radius: 10px;
   background: var(--c-raised);
 }
 
 .th-screen > .ag-tune {
-  margin: 4px 16px 8px;
+  margin: var(--s-1) var(--s-4) var(--s-2);
 }
 
 .ag-sheet {
@@ -132,7 +148,7 @@
 .ag-field {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap-inline);
   flex-wrap: wrap;
 }
 
@@ -143,7 +159,7 @@
 
 .ag-field input,
 .ag-brief {
-  padding: 4px 8px;
+  padding: var(--s-1) var(--s-2);
   border: 1px solid var(--c-line-strong);
   border-radius: 6px;
   background: var(--c-solid);
@@ -168,17 +184,17 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: var(--gap-section);
 }
 
 .ag-check {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--gap-inline);
 }
 
 .ag-seg {
-  padding: 3px 10px;
+  padding: var(--s-1) var(--pad-control-x-sm);
   border: 1px solid var(--c-line-strong);
   border-radius: 999px;
   background: none;
@@ -211,14 +227,14 @@
 .ag-model-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
   max-height: 220px;
   overflow: auto;
   min-width: 320px;
 }
 
 .ag-model-head {
-  margin: 6px 0 2px;
+  margin: var(--s-2) 0 var(--gap-tight);
   color: var(--c-text-2);
   font-size: 12px;
 }
@@ -226,8 +242,8 @@
 .ag-model {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  padding: 3px 8px;
+  gap: var(--gap-inline);
+  padding: var(--s-1) var(--pad-row-x);
   border: none;
   border-radius: 6px;
   background: none;

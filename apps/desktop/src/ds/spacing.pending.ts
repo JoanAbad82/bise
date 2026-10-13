@@ -6,7 +6,6 @@
 
 /** hand-written spacing lengths per stylesheet (path under src/) */
 export const PENDING_SPACING: Readonly<Record<string, number>> = {
-  'agents/agents.css': 41,
   'app/palette.css': 32,
   'artifacts/artifacts.css': 42,
   'capsule/capsule.css': 11,

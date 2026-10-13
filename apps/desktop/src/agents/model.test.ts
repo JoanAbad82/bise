@@ -35,7 +35,7 @@ describe('the agents list', () => {
     expect(dotOf('working')).toBe('wk');
     expect(dotOf('waiting')).toBe('nd');
     expect(dotOf('failed')).toBe('er');
-    expect(endOf(ag('a', { waits: 3 }), T)).toEqual({ text: '3', needs: true });
+    expect(endOf(ag('a', { waits: 3 }), T)).toEqual({ text: 'waits', needs: true });
     expect(endOf(ag('a', { status: 'working' }), T + 12 * 60_000)).toEqual({ text: '12 min', needs: false });
     expect(endOf(ag('a', { status: 'done' }), T)).toEqual({ text: 'done', needs: false });
     // an archived one on /archived (designer m_19489): how it ended, then how long ago
