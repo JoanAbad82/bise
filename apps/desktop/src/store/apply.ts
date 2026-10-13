@@ -302,6 +302,12 @@ export function applyTyped(s: Store, ev: Ev): void {
       // that is gone (the core reconnected), so none can be answered
       if (s.confirms(ev.project).length > 0)
         s.put(`confirms:${ev.project}`, EMPTY);
+      // the hub's last plain line was said on the connection before this hello: a /restart's
+      // 'restarting the hub …' is over once the hub says hello again, so it goes (his m_22835:
+      // it stayed 40 min after the hub came back; designer m_22843: no past line). A refused line
+      // (his words to fix) stays.
+      if (s.notice(ev.project)?.level === "note")
+        s.put(`notice:${ev.project}`, null);
       return;
     case "route":
     case "route_done":

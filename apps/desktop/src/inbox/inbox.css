@@ -11,8 +11,10 @@
 .confirm-bar.note { color: var(--c-text-2); }
 .confirm-bar.error { color: var(--c-err); }
 /* a typed command's result (desktop-notices, designer): one quiet row in the thread, above the
-   composer, never a bar under it; tier 4 (dim sans 13, '·') from .th-notice.info */
-.th-hubnote { margin: 0 var(--s-4) var(--s-2); }
+   composer, never a bar under it; tier 4 (dim sans 13, '·') from .th-notice.info. On the thread's
+   text column like the rows above it, its '·' on the column's left edge (his restart row sat 16 px
+   in from the screen's edge, left of the column: ambient-lead m_22827) */
+.th-hubnote { box-sizing: border-box; width: var(--th-col, auto); margin: 0 auto var(--s-2); }
 /* answering an open item (designer m_20053): the way back on the right ('esc write to perf instead')
    always shows whole; the label ('answering p99 · telemetry · <question>') is cut with … instead */
 .th-screen[data-answering='true'] .b-composer .div .lbl { flex: 0 1 auto; }

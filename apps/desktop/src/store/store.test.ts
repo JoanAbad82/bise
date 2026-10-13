@@ -103,6 +103,18 @@ describe("store", () => {
     expect(store.confirms(P)).toEqual([]);
   });
 
+  it("drops the hub's plain line at its next hello, keeps a refused one (his m_22835)", () => {
+    const { store } = fake();
+    const hello = { ev: "welcome", project: P, proto: 1, workspace: "/w", name: "acme" } as const;
+    store.apply({ ev: "notice", project: P, cmd: "slash", text: "restarting the hub on 041168b2 · the agents keep running", cid: 7 });
+    expect(store.notice(P)?.level).toBe("note");
+    store.apply(hello);
+    expect(store.notice(P)).toBeNull();
+    store.apply({ ev: "error", project: P, cmd: "slash", text: "/close 999: no such item", cid: 8, reason: "refused" });
+    store.apply(hello);
+    expect(store.notice(P)).toEqual({ text: "/close 999: no such item", level: "error" });
+  });
+
   it("keeps the approvals mode and rules per project, whole each time (V8/W21)", () => {
     const { store } = fake();
     expect(store.approvals(P)).toBeNull();
