@@ -3,7 +3,6 @@
 # its count in the same commit; at 1,000 or under, its line goes. Checked by tests/line_gate.py
 # (gate.sh quick on the changed files, gate.sh full on the whole tree). Never add a line: split
 # the file instead.
-1329 apps/desktop/src/composer/pm/PmField.tsx
 1024 apps/desktop/src/store/store.ts
 1200 bend/core/wire.bend
 3883 bend/hub/core.bend

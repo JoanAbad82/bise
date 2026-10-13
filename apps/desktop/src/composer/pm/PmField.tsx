@@ -4,6 +4,9 @@
 // drafts or the list), the pickers (@ $ / :), long pastes and images as chips, the drafts kept
 // per target as editor-neutral entries (entry.ts), the queue sent at the turn's end, and the
 // dictation as one live node in the field (schema.ts) that nothing reads until its last words.
+// Its parts by area: keys.ts (every key), dictation.ts (ctrl+r and the live node), paste.ts
+// (paste, drop, the clipboard's text), Strip.tsx (the chips and queue above the box); this file
+// keeps the editor, the drafts, the picker and the actions, and wires the parts to them.
 //
 // The editor is created once per mount on a host element React never renders into: his typing
 // goes keyboard -> contenteditable -> ProseMirror, and nothing writes it back. React state here
@@ -18,26 +21,12 @@ import {
 } from "react";
 import { Editor } from "@tiptap/core";
 import { UndoRedo } from "@tiptap/extensions";
-import { closeHistory, undo, undoDepth } from "@tiptap/pm/history";
+import { closeHistory } from "@tiptap/pm/history";
 import { EditorState, TextSelection, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
-import type { Slice } from "@tiptap/pm/model";
 import type { ComposerActions, FieldBar } from "../actions";
 import {
-  enterMakesNewline,
-  indent,
-  newline,
-  outdentAtStart,
-  subwordLeft,
-  subwordRight,
-  NO_UNDO,
-  type Op,
-} from "../mdlive";
-import {
   buildMessage,
-  chipLabel,
-  chipStrip,
-  isLongPaste,
   nextChipNumber,
   noVisionLine,
   preview,
@@ -47,10 +36,8 @@ import {
 } from "../message";
 import {
   enqueue,
-  historyAt,
   keepUnread,
   load,
-  popNewest,
   remember,
   save,
   takeOldest,
@@ -64,18 +51,14 @@ import {
   artifactRows,
   commandLine,
   commandRows,
-  completion,
   emojiRows,
-  enterSends,
   fileRows,
-  move,
   skillRows,
   MAX_ROWS,
   type Pick,
   type Row,
 } from "../pick";
-import { isImagePath, type ComposerSources, type PickFile } from "../sources";
-import { thumbnail } from "../attach";
+import type { ComposerSources, PickFile } from "../sources";
 import { registerGrab } from "../grab";
 import {
   argAt,
@@ -85,18 +68,14 @@ import {
   type Trigger,
 } from "../tokens";
 import { emojiToken, typedEmoji } from "../emoji";
-import { dictated, HOLD_MS } from "../dictate";
-import { DOUBLE_CTRL_R_MS } from "@/voicemode/model";
 import { typed } from "@/working/clock";
 import { Picker } from "../Picker";
-import { freeEscape } from "../escape";
 import { FIELD_NODES } from "./schema";
 import { Colors } from "./colors";
 import {
   applyOp,
   beforeCaret,
   caretOf,
-  caretOnFirstLine,
   chipsOf,
   dictationAt,
   docOf,
@@ -104,12 +83,12 @@ import {
   insertText,
   isBlank,
   nodeType,
-  plainText,
-  offsetOf,
-  posOf,
   segmentsOf,
-  selectRange,
 } from "./pmtext";
+import { useDictation } from "./dictation";
+import { fieldKey } from "./keys";
+import { clipboardText, dropInto, pasteInto, useDropAnywhere, type PasteCtx } from "./paste";
+import { Strip } from "./Strip";
 
 export interface PmFieldProps {
   readonly target: string;
@@ -163,46 +142,6 @@ function slotOf(
     (name, i) => find(name)?.argKinds?.[i] === "text",
   );
 }
-
-/** What the clipboard reads of a selection: chips as their labels, a newline '\n', no dictation. */
-export function clipboardText(slice: Slice): string {
-  return slice.content.textBetween(0, slice.content.size, "\n", (n) =>
-    n.type.name === "hardBreak"
-      ? "\n"
-      : n.type.name === "chip"
-        ? chipLabel(n.attrs.chip as Chip)
-        : "",
-  );
-}
-
-/** The state's selection made the DOM's before a key reads the caret. ProseMirror reads a native
- *  caret move (←, a click) on the next selectionchange event, and a quick key can come first
- *  (qa-type's list-indent: ← then ⌫ outdented nothing, the native ⌫ ate the space). */
-function syncSelection(v: EditorView): void {
-  const ds = v.dom.ownerDocument.getSelection();
-  if (
-    ds?.anchorNode == null ||
-    ds.focusNode == null ||
-    !v.dom.contains(ds.anchorNode) ||
-    !v.dom.contains(ds.focusNode)
-  )
-    return;
-  try {
-    const anchor = v.posAtDOM(ds.anchorNode, ds.anchorOffset);
-    const head = v.posAtDOM(ds.focusNode, ds.focusOffset);
-    const s = v.state.selection;
-    if (s.anchor === anchor && s.head === head) return;
-    v.dispatch(
-      v.state.tr.setSelection(TextSelection.create(v.state.doc, anchor, head)),
-    );
-  } catch {
-    // a DOM place ProseMirror can't map (inside a chip's view): its own selection stays
-  }
-}
-
-/** A transaction kept out of the undo history (the dictation's live node). */
-const offHistory = (tr: Transaction): Transaction =>
-  tr.setMeta("addToHistory", false);
 
 export function PmField(p: PmFieldProps): JSX.Element {
   const props = useRef(p);
@@ -582,51 +521,14 @@ export function PmField(p: PmFieldProps): JSX.Element {
     writeNow();
   };
 
-  const addChip = (make: (n: number) => Chip): void => {
-    const st = state();
-    if (st !== null)
-      dispatch(insertChip(st, make(nextChipNumber(segmentsOf(st.doc)))));
+  // ---- paste and drop (paste.ts): images as chips, a long text as a chip, any text as plain text ----
+  const pasteCtx: PasteCtx = {
+    sources: () => props.current.sources,
+    state,
+    dispatch,
+    view,
   };
-
-  const addImages = (list: readonly File[]): void => {
-    for (const f of list) {
-      void Promise.all([props.current.sources.saveImage(f), thumbnail(f)]).then(
-        ([img, thumb]) => {
-          if (img !== null)
-            addChip((n) => ({
-              kind: "image",
-              n,
-              path: img.path,
-              name: img.name,
-              ...(thumb === null ? {} : { thumb }),
-            }));
-        },
-      );
-    }
-  };
-
-  /** A long paste: inline first, then its chip in a second undo step (⌘Z puts it back inline). */
-  const longPaste = (raw: string): void => {
-    const text = raw.replace(/\r\n?/gu, "\n");
-    const st = state();
-    if (st === null) return;
-    const start = st.selection.from;
-    dispatch(closeHistory(insertText(st, text).setMeta("paste", true)));
-    const now = state();
-    if (now === null) return;
-    const chip: Chip = {
-      kind: "paste",
-      n: nextChipNumber(segmentsOf(now.doc)),
-      text,
-    };
-    const tr = now.tr.replaceWith(
-      start,
-      start + text.length,
-      nodeType(now.schema, "chip").create({ chip }),
-    );
-    tr.setSelection(TextSelection.create(tr.doc, start + 1));
-    dispatch(closeHistory(tr));
-  };
+  useDropAnywhere(pasteCtx);
 
   // ---- the strip above the box: the chips and the queue, re-drawn only when they change ----
   const lastStrip = useRef("");
@@ -679,162 +581,21 @@ export function PmField(p: PmFieldProps): JSX.Element {
     pushBar({ fileList });
   }, [fileList]);
 
-  // ---- dictation (bar I / 2.6, the TUI's ctrl+r): a live node at the caret shows his words as
-  // they come; nothing reads it (not the send, not the draft); his last words replace it as text,
-  // one undo step. Esc cancels it: the node goes, the text around it stays ----
-  /** the last ctrl+r's time (the double press is voice mode) */
-  const lastR = useRef(Number.NEGATIVE_INFINITY);
-  const dict = useRef<{
-    id: string;
-    mic: boolean;
-    downAt: number;
-    off: () => void;
-  } | null>(null);
-  const dictUpdate = (): void => {
-    const d = dict.current;
-    const port = props.current.sources.dictate;
-    const st = state();
-    if (d === null || port === undefined || st === null) return;
-    const s = port.read(d.id);
-    if (s === null) return;
-    const at = dictationAt(st.doc);
-    if (!s.final) {
-      if (at !== null && !s.cancelled) {
-        const node = st.doc.nodeAt(posOf(at));
-        if (node !== null && node.attrs.text !== s.text)
-          dispatch(
-            offHistory(
-              st.tr.setNodeMarkup(posOf(at), undefined, {
-                ...node.attrs,
-                text: s.text,
-              }),
-            ),
-          );
-      }
-      return;
-    }
-    d.off();
-    dict.current = null;
-    pushBar({ dictating: null });
-    if (at !== null) {
-      // the node goes (out of the history), then his words where it was (one undo step)
-      const before = plainText(st.doc).slice(0, at);
-      const caretAfter = st.selection.from > posOf(at);
-      const rm = offHistory(st.tr.delete(posOf(at), posOf(at) + 1));
-      dispatch(rm);
-      const words = s.cancelled ? "" : dictated(s.text, before);
-      const now = state();
-      if (now !== null && words !== "") {
-        const keep = now.selection;
-        const tr = now.tr.replaceWith(
-          posOf(at),
-          posOf(at),
-          now.schema.text(words),
-        );
-        // the caret: after his words when it was after the node, else where it was
-        tr.setSelection(
-          caretAfter || keep.from === posOf(at)
-            ? TextSelection.create(
-                tr.doc,
-                posOf(at) + words.length + (keep.from - posOf(at)),
-              )
-            : keep.map(tr.doc, tr.mapping),
-        );
-        dispatch(closeHistory(tr));
-      }
-    }
-    if (s.error !== null) say(s.error);
-  };
-  const dictStart = (downAt = Number.POSITIVE_INFINITY): void => {
-    const port = props.current.sources.dictate;
-    const st = state();
-    if (port === undefined || dict.current !== null || st === null) return;
-    const d = { id: "", mic: true, downAt, off: (): void => undefined };
-    dict.current = d;
-    const { from, to } = st.selection;
-    const lead = dictated(
-      "x",
-      plainText(st.doc).slice(0, offsetOf(from)),
-    ).startsWith(" ")
-      ? " "
-      : "";
-    const tr = st.tr.replaceWith(
-      from,
-      to,
-      nodeType(st.schema, "dictation").create({ text: "", lead }),
-    );
-    tr.setSelection(TextSelection.create(tr.doc, from + 1));
-    dispatch(offHistory(tr));
-    pushBar({ dictating: "recording" });
-    d.id = port.start();
-    d.off = port.subscribe(d.id, dictUpdate);
-    dictUpdate(); // a refusal comes at once ('the mic is busy.')
-  };
-  const dictStop = (): void => {
-    const d = dict.current;
-    if (d === null || !d.mic) return;
-    d.mic = false;
-    props.current.sources.dictate?.stop(d.id);
-    if (dict.current !== null) pushBar({ dictating: "transcribing" });
-  };
-  const dictCancel = (): void => {
-    const d = dict.current;
-    if (d !== null) props.current.sources.dictate?.cancel(d.id);
-  };
-  /** ctrl+r: the mic on (held: push-to-talk; pressed: on until a key), again: off; twice within
-   *  DOUBLE_CTRL_R_MS (the TUI's): voice mode. In the field, or anywhere in the window through
-   *  grab.ts (his try a43609b2): the same press count either way. False: not this key. */
-  const onCtrlR = (e: KeyboardEvent): boolean => {
-    if (
-      !e.ctrlKey ||
-      e.metaKey ||
-      e.altKey ||
-      e.shiftKey ||
-      e.key.toLowerCase() !== "r" ||
-      props.current.sources.dictate === undefined
-    )
-      return false;
-    e.preventDefault();
-    if (e.repeat) return true;
-    // the first press's dictation cancelled (amb-home's src/voicemode; one ctrl+r stays dictation)
-    const voice = props.current.sources.voice;
-    const twice =
-      voice !== undefined && e.timeStamp - lastR.current < DOUBLE_CTRL_R_MS;
-    lastR.current = e.timeStamp;
-    if (twice) {
-      lastR.current = Number.NEGATIVE_INFINITY;
-      if (dict.current !== null) dictCancel();
-      voice();
-      return true;
-    }
-    if (dict.current === null) dictStart(e.timeStamp);
-    else if (dict.current.mic) dictStop();
-    return true;
-  };
-  useEffect(() => {
-    const up = (e: KeyboardEvent): void => {
-      const d = dict.current;
-      if (
-        d === null ||
-        !d.mic ||
-        (e.key.toLowerCase() !== "r" && e.key !== "Control")
-      )
-        return;
-      if (e.timeStamp - d.downAt >= HOLD_MS) dictStop();
-    };
-    window.addEventListener("keyup", up, true);
-    return () => {
-      window.removeEventListener("keyup", up, true);
-      dictCancel();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- registered once; reads refs
-  }, []);
+  // ---- dictation (dictation.ts, the TUI's ctrl+r): a live node at the caret nothing reads ----
+  const dictation = useDictation({
+    sources: () => props.current.sources,
+    state,
+    dispatch,
+    pushBar,
+    say,
+  });
 
   const actions: ComposerActions = {
     submit,
     dictate: () => {
-      if (dict.current === null) dictStart();
-      else if (dict.current.mic) dictStop();
+      const d = dictation.dict.current;
+      if (d === null) dictation.start();
+      else if (d.mic) dictation.stop();
     },
     insertText: (text) => {
       const st = state();
@@ -951,300 +712,44 @@ export function PmField(p: PmFieldProps): JSX.Element {
     }
   };
 
-  // ---- the keys ----
+  // ---- the keys (keys.ts) ----
   const onKey = (e: KeyboardEvent): boolean => {
     const v = view();
-    if (v === null || e.isComposing || v.composing) return false;
-    syncSelection(v);
-    const st = v.state;
-    const blankNow = (): boolean => isBlank(v.state.doc);
-    const at = (): { text: string; caret: number } | null => {
-      const c = caretOf(v.state);
-      return c === null ? null : { text: plainText(v.state.doc), caret: c };
-    };
-    const run = (make: (text: string, caret: number) => Op | null): boolean => {
-      const a = at();
-      const op = a === null ? null : make(a.text, a.caret);
-      if (op === null) return false;
-      e.preventDefault();
-      dispatch(applyOp(v.state, op));
-      return true;
-    };
-    const k = e.key;
-    const plain = !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey;
-    if (onCtrlR(e)) return true;
-    // another key between two ctrl+r: not a double press (esc, his words, then ctrl+r is dictation)
-    if (k !== "Control" && k !== "Shift" && k !== "Alt" && k !== "Meta")
-      lastR.current = Number.NEGATIVE_INFINITY;
-    if (dict.current !== null && k === "Enter") {
-      // never send half a dictation: ⏎ turns the mic off, the words come in to read
-      e.preventDefault();
-      dictStop();
-      return true;
-    }
-    if (dict.current !== null && k === "Escape") {
-      e.preventDefault();
-      dictCancel();
-      return true;
-    }
-    if (
-      dict.current?.mic === true &&
-      !["Control", "Shift", "Alt", "Meta", "Escape", "CapsLock"].includes(k)
-    )
-      dictStop();
-    if (
-      (e.ctrlKey || e.metaKey) &&
-      !e.shiftKey &&
-      !e.altKey &&
-      k.toLowerCase() === "z"
-    ) {
-      e.preventDefault();
-      if (undoDepth(st) > 0) undo(st, v.dispatch);
-      else say(NO_UNDO);
-      return true;
-    }
-    if (
-      e.ctrlKey &&
-      e.altKey &&
-      !e.metaKey &&
-      (k === "ArrowLeft" ||
-        k === "ArrowRight" ||
-        k === "Backspace" ||
-        k === "Delete")
-    ) {
-      const a = at();
-      if (a === null) return false;
-      e.preventDefault();
-      const left = k === "ArrowLeft" || k === "Backspace";
-      const to = left
-        ? subwordLeft(a.text, a.caret)
-        : subwordRight(a.text, a.caret);
-      if (k === "ArrowLeft" || k === "ArrowRight")
-        dispatch(selectRange(st, to, to));
-      else
-        dispatch(
-          applyOp(st, {
-            from: Math.min(to, a.caret),
-            to: Math.max(to, a.caret),
-            insert: "",
-            caret: Math.min(to, a.caret),
-          }),
-        );
-      return true;
-    }
-    const l = live.current;
-    switch (k) {
-      case "Backspace":
-        if (!plain) return false;
-        if (folderUp()) {
-          e.preventDefault();
-          return true;
-        }
-        return run(outdentAtStart);
-      case "ArrowRight": {
-        const row = l.rows[l.index];
-        if (!l.open || l.trigger?.kind !== "at" || row?.tag !== "dir" || !plain)
-          return false;
-        e.preventDefault();
-        apply(row.pick);
-        return true;
-      }
-      case "ArrowLeft":
-        if (!plain || !folderUp()) return false;
-        e.preventDefault();
-        return true;
-      case "Enter": {
-        if (e.metaKey && !l.open) {
-          e.preventDefault();
-          submit();
-          return true;
-        }
-        // an argument already typed whole ('/close 1' on row '1') sends; else the row is picked (amb-feed 8074b58c)
-        if (l.open && !enterSends(l.trigger, l.rows[l.index])) {
-          e.preventDefault();
-          const row = l.rows[l.index];
-          if (row !== undefined && !row.off) apply(row.pick);
-          return true;
-        }
-        const a = at();
-        if (e.shiftKey || (a !== null && enterMakesNewline(a.text, a.caret))) {
-          // ⇧⏎ a new line, a list item continued; ⏎ in a ``` block a new line too (mdlive.rs)
-          if (run(newline)) return true;
-          e.preventDefault();
-          dispatch(insertText(v.state, "\n"));
-          return true;
-        }
-        e.preventDefault();
-        submit();
-        return true;
-      }
-      case "Tab": {
-        if (l.open) {
-          e.preventDefault();
-          const row = l.rows[l.index];
-          if (row !== undefined && !row.off) apply(completion(row));
-          return true;
-        }
-        // approvals-design.md §8.1 (the TUI's input.rs): in the composer shift+tab always switches
-        // yolo ↔ auto (a list item outdents with backspace)
-        if (
-          e.shiftKey &&
-          !e.altKey &&
-          !e.metaKey &&
-          !e.ctrlKey &&
-          props.current.onShiftTab !== undefined
-        ) {
-          e.preventDefault();
-          props.current.onShiftTab();
-          return true;
-        }
-        if (!e.shiftKey && run(indent)) return true;
-        if (props.current.busy && !blankNow()) {
-          e.preventDefault();
-          queue();
-          return true;
-        }
-        return false;
-      }
-      case "Escape": {
-        if (l.open && l.trigger !== null) {
-          e.preventDefault();
-          if (l.trigger.kind === "slash") {
-            clear();
-            writeNow();
-            return true;
-          }
-          setDismissed(`${l.trigger.kind}:${l.trigger.start}`);
-          return true;
-        }
-        // no list open: the screen's esc (stop the turn) while busy or on a blank field; else his
-        // words go to history (↑ brings them back). A blank field the screen did nothing with
-        // leaves the esc free: the window goes up (esc-up.ts; ProseMirror prevents it anyway)
-        e.preventDefault();
-        if (props.current.busy) props.current.onEscape?.();
-        else if (blankNow()) {
-          if (props.current.onEscape?.() !== true) freeEscape(e);
-        } else putAway();
-        return true;
-      }
-      case "ArrowUp": {
-        if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false;
-        if (l.open) {
-          e.preventDefault();
-          setIndex(move(l.index, -1, l.rows.length));
-          return true;
-        }
-        if (blankNow()) {
-          const popped = popNewest(saved.current);
-          if (popped !== null) {
-            e.preventDefault();
-            saved.current = popped.rest;
-            setContent(popped.entry);
-            return true;
-          }
-        }
-        if (
-          blankNow() ||
-          (browsing.current >= 0 && caretOnFirstLine(v.state))
-        ) {
-          const entry = historyAt(saved.current, browsing.current + 1);
-          if (entry === null) {
-            if (blankNow()) e.preventDefault();
-            return blankNow();
-          }
-          e.preventDefault();
-          browsing.current += 1;
-          setContent(entry);
-          return true;
-        }
-        return false;
-      }
-      case "ArrowDown": {
-        if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false;
-        if (l.open) {
-          e.preventDefault();
-          setIndex(move(l.index, 1, l.rows.length));
-          return true;
-        }
-        if (browsing.current < 0) return false;
-        e.preventDefault();
-        browsing.current -= 1;
-        setContent(
-          browsing.current < 0
-            ? null
-            : historyAt(saved.current, browsing.current),
-        );
-        return true;
-      }
-      default:
-        return false;
-    }
-  };
-
-  // ---- paste and drop: images as chips, a long text as a chip, any text as plain text ----
-  const onPaste = (e: ClipboardEvent): boolean => {
-    const data = e.clipboardData;
-    if (data === null) return false;
-    const images = Array.from(data.files).filter((f) =>
-      f.type.startsWith("image/"),
+    if (v === null) return false;
+    const q = props.current;
+    return fieldKey(
+      {
+        view: v,
+        dispatch,
+        say,
+        list: live.current,
+        dictation,
+        saved,
+        browsing,
+        busy: q.busy,
+        onEscape: q.onEscape,
+        onShiftTab: q.onShiftTab,
+        apply,
+        folderUp,
+        submit,
+        queue,
+        clear,
+        writeNow,
+        putAway,
+        setContent,
+        setIndex,
+        setDismissed,
+      },
+      e,
     );
-    if (images.length > 0) {
-      e.preventDefault();
-      addImages(images);
-      return true;
-    }
-    const text = data.getData("text/plain");
-    e.preventDefault();
-    if (isLongPaste(text)) {
-      longPaste(text);
-      return true;
-    }
-    const st = state();
-    if (st !== null && text !== "")
-      dispatch(
-        insertText(st, text.replace(/\r\n?/gu, "\n")).setMeta("paste", true),
-      );
-    return true;
   };
-  const onDropHere = (e: DragEvent): boolean => {
-    const images = Array.from(e.dataTransfer?.files ?? []).filter(
-      (f) => f.type.startsWith("image/") || isImagePath(f.name),
-    );
-    if (images.length === 0) return false;
-    e.preventDefault();
-    addImages(images);
-    return true;
-  };
-
   useLayoutEffect(() => {
     changed.current = onChange;
     keys.current = onKey;
-    paste.current = onPaste;
-    drop.current = onDropHere;
-    ctrlR.current = onCtrlR;
+    paste.current = (e) => pasteInto(pasteCtx, e);
+    drop.current = (e) => dropInto(pasteCtx, e);
+    ctrlR.current = dictation.onCtrlR;
   });
-
-  // ---- a file dropped anywhere in the window is the composer's, never a navigation ----
-  useEffect(() => {
-    const over = (e: DragEvent): void => {
-      e.preventDefault();
-    };
-    const onDrop = (e: DragEvent): void => {
-      e.preventDefault();
-      if (view()?.dom.contains(e.target as Node) === true) return; // handleDrop has it
-      const images = Array.from(e.dataTransfer?.files ?? []).filter(
-        (f) => f.type.startsWith("image/") || isImagePath(f.name),
-      );
-      if (images.length > 0) addImages(images);
-    };
-    window.addEventListener("dragover", over);
-    window.addEventListener("drop", onDrop);
-    return () => {
-      window.removeEventListener("dragover", over);
-      window.removeEventListener("drop", onDrop);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- registered once; reads refs
-  }, []);
 
   // ---- the turn ended: the oldest queued message leaves (queue.rs) ----
   const wasBusy = useRef(p.busy);
@@ -1281,48 +786,6 @@ export function PmField(p: PmFieldProps): JSX.Element {
         />
       )}
     </>
-  );
-}
-
-/** Above the box: the chips' strip (`▤ 1 “first words…”  240 lines · 9.8 kB`) and the queue. */
-function Strip({
-  chips,
-  queued,
-  note,
-  testId,
-}: {
-  chips: readonly Chip[];
-  queued: readonly string[];
-  note: string | null;
-  testId: string;
-}): JSX.Element {
-  return (
-    <div className="b-composer-strip" data-testid={`${testId}.strip`}>
-      {note !== null && (
-        <div className="n" data-testid={`${testId}.note`}>
-          {note}
-        </div>
-      )}
-      {queued.map((q, i) => (
-        <div
-          key={`q${i}`}
-          className="q"
-          data-testid={`${testId}.queued.${i + 1}`}
-        >
-          {q}
-          <span className="k">queued · sent when this turn ends · ↑ edit</span>
-        </div>
-      ))}
-      {/* an image has no strip line in the window: its chip and thumbnail say it (designer m_13808;
-          the TUI keeps its '[Image #1] name' line, it has no thumbnail) */}
-      {chips
-        .filter((c) => c.kind !== "image")
-        .map((c) => (
-          <div key={c.n} className="c" data-testid={`${testId}.strip.${c.n}`}>
-            {chipStrip(c)}
-          </div>
-        ))}
-    </div>
   );
 }
 
