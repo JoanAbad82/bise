@@ -1,16 +1,18 @@
-//! Image attachments in the composer (docs/images.md).
+//! Image attachments in the composer (docs/images.md), and every chip's
+//! drawing (images, quotes, pastes, files, artifacts).
 //!
 //! The composer shows `[Image #N]`; the app keeps what each label
 //! stands for. On send, every label still in the text becomes its
 //! marker (`<image name=… b64=…>`, see the `bend-images` crate) and the
-//! attachments start over. Sources: a picked `@` image, a paste that is
-//! only image paths (a file dragged into the terminal, iTerm2's "save to
-//! temp file and paste path"), Ctrl+V, Cmd+V passed through and an empty
-//! paste (the clipboard image, see `input::on_paste`). Nothing here
-//! panics on any input.
+//! attachments start over. Sources: a picked `@` image and a paste of
+//! paths (attach_file.rs: an image there, any other file a file chip),
+//! Ctrl+V, Cmd+V passed through and an empty paste (the clipboard image,
+//! see `input::on_paste`). In the history an image's chip is a link: a
+//! click previews it, ⌥ click shows it in Finder (open_file.rs). Nothing
+//! here panics on any input.
 
 use crate::app::App;
-use crate::theme::{accent, dim, error, glyph, text, G_FAILED, G_IMAGE, G_PASTE, G_QUOTE};
+use crate::theme::{accent, dim, error, glyph, text, G_FAILED, G_FILE, G_IMAGE, G_PASTE, G_QUOTE};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use std::cell::RefCell;
@@ -154,20 +156,6 @@ pub(crate) fn attach_clipboard(app: &mut App) -> Result<String, String> {
     Ok(add(app, &source, CLIPBOARD, original, &stored))
 }
 
-/// A paste that is only image paths (drag-and-drop): attach them all.
-/// None when the paste is something else (it stays text).
-pub(crate) fn on_paste(app: &mut App, text: &str) -> Option<Result<Vec<String>, String>> {
-    let paths = bend_images::pasted_images(text)?;
-    let mut labels = Vec::new();
-    for p in &paths {
-        match attach_file(app, p, &p.to_string_lossy()) {
-            Ok(l) => labels.push(l),
-            Err(e) => return Some(Err(e)),
-        }
-    }
-    Some(Ok(labels))
-}
-
 /// The message to send, as typed parts (msg-parts) and their text
 /// (`parts::render`, the one template): each quote label leaves the
 /// words and its quote goes in front, in text order (quote.rs); each
@@ -218,42 +206,6 @@ fn part_of(a: &Attachment) -> bise_proto::parts::Part {
     }
 }
 
-/// The picked `@` entry is an image file: attach it (the `@token` goes).
-/// Returns the label, or None when it is not an image.
-pub(crate) fn pick_image(app: &mut App, rel: &str) -> Option<Result<String, String>> {
-    if !bend_images::has_image_ext(rel) {
-        return None;
-    }
-    let (start, _) = crate::files::token(&app.ed.text, app.ed.cursor)?;
-    let cursor = app.ed.cursor;
-    // the root the `@` popup searched (commands::at_items)
-    let root = crate::sb::workspace(app)
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::current_dir().ok())
-        .unwrap_or_default();
-    let path = root.join(rel);
-    if !path.is_file() {
-        return None;
-    }
-    // drop the `@token`, then attach at its place
-    let chars: Vec<char> = app.ed.text.chars().collect();
-    let cursor = cursor.min(chars.len());
-    let start = start.min(cursor);
-    let head: String = chars.get(..start).unwrap_or(&[]).iter().collect();
-    let tail: String = chars.get(cursor..).unwrap_or(&[]).iter().collect();
-    let tail = tail.strip_prefix(' ').map(str::to_string).unwrap_or(tail);
-    let at = head.chars().count();
-    let before = app.ed.text.clone();
-    app.ed.set(&format!("{head}{tail}"), at);
-    match attach_file(app, &path, rel) {
-        Ok(l) => Some(Ok(l)),
-        Err(e) => {
-            app.ed.set(&before, cursor);
-            Some(Err(e))
-        }
-    }
-}
-
 // ---- chips (book §14): `▣ 1` in the composer, `▣ login.png` in the history ----
 
 /// What a clipboard image is called in the strip and the history.
@@ -265,6 +217,7 @@ const CLIPBOARD: &str = "clipboard";
 /// as one chip, the cursor steps over it, a delete takes it whole.
 pub(crate) fn chips(text: &str) -> Vec<(usize, usize, usize)> {
     let mut v = image_chips(text);
+    v.extend(crate::attach_file::chips(text));
     v.extend(crate::quote::chips(text));
     v.extend(crate::pasted::chips(text));
     v.extend(find_labels(text, crate::voice::chip::OPEN));
@@ -364,6 +317,9 @@ fn chip_parts(label: &str) -> (&'static str, &str) {
     }
     if let Some(n) = label.strip_prefix(crate::pasted::OPEN) {
         return (glyph(G_PASTE), n.trim_end_matches(']'));
+    }
+    if let Some(n) = label.strip_prefix(crate::attach_file::OPEN) {
+        return (glyph(G_FILE), n.trim_end_matches(']'));
     }
     (G_IMAGE, label.trim_start_matches("[Image #").trim_end_matches(']'))
 }
@@ -484,6 +440,18 @@ fn marker_size(m: &bend_images::Marker) -> Option<(u32, u32)> {
     size
 }
 
+/// The file a click on an image's chip opens: where he took it from, else
+/// (gone, a clipboard image) the store's copy beside its `.b64`.
+fn image_file(m: &bend_images::Marker) -> String {
+    if Path::new(&m.path).is_absolute() && Path::new(&m.path).is_file() {
+        return m.path.clone();
+    }
+    match bend_images::Kind::from_mime(&m.mime) {
+        Some(k) => Path::new(&m.b64).with_extension(k.ext()).to_string_lossy().into_owned(),
+        None => m.path.clone(),
+    }
+}
+
 fn wxh((w, h): (u32, u32)) -> String {
     format!("{w}×{h}")
 }
@@ -497,6 +465,13 @@ pub(crate) fn chip_spans(text: &str, style: Style) -> Vec<Span<'static>> {
         let mut out = chip_spans(&text[..a], style);
         let gone = crate::artifacts::parse_url(&url).and_then(|(id, _)| crate::artifacts::get(&id)).is_some_and(|x| x.gone);
         out.extend(crate::render::artifact_chip(&title, gone, &url));
+        out.extend(chip_spans(&text[b..], style));
+        return out.into_iter().filter(|s| !s.content.is_empty()).collect();
+    }
+    // a file chip as sent (file-chips): `▯ deck.pptx`, a link
+    if let Some((a, b, path, missing)) = crate::attach_file::first_marker(text) {
+        let mut out = chip_spans(&text[..a], style);
+        out.extend(crate::attach_file::spans(&path, missing));
         out.extend(chip_spans(&text[b..], style));
         return out.into_iter().filter(|s| !s.content.is_empty()).collect();
     }
@@ -552,7 +527,12 @@ fn image_spans(text: &str, style: Style) -> Vec<Span<'static>> {
         if !before.is_empty() {
             out.push(Span::styled(before.to_string(), style));
         }
-        out.push(Span::styled(format!("{G_IMAGE} {}", short_name(&m.path)), chip_style()));
+        // a link (main m_21751): a click previews the image, ⌥ click
+        // shows it in Finder (open_file.rs)
+        let tag = crate::links::add(&crate::open_file::chip_url(&image_file(&m)));
+        let st = chip_style();
+        let st = Style { add_modifier: crate::links::with_tag(st.add_modifier, tag), ..st };
+        out.push(Span::styled(format!("{G_IMAGE} {}", short_name(&m.path)), st));
         last = m.end;
     }
     let rest = text.get(last..).unwrap_or("");
@@ -754,7 +734,7 @@ fn shown_quotes(app: &App) -> Vec<(usize, crate::quote::Quote)> {
 /// How many rows the attachments box takes (0: nothing attached): its
 /// two borders and one row per attachment.
 pub(crate) fn strip_height(app: &App) -> u16 {
-    match shown_quotes(app).len() + shown(app).len() + shown_pastes(app).len() {
+    match shown_quotes(app).len() + shown(app).len() + shown_pastes(app).len() + crate::attach_file::shown(app).len() {
         0 => 0,
         n => n as u16 + 2,
     }
@@ -852,6 +832,11 @@ fn box_rows(app: &App) -> Vec<BoxRow> {
         .collect();
     rows.extend(shown(app).into_iter().map(|(n, a)| {
         let (_, source) = strip_row(n, &a.info);
+        (n, BoxRow { label: a.label.clone(), preview: Preview::File(file_name(&a.info.source).to_string()), source, place: false })
+    }));
+    // a file: `▯ 2  deck.pptx  2.1 MB  ~/Desktop` (designer m_21765)
+    rows.extend(crate::attach_file::shown(app).into_iter().map(|(n, a)| {
+        let source = crate::attach_file::strip_source(a);
         (n, BoxRow { label: a.label.clone(), preview: Preview::File(file_name(&a.info.source).to_string()), source, place: false })
     }));
     // a paste: its first words like a quote's, `240 lines · 9.8 kB`
@@ -1306,7 +1291,9 @@ mod tests {
         let spans = chip_spans(&t, Style::default());
         let s: String = spans.iter().map(|s| s.content.as_ref()).collect();
         assert_eq!(s, "compare ▣ login-mobile.png with ▣ y.png, off");
-        assert_eq!(spans[1].style, chip_style());
+        // the chip's color, and a link (a click previews it, main m_21751)
+        assert_eq!(spans[1].style.fg, chip_style().fg);
+        assert!(crate::links::tag_of(spans[1].style.add_modifier) > 0);
         assert_eq!(sizes_line(&t).as_deref(), Some("▣ login-mobile.png 390×844 · ▣ y.png 390×844"));
         assert_eq!(sizes_line("plain"), None);
         assert_eq!(chip_spans("plain", Style::default()).len(), 1);

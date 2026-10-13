@@ -445,7 +445,7 @@ fn words_parts(body: &str) -> Vec<Part> {
     let mut from = 0usize;
     let mut scan = 0usize;
     while let Some(at) = next_tag(body, scan) {
-        match paste_at(&body[at..]).or_else(|| image_at(&body[at..])).or_else(|| file_at(&body[at..])) {
+        match paste_at(&body[at..]).or_else(|| image_at(&body[at..])).or_else(|| file_marker_at(&body[at..])) {
             Some((p, used)) => {
                 if at > from {
                     out.push(Part::Text { text: body[from..at].to_string() });
@@ -470,8 +470,9 @@ fn next_tag(s: &str, from: usize) -> Option<usize> {
 }
 
 /// The file marker at the very start of `s`, when it renders back the
-/// same.
-fn file_at(s: &str) -> Option<(Part, usize)> {
+/// same: the part and the bytes it takes (the TUI's history draws each
+/// as its chip).
+pub fn file_marker_at(s: &str) -> Option<(Part, usize)> {
     let rest = s.strip_prefix(FILE_OPEN)?;
     let (name, rest) = rest.split_once("\" path=\"")?;
     let (path, tail) = rest.split_once('"')?;

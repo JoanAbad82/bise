@@ -175,6 +175,9 @@ pub(crate) fn flashing(a: &crate::sb::Approvals) -> bool {
 /// and the tip of the moment (none in an agent's view); for 3 s after a
 /// switch of approvals mode, the switch's line (the mode itself is on the
 /// divider, after the model: chrome.rs [`crate::chrome::Who`]).
+/// The key bar over an attachment's chip in the history (an image, a file).
+pub(crate) const CHIP_HOVER: [(&str, &str); 2] = [("click", "preview"), ("⌥ click", "show in Finder")];
+
 pub(crate) fn line(app: &App, width: u16) -> Line<'static> {
     let dimmed = Style::default().fg(theme::dim());
     // the diff panel has the keys (site/m/artifacts D)
@@ -190,6 +193,10 @@ pub(crate) fn line(app: &App, width: u16) -> Line<'static> {
         .and_then(|u| crate::artifacts::hover_words(&u, crate::when::now_ms()))
     {
         return Line::from(Span::styled(cut(&words, usize::from(width)), dimmed));
+    }
+    // an attachment's chip under the mouse (open_file.rs, designer m_21765)
+    if app.hover.and_then(|(x, y)| crate::links::hit_url(x, y)).is_some_and(|u| crate::open_file::path_of_url(&u).is_some()) {
+        return pairs_line(&CHIP_HOVER, usize::from(width)).0;
     }
     // a draft with an artifact's chip: how it goes
     if crate::attach::has_artifact(&app.ed.text) && !app.ed.text.trim().is_empty() {

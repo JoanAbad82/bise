@@ -147,6 +147,7 @@ pub const VARS: &[Var] = &[
     internal("BISE_ONESHOT", "a one-shot provider call's request file, for repl-live"),
     user("BISE_OPEN", "the program a link opens with"),
     test("BISE_OPENROUTER_AUTH", "where OpenRouter's login is (tests)"),
+    test("BISE_OPEN_RECORD", "a file the TUI appends `preview <path>` / `reveal <path>` to instead of opening a chip's file (tests)"),
     user("BISE_OPTION_DIGITS", "read Option+digit characters as ⌥0-9 (1) or never (0), over the keyboard layout"),
     internal("BISE_OWNERS", "the agents a process belongs to (BISE-243)"),
     internal("BISE_PAGES_EXPORT", "the public pages' export folder, for the mirror command the hub runs (pages/mirror.rs)"),

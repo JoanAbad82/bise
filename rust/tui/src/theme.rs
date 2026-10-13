@@ -328,6 +328,7 @@ pub(crate) const G_MSG: &str = "@"; // a message between agents, or to you (was 
 pub(crate) const G_IMAGE: &str = "▣"; // an image (accent chip)
 pub(crate) const G_QUOTE: &str = "❝"; // a quote of the history (accent chip, BISE-134)
 pub(crate) const G_PASTE: &str = "▤"; // a long paste (accent chip, BISE-240)
+pub(crate) const G_FILE: &str = "▯"; // a file he attached (accent chip, file-chips: designer m_21765)
 pub(crate) const G_CARD: &str = "?"; // a card: a decision that needs you (accent)
 pub(crate) const G_COMPACTING: &str = "≡"; // compaction running (dim, pulsing; was ⟳)
 pub(crate) const G_SUMMARY: &str = "≡"; // compaction summary (dim, still)
@@ -446,6 +447,7 @@ pub(crate) const LEGEND: &[Symbol] = &[
     sym(MESSAGES, G_IMAGE, Tone::Accent, "an image"),
     sym(MESSAGES, G_QUOTE, Tone::Accent, "a quote of the history"),
     sym(MESSAGES, G_PASTE, Tone::Accent, "a long paste"),
+    sym(MESSAGES, G_FILE, Tone::Accent, "a file you attached"),
     sym(MESSAGES, "●", Tone::Accent, "recording your voice"),
     sym(HISTORY, G_BRIEF, Tone::Text, "an agent's brief"),
     sym(HISTORY, G_THINK, Tone::Dim, "thinking"),
@@ -499,6 +501,7 @@ pub(crate) const ASCII: &[(&str, &str)] = &[
     ("▣", "#"),
     ("❝", "\""),
     ("▤", "T"),
+    ("▯", "F"),
     ("≡", "="),
     ("▲", "^"),
     ("»", "}"),
@@ -914,7 +917,7 @@ mod tests {
     }
 
     const ALL_GLYPHS: &[&str] = &[
-        G_YOU, G_MAIN, G_BRIEF, G_THINK, G_BASH, G_TS, G_SUBCALL, G_PATCH, G_MSG, G_IMAGE, G_QUOTE, G_PASTE,
+        G_YOU, G_MAIN, G_BRIEF, G_THINK, G_BASH, G_TS, G_SUBCALL, G_PATCH, G_MSG, G_IMAGE, G_QUOTE, G_PASTE, G_FILE,
         G_CARD, G_COMPACTING, G_SUMMARY, G_INTERRUPTED, G_WRAP, G_STARTING, G_WORKING,
         G_WAITING, G_NEEDS_YOU, G_DONE, G_FAILED, G_IDLE, G_STOPPED, G_SENDING, G_RECEIVED,
         G_READ, G_UNREAD, G_WORKTREE, G_OVERLAP, G_RESTART_FAILED, G_BUILDING, G_CLOSED, G_OPEN,
@@ -998,7 +1001,7 @@ mod tests {
         let named: &[(&str, &str)] = &[
             ("G_YOU", G_YOU), ("G_MAIN", G_MAIN), ("G_BRIEF", G_BRIEF), ("G_THINK", G_THINK),
             ("G_BASH", G_BASH), ("G_TS", G_TS), ("G_SUBCALL", G_SUBCALL), ("G_PATCH", G_PATCH),
-            ("G_MSG", G_MSG), ("G_IMAGE", G_IMAGE), ("G_QUOTE", G_QUOTE), ("G_PASTE", G_PASTE),
+            ("G_MSG", G_MSG), ("G_IMAGE", G_IMAGE), ("G_QUOTE", G_QUOTE), ("G_PASTE", G_PASTE), ("G_FILE", G_FILE),
             ("G_CARD", G_CARD),
             ("G_COMPACTING", G_COMPACTING), ("G_SUMMARY", G_SUMMARY), ("G_INTERRUPTED", G_INTERRUPTED),
             ("G_WRAP", G_WRAP), ("G_SCHEDULED", G_SCHEDULED), ("G_STARTING", G_STARTING), ("G_WORKING", G_WORKING),

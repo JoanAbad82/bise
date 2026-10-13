@@ -317,6 +317,15 @@ pub(crate) fn on_mouse(app: &mut App, m: &crossterm::event::MouseEvent, term_h: 
             app.quote_hint = false;
         }
         textlayer::Out::Copy(t) => copy_text(app, &t),
+        // an attachment's chip (open_file.rs): a click previews it, ⌥
+        // click shows it in Finder
+        textlayer::Out::Open(url) if crate::open_file::path_of_url(&url).is_some() => {
+            let alt = m.modifiers.contains(crossterm::event::KeyModifiers::ALT);
+            let note = crate::open_file::on_chip(crate::open_file::path_of_url(&url).unwrap_or_default(), alt);
+            if !note.is_empty() {
+                flash(app, note);
+            }
+        }
         textlayer::Out::Open(url) => {
             let note = textlayer::open(app, &url);
             flash(app, note);
@@ -559,7 +568,7 @@ pub(crate) fn on_paste(app: &mut App, text: &str) {
     let attached = if text.trim().is_empty() {
         Some(crate::attach::attach_clipboard(app).map(|l| vec![l]))
     } else {
-        crate::attach::on_paste(app, &text)
+        crate::attach_file::on_paste(app, &text)
     };
     match attached {
         Some(Ok(labels)) => flash(app, format!("attached {}", labels.join(" "))),
@@ -926,8 +935,9 @@ fn pick(app: &mut App, c: &PopItem) {
     }
     if let Some(p) = c.path.as_ref().filter(|_| !c.folder) {
         files::picked(p);
-        // an image is attached, not inserted as a path
-        match crate::attach::pick_image(app, p) {
+        // an image or a document is attached, not inserted as a path
+        // (parts::pick_kind: code stays `@path`)
+        match crate::attach_file::pick(app, p) {
             Some(Ok(l)) => {
                 flash(app, format!("attached {l} {}", crate::attach::file_name(p)));
                 app.popup_sel = 0;

@@ -112,17 +112,13 @@ pub(crate) enum Hit {
     Archived,
 }
 
-/// Quick Look's process and the file it shows.
-pub(crate) struct Look {
-    child: Option<std::process::Child>,
-}
+/// Quick Look is up (open_file.rs holds its process): closed when this
+/// goes.
+pub(crate) struct Look;
 
 impl Drop for Look {
     fn drop(&mut self) {
-        if let Some(mut c) = self.child.take() {
-            let _ = c.kill();
-            let _ = c.wait();
-        }
+        crate::open_file::close_preview();
     }
 }
 
@@ -765,25 +761,9 @@ fn quick_look(app: &mut App) {
         sc.look = None;
         return open_selected(app);
     }
-    sc.look = Some(Look { child: spawn_look(&target) });
-}
-
-fn spawn_look(path: &str) -> Option<std::process::Child> {
-    #[cfg(test)]
-    {
-        let _ = path;
-        None
-    }
-    #[cfg(not(test))]
-    {
-        std::process::Command::new("qlmanage")
-            .args(["-p", path])
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .ok()
-    }
+    // the chips' Quick Look (open_file.rs): one up at a time
+    crate::open_file::preview(&target);
+    sc.look = Some(Look);
 }
 
 /// `r`: the file in Finder (its folder elsewhere).
@@ -799,20 +779,10 @@ fn reveal(app: &mut App) {
         return;
     }
     let path = a.open_target(None);
-    #[cfg(not(test))]
-    {
-        let ok = if cfg!(target_os = "macos") {
-            std::process::Command::new("open").args(["-R", &path]).spawn().is_ok()
-        } else {
-            let dir = std::path::Path::new(&path).parent().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
-            std::process::Command::new("xdg-open").arg(dir).spawn().is_ok()
-        };
-        if !ok {
-            flash(app, format!("could not show {}", path));
-        }
+    // the chips' ⌥ click does the same (open_file.rs)
+    if !crate::open_file::reveal(&path) {
+        flash(app, format!("could not show {}", path));
     }
-    #[cfg(test)]
-    crate::links::OPENED.with(|o| o.borrow_mut().push(format!("reveal:{}", path)));
 }
 
 /// `c`: the path or the link.

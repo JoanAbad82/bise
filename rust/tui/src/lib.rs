@@ -90,6 +90,8 @@ mod editor;
 mod undo;
 mod clipboard;
 mod attach;
+mod attach_file;
+mod open_file;
 mod quote;
 mod pasted;
 mod usage;
