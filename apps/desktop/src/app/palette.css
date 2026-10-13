@@ -1,5 +1,6 @@
-/* ⌘K, one search (designer's signed block s-k, desktop-screens v7): a 640 px panel 58 px under
-   the titlebar, centred, r 14, e-3, over a 45 % scrim of the window's ground. Owner: amb-web. */
+/* ⌘K, one search (designer's signed block s-k, desktop-screens v7): a 640 px panel --s-12 under
+   the titlebar, centred, r 14, e-3, over a 45 % scrim of the window's ground. On the spacing grid
+   (designer's p/desktop-spacing): every text of the panel starts 16 px in. Owner: amb-web. */
 .app-palette {
   position: fixed;
   inset: 0;
@@ -10,11 +11,11 @@
 
 .app-k {
   position: absolute;
-  top: calc(36px + 58px);
+  top: calc(var(--h-bar) + var(--s-12));
   left: 50%;
   transform: translateX(-50%);
   width: min(640px, calc(100vw - 40px));
-  max-height: calc(100vh - 36px - 58px - 24px);
+  max-height: calc(100vh - var(--h-bar) - var(--s-12) - var(--s-6));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -30,8 +31,8 @@
 .app-k-field {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 13px 16px;
+  gap: var(--gap-inline);
+  padding: var(--s-3) var(--s-4);
   font-size: 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--c-text) 8%, transparent);
 }
@@ -55,12 +56,12 @@
 /* the scope chips: 'on' is the text's 9 % tint, never pink */
 .app-k-scopes {
   display: flex;
-  gap: 4px;
-  padding: 8px 14px 2px;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--pad-list) 0;
 }
 .app-k-scopes .app-k-scope {
-  height: 22px;
-  padding: 0 9px;
+  height: var(--s-6);
+  padding: 0 var(--s-2);
   border: 0;
   border-radius: var(--r-pill);
   background: none;
@@ -81,13 +82,13 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 5px 7px 6px;
+  padding: var(--s-1) var(--pad-list) var(--s-2);
 }
 
 .app-k-head {
   display: flex;
   align-items: center;
-  padding: 10px 8px 4px;
+  padding: var(--s-3) var(--pad-row-x) var(--gap-tight);
   font-size: 11.5px;
   font-weight: 600;
   color: var(--c-text-3);
@@ -103,9 +104,9 @@
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 9px;
-  height: 33px;
-  padding: 0 8px;
+  gap: var(--gap-inline);
+  height: var(--h-row);
+  padding: 0 var(--pad-row-x);
   border-radius: 8px;
   cursor: default;
 }
@@ -148,7 +149,7 @@
   text-overflow: ellipsis;
 }
 .app-k-row .nm .d {
-  margin-left: 6px;
+  margin-left: var(--gap-inline);
   color: var(--c-text-2);
 }
 .app-k-row .mt {
@@ -160,7 +161,7 @@
 .app-k-row .rt {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-3);
   white-space: nowrap;
   font-size: 12px;
   color: var(--c-text-3);
@@ -177,8 +178,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 30px 20px;
+  gap: var(--gap-rows);
+  padding: var(--s-8) var(--s-5);
   text-align: center;
   color: var(--c-text-2);
 }
@@ -195,9 +196,9 @@
 .app-k-ask {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 28px;
-  padding: 0 12px;
+  gap: var(--gap-inline);
+  height: var(--h-control-sm);
+  padding: 0 var(--pad-control-x);
   border: 1px solid var(--c-line);
   border-radius: var(--r-2);
   background: var(--c-surface);
@@ -223,7 +224,7 @@
 }
 
 .app-k-keys {
-  padding: 9px 16px;
+  padding: var(--s-2) var(--s-4);
   border-top: 1px solid color-mix(in srgb, var(--c-text) 8%, transparent);
   font-size: 11.5px;
   color: var(--c-text-3);
