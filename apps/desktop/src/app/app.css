@@ -325,6 +325,29 @@ body:has(.app-shell) {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+/* ⌘ held: a place's ⌘ digit, a 16 px kbd at the row's end in place of the count (held.ts) */
+.app-keyhint {
+  flex: none;
+  display: inline-flex;
+}
+.app-keyhint .b-kbd {
+  justify-content: center;
+  min-width: var(--s-4);
+  height: var(--s-4);
+  padding: 0;
+}
+/* under a title-bar control, over what's below, so nothing moves while ⌘ is held */
+.app-keyhint.float {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+}
+.app-keyhint.float .b-kbd {
+  padding: 0 var(--s-1);
+  background: var(--c-window);
+}
 /* a project's pearl: 12 px, still (bise's own is the live one) */
 .app-r.pj .b-pearl {
   width: 12px;

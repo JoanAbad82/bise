@@ -9,7 +9,7 @@
 // It reads only projects, the route and counts (numbers, so a snapshot never
 // changes for nothing): a thread's entries never re-render it.
 import { memo, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { IconButton, Menu, MenuItem, MenuSep, Pearl, SearchButton, SectionHead, Side } from '@/ds';
+import { IconButton, Kbd, Menu, MenuItem, MenuSep, Pearl, SearchButton, SectionHead, Side } from '@/ds';
 import type { ProjectRow } from '@/proto';
 import { useAgents, useHubRefused, useProjects, useStore, type Store } from '@/store';
 import { RefusedLine } from './Refused';
@@ -20,6 +20,7 @@ import { useRoute, useRouter } from './router';
 import { projectSide } from './side';
 import { useKeptScroll } from './keep';
 import { BisePearl } from './BisePearl';
+import { useModHeld } from './held';
 
 /** His projects in his order, bise's own out (it is the bise row). Pure. */
 export function projectsOf(rows: readonly ProjectRow[]): ProjectRow[] {
@@ -82,14 +83,16 @@ function NewEnd({ words }: { words: string }) {
   );
 }
 
-/** One sidebar row: a lead (pearl or sign), the name, its end words, his pink count. */
-function SRow({ kind, lead, name, end, endErr, count, on, title, onClick, testId, children }: {
+/** One sidebar row: a lead (pearl or sign), the name, its end words, his pink count; ⌘ held: its number. */
+function SRow({ kind, lead, name, end, endErr, count, hint, on, title, onClick, testId, children }: {
   kind: 'top' | 'pj' | 'ag' | 'more' | 'ft';
   lead: ReactNode;
   name: ReactNode;
   end?: ReactNode;
   endErr?: boolean;
   count?: number;
+  /** ⌘ held: its ⌘ digit, a 16 px kbd at the row's end in place of the count (held.ts) */
+  hint?: number | undefined;
   on?: boolean;
   title?: string;
   onClick?: () => void;
@@ -99,7 +102,13 @@ function SRow({ kind, lead, name, end, endErr, count, on, title, onClick, testId
   const tail = (
     <>
       {end != null && end !== '' && <span className={endErr === true ? 'app-m err' : 'app-m'}>{end}</span>}
-      {count !== undefined && count > 0 && <span className="app-cnt">{count}</span>}
+      {hint !== undefined ? (
+        <span className="app-keyhint" title={`⌘${String(hint)}`} data-testid={testId === undefined ? undefined : `${testId}.hint`}>
+          <Kbd>{hint}</Kbd>
+        </span>
+      ) : (
+        count !== undefined && count > 0 && <span className="app-cnt">{count}</span>
+      )}
     </>
   );
   return (
@@ -181,6 +190,8 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const makers = useNewMakers(ids);
   const scheduled = useSum('scheduled', ids, (s, p) => s.scheduled(p).length);
   const projects = projectsOf(rows);
+  // ⌘ held alone: every place shows its ⌘ digit (bise 0, the projects 1-9 in keys.ts's order)
+  const cmd = useModHeld('Meta');
   const add = () => {
     addProject(router);
   };
@@ -210,6 +221,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         lead={<BisePearl size={14} />}
         name="bise"
         count={waits}
+        hint={cmd ? 0 : undefined}
         title={waits > 0 ? `${String(waits)} waiting for you` : 'every project'}
         on={route.screen === 'bise' || (home !== undefined && inView === home.project && route.screen === 'thread' && route.agent === MAIN)}
         onClick={() => { router.go({ screen: 'bise' }); }}
@@ -222,14 +234,14 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         onClick={() => { router.go({ screen: 'scheduled' }); }} testId="app.sidebar.scheduled" />
       <SectionHead>projects</SectionHead>
       {projects.length === 0 && <SRow kind="more" lead="+" name="add a project" end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.empty-add" />}
-      {projects.map((p) => (
-        <ProjectItem key={p.project} p={p} on={inView === p.project} route={route} />
+      {projects.map((p, i) => (
+        <ProjectItem key={p.project} p={p} on={inView === p.project} route={route} hint={cmd && i < 9 ? i + 1 : undefined} />
       ))}
     </Side>
   );
 }
 
-const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow; on: boolean; route: Route }) {
+const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: ProjectRow; on: boolean; route: Route; hint: number | undefined }) {
   const router = useRouter();
   const refused = useHubRefused(p.project) !== null;
   const side = projectSide(p, refused);
@@ -243,6 +255,7 @@ const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow;
         end={side.text}
         endErr={side.err}
         count={side.count}
+        hint={hint}
         title={side.count > 0 ? `${String(side.count)} waiting for you` : undefined}
         on={on && route.screen === 'thread' && route.agent === MAIN}
         onClick={() => { router.go({ screen: 'thread', project: p.project, agent: MAIN }); }}

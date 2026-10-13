@@ -9,6 +9,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, t
 import { Act, Dot, Press } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAllArtifacts } from '@/artifacts';
+import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
 import { useComputerLive, useFeatures, useStore, type Store } from '@/store';
 import { Tip } from '@/setup';
@@ -52,28 +53,6 @@ export function useBarAgents(project: string): readonly ProjAgent[] {
       return items;
     },
   );
-}
-
-/** ⌥ held: the agents' rows show ⌥1-⌥9 (designer: '⌥ tenu'). */
-function useAltHeld(): boolean {
-  const [held, setHeld] = useState(false);
-  useEffect(() => {
-    const on = (e: KeyboardEvent) => {
-      setHeld(e.altKey && !e.metaKey && !e.ctrlKey);
-    };
-    const off = () => {
-      setHeld(false);
-    };
-    window.addEventListener('keydown', on);
-    window.addEventListener('keyup', on);
-    window.addEventListener('blur', off);
-    return () => {
-      window.removeEventListener('keydown', on);
-      window.removeEventListener('keyup', on);
-      window.removeEventListener('blur', off);
-    };
-  }, []);
-  return held;
 }
 
 /** A section folded or not, kept per window (designer: 'L'état replié est gardé par fenêtre'). */
@@ -251,7 +230,8 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   const router = useRouter();
   const route = useRoute();
   const now = useNow();
-  const alt = useAltHeld();
+  // ⌥ held alone for HINT_HOLD_MS: the agents' rows show ⌥1-⌥9 (designer: '⌥ tenu'; held.ts)
+  const alt = useModHeld('Alt');
   const all = project === '';
   // back from an artifact (‹, esc, ✕): the bar as he left it, its scroll too (designer's desktop-history)
   useKeptScroll(`rb:${project}`, () => document.querySelector<HTMLElement>('[data-testid="app.panel"] .app-rb-body'));

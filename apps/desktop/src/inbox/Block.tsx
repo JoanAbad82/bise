@@ -22,6 +22,7 @@ import { STRIP_KEYS, stripKey, stripWords } from './stripRows';
 import { cardKeyOf } from './Strip';
 import { pruneCardDrafts } from './drafts';
 import { keep } from '@/app/keep';
+import { useModHeld } from '@/app/held';
 import './inbox.css';
 
 /** What the composer under the block does with his words while an item is open. */
@@ -218,6 +219,7 @@ function typing(t: EventTarget | null): boolean {
 // ambient-lead m_21498): only his hand (a click, esc, ctrl+o) or its content changes it. The H10
 // one-line form while he read up the thread (m_19835) is gone: the layout jumped under him.
 export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProps) {
+  const cmd = useModHeld('Meta');
   const rows = useProjects();
   const store = useStore();
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
@@ -447,7 +449,12 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
           >{`+ ${String(more)} more`}</Act>
         )}
         <span className="strip-keys" data-testid="inbox.block.keys">
-          {openCard !== undefined ? (
+          {cmd ? (
+            // ⌘ held: the inbox's own ⌘ key on its head (amb-win's held.ts, designer m_21510)
+            <span className="app-keyhint" data-testid="inbox.block.hint">
+              <Kbd>⌘I</Kbd>
+            </span>
+          ) : openCard !== undefined ? (
             <>
               <Kbd>↑↓</Kbd> next <Kbd>esc</Kbd> fold
             </>

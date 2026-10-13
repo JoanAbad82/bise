@@ -12,7 +12,8 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { Chip, IconButton, Menu, MenuItem, Pearl } from "@/ds";
+import { Chip, IconButton, Kbd, Menu, MenuItem, Pearl } from "@/ds";
+import { useModHeld } from "./held";
 import { useProjects } from "@/store";
 import { keep } from "./keep";
 import { formatRoute } from "./route";
@@ -260,6 +261,8 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
   const router = useRouter();
   useRoute();
   const [menu, setMenu] = useState<Side | null>(null);
+  // ⌘ held: ⌘[ ⌘] under the arrows that can go (held.ts, designer m_21510)
+  const cmd = useModHeld("Meta");
   const press = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const long = useRef(false);
   useEffect(() => {
@@ -329,6 +332,11 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
         >
           {side === "back" ? "‹" : "›"}
         </IconButton>
+        {cmd && can && (
+          <span className="app-keyhint float" data-testid={`app.title.${label}.hint`}>
+            <Kbd>{side === "back" ? "⌘[" : "⌘]"}</Kbd>
+          </span>
+        )}
         {menu === side && (
           <div className="app-hist-menu">
             <Menu testId={`app.title.${label}.menu`}>
