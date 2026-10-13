@@ -1348,6 +1348,10 @@ async function newRows(harness, say) {
     if (!VOICE) { step('the fn talk corner card', false, 'no fake voice (AS_HE_DOES_VOICE)'); return; }
     await harness();
     fs.writeFileSync(VOICE, 'what time is it');
+    // amb-mac e3e5b750: off-screen, each capsule show/move appends where place.ts would put it
+    const CFR = process.env.AS_HE_DOES_USERDATA ? path.join(process.env.AS_HE_DOES_USERDATA, 'capsule-frames.jsonl') : null;
+    const cfrLines = () => { try { return fs.readFileSync(CFR, 'utf8').split(String.fromCharCode(10)).filter(Boolean); } catch { return []; } };
+    const cfrBefore = cfrLines().length;
     // no helper off-screen: the talk starts and ends as the capsule's fn would send them
     await page.evaluate(() => window.bise.core.send({ cmd: 'talk_start' }));
     await page.waitForTimeout(1500);
@@ -1378,9 +1382,20 @@ async function newRows(harness, say) {
     const heard = LOG && fs.existsSync(LOG) ? fs.readFileSync(LOG, 'utf8').includes('what time is it') : null;
     step("the fn talk's words reach main's model (core talk_start/talk_end)", heard === true, { log: LOG ?? 'AS_HE_DOES_FAKE_LOG not set', heard });
     step('the fn talk corner card: his words and the answer', !!seen, seen ?? { capsule: !!cp, why: 'off-screen has no helper: the capsule never enters a talk from a core talk_start alone' });
-    // off-screen rule (offscreen.ts): every window at -30000, never on a screen
-    const off = !!frame?.bounds && (frame.bounds.left <= -20000 || frame.bounds.top <= -20000 || frame.bounds.windowState === 'minimized');
-    step('its window frame is off every screen (the off-screen rule: -30000)', off, frame);
+    // where the card would sit on his display (capsule-frames.jsonl): bottom-right 16 px inside the
+    // work area (capsuleframe.test.ts); the real window stays parked off every screen
+    const recs = cfrLines().slice(cfrBefore).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+    const corner = recs.filter((r) => r.mode === 'corner');
+    const ruleOf = (r) => ({ ev: r.ev, dock: r.dock, right: r.bounds.x + r.bounds.width, wantRight: r.work.x + r.work.width - 16, bottom: r.bounds.y + r.bounds.height, wantBottom: r.work.y + r.work.height - 16, bounds: r.bounds, parked: r.parked });
+    const rules = corner.map(ruleOf);
+    const ruleOk = rules.length > 0 && rules.every((r) => r.right === r.wantRight && r.bottom === r.wantBottom);
+    step('the corner card frame: bottom-right 16 px inside the work area (capsule-frames.jsonl)', ruleOk, rules.length ? rules : { file: CFR ?? 'AS_HE_DOES_USERDATA not set', records: recs.length, why: recs.length ? 'no corner show' : 'no capsule show off-screen (no helper fn): nothing written' });
+    // off-screen rule (offscreen.ts): every window at -30000, never on a screen; the file's parked
+    // frame first, else the page's own screenX/Y
+    const parked = corner.map((r) => r.parked);
+    const off = parked.length ? parked.every((p) => p.x <= -20000 || p.y <= -20000)
+      : !!frame?.bounds && (frame.bounds.left <= -20000 || frame.bounds.top <= -20000 || frame.bounds.windowState === 'minimized');
+    step('its window frame is off every screen (the off-screen rule: -30000)', off, parked.length ? { parked } : frame);
     const t0 = Date.now();
     const closed = await until(async () => {
       const r = await capPage()?.evaluate(() => !document.querySelector('[data-testid="capsule.card"]')).catch(() => null);
