@@ -70,7 +70,12 @@ def main():
     with open(fake, "w") as f:
         f.write(FAKE)
     os.chmod(fake, 0o755)
-    ext = os.path.join(d, "dev", "try", "computer-use", "extension")
+    # the folder the fake state names (never made: the TUI only shows and
+    # copies it), one short path whatever the run's tmp: under the gate's
+    # ~/.bise/gate/<pid> a path under it made '   the folder: <path>' wider
+    # than its row at 150 and at 80 columns, so it wrapped or was cut and
+    # the test waited 40 s for the one-line row (issue 26)
+    ext = "/opt/bise/extension"
     clip = os.path.join(d, "clipboard")
 
     helper = os.path.join(d, "app", "bise Computer Use.app")

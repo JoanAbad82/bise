@@ -1,6 +1,6 @@
 # 26 · the gate is green on main, and stays green
 
-Status: in progress (debt-t1, plan signed by architect m_23084). Item T1
+Status: fixes on sb/debt-t1, the full gate twice next (debt-t1, plan signed by architect m_23084). Item T1
 of architect's tech-debt-night list. Label: tests, gate.
 
 ## The problem
@@ -23,7 +23,46 @@ main's tip, with no known red; each fixed red has its cause in its commit
 | ambient_core_e2e | red | dffe9d15 puts his card answer in the asker's thread | the test allows it |
 | prompt_size_e2e | red | main's role grew 1.5k without its budget | budget raised by the rows |
 | tui_file_chips_tmux | green | asserts the size on the first screen with the name | waits for the row |
-| tui_computer_use_tmux | green | (being found) | |
+| tui_computer_use_tmux | green | its folder path's length came from the run's tmp: the gate's made the row wrap | a short path |
+
+Not fixed here, owned elsewhere:
+
+- **tui_queue_tmux**: 2 of 3 alone under load. T4 removes its cause
+  (owner: T4 of architect's tech-debt-night list); green in this run.
+- **apps/desktop delivery.spec** (not in gate.sh full): amb-win's
+  ef74cc92 on main fixed it (the check scrolled the wrong element).
+
+## main's prompt grew past its budget
+
+prompt_size_e2e: main 40913 chars > 40684. Its role rows grew without the
+budget, measured on rust/switchboard/src/testdata/prompts/main_role_desktop.txt
+at each sha (27929 -> 29437). The budget is raised by exactly these
+(architect m_23084), for a later prompt-diet to weigh:
+
+| sha | row | chars |
+|---|---|---|
+| f0c1b04f | sb every: estimate low and check often, prefer the event | +229 |
+| f681138e | sb every: wakes reach a busy agent mid-turn | +34 |
+| ae7fcca8 | sb artifact archive / unarchive | +216 |
+| 338dd46c | sb wake (a new row) | +548 |
+| df1bacdf | sb wake --then / --alarm | +327 |
+| d7e20a63 | sb feature retire | +154 |
+| | total | +1508 |
+
+The task's prompt is at 28921 of 29044: 123 chars left.
+
+## tui_computer_use_tmux: the gate's tmp
+
+Red in every full gate run from an agent, green alone from an agent's
+shell. The extension folder the test shows was
+`<tmp>/cu-xxxxxxxx/dev/try/computer-use/extension`, `<tmp>` from
+e2e.short_tmp(): the run's $TMPDIR when 40 chars or less (the gate's
+`~/.bise/gate/<pid>`, 39 chars here), else /tmp (an agent's own $TMPDIR is
+deeper). Under the gate the row `   the folder: <path>` was 97 chars, wider
+than the steps column at 150 columns: the TUI wrapped it, and the test
+waited 40 s for the one-line row. Reproduced alone with
+`TMPDIR=~/.bise/gate/99999`: red, same screen. The path is now
+`<tmp>/cu-xxxxxxxx/ext`, short for any tmp short_tmp gives.
 
 ## The leak: test hubs had the user's real keys
 
