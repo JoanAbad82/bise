@@ -390,9 +390,9 @@ test("composer/dictate-anywhere: ctrl+r from the thread or a sidebar row takes t
       { timeout: 5000 },
     );
     await away(page, "main");
-    await page.keyboard.press("?");
+    await page.keyboard.press("Meta+/");
     const help = page.locator('[role="dialog"][aria-label="keys"]');
-    await expect(help, "? opens the keys sheet").toBeVisible({ timeout: 3000 });
+    await expect(help, "⌘/ opens the keys sheet").toBeVisible({ timeout: 3000 });
     await page.keyboard.press("Control+r");
     await page.waitForTimeout(500);
     expect(starts(core), "ctrl+r with a dialog open starts nothing").toBe(n);
@@ -524,7 +524,9 @@ test("composer/dictate-anywhere: a core that never answers: esc still ends the d
       "his next words are alone in the field",
     ).toHaveText("his words");
 
-    // a stop (a key) the core never answers: listening… goes after the wait, his words stay
+    // a stop (a key) the core never answers: the take waits for its words as long as the core
+    // may (125 s, past its 120 s flush; the store law checks the end), never cut at 5 s like
+    // before (ambient-lead m_22121); his words stay, esc ends it at once
     await page.keyboard.press("Control+r");
     await expect.poll(() => mic(page)).toBe("recording");
     await page.keyboard.type(" more");
@@ -532,13 +534,18 @@ test("composer/dictate-anywhere: a core that never answers: esc still ends the d
       dictation(page),
       "stopped: waiting for the last words",
     ).toHaveCount(1);
-    await expect(dictation(page), "the wait ends it").toHaveCount(0, {
-      timeout: 8000,
+    await expect.poll(() => mic(page), { message: "the key stopped the mic" }).toBe("transcribing");
+    await page.waitForTimeout(6000);
+    await expect(dictation(page), "still waiting past the old 5 s cut").toHaveCount(1);
+    expect(await mic(page)).toBe("transcribing");
+    await expect(field(page), "his words stay around the waiting take").toHaveText(
+      "his words transcribing… more",
+    );
+    await page.keyboard.press("Escape");
+    await expect(dictation(page), "esc ends the wait at once").toHaveCount(0, {
+      timeout: 1000,
     });
     expect(await mic(page)).toBe("off");
-    await expect(page.getByTestId("composer.note")).toContainText(
-      "didn't answer",
-    );
     await expect(field(page)).toHaveText("his words more");
   } finally {
     await s.close();
