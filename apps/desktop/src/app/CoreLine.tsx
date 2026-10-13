@@ -5,7 +5,7 @@
 // back.' for 3 s once it is. Only when it doesn't come back by itself does it ask him: a crash
 // whose restart failed, or 3 crashes in 10 min (main stopped trying), with 'start bise' and
 // 'show the report' (the report main wrote, ~/.bise/reports; never sent anywhere).
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { BiseApi, CoreExit, CoreState } from '@/shared/api';
 import { Button } from '@/ds';
 import { useBroken, useCoreState } from '@/store';
@@ -18,6 +18,8 @@ export const QUIET_START_MS = 2000;
 
 /** How long bise may be down before the window says so (designer: under 2 s, nothing at all). */
 export const QUIET_DOWN_MS = 2000;
+/** How long the core must stay up before a down spell counts as over (a crash loop flickers up). */
+export const STABLE_UP_MS = 1000;
 /** How long 'bise is back.' stays. */
 export const BACK_MS = 3000;
 
@@ -72,7 +74,9 @@ export function coreView(
       ? { text: `▲ bise crashed and didn't start again: ${reason}.`, tone: 'err', start: true, report }
       : { text: `▲ bise didn't start: ${reason}.`, tone: 'err', start: true, report: false };
   }
-  if (o.wasUp) return o.long === true ? plain('bise stopped. starting it again… nothing is lost.') : undefined;
+  // down 2 s or more: the core's last log line dim under it, so he sees why (setup/offline S.5)
+  // after it was up, or a first start that already died once
+  if (o.wasUp || e !== null) return o.long === true ? { ...plain('bise stopped. starting it again… nothing is lost.'), ...(e !== null && e.last !== '' ? { note: e.last } : {}) } : undefined;
   return o.slow ? plain('starting bise…') : undefined;
 }
 
@@ -126,16 +130,34 @@ export function useCoreLine(): StatusPart | null {
       setCrashed(false);
     } else if (prev === 'up') setBack(false);
   }
-  // down 2 s or more (after it was up): then the line says so
+  // down 2 s or more (after it was up): then the line says so. Counted from the first moment it
+  // left 'up', not from each flip: a core that keeps dying (down -> starting -> down) still says
+  // so after 2 s (qa-flows m_20808: a crash loop stayed silent)
+  const downAt = useRef<number | null>(null);
   useEffect(() => {
-    if (state === 'up' || !wasUp) return;
-    const t = setTimeout(() => {
-      setLong(true);
-    }, QUIET_DOWN_MS);
+    if (state === 'up') {
+      // a core that comes up for a moment and dies again is still the same spell (the probe saw
+      // 113 ms up in a crash loop): the count starts over only once it stays up
+      const t = setTimeout(() => {
+        downAt.current = null;
+      }, STABLE_UP_MS);
+      return () => {
+        clearTimeout(t);
+      };
+    }
+    // a first start that keeps dying counts too (it has an exit): the check kills each new core
+    if (!wasUp && exit === null) return;
+    downAt.current ??= Date.now();
+    const t = setTimeout(
+      () => {
+        setLong(true);
+      },
+      Math.max(0, QUIET_DOWN_MS - (Date.now() - downAt.current)),
+    );
     return () => {
       clearTimeout(t);
     };
-  }, [state, wasUp]);
+  }, [state, wasUp, exit]);
   useEffect(() => {
     if (!back) return;
     const t = setTimeout(() => {
@@ -145,11 +167,20 @@ export function useCoreLine(): StatusPart | null {
       clearTimeout(t);
     };
   }, [back]);
+  // a first start that takes 2 s or more: counted from its first 'starting', not from each flip
+  const startAt = useRef<number | null>(null);
   useEffect(() => {
-    if (state !== 'starting' || wasUp) return;
-    const t = setTimeout(() => {
-      setSlow(true);
-    }, QUIET_START_MS);
+    if (state === 'up' || wasUp) {
+      startAt.current = null;
+      return;
+    }
+    startAt.current ??= Date.now();
+    const t = setTimeout(
+      () => {
+        setSlow(true);
+      },
+      Math.max(0, QUIET_START_MS - (Date.now() - startAt.current)),
+    );
     return () => {
       clearTimeout(t);
     };
