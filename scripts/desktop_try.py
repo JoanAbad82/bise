@@ -743,20 +743,17 @@ def bundle_apps(app):
 
 
 def quit_bundle(app, timeout=10):
-    """Every instance of the bundle quits (one app holds fn and the menu bar): an Apple Event
-    quit by the bundle's own id (its Info.plist, so a candidate's quit never reaches his app), then
-    SIGTERM to each checked pid, never by name. Returns the pids."""
+    """Every instance of THIS bundle quits (one app holds fn and the menu bar): SIGTERM (Electron
+    quits as on ⌘Q), then SIGKILL, to each pid whose executable is inside this bundle's path
+    (bundle_apps), else nothing. Never by bundle id: a stand-in or copy of his try shares his id,
+    and an Apple Event by id would quit his app too (ambient-lead m_22006); never by name."""
     pids = bundle_apps(app)
-    if not pids:
-        return []
-    subprocess.run(["osascript", "-e", 'tell application id "%s" to quit' % (bundle_id(app) or APP_ID)], capture_output=True, timeout=15)
-    for sig in (None, signal.SIGTERM, signal.SIGKILL):
-        if sig is not None:
-            for pid in [p for p in pids if pid_alive(p)]:
-                try:
-                    os.kill(pid, sig)
-                except OSError:
-                    pass
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        for pid in [p for p in pids if pid_alive(p)]:
+            try:
+                os.kill(pid, sig)
+            except OSError:
+                pass
         t0 = time.time()
         while any(pid_alive(p) for p in pids) and time.time() - t0 < timeout:
             time.sleep(0.2)
@@ -883,15 +880,9 @@ def quit_app(app, tryh, timeout=10):
     pid = app_running(app, tryh)
     if not pid:
         return None
-    # an Apple Event quit (app.quit: will-quit stops its core and shells, the helper quits), by the
-    # bundle's own id (Info.plist: a candidate's never names his); SIGTERM to the checked pid if it
-    # doesn't go, never pkill by name
-    subprocess.run(["osascript", "-e", 'tell application id "%s" to quit' % (bundle_id(app) or APP_ID)], capture_output=True, timeout=15)
-    t0 = time.time()
-    while pid_alive(pid) and time.time() - t0 < timeout:
-        time.sleep(0.2)
-    if pid_alive(pid):
-        os.kill(pid, signal.SIGTERM)
+    # SIGTERM to the checked pid (Electron's quit: will-quit stops its core and shells, the helper
+    # quits), never an Apple Event by id (his try shares it: quit_bundle), never pkill by name
+    os.kill(pid, signal.SIGTERM)
     t0 = time.time()
     while pid_alive(pid) and time.time() - t0 < timeout:
         time.sleep(0.2)

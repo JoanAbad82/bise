@@ -430,6 +430,41 @@ def real_stop_never_his_hubs():
         T.quit_bundle = real_quit
 
 
+def quit_only_this_bundle():
+    """quit_bundle and quit_app never quit by bundle id (ambient-lead m_22006): a stand-in or a copy
+    of his try has his id, and 'tell application id … to quit' quit his app too. Only the pids whose
+    executable is inside THIS bundle's path get a signal; another bundle's app of the same name and
+    id, this bundle's helpers and its core don't; no pid: nothing at all. ps and kill are faked."""
+    src = open(os.path.join(ROOT, "scripts", "desktop_try.py")).read()
+    check("osascript" not in src and "tell application" not in src, "the launcher never sends an Apple Event")
+    app, his = "/g/build/desktop-try/mac-arm64/bise try.app", "/Users/x/.bise/dev/build/desktop-try/mac-arm64/bise try.app"
+    ps = "".join("%d %s%s" % (p, c, chr(10)) for p, c in (
+        (11, his + "/Contents/MacOS/bise try"), (12, app + "/Contents/MacOS/bise try --flag"),
+        (13, app + "/Contents/Frameworks/bise try Helper.app/Contents/MacOS/bise try Helper"),
+        (14, app + "/Contents/Resources/bin/bise ambient-core --workspace /w")))
+    calls, alive = [], {12}
+    real = (T.subprocess.run, T.os.kill, T.pid_alive)
+
+    def run(argv, **kw):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout=ps if argv[0] == "ps" else "", stderr="")
+
+    def kill(pid, sig):
+        calls.append(("kill", pid, sig))
+        alive.discard(pid)
+    T.subprocess.run, T.os.kill, T.pid_alive = run, kill, lambda p: p in alive
+    try:
+        check(T.quit_bundle(app, timeout=1) == [12], "only this bundle's app")
+        kills = [c for c in calls if c[0] == "kill"]
+        check(kills == [("kill", 12, T.signal.SIGTERM)], "one SIGTERM to its pid, nothing else: %r" % kills)
+        check([c for c in calls if c[0] != "ps" and c[0] != "kill"] == [], "no other command: %r" % calls)
+        del calls[:]
+        ps = ""
+        check(T.quit_bundle(app, timeout=1) == [] and [c for c in calls if c[0] != "ps"] == [], "no app of this bundle: nothing sent")
+    finally:
+        T.subprocess.run, T.os.kill, T.pid_alive = real
+
+
 def hook_keeps_pid():
     """BISE_TRY_OPEN (the gate's open): the app the hook starts is found and its pid kept in
     <try>/dev/desktop/app.pid, so --stop finds it (qa-native m_11066). The 'app' is a throwaway
@@ -692,6 +727,7 @@ if __name__ == "__main__":
     legacy_old_retired()
     real_opens_with_nothing()
     real_stop_never_his_hubs()
+    quit_only_this_bundle()
     real_open_in_background_offscreen()
     candidate_then_promote()
     if "--pure" not in sys.argv:
