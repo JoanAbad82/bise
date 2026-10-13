@@ -9,6 +9,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, t
 import { Act, Dot, Press } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAllArtifacts } from '@/artifacts';
+import { useGoArtifact } from '@/artifacts/leave';
 import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
 import { useComputerLive, useFeatures, useStore, type Store } from '@/store';
@@ -228,6 +229,8 @@ function useAgentTip(project: string, rows: readonly BarRow[], route: ReturnType
 
 export function RightBar({ project, name, over }: { project: string; name: string; over?: boolean }) {
   const router = useRouter();
+  // a browser-only artifact (a PR, a link) opens his browser, the bar stays (leave.ts)
+  const goArtifact = useGoArtifact();
   const route = useRoute();
   const now = useNow();
   // ⌥ held alone for HINT_HOLD_MS: the agents' rows show ⌥1-⌥9 (designer: '⌥ tenu'; held.ts)
@@ -309,7 +312,7 @@ export function RightBar({ project, name, over }: { project: string; name: strin
             router.go({ screen: 'artifacts', project });
           }}
         >
-          {(r) => <Row key={r.key} r={r} onOpen={() => { router.go({ screen: 'artifacts', project: r.project, id: r.id ?? '' }); }} />}
+          {(r) => <Row key={r.key} r={r} onOpen={() => { goArtifact(r.project, r.id ?? ''); }} />}
         </Section>
         <Section
           id="scheduled"

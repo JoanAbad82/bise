@@ -208,13 +208,12 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
         </span>
       </div>
       <div className="art-open-body">
-        {src !== null ? (
-          // the page follows his theme: opened with ?theme=<his pref>, the kit wears it (kit.js puts
-          // it on <html data-theme>); with no pref, the system's
+        {/* the page follows his theme: opened with ?theme=<his pref>, the kit wears it (kit.js puts
+            it on <html data-theme>); with no pref, the system's. A browser-only kind never gets
+            here from a list (leave.ts opens his browser): no 'opens in your browser' panel (designer m_21714) */}
+        {src !== null && (
           <iframe className="art-paper" src={src} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             data-testid="artifact.page" />
-        ) : (
-          <div className="art-empty">this kind opens in your browser: ↗ browser</div>
         )}
       </div>
       {/* the screen's one composer, the maker's (maker.ts), when no thread sits beside the page; the

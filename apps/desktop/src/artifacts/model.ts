@@ -28,6 +28,30 @@ export function kindOf(kind: string): KindFilter {
   return 'file';
 }
 
+/** What decides where an artifact opens: its kind, its url, the hub's in-app copy (frame_url), if any. */
+export interface Leaving {
+  readonly kind: string;
+  readonly url?: string | null;
+  readonly frame_url?: string | null;
+}
+
+/** It has a view in the window: the hub's framed copy, or a page at an http(s) url. Pure. */
+export function inApp(a: Leaving): boolean {
+  if ((a.frame_url ?? '') !== '') return true;
+  return kindOf(a.kind) === 'page' && /^https?:\/\//i.test(a.url ?? '');
+}
+
+/**
+ * Browser-only (designer m_21714): no view in the window and a url his browser takes (http,
+ * https, mailto): a PR, a link. Its rows open the browser at once (leave.ts). Pure.
+ */
+export function leaves(a: Leaving): boolean {
+  return !inApp(a) && /^(https?:\/\/|mailto:)/i.test(a.url ?? '');
+}
+
+/** The mark a browser-only row shows in place of its kind and version (designer m_21714). */
+export const LEAVES = '↗';
+
 /** The row's glyph, mono: ↗ page, ▤ file, ⇡ PR, ◫ shots. */
 export function glyphOf(kind: string): string {
   return { page: '↗', file: '▤', pr: '⇡', shots: '◫' }[kindOf(kind)];

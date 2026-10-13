@@ -6,7 +6,7 @@ import { Store, StoreProvider } from '@/store';
 import { RouterContext, createRouter } from '@/app/router';
 import type { Route } from '@/app/route';
 import { formatRoute, parseRoute } from '@/app/route';
-import { byDay, dayWords, filterItems, glyphOf, kindWords, ALL, splitArchived, timeOf, versions, whenWords, type Item } from './model';
+import { byDay, dayWords, filterItems, glyphOf, inApp, kindWords, leaves, ALL, splitArchived, timeOf, versions, whenWords, type Item } from './model';
 import { aboutWords, ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
 import { putInDraft } from './put';
 import { frameSrc, themedUrl } from './Open';
@@ -251,6 +251,23 @@ describe('artifacts screens', () => {
     expect(frameSrc({ kind: 'page', url: 'http://127.0.0.1:47123/p/notes', version: 3 }, 1, 'light')).toBe('http://127.0.0.1:47123/p/notes/v/1?theme=light');
     expect(frameSrc({ kind: 'link', url: 'https://example.com/a', version: 1 }, 1, null)).toBe('https://example.com/a');
     expect(frameSrc({ kind: 'file', url: 'http://127.0.0.1:47123/x.csv', version: 1 }, 1, null)).toBeNull();
+  });
+
+  it('browser-only (designer m_21714): no view in the window and a url his browser takes; every in-app kind stays', () => {
+    // a PR, an http file, a mailto: his browser
+    expect(leaves({ kind: 'pr', url: 'https://github.com/acme/shop/pull/381' })).toBe(true);
+    expect(leaves({ kind: 'file', url: 'http://127.0.0.1:47123/x.csv' })).toBe(true);
+    expect(leaves({ kind: 'file', url: 'mailto:a@b.c' })).toBe(true);
+    // a page, a link (framed), anything with the hub's copy: in the window
+    expect(leaves({ kind: 'page', url: 'http://127.0.0.1:47123/p/notes' })).toBe(false);
+    expect(leaves({ kind: 'link', url: 'https://example.com/a' })).toBe(false);
+    expect(leaves({ kind: 'pr', url: 'https://github.com/x/y/pull/1', frame_url: 'http://127.0.0.1:47123/a/pr/1/pr.html' })).toBe(false);
+    // a bare path the browser can't take: never 'leaves' (the open view, as before)
+    expect(leaves({ kind: 'file', url: '/Users/x/report.csv' })).toBe(false);
+    expect(leaves({ kind: 'pr', url: '' })).toBe(false);
+    // the thread chip's `made` reads the same
+    expect(leaves({ kind: 'pr', url: null })).toBe(false);
+    expect(inApp({ kind: 'page', url: 'https://example.com/a' })).toBe(true);
   });
 });
 

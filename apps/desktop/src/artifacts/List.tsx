@@ -6,6 +6,7 @@ import { memo, useState, type KeyboardEvent, type Ref } from 'react';
 import { byDay, glyphOf, keyOf, kindWords, madeBy, pathOf, splitArchived, timeOf, type Item } from './model';
 import { useAllArtifacts } from './hooks';
 import { bridge, copyLink, openWithVersions, usePutInMessage } from './Open';
+import { leaves, LEAVES, useGoArtifact } from './leave';
 import './artifacts.css';
 import { Press } from '@/ds';
 
@@ -114,21 +115,24 @@ const ArtRow = memo(function ArtRow({ it, on, form, onPick, onOpen, testId, ref 
       {a.new && <span className="art-new" data-testid={`${testId}.new`}>new</span>}
     </span>
   );
+  // a browser-only one (a PR, a link): '↗' in place of its kind and version (designer m_21714)
+  const out = leaves(a);
+  const kind = out ? LEAVES : kindWords(a);
   return (
     <div ref={ref} className={`art-row${on ? ' on' : ''}`} role="option" aria-selected={on} data-testid={testId}
-      onClick={onPick} onDoubleClick={onOpen}>
+      data-leaves={out || undefined} onClick={onPick} onDoubleClick={onOpen}>
       <span className="art-g" aria-hidden="true">{glyphOf(a.kind)}</span>
       {form === 'screen' ? (
         <>
           {title}
-          <span className="art-k">{kindWords(a)}</span>
+          <span className="art-k" title={out ? 'opens in your browser' : undefined}>{kind}</span>
           <span className="art-by">{madeBy(it)}</span>
           <span className="art-w">{timeOf(a.at_ms)}</span>
         </>
       ) : (
         <span className="art-two">
           {title}
-          <span className="art-sub">{`${kindWords(a)} · ${madeBy(it, false)} · ${timeOf(a.at_ms)}`}</span>
+          <span className="art-sub">{`${kind} · ${madeBy(it, false)} · ${timeOf(a.at_ms)}`}</span>
         </span>
       )}
     </div>
@@ -142,7 +146,13 @@ const ArtRow = memo(function ArtRow({ it, on, form, onPick, onOpen, testId, ref 
 export function ArtifactList({ project, onOpen, testId = 'artifacts.panel' }: { project: string; onOpen: (id: string) => void; testId?: string }) {
   const { live, archived } = splitArchived(useAllArtifacts(project));
   const put = usePutInMessage();
-  const look = useLook((it) => { onOpen(it.a.id); });
+  // a browser-only one opens his browser (leave.ts), the others the frame's way
+  const goArtifact = useGoArtifact();
+  const openIt = (it: Item) => {
+    if (leaves(it.a)) goArtifact(it.project, it.a.id, it.a);
+    else onOpen(it.a.id);
+  };
+  const look = useLook(openIt);
   const [sel, setSel] = useState<string | null>(null);
   // the archived ones behind a faint 'N archived' row; a click shows them under the others
   const [showArchived, setShowArchived] = useState(false);
@@ -165,7 +175,7 @@ export function ArtifactList({ project, onOpen, testId = 'artifacts.panel' }: { 
   }
   return (
     <>
-      <ArtifactRows items={items} now={now} sel={sel} onSel={setSel} onOpen={(it) => { onOpen(it.a.id); }} onLook={look}
+      <ArtifactRows items={items} now={now} sel={sel} onSel={setSel} onOpen={openIt} onLook={look}
         onPut={(it) => { put(it.project, it.a); }} form="panel" testId={testId} />
       {more}
     </>

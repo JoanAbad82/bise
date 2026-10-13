@@ -5,16 +5,15 @@
 import { useState, type KeyboardEvent } from 'react';
 import { Button, Field, Menu, MenuItem, Press } from '@/ds';
 import { useProjects } from '@/store';
-import { useRouter } from '@/app/router';
 import { useKeptScroll } from '@/app/keep';
 import { useAllArtifacts } from './hooks';
 import { ArtifactRows, useLook } from './List';
 import { usePutInMessage } from './Open';
+import { useGoArtifact } from './leave';
 import { agentsOf, ALL, filterItems, KIND_FILTERS, keyOf, splitArchived, type Filter, type Item, type KindFilter } from './model';
 import './artifacts.css';
 
 export function ArtifactsScreen({ project = '' }: { project?: string }) {
-  const router = useRouter();
   const all = useAllArtifacts();
   const projects = useProjects();
   // back from an open artifact (esc, ‹): the list where he left it (designer's desktop-history)
@@ -30,8 +29,10 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   const { live, archived } = splitArchived(kept);
   const items = archivedOn ? archived : live;
   const projectName = projects.find((p) => p.project === f.project)?.name ?? f.project;
+  // a browser-only one (a PR, a link) opens his browser, the list keeps its selection (leave.ts)
+  const goArtifact = useGoArtifact();
   const open = (it: Item) => {
-    router.go({ screen: 'artifacts', project: it.project, id: it.a.id });
+    goArtifact(it.project, it.a.id, it.a);
   };
   const look = useLook(open);
   const put = usePutInMessage();

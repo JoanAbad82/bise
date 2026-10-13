@@ -13,6 +13,7 @@ import { caretAtEnd, keep, useKeptText } from '@/app/keep';
 import type { Ev } from '@/store/store';
 import { flatHits, marks, nextScope, SCOPES, searchList, type Hit, type Scope, type SearchList } from '@/search/rank';
 import { searchDataOf } from '@/search/data';
+import { useGoArtifact } from '@/artifacts/leave';
 import { PAGES } from '@/settings';
 import { useNow } from './clock';
 import { askInbox } from './inboxAsk';
@@ -102,6 +103,7 @@ function Marked({ text, q }: { text: string; q: string }): ReactNode {
 export function Palette({ onClose }: { onClose: () => void }) {
   const store = useStore();
   const router = useRouter();
+  const goArtifact = useGoArtifact();
   const projects = useProjects();
   const index = useIndex();
   const now = useNow();
@@ -151,7 +153,8 @@ export function Palette({ onClose }: { onClose: () => void }) {
     dropQ();
     onClose();
     if (h.open.to === 'artifact') {
-      router.go({ screen: 'artifacts', project: h.open.project, id: h.open.id });
+      // a browser-only one (a PR, a link) opens his browser, no route (leave.ts)
+      goArtifact(h.open.project, h.open.id);
       return;
     }
     // a page: as its key does (⌘I the inbox in place, ⌘/ the key list, the rest a route)

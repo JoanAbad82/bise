@@ -5,7 +5,8 @@ import { useOpenArtifact } from './openArtifact';
 import { useState, type ReactNode } from 'react';
 import { Act, BriefLine, Button, Fold, Marker, Press, SchedHead } from '@/ds';
 import type { Entry } from '@/proto';
-import { useAgents, useStore } from '@/store';
+import { useAgents, useArtifacts, useStore } from '@/store';
+import { leaves, LEAVES, useGoArtifact } from '@/artifacts/leave';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
 import { clock, handoffOf, repeatsReport, reportBody, schedHead } from './entry';
@@ -110,18 +111,21 @@ export function PrRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 
 /** What an agent made: a card that opens it (its page, else the project's artifacts). */
 export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
-  const router = useRouter();
+  const artifacts = useArtifacts(ctx.project);
+  const goArtifact = useGoArtifact();
   const openId = useOpenArtifact();
   const m = e.made;
   if (m == null) return <Marker>{e.text}</Marker>;
+  // a browser-only one (a PR, a link): '↗' in place of its kind and version (designer m_21714)
+  const out = leaves(artifacts.find((x) => x.id === m.id) ?? m);
   return (
     <ArtChip
       open={openId === m.id}
       title={m.title}
-      meta={[m.kind_word, m.v > 1 ? `v${String(m.v)}` : ''].filter(Boolean).join(' · ')}
+      meta={out ? LEAVES : [m.kind_word, m.v > 1 ? `v${String(m.v)}` : ''].filter(Boolean).join(' · ')}
       onOpen={() => {
-        // designer's v6 (2): an artifact opens in the window, its own screen
-        router.go({ screen: 'artifacts', project: ctx.project, id: m.id });
+        // designer's v6 (2): an artifact opens in the window, its own screen; a browser-only one his browser
+        goArtifact(ctx.project, m.id, m);
       }}
       testId={`thread.artifact.${String(e.pos)}`}
     />

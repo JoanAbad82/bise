@@ -5,6 +5,7 @@
 // written_ms); the scheduled tasks from amb-feed's typed list (284bd5c6) for a held project, from
 // the index row's scheduled (26b2400b, its live timers as of written_ms) for the others.
 import type { Agent, Artifact, Card, IndexRow, ProjectRow, ScheduledTask } from '@/proto';
+import { leaves, LEAVES } from '@/artifacts/model';
 import type { SearchData, SearchScheduled } from './rank';
 
 export interface StoreView {
@@ -17,8 +18,8 @@ export interface StoreView {
   readonly index?: readonly IndexRow[];
 }
 
-/** An artifact's dim words: 'page · v2', 'image'. */
-const whatOf = (a: Artifact): string => (a.version > 1 ? `${a.kind} · v${String(a.version)}` : a.kind);
+/** An artifact's dim words: 'page · v2', 'image'; a browser-only one (a PR, a link) '↗' (designer m_21714). */
+const whatOf = (a: Artifact): string => (leaves(a) ? LEAVES : a.version > 1 ? `${a.kind} · v${String(a.version)}` : a.kind);
 
 /** A scheduled task as the search reads it (its words, the agent it wakes, when next). */
 const scheduledOf = (project: string, t: ScheduledTask): SearchScheduled => ({
