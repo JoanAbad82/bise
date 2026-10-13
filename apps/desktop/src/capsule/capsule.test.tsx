@@ -47,8 +47,18 @@ describe('the capsule machine', () => {
     expect(early.fx).toContainEqual({ fx: 'mic', open: false });
     expect(early.fx).not.toContainEqual({ fx: 'talk', cmd: 'talk_end' });
     expect(run([...talk, { ev: 'talk_over', said: "i didn't hear anything" }]).view).toMatchObject({ phase: 'over', said: "i didn't hear anything" });
-    // his words answered a card: nothing to say here, the capsule goes
-    expect(run([...talk, { ev: 'talk_over', said: null }])).toMatchObject({ view: NONE });
+    // a reason with where to fix it
+    const link = { label: 'settings › voice', route: 'settings/voice' };
+    expect(run([...talk, { ev: 'talk_over', said: 'bise needs a voice key to hear you.', link }]).view).toMatchObject({ phase: 'over', link });
+    // his words answered a card (designer m_21945: not silent): said, then gone when its time is up
+    const answered = run([...talk, { ev: 'talk_over', said: '✓ answered checkout', fades: true }]);
+    expect(answered.view).toEqual({ kind: 'talk', phase: 'over', handsFree: false, said: '✓ answered checkout', fades: true });
+    const gone = run([...talk, { ev: 'talk_over', said: '✓ answered checkout', fades: true }, { ev: 'over_gone' }]);
+    expect(gone.view).toEqual(NONE);
+    expect(gone.fx.at(-1)).toEqual({ fx: 'hide' });
+    // a reason never fades; a talk started meanwhile is never closed by an old timer
+    expect(run([...talk, { ev: 'talk_over', said: 'x' }, { ev: 'over_gone' }]).view).toMatchObject({ phase: 'over' });
+    expect(run([...talk, { ev: 'talk_over', said: 'y', fades: true }, { ev: 'fn', act: 'talk_start' }, { ev: 'over_gone' }]).view).toMatchObject({ phase: 'listen' });
     // esc closes it; the next fn talks again
     expect(run([...talk, { ev: 'talk_over', said: 'x' }, { ev: 'fn', act: 'esc' }]).view).toEqual(NONE);
     expect(run([...talk, { ev: 'talk_over', said: 'x' }, { ev: 'fn', act: 'talk_start' }]).view).toEqual({ kind: 'talk', phase: 'listen', handsFree: false });

@@ -23,7 +23,8 @@ import type { SpotAnswer, SpotFront, SpotItem, SpotRoute } from "@/spotlight";
 import { W } from "@/spotlight/words";
 import { useTheme } from "@/theme";
 import "@/ds/index.css";
-import { Capsule, menuCards, W as CW } from "./Capsule";
+import { Capsule, menuCards } from "./Capsule";
+import { answeredOver, errorOver, heardOver, OVER_FADE_MS } from "./over";
 import { useAgentPreview, useSpotData } from "./data";
 import { START, step, type CapEvent, type Fx, type State } from "./machine";
 
@@ -216,15 +217,29 @@ export function CapsuleRoot(): JSX.Element {
   useEffect(
     () =>
       store.onEvent((ev) => {
-        if (ev.ev === "error" && ev.project == null && (ev.cmd == null || ev.cmd === "talk_start"))
-          dispatch({ ev: "talk_over", said: ev.text });
-        else if (ev.ev === "heard" && ev.final && ev.text.trim() === "")
-          dispatch({ ev: "talk_over", said: CW.heardNothing });
-        else if (ev.ev === "voice_answer")
-          dispatch({ ev: "talk_over", said: null });
+        const over =
+          ev.ev === "error"
+            ? errorOver(ev.project, ev.cmd, ev.text)
+            : ev.ev === "heard"
+              ? heardOver(ev.text, ev.final)
+              : ev.ev === "voice_answer"
+                ? answeredOver(store.projects().find((p) => p.project === ev.project)?.name ?? ev.project)
+                : null;
+        if (over !== null) dispatch(over);
       }),
     [store],
   );
+  // a card his words answered: its line stays OVER_FADE_MS, then the capsule goes (designer m_21945)
+  const fading = view.kind === "talk" && view.phase === "over" && view.fades === true;
+  useEffect(() => {
+    if (!fading) return undefined;
+    const t = window.setTimeout(() => {
+      dispatch({ ev: "over_gone" });
+    }, OVER_FADE_MS);
+    return () => {
+      window.clearTimeout(t);
+    };
+  }, [fading]);
   useEffect(
     () =>
       store.onEvent((ev) => {

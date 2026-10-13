@@ -16,12 +16,22 @@ import type { CapsuleFit } from '../shared/api';
 /** The voice view grows down from where it showed and never moves (lead m_11532); its glass is at most 320 px (capsule.css). */
 export const TALK_FIT: CapsuleFit = { grow: 'down', maxHeight: 320 };
 
+/** a window page the 'over' line links to (designer m_21945: 'settings › voice') */
+export interface OverLink {
+  readonly label: string;
+  readonly route: string;
+}
+
 export type View =
   | { readonly kind: 'none' }
   | { readonly kind: 'spot' }
   | { readonly kind: 'talk'; readonly phase: 'listen' | 'think'; readonly handsFree: boolean }
-  /** the core ended his talk without a send (amb-core m_21857): its reason, or 'nothing heard'; esc or the next fn closes it */
-  | { readonly kind: 'talk'; readonly phase: 'over'; readonly handsFree: boolean; readonly said: string }
+  /**
+   * the core ended his talk without a send (amb-core m_21857): its reason (`link`: where to fix it),
+   * 'nothing heard', or the card his words answered (`fades`: goes by itself, CapsuleRoot's
+   * OVER_FADE_MS); esc or the next fn closes it
+   */
+  | { readonly kind: 'talk'; readonly phase: 'over'; readonly handsFree: boolean; readonly said: string; readonly link?: OverLink; readonly fades?: boolean }
   | { readonly kind: 'answer' }
   /**
    * opened from the spotlight's waiting row (⏎ '↵ answer') or the tray menu's (a click, fn+n:
@@ -42,10 +52,12 @@ export type CapEvent =
   | { readonly ev: 'answer' }
   /**
    * the core ended his talk without sending it (amb-core m_21857, his fn stuck on 'thinking…'): a
-   * failure (`said`: its reason), nothing heard (`said`: those words), or his words answered a card
-   * (`said` null: nothing to show)
+   * failure (`said`: its reason, `link`: where to fix it), nothing heard, or the card his words
+   * answered (`fades`): capsule/over.ts says which
    */
-  | { readonly ev: 'talk_over'; readonly said: string | null }
+  | { readonly ev: 'talk_over'; readonly said: string; readonly link?: OverLink; readonly fades?: boolean }
+  /** a fading 'over' line's time is up */
+  | { readonly ev: 'over_gone' }
   /** a card was answered or went away */
   | { readonly ev: 'card_done'; readonly id: string }
   /** ⏎ on a spotlight waiting row: that card's answer, in place (qa-native R03: it closed to nothing) */
@@ -119,7 +131,9 @@ export function step(s: State, e: CapEvent): Step {
     case 'talk_over':
       // at fn down (no key, no mic) or after his release: the mic closes, the core's talk is already over
       if (v.kind !== 'talk' || (v.phase !== 'listen' && v.phase !== 'think')) return stay(s);
-      return e.said === null ? go(s, NONE, { fx: 'hide' }) : go(s, { kind: 'talk', phase: 'over', handsFree: v.handsFree, said: e.said });
+      return go(s, { kind: 'talk', phase: 'over', handsFree: v.handsFree, said: e.said, ...(e.link ? { link: e.link } : {}), ...(e.fades ? { fades: true } : {}) });
+    case 'over_gone':
+      return v.kind === 'talk' && v.phase === 'over' && v.fades === true ? go(s, NONE, { fx: 'hide' }) : stay(s);
     case 'card_done':
       return v.kind === 'card' && v.id === e.id ? back(s) : stay(s);
     case 'open_card':

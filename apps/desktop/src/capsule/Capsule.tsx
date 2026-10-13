@@ -32,8 +32,12 @@ import "./capsule.css";
 export const W = {
   listening: "listening…",
   thinking: "bise is thinking…",
-  // his talk ended with no words (amb-core m_21857; designer signs)
-  heardNothing: "i didn't hear anything",
+  // a talk the core ended without a send (amb-core m_21857; designer m_21945, as is)
+  heardNothing: "i didn't hear anything. hold fn and talk.",
+  needsVoiceKey: "bise needs a voice key to hear you.",
+  voiceSettings: "settings › voice",
+  notReached: "bise didn't get it. try again in a moment.",
+  answered: (name: string): string => `✓ answered ${name}`,
   restInBise: "the rest in bise   ⏎ open",
   openBise: "open bise",
   inbox: "inbox",
@@ -166,9 +170,25 @@ export function Capsule(p: CapsuleProps): JSX.Element {
       )}
       {v.kind === "talk" && (
         <div className="b-cap-talk" data-testid="capsule.talk" data-glass>
-          {v.phase === "over"
-            ? v.said
-            : p.heard !== ""
+          {v.phase === "over" ? (
+            <>
+              {v.said}
+              {v.link !== undefined && (
+                <>
+                  {" "}
+                  <Press
+                    look="b-cap-link"
+                    data-testid="capsule.over.link"
+                    onClick={() => {
+                      p.onOpenWindow(v.link?.route ?? "bise");
+                    }}
+                  >
+                    {v.link.label}
+                  </Press>
+                </>
+              )}
+            </>
+          ) : p.heard !== ""
             ? p.heard
             : v.phase === "listen"
               ? W.listening

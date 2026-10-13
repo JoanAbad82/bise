@@ -107,7 +107,7 @@ fn ambient_workspace(args: &[String], core: bool) -> std::path::PathBuf {
 /// is undone the same way: the app owns its home hub while it runs.
 /// Bounded ([`home_start`]): a home hub that dies at boot (a bad version,
 /// a corrupt journal) is started at most [`HOME_STARTS`] times in
-/// [`HOME_SPELL`], then the window says why and no start is tried until
+/// [`HOME_SPELL`], then the window says why (designer m_21945: no 'hub' to him) and no start is tried until
 /// his next fn talk or an app relaunch (architect m_21925); each start
 /// writes one core.log line with the cause of the loss. `client::open`
 /// starts one hub at a time per folder, so the home and project
@@ -149,7 +149,7 @@ fn ambient_connector(paths: switchboard::paths::Paths, how: Connector, home: boo
         let cause = last_err.clone().or_else(|| last_line(&paths.state.join("hub.err"))).unwrap_or_else(|| "its connection closed".into());
         if home_start(&starts, now) == HomeStart::Wait {
             return Err(std::io::Error::other(format!(
-                "bise's home hub stopped {HOME_STARTS} times in {} minutes ({}). your next fn talk starts it again.",
+                "bise stopped {HOME_STARTS} times in {} minutes ({}). your next fn talk starts it again.",
                 HOME_SPELL.as_secs() / 60,
                 clip(&cause, 160)
             )));

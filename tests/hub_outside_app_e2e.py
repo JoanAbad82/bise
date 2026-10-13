@@ -123,7 +123,7 @@ def main():
         # his home hub killed under the core: reaped, and the core starts it again (fn talked to
         # nothing until the app restarted)
         at = core.mark()
-        old = hubs[0][0]
+        old = [p for p, c in procs() if " sbd --workspace " in c and c.endswith(E.ws)][0]
         os.kill(old, 9)
         wait.until(lambda: all(p != old for p, _ in procs()), 20, "the killed hub reaped (never <defunct>)", poll=0.2)
         core.wait(lambda e: e.get("ev") == "hub" and e.get("up") is True, 90, "the home hub up again", since=at)
