@@ -12,7 +12,6 @@ import { Breath, Pulse } from '@/working/Signs';
 import { useRouter } from '@/app/router';
 import { BisePearl } from '@/app/BisePearl';
 import { archivedFit, biseChip, branchLine, dropsFor, roleOf, stateChip, usageLine, type StateChip } from './head';
-import { waitingFor, waitsEvent } from './wake';
 import { Button, Press } from '@/ds';
 
 /** an agent whose wheel he took waits for him, like any agent that asks him */
@@ -211,22 +210,6 @@ export function BiseHead({ project, name, more }: { project: string; name: strin
         <Chip chip={biseChip(agents)} testId="thread.head.state" />
       </Press>
       <span className="ah-end">{more}</span>
-    </div>
-  );
-}
-
-/**
- * Event-wake's row at the thread's end (designer's page): an agent waiting on an event ends its
- * thread on what it waits for, '… waiting for …', dim, never the accent. A working agent has no
- * row here any more: the gust beside the composer's label says it (LabelMark.tsx, designer's
- * desktop-working v2, his m_21668).
- */
-export function WaitingLine({ a }: { a: Agent | undefined }) {
-  const now = useNow();
-  if (a === undefined || a.archived || !waitsEvent(a)) return null;
-  return (
-    <div className="th-live th-waiting" data-testid="thread.waiting" aria-live="polite">
-      … {waitingFor(a.watching, now)}
     </div>
   );
 }

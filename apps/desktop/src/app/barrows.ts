@@ -6,7 +6,7 @@ import { glyphOf, leaves } from '@/artifacts/model';
 import type { Task } from '@/scheduled/model';
 import { howOften, nextWords } from '@/scheduled/model';
 import { shortAge } from '@/agents/model';
-import { waitingFor, waitSince, waitsEvent } from '@/thread/wake';
+import { waitEnd, waitingLine, waitsEvent, waitWords } from '@/thread/wake';
 import type { Agent, ComputerAgent, Feature } from '@/proto';
 import { groupsOf } from '@/review/feature';
 import { computerDot, gaugeSays, signOf, type Tone } from './side';
@@ -205,6 +205,7 @@ export function scheduledRows(tasks: readonly Task[], now: number): BarRow[] {
 export function waitingRows(agents: readonly ProjAgent[], now: number, all: boolean): BarRow[] {
   return agents
     .filter((x) => !x.a.archived && waitsEvent(x.a))
+    .map((x) => ({ ...x, line: waitingLine(x.a.watching, now) }))
     .map((x) => ({
       key: `w:${x.project}/${x.a.name}`,
       project: x.project,
@@ -213,9 +214,10 @@ export function waitingRows(agents: readonly ProjAgent[], now: number, all: bool
       tone: 'ink',
       name: x.a.name,
       sub: x.a.watching[0]?.what ?? '',
-      end: shortAge(now - (waitSince(x.a.watching) ?? now)),
+      // the status line's time words, never a bare '14 h' (desktop-status-line A)
+      end: x.line === null ? '' : waitEnd(x.line),
       endTone: 'dim',
-      title: waitingFor(x.a.watching, now) ?? 'waiting',
+      title: x.line === null ? 'waiting' : waitWords(x.line),
       testId: `app.right.waiting.${idOf(all, x.project, x.a.name)}`,
       waits: false,
     }));

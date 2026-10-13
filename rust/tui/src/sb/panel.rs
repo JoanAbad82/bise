@@ -522,7 +522,7 @@ impl Sb {
         let notice = crate::topedge::notice(crate::artifacts::new_count(), &crate::artifacts::new_rows(), &link);
         // event-wake: the agent in view waits for an event: `… waiting
         // for cargo test · 2m`, dim, before the counts (when it fits)
-        let waiting = self.waiting_words(crate::when::now_ms());
+        let waiting = self.waiting_words(crate::when::now_ms(), usize::MAX);
         // cost-pause: a paused project says so first, in accent, whatever
         // the room (the counts give way)
         let paused = self.paused.map(|_| paused_spans());
@@ -555,12 +555,6 @@ impl Sb {
         crate::topedge::lay(room, &paths, self.role_spans(), counts, &notice)
     }
 
-    /// event-wake: the live words of the agent in view when it waits for
-    /// an event (`waiting for cargo test · 2m`, bise-proto's words).
-    pub(crate) fn waiting_words(&self, now: u64) -> Option<String> {
-        let a = self.agent(&self.focus).filter(|a| a.waits_event())?;
-        bise_proto::thread::words::waiting_for(&a.watching, now)
-    }
 
     /// The counts in at most `room` columns (book §8 "The frame"): not
     /// enough room, they shorten (`∿ 3 · ? 1`). BISE-303: with the panel
@@ -1690,6 +1684,7 @@ mod tests {
         let row = t.iter().find(|r| r.contains("perf")).cloned().unwrap_or_default();
         assert!(row.contains(&format!("{} perf", G_IDLE)), "{row:?}");
     }
+
 
     /// BISE-135: the model and effort are on the divider (no tag in the
     /// panel since BISE-303).

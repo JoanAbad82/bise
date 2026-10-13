@@ -27,13 +27,13 @@ use cards::{Card, CardView};
 mod card_draw;
 pub(super) use card_draw::{box_height, card_frame, BoxFit, card_view_open, divider_label as card_divider_label, draw_box, draw_view as draw_card_view, fit_pairs as fit_card_pairs, key_pairs as card_key_pairs};
 mod panel;
+mod waiting;
 pub(crate) mod places;
 #[cfg(test)]
 mod tour_tests;
 #[cfg(test)]
 mod places_tests;
-pub(super) use panel::PANEL_TITLE;
-pub(super) use panel::{archived_refusal, archived_warn, draw_panel, focus_model, key_mode, panel_mouse, placeholder, split, status_state, viewed_model, viewed_who, viewed_working, workspace};
+pub(super) use panel::{archived_refusal, PANEL_TITLE, archived_warn, draw_panel, focus_model, key_mode, panel_mouse, placeholder, split, status_state, viewed_model, viewed_who, viewed_working, workspace};
 #[cfg(test)]
 pub(super) use panel::status_text;
 pub(crate) use panel::{demo_ready, fill_demo, prefill_demo, short_age, DEMO, DEMO_READY};

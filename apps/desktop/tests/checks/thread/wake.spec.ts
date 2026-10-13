@@ -1,8 +1,8 @@
 // thread/wake · event-wake in the window (designer's page event-wake, ambient-lead m_17770; hub
 // side wake-ui, TS bedb99c2). On the REAL screens (FakeCore): perf ran a command in the background
-// and waits for it, so it doesn't look idle: its right bar row says '…' in ink and '2 min' on the right;
-// its head a dim chip '… waiting for cargo bench · 2m' instead of 'idle'; its thread ends on the same
-// live line. Earlier watches' ends are the hub's wake lines: 'cargo test ended · rc 101 · after
+// and waits for it, so it doesn't look idle: its right bar row says '…' in ink and 'for 2 min' on the
+// right; its head a dim chip '… waiting for 2 min' instead of 'idle'; its thread ends on the line
+// 'waiting for 2 min · cargo bench' (desktop-status-line A: the state first, the note after). Earlier watches' ends are the hub's wake lines: 'cargo test ended · rc 101 · after
 // 3m10s' with only 'rc 101' in the error tone, '▸ its last 2 lines' folded (a click opens them),
 // 'rc 0' never red, '– stopped waiting for the reindex'. Never the accent, nothing in the inbox.
 // Light and dark at 1100, one frame each. Owner: amb-win.
@@ -80,14 +80,15 @@ test('thread/wake: an agent waiting for an event says what and how long; its wak
       // the sidebar: '…' in ink, its wait's age on the right, what it waits for on hover
       const row = page.getByTestId('app.right.agent.perf');
       await expect(row.locator('.app-rb-g')).toHaveText('…');
-      await expect(row.locator('.app-rb-end')).toHaveText('2 min');
-      await expect(row).toHaveAttribute('title', /^waiting for cargo bench · 2m · /u);
+      await expect(row.locator('.app-rb-end')).toHaveText('for 2 min');
+      await expect(row).toHaveAttribute('title', /^waiting for 2 min · cargo bench · /u);
       expect(await color('[data-testid="app.right.agent.perf"] .app-rb-g'), `${t}: '…' in ink`).toBe(await token('--c-text'));
       expect(await color('[data-testid="app.right.agent.perf"] .app-rb-g'), `${t}: never the accent`).not.toBe(accent);
-      // the head: a dim chip with what and how long, not 'idle'
-      await expect(page.getByTestId('thread.head.state')).toHaveText('… waiting for cargo bench · 2m');
-      // the thread's end: the same live line, dim
-      await expect(page.getByTestId('thread.waiting')).toHaveText('… waiting for cargo bench · 2m');
+      // the head: a dim chip, since when, not 'idle'
+      await expect(page.getByTestId('thread.head.state')).toHaveText('… waiting for 2 min');
+      // the thread's end: the state first, then what for, dim
+      await expect(page.getByTestId('thread.waiting')).toHaveText('waiting for 2 min · cargo bench');
+      await expect(page.getByTestId('thread.waiting')).toHaveAttribute('title', 'cargo bench · for 2 min');
       expect(await color('[data-testid="thread.waiting"]'), `${t}: the live line dim`).toBe(await token('--c-text-2'));
       // the wake lines: the hub's words, only a non-zero rc in the error tone
       await expect(page.getByTestId('thread.wake.3')).toContainText('cargo test ended · rc 101 · after 3m10s');
@@ -102,10 +103,12 @@ test('thread/wake: an agent waiting for an event says what and how long; its wak
       await page.waitForTimeout(200);
       await page.screenshot({ path: test.info().outputPath(`wake-${t}-1100.png`) });
     }
-    // designer m_17827: (1) the composer's label follows the head, never 'idle'; (2) a turn that
-    // opens on its work keeps a new turn's gap under a wake line; (3) a blank row over the live line
-    await expect(page.locator('[data-testid="composer"] .end')).toHaveText(/… waiting · 2m/u);
-    await expect(page.locator('[data-testid="composer"] .end')).not.toHaveText(/idle/u);
+    // designer m_17827: (1) the composer's label never says 'idle', nor the wait the line over it
+    // says already (desktop-status-line A); (2) a turn that opens on its work keeps a new turn's gap
+    // under a wake line; (3) a blank row over the live line
+    // (no model, effort or mode in this world: the label line is 'to perf' alone)
+    await expect(page.locator('[data-testid="composer"] .div')).toHaveText(/^to perf/u);
+    await expect(page.locator('[data-testid="composer"] .div')).not.toHaveText(/waiting|idle/u);
     const gaps = await page.evaluate(() => {
       const txt = (id: string) => {
         const el = document.querySelector(`[data-testid="${id}"]`);

@@ -7,7 +7,7 @@
 import type { Agent, ComputerAgent, ProjectRow } from '@/proto';
 import { MAIN, type Route } from './route';
 import { shortAge, shownName } from '@/agents/model';
-import { waitingFor, waitSince, waitsEvent } from '@/thread/wake';
+import { waitEnd, waitingLine, waitsEvent, waitWords } from '@/thread/wake';
 
 /** A sign's tone: ink (at work), accent (asks him), err (failed), dim (the rest). */
 export type Tone = 'ink' | 'acc' | 'err' | 'dim';
@@ -50,10 +50,11 @@ export function signOf(a: Agent, now: number, wake?: number): Sign {
   if (a.waiting_on?.who === 'agent') return { g: '⋯', tone: 'dim', end: 'waiting', endTone: 'dim', count: 0, title: `waiting on ${shownName(a.waiting_on.name)} · ${what}` };
   // event-wake (designer's page event-wake): it waits for an event, not idle: '…' in ink, how long
   // it waits on the right, what it waits for on hover; never the accent (it doesn't wait on him)
-  if (waitsEvent(a)) {
-    const since = waitSince(a.watching) ?? now;
-    // the end in the bar's one age form ('2 min', designer m_20272 (3)); the TUI's words on hover
-    return { g: '…', tone: 'ink', end: shortAge(now - since), endTone: 'dim', count: 0, title: `${waitingFor(a.watching, now) ?? 'waiting'} · ${what}` };
+  const line = waitsEvent(a) ? waitingLine(a.watching, now) : null;
+  if (line !== null) {
+    // the end in the status line's time words ('for 12 min', 'since 04:12', never a bare '14 h':
+    // desktop-status-line A), the line's words on hover
+    return { g: '…', tone: 'ink', end: waitEnd(line), endTone: 'dim', count: 0, title: `${waitWords(line)} · ${what}` };
   }
   switch (a.status) {
     case 'working':

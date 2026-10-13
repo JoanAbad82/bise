@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentWatch, WatchKind } from '@/proto';
-import { waitAge, waitingFor, waitsEvent, wakeLine, wakeTail, watchLabel } from './wake';
+import { waitAge, waitingFor, waitingLine, waitsEvent, waitWhen, wakeLine, wakeTail, watchLabel } from './wake';
+import WAIT_WORDS from '../../../../rust/proto/fixtures/wait_words.json';
 
 // bise-proto's own examples (rust/proto/src/thread/words.rs the_waiting_words_are_designers): the
 // window says the TUI's words
@@ -49,5 +50,18 @@ describe('event-wake words (designer page event-wake, words.rs)', () => {
     expect(wakeLine({ text: 'stopped waiting for npm run dev after 24h', wake: { id: 1, ev: 'expired', kind: 'bg', what: 'npm run dev', after_ms: 86_400_000 } }).mark).toBe('–');
     expect(wakeLine({ text: 'the reindex still running after 1h00m', wake: { id: 1, ev: 'still', kind: 'pid', what: 'the reindex', after_ms: 3_600_000 } }).mark).toBe('·');
     expect([wakeTail(0), wakeTail(1), wakeTail(3)]).toEqual([null, 'its last line', 'its last 3 lines']);
+  });
+
+  // desktop-status-line: the fixture words.rs reads too (wait_words_follow_the_fixture, architect m_22744)
+  it('wait_words.json: the when, each instant with its own offset, and the line', () => {
+    for (const c of WAIT_WORDS.when) {
+      expect(waitWhen(c.since_ms, c.since_off_s, c.now_ms, c.now_off_s, false), c.why).toBe(c.long);
+      expect(waitWhen(c.since_ms, c.since_off_s, c.now_ms, c.now_off_s, true), c.why).toBe(c.short);
+    }
+    for (const c of WAIT_WORDS.lines) {
+      const ws = c.watching.map((x) => w(x.id, x.kind as WatchKind, x.what, x.since_ms, x.noted));
+      expect(waitingLine(ws, c.now_ms, c.short, () => c.off_s), c.why).toEqual({ state: c.state, note: c.note, more: c.more, title: c.title });
+    }
+    expect(waitingLine([], 0)).toBeNull();
   });
 });

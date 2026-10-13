@@ -438,10 +438,10 @@ fn draw_feed(app: &mut App, frame: &mut Frame, area: Rect, bar: Option<Rect>) {
     let feed_w = (area.width as usize).saturating_sub(usize::from(bar.is_none())).max(1);
     let area_w = feed_w;
     // event-wake (designer's page): the agent in view waits for an event:
-    // one live dim line under its last row, `… waiting for cargo test ·
-    // 2m` (its own row, kept off the feed's rows), a blank row above it
-    // (designer m_17730)
-    let waiting = app.sb.waiting_words(crate::when::now_ms()).filter(|_| area.height > 3);
+    // one live dim line under its last row, `… waiting 2m · cargo test`
+    // (its own row, kept off the feed's rows), a blank row above it
+    // (designer m_17730); `… ` in the glyph column, the words after it
+    let waiting = app.sb.waiting_words(crate::when::now_ms(), (area.width as usize).saturating_sub(3)).filter(|_| area.height > 3);
     let area_h = (area.height as usize).saturating_sub(if waiting.is_some() { 2 } else { 0 });
     let text_area = Rect {
         x: area.x,

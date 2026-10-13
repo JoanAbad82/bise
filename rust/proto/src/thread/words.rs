@@ -558,7 +558,86 @@ pub fn waiting_for(watching: &[crate::rows::AgentWatch], now_ms: u64) -> Option<
         0 => String::new(),
         n => format!(" and {} more", n),
     };
+    // TODO(rule 7): goes once the sidebar row and the head chip read waiting_line (designer's
+    // desktop-status-line, architect m_22744); no third form meanwhile.
     Some(format!("waiting for {}{} · {}", watch_label(first.kind, &first.what, first.noted), more, wait_age(now_ms.saturating_sub(first.since_ms))))
+}
+
+const WEEKDAYS: [&str; 7] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const MONTHS: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/// How long, or since when, a wait runs (designer's desktop-status-line,
+/// architect m_22744): under an hour its length, `for 40 s`, `for 12 min`
+/// (`short`, the TUI's: `40s`, `12m`); from an hour on its start on the
+/// clock, `since 04:12` the same local day, `since mon 23:10` within 6
+/// days, `since oct 5 23:10` before. Each instant brings its own offset
+/// (seconds east of UTC), so a DST change between them never moves the
+/// day. A since after now (clock skew) is `for 0 s`, never negative.
+/// Its TS twin is apps/desktop/src/thread/wake.ts `waitWhen`; both read
+/// fixtures/wait_words.json.
+pub fn wait_when(since_ms: u64, since_off_s: i32, now_ms: u64, now_off_s: i32, short: bool) -> String {
+    let d = now_ms.saturating_sub(since_ms) / 1000;
+    if d < 60 {
+        return if short { format!("{}s", d) } else { format!("for {} s", d) };
+    }
+    if d < 3600 {
+        return if short { format!("{}m", d / 60) } else { format!("for {} min", d / 60) };
+    }
+    let local = |ms: u64, off: i32| (ms / 1000) as i64 + i64::from(off);
+    let (s, n) = (local(since_ms, since_off_s), local(now_ms, now_off_s));
+    let (sd, nd) = (s.div_euclid(86_400), n.div_euclid(86_400));
+    let hm = format!("{:02}:{:02}", s.rem_euclid(86_400) / 3600, s.rem_euclid(3600) / 60);
+    if sd == nd {
+        return format!("since {}", hm);
+    }
+    if nd - sd <= 6 {
+        // day 0 (1970-01-01) was a thursday
+        return format!("since {} {}", WEEKDAYS[(sd + 4).rem_euclid(7) as usize], hm);
+    }
+    let (_, m, day) = civil(sd);
+    format!("since {} {} {}", MONTHS[(m - 1) as usize], day, hm)
+}
+
+/// A day number (days since 1970-01-01) as its year, month (1-12) and day
+/// (Howard Hinnant's civil_from_days).
+fn civil(z: i64) -> (i64, i64, i64) {
+    let z = z + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    (yoe + era * 400 + i64::from(m <= 2), m, d)
+}
+
+/// The line of an agent that waits for events, in parts: its state, whole
+/// (`waiting since 04:12`, `waiting for 12 min`, the TUI's `waiting 12m`),
+/// then ` · ` and the oldest watch's note (the only part a surface cuts,
+/// on a word, with `…`), ` and 1 more` after it when there are several;
+/// the title lists every watch, oldest first (`<note> · <when>`, one a
+/// line). `off` gives each instant's offset (seconds east of UTC).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WaitLine {
+    pub state: String,
+    pub note: String,
+    pub more: String,
+    pub title: String,
+}
+
+pub fn waiting_line(watching: &[crate::rows::AgentWatch], now_ms: u64, off: &dyn Fn(u64) -> i32, short: bool) -> Option<WaitLine> {
+    let mut ws: Vec<&crate::rows::AgentWatch> = watching.iter().collect();
+    ws.sort_by_key(|w| (w.since_ms, w.id));
+    let first = ws.first()?;
+    let when = |w: &crate::rows::AgentWatch| wait_when(w.since_ms, off(w.since_ms), now_ms, off(now_ms), short);
+    let state = format!("waiting {}", when(first));
+    let more = match ws.len() - 1 {
+        0 => String::new(),
+        n => format!(" and {} more", n),
+    };
+    let title = ws.iter().map(|w| format!("{} · {}", watch_label(w.kind, &w.what, w.noted), when(w))).collect::<Vec<_>>().join("\n");
+    Some(WaitLine { state, note: watch_label(first.kind, &first.what, first.noted), more, title })
 }
 
 /// A wake entry's head, in parts (` · ` between them), each with whether
@@ -748,5 +827,29 @@ mod tests {
     fn one_line_and_the_summary() {
         assert_eq!(summary(&[]), "");
         assert_eq!(one_line("  \nabcdef", 4), "abc…");
+    }
+
+    /// desktop-status-line: the wait's words, read from the fixture the
+    /// desktop's TS twin (thread/wake.test.ts) reads too (architect m_22744).
+    #[test]
+    fn wait_words_follow_the_fixture() {
+        use super::*;
+        let fx: serde_json::Value = serde_json::from_str(include_str!("../../fixtures/wait_words.json")).unwrap();
+        let n = |v: &serde_json::Value, k: &str| v[k].as_u64().unwrap();
+        let o = |v: &serde_json::Value, k: &str| v[k].as_i64().unwrap() as i32;
+        for c in fx["when"].as_array().unwrap() {
+            for (short, key) in [(false, "long"), (true, "short")] {
+                let got = wait_when(n(c, "since_ms"), o(c, "since_off_s"), n(c, "now_ms"), o(c, "now_off_s"), short);
+                assert_eq!(got, c[key].as_str().unwrap(), "{} ({})", c["why"], key);
+            }
+        }
+        for c in fx["lines"].as_array().unwrap() {
+            let ws: Vec<crate::rows::AgentWatch> = serde_json::from_value(c["watching"].clone()).unwrap();
+            let off = o(c, "off_s");
+            let got = waiting_line(&ws, n(c, "now_ms"), &|_| off, c["short"].as_bool().unwrap()).unwrap();
+            let want = |k: &str| c[k].as_str().unwrap().to_string();
+            assert_eq!(got, WaitLine { state: want("state"), note: want("note"), more: want("more"), title: want("title") }, "{}", c["why"]);
+        }
+        assert_eq!(waiting_line(&[], 0, &|_| 0, false), None);
     }
 }

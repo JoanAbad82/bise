@@ -3,7 +3,7 @@
 // them. The words are the TUI's. Owner: amb-home.
 import type { Agent, EntryKind } from '@/proto';
 import { ago, shownName } from '@/agents/model';
-import { waitingFor, waitsEvent } from './wake';
+import { waitingLine, waitsEvent } from './wake';
 
 /** The state chip: '<breath> working · 14 min', 'starting', '? waiting for you' (accent). */
 export interface StateChip {
@@ -34,8 +34,9 @@ export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits' | 'wait
   // R9/S3: whom it waits on, the hub's own fact (the TUI's panel reads the same field)
   if (a.waits > 0 || a.waiting_on?.who === 'you') return { text: '? waiting for you', needs: true, live: false };
   if (a.waiting_on?.who === 'agent') return { text: `⋯ waiting on ${shownName(a.waiting_on.name)}`, needs: false, live: false };
-  // event-wake (designer's page): it waits for an event, a dim chip with what and how long, not 'idle'
-  if (waitsEvent(a) && a.watching !== undefined) return { text: `… ${waitingFor(a.watching, now) ?? 'waiting'}`, needs: false, live: false };
+  // event-wake (designer's page): it waits for an event, a dim chip, not 'idle'; since when in the
+  // status line's words ('… waiting since 04:12', desktop-status-line), what for in the line itself
+  if (waitsEvent(a) && a.watching !== undefined) return { text: `… ${waitingLine(a.watching, now)?.state ?? 'waiting'}`, needs: false, live: false };
   if (a.status === 'waiting' || a.status === 'blocked') return { text: '? waiting for you', needs: true, live: false };
   switch (a.status) {
     case 'working': {
@@ -101,21 +102,28 @@ export function workingRowShows(a: Agent | undefined): boolean {
  * approvals mode (yolo / auto), its state ('working · 4 min', 'idle'), its context ('42k · 17%',
  * the hub's words). Any part it doesn't know is left out. Pure.
  */
-export function dividerEnd(a: {
+type DividerWords = {
   model?: string | null;
   modelLabel?: string | null;
   effort?: string | null;
   mode?: string | null;
   status?: string | null;
   context?: string | null;
-}): string {
+};
+
+export function dividerEnd(a: DividerWords): string {
+  return dividerParts(a).join(' · ');
+}
+
+/** The divider's parts, in order: the label drops them whole, from the end (desktop-status-line A). */
+export function dividerParts(a: DividerWords): string[] {
   const model = (a.modelLabel ?? '').trim() || (a.model ?? '').split('/').at(-1)?.trim() || '';
   const mode = a.mode === 'yolo' || a.mode === 'auto' ? a.mode : '';
   // working is never in the label: the gust after 'to <agent>' is its one sign (desktop-working v2,
   // designer m_22403)
   const status = (a.status ?? '').trim();
   const state = status === 'working' ? '' : status;
-  return [model, (a.effort ?? '').trim(), mode, state, (a.context ?? '').trim()].filter((x) => x !== '').join(' · ');
+  return [model, (a.effort ?? '').trim(), mode, state, (a.context ?? '').trim()].filter((x) => x !== '');
 }
 
 

@@ -26,6 +26,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   busy,
   to,
   toEnd,
+  divider,
   placeholder,
   answer,
   onStop,
@@ -46,6 +47,9 @@ export const ThreadComposer = memo(function ThreadComposer({
   mark?: ReactNode;
   /** the label line's right: 'esc write a plain message' while it answers (designer v6 s-wait) */
   toEnd?: string | undefined;
+  /** else the divider's parts (model · effort · mode · …), '\u0000' between them: each shows whole
+   *  or drops whole from the end (desktop-status-line A, thread.css .th-end-parts) */
+  divider?: string | undefined;
   /** the field's words when empty (the composer's own 'write to …' when none) */
   placeholder: string | undefined;
   /** the open card his words answer (the inbox block's, any project's), else none */
@@ -70,8 +74,16 @@ export const ThreadComposer = memo(function ThreadComposer({
   // the TUI; for 3 s after a switch the label line's right says it (the TUI's key bar flash)
   const approvals = useApprovals(project);
   const flash = useApprovalsFlash(approvals) && approvals !== null ? flashWords(approvals.mode, approvals.checker, approvals.env) : null;
+  const parts =
+    divider === undefined || divider === '' ? undefined : (
+      <span className="th-end-parts">
+        {divider.split('\u0000').map((w, i) => (
+          <span key={i}>{i === 0 ? w : ` · ${w}`}</span>
+        ))}
+      </span>
+    );
   const end: ReactNode =
-    flash === null ? toEnd : (
+    flash === null ? (toEnd ?? parts) : (
       <span data-testid="composer.flash">
         <span className="flash-word">{flash.word}</span>
         {flash.rest}

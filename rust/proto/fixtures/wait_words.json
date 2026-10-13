@@ -1,0 +1,170 @@
+{
+ "about": "bise_proto::thread::words::wait_when and waiting_line, read by rust/proto (words_tests) and apps/desktop (thread/wake.test.ts) (architect m_22744)",
+ "when": [
+  {
+   "why": "40 s ago",
+   "since_ms": 1791791960000,
+   "since_off_s": 7200,
+   "now_ms": 1791792000000,
+   "now_off_s": 7200,
+   "long": "for 40 s",
+   "short": "40s"
+  },
+  {
+   "why": "12 min ago",
+   "since_ms": 1791791275000,
+   "since_off_s": 7200,
+   "now_ms": 1791792000000,
+   "now_off_s": 7200,
+   "long": "for 12 min",
+   "short": "12m"
+  },
+  {
+   "why": "59 min 59 s: still a duration",
+   "since_ms": 1791788401000,
+   "since_off_s": 7200,
+   "now_ms": 1791792000000,
+   "now_off_s": 7200,
+   "long": "for 59 min",
+   "short": "59m"
+  },
+  {
+   "why": "exactly 60 min: the clock",
+   "since_ms": 1791788400000,
+   "since_off_s": 7200,
+   "now_ms": 1791792000000,
+   "now_off_s": 7200,
+   "long": "since 09:00",
+   "short": "since 09:00"
+  },
+  {
+   "why": "the same local day",
+   "since_ms": 1791771120000,
+   "since_off_s": 7200,
+   "now_ms": 1791792000000,
+   "now_off_s": 7200,
+   "long": "since 04:12",
+   "short": "since 04:12"
+  },
+  {
+   "why": "local midnight: 00:00 is today",
+   "since_ms": 1791756000000,
+   "since_off_s": 7200,
+   "now_ms": 1791792000000,
+   "now_off_s": 7200,
+   "long": "since 00:00",
+   "short": "since 00:00"
+  },
+  {
+   "why": "23:59 is yesterday: its weekday",
+   "since_ms": 1791755940000,
+   "since_off_s": 7200,
+   "now_ms": 1791792000000,
+   "now_off_s": 7200,
+   "long": "since sun 23:59",
+   "short": "since sun 23:59"
+  },
+  {
+   "why": "6 days back: its weekday",
+   "since_ms": 1791321000000,
+   "since_off_s": 7200,
+   "now_ms": 1791792000000,
+   "now_off_s": 7200,
+   "long": "since tue 23:10",
+   "short": "since tue 23:10"
+  },
+  {
+   "why": "7 days back: its date",
+   "since_ms": 1791234600000,
+   "since_off_s": 7200,
+   "now_ms": 1791792000000,
+   "now_off_s": 7200,
+   "long": "since oct 5 23:10",
+   "short": "since oct 5 23:10"
+  },
+  {
+   "why": "a since in the future (clock skew): never negative",
+   "since_ms": 1791792005000,
+   "since_off_s": 7200,
+   "now_ms": 1791792000000,
+   "now_off_s": 7200,
+   "long": "for 0 s",
+   "short": "0s"
+  },
+  {
+   "why": "DST end: each instant its own offset, the same local day",
+   "since_ms": 1792881000000,
+   "since_off_s": 7200,
+   "now_ms": 1792965600000,
+   "now_off_s": 3600,
+   "long": "since 00:30",
+   "short": "since 00:30"
+  }
+ ],
+ "lines": [
+  {
+   "why": "one watch",
+   "now_ms": 1791792000000,
+   "off_s": 7200,
+   "short": false,
+   "watching": [
+    {
+     "id": 1,
+     "kind": "bg",
+     "what": "nightly full gate (all tests, main's tip)",
+     "noted": true,
+     "since_ms": 1791771120000
+    }
+   ],
+   "state": "waiting since 04:12",
+   "note": "nightly full gate (all tests, main's tip)",
+   "more": "",
+   "title": "nightly full gate (all tests, main's tip) · since 04:12"
+  },
+  {
+   "why": "two watches: the oldest, and 1 more; the title lists both",
+   "now_ms": 1791792000000,
+   "off_s": 7200,
+   "short": false,
+   "watching": [
+    {
+     "id": 2,
+     "kind": "bg",
+     "what": "cargo test",
+     "noted": false,
+     "since_ms": 1791791960000
+    },
+    {
+     "id": 1,
+     "kind": "file",
+     "what": "build.rc",
+     "noted": false,
+     "since_ms": 1791791280000
+    }
+   ],
+   "state": "waiting for 12 min",
+   "note": "build.rc to appear",
+   "more": " and 1 more",
+   "title": "build.rc to appear · for 12 min\ncargo test · for 40 s"
+  },
+  {
+   "why": "the TUI's short ages",
+   "now_ms": 1791792000000,
+   "off_s": 7200,
+   "short": true,
+   "watching": [
+    {
+     "id": 1,
+     "kind": "bg",
+     "what": "cargo bench",
+     "noted": false,
+     "since_ms": 1791791280000
+    }
+   ],
+   "state": "waiting 12m",
+   "note": "cargo bench",
+   "more": "",
+   "title": "cargo bench · 12m"
+  }
+ ]
+}

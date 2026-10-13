@@ -26,12 +26,12 @@ import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
 import { HubNoteRow, InboxBlock, type Answering } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
-import { AgentHead, BiseHead, StartingLine, WaitingLine } from './AgentHead';
+import { AgentHead, BiseHead, StartingLine } from './AgentHead';
+import { WaitingLine } from './WaitingLine';
 import { LabelMark } from './LabelMark';
 import { StepLine } from './live-step';
-import { composerWords, dividerEnd, emptyEnter, nothingOwnYet, usageLine, workingRowShows } from './head';
-import { waitAge, waitSince, waitsEvent } from './wake';
-import { useNow } from '@/app/clock';
+import { composerWords, dividerParts, emptyEnter, nothingOwnYet, usageLine, workingRowShows } from './head';
+import { waitsEvent } from './wake';
 import { SignInLine, useThreadSignIn } from './signin';
 import { type ThreadListHandle } from './ThreadList';
 import { ComputerLine } from './ComputerLine';
@@ -99,7 +99,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
   // S40/W3: the TUI's divider on the composer's label line: model · effort · approvals mode · state · context
   const approvals = useApprovals(project);
   const models = useModels(project);
-  const now = useNow();
   // voice mode on this agent: its pane takes the composer's place (amb-home's src/voicemode)
   const voice = useVoiceHere(project, agent);
   const typing = useTyping(tkey);
@@ -345,21 +344,24 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
     () => <LabelMark project={project} agent={markAgent} name={markName} starting={startingMark} />,
     [project, markAgent, markName, startingMark],
   );
-  const divider =
+  // each part whole or not at all, dropped from the end when the line is short (desktop-status-line
+  // A: never 'waitin'): ThreadComposer draws them (thread.css .th-end-parts); one string, so a new
+  // entry never draws the memoised composer again
+  const dividerKey =
     me === undefined
       ? ''
-      : dividerEnd({
+      : dividerParts({
           model: me.model,
           modelLabel: models.find((m) => m.id === me.model)?.label,
           effort: me.effort,
           mode: approvals?.mode,
-          // event-wake (designer m_17827): while it waits for an event the label follows the head
-          // ('… waiting · 2m'), never 'idle', the word he misread
-          status: rowSays ? null : waitsEvent(me) ? `… waiting · ${waitAge(now - (waitSince(me.watching) ?? now))}` : me.status,
+          // event-wake: while it waits for an event the line over the composer says it, never this
+          // row (desktop-status-line A: no double), and never 'idle', the word he misread
+          status: rowSays || waitsEvent(me) ? null : me.status,
           // named like the head's gauge ('context 42k · 17%'), none at 0% (designer m_14523: a bare
           // '15 · 0%' read as nothing)
           context: usageLine(me.usage?.words),
-        });
+        }).join('\u0000');
   // designer's desktop-screens v6 (1): '⋯' at the head's right (rename, model, reasoning)
   const more =
     me && !me.archived && !bise ? (
@@ -476,7 +478,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
             // 'to bise · the merge waits for 1 or 2' where his words stay a plain message, ambient m_8773);
             // voice mode while he types: 'to perf · voice paused', 'tab back to voice' (designer's voice-window (1))
             to={voice === 'typing' ? typingLabelOf(agent) : answering !== null ? answering.label : artifact !== undefined ? artifact.to : composerWords(title).label}
-            toEnd={voice === 'typing' ? TYPING_END : (answering?.end ?? (divider === '' ? undefined : divider))}
+            toEnd={voice === 'typing' ? TYPING_END : answering?.end}
+            divider={dividerKey}
             keys={voice === 'typing' ? VOICE_TYPING_KEYS : undefined}
             lead={voice === 'typing' ? <VoiceTypePearl /> : undefined}
             mark={labelMark}

@@ -1038,7 +1038,32 @@
 }
 /* event-wake's live line: a blank row above it, as the terminal leaves (designer m_17827 (3)) */
 .th-live.th-waiting {
+  display: flex;
+  min-width: 0;
   padding-top: var(--s-4);
+  overflow: hidden;
+  white-space: nowrap;
+}
+/* desktop-status-line A: the state whole in text-2, the note in text-3 (cut on a word in JS),
+   the digits mono */
+.th-wait-state,
+.th-wait-sep,
+.th-wait-more {
+  flex: none;
+  /* their edge spaces (' · ', ' and 1 more') are words, kept in a flex row */
+  white-space: pre;
+}
+.th-wait-sep,
+.th-wait-note,
+.th-wait-more {
+  color: var(--c-text-3);
+}
+.th-wait-note {
+  min-width: 0;
+}
+.th-wait-num {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
 }
 /* the hub's brief (designer): one dim row 'bise started gift-ui · <objective>', cut with …; open, the
    whole brief under a thin rail, dim, its markdown at reading size without big headings */
@@ -1090,6 +1115,18 @@
   color: var(--c-text-3);
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+/* the divider's parts (model · effort · mode · …) show whole or drop whole from the end
+   (desktop-status-line A): a part that doesn't fit wraps to a second line, clipped */
+.th-end-parts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  height: 1lh;
+  overflow: hidden;
+}
+.th-end-parts > span {
+  white-space: pre;
 }
 
 /* the composer about an open artifact (designer m_20435 (d)): 'to perf · about “…”' gives way,
