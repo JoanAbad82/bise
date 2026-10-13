@@ -34,6 +34,9 @@ interface Shell {
   alive: boolean;
 }
 
+// how long an open waits for the core's first projects rows (a slow ~/.zshrc delays the core)
+const ROWS_WAIT_MS = 30_000;
+
 function broadcast(channel: string, payload: unknown): void {
   for (const w of BrowserWindow.getAllWindows()) {
     if (!w.isDestroyed()) w.webContents.send(channel, payload);
@@ -44,6 +47,8 @@ export class TermHost {
   private readonly shells = new Map<string, Shell>();
   private readonly lastUse = new Map<string, number>();
   private rows: readonly unknown[] = [];
+  /** the opens that came before the core's first projects rows (ambient-lead m_21602) */
+  private early: (() => void)[] | null = [];
   private readonly batch = new Batcher((id, bytes) => {
     broadcast(IPC.termData, { id, bytes });
   });
@@ -57,11 +62,33 @@ export class TermHost {
   /** The core's projects rows: where each project's shell runs. */
   setRows(rows: readonly unknown[]): void {
     this.rows = rows;
+    const early = this.early;
+    this.early = null;
+    for (const go of early ?? []) go();
+  }
+
+  /**
+   * The rows to read: at launch the window can name its project (its kept route, the panel kept
+   * open) before the core, which waits for his login env, said its first projects: such an open
+   * waits for them (at most ROWS_WAIT_MS), never answers 'no folder' from rows not there yet.
+   */
+  private async rowsNow(): Promise<readonly unknown[]> {
+    const early = this.early;
+    if (early !== null) {
+      await new Promise<void>((done) => {
+        const t = setTimeout(done, ROWS_WAIT_MS);
+        early.push(() => {
+          clearTimeout(t);
+          done();
+        });
+      });
+    }
+    return this.rows;
   }
 
   /** The project's live shell (with its screen), else a new one; an error line when it can't. */
   async open(project: unknown, cols: unknown, rows: unknown): Promise<TermOpened> {
-    const folder = folderOf(project, this.rows);
+    const folder = folderOf(project, await this.rowsNow());
     if (folder === null || typeof project !== 'string') return { error: 'no folder for this project' };
     const size = clampSize(cols, rows) ?? { cols: 80, rows: 24 };
     const id = project;
