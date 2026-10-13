@@ -111,9 +111,14 @@ core_kinds! {
         RoutePick = "route_pick" => IRoutePick { rid: Nat, to: Str, name: Str, why: Str },
         /// S10: follow a task
         Follow = "follow" => IFollow { agent: Str, on: Bool },
-        /// `sb wake`: `spec` is the watch's spec as the hub wrote it
-        WakeSet = "wake_set" => IWakeSet { agent: Str, spec: Json, max_text: Str, max_ms: Nat, quiet: Bool },
-        WakeStop = "wake_stop" => IWakeStop { id: Nat, why: Str },
+        /// `sb wake`: `spec` is the watch's spec as the hub wrote it;
+        /// `then`: `--then` (Some true: a pause, the agent resumes its
+        /// work at the end) or `--alarm` (Some false); none: sb-core's
+        /// default by the spec's kind (wakes.bend `resumes_of`)
+        WakeSet = "wake_set" => IWakeSet { agent: Str, spec: Json, max_text: Str, max_ms: Nat, quiet: Bool, then: OptBoolOmit },
+        /// `tell`: his stop's words for the watch's agent (one message
+        /// from bise); none: the agent's own `sb wake --stop`
+        WakeStop = "wake_stop" => IWakeStop { id: Nat, why: Str, tell: StrOmit },
         WakeHit = "wake_hit" => IWakeHit { id: Nat, text: Str },
         /// cost-pause: his pause and resume of the whole project
         /// (hub/pause.bend; the client socket only)

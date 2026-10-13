@@ -266,8 +266,8 @@ pub enum WakeReq {
     Stop(u64),
     /// `--stop bg/<n>`: the watch of the caller's background command n
     StopBg(String),
-    /// one watch, its max (ms)
-    Add { spec: crate::wake::Spec, max_ms: u64 },
+    /// one watch, its max (ms), `then`: --then / --alarm (none: by kind)
+    Add { spec: crate::wake::Spec, max_ms: u64, then: Option<bool> },
 }
 
 /// `m_12` or `12`.
@@ -456,10 +456,7 @@ impl AgentReq {
                 "" | "list" => WakeReq::List,
                 "stop" if v["bg"].is_string() => WakeReq::StopBg(jstr(v, "bg")),
                 "stop" => WakeReq::Stop(v["id"].as_u64().ok_or("usage: sb wake --stop <id|bg/<n>>")?),
-                "add" => WakeReq::Add {
-                    spec: crate::wake::Spec::from_json(&v["spec"]).ok_or("sb wake: --on-exit, --on-file or --on-job")?,
-                    max_ms: v["max_ms"].as_u64().unwrap_or(crate::wake::MAX_DEFAULT_MS).min(crate::wake::MAX_MOST_MS),
-                },
+                "add" => WakeReq::add(v)?,
                 other => return Err(format!("sb wake: unknown step {}", other)),
             }),
             "every" => AgentReq::Every(match jstr(v, "step").as_str() {
@@ -572,6 +569,8 @@ pub enum Input {
     EveryRun {
         id: u64,
     },
+    /// event-wake: the user stopped watch `id` (the window's wake_stop)
+    WakeStop { id: u64 },
     /// event-wake: the look (daemon/wakes.rs) saw watch `id`'s event;
     /// `text` is the wake (wake.rs `hit_text`); `rc`, `tail` (clipped
     /// once, wake.rs `tail_clip`) and `after_ms` the same facts, typed,
@@ -2212,6 +2211,7 @@ impl Hub {
             Input::Tick => self.core(&mut fx, env, None, In::Tick(ci::Tick {})),
             Input::EveryStop { id, why } => self.timer_stop_by_user(&mut fx, env, id, &why),
             Input::EveryRun { id } => self.timer_run_now(&mut fx, env, id),
+            Input::WakeStop { id } => self.wake_stop_by_him(&mut fx, env, id),
             Input::WakeHit { id, text, rc, tail, after_ms } => self.wake_hit(&mut fx, env, id, &text, crate::wake::Hit { rc, tail, after_ms }),
             Input::ConfirmOpen { agent, text } => self.core(&mut fx, env, None, In::ConfirmOpen(ci::ConfirmOpen { agent, text })),
             Input::ConfirmClose { card, res } => self.core(&mut fx, env, None, In::ConfirmClose(ci::ConfirmClose { card, res })),

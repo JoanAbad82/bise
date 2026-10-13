@@ -83,6 +83,7 @@ pub const METHODS: &[MethodRow] = &[
     m("prs/list", "prs", Some("prs")),
     m("scheduled/list", "scheduled", Some("scheduled")),
     m("scheduled/stop", "scheduled_stop", None),
+    m("wake/stop", "wake_stop", None),
     m("models/list", "models", Some("models")),
     m("route/correct", "route_correct", None),
     m("route/cancel", "route_cancel", None),

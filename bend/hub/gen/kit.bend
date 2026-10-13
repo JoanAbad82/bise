@@ -37,6 +37,13 @@ def opt_n(m: Maybe<&2, J.Json>) -> Maybe<&2, Nat>:
     case _:
       None{}
 
+def opt_b(m: Maybe<&2, J.Json>) -> Maybe<&2, Bool>:
+  match m:
+    case Some{J.JBool{+b}}:
+      Some{b}
+    case _:
+      None{}
+
 def arr(m: Maybe<&2, J.Json>) -> List<&2, J.Json>:
   match m:
     case Some{J.JArr{+vals}}:
@@ -157,6 +164,13 @@ def omit_mn(+k: String, m: Maybe<&2, Nat>) -> List<&2, Sigma<&2, &2, String, _ =
       Nil{}
     case Some{+n}:
       [J.kv(k, J.JNum{n})]
+
+def omit_mb(+k: String, m: Maybe<&2, Bool>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match m:
+    case None{}:
+      Nil{}
+    case Some{+b}:
+      [J.kv(k, J.JBool{b})]
 
 def omit_mss(+k: String, m: Maybe<&2, List<&2, String>>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   match m:

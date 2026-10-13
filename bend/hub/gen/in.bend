@@ -103,9 +103,9 @@ type In is Data:
   # follow
   IFollow{agent: String, on: Bool}
   # wake_set
-  IWakeSet{agent: String, spec: J.Json, max_text: String, max_ms: Nat, quiet: Bool}
+  IWakeSet{agent: String, spec: J.Json, max_text: String, max_ms: Nat, quiet: Bool, then: Maybe<&2, Bool>}
   # wake_stop
-  IWakeStop{id: Nat, why: String}
+  IWakeStop{id: Nat, why: String, tell: String}
   # wake_hit
   IWakeHit{id: Nat, text: String}
   # pause
@@ -266,10 +266,10 @@ def IFollow.of(+i: J.Json) -> In:
   IFollow{K.get_s(i, "agent"), K.get_b(i, "on")}
 
 def IWakeSet.of(+i: J.Json) -> In:
-  IWakeSet{K.get_s(i, "agent"), K.get_j(i, "spec"), K.get_s(i, "max_text"), K.get_n(i, "max_ms"), K.get_b(i, "quiet")}
+  IWakeSet{K.get_s(i, "agent"), K.get_j(i, "spec"), K.get_s(i, "max_text"), K.get_n(i, "max_ms"), K.get_b(i, "quiet"), K.opt_b(J.get(i, "then"))}
 
 def IWakeStop.of(+i: J.Json) -> In:
-  IWakeStop{K.get_n(i, "id"), K.get_s(i, "why")}
+  IWakeStop{K.get_n(i, "id"), K.get_s(i, "why"), K.get_s(i, "tell")}
 
 def IWakeHit.of(+i: J.Json) -> In:
   IWakeHit{K.get_n(i, "id"), K.get_s(i, "text")}
@@ -864,10 +864,10 @@ def kvs(x: In) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("t", J.JStr{"route_pick"}), J.kv("rid", J.JNum{rid}), J.kv("to", J.JStr{to}), J.kv("name", J.JStr{name}), J.kv("why", J.JStr{why})]
     case IFollow{+agent, +on}:
       [J.kv("t", J.JStr{"follow"}), J.kv("agent", J.JStr{agent}), J.kv("on", J.JBool{on})]
-    case IWakeSet{+agent, +spec, +max_text, +max_ms, +quiet}:
-      [J.kv("t", J.JStr{"wake_set"}), J.kv("agent", J.JStr{agent}), J.kv("spec", spec), J.kv("max_text", J.JStr{max_text}), J.kv("max_ms", J.JNum{max_ms}), J.kv("quiet", J.JBool{quiet})]
-    case IWakeStop{+id, +why}:
-      [J.kv("t", J.JStr{"wake_stop"}), J.kv("id", J.JNum{id}), J.kv("why", J.JStr{why})]
+    case IWakeSet{+agent, +spec, +max_text, +max_ms, +quiet, +then}:
+      K.cat([[J.kv("t", J.JStr{"wake_set"}), J.kv("agent", J.JStr{agent}), J.kv("spec", spec), J.kv("max_text", J.JStr{max_text}), J.kv("max_ms", J.JNum{max_ms}), J.kv("quiet", J.JBool{quiet})], K.omit_mb("then", then)])
+    case IWakeStop{+id, +why, +tell}:
+      K.cat([[J.kv("t", J.JStr{"wake_stop"}), J.kv("id", J.JNum{id}), J.kv("why", J.JStr{why})], K.omit_s("tell", tell)])
     case IWakeHit{+id, +text}:
       [J.kv("t", J.JStr{"wake_hit"}), J.kv("id", J.JNum{id}), J.kv("text", J.JStr{text})]
     case IPause{}:

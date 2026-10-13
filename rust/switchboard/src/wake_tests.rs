@@ -141,12 +141,22 @@ fn the_wake_says_what_ended_its_rc_and_its_last_lines() {
     let j = Spec { what: What::Job { label: "dev.x".into() }, tail: Some("/t/lo".into()), note: String::new() };
     assert_eq!(hit_text(&j, Some("0"), Some("ok\n"), 723_000), "launchd job dev.x ended · rc 0 · after 12m03s\nits last line (/t/lo):\nok");
     assert_eq!(
-        max_text(&p, 3_600_000),
+        max_text(&p, 3_600_000, None),
         "pid 42 still running · after 1h00m · the build\nthis watch stopped at its --max (1h). to keep waiting: sb wake --on-exit 42 --note 'the build'"
     );
     let g = Spec { what: What::File { path: "/a b/rc".into() }, tail: Some("/t/log".into()), note: String::new() };
-    assert_eq!(again(&g, 90 * 60_000), "sb wake --on-file '/a b/rc' --tail /t/log --max 1h30m");
-    assert_eq!(set_text(4, &p, 3_600_000), "watch #4 set: you'll be woken when pid 42 ends (at most 1h00m; sb wake --stop 4)");
+    assert_eq!(again(&g, 90 * 60_000, None), "sb wake --on-file '/a b/rc' --tail /t/log --max 1h30m");
+    // the agent's --then / --alarm is said again; none: sb-core's default
+    assert_eq!(again(&g, 90 * 60_000, Some(true)), "sb wake --on-file '/a b/rc' --tail /t/log --then --max 1h30m");
+    assert_eq!(again(&p, MAX_DEFAULT_MS, Some(false)), "sb wake --on-exit 42 --note 'the build' --alarm");
+    assert_eq!(
+        set_text(4, &p, 3_600_000, true),
+        "watch #4 set, a pause: you continue your work when it ends · you'll be woken when pid 42 ends (at most 1h00m; sb wake --stop 4)"
+    );
+    assert_eq!(
+        set_text(5, &f, 3_600_000, false),
+        "watch #5 set, an alarm: you're free until it fires · you'll be woken when /t/rc ends (at most 1h00m; sb wake --stop 5)"
+    );
 }
 
 #[test]

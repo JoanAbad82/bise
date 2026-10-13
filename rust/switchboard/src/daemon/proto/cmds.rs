@@ -339,6 +339,14 @@ impl Shell {
                 }
                 self.step_typed(id, &tag, Input::EveryStop { id: timer, why: String::new() });
             }
+            // his stop of a watch (an alarm's 'stop watching'): its line
+            // says `stopped`, its agent hears it once (core_wake.rs)
+            HubCmd::WakeStop { id: watch, .. } => {
+                if !self.hub.wakes().live.contains_key(&watch) {
+                    return self.proto_error(id, &tag, &format!("no watch #{watch} (it ended)"));
+                }
+                self.step_typed(id, &tag, Input::WakeStop { id: watch });
+            }
             // his run now, the TUI's /scheduled r
             HubCmd::ScheduledRun { id: timer, .. } => {
                 if !self.hub.timers().map.contains_key(&timer) {

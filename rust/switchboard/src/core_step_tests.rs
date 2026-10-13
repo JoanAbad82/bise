@@ -1,7 +1,7 @@
 //! A step's answer, applied (core_link.rs's apply_step): its effects run
 //! whatever its view, and his message's id (A1) comes back typed; his card
-//! answer's route lines (inbox picks). Out of core_tests.rs (its line
-//! limit).
+//! answer's route lines (inbox picks); a watch's pause or alarm on the
+//! agents row and his stop of it. Out of core_tests.rs (its line limit).
 
 use super::*;
 
@@ -96,4 +96,57 @@ fn an_answer_by_number_names_its_option_in_both_feeds() {
     let fx = t.go(Input::UserCmd { client: 1, focus: MAIN.into(), cmd: UserCmd::Answer { card: card3, text: "1".into(), parts: String::new() } });
     let rs: Vec<Value> = recs(&fx, MAIN).into_iter().filter(|r| r["sb"] == "route").collect();
     assert_eq!(rs, vec![json!({"sb": "route", "who": MAIN, "card": card3, "said": "1", "pick_n": 1, "pick": "merge"})], "{fx:?}");
+}
+
+/// agent-waiting-states (pick A, architect m_22919): sb-core says whether
+/// a watch is a pause or an alarm; a backgrounded command and a pid are
+/// pauses, a file an alarm, `--then` / `--alarm` win; the agents row
+/// carries it with the watch's end; his stop (the window's wake_stop)
+/// ends it with one `stopped` line; a watch never moves the agent's
+/// status.
+#[test]
+fn a_watch_is_a_pause_or_an_alarm_on_the_agents_row() {
+    use crate::wake::{Spec, What, MAX_DEFAULT_MS};
+    let mut t = T::new();
+    t.spawn_task("perf");
+    t.go(Input::ReplIdle { agent: "perf".into(), leftover: false });
+    let row = |t: &mut T| t.hub.snapshot(t.env.now)["agents"].as_array().unwrap().iter().find(|a| a["name"] == "perf").unwrap().clone();
+    let spec = |what| Spec { what, tail: None, note: String::new() };
+    let file = || spec(What::File { path: "/t/build.rc".into() });
+    let add = |t: &mut T, s: Spec, then| t.req("perf", AgentReq::Wake(WakeReq::Add { spec: s, max_ms: MAX_DEFAULT_MS, then })).1;
+    let status = row(&mut t)["status"].clone();
+    add(&mut t, spec(What::Pid { pid: 4242, start: String::new() }), None);
+    add(&mut t, file(), None);
+    add(&mut t, file(), Some(true));
+    add(&mut t, spec(What::Pid { pid: 4243, start: String::new() }), Some(false));
+    let r = row(&mut t);
+    let ws: Vec<bise_proto::rows::AgentWatch> = serde_json::from_value(r["watching"].clone()).unwrap();
+    assert_eq!(ws.iter().map(|w| w.resumes).collect::<Vec<_>>(), [true, false, true, false], "{r}");
+    assert!(ws.iter().all(|w| w.until_ms == Some(w.since_ms + MAX_DEFAULT_MS)), "{r}");
+    assert_eq!(r["status"], status, "a watch never moves the agent's status");
+    // its journal line keeps it: a replay reads the same
+    let mut h = Hub::new("/w");
+    assert!(h.replay(&t.journal.borrow().clone()).is_empty());
+    assert_eq!(h.wakes().live.values().map(|w| w.resumes).collect::<Vec<_>>(), [true, false, true, false]);
+    // a line from before the field: its kind's default
+    let old = json!({"type": "wake_set", "watch": {"id": 1, "agent": "perf", "spec": {"kind": "bg", "slot": "/b/3", "cmd": "x"}, "max_text": "", "set_at": 1, "max_at": 2, "quiet": true}});
+    let mut h = Hub::new("/w");
+    let mut evs = t.journal.borrow().iter().take_while(|j| j["type"] != "wake_set").cloned().collect::<Vec<_>>();
+    evs.push(old);
+    h.replay(&evs);
+    assert_eq!(h.wakes().live.get(&1).map(|w| w.resumes), Some(true));
+    // his stop: one `stopped` line in perf's thread, and perf hears it
+    // once from bise
+    let fx = t.go(Input::WakeStop { id: ws[1].id });
+    let ls: Vec<_> = lines_of(&fx, "perf").into_iter().filter(|l| l.starts_with("sb wake :: ")).collect();
+    assert!(ls.len() == 1 && ls[0].contains("\"ev\":\"stopped\""), "{fx:?}");
+    let told: Vec<_> = fx.iter().filter_map(|e| match e {
+        Effect::Journal(j) if j["type"] == "message_sent" && j["msg"]["to"] == "perf" => j["msg"]["text"].as_str(),
+        _ => None,
+    }).collect();
+    assert_eq!(told, [format!("the user stopped watch #{} (build.rc): it won't wake you", ws[1].id)], "{fx:?}");
+    // the agent's own stop tells it nothing
+    let (_, fx) = t.req("perf", AgentReq::Wake(WakeReq::Stop(ws[2].id)));
+    assert!(!fx.iter().any(|e| matches!(e, Effect::Journal(j) if j["type"] == "message_sent")), "{fx:?}");
+    assert_eq!(row(&mut t)["watching"].as_array().unwrap().len(), 2);
 }

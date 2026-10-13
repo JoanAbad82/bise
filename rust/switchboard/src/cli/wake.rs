@@ -2,12 +2,13 @@
 //! effects that belong to the caller happen here: a relative path is made
 //! absolute (the hub runs elsewhere), a pid's start time is read (a later
 //! process with the same pid is not it), and a pid or a launchd job that
-//! is not there is refused at once.
+//! is not there is refused at once. `--then` (a pause) and `--alarm`
+//! go as the request's `then`; neither: sb-core's default by kind.
 
 use super::*;
 use crate::wake::{Spec, What};
 
-pub(super) const WAKE_USAGE: &str = "usage: sb wake --on-exit <pid> | --on-file <path> | --on-job <launchd label> [--tail <file>] [--note \"<words>\"] [--max 1h] | sb wake | sb wake --stop <id|bg/<n>>";
+pub(super) const WAKE_USAGE: &str = "usage: sb wake --on-exit <pid> | --on-file <path> | --on-job <launchd label> [--then | --alarm] [--tail <file>] [--note \"<words>\"] [--max 1h] | sb wake | sb wake --stop <id|bg/<n>>";
 
 fn absolute(p: &str) -> String {
     let path = std::path::Path::new(p);
@@ -18,7 +19,7 @@ fn absolute(p: &str) -> String {
 }
 
 pub(super) fn wake_req(rest: &[String], req: &mut Map<String, Value>) -> Result<(), String> {
-    let (pos, o) = parse_args(rest, &["on-exit", "on-file", "on-job", "tail", "note", "max", "stop"], &[])?;
+    let (pos, o) = parse_args(rest, &["on-exit", "on-file", "on-job", "tail", "note", "max", "stop"], &["then", "alarm"])?;
     if o.contains_key("stop") {
         // `#3` or `3`: a watch; `bg/3`: the watch of background command 3
         let which = str_of(&o, "stop");
@@ -62,6 +63,18 @@ pub(super) fn wake_req(rest: &[String], req: &mut Map<String, Value>) -> Result<
     let spec = Spec { what, tail, note: str_of(&o, "note").trim().to_string() };
     req.insert("step".into(), json!("add"));
     req.insert("spec".into(), spec.json());
+    // a pause (the agent continues its work at the end) or an alarm;
+    // neither: sb-core's default by kind (a pid: pause; file, job: alarm)
+    match (o.contains_key("then"), o.contains_key("alarm")) {
+        (true, true) => return Err("sb wake: --then or --alarm, not both".into()),
+        (true, false) => {
+            req.insert("then".into(), json!(true));
+        }
+        (false, true) => {
+            req.insert("then".into(), json!(false));
+        }
+        (false, false) => {}
+    }
     let max = str_of(&o, "max");
     if !max.is_empty() {
         let ms = crate::every::parse_dur(&max)?;

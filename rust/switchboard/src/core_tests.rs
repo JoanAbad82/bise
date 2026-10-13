@@ -4625,7 +4625,7 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     let watching = |t: &mut T| t.hub.snapshot(t.env.now)["agents"].as_array().unwrap().iter().find(|a| a["name"] == "perf").unwrap()["watching"].clone();
     assert_eq!(watching(&mut t), json!([]));
     let spec = crate::wake::Spec { what: crate::wake::What::Pid { pid: 4242, start: String::new() }, tail: None, note: "the build".into() };
-    let (tok, _) = t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.clone(), max_ms: crate::wake::MAX_DEFAULT_MS }));
+    let (tok, _) = t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.clone(), max_ms: crate::wake::MAX_DEFAULT_MS, then: None }));
     let _ = tok;
     let w = watching(&mut t);
     assert_eq!((w[0]["what"].as_str(), w[0]["kind"].as_str()), (Some("the build"), Some("pid")), "{w}");
@@ -4647,7 +4647,7 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     assert_eq!(m, bise_proto::thread::WakeFold { agent: "perf".into(), ..l });
     assert_eq!(watching(&mut t), json!([]), "the hit ends it: the row moves");
     // a stop: one line, no message
-    t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.clone(), max_ms: crate::wake::MAX_DEFAULT_MS }));
+    t.req("perf", AgentReq::Wake(WakeReq::Add { spec: spec.clone(), max_ms: crate::wake::MAX_DEFAULT_MS, then: None }));
     let id = watching(&mut t)[0]["id"].as_u64().unwrap();
     let (_, fx) = t.req("perf", AgentReq::Wake(WakeReq::Stop(id)));
     let ls = wakes(&fx);
@@ -4662,7 +4662,7 @@ fn a_watch_end_is_one_wake_line_and_its_row_moves() {
     // an archived agent's watch ends 'gone': no line (the wake started a
     // turn: it ends first, so the drop needs no card)
     t.go(Input::ReplIdle { agent: "perf".into(), leftover: false });
-    t.req("perf", AgentReq::Wake(WakeReq::Add { spec, max_ms: crate::wake::MAX_DEFAULT_MS }));
+    t.req("perf", AgentReq::Wake(WakeReq::Add { spec, max_ms: crate::wake::MAX_DEFAULT_MS, then: None }));
     let (_, fx) = t.req(MAIN, AgentReq::Drop { agent: "perf".into() });
     assert!(fx.iter().any(|e| matches!(e, Effect::Journal(j) if j["type"] == "wake_end" && j["why"] == "gone")), "{fx:?}");
     assert!(wakes(&fx).is_empty(), "{fx:?}");

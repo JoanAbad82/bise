@@ -650,6 +650,11 @@ pub enum HubCmd {
     /// agent hears it, its line says `stopped by you`); an unknown or
     /// ended id is an `error`
     ScheduledStop { project: Project, id: u64 },
+    /// stop watch `id` (his, like `sb wake --stop` by its agent: the
+    /// TUI's /scheduled x, the desktop's 'stop watching' on an alarm):
+    /// its agent's thread says `stopped waiting for …`; an unknown or
+    /// ended id is an `error`
+    WakeStop { project: Project, id: u64 },
     /// the model picker opened: `models` comes again (after a login made
     /// elsewhere, the keys are read again)
     Models { project: Project },
@@ -794,7 +799,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "scheduled", "scheduled_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -841,6 +846,7 @@ impl HubCmd {
             | HubCmd::Pause { project }
             | HubCmd::Resume { project }
             | HubCmd::ScheduledStop { project, .. }
+            | HubCmd::WakeStop { project, .. }
             | HubCmd::Models { project }
             | HubCmd::New { project, .. }
             | HubCmd::Rename { project, .. }

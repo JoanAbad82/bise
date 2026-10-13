@@ -9,20 +9,35 @@
 use super::*;
 use crate::wake::{self, Spec};
 
+impl WakeReq {
+    /// `sb wake`'s `add` request: the spec, the max (at most a day), the
+    /// agent's `--then` / `--alarm` (none: sb-core's default by kind).
+    pub fn add(v: &Value) -> Result<WakeReq, String> {
+        Ok(WakeReq::Add {
+            spec: Spec::from_json(&v["spec"]).ok_or("sb wake: --on-exit, --on-file or --on-job")?,
+            max_ms: v["max_ms"].as_u64().unwrap_or(wake::MAX_DEFAULT_MS).min(wake::MAX_MOST_MS),
+            then: v["then"].as_bool(),
+        })
+    }
+}
+
 impl Hub {
     pub fn wakes(&self) -> &wake::Wakes {
         &self.st.wakes
     }
 
-    /// One watch for `agent`; its id (sb-core's `wake_set` journal line),
-    /// or None when sb-core set none (no such active agent).
-    fn wake_set(&mut self, fx: &mut Fx, env: &mut dyn Env, agent: &str, spec: &Spec, max_ms: u64, quiet: bool) -> Option<u64> {
-        let max_text = if quiet { String::new() } else { wake::max_text(spec, max_ms) };
+    /// One watch for `agent` (`then`: `--then` / `--alarm`, none: sb-core's
+    /// default by kind; a bash command's is quiet: its max ends it without
+    /// a wake); its id and whether sb-core made it a pause (its `wake_set`
+    /// journal line), or None when sb-core set none (no such active agent).
+    fn wake_set(&mut self, fx: &mut Fx, env: &mut dyn Env, agent: &str, spec: &Spec, max_ms: u64, then: Option<bool>) -> Option<(u64, bool)> {
+        let quiet = matches!(spec.what, wake::What::Bg { .. });
+        let max_text = if quiet { String::new() } else { wake::max_text(spec, max_ms, then) };
         let k = fx.len();
-        let set = ci::WakeSet { agent: agent.into(), spec: spec.json(), max_text, max_ms, quiet };
+        let set = ci::WakeSet { agent: agent.into(), spec: spec.json(), max_text, max_ms, quiet, then };
         self.core(fx, env, None, In::WakeSet(set));
         fx[k..].iter().find_map(|e| match e {
-            Effect::Journal(j) if j["type"] == "wake_set" => j["watch"]["id"].as_u64(),
+            Effect::Journal(j) if j["type"] == "wake_set" => Some((j["watch"]["id"].as_u64()?, j["watch"]["resumes"].as_bool().unwrap_or(false))),
             _ => None,
         })
     }
@@ -42,11 +57,11 @@ impl Hub {
                 if self.st.wakes.live.get(&id).is_none_or(|w| w.agent != by) {
                     return json!({"ok": false, "error": format!("no watch #{} of yours (`sb wake` lists them)", id)});
                 }
-                self.core(fx, env, None, In::WakeStop(ci::WakeStop { id, why: format!("stopped by {}", by) }));
+                self.core(fx, env, None, In::WakeStop(ci::WakeStop { id, why: format!("stopped by {}", by), tell: String::new() }));
                 json!({"ok": true, "text": format!("watch #{} stopped", id)})
             }
-            WakeReq::Add { spec, max_ms } => match self.wake_set(fx, env, &by, &spec, max_ms, false) {
-                Some(id) => json!({"ok": true, "id": id, "text": wake::set_text(id, &spec, max_ms)}),
+            WakeReq::Add { spec, max_ms, then } => match self.wake_set(fx, env, &by, &spec, max_ms, then) {
+                Some((id, resumes)) => json!({"ok": true, "id": id, "text": wake::set_text(id, &spec, max_ms, resumes)}),
                 None => json!({"ok": false, "error": format!("sb wake: @{} is not active", by)}),
             },
         }
@@ -54,7 +69,8 @@ impl Hub {
 
     /// The bash tool handed a command off to the background (its wire
     /// line `bg_handoff : {"slot", "cmd"}`): a quiet watch on its slot,
-    /// default on (`sb wake --stop <id>` to not be woken).
+    /// default on (`sb wake --stop <id>` to not be woken), a pause by
+    /// sb-core's default for its kind.
     pub(super) fn bg_handoff(&mut self, fx: &mut Fx, env: &mut dyn Env, agent: &str, args: &str) {
         let Ok(v) = serde_json::from_str::<Value>(args) else { return };
         let slot = v["slot"].as_str().unwrap_or_default();
@@ -62,7 +78,15 @@ impl Hub {
             return;
         }
         let spec = Spec::bg(slot, v["cmd"].as_str().unwrap_or_default());
-        self.wake_set(fx, env, agent, &spec, wake::BG_MAX_MS, true);
+        self.wake_set(fx, env, agent, &spec, wake::BG_MAX_MS, None);
+    }
+
+    /// His stop of watch `id` (the window's wake_stop): it ends and its
+    /// agent hears it once from bise (sb-core's `stop_tells`), the words
+    /// bise-proto's.
+    pub(super) fn wake_stop_by_him(&mut self, fx: &mut Fx, env: &mut dyn Env, id: u64) {
+        let tell = self.st.wakes.live.get(&id).map(|w| bise_proto::thread::words::watch_stopped(id, &w.spec.name())).unwrap_or_default();
+        self.core(fx, env, None, In::WakeStop(ci::WakeStop { id, why: "stopped by the user".into(), tell }));
     }
 
     /// The look saw watch `id`'s event (daemon/wakes.rs): sb-core ends it

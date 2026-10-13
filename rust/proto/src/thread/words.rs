@@ -641,6 +641,13 @@ pub fn waiting_line(watching: &[crate::rows::AgentWatch], now_ms: u64, off: &dyn
     Some(WaitLine { state, note: watch_label(first.kind, &first.what, first.noted), more, title })
 }
 
+/// What bise tells an agent when the user stopped its watch (the
+/// window's `wake_stop`): `the user stopped watch #3 (cargo test): it
+/// won't wake you`.
+pub fn watch_stopped(id: u64, what: &str) -> String {
+    format!("the user stopped watch #{id} ({what}): it won't wake you")
+}
+
 /// A wake entry's head, in parts (` · ` between them), each with whether
 /// it is an error (only a non-zero rc): `cargo test ended`, `rc 0`,
 /// `after 2m04s`; `the reindex still running after 1h00m`; `stopped

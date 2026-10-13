@@ -90,9 +90,9 @@ pub const COMMANDS: &[CmdDoc] = &[
         "a standing order: the hub wakes you (or `--to` that agent) with the message every N (at least 1m) or every day at that time, until a time or for n times. Never sleep or loop in a turn to wait: set a timer and end your turn. Estimate low and check often: a build you think takes 5 min, first check at 1-2 min, then short re-checks; never one long timer. Better, wake on the event: for a background bash command, read its .rc/.out when your turn resumes. A wake reaches you at once: idle, a new turn; mid-turn, as a message in that turn (one, never stacked). `--page <id>`: the page it keeps fresh (its frame says `watching` and has `stop`). No argument: the timers; `--stop` ends one.",
     ),
     cmd(
-        "sb wake --on-exit <pid> | --on-file <path> | --on-job <launchd label> [--tail <file>] [--note \"<text>\"] [--max 1h] | sb wake | sb wake --stop <id>",
+        "sb wake --on-exit <pid> | --on-file <path> | --on-job <launchd label> [--then | --alarm] [--tail <file>] [--note \"<text>\"] [--max 1h] | sb wake | sb wake --stop <id>",
         Who::Everyone,
-        "wake on an event, not a timer: the hub wakes you once when that pid or launchd job ends or that file appears (an rc file), with its rc and the last lines of `--tail`; still running at `--max` (1h, at most 24h): one wake that says so. Your bash commands that go to the background are watched already: their end wakes you. Set it and end your turn. No argument: your watches; `--stop` ends one.",
+        "wake on an event, not a timer: the hub wakes you once when that pid or launchd job ends or that file appears (an rc file), with its rc and the last lines of `--tail`; still running at `--max` (1h, at most 24h): one wake that says so. `--then`: a pause, you continue your work when it ends (the user sees you waiting); `--alarm`: you are free, woken only if it fires (the user sees you idle). Default: a pid is a pause, a file or a job an alarm. `--note` reads after \"when\" or \"if\": `the reindex ends`, `the nightly gate goes red`. Your bash commands that go to the background are watched already, as pauses: their end wakes you. Set it and end your turn. No argument: your watches; `--stop` ends one.",
     ),
     cmd(
         "sb taste [add \"<rule>\" [--from \"<where>\"] | remove <n|words>]",

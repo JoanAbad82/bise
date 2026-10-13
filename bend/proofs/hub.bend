@@ -322,7 +322,7 @@ def Laws.wake_gone_never_hits(o, cx, text):
 
 def Laws.wake_replay_keeps(x):
   match x:
-    case HWK.Watch{i, a, s, m, sa, ma, q}:
+    case HWK.Watch{i, a, s, m, sa, ma, q, r}:
       {==}
 
 # ---- who a wake reaches (wake-deliver) ----

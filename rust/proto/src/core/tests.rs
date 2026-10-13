@@ -24,7 +24,7 @@ fn full(k: FieldKind, name: &str) -> Value {
     match k {
         Str | StrOmit | OptStr | OptStrOmit => json!(format!("{name}-x")),
         Nat | OptNat | OptNatOmit => json!(42),
-        Bool => json!(true),
+        Bool | OptBoolOmit => json!(true),
         Json => json!({"k": [1, "two", null]}),
         Strs | OptStrsOmit => json!(["a", "b c"]),
         Nats => json!([3, 5]),
@@ -52,7 +52,7 @@ fn empty(k: FieldKind) -> Option<Value> {
         OptStr | OptNat | Json => Some(Value::Null),
         Strs | Nats | Jsons | Msgs | Recs(_) => Some(json!([])),
         Ver => Some(json!(1)),
-        StrOmit | OptStrOmit | OptNatOmit | OptStrsOmit | OptJsonsOmit => None,
+        StrOmit | OptStrOmit | OptNatOmit | OptBoolOmit | OptStrsOmit | OptJsonsOmit => None,
     }
 }
 

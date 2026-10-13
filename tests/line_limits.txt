@@ -4,7 +4,7 @@
 # (gate.sh quick on the changed files, gate.sh full on the whole tree). Never add a line: split
 # the file instead.
 1200 bend/core/wire.bend
-3883 bend/hub/core.bend
+3882 bend/hub/core.bend
 1340 bend/runtime/provider-pure.bend
 1319 docs/brand/design-system/content.py
 1387 docs/brand/readme/make.py

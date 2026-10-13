@@ -140,6 +140,7 @@ export const hub_cmd: readonly HubCmd[] = [
   {"cmd":"prs","project":"acme-1a2b3c4d"},
   {"cmd":"scheduled","project":"acme-1a2b3c4d"},
   {"cmd":"scheduled_stop","id":48,"project":"acme-1a2b3c4d"},
+  {"cmd":"wake_stop","id":7,"project":"acme-1a2b3c4d"},
   {"cmd":"models","project":"acme-1a2b3c4d"},
   {"brief":"-w the login button: keep its label","cmd":"new","name":"fix","project":"acme-1a2b3c4d","with_changes":true,"worktree":true},
   {"brief":"x: look at the flaky e2e","cmd":"new","project":"acme-1a2b3c4d"},

@@ -1431,30 +1431,29 @@ def wake_hit(-o: M.St, +cx: X.Cx<o>, +id: Nat, +text: String) -> X.Cx<o>:
 
 # {"t":"wake_set"}: the hub checked the request and wrote the words; a
 # watch only for an active agent, its id the next free one
-def wake_set.agent(-o: M.St, ok: Bool, +cx: X.Cx<o>, +agent: String, +spec: J.Json, +max_text: String, +max_ms: Nat, +quiet: Bool) -> X.Cx<o>:
+def wake_set.agent(-o: M.St, ok: Bool, +cx: X.Cx<o>, +agent: String, +spec: J.Json, +max_text: String, +max_ms: Nat, +quiet: Bool, +then: Maybe<&2, Bool>) -> X.Cx<o>:
   match ok:
     case False{}:
       cx
     case True{}:
-      +w = WK.make(wks(o, cx), agent, spec, max_text, now(o, cx), max_ms, quiet)
+      +w = WK.make(wks(o, cx), agent, spec, max_text, now(o, cx), max_ms, quiet, then)
       emit(o, cx, M.EWake{WK.WSet{w}}, Unit{}, Unit{}, Unit{})
 
-def wake_set(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +spec: J.Json, +max_text: String, +max_ms: Nat, +quiet: Bool) -> X.Cx<o>:
+def wake_set(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +spec: J.Json, +max_text: String, +max_ms: Nat, +quiet: Bool, +then: Maybe<&2, Bool>) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+n}:
-      wake_set.agent(o, R.agent_active(st(o, cx), n), cx, n, spec, max_text, max_ms, quiet)
+      wake_set.agent(o, R.agent_active(st(o, cx), n), cx, n, spec, max_text, max_ms, quiet, then)
 
-# {"t":"wake_stop"}: `sb wake --stop`; ended or unknown: nothing
-def wake_stop.found(-o: M.St, m: Maybe<&2, WK.Watch>, +cx: X.Cx<o>, +why: String) -> X.Cx<o>:
+# {"t":"wake_stop"}: `sb wake --stop`, or his stop (`tell`: its agent hears it once); ended or unknown: nothing
+def wake_stop.found(-o: M.St, m: Maybe<&2, WK.Watch>, +cx: X.Cx<o>, +why: String, +tell: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+w}:
-      wake_end(o, cx, WK.Watch.id(w), why)
-
-
+      pick_lazy(X.Cx<o>, WK.stop_tells(tell, R.agent_active(st(o, cx), WK.Watch.agent(w))),
+        u => wake_say(o, wake_end(o, cx, WK.Watch.id(w), why), WK.Watch.agent(w), tell), u => wake_end(o, cx, WK.Watch.id(w), why))
 
 # a watch past its max ends, with its "still running" wake unless quiet
 # (law wake_max_once: ended, it is never due again)
@@ -3793,10 +3792,10 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       route_pick(o, cx, rid, to, name, why)
     case GI.IFollow{+agent, +on}:
       follow_in(o, follow_err(st(o, cx), agent), cx, agent, on)
-    case GI.IWakeSet{+agent, +spec, +max_text, +max_ms, +quiet}:
-      wake_set(o, M.resolve(st(o, cx), agent), cx, spec, max_text, max_ms, quiet)
-    case GI.IWakeStop{+id, +why}:
-      wake_stop.found(o, WK.hit(wks(o, cx), id), cx, why)
+    case GI.IWakeSet{+agent, +spec, +max_text, +max_ms, +quiet, +then}:
+      wake_set(o, M.resolve(st(o, cx), agent), cx, spec, max_text, max_ms, quiet, then)
+    case GI.IWakeStop{+id, +why, +tell}:
+      wake_stop.found(o, WK.hit(wks(o, cx), id), cx, why, tell)
     case GI.IWakeHit{+id, +text}:
       wake_hit(o, cx, id, text)
     case GI.IPause{}:

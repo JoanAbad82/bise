@@ -38,6 +38,7 @@
 {"cmd":"prs","project":"acme-1a2b3c4d"}
 {"cmd":"scheduled","project":"acme-1a2b3c4d"}
 {"cmd":"scheduled_stop","project":"acme-1a2b3c4d","id":48}
+{"cmd":"wake_stop","project":"acme-1a2b3c4d","id":7}
 {"cmd":"models","project":"acme-1a2b3c4d"}
 {"cmd":"new","project":"acme-1a2b3c4d","name":"fix","brief":"-w the login button: keep its label","worktree":true,"with_changes":true}
 {"cmd":"new","project":"acme-1a2b3c4d","brief":"x: look at the flaky e2e"}

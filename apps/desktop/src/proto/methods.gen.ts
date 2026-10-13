@@ -36,6 +36,7 @@ export const METHODS = {
   "prs/list": { cmd: "prs", result: "prs" },
   "scheduled/list": { cmd: "scheduled", result: "scheduled" },
   "scheduled/stop": { cmd: "scheduled_stop", result: null },
+  "wake/stop": { cmd: "wake_stop", result: null },
   "models/list": { cmd: "models", result: "models" },
   "route/correct": { cmd: "route_correct", result: null },
   "route/cancel": { cmd: "route_cancel", result: null },

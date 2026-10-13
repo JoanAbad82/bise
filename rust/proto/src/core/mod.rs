@@ -67,6 +67,9 @@ pub enum FieldKind {
     OptNat,
     /// `Option<u64>`, absent when none.
     OptNatOmit,
+    /// `Option<bool>`, absent when none (Bend `Maybe<Bool>`; a value that
+    /// is not a bool reads none).
+    OptBoolOmit,
     /// any JSON value, kept as is (Bend `J.Json`); missing reads null.
     Json,
     /// `Vec<String>`, always written; missing reads empty.
@@ -295,6 +298,9 @@ macro_rules! core_fields {
     };
     (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : OptNatOmit $(, $($rest:tt)*)?) => {
         $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default, skip_serializing_if = "Option::is_none")] pub $f: Option<u64>,] $($($rest)*)?);
+    };
+    (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : OptBoolOmit $(, $($rest:tt)*)?) => {
+        $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default, skip_serializing_if = "Option::is_none")] pub $f: Option<bool>,] $($($rest)*)?);
     };
     (@go $m:tt $name:ident [$($done:tt)*] $(#[$fm:meta])* $f:ident : Json $(, $($rest:tt)*)?) => {
         $crate::core::core_fields!(@go $m $name [$($done)* $(#[$fm])* #[serde(default)] pub $f: serde_json::Value,] $($($rest)*)?);

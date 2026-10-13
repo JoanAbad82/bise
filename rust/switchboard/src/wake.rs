@@ -570,8 +570,9 @@ fn sh_word(s: &str) -> String {
     }
 }
 
-/// The `sb wake` line that sets the same watch again.
-pub fn again(spec: &Spec, max_ms: u64) -> String {
+/// The `sb wake` line that sets the same watch again (`then`: the
+/// agent's `--then` / `--alarm`, said again).
+pub fn again(spec: &Spec, max_ms: u64, then: Option<bool>) -> String {
     let mut v = vec!["sb wake".to_string()];
     match &spec.what {
         What::Pid { pid, .. } => v.push(format!("--on-exit {}", pid)),
@@ -585,6 +586,11 @@ pub fn again(spec: &Spec, max_ms: u64) -> String {
     if !spec.note.is_empty() {
         v.push(format!("--note {}", sh_word(&spec.note)));
     }
+    match then {
+        Some(true) => v.push("--then".into()),
+        Some(false) => v.push("--alarm".into()),
+        None => {}
+    }
     if max_ms != MAX_DEFAULT_MS {
         v.push(format!("--max {}", dur_flag(max_ms)));
     }
@@ -592,20 +598,22 @@ pub fn again(spec: &Spec, max_ms: u64) -> String {
 }
 
 /// The wake of a watch past its max (given to sb-core at the set).
-pub fn max_text(spec: &Spec, max_ms: u64) -> String {
+pub fn max_text(spec: &Spec, max_ms: u64, then: Option<bool>) -> String {
     let mut parts = vec![format!("{} still running", what(spec)), format!("after {}", dur(max_ms))];
     parts.extend(words_after(spec));
     format!(
         "{}\nthis watch stopped at its --max ({}). to keep waiting: {}",
         parts.join(" · "),
         dur_flag(max_ms),
-        again(spec, max_ms)
+        again(spec, max_ms, then)
     )
 }
 
-/// The set's answer: what the agent will hear and how to stop it.
-pub fn set_text(id: u64, spec: &Spec, max_ms: u64) -> String {
-    format!("watch #{} set: you'll be woken when {} ends (at most {}; sb wake --stop {})", id, spec.label(), dur(max_ms), id)
+/// The set's answer: what the agent will hear, whether it is a pause or
+/// an alarm (sb-core's `resumes`), and how to stop it.
+pub fn set_text(id: u64, spec: &Spec, max_ms: u64, resumes: bool) -> String {
+    let what = if resumes { "a pause: you continue your work when it ends" } else { "an alarm: you're free until it fires" };
+    format!("watch #{} set, {} · you'll be woken when {} ends (at most {}; sb wake --stop {})", id, what, spec.label(), dur(max_ms), id)
 }
 
 #[cfg(test)]

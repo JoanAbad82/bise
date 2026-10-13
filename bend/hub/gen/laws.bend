@@ -304,13 +304,13 @@ def in_follow_bare():
   {==}
 
 law in_wake_set_bare:
-  {IN.of(J.obj([J.kv("t", J.JStr{"wake_set"})])) == IN.IWakeSet{"", J.JNull{}, "", 0n, False{}} : IN.In}
+  {IN.of(J.obj([J.kv("t", J.JStr{"wake_set"})])) == IN.IWakeSet{"", J.JNull{}, "", 0n, False{}, None{}} : IN.In}
 
 def in_wake_set_bare():
   {==}
 
 law in_wake_stop_bare:
-  {IN.of(J.obj([J.kv("t", J.JStr{"wake_stop"})])) == IN.IWakeStop{0n, ""} : IN.In}
+  {IN.of(J.obj([J.kv("t", J.JStr{"wake_stop"})])) == IN.IWakeStop{0n, "", ""} : IN.In}
 
 def in_wake_stop_bare():
   {==}
@@ -914,18 +914,28 @@ law in_IWakeSet_round:
   for max_text: String
   for max_ms: Nat
   for quiet: Bool
-  {IN.of(IN.json(IN.IWakeSet{agent, spec, max_text, max_ms, quiet})) == IN.IWakeSet{agent, spec, max_text, max_ms, quiet} : IN.In}
+  for then: Maybe<&2, Bool>
+  {IN.of(IN.json(IN.IWakeSet{agent, spec, max_text, max_ms, quiet, then})) == IN.IWakeSet{agent, spec, max_text, max_ms, quiet, then} : IN.In}
 
-def in_IWakeSet_round(agent, spec, max_text, max_ms, quiet):
-  {==}
+def in_IWakeSet_round(agent, spec, max_text, max_ms, quiet, then):
+  match then:
+    case None{}:
+      {==}
+    case Some{x_then}:
+      {==}
 
 law in_IWakeStop_round:
   for id: Nat
   for why: String
-  {IN.of(IN.json(IN.IWakeStop{id, why})) == IN.IWakeStop{id, why} : IN.In}
+  for tell: String
+  {IN.of(IN.json(IN.IWakeStop{id, why, tell})) == IN.IWakeStop{id, why, tell} : IN.In}
 
-def in_IWakeStop_round(id, why):
-  {==}
+def in_IWakeStop_round(id, why, tell):
+  match tell:
+    case SNil{}:
+      {==}
+    case SCon{h_tell, t_tell}:
+      {==}
 
 law in_IWakeHit_round:
   for id: Nat
