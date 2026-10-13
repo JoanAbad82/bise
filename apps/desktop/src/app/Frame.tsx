@@ -357,6 +357,39 @@ function HistoryArrows({ name }: { name: (p: string) => string }) {
   );
 }
 
+/** under this much room the status pill takes its short form (designer's desktop-notices v2) */
+export const STATUS_NARROW_PX = 160;
+
+/**
+ * The title bar's status slot (designer's desktop-notices v2, ambient-lead m_21070): the free room
+ * between the crumb's end (+16) and the right bar's toggle (8 before it), its content right-aligned;
+ * the crumb never cuts for it. It marks data-narrow when that room is under 160 px, so the pill
+ * (amb-home's TitleStatus) shows its short form. The slot drags like the bar; only what it holds is
+ * a no-drag region (app.css).
+ */
+function StatusSlot({ children }: { children?: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (el === null) return;
+    const read = () => {
+      setNarrow(el.clientWidth < STATUS_NARROW_PX);
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
+  return (
+    <div ref={ref} className="app-title-status" data-narrow={narrow} data-testid="app.title.status">
+      {children}
+    </div>
+  );
+}
+
 /** The titlebar over the main column: the sidebar button and what waits when the sidebar is away, the crumb, the panel's button. */
 export function Titlebar({ frame }: { frame: FrameState }) {
   const route = useRoute();
@@ -417,6 +450,7 @@ export function Titlebar({ frame }: { frame: FrameState }) {
           </span>
         ))}
       </span>
+      <StatusSlot />
       {/* the right bar's toggle (designer m_20274/m_20275): the left toggle's panel icon mirrored,
           pressed while the bar is open; the accent count of what waits on him in its place, none at 0 */}
       {frame.panel !== undefined && (

@@ -546,12 +546,29 @@ body:has(.app-shell) {
   font-variant-numeric: tabular-nums;
 }
 .app-crumb {
-  flex: 1;
+  /* its own width: the status slot takes the free room, and the crumb only cuts when there is none */
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--c-text-2);
   font-size: var(--t-13, 13px);
+}
+/* the status slot (designer's desktop-notices v2): the room between the crumb's end +16 (the bar's
+   gap 8 + 8) and the toggle (the bar's gap, 8), what it holds on its right end; the slot drags,
+   what it holds doesn't */
+.app-title-status {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-left: var(--s-2);
+}
+.app-title-status > * {
+  min-width: 0;
+  max-width: 100%;
+  -webkit-app-region: no-drag;
 }
 .app-crumb .last {
   color: var(--c-text);
