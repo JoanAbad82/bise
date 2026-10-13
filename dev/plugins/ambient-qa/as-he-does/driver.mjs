@@ -648,8 +648,9 @@ if (mode === 'rows2') {
     await shot('working-mark-tip');
     await page.mouse.move(1, 400);
   }
-  step("the working mark: a gust after 'to main' while main works, no 'is working' row, the thread still under its frames",
-    marked && /to main/.test(wk.label ?? '') && wk.on_label_line && wk.old_rows === 0 && !wk.is_working_text && wk.gust_frames >= 2 && Object.values(wk.still).every(Boolean), wk);
+  // the home thread names its main 'bise' (ambient-lead m_22076): the label reads 'to bise'
+  step("the working mark: a gust after 'to bise' while main works, no 'is working' row, the thread still under its frames",
+    marked && /^to (bise|main)\b/.test((wk.label ?? '').trim()) && wk.on_label_line && wk.old_rows === 0 && !wk.is_working_text && wk.gust_frames >= 2 && Object.values(wk.still).every(Boolean), wk);
   await until(async () => (/ack: take a moment/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), ANSWER_MS, 1000);
   await say('one quick thought [[think: weighing the proof rows]]');
   // the TUI folds a thought too (ambient-lead m_20609): the row is there, then opens to its words
@@ -1297,7 +1298,13 @@ async function fileChips(harness) {
   await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
   const row = page.locator('[data-testid^="inbox.block.row."]', { hasText: 'zqbench' }).first();
   const card = page.locator('[data-testid^="inbox.block.card."]').filter({ hasText: 'zqbench' }).first();
-  const listed = await until(async () => ((await row.isVisible().catch(() => false)) || (await card.isVisible().catch(() => false)) || /zqbench/.test(((await text('[data-testid="inbox.block"]')) ?? '')) ? true : null), 90000, 1000);
+  // the block draws its first items only: an item under '+ N more' is listed too (ambient-lead m_22076),
+  // so each poll that sees no zqbench opens the next ones
+  const listed = await until(async () => {
+    if ((await row.isVisible().catch(() => false)) || (await card.isVisible().catch(() => false)) || /zqbench/.test(((await text('[data-testid="inbox.block"]')) ?? ''))) return true;
+    await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 1000 }).catch(() => {});
+    return null;
+  }, 90000, 1000);
   for (let i = 0; listed && i < 40 && !(await card.isVisible().catch(() => false)); i++) {
     if (await row.isVisible().catch(() => false)) await row.click({ timeout: 2000 }).catch(() => {});
     else await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 2000 }).catch(() => {});
