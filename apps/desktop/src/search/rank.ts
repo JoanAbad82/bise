@@ -68,22 +68,47 @@ export interface SearchScheduled {
   readonly at_ms?: number;
 }
 
+/** What ⏎ on a page row does: go to a route (its string form), or open the inbox or the key list in place. */
+export type PageGo = { readonly route: string } | { readonly inbox: true } | { readonly help: true };
+
+/** A page of the app (the window's src/app/pages.ts lists them; the spotlight has none). */
+export interface SearchPage {
+  /** unique: the route's string, or 'inbox' / 'help' */
+  readonly id: string;
+  /** as its head says it ('keys', 'changes') */
+  readonly name: string;
+  /** a sub-page's parent ('settings' for 'settings › keys') */
+  readonly parent?: string;
+  /** the project or agent it is about ('acme', 'perf · acme') */
+  readonly of?: string;
+  /** other words that find it ('worktrees' for environments) */
+  readonly words: readonly string[];
+  /** the left bar's sign for it ('·' when it has none) */
+  readonly glyph: string;
+  /** the key that opens it from here, as the left bar writes it ('⌘,'); none: '' */
+  readonly key: string;
+  readonly go: PageGo;
+}
+
 export interface SearchData {
   readonly projects: readonly SearchProject[];
   readonly agents: readonly SearchAgent[];
   readonly artifacts: readonly SearchArtifact[];
   readonly scheduled: readonly SearchScheduled[];
+  /** the app's pages, found by name only with a query (never in 'waiting' or 'recent') */
+  readonly pages?: readonly SearchPage[];
 }
 
 export type Scope = 'all' | 'agents' | 'artifacts' | 'scheduled';
 export const SCOPES: readonly Scope[] = ['all', 'agents', 'artifacts', 'scheduled'];
 
-export type HitKind = 'agent' | 'artifact' | 'scheduled';
+export type HitKind = 'agent' | 'page' | 'artifact' | 'scheduled';
 
 /** What ⏎ does on a result; ⌘⏎ on an archived agent restores it, then opens it. */
 export type HitOpen =
   | { readonly to: 'thread'; readonly project: string; readonly agent: string }
-  | { readonly to: 'artifact'; readonly project: string; readonly id: string };
+  | { readonly to: 'artifact'; readonly project: string; readonly id: string }
+  | { readonly to: 'page'; readonly go: PageGo };
 
 export interface Hit {
   readonly kind: HitKind;
@@ -108,10 +133,16 @@ export interface Hit {
   readonly at_ms: number;
   readonly score: number;
   readonly open: HitOpen;
+  /** a page: its parent before ' › ' ('settings'), dim */
+  readonly parent?: string;
+  /** a page: its project or agent after ' · ' ('acme'), dim */
+  readonly of?: string;
+  /** a page: its key at the right ('⌘,') */
+  readonly key?: string;
 }
 
 export interface Group {
-  readonly id: 'waiting' | 'recent' | 'agents' | 'artifacts' | 'scheduled';
+  readonly id: 'waiting' | 'recent' | 'agents' | 'pages' | 'artifacts' | 'scheduled';
   readonly label: string;
   readonly hits: readonly Hit[];
 }
@@ -328,6 +359,28 @@ function scheduledHit(s: SearchScheduled, pname: string, tz?: string): Hit {
   };
 }
 
+function pageHit(p: SearchPage): Hit {
+  return {
+    kind: 'page',
+    id: `page.${p.id}`,
+    project: '',
+    glyph: p.glyph,
+    tone: '',
+    name: p.name,
+    detail: '',
+    where: '',
+    when: '',
+    archived: false,
+    waiting: false,
+    at_ms: 0,
+    score: 0,
+    open: { to: 'page', go: p.go },
+    ...(p.parent === undefined ? {} : { parent: p.parent }),
+    ...(p.of === undefined ? {} : { of: p.of }),
+    ...(p.key === '' ? {} : { key: p.key }),
+  };
+}
+
 /** How many rows 'recent' shows. */
 export const RECENT = 12;
 
@@ -383,6 +436,17 @@ export function searchList(d: SearchData, q: string, scope: Scope, now: number, 
       (a) => !a.main && sentenceNames(q, a),
     );
     if (hits.length > 0) groups.push({ id: 'agents', label: 'agents', hits });
+  }
+  // the app's pages (designer m_21505): after the agents, in 'all' only, by a word of their name
+  // (a project's name alone finds its agents, not its six pages)
+  if (scope === 'all' && d.pages !== undefined) {
+    const own = (p: SearchPage): Fields => ({ name: [p.parent === undefined ? p.name : `${p.parent} ${p.name}`], about: p.words });
+    const hits = ranked(
+      d.pages.filter((p) => ws.some((w) => matchScore([w], own(p)) > 0)),
+      pageHit,
+      (p) => ({ ...own(p), where: p.of === undefined ? [] : [p.of] }),
+    );
+    if (hits.length > 0) groups.push({ id: 'pages', label: 'pages', hits });
   }
   if (want('artifact')) {
     const hits = ranked(

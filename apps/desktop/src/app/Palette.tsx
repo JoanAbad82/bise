@@ -13,9 +13,13 @@ import { caretAtEnd, keep, useKeptText } from '@/app/keep';
 import type { Ev } from '@/store/store';
 import { flatHits, marks, nextScope, SCOPES, searchList, type Hit, type Scope, type SearchList } from '@/search/rank';
 import { searchDataOf } from '@/search/data';
+import { PAGES } from '@/settings';
 import { useNow } from './clock';
-import { MAIN } from './route';
-import { useRouter } from './router';
+import { askInbox } from './inboxAsk';
+import { HELP_EVENT } from './keys';
+import { appPages } from './pages';
+import { MAIN, parseRoute } from './route';
+import { useRoute, useRouter } from './router';
 import './palette.css';
 import { Input, Press } from '@/ds';
 
@@ -116,12 +120,14 @@ export function Palette({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     store.askIndex();
   }, [store]);
-  const data = useMemo(
-    () => searchDataOf({ projects, agents: (p) => store.agents(p), artifacts: (p) => store.artifacts(p), cards: (p) => store.cards(p), scheduled: (p) => store.scheduled(p), index }),
+  const route = useRoute();
+  const data = useMemo(() => {
+    const d = searchDataOf({ projects, agents: (p) => store.agents(p), artifacts: (p) => store.artifacts(p), cards: (p) => store.cards(p), scheduled: (p) => store.scheduled(p), index });
+    // the app's pages by name (ambient-lead m_21499): the in-view project's first, the in-view agent's log
+    return { ...d, pages: appPages({ projects: d.projects, route, settings: PAGES }) };
     // version: a held project's agents, cards or artifacts changed
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [projects, index, store, version],
-  );
+  }, [projects, index, store, version, route]);
   const list = useMemo(() => searchList(data, q, scope, now), [data, q, scope, now]);
   const hits = useMemo(() => flatHits(list), [list]);
   // a sentence (main m_12973): 'ask bise' is the first row, ⏎ asks; the hits come one row down
@@ -146,6 +152,14 @@ export function Palette({ onClose }: { onClose: () => void }) {
     onClose();
     if (h.open.to === 'artifact') {
       router.go({ screen: 'artifacts', project: h.open.project, id: h.open.id });
+      return;
+    }
+    // a page: as its key does (⌘I the inbox in place, ⌘/ the key list, the rest a route)
+    if (h.open.to === 'page') {
+      const go = h.open.go;
+      if ('inbox' in go) askInbox();
+      else if ('help' in go) window.dispatchEvent(new Event(HELP_EVENT));
+      else router.go(parseRoute(go.route));
       return;
     }
     if (restore && h.archived) store.command({ cmd: 'unarchive', project: h.open.project, agent: h.open.agent });
@@ -301,12 +315,15 @@ export function Palette({ onClose }: { onClose: () => void }) {
                       {h.tone === 'pearl' ? <i className="app-k-pearl" /> : h.tone === 'bise' ? <i className="app-k-pearl bise" data-testid={`app.palette.item.${String(n)}.pink`} /> : h.glyph}
                     </span>
                     <span className="nm">
+                      {h.parent !== undefined && <span className="up">{h.parent} › </span>}
                       <Marked text={h.name} q={q} />
+                      {h.of !== undefined && <span className="up"> · {h.of}</span>}
                       {h.detail !== '' && <span className="d">{h.detail}</span>}
                     </span>
                     <span className="rt">
                       {h.where !== '' && <span className="pj">{h.where}</span>}
                       {h.when !== '' && <span>{h.when}</span>}
+                      {h.key !== undefined && <kbd className="b-kbd">{h.key}</kbd>}
                       {on && <span className="hint"><Pairs text={PW.hint(h)} /></span>}
                     </span>
                   </div>

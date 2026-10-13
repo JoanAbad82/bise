@@ -180,3 +180,58 @@ test('agents/palette at 800 px: the same panel, the project column drops', async
     core.dispose();
   }
 });
+
+// ⌘K finds the app's pages by name (ambient-lead m_21499, designer m_21505): a 'pages' group after the
+// agents, only with a query; 'settings › keys' with its parent dim, 'changes · acme' with its project
+// dim, the page's key at the right; ⏎ opens it as its key does. Shot for designer: 1100 light, 'set'.
+test('agents/palette: pages by name, after the agents; ⏎ opens one like its key', async () => {
+  const core = new FakeCore();
+  const s = await launchDesktop({ core, route: `project/${ACME}` });
+  try {
+    const { page } = s;
+    const win = await s.app.browserWindow(page);
+    await win.evaluate((w: BrowserWindow) => {
+      w.setSize(1100, 720);
+    });
+    await expect.poll(() => page.evaluate(() => window.innerWidth), { timeout: 3000 }).toBe(1100);
+    await expect(page.locator(T.thread)).toHaveAttribute('data-project', ACME, { timeout: 10_000 });
+    await openK(page);
+    await expect(page.locator(T.group('pages')), 'no pages with no query').toHaveCount(0);
+    await page.keyboard.type('set');
+    const pages = page.locator(T.group('pages'));
+    await expect(pages, "'set' finds pages").toBeVisible();
+    await expect(pages.locator('[data-kind="page"]').first(), 'settings first, its key at the right').toContainText('settings');
+    await expect(pages.locator('[data-kind="page"]').first().locator('kbd')).toHaveText('⌘,');
+    await expect(pages.locator('[data-kind="page"]').filter({ hasText: 'settings › setup' }), 'a settings page, its parent first').toHaveCount(1);
+    const order = await page.locator('[data-testid^="app.palette.group."]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
+    const at = (g: string) => order.indexOf(`app.palette.group.${g}`);
+    if (at('agents') >= 0) expect(at('agents'), 'pages after the agents').toBeLessThan(at('pages'));
+    if (at('artifacts') >= 0) expect(at('pages'), 'pages before the artifacts').toBeLessThan(at('artifacts'));
+    await page.screenshot({ path: test.info().outputPath('light-1100-pages-set.png') });
+
+    // a project's page reads 'changes · acme', the project in view first, ⌘D from its main
+    await page.locator(T.field).fill('changes');
+    const changes = pages.locator('[data-kind="page"]').first();
+    await expect(changes).toContainText('changes · acme');
+    await expect(changes.locator('kbd')).toHaveText('⌘D');
+    await page.screenshot({ path: test.info().outputPath('light-1100-pages-changes.png') });
+
+    // ⏎ on a settings page opens it
+    await page.locator(T.field).fill('quiet');
+    await expect(page.locator(T.item(0)), 'quiet moments first').toContainText('settings › quiet moments');
+    await page.keyboard.press('Enter');
+    await expect(page.locator(T.palette)).toBeHidden({ timeout: 2000 });
+    await expect(page.getByTestId('settings.root'), 'the settings page opened').toBeVisible({ timeout: 3000 });
+    await expect(page.getByTestId('settings.root')).toContainText('when cards wait');
+
+    // ⏎ on help opens the key list over the screen, as ⌘/ does
+    await openK(page);
+    await page.keyboard.type('help');
+    await expect(page.locator(T.item(0))).toContainText('help');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('help.overlay'), 'the key list').toBeVisible({ timeout: 3000 });
+  } finally {
+    await s.close();
+    core.dispose();
+  }
+});

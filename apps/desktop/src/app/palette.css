@@ -152,6 +152,10 @@
   margin-left: var(--gap-inline);
   color: var(--c-text-2);
 }
+/* a page's parent ('settings › ') and its project (' · acme'), designer m_21505 */
+.app-k-row .nm .up {
+  color: var(--c-text-3);
+}
 .app-k-row .mt {
   font-weight: 700;
   text-decoration: underline;
