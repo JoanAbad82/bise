@@ -99,6 +99,7 @@ impl Core {
         }
         self.out.extend(evs);
         if let Some(e) = failed {
+            eprintln!("ambient-core: talk: the listener: {e}");
             self.talk = None;
             if let Some(p) = page {
                 self.error(&e);
@@ -166,11 +167,16 @@ impl Core {
     }
 
     pub(super) fn talk_start(&mut self, page: Option<String>) {
-        if self.talk.is_some() {
+        // each fn talk on receipt, in core.log (ambient-lead m_21884: did it reach the core?)
+        eprintln!("ambient-core: talk_start{}", page.as_deref().map(|p| format!(" (note on page {p})")).unwrap_or_default());
+        if let Some(t) = &self.talk {
+            // never silent in core.log (his fn stuck on 'thinking…', main m_21882)
+            eprintln!("ambient-core: talk: talk_start while a talk runs ({}): ignored", if t.ending.is_some() { "ending" } else { "listening" });
             return;
         }
         // one mic owner: voice mode has it (ambient-lead m_11168)
         if let Some(why) = self.voice_mode_busy() {
+            eprintln!("ambient-core: talk: {why}");
             return self.emit(json!({"ev": "error", "cmd": "talk_start", "text": why}));
         }
         // fn wins over the composer's mic: the dictation ends first
@@ -189,6 +195,7 @@ impl Core {
         let stream = match self.ports.mic.open(btx) {
             Ok(s) => s,
             Err(e) => {
+                eprintln!("ambient-core: talk: the mic: {e}");
                 self.error(&e);
                 return self.set_phase(Phase::Failed, None);
             }
@@ -219,7 +226,11 @@ impl Core {
     }
 
     pub(super) fn talk_end(&mut self, now: Instant) {
-        let Some(t) = self.talk.as_mut() else { return };
+        eprintln!("ambient-core: talk_end");
+        let Some(t) = self.talk.as_mut() else {
+            eprintln!("ambient-core: talk: talk_end with no talk: ignored");
+            return;
+        };
         if t.ending.is_some() {
             return;
         }

@@ -20,6 +20,8 @@ export type View =
   | { readonly kind: 'none' }
   | { readonly kind: 'spot' }
   | { readonly kind: 'talk'; readonly phase: 'listen' | 'think'; readonly handsFree: boolean }
+  /** the core ended his talk without a send (amb-core m_21857): its reason, or 'nothing heard'; esc or the next fn closes it */
+  | { readonly kind: 'talk'; readonly phase: 'over'; readonly handsFree: boolean; readonly said: string }
   | { readonly kind: 'answer' }
   /**
    * opened from the spotlight's waiting row (⏎ '↵ answer') or the tray menu's (a click, fn+n:
@@ -38,6 +40,12 @@ export type CapEvent =
   | { readonly ev: 'window'; readonly shown: boolean; readonly why: 'asked' | 'tray' | 'blur' }
   /** bise's answer to what he said or typed started */
   | { readonly ev: 'answer' }
+  /**
+   * the core ended his talk without sending it (amb-core m_21857, his fn stuck on 'thinking…'): a
+   * failure (`said`: its reason), nothing heard (`said`: those words), or his words answered a card
+   * (`said` null: nothing to show)
+   */
+  | { readonly ev: 'talk_over'; readonly said: string | null }
   /** a card was answered or went away */
   | { readonly ev: 'card_done'; readonly id: string }
   /** ⏎ on a spotlight waiting row: that card's answer, in place (qa-native R03: it closed to nothing) */
@@ -108,6 +116,10 @@ export function step(s: State, e: CapEvent): Step {
       return stay(s);
     case 'answer':
       return v.kind === 'talk' ? go(s, { kind: 'answer' }) : stay(s);
+    case 'talk_over':
+      // at fn down (no key, no mic) or after his release: the mic closes, the core's talk is already over
+      if (v.kind !== 'talk' || (v.phase !== 'listen' && v.phase !== 'think')) return stay(s);
+      return e.said === null ? go(s, NONE, { fx: 'hide' }) : go(s, { kind: 'talk', phase: 'over', handsFree: v.handsFree, said: e.said });
     case 'card_done':
       return v.kind === 'card' && v.id === e.id ? back(s) : stay(s);
     case 'open_card':

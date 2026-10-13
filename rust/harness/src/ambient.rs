@@ -23,12 +23,12 @@ pub fn core(args: &[String]) -> std::io::Result<i32> {
         Ok((exe, root)) => {
             let projects = ambient_projects(Connector::Hub(exe.clone(), root.clone()));
             let home_move = home_move(paths.clone(), root.clone());
-            (projects, Some(home_move), ambient_connector(paths, Connector::Hub(exe, root)), None)
+            (projects, Some(home_move), ambient_connector(paths, Connector::Hub(exe, root), true), None)
         }
         Err(why) => {
             eprintln!("ambient-core: {why}");
             let projects = ambient_projects(Connector::Broken(why.clone()));
-            (projects, None, ambient_connector(paths, Connector::Broken(why.clone())), Some(why))
+            (projects, None, ambient_connector(paths, Connector::Broken(why.clone()), true), Some(why))
         }
     };
     Ok(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects), Some(ambient_setup()), home_move, broken))
@@ -98,20 +98,26 @@ fn ambient_workspace(args: &[String], core: bool) -> std::path::PathBuf {
 }
 
 /// bise ambient's hub connection: the first call starts the hub when
-/// none runs (`client::open`, like the TUI); later calls (after a loss)
-/// only connect: the user may have stopped bise. It says nothing: the
+/// none runs (`client::open`, like the TUI); a project's later calls
+/// (after a loss) only connect: the user may have stopped that hub. The
+/// home hub (`home`: the voice target) is started again after a loss:
+/// while the app runs it is always wanted, and one killed or crashed
+/// under the core left fn talking to nothing until the app restarted
+/// (ambient-lead m_21848). `client::open` starts one hub at a time per
+/// folder, so the home and project connections to ~/bise never start
+/// two. It says nothing: the
 /// core's first line is JSON-RPC's `initialize` (the home hub's
 /// connection since client-protocol step 5, a project's since P1c).
 /// A start that fails says why (`client::open`'s cause, an `Other`
 /// error: the reader's `HubIn::Down` carries it to the row).
-fn ambient_connector(paths: switchboard::paths::Paths, how: Connector) -> bend_tui::ambient::Connect {
+fn ambient_connector(paths: switchboard::paths::Paths, how: Connector, home: bool) -> bend_tui::ambient::Connect {
     let mut first = true;
     Box::new(move || {
         let (exe, root) = match &how {
             Connector::Hub(exe, root) => (exe, root),
             Connector::Broken(why) => return Err(std::io::Error::other(why.clone())),
         };
-        let s = if std::mem::take(&mut first) {
+        let s = if std::mem::take(&mut first) || home {
             switchboard::client::open(&paths, exe, root).map_err(|e| std::io::Error::other(e.to_string()))?
         } else {
             std::os::unix::net::UnixStream::connect(paths.socket())?
@@ -126,7 +132,7 @@ fn ambient_connector(paths: switchboard::paths::Paths, how: Connector) -> bend_t
 /// checkout's branch. Read-only but the connection.
 fn ambient_projects(how: Connector) -> (bend_tui::ambient::ConnectFor, bend_tui::ambient::ProjectFacts) {
     let connect_for: bend_tui::ambient::ConnectFor = Box::new(move |path| {
-        ambient_connector(switchboard::paths::Paths::for_workspace(path), how.clone())
+        ambient_connector(switchboard::paths::Paths::for_workspace(path), how.clone(), false)
     });
     let facts = bend_tui::ambient::ProjectFacts {
         rows: Box::new(|| bise_home::projects::list(&bise_home::Home::from_env(), &switchboard::paths::home_workspace())),

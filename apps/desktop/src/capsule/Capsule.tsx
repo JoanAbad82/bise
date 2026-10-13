@@ -32,6 +32,8 @@ import "./capsule.css";
 export const W = {
   listening: "listening…",
   thinking: "bise is thinking…",
+  // his talk ended with no words (amb-core m_21857; designer signs)
+  heardNothing: "i didn't hear anything",
   restInBise: "the rest in bise   ⏎ open",
   openBise: "open bise",
   inbox: "inbox",
@@ -87,7 +89,7 @@ export interface CapsuleProps {
 }
 
 const moodOf = (v: View, answering: boolean): Mood => {
-  if (v.kind === "talk") return v.phase === "listen" ? "listen" : "work";
+  if (v.kind === "talk") return v.phase === "listen" ? "listen" : v.phase === "over" ? "rest" : "work";
   if (v.kind === "answer") return answering ? "speak" : "rest";
   return "rest";
 };
@@ -164,7 +166,9 @@ export function Capsule(p: CapsuleProps): JSX.Element {
       )}
       {v.kind === "talk" && (
         <div className="b-cap-talk" data-testid="capsule.talk" data-glass>
-          {p.heard !== ""
+          {v.phase === "over"
+            ? v.said
+            : p.heard !== ""
             ? p.heard
             : v.phase === "listen"
               ? W.listening

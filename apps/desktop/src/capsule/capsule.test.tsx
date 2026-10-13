@@ -37,6 +37,25 @@ describe('the capsule machine', () => {
     expect(run([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'cancel' }]).fx).toContainEqual({ fx: 'talk', cmd: 'talk_cancel' });
     expect(run([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'talk_end' }, { ev: 'answer' }]).view).toEqual({ kind: 'answer' });
   });
+  it("a talk the core ends without a send never stays on 'thinking…' (amb-core m_21857): its reason, nothing heard, or a card answered", () => {
+    const talk: CapEvent[] = [{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'talk_end' }];
+    // a failure after his release (the listener): its reason in place of 'thinking…'
+    expect(run([...talk, { ev: 'talk_over', said: 'voice needs a key. /voice picks one.' }]).view).toEqual({ kind: 'talk', phase: 'over', handsFree: false, said: 'voice needs a key. /voice picks one.' });
+    // a failure at fn down (no key, no mic): shown at once, the mic closed, and his release keeps it
+    const early = run([{ ev: 'fn', act: 'talk_start' }, { ev: 'talk_over', said: 'no mic' }, { ev: 'fn', act: 'talk_end' }]);
+    expect(early.view).toEqual({ kind: 'talk', phase: 'over', handsFree: false, said: 'no mic' });
+    expect(early.fx).toContainEqual({ fx: 'mic', open: false });
+    expect(early.fx).not.toContainEqual({ fx: 'talk', cmd: 'talk_end' });
+    expect(run([...talk, { ev: 'talk_over', said: "i didn't hear anything" }]).view).toMatchObject({ phase: 'over', said: "i didn't hear anything" });
+    // his words answered a card: nothing to say here, the capsule goes
+    expect(run([...talk, { ev: 'talk_over', said: null }])).toMatchObject({ view: NONE });
+    // esc closes it; the next fn talks again
+    expect(run([...talk, { ev: 'talk_over', said: 'x' }, { ev: 'fn', act: 'esc' }]).view).toEqual(NONE);
+    expect(run([...talk, { ev: 'talk_over', said: 'x' }, { ev: 'fn', act: 'talk_start' }]).view).toEqual({ kind: 'talk', phase: 'listen', handsFree: false });
+    // never outside a talk: an error elsewhere doesn't open the capsule, nor end an answer
+    expect(run([{ ev: 'talk_over', said: 'x' }])).toEqual({ view: NONE, fx: [] });
+    expect(run([...talk, { ev: 'answer' }, { ev: 'talk_over', said: 'x' }]).view).toEqual({ kind: 'answer' });
+  });
   it('b3: a card is never pushed; one shows only from the spotlight (decision 2026-10-09, card #476)', () => {
     // no event shows a card by itself: the window's inbox block or the native notification does
     const pushes: CapEvent[] = [{ ev: 'answer' }, { ev: 'card_done', id: 'p.1' }, { ev: 'later' }, { ev: 'close' }, { ev: 'window', shown: false, why: 'blur' }];

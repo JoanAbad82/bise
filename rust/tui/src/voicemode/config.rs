@@ -185,6 +185,27 @@ pub fn listen_job() -> Result<ListenJob, String> {
     with_keys(listen_job_of)
 }
 
+/// Where the listener's model and key were looked for, never the key
+/// (main m_21866: the app's core said 'voice needs a key' on a Mac whose
+/// auth.json has one): the voice model, its provider and key name, where
+/// the key was found or 'none', and the config and auth files read.
+pub fn listen_where() -> String {
+    let home = home();
+    with_keys(|setup, keys| {
+        let r = setup.catalog.resolve_stt(&setup.voice.model);
+        let from = keys.find(&r.provider, &r.key_env).map_or_else(|| "none".to_string(), |f| format!("{:?}", f.from));
+        format!(
+            "voice model '{}' (provider '{}', key {} from {}; config {}, auth {})",
+            setup.voice.model,
+            r.provider,
+            r.key_env,
+            from,
+            home.config_file().display(),
+            home.auth_file().display()
+        )
+    })
+}
+
 /// Realtime when the voice role's provider has it (Mistral), the voice
 /// role's batch model always (the realtime fallback, and the only one
 /// elsewhere).

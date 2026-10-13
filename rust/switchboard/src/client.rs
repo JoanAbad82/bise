@@ -24,7 +24,8 @@ pub fn start_hub(paths: &Paths, exe: &Path, app_root: &Path) -> std::io::Result<
     // the TUI's environment minus every internal variable (bise_home::env),
     // with the TUI's app root: the hub never uses its own lookup's
     bise_home::env::for_child(bise_home::env::Child::Hub, [("BISE_APP_ROOT", app_root)]).apply(&mut cmd);
-    cmd.arg("sbd")
+    let child = cmd
+        .arg("sbd")
         .arg("--workspace")
         .arg(&paths.workspace)
         .current_dir(app_root)
@@ -33,7 +34,37 @@ pub fn start_hub(paths: &Paths, exe: &Path, app_root: &Path) -> std::io::Result<
         .stderr(Stdio::from(err))
         .process_group(0)
         .spawn()?;
+    reap(child);
     Ok(())
+}
+
+/// A hub this process started is its child until it exits: waited for
+/// on its own thread, so one that exits (a second start that found the
+/// hub already up, a hub killed or crashed) never stays a zombie under a
+/// long-lived client, the desktop core (ambient-lead m_21848). If this
+/// process ends first, the hub is reparented and launchd reaps it.
+fn reap(mut child: std::process::Child) {
+    let _ = std::thread::Builder::new().name("hub-reap".into()).spawn(move || {
+        let _ = child.wait();
+    });
+}
+
+/// One hub start at a time per workspace, across threads and processes
+/// (ambient-lead m_21848): the desktop core's home connection and its
+/// project connection to the same folder both found no socket at boot
+/// and both started a hub; the second one said 'a hub is already running'
+/// or 'Address already in use'. Held from the check to the socket being
+/// up, so whoever waited connects to the hub the first one started.
+/// An exclusive flock on `<state>/hub.start.lock`, released on drop.
+fn start_lock(paths: &Paths) -> std::io::Result<std::fs::File> {
+    use std::os::fd::AsRawFd;
+    std::fs::create_dir_all(&paths.state)?;
+    let f = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(paths.state.join("hub.start.lock"))?;
+    // SAFETY: flock on a descriptor this function owns; blocks until free
+    if unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(f)
 }
 
 /// Under BISE_TEST_HOME (bise_home::test_home::jail): the hub's workspace
@@ -73,6 +104,12 @@ pub fn open(paths: &Paths, exe: &Path, app_root: &Path) -> std::io::Result<UnixS
     let s = match UnixStream::connect(paths.socket()) {
         Ok(s) => s,
         Err(_) => {
+            jailed(paths)?;
+            let _start = start_lock(paths)?;
+            // another client started it while this one waited for the lock
+            if let Ok(s) = UnixStream::connect(paths.socket()) {
+                return Ok(s);
+            }
             let err_file = paths.state.join("hub.err");
             let err0 = std::fs::metadata(&err_file).map_or(0, |m| m.len());
             start_hub(paths, exe, app_root)?;

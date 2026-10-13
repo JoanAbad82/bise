@@ -89,7 +89,9 @@ fn live_ports(user_kind: fn(&str) -> bool) -> Ports {
         listener: Box::new(listen::listener_for),
         synth: Box::new(tts::VoxtralTts),
         open_speaker: Box::new(audio::open_speaker),
-        listen_job: Box::new(config::listen_job),
+        // a talk that can't start says why in core.log, with where the
+        // model and key were looked for (main m_21866)
+        listen_job: Box::new(|| config::listen_job().inspect_err(|e| eprintln!("ambient-core: talk: {e} [{}]", config::listen_where()))),
         say_job: Box::new(|| config::say_job(&config::load())),
         language,
         store_image: Box::new(bend_images::store_file),

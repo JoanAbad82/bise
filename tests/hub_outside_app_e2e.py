@@ -73,6 +73,17 @@ def hub_exe(E):
     return hubs[0][1].split(" sbd --workspace ")[0] if hubs else ""
 
 
+def zombies(parent):
+    """`parent`'s children that exited and were never waited for: (pid, command)."""
+    out = subprocess.run(["ps", "-axww", "-o", "pid=,ppid=,stat=,command="], capture_output=True, text=True).stdout
+    rows = []
+    for line in out.split(chr(10)):
+        f = line.split(None, 3)
+        if len(f) >= 3 and f[1] == str(parent) and f[2].startswith("Z"):
+            rows.append((int(f[0]), f[3] if len(f) > 3 else ""))
+    return rows
+
+
 def main():
     if not os.path.exists(EXE):
         sys.exit("build first: cd rust && cargo build")
@@ -104,6 +115,23 @@ def main():
         mine = [(p, c) for p, c in procs() if ID in c or c.startswith(inside)]
         check(all(not c.startswith(inside) for _, c in mine if "ambient-core" not in c),
               "only the core runs from the bundle: %r" % [m for m in mine if m[1].startswith(inside)])
+
+        # one home hub, and none left a zombie under the core (ambient-lead m_21848: at boot his
+        # core's home and project connections to the same folder both started one; the loser,
+        # and every hub killed under it, stayed <defunct> children of the core)
+        check(zombies(core.p.pid) == [], "no zombie under the core: %r" % zombies(core.p.pid))
+        # his home hub killed under the core: reaped, and the core starts it again (fn talked to
+        # nothing until the app restarted)
+        at = core.mark()
+        old = hubs[0][0]
+        os.kill(old, 9)
+        wait.until(lambda: all(p != old for p, _ in procs()), 20, "the killed hub reaped (never <defunct>)", poll=0.2)
+        core.wait(lambda e: e.get("ev") == "hub" and e.get("up") is True, 90, "the home hub up again", since=at)
+        again = [(p, c) for p, c in procs() if " sbd --workspace " in c and c.endswith(E.ws)]
+        check(len(again) == 1 and again[0][0] != old, "one new home hub: %r" % again)
+        check(zombies(core.p.pid) == [], "still no zombie under the core: %r" % zombies(core.p.pid))
+        core.cmd(cmd="send", text="still there?")
+        core.wait(lambda e: e.get("ev") == "sent", 60, "a send after the restart is taken", since=at)
 
         # the app quits: its core goes; the hub's tree stays, none of it in the bundle
         core.p.stdin.close()

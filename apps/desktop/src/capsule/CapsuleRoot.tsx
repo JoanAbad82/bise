@@ -23,7 +23,7 @@ import type { SpotAnswer, SpotFront, SpotItem, SpotRoute } from "@/spotlight";
 import { W } from "@/spotlight/words";
 import { useTheme } from "@/theme";
 import "@/ds/index.css";
-import { Capsule, menuCards } from "./Capsule";
+import { Capsule, menuCards, W as CW } from "./Capsule";
 import { useAgentPreview, useSpotData } from "./data";
 import { START, step, type CapEvent, type Fx, type State } from "./machine";
 
@@ -209,6 +209,22 @@ export function CapsuleRoot(): JSX.Element {
   useEffect(() => {
     routeRef.current = route;
   });
+  // the core ended his talk without a send (amb-core m_21857: fn stuck on 'thinking…' when the
+  // core had no voice key): its error (no project: the core's own, a talk's failure), nothing
+  // heard (its final words empty), or his words answered a card (voice_answer); machine.ts takes
+  // it only while a talk listens or thinks
+  useEffect(
+    () =>
+      store.onEvent((ev) => {
+        if (ev.ev === "error" && ev.project == null && (ev.cmd == null || ev.cmd === "talk_start"))
+          dispatch({ ev: "talk_over", said: ev.text });
+        else if (ev.ev === "heard" && ev.final && ev.text.trim() === "")
+          dispatch({ ev: "talk_over", said: CW.heardNothing });
+        else if (ev.ev === "voice_answer")
+          dispatch({ ev: "talk_over", said: null });
+      }),
+    [store],
+  );
   useEffect(
     () =>
       store.onEvent((ev) => {
