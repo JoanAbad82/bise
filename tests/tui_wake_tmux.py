@@ -11,7 +11,8 @@ the fake provider, tmux at 150 and 80 columns, dark and light.
       ended · rc 0 · after …  ▸ its last 3 lines`, never bise's message
       (`background 0 ended`); ctrl+o opens the lines
   `sb wake --on-file` with a note: an ALARM. perf stays `○`, no live
-      line; the panel's `watching` says `◌ perf  if the reindex  →<clock>`;
+      line; the panel's `watching` says `◌ perf  →<clock>`, the note
+      `if the reindex` under it;
       its rc file with 101: `the reindex ended · rc 101`, the rc in red
   the same with `--then`: a pause, `… continues when the reindex`;
       `sb wake --stop`: `– stopped waiting for the reindex`, `○` again
@@ -61,6 +62,19 @@ def fake_cargo(E):
         f.write("#!/bin/sh\nsleep %d\necho 'running 212 tests'\necho 'test result: ok. 212 passed'\necho 'finished'\n" % SECS)
     os.chmod(p, 0o755)
     return d
+
+
+def light(t, name, still):
+    """`name`'s shot in the light palette, then dark again."""
+    if not SHOTS:
+        return
+    t.typed("/theme light")
+    t.keys("Enter")
+    t.wait(still)
+    shot(t, name)
+    t.typed("/theme dark")
+    t.keys("Enter")
+    t.wait(still)
 
 
 def view(t, name):
@@ -117,10 +131,12 @@ def wide(t, E, bin_dir):
     # panel's `watching` has it with its end
     rc = os.path.join(E.tmp, "reindex.rc")
     sb(E, "perf", "wake", "--on-file", rc, "--note", "the reindex")
-    sc = t.wait_re(r"◌ perf\s+if the reindex\s+→", 30)
+    # designer m_22997: the agent and its end on a row, the note under it
+    sc = t.wait_re(r"◌ perf +→\S+ +│\n.*│ +if the reindex", 30)
     assert "○ perf" in row(sc, "perf"), row(sc, "perf")
     assert "continues when" not in sc, sc
     shot(t, "150-alarm")
+    light(t, "150-alarm-light", "if the reindex")
     with open(rc, "w") as f:
         f.write("101\n")
     # a note names the thing (designer m_17730): `ended`, no `appeared`
@@ -134,6 +150,7 @@ def wide(t, E, bin_dir):
     sc = t.wait("… continues when the reindex", 30)
     assert "… perf" in row(sc, "perf"), row(sc, "perf")
     shot(t, "150-pause-note")
+    light(t, "150-pause-note-light", "… continues when the reindex")
     sb(E, "perf", "wake", "--stop", watch_id(E, "the reindex"))
     sc = t.wait("– stopped waiting for the reindex", 30)
     t.wait_gone("… continues when the reindex", 20)
@@ -149,9 +166,18 @@ def narrow(t, E):
     sb(E, "perf", "wake", "--on-file", os.path.join(E.tmp, "x.rc"), "--note", "the reindex")
     sc = t.wait_re(r"you → perf .*◌ 1 watching", 30)
     for line in sc.splitlines():
-        assert len(line) <= 80, line
+        # `✉︎` is 2 code points (its text-style selector) in 1 cell
+        assert len(line.replace("\ufe0e", "")) <= 80, line
     assert "continues when" not in sc, sc
     shot(t, "80-alarm")
+    light(t, "80-alarm-light", "◌ 1 watching")
+    # /scheduled lists it under `watching`: x stops it
+    t.typed("/scheduled")
+    t.keys("Enter")
+    t.wait("x stop watching", 20)
+    shot(t, "80-scheduled")
+    t.keys("Escape")
+    t.wait_gone("x stop watching", 20)
     sb(E, "perf", "wake", "--then", "--on-file", os.path.join(E.tmp, "y.rc"), "--note", "the reindex ends")
     t.wait("… continues when the reindex ends", 30)
     shot(t, "80-pause")
