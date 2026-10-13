@@ -20,11 +20,24 @@ say() { echo "check-dist-pages: $*" >&2; }
 home="$(mktemp -d "${TMPDIR:-/tmp}/bise-dist-check.XXXXXX")"
 mkdir -p "$home/bise"
 pid=""
+dog=""
+# the hub gets 5 s to stop on TERM, then KILL: a hub that never stops
+# must not hold the build (CI's darwin-x86_64 sat in build-dist for 25+
+# min on -33); never an unbounded wait
 cleanup() {
-  if [ -n "$pid" ]; then kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; fi
+  [ -z "$dog" ] || kill "$dog" 2>/dev/null || true
+  if [ -n "$pid" ]; then
+    kill "$pid" 2>/dev/null || true
+    for _ in $(seq 1 25); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
+    kill -9 "$pid" 2>/dev/null || true
+  fi
   rm -rf "$home"
 }
 trap cleanup EXIT
+trap 'say "timed out after ${CHECK_DIST_PAGES_TIMEOUT:-120} s"; exit 124' TERM
+# the whole check: at most CHECK_DIST_PAGES_TIMEOUT s (default 120)
+( sleep "${CHECK_DIST_PAGES_TIMEOUT:-120}"; kill -TERM $$ 2>/dev/null ) &
+dog=$!
 
 # a clean environment: never the caller's hub (an agent's SB_SOCKET) nor home
 (cd "$app" && exec env -i HOME="$home" PATH=/usr/bin:/bin:/usr/sbin:/sbin USER="${USER:-bise}" TMPDIR="$home" \
@@ -36,7 +49,7 @@ port=""
 for _ in $(seq 1 100); do
   f="$(find "$home/.bise" -name pages.port 2>/dev/null | head -1 || true)"
   [ -n "$f" ] && port="$(tr -d '[:space:]' < "$f")"
-  if [ -n "$port" ] && curl -fs -o /dev/null "http://127.0.0.1:$port/p/start-here"; then break; fi
+  if [ -n "$port" ] && curl -fs --max-time 5 -o /dev/null "http://127.0.0.1:$port/p/start-here"; then break; fi
   kill -0 "$pid" 2>/dev/null || { say "the hub exited:"; tail -20 "$home/sbd.log" >&2; exit 1; }
   sleep 0.2
 done
@@ -47,7 +60,7 @@ fail=0
 # fetch <path> <want status> <want type prefix>
 fetch() {
   local got
-  got="$(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$base$1")"
+  got="$(curl -s --max-time 10 -o /dev/null -w '%{http_code} %{content_type}' "$base$1")"
   case "$got" in
     "$2 $3"*) echo "ok   $1  $got" >&2 ;;
     *) echo "FAIL $1  $got (want $2 $3)" >&2; fail=1 ;;
@@ -57,7 +70,7 @@ fetch() {
 fetch /p/start-here 200 text/html
 links=""
 for p in / /p/start-here; do
-  html="$(curl -fs "$base$p")" || { say "$p did not answer"; exit 1; }
+  html="$(curl -fs --max-time 10 "$base$p")" || { say "$p did not answer"; exit 1; }
   links="$links
 $(printf '%s' "$html" | grep -oE '<link rel="stylesheet" href="[^"]+"' | sed 's/.*href="//; s/"$//' || true)
 $(printf '%s' "$html" | grep -oE '<script src="[^"]+"' | sed 's/.*src="//; s/"$//' || true)"
