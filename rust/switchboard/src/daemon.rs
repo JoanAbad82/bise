@@ -1856,7 +1856,7 @@ fn oneshot(repl: &Path, root: &Path, req_file: &Path, model: &str, keys: &[(Stri
 /// `<agent dir>/role.json`: the last role line and its key (BISE-126).
 fn read_role(adir: &Path) -> Option<(String, String)> {
     let v: Value = serde_json::from_str(&std::fs::read_to_string(adir.join("role.json")).ok()?).ok()?;
-    let line = v["line"].as_str().filter(|l| !l.is_empty())?.to_string();
+    let line = v["line"].as_str().and_then(crate::role::clean)?;
     Some((line, v["key"].as_str().unwrap_or("").to_string()))
 }
 

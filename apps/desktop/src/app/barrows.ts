@@ -54,6 +54,15 @@ export interface AgentExtras {
   readonly computer?: readonly ComputerAgent[];
 }
 
+/**
+ * An agent's role words as the bar draws them: never a raw `<tag>` (a
+ * model's `<think>` once reached its title, main m_22156; the hub drops it
+ * at the source, role.rs `clean`). Such words read 'thinking'.
+ */
+export function roleWords(t: string): string {
+  return /<\/?[a-z][a-z0-9_-]*(\s[^>]*)?>/i.test(t) ? 'thinking' : t;
+}
+
 /** A feature's end: what it waits for, else how far it is. Pure. */
 export function featureEnd(f: Feature): string {
   if (f.building) return 'building';
@@ -98,7 +107,7 @@ export function agentRows(agents: readonly ProjAgent[], now: number, all: boolea
     const i = n++;
     const s = signOf(x.a, now, extras.wakes?.get(`${x.project}/${x.a.name}`));
     const waits = s.g === '?';
-    const role = x.a.title !== '' ? x.a.title : x.a.purpose;
+    const role = roleWords(x.a.title !== '' ? x.a.title : x.a.purpose);
     const numbered = alt && i < 9;
     const cu = computerDot(extras.computer?.find((r) => r.project === x.project && r.agent === x.a.name));
     const short = x.a.usage?.short;

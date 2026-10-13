@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent, Feature } from '@/proto';
-import { agentRows, archivedRows, capRows, type ProjAgent } from './barrows';
+import { agentRows, archivedRows, capRows, roleWords, type ProjAgent } from './barrows';
 
 const NOW = 1_791_100_000_000;
 const ag = (name: string, over: Partial<Agent> = {}): ProjAgent => ({
@@ -45,5 +45,12 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
     const { shown, hidden } = capRows(agentRows(list, NOW, false), 8);
     expect(shown.map((r) => r.name)).toEqual(['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a10']);
     expect(hidden).toBe(3);
+  });
+  it("never draws a raw tag as an agent's role: '<think>' reads 'thinking' (main m_22156)", () => {
+    expect(roleWords('<think>')).toBe('thinking');
+    expect(roleWords('</think> fixing the login')).toBe('thinking');
+    expect(roleWords('fixing a < b in the parser')).toBe('fixing a < b in the parser');
+    const rows = agentRows([ag('perf', { status: 'working', title: '<think>' })], NOW, false);
+    expect(rows[0]?.sub).toBe('thinking');
   });
 });

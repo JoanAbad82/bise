@@ -86,8 +86,13 @@ fn escape(s: &str) -> String {
 
 /// The line of a model's reply: its first non-empty line, without quotes,
 /// a `role:` label or a final period, lowercase, cut to [`MAX`]. None:
-/// nothing usable (the old line stays).
+/// nothing usable (the old line stays). A reasoning model's `<think>`
+/// span is its thinking, never the line (his sidebar read '<think>',
+/// main m_22156): it goes first, an unclosed one with all after it.
+/// Also the reader of a stored line (daemon.rs read_role), so a line
+/// saved before this rule is dropped, not shown.
 pub fn clean(reply: &str) -> Option<String> {
+    let reply = crate::util::strip_thinking(reply);
     let first = reply
         .lines()
         .map(str::trim)
@@ -139,6 +144,20 @@ mod tests {
         assert!(d.ends_with('…'), "{}", d);
         assert!(d.starts_with("BISE-126: when the user views a sub-agent"), "{}", d);
         assert_eq!(default_line(""), "");
+    }
+
+    /// main m_22156: a reasoning model's thinking never becomes the line.
+    #[test]
+    fn a_think_span_is_never_the_line() {
+        assert_eq!(clean("<think>
+the user wants a label
+</think>
+Fixing the login.").as_deref(), Some("fixing the login"));
+        assert_eq!(clean("<think>a</think> drafting the notes").as_deref(), Some("drafting the notes"));
+        assert_eq!(clean("<think>
+still thinking"), None, "unclosed: no line, the old one stays");
+        assert_eq!(clean("<think>"), None, "a line stored before the rule is dropped on read");
+        assert_eq!(clean("reviewing the parser"), Some("reviewing the parser".into()), "a stored line reads back as itself");
     }
 
     #[test]
