@@ -37,7 +37,7 @@ test('agents/archived: history only in the window, a line refused in the TUI, re
   test.setTimeout(240_000);
   const w = realWorld();
   const project = path.basename(path.dirname(hubOf(w, 'shop').sock));
-  const live = async () => (await hubAgents(w, 'shop')).filter((a) => !a.dropped && a.status !== 'archived');
+  const live = async () => (await hubAgents(w, 'shop')).filter((a) => !a.dropped && a.status !== 'archived' && a.archived !== true);
   const n = `h${Date.now() % 1_000_000}`;
   let t: Tui | undefined;
   const s = await launchOn(w, `agents/${project}`, T.screen);
@@ -104,7 +104,9 @@ test('agents/archived: history only in the window, a line refused in the TUI, re
     await expect(page.locator(`${T.screen}[data-archived="true"] ${T.row(AG)}`), "on /archived's list").toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: test.info().outputPath('archived-list.png') });
     await page.locator(T.open(AG)).click({ timeout: 10_000 });
-    await expect(page.locator(T.history), "its thread says it's history only").toContainText('history only', { timeout: 10_000 });
+    // designer's words (ThreadScreen History, amb-win m_11920): '<name> is archived · ⌘⏎ restore'
+    await expect(page.locator(T.history), "its thread says it's archived, with a way back").toContainText(`${AG} is archived`, { timeout: 10_000 });
+    await expect(page.locator(T.history)).toContainText('restore');
     await expect(page.locator(`${T.thread} ${T.field}`), 'no composer that sends').toHaveCount(0);
     await expect(page.locator(`${T.list} [data-testid^="thread.entry."]`).first(), 'its old rows are there').toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: test.info().outputPath('history.png') });

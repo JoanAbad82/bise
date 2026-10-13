@@ -30,7 +30,7 @@ test('agents/worktrees: a shared worktree is one section, an agent alone carries
     if (!(await hubAgents(w, 'shop')).some((a) => a.name === 'helper' && !a.dropped)) {
       worldSay('shop', '[[bash: sb spawn helper --place checkout --objective "look over the checkout change with checkout"]]');
     }
-    const live = async () => (await hubAgents(w, 'shop')).filter((a) => !a.dropped && a.status !== 'archived');
+    const live = async () => (await hubAgents(w, 'shop')).filter((a) => !a.dropped && a.status !== 'archived' && a.archived !== true);
     await expect.poll(async () => (await live()).find((a) => a.name === 'helper')?.path ?? '', { timeout: 30_000, message: "the hub has helper in checkout's worktree" })
       .toBe((await live()).find((a) => a.name === 'checkout')?.path ?? 'none');
     const hub = await live();

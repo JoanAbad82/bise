@@ -218,10 +218,13 @@ function panelOf(screen: string): string[] {
   // ('│  agents   │'), cut from each line's right border. Not by '│': the first-run tip box
   // ('new: your agents…', qa-native e3f7e598) drawn just left of the panel puts its own corners and
   // borders on the agent rows' lines, so the cell before the last '│' can be the whole feed.
-  const head = col < 0 ? lines.find((l) => /│\s+agents\s+│\s*$/.test(l)) : undefined;
+  // With a '┬' too: a feed line holding a character of two code units ('✉︎' is U+2709 + U+FE0E, the
+  // TUI's message rows) shifts everything after it by one, so a cut at the '┬' column misses the
+  // panel on that line ('│  agents' instead of 'agents'); from the right border it never does.
+  const head = lines.find((l) => /│\s+agents\s+│\s*$/.test(l));
   const width = head ? head.lastIndexOf('│') - head.lastIndexOf('│', head.lastIndexOf('agents')) - 1 : -1;
   return lines.map((l) => {
-    if (col < 0 && width > 0) {
+    if (width > 0) {
       const end = l.lastIndexOf('│');
       return end > width ? l.slice(end - width, end).trim() : '';
     }
@@ -347,7 +350,7 @@ export const TUI_STATUS: Readonly<Record<string, readonly string[]>> = {
 };
 
 /** One agent as the hub's socket state has it (the fields the A rows read). */
-export type HubAgent = { name: string; status: string; main: boolean; dropped: boolean; branch: string | null; report: string | null; model: string; effort?: string | null; efforts?: string[]; mode?: string; path?: string; changes: { add: number; del: number; files: number } | null };
+export type HubAgent = { name: string; status: string; main: boolean; dropped: boolean; archived?: boolean; branch: string | null; report: string | null; model: string; effort?: string | null; efforts?: string[]; mode?: string; path?: string; changes: { add: number; del: number; files: number } | null };
 
 /** The hub's agents, read straight from its socket (`hubState`). */
 export async function hubAgents(w: World, project: string): Promise<HubAgent[]> {

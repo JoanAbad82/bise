@@ -29,8 +29,9 @@ test('agents/lifecycle: stop, archive and restore from the window act as in the 
   test.setTimeout(240_000);
   const w = realWorld();
   const project = path.basename(path.dirname(hubOf(w, 'shop').sock));
-  // the hub keeps an archived agent in its state with status 'archived'
-  const live = async () => (await hubAgents(w, 'shop')).filter((a) => !a.dropped && a.status !== 'archived');
+  // the hub keeps an archived agent in its state: its row says archived: true (bise_proto rows/agents.rs),
+  // its status stays what it was (older hubs said status 'archived')
+  const live = async () => (await hubAgents(w, 'shop')).filter((a) => !a.dropped && a.status !== 'archived' && a.archived !== true);
   const status = async () => (await live()).find((a) => a.name === AG)?.status;
   let t: Tui | undefined;
   const s = await launchOn(w, `agents/${project}`, T.screen);
