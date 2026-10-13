@@ -11,11 +11,15 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fxDir, named } from './fx.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DESKTOP = process.env.PW_FROM ?? path.join(HERE, '..', '..', '..', '..', 'apps', 'desktop');
 const { chromium } = createRequire(path.join(DESKTOP, 'package.json'))('@playwright/test');
 const [port, out, mode, draft] = process.argv.slice(2);
+// the files its words carry: never under a path that names a world project (fx.mjs)
+const FX = fxDir(out, process.env);
+fs.mkdirSync(FX, { recursive: true });
 const tag = process.env.AS_HE_DOES_TAG ? `-${process.env.AS_HE_DOES_TAG}` : '';
 const WATCHDOG_MS = Number(process.env.AS_HE_DOES_WATCHDOG_MS ?? 600000);
 const ANSWER_MS = Number(process.env.AS_HE_DOES_ANSWER_MS ?? 240000);
@@ -665,7 +669,15 @@ if (mode === 'rows2') {
   await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
   // a long reply in bise's own thread, so it scrolls for the block's height row (1c5659b8 run: the
   // thread was empty, nothing scrolled)
-  const longMd = path.join(out, 'long-reply.md');
+  // regress-25e5: a path naming a project routes these words there (fx.mjs), and the rows below
+  // read a reply that never comes to bise's thread
+  // the project rows only (app.sidebar.project.<id>, not their parts), their first line: the name
+  const projects = (await page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
+    .filter((r) => /^app\.sidebar\.project\.[^.]+$/.test(r.getAttribute('data-testid') ?? ''))
+    .map((r) => (r.innerText ?? '').split(String.fromCharCode(10))[0].trim())).catch(() => [])).filter(Boolean);
+  const hits = named(FX, projects);
+  step("the files the words carry name no world project (else bise's thread routes them there)", projects.length > 0 && hits.length === 0, { fx: FX, projects, named: hits });
+  const longMd = path.join(FX, 'long-reply.md');
   fs.writeFileSync(longMd, Array.from({ length: 60 }, (_, i) => `scroll line ${i + 1}: a long reply so bise's thread scrolls.`).join('\n\n') + '\n');
   await say(`a long one please [[reply: ${longMd}]]`);
   const longIn = await until(async () => (/scroll line 60/.test((await text('[data-testid="thread.list"]')) ?? '') ? true : null), ANSWER_MS, 1000);
@@ -935,7 +947,7 @@ if (mode === 'rows2') {
     if (await page.locator('[data-testid="terminal.panel"]').first().isVisible().catch(() => false)) await click('hide the terminal', page.locator('[data-testid="terminal.hide"]').first());
   }
   step('the terminal panel opens at 1100 (⌃`)', at1100.terminal.there && !at1100.terminal.overflow, at1100.terminal);
-  const md = path.join(out, 'code-reply.md');
+  const md = path.join(FX, 'code-reply.md');
   fs.writeFileSync(md, 'here is the proof, quote me if you like.\n\n```sh\necho proof-code\nls -la | head -3\n```\n\nthat was the code block.\n');
   await harness();
   await say(`[[bash: echo tool-row-proof]] [[reply: ${md}]]`);
@@ -1438,7 +1450,7 @@ async function rows37(harness, say) {
   };
 
   await row('attachment list', async () => {
-    const AD = path.join(out, 'attach37');
+    const AD = path.join(FX, 'attach37');
     fs.rmSync(AD, { recursive: true, force: true });
     fs.mkdirSync(AD, { recursive: true });
     const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
@@ -1680,7 +1692,7 @@ async function rows25(harness, say) {
     await page.keyboard.press('Meta+a');
     await page.keyboard.press('Backspace');
   };
-  const D = path.join(out, 'rows25');
+  const D = path.join(FX, 'rows25');
   fs.rmSync(D, { recursive: true, force: true });
   fs.mkdirSync(D, { recursive: true });
   const NW = 1600, NH = 1000;
@@ -1961,12 +1973,12 @@ async function quickRows(harness, say) {
 // (f1) ad753852's file chips (ambient-lead m_22068): a Finder drop (CDP's drag, the desktop checks'
 // dropFiles) of a pdf, csv, xlsx, docx and pptx on harness' composer; the hub's 'you' entry; his
 // bubble; a click / right-click; a file gone at send time; a csv dropped while answering a card.
-// The files live in <out>/file-chips: outside the app's home and every world project, so main's
+// The files live in <fx>/file-chips: outside the app's home and every world project, so main's
 // fence (ipc.ts lookable) refuses a preview or a reveal and nothing reaches his screen. The calls
 // are seen from logpoints on the preload's quickLook / showInFinder (this build has no test mode,
 // so no 'bise-desktop: quicklook' line).
 async function fileChips(harness) {
-  const FD = path.join(out, 'file-chips');
+  const FD = path.join(FX, 'file-chips');
   fs.rmSync(FD, { recursive: true, force: true });
   fs.mkdirSync(FD, { recursive: true });
   const DOCS = ['q3.pdf', 'data.csv', 'plan.xlsx', 'brief.docx', 'deck.pptx'];

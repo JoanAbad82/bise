@@ -167,6 +167,9 @@ $RS libsnap --out $O/before.json
 $RS build | tail -8
 # every model request in a line (the quote row reads it), in the world, never /tmp's default
 export FAKE_LOG=$G/fake/requests.jsonl AS_HE_DOES_FAKE_LOG=$G/fake/requests.jsonl
+# the files the driver's words carry, under the world (fx.mjs, regress-25e5): an out dir in an
+# agent's tmp (~/.bise/hubs/harness-<id>/...) names 'harness', and bise's thread routed them there
+export AS_HE_DOES_FX=$G/fx
 mkdir -p $G/fake; : > $FAKE_LOG; ($P -u $T/tests/fake_provider.py 0 > $G/fake/fake.out 2> $G/fake/fake.err & echo $! > $G/fake/fake.pid)
 for i in $(seq 30); do grep -q PORT $G/fake/fake.out 2>/dev/null && break; sleep 0.3; done
 PORT=$(awk '/PORT/{print $2}' $G/fake/fake.out); say "fake provider port $PORT"

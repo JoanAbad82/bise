@@ -17,6 +17,8 @@ G=$HOME/.bise/gate/real-shape; H=$G/w/h
 SRC=${AS_HE_DOES_SRC:-$HOME/.bise/dev/try-src}
 A="$SRC/apps/desktop/dist/mac-arm64/bise try.app"
 export PW_FROM=$T/apps/desktop
+# the files the driver's words carry, under the world, never under a path naming a project (fx.mjs)
+export AS_HE_DOES_FX=$G/fx
 say() { echo "$(date +%T) $*"; }
 stopall() { (cd "$SRC" && BISE_TRY_REAL=$H/.bise scripts/desktop-try.sh --real --stop); sleep 2; say "left naming the world: $(ps -axo pid,command | grep -F "$G/w" | grep -v grep | wc -l)"; }
 endrun() { touch $O/stop; kill $TPID $NPID $CPID $CCPID 2>/dev/null; kill $(cat $G/fake/fake.pid) 2>/dev/null; }
