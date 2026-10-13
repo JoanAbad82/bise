@@ -114,12 +114,15 @@ const windowPort = (): Pick<CorePort, 'onEvent'> | null => (globalThis as { bise
  * defaults to window.bise.core (a test passes its own).
  */
 export function usePartialText(project: string | null, agent: string | null, port?: Pick<CorePort, 'onEvent'> | null): LivePartial | null {
-  const [live, setLive] = useState<LivePartial | null>(null);
+  // the partial with what it is of: another agent (or port) reads null until its own comes, as the
+  // old setLive(null) in the effect did, without a second render (react-hooks/set-state-in-effect)
+  const [live, setLive] = useState<{ readonly p: unknown; readonly project: string; readonly agent: string; readonly v: LivePartial | null } | null>(null);
   const p = port === undefined ? windowPort() : port;
   useEffect(() => {
-    setLive(null);
     if (p === null || project === null || agent === null) return;
-    return followPartial(p, project, agent, setLive);
+    return followPartial(p, project, agent, (v) => {
+      setLive({ p, project, agent, v });
+    });
   }, [p, project, agent]);
-  return live;
+  return live !== null && live.p === p && live.project === project && live.agent === agent ? live.v : null;
 }

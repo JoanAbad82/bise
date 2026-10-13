@@ -8,6 +8,7 @@ import { sortCards } from '@/inbox/order';
 import { threadKey, useProjects, useStore, useThreadOrder } from '@/store';
 import type { SpotCard, SpotData, SpotFront } from '@/spotlight';
 import { previewLines, type PreviewLine } from '@/spotlight/preview';
+import { useNow } from '@/app/clock';
 
 export function cardKind(c: Card): SpotCard['kind'] {
   if (c.approval !== true) return 'question';
@@ -54,24 +55,29 @@ const PREVIEW_PAGE = 12;
  */
 export function useAgentPreview(sel: { readonly id: string; readonly project: string; readonly name: string } | null, keep: string | null): { readonly id: string; readonly lines: readonly PreviewLine[] } | null {
   const store = useStore();
-  const key = sel === null ? '' : threadKey(sel.project, sel.name);
+  const id = sel?.id ?? null;
+  const project = sel?.project ?? null;
+  const name = sel?.name ?? null;
+  const key = project === null || name === null ? '' : threadKey(project, name);
   useEffect(() => {
-    if (sel === null) return;
+    if (project === null || name === null) return;
     // a short pause: arrows held through the list don't subscribe to every agent on the way
     const t = window.setTimeout(() => {
-      store.subscribeThread(sel.project, sel.name, PREVIEW_PAGE);
+      store.subscribeThread(project, name, PREVIEW_PAGE);
     }, 120);
     return () => {
       window.clearTimeout(t);
-      if (key !== keep) store.unsubscribeThread(sel.project, sel.name);
+      if (key !== keep) store.unsubscribeThread(project, name);
     };
-  }, [store, key, keep]);
+  }, [store, project, name, key, keep]);
   const order = useThreadOrder(key);
+  // the minute clock, not Date.now() in render: the ages also move on while he looks
+  const now = useNow();
   return useMemo(() => {
-    if (sel === null) return null;
+    if (id === null) return null;
     const entries = order.order.slice(-PREVIEW_PAGE).flatMap((pos) => store.entry(key, pos) ?? []);
-    return { id: sel.id, lines: previewLines(entries, Date.now()) };
-  }, [sel?.id, order, store, key]);
+    return { id, lines: previewLines(entries, now) };
+  }, [id, order, store, key, now]);
 }
 
 /** Every project's agents and cards, with what's in front, re-read only when a slice changes. */

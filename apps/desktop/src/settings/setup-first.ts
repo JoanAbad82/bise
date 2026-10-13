@@ -87,7 +87,10 @@ export function useHeldSetup(held: Held | null, accounts: readonly Account[]): v
   }, [held, accounts, store, router]);
   // the latest wait and accounts, for the leave (the cleanup must not run on each change)
   const now = useRef({ held, accounts });
-  now.current = { held, accounts };
+  // kept after each commit, not during render (react-hooks/refs); the leave reads the last one
+  useEffect(() => {
+    now.current = { held, accounts };
+  });
   useEffect(
     () => () => {
       const cmd = onLeave(now.current.held, now.current.accounts);

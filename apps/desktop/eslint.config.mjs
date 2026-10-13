@@ -23,8 +23,8 @@ export default tseslint.config(
     },
   },
   {
-    // a hook may live in a .ts file too (composer/pm/dictation.ts, paste.ts, composer/useSources.ts)
-    files: ['src/**/*.tsx', 'src/renderer/**/*.ts', 'src/app/**/*.ts', 'src/composer/**/*.ts'],
+    // a hook may live in any .ts file too (composer/pm/dictation.ts, shared/partial.ts, capsule/data.ts…)
+    files: ['src/**/*.tsx', 'src/**/*.ts'],
     extends: [reactHooks.configs.flat['recommended-latest']],
     languageOptions: { globals: globals.browser },
   },
