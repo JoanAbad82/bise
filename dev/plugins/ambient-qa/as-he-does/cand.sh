@@ -80,11 +80,21 @@ breach() { [ -e $O/BREACH ] && { say "BREACH: $(cat $O/BREACH)"; stopcand; endru
 # is read with lsof (read only) on the candidate's pids: any open file under his folder = ours, kill
 # as before; none = his own app's write, logged, the run goes on. Anything else changed = kill.
 HISDATA="$HOME/Library/Application Support/bise try"
+CANDPREF="$HOME/Library/Preferences/$CAND_ID.plist"
 libgate() {
   local out; out=$($RS libsnap --out $O/after-$1.json --diff $O/before.json) && return 0
   echo "$out"
   # (the folder's own line counts as his userData too: run 4 stopped on it)
-  local other; other=$(echo "$out" | sed -n 's/^  //p' | grep -vF "$HISDATA/" | grep -vxF "$HISDATA" | grep -v '^$')
+  # the candidate's OWN preferences domain is allowed and logged (main m_20867: Chromium writes 3 keys
+  # through cfprefsd at startup, under his real home whatever HOME is); deleted at the run's end
+  echo "$out" | sed -n 's/^  //p' | grep -xF "$CANDPREF" | sed "s|^|$1 |" >> $O/cand-prefs.txt
+  local other; other=$(echo "$out" | sed -n 's/^  //p' | grep -vxF "$CANDPREF" | grep -vF "$HISDATA/" | grep -vxF "$HISDATA" | grep -v '^$')
+  local his; his=$(echo "$out" | sed -n 's/^  //p' | grep -vxF "$CANDPREF" | grep -v '^$')
+  if [ -z "$his" ]; then
+    say "library $1: only the candidate's own $CANDPREF (allowed, logged)"
+    cp $O/after-$1.json $O/before.json
+    return 0
+  fi
   if [ -z "$other" ] && [ -n "$(hispids)" ]; then
     local pids; pids=$(sort -u $O/pids.txt | tr '\n' ',' | sed 's/,$//')
     local ourfd; ourfd=$([ -n "$pids" ] && lsof -n -P -Fn -p "$pids" 2>/dev/null | sed -n 's/^n//p' | grep -F "$HISDATA/")
@@ -165,6 +175,10 @@ kill $(cat $G/fake/fake.pid) 2>/dev/null
 say "realshape core with no env"
 $RS core --bundle "$A" --out $O/core-noenv 2>&1 | tail -10
 w=$(ps -axo pid=,command= | grep -F "$G/w" | grep -v grep | awk '{print $1}'); [ -n "$w" ] && killpids $w
+# the candidate's own preferences domain goes through cfprefsd, never rm (it caches and writes back)
+defaults delete "$CAND_ID" > $O/cand-prefs-delete.txt 2>&1; echo "rc=$?" >> $O/cand-prefs-delete.txt
+if [ -e "$CANDPREF" ]; then say "cand prefs: 'defaults delete $CAND_ID' done, the file is still there ($(stat -f %z "$CANDPREF") bytes, $(plutil -p "$CANDPREF" 2>/dev/null | tr -d '\n '))"
+else say "cand prefs: 'defaults delete $CAND_ID' done, the file is gone"; fi
 libgate final
 say "his app after: $(hispids)" | tee -a $O/his.txt
 say "done"

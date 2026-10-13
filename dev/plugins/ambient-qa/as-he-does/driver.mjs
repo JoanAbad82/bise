@@ -67,7 +67,9 @@ const click = async (name, loc) => {
 };
 // the window can go away under a pass (7e691aef's rerun: the candidate quit at 07:48:09, rows2 then
 // crashed in page.waitForTimeout): say it as a red step and end the pass, never an uncaught error
+let ending = false;
 const closed = () => {
+  if (ending) return;
   step('the window stayed open through the pass', false, 'the page closed');
   process.exit(3);
 };
@@ -197,7 +199,11 @@ if (mode === 'cut') {
   const composerOf = () => page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
   const say = async (words) => {
     if (!(await click(`say ${words.slice(0, 30)}`, composerOf()))) return false;
-    await page.keyboard.type(words, { delay: 5 });
+    const parts = words.split('\n');
+    for (let i = 0; i < parts.length; i++) {
+      if (i) await page.keyboard.press('Shift+Enter');
+      await page.keyboard.type(parts[i], { delay: 5 });
+    }
     await page.keyboard.press('Enter');
     return true;
   };
@@ -241,7 +247,7 @@ if (mode === 'cut') {
   // a thought of its own message (the fake provider's [[think: …]]): opened, it must never draw its
   // signature (BENDSIG::…, c28260a9's window guard)
   await say('think it over [[think: weighing the proof rows]]');
-  const thoughts = page.locator('[data-testid^="thread.entry."][data-kind="thinking"]');
+  const thoughts = page.locator('[data-testid^="thread.entry."]').filter({ has: page.locator('[data-testid^="thread.think."]') });
   const nThoughts = (await until(async () => ((await thoughts.count()) > 0 ? await thoughts.count() : null), ANSWER_MS, 1000)) ?? 0;
   for (let i = 0; i < nThoughts; i++) {
     const t = thoughts.nth(i);
@@ -344,7 +350,11 @@ if (mode === 'rows2') {
   const composerOf = () => page.locator('[data-testid="composer"] [contenteditable="true"], [data-testid="composer"] textarea').first();
   const say = async (words) => {
     if (!(await click(`say ${words.slice(0, 30)}`, composerOf()))) return false;
-    await page.keyboard.type(words, { delay: 5 });
+    const parts = words.split('\n');
+    for (let i = 0; i < parts.length; i++) {
+      if (i) await page.keyboard.press('Shift+Enter');
+      await page.keyboard.type(parts[i], { delay: 5 });
+    }
     await page.keyboard.press('Enter');
     return true;
   };
@@ -364,7 +374,7 @@ if (mode === 'rows2') {
   await shot('right-bar');
   step('the right bar: agents, archived, artifacts, scheduled', shown && order.join(',') === 'app.right.agents,app.right.archived,app.right.artifacts,app.right.scheduled', order);
   const agentsText = (await text('[data-testid="app.right.agents"]')) ?? '';
-  step('the right bar lists agents in start order (main, then keeper)', /bise|main/.test(agentsText) && agentsText.indexOf('keeper') > 0, agentsText.slice(0, 300));
+  step('the right bar lists the agents (keeper; main is the thread itself)', /\bkeeper\b/.test(agentsText) && !/\bgone\b/.test(agentsText), agentsText.slice(0, 300));
   const leftAgents = await page.locator('[data-testid="app.sidebar"] [data-testid*=".agent."]').count().catch(() => 0);
   step('the left bar holds places only (no agent rows)', leftAgents === 0 && !/\bkeeper\b/.test((await text('[data-testid="app.sidebar"]')) ?? ''), { agent_rows: leftAgents });
   // ⌥⌘0 and the title bar's toggle hide and bring back the right bar
@@ -400,9 +410,13 @@ if (mode === 'rows2') {
       return n / (d.length / 4);
     }, png) : 0;
   }
-  const cols = await page.evaluate(() => ({ left: !!document.querySelector('[data-testid="app.sidebar"]'), right: !!document.querySelector('[data-testid="app.panel"]') }));
+  const cols = await page.evaluate(() => {
+    const vis = (sel) => { const e = document.querySelector(sel); if (!e) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const rail = document.elementFromPoint(50, 110);
+    return { rail: !!rail && rail.getBoundingClientRect().right < 160, thread: vis('[data-testid="app.main"]'), page: vis('[data-testid="artifact.page"]') };
+  });
   await shot('artifact-from-right-bar');
-  step('an artifact from the right bar: 3 columns, its page drawn (green pixels)', drawn && green > 0.3 && cols.left && cols.right, { opened, drawn, green: Math.round(green * 100) / 100, cols });
+  step('an artifact from the right bar: 3 columns, its page drawn (green pixels)', drawn && green > 0.3 && cols.rail && cols.thread && cols.page, { opened, drawn, green: Math.round(green * 100) / 100, cols });
   const closed = await click('✕', page.locator('[data-testid="artifact.close"]').first());
   const gone1 = closed && await pageEl.waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
   await click('proof-html again', row);
@@ -434,7 +448,7 @@ if (mode === 'rows2') {
   await until(async () => (/ack: take a moment/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), ANSWER_MS, 1000);
   await say('one quick thought [[think: weighing the proof rows]]');
   // the TUI folds a thought too (ambient-lead m_20609): the row is there, then opens to its words
-  const rows = page.locator('[data-testid^="thread.entry."][data-kind="thinking"]');
+  const rows = page.locator('[data-testid^="thread.entry."]').filter({ has: page.locator('[data-testid^="thread.think."]') });
   const nRows = (await until(async () => ((await rows.count()) > 0 ? await rows.count() : null), ANSWER_MS, 1000)) ?? 0;
   const last = rows.nth(Math.max(0, nRows - 1));
   if (nRows) await last.getByText(/thought for/).first().click({ timeout: 3000 }).catch(() => last.click({ timeout: 3000 }).catch(() => {}));
@@ -486,4 +500,5 @@ if (mode === 'draft-type' || mode === 'draft-check') {
     }
   }
 }
+ending = true;
 await browser.close().catch(() => {});
