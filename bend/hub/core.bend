@@ -30,6 +30,8 @@ import ./gen/kit.bend as K
 
 import ./pause.bend as P
 import ./gen/feed.bend as FD
+import ./keyed.bend as KL
+import ./feature.bend as FT
 
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
@@ -270,71 +272,7 @@ def waiter_drop(xs: List<&2, X.Waiter>, +tok: Nat) -> List<&2, X.Waiter>:
     case Con{+h, +t}:
       Bool.pick(List<&2, X.Waiter>, Nat.is_eq(X.Waiter.token(h), tok), t, h <> waiter_drop(t, tok))
 
-# ---- keyed lists (a list of entries, at most one per key) ----
-
-# the entries whose key is not `n`
-def del_key(~A: Data, ~key: A -> String, xs: List<&2, A>, +n: String) -> List<&2, A>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      +rest = del_key(~A, ~key, t, n)
-      Bool.pick(List<&2, A>, String.eq(key(h), n), rest, h <> rest)
-
-# the value of the first entry whose key is `n`, or `dflt`
-def get_key(~A: Data, ~B: Data, ~key: A -> String, ~val: A -> B, xs: List<&2, A>, +n: String, +dflt: B) -> B:
-  match xs:
-    case Nil{}:
-      dflt
-    case Con{+h, +t}:
-      Bool.pick(B, String.eq(key(h), n), val(h), get_key(~A, ~B, ~key, ~val, t, n, dflt))
-
-def steer_get(xs: List<&2, X.Steer>, +n: String) -> List<&2, Nat>:
-  get_key(~X.Steer, ~List<&2, Nat>, ~X.Steer.agent, ~X.Steer.ids, xs, n, Nil{})
-
-# how many of an agent's steered ids a receipt already reported
-def steer_seen(xs: List<&2, X.Steer>, +n: String) -> Nat:
-  get_key(~X.Steer, ~Nat, ~X.Steer.agent, ~X.Steer.seen, xs, n, 0n)
-
-# how many of an agent's steered ids a received receipt already reported
-def steer_rx_seen(xs: List<&2, X.Steer>, +n: String) -> Nat:
-  get_key(~X.Steer, ~Nat, ~X.Steer.agent, ~X.Steer.rx_seen, xs, n, 0n)
-
-def cnt_get(xs: List<&2, X.Cnt>, +n: String) -> X.Cnt:
-  get_key(~X.Cnt, ~X.Cnt, ~X.Cnt.agent, ~(c => c), xs, n, X.Cnt{n, 0n, 0n})
-
-def cnt_del(xs: List<&2, X.Cnt>, +n: String) -> List<&2, X.Cnt>:
-  del_key(~X.Cnt, ~X.Cnt.agent, xs, n)
-
-def kv_get(xs: List<&2, X.Kv>, +n: String) -> String:
-  get_key(~X.Kv, ~String, ~X.Kv.key, ~X.Kv.val, xs, n, "")
-
-def kv_del(xs: List<&2, X.Kv>, +n: String) -> List<&2, X.Kv>:
-  del_key(~X.Kv, ~X.Kv.key, xs, n)
-
-def kn_get(xs: List<&2, X.Kn>, +n: String) -> Nat:
-  get_key(~X.Kn, ~Nat, ~X.Kn.key, ~X.Kn.n, xs, n, 0n)
-
-def kn_del(xs: List<&2, X.Kn>, +n: String) -> List<&2, X.Kn>:
-  del_key(~X.Kn, ~X.Kn.key, xs, n)
-
-def steer_del(xs: List<&2, X.Steer>, +n: String) -> List<&2, X.Steer>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      +rest = steer_del(t, n)
-      Bool.pick(List<&2, X.Steer>, String.eq(X.Steer.agent(h), n), rest, h <> rest)
-
-def steer_add(+xs: List<&2, X.Steer>, +n: String, +ids: List<&2, Nat>) -> List<&2, X.Steer>:
-  M.snoc(X.Steer, steer_del(xs, n), X.Steer{n, List.append(&2, Nat, steer_get(xs, n), ids), steer_seen(xs, n), steer_rx_seen(xs, n)})
-
-def steer_rename(xs: List<&2, X.Steer>, +old: String, +new: String) -> List<&2, X.Steer>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+h, +t}:
-      Bool.pick(X.Steer, String.eq(X.Steer.agent(h), old), X.Steer{new, X.Steer.ids(h), X.Steer.seen(h), X.Steer.rx_seen(h)}, h) <> steer_rename(t, old, new)
+# (the keyed lists' helpers, `KL.`: hub/keyed.bend)
 
 def ids_of(xs: List<&2, M.Msg>) -> List<&2, Nat>:
   match xs:
@@ -688,7 +626,7 @@ def pump.send.go(-o: M.St, busy: Bool, +cx: X.Cx<o>, +name: String, +ids: List<&
   match busy:
     case True{}:
       +r = rr(o, cx)
-      +cx2 = set_r(o, cx, X.R.with_steered(r, steer_add(X.R.steered(r), name, ids)))
+      +cx2 = set_r(o, cx, X.R.with_steered(r, KL.steer_add(X.R.steered(r), name, ids)))
       dirty(o, out(o, cx2, F.deliver("steer", name, notes, status, msgs)))
     case False{}:
       # the turn starts now: nothing else may `say` meanwhile
@@ -828,7 +766,7 @@ def send.revive(-o: M.St, ok: Bool, +cx: X.Cx<o>, +s: Snd, +why: String) -> X.Cx
       +to = Snd.to(s)
       +cx2 = emit(o, cx, M.ELifecycle{to, M.LActive{}, None{}}, Unit{}, Unit{}, Unit{})
       +r = rr(o, cx2)
-      +cx3 = set_r(o, cx2, X.R.with_crashes(r, kn_del(X.R.crashes(r), to)))
+      +cx3 = set_r(o, cx2, X.R.with_crashes(r, KL.kn_del(X.R.crashes(r), to)))
       send.thread(o, Snd.reply_to(s), spawn(o, cx3, to, True{}), s)
 
 def dropped_wt(+a: M.Agent) -> Bool:
@@ -1590,7 +1528,7 @@ def stop_task.go(-o: M.St, +cx: X.Cx<o>, +name: String, +life: M.Life, +reason: 
   +cx1 = out(o, cx, F.kill(name))
   +cx2 = fail_waiters(o, cx1, name, "stopped")
   +r = rr(o, cx2)
-  +cx3 = set_r(o, cx2, X.R.with_steered(r, steer_del(X.R.steered(r), name)))
+  +cx3 = set_r(o, cx2, X.R.with_steered(r, KL.steer_del(X.R.steered(r), name)))
   +cx4 = upd_rt(o, cx3, X.Rt.with_turn(X.Rt.with_run(rt(o, cx3, name), M.RDown{}), None{}))
   +cx5 = emit(o, cx4, M.ELifecycle{name, life, Bool.pick(Maybe<&2, String>, String.is_empty(reason), None{}, Some{reason})}, Unit{}, Unit{}, Unit{})
   +cx6 = reject_ids(o, ids_of(M.queued_for(st(o, cx5), name)), cx5)
@@ -1786,7 +1724,7 @@ def restore.go(-o: M.St, +cx: X.Cx<o>, +a: M.Agent) -> X.Cx<o> & TaskR:
   +n = M.Agent.name(a)
   +cx2 = emit(o, cx, M.ELifecycle{n, M.LActive{}, None{}}, Unit{}, Unit{}, Unit{})
   +r = rr(o, cx2)
-  +cx3 = set_r(o, cx2, X.R.with_crashes(r, kn_del(X.R.crashes(r), n)))
+  +cx3 = set_r(o, cx2, X.R.with_crashes(r, KL.kn_del(X.R.crashes(r), n)))
   +cx4 = spawn(o, cx3, n, True{})
   # an idle task back from failed gets the mail it kept (law L4)
   (feed(o, pump(o, cx4, n), M.MAIN(), FD.info(cat(["@", n, " restored"]))), TOk{n})
@@ -1944,6 +1882,34 @@ def move_task(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +j:
       (cx, TErr{e})
     case None{}:
       move.to(o, j, cx, name)
+
+# ---- `sb feature retire <name>` (hub/feature.bend: who, the words) ----
+
+# an active agent gets the note from the hub, queued (a busy one reads it
+# after its turn, never a steer); a stopped or failed one only its new
+# workspace: never a revive (law feature_retire_stops_nothing)
+def feature_retire.tell(-o: M.St, life: M.Life, +cx: X.Cx<o>, +n: String, +text: String) -> X.Cx<o>:
+  match life:
+    case M.LActive{}:
+      fst(o, send.thread(o, None{}, cx, Snd{M.HUB(), n, text, False{}, None{}, True{}, False{}, True{}, None{}, ""}))
+    case _:
+      cx
+
+def feature_retire.one(-o: M.St, +cx: X.Cx<o>, +a: M.Agent, +text: String) -> X.Cx<o>:
+  +n = M.Agent.name(a)
+  feature_retire.tell(o, M.Agent.life(a), emit(o, cx, M.EWorkspace{n, FT.unfeature(M.Agent.ws(a))}, Unit{}, Unit{}, Unit{}), n, text)
+
+def feature_retire.all(-o: M.St, xs: List<&2, M.Agent>, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
+  match xs:
+    case Nil{}:
+      cx
+    case Con{+a, +t}:
+      feature_retire.all(o, t, feature_retire.one(o, cx, a, text), text)
+
+def feature_retire(-o: M.St, +cx: X.Cx<o>, +name: String, +kept: String, +main: String) -> X.Cx<o>:
+  +xs = FT.retirees(st(o, cx), name)
+  +cx2 = feature_retire.all(o, xs, cx, FT.note(name, kept, main))
+  feed(o, cx2, M.MAIN(), FD.info(FT.line(name, kept, main, xs)))
 
 # ---- the user ----
 
@@ -2259,7 +2225,7 @@ def user_isolate.res(-o: M.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
 def rename.apply.new(-o: M.St, +cx: X.Cx<o>, +old: String, +new: String, +e: {M.name_taken(X.d(o, cx), new) == False{} : Bool}) -> X.Cx<o>:
   +cx2 = emit(o, cx, M.ERenamed{old, new}, e, Unit{}, Unit{})
   +r = rr(o, cx2)
-  +cx3 = set_r(o, cx2, X.R.with_rts(X.R.with_waiters(X.R.with_steered(r, steer_rename(X.R.steered(r), old, new)),
+  +cx3 = set_r(o, cx2, X.R.with_rts(X.R.with_waiters(X.R.with_steered(r, KL.steer_rename(X.R.steered(r), old, new)),
     waiters_rename(X.R.waiters(r), old, new)), rt_rename(X.R.rts(r), old, new)))
   +cx4 = out(o, cx3, F.renamed(old, new))
   feed(o, cx4, M.MAIN(), FD.info(cat(["@", old, " s'appelle maintenant @", new])))
@@ -3393,9 +3359,9 @@ def turn_started(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
 
 def steer_count(-o: M.St, +cx: X.Cx<o>, +agent: String, +injected: Bool) -> X.Cx<o>:
   +r = rr(o, cx)
-  +c = cnt_get(X.R.counts(r), agent)
+  +c = KL.cnt_get(X.R.counts(r), agent)
   +c2 = Bool.pick(X.Cnt, injected, X.Cnt{agent, X.Cnt.recv(c), 1n+X.Cnt.inj(c)}, X.Cnt{agent, 1n+X.Cnt.recv(c), X.Cnt.inj(c)})
-  set_r(o, cx, X.R.with_counts(r, M.snoc(X.Cnt, cnt_del(X.R.counts(r), agent), c2)))
+  set_r(o, cx, X.R.with_counts(r, M.snoc(X.Cnt, KL.cnt_del(X.R.counts(r), agent), c2)))
 
 # an agent's steered list with `seen` set to `k` (the list itself kept)
 def steer_mark(xs: List<&2, X.Steer>, +n: String, +k: Nat) -> List<&2, X.Steer>:
@@ -3430,8 +3396,8 @@ def steer_receipt.go(-o: M.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: String,
 # R.steered stays whole for the turn's end (repl_idle reads it)
 def steer_receipt(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   +xs = X.R.steered(rr(o, cx))
-  +ids = steer_get(xs, agent)
-  steer_receipt.go(o, List.drop(&2, Nat, ids, steer_seen(xs, agent)), cx, agent, List.length(&2, Nat, ids))
+  +ids = KL.steer_get(xs, agent)
+  steer_receipt.go(o, List.drop(&2, Nat, ids, KL.steer_seen(xs, agent)), cx, agent, List.length(&2, Nat, ids))
 
 # the received receipt's ids: the steer-mode deliveries since the last
 # received receipt (none: nothing marked, nothing written)
@@ -3449,12 +3415,12 @@ def steer_rx_receipt.go(-o: M.St, new: List<&2, Nat>, +cx: X.Cx<o>, +agent: Stri
 # ✓); its own cursor, rx_seen, apart from steered's
 def steer_rx_receipt(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
   +xs = X.R.steered(rr(o, cx))
-  +ids = steer_get(xs, agent)
-  steer_rx_receipt.go(o, List.drop(&2, Nat, ids, steer_rx_seen(xs, agent)), cx, agent, List.length(&2, Nat, ids))
+  +ids = KL.steer_get(xs, agent)
+  steer_rx_receipt.go(o, List.drop(&2, Nat, ids, KL.steer_rx_seen(xs, agent)), cx, agent, List.length(&2, Nat, ids))
 
 def assistant(-o: M.St, +cx: X.Cx<o>, +agent: String, +text: String) -> X.Cx<o>:
   +r = rr(o, cx)
-  set_r(o, cx, X.R.with_last(r, M.snoc(X.Kv, kv_del(X.R.last(r), agent), X.Kv{agent, text})))
+  set_r(o, cx, X.R.with_last(r, M.snoc(X.Kv, KL.kv_del(X.R.last(r), agent), X.Kv{agent, text})))
 
 # ---- file overlap (RFC 0001 §10.3) ----
 
@@ -3543,8 +3509,8 @@ def crash.count(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String, +reason: Strin
       cx
     case True{}:
       +r = rr(o, cx)
-      +n = {1n+kn_get(X.R.crashes(r), agent) : Nat}
-      +cx2 = set_r(o, cx, X.R.with_crashes(r, M.snoc(X.Kn, kn_del(X.R.crashes(r), agent), X.Kn{agent, n})))
+      +n = {1n+KL.kn_get(X.R.crashes(r), agent) : Nat}
+      +cx2 = set_r(o, cx, X.R.with_crashes(r, M.snoc(X.Kn, KL.kn_del(X.R.crashes(r), agent), X.Kn{agent, n})))
       crash.pick(o, Nat.is_le(n, MAX_CRASHES()), cx2, agent, n, reason)
 
 def exited.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +agent: String, +crashed: Bool, +reason: String) -> X.Cx<o>:
@@ -3558,7 +3524,7 @@ def exited.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +agent: String, 
 def repl_exited(-o: M.St, +cx: X.Cx<o>, +agent: String, +crashed: Bool, +reason: String) -> X.Cx<o>:
   +cx2 = fail_waiters(o, cx, agent, "interrupted_by_restart")
   +r = rr(o, cx2)
-  +cx3 = set_r(o, cx2, X.R.with_steered(r, steer_del(X.R.steered(r), agent)))
+  +cx3 = set_r(o, cx2, X.R.with_steered(r, KL.steer_del(X.R.steered(r), agent)))
   exited.agent(o, M.get_agent(st(o, cx3), agent), cx3, agent, crashed, reason)
 
 def boot.live(-o: M.St, live: Bool, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
@@ -3687,8 +3653,8 @@ def idle.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +agent: String, +l
     case Some{+a}:
       +cx2 = dirty(o, set_rt(o, cx, X.Rt{agent, M.RIdle{}, False{}, None{}, 0n}))
       +r = rr(o, cx2)
-      +text = kv_get(X.R.last(r), agent)
-      +cx3 = set_r(o, cx2, X.R.with_last(r, kv_del(X.R.last(r), agent)))
+      +text = KL.kv_get(X.R.last(r), agent)
+      +cx3 = set_r(o, cx2, X.R.with_last(r, KL.kv_del(X.R.last(r), agent)))
       +qs = skip_steered(M.unanswered_for(st(o, cx3), agent), leftover || unread || held, steered)
       +body = Bool.pick(String, M.trim_is_empty(text), "(no written reply at the end of the turn)", text)
       +cx4 = pick_lazy(X.Cx<o>, held, u => cx3, u => auto_replies(o, qs, cx3, agent, body))
@@ -3700,9 +3666,9 @@ def idle.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +agent: String, +l
 def repl_idle(-o: M.St, +cx: X.Cx<o>, +agent: String, +leftover: Bool, +held: Bool) -> X.Cx<o>:
   +cx1 = fail_waiters(o, cx, agent, "turn_ended")
   +r = rr(o, cx1)
-  +steered = steer_get(X.R.steered(r), agent)
-  +c = cnt_get(X.R.counts(r), agent)
-  +cx2 = set_r(o, cx1, X.R.with_counts(X.R.with_steered(r, steer_del(X.R.steered(r), agent)), cnt_del(X.R.counts(r), agent)))
+  +steered = KL.steer_get(X.R.steered(r), agent)
+  +c = KL.cnt_get(X.R.counts(r), agent)
+  +cx2 = set_r(o, cx1, X.R.with_counts(X.R.with_steered(r, KL.steer_del(X.R.steered(r), agent)), KL.cnt_del(X.R.counts(r), agent)))
   # steering committed after the last model call: the model never read
   # it; a new turn makes it answer
   +unread = Bool.not(leftover) && Nat.is_gt(X.Cnt.recv(c), X.Cnt.inj(c)) && Bool.not(List.is_empty(&2, Nat, steered))
@@ -3777,6 +3743,8 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       user_restore.res(o, restore_task(o, cx, name))
     case GI.IIsolate{+name}:
       user_isolate.res(o, isolate_task(o, cx, name))
+    case GI.IFeatureRetire{+name, +kept, +main}:
+      feature_retire(o, cx, name, kept, main)
     case GI.IRename{+name, +new_name, +valid}:
       rename.old(o, M.resolve(st(o, cx), name), cx, name, new_name, valid)
     case GI.IAnswer{+card, +text, +parts}:

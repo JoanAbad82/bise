@@ -162,8 +162,8 @@ impl Shell {
             }
             return;
         }
-        if !matches!(op.as_str(), "new" | "sync" | "ready" | "merge" | "drop" | "try" | "diff" | "later" | "keep") {
-            return refuse(&mut stream, "usage: sb feature new|sync|ready|merge|drop|list <name>".into());
+        if !matches!(op.as_str(), "new" | "sync" | "ready" | "merge" | "drop" | "retire" | "try" | "diff" | "later" | "keep") {
+            return refuse(&mut stream, "usage: sb feature new|sync|ready|merge|drop|retire|list <name>".into());
         }
         if name.is_empty() {
             return refuse(&mut stream, format!("usage: sb feature {} <name>", op));
@@ -175,7 +175,8 @@ impl Shell {
         if op == "new" && known {
             return refuse(&mut stream, format!("{} is a feature already: spawn its agents with --feature {}", name, name));
         }
-        if op != "new" && !known {
+        // a retire run again finishes what is left (its step says what)
+        if op != "new" && op != "retire" && !known {
             return refuse(&mut stream, format!("no feature {}: `sb feature` lists them", name));
         }
         {
@@ -445,6 +446,89 @@ fn step(job: &Job) -> Out {
             d.line = Some(Feed::info(line.clone()));
             Ok((line, d))
         }
+        "retire" => retire(job, &feature_ref, &place, &main),
         op => Err(format!("unknown feature step: {}", op)),
+    }
+}
+
+/// `sb feature retire <name>` (main's): the feature's work is in the
+/// trunk already; its agents stay and land on the trunk from now on.
+/// Unlike merge and drop (git first, then the state), the state goes
+/// first: the check proved the tip is in the trunk, so agents landing
+/// there is right whatever the branch is called; a crash after sb-core's
+/// step leaves a branch still named X and a registry entry with no
+/// agents, both harmless, where git first would leave agents pointing at
+/// a branch that's gone. So: the check, sb-core's step (who moves, their
+/// note, main's line), then the rename (never a delete), then the
+/// registry, all under the feature's land turn: a land queued behind
+/// reads its agent's new place once in line (`land::run`'s `onto_now`)
+/// and goes to the trunk. Run again, it finishes whatever is left.
+fn retire(job: &Job, feature_ref: &str, place: &str, main: &str) -> Out {
+    let name = job.name.as_str();
+    let _turn = job.queue.wait_turn(feature_ref, place, &mut || {});
+    let trunk = crate::trunk::trunk_ref(&job.shared)?;
+    let branch = feature::exists(&job.shared, name);
+    if branch {
+        let missing = feature::missing(&job.shared, &trunk, name)?;
+        if missing > 0 {
+            return Err(feature::retire_refusal(name, main, missing));
+        }
+    }
+    let known = job.features.names().iter().any(|n| n == name);
+    let kept = if branch {
+        feature::retired_name(name, &|b| feature::exists(&job.shared, b))
+    } else {
+        feature::last_retired(&job.shared, name).unwrap_or_default()
+    };
+    if !branch && !known && job.agents.is_empty() {
+        return match kept.is_empty() {
+            true => Err(format!("no feature {}: `sb feature` lists them", name)),
+            false => {
+                let d = FeatureDone { name: name.to_string(), ..FeatureDone::default() };
+                Ok((format!("{} is retired already (its branch is {}): nothing left to do.", name, kept), d))
+            }
+        };
+    }
+    let mut did = Vec::new();
+    if branch || !job.agents.is_empty() {
+        // sb-core's step, applied before the branch moves
+        let (tx, rx) = std::sync::mpsc::channel();
+        let step = FeatureDone {
+            name: name.to_string(),
+            retire: Some((kept.clone(), main.to_string())),
+            ack: Some(crate::core::feature::Ack(tx)),
+            ..FeatureDone::default()
+        };
+        if job.tx.send(Msg::In(Input::Feature(step))).is_err() || rx.recv().is_err() {
+            return Err("the hub stopped before the retire: nothing changed; run it again".into());
+        }
+        did.push(match job.agents.len() {
+            0 => "no live agent to move".to_string(),
+            _ => format!("{} land on {} now", agents_line(&job.agents), main),
+        });
+    }
+    if branch {
+        feature::rename(&job.shared, name, &kept)?;
+        did.push(format!("the branch renamed {}", kept));
+    }
+    if known {
+        let mut g = job.features.lock();
+        g.reg.remove(name);
+        g.reg.save(&job.state)?;
+        did.push("off the feature list".to_string());
+    }
+    let mut d = FeatureDone { name: name.to_string(), ..FeatureDone::default() };
+    d.close = Some("retired".into());
+    Ok((format!("{} retired: {}.", name, did.join(", ")), d))
+}
+
+/// A land's `onto_now` (`land::run`): asks the hub's loop where `agent`
+/// lands now; `was` (the request's) when the hub does not answer.
+pub(super) fn onto_now(tx: &std::sync::mpsc::Sender<Msg>, agent: &str, was: Option<String>) -> impl FnMut() -> Option<String> {
+    let (tx, agent) = (tx.clone(), agent.to_string());
+    move || {
+        let (reply, rx) = std::sync::mpsc::channel();
+        let _ = tx.send(Msg::In(Input::Onto { agent: agent.clone(), reply }));
+        rx.recv().unwrap_or_else(|_| was.clone())
     }
 }

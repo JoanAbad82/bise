@@ -340,6 +340,11 @@ feature on main.
   <name>` only after it."
 - "When the branch is far behind main, or before a try: `sb feature sync
   <name>`."
+- "A feature whose work reached main another way (merged by hand):
+  `sb feature retire <name>` ends it without archiving its agents. They
+  keep their worktrees and branches and land on main from then on (each
+  gets a note); the branch is kept as `<name>-retired`. Refused while the
+  branch has commits main lacks."
 
 **A task's prompt** on a feature: "You work for the feature
 `computer-use`, a local branch the user will try before it reaches main.

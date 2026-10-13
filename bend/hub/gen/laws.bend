@@ -123,6 +123,12 @@ law in_isolate_bare:
 def in_isolate_bare():
   {==}
 
+law in_feature_retire_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"feature_retire"})])) == IN.IFeatureRetire{"", "", ""} : IN.In}
+
+def in_feature_retire_bare():
+  {==}
+
 law in_rename_bare:
   {IN.of(J.obj([J.kv("t", J.JStr{"rename"})])) == IN.IRename{"", "", False{}} : IN.In}
 
@@ -484,6 +490,15 @@ law in_IIsolate_round:
   {IN.of(IN.json(IN.IIsolate{name})) == IN.IIsolate{name} : IN.In}
 
 def in_IIsolate_round(name):
+  {==}
+
+law in_IFeatureRetire_round:
+  for name: String
+  for kept: String
+  for main: String
+  {IN.of(IN.json(IN.IFeatureRetire{name, kept, main})) == IN.IFeatureRetire{name, kept, main} : IN.In}
+
+def in_IFeatureRetire_round(name, kept, main):
   {==}
 
 law in_IRename_round:

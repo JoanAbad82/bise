@@ -50,6 +50,12 @@ core_kinds! {
         ConfirmDrop = "confirm_drop" => IConfirmDrop { name: Str },
         Restore = "restore" => IRestore { name: Str },
         Isolate = "isolate" => IIsolate { name: Str },
+        /// `sb feature retire <name>` (main's): the feature's tip is in
+        /// the trunk (the hub checked); its live agents land on the trunk
+        /// from now on. `kept`: the branch's name after the retire
+        /// (`<name>-retired`), `main`: the trunk's short name, for the
+        /// words
+        FeatureRetire = "feature_retire" => IFeatureRetire { name: Str, kept: Str, main: Str },
         Rename = "rename" => IRename { name: Str, new_name: Str, valid: Bool },
         /// his answer to a card
         Answer = "answer" => IAnswer { card: Nat, text: Str, parts: StrOmit },

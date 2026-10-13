@@ -289,6 +289,56 @@ pub fn trash(shared: &Path, name: &str, now: u64) -> Result<String, String> {
     Ok(r)
 }
 
+/// `sb feature retire`: how many commits of feature `name` the trunk
+/// (`main`, a ref) lacks; 0: its tip is in the trunk.
+pub fn missing(shared: &Path, main: &str, name: &str) -> Result<usize, String> {
+    let n = git(shared, &["rev-list", "--count", &format!("{}..{}", main, branch_ref(name))])?;
+    n.trim().parse::<usize>().map_err(|e| format!("git rev-list --count: {}: {}", n, e))
+}
+
+/// The refusal of a retire whose feature has work the trunk lacks.
+pub fn retire_refusal(name: &str, main: &str, missing: usize) -> String {
+    format!(
+        "{} has {} not in {}: a retire ends only a feature whose work is on {} already. `sb feature merge {}` puts it there; `sb feature drop {}` throws it away",
+        name,
+        plural(missing, "commit", "commits"),
+        main,
+        main,
+        name,
+        name
+    )
+}
+
+/// The retired branch's name: `<name>-retired`, else the first free
+/// `<name>-retired-2`, `-3`... (`taken`: a branch by that name exists;
+/// a retire never overwrites a branch).
+pub fn retired_name(name: &str, taken: &dyn Fn(&str) -> bool) -> String {
+    let first = format!("{}-retired", name);
+    if !taken(&first) {
+        return first;
+    }
+    (2..).map(|i| format!("{}-{}", first, i)).find(|b| !taken(b)).unwrap_or(first)
+}
+
+/// The newest retired branch of `name` (a retire run again: the branch
+/// is renamed already), if any.
+pub fn last_retired(shared: &Path, name: &str) -> Option<String> {
+    let first = format!("{}-retired", name);
+    let mut last = None;
+    for b in std::iter::once(first.clone()).chain((2..100).map(|i| format!("{}-{}", first, i))) {
+        if !exists(shared, &b) {
+            break;
+        }
+        last = Some(b);
+    }
+    last
+}
+
+/// The retire's rename: the branch keeps its commits under `to`.
+pub fn rename(shared: &Path, name: &str, to: &str) -> Result<(), String> {
+    git(shared, &["branch", "-m", name, to]).map(|_| ())
+}
+
 /// What a merge did.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Merged {

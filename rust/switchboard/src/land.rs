@@ -24,9 +24,8 @@
 use crate::flow::{FlowConfig, FlowMode};
 pub use crate::land_pick::left_out_note;
 use crate::land_pick::{pick, Change, Claims, Picked};
-use std::collections::BTreeMap;
+pub use crate::land_queue::{Queue, Turn};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Condvar, Mutex};
 
 /// What the hub knows when an agent asks to land (core.rs builds it from
 /// the state; the daemon adds the repo's flow).
@@ -71,86 +70,6 @@ pub struct Outcome {
     /// New files of the place that no agent claimed, made since the agent
     /// started: not landed, named in the answer ([`left_out_note`]).
     pub left_out: Vec<String>,
-}
-
-// ---- the queue: one land at a time per target ref ----
-
-#[derive(Default)]
-struct Line {
-    /// (ticket, target ref, place id), the first one landing.
-    waiting: Vec<(u64, String, String)>,
-    next: u64,
-}
-
-/// The land queue, shared by the daemon's land threads.
-#[derive(Clone, Default)]
-pub struct Queue {
-    inner: Arc<(Mutex<Line>, Condvar)>,
-}
-
-/// A place in line; dropping it leaves the line.
-pub struct Turn {
-    q: Queue,
-    ticket: u64,
-}
-
-impl Drop for Turn {
-    fn drop(&mut self) {
-        let (m, cv) = &*self.q.inner;
-        let mut l = m.lock().unwrap_or_else(|e| e.into_inner());
-        l.waiting.retain(|(t, _, _)| *t != self.ticket);
-        cv.notify_all();
-    }
-}
-
-fn ordinal(n: usize) -> String {
-    let suffix = match (n % 10, n % 100) {
-        (1, x) if x != 11 => "st",
-        (2, x) if x != 12 => "nd",
-        (3, x) if x != 13 => "rd",
-        _ => "th",
-    };
-    format!("{}{}", n, suffix)
-}
-
-impl Queue {
-    /// Join the line for `target` and wait until first. `joined`: called
-    /// once in line (the views refresh: the lid says it waits).
-    pub fn wait_turn(&self, target: &str, place: &str, joined: &mut dyn FnMut()) -> Turn {
-        let (m, cv) = &*self.inner;
-        let ticket = {
-            let mut l = m.lock().unwrap_or_else(|e| e.into_inner());
-            l.next += 1;
-            let t = l.next;
-            l.waiting.push((t, target.to_string(), place.to_string()));
-            t
-        };
-        joined();
-        let mut l = m.lock().unwrap_or_else(|e| e.into_inner());
-        while l.waiting.iter().find(|(_, r, _)| r == target).map(|(t, _, _)| *t) != Some(ticket) {
-            l = cv.wait(l).unwrap_or_else(|e| e.into_inner());
-        }
-        Turn {
-            q: self.clone(),
-            ticket,
-        }
-    }
-
-    /// The held line of each place in line (pr-design §4.1, the lid):
-    /// `landing` for the first, `waits to land · 2nd` for the next.
-    pub fn lids(&self) -> BTreeMap<String, String> {
-        let (m, _) = &*self.inner;
-        let l = m.lock().unwrap_or_else(|e| e.into_inner());
-        let mut out = BTreeMap::new();
-        let mut rank: BTreeMap<&str, usize> = BTreeMap::new();
-        for (_, r, p) in &l.waiting {
-            let n = rank.entry(r.as_str()).or_insert(0);
-            let lid = if *n == 0 { "landing".to_string() } else { format!("waits to land · {}", ordinal(*n + 1)) };
-            out.entry(p.clone()).or_insert(lid);
-            *n += 1;
-        }
-        out
-    }
 }
 
 // ---- git ----
@@ -420,6 +339,13 @@ fn pushed(job: &Job, target: &str, main: &str) -> (Option<bool>, Option<String>)
 
 /// `sb land` for `job`, in line on `queue`. `joined`: the views refresh.
 pub fn run(job: &Job, queue: &Queue, joined: &mut dyn FnMut()) -> Result<Outcome, String> {
+    run_onto(job, queue, joined, &mut || job.onto.clone())
+}
+
+/// [`run`], with `onto_now`: where the agent lands now (the hub's state,
+/// `core::feature::onto`), read again once in line on a feature: a
+/// retire may have ended it meanwhile, and its agents land on the trunk.
+pub fn run_onto(job: &Job, queue: &Queue, joined: &mut dyn FnMut(), onto_now: &mut dyn FnMut() -> Option<String>) -> Result<Outcome, String> {
     let main = crate::trunk::trunk_ref(&job.shared)?;
     if !job.here && job.worktree && job.flow.mode == Some(FlowMode::Pr) {
         return Err("this repo ships through pull requests: commit with `sb land --here`, then open a PR".into());
@@ -433,7 +359,8 @@ pub fn run(job: &Job, queue: &Queue, joined: &mut dyn FnMut()) -> Result<Outcome
     if !job.here && job.worktree {
         // a feature's agent lands on the feature (dev-flow §5.1)
         let onto = job.onto.clone().unwrap_or_else(|| main.clone());
-        return land_branch(job, queue, joined, &onto, &main, &mine, left_out);
+        let line = Line { queue, joined, onto_now };
+        return land_branch(job, line, &onto, &main, &mine, left_out);
     }
     if mine.is_empty() {
         let note = left_out_note(&left_out);
@@ -471,18 +398,19 @@ pub(crate) fn move_main(shared: &Path, main: &str, base: &str, tip: &str) -> Res
     }
 }
 
+/// A land's place in line: the queue, the views' refresh, and where its
+/// agent lands now ([`run`]'s `onto_now`).
+struct Line<'a> {
+    queue: &'a Queue,
+    joined: &'a mut dyn FnMut(),
+    onto_now: &'a mut dyn FnMut() -> Option<String>,
+}
+
 /// A worktree's branch onto `main` (the default branch, or the agent's
 /// feature: `real_main` says which is pushed): its agent's files first,
 /// then rebase, check, fast-forward.
-fn land_branch(
-    job: &Job,
-    queue: &Queue,
-    joined: &mut dyn FnMut(),
-    main: &str,
-    real_main: &str,
-    mine: &[String],
-    left_out: Vec<String>,
-) -> Result<Outcome, String> {
+fn land_branch(job: &Job, l: Line, main: &str, real_main: &str, mine: &[String], left_out: Vec<String>) -> Result<Outcome, String> {
+    let Line { queue, joined, onto_now } = l;
     let branch = head_ref(&job.dir)?;
     if !mine.is_empty() {
         if job.message.trim().is_empty() {
@@ -498,7 +426,21 @@ fn land_branch(
             files.join(", ")
         ));
     }
-    let _turn = queue.wait_turn(main, &job.place, joined);
+    let mut turn = queue.wait_turn(main, &job.place, joined);
+    // in line on a feature: a retire ahead of it may have ended it (the
+    // agent lands on the trunk now): its line there, then the trunk's
+    let now;
+    let main = if main != real_main {
+        now = onto_now().unwrap_or_else(|| real_main.to_string());
+        if now != main {
+            drop(turn);
+            turn = queue.wait_turn(&now, &job.place, joined);
+        }
+        now.as_str()
+    } else {
+        main
+    };
+    let _turn = turn;
     let base = git(&job.shared, &["rev-parse", "--verify", main])?;
     let tip = git(&job.dir, &["rev-parse", "HEAD"])?;
     if git(&job.dir, &["merge-base", "--is-ancestor", &tip, &base]).is_ok() {
@@ -721,8 +663,8 @@ mod tests {
         h.join().unwrap();
         drop(other);
         assert!(q.lids().is_empty());
-        assert_eq!(ordinal(3), "3rd");
-        assert_eq!(ordinal(11), "11th");
+        assert_eq!(crate::land_queue::ordinal(3), "3rd");
+        assert_eq!(crate::land_queue::ordinal(11), "11th");
     }
 
     #[test]

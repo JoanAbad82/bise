@@ -619,6 +619,9 @@ pub enum Input {
     },
     /// A feature step ended (dev-flow §5.1, the daemon's thread).
     Feature(FeatureDone),
+    /// A land in line on a feature asks where its agent lands now
+    /// (`feature::onto`): the daemon answers from the state on its loop.
+    Onto { agent: String, reply: std::sync::mpsc::Sender<Option<String>> },
     /// update-card: a check of the release channel (the daemon's, at
     /// the start and every hour, or `/update`).
     Release(update_card::ReleaseCheck),
@@ -974,6 +977,11 @@ pub struct FeatureDone {
     /// Close the feature's open items (with this result).
     pub close: Option<String>,
     pub archive: Vec<String>,
+    /// A retire (`sb feature retire`): (the branch's new name, the
+    /// trunk's short name); sb-core moves the feature's agents to the trunk.
+    pub retire: Option<(String, String)>,
+    /// Told once the hub ran this step (the retire's thread waits for it).
+    pub ack: Option<feature::Ack>,
     /// a record for main's feed (`info`, `warn`).
     pub line: Option<Feed>,
 }
@@ -1576,88 +1584,6 @@ impl Hub {
         Ok(target)
     }
 
-    /// A feature step ended (dev-flow §5.1): its items replaced or
-    /// closed, its agents archived (a merge, a drop), main's feed told.
-    fn feature_done(&mut self, fx: &mut Fx, env: &mut dyn Env, d: FeatureDone) {
-        let place = crate::feature::place_id(&d.name);
-        if d.open.is_some() || d.close.is_some() {
-            let open: Vec<u64> = self
-                .st
-                .open_cards()
-                .filter(|c| c.place.as_deref() == Some(place.as_str()))
-                .map(|c| c.id)
-                .collect();
-            let res = d.close.clone().unwrap_or_else(|| "replaced".into());
-            for id in open {
-                self.close_card(fx, env, id, &res);
-            }
-        }
-        if let Some((kind, text)) = &d.open {
-            self.open_card(
-                fx,
-                env,
-                merge::HubItem { kind, agent: MAIN, text, place: &place, pr: None },
-            );
-        }
-        for a in &d.archive {
-            self.core(fx, env, None, In::Drop(ci::Drop { name: a.to_string(), force: true }));
-        }
-        if let Some(rec) = d.line.clone() {
-            fx.push(feed(MAIN, rec));
-        }
-        // the merge reached the trunk: the changes tab's merged today again
-        if d.close.as_deref() == Some("merged") {
-            fx.push(Effect::MergedChanged);
-        }
-        self.dirty = true;
-    }
-
-    /// The user's number on a feature item (pr-merge's choice cards,
-    /// dev-flow §5.1): `feature_try` 1 try it / 2 show the diff / 3 not
-    /// yet; `feature_merge` 1 merge / 2 keep working / 3 drop the branch
-    /// (the TUI asked "drop it?" once more before sending 3). The card
-    /// stays open until the step ends (`feature_done` closes or replaces
-    /// it). A number out of range: nothing.
-    fn feature_choice(&mut self, fx: &mut Fx, kind: &str, place: Option<&str>, choice: &str) {
-        let Some(name) = place.and_then(crate::feature::of_place) else { return };
-        let op = match (kind, choice.trim()) {
-            (crate::feature::TRY, "1") => "try",
-            (crate::feature::TRY, "2") => "diff",
-            (crate::feature::TRY, "3") => "later",
-            (crate::feature::MERGE, "1") => "merge",
-            (crate::feature::MERGE, "2") => "keep",
-            (crate::feature::MERGE, "3") => "drop",
-            _ => return,
-        };
-        let agents = self.feature_agents(name);
-        fx.push(Effect::Feature { token: None, op: op.into(), name: name.into(), agents });
-    }
-
-    /// The live agents of feature `name` with their worktrees (dev-flow
-    /// §5.1), in the hub's order.
-    pub fn feature_agents(&self, name: &str) -> Vec<(String, String)> {
-        self.st
-            .order
-            .iter()
-            .filter_map(|n| self.st.agents.get(n))
-            .filter(|a| a.lifecycle != Lifecycle::Archived && a.ws.feature() == Some(name))
-            .map(|a| (a.name.clone(), a.ws.path.clone()))
-            .collect()
-    }
-
-    /// `sb spawn --feature <f>` (dev-flow §5.1): the task's name as sb-core
-    /// will pick it (the next free one, `fix-2`), then its worktree from
-    /// the feature's tip, made now so sb-core takes it as the place to
-    /// join.
-    fn feature_worktree(&self, env: &mut dyn Env, name: Option<&str>, brief: &Brief, feature: &str) -> Result<Workspace, String> {
-        if self.flow == Some(crate::flow::FlowMode::Pr) {
-            return Err("this repo ships through pull requests: a feature is a PR's branch here (`--place new`)".into());
-        }
-        let base = new_task(name, brief, true, false)?.base;
-        let free = unique_name(&self.st, &base);
-        env.worktree_feature(&free, feature)
-    }
-
     /// `sb land` (dev-flow §5): what the land needs from the state. The
     /// daemon adds the repo's flow and runs it (`land::run`).
     fn land_job(&self, from: &str, here: bool, message: &str, add: Vec<String>) -> Result<crate::land::Job, String> {
@@ -1686,7 +1612,7 @@ impl Hub {
             since_ms: a.created_ms,
             flow: crate::flow::FlowConfig::default(),
             // a feature's agent lands on the feature (dev-flow §5.1)
-            onto: a.ws.feature().map(|f| format!("refs/heads/{}", f)),
+            onto: feature::onto(&a.ws),
         })
     }
 
@@ -2260,6 +2186,9 @@ impl Hub {
             }
             Input::Prs(r) => self.prs_in(&mut fx, env, r),
             Input::Feature(d) => self.feature_done(&mut fx, env, d),
+            Input::Onto { agent, reply } => {
+                let _ = reply.send(self.onto_now(&agent).flatten());
+            }
             Input::ReplExited { agent, crashed, reason } => {
                 self.core(&mut fx, env, None, In::Exited(ci::Exited { agent, crashed, reason }))
             }
@@ -2567,7 +2496,7 @@ impl Hub {
             AgentReq::Feature { op, name } => {
                 // merge and drop on the user's go only: main's (dev-flow §5.1)
                 let is_main = self.st.resolve(from).as_deref() == Some(MAIN);
-                if matches!(op.as_str(), "new" | "merge" | "drop") && !is_main {
+                if matches!(op.as_str(), "new" | "merge" | "drop" | "retire") && !is_main {
                     reply(fx, json!({"ok": false, "error": format!("sb feature {} is main's: ask main", op)}));
                     return;
                 }
@@ -2863,6 +2792,9 @@ mod user;
 
 #[path = "core_wake.rs"]
 mod wake_link;
+
+#[path = "core_feature.rs"]
+pub mod feature;
 
 #[path = "merge.rs"]
 mod merge;

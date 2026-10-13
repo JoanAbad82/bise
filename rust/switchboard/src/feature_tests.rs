@@ -225,3 +225,63 @@ fn the_items_lids_and_lines() {
     assert_eq!((thousands(0), thousands(999), thousands(1000), thousands(1234567)), ("0".into(), "999".into(), "1,000".into(), "1,234,567".into()));
     assert_eq!((place_id("cu"), of_place("feature:cu"), of_place("wt:cu")), ("feature:cu".into(), Some("cu"), None));
 }
+
+// `sb feature retire`: the feature's work in main (merged by hand, a
+// merge commit, like ambient-app's), the check, the rename, the words
+#[test]
+fn a_retire_checks_the_tip_is_in_main_and_renames_the_branch() {
+    let ws = repo("retire");
+    create(&ws, "cu", 1).unwrap();
+    let a = agent_wt(&ws, "cu-a", "cu");
+    sh(&a, "echo a2 > a");
+    land::run(&job("cu-a", &a, &ws, &["a"], "cu"), &Queue::default(), &mut || {}).unwrap();
+    // one commit main lacks: refused, the number said
+    assert_eq!(missing(&ws, "refs/heads/main", "cu").unwrap(), 1);
+    assert_eq!(
+        retire_refusal("cu", "main", 1),
+        "cu has 1 commit not in main: a retire ends only a feature whose work is on main already. `sb feature merge cu` puts it there; `sb feature drop cu` throws it away"
+    );
+    // merged by hand (a merge commit): inside main now
+    sh(&ws, "echo c2 > c && git commit -qam 'main moves' && git merge -q --no-ff cu -m 'Merge cu'");
+    assert_eq!(missing(&ws, "refs/heads/main", "cu").unwrap(), 0);
+    let tip = out(&ws, &["rev-parse", "cu"]);
+    // the name: never one that exists
+    assert_eq!(retired_name("cu", &|b| exists(&ws, b)), "cu-retired");
+    sh(&ws, "git branch cu-retired main");
+    assert_eq!(retired_name("cu", &|b| exists(&ws, b)), "cu-retired-2");
+    assert_eq!(last_retired(&ws, "cu").as_deref(), Some("cu-retired"));
+    rename(&ws, "cu", "cu-retired-2").unwrap();
+    assert!(!exists(&ws, "cu"));
+    assert_eq!(out(&ws, &["rev-parse", "cu-retired-2"]), tip, "the branch keeps its commits");
+    assert_eq!(last_retired(&ws, "cu").as_deref(), Some("cu-retired-2"));
+    assert_eq!(last_retired(&ws, "other"), None);
+    let _ = std::fs::remove_dir_all(ws.parent().unwrap());
+}
+
+// a land in line on a feature that a retire ended meanwhile goes to the
+// trunk: `onto_now` is read again once its turn comes
+#[test]
+fn a_land_queued_behind_a_retire_goes_to_main() {
+    let ws = repo("retire-land");
+    create(&ws, "cu", 1).unwrap();
+    let a = agent_wt(&ws, "cu-a", "cu");
+    sh(&a, "echo a2 > a");
+    let q = Queue::default();
+    // the retire holds the feature's turn; the land waits behind it
+    let turn = q.wait_turn("refs/heads/cu", "feature:cu", &mut || {});
+    let (j, q2) = (job("cu-a", &a, &ws, &["a"], "cu"), q.clone());
+    let land = std::thread::spawn(move || land::run_onto(&j, &q2, &mut || {}, &mut || None));
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    sh(&ws, "git branch -m cu cu-retired");
+    drop(turn);
+    let o = land.join().unwrap().unwrap();
+    assert_eq!((o.target.as_str(), o.commits), ("main", 1));
+    assert_eq!(out(&ws, &["log", "--format=%s", "main"]), "cu-a's work\u{a}init");
+    // the feature still there and still the agent's: it lands there
+    create(&ws, "cv", 2).unwrap();
+    let b = agent_wt(&ws, "cv-b", "cv");
+    sh(&b, "echo b2 > b");
+    let o = land::run_onto(&job("cv-b", &b, &ws, &["b"], "cv"), &q, &mut || {}, &mut || Some("refs/heads/cv".into())).unwrap();
+    assert_eq!(o.target, "cv");
+    let _ = std::fs::remove_dir_all(ws.parent().unwrap());
+}

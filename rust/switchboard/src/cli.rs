@@ -130,9 +130,9 @@ pub const COMMANDS: &[CmdDoc] = &[
         "move a task to another model (and effort), from its next turn; with a text, the message goes too.",
     ),
     cmd(
-        "sb feature [new|sync|ready|merge|drop|list] <name>",
+        "sb feature [new|sync|ready|merge|drop|retire|list] <name>",
         Who::Main,
-        "feature branches (trunk flow): `new` a local branch from main's tip (an existing local branch is adopted), never pushed; `sync` rebases it on main and moves its agents' worktrees; `ready` runs the check and opens the user's \"ready to try\" item; `merge` (only on the user's go) rebases, checks, fast-forwards main, pushes, archives its agents; `drop` (only on the user's word) deletes it, its tip kept in refs/switchboard/trash/. No argument: the list.",
+        "feature branches (trunk flow): `new` a local branch from main's tip (an existing local branch is adopted), never pushed; `sync` rebases it on main and moves its agents' worktrees; `ready` runs the check and opens the user's \"ready to try\" item; `merge` (only on the user's go) rebases, checks, fast-forwards main, pushes, archives its agents; `drop` (only on the user's word) deletes it, its tip kept in refs/switchboard/trash/; `retire` ends a feature already inside main (refused otherwise): its agents stay and land on main from then on, the branch renamed <name>-retired. No argument: the list.",
     ),
     cmd(
         "sb move <agent> new|shared|<agent>|<branch>",
@@ -675,9 +675,9 @@ pub fn build(args: &[String]) -> Result<Value, String> {
             req.insert("place".into(), json!(pos.get(1).ok_or(usage)?));
         }
         "feature" => {
-            // dev-flow §5.1: sb feature [new|sync|ready|merge|drop|list] <name>
+            // dev-flow §5.1: sb feature [new|sync|ready|merge|drop|retire|list] <name>
             let (pos, _) = parse_args(rest, &[], &[])?;
-            let usage = "usage: sb feature [new|sync|ready|merge|drop|list] <name>";
+            let usage = "usage: sb feature [new|sync|ready|merge|drop|retire|list] <name>";
             // `step`, not `op`: the wire's own key (`"op": "agent"`)
             match pos.as_slice() {
                 [] => {
@@ -686,7 +686,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
                 [op] if op == "list" => {
                     req.insert("step".into(), json!("list"));
                 }
-                [op, name] if ["new", "sync", "ready", "merge", "drop"].contains(&op.as_str()) => {
+                [op, name] if ["new", "sync", "ready", "merge", "drop", "retire"].contains(&op.as_str()) => {
                     req.insert("step".into(), json!(op));
                     req.insert("name".into(), json!(name));
                 }

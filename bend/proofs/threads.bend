@@ -5,6 +5,7 @@ import Base
 import ../hub/model.bend as HM
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
+import ../hub/keyed.bend as HKL
 import ../hub/gen/feed.bend as HFD
 import ./lib/hub-1.bend as PL1
 import ./lib/hub-2.bend as PL2
@@ -127,19 +128,19 @@ def Laws.steered_receipt_after_all_seen_is_nothing(o, cx, agent, ids, total):
 # the cursor read back after the agent's entry was dropped and put last
 def hub_seen_snoc_del.pick(c: Bool, +h: HX.Steer, +t: List<&2, HX.Steer>, +n: String, +s: List<&2, Nat>, +k: Nat, +r: Nat,
     +e: {String.eq(HX.Steer.agent(h), n) == c : Bool},
-    ih: {HC.steer_seen(HM.snoc(HX.Steer, HC.steer_del(t, n), HX.Steer{n, s, k, r}), n) == k : Nat})
-    -> {HC.steer_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, String.eq(HX.Steer.agent(h), n), HC.steer_del(t, n), h <> HC.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == k : Nat}:
+    ih: {HKL.steer_seen(HM.snoc(HX.Steer, HKL.steer_del(t, n), HX.Steer{n, s, k, r}), n) == k : Nat})
+    -> {HKL.steer_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, String.eq(HX.Steer.agent(h), n), HKL.steer_del(t, n), h <> HKL.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == k : Nat}:
   match c:
     case True{}:
-      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), True{}, e) : {HC.steer_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, _, HC.steer_del(t, n), h <> HC.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == k : Nat}
+      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), True{}, e) : {HKL.steer_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, _, HKL.steer_del(t, n), h <> HKL.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == k : Nat}
       ih
     case False{}:
-      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {HC.steer_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, _, HC.steer_del(t, n), h <> HC.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == k : Nat}
-      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {Bool.pick(Nat, _, HX.Steer.seen(h), HC.steer_seen(HM.snoc(HX.Steer, HC.steer_del(t, n), HX.Steer{n, s, k, r}), n)) == k : Nat}
+      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {HKL.steer_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, _, HKL.steer_del(t, n), h <> HKL.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == k : Nat}
+      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {Bool.pick(Nat, _, HX.Steer.seen(h), HKL.steer_seen(HM.snoc(HX.Steer, HKL.steer_del(t, n), HX.Steer{n, s, k, r}), n)) == k : Nat}
       ih
 
 def hub_seen_snoc_del(+xs: List<&2, HX.Steer>, +n: String, +s: List<&2, Nat>, +k: Nat, +r: Nat)
-    -> {HC.steer_seen(HM.snoc(HX.Steer, HC.steer_del(xs, n), HX.Steer{n, s, k, r}), n) == k : Nat}:
+    -> {HKL.steer_seen(HM.snoc(HX.Steer, HKL.steer_del(xs, n), HX.Steer{n, s, k, r}), n) == k : Nat}:
   match xs:
     case Nil{}:
       %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {Bool.pick(Nat, _, k, 0n) == k : Nat}
@@ -148,7 +149,7 @@ def hub_seen_snoc_del(+xs: List<&2, HX.Steer>, +n: String, +s: List<&2, Nat>, +k
       hub_seen_snoc_del.pick(String.eq(HX.Steer.agent(h), n), h, t, n, s, k, r, {==}, hub_seen_snoc_del(t, n, s, k, r))
 
 def Laws.steer_add_keeps_seen(xs, n, ids):
-  hub_seen_snoc_del(xs, n, List.append(&2, Nat, HC.steer_get(xs, n), ids), HC.steer_seen(xs, n), HC.steer_rx_seen(xs, n))
+  hub_seen_snoc_del(xs, n, List.append(&2, Nat, HKL.steer_get(xs, n), ids), HKL.steer_seen(xs, n), HKL.steer_rx_seen(xs, n))
 
 def Laws.steer_rx_receipt_names_the_new_ones(o, cx, agent, h, t, total):
   {==}
@@ -164,19 +165,19 @@ def Laws.steer_rx_receipt_after_all_seen_is_nothing(o, cx, agent, ids, total):
 # put last
 def hub_rx_seen_snoc_del.pick(c: Bool, +h: HX.Steer, +t: List<&2, HX.Steer>, +n: String, +s: List<&2, Nat>, +k: Nat, +r: Nat,
     +e: {String.eq(HX.Steer.agent(h), n) == c : Bool},
-    ih: {HC.steer_rx_seen(HM.snoc(HX.Steer, HC.steer_del(t, n), HX.Steer{n, s, k, r}), n) == r : Nat})
-    -> {HC.steer_rx_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, String.eq(HX.Steer.agent(h), n), HC.steer_del(t, n), h <> HC.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == r : Nat}:
+    ih: {HKL.steer_rx_seen(HM.snoc(HX.Steer, HKL.steer_del(t, n), HX.Steer{n, s, k, r}), n) == r : Nat})
+    -> {HKL.steer_rx_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, String.eq(HX.Steer.agent(h), n), HKL.steer_del(t, n), h <> HKL.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == r : Nat}:
   match c:
     case True{}:
-      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), True{}, e) : {HC.steer_rx_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, _, HC.steer_del(t, n), h <> HC.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == r : Nat}
+      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), True{}, e) : {HKL.steer_rx_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, _, HKL.steer_del(t, n), h <> HKL.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == r : Nat}
       ih
     case False{}:
-      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {HC.steer_rx_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, _, HC.steer_del(t, n), h <> HC.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == r : Nat}
-      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {Bool.pick(Nat, _, HX.Steer.rx_seen(h), HC.steer_rx_seen(HM.snoc(HX.Steer, HC.steer_del(t, n), HX.Steer{n, s, k, r}), n)) == r : Nat}
+      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {HKL.steer_rx_seen(HM.snoc(HX.Steer, Bool.pick(List<&2, HX.Steer>, _, HKL.steer_del(t, n), h <> HKL.steer_del(t, n)), HX.Steer{n, s, k, r}), n) == r : Nat}
+      %Equal.sym(Bool, String.eq(HX.Steer.agent(h), n), False{}, e) : {Bool.pick(Nat, _, HX.Steer.rx_seen(h), HKL.steer_rx_seen(HM.snoc(HX.Steer, HKL.steer_del(t, n), HX.Steer{n, s, k, r}), n)) == r : Nat}
       ih
 
 def hub_rx_seen_snoc_del(+xs: List<&2, HX.Steer>, +n: String, +s: List<&2, Nat>, +k: Nat, +r: Nat)
-    -> {HC.steer_rx_seen(HM.snoc(HX.Steer, HC.steer_del(xs, n), HX.Steer{n, s, k, r}), n) == r : Nat}:
+    -> {HKL.steer_rx_seen(HM.snoc(HX.Steer, HKL.steer_del(xs, n), HX.Steer{n, s, k, r}), n) == r : Nat}:
   match xs:
     case Nil{}:
       %Equal.sym(Bool, String.eq(n, n), True{}, PL2.hub_str_eq_refl(n)) : {Bool.pick(Nat, _, r, 0n) == r : Nat}
@@ -185,7 +186,7 @@ def hub_rx_seen_snoc_del(+xs: List<&2, HX.Steer>, +n: String, +s: List<&2, Nat>,
       hub_rx_seen_snoc_del.pick(String.eq(HX.Steer.agent(h), n), h, t, n, s, k, r, {==}, hub_rx_seen_snoc_del(t, n, s, k, r))
 
 def Laws.steer_add_keeps_rx_seen(xs, n, ids):
-  hub_rx_seen_snoc_del(xs, n, List.append(&2, Nat, HC.steer_get(xs, n), ids), HC.steer_seen(xs, n), HC.steer_rx_seen(xs, n))
+  hub_rx_seen_snoc_del(xs, n, List.append(&2, Nat, HKL.steer_get(xs, n), ids), HKL.steer_seen(xs, n), HKL.steer_rx_seen(xs, n))
 
 # ---- his queued message taken back ----
 

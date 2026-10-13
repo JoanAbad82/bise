@@ -753,9 +753,8 @@ impl Shell {
         let (queue, tx) = (self.lands.clone(), self.tx.clone());
         std::thread::spawn(move || {
             let txj = tx.clone();
-            let res = crate::land::run(&job, &queue, &mut || {
-                let _ = txj.send(Msg::Land { line: None });
-            });
+            let mut onto = features::onto_now(&tx, &job.agent, job.onto.clone());
+            let res = crate::land::run_onto(&job, &queue, &mut || drop(txj.send(Msg::Land { line: None })), &mut onto);
             let mut landed: Option<Feed> = None;
             let (body, line) = match res {
                 Ok(o) => {

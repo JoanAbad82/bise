@@ -12,6 +12,7 @@ import ../vendor/http/encoding/utf8.bend as U8
 import ../hub/model.bend as HM
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
+import ../hub/keyed.bend as HKL
 import ../hub/gen/feed.bend as HFD
 
 # ---- a stopped turn is a typed fact (desktop reset, architect m_9650 D,
@@ -233,7 +234,7 @@ law steer_add_keeps_seen:
   for +xs: List<&2, HX.Steer>
   for +n: String
   for +ids: List<&2, Nat>
-  {HC.steer_seen(HC.steer_add(xs, n, ids), n) == HC.steer_seen(xs, n) : Nat}
+  {HKL.steer_seen(HKL.steer_add(xs, n, ids), n) == HKL.steer_seen(xs, n) : Nat}
 
 # ---- the received receipt (ISteerRx, the clients' ✓) ----
 # A second cursor, rx_seen, apart from steered's `seen`: the runtime
@@ -270,7 +271,7 @@ law steer_add_keeps_rx_seen:
   for +xs: List<&2, HX.Steer>
   for +n: String
   for +ids: List<&2, Nat>
-  {HC.steer_rx_seen(HC.steer_add(xs, n, ids), n) == HC.steer_rx_seen(xs, n) : Nat}
+  {HKL.steer_rx_seen(HKL.steer_add(xs, n, ids), n) == HKL.steer_rx_seen(xs, n) : Nat}
 
 # ---- his queued message taken back (HubCmd queued_take, issue 16) ----
 # No new state: a taken-back message is Rejected{"taken_back"}, the state
