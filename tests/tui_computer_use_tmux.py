@@ -32,7 +32,9 @@ import e2e  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run  # noqa: E402
 
-COLS, ROWS = 120, 40
+COLS, ROWS = 150, 40
+# the setup screen again at 80 columns (Benjamin's steps were cut there)
+NARROW = 80
 
 FAKE = r'''#!/usr/bin/env python3
 import json, os, sys, time
@@ -71,9 +73,13 @@ def main():
     ext = os.path.join(d, "dev", "try", "computer-use", "extension")
     clip = os.path.join(d, "clipboard")
 
+    helper = os.path.join(d, "app", "bise Computer Use.app")
+
     def check(rows, browser="Chrome"):
+        apps = any(r["id"] == "accessibility" and r["fix"] != "install_helper" for r in rows)
         v = {"browser": browser, "min_major": 116, "extension": {"id": "bogffepmbkbmbfejcadaipgphgkocgob", "dir": ext},
-             "browsers": [{"key": "chrome", "name": "Chrome", "app": "/Applications/Google Chrome.app"}], "rows": rows}
+             "browsers": [{"key": "chrome", "name": "Chrome", "app": "/Applications/Google Chrome.app"}], "rows": rows,
+             "helper": helper if apps else None}
         tmp = os.path.join(d, "check.json.tmp")
         with open(tmp, "w") as f:
             json.dump(v, f)
@@ -187,14 +193,26 @@ def main():
             called("open -a /Applications/Google Chrome.app")
             # Chrome open: the extension's steps
             check([row("browser", "done", "Chrome 154"), row("extension", "waits", "add bise to Chrome", "add_extension"), row("live_test", "not_yet")] + NO_HELPER)
-            sc = t.wait_all(["3  i'll see it here, no key needed",
+            # Benjamin (13 Oct): every step whole, the folder to pick named
+            sc = t.wait_all(["4  i'll see it here, no key needed",
                              "✓ Chrome              Chrome 154", "? Chrome extension    add bise to Chrome",
-                             "1  ⏎ opens chrome://extensions · turn on Developer mode, top right",
-                             "⏎ open chrome://extensions"])
+                             "1  ⏎ opens chrome://extensions and copies bise's folder",
+                             "2  turn on Developer mode, top right",
+                             # one line at 150 (designer m_21219)
+                             "3  click Load unpacked, then cmd+shift+g, cmd+v, return and Select",
+                             "   the folder: " + ext,
+                             "⏎ open chrome://extensions   c copy the path"])
+            assert "…" not in sc.split("? Chrome extension")[1].split("· live test")[0], sc
             shot(t, "extension-steps", sc)
             t.keys("Enter")
-            sc = t.wait("opened · path copied")
+            sc = t.wait("opened chrome://extensions · path copied")
             called("open -a /Applications/Google Chrome.app chrome://extensions")
+            # a first setup: ⏎ writes the native host too
+            called("repair")
+            assert open(clip).read() == ext
+            os.remove(clip)
+            t.typed("c")
+            t.wait("path copied")
             assert open(clip).read() == ext
             shot(t, "extension-flash", sc)
             # the extension connects: the live test runs by itself
@@ -216,17 +234,29 @@ def main():
             shot(t, "live-test-failed", sc)
             # the helper installed: the apps rows after the live test
             web = [row("browser", "done", "Chrome 154"), row("extension", "done", "v0.1.0"), row("live_test", "done", "ready")]
-            check(web + [row("accessibility", "waits", "", "request_accessibility"), row("screen_recording", "waits", "", "request_screen_recording")])
+            # the helper doesn't answer yet (Benjamin, 13 Oct: no ⏎ then):
+            # the rows act all the same
+            check(web + [row("accessibility", "checking"), row("screen_recording", "checking")])
             t.wait_all(["for apps", "agents can drive your apps and Chrome"])
-            t.wait("turn on bise Computer Use in the list. i'll see it")
-            sc = t.wait_all(["⏎ open System Settings", "? accessibility       bise can click and type in apps"])
-            shot(t, "apps-accessibility", sc)
+            sc = t.wait_all(["∿ accessibility       waiting for bise Computer Use to answer…",
+                             "1  ⏎ opens Privacy & Security › Accessibility",
+                             "⏎ open System Settings   c copy the path"])
+            shot(t, "apps-helper-silent", sc)
             t.keys("Enter")
+            # the pane, by its URL: from the TUI, whatever the helper does
+            called("open x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
             called("request accessibility")
+            t.wait("opened System Settings · path copied")
+            assert open(clip).read() == helper
+            check(web + [row("accessibility", "waits", "", "request_accessibility"), row("screen_recording", "waits", "", "request_screen_recording")])
+            t.wait_all(["2  turn on bise Computer Use", "not in the list? click +, then cmd+shift+g, cmd+v, return, Open", "3  i'll see it here"])
+            sc = t.wait_all(["⏎ open System Settings", "? accessibility       lets agents click and type in apps"])
+            shot(t, "apps-accessibility", sc)
             check(web + [row("accessibility", "done"), row("screen_recording", "waits", "", "request_screen_recording")])
             sc = t.wait_all(["macOS reopens it, i'll wait", "✓ accessibility       bise can click and type in apps"])
             shot(t, "apps-screen-recording", sc)
             t.keys("Enter")
+            called("open x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
             called("request screen_recording")
             check(web + [row("accessibility", "done"), row("screen_recording", "checking")])
             sc = t.wait("∿ screen recording    bise Computer Use reopens…")
@@ -281,6 +311,29 @@ def main():
             # one line only (m_3904): no echo of /stop, no "no turn to interrupt"
             assert "stopped main:" not in sc and "no turn in progress" not in sc, sc
             shot(t, "stopped-feed-line", sc)
+        # ---- 80 columns: every step whole, wrapped under its number ----
+        state({})
+        check([row("browser", "done", "Chrome 154"), row("extension", "waits", "add bise to Chrome", "add_extension"), row("live_test", "not_yet")] + NO_HELPER)
+        with tui_session(NARROW, ROWS, env=env, E=E) as t:
+            t.wait("bise :*")
+            t.typed("/computer-use")
+            t.keys("Enter")
+            # its menu: 'on' or 'setup', as this session reads the plugin
+            t.wait_any(["turn computer use on and set it up", "the setup steps: browsers, extension, apps"])
+            t.keys("Enter")
+            # two lines at 80 (designer m_21219)
+            sc = t.wait_all(["3  click Load unpacked, then cmd+shift+g, cmd+v,",
+                             "   return and Select", "4  i'll see it here, no key needed",
+                             "⏎ open chrome://extensions   c copy the path"])
+            assert "…" not in sc.split("? Chrome extension")[1].split("· live test")[0], sc
+            shot(t, "narrow-extension-steps", sc)
+            web = [row("browser", "done", "Chrome 154"), row("extension", "done", "v0.1.0"), row("live_test", "done", "ready")]
+            check(web + [row("accessibility", "waits", "", "request_accessibility"), row("screen_recording", "waits", "", "request_screen_recording")])
+            sc = t.wait_all(["? accessibility       lets agents click and type in apps",
+                             "1  ⏎ opens Privacy & Security › Accessibility",
+                             "   not in the list? click +, then cmd+shift+g, cmd+v,",
+                             "   return, Open", "⏎ open System Settings   c copy the path"])
+            shot(t, "narrow-apps", sc)
     finally:
         ctl.close()
         shutil.rmtree(d, ignore_errors=True)

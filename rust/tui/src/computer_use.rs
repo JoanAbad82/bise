@@ -6,10 +6,14 @@
 //! then, under a faint "for apps", accessibility and screen recording
 //! (only when the helper app is installed). The rows come from `bise
 //! computer-use setup-check --json`, polled once a second on a thread; a
-//! row that turns `✓` moves the cursor on. ⏎ runs the selected row's fix
-//! (open the browser, the load-unpacked steps, repair, the live test, the
-//! macOS prompts), ↑↓ step, ⇧⇥ the approvals mode, x stops every agent
-//! that drives, esc closes.
+//! row that turns `✓` moves the cursor on. The rows' words are
+//! `computer_use_rows.rs` (pure); a step's numbered lines wrap, never
+//! cut. ⏎ runs the selected row's fix (open the browser, the
+//! load-unpacked steps with the native host written first, repair, the
+//! live test; for apps, the System Settings pane by its URL and the
+//! helper's prompt, even while the helper doesn't answer), `c` copies the
+//! row's path (the extension's folder, the helper app), ↑↓ step, ⇧⇥ the
+//! approvals mode, x stops every agent that drives, esc closes.
 //!
 //! The marks read C6's `~/.bise/run/computer-use/state.json` (by mtime):
 //! `↖` in the agent's row, `· ↖ Chrome` in its divider, `? you took the
@@ -345,6 +349,8 @@ pub(crate) struct Row {
     pub(crate) fix: Option<String>,
     /// under "for apps"
     pub(crate) apps: bool,
+    /// the path `c` copies (the extension's folder, the helper app)
+    pub(crate) copy: Option<String>,
 }
 
 /// What runs now, started from this screen (or the desktop's page: pub
@@ -365,8 +371,9 @@ pub(crate) struct Screen {
     busy: Arc<Mutex<Busy>>,
     /// what went wrong with a fix (error color, under the rows)
     said: Arc<Mutex<Option<String>>>,
-    /// the key bar's flash: `opened · path copied` (3 s)
-    flash: Option<(String, Instant)>,
+    /// the key bar's flash: `opened chrome://extensions · path copied` (3 s, or until the
+    /// row it came from, the third, turns `✓`)
+    flash: Option<(String, Instant, String)>,
     /// the live test ran by itself once (never again on its own)
     auto_ran: bool,
     /// the rows of the last frame (the cursor follows a row that turns ✓)
@@ -421,144 +428,10 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 
 // ---- the words (pure) ----
 
-fn st_of(s: &str) -> St {
-    match s {
-        "done" => St::Done,
-        "waits" => St::Waits,
-        "checking" => St::Checking,
-        "failed" => St::Failed,
-        _ => St::NotYet,
-    }
-}
-
-fn str_at<'a>(v: &'a Value, k: &str) -> &'a str {
-    v.get(k).and_then(Value::as_str).unwrap_or("")
-}
-
-/// The extension's folder as the user reads it (`~/...`).
-fn tilde(p: &str) -> String {
-    match std::env::var("HOME") {
-        Ok(h) if !h.is_empty() && p.starts_with(&h) => format!("~{}", &p[h.len()..]),
-        _ => p.to_string(),
-    }
-}
-
-/// A failure line with contractions (m_3904): `did not` → `didn't`.
-fn contract(t: &str) -> String {
-    [("did not", "didn't"), ("does not", "doesn't"), ("is not", "isn't"), ("cannot", "can't"), ("could not", "couldn't")]
-        .iter()
-        .fold(t.to_string(), |acc, (a, b)| acc.replace(a, b))
-}
-
-/// The rows from a setup-check and what runs now.
-pub(crate) fn rows(check: &Value, busy: &Busy) -> Vec<Row> {
-    let browser = str_at(check, "browser");
-    let browser = if browser.is_empty() { "Chrome" } else { browser };
-    // brand names keep their case in the label column (m_3904)
-    let low = browser.to_string();
-    let min = check.get("min_major").and_then(Value::as_u64).unwrap_or(116);
-    let mut out: Vec<Row> = Vec::new();
-    let Some(list) = check.get("rows").and_then(Value::as_array) else { return out };
-    // no helper app: no "for apps" rows at all (m_3896)
-    let helper = list.iter().any(|r| str_at(r, "id") == "accessibility" && str_at(r, "fix") != "install_helper");
-    for r in list {
-        let id = str_at(r, "id");
-        let mut st = st_of(str_at(r, "state"));
-        let given = str_at(r, "detail").to_string();
-        let fix = r.get("fix").and_then(Value::as_str).map(String::from);
-        let prev = out.last().map(|p: &Row| p.label.clone()).unwrap_or_default();
-        let after = || if prev.is_empty() { String::new() } else { format!("after {prev}") };
-        let o = |s: &str| Some(s.to_string());
-        let (label, detail, help, action, apps): (String, String, Vec<String>, Option<String>, bool) = match id {
-            "browser" => {
-                let (d, h, a) = match (st, fix.as_deref()) {
-                    (St::Done, _) => (given, vec![], None),
-                    (_, Some("install_browser")) => (format!("{browser} isn't installed"), vec![format!("install it, i'll wait")], o("open its download page")),
-                    (_, Some("update_browser")) => (format!("{given} is too old. bise needs {min}"), vec![], o("open chrome://settings/help")),
-                    (_, Some("open_browser")) => (format!("{browser} isn't open. open it, i'll wait"), vec![], Some(format!("open {browser}"))),
-                    _ => (given, vec![], None),
-                };
-                (low.clone(), d, h, a, false)
-            }
-            "extension" => {
-                let label = format!("{low} extension");
-                let (d, h, a) = match (st, fix.as_deref()) {
-                    (St::Done, _) => (given, vec![], None),
-                    (St::NotYet, _) => (after(), vec![], None),
-                    (_, Some("add_extension")) => {
-                        let dir = check.get("extension").map(|e| str_at(e, "dir")).filter(|d| !d.is_empty()).map(tilde);
-                        let mut h = vec!["1  ⏎ opens chrome://extensions · turn on Developer mode, top right".to_string()];
-                        h.push(match &dir {
-                            Some(_) => "2  Load unpacked · cmd+shift+g, cmd+v (i copied the folder's path), Open".to_string(),
-                            None => "2  Load unpacked, then pick bise's extension folder".to_string(),
-                        });
-                        h.push("3  i'll see it here, no key needed".to_string());
-                        (format!("add bise to {browser}"), h, o("open chrome://extensions"))
-                    }
-                    (_, Some("repair")) => ("the extension can't reach bise".to_string(), vec!["⏎ rewrites the native host".to_string()], o("repair it")),
-                    // a newer build is in its folder and Chrome didn't reload it
-                    (_, Some("reload_extension")) => (
-                        "an update is ready".to_string(),
-                        vec![format!("⏎ opens chrome://extensions · click ↻ on bise computer use"), "i'll see it here".to_string()],
-                        o("open chrome://extensions"),
-                    ),
-                    _ => (given, vec![], None),
-                };
-                (label, d, h, a, false)
-            }
-            "live_test" => {
-                if busy.live_test {
-                    st = St::Checking;
-                }
-                let (d, a) = match st {
-                    St::Checking => (format!("opening a tab in the background{}", theme::ellipsis()), None),
-                    St::Done => ("opened a tab, clicked a button. all set".to_string(), None),
-                    St::Failed => (contract(&given), o("try again")),
-                    St::Waits => ("opens a tab in the background and clicks".to_string(), o("run it")),
-                    St::NotYet => ("last".to_string(), None),
-                };
-                ("live test".to_string(), d, vec![], a, false)
-            }
-            "accessibility" if helper => {
-                let (d, h, a) = match st {
-                    St::Done => ("bise can click and type in apps".to_string(), vec![], None),
-                    St::Waits | St::Failed => (
-                        "bise can click and type in apps".to_string(),
-                        vec!["turn on bise Computer Use in the list. i'll see it".to_string()],
-                        o("open System Settings"),
-                    ),
-                    _ => (format!("asking bise Computer Use{}", theme::ellipsis()), vec![], None),
-                };
-                ("accessibility".to_string(), d, h, a, true)
-            }
-            "screen_recording" if helper => {
-                if busy.reopening.is_some() && st != St::Done {
-                    st = St::Checking;
-                }
-                let (d, h, a) = match st {
-                    St::Done => ("bise can see app windows".to_string(), vec![], None),
-                    St::Checking if busy.reopening.is_some() => (format!("bise Computer Use reopens{}", theme::ellipsis()), vec![], None),
-                    St::Waits | St::Failed => (
-                        "optional · for screenshots of apps".to_string(),
-                        vec!["turn on bise Computer Use in the list. macOS reopens it, i'll wait".to_string()],
-                        o("open System Settings"),
-                    ),
-                    _ => (format!("asking bise Computer Use{}", theme::ellipsis()), vec![], None),
-                };
-                ("screen recording".to_string(), d, h, a, true)
-            }
-            _ => continue,
-        };
-        out.push(Row { id: id.to_string(), label, st, detail, help, action, fix, apps });
-    }
-    out
-}
-
-/// The browser, extension and live test are all `✓`.
-pub(crate) fn ready(rows: &[Row]) -> bool {
-    let web: Vec<&Row> = rows.iter().filter(|r| !r.apps).collect();
-    !web.is_empty() && web.iter().all(|r| r.st == St::Done)
-}
+#[path = "computer_use_rows.rs"]
+mod words;
+pub(crate) use words::{pane_url, ready, rows};
+use words::{extension_dir, helper_app, str_at};
 
 /// `↖ api-v2 drives Chrome`, `↖ api-v2 and perf drive Chrome`, `↖ 3
 /// agents drive Chrome` (m_3896); None: nobody drives.
@@ -606,6 +479,32 @@ fn cut(t: &str, w: usize) -> String {
         out.push(c);
     }
     out.push_str(e);
+    out
+}
+
+/// `t` in lines of `w` columns at most, cut at spaces; a numbered step
+/// (`2  turn on…`) goes on under its words, a word wider than `w` is cut.
+fn wrap(t: &str, w: usize) -> Vec<String> {
+    // the step's number and its spaces (`2  `), or a step's own indent
+    let head = t.len() - t.trim_start_matches(|c: char| c.is_ascii_digit()).trim_start().len();
+    let (lead, body) = t.split_at(head);
+    let indent = " ".repeat(lead.width());
+    let mut out: Vec<String> = Vec::new();
+    let mut cur = lead.to_string();
+    let mut fresh = true;
+    for word in body.split(' ').filter(|x| !x.is_empty()) {
+        if !fresh && cur.width() + 1 + word.width() > w {
+            out.push(cut(&cur, w));
+            cur = indent.clone();
+            fresh = true;
+        }
+        if !fresh {
+            cur.push(' ');
+        }
+        cur.push_str(word);
+        fresh = false;
+    }
+    out.push(cut(&cur, w));
     out
 }
 
@@ -666,8 +565,9 @@ pub(crate) fn lines(rows: &[Row], sel: usize, a: &Around, w: usize) -> Vec<Line<
         };
         v.push(Line::from(vec![Span::raw(" "), glyph_of(r.st), Span::raw(" "), label, s(cut(&r.detail, detail_w), dc)]));
         if on {
-            for h in &r.help {
-                v.push(Line::from(s(format!("{}{}", " ".repeat(3 + LABEL_W), cut(h, detail_w)), theme::dim())));
+            // whole, never cut (the Load unpacked steps at 80 columns)
+            for h in r.help.iter().flat_map(|h| wrap(h, detail_w)) {
+                v.push(Line::from(s(format!("{}{h}", " ".repeat(3 + LABEL_W)), theme::dim())));
             }
         }
     }
@@ -709,6 +609,9 @@ pub(crate) fn lines(rows: &[Row], sel: usize, a: &Around, w: usize) -> Vec<Line<
     let mut keys: Vec<(String, String)> = Vec::new();
     if let Some(act) = rows.get(sel).and_then(|r| r.action.clone()) {
         keys.push(("⏎".into(), act));
+    }
+    if rows.get(sel).is_some_and(|r| r.copy.is_some()) {
+        keys.push(("c".into(), "copy the path".into()));
     }
     if a.drivers.is_some() {
         keys.push(("x".into(), "stop all".into()));
@@ -753,7 +656,7 @@ fn act(sc: &mut Screen, check: &Value, row: &Row) {
     let Some(f) = row.fix.as_deref() else { return };
     let said = sc.said.clone();
     if let Some(flash) = fix(check, f, sc.busy.clone(), move |t| *lock(&said) = Some(t)) {
-        sc.flash = Some((flash, Instant::now()));
+        sc.flash = Some((flash, Instant::now(), row.id.clone()));
     }
 }
 
@@ -782,10 +685,12 @@ pub(crate) fn fix(check: &Value, fix: &str, busy: Arc<Mutex<Busy>>, said: impl F
         "open_browser" if !app.is_empty() => open(&["-a".into(), app.clone()]),
         "update_browser" => open(&with_app("chrome://settings/help")),
         "add_extension" => {
-            let dir = check.get("extension").map(|e| str_at(e, "dir").to_string()).unwrap_or_default();
-            let copied = !dir.is_empty() && crate::clipboard::copy(&dir);
+            // the native host first (a first setup has none): the
+            // extension can reach bise as soon as it is loaded
+            fire(&["repair"]);
+            let copied = extension_dir(check).is_some_and(|d| crate::clipboard::copy(&d));
             open(&with_app("chrome://extensions"));
-            return Some(if copied { format!("opened {} path copied", dot()) } else { "opened".into() });
+            return Some(if copied { format!("opened chrome://extensions {} path copied", dot()) } else { "opened chrome://extensions".into() });
         }
         "reload_extension" => open(&with_app("chrome://extensions")),
         "repair" => {
@@ -799,14 +704,21 @@ pub(crate) fn fix(check: &Value, fix: &str, busy: Arc<Mutex<Busy>>, said: impl F
         "run_live_test" => live_test(&busy),
         f @ ("request_accessibility" | "request_screen_recording") => {
             let what = f.trim_start_matches("request_").to_string();
+            // the pane opens from here, whatever the helper does: one that
+            // doesn't answer left the row with no way on (Benjamin, 13 Oct)
+            if let Some(url) = pane_url(&what) {
+                open(&[url.to_string()]);
+            }
+            let copied = helper_app(check).is_some_and(|a| crate::clipboard::copy(&a));
+            // the helper's prompt puts it in the list (and opens the same pane)
             std::thread::spawn(move || {
                 let v = json_of(&["request", &what]);
                 if what == "screen_recording" && v.as_ref().is_some_and(|v| v["relaunching"] == true) {
                     lock(&busy).reopening = Some(Instant::now());
-                } else if v.is_none() {
-                    said("bise Computer Use didn't answer. try again".into());
                 }
             });
+            drop(said);
+            return Some(if copied { format!("opened System Settings {} path copied", dot()) } else { "opened System Settings".into() });
         }
         _ => {}
     }
@@ -878,8 +790,9 @@ fn refresh(sc: &mut Screen) -> (Value, Vec<Row>) {
         sc.auto_ran = true;
         run_live_test(sc);
     }
-    // the extension is in: the step-2 flash has done its job (m_3904)
-    if now.iter().any(|r| r.id == "extension" && r.st == St::Done) {
+    // its step is done (the extension is in): the flash has done its job
+    // (m_3904); another row's flash stays its 3 s
+    if sc.flash.as_ref().is_some_and(|(_, _, id)| now.iter().any(|r| &r.id == id && r.st == St::Done)) {
         sc.flash = None;
     }
     sc.last = now.clone();
@@ -903,6 +816,13 @@ pub(crate) fn on_key(app: &mut App, k: &KeyEvent) -> bool {
         KeyCode::Enter => {
             if let Some(r) = now.get(sc.sel).cloned() {
                 act(sc, &check, &r);
+            }
+        }
+        KeyCode::Char('c') if !ctrl => {
+            if let Some(r) = now.get(sc.sel) {
+                if r.copy.as_deref().is_some_and(crate::clipboard::copy) {
+                    sc.flash = Some(("path copied".into(), Instant::now(), r.id.clone()));
+                }
             }
         }
         KeyCode::Char('x') if drivers_line(&drivers()).is_some() => fire(&["stop", "--all"]),
@@ -943,7 +863,7 @@ pub(crate) fn draw(app: &mut App, frame: &mut Frame) {
     let mode = app.sb.approvals.mode.clone();
     let Some(sc) = app.computer_use.as_mut() else { return };
     let (_, now) = refresh(sc);
-    if sc.flash.as_ref().is_some_and(|(_, t)| t.elapsed() > Duration::from_secs(3)) {
+    if sc.flash.as_ref().is_some_and(|(_, t, _)| t.elapsed() > Duration::from_secs(3)) {
         sc.flash = None;
     }
     let full = frame.area();
@@ -957,7 +877,7 @@ pub(crate) fn draw(app: &mut App, frame: &mut Frame) {
         mode,
         drivers: drivers_line(&drivers()),
         said: lock(&sc.said).clone(),
-        flash: sc.flash.as_ref().map(|(f, _)| f.clone()),
+        flash: sc.flash.as_ref().map(|(f, _, _)| f.clone()),
         apps: now.iter().any(|r| r.apps),
     };
     let w = full.width.saturating_sub(4).min(96);

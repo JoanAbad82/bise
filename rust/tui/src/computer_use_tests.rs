@@ -42,16 +42,66 @@ fn the_extension_step_shows_the_load_unpacked_steps() {
 
  ✓ Chrome              Chrome 154
  ? Chrome extension    add bise to Chrome
-                       1  ⏎ opens chrome://extensions · turn on Developer mode,…
-                       2  Load unpacked · cmd+shift+g, cmd+v (i copied the fold…
-                       3  i'll see it here, no key needed
+                       1  ⏎ opens chrome://extensions and copies bise's folder
+                       2  turn on Developer mode, top right
+                       3  click Load unpacked, then cmd+shift+g, cmd+v, return
+                          and Select
+                          the folder: /h/.bise/dev/try/computer-use/extension
+                       4  i'll see it here, no key needed
  · live test           last
 
  what the agents see goes only to their model: Anthropic.
  in yolo, agents act without asking, purchases included. ⇧⇥ for auto.
 
- ⏎ open chrome://extensions   ↑↓ step   esc later"
+ ⏎ open chrome://extensions   c copy the path   ↑↓ step   esc later"
     );
+    assert_eq!(rows[1].copy.as_deref(), Some("/h/.bise/dev/try/computer-use/extension"), "c copies the folder");
+}
+
+/// Benjamin (13 Oct): with the helper app installed but not answering,
+/// the "for apps" rows had no ⏎ at all. They act now: ⏎ opens their
+/// pane in System Settings, `c` copies the app for its `+`.
+#[test]
+fn the_apps_rows_act_while_the_helper_does_not_answer() {
+    let mut c = check(vec![
+        row("browser", "done", "Chrome 154", None),
+        row("extension", "done", "v0.1.0", None),
+        row("live_test", "done", "ready", None),
+        row("accessibility", "checking", "", None),
+        row("screen_recording", "checking", "", None),
+    ]);
+    c["helper"] = json!("/x/bise Computer Use.app");
+    let r = rows(&c, &Busy::default());
+    for (i, id) in [(3, "accessibility"), (4, "screen_recording")] {
+        assert_eq!(r[i].id, id);
+        assert_eq!(r[i].fix.as_deref(), Some(format!("request_{id}").as_str()), "{:?}", r[i]);
+        assert_eq!(r[i].action.as_deref(), Some("open System Settings"));
+        assert_eq!(r[i].copy.as_deref(), Some("/x/bise Computer Use.app"));
+    }
+    let t = text(&lines(&r, 3, &Around { apps: true, ..around() }, 80));
+    assert!(t.contains(" ∿ accessibility       waiting for bise Computer Use to answer…
+                       1  ⏎ opens Privacy & Security › Accessibility
+                       2  turn on bise Computer Use
+                          not in the list? click +, then cmd+shift+g, cmd+v,
+                          return, Open
+                       3  i'll see it here
+"), "{t}");
+    assert!(t.ends_with(" ⏎ open System Settings   c copy the path   ↑↓ step   esc later"), "{t}");
+    assert_eq!(pane_url("accessibility"), Some("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"));
+    assert_eq!(pane_url("screen_recording"), Some("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"));
+    // granted: no ⏎, nothing to copy
+    c["rows"][3] = row("accessibility", "done", "", None);
+    let r = rows(&c, &Busy::default());
+    assert_eq!((r[3].st, r[3].action.clone(), r[3].copy.clone()), (St::Done, None, None));
+}
+
+/// a step's words wrap under their number, never cut
+#[test]
+fn the_steps_wrap_under_their_number() {
+    assert_eq!(wrap("2  turn on bise Computer Use", 40), ["2  turn on bise Computer Use"]);
+    assert_eq!(wrap("3  click Load unpacked, then Select", 20), ["3  click Load", "   unpacked, then", "   Select"]);
+    assert_eq!(wrap("   the folder: ~/x", 12), ["   the", "   folder:", "   ~/x"]);
+    assert_eq!(wrap("install it, i'll wait", 12), ["install it,", "i'll wait"]);
 }
 
 /// Chrome not open, too old, not installed: the designer's lines
@@ -113,7 +163,7 @@ fn the_apps_rows_come_after_the_live_test() {
     assert_eq!(follow(&[], &r, 0), 4);
     let t = text(&lines(&r, 4, &Around { apps: true, ..around() }, 90));
     assert!(t.starts_with(" computer use · agents can drive your apps and Chrome"), "{t}");
-    assert!(t.contains("   for apps\n ✓ accessibility       bise can click and type in apps\n ? screen recording    optional · for screenshots of apps\n                       turn on bise Computer Use in the list. macOS reopens it, i'll wait"), "{t}");
+    assert!(t.contains("   for apps\n ✓ accessibility       bise can click and type in apps\n ? screen recording    optional · for screenshots of apps\n                       1  ⏎ opens Privacy & Security › Screen Recording\n                       2  turn on bise Computer Use. macOS reopens it, i'll wait\n                       3  i'll see it here"), "{t}");
     assert!(t.ends_with(" ⏎ open System Settings   ↑↓ step   esc later"), "{t}");
     // an apps row not done yet: the ready line names Chrome only
     assert!(t.contains(" ✓ Chrome is ready. ask any agent to use it."), "{t}");

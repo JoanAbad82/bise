@@ -492,7 +492,9 @@ fn browser_rows(paths: &Paths) -> Value {
         row("extension", "waits", "an update is ready".into(), Some("reload_extension"))
     } else if pick["connected"] == true {
         row("extension", "done", format!("v{}", pick["extension_version"].as_str().unwrap_or("?")), None)
-    } else if pick["manifest"] != "ok" {
+    } else if pick["manifest"] != "ok" && paths.shim().exists() {
+        // set up once and broken since; a first setup has no shim yet:
+        // its add_extension writes the host (the TUI runs repair first)
         row("extension", "failed", "the extension can't reach bise".into(), Some("repair"))
     } else {
         row("extension", "waits", format!("add bise to {}", name), Some("add_extension"))
