@@ -89,6 +89,18 @@ describe("src/ds", () => {
     expect(input.value).toBe("acme/x");
   });
 
+  it("a search that '/' focuses says so: a boxed '/' after the input (GitHub's); the placeholder says what it searches", () => {
+    const { getByTestId } = render(<Field slash placeholder="search artifacts" testId="list.search" />);
+    const input = getByTestId("list.search") as HTMLInputElement;
+    expect(input.placeholder).toBe("search artifacts");
+    expect(input.getAttribute("aria-keyshortcuts")).toBe("/");
+    const cap = getByTestId("list.search.slash");
+    expect(cap.textContent).toBe("/");
+    expect(cap.className).toContain("b-kbd");
+    expect(input.nextElementSibling).toBe(cap);
+    expect(input.closest(".b-field")?.classList.contains("slash")).toBe(true);
+  });
+
   it("a dot says its state in words, an error dock carries ▲ (never by color alone)", () => {
     const { getAllByRole, getByTestId } = render(<><Dot state="er" /><Dot state="nd" /><Dot /><Dock kind="err" head="search failed" q="x" testId="dock" /></>);
     expect(getAllByRole("img").map((e) => e.getAttribute("aria-label"))).toEqual(["error", "needs you", "idle"]);

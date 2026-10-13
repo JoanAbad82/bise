@@ -452,7 +452,7 @@ export function LogScreen({
               ref={field}
               data-testid="log.find"
               value={needle}
-              placeholder="words in the log"
+              placeholder="find in the log"
               onChange={(e) => {
                 setNeedle(e.target.value);
                 setAt(0);

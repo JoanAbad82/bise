@@ -136,7 +136,7 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
           ))}
         </span>
         <span className="art-search">
-          <Field placeholder="search" value={f.q} onChange={(e) => { setF({ ...f, q: e.currentTarget.value }); }} onKeyDown={searchKey} testId="artifacts.search" />
+          <Field slash placeholder="search artifacts" value={f.q} onChange={(e) => { setF({ ...f, q: e.currentTarget.value }); }} onKeyDown={searchKey} testId="artifacts.search" />
         </span>
       </div>
       {archivedOn && items.length === 0 ? (

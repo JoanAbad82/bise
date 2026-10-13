@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { editable, grabsKey, isCtrlR, spaceFree, type GrabKey } from "./grab";
+import { editable, grabsKey, isCtrlR, registerGrab, spaceFree, type GrabKey } from "./grab";
 
 const k = (key: string, more: Partial<GrabKey> = {}): GrabKey => ({
   key,
@@ -105,5 +105,35 @@ describe("ctrl+r anywhere is dictation (grab.ts, his try a43609b2)", () => {
     expect(isCtrlR(r("r", { defaultPrevented: true }))).toBe(false);
     expect(isCtrlR(r("r", { isComposing: true }))).toBe(false);
     expect(isCtrlR(r("c"))).toBe(false);
+  });
+});
+
+describe("a key a screen took stays the screen’s (grab.ts, archived.spec: 'a' then esc)", () => {
+  const press = (on: HTMLElement, key: string) =>
+    on.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+  it("a list screen’s own letter (preventDefault in bubble) keeps the focus; a stray one goes to the field", () => {
+    const field = document.createElement("div");
+    field.textContent = "field";
+    const screen = document.createElement("section");
+    screen.tabIndex = -1;
+    screen.addEventListener("keydown", (e) => {
+      if (e.key === "a") e.preventDefault();
+    });
+    document.body.append(field, screen);
+    let took = 0;
+    const un = registerGrab({ el: field, take: () => { took += 1; }, paste: () => false });
+    // happy-dom draws nothing: the field counts as on screen
+    field.getClientRects = () => [new DOMRect(0, 0, 10, 10)] as unknown as DOMRectList;
+    try {
+      screen.focus();
+      press(screen, "a");
+      expect(took, "the screen’s 'a'").toBe(0);
+      press(screen, "x");
+      expect(took, "a stray 'x'").toBe(1);
+    } finally {
+      un();
+      field.remove();
+      screen.remove();
+    }
   });
 });

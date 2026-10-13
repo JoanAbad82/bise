@@ -5,7 +5,7 @@
 // Passes when, on the scripted core (FakeCore) with a fake pages server on 127.0.0.1, light and
 // dark: the local .html file opens with its own pixels in the window (its blue paper fills the
 // frame), a bise page still opens with the kit's paper, and a row from an older hub (a bare path,
-// no frame_url) shows the 'opens in your browser' line, no frame, no white box. Owner: amb-web.
+// no frame_url) shows an empty body: no frame, no white box, no 'opens in your browser' panel (designer m_21714). Owner: amb-web.
 import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
@@ -213,9 +213,10 @@ test("artifacts/local-file: a local .html artifact and a bise page render in the
         page.getByTestId("artifact.page"),
         `${t}: no frame for a bare path`,
       ).toHaveCount(0);
-      await expect(page.locator(".art-empty")).toContainText(
-        "opens in your browser",
-      );
+      // no 'opens in your browser' panel any more (designer m_21714): the body stays empty, no white box
+      await expect(page.locator(".art-open-body iframe")).toHaveCount(0);
+      await expect(page.locator(".art-open-body img")).toHaveCount(0);
+      await expect(page.locator(".art-empty")).toHaveCount(0);
       await page.screenshot({
         path: test.info().outputPath(`old-hub-${t}.png`),
       });

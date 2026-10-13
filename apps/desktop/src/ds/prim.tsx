@@ -6,7 +6,7 @@
 // What he can act on takes a `testId` (data-testid, `<area>.<thing>[.<id>]`, given by the screen)
 // and a handler. A `state` prop shows a state without a mouse (the gallery); live, :hover and
 // :focus-within do it (css/live.css).
-import type { InputHTMLAttributes, MouseEventHandler, ReactNode, Ref } from "react";
+import { useCallback, useState, type InputHTMLAttributes, type MouseEventHandler, type ReactNode, type Ref } from "react";
 import { cx, st, step5, sub, type UiState } from "./cx";
 import { LivePearl, MOODS, type Mood } from "@/pearl";
 import { Breath } from "@/working/Signs";
@@ -125,17 +125,50 @@ export interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   state?: "focus" | "error";
   testId?: string;
   ref?: Ref<HTMLInputElement>;
+  /**
+   * a list's search that '/' focuses (GitHub's pattern, his words via ambient-lead m_22845;
+   * designer m_22848): the sidebar's boxed key, '/', at the field's right end; the placeholder says
+   * what it searches. The box hides once the field has the focus or words, and drops whole under
+   * 160 px of field (css/live.css, no re-render). The field fills its slot (width: 100%). A
+   * placeholder too long for the field falls back to the whole word 'search' (designer m_22910).
+   */
+  slash?: boolean;
 }
+
 /**
  * a one-line field: a real <input> inside the reference's frame. Uncontrolled-friendly: pass
  * defaultValue (or value + onChange); the frame never re-renders the input to show focus, the
  * :focus-within rule does (css/live.css).
  */
-export function Field({ icon, state, testId, ref, ...input }: FieldProps) {
+export function Field({ icon, state, testId, ref, slash, placeholder, ...input }: FieldProps) {
+  const [short, setShort] = useState(false);
+  // a '/' search whose placeholder doesn't fit says the whole word 'search', never a cut one
+  // (designer m_22910): measured against the input's width each time it changes size.
+  const fit = useCallback((el: HTMLInputElement | null) => {
+    if (typeof ref === "function") ref(el);
+    else if (ref) ref.current = el;
+    if (el === null || slash !== true || placeholder === undefined) return;
+    const measure = (): void => {
+      const ctx = document.createElement("canvas").getContext("2d");
+      if (!ctx) return;
+      const cs = getComputedStyle(el);
+      ctx.font = cs.font;
+      const room = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      setShort(room > 0 && ctx.measureText(placeholder).width > room);
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      if (typeof ref === "function") ref(null);
+      else if (ref) ref.current = null;
+    };
+  }, [ref, slash, placeholder]);
   return (
-    <label className={cx("b-field", st(state))}>
+    <label className={cx("b-field", st(state), slash === true && "slash")}>
       {icon}
-      <input ref={ref} {...input} aria-invalid={state === "error" || undefined} data-testid={testId} />
+      <input ref={fit} {...input} placeholder={slash === true && short ? "search" : placeholder} aria-invalid={state === "error" || undefined} aria-keyshortcuts={slash === true ? "/" : undefined} data-testid={testId} />
+      {slash === true && <span className="b-kbd slash-key" aria-hidden="true" data-testid={testId === undefined ? undefined : `${testId}.slash`}>/</span>}
     </label>
   );
 }

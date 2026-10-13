@@ -5,6 +5,14 @@
 /* a real <input> inside the field's frame */
 .b-field input{flex:1;min-width:0;height:100%;padding:0;border:0;outline:0;background:none;font:inherit;color:inherit}
 .b-field input::placeholder{color:var(--c-text-3)}
+/* a search that '/' focuses (GitHub's, ambient-lead m_22845, designer m_22848): the sidebar's boxed
+   key at the right end, 8 px from the edge, centred; a flex sibling, so the words never run under
+   it. Gone once the field has the focus or words; dropped whole under 160 px of field. */
+.b-field.slash{container-type:inline-size;padding-right:var(--s-2)}
+.b-field.slash .slash-key{flex:none;pointer-events:none}
+.b-field.slash input:focus~.slash-key,.b-field.slash input:not(:placeholder-shown)~.slash-key{display:none}
+/* the query sees the content box: 160 px of field less 12 (--pad-control-x) and 8 (--s-2) of padding */
+@container (max-width:139.9px){.b-field.slash .slash-key{display:none}}
 .b-field:focus-within{box-shadow:inset 0 0 0 1px var(--c-focus),0 0 0 3px color-mix(in srgb,var(--c-focus) 25%,transparent)}
 
 /* the composer's box shows focus while the editor inside has it; the editor's own caret, in the text color */

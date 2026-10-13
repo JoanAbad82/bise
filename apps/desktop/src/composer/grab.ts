@@ -8,7 +8,8 @@
 // and the field's own handling work as if he had clicked first. And ⌥ letters are text on a Mac
 // (⌥e é on a US layout, ⌥( { on a French one): kept, but ⌥ digits stay the window's (⌥0-9).
 // Never taken: a key the window or a screen already took (they listen on window in the capture
-// phase, this on document, so they run first and preventDefault), a picker, menu or dialog, a
+// phase, this on document, so they run first and preventDefault; a screen's React keys, a list's
+// 'a' or 'v', run before the take, which waits for the key's bubble on window), a picker, menu or dialog, a
 // selection he made outside the field, arrows, esc, enter, tab; space only where the focus does
 // nothing with it (spaceFree: no focus, the thread), never ⌥space.
 
@@ -166,8 +167,22 @@ function onKey(e: KeyboardEvent): void {
     selectingOutside(f.el)
   )
     return;
+  // decided on what had the focus before any handler ran; taken once they all ran (onKeyLate)
+  pending = { e, f };
+}
+
+/** The key the capture phase picked, until its bubble phase reaches the window. */
+let pending: { readonly e: KeyboardEvent; readonly f: GrabField } | null = null;
+
+/** The same key at the end of its way (window, bubble): a screen's own React keys (a list's a, v,
+ *  @, j, k) run on the root before this; a key one of them took (preventDefault) stays theirs,
+ *  else the field takes the focus and the key goes on to it (archived.spec: 'a' then esc). */
+function onKeyLate(e: KeyboardEvent): void {
+  const p = pending;
+  pending = null;
+  if (p?.e !== e || e.defaultPrevented || !p.f.el.isConnected) return;
   // no preventDefault: the key goes on to the field that has the focus now
-  f.take();
+  p.f.take();
 }
 
 function onPaste(e: ClipboardEvent): void {
@@ -185,6 +200,7 @@ function onPaste(e: ClipboardEvent): void {
 export function registerGrab(f: GrabField): () => void {
   if (fields.length === 0) {
     document.addEventListener("keydown", onKey, true);
+    window.addEventListener("keydown", onKeyLate);
     document.addEventListener("paste", onPaste, true);
   }
   fields.push(f);
@@ -193,6 +209,8 @@ export function registerGrab(f: GrabField): () => void {
     if (i >= 0) fields.splice(i, 1);
     if (fields.length === 0) {
       document.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("keydown", onKeyLate);
+      pending = null;
       document.removeEventListener("paste", onPaste, true);
     }
   };

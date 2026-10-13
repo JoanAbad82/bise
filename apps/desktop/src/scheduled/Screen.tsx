@@ -112,7 +112,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
         </header>
         {list.length > 0 && (
           <span className="sch-search">
-            <Field placeholder="search" value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={searchKey} testId="scheduled.search" />
+            <Field slash placeholder="search scheduled tasks" value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={searchKey} testId="scheduled.search" />
           </span>
         )}
         {list.length === 0 ? (
