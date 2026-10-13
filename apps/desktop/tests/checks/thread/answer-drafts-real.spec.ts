@@ -100,7 +100,7 @@ test('thread/answer-drafts-real: free words on another project\'s docked drafts 
 });
 
 // the window half (amb-win): the hub's {ev:'notice', cmd:'answer'} shows where he typed
-test.fixme('thread/answer-drafts-real: his words on a drafts card stay on screen, said where they went (real core)', async () => {
+test('thread/answer-drafts-real: his words on a drafts card stay on screen, said where they went (real core)', async () => {
   test.setTimeout(300_000);
   const w = realWorld();
   const n = `s${String(Date.now() % 1_000_000)}`;
@@ -117,7 +117,7 @@ test.fixme('thread/answer-drafts-real: his words on a drafts card stay on screen
 });
 
 // the window half (amb-win): '1. review' on a batch card opens card.page.url
-test.fixme("thread/answer-drafts-real: '1. review' on a drafts card opens its page on the real core", async () => {
+test("thread/answer-drafts-real: '1. review' on a drafts card opens its page on the real core", async () => {
   test.setTimeout(300_000);
   const w = realWorld();
   const n = `r${String(Date.now() % 1_000_000)}`;

@@ -348,6 +348,12 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
       else notify.later();
       return;
     }
+    // a drafts card's '1. review' does what it says: its page opens, nothing is sent, the card stays
+    // (amb-core m_21541; the hub's own answer to '1' is that url in a notice)
+    if (n === 1 && c.batch != null && c.page != null) {
+      void window.bise.openExternal(c.page.url);
+      return;
+    }
     leave(c);
     store.answer(c.project, c.id, String(n));
   };

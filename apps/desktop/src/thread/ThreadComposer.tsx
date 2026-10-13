@@ -2,12 +2,12 @@
 // and slash commands), also mounted under an open artifact and in the bottom block; and its pure
 // helpers (about-an-artifact words, the docked card's target). Split out of ThreadScreen.tsx (the
 // file cap). Owner: amb-win.
-import { memo, useCallback, useMemo, type ReactNode } from 'react';
+import { memo, useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Composer, flashWords, useApprovalsFlash, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer';
 import type { Part } from '@/proto';
 import type { Outgoing } from '@/composer/message';
-import { threadKey, useApprovals, useCards, useCommands, useFiles, useSkills, useStore } from '@/store';
+import { threadKey, useApprovals, useCards, useCommands, useCoreEvent, useFiles, useSkills, useStore } from '@/store';
 import { useRouter } from '@/app/router';
 import { pickCommands, slashLine, slashOf, windowRun } from './commands';
 import { HELP_EVENT } from '@/app/keys';
@@ -102,6 +102,28 @@ export const ThreadComposer = memo(function ThreadComposer({
     [core, skills, store, project, agent, filesSettled],
   );
   const sources = useComposerSources(project, extra, agent);
+  // the hub's word on his answer, where he typed it (main m_21514, amb-core m_21541): a drafts card
+  // says where his words went; a refusal says why and gives his words back (never a field that just
+  // empties, whichever project's card it was)
+  const asked = useRef<{ project: string; text: string } | null>(null);
+  const actions = useRef<ComposerActions | null>(null);
+  const [note, setNote] = useState<AnswerNote | null>(null);
+  useCoreEvent(
+    useCallback((ev) => {
+      const n = answerNoteOf(ev, asked.current);
+      if (n === null) return;
+      setNote(n);
+      if (n.level === 'err' && asked.current !== null && fieldEmpty()) actions.current?.fill(asked.current.text);
+      asked.current = null;
+    }, []),
+  );
+  const ready = useCallback(
+    (a: ComposerActions) => {
+      actions.current = a;
+      onReady(a);
+    },
+    [onReady],
+  );
   const onCommand = useCallback(
     (name: string, args: string) => {
       const at = { project, agent };
@@ -130,8 +152,10 @@ export const ThreadComposer = memo(function ThreadComposer({
       }
       // the open card's answer (any project's: the block lists them all): his words and the images
       // he attached, the hub's one /answer path (R41)
+      setNote(null);
       if (answer !== null) {
         // msg-parts: his quotes and pastes go typed (the hub renders the model's text from them)
+        asked.current = { project: answer.project, text: out.text };
         store.answer(answer.project, answer.card, out.text, out.files, out.parts);
         onSent();
         return;
@@ -176,8 +200,41 @@ export const ThreadComposer = memo(function ThreadComposer({
   // the open card that takes words keeps his half answer apart, the thread's draft never moves
   // (amb-home 2b, amb-web's draftKey): the card's own key, the same wherever the block opens it
   const draftKey = answer === null ? undefined : cardDraftKey(answer);
-  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} to={to} {...(end === undefined ? {} : { toEnd: end })} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} {...(keys === undefined ? {} : { keys })} lead={lead} testId="composer" />;
+  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} to={to} {...(end === undefined ? {} : { toEnd: end })} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} testId="composer" />;
+  if (note === null) return field;
+  return (
+    <>
+      <div className={`th-notice ${note.level} th-hubnote`} role={note.level === 'err' ? 'alert' : 'status'} data-testid="composer.answer.note" data-level={note.level}>
+        <span className="th-notice-mark" aria-hidden="true">
+          {note.level === 'err' ? '✗' : '·'}
+        </span>{' '}
+        {note.text}
+      </div>
+      {field}
+    </>
+  );
 });
+
+/** The hub's word on an answer this composer sent: its notice (where his words went) or its refusal. */
+export interface AnswerNote {
+  readonly level: 'info' | 'err';
+  readonly text: string;
+}
+
+/** A core event as the note on his last answer, if it is one: the same project, cmd 'answer'. Pure. */
+export function answerNoteOf(ev: unknown, asked: { project: string } | null): AnswerNote | null {
+  if (asked === null || typeof ev !== 'object' || ev === null) return null;
+  const e = ev as { ev?: unknown; cmd?: unknown; project?: unknown; text?: unknown };
+  if (e.cmd !== 'answer' || e.project !== asked.project || typeof e.text !== 'string') return null;
+  if (e.ev === 'notice') return { level: 'info', text: e.text };
+  if (e.ev === 'error') return { level: 'err', text: e.text };
+  return null;
+}
+
+/** The composer's field holds nothing he typed since (his words come back only into an empty field). */
+function fieldEmpty(): boolean {
+  return (document.querySelector('[data-testid="composer.field"]')?.textContent ?? '').trim() === '';
+}
 
 /** A message about an artifact: `about [its title](its url): his words` (the chip's own link form). Pure. */
 export function aboutText(a: { title: string; url: string }, text: string): string {
