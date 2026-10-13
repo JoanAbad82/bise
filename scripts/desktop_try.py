@@ -61,8 +61,8 @@ import subprocess
 import sys
 import time
 
-from desktop_try_env import (GATE, TryError, clone_names, config_for_try, guard, his_env,  # one module, split for its size
-                             his_repos, homes, try_env, under)
+from desktop_try_env import (GATE, SELF_CONTAINED, TryError, clone_names, config_for_try, guard, his_env,  # one module,
+                             his_repos, homes, live_build, not_swapped, self_contained, try_env, under)  # split for its size
 
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 DESKTOP = os.path.join(REPO, "apps", "desktop")
@@ -291,17 +291,20 @@ def write_stamp(paths, stamp):
     os.replace(stamp_path(paths) + ".tmp", stamp_path(paths))
 
 
-def bundle_pids(app):
+def bundle_procs(app):
     """Every process running from that bundle (the app, its Electron helpers, its packed bise and
-    the hubs it started), by the bundle's path, any try home: read only, never killed here."""
+    the hubs it started), by the bundle's path, any try home: (pid, command), read only, never killed here."""
     out = subprocess.run(["ps", "-axww", "-o", "pid=,command="], capture_output=True, text=True).stdout
-    pre = app.rstrip("/") + "/Contents/"
-    pids = []
+    pre, procs = app.rstrip("/") + "/Contents/", []
     for l in out.splitlines():
         pid, _, cmd = l.strip().partition(" ")
         if pid.isdigit() and cmd.startswith(pre) and int(pid) != os.getpid():
-            pids.append(int(pid))
-    return pids
+            procs.append((int(pid), cmd))
+    return procs
+
+
+def bundle_pids(app):
+    return [p for p, _ in bundle_procs(app)]
 
 
 def build(env, paths):
@@ -780,15 +783,6 @@ def real_app_env(environ, real, default_real):
     return out
 
 
-SELF_CONTAINED = ("bise", "VERSION", "repl-live", "sb-core")
-
-
-def self_contained(app):
-    """The bundle runs with no variable: its runtime is in Contents/Resources/bin (amb-core m_18365,
-    update.rs REQUIRED). Returns what is missing."""
-    return [n for n in SELF_CONTAINED if not os.path.exists(os.path.join(app, "Contents", "Resources", "bin", n))]
-
-
 def real_open_cmd(app, extra, environ):
     """The 'open' of --real (pure). With BISE_DESKTOP_OFFSCREEN=1 (amb-tools' as-he-does runs) it adds
     -g: LaunchServices never brings the app to the front (amb-tools m_18713: 'bise try' took his focus
@@ -811,6 +805,9 @@ def open_real(real, tryh, paths, environ=None, timeout=20):
         say("stopped the try (app %s, %d hubs)" % (r["app"] or "not running", len(r["hubs"])))
     quit_bundle(app)
     swap_staged(paths)
+    saved, live = read_stamp(paths) or {}, live_build(app).get("commit", "")[:8]
+    if saved.get("where") == "staged":
+        say(not_swapped(saved.get("head", "")[:8], live, bundle_procs(app)))
     retire_legacy_old(paths)
     if not os.environ.get("BISE_TRY_OPEN") and not os.path.isdir(app):
         raise TryError("no promoted bundle at %s: scripts/desktop-try.sh --promote <sha> first" % app)
@@ -818,7 +815,6 @@ def open_real(real, tryh, paths, environ=None, timeout=20):
     if missing:
         raise TryError("the promoted bundle %s needs its runtime inside (Contents/Resources/bin lacks %s): "
                        "promote a candidate built with amb-core's self-contained pack" % (app, ", ".join(missing)))
-    saved = read_stamp(paths) or {}
     hook = os.environ.get("BISE_TRY_OPEN")
     if hook:
         if not under(real, GATE):
@@ -835,7 +831,7 @@ def open_real(real, tryh, paths, environ=None, timeout=20):
         # the previous bundle and its snapshot root, once the new core answers
         finish_swap(prev_bundle(paths), app, paths=paths)
     say("bise desktop is open on your home %s: %s (%s%s). the try is stopped; its home %s stays on disk"
-        % (real, app, (saved.get("head") or "unknown sha")[:8], ", pid %d" % pids[0] if pids else ", not seen yet", tryh))
+        % (real, app, live_build(app).get("commit", "")[:8] or "unknown build", ", pid %d" % pids[0] if pids else ", not seen yet", tryh))
     return pids[0] if pids else None
 
 

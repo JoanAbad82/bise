@@ -319,6 +319,39 @@ pub(crate) fn hub_root(root: &Path) -> Result<PathBuf, String> {
     place(&versions, &id, root, true).map_err(|e| format!("bise couldn't install its runtime: {}. reinstall bise", e))
 }
 
+/// The bise a hub runs (architect m_21731, ambient-lead m_21726), the one
+/// owner of where a hub runs from: every `sbd` this binary starts (the
+/// desktop core, `bise ambient`, the terminal) gets its executable here,
+/// with `root` from [`hub_root`]. A bise inside a `.app` runs its hubs
+/// from the runtime [`hub_root`] installed (`versions/<id>/bise`), so
+/// neither the hub nor its REPLs and their plugin bridges (they get the
+/// hub's own executable) run from the bundle an update swaps; they outlive
+/// the app. Anywhere else (a dev tree, a version dir): `current`, as
+/// before. Never a silent fallback to the bundle: a root still in an app,
+/// or one without its bise, is an error naming the path. Pure.
+pub(crate) fn hub_exe(root: &Path, current: &Path, has: &dyn Fn(&Path) -> bool) -> Result<PathBuf, String> {
+    if !in_app(current) {
+        return Ok(current.to_path_buf());
+    }
+    if in_app(root) {
+        return Err(format!("a hub never runs from inside an app ({}). reinstall bise", root.display()));
+    }
+    let exe = root.join(switchboard::switch::EXE);
+    if has(&exe) {
+        Ok(exe)
+    } else {
+        Err(format!("bise couldn't install its runtime: no {}. reinstall bise", exe.display()))
+    }
+}
+
+/// [`hub_root`] then [`hub_exe`] for this process: (the hub's exe, its
+/// app root).
+pub(crate) fn hub_of(root: &Path) -> Result<(PathBuf, PathBuf), String> {
+    let root = hub_root(root)?;
+    let me = std::env::current_exe().map_err(|e| format!("bise can't find itself: {e}"))?;
+    Ok((hub_exe(&root, &me, &|p| p.exists())?, root))
+}
+
 /// A path inside an app bundle (`….app/Contents/…`).
 pub(crate) fn in_app(p: &Path) -> bool {
     p.to_string_lossy().contains(".app/Contents/")
@@ -572,6 +605,108 @@ mod tests {
         assert!(place(&versions, "../x", &bin, true).unwrap_err().contains("no usable VERSION id"));
         assert!(!versions.join("root-new").exists());
         let _ = std::fs::remove_dir_all(&t);
+    }
+
+    /// Where a hub runs from (architect m_21731, ambient-lead m_21726): a
+    /// bise inside a .app hands its hubs the installed runtime's bise,
+    /// never its own; a dev tree or a version dir keeps its own; nothing
+    /// falls back to the bundle silently.
+    #[test]
+    fn a_hub_never_runs_from_inside_an_app() {
+        let app = Path::new("/Applications/bise try.app/Contents/Resources/bin/bise");
+        let root = Path::new("/u/.bise/versions/root-1c5659b8-abcdef");
+        let only = |want: PathBuf| move |p: &Path| p == want;
+        assert_eq!(hub_exe(root, app, &only(root.join("bise"))).unwrap(), root.join("bise"));
+        // its runtime not installed: why, with the path; never the bundle's bise
+        let e = hub_exe(root, app, &|_| false).unwrap_err();
+        assert!(e.contains("/u/.bise/versions/root-1c5659b8-abcdef/bise"), "{e}");
+        let inside = Path::new("/Applications/bise try.app/Contents/Resources/bin");
+        let e = hub_exe(inside, app, &|_| true).unwrap_err();
+        assert!(e.contains("bise try.app/Contents/Resources/bin"), "{e}");
+        // a dev tree, a version dir: this bise, as before
+        for me in ["/src/bise/rust/target/debug/bise", "/u/.bise/versions/x/bise"] {
+            assert_eq!(hub_exe(Path::new("/src/bise"), Path::new(me), &|_| true).unwrap(), PathBuf::from(me));
+            assert_eq!(hub_exe(inside, Path::new(me), &|_| false).unwrap(), PathBuf::from(me));
+        }
+    }
+
+    /// The same VERSION id, installed by the desktop app (its bundle's
+    /// runtime, copied) and by the terminal's `bise update` (a release's
+    /// app/, moved), is one versions/<id> dir, whichever came first.
+    #[test]
+    fn the_app_and_the_terminal_share_one_version_dir() {
+        for app_first in [true, false] {
+            let t = std::env::temp_dir().join(format!("bise-share-{}-{}", std::process::id(), app_first));
+            let _ = std::fs::remove_dir_all(&t);
+            let bin = t.join("bise.app/Contents/Resources/bin");
+            let rel = t.join("release/app");
+            for d in [&bin, &rel] {
+                std::fs::create_dir_all(d).unwrap();
+                for f in REQUIRED {
+                    std::fs::write(d.join(f), "x").unwrap();
+                }
+            }
+            let versions = t.join("prefix/versions");
+            let (a, b) = if app_first {
+                (place(&versions, "v1", &bin, true).unwrap(), place(&versions, "v1", &rel, false).unwrap())
+            } else {
+                (place(&versions, "v1", &rel, false).unwrap(), place(&versions, "v1", &bin, true).unwrap())
+            };
+            assert_eq!(a, versions.join("v1"));
+            assert_eq!(b, a);
+            let left: Vec<String> = std::fs::read_dir(&versions).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into()).collect();
+            assert_eq!(left, ["v1"], "one dir, no temp left (app first: {app_first})");
+            let _ = std::fs::remove_dir_all(&t);
+        }
+    }
+
+    /// No path hands this process's own executable to an `sbd` spawn but
+    /// through [`hub_exe`] (architect m_21731): every use of it in the
+    /// harness and switchboard sources is either on a [`hub_of`] /
+    /// [`hub_exe`] line or one of these, each never a hub start from a
+    /// bise that may be inside an app. A new one fails until it's sorted.
+    #[test]
+    fn every_own_exe_use_is_known() {
+        let pat = concat!("current", "_exe()");
+        let allowed: [(&str, &str); 10] = [
+            // the hub itself: its own exe (it runs from versions/<id>) for its switch and its peers' hubs
+            ("harness/src/main.rs", "exe: std::env::"),
+            // the hub's REPLs start their plugin bridge with the hub's own exe
+            ("harness/src/main.rs", "BEND_HARNESS_BIN"),
+            ("harness/src/update.rs", "let me = std::env::"),
+            ("harness/src/update.rs", "let Ok(exe) = std::env::"),
+            ("harness/src/approot.rs", "exe: std::env::"),
+            ("harness/src/doctor.rs", ""),
+            ("switchboard/src/switch.rs", "let mine = || std::env::"),
+            ("switchboard/src/core.rs", "let next_to_exe = std::env::"),
+            ("switchboard/src/computer_use.rs", "let exe = std::env::"),
+            ("harness/src/update.rs", "let pat = concat!"),
+        ];
+        let rust = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut stack = vec![rust.join("harness/src"), rust.join("switchboard/src")];
+        let mut unknown = vec![];
+        while let Some(d) = stack.pop() {
+            for e in std::fs::read_dir(&d).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    stack.push(p);
+                    continue;
+                }
+                if p.extension().is_none_or(|x| x != "rs") {
+                    continue;
+                }
+                let rel = p.strip_prefix(&rust).unwrap().to_string_lossy().into_owned();
+                for (i, l) in std::fs::read_to_string(&p).unwrap().lines().enumerate() {
+                    if !l.contains(pat) || l.contains("hub_of(") || l.contains("hub_exe(") {
+                        continue;
+                    }
+                    if !allowed.iter().any(|(f, frag)| rel == *f && l.contains(frag)) {
+                        unknown.push(format!("{}:{}: {}", rel, i + 1, l.trim()));
+                    }
+                }
+            }
+        }
+        assert!(unknown.is_empty(), "an own exe that may start a hub from inside an app: go through update::hub_of\n{}", unknown.join("\n"));
     }
 
     #[test]

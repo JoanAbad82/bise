@@ -345,12 +345,16 @@ def real_opens_with_nothing():
         os.makedirs(app + ".old")
         staged_dir = os.path.join(w, "build", "desktop-try", "staged")
         paths = {"app": app, "staged_dir": staged_dir, "staged": os.path.join(staged_dir, "mac-arm64", "bise try.app"),
-                 "helper": os.path.join(w, "build", "desktop-try", "bise-mac-helper")}
+                 "helper": os.path.join(w, "build", "desktop-try", "bise-mac-helper"), "bise": os.path.join(w, "build", "bise")}
         got = os.path.join(w, "got")
         hook = os.path.join(w, "hook.sh")
         with open(hook, "w") as f:
             f.write("#!/bin/sh\nprintf '%%s\\n' \"$@\" > %s\n" % shlex.quote(got))
         os.chmod(hook, 0o755)
+        # the bundle carries 1c5659b8; the try checkout's stamp says a newer build waits, staged (m_21726)
+        with open(os.path.join(app, "Contents", "Resources", "bin", "VERSION"), "w") as f:
+            f.write("id=root-1c5659b8-abcdef\ncommit=1c5659b8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n")
+        T.write_stamp(paths, {"head": "b51422c0" + "b" * 32, "changes": "", "recipe": "r", "where": "staged", "root": os.path.join(w, "nowhere")})
         said, real_say, old_hook = [], T.say, os.environ.get("BISE_TRY_OPEN")
         T.say = lambda *a: said.append(" ".join(str(x) for x in a))
         os.environ["BISE_TRY_OPEN"] = hook
@@ -366,6 +370,10 @@ def real_opens_with_nothing():
               "the app gets HOME and BISE_HOME only: %r" % open(got).read())
         check(not os.path.exists(app + ".old"), "the legacy .old is out of the updater's path")
         check(any(("your home %s" % real) in s and app in s for s in said), "it says the home and the bundle: %s" % said)
+        check(any(("your home %s" % real) in s and "(1c5659b8" in s for s in said), "the open line names the bundle's own build: %s" % said)
+        loud = [s for s in said if s.startswith("NOT UPDATED")]
+        check(len(loud) == 1 and "OLD build 1c5659b8" in loud[0] and "staged build b51422c0" in loud[0],
+              "a staged build that did not go live is said loudly, old and staged named: %s" % said)
     finally:
         shutil.rmtree(w, ignore_errors=True)
 
@@ -512,7 +520,7 @@ def integration():
         wait.until(lambda: T.hub_socks(tryh), 30, "the try hub's socket under %s/hubs" % tryh, poll=0.2)
         check(T.hub_socks(tryh) and T.hub_socks(tryh)[0].startswith(tryh + "/hubs/"), "the hub's state is in the try home: %s" % T.hub_socks(tryh))
         r = go("--stop")
-        check(r.returncode == 0 and "your own app stays closed" in r.stderr, "--stop: %s" % r.stderr[-400:])
+        check(r.returncode == 0 and "your own bise wasn't touched" in r.stderr, "--stop: %s" % r.stderr[-400:])
         try:
             hub.wait(timeout=20)
         except subprocess.TimeoutExpired:

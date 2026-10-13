@@ -34,6 +34,34 @@ def under(path, root):
     return p == r or p.startswith(r.rstrip("/") + "/")
 
 
+SELF_CONTAINED = ("bise", "VERSION", "repl-live", "sb-core")
+
+
+def self_contained(app):
+    """The bundle runs with no variable: its runtime is in Contents/Resources/bin (amb-core m_18365,
+    update.rs REQUIRED). Returns what is missing."""
+    return [n for n in SELF_CONTAINED if not os.path.exists(os.path.join(app, "Contents", "Resources", "bin", n))]
+
+
+def live_build(app):
+    """The build a bundle carries: its runtime's VERSION (Contents/Resources/bin/VERSION, id= and
+    commit=), never the try checkout's HEAD (ambient-lead m_21726). {} when it has none."""
+    try:
+        text = open(os.path.join(app, "Contents", "Resources", "bin", "VERSION")).read()
+    except OSError:
+        return {}
+    return dict(l.split("=", 1) for l in text.splitlines() if "=" in l)
+
+
+def not_swapped(staged, live, procs, most=6):
+    """The loud line of --real when its staged build did not go live (ambient-lead m_21726): the
+    OLD build reopens, and what held the bundle, each process's pid and command. Pure."""
+    held = "; ".join("pid %d %s" % (p, c) for p, c in procs[:most]) + ("; +%d more" % (len(procs) - most) if len(procs) > most else "")
+    return ("NOT UPDATED: reopening the OLD build %s; the staged build %s did not go live, %d processes still run from"
+            " the bundle: %s. quit them (bise stop in each of their workspaces), then --real again"
+            % (live or "unknown", staged or "unknown", len(procs), held or "none seen"))
+
+
 def guard(real, tryh, paths=()):
     """The try home is under his ~/.bise/try (or a test's ~/.bise/gate), never his home itself;
     every path the try writes is under it."""

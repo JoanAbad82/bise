@@ -382,13 +382,13 @@ fn run_switchboard(args: &[String], debug: bool) -> std::io::Result<()> {
         return Ok(());
     }
     let root = live_app_root_or_exit();
-    let exe = std::env::current_exe()?;
+    let (exe, hub_root) = update::hub_of(&root).map_err(std::io::Error::other)?;
     // an installed bise newer than the hub it opens (`bise update`, the
     // daily check): the hub moves to it first (BISE-255), agents kept
     switchboard::switch::follow_install(&paths, &root, &|s| eprintln!("{}", s));
     bend_tui::timing::mark("start (connecting)");
     // the terminal's first line: initialize (its answer holds the hub's state)
-    let mut stream = switchboard::client::open(&paths, &exe, &root)?;
+    let mut stream = switchboard::client::open(&paths, &exe, &hub_root)?;
     std::io::Write::write_all(&mut stream, bend_tui::init_line().as_bytes())?;
     bend_tui::timing::mark("connected, initialize sent");
     bend_tui::run_switchboard(

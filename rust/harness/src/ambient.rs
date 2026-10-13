@@ -13,14 +13,14 @@ pub fn core(args: &[String]) -> std::io::Result<i32> {
         eprintln!("ambient-core: cannot create {}: {}", switchboard::paths::home_workspace().display(), e);
     }
     let paths = switchboard::paths::Paths::for_workspace(&ambient_workspace(args, true));
-    let exe = std::env::current_exe()?;
     let workspace = paths.workspace.to_string_lossy().to_string();
     // never an exit before `initialize` (the window would only see a
     // restart loop): no runtime, the core still answers, says why
-    // (`broken`) and every hub's row says it too
-    let root = crate::approot::locate("repl-live").map(|(r, _)| r).and_then(|r| crate::update::hub_root(&r));
-    let (projects, home_move, connect, broken) = match root {
-        Ok(root) => {
+    // (`broken`) and every hub's row says it too. Its hubs run from the
+    // installed runtime, never from inside the app (update::hub_exe)
+    let hub = crate::approot::locate("repl-live").map(|(r, _)| r).and_then(|r| crate::update::hub_of(&r));
+    let (projects, home_move, connect, broken) = match hub {
+        Ok((exe, root)) => {
             let projects = ambient_projects(Connector::Hub(exe.clone(), root.clone()));
             let home_move = home_move(paths.clone(), root.clone());
             (projects, Some(home_move), ambient_connector(paths, Connector::Hub(exe, root)), None)
@@ -63,7 +63,14 @@ fn home_move(paths: switchboard::paths::Paths, root: std::path::PathBuf) -> bend
 pub fn launch(args: &[String]) -> std::io::Result<i32> {
     let paths = switchboard::paths::Paths::for_workspace(&ambient_workspace(args, false));
     let root = crate::live_app_root_or_exit();
-    let exe = std::env::current_exe()?;
+    // the bise the app's core hands its hubs: never one inside an app (update::hub_exe)
+    let exe = match crate::update::hub_of(&root) {
+        Ok((exe, _)) => exe,
+        Err(why) => {
+            eprintln!("bise ambient: {why}");
+            return Ok(1);
+        }
+    };
     Ok(bend_tui::ambient::launch_main(&paths.workspace, &exe, &root))
 }
 
