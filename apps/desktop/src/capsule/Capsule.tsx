@@ -39,7 +39,8 @@ export const W = {
   quit: "quit bise ambient",
   head: (work: number, waits: number): string =>
     `${work > 0 ? `${work} at work` : "nobody at work"}${waits > 0 ? ` · ${waits} waiting for you` : ""}`,
-  more: (n: number): string => `+ ${String(n)} more · open bise`,
+  // never 'open bise' twice: the menu's own item says it (designer m_21314); a click opens ⌘I
+  more: (n: number): string => `+ ${String(n)} more in the inbox`,
 } as const;
 
 const firstLine = (s: string): string => s.split("\n")[0] ?? "";
@@ -250,7 +251,7 @@ function Answer({
   );
 }
 
-/** The tray menu lists this many waiting items; the rest is '+ N more · open bise' (one-inbox 3). */
+/** The tray menu lists this many waiting items; the rest is '+ N more in the inbox', a click opens it (one-inbox 3). */
 export const MENU_ROWS = 5;
 
 const MARK: Record<SpotCard["kind"], string> = { question: "?", approval: "!", drafts: "✉" };

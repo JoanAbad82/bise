@@ -5,7 +5,7 @@
 // Passes when:
 //   - with 7 cards the menu shows 5 rows in the block's order (hub rank, then the oldest), each
 //     '<n> <sign> <agent> <first line> … <project>' at the tight row (28 px), no age, main's
-//     project read 'bise', then '+ 2 more · open bise';
+//     project read 'bise', then '+ 2 more in the inbox' (never 'open bise' twice, designer m_21314);
 //   - a click on a row opens that card in the capsule, esc goes back to the menu; fn+3 opens row 3;
 //   - the spotlight's waiting rows draw the same sign.
 // Shots: the menu light and dark (menu-light.png, menu-dark.png).
@@ -70,7 +70,7 @@ test('spotlight/menu: the tray menu lists the inbox block rows, 5 at most, a cli
     await expect(rows, 'the tray menu lists the waiting items').toBeVisible({ timeout: 3000 });
     const item = (n: number) => cap.locator(`[data-testid="capsule.menu.item.${String(n)}"]`);
     await expect(rows.locator('[data-testid^="capsule.menu.item."]'), '5 rows at most').toHaveCount(5);
-    await expect(cap.locator('[data-testid="capsule.menu.more"]')).toHaveText('+ 2 more · open bise');
+    await expect(cap.locator('[data-testid="capsule.menu.more"]')).toHaveText('+ 2 more in the inbox');
     // the block's order: the oldest first at one rank (main's mail, then docs, telemetry…)
     await expect(item(1), "main's card reads bise, its first line only").toContainText('bise');
     await expect(item(1)).toContainText('send the mail to legal?');

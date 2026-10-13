@@ -143,7 +143,7 @@ describe('the capsule', () => {
     expect(ui.getByTestId('capsule.menu.item.1').textContent).toBe('1?p1ship 1?telemetry');
     ui.getByTestId('capsule.menu.item.2').click();
     expect(onOpenCard).toHaveBeenCalledWith('tel.2');
-    expect(ui.getByTestId('capsule.menu.more').textContent).toBe('+ 2 more · open bise');
+    expect(ui.getByTestId('capsule.menu.more').textContent).toBe('+ 2 more in the inbox');
     ui.getByTestId('capsule.menu.more').click();
     expect(onOpenWindow).toHaveBeenCalledWith('inbox');
   });
