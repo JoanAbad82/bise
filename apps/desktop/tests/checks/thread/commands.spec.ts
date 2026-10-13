@@ -38,8 +38,8 @@ async function tuiCmd(t: Tui, line: string): Promise<string> {
   if (/┃\s*\/\w/.test(t.screen().split('\n').slice(-12).join('\n'))) t.keys('Escape');
   t.keys('Enter');
   const seen: string[] = [];
-  for (let i = 0; i < 8; i++) {
-    await sleep(300);
+  for (let i = 0; i < 20; i++) {
+    await sleep(150);
     seen.push(t.screen());
   }
   return seen.join('\n');
@@ -75,10 +75,17 @@ test('thread/commands: /undo /cancel /flow /artifacts add /new -w --with-changes
   };
   const noticeNow = async (): Promise<string> => ((await page.locator(T.notice).textContent({ timeout: 500 }).catch(() => '')) ?? '').trim();
   /** back to shop's main thread from another screen: its sidebar row, as his click */
+  // the thread's list, not the composer: other screens (shop's artifacts) carry a composer too, and a
+  // project's sidebar row keeps the screen it was on; esc closes such a screen back to the thread
   const toThread = async () => {
-    if (await page.locator(T.field).first().isVisible()) return;
+    const list = page.locator(T.list);
+    if (await list.isVisible()) return;
     await page.locator(`[data-testid="app.sidebar.project.${project}"]`).click({ timeout: 10_000 });
-    await expect(page.locator(T.field).first(), "back in shop's thread").toBeVisible({ timeout: 10_000 });
+    for (let i = 0; i < 3 && !(await list.isVisible().catch(() => false)); i++) {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+    }
+    await expect(list, "back in shop's thread").toBeVisible({ timeout: 10_000 });
   };
   const words = (label: string, window: string, tuiScreen: string) => {
     const head = flat(window).slice(0, 32);
@@ -102,7 +109,13 @@ test('thread/commands: /undo /cancel /flow /artifacts add /new -w --with-changes
         });
         expect.soft(said, `${cmd}: the hub's no-undo line in the window`).toContain('no undo: an agent may already have acted');
         await expect.soft(page.locator(T.list).getByText(cmd, { exact: true }), `${cmd}: never a message row ('not sent' with retry)`).toHaveCount(0);
-        const seen = await tuiCmd(term(), cmd);
+        let seen = await tuiCmd(term(), cmd);
+        // the first slash line after the TUI's start can be eaten (its picker still opening): these
+        // two change nothing, so a miss is said once more before it counts
+        if (!flat(seen).includes('no undo')) {
+          test.info().annotations.push({ type: `${cmd}-tui-retry`, description: flat(seen).slice(-300) });
+          seen = await tuiCmd(term(), cmd);
+        }
         const head = words(cmd, said, seen);
         expect.soft(flat(seen), `${cmd}: the TUI says the same words`).toContain(head);
         await page.locator(T.notice).screenshot({ path: test.info().outputPath(`${cmd.slice(1)}.png`) }).catch(() => undefined);
