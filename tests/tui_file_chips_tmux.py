@@ -90,8 +90,10 @@ def main():
         paste(t, paths["deck.pptx"].replace(" ", "\\ "))
         wait_until(lambda: "▯ 2" in composer(t), 10, lambda: "no file chip: %r" % composer(t))
         t.wait("╭─ attached ─")
-        sc = t.wait("deck.pptx")
-        assert "2 kB" in sc and "~" not in sc.split("deck.pptx")[0][-3:], sc
+        # the row whole, its size with it: a wait on the name alone took a
+        # screen captured while the row was drawn, name before size (issue 26)
+        sc = t.wait_re(r"▯ 2  deck\.pptx +2 kB")
+        assert "~" not in sc.split("deck.pptx")[0][-3:], sc
         # the four other documents in one drop, and one deleted before the send
         t.typed("avec ")
         paste(t, " ".join(paths[n].replace(" ", "\\ ") for n in DOCS[:4] + ["gone.csv"]))
