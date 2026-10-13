@@ -9,6 +9,8 @@ import type { SwitchRow } from '@/proto';
 import { Button, IconButton } from '@/ds';
 import { useHubSwitch, useProjects, useStore } from '@/store';
 import { slashOf } from '@/thread/commands';
+import { turnAge } from '@/working/gust';
+import { Breath } from '@/working/Signs';
 import { RANK, type StatusPart } from './status';
 
 /** How long '✓ reloaded' shows, from the row's at_ms. */
@@ -16,32 +18,74 @@ export const SHOW_DONE_MS = 3000;
 /** Then how long it takes to fold. */
 export const FOLD_MS = 220;
 
-export type ReloadView = { text: string; tone: 'running' | 'done' | 'failed'; fold: boolean };
+export type ReloadView = {
+  text: string;
+  tone: 'running' | 'done' | 'failed';
+  fold: boolean;
+  /** the machine text in `text` (the versions' shas), drawn mono; the rest is sans (designer m_20853 (2)) */
+  shas: readonly string[];
+  /** running: how long since the switch began ('12 s', text-3 at the line's right end) */
+  elapsed?: string;
+};
+
+/** The core's probation reason, in his words (designer m_20853 (3)); other reasons pass through. */
+export function reasonWords(r: Pick<SwitchRow, 'reason' | 'from'>): string {
+  if (r.reason === 'the hub died during its probation')
+    return `the new version stopped right after it started. you're still on ${r.from ?? 'the version before'}.`;
+  return r.reason ?? 'the new version failed';
+}
 
 /** The line's words and tone at `now`, or none (no switch, an unknown phase, a done one past its fold). Pure. */
 export function reloadView(r: SwitchRow | null, now: number): ReloadView | null {
   if (r === null) return null;
   switch (r.phase) {
     case 'reloading':
-      return { text: `reloading bise on ${r.to}`, tone: 'running', fold: false };
+      return { text: `reloading bise on ${r.to}`, tone: 'running', fold: false, shas: [r.to], elapsed: turnAge(now - r.at_ms) };
     case 'up':
     case 'passed': {
       const age = now - r.at_ms;
       if (age >= SHOW_DONE_MS + FOLD_MS) return null;
-      return { text: `✓ reloaded on ${r.to}`, tone: 'done', fold: age >= SHOW_DONE_MS };
+      return { text: `✓ reloaded on ${r.to}`, tone: 'done', fold: age >= SHOW_DONE_MS, shas: [r.to] };
     }
-    case 'rolled_back':
-      return { text: `▲ couldn't reload: ${r.reason ?? 'the new version failed'}`, tone: 'failed', fold: false };
+    case 'rolled_back': {
+      const why = reasonWords(r);
+      return { text: `▲ couldn't reload: ${why}`, tone: 'failed', fold: false, shas: [r.to, r.from].filter((s): s is string => s !== undefined && why.includes(s)) };
+    }
     default:
       return null;
   }
 }
 
-/** The window's clock for a done row: it moves when the row comes, when it folds, when it goes. */
+/** `text` with its shas in mono (designer: shas are machine text). */
+function Words({ text, shas }: { text: string; shas: readonly string[] }) {
+  const live = shas.filter((s) => s !== '');
+  if (live.length === 0) return <>{text}</>;
+  const esc = live.map((s) => s.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'));
+  const parts = text.split(new RegExp(`(${esc.join('|')})`, 'u'));
+  return (
+    <>
+      {parts.map((p, i) =>
+        live.includes(p) ? (
+          <span key={i} className="app-reload-sha">
+            {p}
+          </span>
+        ) : (
+          p
+        ),
+      )}
+    </>
+  );
+}
+
+/**
+ * The window's clock for the row: a done one moves when it comes, when it folds, when it goes; a
+ * running one ticks each second for its elapsed time.
+ */
 function useSwitchClock(r: SwitchRow | null): number {
   const [now, setNow] = useState(() => Date.now());
   const at = r?.at_ms;
   const done = r?.phase === 'up' || r?.phase === 'passed';
+  const running = r?.phase === 'reloading';
   useEffect(() => {
     if (at === undefined) return;
     const tick = () => {
@@ -50,10 +94,12 @@ function useSwitchClock(r: SwitchRow | null): number {
     const age = Date.now() - at;
     const marks = [0, ...(done ? [SHOW_DONE_MS - age, SHOW_DONE_MS + FOLD_MS - age] : [])].filter((ms) => ms >= 0);
     const timers = marks.map((ms) => setTimeout(tick, ms));
+    const every = running ? setInterval(tick, 1000) : undefined;
     return () => {
       for (const t of timers) clearTimeout(t);
+      if (every !== undefined) clearInterval(every);
     };
-  }, [at, done]);
+  }, [at, done, running]);
   return now;
 }
 
@@ -78,7 +124,15 @@ export function useReloadLine(): StatusPart | null {
     node: (
       <div className={cls} role={failed ? 'alert' : 'status'} data-testid="app.reload" data-phase={row.phase}>
         <div className="app-core-head">
-          <span data-testid="app.reload.text">{v.text}</span>
+          {v.tone === 'running' && <Breath testId="app.reload.breath" />}
+          <span data-testid="app.reload.text">
+            <Words text={v.text} shas={v.shas} />
+          </span>
+          {v.elapsed !== undefined && (
+            <span className="app-reload-age" data-testid="app.reload.age">
+              {v.elapsed}
+            </span>
+          )}
           {failed && (
             <>
               <Button size="sm" onClick={retry} testId="app.reload.retry">

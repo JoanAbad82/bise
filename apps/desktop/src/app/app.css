@@ -168,6 +168,30 @@ body:has(.app-shell) {
 /* bise's version switch (ReloadLine, amb-home): '✓ reloaded' folds after its 3 s (FOLD_MS 220) */
 .app-reload {
   transition: opacity 220ms ease;
+  /* one list row high, 16 px sides (designer m_20853 (4)): the words centred in it */
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-height: var(--h-row);
+  padding: 0 16px;
+}
+
+.app-reload .app-core-head {
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+}
+
+/* the versions' shas are machine text (designer m_20853 (2)) */
+.app-reload-sha {
+  font-family: var(--font-mono);
+}
+
+/* running: how long since the switch began, at the right end, dim */
+.app-reload-age {
+  margin-left: auto;
+  color: var(--c-text-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .app-reload.fold {

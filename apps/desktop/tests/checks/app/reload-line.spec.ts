@@ -48,6 +48,21 @@ test('app/reload-line: reloading, then ✓ reloaded that folds; a stale one says
     await core.send(sw('reloading'));
     await expect(line, 'the line under the title bar').toBeVisible({ timeout: 5000 });
     await expect(page.getByTestId('app.reload.text')).toHaveText(`reloading bise on ${TO}`);
+    // designer m_20853: the breath before the words, the elapsed time at the right end, the sha in
+    // mono, one list row high (32 px)
+    await expect(page.getByTestId('app.reload.breath'), 'the 1-cell breath').toBeVisible();
+    await expect(page.getByTestId('app.reload.age'), "the elapsed time ('0 s')").toHaveText(/^\d+ s$/u);
+    const look = await line.evaluate((el) => {
+      const sha = el.querySelector('.app-reload-sha');
+      const text = el.querySelector('[data-testid="app.reload.text"]');
+      return {
+        h: el.getBoundingClientRect().height,
+        sha: sha === null ? '' : getComputedStyle(sha).fontFamily,
+        words: text === null ? '' : getComputedStyle(text).fontFamily,
+      };
+    });
+    expect(look.h, 'the line is one list row (32 px)').toBe(32);
+    expect(look.sha, 'the sha is machine text').not.toBe(look.words);
     await page.screenshot({ path: test.info().outputPath('reloading.png') });
     // up: ✓, then it folds and goes
     await core.send(sw('up'));
@@ -56,7 +71,8 @@ test('app/reload-line: reloading, then ✓ reloaded that folds; a stale one says
     await expect(line, 'folded after its 3 s').toHaveCount(0, { timeout: 5000 });
     // rolled back: stays, retry sends main /version <to>, ✕ folds it
     await core.send(sw('rolled_back', { reason: 'the hub died during its probation' }));
-    await expect(page.getByTestId('app.reload.text')).toHaveText("▲ couldn't reload: the hub died during its probation", { timeout: 3000 });
+    await expect(page.getByTestId('app.reload.text')).toHaveText("▲ couldn't reload: the new version stopped right after it started. you're still on 2065c746.", { timeout: 3000 });
+    expect(await line.evaluate((el) => el.getBoundingClientRect().height), 'with retry and ✕, still one row').toBe(32);
     await expect(line).toHaveAttribute('role', 'alert');
     await page.waitForTimeout(3600);
     await expect(line, 'a failure stays').toBeVisible();

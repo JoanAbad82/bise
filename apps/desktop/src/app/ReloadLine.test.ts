@@ -12,12 +12,13 @@ describe('reloadView: the switch row as the status line, in Rust switch_line wor
     expect(reloadView(null, AT)).toBeNull();
     expect(reloadView(row('unknown'), AT)).toBeNull();
   });
-  it("'reloading' runs, however old", () => {
-    expect(reloadView(row('reloading'), AT + 60_000)).toEqual({ text: 'reloading bise on f7178b72', tone: 'running', fold: false });
+  it("'reloading' runs, however old, with its elapsed time", () => {
+    expect(reloadView(row('reloading'), AT + 12_000)).toEqual({ text: 'reloading bise on f7178b72', tone: 'running', fold: false, shas: ['f7178b72'], elapsed: '12 s' });
+    expect(reloadView(row('reloading'), AT + 3 * 60_000)?.elapsed).toBe('3 min');
   });
   it("'up' and 'passed' show 3 s from at_ms, fold, then go", () => {
     for (const p of ['up', 'passed'] as const) {
-      expect(reloadView(row(p), AT + 100)).toEqual({ text: '✓ reloaded on f7178b72', tone: 'done', fold: false });
+      expect(reloadView(row(p), AT + 100)).toEqual({ text: '✓ reloaded on f7178b72', tone: 'done', fold: false, shas: ['f7178b72'] });
       expect(reloadView(row(p), AT + SHOW_DONE_MS)?.fold).toBe(true);
       expect(reloadView(row(p), AT + SHOW_DONE_MS + FOLD_MS)).toBeNull();
     }
@@ -25,12 +26,15 @@ describe('reloadView: the switch row as the status line, in Rust switch_line wor
   it('a stale done row at hello (an old at_ms) never shows as new', () => {
     expect(reloadView(row('up'), AT + 10 * 60_000)).toBeNull();
   });
-  it("'rolled_back' stays, with the hub's why", () => {
+  it("'rolled_back' stays, with the hub's why in his words (designer m_20853 (3))", () => {
     expect(reloadView(row('rolled_back', { reason: 'the hub died during its probation' }), AT + 3_600_000)).toEqual({
-      text: "▲ couldn't reload: the hub died during its probation",
+      text: "▲ couldn't reload: the new version stopped right after it started. you're still on 2065c746.",
       tone: 'failed',
       fold: false,
+      shas: ['2065c746'],
     });
+    // another reason passes through as the core says it
+    expect(reloadView(row('rolled_back', { reason: 'the build failed' }), AT)?.text).toBe("▲ couldn't reload: the build failed");
     expect(reloadView(row('rolled_back'), AT)?.text).toBe("▲ couldn't reload: the new version failed");
   });
 });
