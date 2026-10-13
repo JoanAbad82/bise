@@ -142,7 +142,9 @@ install uses), without touching `current`, and starts hubs from there.
   adds `target=`/`channel=`, **never strips**, signs
   (`BISE_SIGN_ID` = a Developer ID → hardened runtime + timestamp; ad-hoc
   otherwise), waits 2 s and verifies every piece (a quarantine shows up
-  as a missing file), writes
+  as a missing file), runs `check-dist-pages.sh` on the app root (its hub
+  on a throwaway HOME serves every stylesheet and script a page links,
+  200 with its type: -31 and -32 shipped without `app/kit`), writes
   `bend-harness-<id>-<os>-<arch>.tar.gz` + `.sha256`. 20 s on a warm cache.
 - **`install.sh`** — from an extracted bundle, `--from <tarball|dir>`,
   or (unpublished) `BISE_DIST_URL` download + sha256 check. Checks the

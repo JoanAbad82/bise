@@ -126,6 +126,13 @@ else cp "$vdir"/tool-desc-*.txt "$vdir"/prompt-*.txt "$app/"; pr=""; fi
 # puts them in the version dir; read at run time from the app root)
 if [ -d "$vdir/plugins" ]; then cp -R "$vdir/plugins" "$app/plugins"; fi
 if [ -d "$vdir/computer-use/extension" ]; then mkdir -p "$app/computer-use"; cp -R "$vdir/computer-use/extension" "$app/computer-use/extension"; fi
+# the pages kit (CSS, JS, fonts, the start-here page): the page server
+# serves /kit from <app root>/kit. Without it (v2026.10.2-31, -32) every
+# page and html artifact showed with no CSS. An older version dir has it
+# at apps/ambient/kit, where its own page server reads it.
+kit=""
+if [ -d "$vdir/kit" ]; then cp -R "$vdir/kit" "$app/kit"; kit=kit
+elif [ -d "$vdir/apps/ambient/kit" ]; then mkdir -p "$app/apps/ambient"; cp -R "$vdir/apps/ambient/kit" "$app/apps/ambient/kit"; fi
 cp "$js" "$app/$jsrt_at"
 # VERSION: the dev repo path means nothing on the user's machine (the
 # daemon would look for versions.sh there); the target says what it runs on
@@ -185,6 +192,12 @@ for f in bise bend-harness sb repl-live repl-scripted sb-core "$jsrt_at" \
          LICENSE NOTICE THIRD_PARTY_NOTICES; do
   [ -e "$app/$f" ] || { say "INCOMPLETE: app/$f missing"; exit 1; }
 done
+# ... and its pages serve their kit: the hub of this app root, started on
+# a throwaway HOME, answers every stylesheet and script a page links with
+# 200 and its type (a commit with kit/ at the root, the page server's)
+if [ -n "$kit" ]; then
+  "$HERE/check-dist-pages.sh" "$app" || { say "INCOMPLETE: the pages do not serve their kit"; exit 1; }
+fi
 # ... and no binary needs a macOS newer than the target (a version dir
 # built before BISE-164 has Bend binaries for the build machine's macOS:
 # remove it and run again)
