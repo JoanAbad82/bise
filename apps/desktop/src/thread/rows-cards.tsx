@@ -6,7 +6,7 @@ import { useFold } from './folds';
 import { Act, Answered, CardLine, Chip, Marker, Press } from '@/ds';
 import { openInbox } from '@/inbox/Block';
 import type { Entry } from '@/proto';
-import { useEntry, useThreadOrder } from '@/store';
+import { useEntry, useProjects, useThreadOrder, type Aside } from '@/store';
 import { Markdown } from './Markdown';
 import { clock, lastOfRun, reportStatus } from './entry';
 import { shownName } from '@/agents/model';
@@ -195,6 +195,27 @@ export function shownHead(head: string): string {
  */
 export function withoutImageMarks(words: string): string {
   return words.replace(/\[Image #\d+\]/gu, ' ').replace(/\s+/gu, ' ').replace(/\s+([:,.])/gu, '$1').trim();
+}
+
+/**
+ * Inbox picks (3): his answer to a card asked elsewhere (another project, bise's view), made from
+ * this thread: the asker's '✓ you answered' row word for word (card/answer's result), with the
+ * card's project when it isn't this one. Window-local (asides.ts): the hub writes no row here.
+ */
+export function AsideRow({ a, here }: { a: Aside; here: string }) {
+  const parts = approvalParts(a.notice);
+  const words = [parts.words, a.note].filter((w) => w !== '').join('\n');
+  const id = `thread.aside.${String(a.card)}`;
+  // another project's card: its project's name after the asker ('you answered gift-ui · shop')
+  const pname = useProjects().find((r) => r.project === a.project)?.name ?? a.project;
+  const where = a.project === here ? '' : ` · ${pname}`;
+  return (
+    <div className="th-approval" data-ok data-project={a.project} data-testid={id}>
+      <YouBubble head={<AnsweredHead ok>{`${shownHead(parts.head)}${where}`}</AnsweredHead>} under={clock(a.at_ms)} timeAlways testId={`${id}.row`}>
+        {words === '' ? undefined : <div className="th-you-words" data-testid={`${id}.words`}>{words}</div>}
+      </YouBubble>
+    </div>
+  );
 }
 
 /** His answer to an approval, folded: allowed or said no, and his words under it. */

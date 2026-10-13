@@ -17,8 +17,18 @@ export interface Thread {
 
 export type Listener = () => void;
 
+/**
+ * Where the window keeps his answers' rows (asides.ts) across a reload and a relaunch: they are
+ * the window's own, no hub has them. The app passes its keep (hooks.ts); tests a map or nothing.
+ */
+export interface AsideKeep {
+  read(key: string): unknown;
+  write(key: string, v: unknown): void;
+}
+
 export interface StoreOptions {
   readonly now?: () => number;
+  readonly asides?: AsideKeep;
 }
 
 export class StoreBase {
@@ -66,7 +76,9 @@ export class StoreBase {
     opts: StoreOptions = {},
   ) {
     this.now = opts.now ?? Date.now;
+    this.asideKeep = opts.asides ?? null;
   }
+  /** @internal for store.ts */ readonly asideKeep: AsideKeep | null;
 
   // ---- subscriptions
 

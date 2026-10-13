@@ -39,18 +39,24 @@ import {
 import { applyTyped } from "./apply";
 import { answered, echoOf, keepLanded, sentOf, ECHO_SLACK_MS, type Sent } from "./echo";
 import { EMPTY, type Thread } from "./base";
+import { asideOf, asidesOf, cardAnsweredOf, keptAsides, type AnswerFrom, type Aside, type CardAnswered } from "./asides";
 import { StoreVoice } from "./voice";
 
 export { DICTATE_STOP_WAIT_MS } from "./voice";
 export type { StoreOptions } from "./base";
 
 export class Store extends StoreVoice {
+  /** inbox picks (3): where he was for each card he answered, until its result comes */
+  private readonly answering = new Map<string, AnswerFrom>();
+
   // ---- the core's events
 
   /** Applies one raw event from the core; false when it isn't one the store knows. */
   apply(raw: unknown): boolean {
     const sent = sentOf(raw);
     if (sent !== null) return this.sendAnswered(sent);
+    const done = cardAnsweredOf(raw);
+    if (done !== null) return this.cardAnswered(done);
     const ev = typed(raw);
     if (ev === null) return false;
     this.applyTyped(ev);
@@ -191,6 +197,31 @@ export class Store extends StoreVoice {
     if (i < 0) return;
     t.pending = t.pending.filter((_, j) => j !== i);
     this.emit(`pending:${key}`);
+  }
+
+  /**
+   * Inbox picks (3): the window-local 'card_answered' (main's ipc.ts): his answer to a card this
+   * window sent, as sb-core wrote it. Answered from a thread the hub writes no row in, it leaves
+   * his row there (asides.ts). Always a known event.
+   */
+  private cardAnswered(d: CardAnswered): true {
+    const k = `${d.project}/${String(d.card)}`;
+    const from = this.answering.get(k);
+    this.answering.delete(k);
+    if (from === undefined) return true;
+    const got = asideOf(from, d.project, d.card, d.answer, this.now());
+    if (got === null) return true;
+    const tkey = threadKey(got.at.project, got.at.agent);
+    const list = keptAsides([...this.asides(tkey).filter((a) => a.key !== got.aside.key), got.aside]);
+    this.put(`asides:${tkey}`, list);
+    this.asideKeep?.write(`asides:${tkey}`, list);
+    return true;
+  }
+  /** His answers made from this thread to a card asked elsewhere (window-local, oldest first; kept across a reload). */
+  asides(key: string): readonly Aside[] {
+    const k = `asides:${key}`;
+    if (!this.slices.has(k) && this.asideKeep !== null) this.slices.set(k, asidesOf(this.asideKeep.read(k)));
+    return this.slice<readonly Aside[]>(k, EMPTY);
   }
 
   /** A1: the window-local 'sent' (main's ipc.ts): the send `cid` has its message id. Always a known event. */
@@ -435,7 +466,10 @@ export class Store extends StoreVoice {
     reply: string,
     files?: readonly string[],
     parts?: readonly Part[],
+    from?: AnswerFrom,
   ): void {
+    // inbox picks (3): where he was, so the answer's result can leave his row there (asides.ts)
+    if (from !== undefined) this.answering.set(`${project}/${String(card)}`, from);
     this.command({
       cmd: "answer",
       project,

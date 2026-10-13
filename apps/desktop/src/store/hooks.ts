@@ -6,6 +6,8 @@
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import type { Account, Agent, FlowMode, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
+import { keep } from '@/app/keep';
+import type { Aside } from './asides';
 import { diffKey, takeKey, toolOutKey, Store, type QueuedTake, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadOrder, type VoiceModeState, type TalkShot } from './store';
 
 /**
@@ -39,7 +41,15 @@ let appStore: Store | null = null;
 export function getAppStore(): Store {
   if (appStore === null) {
     const port = (globalThis as { bise?: { core?: CorePort } }).bise?.core ?? null;
-    appStore = new Store(port);
+    // his answers' rows where he answered are the window's own: kept with his drafts and view
+    appStore = new Store(port, {
+      asides: {
+        read: (k) => keep.view(k),
+        write: (k, v) => {
+          keep.setView(k, v);
+        },
+      },
+    });
     if (port !== null) connect(appStore, port);
   }
   return appStore;
@@ -187,6 +197,8 @@ export const useEntry = (key: string, pos: number): Entry | undefined => useSlic
 export const useTyping = (key: string): string => useSlice(`typing:${key}`, (s) => s.typing(key));
 /** His sends on their way or failed, oldest first. */
 export const usePending = (key: string): readonly Pending[] => useSlice(`pending:${key}`, (s) => s.pending(key));
+/** Inbox picks (3): his answers made from this thread to cards asked elsewhere (window-local, asides.ts). */
+export const useAsides = (key: string): readonly Aside[] => useSlice(`asides:${key}`, (s) => s.asides(key));
 
 /** Calls `fn` on every applied event (one-shot things: open, route, job_end, error). Keep `fn` stable. */
 export function useCoreEvent(fn: (ev: Ev) => void): void {

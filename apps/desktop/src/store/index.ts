@@ -6,4 +6,5 @@
 // StoreProvider, replay(store, fixtures) from './replay'.
 export { Store, TAGS, typed, threadKey, diffKey, takeKey, toolOutKey, type QueuedTake, type ToolOut, type Ev, type EvOf, type Pending, type ThreadOrder, type Diff, type Away, type Confirm, type Dictation, type HubLine, type FilesAnswer, type PrsList, type BranchesList, type VersionsList, type PagesList, type VoiceModeState } from './store';
 export * from './hooks';
+export type { AnswerAt, AnswerFrom, Aside } from './asides';
 export { replay, allFixtureEvents } from './replay';

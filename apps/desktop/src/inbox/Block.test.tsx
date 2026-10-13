@@ -59,7 +59,7 @@ describe('the inbox block (b2)', () => {
     fireEvent.click(screen.getByTestId('inbox.block.more'));
     expect(screen.getByTestId('inbox.block.open.2')).toBeTruthy();
     expect(screen.getByTestId('inbox.block.keys').textContent).toContain('esc');
-    expect(told.at(-1)).toEqual({ project: P, card: 9, label: 'answering perf · which bench?', end: 'esc write to perf instead', answer: 9 });
+    expect(told.at(-1)).toEqual({ project: P, card: 9, label: 'answering perf · which bench?', end: 'esc write to perf instead', answer: 9, asker: 'perf' });
     fireEvent.keyDown(window, { key: '2' });
     expect(hub()).toEqual([{ cmd: 'answer', project: P, card: 9, reply: '2' }]);
     expect(screen.queryByTestId('inbox.block.open.2')).toBeNull();
@@ -225,7 +225,7 @@ describe('one inbox (designer m_19631)', () => {
 
   it("answering another project than the screen's names the agent and the project", () => {
     const here: Here = { project: P, agent: 'main' };
-    expect(answeringOf(card('t-1'), here, 'telemetry')).toEqual({ project: 't-1', card: 9, label: 'answering perf · telemetry · which bench?', end: 'esc write to bise instead', answer: 9 });
+    expect(answeringOf(card('t-1'), here, 'telemetry')).toEqual({ project: 't-1', card: 9, label: 'answering perf · telemetry · which bench?', end: 'esc write to bise instead', answer: 9, asker: 'perf' });
     expect(answeringOf(card('t-1', true), here, 'telemetry')).toEqual({
       project: 't-1',
       card: 10,
@@ -237,7 +237,7 @@ describe('one inbox (designer m_19631)', () => {
 
   it("the screen's own project and bise's view: as before", () => {
     expect(answeringOf(card(P), { project: P, agent: 'main' }, 'acme').label).toBe('answering perf · which bench?');
-    expect(answeringOf(card('t-1'), { project: null, agent: null }, 'telemetry')).toEqual({ project: 't-1', card: 9, label: 'answering perf · which bench?', end: 'esc write a plain message', answer: 9 });
+    expect(answeringOf(card('t-1'), { project: null, agent: null }, 'telemetry')).toEqual({ project: 't-1', card: 9, label: 'answering perf · which bench?', end: 'esc write a plain message', answer: 9, asker: 'perf' });
     expect(answeringOf(card('t-1', true), { project: null, agent: null }, 'telemetry').label).toBe('to bise · the approval waits for 1 or 2');
   });
 });

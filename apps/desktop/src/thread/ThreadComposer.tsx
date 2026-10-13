@@ -159,7 +159,9 @@ export const ThreadComposer = memo(function ThreadComposer({
       if (answer !== null) {
         // msg-parts: his quotes and pastes go typed (the hub renders the model's text from them)
         asked.current = { project: answer.project, text: out.text };
-        store.answer(answer.project, answer.card, out.text, out.files, out.parts);
+        // inbox picks (3): this thread, so his row shows here too when the asker's thread is elsewhere
+        const from = answer.asker === undefined ? undefined : { at: { project, agent }, asker: answer.asker, words: out.text };
+        store.answer(answer.project, answer.card, out.text, out.files, out.parts, from);
         onSent();
         return;
       }
@@ -259,14 +261,17 @@ export function aboutParts(a: { title: string; url: string }, parts: readonly Pa
 export interface CardAt {
   readonly project: string;
   readonly card: number;
+  /** who asked it (inbox picks (3): his row in this thread when the asker's is elsewhere) */
+  readonly asker?: string;
 }
 
 /** The inbox block's 'where am i' on bise's own view (no project, no agent: 'esc write a plain message'). */
 export const HERE_BISE = { project: null, agent: null } as const;
 
 /** The card his words answer while the block has one open, else none (an approval: none). Pure. */
-export function answerOf(a: { project: string; answer: number | null } | null): CardAt | null {
-  return a === null || a.answer === null ? null : { project: a.project, card: a.answer };
+export function answerOf(a: { project: string; answer: number | null; asker?: string } | null): CardAt | null {
+  if (a === null || a.answer === null) return null;
+  return { project: a.project, card: a.answer, ...(a.asker === undefined ? {} : { asker: a.asker }) };
 }
 
 /** The composer's label while it answers a docked card: 'answering perf · which bench do you…' (main is bise). Pure. */

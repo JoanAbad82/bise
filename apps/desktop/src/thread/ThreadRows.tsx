@@ -4,7 +4,8 @@
 import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 import { Marker, Press } from '@/ds';
 import type { ComposerActions } from '@/composer';
-import { useAgents, useEntry, useProjects, usePending, useStore, useThreadOrder } from '@/store';
+import { useAgents, useAsides, useEntry, useProjects, usePending, useStore, useThreadOrder } from '@/store';
+import { AsideRow } from './rows-cards';
 import { usePartialText } from '@/shared/partial';
 import { LIVE, liveKey, useLive, useStill } from './live';
 import { FirstRun, showsFirstRun } from '@/setup';
@@ -43,10 +44,12 @@ export function FirstRunSlot({ tkey, project, composer, bise }: { tkey: string; 
   const noProject = bise && rows.length > 0 && !rows.some((p) => !p.home);
   const view = useThreadOrder(tkey);
   const pending = usePending(tkey);
+  const asides = useAsides(tkey);
   const live = useAgents(project).filter((a) => !a.archived).length;
   const [ready, setReady] = useState(false);
-  // his words in the thread: an entry of his, or a send of his on its way
-  const said = pending.length > 0 || view.order.some((pos) => store.entry(tkey, pos)?.kind === 'you');
+  // his words in the thread: an entry of his, a send of his on its way, or an inbox answer he
+  // made from here (its row sits at the thread's bottom like any other: designer m_22749)
+  const said = pending.length > 0 || asides.length > 0 || view.order.some((pos) => store.entry(tkey, pos)?.kind === 'you');
   if (!view.loaded || !showsFirstRun(said, live)) return null;
   // over an empty list: centred in the thread's column, both ways; under entries of main's: in the
   // column, at the list's end
@@ -76,6 +79,8 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   const store = useStore();
   const view = useThreadOrder(tkey);
   const pending = usePending(tkey);
+  // inbox picks (3): his answers made from here to cards asked elsewhere (window-local)
+  const asides = useAsides(tkey);
   // entries only: his sends not landed yet are the list's tail, outside the
   // virtual list, so his row is drawn in ⏎'s own frame (bar ⛔3: < 100 ms)
   // R13: more than 3 agent-to-agent messages in a row fold into '▸ 4 messages between 2 agents'
@@ -215,8 +220,11 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   // his messages the hub holds until this agent's turn ends (rows::Agent.queued, draft): dashed
   // bubbles at the bottom, oldest first; a sent one becomes his normal bubble (messages-right v1)
   const queued = useAgents(project).find((a) => a.name === agent)?.queued;
-  const tail = pending.length === 0 && (queued ?? []).length === 0 ? undefined : (
+  const tail = pending.length === 0 && (queued ?? []).length === 0 && asides.length === 0 ? undefined : (
     <div className="th-tail">
+      {asides.map((a) => (
+        <AsideRow key={`a:${a.key}`} a={a} here={project} />
+      ))}
       {pending.map((p) => (
         <PendingRow key={pendingKey(String(p.cid))} ctx={ctx} cid={p.cid} />
       ))}

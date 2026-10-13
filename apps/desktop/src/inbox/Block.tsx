@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
 import type { NotifyAuth } from '@/shared/api';
 import { Act, Dot, Kbd, Row } from '@/ds';
-import { useProjects, useStore, useVoiceAnswer } from '@/store';
+import { useProjects, useStore, useVoiceAnswer, type AnswerAt } from '@/store';
 import { shownName } from '@/agents/model';
 import { age, dotOf, folds, InboxCard } from './InboxCard';
 import { useMenuAction } from '@/app/menu';
@@ -35,6 +35,8 @@ export interface Answering {
   readonly end?: string;
   /** his words answer this card (store.answer); null: they go as a plain message (never an approval) */
   readonly answer: number | null;
+  /** who asked the card his words answer (inbox picks (3): his row where he is names it) */
+  readonly asker?: string;
 }
 
 /** Where the block is: the screen's project and agent (none: bise's view, settings, review…). */
@@ -156,6 +158,13 @@ function useNotifyRow(items: number): { show: boolean; on: () => void; later: ()
 
 // ---- the pure parts
 
+/** The thread he answers from: the screen's, or bise's view's (its home project's main); none elsewhere. Pure. */
+export function answerAt(here: Here, home: string): AnswerAt | null {
+  if (here.project !== null && here.agent !== null) return { project: here.project, agent: here.agent };
+  if (here.project === null && here.agent === null && home !== '') return { project: home, agent: 'main' };
+  return null;
+}
+
 /** Every project's open items, in the inbox's order (the hub's rank), the ones acted on here left out. Pure. */
 export function blockList(rows: readonly ProjectRow[], gone: ReadonlySet<string>): Card[] {
   return sortCards(rows.flatMap((r) => (r.cards ?? []).map(withConfirmOptions))).filter((c) => !gone.has(cardKey(c)));
@@ -185,7 +194,7 @@ export function answeringOf(c: Card, here: Here, pname?: string): Answering {
   const other = here.project !== null && here.project !== c.project ? `${shownName(c.agent)} · ${pname ?? c.project}` : null;
   if (takesWords(c)) {
     const label = `answering ${other ?? shownName(c.agent)} · ${cut(c.question, 40)}`;
-    return { project: c.project, card: c.id, label, end: here.agent === null ? 'esc write a plain message' : `esc write to ${to} instead`, answer: c.id };
+    return { project: c.project, card: c.id, label, end: here.agent === null ? 'esc write a plain message' : `esc write to ${to} instead`, answer: c.id, asker: c.agent };
   }
   const waits = pickWaits(c) ?? 'it waits for its options';
   if (other !== null) return { project: c.project, card: c.id, label: `to ${other} · ${waits}`, end: `esc write to ${to} instead`, answer: null };
@@ -366,7 +375,9 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
       return;
     }
     leave(c);
-    store.answer(c.project, c.id, String(n));
+    // inbox picks (3): where he is, so his row shows here too when the asker's thread is elsewhere
+    const words = c.options.find((o) => o.n === n)?.label ?? String(n);
+    store.answer(c.project, c.id, String(n), undefined, undefined, { at: answerAt(here, home), asker: c.agent, words });
   };
   const close = (c: Card) => {
     if (isNotify(c)) {
