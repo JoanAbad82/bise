@@ -1,16 +1,20 @@
-// thread/working · the working indicator (designer's desktop-working page, tui-parity m_20165).
+// thread/working · the working mark beside the composer's label (designer's desktop-working v2,
+// his m_21668, tui-parity m_21679: the TUI's divider).
 // Passes when, with the scripted core (FakeCore, fake data):
-//   - perf's thread ends on the working row: the TUI's 5-cell gust (its frames step at 110 ms, only
-//     the TUI's 9 frames, in a box that never changes width), then 'perf is working · running the
-//     bench three more times · 14 min';
-//   - the head chip carries the 1-cell breath (one of · ~ ∿ ≈) before 'working · 14 min';
-//   - while he types in the composer the gust goes calm: no cell in ink;
-//   - an agent with no action yet says 'docs is working · 42 s', never invented words;
-//   - read up the thread, the row stays in view; a click on it brings the thread to its end;
+//   - while perf works, its thread has no working row: the TUI's 5-cell gust sits 8 px after
+//     'to perf' on the label line (its frames step at 110 ms, only the TUI's 9 frames, in a box
+//     that never changes width), nothing else beside it; the label's right has no 'working';
+//   - the head chip keeps its 1-cell breath before 'working · 14 min';
+//   - hover on the gust: 'perf is working · 14 min';
+//   - the step at work is drawn once: a running command keeps its '$' and ends with '∿ N s'; a
+//     call the model described ('lecture du PDF…') is the growing fold '▸ lecture du PDF…  ∿ N s'
+//     at the thread's end, with no mono line for it;
+//   - while he types the gust goes calm: no cell in ink;
+//   - idle: no mark, no '∿' on the tool row;
 //   - reduced motion: one still ∿ in ink, no frame moves;
-// and writes the row's shots at 1400 / 1100 / 800, light and dark, plus three frames of the gust,
-// in one sheet for designer (working-sheet.png).
-// Owner: amb-web.
+// and writes the shots for designer at 1100, light and dark: working (perf's command, docs' fold),
+// a long turn read up, the hover tooltip, idle (in $SHOTS when set, else the test's output dir).
+// Owner: amb-home (the gust's motion: amb-web's working/).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
@@ -30,8 +34,19 @@ const prefs = (theme: 'light' | 'dark') => ({
     shots_keep_days: 7,
   },
 });
-const world = (now: number) => {
+const agents = (now: number, perf: 'working' | 'idle') => {
   const ag = (name: string, over: Record<string, unknown>) => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: now - 60 * MIN, waits: 0, ...over });
+  return {
+    ev: 'agents',
+    project: P,
+    agents: [
+      ag('main', {}),
+      ag('perf', { status: perf, since_ms: now - 14 * MIN, purpose: 'product page speed', title: 'running the bench three more times', branch: 'sb/perf' }),
+      ag('docs', { status: 'working', since_ms: now - 42_000, purpose: 'api examples', title: '', branch: 'sb/docs' }),
+    ],
+  };
+};
+const world = (now: number) => {
   const said = (i: number) => ({ pos: i, at_ms: now - (40 - i) * 20_000, kind: i % 2 === 1 ? 'you' : 'agent', text: i % 2 === 1 ? `run number ${String(i)} please` : `run ${String(i)}: the page paints in ${String(2 + (i % 7) / 10)} s on mobile, the hero image still dominates the first paint and the reviews widget blocks it while it loads.` });
   return [
     prefs('light'),
@@ -43,23 +58,49 @@ const world = (now: number) => {
       ],
     },
     { ev: 'welcome', project: P, proto: 1, workspace: '/nowhere/storefront', name: 'storefront' },
+    agents(now, 'working'),
     {
-      ev: 'agents',
+      ev: 'thread',
       project: P,
-      agents: [
-        ag('main', {}),
-        ag('perf', { status: 'working', since_ms: now - 14 * MIN, purpose: 'product page speed', title: 'running the bench three more times', branch: 'sb/perf' }),
-        ag('docs', { status: 'working', since_ms: now - 42_000, purpose: 'api examples', title: '', branch: 'sb/docs' }),
+      agent: 'perf',
+      entries: [
+        ...Array.from({ length: 30 }, (_, i) => said(i + 1)),
+        {
+          pos: 31,
+          at_ms: now - 40_000,
+          kind: 'tools',
+          text: 'ran 2 commands',
+          tools: {
+            count: 2,
+            summary: 'ran 2 commands',
+            items: [
+              { pos: 41, at_ms: now - 40_000, text: 'pnpm build web/product', kind: 'run', state: 'ok' },
+              { pos: 42, at_ms: now - 15_000, text: 'pnpm bench web/product --runs 3', kind: 'run', state: 'run' },
+            ],
+          },
+        },
       ],
+      before: null,
+      more: false,
     },
-    { ev: 'thread', project: P, agent: 'perf', entries: Array.from({ length: 30 }, (_, i) => said(i + 1)), before: null, more: false },
     {
       ev: 'thread',
       project: P,
       agent: 'docs',
       entries: [
-        { pos: 1, at_ms: now - 30 * MIN, kind: 'you', text: 'write the api examples' },
+        { pos: 1, at_ms: now - 30 * MIN, kind: 'you', text: 'write the api examples from the tariff PDF' },
         { pos: 2, at_ms: now - 29 * MIN, kind: 'agent', text: 'on it: one example per endpoint.' },
+        {
+          pos: 3,
+          at_ms: now - 10_000,
+          kind: 'tools',
+          text: 'lecture du PDF de tarifs',
+          tools: {
+            count: 1,
+            summary: 'ran 1 command',
+            items: [{ pos: 51, at_ms: now - 10_000, text: "lecture du PDF de tarifs d'Efficience", intent: "lecture du PDF de tarifs d'Efficience", kind: 'run', state: 'run' }],
+          },
+        },
       ],
       before: null,
       more: false,
@@ -68,7 +109,7 @@ const world = (now: number) => {
   ];
 };
 
-test('thread/working: the gust and its words at the thread end, the breath in the chip, calm while he types, still under reduced motion', async () => {
+test('thread/working: only the gust beside the label while it works, the step drawn once, a hover says the age, calm while he types, still under reduced motion', async () => {
   test.setTimeout(150_000);
   const now = Date.now();
   const core = new FakeCore(world(now) as unknown as ConstructorParameters<typeof FakeCore>[0]);
@@ -76,6 +117,8 @@ test('thread/working: the gust and its words at the thread end, the breath in th
   const shots: { label: string; png: Buffer }[] = [];
   try {
     const { page } = s;
+    const W = 1100;
+    const H = 760;
     const size = async (w: number, h: number) => {
       await s.app.evaluate(({ BrowserWindow }, [w, h]) => {
         const win = BrowserWindow.getAllWindows().sort((a, b) => (b.getSize()[0] ?? 0) - (a.getSize()[0] ?? 0))[0];
@@ -87,12 +130,27 @@ test('thread/working: the gust and its words at the thread end, the breath in th
       await core.send(prefs(t) as never);
       await expect.poll(() => page.evaluate(() => document.documentElement.dataset['theme']), { timeout: 5000 }).toBe(t);
     };
-    const row = page.getByTestId('thread.live');
-    const gust = page.getByTestId('thread.live.gust');
+    // the thread's end and the composer: the bottom 340 px
+    const shot = async (label: string) => {
+      await page.mouse.move(2, 2);
+      shots.push({ label, png: await page.screenshot({ clip: { x: 0, y: H - 340, width: W, height: 340 } }) });
+    };
+    const mark = page.getByTestId('thread.mark');
+    const gust = page.getByTestId('thread.mark.gust');
+    const label = page.locator('.th-screen .b-composer .div').first();
+    /** px from the bottom of the last element matching `sel` (the thread's last row) to the label's top */
+    const endGap = (sel: string) =>
+      page.evaluate((s) => {
+        const all = document.querySelectorAll(s);
+        const last = all.item(all.length - 1) as Element | null;
+        const lbl = document.querySelector('.th-screen .b-composer .div');
+        if (!last || !lbl) return -1;
+        return Math.round(lbl.getBoundingClientRect().top - last.getBoundingClientRect().bottom);
+      }, sel);
     /** the gust's cells over `ms`, every 30 ms: text, tones, box width */
     const sample = (ms: number) =>
       page.evaluate(async (ms) => {
-        const el = document.querySelector('[data-testid="thread.live.gust"]') as HTMLElement;
+        const el = document.querySelector('[data-testid="thread.mark.gust"]') as HTMLElement;
         const out: { text: string; tones: string[]; w: number }[] = [];
         const end = Date.now() + ms;
         while (Date.now() < end) {
@@ -102,35 +160,49 @@ test('thread/working: the gust and its words at the thread end, the breath in th
         return out;
       }, ms);
 
-    await size(1400, 900);
-    await expect(row).toBeVisible({ timeout: 10_000 });
-    // (1) the words: name, 'is working', the core's action, the turn's age
-    await expect(row).toHaveText(/perf is working · running the bench three more times · 14 min$/);
-    await expect(row).toHaveAttribute('role', 'status');
+    await size(W, H);
+    await expect(mark).toBeVisible({ timeout: 10_000 });
+    // (1) no working row at the thread's end
+    await expect(page.getByTestId('thread.live')).toHaveCount(0);
+    await expect(page.getByTestId('thread.screen')).not.toContainText('is working');
+    // (2) the gust on the label line, 8 px after 'to perf', nothing else beside it
+    await expect(mark).toHaveAttribute('data-state', 'working');
+    await expect(label.locator('.lbl [data-testid="thread.mark"]')).toHaveCount(1);
+    const gap = await page.evaluate(() => {
+      const lbl = document.querySelector('.th-screen .b-composer .div .lbl');
+      const words = lbl?.firstChild;
+      const m = lbl?.querySelector('[data-testid="thread.mark"]');
+      if (!words || !m) return { words: '', gap: -1 };
+      const r = document.createRange();
+      r.selectNodeContents(words);
+      return { words: words.textContent ?? '', gap: m.getBoundingClientRect().left - r.getBoundingClientRect().right };
+    });
+    expect(gap.words).toBe('to perf');
+    expect(Math.abs(gap.gap - 8), `8 px after the words (${String(gap.gap)})`).toBeLessThanOrEqual(1);
     await expect(gust).toHaveAttribute('aria-hidden', 'true');
-    // (1) the gust steps through the TUI's frames, in a fixed box
+    // the label's right: model · effort · mode · context, never 'working' (the gust says it)
+    await expect(label).not.toContainText('working');
+    // (2) the gust steps through the TUI's frames, in a fixed box
     const run = await sample(700);
     const seen = new Set(run.map((x) => x.text));
     expect(seen.size, `the gust moves (several frames in 700 ms): ${JSON.stringify([...seen])}`).toBeGreaterThanOrEqual(4);
     for (const t of seen) expect(GUST5, `'${t}' is one of the TUI's frames`).toContain(t);
     expect(new Set(run.map((x) => Math.round(x.w))).size, 'the box keeps its width').toBe(1);
-    // (2) the head chip's breath
+    // (5) the head chip's breath, unchanged
     await expect(page.getByTestId('thread.head.state')).toHaveText(/^[·~∿≈] working · 14 min$/);
     await expect(page.getByTestId('thread.head.state.breath')).toHaveCount(1);
-    // (2b) designer m_20262: one place only, the label's right drops 'working · 14 min' while the row shows
-    const label = page.getByTestId('composer').locator('.div').first();
-    await expect(label).toContainText('to perf');
-    await expect(label).not.toContainText('working');
-    // the thread's end gap: 20 px from the row's bottom to the label
-    const rowBox = await row.boundingBox();
-    const labelBox = await label.boundingBox();
-    if (rowBox === null || labelBox === null) throw new Error('no row or label');
-    expect(Math.abs(labelBox.y - (rowBox.y + rowBox.height) - 20), `20 px under the row (${String(labelBox.y - rowBox.y - rowBox.height)})`).toBeLessThanOrEqual(1);
-    // the gust's box starts on the thread's text column ('run 30:' above), no indent
-    const gustBox = await gust.boundingBox();
-    const textBox = await page.getByText(/^run 30:/).last().boundingBox();
-    if (gustBox === null || textBox === null) throw new Error('no gust or text');
-    expect(Math.abs(gustBox.x - textBox.x), `the gust at the text column (gust ${String(gustBox.x)}, text ${String(textBox.x)})`).toBeLessThanOrEqual(0.5);
+    // (4) a running command: its '$' stays, '∿ 15 s' at its end; no fold repeats it
+    await expect(page.getByTestId('thread.tool.42')).toHaveText(/^\$ pnpm bench web\/product --runs 3/);
+    await expect(page.getByTestId('thread.tool.42.time')).toHaveText(/^∿ 1\d s$/);
+    await expect(page.getByTestId('thread.typing')).toHaveCount(0);
+    const toolEnd = await endGap('.th-list .th-row');
+    expect(toolEnd, `the thread's end gap under the tool row (${String(toolEnd)})`).toBeGreaterThanOrEqual(18);
+    // (2) hover: the turn's age
+    await expect(page.getByTestId('thread.mark.tip')).toHaveCount(0);
+    await mark.hover();
+    await expect(page.getByTestId('thread.mark.tip')).toHaveText('perf is working · 14 min');
+    await page.mouse.move(2, 2);
+    await expect(page.getByTestId('thread.mark.tip')).toHaveCount(0);
     // (3) he types: calm (each tone one step down: no cell in ink)
     await page.locator('[data-testid="composer.field"]').first().click();
     await page.keyboard.type('compute it for 25 years too', { delay: 40 });
@@ -138,60 +210,74 @@ test('thread/working: the gust and its words at the thread end, the breath in th
     expect(calm.flatMap((x) => x.tones), 'calm: no cell in ink while he types').not.toContain('ink');
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('Backspace');
-    // (5) read up the thread: the row stays in view; a click on it brings the thread to its end
-    // the list's scrolling box is Virtuoso's scroller inside it
-    const list = page.locator('[data-testid="thread.list"] [data-virtuoso-scroller="true"]').first();
-    const gap = () => list.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop);
-    await list.evaluate((el) => {
-      el.scrollTop = 0;
-    });
-    await expect.poll(gap, { message: 'read up' }).toBeGreaterThan(200);
-    await expect(row).toBeInViewport();
-    await row.click();
-    await expect.poll(gap, { message: 'a click on the row brings the thread to its end' }).toBeLessThan(4);
+    await page.locator('.th-screen').first().click({ position: { x: 4, y: 200 } });
 
-    // the shots: the row and the composer under it, 1400 / 1100 / 800, light and dark
+    const list = page.locator('[data-testid="thread.list"] [data-virtuoso-scroller="true"]').first();
+    const toEnd = () => list.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop);
     for (const t of ['light', 'dark'] as const) {
       await theme(t);
-      for (const w of [1400, 1100, 800]) {
-        await size(w, 760);
-        await expect(row).toBeVisible();
-        const box = await row.boundingBox();
-        if (box === null) throw new Error('no row');
-        const clip = { x: 0, y: Math.max(0, box.y - 120), width: w, height: Math.min(760 - Math.max(0, box.y - 120), 300) };
-        // a frame with the gust's crest in it (its last frames are the tail and a blank)
-        await expect(gust).toHaveText(/∿/);
-        shots.push({ label: `${String(w)} · ${t}`, png: await page.screenshot({ clip }) });
-      }
-    }
-    // three frames of the gust, close
-    await size(1100, 760);
-    await theme('light');
-    for (let i = 0; i < 3; i++) {
-      const box = await row.boundingBox();
-      if (box === null) throw new Error('no row');
-      shots.push({ label: `gust frame ${String(i + 1)}`, png: await page.screenshot({ clip: { x: box.x - 8, y: box.y - 6, width: 420, height: box.height + 12 } }) });
-      await page.waitForTimeout(220);
+      await page.getByTestId('app.right.agent.perf').click();
+      await expect(mark).toBeVisible();
+      await list.evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
+      await expect(gust).toHaveText(/∿/);
+      await shot(`${t}-working-command`);
+      // a long turn, read up a bit: the label's gust stays, nothing else at the end
+      await list.evaluate((el) => {
+        el.scrollTop = Math.max(0, el.scrollTop - 400);
+      });
+      await expect.poll(toEnd, { message: 'read up' }).toBeGreaterThan(200);
+      await expect(mark).toBeInViewport();
+      await shot(`${t}-long-turn-read-up`);
+      await list.evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
+      await mark.hover();
+      await expect(page.getByTestId('thread.mark.tip')).toBeVisible();
+      shots.push({ label: `${t}-hover`, png: await page.screenshot({ clip: { x: 0, y: H - 340, width: W, height: 340 } }) });
+      await page.mouse.move(2, 2);
+      // (4) docs: the model's words about its call, the growing fold, once
+      await page.getByTestId('app.right.agent.docs').click();
+      await expect(page.getByTestId('thread.head.name')).toHaveText('docs', { timeout: 10_000 });
+      await expect(page.getByTestId('thread.typing')).toContainText("lecture du PDF de tarifs d'Efficience");
+      await expect(page.getByTestId('thread.typing.end')).toHaveText(/^∿ \d+ s$/);
+      await expect(page.getByTestId('thread.tool.51'), 'no mono line for the same step').toHaveCount(0);
+      const font = await page.getByTestId('thread.typing').locator('.b-fold').evaluate((el) => getComputedStyle(el).fontFamily);
+      expect(font, 'the model\'s words are sans').not.toMatch(/mono/i);
+      // the thread's end gap is the same under the fold as under a tool row (designer m_21721)
+      const foldEnd = await endGap('[data-testid="thread.typing"]');
+      expect(Math.abs(foldEnd - toolEnd), `the end gap under the fold (${String(foldEnd)}) is the tool row's (${String(toolEnd)})`).toBeLessThanOrEqual(1);
+      await expect(page.locator('.th-screen .b-composer .div .lbl [data-testid="thread.mark"]')).toHaveCount(1);
+      await shot(`${t}-working-fold`);
     }
 
-    // (4) no action yet: the name and the age alone
-    await size(1400, 760);
+    // idle: no mark, the command's row loses its '∿'
+    await page.getByTestId('app.right.agent.perf').click();
+    await expect(page.getByTestId('thread.head.name')).toHaveText('perf', { timeout: 10_000 });
+    await core.send(agents(now, 'idle') as never);
+    await expect(mark).toHaveCount(0);
+    await expect(page.getByTestId('thread.tool.42')).not.toHaveAttribute('data-live', 'true');
+    await expect(page.getByTestId('thread.typing')).toHaveCount(0);
+    for (const t of ['dark', 'light'] as const) {
+      await theme(t);
+      await list.evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
+      await shot(`${t}-idle`);
+    }
+
+    // reduced motion: one still ∿ in ink (docs still works)
     await page.getByTestId('app.right.agent.docs').click();
     await expect(page.getByTestId('thread.head.name')).toHaveText('docs', { timeout: 10_000 });
-    await expect(row).toHaveText(/docs is working · 4\d s$/);
-    await expect(page.getByTestId('thread.live.act')).toHaveCount(0);
-
-    // (6) reduced motion: one still ∿ in ink
-    // (no esc here: with no field focused it goes up, docs → main, and the row would go)
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    // the media change reaches the window's clock as an event: wait for it, then it stays still
     await expect(gust).toHaveText('∿    ', { timeout: 2000 });
     const still = await sample(600);
     expect(new Set(still.map((x) => x.text)), 'still: one ∿').toEqual(new Set(['∿    ']));
     expect(still.every((x) => x.tones.join() === 'ink'), 'the still ∿ is in ink').toBe(true);
     await page.emulateMedia({ reducedMotion: null });
   } finally {
-    const dir = test.info().outputDir;
+    const dir = process.env['SHOTS'] ?? test.info().outputDir;
     mkdirSync(dir, { recursive: true });
     for (const sh of shots) writeFileSync(`${dir}/working-${sh.label.replace(/[^a-z0-9]+/gi, '-')}.png`, sh.png);
     await s.close();

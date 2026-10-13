@@ -36,11 +36,14 @@ export const ThreadComposer = memo(function ThreadComposer({
   about,
   keys,
   lead,
+  mark,
 }: {
   project: string;
   agent: string;
   busy: boolean;
   to: string;
+  /** after the label's first part: the addressee's working gust (LabelMark), else none */
+  mark?: ReactNode;
   /** the label line's right: 'esc write a plain message' while it answers (designer v6 s-wait) */
   toEnd?: string | undefined;
   /** the field's words when empty (the composer's own 'write to …' when none) */
@@ -200,7 +203,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   // the open card that takes words keeps his half answer apart, the thread's draft never moves
   // (amb-home 2b, amb-web's draftKey): the card's own key, the same wherever the block opens it
   const draftKey = answer === null ? undefined : cardDraftKey(answer);
-  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} to={to} {...(end === undefined ? {} : { toEnd: end })} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} testId="composer" />;
+  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} to={to} {...(end === undefined ? {} : { toEnd: end })} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} mark={mark} testId="composer" />;
   if (note === null) return field;
   return (
     <>

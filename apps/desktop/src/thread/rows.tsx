@@ -336,6 +336,7 @@ export { THOUGHT_MS };
 
 // the row families live in their own files; importers keep reading them here
 export { answeredMark, approvalParts, cardFollows, cardLine, fileUrl, imageLabel, toAgentName, withoutImageMarks } from './rows-cards';
-export { LONG_CHARS, LONG_LINES, PendingRow, QueuedRow, TypingLine, YouBubble, foldOf } from './rows-messages';
+export { LONG_CHARS, LONG_LINES, PendingRow, QueuedRow, YouBubble, foldOf } from './rows-messages';
 export { NOTICE_MARK } from './rows-news';
-export { cutWords, liveTime, thoughtFor } from './rows-tools';
+export { cutWords, thoughtFor } from './rows-tools';
+export { liveTime } from './live-step';

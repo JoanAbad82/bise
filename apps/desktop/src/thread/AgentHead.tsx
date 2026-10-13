@@ -8,11 +8,10 @@ import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } fro
 import type { Agent } from '@/proto';
 import { useAgents, useComputerLive, useDiff } from '@/store';
 import { useNow } from '@/app/clock';
-import { Breath, Gust, Pulse } from '@/working/Signs';
-import { turnAge } from '@/working/gust';
+import { Breath, Pulse } from '@/working/Signs';
 import { useRouter } from '@/app/router';
 import { BisePearl } from '@/app/BisePearl';
-import { archivedFit, biseChip, branchLine, dropsFor, roleOf, stateChip, usageLine, workingRowShows, type StateChip } from './head';
+import { archivedFit, biseChip, branchLine, dropsFor, roleOf, stateChip, usageLine, type StateChip } from './head';
 import { waitingFor, waitsEvent } from './wake';
 import { Button, Press } from '@/ds';
 
@@ -217,47 +216,17 @@ export function BiseHead({ project, name, more }: { project: string; name: strin
 }
 
 /**
- * The working row at the thread's end (designer's desktop-working page): the TUI's gust, then
- * '<agent> is working · <the core's action text> · <turn age>'; no action yet, the name and the
- * age alone (never invented words). The action cuts with … first, the rest stays whole. It sits
- * under the list, so it stays in view when he reads up; a click brings the thread to its end.
- * role=status: the gust and the age are aria-hidden, so only a new action is announced.
- * An agent waiting on an event keeps event-wake's '… waiting for …' row, no gust.
+ * Event-wake's row at the thread's end (designer's page): an agent waiting on an event ends its
+ * thread on what it waits for, '… waiting for …', dim, never the accent. A working agent has no
+ * row here any more: the gust beside the composer's label says it (LabelMark.tsx, designer's
+ * desktop-working v2, his m_21668).
  */
-export function LiveLine({ a, name, onJump }: { a: Agent | undefined; name?: string; onJump?: () => void }) {
+export function WaitingLine({ a }: { a: Agent | undefined }) {
   const now = useNow();
-  // event-wake (designer's page): the thread ends on what it waits for, dim, never the accent
-  if (a !== undefined && !a.archived && waitsEvent(a)) {
-    return (
-      <div className="th-live th-waiting" data-testid="thread.waiting" aria-live="polite">
-        … {waitingFor(a.watching, now)}
-      </div>
-    );
-  }
-  // waiting on him (a question, an approval): the row goes, the card docks over the composer
-  if (a === undefined || !workingRowShows(a)) return null;
-  // one turn age with the head chip and the right bar (designer m_20461 (1)): the turn's, else since its start
-  const age = a.turn_ms != null ? turnAge(a.turn_ms) : a.since_ms > 0 ? turnAge(now - a.since_ms) : '';
+  if (a === undefined || a.archived || !waitsEvent(a)) return null;
   return (
-    <div className="th-live th-working" role="status" data-testid="thread.live" onClick={onJump}>
-      <Gust testId="thread.live.gust" />
-      <span className="th-live-words">
-        <b className="th-live-name">{name ?? a.name}</b> is working
-        {a.title !== '' && (
-          <>
-            <span className="th-live-dot"> · </span>
-            <span className="th-live-act" data-testid="thread.live.act">
-              {a.title}
-            </span>
-          </>
-        )}
-      </span>
-      {age !== '' && (
-        <span className="th-live-age" aria-hidden="true" data-testid="thread.live.age">
-          {' · '}
-          {age}
-        </span>
-      )}
+    <div className="th-live th-waiting" data-testid="thread.waiting" aria-live="polite">
+      … {waitingFor(a.watching, now)}
     </div>
   );
 }

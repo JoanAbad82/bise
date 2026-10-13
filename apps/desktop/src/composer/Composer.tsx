@@ -56,6 +56,8 @@ export interface ComposerProps {
   readonly onShiftTab?: () => void;
   /** a key hint at the label line's right ('esc write a plain message' while it answers a docked card) */
   readonly toEnd?: ReactNode;
+  /** a sign after the label's first part ('to bise' + the working gust; 'answering perf' + it + ' · …') */
+  readonly mark?: ReactNode;
   readonly placeholder?: string;
   /** A fixed key bar (a screen of its own); unset: the bar follows the composer's mode (W9). */
   readonly keys?: string;
@@ -81,6 +83,23 @@ export function writeTo(to: string | undefined): string {
   return `write to ${name !== undefined && name !== "" ? name : "bise"}`;
 }
 
+/** The label with its mark after the first part: 'to bise' ∿, 'answering perf' ∿ ' · the question'. */
+function MarkedLabel({ to, mark }: { to: string; mark: ReactNode }) {
+  const cut = to.indexOf(" · ");
+  return cut < 0 ? (
+    <>
+      {to}
+      {mark}
+    </>
+  ) : (
+    <>
+      {to.slice(0, cut)}
+      {mark}
+      {to.slice(cut)}
+    </>
+  );
+}
+
 /** The last tip shown (keybar.rs keeps it in the `tip` preference): the next session starts after it. */
 const TIP_KEY = "bise.composer.v1.tip";
 
@@ -93,6 +112,7 @@ export const Composer = memo(function Composer(
     sources = NO_SOURCES,
     to,
     toEnd,
+    mark,
     placeholder = writeTo(to),
     keys,
     voice = null,
@@ -159,7 +179,7 @@ export const Composer = memo(function Composer(
         // the label keeps its markup with or without a right side (the working row can empty the right)
         to === undefined ? undefined : (
           <>
-            <span className="lbl">{to}</span>
+            <span className="lbl">{mark == null ? to : <MarkedLabel to={to} mark={mark} />}</span>
             {toEnd !== undefined && <span className="end">{toEnd}</span>}
           </>
         )

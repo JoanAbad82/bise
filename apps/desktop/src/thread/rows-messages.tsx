@@ -446,12 +446,3 @@ function HoldLine({ hold }: { hold: Hold }) {
   );
 }
 
-/** The line under the newest row while a turn runs: its current step. */
-export function TypingLine({ text }: { text: string }) {
-  if (text === '') return null;
-  return (
-    <div className="th-typing" data-testid="thread.typing" aria-live="polite">
-      <Fold>{text}</Fold>
-    </div>
-  );
-}

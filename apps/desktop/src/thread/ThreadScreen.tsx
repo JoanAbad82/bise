@@ -7,7 +7,7 @@
 // when its keys change (an entry or a send comes or goes); each row reads
 // its own data; the composer is memo'd with stable props, so neither an
 // entry, a step nor a send ever re-renders it.
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Button, Head, Marker } from '@/ds';
 import type { ComposerActions } from '@/composer';
 import type { Card } from '@/proto';
@@ -26,13 +26,14 @@ import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
 import { HubNoteRow, InboxBlock, type Answering } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
-import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
+import { AgentHead, BiseHead, StartingLine, WaitingLine } from './AgentHead';
+import { LabelMark } from './LabelMark';
+import { StepLine } from './live-step';
 import { composerWords, dividerEnd, emptyEnter, nothingOwnYet, usageLine, workingRowShows } from './head';
 import { waitAge, waitSince, waitsEvent } from './wake';
 import { useNow } from '@/app/clock';
 import { SignInLine, useThreadSignIn } from './signin';
 import { type ThreadListHandle } from './ThreadList';
-import { TypingLine } from './rows';
 import { ComputerLine } from './ComputerLine';
 import { entryKey } from './entry';
 import { FindBar } from './FindBar';
@@ -312,6 +313,15 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
   // the working row at the thread's end says 'working' and its age: the label drops its state then
   // (designer m_20262 (1): one place only; the head chip keeps it)
   const rowSays = !fresh && workingRowShows(me);
+  // the gust beside 'to bise' (designer's desktop-working v2): the composer's addressee's, kept
+  // stable so the memoised composer doesn't draw again for it (the mark reads its agent itself)
+  const markAgent = artifact?.agent ?? agent;
+  const markName = markAgent === agent ? title : markAgent;
+  const startingMark = fresh && markAgent === agent;
+  const labelMark = useMemo(
+    () => <LabelMark project={project} agent={markAgent} name={markName} starting={startingMark} />,
+    [project, markAgent, markName, startingMark],
+  );
   const divider =
     me === undefined
       ? ''
@@ -409,21 +419,14 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
           </div>
         )}
         {fresh && <StartingLine a={me} />}
-        {/* the working row (designer's desktop-working page): under the list, so it stays in view
-            when he reads up; a click brings the thread to its end. bise's own thread too ('bise is working') */}
-        {!fresh && (
-          <LiveLine
-            a={me}
-            name={title}
-            onJump={() => {
-              list.current?.scrollToEnd();
-            }}
-          />
-        )}
+        {/* event-wake's '… waiting for …' row; working, only the gust beside the label says it
+            (designer's desktop-working v2, his m_21668: the working row went) */}
+        {!fresh && <WaitingLine a={me} />}
         {/* a typed command's result (the hub's plain line): one quiet row, never under the composer (amb-home) */}
         <HubNoteRow project={project} />
         {signIn.on && <SignInLine copied={signIn.copied} />}
-        <TypingLine text={typing} />
+        {/* the step at work, once: the growing fold '▸ <its words>  ∿ 10 s' (live-step.tsx) */}
+        <StepLine tkey={tkey} project={project} agent={agent} working={workingRowShows(me)} typing={typing} />
         {/* W7/K24: the project's open items over the composer's divider (amb-home f44d082e) */}
         {/* its hub refused this core: the hub's words and a retry, over the composer (lead m_11347) */}
         <RefusedLine project={project} name={bise ? 'bise' : (projectName ?? project)} className="app-refused th-refused" testId="thread.refused" />
@@ -454,6 +457,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
             toEnd={voice === 'typing' ? TYPING_END : (answering?.end ?? (divider === '' ? undefined : divider))}
             keys={voice === 'typing' ? VOICE_TYPING_KEYS : undefined}
             lead={voice === 'typing' ? <VoiceTypePearl /> : undefined}
+            mark={labelMark}
             placeholder={answering?.answer != null ? 'your answer, then ⏎' : artifact !== undefined ? artifact.placeholder : composerWords(title).placeholder}
             {...(artifact === undefined ? {} : { about: { id: artifact.id, title: artifact.title, url: artifact.url } })}
             answer={answerOf(answering)}

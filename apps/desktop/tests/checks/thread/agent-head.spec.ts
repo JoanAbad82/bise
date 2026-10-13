@@ -172,10 +172,11 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     expect(art.thumb, 'no empty thumbnail box').toBe(false);
     expect(art.h, 'one line').toBeLessThan(36);
     expect(art.w, 'fit-content').toBeLessThan(400);
-    await expect(page.getByTestId('thread.live')).toHaveText(/perf is working · running the bench three more times · 14 min$/);
-    // (4) the composer's words
-    // the label's left (its right is the S40/W3 divider: 'working · 14 min')
-    await expect(page.locator('.th-screen .b-composer .div .lbl')).toHaveText('to perf');
+    // working: no row at the thread's end, the gust beside 'to perf' (designer's desktop-working v2)
+    await expect(page.getByTestId('thread.live')).toHaveCount(0);
+    await expect(page.locator('.th-screen .b-composer .div .lbl [data-testid="thread.mark"]')).toHaveCount(1);
+    // (4) the composer's words: the label's left, then the gust's cells
+    await expect(page.locator('.th-screen .b-composer .div .lbl')).toHaveText(/^to perf[ ·~∿≈]{5}$/);
     await expect(page.locator('[data-testid="composer.field"][aria-placeholder]')).toHaveAttribute('aria-placeholder', 'write to perf, then ⏎');
     // the artifact opens in the window
     await page.getByTestId('thread.artifact.10').click();
@@ -226,7 +227,8 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
             // (5) the empty thread: his first message, then the starting line; the chip says starting
             await expect(page.getByTestId('thread.starting')).toHaveText(/^· ?checkout is starting · its own folder, sb\/checkout$/);
             await expect(page.getByTestId('thread.head.state')).toHaveText('starting');
-            await expect(page.getByTestId('thread.live')).toHaveCount(0);
+            // starting: the '·' pulse beside the label, no gust (designer's desktop-working v2 (2))
+            await expect(page.getByTestId('thread.mark')).toHaveAttribute('data-state', 'starting');
             // (3) the starting row on the column's edge, like every row
             const dx = await page.evaluate(() => {
               const a = document.querySelector('[data-testid="thread.starting"]')?.getBoundingClientRect();
