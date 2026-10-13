@@ -50,7 +50,8 @@ psall() { ps -axww -o pid=,command= | awk -v p="$1" 'index($0, p) && index($0, "
 hubsnow() { # <when>: while the app runs
   local b other hubs bad good repls
   b=$(psall "$A/Contents/")
-  other=$(echo "$b" | grep -v '^$' | grep -vF "$A/Contents/MacOS/" | grep -vF "$A/Contents/Frameworks/" | grep -vF " ambient-core")
+  # 'bise pty' is the terminal panel's shell host (main's child, gone at quit), not a hub/REPL/bridge
+  other=$(echo "$b" | grep -v '^$' | grep -vF "$A/Contents/MacOS/" | grep -vF "$A/Contents/Frameworks/" | grep -vF " ambient-core" | grep -vF "$A/Contents/Resources/bin/bise pty ")
   hubs=$(psall "$G/w" | grep -F ' sbd --workspace ')
   bad=$(echo "$hubs" | grep -F "$A/Contents/")
   good=$(echo "$hubs" | grep -F '/versions/' | grep -vF "$A/Contents/")

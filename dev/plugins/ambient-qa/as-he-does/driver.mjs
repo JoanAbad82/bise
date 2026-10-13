@@ -534,7 +534,9 @@ if (mode === 'rows2') {
   const MAIN_WORDS = 'half a thought for main';
   const ART_WORDS = 'and the green, is it on brand?';
   const field = page.locator('[data-testid="composer.field"]:visible').first();
-  const lbl = () => page.locator('.b-composer .lbl:visible').first().innerText({ timeout: 1000 }).catch(() => null);
+  // the label without the working mark's gust (its glyphs change each frame while main works)
+  const lbl = () => page.locator('.b-composer .lbl:visible').first().innerText({ timeout: 1000 })
+    .then((s) => s.replace(/[∿≈~∼∽·]+/g, ' ').replace(/\s+/g, ' ').trim(), () => null);
   const fieldText = async () => ((await field.innerText({ timeout: 1000 }).catch(() => '')) ?? '').trim();
   const typeIn = async (words) => {
     if (!(await click('the composer', field))) return false;
@@ -624,7 +626,13 @@ if (mode === 'rows2') {
     for (let i = 0; i < 16; i++) { g.push(await geo()); await page.waitForTimeout(110); }
     const same = (k) => new Set(g.map((x) => x?.[k] ?? null)).size === 1;
     wk.gust_frames = new Set(g.map((x) => x?.gust ?? null)).size;
-    wk.still = { list: same('list'), scroll: same('scroll'), composer: same('composer'), mark_box: same('mark') };
+    // the scroller may grow when a row lands (new content, kept at the bottom): that is not the gust
+    // moving it. Red only when scrollTop moves while scrollHeight stays (the thread jumps by itself).
+    const sc = g.map((x) => (x?.scroll ?? '').split(',').map(Number));
+    const jumps = sc.slice(1).filter((s, i) => s[1] === sc[i][1] && s[0] !== sc[i][0]).length;
+    wk.scrolls = [...new Set(g.map((x) => x?.scroll ?? null))];
+    wk.still = { list: same('list'), scroll: jumps === 0, composer: same('composer'), mark_box: same('mark') };
+    wk.scroll_jumps = jumps;
     wk.first = g[0];
     wk.old_rows = await page.locator('[data-testid="thread.live"], [data-testid="thread.waiting"]').count();
     wk.is_working_text = /is working/.test((await text('[data-testid="thread.list"]')) ?? '');
@@ -1098,6 +1106,12 @@ if (mode === 'rows2') {
   // the maker's head beside it at 1100: it ends at its column, never under the panel, restore whole
   // inside it, one line
   const makerArt = page.locator('[data-testid^="app.right.artifact."][data-testid$=".rel-ts-notes"]').first();
+  // (e) left the list at its cap: the maker's row (older than the more-N ones) sits behind '+ N more'
+  const expand = async () => {
+    const more = page.locator('[data-testid="app.right.artifacts.more"]').first();
+    if (await more.isVisible().catch(() => false)) await click("the artifacts' '+ N more'", more);
+  };
+  await expand();
   const made = await makerArt.waitFor({ timeout: 60000 }).then(() => true, () => false);
   await say(`[[bash: sb drop ${MAKER}]]`);
   const dropCard = page.locator('[data-testid^="dock.opt"], [data-testid^="composer.opt"]').filter({ hasText: /yes|drop/i }).first();
@@ -1106,6 +1120,7 @@ if (mode === 'rows2') {
   const archived = await until(async () => (/release-ts/.test((await text('[data-testid="app.right.archived"]')) ?? '') && !/release-ts/.test((await text('[data-testid="app.right.agents"]')) ?? '') ? true : null), 60000, 1000);
   let gh = { made, drop_card: dropAsked, archived: !!archived };
   if (made && archived) {
+    await expand();
     await click(`${MAKER}'s artifact from the right bar`, makerArt);
     const open = await page.locator('[data-testid="app.art"]').first().waitFor({ timeout: 15000 }).then(() => true, () => false);
     const vh2 = await page.evaluate(() => window.innerHeight);
