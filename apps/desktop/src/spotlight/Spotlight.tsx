@@ -260,7 +260,12 @@ const Row = memo(function Row({
       return (
         <SpotRow
           lead="nd"
-          name={`${item.mark} ${shownName(item.agent)}`}
+          // the inbox block's sign (one-inbox 3: the tray menu and the window draw the same row)
+          name={
+            <>
+              <span className="ib-sign">{item.mark}</span> {shownName(item.agent)}
+            </>
+          }
           where={item.pname}
           what={item.text}
           hotkey={W.answerKey}
@@ -550,6 +555,15 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
           : list.mode === "ask"
             ? W.keysAsk
             : W.keysEmpty;
+  // one key per row even when two cards share an id (a hub's cards and its `others` count apart:
+  // the fixture world's acme has two #11). A shared key let React keep a stale row after the
+  // list changed (spotlight/new saw 2 rows); the second one gets '#1', in list order.
+  const seen = new Map<string, number>();
+  const keyOf = (id: string): string => {
+    const n = seen.get(id) ?? 0;
+    seen.set(id, n + 1);
+    return n === 0 ? id : `${id}#${String(n)}`;
+  };
 
   return (
     <div ref={box} className="b-spotlight" data-testid={testId}>
@@ -665,7 +679,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
           ),
           ...s.items.map((item) => (
             <Row
-              key={item.id}
+              key={keyOf(item.id)}
               item={item}
               on={items[index]?.id === item.id}
               testId={testId}

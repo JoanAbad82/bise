@@ -23,7 +23,7 @@ import type { SpotAnswer, SpotFront, SpotItem, SpotRoute } from "@/spotlight";
 import { W } from "@/spotlight/words";
 import { useTheme } from "@/theme";
 import "@/ds/index.css";
-import { Capsule } from "./Capsule";
+import { Capsule, menuCards } from "./Capsule";
 import { useAgentPreview, useSpotData } from "./data";
 import { START, step, type CapEvent, type Fx, type State } from "./machine";
 
@@ -69,6 +69,13 @@ export function CapsuleRoot(): JSX.Element {
   const view = m.state.view;
   const [front, setFront] = useState<SpotFront | null>(null);
   const spot = useSpotData(front);
+  // the helper's fn keys read these: fn+n on the tray menu opens its row n (one-inbox 3)
+  const viewRef = useRef(view);
+  const menuRef = useRef(menuCards(spot));
+  useEffect(() => {
+    viewRef.current = view;
+    menuRef.current = menuCards(spot);
+  });
   const projects = useProjects();
   const home = projects.find((p) => p.home)?.project ?? null;
   // R07-a: the agent row the spotlight's keyboard is on shows its last actions (main's thread
@@ -271,7 +278,11 @@ export function CapsuleRoot(): JSX.Element {
     const offHelper = bise.onHelper((ev) => {
       if (ev.ev === "fn" && ev.act === "esc" && routeRef.current !== null)
         keepWithBise();
-      else if (ev.ev === "fn") dispatch({ ev: "fn", act: ev.act, key: ev.key });
+      else if (ev.ev === "fn" && ev.act === "key" && viewRef.current.kind === "menu" && /^[1-9]$/u.test(ev.key ?? "")) {
+        // fn+n on the tray menu answers its row n in place (one-inbox 3)
+        const c = menuRef.current[Number(ev.key) - 1];
+        if (c !== undefined) dispatch({ ev: "open_card", id: c.id });
+      } else if (ev.ev === "fn") dispatch({ ev: "fn", act: ev.act, key: ev.key });
       else if (ev.ev === "front") setFront(frontOf(ev));
     });
     const offState = bise.capsule.onState((s) => {
@@ -424,6 +435,9 @@ export function CapsuleRoot(): JSX.Element {
         }
         bise?.openWindow(routeOf(item));
         dispatch({ ev: "close" });
+      }}
+      onOpenCard={(id) => {
+        dispatch({ ev: "open_card", id });
       }}
       onOpenWindow={(route) => {
         bise?.openWindow(route);

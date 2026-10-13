@@ -5,7 +5,8 @@
 // The capsule never pushes a card (the user's decision 2026-10-09, card #476, ambient-lead
 // m_14205): a question shows in the window's inbox block when bise's window is in front, and as
 // the native notification when it isn't; a card shows here only when he opens it from the
-// spotlight's 'waiting for you' rows (⏎), its answer in place, esc back to the list.
+// spotlight's 'waiting for you' rows (⏎) or the tray menu's rows (a click, fn+n), its answer in
+// place, esc back to that list.
 // esc or fn esc closes; the tray's click opens the dropdown; a blur that hid the window closes the
 // view. Effects: the capsule window (show, hide), the main window (open), the helper's mic
 // (own_mic, so its quiet sampling skips bise's own use).
@@ -20,8 +21,11 @@ export type View =
   | { readonly kind: 'spot' }
   | { readonly kind: 'talk'; readonly phase: 'listen' | 'think'; readonly handsFree: boolean }
   | { readonly kind: 'answer' }
-  /** opened from the spotlight's waiting row (⏎ '↵ answer'): esc and its answer go back to the list */
-  | { readonly kind: 'card'; readonly id: string }
+  /**
+   * opened from the spotlight's waiting row (⏎ '↵ answer') or the tray menu's (a click, fn+n:
+   * `from` 'menu'): esc and its answer go back to that list
+   */
+  | { readonly kind: 'card'; readonly id: string; readonly from?: 'menu' }
   | { readonly kind: 'menu' };
 
 export interface State {
@@ -72,8 +76,8 @@ function go(s: State, view: View, ...fx: Fx[]): Step {
 const stay = (s: State): Step => ({ state: s, fx: [] });
 const cancelTalk = (s: State): Step => go(s, NONE, { fx: 'hide' }, ...(talking(s.view) ? [{ fx: 'talk', cmd: 'talk_cancel' } as const] : []));
 const close = (s: State): Step => (s.view.kind === 'none' ? stay(s) : go(s, NONE, { fx: 'hide' }));
-/** a card (always opened from the spotlight) goes back to it; any other view closes */
-const back = (s: State): Step => (s.view.kind === 'card' ? go(s, { kind: 'spot' }) : close(s));
+/** a card goes back to the list it was opened from (the spotlight or the tray menu); any other view closes */
+const back = (s: State): Step => (s.view.kind === 'card' ? go(s, s.view.from === 'menu' ? { kind: 'menu' } : { kind: 'spot' }) : close(s));
 
 export function step(s: State, e: CapEvent): Step {
   const v = s.view;
@@ -107,7 +111,8 @@ export function step(s: State, e: CapEvent): Step {
     case 'card_done':
       return v.kind === 'card' && v.id === e.id ? back(s) : stay(s);
     case 'open_card':
-      return v.kind === 'spot' ? go(s, { kind: 'card', id: e.id }) : stay(s);
+      if (v.kind === 'spot') return go(s, { kind: 'card', id: e.id });
+      return v.kind === 'menu' ? go(s, { kind: 'card', id: e.id, from: 'menu' }) : stay(s);
     case 'later':
       return back(s);
     case 'close':

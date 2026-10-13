@@ -70,6 +70,16 @@ describe('the capsule machine', () => {
     // from the card, esc then esc closes the capsule
     expect(run([space, open, { ev: 'fn', act: 'esc' }, { ev: 'fn', act: 'esc' }]).fx.at(-1)).toEqual({ fx: 'hide' });
   });
+  it("one-inbox 3: a tray menu row (a click, fn+n) answers its card in place; esc and the answer go back to the menu", () => {
+    const tray: CapEvent = { ev: 'window', shown: true, why: 'tray' };
+    const open: CapEvent = { ev: 'open_card', id: 'p.4' };
+    expect(run([tray, open]).view).toEqual({ kind: 'card', id: 'p.4', from: 'menu' });
+    expect(run([tray, open, { ev: 'fn', act: 'esc' }]).view).toEqual({ kind: 'menu' });
+    expect(run([tray, open, { ev: 'later' }]).view).toEqual({ kind: 'menu' });
+    expect(run([tray, open, { ev: 'card_done', id: 'p.4' }]).view).toEqual({ kind: 'menu' });
+    // the menu stays where the tray put it: no show, no hide on the way
+    expect(run([tray, open, { ev: 'later' }]).fx).toEqual([]);
+  });
   it('the tray click opens the dropdown; a blur that hid the window closes the view; fn i opens the inbox', () => {
     expect(run([{ ev: 'window', shown: true, why: 'tray' }]).view).toEqual({ kind: 'menu' });
     expect(run([{ ev: 'fn', act: 'key', key: 'space' }, { ev: 'window', shown: false, why: 'blur' }]).view).toEqual(NONE);
@@ -91,9 +101,9 @@ describe('the store mapping', () => {
     );
     expect(d.projects.map((p) => [p.id, p.branch])).toEqual([['shop', 'main'], ['tel', 'dev']]);
     expect(d.agents).toMatchObject([{ name: 'perf', project: 'tel', status: 'working' }]);
-    // bise's home card leaves the project column empty ('? bise   send the mail…'), a real project names it
+    // every card names its project as the window's inbox block does: 'bise' for the home's (one-inbox 3)
     expect(d.cards).toEqual([
-      { id: 'home.2', agent: 'perf', project: 'home', text: 'go?', kind: 'question', pname: '' },
+      { id: 'home.2', agent: 'perf', project: 'home', text: 'go?', kind: 'question', pname: 'bise' },
       { id: 'tel.4', agent: 'perf', project: 'tel', text: 'go?', kind: 'approval', pname: 'tel' },
     ]);
     expect(cardKind(C(1, false))).toBe('question');
@@ -115,5 +125,26 @@ describe('the capsule', () => {
     expect(ui.getByTestId('capsule.answer').textContent).toContain('yes');
     ui.rerender(<Capsule {...base} view={{ kind: 'menu' }} />);
     expect(ui.getByTestId('capsule.menu.quit').getAttribute('aria-disabled')).toBe('true');
+    expect(ui.queryByTestId('capsule.menu.items')).toBeNull();
+  });
+  it("one-inbox 3: the tray menu lists the first 5 items as the block's rows, no age, a click opens one, the rest opens bise", () => {
+    const cards = Array.from({ length: 7 }, (_, i) => ({ id: `tel.${String(i + 1)}`, agent: `p${String(i + 1)}`, project: 'tel', text: `ship ${String(i + 1)}?\nmore words`, kind: 'question' as const, pname: 'telemetry' }));
+    const onOpenCard = vi.fn();
+    const onOpenWindow = vi.fn();
+    const ui = render(
+      <Capsule
+        view={{ kind: 'menu' }} spot={{ agents: [], projects: [], cards }} answer={null} heard="" level={0} still
+        card={() => null} route={null} onRouteKeep={vi.fn()} onRouteTo={vi.fn()} onAsk={vi.fn()} onOpen={vi.fn()}
+        onOpenCard={onOpenCard} onOpenWindow={onOpenWindow} onClose={vi.fn()} onQuit={null} onSize={vi.fn()}
+      />,
+    );
+    expect(ui.getByTestId('capsule.menu.head').textContent).toBe('nobody at work · 7 waiting for you');
+    expect(ui.queryByTestId('capsule.menu.item.6')).toBeNull();
+    expect(ui.getByTestId('capsule.menu.item.1').textContent).toBe('1?p1ship 1?telemetry');
+    ui.getByTestId('capsule.menu.item.2').click();
+    expect(onOpenCard).toHaveBeenCalledWith('tel.2');
+    expect(ui.getByTestId('capsule.menu.more').textContent).toBe('+ 2 more · open bise');
+    ui.getByTestId('capsule.menu.more').click();
+    expect(onOpenWindow).toHaveBeenCalledWith('inbox');
   });
 });

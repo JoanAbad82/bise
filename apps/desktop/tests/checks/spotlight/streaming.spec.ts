@@ -162,7 +162,9 @@ test("spotlight/streaming: the '∿' after a block moves nothing, tables as the 
     const { app } = s;
     await s.page.waitForTimeout(1500);
     const card = (id: number, agent: string, question: string, approval = false): Record<string, unknown> => ({
-      id, project: HOME, kind: approval ? 'confirm' : 'question', rank: 1, agent, question,
+      // rank 0, older than the fixture's: the spotlight lists the cards in the inbox block's order
+      // (one-inbox 3), so these lead and ⏎ on the first waiting row is main's mail
+      id, project: HOME, kind: approval ? 'confirm' : 'question', rank: 0, agent, question,
       options: [{ n: 1, label: 'yes' }, { n: 2, label: 'no' }], urgent: false, since_ms: 1791100310000, ...(approval ? { approval: true } : {}),
     });
     await core.send({ ev: 'cards', project: HOME, cards: [card(11, 'main', 'send the mail to legal?'), card(12, 'main', 'run the release script?', true)] } as unknown as Ev);

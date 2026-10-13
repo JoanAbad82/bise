@@ -10,7 +10,8 @@ import {
   type JSX,
   type ReactNode,
 } from "react";
-import { Menu, MenuItem, MenuSep, Press } from "@/ds";
+import { shownName } from "@/agents/model";
+import { Menu, MenuItem, MenuSep, Press, Row } from "@/ds";
 import { LivePearl, type Mood } from "@/pearl";
 import {
   LiveText,
@@ -18,6 +19,7 @@ import {
   Spotlight,
   answerLines,
   type SpotAnswer,
+  type SpotCard,
   type SpotData,
   type SpotItem,
   type SpotRoute,
@@ -37,7 +39,10 @@ export const W = {
   quit: "quit bise ambient",
   head: (work: number, waits: number): string =>
     `${work > 0 ? `${work} at work` : "nobody at work"}${waits > 0 ? ` · ${waits} waiting for you` : ""}`,
+  more: (n: number): string => `+ ${String(n)} more · open bise`,
 } as const;
+
+const firstLine = (s: string): string => s.split("\n")[0] ?? "";
 
 export interface CapsuleProps {
   readonly view: View;
@@ -58,6 +63,8 @@ export interface CapsuleProps {
   /** '/new …' in the spotlight: start an agent in bise's home (bar A.1) */
   readonly onNew?: (brief: string) => void;
   readonly onOpen: (item: SpotItem) => void;
+  /** A tray menu row's card, by its spot id ('<project>.<n>'): answered in place (one-inbox 3). */
+  readonly onOpenCard?: (id: string) => void;
   /** The spotlight row the keyboard is on (R07-a: the root follows the selected agent). */
   readonly onSelect?: (item: SpotItem | null) => void;
   /** The selected agent's last actions for its row (R07-a). */
@@ -187,6 +194,7 @@ export function Capsule(p: CapsuleProps): JSX.Element {
         <TrayMenu
           spot={p.spot}
           onOpenWindow={p.onOpenWindow}
+          onOpenCard={p.onOpenCard ?? (() => undefined)}
           onQuit={p.onQuit}
         />
       )}
@@ -242,22 +250,77 @@ function Answer({
   );
 }
 
+/** The tray menu lists this many waiting items; the rest is '+ N more · open bise' (one-inbox 3). */
+export const MENU_ROWS = 5;
+
+const MARK: Record<SpotCard["kind"], string> = { question: "?", approval: "!", drafts: "✉" };
+
+/**
+ * The items the tray menu lists under its head: the window's inbox block rows, in its order (the
+ * hub's rank, then the oldest: data.ts), at most MENU_ROWS. fn+n opens row n. Pure.
+ */
+export function menuCards(spot: SpotData): readonly SpotCard[] {
+  return spot.cards.slice(0, MENU_ROWS);
+}
+
 function TrayMenu({
   spot,
   onOpenWindow,
+  onOpenCard,
   onQuit,
 }: {
   spot: SpotData;
   onOpenWindow: (route?: string) => void;
+  onOpenCard: (id: string) => void;
   onQuit: (() => void) | null;
 }): JSX.Element {
   const work = spot.agents.filter((a) => a.status === "working").length;
+  const rows = menuCards(spot);
+  const more = spot.cards.length - rows.length;
   return (
     <div className="b-cap-menu" data-glass>
       <Menu testId="capsule.menu">
         <div className="b-cap-menu-head" data-testid="capsule.menu.head">
           {W.head(work, spot.cards.length)}
         </div>
+        {rows.length > 0 && (
+          // the window's inbox block rows (one-inbox 3, designer m_19631): '1 ? agent question… ·
+          // project' at the tight row height, no age; a click or fn+n answers it here
+          <div className="b-cap-rows" data-testid="capsule.menu.items">
+            {rows.map((c, i) => (
+              <Row
+                key={c.id}
+                lead={
+                  <>
+                    <span className="strip-n">{i + 1}</span>
+                    <span className="ib-sign">{MARK[c.kind]}</span>
+                  </>
+                }
+                name={
+                  <>
+                    <span className="strip-who">{shownName(c.agent)}</span>
+                    <span className="strip-what">{firstLine(c.text)}</span>
+                  </>
+                }
+                end={c.pname}
+                onClick={() => {
+                  onOpenCard(c.id);
+                }}
+                testId={`capsule.menu.item.${String(i + 1)}`}
+              />
+            ))}
+            {more > 0 && (
+              <MenuItem
+                onClick={() => {
+                  onOpenWindow("inbox");
+                }}
+                testId="capsule.menu.more"
+              >
+                {W.more(more)}
+              </MenuItem>
+            )}
+          </div>
+        )}
         <MenuSep />
         <MenuItem
           onClick={() => {

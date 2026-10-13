@@ -23,3 +23,10 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
 .b-cap-answer .more { margin-top: 10px; padding: 0; border: 0; background: none; font: var(--t-12) var(--font-mono); color: var(--c-text-3); cursor: default; }
 .b-cap-menu .b-menu { width: 260px; }
 .b-cap-menu-head { padding: 6px 9px; font-size: var(--t-12); color: var(--c-text-3); }
+/* one-inbox 3: the window's inbox block rows under the head, at the tight row (28 px), no age */
+.b-cap-menu:has(.b-cap-rows) .b-menu { width: 340px; }
+.b-cap-rows { display: flex; flex-direction: column; }
+.b-cap-rows .b-row { height: var(--h-row-tight); font-size: var(--t-13); }
+.b-cap-rows .b-row .nm { display: flex; gap: var(--s-1); min-width: 0; }
+.b-cap-rows .ib-sign { flex: none; width: 1em; text-align: center; font: 600 var(--t-12) var(--font-mono); color: var(--c-accent); }
+.b-cap-rows .strip-who { font-weight: 500; }

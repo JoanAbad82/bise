@@ -241,3 +241,11 @@
     animation: none;
   }
 }
+/* one-inbox 3: a waiting row's sign as the inbox block and the tray menu draw it (accent, mono) */
+.b-spot .r .ib-sign {
+  display: inline-block;
+  width: 1em;
+  text-align: center;
+  font: 600 var(--t-12) var(--font-mono);
+  color: var(--c-accent);
+}
