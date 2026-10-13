@@ -1171,6 +1171,7 @@ if (mode === 'quick') {
   await closeArtifact();
   await quickRows(harness, say);
   await newRows(harness, say);
+  await rows37(harness, say);
 }
 
 // d0d45f92's rows (ambient-lead m_22519): the help sheet opaque, esc never stops a turn and ctrl+c
@@ -1403,6 +1404,259 @@ async function newRows(harness, say) {
     }, 20000, 500);
     step('the corner card closes by itself (8 s linger)', closed !== null && closed <= 14000, { closedAfterMs: closed });
   });
+}
+
+// 37fa183d's rows (ambient-lead m_22814): the composer's attachment list (b46e1fbd, c0e755ca), his
+// inbox answer's row where he is (16c5f1ea), the fn bubble without the capsule's hint (041168b2),
+// the waiting line over the composer (37fa183d), the right bar's heads centred (aad80d58). The
+// dictation meter is dict1.mjs's (it holds the fake voice). Each row is its own try.
+async function rows37(harness, say) {
+  const NL = String.fromCharCode(10);
+  const row = async (name, fn) => {
+    try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
+  };
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const clear = async () => {
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+  };
+  const bise = () => click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  const drop = async (sel, files) => {
+    const box = await page.locator(sel).first().boundingBox().catch(() => null);
+    if (!box) return false;
+    const x = box.x + box.width / 2, y = box.y + box.height / 2;
+    const s = await page.context().newCDPSession(page);
+    const data = { items: [], files, dragOperationsMask: 1 };
+    for (const type of ['dragEnter', 'dragOver', 'drop']) await s.send('Input.dispatchDragEvent', { type, x, y, data });
+    await s.detach().catch(() => {});
+    return true;
+  };
+
+  await row('attachment list', async () => {
+    const AD = path.join(out, 'attach37');
+    fs.rmSync(AD, { recursive: true, force: true });
+    fs.mkdirSync(AD, { recursive: true });
+    const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+    for (const f of ['one.png', 'two.png']) fs.writeFileSync(path.join(AD, f), PNG);
+    fs.writeFileSync(path.join(AD, 'notes.txt'), `fake notes${NL}`);
+    await harness();
+    await clear();
+    await say('[[reply: ATTACH_SRC]] please answer');
+    const src = await until(async () => page.evaluate(() => {
+      const rows = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.entry."]')].filter((r) => r.getAttribute('data-side') !== 'me' && r.getAttribute('data-kind') !== 'tool');
+      const last = rows.at(-1);
+      const w = last ? document.createTreeWalker(last, NodeFilter.SHOW_TEXT) : null;
+      while (w?.nextNode()) { const t = w.currentNode.textContent.trim(); if (t.split(/\s+/).length >= 3) return t.split(/\s+/).slice(0, 3).join(' '); }
+      return null;
+    }), 30000, 1000);
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.type('zqatt ', { delay: 10 });
+    // 1: a quote (the selection's ask), 2 and 3: two images, 4: a file, in that order
+    if (src) {
+      await page.evaluate((words) => {
+        const list = document.querySelector('[data-testid="thread.list"]');
+        const w = document.createTreeWalker(list ?? document.body, NodeFilter.SHOW_TEXT);
+        let n = null;
+        while (w.nextNode()) if (w.currentNode.textContent.includes(words)) n = w.currentNode;
+        if (!n) return;
+        const i = n.textContent.indexOf(words);
+        const r = document.createRange();
+        r.setStart(n, i);
+        r.setEnd(n, i + words.length);
+        const s = window.getSelection();
+        s.removeAllRanges();
+        s.addRange(r);
+        n.parentElement.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      }, src);
+      const pop = await page.locator('[data-testid="thread.quote.pop"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+      if (pop) await page.locator('[data-testid="thread.quote.pop.ask"]').first().click({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(400);
+    }
+    await page.keyboard.press('End');
+    await drop('[data-testid="composer.field"]:visible', [path.join(AD, 'one.png'), path.join(AD, 'two.png')]);
+    await page.waitForTimeout(1200);
+    await page.keyboard.press('End');
+    await drop('[data-testid="composer.field"]:visible', [path.join(AD, 'notes.txt')]);
+    const read = () => page.evaluate(() => {
+      const comp = document.querySelector('[data-testid="composer"]');
+      const list = comp?.querySelector('[data-testid$=".attach"]') ?? null;
+      const f = [...document.querySelectorAll('[data-testid="composer.field"]')].find((e) => e.getBoundingClientRect().width > 0);
+      const box = f?.closest('.b-box, .b-composer, [data-testid="composer"]') ?? comp;
+      const rb = (e) => { if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), r: Math.round(r.right), b: Math.round(r.bottom) }; };
+      const rows = list ? [...list.querySelectorAll('[role="listitem"]')].map((r) => ({ n: r.getAttribute('data-n'), kind: r.getAttribute('data-kind'), lit: r.classList.contains('lit'), text: (r.textContent ?? '').trim().slice(0, 80) })) : [];
+      const chips = f ? [...f.querySelectorAll('.b-chip[data-n]')].map((c) => ({ n: c.getAttribute('data-n'), kind: c.getAttribute('data-kind'), lit: c.classList.contains('lit') })) : [];
+      return { rows, chips, list: rb(list), box: rb(box), inComposer: !!list && !!comp?.contains(list), field: (f?.textContent ?? '').slice(0, 120) };
+    });
+    const r0 = await until(async () => { const r = await read(); return r.rows.length >= 4 ? r : null; }, 10000, 400) ?? await read();
+    await shot('attach-list');
+    const inside = !!r0.list && !!r0.box && r0.list.x >= r0.box.x - 1 && r0.list.r <= r0.box.r + 1 && r0.list.y >= r0.box.y - 1 && r0.list.b <= r0.box.b + 1;
+    const kinds = r0.rows.map((x) => x.kind).join(',');
+    step('the attachment list: a quote, 2 images, a file as rows inside the composer box, in order', r0.inComposer && inside && kinds === 'quote,image,image,file', r0);
+    const nums = (xs) => xs.map((x) => x.n).join(',');
+    step("the list's numbers are the chips' numbers", r0.rows.length === 4 && nums(r0.rows) === nums(r0.chips), { rows: nums(r0.rows), chips: nums(r0.chips) });
+    // hover: a row lights its chip; a chip lights its row
+    const n2 = r0.rows[1]?.n, n3 = r0.rows[2]?.n;
+    let hov = {};
+    if (n2 && n3) {
+      await page.locator(`[data-testid$=".attach.${n2}"]`).first().hover({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(250);
+      const a = await read();
+      hov.rowHover = { chipLit: a.chips.filter((c) => c.lit).map((c) => c.n) };
+      await shot('attach-hover-row');
+      await field.locator(`.b-chip[data-n="${n3}"]`).first().hover({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(250);
+      const b = await read();
+      hov.chipHover = { rowLit: b.rows.filter((x) => x.lit).map((x) => x.n) };
+    }
+    step('hover links them: a row lights its chip, a chip lights its row', hov.rowHover?.chipLit?.join() === n2 && hov.chipHover?.rowLit?.join() === n3, hov);
+    // ✕ on the file's row: the row and its chip go
+    const n4 = r0.rows[3]?.n;
+    let x = null;
+    if (n4) {
+      await page.locator(`[data-testid$=".attach.${n4}"]`).first().hover({ timeout: 3000 }).catch(() => {});
+      await page.locator(`[data-testid$=".attach.${n4}.remove"]`).first().click({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(400);
+      const a = await read();
+      x = { rows: nums(a.rows), chips: nums(a.chips) };
+    }
+    step('✕ on a row removes the row and its chip', !!x && !x.rows.split(',').includes(n4) && !x.chips.split(',').includes(n4) && x.rows.split(',').length === 3, x);
+    // backspace after the last chip (an image): the chip and its row go
+    let bs = null;
+    if (n3) {
+      await field.click({ timeout: 3000 }).catch(() => {});
+      await page.keyboard.press('End');
+      for (let i = 0; i < 2; i++) {
+        await page.keyboard.press('Backspace');
+        await page.waitForTimeout(300);
+        const a = await read();
+        bs = { presses: i + 1, rows: nums(a.rows), chips: nums(a.chips), field: a.field };
+        if (!a.chips.some((c) => c.n === n3)) break;
+      }
+      await shot('attach-backspace');
+    }
+    step('backspace on a chip removes the chip and its row', !!bs && !bs.chips.split(',').includes(n3) && !bs.rows.split(',').includes(n3), bs);
+    await clear();
+  });
+
+  await row('inbox answer rows', async () => {
+    const Q = `zqpick${String(Date.now() % 100000)} which colour?`;
+    await harness();
+    await clear();
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.type(`[[bash: sb card '${Q}`, { delay: 5 });
+    for (const l of ['1. zqred', "2. zqblue']]"]) { await page.keyboard.press('Shift+Enter'); await page.keyboard.type(l, { delay: 5 }); }
+    await page.keyboard.press('Enter');
+    await bise();
+    const rowL = page.locator('[data-testid^="inbox.block.row."]', { hasText: 'zqpick' }).first();
+    const open = page.locator('[data-testid^="inbox.block.open."], [data-testid^="inbox.block.card."]').filter({ hasText: 'zqpick' }).first();
+    const listed = await until(async () => {
+      if ((await rowL.isVisible().catch(() => false)) || (await open.isVisible().catch(() => false))) return true;
+      await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 1000 }).catch(() => {});
+      return null;
+    }, 90000, 1000);
+    for (let i = 0; listed && i < 20 && !(await open.isVisible().catch(() => false)); i++) {
+      if (await rowL.isVisible().catch(() => false)) await rowL.click({ timeout: 2000 }).catch(() => {});
+      else await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 2000 }).catch(() => {});
+      await page.waitForTimeout(400);
+    }
+    const opened = await open.isVisible().catch(() => false);
+    // the ⌘I-less path: a click on the option in the docked block
+    if (opened) await open.locator('[data-testid$=".opt.2"]').first().click({ timeout: 3000 }).catch(() => {});
+    const asideOf = () => page.evaluate(() => {
+      const a = [...document.querySelectorAll('[data-testid^="thread.aside."]')].filter((e) => /^thread\.aside\.\d+$/.test(e.getAttribute('data-testid') ?? '') && (e.textContent ?? '').includes('zqblue'));
+      return a.length ? { n: a.length, text: (a.at(-1).textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200) } : null;
+    });
+    const aside = opened ? await until(asideOf, 20000, 500) : null;
+    await shot('inbox-answer-aside');
+    const good = (a) => !!a && a.n === 1 && /✓/.test(a.text) && /you answered \S+ · harness/.test(a.text) && /zqblue/.test(a.text) && !/zqblue.*\b2\b/.test(a.text);
+    step("his inbox answer from the block in bise's view (no ⌘I, another project's card): '✓ you answered <agent> · harness' + the option's words", good(aside), { listed: !!listed, opened, aside });
+    await page.reload().catch(() => {});
+    await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
+    await bise();
+    const after = await until(asideOf, 20000, 500);
+    step('his answer row is there once after a reload', good(after), after);
+    // the asker's thread: the hub's own row with the option's words
+    await harness();
+    const hub = await until(async () => page.evaluate(() => {
+      const r = [...document.querySelectorAll('[data-testid^="thread.approval."]')].filter((e) => /^thread\.approval\.\d+$/.test(e.getAttribute('data-testid') ?? '') && (e.textContent ?? '').includes('zqblue'));
+      return r.length ? (r.at(-1).textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200) : null;
+    }), 20000, 500);
+    step("the asker's thread (harness) has the hub's row: you answered + the option's words", !!hub && /you answered/.test(hub), hub);
+  });
+
+  await row('fn bubble', async () => {
+    const VOICE = process.env.AS_HE_DOES_VOICE;
+    if (!VOICE) { step('his fn message bubble', false, 'no fake voice (AS_HE_DOES_VOICE)'); return; }
+    const W = 'zqfn tell me the weather';
+    fs.writeFileSync(VOICE, W);
+    await page.evaluate(() => window.bise.core.send({ cmd: 'talk_start' }));
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => window.bise.core.send({ cmd: 'talk_end' }));
+    await bise();
+    const you = await until(async () => page.evaluate((w) => {
+      const r = [...document.querySelectorAll('[data-testid^="thread.you."]')].filter((e) => /^thread\.you\.\d+$/.test(e.getAttribute('data-testid') ?? '') && (e.textContent ?? '').includes(w));
+      const b = r.at(-1);
+      if (!b) return null;
+      const id = b.getAttribute('data-testid');
+      return { id, text: (b.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 300), via: document.querySelector(`[data-testid="${id}.via"]`)?.textContent?.trim() ?? null };
+    }, 'zqfn'), 40000, 1000);
+    await shot('fn-bubble');
+    step("his fn message's bubble: his words, no '[from the capsule…]'", !!you && you.text.includes(W) && !/from the capsule/.test(you.text), you);
+    step("'from fn' on its meta row", you?.via === 'from fn', you);
+    const LOG = process.env.AS_HE_DOES_FAKE_LOG;
+    const line = LOG && fs.existsSync(LOG) ? fs.readFileSync(LOG, 'utf8').split(NL).filter((l) => l.includes('zqfn')).at(-1) ?? null : null;
+    const hint = line ? /\[from the capsule[^\]]*\]/.exec(line)?.[0] ?? null : null;
+    step("the model's request still has the capsule's line after his words (FAKE_LOG)", !!hint && line.indexOf('zqfn') < line.indexOf(hint), { log: LOG ?? 'AS_HE_DOES_FAKE_LOG not set', hint, line: line?.slice(0, 300) ?? null });
+  });
+
+  await row('waiting line', async () => {
+    const RC = path.join(out, `zq-wait-${String(Date.now() % 100000)}.rc`);
+    await harness();
+    await clear();
+    await say(`[[bash: sb wake --on-file ${RC} --note "zq status line watch"]]`);
+    const line = await until(async () => {
+      const t = await page.locator('[data-testid="thread.waiting"]').first().innerText({ timeout: 1000 }).catch(() => null);
+      return t && /zq status line/.test(t) ? t.replace(/\s+/g, ' ').trim() : null;
+    }, 60000, 1000);
+    await shot('waiting-line');
+    const bareH = line ? /(^|\s)\d+[hmsd](\s|$|·)/.test(line) : null;
+    step("the status line over the composer: 'waiting since HH:MM' or 'waiting for N min', then the note; no bare 'Nh'", !!line && /^waiting (since \d{1,2}:\d{2}|for \d+ (s|sec|min|h|hours?)\b)/.test(line) && !bareH, { line, bareH });
+    // the watch's file appears: the wake comes and the line goes
+    fs.writeFileSync(RC, '0');
+    const gone = await until(async () => ((await page.locator('[data-testid="thread.waiting"]').count()) === 0 ? true : null), 30000, 1000);
+    step('the line goes when the watch ends', !!gone, { gone: !!gone });
+  });
+
+  await row('right bar heads', async () => {
+    await harness();
+    const heads = page.locator('.app-rb-head');
+    const hn = await heads.count();
+    const seen = [];
+    for (let i = 0; i < Math.min(hn, 4); i++) {
+      const h = heads.nth(i);
+      if (!(await h.isVisible().catch(() => false))) continue;
+      await h.hover({ timeout: 2000 }).catch(() => {});
+      await page.waitForTimeout(200);
+      seen.push(await h.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const mid = r.top + r.height / 2;
+        const textMid = (e) => {
+          if (!e) return null;
+          const range = document.createRange();
+          range.selectNodeContents(e);
+          const b = range.getBoundingClientRect();
+          return b.height > 0 ? Math.round((b.top + b.height / 2 - mid) * 10) / 10 : null;
+        };
+        return { label: el.querySelector('.app-rb-label')?.textContent?.trim() ?? null, h: Math.round(r.height), bg: getComputedStyle(el).backgroundColor, dy: { label: textMid(el.querySelector('.app-rb-label')), sum: textMid(el.querySelector('.app-rb-sum')), act: textMid(el.querySelector('.b-act')) } };
+      }));
+      if (i === 0) await h.screenshot({ path: path.join(out, `${mode}${tag}-${++n}-rb-head-hover.png`), timeout: 3000 }).then(() => res.shots.push(path.join(out, `${mode}${tag}-${n}-rb-head-hover.png`)), () => {});
+    }
+    await page.mouse.move(1, 300);
+    const off = seen.flatMap((s) => Object.values(s.dy).filter((v) => v !== null && Math.abs(v) > 1));
+    step('right-bar section heads: their text centred in the hover box (±1 px)', seen.length > 0 && seen.some((s) => s.dy.label !== null) && off.length === 0, { heads: hn, seen });
+  });
+  await harness();
 }
 
 // 276074b2's quick rows (ambient-lead m_22369), in harness' thread: '?' and space type (281879ed),

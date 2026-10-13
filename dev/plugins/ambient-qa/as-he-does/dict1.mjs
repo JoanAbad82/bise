@@ -56,7 +56,14 @@ const read = () => page.evaluate(() => ({
   mic: document.querySelector('[data-testid="composer.mic"]')?.getAttribute('data-state') ?? null,
   note: document.querySelector('[data-testid="composer.note"]')?.textContent ?? null,
   why: document.querySelector('[data-testid="composer.dictation.why"]')?.textContent ?? null,
+  // c2331eb3's live chip: the meter's bars (steps 0-7) and phase, the sign's phase
+  bars: document.querySelector('[data-testid="composer.dictation.meter"]')?.getAttribute('data-bars') ?? null,
+  phase: document.querySelector('[data-testid="composer.dictation.meter"]')?.getAttribute('data-phase') ?? null,
+  sign: (() => { const s = document.querySelector('[data-testid="composer.dictation"] .chip .sign'); return s ? getComputedStyle(s, '::before').content : null; })(),
 })).catch(() => null);
+// every meter sample of the take: {ms, phase, bars, sign}
+const meter = [];
+const sample = (r, ms) => { if (r?.bars != null && (meter.at(-1)?.bars !== r.bars || meter.at(-1)?.phase !== r.phase)) meter.push({ ms, phase: r.phase, bars: r.bars, sign: r.sign }); };
 
 await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
 await page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first().click({ timeout: 8000 }).catch(() => {});
@@ -70,13 +77,15 @@ fs.writeFileSync(VOICE, WORDS);
 const mic = [];
 const t0 = Date.now();
 await tap();
-for (let i = 0; i < 12; i++) { const r = await read(); if (r && mic.at(-1)?.s !== r.mic) mic.push({ ms: Date.now() - t0, s: r.mic }); await wait(100); }
+for (let i = 0; i < 24; i++) { const r = await read(); if (r && mic.at(-1)?.s !== r.mic) mic.push({ ms: Date.now() - t0, s: r.mic }); sample(r, Date.now() - t0); await wait(50); }
 await shot('recording');
 await tap();
 let got = null;
 for (let i = 0; i < 100; i++) {
   const r = await read();
   if (r && mic.at(-1)?.s !== r.mic) mic.push({ ms: Date.now() - t0, s: r.mic });
+  sample(r, Date.now() - t0);
+  if (r?.phase === 'transcribing' && !res.shots.some((s) => s.includes('transcribing'))) await shot('transcribing');
   const txt = `${r?.value ?? ''} ${r?.field ?? ''}`;
   if (txt.includes(WORDS)) { got = r; break; }
   got = r;
@@ -85,6 +94,16 @@ for (let i = 0; i < 100; i++) {
 await shot('after');
 const landed = `${got?.value ?? ''} ${got?.field ?? ''}`.includes(WORDS);
 step('one ctrl+r take: the fake voice words reach the field', landed, { words: WORDS, got, mic, ms: Date.now() - t0 });
+// the meter (c2331eb3): listening bars from his voice's levels, flat (all 0) in silence; while
+// transcribing the rolling wave ▂▃▅▆▅▃ (1,2,4,5,4,2 rolled) and the sign ∿. The fake voice sends
+// no levels (the core's fake listener): moving bars can't show here, flat ones must.
+const listen = meter.filter((m) => m.phase === 'listening');
+const trans = meter.filter((m) => m.phase === 'transcribing');
+const WAVE = [1, 2, 4, 5, 4, 2];
+const isWave = (b) => { const a = b.split(',').map(Number); return WAVE.some((_, k) => [...WAVE.slice(k), ...WAVE.slice(0, k)].join() === a.join()); };
+step('the meter while listening: 6 bars; all flat with the fake voice (no levels: silence)', listen.length > 0 && listen.every((m) => m.bars.split(',').length === 6 && m.bars.split(',').every((v) => v === '0')), { listening: listen.slice(0, 8) });
+step('the bars move with his voice (needs levels: the fake voice sends none)', listen.some((m) => m.bars.split(',').some((v) => v !== '0')), { distinct: [...new Set(listen.map((m) => m.bars))], harness_limit: 'the fake voice sends no level events' });
+step('while transcribing: the ∿ sign and the rolling wave', trans.length > 0 && trans.every((m) => isWave(m.bars)) && trans.some((m) => /∿/.test(m.sign ?? '')), { transcribing: trans.slice(0, 8), frames: new Set(trans.map((m) => m.bars)).size });
 await field.fill('').catch(() => {});
 await browser.close().catch(() => {});
 process.exit(0);
