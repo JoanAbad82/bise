@@ -427,10 +427,11 @@ law bg_wrapper_fifo_rdrw:
 # LAW (issue #9): the command's stdin is /dev/null, never the fifo: a
 # command that reads a non-tty stdin (rg with no path, cat) gets EOF at
 # once instead of waiting out the sync window. The fifo is reached by
-# name only ($BEND_STDIN), and the command does not inherit fd 9.
+# name only ($BEND_STDIN), and the command does not inherit fd 9 (nor
+# fd 8, the watchdog's hold on its .out).
 law bg_wrapper_stdin_devnull:
   {Bool.and(String.contains(Sh.bg_wrap("x", "/d", 5, "/i"),
-       "( BEND_STDIN=$BG/$i.in /bin/sh $BG/$i.cmd ) > $BG/$i.out 2>&1 </dev/null 9<&- &"),
+       "( BEND_STDIN=$BG/$i.in /bin/sh $BG/$i.cmd ) > $BG/$i.out 2>&1 </dev/null 9<&- 8<&- &"),
      Bool.not(String.contains(Sh.bg_wrap("x", "/d", 5, "/i"), "<&9")))
     == True{} : Bool}
 
