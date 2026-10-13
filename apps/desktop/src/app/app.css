@@ -140,70 +140,10 @@ body:has(.app-shell) {
   color: var(--ink-2);
 }
 
-/* bise's core can't be reached (CoreLine): one line over the screen */
-.app-core {
-  padding: var(--s-2) var(--pad-panel);
-  border-bottom: 1px solid var(--c-line);
-  color: var(--c-text-2);
-}
-
-.app-core-head {
-  display: flex;
-  gap: var(--s-3);
-  align-items: baseline;
-}
-
-/* it doesn't come back by itself: the line in the error tone (designer: ▲ …) */
-.app-core.err {
-  color: var(--c-err);
-}
-
-/* designer m_16922: 'start bise' and 'show the report' on their own row under the words, as the
-   ds's small Buttons, default kind with their 1 px line (designer m_18491), then the note in the UI font, dim */
-.app-core-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--gap-inline);
-  align-items: center;
-  margin-top: var(--s-2);
-}
-
-.app-core-note {
-  color: var(--c-text-2);
-  white-space: nowrap;
-}
-
-/* bise's version switch (ReloadLine, amb-home): '✓ reloaded' folds after its 3 s (FOLD_MS 220) */
-.app-reload {
-  transition: opacity 220ms ease;
-  /* one list row high, 16 px sides (designer m_20853 (4)): the words centred in it */
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  min-height: var(--h-row);
-  padding: 0 var(--pad-panel);
-}
-
-.app-reload .app-core-head {
-  flex: 1;
-  align-items: center;
-  min-width: 0;
-}
-
-/* the versions' shas are machine text (designer m_20853 (2)) */
+/* the versions' shas are machine text (designer m_20853 (2)); the title bar's pill (status.css)
+   draws them, the old status line's rules went with it */
 .app-reload-sha {
   font-family: var(--font-mono);
-}
-
-/* running: how long since the switch began, at the right end, dim */
-.app-reload-age {
-  margin-left: auto;
-  color: var(--c-text-3);
-  font-variant-numeric: tabular-nums;
-}
-
-.app-reload.fold {
-  opacity: 0;
 }
 
 /* the core's last stderr line, dim mono under the words */
