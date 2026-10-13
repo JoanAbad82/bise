@@ -847,7 +847,7 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
     // R08's spoken ask, about three lines long, heard through the core's real talk path
     writeFileSync(voice, 'can you look at why the checkout page gets slower every friday afternoon, compare it with the dashboards from last week, and tell me if the cache change from tuesday is the cause or if it is the new image pipeline that ships the bigger thumbnails to every phone');
     await helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' });
-    await out.wait(CAPSULE, (l) => l.startsWith('show bottom'), 5000).catch(() => undefined);
+    await out.wait(CAPSULE, (l) => l.startsWith('show corner'), 5000).catch(() => undefined);
     await each('R05', async () => {
       await sleep(300);
       await shot('R05', 'R05-300ms', cap, { omitBackground: true });

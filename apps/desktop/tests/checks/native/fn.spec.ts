@@ -5,7 +5,7 @@
 // and what the app told the core and the helper (their command logs). The real fn key (HID) and his
 // app staying in front are the VM pass's.
 //   fn space   the spotlight at the top, with the keys; again: gone; esc: gone
-//   fn held    the talk at the bottom, never the keys; the core starts listening at once (< 300 ms)
+//   fn held    the talk in the corner card, never the keys; the core starts listening at once (< 300 ms)
 //              and the helper is told bise holds the mic (own_mic, so quiet's mic sample skips it);
 //              released: the core ends the talk
 //   fn fn      hands-free: the talk shows and stays after the release, until the next tap
@@ -36,13 +36,13 @@ test('native/fn: fn space opens the spotlight with the keys; again or esc closes
   });
 });
 
-test('native/fn: fn held talks at the bottom without the keys, and the core listens within 300 ms', async () => {
+test('native/fn: fn held talks in the corner without the keys, and the core listens within 300 ms', async () => {
   await onWorld(async ({ s, helper, core, out }) => {
     const cap = await capsulePage(s);
     const before = core.cmds().length;
     const t0 = Date.now();
     await helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' });
-    expect(await out.wait(CAPSULE, (l) => l.startsWith('show')), 'the talk shows at the bottom and never takes the keys').toBe('show bottom');
+    expect(await out.wait(CAPSULE, (l) => l.startsWith('show')), 'the talk shows in the corner and never takes the keys').toBe('show corner');
     await expect(cap.getByTestId('capsule.talk'), 'the talk is drawn').toBeVisible();
     // the effect outside the app: the core (which owns the mic) was told to listen
     const listen = await core.waitCmd((c) => tag(c) === 'talk_start', 300).catch(() => null);
@@ -61,7 +61,7 @@ test('native/fn: fn twice is hands-free until the next tap', async () => {
     const cap = await capsulePage(s);
     await helper.send({ ev: 'fn', act: 'double' });
     const shown = await out.wait(CAPSULE, (l) => l.startsWith('show'), 1000).catch(() => null);
-    expect(shown, 'fn fn shows the talk at the bottom, without the keys').toBe('show bottom');
+    expect(shown, 'fn fn shows the talk in the corner, without the keys').toBe('show corner');
     await expect(cap.getByTestId('capsule.talk'), 'the talk is drawn').toBeVisible();
     expect.soft(core.cmds().some((c) => tag(c) === 'talk_start'), 'the core listens').toBe(true);
     await sleep(600);

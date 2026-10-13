@@ -22,13 +22,34 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
 /* the 'over' line's link to where he fixes it ('settings › voice', designer m_21945): the line's own words, underlined */
 .b-cap-link { all: unset; color: var(--c-text); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .b-cap-link:focus-visible { outline: 2px solid var(--c-focus, currentColor); outline-offset: 2px; }
-/* the voice view grows down to 320 px, then scrolls (TALK_FIT: main places it once for that height) */
-.b-cap-talk, .b-cap-answer { max-height: 320px; overflow-y: auto; }
+/* THE CORNER CARD (his pick C, designer m_22118): the talk, its answer and every 'over' line, at the
+   bottom-right of the screen (amb-mac's 'corner': the window keeps its right edge and bottom, it
+   grows upward). 320 wide, the capsule's glass (r 16, macOS draws it), padding 12/16, the pearl
+   32 on the left, words t-13. */
+.b-capsule.corner .b-cap-pearl { left: var(--s-4); top: var(--s-3); width: var(--s-8); height: var(--s-8); }
+.b-capsule.corner .b-cap-talk, .b-capsule.corner .b-cap-answer {
+  width: 320px; min-height: calc(var(--s-3) * 2 + var(--s-8));
+  padding: var(--s-3) var(--s-4) var(--s-3) calc(var(--s-4) + var(--s-8) + var(--s-3));
+  font: var(--t-13)/1.45 var(--font-ui);
+}
+/* talking: the last 3 lines of his live words; older lines go up out of view */
+.b-cap-talk .words { display: flex; flex-direction: column; justify-content: flex-end; max-height: calc(3 * 1.45em); overflow: hidden; }
+.b-cap-talk .words > div { flex: none; min-height: var(--s-8); display: flex; align-items: center; }
+/* answering: the card grows to half the screen (--cap-max), then the words scroll */
+.b-cap-answer { display: flex; flex-direction: column; max-height: var(--cap-max, 50vh); }
+.b-cap-answer .t { flex: 0 1 auto; min-height: 0; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 /* scrolled, the line under the top edge fades out over 16 px, as under the thread's head (designer
    m_21358); at the top of the text, no fade */
-.b-cap-answer[data-scrolled] { -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); }
-.b-cap-answer .t { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
-.b-cap-answer .more { margin-top: var(--gap-block); padding: 0; border: 0; background: none; font: var(--t-12) var(--font-mono); color: var(--c-text-3); cursor: default; }
+.b-cap-answer .t[data-scrolled] { -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); }
+.b-cap-answer .more { flex: none; align-self: flex-start; margin-top: var(--s-2); padding: 0; border: 0; background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); cursor: default; }
+.b-cap-answer .more:hover { color: var(--c-text); }
+.b-cap-answer .b-cap-keys { flex: none; }
+/* motion: in 160 ms, fade + 8 px rise; out 120 ms, fade; reduced motion: the fades only */
+@keyframes b-cap-corner-in { from { opacity: 0; transform: translateY(var(--s-2)); } }
+@keyframes b-cap-corner-fade { from { opacity: 0; } }
+.b-capsule.corner { animation: b-cap-corner-in 160ms var(--ease-out, ease-out); transition: opacity 120ms linear; }
+.b-capsule.corner[data-leaving] { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .b-capsule.corner { animation-name: b-cap-corner-fade; } }
 .b-cap-menu .b-menu { width: 260px; }
 /* its words over the rows' words (a row's sides are --pad-row-x) */
 .b-cap-menu-head { padding: var(--s-1) var(--pad-row-x); font-size: var(--t-12); color: var(--c-text-3); }

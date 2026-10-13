@@ -41,7 +41,7 @@ async function next(w: World, pred: (l: string) => boolean, act: () => Promise<v
 const hidden = (l: string): boolean => l === 'hide';
 
 async function talk(w: World): Promise<Page> {
-  await next(w, (l) => l.startsWith('show bottom'), () => w.helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' }));
+  await next(w, (l) => l.startsWith('show corner'), () => w.helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' }));
   return capsulePage(w.s);
 }
 const esc = (w: World): Promise<void> => next(w, hidden, () => w.helper.send({ ev: 'fn', act: 'esc' }));

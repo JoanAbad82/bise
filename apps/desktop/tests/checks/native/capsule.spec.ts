@@ -1,7 +1,7 @@
 // native/capsule · the capsule's place, its keys and quiet moments (desktop v9 S8, bar O.5; the
 // helper's quiet events, bise_proto::helper QuietWhy). Passes when:
 //   - what he opens (fn space) puts the drawn capsule 170 px under the display's top, centred;
-//     what bise brings (the talk) puts its bottom 96 px above the work area's bottom, centred;
+//     the talk is the 320 px corner card, 16 px from the right and the bottom (no Dock here);
 //     both measured from the glass drawn in the capsule's page, against the window's bounds;
 //   - b3 (the user's decision 2026-10-09, card #476): a new card never pops the capsule (the
 //     window's inbox block or the native notification shows it); it waits in the spotlight's
@@ -18,9 +18,9 @@ import { CAPSULE, capsulePage, capsuleWindow, onWorld, sleep, type World } from 
 
 const DISPLAY = { x: -30000, y: -30000, width: 1920, height: 1200 };
 const TOP = 170;
-const BOTTOM = 96;
-/** the voice view's most glass (src/capsule/machine.ts TALK_FIT.maxHeight) */
-const TALK_MAX = 320;
+/** the corner card: 320 wide, 16 px from the right and the bottom (designer m_22118; place.ts CORNER) */
+const CARD_W = 320;
+const CORNER = 16;
 
 /** the glass: the drawn panel of the view (the spotlight's frame, the talk), in its page */
 const glassOf = (p: Page, id: string): Promise<{ x: number; y: number; width: number; height: number }> =>
@@ -29,7 +29,7 @@ const glassOf = (p: Page, id: string): Promise<{ x: number; y: number; width: nu
     return { x: r.x, y: r.y, width: r.width, height: r.height };
   });
 
-type Placed = { glassTop: number; glassBottom: number; glassMidX: number; overflow: { x: number; y: number } };
+type Placed = { glassTop: number; glassBottom: number; glassMidX: number; glassRight: number; glassWidth: number; overflow: { x: number; y: number } };
 
 async function placed(w: World, glass: string): Promise<Placed> {
   const cap = await capsulePage(w.s);
@@ -41,7 +41,7 @@ async function placed(w: World, glass: string): Promise<Placed> {
     const d = document.documentElement;
     return { x: d.scrollWidth - window.innerWidth, y: d.scrollHeight - window.innerHeight };
   });
-  return { glassTop: b.y + g.y, glassBottom: b.y + g.y + g.height, glassMidX: b.x + g.x + g.width / 2, overflow };
+  return { glassTop: b.y + g.y, glassBottom: b.y + g.y + g.height, glassMidX: b.x + g.x + g.width / 2, glassRight: b.x + g.x + g.width, glassWidth: g.width, overflow };
 }
 
 /** the fixture world's cards event, and the same with one more card (a push) */
@@ -55,7 +55,7 @@ function cardsWorld(): { start: (CoreEv | HubEv)[]; push: HubEv } {
   return { start, push: { ...cards, cards: [...cards.cards, fresh] } };
 }
 
-test('native/capsule: fn space sits 170 px under the top, the talk 96 px above the bottom, centred', async () => {
+test('native/capsule: fn space sits 170 px under the top, centred; the talk is the 320 px corner card, 16 px from the right and the bottom', async () => {
   await onWorld(async (w) => {
     await w.helper.send({ ev: 'fn', act: 'key', key: 'space' });
     await w.out.wait(CAPSULE, (l) => l.startsWith('show'));
@@ -66,16 +66,15 @@ test('native/capsule: fn space sits 170 px under the top, the talk 96 px above t
     await w.helper.send({ ev: 'fn', act: 'esc' });
     await w.out.wait(CAPSULE, (l) => l === 'hide');
     await w.helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' });
-    await w.out.wait(CAPSULE, (l) => l.startsWith('show bottom'));
-    const bottom = await placed(w, 'capsule.talk');
-    expect.soft(bottom.overflow, 'nothing of the talk is drawn past its window (cut off)').toEqual({ x: 0, y: 0 });
-    // the voice view never moves while the words come (2887644d, lead m_11532): placed once so that
-    // its MAX height (TALK_FIT 320) would end BOTTOM px above the work area's bottom, then it grows
-    // down; so its top is fixed there and its bottom never passes that line
-    expect.soft(Math.abs(DISPLAY.y + DISPLAY.height - BOTTOM - TALK_MAX - bottom.glassTop), `the talk's glass top sits where ${TALK_MAX} px of glass would end ${BOTTOM} px above the work area's bottom`).toBeLessThanOrEqual(2);
-    expect.soft(bottom.glassBottom, `the talk's glass never passes ${BOTTOM} px above the work area's bottom`).toBeLessThanOrEqual(DISPLAY.y + DISPLAY.height - BOTTOM + 2);
+    await w.out.wait(CAPSULE, (l) => l.startsWith('show corner'));
+    const card = await placed(w, 'capsule.talk');
+    expect.soft(card.overflow, 'nothing of the talk is drawn past its window (cut off)').toEqual({ x: 0, y: 0 });
+    // his pick C (designer m_22118): bottom-right like a notification, pinned at its bottom, it
+    // grows upward (amb-mac's 'corner', d6622e50); no Dock here: 16 px from the display's edges
+    expect.soft(Math.abs(card.glassWidth - CARD_W), `the card is ${CARD_W} px wide`).toBeLessThanOrEqual(1);
+    expect.soft(Math.abs(DISPLAY.x + DISPLAY.width - CORNER - card.glassRight), `its right ${CORNER} px from the display's right`).toBeLessThanOrEqual(2);
+    expect.soft(Math.abs(DISPLAY.y + DISPLAY.height - CORNER - card.glassBottom), `its bottom ${CORNER} px above the display's bottom`).toBeLessThanOrEqual(2);
     await capsulePage(w.s).then((p) => p.screenshot({ path: test.info().outputPath('talk.png') }));
-    expect.soft(Math.abs(bottom.glassMidX - (DISPLAY.x + DISPLAY.width / 2)), 'centred').toBeLessThanOrEqual(2);
   });
 });
 

@@ -7,7 +7,6 @@ import type { Agent, Card, ProjectRow } from '@/proto';
 import { Capsule, type CapsuleProps } from './Capsule';
 import { cardKind, toSpotData } from './data';
 import { NONE, START, step, type CapEvent, type View } from './machine';
-import { TALK_FIT } from './machine';
 import { asksForScreen, shotName, shotOf, shotPref } from './shot';
 
 afterEach(cleanup);
@@ -33,7 +32,7 @@ describe('the capsule machine', () => {
     const r = run([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'talk_end' }]);
     expect(r).toEqual({
       view: { kind: 'talk', phase: 'think', handsFree: false },
-      fx: [{ fx: 'show', at: 'bottom', keys: false, fit: TALK_FIT }, { fx: 'talk', cmd: 'talk_start' }, { fx: 'mic', open: true }, { fx: 'talk', cmd: 'talk_end' }, { fx: 'mic', open: false }],
+      fx: [{ fx: 'show', at: 'corner', keys: false }, { fx: 'talk', cmd: 'talk_start' }, { fx: 'mic', open: true }, { fx: 'talk', cmd: 'talk_end' }, { fx: 'mic', open: false }],
     });
     expect(run([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'cancel' }]).fx).toContainEqual({ fx: 'talk', cmd: 'talk_cancel' });
     expect(run([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'talk_end' }, { ev: 'answer' }]).view).toEqual({ kind: 'answer' });

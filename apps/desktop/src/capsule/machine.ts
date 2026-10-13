@@ -10,11 +10,15 @@
 // esc or fn esc closes; the tray's click opens the dropdown; a blur that hid the window closes the
 // view. Effects: the capsule window (show, hide), the main window (open), the helper's mic
 // (own_mic, so its quiet sampling skips bise's own use).
+// The talk, its answer and every 'over' line show in the corner card (his pick C, designer
+// m_22118): bottom-right of the pointer's screen, growing upward (amb-mac's 'corner', d6622e50).
 import type { FnAct } from '@/proto';
 import type { CapsuleFit } from '../shared/api';
 
-/** The voice view grows down from where it showed and never moves (lead m_11532); its glass is at most 320 px (capsule.css). */
-export const TALK_FIT: CapsuleFit = { grow: 'down', maxHeight: 320 };
+/** The corner card closes this long after the answer ends (or an 'over' line shows), held while the pointer is on it (designer m_22118). */
+export const CORNER_LINGER_MS = 8000;
+/** The corner card's way out: a 120 ms fade, then the window hides (capsule.css, designer m_22118). */
+export const CORNER_OUT_MS = 120;
 
 /** a window page the 'over' line links to (designer m_21945: 'settings › voice') */
 export interface OverLink {
@@ -64,6 +68,8 @@ export type CapEvent =
   | { readonly ev: 'talk_over'; readonly said: string; readonly link?: OverLink; readonly fades?: boolean }
   /** a fading 'over' line's time is up */
   | { readonly ev: 'over_gone' }
+  /** the corner card's CORNER_LINGER_MS are up: an ended answer or an 'over' line goes */
+  | { readonly ev: 'linger_gone' }
   /** a card was answered or went away */
   | { readonly ev: 'card_done'; readonly id: string }
   /** ⏎ on a spotlight waiting row: that card's answer, in place (qa-native R03: it closed to nothing) */
@@ -74,7 +80,7 @@ export type CapEvent =
   | { readonly ev: 'close' };
 
 export type Fx =
-  | { readonly fx: 'show'; readonly at: 'top' | 'bottom' | 'menu'; readonly keys: boolean; readonly fit?: CapsuleFit }
+  | { readonly fx: 'show'; readonly at: 'top' | 'bottom' | 'menu' | 'corner'; readonly keys: boolean; readonly fit?: CapsuleFit }
   | { readonly fx: 'hide' }
   | { readonly fx: 'open'; readonly route?: string }
   | { readonly fx: 'mic'; readonly open: boolean }
@@ -124,9 +130,9 @@ export function step(s: State, e: CapEvent): Step {
           if (e.key === 'i') return v.kind === 'none' ? { state: s, fx: [{ fx: 'open', route: 'inbox' }] } : go(s, NONE, { fx: 'hide' }, { fx: 'open', route: 'inbox' });
           return stay(s);
         case 'talk_start':
-          return go(s, { kind: 'talk', phase: 'listen', handsFree: false }, { fx: 'show', at: 'bottom', keys: false, fit: TALK_FIT }, { fx: 'talk', cmd: 'talk_start' });
+          return go(s, { kind: 'talk', phase: 'listen', handsFree: false }, { fx: 'show', at: 'corner', keys: false }, { fx: 'talk', cmd: 'talk_start' });
         case 'double':
-          return go(s, { kind: 'talk', phase: 'listen', handsFree: true }, { fx: 'show', at: 'bottom', keys: false, fit: TALK_FIT }, { fx: 'talk', cmd: 'talk_start' });
+          return go(s, { kind: 'talk', phase: 'listen', handsFree: true }, { fx: 'show', at: 'corner', keys: false }, { fx: 'talk', cmd: 'talk_start' });
         case 'talk_end':
           if (v.kind === 'talk' && v.phase === 'listen') return go(s, { kind: 'talk', phase: 'think', handsFree: v.handsFree }, { fx: 'talk', cmd: 'talk_end' });
           return s.talk !== null ? endUnseen(s) : stay(s);
@@ -153,6 +159,8 @@ export function step(s: State, e: CapEvent): Step {
       return go({ ...s, talk: null }, { kind: 'talk', phase: 'over', handsFree: v.handsFree, said: e.said, ...(e.link ? { link: e.link } : {}), ...(e.fades ? { fades: true } : {}) });
     case 'over_gone':
       return v.kind === 'talk' && v.phase === 'over' && v.fades === true ? go(s, NONE, { fx: 'hide' }) : stay(s);
+    case 'linger_gone':
+      return v.kind === 'answer' || (v.kind === 'talk' && v.phase === 'over') ? go(s, NONE, { fx: 'hide' }) : stay(s);
     case 'card_done':
       return v.kind === 'card' && v.id === e.id ? back(s) : stay(s);
     case 'open_card':

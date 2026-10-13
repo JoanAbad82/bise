@@ -23,20 +23,24 @@ import type { SpotAnswer, SpotFront, SpotItem, SpotRoute } from "@/spotlight";
 import { W } from "@/spotlight/words";
 import { useTheme } from "@/theme";
 import "@/ds/index.css";
-import { Capsule, menuCards } from "./Capsule";
+import { Capsule, isCorner, menuCards } from "./Capsule";
 import { answeredOver, errorOver, heardOver, OVER_FADE_MS } from "./over";
 import { asksForScreen, shotOf, shotPref } from "./shot";
 import { useAgentPreview, useSpotData } from "./data";
-import { START, step, type CapEvent, type Fx, type State } from "./machine";
+import { CORNER_LINGER_MS, CORNER_OUT_MS, START, step, type CapEvent, type Fx, type State, type View } from "./machine";
 
 interface Model {
   readonly state: State;
   readonly fx: readonly Fx[];
+  /** the corner view a hide just left: it stays drawn while it fades out (CORNER_OUT_MS) */
+  readonly left: View | null;
 }
 
 const reduce = (m: Model, e: CapEvent): Model => {
   const s = step(m.state, e);
-  return { state: s.state, fx: s.fx };
+  const hides = s.fx.some((f) => f.fx === "hide");
+  const left = hides && isCorner(m.state.view) ? m.state.view : s.fx.length === 0 ? m.left : null;
+  return { state: s.state, fx: s.fx, left };
 };
 
 /** The window route for a spotlight row (amb-win's route strings). */
@@ -67,7 +71,7 @@ export function CapsuleRoot(): JSX.Element {
   useTheme();
   const store = useStore();
   const bise = (window as Partial<Window>).bise;
-  const [m, dispatch] = useReducer(reduce, { state: START, fx: [] });
+  const [m, dispatch] = useReducer(reduce, { state: START, fx: [], left: null });
   const view = m.state.view;
   const [front, setFront] = useState<SpotFront | null>(null);
   const spot = useSpotData(front);
@@ -309,11 +313,48 @@ export function CapsuleRoot(): JSX.Element {
     setRoute({ ...r, to, name });
   };
 
+  // the corner card closes CORNER_LINGER_MS after the answer ends or an 'over' line shows, the
+  // time held while the pointer is on it (designer m_22118); a fading 'over' has its own time
+  // (the hover is of the view it was on: a card that went never holds the next one)
+  const [hoverOn, setHoverOn] = useState<View | null>(null);
+  const hovered = hoverOn === view;
+  const onHover = useCallback(
+    (over: boolean) => {
+      setHoverOn(over ? view : null);
+    },
+    [view],
+  );
+  const lingers =
+    (view.kind === "answer" && last?.done === true) ||
+    (view.kind === "talk" && view.phase === "over" && view.fades !== true);
+  useEffect(() => {
+    if (!lingers || hovered) return undefined;
+    const t = window.setTimeout(() => {
+      dispatch({ ev: "linger_gone" });
+    }, CORNER_LINGER_MS);
+    return () => {
+      window.clearTimeout(t);
+    };
+  }, [lingers, hovered]);
+  // its way out: the corner view a hide left stays drawn while it fades (m.left, 120 ms), then the
+  // window hides; a show meanwhile (the next fn) keeps it
+  const leaving = view.kind === "none" ? m.left : null;
+  const outTimer = useRef<number | null>(null);
+
   // the effects of each step, once
   useEffect(() => {
     for (const fx of m.fx) {
+      if ((fx.fx === "show" || fx.fx === "hide") && outTimer.current !== null) {
+        window.clearTimeout(outTimer.current);
+        outTimer.current = null;
+      }
       if (fx.fx === "show") bise?.capsule.show(fx.at, fx.keys, fx.fit);
-      else if (fx.fx === "hide") bise?.capsule.hide();
+      else if (fx.fx === "hide" && m.left !== null) {
+        outTimer.current = window.setTimeout(() => {
+          outTimer.current = null;
+          bise?.capsule.hide();
+        }, CORNER_OUT_MS);
+      } else if (fx.fx === "hide") bise?.capsule.hide();
       else if (fx.fx === "mic") bise?.helper({ cmd: "own_mic", open: fx.open });
       else if (fx.fx === "talk") {
         // the sender of each talk command in app.log, next to core.log (the core can't tell who
@@ -326,7 +367,7 @@ export function CapsuleRoot(): JSX.Element {
         if (fx.cmd === "talk_end" && home !== null) followAsk(home);
       } else bise?.openWindow(fx.route);
     }
-  }, [m.fx, bise, store, home, followAsk]);
+  }, [m.fx, m.left, bise, store, home, followAsk]);
 
   useEffect(() => {
     if (bise === undefined) return;
@@ -449,7 +490,9 @@ export function CapsuleRoot(): JSX.Element {
 
   return (
     <Capsule
-      view={view}
+      view={leaving ?? view}
+      leaving={leaving !== null}
+      onHover={onHover}
       spot={spot}
       answer={last}
       heard={heard?.text ?? ""}

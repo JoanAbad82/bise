@@ -1,7 +1,7 @@
 // native/fn-from-rest · bar O.5: fn held from rest, with another app in front (the old check: listens
 // in under 300 ms; the app doesn't steal focus). 'Rest': the app launched 2 s ago, nothing shown, the
 // helper says another app is in front (TextEdit). Passes when the core gets talk_start within 300 ms
-// of the helper's talk_start, the talk shows at the bottom without the keys, no window of bise is
+// of the helper's talk_start, the talk shows in the corner without the keys, no window of bise is
 // focused, and the window server never saw bise frontmost (the proof's watch, whole run). The real
 // fn key and TextEdit staying active on a real screen are the VM pass's (vm/vm-pass.spec.ts: green
 // on 442f748a).
@@ -21,7 +21,7 @@ test('native/fn-from-rest: fn held with another app in front listens within 300 
     const ms = Date.now() - t0;
     expect(ms, `the core listens ${String(ms)} ms after fn (under 300)`).toBeLessThan(300);
     expect(core.cmds().slice(before).filter((c) => c.cmd === 'talk_start').length, 'one talk_start').toBe(1);
-    expect(await out.wait(CAPSULE, (l) => l.startsWith('show')), 'the talk at the bottom, never the keys').toBe('show bottom');
+    expect(await out.wait(CAPSULE, (l) => l.startsWith('show')), 'the talk in the corner, never the keys').toBe('show corner');
     const focused = await s.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((b) => b.isFocused()).length);
     expect(focused, 'no window of bise is focused').toBe(0);
     await helper.send({ ev: 'fn', act: 'talk_end' });

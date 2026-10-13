@@ -39,7 +39,7 @@ test('native/fn-voice: fn fn with the window in front goes to the window, not th
 
     // a hold with the window in front still talks in the capsule (only fn fn moves)
     await helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' } as never);
-    expect(await out.wait(CAPSULE, (l) => l.startsWith('show')), 'a hold: the capsule talks').toBe('show bottom');
+    expect(await out.wait(CAPSULE, (l) => l.startsWith('show')), 'a hold: the capsule talks').toBe('show corner');
     await helper.send({ ev: 'fn', act: 'cancel' } as never);
     await out.wait(CAPSULE, (l) => l === 'hide');
 
@@ -47,7 +47,7 @@ test('native/fn-voice: fn fn with the window in front goes to the window, not th
     await front(false);
     const before = out.of(CAPSULE).length;
     await helper.send({ ev: 'fn', act: 'double' } as never);
-    await expect.poll(() => out.of(CAPSULE).slice(before), { message: 'fn fn elsewhere: the capsule talks', timeout: 3000 }).toContain('show bottom');
+    await expect.poll(() => out.of(CAPSULE).slice(before), { message: 'fn fn elsewhere: the capsule talks', timeout: 3000 }).toContain('show corner');
     expect(await heard(), 'the window heard only the first').toBe(1);
   });
 });

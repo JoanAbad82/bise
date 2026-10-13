@@ -5,9 +5,8 @@
 // Electron's main after each step; the glass is the drawn panel in the capsule's page.
 //   (a) fn space, then 20 real keystrokes that filter the list: the frame's top-left never moves
 //       while its size follows the list
-//   (b) a voice session (fn held, then its release): the frame's top-left never moves, the glass
-//       is placed for its 320 px max (its top + 320 still ends 96 px above the Dock line) and never
-//       passes the Dock line
+//   (b) a voice session (fn held, then its release) in the corner card: the glass's bottom-right
+//       never moves (it grows upward), sits 16 px above the Dock line and never passes it
 //   ((c), a pushed card's place, is gone with the push: b3, the user's decision 2026-10-09)
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../harness';
@@ -15,8 +14,8 @@ import { CAPSULE, capsulePage, capsuleWindow, onWorld, sleep, type World } from 
 
 const DISPLAY = { x: -30000, y: -30000, width: 1920, height: 1200 };
 const DOCK_LINE = DISPLAY.y + DISPLAY.height;
-const BOTTOM = 96;
-const TALK_MAX = 320;
+/** the corner card's margin (place.ts CORNER) */
+const CORNER = 16;
 
 type Frame = { x: number; y: number; width: number; height: number };
 const frame = async (w: World): Promise<Frame> => {
@@ -62,10 +61,10 @@ test('native/capsule-pin (a): fn space, 20 keystrokes filter the list, the frame
   });
 });
 
-test('native/capsule-pin (b): a voice session never moves the frame, the glass stays above the Dock line', async () => {
+test('native/capsule-pin (b): a voice session never moves the corner card\'s bottom-right, the glass stays above the Dock line', async () => {
   await onWorld(async (w) => {
     await w.helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' });
-    await w.out.wait(CAPSULE, (l) => l.startsWith('show bottom'));
+    await w.out.wait(CAPSULE, (l) => l.startsWith('show corner'));
     const cap = await capsulePage(w.s);
     await sleep(300);
     const first = await frame(w);
@@ -86,12 +85,14 @@ test('native/capsule-pin (b): a voice session never moves the frame, the glass s
     }
     await cap.screenshot({ path: test.info().outputPath('talk-think.png') });
     test.info().annotations.push({ type: 'sizes', description: sizes(seen).join(' ') });
-    const moved = seen.filter((f) => f.x !== first.x || f.y !== first.y);
-    expect(moved, `the frame's top-left stays at ${first.x},${first.y} through the session`).toEqual([]);
+    // the corner card is pinned at its bottom-right and grows upward (designer m_22118, amb-mac d6622e50)
+    const corner = (g: Frame): string => `${Math.round(g.x + g.width)},${Math.round(g.y + g.height)}`;
     const g0 = glasses[0];
     if (!g0) throw new Error('no glass');
-    expect(g0.y + TALK_MAX, `the glass is placed for its ${TALK_MAX} px max: its top + ${TALK_MAX} ends ${BOTTOM} px above the Dock line`).toBeLessThanOrEqual(DOCK_LINE - BOTTOM + 2);
-    const past = glasses.filter((g) => g.y + g.height > DOCK_LINE - BOTTOM + 2);
-    expect(past, 'the glass never passes the Dock line (96 px above the work area)').toEqual([]);
+    const moved = glasses.filter((g) => Math.abs(g.x + g.width - (g0.x + g0.width)) > 1 || Math.abs(g.y + g.height - (g0.y + g0.height)) > 1).map(corner);
+    expect(moved, `the glass's bottom-right stays at ${corner(g0)} through the session`).toEqual([]);
+    expect(Math.abs(g0.y + g0.height - (DOCK_LINE - CORNER)), `the glass's bottom sits ${CORNER} px above the Dock line`).toBeLessThanOrEqual(2);
+    const past = glasses.filter((g) => g.y + g.height > DOCK_LINE - CORNER + 2);
+    expect(past, `the glass never passes ${CORNER} px above the Dock line`).toEqual([]);
   });
 });

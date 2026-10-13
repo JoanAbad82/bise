@@ -7,6 +7,8 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
+  type CSSProperties,
   type JSX,
   type ReactNode,
 } from "react";
@@ -39,7 +41,12 @@ export const W = {
   voiceSettings: "settings › voice",
   notReached: "bise didn't get it. try again in a moment.",
   answered: (name: string): string => `✓ answered ${name}`,
-  restInBise: "the rest in bise   ⏎ open",
+  // the corner card (designer m_22118): past half the screen it scrolls, the rest is in bise
+  restInBise: "the rest in bise ↗",
+  answerKeys: [
+    ["⏎", "open in bise"],
+    ["esc", "close"],
+  ] as const,
   openBise: "open bise",
   inbox: "inbox",
   settings: "settings…",
@@ -92,12 +99,23 @@ export interface CapsuleProps {
   readonly onShotDrop?: () => void;
   /** The one-time ask for Screen Recording, under his words (designer m_21903). */
   readonly screenAsk?: { readonly onOpen: () => void; readonly onLater: () => void } | null;
+  /** The pointer is over the corner card (its 8 s close waits while it is). */
+  readonly onHover?: (over: boolean) => void;
+  /** The corner card is going (its 120 ms fade out before the window hides). */
+  readonly leaving?: boolean;
   readonly onSize: (
     width: number,
     height: number,
     glass: { x: number; y: number; width: number; height: number },
   ) => void;
 }
+
+/** The views the corner card shows: the talk (listening, thinking, its 'over' lines) and its answer. Pure. */
+export const isCorner = (v: View): boolean => v.kind === "talk" || v.kind === "answer";
+
+/** Half the height of the screen the capsule is on: the corner answer grows to it, then scrolls. */
+// half the screen, with a floor so a tiny or unknown screen still shows a few lines
+const halfScreen = (): number => Math.max(240, Math.round((window.screen.availHeight || 800) / 2));
 
 const moodOf = (v: View, answering: boolean): Mood => {
   if (v.kind === "talk") return v.phase === "listen" ? "listen" : v.phase === "over" ? "rest" : "work";
@@ -137,19 +155,26 @@ export function Capsule(p: CapsuleProps): JSX.Element {
   const v = p.view;
   const answering = p.answer?.done === false;
   const pearl = v.kind === "spot" || v.kind === "talk" || v.kind === "answer";
+  const corner = isCorner(v);
+  const hover = p.onHover;
   return (
     <div
       ref={box}
-      className={`b-capsule at-${v.kind}`}
+      className={`b-capsule at-${v.kind}${corner ? " corner" : ""}`}
       data-testid="capsule"
       data-view={v.kind}
+      data-leaving={p.leaving === true ? "" : undefined}
+      // the half-screen cap of the corner card's answer (the screen the capsule is on)
+      style={corner ? ({ "--cap-max": `${String(halfScreen())}px` } as CSSProperties) : undefined}
+      onMouseEnter={hover === undefined ? undefined : () => { hover(true); }}
+      onMouseLeave={hover === undefined ? undefined : () => { hover(false); }}
     >
       <div className={`b-cap-pearl${pearl ? "" : " off"}`}>
         <LivePearl
           mood={moodOf(v, answering)}
           level={p.level}
           still={p.still}
-          size={40}
+          size={corner ? 32 : 40}
           testId="capsule.pearl"
         />
       </div>
@@ -195,11 +220,18 @@ export function Capsule(p: CapsuleProps): JSX.Element {
                 </>
               )}
             </>
-          ) : p.heard !== ""
-            ? p.heard
-            : v.phase === "listen"
-              ? W.listening
-              : W.thinking}
+          ) : (
+            // the last 3 lines of his live words (capsule.css: the older ones go up out of view)
+            <div className="words" data-testid="capsule.talk.words">
+              <div>
+                {p.heard !== ""
+                  ? p.heard
+                  : v.phase === "listen"
+                    ? W.listening
+                    : W.thinking}
+              </div>
+            </div>
+          )}
           {p.shot != null && (
             <ShotRow shot={p.shot} listening={v.phase === "listen"} onDrop={p.onShotDrop ?? (() => undefined)} />
           )}
@@ -246,44 +278,50 @@ function Answer({
   onOpen: () => void;
 }): JSX.Element {
   const a = answer === null ? null : answerLines(answer.text);
-  // it grows line by line up to its 320 px, then scrolls: the newest line stays in view while he
-  // is at the bottom; scrolled up, it never moves (ambient's text-appearing, m_12403)
+  // the corner card grows upward line by line to half the screen, then its words scroll: the
+  // newest line stays in view while he is at the bottom; scrolled up, it never moves (ambient's
+  // text-appearing, m_12403)
   const box = useRef<HTMLDivElement>(null);
   const atEnd = useRef(true);
+  const [over, setOver] = useState(false);
   useLayoutEffect(() => {
     const el = box.current;
-    if (el !== null && atEnd.current) el.scrollTop = el.scrollHeight;
+    if (el === null) return;
+    if (atEnd.current) el.scrollTop = el.scrollHeight;
+    setOver(el.scrollHeight > el.clientHeight + 1);
   }, [a?.shown]);
   return (
-    <div
-      ref={box}
-      className="b-cap-answer"
-      data-testid="capsule.answer"
-      aria-live="polite"
-      data-glass
-      onScroll={(e) => {
-        const el = e.currentTarget;
-        atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
-        // scrolled: the top line fades out over 16 px instead of being cut (capsule.css)
-        el.toggleAttribute("data-scrolled", el.scrollTop > 0);
-      }}
-    >
-      <div className="t">
+    <div className="b-cap-answer" data-testid="capsule.answer" aria-live="polite" data-glass>
+      <div
+        ref={box}
+        className="t"
+        data-testid="capsule.answer.scroll"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+          // scrolled: the top line fades out over 16 px instead of being cut (capsule.css)
+          el.toggleAttribute("data-scrolled", el.scrollTop > 0);
+        }}
+      >
         <LiveText
           text={a?.shown ?? ""}
           live={answer?.done === false}
           testId="capsule.answer.text"
         />
       </div>
-      {a?.cut === true && (
-        <Press
-          look="more"
-          onClick={onOpen}
-          data-testid="capsule.answer.more"
-        >
+      {(a?.cut === true || over) && (
+        <Press look="more" onClick={onOpen} data-testid="capsule.answer.more">
           {W.restInBise}
         </Press>
       )}
+      <div className="b-cap-keys" data-testid="capsule.answer.keys">
+        {W.answerKeys.map(([k, what], i) => (
+          <span key={k}>
+            {i > 0 && " · "}
+            <span className="k">{k}</span> {what}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
