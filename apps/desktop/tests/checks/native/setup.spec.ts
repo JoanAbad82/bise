@@ -6,8 +6,9 @@
 //   S.7  first run with none granted: each permission has its allow; continue works with none
 //        ('continue for now'); a click asks the helper (perm ask); a refused one says how to grant
 //        it later and offers System Settings (perm open); a grant shows at once
-//   S.5  the core dies while the app runs: the window says so in one line, the app starts the core
-//        again by itself, and the line goes once it's back; Terminal never opens
+//   S.5  the core dies while the app runs: the app starts the core again by itself; a spell under
+//        2 s says nothing (designer, CoreLine QUIET_DOWN_MS), a longer one is one line with the
+//        core's last log line; Terminal never opens
 import { execFileSync } from 'node:child_process';
 import { test, expect } from '../../harness';
 import path from 'node:path';
@@ -17,6 +18,9 @@ import { onWorld, sleep } from './world';
 const NOISY = path.join(__dirname, 'fakes', 'core-noisy.mjs');
 
 const PERMS = ['mic', 'accessibility', 'screen'] as const;
+
+/** src/app/CoreLine.tsx QUIET_DOWN_MS: how long the core may be down before the window says so. */
+const QUIET_DOWN_MS = 2000;
 
 test('setup/perms: none granted: allow asks the helper, a refusal says how, a grant shows, continue for now', async () => {
   await onWorld(async ({ s, helper }) => {
@@ -55,22 +59,30 @@ const corePids = (appPid: number): number[] => {
   }
 };
 
-test('setup/offline: the core dies: one line says so, the app starts it again, Terminal never opens', async () => {
+test('setup/offline: the core dies: the app starts it again, a short spell says nothing, Terminal never opens', async () => {
   await onWorld(async ({ s, core, out }) => {
     const pid = s.app.process().pid ?? -1;
     await expect.poll(() => corePids(pid).length, { message: 'the core runs', timeout: 3000 }).toBe(1);
     const first = corePids(pid)[0] ?? -1;
     await expect.poll(() => core.cmds().length, { message: 'the app talks to the core', timeout: 3000 }).toBeGreaterThan(0);
     const before = core.cmds().length;
+    const t0 = Date.now();
     process.kill(first, 'SIGKILL');
-    // the window says it, in one line (amb-win / amb-home: a line with test id app.core)
+    // designer's rule (src/app/CoreLine.tsx QUIET_DOWN_MS, 2 s): a spell under 2 s says nothing at
+    // all; the app restarts the core after its 0.5 s backoff, so this kill must stay silent
     const line = s.page.getByTestId('app.core');
-    const said = await line.waitFor({ state: 'visible', timeout: 1500 }).then(() => true, () => false);
-    expect.soft(said, 'the window says the core is down, in one line (app.core)').toBe(true);
+    let shown = false;
     // the app starts it again by itself (backoff 0.5 s first)
-    await expect.poll(() => corePids(pid).filter((p) => p !== first).length, { message: 'a new core runs', timeout: 3000 }).toBe(1);
+    await expect
+      .poll(async () => {
+        if (await line.isVisible()) shown = true;
+        return corePids(pid).filter((p) => p !== first).length;
+      }, { message: 'a new core runs', timeout: 3000 })
+      .toBe(1);
     await expect.poll(() => core.cmds().length, { message: 'the app talks to the new core', timeout: 3000 }).toBeGreaterThan(before);
-    if (said) await expect.soft(line, 'the line goes once the core is back').toBeHidden({ timeout: 3000 });
+    const backMs = Date.now() - t0;
+    test.info().annotations.push({ type: 'back', description: `the core answered again ${String(backMs)} ms after the kill` });
+    if (backMs < QUIET_DOWN_MS) expect.soft(shown, `back in ${String(backMs)} ms (< ${String(QUIET_DOWN_MS)} ms): no line at all`).toBe(false);
     await sleep(200);
     expect(out.lines.filter((l) => l.startsWith('bise-desktop: external')), 'nothing opened outside the app (no Terminal)').toEqual([]);
   });
@@ -81,9 +93,9 @@ test("setup/offline: while the core is down the line shows the core's last log l
     const pid = s.app.process().pid ?? -1;
     await expect.poll(() => corePids(pid).length, { message: 'the core runs', timeout: 3000 }).toBe(1);
     await sleep(500);
-    // SIGSTOP then SIGKILL: the line must stay up long enough to read, so the restart is held off by
-    // killing every new core too for 1.5 s
-    const end = Date.now() + 1500;
+    // the line says it only after QUIET_DOWN_MS (2 s) down, so the restart is held off by killing
+    // every new core too for that long plus 1.5 s to read it
+    const end = Date.now() + QUIET_DOWN_MS + 1500;
     const seen: string[] = [];
     const line = s.page.getByTestId('app.core');
     while (Date.now() < end) {
