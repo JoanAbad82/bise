@@ -157,33 +157,16 @@ pub(crate) fn attach_clipboard(app: &mut App) -> Result<String, String> {
 }
 
 /// The message to send, as typed parts (msg-parts) and their text
-/// (`parts::render`, the one template): each quote label leaves the
-/// words and its quote goes in front, in text order (quote.rs); each
-/// other chip still present (an image, a long paste) is its part where
-/// it was; the attachments start over.
+/// (`parts::render`, the one template): each chip still present is its
+/// part where it was, in text order; a quote with its chip's number, so
+/// it sits at its place in his words ("regarding ❝ 3, …", his m_22231,
+/// the window's composer the same); the attachments start over.
 pub(crate) fn expand(app: &mut App, text: &str) -> crate::said::Said {
     use bise_proto::parts::Part;
     let atts = std::mem::take(&mut app.attachments);
-    let mut out = text.to_string();
-    let mut quotes: Vec<(usize, &Attachment)> = Vec::new();
-    for a in atts.iter().filter(|a| crate::quote::is_quote(&a.label)) {
-        if let Some(at) = text.find(&a.label) {
-            quotes.push((at, a));
-        }
-        // the label and one space after it (else before it) go
-        for pat in [format!("{} ", a.label), format!(" {}", a.label), a.label.clone()] {
-            out = out.replace(&pat, "");
-        }
-    }
-    if !quotes.is_empty() {
-        out = out.trim().to_string();
-    }
-    quotes.sort_by_key(|(at, _)| *at);
-    let mut parts: Vec<Part> = quotes.iter().map(|(_, a)| part_of(a)).collect();
-    // the words, cut at each other chip's label
-    let others: Vec<&Attachment> = atts.iter().filter(|a| !crate::quote::is_quote(&a.label)).collect();
-    let mut rest = out.as_str();
-    while let Some((at, a)) = others.iter().filter_map(|a| rest.find(&a.label).map(|at| (at, *a))).min_by_key(|(at, _)| *at) {
+    let mut parts: Vec<Part> = Vec::new();
+    let mut rest = text;
+    while let Some((at, a)) = atts.iter().filter_map(|a| rest.find(&a.label).map(|at| (at, a))).min_by_key(|(at, _)| *at) {
         if at > 0 {
             parts.push(Part::Text { text: rest[..at].to_string() });
         }
@@ -196,11 +179,16 @@ pub(crate) fn expand(app: &mut App, text: &str) -> crate::said::Said {
     crate::said::Said::of_parts(parts)
 }
 
-/// The part an attachment's marker holds (a quote, a paste, an image);
-/// a marker that isn't one part (an artifact's link) stays its text.
+/// The part an attachment's marker holds (a quote with its chip's
+/// number, a paste, an image); a marker that isn't one part (an
+/// artifact's link) stays its text.
 fn part_of(a: &Attachment) -> bise_proto::parts::Part {
     use bise_proto::parts::Part;
     match bise_proto::parts::parse(&a.marker).as_slice() {
+        [Part::Quote { from, text, file, new, old, .. }] => {
+            let n = chip_parts(&a.label).1.parse::<u32>().ok();
+            Part::Quote { from: from.clone(), text: text.clone(), file: file.clone(), new: new.clone(), old: old.clone(), n }
+        }
         [p] if !matches!(p, Part::Text { .. }) => p.clone(),
         _ => Part::Text { text: a.marker.clone() },
     }

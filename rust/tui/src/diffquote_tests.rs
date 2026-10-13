@@ -66,7 +66,8 @@ fn the_rows_quote_with_where_they_are() {
 
 /// shift+↓ selects from the cursor; the key bar is in quote mode; a
 /// letter puts the chip in the composer you're in, then types; ⏎ sends
-/// the tag with the file and the lines, then the words.
+/// the tag with its number, the file and the lines where the chip was,
+/// then the words (his m_22231).
 #[test]
 fn shift_arrows_select_and_typing_quotes() {
     let mut app = app(true);
@@ -85,8 +86,8 @@ fn shift_arrows_select_and_typing_quotes() {
     assert!(rows[1].contains("src/pages/pricing.tsx:38-40 · 3 lines"), "{rows:?}");
     crate::input::on_key(&mut app, &key(KeyCode::Enter, KeyModifiers::NONE));
     let sent = app.history[0].clone();
-    assert!(sent.starts_with("<selection from=\"pricing-page vs main\" file=\"src/pages/pricing.tsx\" new=\"38-40\" old=\"38-40\">\n export function Pricing() {\n"), "{sent}");
-    assert!(sent.ends_with("</selection>\nwhy?"), "{sent}");
+    assert!(sent.starts_with("<selection from=\"pricing-page vs main\" n=\"1\" file=\"src/pages/pricing.tsx\" new=\"38-40\" old=\"38-40\">\n export function Pricing() {\n"), "{sent}");
+    assert!(sent.ends_with("</selection> why?"), "{sent}");
 }
 
 /// esc ends the selection (the panel stays); a plain ↓ too, and moves.

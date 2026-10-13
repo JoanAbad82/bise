@@ -121,7 +121,8 @@ def wide(t):
     t.keys("Enter")
     r = sent_to(E, "t1", 'new=\\"6-8\\"')
     blob = json.dumps(r)
-    assert 'from=\\"t1 vs main\\" file=\\"src/pricing.tsx\\" new=\\"6-8\\"' in blob, blob
+    # the quote's tag where its chip was, with its number (his m_22231)
+    assert 'from=\\"t1 vs main\\" n=\\"1\\" file=\\"src/pricing.tsx\\" new=\\"6-8\\"' in blob, blob
     assert "+line 5\\n+line 6\\n+line 7" in blob and "why these three?" in blob, blob
     sc = t.wait_re(r"❝ line 5 line 6 line 7 · src/pricing.tsx:6-8 · 3 lines")
     shot(t, "150-thread")

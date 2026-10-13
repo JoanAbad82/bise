@@ -495,8 +495,9 @@ mod tests {
         assert_eq!(app.ed.text.matches('b').count(), 1, "the key still types");
     }
 
-    /// ⏎: the tags first, one per quote, then the text; the history
-    /// draws a dim quote line over your words.
+    /// ⏎: each quote's tag where its chip was, with its number (his
+    /// m_22231); the history draws a dim quote line over your words,
+    /// '❝ 1' at its place in them.
     #[test]
     fn the_sent_message_carries_the_tag() {
         let mut app = selected();
@@ -506,9 +507,9 @@ mod tests {
         press(&mut app, KeyCode::Enter);
         let sent = app.history[0].clone();
         let (qs, rest) = split(&sent);
-        assert!(sent.starts_with("<selection from=\"main\">\n"), "{sent}");
-        assert!(sent.contains("\n</selection>\nwhy?"), "{sent}");
-        assert_eq!(rest, "why?");
+        assert!(sent.starts_with("<selection from=\"main\" n=\"1\">\n"), "{sent}");
+        assert!(sent.ends_with("\n</selection>why?") || sent.ends_with("\n</selection> why?"), "{sent}");
+        assert!(rest.starts_with("❝ 1") && rest.ends_with("why?"), "{rest}");
         assert_eq!(qs.len(), 1);
         assert!(app.attachments.is_empty());
         let rows: Vec<String> = crate::render::user_block_lines(&sent.as_str().into(), crate::wire::Mark::Sent, false, 60)
@@ -518,12 +519,9 @@ mod tests {
         assert_eq!(rows.len(), 2, "{rows:?}");
         assert!(rows[0].contains("❝ ") && rows[0].contains("safari · main · 1 line"), "{rows:?}");
         assert!(rows[1].contains("why?"), "{rows:?}");
-        // a quote in the middle of the text still goes first, its label gone
+        // a quote in the middle of the text sits there, with its number
         app.attachments.push(Attachment { label: label(1), marker: tag("you", "q"), info: Default::default() });
-        assert_eq!(
-            crate::attach::expand(&mut app, "look [Quote #1] here"),
-            "<selection from=\"you\">\nq\n</selection>\nlook here"
-        );
+        assert_eq!(crate::attach::expand(&mut app, "look [Quote #1] here"), "look <selection from=\"you\" n=\"1\">\nq\n</selection> here");
     }
 
     #[test]
