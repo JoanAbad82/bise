@@ -6,9 +6,4 @@
 
 /** hand-written spacing lengths per stylesheet (path under src/) */
 export const PENDING_SPACING: Readonly<Record<string, number>> = {
-  'ds/css/board.css': 14,
-  'ds/css/live.css': 2,
-  'ds/css/md.css': 1,
-  'ds/css/sideviews.css': 5,
-  'ds/gallery/gallery.css': 11,
 };

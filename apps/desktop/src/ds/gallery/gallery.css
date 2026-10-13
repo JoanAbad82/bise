@@ -1,21 +1,21 @@
 /* src/ds · the gallery page's own frames (not the design system's): each section, dark | light. */
 html,body{margin:0;background:#777}
-.g-page{display:flex;flex-direction:column;gap:18px;padding:18px}
-.g-sec{display:flex;flex-direction:column;gap:6px}
+.g-page{display:flex;flex-direction:column;gap:var(--gap-section);padding:var(--s-4)}
+.g-sec{display:flex;flex-direction:column;gap:var(--s-2)}
 .g-h{margin:0;font:600 12px/1 -apple-system,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#fff}
-.g-themes{display:grid;grid-template-columns:repeat(2,minmax(0,560px));gap:12px}
+.g-themes{display:grid;grid-template-columns:repeat(2,minmax(0,560px));gap:var(--gap-block)}
 .g-sec.wide .g-themes{grid-template-columns:minmax(0,1000px)}
-.g-theme{padding:16px;border-radius:12px;background:var(--c-canvas);color:var(--c-text)}
-.g-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.g-row+.g-row{margin-top:10px}
+.g-theme{padding:var(--s-4);border-radius:12px;background:var(--c-canvas);color:var(--c-text)}
+.g-row{display:flex;flex-wrap:wrap;gap:var(--s-2);align-items:center}
+.g-row+.g-row{margin-top:var(--s-2)}
 .g-top{align-items:flex-start}
 .g-cell{min-width:90px}
 .g-cell>.b-bar{width:90px}
-.g-col{display:flex;flex-direction:column;gap:10px}
+.g-col{display:flex;flex-direction:column;gap:var(--s-2)}
 .g-side{display:flex;width:var(--sidebar);min-height:300px}
 .g-side>.b-side{flex:1}
-.g-main{display:flex;flex-direction:column;gap:12px;background:var(--c-surface);border-radius:var(--r-3)}
+.g-main{display:flex;flex-direction:column;gap:var(--gap-block);background:var(--c-surface);border-radius:var(--r-3)}
 /* stills for the visual check: no motion, no blinking caret */
 .g-still *,.g-still *::before,.g-still *::after{animation:none !important;transition:none !important}
-.g-md{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
-.g-tui{margin:0;padding:12px;border-radius:8px;background:var(--c-solid);color:var(--md-text);font:var(--t-12) var(--font-mono);white-space:pre-wrap;overflow:hidden}
+.g-md{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--gap-section);align-items:start}
+.g-tui{margin:0;padding:var(--s-3);border-radius:8px;background:var(--c-solid);color:var(--md-text);font:var(--t-12) var(--font-mono);white-space:pre-wrap;overflow:hidden}

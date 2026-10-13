@@ -21,7 +21,7 @@
 .b-spot .in .tx input::placeholder{color:var(--c-text-3)}
 /* a still's caret (SpotStill), inline before the placeholder: the composer's caret, drawn in the
    spotlight (the reference nested a .b-composer .in there, which .b-spot .in turns into a flex row) */
-.b-spot .in .tx>.cur{display:inline-block;width:2px;height:1.1em;margin-right:2px;background:var(--c-text);vertical-align:-.2em;animation:b-blink 1s steps(1) infinite}
+.b-spot .in .tx>.cur{display:inline-block;width:2px;height:1.1em;background:var(--c-text);vertical-align:-.2em;animation:b-blink 1s steps(1) infinite}
 
 /* never by color alone (bar N2, NO_COLOR's stand-in): with macOS increase contrast (prefers-contrast:
    more) or forced colors, every color cue also gets a glyph or a shape. Always on, without the media:
@@ -70,4 +70,4 @@
 .b-opt:focus-visible,.b-row:focus-visible,.b-mi:focus-visible,.b-task:focus-visible{outline:0;box-shadow:inset 0 0 0 2px var(--c-focus)}
 .b-toggle:focus-visible,.b-check:focus-visible{outline:0;box-shadow:0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
 /* a group row's check sits on the label's line: .b-gi .l span{display:block} (the sub) also caught the check (round 3 shots) */
-.b-gi .l>.b-check{display:inline-flex;margin-right:6px;vertical-align:-3px}
+.b-gi .l>.b-check{display:inline-flex;margin-right:var(--gap-inline);vertical-align:-3px}

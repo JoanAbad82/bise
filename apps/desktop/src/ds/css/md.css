@@ -5,7 +5,7 @@
 .b-md{color:var(--md-text)}
 .b-md strong,.b-md b{color:var(--md-strong);font-weight:700}
 .b-md em,.b-md i{color:var(--md-em);font-style:italic}
-.b-md :not(pre)>code{color:var(--md-code);font-weight:600;padding:0 2px}
+.b-md :not(pre)>code{color:var(--md-code);font-weight:600;padding:0 var(--s-1)}
 .b-md h1,.b-md h2,.b-md h3,.b-md h4,.b-md h5,.b-md h6{color:var(--md-heading);font-weight:700}
 .b-md a{color:var(--md-link);text-decoration:underline;text-decoration-color:var(--md-link-line);text-underline-offset:2px}
 .b-md a:hover{text-decoration-thickness:2px}
