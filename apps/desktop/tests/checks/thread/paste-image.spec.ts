@@ -113,9 +113,12 @@ test("thread/paste-image: ⌘V of a PNG in bise main's composer is a chip, ⏎ s
     expect(path.isAbsolute(f), f).toBe(true);
     expect(f, "in the image store, the TUI's").toMatch(/\/images\/[0-9a-f]{64}\.png$/u);
     expect(readFileSync(f).equals(readFileSync(PNG_FILE)), `${f} holds the PNG's bytes`).toBe(true);
+    // positional quotes (8ed6bf27, architect m_22341): no text beside parts, the hub renders
+    // the model's text from them; the label, one space, his words are the parts above
+    // (qa-native's R41 read: never '[Image #1]what…')
     const text = typeof sent['text'] === 'string' ? sent['text'] : '';
-    expect(text, "the label, one space, his words (qa-native's R41 read: never '[Image #1]what…')").toBe('[Image #1] what is wrong in this');
-    expect(text, 'no path in his words').not.toContain(f);
+    expect(text, `no text beside parts: ${JSON.stringify(sent)}`).toBe('');
+    expect(JSON.stringify(parts.filter((p) => p['kind'] === 'text')), 'no path in his words').not.toContain(f);
   } finally {
     await s.close();
   }
