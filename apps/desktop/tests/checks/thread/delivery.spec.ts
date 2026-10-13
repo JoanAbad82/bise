@@ -133,6 +133,13 @@ test("thread/delivery: ✓ got it faint, ✓✓ read it dim after the time under
         await page.getByTestId('thread.you.6').evaluate((el) => { el.scrollIntoView({ block: 'center' }); });
         await page.waitForTimeout(150);
         await page.screenshot({ path: test.info().outputPath(`delivery-${t}-${String(w)}-a.png`) });
+        // the list is virtual: at 600 the last bubbles aren't drawn while 6 sits in the middle; to
+        // the end first, then the row (amb-feed m_22774: 'thread.you.15' never came)
+        await page.locator('[data-testid="thread.list"]').evaluate((el) => {
+          const sc = el.querySelector<HTMLElement>('[data-virtuoso-scroller]') ?? el;
+          sc.scrollTop = sc.scrollHeight;
+        });
+        await expect(page.getByTestId('thread.you.15')).toBeAttached({ timeout: 5000 });
         await page.getByTestId('thread.you.15').evaluate((el) => { el.scrollIntoView({ block: 'end' }); });
         await page.waitForTimeout(150);
         await page.screenshot({ path: test.info().outputPath(`delivery-${t}-${String(w)}-b.png`) });
