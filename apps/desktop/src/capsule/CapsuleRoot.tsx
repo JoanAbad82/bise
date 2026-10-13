@@ -17,7 +17,7 @@ import { newAgent } from "@/agents/actions";
 import { InboxCard } from "@/inbox";
 import { cardKeyOf } from "@/inbox/Strip";
 import type { Card, Grant, HelperEv } from "@/proto";
-import { threadKey, useHeard, useLevel, usePrefs, useProjects, useStore } from "@/store";
+import { threadKey, useHeard, useLevel, usePrefs, useProjects, useShot, useStore } from "@/store";
 import { followPartial, type LivePartial } from "@/shared/partial";
 import type { SpotAnswer, SpotFront, SpotItem, SpotRoute } from "@/spotlight";
 import { W } from "@/spotlight/words";
@@ -25,7 +25,7 @@ import { useTheme } from "@/theme";
 import "@/ds/index.css";
 import { Capsule, menuCards } from "./Capsule";
 import { answeredOver, errorOver, heardOver, OVER_FADE_MS } from "./over";
-import { asksForScreen, shotPref } from "./shot";
+import { asksForScreen, shotOf, shotPref } from "./shot";
 import { useAgentPreview, useSpotData } from "./data";
 import { START, step, type CapEvent, type Fx, type State } from "./machine";
 
@@ -82,12 +82,20 @@ export function CapsuleRoot(): JSX.Element {
     const now = inTalk && !ask.shown && asksForScreen(screen, shotOn);
     setAsk({ talk: inTalk, shown: ask.shown || now, on: now });
   }
+  // the still the core took at fn down (null: none, dropped, sent); its drop is the core's
+  const storeShot = useShot();
+  const shot = useMemo(() => (storeShot === null ? null : shotOf(storeShot)), [storeShot]);
+  const dropShot = useCallback(() => {
+    store.command({ cmd: "shot_drop" });
+  }, [store]);
+  const shotRef = useRef(shot);
   // the helper's fn keys read these: fn+n on the tray menu opens its row n (one-inbox 3)
   const viewRef = useRef(view);
   const menuRef = useRef(menuCards(spot));
   useEffect(() => {
     viewRef.current = view;
     menuRef.current = menuCards(spot);
+    shotRef.current = shot;
   });
   const projects = useProjects();
   const home = projects.find((p) => p.home)?.project ?? null;
@@ -325,6 +333,10 @@ export function CapsuleRoot(): JSX.Element {
         // fn+n on the tray menu answers its row n in place (one-inbox 3)
         const c = menuRef.current[Number(ev.key) - 1];
         if (c !== undefined) dispatch({ ev: "open_card", id: c.id });
+      } else if (ev.ev === "fn" && ev.act === "key" && ev.key === "delete") {
+        // fn ⌫ while he talks: the still goes, the talk goes on (designer m_21903)
+        const v = viewRef.current;
+        if (v.kind === "talk" && v.phase === "listen" && shotRef.current !== null) dropShot();
       } else if (ev.ev === "fn") dispatch({ ev: "fn", act: ev.act, key: ev.key });
       else if (ev.ev === "front") setFront(frontOf(ev));
       else if (ev.ev === "perms") setScreen(ev.screen);
@@ -342,7 +354,7 @@ export function CapsuleRoot(): JSX.Element {
       offHelper();
       offState();
     };
-  }, [bise, keepWithBise]);
+  }, [bise, keepWithBise, dropShot]);
 
   // a card opened from the spotlight's waiting row has the keyboard (the spotlight had it): its
   // digits pick, esc goes back to the list, ⏎ opens it in bise, ⌘⌫ closes it (the strip's keys)
@@ -441,6 +453,8 @@ export function CapsuleRoot(): JSX.Element {
       still={still}
       card={cardOf}
       route={route}
+      shot={shot}
+      onShotDrop={dropShot}
       screenAsk={
         ask.on
           ? {
