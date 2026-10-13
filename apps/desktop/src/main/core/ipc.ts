@@ -16,6 +16,7 @@ import { Latest } from '../../shared/latest';
 import { CoreProcess } from './process';
 import { DictationRoutes, type Route } from './dictation';
 import { SubRoutes } from './subs';
+import type { SendResult } from '../../proto';
 
 let core: CoreProcess | null = null;
 // the last state events, for a window or a main-side listener that comes after they went out
@@ -26,6 +27,11 @@ const dictations = new DictationRoutes();
 // the threads each window follows: the core has one set per project (subs.ts)
 const subs = new SubRoutes();
 const watched = new Set<number>();
+// A1 (architect m_21449): a send's result carries its message id; it goes back only to the window
+// that sent it (its cid is that window's own counter), as the window-local event 'sent' (echo.ts)
+const sends = new Map<string, number>();
+const sendKey = (c: Readonly<Record<string, unknown>>): string | null =>
+  c['cmd'] === 'send' && typeof c['cid'] === 'number' ? `${String(c['project'])}/${String(c['agent'])}/${String(c['cid'])}` : null;
 // how its last run ended (exit.ts), sent with every state: null until it ended once
 let lastExit: CoreExit | null = null;
 
@@ -101,6 +107,8 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
       return;
     }
     dictations.sent(e.sender.id, cmd);
+    const sk = typeof cmd === 'object' && cmd !== null ? sendKey(cmd as Record<string, unknown>) : null;
+    if (sk !== null) sends.set(sk, e.sender.id);
     // a window whose mic, voice mode or held /model (R8) must end with it
     if (name === 'dictate_start' || name === 'voice_mode' || name === 'slash' || name === 'subscribe') watch(e.sender);
     // an unsubscribe another window still needs stays here (R18)
@@ -179,11 +187,23 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
         for (const l of [...listeners]) l(ev);
         broadcast(CORE_IPC.ev, ev);
       },
+      onAnswer: (cmd, result) => {
+        const sk = sendKey(cmd);
+        const to = sk === null ? undefined : sends.get(sk);
+        if (sk === null || to === undefined) return;
+        sends.delete(sk);
+        // turn/send's result (bise-proto rpc SendResult); an older hub answers {}: msg_id null,
+        // the window falls back to the words
+        const id = (result as SendResult | null)?.msg_id ?? null;
+        const ev = { ev: 'sent', project: cmd['project'], agent: cmd['agent'], cid: cmd['cid'], msg_id: id };
+        toWindow({ to: 'window', window: to, ev });
+      },
       onState: (s) => {
         // a new core starts from nothing: it says its state again
         if (s === 'starting') {
           latest.clear();
           subs.clear();
+          sends.clear();
         }
         // a core gone took its mic with it: its dictations end
         if (s !== 'up') for (const r of dictations.coreGone()) toWindow(r);

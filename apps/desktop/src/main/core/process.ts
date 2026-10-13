@@ -29,6 +29,8 @@ export interface CoreHooks {
   readonly report?: (exit: CoreExit, tail: string) => string | null;
   /** a log line of main (not the core's stderr, which goes to the log file) */
   readonly log: (line: string) => void;
+  /** a request's result (not its error): the command as the window sent it, and what the core answered (A1) */
+  readonly onAnswer?: (cmd: Readonly<Record<string, unknown>>, result: unknown) => void;
 }
 
 export interface CoreOptions {
@@ -54,9 +56,9 @@ export class CoreProcess {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private readonly backoff = new Backoff();
   private stateNow: CoreState = 'down';
-  /** this run's next request id (0 is its initialize) and the methods waiting for their answer */
+  /** this run's next request id (0 is its initialize) and the requests waiting for their answer */
   private nextId = 1;
-  private readonly waiting = new Map<number, string>();
+  private readonly waiting = new Map<number, { readonly method: string; readonly cmd: Readonly<Record<string, unknown>> }>();
   /** the crashes of the last 10 min (exit.ts crashLoop) */
   private crashTimes: number[] = [];
   /** the third crash in 10 min, or a second early end alike: no restart until 'start bise' (restart()) */
@@ -144,7 +146,7 @@ export class CoreProcess {
       return false;
     }
     this.nextId += 1;
-    this.waiting.set(id, req.method);
+    this.waiting.set(id, { method: req.method, cmd: cmd as Readonly<Record<string, unknown>> });
     c.stdin.write(req.line);
     return true;
   }
@@ -170,9 +172,10 @@ export class CoreProcess {
       this.setState('up');
       return;
     }
-    const method = l.id === null ? undefined : this.waiting.get(l.id);
+    const asked = l.id === null ? undefined : this.waiting.get(l.id);
     if (l.id !== null) this.waiting.delete(l.id);
-    if (l.error !== null) this.hooks.log(refusedLog(method ?? 'a request', l.error));
+    if (l.error !== null) this.hooks.log(refusedLog(asked?.method ?? 'a request', l.error));
+    else if (asked !== undefined) this.hooks.onAnswer?.(asked.cmd, l.result);
   }
 
   private setState(s: CoreState): void {

@@ -66,8 +66,6 @@ import {
   sameJson,
   sameOrder,
   sameStrings,
-  sentParts,
-  sentWords,
   takeKey,
   threadKey,
   type ThreadOrder,
@@ -78,6 +76,7 @@ import {
   type VoiceModeState,
 } from "./types";
 import { applyTyped } from "./apply";
+import { answered, echoOf, keepLanded, sentOf, type Sent } from "./echo";
 const EMPTY_ORDER: ThreadOrder = {
   order: [],
   before: null,
@@ -99,6 +98,7 @@ interface Thread {
   byPos: Map<number, Entry>;
   typing: string;
   pending: readonly Pending[];
+  landedIds?: readonly number[]; // A1: his ids that landed before their send's answer (echo.ts)
 }
 
 type Listener = () => void;
@@ -405,6 +405,8 @@ export class Store {
 
   /** Applies one raw event from the core; false when it isn't one the store knows. */
   apply(raw: unknown): boolean {
+    const sent = sentOf(raw);
+    if (sent !== null) return this.sendAnswered(sent);
     const ev = typed(raw);
     if (ev === null) return false;
     this.applyTyped(ev);
@@ -538,26 +540,24 @@ export class Store {
     }
   }
 
-  /** His message landed in the thread: the oldest pending send with the same message goes. */
+  /** His message landed: its pending send goes, by its id (A1, echo.ts); no row: its id is kept. */
   private landed(key: string, t: Thread, e: Entry): void {
-    // msg-parts: a send with typed parts comes back with them (the hub's text is the model's
-    // template, never the window's): compared by parts; else by words, the hub's image markers
-    // ('<image name="[Image #1]" …>') left out (qa-native R41). architect's A1 matches by id later.
-    // Only an entry written after the send can be its echo: an older one with the same words (a
-    // page, or an old entry sent again with its steered_at) never takes a new send's row.
-    const typed =
-      e.parts != null && e.parts.length > 0 ? sentParts(e.parts) : null;
-    const said = sentWords(e.text);
-    const i = t.pending.findIndex(
-      (p) =>
-        e.at_ms >= p.at_ms - ECHO_SLACK_MS &&
-        (typed !== null && p.parts !== undefined
-          ? sentParts(p.parts) === typed
-          : sentWords(p.text) === said),
-    );
+    const i = echoOf(t.pending, e, ECHO_SLACK_MS);
+    if (i < 0) t.landedIds = keepLanded(t.landedIds, e.msg_id);
     if (i < 0) return;
     t.pending = t.pending.filter((_, j) => j !== i);
     this.emit(`pending:${key}`);
+  }
+
+  /** A1: the window-local 'sent' (main's ipc.ts): the send `cid` has its message id. Always a known event. */
+  private sendAnswered(s: Sent): true {
+    const key = threadKey(s.project, s.agent);
+    const t = this.threads.get(key);
+    const next = t && answered(t.pending, s, new Set(t.landedIds));
+    if (t === undefined || next == null) return true;
+    t.pending = next;
+    this.emit(`pending:${key}`);
+    return true;
   }
 
   /**

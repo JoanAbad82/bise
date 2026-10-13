@@ -153,6 +153,9 @@ export interface Pending {
   readonly at_ms: number;
   readonly state: 'sending' | 'failed';
   readonly why?: string;
+  /** A1: the message id the hub answered the send with (echo.ts); null: answered without one (an
+   *  older hub); absent: not answered yet */
+  readonly msgId?: number | null;
 }
 
 /** A thread's list, as the list draws it: replaced only when its order, before or more change. */
