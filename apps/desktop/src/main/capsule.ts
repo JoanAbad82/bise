@@ -121,8 +121,14 @@ export class Capsule {
     let n = 0;
     this.fading = setInterval(() => {
       n += 1;
-      if (this.win.isDestroyed()) return this.stopFade();
-      if (n < FADE_STEPS) return this.win.setOpacity(1 - n / FADE_STEPS);
+      if (this.win.isDestroyed()) {
+        this.stopFade();
+        return;
+      }
+      if (n < FADE_STEPS) {
+        this.win.setOpacity(1 - n / FADE_STEPS);
+        return;
+      }
       this.stopFade();
       this.win.hide();
     }, CORNER_FADE_MS / FADE_STEPS);
