@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, namedRows, pendingKey, repeatedReport, repeatsReport, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolSource, jsonStrField, toolTime, clock, dayLabel, entryKey, findText, groupHead, namedRows, pendingKey, repeatedReport, repeatsReport, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -345,5 +345,32 @@ describe('repeatedReport (H8: drawn as a quiet row)', () => {
     expect(repeatedReport(rep, msg)).toBe(true);
     expect(repeatedReport(rep, undefined)).toBe(false);
     expect(repeatedReport(msg, msg)).toBe(false);
+  });
+});
+
+describe("a code tool's box shows the source it ran, as the TUI's (main m_22134, code.rs tool_source)", () => {
+  const ts = JSON.stringify({ code: "async function main() {\n  const q = ['\"a\" b'];\n  return q;\n}", description: 'search the error' });
+  it("run_typescript: its 'code' field, decoded (real newlines, real quotes), never the description", () => {
+    const r = toolSource('run_typescript', ts);
+    expect(r.lang).toBe('typescript');
+    expect(r.code).toBe("async function main() {\n  const q = ['\"a\" b'];\n  return q;\n}");
+    expect(r.code).not.toContain('description');
+  });
+  it('a capped payload keeps what came', () => {
+    expect(jsonStrField('{"code":"const a = 1;\\nconst b', 'code')).toBe('const a = 1;\nconst b');
+    expect(jsonStrField('{"x":1}', 'code')).toBeNull();
+  });
+  it("bash: its command from the args, or the raw command as it came", () => {
+    expect(toolSource('bash', JSON.stringify({ arg: 'cargo test\necho ok', description: 'tests' }))).toEqual({ code: 'cargo test\necho ok', lang: 'bash' });
+    expect(toolSource('bash', 'cargo test -p perf')).toEqual({ code: 'cargo test -p perf', lang: 'bash' });
+  });
+  it('another tool keeps its code as it came, plain', () => {
+    expect(toolSource('read_file', '{"path":"a.rs"}')).toEqual({ code: '{"path":"a.rs"}', lang: '' });
+    expect(toolSource(undefined, 'npm run lint')).toEqual({ code: 'npm run lint', lang: '' });
+  });
+  it('toolLines carries it', () => {
+    const l = toolLines([{ pos: 1, at_ms: 1, name: 'run_typescript', text: 'search the error', kind: 'run', state: 'ok', ms: 400, code: ts }]).lines[0];
+    expect(l?.lang).toBe('typescript');
+    expect(l?.code.startsWith('async function main() {\n')).toBe(true);
   });
 });

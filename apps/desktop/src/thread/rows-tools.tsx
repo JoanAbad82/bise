@@ -8,6 +8,7 @@ import { liveTime, useLiveStep, useSecondsSince } from './live-step';
 import { useFold } from './folds';
 import { thinkingWords } from './thinking';
 import { toolLines, type ToolLine } from './entry';
+import { Code, known } from './Code';
 import type { RowCtx } from './rows';
 import { Pulse } from '@/working/Signs';
 /**
@@ -164,7 +165,12 @@ function ToolLineRow({ l, live, runFor, project, agent }: { l: ToolLine; live: b
       {/* an empty box never shows: only with its code, its output or the hub's words about it */}
       {open && opens && (l.code !== '' || out !== '' || full !== null) && (
         <div className="th-tool-open" data-testid={`${id}.open`}>
-          {l.code !== '' && <pre className="th-tool-code">{l.code}</pre>}
+          {/* the source it ran, decoded and in its colours (the TUI's box, toolbox.rs): never its args' JSON */}
+          {l.code !== '' && (
+            <pre className="th-tool-code" data-testid={`${id}.code`} data-lang={l.lang || undefined}>
+              {known(l.lang) ? <Code text={l.code} lang={l.lang} /> : l.code}
+            </pre>
+          )}
           {out !== '' && (
             <pre className="th-tool-out" data-testid={`${id}.out`}>
               {out}

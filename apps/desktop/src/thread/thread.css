@@ -858,6 +858,11 @@
 .th-tool-code {
   color: var(--c-text);
 }
+/* its coloured source is a block, as a code block's: never .b-text code's soft fill per line (one class more than it) */
+.th-tool-open .th-tool-code code {
+  padding: 0;
+  background: none;
+}
 /* under a call's output: it was cut at 4 KB, or the hub had none (amb-feed dece0fe9) */
 .th-tool-cut {
   margin-top: var(--gap-tight);

@@ -327,6 +327,8 @@ export const TOOL_LINES = 6;
 export interface ToolLike {
   pos: number;
   at_ms: number;
+  /** the tool's name ('bash', 'run_typescript'): which language its code is */
+  name?: string | null;
   text: string;
   kind: string;
   state?: string;
@@ -350,7 +352,10 @@ export interface ToolLine {
   state: 'run' | 'ok' | 'err' | '';
   end: string;
   err: string;
+  /** the source it ran, decoded (toolSource): never its args' JSON */
   code: string;
+  /** that source's language for its colours: 'typescript', 'bash', or '' (plain) */
+  lang: string;
   out: string;
   /** an edit's line counts, '+18 −6' (dim after its words); '' when the hub has none */
   counts: string;
@@ -372,6 +377,46 @@ export function editWords(files: ToolLike['files']): { text: string; counts: str
   const add = files.reduce((n, f) => n + f.add, 0);
   const del = files.reduce((n, f) => n + f.del, 0);
   return { text: `${name}${more}`, counts: add === 0 && del === 0 ? '' : `+${String(add)} −${String(del)}` };
+}
+
+/** A JSON string field's value, decoded, read even from a capped payload (the TUI's render.rs
+ *  json_str_field): a cut string keeps what came. Pure. */
+export function jsonStrField(s: string, field: string): string | null {
+  const m = new RegExp(`"${field}"\\s*:\\s*"`, 'u').exec(s);
+  if (m === null) return null;
+  let out = '';
+  const esc: Record<string, string> = { n: '\n', t: '\t', r: '\r', '"': '"', '\\': '\\', '/': '/' };
+  for (let i = m.index + m[0].length; i < s.length; i++) {
+    const c = s[i] ?? '';
+    if (c === '"') return out;
+    if (c !== '\\') {
+      out += c;
+      continue;
+    }
+    const n = s[i + 1];
+    i++;
+    if (n === undefined) return out + '\\';
+    if (n === 'u' && /^[0-9a-f]{4}$/iu.test(s.slice(i + 1, i + 5))) {
+      out += String.fromCharCode(parseInt(s.slice(i + 1, i + 5), 16));
+      i += 4;
+    } else out += esc[n] ?? `\\${n}`;
+  }
+  return out;
+}
+
+/**
+ * The source a code tool ran, as the TUI shows it in its box (code.rs tool_source): run_typescript's
+ * 'code' field, bash's command, decoded, never the args' JSON (his shot, main m_22134); its
+ * description is the row's words already. Anything else: its code as it came. Pure.
+ */
+export function toolSource(name: string | null | undefined, code: string): { code: string; lang: string } {
+  const json = code.trimStart().startsWith('{');
+  if (name === 'run_typescript' || (json && name == null && /"code"\s*:/u.test(code))) return { code: (json ? jsonStrField(code, 'code') : null) ?? code, lang: 'typescript' };
+  if (name === 'bash') {
+    const cmd = json ? (jsonStrField(code, 'command') ?? jsonStrField(code, 'arg') ?? jsonStrField(code, 'cmd')) : null;
+    return { code: cmd ?? code, lang: 'bash' };
+  }
+  return { code, lang: '' };
 }
 
 /** A call's own time, the TUI's: '0.3 s', '4.1 s', '12 s', '1 m 4 s'. Pure. */
@@ -418,7 +463,7 @@ export function toolLines(items: readonly ToolLike[]): {
       state: t.state === 'run' || t.state === 'ok' || t.state === 'err' ? t.state : '',
       end: toolEnd(t, time),
       err: failed ? (t.err ?? '').trim() : '',
-      code: t.code ?? '',
+      ...toolSource(t.name, t.code ?? ''),
       out: t.out ?? '',
     };
     if (((t.kind === 'run' || t.kind === 'edit') && lines.length < TOOL_LINES) || failed) lines.push(line);

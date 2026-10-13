@@ -6,6 +6,20 @@ import { memo, type CSSProperties } from 'react';
 import { Highlight, Prism, type PrismTheme } from 'prism-react-renderer';
 import { staggerOf } from './fade';
 
+// prism-react-renderer bundles no shell grammar: a small one, so a bash call's box has the TUI's
+// colours too (code.rs highlight_bash: comments, strings, variables, keywords, flags, operators)
+if (!('bash' in Prism.languages)) {
+  Prism.languages['bash'] = {
+    comment: { pattern: /(^|\s)#.*/, lookbehind: true },
+    string: { pattern: /"(?:\\.|[^"\\])*"|'[^']*'/, greedy: true },
+    variable: /\$(?:\{[^}]*\}|\w+|[@*#?$!0-9])/,
+    keyword: /\b(?:if|then|else|elif|fi|for|while|until|do|done|case|esac|in|function|return|export|local|set|cd|echo)\b/,
+    property: /(^|\s)--?[\w-]+/,
+    operator: /&&|\|\||[|;&<>]/,
+    number: /\b\d+\b/,
+  };
+}
+
 // The TUI's syntax.rs style(): its token kinds on the ds's markdown roles (src/ds/md-tokens.css,
 // theme.rs syntax_*): keywords bold, comments italic, punctuation dim (amb-kit, lead m_11457).
 export const THEME: PrismTheme = {
