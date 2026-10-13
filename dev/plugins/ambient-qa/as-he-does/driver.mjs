@@ -497,7 +497,9 @@ if (mode === 'rows2') {
   await page.keyboard.press('Control+1');
   // the dock's options carry the composer's id (composer.opt.<n>, ds/composer.tsx); dock.opt before 6ac92eb4
   // b4a25acb: the item opens as the inbox card in the strip's dock, its options strip.card.<key>.opt.<n> (InboxCard.tsx)
-  const OPT = '[data-testid^="strip.card"][data-testid*=".opt."], [data-testid^="composer.opt"], [data-testid^="dock.opt"]';
+  // b51422c0: in bise's thread the item opens in the inbox block itself (Block.tsx's InboxCard,
+  // default id inbox.card.<project>-<id>, options inbox.card.<project>-<id>.opt.<n>)
+  const OPT = '[data-testid^="strip.card"][data-testid*=".opt."], [data-testid^="inbox.card"][data-testid*=".opt."], [data-testid^="composer.opt"], [data-testid^="dock.opt"]';
   const inPlace = await until(async () => ((await page.locator(OPT).count()) > 0 ? true : null), 8000, 400);
   await shot('inbox-ctrl-1');
   step('⌃1 opens the item in place (its options in the dock; ⌘I = native menu, not reachable by CDP)', !!inPlace, ((await text('[data-testid="app.main"]')) ?? '').slice(-300));

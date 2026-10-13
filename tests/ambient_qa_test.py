@@ -855,8 +855,21 @@ def real_shape_pure():
           and rs.is_breach(vibe, True, {17193}, cand, [{"name": "Finder", "pid": 600, "bundle": cand}]), "candidate in the chain = breach")
     check(rs.is_breach(vibe, True, {17193}, cand, None) and rs.is_breach(vibe, True, {17193}, cand, [])
           and rs.is_breach(vibe, True, {17193}, cand, [{"name": "node", "pid": 777, "bundle": None}]), "unknown chain = breach")
-    check(rs.is_breach({"name": "System Settings", "pid": 902, "bundle": "com.apple.systempreferences"}, True, {17193}, cand, raycast)
-          and rs.is_breach(dict(vibe, pid=17193), True, {17193}, cand, raycast), "FRONT_BAD or a pid of ours via Raycast = breach")
+    check(rs.is_breach(dict(vibe, pid=17193), True, {17193}, cand, raycast), "a pid of ours via Raycast = breach")
+    # FRONT_BAD follows the same rule (ambient-lead m_21528; b51422c0's run stopped on his own Raycast -> System Settings)
+    settings = {"name": "System Settings", "pid": 30883, "bundle": "com.apple.systempreferences"}
+    check(not rs.is_breach(settings, True, {58465}, cand, raycast)
+          and not rs.is_breach(settings, True, {58465}, cand, [{"name": "Dock", "pid": 700, "bundle": "com.apple.dock"}]), "Settings via Raycast/Dock = his switch")
+    check(rs.is_breach(settings, True, {58465}, cand, [{"name": "tccd", "pid": 410, "bundle": None}])
+          and rs.is_breach(settings, True, {58465}, cand, [{"name": "UserNotificationCenter", "pid": 15030, "bundle": "com.apple.UserNotificationCenter"}])
+          and rs.is_breach(settings, True, {58465}, cand, [{"name": "bise cand", "pid": 58465, "bundle": cand}])
+          and rs.is_breach(settings, True, {58465}, cand, [{"name": "Raycast", "pid": 2026, "bundle": "com.raycast.macos"}, {"name": "bise cand", "pid": 58465, "bundle": cand}])
+          and rs.is_breach(dict(settings, pid=58465), True, {58465}, cand, raycast)
+          and rs.is_breach(settings, True, {58465}, cand, None)
+          and rs.is_breach(settings, True, {58465}, cand, [{"name": "node", "pid": 777, "bundle": None}]),
+          "Settings via tccd / UserNotificationCenter / our pid / unknown chain = breach")
+    check(rs.is_breach(settings, False, None, cand, raycast), "Settings already running, brought front = breach")
+    check(rs.is_breach({"name": "SecurityAgent", "pid": 903, "bundle": "com.apple.SecurityAgent"}, True, {58465}, cand, None), "SecurityAgent, no his chain = breach")
     line = ("00:18:13.142 Df runningboardd[416:1cb202e] [com.apple.runningboard:ttl] Acquiring assertion targeting "
             "[osservice<com.apple.UserNotificationCenterAgent(501)>:15030] from originator [osservice<com.apple.coreservices.launchservicesd>:378] with descript")
     check(rs.originator(line, 15030) == "osservice<com.apple.coreservices.launchservicesd>:378" and rs.originator(line, 1) is None,

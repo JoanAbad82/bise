@@ -519,7 +519,12 @@ def is_breach(info, started_after, run_pids=None, cand_bundle=None, chain=None):
     when he brought his app to the front). With the candidate's own bundle id (ambient-lead m_20669:
     candidates are built as dev.bise.desktop.cand, never his app's id), that id in front is ours,
     whatever its pid. An app started after the run began that he launched (his_launch on its chain)
-    is his switch too, unless it is one of FRONT_BAD or a pid of ours. Pure."""
+    is his switch too, unless it is a bise app or a pid of ours. FRONT_BAD follows the same rule
+    (ambient-lead m_21528, after b51422c0's run stopped on his own Raycast -> System Settings):
+    started after the run by his launcher with a clean chain = his; a TCC prompt's 'open settings'
+    (tccd, UserNotificationCenter, our pid, an unknown chain) stays a breach, and a FRONT_BAD app
+    that was already running is a breach (its launch chain says nothing about who brought it
+    front). Pure."""
     if cand_bundle and info.get("bundle") == cand_bundle:
         return True
     if run_pids is not None and info.get("pid") and int(info["pid"]) not in run_pids and not started_after:
@@ -527,7 +532,7 @@ def is_breach(info, started_after, run_pids=None, cand_bundle=None, chain=None):
     # any bise app (dev.bise.*, 'bise try', 'bise cand') coming front during a run, whatever its
     # launcher, is a breach (main m_21421); his own app there before the run is handled just above
     bise_app = (info.get("bundle") or "").startswith("dev.bise.") or info["name"] in ("bise", "bise try", "bise cand")
-    if (started_after and not bise_app and info["name"] not in FRONT_BAD and not (run_pids and info.get("pid") in run_pids)
+    if (started_after and not bise_app and not (run_pids and info.get("pid") in run_pids)
             and his_launch(chain, run_pids, cand_bundle)):
         return False
     return info["name"] in FRONT_BAD or bool(started_after)
