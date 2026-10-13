@@ -1222,8 +1222,10 @@ async function newRows(harness, say) {
     await page.waitForTimeout(2500);
     const afterEsc = { keyLine: await keyLine(), stopping: (await page.locator('[data-testid="thread.stopping"]').count()) > 0 };
     step('esc during a turn does not stop it (the turn still runs 2.5 s later)', !!working && afterEsc.keyLine && !afterEsc.stopping, { working: !!working, afterEsc });
+    // esc with words puts them away to history (keys.ts putAway, ↑ brings them back): a new draft
+    // for ctrl+c to keep
     await field.click({ timeout: 3000 }).catch(() => {});
-    await page.keyboard.press('End');
+    await page.keyboard.type('garde ça', { delay: 10 });
     await page.keyboard.press('Control+c');
     const stopping = await until(async () => {
       const s = (await page.locator('[data-testid="thread.stopping"]').count()) > 0;
@@ -1283,8 +1285,11 @@ async function newRows(harness, say) {
       const b = mine.at(-1);
       if (!b) return null;
       const t = b.textContent ?? '';
-      const q = b.querySelector('[data-kind="quote"], [class*="quote"]');
-      return { text: t.slice(0, 300), quote: q ? (q.textContent ?? '').slice(0, 120) : null, order: q ? [t.indexOf('before'), t.indexOf(q.textContent ?? '\u0000'), t.indexOf('after')] : null };
+      // the bubble's own words (its text parts, not the quote card above them): before, the chip, after
+      const parts = b.querySelector('[data-testid$=".parts"]') ?? b;
+      const words = (parts.textContent ?? '').replace(/\s+/g, ' ');
+      const chip = words.search(/[❝“"]\s*1/);
+      return { text: t.slice(0, 300), words: words.slice(0, 200), order: [words.indexOf('before'), chip, words.indexOf('after', Math.max(chip, 0))] };
     }), 10000, 500);
     await shot('quote-mid-sentence-bubble');
     const inPlace = (o) => !!o && o[0] >= 0 && o[1] > o[0] && o[2] > o[1];
@@ -1360,12 +1365,9 @@ async function newRows(harness, say) {
     let frame = null;
     const cp = capPage();
     if (cp) {
+      // Electron's CDP has no Browser.getWindowForTarget: the page's own window.screenX/Y is its frame
       try {
-        const s = await cp.context().newCDPSession(cp);
-        const { targetInfo } = await s.send('Target.getTargetInfo');
-        const b = await browser.newBrowserCDPSession();
-        const w = await b.send('Browser.getWindowForTarget', { targetId: targetInfo.targetId });
-        frame = { bounds: w.bounds, screen: await cp.evaluate(() => ({ w: window.screen.width, h: window.screen.height })) };
+        frame = await cp.evaluate(() => ({ bounds: { left: window.screenX, top: window.screenY, width: window.outerWidth, height: window.outerHeight }, screen: { w: window.screen.width, h: window.screen.height } }));
       } catch (e) { frame = { error: String(e).slice(0, 200) }; }
       try { await cp.screenshot({ path: path.join(out, `${mode}${tag}-corner-card.png`) }); res.shots.push(path.join(out, `${mode}${tag}-corner-card.png`)); save(); } catch { /* the steps say enough */ }
     }
