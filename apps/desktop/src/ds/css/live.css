@@ -31,7 +31,8 @@
   /* a dot: a ring with its state's glyph, in its state's color */
   .b-dot{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:none;box-shadow:inset 0 0 0 1.5px currentColor;color:var(--c-text-2);font:700 9px/1 var(--font-ui);animation:none;opacity:1}
   .b-dot.lg{width:16px;height:16px;font-size:10px}
-  .b-dot.wk{color:var(--c-text)}.b-dot.wk::before,.b-dot.wk::after{content:none}
+  /* working: the still '∿' in ink (bar N2's glyph) in place of the breath, so it reads without its tones */
+  .b-dot.wk{color:var(--c-text)}.b-dot.wk::before{content:none}.b-dot.wk>.wk-sign{display:none}.b-dot.wk::after{content:"∿"}
   .b-dot.nd{color:var(--c-accent);box-shadow:inset 0 0 0 1.5px currentColor}.b-dot.nd::after{content:"?"}
   .b-dot.ok{color:var(--c-ok)}.b-dot.ok::after{content:"✓"}
   .b-dot.er{color:var(--c-err)}.b-dot.er::after{content:"!"}
