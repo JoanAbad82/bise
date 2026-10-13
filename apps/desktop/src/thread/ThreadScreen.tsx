@@ -11,7 +11,7 @@ import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, us
 import { Button, Head, Marker, Press } from '@/ds';
 import { Composer, flashWords, useApprovalsFlash, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer';
-import type { Part } from '@/proto';
+import type { Card, Part } from '@/proto';
 import { quoteFrom, quoteKey, quoteText } from './quote';
 import type { Outgoing } from '@/composer/message';
 import { threadKey, useAgents, useApprovals, useModels, useCards, useCommands, useCoreState, useEntry, useFiles, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
@@ -121,6 +121,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
   const voice = useVoiceHere(project, agent);
   const typing = useTyping(tkey);
   const busy = me?.status === 'working' || typing !== '';
+  // an open artifact's block lists only its maker's own items (this thread's agent)
+  const onlyMaker = useCallback((c: Card) => c.project === project && c.agent === agent, [project, agent]);
 
   // ⌘F's bar stays open across a reload (keep.ts: an open panel, no age); its folds too
   const findKey = `find.open:${project}/${agent}`;
@@ -441,9 +443,13 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
         <RefusedLine project={project} name={bise ? 'bise' : (projectName ?? project)} className="app-refused th-refused" testId="thread.refused" />
         <CardHint project={project} />
         {/* b1/b2: every project's open items, one opened in place (amb-home's InboxBlock, eb3da983) */}
-        {/* beside an open artifact the one composer is the maker's: main's inbox is not on this screen
-            (the maker's own question docks here with amb-home's InboxBlock 'only', after its 2b) */}
-        {artifact === undefined && <InboxBlock here={bise ? HERE_BISE : { project, agent }} onAnswer={setAnswering} reading={reading} />}
+        {artifact === undefined ? (
+          <InboxBlock here={bise ? HERE_BISE : { project, agent }} onAnswer={setAnswering} reading={reading} />
+        ) : (
+          // beside an open artifact: only the maker's own question, docked over its one composer
+          // (designer's artifact-open (g)); main's inbox is not on this screen
+          <InboxBlock here={{ project, agent: artifact.agent ?? agent }} only={onlyMaker} onAnswer={setAnswering} reading={reading} />
+        )}
         {me?.archived === true && artifact === undefined ? (
           <History project={project} agent={agent} />
         ) : voice === 'pane' ? (

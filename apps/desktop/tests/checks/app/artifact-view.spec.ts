@@ -113,8 +113,10 @@ for (const theme of ['light', 'dark']) {
       await expect(page.locator('[data-testid="composer.field"]'), 'one composer on the screen').toHaveCount(1);
       // the page itself, drawn by the pages server
       await expect(page.frameLocator('[data-testid="artifact.page"]').locator('h1'), 'the page is drawn').toHaveText('product page, before / after', { timeout: 10_000 });
-      // main's inbox is not on this screen (the maker's own question docks here after amb-home's 2b)
-      await expect(page.getByTestId('inbox.block'), "another agent's question is not on this screen").toHaveCount(0);
+      // only the maker's own question, docked over its one composer (designer's artifact-open (g))
+      const block = page.getByTestId('inbox.block');
+      await expect(block, "perf's question over its composer").toContainText('keep the webp next to the avif?');
+      await expect(block, "another agent's question is not on this screen").not.toContainText('ship the search index');
       // the open chip: a tint on its own line, never an ink outline
       const chip = await page.getByTestId('thread.artifact.3').evaluate((e) => {
         const c = getComputedStyle(e);
