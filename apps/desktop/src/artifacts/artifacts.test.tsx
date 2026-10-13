@@ -92,12 +92,40 @@ describe('artifacts screens', () => {
     expect(router.get()).toEqual({ screen: 'artifacts', project: 'acme-2', id: 'pr-12' });
   });
 
+  it("his keys (main m_22146), the TUI's /artifacts: the screen has them when it opens; ↓↓⏎ opens the 3rd, ↑ at the top stays, / searches", () => {
+    window.localStorage.clear();
+    const router = mount(<ArtifactsScreen />);
+    const scr = screen.getByTestId('artifacts.screen');
+    expect(document.activeElement).toBe(scr);
+    const on = () => [...screen.getByTestId('artifacts.list').querySelectorAll('[aria-selected=true]')].map((r) => r.getAttribute('data-testid'));
+    expect(on()).toEqual(['artifacts.list.row.notes']);
+    fireEvent.keyDown(document.activeElement ?? scr, { key: 'ArrowUp' });
+    expect(on()).toEqual(['artifacts.list.row.notes']);
+    // / : the search has the keys; the words narrow the list; ↓ gives the keys back and moves
+    fireEvent.keyDown(scr, { key: '/' });
+    const field = screen.getByTestId('artifacts.search');
+    expect(document.activeElement).toBe(field);
+    fireEvent.change(field, { target: { value: 'e' } });
+    fireEvent.keyDown(field, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(scr);
+    expect(on()).toEqual(['artifacts.list.row.pr-12']);
+    // esc clears the search, and the list is whole again
+    fireEvent.keyDown(scr, { key: 'Escape' });
+    expect((field as HTMLInputElement).value).toBe('');
+    fireEvent.keyDown(scr, { key: 'Home' });
+    fireEvent.keyDown(scr, { key: 'ArrowDown' });
+    fireEvent.keyDown(scr, { key: 'ArrowDown' });
+    fireEvent.keyDown(scr, { key: 'Enter' });
+    expect(router.get()).toEqual({ screen: 'artifacts', project: 'shop-1', id: 'bench' });
+  });
+
   it("panel A's list: one project's two-line rows; empty says the TUI's words", () => {
     const opened: string[] = [];
     mount(<ArtifactList project="shop-1" onOpen={(id) => opened.push(id)} />);
     const list = screen.getByTestId('artifacts.panel');
     expect(list.querySelectorAll('[role=option]').length).toBe(2);
-    fireEvent.keyDown(list, { key: 'ArrowDown' });
+    // the first row is selected when it opens (the TUI's): ⏎ opens it; ↑ at the top stays
+    fireEvent.keyDown(list, { key: 'ArrowUp' });
     fireEvent.keyDown(list, { key: 'Enter' });
     expect(opened).toEqual(['notes']);
     cleanup();
@@ -185,7 +213,6 @@ describe('artifacts screens', () => {
       const opened: string[] = [];
       mount(<ArtifactList project="shop-1" onOpen={(id) => opened.push(id)} />);
       const list = screen.getByTestId('artifacts.panel');
-      fireEvent.keyDown(list, { key: 'ArrowDown' });
       fireEvent.keyDown(list, { key: ' ' });
       expect(opened).toEqual(['notes']);
       fireEvent.keyDown(list, { key: 'ArrowDown' });

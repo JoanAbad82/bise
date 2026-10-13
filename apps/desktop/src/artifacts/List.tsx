@@ -1,8 +1,10 @@
 // The artifacts' rows (desktop-screens v6, designer m_11837): the screen's one-line rows with
 // columns (glyph, title + 'new', kind, made by, when), and panel A's two-line rows for one project
-// (amb-win's Panel.tsx mounts <ArtifactList project onOpen />). Both grouped by day; ↑↓ move, ⏎ opens,
-// space looks. Owner: amb-kit.
+// (amb-win's Panel.tsx mounts <ArtifactList project onOpen />). Both grouped by day; the list keys are
+// app/listkeys.ts's (↑↓ jk pgup pgdn home end, ⏎ opens), the row's are rowKey's (space looks, v, c, r,
+// @). Owner: amb-mac (amb-kit's before).
 import { memo, useState, type KeyboardEvent, type Ref } from 'react';
+import { useListKeys } from '@/app/listkeys';
 import { byDay, glyphOf, keyOf, kindWords, madeBy, pathOf, splitArchived, timeOf, type Item } from './model';
 import { useAllArtifacts } from './hooks';
 import { bridge, copyLink, openWithVersions, usePutInMessage } from './Open';
@@ -26,39 +28,45 @@ export interface RowsProps {
   testId: string;
 }
 
-/** ↑↓ ⏎ space over a flat list of items: the shared keys of both forms. */
-export function listKey(e: KeyboardEvent, flat: readonly Item[], sel: string | null, p: Pick<RowsProps, 'onSel' | 'onOpen' | 'onLook' | 'onPut'>): boolean {
-  const i = flat.findIndex((it) => keyOf(it) === sel);
-  const at = (k: number) => flat[Math.max(0, Math.min(flat.length - 1, k))];
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-    const next = at(i < 0 ? 0 : i + (e.key === 'ArrowDown' ? 1 : -1));
-    if (next) p.onSel(keyOf(next));
-    return true;
-  }
-  const cur = i >= 0 ? flat[i] : undefined;
-  if (cur && e.key === 'Enter') {
-    p.onOpen(cur);
-    return true;
-  }
-  if (cur && e.key === ' ') {
-    (p.onLook ?? p.onOpen)(cur);
-    return true;
-  }
-  if (cur && e.key === '@' && p.onPut) {
-    p.onPut(cur);
-    return true;
-  }
-  // v: open it with its versions shown; ⌘C: copy its link
-  if (cur && e.key === 'v' && !e.metaKey && !e.ctrlKey) {
-    openWithVersions(keyOf(cur));
-    p.onOpen(cur);
-    return true;
-  }
-  if (cur && e.key === 'c' && e.metaKey) {
+/**
+ * The selected row's keys of both forms, beside the list keys (app/listkeys.ts: ↑↓ jk pgup pgdn
+ * home end ⏎), as the TUI's /artifacts (artifacts_screen.rs on_key): space looks, @ puts it in a
+ * message, v opens it with its versions, c or ⌘C copies its link, r or o shows its file in the
+ * Finder (a browser-only one: opens it). True when it took the key.
+ */
+export function rowKey(e: KeyboardEvent, cur: Item | undefined, p: Pick<RowsProps, 'onOpen' | 'onLook' | 'onPut'>): boolean {
+  if (cur === undefined || e.altKey || e.ctrlKey) return false;
+  if (e.metaKey) {
+    if (e.key !== 'c') return false;
     copyLink(cur.a.url);
     return true;
   }
-  return false;
+  switch (e.key) {
+    case ' ':
+      (p.onLook ?? p.onOpen)(cur);
+      return true;
+    case '@':
+      if (!p.onPut) return false;
+      p.onPut(cur);
+      return true;
+    case 'v':
+      openWithVersions(keyOf(cur));
+      p.onOpen(cur);
+      return true;
+    case 'c':
+      copyLink(cur.a.url);
+      return true;
+    case 'r':
+    case 'o': {
+      const path = pathOf(cur.a);
+      const finder = bridge()?.showInFinder;
+      if (path !== null && finder !== undefined) void finder(path);
+      else if (leaves(cur.a)) p.onOpen(cur);
+      return true;
+    }
+    default:
+      return false;
+  }
 }
 
 /**
@@ -79,19 +87,11 @@ export function useLook(open: (it: Item) => void): (it: Item) => void {
   };
 }
 
-/** The rows grouped by day. */
-export function ArtifactRows({ items, now, sel, onSel, onOpen, onLook, onPut, form, testId }: RowsProps) {
+/** The rows grouped by day; the keys are its screen's (useListKeys + rowKey), a click picks a row. */
+export function ArtifactRows({ items, now, sel, onSel, onOpen, form, testId }: RowsProps) {
   const groups = byDay(items, now);
   return (
-    <div
-      className={`art-list ${form}`}
-      role="listbox"
-      tabIndex={0}
-      data-testid={testId}
-      onKeyDown={(e) => {
-        if (listKey(e, items, sel, { onSel, onOpen, ...(onLook ? { onLook } : {}), ...(onPut ? { onPut } : {}) })) e.preventDefault();
-      }}
-    >
+    <div className={`art-list ${form}`} role="listbox" data-testid={testId}>
       {groups.map((g) => (
         <div key={g.day} className="art-day" data-testid={`${testId}.day.${g.day}`}>
           <div className="art-day-h">{g.title}</div>
@@ -119,7 +119,7 @@ const ArtRow = memo(function ArtRow({ it, on, form, onPick, onOpen, testId, ref 
   const out = leaves(a);
   const kind = out ? LEAVES : kindWords(a);
   return (
-    <div ref={ref} className={`art-row${on ? ' on' : ''}`} role="option" aria-selected={on} data-testid={testId}
+    <div ref={ref} className={`art-row${on ? ' on' : ''}`} role="option" aria-selected={on} data-testid={testId} data-row={keyOf(it)}
       data-leaves={out || undefined} onClick={onPick} onDoubleClick={onOpen}>
       <span className="art-g" aria-hidden="true">{glyphOf(a.kind)}</span>
       {form === 'screen' ? (
@@ -153,12 +153,23 @@ export function ArtifactList({ project, onOpen, testId = 'artifacts.panel' }: { 
     else onOpen(it.a.id);
   };
   const look = useLook(openIt);
-  const [sel, setSel] = useState<string | null>(null);
   // the archived ones behind a faint 'N archived' row; a click shows them under the others
   const [showArchived, setShowArchived] = useState(false);
   // the clock of the day groups: when the panel mounted (a render reads no clock)
   const [now] = useState(() => Date.now());
   const items = showArchived ? [...live, ...archived] : live;
+  const byKey = new Map(items.map((it) => [keyOf(it), it]));
+  const put1 = (it: Item) => {
+    put(it.project, it.a);
+  };
+  const { sel, setSel, ref, onKeyDown } = useListKeys<HTMLDivElement>({
+    order: items.map(keyOf),
+    onOpen: (k) => {
+      const it = byKey.get(k);
+      if (it) openIt(it);
+    },
+    onKey: (e, k) => rowKey(e, k === null ? undefined : byKey.get(k), { onOpen: openIt, onLook: look, onPut: put1 }),
+  });
   const more =
     archived.length > 0 ? (
       <Press look="art-archived" onClick={() => { setShowArchived((o) => !o); }} data-testid={`${testId}.archived`}>
@@ -174,10 +185,10 @@ export function ArtifactList({ project, onOpen, testId = 'artifacts.panel' }: { 
     );
   }
   return (
-    <>
+    <div ref={ref} tabIndex={-1} onKeyDown={onKeyDown} data-testid={`${testId}.keys`}>
       <ArtifactRows items={items} now={now} sel={sel} onSel={setSel} onOpen={openIt} onLook={look}
-        onPut={(it) => { put(it.project, it.a); }} form="panel" testId={testId} />
+        onPut={put1} form="panel" testId={testId} />
       {more}
-    </>
+    </div>
   );
 }

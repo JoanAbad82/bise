@@ -4,7 +4,7 @@
 // archived ones on their own list (/archived) with restore; '+ new agent' (A.1) and each agent's
 // '…' (rename, model, reasoning: A.5) through amb-feed's typed commands
 // (actions.ts). Owner: amb-win.
-import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { memo, useState } from 'react';
 import { Peek } from './Peek';
 import { Act, Button, cx, Empty, Head, IconButton, Row } from '@/ds';
 import type { Agent } from '@/proto';
@@ -12,28 +12,20 @@ import { useAgents, useStore } from '@/store';
 import { useRouter } from '@/app/router';
 import { useNow } from '@/app/clock';
 import { keep, useKeptScroll } from '@/app/keep';
+import { useListKeys } from '@/app/listkeys';
 import { archivedEnd, archivedOf, dotOf, endOf, lineOf, liveOf } from './model';
 import { NewAgentSheet, Tune } from './Tune';
 import './agents.css';
 
-/** What a key does on the list (W6/K18): move the selection, preview it, open it. Pure. */
-export function listKey(key: string, order: readonly string[], sel: string | null, peek: string | null): { sel: string | null; peek: string | null; open?: string } | null {
-  const i = sel === null ? -1 : order.indexOf(sel);
-  switch (key) {
-    case 'ArrowDown':
-      return { sel: order[Math.min(order.length - 1, i + 1)] ?? null, peek };
-    case 'ArrowUp':
-      return { sel: order[Math.max(0, i - 1)] ?? null, peek };
-    case ' ':
-      if (sel === null || i < 0) return null;
-      return { sel, peek: peek === sel ? null : sel };
-    case 'Escape':
-      return peek === null ? null : { sel, peek: null };
-    case 'Enter':
-      return sel === null || i < 0 ? null : { sel, peek, open: sel };
-    default:
-      return null;
-  }
+/**
+ * The row's keys beside the list keys (app/listkeys.ts: ↑↓ jk pgup pgdn home end, ⏎ opens; W6/K18):
+ * space shows the selected agent's feed in place, space again closes it, esc closes it. The new
+ * preview; null: not its key. Pure.
+ */
+export function peekKey(key: string, sel: string | null, peek: string | null): { peek: string | null } | null {
+  if (key === ' ') return sel === null ? null : { peek: peek === sel ? null : sel };
+  if (key === 'Escape') return peek === null ? null : { peek: null };
+  return null;
 }
 
 /**
@@ -57,36 +49,24 @@ export function AgentsScreen({ project, projectName, archived: showArchived = fa
     });
   };
   const router = useRouter();
-  // W6/K18: ↑↓ select an agent, space shows its feed in place, space again (or esc) closes it
-  // the selected row comes back after a reload, an update swap or a core restart (keep.ts: 10 minutes)
-  const selKey = `agents.sel:${project}`;
-  const [sel, setSelState] = useState<string | null>(() => {
-    const k = keep.view(selKey);
-    return typeof k === 'string' ? k : null;
-  });
-  const setSel = (name: string | null) => {
-    keep.setView(selKey, name ?? undefined, true);
-    setSelState(name);
-  };
   const [peek, setPeek] = useState<string | null>(null);
   const shown = showArchived ? archived : live;
-  const order = shown.map((a) => a.name);
-  const section = useRef<HTMLElement>(null);
-  useEffect(() => {
-    // the list takes the keys when nothing else has the focus
-    if (document.activeElement === null || document.activeElement === document.body) section.current?.focus();
-  }, []);
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
-    const t = e.target as HTMLElement;
-    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable || (t !== section.current && t.closest('button') !== null)) return;
-    const next = listKey(e.key, order, sel, peek);
-    if (next === null) return;
-    e.preventDefault();
-    setSel(next.sel);
-    setPeek(next.peek);
-    if (next.open !== undefined) router.go({ screen: 'thread', project, agent: next.open });
-  };
+  // W6/K18: the list keys (app/listkeys.ts), space shows its feed in place, space again (or esc)
+  // closes it; the selected row comes back after a reload, an update swap or a core restart (keep.ts: 10 minutes)
+  const { sel, ref: section, onKeyDown } = useListKeys({
+    order: shown.map((a) => a.name),
+    keepAs: `agents.sel:${project}`,
+    onOpen: (agent) => {
+      router.go({ screen: 'thread', project, agent });
+    },
+    onKey: (e, at) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return false;
+      const next = peekKey(e.key, at, peek);
+      if (next === null) return false;
+      setPeek(next.peek);
+      return true;
+    },
+  });
   return (
     <section ref={section} tabIndex={-1} onKeyDown={onKeyDown} className="ag-screen" data-testid="agents.screen" data-project={project} data-archived={showArchived ? 'true' : undefined}>
       <Head
@@ -139,7 +119,7 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: 
     });
   };
   return (
-    <div className={sel ? 'ag-item is-sel' : 'ag-item'} data-testid={`agents.row.${id}`} data-status={a.status} data-sel={sel || undefined} aria-selected={sel}>
+    <div className={sel ? 'ag-item is-sel' : 'ag-item'} data-row={a.name} data-testid={`agents.row.${id}`} data-status={a.status} data-sel={sel || undefined} aria-selected={sel}>
       {/* one row (designer m_19489): its sign, its name, then at its right its acts (shown on
           hover, on the ↑↓-selected row and with the focus in it; an archived one's restore always)
           and its end, so a row is one line high. bise's own row has no acts. */}

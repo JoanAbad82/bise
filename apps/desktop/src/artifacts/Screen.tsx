@@ -1,13 +1,17 @@
 // The artifacts screen (desktop-screens v6, designer m_11837; sidebar row '↗ artifacts', route
 // artifacts[/<p>]): what his agents made, across his projects. Title, the filters (projects,
 // agents, kinds, words), the rows by day, the keys line. ⏎ opens one in the window
-// (artifacts/<p>/<id>). Owner: amb-kit.
+// (artifacts/<p>/<id>). The keys are the TUI's /artifacts (artifacts_screen.rs on_key, tui-parity
+// m_22159): the list keys (app/listkeys.ts), the row's (List.tsx rowKey), / the search (⏎ back to
+// the list keeping the words, ↑↓ back and move, esc clears it), a the archived ones, esc clears the
+// search then leaves the archived ones. Owner: amb-mac (amb-kit's before).
 import { useState, type KeyboardEvent } from 'react';
+import { useListKeys } from '@/app/listkeys';
 import { Button, Field, Menu, MenuItem, Press } from '@/ds';
 import { useProjects } from '@/store';
 import { useKeptScroll } from '@/app/keep';
 import { useAllArtifacts } from './hooks';
-import { ArtifactRows, useLook } from './List';
+import { ArtifactRows, rowKey, useLook } from './List';
 import { usePutInMessage } from './Open';
 import { useGoArtifact } from './leave';
 import { agentsOf, ALL, filterItems, KIND_FILTERS, keyOf, splitArchived, type Filter, type Item, type KindFilter } from './model';
@@ -19,7 +23,6 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   // back from an open artifact (esc, ‹): the list where he left it (designer's desktop-history)
   useKeptScroll(`artifacts:${project}`, () => document.querySelector<HTMLElement>('[data-testid="artifacts.list"]'));
   const [f, setF] = useState<Filter>({ ...ALL, project });
-  const [sel, setSel] = useState<string | null>(null);
   const [menu, setMenu] = useState<'project' | 'agent' | null>(null);
   const [now] = useState(() => Date.now());
   // the archived ones leave the list behind a faint 'N archived' row; a (or a click) shows them
@@ -39,21 +42,58 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   const toggleKind = (k: KindFilter) => {
     setF({ ...f, kinds: f.kinds.includes(k) ? f.kinds.filter((x) => x !== k) : [...f.kinds, k] });
   };
-  const onKey = (e: KeyboardEvent) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if ((e.target as HTMLElement).closest('input, textarea, [contenteditable="true"]') !== null) return;
-    if (!archivedOn && e.key === 'a') {
+  const byKey = new Map(items.map((it) => [keyOf(it), it]));
+  const putIt = (it: Item) => {
+    put(it.project, it.a);
+  };
+  const showArchived = (on: boolean) => {
+    setArchivedOn(on);
+    setSel(null);
+  };
+  // the screen's own keys, beside the list's and the row's
+  const screenKey = (e: KeyboardEvent): boolean => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return false;
+    if (e.key === '/') {
+      document.querySelector<HTMLInputElement>('[data-testid="artifacts.search"]')?.focus();
+      return true;
+    }
+    if (e.key === 'a') {
+      showArchived(!archivedOn);
+      return true;
+    }
+    if (e.key !== 'Escape') return false;
+    if (f.q !== '') setF({ ...f, q: '' });
+    else if (archivedOn) showArchived(false);
+    else return false;
+    return true;
+  };
+  const { sel, setSel, ref, onKeyDown, move } = useListKeys({
+    order: items.map(keyOf),
+    keepAs: `artifacts.sel:${project}`,
+    onOpen: (k) => {
+      const it = byKey.get(k);
+      if (it) open(it);
+    },
+    onKey: (e, k) => rowKey(e, k === null ? undefined : byKey.get(k), { onOpen: open, onLook: look, onPut: putIt }) || screenKey(e),
+  });
+  // the search has the keys (the TUI's typing mode): ⏎ gives them back, ↑↓ give them back and move, esc clears
+  const searchKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    const back = () => {
       e.preventDefault();
-      setArchivedOn(true);
-      setSel(null);
-    } else if (archivedOn && e.key === 'Escape') {
-      e.preventDefault();
-      setArchivedOn(false);
-      setSel(null);
+      ref.current?.focus({ preventScroll: true });
+    };
+    if (e.key === 'Escape') {
+      setF({ ...f, q: '' });
+      back();
+    } else if (e.key === 'Enter') {
+      back();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      back();
+      move(e.key === 'ArrowDown' ? 1 : -1);
     }
   };
   return (
-    <section className="art-screen" data-testid="artifacts.screen" data-archived={archivedOn || undefined} onKeyDown={onKey}>
+    <section ref={ref} tabIndex={-1} className="art-screen" data-testid="artifacts.screen" data-archived={archivedOn || undefined} onKeyDown={onKeyDown}>
       <header className="art-head">
         <div className="art-h1">{archivedOn ? 'artifacts · archived' : 'artifacts'}</div>
         <div className="art-h2">{archivedOn ? 'what you or your agents put away' : 'what your agents made'}</div>
@@ -96,7 +136,7 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
           ))}
         </span>
         <span className="art-search">
-          <Field placeholder="search" value={f.q} onChange={(e) => { setF({ ...f, q: e.currentTarget.value }); }} testId="artifacts.search" />
+          <Field placeholder="search" value={f.q} onChange={(e) => { setF({ ...f, q: e.currentTarget.value }); }} onKeyDown={searchKey} testId="artifacts.search" />
         </span>
       </div>
       {archivedOn && items.length === 0 ? (
@@ -106,11 +146,10 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
       ) : items.length === 0 ? (
         <div className="art-empty" data-testid="artifacts.none">nothing matches. clear a filter to see more.</div>
       ) : (
-        <ArtifactRows items={items} now={now} sel={sel ?? (items[0] ? keyOf(items[0]) : null)} onSel={setSel} onOpen={open} onLook={look}
-          onPut={(it) => { put(it.project, it.a); }} form="screen" testId="artifacts.list" />
+        <ArtifactRows items={items} now={now} sel={sel} onSel={setSel} onOpen={open} onLook={look} onPut={putIt} form="screen" testId="artifacts.list" />
       )}
       {!archivedOn && archived.length > 0 && (
-        <Press look="art-archived" onClick={() => { setArchivedOn(true); setSel(null); }} data-testid="artifacts.archived">
+        <Press look="art-archived" onClick={() => { showArchived(true); }} data-testid="artifacts.archived">
           {archived.length} archived
         </Press>
       )}
