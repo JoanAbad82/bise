@@ -146,6 +146,9 @@ def Laws.style_routes_reply():
 def Laws.api_body_anth_maps():
   {==}
 
+def Laws.api_body_anth_xhigh():
+  {==}
+
 def Laws.api_body_anth_bare_omits_tools():
   {==}
 

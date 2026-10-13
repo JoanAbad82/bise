@@ -199,6 +199,21 @@ describe('the agents screen: new, rename, model, reasoning', () => {
     expect(v.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5').getAttribute('aria-selected')).toBe('true');
     expect(v.getByTestId('agents.effort.p99.max')).toBeTruthy();
   });
+
+  it("effort-table: the reasoning row is the model's own list, Opus 5.5's xhigh with its own hint", () => {
+    const { store, cmds, v } = setup();
+    const opus: Model = { id: 'anthropic/claude-opus-5-5', label: 'opus 5.5', provider: 'Anthropic', short: '1M', efforts: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], default_effort: 'high' };
+    act(() => {
+      store.apply({ ev: 'models', project: P, items: [opus] });
+      store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('p99', { model: opus.id, effort: 'high' })] });
+    });
+    fireEvent.click(v.getByTestId('agents.more.p99'));
+    expect([...v.container.querySelectorAll('[data-testid^="agents.effort.p99."]')].map((e) => e.textContent)).toEqual(['none', 'low', 'medium', 'high', 'xhigh', 'max']);
+    expect(v.getByTestId('agents.effort.p99.xhigh').getAttribute('title')).toBe('deeper still');
+    expect(v.getByTestId('agents.effort.p99.max').getAttribute('title')).toBe('the hard stuff');
+    fireEvent.click(v.getByTestId('agents.effort.p99.xhigh'));
+    expect(cmds).toContainEqual({ cmd: 'effort', project: P, agent: 'p99', effort: 'xhigh' });
+  });
 });
 
 describe('the model mark follows the hub (qa-flows a8758ee6)', () => {

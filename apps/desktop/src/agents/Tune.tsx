@@ -16,7 +16,7 @@ import { useKeptText } from '@/app/keep';
 
 /** The TUI's words for an effort (rust/tui/src/commands.rs effort_hint). */
 function hintOf(e: string): string {
-  const known: Record<string, string> = { none: 'no reasoning, the fastest', minimal: 'barely any reasoning', max: 'the hard stuff', xhigh: 'the hard stuff' };
+  const known: Record<string, string> = { none: 'no reasoning, the fastest', minimal: 'barely any reasoning', xhigh: 'deeper still', max: 'the hard stuff' };
   return EFFORTS.find((x) => x.effort === e)?.hint ?? known[e] ?? '';
 }
 

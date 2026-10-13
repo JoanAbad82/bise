@@ -509,8 +509,8 @@ def budget_of(+max: Nat) -> Nat:
   Nat.min(16000n, Nat.div(max, 2n))
 
 # the budget of an effort (BISE-135): low 4000, medium 8000, high (and
-# "", or a word it does not know) 16000 = budget_of, max = half the
-# output cap
+# "", xhigh, or a word it does not know) 16000 = budget_of, max = half
+# the output cap
 def budget_cap.medium(is_medium: Bool, +max: Nat) -> Nat:
   match is_medium:
     case True{}:

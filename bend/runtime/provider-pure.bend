@@ -343,7 +343,7 @@ def max_key.pick(is_openai: Bool) -> String:
 # included). The same rule as rust/catalog's Resolved::efforts.
 
 def anth_efforts() -> List<&2, String>:
-  ["none", "low", "medium", "high", "max"]
+  ["none", "low", "medium", "high", "xhigh", "max"]
 
 def chat_efforts() -> List<&2, String>:
   ["none", "low", "medium", "high"]

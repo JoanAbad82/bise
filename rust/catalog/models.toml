@@ -25,9 +25,12 @@
 #   max_output is the body's max_tokens.
 # Reasoning effort (BISE-135), for a model that reasons: efforts = the
 #   words it takes, comma-separated (unset: its family's: anthropic
-#   none,low,medium,high,max; the others none,low,medium,high);
+#   none,low,medium,high,xhigh,max; the others none,low,medium,high);
 #   effort = the one it gets when nobody picks (unset: high). /reasoning
 #   and config.toml's reasoning_effort / agent_reasoning_effort pick.
+#   Each default model has its own list, from its provider's docs and
+#   openrouter.ai/api/v1/models reasoning.supported_efforts (checked
+#   2026-10-13). On Claude, none is bise's own word: thinking off.
 # Prompt cache (BISE-268): cache_key = the body field and cache_header =
 #   the HTTP header that carry the session's routing key ("bise-<hash>",
 #   core/api.bend session_key) to a provider that routes by it; unset:
@@ -116,6 +119,7 @@ betas = "interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14"
 # "start with Claude Opus 5.5 for most workloads": long-running agentic
 # coding
 [models."anthropic/claude-opus-5-5"]
+efforts = "none,low,medium,high,xhigh,max"
 input_price = 4
 output_price = 20
 cache_read_price = 0.2
@@ -123,21 +127,24 @@ cache_write_price = 5
 
 # demanding reasoning and long-horizon agentic work
 [models."anthropic/claude-fable-5-1"]
+efforts = "none,low,medium,high,xhigh,max"
 input_price = 10
 output_price = 50
 cache_read_price = 0.25
 cache_write_price = 12.5
 
 [models."anthropic/claude-sonnet-5-5"]
+efforts = "none,low,medium,high,xhigh,max"
 input_price = 2
 output_price = 10
 cache_read_price = 0.2
 cache_write_price = 2.5
 
 # extended thinking with a token budget (it rejects adaptive thinking),
-# 200k context
+# 200k context; its efforts are budget sizes (no xhigh)
 [models."anthropic/claude-haiku-4-5"]
 thinking = "budget"
+efforts = "none,low,medium,high,max"
 context = 200000
 max_output = 64000
 input_price = 1
@@ -167,12 +174,14 @@ reasoning = true
 
 # the proxy bills Anthropic's list prices
 [models."foundry/claude-opus-5-5"]
+efforts = "none,low,medium,high,xhigh,max"
 input_price = 4
 output_price = 20
 cache_read_price = 0.2
 cache_write_price = 5
 
 [models."foundry/claude-sonnet-5-5"]
+efforts = "none,low,medium,high,xhigh,max"
 input_price = 2
 output_price = 10
 cache_read_price = 0.2
@@ -182,6 +191,7 @@ cache_write_price = 2.5
 # supported on this model")
 [models."foundry/claude-haiku-4-5"]
 thinking = "budget"
+efforts = "none,low,medium,high,max"
 context = 200000
 input_price = 1
 output_price = 5
@@ -296,6 +306,7 @@ reasoning = true
 # "our most intelligent Flash model, engineered for long-horizon software
 # engineering"
 [models."google/gemini-3.8-flash"]
+efforts = "low,medium,high"
 input_price = 0.75
 output_price = 3.75
 cache_read_price = 0.075
@@ -404,7 +415,9 @@ small_model = "google/gemini-3.8-flash"
 cache_header = "x-session-id"
 reasoning = true
 
+# OpenRouter's reasoning.supported_efforts (it refuses none on Claude)
 [models."openrouter/anthropic/claude-sonnet-5.5"]
+efforts = "low,medium,high,xhigh,max"
 context = 1000000
 max_output = 128000
 vision = true
@@ -414,6 +427,7 @@ cache_read_price = 0.2
 cache_write_price = 2.5
 
 [models."openrouter/anthropic/claude-opus-5.5"]
+efforts = "low,medium,high,xhigh,max"
 context = 1000000
 max_output = 128000
 vision = true
@@ -437,6 +451,7 @@ input_price = 2
 output_price = 10
 
 [models."openrouter/google/gemini-3.8-flash"]
+efforts = "low,medium,high"
 context = 1048576
 max_output = 65536
 vision = true
@@ -444,7 +459,9 @@ input_price = 0.75
 output_price = 3.75
 cache_read_price = 0.075
 
+# reasoning cannot be turned off; xhigh from grok-4.6 (docs.x.ai)
 [models."openrouter/x-ai/grok-4.7"]
+efforts = "low,medium,high,xhigh"
 context = 500000
 vision = true
 input_price = 2
@@ -539,7 +556,9 @@ context = 500000
 vision = true
 reasoning = true
 
+# reasoning cannot be turned off; xhigh from grok-4.6 (docs.x.ai)
 [models."xai/grok-4.7"]
+efforts = "low,medium,high,xhigh"
 input_price = 2
 output_price = 6
 cache_read_price = 0.5

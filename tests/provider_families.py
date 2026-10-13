@@ -220,6 +220,7 @@ def part_d():
     open(models, "w").write(
         'version = 1\ndefault_model = "fake/claude-x"\n\n'
         '[providers.fake]\nname = "Fake"\napi = "anthropic"\nbase_url = "%s"\nkey_env = ""\n\n'
+        '[models."fake/claude-r"]\nreasoning = true\n\n'
         '[providers.fakeoai]\nname = "Fake OpenAI"\napi = "openai-chat"\nbase_url = "%s"\nkey_env = ""\n\n'
         '[providers.fakegem]\nname = "Fake Gemini"\napi = "gemini"\nbase_url = "%s"\nkey_env = ""\n\n'
         '[providers.fakegw]\nname = "Fake Gateway"\napi = "anthropic"\nbase_url = "%s"\nkey_env = ""\n'
@@ -255,8 +256,8 @@ def part_d():
     # the interrupt flag the TUI writes on Ctrl+C (side dir: $TMPDIR)
     flag = os.path.join(tmp, "bend-interrupt-%d.txt" % port)
 
-    def turn(model, text, ctrl_c_on=None):
-        open(cfg, "w").write('model = "%s"\n' % model)
+    def turn(model, text, ctrl_c_on=None, extra=""):
+        open(cfg, "w").write('model = "%s"\n%s' % (model, extra))
         sock = socket.create_connection(("127.0.0.1", port), timeout=60)
         sock.sendall(("run " + text + "\n").encode())
         f = sock.makefile("rb")
@@ -290,6 +291,12 @@ def part_d():
         check("tool bash ok: a1" in text and "tool bash ok: a2" in text and said and "done: " in said[-1],
               "anthropic: two bash calls, then the last reply: %r" % (said[-1:] if said else out[-5:]))
         n = len(recs)
+        # effort-table: xhigh is a Claude effort, sent as is in output_config.effort
+        out = turn("fake/claude-r", "plus fort", extra='reasoning_effort = "xhigh"\n')
+        recs = [json.loads(l) for l in open(F.LOG)][n:]
+        check(recs and all(r["family"] == "anthropic" and r["effort"] == "xhigh" for r in recs),
+              "anthropic: reasoning_effort xhigh reaches output_config.effort: %r" % [r["effort"] for r in recs])
+        n += len(recs)
         out = turn("fakeoai/m2", "[[bash: echo b1]]")
         recs = [json.loads(l) for l in open(F.LOG)][n:]
         check([r["family"] for r in recs] == ["openai-chat"] * 2 and all(r["stream"] for r in recs)

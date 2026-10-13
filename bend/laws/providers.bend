@@ -370,6 +370,17 @@ law api_body_anth_maps:
     == "{\"system\":[{\"type\":\"text\",\"text\":\"You are precise.\",\"cache_control\":{\"type\":\"ephemeral\"}}],\"model\":\"claude-opus-5-5\",\"max_tokens\":32768,\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\"},\"output_config\":{\"effort\":\"high\"},\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"bonjour\",\"cache_control\":{\"type\":\"ephemeral\"}}]}]}"
     : String}
 
+# LAW: xhigh (Claude's "extra high") goes as is in output_config.effort.
+law api_body_anth_xhigh:
+  {Api.api_body_for(Api.Anthropic{}, "m",
+      Api.MFacts{True{}, 0n, "max_tokens", "", "", "xhigh", False{}},
+      W.parse_wire("MODEL default
+MSG user : salut
+END
+"))
+    == "{\"model\":\"m\",\"max_tokens\":32768,\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\"},\"output_config\":{\"effort\":\"xhigh\"},\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"salut\",\"cache_control\":{\"type\":\"ephemeral\"}}]}]}"
+    : String}
+
 # LAW: an Anthropic compaction call (no TOOL lines) omits tools and
 # tool_choice - the model cannot even offer a tool call.
 law api_body_anth_bare_omits_tools:

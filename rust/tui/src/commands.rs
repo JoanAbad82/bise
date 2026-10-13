@@ -330,7 +330,8 @@ pub(crate) fn effort_hint(e: &str) -> &'static str {
         "low" => "faster, cheaper",
         "medium" => "balanced",
         "high" => "deeper, slower",
-        "max" | "xhigh" => "the hard stuff",
+        "xhigh" => "deeper still",
+        "max" => "the hard stuff",
         _ => "",
     }
 }
@@ -849,9 +850,12 @@ mod arg_tests {
         assert!(f.iter().any(|i| i.label == "+ set up OpenRouter for openrouter/x-ai/grok-9" && i.desc == "no key yet: i'll ask for one"), "{:?}", labels(&f));
         crate::models::TEST_READY.with(|r| *r.borrow_mut() = None);
         let r = items(&mut app, "/reasoning ");
-        assert_eq!(labels(&r), ["reasoning for auth-fix", "none", "low", "medium", "high", "max"]);
+        // effort-table: Opus 5.5 takes Claude's xhigh, high stays its default
+        assert_eq!(labels(&r), ["reasoning for auth-fix", "none", "low", "medium", "high", "xhigh", "max"]);
         let high = r.iter().find(|i| i.label == "high").unwrap();
         assert_eq!((high.mark.map(|x| x.0), high.desc.as_str()), (Some("✓"), "deeper, slower · default"));
+        let desc = |l: &str| r.iter().find(|i| i.label == l).unwrap().desc.clone();
+        assert_eq!((desc("xhigh"), desc("max")), ("deeper still".to_string(), "the hard stuff".to_string()));
         assert_eq!(items(&mut app, "/reasoning lo")[1].run.as_deref(), Some("/reasoning low"));
         // main, on a model with two words; one without reasoning
         add_agent(&mut app, "main", "");

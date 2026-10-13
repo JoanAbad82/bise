@@ -99,8 +99,8 @@ pub const THINKING: [&str; 3] = ["adaptive", "budget", "none"];
 
 /// The reasoning efforts of the Anthropic family (BISE-135): `none` turns
 /// thinking off; the others are output_config.effort (adaptive) or the
-/// size of the thinking budget (budget).
-pub const ANTHROPIC_EFFORTS: [&str; 5] = ["none", "low", "medium", "high", "max"];
+/// size of the thinking budget (budget; xhigh there is high's budget).
+pub const ANTHROPIC_EFFORTS: [&str; 6] = ["none", "low", "medium", "high", "xhigh", "max"];
 
 /// The reasoning efforts of the OpenAI-compatible families
 /// (`reasoning_effort`, sent as is).
