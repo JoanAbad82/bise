@@ -49,6 +49,6 @@
 1114 rust/tui/src/ui.rs
 1154 rust/tui/src/voicemode/speak.rs
 1232 rust/tui/src/voicemode/turn.rs
-1142 scripts/desktop_try.py
+1069 scripts/desktop_try.py
 1787 tests/fake_provider.py
 1111 tests/proto_e2e.py

@@ -28,6 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 import desktop_try as T  # noqa: E402
+import desktop_try_env as E  # noqa: E402  (its pure where and what, split out for size)
 
 sys.path.insert(0, HERE)
 import wait  # noqa: E402
@@ -64,7 +65,7 @@ def pure():
     e2 = T.try_env(dict(base, PATH="%s/hubs/h-1/bin:/usr/bin:%s/run/x:/bin" % (real, real)), real, tryh)
     check(e2["PATH"] == "/usr/bin:/bin", "an agent shell's hub bin (his sb) leaves the try's PATH: %s" % e2["PATH"])
     other = "/Users/x/.bise"
-    check(T.clean_path("%s/hubs/h/bin:/usr/bin:%s/run/r:%s/try/bin" % (other, other, other), real, homes=(other,)) == "/usr/bin:%s/try/bin" % other,
+    check(E.clean_path("%s/hubs/h/bin:/usr/bin:%s/run/r:%s/try/bin" % (other, other, other), real, homes=(other,)) == "/usr/bin:%s/try/bin" % other,
           "the default ~/.bise's hubs/ and run/ go too when the real home is a stand-in")
     h = T.his_env(base)
     check("BISE_HOME" not in h and "SB_SOCKET" not in h and h["HOME"] == "/Users/x", "his env: no BISE_HOME, no hub var")
@@ -542,7 +543,8 @@ def candidate_then_promote():
     git = lambda *a, cwd=repo: subprocess.run(["git"] + list(a), cwd=cwd, env=genv, check=True, capture_output=True, text=True).stdout.strip()  # noqa: E731
     os.makedirs(os.path.join(repo, "scripts"))
     os.makedirs(os.path.join(repo, "tests"))
-    shutil.copy(os.path.join(ROOT, "scripts", "desktop_try.py"), os.path.join(repo, "scripts", "desktop_try.py"))
+    for f in ("desktop_try.py", "desktop_try_env.py"):
+        shutil.copy(os.path.join(ROOT, "scripts", f), os.path.join(repo, "scripts", f))
     shutil.copy(os.path.join(ROOT, "tests", "bise_env.py"), os.path.join(repo, "tests", "bise_env.py"))
     with open(os.path.join(repo, ".gitignore"), "w") as f:
         f.write("dist/\n__pycache__/\n")      # as the real repo's .gitignore: the packed app is no change
