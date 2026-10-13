@@ -119,6 +119,27 @@ describe('the inbox block (b2)', () => {
     expect(told.at(-1)).toBeNull();
   });
 
+  it("ctrl+↑↓ walk like ↑↓ (no wrap); ctrl+n / ctrl+p walk and wrap, even with his words in the field (the TUI's cards.rs)", () => {
+    mount();
+    fireEvent.click(screen.getByTestId('inbox.block.row.1'));
+    fireEvent.keyDown(window, { key: 'ArrowDown', ctrlKey: true });
+    expect(screen.getByTestId('inbox.block.open.2')).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'ArrowUp', ctrlKey: true });
+    expect(screen.getByTestId('inbox.block.open.1')).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'ArrowUp', ctrlKey: true });
+    expect(screen.getByTestId('inbox.block.open.1')).toBeTruthy();
+    const field = document.createElement('textarea');
+    field.value = 'not yet';
+    document.body.appendChild(field);
+    fireEvent.keyDown(field, { key: 'p', ctrlKey: true });
+    expect(screen.queryByTestId('inbox.block.open.1')).toBeNull();
+    fireEvent.keyDown(field, { key: 'n', ctrlKey: true });
+    expect(screen.getByTestId('inbox.block.open.1')).toBeTruthy();
+    fireEvent.keyDown(field, { key: 'n', ctrlKey: true });
+    expect(screen.getByTestId('inbox.block.open.2')).toBeTruthy();
+    field.remove();
+  });
+
   it('⌘I (openInbox) opens the first item; a notification click (openInbox at a card) that card', () => {
     mount();
     act(() => {

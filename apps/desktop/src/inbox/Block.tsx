@@ -401,8 +401,19 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
         openTo(null);
         return;
       }
+      // ctrl+n / ctrl+p: the next / previous item, wrapping, even with his words in the field (the TUI's cards.rs step(.., true))
+      if ((e.key === 'n' || e.key === 'p') && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        const i = list.findIndex((c) => cardKey(c) === open);
+        const next = list[(i + (e.key === 'n' ? 1 : -1) + list.length) % list.length];
+        if (next === undefined) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openTo(cardKey(next));
+        return;
+      }
       if (typing(e.target)) return;
-      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      // ↑↓ and ctrl+↑↓: the previous / next item, no wrap (the TUI's arrow_mods: none or ctrl)
+      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.metaKey && !e.altKey && !e.shiftKey) {
         const i = list.findIndex((c) => cardKey(c) === open);
         const next = list[Math.max(0, Math.min(list.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
         if (next === undefined) return;
