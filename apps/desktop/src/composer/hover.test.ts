@@ -19,7 +19,7 @@ describe('composer controls hover (bar O.6)', () => {
 
   it("the mic's hover padding sits in a negative margin: the key line never moves", () => {
     const mic = /\.keys \.mic \{([^}]*)\}/.exec(rules)?.[1] ?? '';
-    expect(mic).toMatch(/padding: 1px 4px/);
-    expect(mic).toMatch(/margin: -1px -4px/);
+    expect(mic).toMatch(/padding: 0 var\(--s-1\)/);
+    expect(mic).toMatch(/margin: 0 calc\(-1 \* var\(--s-1\)\)/);
   });
 });

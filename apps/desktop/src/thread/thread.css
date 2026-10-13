@@ -360,6 +360,8 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* what an open fold shows sits at +16, the thread's one indent (designer m_21012) */
+  padding-left: var(--s-4);
 }
 
 .th-find {
@@ -460,7 +462,7 @@
   margin-left: 0;
 }
 .th-think-body {
-  margin: 4px 0 8px 2ch;
+  margin: 4px 0 8px var(--s-4);
   color: var(--c-text-2);
   white-space: pre-wrap;
   font-size: 13px;
@@ -812,8 +814,9 @@
   box-shadow: 0 0 0 2px var(--c-focus);
 }
 .th-tool-open {
-  /* hangs at 2ch like the error line; the thread's code block box (.th-pre: 10/12 px, r 8) */
-  margin: 2px 0 6px 2ch;
+  /* at +16 like everything an open row shows (designer m_21012); the thread's code block box
+     (.th-pre: 10/12 px, r 8) */
+  margin: 2px 0 6px var(--s-4);
   padding: 10px 12px;
   border: 1px solid var(--c-line);
   border-radius: 8px;
@@ -931,6 +934,16 @@
 .th-screen .b-tool {
   margin-top: 8px;
   line-height: var(--lh-row);
+}
+/* a quiet fold row is plain text at rest, like the thinking row; the tint only on hover or focus,
+   its padding in a negative margin so the chevron stays on the column's edge (designer m_21012) */
+.th-screen .b-tool:not(.err) {
+  padding-inline: var(--s-1);
+  margin-inline: calc(-1 * var(--s-1));
+  background: none;
+}
+.th-screen .b-tool:not(.err):focus-visible {
+  background: var(--c-hover);
 }
 /* between rows of one turn (rows.tsx gapOf): 8 px between two dim rows, 12 px from prose to a dim
    row or back; each row already ends with its 2 px */

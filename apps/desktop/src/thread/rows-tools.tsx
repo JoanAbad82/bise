@@ -157,7 +157,8 @@ function ToolLineRow({ l, live, runFor, project, agent }: { l: ToolLine; live: b
             : undefined
         }
       >
-        <span className="th-tool-mark">{live ? <Pulse kind="tool" testId={`${id}.pulse`} /> : l.mark}</span>{' '}
+        {/* a read has no mark: no empty slot either, so its words start on the edge (designer m_21012) */}
+        {(live || l.mark !== '') && <span className="th-tool-mark">{live ? <Pulse kind="tool" testId={`${id}.pulse`} /> : l.mark}</span>}{' '}
         <span className="th-tool-text">{l.text}</span>
         {l.counts !== '' && (
           <span className="th-tool-count" data-testid={`${id}.count`}>
@@ -182,7 +183,8 @@ function ToolLineRow({ l, live, runFor, project, agent }: { l: ToolLine; live: b
           {l.err}
         </div>
       )}
-      {open && opens && (
+      {/* an empty box never shows: only with its code, its output or the hub's words about it */}
+      {open && opens && (l.code !== '' || out !== '' || full !== null) && (
         <div className="th-tool-open" data-testid={`${id}.open`}>
           {l.code !== '' && <pre className="th-tool-code">{l.code}</pre>}
           {out !== '' && (

@@ -1,68 +1,68 @@
 /* bise desktop window · the thread: message, avatar, tool (folded work), output, fold, answered, marker, route, artifact, diff, quote pop */
-.b-thread{display:flex;flex-direction:column;gap:14px;padding:6px 22px 12px;max-width:760px}
+.b-thread{display:flex;flex-direction:column;gap:var(--gap-block);padding:var(--s-2) var(--pad-column) var(--s-3);max-width:760px}
 .b-msg{display:flex;flex-direction:column;min-width:0}
-.b-who{display:flex;align-items:center;gap:6px;min-height:18px;font:var(--t-12) var(--font-ui);color:var(--c-text-3)}
+.b-who{display:flex;align-items:center;gap:var(--gap-inline);min-height:18px;font:var(--t-12) var(--font-ui);color:var(--c-text-3)}
 .b-who b{color:var(--c-text);font-weight:600}
 .b-who .b-time{color:var(--c-text-3)}
 .b-who.b-hover{opacity:0;transition:opacity var(--d-fast) var(--ease-out)}
 .b-msg.grouped:hover .b-who.b-hover{opacity:1}
 .b-text{min-width:0;font:var(--t-15)/var(--lh-read) var(--font-read);color:var(--c-text);overflow-wrap:anywhere}
 .b-text :where(p,ul,ol,blockquote,h1,h2,h3,h4,h5,h6){max-width:68ch}
-.b-msg.you .b-text{width:fit-content;max-width:68ch;padding:8px 12px;border-radius:12px;background:var(--c-raised)}
-.b-ctx{margin-top:4px}
-.b-text code{font:var(--t-13) var(--font-mono);padding:1px 5px;border-radius:5px;background:var(--c-sunken)}
-.b-msg.is-streaming .b-text::after{content:"∿";display:inline;margin-left:4px;color:var(--c-text);font:400 12px/1 var(--font-ui);animation:b-pulse .8s var(--ease-io) infinite alternate}
+.b-msg.you .b-text{width:fit-content;max-width:68ch;padding:var(--pad-card);border-radius:12px;background:var(--c-raised)}
+.b-ctx{margin-top:var(--gap-tight)}
+.b-text code{font:var(--t-13) var(--font-mono);padding:0 var(--s-1);border-radius:5px;background:var(--c-sunken)}
+.b-msg.is-streaming .b-text::after{content:"∿";display:inline;margin-left:var(--s-1);color:var(--c-text);font:400 12px/1 var(--font-ui);animation:b-pulse .8s var(--ease-io) infinite alternate}
 :root[data-still] .b-msg.is-streaming .b-text::after{animation:none;color:var(--c-text-2)}
 @media (prefers-reduced-motion: reduce){.b-msg.is-streaming .b-text::after{animation:none;color:var(--c-text-2)}}
 .b-msg.is-error .b-text{color:var(--c-text-2)}
-.b-tool{display:flex;align-items:center;gap:8px;margin-top:6px;padding:5px 10px;border-radius:var(--r-2);font-size:var(--t-12);color:var(--c-text-2);background:var(--c-hover);width:fit-content;max-width:100%;white-space:nowrap;overflow:hidden}
+.b-tool{display:flex;align-items:center;gap:var(--gap-inline);margin-top:var(--gap-rows);padding:var(--s-1) var(--s-2);border-radius:var(--r-2);font-size:var(--t-12);color:var(--c-text-2);background:var(--c-hover);width:fit-content;max-width:100%;white-space:nowrap;overflow:hidden}
 .b-tool .chev{color:var(--c-text-3);transition:transform var(--d-fast) var(--ease-out)}
 .b-tool.open .chev{transform:rotate(90deg)}
 .b-tool.run .lbl::after{content:"…"}
 .b-tool.err{color:var(--c-err);background:var(--c-err-soft)}
-.b-out{margin:4px 0 0;padding:8px 10px;border-radius:var(--r-2);font:var(--t-12)/1.5 var(--font-mono);color:var(--c-text-2);background:var(--c-sunken);white-space:pre;overflow:hidden}
-.b-fold{font-size:var(--t-12);color:var(--c-text-3);margin-left:36px}
-.b-answered{font-size:var(--t-13);color:var(--c-text-2);margin-left:36px}
+.b-out{margin:var(--gap-tight) 0 0;padding:var(--s-2) var(--s-3);border-radius:var(--r-2);font:var(--t-12)/1.5 var(--font-mono);color:var(--c-text-2);background:var(--c-sunken);white-space:pre;overflow:hidden}
+.b-fold{font-size:var(--t-12);color:var(--c-text-3)}
+.b-answered{font-size:var(--t-13);color:var(--c-text-2)}
 .b-marker{font-size:var(--t-12);color:var(--c-accent)}
-.b-route{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 10px;align-items:center;margin-top:8px;padding:9px 12px;border-radius:var(--r-3);background:var(--c-raised);box-shadow:var(--e-1)}
+.b-route{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--gap-tight) var(--gap-inline);align-items:center;margin-top:var(--gap-rows);padding:var(--pad-card);border-radius:var(--r-3);background:var(--c-raised);box-shadow:var(--e-1)}
 .b-route .p1{font-weight:600;white-space:nowrap}
 .b-route .p2{font-size:var(--t-12);color:var(--c-text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .b-route .p3{font-size:var(--t-11);color:var(--c-text-3);white-space:nowrap}
-.b-route .b-bar{grid-column:1/-1;margin-top:6px}
-.b-art{display:inline-flex;align-items:center;gap:10px;margin-top:8px;padding:6px 12px 6px 6px;border-radius:var(--r-3);background:var(--c-raised);box-shadow:var(--e-1);transition:box-shadow var(--d-fast) var(--ease-out),transform var(--d-fast) var(--ease-out)}
+.b-route .b-bar{grid-column:1/-1;margin-top:var(--s-2)}
+.b-art{display:inline-flex;align-items:center;gap:var(--gap-inline);margin-top:var(--gap-rows);padding:var(--s-1) var(--s-3) var(--s-1) var(--s-1);border-radius:var(--r-3);background:var(--c-raised);box-shadow:var(--e-1);transition:box-shadow var(--d-fast) var(--ease-out),transform var(--d-fast) var(--ease-out)}
 .b-art:hover,.b-art.is-hover{box-shadow:var(--e-2);transform:translateY(-1px)}
-.b-art .th{width:64px;height:40px;border-radius:6px;background:var(--c-solid);overflow:hidden}
+.b-art .th{width:var(--s-16);height:var(--s-10);border-radius:6px;background:var(--c-solid);overflow:hidden}
 .b-art .th svg{display:block;width:100%;height:100%}
 .b-art .an{font-weight:600;font-size:var(--t-13)}
 .b-art .am{display:block;font-size:var(--t-11);color:var(--c-text-3)}
-.b-diff{margin-top:8px;border-radius:var(--r-3);overflow:hidden;box-shadow:var(--e-1);background:var(--c-solid);font:var(--t-12)/1.6 var(--font-mono)}
-.b-diff .fh{display:flex;gap:10px;align-items:center;padding:6px 12px;background:var(--c-raised);font:500 var(--t-12) var(--font-ui)}
+.b-diff{margin-top:var(--gap-rows);border-radius:var(--r-3);overflow:hidden;box-shadow:var(--e-1);background:var(--c-solid);font:var(--t-12)/1.6 var(--font-mono)}
+.b-diff .fh{display:flex;gap:var(--gap-inline);align-items:center;padding:var(--s-2) var(--s-3);background:var(--c-raised);font:500 var(--t-12) var(--font-ui)}
 .b-diff .fh span{color:var(--c-text-3)}
 .b-diff .fh .ok{color:var(--c-ok)}.b-diff .fh .er{color:var(--c-err)}
 .b-dl{display:grid;grid-template-columns:3em 3em 1.4em minmax(0,1fr);white-space:pre}
-.b-dl i{font-style:normal;color:var(--c-text-3);text-align:right;padding-right:8px}
+.b-dl i{font-style:normal;color:var(--c-text-3);text-align:right;padding-right:var(--s-2)}
 .b-dl.ad{background:color-mix(in srgb,var(--c-ok) 13%,transparent)}
 .b-dl.rm{background:color-mix(in srgb,var(--c-err) 12%,transparent)}
 .b-dl.pk{box-shadow:inset 1px 0 0 var(--c-ink),inset -1px 0 0 var(--c-ink)}.b-dl.pk i{color:var(--c-ink)}.b-dl.pk.first{box-shadow:inset 1px 0 0 var(--c-ink),inset -1px 0 0 var(--c-ink),inset 0 1px 0 var(--c-ink)}.b-dl.pk.last{box-shadow:inset 1px 0 0 var(--c-ink),inset -1px 0 0 var(--c-ink),inset 0 -1px 0 var(--c-ink)}.b-dl.pk.first.last{box-shadow:inset 0 0 0 1px var(--c-ink)}
-.b-quotepop{display:inline-flex;margin:4px 0 4px 6.4em;padding:3px 10px;border-radius:var(--r-2);background:var(--c-ink);color:var(--c-on-ink);font:var(--t-12) var(--font-ui)}
+.b-quotepop{display:inline-flex;margin:var(--gap-tight) 0;padding:var(--s-1) var(--s-2);border-radius:var(--r-2);background:var(--c-ink);color:var(--c-on-ink);font:var(--t-12) var(--font-ui)}
 .b-day{align-self:center;text-align:center;font-size:var(--t-11);color:var(--c-text-3);letter-spacing:.06em;text-transform:uppercase}
-.b-msg .b-quote{display:flex;width:fit-content;margin:2px 0 6px}
+.b-msg .b-quote{display:flex;width:fit-content;margin:0 0 var(--gap-tight)}
 /* the thread's signed one-line looks as ds variants (designer m_18626): the landed sha / PR # (Act
    ref), the '→ perf' handoff (Route handoff), the scheduled head, the brief line, the card line */
-.b-act.ref{margin:0 -2px;color:var(--c-text);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.b-act.ref{margin:0;padding:0;color:var(--c-text);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 /* hover: the same 1 px underline as at rest, the words in ink (designer m_18804) */
 .b-act.ref:hover,.b-act.ref.is-hover{color:var(--c-text);text-decoration:underline}
-.b-route.handoff{display:block;margin:0;padding:2px 0;border:0;border-radius:0;background:none;box-shadow:none;color:var(--c-text);font:var(--t-13) var(--font-ui);text-align:left;cursor:pointer}
+.b-route.handoff{display:block;margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;color:var(--c-text);font:var(--t-13) var(--font-ui);text-align:left;cursor:pointer}
 .b-route.handoff .p2{font-size:inherit;white-space:normal}
 .b-route.handoff:hover .p2,.b-route.handoff.is-hover .p2{color:var(--c-text)}
 .b-route.handoff:focus-visible,.b-sched-head:focus-visible,.b-brief-line:focus-visible,.b-card-line:focus-visible{outline:2px solid var(--c-focus);outline-offset:1px}
 .b-sched-head{margin:0;padding:0;border:0;background:none;font:inherit;color:inherit;text-align:left}
 button.b-sched-head{cursor:default}
-.b-brief-line{display:flex;align-items:baseline;gap:6px;max-width:100%;margin:0;padding:0;border:0;background:none;color:var(--c-text-2);font:var(--t-13) var(--font-ui);text-align:left;cursor:pointer}
+.b-brief-line{display:flex;align-items:baseline;gap:var(--gap-inline);max-width:100%;margin:0;padding:0;border:0;background:none;color:var(--c-text-2);font:var(--t-13) var(--font-ui);text-align:left;cursor:pointer}
 .b-brief-line:hover,.b-brief-line.is-hover{color:var(--c-text)}
 .b-brief-line .chev{flex:none;color:var(--c-text-3);transition:transform var(--d-fast) var(--ease-out)}
 .b-brief-line.open .chev{transform:rotate(90deg)}
 .b-brief-line .w{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.b-card-line{display:block;max-width:100%;margin:2px 0 6px;padding:0;border:0;background:none;font:var(--t-14) var(--font-ui);color:var(--c-text);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.b-card-line{display:block;max-width:100%;margin:0 0 var(--gap-tight);padding:0;border:0;background:none;font:var(--t-14) var(--font-ui);color:var(--c-text);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 .b-card-line:hover,.b-card-line.is-hover{color:var(--c-text)}
 .b-card-line .mark{color:var(--c-accent)}

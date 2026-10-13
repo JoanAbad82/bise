@@ -99,6 +99,9 @@ test("thread/folds-open: a click opens a steps pill, a thinking and a '$' line; 
     await expect(o.think).toBeVisible();
     await expect(o.out).toBeVisible();
     await expect(field, "his draft is untouched (no 'open line')").toHaveText('half a thought');
+    // a read with no code and no output yet opens to nothing: no empty box under its line
+    await expect(page.getByTestId('thread.tool.5'), 'the read line shows').toBeVisible();
+    await expect(page.getByTestId('thread.tool.5.open'), 'a read with nothing to show draws no empty box').toHaveCount(0);
     await page.mouse.move(1, 300);
     await page.screenshot({ path: test.info().outputPath('open-dark.png') });
     await core.send(prefs('light') as never);

@@ -5,13 +5,14 @@
 }
 /* one line high when empty (designer's try gate D18): the frame's min-height 48 px is the box's
    whole height (border-box: as content-box it made a 72 px box with the line at its bottom), and
-   the field's line gets 3 px above and below so one line is the send button's 28 px: empty or one
-   line, the text sits in the middle of a 52 px box; longer drafts grow with send at the bottom */
+   the field's line gets half of what it misses above and below so one line is the send button's
+   --h-control-sm: empty or one line, the text sits in the middle of the box; longer drafts grow
+   with send at the bottom */
 .b-composer .box {
   box-sizing: border-box;
 }
 .b-composer .box .in {
-  padding-block: 3px;
+  padding-block: calc((var(--h-control-sm) - 1lh) / 2);
 }
 /* one frame (ambient m_10689): the box is the frame, the field inside it is borderless (not the
    design system's .b-field input frame) */
@@ -36,15 +37,15 @@
 }
 .b-composer .b-field-ph {
   position: absolute;
-  inset: 3px auto auto 0;
+  inset: calc((var(--h-control-sm) - 1lh) / 2) auto auto 0;
   pointer-events: none;
   user-select: none;
 }
 .b-composer .b-chip.paste,
 .b-composer .b-chip.quote,
 .b-composer .b-chip.artifact {
-  height: 20px;
-  padding: 0 7px;
+  height: var(--s-5);
+  padding: 0 var(--s-2);
   margin: 0 1px;
   vertical-align: 1px;
   color: var(--c-accent);
@@ -67,7 +68,8 @@
   display: inline-block;
   width: 6px;
   height: 6px;
-  margin: 0 5px 1px 1px;
+  margin: 0 var(--s-1) 0 0;
+  vertical-align: 1px;
   border-radius: 50%;
   background: var(--c-text-2);
   animation: b-blink 1s steps(1) infinite;
@@ -80,9 +82,9 @@
 /* an image chip is the sent bubble's (designer m_18135, signed 900f998e): 1 px line, r 9, 'image 1'
    in ink beside its 16 px thumbnail or the faint no-file glyph slot; never the accent */
 .b-composer .b-chip.image {
-  gap: 5px;
-  height: 20px;
-  padding: 0 8px 0 3px;
+  gap: var(--s-1);
+  height: var(--s-5);
+  padding: 0 var(--s-2) 0 var(--s-1);
   margin: 0 1px;
   vertical-align: 1px;
   color: var(--c-text);
@@ -105,21 +107,21 @@
 .b-composer-strip {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 0 4px 6px;
+  gap: 0;
+  padding: 0 var(--s-1) var(--gap-tight);
   font: var(--t-12) var(--font-mono);
   color: var(--c-text-3);
 }
 .b-composer-strip .k {
-  margin-left: 10px;
+  margin-left: var(--gap-inline);
 }
 .b-composer-strip .n {
   color: var(--c-text-2);
 }
 .b-composer-pick {
   position: absolute;
-  left: 22px;
-  bottom: calc(100% - 6px);
+  left: var(--pad-card-x);
+  bottom: calc(100% - var(--s-2));
   z-index: 10;
   max-height: 280px;
   overflow-y: auto;
@@ -146,7 +148,7 @@
   row-gap: 0;
   align-items: center;
   box-sizing: border-box;
-  height: calc(7px + 1lh);
+  height: calc(var(--s-2) + 1lh);
   overflow: hidden;
 }
 .b-composer .keys .pairs {
@@ -168,10 +170,10 @@
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--gap-inline);
   min-width: 15ch;
-  padding: 1px 4px;
-  margin: -1px -4px;
+  padding: 0 var(--s-1);
+  margin: 0 calc(-1 * var(--s-1));
   border: 0;
   border-radius: var(--r-2);
   background: none;
@@ -205,7 +207,8 @@
 .b-composer .keys .mic .meter {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  /* the meter is a glyph: its bars' pitch is half a step, not a spacing */
+  gap: calc(var(--s-1) / 2);
   height: 10px;
 }
 .b-composer .keys .mic .meter i {
