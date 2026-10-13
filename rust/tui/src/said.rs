@@ -129,6 +129,8 @@ pub(crate) fn view_of(text: &str, parts: &[Part]) -> View {
             // attach::chip_spans); a listed file in the list after
             Part::File { path, name, missing } if !name.is_empty() => v.body.push_str(&parts::file_marker(name, path, *missing)),
             Part::File { path, .. } => files.push(path),
+            // the hub's line for the model (the capsule's), never drawn
+            Part::Hint { .. } => {}
             // his notes on a page, never the hub's template
             Part::Page { notes, .. } => v.body.push_str(&page_words(notes, "\n")),
             Part::Unknown(_) => {}
@@ -166,7 +168,8 @@ pub(crate) fn gist(parts: &[Part]) -> String {
             Part::File { path, name, .. } if !name.is_empty() => words.push_str(&format!("▯ {}", parts::file_name(path))),
             Part::File { path, .. } => words.push_str(&format!(" {path}")),
             Part::Page { notes, .. } => words.push_str(&page_words(notes, " · ")),
-            Part::Unknown(_) => {}
+            // the hub's line for the model, never his words (m_22706)
+            Part::Hint { .. } | Part::Unknown(_) => {}
         }
     }
     quotes.push(words.split_whitespace().collect::<Vec<_>>().join(" "));

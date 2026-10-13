@@ -78,3 +78,16 @@ fn a_numbered_quote_from_the_window_sits_at_its_place() {
     assert_eq!(v.quotes.len(), 1);
     assert_eq!(gist(&s.parts), "regarding ❝ 3, which?");
 }
+
+/// ambient-lead m_22706: the hub's hint (the capsule's line for the model)
+/// is never in his row, typed or read back from an old journal's text.
+#[test]
+fn the_hubs_hint_is_never_drawn() {
+    let hint = bise_proto::parts::capsule_hint("capsule").unwrap();
+    let parts = vec![text("what's running?"), hint];
+    let said = bise_proto::parts::render(&parts);
+    assert_eq!(view_of(&said, &parts).body, "what's running?");
+    assert_eq!(gist(&parts), "what's running?");
+    let old = bise_proto::parts::of_text(&said);
+    assert_eq!(view_of(&said, &old).body, "what's running?", "an old line hides it too");
+}

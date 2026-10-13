@@ -119,10 +119,93 @@ pub enum Part {
         #[serde(default)]
         notes: Vec<PageNote>,
     },
+    /// a line the hub adds after his words for the model (ambient-lead
+    /// m_22706, architect m_22715): `text` whole, its separator included,
+    /// rendered after everything else; never drawn in his bubble. Only
+    /// the hub makes one (`parts_in::said` refuses it from a client);
+    /// `of`: which one, so a client reads 'from fn' from it, never from
+    /// its words ([`via_fn`])
+    Hint {
+        #[serde(default)]
+        of: HintKind,
+        text: String,
+    },
     /// a part a newer client sent: kept whole, never rendered
     #[serde(untagged)]
     #[cfg_attr(feature = "ts", ts(skip))]
     Unknown(Value),
+}
+
+/// Which line the hub added ([`Part::Hint`]): the capsule's (he typed it
+/// with fn space: answer in one short line), the capsule's start (fn space
+/// + tab: start an agent), his open steps (a capsule message).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum HintKind {
+    Capsule,
+    CapsuleStart,
+    Steps,
+    #[default]
+    #[serde(other)]
+    Unknown,
+}
+
+/// The capsule's line after his words (main's rule reads it: prompts.rs).
+pub const CAPSULE_HINT: &str = "\n\n[from the capsule: answer in one short line]";
+/// The same for fn space + tab: main starts an agent on it.
+pub const CAPSULE_START_HINT: &str = "\n\n[from the capsule: start an agent; answer in one short line]";
+const STEPS_HEAD: &str = "\n[his open steps: ";
+const STEPS_TAIL: &str = "; when he says one is done: sb page tick <page> <item>]";
+
+/// The capsule's hint for an input sent `via` it (`capsule`,
+/// `capsule-start`); none for any other client.
+pub fn capsule_hint(via: &str) -> Option<Part> {
+    match via {
+        "capsule" => Some(Part::Hint { of: HintKind::Capsule, text: CAPSULE_HINT.into() }),
+        "capsule-start" => Some(Part::Hint { of: HintKind::CapsuleStart, text: CAPSULE_START_HINT.into() }),
+        _ => None,
+    }
+}
+
+/// His open steps as one hint (`page item "text"` each, roadmap D); none
+/// without any.
+pub fn steps_hint(steps: &[String]) -> Option<Part> {
+    match steps.is_empty() {
+        true => None,
+        false => Some(Part::Hint { of: HintKind::Steps, text: format!("{STEPS_HEAD}{}{STEPS_TAIL}", steps.join(", ")) }),
+    }
+}
+
+/// His message came by fn space, typed (designer m_22714: 'from fn' on
+/// his bubble): a capsule hint in it, and not said (a fn talk keeps its
+/// 'said'). The one rule both apps follow (fixture via_fn.json).
+pub fn via_fn(parts: &[Part], said: bool) -> bool {
+    !said && parts.iter().any(|p| matches!(p, Part::Hint { of: HintKind::Capsule | HintKind::CapsuleStart, .. }))
+}
+
+/// The hints at the end of `text` (the steps line, the capsule's), each
+/// exactly as the hub writes it: the text before them and the hints in
+/// order. The same words mid-message stay his.
+fn split_hints(text: &str) -> (&str, Vec<Part>) {
+    let mut rest = text;
+    let mut out = Vec::new();
+    loop {
+        if let Some(r) = rest.strip_suffix(CAPSULE_HINT) {
+            out.push(Part::Hint { of: HintKind::Capsule, text: CAPSULE_HINT.into() });
+            rest = r;
+        } else if let Some(r) = rest.strip_suffix(CAPSULE_START_HINT) {
+            out.push(Part::Hint { of: HintKind::CapsuleStart, text: CAPSULE_START_HINT.into() });
+            rest = r;
+        } else if let Some(i) = rest.strip_suffix(STEPS_TAIL).and_then(|r| r.rfind(STEPS_HEAD)).filter(|&i| !rest[i + 1..].contains('\n')) {
+            out.push(Part::Hint { of: HintKind::Steps, text: rest[i..].to_string() });
+            rest = &rest[..i];
+        } else {
+            break;
+        }
+    }
+    out.reverse();
+    (rest, out)
 }
 
 /// One thing he did on a page ([`Part::Page`]): on block `block`, a
@@ -262,8 +345,11 @@ pub fn render(parts: &[Part]) -> String {
     let mut head: Vec<String> = Vec::new();
     let mut body = String::new();
     let mut files: Vec<&str> = Vec::new();
+    let mut hints = String::new();
     for p in parts {
         match p {
+            // after everything, his files' list too: where the hub put it
+            Part::Hint { text, .. } => hints.push_str(text),
             Part::Quote { from, text, file, new, old, n: None } => head.push(quote_tag(from, file, new, old, None, text)),
             Part::Quote { from, text, file, new, old, n: Some(n) } => body.push_str(&quote_tag(from, file, new, old, Some(*n), text)),
             Part::Text { text } => body.push_str(text),
@@ -289,6 +375,7 @@ pub fn render(parts: &[Part]) -> String {
             out.push_str(f);
         }
     }
+    out.push_str(&hints);
     out
 }
 
@@ -378,6 +465,14 @@ fn marker_attr(s: &str) -> String {
 /// end. `render(&parse(t)) == t` for every `t`; a text with none of them
 /// is one text part (none for an empty text).
 pub fn parse(text: &str) -> Vec<Part> {
+    // the hub's hints at the very end (an old journal's line, hidden too)
+    let (body, hints) = split_hints(text);
+    let mut out = parse_body(body);
+    out.extend(hints);
+    out
+}
+
+fn parse_body(text: &str) -> Vec<Part> {
     let full = parse_all(text);
     if render(&full) == text {
         return full;

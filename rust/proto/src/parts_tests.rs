@@ -130,7 +130,7 @@ impl Rng {
     }
 }
 
-const BITS: &[&str] = &["", "a", "é", "\n", " ", "\"", ">", "</selection>", "</pasted>", "<selection from=\"", "\" n=\"", "\" n=\"1\">\n", "<pasted n=\"", "<image name=\"", "\" caption=\"", "[files he attached:]", "/x", "two words", "\n\n"];
+const BITS: &[&str] = &["", "a", "é", "\n", " ", "\"", ">", "</selection>", "</pasted>", "<selection from=\"", "\" n=\"", "\" n=\"1\">\n", "<pasted n=\"", "<image name=\"", "\" caption=\"", "[files he attached:]", "/x", "two words", "\n\n", "[from the capsule: answer in one short line]", "\n[his open steps: ", "; when he says one is done: sb page tick <page> <item>]"];
 
 fn word(r: &mut Rng) -> String {
     (0..r.next(4)).map(|_| r.pick(BITS)).collect()
@@ -153,6 +153,13 @@ fn gen_parts(r: &mut Rng) -> Vec<Part> {
     }
     for _ in 0..r.next(2) {
         out.push(listed(&format!("/w/{}", r.pick(&["a.md", "b c.pdf", "é.txt"]))));
+    }
+    // the hub's hints, last (m_22706)
+    if r.next(3) == 0 {
+        out.extend(capsule_hint(r.pick(&["capsule", "capsule-start"])));
+    }
+    if r.next(3) == 0 {
+        out.extend(steps_hint(&[format!("p {} \"{}\"", r.next(9), r.pick(&["pay", "a, b", "é"]))]));
     }
     out
 }
@@ -370,4 +377,50 @@ fn a_numbered_quote_sits_at_its_place() {
     // on the wire: n only when set
     assert_eq!(serde_json::to_value(qn(4, "main", "x")).unwrap(), serde_json::json!({"kind": "quote", "from": "main", "text": "x", "n": 4}));
     assert!(serde_json::to_value(q("main", "x")).unwrap().get("n").is_none());
+}
+
+/// ambient-lead m_22706, architect m_22715: the hub's hint renders after
+/// everything (his files' list too), the same bytes the hub wrote before
+/// it was a part; parse reads it back only at the very end; his words and
+/// the bubble never hold it.
+#[test]
+fn a_hint_is_the_hubs_line_after_everything() {
+    let cap = capsule_hint("capsule").unwrap();
+    let steps = steps_hint(&["p1 i2 \"pay\"".into()]).unwrap();
+    assert!(capsule_hint("tui").is_none() && steps_hint(&[]).is_none());
+    // today's bytes, byte for byte
+    assert_eq!(render(&[t("what's running?"), cap.clone()]), "what's running?\n\n[from the capsule: answer in one short line]");
+    assert_eq!(render(&[t("go"), capsule_hint("capsule-start").unwrap()]), "go\n\n[from the capsule: start an agent; answer in one short line]");
+    let both = [t("done"), cap.clone(), steps.clone()];
+    let text = render(&both);
+    assert_eq!(text, "done\n\n[from the capsule: answer in one short line]\n[his open steps: p1 i2 \"pay\"; when he says one is done: sb page tick <page> <item>]");
+    assert_eq!(parse(&text), both.to_vec(), "read back as hints");
+    assert_eq!(words(&parse(&text)), "done");
+    // an old journal's line: its parts, so every client hides it
+    assert_eq!(of_text("what's running?\n\n[from the capsule: answer in one short line]"), vec![t("what's running?"), cap.clone()]);
+    // after his files' list, where the hub put it
+    let with_list = [t("look"), listed("/w/a.md"), cap.clone()];
+    assert_eq!(render(&with_list), "look\n\n[files he attached:]\n/w/a.md\n\n[from the capsule: answer in one short line]");
+    assert_eq!(parse(&render(&with_list)), with_list.to_vec());
+    // the same words mid-message stay his
+    let mid = "he wrote\n\n[from the capsule: answer in one short line]\nthen more";
+    assert_eq!(parse(mid), vec![t(mid)]);
+    assert!(of_text(mid).is_empty());
+    // on the wire: kind hint, its of; an unknown of reads as Unknown
+    assert_eq!(serde_json::to_value(&cap).unwrap()["of"], "capsule");
+    let later: Part = serde_json::from_value(serde_json::json!({"kind": "hint", "of": "later", "text": "x"})).unwrap();
+    assert_eq!(later, Part::Hint { of: HintKind::Unknown, text: "x".into() });
+}
+
+/// 'from fn' on his bubble (designer m_22714): one rule, the same cases
+/// the window's viaFn reads (fixture via_fn.json).
+#[test]
+fn via_fn_follows_its_fixture() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/via_fn.json");
+    let cases: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap();
+    assert!(cases.len() >= 5);
+    for c in cases {
+        let parts: Vec<Part> = serde_json::from_value(c["parts"].clone()).unwrap();
+        assert_eq!(via_fn(&parts, c["said"].as_bool().unwrap()), c["via_fn"].as_bool().unwrap(), "{}", c["why"]);
+    }
 }

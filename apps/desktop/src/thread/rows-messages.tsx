@@ -15,7 +15,7 @@ import { saidFor, useSaidMs } from '@/voicemode';
 import type { RowCtx } from './rows';
 import { Thumb } from './rows-cards';
 import { AttachChip, FileThumb } from './AttachChip';
-import { drawnParts, youView, type YouView } from './parts';
+import { drawnParts, viaFn, youView, type YouView } from './parts';
 import { lineCount, quoteAbout } from '@/composer/message';
 /** A message of his longer than this folds to its first lines (tui-parity B11, the TUI's You(_, _, open)). */
 export const LONG_LINES = 12;
@@ -138,14 +138,28 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   // H12 (designer m_19832): no time under his bubbles, only on hover; the steer, the said line and
   // the delivery mark stay
   const words = steered ? `steered · ${shownName(ctx.agent)} read it mid-turn` : saidMs !== null ? saidFor(saidMs) : undefined;
+  // typed with fn space (designer m_22714): 'from fn' first on the row, always; the time after it
+  // keeps H12's hover rule (its ' · ' with it). Read from the hub's hint part, never its words
+  const fromFn = drawn !== null && viaFn(drawn, saidMs !== null);
+  const time =
+    e.at_ms > 0 ? (
+      <span className="th-you-time" data-testid={`thread.you.${String(e.pos)}.time`}>
+        {fromFn ? ` · ${clock(e.at_ms)}` : clock(e.at_ms)}
+      </span>
+    ) : undefined;
   const lead =
     words !== undefined ? (
       words
-    ) : e.at_ms > 0 ? (
-      <span className="th-you-time" data-testid={`thread.you.${String(e.pos)}.time`}>
-        {clock(e.at_ms)}
-      </span>
-    ) : undefined;
+    ) : fromFn ? (
+      <>
+        <span className="th-you-via" title="sent with fn, from another app" data-testid={`thread.you.${String(e.pos)}.via`}>
+          from fn
+        </span>
+        {time}
+      </>
+    ) : (
+      time
+    );
   const under =
     mark === null ? (
       lead
@@ -159,7 +173,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
       </>
     );
   return (
-    <YouBubble head={to} under={under} timeAlways={words !== undefined || (mark !== null && lastOfRun(e, next))} testId={`thread.you.${String(e.pos)}`}>
+    <YouBubble head={to} under={under} timeAlways={words !== undefined || fromFn || (mark !== null && lastOfRun(e, next))} testId={`thread.you.${String(e.pos)}`}>
       {quotes.map((q, i) => (
         <QuoteLine key={i} source={q.source} about={q.about} text={q.text} n={q.n} testId={`thread.you.${String(e.pos)}.quote.${String(i + 1)}`} />
       ))}

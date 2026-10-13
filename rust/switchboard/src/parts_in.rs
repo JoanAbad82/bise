@@ -58,6 +58,9 @@ pub fn said(parts: &[Part], files: &[String], store: &Path, put: &dyn Fn(&Path) 
                 let kind = v.get("kind").and_then(|k| k.as_str()).unwrap_or("?");
                 return Err(format!("this bise doesn't know part {kind}: update bise"));
             }
+            // a hint is the hub's line for the model, hidden from him:
+            // never a client's (architect m_22715)
+            Part::Hint { .. } => return Err("a hint part is the hub's: update bise".into()),
             Part::Image { b64_file, .. } if !b64_file.is_empty() && !in_store(b64_file, store) => {
                 return Err(format!("an image part must come from bise's image store: {b64_file}"));
             }
@@ -308,6 +311,14 @@ mod tests {
     fn an_unknown_part_is_refused() {
         let ps = [t("a"), Part::Unknown(serde_json::json!({"kind": "voice", "secs": 3}))];
         assert_eq!(said(&ps, &[], Path::new("/h/images"), &none, &yes), Err("this bise doesn't know part voice: update bise".into()));
+    }
+
+    /// architect m_22715: a hint (a model line hidden from him) only from
+    /// the hub; a client's is refused, nothing delivered.
+    #[test]
+    fn a_clients_hint_part_is_refused() {
+        let ps = [t("hi"), bise_proto::parts::capsule_hint("capsule").unwrap()];
+        assert_eq!(said(&ps, &[], Path::new("/h/images"), &none, &yes), Err("a hint part is the hub's: update bise".into()));
     }
 
     /// architect m_17621 Q2: b64_file only inside the image store.

@@ -1,10 +1,13 @@
 //! What bise ambient's capsule adds to an input for main: the line main's
 //! rule reads to answer in one short line (capsule_hint) and the user's
 //! open steps (steps_hint, read from the page cards). Moved out of
-//! daemon.rs unchanged (architect m_12143).
+//! daemon.rs unchanged (architect m_12143). Both go as hidden hint parts
+//! after his own (bise_proto::parts::Part::Hint, ambient-lead m_22706):
+//! the model gets the same text, his bubble never shows them.
 
 use super::page_cards::Page;
 use super::*;
+use bise_proto::parts::Part;
 
 impl Shell {
     /// His words (turn/send, command/run's non-command line: proto/cmds.rs
@@ -34,8 +37,20 @@ impl Shell {
                     if self.route_input(&s("focus"), &s("text"), &said, &s("via"), queued, v.get("context"), &s("parts")) {
                         return self.page_answers();
                     }
-                    let t = Self::capsule_hint(said, &s("via"));
-                    self.steps_hint(t, &s("via"))
+                    // the capsule's lines for the model, as hidden hint
+                    // parts after his own (ambient-lead m_22706, architect
+                    // m_22715): the model gets the same bytes, his bubble
+                    // none of them
+                    let mut hints: Vec<Part> = Self::capsule_hint(&said, &s("via")).into_iter().collect();
+                    hints.extend(self.steps_hint(&said, &s("via")));
+                    if !hints.is_empty() {
+                        let (text, parts) = hinted(&said, &s("parts"), hints);
+                        let mut v = v.clone();
+                        v["parts"] = json!(parts);
+                        self.step_input(id, &v, s("focus"), text, queued);
+                        return self.page_answers();
+                    }
+                    said
                 }
             };
             // S9: with its fn context (daemon/fn_context.rs)
@@ -46,28 +61,25 @@ impl Shell {
 
     /// An input from bise ambient's capsule (`via: "capsule"`) carries one
     /// more line, the one main's rule reads to answer in one short line
-    /// (prompts.rs); a slash command (`/answer N 1`) never gets it.
-    pub(super) fn capsule_hint(text: String, via: &str) -> String {
-        if text.trim_start().starts_with('/') {
-            return text;
-        }
-        match via {
-            "capsule" => format!("{text}\n\n[from the capsule: answer in one short line]"),
-            // fn space's typed text sent with tab (ambient-lead m_6513):
-            // main starts an agent on it, only main does
-            "capsule-start" => format!("{text}\n\n[from the capsule: start an agent; answer in one short line]"),
-            _ => text,
+    /// (prompts.rs; fn space + tab, `capsule-start`: main starts an agent
+    /// on it, ambient-lead m_6513); a slash command (`/answer N 1`) never
+    /// gets it. The line itself: bise_proto::parts::capsule_hint.
+    pub(super) fn capsule_hint(text: &str, via: &str) -> Option<Part> {
+        match text.trim_start().starts_with('/') {
+            true => None,
+            false => bise_proto::parts::capsule_hint(via),
         }
     }
 
     /// The user's open steps (roadmap D) as one more line of a capsule
     /// message to main: "done with the payment" from anywhere ticks the
-    /// right row (main runs `sb page tick`). Unchanged without any.
-    pub(super) fn steps_hint(&mut self, text: String, via: &str) -> String {
+    /// right row (main runs `sb page tick`). None without any. The line
+    /// itself: bise_proto::parts::steps_hint.
+    pub(super) fn steps_hint(&mut self, text: &str, via: &str) -> Option<Part> {
         if via != "capsule" || text.trim_start().starts_with('/') {
-            return text;
+            return None;
         }
-        let Some(pages) = self.pg.pages.clone() else { return text };
+        let pages = self.pg.pages.clone()?;
         let keys: Vec<(String, String)> = self.page_cards().values().filter(|(_, k)| k.starts_with("row:")).cloned().collect();
         let mut steps: Vec<String> = Vec::new();
         for (id, key) in keys {
@@ -76,12 +88,22 @@ impl Shell {
                 steps.push(format!("{id} {item} \"{}\"", s.text));
             }
         }
-        if steps.is_empty() {
-            return text;
-        }
-        format!("{text}
-[his open steps: {}; when he says one is done: sb page tick <page> <item>]", steps.join(", "))
+        bise_proto::parts::steps_hint(&steps)
     }
+}
+
+/// His words with the hub's hints after them: his parts (his words as one
+/// text part when he sent none) then `hints`, and the model's text,
+/// `render` of that one list, so the two agree. Pure.
+fn hinted(said: &str, parts: &str, hints: Vec<Part>) -> (String, String) {
+    let mut list: Vec<Part> = match serde_json::from_str::<Vec<Part>>(parts) {
+        Ok(l) if !l.is_empty() => l,
+        _ if said.is_empty() => Vec::new(),
+        _ => vec![Part::Text { text: said.to_string() }],
+    };
+    list.extend(hints);
+    let text = bise_proto::parts::render(&list);
+    (text, serde_json::to_string(&list).unwrap_or_default())
 }
 
 #[cfg(test)]
@@ -92,18 +114,26 @@ mod tests {
     /// any other client's input, and a slash command, stay as they are.
     #[test]
     fn an_input_from_the_capsule_carries_the_hint_main_reads() {
-        let hinted = Shell::capsule_hint("what's running?".into(), "capsule");
-        assert!(hinted.starts_with("what's running?\n\n"));
-        assert!(hinted.ends_with("[from the capsule: answer in one short line]"));
+        let h = |text: &str, via: &str| Shell::capsule_hint(text, via).into_iter().collect::<Vec<_>>();
+        // the model's text: today's bytes, byte for byte (the hint after his words)
+        let (text, parts) = hinted("what's running?", "", h("what's running?", "capsule"));
+        assert_eq!(text, "what's running?\n\n[from the capsule: answer in one short line]");
+        let back: Vec<Part> = serde_json::from_str(&parts).unwrap();
+        assert_eq!(bise_proto::parts::words(&back), "what's running?", "his words alone");
+        assert!(bise_proto::parts::via_fn(&back, false));
         // main's rule names the same line (prompts.rs)
         assert!(crate::prompts::main_role("/w", "/t", "", true).contains("a `[from the capsule…]` line"));
-        assert_eq!(Shell::capsule_hint("what's running?".into(), ""), "what's running?");
-        assert_eq!(Shell::capsule_hint("hi".into(), "tui"), "hi");
-        assert_eq!(Shell::capsule_hint("/answer 3 1".into(), "capsule"), "/answer 3 1");
+        assert!(h("what's running?", "").is_empty() && h("hi", "tui").is_empty());
+        assert!(h("/answer 3 1", "capsule").is_empty(), "never on a slash command");
         // fn space + tab: main starts an agent on it (ambient-lead m_6513)
-        assert_eq!(
-            Shell::capsule_hint("start an agent for: fix the login loop".into(), "capsule-start"),
-            "start an agent for: fix the login loop\n\n[from the capsule: start an agent; answer in one short line]"
-        );
+        let (text, _) = hinted("start an agent for: fix the login loop", "", h("start an agent for: fix the login loop", "capsule-start"));
+        assert_eq!(text, "start an agent for: fix the login loop\n\n[from the capsule: start an agent; answer in one short line]");
+        // his own parts stay first; the steps line after the capsule's, as before
+        let his = serde_json::to_string(&vec![Part::Text { text: "done with ".into() }, Part::Paste { n: 1, text: "x".into() }]).unwrap();
+        let mut hs = h("done", "capsule");
+        hs.extend(bise_proto::parts::steps_hint(&["p1 i2 \"pay\"".into()]));
+        let (text, _) = hinted("ignored: his parts win", &his, hs);
+        assert!(text.starts_with("done with <pasted n=\"1\""), "{text}");
+        assert!(text.ends_with("\n\n[from the capsule: answer in one short line]\n[his open steps: p1 i2 \"pay\"; when he says one is done: sb page tick <page> <item>]"), "{text}");
     }
 }

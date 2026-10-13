@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Part } from '@/proto';
-import { drawnParts, pageAnswer, pageOf, partsGist, youView } from './parts';
+import VIA_FN from '../../../../rust/proto/fixtures/via_fn.json';
+import { drawnParts, pageAnswer, pageOf, partsGist, viaFn, youView } from './parts';
 
 // msg-parts (architect m_17621): his message drawn from its typed parts, never a tag; the TUI's
 // said.rs view_of / gist are the rule
@@ -85,5 +86,23 @@ describe('his answer on a page (page part)', () => {
     expect(drawnParts([text('a'), { kind: 'voice', secs: 3 } as unknown as Part])).toBeNull();
     expect(drawnParts([text('a')])).toEqual([text('a')]);
     expect(drawnParts([])).toBeNull();
+  });
+});
+
+// ambient-lead m_22706, designer m_22714: the hub's hint (the capsule's line for the model) is never
+// drawn, and 'from fn' follows bise_proto::parts::via_fn on the same cases (via_fn.json)
+describe('the hub hint (m_22706)', () => {
+  const hint: Part = { kind: 'hint', of: 'capsule', text: '\n\n[from the capsule: answer in one short line]' };
+  it('is never in his words, his gist or his chips, and the window still draws the parts', () => {
+    const parts = [text("what's running?"), hint];
+    expect(drawnParts(parts)).toEqual(parts);
+    const v = youView(parts);
+    expect(v.words).toBe("what's running?");
+    expect(partsGist(parts)).toBe("what's running?");
+  });
+  it('from fn: the shared cases', () => {
+    const cases = VIA_FN as { why: string; said: boolean; via_fn: boolean; parts: Part[] }[];
+    expect(cases.length).toBeGreaterThanOrEqual(5);
+    for (const c of cases) expect(viaFn(c.parts, c.said), c.why).toBe(c.via_fn);
   });
 });

@@ -1905,6 +1905,11 @@
 .th-row:hover .th-you-under .th-you-time {
   opacity: 1;
 }
+/* typed with fn space (designer m_22709): 'from fn' first on his meta row, always shown, the
+   row's sans 12 in text-3 like the time; no accent, no chip */
+.th-you-via {
+  color: var(--c-text-3);
+}
 /* H6: a reply's headings never louder than its agent's head: h1 17, h2 and h3 at body size, 600;
    20 above, 4 below (.b-md: over the ds's md.css weight 700) */
 .th-md.b-md :is(h1, h2, h3, h4) {

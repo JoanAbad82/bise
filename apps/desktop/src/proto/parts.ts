@@ -14,6 +14,13 @@
 export type PageNote = { block: string, kind: string, text?: string, quote?: string, card?: number, asked?: string, };
 
 /**
+ * Which line the hub added ([`Part::Hint`]): the capsule's (he typed it
+ * with fn space: answer in one short line), the capsule's start (fn space
+ * + tab: start an agent), his open steps (a capsule message).
+ */
+export type HintKind = "capsule" | "capsule_start" | "steps" | "unknown";
+
+/**
  * One piece of his message.
  */
-export type Part = { "kind": "text", text: string, } | { "kind": "quote", from: string, text: string, file?: string, new?: string, old?: string, n?: number | null, } | { "kind": "paste", n: number, text: string, } | { "kind": "image", name: string, source: string, mime?: string, b64_file?: string, caption?: string, } | { "kind": "file", path: string, name?: string, missing?: boolean, } | { "kind": "page", text: string, to: string, page: string, title?: string, version: number, notes: Array<PageNote>, };
+export type Part = { "kind": "text", text: string, } | { "kind": "quote", from: string, text: string, file?: string, new?: string, old?: string, n?: number | null, } | { "kind": "paste", n: number, text: string, } | { "kind": "image", name: string, source: string, mime?: string, b64_file?: string, caption?: string, } | { "kind": "file", path: string, name?: string, missing?: boolean, } | { "kind": "page", text: string, to: string, page: string, title?: string, version: number, notes: Array<PageNote>, } | { "kind": "hint", of: HintKind, text: string, };

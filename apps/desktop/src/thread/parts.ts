@@ -72,6 +72,9 @@ export function youView(parts: readonly Part[]): YouView {
         // what he did on a page: its own row (pageAnswer), never the hub's template
         words += p.notes.map((n) => pageNoteWords(n, true)).filter((w) => w !== '').join('\n');
         break;
+      case 'hint':
+        // the hub's line for the model (the capsule's, his open steps), never his words (m_22706)
+        break;
       default:
         // a part from a newer client: kept by the hub, never drawn
         break;
@@ -94,6 +97,7 @@ export function partsGist(parts: readonly Part[]): string {
       const file = p.source.split('/').at(-1) ?? '';
       words += `▣ ${p.name.startsWith('[') || file === '' ? p.name : file}`;
     } else if (p.kind === 'page') words += p.notes.map((n) => pageNoteWords(n, true)).join(' · ');
+    else if (p.kind === 'hint') continue;
     else if (p.name !== undefined && p.name !== '') words += `▯ ${p.path.split('/').at(-1) ?? p.path}`;
     else words += ` ${p.path}`;
   }
@@ -101,7 +105,14 @@ export function partsGist(parts: readonly Part[]): string {
 }
 
 /** The part kinds this window draws; an entry with another kind (a newer hub's) is drawn from its text. */
-const KNOWN_KINDS: ReadonlySet<string> = new Set(['text', 'quote', 'paste', 'image', 'file', 'page']);
+const KNOWN_KINDS: ReadonlySet<string> = new Set(['text', 'quote', 'paste', 'image', 'file', 'page', 'hint']);
+
+/** He typed it with fn space (designer m_22714: 'from fn' on his bubble): a capsule hint in his
+ *  parts and not said (a fn talk keeps 'said'). bise_proto::parts::via_fn, the same cases
+ *  (fixture rust/proto/fixtures/via_fn.json, read by both). Pure. */
+export function viaFn(parts: readonly Part[], said: boolean): boolean {
+  return !said && parts.some((p) => p.kind === 'hint' && (p.of === 'capsule' || p.of === 'capsule_start'));
+}
 
 /** His parts when this window can draw them all, else null: an entry with a part of a kind it
  *  doesn't know (a newer hub's) is drawn from its text, never as an empty bubble (architect m_20833). Pure. */
