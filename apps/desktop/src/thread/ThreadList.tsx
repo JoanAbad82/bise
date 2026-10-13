@@ -205,8 +205,15 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
     stick.current = on;
     setStuck(on);
   }, []);
+  // to the end by scrollTop, not Virtuoso's scrollToIndex: a scrollToIndex re-runs itself whenever
+  // the list's sizes change within 150 ms of its scroll (for up to 1.2 s), and his wheel up brings
+  // in unmeasured rows that change those sizes, so a pending one took him back to the end ~300 ms
+  // after he scrolled up (qa-flows' type-anywhere red, 3 of 5). While it sticks, each growth comes
+  // back here (onGrow, the box observer), which is all the retry it needs.
   const toEndNow = useCallback(() => {
-    virtuoso.current?.scrollToIndex(LAST);
+    const el = scroller.current;
+    if (el === null) virtuoso.current?.scrollToIndex(LAST);
+    else el.scrollTop = el.scrollHeight;
   }, []);
   // the hold: the row he reads (its holdPart) back at the y it had before
   // the prepend, by nudging scrollTop (Virtuoso's own prepend left ~7 px,
@@ -380,8 +387,8 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         requestAnimationFrame(settle);
       };
       requestAnimationFrame(settle);
-    } else virtuoso.current?.scrollToIndex(LAST);
-  }, [keys, scrollKey]);
+    } else toEndNow();
+  }, [keys, scrollKey, toEndNow]);
   // his place while scrolled up: the row he reads, measured in the DOM (Virtuoso's range starts
   // in the 600 px drawn above the view, so its first row is one he doesn't see); at the end,
   // nothing kept. At each scroll (measure) and each new range, once he moved it.
@@ -414,8 +421,8 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
 
   const toEnd = useCallback(() => {
     setStick(true);
-    if (keys.length > 0) virtuoso.current?.scrollToIndex({ index: keys.length - 1, align: 'end' });
-  }, [keys, setStick]);
+    if (keys.length > 0) toEndNow();
+  }, [keys, setStick, toEndNow]);
 
   useImperativeHandle(
     ref,

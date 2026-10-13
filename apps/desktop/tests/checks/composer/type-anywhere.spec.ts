@@ -217,7 +217,17 @@ test('composer/type-anywhere: with the thread scrolled up, a key and a paste lan
       });
     // scrolled up, far from the end, the way he does it: a wheel up unsticks the list from its
     // end (ThreadList's stick); a scrollTop set from a script would be pulled back to the end
-    const end = await top();
+    // the end once the list has measured its rows: Virtuoso opens on estimated sizes and shrinks to
+    // the real ones over the first ~250 ms (here ~1,400 px), so an end read before that is far below
+    // the real one, the wheel loop below stopped before any wheel, and the list, never scrolled,
+    // read as 'back at its end' (qa-flows' 3-of-5 red: the list was never moved)
+    let end = await top();
+    for (let i = 0; i < 30; i += 1) {
+      await page.waitForTimeout(100);
+      const now = await top();
+      if (Math.abs(now - end) < 1) break;
+      end = now;
+    }
     const box = must(await page.locator('.th-list [data-virtuoso-scroller="true"]').boundingBox(), 'the thread list is on screen');
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     // up by small steps, to the middle: neither end, so a move either way shows
