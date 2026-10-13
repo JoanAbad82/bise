@@ -12,7 +12,16 @@ REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "tests"))
 from bise_env import NOT_INHERITED, OWN_PATHS  # noqa: E402  (the one list, never copied)
 
-GATE = os.path.realpath(os.path.expanduser("~/.bise/gate"))
+
+def his_bise():
+    """His own ~/.bise from the user database, never from HOME: a run with HOME on a stand-in
+    (a gate world, the app's swap from a stand-in) must never take that home for his."""
+    import pwd
+    return os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".bise")
+
+
+# his gate, whatever HOME says (a stand-in's HOME would put it inside the stand-in)
+GATE = os.path.realpath(os.path.join(his_bise(), "gate"))
 
 
 class TryError(Exception):

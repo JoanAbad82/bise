@@ -33,6 +33,18 @@ export interface BiseApi {
     readonly revert: () => Promise<boolean>;
   };
   /**
+   * His try app's swap to the staged gated build, from inside (src/main/update/tryswap.ts,
+   * ambient-lead m_22832). update(): this app's build and whether a gated build waits. swap():
+   * saves the route (reopened like update.install's), the keeps and the window frame, quits, and
+   * the staged build opens; his hubs keep running. Resolves {ok:false, why} when refused (nothing
+   * staged, not the try bundle...). Test mode: update() answers TEST_APP_UPDATE_ENV's JSON and
+   * swap() prints `APP_SWAP_LINE <route>` instead of quitting.
+   */
+  readonly app: {
+    readonly update: () => Promise<AppUpdate>;
+    readonly swap: (route?: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly why: string }>;
+  };
+  /**
    * Opens a link in his browser or mail app: http, https and mailto only
    * (src/main/external.ts). Resolves false when refused. In test mode nothing
    * opens: main prints `EXTERNAL_LINE <url>` on stdout instead.
@@ -353,6 +365,8 @@ export const IPC = {
   updateNow: 'bise:update-now',
   updateInstall: 'bise:update-install',
   updateRevert: 'bise:update-revert',
+  appUpdate: 'bise:app-update',
+  appSwap: 'bise:app-swap',
   /** the renderer's keep on disk (amb-win, src/main/keep.ts): read (sync) at start, write each change */
   keepRead: 'bise:keep-read',
   keepWrite: 'bise:keep-write',
@@ -369,6 +383,23 @@ export type UpdateState =
   | { readonly state: 'ready'; readonly version: string }
   | { readonly state: 'failed'; readonly version: string; readonly why: string }
   | { readonly state: 'went_bad'; readonly version: string };
+
+/**
+ * His try app against the staged gated build (window.bise.app.update): 'staged' a --promote'd
+ * build waits (staged: its commit), 'current' nothing staged, 'none' no swap from this app (why
+ * says it). live: this app's own build commit (its bundle's runtime VERSION), null in a dev run.
+ */
+export interface AppUpdate {
+  readonly state: 'current' | 'staged' | 'none';
+  readonly live: string | null;
+  readonly staged: string | null;
+  readonly why: string | null;
+}
+
+/** Test mode: window.bise.app.update()'s answer, an AppUpdate as JSON (else 'none'). */
+export const TEST_APP_UPDATE_ENV = 'BISE_DESKTOP_TEST_APP_UPDATE';
+/** Test mode: window.bise.app.swap's line instead of the quit, `APP_SWAP_LINE <route>`. */
+export const APP_SWAP_LINE = 'bise-desktop: app swap';
 
 /** Test mode: the folder window.bise.pickFolder answers (an absolute path), never a panel. */
 export const TEST_PICK_FOLDER_ENV = 'BISE_DESKTOP_TEST_PICK_FOLDER';

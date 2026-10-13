@@ -62,7 +62,7 @@ import sys
 import time
 
 from desktop_try_env import (GATE, SELF_CONTAINED, TryError, clone_names, config_for_try, guard, his_env,  # one module,
-                             his_repos, homes, keep_old_root, live_build, not_swapped, self_contained, try_env,
+                             his_bise, his_repos, homes, keep_old_root, live_build, not_swapped, self_contained, try_env,
                              under)  # split for its size
 
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -596,7 +596,7 @@ def promote(env, sha, checkout=None, repo=REPO):
             os.rename(src, dst)
         except OSError:
             shutil.copytree(src, dst, symlinks=True)
-    new = dict(stamp, where="staged", root=root, **keep_old_root(saved))
+    new = dict(stamp, where="staged", root=root, promoted=sha, **keep_old_root(saved))  # gated: desktop_try_swap
     if live_root and live_root != root:
         new["live_root"] = live_root
     write_stamp(tp, new)
@@ -794,7 +794,7 @@ def open_real(real, tryh, paths, environ=None, timeout=20):
     quits first; the bundle is opened with no variable (real_app_env). Says what it opened."""
     environ = os.environ if environ is None else environ
     app = paths["app"]
-    extra = real_app_env(environ, real, os.path.expanduser("~/.bise"))
+    extra = real_app_env(environ, real, his_bise())
     if os.path.isdir(tryh) and (app_running(app, tryh) or any(os.path.exists(s) for s in hub_socks(tryh))):
         r = stop(real, tryh, app)
         say("stopped the try (app %s, %d hubs)" % (r["app"] or "not running", len(r["hubs"])))
@@ -834,7 +834,7 @@ def stop_real(real, app, default_real=None):
     """bise-ambient --real --stop: every instance of the bundle quits. On a stand-in home (under
     ~/.bise/gate, amb-tools' world) its hubs stop too, then every process left whose args name that
     home (repl-live outlived the app: ambient-lead m_18642), by pid; on his own home, never his hubs."""
-    default_real = default_real or os.path.expanduser("~/.bise")
+    default_real = default_real or his_bise()
     out = {"app": quit_bundle(app), "hubs": [], "killed": []}
     if os.path.realpath(real) == os.path.realpath(default_real):
         return out

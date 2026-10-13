@@ -5,7 +5,7 @@
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
-import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type NotifyAuth, type Surface, type TermOpened, type UpdateState } from '../shared/api';
+import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type AppUpdate, type BiseApi, type CapsuleState, type MenuAction, type NotifyAuth, type Surface, type TermOpened, type UpdateState } from '../shared/api';
 import { argValue } from './args';
 import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
 import { coreBridge } from './core/bridge';
@@ -67,6 +67,10 @@ const api: BiseApi = {
     onState: (listener) => listen(IPC.updateState, listener),
     install: async (route) => (await ipcRenderer.invoke(IPC.updateInstall, route)) === true,
     revert: async () => (await ipcRenderer.invoke(IPC.updateRevert)) === true,
+  },
+  app: {
+    update: () => ipcRenderer.invoke(IPC.appUpdate) as Promise<AppUpdate>,
+    swap: (route) => ipcRenderer.invoke(IPC.appSwap, route) as Promise<{ ok: true } | { ok: false; why: string }>,
   },
   openExternal: async (url) => (await ipcRenderer.invoke(IPC.openExternal, url)) === true,
   openPath: async (path, opts) => (await ipcRenderer.invoke(IPC.openPath, path, opts)) === true,

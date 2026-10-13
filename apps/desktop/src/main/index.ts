@@ -35,6 +35,7 @@ import { testHomeProblem } from './testhome';
 import { standInPaths } from './userdata';
 import { themeSourceOf } from './theme';
 import { takeRoute, Updates, updateTarget } from './update/run';
+import { installTrySwapIpc } from './update/tryrun';
 import { MainWindow } from './windows';
 import { fenceOffscreen, isOffscreen, noAsks, OFFSCREEN_DISABLED_BLINK, OFFSCREEN_DISABLED_FEATURES, offscreenActivation } from './offscreen';
 import { Notifier } from './notify/run';
@@ -259,6 +260,8 @@ void app.whenReady().then(() => {
   ipcMain.handle(IPC.updateNow, () => updates?.now() ?? { state: 'none' });
   ipcMain.handle(IPC.updateInstall, (_e, route: unknown) => updates?.install(typeof route === 'string' ? route : null) ?? false);
   ipcMain.handle(IPC.updateRevert, () => updates?.revert() ?? false);
+  // his try's swap to the staged gated build, from inside (update/tryrun.ts)
+  installTrySwapIpc({ testMode, env: process.env, execPath: process.execPath, packaged: app.isPackaged, realHome: userInfo().homedir, updatesDir });
   if (updates !== null) {
     void updates.start().then(() => {
       onCoreEvent((ev) => {
