@@ -421,9 +421,13 @@ impl Shell {
                 if !parts.is_empty() {
                     let refused = cid.map(|_| "refused");
                     return match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image, &crate::daemon::fn_context::file_exists) {
-                        Ok(s) => match line.strip_suffix(s.text.as_str()) {
-                            Some("" | "say " | "steer ") if !line.trim_start().starts_with('/') => {
-                                self.proto_input(id, &tag, agent, line.clone(), opts, cid, s.parts)
+                        // the line is the text of the parts he sent; the
+                        // model gets the hub's (a file gone at send time
+                        // is marked missing there, file-chips)
+                        Ok(s) => match line.strip_suffix(bise_proto::parts::render(&parts).as_str()) {
+                            Some(verb @ ("" | "say " | "steer ")) if !line.trim_start().starts_with('/') => {
+                                let text = format!("{verb}{}", s.text);
+                                self.proto_input(id, &tag, agent, text, opts, cid, s.parts)
                             }
                             _ => self.proto_error_cid(id, &tag, PARTS_NOT_THE_LINE, cid, refused),
                         },

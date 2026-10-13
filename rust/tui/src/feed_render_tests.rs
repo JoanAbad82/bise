@@ -2166,3 +2166,58 @@ fn an_interrupt_mid_answer_is_a_dim_stop_naming_who() {
         assert_eq!(rows_text(&ev_rows(&ev, 0, 100)).join("\n"), text);
     }
 }
+
+/// file-chips: a message of yours with an image and file chips draws
+/// each chip by name in its place (`▯ deck.pptx`), a gone one
+/// `· missing`, never a marker.
+#[test]
+fn your_file_chips_draw_by_name_in_place() {
+    use bise_proto::parts::Part;
+    let parts = vec![
+        Part::Text { text: "ajouter l'image ".into() },
+        Part::Image { name: "[Image #1]".into(), source: "/u/logo.png".into(), mime: "image/png".into(), b64_file: "/nowhere/1.b64".into() },
+        Part::Text { text: " dans ".into() },
+        Part::File { path: "/u/My Desktop/deck.pptx".into(), name: "[File #2]".into(), missing: false },
+        Part::Text { text: " et ".into() },
+        Part::File { path: "/u/gone.csv".into(), name: "[File #3]".into(), missing: true },
+    ];
+    let said = crate::said::Said::new(bise_proto::parts::render(&parts), parts);
+    let (events, mut cache) = arrive(vec![Ev::You(said, Mark::Read, false, None)]);
+    let rows = cached_text(&events, &mut cache, 120).join("\n");
+    assert!(rows.contains("▣ logo.png") && rows.contains("▯\u{a0}deck.pptx") && rows.contains("▯\u{a0}gone.csv · missing"), "{rows}");
+    assert!(!rows.contains("<file") && !rows.contains("<image"), "{rows}");
+}
+
+/// file-chips: the tmux test's message (an image, seven file chips, one
+/// gone) draws at every width without a panic.
+#[test]
+fn many_file_chips_draw_at_every_width() {
+    use bise_proto::parts::Part;
+    let f = |n: u32, name: &str, missing: bool| Part::File { path: format!("/tmp/sb-e2e-x/My Desktop/{name}"), name: format!("[File #{n}]"), missing };
+    let t = |s: &str| Part::Text { text: s.into() };
+    let parts = vec![
+        t("ajouter l'image "),
+        Part::Image { name: "[Image #1]".into(), source: "/tmp/sb-e2e-x/My Desktop/logo.png".into(), mime: "image/png".into(), b64_file: "/nowhere/1.b64".into() },
+        t(" dans la presentation powerpoint "),
+        f(2, "deck.pptx", false),
+        t(" avec "),
+        f(3, "q3.pdf", false),
+        t(" "),
+        f(4, "data.csv", false),
+        t(" "),
+        f(5, "plan.xlsx", false),
+        t(" "),
+        f(6, "brief.docx", false),
+        t(" "),
+        f(7, "gone.csv", true),
+        t("  "),
+        Part::File { path: "/tmp/sb-e2e-x/ws/docs/roadmap.pdf".into(), name: "[File #8]".into(), missing: false },
+        t(" "),
+    ];
+    let said = crate::said::Said::new(bise_proto::parts::render(&parts), parts);
+    for w in [20, 40, 60, 80, 100, 110, 116, 150] {
+        let (events, mut cache) = arrive(vec![Ev::You(said.clone(), Mark::Read, false, None)]);
+        let rows = cached_text(&events, &mut cache, w).join("\n");
+        assert!(rows.contains("deck.pptx"), "{w}: {rows}");
+    }
+}

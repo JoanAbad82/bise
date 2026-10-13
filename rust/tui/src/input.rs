@@ -317,23 +317,23 @@ pub(crate) fn on_mouse(app: &mut App, m: &crossterm::event::MouseEvent, term_h: 
             app.quote_hint = false;
         }
         textlayer::Out::Copy(t) => copy_text(app, &t),
-        // an attachment's chip (open_file.rs): a click previews it, ⌥
-        // click shows it in Finder
-        textlayer::Out::Open(url) if crate::open_file::path_of_url(&url).is_some() => {
-            let alt = m.modifiers.contains(crossterm::event::KeyModifiers::ALT);
-            let note = crate::open_file::on_chip(crate::open_file::path_of_url(&url).unwrap_or_default(), alt);
-            if !note.is_empty() {
-                flash(app, note);
-            }
-        }
-        textlayer::Out::Open(url) => {
-            let note = textlayer::open(app, &url);
-            flash(app, note);
-        }
+        textlayer::Out::Open(url) => open_link(app, &url, m.modifiers.contains(crossterm::event::KeyModifiers::ALT)),
         textlayer::Out::Click(press) => {
             on_screen_mouse(app, &press, term_h);
             on_screen_mouse(app, m, term_h);
         }
+    }
+}
+
+/// A click on a link: an attachment's chip previews its file, ⌥ held
+/// shows it in Finder (open_file.rs); any other opens (textlayer::open).
+fn open_link(app: &mut App, url: &str, alt: bool) {
+    let note = match crate::open_file::path_of_url(url) {
+        Some(path) => crate::open_file::on_chip(path, alt),
+        None => textlayer::open(app, url),
+    };
+    if !note.is_empty() {
+        flash(app, note);
     }
 }
 
@@ -521,9 +521,9 @@ fn on_screen_mouse(app: &mut App, m: &crossterm::event::MouseEvent, term_h: u16)
             // the terminal's own (Ghostty keeps the release)
             let Some((i, row, col)) = app.feed_sel.take().map(|s| s.anchor) else { return };
             if let Some(url) = feed_link_at(app, i, row, col) {
-                // a local file opens in your editor (BISE-264)
-                let note = textlayer::open(app, &url);
-                flash(app, note);
+                // a local file opens in your editor (BISE-264), an
+                // attachment's chip in its preview (⌥: Finder)
+                open_link(app, &url, m.modifiers.contains(crossterm::event::KeyModifiers::ALT));
                 return;
             }
             crate::feed::toggle_at(&mut app.events, &mut app.cache, i, row);
