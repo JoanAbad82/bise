@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { Button } from '@/ds';
 import { useStore } from '@/store';
+import { useKeptScroll } from '@/app/keep';
 import { useAllScheduled } from './hooks';
 import { asks, bySoonest, endsWords, howOften, keyOf, nextRunWords, nextWords, runsWords, wakes, type Task } from './model';
 import './scheduled.css';
@@ -20,6 +21,7 @@ export interface ScheduledPorts {
 export function ScheduledScreen() {
   const store = useStore();
   const tasks = useAllScheduled();
+  useKeptScroll('scheduled', () => document.querySelector<HTMLElement>('[data-testid="scheduled.list"]'));
   return (
     <ScheduledView
       tasks={tasks}

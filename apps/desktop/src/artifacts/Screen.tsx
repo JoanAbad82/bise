@@ -6,6 +6,7 @@ import { useState, type KeyboardEvent } from 'react';
 import { Button, Field, Menu, MenuItem, Press } from '@/ds';
 import { useProjects } from '@/store';
 import { useRouter } from '@/app/router';
+import { useKeptScroll } from '@/app/keep';
 import { useAllArtifacts } from './hooks';
 import { ArtifactRows, useLook } from './List';
 import { usePutInMessage } from './Open';
@@ -16,6 +17,8 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   const router = useRouter();
   const all = useAllArtifacts();
   const projects = useProjects();
+  // back from an open artifact (esc, ‹): the list where he left it (designer's desktop-history)
+  useKeptScroll(`artifacts:${project}`, () => document.querySelector<HTMLElement>('[data-testid="artifacts.list"]'));
   const [f, setF] = useState<Filter>({ ...ALL, project });
   const [sel, setSel] = useState<string | null>(null);
   const [menu, setMenu] = useState<'project' | 'agent' | null>(null);

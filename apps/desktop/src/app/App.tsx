@@ -167,7 +167,8 @@ function useStill(): void {
 }
 
 function Shell() {
-  useHistoryWays(useRouter());
+  const router = useRouter();
+  useHistoryWays(router);
   useStill();
   const [palette, setPalette] = usePaletteOpen();
   const [help, setHelp] = useState(false);
@@ -196,7 +197,6 @@ function Shell() {
       window.removeEventListener(HELP_EVENT, open);
     };
   }, []);
-  const router = useRouter();
   const route = useRoute();
   useMenuRouting(router);
   useMainRoutes(router);

@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { Markdown, openable } from './Markdown';
-import { anchorRow, nextFirstIndex } from './ThreadList';
+import { anchorRow, nextFirstIndex, placeOf } from './ThreadList';
 
 afterEach(cleanup);
 
@@ -23,6 +23,14 @@ describe('the list keeps what he reads when an older page comes in front', () =>
     expect(anchorRow(rows, 0)).toEqual({ index: 999, top: -50 });
     expect(anchorRow(rows, 10)).toEqual({ index: 1000, top: 10 });
     expect(anchorRow([], 0)).toBeUndefined();
+  });
+  it('his place in keep: the row and its px from the top; an older build kept the row alone', () => {
+    expect(placeOf({ key: 'e:14', off: -17 })).toEqual({ key: 'e:14', off: -17 });
+    expect(placeOf('e:14')).toEqual({ key: 'e:14', off: 0 });
+    expect(placeOf({ key: 'e:14', off: Number.NaN })).toEqual({ key: 'e:14', off: 0 });
+    expect(placeOf({ off: 3 })).toBeUndefined();
+    expect(placeOf(undefined)).toBeUndefined();
+    expect(placeOf(400)).toBeUndefined();
   });
 });
 

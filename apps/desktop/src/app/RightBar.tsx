@@ -16,7 +16,7 @@ import { useTour } from '@/setup/useTour';
 import { Hint, hintUsed, useHint } from './hints';
 import { MAIN } from './route';
 import { useNow } from './clock';
-import { keep } from './keep';
+import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
 import { agentRows, archivedRows, artifactRows, capRows, scheduledRows, waitingRows, type BarRow, type ProjAgent } from './barrows';
 
@@ -232,6 +232,8 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   const now = useNow();
   const alt = useAltHeld();
   const all = project === '';
+  // back from an artifact (‹, esc, ✕): the bar as he left it, its scroll too (designer's desktop-history)
+  useKeptScroll(`rb:${project}`, () => document.querySelector<HTMLElement>('[data-testid="app.panel"] .app-rb-body'));
   const agents = useBarAgents(project);
   const artifacts = useAllArtifacts(all ? undefined : project);
   const tasks = useAllScheduled(all ? undefined : project);

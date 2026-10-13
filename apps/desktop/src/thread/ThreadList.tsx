@@ -92,6 +92,18 @@ export function anchorRow(rows: readonly { index: number; top: number; bottom: n
   return r === undefined ? undefined : { index: r.index, top: r.top };
 }
 
+/**
+ * His place in a thread as keep.ts holds it: the key of the row he reads (the first one under the
+ * top edge) and its top's px from that edge, so it comes back at the same y, back on the thread
+ * after an artifact, ‹ › or a reload. An older build kept the key alone (no px). Pure.
+ */
+export function placeOf(v: unknown): { key: string; off: number } | undefined {
+  if (typeof v === 'string') return { key: v, off: 0 };
+  if (typeof v !== 'object' || v === null) return undefined;
+  const { key, off } = v as { key?: unknown; off?: unknown };
+  return typeof key === 'string' ? { key, off: typeof off === 'number' && Number.isFinite(off) ? off : 0 } : undefined;
+}
+
 /** How long after a prepend the anchor row is held (Virtuoso measures the new rows over a few frames). */
 const HOLD_MS = 1500;
 
@@ -122,6 +134,8 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
   // click: held because he opened or closed a row (it keeps its y even at the end: never re-stuck)
   const held = useRef<{ index: number; top: number; until: number; click?: boolean } | undefined>(undefined);
   const holdRef = useRef<() => void>(() => undefined);
+  // his place written to keep.ts (keepPlace below, once `stick` exists)
+  const placeRef = useRef<() => void>(() => undefined);
   const measure = useCallback(() => {
     const el = scroller.current;
     if (el === null) return;
@@ -134,6 +148,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
       return { index: Number(r.dataset.itemIndex), top: b.top, bottom: b.bottom };
     });
     reading.current = anchorRow(rows, el.getBoundingClientRect().top);
+    placeRef.current();
   }, [holdPart]);
   const scrollerRef = useCallback(
     (el: HTMLElement | Window | null) => {
@@ -169,6 +184,13 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
   // After a reload (keep.ts) it opens where he had scrolled up to, if that row is loaded
   // (below, once `stick` exists).
   const opened = useRef(false);
+  // he moved this list (wheel, key, press): only then is a place written. The list a mount put
+  // back keeps the place it was given: the narrow thread beside an artifact wraps its rows
+  // taller, so its own px would bring the wide one back lower than he left it.
+  const moved = useRef(false);
+  // a kept place being put back (the frames after the restore): Virtuoso's first atBottom, from
+  // its mount at the end, may come after it and must not stick the list back to the end
+  const restoring = useRef(false);
   const scrollKey = keepKey === undefined ? undefined : `scroll:${keepKey}`;
 
   // it stays at its end until HE scrolls up (qa-type b37dc4c1, his bug 5):
@@ -325,25 +347,70 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
   useLayoutEffect(() => {
     if (opened.current || keys.length === 0) return;
     opened.current = true;
-    const at = scrollKey === undefined ? undefined : keep.view(scrollKey);
-    const i = typeof at === 'string' ? keys.indexOf(at) : -1;
-    if (i >= 0 && i < keys.length - 1) {
+    const at = scrollKey === undefined ? undefined : placeOf(keep.view(scrollKey));
+    const i = at === undefined ? -1 : keys.indexOf(at.key);
+    if (at !== undefined && i >= 0 && i < keys.length - 1) {
       // unstuck now (no growth may take it back to the end), drawn so in the next tick
       stick.current = false;
       queueMicrotask(() => {
         setStuck(false);
       });
-      virtuoso.current?.scrollToIndex({ index: i, align: 'start' });
+      // that row's top back at its px from the top edge
+      virtuoso.current?.scrollToIndex({ index: i, align: 'start', offset: -at.off });
+      // Virtuoso lands on its estimated sizes (a few px off): that row's top, measured in the
+      // DOM, is nudged back to its px over the next frames, until he moves the list
+      const index = firstIndex.current + i;
+      const until = Date.now() + HOLD_MS;
+      restoring.current = true;
+      const settle = () => {
+        if (moved.current || Date.now() >= until) {
+          restoring.current = false;
+          return;
+        }
+        if (stick.current) {
+          stick.current = false;
+          setStuck(false);
+        }
+        const el = scroller.current;
+        const r = el?.querySelector<HTMLElement>(`[data-item-index="${String(index)}"]`) ?? null;
+        if (el !== null && r !== null) {
+          const d = r.getBoundingClientRect().top - el.getBoundingClientRect().top - at.off;
+          if (Math.abs(d) >= 0.5) el.scrollTop += d;
+        }
+        requestAnimationFrame(settle);
+      };
+      requestAnimationFrame(settle);
     } else virtuoso.current?.scrollToIndex(LAST);
   }, [keys, scrollKey]);
-  // his place while scrolled up (the first row in view); at the end, nothing kept
-  const onRange = useCallback(
-    (r: { startIndex: number }) => {
-      if (scrollKey === undefined || !opened.current) return;
-      keep.setView(scrollKey, stick.current ? undefined : keys[r.startIndex - next.index], true);
-    },
-    [scrollKey, keys, next.index],
-  );
+  // his place while scrolled up: the row he reads, measured in the DOM (Virtuoso's range starts
+  // in the 600 px drawn above the view, so its first row is one he doesn't see); at the end,
+  // nothing kept. At each scroll (measure) and each new range, once he moved it.
+  const keepPlace = useCallback(() => {
+    // a mount that only put his place back writes nothing, not even "at the end": Virtuoso's
+    // first atBottom (before the restore lands) sticks it for a frame
+    if (scrollKey === undefined || !opened.current || !moved.current) return;
+    if (stick.current) {
+      keep.setView(scrollKey, undefined, true);
+      return;
+    }
+    const el = scroller.current;
+    if (el === null) return;
+    const edge = el.getBoundingClientRect().top;
+    const rows = Array.from(el.querySelectorAll<HTMLElement>('[data-item-index]'), (r) => {
+      const b = r.getBoundingClientRect();
+      return { index: Number(r.dataset.itemIndex), top: b.top, bottom: b.bottom };
+    });
+    const a = anchorRow(rows, edge);
+    const key = a === undefined ? undefined : keys[a.index - next.index];
+    if (a === undefined || key === undefined) return;
+    keep.setView(scrollKey, { key, off: Math.round(a.top - edge) }, true);
+  }, [scrollKey, keys, next.index]);
+  useLayoutEffect(() => {
+    placeRef.current = keepPlace;
+  }, [keepPlace]);
+  const onRange = useCallback(() => {
+    keepPlace();
+  }, [keepPlace]);
 
   const toEnd = useCallback(() => {
     setStick(true);
@@ -371,6 +438,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
       data-testid={testId}
       data-stuck={stuck}
       onPointerDown={(e) => {
+        moved.current = true;
         held.current = undefined;
         // a press on a row's toggle (a fold, a thinking row, a tool line): that row keeps its y
         // while it opens or closes
@@ -380,10 +448,12 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         if (rowEl !== null) holdRow(rowEl);
       }}
       onWheel={(e) => {
+        moved.current = true;
         held.current = undefined;
         if (e.deltaY < 0 && stick.current) setStick(false);
       }}
       onKeyDown={(e) => {
+        moved.current = true;
         if (['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown'].includes(e.key)) held.current = undefined;
         if (['PageUp', 'Home', 'ArrowUp'].includes(e.key) && stick.current) setStick(false);
       }}
@@ -403,6 +473,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         alignToBottom
         startReached={startReached}
         atBottomStateChange={(b) => {
+          if (b && restoring.current) return;
           setAtBottom(b);
           if (b) {
             setSeen((x) => ({ ...x, unseen: 0 }));

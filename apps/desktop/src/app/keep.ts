@@ -263,42 +263,53 @@ export const keptStorage = {
 };
 
 /**
- * A list's scroll kept across reloads (10 minutes, like the thread's anchor): read back when
- * the list mounts, once its rows are tall enough (a store refill can take a few frames), and
- * written as he scrolls; at the top nothing is kept. `el` finds the scrolling element.
+ * A list's scroll kept across reloads and back on its place (10 minutes, like the thread's
+ * anchor; designer's desktop-history: ‹ brings a place back with its scroll): read back when the
+ * list mounts, once its rows are tall enough (a store refill can take a few frames), and written
+ * as he scrolls; at the top nothing is kept. `el` finds the scrolling element; a list drawn only
+ * once its rows come (empty first) is looked for over the same frames.
  */
 export function useKeptScroll(key: string, el: () => HTMLElement | null): void {
   useEffect(() => {
-    const box = el();
-    if (box === null) return;
     const k = `scroll:${key}`;
     const want = keep.view(k);
+    let box: HTMLElement | null = null;
     let frame = 0;
     let tries = 0;
     let moved = false;
+    // the scrollTop the restore set: its own scroll event is not his move
+    let ours = -1;
+    const onScroll = () => {
+      if (box === null || (!moved && box.scrollTop === ours)) return;
+      moved = true;
+      keep.setView(k, box.scrollTop > 0 ? box.scrollTop : undefined, true);
+    };
     // back where he was, as soon as the rows reach that far (at most ~1 s of frames)
     const restore = () => {
-      if (typeof want !== 'number' || moved) return;
+      if (box === null || typeof want !== 'number' || moved) return;
       if (box.scrollHeight - box.clientHeight >= want || tries > 60) {
         box.scrollTop = want;
+        ours = box.scrollTop;
         return;
       }
       tries += 1;
       frame = requestAnimationFrame(restore);
     };
-    restore();
-    const onScroll = () => {
-      moved = true;
-      keep.setView(k, box.scrollTop > 0 ? box.scrollTop : undefined, true);
-    };
-    // the restore's own scroll event is not his move
-    const arm = requestAnimationFrame(() => {
+    const find = () => {
+      box = el();
+      if (box === null) {
+        tries += 1;
+        if (tries <= 60) frame = requestAnimationFrame(find);
+        return;
+      }
+      // listening at once: a scroll in the list's first frame is his too
       box.addEventListener('scroll', onScroll, { passive: true });
-    });
+      restore();
+    };
+    find();
     return () => {
       cancelAnimationFrame(frame);
-      cancelAnimationFrame(arm);
-      box.removeEventListener('scroll', onScroll);
+      box?.removeEventListener('scroll', onScroll);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per list and key
   }, [key]);
