@@ -292,7 +292,10 @@ test("spotlight/streaming: the '∿' after a block moves nothing, tables as the 
     await cap.waitForTimeout(400);
     await helper.send({ ev: 'fn', act: 'talk_end' });
     await core.waitCmd((c) => c['cmd'] === 'talk_end');
-    const lines = Array.from({ length: 14 }, (_, i) => `Line ${String(i + 1)}: the cold bench walks the index again.`);
+    // since the corner card (666d9549) the card grows to half the screen (240 px floor) and its
+    // inner words box scrolls; the answer stops at ANSWER_MAX_LINES (18), so each line wraps over
+    // a few rows to overflow even a tall screen's half
+    const lines = Array.from({ length: 14 }, (_, i) => `Line ${String(i + 1)}: the cold bench walks the index again, every file under the root, then hashes each one before the cache reads a single entry, which is why the first run takes two seconds.`);
     for (let n = 2; n <= lines.length; n += 3) {
       await core.send(partial(lines.slice(0, n).join('\n'), '10.1'));
       await cap.waitForTimeout(300);
@@ -302,15 +305,18 @@ test("spotlight/streaming: the '∿' after a block moves nothing, tables as the 
     await expect(answer, 'the talk reaches its answer view').toBeVisible({ timeout: 2000 });
     await expect(answer).toContainText('Line 14', { timeout: 1000 });
     await cap.waitForTimeout(400);
-    const m = await answer.evaluate((el) => ({ h: el.clientHeight, sh: el.scrollHeight, top: el.scrollTop, all: el.textContent }));
-    expect.soft(m.h, 'it stops growing at 320 px').toBeLessThanOrEqual(320);
+    const scroll = cap.locator('[data-testid="capsule.answer.scroll"]');
+    const half = await cap.evaluate(() => Math.max(240, Math.round((window.screen.availHeight || 800) / 2)));
+    const outer = (await answer.boundingBox())?.height ?? 0;
+    const m = await scroll.evaluate((el) => ({ h: el.clientHeight, sh: el.scrollHeight, top: el.scrollTop, all: el.textContent }));
+    expect.soft(outer, `it stops growing at half the screen (${String(half)} px)`).toBeLessThanOrEqual(half + 1);
     expect.soft(m.sh, 'then it scrolls').toBeGreaterThan(m.h);
     expect.soft(m.sh - m.top - m.h, 'the newest line at the bottom').toBeLessThan(4);
     expect.soft(m.all, 'the first lines are still there, above').toContain('Line 1:');
-    const mask = (): Promise<string> => answer.evaluate((el) => getComputedStyle(el).maskImage);
+    const mask = (): Promise<string> => scroll.evaluate((el) => getComputedStyle(el).maskImage);
     expect.soft(await mask(), "scrolled: the top line fades out over 16 px, never cut (designer m_21358)").toContain('gradient');
     await cap.screenshot({ path: test.info().outputPath('12-cap-scrolled.png') });
-    await answer.evaluate((el) => { el.scrollTop = 0; });
+    await scroll.evaluate((el) => { el.scrollTop = 0; });
     await cap.waitForTimeout(200);
     expect.soft(await mask(), 'at the top of the text, no fade').toBe('none');
     await cap.screenshot({ path: test.info().outputPath('12b-cap-top.png') });

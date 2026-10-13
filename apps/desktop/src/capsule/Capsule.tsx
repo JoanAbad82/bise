@@ -286,6 +286,7 @@ function Answer({
   // text-appearing, m_12403)
   const box = useRef<HTMLDivElement>(null);
   const atEnd = useRef(true);
+  const lastTop = useRef(0);
   const [over, setOver] = useState(false);
   // the overlay scrollbar shows only while he scrolls (designer m_22394): data-scrolling, gone
   // SCROLLBAR_LINGER_MS after the last scroll
@@ -302,6 +303,20 @@ function Answer({
     if (atEnd.current) el.scrollTop = el.scrollHeight;
     setOver(el.scrollHeight > el.clientHeight + 1);
   }, [a?.shown]);
+  // the box changes size after that effect too ('the rest in bise' showing under it, the card
+  // growing to its cap): while he is at the bottom, the newest line stays in view
+  useEffect(() => {
+    const el = box.current;
+    if (el === null || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (atEnd.current) el.scrollTop = el.scrollHeight;
+      setOver(el.scrollHeight > el.clientHeight + 1);
+    });
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
   return (
     <div className="b-cap-answer" data-testid="capsule.answer" aria-live="polite" data-glass>
       <div
@@ -311,7 +326,11 @@ function Answer({
         data-testid="capsule.answer.scroll"
         onScroll={(e) => {
           const el = e.currentTarget;
-          atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+          // only his scrolling up lets go of the bottom: a box that shrank under a follow (the
+          // 'rest in bise' line appearing) leaves a gap with no scroll up, and keeps following
+          const up = el.scrollTop < lastTop.current - 1;
+          lastTop.current = el.scrollTop;
+          atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4 || (atEnd.current && !up);
           // scrolled: the top line fades out over 16 px instead of being cut (capsule.css)
           el.toggleAttribute("data-scrolled", el.scrollTop > 0);
           el.toggleAttribute("data-scrolling", true);
