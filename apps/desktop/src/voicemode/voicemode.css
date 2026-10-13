@@ -1,21 +1,21 @@
 /* voice mode's bar (VoicePane.tsx, designer's voice-window page (1)): the composer's box and place
    (src/ds/css/composer.css's .b-composer padding, .div, .box, .keys), the live pearl 40 px at its
    left, the words in the middle, mute and leave on its right; ds tokens only */
-.vm-pane { flex: none; padding: 6px 22px 14px; outline: none; }
+.vm-pane { flex: none; padding: var(--s-2) var(--pad-column) var(--s-4); outline: none; }
 /* in the thread, the composer's column has no side padding (thread.css's .th-screen .b-composer): nor the bar's */
 .th-screen .vm-pane { padding-left: 0; padding-right: 0; }
-.vm-label { display: flex; gap: 12px; padding: 0 4px 6px; font: var(--t-11) var(--font-mono); color: var(--c-text-3); white-space: nowrap; overflow: hidden; }
+.vm-label { display: flex; gap: var(--gap-block); padding: 0 var(--s-1) var(--gap-tight); font: var(--t-11) var(--font-mono); color: var(--c-text-3); white-space: nowrap; overflow: hidden; }
 .vm-label > span:first-child { overflow: hidden; text-overflow: ellipsis; }
 .vm-label .end { margin-left: auto; flex: none; }
 .vm-bar {
-  display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 12px; box-sizing: border-box; min-height: 64px;
-  padding: 10px 12px 10px 12px; border-radius: var(--r-4); background: var(--c-raised);
+  display: grid; grid-template-columns: var(--s-10) 1fr auto; align-items: center; gap: var(--gap-block); box-sizing: border-box; min-height: 64px;
+  padding: var(--s-3); border-radius: var(--r-4); background: var(--c-raised);
   box-shadow: 0 0 0 1px var(--c-line), 0 4px 16px var(--c-shadow); transition: box-shadow var(--d-fast) var(--ease-out);
 }
 /* on (his voice live, the agent's turn): the stronger border; muted and failed keep the plain one */
 .vm-bar.on { box-shadow: 0 0 0 1px var(--c-line-strong), 0 4px 16px var(--c-shadow); }
 .vm-pane:focus-visible .vm-bar { box-shadow: 0 0 0 1px var(--c-focus), 0 4px 16px var(--c-shadow); }
-.vm-pearl { display: inline-flex; width: 40px; height: 40px; flex: none; transition: filter var(--d-fast) var(--ease-out), opacity var(--d-fast) var(--ease-out); }
+.vm-pearl { display: inline-flex; width: var(--s-10); height: var(--s-10); flex: none; transition: filter var(--d-fast) var(--ease-out), opacity var(--d-fast) var(--ease-out); }
 /* failed (and muted with nobody talking): the pearl goes grey; the accent is the pearl's only */
 .vm-pearl.grey { filter: grayscale(1); opacity: .6; }
 .vm-words { margin: 0; min-width: 0; font: var(--t-15)/1.45 var(--font-read); color: var(--c-text-3); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
@@ -24,24 +24,24 @@
 .vm-words .err { color: var(--c-err); }
 /* '● listening': the mic is live for him, the dot in the accent (designer m_16835) */
 .vm-words .vm-dot { color: var(--c-accent); }
-.vm-btns { display: flex; gap: 6px; align-self: center; }
+.vm-btns { display: flex; gap: var(--gap-inline); align-self: center; }
 .vm-btns .vm-btn {
-  display: inline-flex; align-items: baseline; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: var(--r-3);
+  display: inline-flex; align-items: baseline; gap: var(--gap-inline); height: var(--h-control-sm); padding: 0 var(--pad-control-x-sm); border: 0; border-radius: var(--r-3);
   box-shadow: 0 0 0 1px var(--c-line); background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); white-space: nowrap; cursor: default; align-items: center;
   transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
 }
 .vm-btns .vm-btn:hover { background: var(--c-hover); color: var(--c-text); }
 .vm-btns kbd { font: var(--t-11) var(--font-mono); color: var(--c-text-3); }
 /* the key line: the composer's (keys in text-2, what they do dim, 3ch between pairs) */
-.vm-keys { display: flex; flex-wrap: nowrap; overflow: hidden; column-gap: 3ch; row-gap: 0; padding: 7px 4px 0; font: var(--t-11) var(--font-mono); color: var(--c-text-3); white-space: pre; }
+.vm-keys { display: flex; flex-wrap: nowrap; overflow: hidden; column-gap: 3ch; row-gap: 0; padding: var(--s-2) var(--s-1) 0; font: var(--t-11) var(--font-mono); color: var(--c-text-3); white-space: pre; }
 .vm-keys .vm-key { flex: none; font: inherit; color: inherit; background: none; border: 0; padding: 0; white-space: pre; cursor: default; }
 .vm-keys .vm-key:hover { color: var(--c-text-2); }
 .vm-keys kbd { font: inherit; color: var(--c-text-2); }
 /* typing: the composer is back in place, the pearl grey and small at its left (ThreadVoice) */
-.vm-type-pearl { display: inline-flex; width: 20px; height: 20px; flex: none; align-self: center; margin-right: -2px; filter: grayscale(1); opacity: .6; }
+.vm-type-pearl { display: inline-flex; width: var(--s-5); height: var(--s-5); flex: none; align-self: center; filter: grayscale(1); opacity: .6; }
 /* the thread while voice mode lights an answer (rows.tsx): said words in ink, the rest faint */
 .vm-unsaid { color: var(--c-text-3); }
-.vm-mark { margin-top: 4px; font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+.vm-mark { margin-top: var(--s-1); font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
 @media (prefers-reduced-motion: reduce) {
   .vm-pearl { transition: none; }
 }

@@ -21,7 +21,7 @@
 .q-float {
   position: fixed;
   z-index: 15;
-  padding: 3px 10px;
+  padding: var(--s-1) var(--pad-control-x-sm);
   border-radius: var(--r-2);
   background: var(--c-ink);
   color: var(--c-on-ink);

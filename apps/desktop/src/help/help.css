@@ -53,7 +53,7 @@
   grid-template-columns: 9.5em 1fr auto;
   align-items: baseline;
   gap: var(--s-3);
-  padding: 3px 0;
+  padding: var(--s-1) 0;
 }
 
 .help-row .a {

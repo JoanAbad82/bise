@@ -18,10 +18,10 @@
 /* its top edge: drag it to resize (M16) */
 .term-grip {
   position: absolute;
-  top: -3px;
+  top: calc(-1 * var(--s-1));
   left: 0;
   right: 0;
-  height: 6px;
+  height: var(--s-2);
   cursor: row-resize;
   z-index: 1;
 }
@@ -31,7 +31,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 6px 0 0 10px;
+  padding: var(--s-2) 0 0 var(--s-3);
 }
 
 .term-host {
@@ -41,7 +41,7 @@
 
 .term-line {
   margin: 0;
-  padding: 4px 0;
+  padding: var(--s-1) 0;
   color: var(--c-text-2);
   font-family: var(--font-mono);
   font-size: 12px;
@@ -60,7 +60,7 @@
 .term-head {
   display: flex;
   justify-content: space-between;
-  padding: 6px 12px 0 10px;
+  padding: var(--s-2) var(--s-3) 0 var(--s-3);
   color: var(--c-text-2);
   font: 12px/1.4 var(--font-mono);
 }

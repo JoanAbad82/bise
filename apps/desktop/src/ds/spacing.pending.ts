@@ -11,9 +11,5 @@ export const PENDING_SPACING: Readonly<Record<string, number>> = {
   'ds/css/md.css': 1,
   'ds/css/sideviews.css': 5,
   'ds/gallery/gallery.css': 11,
-  'help/help.css': 1,
-  'quote/quote.css': 2,
-  'terminal/terminal.css': 7,
   'thread/thread.css': 158,
-  'voicemode/voicemode.css': 21,
 };
