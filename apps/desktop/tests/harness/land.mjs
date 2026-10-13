@@ -16,6 +16,8 @@ export const LAND = [
   'checks/app/keep-all.spec.ts',
   'checks/app/sidebar-v6.spec.ts',
   'checks/app/core-line.spec.ts',
+  // every list page walks with the TUI's list keys (ambient-lead m_22338)
+  'checks/app/list-walk.spec.ts',
   'checks/thread/reading.spec.ts',
   'checks/thread/streaming.spec.ts',
   'checks/thread/esc-order.spec.ts',

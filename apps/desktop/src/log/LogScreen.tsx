@@ -247,15 +247,11 @@ export function LogScreen({
   };
   const move = (by: number) => {
     if (entries.length === 0) return;
-    const i = entries.findIndex((r) => r.key === cursor);
-    const next =
-      entries[
-        i === -1
-          ? by > 0
-            ? 0
-            : entries.length - 1
-          : Math.max(0, Math.min(entries.length - 1, i + by))
-      ];
+    // no cursor yet: a step down starts above the first row, a step up below the last (so ↓ is
+    // the first, ↑ the last, home the first, end the last)
+    const found = entries.findIndex((r) => r.key === cursor);
+    const i = found !== -1 ? found : by > 0 ? -1 : entries.length;
+    const next = entries[Math.max(0, Math.min(entries.length - 1, i + by))];
     if (next === undefined) return;
     setCursor(next.key);
     reveal(next.key);

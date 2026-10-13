@@ -121,15 +121,21 @@ export interface GroupItem {
   /** the control on the right: a Toggle, a Button, a Chip, a Field, or a value */
   control?: ReactNode;
   value?: ReactNode;
+  /** a list's row (Group list): the keys' selection is on it (the 9% tint, past hover's 6%) */
+  sel?: boolean;
+  /** a list's row: a click picks it (the mouse never moves the selection otherwise) */
+  onPick?: () => void;
 }
-/** a settings group: a small head, its rows, a help line */
-export function Group({ title, items, help, testId }: { title?: ReactNode; items: readonly GroupItem[]; help?: ReactNode; testId?: string }) {
+/** a settings group: a small head, its rows, a help line. `list`: its rows are a list the keys walk
+ * (useListKeys): each row carries data-row, hover tints 6%, the selected row 9% (designer m_22280). */
+export function Group({ title, items, help, list, testId }: { title?: ReactNode; items: readonly GroupItem[]; help?: ReactNode; list?: boolean; testId?: string }) {
   return (
     <div data-testid={testId}>
       {title != null && <div className="b-gt">{title}</div>}
-      <div className="b-group">
+      <div className={cx("b-group", list && "is-list")}>
         {items.map((it) => (
-          <div key={it.id} className="b-gi" data-testid={sub(testId, it.id)}>
+          <div key={it.id} className={cx("b-gi", it.sel && "is-sel")} data-testid={sub(testId, it.id)}
+            data-row={list ? it.id : undefined} aria-selected={list ? it.sel === true : undefined} onClick={it.onPick}>
             <span className="l">{it.check}{it.check != null && " "}{it.label}{it.sub != null && <span>{it.sub}</span>}</span>
             {it.control}{it.value != null && <span className="v">{it.value}</span>}
           </div>

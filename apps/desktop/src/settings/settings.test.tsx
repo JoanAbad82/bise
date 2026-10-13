@@ -468,6 +468,40 @@ describe('approvals (V8 / W21) on the typed HubEv approvals, and the expired sig
     expect(screen.getByTestId('settings.approvals.error').textContent).toBe('that rule is already gone');
   });
 
+  it("the rules walk with the TUI's /approvals keys: ↑↓ home/end, ⌫ asks, esc keeps, ⏎ removes", () => {
+    const sent: ApprovalsCmd[] = [];
+    render(<Approvals approvals={A} send={(c) => sent.push(c)} home="/Users/camille" now={NOW} />);
+    const page = screen.getByTestId('settings.approvals.rules').closest<HTMLElement>('.settings-approvals');
+    if (page === null) throw new Error('no approvals page');
+    const key = (k: string) => fireEvent.keyDown(page, { key: k });
+    const selRow = () => page.querySelector('.b-gi.is-sel')?.getAttribute('data-row');
+    expect(document.activeElement, 'the page takes the keys at mount').toBe(page);
+    expect(selRow(), 'the first rule is selected').toBe('0');
+    key('ArrowUp');
+    expect(selRow(), '↑ at the top stays').toBe('0');
+    key('ArrowDown');
+    key('j');
+    key('ArrowDown');
+    expect(selRow(), 'it clamps at the last').toBe('2');
+    key('Home');
+    expect(selRow()).toBe('0');
+    key('End');
+    key('Backspace');
+    expect(screen.getByTestId('settings.approvals.rules').textContent).toContain('remove it?');
+    key('ArrowUp');
+    expect(selRow(), 'the move keys stay put while it asks').toBe('2');
+    key('Escape');
+    expect(screen.getByTestId('settings.approvals.rules').textContent).not.toContain('remove it?');
+    expect(sent).toEqual([]);
+    key('ArrowUp');
+    key('Delete');
+    key('Enter');
+    expect(sent).toEqual([{ cmd: 'remove_rule', project: 'acme-1a2b3c4d', rule: R[1] }]);
+    // a click picks; hover never moves the selection (no handler for it)
+    fireEvent.click(screen.getByTestId('settings.approvals.rules.0'));
+    expect(selRow()).toBe('0');
+  });
+
   it('a mode forced by the environment is said, not switched; no rule yet says how one comes; nothing sent yet says so', () => {
     const { rerender } = render(<Approvals approvals={{ ...A, env: true, rules: [] }} send={null} now={NOW} />);
     expect(screen.queryByTestId('settings.approvals.switch')).toBeNull();

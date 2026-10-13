@@ -4,8 +4,10 @@
 // asks inline first ("remove it? yes · keep it"), then the hub drops it from approvals.toml and
 // every TUI hears the new list. Pure: draws the hub's typed approvals event (HubEv approvals,
 // the store's useApprovals) and says what he changes (HubCmd approvals / remove_rule; a refusal
-// comes as error {cmd: approvals|remove_rule}). Owner: amb-kit.
+// comes as error {cmd: approvals|remove_rule}). The rules walk with the list keys (useListKeys).
+// Owner: amb-mac (amb-kit's before).
 import { useState } from 'react';
+import { useListKeys } from '@/app/listkeys';
 import { Act, Group, Help, Seg, type GroupItem } from '@/ds';
 import type { ApprovalRule, HubCmd, HubEv } from '@/proto';
 
@@ -66,6 +68,34 @@ export function Approvals({ approvals: a, send, error = null, home = '', now: pi
   const now = pinned ?? opened;
   // the rule whose remove asks now, inline: the row as it came (a new list folds the ask)
   const [asking, setAsking] = useState<ApprovalRule | null>(null);
+  // the rules are a list (the TUI's /approvals, approvals_screen.rs:43-66): ↑/k ↓/j home/end move,
+  // ⌫ or delete asks to remove the selected rule, ⏎ removes it, esc (or n) keeps it; a second esc
+  // leaves settings. While it asks, the move keys stay put.
+  const { sel, setSel, ref, onKeyDown } = useListKeys<HTMLDivElement>({
+    order: (a?.rules ?? []).map((_, i) => String(i)),
+    still: asking !== null,
+    onKey: (e, sel) => {
+      if (a === null || e.metaKey || e.ctrlKey || e.altKey) return false;
+      if (asking !== null) {
+        if (e.key === 'Enter' || e.key === 'y') {
+          if (send) send({ cmd: 'remove_rule', project: a.project, rule: asking });
+          setAsking(null);
+          return true;
+        }
+        if (e.key === 'Escape' || e.key === 'n') {
+          setAsking(null);
+          return true;
+        }
+        return false;
+      }
+      const r = sel === null ? undefined : a.rules[Number(sel)];
+      if ((e.key === 'Backspace' || e.key === 'Delete') && r !== undefined && send !== null) {
+        setAsking(r);
+        return true;
+      }
+      return false;
+    },
+  });
   if (a === null) return <Help testId="settings.approvals.none">the hub hasn't sent its approvals yet.</Help>;
   const modes = ['auto', 'yolo'] as const;
   const repo = a.repo === '' ? 'this repo' : tilde(a.repo, home);
@@ -121,19 +151,16 @@ export function Approvals({ approvals: a, send, error = null, home = '', now: pi
       ),
   }));
   return (
-    <div
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && asking !== null) {
-          // esc keeps the rule; a second esc leaves settings
-          e.preventDefault();
-          setAsking(null);
-        }
-      }}
-    >
+    <div ref={ref} tabIndex={-1} className="settings-approvals" onKeyDown={onKeyDown}>
       <Help testId="settings.approvals.repo">{`what runs without asking you in ${repo}.`}</Help>
       <Group testId="settings.approvals" items={head} />
       {rules.length > 0 ? (
-        <Group title="always allowed here" testId="settings.approvals.rules" items={rules} />
+        <Group
+          title="always allowed here"
+          testId="settings.approvals.rules"
+          list
+          items={rules.map((it) => ({ ...it, sel: it.id === sel, onPick: () => { setSel(it.id); } }))}
+        />
       ) : (
         <Help testId="settings.approvals.empty">nothing yet: a card's “always allow” adds a rule here.</Help>
       )}
