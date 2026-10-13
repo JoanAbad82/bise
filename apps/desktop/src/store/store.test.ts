@@ -771,6 +771,28 @@ what is in this picture?`,
       error: "the mic is busy.",
     });
   });
+  it("I: a take the core kept (no words, an error) is transcribed again on retry, dropped on drop; never one it didn't keep (amb-core 276074b2)", () => {
+    const { sent, store } = fake();
+    const a = store.dictateStart();
+    store.dictateRetry(a);
+    expect(sent.at(-1), "not over yet: no retry").toEqual({ cmd: "dictate_start", id: a });
+    store.apply({ ev: "dictation", id: a, text: "", final: true, error: "the transcription timed out.", kept: true });
+    expect(store.dictation(a)?.kept).toBe(true);
+    store.dictateRetry(a);
+    expect(sent.at(-1)).toEqual({ cmd: "dictate_retry", id: a });
+    expect(store.dictation(a)).toEqual({ text: "", final: false, cancelled: false, error: null });
+    store.apply({ ev: "dictation", id: a, text: "there", final: true });
+    expect(store.dictation(a)).toEqual({ text: "there", final: true, cancelled: false, error: null });
+    const b = store.dictateStart();
+    store.apply({ ev: "dictation", id: b, text: "", final: true, kept: true });
+    store.dictateDrop(b);
+    expect(sent.at(-1)).toEqual({ cmd: "dictate_cancel", id: b });
+    expect(store.dictation(b)?.cancelled).toBe(true);
+    const n = sent.length;
+    store.dictateDrop(b);
+    store.dictateRetry(b);
+    expect(sent.length, "a dropped take is gone").toBe(n);
+  });
   it("I: esc ends a dictation at once, a stop the core never answers ends after a wait (amb-tools on the cut, m_20100)", () => {
     vi.useFakeTimers();
     try {

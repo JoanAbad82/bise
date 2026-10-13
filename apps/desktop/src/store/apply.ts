@@ -215,6 +215,7 @@ export function applyTyped(s: Store, ev: Ev): void {
         final: ev.final,
         cancelled: ev.cancelled ?? false,
         error: ev.error ?? null,
+        ...(ev.final && ev.kept === true ? { kept: true } : {}),
       } satisfies Dictation);
       return;
     case "error":

@@ -82,6 +82,29 @@
     animation: none;
   }
 }
+/* a take that came back with no words or an error (designer m_22396): sans text-2, only the ▲ in
+   the warn tone; 'try again' in ink, underlined on hover, a click does it; its key and 'esc drops
+   it' text-3, the key mono as the key line's */
+.b-composer .b-field .b-dictation[data-failed] {
+  font-family: var(--font-ui);
+}
+.b-composer .b-field .b-dictation .warn {
+  color: var(--c-err); /* no warn token in the ds: the err tone, as a failed try's in the thread */
+}
+.b-composer .b-field .b-dictation .retry {
+  color: var(--c-text);
+  cursor: pointer;
+}
+.b-composer .b-field .b-dictation .retry:hover {
+  text-decoration: underline;
+}
+.b-composer .b-field .b-dictation .k {
+  font-family: var(--font-mono);
+  color: var(--c-text-3);
+}
+.b-composer .b-field .b-dictation .k-what {
+  color: var(--c-text-3);
+}
 /* an image chip is the sent bubble's (designer m_18135, signed 900f998e): 1 px line, r 9, 'image 1'
    in ink beside its 16 px thumbnail or the faint no-file glyph slot; never the accent */
 /* a file chip is the image chip's look (file-chips, designer m_21765): its system icon or ▯, its name */

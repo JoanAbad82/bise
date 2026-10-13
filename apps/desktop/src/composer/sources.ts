@@ -106,6 +106,8 @@ export interface DictateState {
   readonly cancelled: boolean;
   /** what went wrong ('the mic is busy.', no mic, no voice model); its words so far are kept */
   readonly error: string | null;
+  /** a final with no words or an error whose take the core kept: `retry` transcribes it again */
+  readonly kept?: boolean;
 }
 
 /** The mic, as the composer sees it (the store's dictateStart/Stop/Cancel and its dictation slice). */
@@ -115,6 +117,10 @@ export interface DictatePort {
   /** The mic off: the final words follow. */
   readonly stop: (id: string) => void;
   readonly cancel: (id: string) => void;
+  /** A kept take (its final `kept`): transcribed once more, one more final for that id. */
+  readonly retry?: (id: string) => void;
+  /** A kept take he let go: the core drops it. */
+  readonly drop?: (id: string) => void;
   readonly read: (id: string) => DictateState | null;
   /** Called on each change of that dictation; returns the unsubscribe. */
   readonly subscribe: (id: string, fn: () => void) => () => void;

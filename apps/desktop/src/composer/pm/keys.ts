@@ -111,6 +111,17 @@ export function fieldKey(c: KeyCtx, e: KeyboardEvent): boolean {
   // another key between two ctrl+r: not a double press (esc, his words, then ctrl+r is dictation)
   if (k !== "Control" && k !== "Shift" && k !== "Alt" && k !== "Meta")
     d.lastR.current = Number.NEGATIVE_INFINITY;
+  // a failed take's line: ⌥⏎ tries it again, esc drops it (designer m_22396)
+  if (d.hasFailed() && k === "Enter" && e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+    e.preventDefault();
+    d.retry();
+    return true;
+  }
+  if (d.dict.current === null && d.hasFailed() && k === "Escape") {
+    e.preventDefault();
+    d.cancel();
+    return true;
+  }
   if (d.dict.current !== null && k === "Enter") {
     // never send half a dictation: ⏎ turns the mic off, the words come in to read
     e.preventDefault();

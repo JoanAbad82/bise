@@ -124,6 +124,47 @@ export const dictationLabel = (text: string, lead: string, wait = false): string
   text.trim() === '' ? `${lead}${wait ? 'transcribing…' : 'listening…'}` : `${lead}${text.trim()}`;
 const labelOf = (n: { attrs: Record<string, unknown> }): string => dictationLabel(n.attrs.text as string, n.attrs.lead as string, n.attrs.wait === true);
 
+/** A take that came back with no words or an error, the core keeping it (designer m_22396): its line. */
+export const FAILED = {
+  noWords: "didn't catch any words",
+  error: (reason: string): string => `couldn't transcribe it${reason === '' ? '' : ` (${reason})`}`,
+  retry: 'try again',
+  retryKey: '⌥⏎',
+  drop: 'esc drops it',
+} as const;
+/** The core's error, short for the line: no final period. Pure. */
+export const shortReason = (error: string | null): string => (error ?? '').trim().replace(/\.$/u, '');
+/** The node's 'try again' asks its take again through this event (dictation.ts listens), its detail the take's id. */
+export const RETRY_EVENT = 'b-dictate-retry';
+
+const el = (tag: string, cls: string, text: string): HTMLElement => {
+  const e = document.createElement(tag);
+  if (cls !== '') e.className = cls;
+  e.textContent = text;
+  return e;
+};
+
+/** The failed take's line: '▲ couldn't transcribe it (…)' or 'didn't catch any words', then
+ *  'try again ⌥⏎' (a click does it) and 'esc drops it'. */
+function failedLine(dom: HTMLElement, id: string, lead: string, reason: string | null): void {
+  const parts: (HTMLElement | string)[] = [lead];
+  if (reason !== null) parts.push(el('span', 'warn', '▲'), ' ');
+  parts.push(el('span', 'w', reason === null ? FAILED.noWords : FAILED.error(reason)), ' · ');
+  const retry = el('span', 'retry', FAILED.retry);
+  retry.setAttribute('role', 'button');
+  retry.dataset.testid = 'composer.dictation.retry';
+  // the field keeps its caret; the click asks the take again
+  retry.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+  });
+  retry.addEventListener('click', (e) => {
+    e.preventDefault();
+    retry.dispatchEvent(new CustomEvent(RETRY_EVENT, { bubbles: true, detail: id }));
+  });
+  parts.push(retry, ' ', el('span', 'k', FAILED.retryKey), ' · ', el('span', 'k-what', FAILED.drop));
+  dom.replaceChildren(...parts);
+}
+
 export const DictationNode = Node.create({
   name: 'dictation',
   group: 'inline',
@@ -131,8 +172,17 @@ export const DictationNode = Node.create({
   atom: true,
   selectable: false,
   draggable: false,
-  // id: its take (a new take may start while an older one is still transcribed); wait: the mic is off
-  addAttributes: () => ({ text: { default: '', rendered: false }, lead: { default: '', rendered: false }, id: { default: '', rendered: false }, wait: { default: false, rendered: false } }),
+  // id: its take (a new take may start while an older one is still transcribed); wait: the mic is
+  // off; failed: its final had no words or an error and the core kept it ('try again'), reason:
+  // the error, short ('': no words)
+  addAttributes: () => ({
+    text: { default: '', rendered: false },
+    lead: { default: '', rendered: false },
+    id: { default: '', rendered: false },
+    wait: { default: false, rendered: false },
+    failed: { default: false, rendered: false },
+    reason: { default: '', rendered: false },
+  }),
   renderHTML: () => ['span', { class: 'b-dictation' }],
   renderText: () => '',
   addNodeView:
@@ -146,14 +196,27 @@ export const DictationNode = Node.create({
       dot.setAttribute('aria-hidden', 'true');
       const words = document.createElement('span');
       words.className = 'w';
-      words.textContent = labelOf(node);
-      dom.append(dot, words);
+      let failed = false;
+      const draw = (n: typeof node): void => {
+        failed = n.attrs.failed === true;
+        dom.toggleAttribute('data-failed', failed);
+        if (failed) failedLine(dom, n.attrs.id as string, n.attrs.lead as string, n.attrs.reason === '' ? null : (n.attrs.reason as string));
+        else {
+          words.textContent = labelOf(n);
+          dom.replaceChildren(dot, words);
+        }
+      };
+      draw(node);
       return {
         dom,
         ignoreMutation: () => true,
         // a new partial changes only the words' text: the node's DOM stays the same node
         update: (next) => {
           if (next.type.name !== 'dictation') return false;
+          if (failed || next.attrs.failed === true) {
+            draw(next);
+            return true;
+          }
           const w = labelOf(next);
           if (words.textContent !== w) words.textContent = w;
           return true;

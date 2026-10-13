@@ -681,6 +681,8 @@ export function PmField(p: PmFieldProps): JSX.Element {
     if (st === null) return;
     const b = isBlank(st.doc);
     setDictShown(dictationAt(st.doc) !== null);
+    // a failed take whose 'try again' line he deleted or sent: the core drops it
+    if (tr === null || tr.docChanged) dictation.sweep();
     const before = beforeCaret(st);
     const segs = segmentsOf(st.doc);
     const typedColon =

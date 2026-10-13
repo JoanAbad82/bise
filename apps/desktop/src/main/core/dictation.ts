@@ -31,7 +31,8 @@ export class DictationRoutes {
   sent(window: number, cmd: unknown): void {
     if (typeof cmd !== 'object' || cmd === null) return;
     const c = cmd as Ev;
-    if (c.cmd === 'dictate_start' && typeof c.id === 'string' && c.id.trim() !== '') this.owners.set(c.id, window);
+    // a kept take tried again (its first final ended the route): one more final, to the same window
+    if ((c.cmd === 'dictate_start' || c.cmd === 'dictate_retry') && typeof c.id === 'string' && c.id.trim() !== '') this.owners.set(c.id, window);
     // voice mode belongs to the window that turned it on (or moved it)
     if (c.cmd === 'voice_mode' && c.on === true && typeof c.project === 'string' && typeof c.agent === 'string') {
       this.voice = { window, project: c.project, agent: c.agent };

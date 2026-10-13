@@ -19,6 +19,19 @@ describe('dictation routes (bar I, architect m_10537)', () => {
     expect(r.route({ ev: 'error', cmd: 'send', text: 'other' })).toEqual({ to: 'all' });
   });
 
+  it("a kept take tried again: its second final goes to the same window (amb-tools m_22473)", () => {
+    const r = new DictationRoutes();
+    r.sent(7, { cmd: 'dictate_start', id: 'd1' });
+    r.sent(8, { cmd: 'dictate_start', id: 'd2' });
+    const kept = { ev: 'dictation', id: 'd1', text: '', final: true, kept: true };
+    expect(r.route(kept)).toEqual({ to: 'window', window: 7, ev: kept });
+    expect(r.route(final)).toEqual({ to: 'none' });
+    r.sent(7, { cmd: 'dictate_retry', id: 'd1' });
+    expect(r.route(final)).toEqual({ to: 'window', window: 7, ev: final });
+    // its final ends the route again; the other window never got it
+    expect(r.route(final)).toEqual({ to: 'none' });
+  });
+
   it('a busy refusal goes to the window that asked, the running dictation keeps its route', () => {
     const r = new DictationRoutes();
     r.sent(1, { cmd: 'dictate_start', id: 'd1' });

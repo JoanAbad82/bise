@@ -19,6 +19,7 @@ import type { ComposerSources } from "../sources";
 import { dictated, HOLD_MS } from "../dictate";
 import { DOUBLE_CTRL_R_MS } from "@/voicemode/model";
 import { dictationAt, nodeType, offsetOf, plainText, posOf } from "./pmtext";
+import { RETRY_EVENT, shortReason } from "./schema";
 
 /** A transaction kept out of the undo history (the dictation's live node). */
 const offHistory = (tr: Transaction): Transaction =>
@@ -54,8 +55,14 @@ export interface Dictation {
   readonly lastR: RefObject<number>;
   readonly start: (downAt?: number) => void;
   readonly stop: () => void;
-  /** esc: every take over, its words gone */
+  /** esc: every take over, its words gone; a failed take's line too (the core drops it) */
   readonly cancel: () => void;
+  /** ⌥⏎ or a failed line's click: that take (none: the newest failed) transcribed once more */
+  readonly retry: (id?: string) => void;
+  /** after each change of the field: a failed take whose line went (deleted, sent) is dropped */
+  readonly sweep: () => void;
+  /** a failed take's line is in the field ('try again') */
+  readonly hasFailed: () => boolean;
   /** ctrl+r in the field or anywhere through grab.ts; false: not this key */
   readonly onCtrlR: (e: KeyboardEvent) => boolean;
 }
@@ -65,6 +72,8 @@ export function useDictation(c: DictationCtx): Dictation {
   const dict = useRef<Take | null>(null);
   // stopped takes under the newest, still transcribed (oldest first)
   const older = useRef<Take[]>([]);
+  // takes that came back with no words or an error, the core keeping them: their line offers 'try again'
+  const failed = useRef<Set<string>>(new Set());
   const now = (): number => (c.now ?? Date.now)();
   const log = (line: string): void => c.log?.(`dictation: ${line}`);
   const bar = (): void => {
@@ -102,7 +111,23 @@ export function useDictation(c: DictationCtx): Dictation {
     end(t);
     bar();
     const ms = t.stoppedAt === null ? "" : ` ${String(now() - t.stoppedAt)} ms after stop`;
-    log(`final ${t.id} len ${String(s.text.trim().length)}${s.cancelled ? " cancelled" : ""}${s.error === null ? "" : ` error '${s.error}'`}${ms}${at === null ? " (its node gone)" : ""}`);
+    log(`final ${t.id} len ${String(s.text.trim().length)}${s.cancelled ? " cancelled" : ""}${s.error === null ? "" : ` error '${s.error}'`}${s.kept === true ? " kept" : ""}${ms}${at === null ? " (its node gone)" : ""}`);
+    if (s.kept === true && !s.cancelled && s.text.trim() === "") {
+      // no words or an error, the core keeps the take: its line offers 'try again' (designer
+      // m_22396); its node gone (he cleared the field): let it go
+      if (at === null) {
+        port.drop?.(t.id);
+        return;
+      }
+      const node = st.doc.nodeAt(posOf(at));
+      if (node !== null) {
+        c.dispatch(offHistory(st.tr.setNodeMarkup(posOf(at), undefined, { ...node.attrs, text: "", wait: false, failed: true, reason: s.error === null ? "" : shortReason(s.error) })));
+        failed.current.add(t.id);
+      }
+      return;
+    }
+    // words with an error: they land (below), the take the core kept goes
+    if (s.kept === true) port.drop?.(t.id);
     if (at !== null) {
       // the node goes (out of the history), then his words where it was (one undo step)
       const before = plainText(st.doc).slice(0, at);
@@ -187,9 +212,50 @@ export function useDictation(c: DictationCtx): Dictation {
     log(`cancel ${t.id} (${why})`);
     c.sources().dictate?.cancel(t.id);
   };
+  /** a failed take's line goes: its node out (off the history), the core drops the take */
+  const dropOne = (id: string, why: string): void => {
+    failed.current.delete(id);
+    log(`drop ${id} (${why})`);
+    const st = c.state();
+    const at = st === null ? null : dictationAt(st.doc, id);
+    if (st !== null && at !== null) c.dispatch(offHistory(st.tr.delete(posOf(at), posOf(at) + 1)));
+    c.sources().dictate?.drop?.(id);
+  };
   const cancel = (): void => {
     for (const t of [...older.current, ...(dict.current === null ? [] : [dict.current])]) cancelOne(t, "esc");
+    for (const id of Array.from(failed.current)) dropOne(id, "esc");
   };
+  /** 'try again' (⌥⏎ or its click): the take the core kept is transcribed once more; its line
+   *  goes back to 'transcribing…' (designer m_22396). No id: the newest failed take. */
+  const retry = (id?: string): void => {
+    const port = c.sources().dictate;
+    const which = id ?? Array.from(failed.current).at(-1);
+    if (port?.retry === undefined || which === undefined || !failed.current.has(which)) return;
+    failed.current.delete(which);
+    const st = c.state();
+    const at = st === null ? null : dictationAt(st.doc, which);
+    const node = at === null || st === null ? null : st.doc.nodeAt(posOf(at));
+    if (st !== null && at !== null && node !== null)
+      c.dispatch(offHistory(st.tr.setNodeMarkup(posOf(at), undefined, { ...node.attrs, failed: false, reason: "", wait: true })));
+    const t: Take = { id: which, mic: false, downAt: Number.POSITIVE_INFINITY, startedAt: now(), stoppedAt: now(), off: (): void => undefined };
+    // transcribed again beside any newer take: its final lands in its own node
+    if (dict.current === null) dict.current = t;
+    else older.current.unshift(t);
+    log(`retry ${which}`);
+    port.retry(which);
+    t.off = port.subscribe(which, () => {
+      update(t);
+    });
+    bar();
+    update(t);
+  };
+  /** after each change of the field: a failed take whose line he deleted (or sent) goes */
+  const sweep = (): void => {
+    const st = c.state();
+    if (st === null || failed.current.size === 0) return;
+    for (const id of Array.from(failed.current)) if (dictationAt(st.doc, id) === null) dropOne(id, "its line gone");
+  };
+  const hasFailed = (): boolean => failed.current.size > 0;
   /** ctrl+r: the mic on (held: push-to-talk; pressed: on until a key), again: off; twice within
    *  DOUBLE_CTRL_R_MS of a press that started a take (the TUI's): voice mode. In the field, or
    *  anywhere in the window through grab.ts (his try a43609b2). False: not this key. */
@@ -246,5 +312,19 @@ export function useDictation(c: DictationCtx): Dictation {
       gone();
     };
   }, []);
-  return { dict, lastR, start, stop, cancel, onCtrlR };
+  // a failed line's 'try again' click (schema.ts): only this field's takes
+  const retryClick = useEffectEvent((e: Event): void => {
+    const id = (e as CustomEvent<unknown>).detail;
+    if (typeof id === "string" && failed.current.has(id)) retry(id);
+  });
+  useEffect(() => {
+    const on = (e: Event): void => {
+      retryClick(e);
+    };
+    window.addEventListener(RETRY_EVENT, on);
+    return () => {
+      window.removeEventListener(RETRY_EVENT, on);
+    };
+  }, []);
+  return { dict, lastR, start, stop, cancel, retry, sweep, hasFailed, onCtrlR };
 }

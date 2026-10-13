@@ -205,6 +205,9 @@ export interface Dictation {
   readonly final: boolean;
   readonly cancelled: boolean;
   readonly error: string | null;
+  /** a final with no words or an error whose take the core kept: dictateRetry transcribes it
+   *  again, dictateDrop lets it go (amb-core 276074b2) */
+  readonly kept?: boolean;
 }
 /** Voice mode's state (core/voice_mode.rs), only in the window that turned it on. */
 export type VoiceModeState = EvOf<'voice_mode'>;

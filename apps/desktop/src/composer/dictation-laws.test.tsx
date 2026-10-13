@@ -40,6 +40,12 @@ function testMic() {
       calls.push(`cancel ${id}`);
       say(id, { final: true, cancelled: true });
     },
+    // the store's retry and drop of a take the core kept
+    retry: (id) => {
+      calls.push(`retry ${id}`);
+      states.set(id, { text: '', final: false, cancelled: false, error: null });
+    },
+    drop: (id) => calls.push(`drop ${id}`),
     read: (id) => states.get(id) ?? null,
     subscribe: (id, fn) => {
       subs.set(id, fn);
@@ -167,5 +173,89 @@ describe('dictation: a take is never lost to a key', () => {
     });
     await f.say('d1', { text: 'still mine', final: true });
     expect(f.field.textContent).toBe('still mine');
+  });
+});
+
+describe("dictation: a take with no words or an error, kept by the core, offers 'try again' (designer m_22396)", () => {
+  const altEnter = async (f: Awaited<ReturnType<typeof mount>>): Promise<void> => {
+    await act(async () => {
+      f.field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', altKey: true, bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+  };
+  const esc = async (f: Awaited<ReturnType<typeof mount>>): Promise<void> => {
+    await act(async () => {
+      f.field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+  };
+
+  it("no words: 'didn't catch any words · try again ⌥⏎ · esc drops it'; ⌥⏎ transcribes it again, its words land", async () => {
+    const f = await mount();
+    await f.press(0);
+    await f.press(3000);
+    await f.say('d1', { final: true, kept: true });
+    const node = f.getByTestId('composer.dictation');
+    expect(node.textContent).toBe("didn't catch any words · try again ⌥⏎ · esc drops it");
+    expect(node.hasAttribute('data-failed')).toBe(true);
+    expect(f.mode(), 'the mic is off').toBe('off');
+    await altEnter(f);
+    expect(f.mic.calls).toEqual(['start d1', 'stop d1', 'retry d1']);
+    expect(f.getByTestId('composer.dictation').textContent, 'back to transcribing').toBe('transcribing…');
+    expect(f.mode()).toBe('transcribing');
+    await f.say('d1', { text: 'there it is', final: true });
+    expect(f.field.textContent).toBe('there it is');
+    expect(f.mode()).toBe('off');
+  });
+
+  it("an error: '▲ couldn't transcribe it (reason)'; a click on 'try again' does it; a second failure shows the same line", async () => {
+    const f = await mount();
+    await f.press(0);
+    await f.press(3000);
+    await f.say('d1', { final: true, kept: true, error: 'the transcription timed out.' });
+    expect(f.getByTestId('composer.dictation').textContent).toBe("▲ couldn't transcribe it (the transcription timed out) · try again ⌥⏎ · esc drops it");
+    await act(async () => {
+      f.getByTestId('composer.dictation.retry').click();
+      await Promise.resolve();
+    });
+    expect(f.mic.calls.at(-1)).toBe('retry d1');
+    await f.say('d1', { final: true, kept: true, error: 'the transcription timed out.' });
+    expect(f.getByTestId('composer.dictation').textContent).toContain("couldn't transcribe it");
+  });
+
+  it('typing keeps the line and the take; esc drops it (the core is told); a sent field drops it too', async () => {
+    const f = await mount();
+    await f.press(0);
+    await f.press(3000);
+    await f.say('d1', { final: true, kept: true });
+    await act(async () => {
+      f.a.insertText('hello ');
+      await Promise.resolve();
+    });
+    expect(f.getByTestId('composer.dictation').hasAttribute('data-failed')).toBe(true);
+    expect(f.mic.calls).not.toContain('drop d1');
+    await esc(f);
+    expect(f.mic.calls.at(-1)).toBe('drop d1');
+    expect(f.queryByTestId('composer.dictation')).toBeNull();
+    expect(f.field.textContent).toContain('hello');
+    // another failed take, then the field cleared (his send)
+    await f.press(5000);
+    await f.press(8000);
+    await f.say('d2', { final: true, kept: true });
+    await act(async () => {
+      f.a.fill('');
+      await Promise.resolve();
+    });
+    expect(f.mic.calls.at(-1)).toBe('drop d2');
+  });
+
+  it('words with an error land, and the kept take goes', async () => {
+    const f = await mount();
+    await f.press(0);
+    await f.say('d1', { text: 'half of it' });
+    await f.press(3000);
+    await f.say('d1', { text: 'half of it', final: true, kept: true, error: 'the mic went away.' });
+    expect(f.field.textContent).toBe('half of it');
+    expect(f.mic.calls.at(-1)).toBe('drop d1');
   });
 });

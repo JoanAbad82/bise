@@ -61,6 +61,34 @@ export class StoreVoice extends StoreReads {
   dictateStop(id: string): void {
     if (!this.dictating.has(id)) return;
     this.command({ cmd: "dictate_stop", id });
+    this.dictateWait(id);
+  }
+  /** A take the core kept (its final with no words or an error, `kept`): transcribed once more,
+   *  one more final for that id (amb-core 276074b2); the same wait as a stop. */
+  dictateRetry(id: string): void {
+    if (this.dictating.has(id) || this.dictation(id)?.kept !== true) return;
+    this.dictating.add(id);
+    this.put(`dictation:${id}`, {
+      text: "",
+      final: false,
+      cancelled: false,
+      error: null,
+    } satisfies Dictation);
+    this.command({ cmd: "dictate_retry", id });
+    this.dictateWait(id);
+  }
+  /** A kept take he let go (esc, his send, its line gone): the core drops it. */
+  dictateDrop(id: string): void {
+    if (this.dictating.has(id) || this.dictation(id)?.kept !== true) return;
+    this.command({ cmd: "dictate_cancel", id });
+    this.put(`dictation:${id}`, {
+      text: "",
+      final: true,
+      cancelled: true,
+      error: null,
+    } satisfies Dictation);
+  }
+  private dictateWait(id: string): void {
     setTimeout(() => {
       if (!this.dictating.has(id)) return;
       this.dictating.delete(id);
