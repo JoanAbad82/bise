@@ -16,8 +16,8 @@ import {
 import { newAgent } from "@/agents/actions";
 import { InboxCard } from "@/inbox";
 import { cardKeyOf } from "@/inbox/Strip";
-import type { Card, HelperEv } from "@/proto";
-import { threadKey, useHeard, useLevel, useProjects, useStore } from "@/store";
+import type { Card, Grant, HelperEv } from "@/proto";
+import { threadKey, useHeard, useLevel, usePrefs, useProjects, useStore } from "@/store";
 import { followPartial, type LivePartial } from "@/shared/partial";
 import type { SpotAnswer, SpotFront, SpotItem, SpotRoute } from "@/spotlight";
 import { W } from "@/spotlight/words";
@@ -25,6 +25,7 @@ import { useTheme } from "@/theme";
 import "@/ds/index.css";
 import { Capsule, menuCards } from "./Capsule";
 import { answeredOver, errorOver, heardOver, OVER_FADE_MS } from "./over";
+import { asksForScreen, shotPref } from "./shot";
 import { useAgentPreview, useSpotData } from "./data";
 import { START, step, type CapEvent, type Fx, type State } from "./machine";
 
@@ -70,6 +71,17 @@ export function CapsuleRoot(): JSX.Element {
   const view = m.state.view;
   const [front, setFront] = useState<SpotFront | null>(null);
   const spot = useSpotData(front);
+  // the talk's still (designer m_21903): Screen Recording as the helper says, his pref
+  // (prefs.context.shot, absent: never asked); the ask shows on the first talk that needs it, once
+  // a run, until he answers it ('not now' or the grant set the pref)
+  const [screen, setScreen] = useState<Grant | undefined>(undefined);
+  const shotOn = shotPref(usePrefs());
+  const [ask, setAsk] = useState<{ talk: boolean; shown: boolean; on: boolean }>({ talk: false, shown: false, on: false });
+  const inTalk = view.kind === "talk";
+  if (inTalk !== ask.talk) {
+    const now = inTalk && !ask.shown && asksForScreen(screen, shotOn);
+    setAsk({ talk: inTalk, shown: ask.shown || now, on: now });
+  }
   // the helper's fn keys read these: fn+n on the tray menu opens its row n (one-inbox 3)
   const viewRef = useRef(view);
   const menuRef = useRef(menuCards(spot));
@@ -315,6 +327,7 @@ export function CapsuleRoot(): JSX.Element {
         if (c !== undefined) dispatch({ ev: "open_card", id: c.id });
       } else if (ev.ev === "fn") dispatch({ ev: "fn", act: ev.act, key: ev.key });
       else if (ev.ev === "front") setFront(frontOf(ev));
+      else if (ev.ev === "perms") setScreen(ev.screen);
     });
     const offState = bise.capsule.onState((s) => {
       dispatch({ ev: "window", shown: s.shown, why: s.why });
@@ -322,6 +335,7 @@ export function CapsuleRoot(): JSX.Element {
     void bise.helperState().then((evs) => {
       for (const ev of evs) {
         if (ev.ev === "front") setFront(frontOf(ev));
+        else if (ev.ev === "perms") setScreen(ev.screen);
       }
     });
     return () => {
@@ -427,6 +441,22 @@ export function CapsuleRoot(): JSX.Element {
       still={still}
       card={cardOf}
       route={route}
+      screenAsk={
+        ask.on
+          ? {
+              // the same System Settings pane as settings › privacy's switch (amb-mac's)
+              onOpen: () => {
+                bise?.helper({ cmd: "perm", perm: "screen", action: "open" });
+                setAsk({ ...ask, on: false });
+              },
+              // 'not now': never asked again (the switch turns it on later)
+              onLater: () => {
+                store.command({ cmd: "prefs_set", key: "context.shot", value: false });
+                setAsk({ ...ask, on: false });
+              },
+            }
+          : null
+      }
       onRouteKeep={keepWithBise}
       onRouteTo={routeTo}
       onAsk={(text, parts) => {

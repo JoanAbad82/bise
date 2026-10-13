@@ -27,6 +27,7 @@ import {
 import type { View } from "./machine";
 import type { PreviewLine } from "@/spotlight/preview";
 import type { Part } from "@/proto";
+import { ScreenAsk, ShotRow, type TalkShot } from "./shot";
 import "./capsule.css";
 
 export const W = {
@@ -85,6 +86,12 @@ export interface CapsuleProps {
   readonly onQuit: (() => void) | null;
   /** The page's size and the glass inside it: the page is the glass now (macOS vibrancy fills the
    *  window, glass.ts), so the rect is {0, 0, width, height}. */
+  /** The front window's still for this talk (the core's {ev:'shot'}), null: none. */
+  readonly shot?: TalkShot | null;
+  /** fn ⌫ or the chip's ✕: the still goes, the talk goes on ({cmd:'shot_drop'}). */
+  readonly onShotDrop?: () => void;
+  /** The one-time ask for Screen Recording, under his words (designer m_21903). */
+  readonly screenAsk?: { readonly onOpen: () => void; readonly onLater: () => void } | null;
   readonly onSize: (
     width: number,
     height: number,
@@ -193,6 +200,10 @@ export function Capsule(p: CapsuleProps): JSX.Element {
             : v.phase === "listen"
               ? W.listening
               : W.thinking}
+          {p.shot != null && (
+            <ShotRow shot={p.shot} listening={v.phase === "listen"} onDrop={p.onShotDrop ?? (() => undefined)} />
+          )}
+          {p.screenAsk != null && <ScreenAsk onOpen={p.screenAsk.onOpen} onLater={p.screenAsk.onLater} />}
           {p.route !== null && (
             <RouteLine
               route={p.route}

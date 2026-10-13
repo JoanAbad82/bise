@@ -8,6 +8,7 @@ import { Capsule, type CapsuleProps } from './Capsule';
 import { cardKind, toSpotData } from './data';
 import { NONE, START, step, type CapEvent, type View } from './machine';
 import { TALK_FIT } from './machine';
+import { asksForScreen, shotName, shotOf, shotPref } from './shot';
 
 afterEach(cleanup);
 
@@ -175,5 +176,51 @@ describe('the capsule', () => {
     expect(ui.getByTestId('capsule.menu.more').textContent).toBe('+ 2 more in the inbox');
     ui.getByTestId('capsule.menu.more').click();
     expect(onOpenWindow).toHaveBeenCalledWith('inbox');
+  });
+});
+
+describe('the talk still (designer m_21903)', () => {
+  const base: CapsuleProps = {
+    view: { kind: 'talk', phase: 'listen', handsFree: false }, spot: { agents: [], projects: [], cards: [] }, answer: null, heard: 'what does this cost', level: 0, still: true,
+    card: () => null, route: null, onRouteKeep: vi.fn(), onRouteTo: vi.fn(), onAsk: vi.fn(), onOpen: vi.fn(), onOpenWindow: vi.fn(), onClose: vi.fn(), onQuit: null, onSize: vi.fn(),
+  };
+  const shot = { file: '/h/images/ab12.png', app: 'Safari', title: 'Stripe pricing: pay as you go, per transaction, no fees' };
+  it("the chip's words: the app, then the title cut with '…'; the app alone without one", () => {
+    expect(shotName({ app: 'Safari', title: 'stripe.com' })).toBe('Safari · stripe.com');
+    expect(shotName(shot)).toBe('Safari · Stripe pricing: pay as you go…');
+    expect(shotName({ app: 'Notes', title: '' })).toBe('Notes');
+    expect(shotOf({ file: null })).toBeNull();
+    expect(shotOf({ file: '/a.png', app: 'Mail' })).toEqual({ file: '/a.png', app: 'Mail', title: '' });
+  });
+  it('while he talks: the row under his words, its ✕ drops it, the keys line says fn ⌫; thinking: the chip alone', () => {
+    const onShotDrop = vi.fn();
+    const ui = render(<Capsule {...base} shot={shot} onShotDrop={onShotDrop} />);
+    expect(ui.getByTestId('capsule.shot.chip').textContent).toBe('Safari · Stripe pricing: pay as you go…');
+    expect(ui.getByTestId('capsule.shot.chip').querySelector('img')?.getAttribute('src')).toBe('file:///h/images/ab12.png');
+    expect(ui.getByTestId('capsule.keys').textContent).toBe('fn ⌫ no screenshot');
+    ui.getByTestId('capsule.shot.drop').click();
+    expect(onShotDrop).toHaveBeenCalledTimes(1);
+    ui.rerender(<Capsule {...base} view={{ kind: 'talk', phase: 'think', handsFree: false }} shot={shot} onShotDrop={onShotDrop} />);
+    expect(ui.getByTestId('capsule.shot')).toBeTruthy();
+    expect(ui.queryByTestId('capsule.shot.drop')).toBeNull();
+    expect(ui.queryByTestId('capsule.keys')).toBeNull();
+    ui.rerender(<Capsule {...base} shot={null} />);
+    expect(ui.queryByTestId('capsule.shot')).toBeNull();
+  });
+  it('the ask: only without Screen Recording and never asked; its two buttons', () => {
+    expect(asksForScreen('ask', undefined)).toBe(true);
+    expect(asksForScreen('denied', undefined)).toBe(true);
+    expect(asksForScreen('allowed', undefined)).toBe(false);
+    expect(asksForScreen('ask', false)).toBe(false);
+    expect(asksForScreen(undefined, undefined)).toBe(false);
+    expect(shotPref({ context: { shot: false } })).toBe(false);
+    expect(shotPref({ context: {} })).toBeUndefined();
+    const onOpen = vi.fn();
+    const onLater = vi.fn();
+    const ui = render(<Capsule {...base} screenAsk={{ onOpen, onLater }} />);
+    expect(ui.getByTestId('capsule.ask').textContent).toContain("bise can see the window you're on when you talk. it needs Screen Recording for that.");
+    ui.getByTestId('capsule.ask.open').click();
+    ui.getByTestId('capsule.ask.later').click();
+    expect([onOpen.mock.calls.length, onLater.mock.calls.length]).toEqual([1, 1]);
   });
 });

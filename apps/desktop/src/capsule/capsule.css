@@ -41,3 +41,17 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
 .b-cap-rows .strip-who { font-weight: 500; }
 /* the project tag at the row's end: sans t-13 text-3, as the block's (designer m_20986) */
 .b-cap-rows .b-row .end { flex: none; font: var(--t-13) var(--font-ui); color: var(--c-text-3); }
+/* the talk's still (designer m_21903): one row under his words, 8 px above the keys line; the
+   signed image chip (ink, 1 px line, r 9, no fill, 16 px thumb), its ✕ on hover */
+.b-cap-shot { display: flex; margin-top: var(--s-2); font-size: var(--t-12); }
+.b-cap-shot-chip { position: relative; display: inline-flex; align-items: center; gap: var(--s-1); min-width: 0; max-width: 100%; }
+.b-cap-shot .b-chip.part { color: var(--c-text-2); }
+.b-cap-shot .b-chip.part .ink { color: var(--c-text-2); }
+.b-cap-shot .x { visibility: hidden; flex: none; padding: 0 var(--s-1); border: 0; background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-3); cursor: default; }
+.b-cap-shot-chip:hover .x, .b-cap-shot .x:focus-visible { visibility: visible; }
+.b-cap-shot .x:hover { color: var(--c-text); }
+.b-cap-keys { margin-top: var(--s-2); font: var(--t-12) var(--font-mono); color: var(--c-text-3); }
+.b-cap-keys .k { color: var(--c-text-2); }
+/* the one-time ask under his words: its line, then its two buttons */
+.b-cap-ask { margin-top: var(--gap-block); font: var(--t-13)/1.45 var(--font-ui); color: var(--c-text-2); }
+.b-cap-ask .acts { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
