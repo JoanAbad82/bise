@@ -77,6 +77,7 @@ import {
   type VersionsList,
   type VoiceModeState,
 } from "./types";
+import { applyTyped } from "./apply";
 const EMPTY_ORDER: ThreadOrder = {
   order: [],
   before: null,
@@ -109,25 +110,25 @@ export interface StoreOptions {
 export class Store {
   private readonly listeners = new Map<string, Set<Listener>>();
   private readonly threads = new Map<string, Thread>();
-  private readonly slices = new Map<string, unknown>();
+  /** @internal for apply.ts */ readonly slices = new Map<string, unknown>();
   private readonly evListeners = new Set<(ev: Ev) => void>();
   private coreState: CoreState = "down";
   private cid = 0;
   /** R8: when this window last sent a /model (a setup_first after it is his; a replayed one isn't) */
   private modelSentAt = Number.NEGATIVE_INFINITY;
   /** tool_out asks in flight (by key), and each project's last one (an error names no call) */
-  private readonly toolAsks = new Set<string>();
-  private readonly toolAsk = new Map<string, string>();
+  /** @internal for apply.ts */ readonly toolAsks = new Set<string>();
+  /** @internal for apply.ts */ readonly toolAsk = new Map<string, string>();
   /** each project's last queued_take (its error carries no id: it answers that one) */
-  private readonly takeAsk = new Map<string, string>();
+  /** @internal for apply.ts */ readonly takeAsk = new Map<string, string>();
   /**
    * the diff asks this window sent with a `req` (none today: the review asks without one); a diff
    * that answers another `req` (a terminal's `/diff` the hub broadcasts) is for the view that
    * asked, never the review's diff of the same agent (lead m_16528)
    */
-  private readonly diffReqs = new Set<number>();
+  /** @internal for apply.ts */ readonly diffReqs = new Set<number>();
   /** the dictations this window started and not over yet (bar I) */
-  private readonly dictating = new Set<string>();
+  /** @internal for apply.ts */ readonly dictating = new Set<string>();
   /** the `@` queries on their way: rid -> its project and resolve; each project's newest rid */
   private rid = 0;
   private readonly asked = new Map<
@@ -175,13 +176,13 @@ export class Store {
     };
   }
 
-  private emit(key: string): void {
+  /** @internal for apply.ts */ emit(key: string): void {
     const set = this.listeners.get(key);
     if (set === undefined) return;
     for (const fn of [...set]) fn();
   }
 
-  private put(key: string, value: unknown): void {
+  /** @internal for apply.ts */ put(key: string, value: unknown): void {
     this.slices.set(key, value);
     this.emit(key);
   }
@@ -412,289 +413,7 @@ export class Store {
   }
 
   private applyTyped(ev: Ev): void {
-    switch (ev.ev) {
-      case "projects":
-        this.put("projects", ev.projects);
-        for (const row of ev.projects) {
-          if (
-            row.cards !== undefined &&
-            !this.slices.has(`hubcards:${row.project}`)
-          ) {
-            this.put(`cards:${row.project}`, row.cards);
-          }
-        }
-        return;
-      case "agents":
-        this.put(`agents:${ev.project}`, ev.agents);
-        return;
-      case "cards":
-        this.slices.set(`hubcards:${ev.project}`, true);
-        // his cards and bise's own (`others`: a drop asking him, a done, a merge...) in one
-        // list by id, as the TUI's inbox (state_rows::cards_of_rows): a drop of an agent
-        // mid-turn is a question for him, and only `others` carries it
-        this.put(`cards:${ev.project}`, (ev.others ?? []).length === 0 ? ev.cards : [...ev.cards, ...(ev.others ?? [])].sort((a, b) => a.id - b.id));
-        return;
-      case "thread":
-        this.page(ev);
-        return;
-      case "entry":
-        this.entryEv(ev);
-        return;
-      case "typing": {
-        const key = threadKey(ev.project, ev.agent);
-        const t = this.thread(key);
-        if (t.typing === ev.text) return;
-        t.typing = ev.text;
-        this.emit(`typing:${key}`);
-        return;
-      }
-      case "artifacts":
-      case "scheduled":
-      case "worktrees":
-      case "dev_servers":
-      case "merged":
-      case "features":
-      case "models":
-      case "jobs":
-        this.put(`${ev.ev}:${ev.project}`, ev.items);
-        return;
-      case "branches":
-        // the answer to branches (scanned on a thread): the review's branch picker
-        this.put(`branches:${ev.project}`, {
-          base: ev.base,
-          rows: ev.rows,
-        } satisfies BranchesList);
-        return;
-      case "versions":
-        this.put(`versions:${ev.project}`, {
-          current: ev.current,
-          dev: ev.dev === true,
-          installed: ev.installed === true,
-          items: ev.items,
-        } satisfies VersionsList);
-        return;
-      case "flow":
-        // the repo's [flow] mode; none = not set
-        this.put(`flow:${ev.project}`, ev.flow ?? null);
-        return;
-      case "switch":
-        // where the hub's version switch is (/reload, /restart): at hello and when it moved; none = no switch yet
-        this.put(`switch:${ev.project}`, ev.switch ?? null);
-        return;
-      case "pages":
-        this.put(`pages:${ev.project}`, {
-          items: ev.items,
-          overdue: ev.overdue,
-        } satisfies PagesList);
-        return;
-      case "release":
-      case "update":
-        // a /release-bise run (dev builds) or /update's build: its latest step, whole each time
-        this.put(`${ev.ev}:${ev.project}`, ev);
-        return;
-      case "prs":
-        this.put(`prs:${ev.project}`, {
-          head: ev.head,
-          items: ev.items,
-          none: ev.none ?? null,
-        } satisfies PrsList);
-        return;
-      case "tool_out": {
-        const key = toolOutKey(ev.project, ev.agent, ev.pos);
-        this.toolAsks.delete(key);
-        this.put(key, {
-          out: ev.out,
-          cut: ev.cut,
-          ...(ev.total == null ? {} : { total: ev.total }),
-        } satisfies ToolOut);
-        return;
-      }
-      case "queued_taken": {
-        const key = takeKey(ev.project, ev.agent, ev.id);
-        if (this.takeAsk.get(ev.project) === key)
-          this.takeAsk.delete(ev.project);
-        this.put(key, { text: ev.text } satisfies QueuedTake);
-        return;
-      }
-      case "diff":
-        // an answer to someone else's `req` (a terminal's /diff) never lands on this window's views
-        if (ev.req != null) {
-          if (!this.diffReqs.has(ev.req)) return;
-          this.diffReqs.delete(ev.req);
-        }
-        this.put(diffKey(ev.project, ev.agent, ev.commit ?? undefined), ev);
-        return;
-      case "prefs":
-        this.put("prefs", ev.prefs);
-        return;
-      case "accounts":
-        this.put("accounts", ev.items);
-        // a sign-in's end: its link is no longer open
-        if (this.signing() !== null) this.put("signing", null);
-        return;
-      case "signing":
-        this.put("signing", { id: ev.id, url: ev.url });
-        return;
-      case "found":
-        this.put("found", ev.items);
-        return;
-      case "plugins":
-        this.put(`plugins:${ev.project ?? ""}`, ev.items);
-        return;
-      case "computer_use":
-        this.put("computer_use", ev);
-        return;
-      case "computer_live":
-        // S29: every agent using computer use now, whole each time
-        this.put("computer_live", ev.items);
-        return;
-      case "computer_peek":
-        // S29: the latest still of that agent replaces the last (memory only)
-        this.put(`peek:${ev.key}`, ev);
-        return;
-      case "away_summary":
-        this.put("away", ev);
-        return;
-      case "commands":
-        this.put("commands", ev.items);
-        return;
-      case "roles":
-        this.put("roles", ev.items);
-        return;
-      case "skills":
-        this.put(`skills:${ev.project}`, ev.items);
-        return;
-      case "files":
-        this.filesAnswer(ev);
-        return;
-      case "heard":
-        // fn's talk: the whole text so far, then all of it (final); the capsule's talk view draws it
-        this.put("heard", { text: ev.text, final: ev.final });
-        return;
-      case "level":
-        // a meter's input (~30 Hz): only who reads that voice re-renders
-        if (this.slices.get(`level:${ev.who}`) !== ev.v)
-          this.put(`level:${ev.who}`, ev.v);
-        return;
-      case "voice_answer":
-        // bar N14: his talk answered a card in view; the inbox shows it, then answers
-        this.put("voice_answer", ev);
-        return;
-      case "voice_mode":
-        // only the window that turned it on gets it (main's routes); its
-        // last (on: false) stays until he turns it on again
-        this.put("voice_mode", ev);
-        return;
-      case "dictation":
-        // only the window that started it gets it (main's routes); an id
-        // this store never started, or one already over, is ignored
-        if (!this.dictating.has(ev.id)) return;
-        if (ev.final) this.dictating.delete(ev.id);
-        this.put(`dictation:${ev.id}`, {
-          text: ev.text,
-          final: ev.final,
-          cancelled: ev.cancelled ?? false,
-          error: ev.error ?? null,
-        } satisfies Dictation);
-        return;
-      case "error":
-        if (ev.cmd === "sign_in" && this.signing() !== null)
-          this.put("signing", null);
-        // a typed line the hub's router refused (HubCmd slash): his words to fix, as an error line
-        if (ev.cmd === "slash" && ev.project != null) {
-          this.put(`notice:${ev.project}`, {
-            text: ev.text,
-            level: "error",
-          } satisfies HubLine);
-          return;
-        }
-        // a queued message he took back had gone already (delivered, no longer waiting): the hub's words on its row
-        if (ev.cmd === "queued_take" && ev.project != null) {
-          const key = this.takeAsk.get(ev.project);
-          if (key !== undefined) {
-            this.takeAsk.delete(ev.project);
-            this.put(key, { error: ev.text } satisfies QueuedTake);
-            return;
-          }
-        }
-        // the hub found no such call or no result yet: that project's last ask says so (asked again on the next open)
-        if (ev.cmd === "tool_out" && ev.project != null) {
-          const key = this.toolAsk.get(ev.project);
-          if (key !== undefined) {
-            this.toolAsks.delete(key);
-            this.put(key, { error: ev.text } satisfies ToolOut);
-          }
-          return;
-        }
-        if (ev.cmd !== "send") return;
-        // G: exactly the row with this cid; with no cid (an older core or
-        // hub) the oldest sending row of that project, as before
-        if (ev.cid !== undefined && ev.cid !== null)
-          this.failCid(ev.cid, ev.reason ?? "refused", ev.text);
-        else this.failOldest(ev.project ?? null, ev.text);
-        return;
-      case "confirm":
-        // a question belongs to the connection that asked: only this window gets it
-        this.put(`confirms:${ev.project}`, [
-          ...this.confirms(ev.project).filter((c) => c.id !== ev.id),
-          { project: ev.project, id: ev.id, text: ev.text },
-        ]);
-        return;
-      case "notice":
-        this.put(`notice:${ev.project}`, {
-          text: ev.text,
-          level: "note",
-        } satisfies HubLine);
-        return;
-      case "approvals":
-        // bar V8/W21: the mode, the checker and the rules, whole each time
-        this.put(`approvals:${ev.project}`, ev);
-        return;
-      case "refused":
-        // a hub's own refusal of a connection: the core reads it and says
-        // hub_refused; it never reaches a window as is
-        return;
-      case "index":
-        // ⌘K's index: the projects the core doesn't hold, from their files
-        this.put("index", ev.projects);
-        return;
-      case "setup_first":
-        // R8: his /model needs that provider's setup first (the core holds the line)
-        this.put("setup_first", ev);
-        return;
-      case "keychain":
-        // N1: where his keys and sign-ins are kept, and the last /keychain move's lines
-        this.put("keychain", ev);
-        return;
-      case "hub_refused":
-        // a project's hub refused this core: its words until he retries
-        this.put(`hub_refused:${ev.project}`, ev.error);
-        return;
-      case "broken":
-        // this core can start no hub (its runtime is missing): why, for this core's life
-        this.put("broken", ev.reason);
-        return;
-      case "welcome":
-        // its hub took this core (again): no refusal holds
-        if (this.slices.get(`hub_refused:${ev.project}`) != null)
-          this.put(`hub_refused:${ev.project}`, null);
-        // a new hello: the hub tied the open questions to a connection
-        // that is gone (the core reconnected), so none can be answered
-        if (this.confirms(ev.project).length > 0)
-          this.put(`confirms:${ev.project}`, EMPTY);
-        return;
-      case "route":
-      case "route_done":
-      case "job_end":
-      case "followed_end":
-      case "open":
-      case "page_changed":
-      case "card_open":
-      case "focused":
-        // one-shot: read through onEvent (page_changed: a 'v2 published' moment before the next
-        // pages; card_open: open that card in the inbox; focused: this connection's thread moved)
-        return;
-    }
+    applyTyped(this, ev);
   }
 
   /** The core went up or down: down fails every send still on its way ('not sent · retry'). */
@@ -739,7 +458,7 @@ export class Store {
     }
   }
 
-  private thread(key: string): Thread {
+  /** @internal for apply.ts */ thread(key: string): Thread {
     let t = this.threads.get(key);
     if (t === undefined) {
       t = { view: EMPTY_ORDER, byPos: new Map(), typing: "", pending: EMPTY };
@@ -767,7 +486,7 @@ export class Store {
     this.emit(`order:${key}`);
   }
 
-  private page(ev: EvOf<"thread">): void {
+  /** @internal for apply.ts */ page(ev: EvOf<"thread">): void {
     const key = threadKey(ev.project, ev.agent);
     const t = this.thread(key);
     for (const e of ev.entries) this.putEntry(key, t, e);
@@ -790,7 +509,7 @@ export class Store {
     this.setOrder(key, t, order, before, more);
   }
 
-  private entryEv(ev: EvOf<"entry">): void {
+  /** @internal for apply.ts */ entryEv(ev: EvOf<"entry">): void {
     const key = threadKey(ev.project, ev.agent);
     const t = this.thread(key);
     const known = t.byPos.has(ev.entry.pos);
@@ -846,7 +565,11 @@ export class Store {
    * shows 'not delivered' with retry. undelivered: the hub wrote its
    * undelivered entry in the thread, which stands in for his row (gone).
    */
-  private failCid(cid: number, reason: string, why: string): void {
+  /** @internal for apply.ts */ failCid(
+    cid: number,
+    reason: string,
+    why: string,
+  ): void {
     for (const [key, t] of this.threads) {
       if (!t.pending.some((p) => p.cid === cid)) continue;
       t.pending =
@@ -860,7 +583,10 @@ export class Store {
     }
   }
 
-  private failOldest(project: string | null, why: string): void {
+  /** @internal for apply.ts */ failOldest(
+    project: string | null,
+    why: string,
+  ): void {
     let oldest: { key: string; t: Thread; p: Pending } | null = null;
     for (const [key, t] of this.threads) {
       for (const p of t.pending) {
@@ -981,7 +707,7 @@ export class Store {
     return this.slice<FilesAnswer | null>(`files:${project}`, null);
   }
 
-  private filesAnswer(ev: EvOf<"files">): void {
+  /** @internal for apply.ts */ filesAnswer(ev: EvOf<"files">): void {
     // an older query's late answer never replaces a newer one's
     if (ev.rid !== this.newestRid.get(ev.project)) return;
     const a: FilesAnswer = {
