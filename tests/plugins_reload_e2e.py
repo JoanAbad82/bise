@@ -24,6 +24,37 @@ def check(cond, what):
         FAILS.append(what)
 
 
+def bridges(E):
+    """This hub's plugin bridges (`bise plugins serve --dir <its run dir>`)
+    and the servers they started (their children: `bise computer-use
+    mcp`, the fixture's): pids."""
+    import subprocess
+    out = subprocess.run(["ps", "-axww", "-o", "pid=,ppid=,command="], capture_output=True, text=True).stdout
+    rows = []
+    for l in out.splitlines():
+        p = l.split(None, 2)
+        if len(p) == 3 and p[0].isdigit() and p[1].isdigit():
+            rows.append((int(p[0]), int(p[1]), p[2]))
+    run = os.path.join(E.tmp, "run") + "/"
+    bs = {pid for pid, _, cmd in rows if " plugins serve " in cmd and ("--dir " + run) in cmd}
+    kids = {pid for pid, ppid, _ in rows if ppid in bs}
+    return bs, kids
+
+
+def one_bridge(E, what):
+    """One bridge for main's one REPL, whatever relaunched before (the old
+    one goes within its parent check, 500 ms), its servers its children."""
+    got = {}
+
+    def ok():
+        bs, kids = bridges(E)
+        got["now"] = (sorted(bs), sorted(kids))
+        return len(bs) == 1
+    wait.until(ok, 10, "one bridge (%s)" % what)
+    check(len(got["now"][0]) == 1, "one plugin bridge %s: %r" % (what, got["now"]))
+    return got["now"]
+
+
 def repl_pid(E):
     try:
         return open(os.path.join(E.state, "agents", "main", "repl.pid")).read().strip()
@@ -55,6 +86,8 @@ def main():
         c.wait(lambda: repl_pid(E) not in (None, before), 60, "main's REPL relaunched")
         c.wait_idle("main")
         check(True, "relaunched at idle: %s -> %s" % (before, repl_pid(E)))
+        # the old REPL's bridge went with it: one, the new REPL's
+        one_bridge(E, "after a relaunch")
         # same session: the conversation goes on
         c.say("hello after")
         c.wait_line("main", "ack: hello after")
@@ -95,6 +128,19 @@ def main():
         check("- `computer`: computer use" in on and "Mac apps" in on and "computer:computer-use" in on,
               "computer use on: the prompt names it, its Mac apps and its skill")
         check("- `hello-plugin`" not in on, "the disabled plugin left the prompt")
+        # ambient-lead m_21727 (2): the servers are one bridge per REPL and
+        # its servers, its children; a relaunch leaves no second set, and a
+        # hub stop for good takes every one of them with its REPL
+        _, kids = one_bridge(E, "after the second relaunch")
+        check(len(kids) == 1, "one server (computer-use mcp) under it: %r" % kids)
+        E.stop_hub()
+        gone = {}
+
+        def none_left():
+            gone["now"] = bridges(E)
+            return gone["now"] == (set(), set())
+        wait.until(none_left, 15, "no bridge or server after the hub stop")
+        check(gone["now"] == (set(), set()), "a hub stop leaves no bridge or server: %r" % (gone["now"],))
     finally:
         if FAILS:
             os.environ["SB_KEEP"] = "1"
