@@ -74,6 +74,7 @@ test('app/cmd-hints: ⌘1-9 picks a project; ⌘ held alone shows the places\' d
       const row = page.getByTestId(`app.sidebar.project.${p.project}`);
       await expect(row.locator('.app-keyhint'), `${p.name}: ⌘${String(i + 1)}`).toHaveText(String(i + 1));
       await expect(row.locator('.app-cnt'), `${p.name}: the digit in place of its count`).toHaveCount(0);
+      await expect(row.locator('.app-m'), `${p.name}: its words hide too, the digit takes the right end`).toHaveCount(0);
     }
     await expect(page.getByTestId('app.title.back.hint')).toHaveText('⌘[');
     await expect(page.getByTestId('app.title.forward.hint'), 'nothing ahead: no ⌘]').toHaveCount(0);

@@ -99,18 +99,18 @@ function SRow({ kind, lead, name, end, endErr, count, hint, on, title, onClick, 
   testId?: string;
   children?: ReactNode;
 }) {
-  const tail = (
-    <>
-      {end != null && end !== '' && <span className={endErr === true ? 'app-m err' : 'app-m'}>{end}</span>}
-      {hint !== undefined ? (
-        <span className="app-keyhint" title={`⌘${String(hint)}`} data-testid={testId === undefined ? undefined : `${testId}.hint`}>
-          <Kbd>{hint}</Kbd>
-        </span>
-      ) : (
-        count !== undefined && count > 0 && <span className="app-cnt">{count}</span>
-      )}
-    </>
-  );
+  // ⌘ held: the digit takes the whole right end, its words hide like the count (designer m_21692)
+  const tail =
+    hint !== undefined ? (
+      <span className="app-keyhint" title={`⌘${String(hint)}`} data-testid={testId === undefined ? undefined : `${testId}.hint`}>
+        <Kbd>{hint}</Kbd>
+      </span>
+    ) : (
+      <>
+        {end != null && end !== '' && <span className={endErr === true ? 'app-m err' : 'app-m'}>{end}</span>}
+        {count !== undefined && count > 0 && <span className="app-cnt">{count}</span>}
+      </>
+    );
   return (
     <div className={`b-row app-r ${kind}${on === true ? ' on' : ''}`} role="button" tabIndex={-1} aria-current={on === true || undefined} title={title}
       onClick={onClick} data-testid={testId}>
