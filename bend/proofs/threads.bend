@@ -5,6 +5,7 @@ import Base
 import ../hub/model.bend as HM
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
+import ../hub/picks.bend as HPK
 import ../hub/keyed.bend as HKL
 import ../hub/gen/feed.bend as HFD
 import ../hub/said.bend as HSD
@@ -108,9 +109,38 @@ def Laws.no_parts_no_line(o, cx, who, card, said):
   {==}
 
 def Laws.route_parts_follow_the_route(o, cx, who, card, said, parts, e):
-  +ln = HC.feed(o, cx, HM.MAIN(), HFD.route(who, card, said))
+  +ln = HC.feed(o, cx, HM.MAIN(), HFD.route(who, card, said, None{}, None{}, None{}))
   +rec = HFD.route_parts(HC.parts_json(parts))
   %Equal.sym(Bool, String.is_empty(parts), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, HM.MAIN(), rec)) == HC.feed(o, ln, HM.MAIN(), rec) : HX.Cx<o>}
+  {==}
+
+def Laws.an_option_number_gets_its_words():
+  {==}
+
+def Laws.words_get_no_pick():
+  {==}
+
+def Laws.a_number_off_the_list_gets_no_pick():
+  {==}
+
+def Laws.pick_both_or_neither(p):
+  match p:
+    case None{}:
+      {==}
+    case Some{k}:
+      match k:
+        case HPK.Pick{n, w}:
+          {==}
+
+def Laws.the_answer_line_keeps_said(who, c, said, msg):
+  {==}
+
+def Laws.an_agents_answer_is_in_the_askers_feed(o, cx, asker, c, said, parts, msg, e):
+  +ln = HC.answer_line(o, cx, asker, asker, c, said, parts, msg)
+  %Equal.sym(Bool, String.eq(asker, HM.MAIN()), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => cx, u => ln) == ln : HX.Cx<o>}
+  {==}
+
+def Laws.mains_own_answer_is_one_line(o, cx, c, said, parts, msg):
   {==}
 
 def Laws.answer_keeps_its_parts(to, text, r, parts):
