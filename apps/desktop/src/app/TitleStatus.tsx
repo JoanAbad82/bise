@@ -7,7 +7,7 @@
 // (amb-win's slot, app.title.status): its words cut with …, a click opens a 320 px popover with
 // the whole words, the actions and ✕; under 160 px of room (the slot's data-narrow) only its sign
 // and short words show. Owner: amb-home.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { Act, IconButton, Press, cx } from '@/ds';
 import { Breath } from '@/working/Signs';
 import { useCoreLine } from './CoreLine';
@@ -33,6 +33,46 @@ export function TitleStatus() {
   return part === null ? null : <Pill key={part.testId} part={part} />;
 }
 
+/** When even the short words don't fit, the pill is its sign alone (the breath while running; designer m_21244). */
+const GLYPH = { done: '✓', quiet: '↑', err: '▲' } as const;
+
+/**
+ * Whether even the short words don't fit the slot's room (designer m_21244): then the pill is a
+ * 24 px square with its sign alone, and a click opens the popover. The short words stay laid out
+ * (out of the flow, hidden) so their width is still known when the pill is tight.
+ */
+function useTight(box: RefObject<HTMLDivElement | null>, short: string): boolean {
+  const [tight, setTight] = useState(false);
+  useLayoutEffect(() => {
+    const pill = box.current;
+    const slot = pill?.parentElement;
+    if (pill === null || slot === null || slot === undefined) return;
+    const read = () => {
+      const words = pill.querySelector<HTMLElement>('.app-ts-short');
+      if (slot.dataset['narrow'] !== 'true' || words === null) {
+        setTight(false);
+        return;
+      }
+      const cs = getComputedStyle(pill);
+      const breath = pill.querySelector<HTMLElement>('.breath');
+      const lead = breath === null ? 0 : breath.offsetWidth + parseFloat(cs.columnGap || '0');
+      const need = words.offsetWidth + lead + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      setTight(slot.clientWidth < need);
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(slot);
+    // the slot's data-narrow flips after its own resize: read again then
+    const mo = new MutationObserver(read);
+    mo.observe(slot, { attributes: true, attributeFilter: ['data-narrow'] });
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, [box, short]);
+  return tight;
+}
+
 function Pill({ part }: { part: StatusPart }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -52,6 +92,7 @@ function Pill({ part }: { part: StatusPart }) {
       window.removeEventListener('keydown', esc, true);
     };
   }, [open]);
+  const tight = useTight(box, part.short);
   const id = part.testId;
   const err = part.tone === 'err';
   const acts = part.acts ?? [];
@@ -70,7 +111,14 @@ function Pill({ part }: { part: StatusPart }) {
     </>
   );
   return (
-    <div ref={box} className={cx('app-ts', part.tone, part.fold === true && 'fold')} role={err ? 'alert' : 'status'} data-testid={id} data-state={part.state}>
+    <div
+      ref={box}
+      className={cx('app-ts', part.tone, part.fold === true && 'fold')}
+      role={err ? 'alert' : 'status'}
+      data-testid={id}
+      data-state={part.state}
+      data-tight={tight}
+    >
       <Press
         look="app-ts-open"
         aria-expanded={open}
@@ -79,7 +127,13 @@ function Pill({ part }: { part: StatusPart }) {
         }}
         data-testid={`${id}.open`}
       >
-        {part.tone === 'running' && <Breath testId={`${id}.breath`} />}
+        {part.tone === 'running' ? (
+          <Breath testId={`${id}.breath`} />
+        ) : (
+          <span className="app-ts-glyph" aria-hidden="true" data-testid={`${id}.glyph`}>
+            {GLYPH[part.tone]}
+          </span>
+        )}
         <span className="app-ts-words" data-testid={`${id}.text`}>
           {part.words}
         </span>

@@ -10,7 +10,6 @@
   align-items: center;
   gap: var(--s-2);
   min-width: 0;
-  max-width: 100%;
   height: calc(var(--h-control-sm) - var(--s-1)); /* 24: the title bar's own controls' height */
   padding: 0 var(--s-2);
   border-radius: var(--r-1);
@@ -19,6 +18,12 @@
   font: var(--t-13) var(--font-ui);
   -webkit-app-region: no-drag;
   transition: opacity 220ms ease;
+}
+
+/* past 480 a failure reads as a red banner (designer m_21244): it cuts with …. Over the slot's own
+   `.app-title-status > *` max-width (app.css, loaded after this file). */
+.app-title-status > .app-ts {
+  max-width: min(100%, 480px);
 }
 
 /* failed or down: --c-err 8%, its words in --c-err */
@@ -92,6 +97,27 @@
 .app-title-status[data-narrow="true"] .app-ts-age,
 .app-title-status[data-narrow="true"] .app-ts-acts {
   display: none;
+}
+
+/* the short words don't fit either (designer m_21244): a 24 px square with the sign alone ('▲', ✓,
+   ↑, or the breath while running); a click opens the popover. The short words stay laid out, hidden
+   and out of the flow, so TitleStatus.tsx still knows their width. */
+.app-ts-glyph {
+  display: none;
+  flex: none;
+}
+.app-ts[data-tight="true"] {
+  justify-content: center;
+  width: calc(var(--h-control-sm) - var(--s-1));
+  padding: 0;
+}
+.app-ts[data-tight="true"] .app-ts-glyph {
+  display: inline;
+}
+.app-title-status[data-narrow="true"] .app-ts[data-tight="true"] .app-ts-short {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* a click: 320 px, the whole words, the dim lines, the actions and ✕ */

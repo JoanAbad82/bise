@@ -74,6 +74,22 @@ test('app/reload-line: reloading, then ✓ reloaded that folds; a stale one says
     await core.send(sw('rolled_back', { reason: 'the hub died during its probation' }));
     await expect(page.getByTestId('app.reload.text')).toHaveText("▲ couldn't reload: the new version stopped right after it started. you're still on 2065c746.", { timeout: 3000 });
     expect(await line.evaluate((el) => el.getBoundingClientRect().height), 'with retry and ✕, still 24 px').toBe(24);
+    // at most 480 px, never a red banner from the crumb to the toggle (designer m_21244): the reason cuts with …
+    const wide = await page.evaluate(() => {
+      const pill = document.querySelector<HTMLElement>('[data-testid="app.reload"]');
+      const words = document.querySelector<HTMLElement>('[data-testid="app.reload.text"]');
+      const slot = document.querySelector<HTMLElement>('[data-testid="app.title.status"]');
+      return {
+        w: Math.round(pill?.getBoundingClientRect().width ?? 0),
+        room: slot?.clientWidth ?? 0,
+        cut: words !== null && words.scrollWidth > words.clientWidth,
+        ellipsis: words === null ? '' : getComputedStyle(words).textOverflow,
+      };
+    });
+    test.info().annotations.push({ type: 'room', description: `1100 wide: ${String(wide.room)} px, the failed pill ${String(wide.w)} px, cut ${String(wide.cut)}` });
+    expect(wide.w, 'the pill is 480 px at most').toBeLessThanOrEqual(480);
+    if (wide.room > 480) expect(wide.cut, 'the reason is cut, not the pill widened').toBe(true);
+    expect(wide.ellipsis).toBe('ellipsis');
     await expect(line).toHaveAttribute('role', 'alert');
     await page.waitForTimeout(3600);
     await expect(line, 'a failure stays').toBeVisible();
@@ -139,7 +155,18 @@ test('app/reload-line: reloading, then ✓ reloaded that folds; a stale one says
       await page.getByTestId('app.title.crumb').evaluate((el) => el.scrollWidth <= el.clientWidth),
       'narrow: the crumb is never cut for it',
     ).toBe(true);
-    await expect(page.getByTestId('app.reload.short'), 'narrow: the short words').toHaveText("▲ couldn't reload");
+    // '▲ couldn't reload' needs ~110 px: under that, the sign alone in a 24 px square (designer m_21244)
+    expect(narrowRoom, 'the long crumb leaves less room than the short words need').toBeLessThan(110);
+    await expect(line, 'tight: the short words do not fit either').toHaveAttribute('data-tight', 'true');
+    const sq = await line.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const slot = el.parentElement?.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height), inside: slot !== undefined && r.left >= slot.left - 0.5 && r.right <= slot.right + 0.5 };
+    });
+    expect(sq, 'a 24 px square, inside its room').toEqual({ w: 24, h: 24, inside: true });
+    await expect(page.getByTestId('app.reload.glyph'), 'tight: the sign alone').toHaveText('▲');
+    await expect(page.getByTestId('app.reload.glyph')).toBeVisible();
+    await expect(page.getByTestId('app.reload.short'), 'tight: no short words').toBeHidden();
     await expect(page.getByTestId('app.reload.text'), 'narrow: no long words').toBeHidden();
     await expect(page.getByTestId('app.reload.retry'), 'narrow: the actions are in the popover').toBeHidden();
     await page.screenshot({ path: test.info().outputPath('rolled-back-narrow.png') });
