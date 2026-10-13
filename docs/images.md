@@ -249,9 +249,9 @@ its `[Image #1]` name, never only a path or the bare marker).
 
 ## Not done / later
 
-- bend-jsrt is a 110 MB debug binary: an agent shell (50 MB file cap)
-  cannot link it; rebuild it from a terminal (`cd rust/jsrt && cargo
-  build`) after a change in `rust/jsrt` or `rust/images`.
+- bend-jsrt is a 110 MB debug binary: rebuild it (`cd rust/jsrt && cargo
+  build`) after a change in `rust/jsrt` or `rust/images` (an agent's
+  shell has no file size cap since no-fsize).
 - Downscaling needs macOS `sips`; elsewhere an image over 2048 px or
   3.75 MB is refused with a message.
 

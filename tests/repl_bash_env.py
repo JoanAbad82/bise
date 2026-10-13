@@ -14,7 +14,11 @@ A) A real repl-live on the scripted fake provider (fake_provider.py)
    (2026-10-01: two `vercel deploy` runs left growing, 32 + 17 GB of node,
    the Mac out of memory): with BEND_MEM_LIMIT_MB=100, a command that
    grows to 300 MB is killed and says why, and so is an orphaned child
-   `( cmd & )` that grows after its command returned.
+   `( cmd & )` that grows after its command returned. Then the output
+   limit (BEND_OUT_LIMIT_MB=5): a command writes a 300 MB file and ends
+   with rc 0 (no file size limit: rustc once died of SIGXFSZ on an
+   rlib), and a command that prints without end is stopped, its line
+   after the first MiB.
 B) `bend-harness --headless --scripted` started with an agent's vars
    (BEND_WIRE_LOG, BEND_CONTEXT_FILE, SB_*) writes nothing into that
    agent's wire log (once: a scripted REPL run from an agent's shell
@@ -87,6 +91,8 @@ def part_a(tmp):
         "SB_AGENT": "probe",
         # the memory watchdog's limit, per process (the hogs below: 300 MB)
         "BEND_MEM_LIMIT_MB": "100",
+        # the output limit (the printer below: 2 MB/s, stopped at ~4 s)
+        "BEND_OUT_LIMIT_MB": "5",
     })
     log, err = os.path.join(tmp, "repl.log"), os.path.join(tmp, "repl.err")
     repl = subprocess.Popen([os.path.join(ROOT, "repl-live")], cwd=ROOT, env=env,
@@ -104,7 +110,12 @@ def part_a(tmp):
                 HOG % "bise-memhog-fg",
                 # the same, orphaned: the command returns at once, the hog grows after
                 "( " + HOG % "bise-memhog-orphan" + " & ); echo spawned",
-                "sleep 5; pgrep -f bise-memhog || echo no-hog-left"]
+                "sleep 5; pgrep -f bise-memhog || echo no-hog-left",
+                # a 300 MB FILE: no file size limit (rustc died on SIGXFSZ)
+                "dd if=/dev/zero of=%s bs=1048576 count=300 2>/dev/null; echo dd-rc:$? size:$(wc -c < %s | tr -d ' '); rm -f %s"
+                % ((os.path.join(tmp, "big.bin"),) * 3),
+                # an output without end: stopped at 5 MB, its line after the first MiB
+                "while :; do head -c 1048576 /dev/zero | tr '\\0' a; sleep 0.5; done"]
         sock = socket.create_connection(("127.0.0.1", port), timeout=120)
         sock.sendall(("run " + " ".join("[[bash: %s]]" % c for c in cmds) + "\n").encode())
         f = sock.makefile("rb")
@@ -129,6 +140,10 @@ def part_a(tmp):
             ("a 3 MB output comes back cut at 1 MiB, with its size",
              "[bash: the output is 3000000 bytes; only its first 1048576 follow." in res[3]),
             ("the REPL's session vars stay out of the command", "env:[][][][probe]" in res[4]),
+            ("a command writes a 300 MB file", "dd-rc:0 size:314572800" in res[8]),
+            ("an output without end is stopped at its limit, with its line",
+             "[bash: the output is " in res[9] and len(res[9]) < 1050000
+             and "\n[bash: stopped: its output passed 5 MB (BEND_OUT_LIMIT_MB, 0 = no limit)" in res[9]),
             ("the REPL is alive", repl.poll() is None),
         ]
         bad = [n for n, ok in checks if not ok]

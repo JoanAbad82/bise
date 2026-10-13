@@ -184,7 +184,7 @@ def Laws.bg_wrapper_output_back_bounded():
 def Laws.bg_wrapper_unsets_repl_env():
   {==}
 
-def Laws.bg_wrapper_output_capped():
+def Laws.bg_wrapper_caps_only_its_output():
   {==}
 
 def Laws.bg_wrapper_runner_ownership_check():

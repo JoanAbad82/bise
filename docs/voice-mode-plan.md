@@ -60,7 +60,7 @@ one gate seed for everybody).
   read-tree HEAD` in your own worktree fixes it.)
 - Gates: `tests/gate.sh quick` before each commit (green: clippy -D warnings + the tests). The lead
   runs the full gate (`ulimit -n 8192; tests/gate.sh full`) once at integration.
-- The machine: the bash tool caps files at 50 MB: a release build or a big binary goes through
+- The machine: a release build or a big binary goes through
   `launchctl submit -l bise.<you>.N -o $TMPDIR/N.log -e $TMPDIR/N.log -- nice -n 10 …`, then
   `launchctl remove bise.<you>.N`. `df -h .` before a new target (under 8 GB free: wait). Node capped.
   `tests/gate.sh done <name>` at the end (it deletes your target/).
@@ -260,8 +260,7 @@ What he found, and the fix:
 | 6 | on speakers it hears itself, takes it for him and answers itself | echo cancelled at the source (macOS VoiceProcessingIO: mic + speaker in one voice-processing unit) behind `audio::open_voice_io()`; the controller also drops what it hears that matches what the agent just said, and without AEC never lets the mic through while the agent talks unless the route is headphones | voice-echo (AEC), lead (filter, gating) |
 | 7 | choose the voice (type of voice) and the language | the Mistral voices list (`GET /v1/audio/voices`: name, languages, gender) in `/voice`, ▸ hear it on press; the language row (auto, or one) feeds the transcription and `speakable` | voice-settings2 |
 
-Same rules as §3 (branch only, own worktree, launchctl for gates: the bend-tui test binary is over
-the bash tool's 50 MB cap, `launchctl submit` jobs restart when they exit: `launchctl remove` as soon
+Same rules as §3 (branch only, own worktree, launchctl for gates: `launchctl submit` jobs restart when they exit: `launchctl remove` as soon
 as the log has its end). New contracts in `mod.rs`: `PaneView.work: Vec<Work>` (`Work { kind:
 Tool|Thinking|Message, text, state: Running|Done|Failed }`), `VoiceIo { mic, speaker, aec }` and
 `audio::open_voice_io()` (a stub with `aec: false` until voice-echo lands).

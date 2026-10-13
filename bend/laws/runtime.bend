@@ -218,7 +218,8 @@ whoami
 XQ-3131618372-EOF
 if [ $? -ne 0 ]; then echo \"background: could not write /tmp/bend-bg-0/$i.cmd (disk full?)\"; rm -f $BG/$i.in $BG/$i.cmd; rmdir $BG/$i.slot 2>/dev/null; rm -f \"$0\"; exit 1; fi
 L=${BEND_MEM_LIMIT_MB:-}; if [ -z \"$L\" ]; then m=$(sysctl -n hw.memsize 2>/dev/null); m=$((${m:-0}/4194304)); if [ $m -eq 0 ] || [ $m -gt 8192 ]; then m=8192; fi; if [ $m -lt 2048 ]; then m=2048; fi; L=$m; fi
-( ulimit -f 102400; set -m; ( BEND_STDIN=$BG/$i.in /bin/sh $BG/$i.cmd ) > $BG/$i.out 2>&1 </dev/null 9<&- & C=$!; set +m; echo $C > $BG/$i.pid; if [ \"$L\" -gt 0 ] 2>/dev/null; then ( while kill -0 -$C 2>/dev/null; do sleep 2; k=$(ps -axo pgid=,pid=,rss=,ucomm= 2>/dev/null | awk -v g=$C -v l=$((L*1024)) '$1==g && $3>l {print \"pid \" $2 \" (\" $4 \") at \" int($3/1024) \" MB\"; exit}'); if [ -n \"$k\" ]; then kill -9 -$C 2>/dev/null; if { [ -d $BG/$i.slot ] && [ \"$(cat $BG/$i.pid 2>/dev/null)\" = \"$C\" ]; } || { [ ! -d $BG/$i.slot ] && [ -e $BG/$i.rc ]; }; then echo \"[bash: killed $k of RAM, over the limit of $L MB per process (BEND_MEM_LIMIT_MB, 0 = no limit). A process that keeps growing is a leak or a command that never ends: e.g. its output piped into grep -m1 or head, or a CLI left running in the background]\" >> $BG/$i.out; fi; break; fi; done ) >/dev/null 2>&1 & fi; wait $C; R=$?; if [ \"$(cat $BG/$i.pid 2>/dev/null)\" = \"$C\" ]; then echo $R > $BG/$i.rc; rm -f $BG/$i.pid $BG/$i.cmd $BG/$i.in; rmdir $BG/$i.slot 2>/dev/null; fi; exit $R ) >/dev/null 2>&1 &
+O=${BEND_OUT_LIMIT_MB:-2048}
+( : > $BG/$i.out; set -m; ( BEND_STDIN=$BG/$i.in /bin/sh $BG/$i.cmd ) > $BG/$i.out 2>&1 </dev/null 9<&- & C=$!; set +m; echo $C > $BG/$i.pid; if [ \"$L\" -gt 0 ] 2>/dev/null || [ \"$O\" -gt 0 ] 2>/dev/null; then ( while kill -0 -$C 2>/dev/null; do sleep 2; m=; if [ \"$L\" -gt 0 ] 2>/dev/null; then k=$(ps -axo pgid=,pid=,rss=,ucomm= 2>/dev/null | awk -v g=$C -v l=$((L*1024)) '$1==g && $3>l {print \"pid \" $2 \" (\" $4 \") at \" int($3/1024) \" MB\"; exit}'); if [ -n \"$k\" ]; then m=\"[bash: killed $k of RAM, over the limit of $L MB per process (BEND_MEM_LIMIT_MB, 0 = no limit). A process that keeps growing is a leak or a command that never ends: e.g. its output piped into grep -m1 or head, or a CLI left running in the background]\"; fi; fi; if [ -z \"$m\" ] && [ \"$O\" -gt 0 ] 2>/dev/null; then n=$(wc -c <&8 2>/dev/null); if [ $((${n:-0}+0)) -gt $((O*1048576)) ]; then m=\"[bash: stopped: its output passed $O MB (BEND_OUT_LIMIT_MB, 0 = no limit); a command that prints without end, or reads its own output back]\"; fi; fi; if [ -n \"$m\" ]; then kill -STOP -$C 2>/dev/null; if { [ -d $BG/$i.slot ] && [ \"$(cat $BG/$i.pid 2>/dev/null)\" = \"$C\" ]; } || { [ ! -d $BG/$i.slot ] && [ -e $BG/$i.rc ]; }; then { [ -z \"$(tail -c 1 $BG/$i.out)\" ] || echo; echo \"$m\"; } >> $BG/$i.out; fi; kill -9 -$C 2>/dev/null; break; fi; done ) 8<$BG/$i.out >/dev/null 2>&1 & fi; wait $C; R=$?; if [ \"$(cat $BG/$i.pid 2>/dev/null)\" = \"$C\" ]; then echo $R > $BG/$i.rc; rm -f $BG/$i.pid $BG/$i.cmd $BG/$i.in; rmdir $BG/$i.slot 2>/dev/null; fi; exit $R ) >/dev/null 2>&1 &
 r=$!
 sleep 30 >/dev/null 2>&1 </dev/null 9<&- & t=$!
 trap 'kill $t 2>/dev/null; exit 143' HUP INT TERM
@@ -245,7 +246,7 @@ wait $r
 s=$?
 if [ ! -d /tmp/bend-bg-0 ]; then echo \"background: the bg dir vanished before the exit code was recorded: /tmp/bend-bg-0\"; rm -f \"$0\"; exit 1; fi
 if [ ! -f /tmp/bend-bg-0/$i.out ]; then echo \"background: could not write /tmp/bend-bg-0/$i.out (disk full?)\"; fi
-n=$(wc -c < $BG/$i.out 2>/dev/null); n=$((${n:-0}+0)); if [ $n -gt 1048576 ]; then echo \"[bash: the output is $n bytes; only its first 1048576 follow. The rest is lost: redirect a big output to a file and read it in parts]\"; head -c 1048576 $BG/$i.out; echo; else cat $BG/$i.out 2>/dev/null; fi
+n=$(wc -c < $BG/$i.out 2>/dev/null); n=$((${n:-0}+0)); if [ $n -gt 1048576 ]; then echo \"[bash: the output is $n bytes; only its first 1048576 follow. The rest is lost: redirect a big output to a file and read it in parts]\"; head -c 1048576 $BG/$i.out; echo; tail -c 1024 $BG/$i.out | grep -a -E '^\\[bash: (stopped:|killed) '; else cat $BG/$i.out 2>/dev/null; fi
 if [ ! -s /tmp/bend-bg-0/$i.rc ]; then echo \"background: could not write /tmp/bend-bg-0/$i.rc (disk full?) - the output above may be incomplete\"; fi
 if [ -n \"$x\" ]; then echo \"[bash: interrupted by $x: the command was stopped (TERM to its process group, then KILL); its output so far is above. Check what it changed before you run it again]\"; s=130; fi
 rm -f $BG/$i.in $BG/$i.out $BG/$i.pid $BG/$i.cmd $BG/$i.rc 2>/dev/null
@@ -451,7 +452,7 @@ law bg_wrapper_runner_waits_and_records:
 # the watchdog: no command output goes through it.
 law bg_wrapper_output_is_a_file:
   {Bool.and(String.contains(Sh.bg_wrap("x", "/d", 5, "/i"), " /bin/sh $BG/$i.cmd ) > $BG/$i.out 2>&1"),
-   Bool.and(String.contains(Sh.bg_mem_watch(), "k=$(ps -axo pgid=,pid=,rss=,ucomm= 2>/dev/null | awk "),
+   Bool.and(String.contains(Sh.bg_watch(), "k=$(ps -axo pgid=,pid=,rss=,ucomm= 2>/dev/null | awk "),
      Bool.not(String.contains(Sh.bg_wrap("x", "/d", 5, "/i"), ".cmd ) |"))))
     == True{} : Bool}
 
@@ -462,7 +463,7 @@ law bg_wrapper_output_is_a_file:
 law bg_wrapper_never_kills:
   {Bool.and(Bool.not(String.contains(Sh.bg_wrap("x", "/d", 5, "/i"), "kill $c")),
      Bool.and(Bool.not(String.contains(Sh.bg_wrap("x", "/d", 5, "/i"), "kill -9 $")),
-       String.contains(Sh.bg_mem_watch(), "$3>l {print")))
+       String.contains(Sh.bg_watch(), "$3>l {print")))
     == True{} : Bool}
 
 # LAW: every command runs in its own process group under the memory
@@ -472,8 +473,8 @@ law bg_wrapper_never_kills:
 # lasts while any process of the group lives; the limit has an override.
 # (bg_wrapper_script pins both lines in the wrapper, byte for byte)
 law bg_wrapper_watches_memory:
-  {Bool.and(String.contains(Sh.bg_mem_watch(), "while kill -0 -$C"),
-   Bool.and(String.contains(Sh.bg_mem_watch(), "kill -9 -$C"),
+  {Bool.and(String.contains(Sh.bg_watch(), "while kill -0 -$C"),
+   Bool.and(String.contains(Sh.bg_watch(), "kill -9 -$C"),
      String.contains(Sh.bg_mem_limit(), "L=${BEND_MEM_LIMIT_MB:-}")))
     == True{} : Bool}
 
@@ -528,7 +529,7 @@ law bg_wrapper_atomic_slot_allocation:
 # LAW: a slot that still holds a finished job's results (.out, .rc) is
 # never handed to the next command: recycling it truncated the job's
 # output, and a next command that cat'd that .out fed its own output
-# back into itself up to the ulimit (a 100 MiB result: "bend: memory
+# back into itself up to the file size limit of the time (a 100 MiB result: "bend: memory
 # fault" in three agents).
 law bg_wrapper_keeps_finished_results:
   {String.starts_with(Sh.bg_slot_loop(),
@@ -553,11 +554,21 @@ unset BEND_SESSION_FILE BEND_CONTEXT_FILE BEND_WIRE_LOG BEND_REPL_PORT "),
      Bool.not(String.contains(Sh.bg_unset_private(), "SB_SOCKET")))
     == True{} : Bool}
 
-# LAW: the runner caps the process's file writes (ulimit -f 102400 =
-# 50MiB) — an output-looping background command dies at the cap
-# instead of filling the disk (once: a 6.4GB .out).
-law bg_wrapper_output_capped:
-  {String.contains(Sh.bg_wrap("x", "/d", 5, "/i"), "( ulimit -f 102400; set -m; ( ")
+# LAW: only the command's own output is capped: no `ulimit -f` (it
+# killed rustc writing a 100 MiB rlib with SIGXFSZ), and the watchdog
+# stops a command whose .out passes BEND_OUT_LIMIT_MB (2048 by default),
+# read through the fd it holds on that .out (an orphan's unlinked .out
+# too). Once an output-looping command filled the disk (a 6.4 GB .out).
+law bg_wrapper_caps_only_its_output:
+  {Bool.and(Bool.not(String.contains(Sh.bg_wrap("x", "/d", 5, "/i"), "ulimit -f")),
+   Bool.and(String.contains(Sh.bg_wrap("x", "/d", 5, "/i"),
+       String.append("
+", String.append(Sh.bg_out_limit(), "
+( : > $BG/$i.out; set -m; ( "))),
+   Bool.and(String.eq(Sh.bg_out_limit(), "O=${BEND_OUT_LIMIT_MB:-2048}"),
+   Bool.and(String.contains(Sh.bg_watch(),
+       "n=$(wc -c <&8 2>/dev/null); if [ $((${n:-0}+0)) -gt $((O*1048576)) ]; then m=\"[bash: stopped: its output passed $O MB (BEND_OUT_LIMIT_MB, 0 = no limit)"),
+     String.contains(Sh.bg_watch(), "done ) 8<$BG/$i.out >/dev/null 2>&1 & fi")))))
     == True{} : Bool}
 
 # LAW: the runner checks it still OWNS the slot before writing the rc
