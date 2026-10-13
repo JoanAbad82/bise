@@ -248,3 +248,83 @@ for (const theme of ['light', 'dark']) {
     }
   });
 }
+
+// his ask (main m_21531, designer m_21535): with an artifact open, esc closes the artifact first,
+// after a menu; his words and the answering mode stay as they were; an esc inside the page closes
+// it too, unless the page used it (its own field)
+test("app/artifact-view: esc closes the open artifact first, after a menu, his words and mode kept; from inside its page too, unless the page used it", async () => {
+  const pages = await pagesServer();
+  const core = new FakeCore(world('light', pages.url) as unknown as ConstructorParameters<typeof FakeCore>[0]);
+  const s = await launchDesktop({ core, route: `project/${P}`, size: '1400x900' });
+  try {
+    const { page } = s;
+    await page.setViewportSize({ width: 1400, height: 900 });
+    const field = page.getByTestId('composer.field');
+    const label = page.locator('.th-screen .b-composer .div .lbl');
+    const art = page.getByTestId('app.art');
+    const row = page.getByTestId(`app.right.artifact.${P}.product-page`);
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    // main's composer: his words, its label (answering a docked card, or to main)
+    await field.click();
+    await page.keyboard.type('half a thought for main');
+    const mainLabel = await label.innerText();
+    const open = async () => {
+      await row.click();
+      await expect(art).toBeVisible({ timeout: 5000 });
+      await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'perf');
+    };
+    await open();
+    // perf's composer focused, with words, its label answering perf's docked question or about the page
+    await field.click();
+    await page.keyboard.type('and the avif sizes?');
+    const perfLabel = await label.innerText();
+    // a menu open: esc closes the menu only
+    await page.getByTestId('artifact.more').click();
+    await expect(page.locator('[role="menu"]')).toHaveCount(1);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[role="menu"]'), 'the menu closes first').toHaveCount(0);
+    await expect(art, 'the artifact stays').toBeVisible();
+    await expect(field, 'his words stay').toContainText('and the avif sizes?');
+    await expect(label, 'its mode stays').toHaveText(perfLabel);
+    // then esc, from his composer, closes the artifact, not his words or his mode
+    await field.click();
+    await page.keyboard.press('Escape');
+    await expect(art, 'esc closes the artifact').toHaveCount(0);
+    await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'main');
+    await expect(field, "main's words as he left them").toContainText('half a thought for main');
+    await expect(label, "main's mode as he left it").toHaveText(mainLabel);
+    // back on it: perf's words and mode kept
+    await open();
+    await expect(field, "perf's words kept").toContainText('and the avif sizes?');
+    await expect(label).toHaveText(perfLabel);
+
+    // inside the page: a field that uses esc keeps it; anywhere else in the page esc closes the artifact
+    const frame = page.frameLocator('[data-testid="artifact.page"]');
+    await expect(frame.locator('h1')).toHaveText('product page, before / after', { timeout: 10_000 });
+    await frame.locator('body').evaluate((b) => {
+      const q = document.createElement('input');
+      q.id = 'q';
+      q.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') e.preventDefault();
+      });
+      b.append(q);
+    });
+    // the off-screen window gives the page's field no real focus: its esc is dispatched on the field,
+    // through the same listeners (the page's, then the forwarder's check after them)
+    await frame.locator('#q').evaluate((q) => q.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
+    await page.waitForTimeout(300);
+    await expect(art, "the page's own field used it: open").toBeVisible();
+    // an esc the page doesn't use: dispatched on the page, then a real key after a click in it
+    await frame.locator('h1').evaluate((h) => h.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
+    await expect(art, 'an esc the page left free closes it').toHaveCount(0, { timeout: 3000 });
+    await open();
+    await expect(frame.locator('h1')).toHaveText('product page, before / after', { timeout: 10_000 });
+    await frame.locator('h1').click();
+    await page.keyboard.press('Escape');
+    await expect(art, 'an esc in the page closes it').toHaveCount(0, { timeout: 3000 });
+  } finally {
+    await s.close();
+    core.dispose();
+    pages.server.close();
+  }
+});

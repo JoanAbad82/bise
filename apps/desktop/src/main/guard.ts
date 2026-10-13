@@ -14,7 +14,7 @@
 // In test mode also: a window that isn't offscreen is destroyed at birth, and
 // every window's show/showInactive/focus are no-ops, with a 'show' that still
 // happens destroying the window (the last fence).
-import { app, type BrowserWindow, type WebContents } from 'electron';
+import { app, webFrameMain, type BrowserWindow, type WebContents } from 'electron';
 import { openLink } from './ipc';
 
 export interface OwnPage {
@@ -56,6 +56,19 @@ export function isPagesFrame(url: string): boolean {
   }
 }
 
+/**
+ * Put in an artifact's frame (his ask, main m_21531; designer m_21535): an esc the page didn't use
+ * (its own field or menu prevents it) tells the window, which closes the artifact (ArtifactView's
+ * useEscClosesArtifact). Read after the page's own handlers ran; once per document.
+ */
+export const ESC_FORWARD = `(() => {
+  if (window.__biseEsc) return; window.__biseEsc = true;
+  addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.repeat || e.isComposing) return;
+    setTimeout(() => { if (!e.defaultPrevented) parent.postMessage({ bise: 'esc' }, '*'); }, 0);
+  }, true);
+})();`;
+
 function guardContents(wc: WebContents, own: OwnPage, testMode: boolean): void {
   wc.setWindowOpenHandler(({ url }) => {
     void openLink(url, testMode);
@@ -78,6 +91,13 @@ function guardContents(wc: WebContents, own: OwnPage, testMode: boolean): void {
   });
   wc.on('will-attach-webview', (e) => {
     e.preventDefault();
+  });
+  // an artifact's page (a pages-server subframe): its esc reaches the window (ESC_FORWARD)
+  wc.on('did-frame-finish-load', (_e, isMainFrame, pid, rid) => {
+    if (isMainFrame) return;
+    const f = webFrameMain.fromId(pid, rid);
+    if (f === undefined || !isPagesFrame(f.url)) return;
+    f.executeJavaScript(ESC_FORWARD).catch(() => undefined);
   });
 }
 

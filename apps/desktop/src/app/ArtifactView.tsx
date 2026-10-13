@@ -6,7 +6,7 @@
 // the width with the maker's composer under the page, and '◧ <maker>' slides the thread over it from
 // the left. ✕ or esc go back where he was. The route drives it (artifacts/<project>/<id>), so back
 // and forward fit. The artifact itself is task-panel's ArtifactOpen. Owner: amb-win.
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Button } from '@/ds';
 import { ArtifactOpen, useAboutWords, useAllArtifacts } from '@/artifacts';
 import { useProjects } from '@/store';
@@ -15,6 +15,7 @@ import { keep } from './keep';
 import { MAIN, type Route } from './route';
 import { useRouter } from './router';
 import { Over } from './Frame';
+import { popupOpen } from './esc-up';
 import { NARROW_PX } from './side';
 
 /** Under this width the left bar folds while an artifact is open (designer: 'sous 1200 px'). */
@@ -76,6 +77,57 @@ function useClose(project: string, maker: string | undefined): () => void {
   };
 }
 
+/**
+ * Esc while an artifact is open (his ask, main m_21531; designer m_21535): a menu, a popover, ⌘K or a
+ * confirm closes first (their own esc); else esc closes the artifact, before the composer reads it, so
+ * his words and the answering mode stay as they were. An esc inside the artifact's page reaches the
+ * window as a message from its frame (main's guard.ts adds the forwarder), only when the page didn't
+ * use it. `on`: false while the maker's thread is slid over (its own esc closes it first).
+ */
+export function useEscClosesArtifact(close: () => void, on: boolean): void {
+  useEffect(() => {
+    if (!on) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.repeat || e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (popupOpen() || overOpen() || inFind(document.activeElement)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      close();
+    };
+    const onMessage = (e: MessageEvent) => {
+      if (!fromArtifactFrame(e.source) || !isFrameEsc(e.data) || popupOpen()) return;
+      close();
+    };
+    // capture, on the window: before the composer's field and every handler under it
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('message', onMessage);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('message', onMessage);
+    };
+  }, [close, on]);
+}
+
+/** The forwarder's message (main's guard.ts ESC_FORWARD). Pure. */
+export function isFrameEsc(data: unknown): boolean {
+  return typeof data === 'object' && data !== null && (data as { bise?: unknown }).bise === 'esc';
+}
+
+function fromArtifactFrame(source: MessageEventSource | null): boolean {
+  if (source === null) return false;
+  return [...document.querySelectorAll('iframe.art-paper')].some((f) => f instanceof HTMLIFrameElement && f.contentWindow === source);
+}
+
+/** A bar slid over the window (the left bar under 1200 px, the maker's thread under 1000): its esc first. */
+function overOpen(): boolean {
+  return document.querySelector('[data-testid^="app.over."]') !== null;
+}
+
+/** The thread's find bar (⌘F) with the focus: its esc closes it first. */
+function inFind(el: Element | null): boolean {
+  return el instanceof HTMLElement && el.closest('[data-testid="thread.find"]') !== null;
+}
+
 /** The centre beside an open artifact: the maker's thread, its one composer about the artifact. */
 export function ArtifactThread({ project, id }: { project: string; id: string }) {
   const it = useAllArtifacts(project).find((x) => x.a.id === id);
@@ -101,6 +153,7 @@ export function ArtifactThread({ project, id }: { project: string; id: string })
 export function ArtifactColumn({ project, id }: { project: string; id: string }) {
   const maker = useAllArtifacts(project).find((x) => x.a.id === id)?.a.agent;
   const close = useClose(project, maker);
+  useEscClosesArtifact(close, true);
   return (
     <aside className="app-panel app-art" data-testid="app.art" aria-label="the artifact">
       <ArtifactOpen project={project} id={id} onClose={close} composer={false} />
@@ -113,6 +166,7 @@ export function ArtifactNarrow({ project, id }: { project: string; id: string })
   const maker = useAllArtifacts(project).find((x) => x.a.id === id)?.a.agent;
   const close = useClose(project, maker);
   const [over, setOver] = useState(false);
+  useEscClosesArtifact(close, !over);
   // the maker's name, archived or not: the button opens its own thread (designer m_20453)
   const who = maker ?? MAIN;
   return (

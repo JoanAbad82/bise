@@ -36,6 +36,11 @@ export function holdsWords(el: Element | null): boolean {
   return false;
 }
 
+/** A menu, a sheet, ⌘K, the keys sheet or a composer list is open: its esc comes first (ArtifactView). */
+export function popupOpen(doc: Document = document): boolean {
+  return doc.querySelector(POPUP) !== null;
+}
+
 /** A sheet is open: the history keys and buttons do nothing. */
 export function sheetOpen(doc: Document = document): boolean {
   return doc.querySelector(SHEET) !== null;
