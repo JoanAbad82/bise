@@ -49,7 +49,8 @@ export interface InboxBlockProps {
   readonly now?: number;
   /**
    * He scrolled the thread up to read (H10, designer m_19835): folded, the block is one 36 px line
-   * ('inbox · 3 waiting · ? search · which sizes… ⌃1'); at the thread's bottom it is whole again.
+   * ('inbox  3 waiting · ? search · which sizes… ⌃1', an 8 px gap after 'inbox', designer m_21013);
+   * at the thread's bottom it is whole again.
    */
   readonly reading?: boolean;
   /**
@@ -438,7 +439,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, reading = false, only 
           name={
             <>
               <span className="strip-title-words">inbox</span>
-              <span className="strip-count">{` · ${String(list.length)} waiting · `}</span>
+              <span className="strip-count">{`${String(list.length)} waiting · `}</span>
               {sign !== null && <span className="ib-sign">{sign}</span>}
               <span className="strip-who">{shownName(who)}</span>
               {what !== '' && <span className="strip-what">{` · ${what}`}</span>}

@@ -212,10 +212,12 @@ describe('one inbox (designer m_19631)', () => {
 });
 
 describe('H10: scrolled up to read, the block is one line', () => {
-  it("'inbox · 2 waiting · ? agent · question' and ⌃1; a click opens the first item whole", () => {
+  it("'inbox  2 waiting · ? agent · question' and ⌃1; a click opens the first item whole", () => {
     mount(undefined, core_ev, true);
     const line = screen.getByTestId('inbox.block.line');
-    expect(line.textContent).toContain('inbox · 2 waiting · ');
+    // no '·' between 'inbox' and the count (an 8 px gap, designer m_21013); the one before the row stays
+    expect(line.textContent).toContain('inbox2 waiting · ');
+    expect(line.textContent).not.toContain('inbox ·');
     expect(line.textContent).toContain('⌃1');
     expect(screen.queryByTestId('inbox.block.row.1')).toBeNull();
     fireEvent.click(line);
