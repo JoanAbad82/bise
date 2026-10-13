@@ -65,6 +65,7 @@ def main():
         # the hub runs from the bundle, its root found from its exe (no
         # BISE_APP_ROOT: a switched hub's)
         bise_env.refuse_real_home(E.env)
+        bise_env.refuse_real_keys(E.env)
         env = {k: val for k, val in E.env.items() if k != "BISE_APP_ROOT"}
         err = open(os.path.join(E.tmp, "hub.stderr"), "a")
         hub = subprocess.Popen([os.path.join(v, "bise"), "sbd", "--workspace", E.ws], cwd=v, env=env,

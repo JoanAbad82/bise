@@ -210,6 +210,31 @@ fn refresh_fetches_the_providers_he_uses_and_keeps_the_old_file_on_failure() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A hub with no provider key (a test hub: tests/bise_env.py drops his
+/// keys) makes no fetch at all: both providers point at a server that
+/// counts, and it is never called (docs/issues/26: a test hub with his
+/// real OPENROUTER_API_KEY fetched OpenRouter's real list).
+#[test]
+fn no_key_no_fetch() {
+    let dir = tmp("nokey");
+    let l = TcpListener::bind("127.0.0.1:0").unwrap();
+    l.set_nonblocking(true).unwrap();
+    let port = l.local_addr().unwrap().port();
+    let cfg = format!("[providers.anthropic]
+base_url = \"http://127.0.0.1:{port}/v1\"
+[providers.openrouter]
+base_url = \"http://127.0.0.1:{port}/api/v1\"
+");
+    let setup = Setup::from_text(Some(&cfg), &no_env);
+    let store = auth::Store::default();
+    let keys = auth::Keys { env: &no_env, store: &store, files: &[] };
+    let lines = live_fetch::refresh(&paths(&dir), &dir.join("cache"), &setup, &keys, 1_000);
+    assert!(lines.is_empty(), "{lines:?}");
+    assert!(l.accept().is_err(), "a fetch with no key");
+    assert!(live_fetch::read(&dir.join("cache")).is_empty());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// The hub with no network starts the same: no file, no wait, the
 /// table's and the family's lists.
 #[test]

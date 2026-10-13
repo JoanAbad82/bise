@@ -285,6 +285,7 @@ def start_tui(E, cols, rows, extra_env, session):
     # double quotes still run backticks and $(…) (an agent's BEND_TOOLS_NOTE
     # holds `node`: the pane ran a node REPL and bise never started)
     bise_env.refuse_real_home(E.env)
+    bise_env.refuse_real_keys(E.env)
     envs = " ".join("%s=%s" % (k, shlex.quote(v)) for k, v in pane_env(E.env).items())
     unset = " ".join("-u " + k for k in pane_unset(E.env))   # tmux's server env may carry them
     # a TUI that exits early leaves its last screen and its exit code

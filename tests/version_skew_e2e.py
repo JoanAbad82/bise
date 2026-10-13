@@ -95,6 +95,7 @@ class CoreOf(Core):
 
     def __init__(self, E, v):
         bise_env.refuse_real_home(E.env)
+        bise_env.refuse_real_keys(E.env)
         super().__init__(E, exe=os.path.join(v, "bise"), cwd=v, env=env_of(E),
                          err="core-%s.stderr" % os.path.basename(v))
 
@@ -109,6 +110,7 @@ class CoreOf(Core):
 def tui_from(E, v, session):
     """The TUI as version dir `v`'s bise, in its own tmux session."""
     bise_env.refuse_real_home(E.env)
+    bise_env.refuse_real_keys(E.env)
     env = env_of(E)
     # pane_env names this tree as the root unless told otherwise: here the
     # version dir's own (its VERSION next to its bise) must win

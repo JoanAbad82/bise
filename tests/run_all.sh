@@ -111,5 +111,6 @@ fi
 rm -rf "$out"
 if [ $live = 1 ]; then
   echo "== live model"
-  python3 -u tests/live_smoke.py
+  # his real keys and accounts, for this run he asked for (bise_env.clean_env drops them otherwise)
+  BISE_TEST_REAL_ACCOUNTS=1 python3 -u tests/live_smoke.py
 fi

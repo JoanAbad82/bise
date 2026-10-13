@@ -63,6 +63,41 @@ PATH_VARS = _path_vars()
 OWN_PATHS = PATH_VARS + ("BISE_EXPORTS_FOR",)
 
 
+def _provider_keys():
+    """Every provider's key variable: the catalog's key_env names
+    (rust/catalog/models.toml, the one table) and their aliases
+    (rust/catalog/src/auth.rs ALIASES), read from the sources themselves:
+    a provider added there is dropped here with no copy to update."""
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rust", "catalog")
+    names = set(re.findall(r'^key_env = "([A-Z0-9_]+)"', open(os.path.join(root, "models.toml")).read(), re.M))
+    auth = open(os.path.join(root, "src", "auth.rs")).read()
+    m = re.search(r"pub const ALIASES: &\[\(&str, &\[&str\]\)\] = &\[(.*?)\];", auth, re.S)
+    assert m, "ALIASES in rust/catalog/src/auth.rs"
+    names.update(re.findall(r'"([A-Z0-9_]+)"', m.group(1)))
+    assert "OPENROUTER_API_KEY" in names and "GOOGLE_API_KEY" in names, names
+    return tuple(sorted(names))
+
+
+# The user's provider keys (OPENROUTER_API_KEY, ANTHROPIC_API_KEY...) and
+# any other *_API_KEY of his shell: a test hub never gets them, or its
+# checker, small jobs and the efforts refresher call the real provider with
+# his real key (one_key_auto_e2e's checker asked OpenRouter with it, red on
+# 'API key expired'; docs/issues/26). A test sets its own fake one.
+# BISE_TEST_REAL_ACCOUNTS=1 keeps them, for the one run he asks for (the
+# live tests: run_all.sh --live).
+PROVIDER_KEYS = _provider_keys()
+
+
+def is_real_key_var(k):
+    """A variable that holds one of the user's model or service keys."""
+    return k in PROVIDER_KEYS or k.endswith("_API_KEY")
+
+
+def real_accounts():
+    """BISE_TEST_REAL_ACCOUNTS=1: this run may use his real keys and accounts."""
+    return os.environ.get("BISE_TEST_REAL_ACCOUNTS") == "1"
+
+
 def real_home():
     """The user's own home, from the password database: the test process
     itself may already run on a throwaway HOME."""
@@ -106,11 +141,14 @@ def is_place_var(k):
 
 def clean_env(**extra):
     """os.environ minus every internal and test variable, minus the
-    caller's path overrides (OWN_PATHS: his ~/.bise paths) and XDG homes,
-    on a throwaway HOME (test_home; cargo keeps its real CARGO_HOME and
-    RUSTUP_HOME), plus `extra` (a test's own HOME wins)."""
+    caller's path overrides (OWN_PATHS: his ~/.bise paths), XDG homes and
+    real keys (is_real_key_var, unless real_accounts()), on a throwaway
+    HOME (test_home; cargo keeps its real CARGO_HOME and RUSTUP_HOME),
+    plus `extra` (a test's own HOME wins)."""
     drop = NOT_INHERITED + OWN_PATHS
-    env = on_test_home({k: v for k, v in os.environ.items() if k not in drop})
+    keys = not real_accounts()
+    env = on_test_home({k: v for k, v in os.environ.items()
+                        if k not in drop and not (keys and is_real_key_var(k))})
     env.update(extra)
     return env
 
@@ -142,6 +180,19 @@ def refuse_real_home(env):
         if is_place_var(k) and os.path.realpath(v).startswith(real_home() + "/") \
                 and not os.path.realpath(v).startswith(os.path.realpath(home) + "/"):
             raise AssertionError("a test env's %s %s is in the user's home" % (k, v))
+
+
+def refuse_real_keys(env, caller=None):
+    """The law: a test's hub or REPL holds none of the user's real keys
+    (a key variable with the caller's own value), unless real_accounts().
+    A test's fake key (MISTRAL_API_KEY=fake-key) is its own: allowed."""
+    if real_accounts():
+        return
+    caller = os.environ if caller is None else caller
+    real = sorted(k for k, v in env.items() if is_real_key_var(k) and v and caller.get(k) == v)
+    if real:
+        raise AssertionError("a test env holds the user's real key %s (tests run on fakes: "
+                             "BISE_TEST_REAL_ACCOUNTS=1 for the one run he asks for)" % ", ".join(real))
 
 
 def refuse_real_skills(index):
@@ -218,7 +269,33 @@ def _self_test():
         except AssertionError:
             continue
         raise AssertionError("refuse_real_run_dir let %r through" % bad)
-    print("ok   bise_env: clean_env drops %d path vars with an own HOME/BISE_HOME; the run-dir law refuses his run" % len(OWN_PATHS))
+    # the keys law: his provider keys never reach a test env, a fake one may
+    assert "ANTHROPIC_FOUNDRY_API_KEY" in PROVIDER_KEYS and "AWS_BEARER_TOKEN_BEDROCK" in PROVIDER_KEYS
+    saved = {k: os.environ.get(k) for k in ("OPENROUTER_API_KEY", "AWS_BEARER_TOKEN_BEDROCK", "KIT_API_KEY", "BISE_TEST_REAL_ACCOUNTS")}
+    try:
+        os.environ.pop("BISE_TEST_REAL_ACCOUNTS", None)
+        os.environ.update(OPENROUTER_API_KEY="his-or", AWS_BEARER_TOKEN_BEDROCK="his-aws", KIT_API_KEY="his-kit")
+        env = clean_env(MISTRAL_API_KEY="fake-key")
+        kept = [k for k in env if is_real_key_var(k) and k != "MISTRAL_API_KEY"]
+        assert not kept, "clean_env keeps his keys %s" % kept
+        refuse_real_keys(env)
+        for bad in ({"OPENROUTER_API_KEY": "his-or"}, {"AWS_BEARER_TOKEN_BEDROCK": "his-aws"}, {"KIT_API_KEY": "his-kit"}):
+            try:
+                refuse_real_keys(bad)
+            except AssertionError:
+                continue
+            raise AssertionError("refuse_real_keys let %r through" % bad)
+        os.environ["BISE_TEST_REAL_ACCOUNTS"] = "1"
+        assert clean_env().get("OPENROUTER_API_KEY") == "his-or", "BISE_TEST_REAL_ACCOUNTS=1 keeps his keys"
+        refuse_real_keys({"OPENROUTER_API_KEY": "his-or"})
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    print("ok   bise_env: clean_env drops %d path vars with an own HOME/BISE_HOME and his %d provider keys + any *_API_KEY; "
+          "the run-dir and keys laws refuse his" % (len(OWN_PATHS), len(PROVIDER_KEYS)))
 
 
 if __name__ == "__main__":

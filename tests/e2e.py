@@ -18,7 +18,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import wait  # noqa: E402
-from bise_env import clean_env, refuse_real_home, refuse_real_run_dir, refuse_real_skills  # noqa: E402
+from bise_env import clean_env, refuse_real_home, refuse_real_keys, refuse_real_run_dir, refuse_real_skills  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
@@ -187,6 +187,7 @@ class Env:
     def start_hub(self):
         refuse_real_run_dir(self.env, self.tmp)
         refuse_real_home(self.env)
+        refuse_real_keys(self.env)
         err = open(os.path.join(self.tmp, "hub.stderr"), "a")
         self.hub = subprocess.Popen([EXE, "sbd", "--workspace", self.ws], cwd=ROOT, env=self.env,
                                     stdin=subprocess.DEVNULL, stdout=err, stderr=err)
