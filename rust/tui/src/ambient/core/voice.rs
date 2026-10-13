@@ -15,6 +15,8 @@ pub(super) enum TalkEv {
     DictateStart,
     /// the clock
     Tick,
+    /// talk_cancel: fn let go without words, escaped, the helper gone
+    Cancel,
 }
 
 /// Why a listening talk ended.
@@ -35,17 +37,23 @@ pub(super) enum TalkRule {
     Keep,
     /// a talk_start while a talk runs: ignored, said in core.log
     Refuse,
+    /// the listening talk goes, its words with it
+    Cancel,
 }
 
 /// The fn talk's one end rule (architect m_22291): `talk` is (listening,
 /// fn down at), None with no talk. A lost fn up reads as a fn up: a
 /// press on the window's mic or DICTATE_MAX ends a listening talk, its
-/// words to main, never a mic held forever.
+/// words to main, never a mic held forever. A cancel takes only a
+/// listening talk: one past its end (fn up, a take, the limit) was
+/// promised to main, its flush finishes and its words go (amb-tools
+/// m_22412: the helper's exit cancel came during a take's flush).
 pub(super) fn talk_rule(talk: Option<(bool, Instant)>, ev: TalkEv, now: Instant) -> TalkRule {
     let Some((listening, started)) = talk else { return TalkRule::Keep };
     match ev {
         TalkEv::Start => TalkRule::Refuse,
         _ if !listening => TalkRule::Keep,
+        TalkEv::Cancel => TalkRule::Cancel,
         TalkEv::FnUp => TalkRule::End(TalkEnd::FnUp),
         TalkEv::DictateStart => TalkRule::End(TalkEnd::Dictation),
         TalkEv::Tick if now.duration_since(started) >= DICTATE_MAX => TalkRule::End(TalkEnd::Limit),
@@ -223,8 +231,18 @@ impl Core {
 // ---- his talk: fn held, a note talk on a page, a window shot ----
 
 impl Core {
-    /// fn let go without words (or escaped): nothing goes to main.
-    pub(super) fn talk_cancel(&mut self) {
+    /// fn let go without words (or escaped): nothing goes to main. A talk
+    /// already ending ([`talk_rule`]) is left to its flush.
+    pub(super) fn talk_cancel(&mut self, now: Instant) {
+        match talk_rule(self.talk.as_ref().map(Talk::state), TalkEv::Cancel, now) {
+            TalkRule::Cancel => {}
+            _ => {
+                if self.talk.is_some() {
+                    eprintln!("ambient-core: talk: talk_cancel while the talk ends: its words still go");
+                }
+                return;
+            }
+        }
         if let Some(page) = self.talk.as_ref().and_then(|t| t.page.clone()) {
             self.talk = None;
             return self.page_voice_over(&page, "cancel", "");
@@ -444,13 +462,15 @@ mod rule_tests {
         assert_eq!(talk_rule(fresh, TalkEv::Tick, now), TalkRule::Keep);
         assert_eq!(talk_rule(Some((true, long_ago)), TalkEv::Tick, now), TalkRule::End(TalkEnd::Limit));
         assert_eq!(talk_rule(fresh, TalkEv::Start, now), TalkRule::Refuse);
-        // past fn up: its words are on their way, nothing ends it again
-        for ev in [TalkEv::FnUp, TalkEv::DictateStart, TalkEv::Tick] {
+        assert_eq!(talk_rule(fresh, TalkEv::Cancel, now), TalkRule::Cancel);
+        // past fn up: its words are on their way, nothing ends it again,
+        // a cancel neither (amb-tools m_22412)
+        for ev in [TalkEv::FnUp, TalkEv::DictateStart, TalkEv::Tick, TalkEv::Cancel] {
             assert_eq!(talk_rule(Some((false, long_ago)), ev, now), TalkRule::Keep, "{ev:?}");
         }
         assert_eq!(talk_rule(Some((false, now)), TalkEv::Start, now), TalkRule::Refuse);
         // no talk: a talk_start starts one, the rest is nothing
-        for ev in [TalkEv::Start, TalkEv::FnUp, TalkEv::DictateStart, TalkEv::Tick] {
+        for ev in [TalkEv::Start, TalkEv::FnUp, TalkEv::DictateStart, TalkEv::Tick, TalkEv::Cancel] {
             assert_eq!(talk_rule(None, ev, now), TalkRule::Keep, "{ev:?}");
         }
     }

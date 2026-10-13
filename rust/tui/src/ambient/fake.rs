@@ -79,10 +79,19 @@ impl Words {
     }
 }
 
-/// A mic that never opens a device: a voice-like level while open.
+/// A mic that never opens a device: a voice-like level while open, and
+/// [`QUIET_BLOCK`]s of quiet, so a take has sound like a real one (a take
+/// with no words is kept and dictate_retry runs end to end, amb-tools
+/// m_22412).
 pub struct FakeMic;
 
-struct FakeStream(Instant);
+/// One block of quiet every this long while the fake mic is open.
+pub const QUIET_BLOCK: Duration = Duration::from_millis(100);
+/// [`QUIET_BLOCK`] at the listener's 16 kHz.
+const QUIET_SAMPLES: usize = 1600;
+
+/// The open fake mic; dropped (the mic off), its quiet stops.
+struct FakeStream(Instant, Arc<AtomicBool>);
 
 impl MicStream for FakeStream {
     fn level(&self) -> f32 {
@@ -91,9 +100,26 @@ impl MicStream for FakeStream {
     }
 }
 
+impl Drop for FakeStream {
+    fn drop(&mut self) {
+        self.1.store(true, Ordering::SeqCst);
+    }
+}
+
 impl Mic for FakeMic {
-    fn open(&mut self, _blocks: Sender<MicBlock>) -> Result<Box<dyn MicStream>, String> {
-        Ok(Box::new(FakeStream(Instant::now())))
+    fn open(&mut self, blocks: Sender<MicBlock>) -> Result<Box<dyn MicStream>, String> {
+        let closed = Arc::new(AtomicBool::new(false));
+        let stop = closed.clone();
+        std::thread::spawn(move || {
+            while !stop.load(Ordering::SeqCst) {
+                let at = Instant::now();
+                std::thread::sleep(QUIET_BLOCK);
+                if stop.load(Ordering::SeqCst) || blocks.send(MicBlock { pcm: vec![0; QUIET_SAMPLES], at }).is_err() {
+                    return;
+                }
+            }
+        });
+        Ok(Box::new(FakeStream(Instant::now(), closed)))
     }
 }
 
@@ -116,11 +142,18 @@ impl Listener for FakeListener {
         let wait = self.1;
         std::thread::spawn(move || {
             let mut words = text.split_whitespace().map(|w| format!(" {w}")).collect::<std::collections::VecDeque<_>>();
+            // a word every WORD_EVERY on its own clock: the mic's quiet
+            // blocks (every QUIET_BLOCK) never put it off
+            let mut next_word = Instant::now() + WORD_EVERY;
             loop {
                 if cancel.load(Ordering::SeqCst) {
                     return;
                 }
-                match audio.recv_timeout(WORD_EVERY) {
+                let msg = match next_word.checked_duration_since(Instant::now()) {
+                    Some(left) if !left.is_zero() => audio.recv_timeout(left),
+                    _ => Err(RecvTimeoutError::Timeout),
+                };
+                match msg {
                     Ok(ListenMsg::Flush) => {
                         let until = Instant::now() + wait;
                         while Instant::now() < until {
@@ -142,6 +175,7 @@ impl Listener for FakeListener {
                     Ok(ListenMsg::Clear) => words.clear(),
                     Ok(ListenMsg::Audio(_)) => {}
                     Err(RecvTimeoutError::Timeout) => {
+                        next_word = Instant::now() + WORD_EVERY;
                         if let Some(w) = words.pop_front() {
                             if events.send(Heard::Text(w)).is_err() {
                                 return;

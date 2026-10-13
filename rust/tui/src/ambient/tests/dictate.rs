@@ -340,3 +340,35 @@ fn the_core_keeps_the_last_three_takes() {
     t.cmd(Cmd::DictateRetry { id: "k2".into() });
     assert_eq!(t.fakes.listen.lock().unwrap().len(), n + 1, "k2 is still kept");
 }
+
+/// amb-tools m_22412 (#40): a take ends a listening talk, its flush is
+/// slow, and a talk_cancel comes meanwhile (the fn helper's exit, a fn
+/// cancel). The talk was promised to main: its words still go, with its
+/// one notice; a cancel only takes a talk still listening.
+#[test]
+fn a_cancel_during_the_flush_of_a_talk_a_take_ended_keeps_its_words() {
+    let mut t = T::new();
+    t.ready();
+    t.cmd(Cmd::TalkStart);
+    let talk = t.fakes.listen.lock().unwrap().last().unwrap().heard.clone();
+    t.take();
+    let _take = start(&mut t, "d0");
+    t.take();
+    t.cmd(Cmd::TalkCancel);
+    let out = t.take();
+    assert!(!out.iter().any(|v| v["ev"] == "phase" && v["phase"] == "idle"), "the cancel took the ending talk: {out:#?}");
+    talk.send(Heard::Text(" ship the fix".into())).unwrap();
+    talk.send(Heard::Flushed).unwrap();
+    t.until(|o| has(o, "sent"));
+    assert_eq!(t.hub.next()["text"], "ship the fix");
+    let notices: Vec<Value> = t.take().into_iter().filter(|v| v["ev"] == "notice").collect();
+    assert_eq!(notices.len(), 1, "{notices:#?}");
+    assert_eq!(notices[0]["text"], "fn talk sent to main: the mic went to dictation");
+    // a talk still listening: the cancel takes it, nothing to main
+    t.cmd(Cmd::DictateCancel { id: "d0".into() });
+    t.cmd(Cmd::TalkStart);
+    t.take();
+    t.cmd(Cmd::TalkCancel);
+    assert!(t.take().iter().any(|v| v["ev"] == "phase" && v["phase"] == "idle"));
+    hub_quiet(&mut t);
+}

@@ -395,7 +395,7 @@ impl Core {
             Cmd::TalkStart => self.talk_start(None, now),
             Cmd::PageTalk { page } => self.talk_start(Some(page), now),
             Cmd::TalkEnd => self.talk_end(now),
-            Cmd::TalkCancel => self.talk_cancel(),
+            Cmd::TalkCancel => self.talk_cancel(now),
             Cmd::ShotDrop => self.drop_shot(),
             Cmd::DictateStart { id } => self.dictate_start(id, now),
             Cmd::DictateStop { id } => self.dictate_stop(&id, now),
