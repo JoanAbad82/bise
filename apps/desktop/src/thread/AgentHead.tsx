@@ -12,9 +12,9 @@ import { Breath, Gust, Pulse } from '@/working/Signs';
 import { turnAge } from '@/working/gust';
 import { useRouter } from '@/app/router';
 import { BisePearl } from '@/app/BisePearl';
-import { biseChip, branchLine, dropsFor, roleOf, stateChip, usageLine, workingRowShows, type StateChip } from './head';
+import { archivedFit, biseChip, branchLine, dropsFor, roleOf, stateChip, usageLine, workingRowShows, type StateChip } from './head';
 import { waitingFor, waitsEvent } from './wake';
-import { Press } from '@/ds';
+import { Button, Press } from '@/ds';
 
 /** an agent whose wheel he took waits for him, like any agent that asks him */
 const HELD: StateChip = { text: '? waiting for you', needs: true, live: false };
@@ -46,7 +46,7 @@ function useHeadFit(ref: RefObject<HTMLDivElement | null>, words: string): 0 | 1
       const role = q('thread.head.role');
       const who = nat(name) + (role === null ? 0 : 8 + nat(role));
       const end = head.querySelector<HTMLElement>('.ah-end');
-      const endFixed = end === null ? 0 : [...end.children].filter((c) => !(c as HTMLElement).dataset['testid']?.startsWith('thread.head.branch')).reduce((n, c, i) => n + Math.ceil((c as HTMLElement).offsetWidth) + (i > 0 ? 6 : 0), 0);
+      const endFixed = end === null ? 0 : [...end.children].filter((c) => !(c as HTMLElement).dataset['testid']?.startsWith('thread.head.branch') && !c.classList.contains('ah-gone')).reduce((n, c, i) => n + Math.ceil((c as HTMLElement).offsetWidth) + (i > 0 ? 6 : 0), 0);
       const voice = q('thread.voice');
       const next = dropsFor({ avail, who, chip: nat(q('thread.head.state')), notes: voice === null ? [] : [nat(voice)], usage: nat(q('thread.usage')), branch: nat(q('thread.head.branch')), end: endFixed });
       setDrop((d) => (d === next ? d : next));
@@ -62,8 +62,66 @@ function useHeadFit(ref: RefObject<HTMLDivElement | null>, words: string): 0 | 1
   return drop;
 }
 
+/** a name cuts with '…' down to its first 12 chars, never shorter while something else can go */
+const NAME_KEEP = 12;
+
+/** An archived maker's head (designer m_21714): what it drops so restore always fits, and the width
+ *  its name keeps (its first 12 chars; 0 once restore is the icon: then the name cuts further). */
+function useArchivedFit(ref: RefObject<HTMLDivElement | null>, on: boolean, words: string): { stage: 0 | 1 | 2; nameMin: number } {
+  const [fit, setFit] = useState<{ stage: 0 | 1 | 2; nameMin: number }>({ stage: 0, nameMin: 0 });
+  useLayoutEffect(() => {
+    const head = ref.current;
+    if (head === null || !on) return;
+    const measure = () => {
+      const one = (sel: string) => head.querySelector<HTMLElement>(sel);
+      const cs = getComputedStyle(head);
+      const gap = parseFloat(cs.columnGap) || 0;
+      const avail = head.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const name = one('[data-testid="thread.head.name"]');
+      const chars = name === null ? 0 : name.textContent.length;
+      const nat = name === null ? 0 : Math.ceil(name.scrollWidth);
+      // its first 12 chars and the '…' (an average char's width: the name's own font)
+      const nameMin = chars > NAME_KEEP ? Math.ceil((nat / chars) * (NAME_KEEP + 1)) : nat;
+      const role = one('[data-testid="thread.head.role"]');
+      const usage = one('[data-testid="thread.usage"]:not(.ah-gone)');
+      const who = nameMin + (role === null ? 0 : gap) + (usage === null ? 0 : gap + Math.ceil(usage.offsetWidth));
+      const width = (sel: string) => Math.ceil(one(sel)?.offsetWidth ?? 0);
+      const stage = archivedFit({ avail, gap, who, chip: width('.ah-archived'), restore: width('.ah-restore-full') });
+      const next = { stage, nameMin: stage === 2 ? 0 : nameMin };
+      setFit((f) => (f.stage === next.stage && f.nameMin === next.nameMin ? f : next));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(head);
+    return () => {
+      ro.disconnect();
+    };
+  }, [ref, on, words]);
+  return fit;
+}
+
+/** '↺ restore', or its 28 px '↺' when the head is short (designer m_21714); both drawn, one out of the
+ *  flow and still measured ('ah-gone'), so the head knows the whole one's width */
+function Restore({ icon, onRestore }: { icon: boolean; onRestore: () => void }) {
+  return (
+    <>
+      <span className={icon ? 'ah-restore-full ah-gone' : 'ah-restore-full'} aria-hidden={icon || undefined}>
+        <Button size="sm" onClick={onRestore} testId={icon ? undefined : 'thread.head.restore'}>
+          ↺ restore
+        </Button>
+      </span>
+      <span className={icon ? 'ah-icon' : 'ah-icon ah-gone'} aria-hidden={!icon || undefined}>
+        <Button size="sm" onClick={onRestore} testId={icon ? 'thread.head.restore' : undefined} title="restore">
+          ↺
+        </Button>
+      </span>
+    </>
+  );
+}
+
 /** An agent's head (`starting`: its thread has nothing of its own yet). `more` is the '⋯' button (rename, model; the screen owns its panel); `note` a quiet word after the chip ('voice mode'); its context gauge after it. */
-export function AgentHead({ project, a, more, note, starting = false, restore }: { project: string; a: Agent; more?: ReactNode; note?: string | undefined; starting?: boolean; restore?: ReactNode }) {
+export function AgentHead({ project, a, more, note, starting = false, restore }: { project: string; a: Agent; more?: ReactNode; note?: string | undefined; starting?: boolean; restore?: () => void }) {
   const usage = usageLine(a.usage?.words);
   const now = useNow();
   const router = useRouter();
@@ -75,11 +133,13 @@ export function AgentHead({ project, a, more, note, starting = false, restore }:
     router.go({ screen: 'review', project, agent: a.name });
   };
   const headRef = useRef<HTMLDivElement>(null);
-  const drop = useHeadFit(headRef, `${a.name}|${roleOf(a)}|${usage}|${branch}|${note ?? ''}`);
+  const words = `${a.name}|${roleOf(a)}|${usage}|${branch}|${note ?? ''}`;
+  const drop = useHeadFit(headRef, words);
+  const arch = useArchivedFit(headRef, restore !== undefined, words);
   return (
-    <div className="ah" data-testid="thread.head" ref={headRef} data-drop={drop}>
+    <div className="ah" data-testid="thread.head" ref={headRef} data-drop={drop} data-arch={restore === undefined ? undefined : arch.stage}>
       <span className="ah-who">
-        <b className="ah-name" data-testid="thread.head.name">
+        <b className="ah-name" data-testid="thread.head.name" title={restore === undefined ? undefined : a.name} style={restore === undefined ? undefined : { minWidth: arch.nameMin }}>
           {a.name}
         </b>
         {roleOf(a) !== '' && (
@@ -89,9 +149,10 @@ export function AgentHead({ project, a, more, note, starting = false, restore }:
         )}
       </span>
       {/* an archived maker beside its artifact (designer m_20525): the same one-line head, 'archived'
-          where its state sits, '↺ restore' in place of 'changes ⌘D' */}
+          where its state sits, '↺ restore' in place of 'changes ⌘D'; short, the chip goes, then
+          restore turns to its icon (designer m_21714) */}
       {restore !== undefined ? (
-        <span className="ah-chip ah-archived" data-testid="thread.head.state">
+        <span className={arch.stage >= 1 ? 'ah-chip ah-archived ah-gone' : 'ah-chip ah-archived'} data-testid="thread.head.state" aria-hidden={arch.stage >= 1 || undefined}>
           archived
         </span>
       ) : (
@@ -111,7 +172,7 @@ export function AgentHead({ project, a, more, note, starting = false, restore }:
         </span>
       )}
       <span className="ah-end">
-        {restore}
+        {restore !== undefined && <Restore icon={arch.stage === 2} onRestore={restore} />}
         {restore === undefined && branch !== '' && (
           <Press look={drop >= 2 ? 'ah-quiet ah-gone' : 'ah-quiet'} onClick={review} data-testid="thread.head.branch" title="its changes" tabIndex={drop >= 2 ? -1 : undefined} aria-hidden={drop >= 2 || undefined}>
             {branch}

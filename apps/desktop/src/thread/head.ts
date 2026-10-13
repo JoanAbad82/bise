@@ -170,3 +170,15 @@ export function dropsFor(widths: { avail: number; who: number; chip: number; not
   if (base + withBranch <= widths.avail) return 1;
   return 2;
 }
+
+/**
+ * An archived maker's head beside its artifact (designer m_21714): it clips at its column, never runs
+ * under the panel. Its purpose cuts with '…' first, down to nothing (css), then its name down to 12
+ * chars (`who`: that short name and the gaps after it); then the 'archived' chip goes; last, '↺ restore'
+ * becomes the '↺' icon button. 0: all shown, 1: no chip, 2: no chip and the icon.
+ */
+export function archivedFit(widths: { avail: number; gap: number; who: number; chip: number; restore: number }): 0 | 1 | 2 {
+  if (widths.who + widths.gap + widths.chip + widths.gap + widths.restore <= widths.avail) return 0;
+  if (widths.who + widths.gap + widths.restore <= widths.avail) return 1;
+  return 2;
+}

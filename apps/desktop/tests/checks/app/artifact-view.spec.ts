@@ -249,6 +249,102 @@ for (const theme of ['light', 'dark']) {
   });
 }
 
+// his feedback (main m_21706, designer m_21714): an archived maker with a long name and purpose; its
+// head clips at its column, never under the artifact panel: the purpose cuts with '…' first, then the
+// name (to 12 chars), then the 'archived' chip goes, last '↺ restore' is its 28 px '↺' (never cut)
+const LONG = 'release-ts-pattern';
+const longWorld = (pages: string) => {
+  const w = JSON.parse(JSON.stringify(world('light', pages, true)).replaceAll('"perf"', `"${LONG}"`)) as { ev: string; project?: string; agents?: { name: string; purpose: string }[] }[];
+  for (const e of w) for (const a of e.ev === 'agents' && e.project === P ? (e.agents ?? []) : []) if (a.name === LONG) a.purpose = 'Release ts-pattern on npm: the changelog, the tag, the GitHub release notes and the docs site';
+  return w;
+};
+test("app/artifact-view: an archived maker's long head fits its column at 1400, 1100 and 800, the panel open: purpose, then name cut, then the chip goes, then restore's icon", async () => {
+  const pages = await pagesServer();
+  const core = new FakeCore(longWorld(pages.url) as unknown as ConstructorParameters<typeof FakeCore>[0]);
+  const s = await launchDesktop({ core, route: `artifacts/${P}/product-page`, size: '1400x900' });
+  try {
+    const { page } = s;
+    const head = page.getByTestId('thread.head');
+    const restore = page.getByTestId('thread.head.restore');
+    const boxOf = async (l: ReturnType<Page['getByTestId']>, what: string) => {
+      const b = await l.boundingBox();
+      if (b === null) throw new Error(`${what}: not on screen`);
+      return b;
+    };
+    const fits = async (w: number) => {
+      const box = await boxOf(head, `${String(w)}: a head`);
+      const col = await head.evaluate((h) => h.parentElement?.getBoundingClientRect().right ?? 0);
+      expect(Math.round(box.x + box.width), `${String(w)}: the head ends at its column`).toBeLessThanOrEqual(Math.round(col));
+      const art = await page.getByTestId('app.art').first().boundingBox();
+      if (art !== null && art.x > box.x) expect(Math.round(box.x + box.width), `${String(w)}: never under the panel`).toBeLessThanOrEqual(Math.round(art.x));
+      const r = await boxOf(restore, `${String(w)}: restore`);
+      expect(Math.round(r.x + r.width), `${String(w)}: restore whole, inside the head`).toBeLessThanOrEqual(Math.round(box.x + box.width));
+      expect(await restore.evaluate((b) => b.scrollWidth <= b.clientWidth), `${String(w)}: '↺' never cut`).toBe(true);
+      expect(Math.round(box.height), `${String(w)}: one line`).toBe(44);
+    };
+    const cut = (id: string) => page.getByTestId(id).evaluate((e) => e.scrollWidth > e.clientWidth + 1);
+    await page.setViewportSize({ width: 1400, height: 900 });
+    await expect(page.getByTestId('app.art')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', LONG);
+    await settle(page);
+    await fits(1400);
+    await expect(restore, '1400: the whole button').toHaveText('↺ restore');
+    await expect(page.getByTestId('thread.head.state'), "1400: 'archived' shows").toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('archived-long-light-1400.png') });
+
+    await page.setViewportSize({ width: 1100, height: 900 });
+    await settle(page);
+    await fits(1100);
+    expect(await cut('thread.head.role'), "1100: the purpose cuts with '…'").toBe(true);
+    await page.mouse.move(1, 400);
+    await page.screenshot({ path: test.info().outputPath('archived-long-light-1100.png') });
+    await head.screenshot({ path: test.info().outputPath('archived-long-light-1100-head.png') });
+
+    // narrower than the name, the chip and the whole button: the chip goes, then the icon
+    for (const w of [1000, 900, 800]) {
+      await page.setViewportSize({ width: w, height: 900 });
+      if (w === 800) {
+        await page.getByTestId('app.art.maker').click();
+        await expect(page.getByTestId('app.over.left').getByTestId('thread.screen')).toHaveAttribute('data-agent', LONG);
+      }
+      await settle(page);
+      await fits(w);
+    }
+    await page.screenshot({ path: test.info().outputPath('archived-long-light-800.png') });
+    // the stages in order, from a head squeezed by hand (the 380 px column is already wide enough at 1100)
+    const stageAt = async (px: number) => {
+      await head.evaluate((h, v) => {
+        (h as HTMLElement).style.width = `${String(v)}px`;
+        (h as HTMLElement).style.flex = 'none';
+      }, px);
+      await page.evaluate(() => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok))));
+      return head.getAttribute('data-arch');
+    };
+    const seen: string[] = [];
+    for (let px = 420; px >= 150; px -= 10) {
+      const st = (await stageAt(px)) ?? '?';
+      if (seen.at(-1) !== st) seen.push(st);
+      expect(await restore.evaluate((b) => b.scrollWidth <= b.clientWidth), `${String(px)} px: '↺' never cut`).toBe(true);
+      const hb = await boxOf(head, `${String(px)} px: the head`);
+      const rb = await boxOf(restore, `${String(px)} px: restore`);
+      expect(Math.round(rb.x + rb.width), `${String(px)} px: restore inside`).toBeLessThanOrEqual(Math.round(hb.x + hb.width));
+      // the purpose goes to nothing before the name cuts; the name keeps its first 12 chars while the chip shows
+      if (await cut('thread.head.name')) expect(Math.round((await boxOf(page.getByTestId('thread.head.role'), 'the role')).width), `${String(px)} px: the purpose gone before the name cuts`).toBe(0);
+      if (st === '0') expect(await page.getByTestId('thread.head.name').evaluate((e) => e.clientWidth >= parseFloat((e as HTMLElement).style.minWidth) - 1), `${String(px)} px: the name keeps 12 chars while the chip shows`).toBe(true);
+    }
+    expect(seen, 'the chip goes before the icon').toEqual(['0', '1', '2']);
+    await expect(restore, 'the icon').toHaveText('↺');
+    await expect(restore, "its tooltip").toHaveAttribute('title', 'restore');
+    expect(Math.round((await boxOf(restore, 'the icon')).width), '28 px').toBe(28);
+    await restore.click();
+    await core.waitCmd((c) => c.cmd === 'unarchive' && 'agent' in c && c.agent === LONG);
+  } finally {
+    await s.close();
+    core.dispose();
+    pages.server.close();
+  }
+});
+
 // his ask (main m_21531, designer m_21535): with an artifact open, esc closes the artifact first,
 // after a menu; his words and the answering mode stay as they were; an esc inside the page closes
 // it too, unless the page used it (its own field)

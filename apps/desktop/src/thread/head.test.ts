@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { biseChip, branchLine, composerWords, dropsFor, dividerEnd, emptyEnter, emptyEnterAct, nothingOwnYet, roleOf, stateChip, STARTING_MS, usageLine } from './head';
+import { archivedFit, biseChip, branchLine, composerWords, dropsFor, dividerEnd, emptyEnter, emptyEnterAct, nothingOwnYet, roleOf, stateChip, STARTING_MS, usageLine } from './head';
 
 const NOW = 1_791_100_000_000;
 const MIN = 60_000;
@@ -100,6 +100,14 @@ describe("the head's fit (designer m_17194: a meta item whole or not at all)", (
     // no context note or branch: nothing to drop
     expect(dropsFor({ ...base, usage: 0, branch: 0, avail: 300 })).toBe(2);
     expect(dropsFor({ ...base, usage: 0, avail: 480 })).toBe(0);
+  });
+  it("an archived maker's head: the chip goes before restore turns to its icon (designer m_21714)", () => {
+    const base = { gap: 8, who: 90, chip: 64, restore: 78 };
+    // 90 + 8 + 64 + 8 + 78 = 248; without the chip 176
+    expect(archivedFit({ ...base, avail: 248 })).toBe(0);
+    expect(archivedFit({ ...base, avail: 247 })).toBe(1);
+    expect(archivedFit({ ...base, avail: 176 })).toBe(1);
+    expect(archivedFit({ ...base, avail: 175 })).toBe(2);
   });
 });
 

@@ -348,7 +348,11 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
     <OpenArtifactContext value={artifact?.id}>
       <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} data-reading={reading} data-about={artifact !== undefined || undefined} data-dim={(artifact !== undefined && me?.archived === true) || undefined} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
         {artifact !== undefined && me?.archived === true && agent !== MAIN ? (
-          <AgentHead project={project} a={me} restore={<RestoreButton project={project} agent={agent} />} />
+          <AgentHead project={project} a={me} restore={() => {
+              // '↺ restore' in an archived maker's head, beside its artifact (designer m_20453)
+              store.command({ cmd: 'unarchive', project, agent });
+            }}
+          />
         ) : bise || !me || me.archived ? (
           <Head
             title={headTitle}
@@ -493,22 +497,6 @@ export function countsOf(agents: readonly { main: boolean; archived: boolean; st
   const work = live.filter((a) => a.status === 'working').length;
   const waits = agents.reduce((n, a) => n + a.waits, 0);
   return [`${String(live.length)} ${live.length === 1 ? 'agent' : 'agents'}`, work > 0 ? `${String(work)} at work` : '', waits > 0 ? `${String(waits)} waiting for you` : ''].filter(Boolean).join(' · ');
-}
-
-/** '↺ restore' in an archived maker's head, beside its artifact (designer m_20453). */
-function RestoreButton({ project, agent }: { project: string; agent: string }) {
-  const store = useStore();
-  return (
-    <Button
-      size="sm"
-      onClick={() => {
-        store.command({ cmd: 'unarchive', project, agent });
-      }}
-      testId="thread.head.restore"
-    >
-      ↺ restore
-    </Button>
-  );
 }
 
 /** An archived agent's thread is history only (tui-parity C47): no composer, a way to restore it. */

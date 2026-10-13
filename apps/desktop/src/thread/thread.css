@@ -1039,6 +1039,34 @@
 .ah-chip.ah-archived {
   color: var(--c-text-3);
 }
+/* short, it clips at its column, never under the panel (designer m_21714): the purpose cuts with '…'
+   first, down to nothing; then the name, to its first 12 chars (AgentHead's useArchivedFit keeps
+   them); then the chip goes; last, restore is its 28 px '↺' */
+.ah[data-arch] {
+  min-width: 0;
+  overflow: hidden;
+}
+.ah[data-arch] .ah-name {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ah[data-arch] .ah-role {
+  flex-shrink: 1000;
+}
+.ah[data-arch] .ah-end {
+  flex: none;
+}
+.ah-restore-full {
+  display: flex;
+}
+.ah-icon {
+  display: flex;
+}
+.ah-icon > .b-btn {
+  width: var(--h-control-sm);
+  padding: 0;
+}
 .th-screen[data-dim='true'] .th-main {
   opacity: 0.55;
 }
