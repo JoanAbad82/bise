@@ -79,7 +79,7 @@ export function partsGist(parts: readonly Part[]): string {
       const file = p.source.split('/').at(-1) ?? '';
       words += `▣ ${p.name.startsWith('[') || file === '' ? p.name : file}`;
     } else if (p.kind === 'page') words += p.notes.map((n) => pageNoteWords(n, true)).join(' · ');
-    else if (p.kind === 'file') words += ` ${p.path}`;
+    else words += ` ${p.path}`;
   }
   return [...quotes, words.split(/\s+/u).filter((w) => w !== '').join(' ')].filter((s) => s !== '').join(' ');
 }
@@ -110,7 +110,9 @@ function oneLine(s: string, max: number): string {
       .split('\n')
       .map((x) => x.trim())
       .find((x) => x !== '') ?? '';
-  return [...l].length <= max ? l : `${[...l].slice(0, max - 1).join('')}…`;
+  // code points, as bise-proto's chars().count()
+  const cps = Array.from(l);
+  return cps.length <= max ? l : `${cps.slice(0, max - 1).join('')}…`;
 }
 
 /** One note's words, bise-proto's words::page_note_words word for word. Pure. */
@@ -131,7 +133,7 @@ export function pageAnswer(p: PagePart): { head: string; asked: string; words: s
   const only = p.notes.length === 1 ? p.notes[0] : undefined;
   if (only !== undefined && (only.asked ?? '') !== '') {
     const w = pageNoteWords(only, false).trim();
-    const short = !w.includes('\n') && [...w].length <= ON_THE_LINE;
+    const short = !w.includes('\n') && Array.from(w).length <= ON_THE_LINE;
     return short ? { head: `you answered ${p.to}: ${w}`, asked: (only.asked ?? '').trim(), words: '' } : { head: `you answered ${p.to}`, asked: (only.asked ?? '').trim(), words: w };
   }
   // a note is not an answer (designer m_20985): what he sent, the page as its ↗ link
