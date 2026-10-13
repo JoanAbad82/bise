@@ -85,8 +85,10 @@ const EMPTY_ORDER: ThreadOrder = {
   loaded: false,
 };
 const EMPTY: readonly never[] = [];
-/** A stopped dictation's final is the core's within its FINAL_WAIT (1.5 s, core.rs); past this, the window ends it. */
-export const DICTATE_STOP_WAIT_MS = 5000;
+/** A stopped dictation's final is the core's once its listener flushed, up to DICTATE_FLUSH_MAX
+ *  (120 s, amb-core m_22162: a batch listener gives every word then); past this, the window ends
+ *  it. Never shorter than the core's wait: a 5 s cut threw his words away (ambient-lead m_22121). */
+export const DICTATE_STOP_WAIT_MS = 125_000;
 
 /**
  * How much earlier than his send its echo (the hub's 'you' entry) may say it was written: the

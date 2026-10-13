@@ -140,6 +140,9 @@ const api: BiseApi = {
     openMicSettings: () => {
       ipcRenderer.send(IPC.micSettings);
     },
+    log: (line: string) => {
+      ipcRenderer.send(IPC.appLog, line);
+    },
   },
   quit: () => {
     ipcRenderer.send(IPC.quit);

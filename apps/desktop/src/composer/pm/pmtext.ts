@@ -140,12 +140,12 @@ export function insertChip(state: EditorState, chip: Chip): Transaction {
 /** The chips in the field, in order. */
 export const chipsOf = (doc: PmNode): Chip[] => segmentsOf(doc).flatMap((s) => (s.kind === 'chip' ? [s.chip] : []));
 
-/** The dictation node's offset, or null when he isn't dictating. */
-export function dictationAt(doc: PmNode): number | null {
+/** The dictation node's offset (the first, or that take's), or null when he isn't dictating. */
+export function dictationAt(doc: PmNode, id?: string): number | null {
   let at: number | null = null;
   let off = 0;
   doc.firstChild?.forEach((n) => {
-    if (at === null && n.type.name === 'dictation') at = off;
+    if (at === null && n.type.name === 'dictation' && (id === undefined || n.attrs.id === id)) at = off;
     off += n.isText ? (n.text ?? '').length : 1;
   });
   return at;

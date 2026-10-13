@@ -118,8 +118,11 @@ export const ChipNode = Node.create({
 });
 
 /** The live words as the dictation node shows them: `lead` (a space after a word, dictate.ts
- *  dictated) then the words, or 'listening…' before the first. */
-export const dictationLabel = (text: string, lead: string): string => (text.trim() === '' ? `${lead}listening…` : `${lead}${text.trim()}`);
+ *  dictated) then the words, or 'listening…' before the first ('transcribing…' once the mic is
+ *  off: a batch listener gives every word at the end, for as long as it takes). */
+export const dictationLabel = (text: string, lead: string, wait = false): string =>
+  text.trim() === '' ? `${lead}${wait ? 'transcribing…' : 'listening…'}` : `${lead}${text.trim()}`;
+const labelOf = (n: { attrs: Record<string, unknown> }): string => dictationLabel(n.attrs.text as string, n.attrs.lead as string, n.attrs.wait === true);
 
 export const DictationNode = Node.create({
   name: 'dictation',
@@ -128,7 +131,8 @@ export const DictationNode = Node.create({
   atom: true,
   selectable: false,
   draggable: false,
-  addAttributes: () => ({ text: { default: '', rendered: false }, lead: { default: '', rendered: false } }),
+  // id: its take (a new take may start while an older one is still transcribed); wait: the mic is off
+  addAttributes: () => ({ text: { default: '', rendered: false }, lead: { default: '', rendered: false }, id: { default: '', rendered: false }, wait: { default: false, rendered: false } }),
   renderHTML: () => ['span', { class: 'b-dictation' }],
   renderText: () => '',
   addNodeView:
@@ -142,7 +146,7 @@ export const DictationNode = Node.create({
       dot.setAttribute('aria-hidden', 'true');
       const words = document.createElement('span');
       words.className = 'w';
-      words.textContent = dictationLabel(node.attrs.text as string, node.attrs.lead as string);
+      words.textContent = labelOf(node);
       dom.append(dot, words);
       return {
         dom,
@@ -150,7 +154,7 @@ export const DictationNode = Node.create({
         // a new partial changes only the words' text: the node's DOM stays the same node
         update: (next) => {
           if (next.type.name !== 'dictation') return false;
-          const w = dictationLabel(next.attrs.text as string, next.attrs.lead as string);
+          const w = labelOf(next);
           if (words.textContent !== w) words.textContent = w;
           return true;
         },

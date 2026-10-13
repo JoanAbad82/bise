@@ -2,9 +2,9 @@
 // links he opens, the clipboard, the menu's own keys. In test mode nothing
 // leaves the app: a link and a copy become stdout lines the harness reads
 // (EXTERNAL_LINE, COPY_LINE), never his browser or his clipboard.
-import { existsSync, readFileSync } from 'node:fs';
+import { appendFile, existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, extname, isAbsolute } from 'node:path';
+import { basename, extname, isAbsolute, join } from 'node:path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, session, shell, type OpenDialogOptions } from 'electron';
 import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FOLDER_ENV, type MenuAction } from '../shared/api';
 import { cleanLine, cleanPath, openPlan } from './openpath';
@@ -128,6 +128,11 @@ export function installIpc(testMode: boolean): void {
     }
     void shell.openExternal(MIC_SETTINGS_URL);
   });
+  // a window's line for app.log, next to core.log (his dictation's decisions; we were blind on his Mac)
+  ipcMain.on(IPC.appLog, (_e, raw: unknown) => {
+    const line = appLogLine(raw, new Date());
+    if (line !== null) appendFile(join(app.getPath('userData'), 'app.log'), line, () => undefined);
+  });
   ipcMain.handle(IPC.openPath, (_e, raw: unknown, opts: unknown): Promise<boolean> => openFile(raw, opts, testMode));
   ipcMain.handle(IPC.quickLook, (e, raw: unknown): boolean => quickLook(BrowserWindow.fromWebContents(e.sender), raw, testMode));
   ipcMain.handle(IPC.showInFinder, (_e, raw: unknown): boolean => showInFinder(raw, testMode));
@@ -152,6 +157,12 @@ export function installIpc(testMode: boolean): void {
  * (externalUrl), refused otherwise; in test mode only EXTERNAL_LINE on stdout.
  * The one path for window.bise.openExternal and the guard's links.
  */
+/** A window's app.log line: its time, one line, 300 chars at most; null when it isn't text. Pure. */
+export function appLogLine(raw: unknown, at: Date): string | null {
+  if (typeof raw !== 'string' || raw.trim() === '') return null;
+  return `${at.toISOString()} ${raw.replace(/\s+/gu, ' ').trim().slice(0, 300)}\n`;
+}
+
 export async function openLink(raw: unknown, testMode: boolean): Promise<boolean> {
   const url = externalUrl(raw);
   if (url === null) return false;

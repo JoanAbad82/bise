@@ -121,6 +121,8 @@ export interface BiseApi {
    *  Privacy › Microphone (test mode: EXTERNAL_LINE with its URL on stdout, nothing opens). */
   readonly voice: {
     readonly openMicSettings: () => void;
+    /** One line in app.log, next to core.log (the field's dictation: start, stop, final len/error/ms; never words). */
+    readonly log?: (line: string) => void;
   };
   /** Opens the main window, on `route` when given (the capsule's ⏎, a card's 'open'). */
   readonly openWindow: (route?: string) => void;
@@ -328,6 +330,8 @@ export const IPC = {
   notifySettings: 'bise:notify-settings',
   /** a window -> main: open System Settings › Privacy › Microphone (voice mode's failed line) */
   micSettings: 'bise:mic-settings',
+  /** a window -> main: one line for app.log next to core.log (the field's dictation; never his words) */
+  appLog: 'bise:app-log',
   /** main -> a window: it entered (true) or left (false) full screen; invoke: the state now */
   fullScreen: 'bise:full-screen',
   openWindow: 'bise:open-window',

@@ -609,14 +609,17 @@ export function PmField(p: PmFieldProps): JSX.Element {
     dispatch,
     pushBar,
     say,
+    log: (line) => {
+      (window as { bise?: Window["bise"] }).bise?.voice.log?.(line);
+    },
   });
 
   const actions: ComposerActions = {
     submit,
+    // the mic: off when it listens, else a new take (one still transcribed lands beside it)
     dictate: () => {
-      const d = dictation.dict.current;
-      if (d === null) dictation.start();
-      else if (d.mic) dictation.stop();
+      if (dictation.dict.current?.mic === true) dictation.stop();
+      else dictation.start();
     },
     insertText: (text) => {
       const st = state();
