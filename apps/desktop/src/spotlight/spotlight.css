@@ -1,10 +1,14 @@
 /* The spotlight's own parts in amb-kit's Spot: bise's answer, readable (his bug 6: too small to
-   read). Tokens only. The panel grows with the content (Spotlight's onHeight). */
+   read). Tokens only. The panel grows with the content (Spotlight's onHeight). Spacing on
+   designer's desktop-spacing grid: every text of the spot starts 20 px in (--s-5: the field, the
+   group heads, the rows' 8 + 12, the keys), and bise's answer under the field's words, past the
+   40 px pearl (--s-10) and its gap. */
 .b-spotlight {
   width: 100%;
+  --spot-words: calc(var(--s-5) + var(--s-10) + var(--s-3));
 }
 .b-spot-answer {
-  padding: 4px 20px 12px 70px;
+  padding: var(--s-1) var(--s-5) var(--s-3) var(--spot-words);
   font: var(--t-15)/1.5 var(--font-read);
   color: var(--c-text);
   white-space: pre-wrap;
@@ -23,7 +27,7 @@
 .b-spot-field {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap-inline);
   min-width: 0;
 }
 .b-spot-field > input {
@@ -32,21 +36,18 @@
 }
 .b-spot-files {
   display: flex;
-  gap: 4px;
+  gap: var(--gap-inline);
   flex: none;
   max-width: 60%;
   overflow: hidden;
-}
-.b-spot-files {
-  gap: 6px;
 }
 /* the sent bubble's chip (amb-win 900f998e, designer m_18136): ink words, 1 px line, r 9, no fill */
 .b-spot-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 22px;
-  padding: 0 9px;
+  gap: var(--s-1);
+  height: var(--s-6);
+  padding: 0 var(--s-2);
   border: 1px solid var(--c-line);
   border-radius: 9px;
   background: none;
@@ -72,22 +73,22 @@
    older dim; the time right-aligned dim; a question that waits on him in accent; each line cut with … */
 .b-spot .r:has(.b-spot-acts) {
   height: auto;
-  min-height: 34px;
+  min-height: var(--h-row);
   align-items: start;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  padding-top: var(--s-2);
+  padding-bottom: var(--s-2);
 }
 .b-spot .r:has(.b-spot-acts) > :is(b, .pp, .ky) {
   line-height: 18px;
 }
 .b-spot-acts {
   display: grid;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
 }
 .b-spot-acts .a {
   display: flex;
-  gap: 10px;
+  gap: var(--gap-inline);
   min-width: 0;
   line-height: 18px;
   color: var(--c-text-3);
@@ -112,8 +113,8 @@
 .b-spot-route {
   display: flex;
   align-items: baseline;
-  gap: 14px;
-  padding: 4px 20px 10px 70px;
+  gap: var(--s-4);
+  padding: var(--s-1) var(--s-5) var(--s-3) var(--spot-words);
   font: var(--t-15)/1.4 var(--font-read);
   color: var(--c-text);
 }
@@ -150,20 +151,21 @@
   font-family: var(--font-mono);
   font-size: 0.88em;
 }
-/* inline code: 2 px each side at most, so punctuation hugs it (amb-kit's fix, ambient m_12433) */
+/* inline code: one grid step each side, as the thread's (ds thread.css .b-text code); was 2 px
+   (amb-kit's fix, ambient m_12433) */
 .b-live code {
-  padding: 0 2px;
+  padding: 0 var(--s-1);
   border-radius: 4px;
   background: var(--c-sunken);
 }
 .b-live .box,
 .b-live .table {
   display: block;
-  margin: 6px 0;
+  margin: var(--s-2) 0;
   overflow-x: auto;
 }
 .b-live .box {
-  padding: 8px 10px;
+  padding: var(--s-2) var(--s-3);
   border-radius: 8px;
   background: var(--c-sunken);
   white-space: pre;
@@ -179,7 +181,7 @@
   display: grid;
 }
 .b-live .table .tr > span {
-  padding: 3px 10px 3px 0;
+  padding: var(--s-1) var(--s-3) var(--s-1) 0;
   overflow-wrap: anywhere;
 }
 .b-live .table .th {
