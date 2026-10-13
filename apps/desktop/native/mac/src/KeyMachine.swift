@@ -12,8 +12,9 @@
 // fires: no emoji picker on a double fn).
 // fn + a bise key (SPEC §4) is swallowed, before or after the hold began:
 //   fn + esc while talking -> cancel; any other bise key while talking
-//   -> cancel, then the key. fn + another key (arrows, delete, F-keys)
-//   passes and spoils the hold. Right option never swallows: any key or
+//   -> cancel, then the key. fn + ⌫ while talking -> the key 'delete' (the
+//   capsule drops the talk's screenshot), the talk goes on. fn + another key
+//   (arrows, delete outside a talk, F-keys) passes and spoils the hold. Right option never swallows: any key or
 //   modifier with it spoils it (it's ⌥ + a letter, typing).
 
 import Foundation
@@ -65,6 +66,10 @@ let biseKeys: [Int: String] = [
     0: "a",     // round 10: fn a, all your agents (the finder, like fn space)
     53: "esc",
 ]
+
+// ⌫ with fn: forward delete (117, made below us by HID) or delete (51). bise's only during a
+// talk ('delete'); outside one, fn ⌫ is his forward delete and passes
+let talkDeleteKeys: Set<Int> = [51, 117]
 
 struct KeyMachine {
     var holdAfter: Double = 0.25
@@ -135,7 +140,13 @@ struct KeyMachine {
         case .otherModifiers:
             if roptIsDown { out.append(contentsOf: spoilRopt()) }
         case .keyDown(let code, let repeated):
-            if fnIsDown, let name = biseKeys[code] {
+            if fnIsDown && (talking != nil || handsFree) && talkDeleteKeys.contains(code) {
+                // fn ⌫ during a talk drops its screenshot (designer m_21902): bise's key, and
+                // the talk goes on (its release still ends a hold; a hands-free talk ignores it)
+                swallow = true
+                swallowed.insert(code)
+                if !repeated { fnSpoiled = true; out.append(.key("delete")) }
+            } else if fnIsDown, let name = biseKeys[code] {
                 swallow = true
                 swallowed.insert(code)
                 if repeated { break }

@@ -54,8 +54,19 @@ law("fn + esc outside a hold: the key esc",
     run([(.fnDown, 0), (.keyDown(53, repeated: false), 0.1), (.fnUp, 0.2)]).out == [.key("esc")])
 let arrow = run([(.fnDown, 0), (.keyDown(123, repeated: false), 0.1), (.fnUp, 0.2)])
 law("fn + left arrow: passes, no tap, no talk", arrow.out == [] && arrow.swallowed == [true, false, true])
-law("fn + delete after the hold began: cancel, the key passes",
-    run([(.fnDown, 0), (.keyDown(51, repeated: false), 0.5), (.fnUp, 0.6)]).out == [.talkStart(.fn), .cancel])
+for code in [51, 117] {
+    let held = run([(.fnDown, 0), (.keyDown(code, repeated: false), 0.5), (.keyDown(code, repeated: true), 0.7),
+                    (.keyUp(code), 0.8), (.fnUp, 1.0)])
+    law("fn ⌫ (\(code)) during a hold: the key delete once, swallowed, the talk goes on to its release",
+        held.out == [.talkStart(.fn), .key("delete"), .talkEnd] && held.swallowed == [true, true, true, true, true])
+    let free = run([(.fnDown, 0), (.fnUp, 0.1), (.fnDown, 0.2), (.fnUp, 0.3), (.fnDown, 1.0), (.keyDown(code, repeated: false), 1.1),
+                    (.keyUp(code), 1.2), (.fnUp, 1.3), (.fnDown, 2.0), (.fnUp, 2.1)])
+    law("fn ⌫ (\(code)) hands-free: the key delete, the talk stays on, the next tap ends it",
+        free.out == [.tap, .double, .key("delete"), .talkEnd])
+    let idle = run([(.fnDown, 0), (.keyDown(code, repeated: false), 0.1), (.fnUp, 0.2)])
+    law("fn ⌫ (\(code)) outside a talk: his forward delete passes, no tap, no talk",
+        idle.out == [] && idle.swallowed == [true, false, true])
+}
 law("auto-repeat of a bise key: swallowed, said once",
     run([(.fnDown, 0), (.keyDown(18, repeated: false), 0.1), (.keyDown(18, repeated: true), 0.6), (.keyUp(18), 0.7), (.fnUp, 0.8)]).out
         == [.key("1")])
