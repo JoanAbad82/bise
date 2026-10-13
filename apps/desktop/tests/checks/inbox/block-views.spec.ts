@@ -12,8 +12,9 @@
 //   - the permission ask (macOS never asked in a fresh test home) is an ordinary item from bise, the last
 //     one (H10, designer m_19835: '? bise · let questions reach you as macOS notifications?', 1 turn on ·
 //     2 not now): its 1 asks (the test answers 'on') and it goes;
-//   - H10 at 1400/1100/800 x 820: ≤ 180 px under the thread at rest, one 36 px line and no keys line
-//     (≤ 120 px: designer's 110 with D18's 52 px box) scrolled up, the rows he reads stay put, back at the bottom the last row whole.
+//   - H10 at 1400/1100/800 x 820: ≤ 180 px under the thread at rest; scrolled up, the block stays as it
+//     was, no fold and the same height (designer m_21505: nothing around the composer changes on scroll),
+//     the rows he reads stay put; back at the bottom the last row whole.
 // Shots (looked at, for designer): folded, question opened, merge opened, ⌘I from settings, each light + dark.
 // Owner: amb-home.
 import type { Page } from '@playwright/test';
@@ -254,7 +255,7 @@ const longWorld = () => world().map((e) => ((e as { ev: string; agent?: string }
 const bottomPart = (page: Page) => page.evaluate(() => window.innerHeight - (document.querySelector('[data-testid="inbox.block"]')?.getBoundingClientRect().top ?? window.innerHeight));
 
 for (const size of ['1400x820', '1100x820', '800x820'] as const) {
-  test(`inbox/block-views: H10 at ${size}: the head + one line at rest, one line while he reads`, async () => {
+  test(`inbox/block-views: H10 at ${size}: the head + one line at rest, the same while he reads`, async () => {
     const core = new FakeCore(longWorld() as unknown as ConstructorParameters<typeof FakeCore>[0]);
     const s = await launchDesktop({ core, route: `agent/${P}/perf`, size });
     const w = size.split('x')[0] ?? size;
@@ -270,12 +271,11 @@ for (const size of ['1400x820', '1100x820', '800x820'] as const) {
         await expect(page.getByTestId('composer.keys')).toBeVisible();
         await shoot(page, core, `h10-${w}-rest`);
       });
-      await test.step('scrolled up: one line, no keys line, ≤ 110 px, the rows he reads stay put', async () => {
+      await test.step('scrolled up: the block stays as it was (no fold, same height), the rows he reads stay put', async () => {
+        const before = await block.evaluate((e) => Math.round(e.getBoundingClientRect().height));
         await page.getByTestId('thread.list').hover();
         await page.mouse.wheel(0, -900);
-        await expect(page.getByTestId('inbox.block.line')).toBeVisible({ timeout: 3000 });
-        await expect(page.getByTestId('inbox.block.line')).toContainText('5 waiting');
-        await expect(page.getByTestId('composer.keys')).toBeHidden();
+        await expect(page.getByText('bench note 60:')).toBeHidden({ timeout: 3000 });
         // the wheel is a smooth scroll (~370 ms, longer under load) that goes on after the line shows,
         // and Virtuoso fixes the heights of the rows above as it draws them: y is read once the list
         // stops (the same scrollTop over 3 frames); what must not come after is a move of its own
@@ -301,20 +301,11 @@ for (const size of ['1400x820', '1100x820', '800x820'] as const) {
         await page.waitForTimeout(400);
         const y2 = await note.evaluate((e) => e.getBoundingClientRect().top).catch(() => null);
         if (y !== null && y2 !== null) expect(Math.abs(y2 - y), 'the rows he reads stay put').toBeLessThan(1);
-        expect(await page.getByTestId('inbox.block').evaluate((e) => e.getBoundingClientRect().height), 'one 36 px line').toBeLessThanOrEqual(37);
-        const parts = await page.evaluate(() => {
-          const r = (q: string) => {
-            const e = document.querySelector(q);
-            if (e === null) return `${q}:none`;
-            const b = e.getBoundingClientRect();
-            return `${q}:${String(Math.round(b.top))}+${String(Math.round(b.height))}`;
-          };
-          const c = document.querySelector('.b-composer');
-          const kids = c === null ? '' : Array.from(c.children).map((k) => `${k.className}:${String(Math.round(k.getBoundingClientRect().height))}`).join(',');
-          return [r('[data-testid="inbox.block"]'), r('.b-composer'), kids, String(window.innerHeight)].join(' ');
-        });
-        // designer's 110 counted a 48 px box; D18's box is 52: line 36 + 4 + label 20 + box 52 + 8 = 120
-        expect(await bottomPart(page), `the block + the composer while he reads (${parts})`).toBeLessThanOrEqual(120);
+        // nothing around the composer changes on scroll (designer m_21505): the block keeps its head,
+        // its line and its height; only his hand or its content folds or opens it
+        await expect(page.getByTestId('inbox.block.row.1')).toBeVisible();
+        await expect(block).not.toHaveAttribute('data-open');
+        expect(await block.evaluate((e) => Math.round(e.getBoundingClientRect().height)), 'the block keeps its height').toBe(before);
         await page.mouse.move(1, 300);
         await shoot(page, core, `h10-${w}-reading`);
       });

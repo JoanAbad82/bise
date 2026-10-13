@@ -48,12 +48,6 @@ export interface InboxBlockProps {
   /** now, for the ages (a test pins it) */
   readonly now?: number;
   /**
-   * He scrolled the thread up to read (H10, designer m_19835): folded, the block is one 36 px line
-   * ('inbox  3 waiting · ? search · which sizes… ⌃1', an 8 px gap after 'inbox', designer m_21013);
-   * at the thread's bottom it is whole again.
-   */
-  readonly reading?: boolean;
-  /**
    * Only these items (task-panel m_20455: the artifact view docks only its maker's questions). It
    * filters the list before anything else (head count, ↑↓, ⌃n, the first item ⌘I opens), and bise's
    * notifications ask stays out. Absent: every project's items.
@@ -220,7 +214,10 @@ function typing(t: EventTarget | null): boolean {
   return t instanceof HTMLElement && t.isContentEditable && t.textContent.trim() !== '';
 }
 
-export function InboxBlock({ here, onAnswer, now: pinned, reading = false, only }: InboxBlockProps) {
+// The block never folds, opens or changes height when he scrolls the thread (designer m_21505,
+// ambient-lead m_21498): only his hand (a click, esc, ctrl+o) or its content changes it. The H10
+// one-line form while he read up the thread (m_19835) is gone: the layout jumped under him.
+export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProps) {
   const rows = useProjects();
   const store = useStore();
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
@@ -428,32 +425,6 @@ export function InboxBlock({ here, onAnswer, now: pinned, reading = false, only 
   // '+ N more' walks on past the open item, then wraps: never back and forth between two
   const next = list.find((_, i) => i >= BLOCK_ROWS && i > openAt) ?? list.find((_, i) => i >= BLOCK_ROWS && i !== openAt);
   const keys = list.length > 1 ? `⌃1–${String(Math.min(list.length, STRIP_KEYS))}` : '⌃1';
-  const first = list[0];
-  // he reads up the thread (H10, designer m_19835): one 36 px line, the first item in it; a click opens it
-  if (reading && openCard === undefined && first !== undefined) {
-    const { who, what } = stripWords(first);
-    const sign = signOf(first);
-    return (
-      <section className="inbox-strip inbox-block is-reading" aria-label="inbox" data-testid="inbox.block" data-reading="true">
-        <Row
-          name={
-            <>
-              <span className="strip-title-words">inbox</span>
-              <span className="strip-count">{`${String(list.length)} waiting · `}</span>
-              {sign !== null && <span className="ib-sign">{sign}</span>}
-              <span className="strip-who">{shownName(who)}</span>
-              {what !== '' && <span className="strip-what">{` · ${what}`}</span>}
-            </>
-          }
-          end={<Kbd>⌃1</Kbd>}
-          onClick={() => {
-            openTo(cardKey(first));
-          }}
-          testId="inbox.block.line"
-        />
-      </section>
-    );
-  }
   return (
     <section className="inbox-strip inbox-block" aria-label="inbox" data-testid="inbox.block" data-open={openCard !== undefined || undefined}>
       <div className="strip-title">

@@ -426,11 +426,11 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
         <CardHint project={project} />
         {/* b1/b2: every project's open items, one opened in place (amb-home's InboxBlock, eb3da983) */}
         {artifact === undefined ? (
-          <InboxBlock here={bise ? HERE_BISE : { project, agent }} onAnswer={setAnswering} reading={reading} />
+          <InboxBlock here={bise ? HERE_BISE : { project, agent }} onAnswer={setAnswering} />
         ) : (
           // beside an open artifact: only the maker's own question, docked over its one composer
           // (designer's artifact-open (g)); main's inbox is not on this screen
-          <InboxBlock here={{ project, agent: artifact.agent ?? agent }} only={onlyMaker} onAnswer={setAnswering} reading={reading} />
+          <InboxBlock here={{ project, agent: artifact.agent ?? agent }} only={onlyMaker} onAnswer={setAnswering} />
         )}
         {me?.archived === true && artifact === undefined ? (
           <History project={project} agent={agent} />

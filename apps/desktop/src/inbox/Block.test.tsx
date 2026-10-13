@@ -25,7 +25,7 @@ const withLong = (lines: number): typeof core_ev =>
       : { ...e, projects: e.projects.map((r) => ({ ...r, cards: r.cards?.map((c) => (c.id === 9 ? { ...c, question: Array.from({ length: lines }, (_, i) => `line ${String(i + 1)} of the long ask`).join(String.fromCharCode(10)) } : c)) })) },
   );
 
-const mount = (here: Here = { project: P, agent: 'perf' }, events: typeof core_ev = core_ev, reading = false) => {
+const mount = (here: Here = { project: P, agent: 'perf' }, events: typeof core_ev = core_ev) => {
   const sent: CoreCmd[] = [];
   const port: CorePort = { send: (c) => sent.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
   const store = new Store(port);
@@ -34,7 +34,7 @@ const mount = (here: Here = { project: P, agent: 'perf' }, events: typeof core_e
   render(
     <StoreProvider store={store}>
       <RouterContext value={createRouter({ screen: 'thread', project: P, agent: 'perf' })}>
-        <InboxBlock here={here} onAnswer={(a) => told.push(a)} now={NOW} reading={reading} />
+        <InboxBlock here={here} onAnswer={(a) => told.push(a)} now={NOW} />
       </RouterContext>
     </StoreProvider>,
   );
@@ -211,20 +211,6 @@ describe('one inbox (designer m_19631)', () => {
   });
 });
 
-describe('H10: scrolled up to read, the block is one line', () => {
-  it("'inbox  2 waiting · ? agent · question' and ⌃1; a click opens the first item whole", () => {
-    mount(undefined, core_ev, true);
-    const line = screen.getByTestId('inbox.block.line');
-    // no '·' between 'inbox' and the count (an 8 px gap, designer m_21013); the one before the row stays
-    expect(line.textContent).toContain('inbox2 waiting · ');
-    expect(line.textContent).not.toContain('inbox ·');
-    expect(line.textContent).toContain('⌃1');
-    expect(screen.queryByTestId('inbox.block.row.1')).toBeNull();
-    fireEvent.click(line);
-    expect(screen.getByTestId('inbox.block.open.1')).toBeTruthy();
-  });
-});
-
 describe("the notifications' permission row (amb-mac's notify.ask)", () => {
   it("shows while macOS was never asked and an item waits; 'not now' once a launch, twice for good", () => {
     expect(asksNotify('never', 1, 0, false)).toBe(true);
@@ -247,7 +233,8 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
       // H10 (designer m_19835): an ordinary item from bise, the last one, never a line of its own
       expect(await screen.findByText('+ 2 more')).toBeTruthy();
       fireEvent.keyDown(window, { key: '3', code: 'Digit3', ctrlKey: true });
-      expect(screen.getByTestId('inbox.block.notify').textContent).toContain('let questions reach you as macOS notifications?');
+      // waits: under a loaded run the open can land a tick later (it passed alone, failed once in pnpm check)
+      expect((await screen.findByTestId('inbox.block.notify')).textContent).toContain('let questions reach you as macOS notifications?');
       await act(async () => {
         fireEvent.click(screen.getByTestId('inbox.block.notify.opt.1'));
         // a clicked option shows picked for PICKED_MS (InboxCard), then picks
