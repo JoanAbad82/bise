@@ -727,10 +727,56 @@ pub fn page_part(m: &Meta, questions: &[super::questions::Question], sent: &[Not
     bise_proto::parts::Part::Page { text: text.to_string(), to: to.to_string(), page: m.id.clone(), title: m.title.clone(), version: m.version(), notes }
 }
 
+/// His words on a page's drafts card that are no option (ambient-lead
+/// m_21516: 'Ou sont les drafts?' was lost): the message `to` gets (the
+/// page's agent, main when gone) and its typed part, one note on the
+/// batch (block "") quoting the card's line, so the clients draw
+/// `you answered · <asked>` and his words, never the text.
+pub fn batch_words(m: &Meta, url: &str, card: u64, line: &str, asked: &str, to: &str, words: &str) -> (String, bise_proto::parts::Part) {
+    let text = format!("on the drafts card \"{line}\" of your page \"{}\" ({url}), the user says: {words}", m.title);
+    let note = bise_proto::parts::PageNote {
+        block: super::checklist::BATCH.to_string(),
+        kind: "note".into(),
+        text: words.to_string(),
+        quote: line.to_string(),
+        card,
+        asked: asked.trim().to_string(),
+    };
+    let part = bise_proto::parts::Part::Page { text: text.clone(), to: to.to_string(), page: m.id.clone(), title: m.title.clone(), version: m.version(), notes: vec![note] };
+    (text, part)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// Law (architect m_21543): his words on a drafts card reach the asker
+    /// as a page note, the card's line quoted; the model reads the text.
+    #[test]
+    fn words_on_a_drafts_card_are_a_page_note() {
+        let d = temp();
+        let s = Store::new(&d);
+        s.publish(&publish("t1", Some("rel"), Some("release replies")), vec![], 10, &|_| false).unwrap();
+        let m = s.meta("rel").unwrap();
+        let (text, part) = batch_words(&m, "http://p/rel", 7, "2 drafts wait for you · release replies", "2 drafts wait for you · release replies\nreplies to Lucas and Marc", "t1", "Ou sont les drafts?");
+        assert_eq!(text, "on the drafts card \"2 drafts wait for you · release replies\" of your page \"release replies\" (http://p/rel), the user says: Ou sont les drafts?");
+        assert_eq!(bise_proto::parts::render(std::slice::from_ref(&part)), text, "the model's text, byte for byte");
+        let bise_proto::parts::Part::Page { to, page, title, version, notes, .. } = part else { panic!("{part:?}") };
+        assert_eq!((to.as_str(), page.as_str(), title.as_str(), version), ("t1", "rel", "release replies", 1));
+        assert_eq!(
+            notes,
+            vec![bise_proto::parts::PageNote {
+                block: String::new(),
+                kind: "note".into(),
+                text: "Ou sont les drafts?".into(),
+                quote: "2 drafts wait for you · release replies".into(),
+                card: 7,
+                asked: "2 drafts wait for you · release replies\nreplies to Lucas and Marc".into(),
+            }]
+        );
+        let _ = std::fs::remove_dir_all(d);
+    }
 
     fn temp() -> PathBuf {
         static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);

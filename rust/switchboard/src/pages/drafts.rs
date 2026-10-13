@@ -378,6 +378,38 @@ pub fn carded(id: &str) -> bool {
     !(id.starts_with("promises-") || id.starts_with("meeting-"))
 }
 
+/// Words on a batch card that review them (its option 1): the page, never
+/// a message. Only these exact words: any other words go to the asker.
+pub fn is_review(reply: &str) -> bool {
+    let w = reply.trim().trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+    matches!(w.as_str(), "1" | "review" | "voir" | "relire")
+}
+
+/// What his words on a batch card do (ambient-lead m_21516, architect
+/// m_21543): review opens the page, send all sends them, any other words
+/// go to the card's asker as his message, none do nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BatchAnswer<'a> {
+    Review,
+    SendAll,
+    Words(&'a str),
+    Empty,
+}
+
+/// His words on a batch card, sorted: never swallowed.
+pub fn batch_answer(reply: &str) -> BatchAnswer<'_> {
+    let words = reply.trim();
+    if words.is_empty() {
+        BatchAnswer::Empty
+    } else if is_review(words) {
+        BatchAnswer::Review
+    } else if is_send_all(words) {
+        BatchAnswer::SendAll
+    } else {
+        BatchAnswer::Words(words)
+    }
+}
+
 /// Words on a batch card that send them all: option 2 (1 is review, the
 /// default), 'send all <n>', 'send both', send, envoie, yes.
 pub fn is_send_all(reply: &str) -> bool {
@@ -546,6 +578,21 @@ emails to lucas and marc");
         for no in ["1", "review", "1. review", "no", "send later", ""] {
             assert!(!is_send_all(no), "{no}");
         }
+        // review is only its own words: any other words are his message
+        // to the asker (ambient-lead m_21516: 'Ou sont les drafts?' was lost)
+        for r in ["1", "1.", "Review", "voir"] {
+            assert!(is_review(r), "{r}");
+        }
+        for w in ["Ou sont les drafts?", "review them later", "revoir le titre", "voir plus tard", "2", "send all", ""] {
+            assert!(!is_review(w), "{w}");
+        }
+        // each path of his words (architect m_21543): review, send all, words, empty
+        assert_eq!(batch_answer(" 1. "), BatchAnswer::Review);
+        assert_eq!(batch_answer("relire"), BatchAnswer::Review);
+        assert_eq!(batch_answer("send both"), BatchAnswer::SendAll);
+        assert_eq!(batch_answer("  Ou sont les drafts? "), BatchAnswer::Words("Ou sont les drafts?"));
+        assert_eq!(batch_answer("revoir le titre"), BatchAnswer::Words("revoir le titre"), "a note, never a review");
+        assert_eq!(batch_answer(" \n "), BatchAnswer::Empty);
         assert_eq!((send_label(2), send_label(3)), ("send both".to_string(), "send all 3".to_string()));
         let s = |n: &[&str]| n.iter().map(|x| x.to_string()).collect::<Vec<_>>();
         assert_eq!(and_list(&s(&["legal", "Lucas", "Marc"])), "legal, Lucas and Marc");

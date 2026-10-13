@@ -422,13 +422,42 @@ impl Shell {
 
     /// His answer on a batch card: send all = an approve note per draft
     /// it holds that still waits, one notes message to the page's agent
-    /// (main when it is gone), the card closes. Review (2) or other
-    /// words: the card stays (the capsule opens the page at the first).
-    pub(super) fn page_drafts_answer(&mut self, id: &str, card: u64, reply: &str) -> bool {
+    /// (main when it is gone), the card closes. Review (1): the card
+    /// stays, the answering client hears where the page is (the capsule
+    /// and the window open it themselves). Other words: they go to the
+    /// card's asker (the page's agent, main when it is gone) as his
+    /// message, the card stays, and the client hears where they went;
+    /// never silently nothing (his 'Ou sont les drafts?' on a docked
+    /// card, ambient-lead m_21516).
+    pub(super) fn page_drafts_answer(&mut self, client: ClientId, id: &str, card: u64, reply: &str) -> bool {
         let Some(pages) = self.pg.pages.clone() else { return false };
         let Some(meta) = pages.store.meta(id) else { return false };
-        if !crate::pages::drafts::is_send_all(reply) {
-            return true;
+        use crate::pages::drafts::BatchAnswer;
+        match crate::pages::drafts::batch_answer(reply) {
+            BatchAnswer::Empty => return true,
+            // option 1 does what it says: the page, never a message; the card stays
+            BatchAnswer::Review => {
+                let text = format!("the drafts of {} are on its page: {}", meta.title, pages.url(id));
+                log_line(&self.opts.paths, &format!("page {id}: review on batch card #{card}"));
+                self.notice_out(client, Some("answer"), &text);
+                return true;
+            }
+            // words that are no option (ambient-lead m_21516: they were swallowed):
+            // the asker gets them as his page note, he gets one line where he typed
+            BatchAnswer::Words(words) => {
+                let to = if self.page_agent_gone(&meta.agent) { MAIN.to_string() } else { meta.agent.clone() };
+                let line = pages.store.steps(id).into_iter().find(|s| s.card == card).map(|s| s.text.lines().next().unwrap_or_default().to_string()).unwrap_or_default();
+                let asked = self.hub.st.open_cards().find(|c| c.id == card).map_or_else(|| line.clone(), |c| c.text.clone());
+                let (text, part) = crate::pages::store::batch_words(&meta, &pages.url(id), card, &line, &asked, &to, words);
+                let parts = serde_json::to_string(&[part]).unwrap_or_default();
+                log_line(&self.opts.paths, &format!("page {id}: words on batch card #{card} → {to}: {words:?}"));
+                // client 0, as every page message: a real id would move that client's focus to `to` (focus_of)
+                self.step(Input::ClientInput { client: 0, focus: to.clone(), text, queued: false, parts });
+                let who = if to == MAIN { "bise".to_string() } else { to };
+                self.notice_out(client, Some("answer"), &format!("sent to {who}: \"{words}\". the drafts still wait for you."));
+                return true;
+            }
+            BatchAnswer::SendAll => {}
         }
         let mut steps = pages.store.steps(id);
         let Some(keys) = steps.iter().find(|s| s.card == card && s.reply.is_none()).map(|s| s.batch.clone()) else { return false };
@@ -493,7 +522,7 @@ impl Shell {
         let now = pages.store.steps(&id).into_iter().find(|s| s.block == BATCH && s.reply.is_none() && open.contains(&s.card));
         let say = match (now, crate::pages::drafts::is_send_all(reply)) {
             (Some(s), true) => {
-                self.page_drafts_answer(&id, s.card, reply);
+                self.page_drafts_answer(client, &id, s.card, reply);
                 None
             }
             (None, true) => {
@@ -594,7 +623,7 @@ impl Shell {
         let Ok(card) = n.trim_start_matches('#').parse::<u64>() else { return false };
         let Some((id, key)) = self.page_cards().get(&card).cloned() else { return self.page_old_batch_answer(client, card, reply) };
         if key.starts_with("drafts:") {
-            return self.page_drafts_answer(&id, card, reply);
+            return self.page_drafts_answer(client, &id, card, reply);
         }
         match key.strip_prefix("row:").and_then(|k| k.split_once('/')).map(|(_, i)| i.to_string()) {
             Some(item) => self.page_tick(&id, &item, reply),
