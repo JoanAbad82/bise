@@ -1,9 +1,10 @@
-// thread/interrupt · bar ⛔6 (docs/desktop-bar.md): esc stops the turn. Owner: qa-flows.
+// thread/interrupt · bar ⛔6 (docs/desktop-bar.md): ctrl+c stops the turn, as the TUI's; esc never does
+// (his ask main m_22205; amb-win). Owner: qa-flows.
 // The NEW app on the REAL core over the throwaway world (../world.ts). His words carry
 // "[[bash: sleep 12]]": the scripted model makes bise's main run a 12 s tool, a long turn.
 // Real keys only: the send, then, while main works, a draft typed in the composer and esc.
 // Passes when:
-//   - the stop shows in the thread within 1 s of esc;
+//   - the stop shows in the thread within 1 s of ctrl+c (an esc before it stops nothing);
 //   - bise's main really stops (its hub says it is no longer working: read on the hub's socket,
 //     outside the app) within 1 s of esc: the bar's rule;
 //   - the composer keeps his draft.
@@ -30,7 +31,7 @@ const mainStatus = async (w: World): Promise<string> => {
   return agents?.find((a) => a.name === 'main')?.status ?? '';
 };
 
-test('thread/interrupt: esc during a long turn stops it in under 1 s, the composer keeps its text', async () => {
+test('thread/interrupt: esc during a long turn stops nothing, ctrl+c stops it in under 1 s, the composer keeps its text', async () => {
   test.setTimeout(180_000);
   const w = realWorld();
   const n = `i${Date.now() % 1_000_000}`;
@@ -57,8 +58,15 @@ test('thread/interrupt: esc during a long turn stops it in under 1 s, the compos
     await page.waitForTimeout(1500); // inside the tool now
     await page.keyboard.type('garde ça');
     const before = await page.locator(T.thread).innerText();
-    const t0 = Date.now();
+    // esc never stops a turn (main m_22205): main still works a second later
     await page.keyboard.press('Escape');
+    await page.waitForTimeout(1000);
+    expect(await mainStatus(w), 'esc: main still works').toBe('working');
+    await field.click();
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.type('garde ça');
+    const t0 = Date.now();
+    await page.keyboard.press('Control+c');
     await expect.soft(page.locator(T.screen), 'the stop shows in the thread within 1 s').toContainText(/stopping|stopped|interrupted/i, { timeout: 1000 });
     expect.soft(before, 'the stop line is new').not.toMatch(new RegExp(`${n}[\\s\\S]*(stopping|interrupted)`, 'i'));
     await expectShownSoft(page.locator(T.screen).getByText(/stopping|stopped|interrupted/i).last(), 'the stop line', 500);
@@ -68,10 +76,10 @@ test('thread/interrupt: esc during a long turn stops it in under 1 s, the compos
       if ((await mainStatus(w)) !== 'working') { stoppedMs = Date.now() - t0; break; }
       await page.waitForTimeout(100);
     }
-    test.info().annotations.push({ type: 'stopped', description: `bise main stopped ${stoppedMs} ms after esc` });
+    test.info().annotations.push({ type: 'stopped', description: `bise main stopped ${stoppedMs} ms after ctrl+c` });
     await page.screenshot({ path: test.info().outputPath('stopped.png') });
     await expect(field, 'the composer keeps his draft').toHaveText('garde ça');
-    expect(stoppedMs, "ms from esc to bise main's turn ended (hub)").toBeLessThan(1000);
+    expect(stoppedMs, "ms from ctrl+c to bise main's turn ended (hub)").toBeLessThan(1000);
   } finally {
     await s.close();
   }

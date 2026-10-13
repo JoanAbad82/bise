@@ -1,6 +1,6 @@
 // One agent's thread: its head, its entries, its current step, ⌘F, and
 // amb-web's composer. Owner: amb-win. Bar ⛔3 (a send shows at once),
-// ⛔4 (readable answers), ⛔6 (esc stops the turn), 3.3 (writing to one
+// ⛔4 (readable answers), ⛔6 (ctrl+c stops the turn), 3.3 (writing to one
 // agent: the composer's target is this agent), 3.4 (⌘F).
 //
 // What re-renders what (the reset's flicker rule): the list re-renders
@@ -187,23 +187,24 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
 
   /**
    * The thread's esc, once no list or popup took it (R18, the TUI's order): while bise holds his
-   * words, keep them with bise (route_cancel); while the agent works, stop the turn. The composer
-   * calls it itself (ProseMirror preventDefaults every Escape); an esc from elsewhere bubbles here.
+   * words, keep them with bise (route_cancel). It never stops a turn: ctrl+c does, as the TUI's
+   * (his ask main m_22205; rust/tui/src/sb/keys.rs:104). The composer calls it itself (ProseMirror
+   * preventDefaults every Escape); an esc from elsewhere bubbles here.
    */
   // memo'd: the composer is (a new entry never re-renders it)
   const escape = useCallback((): boolean => {
     if (findOpen) return false;
-    if (held !== undefined) store.command({ cmd: 'route_cancel', project: held.home, rid: held.rid });
-    else if (busy) stop();
-    else return false;
+    if (held === undefined) return false;
+    store.command({ cmd: 'route_cancel', project: held.home, rid: held.rid });
     return true;
-  }, [findOpen, held, busy, store, stop]);
+  }, [findOpen, held, store]);
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape' && !e.defaultPrevented) {
       if (escape()) e.preventDefault();
     } else if (e.key === 'c' && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && !e.defaultPrevented) {
-      // K6, the TUI's ctrl+c (ambient-pm m_17250): it stops the turn too; copy is ⌘C on the Mac, so
-      // ctrl+c is free, but with text selected it does nothing else (he may be copying by habit)
+      // the TUI's ctrl+c (rust/tui/src/sb/keys.rs:104, his ask main m_22205): the one key that stops
+      // the turn; copy is ⌘C on the Mac, so ctrl+c is free, but with text selected it does nothing
+      // (he may be copying by habit)
       if (busy && (window.getSelection()?.isCollapsed ?? true)) {
         e.preventDefault();
         stop();

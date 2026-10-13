@@ -252,12 +252,13 @@ export function fieldKey(c: KeyCtx, e: KeyboardEvent): boolean {
         c.setDismissed(`${l.trigger.kind}:${l.trigger.start}`);
         return true;
       }
-      // no list open: the screen's esc (stop the turn) while busy or on a blank field; else his
-      // words go to history (↑ brings them back). A blank field the screen did nothing with
-      // leaves the esc free: the window goes up (esc-up.ts; ProseMirror prevents it anyway)
+      // no list open: the screen's esc first (keep his words with bise during a route hold); it
+      // never stops a turn, ctrl+c does (main m_22205). Else his words go to history (↑ brings
+      // them back). A blank field the screen did nothing with leaves the esc free: the window goes
+      // up (esc-up.ts; ProseMirror prevents it anyway)
       e.preventDefault();
-      if (c.busy) c.onEscape?.();
-      else if (blankNow()) {
+      if (c.busy && c.onEscape?.() === true) return true;
+      if (blankNow()) {
         if (c.onEscape?.() !== true) freeEscape(e);
       } else c.putAway();
       return true;

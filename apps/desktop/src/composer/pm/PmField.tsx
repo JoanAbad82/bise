@@ -113,7 +113,7 @@ export interface PmFieldProps {
   /** K2: ⏎ on an empty field (never an empty send): the screen's act, if any (sign in again, ...) */
   readonly onEmptyEnter?: (() => void) | undefined;
   /**
-   * R18: an esc no list took, while busy or on a blank field: the screen's act (stop the turn,
+   * R18: an esc no list took, while busy or on a blank field: the screen's act (never a stop: ctrl+c,
    * keep his words with bise). Called here because ProseMirror preventDefaults every Escape
    * (captureKeyDown), so a screen's bubbling handler never sees it as free.
    */

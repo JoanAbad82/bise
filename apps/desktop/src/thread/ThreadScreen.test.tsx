@@ -138,7 +138,7 @@ describe('the thread screen', () => {
     expect(cmds.at(-1)).toMatchObject({ cmd: 'send', project: P, agent: 'perf', text: 'hi there', mode: 'now' });
   });
 
-  it('⛔6: esc while its turn runs sends stop, and the stop shows; at rest esc sends nothing', () => {
+  it('⛔6: ctrl+c while its turn runs sends stop, and the stop shows; esc never stops (main m_22205); at rest ctrl+c sends nothing', () => {
     const { store, cmds } = setup();
     const v = render(
       <StoreProvider store={store}>
@@ -149,7 +149,10 @@ describe('the thread screen', () => {
       store.apply({ ev: 'typing', project: P, agent: 'perf', text: 'running the tests' });
     });
     expect(v.getByTestId('thread.typing').textContent).toContain('running the tests');
+    const before = cmds.length;
     fireEvent.keyDown(v.getByTestId('thread.screen'), { key: 'Escape' });
+    expect(cmds.length, 'esc: no stop').toBe(before);
+    fireEvent.keyDown(v.getByTestId('thread.screen'), { key: 'c', ctrlKey: true });
     expect(cmds.at(-1)).toEqual({ cmd: 'stop', project: P, agent: 'perf' });
     expect(v.getByTestId('thread.screen').textContent).toContain('stopping perf');
     act(() => {
@@ -157,7 +160,7 @@ describe('the thread screen', () => {
       store.apply({ ev: 'agents', project: P, agents: store.agents(P).map((a) => ({ ...a, status: 'idle' as const })) });
     });
     const n = cmds.length;
-    fireEvent.keyDown(v.getByTestId('thread.screen'), { key: 'Escape' });
+    fireEvent.keyDown(v.getByTestId('thread.screen'), { key: 'c', ctrlKey: true });
     expect(cmds.length).toBe(n);
     expect(v.getByTestId('thread.screen').textContent).not.toContain('stopping perf');
   });

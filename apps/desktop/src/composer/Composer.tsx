@@ -50,7 +50,7 @@ export interface ComposerProps {
   readonly to?: string;
   /** K2: ⏎ on an empty field: the screen's act (the TUI's: sign in again after expiry, ...) */
   readonly onEmptyEnter?: () => void;
-  /** R18: an esc no list took, while busy or on a blank field: the screen's (stop the turn, ...). */
+  /** R18: an esc no list took, while busy or on a blank field: the screen's (a route hold; never a stop: ctrl+c, main m_22205). */
   readonly onEscape?: () => boolean;
   /** TP-R6, ⇧⇥ (no list open): the screen's (the TUI's: switch the approvals mode yolo ↔ auto). */
   readonly onShiftTab?: () => void;

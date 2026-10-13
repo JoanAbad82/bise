@@ -118,7 +118,7 @@ test("thread/keys-real: ⇧⇥ flips approvals yolo ↔ auto like the TUI's, bot
   }
 });
 
-test('thread/keys-real: ctrl+c (no selection) and esc stop a busy turn, like the TUI’s ctrl+c', async () => {
+test('thread/keys-real: ctrl+c (no selection) stops a busy turn like the TUI’s ctrl+c; esc never does (main m_22205)', async () => {
   test.setTimeout(300_000);
   const w = realWorld();
   const { s, page, field } = await open(w);
@@ -153,7 +153,7 @@ test('thread/keys-real: ctrl+c (no selection) and esc stop a busy turn, like the
     t = tui(w, 'bise');
     await tuiReady(t);
 
-    for (const [how, key] of [['window ctrl+c', 'Control+c'], ['window esc', 'Escape']] as const) {
+    for (const [how, key] of [['window ctrl+c', 'Control+c']] as const) {
       await test.step(`${how}: the busy turn stops, the draft stays`, async () => {
         await busy(how, fromWindow);
         await page.keyboard.type('garde ça');
@@ -180,7 +180,7 @@ test('thread/keys-real: ctrl+c (no selection) and esc stop a busy turn, like the
     });
     test.info().annotations.push({ type: 'times', description: JSON.stringify(times) });
     const ref = times['tui ctrl+c'] ?? Infinity;
-    for (const how of ['window ctrl+c', 'window esc']) expect.soft(times[how] ?? Infinity, `${how} is no slower than the TUI's ctrl+c (+1 s)`).toBeLessThan(ref + 1000);
+    for (const how of ['window ctrl+c']) expect.soft(times[how] ?? Infinity, `${how} is no slower than the TUI's ctrl+c (+1 s)`).toBeLessThan(ref + 1000);
   } finally {
     t?.close();
     await s.close();

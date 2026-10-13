@@ -1,6 +1,6 @@
 // thread/ctrl-c-stop · K6 (docs/terminal-parity.md; ambient-pm m_17250, lead m_17252): ctrl+c stops
 // the turn in the window like the TUI's (rust/tui/src/input.rs: a running turn is interrupted
-// first). Esc keeps doing it too (esc-order.spec). Copy is ⌘C on the Mac, so ctrl+c is free; but
+// first). It is the one key that stops a turn: esc never does (his ask main m_22205, esc-order.spec). Copy is ⌘C on the Mac, so ctrl+c is free; but
 // with text selected in the thread, ctrl+c does nothing else (he may be copying by habit).
 //   - text selected in the thread: ctrl+c sends no stop;
 //   - no selection, the caret in the composer with a draft: ctrl+c sends HubCmd stop for the agent

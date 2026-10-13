@@ -89,9 +89,9 @@ export function barPairs(mode: BarMode, typing: boolean): readonly Pair[] {
         ? [
             ['tab', 'queue'],
             ['⏎', 'steer'],
-            ['esc', 'stop'],
+            ['ctrl+c', 'stop'],
           ]
-        : [['esc', 'stop']];
+        : [['ctrl+c', 'stop']];
     case 'rest':
       return REST;
   }

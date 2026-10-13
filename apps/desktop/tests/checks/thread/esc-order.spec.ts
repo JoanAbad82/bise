@@ -1,7 +1,8 @@
 // thread/esc-order · the TUI re-audit's R18 and R20 (docs/terminal-parity.md cd629c93, lead m_12186):
-// in a working agent's thread, esc closes an open list first and only then stops the turn.
+// in a working agent's thread, esc closes an open list first; it never stops the turn, ctrl+c does
+// (his ask main m_22205, the TUI's sb/keys.rs:104).
 //   - R18: '/switch ' (an argument list: the agents) open while the agent works: esc closes the list, keeps
-//     the text, and sends no stop; the next esc (no list open) stops the turn (HubCmd stop).
+//     the text, and sends no stop; the next esc (no list open) still sends none; ctrl+c stops it.
 //   - R20: esc on the / NAME list ('/ar') closes it and clears the /query, as the TUI's
 //     (rust/tui/src/input.rs: a command-name list isn't 'closable', its argument lists are) and
 //     bar T B21; an argument list keeps the text, as the TUI's. No stop either way.
@@ -19,7 +20,7 @@ const T = {
 };
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-test('thread/esc-order: esc closes an open list first (no stop), then stops the turn; esc on the / name list clears it', async () => {
+test('thread/esc-order: esc closes an open list first and never stops the turn, ctrl+c does; esc on the / name list clears it', async () => {
   const core = new FakeCore();
   const s = await launchDesktop({ core, route: `agent/${ACME}/perf` });
   const { page } = s;
@@ -49,11 +50,19 @@ test('thread/esc-order: esc closes an open list first (no stop), then stops the 
       expect(stops(), "a list open: esc is the list's").toEqual([]);
     });
 
-    await test.step('R18: the next esc, no list open, stops the turn and keeps the draft', async () => {
+    await test.step('the next esc, no list open, stops nothing (main m_22205); ctrl+c stops the turn', async () => {
       expect(stops()).toEqual([]);
       await page.keyboard.press('Escape');
-      await core.waitCmd((c) => c.cmd === 'stop' && c.project === ACME && c.agent === 'perf');
-      expect(await text(), 'his draft stays').toBe('/switch');
+      await sleep(300);
+      expect(stops(), 'esc: the turn goes on').toEqual([]);
+      await expect(page.locator(T.thread), 'perf still works').toHaveAttribute('data-agent', 'perf');
+      await page.locator(T.field).click();
+      await page.keyboard.type('garde');
+      await expect(page.getByTestId('composer.keys'), "the key line says it: 'ctrl+c stop'").toContainText('ctrl+c stop');
+      await page.screenshot({ path: test.info().outputPath('keyline-working-light.png') });
+      await page.keyboard.press('Control+c');
+      await core.waitCmd((c) => c.cmd === 'stop' && c.project === ACME && c.agent === 'perf', 1000);
+      expect(await text(), 'his draft stays').toBe('garde');
     });
   } finally {
     await s.close().catch(() => undefined);

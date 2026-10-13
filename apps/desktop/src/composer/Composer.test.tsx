@@ -91,7 +91,7 @@ describe('the composer', () => {
     expect(getByTestId('composer.field')).toBe(field);
   });
 
-  it("R18: esc no list took goes to the screen while busy or on a blank field (ProseMirror swallows esc's default); else his words go to history", async () => {
+  it("R18: esc no list took goes to the screen while busy or on a blank field (ProseMirror swallows esc's default); else, or when the screen did nothing, his words go to history", async () => {
     const onEscape = vi.fn();
     const esc = (el: Element) => {
       el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true, cancelable: true }));
@@ -103,8 +103,10 @@ describe('the composer', () => {
       await Promise.resolve();
     });
     esc(field);
-    expect(onEscape, 'busy: the screen stops the turn').toHaveBeenCalledTimes(1);
-    expect(field.textContent, 'his draft stays').toBe('hello');
+    // esc never stops a turn (ctrl+c does, main m_22205): the screen gets it first (a route hold);
+    // it did nothing here, so his words go to history as at rest
+    expect(onEscape, 'busy: the screen first').toHaveBeenCalledTimes(1);
+    expect(field.textContent, 'the screen did nothing: put away').toBe('');
     busy.unmount();
 
     const idle = await mount({ onEscape, target: 'p/other' });

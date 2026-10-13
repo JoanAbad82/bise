@@ -271,7 +271,28 @@ test("app/artifact-view: an archived maker's long head fits its column at 1400, 
       if (b === null) throw new Error(`${what}: not on screen`);
       return b;
     };
+    // the columns fold and widen with a transition; the head picks its stage once its width holds
+    // (the same box over 4 frames), as he sees it once the window stops moving
+    const steady = () =>
+      head.evaluate(
+        (h) =>
+          new Promise<void>((done) => {
+            let last = '';
+            let same = 0;
+            const t0 = performance.now();
+            const f = () => {
+              const r = h.getBoundingClientRect();
+              const k = `${String(Math.round(r.width))}|${h.getAttribute('data-arch') ?? ''}`;
+              same = k === last ? same + 1 : 0;
+              last = k;
+              if (same >= 4 || performance.now() - t0 > 3000) done();
+              else requestAnimationFrame(f);
+            };
+            requestAnimationFrame(f);
+          }),
+      );
     const fits = async (w: number) => {
+      await steady();
       const box = await boxOf(head, `${String(w)}: a head`);
       const col = await head.evaluate((h) => h.parentElement?.getBoundingClientRect().right ?? 0);
       expect(Math.round(box.x + box.width), `${String(w)}: the head ends at its column`).toBeLessThanOrEqual(Math.round(col));
@@ -303,9 +324,11 @@ test("app/artifact-view: an archived maker's long head fits its column at 1400, 
     // narrower than the name, the chip and the whole button: the chip goes, then the icon
     for (const w of [1000, 900, 800]) {
       await page.setViewportSize({ width: w, height: 900 });
-      if (w === 800) {
+      // under 1000 the artifact takes the width: its maker's thread slides over from '◧' (once)
+      const over = page.getByTestId('app.over.left').getByTestId('thread.screen');
+      if (w < 1000 && !(await over.isVisible())) {
         await page.getByTestId('app.art.maker').click();
-        await expect(page.getByTestId('app.over.left').getByTestId('thread.screen')).toHaveAttribute('data-agent', LONG);
+        await expect(over).toHaveAttribute('data-agent', LONG);
       }
       await settle(page);
       await fits(w);

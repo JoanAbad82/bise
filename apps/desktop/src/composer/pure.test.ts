@@ -408,8 +408,8 @@ describe('the key bar (keybar.rs, W9)', () => {
     expect(line('quote')).toBe('type to ask about it   tab quote   ⌘C copy   esc drop');
     expect(barMode({ ...st, selected: true, busy: true })).toBe('selection');
     expect(barMode({ ...st, busy: true, images: true })).toBe('steer');
-    expect(line('steer', true)).toBe('tab queue   ⏎ steer   esc stop');
-    expect(line('steer', false)).toBe('esc stop');
+    expect(line('steer', true)).toBe('tab queue   ⏎ steer   ctrl+c stop');
+    expect(line('steer', false)).toBe('ctrl+c stop');
     expect(line(barMode({ ...st, images: true }))).toBe('⌘V paste image   @ file   $ skills   / commands');
   });
   it('a tip every 5 minutes, never while he types, only at rest', () => {
