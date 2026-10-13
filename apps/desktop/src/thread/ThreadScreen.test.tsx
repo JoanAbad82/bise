@@ -97,7 +97,7 @@ describe('the thread screen', () => {
     );
     const set = v.getByTestId('thread.scheduled.33');
     expect(set.textContent).toContain('◷');
-    expect(set.textContent).toBe('◷main scheduled perf · every 2m · 6 times · next 14:22 ▸');
+    expect(set.textContent).toBe('◷main scheduled perf · every 2 min · 6 times · next 14:22 ▸');
     expect(set.dataset.id).toBe('48');
     expect(v.queryByTestId('thread.scheduled.33.words')).toBeNull();
     fireEvent.click(v.getByTestId('thread.scheduled.33.head'));

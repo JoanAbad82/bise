@@ -58,11 +58,9 @@ describe('K2: ⏎ on an empty composer', () => {
 describe('S40/W3: the divider says model · effort · approvals mode · state · context', () => {
   it("as the TUI's divider, leaving out what it doesn't know", () => {
     expect(dividerEnd({ model: 'mistral/mistral-medium-latest', modelLabel: 'Mistral Medium', effort: 'high', mode: 'auto', status: 'idle', context: '42k · 17%' })).toBe('Mistral Medium · high · auto · idle · 42k · 17%');
-    expect(dividerEnd({ model: 'anthropic/claude-opus-5-5', status: 'working', turnMs: 4 * 60_000 + 3000 })).toBe('claude-opus-5-5 · working · 4 min');
-    expect(dividerEnd({ status: 'working', turnMs: 12_400, mode: 'yolo' })).toBe('yolo · working · 12 s');
-    // the head's short age past an hour, days included (designer m_18099: never '169 h' beside '7 d')
-    expect(dividerEnd({ status: 'working', turnMs: 169 * 3_600_000 })).toBe('working · 7 d');
-    expect(dividerEnd({ status: 'working', turnMs: 2 * 3_600_000 + 60_000 })).toBe('working · 2 h');
+    // working is never in the label: the gust after 'to <agent>' says it (designer m_22403)
+    expect(dividerEnd({ model: 'anthropic/claude-opus-5-5', status: 'working' })).toBe('claude-opus-5-5');
+    expect(dividerEnd({ status: 'working', mode: 'yolo', context: 'context 42k · 17%' })).toBe('yolo · context 42k · 17%');
     expect(dividerEnd({ status: 'done', mode: 'unknown', effort: '' })).toBe('done');
     expect(dividerEnd({})).toBe('');
   });

@@ -334,7 +334,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
           // event-wake (designer m_17827): while it waits for an event the label follows the head
           // ('… waiting · 2m'), never 'idle', the word he misread
           status: rowSays ? null : waitsEvent(me) ? `… waiting · ${waitAge(now - (waitSince(me.watching) ?? now))}` : me.status,
-          turnMs: !rowSays && me.status === 'working' ? (me.turn_ms ?? now - me.since_ms) : null,
           // named like the head's gauge ('context 42k · 17%'), none at 0% (designer m_14523: a bare
           // '15 · 0%' read as nothing)
           context: usageLine(me.usage?.words),

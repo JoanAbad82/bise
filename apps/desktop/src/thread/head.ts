@@ -2,7 +2,7 @@
 // role line, the branch line, the composer's label and placeholder. Pure: AgentHead.tsx draws
 // them. The words are the TUI's. Owner: amb-home.
 import type { Agent, EntryKind } from '@/proto';
-import { ago, shortAge, shownName } from '@/agents/model';
+import { ago, shownName } from '@/agents/model';
 import { waitingFor, waitsEvent } from './wake';
 
 /** The state chip: '<breath> working · 14 min', 'starting', '? waiting for you' (accent). */
@@ -107,22 +107,17 @@ export function dividerEnd(a: {
   effort?: string | null;
   mode?: string | null;
   status?: string | null;
-  turnMs?: number | null;
   context?: string | null;
 }): string {
   const model = (a.modelLabel ?? '').trim() || (a.model ?? '').split('/').at(-1)?.trim() || '';
   const mode = a.mode === 'yolo' || a.mode === 'auto' ? a.mode : '';
+  // working is never in the label: the gust after 'to <agent>' is its one sign (desktop-working v2,
+  // designer m_22403)
   const status = (a.status ?? '').trim();
-  const state = status === 'working' && a.turnMs != null && a.turnMs > 0 ? `working · ${turnAge(a.turnMs)}` : status;
+  const state = status === 'working' ? '' : status;
   return [model, (a.effort ?? '').trim(), mode, state, (a.context ?? '').trim()].filter((x) => x !== '').join(' · ');
 }
 
-/** A turn's running time on the divider: '12 s' under a minute, then the head's own short age
- *  ('4 min', '2 h', '7 d': designer m_18099, never '169 h' beside the head's '7 d'). Pure. */
-function turnAge(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  return s < 60 ? `${String(s)} s` : shortAge(ms);
-}
 
 export function composerWords(name: string): { label: string; placeholder: string } {
   return { label: `to ${name}`, placeholder: `write to ${name}, then ⏎` };

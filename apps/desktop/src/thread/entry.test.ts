@@ -201,8 +201,8 @@ describe('D14 / D15: a report is a status line, a command reads once', () => {
 
 describe("N2: a scheduled task's line names the agent, not the task's number", () => {
   it("'main scheduled #1 for dashboards · every 30m · next 16:56' -> 'main scheduled dashboards · …'", () => {
-    expect(schedHead('main scheduled #1 for dashboards · every 30m · next 16:56')).toBe('main scheduled dashboards · every 30m · next 16:56');
-    expect(schedHead('main scheduled #48 for perf · every 2m · 6 times · next 14:22')).toBe('main scheduled perf · every 2m · 6 times · next 14:22');
+    expect(schedHead('main scheduled #1 for dashboards · every 30m · next 16:56')).toBe('main scheduled dashboards · every 30 min · next 16:56');
+    expect(schedHead('main scheduled #48 for perf · every 2m · 6 times · next 14:22')).toBe('main scheduled perf · every 2 min · 6 times · next 14:22');
     expect(schedHead('a plain line')).toBe('a plain line');
     // never the internal number (designer m_14246)
     expect(schedHead('scheduled #48 ended · stopped by you', 'perf')).toBe('scheduled perf ended · stopped by you');

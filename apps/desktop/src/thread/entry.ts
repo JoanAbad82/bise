@@ -3,6 +3,7 @@
 import type { Entry } from '@/proto';
 import { NAMELESS_KINDS } from './tiers';
 import { thinkingWords } from './thinking';
+import { rhythmWords } from '@/scheduled/model';
 
 /** A row's key in the thread list: an entry by its pos, a send not confirmed by its cid. */
 export const entryKey = (pos: number) => `e:${pos}`;
@@ -232,7 +233,8 @@ export function stepTime(ms: number): string {
 export function schedHead(head: string, agent: string | null = null): string {
   // never the internal number (designer m_14246): 'scheduled #48 ended' reads 'scheduled perf ended' in
   // that agent's thread, else 'a scheduled task ended'
-  return head
+  // its rhythm in the app's one form, as the right bar's: 'every 2m' reads 'every 2 min' (designer m_22403)
+  return rhythmWords(head)
     .replace(/\bscheduled #\d+ for /, 'scheduled ')
     .replace(/\bscheduled #\d+ (?=ended|stopped|failed)/, agent === null ? 'a scheduled task ' : `scheduled ${agent} `);
 }
