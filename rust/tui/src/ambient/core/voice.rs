@@ -105,9 +105,7 @@ impl Core {
                 self.error(&e);
                 return self.page_voice_over(&p, "cancel", "");
             }
-            if let Some(s) = self.shot.take() {
-                self.forget(vec![s]);
-            }
+            self.drop_shot();
             self.error(&e);
             return self.set_phase(Phase::Failed, None);
         }
@@ -159,9 +157,7 @@ impl Core {
         if self.talk.take().is_some() {
             // the shot and context of fn down were for these words
             self.fn_ctx = None;
-            if let Some(s) = self.shot.take() {
-                self.forget(vec![s]);
-            }
+            self.drop_shot();
             self.set_phase(Phase::Idle, None);
         }
     }
@@ -268,9 +264,7 @@ impl Core {
         }
         if words.is_empty() {
             self.fn_ctx = None;
-            if let Some(s) = self.shot.take() {
-                self.forget(vec![s]);
-            }
+            self.drop_shot();
             return self.set_phase(Phase::Idle, None);
         }
         // bar N14: words that answer the card in view don't go to main
@@ -290,10 +284,34 @@ impl Core {
                 if let Some(old) = self.shot.replace(Shot { stored, app, title, reached: false }) {
                     self.forget(vec![old]);
                 }
+                let ev = shot_ev(self.shot.as_ref());
+                self.emit(ev);
             }
             Err(_) => self.error("main can't see this window: the screenshot didn't save."),
         }
     }
+
+    /// The talk's still goes unsent (his ✕ on it: `shot_drop`, a cancel,
+    /// a talk with no words, a failed talk): forgotten, and the app told
+    /// (`shot {file: null}`); the talk itself goes on.
+    pub(super) fn drop_shot(&mut self) {
+        if let Some(s) = self.shot.take() {
+            self.forget(vec![s]);
+            self.emit(shot_ev(None));
+        }
+    }
+}
+
+/// fn's talk's still as the app reads it: bise-proto's CoreEv::Shot
+/// (ambient-lead m_21912): its stored file, front app and window, or
+/// `file: null` once it went.
+pub(super) fn shot_ev(shot: Option<&Shot>) -> Value {
+    let some = |s: &str| Some(s.trim().to_string()).filter(|s| !s.is_empty());
+    let ev = match shot {
+        Some(s) => bise_proto::draft::CoreEv::Shot { file: Some(s.stored.file.display().to_string()), app: some(&s.app), title: some(&s.title) },
+        None => bise_proto::draft::CoreEv::Shot { file: None, app: None, title: None },
+    };
+    serde_json::to_value(ev).unwrap_or_default()
 }
 
 /// fn's talk words as the app reads them: bise-proto's CoreEv::Heard, its

@@ -63,6 +63,7 @@ import {
   type Pending,
   type PrsList,
   type QueuedTake,
+  type TalkShot,
   sameJson,
   sameOrder,
   sameStrings,
@@ -609,9 +610,11 @@ export class Store {
   // ---- actions (typed commands to the core)
 
   command(cmd: CoreCmd): void {
-    // a new talk starts with nothing heard
+    // a new talk starts with nothing heard and no still
     if (cmd.cmd === "talk_start" && this.slices.get("heard") != null)
       this.put("heard", null);
+    if (cmd.cmd === "talk_start" && this.slices.get("shot") != null)
+      this.put("shot", null);
     if (cmd.cmd === "slash" && cmd.line.trim().startsWith("/model "))
       this.modelSentAt = this.now();
     this.port?.send(cmd);
@@ -824,6 +827,10 @@ export class Store {
       readonly final: boolean;
     } | null>("heard", null);
   }
+  /** fn's talk: the still of his front window it will send (its stored file), null: none or gone. */
+  shot(): TalkShot | null {
+    return this.slice<TalkShot | null>("shot", null);
+  }
   /** A voice's loudness now, 0..1: 'you' (the mic), 'main' (its spoken answer). */
   level(who: string): number {
     return this.slice(`level:${who}`, 0);
@@ -1017,6 +1024,7 @@ export type {
   Pending,
   PrsList,
   QueuedTake,
+  TalkShot,
   ThreadOrder,
   ToolOut,
   VersionsList,

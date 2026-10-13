@@ -52,6 +52,7 @@ export const TAGS = {
   voice_answer: true,
   level: true,
   heard: true,
+  shot: true,
   commands: true,
   skills: true,
   files: true,
@@ -89,6 +90,13 @@ export const TAGS = {
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */
+/** fn's talk's still (core `shot`, ambient-lead m_21912): its stored file, the front app and window. */
+export interface TalkShot {
+  readonly file: string;
+  readonly app: string | null;
+  readonly title: string | null;
+}
+
 /** A project's branches, the hub's answer to branches (the /diff branch picker; amb-feed m_16785). */
 export interface BranchesList {
   readonly base: string;

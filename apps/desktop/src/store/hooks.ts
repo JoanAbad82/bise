@@ -6,7 +6,7 @@
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import type { Account, Agent, FlowMode, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
-import { diffKey, takeKey, toolOutKey, Store, type QueuedTake, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadOrder, type VoiceModeState } from './store';
+import { diffKey, takeKey, toolOutKey, Store, type QueuedTake, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadOrder, type VoiceModeState, type TalkShot } from './store';
 
 /**
  * Feeds a store from a core port: its live events, then the state events
@@ -131,6 +131,8 @@ export function useSkills(project: string): readonly PickSkill[] {
 export const useFiles = (project: string): FilesAnswer | null => useSlice(`files:${project}`, (s) => s.filesNow(project));
 /** fn's talk: what bise heard so far (the whole text; final once the talk ended), null before a talk. */
 export const useHeard = (): { readonly text: string; readonly final: boolean } | null => useSlice('heard', (s) => s.heard());
+/** fn's talk: the still of his front window it will send, null: none, dropped or gone (ambient-lead m_21912). */
+export const useShot = (): TalkShot | null => useSlice('shot', (s) => s.shot());
 /** A voice's loudness now, 0..1 ('you': the mic during a talk, a dictation or voice mode; 'main': its spoken answer; 'agent': voice mode's agent speaking). */
 export const useLevel = (who: 'you' | 'main' | 'agent'): number => useSlice(`level:${who}`, (s) => s.level(who));
 /** A dictation this window started (store.dictateStart()): its whole text so far, final, cancelled, error. */

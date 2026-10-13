@@ -151,7 +151,7 @@ fn ambient_connector(paths: switchboard::paths::Paths, how: Connector, home: boo
             return Err(std::io::Error::other(format!(
                 "bise stopped {HOME_STARTS} times in {} minutes ({}). your next fn talk starts it again.",
                 HOME_SPELL.as_secs() / 60,
-                clip(&cause, 160)
+                clip(&said_cause(&cause), 160)
             )));
         }
         starts.push(now);
@@ -198,6 +198,22 @@ fn last_line(path: &std::path::Path) -> Option<String> {
     let mut buf = Vec::new();
     f.read_to_end(&mut buf).ok()?;
     String::from_utf8_lossy(&buf).lines().rev().map(str::trim).find(|l| !l.is_empty()).map(str::to_string)
+}
+
+/// The cause as the capsule's stop line says it (designer m_21989): never
+/// 'hub', a word he never sees anywhere else. switchboard's 'the hub did
+/// not start: <why>' / 'the hub exited: <why>' say only <why>; another
+/// 'the hub …' says 'it …', 'this hub' says 'bise'.
+fn said_cause(cause: &str) -> String {
+    let c = cause.trim();
+    let c = match c.strip_prefix("the hub ") {
+        Some(rest) => match rest.split_once(": ").filter(|(head, _)| !head.contains('(')) {
+            Some((_, why)) => why.to_string(),
+            None => format!("it {rest}"),
+        },
+        None => c.to_string(),
+    };
+    c.replace("this hub", "bise")
 }
 
 fn clip(s: &str, n: usize) -> String {
@@ -266,8 +282,17 @@ fn ambient_setup() -> bend_tui::ambient::setup::SetupPorts {
 
 #[cfg(test)]
 mod tests {
-    use super::{home_start, HomeStart, HOME_SPELL, HOME_STARTS};
+    use super::{home_start, said_cause, HomeStart, HOME_SPELL, HOME_STARTS};
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn the_stop_lines_cause_never_says_hub() {
+        assert_eq!(said_cause("the hub exited: journal.jsonl line 812 isn't json"), "journal.jsonl line 812 isn't json");
+        assert_eq!(said_cause("the hub did not start: sb-core: no such file (its log: /x/hub.err)"), "sb-core: no such file (its log: /x/hub.err)");
+        assert_eq!(said_cause("the hub did not start in 15 s (its log: /x/hub.err)"), "it did not start in 15 s (its log: /x/hub.err)");
+        assert_eq!(said_cause("another start of this hub took over 17 s"), "another start of bise took over 17 s");
+        assert_eq!(said_cause("its connection closed"), "its connection closed");
+    }
 
     #[test]
     fn the_home_hub_is_started_three_times_in_two_minutes_then_waits_for_his_next_fn_talk() {

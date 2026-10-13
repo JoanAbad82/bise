@@ -866,6 +866,21 @@ what is in this picture?`,
     expect(store.heard()).toBeNull();
   });
 
+  it("shot: the talk's still while it is stored, null once it goes; a new talk starts with none (ambient-lead m_21912)", () => {
+    const { sent, store } = fake();
+    expect(store.shot()).toBeNull();
+    store.apply({ ev: "shot", file: "/x/.bise/images/9f.png", app: "Safari", title: "cold bench · grafana" });
+    expect(store.shot()).toEqual({ file: "/x/.bise/images/9f.png", app: "Safari", title: "cold bench · grafana" });
+    store.apply({ ev: "shot", file: null });
+    expect(store.shot()).toBeNull();
+    store.apply({ ev: "shot", file: "/x/.bise/images/a0.png" });
+    expect(store.shot()).toEqual({ file: "/x/.bise/images/a0.png", app: null, title: null });
+    store.command({ cmd: "shot_drop" });
+    expect(sent.at(-1)).toEqual({ cmd: "shot_drop" });
+    store.command({ cmd: "talk_start" });
+    expect(store.shot()).toBeNull();
+  });
+
   it("level: each voice's loudness, the last value, a repeat changes nothing", () => {
     const { store } = fake();
     expect(store.level("you")).toBe(0);

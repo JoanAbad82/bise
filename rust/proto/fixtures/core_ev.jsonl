@@ -13,6 +13,8 @@
 {"ev":"computer_use","on":false,"ready":false,"rows":[]}
 {"ev":"heard","text":"why is the cold","final":false}
 {"ev":"heard","text":"why is the cold bench slow","final":true}
+{"ev":"shot","file":"/Users/camille/.bise/images/9f3c2a1b.png","app":"Safari","title":"cold bench · grafana"}
+{"ev":"shot","file":null}
 {"ev":"dictation","id":"d1","text":"fix the","final":false}
 {"ev":"voice_answer","project":"acme-1a2b3c4d","card":9,"n":1,"line":"heard \"the first one\" → 1 cold","ms":1500}
 {"ev":"dictation","id":"d1","text":"fix the login test","final":true}

@@ -435,6 +435,41 @@ fn send_goes_to_main_with_the_shot_marker_and_the_png_is_deleted() {
     assert!(!b64.exists(), "the stored shot is not kept after main's turn");
 }
 
+/// The talk's still, told to the app (ambient-lead m_21912): `shot` with
+/// its stored file once stored, `shot {file: null}` when he drops it
+/// (`shot_drop`: forgotten, the talk goes on with his words only) and when
+/// it is sent.
+#[test]
+fn the_talks_still_is_told_to_the_app_and_his_drop_forgets_it() {
+    let mut t = T::new();
+    t.ready();
+    let shot = |t: &mut T, title: &str| {
+        let png = t.dir.join("front.png");
+        std::fs::write(&png, [b"\x89PNG ".as_slice(), title.as_bytes()].concat()).unwrap();
+        t.cmd(Cmd::Shot { path: png, app: "Safari".into(), title: title.into() });
+        let out = t.take();
+        let ev = out.iter().find(|v| v["ev"] == "shot").cloned().unwrap_or_else(|| panic!("no shot event: {out:?}"));
+        assert_eq!((ev["app"].as_str(), ev["title"].as_str()), (Some("Safari"), Some(title)));
+        PathBuf::from(ev["file"].as_str().expect("its stored file"))
+    };
+    let first = shot(&mut t, "cold bench");
+    assert!(first.exists(), "the still is in the image store");
+    // his ✕: forgotten, the app told, nothing of it in the send
+    t.cmd(Cmd::ShotDrop);
+    assert!(t.take().contains(&json!({"ev": "shot", "file": null})));
+    assert!(!first.exists(), "a dropped still is forgotten");
+    t.cmd(Cmd::Send { text: "why is it slow?".into() });
+    assert_eq!(t.hub.next()["text"], "why is it slow?");
+    // a drop with no still says nothing
+    t.cmd(Cmd::ShotDrop);
+    assert!(!t.take().iter().any(|v| v["ev"] == "shot"));
+    // sent: the app is told it went
+    shot(&mut t, "warm bench");
+    t.cmd(Cmd::Send { text: "and this one?".into() });
+    let _ = t.hub.next();
+    assert!(t.take().contains(&json!({"ev": "shot", "file": null})));
+}
+
 /// S9 (amb-mac m_9035): the latest fn_context rides the next message to
 /// main as the input op's `context` field (never rendered by the core),
 /// its shot is the stored file in the image store, and it's gone after

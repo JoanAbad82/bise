@@ -378,6 +378,7 @@ impl Core {
             Cmd::PageTalk { page } => self.talk_start(Some(page)),
             Cmd::TalkEnd => self.talk_end(now),
             Cmd::TalkCancel => self.talk_cancel(),
+            Cmd::ShotDrop => self.drop_shot(),
             Cmd::DictateStart { id } => self.dictate_start(id, now),
             Cmd::DictateStop { id } => self.dictate_stop(&id, now),
             Cmd::DictateCancel { id } => self.dictate_cancel(&id),
@@ -518,6 +519,10 @@ impl Core {
         }
         if !files.is_empty() {
             input["files"] = json!(files);
+        }
+        if shot.is_some() {
+            // the still leaves the talk either way: sent, or forgotten below
+            self.emit(voice::shot_ev(None));
         }
         if !self.home_call("turn/send", input) {
             if let Some(s) = shot {

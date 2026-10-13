@@ -27,6 +27,7 @@
 {"cmd":"talk_start","page":{"id":"q3-notes","url":"http://127.0.0.1:47438/p/q3-notes"}}
 {"cmd":"talk_end"}
 {"cmd":"talk_cancel"}
+{"cmd":"shot_drop"}
 {"cmd":"setup_check"}
 {"cmd":"dictate_start","id":"d1"}
 {"cmd":"dictate_stop","id":"d1"}

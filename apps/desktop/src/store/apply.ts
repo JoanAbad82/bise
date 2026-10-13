@@ -187,6 +187,10 @@ export function applyTyped(s: Store, ev: Ev): void {
       // fn's talk: the whole text so far, then all of it (final); the capsule's talk view draws it
       s.put("heard", { text: ev.text, final: ev.final });
       return;
+    case "shot":
+      // fn's talk: the still it will send (file: its stored path), null once it went or was dropped
+      s.put("shot", ev.file == null ? null : { file: ev.file, app: ev.app ?? null, title: ev.title ?? null });
+      return;
     case "level":
       // a meter's input (~30 Hz): only who reads that voice re-renders
       if (s.slices.get(`level:${ev.who}`) !== ev.v)

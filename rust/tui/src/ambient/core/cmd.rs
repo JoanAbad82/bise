@@ -12,6 +12,9 @@ pub enum Cmd {
     PageTalk { page: String },
     TalkEnd,
     TalkCancel,
+    /// his ✕ on the talk's still (ambient-lead m_21912): it is forgotten,
+    /// the talk goes on
+    ShotDrop,
     /// The composer's mic (bar I, core/dictate.rs): `id` is the window's,
     /// echoed on each `dictation`.
     DictateStart { id: String },
@@ -110,13 +113,14 @@ impl Cmd {
         }
         Ok(match cmd.as_str() {
             // bise-proto's AppCmd talk_* (qa-native m_9726): the proto's shapes are the ones parsed
-            "talk_start" | "talk_end" | "talk_cancel" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+            "talk_start" | "talk_end" | "talk_cancel" | "shot_drop" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
                 bise_proto::draft::AppCmd::TalkStart { page } => match page.as_ref().map(|p| p.id.trim()) {
                     Some(id) if !id.is_empty() => Cmd::PageTalk { page: id.to_string() },
                     _ => Cmd::TalkStart,
                 },
                 bise_proto::draft::AppCmd::TalkEnd => Cmd::TalkEnd,
                 bise_proto::draft::AppCmd::TalkCancel => Cmd::TalkCancel,
+                bise_proto::draft::AppCmd::ShotDrop => Cmd::ShotDrop,
                 other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
             "dictate_start" | "dictate_stop" | "dictate_cancel" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {

@@ -451,6 +451,20 @@ pub enum CoreEv {
         #[serde(rename = "final")]
         is_final: bool,
     },
+    /// fn's talk: the still of his front window the talk will send
+    /// (ambient-lead m_21912, amb-web m_21935): `file` its stored path in
+    /// the image store, `app` and `title` the front app and window; once
+    /// it is stored, then `file: null` when it goes (he dropped it with
+    /// `shot_drop`, the talk sent or cancelled it). To every window (the
+    /// capsule's talk view shows it). Never journaled, never in a log
+    Shot {
+        #[serde(default)]
+        file: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        app: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+    },
     /// a dictation's words (bar I, `dictate_start {id}`), only to the
     /// window that started it (the app's main routes it by `id`), never
     /// to main, never journaled, never in a log. `text` is the WHOLE text
@@ -595,7 +609,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -713,6 +727,10 @@ pub enum AppCmd {
     TalkEnd,
     /// the talk is dropped, nothing sent
     TalkCancel,
+    /// the talk's still is dropped (his ✕ on it, ambient-lead m_21912):
+    /// the core forgets it, says `shot {file: null}`, and the talk goes on
+    /// with his words only
+    ShotDrop,
     /// the composer's mic (bar I): the core opens the mic and dictates
     /// into the window that sent this, never to main, never journaled;
     /// `id`: the window's short-lived id, echoed on each `dictation`. One
@@ -832,6 +850,7 @@ impl AppCmd {
         "talk_start",
         "talk_end",
         "talk_cancel",
+        "shot_drop",
         "dictate_start",
         "dictate_stop",
         "dictate_cancel",
