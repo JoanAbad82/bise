@@ -1150,6 +1150,174 @@ if (mode === 'rows2') {
     && (!gh.art || gh.art.x <= gh.head.x || gh.head.right <= gh.art.x + 1) && gh.restore.right <= gh.head.right + 1 && gh.restore_cut === false && gh.head.h === 44;
   step("an archived maker's head beside its artifact at 1100: restore inside its column", gh.agent === MAKER && gh.width === 1100 && fits, gh);
   await harness();
+  await fileChips(harness);
+}
+
+// (f1) ad753852's file chips (ambient-lead m_22068): a Finder drop (CDP's drag, the desktop checks'
+// dropFiles) of a pdf, csv, xlsx, docx and pptx on harness' composer; the hub's 'you' entry; his
+// bubble; a click / right-click; a file gone at send time; a csv dropped while answering a card.
+// The files live in <out>/file-chips: outside the app's home and every world project, so main's
+// fence (ipc.ts lookable) refuses a preview or a reveal and nothing reaches his screen. The calls
+// are seen from logpoints on the preload's quickLook / showInFinder (this build has no test mode,
+// so no 'bise-desktop: quicklook' line).
+async function fileChips(harness) {
+  const FD = path.join(out, 'file-chips');
+  fs.rmSync(FD, { recursive: true, force: true });
+  fs.mkdirSync(FD, { recursive: true });
+  const DOCS = ['q3.pdf', 'data.csv', 'plan.xlsx', 'brief.docx', 'deck.pptx'];
+  const NL = String.fromCharCode(10);
+  for (const d of DOCS) fs.writeFileSync(path.join(FD, d), `fake ${d}${NL}`);
+  const at = (d) => path.join(FD, d);
+  const appHome = await page.evaluate(() => window.bise?.home ?? null).catch(() => null);
+  const fenced = !!appHome && !FD.startsWith(`${appHome}/`);
+  const drop = async (sel, files) => {
+    const box = await page.locator(sel).first().boundingBox().catch(() => null);
+    if (!box) return false;
+    const x = box.x + box.width / 2, y = box.y + box.height / 2;
+    const s = await page.context().newCDPSession(page);
+    const data = { items: [], files, dragOperationsMask: 1 };
+    for (const type of ['dragEnter', 'dragOver', 'drop']) await s.send('Input.dispatchDragEvent', { type, x, y, data });
+    await s.detach().catch(() => {});
+    return true;
+  };
+  // the home hubs' journals (the world's, under the app's home): the msg rows that carry word
+  const journal = (word) => {
+    const rows = [];
+    const hubs = appHome ? path.join(appHome, '.bise', 'hubs') : null;
+    for (const h of hubs && fs.existsSync(hubs) ? fs.readdirSync(hubs) : []) {
+      const f = path.join(hubs, h, 'journal.jsonl');
+      if (!fs.existsSync(f)) continue;
+      for (const l of fs.readFileSync(f, 'utf8').split(NL)) {
+        if (!l.includes(word)) continue;
+        try {
+          const j = JSON.parse(l);
+          const m = j.msg ?? j;
+          const parts = typeof m.parts === 'string' ? JSON.parse(m.parts) : m.parts;
+          rows.push({ hub: h, type: j.type ?? null, from: m.from ?? null, to: m.to ?? null, parts: Array.isArray(parts) ? parts : null, text: String(m.text ?? '').slice(0, 300) });
+        } catch { /* not a json row */ }
+      }
+    }
+    return rows;
+  };
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const fileChip = page.locator('[data-testid^="composer.chip."][data-kind="file"]');
+  const fresh = async (words) => {
+    await field.click({ timeout: 5000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type(words, { delay: 5 });
+  };
+
+  // the drop: one file chip each, in the drop order
+  await fresh('here are the files zqfiles ');
+  const dropped = await drop('[data-testid="composer.field"]:visible', DOCS.map(at));
+  const five = await until(async () => ((await fileChip.count()) === DOCS.length ? true : null), 8000, 300);
+  const names = (await fileChip.allInnerTexts().catch(() => [])).map((t) => t.replace('▯', '').trim());
+  await shot('file-chips-composer');
+  step('(f1) a drop of a pdf, csv, xlsx, docx and pptx on the composer: one data-kind=file chip each, in order', dropped && !!five && JSON.stringify(names) === JSON.stringify(DOCS), { dropped, names, fenced, app_home: appHome });
+
+  // deck.pptx goes before the send: the hub finds it gone, the bubble says '· missing'
+  fs.rmSync(at('deck.pptx'), { force: true });
+  await page.keyboard.press('Enter');
+  const entry = await until(async () => journal('zqfiles').find((r) => r.parts?.some((p) => p.kind === 'file')) ?? null, 30000, 1000);
+  const fparts = (entry?.parts ?? []).filter((p) => p.kind === 'file');
+  step("(f1) the hub's 'you' entry carries the Part::File parts in order (his words first, deck.pptx missing)",
+    !!entry && entry.parts?.[0]?.kind === 'text' && JSON.stringify(fparts.map((p) => p.path)) === JSON.stringify(DOCS.map(at))
+      && fparts.every((p) => /^\[File #\d+\]$/.test(String(p.name))) && fparts.find((p) => p.path === at('deck.pptx'))?.missing === true
+      && fparts.filter((p) => p.missing).length === 1,
+    entry ? { ...entry, parts: entry.parts?.map((p) => ({ kind: p.kind, name: p.name, path: p.path ? path.basename(p.path) : undefined, missing: p.missing, text: p.text })) } : journal('zqfiles').slice(0, 2));
+  const bubble = page.locator('[data-testid^="thread.you."][data-testid$=".parts"]').filter({ hasText: 'q3.pdf' }).last();
+  const drawn = await bubble.waitFor({ timeout: 20000 }).then(() => true, () => false);
+  const bchips = bubble.locator('[data-kind="file"]');
+  const gone = bchips.filter({ hasText: 'deck.pptx' }).first();
+  const bub = drawn ? {
+    names: (await bchips.allInnerTexts().catch(() => [])).map((t) => t.replace(/[▯\s]+/g, ' ').trim()),
+    gone_text: ((await gone.innerText().catch(() => '')) ?? '').trim(),
+    gone_title: await gone.getAttribute('title').catch(() => null),
+    q3_title: await bchips.filter({ hasText: 'q3.pdf' }).first().getAttribute('title').catch(() => null),
+  } : null;
+  await page.mouse.move(1, 300);
+  await shot('file-chips-bubble');
+  step("(f1) his bubble draws a chip per file, '· missing' on the one gone at send time",
+    drawn && bub.names.length === DOCS.length && /· missing/.test(bub.gone_text) && /deck\.pptx is gone from /.test(bub.gone_title ?? '') && /preview · right-click: show in Finder/.test(bub.q3_title ?? ''), bub);
+
+  // a click -> quickLook(path), a right-click -> showInFinder(path), the gone one calls nothing
+  const calls = [];
+  const dbg = await page.context().newCDPSession(page).catch(() => null);
+  const bps = [];
+  if (dbg && fenced) {
+    const scripts = [];
+    dbg.on('Debugger.scriptParsed', (e) => scripts.push(e));
+    dbg.on('Runtime.consoleAPICalled', (e) => { const v = e.args?.[0]?.value; if (typeof v === 'string' && v.startsWith('AHD-F ')) calls.push(v.slice(6)); });
+    await dbg.send('Runtime.enable').catch(() => {});
+    await dbg.send('Debugger.enable').catch(() => {});
+    await page.waitForTimeout(800);
+    for (const s of scripts) {
+      const src = (await dbg.send('Debugger.getScriptSource', { scriptId: s.scriptId }).catch(() => null))?.scriptSource ?? '';
+      for (const fn of ['quickLook', 'showInFinder']) {
+        const m = new RegExp(`${fn}:\\s*async\\s*\\(?(\\w+)\\)?\\s*=>\\s*`).exec(src);
+        if (!m || bps.some((b) => b.fn === fn)) continue;
+        const where = m.index + m[0].length;
+        const head = src.slice(0, where);
+        const line = head.split(NL).length - 1;
+        const col = where - (head.lastIndexOf(NL) + 1);
+        const r = await dbg.send('Debugger.setBreakpoint', {
+          location: { scriptId: s.scriptId, lineNumber: line + (s.startLine ?? 0), columnNumber: col + (line === 0 ? (s.startColumn ?? 0) : 0) },
+          condition: `console.log('AHD-F ${fn} ' + String(${m[1]})), false`,
+        }).catch((e) => ({ error: String(e).slice(0, 200) }));
+        bps.push({ fn, id: r.breakpointId ?? null, error: r.error ?? null });
+      }
+    }
+  }
+  const ck = { fenced, logpoints: bps };
+  if (drawn && fenced && bps.filter((b) => b.id).length === 2) {
+    await bchips.filter({ hasText: 'q3.pdf' }).first().click({ timeout: 5000 }).catch(() => {});
+    await until(async () => (calls.some((c) => c.startsWith('quickLook ')) ? true : null), 5000, 200);
+    await bchips.filter({ hasText: 'data.csv' }).first().click({ button: 'right', timeout: 5000 }).catch(() => {});
+    await until(async () => (calls.some((c) => c.startsWith('showInFinder ')) ? true : null), 5000, 200);
+    const n0 = calls.length;
+    await gone.click({ timeout: 5000 }).catch(() => {});
+    await gone.click({ button: 'right', timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    ck.calls = [...calls];
+    ck.gone_calls = calls.length - n0;
+  }
+  for (const b of bps) if (b.id) await dbg.send('Debugger.removeBreakpoint', { breakpointId: b.id }).catch(() => {});
+  if (dbg) { await dbg.send('Debugger.disable').catch(() => {}); await dbg.detach().catch(() => {}); }
+  step('(f1) a click on a file chip calls quickLook(its path), a right-click showInFinder(its path), the gone one calls nothing (seen in the preload; main fences them out)',
+    (ck.calls ?? []).includes(`quickLook ${at('q3.pdf')}`) && (ck.calls ?? []).includes(`showInFinder ${at('data.csv')}`) && ck.gone_calls === 0, ck);
+
+  // a csv dropped while answering a card: harness' main asks, bise's inbox block docks it
+  const csv = at('bench-zq.csv');
+  fs.writeFileSync(csv, ['run,ms', 'cold,412', ''].join(NL));
+  const Q = 'which bench zqbench?';
+  await fresh(`[[bash: sb card '${Q}`);
+  for (const l of ['1. cold', "2. warm']]"]) { await page.keyboard.press('Shift+Enter'); await page.keyboard.type(l, { delay: 5 }); }
+  await page.keyboard.press('Enter');
+  await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  const row = page.locator('[data-testid^="inbox.block.row."]', { hasText: 'zqbench' }).first();
+  const card = page.locator('[data-testid^="inbox.block.card."]').filter({ hasText: 'zqbench' }).first();
+  const listed = await until(async () => ((await row.isVisible().catch(() => false)) || (await card.isVisible().catch(() => false)) || /zqbench/.test(((await text('[data-testid="inbox.block"]')) ?? '')) ? true : null), 90000, 1000);
+  for (let i = 0; listed && i < 40 && !(await card.isVisible().catch(() => false)); i++) {
+    if (await row.isVisible().catch(() => false)) await row.click({ timeout: 2000 }).catch(() => {});
+    else await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 2000 }).catch(() => {});
+    await page.waitForTimeout(500);
+  }
+  const docked = await card.isVisible().catch(() => false);
+  const answering = docked && /answering/.test(((await page.locator('[data-testid="composer"]').first().innerText({ timeout: 1000 }).catch(() => '')) ?? ''));
+  let ans = { listed: !!listed, docked, answering };
+  if (answering) {
+    await fresh('cold, see ');
+    await drop('[data-testid="composer.field"]:visible', [csv]);
+    const chip = await until(async () => ((await fileChip.count()) === 1 && /bench-zq\.csv/.test(await fileChip.first().innerText().catch(() => '')) ? true : null), 8000, 300);
+    await shot('file-chip-card-answer');
+    await page.keyboard.press('Enter');
+    const got = await until(async () => journal('bench-zq.csv').find((r) => r.parts?.some((p) => p.kind === 'file' && p.path === csv)) ?? null, 30000, 1000);
+    ans = { ...ans, chip: !!chip, entry: got ? { ...got, parts: got.parts.map((p) => ({ kind: p.kind, name: p.name, path: p.path ? path.basename(p.path) : undefined, text: p.text })) } : journal('bench-zq.csv').slice(0, 2) };
+    ans.ok = !!chip && !!got && got.parts[0]?.kind === 'text' && /cold, see/.test(got.parts[0]?.text ?? '');
+  }
+  step("(f1) a csv dropped while answering a card: a file chip, sent as a file part where it was", !!ans.ok, ans);
+  await harness();
 }
 
 // the draft across a restart (ambient-lead m_19525): typed in harness' composer, never sent; after
