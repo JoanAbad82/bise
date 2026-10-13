@@ -656,7 +656,7 @@ pub struct PauseLine {
 /// that resume it count only while it is idle. TS twin: wake.ts
 /// `pauseLine`; both read fixtures/wait_words.json.
 pub fn pause_line(a: &crate::rows::Agent, now_ms: u64, short: bool) -> Option<PauseLine> {
-    use crate::rows::{AgentWatch, Status, WaitingOn, WatchKind};
+    use crate::rows::{Status, WaitingOn};
     let state = "continues when".to_string();
     if let Some(WaitingOn::Agent { name }) = &a.waiting_on {
         let len = wait_len(now_ms.saturating_sub(a.since_ms), short);
@@ -667,7 +667,15 @@ pub fn pause_line(a: &crate::rows::Agent, now_ms: u64, short: bool) -> Option<Pa
     if a.status != Status::Idle {
         return None;
     }
-    let mut ws: Vec<&AgentWatch> = a.watching.iter().filter(|w| w.resumes).collect();
+    pause_of(&a.watching, now_ms, short)
+}
+
+/// The watch half of [`pause_line`]: the line of an idle agent's watches
+/// that resume it (the TUI's agent isn't a rows::Agent); None: none.
+pub fn pause_of(watching: &[crate::rows::AgentWatch], now_ms: u64, short: bool) -> Option<PauseLine> {
+    use crate::rows::{AgentWatch, WatchKind};
+    let state = "continues when".to_string();
+    let mut ws: Vec<&AgentWatch> = watching.iter().filter(|w| w.resumes).collect();
     ws.sort_by_key(|w| (w.since_ms, w.id));
     let first = *ws.first()?;
     let len = |w: &AgentWatch| wait_len(now_ms.saturating_sub(w.since_ms), short);
@@ -704,14 +712,20 @@ pub struct Alarm {
 /// whatever its status. `off` gives each instant's offset (seconds east
 /// of UTC). TS twin: wake.ts `alarms`.
 pub fn alarms(a: &crate::rows::Agent, now_ms: u64, off: &dyn Fn(u64) -> i32) -> Vec<Alarm> {
-    let mut ws: Vec<&crate::rows::AgentWatch> = a.watching.iter().filter(|w| !w.resumes).collect();
+    alarms_of(&a.name, &a.watching, now_ms, off)
+}
+
+/// [`alarms`] from an agent's name and watches (the TUI's agent isn't a
+/// rows::Agent).
+pub fn alarms_of(name: &str, watching: &[crate::rows::AgentWatch], now_ms: u64, off: &dyn Fn(u64) -> i32) -> Vec<Alarm> {
+    let mut ws: Vec<&crate::rows::AgentWatch> = watching.iter().filter(|w| !w.resumes).collect();
     ws.sort_by_key(|w| (w.since_ms, w.id));
     ws.into_iter()
         .map(|w| {
             let event = watch_event(w.kind, &w.what, w.noted);
             let set = clock_past(w.since_ms, off(w.since_ms), now_ms, off(now_ms));
             let end = w.until_ms.map(|u| clock_ahead(u, off(u), now_ms, off(now_ms))).unwrap_or_default();
-            let mut title = format!("bise wakes {} if {} · set {}", a.name, event, set);
+            let mut title = format!("bise wakes {} if {} · set {}", name, event, set);
             if !end.is_empty() {
                 // `at 08:07` today, `tomorrow 08:07`, `on fri 08:07`
                 let at = match end.split(' ').count() {
