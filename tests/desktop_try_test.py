@@ -269,8 +269,23 @@ def staged_never_over_a_running_try():
         check(T.try_root(paths) == root2, "the swap moves the root with the bundle: the app opens on %s" % T.try_root(paths))
         check(T.build(env, paths) is False and len(scripts) == 2, "the swapped build is up to date: no build call")
         T.core_up = lambda app: app == paths["app"]
-        check(T.finish_swap(old, paths["app"], timeout=5, paths=paths) and not os.path.exists(old) and not os.path.exists(root1)
-              and os.path.isdir(root2) and "old_root" not in T.read_stamp(paths), ".old and its root removed once the core answers")
+        check(T.finish_swap(old, paths["app"], timeout=5, paths=paths) and os.path.isdir(old) and os.path.isdir(root1)
+              and os.path.isdir(root2) and T.read_stamp(paths).get("old_root") == root1,
+              "prev/ and its root stay after the core answers, for a rollback (ambient-lead m_21844)")
+        # the next swap retires them: a fake staged build over the live one
+        os.makedirs(os.path.join(paths["staged"], "Contents"))
+        T.write_stamp(paths, dict(T.read_stamp(paths), where="staged", live_root=root2))
+        real_out, T.outputs_there = T.outputs_there, lambda *a: True
+        try:
+            check(T.swap_staged(paths) == old and not os.path.exists(root1) and mark(old) == "build 2"
+                  and T.read_stamp(paths).get("old_root") is None,
+                  "the next swap removes the root before (prev/ now holds the build it replaced)")
+        finally:
+            T.outputs_there = real_out
+        # put build 2 back live for the rest
+        shutil.rmtree(paths["app"])
+        os.rename(old, paths["app"])
+        T.write_stamp(paths, dict(T.read_stamp(paths), where="live"))
         # a stamp that says staged with no staged bundle: nothing to swap
         T.write_stamp(paths, dict(T.read_stamp(paths), where="staged"))
         check(T.swap_staged(paths) is None and mark(paths["app"]) == "build 2", "no staged bundle: no swap")

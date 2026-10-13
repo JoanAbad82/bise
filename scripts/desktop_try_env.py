@@ -53,6 +53,11 @@ def live_build(app):
     return dict(l.split("=", 1) for l in text.splitlines() if "=" in l)
 
 
+def keep_old_root(saved):
+    """The previous bundle's root, carried by a new stamp until the next swap removes it. Pure."""
+    return {"old_root": saved["old_root"]} if (saved or {}).get("old_root") else {}
+
+
 def not_swapped(staged, live, procs, most=6):
     """The loud line of --real when its staged build did not go live (ambient-lead m_21726): the
     OLD build reopens, and what held the bundle, each process's pid and command. Pure."""

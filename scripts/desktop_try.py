@@ -62,7 +62,8 @@ import sys
 import time
 
 from desktop_try_env import (GATE, SELF_CONTAINED, TryError, clone_names, config_for_try, guard, his_env,  # one module,
-                             his_repos, homes, live_build, not_swapped, self_contained, try_env, under)  # split for its size
+                             his_repos, homes, keep_old_root, live_build, not_swapped, self_contained, try_env,
+                             under)  # split for its size
 
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 DESKTOP = os.path.join(REPO, "apps", "desktop")
@@ -345,7 +346,7 @@ def build(env, paths):
     for k, p in (("bise", paths["bise"]), ("app", app), ("app root", os.path.join(root, "repl-live"))):
         if not os.path.exists(p):
             raise TryError("no %s at %s after the build" % (k, p))
-    new = dict(stamp, where="staged" if busy else "live", root=root)
+    new = dict(stamp, where="staged" if busy else "live", root=root, **keep_old_root(saved))
     if busy and live_root and live_root != root:
         new["live_root"] = live_root
     write_stamp(paths, new)
@@ -433,10 +434,13 @@ def swap_staged(paths):
         os.rename(app + ".new", app)
         shutil.rmtree(paths["staged_dir"], ignore_errors=True)
     # the staged build's snapshot root goes live with it; the old one is retired with prev/
-    live = {k: v for k, v in saved.items() if k != "live_root"}
+    live = {k: v for k, v in saved.items() if k not in ("live_root", "old_root")}
     live["where"] = "live"
     if saved.get("live_root") and saved["live_root"] != saved.get("root"):
         live["old_root"] = saved["live_root"]
+    # the one before goes now, with the prev/ bundle it served (finish_swap keeps both)
+    if saved.get("old_root") and saved["old_root"] not in (saved.get("root"), saved.get("live_root")):
+        shutil.rmtree(saved["old_root"], ignore_errors=True)
     write_stamp(paths, live)
     say("swapped in the staged build (%s)" % saved.get("head", "")[:8])
     return old if os.path.exists(old) else None
@@ -469,7 +473,7 @@ def resolve_sha(sha, env, repo=REPO):
 
 def cand_paths(paths, sha):
     d = os.path.join(paths["cand"], sha[:12])
-    return {"dir": d, "src": os.path.join(d, "src"), "dist": os.path.join(d, "dist"), "root": os.path.join(d, "root"),
+    return {"dir": d, "src": os.path.join(d, "src"), "dist": os.path.join(d, "dist"), "root": os.path.join(d, "root-" + sha[:12]),
             "json": os.path.join(d, "cand.json"), "app": os.path.join(d, "dist", paths["arch"], CAND_NAME + ".app"),
             # --promote's repack with his try's name and id, before it moves into the try's staged place
             "promoted_dir": os.path.join(d, "promoted"), "promoted": os.path.join(d, "promoted", paths["arch"], APP_NAME + ".app")}
@@ -592,7 +596,7 @@ def promote(env, sha, checkout=None, repo=REPO):
             os.rename(src, dst)
         except OSError:
             shutil.copytree(src, dst, symlinks=True)
-    new = dict(stamp, where="staged", root=root)
+    new = dict(stamp, where="staged", root=root, **keep_old_root(saved))
     if live_root and live_root != root:
         new["live_root"] = live_root
     write_stamp(tp, new)
@@ -614,18 +618,12 @@ def core_up(app):
 
 
 def finish_swap(old, app, timeout=60, paths=None):
-    """Removes the previous bundle (prev/, prev_bundle), and with it its snapshot root (the stamp's
-    old_root), once the swapped-in app's core answers; both kept (for a rollback by hand) if it
-    doesn't within the timeout."""
+    """Waits for the swapped-in app's core. The previous bundle (prev/, prev_bundle) and its
+    snapshot root (the stamp's old_root) stay either way, for a rollback, until the next swap
+    replaces them (ambient-lead m_21844: a core that answers can still fail his first talk)."""
     t0 = time.time()
     while time.time() - t0 < timeout:
         if core_up(app):
-            shutil.rmtree(old, ignore_errors=True)
-            saved = read_stamp(paths) if paths else None
-            if saved and saved.get("old_root"):
-                if saved["old_root"] != saved.get("root"):
-                    shutil.rmtree(saved["old_root"], ignore_errors=True)
-                write_stamp(paths, {k: v for k, v in saved.items() if k != "old_root"})
             return True
         time.sleep(0.5)
     say("the new try's core didn't start within %d s: the previous build stays at %s" % (timeout, old))

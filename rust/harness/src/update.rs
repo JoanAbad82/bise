@@ -262,7 +262,19 @@ fn place(versions: &Path, id: &str, from: &Path, copy: bool) -> Result<PathBuf, 
     }
     let dir = versions.join(id);
     if dir.join("bise").exists() {
-        return Ok(dir);
+        if same_build(&dir, from) {
+            return Ok(dir);
+        }
+        // that id names another build (or a half one): never handed out,
+        // never written over (a hub may run from it). An app's runtime goes
+        // to <id>-<commit12> (ambient-lead m_21844: every candidate said
+        // id=root and his 8b00ed2b hubs ran b4a25acb's dir)
+        let commit = release::read_version(from).get("commit").cloned().unwrap_or_default();
+        let ok = copy && commit.len() >= 12 && commit.chars().all(|c| c.is_ascii_alphanumeric());
+        if !ok {
+            return Err(format!("{} holds another build than {}", dir.display(), from.display()));
+        }
+        return place(versions, &format!("{}-{}", id, &commit[..12]), from, copy);
     }
     std::fs::create_dir_all(versions).map_err(|e| format!("{}: {}", versions.display(), e))?;
     let tmp = versions.join(format!(".{}.{}.tmp", id, std::process::id()));
@@ -302,6 +314,13 @@ fn place(versions: &Path, id: &str, from: &Path, copy: bool) -> Result<PathBuf, 
     }
 }
 
+/// `dir` is the build `from` holds, whole: every REQUIRED file there and
+/// the same VERSION id and commit.
+fn same_build(dir: &Path, from: &Path) -> bool {
+    let (a, b) = (release::read_version(dir), release::read_version(from));
+    REQUIRED.iter().all(|f| dir.join(f).exists()) && a.get("id") == b.get("id") && a.get("commit") == b.get("commit")
+}
+
 /// The app root hubs run from (architect m_18354): the desktop app's
 /// bise finds its runtime in `<x>.app/Contents/Resources/bin` (a version
 /// dir the app carries), but a hub never runs from inside a `.app` (its
@@ -336,12 +355,12 @@ pub(crate) fn hub_exe(root: &Path, current: &Path, has: &dyn Fn(&Path) -> bool) 
     if in_app(root) {
         return Err(format!("a hub never runs from inside an app ({}). reinstall bise", root.display()));
     }
-    let exe = root.join(switchboard::switch::EXE);
-    if has(&exe) {
-        Ok(exe)
-    } else {
-        Err(format!("bise couldn't install its runtime: no {}. reinstall bise", exe.display()))
+    // the whole runtime, or no hub: a hub on a dir without its REPL or
+    // its core can't start an agent (ambient-lead m_21839)
+    if let Some(f) = [switchboard::switch::EXE, "repl-live", "sb-core"].iter().map(|f| root.join(f)).find(|p| !has(p)) {
+        return Err(format!("bise couldn't install its runtime: no {}. reinstall bise", f.display()));
     }
+    Ok(root.join(switchboard::switch::EXE))
 }
 
 /// [`hub_root`] then [`hub_exe`] for this process: (the hub's exe, its
@@ -615,11 +634,16 @@ mod tests {
     fn a_hub_never_runs_from_inside_an_app() {
         let app = Path::new("/Applications/bise try.app/Contents/Resources/bin/bise");
         let root = Path::new("/u/.bise/versions/root-1c5659b8-abcdef");
-        let only = |want: PathBuf| move |p: &Path| p == want;
-        assert_eq!(hub_exe(root, app, &only(root.join("bise"))).unwrap(), root.join("bise"));
+        let whole = |p: &Path| ["bise", "repl-live", "sb-core"].iter().any(|f| p == root.join(f));
+        assert_eq!(hub_exe(root, app, &whole).unwrap(), root.join("bise"));
         // its runtime not installed: why, with the path; never the bundle's bise
         let e = hub_exe(root, app, &|_| false).unwrap_err();
         assert!(e.contains("/u/.bise/versions/root-1c5659b8-abcdef/bise"), "{e}");
+        // a half runtime (ambient-lead m_21839): no REPL or no core, no hub
+        for gone in ["repl-live", "sb-core"] {
+            let e = hub_exe(root, app, &|p: &Path| whole(p) && p != root.join(gone)).unwrap_err();
+            assert!(e.contains(&format!("root-1c5659b8-abcdef/{gone}")), "{e}");
+        }
         let inside = Path::new("/Applications/bise try.app/Contents/Resources/bin");
         let e = hub_exe(inside, app, &|_| true).unwrap_err();
         assert!(e.contains("bise try.app/Contents/Resources/bin"), "{e}");
@@ -628,6 +652,46 @@ mod tests {
             assert_eq!(hub_exe(Path::new("/src/bise"), Path::new(me), &|_| true).unwrap(), PathBuf::from(me));
             assert_eq!(hub_exe(inside, Path::new(me), &|_| false).unwrap(), PathBuf::from(me));
         }
+    }
+
+    /// A newer app never hands its hubs an older build's dir (ambient-lead
+    /// m_21844: every promoted candidate said id=root, so his 8b00ed2b app
+    /// ran its hubs on b4a25acb's versions/root). The same id with another
+    /// commit, or a half dir: the bundle's runtime goes whole to
+    /// <id>-<commit12>, and the dir there stays as it is (a hub may run it).
+    #[test]
+    fn an_app_never_hands_its_hubs_another_builds_dir() {
+        let t = std::env::temp_dir().join(format!("bise-other-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&t);
+        let versions = t.join("prefix/versions");
+        let app = |name: &str, commit: &str| {
+            let bin = t.join(format!("{name}.app/Contents/Resources/bin"));
+            std::fs::create_dir_all(&bin).unwrap();
+            for f in REQUIRED {
+                std::fs::write(bin.join(f), commit).unwrap();
+            }
+            std::fs::write(bin.join("VERSION"), format!("id=root{}commit={commit}{}", '\n', '\n')).unwrap();
+            bin
+        };
+        let (a, b) = ("b4a25acbc155ff9315c299f62ad9089142565abf", "8b00ed2b0123456789abcdef0123456789abcdef");
+        let dir_a = place(&versions, "root", &app("a", a), true).unwrap();
+        assert_eq!(dir_a, versions.join("root"));
+        let dir_b = place(&versions, "root", &app("b", b), true).unwrap();
+        assert_eq!(dir_b, versions.join("root-8b00ed2b0123"));
+        assert_eq!(std::fs::read_to_string(dir_b.join("bise")).unwrap(), b, "B's own runtime");
+        assert_eq!(std::fs::read_to_string(dir_a.join("bise")).unwrap(), a, "A's dir untouched");
+        assert_eq!(place(&versions, "root", &app("b", b), true).unwrap(), dir_b, "B again: its dir");
+        assert_eq!(place(&versions, "root", &app("a", a), true).unwrap(), dir_a, "A again: its dir");
+        // a half dir under B's own id: never handed out, B goes beside it
+        std::fs::create_dir_all(versions.join("v2")).unwrap();
+        std::fs::write(versions.join("v2/bise"), "x").unwrap();
+        let c = app("c", b);
+        std::fs::write(c.join("VERSION"), format!("id=v2{}commit={b}{}", '\n', '\n')).unwrap();
+        assert_eq!(place(&versions, "v2", &c, true).unwrap(), versions.join("v2-8b00ed2b0123"));
+        // a release (moved, its dir is current's target) never goes beside: why
+        let e = place(&versions, "root", &app("r", "ffffffffffffffffffffffff"), false).unwrap_err();
+        assert!(e.contains("holds another build"), "{e}");
+        let _ = std::fs::remove_dir_all(&t);
     }
 
     /// The same VERSION id, installed by the desktop app (its bundle's
