@@ -706,7 +706,7 @@ mod tests {
         use super::*;
         use crate::rows::{AgentWatch, WatchKind};
         use crate::thread::{WakeEv, WakeFold};
-        let w = |id, kind, what: &str, since_ms| AgentWatch { id, kind, what: what.into(), since_ms, noted: false };
+        let w = |id, kind, what: &str, since_ms| AgentWatch { id, kind, what: what.into(), since_ms, noted: false, resumes: false, until_ms: None };
         assert_eq!(waiting_for(&[], 0), None);
         let one = [w(3, WatchKind::Bg, "cargo test", 1_000)];
         assert_eq!(waiting_for(&one, 121_000).as_deref(), Some("waiting for cargo test · 2m"));

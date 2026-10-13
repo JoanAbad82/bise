@@ -77,7 +77,7 @@ fn the_kept_rows_equal_fresh_rows_at_every_step() {
                     st.put_msg_judged(msg(n, from, to, r.below(2) == 0), Some(state), r.below(4) == 0);
                 }
                 5 => {
-                    let w = AgentWatch { id: n, kind: bise_proto::rows::WatchKind::Pid, what: "the build".into(), since_ms: now, noted: false };
+                    let w = AgentWatch { id: n, kind: bise_proto::rows::WatchKind::Pid, what: "the build".into(), since_ms: now, noted: false, resumes: false, until_ms: None };
                     watches.insert(a.clone(), if r.below(2) == 0 { vec![w] } else { vec![] });
                 }
                 6 => {

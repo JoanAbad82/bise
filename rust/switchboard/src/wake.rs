@@ -190,6 +190,9 @@ pub struct Watch {
     pub set_at: u64,
     pub max_at: u64,
     pub quiet: bool,
+    /// a pause (sb-core's `resumes`, wakes.bend `resumes_of`), else an
+    /// alarm
+    pub resumes: bool,
 }
 
 impl Watch {
@@ -201,6 +204,7 @@ impl Watch {
             set_at: v["set_at"].as_u64().unwrap_or(0),
             max_at: v["max_at"].as_u64().unwrap_or(0),
             quiet: v["quiet"].as_bool().unwrap_or(false),
+            resumes: v["resumes"].as_bool().unwrap_or(false),
         })
     }
 }
@@ -245,7 +249,15 @@ impl Wakes {
             .live
             .values()
             .filter(|w| w.agent == agent)
-            .map(|w| bise_proto::rows::AgentWatch { id: w.id, kind: w.spec.kind(), what: w.spec.name(), since_ms: w.set_at, noted: w.spec.noted() })
+            .map(|w| bise_proto::rows::AgentWatch {
+                id: w.id,
+                kind: w.spec.kind(),
+                what: w.spec.name(),
+                since_ms: w.set_at,
+                noted: w.spec.noted(),
+                resumes: w.resumes,
+                until_ms: Some(w.max_at),
+            })
             .collect();
         v.sort_by_key(|w| (w.since_ms, w.id));
         v

@@ -199,7 +199,7 @@ fn a_watch_is_named_for_the_person() {
 
 #[test]
 fn a_watch_end_is_one_typed_line_but_for_an_archived_agent() {
-    let w = Watch { id: 7, agent: "perf".into(), spec: Spec::bg("/b/3", "cargo test"), set_at: 1_000, max_at: 0, quiet: true };
+    let w = Watch { id: 7, agent: "perf".into(), spec: Spec::bg("/b/3", "cargo test"), set_at: 1_000, max_at: 0, quiet: true, resumes: true };
     let hit = Hit::of(Some("101\n"), Some("a\nb\nfailed\n"), 190_000);
     assert_eq!((hit.rc, hit.tail.len()), (Some(101), 3));
     let l = end_line(&w, "hit", 9, Some(&hit), Some(12)).unwrap();

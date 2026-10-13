@@ -63,7 +63,7 @@ mod tests {
         use ratatui::{backend::TestBackend, Terminal};
         let mut app = super::super::bench::test_app_drained();
         let now = crate::when::now_ms();
-        let w = |id, what: &str, ago| bise_proto::rows::AgentWatch { id, kind: bise_proto::rows::WatchKind::Bg, what: what.into(), since_ms: now - ago, noted: true };
+        let w = |id, what: &str, ago| bise_proto::rows::AgentWatch { id, kind: bise_proto::rows::WatchKind::Bg, what: what.into(), since_ms: now - ago, noted: true, resumes: false, until_ms: None };
         let watching = vec![w(9, "nightly full gate (all tests, main's tip) then the bench on every target", 3 * 3_600_000), w(10, "cargo bench", 40_000)];
         app.sb.agents = vec![Agent { main: true, name: "main".into(), status: "idle".into(), ..Agent::default() }, Agent { name: "perf".into(), status: "idle".into(), watching, ..Agent::default() }];
         app.sb.focus = "perf".into();

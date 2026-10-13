@@ -874,7 +874,21 @@ since_ms: number,
  * `what` is the agent's note (`--note the reindex`): the note names
  * the thing, a file's words add no `to appear` (designer m_17730)
  */
-noted?: boolean, };
+noted?: boolean, 
+/**
+ * a pause: the agent continues its work when it ends (`sb wake
+ * --then`; by default a backgrounded bash command or a pid it
+ * started). false: an alarm, the agent is free and only woken if it
+ * fires (`--alarm`; by default a file or a launchd job). Designer's
+ * page agent-waiting-states: a pause shows over the composer, an
+ * alarm only in the right bar. An older hub writes none: alarm
+ */
+resumes?: boolean, 
+/**
+ * when it stops watching (ms): its `--max` deadline (a backgrounded
+ * command's: a day, then it ends quietly); none from an older hub
+ */
+until_ms?: number | null, };
 
 /**
  * Tokens of some calls and what they cost.
