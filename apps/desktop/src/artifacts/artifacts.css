@@ -1,15 +1,15 @@
 /* src/artifacts (amb-kit): the artifacts screen, panel A's list, one artifact open (desktop-screens v6,
    designer m_11837). ds tokens only; real px as signed. */
-.art-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 20px 28px 0; box-sizing: border-box; }
+.art-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: var(--s-5) var(--pad-column) 0; box-sizing: border-box; }
 .art-head { flex: none; }
 .art-h1 { font: 600 22px/1.2 var(--font-ui); color: var(--c-text); }
-.art-h2 { margin-top: 2px; font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
-.art-filters { flex: none; display: flex; align-items: center; gap: 8px; margin: 16px 0 8px; min-width: 0; }
+.art-h2 { margin-top: 0; font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.art-filters { flex: none; display: flex; align-items: center; gap: var(--gap-inline); margin: var(--gap-section) 0 var(--s-2); min-width: 0; }
 .art-drop { position: relative; display: inline-flex; }
-.art-drop > .b-menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 200px; }
+.art-drop > .b-menu { position: absolute; top: calc(100% + var(--s-1)); left: 0; z-index: 20; min-width: 200px; }
 .art-open-end .art-drop > .b-menu { left: auto; right: 0; }
-.art-kinds { display: inline-flex; gap: 4px; }
-.art-kind { height: 24px; padding: 0 10px; border: 0; border-radius: 999px; background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); box-shadow: inset 0 0 0 1px var(--c-line); cursor: default; }
+.art-kinds { display: inline-flex; gap: var(--gap-inline); }
+.art-kind { height: var(--s-6); padding: 0 var(--pad-control-x-sm); border: 0; border-radius: 999px; background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); box-shadow: inset 0 0 0 1px var(--c-line); cursor: default; }
 .art-kind:hover { color: var(--c-text); background: var(--c-hover); }
 .art-kind.on { color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-ink); }
 .art-kind:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--c-focus); }
@@ -17,54 +17,58 @@
 .art-search { margin-left: auto; flex: 0 1 220px; min-width: 120px; }
 @media (max-width: 900px) {
   /* one row at 800: tighter filters, the search 160 when it fits, never past the edge */
-  .art-filters { gap: 4px; }
-  .art-filters .b-btn.ghost { padding: 0 8px; }
-  .art-kind { padding: 0 8px; }
+  .art-filters { gap: var(--s-1); }
+  .art-filters .b-btn.ghost { padding: 0 var(--pad-control-x-sm); }
+  .art-kind { padding: 0 var(--pad-control-x-sm); }
   .art-search { flex-basis: 160px; min-width: 120px; }
 }
 /* border-box: the field's 10 px sides stay inside its slot (content-box ran 20 px past the edge) */
-.art-search .b-field { width: 100%; box-sizing: border-box; }
+.art-search .b-field { width: 100%; box-sizing: border-box; height: var(--h-control-sm); }
 
 .art-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; outline: none; }
-.art-day-h { padding: 14px 8px 4px; font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
-.art-row { display: grid; align-items: center; gap: 12px; min-height: 36px; padding: 0 8px; border-radius: var(--r-2); color: var(--c-text); font: var(--t-13) var(--font-ui); cursor: default; }
+/* one edge (designer m_21220): the screen's rows put their content on the title's edge (264), their
+   tint and hover 8 out on both sides (--pad-row-x) */
+.art-list.screen { margin: 0 calc(-1 * var(--pad-row-x)); }
+.art-list.screen .art-g { text-align: left; }
+.art-day-h { padding: var(--s-4) var(--pad-row-x) var(--gap-tight); font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
+.art-row { display: grid; align-items: center; gap: var(--gap-block); min-height: var(--h-row); padding: 0 var(--pad-row-x); border-radius: var(--r-2); color: var(--c-text); font: var(--t-13) var(--font-ui); cursor: default; }
 .art-list.screen .art-row { grid-template-columns: 16px minmax(0, 1fr) 120px 180px 90px; }
 .art-row:hover { background: var(--c-hover); }
 .art-row.on { background: color-mix(in srgb, var(--c-text) 9%, transparent); }
 .art-g { font: var(--t-13) var(--font-mono); color: var(--c-text-2); text-align: center; }
-.art-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.art-title { display: flex; align-items: center; gap: var(--gap-inline); min-width: 0; }
 .art-t { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 /* his 'petit new rose' (try gate D4, regression R10): the ds accent chip's pink, the word says it too */
-.art-new { flex: none; height: 16px; padding: 0 6px; border-radius: 999px; font: 600 10.5px/16px var(--font-ui); color: var(--c-accent); background: var(--c-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-accent) 45%, transparent); }
+.art-new { flex: none; height: 16px; padding: 0 var(--s-2); border-radius: 999px; font: 600 10.5px/16px var(--font-ui); color: var(--c-accent); background: var(--c-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-accent) 45%, transparent); }
 .art-k, .art-by { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--c-text-2); }
 .art-w { color: var(--c-text-3); text-align: right; white-space: nowrap; }
 /* at 800 the 'made by' column drops */
 @media (max-width: 900px) {
   .art-list.screen .art-row { grid-template-columns: 16px minmax(0, 1fr) 110px 80px; }
   .art-list.screen .art-by { display: none; }
-  .art-screen { padding: 16px 16px 0; }
+  .art-screen { padding: var(--s-4) var(--s-4) 0; }
 }
 /* panel A: two lines, the glyph at the first line */
-.art-list.panel .art-row { grid-template-columns: 14px minmax(0, 1fr); align-items: start; padding: 6px 8px; }
+.art-list.panel .art-row { grid-template-columns: 14px minmax(0, 1fr); align-items: start; padding: var(--s-2) var(--pad-row-x); }
 .art-list.panel .art-g { padding-top: 1px; }
-.art-two { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.art-two { display: flex; flex-direction: column; gap: 0; min-width: 0; }
 .art-sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
 
-.art-keys { flex: none; display: flex; gap: 3ch; padding: 10px 8px 12px; border-top: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+.art-keys { flex: none; display: flex; gap: 3ch; padding: var(--s-2) 0 var(--s-3); border-top: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
 .art-keys b { font-weight: 500; color: var(--c-text-2); }
 /* the archived ones left behind (the TUI's faint '2 archived' row): a quiet line, a click shows them */
-.art-archived { flex: none; display: block; width: 100%; padding: 8px; border: 0; background: none; text-align: left; font: var(--t-12) var(--font-ui); color: var(--c-text-3); cursor: pointer; }
+.art-archived { flex: none; display: block; width: 100%; padding: var(--s-2); border: 0; background: none; text-align: left; font: var(--t-12) var(--font-ui); color: var(--c-text-3); cursor: pointer; }
 .art-archived:hover { color: var(--c-text-2); text-decoration: underline; text-underline-offset: 3px; }
 .art-archived:focus-visible { outline: 2px solid var(--c-text); outline-offset: 2px; border-radius: 3px; }
-.art-empty { padding: 32px 8px; font: var(--t-14) var(--font-read); color: var(--c-text-2); }
+.art-empty { padding: var(--s-8) var(--pad-row-x); font: var(--t-14) var(--font-read); color: var(--c-text-2); }
 
 /* one artifact open */
 .art-open { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.art-open-head { flex: none; display: flex; align-items: center; gap: var(--s-3); height: 44px; box-sizing: border-box; padding: 0 var(--s-4); border-bottom: 1px solid var(--c-line); }
+.art-open-head { flex: none; display: flex; align-items: center; gap: var(--s-3); height: var(--h-head); box-sizing: border-box; padding: 0 var(--s-4); border-bottom: 1px solid var(--c-line); }
 .art-open-t { display: flex; flex-direction: column; min-width: 0; }
 .art-open-title { min-width: 0; flex: 0 1 auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 600 var(--t-15) var(--font-ui); color: var(--c-text); }
 .art-open-sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
-.art-open-end { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.art-open-end { margin-left: auto; display: inline-flex; align-items: center; gap: var(--s-1); flex: none; }
 .art-v { font-family: var(--font-mono); }
 .art-open-body { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; padding: var(--s-4); background: color-mix(in srgb, var(--c-text) 3%, transparent); overflow: hidden; }
 /* a picked row in these menus is the text's 9% tint, as every selected row (designer m_11948) */
@@ -74,8 +78,8 @@
   .art-open-sub, .art-open .art-wide { display: none; }
 }
 /* the versions popover's row: 'v2  the current one  14:02' */
-.art-v-words { margin-left: 10px; color: var(--c-text-2); }
-.art-v-when { margin-left: auto; padding-left: 16px; color: var(--c-text-3); }
+.art-v-words { margin-left: var(--gap-inline); color: var(--c-text-2); }
+.art-v-when { margin-left: auto; padding-left: var(--s-4); color: var(--c-text-3); }
 /* his words about it, under the page: the thread's composer, the 680 column */
 .art-open-composer { flex: none; display: flex; flex-direction: column; align-items: stretch; width: 100%; max-width: 712px; margin: 0 auto; padding: 0 var(--pad-panel) var(--pad-panel); box-sizing: border-box; }
 /* it wears .th-screen for the docked inbox's look, never its full height: the page keeps the room (designer m_20594) */
