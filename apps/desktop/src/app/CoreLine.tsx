@@ -10,6 +10,7 @@ import type { BiseApi, CoreExit, CoreState } from '@/shared/api';
 import { Button } from '@/ds';
 import { useBroken, useCoreState } from '@/store';
 import { useRouter } from './router';
+import { RANK, type StatusPart } from './status';
 
 /** How long a first start may take before the line says so. */
 export const QUIET_START_MS = 2000;
@@ -97,7 +98,13 @@ function useCoreExit(): CoreExit | null {
   return exit;
 }
 
+/** The window's one status line draws this (StatusLine.tsx, amb-home): down or broken over the rest. */
 export function CoreLine() {
+  return useCoreLine()?.node ?? null;
+}
+
+/** The core's candidate for the one status line: a dim 'starting'/'stopped' runs, 'is back' is done, ▲ is down. */
+export function useCoreLine(): StatusPart | null {
   const router = useRouter();
   const state = useCoreState();
   const broken = useBroken();
@@ -150,7 +157,8 @@ export function CoreLine() {
   const v = coreView(state, { wasUp, slow, exit, crashed, long, back, broken });
   if (v === undefined) return null;
   const path = exit?.report ?? null;
-  return (
+  const rank = v.tone === 'err' ? RANK.down : state === 'up' ? RANK.done : RANK.running;
+  return { rank, node: (
     <div className={`app-core${v.tone === 'err' ? ' err' : ''}`} role="status" data-testid="app.core" data-state={state}>
       <div className="app-core-head">
         <span data-testid="app.core.text">{v.text}</span>
@@ -176,5 +184,5 @@ export function CoreLine() {
         </div>
       )}
     </div>
-  );
+  ) };
 }

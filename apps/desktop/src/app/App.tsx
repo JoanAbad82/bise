@@ -39,8 +39,7 @@ import { Over, Titlebar, useFrame } from './Frame';
 import { ART_FOLD_PX, ArtifactCentre, ArtifactColumn, artOf, artWidth, useArtPct, useInnerWidth } from './ArtifactView';
 import { RightBar } from './RightBar';
 import { numbersOf } from '@/agents/model';
-import { CoreLine } from './CoreLine';
-import { HubUpdateLine, UpdateLine } from './UpdateLine';
+import { StatusLine } from './StatusLine';
 import { HubMoments } from './HubMoments';
 import { ReportScreen } from './ReportScreen';
 import { Palette, usePaletteOpen } from './Palette';
@@ -359,9 +358,7 @@ function Current({ top }: { top: ReactNode }) {
   return (
     <Main testId="app.main">
       {top}
-      <CoreLine />
-      <UpdateLine />
-      <HubUpdateLine />
+      <StatusLine />
       <HubMoments />
       <AddHost />
       <div className="app-screen">
@@ -381,7 +378,9 @@ function Current({ top }: { top: ReactNode }) {
  */
 function RouteConfirm({ route }: { route: Route }) {
   const project = projectOf(route);
-  return project === undefined ? null : <ConfirmBar project={project} />;
+  // a thread shows the hub's plain lines as its own quiet row (HubNoteRow); other screens here
+  const thread = route.screen === 'thread' || route.screen === 'bise';
+  return project === undefined ? null : <ConfirmBar project={project} plain={!thread} />;
 }
 
 /**

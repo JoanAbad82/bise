@@ -29,7 +29,7 @@ import { useTour } from '@/setup/useTour';
 import { takeQuotes } from '@/review/quote';
 import { copyText, QuotePop } from '@/quote/QuotePop';
 import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
-import { cardDraftKey, InboxBlock, openInbox, type Answering } from '@/inbox';
+import { cardDraftKey, HubNoteRow, InboxBlock, openInbox, type Answering } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
@@ -436,6 +436,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
             }}
           />
         )}
+        {/* a typed command's result (the hub's plain line): one quiet row, never under the composer (amb-home) */}
+        <HubNoteRow project={project} />
         {signIn.on && <SignInLine copied={signIn.copied} />}
         <TypingLine text={typing} />
         {/* W7/K24: the project's open items over the composer's divider (amb-home f44d082e) */}

@@ -11,6 +11,7 @@ import { Button } from '@/ds';
 import { useHubUpdate, useProjects } from '@/store';
 import { useRoute } from './router';
 import { formatRoute } from './route';
+import { RANK, type StatusPart } from './status';
 
 /** The line's words and its one action, or none. Pure. */
 export function updateLine(s: UpdateState): { text: string; act: 'restart' | 'go back' } | null {
@@ -44,7 +45,13 @@ function useUpdate(): UpdateState {
   return s;
 }
 
+/** The window's one status line draws this (StatusLine.tsx, amb-home). */
 export function UpdateLine() {
+  return useUpdateLine()?.node ?? null;
+}
+
+/** The app update's candidate for the one status line: 'ready' stays until his click, went_bad is a failure. */
+export function useUpdateLine(): StatusPart | null {
   const s = useUpdate();
   const route = useRoute();
   const [busy, setBusy] = useState(false);
@@ -62,7 +69,7 @@ export function UpdateLine() {
   // designer's raw-controls call (m_18343, his real-home screenshot showed a native button): the
   // ds's small ghost Button; went_bad's words in the error tone with '▲', never pink
   const bad = s.state === 'went_bad';
-  return (
+  return { rank: bad ? RANK.failed : RANK.ready, node: (
     <div className={bad ? 'app-core app-update err' : 'app-core app-update'} role="status" data-testid="app.update" data-state={s.state}>
       <div className="app-core-head">
         <span data-testid="app.update.text">{bad ? `▲ ${line.text}` : line.text}</span>
@@ -71,7 +78,7 @@ export function UpdateLine() {
         </Button>
       </div>
     </div>
-  );
+  ) };
 }
 
 /**
@@ -90,11 +97,17 @@ export function hubUpdateLine(u: UpdateEv | null): { text: string; tail: readonl
   return null;
 }
 
+/** The window's one status line draws this (StatusLine.tsx, amb-home). */
 export function HubUpdateLine() {
+  return useHubUpdateLine()?.node ?? null;
+}
+
+/** /update's build as a candidate for the one status line: building runs, failed is a failure. */
+export function useHubUpdateLine(): StatusPart | null {
   const home = useProjects().find((p) => p.home)?.project ?? '';
   const line = hubUpdateLine(useHubUpdate(home));
   if (line === null) return null;
-  return (
+  return { rank: line.failed ? RANK.failed : RANK.running, node: (
     <div className="app-core app-update" role="status" data-testid="app.hubupdate" data-state={line.failed ? 'failed' : 'building'}>
       <div className="app-core-head">
         <span>{line.text}</span>
@@ -105,5 +118,5 @@ export function HubUpdateLine() {
         </div>
       )}
     </div>
-  );
+  ) };
 }

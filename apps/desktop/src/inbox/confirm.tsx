@@ -19,7 +19,27 @@ export function confirmWords(text: string): string {
   return text.replace(/\s*[([]\s*y\s*\/\s*n\s*[)\]]\s*$/i, '').trim();
 }
 
-export function ConfirmBar({ project }: { project: string }) {
+/**
+ * The hub's last plain line to this window for the project (a typed command's result: /flow,
+ * /help, a no's 'drop of @x cancelled', /restart's words) as ONE quiet row at the thread's end
+ * (designer's desktop-notices page (1)): the thread's notice look, dim, its '·'. ThreadScreen
+ * mounts it after the working row (amb-win m_20575). A refused line stays in ConfirmBar.
+ */
+export function HubNoteRow({ project }: { project: string }) {
+  const notice = useNotice(project);
+  if (notice === null || notice.level === 'error') return null;
+  return (
+    <div className="th-notice info th-hubnote" role="status" data-level="info" data-testid="confirm.notice">
+      <span className="th-notice-mark" aria-label="note">
+        ·
+      </span>{' '}
+      {notice.text}
+    </div>
+  );
+}
+
+/** `plain`: the screen has no thread (so no HubNoteRow): the hub's plain lines show here too. */
+export function ConfirmBar({ project, plain = false }: { project: string; plain?: boolean }) {
   const store = useStore();
   const asks = useConfirms(project);
   const notice = useNotice(project);
@@ -38,11 +58,22 @@ export function ConfirmBar({ project }: { project: string }) {
   }, [q]);
 
   if (q === undefined) {
-    return notice === null ? null : (
-      <div className={`confirm-bar ${notice.level}`} role={notice.level === 'error' ? 'alert' : 'status'} data-testid="confirm.notice" data-level={notice.level}>
+    if (notice === null) return null;
+    // a refused line (his words to fix) stays under the screen; on a thread the hub's plain lines
+    // are a quiet row in it (HubNoteRow: nothing under the composer but its keys), on a screen
+    // with no thread (agents, review…) they stay here, dim, or he'd never see a no's answer
+    if (notice.level === 'error') {
+      return (
+        <div className="confirm-bar error" role="alert" data-testid="confirm.notice" data-level="error">
+          {notice.text}
+        </div>
+      );
+    }
+    return plain ? (
+      <div className="confirm-bar note" role="status" data-testid="confirm.notice" data-level={notice.level}>
         {notice.text}
       </div>
-    );
+    ) : null;
   }
   const yes = () => {
     store.confirm(project, q.id, true);

@@ -12,5 +12,5 @@ export { takesWords, pickWaits } from './model';
 export { InboxBlock, openInbox, answeringOf, blockList, useNotifyAuth, type Answering, type Here, type InboxBlockProps } from './Block';
 export { cardDraftKey } from './drafts';
 export { ThreadInbox, inboxOf } from './screen';
-export { ConfirmBar } from './confirm';
+export { ConfirmBar, HubNoteRow } from './confirm';
 export { InboxStrip, useStripCard, type InboxStripProps, type StripPorts } from './Strip';

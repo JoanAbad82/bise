@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { CoreCmd } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
-import { ConfirmBar, confirmWords } from './confirm';
+import { ConfirmBar, confirmWords, HubNoteRow } from './confirm';
 
 afterEach(cleanup);
 
@@ -16,6 +16,7 @@ function setup() {
   render(
     <StoreProvider store={store}>
       <ConfirmBar project={P} />
+      <HubNoteRow project={P} />
     </StoreProvider>,
   );
   const ask = (id: number) => {
@@ -48,7 +49,9 @@ describe('ConfirmBar', () => {
     act(() => {
       store.apply({ ev: 'notice', project: P, cmd: 'confirm', text: 'drop of @perf cancelled' });
     });
-    expect(screen.getByTestId('confirm.notice').textContent).toBe('drop of @perf cancelled');
+    // the hub's plain line is the thread's quiet row (HubNoteRow), not a box under the composer
+    expect(screen.getByTestId('confirm.notice').textContent).toBe('· drop of @perf cancelled');
+    expect(screen.getByTestId('confirm.notice').classList.contains('confirm-bar')).toBe(false);
 
     ask(5);
     const n = sent.length;
