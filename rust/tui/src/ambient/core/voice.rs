@@ -169,6 +169,8 @@ impl Core {
     pub(super) fn talk_start(&mut self, page: Option<String>) {
         // each fn talk on receipt, in core.log (ambient-lead m_21884: did it reach the core?)
         eprintln!("ambient-core: talk_start{}", page.as_deref().map(|p| format!(" (note on page {p})")).unwrap_or_default());
+        // a home hub the connector gave up restarting is tried again now
+        super::super::talked();
         if let Some(t) = &self.talk {
             // never silent in core.log (his fn stuck on 'thinking…', main m_21882)
             eprintln!("ambient-core: talk: talk_start while a talk runs ({}): ignored", if t.ending.is_some() { "ending" } else { "listening" });

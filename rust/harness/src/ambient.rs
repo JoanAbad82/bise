@@ -103,27 +103,109 @@ fn ambient_workspace(args: &[String], core: bool) -> std::path::PathBuf {
 /// home hub (`home`: the voice target) is started again after a loss:
 /// while the app runs it is always wanted, and one killed or crashed
 /// under the core left fn talking to nothing until the app restarted
-/// (ambient-lead m_21848). `client::open` starts one hub at a time per
-/// folder, so the home and project connections to ~/bise never start
-/// two. It says nothing: the
+/// (ambient-lead m_21848). A stop he asked for (`bise stop` on home)
+/// is undone the same way: the app owns its home hub while it runs.
+/// Bounded ([`home_start`]): a home hub that dies at boot (a bad version,
+/// a corrupt journal) is started at most [`HOME_STARTS`] times in
+/// [`HOME_SPELL`], then the window says why and no start is tried until
+/// his next fn talk or an app relaunch (architect m_21925); each start
+/// writes one core.log line with the cause of the loss. `client::open`
+/// starts one hub at a time per folder, so the home and project
+/// connections to ~/bise never start two. It says nothing: the
 /// core's first line is JSON-RPC's `initialize` (the home hub's
 /// connection since client-protocol step 5, a project's since P1c).
 /// A start that fails says why (`client::open`'s cause, an `Other`
 /// error: the reader's `HubIn::Down` carries it to the row).
 fn ambient_connector(paths: switchboard::paths::Paths, how: Connector, home: bool) -> bend_tui::ambient::Connect {
     let mut first = true;
+    // the home hub's starts in this spell, his fn talks when it began, and
+    // the last start's error (the cause of the next loss, when it has one)
+    let mut starts: Vec<std::time::Instant> = Vec::new();
+    let mut talks = bend_tui::ambient::talks();
+    let mut last_err: Option<String> = None;
     Box::new(move || {
         let (exe, root) = match &how {
             Connector::Hub(exe, root) => (exe, root),
             Connector::Broken(why) => return Err(std::io::Error::other(why.clone())),
         };
-        let s = if std::mem::take(&mut first) || home {
-            switchboard::client::open(&paths, exe, root).map_err(|e| std::io::Error::other(e.to_string()))?
+        if !home {
+            return if std::mem::take(&mut first) {
+                switchboard::client::open(&paths, exe, root).map_err(|e| std::io::Error::other(e.to_string()))
+            } else {
+                std::os::unix::net::UnixStream::connect(paths.socket())
+            };
+        }
+        let boot = std::mem::take(&mut first);
+        // up (started by him, a project connection or an earlier start): no start
+        if let Ok(s) = std::os::unix::net::UnixStream::connect(paths.socket()) {
+            return Ok(s);
+        }
+        let now = std::time::Instant::now();
+        let t = bend_tui::ambient::talks();
+        if t != talks {
+            talks = t;
+            starts.clear();
+        }
+        let cause = last_err.clone().or_else(|| last_line(&paths.state.join("hub.err"))).unwrap_or_else(|| "its connection closed".into());
+        if home_start(&starts, now) == HomeStart::Wait {
+            return Err(std::io::Error::other(format!(
+                "bise's home hub stopped {HOME_STARTS} times in {} minutes ({}). your next fn talk starts it again.",
+                HOME_SPELL.as_secs() / 60,
+                clip(&cause, 160)
+            )));
+        }
+        starts.push(now);
+        if boot {
+            eprintln!("ambient-core: home hub: not running, starting it");
         } else {
-            std::os::unix::net::UnixStream::connect(paths.socket())?
-        };
-        Ok(s)
+            eprintln!("ambient-core: home hub lost ({}), starting it again ({}/{HOME_STARTS} in {} s)", clip(&cause, 300), starts.len(), HOME_SPELL.as_secs());
+        }
+        switchboard::client::open(&paths, exe, root).map_err(|e| {
+            last_err = Some(e.to_string());
+            std::io::Error::other(e.to_string())
+        })
     })
+}
+
+/// How many times the home hub is started in [`HOME_SPELL`] before the
+/// connector waits for his next fn talk.
+const HOME_STARTS: usize = 3;
+const HOME_SPELL: std::time::Duration = std::time::Duration::from_secs(120);
+
+#[derive(Debug, PartialEq)]
+enum HomeStart {
+    Start,
+    Wait,
+}
+
+/// Start the home hub again, or wait for his next fn talk: `starts` are
+/// this spell's starts (cleared at each fn talk).
+fn home_start(starts: &[std::time::Instant], now: std::time::Instant) -> HomeStart {
+    let recent = starts.iter().filter(|t| now.saturating_duration_since(**t) < HOME_SPELL).count();
+    if recent >= HOME_STARTS {
+        HomeStart::Wait
+    } else {
+        HomeStart::Start
+    }
+}
+
+/// The last non-empty line of a log (its last 4 KB), for the cause of a loss.
+fn last_line(path: &std::path::Path) -> Option<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = std::fs::File::open(path).ok()?;
+    let len = f.metadata().ok()?.len();
+    f.seek(SeekFrom::Start(len.saturating_sub(4096))).ok()?;
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf).ok()?;
+    String::from_utf8_lossy(&buf).lines().rev().map(str::trim).find(|l| !l.is_empty()).map(str::to_string)
+}
+
+fn clip(s: &str, n: usize) -> String {
+    if s.chars().count() <= n {
+        s.to_string()
+    } else {
+        format!("{}…", s.chars().take(n).collect::<String>())
+    }
 }
 
 /// What ambient-core reads of the projects (bise desktop S3b): a
@@ -180,4 +262,31 @@ fn ambient_setup() -> bend_tui::ambient::setup::SetupPorts {
         });
     });
     p
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{home_start, HomeStart, HOME_SPELL, HOME_STARTS};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn the_home_hub_is_started_three_times_in_two_minutes_then_waits_for_his_next_fn_talk() {
+        let t0 = Instant::now();
+        let s = |secs: u64| t0 + Duration::from_secs(secs);
+        assert_eq!(HOME_STARTS, 3);
+        assert_eq!(HOME_SPELL, Duration::from_secs(120));
+        // boot, then two losses: each starts it again
+        assert_eq!(home_start(&[], t0), HomeStart::Start);
+        assert_eq!(home_start(&[s(0)], s(5)), HomeStart::Start);
+        assert_eq!(home_start(&[s(0), s(5)], s(10)), HomeStart::Start);
+        // a third loss in the spell: no start, the window says why
+        assert_eq!(home_start(&[s(0), s(5), s(10)], s(15)), HomeStart::Wait);
+        assert_eq!(home_start(&[s(0), s(5), s(10)], s(119)), HomeStart::Wait);
+        // the oldest start is out of the spell: one more start
+        assert_eq!(home_start(&[s(0), s(5), s(10)], s(121)), HomeStart::Start);
+        // a hub that lives longer than the spell between losses is always started again
+        assert_eq!(home_start(&[s(0), s(200), s(400)], s(600)), HomeStart::Start);
+        // his fn talk clears the starts (the connector): it starts at once
+        assert_eq!(home_start(&[], s(20)), HomeStart::Start);
+    }
 }

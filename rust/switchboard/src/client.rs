@@ -55,17 +55,41 @@ fn reap(mut child: std::process::Child) {
 /// and both started a hub; the second one said 'a hub is already running'
 /// or 'Address already in use'. Held from the check to the socket being
 /// up, so whoever waited connects to the hub the first one started.
-/// An exclusive flock on `<state>/hub.start.lock`, released on drop.
+/// An exclusive flock on `<state>/hub.start.lock`, released on drop (or
+/// by the kernel when its holder dies). Its holder keeps it at most
+/// open()'s own socket wait ([`START_WAIT`]); a waiter gives up after
+/// [`LOCK_WAIT`] (LOCK_NB, polled), so a stuck start never blocks fn talk
+/// or the terminal for longer (architect m_21925).
 fn start_lock(paths: &Paths) -> std::io::Result<std::fs::File> {
+    start_lock_within(paths, LOCK_WAIT)
+}
+
+fn start_lock_within(paths: &Paths, wait: Duration) -> std::io::Result<std::fs::File> {
     use std::os::fd::AsRawFd;
     std::fs::create_dir_all(&paths.state)?;
     let f = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(paths.state.join("hub.start.lock"))?;
-    // SAFETY: flock on a descriptor this function owns; blocks until free
-    if unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX) } != 0 {
-        return Err(std::io::Error::last_os_error());
+    let t0 = Instant::now();
+    loop {
+        // SAFETY: flock on a descriptor this function owns; never blocks
+        if unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
+            return Ok(f);
+        }
+        let e = std::io::Error::last_os_error();
+        if e.kind() != std::io::ErrorKind::WouldBlock {
+            return Err(e);
+        }
+        if t0.elapsed() > wait {
+            return Err(std::io::Error::other(format!("another start of this hub took over {} s", wait.as_secs())));
+        }
+        std::thread::sleep(Duration::from_millis(50));
     }
-    Ok(f)
 }
+
+/// How long open() waits for the hub it started to take connections.
+const START_WAIT: Duration = Duration::from_secs(15);
+/// How long open() waits for another client's start: that start's own
+/// wait and a little more.
+const LOCK_WAIT: Duration = Duration::from_secs(17);
 
 /// Under BISE_TEST_HOME (bise_home::test_home::jail): the hub's workspace
 /// and state dir must be inside it, else an error and no hub. Used by every
@@ -118,7 +142,7 @@ pub fn open(paths: &Paths, exe: &Path, app_root: &Path) -> std::io::Result<UnixS
                 if let Ok(s) = UnixStream::connect(paths.socket()) {
                     break s;
                 }
-                if t0.elapsed() > Duration::from_secs(15) {
+                if t0.elapsed() > START_WAIT {
                     let cause = crate::switch::last_line(&crate::switch::read_from(&err_file, err0), |_| true);
                     return Err(std::io::Error::other(not_started(&cause, &err_file)));
                 }
@@ -289,6 +313,24 @@ mod tests {
         assert_eq!(not_started("bise: disk full", log), "the hub did not start: bise: disk full (its log: /h/.bise/hubs/x-0123abcd/hub.err)");
         assert_eq!(not_started("", log), "the hub did not start in 15 s (its log: /h/.bise/hubs/x-0123abcd/hub.err)");
         assert!(!not_started(raw, log).contains('\n'));
+    }
+
+    /// A start that hangs never blocks another client past its own wait
+    /// (architect m_21925): the waiter gives up with a cause, and gets the
+    /// lock as soon as the holder lets go (or dies: the kernel drops it).
+    #[test]
+    fn a_stuck_start_holds_the_start_lock_no_longer_than_the_wait() {
+        let dir = std::env::temp_dir().join(format!("start-lock-{}", std::process::id()));
+        let paths = Paths { workspace: dir.clone(), state: dir.join("state"), worktrees: dir.join("wt") };
+        let held = start_lock(&paths).unwrap();
+        let t0 = Instant::now();
+        let e = start_lock_within(&paths, Duration::from_millis(300)).unwrap_err();
+        assert!(t0.elapsed() < Duration::from_secs(2), "{:?}", t0.elapsed());
+        assert!(e.to_string().starts_with("another start of this hub took over"), "{e}");
+        drop(held);
+        assert!(start_lock_within(&paths, Duration::from_millis(300)).is_ok());
+        assert!(LOCK_WAIT > START_WAIT && LOCK_WAIT < START_WAIT + Duration::from_secs(5));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     fn read(r: &mut impl BufRead) -> Value {

@@ -33,6 +33,20 @@ use std::io::{self, BufRead, Write};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
+/// His fn talks so far in this process (one core per app): the home
+/// connector (bise's ambient.rs) bounds its restarts of a hub that keeps
+/// dying, and starts trying again at his next fn talk (architect m_21925).
+static TALKS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// How many fn talks this core has received (see [`TALKS`]).
+pub fn talks() -> u64 {
+    TALKS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+fn talked() {
+    TALKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// The core's clock: the levels at ~30 Hz.
 pub const TICK: Duration = Duration::from_millis(33);
 /// Between two attempts to reach a hub that went away.
