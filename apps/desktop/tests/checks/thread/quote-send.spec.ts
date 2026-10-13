@@ -49,19 +49,25 @@ test('thread/quote-send: drag selects an answer, typing quotes it with its strip
     await expectShown(page.getByTestId('thread.entry.2'), "main's answer");
     const b = await answer.boundingBox();
     if (!b) throw new Error('no answer box');
-    await page.mouse.move(b.x + 6, b.y + 6);
+    // from the text's left edge: a press inside the 't' started the selection after it, and the
+    // chip read '“he p99 climbs…' (designer m_21425)
+    await page.mouse.move(b.x + 1, b.y + 6);
     await page.mouse.down();
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 6 });
     await page.mouse.move(b.x + b.width - 4, b.y + b.height - 4, { steps: 6 });
     await page.mouse.up();
-    expect(await page.evaluate(() => String(window.getSelection())), 'the drag selected the answer').toContain('14:00 compaction');
+    const picked = await page.evaluate(() => String(window.getSelection()));
+    expect(picked, 'the drag selected the answer').toContain('14:00 compaction');
+    expect(picked.trimStart(), 'from its first letter').toMatch(/^the p99/);
     await expect(page.getByTestId('thread.screen'), 'the thread knows a quote is ready').toHaveAttribute('data-quoting', 'true');
     await page.keyboard.type('why 03:00?');
     const field = page.getByTestId('composer.field');
     await expect(field.locator('[data-kind="quote"]'), 'a quote chip in the field').toHaveText('❝ 1');
     await expect(field, 'his words after it').toContainText('why 03:00?');
     // the answer renders as one paragraph (markdown soft breaks): the selection is one line
-    await expect(page.getByTestId('composer'), "its strip names where it's from and its lines").toContainText(/main · \d+ lines?/);
+    // its strip names where it's from as the thread draws it (main is 'bise', designer m_21425)
+    await expect(page.getByTestId('composer'), "its strip names where it's from and its lines").toContainText(/bise · \d+ lines?/);
+    await expect(page.getByTestId('composer'), 'its words from the first letter').toContainText('“the p99 climbs');
     await page.screenshot({ path: test.info().outputPath('quote.png') });
     await page.keyboard.press('Enter');
     const sent = (await core.waitCmd((c) => c.cmd === 'send', 5000)) as { text?: string; parts?: { kind: string; from?: string; text?: string }[] };

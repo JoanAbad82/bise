@@ -1,5 +1,7 @@
 /* bise desktop window · the window's base: .b-ui sets the UI type; .b-stage/.b-grid/.b-state/.b-pane are the dev page's frames */
 .b-ui{font:var(--t-13)/var(--lh-ui) var(--font-ui);color:var(--c-text);-webkit-font-smoothing:antialiased;letter-spacing:-.003em}
+/* a selection anywhere is the TUI's selection tint, its text keeps its own color: never the system blue (designer m_21425) */
+::selection{background:var(--c-selection)}
 .b-stage{padding:var(--s-4);border-radius:var(--r-4);background:radial-gradient(circle at 12% 0%,color-mix(in srgb,var(--c-accent) 18%,transparent),transparent 42%),radial-gradient(circle at 95% 100%,color-mix(in srgb,var(--c-ok) 12%,transparent),transparent 45%),linear-gradient(160deg,var(--c-sunken),var(--c-canvas))}
 .b-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:var(--s-3)}
 .b-grid.w{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}

@@ -29,7 +29,8 @@ export interface QuoteAt {
 export function quoteAbout(from: string, text: string, at?: QuoteAt): string {
   const n = lineCount(text);
   const s = n === 1 ? '' : 's';
-  if (at === undefined || at.file === '') return `${from} · ${n} line${s}`;
+  // the author as the thread draws it: a project's main is 'bise' (designer m_21425; the part keeps 'main')
+  if (at === undefined || at.file === '') return `${from === 'main' ? 'bise' : from} · ${n} line${s}`;
   if (at.new !== '') return `${at.file}:${at.new} · ${n} line${s}`;
   if (at.old !== '') return `${at.file}:${at.old} · ${n} removed line${s}`;
   return `${at.file} · ${n} line${s}`;

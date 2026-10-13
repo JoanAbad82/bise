@@ -72,7 +72,7 @@ export function partsGist(parts: readonly Part[]): string {
   const quotes: string[] = [];
   let words = '';
   for (const p of parts) {
-    if (p.kind === 'quote') quotes.push(`❝ ${p.from}`);
+    if (p.kind === 'quote') quotes.push(`❝ ${p.from === 'main' ? 'bise' : p.from}`);
     else if (p.kind === 'text') words += p.text;
     else if (p.kind === 'paste') words += `▤ ${String(p.n)}`;
     else if (p.kind === 'image') {

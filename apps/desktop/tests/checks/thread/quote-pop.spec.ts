@@ -46,12 +46,15 @@ async function selectAnswer(page: Page): Promise<void> {
   await expectShown(page.getByTestId('thread.entry.2'), "main's answer");
   const b = await answer.boundingBox();
   if (!b) throw new Error('no answer box');
-  await page.mouse.move(b.x + 4, b.y + 4);
+  // from the text's left edge: a press inside the 't' starts the selection after it (designer m_21425)
+  await page.mouse.move(b.x + 1, b.y + 6);
   await page.mouse.down();
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 6 });
   await page.mouse.move(b.x + b.width - 4, b.y + b.height - 4, { steps: 6 });
   await page.mouse.up();
-  expect(await page.evaluate(() => String(window.getSelection())), 'the drag selected the answer').toContain('14:00 compaction');
+  const picked = await page.evaluate(() => String(window.getSelection()));
+  expect(picked, 'the drag selected the answer').toContain('14:00 compaction');
+  expect(picked.trimStart(), 'from its first letter').toMatch(/^the p99/);
 }
 
 /** The field as it reads: words and chips ('❝ 1') in order. */

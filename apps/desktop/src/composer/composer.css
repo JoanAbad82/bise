@@ -41,6 +41,7 @@
   pointer-events: none;
   user-select: none;
 }
+/* a quote, a paste, an artifact: ink in a 1 px line like the image chip, never the accent (designer m_21425) */
 .b-composer .b-chip.paste,
 .b-composer .b-chip.quote,
 .b-composer .b-chip.artifact {
@@ -48,8 +49,10 @@
   padding: 0 var(--s-2);
   margin: 0 1px;
   vertical-align: 1px;
-  color: var(--c-accent);
-  background: var(--c-accent-soft);
+  color: var(--c-text);
+  background: none;
+  border: 1px solid var(--c-line);
+  border-radius: 9px;
 }
 /* the TipTap field (pm/PmField.tsx, behind Composer.tsx ENGINE): its host adds no box; ProseMirror
    needs pre-wrap; the dictation's live words are dim with a pulsing dot, never a frame */

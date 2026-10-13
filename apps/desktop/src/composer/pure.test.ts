@@ -86,7 +86,7 @@ describe('the send', () => {
     expect(lineCount('a\nb\n')).toBe(2);
   });
   it('the strip says what a chip holds', () => {
-    expect(chipStrip({ kind: 'quote', n: 1, text: 'one\ntwo\nthree', from: 'main' })).toBe('❝ 1 “one two three”  main · 3 lines');
+    expect(chipStrip({ kind: 'quote', n: 1, text: 'one\ntwo\nthree', from: 'main' })).toBe('❝ 1 “one two three”  bise · 3 lines');
     expect(chipStrip({ kind: 'paste', n: 2, text: 'x\n'.repeat(240) })).toMatch(/^▤ 2 “x x x .*” {3}240 lines · 0\.5 kB$/u);
   });
 });

@@ -37,7 +37,7 @@ describe('his message from its parts (msg-parts)', () => {
   });
 
   it("a row's gist: each chip's glyph and label in place (the TUI's gist)", () => {
-    expect(partsGist([quote('main', 'q'), text('both '), { kind: 'paste', n: 1, text: 'x' }, text(' and '), { kind: 'image', name: '[Image #2]', source: '/a/shot.png' }])).toBe('❝ main both ▤ 1 and ▣ [Image #2]');
+    expect(partsGist([quote('main', 'q'), text('both '), { kind: 'paste', n: 1, text: 'x' }, text(' and '), { kind: 'image', name: '[Image #2]', source: '/a/shot.png' }])).toBe('❝ bise both ▤ 1 and ▣ [Image #2]');
     expect(partsGist([{ kind: 'image', name: 'shot.png', source: '/a/shot.png' }])).toBe('▣ shot.png');
   });
 });

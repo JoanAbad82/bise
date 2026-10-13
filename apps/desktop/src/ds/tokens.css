@@ -3,6 +3,8 @@
   --p-bg: #141211; --p-text: #ece6da; --p-dim: #a39c90; --p-faint: #857d72; --p-rule: #4a4540;
   --p-accent: #f4a6b0; --p-err: #ff5a52; --p-ok: #b9d99a; --p-raised: #1f1c1a; --p-chip: #231f1d;
   --p-frame: #2a2623; --p-shadow: #000000;
+  /* the selection's tint, the TUI's theme::selection_bg (no system blue: designer m_21425) */
+  --p-sel: #33292c;
   --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   --font-read: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -24,6 +26,7 @@
   --c-line-strong: var(--p-rule);
   --c-hover: color-mix(in srgb, var(--p-text) 6%, transparent);
   --c-active: color-mix(in srgb, var(--p-text) 10%, transparent);
+  --c-selection: var(--p-sel);
   --c-press: color-mix(in srgb, var(--p-text) 15%, transparent);
   --c-focus: color-mix(in srgb, var(--p-text) 60%, transparent);
   --c-accent: var(--p-accent);
@@ -86,12 +89,12 @@
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
   --p-bg: #fdfbf7; --p-text: #1b1917; --p-dim: #6b645a; --p-faint: #7d766c; --p-rule: #cfc8bd;
   --p-accent: #b8416b; --p-err: #b3261e; --p-ok: #3f7a2a; --p-raised: #f4f0e8; --p-chip: #efe9df;
-  --p-frame: #e2dcd2; --p-shadow: #5a4a3a;
+  --p-frame: #e2dcd2; --p-shadow: #5a4a3a; --p-sel: #fdeef2;
 } }
 [data-theme="light"] {
   --p-bg: #fdfbf7; --p-text: #1b1917; --p-dim: #6b645a; --p-faint: #7d766c; --p-rule: #cfc8bd;
   --p-accent: #b8416b; --p-err: #b3261e; --p-ok: #3f7a2a; --p-raised: #f4f0e8; --p-chip: #efe9df;
-  --p-frame: #e2dcd2; --p-shadow: #5a4a3a;
+  --p-frame: #e2dcd2; --p-shadow: #5a4a3a; --p-sel: #fdeef2;
 }
 /* roles are computed where the palette changes, so a light subtree recomputes them */
 [data-theme="light"], [data-theme="dark"] {
@@ -112,6 +115,7 @@
   --c-line-strong: var(--p-rule);
   --c-hover: color-mix(in srgb, var(--p-text) 6%, transparent);
   --c-active: color-mix(in srgb, var(--p-text) 10%, transparent);
+  --c-selection: var(--p-sel);
   --c-press: color-mix(in srgb, var(--p-text) 15%, transparent);
   --c-focus: color-mix(in srgb, var(--p-text) 60%, transparent);
   --c-accent: var(--p-accent);

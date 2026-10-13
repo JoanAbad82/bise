@@ -4,7 +4,7 @@
 // a 3-line answer), with its real composer (ThreadScreen's ThreadComposer).
 // Real mouse and keys: drag across the answer, then type a question. Passes when a quote chip
 // (composer.chip.<n>, data-kind=quote) goes in the field at the caret, before the words typed after
-// it, its strip row names where it comes from ('❝ 1 “…”  main · 3 lines'), and the words follow.
+// it, its strip row names where it comes from ('❝ 1 “…”  bise · 3 lines': main as the thread draws it), and the words follow.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { T, fieldText, press } from './target';
 import { expectShown } from '../thread/shown';
@@ -75,7 +75,7 @@ test('composer/quote: select an answer in the real thread, type: a quote chip at
       return r.toString().trim() === '';
     }, T.chipQuote);
     expect(chipFirst, 'the chip sits at the caret, before the words typed after it').toBe(true);
-    await expect(page.locator(T.strip), 'its strip row names where it comes from').toContainText('main');
+    await expect(page.locator(T.strip), 'its strip row names where it comes from, main as bise').toContainText('bise · ');
     expect(await page.locator(T.field).evaluate(fieldText)).toContain('pourquoi 03:00 ?');
   } finally {
     await s.close();
