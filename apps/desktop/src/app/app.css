@@ -794,7 +794,7 @@ body:has(.app-shell) {
   display: flex;
   flex-direction: column;
   gap: var(--s-1);
-  padding: var(--s-1) var(--s-2) var(--s-2) calc(var(--s-2) + 15px + var(--gap-inline));
+  padding: var(--s-1) var(--s-2) var(--s-2) calc(var(--s-2) + var(--s-4) + var(--gap-inline));
   color: var(--c-text-3);
   font-size: var(--t-12);
 }

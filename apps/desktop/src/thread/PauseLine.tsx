@@ -6,6 +6,7 @@
 // name opens it. The title lists every pause. Digits mono. Never the accent: nothing of it waits on
 // him. The words are wake.ts's (words.rs's twin). Owner: amb-win.
 import { useLayoutEffect, useRef, useState } from 'react';
+import { Act } from '@/ds';
 import type { Agent } from '@/proto';
 import { useNow } from '@/app/clock';
 import { useRouter } from '@/app/router';
@@ -65,16 +66,15 @@ export function PauseLine({ a, project }: { a: Agent | undefined; project: strin
       <span className="th-wait-note" data-testid="thread.waiting.note">
         {line.who !== '' ? (
           <>
-            <button
-              type="button"
-              className="th-wait-who"
-              data-testid="thread.waiting.who"
+            <Act
+              testId="thread.waiting.who"
+              title={`open ${shownName(line.who)}`}
               onClick={() => {
                 router.go({ screen: 'thread', project, agent: line.who });
               }}
             >
               {shownName(line.who)}
-            </button>
+            </Act>
             {' answers'}
           </>
         ) : (
