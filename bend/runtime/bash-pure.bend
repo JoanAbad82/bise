@@ -418,8 +418,8 @@ def bg_unset_private() -> String:
 # .rc for the agent to read. A slot is free only once those are gone:
 # recycling it earlier truncated the job's output (the next command's
 # own > <id>.out), and a next command that cat'd <id>.out after printing
-# anything read its own output file back into itself until the file
-# size limit of the time stopped it: a 100 MiB tool result that killed the REPL ("bend: memory
+# anything read its own output file back into itself until the old
+# 100 MiB file size limit stopped it: a 100 MiB tool result that killed the REPL ("bend: memory
 # fault", three agents in one hour, each cat'ing the .out of a finished
 # background cp).
 def bg_slot_loop() -> String:
@@ -471,8 +471,11 @@ def bg_mem_limit() -> String:
 # the whole command broke every build artifact over 100 MiB: rustc got
 # SIGXFSZ on an rlib); only its own .out has one: the watchdog below
 # reads the .out's size every 2 s and over the limit kills the group,
-# with a line that says why. It reads the size through a descriptor it
-# holds (fd 8, wc -c on it is an fstat), not by path: the orphan of a
+# with a line that says why. It reads the size through fd 8, which the
+# runner opens on the .out before it starts the command (closed for the
+# command: 8<&-) and the watchdog inherits (wc -c on it is an fstat);
+# opened in the watchdog's own fork, a command that ends in a few ms had
+# its .out removed first, and the watchdog never ran. Not by path: the orphan of a
 # finished sync command (`( yes & )`, still in group C, so the watch
 # goes on) keeps writing into the .out the wrapper removed, an unlinked
 # file a path never sees (or a path sees the next command's .out). That
@@ -489,7 +492,7 @@ def bg_out_limit() -> String:
 # kills it: killed first, the runner freed the slot and the sync wrapper
 # read and removed the .out before the line came, so it was lost.
 def bg_watch() -> String:
-  "if [ \"$L\" -gt 0 ] 2>/dev/null || [ \"$O\" -gt 0 ] 2>/dev/null; then ( while kill -0 -$C 2>/dev/null; do sleep 2; m=; if [ \"$L\" -gt 0 ] 2>/dev/null; then k=$(ps -axo pgid=,pid=,rss=,ucomm= 2>/dev/null | awk -v g=$C -v l=$((L*1024)) '$1==g && $3>l {print \"pid \" $2 \" (\" $4 \") at \" int($3/1024) \" MB\"; exit}'); if [ -n \"$k\" ]; then m=\"[bash: killed $k of RAM, over the limit of $L MB per process (BEND_MEM_LIMIT_MB, 0 = no limit). A process that keeps growing is a leak or a command that never ends: e.g. its output piped into grep -m1 or head, or a CLI left running in the background]\"; fi; fi; if [ -z \"$m\" ] && [ \"$O\" -gt 0 ] 2>/dev/null; then n=$(wc -c <&8 2>/dev/null); if [ $((${n:-0}+0)) -gt $((O*1048576)) ]; then m=\"[bash: stopped: its output passed $O MB (BEND_OUT_LIMIT_MB, 0 = no limit); a command that prints without end, or reads its own output back]\"; fi; fi; if [ -n \"$m\" ]; then kill -STOP -$C 2>/dev/null; if { [ -d $BG/$i.slot ] && [ \"$(cat $BG/$i.pid 2>/dev/null)\" = \"$C\" ]; } || { [ ! -d $BG/$i.slot ] && [ -e $BG/$i.rc ]; }; then { [ -z \"$(tail -c 1 $BG/$i.out)\" ] || echo; echo \"$m\"; } >> $BG/$i.out; fi; kill -9 -$C 2>/dev/null; break; fi; done ) 8<$BG/$i.out >/dev/null 2>&1 & fi"
+  "if [ \"$L\" -gt 0 ] 2>/dev/null || [ \"$O\" -gt 0 ] 2>/dev/null; then ( while kill -0 -$C 2>/dev/null; do sleep 2; m=; if [ \"$L\" -gt 0 ] 2>/dev/null; then k=$(ps -axo pgid=,pid=,rss=,ucomm= 2>/dev/null | awk -v g=$C -v l=$((L*1024)) '$1==g && $3>l {print \"pid \" $2 \" (\" $4 \") at \" int($3/1024) \" MB\"; exit}'); if [ -n \"$k\" ]; then m=\"[bash: killed $k of RAM, over the limit of $L MB per process (BEND_MEM_LIMIT_MB, 0 = no limit). A process that keeps growing is a leak or a command that never ends: e.g. its output piped into grep -m1 or head, or a CLI left running in the background]\"; fi; fi; if [ -z \"$m\" ] && [ \"$O\" -gt 0 ] 2>/dev/null; then n=$(wc -c <&8 2>/dev/null); if [ $((${n:-0}+0)) -gt $((O*1048576)) ]; then m=\"[bash: stopped: its output passed $O MB (BEND_OUT_LIMIT_MB, 0 = no limit); a command that prints without end, or reads its own output back]\"; fi; fi; if [ -n \"$m\" ]; then kill -STOP -$C 2>/dev/null; if { [ -d $BG/$i.slot ] && [ \"$(cat $BG/$i.pid 2>/dev/null)\" = \"$C\" ]; } || { [ ! -d $BG/$i.slot ] && [ -e $BG/$i.rc ]; }; then { [ -z \"$(tail -c 1 $BG/$i.out)\" ] || echo; echo \"$m\"; } >> $BG/$i.out; fi; kill -9 -$C 2>/dev/null; break; fi; done ) >/dev/null 2>&1 & fi"
 
 # ---- the wrapper: one line per generated shell statement ----
 def bg_wrap.seg(+a: String, +b: String) -> String:
@@ -542,7 +545,7 @@ def bg_wrap(+command: String, +bg: String, +after: U32, +ipath: String) -> Strin
   # exits before printing anything and the tool returns empty.
   bg_wrap.seg(bg_mem_limit(),
   bg_wrap.seg(bg_out_limit(),
-  bg_wrap.seg(String.append("( : > $BG/$i.out; set -m; ( BEND_STDIN=$BG/$i.in /bin/sh $BG/$i.cmd ) > $BG/$i.out 2>&1 </dev/null 9<&- & C=$!; set +m; echo $C > $BG/$i.pid; ",
+  bg_wrap.seg(String.append("( exec 8>$BG/$i.out; set -m; ( BEND_STDIN=$BG/$i.in /bin/sh $BG/$i.cmd ) > $BG/$i.out 2>&1 </dev/null 9<&- 8<&- & C=$!; set +m; echo $C > $BG/$i.pid; ",
       String.append(bg_watch(),
       "; wait $C; R=$?; if [ \"$(cat $BG/$i.pid 2>/dev/null)\" = \"$C\" ]; then echo $R > $BG/$i.rc; rm -f $BG/$i.pid $BG/$i.cmd $BG/$i.in; rmdir $BG/$i.slot 2>/dev/null; fi; exit $R ) >/dev/null 2>&1 &")),
   bg_wrap.seg("r=$!",

@@ -219,7 +219,7 @@ XQ-3131618372-EOF
 if [ $? -ne 0 ]; then echo \"background: could not write /tmp/bend-bg-0/$i.cmd (disk full?)\"; rm -f $BG/$i.in $BG/$i.cmd; rmdir $BG/$i.slot 2>/dev/null; rm -f \"$0\"; exit 1; fi
 L=${BEND_MEM_LIMIT_MB:-}; if [ -z \"$L\" ]; then m=$(sysctl -n hw.memsize 2>/dev/null); m=$((${m:-0}/4194304)); if [ $m -eq 0 ] || [ $m -gt 8192 ]; then m=8192; fi; if [ $m -lt 2048 ]; then m=2048; fi; L=$m; fi
 O=${BEND_OUT_LIMIT_MB:-2048}
-( : > $BG/$i.out; set -m; ( BEND_STDIN=$BG/$i.in /bin/sh $BG/$i.cmd ) > $BG/$i.out 2>&1 </dev/null 9<&- & C=$!; set +m; echo $C > $BG/$i.pid; if [ \"$L\" -gt 0 ] 2>/dev/null || [ \"$O\" -gt 0 ] 2>/dev/null; then ( while kill -0 -$C 2>/dev/null; do sleep 2; m=; if [ \"$L\" -gt 0 ] 2>/dev/null; then k=$(ps -axo pgid=,pid=,rss=,ucomm= 2>/dev/null | awk -v g=$C -v l=$((L*1024)) '$1==g && $3>l {print \"pid \" $2 \" (\" $4 \") at \" int($3/1024) \" MB\"; exit}'); if [ -n \"$k\" ]; then m=\"[bash: killed $k of RAM, over the limit of $L MB per process (BEND_MEM_LIMIT_MB, 0 = no limit). A process that keeps growing is a leak or a command that never ends: e.g. its output piped into grep -m1 or head, or a CLI left running in the background]\"; fi; fi; if [ -z \"$m\" ] && [ \"$O\" -gt 0 ] 2>/dev/null; then n=$(wc -c <&8 2>/dev/null); if [ $((${n:-0}+0)) -gt $((O*1048576)) ]; then m=\"[bash: stopped: its output passed $O MB (BEND_OUT_LIMIT_MB, 0 = no limit); a command that prints without end, or reads its own output back]\"; fi; fi; if [ -n \"$m\" ]; then kill -STOP -$C 2>/dev/null; if { [ -d $BG/$i.slot ] && [ \"$(cat $BG/$i.pid 2>/dev/null)\" = \"$C\" ]; } || { [ ! -d $BG/$i.slot ] && [ -e $BG/$i.rc ]; }; then { [ -z \"$(tail -c 1 $BG/$i.out)\" ] || echo; echo \"$m\"; } >> $BG/$i.out; fi; kill -9 -$C 2>/dev/null; break; fi; done ) 8<$BG/$i.out >/dev/null 2>&1 & fi; wait $C; R=$?; if [ \"$(cat $BG/$i.pid 2>/dev/null)\" = \"$C\" ]; then echo $R > $BG/$i.rc; rm -f $BG/$i.pid $BG/$i.cmd $BG/$i.in; rmdir $BG/$i.slot 2>/dev/null; fi; exit $R ) >/dev/null 2>&1 &
+( exec 8>$BG/$i.out; set -m; ( BEND_STDIN=$BG/$i.in /bin/sh $BG/$i.cmd ) > $BG/$i.out 2>&1 </dev/null 9<&- 8<&- & C=$!; set +m; echo $C > $BG/$i.pid; if [ \"$L\" -gt 0 ] 2>/dev/null || [ \"$O\" -gt 0 ] 2>/dev/null; then ( while kill -0 -$C 2>/dev/null; do sleep 2; m=; if [ \"$L\" -gt 0 ] 2>/dev/null; then k=$(ps -axo pgid=,pid=,rss=,ucomm= 2>/dev/null | awk -v g=$C -v l=$((L*1024)) '$1==g && $3>l {print \"pid \" $2 \" (\" $4 \") at \" int($3/1024) \" MB\"; exit}'); if [ -n \"$k\" ]; then m=\"[bash: killed $k of RAM, over the limit of $L MB per process (BEND_MEM_LIMIT_MB, 0 = no limit). A process that keeps growing is a leak or a command that never ends: e.g. its output piped into grep -m1 or head, or a CLI left running in the background]\"; fi; fi; if [ -z \"$m\" ] && [ \"$O\" -gt 0 ] 2>/dev/null; then n=$(wc -c <&8 2>/dev/null); if [ $((${n:-0}+0)) -gt $((O*1048576)) ]; then m=\"[bash: stopped: its output passed $O MB (BEND_OUT_LIMIT_MB, 0 = no limit); a command that prints without end, or reads its own output back]\"; fi; fi; if [ -n \"$m\" ]; then kill -STOP -$C 2>/dev/null; if { [ -d $BG/$i.slot ] && [ \"$(cat $BG/$i.pid 2>/dev/null)\" = \"$C\" ]; } || { [ ! -d $BG/$i.slot ] && [ -e $BG/$i.rc ]; }; then { [ -z \"$(tail -c 1 $BG/$i.out)\" ] || echo; echo \"$m\"; } >> $BG/$i.out; fi; kill -9 -$C 2>/dev/null; break; fi; done ) >/dev/null 2>&1 & fi; wait $C; R=$?; if [ \"$(cat $BG/$i.pid 2>/dev/null)\" = \"$C\" ]; then echo $R > $BG/$i.rc; rm -f $BG/$i.pid $BG/$i.cmd $BG/$i.in; rmdir $BG/$i.slot 2>/dev/null; fi; exit $R ) >/dev/null 2>&1 &
 r=$!
 sleep 30 >/dev/null 2>&1 </dev/null 9<&- & t=$!
 trap 'kill $t 2>/dev/null; exit 143' HUP INT TERM
@@ -529,7 +529,7 @@ law bg_wrapper_atomic_slot_allocation:
 # LAW: a slot that still holds a finished job's results (.out, .rc) is
 # never handed to the next command: recycling it truncated the job's
 # output, and a next command that cat'd that .out fed its own output
-# back into itself up to the file size limit of the time (a 100 MiB result: "bend: memory
+# back into itself up to the old 100 MiB file size limit (a 100 MiB result: "bend: memory
 # fault" in three agents).
 law bg_wrapper_keeps_finished_results:
   {String.starts_with(Sh.bg_slot_loop(),
@@ -564,11 +564,12 @@ law bg_wrapper_caps_only_its_output:
    Bool.and(String.contains(Sh.bg_wrap("x", "/d", 5, "/i"),
        String.append("
 ", String.append(Sh.bg_out_limit(), "
-( : > $BG/$i.out; set -m; ( "))),
+( exec 8>$BG/$i.out; set -m; ( "))),
+   Bool.and(String.contains(Sh.bg_wrap("x", "/d", 5, "/i"), " 2>&1 </dev/null 9<&- 8<&- & C=$!;"),
    Bool.and(String.eq(Sh.bg_out_limit(), "O=${BEND_OUT_LIMIT_MB:-2048}"),
    Bool.and(String.contains(Sh.bg_watch(),
        "n=$(wc -c <&8 2>/dev/null); if [ $((${n:-0}+0)) -gt $((O*1048576)) ]; then m=\"[bash: stopped: its output passed $O MB (BEND_OUT_LIMIT_MB, 0 = no limit)"),
-     String.contains(Sh.bg_watch(), "done ) 8<$BG/$i.out >/dev/null 2>&1 & fi")))))
+     Bool.not(String.contains(Sh.bg_watch(), "8<")))))))
     == True{} : Bool}
 
 # LAW: the runner checks it still OWNS the slot before writing the rc
