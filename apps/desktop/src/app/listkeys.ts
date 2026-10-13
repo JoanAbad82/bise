@@ -64,6 +64,8 @@ export interface ListKeysOpts {
   readonly onKey?: (e: KeyboardEvent, sel: string | null) => boolean;
   /** a keep.view key: the selection comes back after a reload (10 minutes) */
   readonly keepAs?: string;
+  /** a row is opened: the move keys and ⏎ stay put and go to `onKey` (the TUI's scheduled) */
+  readonly still?: boolean;
 }
 
 export interface ListKeys<E extends HTMLElement> {
@@ -79,7 +81,7 @@ export interface ListKeys<E extends HTMLElement> {
 }
 
 /** The list keys of one screen (the header says which). */
-export function useListKeys<E extends HTMLElement = HTMLElement>({ order, onOpen, onKey, keepAs }: ListKeysOpts): ListKeys<E> {
+export function useListKeys<E extends HTMLElement = HTMLElement>({ order, onOpen, onKey, keepAs, still = false }: ListKeysOpts): ListKeys<E> {
   const [chosen, setChosen] = useState<string | null>(() => {
     const k = keepAs === undefined ? undefined : keep.view(keepAs);
     return typeof k === 'string' ? k : null;
@@ -111,7 +113,7 @@ export function useListKeys<E extends HTMLElement = HTMLElement>({ order, onOpen
   };
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.defaultPrevented || ownKeys(e.target, ref.current)) return;
-    const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
+    const plain = !still && !e.metaKey && !e.ctrlKey && !e.altKey;
     const d = plain ? stepOf(e.key) : 0;
     if (d !== 0) {
       e.preventDefault();

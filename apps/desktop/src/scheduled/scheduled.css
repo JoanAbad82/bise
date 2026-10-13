@@ -72,3 +72,6 @@
 .sch-here-two { display: flex; flex-direction: column; gap: 0; min-width: 0; }
 .sch-here-t, .sch-here-sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .sch-here-sub { font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
+/* the search ('/' focuses it, the TUI's): on the row under the head, at the right */
+.sch-search { flex: none; align-self: flex-end; width: 220px; margin-bottom: var(--s-2); }
+.sch-search .b-field { width: 100%; box-sizing: border-box; height: var(--h-control-sm); }

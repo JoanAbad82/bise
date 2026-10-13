@@ -81,3 +81,7 @@ export function bySoonest(items: readonly Task[]): Task[] {
 }
 
 export const keyOf = (x: Task): string => `${x.project}#${String(x.t.id)}`;
+
+/** The search: its name or words, who it wakes, its project; case does not count. Pure. */
+export const matches = (x: Task, q: string): boolean =>
+  [x.t.name ?? '', x.t.words, x.t.agent, x.projectName].some((s) => s.toLowerCase().includes(q.trim().toLowerCase()));

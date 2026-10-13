@@ -22,6 +22,7 @@ import { Head, Input, Press } from "@/ds";
 import { useCoreEvent, useStore } from "@/store";
 import type { Ev } from "@/store/store";
 import { useRouter } from "@/app/router";
+import { stepOf } from "@/app/listkeys";
 import { Markdown } from "@/thread/Markdown";
 import { Code } from "@/thread/Code";
 import {
@@ -330,12 +331,10 @@ export function LogScreen({
     } else if (k === "G") {
       done();
       edge(false);
-    } else if (k === "ArrowDown" || k === "j") {
+    } else if (stepOf(k) !== 0) {
+      // the shared list keys (app/listkeys.ts): ↑/k ↓/j, pgup/pgdn ten, home/end
       done();
-      move(1);
-    } else if (k === "ArrowUp" || k === "k") {
-      done();
-      move(-1);
+      move(stepOf(k));
     } else if ((k === " " || k === "Enter") && cursor !== null) {
       done();
       toggle(cursor);

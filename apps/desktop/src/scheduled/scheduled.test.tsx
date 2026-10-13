@@ -65,6 +65,37 @@ describe('the scheduled screen', () => {
     expect(stopped).toEqual(['shop-1#4']);
   });
 
+  it("walks by the TUI's list keys: ↓↓⏎ opens the 3rd, opened the moves stay put, esc closes, ↑ at the top stays, / searches", () => {
+    const tasks = [T(task(1, { next_ms: at(0, 15, 0) })), T(task(2, { agent: 'perf', words: 'rerun the bench', next_ms: at(0, 16, 0) })), T(task(3, { next_ms: at(0, 17, 0) }))];
+    render(<ScheduledView tasks={tasks} ports={{ stop: () => undefined }} now={NOW} />);
+    const root = screen.getByTestId('scheduled.screen');
+    const on = () => screen.getByTestId('scheduled.list').querySelector('[aria-selected=true]')?.getAttribute('data-testid');
+    fireEvent.keyDown(root, { key: 'Home' });
+    expect(on()).toBe('scheduled.row.1');
+    fireEvent.keyDown(root, { key: 'ArrowUp' });
+    expect(on(), '↑ at the top stays').toBe('scheduled.row.1');
+    fireEvent.keyDown(root, { key: 'ArrowDown' });
+    fireEvent.keyDown(root, { key: 'j' });
+    fireEvent.keyDown(root, { key: 'Enter' });
+    expect(on()).toBe('scheduled.row.3');
+    expect(screen.getByTestId('scheduled.row.3').className).toContain('open');
+    fireEvent.keyDown(root, { key: 'ArrowUp' });
+    expect(on(), 'a task is open: the moves stay put').toBe('scheduled.row.3');
+    fireEvent.keyDown(root, { key: 'Escape' });
+    expect(screen.queryByTestId('scheduled.pane')).toBeNull();
+    fireEvent.keyDown(root, { key: 'k' });
+    expect(on()).toBe('scheduled.row.2');
+    fireEvent.keyDown(root, { key: '/' });
+    const field = screen.getByTestId('scheduled.search');
+    expect(document.activeElement).toBe(field);
+    fireEvent.change(field, { target: { value: 'bench' } });
+    expect([...screen.getByTestId('scheduled.list').querySelectorAll('[role=option]')].map((r) => r.getAttribute('data-testid'))).toEqual(['scheduled.row.2']);
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(document.activeElement).toBe(root);
+    fireEvent.keyDown(root, { key: 'Escape' });
+    expect(screen.getByTestId('scheduled.list').querySelectorAll('[role=option]')).toHaveLength(3);
+  });
+
   it('nothing scheduled says how one comes', () => {
     render(<ScheduledView tasks={[]} ports={{ stop: () => undefined }} now={NOW} />);
     expect(screen.getByTestId('scheduled.empty').textContent).toBe('nothing scheduled. agents set them with sb every; tell one “check the build every 5m”.');

@@ -22,8 +22,10 @@
 /* W6/K18: the agent ↑↓ selected (space previews it) */
 .ag-screen:focus { outline: 0; }
 .ag-item.is-sel {
-  /* the tint alone, like every selected row (sidebar, right bar; designer m_21173) */
-  background: var(--c-hover, transparent);
+  /* the tint alone, like every selected row (sidebar, right bar; designer m_21173), a step past
+     the hover's 6% so a hover never looks like the selection (designer m_22280): the 9% of the
+     other lists (artifacts, scheduled) */
+  background: color-mix(in srgb, var(--c-text) 9%, transparent);
 }
 
 /* one row (designer m_19489): the Row, then its acts and its end on the same line; the whole

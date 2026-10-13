@@ -1,13 +1,15 @@
 // The scheduled screen (desktop-screens v6, designer m_11837; sidebar row '◷ scheduled', route
 // scheduled): what wakes his agents, and when. The list (what it asks | wakes | how often | next
 // run) and one task in a 400 px pane at the right (under 1000 px it replaces the list, with
-// '‹ scheduled'). x stops one after asking in place. Owner: amb-kit.
-import { useState } from 'react';
-import { Button } from '@/ds';
+// '‹ scheduled'). x stops one after asking in place. The keys are the shared list keys
+// (app/listkeys.ts) plus the TUI's r, x, / and esc (tui-parity m_22176). Owner: amb-mac (amb-kit's before).
+import { useState, type KeyboardEvent } from 'react';
+import { Button, Field } from '@/ds';
+import { useListKeys } from '@/app/listkeys';
 import { useStore } from '@/store';
 import { useKeptScroll } from '@/app/keep';
 import { useAllScheduled } from './hooks';
-import { asks, bySoonest, endsWords, howOften, keyOf, nextRunWords, nextWords, runsWords, wakes, type Task } from './model';
+import { asks, bySoonest, matches, endsWords, howOften, keyOf, nextRunWords, nextWords, runsWords, wakes, type Task } from './model';
 import './scheduled.css';
 
 export interface ScheduledPorts {
@@ -39,47 +41,68 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const list = bySoonest(tasks);
-  const [sel, setSel] = useState<string | null>(null);
+  const [q, setQ] = useState('');
+  const shown = q === '' ? list : list.filter((x) => matches(x, q));
   const [open, setOpen] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const cur = list.find((x) => keyOf(x) === (open ?? '')) ?? null;
-  const selKey = sel ?? (list[0] ? keyOf(list[0]) : null);
-  const move = (d: number) => {
-    const i = list.findIndex((x) => keyOf(x) === selKey);
-    const next = list[Math.max(0, Math.min(list.length - 1, (i < 0 ? 0 : i) + d))];
-    if (next) setSel(keyOf(next));
-  };
   const stop = (x: Task) => {
     ports.stop(x.project, x.t.id);
     setAsking(false);
     setOpen(null);
   };
+  // the TUI's scheduled keys (scheduled_screen.rs on_key, tui-parity m_22176): r run, x stop (asks),
+  // / search; esc closes the opened task, then clears the search
+  const screenKey = (e: KeyboardEvent, k: string | null): boolean => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return false;
+    const at = shown.find((x) => keyOf(x) === k);
+    if (asking && cur) {
+      if (e.key === 'Enter' || e.key === 'y') stop(cur);
+      else if (e.key === 'Escape' || e.key === 'n') setAsking(false);
+      return true;
+    }
+    const x = cur ?? at;
+    if (e.key === 'Escape') {
+      if (cur) setOpen(null);
+      else if (q !== '') setQ('');
+      else return false;
+    } else if (e.key === 'x' && x) {
+      setOpen(keyOf(x));
+      setAsking(true);
+    } else if (e.key === 'r' && ports.runNow && x) ports.runNow(x.project, x.t.id);
+    else if (e.key === '/' && !cur) document.querySelector<HTMLInputElement>('[data-testid="scheduled.search"]')?.focus();
+    else return false;
+    return true;
+  };
+  const { sel: selKey, setSel, ref, onKeyDown, move } = useListKeys({
+    order: shown.map(keyOf),
+    keepAs: 'scheduled.sel',
+    still: cur !== null,
+    onOpen: setOpen,
+    onKey: screenKey,
+  });
+  // the search has the keys: ⏎ gives them back, ↑↓ give them back and move, esc clears
+  const searchKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    const back = () => {
+      e.preventDefault();
+      ref.current?.focus({ preventScroll: true });
+    };
+    if (e.key === 'Escape') {
+      setQ('');
+      back();
+    } else if (e.key === 'Enter') back();
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      back();
+      move(e.key === 'ArrowDown' ? 1 : -1);
+    }
+  };
   return (
     <section
+      ref={ref}
       className={`sch-screen${cur ? ' has-pane' : ''}`}
       data-testid="scheduled.screen"
       tabIndex={-1}
-      onKeyDown={(e) => {
-        const at = list.find((x) => keyOf(x) === selKey);
-        if (asking && cur) {
-          if (e.key === 'Enter' || e.key === 'y') stop(cur);
-          else if (e.key === 'Escape' || e.key === 'n') setAsking(false);
-          e.preventDefault();
-          return;
-        }
-        if (e.key === 'ArrowDown') move(1);
-        else if (e.key === 'ArrowUp') move(-1);
-        else if (e.key === 'Enter' && at) setOpen(keyOf(at));
-        else if (e.key === 'Escape' && cur) setOpen(null);
-        else if (e.key === 'x' && (cur ?? at)) {
-          if (!cur && at) setOpen(keyOf(at));
-          setAsking(true);
-        } else if (e.key === 'r' && ports.runNow && (cur ?? at)) {
-          const x = cur ?? at;
-          if (x) ports.runNow(x.project, x.t.id);
-        } else return;
-        e.preventDefault();
-      }}
+      onKeyDown={onKeyDown}
     >
       <div className="sch-main">
         <header className="sch-head">
@@ -87,8 +110,15 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
           <div className="sch-h2">what wakes your agents, and when</div>
           <span className="sch-count" data-testid="scheduled.count">{`active · ${String(list.length)}`}</span>
         </header>
+        {list.length > 0 && (
+          <span className="sch-search">
+            <Field placeholder="search" value={q} onChange={(e) => { setQ(e.currentTarget.value); }} onKeyDown={searchKey} testId="scheduled.search" />
+          </span>
+        )}
         {list.length === 0 ? (
           <div className="sch-empty" data-testid="scheduled.empty">nothing scheduled. agents set them with sb every; tell one “check the build every 5m”.</div>
+        ) : shown.length === 0 ? (
+          <div className="sch-empty" data-testid="scheduled.none">nothing matches. esc clears the search.</div>
         ) : (
           <div className="sch-list" role="listbox" data-testid="scheduled.list">
             <div className="sch-row sch-cols" aria-hidden="true">
@@ -97,9 +127,9 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
               <span>how often</span>
               <span>next run</span>
             </div>
-            {list.map((x) => (
+            {shown.map((x) => (
               <div key={keyOf(x)} className={`sch-row${keyOf(x) === selKey ? ' on' : ''}${cur && keyOf(cur) === keyOf(x) ? ' open' : ''}`} role="option"
-                aria-selected={keyOf(x) === selKey} data-testid={`scheduled.row.${String(x.t.id)}`}
+                aria-selected={keyOf(x) === selKey} data-row={keyOf(x)} data-testid={`scheduled.row.${String(x.t.id)}`}
                 onClick={() => { setSel(keyOf(x)); setOpen(keyOf(x)); setAsking(false); }}>
                 <span className="sch-asks" title={x.t.words}>{asks(x.t)}</span>
                 <span className="sch-dim">{wakes(x)}</span>
@@ -113,6 +143,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
           <span><b>⏎</b> open</span>
           {ports.runNow && <span><b>r</b> run now</span>}
           <span><b>x</b> stop</span>
+          <span><b>/</b> search</span>
         </div>
       </div>
       {cur && (
