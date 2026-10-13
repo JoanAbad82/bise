@@ -29,6 +29,8 @@ echo "== No blind sleep in tests/ (tests/sleep_check.py: wait for a state with t
 python3 tests/sleep_check.py --self-test && python3 tests/sleep_check.py || exit 1
 echo "== The terminal and the desktop app release apart (tests/release_split_test.py)"
 python3 tests/release_split_test.py || exit 1
+echo "== publish-release.sh tags unsigned and says each step (tests/publish_release_test.py)"
+python3 tests/publish_release_test.py || exit 1
 echo "== The release's built-in plugins are exactly the shipped list (tests/release_plugins_test.py)"
 python3 tests/release_plugins_test.py || exit 1
 echo "== The nightly gate makes its tree in the heavy slot (tests/nightly_gate_test.py)"

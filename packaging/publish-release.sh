@@ -239,8 +239,17 @@ if [ -z "$remote_sha" ]; then
     say "dry run: would tag ${commit:0:12} $tag, git push $remote $tag, watch release.yml, show the draft"
     exit 0
   fi
-  [ -n "$local_sha" ] || git -C "$REPO_DIR" tag -a "$tag" -m "bise $version" "$commit"
-  git -C "$REPO_DIR" push "$remote" "refs/tags/$tag"
+  # unsigned, whatever the user's git config says: with tag.gpgsign and
+  # an ssh key in an agent like Secretive, git tag waits on a prompt
+  # nobody sees and the release never starts (-30, -31, -32)
+  if [ -z "$local_sha" ]; then
+    say "tagging ${commit:0:12} $tag (unsigned)"
+    git -C "$REPO_DIR" -c tag.gpgsign=false tag -a "$tag" -m "bise $version" "$commit" \
+      || die "cannot make the tag $tag on ${commit:0:12}"
+  fi
+  say "pushing $tag to $remote"
+  GIT_TERMINAL_PROMPT=0 git -C "$REPO_DIR" push "$remote" "refs/tags/$tag" \
+    || die "cannot push $tag to $remote (git auth? gh auth setup-git)"
   say "pushed $tag (${commit:0:12}): release.yml builds both arches (~15-60 min; macOS minutes cost 10x on a private repo)"
 elif [ "$dry" = 1 ]; then
   say "dry run: $tag is on GitHub (${remote_sha:0:12}), release $st: would watch release.yml, show the draft$([ "$publish" = 1 ] && echo ", publish it")"
