@@ -19,7 +19,16 @@ use crate::artifacts::{is_link, Meta as ArtMeta};
 /// The CSP of a site artifact's files: sandboxed (an opaque origin, no
 /// token, no `/api`), its inline styles and scripts allowed, fonts from
 /// Google Fonts (designer's mocks), no remote scripts, no requests out.
-pub const ARTIFACT_CSP: &str = "sandbox allow-scripts allow-popups; default-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; frame-ancestors 'self'";
+///
+/// No `frame-ancestors`, on purpose (ambient-lead m_20610, architect
+/// m_20628): the desktop app frames this file from its renderer, which is
+/// `file://` (or the dev server), never the page server's origin, so
+/// `frame-ancestors 'self'` left the frame blank; listing `file:` there is
+/// unreliable. What it guarded (clickjacking) has nothing to take here: the
+/// content is static, sandboxed, with `connect-src 'none'` and the Host
+/// check, and a framing page can't read it. `/p/` has none either.
+/// `tests::the_artifact_csp_keeps_its_sandbox` pins the other directives.
+pub const ARTIFACT_CSP: &str = "sandbox allow-scripts allow-popups; default-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'";
 
 /// One row of the sidebar.
 #[derive(Clone, Debug, PartialEq)]
@@ -228,5 +237,18 @@ mod tests {
         assert_eq!(safe_rel(&["a%2f..", "b"]), None);
         assert_eq!(ctype("x/a.HTML"), Some("text/html; charset=utf-8"));
         assert_eq!(ctype("a.sh"), None);
+    }
+
+    /// The desktop app frames an artifact from file:// (architect m_20628):
+    /// no frame-ancestors, and dropping it took nothing else with it.
+    #[test]
+    fn the_artifact_csp_keeps_its_sandbox() {
+        let d: Vec<&str> = ARTIFACT_CSP.split(';').map(str::trim).collect();
+        assert!(d.contains(&"sandbox allow-scripts allow-popups"), "an opaque origin: {ARTIFACT_CSP}");
+        assert!(!d[0].contains("allow-same-origin"), "never same-origin with the page API");
+        assert!(d.contains(&"connect-src 'none'"), "no requests out");
+        assert!(d.contains(&"script-src 'self' 'unsafe-inline'"), "no remote scripts");
+        assert!(d.contains(&"default-src 'self' data: blob:"));
+        assert!(!ARTIFACT_CSP.contains("frame-ancestors"), "the desktop's file:// renderer frames it");
     }
 }

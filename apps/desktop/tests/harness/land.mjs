@@ -22,6 +22,8 @@ export const LAND = [
   'checks/thread/first-run.spec.ts',
   'checks/composer/at-files.spec.ts',
   'checks/spotlight/streaming.spec.ts',
+  // the real pages server's CSP in the artifact view (ambient-lead m_20610, architect m_20628)
+  'checks/artifacts/frame-csp.spec.ts',
 ];
 
 const here = path.dirname(fileURLToPath(import.meta.url));
