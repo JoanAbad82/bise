@@ -229,6 +229,8 @@ function Answer({
       onScroll={(e) => {
         const el = e.currentTarget;
         atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+        // scrolled: the top line fades out over 16 px instead of being cut (capsule.css)
+        el.toggleAttribute("data-scrolled", el.scrollTop > 0);
       }}
     >
       <div className="t">

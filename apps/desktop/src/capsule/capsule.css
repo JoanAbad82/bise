@@ -21,6 +21,9 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
 .b-cap-talk { color: var(--c-text-2); }
 /* the voice view grows down to 320 px, then scrolls (TALK_FIT: main places it once for that height) */
 .b-cap-talk, .b-cap-answer { max-height: 320px; overflow-y: auto; }
+/* scrolled, the line under the top edge fades out over 16 px, as under the thread's head (designer
+   m_21358); at the top of the text, no fade */
+.b-cap-answer[data-scrolled] { -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); }
 .b-cap-answer .t { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .b-cap-answer .more { margin-top: var(--gap-block); padding: 0; border: 0; background: none; font: var(--t-12) var(--font-mono); color: var(--c-text-3); cursor: default; }
 .b-cap-menu .b-menu { width: 260px; }

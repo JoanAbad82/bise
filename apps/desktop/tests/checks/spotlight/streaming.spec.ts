@@ -307,9 +307,12 @@ test("spotlight/streaming: the '∿' after a block moves nothing, tables as the 
     expect.soft(m.sh, 'then it scrolls').toBeGreaterThan(m.h);
     expect.soft(m.sh - m.top - m.h, 'the newest line at the bottom').toBeLessThan(4);
     expect.soft(m.all, 'the first lines are still there, above').toContain('Line 1:');
+    const mask = (): Promise<string> => answer.evaluate((el) => getComputedStyle(el).maskImage);
+    expect.soft(await mask(), "scrolled: the top line fades out over 16 px, never cut (designer m_21358)").toContain('gradient');
     await cap.screenshot({ path: test.info().outputPath('12-cap-scrolled.png') });
     await answer.evaluate((el) => { el.scrollTop = 0; });
     await cap.waitForTimeout(200);
+    expect.soft(await mask(), 'at the top of the text, no fade').toBe('none');
     await cap.screenshot({ path: test.info().outputPath('12b-cap-top.png') });
   } finally {
     await s.close();
