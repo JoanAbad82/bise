@@ -62,6 +62,14 @@ for (const theme of ['light', 'dark']) {
       const line = (pos: number) => page.getByTestId(`thread.tool.${String(pos)}`);
       await expect(line(3)).toBeVisible({ timeout: 10_000 });
       await expect(line(3), 'the description is the row').toContainText("recherche du message d'erreur BoursoBank");
+      // the TUI's signs: 'ƒ' a TypeScript run, '$' a command; the description in words (sans), the sign and time mono (designer m_22284)
+      await expect(line(3).locator('.th-tool-mark')).toHaveText('ƒ');
+      await expect(line(4).locator('.th-tool-mark')).toHaveText('$');
+      const fonts = await line(3).evaluate((e) => ({ text: getComputedStyle(e.querySelector('.th-tool-text') as Element).fontFamily, mark: getComputedStyle(e.querySelector('.th-tool-mark') as Element).fontFamily }));
+      expect(fonts.text, 'the description: sans').not.toMatch(/mono/iu);
+      expect(fonts.mark, 'the sign: mono').toMatch(/mono/iu);
+      await page.mouse.move(1, 300);
+      await page.getByTestId('thread.tools.2').or(line(3)).first().screenshot({ path: test.info().outputPath(`tool-rows-${theme}-1100.png`) }).catch(() => undefined);
       await line(3).click();
       await line(4).click();
       for (const [pos, lang, first, last] of [

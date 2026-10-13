@@ -799,6 +799,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* the model's description is words, not machine text (designer m_22284): sans 13 text-2; its sign,
+   its time and its box's code stay mono */
+.th-tool-text.said {
+  font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
+}
 .th-tool-time,
 .th-tool-count {
   flex: none;

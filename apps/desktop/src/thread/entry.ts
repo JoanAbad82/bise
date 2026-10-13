@@ -329,6 +329,8 @@ export interface ToolLike {
   at_ms: number;
   /** the tool's name ('bash', 'run_typescript'): which language its code is */
   name?: string | null;
+  /** the model's one line for it (its 'description'): words, not machine text */
+  intent?: string | null;
   text: string;
   kind: string;
   state?: string;
@@ -344,9 +346,11 @@ export interface ToolLike {
 /** A shown call: its mark, words, its state's words on the right ('✓ 0.3 s', '✗ exit 1 · 2.1 s'), its first error line, and what opens under it. */
 export interface ToolLine {
   pos: number;
-  /** '$' a command, '±' an edit, '' a read, search or other step (its verb says it) */
-  mark: '$' | '±' | '';
+  /** '$' a command, 'ƒ' a TypeScript run (the TUI's), '±' an edit, '' a read, search or other step (its verb says it) */
+  mark: '$' | 'ƒ' | '±' | '';
   text: string;
+  /** its words are the model's description (sans), not a command or a path (mono): designer m_22284 */
+  said: boolean;
   /** the step's length until the next one (a replay, no state) */
   time: string;
   state: 'run' | 'ok' | 'err' | '';
@@ -455,7 +459,8 @@ export function toolLines(items: readonly ToolLike[]): {
     const edit = t.kind === 'edit' ? editWords(t.files) : null;
     const line: ToolLine = {
       pos: t.pos,
-      mark: t.kind === 'run' ? '$' : t.kind === 'edit' ? '±' : '',
+      mark: t.kind === 'run' ? (t.name === 'run_typescript' ? 'ƒ' : '$') : t.kind === 'edit' ? '±' : '',
+      said: t.intent != null && t.intent.trim() !== '' && t.kind !== 'edit' && t.kind !== 'read' && t.kind !== 'search',
       // a read or search says the TUI's verb, like its fold ('read gone.rs', designer m_14103/m_14269)
       text: t.kind === 'read' || t.kind === 'search' ? `${t.kind} ${toolWords(t.text).replace(/^\S+\s+/, '')}`.trim() : t.kind === 'edit' ? (edit?.text ?? toolWords(t.text)) : toolWords(t.text),
       counts: t.kind === 'edit' ? (edit?.counts ?? '') : '',
@@ -472,7 +477,7 @@ export function toolLines(items: readonly ToolLike[]): {
   });
   const lined = new Set(lines.filter((l) => l.mark === '').map((l) => l.pos));
   const n = (k: string) => items.filter((t) => t.kind === k && !lined.has(t.pos)).length;
-  const shownRun = lines.filter((l) => l.mark === '$').length;
+  const shownRun = lines.filter((l) => l.mark === '$' || l.mark === 'ƒ').length;
   const shownEdit = lines.filter((l) => l.mark === '±').length;
   const files = (x: number) => (x === 1 ? '1 file' : `${String(x)} files`);
   const parts: string[] = [];

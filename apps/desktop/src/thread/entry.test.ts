@@ -371,6 +371,11 @@ describe("a code tool's box shows the source it ran, as the TUI's (main m_22134,
   it('toolLines carries it', () => {
     const l = toolLines([{ pos: 1, at_ms: 1, name: 'run_typescript', text: 'search the error', kind: 'run', state: 'ok', ms: 400, code: ts }]).lines[0];
     expect(l?.lang).toBe('typescript');
+    expect(l?.mark, "the TUI's sign for a TypeScript run").toBe('ƒ');
+    expect(l?.said, 'no intent: its words are machine text').toBe(false);
+    const said = toolLines([{ pos: 2, at_ms: 1, name: 'bash', intent: 'the tests', text: 'the tests', kind: 'run', state: 'ok', code: 'cargo test' }]).lines[0];
+    expect(said?.mark).toBe('$');
+    expect(said?.said, 'its description: words').toBe(true);
     expect(l?.code.startsWith('async function main() {\n')).toBe(true);
   });
 });

@@ -137,7 +137,7 @@ function ToolLineRow({ l, live, runFor, project, agent }: { l: ToolLine; live: b
       >
         {/* a read has no mark: no empty slot either, so its words start on the edge (designer m_21012) */}
         {l.mark !== '' && <span className="th-tool-mark">{l.mark}</span>}{' '}
-        <span className="th-tool-text">{l.text}</span>
+        <span className={l.said ? 'th-tool-text said' : 'th-tool-text'}>{l.text}</span>
         {l.counts !== '' && (
           <span className="th-tool-count" data-testid={`${id}.count`}>
             {l.counts}
