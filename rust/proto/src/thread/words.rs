@@ -602,13 +602,13 @@ pub fn clock_ahead(at_ms: u64, at_off_s: i32, now_ms: u64, now_off_s: i32) -> St
 }
 
 /// A clock that's past, only in a hover or a detail and always relative
-/// (`set yesterday 08:07`, never `tue 08:07` alone): `today 08:07`,
-/// `yesterday 08:07`, `tue 08:07` within 6 days, `5 oct 08:07` beyond.
-/// TS twin: wake.ts `clockPast`.
+/// (`set yesterday 08:07`, never `tue 08:07` alone): `at 08:07` today
+/// (designer m_23038: `set at 08:07`), `yesterday 08:07`, `tue 08:07`
+/// within 6 days, `5 oct 08:07` beyond. TS twin: wake.ts `clockPast`.
 pub fn clock_past(at_ms: u64, at_off_s: i32, now_ms: u64, now_off_s: i32) -> String {
     let ((ad, hm), (nd, _)) = (local_day(at_ms, at_off_s), local_day(now_ms, now_off_s));
     match nd - ad {
-        gap if gap <= 0 => format!("today {}", hm),
+        gap if gap <= 0 => format!("at {}", hm),
         1 => format!("yesterday {}", hm),
         gap => far_day(ad, gap, &hm),
     }
@@ -727,13 +727,12 @@ pub fn alarms_of(name: &str, watching: &[crate::rows::AgentWatch], now_ms: u64, 
             let end = w.until_ms.map(|u| clock_ahead(u, off(u), now_ms, off(now_ms))).unwrap_or_default();
             let mut title = format!("bise wakes {} if {} · set {}", name, event, set);
             if !end.is_empty() {
-                // `at 08:07` today, `tomorrow 08:07`, `on fri 08:07`
-                let at = match end.split(' ').count() {
-                    1 => "at ",
-                    _ if end.starts_with("tomorrow ") => "",
-                    _ => "on ",
+                // `at 08:07`, `tomorrow at 08:07`, `fri at 08:07` (designer m_23038)
+                let at = match end.rsplit_once(' ') {
+                    Some((day, hm)) => format!("{} at {}", day, hm),
+                    None => format!("at {}", end),
                 };
-                title.push_str(&format!(" · stops watching {}{}", at, end));
+                title.push_str(&format!(" · stops watching {}", at));
             }
             Alarm { id: w.id, note: format!("if {}", event), end, title }
         })

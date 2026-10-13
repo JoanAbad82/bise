@@ -117,7 +117,7 @@ for (const w of [1400, 1100, 800]) {
             const row = bar.getByTestId('app.right.watching.main.4');
             await expect(row.locator('.app-rb-g')).toHaveText('◌');
             await expect(row.locator('.app-rb-end')).toHaveText(/^until (tomorrow )?\d\d:\d\d$/u);
-            await expect(row).toHaveAttribute('title', /^bise wakes main if the nightly gate goes red · set yesterday \d\d:\d\d · stops watching (at |tomorrow )\d\d:\d\d$/u);
+            await expect(row).toHaveAttribute('title', /^bise wakes main if the nightly gate goes red · set yesterday \d\d:\d\d · stops watching (tomorrow )?at \d\d:\d\d$/u);
             expect(await color('[data-testid="app.right.watching.main.4"] .app-rb-g'), `${theme}: ◌ text-3`).toBe(text3);
             expect(await color('[data-testid="app.right.watching.main.4"] .app-rb-sub'), `${theme}: the note text-3`).toBe(text3);
             const sub = (await row.locator('.app-rb-sub').textContent()) ?? '';

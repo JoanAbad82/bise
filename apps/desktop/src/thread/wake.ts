@@ -53,11 +53,11 @@ export function clockAhead(atMs: number, atOff: number, nowMs: number, nowOff: n
   return farDay(ad, gap, hm);
 }
 
-/** A past clock, hover only: 'today 08:07', 'yesterday 08:07', 'tue 08:07', '5 oct 08:07' (words::clock_past). */
+/** A past clock, hover only: 'at 08:07' today, 'yesterday 08:07', 'tue 08:07', '5 oct 08:07' (words::clock_past). */
 export function clockPast(atMs: number, atOff: number, nowMs: number, nowOff: number): string {
   const [ad, hm] = localDay(atMs, atOff);
   const gap = localDay(nowMs, nowOff)[0] - ad;
-  if (gap <= 0) return `today ${hm}`;
+  if (gap <= 0) return `at ${hm}`;
   if (gap === 1) return `yesterday ${hm}`;
   return farDay(ad, gap, hm);
 }
@@ -133,9 +133,9 @@ export function alarms(a: Pick<Agent, 'name'> & { watching?: readonly AgentWatch
       const end = w.until_ms == null ? '' : clockAhead(w.until_ms, off(w.until_ms), nowMs, off(nowMs));
       let title = `bise wakes ${a.name} if ${event} · set ${set}`;
       if (end !== '') {
-        // 'at 08:07' today, 'tomorrow 08:07', 'on fri 08:07'
-        const at = !end.includes(' ') ? 'at ' : end.startsWith('tomorrow ') ? '' : 'on ';
-        title += ` · stops watching ${at}${end}`;
+        // 'at 08:07', 'tomorrow at 08:07', 'fri at 08:07' (designer m_23038)
+        const cut = end.lastIndexOf(' ');
+        title += ` · stops watching ${cut < 0 ? `at ${end}` : `${end.slice(0, cut)} at ${end.slice(cut + 1)}`}`;
       }
       return { id: w.id, note: `if ${event}`, end, title };
     });

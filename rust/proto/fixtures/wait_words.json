@@ -21,13 +21,13 @@
   { "why": "already past (a late tick): today's clock", "at_ms": 1791788400000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "09:00" }
  ],
  "past": [
-  { "why": "today", "at_ms": 1791771120000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "today 04:12" },
-  { "why": "local midnight is today", "at_ms": 1791756000000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "today 00:00" },
+  { "why": "today: at its clock", "at_ms": 1791771120000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "at 04:12" },
+  { "why": "local midnight is today", "at_ms": 1791756000000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "at 00:00" },
   { "why": "23:59 is yesterday", "at_ms": 1791755940000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "yesterday 23:59" },
   { "why": "yesterday", "at_ms": 1791698820000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "yesterday 08:07" },
   { "why": "6 days back: its weekday", "at_ms": 1791321000000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "tue 23:10" },
   { "why": "7 days back: its date", "at_ms": 1791234600000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "5 oct 23:10" },
-  { "why": "in the future (clock skew): today", "at_ms": 1791792005000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "today 10:00" }
+  { "why": "in the future (clock skew): today", "at_ms": 1791792005000, "at_off_s": 7200, "now_ms": 1791792000000, "now_off_s": 7200, "clock": "at 10:00" }
  ],
  "pauses": [
   {
@@ -102,8 +102,8 @@
     { "id": 7, "kind": "bg", "what": "cargo bench", "since_ms": 1791791820000, "resumes": true }
    ] },
    "want": [
-    { "id": 5, "note": "if launchd job dev.x ends", "end": "tomorrow 09:00", "title": "bise wakes main if launchd job dev.x ends · set today 09:00 · stops watching tomorrow 09:00" },
-    { "id": 9, "note": "if build.rc appears", "end": "fri 08:07", "title": "bise wakes main if build.rc appears · set today 10:00 · stops watching on fri 08:07" }
+    { "id": 5, "note": "if launchd job dev.x ends", "end": "tomorrow 09:00", "title": "bise wakes main if launchd job dev.x ends · set at 09:00 · stops watching tomorrow at 09:00" },
+    { "id": 9, "note": "if build.rc appears", "end": "fri 08:07", "title": "bise wakes main if build.rc appears · set at 10:00 · stops watching fri at 08:07" }
    ]
   },
   {
@@ -111,7 +111,7 @@
    "now_ms": 1791792000000,
    "off_s": 7200,
    "agent": { "name": "main", "watching": [{ "id": 4, "kind": "pid", "what": "pid 4242", "since_ms": 1791788400000 }] },
-   "want": [{ "id": 4, "note": "if pid 4242 ends", "end": "", "title": "bise wakes main if pid 4242 ends · set today 09:00" }]
+   "want": [{ "id": 4, "note": "if pid 4242 ends", "end": "", "title": "bise wakes main if pid 4242 ends · set at 09:00" }]
   }
  ]
 }
