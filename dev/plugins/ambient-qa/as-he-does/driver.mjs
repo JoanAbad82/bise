@@ -479,6 +479,60 @@ if (mode === 'rows2') {
     await shot('inbox-answered');
     step("another project's item answered from bise's thread", !!answered, { option: label.slice(0, 80) });
   }
+  // the two-finger swipe (swipe.ts reads the renderer's wheel events): a horizontal wheel stream
+  // through CDP, fingers right (deltaX < 0) walks back, fingers left forward. Events 20 ms apart
+  // stay one gesture (GAP_MS 220); 8 x 30 px passes THRESHOLD_PX 140.
+  const swipe = async (dx) => {
+    const m = await page.locator('[data-testid="app.main"]').first().boundingBox().catch(() => null);
+    if (m) await page.mouse.move(m.x + m.width / 2, m.y + m.height / 3);
+    for (let i = 0; i < 8; i++) { await page.mouse.wheel(dx, 0); await new Promise((r) => setTimeout(r, 20)); }
+    await new Promise((r) => setTimeout(r, 400));
+  };
+  await harness();
+  await click('artifacts', page.locator('[data-testid="app.sidebar.artifacts"]').first());
+  const onList = await page.locator('[data-testid="artifacts.list"]').first().waitFor({ timeout: 8000 }).then(() => true, () => false);
+  await swipe(-30);
+  const swBack = await until(async () => ((await page.locator('[data-testid="artifacts.list"]').count()) === 0 && /harness/.test((await text('[data-testid="app.main"]')) ?? '') ? true : null), 5000, 300);
+  await shot('swipe-back');
+  await swipe(30);
+  const swFwd = await page.locator('[data-testid="artifacts.list"]').first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+  await shot('swipe-forward');
+  step('two-finger swipe (CDP wheel deltaX): back, then forward', onList && !!swBack && swFwd, { on_list: onList, back: !!swBack, forward: swFwd });
+  // spacing (designer's desktop-spacing, steps 1-4): a frame per screen at 1100 wide. The viewport
+  // is narrowed by CDP emulation, the native window doesn't move or resize.
+  const cdp = await page.context().newCDPSession(page);
+  const vh = await page.evaluate(() => window.innerHeight);
+  const narrowed = await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1100, height: vh, deviceScaleFactor: 0, mobile: false }).then(() => true, () => false);
+  await new Promise((r) => setTimeout(r, 600));
+  const vw = await page.evaluate(() => window.innerWidth);
+  const overflow = async () => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  const at1100 = {};
+  await harness();
+  await page.waitForTimeout(800);
+  await shot('w1100-thread');
+  at1100.thread = { overflow: await overflow() };
+  // the frame: the title bar, both bars and the status line, with the right bar open
+  if (!(await page.locator('[data-testid="app.panel"]').count())) await click('right bar', page.locator('[data-testid="app.title.panel"]').first());
+  await page.waitForTimeout(600);
+  await shot('w1100-frame');
+  at1100.frame = { overflow: await overflow(), panel: (await page.locator('[data-testid="app.panel"]').count()) > 0 };
+  await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  await page.locator('[data-testid^="inbox.block"]').first().waitFor({ timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(600);
+  await shot('w1100-inbox');
+  at1100.inbox = { overflow: await overflow(), block: (await page.locator('[data-testid^="inbox.block"]').count()) > 0 };
+  await harness();
+  await say('/agents');
+  const agents = await page.locator('[data-testid="agents.screen"]').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
+  await page.waitForTimeout(600);
+  await shot('w1100-agents');
+  at1100.agents = { overflow: await overflow(), screen: agents };
+  await cdp.send('Emulation.clearDeviceMetricsOverride').catch(() => {});
+  step('a frame per screen at 1100 wide (thread, frame, inbox, agents), nothing wider than the window',
+    narrowed && vw === 1100 && agents && Object.values(at1100).every((s) => !s.overflow), { width: vw, ...at1100 });
+  // the tray menu is native (Electron Tray in the main process): CDP reaches the renderer only
+  step('the tray menu\'s inbox rows: not reachable off-screen (native menu, no CDP)', true, 'not proven here');
+  await harness();
 }
 
 // the draft across a restart (ambient-lead m_19525): typed in harness' composer, never sent; after
