@@ -119,6 +119,52 @@ step('core line', true, await text('[data-testid="app.core"]'));
 const side = await text('[data-testid="app.sidebar"]');
 step('sidebar', !!side, side);
 
+// the window's frame (amb-mac 9f7c2f72, ambient-lead m_21559): 1280x720 on first open, clamped to the
+// work area minus 24 px a side, kept per display in userData/window-frame.json. An off-screen run
+// sees only the off-screen display (windows.ts OFF_SCREEN, 1920x1200 far from his), so it never
+// lands on his screen. The bounds come from the page (outer size) and the kept file.
+const FRAMES = process.env.AS_HE_DOES_USERDATA ? path.join(process.env.AS_HE_DOES_USERDATA, 'window-frame.json') : null;
+const winBox = () => page.evaluate(() => ({ x: window.screenX, y: window.screenY, w: window.outerWidth, h: window.outerHeight, iw: window.innerWidth, ih: window.innerHeight, aw: window.screen.availWidth, ah: window.screen.availHeight })).catch(() => null);
+const keptFrames = () => { try { return JSON.parse(fs.readFileSync(FRAMES, 'utf8')); } catch { return null; } };
+// resize from CDP: the browser's Browser.setWindowBounds when Electron answers it, else window.resizeTo
+const resizeWin = async (width, height) => {
+  const how = await (async () => {
+    const b = await browser.newBrowserCDPSession().catch(() => null);
+    if (!b) return null;
+    const t = await page.context().newCDPSession(page).then((s) => s.send('Target.getTargetInfo')).catch(() => null);
+    const w = await b.send('Browser.getWindowForTarget', t?.targetInfo?.targetId ? { targetId: t.targetInfo.targetId } : {}).catch(() => null);
+    if (!w) return null;
+    return b.send('Browser.setWindowBounds', { windowId: w.windowId, bounds: { width, height } }).then(() => 'Browser.setWindowBounds', () => null);
+  })();
+  if (how) return how;
+  await page.evaluate(([w, h]) => window.resizeTo(w, h), [width, height]).catch(() => {});
+  return 'window.resizeTo';
+};
+if (mode === 'first') {
+  const box = await winBox();
+  const wantW = box && box.aw > 0 ? Math.min(1280, box.aw - 48) : 1280;
+  const wantH = box && box.ah > 0 ? Math.min(720, box.ah - 48) : 720;
+  await shot('window-1280');
+  step('the first launch opens at 1280x720, clamped to the work area (a frame for designer)', !!box && Math.abs(box.w - wantW) <= 2 && Math.abs(box.h - wantH) <= 2, { box, want: { w: wantW, h: wantH } });
+}
+if (mode === 'draft-type' && !tag.endsWith('atonce')) {
+  // resized now; the restart that follows must bring this frame back (checked in draft-check)
+  const before = await winBox();
+  const how = await resizeWin(1180, 760);
+  const after = await until(async () => { const b = await winBox(); return b && b.w !== before?.w ? b : null; }, 4000, 300);
+  await page.waitForTimeout(800); // windows.ts keeps it 300 ms after the resize settles
+  const kept = keptFrames();
+  if (after) fs.writeFileSync(path.join(out, 'win-resized.json'), JSON.stringify({ w: after.w, h: after.h }));
+  await shot('resized-window');
+  step('the window resizes from CDP and its frame is kept (window-frame.json)', !!after && !!kept, { how, before, after, kept });
+}
+if (mode === 'draft-check' && fs.existsSync(path.join(out, 'win-resized.json')) && !tag.endsWith('atonce')) {
+  const want = JSON.parse(fs.readFileSync(path.join(out, 'win-resized.json'), 'utf8'));
+  const box = await until(async () => { const b = await winBox(); return b && Math.abs(b.w - want.w) <= 2 && Math.abs(b.h - want.h) <= 2 ? b : null; }, 5000, 300);
+  await shot('frame-back');
+  step('after a resize and a restart, the window comes back at its kept frame', !!box, { want, now: box ?? (await winBox()), kept: keptFrames() });
+}
+
 if (mode === 'first') {
   // the sidebar's '+ add a project' opens amb-home's add sheet in place (amb-win a83184e3), as he
   // does; when it doesn't, settings › projects and its own 'add a project'

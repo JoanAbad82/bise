@@ -108,7 +108,8 @@ libgate() {
   fi
   echo "library $1" > $O/BREACH; breach
 }
-drive() { AS_HE_DOES_TAG=${TAG:-} node $HERE/driver.mjs $PORT_CDP $O "$@" > $O/driver-$1${TAG:+-$TAG}.log 2>&1; tail -4 $O/driver-$1${TAG:+-$TAG}.log; breach; }
+# the candidate's userData in the world (userdata.ts standInPaths: HOME is the world's): window-frame.json
+drive() { AS_HE_DOES_USERDATA="$H/Library/Application Support/$(basename "$A" .app)" AS_HE_DOES_TAG=${TAG:-} node $HERE/driver.mjs $PORT_CDP $O "$@" > $O/driver-$1${TAG:+-$TAG}.log 2>&1; tail -4 $O/driver-$1${TAG:+-$TAG}.log; breach; }
 
 rm -f $O/BREACH $O/stop $O/pids.txt
 say "his app before: $(hispids)" | tee $O/his.txt
