@@ -446,7 +446,7 @@ def lib_diff(before, after):
 
 
 # what may never come front during the run (anything started after the run began counts too)
-FRONT_BAD = ("bise try", "bise", "UserNotificationCenter", "System Settings", "SecurityAgent", "CoreServicesUIAgent")
+FRONT_BAD = ("bise try", "bise cand", "bise", "UserNotificationCenter", "System Settings", "SecurityAgent", "CoreServicesUIAgent")
 
 
 def front_info(text):

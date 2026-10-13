@@ -18,7 +18,8 @@ HERE=$(cd "$(dirname "$0")" && pwd); T=$(cd "$HERE/../../../.." && pwd)
 RS="$P -B $HERE/../realshape.py"
 G=$HOME/.bise/gate/real-shape; H=$G/w/h
 HIS="$HOME/.bise/dev/try-src/apps/desktop/dist/mac-arm64/bise try.app"
-MAIN="$A/Contents/MacOS/bise try"
+# its main executable from its own Info.plist (amb-mac fb2e544f: candidates are "bise cand.app")
+MAIN="$A/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$A/Contents/Info.plist" 2>/dev/null || echo "bise try")"
 PORT_CDP=9341
 export PW_FROM=$T/apps/desktop
 say() { echo "$(date +%T) $*"; }
