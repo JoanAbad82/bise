@@ -67,6 +67,9 @@ def Laws.effort_order():
 def Laws.effort_outside_the_list_falls_to_the_default():
   {==}
 
+def Laws.effort_without_models_file_is_none():
+  {==}
+
 def Laws.effort_none_without_reasoning():
   {==}
 

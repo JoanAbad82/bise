@@ -41,6 +41,9 @@ import ../vendor/json.bend as J
 # '/' is an alias, else the legacy guess: claude* -> foundry/<name>,
 # anything else -> mistral/<name>.
 
+# No models file (it could not be written: every spawn sets
+# BISE_MODELS_FILE): these two setups, with no efforts list (no effort
+# chosen, the body default goes; an effort list never lives in bend/).
 def builtin() -> List<&2, Cf.KV>:
   [Cf.KV{"aliases.\"opus-5.5\"", "foundry/claude-opus-5-5"},
     Cf.KV{"providers.foundry.api", "anthropic"},
@@ -337,31 +340,13 @@ def max_key.pick(is_openai: Bool) -> String:
       "max_tokens"
 
 # ---- the reasoning effort (BISE-135) ----
-# The words a model takes: its `efforts` key (comma-separated, the
-# models file has them normalized by Rust), else its family's; none
-# when it does not reason (an Anthropic one with thinking = "none"
-# included). The same rule as rust/catalog's Resolved::efforts.
-
-def anth_efforts() -> List<&2, String>:
-  ["none", "low", "medium", "high", "xhigh", "max"]
-
-def chat_efforts() -> List<&2, String>:
-  ["none", "low", "medium", "high"]
-
-def efforts.family(is_anth: Bool) -> List<&2, String>:
-  match is_anth:
-    case True{}:
-      anth_efforts()
-    case False{}:
-      chat_efforts()
-
-def efforts.own(empty: Bool, +own: List<&2, String>, is_anth: Bool)
-    -> List<&2, String>:
-  match empty:
-    case True{}:
-      efforts.family(is_anth)
-    case False{}:
-      own
+# The words a model takes: its `efforts` key, else its provider's
+# (comma-separated). Rust is the one owner of the lists
+# (rust/catalog/src/efforts.rs): the models file carries each model's
+# list and each provider's family list; no list lives here. None when it
+# does not reason (an Anthropic one with thinking = "none" included), or
+# when no file says (no models file: builtin() below has none, the body
+# default goes).
 
 def non_empty(s: String) -> Bool:
   Bool.not(String.is_empty(s))
@@ -369,11 +354,10 @@ def non_empty(s: String) -> Bool:
 def efforts.words(+s: String) -> List<&2, String>:
   List.filter(~String, ~non_empty, String.split(s, ','))
 
-def efforts.on(on: Bool, +own: String, is_anth: Bool) -> List<&2, String>:
+def efforts.on(on: Bool, +own: String) -> List<&2, String>:
   match on:
     case True{}:
-      +ws = efforts.words(own)
-      efforts.own(List.is_empty(&2, String, ws), ws, is_anth)
+      efforts.words(own)
     case False{}:
       Nil{}
 
@@ -389,7 +373,7 @@ def efforts(+reg: List<&2, Cf.KV>, +prov: String, +id: String)
   +off = Bool.and(is_anth,
     String.eq(Cf.cfg_or(model_key(reg, prov, id, "thinking"), ""), "none"))
   efforts.on(Bool.and(reasons, Bool.not(off)),
-    Cf.cfg_or(model_key(reg, prov, id, "efforts"), ""), is_anth)
+    Cf.cfg_or(model_key(reg, prov, id, "efforts"), ""))
 
 def has_word(+xs: List<&2, String>, +w: String) -> Bool:
   List.contains(~String, ~String.eq, xs, w)

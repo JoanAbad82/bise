@@ -237,7 +237,7 @@ fn env_for_spawn() -> Vec<(String, Option<String>)> {
     let url_env = |k: &str| bise_catalog::with_files(&env, &files, k);
     let mut out = match Store::read(&paths.auth_file) {
         Ok(store) => {
-            let setup = bise_catalog::Setup::from_parts(std::fs::read_to_string(&paths.config).ok().as_deref(), &|k| std::env::var(k).ok(), &url_env);
+            let setup = bise_catalog::Setup::from_parts(std::fs::read_to_string(&paths.config).ok().as_deref(), &[], &|k| std::env::var(k).ok(), &url_env);
             Keys { env: &env, store: &store, files: &files }
                 .resolve(&setup.catalog)
                 .spawn_env(&setup.catalog, &ours)
@@ -331,8 +331,8 @@ fn sb_workspace(args: &[String]) -> std::path::PathBuf {
 fn run_sbd(args: &[String]) -> std::io::Result<()> {
     let paths = switchboard::paths::Paths::for_workspace(&sb_workspace(args));
     let root = live_app_root_or_exit();
-    // the agents' REPLs load their MCP index like a normal session: its
-    // path came with bise_home's exports (main)
+    bise_catalog::live_fetch::spawn_refresher(auth_paths(), cache_dir(), |l| eprintln!("sbd: {l}"));
+    // the REPLs load their MCP index like a session (bise_home's exports)
     switchboard::daemon::run(switchboard::daemon::Opts {
         paths,
         core_bin: core_bin_of(&root),

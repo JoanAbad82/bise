@@ -40,14 +40,16 @@ law provider_no_default_model:
 
 law provider_resolves_alias:
   {Pv.resolve("", "", "", "", "model = \"opus-5.5\"",
-      "[providers.foundry]\nbase_url = \"https://foundry.example.net/anthropic/v1\"", "")
+      "[providers.foundry]\nbase_url = \"https://foundry.example.net/anthropic/v1\"
+efforts = \"none,low,medium,high,xhigh,max\"", "")
     == Pv.ROk{Pv.Prov{"foundry", "claude-opus-5-5", Api.Anthropic{},
       "https://foundry.example.net/anthropic/v1/messages",
       "ANTHROPIC_FOUNDRY_API_KEY", Api.MFacts{True{}, 0n, "max_tokens", "", "", "high", False{}}}} : Pv.Resolved}
 
 law provider_legacy_claude_is_foundry:
   {Pv.resolve("", "claude-opus-5-5", "", "", "",
-      "[providers.foundry]\nbase_url = \"https://foundry.example.net/anthropic/v1\"", "")
+      "[providers.foundry]\nbase_url = \"https://foundry.example.net/anthropic/v1\"
+efforts = \"none,low,medium,high,xhigh,max\"", "")
     == Pv.ROk{Pv.Prov{"foundry", "claude-opus-5-5", Api.Anthropic{},
       "https://foundry.example.net/anthropic/v1/messages",
       "ANTHROPIC_FOUNDRY_API_KEY", Api.MFacts{True{}, 0n, "max_tokens", "", "", "high", False{}}}} : Pv.Resolved}
@@ -79,14 +81,14 @@ base_url = \"\"", "")
 law provider_legacy_glm_is_mistral:
   {Pv.resolve("", "zai-glm-5-3", "", "", "", "", "")
     == Pv.ROk{Pv.Prov{"mistral", "zai-glm-5-3", Api.OpenAI{},
-      "https://api.mistral.ai/v1/chat/completions", "MISTRAL_API_KEY", Api.MFacts{True{}, 0n, "max_tokens", "", "", "high", False{}}}} : Pv.Resolved}
+      "https://api.mistral.ai/v1/chat/completions", "MISTRAL_API_KEY", Api.MFacts{True{}, 0n, "max_tokens", "", "", "", False{}}}} : Pv.Resolved}
 
 # LAW: a model the registry does not list works on its provider's
 # defaults.
 law provider_unlisted_model_works:
   {Pv.resolve("", "", "", "", "model = \"mistral/brand-new-7b\"", "", "")
     == Pv.ROk{Pv.Prov{"mistral", "brand-new-7b", Api.OpenAI{},
-      "https://api.mistral.ai/v1/chat/completions", "MISTRAL_API_KEY", Api.MFacts{True{}, 0n, "max_tokens", "", "", "high", False{}}}} : Pv.Resolved}
+      "https://api.mistral.ai/v1/chat/completions", "MISTRAL_API_KEY", Api.MFacts{True{}, 0n, "max_tokens", "", "", "", False{}}}} : Pv.Resolved}
 
 # LAW: the choice order (as rust/catalog's Setup): main = BISE_MODEL >
 # BEND_MODEL > config model; a sub-agent (BISE_ROLE=agent) =
@@ -149,13 +151,15 @@ law effort_of_the_roles:
 agent_reasoning_effort = \"low\"
 [roles.agents]
 effort = \"medium\"", "[providers.foundry]
-base_url = \"https://foundry.example.net/anthropic/v1\"", "")),
+base_url = \"https://foundry.example.net/anthropic/v1\"
+efforts = \"none,low,medium,high,xhigh,max\"", "")),
       Pv.shown_effort(Pv.resolve_chosen("", "", "", "", "main",
         "model = \"opus-5.5\"
 reasoning_effort = \"high\"
 [roles.main]
 effort = \"low\"", "[providers.foundry]
-base_url = \"https://foundry.example.net/anthropic/v1\"", "")))
+base_url = \"https://foundry.example.net/anthropic/v1\"
+efforts = \"none,low,medium,high,xhigh,max\"", "")))
     == ("medium", "low") : String & String}
 
 # LAW (BISE-150): the compaction threshold defaults to 80 % of the
@@ -278,7 +282,8 @@ law provider_model_key_wins:
 # aliases and default_model are used.
 law provider_file_over_builtin:
   {Pv.resolve("", "", "", "", "",
-      "default_model = \"big\"\n[aliases]\n\"big\" = \"foundry/claude-x\"\n[providers.foundry]\nbase_url = \"https://api.anthropic.com/v1\"",
+      "default_model = \"big\"\n[aliases]\n\"big\" = \"foundry/claude-x\"\n[providers.foundry]\nbase_url = \"https://api.anthropic.com/v1\"
+efforts = \"none,high\"",
       "")
     == Pv.ROk{Pv.Prov{"foundry", "claude-x", Api.Anthropic{},
       "https://api.anthropic.com/v1/messages",
@@ -289,7 +294,7 @@ law provider_url_env_wins:
   {Pv.resolve("", "mistral-small-latest", "", "", "", "",
       "http://127.0.0.1:9/v1/chat/completions")
     == Pv.ROk{Pv.Prov{"mistral", "mistral-small-latest", Api.OpenAI{},
-      "http://127.0.0.1:9/v1/chat/completions", "MISTRAL_API_KEY", Api.MFacts{True{}, 0n, "max_tokens", "", "", "high", False{}}}}
+      "http://127.0.0.1:9/v1/chat/completions", "MISTRAL_API_KEY", Api.MFacts{True{}, 0n, "max_tokens", "", "", "", False{}}}}
     : Pv.Resolved}
 
 # LAW: a long file is read to its end (a pair line takes 3 steps of the

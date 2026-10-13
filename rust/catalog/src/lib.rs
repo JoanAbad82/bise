@@ -24,6 +24,10 @@ pub mod chatgpt;
 pub mod cli;
 pub mod config_cli;
 pub mod detect;
+mod efforts;
+pub use efforts::*;
+pub mod live_efforts;
+pub mod live_fetch;
 pub mod openrouter_login;
 pub mod names;
 pub mod picks;
@@ -96,35 +100,6 @@ pub struct Caps {
 
 /// The thinking modes of the Anthropic family.
 pub const THINKING: [&str; 3] = ["adaptive", "budget", "none"];
-
-/// The reasoning efforts of the Anthropic family (BISE-135): `none` turns
-/// thinking off; the others are output_config.effort (adaptive) or the
-/// size of the thinking budget (budget; xhigh there is high's budget).
-pub const ANTHROPIC_EFFORTS: [&str; 6] = ["none", "low", "medium", "high", "xhigh", "max"];
-
-/// The reasoning efforts of the OpenAI-compatible families
-/// (`reasoning_effort`, sent as is).
-pub const CHAT_EFFORTS: [&str; 4] = ["none", "low", "medium", "high"];
-
-/// The effort a reasoning model gets when nobody picks one: today's.
-pub const DEFAULT_EFFORT: &str = "high";
-
-/// An effort word: letters, digits, '-' or '_' (a provider may take its
-/// own, "minimal", "xhigh"...).
-pub fn is_effort_word(w: &str) -> bool {
-    !w.is_empty() && w.len() <= 20 && w.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-}
-
-/// "none, low,high" -> ["none", "low", "high"]; empty when a word is not
-/// an effort word.
-pub fn effort_list(s: &str) -> Vec<String> {
-    let l: Vec<String> = s.split(',').map(|w| w.trim().to_string()).filter(|w| !w.is_empty()).collect();
-    if l.iter().all(|w| is_effort_word(w)) {
-        l
-    } else {
-        Vec::new()
-    }
-}
 
 /// The defaults of a model nothing describes.
 pub const DEFAULT_CAPS: Caps = Caps {
@@ -413,50 +388,6 @@ pub struct Resolved {
     /// its prices (BISE-150): the model's, else its provider's
     pub price: Price,
     pub known: Known,
-}
-
-impl Resolved {
-    /// The reasoning efforts the model takes (BISE-135), in order: its
-    /// `efforts` key, else its family's ([`ANTHROPIC_EFFORTS`],
-    /// [`CHAT_EFFORTS`]); none for a model that does not reason (an
-    /// Anthropic one with `thinking = "none"` included). The Bend
-    /// runtime computes the same (runtime/provider-pure.bend `efforts`).
-    pub fn efforts(&self) -> Vec<String> {
-        if !self.caps.reasoning || (self.api == "anthropic" && self.caps.thinking == "none") {
-            return Vec::new();
-        }
-        let own = effort_list(&self.caps.efforts);
-        if !own.is_empty() {
-            return own;
-        }
-        let family: &[&str] = if self.api == "anthropic" { &ANTHROPIC_EFFORTS } else { &CHAT_EFFORTS };
-        family.iter().map(|w| w.to_string()).collect()
-    }
-
-    /// The effort nobody picked: its `effort` key when it takes it, else
-    /// high, else the last of its list; "" when it takes none.
-    pub fn default_effort(&self) -> String {
-        let l = self.efforts();
-        let has = |w: &str| l.iter().any(|x| x == w);
-        if has(&self.caps.effort) {
-            self.caps.effort.clone()
-        } else if has(DEFAULT_EFFORT) {
-            DEFAULT_EFFORT.into()
-        } else {
-            l.last().cloned().unwrap_or_default()
-        }
-    }
-
-    /// The effort a call runs with when `asked` is asked ("" = nothing
-    /// asked): `asked` when the model takes it, else its default.
-    pub fn effort_for(&self, asked: &str) -> String {
-        let asked = asked.trim();
-        if self.efforts().iter().any(|w| w == asked) {
-            asked.to_string()
-        } else {
-            self.default_effort()
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1202,17 +1133,20 @@ impl Setup {
     /// is a warning: its tables are ignored, `model`/`agent_model` lines
     /// are still read.
     pub fn from_text(config: Option<&str>, env: &dyn Fn(&str) -> Option<String>) -> Setup {
-        Setup::from_parts(config, env, env)
+        Setup::from_parts(config, &[], env, env)
     }
 
-    /// [`Setup::from_text`] with the base URLs' variables read through
-    /// `url_env` (the env, then the .env files: [`Setup::load`]).
+    /// [`Setup::from_text`] with the APIs' effort lists (`live`,
+    /// [`live_fetch::read`]: over the table, under config.toml) and the
+    /// base URLs' variables read through `url_env` (the env, then the
+    /// .env files: [`Setup::load`]).
     pub fn from_parts(
         config: Option<&str>,
+        live: &[(String, Vec<String>)],
         env: &dyn Fn(&str) -> Option<String>,
         url_env: &dyn Fn(&str) -> Option<String>,
     ) -> Setup {
-        let mut catalog = Catalog::builtin();
+        let mut catalog = Catalog::builtin().with_live(live);
         let (mut model_cfg, mut agent_cfg, mut small_cfg) = (None, None, None);
         let (mut effort_cfg, mut agent_effort_cfg) = (None, None);
         let mut voice_cfg = voice::VoiceConfig::default();
@@ -1383,7 +1317,7 @@ impl Setup {
         let files = auth::EnvFile::read_all(&home.env_files());
         let real = |k: &str| std::env::var(k).ok();
         let store = auth::Store::read(&home.auth_file()).unwrap_or_default();
-        Setup::from_parts(text.as_deref(), &real, &|k| with_files(&real, &files, k))
+        Setup::from_parts(text.as_deref(), &live_fetch::read(&home.cache_dir()), &real, &|k| with_files(&real, &files, k))
             .with_keys(&auth::Keys { env: &real, store: &store, files: &files })
     }
 
@@ -1463,6 +1397,11 @@ impl Setup {
                 o.push_str(&format!("shape = {}\n", q(&p.shape)));
             }
             let mut caps = c.provider_caps(p);
+            // the family's list, so a model the file does not list gets
+            // it: the runtime has no list of its own (efforts.rs)
+            if caps.efforts.is_empty() {
+                caps.efforts = family_efforts(&p.api).join(",");
+            }
             // a provider that signs in: its token comes from this binary
             // (`bise auth token <id>`), unless config.toml names a command
             if p.signs_in() && caps.key_command.is_empty() {
@@ -1758,11 +1697,17 @@ fn key(s: &str) -> String {
 /// the .env files read again, so an edit reaches the next call).
 pub fn export_handoff(config: &Path, cache_dir: &Path, env: &dyn Fn(&str) -> Option<String>) -> Option<PathBuf> {
     let text = std::fs::read_to_string(config).ok();
-    let setup = Setup::from_text(text.as_deref(), env);
+    let setup = Setup::from_parts(text.as_deref(), &live_fetch::read(cache_dir), env, env);
     let fallback = std::env::temp_dir().join(format!("bise-models-{}.toml", std::process::id()));
-    [cache_dir.join("models.toml"), fallback]
+    let mut why = Vec::new();
+    let found = [cache_dir.join("models.toml"), fallback]
         .into_iter()
-        .find(|p| setup.write_handoff(p).is_ok())
+        .find(|p| setup.write_handoff(p).map_err(|e| why.push(format!("{}: {e}", p.display()))).is_ok());
+    if found.is_none() {
+        // no file: the runtime has no effort list of its own (efforts.rs)
+        eprintln!("warn: no models file for the runtime, its calls go without an effort ({})", why.join("; "));
+    }
+    found
 }
 
 #[cfg(test)]

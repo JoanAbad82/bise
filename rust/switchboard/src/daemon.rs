@@ -566,7 +566,7 @@ impl Shell {
     /// changes (a `/model ... default`, the user's editor).
     fn setup(&mut self) -> &bise_catalog::Setup {
         let path = self.config_path.get_or_insert_with(|| bise_home::Home::from_env().config_file()).clone();
-        let mtime = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+        let mtime = bise_catalog::live_fetch::stamp(&path, &bise_home::Home::from_env().cache_dir());
         if self.setup.as_ref().is_none_or(|(t, _)| *t != mtime) {
             self.setup = Some((mtime, bise_catalog::Setup::load(&path)));
         }

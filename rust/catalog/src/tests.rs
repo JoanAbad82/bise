@@ -364,11 +364,11 @@ fast = "groq/openai/gpt-oss-120b"
         r
     };
     for m in &s.catalog.models {
-        assert_eq!(read_back(&m.name()), s.catalog.resolve(&m.name()), "{}", m.name());
+        assert_eq!(read_back(&m.name()), effort_tests::with_family(&s.catalog, s.catalog.resolve(&m.name())), "{}", m.name());
     }
     for p in &s.catalog.providers {
         let n = format!("{}/unlisted", p.id);
-        assert_eq!(read_back(&n), s.catalog.resolve(&n));
+        assert_eq!(read_back(&n), effort_tests::with_family(&s.catalog, s.catalog.resolve(&n)));
         let b = back.catalog.provider(&p.id).unwrap();
         assert_eq!((&b.auth, &b.shape), (&p.auth, &p.shape), "{}", p.id);
     }
@@ -1135,7 +1135,7 @@ fn the_env_then_the_env_files_in_order() {
     assert_eq!(with_files(&env, &files, "X").as_deref(), Some("from-env"));
     assert_eq!(with_files(&env, &files, "Y"), None);
     // Ben's setup: key and URL in ~/.vibe/.env, nothing in config.toml
-    let s = Setup::from_parts(Some(OPUS), &none, &|k| with_files(&none, &files, k));
+    let s = Setup::from_parts(Some(OPUS), &[], &none, &|k| with_files(&none, &files, k));
     assert_eq!(s.model_for("main").base_url, "https://vibe.example/anthropic/v1");
 }
 

@@ -7,12 +7,12 @@
 1024 apps/desktop/src/store/store.ts
 1200 bend/core/wire.bend
 3883 bend/hub/core.bend
-1356 bend/runtime/provider-pure.bend
+1340 bend/runtime/provider-pure.bend
 1319 docs/brand/design-system/content.py
 1387 docs/brand/readme/make.py
 1335 rust/catalog/src/auth_cli.rs
-1130 rust/catalog/src/chatgpt.rs
-1777 rust/catalog/src/lib.rs
+1118 rust/catalog/src/chatgpt.rs
+1722 rust/catalog/src/lib.rs
 1251 rust/catalog/src/tests.rs
 1015 rust/computer-use/src/e2e.rs
 1112 rust/harness/src/doctor.rs

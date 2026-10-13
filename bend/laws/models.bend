@@ -204,19 +204,23 @@ law effort_order:
         "", "agent", "model = \"opus-5.5\"
 reasoning_effort = \"low\"
 agent_reasoning_effort = \"medium\"", "[providers.foundry]
-base_url = \"https://foundry.example.net/anthropic/v1\"", "")),
+base_url = \"https://foundry.example.net/anthropic/v1\"
+efforts = \"none,low,medium,high,xhigh,max\"", "")),
       Pv.shown_effort(Pv.resolve_chosen("", "", "", "", "agent",
         "model = \"opus-5.5\"
 reasoning_effort = \"low\"
 agent_reasoning_effort = \"medium\"", "[providers.foundry]
-base_url = \"https://foundry.example.net/anthropic/v1\"", "")),
+base_url = \"https://foundry.example.net/anthropic/v1\"
+efforts = \"none,low,medium,high,xhigh,max\"", "")),
       Pv.shown_effort(Pv.resolve_chosen("", "", "", "", "main",
         "model = \"opus-5.5\"
 reasoning_effort = \"low\"
 agent_reasoning_effort = \"medium\"", "[providers.foundry]
-base_url = \"https://foundry.example.net/anthropic/v1\"", "")),
+base_url = \"https://foundry.example.net/anthropic/v1\"
+efforts = \"none,low,medium,high,xhigh,max\"", "")),
       Pv.shown_effort(Pv.resolve_chosen("", "", "", "", "main", "model = \"opus-5.5\"", "[providers.foundry]
-base_url = \"https://foundry.example.net/anthropic/v1\"", "")))
+base_url = \"https://foundry.example.net/anthropic/v1\"
+efforts = \"none,low,medium,high,xhigh,max\"", "")))
     == ("max", "medium", "low", "high") : String & String & String & String}
 
 # LAW: an effort the model does not take falls to its default: max is
@@ -224,7 +228,8 @@ base_url = \"https://foundry.example.net/anthropic/v1\"", "")))
 # (efforts, effort keys of the models file) win over its family's.
 law effort_outside_the_list_falls_to_the_default:
   {(Pv.shown_effort(Pv.resolve_chosen("reasoning_effort = \"max\"", "",
-        "zai-glm-5-3", "", "", "", "", "")),
+        "zai-glm-5-3", "", "", "", "[providers.mistral]
+efforts = \"none,low,medium,high\"", "")),
       Pv.shown_effort(Pv.resolve_chosen("reasoning_effort = \"low\"", "",
         "", "", "", "model = \"work/m\"", "[providers.work]
 base_url = \"http://x\"
@@ -237,6 +242,17 @@ reasoning = true
 efforts = \"minimal,low\"
 effort = \"minimal\"", "")))
     == ("high", "high", "minimal") : String & String & String}
+
+# LAW (effort-table): no models file, no effort list: the runtime keeps
+# no list of its own (Rust owns them, rust/catalog/src/efforts.rs), so a
+# model it only knows from builtin() gets none, whatever was asked, and
+# the body's default goes.
+law effort_without_models_file_is_none:
+  {(Pv.shown_effort(Pv.resolve_chosen("reasoning_effort = \"high\"", "",
+        "zai-glm-5-3", "", "", "", "", "")),
+      Pv.shown_effort(Pv.resolve_chosen("reasoning_effort = \"xhigh\"", "",
+        "", "", "", "model = \"opus-5.5\"", "", "")))
+    == ("", "") : String & String}
 
 # LAW: a model that does not reason (or an Anthropic one whose thinking
 # is none) has no effort: none is sent, whatever was asked.

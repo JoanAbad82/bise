@@ -196,7 +196,7 @@ pub(crate) fn setup_of(env: Env, home: &bise_home::Home) -> bise_catalog::Setup 
     let files = bise_catalog::auth::EnvFile::read_all(&home.env_files());
     let store = bise_catalog::auth::Store::read(&home.auth_file()).unwrap_or_default();
     // one key, every role: the checker and voice follow the keys found
-    bise_catalog::Setup::from_parts(text.as_deref(), env, &|k| bise_catalog::with_files(env, &files, k))
+    bise_catalog::Setup::from_parts(text.as_deref(), &[], env, &|k| bise_catalog::with_files(env, &files, k))
         .with_keys(&bise_catalog::auth::Keys { env, store: &store, files: &files })
 }
 

@@ -220,7 +220,7 @@ def part_d():
     open(models, "w").write(
         'version = 1\ndefault_model = "fake/claude-x"\n\n'
         '[providers.fake]\nname = "Fake"\napi = "anthropic"\nbase_url = "%s"\nkey_env = ""\n\n'
-        '[models."fake/claude-r"]\nreasoning = true\n\n'
+        '[models."fake/claude-r"]\nreasoning = true\nefforts = "none,low,medium,high,xhigh,max"\n\n'
         '[providers.fakeoai]\nname = "Fake OpenAI"\napi = "openai-chat"\nbase_url = "%s"\nkey_env = ""\n\n'
         '[providers.fakegem]\nname = "Fake Gemini"\napi = "gemini"\nbase_url = "%s"\nkey_env = ""\n\n'
         '[providers.fakegw]\nname = "Fake Gateway"\napi = "anthropic"\nbase_url = "%s"\nkey_env = ""\n'
