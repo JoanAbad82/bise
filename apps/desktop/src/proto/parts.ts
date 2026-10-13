@@ -3,6 +3,17 @@
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
 /**
+ * One thing he did on a page ([`Part::Page`]): on block `block`, a
+ * `kind` (`pick`, `note`, `voice`, `tick`, `edit`, `keep`, `drop`,
+ * `unsure`, `approve`, `skip`, `start`), his words (`text`: the option
+ * he picked, his note; an edit's new words), what it is on (`quote`: the
+ * words he selected, an edit's old words; "" none) and, when it answers
+ * a question that had a card, that card and its question (`card` 0 and
+ * `asked` "" none).
+ */
+export type PageNote = { block: string, kind: string, text?: string, quote?: string, card?: number, asked?: string, };
+
+/**
  * One piece of his message.
  */
-export type Part = { "kind": "text", text: string, } | { "kind": "quote", from: string, text: string, file?: string, new?: string, old?: string, } | { "kind": "paste", n: number, text: string, } | { "kind": "image", name: string, source: string, mime?: string, b64_file?: string, } | { "kind": "file", path: string, };
+export type Part = { "kind": "text", text: string, } | { "kind": "quote", from: string, text: string, file?: string, new?: string, old?: string, } | { "kind": "paste", n: number, text: string, } | { "kind": "image", name: string, source: string, mime?: string, b64_file?: string, } | { "kind": "file", path: string, } | { "kind": "page", text: string, to: string, page: string, title?: string, version: number, notes: Array<PageNote>, };

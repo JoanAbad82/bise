@@ -862,3 +862,7 @@ pub fn tail_start(lines: &[Line], entries: &[Entry], want: usize) -> Pos {
 #[cfg(test)]
 #[path = "fold_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "fold_page_tests.rs"]
+mod page_tests;

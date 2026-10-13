@@ -14,7 +14,7 @@ import { shownName } from '@/agents/model';
 import { saidFor, useSaidMs } from '@/voicemode';
 import type { RowCtx } from './rows';
 import { Thumb } from './rows-cards';
-import { youView, type YouView } from './parts';
+import { drawnParts, youView, type YouView } from './parts';
 import { lineCount, quoteAbout } from '@/composer/message';
 /** A message of his longer than this folds to its first lines (tui-parity B11, the TUI's You(_, _, open)). */
 export const LONG_LINES = 12;
@@ -109,7 +109,9 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   // msg-parts: his message comes from its typed parts, never from Entry.text (the model's templated
   // text; the fold gives every 'you' entry its parts since msg-parts sha c). No parts (an older
   // hub): the text drawn plain, never parsed for tags (architect's delta review D1)
-  const view = e.parts != null && e.parts.length > 0 ? youView(e.parts) : null;
+  // a part of a kind this window doesn't know (a newer hub's): drawn from its text, never empty
+  const drawn = drawnParts(e.parts);
+  const view = drawn !== null ? youView(drawn) : null;
   const quotes = view !== null ? view.quotes.map((q) => ({ source: q.from, text: q.text, about: q.file !== '' ? quoteAbout(q.from, q.text, q) : '' })) : [];
   const text = view !== null ? view.words : stripContext(e.text);
   const fold = foldOf(text);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Part } from '@/proto';
-import { partsGist, youView } from './parts';
+import { drawnParts, pageAnswer, pageOf, partsGist, youView } from './parts';
 
 // msg-parts (architect m_17621): his message drawn from its typed parts, never a tag; the TUI's
 // said.rs view_of / gist are the rule
@@ -39,5 +39,39 @@ describe('his message from its parts (msg-parts)', () => {
   it("a row's gist: each chip's glyph and label in place (the TUI's gist)", () => {
     expect(partsGist([quote('main', 'q'), text('both '), { kind: 'paste', n: 1, text: 'x' }, text(' and '), { kind: 'image', name: '[Image #2]', source: '/a/shot.png' }])).toBe('❝ main both ▤ 1 and ▣ [Image #2]');
     expect(partsGist([{ kind: 'image', name: 'shot.png', source: '/a/shot.png' }])).toBe('▣ shot.png');
+  });
+});
+
+// page-answer-row (architect m_20833): what he did on a page draws from its page part, bise-proto's
+// words::page_answer word for word, never the hub's template; a part this window doesn't know draws
+// the entry from its text (never an empty bubble)
+describe('his answer on a page (page part)', () => {
+  const page = (notes: object[], to = 'main'): Part =>
+    ({ kind: 'page', text: 'you sent 1 note on your page … answer with: sb page publish <file>', to, page: 'effort-lists', title: 'efforts', version: 4, notes }) as Part;
+  it('one pick on a card reads as the card answer, his words alone', () => {
+    const p = pageOf([page([{ block: 'q-live', kind: 'pick', text: "la table maintenant, la lecture de l'API juste après", card: 516, asked: "Est-ce que bise lit les listes dans l'API ?" }])]);
+    expect(p).not.toBeNull();
+    if (p === null) return;
+    expect(pageAnswer(p)).toEqual({ head: 'you answered main', asked: "Est-ce que bise lit les listes dans l'API ?", words: "la table maintenant, la lecture de l'API juste après" });
+    const short = pageOf([page([{ block: 'q', kind: 'pick', text: 'xhigh', card: 514, asked: 'le nom ?' }])]);
+    expect(short === null ? '' : pageAnswer(short).head).toBe('you answered main: xhigh');
+  });
+  it('notes, a tick, an edit: the page named, his words one per line', () => {
+    const p = pageOf([
+      page([
+        { block: 'p1', kind: 'note', text: 'shorter', quote: 'Revenue grew' },
+        { block: 'r', kind: 'tick', text: 'done' },
+        { block: 'p2', kind: 'edit', text: 'Q3', quote: 'Q2' },
+        { block: 'k', kind: 'keep' },
+      ]),
+    ]);
+    expect(p === null ? null : pageAnswer(p)).toEqual({ head: 'you answered main on efforts', asked: '', words: '"Revenue grew": shorter\n✓ done\n"Q2" → "Q3"\n♡ keep' });
+    const start = pageOf([page([{ block: 'ideas', kind: 'start', text: 'go' }])]);
+    expect(start === null ? '' : pageAnswer(start).head).toBe('you asked main for an agent on efforts');
+  });
+  it('a part kind this window does not know: the entry draws from its text', () => {
+    expect(drawnParts([text('a'), { kind: 'voice', secs: 3 } as unknown as Part])).toBeNull();
+    expect(drawnParts([text('a')])).toEqual([text('a')]);
+    expect(drawnParts([])).toBeNull();
   });
 });

@@ -220,3 +220,25 @@ fn parts_on_the_wire() {
     assert_eq!(serde_json::to_value(&back[0]).unwrap(), serde_json::json!({"kind": "voice", "secs": 3}));
     assert_eq!(render(&back), "b");
 }
+
+/// page-answer-row (architect m_20833): a page's message carries one page
+/// part whose text is the model's whole text, so render gives it back
+/// byte for byte; parse never makes one; canonical keeps it; on the wire
+/// it is `kind: page` with its notes.
+#[test]
+fn a_page_part_renders_as_the_hubs_text() {
+    let text = "you sent 1 note on your page \"efforts\" (effort-lists v4, http://x/p/effort-lists):\n1. on q-live: pick: la table\n<page-notes page=\"effort-lists\" version=\"4\">[]</page-notes>\n\n[from the page: answer on the page; one short line at most]";
+    let note = PageNote { block: "q-live".into(), kind: "pick".into(), text: "la table".into(), card: 516, asked: "Est-ce que bise lit les listes ?".into(), ..PageNote::default() };
+    let p = Part::Page { text: text.into(), to: "main".into(), page: "effort-lists".into(), title: "efforts".into(), version: 4, notes: vec![note.clone()] };
+    assert_eq!(render(std::slice::from_ref(&p)), text);
+    assert_eq!(canonical(std::slice::from_ref(&p)), vec![p.clone()]);
+    assert!(!parse(text).iter().any(|x| matches!(x, Part::Page { .. })), "parse never makes a page part");
+    assert_eq!(words(std::slice::from_ref(&p)), "", "his words come from the notes, never the template");
+    let v = serde_json::to_value(&p).unwrap();
+    assert_eq!(v["kind"], "page");
+    assert_eq!(v["notes"][0], serde_json::json!({"block": "q-live", "kind": "pick", "text": "la table", "card": 516, "asked": "Est-ce que bise lit les listes ?"}));
+    assert_eq!(serde_json::from_value::<Part>(v).unwrap(), p);
+    let s = page_of(std::slice::from_ref(&p)).unwrap();
+    assert_eq!((s.to, s.title, s.notes), ("main", "efforts", &[note][..]));
+    assert!(page_of(&[t("x")]).is_none());
+}

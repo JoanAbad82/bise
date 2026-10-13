@@ -202,6 +202,35 @@ fn his_answer_folded_here_is_skipped_and_the_hubs_asks() {
     assert_eq!(asked.as_deref(), Some("which bench?"));
 }
 
+/// page-answer-row: his pick on a page question that had a card (the
+/// hub's message to main with its page part) draws as the answer row, his
+/// words alone, never the template; answered here (the card's own fold),
+/// it is not placed twice.
+#[test]
+fn his_page_answer_is_one_answer_row() {
+    let text = "you sent 1 note on your page \"efforts\" (effort-lists v4, http://x):\n1. on q-live: pick: la table maintenant, la lecture de l'API juste après\nanswer with: sb page publish <file> --id effort-lists --notes-done n3\n<page-notes page=\"effort-lists\" version=\"4\">[]</page-notes>\n\n[from the page: answer on the page; one short line at most]";
+    let parts = serde_json::json!([{"kind": "page", "text": text, "to": "main", "page": "effort-lists", "title": "efforts", "version": 4,
+        "notes": [{"block": "q-live", "kind": "pick", "text": "la table maintenant, la lecture de l'API juste après", "card": 516, "asked": "Est-ce que bise lit les listes dans l'API ?"}]}]);
+    let e = entry(serde_json::json!({"pos": 9, "at_ms": 0, "kind": "you", "text": text, "parts": parts}));
+    let evs = crate::entry_ev::ev_of(&e);
+    let [Ev::Approval { ok, text: head, note, asked, .. }] = evs.as_slice() else { panic!("not one answer row: {} events", evs.len()) };
+    assert!(*ok);
+    assert_eq!(head, "you answered main");
+    assert_eq!(asked, "Est-ce que bise lit les listes dans l'API ?");
+    assert_eq!(note, "la table maintenant, la lecture de l'API juste après");
+    assert_eq!(answers(&e), Some(516));
+    let mut app = test_app();
+    test_view(&mut app, "main");
+    assert!(!skip(&app, "main", &e), "answered on the page: placed");
+    app.sb.fold_here(516, "main");
+    assert!(skip(&app, "main", &e), "answered here: the card's fold only");
+    // a plain note on the page (no card): placed, the page named
+    let note = entry(serde_json::json!({"pos": 10, "at_ms": 0, "kind": "you", "text": "you sent 1 note…", "parts": [{"kind": "page", "text": "you sent 1 note…", "to": "t1", "page": "w", "title": "plan", "version": 1, "notes": [{"block": "p1", "kind": "note", "text": "shorter"}]}]}));
+    assert_eq!(answers(&note), None);
+    let evs = crate::entry_ev::ev_of(&note);
+    assert!(matches!(evs.as_slice(), [Ev::Approval { text, note, .. }] if text == "you answered t1 on plan" && note == "shorter"), "a note's row");
+}
+
 /// Read 6: The queue: at a turn's end the oldest queued message goes, once
 /// (the next one waits for the turn it starts).
 #[test]

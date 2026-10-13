@@ -29,8 +29,10 @@ use store::{Meta, Publish, Store};
 #[derive(Debug, PartialEq)]
 pub enum PageMsg {
     /// `send` on page `id`: `text` (the notes message) goes to `agent`
-    /// (the page's), as from the user; the hub picks main when it is gone
-    Sent { id: String, agent: String, text: String },
+    /// (the page's), as from the user; the hub picks main when it is gone.
+    /// `notes`: the notes in it, for the message's typed part
+    /// (`store::page_part`: the clients draw his words, never `text`)
+    Sent { id: String, agent: String, text: String, notes: Vec<store::Note> },
     /// the drafts of page `id` changed (its open notes count)
     Notes { id: String },
     /// the user answered question `block` of page `id` on the page

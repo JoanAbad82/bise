@@ -201,8 +201,8 @@ impl Shell {
             Err(e) => return log_line(&self.opts.paths, &format!("page {id}: the pick not saved: {e}")),
         };
         pages.push(id, "notes", &json!({"notes": pages.store.notes(id)}));
-        let text = crate::pages::store::notes_message(&meta, &pages.url(id), &[note]);
-        self.page_msg(crate::pages::PageMsg::Sent { id: id.to_string(), agent: meta.agent.clone(), text });
+        let text = crate::pages::store::notes_message(&meta, &pages.url(id), std::slice::from_ref(&note));
+        self.page_msg(crate::pages::PageMsg::Sent { id: id.to_string(), agent: meta.agent.clone(), text, notes: vec![note] });
         // a drafted step that waited for this answer gets its card now
         self.page_steps(id);
     }
@@ -474,7 +474,7 @@ impl Shell {
         }
         pages.push(id, "notes", &json!({"notes": pages.store.notes(id)}));
         let msg = crate::pages::store::notes_message(meta, &pages.url(id), sent);
-        self.page_msg(crate::pages::PageMsg::Sent { id: id.to_string(), agent: meta.agent.clone(), text: msg });
+        self.page_msg(crate::pages::PageMsg::Sent { id: id.to_string(), agent: meta.agent.clone(), text: msg, notes: sent.to_vec() });
     }
 
     /// An answer on a batch card that was replaced or closed (pm's C fail
@@ -562,8 +562,8 @@ impl Shell {
         if let Err(e) = pages.locked(|st| st.save_steps(id, &steps)) {
             log_line(&self.opts.paths, &format!("page {id}: steps not saved: {e}"));
         }
-        let msg = crate::pages::store::notes_message(&meta, &pages.url(id), &[note]);
-        self.page_msg(crate::pages::PageMsg::Sent { id: id.to_string(), agent: meta.agent.clone(), text: msg });
+        let msg = crate::pages::store::notes_message(&meta, &pages.url(id), std::slice::from_ref(&note));
+        self.page_msg(crate::pages::PageMsg::Sent { id: id.to_string(), agent: meta.agent.clone(), text: msg, notes: vec![note] });
         self.page_steps(id);
         true
     }

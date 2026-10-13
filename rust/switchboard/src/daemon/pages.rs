@@ -345,7 +345,7 @@ impl Shell {
                 // the last good public copy stays up; main hears it once (designer m_7509)
                 self.feed_rec(MAIN, Feed::warn(format!("▲ couldn't publish {id} to the public mirror: {error}")));
             }
-            crate::pages::PageMsg::Sent { id, agent, text } => {
+            crate::pages::PageMsg::Sent { id, agent, text, notes } => {
                 // start notes (an item the user wants an agent on): main's,
                 // never the page's agent's (ambient-lead m_5006)
                 // a stop note (the frame's 'stop' of a watched page): the hub
@@ -363,7 +363,8 @@ impl Shell {
                 if let (false, Some(meta)) = (starts.is_empty(), pages.store.meta(&id)) {
                     let msg = crate::pages::store::start_message(&meta, &pages.url(&id), &starts);
                     let msg = Self::page_hint(MAIN, msg);
-                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text: msg, queued: false, parts: String::new() });
+                    let parts = Self::page_parts(&pages, &meta, &starts, MAIN, &msg);
+                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text: msg, queued: false, parts });
                     pages.push(&id, "notes", &json!({"notes": pages.store.notes(&id)}));
                 }
                 // the other notes: the page's agent, main when it is gone
@@ -379,7 +380,9 @@ impl Shell {
                     let w = self.pg.page_waits.entry(to.clone()).or_insert_with(|| (now_ms(), Vec::new()));
                     w.1.push((id.clone(), text.clone()));
                     let text = Self::page_hint(&to, text);
-                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: false, parts: String::new() });
+                    let sent: Vec<_> = notes.into_iter().filter(|n| n.kind != "start" && n.kind != "stop").collect();
+                    let parts = pages.store.meta(&id).map(|m| Self::page_parts(&pages, &m, &sent, &to, &text)).unwrap_or_default();
+                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: false, parts });
                 }
                 self.state_now();
             }
@@ -396,6 +399,14 @@ impl Shell {
                 self.page_answers();
             }
         }
+    }
+
+    /// The parts' JSON of a page's message `text` to `to` (its one
+    /// `Part::Page`, architect m_20833): what the clients draw his words
+    /// from, while the model reads `text` (render(parts) == text).
+    fn page_parts(pages: &crate::pages::Pages, meta: &crate::pages::store::Meta, sent: &[crate::pages::store::Note], to: &str, text: &str) -> String {
+        let part = crate::pages::store::page_part(meta, &pages.store.questions(&meta.id), sent, to, text);
+        serde_json::to_string(&[part]).unwrap_or_default()
     }
 
     /// The agents each page's latest version names, read from the store

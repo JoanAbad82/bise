@@ -73,10 +73,72 @@ pub enum Part {
     },
     /// another file he attached (an absolute path)
     File { path: String },
+    /// what he did on a page (page-answer-row, architect m_20833): his
+    /// notes, picks, ticks or starts on page `page`, as the hub sends
+    /// them to an agent. `text` is the model's text whole (the hub's
+    /// template, its hint included), so it renders as itself; the clients
+    /// draw his words from `notes`, never from `text`; `to`: the agent it
+    /// went to (the page's, main when it is gone). Only the hub makes one
+    /// ([`parse`] never does), one per message.
+    Page {
+        text: String,
+        to: String,
+        page: String,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        title: String,
+        #[serde(default)]
+        version: u64,
+        #[serde(default)]
+        notes: Vec<PageNote>,
+    },
     /// a part a newer client sent: kept whole, never rendered
     #[serde(untagged)]
     #[cfg_attr(feature = "ts", ts(skip))]
     Unknown(Value),
+}
+
+/// One thing he did on a page ([`Part::Page`]): on block `block`, a
+/// `kind` (`pick`, `note`, `voice`, `tick`, `edit`, `keep`, `drop`,
+/// `unsure`, `approve`, `skip`, `start`), his words (`text`: the option
+/// he picked, his note; an edit's new words), what it is on (`quote`: the
+/// words he selected, an edit's old words; "" none) and, when it answers
+/// a question that had a card, that card and its question (`card` 0 and
+/// `asked` "" none).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PageNote {
+    pub block: String,
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub text: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub quote: String,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub card: u64,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub asked: String,
+}
+
+fn is_zero(n: &u64) -> bool {
+    *n == 0
+}
+
+/// The page part of a message, when it has one (a message the hub wrote
+/// from a page): who it went to, the page's title (its id when it has
+/// none) and his notes.
+pub fn page_of(parts: &[Part]) -> Option<PageSaid<'_>> {
+    parts.iter().find_map(|p| match p {
+        Part::Page { to, page, title, notes, .. } => Some(PageSaid { to, title: if title.is_empty() { page } else { title }, notes }),
+        _ => None,
+    })
+}
+
+/// [`page_of`]'s view of a page part.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PageSaid<'a> {
+    pub to: &'a str,
+    pub title: &'a str,
+    pub notes: &'a [PageNote],
 }
 
 /// The header of the list of his other files (the hub's
@@ -103,6 +165,7 @@ pub fn render(parts: &[Part]) -> String {
             Part::Paste { n, text } => body.push_str(&paste_tag(*n, text)),
             Part::Image { name, source, mime, b64_file } => body.push_str(&image_marker(name, source, mime, b64_file)),
             Part::File { path } => files.push(path),
+            Part::Page { text, .. } => body.push_str(text),
             Part::Unknown(_) => {}
         }
     }

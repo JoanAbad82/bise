@@ -699,6 +699,34 @@ pub fn notes_message(m: &Meta, url: &str, sent: &[Note]) -> String {
     out
 }
 
+/// The typed part of a page's message to `to` (page-answer-row,
+/// architect m_20833): `text` is the message the model gets whole (from
+/// [`notes_message`] or [`start_message`], its hint included), `sent` the
+/// notes in it. A note on a question block carries its question and its
+/// card, so the clients draw `you answered main · <question>` and his
+/// words, never `text`.
+pub fn page_part(m: &Meta, questions: &[super::questions::Question], sent: &[Note], to: &str, text: &str) -> bise_proto::parts::Part {
+    let notes = sent
+        .iter()
+        .map(|n| {
+            let q = questions.iter().find(|q| q.block == n.block && matches!(n.kind.as_str(), "pick" | "note" | "voice"));
+            let (text, quote) = match n.kind.as_str() {
+                "edit" => (n.after.clone().unwrap_or_default(), n.before.clone().unwrap_or_default()),
+                _ => (n.text.clone().unwrap_or_default(), n.quote.clone().unwrap_or_default()),
+            };
+            bise_proto::parts::PageNote {
+                block: n.block.clone(),
+                kind: n.kind.clone(),
+                text,
+                quote,
+                card: q.map(|q| q.card).unwrap_or(0),
+                asked: q.map(|q| q.text.trim().to_string()).unwrap_or_default(),
+            }
+        })
+        .collect();
+    bise_proto::parts::Part::Page { text: text.to_string(), to: to.to_string(), page: m.id.clone(), title: m.title.clone(), version: m.version(), notes }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -843,6 +871,38 @@ mod tests {
         let sent = s.send("bugs", 14).unwrap();
         let text = notes_message(&m, "u", &sent);
         assert!(text.starts_with("you sent 1 note on your page") && text.contains("shorter") && !text.contains("b4"), "{text}");
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    /// page-answer-row (architect m_20833): the message's page part renders
+    /// as the model's text, and carries his pick with the question's card
+    /// and words, his note with what it is on, an edit's old and new words.
+    #[test]
+    fn a_page_message_carries_his_notes_typed() {
+        let d = temp();
+        let s = Store::new(&d);
+        s.publish(&publish("t1", Some("w"), Some("efforts")), vec![], 10, &|_| false).unwrap();
+        let m = s.meta("w").unwrap();
+        let q = super::super::questions::Question { block: "q-live".into(), text: "Est-ce que bise lit les listes ?".into(), card: 516, ..Default::default() };
+        let pick = s.add_pick("w", "q-live", "la table maintenant", 1, 11).unwrap();
+        s.set_drafts("w", &[json!({"block": "p1", "kind": "note", "text": "shorter", "quote": "Revenue grew"}), json!({"block": "p2", "kind": "edit", "before": "Q2", "after": "Q3"})], 1, 12).unwrap();
+        let sent = s.send("w", 13).unwrap();
+        let mut all = vec![pick];
+        all.extend(sent);
+        let text = format!("{}\n\n[from the page: answer on the page; one short line at most]", notes_message(&m, "u", &all));
+        let part = page_part(&m, std::slice::from_ref(&q), &all, "main", &text);
+        assert_eq!(bise_proto::parts::render(std::slice::from_ref(&part)), text, "the model's text, byte for byte");
+        let bise_proto::parts::Part::Page { to, page, title, version, notes, .. } = part else { panic!("{part:?}") };
+        assert_eq!((to.as_str(), page.as_str(), title.as_str(), version), ("main", "w", "efforts", 1));
+        let n = |block: &str, kind: &str, text: &str, quote: &str, card: u64, asked: &str| bise_proto::parts::PageNote { block: block.into(), kind: kind.into(), text: text.into(), quote: quote.into(), card, asked: asked.into() };
+        assert_eq!(
+            notes,
+            vec![
+                n("q-live", "pick", "la table maintenant", "", 516, "Est-ce que bise lit les listes ?"),
+                n("p1", "note", "shorter", "Revenue grew", 0, ""),
+                n("p2", "edit", "Q3", "Q2", 0, ""),
+            ]
+        );
         let _ = std::fs::remove_dir_all(d);
     }
 

@@ -259,6 +259,49 @@ pub fn answered_split(who: &str, words: &str, width: &dyn Fn(&str) -> usize) -> 
     }
 }
 
+/// The row of what he did on a page (page-answer-row, architect m_20833):
+/// the head, what it answered (a card's question, "" none) and his words
+/// under it. One answer to a card reads as any card answer (`you answered
+/// main` · its question, his words); a start asks for an agent; anything
+/// else names the page, his notes one per line. Never the hub's template.
+pub fn page_answer(p: &crate::parts::PageSaid<'_>, width: &dyn Fn(&str) -> usize) -> (String, String, String) {
+    let (to, title, notes) = (p.to, p.title, p.notes);
+    if let [n] = notes {
+        if !n.asked.is_empty() {
+            let (head, note) = answered_split(to, &page_note_words(n, false), width);
+            return (head, n.asked.trim().to_string(), note);
+        }
+    }
+    let head = match notes.iter().all(|n| n.kind == "start") {
+        true => format!("you asked {to} for an agent on {title}"),
+        false => format!("you answered {to} on {title}"),
+    };
+    let lines: Vec<String> = notes.iter().map(|n| page_note_words(n, true)).filter(|l| !l.is_empty()).collect();
+    (head, String::new(), lines.join("\n"))
+}
+
+/// One note's words: the option he picked, his note, his mark (`✓ done`,
+/// `♡ keep`), an edit as `"old" → "new"`; `on`: the words it is on in
+/// front (`"Revenue": use March`).
+pub fn page_note_words(n: &crate::parts::PageNote, on: bool) -> String {
+    let text = n.text.trim();
+    let quote = one_line(&n.quote, 60);
+    let mark = match n.kind.as_str() {
+        "edit" => return format!("\"{quote}\" → \"{}\"", one_line(text, 60)),
+        "tick" if text.is_empty() || text == "done" => "✓ done",
+        "keep" => "♡ keep",
+        "drop" => "✗ drop",
+        "unsure" => "~ not sure",
+        "approve" => "✓ approve",
+        "skip" => "skip",
+        _ => text,
+    };
+    match on && !quote.is_empty() {
+        true => format!("\"{quote}\": {mark}"),
+        false => mark.to_string(),
+    }
+}
+
 /// The gauge's compact form (the TUI's task list, the window's sidebar):
 /// "21%", or "42k" without a known window.
 pub fn short_words(used: u64, window: Option<u64>) -> String {
@@ -551,6 +594,29 @@ pub fn wake_tail(f: &super::WakeFold) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    /// page-answer-row: his answer on a page reads as a card answer, his
+    /// words alone; a note, a tick, an edit, a start in their own words.
+    #[test]
+    fn a_page_answer_reads_as_his_words() {
+        use super::*;
+        use crate::parts::{PageNote, PageSaid};
+        let w = |s: &str| s.chars().count();
+        let note = |kind: &str, text: &str, quote: &str| PageNote { block: "b".into(), kind: kind.into(), text: text.into(), quote: quote.into(), ..PageNote::default() };
+        let said = |notes: &[PageNote]| page_answer(&PageSaid { to: "main", title: "efforts", notes }, &w);
+        // his pick on a question that had a card: the card answer's row
+        let pick = PageNote { card: 516, asked: "Est-ce que bise lit les listes dans l'API ?".into(), ..note("pick", "la table maintenant, la lecture de l'API juste après", "") };
+        assert_eq!(said(std::slice::from_ref(&pick)), ("you answered main".into(), "Est-ce que bise lit les listes dans l'API ?".into(), "la table maintenant, la lecture de l'API juste après".into()));
+        let short = PageNote { text: "xhigh".into(), ..pick };
+        assert_eq!(said(&[short]).0, "you answered main: xhigh");
+        // a note, a tick, an edit, a keep: the page named, his words one per line
+        let notes = [note("note", "shorter", "Revenue grew"), note("tick", "done", ""), note("edit", "Q3", "Q2"), note("keep", "", "")];
+        assert_eq!(said(&notes), ("you answered main on efforts".into(), String::new(), "\"Revenue grew\": shorter\n✓ done\n\"Q2\" → \"Q3\"\n♡ keep".into()));
+        // a start: he asked for an agent
+        assert_eq!(said(&[note("start", "do it", "ideas")]).0, "you asked main for an agent on efforts");
+        // never the hub's template
+        assert!(!said(&notes).2.contains("sb page publish"));
+    }
+
     #[test]
     fn the_waiting_words_are_designers() {
         use super::*;

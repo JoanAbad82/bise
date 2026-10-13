@@ -448,8 +448,9 @@ fn post_send(pages: &Pages, id: &str) -> Response {
     }
     let text = super::store::notes_message(&m, &pages.url(id), &sent);
     pages.push(id, "notes", &json!({"notes": pages.store.notes(id)}));
-    pages.tell_hub(PageMsg::Sent { id: id.to_string(), agent: m.agent.clone(), text });
-    Response::json(200, &json!({"sent": sent.len(), "agent": m.agent}))
+    let n = sent.len();
+    pages.tell_hub(PageMsg::Sent { id: id.to_string(), agent: m.agent.clone(), text, notes: sent });
+    Response::json(200, &json!({"sent": n, "agent": m.agent}))
 }
 
 /// What a new stream of page `id` gets at once besides its version and
@@ -674,7 +675,7 @@ mod tests {
         let r = post(&p, "/api/p/w/send", Some(&tok), Some("http://localhost:47123"), json!({}));
         assert_eq!(r.status, 200);
         match rx.try_recv().unwrap() {
-            PageMsg::Sent { id, agent, text } => {
+            PageMsg::Sent { id, agent, text, .. } => {
                 assert_eq!((id.as_str(), agent.as_str()), ("w", "t1"));
                 assert!(text.starts_with("you sent 1 note on your page \"w\" (w v1, http://127.0.0.1:47123/p/w):\n1. on p1: shorter\n"), "{text}");
             }

@@ -16,7 +16,8 @@ import { GROUP_GAP_MS, THOUGHT_MS, answeredCardOf, repeatedReport, briefOf, cloc
 import { useToday } from '@/app/clock';
 import { useIsCurrent } from './findmark';
 import { useVoiceLit } from '@/voicemode';
-import { AgentNote, AnsweredRow, ApprovalRow, CardAnsweredRow, CardRow, ToAgentRow } from './rows-cards';
+import { AgentNote, AnsweredRow, ApprovalRow, CardAnsweredRow, CardRow, PageAnswerRow, ToAgentRow } from './rows-cards';
+import { pageOf } from './parts';
 import { shownName } from '@/agents/model';
 import { BODY_KINDS, NAMELESS_KINDS, NOTE_KINDS, QUIET_KINDS, QUIET_REPORT, ROW_KINDS, sameRoute } from './tiers';
 import { YouRow } from './rows-messages';
@@ -194,7 +195,8 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
       return <ReportRow pos={e.pos} line={line} text={e.text} next={next} ctx={ctx} waits={line.startsWith('blocked')} />;
     }
     case 'you':
-      return <YouRow e={e} ctx={ctx} next={next} />;
+      // what he did on a page (his pick, note, tick): its answer row, never the hub's template
+      return pageOf(e.parts) !== null ? <PageAnswerRow e={e} next={next} /> : <YouRow e={e} ctx={ctx} next={next} />;
     case 'to_agent':
       return <ToAgentRow e={e} ctx={ctx} chained={chained} />;
     // amb-feed's batch 2 (b8cb4b1e): the lines the hub's fold used to drop

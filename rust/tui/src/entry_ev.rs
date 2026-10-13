@@ -41,6 +41,9 @@ fn kind_evs(e: &Entry) -> Vec<Ev> {
         fold: false,
     };
     match e.kind {
+        // what he did on a page (his pick, note, tick): the answer row,
+        // his words alone, never the hub's template (page-answer-row)
+        EntryKind::You if bise_proto::parts::page_of(&e.parts).is_some() => page_answer(e),
         // G1: the mark the fold moved, by the TUI's own rule
         // msg-parts: drawn from its parts (none from an older hub: read
         // back from its text, once)
@@ -111,6 +114,15 @@ fn kind_evs(e: &Entry) -> Vec<Ev> {
 /// replay, `0.0s` as the line path drew it), its result (the exit code and
 /// output line under a failed bash) and the gate holding it (`? waiting
 /// for you`), since their times.
+/// What he did on a page as the answer row (page-answer-row, architect
+/// m_20833): bise-proto's words (`you answered main` · the question, his
+/// words under it), from the message's page part, never its text.
+fn page_answer(e: &Entry) -> Vec<Ev> {
+    let Some(p) = bise_proto::parts::page_of(&e.parts) else { return Vec::new() };
+    let (text, asked, note) = bise_proto::thread::words::page_answer(&p, &unicode_width::UnicodeWidthStr::width);
+    vec![Ev::Approval { ok: true, text, note, parts: Vec::new(), asked, open: false }]
+}
+
 /// event-wake: a watch's end as the TUI's row (the entry's and the line
 /// path's one mapping), its words bise-proto's.
 pub(crate) fn wake_ev(w: &pthread::WakeFold) -> Ev {

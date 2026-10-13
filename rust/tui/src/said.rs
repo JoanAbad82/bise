@@ -121,6 +121,8 @@ pub(crate) fn view_of(text: &str, parts: &[Part]) -> View {
             }
             Part::Image { name, source, mime, b64_file } => v.body.push_str(&parts::image_marker(name, source, mime, b64_file)),
             Part::File { path } => files.push(path),
+            // his notes on a page, never the hub's template
+            Part::Page { notes, .. } => v.body.push_str(&page_words(notes, "\n")),
             Part::Unknown(_) => {}
         }
     }
@@ -153,12 +155,18 @@ pub(crate) fn gist(parts: &[Part]) -> String {
                 words.push_str(&format!("▣ {shown}"));
             }
             Part::File { path } => words.push_str(&format!(" {path}")),
+            Part::Page { notes, .. } => words.push_str(&page_words(notes, " · ")),
             Part::Unknown(_) => {}
         }
     }
     quotes.push(words.split_whitespace().collect::<Vec<_>>().join(" "));
     quotes.retain(|s| !s.is_empty());
     quotes.join(" ")
+}
+
+/// His notes on a page in bise-proto's words, joined by `sep`.
+fn page_words(notes: &[parts::PageNote], sep: &str) -> String {
+    notes.iter().map(|n| bise_proto::thread::words::page_note_words(n, true)).filter(|w| !w.is_empty()).collect::<Vec<_>>().join(sep)
 }
 
 /// The view of his message.

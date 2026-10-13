@@ -54,6 +54,10 @@ export function youView(parts: readonly Part[]): YouView {
       case 'file':
         files.push(p.path);
         break;
+      case 'page':
+        // what he did on a page: its own row (pageAnswer), never the hub's template
+        words += p.notes.map((n) => pageNoteWords(n, true)).filter((w) => w !== '').join('\n');
+        break;
       default:
         // a part from a newer client: kept by the hub, never drawn
         break;
@@ -74,7 +78,69 @@ export function partsGist(parts: readonly Part[]): string {
     else if (p.kind === 'image') {
       const file = p.source.split('/').at(-1) ?? '';
       words += `▣ ${p.name.startsWith('[') || file === '' ? p.name : file}`;
-    } else words += ` ${p.path}`;
+    } else if (p.kind === 'page') words += p.notes.map((n) => pageNoteWords(n, true)).join(' · ');
+    else if (p.kind === 'file') words += ` ${p.path}`;
   }
   return [...quotes, words.split(/\s+/u).filter((w) => w !== '').join(' ')].filter((s) => s !== '').join(' ');
+}
+
+/** The part kinds this window draws; an entry with another kind (a newer hub's) is drawn from its text. */
+const KNOWN_KINDS: ReadonlySet<string> = new Set(['text', 'quote', 'paste', 'image', 'file', 'page']);
+
+/** His parts when this window can draw them all, else null: an entry with a part of a kind it
+ *  doesn't know (a newer hub's) is drawn from its text, never as an empty bubble (architect m_20833). Pure. */
+export function drawnParts(parts: readonly Part[] | null | undefined): readonly Part[] | null {
+  if (parts == null || parts.length === 0) return null;
+  return parts.every((p) => KNOWN_KINDS.has((p as { kind: string }).kind)) ? parts : null;
+}
+
+type PagePart = Extract<Part, { kind: 'page' }>;
+type PageNoteOf = PagePart['notes'][number];
+
+/** The page part of his message, when the hub wrote it from a page (his pick, note, tick). Pure. */
+export function pageOf(parts: readonly Part[] | null | undefined): PagePart | null {
+  return parts?.find((p): p is PagePart => p.kind === 'page') ?? null;
+}
+
+const ON_THE_LINE = 30;
+
+function oneLine(s: string, max: number): string {
+  const l =
+    s
+      .split('\n')
+      .map((x) => x.trim())
+      .find((x) => x !== '') ?? '';
+  return [...l].length <= max ? l : `${[...l].slice(0, max - 1).join('')}…`;
+}
+
+/** One note's words, bise-proto's words::page_note_words word for word. Pure. */
+export function pageNoteWords(n: PageNoteOf, on: boolean): string {
+  const text = (n.text ?? '').trim();
+  const quote = oneLine(n.quote ?? '', 60);
+  if (n.kind === 'edit') return `"${quote}" → "${oneLine(text, 60)}"`;
+  const marks: Record<string, string> = { keep: '♡ keep', drop: '✗ drop', unsure: '~ not sure', approve: '✓ approve', skip: 'skip' };
+  const mark = n.kind === 'tick' && (text === '' || text === 'done') ? '✓ done' : (marks[n.kind] ?? text);
+  return on && quote !== '' ? `"${quote}": ${mark}` : mark;
+}
+
+/** What he did on a page as its row, bise-proto's words::page_answer word for word: one answer to
+ *  a card reads as any card answer (head 'you answered main', what it asked, his words); a start
+ *  asks for an agent; else the page's name and his notes one per line. Pure. */
+export function pageAnswer(p: PagePart): { head: string; asked: string; words: string } {
+  const title = p.title != null && p.title !== '' ? p.title : p.page;
+  const only = p.notes.length === 1 ? p.notes[0] : undefined;
+  if (only !== undefined && (only.asked ?? '') !== '') {
+    const w = pageNoteWords(only, false).trim();
+    const short = !w.includes('\n') && [...w].length <= ON_THE_LINE;
+    return short ? { head: `you answered ${p.to}: ${w}`, asked: (only.asked ?? '').trim(), words: '' } : { head: `you answered ${p.to}`, asked: (only.asked ?? '').trim(), words: w };
+  }
+  const head = p.notes.every((n) => n.kind === 'start') ? `you asked ${p.to} for an agent on ${title}` : `you answered ${p.to} on ${title}`;
+  return {
+    head,
+    asked: '',
+    words: p.notes
+      .map((n) => pageNoteWords(n, true))
+      .filter((w) => w !== '')
+      .join('\n'),
+  };
 }

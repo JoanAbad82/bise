@@ -146,8 +146,15 @@ pub(crate) fn lights(kind: EntryKind) -> bool {
     )
 }
 
-/// The item a fold of his answer is for (the hub's route line).
+/// The item a fold of his answer is for (the hub's route line, or his
+/// one answer on a page to a question that had a card).
 pub(crate) fn answers(e: &Entry) -> Option<u64> {
+    if let Some(p) = bise_proto::parts::page_of(&e.parts) {
+        return match p.notes {
+            [n] if n.card != 0 => Some(n.card),
+            _ => None,
+        };
+    }
     e.approval.as_ref()?.card
 }
 

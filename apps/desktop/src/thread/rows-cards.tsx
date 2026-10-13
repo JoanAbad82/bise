@@ -13,7 +13,7 @@ import { shownName } from '@/agents/model';
 import { YouBubble } from './rows-messages';
 import { NewsLine, ReportRow } from './rows-news';
 import type { RowCtx } from './rows';
-import { youView } from './parts';
+import { drawnParts, pageAnswer, pageOf, youView } from './parts';
 /** Main answered an agent's question for him: the question, the answer, and why, dim. */
 export function AnsweredRow({ e }: { e: Entry }) {
   const a = e.answered;
@@ -114,6 +114,29 @@ export function CardAnsweredRow({ pos, a, at, timeAlways }: { pos: number; a: { 
   );
 }
 
+/**
+ * What he did on a page (page-answer-row, architect m_20833): the hub's message to the agent
+ * carries a typed page part; the row is '✓ you answered main · <what the card asked>' over his
+ * words, the TUI's row word for word (bise-proto words::page_answer), never the hub's template.
+ */
+export function PageAnswerRow({ e, next }: { e: Entry; next: Entry | undefined }) {
+  const p = pageOf(e.parts);
+  if (p === null) return <Marker>{e.text}</Marker>;
+  const a = pageAnswer(p);
+  const head = a.asked !== '' ? `${a.head} · ${a.asked}` : a.head;
+  return (
+    <div className="th-approval" data-ok>
+      <YouBubble head={<AnsweredHead ok>{head}</AnsweredHead>} under={e.at_ms > 0 ? clock(e.at_ms) : undefined} timeAlways={lastOfRun(e, next)} testId={`thread.pageanswer.${String(e.pos)}`}>
+        {a.words === '' ? undefined : (
+          <div className="th-you-words" data-testid={`thread.pageanswer.${String(e.pos)}.words`}>
+            {a.words}
+          </div>
+        )}
+      </YouBubble>
+    </div>
+  );
+}
+
 /** '✓ you answered gift-ui': the dim head over his answer's bubble, the mark saying it with no color alone. */
 /** The mark of his answer: '✓' allowed, '✕' said no, '·' when the hub doesn't say. Pure. */
 export function answeredMark(ok: boolean | null | undefined): string {
@@ -160,7 +183,8 @@ export function ApprovalRow({ e, next }: { e: Entry; next: Entry | undefined }) 
   if (a == null) return <Marker>{e.text}</Marker>;
   // msg-parts: his answer's own parts (the note's), when the hub sent them: his words and images
   // from them, never from the templated text (no tag shows); the head stays the hub's words
-  const view = e.parts != null && e.parts.length > 0 ? youView(e.parts) : null;
+  const drawn = drawnParts(e.parts);
+  const view = drawn !== null ? youView(drawn) : null;
   // his images ride only in its parts since main 9ae8e01f (ApprovalFold.images is gone)
   const images = view?.images ?? [];
   // the chips draw his images: their marks leave the words (once, never twice)
