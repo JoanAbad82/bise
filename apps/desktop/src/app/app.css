@@ -756,6 +756,12 @@ body:has(.app-shell) {
   text-overflow: ellipsis;
   color: var(--c-text);
 }
+/* a browser-only artifact: '↗' 4 px after its title (designer m_21742) */
+.app-rb-out {
+  flex: none;
+  margin-left: calc(var(--s-1) - var(--gap-inline));
+  color: var(--c-text-3);
+}
 .app-rb-sub {
   min-width: 0;
   overflow: hidden;

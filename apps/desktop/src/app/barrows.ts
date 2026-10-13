@@ -2,7 +2,7 @@
 // name, a dim second word (the role, or the project's name on bise's thread), the end on the right.
 // Pure: RightBar.tsx draws these (barrows.ts: a rightbar.ts would clash with RightBar.tsx on macOS's case-blind disk). Owner: amb-win.
 import type { Item } from '@/artifacts/model';
-import { glyphOf } from '@/artifacts/model';
+import { glyphOf, leaves } from '@/artifacts/model';
 import type { Task } from '@/scheduled/model';
 import { howOften, nextWords } from '@/scheduled/model';
 import { shortAge } from '@/agents/model';
@@ -43,6 +43,8 @@ export interface BarRow {
   readonly cu?: { readonly g: string; readonly tone: Tone; readonly title: string };
   /** its context gauge, the hub's short words, only when it says something (designer D12) */
   readonly gauge?: string;
+  /** a browser-only artifact: '↗' 4 px after its title, text-3 (designer m_21742) */
+  readonly leaves?: boolean;
 }
 
 /** What AGENTS reads besides the agents: their next wakes ('<project>/<agent>' -> ms), the project's features, the computer rows. */
@@ -164,6 +166,7 @@ export function artifactRows(items: readonly Item[], now: number): BarRow[] {
       tone: 'dim',
       name: it.a.title,
       sub: '',
+      leaves: leaves(it.a),
       end: it.a.new ? 'new' : now - it.a.at_ms < 86_400_000 ? hm(it.a.at_ms) : shortAge(now - it.a.at_ms),
       endTone: it.a.new ? 'ink' : 'dim',
       title: `${it.a.title} · ${it.projectName}`,

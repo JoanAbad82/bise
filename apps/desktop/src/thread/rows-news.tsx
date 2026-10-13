@@ -7,6 +7,7 @@ import { Act, BriefLine, Button, Fold, Marker, Press, SchedHead } from '@/ds';
 import type { Entry } from '@/proto';
 import { useAgents, useArtifacts, useStore } from '@/store';
 import { leaves, LEAVES, useGoArtifact } from '@/artifacts/leave';
+import { glyphOf } from '@/artifacts/model';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
 import { clock, handoffOf, repeatsReport, reportBody, schedHead } from './entry';
@@ -121,6 +122,7 @@ export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   return (
     <ArtChip
       open={openId === m.id}
+      glyph={glyphOf(m.kind)}
       title={m.title}
       meta={out ? LEAVES : [m.kind_word, m.v > 1 ? `v${String(m.v)}` : ''].filter(Boolean).join(' · ')}
       onOpen={() => {
@@ -133,10 +135,13 @@ export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 }
 
 /** An artifact or a page as one line (designer m_12065 (2)): '↗ product page, before / after   page · v2', 1 px line, r 9, fit-content, no thumbnail box. */
-export function ArtChip({ title, meta, onOpen, testId, open = false }: { title: string; meta: string; onOpen: () => void; testId: string; open?: boolean }) {
+// its front glyph is its kind's, as the list's left column draws it; '↗' at the end says it leaves the app (designer m_21742)
+export function ArtChip({ title, meta, onOpen, testId, open = false, glyph = '↗' }: { title: string; meta: string; onOpen: () => void; testId: string; open?: boolean; glyph?: string }) {
   return (
     <Press look={open ? 'th-art open' : 'th-art'} onClick={onOpen} data-testid={testId} data-open={open || undefined}>
-      <span className="th-art-title">↗ {title}</span>
+      <span className="th-art-title">
+        {glyph} {title}
+      </span>
       {meta !== '' && <span className="th-art-meta">{meta}</span>}
       {/* the artifact open beside the thread (designer's artifact-open page): 'open', an ink outline */}
       {open && <span className="th-art-open">open</span>}

@@ -9,7 +9,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, t
 import { Act, Dot, Press } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAllArtifacts } from '@/artifacts';
-import { useGoArtifact } from '@/artifacts/leave';
+import { LEAVES, useGoArtifact } from '@/artifacts/leave';
 import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
 import { useComputerLive, useFeatures, useStore, type Store } from '@/store';
@@ -158,6 +158,11 @@ function Row({ r, onOpen, on }: { r: BarRow; onOpen: () => void; on?: boolean })
       {/* at work: the DS's breeze '∿' (it pulses on the open row, murmurs on the others, still with reduced motion) */}
       <span className={`app-rb-g ${r.tone}`}>{r.working === true ? <Dot state="wk" /> : r.glyph}</span>
       <span className="app-rb-name">{r.name}</span>
+      {r.leaves === true && (
+        <span className="app-rb-out" title="opens in your browser" data-testid={`${r.testId}.leaves`}>
+          {LEAVES}
+        </span>
+      )}
       {r.cu !== undefined && (
         <span className={`app-cu ${r.cu.tone}`} title={r.cu.title} data-testid={`${r.testId}.computer`}>
           {r.cu.g}

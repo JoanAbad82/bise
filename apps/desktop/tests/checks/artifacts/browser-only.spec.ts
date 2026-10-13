@@ -107,6 +107,9 @@ test('artifacts/browser-only: a PR opens his browser from the list, space, the r
     await page.getByTestId(`app.sidebar.project.${SHOP}`).click();
     const right = page.getByTestId(`app.right.artifact.${SHOP}.pr-381`);
     await expect(right, "the right bar's PR row").toBeVisible({ timeout: 5000 });
+    // designer m_21742 (b): its time stays, '↗' after its title
+    await expect(page.getByTestId(`app.right.artifact.${SHOP}.pr-381.leaves`), "'↗' after the PR's title").toHaveText('↗');
+    await expect(page.getByTestId(`app.right.artifact.${SHOP}.release-notes.leaves`), 'a page has none').toHaveCount(0);
     await right.click();
     expect(await opened(4)).toContain(PR);
     await expect(page.getByTestId('artifact.open')).toHaveCount(0);
@@ -138,7 +141,10 @@ test("artifacts/browser-only: the thread's PR chip says '↗' and opens his brow
     const { page } = s;
     const chip = page.getByTestId('thread.artifact.2');
     await expect(chip, 'the PR chip').toBeVisible({ timeout: 10_000 });
-    await expect(chip).toContainText('↗');
+    // designer m_21742 (a): its kind's glyph in front, one '↗' only, at the end
+    await expect(chip.locator('.th-art-title'), "the PR's glyph in front").toHaveText(/^⇡ PR #381/);
+    expect((await chip.innerText()).split('↗').length - 1, "one '↗'").toBe(1);
+    await expect(chip.locator('.th-art-meta')).toHaveText('↗');
     await expect(chip).not.toContainText('PR · ');
     await page.screenshot({ path: test.info().outputPath('light-1100-chip.png') });
     await chip.click();
