@@ -1210,11 +1210,13 @@ if (mode === 'quick') {
     await rowsE812(harness, say);
     await rowsF2A7(harness, say);
     await rows233B(harness, say);
+    await rowsC2BA(harness, say);
   } else {
     // first: ARCHIVED's fold is read on a fresh profile, and the PR poller gets the time the others take
     await rowsE812(harness, say);
     await rowsF2A7(harness, say);
     await rows233B(harness, say);
+    await rowsC2BA(harness, say);
     await quickRows(harness, say);
     await newRows(harness, say);
     await rows37(harness, say);
@@ -3208,6 +3210,487 @@ async function rows0170(harness, say) {
 // 276074b2's quick rows (ambient-lead m_22369), in harness' thread: '?' and space type (281879ed),
 // an opened run_typescript box shows its source (1f5819a7), ⌘ hints at 150 ms (e4394a9e), and
 // /artifacts ↓↓⏎ (f3fa6edb's list keys)
+// c2bae3b3's rows (ambient-lead m_24613, main m_24616): the composer as a tab over the box (A) at
+// 1400/1100/800 light and dark, no ghost inbox count and '/inbox' (beside an artifact too), a card
+// closed mid answer keeps his words (⏎ a plain message, esc back to the composer), '✓ answered'
+// opens his answer, the lone ψ's tip, '@' newest first, no trackpad swipe (⌘[ ⌘] kept), the asks
+// row's pink artifact name. Each row is its own try. The '+' is never clicked (its panel is a real
+// window on his screen).
+async function rowsC2BA(harness, say) {
+  const row = async (name, fn) => {
+    if (!wanted(name)) return;
+    try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
+  };
+  const flat = (s) => (s ?? '').replace(/\s+/g, ' ').trim();
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const fieldText = async () => flat(await field.innerText({ timeout: 2000 }).catch(() => ''));
+  const clear = async () => {
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+  };
+  const idle = () => until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 90000, 1000);
+  const color = (v) => page.evaluate((x) => { const d = document.createElement('i'); d.style.color = `var(${x})`; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; }, v).catch(() => null);
+  const agentNow = () => page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent', { timeout: 2000 }).catch(() => null);
+  const goAgent = async (a) => {
+    await page.locator(`[data-testid="app.right.agent.${a}"]`).first().click({ timeout: 5000 }).catch(() => {});
+    return until(async () => ((await agentNow()) === a ? true : null), 8000, 250);
+  };
+  const T = String(Date.now()).slice(-5);
+  const NL = String.fromCharCode(92) + 'n';
+  // one card of main's, by its words in a printf (sb card is main's alone)
+  const card = async (q, opts, tail) => {
+    await clear();
+    await page.keyboard.type(`[[bash: sb card "$(printf "%s${NL}" ${[q, ...opts].map((x) => `"${x}"`).join(' ')})"]] ${tail}`, { delay: 3 });
+    await page.keyboard.press('Enter');
+  };
+  const dock = async (token, ms) => {
+    const rowL = page.locator('[data-testid^="inbox.block.row."]', { hasText: token }).first();
+    const open = page.locator('[data-testid^="inbox.block.open."]').filter({ hasText: token }).first();
+    const listed = await until(async () => {
+      if ((await rowL.isVisible().catch(() => false)) || (await open.isVisible().catch(() => false))) return true;
+      await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 1000 }).catch(() => {});
+      return null;
+    }, ms, 1000);
+    for (let i = 0; listed && i < 20 && !(await open.isVisible().catch(() => false)); i++) {
+      if (await rowL.isVisible().catch(() => false)) await rowL.click({ timeout: 2000 }).catch(() => {});
+      else await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 2000 }).catch(() => {});
+      await page.waitForTimeout(400);
+    }
+    const isOpen = await open.isVisible().catch(() => false);
+    const id = isOpen ? await open.evaluate((el) => {
+      const c = el.matches('[data-testid^="inbox.block.card."]') ? el : el.querySelector('[data-testid^="inbox.block.card."]');
+      const m = /-(\d+)$/.exec(c?.getAttribute('data-testid') ?? '');
+      return m ? Number(m[1]) : null;
+    }).catch(() => null) : null;
+    return { listed: !!listed, open: isOpen ? open : null, id };
+  };
+  const cardEl = (token) => page.locator('[data-testid^="inbox.block.card."]').filter({ hasText: token }).first();
+  const answerWith = async (token, n) => {
+    const d = await dock(token, 5000);
+    if (d.open) await d.open.locator(`[data-testid$=".opt.${String(n)}"]`).first().click({ timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(1200);
+  };
+
+  // the seed: a worktree agent (the tab's ψ, the tip), an artifact (the asks row, '/inbox' beside it)
+  await closeArtifact();
+  await harness();
+  await idle();
+  fs.writeFileSync(path.join(FX, 'zc-art.html'), '<!doctype html><title>zc art</title><h1>zc asks art</h1><p>the asks row opens this.</p>');
+  await clear();
+  await page.keyboard.type(`[[bash: sb spawn zcwt --place new --objective 'zc worktree: nothing to do' && sb artifact add ${path.join(FX, 'zc-art.html')} --title 'zc asks art for the pink asks row']] seeded c2ba`, { delay: 2 });
+  await page.keyboard.press('Enter');
+  const seeded = await until(async () => page.evaluate(() => !!document.querySelector('[data-testid="app.right.agent.zcwt"]')
+    && [...document.querySelectorAll('[data-testid^="app.right.artifact."][data-testid$=".chip"]')].some((x) => /zc asks art/.test(x.textContent ?? ''))), 120000, 1000);
+  await idle();
+  step('rowsC2BA seed: zcwt in a worktree, the zc artifact in ARTIFACTS', !!seeded, { bar: flat(await text('[data-testid="app.right"]')).slice(0, 300) });
+
+  // the composer's parts as drawn now
+  const tabInfo = () => page.evaluate(() => {
+    const q = (s) => document.querySelector(`[data-testid="${s}"]`);
+    const shown = (s) => { const e = q(s); return !!e && !e.classList.contains('gone') && e.getBoundingClientRect().width > 0 && getComputedStyle(e).display !== 'none'; };
+    const words = (s) => (shown(s) ? (q(s).textContent ?? '').replace(/\s+/g, ' ').trim() : null);
+    const t = q('composer.tab')?.getBoundingClientRect();
+    const b = q('composer.box')?.getBoundingClientRect();
+    const boxCs = q('composer.box') ? getComputedStyle(q('composer.box')) : null;
+    const list = document.querySelector('.th-list');
+    const scroller = document.querySelector('.th-list > [data-virtuoso-scroller]');
+    const rowEl = q('composer.row') ?? q('composer.attach')?.parentElement ?? null;
+    return {
+      to: words('composer.tab.to'), place: words('composer.tab.place'), context: words('composer.tab.context'), project: words('composer.tab.project'), end: words('composer.tab.end'),
+      acc: q('composer.tab')?.classList.contains('acc') ?? null,
+      tab: t && b ? { h: Math.round(t.height), l: Math.round(t.left - b.left), r: Math.round(b.right - t.right), glue: Math.round(Math.abs(t.bottom - b.top)), w: Math.round(t.width) } : null,
+      radius: boxCs?.borderTopLeftRadius ?? null, shadow: boxCs?.boxShadow ?? null,
+      after: list ? getComputedStyle(list, '::after').content : null, mask: scroller ? getComputedStyle(scroller).maskImage : null,
+      attach: words('composer.attach'), mode: words('composer.mode'), model: words('composer.model'),
+      send: !!document.querySelector('[data-testid="composer"] [data-testid="composer.send"], [data-testid="composer"] [data-testid="composer.stop"], [data-testid="composer"] button[aria-label*="send" i]'),
+      row: rowEl ? (rowEl.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) : null,
+      keys: shown('composer.keys'),
+    };
+  }).catch((e) => ({ error: String(e).slice(0, 200) }));
+  const noBand = (x) => !!x && (x.after === 'none' || x.after === 'normal') && /linear-gradient/.test(x.mask ?? '') && /^[^,]* 0px 0px 0px 1px$/.test(x.shadow ?? '') && x.radius === '16px';
+
+  await row('composer A', async () => {
+    await harness();
+    await idle();
+    await page.keyboard.press('Escape');
+    const m0 = await tabInfo();
+    step("composer A (main): the tab 'to main' + gust, 'shared folder', context; 32 px, 16 px in each side, glued; no project, idle or model in it; the row '+', mode ⌄, model ⌄, send; keys line",
+      !!m0 && /^to main\b/.test(m0.to ?? '') && m0.place === 'shared folder' && /^context /.test(m0.context ?? '') && !m0.project && !/\bidle\b|yolo|approvals/.test(`${m0.to} ${m0.place} ${m0.context}`)
+        && m0.tab?.h === 32 && m0.tab.l === 16 && m0.tab.r === 16 && m0.tab.glue <= 1 && m0.attach === '+' && /⌄$/.test(m0.mode ?? '') && /⌄$/.test(m0.model ?? '') && m0.send && m0.keys, m0);
+    step('composer A: no shadow band (no ::after, one 1 px line, r 16), the thread fades under a 12 px opacity mask', noBand(m0), { after: m0?.after, mask: m0?.mask, shadow: m0?.shadow, radius: m0?.radius });
+    // the menus open above the box; esc closes them, the field untouched
+    await clear();
+    await page.keyboard.type('zc menu words', { delay: 5 });
+    const menus = {};
+    for (const k of ['mode', 'model']) {
+      await page.locator(`[data-testid="composer.${k}"]`).first().click({ timeout: 3000 }).catch(() => {});
+      const mb = await page.locator(`[data-testid="composer.${k}.menu"]`).first().boundingBox({ timeout: 3000 }).catch(() => null);
+      const bb = await page.locator('[data-testid="composer.box"]').first().boundingBox().catch(() => null);
+      if (k === 'model') await shot('c2ba-model-menu-above');
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      menus[k] = { menuBottom: mb ? Math.round(mb.y + mb.height) : null, boxTop: bb ? Math.round(bb.y) : null, gone: !(await page.locator(`[data-testid="composer.${k}.menu"]`).count()) };
+    }
+    menus.field = await fieldText();
+    step("the mode and the model + effort menus open above the box, esc closes them, the field kept",
+      ['mode', 'model'].every((k) => menus[k].menuBottom !== null && menus[k].menuBottom <= menus[k].boxTop && menus[k].gone) && menus.field === 'zc menu words', menus);
+    await clear();
+    // a worktree agent: 'ψ sb/zcwt'; the drop order: the context first, then the branch, never 'to'
+    await goAgent('zcwt');
+    const w0 = await tabInfo();
+    const drops = await page.evaluate(() => {
+      const tab = document.querySelector('[data-testid="composer.tab"]');
+      const shown = (s) => { const e = document.querySelector(`[data-testid="${s}"]`); return !!e && !e.classList.contains('gone') && e.getBoundingClientRect().width > 0; };
+      const out = [];
+      const full = Math.round(tab.getBoundingClientRect().width);
+      for (let w = full; w >= 120; w -= 10) { tab.style.width = `${w}px`; out.push({ w, ctx: shown('composer.tab.context'), place: shown('composer.tab.place'), to: shown('composer.tab.to') }); }
+      tab.style.width = '';
+      return out;
+    }).catch((e) => String(e).slice(0, 200));
+    await page.waitForTimeout(300);
+    const first = (f) => (Array.isArray(drops) ? drops.findIndex(f) : -1);
+    const [ctxGone, placeGone] = [first((x) => !x.ctx), first((x) => !x.place)];
+    step("composer A (zcwt): 'to zcwt' + 'ψsb/zcwt' + context; narrowed, the context goes first, then the branch, 'to zcwt' always stays",
+      /^to zcwt\b/.test(w0?.to ?? '') && /^ψ ?sb\/zcwt$/.test(w0?.place ?? '') && /^context /.test(w0?.context ?? '') && ctxGone >= 0 && placeGone >= ctxGone && Array.isArray(drops) && drops.every((x) => x.to),
+      { tab: w0, ctxGone: drops[ctxGone]?.w ?? null, placeGone: drops[placeGone]?.w ?? null, full: Array.isArray(drops) ? drops[0] : drops });
+    // answering: the accent tab, 'answering main · …', 'esc write to main instead'; '+' and send only
+    await harness();
+    await idle();
+    const Q = `zcA${T}`;
+    await card(`${Q} which composer accent?`, ['1. zca-one', '2. zca-two'], 'seeded answering');
+    await idle();
+    const d = await dock(Q, 60000);
+    const an = await until(async () => { const x = await tabInfo(); return x?.acc ? x : null; }, 8000, 400) ?? (await tabInfo());
+    step("composer A answering: the tab in the accent, 'answering main · <question cut after a word>', 'esc write to main instead'; no branch, context, mode or model; '+' stays",
+      !!d.open && an?.acc === true && /^answering main · zcA/.test(an.to ?? '') && /^esc write to main instead$/.test(an.end ?? '') && !an.place && !an.context && !an.mode && !an.model && an.attach === '+', { card: d.id, ...an });
+    // the shots: idle (main), words (zcwt), answering, at 1400/1100/800 light and dark
+    const sizes = [];
+    for (const scheme of ['light', 'dark']) {
+      await page.emulateMedia({ colorScheme: scheme }).catch(() => {});
+      for (const w of [1400, 1100, 800]) {
+        await resizeWin(1400, 900);
+        await page.waitForTimeout(400);
+        await page.keyboard.press('Escape');
+        await harness();
+        await page.waitForTimeout(300);
+        await resizeWin(w, 900);
+        await page.waitForTimeout(700);
+        const idleI = await tabInfo();
+        await shot(`c2ba-composer-${scheme}-${w}-idle`);
+        await resizeWin(1400, 900);
+        await page.waitForTimeout(400);
+        await goAgent('zcwt');
+        await resizeWin(w, 900);
+        await page.waitForTimeout(700);
+        await clear();
+        await page.keyboard.type('also run it on mobile safari', { delay: 3 });
+        const wordsI = await tabInfo();
+        await shot(`c2ba-composer-${scheme}-${w}-words`);
+        await clear();
+        await resizeWin(1400, 900);
+        await page.waitForTimeout(400);
+        await harness();
+        const dd = await dock(Q, 5000);
+        await resizeWin(w, 900);
+        await page.waitForTimeout(700);
+        const ansI = await tabInfo();
+        const cut = (ansI?.to ?? '').replace(/[ ·~∿≈]{5}(?= ·|…|$)/u, '');
+        await shot(`c2ba-composer-${scheme}-${w}-answering`);
+        sizes.push({ scheme, w, idle: { to: idleI?.to, place: idleI?.place, ctx: idleI?.context, band: noBand(idleI) }, words: { to: wordsI?.to, place: wordsI?.place, ctx: wordsI?.context, mode: wordsI?.mode, model: wordsI?.model }, answering: { open: !!dd.open, acc: ansI?.acc, to: cut, end: ansI?.end, dots: cut.includes('...') } });
+      }
+    }
+    await page.emulateMedia({ colorScheme: null }).catch(() => {});
+    await resizeWin(1400, 900);
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Escape');
+    step("composer A at 1400/1100/800 light and dark: 'to' always shown, no band, the mode never drops, answering in the accent with one '…' at most",
+      sizes.every((s) => /^to main/.test(s.idle.to ?? '') && s.idle.band && /^to zcwt/.test(s.words.to ?? '') && !!s.words.mode && s.answering.open && s.answering.acc && !s.answering.dots && /^answering main/.test(s.answering.to ?? '')), sizes);
+    await harness();
+    await answerWith(Q, 1);
+  });
+
+  await row('ghost badge', async () => {
+    await harness();
+    await idle();
+    const G = `zcG${T}`;
+    await card(`${G} keep this one?`, ['1. zcg-one', '2. zcg-two'], 'seeded ghost');
+    await idle();
+    const d = await dock(G, 60000);
+    if (!d.open) { step('ghost badge: the card in the block', false, { listed: d.listed }); return; }
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.type('zc ghost words, keep it open', { delay: 3 });
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(6000);
+    await idle();
+    // every count the sidebar shows is an item the block lists (bise's home block lists them all)
+    await click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+    await page.waitForTimeout(1500);
+    const counts = await page.evaluate(() => {
+      const side = [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
+        .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), n: Number(e.querySelector('.app-cnt')?.textContent ?? '0') || 0 }))
+        .filter((p) => p.id && !p.id.includes('.'));
+      const head = document.querySelector('[data-testid="inbox.block"]')?.textContent ?? '';
+      const m = /(\d+) waiting/.exec(head);
+      return { side, sum: side.reduce((a, p) => a + p.n, 0), block: m ? Number(m[1]) : (document.querySelector('[data-testid="inbox.block"]') ? 1 : 0), head: head.replace(/\s+/g, ' ').trim().slice(0, 160) };
+    }).catch((e) => ({ error: String(e) }));
+    const still = await page.evaluate((t) => [...document.querySelectorAll('[data-testid^="inbox.block"]')].some((e) => (e.textContent ?? '').includes(t)), G).catch(() => null);
+    await shot('c2ba-ghost-after-answer');
+    step("no ghost count: after his words on a card, every count in the sidebar is an item the block lists (sum of the counts = 'N waiting'); a card the hub kept is in the block",
+      !!counts && !counts.error && counts.sum === counts.block, { ...counts, zcG_still_listed: still });
+    // '/inbox' in the composer opens the block's first item in place
+    await harness();
+    await page.keyboard.press('Escape');
+    await clear();
+    await page.keyboard.type('/inbox', { delay: 20 });
+    await page.keyboard.press('Enter');
+    const opened = await until(async () => ((await page.locator('[data-testid^="inbox.block.open."], [data-testid^="inbox.block.card."]').first().isVisible().catch(() => false)) ? true : null), 5000, 250);
+    const note = flat(await text('[data-testid="composer.answer.note"]'));
+    await shot('c2ba-inbox-slash');
+    step("'/inbox' opens the block's item in place, or says 'nothing waits for you.'", !!opened || note === 'nothing waits for you.', { opened: !!opened, note, waiting: counts?.block });
+    await page.keyboard.press('Escape');
+    // beside an artifact: the block there lists its maker's items only; '/inbox' widens it, or says so
+    const chip = page.locator('[data-testid^="app.right.artifact."][data-testid$=".chip"]').filter({ hasText: 'zc asks art' }).first();
+    await chip.click({ timeout: 5000 }).catch(() => {});
+    const art = await page.locator('[data-testid="artifact.page"], [data-testid="app.art"]').first().waitFor({ timeout: 8000 }).then(() => true, () => false);
+    await page.waitForTimeout(800);
+    const f2 = page.locator('[data-testid="composer.field"]:visible').last();
+    await f2.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('/inbox', { delay: 20 });
+    await page.keyboard.press('Enter');
+    const wide = await until(async () => {
+      const o = await page.locator('[data-testid^="inbox.block.open."], [data-testid^="inbox.block.card."]').first().isVisible().catch(() => false);
+      const n = flat(await page.locator('[data-testid="composer.answer.note"]:visible').first().innerText({ timeout: 500 }).catch(() => ''));
+      return o || n ? { opened: o, note: n } : null;
+    }, 6000, 300);
+    await shot('c2ba-inbox-slash-beside-artifact');
+    step("'/inbox' beside an artifact: the block widens to the item that waits, or 'nothing waits for you.' (never a silent nothing)",
+      art && !!wide && (wide.opened || wide.note === 'nothing waits for you.'), { art, ...wide });
+    await page.keyboard.press('Escape');
+    await closeArtifact();
+    await harness();
+    if (still) await answerWith(G, 1);
+  });
+
+  // a card main withdraws while his words are typed: '· closed', the tab says so, his words stay
+  const closedCard = async (K, how) => {
+    await harness();
+    await idle();
+    await card(`${K} which bench?`, ['1. zcc-cold', '2. zcc-warm'], `seeded closed ${how}`);
+    await idle();
+    const d0 = await dock(K, 60000);
+    if (d0.id === null) return { error: 'no card', listed: d0.listed };
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    await clear();
+    await say(`[[bash: sleep 20 && sb card --withdraw ${String(d0.id)} "zc the plan changed"]] withdrawing ${how}`);
+    const d = await dock(K, 10000);
+    if (!d.open) return { error: 'not open again', id: d0.id };
+    const HALF = `warm, but only after the reindex ${how}`;
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.type(HALF, { delay: 10 });
+    const closedAt = await until(async () => ((await cardEl(K).getAttribute('data-closed', { timeout: 500 }).catch(() => null)) === 'true' ? true : null), 60000, 500);
+    const c = {
+      id: d0.id, closed: !!closedAt, word: flat(await cardEl(K).innerText({ timeout: 2000 }).catch(() => '')).slice(0, 160),
+      field: await fieldText(), screen: /the question is closed/.test(flat(await text('[data-testid="thread.screen"]'))), tab: (await tabInfo())?.to ?? null, HALF,
+    };
+    await page.mouse.move(1, 300);
+    await shot(`c2ba-closed-mid-answer-${how}`);
+    return c;
+  };
+  await row('card closed mid answer', async () => {
+    const K1 = `zcC${T}`;
+    const c1 = await closedCard(K1, 'enter');
+    step("a card main withdraws mid answer stays open '· closed', the tab 'to main · the question is closed', his words kept",
+      !c1.error && c1.closed && /· closed/.test(c1.word) && c1.field === c1.HALF && c1.screen, c1);
+    if (c1.error) return;
+    const before = await page.evaluate(() => document.querySelectorAll('[data-testid="thread.list"] [data-side="me"]').length).catch(() => 0);
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    const sent = await until(async () => page.evaluate(([h]) => {
+      const me = [...document.querySelectorAll('[data-testid="thread.list"] [data-side="me"]')];
+      return me.some((e) => (e.textContent ?? '').includes(h)) ? me.length : null;
+    }, [c1.HALF]), 20000, 500);
+    await page.waitForTimeout(1500);
+    const asAnswer = await page.evaluate((h) => [...document.querySelectorAll('[data-testid^="thread.approval."], [data-testid^="thread.aside."]')].some((e) => (e.textContent ?? '').includes(h)), c1.HALF).catch(() => null);
+    const gone = !(await cardEl(K1).isVisible().catch(() => false));
+    await shot('c2ba-closed-enter-sent');
+    step("⏎ on the closed card sends his words to main as a plain message (his bubble, never 'you answered'), the card goes",
+      !!sent && asAnswer === false && gone, { me_rows: { before, after: sent }, asAnswer, gone });
+    await idle();
+    const K2 = `zcE${T}`;
+    const c2 = await closedCard(K2, 'esc');
+    if (c2.error || !c2.closed) { step("esc on a closed card: his words back in the composer", false, c2); return; }
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(800);
+    const back = { field: await fieldText(), tab: (await tabInfo())?.to ?? null, note: flat(await text('[data-testid="composer.answer.note"]')), card: await cardEl(K2).isVisible().catch(() => false) };
+    await shot('c2ba-closed-esc-back');
+    step("esc on the closed card: back to the composer 'to main', his words in it (or '↑ brings them back')",
+      /^to main\b/.test(back.tab ?? '') && (back.field === c2.HALF || /↑ brings them back/.test(back.note)), { closed: c2, back });
+    await clear();
+  });
+
+  await row('answered link', async () => {
+    await harness();
+    await idle();
+    const A = `zcL${T}`;
+    await card(`${A} which way for the answered link?`, ['1. zcl-one', '2. zcl-two'], 'seeded answered');
+    await idle();
+    // a long reply after the card: his answer will sit far under it
+    const md = path.join(FX, 'zc-long.md');
+    fs.writeFileSync(md, Array.from({ length: 50 }, (_, i) => `- line ${String(i + 1)}: ${'the answered link needs room between the card and the answer. '.repeat(2)}`).join(String.fromCharCode(10)));
+    await page.keyboard.press('Escape');
+    await say(`[[reply: ${md}]] long`);
+    await until(async () => (/line 50:/.test(flat(await text('[data-testid="thread.list"]'))) ? true : null), 60000, 1000);
+    await idle();
+    const d = await dock(A, 20000);
+    if (d.id === null) { step("'✓ answered' opens his answer", false, { listed: d.listed }); return; }
+    await d.open.locator('[data-testid$=".opt.1"]').first().click({ timeout: 3000 }).catch(() => {});
+    const rowL = page.locator(`[data-testid="thread.card.${String(d.id)}"]`).first();
+    // the thread draws its last rows only: scroll up until the card's row is drawn
+    const sc = page.locator('[data-testid="thread.list"] [data-virtuoso-scroller="true"]').first();
+    const drawn = await until(async () => {
+      if (await rowL.isVisible().catch(() => false)) return true;
+      await sc.evaluate((e) => { e.scrollTop = Math.max(0, e.scrollTop - 500); }).catch(() => {});
+      return null;
+    }, 30000, 300);
+    await rowL.scrollIntoViewIfNeeded().catch(() => {});
+    await page.waitForTimeout(600);
+    const rowWords = flat(await rowL.innerText({ timeout: 2000 }).catch(() => ''));
+    const title = await rowL.locator('xpath=..').getAttribute('title').catch(() => null);
+    const answerOut = await page.evaluate((id) => {
+      const s = document.querySelector('[data-testid="thread.list"] [data-virtuoso-scroller="true"]')?.getBoundingClientRect();
+      const a = [...document.querySelectorAll('[data-testid^="thread.approval."], [data-testid^="thread.entry."]')].filter((e) => /zcl-one/.test(e.textContent ?? '')).at(-1);
+      if (!a || !s) return true;
+      const r = a.getBoundingClientRect();
+      return r.bottom < s.top || r.top > s.bottom;
+    }, d.id).catch(() => null);
+    await shot('c2ba-answered-before');
+    await rowL.click({ timeout: 3000 }).catch(() => {});
+    const flash = await until(async () => page.evaluate(() => {
+      const e = document.querySelector('.th-flash');
+      const s = document.querySelector('[data-testid="thread.list"] [data-virtuoso-scroller="true"]')?.getBoundingClientRect();
+      if (!e || !s) return null;
+      const r = e.getBoundingClientRect();
+      return { id: e.getAttribute('data-testid') ?? e.closest('[data-testid]')?.getAttribute('data-testid'), text: (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 120), inView: r.bottom > s.top && r.top < s.bottom };
+    }), 6000, 150);
+    await shot('c2ba-answered-at-answer');
+    step("'✓ answered: <question>' (title 'show your answer') brings his answer into view, flashed once",
+      !!drawn && /^✓ answered: zcL/.test(rowWords) && !!flash && flash.inView && /zcl-one/.test(flash.text), { card: d.id, rowWords, title, answerOutBefore: answerOut, flash });
+  });
+
+  await row('psi tip', async () => {
+    await harness();
+    const shots = [];
+    for (const scheme of ['light', 'dark']) {
+      await page.emulateMedia({ colorScheme: scheme }).catch(() => {});
+      await page.locator('[data-testid="app.right.agent.zcwt.mark"]').first().hover({ timeout: 3000 }).catch(() => {});
+      const tip = await until(async () => page.evaluate(() => {
+        const t = document.querySelector('[data-testid="app.right.tip.words"]');
+        if (!t) return null;
+        const mono = [...t.querySelectorAll('.app-rb-tip-mono')];
+        return { words: (t.textContent ?? '').replace(/\s+/g, ' ').trim(), mono: mono.map((m) => m.textContent), font: mono[0] ? getComputedStyle(mono[0]).fontFamily : null, c: mono[0] ? getComputedStyle(mono[0]).color : null, w: Math.round(document.querySelector('[data-testid="app.right.tip"]')?.getBoundingClientRect().width ?? 0) };
+      }), 5000, 250);
+      await shot(`c2ba-psi-tip-${scheme}`);
+      shots.push({ scheme, ink: await color('--c-text'), ...tip });
+      await page.mouse.move(1, 400);
+      await page.waitForTimeout(300);
+    }
+    await page.emulateMedia({ colorScheme: null }).catch(() => {});
+    step("the lone ψ's tip: 'ψ worktree: its own copy of the repo, on sb/zcwt · <its folder>', branch and folder mono in ink (light and dark)",
+      shots.every((s) => /^ψ worktree: its own copy of the repo, on sb\/zcwt · \/.+zcwt/.test(s.words ?? '') && s.mono?.length === 2 && s.mono[0] === 'sb/zcwt' && /mono/i.test(s.font ?? '') && s.c === s.ink), shots);
+  });
+
+  await row('at newest first', async () => {
+    const dir = path.join(FX, 'zc-at');
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir, { recursive: true });
+    const ORDER = ['report.pdf', 'new-folder', 'notes.md', 'old-folder', 'a-oldest.txt'];
+    ORDER.forEach((n, i) => {
+      const p = path.join(dir, n);
+      if (n.includes('.')) fs.writeFileSync(p, ''); else fs.mkdirSync(p);
+      const t = 1700000000 - i * 3600;
+      fs.utimesSync(p, t, t);
+    });
+    await harness();
+    await page.keyboard.press('Escape');
+    await clear();
+    await page.keyboard.type(`@${dir}/`, { delay: 5 });
+    const names = await until(async () => {
+      const ids = await page.locator('[data-testid="composer.pick"] [data-testid^="composer.pick.file."]').evaluateAll((rs) => rs.map((r) => r.getAttribute('data-testid') ?? ''));
+      const n = ids.map((id) => id.replace(/\/$/, '').split('/').at(-1) ?? '').filter((x) => ORDER.includes(x));
+      return n.length === ORDER.length ? n : null;
+    }, 8000, 300);
+    await shot('c2ba-at-newest-first');
+    step("'@<folder>/' lists the newest first, folders and files mixed", JSON.stringify(names) === JSON.stringify(ORDER), { names, want: ORDER });
+    await page.keyboard.press('Escape');
+    await clear();
+  });
+
+  await row('no swipe', async () => {
+    await harness();
+    await page.keyboard.press('Escape');
+    await goAgent('zcwt');
+    await clear();
+    await page.keyboard.type('zc words under a swipe', { delay: 5 });
+    const box = await page.locator('[data-testid="thread.list"]').first().boundingBox().catch(() => null);
+    if (box) await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const walks = [];
+    for (const dx of [-30, 30]) {
+      for (let i = 0; i < 12; i++) { await page.mouse.wheel(dx, 0); await page.waitForTimeout(16); }
+      await page.waitForTimeout(600);
+      walks.push({ dx, at: await agentNow() });
+    }
+    const words = await fieldText();
+    await clear();
+    await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
+    await page.keyboard.press('Meta+BracketLeft');
+    const back = await until(async () => ((await agentNow()) === 'main' ? 'main' : null), 5000, 250) ?? (await agentNow());
+    await page.keyboard.press('Meta+BracketRight');
+    const fwd = await until(async () => ((await agentNow()) === 'zcwt' ? 'zcwt' : null), 5000, 250) ?? (await agentNow());
+    step("a two-finger swipe (sideways wheel, either way) never walks, his words stay; ⌘[ back to main, ⌘] forward to zcwt",
+      walks.every((w) => w.at === 'zcwt') && words === 'zc words under a swipe' && back === 'main' && fwd === 'zcwt', { walks, words, back, fwd });
+    await harness();
+  });
+
+  await row('asks pink', async () => {
+    await harness();
+    await idle();
+    const acc = await color('--c-accent');
+    const id = await page.evaluate(() => {
+      const e = [...document.querySelectorAll('[data-testid^="app.right.artifact."][data-testid$=".chip"]')].find((x) => /zc asks art/.test(x.textContent ?? ''));
+      const t = e?.getAttribute('data-testid') ?? '';
+      return t ? t.split('.').slice(4, -1).join('.') : null;
+    }).catch(() => null);
+    if (!id) { step("the asks row's artifact name is pink", false, { why: 'no zc artifact in ARTIFACTS' }); return; }
+    const K = `zcK${T}`;
+    await card(`${K} keep the webp next to [zc asks art](artifact:${id})?`, ['1. zck-yes', '2. zck-no'], 'seeded asks');
+    await idle();
+    await page.keyboard.press('Escape');
+    const asks = await until(async () => page.evaluate((t) => {
+      const e = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread."]')].filter((x) => (x.textContent ?? '').includes(t) && /asks/.test(x.textContent ?? '')).at(-1);
+      if (!e) return null;
+      const n = e.querySelector('.b-artname, [data-testid="thread.artname"]');
+      return { text: (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200), name: n ? { t: n.textContent, c: getComputedStyle(n).color, cursor: getComputedStyle(n).cursor } : null, raw: /\]\(artifact:/.test(e.textContent ?? '') };
+    }, K), 30000, 1000);
+    await page.mouse.move(1, 400);
+    await shot('c2ba-asks-pink');
+    step("the thread's 'bise asks: …' row draws the artifact link as its pink name (no raw '[name](artifact:…)')",
+      !!asks?.name && asks.name.c === acc && !asks.raw && /zc asks art/.test(asks.name.t ?? ''), { id, acc, ...asks });
+    const n = page.locator('[data-testid="thread.list"] .b-artname, [data-testid="thread.list"] [data-testid="thread.artname"]').filter({ hasText: 'zc asks art' }).last();
+    await n.click({ timeout: 3000 }).catch(() => {});
+    const view = await page.locator('[data-testid="artifact.page"], [data-testid="app.art"]').first().waitFor({ timeout: 8000 }).then(() => true, () => false);
+    await shot('c2ba-asks-click-opens');
+    step("a click on the asks row's pink name opens the artifact's view", view, { view });
+    await closeArtifact();
+    await harness();
+    await answerWith(K, 1);
+  });
+}
+
 async function quickRows(harness, say) {
   const field = page.locator('[data-testid="composer.field"]:visible').first();
   const fieldText = async () => ((await field.innerText({ timeout: 2000 }).catch(() => null)) ?? '').trim();
