@@ -144,6 +144,9 @@ const api: BiseApi = {
     openSettings: () => {
       ipcRenderer.send(IPC.notifySettings);
     },
+    listed: (on) => {
+      ipcRenderer.send(IPC.notifyListed, on);
+    },
   },
   voice: {
     openMicSettings: () => {

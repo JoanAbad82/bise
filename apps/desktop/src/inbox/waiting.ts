@@ -2,7 +2,7 @@
 // closed (the store's acted set), plus bise's own notifications ask while the block lists it. One
 // inbox, one number (designer m_25639, m_25690): the sidebar's pink count, the title bar's 'N
 // waiting', the inbox screen and the block above the composer all read this list. Owner: inbox-screen.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
 import { actedKeys, useActed, useProjects } from '@/store';
 import { blockList, notifyCard, useNotifyAsks } from './Block';
@@ -12,6 +12,10 @@ export function useWaitingList(): readonly Card[] {
   const acted = useActed();
   const real = useMemo(() => blockList(rows, actedKeys(acted)), [rows, acted]);
   const asks = useNotifyAsks(real.length);
+  // the Dock's badge and the window title (main/counts.ts) count it too
+  useEffect(() => {
+    window.bise.notify.listed?.(asks);
+  }, [asks]);
   const home = rows.find((r) => r.home)?.project ?? '';
   const [since] = useState(() => Date.now());
   return useMemo(() => (asks ? [...real, notifyCard(home, since)] : real), [real, asks, home, since]);

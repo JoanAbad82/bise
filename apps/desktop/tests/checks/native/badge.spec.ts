@@ -1,7 +1,7 @@
 // native/badge · bar W33/N10 (amb-mac 4ded46e1): with the window in the back he sees what waits, as
-// the TUI's tab title did. Passes when the Dock's badge is the number of open cards (none at 0) and
-// the window's title says it ('bise · 2 waiting'), and both follow the core: a new card counts at
-// once, answered ones drop out. The window is never focused in a test run, so it is always 'in the
+// the TUI's tab title did. Passes when the Dock's badge is the number of what waits (none at 0), bise's
+// notifications ask included as the inbox lists it, and the window's title says it ('bise · N waiting'),
+// and both follow the core: a new card counts at once, answered ones drop out. The window is never focused in a test run, so it is always 'in the
 // back'. Test mode has no Dock icon: main prints the badge as BADGE_LINE on stdout; the title is the
 // main window's (BrowserWindow.getTitle, what the window server shows and Mission Control lists).
 // The Dock icon itself is the VM pass's.
@@ -44,15 +44,24 @@ test('native/badge: the Dock badge and the window title count what waits, and fo
   const { start, cards } = world(2);
   await onWorld(async (w) => {
     // the start world's badge line goes out before the check reads main's stdout: the title says
-    // the start, the badge is read on each change after
-    await expect.poll(() => title(w), { message: "the title says '2 waiting'", timeout: 3000 }).toMatch(/^bise · 2 waiting/);
+    // the start, the badge is read on each change after. The fixture world has cards in other
+    // projects too, and in a fresh test home bise's notifications ask waits beside them (one number,
+    // designer m_25690): read the start, then each change moves it by what changed
+    let n = 0;
+    await expect
+      .poll(async () => {
+        const m = /^bise · (\d+) waiting/.exec(await title(w));
+        n = m ? Number(m[1]) : 0;
+        return n;
+      }, { message: "the title says 'N waiting'", timeout: 3000 })
+      .toBeGreaterThanOrEqual(2);
     const first = cards.cards[0];
     if (!first) throw new Error('no card');
     await w.core.send({ ...cards, cards: [...cards.cards, { ...first, id: 97, question: 'merge it?' }] });
-    await expect.poll(() => badge(w), { message: 'a new card counts at once', timeout: 2000 }).toBe('3');
-    await expect.poll(() => title(w), { timeout: 2000 }).toMatch(/^bise · 3 waiting/);
+    await expect.poll(() => badge(w), { message: 'a new card counts at once', timeout: 2000 }).toBe(String(n + 1));
+    await expect.poll(() => title(w), { timeout: 2000 }).toMatch(new RegExp(`^bise · ${String(n + 1)} waiting`));
+    // acme's cards answered: its 2 leave the count, the other projects' stay
     await w.core.send({ ...cards, cards: [] });
-    await expect.poll(() => badge(w), { message: 'none open: no badge', timeout: 2000 }).toBe('');
-    await expect.poll(() => title(w), { message: "none open: the title is 'bise' (and what works)", timeout: 2000 }).toMatch(/^bise( · \d+ working)?$/);
+    await expect.poll(() => badge(w), { message: "acme's answered ones drop out", timeout: 2000 }).toBe(n - 2 > 0 ? String(n - 2) : '');
   }, { core: new FakeCore(start) });
 });

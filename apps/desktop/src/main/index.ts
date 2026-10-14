@@ -17,7 +17,7 @@ import { app, BrowserWindow, ipcMain, Menu, nativeTheme, session } from 'electro
 import { BADGE_LINE, CORE_IPC, IPC, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
 import { Capsule, installCapsuleIpc } from './capsule';
 import { capsuleFramesDir } from './capsuleframe';
-import { badgeOf, CountKeeper, titleOf } from './counts';
+import { badgeOf, CountKeeper, titleOf, type Counts } from './counts';
 import { installGuard } from './guard';
 import { startHelper } from './helper/run';
 import { adoptLoginEnv } from './loginenv';
@@ -234,8 +234,7 @@ void app.whenReady().then(() => {
   });
   // the counts outside the app (counts.ts): the Dock's badge, the window's title
   const counts = new CountKeeper();
-  onCoreEvent((ev) => {
-    const c = counts.apply(ev);
+  const showCounts = (c: Counts | null) => {
     if (c === null) return;
     main.setTitle(titleOf(c));
     tray?.show(c);
@@ -243,6 +242,13 @@ void app.whenReady().then(() => {
     if (testMode) process.stdout.write(`${BADGE_LINE} ${JSON.stringify(badgeOf(c))}
 `);
     else app.dock?.setBadge(badgeOf(c));
+  };
+  onCoreEvent((ev) => {
+    showCounts(counts.apply(ev));
+  });
+  // bise's notifications ask, as the inbox lists it: one number (designer m_25690)
+  ipcMain.on(IPC.notifyListed, (_e, on: unknown) => {
+    showCounts(counts.ask(on === true));
   });
   // the app's own update (update/run.ts, bar S.6): only a packed app (or a
   // test's fake bundle in its test home) updates itself, on his click

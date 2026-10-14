@@ -137,6 +137,8 @@ export interface BiseApi {
     readonly onState: (listener: (s: NotifyAuth) => void) => () => void;
     readonly ask: () => Promise<NotifyAuth>;
     readonly openSettings: () => void;
+    /** The inbox lists bise's notifications ask now (inbox/waiting.ts): the Dock's badge and the title count it too, one number. */
+    readonly listed?: (on: boolean) => void;
   };
   /** Voice mode's failed line (designer's voice-window (1)): 'open settings' opens System Settings ›
    *  Privacy › Microphone (test mode: EXTERNAL_LINE with its URL on stdout, nothing opens). */
@@ -350,6 +352,8 @@ export const IPC = {
   notifyState: 'bise:notify-state',
   notifyAsk: 'bise:notify-ask',
   notifySettings: 'bise:notify-settings',
+  /** a window -> main: the inbox lists bise's notifications ask (true) or not: the badge counts it */
+  notifyListed: 'bise:notify-listed',
   /** a window -> main: open System Settings › Privacy › Microphone (voice mode's failed line) */
   micSettings: 'bise:mic-settings',
   /** a window -> main: one line for app.log next to core.log (the field's dictation; never his words) */

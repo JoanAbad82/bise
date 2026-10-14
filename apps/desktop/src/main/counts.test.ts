@@ -4,6 +4,14 @@ import { badgeOf, CountKeeper, titleOf } from './counts';
 const card = (id: number): Record<string, unknown> => ({ id });
 
 describe('CountKeeper', () => {
+  it("counts bise's notifications ask while the inbox lists it: one number (designer m_25690)", () => {
+    const k = new CountKeeper();
+    expect(k.apply({ ev: 'projects', projects: [{ project: 'shop', waits: 2, working: 0 }] })).toEqual({ waiting: 2, working: 0 });
+    expect(k.ask(true)).toEqual({ waiting: 3, working: 0 });
+    expect(k.ask(true)).toBeNull();
+    expect(k.ask(false)).toEqual({ waiting: 2, working: 0 });
+  });
+
   it('sums every project: its row cards, else its waits; working from the rows', () => {
     const k = new CountKeeper();
     expect(

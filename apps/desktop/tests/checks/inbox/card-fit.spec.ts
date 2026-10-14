@@ -124,7 +124,8 @@ test('inbox/card-fit: the docked card keeps every label in its box at the 1100 w
       await expect.poll(() => page.evaluate(() => document.documentElement.dataset['theme']), { timeout: 5000 }).toBe(t);
     };
     const dock = async (n: 1 | 2, id: number) => {
-      await page.keyboard.press('Escape');
+      // esc folds an open item; with none open, esc goes up the history (esc-up.ts) and the view changes
+      if ((await page.locator('[data-testid^="inbox.block.open."]').count()) > 0) await page.keyboard.press('Escape');
       await page.keyboard.press(`Control+Digit${String(n)}`);
       await expect(page.getByTestId(`inbox.block.card.${P}-${String(id)}`)).toBeVisible({ timeout: 3000 });
     };
