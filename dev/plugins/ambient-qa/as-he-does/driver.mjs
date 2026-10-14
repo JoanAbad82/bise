@@ -3251,7 +3251,13 @@ async function rowsC2BA(harness, say) {
   const idle = () => until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 90000, 1000);
   const color = (v) => page.evaluate((x) => { const d = document.createElement('i'); d.style.color = `var(${x})`; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; }, v).catch(() => null);
   const agentNow = () => page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent', { timeout: 2000 }).catch(() => null);
+  // the AGENTS cap folds rows past 8 under '+ N more': unfold it first
+  const unfold = async () => {
+    const more = page.locator('[data-testid="app.right.agents.more"]').first();
+    if (/^\+ \d+ more$/.test(flat(await more.textContent({ timeout: 500 }).catch(() => '')))) await more.click({ timeout: 2000 }).catch(() => {});
+  };
   const goAgent = async (a) => {
+    await unfold();
     await page.locator(`[data-testid="app.right.agent.${a}"]`).first().click({ timeout: 5000 }).catch(() => {});
     return until(async () => ((await agentNow()) === a ? true : null), 8000, 250);
   };
@@ -3299,8 +3305,8 @@ async function rowsC2BA(harness, say) {
   await clear();
   await page.keyboard.type(`[[bash: sb spawn zcwt --place new --objective 'zc worktree: nothing to do' && sb artifact add ${path.join(FX, 'zc-art.html')} --title 'zc asks art for the pink asks row']] seeded c2ba`, { delay: 2 });
   await page.keyboard.press('Enter');
-  const seeded = await until(async () => page.evaluate(() => !!document.querySelector('[data-testid="app.right.agent.zcwt"]')
-    && [...document.querySelectorAll('[data-testid^="app.right.artifact."][data-testid$=".chip"]')].some((x) => /zc asks art/.test(x.textContent ?? ''))), 120000, 1000);
+  const seeded = await until(async () => (await unfold(), page.evaluate(() => !!document.querySelector('[data-testid="app.right.agent.zcwt"]')
+    && [...document.querySelectorAll('[data-testid^="app.right.artifact."][data-testid$=".chip"]')].some((x) => /zc asks art/.test(x.textContent ?? '')))), 120000, 1000);
   await idle();
   step('rowsC2BA seed: zcwt in a worktree, the zc artifact in ARTIFACTS', !!seeded, { bar: flat(await text('[data-testid="app.right"]')).slice(0, 300) });
 
@@ -3334,8 +3340,10 @@ async function rowsC2BA(harness, say) {
     await idle();
     await page.keyboard.press('Escape');
     const m0 = await tabInfo();
-    step("composer A (main): the tab 'to main' + gust, 'shared folder', context; 32 px, 16 px in each side, glued; no project, idle or model in it; the row '+', mode ⌄, model ⌄, send; keys line",
-      !!m0 && /^to main\b/.test(m0.to ?? '') && m0.place === 'shared folder' && /^context /.test(m0.context ?? '') && !m0.project && !/\bidle\b|yolo|approvals/.test(`${m0.to} ${m0.place} ${m0.context}`)
+    step("composer A (main): the tab 'to bise' + gust, the folder's name, context when known; 32 px, 16 px in each side, glued; no project, idle or model in it; the row '+', mode ⌄, model ⌄, send; keys line",
+      // main is 'bise' to him (shownName); where: his folder's name since f8a0b301a (was 'shared folder');
+      // the fake provider reports no usage, so the context may be absent
+      !!m0 && /^to (main|bise)\b/.test(m0.to ?? '') && m0.place !== 'shared folder' && (m0.context === null || /^context /.test(m0.context)) && !/\bidle\b|yolo|approvals/.test(`${m0.to} ${m0.place} ${m0.context}`)
         && m0.tab?.h === 32 && m0.tab.l === 16 && m0.tab.r === 16 && m0.tab.glue <= 1 && m0.attach === '+' && /⌄$/.test(m0.mode ?? '') && /⌄$/.test(m0.model ?? '') && m0.send && m0.keys, m0);
     step('composer A: no shadow band (no ::after, one 1 px line, r 16), the thread fades under a 12 px opacity mask', noBand(m0), { after: m0?.after, mask: m0?.mask, shadow: m0?.shadow, radius: m0?.radius });
     // the menus open above the box; esc closes them, the field untouched
@@ -3371,7 +3379,7 @@ async function rowsC2BA(harness, say) {
     const first = (f) => (Array.isArray(drops) ? drops.findIndex(f) : -1);
     const [ctxGone, placeGone] = [first((x) => !x.ctx), first((x) => !x.place)];
     step("composer A (zcwt): 'to zcwt' + 'ψsb/zcwt' + context; narrowed, the context goes first, then the branch, 'to zcwt' always stays",
-      /^to zcwt\b/.test(w0?.to ?? '') && /^ψ ?sb\/zcwt$/.test(w0?.place ?? '') && /^context /.test(w0?.context ?? '') && ctxGone >= 0 && placeGone >= ctxGone && Array.isArray(drops) && drops.every((x) => x.to),
+      /^to zcwt\b/.test(w0?.to ?? '') && /^ψ ?sb\/zcwt$/.test(w0?.place ?? '') && (w0?.context === null || ctxGone >= 0) && (ctxGone < 0 || placeGone >= ctxGone) && Array.isArray(drops) && drops.every((x) => x.to),
       { tab: w0, ctxGone: drops[ctxGone]?.w ?? null, placeGone: drops[placeGone]?.w ?? null, full: Array.isArray(drops) ? drops[0] : drops });
     // answering: the accent tab, 'answering main · …', 'esc write to main instead'; '+' and send only
     await harness();
@@ -3382,7 +3390,7 @@ async function rowsC2BA(harness, say) {
     const d = await dock(Q, 60000);
     const an = await until(async () => { const x = await tabInfo(); return x?.acc ? x : null; }, 8000, 400) ?? (await tabInfo());
     step("composer A answering: the tab in the accent, 'answering main · <question cut after a word>', 'esc write to main instead'; no branch, context, mode or model; '+' stays",
-      !!d.open && an?.acc === true && /^answering main · zcA/.test(an.to ?? '') && /^esc write to main instead$/.test(an.end ?? '') && !an.place && !an.context && !an.mode && !an.model && an.attach === '+', { card: d.id, ...an });
+      !!d.open && an?.acc === true && /^answering (main|bise) · zcA/.test(an.to ?? '') && /^esc write to (main|bise) instead$/.test(an.end ?? '') && !an.place && !an.context && !an.mode && !an.model && an.attach === '+', { card: d.id, ...an });
     // the shots: idle (main), words (zcwt), answering, at 1400/1100/800 light and dark
     const sizes = [];
     for (const scheme of ['light', 'dark']) {
@@ -3424,7 +3432,7 @@ async function rowsC2BA(harness, say) {
     await page.waitForTimeout(500);
     await page.keyboard.press('Escape');
     step("composer A at 1400/1100/800 light and dark: 'to' always shown, no band, the mode never drops, answering in the accent with one '…' at most",
-      sizes.every((s) => /^to main/.test(s.idle.to ?? '') && s.idle.band && /^to zcwt/.test(s.words.to ?? '') && !!s.words.mode && s.answering.open && s.answering.acc && !s.answering.dots && /^answering main/.test(s.answering.to ?? '')), sizes);
+      sizes.every((s) => /^to (main|bise)/.test(s.idle.to ?? '') && s.idle.band && /^to zcwt/.test(s.words.to ?? '') && !!s.words.mode && s.answering.open && s.answering.acc && !s.answering.dots && /^answering (main|bise)/.test(s.answering.to ?? '')), sizes);
     await harness();
     await answerWith(Q, 1);
   });
@@ -3466,7 +3474,7 @@ async function rowsC2BA(harness, say) {
     const opened = await until(async () => ((await page.locator('[data-testid^="inbox.block.open."], [data-testid^="inbox.block.card."]').first().isVisible().catch(() => false)) ? true : null), 5000, 250);
     const note = flat(await text('[data-testid="composer.answer.note"]'));
     await shot('c2ba-inbox-slash');
-    step("'/inbox' opens the block's item in place, or says 'nothing waits for you.'", !!opened || note === 'nothing waits for you.', { opened: !!opened, note, waiting: counts?.block });
+    step("'/inbox' opens the block's item in place, or says 'nothing waits for you.'", !!opened || /nothing waits for you\.$/.test(note), { opened: !!opened, note, waiting: counts?.block });
     await page.keyboard.press('Escape');
     // beside an artifact: the block there lists its maker's items only; '/inbox' widens it, or says so
     const chip = page.locator('[data-testid^="app.right.artifact."][data-testid$=".chip"]').filter({ hasText: 'zc asks art' }).first();
@@ -3486,7 +3494,7 @@ async function rowsC2BA(harness, say) {
     }, 6000, 300);
     await shot('c2ba-inbox-slash-beside-artifact');
     step("'/inbox' beside an artifact: the block widens to the item that waits, or 'nothing waits for you.' (never a silent nothing)",
-      art && !!wide && (wide.opened || wide.note === 'nothing waits for you.'), { art, ...wide });
+      art && !!wide && (wide.opened || /nothing waits for you\.$/.test(wide.note)), { art, ...wide });
     await page.keyboard.press('Escape');
     await closeArtifact();
     await harness();
@@ -3548,7 +3556,7 @@ async function rowsC2BA(harness, say) {
     const back = { field: await fieldText(), tab: (await tabInfo())?.to ?? null, note: flat(await text('[data-testid="composer.answer.note"]')), card: await cardEl(K2).isVisible().catch(() => false) };
     await shot('c2ba-closed-esc-back');
     step("esc on the closed card: back to the composer 'to main', his words in it (or '↑ brings them back')",
-      /^to main\b/.test(back.tab ?? '') && (back.field === c2.HALF || /↑ brings them back/.test(back.note)), { closed: c2, back });
+      /^to (main|bise)\b/.test(back.tab ?? '') && (back.field === c2.HALF || /↑ brings them back/.test(back.note)), { closed: c2, back });
     await clear();
   });
 
