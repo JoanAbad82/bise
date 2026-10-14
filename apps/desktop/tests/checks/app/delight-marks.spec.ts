@@ -126,7 +126,10 @@ test('app/delight-marks: the sidebar marks and their tips, the done kiss, the wi
     expect('·~∿≈∿~'.repeat(4), `the frames · ~ ∿ ≈ ∿ ~ in order (${steps})`).toContain(steps);
     const gaps = seen.slice(2).map((x, i) => x.t - (seen[i + 1]?.t ?? 0));
     expect(gaps.length, 'about 12 frames in 2.7 s').toBeGreaterThanOrEqual(9);
-    for (const g of gaps) expect(Math.abs(g - 220), `220 ms a frame (${String(Math.round(g))})`).toBeLessThan(60);
+    // the frame comes from the time (clock.ts): a late timer on a busy machine stretches one gap and
+    // shortens the next, so the median says the pace
+    const mid = [...gaps].sort((a, b) => a - b)[Math.floor(gaps.length / 2)] ?? 0;
+    expect(Math.abs(mid - 220), `220 ms a frame (median ${String(Math.round(mid))}; ${gaps.map((g) => String(Math.round(g))).join(' ')})`).toBeLessThan(40);
     // reduced motion: one still '∿' in text-2
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(breath, "still: '∿'").toHaveText('∿');
