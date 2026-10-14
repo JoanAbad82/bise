@@ -58,7 +58,8 @@ Each run writes its results under `$TMPDIR/qa/<slice>-<date>/` (screenshots, the
 
 ### C. React (the note layer v1)
 
-- [ ] A typed note on a block: anchored to it, in the side list (`notes for weekly update · 1`).
+- [ ] A typed note on a block: anchored to it, in the side list (`notes · 1`).
+- [ ] The side list folds: its head or `l` folds it to a pill `notes · 1 ▸`, the pill or `l` opens it; a reload keeps the fold; an agent's answer or a ✓ done opens it; on a wide window it sits right of the text, never over it.
 - [ ] A typed note on a text selection: anchored to the quote.
 - [ ] ♡ keep, ✗ drop, ~ not sure on a block: each one is a note in the list.
 - [ ] Edit in place on prose: becomes a note `you changed …`; undo takes it back (and removes it

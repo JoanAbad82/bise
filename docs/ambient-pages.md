@@ -123,7 +123,7 @@ The page goes `updating` until the next publish (or the agent's turn ends withou
 swaps blocks by `data-id` in place (scroll kept, a `bise:swapped` event with the changed ids);
 `what changed` = blocks whose hash differs from the previous version (meta). `notes.js`: pin,
 typed note on a block or a selection (anchor: block id + quote), ♡ ✗ ~, edit in place on `prose`
-(an edit is a note with before/after; undo), the side list (`notes for weekly update · 3`), the send
+(an edit is a note with before/after; undo), the side list (`notes · 3`, folded to a pill `notes · 3 ▸` once read: kit/notes-fold.js), the send
 bar, ⌘⏎; drafts saved through `/api/p/<id>/notes` (never lost on reload); on `bise:swapped` it
 re-anchors (a lost quote: `moved`) and shows outcomes (done / answer / open). Words: ambient's.
 

@@ -86,7 +86,7 @@ When main makes a page instead of talking (main's rule, in its prompt):
 - **edit** in place, where the page says it's editable (doc text, table cells, a draft's lines);
 - **pick** among options (1-3, or click);
 - **approve / skip** an item (job 2).
-Every reaction is a note in the side list (`notes for weekly update · 3`). Nothing goes until you
+Every reaction is a note in the side list (`notes · 3`). Nothing goes until you
 `send` (said, clicked or ⌘⏎): `sent. weekly update is on it.`
 
 **D. Iterate.** The notes go to the agent that made the page, in one message. While it works,
@@ -224,7 +224,7 @@ ambient (product look) with designer (brand); built by an implementer; agents on
   what they make (today paper: the page's content, the site's world: Newsreader to read,
   JetBrains Mono for code and numbers), light and dark following macOS;
 - **the page shell**: the frame (whose, version and age, state, `what changed`, notes count,
-  `send`), the side list of notes (`notes for weekly update · 3`), the send bar (`3 notes for
+  `send`), the side list of notes (`notes · 3`, folded to a pill once read), the send bar (`3 notes for
   weekly update · or just say "send"`), "for you" (the list of pages);
 - **components**: prose, heading, callout, source list, table, item list (review), compare,
   question, checklist, email draft, chart (bars, lines), image, timeline, and the edit states

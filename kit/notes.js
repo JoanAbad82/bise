@@ -15,7 +15,8 @@
 
   // ---- the words (ambient's; a new line goes through ambient)
   const NW = {
-    listTitle: (page, n) => `notes for ${page} · ${n}`,
+    // the box's head reads like its folded pill (designer m_24062: the page's title is right beside it)
+    listTitle: (_page, n) => `notes · ${n}`,
     sendBar: (n, agent) => `${n} ${n === 1 ? "note" : "notes"} for ${agent} · or just say "send"`,
     send: "send",
     count: (n) => (n ? `${n} ${n === 1 ? "note" : "notes"}` : ""),
@@ -503,6 +504,8 @@
     tools.setAttribute("role", "toolbar"); tools.setAttribute("aria-label", NW.say.tools);
     barText.setAttribute("aria-live", "polite");
     doc.body.append(list, bar, tools, pins);
+    // the box folds to a pill (notes-fold.js): its head, the pill, `l`; kept per page
+    const fold = root.BiseNotesFold ? root.BiseNotesFold.attach(doc, { list, head: listHead, page: pageId }) : null;
     // a line whose leading ✎ or ✓ keeps its own color (the pen's, the olive's): ambient, m_4926, m_4919 (4)
     const glyphed = (tag, cls, text) => {
       const m = /^([✎✓])(\s.*)$/su.exec(text || "");
@@ -596,6 +599,7 @@
       renderPins();
       paintHighlights();
       for (const b of blocks()) b.classList.toggle("bn-has", M.all().some((n) => n.block === b.dataset.id && n.status === "draft"));
+      if (fold) fold.update(writing() ? [] : all, composer.classList.contains("bn-on"));
     }
     function renderPins() {
       pins.replaceChildren();

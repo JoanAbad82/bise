@@ -25,7 +25,7 @@ html.bn-pinning #bise-page [data-kit][data-id] { cursor: crosshair; }
 #bise-page .k-dl[data-bn-line="first last"] { box-shadow: inset 3px 0 0 var(--pen, #c8264a), inset 0 0 0 1px var(--pen, #c8264a); }
 #bise-page .k-dl[data-bn-line]::before, #bise-page .k-dl[data-bn-line]::after { color: var(--pen, #c8264a); }
 
-/* the side list: `notes for weekly update · 3` */
+/* the side list: `notes · 3 ▾`, folded `notes · 3 ▸` (notes-fold.js) */
 .bn-list {
   /* as tall as its notes, never more than the window (ambient, m_4919 (5)): the keys right under the last note */
   position: fixed; right: 16px; top: 72px; max-height: calc(100vh - 72px - 84px); width: 300px; display: none; flex-direction: column;
@@ -34,7 +34,34 @@ html.bn-pinning #bise-page [data-kit][data-id] { cursor: crosshair; }
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); z-index: 2147483000; overflow: hidden;
 }
 .bn-list.bn-on { display: flex; }
-.bn-head { padding: 14px 16px 8px; font: 12px var(--font-mono, ui-monospace, monospace); color: var(--talk-dim, #ffffffa0); }
+/* a wide window: the box sits in the page's own side column (kit.css's grid-area side), sticky
+   under the frame, its top on the h1's: never over the text (notes-fold, designer m_23997). A page
+   with a ui block has no side column: the box stays fixed at the right, foldable. */
+@media (min-width: 1081px) {
+  body:not(:has(#bise-page > [data-kit="ui"])) > .bn-list {
+    grid-area: side; position: sticky; top: 66px; right: auto; align-self: start; justify-self: end;
+    margin-top: calc(var(--space-6, 46px) + 6px); max-height: calc(100vh - 66px - 84px); width: 100%;
+  }
+  body:not(:has(#bise-page > [data-kit="ui"])) > .bn-list.bn-folded { width: auto; }
+}
+.bn-head { padding: 14px 34px 8px 16px; font: 12px var(--font-mono, ui-monospace, monospace); color: var(--talk-dim, #ffffffa0); }
+/* the head folds the box (notes-fold.js): a click anywhere on it, its ▾ at the right end; folded,
+   the box is a pill `notes · 1 ▸` at its own top-right corner, in the head's type, ink not accent */
+.bn-head[role="button"] { position: relative; cursor: pointer; }
+.bn-head[role="button"]::after { content: "▾"; position: absolute; right: 16px; top: 14px; }
+.bn-head[role="button"]:hover, .bn-head[role="button"]:hover::after { color: var(--talk-ink, #fff); }
+.bn-head:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; border-radius: var(--radius-small, 10px); }
+.bn-pill { display: none; }
+.bn-list.bn-folded { width: auto; border-radius: 999px; }
+.bn-list.bn-folded > :not(.bn-pill) { display: none; }
+.bn-list.bn-folded > .bn-pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: 0; background: none;
+  font: 12px var(--font-mono, ui-monospace, monospace); color: var(--talk-ink, #fff); white-space: nowrap;
+}
+.bn-pill .bn-fold-glyph { color: var(--talk-dim, #ffffffa0); }
+/* narrow (the desktop side panel too): folded, the pill sits in the page's 46 px top padding, under
+   the frame, its right edge on the frame's padding: the title stays clear */
+@media (max-width: 1080px) { .bn-list.bn-folded { top: 65px; } }
 .bn-items { list-style: none; margin: 0; padding: 0 8px; overflow-y: auto; flex: 0 1 auto; min-height: 0; }
 .bn-item { position: relative; padding: 9px 30px 9px 10px; border-radius: var(--radius-small, 10px); cursor: pointer; }
 .bn-item:hover { background: color-mix(in srgb, var(--talk-ink, #fff) 7%, transparent); }
