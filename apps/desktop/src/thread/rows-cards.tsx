@@ -391,7 +391,7 @@ export function AgentNote({ pos, from, to, text: said, parts, ctx, testId, tag, 
             ))}
           </div>
         ))}
-      {attached && <PartChips view={view} ctx={ctx} pos={pos} />}
+      {attached && <PartChips view={view} ctx={ctx} pos={pos} named />}
     </div>
   );
 }

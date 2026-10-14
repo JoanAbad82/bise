@@ -56,6 +56,17 @@ fn spaced(spans: Vec<Span<'static>>, st: Style) -> Vec<Span<'static>> {
     out
 }
 
+/// A brief's rows: its words as `rows_of` draws them, then its
+/// attachments as one row of quiet chips in `st` (none: its rows alone).
+pub(crate) fn with_chips(body: &str, st: Style, rows_of: impl FnOnce(&str) -> Vec<Line<'static>>) -> Vec<Line<'static>> {
+    let (words, chips) = split(body);
+    let mut rows = rows_of(words.trim_end());
+    if !chips.is_empty() {
+        rows.push(Line::from(spans(chips, st)));
+    }
+    rows
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,15 +78,4 @@ mod tests {
         assert!(flat.contains("flame.png ") && !flat.contains("flame.png▯"), "{flat}");
         assert!(!flat.starts_with(' '), "{flat}");
     }
-}
-
-/// A brief's rows: its words as `rows_of` draws them, then its
-/// attachments as one row of quiet chips in `st` (none: its rows alone).
-pub(crate) fn with_chips(body: &str, st: Style, rows_of: impl FnOnce(&str) -> Vec<Line<'static>>) -> Vec<Line<'static>> {
-    let (words, chips) = split(body);
-    let mut rows = rows_of(words.trim_end());
-    if !chips.is_empty() {
-        rows.push(Line::from(spans(chips, st)));
-    }
-    rows
 }

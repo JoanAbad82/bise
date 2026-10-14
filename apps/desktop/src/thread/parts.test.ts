@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type { Part } from '@/proto';
 import VIA_FN from '../../../../rust/proto/fixtures/via_fn.json';
-import { anchorMeta, drawnParts, pageAnswer, pageOf, partsGist, viaFn, youView } from './parts';
+import { anchorMeta, chipName, drawnParts, pageAnswer, pageOf, partsGist, viaFn, youView } from './parts';
+
+describe('chipName (send-parts, designer m_25875)', () => {
+  it('a short name stays whole', () => {
+    expect(chipName('flame-graph.png')).toBe('flame-graph.png');
+  });
+  it('a long one drops its extension first', () => {
+    expect(chipName('the-cold-start-flamegraph.png')).toBe('the-cold-start-flamegraph');
+  });
+  it('still too long: cut after a whole word with …', () => {
+    expect(chipName('cold-start-flame-graph-of-the-night-batch.png')).toBe('cold-start-flame-graph-of…');
+  });
+  it('one long word: cut on the char', () => {
+    expect(chipName('abcdefghijklmnopqrstuvwxyzabcdefgh')).toBe('abcdefghijklmnopqrstuvwxyza…');
+  });
+});
 
 // msg-parts (architect m_17621): his message drawn from its typed parts, never a tag; the TUI's
 // said.rs view_of / gist are the rule

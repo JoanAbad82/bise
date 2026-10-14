@@ -77,9 +77,10 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page.getByTestId('thread.run.2')).toBeVisible({ timeout: 10_000 });
       await page.getByTestId('thread.run.2').click();
       await expect(page.getByTestId('thread.from.3')).toBeVisible({ timeout: 10_000 });
-      await expect(page.getByTestId('thread.you.3.image.1')).toHaveText('image 1');
+      // an attachment an agent sends has a name: the image chip shows it (designer m_25875)
+      await expect(page.getByTestId('thread.you.3.image.1')).toHaveText('bench.png');
       await expect(page.getByTestId('thread.you.3.file.1')).toContainText('cold-start.log');
-      await expect(page.getByTestId('thread.you.2.image.1')).toHaveText('image 1');
+      await expect(page.getByTestId('thread.you.2.image.1')).toHaveText('bench.png');
       await expect(page.getByTestId('thread.from.3')).not.toContainText('[Image #1]');
       await expect(page.getByTestId('thread.from.3')).toContainText('reads the whole cache first');
       const gap = await page.evaluate(() => {

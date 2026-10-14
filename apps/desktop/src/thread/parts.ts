@@ -200,3 +200,15 @@ export function pageAnswer(p: PagePart): { head: string; on: string; asked: stri
       .join('\n'),
   };
 }
+
+/** An attachment's chip words from its file name (send-parts, designer m_25875): whole up to `max`
+ *  chars; longer, its extension dropped first, then cut after a whole word with '…'. Pure. */
+export function chipName(name: string, max = 28): string {
+  if (name.length <= max) return name;
+  const dot = name.lastIndexOf('.');
+  const bare = dot > 0 ? name.slice(0, dot) : name;
+  if (bare.length <= max) return bare;
+  const head = bare.slice(0, max - 1);
+  const cut = Math.max(head.lastIndexOf(' '), head.lastIndexOf('-'), head.lastIndexOf('_'), head.lastIndexOf('.'));
+  return `${(cut > 0 ? head.slice(0, cut) : head).trimEnd()}…`;
+}

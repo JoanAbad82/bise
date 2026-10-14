@@ -19,8 +19,8 @@ pub(crate) fn asker_act(acts: &[(u32, OptAct)], n: u32) -> Option<&OptAct> {
 /// What opens for an act.
 #[derive(Debug, PartialEq)]
 pub(crate) enum Plan {
-    /// the artifact as /artifacts opens it
-    Artifact(Artifact),
+    /// the artifact as /artifacts opens it (boxed: clippy's large_enum_variant)
+    Artifact(Box<Artifact>),
     /// a link in his browser (a page at its anchor, a PR, the notes)
     Url(String),
     /// the app's own ChatGPT sign-in
@@ -38,7 +38,7 @@ pub(crate) fn plan(act: &OptAct, found: Option<Artifact>) -> Plan {
         OptAct::Open { artifact: Some(id), url, .. } => match (found, url) {
             // a page: its url carries the anchor (`…/p/<id>#<block>`)
             (Some(a), Some(u)) if matches!(artifacts::how(&a, None, false), How::Browser(_)) => Plan::Url(u.clone()),
-            (Some(a), _) => Plan::Artifact(a),
+            (Some(a), _) => Plan::Artifact(Box::new(a)),
             (None, Some(u)) => Plan::Url(u.clone()),
             (None, None) => Plan::Say(format!("{id} is no longer in /artifacts")),
         },
@@ -87,7 +87,7 @@ mod tests {
         assert_eq!(plan(&review, Some(page("issue-15"))), Plan::Url("http://127.0.0.1:1/p/issue-15#m-pr16".into()));
         // a file artifact opens as /artifacts opens it
         let doc = Artifact { id: "plan".into(), title: "plan".into(), kind: "doc".into(), target: "/w/plan.md".into(), ..Default::default() };
-        assert_eq!(plan(&OptAct::artifact("plan", None, None), Some(doc.clone())), Plan::Artifact(doc));
+        assert_eq!(plan(&OptAct::artifact("plan", None, None), Some(doc.clone())), Plan::Artifact(Box::new(doc)));
         // gone: its url, else one line, never nothing
         assert_eq!(plan(&review, None), Plan::Url("http://127.0.0.1:1/p/issue-15#m-pr16".into()));
         assert_eq!(plan(&OptAct::artifact("plan", None, None), None), Plan::Say("plan is no longer in /artifacts".into()));

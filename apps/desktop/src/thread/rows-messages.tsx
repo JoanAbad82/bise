@@ -16,7 +16,7 @@ import { saidFor, useSaidMs } from '@/voicemode';
 import type { RowCtx } from './rows';
 import { Thumb } from './rows-cards';
 import { AttachChip, FileThumb } from './AttachChip';
-import { anchorMeta, drawnParts, viaFn, youView, type YouView } from './parts';
+import { anchorMeta, chipName, drawnParts, viaFn, youView, type YouView } from './parts';
 import { lineCount, quoteAbout } from '@/composer/message';
 /** A message of his longer than this folds to its first lines (tui-parity B11, the TUI's You(_, _, open)). */
 export const LONG_LINES = 12;
@@ -235,7 +235,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
  * glyph slot, and 'image 1' or its file name in ink). The artifact chip's look: 1 px line, r 9,
  * 6 px apart; never the accent (pink is for what waits on him). Never a tag.
  */
-export function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos: number }) {
+export function PartChips({ view, ctx, pos, named = false }: { view: YouView; ctx: RowCtx; pos: number; named?: boolean }) {
   const [shown, setShown] = useState<number | null>(null);
   const paste = view.pastes.find((p) => p.n === shown);
   if (view.pastes.length === 0 && view.images.length === 0 && view.files.length === 0) return null;
@@ -260,7 +260,7 @@ export function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos:
         {/* his images and files (file-chips): a click previews, a right-click shows it in Finder */}
         {view.images.map((img, i) => (
           <AttachChip key={`${img.path}#${String(i)}`} of="image" path={img.path} missing={false} thumb={<Thumb path={img.path} />} testId={`${id}.image.${String(i + 1)}`}>
-            {partImageWords(img.name, i)}
+            {named ? chipName(img.path.split('/').at(-1) ?? img.path) : partImageWords(img.name, i)}
           </AttachChip>
         ))}
         {view.files.map((f, i) =>
@@ -281,7 +281,7 @@ export function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos:
             </Chip>
           ) : (
             <AttachChip key={`${f.path}#${String(i)}`} of="file" path={f.path} missing={f.missing} thumb={<FileThumb path={f.path} />} testId={`${id}.file.${String(i + 1)}`}>
-              {f.path.split('/').at(-1) ?? f.path}
+              {named ? chipName(f.path.split('/').at(-1) ?? f.path) : (f.path.split('/').at(-1) ?? f.path)}
             </AttachChip>
           ),
         )}
