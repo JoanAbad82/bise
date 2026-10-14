@@ -22,6 +22,10 @@ const FX = fxDir(out, process.env);
 fs.mkdirSync(FX, { recursive: true });
 const tag = process.env.AS_HE_DOES_TAG ? `-${process.env.AS_HE_DOES_TAG}` : '';
 const WATCHDOG_MS = Number(process.env.AS_HE_DOES_WATCHDOG_MS ?? 600000);
+// AS_HE_DOES_QUICK_ROWS=quote,merge: a quick pass of those rows alone (rows37's and rowsE812's rows
+// whose name holds one of the words), to prove or clear a red on a fresh world (ambient-lead m_23521)
+const ONLY = (process.env.AS_HE_DOES_QUICK_ROWS ?? '').split(',').map((w) => w.trim()).filter(Boolean);
+const wanted = (name) => ONLY.length === 0 || ONLY.some((w) => name.includes(w));
 const ANSWER_MS = Number(process.env.AS_HE_DOES_ANSWER_MS ?? 240000);
 const MESSAGE = 'hello from the as-he-does proof';
 
@@ -1190,11 +1194,21 @@ if (mode === 'quick') {
   };
   const harness = () => click('open harness', page.locator('[data-testid="app.sidebar"]').getByText('harness', { exact: true }).first());
   await closeArtifact();
-  await quickRows(harness, say);
-  await newRows(harness, say);
-  await rows37(harness, say);
-  await rows25(harness, say);
-  await rows0170(harness, say);
+  if (ONLY.length) {
+    // the chosen rows alone; rows37's before rowsE812's seed (its spawns' task_status would ride on
+    // main's next request, the quote's included)
+    await newRows(harness, say);
+    await rows37(harness, say);
+    await rowsE812(harness, say);
+  } else {
+    // first: ARCHIVED's fold is read on a fresh profile, and the PR poller gets the time the others take
+    await rowsE812(harness, say);
+    await quickRows(harness, say);
+    await newRows(harness, say);
+    await rows37(harness, say);
+    await rows25(harness, say);
+    await rows0170(harness, say);
+  }
 }
 
 // d0d45f92's rows (ambient-lead m_22519): the help sheet opaque, esc never stops a turn and ctrl+c
@@ -1204,6 +1218,7 @@ if (mode === 'quick') {
 // own try: a row that throws is a red step, the next rows still run.
 async function newRows(harness, say) {
   const row = async (name, fn) => {
+    if (!wanted(name)) return;
     try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
   };
   const field = page.locator('[data-testid="composer.field"]:visible').first();
@@ -1326,7 +1341,7 @@ async function newRows(harness, say) {
     const LOG = process.env.AS_HE_DOES_FAKE_LOG;
     const req = await until(async () => {
       if (!LOG || !fs.existsSync(LOG)) return null;
-      const lines = fs.readFileSync(LOG, 'utf8').split('\n').filter((l) => l.includes('before') && l.includes('after'));
+      const lines = fs.readFileSync(LOG, 'utf8').split('\n').filter((l) => l.includes('before') && l.includes('after') && (!src || l.includes(src)));
       if (lines.length === 0) return null;
       const j = JSON.parse(lines.at(-1));
       const u = typeof j.user === 'string' ? j.user : JSON.stringify(j.user ?? j.last_user ?? j);
@@ -1439,6 +1454,7 @@ async function newRows(harness, say) {
 async function rows37(harness, say) {
   const NL = String.fromCharCode(10);
   const row = async (name, fn) => {
+    if (!wanted(name)) return;
     try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
   };
   const field = page.locator('[data-testid="composer.field"]:visible').first();
@@ -1893,6 +1909,254 @@ async function rows25(harness, say) {
 // watch). Rows: the pause over the composer and in the head, the reply line and its name, the
 // alarm only in the right bar (hover words, detail, stop watching), never 'since', and a path that
 // holds a project's name stays in bise's thread. Each row is its own try; the pid is killed at the end.
+// e812463c's rows (main m_23495): the right bar's ARCHIVED starts folded and an opened one stays
+// open after a reload (c4665615); a card answered from another project's thread never comes back
+// through a project switch and a reload (store/acted.ts); a merge-ready card's '2 open it on GitHub'
+// opens the PR, sends nothing, the card stays and nothing says 'you answered' (his #384, localAct).
+// The merge card is the hub's own: the world's GitHub (cand.sh: origin on github.com, the fake gh
+// first on the PATH) lists PR #384 on zqmerge's branch, CLEAN and approved, once its place exists.
+// '2' calls window.bise.openExternal: a breakpoint in the preload reads its URL and swaps it for
+// 'qa-noop:held' (main refuses that scheme), so his browser never opens; a swap that doesn't take
+// stops the renderer's call (Runtime.terminateExecution) and the run (BREACH).
+async function rowsE812(harness, say) {
+  const row = async (name, fn) => {
+    if (!wanted(name)) return;
+    try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
+  };
+  const flat = (s) => (s ?? '').replace(/\s+/g, ' ').trim();
+  const bise = () => click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  const HP = process.env.AS_HE_DOES_HARNESS ?? null;
+  const GHW = process.env.AS_HE_DOES_GH_WORLD ?? null;
+  const git = async (args) => {
+    const { execFileSync } = await import('node:child_process');
+    try { return execFileSync('git', ['-C', HP, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return null; }
+  };
+  // the projects of the sidebar but bise and harness: {id, name}
+  const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
+    .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), name: (e.querySelector('.app-side-name, .name')?.textContent ?? e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
+    .filter((p) => p.id && !p.id.includes('.') && !/^harness\b/.test(p.name))).catch(() => []);
+  const openProject = async (id) => {
+    await page.locator(`[data-testid="app.sidebar.project.${id}"]`).first().click({ timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(800);
+  };
+  // a card's words anywhere a card shows (the inbox block, a strip, the dock), never his asides
+  // a read that fails (a reload under it) counts as seen: a red to look at, never a silent pass
+  const cardShown = (token) => page.evaluate((t) => [...document.querySelectorAll('[data-testid^="inbox."], [data-testid^="strip."], [data-testid^="dock."]')]
+    .some((e) => (e.textContent ?? '').includes(t)), token).catch(() => 'unread');
+  // the block's row or card holding `token`, opened (a click on its row, '+ N more' first)
+  const dock = async (token, ms) => {
+    const rowL = page.locator('[data-testid^="inbox.block.row."]', { hasText: token }).first();
+    const open = page.locator('[data-testid^="inbox.block.card."]').filter({ hasText: token }).first();
+    const listed = await until(async () => {
+      if ((await rowL.isVisible().catch(() => false)) || (await open.isVisible().catch(() => false))) return true;
+      await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 1000 }).catch(() => {});
+      return null;
+    }, ms, 1000);
+    for (let i = 0; listed && i < 20 && !(await open.isVisible().catch(() => false)); i++) {
+      if (await rowL.isVisible().catch(() => false)) await rowL.click({ timeout: 2000 }).catch(() => {});
+      else await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 2000 }).catch(() => {});
+      await page.waitForTimeout(400);
+    }
+    return { listed: !!listed, open: (await open.isVisible().catch(() => false)) ? open : null };
+  };
+  const answeredAsides = (token) => page.evaluate((t) => [...document.querySelectorAll('[data-testid^="thread.aside."], [data-testid^="thread.approval."]')]
+    .filter((e) => /^thread\.(aside|approval)\.\d+$/.test(e.getAttribute('data-testid') ?? '') && /you answered/.test(e.textContent ?? '') && (e.textContent ?? '').includes(t))
+    .map((e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200)), token).catch(() => ['unread']);
+  const fakeLines = (token) => {
+    const LOG = process.env.AS_HE_DOES_FAKE_LOG;
+    return LOG && fs.existsSync(LOG) ? fs.readFileSync(LOG, 'utf8').split('\n').filter((l) => l.includes(token)).length : null;
+  };
+
+  // the seed, in harness' thread: zqmerge (its place's branch carries the PR), zqold dropped (ARCHIVED)
+  await harness();
+  // --place new: its own worktree on sb/zqmerge (the world's agents share the workspace otherwise,
+  // so no branch for a PR: try-gate-e812's first run)
+  await say("[[bash: sb spawn zqmerge --place new --objective 'zq ts-pattern error dx: nothing to do yet' && sb spawn zqold --objective 'zq old: nothing to do' && sleep 3 && sb drop zqold]] seeded e812");
+  const tip = HP ? await until(async () => git(['rev-parse', '--verify', '-q', 'refs/heads/sb/zqmerge']), 60000, 1000) : null;
+  if (tip && GHW) {
+    fs.writeFileSync(path.join(GHW, 'prs-harness.json'), JSON.stringify({ owner: 'qa-world', name: 'harness', prs: [{
+      number: 384, branch: 'sb/zqmerge', head: tip, title: 'zq ts-pattern error dx', draft: false, review: 'APPROVED', rollup: 'SUCCESS',
+      checks: [{ name: 'ci', conclusion: 'SUCCESS' }], reviews: [{ state: 'APPROVED', author: 'alice' }], merge_state: 'CLEAN', commits: 1,
+    }] }, null, 1));
+  }
+  step("rowsE812 seed: zqmerge's place (branch sb/zqmerge) and PR #384 in the world's GitHub", !!tip && !!GHW, { harness: HP, gh_world: GHW, tip });
+
+  await row('archived fold', async () => {
+    await harness();
+    const headL = page.locator('[data-testid="app.right.archived.head"]').first();
+    const shown = await until(async () => ((await headL.count()) ? true : null), 60000, 1000);
+    const state = () => page.evaluate(() => {
+      const h = document.querySelector('[data-testid="app.right.archived.head"]');
+      return {
+        expanded: h?.getAttribute('aria-expanded') ?? null,
+        head: (h?.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80),
+        rows: document.querySelectorAll('[data-testid="app.right.archived"] .app-rb-row').length,
+        zqold: !!document.querySelector('[data-testid="app.right.archived.zqold"], [data-testid$=".zqold"][data-testid^="app.right.archived."]'),
+        agents: document.querySelector('[data-testid="app.right.agents.head"]')?.getAttribute('aria-expanded') ?? null,
+      };
+    });
+    const s0 = await state();
+    await page.mouse.move(1, 300);
+    await shot('archived-folded');
+    step("ARCHIVED starts folded on a fresh profile: its head only (aria-expanded false, 'ARCHIVED · N'), no row; AGENTS open",
+      !!shown && s0.expanded === 'false' && /ARCHIVED/.test(s0.head) && s0.rows === 0 && !s0.zqold && s0.agents !== 'false', s0);
+    if (!shown) return;
+    await headL.click({ timeout: 5000 });
+    const s1 = await until(async () => { const s = await state(); return s.expanded === 'true' && s.zqold ? s : null; }, 5000, 250) ?? (await state());
+    await page.waitForTimeout(700);
+    await page.reload().catch(() => {});
+    await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
+    await harness();
+    const s2 = await until(async () => { const s = await state(); return s.expanded !== null ? s : null; }, 15000, 250);
+    await page.mouse.move(1, 300);
+    await shot('archived-open-after-reload');
+    step('a click opens it (zqold there); after a reload it is still open', s1.expanded === 'true' && s1.zqold && s2?.expanded === 'true' && s2?.zqold, { opened: s1, after_reload: s2 });
+    // folded again, as found
+    await page.locator('[data-testid="app.right.archived.head"]').first().click({ timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(400);
+  });
+
+  await row('card answered from another project, then a switch and a reload', async () => {
+    const [other] = await others();
+    const T = `zqcard${String(Date.now() % 100000)}`;
+    await harness();
+    // harness' main idle first: the seed's turn and its agents' acks can hold the card's words
+    // past the wait (try-gate-e812's third run: no card in 90 s)
+    await until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 90000, 1000);
+    const f = page.locator('[data-testid="composer.field"]:visible').first();
+    await f.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type(`[[bash: sb card '${T} which size?`, { delay: 5 });
+    for (const l of ['1. zqsmall', "2. zqlarge']]"]) { await page.keyboard.press('Shift+Enter'); await page.keyboard.type(l, { delay: 5 }); }
+    await page.keyboard.press('Enter');
+    if (other) await openProject(other.id); else await bise();
+    const d = await dock(T, 90000);
+    if (d.open) await d.open.locator('[data-testid$=".opt.1"]').first().click({ timeout: 3000 }).catch(() => {});
+    const gone = d.open ? await until(async () => (!(await cardShown(T)) ? true : null), 10000, 250) : null;
+    await page.mouse.move(1, 300);
+    await shot('card-answered-other-project');
+    // from here on, sampled every 250 ms: the card must never show again
+    const seen = [];
+    const watch = async (where, ms) => {
+      const t0 = Date.now();
+      while (Date.now() - t0 < ms) { if (await cardShown(T)) seen.push({ where, at_ms: Date.now() - t0 }); await page.waitForTimeout(250); }
+    };
+    await watch(other ? other.name : 'bise', 3000);
+    await harness();
+    await watch('harness (a project switch)', 6000);
+    await bise();
+    await watch('bise (a project switch)', 4000);
+    await page.reload().catch(() => {});
+    await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
+    await watch('bise after a reload', 8000);
+    if (other) { await openProject(other.id); await watch(`${other.name} after the reload`, 4000); }
+    await harness();
+    await watch('harness after the reload', 4000);
+    await page.mouse.move(1, 300);
+    await shot('card-never-back');
+    step(`a card answered from another project's thread (${other ? other.name : 'none: bise'}): gone, never back through a project switch and a reload (sampled every 250 ms, ~30 s)`,
+      d.listed && !!d.open && !!gone && seen.length === 0, { other: other ?? null, listed: d.listed, opened: !!d.open, gone: !!gone, seen: seen.slice(0, 10), asides: await answeredAsides('zqsmall') });
+  });
+
+  await row("merge card's '2 open it on GitHub'", async () => {
+    if (!tip) { step("a merge-ready card's '2 open it on GitHub'", false, 'no PR seeded (no zqmerge branch or no world GitHub)'); return; }
+    await bise();
+    // the PR poller: once a minute with a window (forge/poll.rs SLOW_MS), the first ask at once
+    const d = await dock('#384', 240000);
+    const ghLog = GHW && fs.existsSync(path.join(GHW, 'gh.log')) ? fs.readFileSync(path.join(GHW, 'gh.log'), 'utf8').split('\n').filter(Boolean) : [];
+    if (!d.open) {
+      step("a merge-ready card (#384) shows in bise's inbox", false, { listed: d.listed, gh_calls: ghLog.length, gh_last: ghLog.slice(-3), block: flat(await text('[data-testid="inbox.block"]')).slice(0, 300) });
+      return;
+    }
+    const cardText = flat(await d.open.innerText().catch(() => ''));
+    const opt2 = flat(await d.open.locator('[data-testid$=".opt.2"]').first().innerText().catch(() => ''));
+    await page.mouse.move(1, 300);
+    await shot('merge-card');
+    step("a merge-ready card (#384, the hub's, from the world's GitHub) in bise's inbox, '2 open it on GitHub'", /#384 is ready to merge/.test(cardText) && /open it on GitHub/.test(opt2), { card: cardText.slice(0, 300), opt2, gh_calls: ghLog.length });
+
+    // the preload's openExternal held: a breakpoint, its URL read, swapped for 'qa-noop:held'
+    const dbg = await page.context().newCDPSession(page);
+    const scripts = [];
+    dbg.on('Debugger.scriptParsed', (e) => scripts.push(e));
+    await dbg.send('Debugger.enable');
+    await page.waitForTimeout(800);
+    let bp = null;
+    let param = null;
+    for (const s of scripts) {
+      const src = (await dbg.send('Debugger.getScriptSource', { scriptId: s.scriptId }).catch(() => null))?.scriptSource ?? '';
+      const m = /openExternal:\s*async\s*\(?(\w+)\)?\s*=>\s*/.exec(src);
+      if (!m) continue;
+      const where = m.index + m[0].length;
+      const head = src.slice(0, where);
+      const line = head.split('\n').length - 1;
+      const col = where - (head.lastIndexOf('\n') + 1);
+      const r = await dbg.send('Debugger.setBreakpoint', { location: { scriptId: s.scriptId, lineNumber: line + (s.startLine ?? 0), columnNumber: col + (line === 0 ? (s.startColumn ?? 0) : 0) } }).catch(() => null);
+      if (r?.breakpointId) { bp = r.breakpointId; param = m[1]; break; }
+    }
+    const held = [];
+    dbg.on('Debugger.paused', async (e) => {
+      const f = e.callFrames[0];
+      if (!bp || !(e.hitBreakpoints ?? []).includes(bp)) { await dbg.send('Debugger.resume').catch(() => {}); return; }
+      const read = async () => (await dbg.send('Debugger.evaluateOnCallFrame', { callFrameId: f.callFrameId, expression: param }).catch(() => null))?.result?.value ?? null;
+      const rec = { url: await read(), swapped: false };
+      const sc = f.scopeChain.findIndex((x) => x.type === 'local');
+      await dbg.send('Debugger.setVariableValue', { scopeNumber: Math.max(sc, 0), variableName: param, newValue: { value: 'qa-noop:held' }, callFrameId: f.callFrameId }).catch((err) => { rec.err = String(err).slice(0, 160); });
+      rec.swapped = (await read()) === 'qa-noop:held';
+      held.push(rec);
+      if (!rec.swapped) {
+        // never his browser: the call ends here, and the run with it
+        await dbg.send('Runtime.terminateExecution').catch(() => {});
+        fs.writeFileSync(path.join(out, 'BREACH'), `openExternal not held (${String(rec.url)}): the run stops before his browser opens`);
+      }
+      await dbg.send('Debugger.resume').catch(() => {});
+    });
+    // the swap proved on a harmless call first (main refuses this scheme either way)
+    const probe = bp ? await page.evaluate(() => window.bise.openExternal('qa-noop:probe')).catch((e) => String(e).slice(0, 120)) : null;
+    const probeOk = held.length === 1 && held[0].url === 'qa-noop:probe' && held[0].swapped && probe === false;
+    step("the preload's openExternal is held (its URL read, swapped for a refused one): his browser never opens", probeOk, { bp: !!bp, param, probe, held: [...held] });
+    if (!probeOk || fs.existsSync(path.join(out, 'BREACH'))) { await dbg.detach().catch(() => {}); return; }
+
+    const before = fakeLines('#384');
+    const beforeCount = fakeLines('open it on GitHub');
+    await d.open.locator('[data-testid$=".opt.2"]').first().click({ timeout: 3000 }).catch(() => {});
+    await until(async () => (held.length >= 2 ? true : null), 5000, 200);
+    await page.waitForTimeout(3000);
+    const stays = (await cardShown('#384')) === true;
+    const asides = await answeredAsides('open it on GitHub');
+    const asides384 = await answeredAsides('zqmerge');
+    const label = flat(await text('[data-testid="composer"] .lbl'));
+    await page.mouse.move(1, 300);
+    await shot('merge-2-held');
+    const url = held[1]?.url ?? null;
+    step("'2 open it on GitHub' opens the PR's page (github.com/qa-world/harness/pull/384), and only that", held.length === 2 && url === 'https://github.com/qa-world/harness/pull/384', { held: [...held] });
+    step("…sends nothing (no model request names it) and the card stays, with no 'you answered'",
+      stays && asides.length === 0 && asides384.length === 0 && fakeLines('#384') === before && fakeLines('open it on GitHub') === beforeCount,
+      { stays, asides, asides384, label, fake_384: [before, fakeLines('#384')], fake_opt: [beforeCount, fakeLines('open it on GitHub')] });
+    await dbg.send('Debugger.removeBreakpoint', { breakpointId: bp }).catch(() => {});
+    await dbg.send('Debugger.disable').catch(() => {});
+    await dbg.detach().catch(() => {});
+    // honest across a switch and a reload: still listed (the hub keeps it), still no 'you answered'
+    await harness();
+    await page.waitForTimeout(1500);
+    await page.reload().catch(() => {});
+    await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
+    await bise();
+    const back = await until(async () => ((await cardShown('#384')) === true ? true : null), 20000, 500);
+    await page.mouse.move(1, 300);
+    await shot('merge-after-reload');
+    step("after a project switch and a reload: the merge card is still in bise's inbox, still no 'you answered'",
+      !!back && (await answeredAsides('zqmerge')).length === 0, { back: !!back, asides: await answeredAsides('zqmerge') });
+    // '3 not yet' closes it (the hub's answer), so the later rows see no open merge card
+    const d2 = await dock('#384', 10000);
+    if (d2.open) await d2.open.locator('[data-testid$=".opt.3"]').first().click({ timeout: 3000 }).catch(() => {});
+    const closedIt = await until(async () => (!(await cardShown('#384')) ? true : null), 15000, 500);
+    res.notes = [...(res.notes ?? []), { what: "merge card closed with '3 not yet' after the rows", closed: !!closedIt, asides: await answeredAsides('zqmerge') }];
+    save();
+  });
+  await harness();
+}
+
 async function rows0170(harness, say) {
   const row = async (name, fn) => {
     try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
@@ -2067,15 +2331,23 @@ async function rows0170(harness, say) {
     await page.mouse.move(1, 300);
     await shot('reply-name-opens-zqdocs');
     step('the name opens zqdocs', !!went, { at: await page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent').catch(() => null), ms_after_line: Date.now() - at });
-    // what he sees once the ask gave up (25 s) and zqdocs still hasn't answered: logged, not a gate
-    // row (the reply wakes zqsearch later; nothing says it waits)
+    // past the ask's 25 s hold, zqdocs still not answered (0aefecd2, e812463c's row): the reply still
+    // pending is a pause counted from the ask, so the line stays and its duration goes on from there
     await openAgent('zqsearch');
-    await page.waitForTimeout(Math.max(0, 30000 - (Date.now() - at)));
+    const secs = (t) => { const m = /· (\d+) (s|min)$/.exec(t ?? ''); return m ? Number(m[1]) * (m[2] === 'min' ? 60 : 1) : null; };
+    const n0 = secs(line?.text);
+    await page.waitForTimeout(Math.max(0, 40000 - (Date.now() - at)));
     const later = await waitLine();
+    const passed = Math.round((Date.now() - at) / 1000);
+    const n1 = secs(later?.text);
+    const h1 = await head();
     await page.mouse.move(1, 300);
     await shot('reply-after-ask-cap');
-    res.notes = [...(res.notes ?? []), { what: "zqsearch 30 s after its ask's line showed, zqdocs not answered yet", line: later, head: await head(), row: await agentRow('zqsearch') }];
-    save();
+    // counted from the ask: at least the first reading plus the time since (a 'min' reading rounds down)
+    const counted = n0 !== null && n1 !== null && (/ s$/.test(later?.text ?? '') ? n1 >= n0 + passed - 3 : n1 + 59 >= n0 + passed);
+    step(`past the ask's 25 s hold (${String(passed)} s after the line showed, zqdocs not answered): 'continues when zqdocs answers · N' stays, N counted from the ask`,
+      /^continues when zqdocs answers · \d+ (s|min)$/.test(later?.text ?? '') && counted && /^… waiting · \d+ (s|min)$/.test(h1),
+      { first: line?.text ?? null, later: later?.text ?? null, n0, n1, passed, head: h1, row: await agentRow('zqsearch') });
   });
 
   // the pause's pid ends: the wake comes, zqbench's line goes

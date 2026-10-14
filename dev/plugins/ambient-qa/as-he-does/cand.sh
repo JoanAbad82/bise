@@ -200,6 +200,27 @@ pattern = "pnpm check"
 tool = "bash"
 pattern = "ls *"
 TOML
+# a GitHub of the world's own (e812463c's merge card, his #384): the harness project gets an origin
+# on github.com (never pushed: pushurl disabled) and the world's fake gh (fake_gh.py over
+# $GHW/prs-*.json) first on the PATH his login shell gives (the world's ~/.zprofile), so the
+# candidate's hubs and the app's login env find it before any other gh; the driver writes the PR
+# once its place exists (rowsE812). Nothing reaches his gh, his login or the network.
+GHW=$G/w/gh-world; export AS_HE_DOES_GH_WORLD=$GHW
+HP=$(jq -r '.projects[] | select(.name == "harness") | .path' $H/.bise/projects.json 2>/dev/null | head -1)
+if [ -n "$HP" ] && git -C "$HP" rev-parse --git-dir > /dev/null 2>&1; then
+  export AS_HE_DOES_HARNESS=$HP
+  mkdir -p $GHW/bin
+  git -C "$HP" remote remove origin 2>/dev/null
+  git -C "$HP" remote add origin https://github.com/qa-world/harness.git
+  git -C "$HP" config remote.origin.pushurl DISABLED-in-world
+  echo '{"owner": "qa-world", "name": "harness", "prs": []}' > $GHW/prs-harness.json
+  printf '#!/bin/sh\n# the world'"'"'s fake gh (dev/plugins/ambient-qa/fake_gh.py): never his gh, his login or the network\nexec %s %s %s "$@"\n' \
+    "$P" "$HERE/../fake_gh.py" "$GHW" > $GHW/bin/gh; chmod 755 $GHW/bin/gh
+  echo "export PATH=\"$GHW/bin:\$PATH\"" >> $H/.zprofile
+  say "world GitHub: harness at $HP, origin $(git -C "$HP" remote get-url origin), gh $GHW/bin/gh"
+else
+  say "world GitHub: no harness repo in the world ($HP): the merge rows will say so"
+fi
 log stream --style compact --predicate 'process == "tccd"' > $O/tccd.log 2>&1 & TPID=$!
 log stream --level debug --style ndjson --predicate 'process == "tccd" OR subsystem == "com.apple.TCC"' > $O/tcc-debug.ndjson 2>&1 & NPID=$!
 touch $O/pids.txt

@@ -32,10 +32,11 @@ def node(pr, owner):
     return {
         "number": pr["number"], "url": "https://github.com/%s/pull/%d" % (owner, pr["number"]),
         "state": "OPEN", "isDraft": bool(pr.get("draft")), "reviewDecision": pr.get("review"),
-        "headRefName": pr["branch"], "headRefOid": "0" * 40, "updatedAt": pr.get("updated", "2026-10-07T08:00:00Z"),
+        # head and merge_state: a ready-to-merge PR (as-he-does' merge card: its place's tip, CLEAN)
+        "headRefName": pr["branch"], "headRefOid": pr.get("head", "0" * 40), "updatedAt": pr.get("updated", "2026-10-07T08:00:00Z"),
         "headRepositoryOwner": {"login": owner.split("/")[0]}, "title": pr.get("title", ""),
         "additions": pr.get("additions", 12), "deletions": pr.get("deletions", 3),
-        "mergeStateStatus": "BLOCKED", "total": {"totalCount": pr.get("commits", 1)},
+        "mergeStateStatus": pr.get("merge_state", "BLOCKED"), "total": {"totalCount": pr.get("commits", 1)},
         "latestReviews": {"nodes": reviews},
         "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": pr.get("rollup"), "contexts": {
             "totalCount": len(contexts), "nodes": contexts}} if pr.get("rollup") else None}}]},
