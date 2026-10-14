@@ -28,6 +28,13 @@ export interface Aside {
   /** his words when they don't fit on the head's line */
   readonly note: string;
   readonly at_ms: number;
+  /**
+   * The hub's word drew it (card-state). The build before card-state (0170ed3f) also kept rows
+   * in its own words when the hub said nothing (an older hub, a merge item's digit the hub kept):
+   * the same shape without this field. A read drops them (asidesOf), the store writes the list
+   * back once (stale-aside: '✓ you answered pattern-error-dx' in bise's view, forever).
+   */
+  readonly by: "hub";
 }
 
 /** The window-local 'card_answered' (never a hub event): card/answer's result for a card this window answered. */
@@ -74,7 +81,7 @@ export function asideOf(
   if (rowThere(at, project, answer.agent)) return null;
   return {
     at,
-    aside: { key: `${project}/${String(card)}`, project, card, notice: answer.notice, note: answer.note ?? "", at_ms: atMs },
+    aside: { key: `${project}/${String(card)}`, project, card, notice: answer.notice, note: answer.note ?? "", at_ms: atMs, by: "hub" },
   };
 }
 
@@ -86,7 +93,10 @@ export function keptAsides(list: readonly Aside[]): readonly Aside[] {
   return list.slice(-ASIDES_KEPT);
 }
 
-/** A kept list read back (a reload, a relaunch): anything unreadable is dropped. Pure. */
+/**
+ * A kept list read back (a reload, a relaunch): anything unreadable is dropped, and a row the hub's
+ * word didn't draw (no `by`: the old build's own words, no hub row behind it). Pure.
+ */
 export function asidesOf(raw: unknown): readonly Aside[] {
   if (!Array.isArray(raw)) return [];
   const ok = (x: unknown): x is Aside => {
@@ -98,7 +108,8 @@ export function asidesOf(raw: unknown): readonly Aside[] {
       typeof r["card"] === "number" &&
       typeof r["notice"] === "string" &&
       typeof r["note"] === "string" &&
-      typeof r["at_ms"] === "number"
+      typeof r["at_ms"] === "number" &&
+      r["by"] === "hub"
     );
   };
   return keptAsides(raw.filter(ok));

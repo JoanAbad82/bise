@@ -17,7 +17,7 @@ describe("inbox picks (3): his answer where he was", () => {
     const from = { at: { project: "telemetry", agent: "p99" } };
     const got = asideOf(from, "shop", 4, gift, 1000);
     expect(got?.at).toEqual({ project: "telemetry", agent: "p99" });
-    expect(got?.aside).toEqual({ key: "shop/4", project: "shop", card: 4, notice: "you answered docs: only at checkout", note: "", at_ms: 1000 });
+    expect(got?.aside).toEqual({ key: "shop/4", project: "shop", card: 4, notice: "you answered docs: only at checkout", note: "", at_ms: 1000, by: "hub" });
     expect(asideOf({ ...from, at: { project: "shop", agent: "docs" } }, "shop", 4, gift, 1000)).toBeNull();
     expect(asideOf({ ...from, at: null }, "shop", 4, gift, 1000)).toBeNull();
   });
@@ -62,5 +62,47 @@ describe("inbox picks (3): his answer where he was", () => {
     const many = Array.from({ length: ASIDES_KEPT + 3 }, (_, i) => ({ ...a, key: `shop/${String(i)}`, card: i }));
     expect(asidesOf([{ key: 1 }, ...many, "x"]).map((x) => x.card)).toEqual(many.slice(-ASIDES_KEPT).map((x) => x.card));
     expect(asidesOf("nope")).toEqual([]);
+  });
+
+  it("stale-aside: the old build's own-words row (no hub row behind it) is dropped on load, and leaves the keep once", () => {
+    // his keep-window.json, written by 0170ed3f in bise's view (harness main), word for word
+    const legacy = {
+      key: "ts-pattern-4b4afb4c/14",
+      project: "ts-pattern-4b4afb4c",
+      card: 14,
+      notice: "you answered pattern-error-dx: open it on GitHub",
+      note: "",
+      at_ms: 1791964531024,
+    };
+    const tkey = "harness-3abb2bd8/main";
+    const kept = new Map<string, unknown>([[`asides:${tkey}`, [legacy]]]);
+    const writes: string[] = [];
+    const asides = { read: (k: string) => kept.get(k), write: (k: string, v: unknown) => (writes.push(k), kept.set(k, v)) };
+    expect(asidesOf([legacy])).toEqual([]);
+    const s = new Store({ send: () => undefined }, { asides });
+    expect(s.asides(tkey)).toEqual([]);
+    expect(kept.get(`asides:${tkey}`)).toEqual([]);
+    expect(writes).toEqual([`asides:${tkey}`]);
+    // the next load finds nothing to drop: no write
+    expect(new Store({ send: () => undefined }, { asides }).asides(tkey)).toEqual([]);
+    expect(writes).toHaveLength(1);
+    // a row the hub's word drew stays, next to it
+    const hub = { ...legacy, key: "shop/2", project: "shop", card: 2, notice: "you answered docs: only at checkout", by: "hub" };
+    kept.set(`asides:${tkey}`, [legacy, hub]);
+    expect(new Store({ send: () => undefined }, { asides }).asides(tkey)).toEqual([hub]);
+    expect(kept.get(`asides:${tkey}`)).toEqual([hub]);
+  });
+
+  it("no path writes a row the hub didn't word: every kept row carries by 'hub'", () => {
+    const kept = new Map<string, unknown>();
+    const asides = { read: (k: string) => kept.get(k), write: (k: string, v: unknown) => kept.set(k, v) };
+    const s = new Store({ send: () => undefined }, { now: () => 42, asides });
+    const at = { project: "harness", agent: "main" };
+    s.answer("ts-pattern", 14, "1", undefined, undefined, { at });
+    s.apply({ ev: "card_answered", project: "ts-pattern", card: 14, answer: null });
+    s.answer("shop", 2, "2", undefined, undefined, { at });
+    s.apply({ ev: "card_answered", project: "shop", card: 2, answer: gift });
+    const rows = kept.get("asides:harness/main") as { card: number; by?: string }[];
+    expect(rows.map((r) => [r.card, r.by])).toEqual([[2, "hub"]]);
   });
 });

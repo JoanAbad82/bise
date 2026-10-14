@@ -292,7 +292,13 @@ export class Store extends StoreVoice {
   /** His answers made from this thread to a card asked elsewhere (window-local, oldest first; kept across a reload). */
   asides(key: string): readonly Aside[] {
     const k = `asides:${key}`;
-    if (!this.slices.has(k) && this.asideKeep !== null) this.slices.set(k, asidesOf(this.asideKeep.read(k)));
+    if (!this.slices.has(k) && this.asideKeep !== null) {
+      const raw = this.asideKeep.read(k);
+      const list = asidesOf(raw);
+      this.slices.set(k, list);
+      // a row the read dropped (the old build's own words, junk) leaves the keep too, once
+      if (Array.isArray(raw) && raw.length !== list.length) this.asideKeep.write(k, list);
+    }
     return this.slice<readonly Aside[]>(k, EMPTY);
   }
 
