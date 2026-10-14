@@ -81,6 +81,8 @@ pub const METHODS: &[MethodRow] = &[
     m("merged/list", "merged", Some("merged")),
     m("features/list", "features", Some("features")),
     m("prs/list", "prs", Some("prs")),
+    // inbox-record: his answered and withdrawn cards, one page
+    m("inbox/history", "inbox_history", Some("inbox_history")),
     m("scheduled/list", "scheduled", Some("scheduled")),
     m("scheduled/stop", "scheduled_stop", None),
     m("wake/stop", "wake_stop", None),
@@ -207,6 +209,8 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("route/done", "route_done", Scope::Hub),
     n("confirm/ask", "confirm", Scope::One),
     n("card/open", "card_open", Scope::One),
+    // inbox-record: a card closed, or its answer's position came
+    n("inbox/recorded", "inbox_recorded", Scope::Hub),
     n("client/focused", "focused", Scope::One),
     n("hub/notice", "notice", Scope::One),
     // P4c-5: `/version`'s picker at hello and while one builds, a

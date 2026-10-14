@@ -322,6 +322,11 @@ impl Shell {
                 let prs = self.prs_ev();
                 self.proto_send(id, &prs);
             }
+            // the inbox's history (daemon/answers.rs): memory only
+            HubCmd::InboxHistory { q, .. } => {
+                let page = self.inbox_history_ev(&q);
+                self.proto_send(id, &page);
+            }
             // cost-pause: what the calls cost (daemon/usage.rs: the first
             // read counts the transcripts on a thread, `counting` meanwhile)
             HubCmd::Usage { .. } => {

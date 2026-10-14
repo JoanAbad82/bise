@@ -5,6 +5,24 @@
 
 use super::*;
 
+/// A live line of a feed (C2 `line`): `ts`, the time the transcript
+/// wrote it (ms since the epoch), is left out when unknown (0, a stamp
+/// that did not parse); a client reads a line without it as before.
+pub(super) fn line_event(agent: &str, pos: usize, ts: u64, line: &str) -> Value {
+    let mut v = json!({"ev": "line", "agent": agent, "line": line, "pos": pos});
+    if ts > 0 {
+        v["ts"] = json!(ts);
+    }
+    v
+}
+
+/// How many lines a transcript holds (the position of its last line).
+pub(super) fn transcript_len(path: &Path) -> usize {
+    std::fs::read(path)
+        .map(|b| b.iter().filter(|c| **c == b'\n').count())
+        .unwrap_or(0)
+}
+
 impl Shell {
     /// The lines of one feed entry (its context line too, fn_ctx_lines),
     /// stamped `ts`: (the transcript text to append, the events to send).
@@ -23,6 +41,7 @@ impl Shell {
                 b.pop_front();
             }
             out.push_str(&format!("{ts}\t{line}\n"));
+            self.answers_line(name, pos, &line);
             events.push(line_event(name, pos, ts, &line));
         }
         (out, events)

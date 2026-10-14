@@ -4,7 +4,7 @@
 # (gate.sh quick on the changed files, gate.sh full on the whole tree). Never add a line: split
 # the file instead.
 1200 bend/core/wire.bend
-3840 bend/hub/core.bend
+3827 bend/hub/core.bend
 1340 bend/runtime/provider-pure.bend
 1319 docs/brand/design-system/content.py
 1387 docs/brand/readme/make.py
@@ -21,7 +21,7 @@
 1038 rust/switchboard/src/cli.rs
 2767 rust/switchboard/src/core.rs
 4612 rust/switchboard/src/core_tests.rs
-2415 rust/switchboard/src/daemon.rs
+2404 rust/switchboard/src/daemon.rs
 1187 rust/switchboard/src/daemon/gate.rs
 1207 rust/switchboard/src/daemon/versions.rs
 1379 rust/tui/src/attach.rs

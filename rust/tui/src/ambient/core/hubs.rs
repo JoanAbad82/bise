@@ -62,6 +62,8 @@ pub type ViewOf = Box<dyn Fn(&str) -> Option<ProjectView>>;
 pub type OlderOf = Box<dyn Fn(&str) -> Option<String>>;
 /// A checkout's branch and whether it is a git repo.
 pub type GitOf = Box<dyn Fn(&Path) -> Checkout>;
+/// A hub's journal.jsonl by hub id (none: no file).
+pub type JournalOf = Box<dyn Fn(&str) -> Option<String>>;
 
 /// What the core reads of the projects, real in `bise ambient-core`,
 /// fakes in tests.
@@ -79,6 +81,9 @@ pub struct ProjectFacts {
     /// it runs from an install (`switchboard::client::older_words`: the
     /// terminal's same words); None: `rpc::HUB_OLDER`
     pub older: OlderOf,
+    /// a hub's journal by hub id, read-only (inbox-record: the history of
+    /// a project whose hub isn't connected); none: no file
+    pub journal: JournalOf,
 }
 
 pub struct ProjectPorts {
@@ -360,6 +365,11 @@ impl Core {
         if !row.home && self.hubs.shown.is_none() {
             return self.project_error(&project, &cmd, &format!("project {project} isn't shown yet"), cid, None, app);
         }
+        // the inbox's history of a project whose hub isn't connected: its
+        // journal, folded here, never a hub started to read it
+        if cmd == "inbox_history" && !self.hubs.conns.get(&project).is_some_and(|c| c.welcomed) {
+            return self.history_from_journal(&project, &v, app);
+        }
         // its hub refused this core: nothing goes until he retries
         if let Some(why) = self.hubs.refused.get(&project).cloned() {
             if cmd == "unsubscribe" {
@@ -409,6 +419,25 @@ impl Core {
             // goes at its welcome, then the hold goes (decision m_8720)
             (_, false) => self.deliver_at_welcome(&project, &row.path, v, app),
         }
+    }
+
+    /// `inbox_history` for a project not connected: its journal, folded
+    /// by the hub's own fold (bise_proto::inbox), read-only; a torn last
+    /// line is skipped. The page goes out as its hub's would.
+    fn history_from_journal(&mut self, project: &str, v: &Value, app: Option<Id>) {
+        let text = self.hubs.ports.as_ref().and_then(|p| (p.facts.journal)(project)).unwrap_or_default();
+        let mut index = bise_proto::inbox::Index::new(project.to_string());
+        for line in text.lines() {
+            if let Some((_, l)) = bise_proto::inbox::journal::CardLine::of_text(line) {
+                index.read(&l);
+            }
+        }
+        let q: bise_proto::inbox::HistoryParams = serde_json::from_value(v.clone()).unwrap_or_default();
+        let ev = bise_proto::hub::HubEv::InboxHistory { project: project.to_string(), page: index.page(&q.query()) };
+        if let Some(app) = app {
+            self.replies.push(Response::ok(app, bise_proto::rpc::result(&ev)));
+        }
+        self.emit(ev.to_value());
     }
 
     /// The app's request done here, the core's own way (nothing for its hub to say).

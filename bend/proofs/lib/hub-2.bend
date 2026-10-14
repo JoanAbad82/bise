@@ -61,21 +61,21 @@ def hub_msgs_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: Stri
     case Nil{}:
       {==}
     case Con{id, rest}:
-      +cx2 = HC.emit(o, cx, HM.ECardClosed{id, res}, Unit{}, Unit{}, Unit{})
+      +cx2 = HC.emit(o, cx, HM.ECardClosed{id, res, HM.no_ans()}, Unit{}, Unit{}, Unit{})
       +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
       Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.St.msgs(HX.d(o, cx3)), HM.St.msgs(HX.d(o, cx)),
         hub_msgs_close_ids(o, rest, cx3, res),
         Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, cx3)), HM.St.msgs(HX.d(o, cx2)), HM.St.msgs(HX.d(o, cx)),
           PL1.hub_msgs_eq(o, cx3, cx2, hub_d_feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))),
-          Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, cx2)), HM.St.msgs(HM.apply(HX.d(o, cx), HM.ECardClosed{id, res})), HM.St.msgs(HX.d(o, cx)),
-            Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.St.msgs(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.ECardClosed{id, res}),
-              PL1.hub_d_emit(o, cx, HM.ECardClosed{id, res}, Unit{}, Unit{}, Unit{})),
+          Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, cx2)), HM.St.msgs(HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HM.no_ans()})), HM.St.msgs(HX.d(o, cx)),
+            Equal.cong(HM.St, List<&2, HM.MRec>, s => HM.St.msgs(s), HX.d(o, cx2), HM.apply(HX.d(o, cx), HM.ECardClosed{id, res, HM.no_ans()}),
+              PL1.hub_d_emit(o, cx, HM.ECardClosed{id, res, HM.no_ans()}, Unit{}, Unit{}, Unit{})),
             PL1.hub_msgs_closed(HX.d(o, cx), id, res))))
 
 def hub_agents_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.St.agents(HX.d(o, a)) == HM.St.agents(HX.d(o, b)) : List<&2, HM.Agent>}:
   Equal.cong(HM.St, List<&2, HM.Agent>, s => HM.St.agents(s), HX.d(o, a), HX.d(o, b), e)
 
-def hub_agents_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.agents(HM.apply(s, HM.ECardClosed{id, res})) == HM.St.agents(s) : List<&2, HM.Agent>}:
+def hub_agents_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.agents(HM.apply(s, HM.ECardClosed{id, res, HM.no_ans()})) == HM.St.agents(s) : List<&2, HM.Agent>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
       {==}
@@ -86,7 +86,7 @@ def hub_agents_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: St
     case Nil{}:
       {==}
     case Con{id, rest}:
-      +ev = {HM.ECardClosed{id, res} : HM.Ev}
+      +ev = {HM.ECardClosed{id, res, HM.no_ans()} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
       Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.close_ids(o, rest, cx3, res))), HM.St.agents(HX.d(o, cx3)), HM.St.agents(HX.d(o, cx)),
@@ -200,7 +200,7 @@ def hub_KC(+cs: List<&2, HM.Card>, +n: String, d: HI.Distinct(HI.card_ids(cs))) 
 def hub_cards_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.St.cards(HX.d(o, a)) == HM.St.cards(HX.d(o, b)) : List<&2, HM.Card>}:
   Equal.cong(HM.St, List<&2, HM.Card>, s => HM.St.cards(s), HX.d(o, a), HX.d(o, b), e)
 
-def hub_cards_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.cards(HM.apply(s, HM.ECardClosed{id, res})) == HM.drop_card(HM.St.cards(s), id) : List<&2, HM.Card>}:
+def hub_cards_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.cards(HM.apply(s, HM.ECardClosed{id, res, HM.no_ans()})) == HM.drop_card(HM.St.cards(s), id) : List<&2, HM.Card>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
       {==}
@@ -237,7 +237,7 @@ def hub_cards_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: Str
     case Nil{}:
       {==}
     case Con{id, rest}:
-      +ev = {HM.ECardClosed{id, res} : HM.Ev}
+      +ev = {HM.ECardClosed{id, res, HM.no_ans()} : HM.Ev}
       +cx2 = HC.emit(o, cx, ev, Unit{}, Unit{}, Unit{})
       +cx3 = HC.feed(o, cx2, HM.MAIN(), HFD.card_closed(id, res))
       Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, HC.close_ids(o, rest, cx3, res))), hub_dropc(rest, HM.St.cards(HX.d(o, cx3))),
@@ -368,8 +368,10 @@ def hub_apply_ucards(s: HM.St, e: HM.Ev, u: HI.UniqueCards(s), k: HX.FreshEv(s, 
       match e:
         case HM.ECardOpened{c}:
           hub_ucards_open(ca, c, nc, k, u)
-        case HM.ECardClosed{id, res}:
+        case HM.ECardClosed{id, res, a}:
           hub_ucards_drop(ca, id, nc, u)
+        case HM.ECardAnswerPos{a, b, c}:
+          u
         case HM.ETaskCreated{a, b, c, d, f}:
           u
         case HM.ELifecycle{a, b, c}:

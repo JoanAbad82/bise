@@ -88,7 +88,9 @@ def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e
           u
         case HM.ECardOpened{c}:
           u
-        case HM.ECardClosed{a, b}:
+        case HM.ECardClosed{a, b, c}:
+          u
+        case HM.ECardAnswerPos{a, b, c}:
           u
         case HM.EMainNote{a, b}:
           u

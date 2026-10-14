@@ -65,7 +65,16 @@ pub const JOURNAL: Table = Table {
         k("message_state", "MsgState", "M.EMsgState{id, state}", &[f("id", Nat), f("state", Inline(&MST))]),
         k("message_settled", "Settled", "M.ESettled{id}", &[f("id", Nat)]),
         k("card_opened", "CardOpened", "M.ECardOpened{card}", &[f("card", Rec(&CARD))]),
-        k("card_closed", "CardClosed", "M.ECardClosed{id, resolution}", &[f("id", Nat), f("resolution", Str)]),
+        // inbox-record (architect m_24257): his answer rides on the close
+        // (`via` "" = closed without him: `resolution` is the reason);
+        // `said` his words, `pick` the option's words when he picked by
+        // its number (never the digit alone); `via` inbox|thread|page
+        k("card_closed", "CardClosed", "M.ECardClosed{id, resolution, M.Ans{said, pick_n, pick, via, page, block}}",
+            &[f("id", Nat), f("resolution", Str), f("said", StrOmit), f("pick_n", OptNatOmit), f("pick", StrOmit),
+              f("via", StrOmit), f("page", StrOmit), f("block", StrOmit)]),
+        // the asker's transcript position of the route line his answer
+        // became (the shell knows it once written): a fact, no decision
+        k("card_answer_pos", "CardAnswerPos", "M.ECardAnswerPos{card, agent, pos}", &[f("card", Nat), f("agent", Str), f("pos", Nat)]),
         k("main_note", "MainNote", "M.EMainNote{text, at_ms}", &[f("text", Str), f("at_ms", Nat)]),
         k("main_notes_flushed", "NotesFlushed", "M.ENotesFlushed{}", &[]),
         // the timers' lines, in the shape every.rs wrote them (old hubs

@@ -76,6 +76,7 @@ pub mod diff;
 pub mod draft;
 pub mod helper;
 pub mod hub;
+pub mod inbox;
 pub mod log;
 pub mod office;
 pub mod ops;

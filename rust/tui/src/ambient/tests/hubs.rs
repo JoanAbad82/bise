@@ -63,6 +63,7 @@ pub(super) fn world(t: &mut T) -> World {
         })),
         running: Box::new(|_| false),
         exists: Box::new(move |p| !gone2.lock().unwrap().iter().any(|g| g == p)),
+        journal: Box::new(|id| (id == "mail").then(|| MAIL_JOURNAL.to_string())),
         git: Box::new(|p| {
             let shop = p == Path::new("/p/shop");
             crate::ambient::projects::Checkout {
@@ -477,6 +478,37 @@ fn a_command_is_written_at_most_once_and_ends_written_or_errored() {
     t.core.tick(Instant::now() + START + Duration::from_secs(2));
     t.out.extend(t.core.take_out());
     assert_eq!(t.take().iter().filter(|v| v["ev"] == "error" && v["cmd"] == "stop").count(), 1);
+}
+
+/// mail's journal (its hub not running): an answered card, a withdrawn
+/// one, a torn last line.
+const MAIL_JOURNAL: &str = r#"{"type":"card_opened","ts":10,"card":{"id":1,"kind":"question","agent":"perf","text":"webp or avif?\n1. webp\n2. avif","for_msg":null,"created_ms":10,"place":null,"pr":null}}
+{"type":"card_closed","id":1,"resolution":"answered","said":"2","pick_n":2,"pick":"avif","via":"inbox","ts":20}
+{"type":"card_answer_pos","card":1,"agent":"perf","pos":41,"ts":21}
+{"type":"card_opened","ts":30,"card":{"id":2,"kind":"question","agent":"docs","text":"ship it?","for_msg":null,"created_ms":30,"place":null,"pr":null}}
+{"type":"card_closed","id":2,"resolution":"withdrawn by main: moot","ts":40}
+{"type":"card_clo"#;
+
+/// inbox-record: the history of a project whose hub isn't connected is
+/// its journal, folded by the core (read-only): no hub started for it.
+#[test]
+fn the_history_of_a_project_not_held_is_its_journal() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    w.opened(&mut t, &["home"]);
+    typed(&mut t, json!({"cmd": "inbox_history", "project": "mail", "state": "all"}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "inbox_history"));
+    let ev = t.take().into_iter().find(|v| v["ev"] == "inbox_history").unwrap();
+    assert_eq!(ev["project"], "mail");
+    let cards: Vec<u64> = ev["items"].as_array().unwrap().iter().filter_map(|r| r["card"].as_u64()).collect();
+    assert_eq!(cards, vec![2, 1]);
+    assert_eq!(ev["items"][1]["said"], "avif");
+    assert_eq!(ev["items"][1]["thread"], json!({"agent": "perf", "pos": 41}));
+    assert_eq!(ev["items"][0]["line2"], "withdrawn: moot");
+    assert_eq!((ev["answered"].as_u64(), ev["withdrawn"].as_u64()), (Some(1), Some(1)));
+    assert!(!w.open.contains_key("mail"), "no hub started to read it");
 }
 
 #[test]

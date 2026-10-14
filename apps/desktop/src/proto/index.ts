@@ -11,6 +11,7 @@ export type * from './rows';
 export type * from './thread';
 export type * from './log';
 export type * from './ops';
+export type * from './inbox';
 export type * from './hub';
 export type * from './rpc';
 export type * from './commands';

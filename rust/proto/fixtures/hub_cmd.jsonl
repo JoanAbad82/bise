@@ -34,6 +34,7 @@
 {"cmd":"merged","project":"acme-1a2b3c4d"}
 {"cmd":"features","project":"acme-1a2b3c4d"}
 {"cmd":"prs","project":"acme-1a2b3c4d"}
+{"cmd":"inbox_history","project":"acme-1a2b3c4d","agent":"perf","state":"answered","words":"avif","before":12,"limit":50}
 {"cmd":"scheduled","project":"acme-1a2b3c4d"}
 {"cmd":"scheduled_stop","project":"acme-1a2b3c4d","id":48}
 {"cmd":"wake_stop","project":"acme-1a2b3c4d","id":7}

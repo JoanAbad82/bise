@@ -106,7 +106,7 @@ def hub_set_waiters(-o: HM.St, cx: HX.Cx<o>, +ws: List<&2, HX.Waiter>)
   match cx:
     case HX.Cx{c, r}:
       match r:
-        case HX.R{a, b, st, d, e, f, g, h, i, j, k, l, m}:
+        case HX.R{a, b, st, d, e, f, g, h, i, j, k, l, m, n}:
           {==}
 
 def hub_later_tr(-x: List<&2, HX.Waiter>, -y: List<&2, HX.Waiter>, -now: Nat, e: {x == y : List<&2, HX.Waiter>},
@@ -404,7 +404,9 @@ def hub_apply_unique(s: HM.St, e: HM.Ev, u: HI.Unique(s), k: HX.FreshEv(s, e)) -
           hub_unique_map(ms, id, HM.OSettle{}, nm, u)
         case HM.ECardOpened{c}:
           u
-        case HM.ECardClosed{a, b}:
+        case HM.ECardClosed{a, b, c}:
+          u
+        case HM.ECardAnswerPos{a, b, c}:
           u
         case HM.EMainNote{a, b}:
           u
@@ -522,7 +524,9 @@ def hub_apply_kept(s: HM.St, e: HM.Ev) -> HI.Kept(s, HM.apply(s, e)):
           hub_prefix_refl(HI.ids(ms))
         case HM.ECardOpened{c}:
           hub_prefix_refl(HI.ids(ms))
-        case HM.ECardClosed{a, b}:
+        case HM.ECardClosed{a, b, c}:
+          hub_prefix_refl(HI.ids(ms))
+        case HM.ECardAnswerPos{a, b, c}:
           hub_prefix_refl(HI.ids(ms))
         case HM.EMainNote{a, b}:
           hub_prefix_refl(HI.ids(ms))
@@ -794,7 +798,7 @@ def hub_d_hout(-o: HM.St, +cx: HX.Cx<o>, +kvs: List<&2, Sigma<&2, &2, String, _ 
         case HX.Core{d, fx, p, f, q, v}:
           {==}
 
-def hub_msgs_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.msgs(HM.apply(s, HM.ECardClosed{id, res})) == HM.St.msgs(s) : List<&2, HM.MRec>}:
+def hub_msgs_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.msgs(HM.apply(s, HM.ECardClosed{id, res, HM.no_ans()})) == HM.St.msgs(s) : List<&2, HM.MRec>}:
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
       {==}

@@ -338,6 +338,15 @@ pub enum HubEv {
     /// update-card's new release: open its item (to the connection whose
     /// `/update` found it)
     CardOpen { project: Project, id: u64 },
+    /// one page of the inbox's history (`inbox_history`'s answer)
+    InboxHistory {
+        project: Project,
+        #[serde(flatten)]
+        page: crate::inbox::InboxPage,
+    },
+    /// a card closed (answered or withdrawn) or its answer's thread
+    /// position came: its record, whole, to every client
+    InboxRecorded { project: Project, record: Box<crate::inbox::InboxRecord> },
     /// the hub moved this connection's focus (an agent it was on is
     /// gone: back to main)
     Focused { project: Project, focus: String },
@@ -408,7 +417,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "paused", "switch", "usage", "pages", "page_changed", "card_open", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "paused", "switch", "usage", "pages", "page_changed", "card_open", "inbox_history", "inbox_recorded", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -634,6 +643,13 @@ pub enum HubCmd {
     Features { project: Project },
     /// the PR list opened: `prs` comes again
     Prs { project: Project },
+    /// the inbox's history (inbox-record): one page of his answered and
+    /// withdrawn cards, newest first, answered by `inbox_history`
+    InboxHistory {
+        project: Project,
+        #[serde(flatten)]
+        q: crate::inbox::HistoryParams,
+    },
     /// the scheduled tasks asked for: `scheduled` comes again
     Scheduled { project: Project },
     /// what the project's calls cost: answered by `usage`
@@ -798,7 +814,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
+    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -840,6 +856,7 @@ impl HubCmd {
             | HubCmd::Merged { project }
             | HubCmd::Features { project }
             | HubCmd::Prs { project }
+            | HubCmd::InboxHistory { project, .. }
             | HubCmd::Scheduled { project }
             | HubCmd::Usage { project }
             | HubCmd::Pause { project }

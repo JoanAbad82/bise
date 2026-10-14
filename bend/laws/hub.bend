@@ -16,6 +16,7 @@ import ../hub/gen/feed.bend as HFD
 import ../hub/pause.bend as HP
 import ../hub/feature.bend as HFT
 import ../hub/reach.bend as HR
+import ../hub/answers.bend as HA
 
 # ---- Switchboard hub (hub/*.bend, the sb-core process) ----
 # The laws quantify over EVERY hub state, EVERY input (any JSON line the
@@ -328,7 +329,8 @@ law page_answer_closes:
   for +to: String
   for +page: String
   for +text: String
-  {HC.page_answered(o, Some{c}, cx, to, page, text) == HC.page_answered.tell(o, HR.tells_asker(HM.resolve(HX.d(o, HC.close_card(o, cx, HM.Card.id(c), "answered")), HM.Card.agent(c)), HM.resolve(HX.d(o, HC.close_card(o, cx, HM.Card.id(c), "answered")), to)), HC.close_card(o, cx, HM.Card.id(c), "answered"), c, to, page, text) : HX.Cx<o>}
+  for +block: String
+  {HC.page_answered(o, Some{c}, cx, to, page, text, block) == HC.page_answered.tell(o, HR.tells_asker(HM.resolve(HX.d(o, HC.close_card_ans(o, cx, HM.Card.id(c), "answered", HA.page_ans(text, page, block))), HM.Card.agent(c)), HM.resolve(HX.d(o, HC.close_card_ans(o, cx, HM.Card.id(c), "answered", HA.page_ans(text, page, block))), to)), HC.close_card_ans(o, cx, HM.Card.id(c), "answered", HA.page_ans(text, page, block)), c, to, page, text) : HX.Cx<o>}
 
 # LAW: the asker told: exactly one message from bise to the card's asker,
 # with his answer; not told: nothing more than the close.
@@ -479,8 +481,9 @@ law card_confirm_words_refused:
   for +c: HM.Card
   for +text: String
   for +parts: String
-  for e: {HC.confirm_ok(text) == False{} : Bool}
-  {HC.answer.kind(o, HC.KConfirm{}, cx, c, text, parts) == HC.words_refused(o, cx, c, HC.confirm_opts()) : HX.Cx<o>}
+  for +via: String
+  for e: {HA.confirm_ok(text) == False{} : Bool}
+  {HC.answer.kind(o, HC.KConfirm{}, cx, c, text, parts, via) == HC.words_refused(o, cx, c, HA.confirm_opts()) : HX.Cx<o>}
 
 # LAW: `no` and `no: <why>` (any case, lead m_10900) are deny aliases: the
 # card gets the same verdict path as its option 3, with his words as the
@@ -491,19 +494,20 @@ law card_confirm_no_alias:
   for +c: HM.Card
   for +text: String
   for +parts: String
-  for e: {HC.is_no(String.to_lower(String.trim(text))) == True{} : Bool}
-  {HC.answer.kind(o, HC.KConfirm{}, cx, c, text, parts) == HC.answer.confirm(o, True{}, cx, c, text) : HX.Cx<o>}
+  for +via: String
+  for e: {HA.is_no(String.to_lower(String.trim(text))) == True{} : Bool}
+  {HC.answer.kind(o, HC.KConfirm{}, cx, c, text, parts, via) == HC.answer.confirm(o, True{}, cx, c, text, via) : HX.Cx<o>}
 
 # LAW: only `no` itself or its `no:` prefix: words that start like it stay
 # words.
 law card_confirm_nope_is_words:
-  {HC.confirm_ok("nope") == False{} : Bool}
+  {HA.confirm_ok("nope") == False{} : Bool}
 
 law card_confirm_now_is_words:
-  {HC.confirm_ok("now") == False{} : Bool}
+  {HA.confirm_ok("now") == False{} : Bool}
 
 law card_confirm_no_thanks_is_words:
-  {HC.confirm_ok("No thanks") == False{} : Bool}
+  {HA.confirm_ok("No thanks") == False{} : Bool}
 
 # LAW: a hub item (merge, feature_*, update, signin) takes only one of its
 # options' numbers: other words are refused, the item stays open, main is
@@ -514,8 +518,9 @@ law card_choice_words_refused:
   for +c: HM.Card
   for +text: String
   for +parts: String
+  for +via: String
   for e: {HC.is_option(HM.Card.text(c), text) == False{} : Bool}
-  {HC.answer.kind(o, HC.KChoice{}, cx, c, text, parts) == HC.words_refused(o, cx, c, "one of its numbers") : HX.Cx<o>}
+  {HC.answer.kind(o, HC.KChoice{}, cx, c, text, parts, via) == HC.words_refused(o, cx, c, "one of its numbers") : HX.Cx<o>}
 
 # ---- bise's cross-hub messages (desktop S2, hub/xhub.bend) ----
 # Local laws on xhub.bend's decisions and xhub-model.bend's state: the

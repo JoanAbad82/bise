@@ -584,14 +584,13 @@ pub enum Input {
     },
     /// The approvals gate (approvals-design.md §9): a `confirm` card for
     /// `agent`'s waiting call, in the user's inbox.
-    ConfirmOpen {
-        agent: String,
-        text: String,
-    },
+    ConfirmOpen { agent: String, text: String },
     /// Its calls are gone (interrupted): the card closes unanswered.
     ConfirmClose { card: u64, res: String },
     /// A page question's card answered on its page: sb-core's page_answered (its asker told unless it is `agent`).
-    PageAnswered { card: u64, agent: String, page: String, text: String },
+    PageAnswered { card: u64, agent: String, page: String, text: String, block: String },
+    /// inbox-record: his answer's route line went into `agent`'s transcript at `pos` (daemon/answers.rs).
+    AnswerPos { card: u64, agent: String, pos: u64 },
     /// The end of a role-line call (BISE-126) for the task in `dir`,
     /// asked with `key`: the new line, or None (failed: the old one stays).
     RoleLine {
@@ -2182,7 +2181,8 @@ impl Hub {
             Input::WakeHit { id, text, rc, tail, after_ms } => self.wake_hit(&mut fx, env, id, &text, crate::wake::Hit { rc, tail, after_ms }),
             Input::ConfirmOpen { agent, text } => self.core(&mut fx, env, None, In::ConfirmOpen(ci::ConfirmOpen { agent, text })),
             Input::ConfirmClose { card, res } => self.core(&mut fx, env, None, In::ConfirmClose(ci::ConfirmClose { card, res })),
-            Input::PageAnswered { card, agent, page, text } => self.core(&mut fx, env, None, In::PageAnswered(ci::PageAnswered { card, agent, page, text })),
+            Input::PageAnswered { card, agent, page, text, block } => self.core(&mut fx, env, None, In::PageAnswered(ci::PageAnswered { card, agent, page, text, block })),
+            Input::AnswerPos { card, agent, pos } => self.core(&mut fx, env, None, In::AnswerPos(ci::AnswerPos { card, agent, pos })),
             Input::Merged { card, place, number, res } => self.merged(&mut fx, env, card, &place, number, res),
             Input::Release(c) => self.release_in(&mut fx, env, c),
             Input::SignedIn => self.signed_in(&mut fx, env),

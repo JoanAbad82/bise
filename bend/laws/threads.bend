@@ -14,6 +14,7 @@ import ../hub/model.bend as HM
 import ../hub/cx.bend as HX
 import ../hub/core.bend as HC
 import ../hub/picks.bend as HPK
+import ../hub/answers.bend as HA
 import ../hub/keyed.bend as HKL
 import ../hub/gen/feed.bend as HFD
 import ../hub/said.bend as HSD
@@ -128,12 +129,13 @@ law main_card_answer_routes_once:
   for +c: HM.Card
   for +text: String
   for +parts: String
-  {HC.answer.q.main(o, cx, c, text, parts)
-    == HC.close_card(o,
-      HC.answer_line(o,
+  for +via: String
+  {HC.answer.q.main(o, cx, c, text, parts, via)
+    == HC.close_card_ans(o,
+      HA.due_add(o, HC.answer_line(o,
         HC.notify_main(o, cx, HC.cat([HC.MAIN_ANSWER_HEAD(), HC.ns(HM.Card.id(c)), " (\"", HM.one_line(HM.Card.text(c)), "\"): \"", HM.one_line(text), "\""])),
-        HM.MAIN(), HM.MAIN(), c, text, parts, None{}),
-      HM.Card.id(c), "answered") : HX.Cx<o>}
+        HM.MAIN(), HM.MAIN(), c, text, parts, None{}), HM.Card.id(c)),
+      HM.Card.id(c), "answered", HA.his_ans(c, text, via)) : HX.Cx<o>}
 
 # LAW: his message's feed line is followed, in the same step, by its id
 # ('sb you-id : m_N'): the clients key his entry by it (nothing else may

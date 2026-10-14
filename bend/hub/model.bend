@@ -51,6 +51,18 @@ type Card is Data:
     for_msg: Maybe<&2, Nat>, created: Nat, place: Maybe<&2, String>,
     pr: Maybe<&2, Nat>}
 
+# his answer to a card, as its close journals it (inbox-record): `said`
+# his words, `pick_n`/`pick` the option he picked by its number and its
+# words ("" none), `via` where he answered: "inbox", "thread", "page"
+# ("" none: not answered), `page`/`block` the page's question
+type Ans is Data:
+  Ans{said: String, pick_n: Maybe<&2, Nat>, pick: String, via: String,
+    page: String, block: String}
+
+# a card closed without his answer
+def no_ans() -> Ans:
+  Ans{"", None{}, "", "", "", ""}
+
 type Agent is Data:
   Agent{name: String, is_main: Bool, parent: Maybe<&2, String>, life: Life,
     declared: Maybe<&2, Decl>, aliases: List<&2, String>,
@@ -79,7 +91,12 @@ type Ev is Data:
   EMsgState{id: Nat, st: MSt}
   ESettled{id: Nat}
   ECardOpened{card: Card}
-  ECardClosed{id: Nat, resolution: String}
+  # inbox-record (architect m_24257): `ans` his answer when he gave one
+  # (Ans.via "" when the card closed without him: `resolution` says why)
+  ECardClosed{id: Nat, resolution: String, ans: Ans}
+  # the asker's thread position of the route line his answer became: a
+  # fact the shell knows once written, no state (law answer_pos_once)
+  ECardAnswerPos{card: Nat, agent: String, pos: Nat}
   EMainNote{text: String, at: Nat}
   ENotesFlushed{}
   # the timers of `sb every` (timers.bend): every_set, every_fired (an
@@ -654,8 +671,10 @@ def apply(+st: St, e: Ev) -> St:
           St{agents, order, ms, cards, notes, nm, nc, tm, xs, pz, hot_of(ms)}
         case ECardOpened{+c}:
           St{agents, order, msgs, put_card(cards, c), notes, nm, Nat.max(nc, 1n+Card.id(c)), tm, xs, pz, hot}
-        case ECardClosed{+id, _}:
+        case ECardClosed{+id, _, _}:
           St{agents, order, msgs, drop_card(cards, id), notes, nm, nc, tm, xs, pz, hot}
+        case ECardAnswerPos{_, _, _}:
+          St{agents, order, msgs, cards, notes, nm, nc, tm, xs, pz, hot}
         case EMainNote{+text, _}:
           St{agents, order, msgs, cards, snoc(String, notes, text), nm, nc, tm, xs, pz, hot}
         case ENotesFlushed{}:

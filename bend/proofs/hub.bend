@@ -15,6 +15,7 @@ import ../hub/xhub.bend as HXB
 import ../hub/pause.bend as HP
 import ../hub/feature.bend as HFT
 import ../hub/reach.bend as HR
+import ../hub/answers.bend as HA
 import ./lib/hub-1.bend as PL1
 import ./lib/hub-2.bend as PL2
 import ./lib/hub-3.bend as PL3
@@ -342,7 +343,7 @@ def Laws.timer_fires_busy(o, cx, t, p, q, r):
 def Laws.paused_steers_nothing(o, cx, n, q, r):
   Laws.paused_delivers_nothing(o, cx, n, q)
 
-def Laws.page_answer_closes(o, c, cx, to, page, text):
+def Laws.page_answer_closes(o, c, cx, to, page, text, block):
   {==}
 
 def Laws.page_answer_tells_asker(o, cx, c, to, page, text):
@@ -535,12 +536,12 @@ def Laws.act_due_only(xs, now):
 
 # ---- the composer rule ----
 
-def Laws.card_confirm_words_refused(o, cx, c, text, parts, e):
-  %Equal.sym(Bool, HC.confirm_ok(text), False{}, e) : {HC.answer.confirm(o, _, cx, c, text) == HC.words_refused(o, cx, c, HC.confirm_opts()) : HX.Cx<o>}
+def Laws.card_confirm_words_refused(o, cx, c, text, parts, via, e):
+  %Equal.sym(Bool, HA.confirm_ok(text), False{}, e) : {HC.answer.confirm(o, _, cx, c, text, via) == HC.words_refused(o, cx, c, HA.confirm_opts()) : HX.Cx<o>}
   {==}
 
-def Laws.card_confirm_no_alias(o, cx, c, text, parts, e):
-  %Equal.sym(Bool, HC.is_no(String.to_lower(String.trim(text))), True{}, e) : {HC.answer.confirm(o, HC.confirm_pick(_, String.trim(text)), cx, c, text) == HC.answer.confirm(o, True{}, cx, c, text) : HX.Cx<o>}
+def Laws.card_confirm_no_alias(o, cx, c, text, parts, via, e):
+  %Equal.sym(Bool, HA.is_no(String.to_lower(String.trim(text))), True{}, e) : {HC.answer.confirm(o, HA.confirm_pick(_, String.trim(text)), cx, c, text, via) == HC.answer.confirm(o, True{}, cx, c, text, via) : HX.Cx<o>}
   {==}
 
 def Laws.card_confirm_nope_is_words():
@@ -552,7 +553,7 @@ def Laws.card_confirm_now_is_words():
 def Laws.card_confirm_no_thanks_is_words():
   {==}
 
-def Laws.card_choice_words_refused(o, cx, c, text, parts, e):
+def Laws.card_choice_words_refused(o, cx, c, text, parts, via, e):
   %Equal.sym(Bool, HC.is_option(HM.Card.text(c), text), False{}, e) : {HC.answer.choice(o, _, cx, c, text) == HC.words_refused(o, cx, c, "one of its numbers") : HX.Cx<o>}
   {==}
 
@@ -590,7 +591,9 @@ def Laws.hot_is_the_hot_part(s, e, h):
           PL3.hub_hot_idem(HM.map_msg(ms, i, HM.OSettle{}))
         case HM.ECardOpened{c}:
           h
-        case HM.ECardClosed{i, r}:
+        case HM.ECardClosed{i, r, a}:
+          h
+        case HM.ECardAnswerPos{i, r, a}:
           h
         case HM.EMainNote{t, a}:
           h

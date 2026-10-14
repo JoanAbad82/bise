@@ -19,6 +19,7 @@
 //! one with `daemon/dispatch`.
 
 mod accept;
+mod answers;
 mod art;
 mod boot;
 mod capsule;
@@ -56,6 +57,7 @@ mod xhub;
 mod xread;
 
 use history::{transcript_ahead, transcript_page};
+use lines::transcript_len;
 use repl::{adopt, adoptable, busy_at, kill_pid, supervise};
 use skills::{skill_roots, skills_fingerprint};
 use versions::version_allowed;
@@ -406,6 +408,8 @@ struct Shell {
     pg: pages::PageState,
     /// the typed protocol's connections (bise desktop S3a, daemon/proto.rs)
     proto: proto::Proto,
+    /// the inbox's history, from the journal (inbox-record, daemon/answers.rs)
+    answers: answers::Answers,
     /// the JSON-RPC connections and the hub-wide watermark (daemon/rpc.rs)
     rpc: rpc::Rpcs,
     /// view.json's writer (bise desktop S1, daemon/projects.rs)
@@ -513,24 +517,6 @@ fn write_line(stream: &mut UnixStream, line: &str) -> bool {
     s.push_str(line);
     s.push('\n');
     stream.write_all(s.as_bytes()).is_ok()
-}
-
-/// A live line of a feed (C2 `line`): `ts`, the time the transcript
-/// wrote it (ms since the epoch), is left out when unknown (0, a stamp
-/// that did not parse); a client reads a line without it as before.
-fn line_event(agent: &str, pos: usize, ts: u64, line: &str) -> Value {
-    let mut v = json!({"ev": "line", "agent": agent, "line": line, "pos": pos});
-    if ts > 0 {
-        v["ts"] = json!(ts);
-    }
-    v
-}
-
-/// How many lines a transcript holds (the position of its last line).
-fn transcript_len(path: &Path) -> usize {
-    std::fs::read(path)
-        .map(|b| b.iter().filter(|c| **c == b'\n').count())
-        .unwrap_or(0)
 }
 
 fn free_port() -> std::io::Result<u16> {
@@ -889,6 +875,7 @@ impl Shell {
         for e in fx {
             self.run(e);
         }
+        self.answers_flush();
         // a gate card closed without an answer is a no
         self.gate_sweep();
         // a /drop: the dropped task's worktree folders (gate.sh's too)
@@ -1029,8 +1016,8 @@ impl Shell {
     fn run(&mut self, e: Effect) {
         match e {
             Effect::Journal(ev) => {
-                let _ = writeln!(self.journal, "{}", ev);
-                let _ = self.journal.flush();
+                let _ = writeln!(self.journal, "{}", ev).and_then(|_| self.journal.flush());
+                self.answers_journaled(&ev);
                 // /drop (design §7.3): its tab group closes too
                 if let Some(name) = crate::computer_use::archived(&ev) {
                     crate::computer_use::drop_agent(&self.proc_hub, name);
@@ -2023,6 +2010,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         buffers: BTreeMap::new(),
         positions: BTreeMap::new(),
         proto: proto::Proto::default(),
+        answers: answers::Answers::new(crate::paths::workspace_id(&paths.workspace)),
         rpc: rpc::Rpcs::default(),
         projects: projects::Projects::boot(&paths),
         state_gate: state_gate::StateGate::default(),
@@ -2079,6 +2067,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         art: art::Art::default(),
         wake_look: wakes::Look::default(),
     };
+    sh.answers_replayed(&events);
     sh.start_pages(&paths, &tx);
     sh.start_here(&paths);
     match sh.idle.grace() {
@@ -2407,9 +2396,9 @@ mod tests {
     #[test]
     fn live_lines_carry_their_time() {
         assert_eq!(
-            line_event("main", 3, 1700000000000, "  obs: turn_done: completed"),
+            lines::line_event("main", 3, 1700000000000, "  obs: turn_done: completed"),
             json!({"ev": "line", "agent": "main", "line": "  obs: turn_done: completed", "pos": 3, "ts": 1700000000000u64})
         );
-        assert_eq!(line_event("t1", 1, 0, "x"), json!({"ev": "line", "agent": "t1", "line": "x", "pos": 1}));
+        assert_eq!(lines::line_event("t1", 1, 0, "x"), json!({"ev": "line", "agent": "t1", "line": "x", "pos": 1}));
     }
 }

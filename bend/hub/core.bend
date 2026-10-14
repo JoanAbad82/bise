@@ -21,6 +21,7 @@ import ./xhub-model.bend as XH
 import ./xhub.bend as XB
 
 import ./picks.bend as PK
+import ./answers.bend as A
 
 # the seam, generated from bise_proto::core (issue 25): the inputs'
 # decode, the effects' encoders
@@ -418,7 +419,7 @@ def close_ids(-o: M.St, ids: List<&2, Nat>, +cx: X.Cx<o>, +res: String) -> X.Cx<
     case Nil{}:
       cx
     case Con{+id, +rest}:
-      +cx2 = emit(o, cx, M.ECardClosed{id, res}, Unit{}, Unit{}, Unit{})
+      +cx2 = emit(o, cx, M.ECardClosed{id, res, M.no_ans()}, Unit{}, Unit{}, Unit{})
       close_ids(o, rest, feed(o, cx2, M.MAIN(), FD.card_closed(id, res)), res)
 
 # the cards of `agent` whose kind is in `kinds` (Nil: every kind)
@@ -1867,9 +1868,16 @@ def feature_retire(-o: M.St, +cx: X.Cx<o>, +name: String, +kept: String, +main: 
 def user_sent(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
   out(o, cx, F.user_sent(text))
 
-def close_card(-o: M.St, +cx: X.Cx<o>, +id: Nat, +res: String) -> X.Cx<o>:
-  +cx2 = emit(o, cx, M.ECardClosed{id, res}, Unit{}, Unit{}, Unit{})
+# a card closed with his answer `a` (inbox-record): the journal keeps it
+# for the inbox's history
+def close_card_ans(-o: M.St, +cx: X.Cx<o>, +id: Nat, +res: String, +a: M.Ans) -> X.Cx<o>:
+  +cx2 = emit(o, cx, M.ECardClosed{id, res, a}, Unit{}, Unit{}, Unit{})
   feed(o, cx2, M.MAIN(), FD.card_closed(id, res))
+
+# a card closed without his answer (withdrawn, closed, stopped): its
+# journal line carries no answer (law closed_without_him_has_no_answer)
+def close_card(-o: M.St, +cx: X.Cx<o>, +id: Nat, +res: String) -> X.Cx<o>:
+  close_card_ans(o, cx, id, res, M.no_ans())
 
 # one of the card's options (picks.bend); its laws read it here
 def is_option(+card: String, +t: String) -> Bool:
@@ -1893,7 +1901,7 @@ def answer_line(-o: M.St, +cx: X.Cx<o>, +agent: String, +who: String, +c: M.Card
 def asker_line(-o: M.St, +cx: X.Cx<o>, +asker: String, +c: M.Card, +said: String, +parts: String, +msg: Maybe<&2, Nat>) -> X.Cx<o>:
   pick_lazy(X.Cx<o>, String.eq(asker, M.MAIN()), u => cx, u => answer_line(o, cx, asker, asker, c, said, parts, msg))
 
-def answer.q.sent(-o: M.St, p: X.Cx<o> & SendR, +c: M.Card, +asker: String, +text: String, +parts: String) -> X.Cx<o>:
+def answer.q.sent(-o: M.St, p: X.Cx<o> & SendR, +c: M.Card, +asker: String, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   match p:
     case (+cx, SErr{+e}):
       notice(o, cx, e)
@@ -1902,7 +1910,7 @@ def answer.q.sent(-o: M.St, p: X.Cx<o> & SendR, +c: M.Card, +asker: String, +tex
       +mid = M.Msg.id(m)
       +cx2 = note_main(o, cx, cat(["the user answered card #", ns(id), " (@", asker, " asked: \"", M.one_line(M.Card.text(c)), "\"): \"", M.one_line(text), "\""]))
       +cx3 = answer_line(o, cx2, M.MAIN(), asker, c, text, parts, Some{mid})
-      close_card(o, asker_line(o, cx3, asker, c, text, parts, Some{mid}), id, "answered")
+      close_card_ans(o, A.due_add(o, asker_line(o, cx3, asker, c, text, parts, Some{mid}), id), id, "answered", A.his_ans(c, text, via))
 
 # main's own card: the answer wakes main with a turn that holds it, like
 # a card for an agent reaches that agent (a main note would wait for the
@@ -1917,41 +1925,41 @@ def MAIN_ANSWER_HEAD() -> String:
 # The same route line as an agent's card (answer.q.sent), his answer whole:
 # the clients fold that line into the "you answered" row and drop the
 # notify's twin (lines.rs is_main_answer_note, its head MAIN_ANSWER_HEAD)
-def answer.q.main(-o: M.St, +cx: X.Cx<o>, +c: M.Card, +text: String, +parts: String) -> X.Cx<o>:
+def answer.q.main(-o: M.St, +cx: X.Cx<o>, +c: M.Card, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   +id = M.Card.id(c)
   +cx2 = notify_main(o, cx, cat([MAIN_ANSWER_HEAD(), ns(id), " (\"", M.one_line(M.Card.text(c)), "\"): \"", M.one_line(text), "\""]))
   +cx3 = answer_line(o, cx2, M.MAIN(), M.MAIN(), c, text, parts, None{})
-  close_card(o, cx3, id, "answered")
+  close_card_ans(o, A.due_add(o, cx3, id), id, "answered", A.his_ans(c, text, via))
 
 # his answer as a message to the asker, his parts with it
 def answer.snd(+to: String, +text: String, +reply_to: Maybe<&2, Nat>, +parts: String) -> Snd:
   Snd{M.USER(), to, text, False{}, reply_to, False{}, False{}, False{}, None{}, parts}
 
-def answer.q(-o: M.St, m: Maybe<&2, M.Msg>, +cx: X.Cx<o>, +c: M.Card, +text: String, +parts: String) -> X.Cx<o>:
+def answer.q(-o: M.St, m: Maybe<&2, M.Msg>, +cx: X.Cx<o>, +c: M.Card, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   match m:
     case Some{+q}:
-      answer.q.sent(o, send(o, cx, answer.snd(M.Msg.from(q), text, Some{M.Msg.id(q)}, parts)), c, M.Msg.from(q), text, parts)
+      answer.q.sent(o, send(o, cx, answer.snd(M.Msg.from(q), text, Some{M.Msg.id(q)}, parts)), c, M.Msg.from(q), text, parts, via)
     case None{}:
       # pr-news: a card the hub opened about an agent (checks that still
       # fail after two tries): the answer goes to that agent, main reads it
       +ag = M.Card.agent(c)
       pick_lazy(X.Cx<o>, Bool.not(String.eq(ag, M.MAIN())) && Maybe.is_some(&2, String, M.resolve(st(o, cx), ag)),
-        u => answer.q.sent(o, send(o, cx, answer.snd(ag, text, None{}, parts)), c, ag, text, parts),
-        u => answer.q.main(o, cx, c, text, parts))
+        u => answer.q.sent(o, send(o, cx, answer.snd(ag, text, None{}, parts)), c, ag, text, parts, via),
+        u => answer.q.main(o, cx, c, text, parts, via))
 
-def answer.dropped(-o: M.St, p: X.Cx<o> & DropR, +c: M.Card) -> X.Cx<o>:
+def answer.dropped(-o: M.St, p: X.Cx<o> & DropR, +c: M.Card, +a: M.Ans) -> X.Cx<o>:
   match p:
     case (+cx, DErr{+e}):
-      close_card(o, notice(o, cx, e), M.Card.id(c), "accepted")
+      close_card_ans(o, notice(o, cx, e), M.Card.id(c), "accepted", a)
     case (+cx, _):
-      close_card(o, note_main(o, cx, String.append("the user accepted to drop @", M.Card.agent(c))), M.Card.id(c), "accepted")
+      close_card_ans(o, note_main(o, cx, String.append("the user accepted to drop @", M.Card.agent(c))), M.Card.id(c), "accepted", a)
 
-def answer.drop(-o: M.St, yes: Bool, +cx: X.Cx<o>, +c: M.Card) -> X.Cx<o>:
+def answer.drop(-o: M.St, yes: Bool, +cx: X.Cx<o>, +c: M.Card, +a: M.Ans) -> X.Cx<o>:
   match yes:
     case True{}:
-      answer.dropped(o, drop_task(o, cx, M.Card.agent(c), True{}), c)
+      answer.dropped(o, drop_task(o, cx, M.Card.agent(c), True{}), c, a)
     case False{}:
-      close_card(o, note_main(o, cx, String.append("the user refused to drop @", M.Card.agent(c))), M.Card.id(c), "refused")
+      close_card_ans(o, note_main(o, cx, String.append("the user refused to drop @", M.Card.agent(c))), M.Card.id(c), "refused", a)
 
 def answer.plain.sent(-o: M.St, p: X.Cx<o> & SendR, +id: Nat) -> X.Cx<o>:
   match p:
@@ -1971,45 +1979,20 @@ def card_kind(+k: String) -> CardK:
         Bool.pick(CardK, M.choice_kind(k), KChoice{}, KOther{}))))
 
 
-# a deny alias (lead m_10900): `no` or `no: <why>`, any case, on the
-# lowered trimmed answer; it can only refuse (`nope`, `now` are words)
-def is_no(+l: String) -> Bool:
-  String.eq(l, "no") || String.starts_with(l, "no:")
-
-# a deny alias is an answer; else the options and the TUI's `deny:`
-def confirm_pick(no: Bool, +s: String) -> Bool:
-  match no:
-    case True{}:
-      True{}
-    case False{}:
-      String.eq(s, "1") || String.eq(s, "2") || String.eq(s, "3") || String.starts_with(String.to_lower(s), "deny:")
-
-# an approval card's answer (the composer rule, lead m_8777): its options
-# 1 allow, 2 always, 3 no, the TUI's explicit deny action (`deny: <why>`,
-# a refusal with its note) or its aliases `no` and `no: <why>`; typed
-# words never answer it
-def confirm_ok(+t: String) -> Bool:
-  +s = String.trim(t)
-  confirm_pick(is_no(String.to_lower(s)), s)
-
-# what a confirm card waits for, said when words are refused
-def confirm_opts() -> String:
-  "1 allow · 2 always · 3 no · or no: <why>"
-
 # typed words on an approval card: the card stays open, nothing wakes
 def words_refused(-o: M.St, +cx: X.Cx<o>, +c: M.Card, +opts: String) -> X.Cx<o>:
   notice(o, cx, cat(["card #", ns(M.Card.id(c)), " waits for ", opts, " — typed words don't answer it"]))
 
-def answer.confirm(-o: M.St, ok: Bool, +cx: X.Cx<o>, +c: M.Card, +text: String) -> X.Cx<o>:
+def answer.confirm(-o: M.St, ok: Bool, +cx: X.Cx<o>, +c: M.Card, +text: String, +via: String) -> X.Cx<o>:
   match ok:
     case True{}:
       # the approvals gate (approvals-design.md §9): the answer is the
       # verdict of the waiting call, written to its gate by the hub's
       # Rust side (the `confirm` effect), never a message to the agent
       +cx2 = out(o, cx, F.confirm_card(M.Card.id(c), M.Card.agent(c), text))
-      close_card(o, cx2, M.Card.id(c), "answered")
+      close_card_ans(o, cx2, M.Card.id(c), "answered", A.confirm_ans(text, via))
     case False{}:
-      words_refused(o, cx, c, confirm_opts())
+      words_refused(o, cx, c, A.confirm_opts())
 
 # a hub item's answer (M.choice_kind): one of its numbers goes to the
 # hub's Rust side (the `card_choice` effect), which acts and closes the
@@ -2023,30 +2006,32 @@ def answer.choice(-o: M.St, num: Bool, +cx: X.Cx<o>, +c: M.Card, +text: String) 
     case False{}:
       words_refused(o, cx, c, "one of its numbers")
 
-def answer.kind(-o: M.St, k: CardK, +cx: X.Cx<o>, +c: M.Card, +text: String, +parts: String) -> X.Cx<o>:
+def answer.kind(-o: M.St, k: CardK, +cx: X.Cx<o>, +c: M.Card, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   match k:
     case KQuestion{}:
-      answer.q(o, for_msg_of(st(o, cx), M.Card.for_msg(c)), cx, c, text, parts)
+      answer.q(o, for_msg_of(st(o, cx), M.Card.for_msg(c)), cx, c, text, parts, via)
     case KDrop{}:
-      answer.drop(o, is_yes(text), cx, c)
+      answer.drop(o, is_yes(text), cx, c, A.said_ans(text, via))
     case KConfirm{}:
-      answer.confirm(o, confirm_ok(text), cx, c, text)
+      answer.confirm(o, A.confirm_ok(text), cx, c, text, via)
     case KChoice{}:
       answer.choice(o, is_option(M.Card.text(c), text), cx, c, text)
     case KOther{}:
-      close_card(o, cx, M.Card.id(c), "vue")
+      close_card_ans(o, cx, M.Card.id(c), "vue", A.said_ans(text, via))
 
-def answer.card(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String) -> X.Cx<o>:
+def answer.card(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   match m:
     case None{}:
       notice(o, cx, String.append("no open card #", ns(id)))
     case Some{+c}:
-      answer.kind(o, card_kind(M.Card.kind(c)), cx, c, text, parts)
+      answer.kind(o, card_kind(M.Card.kind(c)), cx, c, text, parts, via)
 
 # his answer to card `id`; `parts`: his message's parts (msg-parts, ""
-# none), kept on the asker's message and written after the route line
-def answer_card(-o: M.St, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String) -> X.Cx<o>:
-  answer.card(o, M.card_of(M.St.cards(st(o, cx)), id), cx, id, text, parts)
+# none), kept on the asker's message and written after the route line;
+# `via`: where he answered ("inbox": the inbox's answer; "thread": his
+# words to the asker in its own view, says.card)
+def answer_card(-o: M.St, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String, +via: String) -> X.Cx<o>:
+  answer.card(o, M.card_of(M.St.cards(st(o, cx)), id), cx, id, text, parts, via)
 
 def asked_by(m: Maybe<&2, M.Msg>, +to: String) -> Bool:
   match m:
@@ -2075,7 +2060,7 @@ def says.sent(-o: M.St, p: X.Cx<o> & SendR, +to: String, +text: String) -> X.Cx<
 def says.card(-o: M.St, card: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
   match card:
     case Some{+id}:
-      answer_card(o, user_sent(o, cx, text), id, text, parts)
+      answer_card(o, user_sent(o, cx, text), id, text, parts, "thread")
     case None{}:
       says.sent(o, send(o, cx, Snd{M.USER(), to, text, False{}, None{}, True{}, False{}, queued, None{}, parts}), to, text)
 
@@ -3231,7 +3216,7 @@ def Hub.r(x: Hub) -> X.R:
       r
 
 def hub_new(+workspace: String) -> Hub:
-  Hub{M.init(workspace), X.R{Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, workspace, False{}, 0n, False{}, Nil{}, None{}, None{}}}
+  Hub{M.init(workspace), X.R{Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, workspace, False{}, 0n, False{}, Nil{}, None{}, None{}, Nil{}}}
 
 # the context of one input over the hub
 def start(+h: Hub, +i: J.Json) -> X.Cx<Hub.d(h)>:
@@ -3636,12 +3621,12 @@ def confirm_close(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat, +res: 
 def page_answered.tell(-o: M.St, tell: Bool, +cx: X.Cx<o>, +c: M.Card, +to: String, +page: String, +text: String) -> X.Cx<o>:
   pick_lazy(X.Cx<o>, tell, u => fst(o, send(o, cx, msg(M.HUB(), M.Card.agent(c), R.answer_words(M.Card.id(c), page, to, text), False{}, None{}, False{}, False{}))), u => cx)
 
-def page_answered(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +to: String, +page: String, +text: String) -> X.Cx<o>:
+def page_answered(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +to: String, +page: String, +text: String, +block: String) -> X.Cx<o>:
   match m:
     case None{}:
       cx
     case Some{+c}:
-      +cx2 = close_card(o, cx, M.Card.id(c), "answered")
+      +cx2 = close_card_ans(o, cx, M.Card.id(c), "answered", A.page_ans(text, page, block))
       page_answered.tell(o, R.tells_asker(M.resolve(st(o, cx2), M.Card.agent(c)), M.resolve(st(o, cx2), to)), cx2, c, to, page, text)
 
 def force_run_of(+r: String) -> M.Run:
@@ -3697,7 +3682,9 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
     case GI.IRename{+name, +new_name, +valid}:
       rename.old(o, M.resolve(st(o, cx), name), cx, name, new_name, valid)
     case GI.IAnswer{+card, +text, +parts}:
-      answer_card(o, cx, card, text, parts)
+      answer_card(o, cx, card, text, parts, "inbox")
+    case GI.IAnswerPos{+card, +agent, +pos}:
+      A.answer_pos(o, cx, card, agent, pos)
     case GI.IInterrupt{+agent}:
       interrupt.go(o, M.resolve(st(o, cx), agent), cx)
     case GI.IUnqueue{+id}:
@@ -3716,8 +3703,8 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       open_confirm(o, cx, agent, text)
     case GI.IConfirmClose{+card, +res}:
       confirm_close(o, M.card_of(M.St.cards(st(o, cx)), card), cx, card, res)
-    case GI.IPageAnswered{+card, +agent, +page, +text}:
-      page_answered(o, M.card_of(M.St.cards(st(o, cx)), card), cx, agent, page, text)
+    case GI.IPageAnswered{+card, +agent, +page, +text, +block}:
+      page_answered(o, M.card_of(M.St.cards(st(o, cx)), card), cx, agent, page, text, block)
     case GI.IForge{+to, +text}:
       fst(o, send(o, cx, msg(M.GITHUB(), to, text, False{}, None{}, False{}, False{})))
     case GI.IForgeCard{+agent, +text}:

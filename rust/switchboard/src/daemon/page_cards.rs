@@ -683,7 +683,7 @@ impl Shell {
         // the agent the pick goes to (wake-deliver: main never heard #513)
         let agent = pages.store.meta(id).map(|m| m.agent).unwrap_or_default();
         let to = if self.page_agent_gone(&agent) { MAIN.to_string() } else { agent };
-        self.step(Input::PageAnswered { card, agent: to, page: id.to_string(), text: words.clone() });
+        self.step(Input::PageAnswered { card, agent: to, page: id.to_string(), text: words.clone(), block: block.to_string() });
         self.page_answer_without_card(id, block, &words);
         true
     }

@@ -220,9 +220,15 @@ def in_hub_msg_bare():
   {==}
 
 law in_page_answered_bare:
-  {IN.of(J.obj([J.kv("t", J.JStr{"page_answered"})])) == IN.IPageAnswered{0n, "", "", ""} : IN.In}
+  {IN.of(J.obj([J.kv("t", J.JStr{"page_answered"})])) == IN.IPageAnswered{0n, "", "", "", ""} : IN.In}
 
 def in_page_answered_bare():
+  {==}
+
+law in_answer_pos_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"answer_pos"})])) == IN.IAnswerPos{0n, "", 0n} : IN.In}
+
+def in_answer_pos_bare():
   {==}
 
 law in_every_set_bare:
@@ -637,9 +643,23 @@ law in_IPageAnswered_round:
   for agent: String
   for page: String
   for text: String
-  {IN.of(IN.json(IN.IPageAnswered{card, agent, page, text})) == IN.IPageAnswered{card, agent, page, text} : IN.In}
+  for block: String
+  {IN.of(IN.json(IN.IPageAnswered{card, agent, page, text, block})) == IN.IPageAnswered{card, agent, page, text, block} : IN.In}
 
-def in_IPageAnswered_round(card, agent, page, text):
+def in_IPageAnswered_round(card, agent, page, text, block):
+  match block:
+    case SNil{}:
+      {==}
+    case SCon{h_block, t_block}:
+      {==}
+
+law in_IAnswerPos_round:
+  for card: Nat
+  for agent: String
+  for pos: Nat
+  {IN.of(IN.json(IN.IAnswerPos{card, agent, pos})) == IN.IAnswerPos{card, agent, pos} : IN.In}
+
+def in_IAnswerPos_round(card, agent, pos):
   {==}
 
 law in_IEverySet_round:

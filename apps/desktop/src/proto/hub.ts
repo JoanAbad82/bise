@@ -4,6 +4,7 @@
 
 import type { FnContext } from './context';
 import type { DiffFile, DiffResult } from './diff';
+import type { InboxRecord, StateFilter } from './inbox';
 import type { LogItem } from './log';
 import type { BranchRow, ReleaseEv, UpdateEv, VersionItem } from './ops';
 import type { Part } from './parts';
@@ -87,7 +88,20 @@ kicker?: string | null,
 /**
  * it holds a question whose card is open (§4.2)
  */
-asking?: boolean, } | { "ev": "card_open", project: string, id: number, } | { "ev": "focused", project: string, focus: string, } | { "ev": "approvals", project: string, mode: ApprovalMode, env: boolean, checker: CheckerKind, 
+asking?: boolean, } | { "ev": "card_open", project: string, id: number, } | { "ev": "inbox_history", project: string, 
+/**
+ * newest first
+ */
+items: Array<InboxRecord>, 
+/**
+ * older records match too: ask again with `before` the last card
+ */
+more: boolean, 
+/**
+ * every record this hub has (the filters left aside): the head's
+ * `41 answered`
+ */
+answered: number, withdrawn: number, } | { "ev": "inbox_recorded", project: string, record: InboxRecord, } | { "ev": "focused", project: string, focus: string, } | { "ev": "approvals", project: string, mode: ApprovalMode, env: boolean, checker: CheckerKind, 
 /**
  * who checks: `TypeSafe`, `OpenRouter`, a chat model's id
  */
@@ -160,7 +174,15 @@ parts?: Array<Part>, mode?: Mode | null, context?: FnContext | null, files?: Arr
 /**
  * his answer as typed parts, as `Send.parts` (`reply` then ignored)
  */
-parts?: Array<Part>, } | { "cmd": "close", project: string, card: number, } | { "cmd": "confirm", project: string, id: number, yes: boolean, } | { "cmd": "approvals", project: string, mode?: string | null, } | { "cmd": "remove_rule", project: string, rule: ApprovalRule, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, at_ms?: number | null, } | { "cmd": "diff", project: string, agent?: string | null, commit?: string | null, branch?: string | null, pr?: number | null, range?: string | null, req?: number | null, } | { "cmd": "tool_out", project: string, agent: string, pos: number, } | { "cmd": "log", project: string, agent: string, before?: number, } | { "cmd": "queued_take", project: string, agent: string, id: number, } | { "cmd": "branches", project: string, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "features", project: string, } | { "cmd": "prs", project: string, } | { "cmd": "scheduled", project: string, } | { "cmd": "usage", project: string, } | { "cmd": "pause", project: string, } | { "cmd": "resume", project: string, } | { "cmd": "scheduled_stop", project: string, id: number, } | { "cmd": "wake_stop", project: string, id: number, } | { "cmd": "models", project: string, } | { "cmd": "new", project: string, name?: string | null, brief: string, worktree?: boolean, with_changes?: boolean, } | { "cmd": "rename", project: string, agent: string, to: string, } | { "cmd": "model", project: string, agent: string, model: string, default?: boolean, } | { "cmd": "effort", project: string, agent: string, effort: string, } | { "cmd": "route_correct", project: string, rid: number, to: string, } | { "cmd": "route_cancel", project: string, rid: number, } | { "cmd": "follow", project: string, agent: string, on: boolean, } | { "cmd": "slash", project: string, agent: string, line: string, cid?: number | null, 
+parts?: Array<Part>, } | { "cmd": "close", project: string, card: number, } | { "cmd": "confirm", project: string, id: number, yes: boolean, } | { "cmd": "approvals", project: string, mode?: string | null, } | { "cmd": "remove_rule", project: string, rule: ApprovalRule, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, at_ms?: number | null, } | { "cmd": "diff", project: string, agent?: string | null, commit?: string | null, branch?: string | null, pr?: number | null, range?: string | null, req?: number | null, } | { "cmd": "tool_out", project: string, agent: string, pos: number, } | { "cmd": "log", project: string, agent: string, before?: number, } | { "cmd": "queued_take", project: string, agent: string, id: number, } | { "cmd": "branches", project: string, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "features", project: string, } | { "cmd": "prs", project: string, } | { "cmd": "inbox_history", project: string, agent?: string | null, state?: StateFilter | null, words?: string | null, 
+/**
+ * a card id: only the older ones (the next page)
+ */
+before?: number | null, 
+/**
+ * at most [`PAGE_MAX`]; none: [`PAGE`]
+ */
+limit?: number | null, } | { "cmd": "scheduled", project: string, } | { "cmd": "usage", project: string, } | { "cmd": "pause", project: string, } | { "cmd": "resume", project: string, } | { "cmd": "scheduled_stop", project: string, id: number, } | { "cmd": "wake_stop", project: string, id: number, } | { "cmd": "models", project: string, } | { "cmd": "new", project: string, name?: string | null, brief: string, worktree?: boolean, with_changes?: boolean, } | { "cmd": "rename", project: string, agent: string, to: string, } | { "cmd": "model", project: string, agent: string, model: string, default?: boolean, } | { "cmd": "effort", project: string, agent: string, effort: string, } | { "cmd": "route_correct", project: string, rid: number, to: string, } | { "cmd": "route_cancel", project: string, rid: number, } | { "cmd": "follow", project: string, agent: string, on: boolean, } | { "cmd": "slash", project: string, agent: string, line: string, cid?: number | null, 
 /**
  * his words' typed parts (msg-parts, as `Send.parts`): a line
  * that isn't a command takes `send`'s path with them (`line` is

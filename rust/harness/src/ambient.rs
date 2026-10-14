@@ -243,6 +243,8 @@ fn ambient_projects(how: Connector) -> (bend_tui::ambient::ConnectFor, bend_tui:
             pid.and_then(|p| p.trim().parse::<u32>().ok()).is_some_and(switchboard::procs::alive)
         }),
         exists: Box::new(|path| path.is_dir()),
+        // its hub's journal.jsonl (switchboard::paths::Paths::journal's name)
+        journal: Box::new(|id| std::fs::read_to_string(bise_home::Home::from_env().hub_dir(id).join("journal.jsonl")).ok()),
         git: Box::new(|path| {
             let dot = path.join(".git");
             let dir = if dot.is_dir() {

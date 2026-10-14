@@ -31,6 +31,7 @@
 {"agent": "dark", "ans": [], "git": true, "now": 1000000, "t": "forge_card", "text": "#412 (sb/dark): e2e still fails after 2 fixes by dark. what should it do? (keep trying, skip it, or you look)"}
 {"ans": [], "git": true, "now": 1000000, "t": "hub_msg", "text": "your ChatGPT sign-in is back. go on where your turn stopped.", "to": "t1"}
 {"agent": "architect", "ans": [], "card": 3, "git": true, "now": 1000000, "page": "architecture", "t": "page_answered", "text": "D10"}
+{"agent": "perf", "ans": [], "card": 3, "git": true, "now": 1000000, "pos": 42, "t": "answer_pos"}
 {"agent": "a", "ans": [], "git": true, "held": false, "leftover": false, "now": 1000000, "t": "idle"}
 {"agent": "net", "ans": [], "git": true, "now": 1000000, "t": "interrupt"}
 {"ans": [], "git": true, "name": "a", "now": 1000000, "t": "isolate"}
