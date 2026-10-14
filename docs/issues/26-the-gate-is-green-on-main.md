@@ -1,6 +1,6 @@
 # 26 · the gate is green on main, and stays green
 
-Status: fixes on sb/debt-t1, the full gate twice next (debt-t1, plan signed by architect m_23084). Item T1
+Status: done on landing: full gate green twice on the tip with every fix (debt-t1, plan signed by architect m_23084). Item T1
 of architect's tech-debt-night list. Label: tests, gate.
 
 ## The problem
@@ -124,4 +124,7 @@ tui_reload_tmux waited for a `reloading bise` line in main's thread after
 a /restart. a38108e7 (on main during this work, designer m_23091) removed
 that line for a reload that goes well: the switch row and hub.log say it.
 The test now checks the line is not there once the draft is back, as
-a38108e7's repl_start_e2e does.
+a38108e7's repl_start_e2e does. The lesson: a38108e7 (switcher-line,
+archived since; signed by designer) changed a visible line and moved one
+of its two tests. A change to a line a test waits on runs every test
+naming it (`rg` the words) before it lands.
