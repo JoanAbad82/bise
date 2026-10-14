@@ -189,6 +189,10 @@ pub struct PlaceView {
     pub agents: Vec<String>,
     pub pr: Option<PrView>,
     pub lid: Option<String>,
+    /// its rank in the land queue's line, 1-based (1: it lands now; the
+    /// lid is `land_queue::lid` of it); None when not in line
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub landing: Option<u32>,
     /// dev-flow §5.1, pr-design §4.1 item 8: a feature branch's place
     /// (`id` = `feature:<name>`, `branch` = the name, never a PR): a box
     /// with 2+ live agents even in separate worktrees. `trying`: its try
@@ -364,7 +368,7 @@ pub fn view_id(a: &crate::model::Agent) -> String {
 
 /// The views the TUI draws: worktrees only. `lids`: the held line of a
 /// place, by id (the land queue's `waits to land · 2nd`, else pr-hub's
-/// `no PR yet · 2 commits`). `stale`: the age of a PR's state, by place
+/// `no PR yet · 2 commits`), `landing` the queue's ranks. `stale`: the age of a PR's state, by place
 /// id, when the forge is late (pr-hub: its last ask failed, or it is
 /// older than `core::PR_STALE_MS`).
 /// Features: `lids` holds their lid too (`feature · 14 commits · not
@@ -373,6 +377,7 @@ pub fn view_id(a: &crate::model::Agent) -> String {
 pub fn views(
     places: &[Place],
     lids: &BTreeMap<String, String>,
+    landing: &BTreeMap<String, u32>,
     stale: &BTreeMap<String, u64>,
     trying: &std::collections::BTreeSet<String>,
 ) -> Vec<PlaceView> {
@@ -385,6 +390,7 @@ pub fn views(
             agents: p.agents.clone(),
             pr: p.pr.as_ref().map(|pr| PrView::of(pr, stale.get(&p.id).copied())),
             lid: lids.get(&p.id).cloned(),
+            landing: landing.get(&p.id).copied(),
             feature: p.kind == PlaceKind::Feature,
             trying: trying.contains(&p.id),
         })
@@ -436,7 +442,7 @@ mod tests {
         assert_eq!(ps[1].agents, ["c"]);
         // the views: worktrees only, the lid by id
         let lids = BTreeMap::from([("wt:a".to_string(), "waits to land · 2nd".to_string())]);
-        let v = views(&ps, &lids, &BTreeMap::new(), &Default::default());
+        let v = views(&ps, &lids, &BTreeMap::new(), &BTreeMap::new(), &Default::default());
         assert_eq!(v.len(), 1);
         assert_eq!(v[0].lid.as_deref(), Some("waits to land · 2nd"));
         assert_eq!(v[0].pr, None);
@@ -467,7 +473,7 @@ mod tests {
         assert_eq!(place_of(&st, "a").as_deref(), Some("wt:a"));
         let trying = std::collections::BTreeSet::from(["feature:cu".to_string()]);
         let lids = BTreeMap::from([("feature:cu".to_string(), "feature · 2 commits · not tried".to_string())]);
-        let v = views(&ps, &lids, &BTreeMap::new(), &trying);
+        let v = views(&ps, &lids, &BTreeMap::new(), &BTreeMap::new(), &trying);
         assert_eq!((v[0].feature, v[0].trying, v[0].lid.as_deref()), (true, true, Some("feature · 2 commits · not tried")));
         // all archived: no place left
         for n in ["a", "b"] {
@@ -512,7 +518,7 @@ mod tests {
         assert_eq!(ps[1].branch.as_deref(), Some("feat/x"));
         assert_eq!(id_of(&st.agents["a"]), "shared");
         // the views: a worktree like any other
-        let v = views(&ps, &BTreeMap::new(), &BTreeMap::new(), &Default::default());
+        let v = views(&ps, &BTreeMap::new(), &BTreeMap::new(), &BTreeMap::new(), &Default::default());
         assert!(v.iter().any(|p| p.id == "pt:/p/a-wt" && p.agents == ["c"]));
     }
 
@@ -544,6 +550,7 @@ mod tests {
             agents: vec!["a".into()],
             pr: Some(PrView::of(&pr, None)),
             lid: None,
+            landing: None,
             feature: false,
             trying: false,
         };

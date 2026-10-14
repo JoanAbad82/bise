@@ -215,6 +215,7 @@ pub fn places(snap: &Value) -> Vec<bise_proto::rows::Place> {
             branch: p.branch,
             agents: p.agents,
             lid: p.lid,
+            landing: p.landing,
             feature: p.feature,
             trying: p.trying,
         })

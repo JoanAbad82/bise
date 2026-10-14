@@ -1144,10 +1144,10 @@ pub struct Hub {
     /// §10): shown `waiting` on `you`; runtime only, like `activity`.
     on_you: BTreeSet<String>,
     /// dev-flow §3.1: the PR of each place, by place id (pr-hub, wave 2;
-    /// empty until then) and the held line of a place (the land queue's
-    /// `waits to land · 2nd`, set by the daemon). Runtime only.
+    /// empty until then) and its rank in the land queue's line (set by the
+    /// daemon; its lid `waits to land · 2nd` is `land_queue::lid` of it).
     pub prs: BTreeMap<String, crate::place::PrSnapshot>,
-    pub lids: BTreeMap<String, String>,
+    pub landing: BTreeMap<String, u32>,
     /// The repo's `[flow] mode` (None: not set), for the views' held
     /// header (`lands via PRs` / `lands on main`); the daemon reads it.
     pub flow: Option<crate::flow::FlowMode>,
@@ -1353,7 +1353,7 @@ impl Hub {
             places: BTreeMap::new(),
             on_you: BTreeSet::new(),
             prs: BTreeMap::new(),
-            lids: BTreeMap::new(),
+            landing: BTreeMap::new(),
             flow: None,
             feature_lids: BTreeMap::new(),
             trying: BTreeSet::new(),
@@ -1976,7 +1976,7 @@ impl Hub {
     /// The held lines (the land queue's first, else `no PR yet`) and the
     /// stale PRs' ages, by place id, for the views.
     fn pr_views(&self, now: u64) -> (BTreeMap<String, String>, BTreeMap<String, u64>) {
-        let mut lids = self.lids.clone();
+        let mut lids = crate::land_queue::lids(&self.landing);
         // trunk flow: a branch lands on main, it never waits for a PR
         let no_pr = if self.flow == Some(crate::flow::FlowMode::Trunk) { &BTreeMap::new() } else { &self.pr_lids };
         for (id, l) in no_pr {
@@ -2050,7 +2050,7 @@ impl Hub {
         for (id, l) in &self.feature_lids {
             lids.entry(id.clone()).or_insert_with(|| l.clone());
         }
-        let places = crate::place::views(&places, &lids, &stale, &self.trying);
+        let places = crate::place::views(&places, &lids, &self.landing, &stale, &self.trying);
         json!({"ev": "state", "agents": agents, "cards": cards, "places": places,
                "flow": self.flow.map(|f| f.as_str())})
     }

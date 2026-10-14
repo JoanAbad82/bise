@@ -60,7 +60,11 @@ fn mock() -> App {
         place("login-fix", &["login-fix"], Some(failing), None),
         place("emoji-csv", &["emoji-csv"], None, Some("no PR yet · 2 commits")),
         place("palette", &["palette"], Some(draft), None),
-        Place { branch: Some("sb/release-notes".into()), ..place("release", &["release"], None, Some("waits to land · 2nd")) },
+        Place {
+            branch: Some("sb/release-notes".into()),
+            landing: Some(2),
+            ..place("release", &["release"], None, Some("waits to land · 2nd"))
+        },
         place("docs", &["docs"], Some(pr(409, "approved", "pass")), None),
     ];
     sb.flow = "pr".into();

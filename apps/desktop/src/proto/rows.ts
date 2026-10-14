@@ -527,6 +527,11 @@ pr?: Pr | null,
  */
 lid?: string | null, 
 /**
+ * its 1-based rank in the land queue's line (1: it lands now, its
+ * lid `landing`; 2: `waits to land · 2nd`); none when not in line
+ */
+landing?: number | null, 
+/**
  * a feature branch's place (dev-flow §5.1): never a PR
  */
 feature?: boolean, 

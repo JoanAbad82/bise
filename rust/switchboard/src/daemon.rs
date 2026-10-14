@@ -797,8 +797,8 @@ impl Shell {
         // pr-news: whose bots' comments reach the agents (`[pr] trusted_bots`)
         self.hub.pr_bots =
             crate::forge::news::trusted_bots(&std::fs::read_to_string(self.opts.paths.config()).unwrap_or_default());
-        // who lands, who waits in line (the boxes' lids)
-        self.hub.lids = self.lands.lids();
+        // who lands, who waits in line (the boxes' lids are said from it)
+        self.hub.landing = self.lands.ranks();
         // the features' lids and Δ (dev-flow §5.1)
         self.feature_views();
         let mut snap = self.hub.snapshot(now_ms());

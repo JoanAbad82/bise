@@ -1,5 +1,6 @@
 //! The land queue (dev-flow §5): one land at a time per target ref, the
-//! others in line, and the views' lids (`landing`, `waits to land · 2nd`).
+//! others in line, each place's rank in its line (the views' `landing`)
+//! and the lid said from it (`landing`, `waits to land · 2nd`).
 //! Moved out of land.rs as is (feature-retire: land.rs stays under 1,000
 //! lines); `land` re-exports [`Queue`] and [`Turn`].
 
@@ -67,19 +68,34 @@ impl Queue {
         }
     }
 
-    /// The held line of each place in line (pr-design §4.1, the lid):
-    /// `landing` for the first, `waits to land · 2nd` for the next.
-    pub fn lids(&self) -> BTreeMap<String, String> {
+    /// The rank of each place in line, 1-based in its target's line (1:
+    /// it lands now), its first ticket when it waits twice. The views'
+    /// `landing`; its lid is [`lid`] of it.
+    pub fn ranks(&self) -> BTreeMap<String, u32> {
         let (m, _) = &*self.inner;
         let l = m.lock().unwrap_or_else(|e| e.into_inner());
         let mut out = BTreeMap::new();
-        let mut rank: BTreeMap<&str, usize> = BTreeMap::new();
+        let mut taken: BTreeMap<&str, u32> = BTreeMap::new();
         for (_, r, p) in &l.waiting {
-            let n = rank.entry(r.as_str()).or_insert(0);
-            let lid = if *n == 0 { "landing".to_string() } else { format!("waits to land · {}", ordinal(*n + 1)) };
-            out.entry(p.clone()).or_insert(lid);
+            let n = taken.entry(r.as_str()).or_insert(0);
             *n += 1;
+            out.entry(p.clone()).or_insert(*n);
         }
         out
     }
+}
+
+/// The held line of a place at `rank` in line (pr-design §4.1, the lid):
+/// `landing` for the first, `waits to land · 2nd` for the next.
+pub fn lid(rank: u32) -> String {
+    if rank <= 1 {
+        "landing".to_string()
+    } else {
+        format!("waits to land · {}", ordinal(rank as usize))
+    }
+}
+
+/// The lids of [`Queue::ranks`], by place id.
+pub fn lids(ranks: &BTreeMap<String, u32>) -> BTreeMap<String, String> {
+    ranks.iter().map(|(p, n)| (p.clone(), lid(*n))).collect()
 }

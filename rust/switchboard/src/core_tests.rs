@@ -2977,7 +2977,7 @@ mod prs {
     use crate::forge::{ForgeError, PrEvent};
     use crate::place::{Checks, PrSnapshot, PrState, Review};
 
-    fn spawn_wt(t: &mut T, name: &str) {
+    pub(super) fn spawn_wt(t: &mut T, name: &str) {
         let (_, fx) = t.req(
             MAIN,
             AgentReq::Spawn {
@@ -3012,11 +3012,11 @@ mod prs {
         vec![Local { place: "wt:dark".into(), branch: "sb/dark".into(), tip: Some("tip1".into()), commits: Some(2), dirty }]
     }
 
-    fn report(at: u64, prs: Result<Vec<PrSnapshot>, ForgeError>, dirty: Option<bool>) -> Input {
+    pub(super) fn report(at: u64, prs: Result<Vec<PrSnapshot>, ForgeError>, dirty: Option<bool>) -> Input {
         Input::Prs(Report { at_ms: at, prs: Some(prs), local: local(dirty), activity: Vec::new() })
     }
 
-    fn place_view(t: &mut T, now: u64) -> Value {
+    pub(super) fn place_view(t: &mut T, now: u64) -> Value {
         let snap = t.hub.snapshot(now);
         snap["places"].as_array().unwrap().iter().find(|p| p["id"] == "wt:dark").cloned().unwrap_or(Value::Null)
     }
@@ -3386,17 +3386,6 @@ mod prs {
         let _ = PrEvent::Unreachable { error: ForgeError::Missing };
     }
 
-    #[test]
-    fn trunk_flow_has_no_no_pr_yet_line() {
-        let mut t = T::new();
-        spawn_wt(&mut t, "dark");
-        t.hub.flow = Some(crate::flow::FlowMode::Trunk);
-        t.go(report(1_000, Ok(vec![]), None));
-        assert_eq!(place_view(&mut t, 1_000)["lid"], Value::Null);
-        // the land queue's line is the held line there
-        t.hub.lids.insert("wt:dark".into(), "waits to land · 2nd".into());
-        assert_eq!(place_view(&mut t, 1_000)["lid"], "waits to land · 2nd");
-    }
 
     /// The local git of the fake life: the branch's tip, fixed.
     struct Tip;
@@ -4612,6 +4601,9 @@ mod core_num_tests;
 
 #[path = "core_step_tests.rs"]
 mod core_step_tests;
+
+#[path = "core_land_rank_tests.rs"]
+mod core_land_rank_tests;
 
 /// wake-ui (architect m_17633): a watch's end is one `sb wake` line in
 /// its agent's thread, its wake's message id on it; a replay writes

@@ -25,6 +25,9 @@ pub(crate) struct Place {
     /// the held line the hub writes (`waits to land · 2nd`, `no PR yet ·
     /// 2 commits`): it wins over the PR's words, shown as it is
     pub(crate) lid: Option<String>,
+    /// its 1-based rank in the land queue's line (1: it lands now);
+    /// None when not in line
+    pub(crate) landing: Option<u32>,
     /// dev-flow §5.1, pr-design §4.1 item 8: a feature branch (its agents
     /// may each have a worktree; they share the branch). `trying`: its
     /// try build builds or is on trial: `Δ` dim, else `ψ`; never `↑`.
@@ -153,10 +156,10 @@ impl Place {
         }
     }
 
-    /// Trunk flow: its land waits in the queue (the hub's lid says
-    /// `waits to land · 2nd`): `…` in its border (dev-flow §7).
+    /// Trunk flow: its land waits in the queue (2nd or later in line, the
+    /// hub's lid `waits to land · 2nd`): `…` in its border (dev-flow §7).
     fn waits_to_land(&self) -> bool {
-        self.lid.as_deref().is_some_and(|l| l.starts_with("waits to land"))
+        self.landing.is_some_and(|n| n >= 2)
     }
 
     /// The title of a shared worktree's section (option B, sidebar-wt),
@@ -441,7 +444,7 @@ mod tests {
             {"id": "wt:dark", "branch": "sb/dark", "agents": ["dark", "i18n"], "lid": null,
              "pr": {"number": 412, "url": "u", "branch": "sb/dark", "agents": ["dark", "i18n"], "state": "open",
                     "review": "changes", "checks": "fail", "failing": ["ci/test"], "words": "", "text": ""}},
-            {"id": "wt:csv", "branch": null, "agents": [], "pr": null, "lid": "waits to land · 2nd"}
+            {"id": "wt:csv", "branch": null, "agents": [], "pr": null, "lid": "waits to land · 2nd", "landing": 2}
         ]});
         let ps = parse(&v);
         assert_eq!(ps.len(), 2);
@@ -478,7 +481,7 @@ mod tests {
         let closed = place("sb/x", Some(pr("closed", "none", "none")), None);
         assert!(!text(&closed.title(31, true)).contains('↑'));
         // trunk: a land waiting
-        let land = place("sb/emoji-csv", None, Some("waits to land · 2nd"));
+        let land = Place { landing: Some(2), ..place("sb/emoji-csv", None, Some("waits to land · 2nd")) };
         assert_eq!(text(&land.title(31, false)), " ψ sb/emoji-csv              …");
         // never wider than its room, whatever the branch
         for w in [12, 18, 24, 31, 44] {

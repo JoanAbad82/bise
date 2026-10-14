@@ -654,7 +654,9 @@ mod tests {
         let other = q.wait_turn("refs/heads/sb/c", "wt:c", &mut || {});
         std::thread::sleep(std::time::Duration::from_millis(100));
         assert!(rx.try_recv().is_err(), "b waits while a lands");
-        let lids = q.lids();
+        let ranks = q.ranks();
+        assert_eq!((ranks["wt:a"], ranks["wt:b"], ranks["wt:c"]), (1, 2, 1));
+        let lids = crate::land_queue::lids(&ranks);
         assert_eq!(lids["wt:a"], "landing");
         assert_eq!(lids["wt:b"], "waits to land · 2nd");
         assert_eq!(lids["wt:c"], "landing");
@@ -662,7 +664,7 @@ mod tests {
         rx.recv_timeout(std::time::Duration::from_secs(5)).expect("b's turn");
         h.join().unwrap();
         drop(other);
-        assert!(q.lids().is_empty());
+        assert!(q.ranks().is_empty());
         assert_eq!(crate::land_queue::ordinal(3), "3rd");
         assert_eq!(crate::land_queue::ordinal(11), "11th");
     }

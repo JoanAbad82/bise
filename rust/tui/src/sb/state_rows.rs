@@ -131,6 +131,7 @@ impl Place {
             agents: p.agents.clone(),
             pr: p.pr.as_ref().map(pr_of_row),
             lid: p.lid.clone().filter(|l| !l.is_empty()),
+            landing: p.landing,
             feature: p.feature,
             trying: p.trying,
         }
