@@ -74,11 +74,12 @@ describe("acted: the cards he answered or closed, one owner", () => {
     // card 4's close is refused (an older request than card 3's, answered later): card 4 alone is back
     s.apply({ ev: "card_refused", project: "shop", card: 4, text: "no such card" });
     expect(s.acted().map((a) => a.key)).toEqual(["shop-2", "shop-3"]);
-    expect(s.notice("shop")).toEqual({ text: "no such card", level: "error" });
-    // the error event every window gets says why, and un-hides nothing: only its request names the card
+    // the words go on that card (refused.ts), never on the project's line (try-gate-f2a7)
+    expect(s.notice("shop")).toBeNull();
+    // the error event every window gets un-hides nothing and says nothing: only its request names the card
     s.apply({ ev: "error", project: "shop", cmd: "answer", text: "card 3 isn't open" });
     expect(s.acted().map((a) => a.key)).toEqual(["shop-2", "shop-3"]);
-    expect(s.notice("shop")).toEqual({ text: "card 3 isn't open", level: "error" });
+    expect(s.notice("shop")).toBeNull();
     s.apply({ ev: "card_refused", project: "shop", card: 3, text: "card 3 isn't open" });
     expect(s.acted().map((a) => a.key)).toEqual(["shop-2"]);
     // another project's refusal touches nothing here

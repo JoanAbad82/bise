@@ -72,6 +72,10 @@
 .ic-l { min-width: 0; }
 .ic .inbox-answer { flex: none; }
 .ic-note { flex: none; margin-top: var(--s-2); font-size: var(--t-12); }
+/* his answer or close refused here (refused.ts): the hub's words on the card, 'try again' a plain act */
+.ic-refused { color: var(--c-err); }
+.ic-refused .b-act { color: inherit; text-decoration: underline; }
+.ic-refused-mark { flex: none; margin-left: var(--s-2); font-size: var(--t-12); color: var(--c-err); }
 .ic-foot {
   display: flex; flex-wrap: wrap; gap: 0 var(--s-4); flex: none; margin-top: var(--gap-block); padding-top: var(--s-2); border-top: 1px solid var(--c-line);
   font: 11.5px var(--font-ui); color: var(--c-text-3);

@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Card as CardRow } from '@/proto';
 import { Act, Kbd } from '@/ds';
+import { refusedLine, useRefused, useStore } from '@/store';
 import { cardKey } from './order';
 import { takesWords } from './model';
 
@@ -132,6 +133,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
         </div>
       )}
       {children}
+      <RefusedNote card={card} id={id} />
       {note != null && <div className="ic-note">{note}</div>}
       <div className="ic-foot" data-testid={`${id}.keys`}>
         {keys ?? <Footer card={card} acts={acts} on={on} id={id} pick={pick} />}
@@ -146,6 +148,41 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
   ) : (
     el
   );
+}
+
+/**
+ * His answer or close of this card refused in this window (store refused.ts, try-gate-f2a7): the
+ * hub's words on the card that came back, wherever it is drawn (the block, the strip, the capsule),
+ * and 'try again' sends what he sent once more. Gone when he acts on it or the hub takes it.
+ */
+function RefusedNote({ card, id }: { card: CardRow; id: string }) {
+  const store = useStore();
+  const refused = useRefused(card.project, card.id);
+  if (refused === null) return null;
+  return (
+    <div className="ic-note ic-refused" role="alert" data-testid={`${id}.refused`}>
+      {refusedLine(refused.text)}
+      {refused.attempt !== undefined && (
+        <>
+          {' · '}
+          <Act
+            onClick={() => {
+              store.retryCard(card.project, card.id);
+            }}
+            testId={`${id}.retry`}
+          >
+            try again
+          </Act>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** A folded row's mark for a card whose answer or close was refused here: 'not sent', or nothing. */
+export function RefusedMark({ card }: { card: CardRow }) {
+  const refused = useRefused(card.project, card.id);
+  return refused === null ? null : <span className="ic-refused-mark">not sent</span>;
 }
 
 /** The footer's keys (ambient's six forms), each pair a button. */

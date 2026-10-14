@@ -8,4 +8,5 @@ export { Store, TAGS, typed, threadKey, diffKey, takeKey, toolOutKey, type Queue
 export * from './hooks';
 export type { AnswerAt, AnswerFrom, Aside } from './asides';
 export { actedKeys, type Acted } from './acted';
+export { refusedLine, type Refused } from './refused';
 export { replay, allFixtureEvents } from './replay';

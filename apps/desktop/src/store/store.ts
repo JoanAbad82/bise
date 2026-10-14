@@ -25,7 +25,7 @@ import type {
   ProjectRow,
 } from "@/proto";
 import { actedAdd, actedKey, actedOf, actedPrune, cardRefusedOf, type Acted } from "./acted";
-import type { HubLine } from "./types";
+import { refusedAdd, refusedDrop, refusedListOf, refusedOf, refusedPrune, type Attempt, type Refused } from "./refused";
 import type { CoreState } from "@/shared/api";
 import {
   type Ev,
@@ -51,6 +51,8 @@ export type { StoreOptions } from "./base";
 export class Store extends StoreVoice {
   /** inbox picks (3): where he was for each card he answered, until its result comes */
   private readonly answering = new Map<string, AnswerFrom>();
+  /** what he sent for each card on its way, by cardKey: a refusal keeps it for 'try again' */
+  private readonly attempts = new Map<string, Attempt>();
 
   // ---- the core's events
 
@@ -211,6 +213,9 @@ export class Store extends StoreVoice {
    */
   private cardAnswered(d: CardAnswered): true {
     const k = `${d.project}/${String(d.card)}`;
+    // the hub took it: no refusal of it holds
+    this.putRefused(refusedDrop(this.refused(), d.project, d.card));
+    this.attempts.delete(actedKey(d.project, d.card));
     const from = this.answering.get(k);
     this.answering.delete(k);
     if (from === undefined) return true;
@@ -238,22 +243,50 @@ export class Store extends StoreVoice {
   /** @internal for apply.ts: a projects event; the cards its rows no longer list leave the set */
   rowsCame(rows: readonly ProjectRow[]): void {
     this.putActed(actedPrune(this.acted(), rows));
+    this.putRefused(refusedPrune(this.refused(), rows));
+    // what he sent matters only while it is on its way (acted)
+    const on = new Set(this.acted().map((a) => a.key));
+    for (const k of [...this.attempts.keys()]) if (!on.has(k)) this.attempts.delete(k);
   }
-  /** He answered or closed it: out of every view until the hub's rows drop it, or its refusal. */
-  private acts(project: string, card: number): void {
+  /** He answered or closed it: out of every view until the hub's rows drop it, or its refusal; its last refusal goes. */
+  private acts(project: string, card: number, attempt: Attempt): void {
     this.putActed(actedAdd(this.acted(), project, card, this.now()));
+    this.putRefused(refusedDrop(this.refused(), project, card));
+    this.attempts.set(actedKey(project, card), attempt);
+  }
+  /**
+   * The cards whose answer or close was refused in this window (refused.ts): each view that draws
+   * the card says 'not sent: <words> · try again' on it. Kept across a reload, as his asides.
+   */
+  refused(): readonly Refused[] {
+    if (!this.slices.has("refused") && this.asideKeep !== null) this.slices.set("refused", refusedListOf(this.asideKeep.read("refused")));
+    return this.slice<readonly Refused[]>("refused", EMPTY);
+  }
+  private putRefused(list: readonly Refused[]): void {
+    if (list === this.refused()) return;
+    this.put("refused", list);
+    this.asideKeep?.write("refused", list);
   }
   /**
    * The window-local 'card_refused' (main's ipc.ts): the core or the hub refused his answer or
    * close of that very card (the RPC error to that request, architect m_23524), or the core went
    * before its hub said. The card is his again in every view, never hidden while it waits, and the
-   * words say why, as the project's error line. Always a known event.
+   * words go on that card (refused.ts), never on the project's line (try-gate-f2a7). Always a known event.
    */
   private cardRefused(project: string, card: number, text: string): true {
+    const key = actedKey(project, card);
     this.answering.delete(`${project}/${String(card)}`);
-    this.putActed(this.acted().filter((x) => x.key !== actedKey(project, card)));
-    this.put(`notice:${project}`, { text, level: "error" } satisfies HubLine);
+    this.putActed(this.acted().filter((x) => x.key !== key));
+    this.putRefused(refusedAdd(this.refused(), project, card, text, this.now(), this.attempts.get(key)));
+    this.attempts.delete(key);
     return true;
+  }
+  /** 'try again' on a refused card: what he sent, sent again (none known: nothing, the card stays his). */
+  retryCard(project: string, card: number): void {
+    const a = refusedOf(this.refused(), project, card)?.attempt;
+    if (a === undefined) return;
+    if (a.kind === "close") this.close(project, card);
+    else this.answer(project, card, a.reply, a.files, a.parts, a.from);
   }
 
   /** His answers made from this thread to a card asked elsewhere (window-local, oldest first; kept across a reload). */
@@ -510,7 +543,13 @@ export class Store extends StoreVoice {
     // inbox picks (3): where he was, so the answer's result can leave his row there (asides.ts)
     if (from !== undefined) this.answering.set(`${project}/${String(card)}`, from);
     // every view leaves it out until the hub's rows drop it (acted.ts), or the hub refuses it
-    this.acts(project, card);
+    this.acts(project, card, {
+      kind: "answer",
+      reply,
+      ...(files !== undefined ? { files } : {}),
+      ...(parts !== undefined ? { parts } : {}),
+      ...(from !== undefined ? { from } : {}),
+    });
     this.command({
       cmd: "answer",
       project,
@@ -539,7 +578,7 @@ export class Store extends StoreVoice {
   }
   /** Close a card without answering it (the TUI's /close N). */
   close(project: string, card: number): void {
-    this.acts(project, card);
+    this.acts(project, card, { kind: "close" });
     this.command({ cmd: "close", project, card });
   }
   stop(project: string, agent: string): void {

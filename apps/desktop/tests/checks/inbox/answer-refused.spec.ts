@@ -52,6 +52,8 @@ const rowOf = (page: Page, question: string) => page.locator('[data-testid^="inb
 /** Card `id` is in the block: open in place (its element) or a row (folded under '+ N more' counts too). */
 async function inBlock(page: Page, id: number, question: string): Promise<boolean> {
   if ((await cardIn(page, id).count()) > 0 || (await rowOf(page, question).count()) > 0) return true;
+  // no block at all (nothing waits): not there
+  if ((await page.getByTestId('inbox.block').count()) === 0) return false;
   return ((await page.getByTestId('inbox.block').textContent()) ?? '').includes(question);
 }
 /** The block unfolded ('+ N more' clicked): every item a row. */
@@ -63,6 +65,14 @@ const present = async (page: Page, id: number, question: string, why: string) =>
   await unfold(page);
   await expect.poll(async () => (await unfold(page), await inBlock(page, id, question)), { message: why, timeout: 5000 }).toBe(true);
 };
+/** Card `id` says 'not sent' where it is in the block: its row, or the open card's refused line. */
+async function notSent(page: Page, id: number, question: string): Promise<boolean> {
+  await unfold(page);
+  const row = rowOf(page, question);
+  if ((await row.count()) > 0) return ((await row.first().textContent()) ?? '').includes('not sent');
+  const line = cardIn(page, id).getByTestId(`inbox.block.card.${P}-${String(id)}.refused`);
+  return (await line.count()) > 0 && ((await line.textContent()) ?? '').startsWith('not sent: ');
+}
 /** Card `id` open in place in the block: as it is when the block opened it, else its row clicked. */
 async function open(page: Page, id: number, question: string): Promise<void> {
   await present(page, id, question, `the block holds '${question}'`);
@@ -85,9 +95,14 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
       await page.keyboard.press('1');
       const a = (await core.waitCmd((c) => (c as Cmd).cmd === 'answer' && (c as Cmd).card === 9, 5000)) as Cmd;
       expect(a.reply).toBe('1');
-      await expect(page.locator('body')).toContainText('perf asked again: card 9 is not open any more', { timeout: 3000 });
       await present(page, 9, 'which bench?', 'card 9 is back');
+      // try-gate-f2a7: the words on the card that came back, where he answered, never the project's line
+      await expect(rowOf(page, 'which bench?').first()).toContainText('not sent', { timeout: 3000 });
+      await open(page, 9, 'which bench?');
+      await expect(cardIn(page, 9).getByTestId(`inbox.block.card.${P}-9.refused`)).toContainText('not sent: perf asked again: card 9 is not open any more · try again', { timeout: 3000 });
+      await expect(page.locator('[data-testid="confirm.notice"][data-level="error"]')).toHaveCount(0);
       await expect(page.locator('[data-testid^="thread.aside."]')).toHaveCount(0);
+      await page.keyboard.press('Escape');
     });
 
     await test.step("an answer the hub takes, to search's card from perf's thread: out of the block, '✓ you answered search' here", async () => {
@@ -105,16 +120,23 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
       // the open card's close: ⌘⌫, the TUI's
       await page.keyboard.press('Meta+Backspace');
       await core.waitCmd((c) => (c as Cmd).cmd === 'close' && (c as Cmd).card === 13, 5000);
-      await expect(page.locator('body')).toContainText('search is still on it: card 13 stays', { timeout: 3000 });
       await present(page, 13, 'drop the old index?', 'card 13 is back');
+      await open(page, 13, 'drop the old index?');
+      await expect(cardIn(page, 13).getByTestId(`inbox.block.card.${P}-13.refused`)).toContainText('not sent: search is still on it: card 13 stays', { timeout: 3000 });
+      await expect(page.locator('[data-testid="confirm.notice"][data-level="error"]')).toHaveCount(0);
+      await page.keyboard.press('Escape');
     });
 
-    const settled = async (why: string) => {
+    const settled = async (why: string, refusedToo = true) => {
       await expect(page.getByTestId('inbox.block'), why).toBeVisible({ timeout: 10_000 });
       await present(page, 9, 'which bench?', `${why}: the refused answer's card stays`);
-      await present(page, 13, 'drop the old index?', `${why}: the refused close's card stays`);
+      if (refusedToo) await present(page, 13, 'drop the old index?', `${why}: the refused close's card stays`);
       await unfold(page);
       expect(await inBlock(page, 11, 'reindex tonight or now?'), `${why}: the answered card never comes back`).toBe(false);
+      // the words stay on the cards that came back, never on the project's line
+      await expect.poll(() => notSent(page, 9, 'which bench?'), { message: `${why}: card 9 says not sent`, timeout: 5000 }).toBe(true);
+      if (refusedToo) await expect.poll(() => notSent(page, 13, 'drop the old index?'), { message: `${why}: card 13 says not sent`, timeout: 5000 }).toBe(true);
+      await expect(page.locator('[data-testid="confirm.notice"][data-level="error"]'), `${why}: no project error line`).toHaveCount(0);
     };
 
     await test.step('a reload: the same (the hub still lists card 11, the window keeps it out), his row stays', async () => {
@@ -137,6 +159,25 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
     await test.step("the hub's rows drop card 11: gone for good, the others as they were", async () => {
       await core.send(projects(CARDS.filter((c) => c.id !== 11)) as never);
       await settled('the rows caught up');
+    });
+
+    await test.step('the hub then takes the late close (its rows drop card 13): the card and its words go at once, card 9 keeps its own', async () => {
+      await core.send(projects(CARDS.filter((c) => c.id === 9)) as never);
+      await unfold(page);
+      await expect.poll(async () => (await unfold(page), await inBlock(page, 13, 'drop the old index?')), { message: 'card 13 leaves', timeout: 3000 }).toBe(false);
+      await expect(page.locator('body')).not.toContainText('search is still on it', { timeout: 3000 });
+      await settled('after the late take', false);
+    });
+
+    await test.step("'try again' on card 9 sends his answer once more: the card and its words go", async () => {
+      const nine = () => core.cmds().filter((c) => (c as Cmd).cmd === 'answer' && (c as Cmd).card === 9) as Cmd[];
+      const before = nine().length;
+      await open(page, 9, 'which bench?');
+      await cardIn(page, 9).getByTestId(`inbox.block.card.${P}-9.retry`).click();
+      await expect.poll(() => nine().length, { message: 'his answer to card 9 goes again', timeout: 5000 }).toBe(before + 1);
+      expect(nine().at(-1)?.reply).toBe('1');
+      await expect.poll(async () => (await unfold(page), await inBlock(page, 9, 'which bench?')), { message: 'card 9 leaves', timeout: 3000 }).toBe(false);
+      await expect(page.locator('body')).not.toContainText('not sent', { timeout: 3000 });
     });
   } finally {
     await s.close();

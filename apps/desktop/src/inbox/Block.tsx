@@ -14,7 +14,7 @@ import type { NotifyAuth } from '@/shared/api';
 import { Act, Dot, Kbd, Row } from '@/ds';
 import { actedKeys, useActed, useProjects, useStore, useVoiceAnswer, type AnswerAt } from '@/store';
 import { shownName } from '@/agents/model';
-import { age, dotOf, folds, InboxCard } from './InboxCard';
+import { age, dotOf, folds, InboxCard, RefusedMark } from './InboxCard';
 import { useMenuAction } from '@/app/menu';
 import { cardKey, sortCards } from './order';
 import { pickWaits, takesWords, withConfirmOptions } from './model';
@@ -568,6 +568,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
               <>
                 <span className="strip-who">{shownName(who)}</span>
                 {what !== '' && <span className="strip-what">{what}</span>}
+                {!isNotify(c) && <RefusedMark card={c} />}
               </>
             }
             end={`${projectWord(row, c.project)} · ${age(now - c.since_ms)}`}

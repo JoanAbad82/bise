@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Card, Part } from '@/proto';
 import { Dot, Kbd, Row } from '@/ds';
-import { age, dotOf, InboxCard, titleOf } from './InboxCard';
+import { age, dotOf, InboxCard, RefusedMark, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { STRIP_KEYS, stripKey, stripList, stripOpen, stripView, stripWords } from './stripRows';
 import { actedKeys, useActed } from '@/store';
@@ -262,6 +262,7 @@ function StripRow({ c, n, now, onOpen }: { c: Card; n: number; now: number; onOp
         <>
           <span className="strip-who">{who}</span>
           {what !== '' && <span className="strip-what">{` · ${what}`}</span>}
+          <RefusedMark card={c} />
         </>
       }
       end={age(now - c.since_ms)}

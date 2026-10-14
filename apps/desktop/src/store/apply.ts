@@ -222,10 +222,12 @@ export function applyTyped(s: Store, ev: Ev): void {
       return;
     case "error":
       if (ev.cmd === "sign_in" && s.signing() !== null) s.put("signing", null);
-      // a typed line the hub's router refused (HubCmd slash): his words to fix, as an error line;
-      // a refused answer or close too (the window that sent it also gets 'card_refused' for that
-      // very card, and shows the card again: store.ts cardRefused)
-      if ((ev.cmd === "slash" || ev.cmd === "answer" || ev.cmd === "close") && ev.project != null) {
+      // a typed line the hub's router refused (HubCmd slash): his words to fix, as an error line.
+      // A refused answer or close never goes on the project's line (try-gate-f2a7: it showed far
+      // from where he answered and stayed after the hub took it late): the window that sent it gets
+      // 'card_refused' for that very card and says so on the card (store.ts cardRefused, refused.ts)
+      if (ev.cmd === "answer" || ev.cmd === "close") return;
+      if (ev.cmd === "slash" && ev.project != null) {
         s.put(`notice:${ev.project}`, {
           text: ev.text,
           level: "error",
