@@ -9,9 +9,8 @@
 //!   only from a process that is not an agent's ([`judge`]; a peer whose
 //!   process is gone is refused), `notice` unless it is proven an agent's;
 //!   `xin`/`xreply`/`xfollow` (hub to hub, judged like `hello`);
-//!   `ping`; and, until the release after v2026.10.2-25, agent requests
-//!   from REPLs adopted from an older hub, whose `SB_SOCKET` is still
-//!   hub.sock (a shim, logged per request).
+//!   `ping`. Never an agent request (`agent`, `version`): those are
+//!   agent.sock's.
 //!
 //! Who is an agent's process is `bise_peer::judge` (shared with the
 //! computer-use broker, docs/issues/18): this hub's agent or a sibling
@@ -21,7 +20,7 @@
 //! sandbox's deny of hub.sock is the wall.
 //!
 //! Who speaks (docs/issues/17): an agent request (`agent`, `version`, on
-//! either socket) counts as the agent whose process sent it, whatever its
+//! agent.sock) counts as the agent whose process sent it, whatever its
 //! `from` says (`sb` fills it from `SB_AGENT`, which any shell can
 //! change). [`speaker`] decides: an agent's process speaks only as that
 //! agent; a process with no tag of this hub ([`Who::Outside`]: the
@@ -85,9 +84,6 @@ pub enum Access {
     Open,
     /// An agent request, served as today (`agent`, `version`).
     Agent,
-    /// An agent request on hub.sock: served, with one hub.log line (REPLs
-    /// adopted from an older hub; ends in the release after v2026.10.2-25).
-    Shim,
     /// The user's: served only when [`judge`] says [`Who::Outside`].
     User,
     /// Not served on this socket.
@@ -99,7 +95,6 @@ pub fn access(sock: Sock, op: &str) -> Access {
     match (sock, op) {
         (_, "ping") => Access::Open,
         (Sock::Agent, "agent" | "version") => Access::Agent,
-        (Sock::Client, "agent" | "version") => Access::Shim,
         (Sock::Client, "hello" | "notice") => Access::User,
         // hub to hub (desktop S2, `daemon/xhub.rs`): bise's hub and a
         // project's hub talk on each other's hub.sock, as the user's
@@ -126,8 +121,10 @@ mod tests {
             assert_eq!(access(Sock::Client, op), Access::User, "{op}");
         }
         assert_eq!(access(Sock::Client, "ping"), Access::Open);
-        assert_eq!(access(Sock::Client, "agent"), Access::Shim);
-        assert_eq!(access(Sock::Client, "version"), Access::Shim);
+        // an agent request is agent.sock's only (the hub.sock shim for
+        // REPLs adopted from an older hub went, debt-t3)
+        assert_eq!(access(Sock::Client, "agent"), Access::No);
+        assert_eq!(access(Sock::Client, "version"), Access::No);
         assert_eq!(access(Sock::Client, "whatever"), Access::No);
     }
 

@@ -6,7 +6,7 @@
 //! peer's pid and the process table) gets one `{"ev":"refused","error"}`
 //! line (bise_proto's HubEv::Refused),
 //! is closed, and leaves one hub.log line naming the agent.
-//! An agent request (`agent`, `version`; agent.sock and hub.sock's shim)
+//! An agent request (`agent`, `version`; agent.sock only)
 //! carries its sender's verdict ([`Asker`]) to the daemon thread, which
 //! checks its `from` against it before anything else (`Shell::speaks_as`,
 //! the rule `crate::peer::speaker`, docs/issues/17). The peer is read with
@@ -91,7 +91,7 @@ pub(super) struct Asker {
 impl super::Shell {
     /// Whether the request that says `from` may be served (the pure rule
     /// is `peer::speaker`); refused: one hub.log line, and the words the
-    /// caller prints. Both doors call it (agent.sock and hub.sock's shim).
+    /// caller prints. agent.sock's agent requests call it.
     pub(super) fn speaks_as(&self, asker: &Asker, from: &str, cmd: &str) -> Result<(), String> {
         let agents: Vec<Known> =
             self.hub.st.agents.values().map(|a| Known { name: &a.name, dir: &a.dir, aliases: &a.aliases }).collect();
@@ -148,9 +148,8 @@ fn serve(stream: UnixStream, pid: Option<u32>, id: u64, tx: &Sender<Msg>, doors:
     let op = if init { "hello".to_string() } else { v.get("op").and_then(|x| x.as_str()).unwrap_or("").to_string() };
     let mut stream = stream;
     let name = if sock == Sock::Agent { "agent.sock" } else { "hub.sock" };
-    // an agent request's sender, judged here for both doors (agent.sock
-    // and hub.sock's shim): the daemon thread maps it to an agent
-    // (`Shell::speaks_as`, docs/issues/17)
+    // an agent request's sender, judged here (agent.sock): the daemon
+    // thread maps it to an agent (`Shell::speaks_as`, docs/issues/17)
     let mut asker = None;
     // a client's pid and program, judged at its accept (hub.log names it)
     let mut peer_of = String::new();
@@ -161,14 +160,6 @@ fn serve(stream: UnixStream, pid: Option<u32>, id: u64, tx: &Sender<Msg>, doors:
         }
         Access::Open => {}
         Access::Agent => asker = Some(doors.asker(pid, name)),
-        Access::Shim => {
-            asker = Some(doors.asker(pid, name));
-            let from = v.get("from").and_then(|x| x.as_str()).unwrap_or("");
-            log_line(
-                &doors.paths,
-                &format!("hub.sock shim: an {op} request from {from:?} (a REPL started by an older hub; hub.sock stops serving it in the release after v2026.10.2-25)"),
-            );
-        }
         Access::User => {
             let (who, peer) = doors.who(pid);
             if let Some(why) = who.refusal_of(&op) {
