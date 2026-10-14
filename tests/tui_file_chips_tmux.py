@@ -64,7 +64,11 @@ def recorded(path):
 
 def main():
     E = e2e.Env()
-    desk = os.path.join(E.tmp, "My Desktop")
+    # in the test's HOME, as his ~/Desktop: the strip says '~/My Desktop'
+    # whatever the run's tmp. Under the gate's ~/.bise/gate/<pid> a folder
+    # in E.tmp made the row's '2 kB  <folder>' too wide, and the strip drops
+    # a source that doesn't fit (attach::box_row): no size (issue 26)
+    desk = os.path.join(E.env["HOME"], "My Desktop")
     os.makedirs(desk)
     paths = {}
     for name in DOCS + ["gone.csv"]:
