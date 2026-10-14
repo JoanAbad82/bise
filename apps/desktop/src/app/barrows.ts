@@ -321,6 +321,8 @@ export function scheduledRows(tasks: readonly Task[], now: number): BarRow[] {
     tone: 'dim',
     name: x.t.name != null && x.t.name !== '' ? x.t.name : (x.t.words.split('\n')[0] ?? ''),
     sub: howOften(x.t),
+    // cut on a whole word, '…' glued to it ('every day…', designer m_25211), as an alarm's note
+    fit: true,
     end: nextWords(x.t, now),
     endTone: 'dim',
     title: x.t.words,

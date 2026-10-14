@@ -38,6 +38,14 @@ impl Sb {
             .flat_map(|a| alarms_of(&a.name, &a.watching, now, &crate::when::offset_at).into_iter().map(|alarm| Watch { agent: a.name.clone(), alarm }))
             .collect()
     }
+
+    /// The alarms the panel and the rule show: on a sub-agent's view
+    /// only its own, on main's every live agent's (the desktop right
+    /// bar's scope, main m_25024); /scheduled keeps them all.
+    pub(crate) fn watches_in_view(&self, now: u64) -> Vec<Watch> {
+        let sub = self.agent(&self.focus).is_some_and(|a| !a.main);
+        self.watches(now).into_iter().filter(|w| !sub || w.agent == self.focus).collect()
+    }
 }
 
 /// `note` cut after a whole word with `…` in `room` columns; None when
@@ -116,7 +124,7 @@ pub(crate) fn watch_rows(wt: &Watch, w: usize, bg: Option<Color>) -> Vec<Line<'s
 /// title, then one row per alarm; a click on one opens /scheduled on
 /// it. Nothing without an alarm.
 pub(super) fn watching_lines(sb: &Sb, w: usize, lines: &mut Vec<Line<'static>>, owners: &mut Vec<(usize, super::panel::Hit)>) {
-    let all = sb.watches(crate::when::now_ms());
+    let all = sb.watches_in_view(crate::when::now_ms());
     if all.is_empty() {
         return;
     }
@@ -136,7 +144,7 @@ pub(super) fn watching_lines(sb: &Sb, w: usize, lines: &mut Vec<Line<'static>>, 
 /// count alone (the last resort); and the count's width (0: no alarm,
 /// or the panel shows them, `states` as they were).
 pub(crate) fn rule_states(sb: &Sb, bare: bool, states: Vec<Vec<Span<'static>>>) -> (Vec<Vec<Span<'static>>>, u16) {
-    let n = sb.watches(crate::when::now_ms()).len();
+    let n = sb.watches_in_view(crate::when::now_ms()).len();
     if !bare || n == 0 {
         return (states, 0);
     }

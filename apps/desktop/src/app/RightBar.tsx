@@ -4,6 +4,8 @@
 // (docked from 1000 px, sliding over under it, ⌥⌘0). On bise's thread the same sections cover every
 // project, the project's name in place of the role. A click opens the agent full in the centre (his
 // pick), an artifact its view, a task the scheduled screen; 'all ›' the full list in the centre.
+// ARTIFACTS and SCHEDULED & WATCHING follow the thread in view (barscope.ts): a sub-agent's shows
+// only its own, its name after the head's count.
 // Owner: amb-win. The rows' words are pure (barrows.ts).
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Act, Dot, Press, tipAttrs } from '@/ds';
@@ -25,6 +27,7 @@ import { pauseInSeconds } from '@/thread/wake';
 import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
 import { agentRows, archivedRows, artifactRows, capRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
+import { barScope, inScope, scopeWords, type ScopeWords } from './barscope';
 import { FitWords } from './FitWords';
 import { DoneSign } from './Marks';
 
@@ -88,6 +91,8 @@ function Section({
   summary,
   noFold = false,
   count,
+  scope = null,
+  full,
   onAll,
   act,
   children,
@@ -100,6 +105,10 @@ function Section({
   count?: number;
   summary: string;
   noFold?: boolean;
+  /** its scope's words after the count ('by perf': a sub-agent's thread, barscope.ts), their tip, its line at 0 */
+  scope?: ScopeWords | null;
+  /** the rows of its full list, when it shows a part ('all ›' stays while the full list has some) */
+  full?: number;
   onAll: () => void;
   /** a control in the head before 'all ›' (ARTIFACTS' '+ add') */
   act?: ReactNode;
@@ -118,7 +127,13 @@ function Section({
       <div className="app-rb-head" ref={head} data-folds={!noFold || undefined}>
         <Press look="app-rb-title" aria-expanded={!shut} onClick={noFold ? undefined : toggle} data-testid={`app.right.${id}.head`}>
           <span className="app-rb-label">
-            {title} · {String(count ?? rows.length)}
+            {`${title} · ${String(count ?? rows.length)}`}
+            {/* in the label: 8 px after the count, the fold's chevron after it */}
+            {scope !== null && (
+              <span className="app-rb-scope" {...tipAttrs(scope.tip)} data-testid={`app.right.${id}.scope`}>
+                {scope.words}
+              </span>
+            )}
           </span>
           {shut && summary !== '' && (
             <span className="app-rb-sum" data-testid={`app.right.${id}.summary`}>
@@ -128,12 +143,20 @@ function Section({
         </Press>
         {act}
         {/* nothing to open at 0: the head stays, 'all ›' goes (designer m_20272 (4)) */}
-        {rows.length > 0 && (
+        {(full ?? rows.length) > 0 && (
           <Act onClick={onAll} testId={`app.right.${id}.all`}>
             all ›
           </Act>
         )}
       </div>
+      {/* a scoped head at 0 rows: one text-3 line ('perf made nothing yet', designer m_25031) */}
+      {!shut && rows.length === 0 && scope !== null && (
+        <div className="app-rb-rows">
+          <div className="app-rb-row app-rb-more app-rb-none" data-testid={`app.right.${id}.none`}>
+            {scope.empty}
+          </div>
+        </div>
+      )}
       {!shut && rows.length > 0 && (
         <div className="app-rb-rows">
           {shown.map(children)}
@@ -390,8 +413,15 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   };
   const tipOf = useAgentTip(project, live, route);
   const archived = archivedRows(agents, now, all);
-  const made = artifactRows(artifacts, now);
-  const later = [...scheduledRows(tasks, now), ...watchRows(agents, now, all)];
+  // ARTIFACTS and SCHEDULED & WATCHING follow the thread in view: a sub-agent's, only its own (barscope.ts)
+  const scope = barScope(route, project);
+  const allMade = artifactRows(artifacts, now);
+  const allLater = [...scheduledRows(tasks, now), ...watchRows(agents, now, all)];
+  const made = scope.level === 'agent' ? artifactRows(artifacts.filter((it) => inScope(scope, it.a.agent)), now) : allMade;
+  const later =
+    scope.level === 'agent'
+      ? [...scheduledRows(tasks.filter((x) => inScope(scope, x.t.agent)), now), ...watchRows(agents.filter((x) => inScope(scope, x.a.name)), now, all)]
+      : allLater;
   const store = useStore();
   // the alarm whose detail is open (one at a time; a click on its row again closes it)
   const [watchOpen, setWatchOpen] = useState<string | null>(null);
@@ -460,6 +490,8 @@ export function RightBar({ project, name, over }: { project: string; name: strin
             id="artifacts"
             title="ARTIFACTS"
             rows={made}
+            full={allMade.length}
+            scope={scopeWords(scope, 'artifacts', name)}
             cap={5}
             summary={made.some((r) => r.end === 'new') ? `${String(made.filter((r) => r.end === 'new').length)} new` : ''}
             onAll={() => {
@@ -474,6 +506,8 @@ export function RightBar({ project, name, over }: { project: string; name: strin
           id="scheduled"
           title="SCHEDULED & WATCHING"
           rows={later}
+          full={allLater.length}
+          scope={scopeWords(scope, 'scheduled', name)}
           cap={5}
           summary={later[0] === undefined ? '' : `${later[0].glyph} ${later[0].end}`}
           onAll={() => {

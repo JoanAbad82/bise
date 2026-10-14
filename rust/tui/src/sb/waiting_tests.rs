@@ -160,3 +160,30 @@ fn an_agent_waiting_on_an_event_is_not_idle() {
     let row = t.iter().find(|r| r.contains("perf")).cloned().unwrap_or_default();
     assert!(row.contains(&format!("{} perf", G_IDLE)), "{row:?}");
 }
+
+/// The panel's `watching` follows the agent in view (the desktop right
+/// bar's scope, main m_25024): main's view lists every live agent's
+/// alarms, a sub-agent's only its own; /scheduled keeps them all.
+#[test]
+fn the_watching_section_follows_the_agent_in_view() {
+    let mut app = app_with_waits();
+    let gate = watch(8, WatchKind::File, "the docs build goes red", 10 * MIN, false, Some(60 * MIN));
+    app.sb.agents.push(Agent { name: "docs".into(), status: "idle".into(), watching: vec![gate], ..Agent::default() });
+    let now = crate::when::now_ms();
+    let names = |app: &crate::app::App| app.sb.watches_in_view(now).into_iter().map(|w| w.agent).collect::<Vec<_>>();
+    app.sb.focus = "main".into();
+    assert_eq!(names(&app), ["main", "docs"]);
+    app.sb.focus = "docs".into();
+    assert_eq!(names(&app), ["docs"]);
+    app.sb.focus = "perf".into();
+    assert!(names(&app).is_empty(), "perf's own pause is no alarm");
+    assert_eq!(app.sb.watches(now).len(), 2, "/scheduled keeps every alarm");
+    let rows = screen(&mut app, 150, 24);
+    assert!(!rows.iter().any(|r| r.contains("│  watching")), "{}", rows.join("
+"));
+    app.sb.focus = "docs".into();
+    let rows = screen(&mut app, 150, 24);
+    let all = rows.join("
+");
+    assert!(all.contains("◌ docs") && !all.contains("◌ main"), "{all}");
+}

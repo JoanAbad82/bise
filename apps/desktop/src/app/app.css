@@ -681,6 +681,18 @@ body:has(.app-shell) {
   outline: 2px solid var(--c-focus);
   outline-offset: -2px;
 }
+/* a scoped head's words, 8 px after the count: lowercase sans 12 text-3 (designer m_25031) */
+.app-rb-scope {
+  margin-left: var(--s-2);
+  color: var(--c-text-3);
+  font: 400 var(--t-12) / var(--h-row-tight) var(--font-ui);
+  letter-spacing: 0;
+}
+.app-rb-none,
+.app-rb-none:hover {
+  cursor: default;
+  background: none;
+}
 .app-rb-sum {
   min-width: 0;
   line-height: var(--h-row-tight);
