@@ -36,6 +36,8 @@ import ./picks.bend as PK
 # the link's requests and answers, generated from bise_proto::core
 import ./gen/link.bend as L
 
+import ./gen/journal.bend as GJ
+
 import ./gen/fx.bend as F
 
 type Got is Type:
@@ -50,7 +52,7 @@ type Flow is Type:
 def fx_json(f: X.Fx) -> J.Json:
   match f:
     case X.FJ{+e}:
-      J.obj(F.journal(C.ev_json(e)))
+      J.obj(F.journal(GJ.json(e)))
     case X.FO{+o}:
       o
 
@@ -103,7 +105,7 @@ def evs_of(evs: List<&2, J.Json>) -> List<&2, Maybe<&2, M.Ev>>:
     case Nil{}:
       Nil{}
     case Con{+e, +rest}:
-      C.ev_of(e) <> evs_of(rest)
+      GJ.of(e) <> evs_of(rest)
 
 def replay_many.go(ms: List<&2, Maybe<&2, M.Ev>>, +st: M.St, +i: Nat, +sk: List<&2, Nat>) -> M.St & List<&2, Nat>:
   match ms:
@@ -129,7 +131,7 @@ def handle.link(l: L.Link, +h: H.Hub, +i: J.Json) -> H.Hub & String:
     case L.TInit{+workspace}:
       (H.hub_new(workspace), J.stringify(L.answer_done()))
     case L.TReplay{+ev}:
-      replay(h, C.ev_of(ev))
+      replay(h, GJ.of(ev))
     case L.TReplayMany{+evs}:
       replay_many(h, evs)
     case L.TPing{}:

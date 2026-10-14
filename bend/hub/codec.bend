@@ -1,6 +1,9 @@
-# hub/codec.bend — the journal events and messages as JSON, in the exact
-# serde format of rust/switchboard/src/model.rs (the Rust mirror and the
-# journal file read them back).
+# hub/codec.bend — the records inside sb-core's journal lines and its
+# messages as JSON (a message, a card, a route, a timer...), in the exact
+# serde format of rust/switchboard/src/model.rs, each with its round law.
+# The lines themselves are generated (gen/journal.bend, from
+# bise_proto::core::journal): a new journal kind is a row there, never a
+# branch here.
 import Base
 
 import ../vendor/json.bend as J
@@ -93,122 +96,6 @@ def mst_kvs(s: M.MSt) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
     case M.Cancelled{}:
       [J.kv("state", J.JStr{"cancelled"})]
 
-def ty(+t: String) -> Sigma<&2, &2, String, _ => J.Json>:
-  J.kv("type", J.JStr{t})
-
-def op_type(op: XH.OutOp) -> String:
-  match op:
-    case XH.OpAcked{}:
-      "x_acked"
-    case XH.OpTried{}:
-      "x_failed"
-    case XH.OpSettled{}:
-      "x_settled"
-
-def route_op_json(+rid: Nat, op: XH.RouteOp) -> J.Json:
-  match op:
-    case XH.RTo{+to, +name}:
-      J.obj([ty("route_set"), J.kv("rid", J.JNum{rid}), J.kv("to", J.JStr{to}), J.kv("name", J.JStr{name})])
-    case XH.REnd{+s}:
-      J.obj([ty(String.append("route_", XH.rst_str(s))), J.kv("rid", J.JNum{rid})])
-
-def x_json(e: XH.XEv) -> J.Json:
-  match e:
-    case XH.XOut{+o}:
-      J.obj([ty("x_out"), J.kv("out", XH.out_json(o))])
-    case XH.XOp{+xid, +op}:
-      J.obj([ty(op_type(op)), J.kv("xid", J.JNum{xid})])
-    case XH.XGot{+i}:
-      J.obj([ty("x_in"), J.kv("in", XH.xin_json(i))])
-    case XH.XReplied{+h, +xid}:
-      J.obj([ty("x_replied"), J.kv("hub", J.JStr{h}), J.kv("xid", J.JNum{xid})])
-    case XH.XRouteHeld{+r}:
-      J.obj([ty("route_held"), J.kv("route", XH.route_json(r))])
-    case XH.XRoute{+rid, +op}:
-      route_op_json(rid, op)
-
-def act_ev_json(e: TM.ActEv) -> J.Json:
-  match e:
-    case TM.ActSet{+a}:
-      J.obj([ty("act_set"), J.kv("act", TM.act_json(a))])
-    case TM.ActDone{+id}:
-      J.obj([ty("act_done"), J.kv("id", J.JNum{id})])
-
-def ev_json(e: M.Ev) -> J.Json:
-  match e:
-    case M.ETaskCreated{+name, +parent, +brief, +ws, +at}:
-      J.obj([ty("task_created"), J.kv("name", J.JStr{name}), J.kv("parent", J.JStr{parent}),
-        J.kv("brief", brief), J.kv("ws", ws), J.kv("at_ms", J.JNum{at})])
-    case M.ELifecycle{+name, +life, +reason}:
-      J.obj([ty("lifecycle"), J.kv("name", J.JStr{name}), J.kv("lifecycle", J.JStr{life_str(life)}),
-        J.kv("reason", jmaybe_str(reason))])
-    case M.EWorkspace{+name, +ws}:
-      J.obj([ty("workspace_changed"), J.kv("name", J.JStr{name}), J.kv("ws", ws)])
-    case M.ESnapshot{+name, +snap}:
-      J.obj([ty("snapshot"), J.kv("name", J.JStr{name}), J.kv("snapshot_ref", jmaybe_str(snap))])
-    case M.EDeclared{+name, +status, +note}:
-      J.obj([ty("declared"), J.kv("name", J.JStr{name}), J.kv("status", jmaybe_decl(status)),
-        J.kv("note", J.JStr{note})])
-    case M.EReported{+name, +report}:
-      J.obj([ty("reported"), J.kv("name", J.JStr{name}), J.kv("report", report)])
-    case M.EFileTouched{+name, +path}:
-      J.obj([ty("file_touched"), J.kv("name", J.JStr{name}), J.kv("path", J.JStr{path})])
-    case M.ERenamed{+name, +nn}:
-      J.obj([ty("renamed"), J.kv("name", J.JStr{name}), J.kv("new_name", J.JStr{nn})])
-    case M.EMsgSent{+m}:
-      J.obj([ty("message_sent"), J.kv("msg", msg_json(m))])
-    case M.EMsgState{+id, +s}:
-      J.obj(ty("message_state") <> J.kv("id", J.JNum{id}) <> mst_kvs(s))
-    case M.ESettled{+id}:
-      J.obj([ty("message_settled"), J.kv("id", J.JNum{id})])
-    case M.ECardOpened{+c}:
-      J.obj([ty("card_opened"), J.kv("card", card_json(c))])
-    case M.ECardClosed{+id, +res}:
-      J.obj([ty("card_closed"), J.kv("id", J.JNum{id}), J.kv("resolution", J.JStr{res})])
-    case M.EMainNote{+text, +at}:
-      J.obj([ty("main_note"), J.kv("text", J.JStr{text}), J.kv("at_ms", J.JNum{at})])
-    case M.ENotesFlushed{}:
-      J.obj([ty("main_notes_flushed")])
-    # the timers' lines, in the shape every.rs wrote them (old hubs read them)
-    case M.ETimerSet{+t, +at}:
-      J.obj(List.append(&2, Sigma<&2, &2, String, _ => J.Json>,
-        [ty("every_set"), J.kv("id", J.JNum{TM.Timer.id(t)}), J.kv("agent", J.JStr{TM.Timer.agent(t)}),
-          J.kv("by", J.JStr{TM.Timer.by(t)}), J.kv("text", J.JStr{TM.Timer.text(t)}),
-          J.kv("next_ms", J.JNum{TM.Timer.next(t)}), J.kv("at", J.JNum{at}), TM.sched_kv(TM.Timer.sched(t))],
-        List.append(&2, Sigma<&2, &2, String, _ => J.Json>, TM.opt_kvs(t), TM.flag_kv("held", TM.Timer.held(t)))))
-    case M.ETimerFired{+id, +fired, +next, +at, +undelivered}:
-      J.obj(List.append(&2, Sigma<&2, &2, String, _ => J.Json>,
-        [ty("every_fired"), J.kv("id", J.JNum{id}), J.kv("fired", J.JNum{fired}), J.kv("next_ms", J.JNum{next}),
-          J.kv("at", J.JNum{at})],
-        Bool.pick(List<&2, Sigma<&2, &2, String, _ => J.Json>>, undelivered, [J.kv("undelivered", J.JBool{True{}})], Nil{})))
-    case M.ETimerRun{+id, +at}:
-      J.obj([ty("every_run"), J.kv("id", J.JNum{id}), J.kv("at", J.JNum{at})])
-    case M.ETimerStop{+id, +why, +at}:
-      J.obj([ty("every_stop"), J.kv("id", J.JNum{id}), J.kv("why", J.JStr{why}), J.kv("at", J.JNum{at})])
-    # an older sb-core reads every_name as unknown: skipped
-    case M.ETimerName{+id, +name, +announce, +at}:
-      J.obj(List.append(&2, Sigma<&2, &2, String, _ => J.Json>,
-        [ty("every_name"), J.kv("id", J.JNum{id}), J.kv("name", J.JStr{name}), J.kv("at", J.JNum{at})],
-        TM.flag_kv("announce", announce)))
-    # bise desktop S2 (an older sb-core reads these as unknown: skipped)
-    case M.EX{+xe}:
-      x_json(xe)
-    case M.EAct{+ae}:
-      act_ev_json(ae)
-    # bise desktop S10 (an older sb-core reads these as unknown: skipped)
-    case M.EFollow{+name, +on, +hub}:
-      J.obj([ty("follow"), J.kv("name", J.JStr{name}), J.kv("on", J.JBool{on}), J.kv("hub", J.JStr{hub})])
-    case M.EJobEnd{+name, +state}:
-      J.obj([ty("job_end"), J.kv("name", J.JStr{name}), J.kv("state", J.JStr{state})])
-    # event-wake (an older sb-core reads these as unknown: skipped)
-    case M.EWake{+we}:
-      WK.ev_json(we)
-    # cost-pause (an older sb-core reads these as unknown: skipped)
-    case M.EPaused{+at}:
-      J.obj([ty("paused"), J.kv("at", J.JNum{at})])
-    case M.EResumed{+at}:
-      J.obj([ty("resumed"), J.kv("at", J.JNum{at})])
-
 # ---- decoding (the journal replayed at boot) ----
 
 def get_nat(+j: J.Json, +k: String) -> Nat:
@@ -266,91 +153,6 @@ def mst_of(+j: J.Json) -> M.MSt:
     Bool.pick(M.MSt, String.eq(s, "rejected"), M.Rejected{get_s(j, "error")},
       Bool.pick(M.MSt, String.eq(s, "cancelled"), M.Cancelled{}, M.Queued{get_s(j, "reason")})))
 
-type EvK is Data:
-  KTaskCreated{}
-  KLifecycle{}
-  KWorkspace{}
-  KSnapshot{}
-  KDeclared{}
-  KReported{}
-  KFileTouched{}
-  KRenamed{}
-  KMsgSent{}
-  KMsgState{}
-  KSettled{}
-  KCardOpened{}
-  KCardClosed{}
-  KMainNote{}
-  KNotesFlushed{}
-  KEverySet{}
-  KEveryFired{}
-  KEveryRun{}
-  KEveryStop{}
-  KEveryName{}
-  KXOut{}
-  KXAcked{}
-  KXFailed{}
-  KXSettled{}
-  KXIn{}
-  KXReplied{}
-  KActSet{}
-  KActDone{}
-  KRouteHeld{}
-  KRouteSet{}
-  KRouteSent{}
-  KRouteCancelled{}
-  KFollow{}
-  KJobEnd{}
-  KWakeSet{}
-  KWakeEnd{}
-  KPaused{}
-  KResumed{}
-  KUnknown{}
-
-def ev_kind.x(+t: String) -> EvK:
-  Bool.pick(EvK, String.eq(t, "x_out"), KXOut{},
-  Bool.pick(EvK, String.eq(t, "x_acked"), KXAcked{},
-  Bool.pick(EvK, String.eq(t, "x_failed"), KXFailed{},
-  Bool.pick(EvK, String.eq(t, "x_settled"), KXSettled{},
-  Bool.pick(EvK, String.eq(t, "x_in"), KXIn{},
-  Bool.pick(EvK, String.eq(t, "x_replied"), KXReplied{},
-  Bool.pick(EvK, String.eq(t, "act_set"), KActSet{},
-  Bool.pick(EvK, String.eq(t, "act_done"), KActDone{},
-  Bool.pick(EvK, String.eq(t, "route_held"), KRouteHeld{},
-  Bool.pick(EvK, String.eq(t, "route_set"), KRouteSet{},
-  Bool.pick(EvK, String.eq(t, "route_sent"), KRouteSent{},
-  Bool.pick(EvK, String.eq(t, "route_cancelled"), KRouteCancelled{},
-  Bool.pick(EvK, String.eq(t, "follow"), KFollow{},
-  Bool.pick(EvK, String.eq(t, "job_end"), KJobEnd{},
-  Bool.pick(EvK, String.eq(t, "wake_set"), KWakeSet{},
-  Bool.pick(EvK, String.eq(t, "wake_end"), KWakeEnd{},
-  Bool.pick(EvK, String.eq(t, "paused"), KPaused{},
-  Bool.pick(EvK, String.eq(t, "resumed"), KResumed{},
-  KUnknown{}))))))))))))))))))
-
-def ev_kind(+t: String) -> EvK:
-  Bool.pick(EvK, String.eq(t, "task_created"), KTaskCreated{},
-  Bool.pick(EvK, String.eq(t, "lifecycle"), KLifecycle{},
-  Bool.pick(EvK, String.eq(t, "workspace_changed"), KWorkspace{},
-  Bool.pick(EvK, String.eq(t, "snapshot"), KSnapshot{},
-  Bool.pick(EvK, String.eq(t, "declared"), KDeclared{},
-  Bool.pick(EvK, String.eq(t, "reported"), KReported{},
-  Bool.pick(EvK, String.eq(t, "file_touched"), KFileTouched{},
-  Bool.pick(EvK, String.eq(t, "renamed"), KRenamed{},
-  Bool.pick(EvK, String.eq(t, "message_sent"), KMsgSent{},
-  Bool.pick(EvK, String.eq(t, "message_state"), KMsgState{},
-  Bool.pick(EvK, String.eq(t, "message_settled"), KSettled{},
-  Bool.pick(EvK, String.eq(t, "card_opened"), KCardOpened{},
-  Bool.pick(EvK, String.eq(t, "card_closed"), KCardClosed{},
-  Bool.pick(EvK, String.eq(t, "main_note"), KMainNote{},
-  Bool.pick(EvK, String.eq(t, "main_notes_flushed"), KNotesFlushed{},
-  Bool.pick(EvK, String.eq(t, "every_set"), KEverySet{},
-  Bool.pick(EvK, String.eq(t, "every_fired"), KEveryFired{},
-  Bool.pick(EvK, String.eq(t, "every_run"), KEveryRun{},
-  Bool.pick(EvK, String.eq(t, "every_stop"), KEveryStop{},
-  Bool.pick(EvK, String.eq(t, "every_name"), KEveryName{},
-  ev_kind.x(t)))))))))))))))))))))
-
 # bise desktop S2's kinds (an older sb-core has none: KUnknown, skipped)
 def out_st_of(+s: String) -> XH.OutSt:
   Bool.pick(XH.OutSt, String.eq(s, "settled"), XH.OSettled{}, Bool.pick(XH.OutSt, String.eq(s, "acked"), XH.OAcked{}, XH.OPending{}))
@@ -380,15 +182,6 @@ def sched_of(e: Maybe<&2, Nat>, d: Maybe<&2, Nat>) -> Maybe<&2, TM.Sched>:
       Some{TM.Every{Nat.max(p, 1000n)}}
     case None{}:
       Maybe.map(&2, Nat, TM.Sched, m => TM.Daily{Nat.mod(m, 1440n)}, d)
-
-def timer_set_of(s: Maybe<&2, TM.Sched>, +j: J.Json) -> Maybe<&2, M.Ev>:
-  match s:
-    case None{}:
-      None{}
-    case Some{+sc}:
-      Some{M.ETimerSet{TM.Timer{get_nat(j, "id"), get_s(j, "agent"), get_s(j, "by"), get_s(j, "text"), sc,
-        get_nat(j, "next_ms"), opt_nat(J.get(j, "until_ms")), opt_nat(J.get(j, "times")), 0n,
-        opt_str(J.get(j, "page")), 0n, Nil{}, get_s(j, "name"), get_b(j, "held")}, get_nat(j, "at")}}
 
 # ---- the records inside a journal line, for gen/journal.bend (one codec
 # per record; journal.rs's Codec rows name them) ----
@@ -452,92 +245,6 @@ def watch_of(+j: J.Json) -> WK.Watch:
 def watch_json(+w: WK.Watch) -> J.Json:
   WK.watch_json(w)
 
-# a match on the kind, not a Bool.pick chain: the chain decoded the event
-# as every kind, then kept one
-def ev_of.kind(k: EvK, +j: J.Json, +n: String) -> Maybe<&2, M.Ev>:
-  match k:
-    case KTaskCreated{}:
-      Some{M.ETaskCreated{n, get_s(j, "parent"), get_j(j, "brief"), get_j(j, "ws"), get_nat(j, "at_ms")}}
-    case KLifecycle{}:
-      Some{M.ELifecycle{n, life_of(get_j(j, "lifecycle")), opt_str(J.get(j, "reason"))}}
-    case KWorkspace{}:
-      Some{M.EWorkspace{n, get_j(j, "ws")}}
-    case KSnapshot{}:
-      Some{M.ESnapshot{n, opt_str(J.get(j, "snapshot_ref"))}}
-    case KDeclared{}:
-      Some{M.EDeclared{n, decl_of(get_j(j, "status")), get_s(j, "note")}}
-    case KReported{}:
-      Some{M.EReported{n, get_j(j, "report")}}
-    case KFileTouched{}:
-      Some{M.EFileTouched{n, get_s(j, "path")}}
-    case KRenamed{}:
-      Some{M.ERenamed{n, get_s(j, "new_name")}}
-    case KMsgSent{}:
-      Some{M.EMsgSent{msg_of(get_j(j, "msg"))}}
-    case KMsgState{}:
-      Some{M.EMsgState{get_nat(j, "id"), mst_of(j)}}
-    case KSettled{}:
-      Some{M.ESettled{get_nat(j, "id")}}
-    case KCardOpened{}:
-      Some{M.ECardOpened{card_of(get_j(j, "card"))}}
-    case KCardClosed{}:
-      Some{M.ECardClosed{get_nat(j, "id"), get_s(j, "resolution")}}
-    case KMainNote{}:
-      Some{M.EMainNote{get_s(j, "text"), get_nat(j, "at_ms")}}
-    case KNotesFlushed{}:
-      Some{M.ENotesFlushed{}}
-    case KEverySet{}:
-      timer_set_of(sched_of(opt_nat(J.get(j, "every_ms")), opt_nat(J.get(j, "daily_min"))), j)
-    case KEveryFired{}:
-      Some{M.ETimerFired{get_nat(j, "id"), get_nat(j, "fired"), get_nat(j, "next_ms"), get_nat(j, "at"), get_b(j, "undelivered")}}
-    case KEveryRun{}:
-      Some{M.ETimerRun{get_nat(j, "id"), get_nat(j, "at")}}
-    case KEveryStop{}:
-      Some{M.ETimerStop{get_nat(j, "id"), get_s(j, "why"), get_nat(j, "at")}}
-    case KEveryName{}:
-      Some{M.ETimerName{get_nat(j, "id"), get_s(j, "name"), get_b(j, "announce"), get_nat(j, "at")}}
-    case KXOut{}:
-      Some{M.EX{XH.XOut{out_of(get_j(j, "out"))}}}
-    case KXAcked{}:
-      Some{M.EX{XH.XOp{get_nat(j, "xid"), XH.OpAcked{}}}}
-    case KXFailed{}:
-      Some{M.EX{XH.XOp{get_nat(j, "xid"), XH.OpTried{}}}}
-    case KXSettled{}:
-      Some{M.EX{XH.XOp{get_nat(j, "xid"), XH.OpSettled{}}}}
-    case KXIn{}:
-      Some{M.EX{XH.XGot{xin_of(get_j(j, "in"))}}}
-    case KXReplied{}:
-      Some{M.EX{XH.XReplied{get_s(j, "hub"), get_nat(j, "xid")}}}
-    case KActSet{}:
-      Some{M.EAct{TM.ActSet{act_of(get_j(j, "act"))}}}
-    case KActDone{}:
-      Some{M.EAct{TM.ActDone{get_nat(j, "id")}}}
-    case KFollow{}:
-      # J: an older journal has no hub ("": this hub's own follow)
-      Some{M.EFollow{get_s(j, "name"), get_b(j, "on"), get_s(j, "hub")}}
-    case KJobEnd{}:
-      Some{M.EJobEnd{get_s(j, "name"), get_s(j, "state")}}
-    case KWakeSet{}:
-      Some{M.EWake{WK.WSet{WK.watch_of(get_j(j, "watch"))}}}
-    case KWakeEnd{}:
-      Some{M.EWake{WK.WEnd{get_nat(j, "id"), get_s(j, "why"), get_nat(j, "at")}}}
-    case KRouteHeld{}:
-      Some{M.EX{XH.XRouteHeld{route_of(get_j(j, "route"))}}}
-    case KRouteSet{}:
-      Some{M.EX{XH.XRoute{get_nat(j, "rid"), XH.RTo{get_s(j, "to"), get_s(j, "name")}}}}
-    case KRouteSent{}:
-      Some{M.EX{XH.XRoute{get_nat(j, "rid"), XH.REnd{XH.RSent{}}}}}
-    case KRouteCancelled{}:
-      Some{M.EX{XH.XRoute{get_nat(j, "rid"), XH.REnd{XH.RCancelled{}}}}}
-    case KPaused{}:
-      Some{M.EPaused{get_nat(j, "at")}}
-    case KResumed{}:
-      Some{M.EResumed{get_nat(j, "at")}}
-    case KUnknown{}:
-      None{}
-
-def ev_of(+j: J.Json) -> Maybe<&2, M.Ev>:
-  ev_of.kind(ev_kind(get_s(j, "type")), j, get_s(j, "name"))
 
 # ---- each record reads back what it writes (gen/journal-laws.bend's
 # round laws go through these) ----

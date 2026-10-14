@@ -14,7 +14,7 @@ use super::core_kinds;
 core_kinds! {
     /// One effect of sb-core.
     pub enum Fx, tag "fx" {
-        /// a journal event (hub/codec.bend's JSON, kept whole here)
+        /// a journal event (hub/gen/journal.bend's JSON, core::journal; kept whole here)
         Journal = "journal" => FJournal { ev: Json },
         /// an agent's runtime state (the view carries it too)
         Rt = "rt" => FRt { agent: Str, run: Str, waiting: Bool, turn_ms: OptNat, turns: Nat },

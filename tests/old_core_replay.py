@@ -54,6 +54,12 @@ FIXTURE = [
     {"type": "every_set", "id": 2, "agent": "main", "by": "main", "text": "read the log", "next_ms": 9000,
      "at": 1000, "every_ms": 600000, "held": True},
     {"type": "every_name", "id": 2, "name": "log read", "announce": True, "at": 1100},
+    # D1 (debt T7): a timer and a message with real ms timestamps (past
+    # 2^32: the generated codec's laws can't write them as literals), the
+    # timer in the generated writer's key order (`at` after its keys)
+    {"type": "every_set", "id": 3, "agent": "main", "by": "user", "text": "check the deploy",
+     "next_ms": 1760000600000, "every_ms": 600000, "until_ms": 1760086400000, "times": 5, "at": 1760000000400},
+    dict(msg(7, "user", "main"), msg=dict(msg(7, "user", "main")["msg"], created_ms=1760000000700)),
     # event-wake: a watch of `sb wake` and its end (skipped: on a rollback
     # the watches are lost, the rest of the state is not)
     {"type": "wake_set", "watch": {"id": 1, "agent": "main", "spec": {"kind": "file", "path": "/t/rc"},
@@ -116,10 +122,10 @@ def main():
         view = call({"t": "view_all"})
         assert core.poll() is None, "the base's sb-core died on the journal"
         text = json.dumps(view)
-        assert all(("m%d" % i) in text for i in (1, 2, 3, 4, 5, 6)), "the messages are rebuilt: %s" % text[:500]
+        assert all(("m%d" % i) in text for i in (1, 2, 3, 4, 5, 6, 7)), "the messages are rebuilt: %s" % text[:500]
         # sched-names: a timer with a name is rebuilt (an older base drops the name)
         timers = view.get("view", view).get("timers", [])
-        assert sorted(t["id"] for t in timers) == [1, 2], "the timers are rebuilt: %r" % timers
+        assert sorted(t["id"] for t in timers) == [1, 2, 3], "the timers are rebuilt: %r" % timers
         print("ok   old_core_replay: %s's sb-core skipped %d of %d new lines, kept the messages" % (sha[:8], len(skipped), len(NEW)))
     except AssertionError as e:
         print("FAIL old_core_replay:", e)

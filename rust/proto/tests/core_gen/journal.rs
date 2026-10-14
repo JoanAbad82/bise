@@ -285,7 +285,7 @@ fn written_back(v: &Jv) -> Jv {
 /// `journal-laws.bend`: per row, its tag alone reads its defaults and
 /// (but an inline read that may fail) its write reads back as itself;
 /// an unknown or missing tag is skipped; each fixture line reads back
-/// as itself, and as the hand codec read it.
+/// as itself.
 pub(crate) fn journal_laws() -> String {
     let t = &JOURNAL;
     let mut s = String::new();
@@ -322,11 +322,27 @@ pub(crate) fn journal_laws() -> String {
         let (l, w) = (bend_json(line), bend_json(&written_back(line)));
         let law = format!("journal_fixture_{n}_{tag}");
         writeln!(s, "law {law}:\n  {{back(GJ.of({l})) == Some{{{w}}} : Maybe<&2, J.Json>}}\n\ndef {law}():\n  {{==}}\n").unwrap();
-        let law = format!("journal_fixture_{n}_{tag}_as_before");
-        writeln!(s, "law {law}:\n  {{GJ.of({l}) == C.ev_of({l}) : {EV}}}\n\ndef {law}():\n  {{==}}\n").unwrap();
+    }
+    // what we write after one read is stable: written again after a
+    // second read, the same line (every_set's schedule is normalized once)
+    writeln!(s, "def again(m: Maybe<&2, J.Json>) -> Maybe<&2, J.Json>:\n  match m:\n    case None{{}}:\n      None{{}}\n    case Some{{+j}}:\n      back(GJ.of(j))\n").unwrap();
+    let extra: Vec<Jv> = STABLE_EXTRA.iter().map(|l| jv(l)).collect();
+    for (n, line) in journal_fixture().iter().chain(&extra).enumerate() {
+        let (tag, l) = (line.tag(), bend_json(line));
+        let law = format!("journal_stable_{n}_{tag}");
+        writeln!(s, "law {law}:\n  {{again(back(GJ.of({l}))) == back(GJ.of({l})) : Maybe<&2, J.Json>}}\n\ndef {law}():\n  {{==}}\n").unwrap();
     }
     s
 }
+
+/// every_set lines whose read changes them (the stable laws, beside the
+/// fixture's): a period under a second, a daily minute past a day, no
+/// optional key, no schedule (skipped).
+const STABLE_EXTRA: &[&str] = &[
+    r#"{"type":"every_set","id":3,"agent":"docs","by":"main","text":"ping","next_ms":5000,"at":4000,"every_ms":500}"#,
+    r#"{"type":"every_set","id":4,"agent":"docs","by":"user","text":"standup","next_ms":5000,"at":4000,"daily_min":3000,"held":false}"#,
+    r#"{"type":"every_set","id":5,"agent":"docs","by":"user","text":"none","next_ms":5000,"at":4000}"#,
+];
 
 /// A row's decode∘encode law: split on each field with cases, each
 /// record without cases rewritten by its codec's own law.

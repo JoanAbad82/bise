@@ -617,22 +617,10 @@ law journal_fixture_0_task_created:
 def journal_fixture_0_task_created():
   {==}
 
-law journal_fixture_0_task_created_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"task_created"}), J.kv("name", J.JStr{"docs"}), J.kv("parent", J.JStr{"main"}), J.kv("brief", J.obj([J.kv("objective", J.JStr{"write the docs"}), J.kv("done_when", J.JArr{[J.JStr{"a page"}]})])), J.kv("ws", J.obj([J.kv("kind", J.JStr{"worktree"}), J.kv("dir", J.JStr{"/Users/camille/acme/.bise/docs"})])), J.kv("at_ms", J.JNum{1000000n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"task_created"}), J.kv("name", J.JStr{"docs"}), J.kv("parent", J.JStr{"main"}), J.kv("brief", J.obj([J.kv("objective", J.JStr{"write the docs"}), J.kv("done_when", J.JArr{[J.JStr{"a page"}]})])), J.kv("ws", J.obj([J.kv("kind", J.JStr{"worktree"}), J.kv("dir", J.JStr{"/Users/camille/acme/.bise/docs"})])), J.kv("at_ms", J.JNum{1000000n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_0_task_created_as_before():
-  {==}
-
 law journal_fixture_1_lifecycle:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"lifecycle"}), J.kv("name", J.JStr{"docs"}), J.kv("lifecycle", J.JStr{"stopped"}), J.kv("reason", J.JStr{"dropped by main"})]))) == Some{J.obj([J.kv("type", J.JStr{"lifecycle"}), J.kv("name", J.JStr{"docs"}), J.kv("lifecycle", J.JStr{"stopped"}), J.kv("reason", J.JStr{"dropped by main"})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_1_lifecycle():
-  {==}
-
-law journal_fixture_1_lifecycle_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"lifecycle"}), J.kv("name", J.JStr{"docs"}), J.kv("lifecycle", J.JStr{"stopped"}), J.kv("reason", J.JStr{"dropped by main"})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"lifecycle"}), J.kv("name", J.JStr{"docs"}), J.kv("lifecycle", J.JStr{"stopped"}), J.kv("reason", J.JStr{"dropped by main"})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_1_lifecycle_as_before():
   {==}
 
 law journal_fixture_2_workspace_changed:
@@ -641,22 +629,10 @@ law journal_fixture_2_workspace_changed:
 def journal_fixture_2_workspace_changed():
   {==}
 
-law journal_fixture_2_workspace_changed_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"workspace_changed"}), J.kv("name", J.JStr{"docs"}), J.kv("ws", J.obj([J.kv("kind", J.JStr{"shared"}), J.kv("dir", J.JStr{"/Users/camille/acme"})]))])) == C.ev_of(J.obj([J.kv("type", J.JStr{"workspace_changed"}), J.kv("name", J.JStr{"docs"}), J.kv("ws", J.obj([J.kv("kind", J.JStr{"shared"}), J.kv("dir", J.JStr{"/Users/camille/acme"})]))])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_2_workspace_changed_as_before():
-  {==}
-
 law journal_fixture_3_snapshot:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"snapshot"}), J.kv("name", J.JStr{"docs"}), J.kv("snapshot_ref", J.JStr{"refs/bise/snap/docs-1"})]))) == Some{J.obj([J.kv("type", J.JStr{"snapshot"}), J.kv("name", J.JStr{"docs"}), J.kv("snapshot_ref", J.JStr{"refs/bise/snap/docs-1"})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_3_snapshot():
-  {==}
-
-law journal_fixture_3_snapshot_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"snapshot"}), J.kv("name", J.JStr{"docs"}), J.kv("snapshot_ref", J.JStr{"refs/bise/snap/docs-1"})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"snapshot"}), J.kv("name", J.JStr{"docs"}), J.kv("snapshot_ref", J.JStr{"refs/bise/snap/docs-1"})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_3_snapshot_as_before():
   {==}
 
 law journal_fixture_4_declared:
@@ -665,22 +641,10 @@ law journal_fixture_4_declared:
 def journal_fixture_4_declared():
   {==}
 
-law journal_fixture_4_declared_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"declared"}), J.kv("name", J.JStr{"docs"}), J.kv("status", J.JStr{"blocked"}), J.kv("note", J.JStr{"needs the API key"})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"declared"}), J.kv("name", J.JStr{"docs"}), J.kv("status", J.JStr{"blocked"}), J.kv("note", J.JStr{"needs the API key"})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_4_declared_as_before():
-  {==}
-
 law journal_fixture_5_reported:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"reported"}), J.kv("name", J.JStr{"docs"}), J.kv("report", J.obj([J.kv("kind", J.JStr{"done"}), J.kv("summary", J.JStr{"the page is up"})]))]))) == Some{J.obj([J.kv("type", J.JStr{"reported"}), J.kv("name", J.JStr{"docs"}), J.kv("report", J.obj([J.kv("kind", J.JStr{"done"}), J.kv("summary", J.JStr{"the page is up"})]))])} : Maybe<&2, J.Json>}
 
 def journal_fixture_5_reported():
-  {==}
-
-law journal_fixture_5_reported_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"reported"}), J.kv("name", J.JStr{"docs"}), J.kv("report", J.obj([J.kv("kind", J.JStr{"done"}), J.kv("summary", J.JStr{"the page is up"})]))])) == C.ev_of(J.obj([J.kv("type", J.JStr{"reported"}), J.kv("name", J.JStr{"docs"}), J.kv("report", J.obj([J.kv("kind", J.JStr{"done"}), J.kv("summary", J.JStr{"the page is up"})]))])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_5_reported_as_before():
   {==}
 
 law journal_fixture_6_file_touched:
@@ -689,22 +653,10 @@ law journal_fixture_6_file_touched:
 def journal_fixture_6_file_touched():
   {==}
 
-law journal_fixture_6_file_touched_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"file_touched"}), J.kv("name", J.JStr{"docs"}), J.kv("path", J.JStr{"docs/index.md"})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"file_touched"}), J.kv("name", J.JStr{"docs"}), J.kv("path", J.JStr{"docs/index.md"})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_6_file_touched_as_before():
-  {==}
-
 law journal_fixture_7_renamed:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"renamed"}), J.kv("name", J.JStr{"docs"}), J.kv("new_name", J.JStr{"docs-site"})]))) == Some{J.obj([J.kv("type", J.JStr{"renamed"}), J.kv("name", J.JStr{"docs"}), J.kv("new_name", J.JStr{"docs-site"})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_7_renamed():
-  {==}
-
-law journal_fixture_7_renamed_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"renamed"}), J.kv("name", J.JStr{"docs"}), J.kv("new_name", J.JStr{"docs-site"})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"renamed"}), J.kv("name", J.JStr{"docs"}), J.kv("new_name", J.JStr{"docs-site"})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_7_renamed_as_before():
   {==}
 
 law journal_fixture_8_message_sent:
@@ -713,22 +665,10 @@ law journal_fixture_8_message_sent:
 def journal_fixture_8_message_sent():
   {==}
 
-law journal_fixture_8_message_sent_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"message_sent"}), J.kv("msg", J.obj([J.kv("id", J.JNum{7n}), J.kv("thread", J.JNum{7n}), J.kv("from", J.JStr{"user"}), J.kv("to", J.JStr{"main"}), J.kv("reply_to", J.JNull{}), J.kv("expect_reply", J.JBool{True{}}), J.kv("auto", J.JBool{False{}}), J.kv("text", J.JStr{"ship the docs"}), J.kv("created_ms", J.JNum{1000100n}), J.kv("plain", J.JBool{False{}}), J.kv("queued", J.JBool{True{}}), J.kv("via", J.JStr{"desktop"}), J.kv("parts", J.JStr{"[]"})]))])) == C.ev_of(J.obj([J.kv("type", J.JStr{"message_sent"}), J.kv("msg", J.obj([J.kv("id", J.JNum{7n}), J.kv("thread", J.JNum{7n}), J.kv("from", J.JStr{"user"}), J.kv("to", J.JStr{"main"}), J.kv("reply_to", J.JNull{}), J.kv("expect_reply", J.JBool{True{}}), J.kv("auto", J.JBool{False{}}), J.kv("text", J.JStr{"ship the docs"}), J.kv("created_ms", J.JNum{1000100n}), J.kv("plain", J.JBool{False{}}), J.kv("queued", J.JBool{True{}}), J.kv("via", J.JStr{"desktop"}), J.kv("parts", J.JStr{"[]"})]))])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_8_message_sent_as_before():
-  {==}
-
 law journal_fixture_9_message_state:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"message_state"}), J.kv("id", J.JNum{7n}), J.kv("state", J.JStr{"queued"}), J.kv("reason", J.JStr{"main is busy"})]))) == Some{J.obj([J.kv("type", J.JStr{"message_state"}), J.kv("id", J.JNum{7n}), J.kv("state", J.JStr{"queued"}), J.kv("reason", J.JStr{"main is busy"})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_9_message_state():
-  {==}
-
-law journal_fixture_9_message_state_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"message_state"}), J.kv("id", J.JNum{7n}), J.kv("state", J.JStr{"queued"}), J.kv("reason", J.JStr{"main is busy"})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"message_state"}), J.kv("id", J.JNum{7n}), J.kv("state", J.JStr{"queued"}), J.kv("reason", J.JStr{"main is busy"})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_9_message_state_as_before():
   {==}
 
 law journal_fixture_10_message_settled:
@@ -737,22 +677,10 @@ law journal_fixture_10_message_settled:
 def journal_fixture_10_message_settled():
   {==}
 
-law journal_fixture_10_message_settled_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"message_settled"}), J.kv("id", J.JNum{7n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"message_settled"}), J.kv("id", J.JNum{7n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_10_message_settled_as_before():
-  {==}
-
 law journal_fixture_11_card_opened:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"card_opened"}), J.kv("card", J.obj([J.kv("id", J.JNum{3n}), J.kv("kind", J.JStr{"question"}), J.kv("agent", J.JStr{"docs"}), J.kv("text", J.JStr{"which theme?"}), J.kv("for_msg", J.JNum{7n}), J.kv("created_ms", J.JNum{1000200n}), J.kv("place", J.JNull{}), J.kv("pr", J.JNull{})]))]))) == Some{J.obj([J.kv("type", J.JStr{"card_opened"}), J.kv("card", J.obj([J.kv("id", J.JNum{3n}), J.kv("kind", J.JStr{"question"}), J.kv("agent", J.JStr{"docs"}), J.kv("text", J.JStr{"which theme?"}), J.kv("for_msg", J.JNum{7n}), J.kv("created_ms", J.JNum{1000200n}), J.kv("place", J.JNull{}), J.kv("pr", J.JNull{})]))])} : Maybe<&2, J.Json>}
 
 def journal_fixture_11_card_opened():
-  {==}
-
-law journal_fixture_11_card_opened_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"card_opened"}), J.kv("card", J.obj([J.kv("id", J.JNum{3n}), J.kv("kind", J.JStr{"question"}), J.kv("agent", J.JStr{"docs"}), J.kv("text", J.JStr{"which theme?"}), J.kv("for_msg", J.JNum{7n}), J.kv("created_ms", J.JNum{1000200n}), J.kv("place", J.JNull{}), J.kv("pr", J.JNull{})]))])) == C.ev_of(J.obj([J.kv("type", J.JStr{"card_opened"}), J.kv("card", J.obj([J.kv("id", J.JNum{3n}), J.kv("kind", J.JStr{"question"}), J.kv("agent", J.JStr{"docs"}), J.kv("text", J.JStr{"which theme?"}), J.kv("for_msg", J.JNum{7n}), J.kv("created_ms", J.JNum{1000200n}), J.kv("place", J.JNull{}), J.kv("pr", J.JNull{})]))])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_11_card_opened_as_before():
   {==}
 
 law journal_fixture_12_card_closed:
@@ -761,22 +689,10 @@ law journal_fixture_12_card_closed:
 def journal_fixture_12_card_closed():
   {==}
 
-law journal_fixture_12_card_closed_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"card_closed"}), J.kv("id", J.JNum{3n}), J.kv("resolution", J.JStr{"answered"})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"card_closed"}), J.kv("id", J.JNum{3n}), J.kv("resolution", J.JStr{"answered"})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_12_card_closed_as_before():
-  {==}
-
 law journal_fixture_13_main_note:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"main_note"}), J.kv("text", J.JStr{"docs is blocked"}), J.kv("at_ms", J.JNum{1000300n})]))) == Some{J.obj([J.kv("type", J.JStr{"main_note"}), J.kv("text", J.JStr{"docs is blocked"}), J.kv("at_ms", J.JNum{1000300n})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_13_main_note():
-  {==}
-
-law journal_fixture_13_main_note_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"main_note"}), J.kv("text", J.JStr{"docs is blocked"}), J.kv("at_ms", J.JNum{1000300n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"main_note"}), J.kv("text", J.JStr{"docs is blocked"}), J.kv("at_ms", J.JNum{1000300n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_13_main_note_as_before():
   {==}
 
 law journal_fixture_14_main_notes_flushed:
@@ -785,22 +701,10 @@ law journal_fixture_14_main_notes_flushed:
 def journal_fixture_14_main_notes_flushed():
   {==}
 
-law journal_fixture_14_main_notes_flushed_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"main_notes_flushed"})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"main_notes_flushed"})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_14_main_notes_flushed_as_before():
-  {==}
-
 law journal_fixture_15_every_set:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"every_set"}), J.kv("id", J.JNum{2n}), J.kv("agent", J.JStr{"main"}), J.kv("by", J.JStr{"user"}), J.kv("text", J.JStr{"check the deploy"}), J.kv("next_ms", J.JNum{1600000n}), J.kv("every_ms", J.JNum{600000n}), J.kv("until_ms", J.JNum{87400000n}), J.kv("times", J.JNum{5n}), J.kv("page", J.JStr{"deploy"}), J.kv("name", J.JStr{"deploy check"}), J.kv("held", J.JBool{True{}}), J.kv("at", J.JNum{1000400n})]))) == Some{J.obj([J.kv("type", J.JStr{"every_set"}), J.kv("id", J.JNum{2n}), J.kv("agent", J.JStr{"main"}), J.kv("by", J.JStr{"user"}), J.kv("text", J.JStr{"check the deploy"}), J.kv("next_ms", J.JNum{1600000n}), J.kv("every_ms", J.JNum{600000n}), J.kv("until_ms", J.JNum{87400000n}), J.kv("times", J.JNum{5n}), J.kv("page", J.JStr{"deploy"}), J.kv("name", J.JStr{"deploy check"}), J.kv("held", J.JBool{True{}}), J.kv("at", J.JNum{1000400n})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_15_every_set():
-  {==}
-
-law journal_fixture_15_every_set_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"every_set"}), J.kv("id", J.JNum{2n}), J.kv("agent", J.JStr{"main"}), J.kv("by", J.JStr{"user"}), J.kv("text", J.JStr{"check the deploy"}), J.kv("next_ms", J.JNum{1600000n}), J.kv("every_ms", J.JNum{600000n}), J.kv("until_ms", J.JNum{87400000n}), J.kv("times", J.JNum{5n}), J.kv("page", J.JStr{"deploy"}), J.kv("name", J.JStr{"deploy check"}), J.kv("held", J.JBool{True{}}), J.kv("at", J.JNum{1000400n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"every_set"}), J.kv("id", J.JNum{2n}), J.kv("agent", J.JStr{"main"}), J.kv("by", J.JStr{"user"}), J.kv("text", J.JStr{"check the deploy"}), J.kv("next_ms", J.JNum{1600000n}), J.kv("every_ms", J.JNum{600000n}), J.kv("until_ms", J.JNum{87400000n}), J.kv("times", J.JNum{5n}), J.kv("page", J.JStr{"deploy"}), J.kv("name", J.JStr{"deploy check"}), J.kv("held", J.JBool{True{}}), J.kv("at", J.JNum{1000400n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_15_every_set_as_before():
   {==}
 
 law journal_fixture_16_every_fired:
@@ -809,22 +713,10 @@ law journal_fixture_16_every_fired:
 def journal_fixture_16_every_fired():
   {==}
 
-law journal_fixture_16_every_fired_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"every_fired"}), J.kv("id", J.JNum{2n}), J.kv("fired", J.JNum{1n}), J.kv("next_ms", J.JNum{2200000n}), J.kv("at", J.JNum{1600000n}), J.kv("undelivered", J.JBool{True{}})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"every_fired"}), J.kv("id", J.JNum{2n}), J.kv("fired", J.JNum{1n}), J.kv("next_ms", J.JNum{2200000n}), J.kv("at", J.JNum{1600000n}), J.kv("undelivered", J.JBool{True{}})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_16_every_fired_as_before():
-  {==}
-
 law journal_fixture_17_every_run:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"every_run"}), J.kv("id", J.JNum{2n}), J.kv("at", J.JNum{1600100n})]))) == Some{J.obj([J.kv("type", J.JStr{"every_run"}), J.kv("id", J.JNum{2n}), J.kv("at", J.JNum{1600100n})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_17_every_run():
-  {==}
-
-law journal_fixture_17_every_run_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"every_run"}), J.kv("id", J.JNum{2n}), J.kv("at", J.JNum{1600100n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"every_run"}), J.kv("id", J.JNum{2n}), J.kv("at", J.JNum{1600100n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_17_every_run_as_before():
   {==}
 
 law journal_fixture_18_every_stop:
@@ -833,22 +725,10 @@ law journal_fixture_18_every_stop:
 def journal_fixture_18_every_stop():
   {==}
 
-law journal_fixture_18_every_stop_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"every_stop"}), J.kv("id", J.JNum{2n}), J.kv("why", J.JStr{"until"}), J.kv("at", J.JNum{87400000n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"every_stop"}), J.kv("id", J.JNum{2n}), J.kv("why", J.JStr{"until"}), J.kv("at", J.JNum{87400000n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_18_every_stop_as_before():
-  {==}
-
 law journal_fixture_19_every_name:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"every_name"}), J.kv("id", J.JNum{2n}), J.kv("name", J.JStr{"deploy check"}), J.kv("at", J.JNum{1000500n}), J.kv("announce", J.JBool{True{}})]))) == Some{J.obj([J.kv("type", J.JStr{"every_name"}), J.kv("id", J.JNum{2n}), J.kv("name", J.JStr{"deploy check"}), J.kv("at", J.JNum{1000500n}), J.kv("announce", J.JBool{True{}})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_19_every_name():
-  {==}
-
-law journal_fixture_19_every_name_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"every_name"}), J.kv("id", J.JNum{2n}), J.kv("name", J.JStr{"deploy check"}), J.kv("at", J.JNum{1000500n}), J.kv("announce", J.JBool{True{}})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"every_name"}), J.kv("id", J.JNum{2n}), J.kv("name", J.JStr{"deploy check"}), J.kv("at", J.JNum{1000500n}), J.kv("announce", J.JBool{True{}})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_19_every_name_as_before():
   {==}
 
 law journal_fixture_20_x_out:
@@ -857,22 +737,10 @@ law journal_fixture_20_x_out:
 def journal_fixture_20_x_out():
   {==}
 
-law journal_fixture_20_x_out_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"x_out"}), J.kv("out", J.obj([J.kv("xid", J.JNum{1n}), J.kv("project", J.JStr{"shop-1a2b3c4d"}), J.kv("kind", J.JStr{"ask"}), J.kv("msg", J.JNum{7n}), J.kv("text", J.JStr{"is the shop up?"}), J.kv("state", J.JStr{"pending"}), J.kv("tries", J.JNum{0n}), J.kv("context", J.JStr{"from bise"}), J.kv("parts", J.JStr{"[]"})]))])) == C.ev_of(J.obj([J.kv("type", J.JStr{"x_out"}), J.kv("out", J.obj([J.kv("xid", J.JNum{1n}), J.kv("project", J.JStr{"shop-1a2b3c4d"}), J.kv("kind", J.JStr{"ask"}), J.kv("msg", J.JNum{7n}), J.kv("text", J.JStr{"is the shop up?"}), J.kv("state", J.JStr{"pending"}), J.kv("tries", J.JNum{0n}), J.kv("context", J.JStr{"from bise"}), J.kv("parts", J.JStr{"[]"})]))])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_20_x_out_as_before():
-  {==}
-
 law journal_fixture_21_x_acked:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"x_acked"}), J.kv("xid", J.JNum{1n})]))) == Some{J.obj([J.kv("type", J.JStr{"x_acked"}), J.kv("xid", J.JNum{1n})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_21_x_acked():
-  {==}
-
-law journal_fixture_21_x_acked_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"x_acked"}), J.kv("xid", J.JNum{1n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"x_acked"}), J.kv("xid", J.JNum{1n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_21_x_acked_as_before():
   {==}
 
 law journal_fixture_22_x_failed:
@@ -881,22 +749,10 @@ law journal_fixture_22_x_failed:
 def journal_fixture_22_x_failed():
   {==}
 
-law journal_fixture_22_x_failed_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"x_failed"}), J.kv("xid", J.JNum{1n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"x_failed"}), J.kv("xid", J.JNum{1n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_22_x_failed_as_before():
-  {==}
-
 law journal_fixture_23_x_settled:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"x_settled"}), J.kv("xid", J.JNum{1n})]))) == Some{J.obj([J.kv("type", J.JStr{"x_settled"}), J.kv("xid", J.JNum{1n})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_23_x_settled():
-  {==}
-
-law journal_fixture_23_x_settled_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"x_settled"}), J.kv("xid", J.JNum{1n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"x_settled"}), J.kv("xid", J.JNum{1n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_23_x_settled_as_before():
   {==}
 
 law journal_fixture_24_x_in:
@@ -905,22 +761,10 @@ law journal_fixture_24_x_in:
 def journal_fixture_24_x_in():
   {==}
 
-law journal_fixture_24_x_in_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"x_in"}), J.kv("in", J.obj([J.kv("hub", J.JStr{"home-00000000"}), J.kv("xid", J.JNum{4n}), J.kv("msg", J.JNum{9n}), J.kv("kind", J.JStr{"job_end"}), J.kv("replied", J.JBool{True{}})]))])) == C.ev_of(J.obj([J.kv("type", J.JStr{"x_in"}), J.kv("in", J.obj([J.kv("hub", J.JStr{"home-00000000"}), J.kv("xid", J.JNum{4n}), J.kv("msg", J.JNum{9n}), J.kv("kind", J.JStr{"job_end"}), J.kv("replied", J.JBool{True{}})]))])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_24_x_in_as_before():
-  {==}
-
 law journal_fixture_25_x_replied:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"x_replied"}), J.kv("hub", J.JStr{"home-00000000"}), J.kv("xid", J.JNum{4n})]))) == Some{J.obj([J.kv("type", J.JStr{"x_replied"}), J.kv("hub", J.JStr{"home-00000000"}), J.kv("xid", J.JNum{4n})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_25_x_replied():
-  {==}
-
-law journal_fixture_25_x_replied_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"x_replied"}), J.kv("hub", J.JStr{"home-00000000"}), J.kv("xid", J.JNum{4n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"x_replied"}), J.kv("hub", J.JStr{"home-00000000"}), J.kv("xid", J.JNum{4n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_25_x_replied_as_before():
   {==}
 
 law journal_fixture_26_route_held:
@@ -929,22 +773,10 @@ law journal_fixture_26_route_held:
 def journal_fixture_26_route_held():
   {==}
 
-law journal_fixture_26_route_held_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"route_held"}), J.kv("route", J.obj([J.kv("rid", J.JNum{2n}), J.kv("text", J.JStr{"tell shop to deploy"}), J.kv("via", J.JStr{"spotlight"}), J.kv("to", J.JStr{"shop-1a2b3c4d"}), J.kv("name", J.JStr{"shop"}), J.kv("due_ms", J.JNum{1003000n}), J.kv("act", J.JNum{5n}), J.kv("why", J.JStr{"named shop"}), J.kv("state", J.JStr{"held"}), J.kv("context", J.JStr{""}), J.kv("parts", J.JStr{"[]"})]))])) == C.ev_of(J.obj([J.kv("type", J.JStr{"route_held"}), J.kv("route", J.obj([J.kv("rid", J.JNum{2n}), J.kv("text", J.JStr{"tell shop to deploy"}), J.kv("via", J.JStr{"spotlight"}), J.kv("to", J.JStr{"shop-1a2b3c4d"}), J.kv("name", J.JStr{"shop"}), J.kv("due_ms", J.JNum{1003000n}), J.kv("act", J.JNum{5n}), J.kv("why", J.JStr{"named shop"}), J.kv("state", J.JStr{"held"}), J.kv("context", J.JStr{""}), J.kv("parts", J.JStr{"[]"})]))])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_26_route_held_as_before():
-  {==}
-
 law journal_fixture_27_route_set:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"route_set"}), J.kv("rid", J.JNum{2n}), J.kv("to", J.JStr{"acme-1a2b3c4d"}), J.kv("name", J.JStr{"acme"})]))) == Some{J.obj([J.kv("type", J.JStr{"route_set"}), J.kv("rid", J.JNum{2n}), J.kv("to", J.JStr{"acme-1a2b3c4d"}), J.kv("name", J.JStr{"acme"})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_27_route_set():
-  {==}
-
-law journal_fixture_27_route_set_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"route_set"}), J.kv("rid", J.JNum{2n}), J.kv("to", J.JStr{"acme-1a2b3c4d"}), J.kv("name", J.JStr{"acme"})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"route_set"}), J.kv("rid", J.JNum{2n}), J.kv("to", J.JStr{"acme-1a2b3c4d"}), J.kv("name", J.JStr{"acme"})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_27_route_set_as_before():
   {==}
 
 law journal_fixture_28_route_sent:
@@ -953,22 +785,10 @@ law journal_fixture_28_route_sent:
 def journal_fixture_28_route_sent():
   {==}
 
-law journal_fixture_28_route_sent_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"route_sent"}), J.kv("rid", J.JNum{2n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"route_sent"}), J.kv("rid", J.JNum{2n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_28_route_sent_as_before():
-  {==}
-
 law journal_fixture_29_route_cancelled:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"route_cancelled"}), J.kv("rid", J.JNum{3n})]))) == Some{J.obj([J.kv("type", J.JStr{"route_cancelled"}), J.kv("rid", J.JNum{3n})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_29_route_cancelled():
-  {==}
-
-law journal_fixture_29_route_cancelled_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"route_cancelled"}), J.kv("rid", J.JNum{3n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"route_cancelled"}), J.kv("rid", J.JNum{3n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_29_route_cancelled_as_before():
   {==}
 
 law journal_fixture_30_act_set:
@@ -977,22 +797,10 @@ law journal_fixture_30_act_set:
 def journal_fixture_30_act_set():
   {==}
 
-law journal_fixture_30_act_set_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"act_set"}), J.kv("act", J.obj([J.kv("id", J.JNum{5n}), J.kv("due", J.JNum{1003000n}), J.kv("what", J.obj([J.kv("kind", J.JStr{"route_send"}), J.kv("rid", J.JNum{2n})]))]))])) == C.ev_of(J.obj([J.kv("type", J.JStr{"act_set"}), J.kv("act", J.obj([J.kv("id", J.JNum{5n}), J.kv("due", J.JNum{1003000n}), J.kv("what", J.obj([J.kv("kind", J.JStr{"route_send"}), J.kv("rid", J.JNum{2n})]))]))])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_30_act_set_as_before():
-  {==}
-
 law journal_fixture_31_act_done:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"act_done"}), J.kv("id", J.JNum{5n})]))) == Some{J.obj([J.kv("type", J.JStr{"act_done"}), J.kv("id", J.JNum{5n})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_31_act_done():
-  {==}
-
-law journal_fixture_31_act_done_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"act_done"}), J.kv("id", J.JNum{5n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"act_done"}), J.kv("id", J.JNum{5n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_31_act_done_as_before():
   {==}
 
 law journal_fixture_32_follow:
@@ -1001,22 +809,10 @@ law journal_fixture_32_follow:
 def journal_fixture_32_follow():
   {==}
 
-law journal_fixture_32_follow_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"follow"}), J.kv("name", J.JStr{"docs"}), J.kv("on", J.JBool{True{}}), J.kv("hub", J.JStr{"home-00000000"})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"follow"}), J.kv("name", J.JStr{"docs"}), J.kv("on", J.JBool{True{}}), J.kv("hub", J.JStr{"home-00000000"})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_32_follow_as_before():
-  {==}
-
 law journal_fixture_33_job_end:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"job_end"}), J.kv("name", J.JStr{"docs"}), J.kv("state", J.JStr{"done"})]))) == Some{J.obj([J.kv("type", J.JStr{"job_end"}), J.kv("name", J.JStr{"docs"}), J.kv("state", J.JStr{"done"})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_33_job_end():
-  {==}
-
-law journal_fixture_33_job_end_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"job_end"}), J.kv("name", J.JStr{"docs"}), J.kv("state", J.JStr{"done"})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"job_end"}), J.kv("name", J.JStr{"docs"}), J.kv("state", J.JStr{"done"})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_33_job_end_as_before():
   {==}
 
 law journal_fixture_34_wake_set:
@@ -1025,22 +821,10 @@ law journal_fixture_34_wake_set:
 def journal_fixture_34_wake_set():
   {==}
 
-law journal_fixture_34_wake_set_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"wake_set"}), J.kv("watch", J.obj([J.kv("id", J.JNum{1n}), J.kv("agent", J.JStr{"docs"}), J.kv("spec", J.obj([J.kv("kind", J.JStr{"pid"}), J.kv("pid", J.JNum{4242n})])), J.kv("max_text", J.JStr{"1h"}), J.kv("set_at", J.JNum{1000600n}), J.kv("max_at", J.JNum{4600600n}), J.kv("quiet", J.JBool{False{}}), J.kv("resumes", J.JBool{True{}})]))])) == C.ev_of(J.obj([J.kv("type", J.JStr{"wake_set"}), J.kv("watch", J.obj([J.kv("id", J.JNum{1n}), J.kv("agent", J.JStr{"docs"}), J.kv("spec", J.obj([J.kv("kind", J.JStr{"pid"}), J.kv("pid", J.JNum{4242n})])), J.kv("max_text", J.JStr{"1h"}), J.kv("set_at", J.JNum{1000600n}), J.kv("max_at", J.JNum{4600600n}), J.kv("quiet", J.JBool{False{}}), J.kv("resumes", J.JBool{True{}})]))])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_34_wake_set_as_before():
-  {==}
-
 law journal_fixture_35_wake_end:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"wake_end"}), J.kv("id", J.JNum{1n}), J.kv("why", J.JStr{"exited"}), J.kv("at", J.JNum{1100000n})]))) == Some{J.obj([J.kv("type", J.JStr{"wake_end"}), J.kv("id", J.JNum{1n}), J.kv("why", J.JStr{"exited"}), J.kv("at", J.JNum{1100000n})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_35_wake_end():
-  {==}
-
-law journal_fixture_35_wake_end_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"wake_end"}), J.kv("id", J.JNum{1n}), J.kv("why", J.JStr{"exited"}), J.kv("at", J.JNum{1100000n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"wake_end"}), J.kv("id", J.JNum{1n}), J.kv("why", J.JStr{"exited"}), J.kv("at", J.JNum{1100000n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_35_wake_end_as_before():
   {==}
 
 law journal_fixture_36_paused:
@@ -1049,21 +833,262 @@ law journal_fixture_36_paused:
 def journal_fixture_36_paused():
   {==}
 
-law journal_fixture_36_paused_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"paused"}), J.kv("at", J.JNum{1200000n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"paused"}), J.kv("at", J.JNum{1200000n})])) : Maybe<&2, M.Ev>}
-
-def journal_fixture_36_paused_as_before():
-  {==}
-
 law journal_fixture_37_resumed:
   {back(GJ.of(J.obj([J.kv("type", J.JStr{"resumed"}), J.kv("at", J.JNum{1300000n})]))) == Some{J.obj([J.kv("type", J.JStr{"resumed"}), J.kv("at", J.JNum{1300000n})])} : Maybe<&2, J.Json>}
 
 def journal_fixture_37_resumed():
   {==}
 
-law journal_fixture_37_resumed_as_before:
-  {GJ.of(J.obj([J.kv("type", J.JStr{"resumed"}), J.kv("at", J.JNum{1300000n})])) == C.ev_of(J.obj([J.kv("type", J.JStr{"resumed"}), J.kv("at", J.JNum{1300000n})])) : Maybe<&2, M.Ev>}
+def again(m: Maybe<&2, J.Json>) -> Maybe<&2, J.Json>:
+  match m:
+    case None{}:
+      None{}
+    case Some{+j}:
+      back(GJ.of(j))
 
-def journal_fixture_37_resumed_as_before():
+law journal_stable_0_task_created:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"task_created"}), J.kv("name", J.JStr{"docs"}), J.kv("parent", J.JStr{"main"}), J.kv("brief", J.obj([J.kv("objective", J.JStr{"write the docs"}), J.kv("done_when", J.JArr{[J.JStr{"a page"}]})])), J.kv("ws", J.obj([J.kv("kind", J.JStr{"worktree"}), J.kv("dir", J.JStr{"/Users/camille/acme/.bise/docs"})])), J.kv("at_ms", J.JNum{1000000n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"task_created"}), J.kv("name", J.JStr{"docs"}), J.kv("parent", J.JStr{"main"}), J.kv("brief", J.obj([J.kv("objective", J.JStr{"write the docs"}), J.kv("done_when", J.JArr{[J.JStr{"a page"}]})])), J.kv("ws", J.obj([J.kv("kind", J.JStr{"worktree"}), J.kv("dir", J.JStr{"/Users/camille/acme/.bise/docs"})])), J.kv("at_ms", J.JNum{1000000n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_0_task_created():
+  {==}
+
+law journal_stable_1_lifecycle:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"lifecycle"}), J.kv("name", J.JStr{"docs"}), J.kv("lifecycle", J.JStr{"stopped"}), J.kv("reason", J.JStr{"dropped by main"})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"lifecycle"}), J.kv("name", J.JStr{"docs"}), J.kv("lifecycle", J.JStr{"stopped"}), J.kv("reason", J.JStr{"dropped by main"})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_1_lifecycle():
+  {==}
+
+law journal_stable_2_workspace_changed:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"workspace_changed"}), J.kv("name", J.JStr{"docs"}), J.kv("ws", J.obj([J.kv("kind", J.JStr{"shared"}), J.kv("dir", J.JStr{"/Users/camille/acme"})]))])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"workspace_changed"}), J.kv("name", J.JStr{"docs"}), J.kv("ws", J.obj([J.kv("kind", J.JStr{"shared"}), J.kv("dir", J.JStr{"/Users/camille/acme"})]))]))) : Maybe<&2, J.Json>}
+
+def journal_stable_2_workspace_changed():
+  {==}
+
+law journal_stable_3_snapshot:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"snapshot"}), J.kv("name", J.JStr{"docs"}), J.kv("snapshot_ref", J.JStr{"refs/bise/snap/docs-1"})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"snapshot"}), J.kv("name", J.JStr{"docs"}), J.kv("snapshot_ref", J.JStr{"refs/bise/snap/docs-1"})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_3_snapshot():
+  {==}
+
+law journal_stable_4_declared:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"declared"}), J.kv("name", J.JStr{"docs"}), J.kv("status", J.JStr{"blocked"}), J.kv("note", J.JStr{"needs the API key"})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"declared"}), J.kv("name", J.JStr{"docs"}), J.kv("status", J.JStr{"blocked"}), J.kv("note", J.JStr{"needs the API key"})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_4_declared():
+  {==}
+
+law journal_stable_5_reported:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"reported"}), J.kv("name", J.JStr{"docs"}), J.kv("report", J.obj([J.kv("kind", J.JStr{"done"}), J.kv("summary", J.JStr{"the page is up"})]))])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"reported"}), J.kv("name", J.JStr{"docs"}), J.kv("report", J.obj([J.kv("kind", J.JStr{"done"}), J.kv("summary", J.JStr{"the page is up"})]))]))) : Maybe<&2, J.Json>}
+
+def journal_stable_5_reported():
+  {==}
+
+law journal_stable_6_file_touched:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"file_touched"}), J.kv("name", J.JStr{"docs"}), J.kv("path", J.JStr{"docs/index.md"})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"file_touched"}), J.kv("name", J.JStr{"docs"}), J.kv("path", J.JStr{"docs/index.md"})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_6_file_touched():
+  {==}
+
+law journal_stable_7_renamed:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"renamed"}), J.kv("name", J.JStr{"docs"}), J.kv("new_name", J.JStr{"docs-site"})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"renamed"}), J.kv("name", J.JStr{"docs"}), J.kv("new_name", J.JStr{"docs-site"})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_7_renamed():
+  {==}
+
+law journal_stable_8_message_sent:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"message_sent"}), J.kv("msg", J.obj([J.kv("id", J.JNum{7n}), J.kv("thread", J.JNum{7n}), J.kv("from", J.JStr{"user"}), J.kv("to", J.JStr{"main"}), J.kv("reply_to", J.JNull{}), J.kv("expect_reply", J.JBool{True{}}), J.kv("auto", J.JBool{False{}}), J.kv("text", J.JStr{"ship the docs"}), J.kv("created_ms", J.JNum{1000100n}), J.kv("plain", J.JBool{False{}}), J.kv("queued", J.JBool{True{}}), J.kv("via", J.JStr{"desktop"}), J.kv("parts", J.JStr{"[]"})]))])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"message_sent"}), J.kv("msg", J.obj([J.kv("id", J.JNum{7n}), J.kv("thread", J.JNum{7n}), J.kv("from", J.JStr{"user"}), J.kv("to", J.JStr{"main"}), J.kv("reply_to", J.JNull{}), J.kv("expect_reply", J.JBool{True{}}), J.kv("auto", J.JBool{False{}}), J.kv("text", J.JStr{"ship the docs"}), J.kv("created_ms", J.JNum{1000100n}), J.kv("plain", J.JBool{False{}}), J.kv("queued", J.JBool{True{}}), J.kv("via", J.JStr{"desktop"}), J.kv("parts", J.JStr{"[]"})]))]))) : Maybe<&2, J.Json>}
+
+def journal_stable_8_message_sent():
+  {==}
+
+law journal_stable_9_message_state:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"message_state"}), J.kv("id", J.JNum{7n}), J.kv("state", J.JStr{"queued"}), J.kv("reason", J.JStr{"main is busy"})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"message_state"}), J.kv("id", J.JNum{7n}), J.kv("state", J.JStr{"queued"}), J.kv("reason", J.JStr{"main is busy"})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_9_message_state():
+  {==}
+
+law journal_stable_10_message_settled:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"message_settled"}), J.kv("id", J.JNum{7n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"message_settled"}), J.kv("id", J.JNum{7n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_10_message_settled():
+  {==}
+
+law journal_stable_11_card_opened:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"card_opened"}), J.kv("card", J.obj([J.kv("id", J.JNum{3n}), J.kv("kind", J.JStr{"question"}), J.kv("agent", J.JStr{"docs"}), J.kv("text", J.JStr{"which theme?"}), J.kv("for_msg", J.JNum{7n}), J.kv("created_ms", J.JNum{1000200n}), J.kv("place", J.JNull{}), J.kv("pr", J.JNull{})]))])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"card_opened"}), J.kv("card", J.obj([J.kv("id", J.JNum{3n}), J.kv("kind", J.JStr{"question"}), J.kv("agent", J.JStr{"docs"}), J.kv("text", J.JStr{"which theme?"}), J.kv("for_msg", J.JNum{7n}), J.kv("created_ms", J.JNum{1000200n}), J.kv("place", J.JNull{}), J.kv("pr", J.JNull{})]))]))) : Maybe<&2, J.Json>}
+
+def journal_stable_11_card_opened():
+  {==}
+
+law journal_stable_12_card_closed:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"card_closed"}), J.kv("id", J.JNum{3n}), J.kv("resolution", J.JStr{"answered"})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"card_closed"}), J.kv("id", J.JNum{3n}), J.kv("resolution", J.JStr{"answered"})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_12_card_closed():
+  {==}
+
+law journal_stable_13_main_note:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"main_note"}), J.kv("text", J.JStr{"docs is blocked"}), J.kv("at_ms", J.JNum{1000300n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"main_note"}), J.kv("text", J.JStr{"docs is blocked"}), J.kv("at_ms", J.JNum{1000300n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_13_main_note():
+  {==}
+
+law journal_stable_14_main_notes_flushed:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"main_notes_flushed"})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"main_notes_flushed"})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_14_main_notes_flushed():
+  {==}
+
+law journal_stable_15_every_set:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"every_set"}), J.kv("id", J.JNum{2n}), J.kv("agent", J.JStr{"main"}), J.kv("by", J.JStr{"user"}), J.kv("text", J.JStr{"check the deploy"}), J.kv("next_ms", J.JNum{1600000n}), J.kv("every_ms", J.JNum{600000n}), J.kv("until_ms", J.JNum{87400000n}), J.kv("times", J.JNum{5n}), J.kv("page", J.JStr{"deploy"}), J.kv("name", J.JStr{"deploy check"}), J.kv("held", J.JBool{True{}}), J.kv("at", J.JNum{1000400n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"every_set"}), J.kv("id", J.JNum{2n}), J.kv("agent", J.JStr{"main"}), J.kv("by", J.JStr{"user"}), J.kv("text", J.JStr{"check the deploy"}), J.kv("next_ms", J.JNum{1600000n}), J.kv("every_ms", J.JNum{600000n}), J.kv("until_ms", J.JNum{87400000n}), J.kv("times", J.JNum{5n}), J.kv("page", J.JStr{"deploy"}), J.kv("name", J.JStr{"deploy check"}), J.kv("held", J.JBool{True{}}), J.kv("at", J.JNum{1000400n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_15_every_set():
+  {==}
+
+law journal_stable_16_every_fired:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"every_fired"}), J.kv("id", J.JNum{2n}), J.kv("fired", J.JNum{1n}), J.kv("next_ms", J.JNum{2200000n}), J.kv("at", J.JNum{1600000n}), J.kv("undelivered", J.JBool{True{}})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"every_fired"}), J.kv("id", J.JNum{2n}), J.kv("fired", J.JNum{1n}), J.kv("next_ms", J.JNum{2200000n}), J.kv("at", J.JNum{1600000n}), J.kv("undelivered", J.JBool{True{}})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_16_every_fired():
+  {==}
+
+law journal_stable_17_every_run:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"every_run"}), J.kv("id", J.JNum{2n}), J.kv("at", J.JNum{1600100n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"every_run"}), J.kv("id", J.JNum{2n}), J.kv("at", J.JNum{1600100n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_17_every_run():
+  {==}
+
+law journal_stable_18_every_stop:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"every_stop"}), J.kv("id", J.JNum{2n}), J.kv("why", J.JStr{"until"}), J.kv("at", J.JNum{87400000n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"every_stop"}), J.kv("id", J.JNum{2n}), J.kv("why", J.JStr{"until"}), J.kv("at", J.JNum{87400000n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_18_every_stop():
+  {==}
+
+law journal_stable_19_every_name:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"every_name"}), J.kv("id", J.JNum{2n}), J.kv("name", J.JStr{"deploy check"}), J.kv("at", J.JNum{1000500n}), J.kv("announce", J.JBool{True{}})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"every_name"}), J.kv("id", J.JNum{2n}), J.kv("name", J.JStr{"deploy check"}), J.kv("at", J.JNum{1000500n}), J.kv("announce", J.JBool{True{}})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_19_every_name():
+  {==}
+
+law journal_stable_20_x_out:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"x_out"}), J.kv("out", J.obj([J.kv("xid", J.JNum{1n}), J.kv("project", J.JStr{"shop-1a2b3c4d"}), J.kv("kind", J.JStr{"ask"}), J.kv("msg", J.JNum{7n}), J.kv("text", J.JStr{"is the shop up?"}), J.kv("state", J.JStr{"pending"}), J.kv("tries", J.JNum{0n}), J.kv("context", J.JStr{"from bise"}), J.kv("parts", J.JStr{"[]"})]))])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"x_out"}), J.kv("out", J.obj([J.kv("xid", J.JNum{1n}), J.kv("project", J.JStr{"shop-1a2b3c4d"}), J.kv("kind", J.JStr{"ask"}), J.kv("msg", J.JNum{7n}), J.kv("text", J.JStr{"is the shop up?"}), J.kv("state", J.JStr{"pending"}), J.kv("tries", J.JNum{0n}), J.kv("context", J.JStr{"from bise"}), J.kv("parts", J.JStr{"[]"})]))]))) : Maybe<&2, J.Json>}
+
+def journal_stable_20_x_out():
+  {==}
+
+law journal_stable_21_x_acked:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"x_acked"}), J.kv("xid", J.JNum{1n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"x_acked"}), J.kv("xid", J.JNum{1n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_21_x_acked():
+  {==}
+
+law journal_stable_22_x_failed:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"x_failed"}), J.kv("xid", J.JNum{1n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"x_failed"}), J.kv("xid", J.JNum{1n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_22_x_failed():
+  {==}
+
+law journal_stable_23_x_settled:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"x_settled"}), J.kv("xid", J.JNum{1n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"x_settled"}), J.kv("xid", J.JNum{1n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_23_x_settled():
+  {==}
+
+law journal_stable_24_x_in:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"x_in"}), J.kv("in", J.obj([J.kv("hub", J.JStr{"home-00000000"}), J.kv("xid", J.JNum{4n}), J.kv("msg", J.JNum{9n}), J.kv("kind", J.JStr{"job_end"}), J.kv("replied", J.JBool{True{}})]))])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"x_in"}), J.kv("in", J.obj([J.kv("hub", J.JStr{"home-00000000"}), J.kv("xid", J.JNum{4n}), J.kv("msg", J.JNum{9n}), J.kv("kind", J.JStr{"job_end"}), J.kv("replied", J.JBool{True{}})]))]))) : Maybe<&2, J.Json>}
+
+def journal_stable_24_x_in():
+  {==}
+
+law journal_stable_25_x_replied:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"x_replied"}), J.kv("hub", J.JStr{"home-00000000"}), J.kv("xid", J.JNum{4n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"x_replied"}), J.kv("hub", J.JStr{"home-00000000"}), J.kv("xid", J.JNum{4n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_25_x_replied():
+  {==}
+
+law journal_stable_26_route_held:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"route_held"}), J.kv("route", J.obj([J.kv("rid", J.JNum{2n}), J.kv("text", J.JStr{"tell shop to deploy"}), J.kv("via", J.JStr{"spotlight"}), J.kv("to", J.JStr{"shop-1a2b3c4d"}), J.kv("name", J.JStr{"shop"}), J.kv("due_ms", J.JNum{1003000n}), J.kv("act", J.JNum{5n}), J.kv("why", J.JStr{"named shop"}), J.kv("state", J.JStr{"held"}), J.kv("context", J.JStr{""}), J.kv("parts", J.JStr{"[]"})]))])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"route_held"}), J.kv("route", J.obj([J.kv("rid", J.JNum{2n}), J.kv("text", J.JStr{"tell shop to deploy"}), J.kv("via", J.JStr{"spotlight"}), J.kv("to", J.JStr{"shop-1a2b3c4d"}), J.kv("name", J.JStr{"shop"}), J.kv("due_ms", J.JNum{1003000n}), J.kv("act", J.JNum{5n}), J.kv("why", J.JStr{"named shop"}), J.kv("state", J.JStr{"held"}), J.kv("context", J.JStr{""}), J.kv("parts", J.JStr{"[]"})]))]))) : Maybe<&2, J.Json>}
+
+def journal_stable_26_route_held():
+  {==}
+
+law journal_stable_27_route_set:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"route_set"}), J.kv("rid", J.JNum{2n}), J.kv("to", J.JStr{"acme-1a2b3c4d"}), J.kv("name", J.JStr{"acme"})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"route_set"}), J.kv("rid", J.JNum{2n}), J.kv("to", J.JStr{"acme-1a2b3c4d"}), J.kv("name", J.JStr{"acme"})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_27_route_set():
+  {==}
+
+law journal_stable_28_route_sent:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"route_sent"}), J.kv("rid", J.JNum{2n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"route_sent"}), J.kv("rid", J.JNum{2n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_28_route_sent():
+  {==}
+
+law journal_stable_29_route_cancelled:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"route_cancelled"}), J.kv("rid", J.JNum{3n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"route_cancelled"}), J.kv("rid", J.JNum{3n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_29_route_cancelled():
+  {==}
+
+law journal_stable_30_act_set:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"act_set"}), J.kv("act", J.obj([J.kv("id", J.JNum{5n}), J.kv("due", J.JNum{1003000n}), J.kv("what", J.obj([J.kv("kind", J.JStr{"route_send"}), J.kv("rid", J.JNum{2n})]))]))])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"act_set"}), J.kv("act", J.obj([J.kv("id", J.JNum{5n}), J.kv("due", J.JNum{1003000n}), J.kv("what", J.obj([J.kv("kind", J.JStr{"route_send"}), J.kv("rid", J.JNum{2n})]))]))]))) : Maybe<&2, J.Json>}
+
+def journal_stable_30_act_set():
+  {==}
+
+law journal_stable_31_act_done:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"act_done"}), J.kv("id", J.JNum{5n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"act_done"}), J.kv("id", J.JNum{5n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_31_act_done():
+  {==}
+
+law journal_stable_32_follow:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"follow"}), J.kv("name", J.JStr{"docs"}), J.kv("on", J.JBool{True{}}), J.kv("hub", J.JStr{"home-00000000"})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"follow"}), J.kv("name", J.JStr{"docs"}), J.kv("on", J.JBool{True{}}), J.kv("hub", J.JStr{"home-00000000"})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_32_follow():
+  {==}
+
+law journal_stable_33_job_end:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"job_end"}), J.kv("name", J.JStr{"docs"}), J.kv("state", J.JStr{"done"})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"job_end"}), J.kv("name", J.JStr{"docs"}), J.kv("state", J.JStr{"done"})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_33_job_end():
+  {==}
+
+law journal_stable_34_wake_set:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"wake_set"}), J.kv("watch", J.obj([J.kv("id", J.JNum{1n}), J.kv("agent", J.JStr{"docs"}), J.kv("spec", J.obj([J.kv("kind", J.JStr{"pid"}), J.kv("pid", J.JNum{4242n})])), J.kv("max_text", J.JStr{"1h"}), J.kv("set_at", J.JNum{1000600n}), J.kv("max_at", J.JNum{4600600n}), J.kv("quiet", J.JBool{False{}}), J.kv("resumes", J.JBool{True{}})]))])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"wake_set"}), J.kv("watch", J.obj([J.kv("id", J.JNum{1n}), J.kv("agent", J.JStr{"docs"}), J.kv("spec", J.obj([J.kv("kind", J.JStr{"pid"}), J.kv("pid", J.JNum{4242n})])), J.kv("max_text", J.JStr{"1h"}), J.kv("set_at", J.JNum{1000600n}), J.kv("max_at", J.JNum{4600600n}), J.kv("quiet", J.JBool{False{}}), J.kv("resumes", J.JBool{True{}})]))]))) : Maybe<&2, J.Json>}
+
+def journal_stable_34_wake_set():
+  {==}
+
+law journal_stable_35_wake_end:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"wake_end"}), J.kv("id", J.JNum{1n}), J.kv("why", J.JStr{"exited"}), J.kv("at", J.JNum{1100000n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"wake_end"}), J.kv("id", J.JNum{1n}), J.kv("why", J.JStr{"exited"}), J.kv("at", J.JNum{1100000n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_35_wake_end():
+  {==}
+
+law journal_stable_36_paused:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"paused"}), J.kv("at", J.JNum{1200000n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"paused"}), J.kv("at", J.JNum{1200000n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_36_paused():
+  {==}
+
+law journal_stable_37_resumed:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"resumed"}), J.kv("at", J.JNum{1300000n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"resumed"}), J.kv("at", J.JNum{1300000n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_37_resumed():
+  {==}
+
+law journal_stable_38_every_set:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"every_set"}), J.kv("id", J.JNum{3n}), J.kv("agent", J.JStr{"docs"}), J.kv("by", J.JStr{"main"}), J.kv("text", J.JStr{"ping"}), J.kv("next_ms", J.JNum{5000n}), J.kv("at", J.JNum{4000n}), J.kv("every_ms", J.JNum{500n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"every_set"}), J.kv("id", J.JNum{3n}), J.kv("agent", J.JStr{"docs"}), J.kv("by", J.JStr{"main"}), J.kv("text", J.JStr{"ping"}), J.kv("next_ms", J.JNum{5000n}), J.kv("at", J.JNum{4000n}), J.kv("every_ms", J.JNum{500n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_38_every_set():
+  {==}
+
+law journal_stable_39_every_set:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"every_set"}), J.kv("id", J.JNum{4n}), J.kv("agent", J.JStr{"docs"}), J.kv("by", J.JStr{"user"}), J.kv("text", J.JStr{"standup"}), J.kv("next_ms", J.JNum{5000n}), J.kv("at", J.JNum{4000n}), J.kv("daily_min", J.JNum{3000n}), J.kv("held", J.JBool{False{}})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"every_set"}), J.kv("id", J.JNum{4n}), J.kv("agent", J.JStr{"docs"}), J.kv("by", J.JStr{"user"}), J.kv("text", J.JStr{"standup"}), J.kv("next_ms", J.JNum{5000n}), J.kv("at", J.JNum{4000n}), J.kv("daily_min", J.JNum{3000n}), J.kv("held", J.JBool{False{}})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_39_every_set():
+  {==}
+
+law journal_stable_40_every_set:
+  {again(back(GJ.of(J.obj([J.kv("type", J.JStr{"every_set"}), J.kv("id", J.JNum{5n}), J.kv("agent", J.JStr{"docs"}), J.kv("by", J.JStr{"user"}), J.kv("text", J.JStr{"none"}), J.kv("next_ms", J.JNum{5000n}), J.kv("at", J.JNum{4000n})])))) == back(GJ.of(J.obj([J.kv("type", J.JStr{"every_set"}), J.kv("id", J.JNum{5n}), J.kv("agent", J.JStr{"docs"}), J.kv("by", J.JStr{"user"}), J.kv("text", J.JStr{"none"}), J.kv("next_ms", J.JNum{5000n}), J.kv("at", J.JNum{4000n})]))) : Maybe<&2, J.Json>}
+
+def journal_stable_40_every_set():
   {==}
 

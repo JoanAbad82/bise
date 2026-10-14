@@ -12,7 +12,6 @@ import ../hub/timers.bend as HTM
 import ../hub/wakes.bend as HWK
 import ../hub/xhub-model.bend as HXH
 import ../hub/xhub.bend as HXB
-import ../hub/codec.bend as HCo
 import ../hub/pause.bend as HP
 import ../hub/feature.bend as HFT
 import ../hub/reach.bend as HR
@@ -154,7 +153,8 @@ law stop_leaves_no_timer:
 # ---- the project's pause (cost-pause, hub/pause.bend) ----
 # Its lines (paused, resumed) are events like the others: the replay laws
 # (hub_run_replays, replay_reproduces) cover them, so a restarted hub is
-# still paused; pause_line_keeps pins the line itself. LOCAL laws, on the
+# still paused; gen/journal-laws.bend's journal_paused_round and
+# journal_resumed_round pin the lines themselves. LOCAL laws, on the
 # steps of core.bend's pause section and its gates.
 
 # LAW: a paused project delivers nothing: pump (every message's way to an
@@ -211,15 +211,6 @@ law resume_keeps_order:
   for +s: HM.St
   for +at: Nat
   {HM.St.msgs(HM.apply(s, HM.EResumed{at})) == HM.St.msgs(s) : List<&2, HM.MRec>}
-
-# LAW: the journal line reads back as the same event (a restart keeps it).
-law pause_line_keeps:
-  for +at: Nat
-  {HCo.ev_of(HCo.ev_json(HM.EPaused{at})) == Some{HM.EPaused{at}} : Maybe<&2, HM.Ev>}
-
-law resume_line_keeps:
-  for +at: Nat
-  {HCo.ev_of(HCo.ev_json(HM.EResumed{at})) == Some{HM.EResumed{at}} : Maybe<&2, HM.Ev>}
 
 # ---- the watches of `sb wake` (event-wake, hub/wakes.bend) ----
 # Their lines (wake_set, wake_end) are events like the others: the replay
@@ -812,15 +803,6 @@ law act_due_only:
   for +xs: List<&2, HTM.Act>
   for +now: Nat
   {all_due(HTM.acts_due(xs, now), now) == True{} : Bool}
-
-# LAW (old-core replay, architect m_8524 c.): a journal line of a kind
-# this sb-core doesn't know decodes to nothing, so it is skipped, never
-# misread; the script test replays a fixture journal with the base's
-# sb-core for the other direction.
-law unknown_kind_skipped:
-  for +j: J.Json
-  for +n: String
-  {HCo.ev_of.kind(HCo.KUnknown{}, j, n) == None{} : Maybe<&2, HM.Ev>}
 
 # LAW (L12): stopping or dropping a task, in any state where no two open
 # cards share an id (every state the hub reaches: cards_unique), leaves no

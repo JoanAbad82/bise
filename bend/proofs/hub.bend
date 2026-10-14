@@ -288,12 +288,6 @@ def Laws.resume_keeps_order(s, at):
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs, pz, ho}:
       {==}
 
-def Laws.pause_line_keeps(at):
-  {==}
-
-def Laws.resume_line_keeps(at):
-  {==}
-
 def Laws.stop_leaves_no_timer(o, cx, n, why):
   +g = HC.stop_task.go(o, cx, n, HM.LArchived{}, why)
   +tg = HC.timers_gone(o, HM.LArchived{}, g, n)
@@ -548,9 +542,6 @@ def Laws.act_due_only(xs, now):
       {==}
     case Con{h, t}:
       hub_due_all.go(Nat.is_le(HTM.Act.due(h), now), h, t, now, {==}, Laws.act_due_only(t, now))
-
-def Laws.unknown_kind_skipped(j, n):
-  {==}
 
 # ---- the composer rule ----
 

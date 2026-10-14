@@ -101,9 +101,11 @@ values, the journal byte-equal on a replay, the e2e transcripts equal
 
 ## Not in this slice
 
-- the journal events: codec.bend's `ev_kind` is still a 38-step
-  `String.eq(t, "…")` pick chain (bend/hub/codec.bend:304-342); generating
-  codec.bend (and model.rs's serde) is the next slice (architect m_18761).
+- the journal events: done since (debt T7): `bise_proto::core::journal`'s
+  JOURNAL table generates bend/hub/gen/journal.bend and its laws;
+  codec.bend keeps only the records inside a line. Left of D1: a typed
+  Rust reader from the same table (switchboard core.rs reads journal lines
+  as `Value`).
 - the typed hot view from sb-core (D3, issue 21).
 
 ## Status
