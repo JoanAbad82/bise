@@ -17,6 +17,9 @@
 //     fails the program with "program call failed: <text>"
 //   - the final value prints to stdout and exits 0; errors go to stderr
 //     and exit 1 so the model can read them and retry
+//
+// `bend-jsrt script|inspect|check ...` is the script mode of `bise office
+// run` (script.rs, door.rs): another engine setup, never this one's.
 
 use std::sync::mpsc;
 use std::sync::Once;
@@ -31,6 +34,9 @@ use deno_ast::TranspileModuleOptions;
 use deno_ast::TranspileOptions;
 use deno_ast::parse_program;
 use deno_core::v8;
+
+mod door;
+mod script;
 
 static INITIALIZE_V8: Once = Once::new();
 const INITIAL_HEAP_BYTES: usize = 4 * 1024 * 1024;
@@ -425,11 +431,7 @@ fn run(program: &str, results: &str) -> ! {
         EPILOGUE
     );
 
-    INITIALIZE_V8.call_once(|| {
-        let platform = v8::new_default_platform(0, false).make_shared();
-        v8::V8::initialize_platform(platform);
-        v8::V8::initialize();
-    });
+    init_v8();
 
     let params = v8::CreateParams::default().heap_limits(INITIAL_HEAP_BYTES, MAX_HEAP_BYTES);
     let mut isolate = v8::Isolate::new(params);
@@ -495,8 +497,20 @@ fn run(program: &str, results: &str) -> ! {
     fail("the program ended without returning");
 }
 
+/// V8 once per process, for either mode.
+pub(crate) fn init_v8() {
+    INITIALIZE_V8.call_once(|| {
+        let platform = v8::new_default_platform(0, false).make_shared();
+        v8::V8::initialize_platform(platform);
+        v8::V8::initialize();
+    });
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if matches!(args.get(1).map(String::as_str), Some("script" | "inspect" | "check")) {
+        script::main(&args[1..]);
+    }
     if args.len() != 3 {
         eprintln!("usage: bend-jsrt <program-file> <results-file>");
         std::process::exit(1);

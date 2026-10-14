@@ -77,6 +77,7 @@ pub mod draft;
 pub mod helper;
 pub mod hub;
 pub mod log;
+pub mod office;
 pub mod ops;
 pub mod parts;
 pub mod pty;

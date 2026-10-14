@@ -20,6 +20,7 @@ fn add(store: &Store, cwd: &Path, target: &str, title: Option<&str>, now: u64) -
             agent: "pricing-page".into(),
             by: "pricing-page".into(),
             cwd: cwd.to_string_lossy().to_string(),
+            known_only: false,
         },
         now,
     )
@@ -499,4 +500,30 @@ fn an_archived_older_version_says_not_kept() {
     assert_eq!(row["versions"][0]["note"], "not kept");
     assert_eq!(row["versions"][0]["copy"], Value::Null);
     assert_eq!(row["versions"][1]["note"], "");
+}
+
+/// `run.write` without `{ artifact: true }` (architect m_23785): a
+/// `known_only` add of a file that is no artifact stores nothing and says
+/// so; of a file that is one, it is its next version like any add.
+#[test]
+fn a_known_only_add_is_only_a_next_version() {
+    let state = tmp("known-only");
+    let work = state.join("work");
+    std::fs::create_dir_all(&work).unwrap();
+    let store = Store::new(&state);
+    std::fs::write(work.join("q3.pptx"), b"v1").unwrap();
+    let known = |now| {
+        store.add(&Add { target: "q3.pptx".into(), agent: "deck".into(), by: "deck".into(), cwd: work.to_string_lossy().to_string(), known_only: true, ..Default::default() }, now)
+    };
+    let a = known(10).unwrap();
+    assert!(a.not_artifact && !a.new_version);
+    assert!(store.stored().is_empty(), "nothing stored");
+    assert_eq!(added_text(&a), format!("{} is not an artifact: written only", work.join("q3.pptx").display()));
+    // added once for real: the next known_only add is its v2
+    add(&store, &work, "q3.pptx", None, 20).unwrap();
+    std::fs::write(work.join("q3.pptx"), b"v2, longer").unwrap();
+    let a = known(30).unwrap();
+    assert!(!a.not_artifact && a.new_version);
+    assert_eq!(a.meta.current().unwrap().v, 2);
+    assert_eq!(store.stored().len(), 1);
 }

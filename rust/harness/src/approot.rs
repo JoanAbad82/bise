@@ -128,6 +128,25 @@ pub(crate) fn missing_words(exe_dir: Option<&Path>, repl: &str) -> String {
     )
 }
 
+/// The V8 engine the runtime runs `run_typescript` with, handed to the
+/// REPLs as BEND_JSRT_BIN: `bend-jsrt` in the app root (a version dir, a
+/// bundle), else the dev tree's debug build (./run.sh builds it), else its
+/// release build; else the test setting BEND_JSRT_BIN (a test's tree has
+/// none built). Never an engine of another version when the root has one.
+pub(crate) fn jsrt_bin(root: &std::path::Path) -> Option<std::path::PathBuf> {
+    let found = [
+        "bend-jsrt",
+        "rust/jsrt/target/debug/bend-jsrt",
+        "rust/jsrt/target/release/bend-jsrt",
+    ]
+    .iter()
+    .map(|rel| root.join(rel))
+    .find(|p| p.exists());
+    found
+        .map(|p| std::path::absolute(&p).unwrap_or(p))
+        .or_else(|| bise_home::env::test_setting("BEND_JSRT_BIN").map(std::path::PathBuf::from))
+}
+
 /// `find` on the real environment and file system.
 pub(crate) fn locate(repl: &str) -> Result<(PathBuf, Via), String> {
     find(&Inputs::from_env(), repl, &|d, f| d.join(f).exists())

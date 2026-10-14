@@ -84,6 +84,7 @@ dependencies = [
  "bise-catalog",
  "bise-computer-use",
  "bise-home",
+ "bise-proto",
  "bise-session",
  "serde_json",
  "switchboard",

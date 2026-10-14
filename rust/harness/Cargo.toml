@@ -14,6 +14,7 @@ path = "src/main.rs"
 [dependencies]
 bise-catalog = { path = "../catalog" }
 bise-home = { path = "../home" }
+bise-proto = { path = "../proto" }
 bise-session = { path = "../session" }
 bend-plugins = { path = "../plugins" }
 bise-computer-use = { path = "../computer-use" }

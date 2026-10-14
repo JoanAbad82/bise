@@ -14,7 +14,7 @@
 1251 rust/catalog/src/tests.rs
 1015 rust/computer-use/src/e2e.rs
 1112 rust/harness/src/doctor.rs
-1252 rust/harness/src/main.rs
+1236 rust/harness/src/main.rs
 1052 rust/plugins/src/resolve.rs
 1173 rust/proto/src/thread/fold_tests.rs
 1132 rust/proto/src/thread/lines.rs

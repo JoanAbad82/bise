@@ -152,6 +152,9 @@ build_from() {
   elif [ -d "$src/apps/ambient/kit" ]; then
     mkdir -p "$tmp/apps/ambient"; cp -R "$src/apps/ambient/kit" "$tmp/apps/ambient/kit"
   fi
+  # the office SDK's bundle: `bise office run` hands bend-jsrt
+  # <app root>/office/dist/office.js (docs/office.md)
+  if [ -d "$src/office/dist" ]; then mkdir -p "$tmp/office"; cp -R "$src/office/dist" "$tmp/office/dist"; fi
   if [ -d "$src/computer-use/extension" ]; then
     mkdir -p "$tmp/computer-use"; cp -R "$src/computer-use/extension" "$tmp/computer-use/extension"
     rm -rf "$tmp/computer-use/extension/test"

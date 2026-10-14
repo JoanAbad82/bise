@@ -143,6 +143,21 @@ fn the_helper_lines_round_trip_and_cover_every_tag() {
     assert!(matches!(&e, HelperEv::Unknown { tag, .. } if tag == "pulse"));
 }
 
+/// `bise office run` <-> bend-jsrt's script mode (architect m_23785):
+/// every line of both directions round-trips, every tag has a line, an
+/// unknown tag stays unknown.
+#[test]
+fn the_office_script_lines_round_trip_and_cover_every_tag() {
+    use bise_proto::office::{HarnessCmd, JsrtEv};
+    let t = round_trip("office_ev.jsonl", "ev", JsrtEv::decode, |m| !matches!(m, JsrtEv::Unknown { .. }), JsrtEv::to_value);
+    covers(&t, JsrtEv::TAGS, "office_ev.jsonl");
+    let t = round_trip("office_cmd.jsonl", "cmd", HarnessCmd::decode, |m| !matches!(m, HarnessCmd::Unknown { .. }), HarnessCmd::to_value);
+    covers(&t, HarnessCmd::TAGS, "office_cmd.jsonl");
+    let e = JsrtEv::decode(r#"{"ev":"progress","n":1}"#).unwrap();
+    assert!(matches!(&e, JsrtEv::Unknown { tag, .. } if tag == "progress"));
+    assert_eq!(e.to_value()["n"], 1);
+}
+
 /// `bise pty`'s lines (architect m_10140): every line of both directions
 /// round-trips, every tag has a line, an unknown tag stays unknown.
 #[test]

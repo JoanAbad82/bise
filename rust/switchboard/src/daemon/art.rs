@@ -118,7 +118,7 @@ impl Shell {
                 Where::Checkout { dir, .. } | Where::Shared { dir, .. } => dir.to_string_lossy().to_string(),
             })
             .unwrap_or_else(|| self.hub.workspace.clone());
-        let add = Add { target: target.to_string(), title, kind: None, agent, by: "you".into(), cwd };
+        let add = Add { target: target.to_string(), title, kind: None, agent, by: "you".into(), cwd, known_only: false };
         let a = self.art_store().add(&add, now_ms())?;
         if a.new_version {
             self.art_lines(&a);
@@ -139,6 +139,7 @@ impl Shell {
                     agent: from.to_string(),
                     by: from.to_string(),
                     cwd: s("cwd"),
+                    known_only: v.get("known_only") == Some(&json!(true)),
                 };
                 match store.add(&add, now_ms()) {
                     Ok(a) => {

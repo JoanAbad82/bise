@@ -40,6 +40,7 @@ mod doctor;
 mod project_cli;
 mod session_cli;
 mod info;
+mod office;
 mod update;
 mod version;
 
@@ -291,25 +292,6 @@ fn app_root_or_exit(repl: &str) -> std::path::PathBuf {
     })
 }
 
-/// The V8 engine the runtime runs `run_typescript` with, handed to the
-/// REPLs as BEND_JSRT_BIN: `bend-jsrt` in the app root (a version dir, a
-/// bundle), else the dev tree's debug build (./run.sh builds it), else its
-/// release build; else the test setting BEND_JSRT_BIN (a test's tree has
-/// none built). Never an engine of another version when the root has one.
-fn jsrt_bin(root: &std::path::Path) -> Option<std::path::PathBuf> {
-    let found = [
-        "bend-jsrt",
-        "rust/jsrt/target/debug/bend-jsrt",
-        "rust/jsrt/target/release/bend-jsrt",
-    ]
-    .iter()
-    .map(|rel| root.join(rel))
-    .find(|p| p.exists());
-    found
-        .map(|p| std::path::absolute(&p).unwrap_or(p))
-        .or_else(|| bise_home::env::test_setting("BEND_JSRT_BIN").map(std::path::PathBuf::from))
-}
-
 /// The workspace a switchboard command is about: --workspace, else the
 /// directory the user launched from (run.sh exports it before its cd).
 fn sb_workspace(args: &[String]) -> std::path::PathBuf {
@@ -336,7 +318,7 @@ fn run_sbd(args: &[String]) -> std::io::Result<()> {
     switchboard::daemon::run(switchboard::daemon::Opts {
         paths,
         core_bin: core_bin_of(&root),
-        jsrt_bin: jsrt_bin(&root),
+        jsrt_bin: approot::jsrt_bin(&root),
         repl_bin: root.join("repl-live"),
         app_root: root,
         exe: std::env::current_exe()?,
@@ -482,6 +464,7 @@ const HELP: &[(&str, &[(&str, &str)])] = &[
         ("{cmd} --headless", "one session without a TUI: --scripted, --model NAME, --port N,"),
         ("", "--continue, --resume ID (an id prefix works)"),
         ("{cmd} sb <command> ...", "the agents' tool; `sb` is a link to this binary (sb help)"),
+        ("{cmd} office run <script.ts>", "run a script on xlsx, pptx, docx files (@bise/office); also inspect|check <file>"),
         ("internal:", "sbd, sbswitch, keyprobe"),
     ]),
 ];
@@ -623,6 +606,7 @@ fn run_main() -> std::io::Result<()> {
             Some("doctor") => std::process::exit(doctor::main(&args[1..])),
             // the session logs (BISE-199)
             Some("session") => std::process::exit(session_cli::main(&args[1..])),
+            Some("office") => std::process::exit(office::main(&args[1..])),
             // the projects registry (bise desktop): never starts a hub
             Some("project" | "projects") => std::process::exit(project_cli::main(&args[1..])),
             // an installed bise (install.sh, BISE-170/171)
@@ -700,7 +684,7 @@ fn run_main() -> std::io::Result<()> {
     let repl_name = if scripted { "repl-scripted" } else { "repl-live" };
     let root = app_root_or_exit(repl_name);
     std::env::set_current_dir(&root)?;
-    let jsrt = jsrt_bin(&root);
+    let jsrt = approot::jsrt_bin(&root);
     let repl_bin = root.join(repl_name);
 
     // REPL port: forced, or pick a free one (bind 0, drop, hand over)

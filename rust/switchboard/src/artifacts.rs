@@ -83,6 +83,10 @@ pub struct Add {
     /// `you` or the agent.
     pub by: String,
     pub cwd: String,
+    /// Only a next version of a file that already is an artifact
+    /// (`bise office run`'s `run.write`, plan §2): another file is not
+    /// added, the answer says so ([`Added::not_artifact`]).
+    pub known_only: bool,
 }
 
 /// The answer to an add.
@@ -93,6 +97,9 @@ pub struct Added {
     pub new_version: bool,
     /// The add named a bise page: nothing stored, the page is its artifact.
     pub page: bool,
+    /// A `known_only` add of a file that is no artifact: nothing stored,
+    /// `meta` is empty but for its `source`.
+    pub not_artifact: bool,
 }
 
 /// A bise page as the page store keeps it (only what the list reads).
@@ -462,7 +469,7 @@ impl Store {
         if let Some(u) = &url {
             if let Some(id) = self.page_of_link(u) {
                 let p = pages.iter().find(|p| p.id == id).cloned().unwrap_or_default();
-                return Ok(Added { meta: page_meta(&p, self.pages_base().as_deref()), new_version: false, page: true });
+                return Ok(Added { meta: page_meta(&p, self.pages_base().as_deref()), new_version: false, page: true, not_artifact: false });
             }
         }
         let (source, target, kind) = match (&path, &url) {
@@ -473,6 +480,10 @@ impl Store {
             (None, Some(u)) => (u.trim_end_matches('/').to_string(), u.clone(), link_kind(u)),
             _ => unreachable!(),
         };
+        if a.known_only && !stored.iter().any(|m| m.source == source) {
+            let meta = Meta { source, ..Meta::default() };
+            return Ok(Added { meta, new_version: false, page: false, not_artifact: true });
+        }
         let kind = a.kind.clone().unwrap_or_else(|| kind.to_string());
         let mut meta = match stored.iter().find(|m| m.source == source) {
             Some(m) => m.clone(),
@@ -524,7 +535,7 @@ impl Store {
             };
             if same_sig || same_bytes() {
                 self.save(&meta)?;
-                return Ok(Added { meta, new_version: false, page: false });
+                return Ok(Added { meta, new_version: false, page: false, not_artifact: false });
             }
         }
         let v = meta.versions.last().map_or(1, |l| l.v + 1);
@@ -548,7 +559,7 @@ impl Store {
         };
         meta.versions.push(Version { v, at_ms: now, target, copy, no_copy, sig });
         self.save(&meta)?;
-        Ok(Added { meta, new_version: true, page: false })
+        Ok(Added { meta, new_version: true, page: false, not_artifact: false })
     }
 
     /// Every artifact, stored ones and pages, newest first (the time of
@@ -783,6 +794,9 @@ pub fn added_text(a: &Added) -> String {
     let m = &a.meta;
     let v = m.current().map_or(1, |v| v.v);
     let link = format!("[{}](artifact:{})", m.title, m.id);
+    if a.not_artifact {
+        return format!("{} is not an artifact: written only", m.source);
+    }
     if a.page {
         return format!("{} is a bise page (v{}): it's in already. link it as {}", m.id, v, link);
     }

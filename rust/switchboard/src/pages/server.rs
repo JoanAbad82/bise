@@ -718,7 +718,7 @@ mod tests {
         std::fs::write(work.join("notes.pdf"), b"%PDF-1.4").unwrap();
         let arts = crate::artifacts::Store::new(&d);
         let add = |target: &str| {
-            let a = crate::artifacts::Add { target: target.into(), title: None, kind: None, agent: "main".into(), by: "main".into(), cwd: work.to_string_lossy().to_string() };
+            let a = crate::artifacts::Add { target: target.into(), title: None, kind: None, agent: "main".into(), by: "main".into(), cwd: work.to_string_lossy().to_string(), known_only: false };
             arts.add(&a, 10).unwrap()
         };
         add("proof.html");

@@ -124,6 +124,8 @@ else cp "$vdir"/tool-desc-*.txt "$vdir"/prompt-*.txt "$app/"; pr=""; fi
 # the built-in plugins and computer use's browser extension (versions.sh
 # puts them in the version dir; read at run time from the app root)
 if [ -d "$vdir/plugins" ]; then cp -R "$vdir/plugins" "$app/plugins"; fi
+# the office SDK's bundle, for `bise office run` (docs/office.md)
+if [ -d "$vdir/office/dist" ]; then mkdir -p "$app/office"; cp -R "$vdir/office/dist" "$app/office/dist"; fi
 if [ -d "$vdir/computer-use/extension" ]; then mkdir -p "$app/computer-use"; cp -R "$vdir/computer-use/extension" "$app/computer-use/extension"; fi
 # the pages kit (CSS, JS, fonts, the start-here page): the page server
 # serves /kit from <app root>/kit. Without it (v2026.10.2-31, -32) every

@@ -107,8 +107,10 @@ name = "bend-jsrt"
 version = "0.1.0"
 dependencies = [
  "bend-images",
+ "bise-proto",
  "deno_ast",
  "deno_core",
+ "serde_json",
 ]
 
 [[package]]
@@ -154,6 +156,14 @@ name = "bise-home"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "serde_json",
+]
+
+[[package]]
+name = "bise-proto"
+version = "0.1.0"
+dependencies = [
+ "serde",
  "serde_json",
 ]
 

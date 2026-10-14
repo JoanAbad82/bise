@@ -244,6 +244,9 @@ pub enum Child {
     /// His own shell (the desktop's terminal panel, `bise pty`): his
     /// settings only, nothing of bise's internals or of a test run.
     Shell,
+    /// bend-jsrt's script mode (`bise office run`): his settings only,
+    /// like his shell; its scope comes as arguments, never from here.
+    Script,
 }
 
 /// The test settings a hub never gets: `SB_CORE_BIN` is the cargo tests'

@@ -23,7 +23,7 @@ TextDecoder are used when the host has them, else its own UTF-8:
 `core/utf8.ts`). So the same `office/dist/office.js` runs in:
 
 - `bise office run <script.ts>` (bend-jsrt's script mode: V8 and deno_core,
-  no web APIs; it embeds the file with `include_str!`);
+  no web APIs; it reads the file from the app root, below);
 - the viewer in the side panel (the pages server serves the same file);
 - node, for the tests and for anyone who wants it.
 
@@ -50,6 +50,52 @@ time (`strict`: it installs node_modules from the lockfile).
 A new dependency in the bundle: its license file in `packaging/notices/`,
 its row in `packaging/third-party-notices.py`'s MANUAL and in
 `THIRD_PARTY_NOTICES`, in the same commit.
+
+## `bise office run`, `inspect`, `check`
+
+```sh
+bise office run make-deck.ts     # a script: import { slides, run } from "@bise/office"
+bise office inspect q3.pptx      # the outline as JSON (no script)
+bise office check q3.pptx        # the problems as JSON
+```
+
+- **Where**: the `bise` binary (`rust/harness/src/office.rs`) finds
+  `bend-jsrt` and `office/dist/office.js` in its app root (a version dir
+  has both: `scripts/versions.sh`, `packaging/build-dist.sh`) and starts
+  `bend-jsrt script|inspect|check <file> --bundle <office.js> --root <dir>...
+  --host` (`rust/jsrt/src/script.rs`) with `bise_home::env`'s `Script`
+  environment.
+- **The engine**: the bundle is the module `@bise/office`; the script is
+  an ES module (TypeScript, types stripped) that may import it and nothing
+  else. A 1 GB heap, a 5 minute cap. `console.log` prints a line. No `fetch`,
+  no `process`, no env, no subprocess.
+- **No timers** (architect m_23800): no `setTimeout`, `setImmediate`,
+  `queueMicrotask`; the script's promises settle in one microtask drain,
+  and a library that needs a timer fails loudly in `rust/jsrt/tests/script.rs`.
+  `run_typescript` has none either.
+- **The door** (`rust/jsrt/src/door.rs`): `run.read` and `run.write` take
+  paths under the agent's worktree (`BEND_WORKDIR`, else the current
+  folder) or its `$TMPDIR`; relative paths start at the current folder.
+  Outside an agent (no `BEND_WORKDIR`) the scope is the current folder: run
+  from `~`, a script may use his whole home (his own shell, so accepted;
+  `bise office --help` says it).
+  Refused, each in one line that names the path and the folders allowed:
+  a path outside, a `..` that climbs out, a symlink that leads out, a write
+  over an existing symlink, a file over 50 MB (read or write), a missing
+  folder. A user's file elsewhere: copy it into `$TMPDIR` with bash first.
+  A write goes to a temp file beside the target, then a rename.
+- **Versions**: after each write, `bise office run` sends the request of
+  `sb artifact add <path>` on `SB_SOCKET`, with `known_only` unless the
+  script wrote `{ artifact: true }`: a file that already is an artifact
+  gets its next version, another is only written (the hub answers
+  `<path> is not an artifact: written only`). `run.write` resolves with the
+  hub's words once it has the version; a refusal of the hub rejects it
+  (the file stays written). Outside an agent (no `SB_SOCKET`): written only.
+- **The wire** between the two binaries: `bise_proto::office` (`JsrtEv`
+  on jsrt's stdout, `HarnessCmd` on its stdin), fixtures
+  `rust/proto/fixtures/office_{ev,cmd}.jsonl`.
+- **Output**: the script's lines and the hub's words on stdout; a failure
+  (an exception, a refusal, the cap) on stderr, exit 1.
 
 ## The API every module shares
 
