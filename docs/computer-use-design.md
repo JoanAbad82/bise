@@ -238,7 +238,10 @@ hub ── "stop <agent>" / "stop all" ──▶ broker
   back". Activating an agent tab, or clicking or typing in it, does not
   pause it: the tab stays the agent's and it keeps driving it while he
   watches (cu-focus). It only marks the tab touched (a drop ungroups it
-  instead of closing it).
+  instead of closing it). Follow-up for designer, not built: a line in
+  the agent's tab while it drives, with a take-over control that calls
+  the same ctl `pause` (architect m_24953; today the group label, the
+  debugger bar and the cursor pill tell him).
 - **Ownership:** an agent owns the tabs it opened, and only those: their
   ids go to `chrome.storage.session` (`t<tab id>` → agent key, beside
   `g<group id>`), and a restarted worker recovers them from there, never
