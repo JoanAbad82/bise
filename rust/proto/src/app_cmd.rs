@@ -2,6 +2,8 @@
 //! (`core/<tag>` on its stdio: [`crate::app_rpc`]).
 
 use crate::app_rows::*;
+use crate::context::FnContext;
+use crate::hub::Mode;
 use crate::{decode, parse, Project};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -207,6 +209,105 @@ pub enum AppCmd {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         max_width: Option<u32>,
     },
+    /// S9 (amb-mac m_9035): what the app read of his front app at fn (talk
+    /// or spotlight), sent apart from `talk_start`; `{}` (an excluded app)
+    /// clears it. The next turn to main carries it, then it's gone
+    FnContext { context: FnContext },
+    /// fn's talk: the still the helper took of his front window (`path`
+    /// in the shots folder), sent with the talk's words
+    Shot {
+        path: String,
+        #[serde(default)]
+        app: String,
+        #[serde(default)]
+        title: String,
+    },
+    /// his words to main (the capsule, the spotlight); `files`: a drop on
+    /// the pearl, absolute paths only, sent with the words (amb-web m_9242)
+    Send {
+        #[serde(default)]
+        text: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        files: Vec<String>,
+    },
+    /// fn space's typed text sent with tab: main starts an agent on it
+    /// (only main starts agents; ambient-lead m_6513)
+    Start {
+        #[serde(default)]
+        text: String,
+    },
+    /// his answer to the main hub's card `card`
+    Answer {
+        card: u64,
+        #[serde(default)]
+        reply: String,
+    },
+    /// main's voice stops (its words stay)
+    Hush,
+    /// he talks over main: its voice stops and his talk starts
+    CutIn,
+    /// on a call or in a meeting (the app's read): text only, no voice
+    /// (docs/ambient-app.md §4)
+    Quiet {
+        #[serde(default)]
+        on: bool,
+    },
+    /// the settings' voice answers (amb-mac m_5327): off, main's answers
+    /// are text only; on (the default), as usual
+    Voice {
+        #[serde(default = "crate::yes")]
+        on: bool,
+    },
+    /// the menu bar's "stop watching" (amb-mac m_5475): standing order
+    /// `id` stops (the hub's scheduled/stop)
+    EveryStop { id: u64 },
+    /// harness A: the words the fake voice hears at the next talk (only
+    /// with the fake voice on; an error otherwise)
+    FakeWords {
+        #[serde(default)]
+        text: String,
+    },
+    /// an agent's preview (now, its last actions, what waits on him, its
+    /// last report, its pages), sent again on its events while it stays
+    /// selected (round 10)
+    AgentPreview { agent: String },
+    /// an agent's history panel: the newest entries (`before` none: the
+    /// panel opens and its live entries follow) or the ones before a pos;
+    /// `limit`: 60 if none, 1..200
+    AgentHistory {
+        agent: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        before: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        limit: Option<u32>,
+    },
+    /// the history panel closed: no more live entries
+    AgentUnwatch { agent: String },
+    /// his words to an agent: `now` (steered into its turn, the default)
+    /// or `queued` (held by the core until the agent is free)
+    AgentSend {
+        agent: String,
+        #[serde(default)]
+        text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mode: Option<Mode>,
+    },
+    /// follow an agent's events (on, the default) or not
+    Follow {
+        agent: String,
+        #[serde(default = "crate::yes")]
+        on: bool,
+    },
+    /// stop an agent's turn (the hub's interrupt; the window asks first)
+    Stop { agent: String },
+    /// `/archive <agent>`; `stop_first`: `--force`, a working agent
+    Archive {
+        agent: String,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        stop_first: bool,
+    },
+    /// `/restore <agent>`: back in his list
+    Unarchive { agent: String },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
@@ -266,6 +367,25 @@ impl AppCmd {
         "setup_check",
         "role_set",
         "computer",
+        "fn_context",
+        "shot",
+        "send",
+        "start",
+        "answer",
+        "hush",
+        "cut_in",
+        "quiet",
+        "voice",
+        "every_stop",
+        "fake_words",
+        "agent_preview",
+        "agent_history",
+        "agent_unwatch",
+        "agent_send",
+        "follow",
+        "stop",
+        "archive",
+        "unarchive",
     ];
 
     pub fn decode(line: &str) -> Result<AppCmd, String> {

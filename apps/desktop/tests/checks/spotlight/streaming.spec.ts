@@ -49,12 +49,12 @@ test('spotlight/streaming: bise main\'s reply streams in, only new words fade, n
     const subMain = (c: Record<string, unknown>): boolean => c['cmd'] === 'subscribe' && c['agent'] === 'main' && c['project'] === HOME;
     const subsBefore = core.cmds().filter(subMain).length;
     await cap.keyboard.press('Enter');
-    await core.waitCmd((c) => c['cmd'] === 'send' && c['agent'] === 'main');
+    await core.waitCmd((c) => c.cmd === 'send' && 'agent' in c && c.agent === 'main');
     // R18 (qa-native m_12853): another window's unsubscribe dropped the capsule's follow of main
     // (one set per project in the core), so the answer never came: the ask follows main again
     // first, and the fresh page it brings back (main's older answers) is never taken for his answer
     const cmds = core.cmds();
-    const sendAt = cmds.findIndex((c) => c['cmd'] === 'send' && c['agent'] === 'main');
+    const sendAt = cmds.findIndex((c) => c.cmd === 'send' && 'agent' in c && c.agent === 'main');
     const subAts = cmds.map((c, i) => (subMain(c) ? i : -1)).filter((i) => i >= 0);
     expect(subAts.length, 'the ask subscribes to main again').toBeGreaterThan(subsBefore);
     expect(subAts[subsBefore] ?? Infinity, 'before it sends').toBeLessThan(sendAt);
@@ -211,7 +211,7 @@ test("spotlight/streaming: the '∿' after a block moves nothing, tables as the 
     await input.click();
     await cap.keyboard.type(`how do the benches compare ${Date.now() % 100000}`);
     await cap.keyboard.press('Enter');
-    await core.waitCmd((c) => c['cmd'] === 'send' && c['agent'] === 'main');
+    await core.waitCmd((c) => c.cmd === 'send' && 'agent' in c && c.agent === 'main');
     const text = cap.locator('[data-testid="spot.answer.text"]');
     const sign = cap.locator('[data-testid="spot.answer.text.sign"]');
     const box = async (sel: string): Promise<Box> => {

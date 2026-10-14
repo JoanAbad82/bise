@@ -61,7 +61,7 @@ test('thread/esc-order: esc closes an open list first and never stops the turn, 
       await expect(page.getByTestId('composer.keys'), "the key line says it: 'ctrl+c stop'").toContainText('ctrl+c stop');
       await page.screenshot({ path: test.info().outputPath('keyline-working-light.png') });
       await page.keyboard.press('Control+c');
-      await core.waitCmd((c) => c.cmd === 'stop' && c.project === ACME && c.agent === 'perf', 1000);
+      await core.waitCmd((c) => c.cmd === 'stop' && 'project' in c && c.project === ACME && c.agent === 'perf', 1000);
       expect(await text(), 'his draft stays').toBe('garde');
     });
   } finally {

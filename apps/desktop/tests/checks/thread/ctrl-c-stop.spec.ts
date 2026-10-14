@@ -102,7 +102,7 @@ test("thread/ctrl-c-stop: ctrl+c stops the working turn, but not while text is s
       ).toBe(true);
       await page.keyboard.press("Control+c");
       await core.waitCmd(
-        (c) => c.cmd === "stop" && c.project === ACME && c.agent === "perf",
+        (c) => c.cmd === "stop" && "project" in c && c.project === ACME && c.agent === "perf",
       );
       expect(stops(), "one stop").toHaveLength(1);
       await expect(field, "the composer keeps his draft").toHaveText(

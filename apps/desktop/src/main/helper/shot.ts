@@ -14,13 +14,13 @@
 // capsule's). A shot that fails, is skipped or comes too late never blocks the
 // talk: the talk just goes without it. An off-screen run has no helper, so no
 // shot (offscreen.ts).
-import type { HelperCmd, HelperEv } from '../../proto';
+import type { AppCmd, HelperCmd, HelperEv } from '../../proto';
 
 export type ShotPorts = {
   /** a command to the helper */
   readonly helper: (c: HelperCmd) => void;
   /** a command to the core; false when no core runs */
-  readonly core: (cmd: { readonly cmd: 'shot'; readonly path: string; readonly app: string; readonly title: string }) => boolean;
+  readonly core: (cmd: Extract<AppCmd, { cmd: 'shot' }>) => boolean;
   /** removes a PNG that no talk takes */
   readonly drop: (path: string) => void;
   /** where the helper writes its PNGs */

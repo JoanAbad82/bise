@@ -3,6 +3,7 @@
 //! of every type appears in a fixture, and the unknown ones stay unknown.
 
 use bise_proto::app_cmd::AppCmd;
+use bise_proto::app_rpc;
 use bise_proto::core_ev::CoreEv;
 use bise_proto::draft::{DraftHubCmd, ProjectView};
 use bise_proto::hub::{HubCmd, HubEv};
@@ -71,15 +72,20 @@ fn drafts_round_trip_and_cover_every_tag() {
 #[test]
 fn the_directions_never_mix() {
     // a hub can't emit the core's events, and the app's commands are no
-    // hub command: each decodes as unknown on the other side
+    // hub command: each decodes as unknown on the other side, or (a tag
+    // both have: send, answer, stop, archive, unarchive, follow) the
+    // project says which, as app_rpc::method_of routes it
+    let method = |l: &str| app_rpc::method_of(&json(l)).unwrap();
     for l in lines("core_ev.jsonl") {
         assert!(matches!(HubEv::decode(&l).unwrap(), HubEv::Unknown { .. }), "{l}");
     }
     for l in lines("app_cmd.jsonl") {
-        assert!(matches!(HubCmd::decode(&l).unwrap(), HubCmd::Unknown { .. }), "{l}");
+        assert!(method(&l).starts_with("core/"), "{l}");
     }
     for l in lines("hub_cmd.jsonl") {
-        assert!(matches!(AppCmd::decode(&l).unwrap(), AppCmd::Unknown { .. }), "{l}");
+        let tag = json(&l)["cmd"].as_str().unwrap().to_string();
+        let hub = matches!(AppCmd::decode(&l).unwrap(), AppCmd::Unknown { .. }) || method(&l) == format!("hub/{tag}");
+        assert!(hub, "{l}");
     }
 }
 

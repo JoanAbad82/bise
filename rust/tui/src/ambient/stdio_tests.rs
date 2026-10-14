@@ -117,13 +117,5 @@ fn every_command_the_core_parses_has_its_method() {
         let e = crate::ambient::Cmd::parse(&json!({"cmd": tag}).to_string()).err().unwrap_or_default();
         assert_eq!(e.starts_with("unknown cmd"), app_rpc::NOT_SERVED.contains(tag), "{tag}: {e}");
     }
-    // and each tag cmd.rs matches by hand is served
-    let cmd_rs = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/ambient/core/cmd.rs")).unwrap();
-    let body = &cmd_rs[cmd_rs.find("Ok(match cmd.as_str()").unwrap()..];
-    for arm in body.lines().map(str::trim).filter(|l| l.starts_with('"') || l.starts_with("c @ (")) {
-        let head = arm.split("=>").next().unwrap();
-        for tag in head.split('"').skip(1).step_by(2) {
-            assert!(served.contains(&format!("core/{tag}")), "cmd.rs reads {tag:?}, core/{tag} is not served");
-        }
-    }
+    // (cmd.rs reads only AppCmd's tags: no hand-matched tag to scan for)
 }

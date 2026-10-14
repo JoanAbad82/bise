@@ -6,7 +6,7 @@
 //!   `initialized`; the core writes nothing before that result and holds
 //!   its events until `initialized`;
 //! - every command is a [`Request`]: method `core/<cmd tag>` (an
-//!   [`AppCmd`], or one of [`CORE_CMDS`] not typed yet) or `hub/<cmd tag>`
+//!   [`AppCmd`]) or `hub/<cmd tag>`
 //!   (a [`HubCmd`] for a project's hub, `project` in its params); params
 //!   are the command's fields as they are, without `cmd`. Its [`Response`]
 //!   is `{}` once the core took it, an error when it couldn't read it;
@@ -16,7 +16,7 @@
 //!   its fields without `ev`.
 //!
 //! One owner for the names: the tags of [`AppCmd`], [`CoreEv`], [`HubCmd`]
-//! and [`HubEv`] plus the two lists below of the core's untyped lines;
+//! and [`HubEv`] plus the list below of the core's untyped events;
 //! laws in `app_rpc_tests.rs` (and bend-tui's ambient tests: every line the
 //! core writes or parses is in a list). A computer-use still
 //! (`core/computer_peek`) is never logged, by the core or the app.
@@ -29,33 +29,9 @@ use crate::PROTO;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-/// The core's commands that have no [`AppCmd`] variant yet (cmd.rs parses
-/// them by hand): each is `core/<tag>`. Shrink-only (docs/issues/24, law
-/// `the_untyped_lists_only_shrink`): never add a tag here.
-pub const CORE_CMDS: &[&str] = &[
-    "fn_context",
-    "shot",
-    "send",
-    "start",
-    "answer",
-    "hush",
-    "cut_in",
-    "quiet",
-    "voice",
-    "every_stop",
-    "fake_words",
-    "agent_preview",
-    "agent_history",
-    "agent_unwatch",
-    "agent_send",
-    "follow",
-    "stop",
-    "archive",
-    "unarchive",
-];
-
 /// The core's events that have no [`CoreEv`] variant yet: each is
-/// `core/<tag>`. Shrink-only, like [`CORE_CMDS`] (docs/issues/24).
+/// `core/<tag>`. Shrink-only (docs/issues/24, law
+/// `the_untyped_lists_only_shrink`): never add a tag here.
 pub const CORE_EVS: &[&str] = &[
     "state",
     "main",
@@ -104,15 +80,14 @@ pub const NOT_SERVED: &[&str] = &["open"];
 
 /// Every command tag the core takes from the app.
 pub fn core_cmds() -> impl Iterator<Item = &'static str> {
-    AppCmd::TAGS.iter().filter(|t| !NOT_SERVED.contains(t)).chain(CORE_CMDS).copied()
+    AppCmd::TAGS.iter().filter(|t| !NOT_SERVED.contains(t)).copied()
 }
 
 /// Every command tag the app sends a project's hub through the core.
 // TODO(client-protocol step 7, architect m_15060): when ambient-app and
 // client-protocol merge, the hub half's names (hub/<cmd tag>, hub/<ev tag>)
 // become rpc::METHODS/NOTIFICATIONS' names (one owner); this module keeps
-// only core/<tag>. Typing CORE_CMDS/CORE_EVS into AppCmd/CoreEv is its own
-// later chunk (plan v11, 'after the release').
+// only core/<tag>.
 pub fn hub_cmds() -> impl Iterator<Item = &'static str> {
     HubCmd::TAGS.iter().copied().filter(|t| !NOT_A_METHOD.contains(t))
 }

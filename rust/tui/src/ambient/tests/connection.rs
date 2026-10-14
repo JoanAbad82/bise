@@ -92,7 +92,8 @@ fn cmd_lines_parse_as_the_contract_says() {
         Cmd::parse(r#"{"cmd":"shot","path":"/t/a.png","app":"Chrome","title":"x"}"#),
         Ok(Cmd::Shot { path: "/t/a.png".into(), app: "Chrome".into(), title: "x".into() })
     );
-    assert_eq!(Cmd::parse(r##"{"cmd":"answer","card":"#3","reply":"1"}"##), Ok(Cmd::Answer { card: 3, reply: "1".into() }));
+    // a card is its number (AppCmd's u64), never "#3" (architect m_23230)
+    assert!(Cmd::parse(r##"{"cmd":"answer","card":"#3","reply":"1"}"##).is_err());
     assert_eq!(Cmd::parse(r#"{"cmd":"answer","card":3,"reply":"yes"}"#), Ok(Cmd::Answer { card: 3, reply: "yes".into() }));
     assert!(Cmd::parse(r#"{"cmd":"answer","reply":"yes"}"#).is_err());
     assert!(Cmd::parse(r#"{"cmd":"fly"}"#).is_err());

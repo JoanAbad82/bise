@@ -18,10 +18,7 @@ fn unique(names: &[String]) -> bool {
 
 #[test]
 fn every_tag_is_exactly_one_name() {
-    // the untyped lists never repeat a typed tag (typing one moves it)
-    for t in CORE_CMDS {
-        assert!(!AppCmd::TAGS.contains(t), "{t}: an AppCmd tag listed untyped too");
-    }
+    // the untyped list never repeats a typed tag (typing one moves it)
     for t in CORE_EVS {
         assert!(!CoreEv::TAGS.contains(t), "{t}: a CoreEv tag listed untyped too");
         assert!(!HubEv::TAGS.contains(t), "{t}: a HubEv tag listed as the core's");
@@ -33,12 +30,12 @@ fn every_tag_is_exactly_one_name() {
     let n = notifications();
     assert!(unique(&m), "a method twice: {m:?}");
     assert!(unique(&n), "a notification twice: {n:?}");
-    assert_eq!(m.len(), 1 + AppCmd::TAGS.len() - NOT_SERVED.len() + CORE_CMDS.len() + HubCmd::TAGS.len() - 1);
+    assert_eq!(m.len(), 1 + AppCmd::TAGS.len() - NOT_SERVED.len() + HubCmd::TAGS.len() - 1);
     assert_eq!(n.len(), CoreEv::TAGS.len() + CORE_EVS.len() + HubEv::TAGS.len());
     for t in NOT_SERVED {
         assert!(AppCmd::TAGS.contains(t) && !m.contains(&format!("core/{t}")), "{t}");
     }
-    for t in AppCmd::TAGS.iter().filter(|t| !NOT_SERVED.contains(t)).chain(CORE_CMDS) {
+    for t in AppCmd::TAGS.iter().filter(|t| !NOT_SERVED.contains(t)) {
         assert!(m.contains(&format!("core/{t}")), "{t}");
     }
     for t in HubCmd::TAGS.iter().filter(|t| **t != "hello") {
@@ -55,28 +52,22 @@ fn every_tag_is_exactly_one_name() {
     assert!(n.contains(&"core/computer_live".to_string()) && n.contains(&"core/computer_peek".to_string()));
 }
 
-/// docs/issues/24: the untyped lists only shrink. A new command or event is
-/// an `AppCmd` / `CoreEv` variant; typing a listed tag takes its row out
-/// of the list and out of these pins in the same sha.
+/// docs/issues/24: the untyped list only shrinks. A new event is a
+/// `CoreEv` variant; typing a listed tag takes its row out of the list and
+/// out of this pin in the same sha. (The commands' list is gone: every
+/// command is an `AppCmd`.)
 #[test]
 fn the_untyped_lists_only_shrink() {
-    const CMDS_PINNED: &[&str] = &[
-        "fn_context", "shot", "send", "start", "answer", "hush", "cut_in", "quiet", "voice", "every_stop",
-        "fake_words", "agent_preview", "agent_history", "agent_unwatch", "agent_send", "follow", "stop", "archive", "unarchive",
-    ];
     const EVS_PINNED: &[&str] = &[
         "state", "main", "hub", "sent", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview",
         "agent_queued", "agent_typing", "fake_voice",
     ];
-    for (list, pinned, what) in [(CORE_CMDS, CMDS_PINNED, "CORE_CMDS"), (CORE_EVS, EVS_PINNED, "CORE_EVS")] {
-        for t in list {
-            assert!(pinned.contains(t), "{what} gained {t}: type it (an AppCmd / CoreEv variant), never a new untyped tag (docs/issues/24)");
-        }
-        for t in pinned {
-            assert!(list.contains(t), "{t} left {what}: drop it from the pin here too, in the same sha (docs/issues/24)");
-        }
+    for t in CORE_EVS {
+        assert!(EVS_PINNED.contains(t), "CORE_EVS gained {t}: type it (a CoreEv variant), never a new untyped tag (docs/issues/24)");
     }
-    assert!(CORE_CMDS.len() <= 19 && CORE_EVS.len() <= 13);
+    for t in EVS_PINNED {
+        assert!(CORE_EVS.contains(t), "{t} left CORE_EVS: drop it from the pin here too, in the same sha (docs/issues/24)");
+    }
 }
 
 #[test]

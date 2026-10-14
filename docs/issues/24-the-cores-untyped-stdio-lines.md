@@ -17,8 +17,12 @@ these lines as raw `serde_json::Value`, and the app reads them as
 `Record<string, unknown>`. A renamed or dropped field fails silently,
 with no red. It was accepted on the ambient-app branch to ship.
 
-`CORE_CMDS`: 19 commands, parsed by hand in
-`rust/tui/src/ambient/core/cmd.rs`:
+`CORE_CMDS` (gone, debt-t6): 19 commands were parsed by hand in
+`rust/tui/src/ambient/core/cmd.rs`. They are `AppCmd` variants now, with
+their fixture lines; cmd.rs decodes the line once and keeps only the
+rules that are not shape (an agent's `@` and empty name, absolute files,
+the history's limit). `answer`'s card and `every_stop`'s id are numbers
+only (the old parse took `"#3"`; nothing sent it):
 
     fn_context, shot, send, start, answer, hush, cut_in, quiet, voice,
     every_stop, fake_words, agent_preview, agent_history, agent_unwatch,

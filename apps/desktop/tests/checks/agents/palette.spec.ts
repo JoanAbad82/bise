@@ -103,7 +103,7 @@ test('agents/palette: ⌘K searches agents (archived too), artifacts, scheduled;
     await expect(page.locator(T.keys)).toHaveText('↑↓ choose   ⏎ open   ⌘⏎ restore   tab agents only   esc close');
     await page.screenshot({ path: test.info().outputPath('light-1400-archived.png') });
     await page.keyboard.press('Meta+Enter');
-    await core.waitCmd((c) => c.cmd === 'unarchive' && c.project === ACME && 'agent' in c && c.agent === 'old-fix');
+    await core.waitCmd((c) => c.cmd === 'unarchive' && 'project' in c && c.project === ACME && 'agent' in c && c.agent === 'old-fix');
     await expect(thread, '⌘⏎ opened old-fix').toHaveAttribute('data-agent', 'old-fix', { timeout: 5000 });
 
     // a sentence (main m_12973, the spotlight's rule): 'ask bise' is the first row and ⏎ asks;
@@ -125,7 +125,7 @@ test('agents/palette: ⌘K searches agents (archived too), artifacts, scheduled;
     await page.keyboard.type('why is perf so slow today');
     await expect(page.locator(T.item(0))).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('Enter');
-    await core.waitCmd((c) => c.cmd === 'send' && c.project === HOME && 'text' in c && c.text === 'why is perf so slow today');
+    await core.waitCmd((c) => c.cmd === 'send' && 'project' in c && c.project === HOME && 'text' in c && c.text === 'why is perf so slow today');
     await expect(page.locator(T.palette)).toBeHidden({ timeout: 2000 });
     await expect(thread, '⏎ asked bise: its thread').toHaveAttribute('data-project', HOME, { timeout: 5000 });
 
@@ -137,7 +137,7 @@ test('agents/palette: ⌘K searches agents (archived too), artifacts, scheduled;
     await expect(page.locator(T.keys)).toHaveText('⏎ ask bise   esc close');
     await page.screenshot({ path: test.info().outputPath('light-1400-none.png') });
     await page.keyboard.press('Enter');
-    await core.waitCmd((c) => c.cmd === 'send' && c.project === HOME && 'text' in c && c.text === 'stripe webhook');
+    await core.waitCmd((c) => c.cmd === 'send' && 'project' in c && c.project === HOME && 'text' in c && c.text === 'stripe webhook');
     await expect(page.locator(T.palette)).toBeHidden({ timeout: 2000 });
     await expect(thread).toHaveAttribute('data-project', HOME, { timeout: 5000 });
 

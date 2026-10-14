@@ -227,5 +227,5 @@ Written where it can't be forgotten (the plan's list, architect m_13367):
 
 - remove the four paths above;
 - the hub owns the queue order (enqueue-style), not the clients;
-- type the app <-> core wire's untyped rows (`app_rpc`'s CORE_CMDS and
-  CORE_EVS) into `AppCmd` / `CoreEv`.
+- type the app <-> core wire's untyped rows (`app_rpc`'s CORE_EVS) into
+  `CoreEv` (the commands are `AppCmd` now: docs/issues/24).
