@@ -547,6 +547,35 @@ pub enum Init {
 /// the desktop core).
 pub const HUB_OLDER: &str = "this project's hub is older than this bise: stop it with `bise switchboard --stop`, then start bise again";
 
+/// What a client says instead of [`HUB_OLDER`] when that hub runs from an
+/// install (bise_home::release::older_hub; ambient-lead m_23937, architect
+/// m_24004): the steps in a terminal, its own bise first (a newer one no
+/// longer speaks to it). `current`: the install's `current` is still that
+/// hub's version (its `bise` stops it, then `bise update`); else `exe`,
+/// the hub's own binary as he types it (`~/…`), stops it. The one sentence
+/// for every client (the desktop core, `bise switchboard --stop`, the
+/// version switch at launch).
+pub fn hub_older_steps(current: bool, exe: &str) -> String {
+    let head = "this project's hub runs an older bise: in a terminal, in that project, run";
+    if current {
+        format!("{head} `bise switchboard --stop`, then `bise update`, then `bise`")
+    } else {
+        format!("{head} `{} switchboard --stop`, then `bise`", shell_word(exe))
+    }
+}
+
+/// A path as one shell word: as is when it has only safe characters, else
+/// single-quoted after a leading `~/` (kept outside the quotes so the
+/// shell still expands it).
+fn shell_word(p: &str) -> String {
+    let safe = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || "/._-+=:@%,".contains(c));
+    let (tilde, rest) = p.strip_prefix("~/").map(|r| ("~/", r)).unwrap_or(("", p));
+    if safe(rest) {
+        return p.to_string();
+    }
+    format!("{tilde}'{}'", rest.replace('\'', "'\\''"))
+}
+
 /// [`Init`] of one line, `init` the `initialize` request's id.
 pub fn init_answer(v: &Value, init: &Id) -> Init {
     if !is_rpc(v) {

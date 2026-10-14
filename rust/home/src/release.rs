@@ -452,26 +452,35 @@ pub fn asset_api_url(release_json: &str, name: &str) -> Result<String, String> {
         .ok_or_else(|| format!("the release has no asset {}", name))
 }
 
-/// What a client says to a project hub from before client-protocol when
-/// that hub runs from an install.sh root (ambient-lead m_23937: the
-/// desktop app, which runs a newer bise than his terminal's): the steps
-/// in a terminal, in that project. Its own bise stops it (a newer one no
-/// longer speaks to it): the prefix's `bise` while `current` is that hub's
-/// version, then `bise update`; once updated, the hub's own binary by its
-/// path. None for any other root: the caller keeps `rpc::HUB_OLDER`.
-pub fn older_hub_words(hub_root: &Path, user_home: &Path) -> Option<String> {
+/// A hub from before client-protocol that runs from an install.sh root
+/// (ambient-lead m_23937, architect m_24004): only its own bise still
+/// speaks to it, so the steps differ by whether `current` is still that
+/// hub's version (its prefix's `bise` stops it, then `bise update`) or
+/// has moved on (the hub's own binary, by its path, stops it). The words
+/// are bise_proto's (`rpc::hub_older_steps`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct OlderHub {
+    /// the prefix's `current` is the hub's own version
+    pub current: bool,
+    /// the hub's own bise
+    pub exe: PathBuf,
+}
+
+/// [`OlderHub`] for a hub root that is an install's version dir; None
+/// for any other root (the caller keeps `rpc::HUB_OLDER`).
+pub fn older_hub(hub_root: &Path) -> Option<OlderHub> {
     let RootKind::Install(install) = root_kind(hub_root) else { return None };
     let root = hub_root.canonicalize().ok()?;
-    let head = "this project's hub runs an older bise: in a terminal, in that project, run";
-    if install.current().as_ref() == Some(&root) {
-        return Some(format!("{head} `bise switchboard --stop`, then `bise update`, then `bise`"));
-    }
-    let exe = root.join("bise");
-    let shown = match exe.strip_prefix(user_home.canonicalize().unwrap_or_else(|_| user_home.to_path_buf())) {
+    Some(OlderHub { current: install.current().as_ref() == Some(&root), exe: root.join("bise") })
+}
+
+/// `path` as he types it: under his home with `~/`, else whole.
+pub fn tilde(path: &Path, user_home: &Path) -> String {
+    let home = user_home.canonicalize().unwrap_or_else(|_| user_home.to_path_buf());
+    match path.strip_prefix(&home) {
         Ok(rest) => format!("~/{}", rest.display()),
-        Err(_) => exe.display().to_string(),
-    };
-    Some(format!("{head} `{shown} switchboard --stop`, then `bise`"))
+        Err(_) => path.display().to_string(),
+    }
 }
 
 impl crate::Home {
@@ -525,37 +534,33 @@ mod tests {
         let _ = std::fs::remove_dir_all(&t);
     }
 
-    /// ambient-lead m_23937: an older hub of an install says the steps
-    /// (its own bise stops it, then the update); once `current` moved on,
-    /// the hub's own binary by its path; any other root: None (HUB_OLDER).
+    /// architect m_24004: an older hub of an install, with `current` its
+    /// own version or moved on; any other root: None (HUB_OLDER).
     #[test]
-    fn an_older_install_hub_says_how_to_update() {
+    fn an_older_hub_of_an_install_is_known() {
         let t = std::env::temp_dir().join(format!("bise-olderhub-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&t);
         let prefix = t.join(".local/share/bise");
         for id in ["v29", "v35"] {
             let v = prefix.join("versions").join(id);
             std::fs::create_dir_all(&v).unwrap();
-            std::fs::write(v.join("VERSION"), format!("id={id}
-")).unwrap();
+            std::fs::write(v.join("VERSION"), format!("id={id}\n")).unwrap();
         }
         std::os::unix::fs::symlink("versions/v29", prefix.join("current")).unwrap();
         let old = prefix.join("versions/v29");
-        let w = older_hub_words(&old, &t).unwrap();
-        assert!(w.ends_with("run `bise switchboard --stop`, then `bise update`, then `bise`"), "{w}");
-        // updated: the prefix's bise no longer speaks to it, its own binary stops it
+        let exe = old.canonicalize().unwrap().join("bise");
+        assert_eq!(older_hub(&old), Some(OlderHub { current: true, exe: exe.clone() }));
         std::fs::remove_file(prefix.join("current")).unwrap();
         std::os::unix::fs::symlink("versions/v35", prefix.join("current")).unwrap();
-        let w = older_hub_words(&old, &t).unwrap();
-        assert!(w.ends_with("run `~/.local/share/bise/versions/v29/bise switchboard --stop`, then `bise`"), "{w}");
-        // a dev root (repo=), a folder of no prefix: today's words
+        assert_eq!(older_hub(&old), Some(OlderHub { current: false, exe: exe.clone() }));
+        assert_eq!(tilde(&exe, &t), "~/.local/share/bise/versions/v29/bise");
+        assert_eq!(tilde(Path::new("/opt/x/bise"), &t), "/opt/x/bise");
+        // a dev root (repo=), a folder of no prefix
         let dev = t.join("src");
         std::fs::create_dir_all(&dev).unwrap();
-        std::fs::write(dev.join("VERSION"), "id=dev
-repo=/x
-").unwrap();
-        assert_eq!(older_hub_words(&dev, &t), None);
-        assert_eq!(older_hub_words(&t.join("nowhere"), &t), None);
+        std::fs::write(dev.join("VERSION"), "id=dev\nrepo=/x\n").unwrap();
+        assert_eq!(older_hub(&dev), None);
+        assert_eq!(older_hub(&t.join("nowhere")), None);
         let _ = std::fs::remove_dir_all(&t);
     }
 

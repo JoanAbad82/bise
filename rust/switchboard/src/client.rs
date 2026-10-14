@@ -157,9 +157,30 @@ pub fn open(paths: &Paths, exe: &Path, app_root: &Path) -> std::io::Result<UnixS
 /// the REPLs keep running (their turns too) for the next hub to adopt -
 /// a version switch, a hub restart. `initialize`, then `hub/stop`; a hub
 /// from before client-protocol is not stopped: an error saying so
-/// (`rpc::HUB_OLDER`).
+/// ([`older_words`]: his install's steps, else `rpc::HUB_OLDER`).
 pub fn stop(paths: &Paths, keep_agents: bool) -> std::io::Result<bool> {
-    stop_at(&paths.socket(), keep_agents, STOP_ANSWER, STOP_WAIT)
+    stop_at(&paths.socket(), keep_agents, STOP_ANSWER, STOP_WAIT).map_err(|e| match e.to_string() == bise_proto::rpc::HUB_OLDER {
+        true => std::io::Error::other(older_words(&paths.state)),
+        false => e,
+    })
+}
+
+/// What a client says to the hub of the state dir `state` when it is from
+/// before client-protocol (architect m_24004): his install's steps
+/// (`rpc::hub_older_steps`) when the hub runs from one (its `hub.root`,
+/// daemon.rs), else `rpc::HUB_OLDER`. The one reading for the terminal
+/// (`stop`, `switch::move_hub`) and the desktop core.
+pub fn older_words(state: &Path) -> String {
+    let home = bise_home::Home::from_env();
+    older_words_in(state, home.user_home())
+}
+
+fn older_words_in(state: &Path, user_home: &Path) -> String {
+    std::fs::read_to_string(state.join("hub.root"))
+        .ok()
+        .and_then(|r| bise_home::release::older_hub(Path::new(r.trim())))
+        .map(|o| bise_proto::rpc::hub_older_steps(o.current, &bise_home::release::tilde(&o.exe, user_home)))
+        .unwrap_or_else(|| bise_proto::rpc::HUB_OLDER.to_string())
 }
 
 /// `answer`: the wait for the hub's `initialize` answer; `wait`: for its
@@ -372,6 +393,27 @@ mod tests {
         assert_eq!(e.to_string(), bise_proto::rpc::HUB_OLDER);
         assert!(!hub.join().unwrap(), "a second connection to the older hub");
         let _ = std::fs::remove_file(&p);
+    }
+
+    /// architect m_24004: an older hub that runs from his install gets
+    /// the install's steps (its own bise stops it), the same words as the
+    /// desktop core's; no hub.root, or a root of no install: HUB_OLDER.
+    #[test]
+    fn an_older_hub_of_his_install_gets_the_install_steps() {
+        let t = std::env::temp_dir().join(format!("sb-olderwords-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&t);
+        let (state, prefix) = (t.join("hub"), t.join(".local/share/bise"));
+        let v = prefix.join("versions/v29");
+        std::fs::create_dir_all(&v).unwrap();
+        std::fs::create_dir_all(&state).unwrap();
+        std::fs::write(v.join("VERSION"), "id=v29\n").unwrap();
+        std::os::unix::fs::symlink("versions/v29", prefix.join("current")).unwrap();
+        assert_eq!(older_words_in(&state, &t), bise_proto::rpc::HUB_OLDER);
+        std::fs::write(state.join("hub.root"), v.to_string_lossy().as_bytes()).unwrap();
+        assert_eq!(older_words_in(&state, &t), bise_proto::rpc::hub_older_steps(true, "~/.local/share/bise/versions/v29/bise"));
+        std::fs::write(state.join("hub.root"), t.to_string_lossy().as_bytes()).unwrap();
+        assert_eq!(older_words_in(&state, &t), bise_proto::rpc::HUB_OLDER);
+        let _ = std::fs::remove_dir_all(&t);
     }
 
     /// 2026-10-11: the hub took the stop but ran on (its stop queued 85 s

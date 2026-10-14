@@ -76,8 +76,8 @@ pub struct ProjectFacts {
     /// its checkout's branch and whether it is a git repo
     pub git: GitOf,
     /// what to do with this hub id's hub from before client-protocol when
-    /// it runs from an install (`bise_home::release::older_hub_words`);
-    /// None: `rpc::HUB_OLDER`
+    /// it runs from an install (`switchboard::client::older_words`: the
+    /// terminal's same words); None: `rpc::HUB_OLDER`
     pub older: OlderOf,
 }
 

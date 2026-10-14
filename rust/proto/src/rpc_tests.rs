@@ -284,3 +284,21 @@ fn initialize_lists_every_method_and_notification() {
     assert_eq!(serde_json::from_value::<InitializeParams>(serde_json::json!({"proto": 1, "client": {"name": "x"}})).unwrap().capabilities, Value::Null);
 }
 
+
+/// architect m_24004: the steps for an older hub of an install, both
+/// cases; a path with a space or a quote stays one shell word, `~/` outside
+/// the quotes.
+#[test]
+fn an_older_install_hubs_steps_are_one_copy_paste_line() {
+    assert_eq!(
+        hub_older_steps(true, "~/.local/share/bise/versions/v29/bise"),
+        "this project's hub runs an older bise: in a terminal, in that project, run `bise switchboard --stop`, then `bise update`, then `bise`"
+    );
+    assert_eq!(
+        hub_older_steps(false, "~/.local/share/bise/versions/v29/bise"),
+        "this project's hub runs an older bise: in a terminal, in that project, run `~/.local/share/bise/versions/v29/bise switchboard --stop`, then `bise`"
+    );
+    assert!(hub_older_steps(false, "/Users/Ben Martin/bise/v29/bise").contains("run `'/Users/Ben Martin/bise/v29/bise' switchboard --stop`"));
+    assert!(hub_older_steps(false, "~/my apps/bise").contains("run `~/'my apps/bise' switchboard --stop`"));
+    assert!(hub_older_steps(false, "/x/it's/bise").contains(r"run `'/x/it'\''s/bise' switchboard --stop`"));
+}

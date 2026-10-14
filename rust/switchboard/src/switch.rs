@@ -771,7 +771,11 @@ pub enum Moved {
 /// and `version` op (switch/ask.rs).
 pub fn move_hub(paths: &Paths, me: &Path, bound: Duration) -> Moved {
     let me = me.canonicalize().unwrap_or_else(|_| me.to_path_buf());
-    let answer = ask::ask_switch(&paths.socket(), &me.to_string_lossy()).unwrap_or_default();
+    let mut answer = ask::ask_switch(&paths.socket(), &me.to_string_lossy()).unwrap_or_default();
+    // an older hub: his install's steps (architect m_24004)
+    if answer == bise_proto::rpc::HUB_OLDER {
+        answer = crate::client::older_words(&paths.state);
+    }
     if !answer.starts_with("switching to version") {
         return Moved::Refused(answer);
     }
