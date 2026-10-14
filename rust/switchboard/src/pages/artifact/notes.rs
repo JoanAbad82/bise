@@ -77,6 +77,10 @@ pub fn outcomes(notes: &[Note], versions: &[(u64, u64)]) -> Vec<Note> {
 
 /// Each version of artifact `id` and when it began ([`began`]), read from
 /// its `meta.json` as written (the fields art-live adds included).
+// TODO(art-live's Version fields, architect m_24038): a bridge. Once
+// `artifacts::Version` has `turn` and `revs`, read them typed through
+// `artifacts::Store::get` and delete this second reader of meta.json;
+// whoever lands second does it.
 fn versions_began(pages: &Pages, id: &str) -> Vec<(u64, u64)> {
     let state = pages.store.dir.parent().unwrap_or(&pages.store.dir);
     let meta: Value = std::fs::read(state.join("artifacts").join(id).join("meta.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
