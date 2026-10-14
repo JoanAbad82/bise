@@ -2,7 +2,8 @@
 // shell with the scripted core (FakeCore, fake data). Passes when:
 //   - the sidebar's '? inbox' row carries the pink waiting count (bise's row keeps its pearl, no count);
 //     a click opens the screen (route inbox/all);
-//   - the head says 'inbox' and '2 waiting · 2 answered'; 'waiting for you · 2' comes first, then the
+//   - the head says 'inbox' and '3 waiting · 2 answered' (bise's notifications ask counts, as in the block
+//     and the sidebar); 'waiting for you · 3' comes first, then the
 //     past by day (today, yesterday), two lines each ('you: <his words> · in the inbox'), the withdrawn
 //     one dim with its reason;
 //   - ⏎ on a waiting item opens it above this screen's composer ('answering perf · which bench?'), as ⌘I;
@@ -94,7 +95,8 @@ test('inbox/inbox-screen: the sidebar row, waiting first then the past by day, �
       const row = page.getByTestId('app.sidebar.inbox');
       await expect(row).toBeVisible({ timeout: 10_000 });
       await expect(row).toContainText('inbox');
-      await expect(row.locator('.app-cnt')).toHaveText('2');
+      // one number (designer m_25690): the screen's 3, bise's notifications ask included
+      await expect(row.locator('.app-cnt')).toHaveText('3');
       await expect(page.getByTestId('app.sidebar.bise').locator('.app-cnt')).toHaveCount(0);
       await row.click();
       await expect(page.getByTestId('inbox.screen')).toBeVisible();

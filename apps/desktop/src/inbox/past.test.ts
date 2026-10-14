@@ -87,3 +87,12 @@ it('mergeRecords keeps one per card, newest first', () => {
   const b = rec(2, { at_ms: 3 });
   expect(mergeRecords([[a, b], [{ ...a, at_ms: 2 }]]).map((r) => [r.card, r.at_ms])).toEqual([[2, 3], [1, 2]]);
 });
+
+describe('waitingCount: one number', () => {
+  it("counts the list, and a row's waits when it carries no cards", async () => {
+    const { waitingCount } = await import('./waiting');
+    const c = card(3, 'perf', 'which bench?');
+    expect(waitingCount([c, c], [{ cards: [c], waits: 1 }, { cards: undefined, waits: 2 }])).toBe(4);
+    expect(waitingCount([], [{ cards: [], waits: 0 }])).toBe(0);
+  });
+});

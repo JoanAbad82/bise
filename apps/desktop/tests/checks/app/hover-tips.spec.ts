@@ -139,7 +139,8 @@ for (const theme of ['light', 'dark']) {
       await hover(`app.sidebar.project.${P}.end`, '2 agents working', 'sidebar-working');
       await hover(`app.sidebar.project.${P}.count`, '1 waiting for you', 'sidebar-count');
       await hover('app.sidebar.project.docs-cff418c0.end', 'all quiet: no agent working, nothing waiting for you', 'sidebar-quiet');
-      await hover('app.sidebar.bise.count', '2 waiting for you, in all your projects', 'sidebar-bise');
+      // the pink count is the inbox row's (inbox-history pick A)
+      await hover('app.sidebar.inbox.count', '2 waiting for you, in all your projects', 'sidebar-inbox');
       await hover('app.sidebar.artifacts.end', "1 artifact you haven't opened yet, from perf", 'sidebar-new');
       await hover('app.sidebar.scheduled.end', '1 scheduled task, in all your projects', 'sidebar-scheduled');
 

@@ -14,6 +14,7 @@ import { IconButton, Kbd, Menu, MenuItem, MenuSep, SearchButton, SectionHead, Si
 import type { ProjectRow } from '@/proto';
 import { useAgents, useHubRefused, useProjects, useStore, type Store } from '@/store';
 import { RefusedLine } from './Refused';
+import { useWaitingCount } from '@/inbox/waiting';
 import { archivedOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
 import { addProject } from './addProject';
@@ -31,8 +32,9 @@ export function projectsOf(rows: readonly ProjectRow[]): ProjectRow[] {
 }
 
 /** What waits on him across every project: bise's pink count, the narrow titlebar's 'n waiting'. */
+/** What waits on him, one number everywhere: the inbox's own list, bise's asks included (designer m_25690). */
 export function useWaitingTotal(): number {
-  return useProjects().reduce((n, p) => n + p.waits, 0);
+  return useWaitingCount();
 }
 
 /** A number summed over projects' store slices, re-read when one of them changes. */
