@@ -21,6 +21,7 @@ import { pickWaits, takesWords, withConfirmOptions } from './model';
 import { STRIP_KEYS, stripKey, stripWords } from './stripRows';
 import { cardKeyOf } from './Strip';
 import { ArtWords } from './artWords';
+import { InboxZero, useInboxZero } from './Zero';
 import { pruneCardDrafts } from './drafts';
 import { keep } from '@/app/keep';
 import { useModHeld } from '@/app/held';
@@ -314,6 +315,8 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
       leavers.delete(f);
     };
   }, []);
+  // inbox zero (desktop-delight TOUCH 3): his answer to the last item, ':* nothing waits for you' for 2 s
+  const zero = useInboxZero(list.length, acted.length);
 
   // a card answered or closed anywhere takes its half answer with it (drafts.ts; 2b); the closed
   // one in view keeps it until he sends it or leaves
@@ -560,7 +563,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
     };
   }, []);
 
-  if (list.length === 0 && !isClosed) return null;
+  if (list.length === 0 && !isClosed) return zero ? <InboxZero /> : null;
   const openAt = openCard === undefined ? -1 : list.indexOf(openCard);
   // the closed card on top, open; the rows under it keep their ⌃N numbers
   const shown = [...(isClosed ? [openCard] : []), ...list.filter((_, i) => i < BLOCK_ROWS || i === openAt)];
