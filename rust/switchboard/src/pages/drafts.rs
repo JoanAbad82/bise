@@ -32,6 +32,12 @@ pub struct Draft {
     /// what it is about, when its address says ('to Benjamin, on the
     /// proxy' → proxy): the card groups one recipient's drafts by it
     pub topic: Option<String>,
+    /// what he needs to decide on it, from the page: an email's subject,
+    /// a message's first words, an action's own line (notif-words)
+    pub detail: Option<String>,
+    /// an action's place among the page's actions, (its rank from 1, how
+    /// many): the notification's '(2 of 7, in order)'
+    pub rank: Option<(usize, usize)>,
 }
 
 impl Draft {
@@ -81,7 +87,8 @@ pub fn pending(html: &str, notes: &[Note], questions: &[Question]) -> Vec<Draft>
             Some(d) => (kit_of(html, d), recipient(html, d)),
             None => ("step", (None, None)),
         };
-        out.push(Draft { block, item, text: r.text.clone(), step: Some(r.item.clone()), kind, to, topic });
+        let detail = r.draft.as_deref().and_then(|d| detail_of(html, d));
+        out.push(Draft { block, item, text: r.text.clone(), step: Some(r.item.clone()), kind, to, topic, detail, rank: None });
     }
     let verdict = |b: &str, i: Option<&str>| {
         notes.iter().any(|n| n.block == b && note_item(n) == i && (matches!(n.kind.as_str(), "approve" | "skip" | "send" | "drafts") || is_go_word(n)))
@@ -97,7 +104,7 @@ pub fn pending(html: &str, notes: &[Note], questions: &[Question]) -> Vec<Draft>
     for r in items_of(html, "review") {
         if !r.done && !verdict(&r.block, Some(&r.item)) && sends(&r.block) {
             let to = reply_to(&r.text);
-            out.push(Draft { block: r.block.clone(), item: Some(r.item.clone()), text: r.text.clone(), step: None, kind: "reply", to, topic: None });
+            out.push(Draft { block: r.block.clone(), item: Some(r.item.clone()), text: r.text.clone(), step: None, kind: "reply", to, topic: None, detail: None, rank: None });
         }
     }
     for kit in ["email", "message"] {
@@ -116,16 +123,20 @@ pub fn pending(html: &str, notes: &[Note], questions: &[Question]) -> Vec<Draft>
                     }
                     k => k,
                 };
-                out.push(Draft { block: b, item: None, text, step: None, kind, to, topic });
+                let detail = detail_of(html, &b);
+                out.push(Draft { block: b, item: None, text, step: None, kind, to, topic, detail, rank: None });
             }
         }
     }
     // a change to one of his accounts (amb-kit m_6198: 'close OPS-12'):
     // his approve does it, his skip drops it; its words are data-do
-    for (b, text) in super::waiting::blocks_of(html, "action") {
+    let actions = super::waiting::blocks_of(html, "action");
+    let total = actions.len();
+    for (i, (b, text)) in actions.into_iter().enumerate() {
         if !verdict(&b, None) {
             let todo = head_of(html, &b).and_then(|(h, _)| h.split("data-do=\"").nth(1).and_then(|r| r.split('"').next()).map(String::from));
-            out.push(Draft { block: b, item: None, text: todo.unwrap_or(text), step: None, kind: "action", to: None, topic: None });
+            let detail = detail_of(html, &b);
+            out.push(Draft { block: b, item: None, text: todo.unwrap_or(text), step: None, kind: "action", to: None, topic: None, detail, rank: Some((i + 1, total)) });
         }
     }
     out
@@ -192,6 +203,27 @@ fn head_of<'a>(html: &'a str, id: &str) -> Option<(&'a str, &'a str)> {
     let end = block.find("</section>").unwrap_or(block.len());
     let head_end = block.find('>').unwrap_or(0);
     Some((&block[..head_end], &block[..end]))
+}
+
+/// What he needs to decide on block `id` (notif-words): an email's
+/// subject, else the block's first paragraph without its '3 · ' rank,
+/// cut. None: nothing to say.
+fn detail_of(html: &str, id: &str) -> Option<String> {
+    let (head, block) = head_of(html, id)?;
+    let body = &block[head.len()..];
+    let field = |f: &str| body.split("<p").find(|p| p.split('>').next().is_some_and(|h| h.contains(&format!("data-field=\"{f}\""))));
+    let p = match field("subject") {
+        Some(p) => p,
+        None => body.split("<p").skip(1).find(|p| !p.split('>').next().unwrap_or("").contains("data-field="))?,
+    };
+    let text = super::questions::text_of(&p[p.find('>')? + 1..p.find("</p>").unwrap_or(p.len())]);
+    let text = text.trim();
+    // '1 · créer …': the page's own rank, not a choice
+    let text = match text.split_once(" · ") {
+        Some((n, rest)) if n.chars().all(|c| c.is_ascii_digit()) => rest.trim(),
+        _ => text,
+    };
+    Some(cut_at(text, 140)).filter(|t| !t.is_empty())
 }
 
 fn kit_of(html: &str, id: &str) -> &'static str {
@@ -342,26 +374,126 @@ pub fn info(drafts: &[Draft], title: &str) -> serde_json::Value {
         "topics": topics(&sends), "line": line(drafts), "actions": action_words(drafts)})
 }
 
-/// The batch card's words, ambient's (m_6055 via ambient-lead m_6058):
-/// '3 drafts wait for you · <title>', then [`line`].
-pub fn batch_text(drafts: &[Draft], title: &str) -> String {
-    let line = line(drafts);
-    let head = if title.trim().is_empty() {
-        format!("{} drafts wait for you", drafts.len())
-    } else {
-        format!("{} drafts wait for you · {}", drafts.len(), title.trim())
-    };
-    format!("{head}
-{line}")
+/// The batch in one line, for `sb page waiting` and an old notification's
+/// answer: '3 drafts wait for you: 3 replies to Benjamin: proxy, …'.
+pub fn summary(drafts: &[Draft]) -> String {
+    format!("{} drafts wait for you: {}", drafts.len(), line(drafts))
 }
 
-/// A batch card's send option: 'send both' for two, 'send all <n>'.
-pub fn send_label(n: usize) -> String {
-    if n == 2 {
-        "send both".into()
-    } else {
-        format!("send all {n}")
+/// The drafts a batch notification lists one by one; the others are
+/// counted ('- and 2 more on the page').
+const LISTED: usize = 3;
+
+/// The batch notification's words, actionable with no page open
+/// (notif-words, his m_25318, signed by designer m_25451): the question
+/// first, one decision. Drafts to send: '<page>: send these 2 emails?',
+/// a line per draft (who or where, what it says). Else the next account
+/// change alone: '<page>: <its data-do>? (1 of 7, in order)', its line
+/// from the page, the others named after it; they never share a
+/// notification with the sends, which go first. Its options are
+/// [`choices`].
+pub fn batch_text(drafts: &[Draft], title: &str) -> String {
+    let sends: Vec<&Draft> = drafts.iter().filter(|d| d.kind != "action").collect();
+    let acts: Vec<&Draft> = drafts.iter().filter(|d| d.kind == "action").collect();
+    let page = |q: String| if title.trim().is_empty() { q } else { format!("{}: {q}", title.trim()) };
+    let mut out = Vec::new();
+    if !sends.is_empty() {
+        let w = what(&sends.iter().map(|d| (*d).clone()).collect::<Vec<_>>());
+        let w = if w == "steps" { "drafts" } else { w };
+        out.push(page(match (sends.len(), w) {
+            (1, "replies") => "send this reply?".to_string(),
+            (1, w) => format!("send this {}?", w.trim_end_matches('s')),
+            (n, w) => format!("send these {n} {w}?"),
+        }));
+        for d in sends.iter().take(LISTED) {
+            out.push(format!("- {}", draft_line(d)));
+        }
+        if sends.len() > LISTED {
+            out.push(format!("- and {} more on the page", sends.len() - LISTED));
+        }
+    } else if let Some((next, rest)) = acts.split_first() {
+        let rank = match next.rank {
+            Some((i, n)) if n > 1 => format!(" ({i} of {n}, in order)"),
+            _ => String::new(),
+        };
+        out.push(page(format!("{}?{rank}", next.text)));
+        if let Some(d) = &next.detail {
+            out.push(d.clone());
+        }
+        if !rest.is_empty() {
+            let names: Vec<String> = rest.iter().map(|d| d.text.clone()).collect();
+            out.push(format!("after it, one at a time: {}", and_list(&names)));
+        }
     }
+    out.join("\n")
+}
+
+/// One draft's line: who it goes to, or where it is posted ('on PR #16'),
+/// and what it says.
+fn draft_line(d: &Draft) -> String {
+    // a drafted step says what it does; a mail or a message its subject or words
+    let says = if d.step.is_some() { Some(d.text.clone()) } else { d.detail.clone() };
+    let who = d.to.as_ref().map(|to| match (&d.topic, to.contains('#')) {
+        // a comment in a place: 'PR #16 review' → on PR #16
+        (_, true) => format!("on {}", to.trim_end_matches(" review").trim_end_matches(" reply").trim_end_matches(" comment")),
+        (Some(t), false) => format!("to {to} ({t})"),
+        (None, false) => format!("to {to}"),
+    });
+    match (who, says) {
+        (Some(w), Some(s)) => format!("{w}: {}", cut_at(&s, 70)),
+        (Some(w), None) => w,
+        (None, Some(s)) => cut_at(&s, 80),
+        (None, None) => cut_at(&d.text, 80),
+    }
+}
+
+/// One way to answer a batch notification past its option 1 (review):
+/// its label, and the drafts it lets leave (`Draft::key`).
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Choice {
+    pub label: String,
+    pub keys: Vec<String>,
+}
+
+/// A batch notification's options past review (notif-words): the drafts
+/// that leave together ('send both', 'send all 3'), then the next account
+/// change alone, labelled with its own verb ('create the env'). Account
+/// changes are never sent all at once: a plan's run in order, and a
+/// later one may need what an earlier one makes (main m_25339).
+pub fn choices(drafts: &[Draft]) -> Vec<Choice> {
+    let sends: Vec<String> = drafts.iter().filter(|d| d.kind != "action").map(Draft::key).collect();
+    // one decision per notification (designer m_25451): the sends first,
+    // then each change alone
+    if !sends.is_empty() {
+        return vec![Choice { label: send_label(sends.len()), keys: sends }];
+    }
+    drafts.iter().find(|d| d.kind == "action").map(|a| Choice { label: a.text.clone(), keys: vec![a.key()] }).into_iter().collect()
+}
+
+/// A batch's send option: 'send it' for one, 'send both' for two, 'send
+/// all <n>'.
+pub fn send_label(n: usize) -> String {
+    match n {
+        1 => "send it".into(),
+        2 => "send both".into(),
+        n => format!("send all {n}"),
+    }
+}
+
+/// `t` cut to about `n` chars after a whole word, '…' glued to it
+/// ('ChatGPT's…', never 'ChatGPT's pl…'; designer m_25451).
+fn cut_at(t: &str, n: usize) -> String {
+    let t = t.trim();
+    let Some((i, _)) = t.char_indices().nth(n) else { return t.to_string() };
+    let head = &t[..i];
+    // the char at i starts a word: head ends on a whole one
+    let whole = t[i..].starts_with(char::is_whitespace);
+    let head = match (whole, head.rfind(char::is_whitespace)) {
+        (true, _) => head,
+        (false, Some(sp)) => &head[..sp],
+        (false, None) => head,
+    };
+    format!("{}…", head.trim_end().trim_end_matches([',', ';', ':', '.', '·', '(']).trim_end())
 }
 
 fn short(t: &str) -> String {
@@ -378,48 +510,77 @@ pub fn carded(id: &str) -> bool {
     !(id.starts_with("promises-") || id.starts_with("meeting-"))
 }
 
-/// Words on a batch card that review them (its option 1): the page, never
-/// a message. Only these exact words: any other words go to the asker.
+/// A batch notification's option 1: the page, never a message. Every
+/// client opens the page on it (the desktop's inbox, notif-open's act):
+/// it stays first.
+pub const OPEN_PAGE: &str = "open the page";
+
+/// Words on a batch card that open its page (its option 1), never a
+/// message. Only these exact words: any other words go to the asker.
 pub fn is_review(reply: &str) -> bool {
     let w = reply.trim().trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
-    matches!(w.as_str(), "1" | "review" | "voir" | "relire")
+    // '1. open the page', as the clients send an option
+    let w = w.strip_prefix("1. ").unwrap_or(&w);
+    matches!(w, "1" | "review" | "voir" | "relire" | "open the page" | "open" | "ouvrir" | "ouvre la page")
 }
 
-/// What his words on a batch card do (ambient-lead m_21516, architect
-/// m_21543): review opens the page, send all sends them, any other words
-/// go to the card's asker as his message, none do nothing.
+/// What his words on a batch notification do (ambient-lead m_21516,
+/// architect m_21543): review opens the page, a choice lets its drafts
+/// leave (its index in [`choices`]), any other words go to the asker as
+/// his message, none do nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BatchAnswer<'a> {
     Review,
-    SendAll,
+    Choice(usize),
     Words(&'a str),
     Empty,
 }
 
-/// His words on a batch card, sorted: never swallowed.
-pub fn batch_answer(reply: &str) -> BatchAnswer<'_> {
+/// His words on a batch notification with these choices, sorted: never
+/// swallowed. Option n (2, 3) or its label; send words pick the sends;
+/// a bare go ('yes', 'oui', 'go') only when there is one choice.
+pub fn batch_answer<'a>(reply: &'a str, choices: &[Choice]) -> BatchAnswer<'a> {
     let words = reply.trim();
+    let w = words.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+    // '2. create the env', as the clients send an option: its number
+    let n = w.split(['.', ')', ' ']).next().and_then(|n| n.parse::<usize>().ok());
+    let label = |c: &Choice| {
+        let l = c.label.to_lowercase();
+        w == l || w.split_once(['.', ')']).is_some_and(|(_, rest)| rest.trim() == l)
+    };
     if words.is_empty() {
         BatchAnswer::Empty
     } else if is_review(words) {
         BatchAnswer::Review
-    } else if is_send_all(words) {
-        BatchAnswer::SendAll
+    } else if let Some(i) = n.filter(|n| *n >= 2 && n - 2 < choices.len()) {
+        BatchAnswer::Choice(i - 2)
+    } else if let Some(i) = choices.iter().position(label) {
+        BatchAnswer::Choice(i)
+    } else if let Some(i) = choices.iter().position(|c| c.label.starts_with("send ")).filter(|_| is_send_word(&w)) {
+        BatchAnswer::Choice(i)
+    } else if choices.len() == 1 && matches!(w.as_str(), "yes" | "oui" | "go" | "ok" | "vas-y" | "vas y") {
+        BatchAnswer::Choice(0)
     } else {
         BatchAnswer::Words(words)
     }
 }
 
-/// Words on a batch card that send them all: option 2 (1 is review, the
-/// default), 'send all <n>', 'send both', send, envoie, yes.
-pub fn is_send_all(reply: &str) -> bool {
-    let w = reply.trim().trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+/// Send words: 'send all <n>', 'send both', send, envoie.
+fn is_send_word(w: &str) -> bool {
     // 'send all 3': the count after the words
     let w = match w.rsplit_once(' ') {
         Some((head, n)) if n.chars().all(|c| c.is_ascii_digit()) => head,
-        _ => w.as_str(),
+        _ => w,
     };
-    matches!(w, "2" | "send all" | "send both" | "send" | "send them" | "envoie" | "envoie tout" | "envoie les" | "yes" | "oui")
+    matches!(w, "send all" | "send both" | "send" | "send it" | "send them" | "envoie" | "envoie tout" | "envoie les" | "envoie-le")
+}
+
+/// Words on an old batch notification (replaced or closed) that still
+/// send the drafts waiting now: option 2 or send words, never an account
+/// change (pm's C fail 43; notif-words).
+pub fn is_send_all(reply: &str) -> bool {
+    let w = reply.trim().trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+    w == "2" || is_send_word(&w) || matches!(w.as_str(), "yes" | "oui")
 }
 
 #[cfg(test)]
@@ -450,8 +611,8 @@ mod tests {
         let p = pending(PAGE, &[], &[]);
         assert_eq!(p.iter().map(Draft::anchor).collect::<Vec<_>>(), vec!["s5", "s6"], "s8 waits behind his s7");
         assert_eq!(p.iter().map(Draft::key).collect::<Vec<_>>(), vec!["mail-lucas", "mail-marc"]);
-        assert_eq!(batch_text(&p, "launch plan"), "2 drafts wait for you · launch plan
-emails to lucas and marc");
+        assert_eq!(batch_text(&p, "launch plan"), "launch plan: send these 2 emails?\n- to lucas: add the DNS records\n- to marc: tell Marc it's done");
+        assert_eq!(summary(&p), "2 drafts wait for you: emails to lucas and marc");
         let sent = [note(json!({"id": "n1", "block": "mail-lucas", "kind": "approve", "text": "send", "status": "sent"}))];
         assert_eq!(pending(PAGE, &sent, &[]).iter().map(Draft::anchor).collect::<Vec<_>>(), vec!["s6"]);
     }
@@ -510,8 +671,8 @@ emails to lucas and marc");
             (Some("Benjamin"), Some("fish")),
             (Some("Benjamin"), Some("French")),
         ]);
-        assert_eq!(batch_text(&p, "benjamin's reports"), "3 drafts wait for you · benjamin's reports
-3 replies to Benjamin: proxy, fish and French");
+        assert_eq!(batch_text(&p, "benjamin's reports"), "benjamin's reports: send these 3 replies?\n- to Benjamin (proxy): a\n- to Benjamin (fish): b\n- to Benjamin (French): c");
+        assert_eq!(line(&p), "3 replies to Benjamin: proxy, fish and French");
         assert_eq!(info(&p, "t")["names"], json!(["Benjamin"]));
         let four: Vec<Draft> = p.iter().cloned().chain([Draft { topic: Some("docs".into()), ..p[0].clone() }]).collect();
         assert_eq!(line(&four), "4 replies to Benjamin: proxy, fish and 2 more");
@@ -538,8 +699,14 @@ emails to lucas and marc");
             ("a-ops12".to_string(), "close OPS-12".to_string()),
             ("a-ops13".to_string(), "close OPS-13".to_string()),
         ]);
-        assert_eq!(batch_text(&p, "t"), "5 drafts wait for you · t
-3 replies to Benjamin: proxy, fish and French · 2 to close");
+        // one decision each (designer m_25451): the sends first, the changes never in them
+        assert_eq!(batch_text(&p, "t"), "t: send these 3 replies?\n- to Benjamin (proxy): a\n- to Benjamin (fish): b\n- to Benjamin (French): c");
+        assert_eq!(choices(&p), vec![Choice { label: "send all 3".into(), keys: vec!["r-s213".into(), "r-s212".into(), "r-s214".into()] }]);
+        let sent: Vec<Note> = ["r-s213", "r-s212", "r-s214"].iter().map(|b| note(json!({"id": b, "block": b, "kind": "approve", "status": "sent"}))).collect();
+        let changes = pending(&html, &sent, &[]);
+        assert_eq!(batch_text(&changes, "t"), "t: close OPS-12? (1 of 2, in order)\nclose OPS-12 in Linear · fixed in 0.4.2\nafter it, one at a time: close OPS-13");
+        assert_eq!(choices(&changes), vec![Choice { label: "close OPS-12".into(), keys: vec!["a-ops12".into()] }]);
+        assert_eq!(line(&p), "3 replies to Benjamin: proxy, fish and French · 2 to close");
         assert_eq!(info(&p, "t")["names"], json!(["Benjamin"]));
         assert_eq!(info(&p, "t")["actions"], json!("2 to close"));
         assert_eq!(what(&p), "replies");
@@ -586,32 +753,80 @@ emails to lucas and marc");
         for w in ["Ou sont les drafts?", "review them later", "revoir le titre", "voir plus tard", "2", "send all", ""] {
             assert!(!is_review(w), "{w}");
         }
-        // each path of his words (architect m_21543): review, send all, words, empty
-        assert_eq!(batch_answer(" 1. "), BatchAnswer::Review);
-        assert_eq!(batch_answer("relire"), BatchAnswer::Review);
-        assert_eq!(batch_answer("send both"), BatchAnswer::SendAll);
-        assert_eq!(batch_answer("  Ou sont les drafts? "), BatchAnswer::Words("Ou sont les drafts?"));
-        assert_eq!(batch_answer("revoir le titre"), BatchAnswer::Words("revoir le titre"), "a note, never a review");
-        assert_eq!(batch_answer(" \n "), BatchAnswer::Empty);
-        assert_eq!((send_label(2), send_label(3)), ("send both".to_string(), "send all 3".to_string()));
+        // each path of his words (architect m_21543): review, a choice, words, empty
+        let send = [Choice { label: "send both".into(), keys: vec!["a".into(), "b".into()] }];
+        assert_eq!(batch_answer(" 1. ", &send), BatchAnswer::Review);
+        assert_eq!(batch_answer("relire", &send), BatchAnswer::Review);
+        for yes in ["2", "2.", "2. send both", "send both", "Send all", "send", "envoie", "yes", "Oui"] {
+            assert_eq!(batch_answer(yes, &send), BatchAnswer::Choice(0), "{yes}");
+        }
+        assert_eq!(batch_answer("3", &send), BatchAnswer::Words("3"), "no option 3");
+        assert_eq!(batch_answer("  Ou sont les drafts? ", &send), BatchAnswer::Words("Ou sont les drafts?"));
+        assert_eq!(batch_answer("revoir le titre", &send), BatchAnswer::Words("revoir le titre"), "a note, never a review");
+        assert_eq!(batch_answer(" \n ", &send), BatchAnswer::Empty);
+        // sends and a change: each by its number or its words; a bare yes is no choice
+        let two = [send[0].clone(), Choice { label: "close OPS-12".into(), keys: vec!["c".into()] }];
+        assert_eq!(batch_answer("3. close OPS-12", &two), BatchAnswer::Choice(1));
+        assert_eq!(batch_answer("Close OPS-12", &two), BatchAnswer::Choice(1));
+        assert_eq!(batch_answer("send all", &two), BatchAnswer::Choice(0));
+        assert_eq!(batch_answer("yes", &two), BatchAnswer::Words("yes"));
+        // a change alone: 'send all' sends nothing (it goes to the asker)
+        let change = [two[1].clone()];
+        assert_eq!(batch_answer("send all 7", &change), BatchAnswer::Words("send all 7"));
+        assert_eq!(batch_answer("go", &change), BatchAnswer::Choice(0));
+        assert_eq!((send_label(1), send_label(2), send_label(3)), ("send it".to_string(), "send both".to_string(), "send all 3".to_string()));
         let s = |n: &[&str]| n.iter().map(|x| x.to_string()).collect::<Vec<_>>();
         assert_eq!(and_list(&s(&["legal", "Lucas", "Marc"])), "legal, Lucas and Marc");
         assert_eq!(and_list(&s(&["legal", "Lucas", "Marc", "Nina", "Ana", "Tom"])), "legal, Lucas and 4 more");
-        let reply = |to: &str| Draft { block: "r".into(), item: Some(to.into()), text: format!("reply to {to}"), step: None, kind: "reply", to: Some(to.into()), topic: None };
-        let three = [reply("legal"), reply("Lucas"), reply("Marc")];
-        assert_eq!(batch_text(&three, "inbox"), "3 drafts wait for you · inbox
-replies to legal, Lucas and Marc");
-        assert_eq!(info(&three, "inbox"), json!({"count": 3, "title": "inbox", "what": "replies", "names": ["legal", "Lucas", "Marc"],
+        let reply = |to: &str| Draft { block: "r".into(), item: Some(to.into()), text: format!("reply to {to}"), step: None, kind: "reply", to: Some(to.into()), topic: None, detail: Some(format!("hi {to}, yes for Friday")), rank: None };
+        let four = [reply("legal"), reply("Lucas"), reply("Marc"), reply("Nina")];
+        assert_eq!(batch_text(&four, "inbox"), "inbox: send these 4 replies?\n- to legal: hi legal, yes for Friday\n- to Lucas: hi Lucas, yes for Friday\n- to Marc: hi Marc, yes for Friday\n- and 1 more on the page");
+        let three = &four[..3];
+        assert_eq!(info(three, "inbox"), json!({"count": 3, "title": "inbox", "what": "replies", "names": ["legal", "Lucas", "Marc"],
             "topics": [], "line": "replies to legal, Lucas and Marc", "actions": null}));
-        let step = super::super::checklist::Step { text: batch_text(&three, "inbox"), batch: vec!["a".into(), "b".into(), "c".into()], ..Default::default() };
-        assert_eq!(step.card_text(), "3 drafts wait for you · inbox
-replies to legal, Lucas and Marc
-1. review
-2. send all 3");
+        let step = super::super::checklist::Step { text: batch_text(three, "inbox"), batch: vec!["a".into(), "b".into(), "c".into()], choices: choices(three), ..Default::default() };
+        assert_eq!(step.card_text(), "inbox: send these 3 replies?\n- to legal: hi legal, yes for Friday\n- to Lucas: hi Lucas, yes for Friday\n- to Marc: hi Marc, yes for Friday\n1. open the page\n2. send all 3");
+        // a comment in a place reads 'on' it; a long line is cut after a whole word
+        let on = Draft { to: Some("PR #16 review".into()), detail: Some("Thanks a lot Eric, you found the real cause: on the ChatGPT plan route, ChatGPT's plan".into()), ..four[0].clone() };
+        assert_eq!(draft_line(&on), "on PR #16: Thanks a lot Eric, you found the real cause: on the ChatGPT plan…");
+        assert_eq!((cut_at("one two three", 9), cut_at("one two three", 7), cut_at("one two, three", 8)), ("one two…".to_string(), "one two…".to_string(), "one two…".to_string()));
+        assert!(is_review("1. open the page") && is_review("open the page") && !is_review("open it later"));
+        // a card saved before its choices: one send of all it holds
+        let old = super::super::checklist::Step { text: "t".into(), batch: vec!["a".into(), "b".into()], ..Default::default() };
+        assert_eq!(old.card_text(), "t\n1. open the page\n2. send both");
         // steps with no recipient: their words alone
         let p = pending(PAGE, &[], &[]);
         let bare: Vec<Draft> = p.into_iter().map(|d| Draft { to: None, kind: "step", ..d }).collect();
-        assert_eq!(batch_text(&bare, ""), "2 drafts wait for you
-add the DNS records and tell Marc it's done");
+        assert_eq!(batch_text(&bare, ""), "send these 2 drafts?\n- add the DNS records\n- tell Marc it's done");
+    }
+
+    /// Law (notif-words, his #549: '7 drafts wait for you · distribuer
+    /// bise desktop / 7 actions / 1. review 2. send all 7'): a plan's
+    /// account changes are never sent all at once; the notification names
+    /// the next one with its own line from the page, its option is that
+    /// change alone, and the next one comes once it is approved.
+    #[test]
+    fn a_plans_changes_go_one_at_a_time() {
+        let act = |id: &str, n: usize, todo: &str, line: &str| format!(r#"<section data-kit="action" data-id="{id}" data-do="{todo}"><p>{n} · {line}</p></section>"#);
+        let html = [
+            act("a-env", 1, "create the desktop-release env", "the GitHub env desktop-release: you as required reviewer, desktop-v* tags and main only."),
+            act("a-secrets", 2, "set the 6 GitHub secrets", "gh secret set --env desktop-release for the cert, its password and the API key."),
+            act("a-var", 3, "turn DESKTOP_RELEASE on", "the variable DESKTOP_RELEASE=on."),
+        ]
+        .concat();
+        let p = pending(&html, &[], &[]);
+        assert_eq!(
+            batch_text(&p, "distribuer bise desktop"),
+            "distribuer bise desktop: create the desktop-release env? (1 of 3, in order)\nthe GitHub env desktop-release: you as required reviewer, desktop-v* tags and main only.\nafter it, one at a time: set the 6 GitHub secrets and turn DESKTOP_RELEASE on"
+        );
+        assert_eq!(choices(&p), vec![Choice { label: "create the desktop-release env".into(), keys: vec!["a-env".into()] }]);
+        assert!(!is_send_all("create the desktop-release env"));
+        // approved: the next one is next, the words follow
+        let ok = [note(json!({"id": "n1", "block": "a-env", "kind": "approve", "text": "send", "status": "sent"}))];
+        let left = pending(&html, &ok, &[]);
+        assert_eq!(choices(&left)[0].keys, vec!["a-secrets".to_string()]);
+        assert!(batch_text(&left, "d").starts_with("d: set the 6 GitHub secrets? (2 of 3, in order)\n"));
+        let last = pending(&html, &[ok[0].clone(), note(json!({"id": "n2", "block": "a-secrets", "kind": "approve", "status": "sent"}))], &[]);
+        assert_eq!(batch_text(&last, "d"), "d: turn DESKTOP_RELEASE on? (3 of 3, in order)\nthe variable DESKTOP_RELEASE=on.");
     }
 }

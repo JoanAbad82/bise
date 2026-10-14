@@ -528,7 +528,8 @@ def main():
         c.say("/answer %d 1" % lq()["id"])
         c.wait(lambda: step_card("d1"), 30, "the drafted step's card, once the question is answered")
         check((step_card("d1").get("page") or {}).get("item") == "d1", "its card links its row: %r" % step_card("d1"))
-        check(step_card("d1")["text"].startswith("ask legal: send the draft?"), "its card asks to send: %r" % step_card("d1"))
+        # the page's title first: where it is, with no page open (notif-words)
+        check(" · ask legal: send the draft?" in step_card("d1")["text"], "its card asks to send: %r" % step_card("d1"))
         check(not step_card("d2"), "his step waits for the draft")
         c.say("/answer %d 1" % step_card("d1")["id"])
         c.wait(lambda: step_card("d2") and not step_card("d1"), 30, "sent: his own step's card comes")
@@ -646,7 +647,9 @@ def main():
         wait.stable(lambda: [x["text"] for x in c.cards() if (x.get("page") or {}).get("id") == "batch-plan"], 30, "the batch-plan cards", quiet=1)
         on_page = [x for x in c.cards() if (x.get("page") or {}).get("id") == "batch-plan"]
         # ambient's words (m_6055 via ambient-lead m_6058): review first
-        check(len(on_page) == 1 and on_page[0]["text"].startswith("2 drafts wait for you · batch plan\nemails to lucas and marc\n1. review\n2. send both"), "one card for both drafts: %r" % on_page)
+        # (notif-words: a line per draft, who it goes to and what it does)
+        check(len(on_page) == 1 and on_page[0]["text"] == "batch plan: send these 2 emails?\n- to lucas: add the DNS records\n- to marc: tell Marc\n1. open the page\n2. send both",
+              "one card for both drafts: %r" % on_page)
         # hub/cards' CardPage has no `drafts` flag (the older state's): the
         # batch is its block, the first draft's
         check(on_page[0]["page"].get("block") == "mail-dns" and on_page[0]["page"].get("item") == "b1", "it opens the page at the first: %r" % on_page[0]["page"])
@@ -683,7 +686,8 @@ def main():
         fb = lambda: [x for x in c.cards() if (x.get("page") or {}).get("id") == "benjamin-bugs"]
         c.wait(fb, 90, "the feedback page's batch card")
         wait.stable(lambda: [x["text"] for x in fb()], 30, "the feedback page's cards", quiet=1)
-        check(len(fb()) == 1 and fb()[0]["text"] == "2 drafts wait for you · benjamin's reports\n2 replies to Benjamin: proxy and French\n1. review\n2. send both",
+        check(len(fb()) == 1 and fb()[0]["text"] == "benjamin's reports: send these 2 replies?\n- to Benjamin (proxy): thanks Benjamin, fixed\n"
+              "- to Benjamin (French): thanks Benjamin, fixed\n1. open the page\n2. send both",
               "fix-fish at work: its reply waits, the other 2 are one card: %r" % fb())
         two = fb()[0]["id"]
         settle(c)
@@ -693,11 +697,11 @@ def main():
         # fix-fish done: its reply still waits for the page written after
         # the fix (ambient-lead m_6187), never the old workaround
         c.wait_status("fix-fish", "done", 90)
-        wait.holds(lambda: fb() and fb()[0]["text"].startswith("2 drafts wait for you"), 3, lambda: "done but not republished: still 2: %r" % fb())
+        wait.holds(lambda: fb() and fb()[0]["text"].startswith("benjamin's reports: send these 2 replies?"), 3, lambda: "done but not republished: still 2: %r" % fb())
         open(fp, "w").write(fi("s212", "fish", "fix-fish").replace("thanks Benjamin, fixed", "fixed in the installer, thanks Benjamin")
                             + fi("s213", "the proxy") + fi("s214", "French"))
         c.say('[[bash: sb page publish %s --id benjamin-bugs]]' % fp)
-        c.wait(lambda: fb() and fb()[0]["text"].startswith("3 drafts wait for you · benjamin's reports\n3 replies to Benjamin: fish, proxy and French\n"), 90,
+        c.wait(lambda: fb() and fb()[0]["text"].startswith("benjamin's reports: send these 3 replies?\n- to Benjamin (fish): fixed in the installer, thanks Benjamin\n"), 90,
                "republished after the fix: the 3 replies in one card")
         check(fb()[0]["text"].endswith("2. send all 3"), "send all 3: %r" % fb())
         b = batch_of(fb()[0])
@@ -715,8 +719,9 @@ def main():
         settle(c)
 
         # account changes (amb-kit's action block, ambient-lead m_6192):
-        # drafts his approve does, counted apart on the card; send all
-        # approves each
+        # drafts his approve does, apart on the card; never in a send all:
+        # one at a time, in page order, each named with its line
+        # (notif-words), the last one asked alone
         op = os.path.join(E.tmp, "ops.html")
         act = lambda i, todo: '<section data-kit="action" data-id="%s" data-do="%s"><p>%s in Linear · fixed in 0.4.2</p></section>' % (i, todo, todo)
         open(op, "w").write('<section data-kit="message" data-id="m-nina" data-to="Slack · #ops · to Nina, on 0.4.2" data-verb="send">'
@@ -725,13 +730,26 @@ def main():
         oc = lambda: [x for x in c.cards() if (x.get("page") or {}).get("id") == "ops-close"]
         c.wait(oc, 90, "the ops page's batch card")
         wait.stable(lambda: [x["text"] for x in oc()], 30, "the ops page's cards", quiet=1)
-        check(len(oc()) == 1 and oc()[0]["text"] == "3 drafts wait for you · ops\nmessages to Nina · 2 to close\n1. review\n2. send all 3", "actions counted apart: %r" % oc())
+        # one decision each (designer m_25451): the message first, then each change
+        check(len(oc()) == 1 and oc()[0]["text"] == "ops: send this message?\n- to Nina (0.4.2): 0.4.2 is out\n1. open the page\n2. send it",
+              "the message first, alone: %r" % oc())
         check(batch_of(oc()[0]).get("actions") == "2 to close", "batch.actions: %r" % batch_of(oc()[0]))
+        approved = lambda: sorted(n["block"] for n in json.loads(request(port, "GET", "/p/ops-close/meta")[2])["notes"] if n["kind"] == "approve")
+        settle(c)
+        first = oc()[0]["id"]
+        c.say("/answer %d 2" % first)
+        c.wait(lambda: approved() == ["m-nina"], 30, "send it sends the message only")
+        c.wait(lambda: oc() and oc()[0]["id"] != first and oc()[0]["text"] == "ops: close OPS-12? (1 of 2, in order)\nclose OPS-12 in Linear · fixed in 0.4.2\n"
+               "after it, one at a time: close OPS-13\n1. open the page\n2. close OPS-12", 30, "then the first change alone")
         settle(c)
         c.say("/answer %d 2" % oc()[0]["id"])
-        c.wait(lambda: not oc(), 30, "the ops batch closes on send all")
-        notes = json.loads(request(port, "GET", "/p/ops-close/meta")[2])["notes"]
-        check(sorted(n["block"] for n in notes if n["kind"] == "approve") == ["a-ops12", "a-ops13", "m-nina"], "an approve per action and message: %r" % notes)
+        c.wait(lambda: approved() == ["a-ops12", "m-nina"], 30, "its go does that change only")
+        c.wait(lambda: oc() and oc()[0]["text"] == "ops: close OPS-13? (2 of 2, in order)\nclose OPS-13 in Linear · fixed in 0.4.2\n1. open the page\n2. close OPS-13",
+               30, "the last change is asked alone")
+        settle(c)
+        c.say("/answer %d close OPS-13" % oc()[0]["id"])
+        c.wait(lambda: not oc(), 30, "the ops notification closes on the last go")
+        check(approved() == ["a-ops12", "a-ops13", "m-nina"], "an approve per action and message: %r" % approved())
         settle(c)
 
         # his step answered from the capsule (pm's D fail 31): the core's

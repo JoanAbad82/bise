@@ -93,6 +93,10 @@ pub struct Step {
     /// title, what, names}
     #[serde(default, skip_serializing_if = "serde_json::Value::is_null")]
     pub info: serde_json::Value,
+    /// a batch card's options past review (drafts::choices), in order;
+    /// empty on a card made before them: one 'send all' of `batch`
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub choices: Vec<super::drafts::Choice>,
 }
 
 /// The `block` of a batch card's entry in steps.json (no block id is
@@ -105,9 +109,8 @@ impl Step {
     /// then send them all; ambient's order, m_6055).
     pub fn card_text(&self) -> String {
         if !self.batch.is_empty() {
-            return format!("{}
-1. review
-2. {}", self.text, super::drafts::send_label(self.batch.len()));
+            let opts: Vec<String> = self.batch_choices().iter().enumerate().map(|(i, c)| format!("{}. {}", i + 2, c.label)).collect();
+            return format!("{}\n1. {}\n{}", self.text, super::drafts::OPEN_PAGE, opts.join("\n"));
         }
         if self.drafted {
             return format!("{}: send the draft?
@@ -115,6 +118,24 @@ impl Step {
         }
         format!("{}
 1. done", self.text)
+    }
+
+    /// A batch card's options past review: its own, else (a card made
+    /// before them) one send of all it holds.
+    pub fn batch_choices(&self) -> Vec<super::drafts::Choice> {
+        if self.choices.is_empty() && !self.batch.is_empty() {
+            return vec![super::drafts::Choice { label: super::drafts::send_label(self.batch.len()), keys: self.batch.clone() }];
+        }
+        self.choices.clone()
+    }
+}
+
+/// A step card's words with its page's title first ('launch plan · pay
+/// the domain'), so he knows where it is with no page open (notif-words).
+pub fn with_title(title: &str, text: &str) -> String {
+    match title.trim() {
+        "" => text.to_string(),
+        t => format!("{t} · {text}"),
     }
 }
 

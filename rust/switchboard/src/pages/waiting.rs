@@ -116,7 +116,7 @@ pub fn of_page(id: &str, html: &str, notes: &[Note], questions: &[Question], bus
         0 => {}
         1 => out.push(w(drafts[0].anchor(), "draft", &drafts[0].text)),
         _ if !carded => out.extend(drafts.iter().map(|d| w(d.anchor(), "draft", &d.text))),
-        _ => out.push(w(drafts[0].anchor(), "draft", &super::drafts::batch_text(&drafts, "").replace('\n', ": "))),
+        _ => out.push(w(drafts[0].anchor(), "draft", &super::drafts::summary(&drafts))),
     }
     // questions he has not answered (on the page: no data-answer)
     for (b, _) in blocks_of(html, "question") {

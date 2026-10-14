@@ -312,7 +312,9 @@ impl Shell {
             self.step(Input::Agent {
                 token: 0,
                 from: MAIN.to_string(),
-                req: crate::core::AgentReq::Card { text: s.card_text(), for_msg: None },
+                // (the page's title first: where this step is, with no page
+                // open; notif-words)
+                req: crate::core::AgentReq::Card { text: crate::pages::checklist::with_title(&meta.title, &s.card_text()), for_msg: None },
             });
             match self.hub.st.open_cards().filter(|c| !before.contains(&c.id) && c.kind == "question").map(|c| c.id).max() {
                 Some(card) => {
@@ -352,6 +354,7 @@ impl Shell {
     pub(super) fn page_batch(&mut self, id: &str, title: &str, steps: &mut Vec<crate::pages::checklist::Step>, drafts: &[crate::pages::drafts::Draft], open: &[u64]) -> bool {
         use crate::pages::checklist::{Step, BATCH};
         let keys: Vec<String> = drafts.iter().map(|d| d.key()).collect();
+        let (text, choices) = (crate::pages::drafts::batch_text(drafts, title), crate::pages::drafts::choices(drafts));
         let mut changed = false;
         let mut have = false;
         let mut replaced = false;
@@ -362,6 +365,10 @@ impl Shell {
                 (true, _, _) => ("done", "done"),
                 // a draft it lacks: one card for them all
                 (false, false, _) => ("replaced", ""),
+                // its words no longer say what waits (the next change
+                // after his go on one, a draft sent from the page): a new
+                // one says it (notif-words)
+                (false, true, true) if s.text != text || s.batch_choices() != choices => ("replaced", "replaced"),
                 (false, true, true) => {
                     have = true;
                     continue;
@@ -381,7 +388,11 @@ impl Shell {
         let dismissed = steps
             .iter()
             .any(|s| s.block == BATCH && s.reply.as_deref() == Some("") && keys.iter().all(|k| s.batch.contains(k)));
-        let new = drafts.len() >= 2 || (replaced && !drafts.is_empty());
+        // (an account change of a chain he started, his go on the one
+        // before, is asked alone too: the last of a plan's changes)
+        let going = drafts.iter().any(|d| d.kind == "action")
+            && steps.iter().any(|s| s.block == BATCH && s.reply.as_deref().is_some_and(|r| !matches!(r, "" | "done" | "replaced")));
+        let new = drafts.len() >= 2 || (replaced && !drafts.is_empty()) || going;
         if have || !new || dismissed {
             return changed;
         }
@@ -404,9 +415,10 @@ impl Shell {
         let mut s = Step {
             block: BATCH.into(),
             item: "drafts".into(),
-            text: crate::pages::drafts::batch_text(drafts, title),
+            text,
             batch: keys,
             info: crate::pages::drafts::info(drafts, title),
+            choices,
             ..Step::default()
         };
         match self.open_page_card(id, s.card_text(), format!("drafts:{}:{}", first.block, first.anchor())) {
@@ -433,7 +445,8 @@ impl Shell {
         let Some(pages) = self.pg.pages.clone() else { return false };
         let Some(meta) = pages.store.meta(id) else { return false };
         use crate::pages::drafts::BatchAnswer;
-        match crate::pages::drafts::batch_answer(reply) {
+        let choices = pages.store.steps(id).into_iter().find(|s| s.card == card && s.reply.is_none()).map(|s| s.batch_choices()).unwrap_or_default();
+        let pick = match crate::pages::drafts::batch_answer(reply, &choices) {
             BatchAnswer::Empty => return true,
             // option 1 does what it says: the page, never a message; the card stays
             BatchAnswer::Review => {
@@ -457,13 +470,15 @@ impl Shell {
                 self.notice_out(client, Some("answer"), &format!("sent to {who}: \"{words}\". the drafts still wait for you."));
                 return true;
             }
-            BatchAnswer::SendAll => {}
-        }
+            BatchAnswer::Choice(i) => i,
+        };
+        // the drafts of the option he picked, only them: an account
+        // change goes alone, the next one gets its own (notif-words)
+        let Some(choice) = choices.get(pick) else { return false };
         let mut steps = pages.store.steps(id);
-        let Some(keys) = steps.iter().find(|s| s.card == card && s.reply.is_none()).map(|s| s.batch.clone()) else { return false };
-        let sent = self.page_approve_drafts(id, Some(&keys));
+        let sent = self.page_approve_drafts(id, Some(&choice.keys));
         for s in steps.iter_mut().filter(|s| s.card == card && s.reply.is_none()) {
-            s.reply = Some("send all".into());
+            s.reply = Some(choice.label.clone());
         }
         if let Err(e) = pages.locked(|st| st.save_steps(id, &steps)) {
             log_line(&self.opts.paths, &format!("page {id}: steps not saved: {e}"));
@@ -520,23 +535,37 @@ impl Shell {
         let Some(meta) = pages.store.meta(&id) else { return false };
         let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
         let now = pages.store.steps(&id).into_iter().find(|s| s.block == BATCH && s.reply.is_none() && open.contains(&s.card));
+        // an old one's send acts on the drafts that wait now, never on an
+        // account change: those go one at a time, each on its own go
+        // (notif-words)
+        let closed = || format!("that notification is closed: nothing waits on {} now.", meta.title);
+        let changed = |s: &crate::pages::checklist::Step| format!("that notification changed: {}", s.text.lines().next().unwrap_or_default());
         let say = match (now, crate::pages::drafts::is_send_all(reply)) {
-            (Some(s), true) => {
-                self.page_drafts_answer(client, &id, s.card, reply);
-                None
-            }
+            (Some(s), true) => match s.batch_choices().into_iter().find(|c| c.label.starts_with("send ")) {
+                Some(c) => {
+                    self.page_drafts_answer(client, &id, s.card, &c.label);
+                    None
+                }
+                None => Some(changed(&s)),
+            },
             (None, true) => {
-                let sent = self.page_approve_drafts(&id, None);
+                let html = pages.store.html(&id, meta.version()).unwrap_or_default();
+                let sends: Vec<String> = crate::pages::drafts::pending(&html, &pages.store.notes(&id), &pages.store.questions(&id))
+                    .iter()
+                    .filter(|d| d.kind != "action")
+                    .map(|d| d.key())
+                    .collect();
+                let sent = if sends.is_empty() { Vec::new() } else { self.page_approve_drafts(&id, Some(&sends)) };
                 if sent.is_empty() {
-                    Some(format!("that card is closed: nothing waits on {} now.", meta.title))
+                    Some(closed())
                 } else {
                     self.page_send_approves(&id, &meta, &sent);
                     self.page_steps(&id);
                     None
                 }
             }
-            (Some(s), false) => Some(format!("that card changed: {}", s.text.replace('\n', " · "))),
-            (None, false) => Some(format!("that card is closed: nothing waits on {} now.", meta.title)),
+            (Some(s), false) => Some(changed(&s)),
+            (None, false) => Some(closed()),
         };
         log_line(&self.opts.paths, &format!("page {id}: an answer on old batch card #{card}: {reply:?} → {}", say.as_deref().unwrap_or("sent the current drafts")));
         if let Some(text) = say {

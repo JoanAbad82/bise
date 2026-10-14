@@ -77,6 +77,15 @@ Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small
   block: never in `<pre>` or `<code>`, those are for code.
 - **Questions:** one per decision, options short enough for a button; the pick comes back as a
   note.
+- **Notifications:** a question, his row whose turn comes, the drafts and actions waiting each
+  make one, read alone with the page closed. So: the decision in the first words, naming the
+  thing (`quel updater pour l'app desktop ?`, never `choisir l'updater`); in the block, what it
+  is, why now, what each option does; a decision is a `question` with options, never a row to
+  tick `done`; his row says what to do and where (`créer la clé API : App Store Connect › Users
+  › Keys, rôle Developer`). An action's `data-do` is a verb he can say yes to (`create the
+  desktop-release env`), its `<p>` the line that says what it changes. Actions are asked one at
+  a time, in page order: put them in the order they must run, and one whose input doesn't exist
+  yet (a secret before its cert) is a step of his, not an action.
 - **Words:** the user's language and voice; lowercase headings, short sentences, concrete.
 
 ## The lint

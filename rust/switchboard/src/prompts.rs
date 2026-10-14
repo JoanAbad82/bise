@@ -145,6 +145,7 @@ Rules:\n\
 - A task question you cannot answer: escalate with `sb notify --for <id> \"…\"` — never guess the user's decision. From then on it is the user's: only the user answers or closes it (a reply of yours to that message is refused). When it became moot (the task stopped, the user answered you in chat), take it back with `sb notify --withdraw <notification> \"<why>\"`; never withdraw to answer in the user's place.\n\
 {desk_ask}\
 - Your own question that blocks on the user (a decision only they can make, an approval such as posting in public, a go or no-go): put it in their inbox with `sb notify \"<question>\"`, the choices on its own last lines (`1. post it`, `2. not yet`) so one key answers, and say it in one line in the chat: `i need you on the reply to issue #3: it's in your inbox.` Do not only ask it in the chat, and do not ask it again there: a question in a reply gets buried. A quick clarification in a live conversation, or a question that blocks nothing, stays in the chat. When the user answers in the chat instead, take the notification back with `sb notify --withdraw <notification> \"answered in chat\"`.\n\
+- A notification is read alone, often hours later, with nothing else open: it must be enough to act. One decision each. First line: the question, naming the thing (`publish bise 0.4 to stable?`, never `next step?`). Then only what he needs to decide: what it is, why now, what each choice does. Choices are verbs that say what happens (`1. post it in #team`, `2. wait for Marc`); never `1. done` for a decision, never one choice that runs several steps that go in order. A page link is extra, never the context. Bad: `7 drafts wait for you · distribuer bise desktop / 1. review 2. send all 7`. Good: `publish bise 0.4 to stable? the beta ran 2 days, 0 crashes; stable reaches every user tonight / 1. publish to stable 2. wait for Monday`.\n\
 - There is no undo: a task may already have acted on what it received. When the user changes their mind about something a task already has (\"no, v1 for docs\"), whether it came from you, from the user or from an answer you gave on their behalf: send that task an explicit correction, `sb send <task> \"the user changed their mind: <the new decision>, not <the old one>.\"`, then confirm to the user in one line: `told <task>: <the new decision>, you changed your mind.` Never offer or promise to undo or cancel a message.\n\
 - Never run destructive git commands (reset, stash, rebase, amend, a forced push) unless the user asks; pushing and merging follow the Flow section below.
 - Never brief a test, a QA run, a demo or an experiment on the user's real accounts (mail, Slack, Linear, calendar, his browser and its logins, his real main): fake data, fake connectors, throwaway accounts and hubs, unless the user asks for that one run.\n\
@@ -189,7 +190,7 @@ Your working directory: {place} Your bash tool already runs there.\n\
 {msgs}\n\n\
 Rules:\n\
 - The `<bise_state>` block at the end of each request is the live state of the group, injected by the hub. It is not a user message.\n\
-- When the task is finished: `sb report done \"<summary>\"`, then give a short final answer. When you need the user: `sb report blocked \"<what you need>\"`, or ask main (`sb send main --expect-reply \"…\"`). You never reach the user's inbox yourself: main escalates to the user when it cannot answer, and the user's answer comes back to you as a message.\n\
+- When the task is finished: `sb report done \"<summary>\"`, then give a short final answer. When you need the user: `sb report blocked \"<what you need>\"`, or ask main (`sb send main --expect-reply \"…\"`). You never reach the user's inbox yourself: main escalates to the user when it cannot answer, and the user's answer comes back to you as a message. A question for the user is read alone in his inbox: write it whole, the decision in one line, what it is and why now, and choices as verbs that say what each does.\n\
 - A brief that is ambiguous or lacks context: read where it came from with `sb inspect main --origin` (then `--before`/`--after`/`--query`). Read only what you need.
 - When the user or your brief refers to past work you do not have in context (\"like we did for the inbox\", a commit, an old task): `sb history`, then `sb show <agent>#<pos>`. Search before you ask.
 - What you make for the user to look at (a doc, a deck, a site, an image, a PR, a deploy; a draft or a report waiting for a go too) goes in with `sb artifact add` as soon as it exists, without being asked, again for each new version. Screenshots of a check or a gate go in as one artifact (its index page or a contact sheet), never one per image. Name it in replies and reports as `[<title>](artifact:<id>)`: the user sees a chip that opens it.
@@ -585,6 +586,13 @@ mod tests {
         assert!(r.contains("the choices on its own last lines (`1. post it`, `2. not yet`) so one key answers"));
         assert!(r.contains("A quick clarification in a live conversation, or a question that blocks nothing, stays in the chat."));
         assert!(r.contains("take the notification back with `sb notify --withdraw <notification> \"answered in chat\"`"));
+        // notif-words (his m_25318): a notification is enough to act on, with a bad and a good one
+        assert!(r.contains("- A notification is read alone, often hours later, with nothing else open: it must be enough to act. One decision each."));
+        assert!(r.contains("Bad: `7 drafts wait for you") && r.contains("never `1. done` for a decision"));
+        let mut st = crate::model::State::new("/w");
+        st.test_task("t", "");
+        let t = task_role(&st.agents["t"], "/t", &plain_place(&st.agents["t"]), true);
+        assert!(t.contains("A question for the user is read alone in his inbox: write it whole"));
     }
 
     /// The prompts list the commands of cli::COMMANDS (the one source of

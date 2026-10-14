@@ -68,6 +68,10 @@ label. Then `leaving.md`. Any other write (close an issue, an invite) is on the 
 its own `action` block (`data-do="close OPS-12"`); on his word, do exactly what he approved.
 Code work is never an action: it is a `start an agent` item.
 
+A question, his row whose turn comes, the drafts and actions waiting: each becomes a
+notification he reads alone, page closed. Write each to be enough to act on ("notifications"
+in `blocks.md`).
+
 ## The blocks
 
 Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kept across versions.
