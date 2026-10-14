@@ -846,7 +846,7 @@ fn answer_with(app: &mut App, id: u64, said: &crate::said::Said, picked: Option<
     // the asker's thread opens at his answer (its end: the hub's row comes
     // there), esc back to main; not while the card view moves on to the next
     if let Some(to) = asker_view(&app.sb.focus, &c.agent, &app.sb.agents, app.sb.card.open) {
-        super::focus(app, &to);
+        super::inbox::to_answer(app, &to, None, false);
         return;
     }
     if !open {

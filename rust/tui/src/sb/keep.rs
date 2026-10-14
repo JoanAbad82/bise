@@ -328,7 +328,7 @@ pub(crate) fn apply(app: &mut App) {
 
 /// The history back at the same line: its event in the replayed feed (the
 /// oldest loaded when that line is older than the replay).
-fn repin(app: &mut App, p: Pin) {
+pub(super) fn repin(app: &mut App, p: Pin) {
     if app.events.is_empty() {
         return;
     }

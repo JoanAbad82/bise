@@ -55,6 +55,7 @@ mod keep_tests;
 pub(crate) mod reload_wait;
 mod keys;
 pub(crate) mod rpc;
+pub(crate) mod inbox;
 pub(crate) mod hub_reads;
 mod state_rows;
 mod reads;
@@ -909,14 +910,9 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
         "/archived" => sb.toggle_archived(),
         // the agent palette (BISE-265), on the rest of the line
         "/switch" => palette::open(app, typed.strip_prefix("/switch").unwrap_or("")),
-        // the inbox: its first item in the view (`/cards`: its old name)
-        "/inbox" | "/cards" => {
-            if sb.sorted_cards().is_empty() {
-                out.push(Ev::Info("the inbox is empty: nothing waits for you".into()));
-            } else {
-                cards::open_view(app, None);
-            }
-        }
+        // the inbox: what waits, then his past answers (inbox_screen.rs;
+        // `/cards`: its old name)
+        "/inbox" | "/cards" => crate::inbox_screen::open(app),
         "/theme" => out.push(theme_command(typed.split_whitespace().nth(1), crate::theme_detect::choose)),
         "/keychain" => out.extend(crate::keychain::command(&typed)),
         // approvals-design.md §8: the mode, the checker, the rules; or a switch

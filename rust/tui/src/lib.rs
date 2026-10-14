@@ -118,6 +118,8 @@ mod artifacts_screen;
 mod scheduled;
 mod scheduled_screen;
 mod scheduled_watch;
+mod inbox_list;
+mod inbox_screen;
 mod usage_screen;
 mod diffbranches;
 mod diffquote;

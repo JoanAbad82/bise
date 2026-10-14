@@ -63,6 +63,9 @@ pub(crate) enum Then {
     /// `hub/read` (a gap or a new epoch in the hub-wide notifications):
     /// its state replaces the terminal's (hub_reads.rs)
     HubRead,
+    /// `inbox/history` (`/inbox`): the first page (None) or the one
+    /// before that card (inbox_screen.rs)
+    Inbox(Option<u64>),
 }
 
 /// The requests waiting for their answer, by id (cells: a popup asks
@@ -178,6 +181,11 @@ fn run(app: &mut App, then: Then, r: Response) {
         (Then::Usage, Ok(v)) => {
             if let Ok(Some(ev)) = bise_proto::rpc::ev_of_result("usage/read", v) {
                 crate::usage_screen::answered(app, ev);
+            }
+        }
+        (Then::Inbox(before), Ok(v)) => {
+            if let Ok(Some(ev)) = bise_proto::rpc::ev_of_result("inbox/history", v) {
+                crate::inbox_screen::answered(app, before, ev);
             }
         }
         (Then::Approvals, Ok(v)) => {

@@ -88,6 +88,7 @@ pub(super) fn page(app: &mut App, agent: &str, older: Option<usize>, entries: Ve
     if older.is_none() {
         first_page_in(app, agent);
     }
+    super::inbox::reveal(app);
 }
 
 fn first_page(app: &mut App, agent: &str, entries: &[Entry], more: bool) {
