@@ -542,6 +542,11 @@ pub enum Init {
     Other,
 }
 
+/// What a client says when [`Init::Older`] answers it: a hub from before
+/// client-protocol (v2026.10.2-30) is no longer spoken to. The one
+/// sentence, for every client (`bise stop`, the version switch at launch).
+pub const HUB_OLDER: &str = "this project's hub is older than this bise: stop it with `bise switchboard --stop`, then start bise again";
+
 /// [`Init`] of one line, `init` the `initialize` request's id.
 // TODO(client-protocol, the plan's 'after the release' step): Older goes
 // with the older door it detects, the release after client-protocol's.

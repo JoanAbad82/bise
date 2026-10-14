@@ -2,7 +2,7 @@
 //! starting the hub first when none runs.
 
 use crate::paths::Paths;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::Path;
@@ -155,9 +155,9 @@ pub fn open(paths: &Paths, exe: &Path, app_root: &Path) -> std::io::Result<UnixS
 
 /// Stop the hub of a workspace and every agent REPL. `keep_agents`:
 /// the REPLs keep running (their turns too) for the next hub to adopt -
-/// a version switch, a hub restart. `initialize`, then `hub/stop`; an
-/// older hub (before client-protocol) gets its hello and the `stop_hub`
-/// op instead.
+/// a version switch, a hub restart. `initialize`, then `hub/stop`; a hub
+/// from before client-protocol is not stopped: an error saying so
+/// (`rpc::HUB_OLDER`).
 pub fn stop(paths: &Paths, keep_agents: bool) -> std::io::Result<bool> {
     stop_at(&paths.socket(), keep_agents, STOP_ANSWER, STOP_WAIT)
 }
@@ -183,26 +183,21 @@ fn stop_at(socket: &Path, keep_agents: bool, answer: Duration, wait: Duration) -
             _ => return Ok(true),
         };
         match rpc::init_answer(&serde_json::from_str(&line).unwrap_or(Value::Null), &Id::Num(0)) {
-            Init::Ready(res) => break Some(res.project),
+            Init::Ready(res) => break res.project,
             // refused (it runs in an agent's process): the hub stays
             Init::Refused(_) => return Ok(true),
-            Init::Older => break None,
+            // a hub from before client-protocol: never asked, it runs on
+            Init::Older => return Err(std::io::Error::other(rpc::HUB_OLDER)),
             Init::Other => {}
         }
     };
     drop(lines);
-    let mut s = match project {
-        Some(project) => {
-            if let Some(req) = rpc::request(Id::Num(1), &HubCmd::StopHub { project, keep_agents }) {
-                writeln!(s, "{}", Message::Request(req).to_value())?;
-            }
-            s
-        }
-        None => older_stop(socket, keep_agents)?,
-    };
+    if let Some(req) = rpc::request(Id::Num(1), &HubCmd::StopHub { project, keep_agents }) {
+        writeln!(s, "{}", Message::Request(req).to_value())?;
+    }
     // wait for the socket to go away, reading what the hub writes
-    // (notifications; an older hub's hello is tens of KB): a full socket
-    // buffer would block the hub, which would never stop
+    // (notifications): a full socket buffer would block the hub, which
+    // would never stop
     let _ = s.set_read_timeout(Some(Duration::from_millis(100)));
     let mut sink = [0u8; 65536];
     let t0 = Instant::now();
@@ -227,16 +222,6 @@ const STOP_ANSWER: Duration = Duration::from_secs(5);
 /// How long `stop` waits for the hub's socket to go: the hub removes it
 /// as its loop ends, before its REPLs checkpoint.
 const STOP_WAIT: Duration = Duration::from_secs(30);
-
-/// An older hub (before client-protocol): its hello, then the op.
-// TODO(client-protocol, the plan's 'after the release' step, with
-// switch/ask.rs older_switch): goes the release after client-protocol's.
-fn older_stop(socket: &Path, keep_agents: bool) -> std::io::Result<UnixStream> {
-    let mut s = UnixStream::connect(socket)?;
-    let req = json!({"op": "stop_hub", "keep_agents": keep_agents});
-    s.write_all(format!("{{\"op\":\"hello\"}}\n{req}\n").as_bytes())?;
-    Ok(s)
-}
 
 /// The start of `request`'s error when the hub did not answer in time.
 pub const NO_ANSWER: &str = "the hub did not answer (busy) in";
@@ -297,6 +282,7 @@ pub fn request_retry(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     /// The user's fresh install: a raw `Error: Custom { .. }` line in
     /// hub.err becomes one human line with the cause and the log.
@@ -368,25 +354,24 @@ mod tests {
         assert_eq!((req["method"].as_str(), req["params"]["project"].as_str(), req["params"]["keep_agents"].as_bool()), (Some("hub/stop"), Some("p1"), Some(true)));
     }
 
-    /// An older hub (before client-protocol): its hello and the op.
+    /// A hub from before client-protocol (it doesn't serve `initialize`)
+    /// is never asked: one error that says so, no second connection.
     #[test]
-    fn an_older_hub_gets_hello_and_stop_hub() {
+    fn an_older_hub_is_not_stopped_and_says_why() {
         let (p, l) = sock(2);
-        let path = p.clone();
         let hub = std::thread::spawn(move || {
             let (mut w, _) = l.accept().unwrap();
             let _ = read(&mut BufReader::new(w.try_clone().unwrap()));
             writeln!(w, "{}", json!({"ok": false, "error": "hub.sock does not serve the op \"\""})).unwrap();
             drop(w);
-            let (w, _) = l.accept().unwrap();
-            let mut r = BufReader::new(w);
-            assert_eq!(read(&mut r)["op"], "hello");
-            let op = read(&mut r);
-            std::fs::remove_file(&path).unwrap();
-            op
+            l.set_nonblocking(true).unwrap();
+            std::thread::sleep(Duration::from_millis(200));
+            l.accept().is_ok()
         });
-        assert!(stop_at(&p, false, STOP_ANSWER, STOP_WAIT).unwrap());
-        assert_eq!(hub.join().unwrap(), json!({"op": "stop_hub", "keep_agents": false}));
+        let e = stop_at(&p, false, STOP_ANSWER, STOP_WAIT).unwrap_err();
+        assert_eq!(e.to_string(), bise_proto::rpc::HUB_OLDER);
+        assert!(!hub.join().unwrap(), "a second connection to the older hub");
+        let _ = std::fs::remove_file(&p);
     }
 
     /// 2026-10-11: the hub took the stop but ran on (its stop queued 85 s

@@ -1,12 +1,12 @@
 //! `follow_install`'s question to the folder's hub (BISE-255): switch to
 //! the launched version, and the hub's words back. A hub that serves
-//! JSON-RPC (client-protocol) gets `initialize` then `version/switch`; an
-//! older one (`bise_proto::rpc::init_answer`'s `Older`, the one reading
-//! of its door) the older hello and `version` op on a new connection.
+//! JSON-RPC (client-protocol) gets `initialize` then `version/switch`; a
+//! hub from before it (`bise_proto::rpc::init_answer`'s `Older`) is not
+//! asked: its words back are `rpc::HUB_OLDER`.
 
 use bise_proto::hub::HubCmd;
 use bise_proto::rpc::{self, Id, Init, InitializeParams, Message, Request};
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::Path;
@@ -28,7 +28,7 @@ pub(super) fn ask_switch(socket: &Path, to: &str) -> std::io::Result<String> {
         match rpc::init_answer(&serde_json::from_str(&line?).unwrap_or(Value::Null), &Id::Num(INIT)) {
             Init::Ready(res) => break res.project,
             Init::Refused(e) => return Ok(e),
-            Init::Older => return older_switch(socket, to),
+            Init::Older => return Ok(rpc::HUB_OLDER.to_string()),
             Init::Other => {}
         }
     };
@@ -49,28 +49,10 @@ pub(super) fn ask_switch(socket: &Path, to: &str) -> std::io::Result<String> {
     Ok(String::new())
 }
 
-/// An older hub (before client-protocol): hello, then the `version` op;
-/// its answer is a `notice` after the hello's lines.
-// TODO(client-protocol, the plan's 'after the release' step, with
-// Hubs.older_door): goes the release after client-protocol's.
-fn older_switch(socket: &Path, to: &str) -> std::io::Result<String> {
-    let mut s = UnixStream::connect(socket)?;
-    let req = json!({"op": "version", "do": "switch", "to": to});
-    s.write_all(format!("{{\"op\":\"hello\"}}\n{}\n", req).as_bytes())?;
-    s.set_read_timeout(Some(Duration::from_secs(5)))?;
-    // the hub's hello first (tens of KB), then the answer: a notice
-    for line in BufReader::new(s).lines() {
-        let v: Value = serde_json::from_str(&line?).unwrap_or(Value::Null);
-        if v.get("ev").and_then(|x| x.as_str()) == Some("notice") {
-            return Ok(v.get("text").and_then(|x| x.as_str()).unwrap_or("").to_string());
-        }
-    }
-    Ok(String::new())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::os::unix::net::UnixListener;
 
     fn read(r: &mut impl BufRead) -> Value {
@@ -118,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn an_older_hub_refuses_initialize_and_gets_the_older_op() {
+    fn an_older_hub_is_not_asked_and_the_words_say_why() {
         let (_d, p, l) = sock(2);
         let hub = std::thread::spawn(move || {
             // accept.rs before client-protocol: initialize isn't an op it serves
@@ -126,16 +108,12 @@ mod tests {
             let _ = read(&mut BufReader::new(w.try_clone().unwrap()));
             writeln!(w, "{}", json!({"ok": false, "error": "hub.sock does not serve the op \"\""})).unwrap();
             drop(w);
-            let (mut w, _) = l.accept().unwrap();
-            let mut r = BufReader::new(w.try_clone().unwrap());
-            assert_eq!(read(&mut r)["op"], "hello");
-            let op = read(&mut r);
-            writeln!(w, "{}", json!({"ev": "hello", "workspace": "/w"})).unwrap();
-            writeln!(w, "{}", json!({"ev": "notice", "text": "switching to version v2"})).unwrap();
-            op
+            l.set_nonblocking(true).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            l.accept().is_ok()
         });
-        assert_eq!(ask_switch(&p, "/apps/v2").unwrap(), "switching to version v2");
-        assert_eq!(hub.join().unwrap(), json!({"op": "version", "do": "switch", "to": "/apps/v2"}));
+        assert_eq!(ask_switch(&p, "/apps/v2").unwrap(), rpc::HUB_OLDER);
+        assert!(!hub.join().unwrap(), "a second connection to the older hub");
     }
 
     #[test]

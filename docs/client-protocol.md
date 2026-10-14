@@ -185,14 +185,14 @@ go in the release after:
   "hello","proto":1}`) when a hub doesn't answer `initialize`
   (`older_door`, `Read::Older`: `rust/tui/src/ambient/core/hubs.rs`,
   `hub_rpc.rs`), and says `this project's hub is older: update bise` for
-  a command that hub lacks;
-- `sb`'s questions to a hub (`rust/switchboard/src/switch/ask.rs`, the
-  version switch at launch, BISE-255) try `initialize` first and fall
-  back to the older hello and `version` op (`rpc::init_answer`'s
-  `Older`);
-- `bise stop` (`switchboard::client::stop`) says `initialize` then
-  `hub/stop`; an older hub gets the older hello and `stop_hub` op on a new
-  connection (`older_stop`, `rust/switchboard/src/client.rs`).
+  a command that hub lacks.
+
+Gone (debt-t3): the hub's hello stub and older door (an older client's
+`{"op":"hello"}` gets `exe` and `reload`, then the connection closes);
+the fallbacks of `sb`'s version switch at launch (`switch/ask.rs`) and of
+`bise stop` (`client::stop`) to an older hub's hello and op: an older hub
+(`rpc::init_answer`'s `Older`) is not asked, and they say
+`rpc::HUB_OLDER` instead.
 
 ## After the release
 
