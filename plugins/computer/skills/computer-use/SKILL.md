@@ -106,8 +106,9 @@ visible, enabled element.
   the user asked for exactly that action in this task. bise may also ask
   him on its own.
 - **Never touch the user's own tabs or windows**: work in the tabs you
-  opened. When he touches one of yours, you are paused (`paused`): wait,
-  don't fight him. When he stops you (`stopped`), stop and ask before you
+  opened. He may look at one of yours, or click in it: it stays yours and
+  you keep driving it. When he takes over from bise, you are paused
+  (`paused`): wait, don't fight him. When he stops you (`stopped`), stop and ask before you
   start again.
 - Some targets are always refused (`refused`): browser settings,
   extension stores, password managers, Keychain, Terminal, bise, System
@@ -124,7 +125,7 @@ visible, enabled element.
 | `not_found`, `ambiguous` | read `candidates`, fix the locator, or snapshot again |
 | `stale_ref` | the page changed: snapshot again, use the new ref |
 | `timeout` | the element never showed: snapshot to see what is there |
-| `paused` | the user took the wheel: wait for him, or ask |
+| `paused` | the user took over from bise: wait for him, or ask |
 | `stopped` | the user stopped you: ask before you go on |
 | `refused` | a protected target: do it another way, or ask the user |
 | `needs_front` | this action needs the app in front: ask the user |

@@ -246,6 +246,10 @@ pair and commits the public key; the Web Store keeps the same id).
   ones do.
 - ext → host events: `{"event":"stopped","agent","reason":"cancel_bar|group_closed"}`,
   `{"event":"paused","agent","target"}`, `{"event":"resumed","agent"}`.
+  Since extension 0.1.1 the extension never sends `paused`: his focus,
+  clicks and keys in an agent tab leave it the agent's, and taking over
+  is ctl `pause` only. The broker keeps reading `paused` for the helper
+  (C5) and for an older extension still installed.
 
 ### C5. Broker ↔ helper app
 

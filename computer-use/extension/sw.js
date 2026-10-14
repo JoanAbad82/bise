@@ -5,14 +5,15 @@
 // screenshot / act on behalf of an agent; each agent works in its own tab
 // group "bise · <agent>", in background tabs, through chrome.debugger (CDP).
 // The user stays in control: the debugging bar's Cancel or closing the group
-// stops the agent; touching one of its tabs pauses it.
+// stops the agent; taking over from bise's window pauses it. Looking at or
+// using one of its tabs doesn't: the agent keeps driving it.
 //
 // The code is in sw/, by area: state.js (the agents, their tabs, the
 // groups' titles), host.js (the native port), tabs.js (the ops, open,
 // show), cdp.js (the debugger, the snapshot), act.js (driving a tab),
 // control.js (stop, pause, drop, the user's moves). This file starts it.
 
-import { agents, tabs, log, note } from "./sw/state.js";
+import { agents, tabs, log, note, recover } from "./sw/state.js";
 import { port, timer, connect } from "./sw/host.js";
 import { detached } from "./sw/cdp.js";
 import "./sw/control.js";
@@ -54,6 +55,6 @@ async function checkBuild() {
 checkBuild();
 
 // For the tests (test/e2e.mjs reads it through CDP on this worker).
-globalThis.bise = { agents, tabs, log, connected: () => !!port, detached, build: BUILD, checkBuild };
+globalThis.bise = { agents, tabs, log, connected: () => !!port, detached, build: BUILD, checkBuild, recover };
 
 connect();

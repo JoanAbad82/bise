@@ -4,7 +4,8 @@
 //    the target (~150 ms), then a pink ring grows and fades (300 ms).
 //    Purely visual, in a closed shadow root, pointer-events: none.
 // 2. Tell the service worker when someone clicks or types in this tab; the
-//    worker keeps the user's input only (takeover → the agent pauses).
+//    worker keeps the user's input only (the tab counts as touched; the
+//    agent keeps driving it: taking over is bise's window only).
 (() => {
   if (window.__biseOverlay) return;
   window.__biseOverlay = true;
@@ -74,7 +75,7 @@
     return true;
   });
 
-  // Takeover: a real click or key from the user, in a tab they can see.
+  // A real click or key from the user, in a tab they can see: touched.
   const user = (e) => {
     // The worker keeps only what comes from the tab in view, outside its own actions.
     if (!e.isTrusted) return;

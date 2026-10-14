@@ -61,6 +61,8 @@ async function retitle(label) {
 
 /** Which agent owns which group, for a restarted worker: `g<group id>` → key (session storage: gone with the browser). */
 const ownerKey = (groupId) => `g${groupId}`;
+/** Which agent opened which tab, the same way: `t<tab id>` → key. Only these tabs are ever an agent's. */
+const tabKey = (tabId) => `t${tabId}`;
 
 function register(tabId, agent) {
   const t = { agent, attached: false, paused: false, userTouched: false, refs: new Map(), byRef: new Map(), nextRef: 1, navs: 0, acting: false, actingUntil: 0, queue: Promise.resolve(), overlayNavs: -1 };
@@ -68,14 +70,27 @@ function register(tabId, agent) {
   return t;
 }
 
+/** A tab the agent opened (open): its own until it closes it, a drop, or the tab is gone. */
+async function adopt(tabId, agent) {
+  register(tabId, agent);
+  await chrome.storage.session.set({ [tabKey(tabId)]: agent }).catch(() => {});
+}
+
+/** The tab is no longer an agent's (closed, handed to the user, dropped). */
+function forget(tabId) {
+  tabs.delete(tabId);
+  chrome.storage.session.remove(tabKey(tabId)).catch(() => {});
+}
+
 const tabsOf = (agent) => [...tabs.entries()].filter(([, t]) => t.agent === agent).map(([id]) => id);
 
-// After a service worker restart, the groups say who owns what.
+// After a service worker restart, storage says who owns what.
 async function recover() {
-  // by the owners this browser session wrote (groupTab), never by a
-  // title: two projects' agents can share one (docs/issues/18). After a
-  // browser restart the groups have new ids and no owner: they stay the
-  // user's, and an agent opens a new one.
+  // by the owners this browser session wrote (groupTab, adopt), never by
+  // a title: two projects' agents can share one (docs/issues/18), nor by
+  // group membership: a tab the user dragged into an agent's group stays
+  // his. After a browser restart the ids are new and have no owner: they
+  // stay the user's, and an agent opens a new one.
   try {
     const owners = await chrome.storage.session.get(null);
     for (const g of await chrome.tabGroups.query({})) {
@@ -83,7 +98,19 @@ async function recover() {
       if (!key) continue;
       const a = agentOf(key, g.title?.startsWith(GROUP_PREFIX) ? g.title.slice(GROUP_PREFIX.length) : undefined);
       a.groupId = g.id;
-      for (const tab of await chrome.tabs.query({ groupId: g.id })) if (!tabs.has(tab.id)) register(tab.id, a.name);
+    }
+    for (const [k, key] of Object.entries(owners)) {
+      const m = /^t(\d+)$/.exec(k);
+      if (!m) continue;
+      const id = Number(m[1]);
+      if (tabs.has(id)) continue;
+      try {
+        await chrome.tabs.get(id);
+      } catch {
+        chrome.storage.session.remove(k).catch(() => {});
+        continue;
+      }
+      register(id, agentOf(key).name);
     }
   } catch {
     // no window yet
@@ -91,4 +118,4 @@ async function recover() {
 }
 const ready = recover();
 
-export { HOST, MAX_TABS, CODES, ACTIONS, LOCATOR_KEYS, CuError, fail, sleep, agents, tabs, log, note, agentOf, titleOf, retitle, ownerKey, register, tabsOf, ready };
+export { HOST, MAX_TABS, CODES, ACTIONS, LOCATOR_KEYS, CuError, fail, sleep, agents, tabs, log, note, agentOf, titleOf, retitle, ownerKey, register, adopt, forget, tabsOf, recover, ready };

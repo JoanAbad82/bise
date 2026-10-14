@@ -1,10 +1,10 @@
 // The user's control: stop, resume, release, pause, drop, and what his
 // own moves in the browser mean (a touched tab, a closed group).
 
-import { agents, tabs, agentOf, retitle, ownerKey, tabsOf } from "./state.js";
+import { agents, tabs, agentOf, retitle, ownerKey, tabsOf, forget } from "./state.js";
 import { post } from "./host.js";
 import { detach } from "./cdp.js";
-import { ensureOverlay, pause } from "./act.js";
+import { ensureOverlay, touched } from "./act.js";
 
 // ---------------------------------------------------------------- stop, resume, release, drop
 
@@ -52,7 +52,7 @@ async function dropAgent(name) {
   const a = agentOf(name);
   const ids = tabsOf(name);
   const touched = ids.some((id) => tabs.get(id).userTouched);
-  for (const id of ids) tabs.delete(id);
+  for (const id of ids) forget(id);
   a.closing = true;
   if (touched) {
     // The user used them: they become ordinary tabs.
@@ -73,13 +73,15 @@ async function dropAgent(name) {
 
 // ---------------------------------------------------------------- the user's moves
 
+// He focuses an agent's tab: it stays the agent's, and the agent keeps
+// driving it while he watches. Only bise's window takes over (pauseAgent).
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   const t = tabs.get(tabId);
-  if (t) pause(tabId, t, "activated");
+  if (t) touched(tabId, t, "activated");
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-  tabs.delete(tabId);
+  forget(tabId);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, info) => {

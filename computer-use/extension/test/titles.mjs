@@ -26,7 +26,7 @@ try {
   check("two projects' perf: each names its project", JSON.stringify(await titles()) === JSON.stringify(["bise · perf · harness", "bise · perf · site"]), await titles());
   const keys = await ext.ev(`[...bise.agents.keys()].sort()`);
   check("two agents, keyed by hub", JSON.stringify(keys) === JSON.stringify(["00000000000000aa.perf", "00000000000000bb.perf"]), keys);
-  const owners = await ext.ev(`chrome.storage.session.get(null).then(o => Object.values(o).sort())`);
+  const owners = await ext.ev(`chrome.storage.session.get(null).then(o => Object.entries(o).filter(([k]) => k.startsWith("g")).map(([, v]) => v).sort())`);
   check("groups mapped to keys in session storage", JSON.stringify(owners) === JSON.stringify(keys), owners);
   // step 4: {"pause": key} takes one agent's tabs over, not the other's
   broker.send({ pause: "00000000000000aa.perf" });

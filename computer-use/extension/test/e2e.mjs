@@ -33,7 +33,7 @@ try {
   check("extension id is the pinned one", ext.id === EXT_ID, ext.id);
   check("hello on the native port", await broker.until(() => broker.hellos.length > 0, 10_000), broker.hellos[0]);
   const hello = broker.hellos[0] || {};
-  check("hello names the browser and versions", hello.browser === (browser === "edge" ? "edge" : "chrome") && /^\d+\./.test(hello.version) && hello.extension_version === "0.1.0", hello);
+  check("hello names the browser and versions", hello.browser === (browser === "edge" ? "edge" : "chrome") && /^\d+\./.test(hello.version) && hello.extension_version === "0.1.1", hello);
 
   const req = async (agent, op, args) => {
     const r = await broker.request(agent, op, args);
@@ -199,32 +199,63 @@ try {
   // Focus emulation makes an attached background tab report "visible" (measured): the tab stays inactive.
   check("agent tab stayed in the background", t2tab === false, { active: t2tab, visibilityState: vis });
 
-  // ---- takeover: the user activates an agent tab
+  // ---- he focuses an agent tab: it stays the agent's (no take-over by a look or a click)
   const id3 = Number(T3.slice(4));
-  await ext.ev(`chrome.tabs.update(${id3}, {active: true}).then(() => 1)`);
-  check("activating an agent tab → paused event", await broker.until(() => broker.events.some((e) => e.event === "paused" && e.agent === B && e.target === T3)), broker.events);
-  const pz = await act(B, T3, "click", { locator: { role: "button", name: "Add to cart" } });
-  check("act on a paused tab → paused", !pz.ok && pz.error.code === "paused" && pz.error.summary === `couldn't click "Add to cart": you're using this tab · ${HOST}`, pz.error);
-  const tb = await req(B, "tabs", {});
-  check("tabs shows user_touched", tb.result.find((t) => t.target === T3)?.user_touched === true, tb.result);
-  broker.send({ resume: B });
-  await sleep(200);
-  const rs = await act(B, T3, "click", { locator: { role: "button", name: "Add to cart" } });
-  check("resume → acts again (in the visible tab, cursor drawn)", rs.ok, rs.error);
-  const cur = await req(B, "screenshot", { target: T3 });
-  if (cur.ok) writeFileSync(path.join(process.env.TMPDIR || "/tmp", "cu-cursor.jpg"), Buffer.from(cur.result.data, "base64"));
-  // The user clicks in the (visible) tab: the content script sees it.
-  await sleep(700);
   const n0 = broker.events.length;
+  await ext.ev(`chrome.tabs.update(${id3}, {active: true}).then(() => 1)`);
+  check("the agent tab is in front of him", (await ext.ev(`chrome.tabs.get(${id3}).then(t => t.active)`)) === true);
+  // and he clicks in it (a real, trusted click, like his mouse)
+  await sleep(700);
   const user = await pageSession(b, (t) => t.targetId && t.url.includes("form.html") && true);
-  const visibleTarget = (await b.send("Target.getTargets")).targetInfos.find((t) => t.type === "page" && t.url.includes("form.html"));
-  void visibleTarget;
   await user.call("Input.dispatchMouseEvent", { type: "mousePressed", x: 5, y: 5, button: "left", clickCount: 1 });
   await user.call("Input.dispatchMouseEvent", { type: "mouseReleased", x: 5, y: 5, button: "left", clickCount: 1 });
   await user.detach();
-  check("a user click in the tab → paused", await broker.until(() => broker.events.slice(n0).some((e) => e.event === "paused" && e.agent === B), 3000), broker.events.slice(n0));
+  await sleep(500);
+  check("focusing and clicking his way: no paused event", !broker.events.slice(n0).some((e) => e.event === "paused"), broker.events.slice(n0));
+  const fc = await act(B, T3, "click", { locator: { role: "button", name: "Add to cart" } });
+  check("the agent clicks in the tab he is looking at", fc.ok && fc.result.changed.includes("bought"), fc.error || fc.result);
+  const ff = await act(B, T3, "fill", { locator: { label: "Email" }, text: "seen@example.com" });
+  check("the agent types in it", ff.ok, ff.error);
+  const fr = await act(B, T3, "read", {});
+  check("the agent reads the result", fr.ok && /bought \d+/.test(JSON.stringify(fr.result)) && (await ext.ev(`chrome.scripting.executeScript({target:{tabId:${id3}}, func: () => document.getElementById('email').value}).then(r => r[0].result)`)) === "seen@example.com", fr.error || fr.result);
+  const fs = await req(B, "screenshot", { target: T3 });
+  check("the agent screenshots it", fs.ok && fs.result.data?.length > 1000, fs.error);
+  if (fs.ok) writeFileSync(path.join(process.env.TMPDIR || "/tmp", "cu-cursor.jpg"), Buffer.from(fs.result.data, "base64"));
+  check("the tab is still in front of him, still in the agent's group", (await ext.ev(`chrome.tabs.get(${id3}).then(t => t.active && t.groupId !== -1)`)) === true);
+  const tb = await req(B, "tabs", {});
+  check("tabs shows user_touched (drop leaves it to him)", tb.result.find((t) => t.target === T3)?.user_touched === true, tb.result);
   const cursorDrawn = await ext.ev(`chrome.scripting.executeScript({target:{tabId:${id3}}, func: () => !!document.querySelector('bise-cursor')}).then(r => r[0].result)`);
   check("cursor overlay is in the page", cursorDrawn === true);
+
+  // ---- his tabs stay his: the one he opened, and one he drags into the agent's group
+  const mine = `tab:${before.id}`;
+  const his = await Promise.all([act(B, mine, "read", {}), act(B, mine, "click", { locator: { role: "link", name: "Next page" } }), req(B, "screenshot", { target: mine }), req(B, "snapshot", { target: mine })]);
+  check("a tab he opened is off-limits (read, click, screenshot, snapshot)", his.every((r) => !r.ok && r.error.code === "not_found"), his.map((r) => r.error));
+  const groupB = await ext.ev(`chrome.tabs.get(${id3}).then(t => t.groupId)`);
+  const dragged = await ext.ev(`chrome.tabs.create({url: "${pages.base}next.html?dragged", active: false}).then(t => chrome.tabs.group({tabIds: [t.id], groupId: ${groupB}}).then(() => t.id))`);
+  await sleep(300);
+  const dr = await act(B, `tab:${dragged}`, "read", {});
+  check("a tab he dragged into the agent's group is still his", !dr.ok && dr.error.code === "not_found", dr.error);
+  // a worker restart (MV3 stops it): fresh maps, recover() from session storage
+  await ext.ev("(() => { bise.tabs.clear(); bise.agents.clear(); return bise.recover().then(() => 1); })()");
+  const ownersNow = await ext.ev("[...bise.tabs.entries()].map(([id, t]) => [id, t.agent])");
+  check("after a worker restart: the agent's tabs are recovered, his dragged-in tab is not", ownersNow.some(([id, a]) => id === id3 && a === B) && !ownersNow.some(([id]) => id === dragged), ownersNow);
+  const ra = await act(B, T3, "click", { locator: { role: "button", name: "Add to cart" } });
+  const rd = await act(B, `tab:${dragged}`, "read", {});
+  check("after the restart the agent still drives its tab, not his", ra.ok && !rd.ok && rd.error.code === "not_found", { ra: ra.error, rd: rd.error });
+  await ext.ev(`chrome.tabs.remove(${dragged}).then(() => 1)`);
+  // the restart forgot userTouched (memory only): he touches it again
+  await ext.ev(`chrome.tabs.update(${before.id}, {active: true}).then(() => chrome.tabs.update(${id3}, {active: true})).then(() => 1)`);
+
+  // ---- the explicit take-over (bise's window, ctl pause) still pauses, resume gives it back
+  broker.send({ pause: B });
+  await sleep(300);
+  const pz = await act(B, T3, "click", { locator: { role: "button", name: "Add to cart" } });
+  check("take-over from bise → paused", !pz.ok && pz.error.code === "paused" && pz.error.summary === `couldn't click "Add to cart": you're using this tab · ${HOST}`, pz.error);
+  broker.send({ resume: B });
+  await sleep(200);
+  const rs = await act(B, T3, "click", { locator: { role: "button", name: "Add to cart" } });
+  check("resume → acts again", rs.ok, rs.error);
   await ext.ev(`chrome.tabs.update(${before.id}, {active: true}).then(() => 1)`);
 
   // ---- release, stop by closing the group, drop

@@ -1,7 +1,7 @@
 // The agents' tabs and groups: the ops' dispatch, open, the user's own
 // page (show), and whose tab a target is.
 
-import { MAX_TABS, fail, sleep, agents, tabs, agentOf, titleOf, retitle, ownerKey, register, tabsOf } from "./state.js";
+import { MAX_TABS, fail, sleep, agents, tabs, agentOf, titleOf, retitle, ownerKey, adopt, forget, tabsOf } from "./state.js";
 import { snapshotOp } from "./cdp.js";
 import { ensureOverlay, act, screenshotOp, peekOp } from "./act.js";
 import { summary, failure, hostOf, refused } from "../lib/text.js";
@@ -29,7 +29,7 @@ async function listTabs(agent) {
       const tab = await chrome.tabs.get(id);
       out.push({ target: `tab:${id}`, url: tab.url, title: tab.title, user_touched: tabs.get(id).userTouched });
     } catch {
-      tabs.delete(id);
+      forget(id);
     }
   }
   return out;
@@ -95,7 +95,7 @@ async function open(agent, args) {
     }
     tab = await chrome.tabs.create({ url, active: false, windowId, ...(index !== undefined ? { index } : {}) });
   }
-  register(tab.id, agent);
+  await adopt(tab.id, agent);
   await groupTab(a, tab);
   await waitLoaded(tab.id, Math.max(args.timeout_ms ?? 0, 15_000));
   const now = await chrome.tabs.get(tab.id);
@@ -176,7 +176,7 @@ async function owned(agent, target) {
   try {
     await chrome.tabs.get(tabId);
   } catch {
-    tabs.delete(tabId);
+    forget(tabId);
     fail("not_found", `${target} is closed; computer.tabs() lists your tabs`);
   }
   return { tabId, t };

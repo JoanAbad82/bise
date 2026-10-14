@@ -1,8 +1,8 @@
-// Driving a tab: finding an element, the overlay (cursor, takeover), the
+// Driving a tab: finding an element, the overlay (cursor, his touch), the
 // actions, the screenshot.
 
-import { ACTIONS, LOCATOR_KEYS, CuError, fail, sleep, agents, tabs, note, agentOf, tabsOf } from "./state.js";
-import { post, toError } from "./host.js";
+import { ACTIONS, LOCATOR_KEYS, CuError, fail, sleep, agents, tabs, note, agentOf, tabsOf, forget } from "./state.js";
+import { toError } from "./host.js";
 import { refuseUrl, normalUrl, waitLoaded, owned, serial } from "./tabs.js";
 import { cdp, attach, detach, lostTab, evaluate, callOn, takeSnapshot, onTab, PDF_NOTE, isPdf } from "./cdp.js";
 import { pick, diff, describeLocator, TEXT_ROLES } from "../lib/ax.js";
@@ -129,7 +129,7 @@ async function resolve(tabId, t, args, deadline, { visible = true, enabled = fal
   }
 }
 
-// ---------------------------------------------------------------- the overlay (cursor, takeover)
+// ---------------------------------------------------------------- the overlay (cursor, his touch)
 
 async function ensureOverlay(tabId) {
   const t = tabs.get(tabId);
@@ -161,15 +161,18 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
   // CDP input is trusted too: ignore what arrives while (or right after) we act.
   // Only a tab in view can get the user's input (a hidden agent tab can't).
   if (!t || !sender.tab.active || t.acting || Date.now() < t.actingUntil) return;
-  pause(sender.tab.id, t, msg.kind);
+  touched(sender.tab.id, t, msg.kind);
 });
 
-function pause(tabId, t, why) {
-  note({ pause: tabId, why });
+/**
+ * The user looked at or used an agent's tab (activated it, clicked or typed
+ * in it). It stays the agent's and the agent keeps driving it: taking over
+ * is his explicit act (bise's window, ctl `pause`). It only changes what a
+ * drop does: the tab is left to him, not closed under his eyes.
+ */
+function touched(tabId, t, why) {
+  note({ touched: tabId, why });
   t.userTouched = true;
-  if (t.paused) return;
-  t.paused = true;
-  post({ event: "paused", agent: t.agent, target: `tab:${tabId}` });
 }
 
 // ---------------------------------------------------------------- act
@@ -296,7 +299,7 @@ async function act(agent, args) {
   if (t.paused && action === "close") {
     const where = await place();
     await detach(tabId, t);
-    tabs.delete(tabId);
+    forget(tabId);
     await chrome.tabs.ungroup([tabId]).catch(() => {});
     return { ok: true, changed: "", summary: withPlace("gave the tab to you", where), handed_over: true };
   }
@@ -459,7 +462,7 @@ async function doAct(tabId, t, agent, action, args, seen) {
       // raced the timer and read as the user closing the group).
       if (tabsOf(agent).length === 1) a.closingGroup = a.groupId;
       await detach(tabId, t);
-      tabs.delete(tabId);
+      forget(tabId);
       await chrome.tabs.remove(tabId);
       return { ok: true, url: tab.url, title: tab.title, changed: "", summary: summary("close", null, args, hostOf(tab.url)) };
     }
@@ -562,4 +565,4 @@ async function peekOp(agent, args) {
   }
 }
 
-export { ensureOverlay, pause, act, screenshotOp, peekOp };
+export { ensureOverlay, touched, act, screenshotOp, peekOp };

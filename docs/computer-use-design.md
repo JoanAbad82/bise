@@ -232,10 +232,17 @@ hub ── "stop <agent>" / "stop all" ──▶ broker
 - Attach on first action, `Emulation.setFocusEmulationEnabled` (§3),
   detach when the agent's turn ends (the yellow bar goes away when no
   agent drives).
-- **Takeover:** `tabs.onActivated` on an agent tab, or a user
-  click/keypress seen by the content script in it → that tab is paused;
-  the next action returns `paused: the user is using this tab` and the
-  agent row shows "? you took the wheel · ⏎ give it back".
+- **Takeover:** only explicit, from bise's window (ctl `pause`): the
+  agent's tabs let go and the next action returns `paused: the user is
+  using this tab`; the agent row shows "? you took the wheel · ⏎ give it
+  back". Activating an agent tab, or clicking or typing in it, does not
+  pause it: the tab stays the agent's and it keeps driving it while he
+  watches (cu-focus). It only marks the tab touched (a drop ungroups it
+  instead of closing it).
+- **Ownership:** an agent owns the tabs it opened, and only those: their
+  ids go to `chrome.storage.session` (`t<tab id>` → agent key, beside
+  `g<group id>`), and a restarted worker recovers them from there, never
+  from group membership (a tab he drags into the group stays his).
 - **Stop:** `debugger.onDetach(canceled_by_user)` (the yellow bar's
   Cancel) or the group closed by the user → the broker marks the agent
   stopped; its running action fails with "stopped by the user"; later
@@ -385,7 +392,8 @@ Every `computer.*` call goes through the gate like a connector call.
 | click on the `↖` mark, `/stop <agent>` | the same, from anywhere |
 | Chrome's yellow bar Cancel | `onDetach(canceled_by_user)` → the agent is stopped |
 | closing the agent's tab group | the same |
-| touching an agent tab or the driven app | pause, not stop: "? you took the wheel · ⏎ give it back" |
+| taking over from bise's window, or touching the driven app | pause, not stop: "? you took the wheel · ⏎ give it back" |
+| focusing, clicking or typing in an agent tab | nothing: the agent keeps driving it (the tab counts as touched for `/drop`) |
 | `/computer-use` → "stop all" | every agent lets go |
 
 Each stop writes one line in main's feed: "↖ api-v2 stopped driving
