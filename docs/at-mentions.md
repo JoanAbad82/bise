@@ -97,13 +97,21 @@ The query is split at its last `/`: `dir part` + `name part`
 Then a tier, best first: exact name, name prefix, name fuzzy (the name
 part is a subsequence of the file name), path fuzzy. Inside a tier:
 recently picked first (this session), then the `nucleo-matcher` score
-(fuzzy tiers only, `match_paths` config), then shallower, then shorter,
-then path order. Only the tiers needed to fill the visible top (50) are
+(fuzzy tiers only, `match_paths` config), then the last modified
+(task `at-recent`: mtime only breaks a tie, the match comes first), then
+shallower, then shorter, then path order. Only the tiers needed to fill the visible top (50) are
 scored: a 1-letter query on 80 000 entries does no fuzzy scoring at all.
 
 Empty query (`@` alone) and `dir/`: the recent picks, then the immediate
-children of the root (or of `dir/`), directories first. Dot files show
+children of the root (or of `dir/`), the last modified first, folders
+and files mixed (Finder's Date Modified; a folder by its own mtime,
+never what is inside it; designer m_24034). The walk stats each entry
+once, in its threads, so a keystroke never stats. Dot files show
 only when the query starts with `.` (Vibe).
+
+One ranking for both apps: the TUI popup and the desktop's `files`
+answers (the window core, `ambient/core/picks.rs`) both call
+`files::pick`, so the order is decided once, in `files.rs`.
 
 A dir part that is a folder of the index (`rust/tui/`, exact path, case
 insensitive) scopes the search: `rust/tui/` lists that folder's own
@@ -152,7 +160,8 @@ subsequence of the path is the last tier (`tu/sr` finds `rust/tui/src/`).
 A query that starts with `../`, `~/` or `/` does not use the index:
 the popup reads the one folder typed up to the last `/` (`read_dir`,
 at most 500 entries) and ranks its entries against the rest like the
-index does (folders first when the rest is empty, dot files only when
+index does (the newest first when the rest is empty, one lstat per
+entry read, dot files only when
 it starts with `.`). Nothing else is read: no prefetch, no recursion.
 So macOS asks for a guarded folder (« Ghostty would like to access
 files in your Desktop folder ») only when the user enters it: `tab`,

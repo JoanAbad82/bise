@@ -19,6 +19,10 @@ def popup_rows(t):
     return [r for r in t.screen().splitlines() if ("▪" in r or "▸" in r or " @" in r) and "┃" in r]
 
 
+# names that match none of the queries below (`not`, `app`, `sb/me`)
+DL_ORDER = ["report.pdf", "new-folder", "memo.md", "old-folder", "a-oldest.txt"]
+
+
 def main():
     E = e2e.Env()
     for d in ["src/sb", "target/debug", "docs", "rust/tui/src"]:
@@ -28,6 +32,16 @@ def main():
                     ("rust/tui/src/files.rs", ""), ("rust/tui/Cargo.toml", "")]:
         with open(os.path.join(E.ws, f), "w") as fh:
             fh.write(body)
+    # rust/tui/src/ newer than Cargo.toml: first in `@rust/tui/` (→ enters it)
+    os.utime(os.path.join(E.ws, "rust/tui/Cargo.toml"), (1_700_000_000,) * 2)
+    os.utime(os.path.join(E.ws, "rust/tui/src"), (1_700_000_060,) * 2)
+    # a downloads-like folder, newest first: folders and files mixed
+    for d in ["dl/old-folder", "dl/new-folder"]:
+        os.makedirs(os.path.join(E.ws, d), exist_ok=True)
+    for f in ["dl/a-oldest.txt", "dl/report.pdf", "dl/memo.md"]:
+        open(os.path.join(E.ws, f), "w").close()
+    for i, n in enumerate(DL_ORDER):
+        os.utime(os.path.join(E.ws, "dl", n), (1_700_000_000 - i * 3600,) * 2)
     with tui_session(150, 42, E=E) as t:
         t.wait("bise :*")
         t.wait_re(MAIN_IDLE)
@@ -101,6 +115,14 @@ def main():
         wait_composer(t, "rust/tui/src/files.rs")
         t.wait_gone("▪ rust/tui/src/files.rs")
         assert "@" not in composer(t), composer(t)
+        # at-recent: browsing a folder lists the last modified first,
+        # folders and files mixed (dl/'s mtimes set before the walk)
+        t.keys("C-u")
+        t.typed("@dl/")
+        t.wait("dl/a-oldest.txt")
+        names = [n for r in popup_rows(t) for n in DL_ORDER if f"dl/{n}" in r]
+        assert names == DL_ORDER, (names, t.screen())
+        t.keys("C-u")
         print(t.screen())
         print("PASS tui at-files")
 

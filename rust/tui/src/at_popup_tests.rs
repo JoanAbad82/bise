@@ -31,6 +31,19 @@ pub(crate) fn ws() -> &'static str {
         for f in files {
             std::fs::write(root.join(f), "").unwrap();
         }
+        // set mtimes (a folder lists the newest first, at-recent): all the
+        // same, sb/ newer, so `@rust/tui/src/` reads sb/, files.rs, input.rs
+        let at = |p: &str, s: u64| {
+            let t = std::time::UNIX_EPOCH + std::time::Duration::from_secs(s);
+            std::fs::File::open(root.join(p)).and_then(|f| f.set_modified(t)).unwrap();
+        };
+        for f in files {
+            at(f, 1_700_000_000);
+        }
+        for d in ["rust", "rust/tui", "rust/tui/src", "docs", "docs/my notes", "docs/émoji 👍", "empty"] {
+            at(d, 1_700_000_000);
+        }
+        at("rust/tui/src/sb", 1_700_000_060);
         root.to_string_lossy().into_owned()
     })
 }
@@ -101,7 +114,7 @@ fn browse_into_folders_then_pick_a_file() {
     // → on a folder: the popup lists its entries, the `@` stays
     key(&mut app, KeyCode::Right);
     assert_eq!(text(&app), ("@rust/tui/", 10));
-    // folders first, the folder itself last (a recent pick of another
+    // the newest first, the folder itself last (a recent pick of another
     // test may come first: compare as a set)
     let mut r = rows(&app);
     assert_eq!(r.pop().as_deref(), Some("rust/tui/"));

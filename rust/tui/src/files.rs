@@ -1,7 +1,9 @@
 //! The workspace file index behind the `@` popup: every file and folder
 //! under the working directory that `.gitignore` keeps, walked in a
-//! background thread, ranked per keystroke (file name before path).
-//! Design: docs/at-mentions.md.
+//! background thread, ranked per keystroke (file name before path;
+//! browsing a folder, or a tie: the last modified first). The one
+//! ranking of the TUI popup and the desktop's `files` (window core).
+//! Design: docs/at-mentions.md. Tests: files_tests.rs.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -28,19 +30,30 @@ pub(crate) struct Entry {
     depth: u16,
     /// bit `b % 64` set for every byte `b` of `lower`
     mask: u64,
+    /// last modified, ns since the epoch (0: unknown, oldest); a folder
+    /// its own, never what is inside it
+    mtime: u64,
 }
 
 impl Entry {
-    pub(crate) fn new(path: String, dir: bool) -> Entry {
+    pub(crate) fn new(path: String, dir: bool, mtime: u64) -> Entry {
         let lower = path.to_lowercase().into_bytes();
         let name = lower.iter().rposition(|&b| b == b'/').map(|i| i + 1).unwrap_or(0);
         let depth = path.matches('/').count().min(u16::MAX as usize) as u16;
-        Entry { mask: mask(&lower), path, dir, lower, name, depth }
+        Entry { mask: mask(&lower), path, dir, lower, name, depth, mtime }
     }
 
     fn lname(&self) -> &[u8] {
         &self.lower[self.name..]
     }
+}
+
+/// A file's last modified time for [`Entry::mtime`] (0 when unknown).
+fn mtime_of(m: &std::fs::Metadata) -> u64 {
+    m.modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| d.as_nanos().min(u64::MAX as u128) as u64)
 }
 
 fn mask(bytes: &[u8]) -> u64 {
@@ -60,7 +73,8 @@ fn subseq(mut hay: &[u8], q: &[u8]) -> bool {
 
 /// Walk `root` as git sees it: `.gitignore`, `.ignore`, `.git/info/exclude`
 /// and the global excludes apply (only inside a git repo, like git);
-/// dot files are kept, `.git` is not. Files and folders, sorted.
+/// dot files are kept, `.git` is not. Files and folders, sorted by
+/// path, each with its own mtime (one stat per entry, in the walk).
 pub(crate) fn walk(root: &Path, cap: usize) -> Vec<Entry> {
     let out = Mutex::new(Vec::new());
     ignore::WalkBuilder::new(root)
@@ -80,17 +94,19 @@ pub(crate) fn walk(root: &Path, cap: usize) -> Vec<Entry> {
                     return ignore::WalkState::Continue;
                 }
                 let dir = e.file_type().is_some_and(|t| t.is_dir());
+                // one stat per entry, in the walk's threads (never per keystroke)
+                let mtime = e.metadata().map_or(0, |m| mtime_of(&m));
                 let mut v = out.lock().unwrap_or_else(|e| e.into_inner());
                 if v.len() >= cap {
                     return ignore::WalkState::Quit;
                 }
-                v.push((rel.replace('\\', "/"), dir));
+                v.push((rel.replace('\\', "/"), dir, mtime));
                 ignore::WalkState::Continue
             })
         });
     let mut v = out.into_inner().unwrap_or_else(|e| e.into_inner());
     v.sort();
-    v.into_iter().map(|(p, d)| Entry::new(p, d)).collect()
+    v.into_iter().map(|(p, d, m)| Entry::new(p, d, m)).collect()
 }
 
 /// The entries matching `query`, best first, at most `limit`.
@@ -98,9 +114,11 @@ pub(crate) fn walk(root: &Path, cap: usize) -> Vec<Entry> {
 /// The query splits at its last `/` into a folder part (a subsequence
 /// of the parent path) and a name part. Tiers: exact name, name prefix,
 /// name fuzzy, path fuzzy (no folder part only). In a tier: recent
-/// picks first, then the fuzzy score, then shallower, shorter, path.
-/// Empty name part (`""`, `src/`): the children of that folder only,
-/// folders first. Dot files only when the name part starts with `.`.
+/// picks first, then the fuzzy score, then the newest (mtime), then
+/// shallower, shorter, path. Empty name part (`""`, `src/`): the
+/// children of that folder only, recent picks then the newest first,
+/// folders and files mixed. Dot files only when the name part starts
+/// with `.`.
 pub(crate) fn rank(entries: &[Entry], query: &str, recent: &[String], limit: usize) -> Vec<usize> {
     let q = query.to_lowercase();
     let q = q.as_bytes();
@@ -154,8 +172,8 @@ pub(crate) fn rank(entries: &[Entry], query: &str, recent: &[String], limit: usi
         if want == 0 {
             break;
         }
-        // (recent, score, -depth, -len): bigger is better
-        let mut v: Vec<((bool, u32, i32, i32), usize)> = ids
+        // (recent, score, mtime, -depth, -len): bigger is better
+        let mut v: Vec<((bool, u32, u64, i32, i32), usize)> = ids
             .iter()
             .map(|&i| {
                 let e = &entries[i];
@@ -164,10 +182,11 @@ pub(crate) fn rank(entries: &[Entry], query: &str, recent: &[String], limit: usi
                     3 => pat.score(Utf32Str::new(&e.path, &mut buf), &mut matcher),
                     _ => Some(0),
                 };
-                ((is_recent(e), score.unwrap_or(0), -(e.depth as i32), -(e.path.len() as i32)), i)
+                ((is_recent(e), score.unwrap_or(0), e.mtime, -(e.depth as i32), -(e.path.len() as i32)), i)
             })
             .collect();
-        let cmp = |a: &((bool, u32, i32, i32), usize), b: &((bool, u32, i32, i32), usize)| {
+        type Key = ((bool, u32, u64, i32, i32), usize);
+        let cmp = |a: &Key, b: &Key| {
             b.0.cmp(&a.0).then(a.1.cmp(&b.1))
         };
         if v.len() > want {
@@ -187,7 +206,7 @@ fn is_folder(entries: &[Entry], lower: &[u8]) -> bool {
 
 /// The children of folder `dir` (`""`: the root; a folder query like
 /// `src/` also matches `rust/tui/src/` unless `scoped`: `dir` is a folder
-/// of the index, only its own children), recent then folders first.
+/// of the index, only its own children), recent then the newest first.
 fn children(
     entries: &[Entry],
     dir: &[u8],
@@ -213,11 +232,13 @@ fn children(
         })
         .map(|(i, _)| i)
         .collect();
-    // exact folder path first, then the shallowest folders named so
+    // exact folder path first, then the shallowest folders named so; in
+    // one folder, newest first, folders and files mixed (Finder's Date
+    // Modified, designer m_24034)
     v.sort_by(|&a, &b| {
         let (x, y) = (&entries[a], &entries[b]);
-        (!is_recent(x), parent(x).len() != dir.len(), x.depth, !x.dir, &x.lower)
-            .cmp(&(!is_recent(y), parent(y).len() != dir.len(), y.depth, !y.dir, &y.lower))
+        (!is_recent(x), parent(x).len() != dir.len(), x.depth, std::cmp::Reverse(x.mtime), &x.lower)
+            .cmp(&(!is_recent(y), parent(y).len() != dir.len(), y.depth, std::cmp::Reverse(y.mtime), &y.lower))
     });
     v.truncate(limit);
     v
@@ -465,6 +486,8 @@ fn list_dir(dir: &Path, home: Option<&Path>, cap: usize) -> Option<Vec<Entry>> {
     for e in std::fs::read_dir(dir).ok()?.flatten().take(cap) {
         let Some(name) = e.file_name().to_str().map(str::to_string) else { continue };
         let Ok(t) = e.file_type() else { continue };
+        // the entry's own mtime (a link's lstat: never a stat inside a guarded folder)
+        let mtime = e.metadata().map_or(0, |m| mtime_of(&m));
         let dir = if t.is_symlink() {
             let target = std::fs::read_link(e.path()).map(|t| dir.join(t));
             let guarded = target.as_ref().map_or(true, |t| {
@@ -474,7 +497,7 @@ fn list_dir(dir: &Path, home: Option<&Path>, cap: usize) -> Option<Vec<Entry>> {
         } else {
             t.is_dir()
         };
-        out.push(Entry::new(name, dir));
+        out.push(Entry::new(name, dir, mtime));
     }
     Some(out)
 }
@@ -521,7 +544,7 @@ fn listing(dir: &Path, home: Option<&Path>) -> Option<Listing> {
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Outside {
     /// the entries of the typed folder matching the name part, as typed
-    /// (`~/Documents`, `../other/a.md`), folders first when browsing
+    /// (`~/Documents`, `../other/a.md`), the newest first when browsing
     pub(crate) hits: Vec<Hit>,
     /// the typed folder cannot be read (EPERM...)
     pub(crate) locked: bool,
@@ -617,365 +640,5 @@ fn remember(s: &mut State, path: &str) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Every folder `list_dir` read (the protected-folder tests).
-    pub(super) static LISTED: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
-
-    fn index(paths: &[&str]) -> Vec<Entry> {
-        paths
-            .iter()
-            .map(|p| match p.strip_suffix('/') {
-                Some(d) => Entry::new(d.to_string(), true),
-                None => Entry::new(p.to_string(), false),
-            })
-            .collect()
-    }
-
-    fn top<'a>(e: &'a [Entry], q: &str, recent: &[&str]) -> Vec<&'a str> {
-        let recent: Vec<String> = recent.iter().map(|s| s.to_string()).collect();
-        rank(e, q, &recent, 10).into_iter().map(|i| e[i].path.as_str()).collect()
-    }
-
-    const TREE: &[&str] = &[
-        "Makefile",
-        "README.md",
-        ".gitignore",
-        "rust/",
-        "rust/tui/",
-        "rust/tui/src/",
-        "rust/tui/src/app.rs",
-        "rust/tui/src/sb/",
-        "rust/tui/src/sb/mention.rs",
-        "rust/tui/src/main.rs",
-        "hub/main.bend",
-        "docs/main-notes/readme.txt",
-        "projects/switchboard/docs/at-mentions.md",
-    ];
-
-    #[test]
-    fn file_name_beats_path() {
-        let e = index(TREE);
-        // exact name, then name prefix, then the path-only match
-        assert_eq!(top(&e, "main.rs", &[]), ["rust/tui/src/main.rs"]);
-        assert_eq!(top(&e, "main", &[])[..2], ["hub/main.bend", "rust/tui/src/main.rs"]);
-        assert_eq!(top(&e, "mention", &[]), ["rust/tui/src/sb/mention.rs", "projects/switchboard/docs/at-mentions.md"]);
-        // "sbmen" only matches along a path: the tighter match first
-        assert_eq!(top(&e, "sbmen", &[])[0], "rust/tui/src/sb/mention.rs");
-        // case-insensitive; same tier: the shallower first
-        assert_eq!(top(&e, "readme", &[])[..2], ["README.md", "docs/main-notes/readme.txt"]);
-        assert!(top(&e, "zzz", &[]).is_empty());
-    }
-
-    #[test]
-    fn exact_beats_prefix_beats_fuzzy() {
-        let e = index(&["a/src.rs", "b/src/", "c/sourcery.rs", "d/xsrc.rs"]);
-        assert_eq!(top(&e, "src", &[]), ["b/src", "a/src.rs", "c/sourcery.rs", "d/xsrc.rs"]);
-    }
-
-    #[test]
-    fn folder_part_filters_the_parent_path() {
-        let e = index(TREE);
-        // the folder part is fuzzy too ("sb/" in "projects/switchboard/docs/")
-        assert_eq!(top(&e, "sb/me", &[]), ["rust/tui/src/sb/mention.rs", "projects/switchboard/docs/at-mentions.md"]);
-        assert_eq!(top(&e, "docs/me", &[])[0], "projects/switchboard/docs/at-mentions.md");
-        assert_eq!(top(&e, "tui/src/m", &[]), ["rust/tui/src/main.rs", "rust/tui/src/sb/mention.rs"]);
-        // folder then empty name: the children of that folder, folders first
-        assert_eq!(top(&e, "rust/tui/src/", &[]), ["rust/tui/src/sb", "rust/tui/src/app.rs", "rust/tui/src/main.rs"]);
-        assert_eq!(top(&e, "src/", &[]), ["rust/tui/src/sb", "rust/tui/src/app.rs", "rust/tui/src/main.rs"]);
-    }
-
-    #[test]
-    fn empty_query_lists_the_root_dot_files_hidden() {
-        let e = index(TREE);
-        assert_eq!(top(&e, "", &[]), ["rust", "Makefile", "README.md"]);
-        assert_eq!(top(&e, ".git", &[]), [".gitignore"]);
-        assert!(!top(&e, "gitig", &[]).contains(&".gitignore"));
-    }
-
-    #[test]
-    fn recent_picks_come_first_in_their_tier() {
-        let e = index(TREE);
-        assert_eq!(top(&e, "main", &["rust/tui/src/main.rs"])[..2], ["rust/tui/src/main.rs", "hub/main.bend"]);
-        assert_eq!(top(&e, "", &["README.md"])[0], "README.md");
-        // a recent path-only match does not jump over a name match
-        assert_eq!(top(&e, "mention", &["projects/switchboard/docs/at-mentions.md"])[0], "rust/tui/src/sb/mention.rs");
-    }
-
-    /// R14 (architect m_12214): a window's pick lands on its own root's
-    /// index, never the root searched last; a re-pick moves to the front;
-    /// a root with no index (evicted) is a no-op.
-    #[test]
-    fn a_pick_in_a_root_is_remembered_on_that_root_only() {
-        let (a, b) = (PathBuf::from("/r14/project-a"), PathBuf::from("/r14/project-b"));
-        let recent = |r: &Path| state().iter().find(|s| s.root == r).map(|s| s.recent.clone());
-        {
-            let mut g = state();
-            for r in [&a, &b] {
-                g.retain(|s| s.root != *r);
-                g.insert(0, State { root: r.clone(), entries: Arc::new(Vec::new()), built: None, walking: false, recent: Vec::new() });
-            }
-        }
-        // b was searched last (first in the list): a's pick still goes to a
-        picked_in(&a, "src/b.rs");
-        picked_in(&a, "src/c.rs");
-        picked_in(&a, "src/b.rs");
-        assert_eq!(recent(&a).unwrap(), ["src/b.rs", "src/c.rs"]);
-        assert_eq!(recent(&b).unwrap(), Vec::<String>::new());
-        // an evicted (or never searched) root: nothing, no index made
-        picked_in(Path::new("/r14/gone"), "x.rs");
-        assert!(recent(Path::new("/r14/gone")).is_none());
-        state().retain(|s| s.root != a && s.root != b);
-    }
-
-    #[test]
-    fn walk_respects_gitignore() {
-        let root = std::env::temp_dir().join(format!("at-files-walk-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
-        for d in ["src", "target/debug", "node_modules/x", ".git"] {
-            std::fs::create_dir_all(root.join(d)).unwrap();
-        }
-        for (f, body) in [
-            (".gitignore", "target/\nnode_modules\n*.log\n"),
-            ("src/lib.rs", ""),
-            ("src/app.log", ""),
-            ("target/debug/bin", ""),
-            ("node_modules/x/i.js", ""),
-            (".env.example", ""),
-            (".git/HEAD", "ref: refs/heads/main\n"),
-        ] {
-            std::fs::write(root.join(f), body).unwrap();
-        }
-        let got: Vec<(String, bool)> = walk(&root, 100).into_iter().map(|e| (e.path, e.dir)).collect();
-        let _ = std::fs::remove_dir_all(&root);
-        let want = [(".env.example", false), (".gitignore", false), ("src", true), ("src/lib.rs", false)];
-        assert_eq!(got, want.map(|(p, d)| (p.to_string(), d)));
-    }
-
-    #[test]
-    fn token_is_the_at_word_at_the_cursor() {
-        assert_eq!(token("@", 1), Some((0, String::new())));
-        assert_eq!(token("@ma", 3), Some((0, "ma".into())));
-        assert_eq!(token("look at @src/ma", 15), Some((8, "src/ma".into())));
-        assert_eq!(token("look at @src/ma now", 15), Some((8, "src/ma".into())));
-        assert_eq!(token("look at @src/ma now", 19), None); // cursor past the word
-        assert_eq!(token("mail a@b.c", 10), None); // mid-word @
-        assert_eq!(token("@main ", 6), None); // done: a space follows
-        assert_eq!(token("line\n@ap", 8), Some((5, "ap".into())));
-    }
-
-    #[test]
-    fn token_is_total_and_reads_an_open_quote() {
-        // the cursor on the `@` (← after typing it): no token, no panic
-        assert_eq!(token("@", 0), None);
-        assert_eq!(token("see @ru", 4), None);
-        assert_eq!(token("", 5), None);
-        // an open quote: a folder with a space being browsed
-        assert_eq!(token("@\"docs/my notes/", 16), Some((0, "docs/my notes/".into())));
-        assert_eq!(token("see @\"docs/my notes/a", 21), Some((4, "docs/my notes/a".into())));
-        // a closed quote ends it; a quote mid-word is not an opener
-        assert_eq!(token("@\"docs/my notes/a.md\" ", 22), None);
-        assert_eq!(token("say \"@x", 7), None);
-    }
-
-    #[test]
-    fn browse_and_parent_query() {
-        assert_eq!(browse("rust/tui"), "@rust/tui/");
-        assert_eq!(browse("docs/my notes"), "@\"docs/my notes/");
-        assert_eq!(browse(""), "@");
-        assert_eq!(parent_query("rust/tui/"), Some("rust"));
-        assert_eq!(parent_query("rust/"), Some(""));
-        assert_eq!(parent_query("rust/tu"), None);
-        assert_eq!(parent_query(""), None);
-        assert_eq!(replace_token("see @ru now", 4, 7, "@rust/"), ("see @rust/ now".into(), 10));
-        assert_eq!(replace_token("@", 5, 9, "@x/"), ("@@x/".into(), 4)); // out of range: clamped, no panic
-    }
-
-    #[test]
-    fn a_folder_path_scopes_the_search() {
-        let e = index(&[
-            "rust/",
-            "rust/tui/",
-            "rust/tui/src/",
-            "rust/tui/src/files.rs",
-            "rust/tui/src/main.rs",
-            "rust/tui/Cargo.toml",
-            "rust/other/",
-            "rust/other/tui/",
-            "rust/other/tui/files.rs",
-            "vendor/rust/tui/x.rs",
-        ]);
-        // an exact folder: its own children only (not vendor/rust/tui/)
-        assert_eq!(top(&e, "rust/tui/", &[]), ["rust/tui/src", "rust/tui/Cargo.toml"]);
-        // a name inside it: its descendants only
-        assert_eq!(top(&e, "rust/tui/fi", &[]), ["rust/tui/src/files.rs"]);
-        // not a folder path: fuzzy as before, and the whole query along
-        // the path finds folders (`src/fi`, `tu/sr`)
-        assert_eq!(top(&e, "tui/", &[]), ["rust/tui/src", "rust/tui/Cargo.toml", "rust/other/tui/files.rs", "vendor/rust/tui/x.rs"]);
-        assert_eq!(top(&e, "rust/tu", &[])[..2], ["rust/tui", "rust/other/tui"]);
-        assert!(top(&e, "tu/sr", &[]).contains(&"rust/tui/src"));
-    }
-
-    #[test]
-    fn completion_inserts_the_reference() {
-        assert_eq!(reference("src/app.rs", false), "src/app.rs");
-        assert_eq!(reference("rust/tui", true), "rust/tui/");
-        assert_eq!(reference("docs/my notes.md", false), "\"docs/my notes.md\"");
-        assert_eq!(complete("see @ap", 4, 7, "src/app.rs"), ("see src/app.rs ".into(), 15));
-        assert_eq!(complete("see @ap now", 4, 7, "src/app.rs"), ("see src/app.rs now".into(), 15));
-        let (t, c) = complete("@ma", 0, 3, "hub/main.bend");
-        assert_eq!((t.as_str(), c), ("hub/main.bend ", 14));
-        assert_eq!(token(&t, c), None); // popup closes
-    }
-
-    /// Per-keystroke latency on a big repo (release):
-    /// `AT_FILES_BENCH=~/mistral/dashboard cargo test --release -p bend-tui files::tests::bench -- --ignored --nocapture`
-    #[test]
-    #[ignore]
-    fn bench() {
-        let root = std::env::var("AT_FILES_BENCH").unwrap_or_else(|_| ".".into());
-        let t = Instant::now();
-        let e = walk(Path::new(&root), MAX_ENTRIES);
-        println!("walk {root}: {} entries in {:.1?}", e.len(), t.elapsed());
-        let mut worst = Duration::ZERO;
-        for q in ["", "m", "ma", "mai", "main", "main.rs", "src/", "src/comp", "README", "c", "co", "com", "comp", "compose", "composer", "fidx", "zzzq"] {
-            let t = Instant::now();
-            for _ in 0..10 {
-                rank(&e, q, &[], 50);
-            }
-            let d = t.elapsed() / 10;
-            worst = worst.max(d);
-            println!("{:>12} {:>9.2?}", format!("{q:?}"), d);
-        }
-        println!("worst {worst:.2?}");
-    }
-
-    // ---- outside the workspace (BISE-206) ----
-
-    fn tmp(name: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("at-out-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&d);
-        std::fs::create_dir_all(&d).unwrap();
-        d
-    }
-
-    /// The outside search once its folder is read (the first keystroke
-    /// may return before the background read ends).
-    fn outside_rows(root: &Path, home: Option<&Path>, q: &str) -> Outside {
-        for _ in 0..500 {
-            let o = search_outside_in(root, home, q, 50);
-            if !o.loading {
-                return o;
-            }
-            std::thread::sleep(Duration::from_millis(5));
-        }
-        panic!("{q} never read")
-    }
-
-    fn paths(o: &Outside) -> Vec<&str> {
-        o.hits.iter().map(|h| h.path.as_str()).collect()
-    }
-
-    fn listed(dir: &Path) -> bool {
-        LISTED.lock().unwrap_or_else(|e| e.into_inner()).iter().any(|d| d == dir)
-    }
-
-    #[test]
-    fn outside_lists_the_typed_folder_only() {
-        let up = tmp("up");
-        for d in ["ws/src", "other/deep", "zeta"] {
-            std::fs::create_dir_all(up.join(d)).unwrap();
-        }
-        for f in ["b.md", "a.txt", ".env", "other/o.rs"] {
-            std::fs::write(up.join(f), "").unwrap();
-        }
-        let ws = up.join("ws");
-        assert!(outside("../") && outside("~/") && outside("/") && !outside("src/") && !outside(".."));
-        // `../`: the parent's entries, folders first, dot files hidden
-        let o = outside_rows(&ws, None, "../");
-        assert_eq!(paths(&o), ["../other", "../ws", "../zeta", "../a.txt", "../b.md"]);
-        assert!(o.hits[..3].iter().all(|h| h.dir && !h.protected));
-        // the name part narrows; dot files once it starts with `.`
-        assert_eq!(paths(&outside_rows(&ws, None, "../b")), ["../b.md"]);
-        assert_eq!(paths(&outside_rows(&ws, None, "../.e")), ["../.env"]);
-        // a folder not entered is not read; entered, only it
-        assert!(!listed(&up.join("other")) && !listed(&up.join("other/deep")));
-        assert_eq!(paths(&outside_rows(&ws, None, "../other/")), ["../other/deep", "../other/o.rs"]);
-        assert!(listed(&ws.join("../other/")) && !listed(&up.join("other/deep")));
-        // `/`: absolute, typed as is
-        let abs = format!("{}/", up.join("other").display());
-        assert_eq!(paths(&outside_rows(&ws, None, &abs)), [format!("{abs}deep"), format!("{abs}o.rs")]);
-        let _ = std::fs::remove_dir_all(&up);
-    }
-
-    #[test]
-    fn protected_folders_are_read_only_once_entered() {
-        let home = tmp("home");
-        for d in ["Desktop", "Documents", "Downloads", "Library/Mobile Documents", "code"] {
-            std::fs::create_dir_all(home.join(d)).unwrap();
-        }
-        std::fs::write(home.join("Desktop/secret.txt"), "").unwrap();
-        let ws = home.join("code");
-        let h = Some(home.as_path());
-        let o = outside_rows(&ws, h, "~/");
-        let prot: Vec<&str> = o.hits.iter().filter(|x| x.protected).map(|x| x.path.as_str()).collect();
-        assert_eq!(prot, ["~/Desktop", "~/Documents", "~/Downloads"]);
-        assert!(!o.hits.iter().any(|x| x.path == "~/code" && x.protected));
-        // typing its name, even whole, reads nothing inside
-        for q in ["~/Desk", "~/Desktop", "~/Library/", "~/Library/Mob"] {
-            let o = outside_rows(&ws, h, q);
-            assert!(!listed(&home.join("Desktop")), "{q} read Desktop");
-            if q == "~/Library/" {
-                assert!(o.hits[0].protected && o.hits[0].path == "~/Library/Mobile Documents");
-            }
-        }
-        assert!(!listed(&home.join("Library/Mobile Documents")));
-        // the `/` after it enters it: read now
-        assert_eq!(paths(&outside_rows(&ws, h, "~/Desktop/")), ["~/Desktop/secret.txt"]);
-        assert!(listed(&home.join("Desktop/")));
-        assert!(protected(None, Path::new("/Volumes/Backup")));
-        assert!(!protected(None, Path::new("/Volumes")) && !protected(h, &home.join("code")));
-        let _ = std::fs::remove_dir_all(&home);
-    }
-
-    #[test]
-    fn a_folder_that_cannot_be_read_is_locked_and_empty() {
-        use std::os::unix::fs::PermissionsExt;
-        let up = tmp("eperm");
-        let lock = up.join("Mail");
-        std::fs::create_dir_all(lock.join("inbox")).unwrap();
-        std::fs::set_permissions(&lock, std::fs::Permissions::from_mode(0o000)).unwrap();
-        if std::fs::read_dir(&lock).is_ok() {
-            // root reads anything: nothing to test
-            let _ = std::fs::set_permissions(&lock, std::fs::Permissions::from_mode(0o755));
-            return;
-        }
-        let q = format!("{}/", lock.display());
-        let o = outside_rows(&up, None, &q);
-        assert!(o.locked && o.hits.is_empty());
-        assert!(outside_rows(&up, None, "/no/such/folder/").locked);
-        let _ = std::fs::set_permissions(&lock, std::fs::Permissions::from_mode(0o755));
-        let _ = std::fs::remove_dir_all(&up);
-    }
-
-    #[test]
-    fn the_sent_path_expands_home_and_keeps_the_rest() {
-        let h = Some(Path::new("/Users/me"));
-        assert_eq!(sent_path_in(h, "~/Documents/a b.md"), "/Users/me/Documents/a b.md");
-        assert_eq!(sent_path_in(Some(Path::new("/Users/me/")), "~/x"), "/Users/me/x");
-        assert_eq!(sent_path_in(h, "../other/o.rs"), "../other/o.rs");
-        assert_eq!(sent_path_in(h, "/etc/hosts"), "/etc/hosts");
-        assert_eq!(sent_path_in(None, "~/x"), "~/x");
-        assert_eq!(resolve_in(Path::new("/ws"), h, "~/Desktop/"), Path::new("/Users/me/Desktop/"));
-        assert_eq!(resolve_in(Path::new("/ws"), h, "../o/"), Path::new("/ws/../o/"));
-        assert_eq!(resolve_in(Path::new("/ws"), h, "/usr/"), Path::new("/usr/"));
-        // browsing: `/` is the root, one folder up from `/usr/` is `/`
-        assert_eq!(browse("/"), "@/");
-        assert_eq!(browse("~/Documents"), "@~/Documents/");
-        assert_eq!(parent_query("/usr/"), Some("/"));
-        assert_eq!(parent_query("/usr/lib/"), Some("/usr"));
-        assert_eq!(parent_query("~/Documents/"), Some("~"));
-        assert_eq!(parent_query("../../"), Some(".."));
-    }
-}
+#[path = "files_tests.rs"]
+mod tests;
