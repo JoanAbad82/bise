@@ -105,7 +105,7 @@ const alarmRows = (words) => page.evaluate((w) => [...document.querySelectorAll(
   .filter((e) => /\.\d+$/.test(e.getAttribute('data-testid') ?? '') && (e.textContent ?? '').includes(w))
   .map((e) => ({ id: e.getAttribute('data-testid'), text: (e.textContent ?? '').replace(/\s+/g, ' ').trim(), title: e.getAttribute('title'),
     g: e.querySelector('.app-rb-g')?.textContent?.trim() ?? null, sub: e.querySelector('.app-rb-sub')?.textContent?.trim() ?? null,
-    end: e.querySelector('.app-rb-end')?.textContent?.trim() ?? null })), words).catch(() => []);
+    end: e.querySelector('.app-rb-end, .app-rb-time')?.textContent?.trim() ?? null })), words).catch(() => []);
 
 await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
 // the status pill (e41cd3c2): 'starting bise…' and the core's words sit IN the title bar, no row
@@ -1209,10 +1209,12 @@ if (mode === 'quick') {
     await rows37(harness, say);
     await rowsE812(harness, say);
     await rowsF2A7(harness, say);
+    await rows233B(harness, say);
   } else {
     // first: ARCHIVED's fold is read on a fresh profile, and the PR poller gets the time the others take
     await rowsE812(harness, say);
     await rowsF2A7(harness, say);
+    await rows233B(harness, say);
     await quickRows(harness, say);
     await newRows(harness, say);
     await rows37(harness, say);
@@ -2470,7 +2472,7 @@ async function rowsF2A7(harness, say) {
     const lineT = async () => flat(await page.locator('[data-testid="thread.waiting"]').first().innerText({ timeout: 1000 }).catch(() => null));
     const agentRow = (name) => page.evaluate((nm) => {
       const e = [...document.querySelectorAll('[data-testid^="app.right.agent."]')].find((x) => { const id = x.getAttribute('data-testid') ?? ''; return id === `app.right.agent.${nm}` || id.endsWith(`.${nm}`); });
-      return e ? { g: e.querySelector('.app-rb-g')?.textContent?.trim() ?? null, end: e.querySelector('.app-rb-end')?.textContent?.trim() ?? null } : null;
+      return e ? { g: e.querySelector('.app-rb-g')?.textContent?.trim() ?? null, end: e.querySelector('.app-rb-end, .app-rb-time')?.textContent?.trim() ?? null } : null;
     }, name).catch(() => null);
     const read = async () => ({ line: await lineT(), head: await head(), row: await agentRow('zqtick'), at_ms: Date.now() });
     const secs = (s) => { const m = /(\d+) s$/.exec(s ?? ''); return m ? Number(m[1]) : null; };
@@ -2500,6 +2502,499 @@ async function rowsF2A7(harness, say) {
     } finally {
       try { process.kill(tick.pid, 'SIGTERM'); } catch { /* gone */ }
     }
+  });
+  await harness();
+}
+
+// 233baf9a's rows (ambient-lead m_23723): the right bar's agents rows as the TUI's panel (e3ce0c60,
+// 1ddc0b7c, 233baf9a) at 1400/1100/800 light and dark on the world's own hubs, seeded by one
+// message to harness' main (solo worktrees, a PR with failing checks and one approved, two agents in
+// one worktree, a PR whose agent was dropped, a done and a failed agent, a blocked one spawned last
+// so the 8 cap would hide it); an artifact's name pink and opening its view (b4114e72); a refused
+// answer says 'not sent: … · try again' on the card that came back, kept across a reload, gone on a
+// take (1cae6676); an old kept 'you answered' row with no 'by' dropped on load (59a27050); the
+// corner card's one rounded edge and its growth to half the screen, then a scroll (5656ff7b).
+async function rows233B(harness, say) {
+  const row = async (name, fn) => {
+    if (!wanted(name)) return;
+    try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
+  };
+  const flat = (s) => (s ?? '').replace(/\s+/g, ' ').trim();
+  const bise = () => click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const clear = async () => {
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+  };
+  const idle = () => until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 90000, 1000);
+  const reload = async () => {
+    await page.reload().catch(() => {});
+    await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+  };
+  const HP = process.env.AS_HE_DOES_HARNESS ?? null;
+  const GHW = process.env.AS_HE_DOES_GH_WORLD ?? null;
+  const UD = process.env.AS_HE_DOES_USERDATA ?? null;
+  const { execFileSync } = await import('node:child_process');
+  const git = (args) => { try { return execFileSync('git', ['-C', HP, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return null; } };
+  const psLines = () => { try { return execFileSync('/bin/ps', ['-axww', '-o', 'pid=,command='], { encoding: 'utf8' }).split(String.fromCharCode(10)); } catch { return []; } };
+  const hubPids = () => (HP ? psLines().filter((l) => l.includes(' sbd --workspace ') && (l.includes(`--workspace ${HP} `) || l.endsWith(`--workspace ${HP}`))).map((l) => Number(l.trim().split(/\s+/)[0])) : []);
+  const signal = (pids, s) => pids.forEach((p) => {
+    if (s === 'SIGSTOP') HELD.add(p); else HELD.delete(p);
+    try { process.kill(p, s); } catch { /* gone */ }
+  });
+  // a css variable's computed color, as the page draws it
+  const color = (v) => page.evaluate((x) => { const d = document.createElement('i'); d.style.color = `var(${x})`; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; }, v).catch(() => null);
+  const project = async () => page.evaluate(() => {
+    const e = document.querySelector('[data-testid^="app.right.artifact."]');
+    return e ? (e.getAttribute('data-testid') ?? '').split('.')[3] ?? null : null;
+  }).catch(() => null);
+  const harnessId = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
+    .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), t: (e.textContent ?? '').trim() }))
+    .find((p) => p.id && !p.id.includes('.') && /^harness\b/.test(p.t))?.id ?? null).catch(() => null);
+  const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
+    .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), name: (e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
+    .filter((p) => p.id && !p.id.includes('.') && !/^harness\b/.test(p.name))).catch(() => []);
+  const other = (await others())[0] ?? null;
+  const goOther = async () => {
+    if (other) { await page.locator(`[data-testid="app.sidebar.project.${other.id}"]`).first().click({ timeout: 5000 }).catch(() => {}); await page.waitForTimeout(800); }
+    else await bise();
+  };
+  const T = String(Date.now()).slice(-5);
+  const NL = String.fromCharCode(92) + 'n';
+  const cards = async (list, tail) => {
+    await clear();
+    const one = (c) => `sb card "$(printf "%s${NL}" ${[c.q, ...c.opts].map((x) => `"${x}"`).join(' ')})"`;
+    await page.keyboard.type(`[[bash: ${list.map(one).join(' && ')}]] ${tail}`, { delay: 5 });
+    await page.keyboard.press('Enter');
+  };
+  const cardShown = (token) => page.evaluate((t) => [...document.querySelectorAll('[data-testid^="inbox."], [data-testid^="strip."], [data-testid^="dock."]')]
+    .some((e) => (e.textContent ?? '').includes(t)), token).catch(() => 'unread');
+  const present = async (token) => {
+    if ((await cardShown(token)) !== false) return true;
+    for (let i = 0; i < 12; i++) {
+      const m = page.locator('[data-testid="inbox.block.more"]').first();
+      if (!(await m.count().catch(() => 0))) break;
+      await m.click({ timeout: 1000 }).catch(() => {});
+      await page.waitForTimeout(250);
+      if ((await cardShown(token)) !== false) return true;
+    }
+    return false;
+  };
+  const dock = async (token, ms) => {
+    const rowL = page.locator('[data-testid^="inbox.block.row."]', { hasText: token }).first();
+    const open = page.locator('[data-testid^="inbox.block.open."]').filter({ hasText: token }).first();
+    const listed = await until(async () => {
+      if ((await rowL.isVisible().catch(() => false)) || (await open.isVisible().catch(() => false))) return true;
+      await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 1000 }).catch(() => {});
+      return null;
+    }, ms, 1000);
+    for (let i = 0; listed && i < 20 && !(await open.isVisible().catch(() => false)); i++) {
+      if (await rowL.isVisible().catch(() => false)) await rowL.click({ timeout: 2000 }).catch(() => {});
+      else await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 2000 }).catch(() => {});
+      await page.waitForTimeout(400);
+    }
+    return { listed: !!listed, open: (await open.isVisible().catch(() => false)) ? open : null };
+  };
+  // the refused line on whatever card holds `token` (block, strip, capsule): its words, or null
+  const refusedOn = (token) => page.evaluate((t) => {
+    for (const e of document.querySelectorAll('[data-testid$=".refused"]')) {
+      let c = e.parentElement;
+      while (c && !/^inbox\.|^strip\.|^dock\./.test(c.getAttribute('data-testid') ?? '')) c = c.parentElement;
+      const within = (c ?? e.parentElement)?.textContent ?? '';
+      if (within.includes(t)) return (e.textContent ?? '').replace(/\s+/g, ' ').trim();
+    }
+    // folded in the block or the strip: its row's RefusedMark ('not sent'), the line itself on open
+    // (try-gate-233b's run r: a folded, b open; the step read only the open card's line)
+    for (const e of document.querySelectorAll('.ic-refused-mark')) {
+      const r = e.closest('[data-testid^="inbox.block.row."], [data-testid^="strip."]');
+      if (r && (r.textContent ?? '').includes(t)) return `${(e.textContent ?? '').trim()} (its folded row)`;
+    }
+    return null;
+  }, token).catch(() => 'unread');
+
+  // the seed, in harness' thread. Agents' briefs carry their script in {{bash: …}} (fake_provider)
+  await closeArtifact();
+  await harness();
+  await idle();
+  fs.writeFileSync(path.join(FX, 'zq-art.html'), '<!doctype html><title>zq art</title><h1>zq art chip report</h1><p>the pink name opens this.</p>');
+  const seed = [
+    "sb spawn zqsolo --place new --objective 'zq solo: nothing to do'",
+    "sb spawn zqfails --place new --objective 'zq checks fail: nothing to do'",
+    "sb spawn zqgone --place new --objective 'zq orphan: nothing to do'",
+    "sb spawn zqg1 --place new --objective 'zq group one: nothing to do'",
+    "sb spawn zqg2 --place zqg1 --objective 'zq group two: nothing to do'",
+    "sb spawn zqfin --objective 'zq finished {{bash: sb report done zq-finished}}'",
+    "sb spawn zqbad --objective 'zq broken {{bash: sb report failed zq-broken}}'",
+    "sb spawn zqf1 --objective 'zq filler one: nothing to do'",
+    "sb spawn zqf2 --objective 'zq filler two: nothing to do'",
+    `sb artifact add ${path.join(FX, 'zq-art.html')} --title 'zq art chip report for the pink name check'`,
+    'sleep 4', 'sb drop zqgone',
+    "sb spawn zqwait --objective 'zq waits for him {{bash: sb report blocked zq-needs-your-pick}}'",
+  ];
+  await clear();
+  await page.keyboard.type(`[[bash: ${seed.join(' && ')}]] seeded 233b`, { delay: 2 });
+  await page.keyboard.press('Enter');
+  const tips = HP ? await until(async () => {
+    const t = ['zqfails', 'zqgone', 'zqg1'].map((b) => git(['rev-parse', '--verify', '-q', `refs/heads/sb/${b}`]));
+    return t.every(Boolean) ? t : null;
+  }, 120000, 1000) : null;
+  if (tips && GHW) {
+    const prs = JSON.parse(fs.readFileSync(path.join(GHW, 'prs-harness.json'), 'utf8'));
+    const pr = (number, branch, head, rollup, review) => ({ number, branch, head, title: `zq ${branch}`, draft: false, review, rollup,
+      checks: [{ name: 'ci', conclusion: rollup }], reviews: review === 'APPROVED' ? [{ state: 'APPROVED', author: 'alice' }] : [], merge_state: rollup === 'SUCCESS' ? 'CLEAN' : 'BLOCKED', commits: 1 });
+    prs.prs = [...(prs.prs ?? []).filter((p) => ![501, 502, 503].includes(p.number)),
+      pr(501, 'sb/zqfails', tips[0], 'FAILURE', 'REVIEW_REQUIRED'), pr(502, 'sb/zqgone', tips[1], 'SUCCESS', 'REVIEW_REQUIRED'), pr(503, 'sb/zqg1', tips[2], 'SUCCESS', 'REVIEW_REQUIRED')];
+    fs.writeFileSync(path.join(GHW, 'prs-harness.json'), JSON.stringify(prs, null, 1));
+  }
+  await idle();
+  step('rows233B seed: 10 agents in harness (worktrees, a group, an orphan PR, done, failed, blocked last), PRs #501-503 in the world GitHub, an artifact',
+    !!tips && !!GHW, { harness: HP, gh_world: GHW, tips, thread: flat(await text('[data-testid="thread.list"]')).slice(-400) });
+
+  // the bar as it is now: rows, signs, words, columns, marks
+  const bar = () => page.evaluate(() => {
+    const L = document.querySelector('[data-testid="app.right.agents"]');
+    if (!L) return null;
+    const rows = [...L.querySelectorAll('.app-rb-arow')].map((e) => {
+      const r = (q) => e.querySelector(q)?.getBoundingClientRect();
+      const g = e.querySelector('.app-rb-g');
+      const m = e.querySelector('.app-rb-mark');
+      return {
+        id: e.getAttribute('data-testid'), head: e.classList.contains('app-rb-ghead'), orphan: e.classList.contains('app-rb-orphan'),
+        g: g?.textContent ?? null, gc: g ? getComputedStyle(g).color : null, mark: m?.textContent ?? null, mc: m ? getComputedStyle(m).color : null,
+        time: Math.round(r('.app-rb-time')?.right ?? 0), pct: Math.round(r('.app-rb-pct')?.right ?? 0), markR: Math.round(r('.app-rb-mark')?.right ?? 0),
+        tw: Math.round(r('.app-rb-time')?.width ?? 0), pw: Math.round(r('.app-rb-pct')?.width ?? 0), h: Math.round(e.getBoundingClientRect().height),
+      };
+    });
+    return { rows, words: L.innerText, more: document.querySelector('[data-testid="app.right.agents.more"]')?.textContent ?? null,
+      head: document.querySelector('[data-testid="app.right.agents.head"]')?.textContent?.replace(/\s+/g, ' ').trim() ?? null };
+  }).catch(() => null);
+
+  await row('agents bar', async () => {
+    await harness();
+    // the seed's agents in the bar (their briefs ran: done, failed, blocked)
+    const b0 = await until(async () => {
+      const b = await bar();
+      const has = (n) => b?.rows.some((r) => r.id === `app.right.agent.${n}`);
+      // zqwait's own turn over (run r read it mid-turn: '∿')
+      const g = (n) => b?.rows.find((r) => r.id === `app.right.agent.${n}`)?.g;
+      return b && has('zqwait') && has('zqfin') && has('zqbad') && g('zqwait') !== '∿' && g('zqwait') !== '~' ? b : null;
+    }, 120000, 1000) ?? (await bar());
+    const [acc, err, t2, t3] = [await color('--c-accent'), await color('--c-err'), await color('--c-text-2'), await color('--c-text-3')];
+    const by = (n) => b0?.rows.find((r) => r.id === `app.right.agent.${n}`) ?? null;
+    // zqwait reported blocked to main: it waits on another agent ('…'); '?' needs a card of its own
+    // for him (proto_view waits: a card whose agent is it), which only main's hub makes here
+    step("the bar's signs: ✓ pink done (zqfin), ▲ red failed (zqbad), '…' waits on main (zqwait, blocked); no state word in the rows",
+      by('zqfin')?.g === '✓' && by('zqfin')?.gc === acc && by('zqbad')?.g === '▲' && by('zqbad')?.gc === err && ['…', '?'].includes(by('zqwait')?.g ?? '')
+        && !/\b(done|idle|now|waits|failed|working|blocked)\b/.test(b0?.words ?? ''),
+      { zqfin: by('zqfin'), zqbad: by('zqbad'), zqwait: by('zqwait'), words: (b0?.words ?? '').slice(0, 600), acc, err });
+    const plain = (b0?.rows ?? []).filter((r) => !r.head && !r.orphan);
+    step("columns: time and % right edges line up on every agent row (40 / 32 px), the mark's right edge the same on every row",
+      plain.length > 0 && new Set(plain.map((r) => r.time)).size === 1 && new Set(plain.map((r) => r.pct)).size === 1 && new Set((b0?.rows ?? []).map((r) => r.markR)).size === 1 && plain[0].tw === 40 && plain[0].pw === 32,
+      { cols: (b0?.rows ?? []).map((r) => ({ id: r.id, time: r.time, pct: r.pct, mark: r.markR, tw: r.tw, pw: r.pw })) });
+    // the drop order on a real row: narrowed step by step, the role goes first, then the %, then the time; the mark stays
+    const drops = await page.locator('[data-testid="app.right.agent.zqsolo"]').first().evaluate((e) => {
+      const q = (s) => e.querySelector(s);
+      const on = (s) => { const x = q(s); return !!x && x.getBoundingClientRect().width > 0 && getComputedStyle(x).display !== 'none' && getComputedStyle(x).visibility !== 'hidden'; };
+      const out = [];
+      const full = Math.round(e.getBoundingClientRect().width);
+      for (let w = full; w >= 100; w -= 2) {
+        e.style.width = `${w}px`;
+        out.push({ w, role: q('.app-rb-role')?.clientWidth ?? 0, pct: on('.app-rb-pct'), time: on('.app-rb-time'), mark: Math.round(q('.app-rb-mark')?.getBoundingClientRect().width ?? 0) });
+      }
+      e.style.width = '';
+      return out;
+    }).catch((x) => String(x).slice(0, 200));
+    const first = (f) => (Array.isArray(drops) ? drops.findIndex(f) : -1);
+    const [roleGone, pctGone, timeGone] = [first((x) => x.role === 0), first((x) => !x.pct), first((x) => !x.time)];
+    step('a row short on room: the role goes first, then the %, then the time; the 16 px mark never goes (zqsolo narrowed)',
+      Array.isArray(drops) && roleGone >= 0 && (pctGone === -1 || pctGone >= roleGone) && (timeGone === -1 || timeGone >= Math.max(pctGone, roleGone)) && drops.every((x) => x.mark === 16),
+      { roleGone: drops[roleGone]?.w ?? null, pctGone: drops[pctGone]?.w ?? null, timeGone: drops[timeGone]?.w ?? null, full: Array.isArray(drops) ? drops[0] : drops });
+    // marks: ψ (no PR), ↑ red (checks fail), the group's head, the orphan PR, the tip. The cap
+    // folds the rows past 8 under '+ N more' (the group's head and the orphan among them): unfolded
+    const capped = await bar();
+    const b1 = await until(async () => {
+      const more = page.locator('[data-testid="app.right.agents.more"]').first();
+      if (/^\+ \d+ more$/.test(flat(await more.textContent({ timeout: 500 }).catch(() => '')))) await more.click({ timeout: 2000 }).catch(() => {});
+      const b = await bar();
+      return b?.rows.some((r) => r.id === 'app.right.agent.zqfails' && r.mark === '↑') && b.rows.some((r) => r.orphan) ? b : null;
+    }, 150000, 2000) ?? (await bar());
+    const by1 = (id) => b1?.rows.find((r) => r.id === id) ?? null;
+    const headR = by1('app.right.group.sb/zqg1');
+    const orphan = b1?.rows.find((r) => r.orphan) ?? null;
+    step("marks: ψ text-2 on a worktree with no PR (zqsolo), ↑ red on #501 (checks fail); the group 'ψ sb/zqg1' head 28 px with '↑ #503', its rows no mark; the orphan PR #502's row: no sign, its ↑",
+      by1('app.right.agent.zqsolo')?.mark === 'ψ' && by1('app.right.agent.zqsolo')?.mc === t2 && by1('app.right.agent.zqfails')?.mark === '↑' && by1('app.right.agent.zqfails')?.mc === err
+        && !!headR && headR.h === 28 && headR.g === 'ψ' && /↑ #503/.test(headR.mark ?? '') && !by1('app.right.agent.zqg1')?.mark && !by1('app.right.agent.zqg2')?.mark
+        && !!orphan && (orphan.g ?? '') === '' && /↑/.test(orphan.mark ?? ''),
+      { zqsolo: by1('app.right.agent.zqsolo'), zqfails: by1('app.right.agent.zqfails'), head: headR, g1: by1('app.right.agent.zqg1'), g2: by1('app.right.agent.zqg2'), orphan, more: b1?.more, t2, t3 });
+    const mk = page.locator('[data-testid="app.right.agent.zqfails.mark"]').first();
+    await mk.hover({ timeout: 3000 }).catch(() => {});
+    const tip = await until(async () => page.evaluate(() => {
+      const t = document.querySelector('[data-testid="app.right.tip"]');
+      return t ? { w: Math.round(t.getBoundingClientRect().width), words: document.querySelector('[data-testid="app.right.tip.words"]')?.textContent ?? null, open: document.querySelector('[data-testid="app.right.tip.open"]')?.textContent ?? null } : null;
+    }), 5000, 250);
+    await shot('233b-bar-tip');
+    step("the mark's tip: 280 px, '#501 · <the hub's words>', 'open the PR ↗'", !!tip && tip.w === 280 && /^#501 · /.test(tip.words ?? '') && tip.open === 'open the PR ↗', tip);
+    await page.mouse.move(1, 400);
+    // the cap: 8 rows and '+ N more' (a '?' row past it is the spec's: no agent card for him here)
+    const ids = (capped?.rows ?? []).map((r) => r.id);
+    const waitsIdx = (capped?.rows ?? []).findIndex((r) => r.g === '?');
+    step("the AGENTS cap: 8 rows then '+ N more'; a row that waits on him ('?') shows past it",
+      ids.length >= 8 && /^\+ \d+ more$/.test(capped?.more ?? '') && (waitsIdx < 0 || ids.length > 8 || waitsIdx < 8),
+      { ids, more: capped?.more, head: capped?.head, waits_on_him: waitsIdx, note: waitsIdx < 0 ? "no '?' row in the world: the cap's wait rule is agents-bar.spec's" : null });
+    // ARCHIVED: open, its rows sign + name + age (zqgone dropped, the e812 seed's zqold)
+    const ah = page.locator('[data-testid="app.right.archived.head"]').first();
+    if ((await ah.getAttribute('aria-expanded').catch(() => null)) === 'false') await ah.click({ timeout: 3000 }).catch(() => {});
+    const arch = await until(async () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.right.archived."]')]
+      .filter((e) => !/\.(head|all)$/.test(e.getAttribute('data-testid') ?? '') && e.getAttribute('data-testid') !== 'app.right.archived' && !/^all\s*›$/.test((e.textContent ?? '').trim()))
+      .map((e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim())).then((r) => (r.length ? r : null)), 10000, 500);
+    step("ARCHIVED open: each row the sign, the name and its age ('✓ zqold 4 min'), no state word",
+      !!arch && arch.every((t) => /^[✓▲○–·]?\s*[a-z0-9-]+?\s*\d+ (s|min|h|d)$/.test(t)) && arch.some((t) => /zqgone/.test(t)), { rows: arch });
+    // ARTIFACTS: the title in the pink chip, 'new' in ink
+    const art = await page.evaluate(() => {
+      const c = document.querySelector('[data-testid^="app.right.artifact."][data-testid$=".chip"]');
+      const nw = document.querySelector('[data-testid^="app.right.artifact."][data-testid$=".new"]');
+      return { chip: c ? { t: c.textContent, c: getComputedStyle(c).color, bg: getComputedStyle(c).backgroundColor, h: Math.round(c.getBoundingClientRect().height) } : null, new: nw ? { t: nw.textContent, c: getComputedStyle(nw).color } : null };
+    }).catch(() => null);
+    const ink = await color('--c-text');
+    step("ARTIFACTS: the title in the pink chip (accent, 24 px), 'new' stays ink", !!art?.chip && art.chip.c === acc && art.chip.h === 24 && (!art.new || art.new.c === ink), { ...art, acc, ink });
+    // the shots: 1400, 1100, 800 (slid over), light and dark
+    const sizes = [];
+    for (const scheme of ['light', 'dark']) {
+      await page.emulateMedia({ colorScheme: scheme }).catch(() => {});
+      for (const w of [1400, 1100, 800]) {
+        const how = await resizeWin(w, 900);
+        await page.waitForTimeout(900);
+        let over = null;
+        if (w === 800) {
+          await page.mouse.click(500, 300).catch(() => {});
+          await page.keyboard.press('Meta+Alt+Digit0');
+          over = await page.locator('[data-testid="app.over.right"] [data-testid="app.panel"]').first().isVisible({ timeout: 3000 }).catch(() => false);
+        }
+        await page.mouse.move(1, 400);
+        const b = await bar();
+        sizes.push({ scheme, w, how, inner: await page.evaluate(() => window.innerWidth).catch(() => null), over, rows: b?.rows.length ?? 0, wait: !!b?.rows.some((r) => r.id === 'app.right.agent.zqwait') });
+        await shot(`233b-bar-${scheme}-${w}`);
+        if (w === 800) await page.keyboard.press('Escape');
+      }
+    }
+    await page.emulateMedia({ colorScheme: null }).catch(() => {});
+    await resizeWin(1400, 900);
+    await page.waitForTimeout(600);
+    step('the bar at 1400 / 1100 / 800 (slid over, ⌘⌥0), light and dark: rows drawn, zqwait shown at each', sizes.every((s) => s.rows > 0 && s.wait && (s.w !== 800 || s.over)), sizes);
+  });
+
+  await row('art chips', async () => {
+    await harness();
+    await idle();
+    const acc = await color('--c-accent');
+    // the id the hub gave it: the ARTIFACTS row's
+    const id = await page.evaluate(() => {
+      const e = [...document.querySelectorAll('[data-testid^="app.right.artifact."][data-testid$=".chip"]')].find((x) => /zq art chip/.test(x.textContent ?? ''));
+      const t = e?.getAttribute('data-testid') ?? '';
+      return t ? t.split('.').slice(4, -1).join('.') : null;
+    }).catch(() => null);
+    if (!id) { step('art chips: the zq artifact in ARTIFACTS', false, { bar: flat(await text('[data-testid="app.right"]')).slice(0, 400) }); return; }
+    const md = path.join(FX, 'zq-art-reply.md');
+    fs.writeFileSync(md, `the report is [zq art chip report](artifact:${id}), and here is plain text after it.`);
+    await clear();
+    await say(`[[bash: sb card "$(printf "%s${NL}" "zqart${T} look at [zq art chip report](artifact:${id})?" "1. zqart-ok" "2. zqart-no")"]] [[reply: ${md}]] art`);
+    // main's answer (not his own bubble, which draws the name too): the row with 'plain text after it'
+    const name = await until(async () => page.evaluate(() => {
+      const rows = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.entry."]')]
+        .filter((r) => r.getAttribute('data-side') !== 'me' && /plain text after it/.test(r.textContent ?? ''));
+      const e = rows.at(-1)?.querySelector('[data-testid="thread.artname"]');
+      return e ? { t: e.textContent, c: getComputedStyle(e).color, bg: getComputedStyle(e).backgroundColor, row: rows.at(-1).getAttribute('data-testid') } : null;
+    }), 90000, 1000);
+    const mine = await page.evaluate(() => {
+      const e = [...document.querySelectorAll('[data-testid="thread.list"] [data-side="me"] [data-testid="thread.artname"]')].at(-1);
+      return e ? { t: e.textContent, c: getComputedStyle(e).color } : null;
+    }).catch(() => null);
+    await page.mouse.move(1, 400);
+    await shot('233b-art-inline-answer');
+    // the inbox line's name (the card's question), once the card is in
+    const inboxName = await until(async () => {
+      await present(`zqart${T}`);
+      return page.evaluate((t) => {
+        for (const e of document.querySelectorAll('.b-artname')) {
+          let c = e.parentElement;
+          while (c && !/^inbox\.|^strip\./.test(c.getAttribute('data-testid') ?? '')) c = c.parentElement;
+          if (c && (c.textContent ?? '').includes(t)) return { t: e.textContent, c: getComputedStyle(e).color, in: c.getAttribute('data-testid') };
+        }
+        return null;
+      }, `zqart${T}`);
+    }, 60000, 1000);
+    await page.mouse.move(1, 400);
+    await shot('233b-art-inbox-line');
+    // the thread's 'bise asks: …' row of that card: its link as words, or the name (info)
+    const asks = await page.evaluate((t) => {
+      const e = [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread."]')].filter((x) => (x.textContent ?? '').includes(t) && /asks/.test(x.textContent ?? '')).at(-1);
+      return e ? { text: (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200), artname: !!e.querySelector('.b-artname'), raw: /\]\(artifact:/.test(e.textContent ?? '') } : null;
+    }, `zqart${T}`).catch(() => null);
+    res.notes = [...(res.notes ?? []), { what: "233b art: his own bubble's name, the thread's 'asks' row of the card", mine, asks }];
+    save();
+    // the thread's artifact row chip
+    const rowChip = await page.evaluate(() => {
+      const e = [...document.querySelectorAll('[data-testid="thread.list"] .b-artchip')].at(-1);
+      return e ? { t: (e.textContent ?? '').trim().slice(0, 80), c: getComputedStyle(e).color } : null;
+    }).catch(() => null);
+    step("an artifact's name is pink: inline in main's answer (thread.artname), in the inbox line, the thread's artifact chip",
+      !!name && name.c === acc && !!inboxName && inboxName.c === acc && (!rowChip || rowChip.c === acc), { id, name, inboxName, rowChip, acc });
+    // a click on the inline name opens the artifact's view
+    await page.locator('[data-testid="thread.artname"]').last().click({ timeout: 3000 }).catch(() => {});
+    const view = await until(async () => page.evaluate(() => {
+      const v = document.querySelector('[data-testid^="artifact."], [data-testid="app.artifact"], [data-testid="artifacts.view"]');
+      return v && v.getBoundingClientRect().width > 0 ? { id: v.getAttribute('data-testid'), t: (v.textContent ?? '').replace(/\s+/g, ' ').slice(0, 160) } : null;
+    }), 8000, 400);
+    // its frame draws the page (the first run's shot: a dark empty frame right after the click)
+    const framed = await until(async () => {
+      for (const f of page.frames()) {
+        const t = await f.evaluate(() => document.body?.innerText ?? '').catch(() => '');
+        if (/zq art chip report/.test(t) && /pink name opens this/.test(t)) return { url: f.url().slice(0, 120) };
+      }
+      return null;
+    }, 15000, 500);
+    await shot('233b-art-click-opens');
+    step("a click on the pink name opens the artifact's view, its page drawn in the frame", !!view && /zq art/.test(view.t) && !!framed, { view, framed });
+    await closeArtifact();
+    // the card answered so it leaves the later rows' block
+    const d = await dock(`zqart${T}`, 5000);
+    if (d.open) { await d.open.click({ position: { x: 4, y: 4 } }).catch(() => {}); await page.keyboard.press('1'); }
+  });
+
+  await row('refusal where he answered', async () => {
+    const R = `zqW${T}`;
+    await harness();
+    await idle();
+    await cards([{ q: `${R}a answer me?`, opts: ['1. zqwa-one', '2. zqwa-two'] }, { q: `${R}b then retry me?`, opts: ['1. zqwb-one', '2. zqwb-two'] }], 'seeded refusal-where');
+    const listed = await until(async () => ((await present(`${R}a`)) && (await present(`${R}b`)) ? true : null), 90000, 1000);
+    await idle();
+    await goOther();
+    await clear();
+    const pids = hubPids();
+    if (!listed || pids.length !== 1) { step("refusal-where: 'not sent: … · try again' on the card that came back", false, { listed: !!listed, pids }); return; }
+    let back = null;
+    let kept = null;
+    try {
+      signal(pids, 'SIGSTOP');
+      for (const k of ['a', 'b']) {
+        const d = await dock(`${R}${k}`, 10000);
+        if (d.open) { await d.open.click({ position: { x: 4, y: 4 } }).catch(() => {}); await page.keyboard.press('1'); }
+        await page.waitForTimeout(800);
+      }
+      back = await until(async () => {
+        const a = (await present(`${R}a`)) ? await refusedOn(`${R}a`) : null;
+        const b = (await present(`${R}b`)) ? await refusedOn(`${R}b`) : null;
+        return a && b ? { a, b } : null;
+      }, 60000, 1000);
+      await page.mouse.move(1, 300);
+      await shot('233b-refused-where');
+      await reload();
+      await goOther();
+      kept = { a: (await present(`${R}a`)) ? await refusedOn(`${R}a`) : null, b: (await present(`${R}b`)) ? await refusedOn(`${R}b`) : null };
+      await shot('233b-refused-after-reload');
+    } finally { signal(pids, 'SIGCONT'); }
+    const line = /^not sent: .+ · try again$/;
+    // each card: the whole line when it's open, 'not sent' on its row when folded; one of them open
+    const said = (x) => line.test(x ?? '') || /^not sent \(its folded row\)$/.test(x ?? '');
+    const both = (s) => !!s && said(s.a) && said(s.b) && (line.test(s.a ?? '') || line.test(s.b ?? ''));
+    step(`a refused answer (harness hub held past 30 s) from ${other?.name ?? 'bise'}: 'not sent: <words> · try again' on the card that came back, where he answered ('not sent' on a folded one's row)`,
+      both(back), { back });
+    step("the 'not sent' line is kept across a reload", both(kept), { kept });
+    // the hub runs again: a late take of a clears its line (the card goes); b: 'try again' sends it once more
+    await page.waitForTimeout(8000);
+    const late = { a_card: await present(`${R}a`), a_line: await refusedOn(`${R}a`) };
+    const retry = page.locator('[data-testid$=".retry"]').filter({ has: page.locator('xpath=.') });
+    let retried = false;
+    if (await present(`${R}b`)) {
+      const d = await dock(`${R}b`, 5000);
+      const r = d.open ? d.open.locator('[data-testid$=".retry"]').first() : retry.first();
+      retried = await r.click({ timeout: 3000 }).then(() => true, () => false);
+    }
+    const after = await until(async () => {
+      const s = { a_card: await present(`${R}a`), a_line: await refusedOn(`${R}a`), b_card: await present(`${R}b`), b_line: await refusedOn(`${R}b`) };
+      return !s.a_line && !s.b_line ? s : null;
+    }, 30000, 1000) ?? { a_card: await present(`${R}a`), a_line: await refusedOn(`${R}a`), b_card: await present(`${R}b`), b_line: await refusedOn(`${R}b`) };
+    await page.mouse.move(1, 300);
+    await shot('233b-refused-taken');
+    step("the hub running again: no 'not sent' line stays on a card it took (a late take, or 'try again')", !after.a_line && !after.b_line, { late, retried, after });
+    // whatever is still open, answered now so the later rows see no zqW card
+    for (const k of ['a', 'b']) {
+      if (!(await present(`${R}${k}`))) continue;
+      const d = await dock(`${R}${k}`, 5000);
+      if (d.open) { await d.open.click({ position: { x: 4, y: 4 } }).catch(() => {}); await page.keyboard.press('1'); await page.waitForTimeout(600); }
+    }
+  });
+
+  await row('stale aside dropped', async () => {
+    const file = UD ? path.join(UD, 'keep-window.json') : null;
+    const hid = await harnessId();
+    if (!file || !hid) { step("an old 'you answered' row with no 'by' in keep-window.json is dropped on load", false, { file, hid }); return; }
+    await bise();
+    const raw = (() => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return { v: 1, fields: {}, view: {} }; } })();
+    const key = `asides:${hid}/main`;
+    const now = Date.now();
+    const legacy = { key: `${hid}/9${T}`, project: hid, card: Number(`9${T}`), notice: `you answered zqstale${T}: open it on GitHub`, note: '', at_ms: now - 60000 };
+    const prev = Array.isArray(raw.view?.[key]?.v) ? raw.view[key].v : [];
+    raw.view = { ...(raw.view ?? {}), [key]: { v: [...prev, legacy], at: now } };
+    fs.writeFileSync(file, JSON.stringify(raw));
+    await reload();
+    await harness();
+    await page.waitForTimeout(1500);
+    const shown = await page.evaluate((t) => [...document.querySelectorAll('[data-testid^="thread.aside."]')].some((e) => (e.textContent ?? '').includes(t)), `zqstale${T}`).catch(() => 'unread');
+    await page.mouse.move(1, 300);
+    await shot('233b-stale-aside-dropped');
+    // and the keep wrote it out once (the load's own write)
+    const left = await until(async () => { try { return fs.readFileSync(file, 'utf8').includes(`zqstale${T}`) ? null : true; } catch { return null; } }, 10000, 500);
+    step("an old 'you answered' row with no 'by' in keep-window.json is dropped on load: not drawn in harness, out of the file", shown === false && !!left,
+      { shown, out_of_file: !!left, key, kept_hub_rows: prev.length });
+  });
+
+  await row('corner card grows then scrolls', async () => {
+    const VOICE = process.env.AS_HE_DOES_VOICE;
+    if (!VOICE) { step('the corner card with a long talk and answer', false, 'no fake voice (AS_HE_DOES_VOICE)'); return; }
+    await harness();
+    const long = path.join(FX, 'zq-long-answer.md');
+    fs.writeFileSync(long, Array.from({ length: 40 }, (_, i) => `${i + 1}. step ${i + 1} of the checkout trace: the total after this step, and which function changed it.`).join(String.fromCharCode(10)));
+    const words = `so the checkout page on stripe, the one with the coupon field, why does the total jump by two cents when i apply the code and then remove it again, ${'is that rounding on our side or theirs, '.repeat(6)}[[reply: ${long}]]`;
+    fs.writeFileSync(VOICE, words);
+    const CFR = UD ? path.join(UD, 'capsule-frames.jsonl') : null;
+    const cfr = () => { try { return fs.readFileSync(CFR, 'utf8').split(String.fromCharCode(10)).filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean); } catch { return []; } };
+    const n0 = cfr().length;
+    await page.evaluate(() => window.bise.core.send({ cmd: 'talk_start' })).catch(() => {});
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => window.bise.core.send({ cmd: 'talk_end' })).catch(() => {});
+    const capPage = () => browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().includes('surface=capsule'));
+    const read = async () => capPage()?.evaluate(() => {
+      const q = (s) => document.querySelector(`[data-testid="${s}"]`);
+      const root = q('capsule');
+      const rs = root ? getComputedStyle(root) : null;
+      const sc = [...document.querySelectorAll('[data-testid^="capsule"]')].find((e) => e.scrollHeight > e.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(e).overflowY));
+      const radii = [...document.querySelectorAll('[data-testid^="capsule"], .b-capsule')].filter((e) => parseFloat(getComputedStyle(e).borderTopLeftRadius) > 0).map((e) => e.getAttribute('data-testid') ?? e.className);
+      return {
+        card: !!q('capsule.card') || !!q('capsule.talk'), answer: (q('capsule.answer')?.textContent ?? '').length,
+        root: rs ? { radius: rs.borderTopLeftRadius, fill: rs.backgroundColor, shadow: rs.boxShadow } : null, radii,
+        h: window.innerHeight, half: Math.max(240, Math.round((window.screen.availHeight || 800) / 2)),
+        scroll: sc ? { id: sc.getAttribute('data-testid'), sh: sc.scrollHeight, ch: sc.clientHeight } : null,
+        scrolled: !!document.querySelector('[data-scrolled]'), rest: /the rest in bise/.test(document.body.innerText),
+      };
+    }).catch(() => null);
+    const seen = await until(async () => { const r = await read(); return r && r.answer > 200 ? r : null; }, 45000, 500);
+    await page.waitForTimeout(1000);
+    const r = (await read()) ?? seen;
+    const cp = capPage();
+    if (cp) { try { const f = path.join(out, `${mode}${tag}-${++n}-233b-corner-long.png`); await cp.screenshot({ path: f }); res.shots.push(f); save(); } catch { /* the steps say */ } }
+    const recs = cfr().slice(n0).filter((x) => x.mode === 'corner');
+    const hs = recs.map((x) => x.bounds?.height ?? 0);
+    step("the corner card: one rounded edge (the page's root no radius, fill or shadow)", !!r?.root && r.root.radius === '0px' && r.root.shadow === 'none' && /rgba\(0, 0, 0, 0\)|transparent/.test(r.root.fill), r ?? { capsule: !!cp });
+    step('a long talk and answer: the card grows to half the screen at most, then scrolls (the rest in bise ↗)',
+      !!r && r.h <= r.half + 2 && !!r.scroll && (r.rest || r.scrolled), { r, frames: hs });
+    step('its frames (capsule-frames.jsonl): taller as the words came, bottom-right pinned, parked off every screen',
+      recs.length > 0 && Math.max(...hs) > Math.min(...hs) && recs.every((x) => (x.parked?.x ?? 0) <= -20000 || (x.parked?.y ?? 0) <= -20000)
+        && recs.every((x) => x.bounds.x + x.bounds.width === x.work.x + x.work.width - 16 && x.bounds.y + x.bounds.height === x.work.y + x.work.height - 16),
+      { n: recs.length, heights: hs, last: recs.at(-1) ?? null, file: CFR });
+    await until(async () => (await capPage()?.evaluate(() => !document.querySelector('[data-testid="capsule.card"]')).catch(() => null)) ? true : null, 20000, 500);
   });
   await harness();
 }
@@ -2534,7 +3029,7 @@ async function rows0170(harness, say) {
   };
   const agentRow = (name) => page.evaluate((n) => {
     const e = [...document.querySelectorAll('[data-testid^="app.right.agent."]')].find((x) => { const id = x.getAttribute('data-testid') ?? ''; return id === `app.right.agent.${n}` || id.endsWith(`.${n}`); });
-    return e ? { id: e.getAttribute('data-testid'), g: e.querySelector('.app-rb-g')?.textContent?.trim() ?? null, end: e.querySelector('.app-rb-end')?.textContent?.trim() ?? null, text: (e.textContent ?? '').replace(/\s+/g, ' ').trim() } : null;
+    return e ? { id: e.getAttribute('data-testid'), g: e.querySelector('.app-rb-g')?.textContent?.trim() ?? null, end: e.querySelector('.app-rb-end, .app-rb-time')?.textContent?.trim() ?? null, text: (e.textContent ?? '').replace(/\s+/g, ' ').trim() } : null;
   }, name).catch(() => null);
   const waitLine = async () => {
     const l = page.locator('[data-testid="thread.waiting"]').first();
