@@ -22,7 +22,7 @@ main's tip, with no known red; each fixed red has its cause in its commit
 | one_key_auto_e2e | red | the test hub got the user's real keys (below) | keys dropped, a law |
 | ambient_core_e2e | red | dffe9d15 puts his card answer in the asker's thread | the test allows it |
 | prompt_size_e2e | red | main's role grew 1.5k without its budget | budget raised by the rows |
-| tui_file_chips_tmux | green | asserts the size on the first screen with the name | waits for the row |
+| tui_file_chips_tmux | green | its folder in the gate's tmp: the strip dropped the too-wide source (size included) | the folder in the test's HOME |
 | tui_computer_use_tmux | green | its folder path's length came from the run's tmp: the gate's made the row wrap | a short path |
 
 Not fixed here, owned elsewhere:
@@ -104,3 +104,24 @@ Closed by:
 
 After: one_key_auto_e2e 5/5 alone, and a kept run's hub stderr has no
 efforts line, its cache no efforts.json, its checker no card.
+
+## tui_file_chips_tmux: the gate's tmp too
+
+The first fix (94ea51ec, waits for the row with its size) named the wrong
+cause: a capture between the name and the size. The next full gate showed
+the row with no size for 40 s. The real cause is the one of
+tui_computer_use_tmux: the documents lived in `E.tmp/My Desktop`, under
+the gate's `~/.bise/gate/<pid>`, so the row's source `2 kB  <folder>` was
+wider than the strip, and the strip drops a source that does not fit
+(attach::box_row), size included. Reproduced alone with the old test and
+`TMPDIR=~/.bise/gate/99999`: red, the same screen. The documents now live
+in the test's HOME, as his `~/My Desktop`: the strip says `2 kB  ~/My
+Desktop` whatever the tmp.
+
+## The second full gate: one more red
+
+tui_reload_tmux waited for a `reloading bise` line in main's thread after
+a /restart. a38108e7 (on main during this work, designer m_23091) removed
+that line for a reload that goes well: the switch row and hub.log say it.
+The test now checks the line is not there once the draft is back, as
+a38108e7's repl_start_e2e does.

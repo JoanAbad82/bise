@@ -64,9 +64,11 @@ def main():
             # the TUI re-executes itself, the REPL restarts on its session
             wait_until(lambda: tui_starts() >= 2, 30, lambda: "the TUI did not re-exec: %d starts" % tui_starts())
             wait_until(lambda: repl_pid() not in ("", pid0), 30, lambda: "the REPL was not relaunched: pid %s" % repl_pid())
-            t.wait("reloading bise")
             sc = t.wait("half a thought")
             assert "half a thought" in composer(sc), sc
+            # a reload that goes well leaves no line in main's thread (a38108e7,
+            # designer m_23091): its start is the switch row's and hub.log's
+            assert "reloading bise" not in sc, sc
             # its history goes on: the next request carries the first prompt
             t.wait_re(MAIN_IDLE)
             n = len(E.fake_requests())
