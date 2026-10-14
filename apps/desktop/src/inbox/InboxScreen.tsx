@@ -3,13 +3,14 @@
 // hub's records of what he answered or what was withdrawn (useInboxRecords), into InboxView
 // (List.tsx). ⏎ on a waiting item opens it above this screen's composer (openInbox, as ⌘I); a past
 // one goes to his answer: the thread at it with one th-flash, a history step (answered-link's
-// openAnswer, the one jump), or the page at its block. Owner: inbox-screen.
+// openAnswer, the one jump), or the page in the window at its block (notif-open's useOptAct). Owner: inbox-screen.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProjects, useStore, useThreadOrder } from '@/store';
 import { useRouter } from '@/app/router';
 import { useKeptScroll } from '@/app/keep';
 import { threadKey, type Store } from '@/store';
 import { openInbox } from './Block';
+import { useOptAct } from './optAct';
 import { useWaitingList } from './waiting';
 import { InboxView } from './List';
 import { openAnswer } from '@/thread/answerlink';
@@ -38,16 +39,17 @@ export function InboxScreen() {
       store.unsubscribeThread(looked.project, at.agent);
     };
   }, [store, looked, at]);
+  const optAct = useOptAct();
   const jump = useCallback(
     (j: Jump) => {
       if (j.kind === 'thread') {
         openAnswer(router, { project: j.project, agent: j.agent, card: j.card });
         return;
       }
-      const url = store.pages(j.project)?.items.find((p) => p.id === j.page)?.url;
-      if (url !== undefined) void window.bise.openExternal(j.block === undefined ? url : `${url.replace(/#.*$/u, '')}#${j.block}`);
+      // a page answer: the page in the window beside the thread, at the block he answered (notif-open's useOptAct)
+      optAct(j.project, { act: 'open', artifact: j.page, at: j.block ?? null });
     },
-    [router, store],
+    [router, optAct],
   );
   return (
     <InboxView
