@@ -1,6 +1,8 @@
 # Office artifacts: xlsx, pptx, docx as first-class artifacts
 
-Status: plan, waiting for architect's signature. Lead: task `office-lead`.
+Status: signed by architect (m_23701) with the changes folded into §8 and
+§9; the design questions (§10) wait for Gabriel on designer's page. Lead:
+task `office-lead`.
 Branch: `office-artifacts` (Gabriel tries it before it reaches main).
 
 Gabriel's ask, in three parts:
@@ -212,10 +214,9 @@ generalises it to every artifact instead of building a second one.
   (notes.js's line), and each sent note shows `✓ done` or the agent's
   answer when the version that answers it lands.
 - **Versions**: an agent that saves 30 times in 2 minutes must not make 30
-  rows to scroll. Proposal (architect's call): saves of the same artifact
-  by the same agent within one turn collapse into one version at the turn's
-  end, and the viewer still shows each save live (the SSE carries a
-  `draft` swap that is not a version).
+  rows to scroll. Signed (§9.4): a save by the same agent in the same turn
+  replaces the newest version's copy, `v` stays n, and the SSE's
+  `version {n, rev}` still lets the viewer show each save.
 
 ## 7. Adding a file as an artifact in the app
 
@@ -230,38 +231,83 @@ head (the macOS file picker through the shell's bridge). The kinds
 Order: `office-sdk-core` first (one day); then the rest in parallel, the
 skills last. Battery mode: main spawns as many as the heavy lock allows.
 
+The artifact routes of the pages server go in a new module, one file per
+chunk, so no two chunks own one file: `pages/artifact/mod.rs` (the
+dispatch, made by office-viewer), `view.rs` (office-viewer), `events.rs`
+(art-live), `notes.rs` (art-notes).
+
 | agent | brief | area (owns) | after |
 |---|---|---|---|
-| `office-sdk-core` | the package, its build (one ESM bundle, no node imports), zip/XML core, anchors type, `inspect`/`at`/`check`/diff interfaces, fixtures folder of real-world files (made by us, not his) | `office/sdk/` (package.json, `src/core/`, `fixtures/`), `THIRD_PARTY_NOTICES` | — |
+| `office-sdk-core` | the package and its build to the committed `office/dist/office.js` (one ESM bundle, no node imports) + the gate check that rebuilds it and fails on a diff; the `Anchor` type in `bise_proto` (kind enum with `Unknown`, released-fixture test) and its generated TS; zip/XML core; `inspect`/`at`/`check`/diff interfaces; fixtures made by us; `docs/office.md` | `office/` (sdk, dist, fixtures), `rust/proto` (anchor), `tests/` (the bundle check), `THIRD_PARTY_NOTICES` | — |
 | `office-sheets` | `sheets` module on ExcelJS: open/create/edit/save, inspect, at, check (formula errors), diff | `office/sdk/src/sheets/` | core |
 | `office-slides` | `slides` module: create through pptxgenjs, read/edit our OOXML layer that keeps unknown parts, inspect, at, check (overflow, off-slide), diff | `office/sdk/src/slides/` | core |
 | `office-docs` | `docs` module: create through `docx`, read/edit our OOXML layer (paragraphs, runs, tables, comments, tracked changes), inspect, at, check, diff | `office/sdk/src/docs/` | core |
-| `office-run` | `bise office run|inspect|check`: bend-jsrt script mode (heap, cap, the two scoped ops, SDK bundle embedded), `run.write` adds the artifact's next version | `rust/jsrt/`, `rust/harness/` subcommand, `rust/home` (paths) | core |
-| `office-viewer` | `/a/<id>/<v>/view` and `/a/<id>/view` (current), `frame_url` for the three kinds, `kit/office/{sheet,slides,doc}.js` renderers, swap in place on SSE `version` with the place kept and changes marked | `rust/switchboard/src/pages/{server,site}.rs`, `proto_view.rs`, `kit/office/` | core, then the 3 modules' readers |
-| `art-notes` | notes on any artifact: anchor kinds in notes.js's core, `artifacts/<id>/notes.json`, `/api/a/<id>/notes|send`, `PageMsg::Sent` widened, the message's typed part, the viewers' anchor hooks (image, html, pdf first; office kinds with office-viewer) | `kit/notes.js`, `rust/switchboard/src/pages/{store,drafts,mod}.rs`, `artifacts.rs` | — (starts on html/images) |
-| `art-desktop` | the side panel: the frame keeps its src across versions, "updating…" state, drop a file / `+ add`, the versions menu with live drafts | `apps/desktop/src/artifacts/`, the shell's bridge (file picker) | designer's page |
-| `office-plugins` | `plugins/{sheets,slides,docs}`: manifests, skills and reference files on the real API, one recorded fake run each, on by default | `plugins/sheets`, `plugins/slides`, `plugins/docs` | the 3 modules + office-run |
+| `office-run` | `bise office run|inspect|check`: bend-jsrt script mode (1 GB heap, 5 min cap, only the two ops, `office/dist/office.js` by `include_str!`); the door check in Rust (canonicalize, no symlink or `..` out of worktree + `$TMPDIR` from `env::VARS`, 50 MB max) with a test per refusal; `run.write` = write, then the `sb artifact add` request on `SB_SOCKET` | `rust/jsrt/`, the `office` subcommand in `rust/harness/`, `rust/home` (env rows) | core |
+| `office-viewer` | `/a/<id>/<v>/view` and `/a/<id>/view` (current), `frame_url` for the three kinds decided in `proto_view`, renderers per format in `kit/office/` loading `office/dist/office.js` (no copy), what it can't draw said in the frame | `rust/switchboard/src/pages/artifact/{mod,view}.rs`, `proto_view.rs`, `kit/office/` | core, then the 3 modules' readers |
+| `art-live` | saves in one turn: `artifacts_turns.rs` (pure fn + unit laws), the turn stamped at the door from sb-core's fact; `/a/<id>/events` on the `/p/<id>/events` subs map with `version {n, rev}`; the viewer's swap in place (place kept, changes marked from the SDK diff); the "updating…" state decided server-side; `docs/artifacts.md` | `rust/switchboard/src/artifacts_turns.rs`, `artifacts.rs` (the call), `pages/artifact/events.rs`, `kit/office/swap.js` | office-viewer's route |
+| `art-notes` | one notes system for every target: `store.rs`/`drafts.rs` generalised to a target dir, `PageMsg::Sent` with `target`, `/api/a/<id>/notes|send`, notes.js split (`kit/notes-anchors.js` per anchor kind, from the generated `Anchor` TS), anchors for images, html and pdf first, then the office kinds; the words in `bise_proto`, signed by designer | `kit/notes.js`, `kit/notes-anchors.js`, `rust/switchboard/src/pages/{store,drafts,mod}.rs`, `pages/artifact/notes.rs` | core's `Anchor`; designer's page |
+| `art-desktop` | the side panel: the frame keeps its src across versions, draws the hub's "updating…" and words, drop a file / `+ add` through the hub's `do: add` (file picker through the shell's bridge) | `apps/desktop/src/artifacts/`, the shell's bridge | designer's page, art-live |
+| `office-plugins` | `plugins/{sheets,slides,docs}`: short manifests, skills and reference files on the real API, one recorded fake run each, on by default, the prompt budget test with all three on | `plugins/sheets`, `plugins/slides`, `plugins/docs` | the 3 modules + office-run |
 
 `office-lead` (me) stays: merges order, the plan's updates, the QA pass on
 fakes at the end (a deck, a sheet, a doc made and edited by an agent with
 notes, the panel open, on a throwaway hub).
 
-## 9. Questions for architect (to sign)
+## 9. Architect's answers (m_23701): the rules every chunk follows
 
-1. `office/sdk/` as a new top-level folder for a TS package (or `kit/office`
-   / `apps/office-sdk`)? It is built into the bise binary (`include_str!`
-   of the bundle) and into `kit/office/`.
-2. `bise office run`: bend-jsrt in a script mode with two file ops, scoped
-   to the worktree, `$TMPDIR` and the script's folder. OK, or a separate
-   small binary?
-3. `run.write` adding the next version: through the hub's `artifacts` op
-   from inside `bise office run` (the agent's `SB_SOCKET`), like `sb
-   artifact add`.
-4. Collapsing saves into one version per turn (§6): who decides? It reads
-   like a hub decision (sb-core, a law) or a store rule in `artifacts.rs`.
-5. `PageMsg::Sent` widened to artifacts, and `artifacts/<id>/notes.json`
-   owned by the pages store or by `artifacts.rs`?
-6. The plugins on by default (no `dev.bise default: off`).
+1. **`office/sdk/`** at the top level. Cargo and nix never run pnpm, so the
+   built bundle is committed as **`office/dist/office.js`** (like generated
+   code); a gate check rebuilds it and fails on a diff. `include_str!` and
+   the viewer both use that one file: no copy in `kit/`. Third-party code in
+   the bundle gets its `THIRD_PARTY_NOTICES` rows in the same commit.
+2. **Script mode of bend-jsrt**, no second binary. The scope check is in
+   Rust, at the door: canonicalize, refuse a symlink or `..` that leaves the
+   scope, refuse a write over 50 MB (`MAX_COPY`). Scope = the agent's
+   worktree + its `$TMPDIR`, both from `bise_home` / `env::VARS` rows (not
+   "the script's folder": a user file elsewhere is copied into `$TMPDIR`
+   with bash first). No other op: no net, no env, no subprocess. A test
+   proves each refusal.
+3. **`run.write` → next version** through `SB_SOCKET`, with the request
+   `sb artifact add` already sends (no new op; debt-t5's typed `sb::Req`
+   if it has landed). Write the file, then send. Whether a path is already
+   an artifact is the hub's call (`artifacts.rs`), never jsrt's.
+4. **Saves in one turn** (§6): `artifacts.rs` owns it, as a pure fn with
+   unit laws in a new `artifacts_turns.rs`: a save by the same agent in the
+   same turn as the newest version replaces that version's copy, `v` stays
+   n. The hub stamps the turn from sb-core's fact (the agent's turn number)
+   at the door, never from the request. The SSE sends `version {n, rev}`, so
+   the viewer swaps on each save; whether Gabriel sees each save or only the
+   turn's result is §10.3, the rule allows both.
+5. **One notes system**: the pages module owns the notes rules for every
+   target (`store.rs`/`drafts.rs` generalised to a target dir, `pages/<id>`
+   or `artifacts/<id>`); `artifacts.rs` only reads the counts.
+   `PageMsg::Sent` gets a `target` field. The anchor type is wire: it lives
+   **once in `bise_proto`** (a kind enum with `Unknown`, fields only added, a
+   released-fixture test); notes.js and the SDK import its generated TS, and
+   the SDK's `at(anchor)` takes that type.
+6. **On by default**; short `plugin.json` descriptions, and the prompt
+   budget test runs with all three on.
+
+Also:
+
+- **Line limits**: `kit/notes.js` (1,277) is on the ratchet: generalising
+  it splits it (anchor kinds in `kit/notes-anchors.js`), never grows it.
+  `server.rs` (898): the `/a/<id>/view`, `/a/<id>/events`,
+  `/api/a/<id>/notes|send` routes go in a new `pages/artifact_routes.rs`.
+- **Clients draw**: the hub/server decides `frame_url` (`proto_view`), the
+  "updating…" state and the notes words; the desktop only draws them. Words
+  go through `bise_proto` words, signed by designer.
+- **Adding a file** (§7): the desktop calls the hub's `do: add`, never writes
+  into `artifacts/`.
+- **SSE**: reuse the `/p/<id>/events` mechanism (its subs map).
+- **Formulas**: v1 ships without an evaluator if `check()` names the cells
+  with no value and the viewer says so.
+- **Docs**: `docs/office.md` (new) and `docs/artifacts.md` (versions per
+  turn, notes on artifacts) in the chunks that change them, plus `//!`
+  headers.
+- **Process**: each chunk runs its unit tests + one off-screen check under
+  `heavy-run --low`, lands on `office-artifacts` with `sb land --here`, and
+  sends architect its sha before landing.
 
 ## 10. Design questions for Gabriel (designer's page)
 
