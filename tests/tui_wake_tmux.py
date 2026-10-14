@@ -18,6 +18,12 @@ the fake provider, tmux at 150 and 80 columns, dark and light.
       `sb wake --stop`: `– stopped waiting for the reindex`, `○` again
   at 80 columns (no panel) the alarm is `◌ 1 watching` on the composer
       rule, and the same in the light palette
+  a reply still pending (ask-wait, its own hub: no BEND_BG_AFTER, so
+      search's `sleep 25` holds its turn): docs asks search with `sb ask
+      --timeout 3`; the hold ends with no reply and docs stays a PAUSE,
+      `… continues when search answers · <age>` counted from the ask and
+      counting up live, `…` on its panel row; search's turn ends, its
+      reply wakes docs and the line goes
 
 WAKE_SHOTS=<dir> keeps the captures (.txt and .ansi) for the designer.
 
@@ -189,6 +195,29 @@ def narrow(t, E):
     t.keys("Enter")
 
 
+def reply_row(t, E):
+    t.wait("bise :*")
+    t.wait_re(MAIN_IDLE)
+    sb(E, "main", "spawn", "search", "--objective", "look it up [[bash: sleep 25; echo found]]")
+    sb(E, "main", "spawn", "docs", "--objective", "write the docs")
+    t.wait_re(r"\b\d+ ○ docs\b", 90)
+    env = {**E.env, "SB_SOCKET": os.path.join(E.state, "agent.sock"), "SB_AGENT": "docs"}
+    r = subprocess.run([e2e.EXE, "sb", "ask", "search", "which port?", "--timeout", "3"], env=env, cwd=E.ws, capture_output=True, text=True, timeout=60)
+    assert "no answer" in (r.stdout + r.stderr).lower() or "timeout" in (r.stdout + r.stderr).lower(), (r.stdout, r.stderr)
+    view(t, "docs")
+    line = re.compile(r"… continues when search answers · (\d+)s")
+    sc = t.wait_re(line.pattern, 30)
+    first = int(line.search(sc).group(1))
+    assert first >= 3, "counted from the ask, not from the hold's end: " + sc
+    assert "… docs" in row(sc, "docs"), row(sc, "docs")
+    shot(t, "150-reply-pause")
+    # it counts up live
+    t.wait_re(r"… continues when search answers · (?:%s)s" % "|".join(str(n) for n in range(first + 3, 60)), 20)
+    # search's turn ends: its reply wakes docs, the line goes
+    t.wait_gone("continues when search answers", 90)
+    shot(t, "150-reply-answered")
+
+
 def main():
     E = e2e.Env()
     E.env["BEND_BG_AFTER"] = "2"
@@ -198,6 +227,9 @@ def main():
         print("PASS tui wake 150")
         narrow(t, E)
         print("PASS tui wake 80")
+    with tui_session(150, 40) as t:
+        reply_row(t, t.E)
+        print("PASS tui wake reply")
 
 
 if __name__ == "__main__":

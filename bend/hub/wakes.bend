@@ -7,7 +7,9 @@
 # past their max, an agent's) and the view's JSON of them.
 #
 # Owns: the live watches, the ended ones (at most ENDED_KEPT, for `sb
-# wake`'s list), the last id. A watch is one-shot: it ends at its first
+# wake`'s list), the last id; and the one kind sb-core sets itself, a
+# `reply` watch (ask-wait: an ask's hold ended with no reply, a pause from
+# the ask; `make_reply`, the reply/done/drop decisions). A watch is one-shot: it ends at its first
 # hit, at its max, at its stop or with its agent (dropped). Whether a
 # watch is a pause (`resumes`: its agent continues its work at the end,
 # `sb wake --then`) or an alarm (its agent is free, only woken if it
@@ -24,7 +26,10 @@
 # wake_max_once, wake_replay_keeps; bend/laws/wakes.bend wake_bg_pauses,
 # wake_pid_pauses, wake_file_alarms, wake_job_alarms, wake_unknown_alarms,
 # wake_then_wins, wake_set_keeps_run, wake_set_keeps_agents,
-# wake_own_stop_quiet, wake_his_stop_tells, wake_stop_gone_quiet.
+# wake_own_stop_quiet, wake_his_stop_tells, wake_stop_gone_quiet,
+# wake_reply_pauses, ask_timeout_pauses, ask_pause_resumes, ask_max_tells,
+# ask_once, ask_reply_ends, ask_reply_ends_quiet, ask_done_ends,
+# ask_done_quiet, ask_target_gone_tells.
 import Base
 
 import ../vendor/json.bend as J
@@ -44,6 +49,7 @@ type WatchKind is Data:
   KPid{}
   KFile{}
   KJob{}
+  KReply{}
   KOther{}
 
 # a watch that ended: when and why (hit, max, stop, gone)
@@ -183,7 +189,8 @@ def kind.str(+k: String) -> WatchKind:
   Bool.pick(WatchKind, String.eq(k, "bg"), KBg{},
     Bool.pick(WatchKind, String.eq(k, "pid"), KPid{},
       Bool.pick(WatchKind, String.eq(k, "file"), KFile{},
-        Bool.pick(WatchKind, String.eq(k, "job"), KJob{}, KOther{}))))
+        Bool.pick(WatchKind, String.eq(k, "job"), KJob{},
+          Bool.pick(WatchKind, String.eq(k, "reply"), KReply{}, KOther{})))))
 
 def kind_of(+spec: J.Json) -> WatchKind:
   kind.str(J.get_str_or(spec, "kind", ""))
@@ -200,6 +207,8 @@ def kind_pauses(k: WatchKind) -> Bool:
       False{}
     case KJob{}:
       False{}
+    case KReply{}:
+      True{}
     case KOther{}:
       False{}
 
@@ -216,6 +225,95 @@ def resumes_of(+spec: J.Json, then: Maybe<&2, Bool>) -> Bool:
 # from now
 def make(+ws: Wakes, +agent: String, +spec: J.Json, +max_text: String, +now: Nat, +max_ms: Nat, +quiet: Bool, then: Maybe<&2, Bool>) -> Watch:
   Watch{1n+Wakes.last_id(ws), agent, spec, max_text, now, Nat.add(now, max_ms), quiet, resumes_of(spec, then)}
+
+# ---- a reply still pending (ask-wait) ----
+# An agent's `sb ask` / `sb wait` holds it WAIT_CAP seconds at most
+# (core.bend); when the hold ends with no reply, sb-core sets a watch of
+# kind `reply` (the one spec sb-core builds itself: kind, to, msg; Rust
+# never probes it). A pause from the ask (set_at: the asked message's
+# time) until its reply ends it (no wake: the reply is its own), its
+# agent moves on (its stop, done, failed, dropped), the asked agent is
+# dropped or a day passes (both tell the agent once).
+
+def REPLY_MAX_MS() -> Nat:
+  86400000n
+
+def reply_spec(+to: String, +msg: Nat) -> J.Json:
+  J.obj([J.kv("kind", J.JStr{"reply"}), J.kv("to", J.JStr{to}), J.kv("msg", J.JNum{msg})])
+
+# the words at its max: the agent planned to continue on the reply
+def reply_max_text(+to: String, +msg: Nat) -> String:
+  String.append(String.append(String.append(String.append("no reply from @", to), " to m_"), Nat.show(msg)),
+    " in a day: it no longer waits for it. ask again, or continue with an explicit assumption.")
+
+# the reply watch of `agent` on its message `msg` to `to`, asked at
+# `asked_at`
+def make_reply(+ws: Wakes, +agent: String, +to: String, +msg: Nat, +asked_at: Nat, +now: Nat) -> Watch:
+  Watch{1n+Wakes.last_id(ws), agent, reply_spec(to, msg), reply_max_text(to, msg), asked_at,
+    Nat.add(now, REPLY_MAX_MS()), False{}, True{}}
+
+def kind_is_reply(k: WatchKind) -> Bool:
+  match k:
+    case KReply{}:
+      True{}
+    case _:
+      False{}
+
+def is_reply(+x: Watch) -> Bool:
+  kind_is_reply(kind_of(Watch.spec(x)))
+
+def reply_to_of(+x: Watch) -> String:
+  J.get_str_or(Watch.spec(x), "to", "")
+
+def reply_msg(+x: Watch) -> Nat:
+  J.get_num_or(Watch.spec(x), "msg", 0n)
+
+# the live reply watch of `agent` on its message `msg`: a walk that stops
+# at it (`hit`: the head is it; not Bool.pick, tests/pick_gate.py)
+def reply_hit(xs: List<&2, Watch>, +agent: String, +msg: Nat) -> Bool:
+  match xs:
+    case Nil{}:
+      False{}
+    case Con{+h, _}:
+      is_reply(h) && String.eq(Watch.agent(h), agent) && Nat.is_eq(reply_msg(h), msg)
+
+def reply_for.go(xs: List<&2, Watch>, +hit: Bool, +agent: String, +msg: Nat) -> Maybe<&2, Watch>:
+  match xs hit:
+    case Nil{} _:
+      None{}
+    case Con{+h, _} True{}:
+      Some{h}
+    case Con{+h, +t} False{}:
+      reply_for.go(t, reply_hit(t, agent, msg), agent, msg)
+
+def reply_for(+xs: List<&2, Watch>, +agent: String, +msg: Nat) -> Maybe<&2, Watch>:
+  reply_for.go(xs, reply_hit(xs, agent, msg), agent, msg)
+
+# the reply watch a message answers: sent to its agent, a reply to its
+# message, by the asked agent (`by`: the sender's names) or the user
+def answered(+x: Watch, +to: String, +reply_to: Nat, +by: List<&2, String>, +user: Bool) -> Bool:
+  is_reply(x) && String.eq(Watch.agent(x), to) && Nat.is_eq(reply_msg(x), reply_to) && (user || str_in(by, reply_to_of(x)))
+
+def answered_of(xs: List<&2, Watch>, +to: String, +reply_to: Nat, +by: List<&2, String>, +user: Bool) -> List<&2, Nat>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Bool.pick(List<&2, Nat>, answered(h, to, reply_to, by, user), Watch.id(h) <> answered_of(t, to, reply_to, by, user),
+        answered_of(t, to, reply_to, by, user))
+
+# the reply watches of an agent (`ns`: its names): it moved on (done, failed)
+def replies_of(xs: List<&2, Watch>, +ns: List<&2, String>) -> List<&2, Nat>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Bool.pick(List<&2, Nat>, is_reply(h) && str_in(ns, Watch.agent(h)), Watch.id(h) <> replies_of(t, ns), replies_of(t, ns))
+
+# the words its agent hears when the asked agent is dropped
+def reply_gone_text(+x: Watch) -> String:
+  String.append(String.append(String.append(String.append("@", reply_to_of(x)), " was dropped: no reply to m_"), Nat.show(reply_msg(x))),
+    " will come. continue with an explicit assumption, or ask someone else.")
 
 # a watch past its max says "still running" to its agent, unless quiet (a
 # bash slot's) or its agent is not active (stopped: nothing to wake)

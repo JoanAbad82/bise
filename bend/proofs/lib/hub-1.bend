@@ -115,17 +115,17 @@ def hub_later_tr(-x: List<&2, HX.Waiter>, -y: List<&2, HX.Waiter>, -now: Nat, e:
   l
 
 def hub_keep_later.pick(c: Bool, +w: HX.Waiter, -t: List<&2, HX.Waiter>, -now: Nat,
-    +e: {Nat.is_le(HX.Waiter.deadline(w), now) == c : Bool}, ih: HC.Later(HC.waiters_keep(t, now), now))
-    -> HC.Later(Bool.pick(List<&2, HX.Waiter>, Nat.is_le(HX.Waiter.deadline(w), now), HC.waiters_keep(t, now), w <> HC.waiters_keep(t, now)), now):
+    +e: {Nat.is_le(HX.Waiter.deadline(w), now) == c : Bool}, ih: HC.Later(HX.waiters_keep(t, now), now))
+    -> HC.Later(Bool.pick(List<&2, HX.Waiter>, Nat.is_le(HX.Waiter.deadline(w), now), HX.waiters_keep(t, now), w <> HX.waiters_keep(t, now)), now):
   match c:
     case True{}:
-      %Equal.sym(Bool, Nat.is_le(HX.Waiter.deadline(w), now), True{}, e) : HC.Later(Bool.pick(List<&2, HX.Waiter>, _, HC.waiters_keep(t, now), w <> HC.waiters_keep(t, now)), now)
+      %Equal.sym(Bool, Nat.is_le(HX.Waiter.deadline(w), now), True{}, e) : HC.Later(Bool.pick(List<&2, HX.Waiter>, _, HX.waiters_keep(t, now), w <> HX.waiters_keep(t, now)), now)
       ih
     case False{}:
-      %Equal.sym(Bool, Nat.is_le(HX.Waiter.deadline(w), now), False{}, e) : HC.Later(Bool.pick(List<&2, HX.Waiter>, _, HC.waiters_keep(t, now), w <> HC.waiters_keep(t, now)), now)
+      %Equal.sym(Bool, Nat.is_le(HX.Waiter.deadline(w), now), False{}, e) : HC.Later(Bool.pick(List<&2, HX.Waiter>, _, HX.waiters_keep(t, now), w <> HX.waiters_keep(t, now)), now)
       HX.Both{e, ih}
 
-def hub_keep_later(+ws: List<&2, HX.Waiter>, +now: Nat) -> HC.Later(HC.waiters_keep(ws, now), now):
+def hub_keep_later(+ws: List<&2, HX.Waiter>, +now: Nat) -> HC.Later(HX.waiters_keep(ws, now), now):
   match ws:
     case Nil{}:
       Unit{}
@@ -138,17 +138,17 @@ def hub_none_tr(-x: List<&2, HX.Waiter>, -y: List<&2, HX.Waiter>, -n: String, e:
   l
 
 def hub_not_none.pick(c: Bool, +w: HX.Waiter, -t: List<&2, HX.Waiter>, -n: String,
-    +e: {String.eq(HX.Waiter.agent(w), n) == c : Bool}, ih: HC.NoneOf(HC.waiters_not(t, n), n))
-    -> HC.NoneOf(Bool.pick(List<&2, HX.Waiter>, String.eq(HX.Waiter.agent(w), n), HC.waiters_not(t, n), w <> HC.waiters_not(t, n)), n):
+    +e: {String.eq(HX.Waiter.agent(w), n) == c : Bool}, ih: HC.NoneOf(HX.waiters_not(t, n), n))
+    -> HC.NoneOf(Bool.pick(List<&2, HX.Waiter>, String.eq(HX.Waiter.agent(w), n), HX.waiters_not(t, n), w <> HX.waiters_not(t, n)), n):
   match c:
     case True{}:
-      %Equal.sym(Bool, String.eq(HX.Waiter.agent(w), n), True{}, e) : HC.NoneOf(Bool.pick(List<&2, HX.Waiter>, _, HC.waiters_not(t, n), w <> HC.waiters_not(t, n)), n)
+      %Equal.sym(Bool, String.eq(HX.Waiter.agent(w), n), True{}, e) : HC.NoneOf(Bool.pick(List<&2, HX.Waiter>, _, HX.waiters_not(t, n), w <> HX.waiters_not(t, n)), n)
       ih
     case False{}:
-      %Equal.sym(Bool, String.eq(HX.Waiter.agent(w), n), False{}, e) : HC.NoneOf(Bool.pick(List<&2, HX.Waiter>, _, HC.waiters_not(t, n), w <> HC.waiters_not(t, n)), n)
+      %Equal.sym(Bool, String.eq(HX.Waiter.agent(w), n), False{}, e) : HC.NoneOf(Bool.pick(List<&2, HX.Waiter>, _, HX.waiters_not(t, n), w <> HX.waiters_not(t, n)), n)
       HX.Both{e, ih}
 
-def hub_not_none(+ws: List<&2, HX.Waiter>, +n: String) -> HC.NoneOf(HC.waiters_not(ws, n), n):
+def hub_not_none(+ws: List<&2, HX.Waiter>, +n: String) -> HC.NoneOf(HX.waiters_not(ws, n), n):
   match ws:
     case Nil{}:
       Unit{}
@@ -648,13 +648,13 @@ def hub_d_reply_all(-o: HM.St, +ws: List<&2, HX.Waiter>, +cx: HX.Cx<o>, +why: St
 
 def hub_d_fail_waiters(-o: HM.St, +cx: HX.Cx<o>, +a: String, +why: String) -> {HX.d(o, HC.fail_waiters(o, cx, a, why)) == HX.d(o, cx) : HM.St}:
   +ws = HX.R.waiters(HC.rr(o, cx))
-  +cx2 = HC.set_r(o, cx, HX.R.with_waiters(HC.rr(o, cx), HC.waiters_not(ws, a)))
-  +cx3 = HC.reply_all(o, HC.waiters_of(ws, a), cx2, why)
+  +cx2 = HC.set_r(o, cx, HX.R.with_waiters(HC.rr(o, cx), HX.waiters_not(ws, a)))
+  +cx3 = HC.reply_all(o, HX.waiters_of(ws, a), cx2, why)
   Equal.trans(HM.St, HX.d(o, HC.upd_rt(o, cx3, HX.Rt.with_waiting(HC.rt(o, cx3, a), False{}))), HX.d(o, cx3), HX.d(o, cx),
     hub_d_upd_rt(o, cx3, HX.Rt.with_waiting(HC.rt(o, cx3, a), False{})),
     Equal.trans(HM.St, HX.d(o, cx3), HX.d(o, cx2), HX.d(o, cx),
-      hub_d_reply_all(o, HC.waiters_of(ws, a), cx2, why),
-      hub_d_with_r(o, cx, HX.R.with_waiters(HC.rr(o, cx), HC.waiters_not(ws, a)))))
+      hub_d_reply_all(o, HX.waiters_of(ws, a), cx2, why),
+      hub_d_with_r(o, cx, HX.R.with_waiters(HC.rr(o, cx), HX.waiters_not(ws, a)))))
 
 def hub_eq_refl(+n: Nat) -> {Nat.is_eq(n, n) == True{} : Bool}:
   match n:

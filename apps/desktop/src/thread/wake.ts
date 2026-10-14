@@ -65,6 +65,7 @@ export function clockPast(atMs: number, atOff: number, nowMs: number, nowOff: nu
 /** What a watch waits for, after 'continues when' / 'if': 'cargo bench ends', 'build.rc appears', a note as is (words::watch_event). */
 export function watchEvent(kind: WatchKind, what: string, noted: boolean): string {
   if (noted) return what;
+  if (kind === 'reply') return `${what} answers`;
   return kind === 'file' ? `${what} appears` : `${what} ends`;
 }
 
@@ -89,21 +90,25 @@ type Waits = Pick<Agent, 'status' | 'since_ms'> & { waiting_on?: Agent['waiting_
 export function pauseLine(a: Waits, nowMs: number, short = false): PauseLine | null {
   const state = 'continues when';
   if (a.waiting_on?.who === 'agent') {
-    const len = waitLen(nowMs - a.since_ms, short);
-    const note = `${a.waiting_on.name} answers`;
-    return { state, note, who: a.waiting_on.name, more: '', dur: len, len, title: `${state} ${note} · ${len}` };
+    // held again on a reply an earlier hold left pending (ask-wait): counted from the ask
+    const name = a.waiting_on.name;
+    const asked = (a.watching ?? []).filter((w) => w.kind === 'reply' && w.what === name).map((w) => w.since_ms);
+    const len = waitLen(nowMs - Math.min(a.since_ms, ...asked), short);
+    const note = `${name} answers`;
+    return { state, note, who: name, more: '', dur: len, len, title: `${state} ${note} · ${len}` };
   }
   if (a.status !== 'idle') return null;
   const ws = (a.watching ?? []).filter((w) => w.resumes === true).sort((x, y) => x.since_ms - y.since_ms || x.id - y.id);
   const first = ws[0];
   if (first === undefined) return null;
   const len = (w: AgentWatch): string => waitLen(nowMs - w.since_ms, short);
-  const dur = (w: AgentWatch): string => (short ? len(w) : w.kind === 'bg' || w.kind === 'pid' ? `running for ${len(w)}` : `for ${len(w)}`);
+  const dur = (w: AgentWatch): string =>
+    short || w.kind === 'reply' ? len(w) : w.kind === 'bg' || w.kind === 'pid' ? `running for ${len(w)}` : `for ${len(w)}`;
   const event = (w: AgentWatch): string => watchEvent(w.kind, w.what, w.noted === true);
   return {
     state,
     note: event(first),
-    who: '',
+    who: first.kind === 'reply' ? first.what : '',
     more: ws.length > 1 ? ` and ${String(ws.length - 1)} more` : '',
     dur: dur(first),
     len: len(first),

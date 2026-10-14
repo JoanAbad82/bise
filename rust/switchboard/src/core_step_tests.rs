@@ -150,3 +150,7 @@ fn a_watch_is_a_pause_or_an_alarm_on_the_agents_row() {
     assert!(!fx.iter().any(|e| matches!(e, Effect::Journal(j) if j["type"] == "message_sent")), "{fx:?}");
     assert_eq!(row(&mut t)["watching"].as_array().unwrap().len(), 2);
 }
+
+/// ask-wait's tests, out of core_tests.rs too.
+#[path = "core_ask_tests.rs"]
+mod core_ask_tests;

@@ -68,8 +68,8 @@ def Laws.tick_clears_late_waiters(o, cx):
     PL1.hub_keep_later(HX.R.waiters(HX.Cx.r(o, cx)), HX.R.now(HX.Cx.r(o, cx))))
 
 def Laws.stop_leaves_no_waiter(o, cx, n, life, why):
-  PL1.hub_none_tr(HC.waiters_of_cx(o, HC.stop_task(o, cx, n, life, why)), HC.waiters_not(HX.R.waiters(HX.Cx.r(o, cx)), n), n,
-    PL1.hub_set_waiters(o, HC.wakes_gone(o, life, HC.timers_gone(o, life, HC.stop_task.go(o, cx, n, life, why), n), n), HC.waiters_not(HX.R.waiters(HX.Cx.r(o, cx)), n)),
+  PL1.hub_none_tr(HC.waiters_of_cx(o, HC.stop_task(o, cx, n, life, why)), HX.waiters_not(HX.R.waiters(HX.Cx.r(o, cx)), n), n,
+    PL1.hub_set_waiters(o, HC.wakes_gone(o, life, HC.timers_gone(o, life, HC.stop_task.go(o, cx, n, life, why), n), n), HX.waiters_not(HX.R.waiters(HX.Cx.r(o, cx)), n)),
     PL1.hub_not_none(HX.R.waiters(HX.Cx.r(o, cx)), n))
 
 def Laws.init_unique(w):
@@ -132,7 +132,7 @@ def Laws.stop_leaves_no_queue(o, cx, n, life, why, u, k):
   +ef = Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.msgs(HX.d(o, g)), PL1.hub_rej(ids, m5),
     Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.msgs(HX.d(o, tg)), HM.St.msgs(HX.d(o, g)),
       Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.msgs(HX.d(o, wg)), HM.St.msgs(HX.d(o, tg)),
-        PL1.hub_msgs_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HC.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
+        PL1.hub_msgs_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
         PL1.hub_msgs_wakes(o, life, tg, n)),
       PL2.hub_msgs_gone(o, HC.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
     Equal.trans(List<&2, HM.MRec>, HM.St.msgs(HX.d(o, g)), HM.St.msgs(HX.d(o, cx6)), PL1.hub_rej(ids, m5),
@@ -144,7 +144,7 @@ def Laws.stop_leaves_no_queue(o, cx, n, life, why, u, k):
     Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.agents(HX.d(o, g)), HM.St.agents(HX.d(o, cx5)),
       Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.agents(HX.d(o, tg)), HM.St.agents(HX.d(o, g)),
         Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.agents(HX.d(o, wg)), HM.St.agents(HX.d(o, tg)),
-          PL2.hub_agents_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HC.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
+          PL2.hub_agents_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
           PL1.hub_agents_wakes(o, life, tg, n)),
         PL2.hub_agents_gone(o, HC.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
       Equal.trans(List<&2, HM.Agent>, HM.St.agents(HX.d(o, g)), HM.St.agents(HX.d(o, cx6)), HM.St.agents(HX.d(o, cx5)),
@@ -189,7 +189,7 @@ def Laws.stop_leaves_no_card(o, cx, n, life, why, u):
     PL2.hub_dropc(HC.card_ids(c6, n, Nil{}), c6),
     Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.cards(HX.d(o, tg)), HM.St.cards(HX.d(o, g)),
       Equal.trans(List<&2, HM.Card>, HM.St.cards(HX.d(o, HC.stop_task(o, cx, n, life, why))), HM.St.cards(HX.d(o, wg)), HM.St.cards(HX.d(o, tg)),
-        PL2.hub_cards_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HC.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
+        PL2.hub_cards_eq(o, HC.stop_task(o, cx, n, life, why), wg, PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n)))),
         PL2.hub_cards_wakes(o, life, tg, n)),
       PL2.hub_cards_gone(o, HC.life_gone(life), g, n, HM.names_of(HX.d(o, g), n))),
     PL2.hub_cards_close_ids(o, HC.card_ids(c6, n, Nil{}), cx6, "agent stopped"))
@@ -298,7 +298,7 @@ def Laws.stop_leaves_no_timer(o, cx, n, why):
   +xs = HTM.Tms.live(HM.St.tm(HX.d(o, g)))
   +ids = HTM.ids_in(xs, ns)
   +e0 = Equal.cong(HM.St, List<&2, HTM.Timer>, s => HTM.Tms.live(HM.St.tm(s)), HX.d(o, st), HX.d(o, wg),
-    PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HC.waiters_not(HX.R.waiters(HC.rr(o, cx)), n))))
+    PL1.hub_d_with_r(o, wg, HX.R.with_waiters(HC.rr(o, wg), HX.waiters_not(HX.R.waiters(HC.rr(o, cx)), n))))
   +e1 = Equal.trans(List<&2, HTM.Timer>, HTM.Tms.live(HM.St.tm(HX.d(o, st))), HTM.Tms.live(HM.St.tm(HX.d(o, wg))), HTM.Tms.live(HM.St.tm(HX.d(o, tg))),
     e0, PL3.hub_live_wakes_each(o, wids, tg))
   +e2 = PL3.hub_live_gone_each(o, ids, g, HC.cat(["@", n, " is gone"]))

@@ -589,3 +589,77 @@ def dirty(-o: M.St, +cx: Cx<o>) -> Cx<o>:
 
 def now(-o: M.St, +cx: Cx<o>) -> Nat:
   R.now(Cx.r(o, cx))
+
+# ---- the runtimes' and the waits' lists (moved from core.bend) ----
+
+def rt_rename(xs: List<&2, Rt>, +old: String, +new: String) -> List<&2, Rt>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Bool.pick(Rt, String.eq(Rt.name(h), old), Rt.with_name(h, new), h) <> rt_rename(t, old, new)
+
+def any_waiter(xs: List<&2, Waiter>, +n: String) -> Bool:
+  match xs:
+    case Nil{}:
+      False{}
+    case Con{+h, +t}:
+      String.eq(Waiter.agent(h), n) || any_waiter(t, n)
+
+def waiters_of(xs: List<&2, Waiter>, +n: String) -> List<&2, Waiter>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      +rest = waiters_of(t, n)
+      Bool.pick(List<&2, Waiter>, String.eq(Waiter.agent(h), n), h <> rest, rest)
+
+def waiters_not(xs: List<&2, Waiter>, +n: String) -> List<&2, Waiter>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      +rest = waiters_not(t, n)
+      Bool.pick(List<&2, Waiter>, String.eq(Waiter.agent(h), n), rest, h <> rest)
+
+def waiters_late(xs: List<&2, Waiter>, +now: Nat) -> List<&2, Waiter>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      +rest = waiters_late(t, now)
+      Bool.pick(List<&2, Waiter>, Nat.is_le(Waiter.deadline(h), now), h <> rest, rest)
+
+def waiters_keep(xs: List<&2, Waiter>, +now: Nat) -> List<&2, Waiter>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      +rest = waiters_keep(t, now)
+      Bool.pick(List<&2, Waiter>, Nat.is_le(Waiter.deadline(h), now), rest, h <> rest)
+
+def waiters_rename(xs: List<&2, Waiter>, +old: String, +new: String) -> List<&2, Waiter>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Bool.pick(Waiter, String.eq(Waiter.agent(h), old), Waiter.with_agent(h, new), h) <> waiters_rename(t, old, new)
+
+# the first waiter a new message releases (RFC 0003 §6.2): the agent's
+# wait for this reply, or any wait when the message asks a question
+def waiter_hit(+w: Waiter, +to: String, +reply_to: Maybe<&2, Nat>, +asks: Bool) -> Bool:
+  String.eq(Waiter.agent(w), to) && (M.maybe_nat_is(reply_to, Waiter.msg(w)) || asks)
+
+def waiter_pick(xs: List<&2, Waiter>, +to: String, +reply_to: Maybe<&2, Nat>, +asks: Bool) -> Maybe<&2, Waiter>:
+  match xs:
+    case Nil{}:
+      None{}
+    case Con{+h, +t}:
+      Bool.pick(Maybe<&2, Waiter>, waiter_hit(h, to, reply_to, asks), Some{h}, waiter_pick(t, to, reply_to, asks))
+
+def waiter_drop(xs: List<&2, Waiter>, +tok: Nat) -> List<&2, Waiter>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Bool.pick(List<&2, Waiter>, Nat.is_eq(Waiter.token(h), tok), t, h <> waiter_drop(t, tok))

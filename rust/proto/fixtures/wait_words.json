@@ -59,6 +59,20 @@
    "want": { "state": "continues when", "note": "perf answers", "who": "perf", "more": "", "dur": "1 min", "len": "1 min", "title": "continues when perf answers · 1 min" }
   },
   {
+   "why": "ask-wait: the hold ended with no reply, search is idle on its reply watch: counted from the ask",
+   "now_ms": 1791792000000,
+   "short": false,
+   "agent": { "name": "search", "status": "idle", "since_ms": 1791791990000, "watching": [{ "id": 9, "kind": "reply", "what": "perf", "since_ms": 1791791820000, "resumes": true }] },
+   "want": { "state": "continues when", "note": "perf answers", "who": "perf", "more": "", "dur": "3 min", "len": "3 min", "title": "continues when perf answers · 3 min" }
+  },
+  {
+   "why": "ask-wait: held again on the same reply (sb wait): still counted from the ask",
+   "now_ms": 1791792000000,
+   "short": true,
+   "agent": { "name": "search", "status": "waiting", "since_ms": 1791791990000, "waiting_on": { "who": "agent", "name": "perf" }, "watching": [{ "id": 9, "kind": "reply", "what": "perf", "since_ms": 1791791820000, "resumes": true }] },
+   "want": { "state": "continues when", "note": "perf answers", "who": "perf", "more": "", "dur": "3m", "len": "3m", "title": "continues when perf answers · 3m" }
+  },
+  {
    "why": "two pauses and an alarm: the oldest pause, 1 more; the alarm says nothing here",
    "now_ms": 1791792000000,
    "short": false,

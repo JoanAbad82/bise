@@ -12,7 +12,12 @@
 //! busy: laws wake_steers_busy, busy_steers_now), the max
 //! at the tick, a dropped agent's watches ending with it; laws
 //! wake_hit_once, wake_gone_never_hits, wake_drop_ends, wake_max_once,
-//! wake_replay_keeps in bend/laws/hub.bend.
+//! wake_replay_keeps in bend/laws/hub.bend. One kind is sb-core's own
+//! (ask-wait): a `reply` watch ([`What::Reply`]), set when an `sb ask` /
+//! `sb wait` hold ends with no reply, a pause from the ask; nothing to
+//! look at here, sb-core ends it (its reply, a stop, done, a drop, a
+//! day: laws ask_* in bend/laws/wakes.bend) and only a stop of it writes
+//! a wake line.
 //!
 //! Here, pure: what a watch looks at ([`Spec`], opaque to sb-core), the
 //! look over an injected [`Probe`] ([`look`]), the words (the hit line,
@@ -53,6 +58,10 @@ pub enum What {
     File { path: String },
     /// A launchd job (`launchctl submit -l <label>`).
     Job { label: String },
+    /// Another agent's reply to the agent's message `msg` (ask-wait):
+    /// sb-core sets it when a hold (`sb ask`, `sb wait`) ends with no
+    /// reply and ends it itself; nothing to look at.
+    Reply { to: String, msg: u64 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -71,6 +80,7 @@ impl Spec {
             What::Pid { pid, start } => json!({"kind": "pid", "pid": pid, "start": start}),
             What::File { path } => json!({"kind": "file", "path": path}),
             What::Job { label } => json!({"kind": "job", "label": label}),
+            What::Reply { to, msg } => json!({"kind": "reply", "to": to, "msg": msg}),
         };
         if let Some(t) = &self.tail {
             v["tail"] = json!(t);
@@ -88,6 +98,7 @@ impl Spec {
             "pid" => What::Pid { pid: u32::try_from(v["pid"].as_u64()?).ok()?, start: s("start") },
             "file" => What::File { path: s("path") },
             "job" => What::Job { label: s("label") },
+            "reply" => What::Reply { to: s("to"), msg: v["msg"].as_u64()? },
             _ => return None,
         };
         let tail = v["tail"].as_str().filter(|t| !t.is_empty()).map(String::from);
@@ -112,6 +123,7 @@ impl Spec {
             What::Pid { pid, .. } => format!("pid {}", pid),
             What::File { path } => path.clone(),
             What::Job { label } => format!("launchd job {}", label),
+            What::Reply { to, msg } => format!("@{}'s reply to m_{}", to, msg),
         }
     }
 }
@@ -124,6 +136,7 @@ impl Spec {
             What::Pid { .. } => WatchKind::Pid,
             What::File { .. } => WatchKind::File,
             What::Job { .. } => WatchKind::Job,
+            What::Reply { .. } => WatchKind::Reply,
         }
     }
 
@@ -153,6 +166,7 @@ impl Spec {
             What::Pid { pid, .. } => format!("pid {}", pid),
             What::File { path } => path.rsplit('/').find(|p| !p.is_empty()).unwrap_or(path).to_string(),
             What::Job { label } => format!("launchd job {}", label),
+            What::Reply { to, .. } => to.clone(),
         }
     }
 }
@@ -304,6 +318,7 @@ fn why_words(why: &str) -> String {
         "hit" => "woke you".into(),
         "max" => "ran out of time".into(),
         "gone" => "ended with its agent".into(),
+        "answered" => "answered".into(),
         w => w.to_string(),
     }
 }
@@ -421,6 +436,8 @@ pub fn look(spec: &Spec, p: &dyn Probe, costly: Costly, job_pid: Option<u32>) ->
                 Some(JobState { pid: None, last_exit }) => (Seen::Ended { rc: last_exit.map(|r| r.to_string()) }, None),
             }
         }
+        // sb-core ends it (the reply, a stop, a drop, a day)
+        What::Reply { .. } => (Seen::Running, None),
     }
 }
 
@@ -457,6 +474,7 @@ fn what(spec: &Spec) -> String {
         What::Pid { pid, .. } => format!("pid {}", pid),
         What::File { path } => path.clone(),
         What::Job { label } => format!("launchd job {}", label),
+        What::Reply { to, msg } => format!("@{}'s reply to m_{}", to, msg),
     }
 }
 
@@ -513,6 +531,9 @@ impl Hit {
 pub fn end_line(w: &Watch, why: &str, at: u64, hit: Option<&Hit>, msg: Option<u64>) -> Option<WakeFold> {
     let after_ms = hit.map_or(at.saturating_sub(w.set_at), |h| h.after_ms);
     let ev = match why {
+        // a reply watch's end other than a stop: its reply (the msg-in is
+        // the line), its agent moved on, or bise's own words (a day, a drop)
+        _ if matches!(w.spec.what, What::Reply { .. }) && !why.starts_with("stopped") => return None,
         "hit" => WakeEv::Ended,
         "max" if w.quiet => WakeEv::Expired,
         "max" => WakeEv::Still,
@@ -579,6 +600,8 @@ pub fn again(spec: &Spec, max_ms: u64, then: Option<bool>) -> String {
         What::File { path } => v.push(format!("--on-file {}", sh_word(path))),
         What::Job { label } => v.push(format!("--on-job {}", sh_word(label))),
         What::Bg { slot, .. } => v.push(format!("--on-file {}", sh_word(&format!("{}.rc", slot)))),
+        // never at a max: sb-core says its own words (wakes.bend)
+        What::Reply { msg, .. } => return format!("sb wait m_{}", msg),
     }
     if let Some(t) = &spec.tail {
         v.push(format!("--tail {}", sh_word(t)));

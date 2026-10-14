@@ -166,6 +166,7 @@ fn a_spec_survives_its_json() {
         Spec { what: What::Pid { pid: 1, start: "x".into() }, tail: Some("/l".into()), note: "n".into() },
         Spec { what: What::File { path: "/f".into() }, tail: None, note: String::new() },
         Spec { what: What::Job { label: "l".into() }, tail: None, note: String::new() },
+        Spec { what: What::Reply { to: "search".into(), msg: 12 }, tail: None, note: String::new() },
     ] {
         assert_eq!(Spec::from_json(&s.json()), Some(s));
     }
@@ -219,4 +220,19 @@ fn a_watch_end_is_one_typed_line_but_for_an_archived_agent() {
     let s = end_line(&w, "stopped by perf", 61_000, None, None).unwrap();
     assert_eq!((s.ev, s.after_ms), (WakeEv::Stopped, 60_000));
     assert_eq!(end_line(&w, "gone", 9, None, None), None);
+}
+
+/// ask-wait: a reply watch is named for the agent it waits on, and only
+/// a stop of it writes a wake line (its reply is its own line; a day or a
+/// drop, bise's message says it).
+#[test]
+fn a_reply_watch_ends_with_no_line_but_a_stop() {
+    let spec = Spec { what: What::Reply { to: "search".into(), msg: 12 }, tail: None, note: String::new() };
+    assert_eq!((spec.name(), spec.kind(), spec.label()), ("search".to_string(), bise_proto::rows::WatchKind::Reply, "@search's reply to m_12".to_string()));
+    let w = Watch { id: 3, agent: "a".into(), spec, set_at: 0, max_at: 86_400_000, quiet: false, resumes: true };
+    for why in ["answered", "moved on", "max", "gone"] {
+        assert!(end_line(&w, why, 5, None, None).is_none(), "{why}");
+    }
+    let l = end_line(&w, "stopped by a", 5, None, None).expect("a stop's line");
+    assert_eq!(bise_proto::thread::words::watch_label(l.kind, &l.what, l.noted), "search's reply");
 }

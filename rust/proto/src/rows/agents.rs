@@ -237,6 +237,9 @@ pub enum WatchKind {
     File,
     /// a launchd job (`--on-job`)
     Job,
+    /// another agent's reply, still pending after an `sb ask` / `sb wait`
+    /// hold (ask-wait): `what` is that agent's name
+    Reply,
     /// a kind this version doesn't know (a newer hub)
     #[serde(other)]
     Unknown,

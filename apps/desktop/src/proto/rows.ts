@@ -849,7 +849,7 @@ note?: string, };
 /**
  * What a watch looks at (event-wake).
  */
-export type WatchKind = "bg" | "pid" | "file" | "job" | "unknown";
+export type WatchKind = "bg" | "pid" | "file" | "job" | "reply" | "unknown";
 
 /**
  * One event an agent waits for (event-wake): the panel's `…`, the live

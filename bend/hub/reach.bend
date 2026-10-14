@@ -20,6 +20,7 @@
 import Base
 
 import ./model.bend as M
+import ./wakes.bend as WK
 
 # a message from bise in `xs` (a wake not delivered yet: law
 # wake_never_stacked)
@@ -89,3 +90,31 @@ def tells_asker(+asker: Maybe<&2, String>, +to: Maybe<&2, String>) -> Bool:
 def answer_words(+card: Nat, +page: String, +to: String, +text: String) -> String:
   String.concat(["the user answered card #", Nat.show(card), " on the page ", page, " (its pick went to @", to, "): \"",
     M.one_line(text), "\""])
+
+# ---- a reply still pending (ask-wait, core.bend replies_tick) ----
+
+def life_gone(l: M.Life) -> Bool:
+  match l:
+    case M.LArchived{}:
+      True{}
+    case _:
+      False{}
+
+# the asked agent is gone: dropped (archived), or no agent of that name
+def asked_gone.go(m: Maybe<&2, M.Agent>) -> Bool:
+  match m:
+    case None{}:
+      True{}
+    case Some{+a}:
+      life_gone(M.Agent.life(a))
+
+def asked_gone(+s: M.St, +n: String) -> Bool:
+  asked_gone.go(agent_of(s, n))
+
+# the reply watches whose asked agent is gone (dropped, or no such agent)
+def replies_orphan(+s: M.St, xs: List<&2, WK.Watch>) -> List<&2, WK.Watch>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+h, +t}:
+      Bool.pick(List<&2, WK.Watch>, WK.is_reply(h) && asked_gone(s, WK.reply_to_of(h)), h <> replies_orphan(s, t), replies_orphan(s, t))

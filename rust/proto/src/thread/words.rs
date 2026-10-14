@@ -549,6 +549,7 @@ pub fn wake_dur(ms: u64) -> String {
 pub fn watch_label(kind: crate::rows::WatchKind, what: &str, noted: bool) -> String {
     match kind {
         crate::rows::WatchKind::File if !noted => format!("{} to appear", what),
+        crate::rows::WatchKind::Reply => format!("{}'s reply", what),
         _ => what.to_string(),
     }
 }
@@ -560,6 +561,7 @@ pub fn watch_event(kind: crate::rows::WatchKind, what: &str, noted: bool) -> Str
     match kind {
         _ if noted => what.to_string(),
         crate::rows::WatchKind::File => format!("{} appears", what),
+        crate::rows::WatchKind::Reply => format!("{} answers", what),
         _ => format!("{} ends", what),
     }
 }
@@ -652,14 +654,17 @@ pub struct PauseLine {
 
 /// An agent's pause line at `now_ms`; None: nothing it continues on (an
 /// alarm is no pause and says nothing here, see [`alarms`]). A reply it
-/// waits on (`waiting_on` an agent) runs since its status; its watches
-/// that resume it count only while it is idle. TS twin: wake.ts
+/// is held on (`waiting_on` an agent, inside its turn) runs since the ask
+/// when an earlier hold left its reply watch (ask-wait), else since its
+/// status; its watches that resume it (a reply still pending after the
+/// hold among them) count only while it is idle. TS twin: wake.ts
 /// `pauseLine`; both read fixtures/wait_words.json.
 pub fn pause_line(a: &crate::rows::Agent, now_ms: u64, short: bool) -> Option<PauseLine> {
-    use crate::rows::{Status, WaitingOn};
+    use crate::rows::{Status, WaitingOn, WatchKind};
     let state = "continues when".to_string();
     if let Some(WaitingOn::Agent { name }) = &a.waiting_on {
-        let len = wait_len(now_ms.saturating_sub(a.since_ms), short);
+        let asked = a.watching.iter().filter(|w| w.kind == WatchKind::Reply && w.what == *name).map(|w| w.since_ms).min();
+        let len = wait_len(now_ms.saturating_sub(asked.unwrap_or(a.since_ms).min(a.since_ms)), short);
         let note = format!("{} answers", name);
         let title = format!("{} {} · {}", state, note, len);
         return Some(PauseLine { state, note, who: name.clone(), more: String::new(), dur: len.clone(), len, title });
@@ -682,6 +687,7 @@ pub fn pause_of(watching: &[crate::rows::AgentWatch], now_ms: u64, short: bool) 
     let dur = |w: &AgentWatch| match w.kind {
         _ if short => len(w),
         WatchKind::Bg | WatchKind::Pid => format!("running for {}", len(w)),
+        WatchKind::Reply => len(w),
         _ => format!("for {}", len(w)),
     };
     let event = |w: &AgentWatch| watch_event(w.kind, &w.what, w.noted);
@@ -690,7 +696,9 @@ pub fn pause_of(watching: &[crate::rows::AgentWatch], now_ms: u64, short: bool) 
         n => format!(" and {} more", n),
     };
     let title = ws.iter().map(|w| format!("{} {} · {}", state, event(w), dur(w))).collect::<Vec<_>>().join("\n");
-    Some(PauseLine { note: event(first), who: String::new(), more, dur: dur(first), len: len(first), title, state })
+    // a reply's line names the agent it waits on (its name opens it)
+    let who = if first.kind == WatchKind::Reply { first.what.clone() } else { String::new() };
+    Some(PauseLine { note: event(first), who, more, dur: dur(first), len: len(first), title, state })
 }
 
 /// An alarm in the right bar's `scheduled & watching` (agent-waiting-states
@@ -814,6 +822,7 @@ mod tests {
         // what a watch waits for, after `continues when` / `if`; a note says it itself
         assert_eq!(watch_event(WatchKind::Bg, "cargo bench", false), "cargo bench ends");
         assert_eq!(watch_event(WatchKind::File, "build.rc", false), "build.rc appears");
+        assert_eq!(watch_event(WatchKind::Reply, "search", false), "search answers");
         assert_eq!(watch_event(WatchKind::File, "the nightly gate goes red", true), "the nightly gate goes red");
         let f = |ev, kind, what: &str, rc, after_ms| WakeFold { id: 1, ev, kind, what: what.into(), noted: false, rc, after_ms, tail: Vec::new(), msg: None, agent: String::new() };
         let n = |ev| WakeFold { noted: true, ..f(ev, WatchKind::File, "the reindex", Some(101), 0) };
