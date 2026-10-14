@@ -5,8 +5,11 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
    'popover' vibrancy panel with its own shadow and rounded corners, filling the whole window, so
    the page has no margin, sizes itself to the view (the window follows it: onSize, the glass rect
    = the page), and paints no background, blur, shadow or big corner of its own: the real glass
-   shows through (a CSS backdrop-filter sees nothing of the apps behind a window anyway). */
-.b-capsule { position: relative; width: fit-content; padding: 0; }
+   shows through (a CSS backdrop-filter sees nothing of the apps behind a window anyway). The ds's
+   own .b-capsule (ds/css/capsule.css: r 26, overlay fill, e-3 shadow) is undone here: inside the
+   native rounded glass it drew a second rounded card and a clipped square shadow (his corner card
+   shot, 2026-10-14). The only rounded edge is the window's. */
+.b-capsule { position: relative; width: fit-content; padding: 0; border-radius: 0; background: transparent; backdrop-filter: none; box-shadow: none; }
 .b-cap-glass, .b-cap-talk, .b-cap-answer { width: 640px; box-sizing: border-box; }
 .b-capsule .b-spot, .b-capsule .b-menu { background: transparent; backdrop-filter: none; box-shadow: none; border-radius: 0; }
 .b-capsule .b-spot { width: 640px; }
@@ -32,25 +35,27 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
   padding: var(--s-3) var(--s-4) var(--s-3) calc(var(--s-4) + var(--s-8) + var(--s-3));
   font: var(--t-13)/1.45 var(--font-ui);
 }
-/* talking: the last 3 lines of his live words; older lines go up out of view */
-.b-cap-talk .words { display: flex; flex-direction: column; justify-content: flex-end; max-height: calc(3 * 1.45em); overflow: hidden; }
-.b-cap-talk .words > div { flex: none; min-height: var(--s-8); display: flex; align-items: center; }
-/* answering: the card grows to half the screen (--cap-max), then the words scroll */
-.b-cap-answer { display: flex; flex-direction: column; max-height: var(--cap-max, 50vh); }
-.b-cap-answer .t { flex: 0 1 auto; min-height: 0; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+/* talking and answering: never a cropped message. The card starts at its one-line size, grows
+   upward to half the screen (--cap-max) with his words or the answer, then the words scroll
+   (Capsule.tsx useFollow: the newest line followed unless he scrolled up) */
+.b-cap-talk, .b-cap-answer { display: flex; flex-direction: column; max-height: var(--cap-max, 50vh); }
+.b-cap-talk .words, .b-cap-answer .t { flex: 0 1 auto; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; }
+.b-cap-talk .words > div { min-height: var(--s-8); display: flex; align-items: center; }
+.b-cap-talk > *:not(.words) { flex: none; }
+.b-cap-answer .t { white-space: pre-wrap; user-select: text; }
 /* scrolled, the line under the top edge fades out over 16 px, as under the thread's head (designer
    m_21358); at the top of the text, no fade */
-.b-cap-answer .t[data-scrolled] { -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); }
+.b-cap-talk .words[data-scrolled], .b-cap-answer .t[data-scrolled] { -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); }
 /* its markdown in the thread's colors (.b-md, ds md.css): inline code green with no fill, never the
    chip tint (designer m_22394) */
 .b-cap-answer .t code { background: none; }
 /* the overlay scrollbar: 4 px, text-3, only while he scrolls, in the card's right padding (the
    words keep their width: the box reaches 12 px into the padding, 8 px padding + the 4 px bar) */
-.b-capsule.corner .b-cap-answer .t { margin-right: calc(-1 * var(--s-3)); padding-right: var(--s-2); }
-.b-cap-answer .t::-webkit-scrollbar { width: 4px; background: transparent; }
-.b-cap-answer .t::-webkit-scrollbar-track { background: transparent; }
-.b-cap-answer .t::-webkit-scrollbar-thumb { border-radius: 2px; background: transparent; }
-.b-cap-answer .t[data-scrolling]::-webkit-scrollbar-thumb { background: var(--c-text-3); }
+.b-capsule.corner .b-cap-answer .t, .b-capsule.corner .b-cap-talk .words { margin-right: calc(-1 * var(--s-3)); padding-right: var(--s-2); }
+.b-cap-answer .t::-webkit-scrollbar, .b-cap-talk .words::-webkit-scrollbar { width: 4px; background: transparent; }
+.b-cap-answer .t::-webkit-scrollbar-track, .b-cap-talk .words::-webkit-scrollbar-track { background: transparent; }
+.b-cap-answer .t::-webkit-scrollbar-thumb, .b-cap-talk .words::-webkit-scrollbar-thumb { border-radius: 2px; background: transparent; }
+.b-cap-answer .t[data-scrolling]::-webkit-scrollbar-thumb, .b-cap-talk .words[data-scrolling]::-webkit-scrollbar-thumb { background: var(--c-text-3); }
 .b-cap-answer .more { flex: none; align-self: flex-start; margin-top: var(--s-2); padding: 0; border: 0; background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); cursor: default; }
 .b-cap-answer .more:hover { color: var(--c-text); }
 .b-cap-answer .b-cap-keys { flex: none; }

@@ -11,6 +11,8 @@ import {
   type CSSProperties,
   type JSX,
   type ReactNode,
+  type RefObject,
+  type UIEvent,
 } from "react";
 import { shownName } from "@/agents/model";
 import { Menu, MenuItem, MenuSep, Press, Row } from "@/ds";
@@ -203,7 +205,8 @@ export function Capsule(p: CapsuleProps): JSX.Element {
       {v.kind === "talk" && (
         <div className="b-cap-talk" data-testid="capsule.talk" data-glass>
           {v.phase === "over" ? (
-            <>
+            // one block: the card is a flex column now (capsule.css), its words one item
+            <div className="said">
               {v.said}
               {v.link !== undefined && (
                 <>
@@ -219,18 +222,10 @@ export function Capsule(p: CapsuleProps): JSX.Element {
                   </Press>
                 </>
               )}
-            </>
-          ) : (
-            // the last 3 lines of his live words (capsule.css: the older ones go up out of view)
-            <div className="words" data-testid="capsule.talk.words">
-              <div>
-                {p.heard !== ""
-                  ? p.heard
-                  : v.phase === "listen"
-                    ? W.listening
-                    : W.thinking}
-              </div>
             </div>
+          ) : (
+            // all his live words: the card grows to half the screen, then they scroll
+            <TalkWords heard={p.heard} phase={v.phase} />
           )}
           {p.shot != null && (
             <ShotRow shot={p.shot} listening={v.phase === "listen"} onDrop={p.onShotDrop ?? (() => undefined)} />
@@ -273,17 +268,18 @@ export function Capsule(p: CapsuleProps): JSX.Element {
 /** The corner answer's scrollbar stays this long after the last scroll, then goes. */
 export const SCROLLBAR_LINGER_MS = 700;
 
-function Answer({
-  answer,
-  onOpen,
-}: {
-  answer: SpotAnswer | null;
-  onOpen: () => void;
-}): JSX.Element {
-  const a = answer === null ? null : answerLines(answer.text);
-  // the corner card grows upward line by line to half the screen, then its words scroll: the
-  // newest line stays in view while he is at the bottom; scrolled up, it never moves (ambient's
-  // text-appearing, m_12403)
+/**
+ * The corner card's words, his and bise's: the card grows upward line by line to half the screen
+ * (--cap-max), then its words scroll. The newest line stays in view while he is at the bottom;
+ * scrolled up, it never moves (ambient's text-appearing, m_12403). Scrolled, the top line fades
+ * (data-scrolled); the overlay scrollbar shows only while he scrolls (data-scrolling). `text`:
+ * what grows. `over`: the words don't all fit.
+ */
+function useFollow(text: string | undefined): {
+  box: RefObject<HTMLDivElement | null>;
+  over: boolean;
+  onScroll: (e: UIEvent<HTMLDivElement>) => void;
+} {
   const box = useRef<HTMLDivElement>(null);
   const atEnd = useRef(true);
   const lastTop = useRef(0);
@@ -302,7 +298,7 @@ function Answer({
     if (el === null) return;
     if (atEnd.current) el.scrollTop = el.scrollHeight;
     setOver(el.scrollHeight > el.clientHeight + 1);
-  }, [a?.shown]);
+  }, [text]);
   // the box changes size after that effect too ('the rest in bise' showing under it, the card
   // growing to its cap): while he is at the bottom, the newest line stays in view
   useEffect(() => {
@@ -317,6 +313,44 @@ function Answer({
       ro.disconnect();
     };
   }, []);
+  const onScroll = (e: UIEvent<HTMLDivElement>): void => {
+    const el = e.currentTarget;
+    // only his scrolling up lets go of the bottom: a box that shrank under a follow (the
+    // 'rest in bise' line appearing) leaves a gap with no scroll up, and keeps following
+    const up = el.scrollTop < lastTop.current - 1;
+    lastTop.current = el.scrollTop;
+    atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4 || (atEnd.current && !up);
+    // scrolled: the top line fades out over 16 px instead of being cut (capsule.css)
+    el.toggleAttribute("data-scrolled", el.scrollTop > 0);
+    el.toggleAttribute("data-scrolling", true);
+    if (scrolling.current !== null) window.clearTimeout(scrolling.current);
+    scrolling.current = window.setTimeout(() => {
+      el.toggleAttribute("data-scrolling", false);
+      scrolling.current = null;
+    }, SCROLLBAR_LINGER_MS);
+  };
+  return { box, over, onScroll };
+}
+
+/** His live words in the corner card: all of them, never cropped; past half the screen they scroll (useFollow). */
+function TalkWords({ heard, phase }: { heard: string; phase: "listen" | "think" }): JSX.Element {
+  const { box, onScroll } = useFollow(heard);
+  return (
+    <div ref={box} className="words" data-testid="capsule.talk.words" onScroll={onScroll}>
+      <div>{heard !== "" ? heard : phase === "listen" ? W.listening : W.thinking}</div>
+    </div>
+  );
+}
+
+function Answer({
+  answer,
+  onOpen,
+}: {
+  answer: SpotAnswer | null;
+  onOpen: () => void;
+}): JSX.Element {
+  const a = answer === null ? null : answerLines(answer.text);
+  const { box, over, onScroll } = useFollow(a?.shown);
   return (
     <div className="b-cap-answer" data-testid="capsule.answer" aria-live="polite" data-glass>
       <div
@@ -324,22 +358,7 @@ function Answer({
         // b-md: the thread's markdown colors (ds md.css: code green, bold pale pink; designer m_22394)
         className="t b-md"
         data-testid="capsule.answer.scroll"
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          // only his scrolling up lets go of the bottom: a box that shrank under a follow (the
-          // 'rest in bise' line appearing) leaves a gap with no scroll up, and keeps following
-          const up = el.scrollTop < lastTop.current - 1;
-          lastTop.current = el.scrollTop;
-          atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4 || (atEnd.current && !up);
-          // scrolled: the top line fades out over 16 px instead of being cut (capsule.css)
-          el.toggleAttribute("data-scrolled", el.scrollTop > 0);
-          el.toggleAttribute("data-scrolling", true);
-          if (scrolling.current !== null) window.clearTimeout(scrolling.current);
-          scrolling.current = window.setTimeout(() => {
-            el.toggleAttribute("data-scrolling", false);
-            scrolling.current = null;
-          }, SCROLLBAR_LINGER_MS);
-        }}
+        onScroll={onScroll}
       >
         <LiveText
           text={a?.shown ?? ""}
