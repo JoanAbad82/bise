@@ -6,10 +6,12 @@ Two parts:
    GitHub API becomes {version, size, date, notes}; the beta shows only when
    it is newer than stable; a 404 is "soon" (no desktop release yet), a failed
    call is "unknown" (the button stays); the notes are escaped.
-2. site/download.html rendered by headless Chrome against the fake feeds in
-   tests/fixtures/site-download/ (ready: stable + a newer beta; soon: both
-   tags 404), served next to site/ by a local server. Skipped when Chrome is
-   not installed. SHOTS=<dir> also saves a screenshot of each.
+2. site/download.html (designer's page) rendered by headless Chrome against
+   the fake feeds in tests/fixtures/site-download/ (ready: stable + a newer
+   beta; soon: both tags 404; down: GitHub answers 503), served next to site/
+   by a local server: its data-slot spots filled, the beta column off unless
+   newer, and at 390 px wide nothing past the right edge (designer m_25237).
+   Skipped when Chrome is not installed. SHOTS=<dir> also saves screenshots.
 
 The fixtures follow the feed dist-ci and dist-updater agreed on (m_25185,
 m_25204): the rolling tags desktop-latest and desktop-beta, each release
@@ -17,13 +19,17 @@ named after its version, its body the notes, a bise-mac-arm64.dmg asset.
 
 Run: python3 tests/site_download_test.py
 """
+import html
 import http.server
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import threading
+import urllib.parse
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SITE = os.path.join(REPO, "site")
@@ -79,8 +85,44 @@ console.log("unit ok");
 """
 
 
+FRAME = """<!doctype html><meta charset="utf-8"><body style="margin:0">
+<iframe id="f" src="%(src)s" style="width:%(w)dpx;height:900px;border:0"></iframe>
+<pre id="out">pending</pre>
+<script>
+const f = document.getElementById("f");
+const look = () => {
+  const d = f.contentDocument;
+  if (!d || !d.body || d.body.dataset.fed !== "1") return setTimeout(look, 100);
+  const wide = [...d.querySelectorAll("body *")].filter((el) => {
+    const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+    return r.width && cs.position !== "fixed" && r.right > d.documentElement.clientWidth + 1 && !el.closest(".install, .stage, .shot, .dmg");
+  }).slice(0, 5).map((el) => el.tagName.toLowerCase() + "." + el.className + " right=" + Math.round(el.getBoundingClientRect().right));
+  document.getElementById("out").textContent = JSON.stringify({ scroll: d.documentElement.scrollWidth, client: d.documentElement.clientWidth, wide });
+};
+f.onload = look;
+</script>"""
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
-    """site/ at /, the fixtures at /__fixtures/, like vercel's cleanUrls."""
+    """site/ at /, the fixtures at /__fixtures/ (down/: GitHub failing), a
+    phone-width frame at /__frame, like vercel's cleanUrls."""
+
+    def do_GET(self):
+        path = self.path.split("?", 1)[0]
+        if path.startswith("/__fixtures/down/"):
+            self.send_error(503)
+            return
+        if path == "/__frame":
+            q = dict(p.split("=", 1) for p in self.path.split("?", 1)[1].split("&"))
+            src = urllib.parse.unquote(q["src"])
+            data = (FRAME % {"src": src, "w": int(q["w"])}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        super().do_GET()
 
     def translate_path(self, path):
         path = path.split("?", 1)[0]
@@ -102,21 +144,19 @@ def unit():
     print("ok   download.js: feed -> view, versions, sizes, notes escaped")
 
 
-def render(port, scenario, shots, profile):
-    url = f"http://127.0.0.1:{port}/download?api=/__fixtures/{scenario}"
+def chrome(profile, *args, size="1280,1600"):
     base = [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--user-data-dir={profile}",
-            "--virtual-time-budget=5000", "--window-size=1280,1600"]
-    r = subprocess.run(base + ["--dump-dom", url], capture_output=True, text=True, timeout=60)
-    dom = r.stdout
-    if shots:
-        subprocess.run(base + [f"--screenshot={os.path.join(shots, scenario + '.png')}", url],
-                       capture_output=True, timeout=60)
-    return dom
+            "--virtual-time-budget=8000", f"--window-size={size}"]
+    return subprocess.run(base + list(args), capture_output=True, text=True, timeout=90).stdout
+
+
+def page(port, scenario):
+    return f"http://127.0.0.1:{port}/download?api=/__fixtures/{scenario}&still"
 
 
 def check(dom, scenario, want, absent):
-    if f'data-state="{"ready" if scenario == "ready" else "soon"}"' not in dom:
-        sys.exit(f"FAIL {scenario}: the page did not finish (no data-state)\n{dom[-2000:]}")
+    if 'data-fed="1"' not in dom:
+        sys.exit(f"FAIL {scenario}: the page did not finish (no data-fed)\n{dom[-2000:]}")
     for w in want:
         if w not in dom:
             sys.exit(f"FAIL {scenario}: missing {w!r}")
@@ -124,6 +164,20 @@ def check(dom, scenario, want, absent):
         if a in dom:
             sys.exit(f"FAIL {scenario}: should not show {a!r}")
     print(f"ok   render {scenario}")
+
+
+def phone(port, scenario, profile):
+    """390 px wide: nothing reaches past the screen's right edge (the
+    command's box, the screenshots and the DMG drawing scale or scroll inside)."""
+    src = urllib.parse.quote(page(port, scenario), safe="")
+    dom = chrome(profile, "--dump-dom", f"http://127.0.0.1:{port}/__frame?w=390&src={src}")
+    m = re.search(r'<pre id="out">(.*?)</pre>', dom, re.S)
+    if not m or m.group(1) == "pending":
+        sys.exit(f"FAIL phone {scenario}: the frame never finished")
+    r = json.loads(html.unescape(m.group(1)))
+    if r["scroll"] > r["client"] or r["wide"]:
+        sys.exit(f"FAIL phone {scenario}: wider than 390 ({r})")
+    print(f"ok   phone {scenario}: no x scroll at 390")
 
 
 def main():
@@ -137,17 +191,23 @@ def main():
     profile = tempfile.mkdtemp(prefix="site-download-")
     try:
         port = srv.server_address[1]
-        dom = render(port, "ready", shots, profile)
-        check(dom, "ready",
-              ['<a href="https://github.com/gvergnaud/bise/releases/tag/desktop-v2026.10.1">2026.10.1</a>',
-               "205 MB", "Oct 12, 2026", '<section id="new">', "<code>⌘K</code> opens any agent",
-               "and 2 more in the release notes", '<section id="beta">', '<b id="beta-v">2026.10.3</b>',
-               ' (206 MB)', 'href="/download/mac"', 'href="/download/mac-beta"'],
-              [])
-        dom = render(port, "soon", shots, profile)
-        check(dom, "soon",
-              ['<p class="note" id="soon">', 'id="dl" href="/download/mac" hidden', "curl -fsSL bise.dev/install | sh"],
-              ['<section id="new">', '<section id="beta">'])
+        beta_on = '<div class="way beta" data-slot="beta">'
+        beta_off = '<div class="way beta" data-slot="beta" data-off="">'
+        check(chrome(profile, "--dump-dom", page(port, "ready")), "ready",
+              ['data-state="ready"', '<span class="nw" data-slot="version">2026.10.1</span>',
+               '<span class="nw" data-slot="size">205 MB</span>', '<span data-slot="date">Oct 12, 2026</span>',
+               "<li><code>⌘K</code> opens any agent, live or archived</li>",
+               'href="https://github.com/gvergnaud/bise/releases/tag/desktop-v2026.10.1">and 2 more in the release notes</a>',
+               beta_on, '<span data-slot="beta-version">2026.10.3</span>', '<span data-slot="beta-size">206 MB</span>',
+               'href="/download/mac"', 'href="/download/mac-beta"'],
+              [beta_off, "pages open next to the thread"])  # the 7th note: 6 max
+        check(chrome(profile, "--dump-dom", page(port, "soon")), "soon", ['data-state="soon"', beta_off], [beta_on])
+        check(chrome(profile, "--dump-dom", page(port, "down")), "down", ['data-state="unknown"', beta_off], [beta_on])
+        for s in ("ready", "soon"):
+            phone(port, s, profile)
+        if shots:
+            for s in ("ready", "soon"):
+                chrome(profile, f"--screenshot={os.path.join(shots, s + '.png')}", page(port, s), size="1280,3000")
     finally:
         srv.shutdown()
         shutil.rmtree(profile, ignore_errors=True)
