@@ -31,7 +31,7 @@ export function tidy(segs: readonly Segment[]): Segment[] {
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
 const isChip = (x: unknown): x is Chip =>
-  isObj(x) && typeof x.n === 'number' && (x.kind === 'image' || x.kind === 'paste' || x.kind === 'quote' || x.kind === 'artifact');
+  isObj(x) && typeof x.n === 'number' && (x.kind === 'image' || x.kind === 'paste' || x.kind === 'quote' || x.kind === 'artifact' || x.kind === 'anchor');
 
 function isSegment(x: unknown): x is Segment {
   if (!isObj(x)) return false;

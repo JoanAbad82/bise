@@ -14,6 +14,7 @@ import { useAllArtifacts } from './hooks';
 import { ArtifactRows, rowKey, useLook } from './List';
 import { usePutInMessage } from './Open';
 import { useGoArtifact } from './leave';
+import { AddButton, AddDrop, useAddPlace } from './Drops';
 import { agentsOf, ALL, filterItems, KIND_FILTERS, keyOf, splitArchived, type Filter, type Item, type KindFilter } from './model';
 import './artifacts.css';
 
@@ -32,6 +33,7 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   const { live, archived } = splitArchived(kept);
   const items = archivedOn ? archived : live;
   const projectName = projects.find((p) => p.project === f.project)?.name ?? f.project;
+  const place = useAddPlace(f.project);
   // a browser-only one (a PR, a link) opens his browser, the list keeps its selection (leave.ts)
   const goArtifact = useGoArtifact();
   const open = (it: Item) => {
@@ -95,7 +97,11 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   return (
     <section ref={ref} tabIndex={-1} className="art-screen" data-testid="artifacts.screen" data-archived={archivedOn || undefined} onKeyDown={onKeyDown}>
       <header className="art-head">
-        <div className="art-h1">{archivedOn ? 'artifacts · archived' : 'artifacts'}</div>
+        <div className="art-h1-row">
+          <div className="art-h1">{archivedOn ? 'artifacts · archived' : 'artifacts'}</div>
+          {/* '+ add' always there (designer m_23898): the picked project's main, else bise's home */}
+          <AddButton place={place} testId="artifacts.add" />
+        </div>
         <div className="art-h2">{archivedOn ? 'what you or your agents put away' : 'what your agents made'}</div>
       </header>
       <div className="art-filters">
@@ -139,15 +145,18 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
           <Field slash placeholder="search artifacts" value={f.q} onChange={(e) => { setF({ ...f, q: e.currentTarget.value }); }} onKeyDown={searchKey} testId="artifacts.search" />
         </span>
       </div>
-      {archivedOn && items.length === 0 ? (
-        <div className="art-empty" data-testid="artifacts.none">nothing archived. esc goes back.</div>
-      ) : all.length === 0 || (live.length === 0 && archived.length > 0 && f.q === '' && f.kinds.length === 0 && f.agent === '') ? (
-        <div className="art-empty" data-testid="artifacts.empty">nothing yet. when an agent makes a page, a doc or a file for you, it lands here.</div>
-      ) : items.length === 0 ? (
-        <div className="art-empty" data-testid="artifacts.none">nothing matches. clear a filter to see more.</div>
-      ) : (
-        <ArtifactRows items={items} now={now} sel={sel} onSel={setSel} onOpen={open} onLook={look} onPut={putIt} form="screen" testId="artifacts.list" />
-      )}
+      {/* a drop on the list adds there too, the dashed zone only while he drags files */}
+      <AddDrop place={place} testId="artifacts.drop">
+        {archivedOn && items.length === 0 ? (
+          <div className="art-empty" data-testid="artifacts.none">nothing archived. esc goes back.</div>
+        ) : all.length === 0 || (live.length === 0 && archived.length > 0 && f.q === '' && f.kinds.length === 0 && f.agent === '') ? (
+          <div className="art-empty" data-testid="artifacts.empty">nothing yet. when an agent makes a page, a doc or a file for you, it lands here.</div>
+        ) : items.length === 0 ? (
+          <div className="art-empty" data-testid="artifacts.none">nothing matches. clear a filter to see more.</div>
+        ) : (
+          <ArtifactRows items={items} now={now} sel={sel} onSel={setSel} onOpen={open} onLook={look} onPut={putIt} form="screen" testId="artifacts.list" />
+        )}
+      </AddDrop>
       {!archivedOn && archived.length > 0 && (
         <Press look="art-archived" onClick={() => { showArchived(true); }} data-testid="artifacts.archived">
           {archived.length} archived

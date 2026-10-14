@@ -129,3 +129,22 @@
   font: var(--t-12) / var(--h-row-tight, 24px) var(--font-mono);
   pointer-events: none;
 }
+
+/* giving files (give.ts, designer's pick 4 m_23868): the dashed zone over a thread's rows or an
+   artifacts list, only while he drags files; '+ add' in a list's head */
+.art-add-drop { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.art-give {
+  position: absolute;
+  inset: var(--s-2);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--c-accent-line);
+  border-radius: var(--r-3);
+  background: color-mix(in srgb, var(--c-accent-soft) 85%, transparent);
+}
+.art-give-words { pointer-events: none; padding: 0 var(--s-4); text-align: center; font: 500 var(--t-14) var(--font-ui); color: var(--c-accent); }
+.art-add { flex: none; display: inline-flex; }
+.art-h1-row { display: flex; align-items: center; gap: var(--s-3); }
+.art-h1-row .art-add { margin-left: auto; }

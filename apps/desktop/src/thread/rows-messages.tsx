@@ -118,7 +118,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   // a part of a kind this window doesn't know (a newer hub's): drawn from its text, never empty
   const drawn = drawnParts(e.parts);
   const view = drawn !== null ? youView(drawn) : null;
-  const quotes = view !== null ? view.quotes.map((q) => ({ source: q.from, text: q.text, n: q.n, about: q.file !== '' ? quoteAbout(q.from, q.text, q) : '' })) : [];
+  const quotes = view !== null ? view.quotes.map((q) => ({ source: q.from, text: q.text, n: q.n, about: q.about ?? (q.file !== '' ? quoteAbout(q.from, q.text, q) : '') })) : [];
   const text = view !== null ? view.words : stripContext(e.text);
   const fold = foldOf(text);
   const toggle = () => {

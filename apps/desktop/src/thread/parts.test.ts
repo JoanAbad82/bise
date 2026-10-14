@@ -42,6 +42,19 @@ describe('his message from its parts (msg-parts)', () => {
     expect(partsGist([text('see '), { kind: 'quote', from: 'main', text: 'q', n: 1 }, text(' and '), quote('perf', 'r')])).toBe('❝ perf see ❝ 1 and');
   });
 
+  it("a part of an artifact (Part::Anchor): its number in his words, a quote line that says where (said.rs anchor_words)", () => {
+    const cell: Part = { kind: 'anchor', artifact: 'q3-xlsx', version: 4, anchor: { kind: 'cell', sheet: 'Q3', range: 'B4:D9' }, quote: '1200 1350', n: 1 };
+    const slide: Part = { kind: 'anchor', artifact: 'deck', version: 2, anchor: { kind: 'slide', slide: 5 } };
+    const v = youView([text('why is '), cell, text(' so low?'), slide]);
+    expect(v.words).toBe('why is ❝ 1 so low?');
+    expect(v.quotes).toEqual([
+      { from: '', text: '1200 1350', file: '', new: '', old: '', about: 'Q3!B4:D9 · q3-xlsx v4', n: 1 },
+      { from: '', text: 'slide 5', file: '', new: '', old: '', about: 'slide 5 · deck v2' },
+    ]);
+    expect(drawnParts([cell])).not.toBeNull();
+    expect(partsGist([text('why is '), cell, slide])).toBe('why is ❝ 1❝ slide 5 · deck v2');
+  });
+
   it('plain words are his words; a part from a newer client draws nothing', () => {
     expect(youView([text('ship it')])).toEqual({ quotes: [], words: 'ship it', pastes: [], images: [], files: [] });
     expect(youView([text('a'), { kind: 'video', url: 'x' } as unknown as Part]).words).toBe('a');

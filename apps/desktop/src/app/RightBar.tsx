@@ -11,6 +11,7 @@ import { markTip } from './tipwords';
 import type { Agent } from '@/proto';
 import { useAllArtifacts } from '@/artifacts';
 import { LEAVES, useGoArtifact } from '@/artifacts/leave';
+import { AddButton, AddDrop, useAddPlace } from '@/artifacts/Drops';
 import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
 import { useCards, useComputerLive, usePlaces, useStore, type Store } from '@/store';
@@ -87,6 +88,7 @@ function Section({
   noFold = false,
   count,
   onAll,
+  act,
   children,
 }: {
   id: SectionId;
@@ -98,6 +100,8 @@ function Section({
   summary: string;
   noFold?: boolean;
   onAll: () => void;
+  /** a control in the head before 'all ›' (ARTIFACTS' '+ add') */
+  act?: ReactNode;
   children: (r: BarRow) => ReactNode;
 }) {
   const [folded, toggle] = useFolded(id, id === 'archived');
@@ -121,6 +125,7 @@ function Section({
             </span>
           )}
         </Press>
+        {act}
         {/* nothing to open at 0: the head stays, 'all ›' goes (designer m_20272 (4)) */}
         {rows.length > 0 && (
           <Act onClick={onAll} testId={`app.right.${id}.all`}>
@@ -360,6 +365,8 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   // a live row's pause under a minute ends on seconds: the second clock while one does
   const now = useNowFor((t) => agents.some((x) => !x.a.archived && pauseInSeconds(x.a, t)));
   const artifacts = useAllArtifacts(all ? undefined : project);
+  // where '+ add' and a drop on ARTIFACTS put a file: this project's main, bise's home on bise's own
+  const addHere = useAddPlace(project);
   const tasks = useAllScheduled(all ? undefined : project);
   const places = usePlaces(project);
   const cards = useCards(project);
@@ -439,18 +446,22 @@ export function RightBar({ project, name, over }: { project: string; name: strin
         >
           {(r) => <Row key={r.key} r={r} onOpen={() => { openAgent(r.project, r.agent ?? ''); }} />}
         </Section>
-        <Section
-          id="artifacts"
-          title="ARTIFACTS"
-          rows={made}
-          cap={5}
-          summary={made.some((r) => r.end === 'new') ? `${String(made.filter((r) => r.end === 'new').length)} new` : ''}
-          onAll={() => {
-            router.go({ screen: 'artifacts', project });
-          }}
-        >
-          {(r) => <Row key={r.key} r={r} onOpen={() => { goArtifact(r.project, r.id ?? ''); }} />}
-        </Section>
+        {/* a drop on the section adds a file there, '+ add' in its head (designer's office-artifacts pick 4) */}
+        <AddDrop place={addHere} testId="app.right.artifacts.drop">
+          <Section
+            id="artifacts"
+            title="ARTIFACTS"
+            rows={made}
+            cap={5}
+            summary={made.some((r) => r.end === 'new') ? `${String(made.filter((r) => r.end === 'new').length)} new` : ''}
+            onAll={() => {
+              router.go({ screen: 'artifacts', project });
+            }}
+            act={<AddButton place={addHere} testId="app.right.artifacts.add" />}
+          >
+            {(r) => <Row key={r.key} r={r} onOpen={() => { goArtifact(r.project, r.id ?? ''); }} />}
+          </Section>
+        </AddDrop>
         <Section
           id="scheduled"
           title="SCHEDULED & WATCHING"

@@ -12,13 +12,17 @@
 
 import type { Part } from '@/proto';
 import { NO_SPACE_BEFORE } from '@/proto/chips.gen';
+import type { Anchor } from '@/proto/anchor';
+import { anchorLabel, anchorWhere } from './anchor';
 
 export type Chip =
   | { readonly kind: 'image'; readonly n: number; readonly path: string; readonly name: string; readonly thumb?: string; readonly w?: number; readonly h?: number; readonly bytes?: number }
   | { readonly kind: 'paste'; readonly n: number; readonly text: string }
   | { readonly kind: 'quote'; readonly n: number; readonly text: string; readonly from: string; readonly at?: QuoteAt }
   | { readonly kind: 'file'; readonly n: number; readonly path: string; readonly bytes?: number; readonly icon?: string }
-  | { readonly kind: 'artifact'; readonly n: number; readonly id: string; readonly title: string; readonly url: string };
+  | { readonly kind: 'artifact'; readonly n: number; readonly id: string; readonly title: string; readonly url: string }
+  // a part of an artifact picked in the side panel (plan §9b): sent as Part::Anchor with its number
+  | { readonly kind: 'anchor'; readonly n: number; readonly artifact: string; readonly version: number; readonly rev?: number; readonly anchor: Anchor; readonly quote?: string; readonly file: string };
 
 /** Where in a diff a quote comes from (quote.rs Where): the file, its lines in the new file and the old one ('12-14'; '' none). */
 export interface QuoteAt {
@@ -78,6 +82,7 @@ export function chipLabel(c: Chip): string {
     case 'paste':
       return `▤ ${c.n}`;
     case 'quote':
+    case 'anchor':
       return `❝ ${c.n}`;
     case 'file':
       return `[File #${String(c.n)}]`;
@@ -118,6 +123,8 @@ export function chipStrip(c: Chip): string {
       return `▯ ${String(c.n)}  ${fileName(c.path)}${c.bytes === undefined ? '' : `  ${sizeText(c.bytes)}`}`;
     case 'artifact':
       return `${chipLabel(c)}  ${c.url}`;
+    case 'anchor':
+      return `${chipLabel(c)} ${anchorLabel(c.anchor)}  ${anchorWhere(c.file, c.version)}`;
   }
 }
 
@@ -145,6 +152,9 @@ export function attachRow(c: Chip, home = ''): { readonly name: string; readonly
     }
     case 'artifact':
       return null;
+    case 'anchor':
+      // designer's row: '❝ Summary!C4:E4  q3-forecast.xlsx · v4'
+      return { name: anchorLabel(c.anchor), info: anchorWhere(c.file, c.version) };
   }
 }
 
@@ -198,6 +208,16 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
       spaceNext = true;
       continue;
     }
+    if (c.kind === 'anchor') {
+      // a part of an artifact: at its place with its number, like a quote (art-notes' Part::Anchor);
+      // the hub checks the artifact and version, and records the note sent
+      const pad = /\S$/u.test(body) ? ' ' : '';
+      body += pad + chipLabel(c);
+      say(pad);
+      bodyParts.push(anchorPart(c));
+      spaceNext = true;
+      continue;
+    }
     if (c.kind === 'paste') {
       body += chipLabel(c);
       bodyParts.push({ kind: 'paste', n: c.n, text: c.text });
@@ -222,6 +242,11 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
   // parts only when they say more than words (the TUI's of_parts); words alone stay text
   const typed = bodyParts.some((p) => p.kind !== 'text');
   return typed ? { text, files, parts: trimParts(bodyParts) } : { text, files };
+}
+
+/** An anchor chip as its part: {kind:'anchor', artifact, version, anchor, quote?, n}. Pure. */
+function anchorPart(c: Extract<Chip, { kind: 'anchor' }>): Part {
+  return { kind: 'anchor', artifact: c.artifact, version: c.version, ...(c.rev === undefined ? {} : { rev: c.rev }), anchor: c.anchor, ...(c.quote === undefined ? {} : { quote: chars(c.quote).slice(0, QUOTE_MAX_CHARS).join('') }), n: c.n };
 }
 
 /** The words' parts trimmed like the text (both ends, and `say ` / `steer ` in front), empty text parts dropped. */

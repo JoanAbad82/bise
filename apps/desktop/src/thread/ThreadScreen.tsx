@@ -46,6 +46,7 @@ import { BisePearl } from '@/app/BisePearl';
 import { createFindMark, FindMarkContext } from './findmark';
 import { trackRoutes, useHeld } from './routes';
 import { OpenArtifactContext } from './openArtifact';
+import { ThreadDrop } from '@/artifacts/Drops';
 import { createFolds, FoldsContext } from './folds';
 import { ThreadVoice, TYPING_END, typingLabelOf, useVoiceHere, VoiceTypePearl, VOICE_TYPING_KEYS } from '@/voicemode';
 import { FirstRunSlot, Rows } from './ThreadRows';
@@ -422,6 +423,11 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
         <div className="th-main">
           <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} onTakeBack={takeBack} onReading={setReading} />
           {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} bise={bise} />}
+          {/* files dragged over the window: 'drop to give this file to perf' over the rows, to the
+              composer's agent (designer's office-artifacts pick 4); an archived thread takes none */}
+          {(me?.archived !== true || artifact !== undefined) && (
+            <ThreadDrop project={project} agent={artifact?.agent ?? agent} to={bise ? 'bise' : shownName(artifact?.agent ?? agent)} />
+          )}
         </div>
         {/* in the thread's column like the lines under it (amb-web m_17316: it sat flush left) */}
         {stopping && (

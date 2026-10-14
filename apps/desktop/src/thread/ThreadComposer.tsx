@@ -3,6 +3,7 @@
 // helpers (about-an-artifact words, the docked card's target). Split out of ThreadScreen.tsx (the
 // file cap). Owner: amb-win.
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ANCHOR_EVENT, type AnchorAct } from '@/artifacts/useFrameNote';
 import { load, save } from '@/composer/drafts';
 import { shownName } from '@/agents/model';
 import { Composer, flashWords, useApprovalsFlash, useComposerSources } from '@/composer';
@@ -137,6 +138,26 @@ export const ThreadComposer = memo(function ThreadComposer({
     },
     [onReady],
   );
+  // the composer about an open artifact: a selection in its frame (artifacts/useFrameNote.ts)
+  // comes as a numbered attachment at the caret, and the composer takes the focus for his words
+  const aboutId = about?.id;
+  useEffect(() => {
+    if (aboutId === undefined) return;
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<AnchorAct>).detail;
+      if (d.project !== project || d.id !== aboutId) return;
+      const a = actions.current;
+      if (a === null) return;
+      // his first typed character took the selection in the frame: it goes after the chip
+      const { key, ...note } = d.note;
+      a.anchor({ ...note, file: d.file });
+      if (key !== undefined) a.insertText(key);
+    };
+    window.addEventListener(ANCHOR_EVENT, on);
+    return () => {
+      window.removeEventListener(ANCHOR_EVENT, on);
+    };
+  }, [project, aboutId]);
   const onCommand = useCallback(
     (name: string, args: string) => {
       const at = { project, agent };

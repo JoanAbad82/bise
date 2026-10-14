@@ -6,7 +6,9 @@
 // words come from maker.ts. Owner: amb-kit (the list, the model); task-panel (the open view).
 import { ImageView } from './ImageView';
 import { isImageSrc } from './zoom';
-import { useCallback, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { APP_FRAME_NAME } from './frameNote';
+import { useFrameNote } from './useFrameNote';
 import { Button, IconButton, Menu, MenuItem } from '@/ds';
 import { useRouter } from '@/app/router';
 import { useAgents, usePrefs, useStore } from '@/store';
@@ -86,6 +88,8 @@ export function themedUrl(url: string, theme: 'light' | 'dark' | null): string {
  */
 export function frameSrc(a: { kind: string; url: string; version: number; frame_url?: string | null }, shown: number, theme: 'light' | 'dark' | null): string | null {
   const local = a.frame_url ?? '';
+  // the newest version of an xlsx, pptx or docx: bise's viewer at /a/<id>/view, the src the frame
+  // keeps while new versions land (pages::site::frame_href); never built here (architect m_23970)
   if (shown === a.version && local !== '') return themedUrl(local, theme);
   if (kindOf(a.kind) !== 'page' || !/^https?:\/\//i.test(a.url)) return null;
   return themedUrl(versionUrl(a.url, a.version, shown), theme);
@@ -133,6 +137,10 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
     store.stop(project, agent);
   }, [store, project, agent]);
   const about = useMemo(() => (it === undefined ? undefined : { id: it.a.id, title: it.a.title, url: it.a.url }), [it]);
+  // the frame's src, from the hub's row (hooks before the early return)
+  const src = it === undefined ? null : frameSrc(it.a, v ?? it.a.version, theme);
+  const frame = useRef<HTMLIFrameElement>(null);
+  useFrameNote(frame, src, project, id, it?.a.title ?? '');
   const close = () => {
     // ✕ and esc as ‹: back to the place before (designer's desktop-history); opened straight (a link) the list
     if (onClose !== undefined) onClose();
@@ -171,7 +179,6 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   const a = it.a;
   const shown = v ?? a.version;
   const url = versionUrl(a.url, a.version, shown);
-  const src = frameSrc(a, shown, theme);
   const path = pathOf(a);
   const finder = path !== null && bise?.showInFinder !== undefined ? bise.showInFinder : undefined;
   return (
@@ -220,10 +227,14 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
             here from a list (leave.ts opens his browser): no 'opens in your browser' panel (designer m_21714) */}
         {/* one image file: drawn here, zoomable (a pinch, two fingers, a double-click; his m_22822) */}
         {src !== null && isImageSrc(src) && <ImageView src={src} alt={a.title} />}
+        {/* the src stays /a/<id>/view while new versions land: the viewer swaps in place, never a
+            reload (plan §6). Its name tells the viewer it sits in the app: a selection comes here
+            (useFrameNote) for the maker's composer, not the frame's own note */}
         {src !== null && !isImageSrc(src) && (
-          <iframe className="art-paper" src={src} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          <iframe ref={frame} name={APP_FRAME_NAME} className="art-paper" src={src} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             data-testid="artifact.page" />
         )}
+
       </div>
       {/* the screen's one composer, the maker's (maker.ts), when no thread sits beside the page; the
           maker's own question docks over it (designer m_20452: only the maker's, as in its thread) */}

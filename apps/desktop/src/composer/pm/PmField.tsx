@@ -700,16 +700,26 @@ export function PmField(p: PmFieldProps): JSX.Element {
         from,
         ...(at === undefined ? {} : { at }),
       };
-      const pos = hadFocus.current
-        ? st.selection.to
-        : TextSelection.atEnd(st.doc).from;
-      const node = nodeType(st.schema, "chip").create({ chip });
-      const tr = st.tr.insert(pos, node);
-      tr.setSelection(TextSelection.create(tr.doc, pos + node.nodeSize));
-      dispatch(tr);
-      view()?.focus();
+      putChip(chip);
+    },
+    // a part of an artifact from the side panel: placed like a quote, its number in the one sequence
+    anchor: (a) => {
+      const st = state();
+      if (st === null) return;
+      putChip({ kind: "anchor", n: nextChipNumber(segmentsOf(st.doc)), ...a });
     },
   };
+  /** A chip at his caret (kept while the field is blurred), else the draft's end; the caret after it. */
+  function putChip(chip: Chip): void {
+    const st = state();
+    if (st === null) return;
+    const pos = hadFocus.current ? st.selection.to : TextSelection.atEnd(st.doc).from;
+    const node = nodeType(st.schema, "chip").create({ chip });
+    const tr = st.tr.insert(pos, node);
+    tr.setSelection(TextSelection.create(tr.doc, pos + node.nodeSize));
+    dispatch(tr);
+    view()?.focus();
+  }
   useEffect(() => {
     props.current.onActions(actions);
   });

@@ -60,6 +60,6 @@ export function AttachList({ chips, lit, onLit, onRemove, onOpen, home, testId }
 function Sign({ c }: { c: Chip }): JSX.Element {
   if (c.kind === "image" && c.thumb !== undefined) return <img className="sg th" src={c.thumb} alt="" draggable={false} />;
   if (c.kind === "file" && c.icon !== undefined) return <img className="sg th" src={c.icon} alt="" draggable={false} />;
-  const g = c.kind === "quote" ? "❝" : c.kind === "paste" ? "▤" : c.kind === "image" ? "▣" : "▯";
+  const g = c.kind === "quote" || c.kind === "anchor" ? "❝" : c.kind === "paste" ? "▤" : c.kind === "image" ? "▣" : "▯";
   return <span className="sg" aria-hidden="true">{g}</span>;
 }

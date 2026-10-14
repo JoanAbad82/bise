@@ -1,6 +1,7 @@
 // What the screen around a composer may ask of it (ComposerActions, handed over once mounted), and
 // what its field tells the key bar (FieldBar). Types only.
 import type { QuoteAt } from './message';
+import type { Anchor } from '@/proto/anchor';
 
 /** What the screen around a composer may ask of it (dictation, the send button, focus). */
 export interface ComposerActions {
@@ -29,6 +30,21 @@ export interface ComposerActions {
    * `at`: lines of a diff (V7, diffquote.rs): the strip says 'src/a.rs:12-14 · 3 lines' and the tag carries file / new / old.
    */
   quote(text: string, from: string, at?: QuoteAt): void;
+  /**
+   * A part of an artifact picked in the side panel (plan §9b) as a numbered attachment at the caret
+   * ('❝ 2', its row 'Summary!C4:E4  q3-forecast.xlsx · v4'), then the focus; sent as Part::Anchor.
+   */
+  anchor(a: AnchorPick): void;
+}
+
+/** What the side panel's frame gave: the artifact, its version, where in it, the words, its file's name. */
+export interface AnchorPick {
+  readonly artifact: string;
+  readonly version: number;
+  readonly rev?: number;
+  readonly anchor: Anchor;
+  readonly quote?: string;
+  readonly file: string;
 }
 
 /** What the field tells the key bar: a list open, text selected, images, text in it. */

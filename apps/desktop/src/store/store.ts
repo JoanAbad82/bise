@@ -607,6 +607,14 @@ export class Store extends StoreVoice {
   stop(project: string, agent: string): void {
     this.command({ cmd: "stop", project, agent });
   }
+  /**
+   * A file he gives an agent (a drop on its thread, the artifacts list's '+ add' or drop): the
+   * hub's do: add (the TUI's /artifacts add) makes it an artifact of `agent`, by you; the window
+   * never writes the store. The hub's words come back as a notice, the row in `artifacts`.
+   */
+  addArtifact(project: string, agent: string, path: string): void {
+    this.command({ cmd: "artifacts_add", project, agent, target: path });
+  }
 }
 
 // the store's shapes and helpers live in types.ts; importers keep reading them here

@@ -4,6 +4,7 @@
 // text, kept for search and copy): no '<selection …>', '<pasted …>' or '<image …>' tag ever shows.
 // The TUI does the same (rust/tui/src/said.rs view_of / gist). Owner: amb-win. Pure.
 import type { Part } from '@/proto';
+import { anchorLabel } from '@/composer/anchor';
 
 /** A quote he sent: who wrote it, its text, and from a diff where (file, its new / old lines). */
 export interface PartQuote {
@@ -15,7 +16,14 @@ export interface PartQuote {
   /** its chip's number when he put it in his words ('❝ 1' sits there, his m_22231); none: a quote
    *  in front (an older client) */
   readonly n?: number;
+  /** a part of an artifact (Part::Anchor): where, 'Q3!B4:D9 · q3-xlsx v4' */
+  readonly about?: string;
 }
+
+type AnchorPart = Extract<Part, { kind: 'anchor' }>;
+
+/** Where an anchor part is, the TUI's words (said.rs anchor_words without its ❝): 'Q3!B4:D9 · q3-xlsx v4'. Pure. */
+export const anchorAbout = (p: AnchorPart): string => `${anchorLabel(p.anchor)} · ${p.artifact} v${String(p.version)}`;
 
 /** His message as the bubble draws it. */
 export interface YouView {
@@ -55,6 +63,12 @@ export function youView(parts: readonly Part[]): YouView {
         // his m_22231: a quote he put in his words keeps its place there, its label like a paste's
         if (p.n != null) words += `❝ ${String(p.n)}`;
         break;
+      case 'anchor':
+        // a part of an artifact he picked in the side panel: a quote line that says where
+        // ('❝ 2 “1200 1350” · Q3!B4:D9 · q3-xlsx v4', said.rs anchor_words), its number in his words
+        quotes.push({ from: '', text: p.quote ?? anchorLabel(p.anchor), file: '', new: '', old: '', about: anchorAbout(p), ...(p.n == null ? {} : { n: p.n }) });
+        if (p.n != null) words += `❝ ${String(p.n)}`;
+        break;
       case 'text':
         words += p.text;
         break;
@@ -89,7 +103,8 @@ export function partsGist(parts: readonly Part[]): string {
   const quotes: string[] = [];
   let words = '';
   for (const p of parts) {
-    if (p.kind === 'quote' && p.n != null) words += `❝ ${String(p.n)}`;
+    if (p.kind === 'anchor') words += p.n != null ? `❝ ${String(p.n)}` : `❝ ${anchorAbout(p)}`;
+    else if (p.kind === 'quote' && p.n != null) words += `❝ ${String(p.n)}`;
     else if (p.kind === 'quote') quotes.push(`❝ ${p.from === 'main' ? 'bise' : p.from}`);
     else if (p.kind === 'text') words += p.text;
     else if (p.kind === 'paste') words += `▤ ${String(p.n)}`;
@@ -105,7 +120,7 @@ export function partsGist(parts: readonly Part[]): string {
 }
 
 /** The part kinds this window draws; an entry with another kind (a newer hub's) is drawn from its text. */
-const KNOWN_KINDS: ReadonlySet<string> = new Set(['text', 'quote', 'paste', 'image', 'file', 'page', 'hint']);
+const KNOWN_KINDS: ReadonlySet<string> = new Set(['text', 'quote', 'paste', 'image', 'file', 'page', 'hint', 'anchor']);
 
 /** He typed it with fn space (designer m_22714: 'from fn' on his bubble): a capsule hint in his
  *  parts and not said (a fn talk keeps 'said'). bise_proto::parts::via_fn, the same cases
