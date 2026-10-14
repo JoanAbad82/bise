@@ -697,20 +697,20 @@ var require_dom = __commonJS({
       }
     }
     function _extends(Class, Super) {
-      var pt = Class.prototype;
-      if (!(pt instanceof Super)) {
+      var pt2 = Class.prototype;
+      if (!(pt2 instanceof Super)) {
         let t = function() {
         };
         t.prototype = Super.prototype;
         t = new t();
-        copy(pt, t);
-        Class.prototype = pt = t;
+        copy(pt2, t);
+        Class.prototype = pt2 = t;
       }
-      if (pt.constructor != Class) {
+      if (pt2.constructor != Class) {
         if (typeof Class != "function") {
           console.error("unknown Class:" + Class);
         }
-        pt.constructor = Class;
+        pt2.constructor = Class;
       }
     }
     var NodeType = {};
@@ -1925,7 +1925,7 @@ var require_dom = __commonJS({
         el2._nsMap[newAttr.prefix ? newAttr.localName : ""] = newAttr.value;
       }
     }
-    function _onRemoveAttribute(doc, el2, newAttr, remove2) {
+    function _onRemoveAttribute(doc, el2, newAttr, remove3) {
       doc && doc._inc++;
       var ns = newAttr.namespaceURI;
       if (ns === NAMESPACE.XMLNS) {
@@ -6388,15 +6388,15 @@ var require_dom_parser = __commonJS({
           this.doc.doctype = dt;
         }
       },
-      reportError: function(level, message) {
+      reportError: function(level2, message) {
         if (typeof this.onError === "function") {
           try {
-            this.onError(level, message, this);
+            this.onError(level2, message, this);
           } catch (e) {
-            throw new ParseError("Reporting " + level + ' "' + message + '" caused ' + e, this.locator);
+            throw new ParseError("Reporting " + level2 + ' "' + message + '" caused ' + e, this.locator);
           }
         } else {
-          console.error("[xmldom " + level + "]	" + message, _locator(this.locator));
+          console.error("[xmldom " + level2 + "]	" + message, _locator(this.locator));
         }
       },
       /**
@@ -6455,8 +6455,8 @@ var require_dom_parser = __commonJS({
         handler.currentElement.appendChild(node);
       }
     }
-    function onErrorStopParsing(level) {
-      if (level === "error") throw "onErrorStopParsing";
+    function onErrorStopParsing(level2) {
+      if (level2 === "error") throw "onErrorStopParsing";
     }
     function onWarningStopParsing() {
       throw "onWarningStopParsing";
@@ -6531,9 +6531,6 @@ function notBuilt(name, ext) {
 
 // src/sheets/index.ts
 var sheets = notBuilt("sheets", "xlsx");
-
-// src/slides/index.ts
-var slides = notBuilt("slides", "pptx");
 
 // src/anchor.gen.ts
 var ANCHOR_KINDS = ["block", "cell", "slide", "shape", "para", "region", "text"];
@@ -6613,8 +6610,8 @@ function parseXml(text, part2) {
   let doc;
   try {
     doc = new import_xmldom.DOMParser({
-      onError: (level, msg) => {
-        if (level !== "warning" && !failed) failed = msg;
+      onError: (level2, msg) => {
+        if (level2 !== "warning" && !failed) failed = msg;
       }
     }).parseFromString(text, "application/xml");
   } catch (e) {
@@ -6708,10 +6705,10 @@ function relsPath(part2) {
   return `${p.slice(0, slash + 1)}_rels/${p.slice(slash + 1)}.rels`;
 }
 function rels(zip, part2) {
-  const path = relsPath(part2);
-  const text = zip.text(path);
+  const path2 = relsPath(part2);
+  const text = zip.text(path2);
   if (text === void 0) return [];
-  const root = parseXml(text, path).documentElement;
+  const root = parseXml(text, path2).documentElement;
   const base = part2.replace(/^\//, "").slice(0, part2.lastIndexOf("/") + 1);
   return children(root, NS.rel, "Relationship").map((r) => {
     const external = attr(r, "TargetMode") === "External";
@@ -6730,8 +6727,8 @@ function resolve(base, target) {
 }
 function brokenRels(zip) {
   const out = [];
-  for (const path of zip.list()) {
-    const m = /^(.*?)_rels\/([^/]*)\.rels$/.exec(path);
+  for (const path2 of zip.list()) {
+    const m = /^(.*?)_rels\/([^/]*)\.rels$/.exec(path2);
     if (!m) continue;
     const from = `${m[1]}${m[2]}`;
     for (const rel of rels(zip, from)) {
@@ -7588,7 +7585,7 @@ var exfl = function(ex) {
   return le;
 };
 var wzh = function(d, b, f, fn, u, c, ce, co) {
-  var fl2 = fn.length, ex = f.extra, col = co && co.length;
+  var fl2 = fn.length, ex = f.extra, col2 = co && co.length;
   var exl = exfl(ex);
   wbytes(d, b, ce != null ? 33639248 : 67324752), b += 4;
   if (ce != null)
@@ -7608,7 +7605,7 @@ var wzh = function(d, b, f, fn, u, c, ce, co) {
   wbytes(d, b + 12, fl2);
   wbytes(d, b + 14, exl), b += 16;
   if (ce != null) {
-    wbytes(d, b, col);
+    wbytes(d, b, col2);
     wbytes(d, b + 6, f.attrs);
     wbytes(d, b + 10, ce), b += 14;
   }
@@ -7622,8 +7619,8 @@ var wzh = function(d, b, f, fn, u, c, ce, co) {
       d.set(exf, b + 4), b += 4 + l;
     }
   }
-  if (col)
-    d.set(co, b), b += col;
+  if (col2)
+    d.set(co, b), b += col2;
   return b;
 };
 var wzf = function(o, b, c, d, e) {
@@ -7816,22 +7813,22 @@ var Zip = class _Zip {
   list() {
     return [...this.parts.keys()];
   }
-  has(path) {
-    return this.parts.has(clean(path));
+  has(path2) {
+    return this.parts.has(clean(path2));
   }
-  bytes(path) {
-    return this.parts.get(clean(path));
+  bytes(path2) {
+    return this.parts.get(clean(path2));
   }
   /** A part as UTF-8 text, undefined when absent. */
-  text(path) {
-    const b = this.bytes(path);
+  text(path2) {
+    const b = this.bytes(path2);
     return b === void 0 ? void 0 : utf8Decode(b);
   }
-  set(path, data) {
-    this.parts.set(clean(path), typeof data === "string" ? utf8Encode(data) : data);
+  set(path2, data) {
+    this.parts.set(clean(path2), typeof data === "string" ? utf8Encode(data) : data);
   }
-  remove(path) {
-    return this.parts.delete(clean(path));
+  remove(path2) {
+    return this.parts.delete(clean(path2));
   }
   /** The package as zip bytes. `[Content_Types].xml` first, as Office writes it. */
   write() {
@@ -7842,8 +7839,8 @@ var Zip = class _Zip {
     return zipSync(files);
   }
 };
-function clean(path) {
-  return path.startsWith("/") ? path.slice(1) : path;
+function clean(path2) {
+  return path2.startsWith("/") ? path2.slice(1) : path2;
 }
 
 // src/core/package.ts
@@ -7860,10 +7857,10 @@ function kindOf(bytes) {
 }
 function checkPackage(zip) {
   const out = [];
-  for (const path of zip.list()) {
-    if (!/\.(xml|rels)$/i.test(path)) continue;
+  for (const path2 of zip.list()) {
+    if (!/\.(xml|rels)$/i.test(path2)) continue;
     try {
-      parseXml(zip.text(path) ?? "", path);
+      parseXml(zip.text(path2) ?? "", path2);
     } catch (e) {
       out.push({ code: "bad_xml", severity: "error", message: e.message });
     }
@@ -7874,16 +7871,1861 @@ function checkPackage(zip) {
   return out;
 }
 
+// src/slides/dom.ts
+var PNS = {
+  ...NS,
+  c: "http://schemas.openxmlformats.org/drawingml/2006/chart",
+  pic: "http://schemas.openxmlformats.org/drawingml/2006/picture",
+  dgm: "http://schemas.openxmlformats.org/drawingml/2006/diagram",
+  mc: "http://schemas.openxmlformats.org/markup-compatibility/2006"
+};
+var REL = {
+  slide: `${NS.r}/slide`,
+  slideLayout: `${NS.r}/slideLayout`,
+  slideMaster: `${NS.r}/slideMaster`,
+  theme: `${NS.r}/theme`,
+  image: `${NS.r}/image`,
+  chart: `${NS.r}/chart`,
+  notesSlide: `${NS.r}/notesSlide`,
+  package: `${NS.r}/package`
+};
+var DECLS = `xmlns:a="${PNS.a}" xmlns:p="${PNS.p}" xmlns:r="${PNS.r}" xmlns:c="${PNS.c}" xmlns:pic="${PNS.pic}"`;
+function frag(doc, xml) {
+  const wrap2 = parseXml(`<w ${DECLS}>${xml}</w>`, "a new element");
+  const el2 = children(wrap2.documentElement)[0];
+  if (!el2) throw new Error(`frag: no element in ${xml.slice(0, 60)}`);
+  return doc.importNode(el2, true);
+}
+function path(el2, ...steps) {
+  let cur = el2;
+  for (const [ns, local] of steps) {
+    if (!cur) return void 0;
+    cur = child(cur, ns, local);
+  }
+  return cur;
+}
+function int(el2, name) {
+  if (!el2 || !el2.hasAttribute(name)) return void 0;
+  const n = Number.parseInt(el2.getAttribute(name), 10);
+  return Number.isFinite(n) ? n : void 0;
+}
+function insertBefore(parent, el2, before) {
+  for (let c = parent.firstChild; c; c = c.nextSibling) {
+    if (c.nodeType !== 1) continue;
+    const e = c;
+    if (before.some(([ns, l]) => e.namespaceURI === ns && e.localName === l)) {
+      parent.insertBefore(el2, e);
+      return el2;
+    }
+  }
+  parent.appendChild(el2);
+  return el2;
+}
+function ensure(parent, ns, qname, before = []) {
+  const local = qname.slice(qname.indexOf(":") + 1);
+  return child(parent, ns, local) ?? insertBefore(parent, parent.ownerDocument.createElementNS(ns, qname), before);
+}
+var ln2 = (e) => e.localName ?? "";
+function remove(el2) {
+  el2?.parentNode?.removeChild(el2);
+}
+
+// src/slides/units.ts
+var EMU_PER_PT = 12700;
+var pt = (emu2) => Math.round(emu2 / EMU_PER_PT * 100) / 100;
+var emu = (points2) => Math.round(points2 * EMU_PER_PT);
+function boxEmu(box, what = "box") {
+  const b = Array.isArray(box) ? { x: box[0], y: box[1], w: box[2], h: box[3] } : box;
+  if (!b || ![b.x, b.y, b.w, b.h].every((v) => typeof v === "number" && Number.isFinite(v)) || b.w <= 0 || b.h <= 0) {
+    throw new OfficeError("bad_arg", `a ${what} is [x, y, w, h] in points (a 16:9 slide is 960 x 540), w and h above 0; got ${JSON.stringify(box)}`);
+  }
+  return { x: emu(b.x), y: emu(b.y), w: emu(b.w), h: emu(b.h) };
+}
+var boxPt = (e) => [pt(e.x), pt(e.y), pt(e.w), pt(e.h)];
+function hex(color2) {
+  const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(String(color2).trim());
+  if (!m) throw new OfficeError("bad_arg", `a color is "#rrggbb" (like "#1f6feb"), got ${JSON.stringify(color2)}`);
+  const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join("") : m[1];
+  return h.toUpperCase();
+}
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+}
+function overlapArea(a, b) {
+  const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return w > 0 && h > 0 ? w * h : 0;
+}
+
+// src/slides/chart.ts
+var { a: A, c: C } = PNS;
+function readChart(root, color2) {
+  const chart = child(root, C, "chart");
+  const plot = chart && child(chart, C, "plotArea");
+  const kind = plot ? children(plot, C).find((e) => ln2(e).endsWith("Chart")) : void 0;
+  let type = kind ? ln2(kind).replace(/3D/, "").replace(/Chart$/, "") : "chart";
+  if (type === "bar" && kind) type = attr(child(kind, C, "barDir") ?? kind, "val") === "bar" ? "bar" : "column";
+  const titleEl = chart && child(chart, C, "title");
+  const title = titleEl ? descendants(titleEl, A, "t").map((t) => t.textContent ?? "").join("") || cacheStrings(child(titleEl, C, "tx"))[0] : void 0;
+  const sers = kind ? children(kind, C, "ser") : [];
+  const categories = sers.length ? cacheStrings(child(sers[0], C, "cat") ?? child(sers[0], C, "xVal")) : [];
+  const series = sers.map((s) => {
+    const out = {
+      name: cacheStrings(child(s, C, "tx"))[0] ?? "",
+      values: cacheNumbers(child(s, C, "val") ?? child(s, C, "yVal"))
+    };
+    const sp = child(s, C, "spPr");
+    const c = sp && (color2(child(sp, A, "solidFill")) ?? color2(child(child(sp, A, "ln") ?? sp, A, "solidFill")));
+    if (c) out.color = c;
+    return out;
+  });
+  return { type, ...title ? { title } : {}, categories, series };
+}
+function points(holder) {
+  if (!holder) return [];
+  const direct = child(holder, C, "v");
+  if (direct) return [direct.textContent ?? ""];
+  const cache = descendants(holder, C, "strCache")[0] ?? descendants(holder, C, "numCache")[0] ?? child(holder, C, "strLit") ?? child(holder, C, "numLit") ?? descendants(holder, C, "lvl")[0];
+  if (!cache) return [];
+  const n = int(child(cache, C, "ptCount"), "val") ?? 0;
+  const out = new Array(n).fill(void 0);
+  for (const pt2 of children(cache, C, "pt")) {
+    const i2 = int(pt2, "idx") ?? 0;
+    out[i2] = child(pt2, C, "v")?.textContent ?? "";
+  }
+  return out;
+}
+var cacheStrings = (h) => points(h).map((v) => v ?? "");
+var cacheNumbers = (h) => points(h).map((v) => {
+  const n = v === void 0 || v === "" ? NaN : Number(v);
+  return Number.isFinite(n) ? n : null;
+});
+var col = (n) => {
+  let s = "";
+  for (let i2 = n + 1; i2 > 0; i2 = Math.floor((i2 - 1) / 26)) s = String.fromCharCode(65 + (i2 - 1) % 26) + s;
+  return s;
+};
+function checkChart(d) {
+  const bad2 = (why) => new OfficeError("bad_arg", `a chart ${why}: { type: "column" | "bar" | "line" | "pie", categories: ["Q1", ...], series: [{ name, values: [n, ...] }] }`);
+  if (!["column", "bar", "line", "pie"].includes(d?.type)) throw bad2(`type is column, bar, line or pie, not ${JSON.stringify(d?.type)}`);
+  if (!Array.isArray(d.categories) || !d.categories.length) throw bad2("needs categories");
+  if (!Array.isArray(d.series) || !d.series.length) throw bad2("needs at least one series");
+  for (const s of d.series) {
+    if (!Array.isArray(s.values) || s.values.length !== d.categories.length || !s.values.every((v) => typeof v === "number" && Number.isFinite(v))) {
+      throw bad2(`series ${JSON.stringify(s.name)} needs ${d.categories.length} numbers (one per category)`);
+    }
+  }
+  if (d.type === "pie" && d.series.length !== 1) throw bad2("of type pie has one series");
+}
+var strCache = (vals) => `<c:strCache><c:ptCount val="${vals.length}"/>${vals.map((v, i2) => `<c:pt idx="${i2}"><c:v>${esc(v)}</c:v></c:pt>`).join("")}</c:strCache>`;
+var numCache = (vals) => `<c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${vals.length}"/>${vals.map((v, i2) => `<c:pt idx="${i2}"><c:v>${v}</c:v></c:pt>`).join("")}</c:numCache>`;
+var fill = (s, i2) => s.color ? `<a:srgbClr val="${hex(s.color)}"/>` : `<a:schemeClr val="accent${i2 % 6 + 1}"/>`;
+function writeChart(d, workbookRid) {
+  checkChart(d);
+  const n = d.categories.length;
+  const cat = `<c:cat><c:strRef><c:f>Sheet1!$A$2:$A$${n + 1}</c:f>${strCache(d.categories.map(String))}</c:strRef></c:cat>`;
+  const ser = d.series.map((s, i2) => {
+    const c = col(i2 + 1);
+    const head = `<c:idx val="${i2}"/><c:order val="${i2}"/><c:tx><c:strRef><c:f>Sheet1!$${c}$1</c:f>${strCache([String(s.name ?? "")])}</c:strRef></c:tx>`;
+    const val = `<c:val><c:numRef><c:f>Sheet1!$${c}$2:$${c}$${n + 1}</c:f>${numCache(s.values)}</c:numRef></c:val>`;
+    if (d.type === "line") {
+      return `<c:ser>${head}<c:spPr><a:ln w="28575" cap="rnd"><a:solidFill>${fill(s, i2)}</a:solidFill><a:round/></a:ln></c:spPr><c:marker><c:symbol val="none"/></c:marker>${cat}${val}<c:smooth val="0"/></c:ser>`;
+    }
+    if (d.type === "pie") {
+      const dpt = d.categories.map((_, k) => `<c:dPt><c:idx val="${k}"/><c:bubble3D val="0"/><c:spPr><a:solidFill>${fill({}, k)}</a:solidFill></c:spPr></c:dPt>`).join("");
+      return `<c:ser>${head}${dpt}${cat}${val}</c:ser>`;
+    }
+    return `<c:ser>${head}<c:spPr><a:solidFill>${fill(s, i2)}</a:solidFill></c:spPr><c:invertIfNegative val="0"/>${cat}${val}</c:ser>`;
+  }).join("");
+  const axes = `<c:axId val="50010"/><c:axId val="50020"/>`;
+  const catPos = d.type === "bar" ? "l" : "b";
+  const valPos = d.type === "bar" ? "b" : "l";
+  const axisXml = `<c:catAx><c:axId val="50010"/><c:scaling><c:orientation val="${d.type === "bar" ? "maxMin" : "minMax"}"/></c:scaling><c:delete val="0"/><c:axPos val="${catPos}"/><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="50020"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx><c:valAx><c:axId val="50020"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${valPos}"/><c:majorGridlines><c:spPr><a:ln w="6350"><a:solidFill><a:srgbClr val="D9D9D9"/></a:solidFill></a:ln></c:spPr></c:majorGridlines><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="50010"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`;
+  let plot;
+  if (d.type === "pie") plot = `<c:pieChart><c:varyColors val="1"/>${ser}<c:firstSliceAng val="0"/></c:pieChart>`;
+  else if (d.type === "line") plot = `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${ser}<c:marker val="1"/>${axes}</c:lineChart>${axisXml}`;
+  else plot = `<c:barChart><c:barDir val="${d.type === "bar" ? "bar" : "col"}"/><c:grouping val="clustered"/><c:varyColors val="0"/>${ser}<c:gapWidth val="80"/>${axes}</c:barChart>${axisXml}`;
+  const title = d.title ? `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1400" b="1"/></a:pPr><a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>${esc(d.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/>` : `<c:autoTitleDeleted val="1"/>`;
+  const pos = { bottom: "b", right: "r", top: "t" }[d.legend === void 0 ? "bottom" : d.legend || "bottom"];
+  const legend = d.legend === false ? "" : `<c:legend><c:legendPos val="${pos}"/><c:overlay val="0"/></c:legend>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="${C}" xmlns:a="${A}" xmlns:r="${PNS.r}"><c:roundedCorners val="0"/><c:chart>${title}<c:plotArea><c:layout/>${plot}</c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1200"/></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr><c:externalData r:id="${workbookRid}"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>`;
+}
+function chartWorkbook(d) {
+  checkChart(d);
+  const X4 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+  const R6 = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  const PR = "http://schemas.openxmlformats.org/package/2006/relationships";
+  const str = (ref, v) => `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
+  const num = (ref, v) => `<c r="${ref}"><v>${v}</v></c>`;
+  const head = `<row r="1">${d.series.map((s, i2) => str(`${col(i2 + 1)}1`, String(s.name ?? ""))).join("")}</row>`;
+  const body = d.categories.map((c, r) => `<row r="${r + 2}">${str(`A${r + 2}`, String(c))}${d.series.map((s, i2) => num(`${col(i2 + 1)}${r + 2}`, s.values[r])).join("")}</row>`).join("");
+  const zip = Zip.empty();
+  zip.set(
+    "[Content_Types].xml",
+    `${X4}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`
+  );
+  zip.set("_rels/.rels", `${X4}<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="${R6}/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
+  zip.set("xl/workbook.xml", `${X4}<workbook xmlns="${S}" xmlns:r="${R6}"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>`);
+  zip.set("xl/_rels/workbook.xml.rels", `${X4}<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="${R6}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`);
+  zip.set("xl/worksheets/sheet1.xml", `${X4}<worksheet xmlns="${S}"><sheetData>${head}${body}</sheetData></worksheet>`);
+  return zip.write();
+}
+
+// src/slides/inherit.ts
+var { a: A2, p: P } = PNS;
+function ctxOf(store, pres, slide) {
+  const layout = store.relTarget(slide, REL.slideLayout);
+  const master = layout ? store.relTarget(layout, REL.slideMaster) : void 0;
+  const theme2 = master ? store.relTarget(master, REL.theme) : void 0;
+  const ok = (p) => p && store.has(p) ? p : void 0;
+  return { store, pres, slide, layout: ok(layout), master: ok(master), theme: ok(theme2) };
+}
+function phOf(shape) {
+  const nv2 = children(shape).find((c) => ln2(c).startsWith("nv"));
+  const ph2 = path(nv2, [P, "nvPr"], [P, "ph"]);
+  if (!ph2) return void 0;
+  return { type: attr(ph2, "type") ?? "obj", idx: int(ph2, "idx") ?? 0, hasIdx: ph2.hasAttribute("idx") };
+}
+var TITLE = /* @__PURE__ */ new Set(["title", "ctrTitle"]);
+var SPECIAL = /* @__PURE__ */ new Set(["dt", "ftr", "sldNum", "hdr"]);
+function masterType(t) {
+  if (TITLE.has(t)) return "title";
+  if (SPECIAL.has(t)) return t;
+  return "body";
+}
+function placeholders(store, part2) {
+  if (!part2) return [];
+  const tree2 = path(store.root(part2), [P, "cSld"], [P, "spTree"]);
+  if (!tree2) return [];
+  return children(tree2).map((el2) => ({ el: el2, ph: phOf(el2) })).filter((x2) => !!x2.ph);
+}
+function phChain(ctx, ph2) {
+  const out = [];
+  const lay = placeholders(ctx.store, ctx.layout);
+  const onLayout = ph2.hasIdx && !TITLE.has(ph2.type) && lay.find((x2) => x2.ph.idx === ph2.idx) || lay.find((x2) => x2.ph.type === ph2.type) || lay.find((x2) => masterType(x2.ph.type) === masterType(ph2.type) && (TITLE.has(ph2.type) || x2.ph.idx === ph2.idx));
+  if (onLayout) out.push(onLayout.el);
+  const want = masterType(onLayout?.ph.type ?? ph2.type);
+  const onMaster = placeholders(ctx.store, ctx.master).find((x2) => masterType(x2.ph.type) === want);
+  if (onMaster) out.push(onMaster.el);
+  return out;
+}
+function layoutPlaceholders(store, layout) {
+  return placeholders(store, layout).filter((x2) => !SPECIAL.has(x2.ph.type)).map((x2) => x2.el);
+}
+function ownXfrm(shape) {
+  const xfrm2 = path(shape, [P, "spPr"], [A2, "xfrm"]) ?? path(shape, [P, "grpSpPr"], [A2, "xfrm"]) ?? child(shape, P, "xfrm");
+  const off = xfrm2 && child(xfrm2, A2, "off");
+  const ext = xfrm2 && child(xfrm2, A2, "ext");
+  if (!off || !ext) return void 0;
+  return { x: int(off, "x") ?? 0, y: int(off, "y") ?? 0, w: int(ext, "cx") ?? 0, h: int(ext, "cy") ?? 0 };
+}
+function boxOf(ctx, shape) {
+  const own = ownXfrm(shape);
+  if (own) return own;
+  const ph2 = phOf(shape);
+  if (!ph2) return void 0;
+  for (const el2 of phChain(ctx, ph2)) {
+    const b = ownXfrm(el2);
+    if (b) return b;
+  }
+  return void 0;
+}
+function slideSize(store, pres) {
+  const sz = child(store.root(pres), P, "sldSz");
+  return { w: int(sz, "cx") ?? 12192e3, h: int(sz, "cy") ?? 6858e3 };
+}
+function colorIn(ctx, holder) {
+  if (!holder) return void 0;
+  const c = children(holder, A2).find((e) => /Clr$/.test(ln2(e)));
+  if (!c) return void 0;
+  let rgb;
+  if (c.localName === "srgbClr") rgb = attr(c, "val");
+  else if (c.localName === "sysClr") rgb = attr(c, "lastClr") ?? (attr(c, "val") === "window" ? "FFFFFF" : "000000");
+  else if (c.localName === "schemeClr") rgb = schemeColor(ctx, attr(c, "val") ?? "");
+  else if (c.localName === "prstClr") rgb = { black: "000000", white: "FFFFFF", red: "FF0000", green: "008000", blue: "0000FF" }[attr(c, "val") ?? ""];
+  if (!rgb || !/^[0-9a-f]{6}$/i.test(rgb)) return void 0;
+  return `#${mods(rgb, c).toLowerCase()}`;
+}
+function schemeColor(ctx, val) {
+  let name = val;
+  if (ctx.master) {
+    const map = child(ctx.store.root(ctx.master), P, "clrMap");
+    const mapped = map && attr(map, val);
+    if (mapped) name = mapped;
+  }
+  if (!ctx.theme) return void 0;
+  const scheme = descendants(ctx.store.root(ctx.theme), A2, "clrScheme")[0];
+  const slot = scheme && child(scheme, A2, name);
+  const c = slot && children(slot)[0];
+  if (!c) return void 0;
+  return c.localName === "sysClr" ? attr(c, "lastClr") : attr(c, "val");
+}
+function mods(rgb, c) {
+  let [h, s, l] = hsl(rgb);
+  let [r, g, b] = [0, 2, 4].map((i2) => Number.parseInt(rgb.slice(i2, i2 + 2), 16) / 255);
+  let viaHsl = false;
+  for (const m of children(c, A2)) {
+    const v = (int(m, "val") ?? 1e5) / 1e5;
+    if (m.localName === "lumMod") l *= v, viaHsl = true;
+    else if (m.localName === "lumOff") l += v, viaHsl = true;
+    else if (m.localName === "tint" || m.localName === "shade") {
+      if (viaHsl) [r, g, b] = rgbOf(h, s, l);
+      [r, g, b] = [r, g, b].map((x2) => m.localName === "tint" ? x2 + (1 - x2) * (1 - v) : x2 * v);
+      [h, s, l] = hsl(toHex(r, g, b));
+      viaHsl = false;
+    }
+  }
+  if (viaHsl) [r, g, b] = rgbOf(h, s, Math.min(1, Math.max(0, l)));
+  return toHex(r, g, b);
+}
+var toHex = (r, g, b) => [r, g, b].map((x2) => Math.round(Math.min(1, Math.max(0, x2)) * 255).toString(16).padStart(2, "0")).join("").toUpperCase();
+function hsl(rgb) {
+  const [r, g, b] = [0, 2, 4].map((i2) => Number.parseInt(rgb.slice(i2, i2 + 2), 16) / 255);
+  const max2 = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max2 + min) / 2;
+  if (max2 === min) return [0, 0, l];
+  const d = max2 - min;
+  const s = l > 0.5 ? d / (2 - max2 - min) : d / (max2 + min);
+  const h = max2 === r ? (g - b) / d + (g < b ? 6 : 0) : max2 === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h / 6, s, l];
+}
+function rgbOf(h, s, l) {
+  if (s === 0) return [l, l, l];
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const f = (t) => {
+    const u = t < 0 ? t + 1 : t > 1 ? t - 1 : t;
+    if (u < 1 / 6) return p + (q - p) * 6 * u;
+    if (u < 1 / 2) return q;
+    if (u < 2 / 3) return p + (q - p) * (2 / 3 - u) * 6;
+    return p;
+  };
+  return [f(h + 1 / 3), f(h), f(h - 1 / 3)];
+}
+function fillOf(ctx, shape) {
+  const spPr = child(shape, P, "spPr");
+  if (spPr && child(spPr, A2, "noFill")) return "none";
+  const own = spPr && child(spPr, A2, "solidFill");
+  if (own) return colorIn(ctx, own);
+  const ref = path(shape, [P, "style"], [A2, "fillRef"]);
+  if (ref && (int(ref, "idx") ?? 0) > 0) return colorIn(ctx, ref);
+  return void 0;
+}
+function lineOf(ctx, shape) {
+  const ln3 = path(shape, [P, "spPr"], [A2, "ln"]);
+  if (ln3 && child(ln3, A2, "noFill")) return "none";
+  const own = ln3 && child(ln3, A2, "solidFill");
+  if (own) return colorIn(ctx, own);
+  const ref = path(shape, [P, "style"], [A2, "lnRef"]);
+  if (ref && (int(ref, "idx") ?? 0) > 0) return colorIn(ctx, ref);
+  return void 0;
+}
+function levelChain(ctx, shape, level2) {
+  const name = `lvl${level2}pPr`;
+  const out = [];
+  const fromList = (holder) => {
+    const l = holder && path(holder, [P, "txBody"], [A2, "lstStyle"], [A2, name]);
+    if (l) out.push(l);
+  };
+  const ph2 = shape ? phOf(shape) : void 0;
+  if (shape) fromList(shape);
+  if (ph2) for (const el2 of phChain(ctx, ph2)) fromList(el2);
+  if (ctx.master) {
+    const styles = child(ctx.store.root(ctx.master), P, "txStyles");
+    const which = !ph2 ? "otherStyle" : TITLE.has(ph2.type) ? "titleStyle" : SPECIAL.has(ph2.type) ? "otherStyle" : "bodyStyle";
+    const l = styles && path(styles, [P, which], [A2, name]);
+    if (l) out.push(l);
+  }
+  const def = path(ctx.store.root(ctx.pres), [P, "defaultTextStyle"], [A2, name]);
+  if (def) out.push(def);
+  return out;
+}
+function runStyle(ctx, shape, para3, rPr) {
+  const pPr = child(para3, A2, "pPr");
+  const level2 = (int(pPr, "lvl") ?? 0) + 1;
+  const chain = levelChain(ctx, shape, level2);
+  const defs = chain.map((l) => child(l, A2, "defRPr")).filter((d) => !!d);
+  const rprs = [rPr, ...defs].filter((d) => !!d);
+  const first = (f, list) => {
+    for (const e of list) {
+      const v = f(e);
+      if (v !== void 0) return v;
+    }
+    return void 0;
+  };
+  const scale = (int(path(shape, [P, "txBody"], [A2, "bodyPr"], [A2, "normAutofit"]), "fontScale") ?? 1e5) / 1e5;
+  const size = (first((e) => int(e, "sz"), rprs) ?? 1800) / 100 * scale;
+  const flag = (n) => first((e) => e.hasAttribute(n) ? ["1", "true"].includes(e.getAttribute(n)) : void 0, rprs) ?? false;
+  const fontRef = shape ? path(shape, [P, "style"], [A2, "fontRef"]) : void 0;
+  const color2 = first((e) => colorIn(ctx, child(e, A2, "solidFill")), rprs.slice(0, 1)) ?? colorIn(ctx, fontRef) ?? first((e) => colorIn(ctx, child(e, A2, "solidFill")), defs);
+  const font = first((e) => attr(child(e, A2, "latin") ?? e, "typeface"), rprs);
+  const align = first((e) => attr(e, "algn"), [pPr, ...chain].filter((d) => !!d));
+  const bu = first((e) => {
+    if (child(e, A2, "buNone")) return false;
+    if (child(e, A2, "buChar") || child(e, A2, "buAutoNum") || child(e, A2, "buBlip")) return true;
+    return void 0;
+  }, [pPr, ...chain].filter((d) => !!d));
+  return { size, bold: flag("b"), italic: flag("i"), color: color2, font: font && !font.startsWith("+") ? font : themeFont(ctx, font), align, bullet: bu ?? false };
+}
+function themeFont(ctx, ref) {
+  if (!ctx.theme) return void 0;
+  const which = ref === "+mj-lt" ? "majorFont" : "minorFont";
+  const f = descendants(ctx.store.root(ctx.theme), A2, which)[0];
+  return attr(child(f, A2, "latin") ?? f, "typeface");
+}
+
+// src/slides/read.ts
+var { a: A3, p: P2 } = PNS;
+var SHAPES = /* @__PURE__ */ new Set(["sp", "pic", "graphicFrame", "grpSp", "cxnSp", "contentPart"]);
+function shapeEls(tree2) {
+  const out = [];
+  for (const el2 of children(tree2)) {
+    if (el2.namespaceURI === P2 && SHAPES.has(ln2(el2))) out.push(el2);
+    else if (el2.localName === "AlternateContent" && el2.namespaceURI === PNS.mc) {
+      const choice = child(el2, PNS.mc, "Choice") ?? child(el2, PNS.mc, "Fallback");
+      const inner = choice && children(choice).find((c) => c.namespaceURI === P2 && SHAPES.has(ln2(c)));
+      if (inner) out.push(inner);
+    }
+  }
+  return out;
+}
+function cNvPr(shape) {
+  const nv2 = children(shape).find((c) => ln2(c).startsWith("nv"));
+  return nv2 && child(nv2, P2, "cNvPr");
+}
+function spTree(ctx) {
+  const tree2 = path(ctx.store.root(ctx.slide), [P2, "cSld"], [P2, "spTree"]);
+  if (!tree2) throw new Error(`${ctx.slide} has no p:spTree`);
+  return tree2;
+}
+function readShapes(ctx) {
+  return shapeEls(spTree(ctx)).map((el2) => readShape(ctx, el2, void 0));
+}
+function readShape(ctx, el2, frame) {
+  const nv2 = cNvPr(el2);
+  const own = boxOf(ctx, el2);
+  const box = own && frame ? frame(own) : own;
+  const info2 = {
+    el: el2,
+    id: attr(nv2 ?? el2, "id") ?? "",
+    name: attr(nv2 ?? el2, "name") ?? "",
+    type: "shape",
+    box,
+    ph: phOf(el2),
+    paras: [],
+    wrap: true,
+    inset: [91440, 45720, 91440, 45720]
+  };
+  const alt = nv2 && attr(nv2, "descr");
+  if (alt) info2.alt = alt;
+  switch (el2.localName) {
+    case "sp":
+      readText(ctx, el2, info2);
+      info2.fill = fillOf(ctx, el2);
+      info2.line = lineOf(ctx, el2);
+      info2.geometry = attr(path(el2, [P2, "spPr"], [A3, "prstGeom"]) ?? el2, "prst") ?? (path(el2, [P2, "spPr"], [A3, "custGeom"]) ? "custom" : void 0);
+      break;
+    case "cxnSp":
+      info2.type = "connector";
+      info2.line = lineOf(ctx, el2);
+      break;
+    case "pic": {
+      info2.type = "picture";
+      const blip = path(el2, [P2, "blipFill"], [A3, "blip"]);
+      const rid = blip && attr(blip, "embed", PNS.r);
+      const rel = rid ? ctx.store.rel(ctx.slide, rid) : void 0;
+      if (rel && !rel.external) info2.image = rel.target;
+      break;
+    }
+    case "graphicFrame":
+      readFrame(ctx, el2, info2);
+      break;
+    case "grpSp": {
+      info2.type = "group";
+      const xfrm2 = path(el2, [P2, "grpSpPr"], [A3, "xfrm"]);
+      const chOff = xfrm2 && child(xfrm2, A3, "chOff");
+      const chExt = xfrm2 && child(xfrm2, A3, "chExt");
+      let inner = frame;
+      if (own && chOff && chExt) {
+        const cx = int(chOff, "x") ?? 0;
+        const cy = int(chOff, "y") ?? 0;
+        const sx = int(chExt, "cx") ?? 0 ? own.w / int(chExt, "cx") : 1;
+        const sy = int(chExt, "cy") ?? 0 ? own.h / int(chExt, "cy") : 1;
+        const local = (b) => ({ x: own.x + (b.x - cx) * sx, y: own.y + (b.y - cy) * sy, w: b.w * sx, h: b.h * sy });
+        inner = frame ? (b) => frame(local(b)) : local;
+      }
+      info2.children = shapeEls(el2).map((c) => readShape(ctx, c, inner));
+      break;
+    }
+    default:
+      info2.type = "graphic";
+      info2.notDrawn = ln2(el2);
+  }
+  return info2;
+}
+function readText(ctx, el2, info2) {
+  const body = child(el2, P2, "txBody");
+  if (!body) return;
+  const bodyPr = child(body, A3, "bodyPr");
+  if (bodyPr) {
+    if (child(bodyPr, A3, "normAutofit")) info2.autofit = "shrink";
+    else if (child(bodyPr, A3, "spAutoFit")) info2.autofit = "grow";
+    info2.wrap = attr(bodyPr, "wrap") !== "none";
+    info2.inset = [
+      int(bodyPr, "lIns") ?? 91440,
+      int(bodyPr, "tIns") ?? 45720,
+      int(bodyPr, "rIns") ?? 91440,
+      int(bodyPr, "bIns") ?? 45720
+    ];
+    info2.valign = { t: "top", ctr: "middle", b: "bottom" }[attr(bodyPr, "anchor") ?? ""] ?? void 0;
+  }
+  info2.paras = children(body, A3, "p").map((p) => readPara(ctx, el2, p));
+  info2.text = info2.paras.map((p) => p.text).join("\n");
+}
+function readPara(ctx, shape, p) {
+  let text = "";
+  let firstRPr;
+  let seen = false;
+  for (const r of children(p, A3)) {
+    if (r.localName === "r" || r.localName === "fld") {
+      if (!seen) firstRPr = child(r, A3, "rPr"), seen = true;
+      text += child(r, A3, "t")?.textContent ?? "";
+    } else if (r.localName === "br") text += "\v";
+  }
+  if (!seen) firstRPr = child(p, A3, "endParaRPr");
+  const s = runStyle(ctx, shape, p, firstRPr);
+  const level2 = (int(child(p, A3, "pPr"), "lvl") ?? 0) + 1;
+  return { text, level: level2, ...s, bullet: s.bullet && text.length > 0 };
+}
+function readFrame(ctx, el2, info2) {
+  const data = path(el2, [A3, "graphic"], [A3, "graphicData"]);
+  const uri = data ? attr(data, "uri") ?? "" : "";
+  if (uri.endsWith("/table")) {
+    info2.type = "table";
+    const tbl = child(data, A3, "tbl");
+    info2.rows = tbl ? children(tbl, A3, "tr").map((tr) => children(tr, A3, "tc").map((tc) => cellText(tc))) : [];
+    info2.text = info2.rows.map((r) => r.join("	")).join("\n");
+  } else if (uri.endsWith("/chart")) {
+    info2.type = "chart";
+    const rid = attr(child(data, PNS.c, "chart") ?? data, "id", PNS.r);
+    const rel = rid ? ctx.store.rel(ctx.slide, rid) : void 0;
+    if (rel && !rel.external && ctx.store.has(rel.target)) {
+      info2.chart = readChart(ctx.store.root(rel.target), (h) => colorIn(ctx, h));
+      if (info2.chart.title) info2.text = info2.chart.title;
+    } else info2.notDrawn = "chart";
+  } else {
+    info2.type = "graphic";
+    info2.notDrawn = uri.endsWith("/diagram") ? "smartart" : uri.slice(uri.lastIndexOf("/") + 1) || "graphic";
+  }
+}
+function cellText(tc) {
+  const body = child(tc, A3, "txBody");
+  if (!body) return "";
+  return children(body, A3, "p").map(
+    (p) => children(p, A3).filter((r) => r.localName === "r" || r.localName === "fld").map((r) => child(r, A3, "t")?.textContent ?? "").join("")
+  ).join("\n");
+}
+function notesOf(ctx) {
+  const notes = ctx.store.relTarget(ctx.slide, REL.notesSlide);
+  if (!notes || !ctx.store.has(notes)) return void 0;
+  const tree2 = path(ctx.store.root(notes), [P2, "cSld"], [P2, "spTree"]);
+  if (!tree2) return void 0;
+  for (const el2 of shapeEls(tree2)) {
+    const ph2 = phOf(el2);
+    if (ph2?.type !== "body") continue;
+    const body = child(el2, P2, "txBody");
+    const text = body ? children(body, A3, "p").map((p) => children(p, A3, "r").map((r) => child(r, A3, "t")?.textContent ?? "").join("")).join("\n") : "";
+    return text.trim() ? text : void 0;
+  }
+  return void 0;
+}
+function backgroundOf(ctx) {
+  for (const part2 of [ctx.slide, ctx.layout, ctx.master]) {
+    if (!part2) continue;
+    const bg = path(ctx.store.root(part2), [P2, "cSld"], [P2, "bg"]);
+    if (!bg) continue;
+    const fill2 = path(bg, [P2, "bgPr"], [A3, "solidFill"]);
+    if (fill2) return colorIn(ctx, fill2);
+    const ref = child(bg, P2, "bgRef");
+    if (ref) return colorIn(ctx, ref);
+    return void 0;
+  }
+  return void 0;
+}
+
+// src/slides/check.ts
+function glyphEm(ch) {
+  if (ch === " ") return 0.28;
+  if ("iljtfI.,;:'!|()[]".includes(ch)) return 0.3;
+  if ("mwMW@%".includes(ch)) return 0.88;
+  if (/[A-Z]/.test(ch)) return 0.68;
+  if (/[0-9]/.test(ch)) return 0.56;
+  if (/[\u3000-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(ch)) return 1;
+  return 0.52;
+}
+function linesOf(text, size, width, wrap2 = true) {
+  let lines = 0;
+  let widest = 0;
+  for (const hard of text.split("\v")) {
+    const words = hard.split(/(\s+)/);
+    let line = 0;
+    let n = 1;
+    for (const w of words) {
+      const ww = [...w].reduce((s, c) => s + glyphEm(c), 0) * size;
+      if (wrap2 && line > 0 && line + ww > width && w.trim()) {
+        widest = Math.max(widest, line);
+        n++;
+        line = ww;
+      } else line += ww;
+    }
+    widest = Math.max(widest, line);
+    lines += n;
+  }
+  return { lines, widest };
+}
+function textHeight(paras, width, wrap2) {
+  let height = 0;
+  let widest = 0;
+  paras.forEach((p, i2) => {
+    const indent = p.bullet ? 18 * p.level : 0;
+    const { lines, widest: w } = linesOf(p.text || " ", p.size, width - indent, wrap2);
+    height += lines * p.size * 1.2 + (i2 > 0 ? p.size * 0.2 : 0);
+    widest = Math.max(widest, w + indent);
+  });
+  return { height, widest };
+}
+var label = (s) => `${s.name ? `"${s.name}" ` : ""}(shape ${s.id})`;
+var short = (t) => (t.length > 40 ? `${t.slice(0, 40)}…` : t).replace(/[\n\v]/g, " / ");
+function check(deck) {
+  deck.store.flush();
+  const out = checkPackage(deck.store.zip);
+  const size = deck.size();
+  const slideBox = { x: 0, y: 0, w: size.w, h: size.h };
+  for (const s of deck.slides()) {
+    const ctx = deck.ctx(s);
+    const top = readShapes(ctx);
+    const flat2 = [];
+    const walk = (list) => list.forEach((i2) => (flat2.push(i2), i2.children && walk(i2.children)));
+    walk(top);
+    const at2 = (i2) => ({ kind: "shape", slide: s.index, shape: i2.id });
+    if (!top.length) out.push({ code: "empty_slide", severity: "warning", at: { kind: "slide", slide: s.index }, message: `slide ${s.index} has nothing on it` });
+    for (const i2 of flat2) {
+      const where = `slide ${s.index}: ${label(i2)}`;
+      if (i2.box && (i2.box.w > 0 || i2.box.h > 0)) {
+        const inside = overlapArea(i2.box, slideBox);
+        const area = Math.max(1, i2.box.w * i2.box.h);
+        const tol = 2 * EMU_PER_PT;
+        if (!inside) {
+          out.push({ code: "off_slide", severity: "error", at: at2(i2), message: `${where} is off the slide (box at ${pt(i2.box.x)}, ${pt(i2.box.y)} pt; the slide is ${pt(size.w)} x ${pt(size.h)} pt)` });
+        } else if (i2.box.x < -tol || i2.box.y < -tol || i2.box.x + i2.box.w > size.w + tol || i2.box.y + i2.box.h > size.h + tol) {
+          const pct = Math.round((1 - inside / area) * 100);
+          out.push({ code: "off_slide", severity: pct >= 10 ? "error" : "warning", at: at2(i2), message: `${where} goes past the slide's edge (${pct}% of it is outside; the slide is ${pt(size.w)} x ${pt(size.h)} pt)` });
+        }
+      }
+      if (i2.ph && i2.type === "shape" && !(i2.text ?? "").trim() && !["pic", "chart", "tbl", "media", "clipArt", "dgm", "dt", "ftr", "sldNum", "hdr"].includes(i2.ph.type)) {
+        out.push({ code: "empty_placeholder", severity: "warning", at: at2(i2), message: `${where} is an empty ${i2.ph.type} placeholder: fill it or remove it (PowerPoint shows "Click to add text" there)` });
+      }
+      const text = i2.paras.some((p) => p.text.trim());
+      if (text && i2.box) {
+        const width = pt(i2.box.w - i2.inset[0] - i2.inset[2]);
+        const height = pt(i2.box.h - i2.inset[1] - i2.inset[3]);
+        const need = textHeight(i2.paras, width, i2.wrap);
+        if (need.height > height * 1.05 && i2.autofit !== "grow") {
+          const shrink = i2.autofit === "shrink";
+          out.push({
+            code: "overflow",
+            severity: shrink ? "warning" : "error",
+            at: at2(i2),
+            message: `${where}: its text needs about ${Math.round(need.height)} pt of height, the box has ${Math.round(height)} pt ("${short(i2.text ?? "")}")${shrink ? "; PowerPoint shrinks it to fit, other viewers may not" : ""}: cut the text, make the box taller, or the font smaller (an estimate from average letter widths)`
+          });
+        }
+        if (!i2.wrap && need.widest > width * 1.05) {
+          out.push({ code: "overflow", severity: "error", at: at2(i2), message: `${where}: a line of its text is about ${Math.round(need.widest)} pt wide, the box ${Math.round(width)} pt, and it does not wrap` });
+        }
+        const small = i2.paras.filter((p) => p.text.trim() && p.size < 10);
+        if (small.length) out.push({ code: "small_text", severity: "warning", at: at2(i2), message: `${where} has text at ${Math.min(...small.map((p) => p.size))} pt: below 10 pt is hard to read on a slide` });
+      }
+      if (i2.type === "picture" && !i2.image) out.push({ code: "broken_image", severity: "error", at: at2(i2), message: `${where} is a picture whose image is missing` });
+    }
+    const texts = flat2.filter((i2) => i2.box && i2.type !== "group" && (i2.text ?? "").trim());
+    for (let a = 0; a < texts.length; a++) {
+      for (let b = a + 1; b < texts.length; b++) {
+        const A8 = texts[a];
+        const B = texts[b];
+        const o = overlapArea(A8.box, B.box);
+        const smaller = Math.min(A8.box.w * A8.box.h, B.box.w * B.box.h);
+        if (smaller > 0 && o > smaller * 0.1) {
+          out.push({ code: "overlap", severity: "warning", at: at2(B), message: `slide ${s.index}: ${label(A8)} and ${label(B)} overlap, both with text: move one, or say why they should` });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+// src/slides/store.ts
+var RELS_EMPTY = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>';
+var Store = class {
+  zip;
+  docs = /* @__PURE__ */ new Map();
+  dirty = /* @__PURE__ */ new Set();
+  constructor(zip) {
+    this.zip = zip;
+  }
+  has(path2) {
+    return this.docs.has(path2) || this.zip.has(path2);
+  }
+  /** A part as a DOM; throws no_part when it is not in the file. */
+  doc(path2) {
+    let d = this.docs.get(path2);
+    if (!d) {
+      const text = this.zip.text(path2);
+      if (text === void 0) throw new OfficeError("no_part", `the deck has no ${path2}`);
+      d = parseXml(text, path2);
+      this.docs.set(path2, d);
+    }
+    return d;
+  }
+  root(path2) {
+    return this.doc(path2).documentElement;
+  }
+  /** Mark a part changed: it is written on flush. */
+  touch(path2) {
+    this.dirty.add(path2);
+  }
+  /** A new part from its XML text. */
+  put(path2, xml) {
+    this.docs.set(path2, parseXml(xml, path2));
+    this.dirty.add(path2);
+  }
+  /** A new binary part (an image). */
+  putBytes(path2, bytes) {
+    this.docs.delete(path2);
+    this.dirty.delete(path2);
+    this.zip.set(path2, bytes);
+  }
+  drop(path2) {
+    this.docs.delete(path2);
+    this.dirty.delete(path2);
+    this.zip.remove(path2);
+  }
+  /** Write every changed part into the zip. */
+  flush() {
+    for (const p of this.dirty) this.zip.set(p, writeXml(this.docs.get(p)));
+    this.dirty.clear();
+  }
+  // ---- relationships
+  relsDoc(part2, make) {
+    const p = relsPath(part2);
+    if (!this.has(p)) {
+      if (!make) return void 0;
+      this.put(p, RELS_EMPTY);
+    }
+    return this.doc(p);
+  }
+  /** The relationships of a part, targets resolved to part paths. */
+  rels(part2) {
+    const d = this.relsDoc(part2, false);
+    if (!d) return [];
+    const base = part2.slice(0, part2.lastIndexOf("/") + 1);
+    return children(d.documentElement, NS.rel, "Relationship").map((el2) => {
+      const external = attr(el2, "TargetMode") === "External";
+      const raw = attr(el2, "Target") ?? "";
+      return { id: attr(el2, "Id") ?? "", type: attr(el2, "Type") ?? "", target: external ? raw : resolve(base, raw), external, el: el2 };
+    });
+  }
+  rel(part2, id) {
+    return this.rels(part2).find((r) => r.id === id);
+  }
+  /** The first relationship of that type, its target part. */
+  relTarget(part2, type) {
+    return this.rels(part2).find((r) => r.type === type && !r.external)?.target;
+  }
+  /** Add a relationship from `part` to the part `target` (both package paths); its new id. */
+  addRel(part2, type, target) {
+    const d = this.relsDoc(part2, true);
+    const root = d.documentElement;
+    const used = new Set(children(root, NS.rel, "Relationship").map((r) => attr(r, "Id")));
+    let n = 1;
+    while (used.has(`rId${n}`)) n++;
+    const el2 = d.createElementNS(NS.rel, "Relationship");
+    el2.setAttribute("Id", `rId${n}`);
+    el2.setAttribute("Type", type);
+    el2.setAttribute("Target", relative(part2, target));
+    root.appendChild(el2);
+    this.touch(relsPath(part2));
+    return `rId${n}`;
+  }
+  removeRel(part2, id) {
+    const r = this.rel(part2, id);
+    if (!r) return;
+    r.el.parentNode.removeChild(r.el);
+    this.touch(relsPath(part2));
+  }
+  // ---- content types
+  /** Declare a part's content type (an override), or an extension's (a default). */
+  contentType(opts) {
+    const path2 = "[Content_Types].xml";
+    const root = this.root(path2);
+    const ct = "http://schemas.openxmlformats.org/package/2006/content-types";
+    if ("part" in opts) {
+      const name = `/${opts.part}`;
+      if (children(root, ct, "Override").some((o) => attr(o, "PartName") === name)) return;
+      const el2 = root.ownerDocument.createElementNS(ct, "Override");
+      el2.setAttribute("PartName", name);
+      el2.setAttribute("ContentType", opts.type);
+      root.appendChild(el2);
+    } else {
+      const ext = opts.ext.toLowerCase();
+      if (children(root, ct, "Default").some((o) => (attr(o, "Extension") ?? "").toLowerCase() === ext)) return;
+      const el2 = root.ownerDocument.createElementNS(ct, "Default");
+      el2.setAttribute("Extension", ext);
+      el2.setAttribute("ContentType", opts.type);
+      const first = children(root, ct, "Override")[0];
+      if (first) root.insertBefore(el2, first);
+      else root.appendChild(el2);
+    }
+    this.touch(path2);
+  }
+  /** Forget a part's override (the part is gone). */
+  dropContentType(part2) {
+    const path2 = "[Content_Types].xml";
+    const root = this.root(path2);
+    const ct = "http://schemas.openxmlformats.org/package/2006/content-types";
+    for (const o of children(root, ct, "Override")) {
+      if (attr(o, "PartName") === `/${part2}`) {
+        root.removeChild(o);
+        this.touch(path2);
+      }
+    }
+  }
+  /** The first free `<dir><stem>N.<ext>` path, N from 1. */
+  freePath(dir, stem, ext) {
+    for (let n = 1; ; n++) {
+      const p = `${dir}${stem}${n}.${ext}`;
+      if (!this.has(p)) return p;
+    }
+  }
+};
+function relative(from, target) {
+  const a = from.split("/").slice(0, -1);
+  const b = target.split("/");
+  let i2 = 0;
+  while (i2 < a.length && i2 < b.length - 1 && a[i2] === b[i2]) i2++;
+  return [...a.slice(i2).map(() => ".."), ...b.slice(i2)].join("/");
+}
+
+// src/slides/template.ts
+var X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+var R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+var NSP = `xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="${R}" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"`;
+var CT = "application/vnd.openxmlformats-officedocument";
+var LAYOUTS = [
+  { key: "title", type: "title", name: "Title Slide" },
+  { key: "title-body", type: "obj", name: "Title and Content" },
+  { key: "two-content", type: "twoObj", name: "Two Content" },
+  { key: "section", type: "secHead", name: "Section Header" },
+  { key: "title-only", type: "titleOnly", name: "Title Only" },
+  { key: "blank", type: "blank", name: "Blank" }
+];
+var LAYOUT_TYPE = Object.fromEntries(LAYOUTS.map((l) => [l.key, l.type]));
+function rels2(list) {
+  const rows = list.map(([id, type, target]) => `<Relationship Id="${id}" Type="${R}/${type}" Target="${target}"/>`).join("");
+  return `${X}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rows}</Relationships>`;
+}
+var tree = (shapes) => `<p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${shapes}</p:spTree></p:cSld>`;
+function ph(p) {
+  const [x2, y, w, h] = p.box;
+  const attrs = `${p.type ? ` type="${p.type}"` : ""}${p.idx !== void 0 ? ` idx="${p.idx}"` : ""}`;
+  const lvl = p.size || p.align ? `<a:lstStyle><a:lvl1pPr${p.align ? ` algn="${p.align}"` : ""}>${p.size ? `<a:defRPr sz="${p.size * 100}"/>` : ""}</a:lvl1pPr></a:lstStyle>` : "<a:lstStyle/>";
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${p.id}" name="${esc(p.name)}"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph${attrs}/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="${emu(x2)}" y="${emu(y)}"/><a:ext cx="${emu(w)}" cy="${emu(h)}"/></a:xfrm></p:spPr><p:txBody><a:bodyPr${p.anchor ? ` anchor="${p.anchor}"` : ""}><a:normAutofit/></a:bodyPr>${lvl}<a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>`;
+}
+function layoutShapes(type, w) {
+  const m = 48;
+  const inner = w - 2 * m;
+  const title = { id: 2, name: "Title 1", type: "title", box: [m, 30, inner, 70], anchor: "b" };
+  const body = (id, idx, box) => ({ id, name: `Content Placeholder ${id - 1}`, idx, box });
+  switch (type) {
+    case "title":
+      return ph({ id: 2, name: "Title 1", type: "ctrTitle", box: [m * 2, 150, w - 4 * m, 130], anchor: "b", size: 48, align: "ctr" }) + ph({ id: 3, name: "Subtitle 2", type: "subTitle", idx: 1, box: [m * 2, 292, w - 4 * m, 90], size: 24, align: "ctr" });
+    case "obj":
+      return ph(title) + ph(body(3, 1, [m, 118, inner, 378]));
+    case "twoObj": {
+      const half = (inner - 24) / 2;
+      return ph(title) + ph(body(3, 1, [m, 118, half, 378])) + ph(body(4, 2, [m + half + 24, 118, half, 378]));
+    }
+    case "secHead":
+      return ph({ ...title, box: [m + 12, 170, inner - 24, 110], size: 40 }) + ph({ id: 3, name: "Text Placeholder 2", type: "body", idx: 1, box: [m + 12, 290, inner - 24, 60], size: 20 });
+    case "titleOnly":
+      return ph(title);
+    default:
+      return "";
+  }
+}
+var level = (n, size, bullet) => {
+  const indent = bullet ? ` marL="${emu(18 + 22 * (n - 1))}" indent="${emu(-18)}"` : "";
+  const bu = bullet ? `<a:buFont typeface="Arial"/><a:buChar char="&#8226;"/>` : "<a:buNone/>";
+  return `<a:lvl${n}pPr${indent} algn="l"><a:spcBef><a:spcPts val="${n === 1 ? 1e3 : 500}"/></a:spcBef>${bu}<a:defRPr sz="${size * 100}"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/></a:defRPr></a:lvl${n}pPr>`;
+};
+var txStyles = `<p:txStyles><p:titleStyle><a:lvl1pPr algn="l"><a:lnSpc><a:spcPct val="90000"/></a:lnSpc><a:buNone/><a:defRPr sz="3600" b="1"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mj-lt"/></a:defRPr></a:lvl1pPr></p:titleStyle><p:bodyStyle>${[24, 20, 18, 16, 16, 16, 16, 16, 16].map((s, i2) => level(i2 + 1, s, true)).join("")}</p:bodyStyle><p:otherStyle>${[18, 18, 18, 18, 18, 18, 18, 18, 18].map((s, i2) => level(i2 + 1, s, false)).join("")}</p:otherStyle></p:txStyles>`;
+var clrMap = `<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>`;
+var solid = (c) => `<a:solidFill><a:schemeClr val="${c}"/></a:solidFill>`;
+var theme = `${X}<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="bise"><a:themeElements><a:clrScheme name="bise"><a:dk1><a:srgbClr val="1F2328"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="44546A"/></a:dk2><a:lt2><a:srgbClr val="E7E6E6"/></a:lt2>` + ["4472C4", "ED7D31", "A5A5A5", "FFC000", "5B9BD5", "70AD47"].map((c, i2) => `<a:accent${i2 + 1}><a:srgbClr val="${c}"/></a:accent${i2 + 1}>`).join("") + `<a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="bise"><a:majorFont><a:latin typeface="Arial"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Arial"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="bise"><a:fillStyleLst>${solid("phClr").repeat(3)}</a:fillStyleLst><a:lnStyleLst>${[6350, 12700, 19050].map((w) => `<a:ln w="${w}">${solid("phClr")}</a:ln>`).join("")}</a:lnStyleLst><a:effectStyleLst>${"<a:effectStyle><a:effectLst/></a:effectStyle>".repeat(3)}</a:effectStyleLst><a:bgFillStyleLst>${solid("phClr").repeat(3)}</a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>`;
+function newDeck(size = "16:9") {
+  const w = size === "4:3" ? 720 : 960;
+  const types = [
+    ["ppt/presentation.xml", "presentationml.presentation.main+xml"],
+    ["ppt/slideMasters/slideMaster1.xml", "presentationml.slideMaster+xml"],
+    ...LAYOUTS.map((_, i2) => [`ppt/slideLayouts/slideLayout${i2 + 1}.xml`, "presentationml.slideLayout+xml"]),
+    ["ppt/theme/theme1.xml", "theme+xml"]
+  ];
+  const ct = `${X}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>` + types.map(([p, t]) => `<Override PartName="/${p}" ContentType="${CT}.${t}"/>`).join("") + `</Types>`;
+  const masterShapes = ph({ id: 2, name: "Title Placeholder 1", type: "title", box: [48, 30, w - 96, 70], anchor: "b" }) + ph({ id: 3, name: "Text Placeholder 2", type: "body", idx: 1, box: [48, 118, w - 96, 378] });
+  const parts = [
+    ["[Content_Types].xml", ct],
+    ["_rels/.rels", rels2([["rId1", "officeDocument", "ppt/presentation.xml"]])],
+    [
+      "ppt/presentation.xml",
+      `${X}<p:presentation ${NSP} saveSubsetFonts="1"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldSz cx="${emu(w)}" cy="${emu(540)}"${size === "4:3" ? ' type="screen4x3"' : ""}/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>`
+    ],
+    ["ppt/_rels/presentation.xml.rels", rels2([["rId1", "slideMaster", "slideMasters/slideMaster1.xml"], ["rId2", "theme", "theme/theme1.xml"]])],
+    [
+      "ppt/slideMasters/slideMaster1.xml",
+      `${X}<p:sldMaster ${NSP}>${tree(masterShapes).replace("<p:cSld>", `<p:cSld><p:bg><p:bgPr>${solid("bg1")}<a:effectLst/></p:bgPr></p:bg>`)}${clrMap}<p:sldLayoutIdLst>${LAYOUTS.map((_, i2) => `<p:sldLayoutId id="${2147483649 + i2}" r:id="rId${i2 + 1}"/>`).join("")}</p:sldLayoutIdLst>${txStyles}</p:sldMaster>`
+    ],
+    [
+      "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+      rels2([...LAYOUTS.map((_, i2) => [`rId${i2 + 1}`, "slideLayout", `../slideLayouts/slideLayout${i2 + 1}.xml`]), [`rId${LAYOUTS.length + 1}`, "theme", "../theme/theme1.xml"]])
+    ],
+    ["ppt/theme/theme1.xml", theme]
+  ];
+  LAYOUTS.forEach((l, i2) => {
+    parts.push([
+      `ppt/slideLayouts/slideLayout${i2 + 1}.xml`,
+      `${X}<p:sldLayout ${NSP} type="${l.type}" preserve="1">${tree(layoutShapes(l.type, w)).replace("<p:cSld>", `<p:cSld name="${l.name}">`)}<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>`
+    ]);
+    parts.push([`ppt/slideLayouts/_rels/slideLayout${i2 + 1}.xml.rels`, rels2([["rId1", "slideMaster", "../slideMasters/slideMaster1.xml"]])]);
+  });
+  return parts;
+}
+
+// src/slides/deck.ts
+var { a: A4, p: P3, r: R2 } = PNS;
+var CT_SLIDE = "application/vnd.openxmlformats-officedocument.presentationml.slide+xml";
+var CT_CHART = "application/vnd.openxmlformats-officedocument.drawingml.chart+xml";
+var DeckCore = class _DeckCore {
+  store;
+  pres;
+  constructor(store, pres) {
+    this.store = store;
+    this.pres = pres;
+  }
+  static open(bytes) {
+    const pkg = openPackage(bytes);
+    if (pkg.kind !== "pptx") throw new OfficeError("not_office", `this is a ${pkg.kind}, not a pptx: open it with the ${pkg.kind === "xlsx" ? "sheets" : "docs"} module`);
+    return new _DeckCore(new Store(pkg.zip), pkg.main);
+  }
+  static create(size) {
+    const zip = Zip.empty();
+    for (const [p, xml] of newDeck(size)) zip.set(p, xml);
+    return new _DeckCore(new Store(zip), "ppt/presentation.xml");
+  }
+  /** The slide size in EMU. */
+  size() {
+    return slideSize(this.store, this.pres);
+  }
+  // ---- slides
+  idList(make = false) {
+    const root = this.store.root(this.pres);
+    const lst = child(root, P3, "sldIdLst");
+    if (lst || !make) return lst;
+    const el2 = root.ownerDocument.createElementNS(P3, "p:sldIdLst");
+    return insertBefore(root, el2, [[P3, "sldSz"], [P3, "notesSz"], [P3, "smartTags"], [P3, "embeddedFontLst"], [P3, "custShowLst"], [P3, "photoAlbum"], [P3, "custDataLst"], [P3, "kinsoku"], [P3, "defaultTextStyle"], [P3, "modifyVerifier"], [P3, "extLst"]]);
+  }
+  slides() {
+    const lst = this.idList();
+    if (!lst) return [];
+    const out = [];
+    for (const el2 of children(lst, P3, "sldId")) {
+      const rid = attr(el2, "id", R2) ?? "";
+      const rel = this.store.rel(this.pres, rid);
+      if (!rel || rel.external) continue;
+      out.push({ sldId: int(el2, "id") ?? 0, rid, part: rel.target, index: out.length + 1 });
+    }
+    return out;
+  }
+  /** The slide at `n` (from 1); throws not_found with the count. */
+  slideAt(n) {
+    const all = this.slides();
+    if (!Number.isInteger(n) || n < 1 || n > all.length) {
+      throw new OfficeError("not_found", `there is no slide ${n}: the deck has ${all.length} slide${all.length === 1 ? "" : "s"}${all.length ? ` (1 to ${all.length})` : ""}`);
+    }
+    return all[n - 1];
+  }
+  /** The slide with that stable id; throws not_found when it was removed. */
+  slideById(sldId) {
+    const s = this.slides().find((x2) => x2.sldId === sldId);
+    if (!s) throw new OfficeError("not_found", `that slide is no longer in the deck (it was removed)`);
+    return s;
+  }
+  ctx(s) {
+    return ctxOf(this.store, this.pres, s.part);
+  }
+  /** The layouts of every master, in order. */
+  layouts() {
+    const out = [];
+    const masters = children(child(this.store.root(this.pres), P3, "sldMasterIdLst") ?? this.store.root(this.pres), P3, "sldMasterId").map((m) => this.store.rel(this.pres, attr(m, "id", R2) ?? "")).filter((r) => r && !r.external).map((r) => r.target);
+    for (const m of masters) {
+      const ids = children(child(this.store.root(m), P3, "sldLayoutIdLst") ?? this.store.root(m), P3, "sldLayoutId");
+      for (const l of ids) {
+        const rel = this.store.rel(m, attr(l, "id", R2) ?? "");
+        if (!rel || rel.external || !this.store.has(rel.target)) continue;
+        const root = this.store.root(rel.target);
+        const type = attr(root, "type");
+        const name = attr(child(root, P3, "cSld") ?? root, "name") ?? LAYOUTS.find((x2) => x2.type === type)?.name ?? rel.target;
+        out.push({ name, type, key: LAYOUTS.find((x2) => x2.type === type)?.key, part: rel.target });
+      }
+    }
+    return out;
+  }
+  /** A layout by key ("title-body"), by name ("Title and Content"), or by its number in layouts(). */
+  layout(want) {
+    const all = this.layouts();
+    if (!all.length) throw new OfficeError("no_part", "the deck has no slide layout to add a slide on");
+    const list = () => all.map((l, i2) => `${i2 + 1}. ${l.key ? `${l.key} ` : ""}"${l.name}"`).join(", ");
+    if (want === void 0) return all.find((l) => l.type === "obj") ?? all.find((l) => l.type !== "title") ?? all[0];
+    if (typeof want === "number") {
+      if (all[want - 1]) return all[want - 1];
+    } else {
+      const w = want.toLowerCase();
+      const hit = all.find((l) => l.key === w) ?? all.find((l) => l.type && l.type === LAYOUT_TYPE[w]) ?? all.find((l) => l.name.toLowerCase() === w);
+      if (hit) return hit;
+    }
+    throw new OfficeError("not_found", `no layout ${JSON.stringify(want)} in this deck; it has: ${list()}`);
+  }
+  /** Add a slide on a layout, with the layout's placeholders (empty) on it, at position `at` (default: last). */
+  addSlide(opts = {}) {
+    const layout = this.layout(opts.layout);
+    const count = this.slides().length;
+    const at2 = opts.at ?? count + 1;
+    if (!Number.isInteger(at2) || at2 < 1 || at2 > count + 1) throw new OfficeError("bad_arg", `at is a slide position from 1 to ${count + 1}, got ${JSON.stringify(opts.at)}`);
+    const part2 = this.store.freePath("ppt/slides/", "slide", "xml");
+    let id = 1;
+    const phs = layoutPlaceholders(this.store, layout.part).map((el2) => {
+      const ph2 = path(el2, [P3, "nvSpPr"], [P3, "nvPr"], [P3, "ph"]);
+      if (!ph2) return "";
+      const attrs = ["type", "orient", "sz", "idx", "hasCustomPrompt"].filter((n) => ph2.hasAttribute(n) && n !== "hasCustomPrompt").map((n) => ` ${n}="${esc(ph2.getAttribute(n))}"`).join("");
+      const name = attr(cNvPr(el2) ?? el2, "name") ?? "Placeholder";
+      id++;
+      return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${esc(name)}"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph${attrs}/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>`;
+    }).join("");
+    this.store.put(
+      part2,
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:a="${A4}" xmlns:r="${R2}" xmlns:p="${P3}"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${phs}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`
+    );
+    this.store.addRel(part2, REL.slideLayout, layout.part);
+    this.store.contentType({ part: part2, type: CT_SLIDE });
+    return this.insertSlide(part2, at2);
+  }
+  /** Put a slide part in the deck's list at `at`. */
+  insertSlide(part2, at2) {
+    const rid = this.store.addRel(this.pres, REL.slide, part2);
+    const lst = this.idList(true);
+    const used = children(lst, P3, "sldId").map((e) => int(e, "id") ?? 0);
+    const sldId = Math.max(255, ...used) + 1;
+    const el2 = frag(this.store.doc(this.pres), `<p:sldId id="${sldId}" r:id="${rid}"/>`);
+    const before = children(lst, P3, "sldId")[at2 - 1];
+    if (before) lst.insertBefore(el2, before);
+    else lst.appendChild(el2);
+    this.store.touch(this.pres);
+    return this.slideById(sldId);
+  }
+  removeSlide(s) {
+    const lst = this.idList();
+    const el2 = children(lst, P3, "sldId").find((e) => int(e, "id") === s.sldId);
+    if (el2) lst.removeChild(el2);
+    this.store.removeRel(this.pres, s.rid);
+    this.store.touch(this.pres);
+    const notes = this.store.relTarget(s.part, REL.notesSlide);
+    for (const p of [s.part, notes].filter((x2) => !!x2)) this.dropPart(p);
+  }
+  /** Move a slide to position `to` (from 1). */
+  moveSlide(s, to) {
+    const lst = this.idList();
+    const els = children(lst, P3, "sldId");
+    if (!Number.isInteger(to) || to < 1 || to > els.length) throw new OfficeError("bad_arg", `a slide moves to a position from 1 to ${els.length}, got ${JSON.stringify(to)}`);
+    const el2 = els.find((e) => int(e, "id") === s.sldId);
+    lst.removeChild(el2);
+    const rest = children(lst, P3, "sldId");
+    if (rest[to - 1]) lst.insertBefore(el2, rest[to - 1]);
+    else lst.appendChild(el2);
+    this.store.touch(this.pres);
+    return this.slideById(s.sldId);
+  }
+  /** A copy of a slide right after it: its shapes, images (shared) and charts (copied); not its notes. */
+  duplicateSlide(s) {
+    this.store.flush();
+    const part2 = this.store.freePath("ppt/slides/", "slide", "xml");
+    this.store.put(part2, this.store.zip.text(s.part));
+    const doc = this.store.doc(part2);
+    const remap = /* @__PURE__ */ new Map();
+    for (const rel of this.store.rels(s.part)) {
+      if (rel.type === REL.notesSlide) continue;
+      if (rel.external) {
+        remap.set(rel.id, this.addExternalRel(part2, rel.type, rel.target));
+        continue;
+      }
+      let target = rel.target;
+      if (rel.type === REL.chart && this.store.has(rel.target)) {
+        target = this.store.freePath("ppt/charts/", "chart", "xml");
+        this.store.put(target, this.store.zip.text(rel.target));
+        this.store.contentType({ part: target, type: CT_CHART });
+        const chartDoc = this.store.doc(target);
+        const ids = /* @__PURE__ */ new Map();
+        for (const cr of this.store.rels(rel.target)) {
+          if (cr.external) ids.set(cr.id, this.addExternalRel(target, cr.type, cr.target));
+          else if (cr.type === REL.package && this.store.has(cr.target)) {
+            const ext = cr.target.slice(cr.target.lastIndexOf(".") + 1);
+            const copy = this.store.freePath("ppt/embeddings/", "Microsoft_Excel_Worksheet", ext);
+            this.store.putBytes(copy, this.store.zip.bytes(cr.target));
+            ids.set(cr.id, this.store.addRel(target, cr.type, copy));
+          } else ids.set(cr.id, this.store.addRel(target, cr.type, cr.target));
+        }
+        remapRels(chartDoc.documentElement, ids);
+        this.store.touch(target);
+      }
+      remap.set(rel.id, this.store.addRel(part2, rel.type, target));
+    }
+    remapRels(doc.documentElement, remap);
+    this.store.contentType({ part: part2, type: CT_SLIDE });
+    return this.insertSlide(part2, s.index + 1);
+  }
+  addExternalRel(part2, type, target) {
+    const id = this.store.addRel(part2, type, "x");
+    const rel = this.store.rel(part2, id);
+    rel.el.setAttribute("Target", target);
+    rel.el.setAttribute("TargetMode", "External");
+    return id;
+  }
+  /** Remove a part with its relationships part and content type. */
+  dropPart(part2) {
+    const relsPart = part2.replace(/([^/]*)$/, "_rels/$1.rels");
+    this.store.drop(part2);
+    this.store.drop(relsPart);
+    this.store.dropContentType(part2);
+  }
+  /** Media, charts and their workbooks that nothing points at any more (after a slide or a shape went). */
+  collect() {
+    for (; ; ) {
+      this.store.flush();
+      const zip = this.store.zip;
+      const targeted = /* @__PURE__ */ new Set();
+      for (const p of zip.list()) {
+        const m = /^(.*?)_rels\/([^/]*)\.rels$/.exec(p);
+        if (!m) continue;
+        for (const r of rels(zip, `${m[1]}${m[2]}`)) if (!r.external) targeted.add(r.target);
+      }
+      const orphans = zip.list().filter((p) => /^ppt\/(media|charts|embeddings|notesSlides)\/[^/]+$/.test(p) && !targeted.has(p));
+      if (!orphans.length) return;
+      for (const p of orphans) this.dropPart(p);
+    }
+  }
+  /** The deck's bytes. */
+  save() {
+    this.collect();
+    this.store.flush();
+    return this.store.zip.write();
+  }
+  /** The relationships that point at a missing part (after a flush). */
+  broken() {
+    this.store.flush();
+    return brokenRels(this.store.zip).map(({ from, rel }) => ({ from, target: rel.target, id: rel.id }));
+  }
+  /** The highest shape id on a slide, + 1. */
+  nextId(s) {
+    let max2 = 1;
+    for (const el2 of descendants(this.store.doc(s.part), P3, "cNvPr")) max2 = Math.max(max2, int(el2, "id") ?? 0);
+    return max2 + 1;
+  }
+  /** The shape element with that id on the slide (in groups too). */
+  shapeEl(s, id) {
+    for (const el2 of descendants(this.store.doc(s.part), P3, "cNvPr")) {
+      if (attr(el2, "id") !== id) continue;
+      const shape = el2.parentNode?.parentNode;
+      if (shape && shape.localName !== "spTree") return shape;
+    }
+    return void 0;
+  }
+};
+function remapRels(root, ids) {
+  for (const el2 of [root, ...descendants(root, "*", "*")]) {
+    for (let i2 = 0; i2 < el2.attributes.length; i2++) {
+      const a = el2.attributes.item(i2);
+      if (a.namespaceURI === R2 && ids.has(a.value)) a.value = ids.get(a.value);
+    }
+  }
+}
+
+// src/slides/build.ts
+var GEOMETRIES = ["rect", "roundRect", "ellipse", "triangle", "rightArrow", "leftArrow", "upArrow", "downArrow", "chevron", "homePlate", "diamond", "hexagon", "star5", "line"];
+var xfrm = (b) => `<a:xfrm><a:off x="${b.x}" y="${b.y}"/><a:ext cx="${b.w}" cy="${b.h}"/></a:xfrm>`;
+var nv = (tag, id, name, inner, alt) => `<p:nv${tag}Pr><p:cNvPr id="${id}" name="${esc(name)}"${alt ? ` descr="${esc(alt)}"` : ""}/>${inner}<p:nvPr/></p:nv${tag}Pr>`;
+var color = (c) => c === "none" ? "<a:noFill/>" : `<a:solidFill><a:srgbClr val="${hex(c)}"/></a:solidFill>`;
+var ANCHOR = { top: "t", middle: "ctr", bottom: "b" };
+function checkLook(l) {
+  if (l.lineWidth !== void 0 && !(typeof l.lineWidth === "number" && l.lineWidth >= 0 && l.lineWidth <= 100)) {
+    throw new OfficeError("bad_arg", `lineWidth is in points, 0 to 100, got ${JSON.stringify(l.lineWidth)}`);
+  }
+  if (l.valign !== void 0 && !ANCHOR[l.valign]) throw new OfficeError("bad_arg", `valign is top, middle or bottom, got ${JSON.stringify(l.valign)}`);
+}
+function textBoxXml(id, name, box, look = {}) {
+  checkLook(look);
+  const fill2 = look.fill ? color(look.fill) : "<a:noFill/>";
+  const line = look.line ? `<a:ln${look.lineWidth !== void 0 ? ` w="${Math.round(look.lineWidth * 12700)}"` : ""}>${color(look.line)}</a:ln>` : "";
+  return `<p:sp>${nv("Sp", id, name, '<p:cNvSpPr txBox="1"/>')}<p:spPr>${xfrm(box)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${fill2}${line}</p:spPr><p:txBody><a:bodyPr wrap="square" rtlCol="0" anchor="${ANCHOR[look.valign ?? "top"]}"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>`;
+}
+function shapeXml(id, name, geometry, box, look = {}) {
+  checkLook(look);
+  if (typeof geometry !== "string" || !/^[a-zA-Z0-9]+$/.test(geometry)) {
+    throw new OfficeError("bad_arg", `a shape's geometry is a preset name (${GEOMETRIES.join(", ")}, ...), got ${JSON.stringify(geometry)}`);
+  }
+  const fill2 = look.fill ? color(look.fill) : '<a:solidFill><a:schemeClr val="accent1"/></a:solidFill>';
+  const w = look.lineWidth !== void 0 ? ` w="${Math.round(look.lineWidth * 12700)}"` : "";
+  const line = look.line ? `<a:ln${w}>${color(look.line)}</a:ln>` : `<a:ln${w}><a:noFill/></a:ln>`;
+  return `<p:sp>${nv("Sp", id, name, "<p:cNvSpPr/>")}<p:spPr>${xfrm(box)}<a:prstGeom prst="${geometry}"><a:avLst/></a:prstGeom>${fill2}${line}</p:spPr><p:txBody><a:bodyPr wrap="square" rtlCol="0" anchor="${ANCHOR[look.valign ?? "middle"]}"><a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr algn="ctr"/><a:endParaRPr lang="en-US"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:endParaRPr></a:p></p:txBody></p:sp>`;
+}
+function pictureXml(id, name, rid, box, alt) {
+  return `<p:pic>${nv("Pic", id, name, '<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>', alt)}<p:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${xfrm(box)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+}
+function tableXml(id, name, rows, box, opts = {}) {
+  if (!Array.isArray(rows) || !rows.length || !rows.every((r) => Array.isArray(r) && r.length)) {
+    throw new OfficeError("bad_arg", 'a table is rows of cells: [["Region", "Revenue"], ["North", "120"]]');
+  }
+  const cols = Math.max(...rows.map((r) => r.length));
+  const shares = opts.widths ?? new Array(cols).fill(1);
+  if (shares.length !== cols || !shares.every((w) => typeof w === "number" && w > 0)) {
+    throw new OfficeError("bad_arg", `widths has one positive number per column (${cols}), got ${JSON.stringify(opts.widths)}`);
+  }
+  const size = opts.size ?? 14;
+  if (!(typeof size === "number" && size >= 1 && size <= 400)) throw new OfficeError("bad_arg", `a table's size is in points, got ${JSON.stringify(size)}`);
+  const total = shares.reduce((a, b) => a + b, 0);
+  const widths = shares.map((s) => Math.round(box.w * s / total));
+  const rowH = Math.round(box.h / rows.length);
+  const cell = (t) => {
+    const paras = String(t ?? "").split("\n").map((line) => `<a:p>${line ? `<a:r><a:rPr lang="en-US" sz="${size * 100}" dirty="0"/><a:t>${esc(line)}</a:t></a:r>` : ""}<a:endParaRPr lang="en-US" sz="${size * 100}"/></a:p>`).join("");
+    return `<a:tc><a:txBody><a:bodyPr/><a:lstStyle/>${paras}</a:txBody><a:tcPr/></a:tc>`;
+  };
+  const body = rows.map((r) => `<a:tr h="${rowH}">${Array.from({ length: cols }, (_, i2) => cell(r[i2] ?? "")).join("")}</a:tr>`).join("");
+  return `<p:graphicFrame>${nv("GraphicFrame", id, name, '<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr>')}<p:xfrm><a:off x="${box.x}" y="${box.y}"/><a:ext cx="${box.w}" cy="${box.h}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr firstRow="${opts.header === false ? 0 : 1}" bandRow="1"><a:tableStyleId>{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}</a:tableStyleId></a:tblPr><a:tblGrid>${widths.map((w) => `<a:gridCol w="${w}"/>`).join("")}</a:tblGrid>${body}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>`;
+}
+function chartFrameXml(id, name, rid, box) {
+  return `<p:graphicFrame>${nv("GraphicFrame", id, name, "<p:cNvGraphicFramePr/>")}<p:xfrm><a:off x="${box.x}" y="${box.y}"/><a:ext cx="${box.w}" cy="${box.h}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="${rid}"/></a:graphicData></a:graphic></p:graphicFrame>`;
+}
+function imageInfo(b) {
+  if (!(b instanceof Uint8Array)) throw new OfficeError("bad_arg", "an image is its bytes (a Uint8Array, from run.read)");
+  const u32 = (i2) => (b[i2] << 24 | b[i2 + 1] << 16 | b[i2 + 2] << 8 | b[i2 + 3]) >>> 0;
+  if (b.length > 24 && b[0] === 137 && b[1] === 80 && b[2] === 78 && b[3] === 71) {
+    return { ext: "png", mime: "image/png", w: u32(16), h: u32(20) };
+  }
+  if (b.length > 10 && b[0] === 71 && b[1] === 73 && b[2] === 70) {
+    return { ext: "gif", mime: "image/gif", w: b[6] | b[7] << 8, h: b[8] | b[9] << 8 };
+  }
+  if (b.length > 4 && b[0] === 255 && b[1] === 216) {
+    let i2 = 2;
+    while (i2 + 9 < b.length) {
+      if (b[i2] !== 255) break;
+      const marker = b[i2 + 1];
+      const len = b[i2 + 2] << 8 | b[i2 + 3];
+      if (marker >= 192 && marker <= 207 && ![196, 200, 204].includes(marker)) {
+        return { ext: "jpeg", mime: "image/jpeg", h: b[i2 + 5] << 8 | b[i2 + 6], w: b[i2 + 7] << 8 | b[i2 + 8] };
+      }
+      i2 += 2 + len;
+    }
+    return { ext: "jpeg", mime: "image/jpeg" };
+  }
+  throw new OfficeError("bad_arg", "an image is a PNG, JPEG or GIF (these bytes are none of them)");
+}
+
+// src/slides/outline.ts
+function outline(deck) {
+  const size = deck.size();
+  return { kind: "pptx", nodes: deck.slides().map((s) => slideNode(deck, s, size)) };
+}
+function slideNode(deck, s, size = deck.size()) {
+  const ctx = deck.ctx(s);
+  const layout = deck.layouts().find((l) => l.part === ctx.layout);
+  const props2 = { index: s.index, w: pt(size.w), h: pt(size.h) };
+  if (layout) props2.layout = layout.key ?? layout.name;
+  const bg = backgroundOf(ctx);
+  if (bg) props2.background = bg;
+  const notes = notesOf(ctx);
+  if (notes) props2.notes = notes;
+  return {
+    id: `s${s.sldId}`,
+    type: "slide",
+    anchor: { kind: "slide", slide: s.index },
+    ...layout ? { name: layout.name } : {},
+    props: props2,
+    children: readShapes(ctx).map((i2) => shapeNode(ctx, s, i2))
+  };
+}
+function shapeNode(ctx, s, i2) {
+  const props2 = {};
+  if (i2.box) props2.box = boxPt(i2.box);
+  if (i2.ph) props2.placeholder = i2.ph.type;
+  for (const k of ["fill", "line", "geometry", "image", "alt", "rows", "chart", "notDrawn", "valign"]) {
+    if (i2[k] !== void 0) props2[k] = i2[k];
+  }
+  const lead = i2.paras.find((p) => p.text) ?? i2.paras[0];
+  if (lead) {
+    props2.fontSize = lead.size;
+    if (lead.bold) props2.bold = true;
+    if (lead.italic) props2.italic = true;
+    if (lead.color) props2.color = lead.color;
+    if (lead.font) props2.font = lead.font;
+    if (lead.align) props2.align = { l: "left", ctr: "center", r: "right", just: "justify" }[lead.align] ?? lead.align;
+  }
+  if (i2.paras.length > 1 || i2.paras.some((p) => p.bullet)) {
+    props2.paras = i2.paras.map((p) => {
+      const o = { text: p.text, level: p.level, size: p.size };
+      if (p.bullet) o.bullet = true;
+      if (p.bold) o.bold = true;
+      if (p.italic) o.italic = true;
+      if (p.color) o.color = p.color;
+      if (p.align) o.align = { l: "left", ctr: "center", r: "right", just: "justify" }[p.align] ?? p.align;
+      return o;
+    });
+  }
+  const node = {
+    id: `s${s.sldId}/${i2.id}`,
+    type: i2.type,
+    anchor: { kind: "shape", slide: s.index, shape: i2.id },
+    props: props2
+  };
+  if (i2.name) node.name = i2.name;
+  if (i2.text !== void 0) node.text = i2.text;
+  if (i2.children) node.children = i2.children.map((c) => shapeNode(ctx, s, c));
+  return node;
+}
+
+// src/slides/text.ts
+var A5 = PNS.a;
+var ALIGN = { left: "l", center: "ctr", right: "r", justify: "just" };
+var FILLS = ["noFill", "solidFill", "gradFill", "blipFill", "pattFill", "grpFill"];
+var AFTER_FILL = ["effectLst", "effectDag", "highlight", "uLnTx", "uLn", "uFillTx", "uFill", "latin", "ea", "cs", "sym", "hlinkClick", "hlinkMouseOver", "rtl", "extLst"];
+var AFTER_LATIN = ["ea", "cs", "sym", "hlinkClick", "hlinkMouseOver", "rtl", "extLst"];
+var BULLETS = ["buNone", "buAutoNum", "buChar", "buBlip"];
+var AFTER_BULLET = ["tabLst", "defRPr", "extLst"];
+var at = (names) => names.map((n) => [A5, n]);
+function checkStyle(s) {
+  if (!s) return;
+  if (s.size !== void 0 && !(typeof s.size === "number" && s.size >= 1 && s.size <= 400)) {
+    throw new OfficeError("bad_arg", `a text size is in points, 1 to 400, got ${JSON.stringify(s.size)}`);
+  }
+  if (s.align !== void 0 && !ALIGN[s.align]) throw new OfficeError("bad_arg", `align is left, center, right or justify, got ${JSON.stringify(s.align)}`);
+  if (s.color !== void 0) hex(s.color);
+}
+function styleRun(rPr, s) {
+  if (s.size !== void 0) rPr.setAttribute("sz", String(Math.round(s.size * 100)));
+  if (s.bold !== void 0) rPr.setAttribute("b", s.bold ? "1" : "0");
+  if (s.italic !== void 0) rPr.setAttribute("i", s.italic ? "1" : "0");
+  if (s.color !== void 0) {
+    for (const f of children(rPr, A5).filter((e) => FILLS.includes(ln2(e)))) remove(f);
+    const fill2 = rPr.ownerDocument.createElementNS(A5, "a:solidFill");
+    const c = rPr.ownerDocument.createElementNS(A5, "a:srgbClr");
+    c.setAttribute("val", hex(s.color));
+    fill2.appendChild(c);
+    insertBefore(rPr, fill2, at(AFTER_FILL));
+  }
+  if (s.font !== void 0) {
+    remove(child(rPr, A5, "latin"));
+    const latin = rPr.ownerDocument.createElementNS(A5, "a:latin");
+    latin.setAttribute("typeface", s.font);
+    insertBefore(rPr, latin, at(AFTER_LATIN));
+  }
+}
+function stylePara(p, s) {
+  if (s.align === void 0 && s.level === void 0 && s.bullet === void 0) return;
+  const pPr = ensure(p, A5, "a:pPr", at(["r", "br", "fld", "endParaRPr"]));
+  if (s.align !== void 0) pPr.setAttribute("algn", ALIGN[s.align]);
+  if (s.level !== void 0) {
+    if (s.level > 1) pPr.setAttribute("lvl", String(s.level - 1));
+    else pPr.removeAttribute("lvl");
+  }
+  if (s.bullet !== void 0) {
+    for (const b of children(pPr, A5).filter((e) => BULLETS.includes(ln2(e)) || ln2(e) === "buFont")) remove(b);
+    if (s.bullet) {
+      const lvl = s.level ?? 1;
+      pPr.setAttribute("marL", String(emu(18 * lvl)));
+      pPr.setAttribute("indent", String(emu(-18)));
+      const ch = p.ownerDocument.createElementNS(A5, "a:buChar");
+      ch.setAttribute("char", "•");
+      insertBefore(pPr, ch, at(AFTER_BULLET));
+    } else {
+      insertBefore(pPr, p.ownerDocument.createElementNS(A5, "a:buNone"), at(AFTER_BULLET));
+    }
+  }
+}
+function normalize(input) {
+  const list = typeof input === "string" ? input.split("\n") : input;
+  if (!Array.isArray(list)) throw new OfficeError("bad_arg", `text is a string or an array of paragraphs, got ${JSON.stringify(input)}`);
+  return list.map((p) => {
+    const o = typeof p === "string" ? { text: p } : p;
+    if (!o || typeof o.text !== "string") throw new OfficeError("bad_arg", `a paragraph is a string or { text, level?, bullet?, size?, bold?, color?, ... }, got ${JSON.stringify(p)}`);
+    if (o.level !== void 0 && !(Number.isInteger(o.level) && o.level >= 1 && o.level <= 9)) throw new OfficeError("bad_arg", `a paragraph's level is 1 to 9, got ${o.level}`);
+    checkStyle(o);
+    return o;
+  });
+}
+function setText(body, input, style) {
+  checkStyle(style);
+  const paras = normalize(input);
+  const doc = body.ownerDocument;
+  const old = children(body, A5, "p");
+  const first = old[0];
+  const pPrT = first && child(first, A5, "pPr");
+  const runT = first && (children(first, A5, "r")[0] ?? void 0);
+  const rPrT = (runT && child(runT, A5, "rPr")) ?? (first && child(first, A5, "endParaRPr"));
+  for (const p of old) remove(p);
+  const tail = child(body, A5, "extLst");
+  for (const para3 of paras) {
+    const p = doc.createElementNS(A5, "a:p");
+    if (pPrT) p.appendChild(pPrT.cloneNode(true));
+    const rPr = () => {
+      const r = rPrT ? rPrT.cloneNode(true) : doc.createElementNS(A5, "a:rPr");
+      if (r.localName !== "rPr") {
+        const n = doc.createElementNS(A5, "a:rPr");
+        for (let i2 = 0; i2 < r.attributes.length; i2++) n.setAttribute(r.attributes.item(i2).name, r.attributes.item(i2).value);
+        for (let c = r.firstChild; c; c = c.nextSibling) n.appendChild(c.cloneNode(true));
+        return n;
+      }
+      return r;
+    };
+    const look = { ...style, ...para3 };
+    const lines = para3.text.split("\v");
+    lines.forEach((line, i2) => {
+      if (i2 > 0) {
+        const br = doc.createElementNS(A5, "a:br");
+        br.appendChild(rPr());
+        p.appendChild(br);
+      }
+      if (!line) return;
+      const r = doc.createElementNS(A5, "a:r");
+      const rp = rPr();
+      rp.removeAttribute("dirty");
+      rp.removeAttribute("err");
+      if (!rp.hasAttribute("lang")) rp.setAttribute("lang", "en-US");
+      styleRun(rp, look);
+      r.appendChild(rp);
+      const t = doc.createElementNS(A5, "a:t");
+      t.appendChild(doc.createTextNode(line));
+      r.appendChild(t);
+      p.appendChild(r);
+    });
+    const end = rPrT ? rPrT.cloneNode(true) : doc.createElementNS(A5, "a:endParaRPr");
+    const endEl = doc.createElementNS(A5, "a:endParaRPr");
+    for (let i2 = 0; i2 < end.attributes.length; i2++) endEl.setAttribute(end.attributes.item(i2).name, end.attributes.item(i2).value);
+    endEl.removeAttribute("dirty");
+    if (!endEl.hasAttribute("lang")) endEl.setAttribute("lang", "en-US");
+    if (style?.size !== void 0 || para3.size !== void 0) endEl.setAttribute("sz", String(Math.round((para3.size ?? style.size) * 100)));
+    p.appendChild(endEl);
+    stylePara(p, { align: look.align, level: para3.level, bullet: para3.bullet });
+    if (tail) body.insertBefore(p, tail);
+    else body.appendChild(p);
+  }
+}
+function styleText(body, style) {
+  checkStyle(style);
+  for (const p of children(body, A5, "p")) {
+    for (const r of children(p, A5).filter((e) => e.localName === "r" || e.localName === "fld")) {
+      styleRun(ensure(r, A5, "a:rPr", at(["t"])), style);
+    }
+    const end = child(p, A5, "endParaRPr");
+    if (end && style.size !== void 0) end.setAttribute("sz", String(Math.round(style.size * 100)));
+    stylePara(p, { align: style.align });
+  }
+}
+function replaceText(body, find2, by) {
+  if (typeof find2 !== "string" || !find2) throw new OfficeError("bad_arg", "replace needs the text to find, not an empty string");
+  let count = 0;
+  for (const p of children(body, A5, "p")) {
+    const ts = children(p, A5).filter((e) => e.localName === "r" || e.localName === "fld").map((r) => child(r, A5, "t")).filter((t) => !!t);
+    const texts = ts.map((t) => t.textContent ?? "");
+    const whole = texts.join("");
+    const hits = [];
+    for (let i2 = whole.indexOf(find2); i2 >= 0; i2 = whole.indexOf(find2, i2 + find2.length)) hits.push(i2);
+    if (!hits.length) continue;
+    count += hits.length;
+    for (const start of hits.reverse()) {
+      const end = start + find2.length;
+      let pos = 0;
+      let placed = false;
+      for (let k = 0; k < ts.length; k++) {
+        const s = pos;
+        const e = pos + texts[k].length;
+        pos = e;
+        if (e <= start || s >= end) continue;
+        const keepHead = texts[k].slice(0, Math.max(0, start - s));
+        const keepTail = texts[k].slice(Math.max(0, end - s));
+        texts[k] = keepHead + (placed ? "" : by) + keepTail;
+        placed = true;
+      }
+    }
+    ts.forEach((t, k) => {
+      if (t.textContent !== texts[k]) t.textContent = texts[k];
+    });
+  }
+  return count;
+}
+
+// src/slides/ops.ts
+var { a: A6, p: P4, r: R3 } = PNS;
+var bad = (msg) => new OfficeError("bad_arg", msg);
+var XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+function slideSel(deck, sldId, rect) {
+  const ref = () => deck.slideById(sldId);
+  const s0 = ref();
+  const add = (xml, name) => {
+    const s = ref();
+    const id = deck.nextId(s);
+    const el2 = frag(deck.store.doc(s.part), xml(id, name.replace("#", String(id - 1))));
+    insertBefore(spTree(deck.ctx(s)), el2, [[P4, "extLst"]]);
+    deck.store.touch(s.part);
+    return shapeSel(deck, sldId, String(id));
+  };
+  const top = () => readShapes(deck.ctx(ref()));
+  const sel = {
+    kind: "slide",
+    node: slideNode(deck, s0),
+    index: s0.index,
+    ...rect ? { rect } : {},
+    shapes: () => top().map((i2) => shapeSel(deck, sldId, i2.id)),
+    shape(idOrName) {
+      const all = flat(top());
+      const hit = all.find((i2) => i2.id === String(idOrName)) ?? all.find((i2) => i2.name === idOrName);
+      if (!hit) {
+        throw new OfficeError("not_found", `slide ${ref().index} has no shape ${JSON.stringify(idOrName)}; it has: ${all.map((i2) => `${i2.id} "${i2.name}"`).join(", ") || "nothing"}`);
+      }
+      return shapeSel(deck, sldId, hit.id);
+    },
+    placeholder(type) {
+      const want = type === "title" ? ["title", "ctrTitle"] : type === "body" ? ["body", "obj"] : [type];
+      const hit = top().find((i2) => i2.ph && want.includes(i2.ph.type));
+      return hit ? shapeSel(deck, sldId, hit.id) : void 0;
+    },
+    under() {
+      if (!rect) return [];
+      const size = deck.size();
+      const r = { x: rect.x / 100 * size.w, y: rect.y / 100 * size.h, w: rect.w / 100 * size.w, h: rect.h / 100 * size.h };
+      return top().filter((i2) => i2.box && overlapArea(i2.box, r) > 0).sort((a, b) => overlapArea(b.box, r) - overlapArea(a.box, r)).map((i2) => shapeSel(deck, sldId, i2.id));
+    },
+    addText(text, box, style = {}) {
+      const { fill: fill2, line, lineWidth, valign, name, ...ts } = style;
+      const b = boxEmu(box);
+      const s = add((id, n) => textBoxXml(id, n, b, { fill: fill2, line, lineWidth, valign }), name ?? "TextBox #");
+      return s.setText(text, ts);
+    },
+    addShape(geometry, box, opts = {}) {
+      const b = boxEmu(box);
+      const s = add((id, n) => shapeXml(id, n, geometry, b, opts), opts.name ?? `${geometry} #`);
+      return opts.text !== void 0 ? s.setText(opts.text, opts.style) : s;
+    },
+    addImage(bytes, box, opts = {}) {
+      const info2 = imageInfo(bytes);
+      const [x2, y, w, h0] = Array.isArray(box) ? box : [box.x, box.y, box.w, box.h];
+      const h = h0 || (info2.w && info2.h ? w * info2.h / info2.w : 0);
+      if (!h) throw bad(`give the image's height too ([x, y, w, h]): its size could not be read from the bytes`);
+      const b = boxEmu([x2, y, w, h]);
+      const s = ref();
+      const media = deck.store.freePath("ppt/media/", "image", info2.ext === "jpeg" ? "jpeg" : info2.ext);
+      deck.store.putBytes(media, bytes);
+      deck.store.contentType({ ext: media.slice(media.lastIndexOf(".") + 1), type: info2.mime });
+      const rid = deck.store.addRel(s.part, REL.image, media);
+      return add((id, n) => pictureXml(id, n, rid, b, opts.alt), opts.name ?? "Picture #");
+    },
+    addTable(rows, box, opts = {}) {
+      const b = boxEmu(box);
+      return add((id, n) => tableXml(id, n, rows, b, opts), opts.name ?? "Table #");
+    },
+    addChart(chart, box, opts = {}) {
+      const b = boxEmu(box);
+      const workbook = chartWorkbook(chart);
+      const s = ref();
+      const part2 = deck.store.freePath("ppt/charts/", "chart", "xml");
+      const emb = deck.store.freePath("ppt/embeddings/", "Microsoft_Excel_Worksheet", "xlsx");
+      deck.store.putBytes(emb, workbook);
+      deck.store.contentType({ ext: "xlsx", type: XLSX });
+      deck.store.put(part2, writeChart(chart, deck.store.addRel(part2, REL.package, emb)));
+      deck.store.contentType({ part: part2, type: "application/vnd.openxmlformats-officedocument.drawingml.chart+xml" });
+      const rid = deck.store.addRel(s.part, REL.chart, part2);
+      return add((id, n) => chartFrameXml(id, n, rid, b), opts.name ?? "Chart #");
+    },
+    remove: () => deck.removeSlide(ref()),
+    moveTo: (position) => slideSel(deck, deck.moveSlide(ref(), position).sldId),
+    duplicate: () => slideSel(deck, deck.duplicateSlide(ref()).sldId)
+  };
+  return sel;
+}
+function flat(list) {
+  return list.flatMap((i2) => [i2, ...i2.children ? flat(i2.children) : []]);
+}
+function shapeSel(deck, sldId, id, quote) {
+  const slide = () => deck.slideById(sldId);
+  const el2 = () => {
+    const s = slide();
+    const e = deck.shapeEl(s, id);
+    if (!e) throw new OfficeError("not_found", `slide ${s.index} has no shape ${id} (any more): inspect() again for its shapes`);
+    return { s, el: e };
+  };
+  const info2 = () => {
+    const s = slide();
+    const hit = flat(readShapes(deck.ctx(s))).find((i2) => i2.id === id);
+    if (!hit) throw new OfficeError("not_found", `slide ${s.index} has no shape ${id} (any more): inspect() again for its shapes`);
+    return hit;
+  };
+  const body = (what) => {
+    const { s, el: e } = el2();
+    if (e.localName !== "sp") throw bad(`shape ${id} on slide ${s.index} is a ${describe2(e)}: it has no text to ${what}${e.localName === "graphicFrame" ? " (a table's cells: setCell)" : ""}`);
+    let b = child(e, P4, "txBody");
+    if (!b) {
+      b = frag(deck.store.doc(s.part), `<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody>`);
+      insertBefore(e, b, [[P4, "extLst"]]);
+    }
+    return { s, body: b };
+  };
+  const done = (s) => {
+    deck.store.touch(s.part);
+    return shapeSel(deck, sldId, id, quote);
+  };
+  const s0 = slide();
+  const i0 = info2();
+  const node = shapeNode(deck.ctx(s0), s0, i0);
+  return {
+    kind: "shape",
+    node,
+    slide: s0.index,
+    id,
+    ...quote !== void 0 ? { quote } : {},
+    text: () => info2().text ?? "",
+    setText(text, style) {
+      const { s, body: b } = body("set");
+      setText(b, text, style);
+      return done(s);
+    },
+    replace(find2, by) {
+      const { s, body: b } = body("replace");
+      if (typeof by !== "string") throw bad(`replace(find, by) takes two strings, got ${JSON.stringify(by)} for by`);
+      if (!replaceText(b, find2, by)) {
+        throw new OfficeError("not_found", `${JSON.stringify(find2)} is not in shape ${id} of slide ${s.index}; its text is ${JSON.stringify(info2().text ?? "")}`);
+      }
+      return done(s);
+    },
+    style(style) {
+      const { s, body: b } = body("style");
+      styleText(b, style);
+      return done(s);
+    },
+    move(box) {
+      const { s, el: e } = el2();
+      const cur = boxOf(deck.ctx(s), e);
+      const want = Array.isArray(box) ? { x: box[0], y: box[1], w: box[2], h: box[3] } : box;
+      if (!want || typeof want !== "object") throw bad(`move takes { x?, y?, w?, h? } in points, or [x, y, w, h]`);
+      const pts = { x: want.x, y: want.y, w: want.w, h: want.h };
+      if (!cur && Object.values(pts).some((v) => v === void 0)) throw bad(`shape ${id} has no box yet: give all of x, y, w, h`);
+      const merged = {
+        x: pts.x !== void 0 ? pts.x : cur.x / 12700,
+        y: pts.y !== void 0 ? pts.y : cur.y / 12700,
+        w: pts.w !== void 0 ? pts.w : cur.w / 12700,
+        h: pts.h !== void 0 ? pts.h : cur.h / 12700
+      };
+      const b = boxEmu(merged);
+      setXfrm(deck, s, e, b);
+      return done(s);
+    },
+    fill(color2) {
+      const { s, el: e } = el2();
+      const spPr = shapeProps(e, s.index);
+      for (const f2 of children(spPr, A6).filter((x2) => ["noFill", "solidFill", "gradFill", "blipFill", "pattFill", "grpFill"].includes(ln2(x2)))) remove(f2);
+      const f = frag(deck.store.doc(s.part), color2 === "none" ? "<a:noFill/>" : `<a:solidFill><a:srgbClr val="${hex(color2)}"/></a:solidFill>`);
+      insertBefore(spPr, f, [[A6, "ln"], [A6, "effectLst"], [A6, "effectDag"], [A6, "scene3d"], [A6, "sp3d"], [A6, "extLst"]]);
+      return done(s);
+    },
+    line(color2, width) {
+      const { s, el: e } = el2();
+      const spPr = shapeProps(e, s.index);
+      const outline2 = ensure(spPr, A6, "a:ln", [[A6, "effectLst"], [A6, "effectDag"], [A6, "scene3d"], [A6, "sp3d"], [A6, "extLst"]]);
+      for (const f2 of children(outline2, A6).filter((x2) => ["noFill", "solidFill", "gradFill", "pattFill"].includes(ln2(x2)))) remove(f2);
+      if (width !== void 0) {
+        if (!(typeof width === "number" && width >= 0 && width <= 100)) throw bad(`a line's width is in points, 0 to 100, got ${JSON.stringify(width)}`);
+        outline2.setAttribute("w", String(emu(width)));
+      }
+      const f = frag(deck.store.doc(s.part), color2 === "none" ? "<a:noFill/>" : `<a:solidFill><a:srgbClr val="${hex(color2)}"/></a:solidFill>`);
+      outline2.insertBefore(f, outline2.firstChild);
+      return done(s);
+    },
+    rows: () => info2().rows ?? [],
+    setCell(row, col2, text, style) {
+      const { s, el: e } = el2();
+      const tbl = path(e, [A6, "graphic"], [A6, "graphicData"], [A6, "tbl"]);
+      if (!tbl) throw bad(`shape ${id} on slide ${s.index} is a ${describe2(e)}, not a table`);
+      const trs = children(tbl, A6, "tr");
+      const tcs = trs[row - 1] ? children(trs[row - 1], A6, "tc") : [];
+      const tc = tcs[col2 - 1];
+      if (!tc) throw new OfficeError("not_found", `the table has ${trs.length} rows and ${tcs.length || children(trs[0], A6, "tc").length} columns (from 1); there is no cell ${row}, ${col2}`);
+      let b = child(tc, A6, "txBody");
+      if (!b) {
+        b = frag(deck.store.doc(s.part), `<a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></a:txBody>`);
+        tc.insertBefore(b, tc.firstChild);
+      }
+      setText(b, text, style);
+      return done(s);
+    },
+    replaceImage(bytes) {
+      const { s, el: e } = el2();
+      const blip = path(e, [P4, "blipFill"], [A6, "blip"]);
+      if (!blip) throw bad(`shape ${id} on slide ${s.index} is a ${describe2(e)}, not a picture`);
+      const info22 = imageInfo(bytes);
+      const media = deck.store.freePath("ppt/media/", "image", info22.ext);
+      deck.store.putBytes(media, bytes);
+      deck.store.contentType({ ext: info22.ext, type: info22.mime });
+      const old = attr(blip, "embed", R3);
+      blip.setAttributeNS(R3, "r:embed", deck.store.addRel(s.part, REL.image, media));
+      if (old && !usesRel(deck.store.root(s.part), old)) deck.store.removeRel(s.part, old);
+      return done(s);
+    },
+    remove() {
+      const { s, el: e } = el2();
+      const rids = relIds(e);
+      remove(e);
+      for (const rid of rids) if (!usesRel(deck.store.root(s.part), rid)) deck.store.removeRel(s.part, rid);
+      deck.store.touch(s.part);
+    }
+  };
+}
+function describe2(e) {
+  if (e.localName === "pic") return "picture";
+  if (e.localName === "grpSp") return "group";
+  if (e.localName === "cxnSp") return "connector";
+  if (e.localName === "graphicFrame") {
+    const uri = attr(path(e, [A6, "graphic"], [A6, "graphicData"]) ?? e, "uri") ?? "";
+    return uri.endsWith("/table") ? "table" : uri.endsWith("/chart") ? "chart" : "graphic";
+  }
+  return "shape";
+}
+function shapeProps(e, slide) {
+  if (e.localName === "graphicFrame") throw bad(`a ${describe2(e)} on slide ${slide} has no fill or line of its own`);
+  return ensure(e, P4, e.localName === "grpSp" ? "p:grpSpPr" : "p:spPr", [[P4, "style"], [P4, "txBody"], [P4, "extLst"]]);
+}
+function setXfrm(deck, s, e, b) {
+  let xfrm2;
+  if (e.localName === "graphicFrame") {
+    xfrm2 = ensure(e, P4, "p:xfrm", [[A6, "graphic"]]);
+  } else {
+    const spPr = shapeProps(e, s.index);
+    xfrm2 = ensure(spPr, A6, "a:xfrm", [[A6, "custGeom"], [A6, "prstGeom"], [A6, "noFill"], [A6, "solidFill"], [A6, "gradFill"], [A6, "blipFill"], [A6, "pattFill"], [A6, "grpFill"], [A6, "ln"], [A6, "effectLst"], [A6, "extLst"]]);
+  }
+  const off = ensure(xfrm2, A6, "a:off", [[A6, "ext"]]);
+  const ext = ensure(xfrm2, A6, "a:ext", [[A6, "chOff"], [A6, "chExt"]]);
+  off.setAttribute("x", String(b.x));
+  off.setAttribute("y", String(b.y));
+  ext.setAttribute("cx", String(b.w));
+  ext.setAttribute("cy", String(b.h));
+  void deck;
+}
+function relIds(e) {
+  const out = [];
+  const walk = (n) => {
+    for (let i2 = 0; i2 < n.attributes.length; i2++) {
+      const a = n.attributes.item(i2);
+      if (a.namespaceURI === R3) out.push(a.value);
+    }
+    for (const c of children(n)) walk(c);
+  };
+  walk(e);
+  return out;
+}
+function usesRel(root, rid) {
+  return relIds(root).includes(rid);
+}
+
+// src/slides/index.ts
+var Deck = class {
+  kind = "pptx";
+  core;
+  constructor(core) {
+    this.core = core;
+  }
+  /** The slide size in points (960 x 540 for 16:9). */
+  get size() {
+    const s = this.core.size();
+    return { w: pt(s.w), h: pt(s.h) };
+  }
+  /** How many slides. */
+  get count() {
+    return this.core.slides().length;
+  }
+  /** The layouts a slide can be added on: { key? (ours: title, title-body, ...), name, type }. */
+  layouts() {
+    return this.core.layouts().map(({ part: _part, ...l }) => l);
+  }
+  /** Slide `n`, from 1. */
+  slide(n) {
+    return slideSel(this.core, this.core.slideAt(n).sldId);
+  }
+  slides() {
+    return this.core.slides().map((s) => slideSel(this.core, s.sldId));
+  }
+  /** A new slide on a layout (key, name or number; default "title-body"), with its placeholders, at `at` (default last). */
+  addSlide(opts = {}) {
+    return slideSel(this.core, this.core.addSlide(opts).sldId);
+  }
+  inspect() {
+    return outline(this.core);
+  }
+  at(anchor) {
+    const a = anchorFor("pptx", anchor);
+    if (a.kind === "slide") return slideSel(this.core, this.core.slideAt(a.slide).sldId, a.rect);
+    if (a.kind !== "shape") throw new OfficeError("anchor_kind_mismatch", `a ${a.kind} anchor does not point into a pptx`);
+    const s = this.core.slideAt(a.slide);
+    if (!this.core.shapeEl(s, a.shape)) {
+      throw new OfficeError("not_found", `slide ${a.slide} has no shape ${a.shape} (any more): the deck changed since the note; inspect() and find it by its text${a.quote ? ` ("${a.quote}")` : ""}`);
+    }
+    return shapeSel(this.core, s.sldId, a.shape, a.quote);
+  }
+  check() {
+    return check(this.core);
+  }
+  async save() {
+    return this.core.save();
+  }
+};
+var slides = {
+  /** A pptx's bytes as a deck; throws OfficeError (not_a_zip, not_office, bad_xml). */
+  async open(bytes) {
+    return new Deck(DeckCore.open(bytes));
+  },
+  /** A new, empty deck: 16:9 (960 x 540 pt) or 4:3 (720 x 540 pt). */
+  async create(opts = {}) {
+    const size = opts.size ?? "16:9";
+    if (size !== "16:9" && size !== "4:3") throw new OfficeError("bad_arg", `a deck's size is "16:9" or "4:3", got ${JSON.stringify(size)}`);
+    return new Deck(DeckCore.create(size));
+  }
+};
+
 // src/docs/w.ts
 var W = NS.w;
 var W14 = NS.w14;
 var W15 = "http://schemas.microsoft.com/office/word/2012/wordml";
-var R = NS.r;
+var R4 = NS.r;
 var MC = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 var XMLNS = "http://www.w3.org/2000/xmlns/";
 var XML = "http://www.w3.org/XML/1998/namespace";
 var WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
-var A = NS.a;
+var A7 = NS.a;
 function el(doc, local, attrs = {}, ns = W, prefix = "w") {
   const e = doc.createElementNS(ns, `${prefix}:${local}`);
   for (const [k, v] of Object.entries(attrs)) setW(e, k, v);
@@ -7938,7 +9780,7 @@ function unwrap(e) {
   while (e.firstChild) parent.insertBefore(e.firstChild, e);
   parent.removeChild(e);
 }
-function remove(n) {
+function remove2(n) {
   n.parentNode?.removeChild(n);
 }
 function insertAfter(n, ref) {
@@ -7951,9 +9793,9 @@ function wordDate(d) {
 // src/docs/styles.ts
 function readStyles(parts) {
   const out = /* @__PURE__ */ new Map();
-  const path = parts.find("styles");
-  if (!path) return out;
-  for (const s of wkids(parts.dom(path).documentElement, "style")) {
+  const path2 = parts.find("styles");
+  if (!path2) return out;
+  for (const s of wkids(parts.dom(path2).documentElement, "style")) {
     const id = getW(s, "styleId") ?? "";
     const pPr = wkid(s, "pPr");
     const lvl = pPr && wkid(pPr, "outlineLvl");
@@ -8010,33 +9852,33 @@ function stylesXml(ids = Object.keys(BUILTIN)) {
 }
 function ensureStyle(parts, id) {
   if (!BUILTIN[id]) return readStyles(parts).has(id);
-  const path = parts.ensure("styles", () => stylesXml(["Normal", "TableNormal"]));
-  const doc = parts.dom(path);
+  const path2 = parts.ensure("styles", () => stylesXml(["Normal", "TableNormal"]));
+  const doc = parts.dom(path2);
   const root = doc.documentElement;
   const have = new Set(wkids(root, "style").map((s) => getW(s, "styleId")));
   if (have.has(id)) return true;
-  const frag = parseXml(`<x xmlns:w="${W}">${BUILTIN[id]}</x>`, "style");
-  const made = frag.documentElement.firstChild;
+  const frag2 = parseXml(`<x xmlns:w="${W}">${BUILTIN[id]}</x>`, "style");
+  const made = frag2.documentElement.firstChild;
   root.appendChild(doc.importNode(made, true));
-  parts.touch(path);
+  parts.touch(path2);
   const based = /w:basedOn w:val="([^"]+)"/.exec(BUILTIN[id])?.[1];
   if (based) ensureStyle(parts, based);
   return true;
 }
-var BULLETS = ["•", "◦", "▪", "•", "◦", "▪", "•", "◦", "▪"];
+var BULLETS2 = ["•", "◦", "▪", "•", "◦", "▪", "•", "◦", "▪"];
 var NUMBERS = ["decimal", "lowerLetter", "lowerRoman", "decimal", "lowerLetter", "lowerRoman", "decimal", "lowerLetter", "lowerRoman"];
 function abstractNum(id, ordered) {
   const lvls = Array.from({ length: 9 }, (_, i2) => {
     const fmt = ordered ? NUMBERS[i2] : "bullet";
-    const text = ordered ? `%${i2 + 1}.` : BULLETS[i2];
+    const text = ordered ? `%${i2 + 1}.` : BULLETS2[i2];
     return `<w:lvl w:ilvl="${i2}"><w:start w:val="1"/><w:numFmt w:val="${fmt}"/><w:lvlText w:val="${text}"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="${720 * (i2 + 1)}" w:hanging="360"/></w:pPr></w:lvl>`;
   }).join("");
   return `<w:abstractNum w:abstractNumId="${id}"><w:multiLevelType w:val="hybridMultilevel"/><w:name w:val="bise ${ordered ? "numbered" : "bullets"}"/>${lvls}</w:abstractNum>`;
 }
 function listNumId(parts, ordered) {
-  const path = parts.ensure("numbering", () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  const path2 = parts.ensure("numbering", () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:numbering xmlns:w="${W}"></w:numbering>`);
-  const doc = parts.dom(path);
+  const doc = parts.dom(path2);
   const root = doc.documentElement;
   const name = `bise ${ordered ? "numbered" : "bullets"}`;
   const abs = wkids(root, "abstractNum");
@@ -8049,30 +9891,30 @@ function listNumId(parts, ordered) {
   }
   const aid = Math.max(-1, ...abs.map((a2) => Number(getW(a2, "abstractNumId") ?? -1))) + 1;
   const nid = Math.max(0, ...nums.map((n2) => Number(getW(n2, "numId") ?? 0))) + 1;
-  const frag = parseXml(`<x xmlns:w="${W}">${abstractNum(aid, ordered)}<w:num w:numId="${nid}"><w:abstractNumId w:val="${aid}"/></w:num></x>`, "numbering");
-  const [a, n] = children(frag.documentElement, W);
+  const frag2 = parseXml(`<x xmlns:w="${W}">${abstractNum(aid, ordered)}<w:num w:numId="${nid}"><w:abstractNumId w:val="${aid}"/></w:num></x>`, "numbering");
+  const [a, n] = children(frag2.documentElement, W);
   root.insertBefore(doc.importNode(a, true), nums[0] ?? null);
   root.appendChild(doc.importNode(n, true));
-  parts.touch(path);
+  parts.touch(path2);
   return String(nid);
 }
-function listOrdered(parts, numId, level) {
-  const path = parts.find("numbering");
-  if (!path) return void 0;
-  const root = parts.dom(path).documentElement;
+function listOrdered(parts, numId, level2) {
+  const path2 = parts.find("numbering");
+  if (!path2) return void 0;
+  const root = parts.dom(path2).documentElement;
   const num = wkids(root, "num").find((n) => getW(n, "numId") === numId);
   const aidEl = num && wkid(num, "abstractNumId");
   if (!aidEl) return void 0;
   const aid = getW(aidEl, "val");
   const abs = wkids(root, "abstractNum").find((a) => getW(a, "abstractNumId") === aid);
-  const lvl = abs && wkids(abs, "lvl").find((l) => getW(l, "ilvl") === String(level));
+  const lvl = abs && wkids(abs, "lvl").find((l) => getW(l, "ilvl") === String(level2));
   const fmt = lvl && wkid(lvl, "numFmt");
   return fmt ? getW(fmt, "val") !== "bullet" && getW(fmt, "val") !== "none" : void 0;
 }
 function numIds(parts) {
-  const path = parts.find("numbering");
-  if (!path) return /* @__PURE__ */ new Set();
-  return new Set(wkids(parts.dom(path).documentElement, "num").map((n) => getW(n, "numId") ?? ""));
+  const path2 = parts.find("numbering");
+  if (!path2) return /* @__PURE__ */ new Set();
+  return new Set(wkids(parts.dom(path2).documentElement, "num").map((n) => getW(n, "numId") ?? ""));
 }
 
 // src/docs/text.ts
@@ -8081,7 +9923,7 @@ var MARKS = /* @__PURE__ */ new Set(["commentRangeStart", "commentRangeEnd", "co
 function scan(p) {
   const atoms = [];
   const marks = [];
-  let at = 0;
+  let at2 = 0;
   const run2 = (r) => {
     for (const c of wkids(r)) {
       let t;
@@ -8103,12 +9945,12 @@ function scan(p) {
           t = "-";
           break;
         case "commentReference":
-          marks.push({ node: c, local: c.localName, id: getW(c, "id") ?? "", offset: at });
+          marks.push({ node: c, local: c.localName, id: getW(c, "id") ?? "", offset: at2 });
           break;
       }
       if (t !== void 0 && t.length) {
-        atoms.push({ run: r, node: c, start: at, text: t });
-        at += t.length;
+        atoms.push({ run: r, node: c, start: at2, text: t });
+        at2 += t.length;
       }
     }
   };
@@ -8120,7 +9962,7 @@ function scan(p) {
       else if (l === "sdt") {
         const content = wkid(c, "sdtContent");
         if (content) walk(content);
-      } else if (MARKS.has(l)) marks.push({ node: c, local: l, id: getW(c, "id") ?? "", offset: at });
+      } else if (MARKS.has(l)) marks.push({ node: c, local: l, id: getW(c, "id") ?? "", offset: at2 });
     }
   };
   walk(p);
@@ -8197,7 +10039,7 @@ function deleteRuns(runs, track) {
   for (const r of runs) {
     const parent = r.parentNode;
     if (!track || isW(parent, "ins")) {
-      remove(r);
+      remove2(r);
       dropEmpty(parent);
     } else {
       asDeleted(r);
@@ -8208,7 +10050,7 @@ function deleteRuns(runs, track) {
 function dropEmpty(e) {
   if ((isW(e, "ins") || isW(e, "hyperlink") || isW(e, "smartTag")) && !wkids(e).some((c) => c.localName === "r" || INLINE.has(c.localName ?? ""))) {
     const up = e.parentNode;
-    remove(e);
+    remove2(e);
     dropEmpty(up);
   }
 }
@@ -8313,7 +10155,7 @@ function fillRuns(m, p, text, track) {
       ensureStyle(m.parts, "Hyperlink");
       const rid = m.parts.addRel("http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", link, true);
       const h = el(m.doc, "hyperlink");
-      h.setAttributeNS(R, "r:id", rid);
+      h.setAttributeNS(R4, "r:id", rid);
       h.appendChild(r);
       made.push(h);
     } else made.push(r);
@@ -8353,9 +10195,9 @@ function buildBlock(m, spec, track) {
     case "title":
       return para(m, "Title", spec.text, track);
     case "heading": {
-      const level = spec.level ?? 1;
-      if (!Number.isInteger(level) || level < 1 || level > 6) throw new OfficeError("bad_arg", `a heading's level is 1 to 6, got ${level}`);
-      return para(m, `Heading${level}`, spec.text, track);
+      const level2 = spec.level ?? 1;
+      if (!Number.isInteger(level2) || level2 < 1 || level2 > 6) throw new OfficeError("bad_arg", `a heading's level is 1 to 6, got ${level2}`);
+      return para(m, `Heading${level2}`, spec.text, track);
     }
     case "quote":
       return para(m, "Quote", spec.text, track);
@@ -8423,8 +10265,8 @@ function buildRow(m, row, cols, tw, isHeader, track) {
   }
   return tr;
 }
-var EMU_PER_PT = 12700;
-function imageInfo(b) {
+var EMU_PER_PT2 = 12700;
+function imageInfo2(b) {
   if (!(b instanceof Uint8Array)) throw new OfficeError("bad_arg", "an image's bytes are a Uint8Array (run.read gives one)");
   const u32 = (i2) => (b[i2] << 24 | b[i2 + 1] << 16 | b[i2 + 2] << 8 | b[i2 + 3]) >>> 0;
   if (b[0] === 137 && b[1] === 80 && b[2] === 78 && b[3] === 71) return { ext: "png", mime: "image/png", w: u32(16), h: u32(20) };
@@ -8444,22 +10286,22 @@ function imageInfo(b) {
   throw new OfficeError("bad_arg", "the image is not a PNG, JPEG or GIF this SDK can size");
 }
 function buildImage(m, bytes, widthPt, alt, track) {
-  const info2 = imageInfo(bytes);
-  const path = m.parts.freePath("media", "image", info2.ext);
-  m.parts.zip.set(path, bytes);
+  const info2 = imageInfo2(bytes);
+  const path2 = m.parts.freePath("media", "image", info2.ext);
+  m.parts.zip.set(path2, bytes);
   m.parts.addDefault(info2.ext, info2.mime);
-  const rid = m.parts.addRel("http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", m.parts.relTarget(path));
+  const rid = m.parts.addRel("http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", m.parts.relTarget(path2));
   const maxPt = m.textWidth() / 20;
   const natural = info2.w * 0.75;
   const wPt = Math.min(widthPt ?? natural, maxPt);
-  const cx = Math.round(wPt * EMU_PER_PT);
+  const cx = Math.round(wPt * EMU_PER_PT2);
   const cy = Math.round(cx * info2.h / Math.max(1, info2.w));
   const used = m.doc.getElementsByTagNameNS(WP, "docPr");
   let id = 1;
   for (let i2 = 0; i2 < used.length; i2++) id = Math.max(id, Number(used.item(i2).getAttribute("id")) + 1 || id);
   const name = `Picture ${id}`;
   const descr = (alt ?? "").replace(/[<>&"]/g, (c) => `&#${c.charCodeAt(0)};`);
-  const xml = `<w:r xmlns:w="${W}" xmlns:r="${R}" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${id}" name="${name}" descr="${descr}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="${name}" descr="${descr}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+  const xml = `<w:r xmlns:w="${W}" xmlns:r="${R4}" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${id}" name="${name}" descr="${descr}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="${name}" descr="${descr}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
   const r = m.doc.importNode(parseXml(xml, "image").documentElement, true);
   const p = para(m, void 0, void 0, track);
   p.appendChild(track ? wrapNew(m, r, track) : r);
@@ -8489,19 +10331,19 @@ var Parts = class {
     this.main = main;
   }
   /** A part's DOM, parsed once. */
-  dom(path) {
-    let d = this.doms.get(path);
+  dom(path2) {
+    let d = this.doms.get(path2);
     if (!d) {
-      const text = this.zip.text(path);
-      if (text === void 0) throw new OfficeError("no_part", `the docx has no ${path}`);
-      d = parseXml(text, path);
-      this.doms.set(path, d);
+      const text = this.zip.text(path2);
+      if (text === void 0) throw new OfficeError("no_part", `the docx has no ${path2}`);
+      d = parseXml(text, path2);
+      this.doms.set(path2, d);
     }
     return d;
   }
   /** Mark a part as edited: save() writes it. */
-  touch(path) {
-    this.dirty.add(path);
+  touch(path2) {
+    this.dirty.add(path2);
   }
   /** The main document's relationships. */
   rels() {
@@ -8517,20 +10359,20 @@ var Parts = class {
     const have = this.find(kind);
     if (have) return have;
     const dir = this.main.slice(0, this.main.lastIndexOf("/") + 1);
-    const path = `${dir}${KNOWN[kind].file}`;
-    this.zip.set(path, xml());
-    this.addOverride(path, KNOWN[kind].type);
+    const path2 = `${dir}${KNOWN[kind].file}`;
+    this.zip.set(path2, xml());
+    this.addOverride(path2, KNOWN[kind].type);
     this.addRel(KNOWN[kind].rel, KNOWN[kind].file);
-    return path;
+    return path2;
   }
   /** A new relationship from the main part; returns its id. */
   addRel(type, target, external = false) {
-    const path = relsPath(this.main);
-    if (!this.zip.has(path)) {
-      this.zip.set(path, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    const path2 = relsPath(this.main);
+    if (!this.zip.has(path2)) {
+      this.zip.set(path2, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="${NS.rel}"></Relationships>`);
     }
-    const doc = this.dom(path);
+    const doc = this.dom(path2);
     const root = doc.documentElement;
     const taken = new Set(children(root, NS.rel, "Relationship").map((r2) => attr(r2, "Id")));
     let n = taken.size + 1;
@@ -8541,17 +10383,17 @@ var Parts = class {
     r.setAttribute("Target", target);
     if (external) r.setAttribute("TargetMode", "External");
     root.appendChild(r);
-    this.zip.set(path, writeXml(doc));
+    this.zip.set(path2, writeXml(doc));
     return `rId${n}`;
   }
   /** The target part of one of the main part's relationships. */
   target(rid) {
     return this.rels().find((r) => r.id === rid);
   }
-  addOverride(path, type) {
+  addOverride(path2, type) {
     const ct = "[Content_Types].xml";
     const root = this.dom(ct).documentElement;
-    const name = `/${path.replace(/^\//, "")}`;
+    const name = `/${path2.replace(/^\//, "")}`;
     if (children(root, NS.ct, "Override").some((o2) => attr(o2, "PartName") === name)) return;
     const o = this.dom(ct).createElementNS(NS.ct, "Override");
     o.setAttribute("PartName", name);
@@ -8578,13 +10420,13 @@ var Parts = class {
   }
   /** The edited DOMs back into the zip. */
   flush() {
-    for (const path of this.dirty) this.zip.set(path, writeXml(this.dom(path)));
+    for (const path2 of this.dirty) this.zip.set(path2, writeXml(this.dom(path2)));
     this.dirty.clear();
   }
   /** A path relative to the main part's folder, as a relationship target. */
-  relTarget(path) {
+  relTarget(path2) {
     const dir = this.main.slice(0, this.main.lastIndexOf("/") + 1);
-    return path.startsWith(dir) ? path.slice(dir.length) : `/${path}`;
+    return path2.startsWith(dir) ? path2.slice(dir.length) : `/${path2}`;
   }
   resolveFromMain(target) {
     return resolve(this.main.slice(0, this.main.lastIndexOf("/") + 1), target);
@@ -8849,28 +10691,28 @@ function settle(m, accept, ids) {
     switch (c.kind) {
       case "insert":
         if (keep) unwrap(c.el);
-        else remove(c.el);
+        else remove2(c.el);
         break;
       case "delete":
         if (keep) {
           undelete(c.el);
           unwrap(c.el);
-        } else remove(c.el);
+        } else remove2(c.el);
         break;
       case "para-insert":
       case "para-delete":
-        remove(c.el);
+        remove2(c.el);
         if (!keep) merges.push(c.p);
         break;
       case "row-insert":
       case "row-delete": {
         const tr = c.el.parentNode.parentNode;
-        remove(c.el);
-        if (!keep) remove(tr);
+        remove2(c.el);
+        if (!keep) remove2(tr);
         break;
       }
       case "format":
-        if (accept) remove(c.el);
+        if (accept) remove2(c.el);
         else restore(c.el);
         break;
     }
@@ -8904,14 +10746,14 @@ function mergeNext(m, p) {
   const empty = !scan(p).text && !wkids(p).some((c) => c.localName !== "pPr" && c.localName !== "bookmarkStart" && c.localName !== "bookmarkEnd");
   const siblings = wkids(parent, "p");
   if (empty && (siblings.length > 1 || isW(parent, "body"))) {
-    remove(p);
+    remove2(p);
     return;
   }
   let next = p.nextSibling;
   while (next && next.nodeType !== 1) next = next.nextSibling;
   if (!isW(next, "p")) return;
   for (const c of wkids(next)) if (c.localName !== "pPr") p.appendChild(c);
-  remove(next);
+  remove2(next);
   void m;
 }
 function dropMoveMarks(m) {
@@ -8919,23 +10761,23 @@ function dropMoveMarks(m) {
     const list = m.doc.getElementsByTagNameNS(W, local);
     const all = [];
     for (let i2 = 0; i2 < list.length; i2++) all.push(list.item(i2));
-    for (const e of all) remove(e);
+    for (const e of all) remove2(e);
   }
 }
 
 // src/docs/comments.ts
-var X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+var X2 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 function part(m, make) {
   if (!make) return m.parts.find("comments");
-  return m.parts.ensure("comments", () => `${X}<w:comments xmlns:w="${W}" xmlns:w14="${W14}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14"></w:comments>`);
+  return m.parts.ensure("comments", () => `${X2}<w:comments xmlns:w="${W}" xmlns:w14="${W14}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14"></w:comments>`);
 }
 function extPart(m, make) {
   if (!make) return m.parts.find("commentsExtended");
-  return m.parts.ensure("commentsExtended", () => `${X}<w15:commentsEx xmlns:w15="${W15}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w15"></w15:commentsEx>`);
+  return m.parts.ensure("commentsExtended", () => `${X2}<w15:commentsEx xmlns:w15="${W15}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w15"></w15:commentsEx>`);
 }
 function commentEls(m) {
-  const path = part(m, false);
-  return path ? wkids(m.parts.dom(path).documentElement, "comment") : [];
+  const path2 = part(m, false);
+  return path2 ? wkids(m.parts.dom(path2).documentElement, "comment") : [];
 }
 function lastParaId(c) {
   const ps = wkids(c, "p");
@@ -8944,9 +10786,9 @@ function lastParaId(c) {
 }
 function extOf(m) {
   const out = /* @__PURE__ */ new Map();
-  const path = extPart(m, false);
-  if (!path) return out;
-  const list = m.parts.dom(path).documentElement.getElementsByTagNameNS(W15, "commentEx");
+  const path2 = extPart(m, false);
+  if (!path2) return out;
+  const list = m.parts.dom(path2).documentElement.getElementsByTagNameNS(W15, "commentEx");
   for (let i2 = 0; i2 < list.length; i2++) {
     const e = list.item(i2);
     out.set((e.getAttributeNS(W15, "paraId") ?? "").toUpperCase(), e);
@@ -8985,14 +10827,14 @@ function listComments(m) {
     const ex = ext.get(pid);
     const parent = ex?.getAttributeNS(W15, "paraIdParent");
     const text = wkids(c, "p").map((p) => scan(p).text).join("\n");
-    const at = where.get(id);
+    const at2 = where.get(id);
     return {
       id,
       author: getW(c, "author") ?? "",
       date: getW(c, "date"),
       text,
-      para: at?.para,
-      quote: at?.quote,
+      para: at2?.para,
+      quote: at2?.quote,
       replyTo: parent ? byPara.get(parent.toUpperCase()) : void 0,
       done: ex?.getAttributeNS(W15, "done") === "1"
     };
@@ -9002,8 +10844,8 @@ function nextCommentId(m) {
   return String(Math.max(-1, ...commentEls(m).map((c) => Number(getW(c, "id") ?? -1))) + 1);
 }
 function makeComment(m, id, text, initials) {
-  const path = part(m, true);
-  const cdoc = m.parts.dom(path);
+  const path2 = part(m, true);
+  const cdoc = m.parts.dom(path2);
   declareW14(cdoc.documentElement);
   const c = el(cdoc, "comment", { id, author: m.author, date: wordDate(m.now()), initials });
   text.split("\n").forEach((line, i2) => {
@@ -9021,7 +10863,7 @@ function makeComment(m, id, text, initials) {
     c.appendChild(p);
   });
   cdoc.documentElement.appendChild(c);
-  m.parts.touch(path);
+  m.parts.touch(path2);
   return c;
 }
 function initialsOf(name) {
@@ -9102,8 +10944,8 @@ function ensureLastParaId(m, c) {
   return id;
 }
 function setExt(m, paraId, attrs) {
-  const path = extPart(m, true);
-  const doc = m.parts.dom(path);
+  const path2 = extPart(m, true);
+  const doc = m.parts.dom(path2);
   const root = doc.documentElement;
   if (root.lookupNamespaceURI("w15") !== W15) root.setAttributeNS(XMLNS, "xmlns:w15", W15);
   let e = extOf(m).get(paraId.toUpperCase());
@@ -9115,7 +10957,7 @@ function setExt(m, paraId, attrs) {
   }
   if (attrs.paraIdParent) e.setAttributeNS(W15, "w15:paraIdParent", attrs.paraIdParent);
   if (attrs.done) e.setAttributeNS(W15, "w15:done", attrs.done);
-  m.parts.touch(path);
+  m.parts.touch(path2);
 }
 function resolve2(m, id, done = true) {
   const c = commentEls(m).find((x2) => getW(x2, "id") === String(id));
@@ -9132,18 +10974,18 @@ function removeComment(m, id) {
     const pid = (lastParaId(c) ?? "").toUpperCase();
     const ex = ext.get(pid);
     if (ex) {
-      remove(ex);
+      remove2(ex);
       m.parts.touch(extPart(m, false));
     }
-    remove(c);
+    remove2(c);
   }
   m.parts.touch(part(m, false));
   for (const p of m.paras()) {
     for (const k of scan(p).marks) {
       if (!gone.has(k.id)) continue;
       const host2 = k.node.parentNode;
-      remove(k.node);
-      if (k.local === "commentReference" && isW(host2, "r") && !wkids(host2).some((x2) => x2.localName !== "rPr")) remove(host2);
+      remove2(k.node);
+      if (k.local === "commentReference" && isW(host2, "r") && !wkids(host2).some((x2) => x2.localName !== "rPr")) remove2(host2);
     }
   }
   m.touch();
@@ -9182,8 +11024,8 @@ function paraProps(ctx, p) {
   const style = styleEl ? getW(styleEl, "val") : void 0;
   if (style) out.style = style;
   const lvlEl = pPr && wkid(pPr, "outlineLvl");
-  const level = headingLevel(ctx.styles, style, lvlEl ? Number(getW(lvlEl, "val")) : void 0);
-  if (level !== void 0) out.level = level;
+  const level2 = headingLevel(ctx.styles, style, lvlEl ? Number(getW(lvlEl, "val")) : void 0);
+  if (level2 !== void 0) out.level = level2;
   const numPr = pPr && wkid(pPr, "numPr");
   const numId = (numPr && wkid(numPr, "numId") && getW(wkid(numPr, "numId"), "val")) ?? (style ? ctx.styles.get(style)?.numId : void 0);
   if (numId && numId !== "0") {
@@ -9206,12 +11048,12 @@ function paraProps(ctx, p) {
   const hl = p.getElementsByTagNameNS(W, "hyperlink");
   const urls = [];
   for (let i2 = 0; i2 < hl.length; i2++) {
-    const rid = hl.item(i2).getAttributeNS(R, "id");
+    const rid = hl.item(i2).getAttributeNS(R4, "id");
     const url = rid ? ctx.links?.get(rid) : void 0;
     if (url) urls.push(url);
   }
   if (urls.length) out.links = urls;
-  void A;
+  void A7;
   return out;
 }
 function para2(ctx, p, cell) {
@@ -9258,7 +11100,7 @@ function table(ctx, tbl) {
 
 // src/docs/check.ts
 var PLACEHOLDER = /lorem ipsum|\bTODO\b|\bTBD\b|\bXXX\b|\[(?:insert|add|your|name|date|placeholder)[^\]]*\]|<(?:insert|placeholder)[^>]*>/i;
-function check(m) {
+function check2(m) {
   m.parts.flush();
   const out = checkPackage(m.parts.zip);
   const styles = readStyles(m.parts);
@@ -9267,30 +11109,30 @@ function check(m) {
   let any = false;
   for (const p of m.paras()) {
     const id = m.paraId(p);
-    const at = paraAnchor(id);
+    const at2 = paraAnchor(id);
     const text = scan(p).text;
     if (text.trim()) any = true;
     const props2 = paraProps({ m, styles }, p);
     const style = props2.style;
     if (style && styles.size && !styles.has(style)) {
-      out.push({ code: "missing_style", severity: "warning", at, message: `paragraph ${id} uses style "${style}", which styles.xml does not define: Word shows it as Normal` });
+      out.push({ code: "missing_style", severity: "warning", at: at2, message: `paragraph ${id} uses style "${style}", which styles.xml does not define: Word shows it as Normal` });
     }
     const pPr = wkid(p, "pPr");
     const numPr = pPr && wkid(pPr, "numPr");
     const numId = numPr && wkid(numPr, "numId") && getW(wkid(numPr, "numId"), "val");
     if (numId && numId !== "0" && !nums.has(numId)) {
-      out.push({ code: "missing_list", severity: "warning", at, message: `paragraph ${id} is in list ${numId}, which numbering.xml does not define: it shows no bullet or number` });
+      out.push({ code: "missing_list", severity: "warning", at: at2, message: `paragraph ${id} is in list ${numId}, which numbering.xml does not define: it shows no bullet or number` });
     }
-    const level = props2.level;
-    if (level !== void 0 && level > 0) {
-      if (!text.trim()) out.push({ code: "empty_heading", severity: "warning", at, message: `heading ${id} has no text` });
-      if (level > prevLevel + 1) {
-        out.push({ code: "heading_skip", severity: "warning", at, message: `heading "${text.slice(0, 40)}" is level ${level} after level ${prevLevel}: a level is skipped` });
+    const level2 = props2.level;
+    if (level2 !== void 0 && level2 > 0) {
+      if (!text.trim()) out.push({ code: "empty_heading", severity: "warning", at: at2, message: `heading ${id} has no text` });
+      if (level2 > prevLevel + 1) {
+        out.push({ code: "heading_skip", severity: "warning", at: at2, message: `heading "${text.slice(0, 40)}" is level ${level2} after level ${prevLevel}: a level is skipped` });
       }
-      prevLevel = level;
+      prevLevel = level2;
     }
-    const ph = PLACEHOLDER.exec(text);
-    if (ph) out.push({ code: "placeholder", severity: "warning", at: paraAnchor(id, ph[0]), message: `paragraph ${id} still says "${ph[0]}"` });
+    const ph2 = PLACEHOLDER.exec(text);
+    if (ph2) out.push({ code: "placeholder", severity: "warning", at: paraAnchor(id, ph2[0]), message: `paragraph ${id} still says "${ph2[0]}"` });
   }
   for (const r of m.renamed) {
     out.push({
@@ -9354,11 +11196,11 @@ function tableProblems(m) {
 }
 
 // src/docs/create.ts
-var X2 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
-var R2 = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+var X3 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+var R5 = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 var PKG = "http://schemas.openxmlformats.org/package/2006/relationships";
 var OD = "application/vnd.openxmlformats-officedocument";
-function esc(s) {
+function esc2(s) {
   return s.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]);
 }
 function blank(opts = {}) {
@@ -9367,39 +11209,39 @@ function blank(opts = {}) {
   const zip = Zip.empty();
   zip.set(
     "[Content_Types].xml",
-    `${X2}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="${OD}.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="${OD}.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="${OD}.wordprocessingml.settings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="${OD}.extended-properties+xml"/></Types>`
+    `${X3}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="${OD}.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="${OD}.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="${OD}.wordprocessingml.settings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="${OD}.extended-properties+xml"/></Types>`
   );
   zip.set(
     "_rels/.rels",
-    `${X2}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${R2}/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="${PKG}/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="${R2}/extended-properties" Target="docProps/app.xml"/></Relationships>`
+    `${X3}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${R5}/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="${PKG}/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="${R5}/extended-properties" Target="docProps/app.xml"/></Relationships>`
   );
   zip.set(
     "word/document.xml",
-    `${X2}<w:document xmlns:w="${W}" xmlns:r="${R2}" xmlns:w14="${W14}" xmlns:mc="${MC}" mc:Ignorable="w14"><w:body><w:sectPr><w:pgSz w:w="${w}" w:h="${h}"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/><w:cols w:space="708"/></w:sectPr></w:body></w:document>`
+    `${X3}<w:document xmlns:w="${W}" xmlns:r="${R5}" xmlns:w14="${W14}" xmlns:mc="${MC}" mc:Ignorable="w14"><w:body><w:sectPr><w:pgSz w:w="${w}" w:h="${h}"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/><w:cols w:space="708"/></w:sectPr></w:body></w:document>`
   );
   zip.set(
     "word/_rels/document.xml.rels",
-    `${X2}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${R2}/styles" Target="styles.xml"/><Relationship Id="rId2" Type="${R2}/settings" Target="settings.xml"/></Relationships>`
+    `${X3}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${R5}/styles" Target="styles.xml"/><Relationship Id="rId2" Type="${R5}/settings" Target="settings.xml"/></Relationships>`
   );
   zip.set("word/styles.xml", stylesXml());
   zip.set(
     "word/settings.xml",
-    `${X2}<w:settings xmlns:w="${W}"><w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="doNotCompress"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>`
+    `${X3}<w:settings xmlns:w="${W}"><w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="doNotCompress"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>`
   );
-  const author = esc(opts.author ?? "bise");
+  const author = esc2(opts.author ?? "bise");
   zip.set(
     "docProps/core.xml",
-    `${X2}<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">` + (opts.title ? `<dc:title>${esc(opts.title)}</dc:title>` : "") + `<dc:creator>${author}</dc:creator><cp:lastModifiedBy>${author}</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${when}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${when}</dcterms:modified></cp:coreProperties>`
+    `${X3}<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">` + (opts.title ? `<dc:title>${esc2(opts.title)}</dc:title>` : "") + `<dc:creator>${author}</dc:creator><cp:lastModifiedBy>${author}</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${when}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${when}</dcterms:modified></cp:coreProperties>`
   );
   zip.set(
     "docProps/app.xml",
-    `${X2}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>bise</Application></Properties>`
+    `${X3}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>bise</Application></Properties>`
   );
   return zip.write();
 }
 
 // src/docs/index.ts
-var P = /* @__PURE__ */ Symbol("paragraph");
+var P5 = /* @__PURE__ */ Symbol("paragraph");
 var Doc = class {
   kind = "docx";
   m;
@@ -9424,7 +11266,7 @@ var Doc = class {
     return inspect(this.m);
   }
   check() {
-    return check(this.m);
+    return check2(this.m);
   }
   async save() {
     this.m.parts.flush();
@@ -9493,7 +11335,7 @@ var Doc = class {
     reject: (ids) => settle(this.m, false, ids)
   };
   paraOf(anchor) {
-    return this.at(anchor)[P];
+    return this.at(anchor)[P5];
   }
   /** @internal a paragraph's selection */
   sel(p, quote) {
@@ -9528,7 +11370,7 @@ function span(p, quote) {
 function paraSel(doc, m, p, anchorQuote) {
   const id = m.paraId(p);
   const sel = {
-    [P]: p,
+    [P5]: p,
     get node() {
       return findNode(inspect(m).nodes, id) ?? { id, type: "para", anchor: paraAnchor(id), text: scan(p).text };
     },
@@ -9545,10 +11387,10 @@ function paraSel(doc, m, p, anchorQuote) {
     replace(find2, by, opts) {
       return replaceIn(m, p, find2, by, opts?.track, opts?.all ?? true);
     },
-    insert(text, at = "end", opts) {
+    insert(text, at2 = "end", opts) {
       const len = scan(p).text.length;
-      const off = at === "start" ? 0 : at === "end" ? len : at;
-      if (!Number.isInteger(off) || off < 0 || off > len) throw new OfficeError("bad_arg", `insert at "start", "end" or an offset 0..${len}, got ${at}`);
+      const off = at2 === "start" ? 0 : at2 === "end" ? len : at2;
+      if (!Number.isInteger(off) || off < 0 || off > len) throw new OfficeError("bad_arg", `insert at "start", "end" or an offset 0..${len}, got ${at2}`);
       insertText(p, off, text, m.track(opts?.track));
       m.touch();
     },
@@ -9590,7 +11432,7 @@ function paraSel(doc, m, p, anchorQuote) {
         setProp(rPr, el(m.doc, "del", { id: t.nextId(), author: t.author, date: t.date }));
       } else {
         const parent = p.parentNode;
-        remove(p);
+        remove2(p);
         if (isW(parent, "tc") && !wkids(parent, "p").length && !wkids(parent, "tbl").length) {
           const empty = el(m.doc, "p");
           m.name(empty, `empty:${id}`);
@@ -9608,10 +11450,10 @@ function paraSel(doc, m, p, anchorQuote) {
   return sel;
 }
 function tableSel(doc, m, tbl) {
-  const cellEl = (row, col) => {
+  const cellEl = (row, col2) => {
     const tr = rowsOf(tbl)[row - 1];
-    const tc = tr && cellsOfRow(tr)[col - 1];
-    if (!tc) throw new OfficeError("not_found", `no cell (${row}, ${col}) in this table (rows and columns count from 1)`);
+    const tc = tr && cellsOfRow(tr)[col2 - 1];
+    if (!tc) throw new OfficeError("not_found", `no cell (${row}, ${col2}) in this table (rows and columns count from 1)`);
     return tc;
   };
   const firstPara = (tc) => {
@@ -9630,11 +11472,11 @@ function tableSel(doc, m, tbl) {
         )
       );
     },
-    cell(row, col) {
-      return doc.sel(firstPara(cellEl(row, col)));
+    cell(row, col2) {
+      return doc.sel(firstPara(cellEl(row, col2)));
     },
-    setCell(row, col, text, opts) {
-      doc.sel(firstPara(cellEl(row, col))).setText(text, opts);
+    setCell(row, col2, text, opts) {
+      doc.sel(firstPara(cellEl(row, col2))).setText(text, opts);
     },
     addRow(values, opts) {
       if (!Array.isArray(values)) throw new OfficeError("bad_arg", "a row's values are an array of cell texts");
@@ -9664,8 +11506,8 @@ function tableSel(doc, m, tbl) {
         }
         setProp(props(tr, "trPr"), el(m.doc, "del", { id: t.nextId(), author: t.author, date: t.date }));
       } else {
-        remove(tr);
-        if (!rowsOf(tbl).length) remove(tbl);
+        remove2(tr);
+        if (!rowsOf(tbl).length) remove2(tbl);
       }
       m.touch();
     }
@@ -9695,13 +11537,13 @@ function setHost(h) {
 }
 var run = {
   /** a file's bytes, by path (relative: to the script's working folder) */
-  read: async (path) => host().read(path),
+  read: async (path2) => host().read(path2),
   /** write a file; when it is an artifact, it becomes its next version */
-  write: async (path, bytes, opts) => host().write(path, bytes, opts)
+  write: async (path2, bytes, opts) => host().write(path2, bytes, opts)
 };
 
 // src/core/diff.ts
-function flatten(outline) {
+function flatten(outline2) {
   const out = [];
   const walk = (nodes) => {
     for (const n of nodes) {
@@ -9710,7 +11552,7 @@ function flatten(outline) {
       if (children2) walk(children2);
     }
   };
-  walk(outline.nodes);
+  walk(outline2.nodes);
   return out;
 }
 function diff(before, after) {

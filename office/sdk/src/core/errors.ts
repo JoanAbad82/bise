@@ -10,6 +10,7 @@ export type OfficeErrorCode =
   | "anchor_shape" // an anchor of a known kind with missing or wrong fields
   | "anchor_kind_mismatch" // an anchor of another file type (a cell on a deck)
   | "not_found" // an anchor that points at nothing in this file
+  | "bad_arg" // an edit's argument is wrong (the message says which and what it takes)
   | "no_host" // run.read/run.write outside `bise office run` with no host set
   | "bad_arg" // an edit's argument is wrong (a block of an unknown kind, a heading level 9)
   | "not_built"; // a module of the SDK that is not built yet

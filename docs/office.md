@@ -190,6 +190,60 @@ doc.tracking = true;               // every edit after it is a tracked change
   them, and has Quick Look render each to a thumbnail (`qlmanage -t`, no
   window).
 
+## Slides (pptx)
+
+`office/sdk/src/slides/`, on the core's zip and XML layers only: no
+pptxgenjs, no timers, no node shims (architect m_23769), so the same code
+runs in `bise office run`, in the viewer and in node.
+
+```ts
+const deck = await slides.create();            // 16:9 (960 x 540 pt) or { size: "4:3" }; no slide yet
+const s = deck.addSlide({ layout: "title-body" });
+s.placeholder("title")!.setText("Q3 review");
+s.placeholder("body")!.setText([{ text: "Revenue up 4%" }, { text: "North leads", level: 2 }]);
+s.addChart({ type: "column", categories: ["Jul", "Aug"], series: [{ name: "Revenue", values: [120, 140] }] }, [480, 120, 432, 360]);
+deck.at({ kind: "shape", slide: 1, shape: "3" }).replace("4%", "5%");
+deck.check();                                  // overflow, off_slide, empty_placeholder, overlap, small_text, empty_slide, broken_rel
+```
+
+- **Units**: boxes are `[x, y, w, h]` in points (EMU / 12700), text sizes
+  in points, colors `"#rrggbb"`.
+- **Ids**: a slide node is `s<sldId>` (stable when slides move), a shape
+  `s<sldId>/<cNvPr id>`; `anchor.shape` is the cNvPr id, `anchor.slide`
+  the slide's position from 1.
+- **Outline props** (the viewer draws from them): a slide has `w, h,
+  index, layout, background?, notes?`; a shape (`type` shape, picture,
+  table, chart, group, connector, graphic) has `box`, and when it has them
+  `placeholder, fill, line, geometry, fontSize, bold, italic, color, font,
+  align, valign, image` (its media part), `rows` (a table), `chart`
+  (`{type, title, categories, series}`), `notDrawn` (SmartArt...), `paras`
+  (per paragraph, with `level` and `bullet`). A placeholder's box and text
+  style come through its layout and master (`inherit.ts`); theme colors
+  are resolved.
+- **Create** is our template (`template.ts`): one master, Arial, six
+  layouts asked for by key: `title`, `title-body`, `two-content`,
+  `section`, `title-only`, `blank` (the keys map to PowerPoint's layout
+  types, so they work on a PowerPoint deck too; a name or a number also
+  works).
+- **Edits**: a slide adds text, shapes, images (PNG, JPEG, GIF), tables,
+  charts (column, bar, line, pie: the values cached in the chart part,
+  plus the small workbook PowerPoint embeds with a chart, which its
+  "Edit Data" opens; Quick Look draws no chart without that workbook. The
+  SDK makes and replaces charts, it does not edit an existing one's data),
+  and moves, duplicates (charts copied, notes not) or removes itself; a
+  shape sets or replaces its text (across runs, each run's style kept),
+  restyles it, moves, fills, outlines, sets a table cell, swaps its image,
+  or removes itself. Parts nothing points at any more (media, charts,
+  notes) go on save.
+- **check()** measures text with average glyph widths of a sans font: an
+  estimate. `shrink` autofit (PowerPoint's) makes an overflow a warning.
+- **Quick Look check** (macOS, off-screen, not in `pnpm check`):
+  `~/.bise/run/heavy-run --low node --test office/sdk/test/slides.quicklook.mjs`
+  makes one deck per layout, a table, an image, each chart kind and the
+  edited fixture, and fails when `qlmanage -t` draws no thumbnail of one.
+- Not in v1: editing a chart's series, SmartArt, animations, speaker
+  notes (read only), a second master's own layouts by key.
+
 ## Anchors
 
 Where a note sits, one type for every artifact: `bise_proto::anchor::Anchor`

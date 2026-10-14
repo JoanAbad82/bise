@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { run, setHost, sheets, slides, docs } from "../../dist/office.js";
+import { run, setHost, sheets } from "../../dist/office.js";
 
 test("no host: refused with what to do", async () => {
   setHost(undefined);
@@ -28,5 +28,5 @@ test("a host gets the reads and writes, with the options", async () => {
 });
 
 test("the modules not built yet say so", async () => {
-  for (const m of [sheets, slides]) await assert.rejects(() => m.open(new Uint8Array()), (e) => e.code === "not_built");
+  for (const m of [sheets]) await assert.rejects(() => m.open(new Uint8Array()), (e) => e.code === "not_built");
 });
