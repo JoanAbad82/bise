@@ -77,7 +77,7 @@ side panel, and the unit tests.
 | formula values | `@formulajs/formulajs` + our evaluator, or none in v1 | MIT | ExcelJS writes formulas without values (see risks) |
 | pptx create | `pptxgenjs` 4.0 | MIT | charts, tables, images, masters |
 | pptx read/edit | ours, on fflate + xmldom | — | no open JS library edits an existing deck |
-| docx create | `docx` 9.10 | MIT | what Codex uses too |
+| docx create | ours: a template + the edit layer (architect m_23763) | — | `docx` 9.10 needs node globals and timers, which `bise office run` does not give; `exceljs` and `pptxgenjs` must prove a save with neither before their modules start, else the same answer (our OOXML) or a timers shim office-run proposes |
 | docx read/edit | ours, on fflate + xmldom | — | `docx` cannot read; `mammoth` (BSD-2) reads to HTML only |
 | docx view | `docx-preview` 0.4 | Apache-2.0 | what the Codex app uses |
 
