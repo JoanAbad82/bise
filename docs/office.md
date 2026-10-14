@@ -81,8 +81,60 @@ const changes = diff(before, deck.inspect());   // { added, removed, changed: [{
   with the same content; an XML edit keeps every attribute and namespace
   it did not touch.
 
-The modules (`sheets`, `slides`, `docs`) are stubs that refuse with
-`not_built` until their chunk lands.
+A module whose chunk has not landed yet is a stub that refuses with
+`not_built`.
+
+## The docs module (docx)
+
+Our own OOXML layer on the core's zip and XML, for create and edit alike:
+`docs.create()` is a blank template written in `docs/create.ts` plus the
+same edits as an open file (the `docx` npm package needs node globals and
+timers: plan §2, architect m_23763). Sources in `office/sdk/src/docs/`,
+one file per concern (`text.ts` runs and spans, `blocks.ts` new blocks,
+`comments.ts`, `changes.ts`, `outline.ts`, `check.ts`, `styles.ts`).
+
+```ts
+const doc = await docs.open(bytes, { author: "bise" });   // or docs.create({ title, size: "A4" | "letter" })
+doc.inspect();                     // paragraphs in order: { id: w14:paraId, type: "para", text, props: { style, level, list, align, images, links } }
+const p = doc.at(note.anchor);     // { kind: "para", para, quote? }; a renamed id falls back to the quote
+p.replace("4%", "5%", { track: true });   // also setText, insert, format, style, align, remove
+p.comment("source?");              // on the anchor's quote, or the whole paragraph
+p.add({ kind: "bullet", text: "North up 6%" });   // para | title | heading | bullet | numbered | quote | table | image | pagebreak
+doc.table(anchor).addRow(["South", "80"]);        // rows, cell, setCell, addRow, removeRow
+doc.comments.reply(id, "done"); doc.comments.resolve(id);
+doc.changes.list(); doc.changes.accept(); doc.changes.reject(ids);
+doc.tracking = true;               // every edit after it is a tracked change
+```
+
+- **The outline**: the body's blocks in document order; a table is a
+  `table` node (`table:<its first paragraph's id>`) whose children are its
+  paragraphs, row by row (`props.cell`); a paragraph's comments and
+  tracked changes are its `comment` and `change` children. Headers,
+  footers, footnotes and text boxes are not in it (the viewer counts the
+  n-th drawn paragraph on that).
+- **Text** is what a paragraph reads with every tracked change accepted:
+  insertions in, deletions out, a tab `\t`, a line break `\n`, a page
+  break nothing. Offsets and quotes are in that text.
+- **Ids**: a paragraph with no `w14:paraId` (or a second one with the
+  same) gets one when the file opens: 8 hex digits below 0x80000000, the
+  same for the same bytes. They are written when an edit saves the part (a
+  save with no edit keeps the bytes); `w14` is then declared and listed in
+  `mc:Ignorable`, or Word would call the file corrupt. A renamed duplicate
+  is in check() as `para_id_renamed` (info): a note on the old id finds
+  its paragraph by its quote.
+- **Edits keep the rest**: a span edit splits the runs at its ends, so the
+  format around it stays; the new text takes the replaced run's format.
+  Styles (Title, Heading1-6, ListParagraph, Quote, TableGrid, Hyperlink),
+  list definitions, comments parts and their content types and
+  relationships are added only when an edit needs them.
+- **check()**: the package's problems, then `dangling_comment` (error),
+  `orphan_comment`, `missing_style`, `missing_list`, `heading_skip`,
+  `empty_heading`, `placeholder` (TODO, TBD, lorem ipsum, `[insert …]`),
+  `table_shape`, `open_changes`, `empty` (warnings).
+- **The off-screen check**: `office/sdk/test/docs-ql.sh` (under
+  `heavy-run --low`, macOS) saves a created and an edited docx, checks
+  them, and has Quick Look render each to a thumbnail (`qlmanage -t`, no
+  window).
 
 ## Anchors
 

@@ -28,5 +28,5 @@ test("a host gets the reads and writes, with the options", async () => {
 });
 
 test("the modules not built yet say so", async () => {
-  for (const m of [sheets, slides, docs]) await assert.rejects(() => m.open(new Uint8Array()), (e) => e.code === "not_built");
+  for (const m of [sheets, slides]) await assert.rejects(() => m.open(new Uint8Array()), (e) => e.code === "not_built");
 });

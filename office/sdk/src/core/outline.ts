@@ -32,7 +32,8 @@ export type Outline = { kind: FileKind; nodes: OutlineNode[] };
 export type Problem = {
   /** stable, for code: "overflow", "off_slide", "formula_error", "broken_rel", "empty_placeholder", ... */
   code: string;
-  severity: "error" | "warning";
+  /** error and warning: fix it; info: worth knowing, nothing to fix */
+  severity: "error" | "warning" | "info";
   /** where it is, when it is somewhere */
   at?: Anchor;
   /** the words, for the agent and the user */

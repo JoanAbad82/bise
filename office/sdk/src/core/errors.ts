@@ -11,6 +11,7 @@ export type OfficeErrorCode =
   | "anchor_kind_mismatch" // an anchor of another file type (a cell on a deck)
   | "not_found" // an anchor that points at nothing in this file
   | "no_host" // run.read/run.write outside `bise office run` with no host set
+  | "bad_arg" // an edit's argument is wrong (a block of an unknown kind, a heading level 9)
   | "not_built"; // a module of the SDK that is not built yet
 
 export class OfficeError extends Error {

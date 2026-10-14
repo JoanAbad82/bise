@@ -38,7 +38,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var require_conventions = __commonJS({
   "node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/conventions.js"(exports) {
     "use strict";
-    function find(list, predicate, ac) {
+    function find2(list, predicate, ac) {
       if (ac === void 0) {
         ac = Array.prototype;
       }
@@ -225,7 +225,7 @@ var require_conventions = __commonJS({
       XMLNS: "http://www.w3.org/2000/xmlns/"
     });
     exports.assign = assign;
-    exports.find = find;
+    exports.find = find2;
     exports.freeze = freeze;
     exports.HTML_BOOLEAN_ATTRIBUTES = HTML_BOOLEAN_ATTRIBUTES;
     exports.HTML_RAW_TEXT_ELEMENTS = HTML_RAW_TEXT_ELEMENTS;
@@ -442,12 +442,12 @@ var require_grammar = __commonJS({
     function reg(args) {
       var self = this;
       return new RegExp(
-        Array.prototype.slice.call(arguments).map(function(part) {
-          var isStr = typeof part === "string";
-          if (isStr && self === void 0 && part === "|") {
+        Array.prototype.slice.call(arguments).map(function(part2) {
+          var isStr = typeof part2 === "string";
+          if (isStr && self === void 0 && part2 === "|") {
             throw new Error("use regg instead of reg to wrap expressions with `|`!");
           }
-          return isStr ? part : part.source;
+          return isStr ? part2 : part2.source;
         }).join(""),
         UNICODE_SUPPORT ? "u" : ""
       );
@@ -614,7 +614,7 @@ var require_dom = __commonJS({
   "node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/dom.js"(exports) {
     "use strict";
     var conventions = require_conventions();
-    var find = conventions.find;
+    var find2 = conventions.find;
     var hasDefaultHTMLNamespace = conventions.hasDefaultHTMLNamespace;
     var hasOwn = conventions.hasOwn;
     var isHTMLMimeType = conventions.isHTMLMimeType;
@@ -889,12 +889,12 @@ var require_dom = __commonJS({
         i2++;
       }
     }
-    function _nnmBucket(map, namespaceURI, create) {
+    function _nnmBucket(map, namespaceURI, create2) {
       if (!namespaceURI) {
         return map._noNsIndex;
       }
       var bucket = map._nsIndex[namespaceURI];
-      if (!bucket && create) {
+      if (!bucket && create2) {
         bucket = map._nsIndex[namespaceURI] = /* @__PURE__ */ Object.create(null);
       }
       return bucket;
@@ -913,7 +913,7 @@ var require_dom = __commonJS({
         delete bucket[attr2.localName];
       }
     }
-    function _addNamedNode(el, list, newAttr, oldAttr) {
+    function _addNamedNode(el2, list, newAttr, oldAttr) {
       if (oldAttr) {
         list[_findNodeIndex(list, oldAttr)] = newAttr;
       } else {
@@ -921,16 +921,16 @@ var require_dom = __commonJS({
         list.length++;
       }
       _nnmIndexAdd(list, newAttr);
-      if (el) {
-        newAttr.ownerElement = el;
-        var doc = el.ownerDocument;
+      if (el2) {
+        newAttr.ownerElement = el2;
+        var doc = el2.ownerDocument;
         if (doc) {
-          oldAttr && _onRemoveAttribute(doc, el, oldAttr);
-          _onAddAttribute(doc, el, newAttr);
+          oldAttr && _onRemoveAttribute(doc, el2, oldAttr);
+          _onAddAttribute(doc, el2, newAttr);
         }
       }
     }
-    function _removeNamedNode(el, list, attr2) {
+    function _removeNamedNode(el2, list, attr2) {
       var i2 = _findNodeIndex(list, attr2);
       if (i2 >= 0) {
         var lastIndex = list.length - 1;
@@ -939,10 +939,10 @@ var require_dom = __commonJS({
         }
         list.length = lastIndex;
         _nnmIndexRemove(list, attr2);
-        if (el) {
-          var doc = el.ownerDocument;
+        if (el2) {
+          var doc = el2.ownerDocument;
           if (doc) {
-            _onRemoveAttribute(doc, el, attr2);
+            _onRemoveAttribute(doc, el2, attr2);
           }
           attr2.ownerElement = null;
         }
@@ -990,8 +990,8 @@ var require_dom = __commonJS({
        * @see https://dom.spec.whatwg.org/#concept-element-attributes-set
        */
       setNamedItem: function(attr2) {
-        var el = attr2.ownerElement;
-        if (el && el !== this._ownerElement) {
+        var el2 = attr2.ownerElement;
+        if (el2 && el2 !== this._ownerElement) {
           throw new DOMException(DOMException.INUSE_ATTRIBUTE_ERR);
         }
         var oldAttr = _nnmIndexFind(this, attr2.namespaceURI, attr2.localName);
@@ -1725,9 +1725,9 @@ var require_dom = __commonJS({
        * @prettierignore
        */
       lookupPrefix: function(namespaceURI) {
-        var el = this;
-        while (el) {
-          var map = el._nsMap;
+        var el2 = this;
+        while (el2) {
+          var map = el2._nsMap;
           if (map) {
             for (var n in map) {
               if (hasOwn(map, n) && map[n] === namespaceURI) {
@@ -1735,7 +1735,7 @@ var require_dom = __commonJS({
               }
             }
           }
-          el = el.nodeType == ATTRIBUTE_NODE ? el.ownerDocument : el.parentNode;
+          el2 = el2.nodeType == ATTRIBUTE_NODE ? el2.ownerDocument : el2.parentNode;
         }
         return null;
       },
@@ -1757,15 +1757,15 @@ var require_dom = __commonJS({
        * @prettierignore
        */
       lookupNamespaceURI: function(prefix) {
-        var el = this;
-        while (el) {
-          var map = el._nsMap;
+        var el2 = this;
+        while (el2) {
+          var map = el2._nsMap;
           if (map) {
             if (hasOwn(map, prefix)) {
               return map[prefix];
             }
           }
-          el = el.nodeType == ATTRIBUTE_NODE ? el.ownerDocument : el.parentNode;
+          el2 = el2.nodeType == ATTRIBUTE_NODE ? el2.ownerDocument : el2.parentNode;
         }
         return null;
       },
@@ -1918,18 +1918,18 @@ var require_dom = __commonJS({
       this.contentType = opt.contentType || MIME_TYPE.XML_APPLICATION;
       this.type = isHTMLMimeType(this.contentType) ? "html" : "xml";
     }
-    function _onAddAttribute(doc, el, newAttr) {
+    function _onAddAttribute(doc, el2, newAttr) {
       doc && doc._inc++;
       var ns = newAttr.namespaceURI;
       if (ns === NAMESPACE.XMLNS) {
-        el._nsMap[newAttr.prefix ? newAttr.localName : ""] = newAttr.value;
+        el2._nsMap[newAttr.prefix ? newAttr.localName : ""] = newAttr.value;
       }
     }
-    function _onRemoveAttribute(doc, el, newAttr, remove) {
+    function _onRemoveAttribute(doc, el2, newAttr, remove2) {
       doc && doc._inc++;
       var ns = newAttr.namespaceURI;
       if (ns === NAMESPACE.XMLNS) {
-        delete el._nsMap[newAttr.prefix ? newAttr.localName : ""];
+        delete el2._nsMap[newAttr.prefix ? newAttr.localName : ""];
       }
     }
     function _onUpdateChild(doc, parent, newChild) {
@@ -1989,10 +1989,10 @@ var require_dom = __commonJS({
     }
     function isElementInsertionPossible(doc, child2) {
       var parentChildNodes = doc.childNodes || [];
-      if (find(parentChildNodes, isElementNode) || isDocTypeNode(child2)) {
+      if (find2(parentChildNodes, isElementNode) || isDocTypeNode(child2)) {
         return false;
       }
-      var docTypeNode = find(parentChildNodes, isDocTypeNode);
+      var docTypeNode = find2(parentChildNodes, isDocTypeNode);
       return !(child2 && docTypeNode && parentChildNodes.indexOf(docTypeNode) > parentChildNodes.indexOf(child2));
     }
     function isElementReplacementPossible(doc, child2) {
@@ -2000,10 +2000,10 @@ var require_dom = __commonJS({
       function hasElementChildThatIsNotChild(node) {
         return isElementNode(node) && node !== child2;
       }
-      if (find(parentChildNodes, hasElementChildThatIsNotChild)) {
+      if (find2(parentChildNodes, hasElementChildThatIsNotChild)) {
         return false;
       }
-      var docTypeNode = find(parentChildNodes, isDocTypeNode);
+      var docTypeNode = find2(parentChildNodes, isDocTypeNode);
       return !(child2 && docTypeNode && parentChildNodes.indexOf(docTypeNode) > parentChildNodes.indexOf(child2));
     }
     function assertPreInsertionValidity1to5(parent, node, child2) {
@@ -2032,7 +2032,7 @@ var require_dom = __commonJS({
       var nodeChildNodes = node.childNodes || [];
       if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
         var nodeChildElements = nodeChildNodes.filter(isElementNode);
-        if (nodeChildElements.length > 1 || find(nodeChildNodes, isTextNode)) {
+        if (nodeChildElements.length > 1 || find2(nodeChildNodes, isTextNode)) {
           throw new DOMException(DOMException.HIERARCHY_REQUEST_ERR, "More than one element or text in fragment");
         }
         if (nodeChildElements.length === 1 && !isElementInsertionPossible(parent, child2)) {
@@ -2045,10 +2045,10 @@ var require_dom = __commonJS({
         }
       }
       if (isDocTypeNode(node)) {
-        if (find(parentChildNodes, isDocTypeNode)) {
+        if (find2(parentChildNodes, isDocTypeNode)) {
           throw new DOMException(DOMException.HIERARCHY_REQUEST_ERR, "Only one doctype is allowed");
         }
-        var parentElementChild = find(parentChildNodes, isElementNode);
+        var parentElementChild = find2(parentChildNodes, isElementNode);
         if (child2 && parentChildNodes.indexOf(parentElementChild) < parentChildNodes.indexOf(child2)) {
           throw new DOMException(DOMException.HIERARCHY_REQUEST_ERR, "Doctype can only be inserted before an element");
         }
@@ -2062,7 +2062,7 @@ var require_dom = __commonJS({
       var nodeChildNodes = node.childNodes || [];
       if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
         var nodeChildElements = nodeChildNodes.filter(isElementNode);
-        if (nodeChildElements.length > 1 || find(nodeChildNodes, isTextNode)) {
+        if (nodeChildElements.length > 1 || find2(nodeChildNodes, isTextNode)) {
           throw new DOMException(DOMException.HIERARCHY_REQUEST_ERR, "More than one element or text in fragment");
         }
         if (nodeChildElements.length === 1 && !isElementReplacementPossible(parent, child2)) {
@@ -2078,10 +2078,10 @@ var require_dom = __commonJS({
         let hasDoctypeChildThatIsNotChild = function(node2) {
           return isDocTypeNode(node2) && node2 !== child2;
         };
-        if (find(parentChildNodes, hasDoctypeChildThatIsNotChild)) {
+        if (find2(parentChildNodes, hasDoctypeChildThatIsNotChild)) {
           throw new DOMException(DOMException.HIERARCHY_REQUEST_ERR, "Only one doctype is allowed");
         }
-        var parentElementChild = find(parentChildNodes, isElementNode);
+        var parentElementChild = find2(parentChildNodes, isElementNode);
         if (child2 && parentChildNodes.indexOf(parentElementChild) < parentChildNodes.indexOf(child2)) {
           throw new DOMException(DOMException.HIERARCHY_REQUEST_ERR, "Doctype can only be inserted before an element");
         }
@@ -2601,12 +2601,12 @@ var require_dom = __commonJS({
               if (node !== base && node.nodeType === ELEMENT_NODE) {
                 var nodeClassNames = node.getAttribute("class");
                 if (nodeClassNames) {
-                  var matches = classNames === nodeClassNames;
-                  if (!matches) {
+                  var matches2 = classNames === nodeClassNames;
+                  if (!matches2) {
                     var nodeClassNamesSet = toOrderedSet(nodeClassNames);
-                    matches = classNamesSet.every(arrayIncludes(nodeClassNamesSet));
+                    matches2 = classNamesSet.every(arrayIncludes(nodeClassNamesSet));
                   }
-                  if (matches) {
+                  if (matches2) {
                     ls.push(node);
                   }
                 }
@@ -5599,36 +5599,36 @@ var require_sax = __commonJS({
               break;
             default:
               locator && position(tagStart);
-              var el = new ElementAttributes();
+              var el2 = new ElementAttributes();
               var currentNSMap = parseStack[parseStack.length - 1].currentNSMap;
-              var end = parseElementStartPart(source, tagStart, el, currentNSMap, entityReplacer, errorHandler, isHTML);
-              var len = el.length;
-              if (!el.closed) {
-                if (isHTML && conventions.isHTMLVoidElement(el.tagName)) {
-                  el.closed = true;
+              var end = parseElementStartPart(source, tagStart, el2, currentNSMap, entityReplacer, errorHandler, isHTML);
+              var len = el2.length;
+              if (!el2.closed) {
+                if (isHTML && conventions.isHTMLVoidElement(el2.tagName)) {
+                  el2.closed = true;
                 } else {
-                  unclosedTags.push(el.tagName);
+                  unclosedTags.push(el2.tagName);
                 }
               }
               if (locator && len) {
                 var locator2 = copyLocator(locator, {});
                 for (var i2 = 0; i2 < len; i2++) {
-                  var a = el[i2];
+                  var a = el2[i2];
                   position(a.offset);
                   a.locator = copyLocator(locator, {});
                 }
                 domBuilder.locator = locator2;
-                if (appendElement(el, domBuilder, currentNSMap)) {
-                  parseStack.push(el);
+                if (appendElement(el2, domBuilder, currentNSMap)) {
+                  parseStack.push(el2);
                 }
                 domBuilder.locator = locator;
               } else {
-                if (appendElement(el, domBuilder, currentNSMap)) {
-                  parseStack.push(el);
+                if (appendElement(el2, domBuilder, currentNSMap)) {
+                  parseStack.push(el2);
                 }
               }
-              if (isHTML && !el.closed) {
-                end = parseHtmlSpecialContent(source, end, el.tagName, entityReplacer, domBuilder);
+              if (isHTML && !el2.closed) {
+                end = parseHtmlSpecialContent(source, end, el2.tagName, entityReplacer, domBuilder);
               } else {
                 end++;
               }
@@ -5654,15 +5654,15 @@ var require_sax = __commonJS({
       t.columnNumber = f.columnNumber;
       return t;
     }
-    function parseElementStartPart(source, start, el, currentNSMap, entityReplacer, errorHandler, isHTML) {
+    function parseElementStartPart(source, start, el2, currentNSMap, entityReplacer, errorHandler, isHTML) {
       function addAttribute(qname, value2, startIndex) {
-        if (hasOwn(el.attributeNames, qname)) {
+        if (hasOwn(el2.attributeNames, qname)) {
           return errorHandler.fatalError("Attribute " + qname + " redefined");
         }
         if (!isHTML && value2.indexOf("<") >= 0) {
           return errorHandler.fatalError("Unescaped '<' not allowed in attributes values");
         }
-        el.addValue(
+        el2.addValue(
           qname,
           // @see https://www.w3.org/TR/xml/#AVNormalize
           // since the xmldom sax parser does not "interpret" DTD the following is not implemented:
@@ -5721,17 +5721,17 @@ var require_sax = __commonJS({
           case "/":
             switch (s) {
               case S_TAG:
-                el.setTagName(source.slice(start, p));
+                el2.setTagName(source.slice(start, p));
               case S_ATTR_END:
               case S_TAG_SPACE:
               case S_TAG_CLOSE:
                 s = S_TAG_CLOSE;
-                el.closed = true;
+                el2.closed = true;
               case S_ATTR_NOQUOT_VALUE:
               case S_ATTR:
                 break;
               case S_ATTR_SPACE:
-                el.closed = true;
+                el2.closed = true;
                 break;
               //case S_EQ:
               default:
@@ -5741,13 +5741,13 @@ var require_sax = __commonJS({
           case "":
             errorHandler.error("unexpected end of input");
             if (s == S_TAG) {
-              el.setTagName(source.slice(start, p));
+              el2.setTagName(source.slice(start, p));
             }
             return p;
           case ">":
             switch (s) {
               case S_TAG:
-                el.setTagName(source.slice(start, p));
+                el2.setTagName(source.slice(start, p));
               case S_ATTR_END:
               case S_TAG_SPACE:
               case S_TAG_CLOSE:
@@ -5758,7 +5758,7 @@ var require_sax = __commonJS({
               case S_ATTR:
                 value = source.slice(start, p);
                 if (value.slice(-1) === "/") {
-                  el.closed = true;
+                  el2.closed = true;
                   value = value.slice(0, -1);
                 }
               case S_ATTR_SPACE:
@@ -5788,7 +5788,7 @@ var require_sax = __commonJS({
             if (c <= " ") {
               switch (s) {
                 case S_TAG:
-                  el.setTagName(source.slice(start, p));
+                  el2.setTagName(source.slice(start, p));
                   s = S_TAG_SPACE;
                   break;
                 case S_ATTR:
@@ -5834,12 +5834,12 @@ var require_sax = __commonJS({
         p++;
       }
     }
-    function appendElement(el, domBuilder, currentNSMap) {
-      var tagName = el.tagName;
+    function appendElement(el2, domBuilder, currentNSMap) {
+      var tagName = el2.tagName;
       var localNSMap = null;
-      var i2 = el.length;
+      var i2 = el2.length;
       while (i2--) {
-        var a = el[i2];
+        var a = el2[i2];
         var qName = a.qName;
         var value = a.value;
         var nsp = qName.indexOf(":");
@@ -5863,9 +5863,9 @@ var require_sax = __commonJS({
           domBuilder.startPrefixMapping(nsPrefix, value);
         }
       }
-      var i2 = el.length;
+      var i2 = el2.length;
       while (i2--) {
-        a = el[i2];
+        a = el2[i2];
         if (a.prefix) {
           if (a.prefix === "xml") {
             a.uri = NAMESPACE.XML;
@@ -5877,15 +5877,15 @@ var require_sax = __commonJS({
       }
       var nsp = tagName.indexOf(":");
       if (nsp > 0) {
-        prefix = el.prefix = tagName.slice(0, nsp);
-        localName = el.localName = tagName.slice(nsp + 1);
+        prefix = el2.prefix = tagName.slice(0, nsp);
+        localName = el2.localName = tagName.slice(nsp + 1);
       } else {
         prefix = null;
-        localName = el.localName = tagName;
+        localName = el2.localName = tagName;
       }
-      var ns = el.uri = currentNSMap[prefix || ""];
-      domBuilder.startElement(ns, localName, tagName, el);
-      if (el.closed) {
+      var ns = el2.uri = currentNSMap[prefix || ""];
+      domBuilder.startElement(ns, localName, tagName, el2);
+      if (el2.closed) {
         domBuilder.endElement(ns, localName, tagName);
         if (localNSMap) {
           for (prefix in localNSMap) {
@@ -5895,8 +5895,8 @@ var require_sax = __commonJS({
           }
         }
       } else {
-        el.currentNSMap = currentNSMap;
-        el.localNSMap = localNSMap;
+        el2.currentNSMap = currentNSMap;
+        el2.localNSMap = localNSMap;
         return true;
       }
     }
@@ -6304,11 +6304,11 @@ var require_dom_parser = __commonJS({
       },
       startElement: function(namespaceURI, localName, qName, attrs) {
         var doc = this.doc;
-        var el = doc.createElementNS(namespaceURI, qName || localName);
+        var el2 = doc.createElementNS(namespaceURI, qName || localName);
         var len = attrs.length;
-        appendElement(this, el);
-        this.currentElement = el;
-        this.locator && position(this.locator, el);
+        appendElement(this, el2);
+        this.currentElement = el2;
+        this.locator && position(this.locator, el2);
         for (var i2 = 0; i2 < len; i2++) {
           var namespaceURI = attrs.getURI(i2);
           var value = attrs.getValue(i2);
@@ -6316,7 +6316,7 @@ var require_dom_parser = __commonJS({
           var attr2 = doc.createAttributeNS(namespaceURI, qName);
           this.locator && position(attrs.getLocator(i2), attr2);
           attr2.value = attr2.nodeValue = value;
-          el.setAttributeNode(attr2);
+          el2.setAttributeNode(attr2);
         }
       },
       endElement: function(namespaceURI, localName, qName) {
@@ -6535,28 +6535,6 @@ var sheets = notBuilt("sheets", "xlsx");
 // src/slides/index.ts
 var slides = notBuilt("slides", "pptx");
 
-// src/docs/index.ts
-var docs = notBuilt("docs", "docx");
-
-// src/run.ts
-var KEY = "__biseOfficeHost";
-function host() {
-  const h = globalThis[KEY];
-  if (!h) {
-    throw new OfficeError("no_host", "run.read and run.write work inside `bise office run <script.ts>`; elsewhere call setHost({read, write}) first");
-  }
-  return h;
-}
-function setHost(h) {
-  globalThis[KEY] = h;
-}
-var run = {
-  /** a file's bytes, by path (relative: to the script's working folder) */
-  read: async (path) => host().read(path),
-  /** write a file; when it is an artifact, it becomes its next version */
-  write: async (path, bytes, opts) => host().write(path, bytes, opts)
-};
-
 // src/anchor.gen.ts
 var ANCHOR_KINDS = ["block", "cell", "slide", "shape", "para", "region", "text"];
 
@@ -6617,53 +6595,6 @@ function describe(want) {
   return w === "count" ? "a whole number from 1" : w === "rect" ? "{x, y, w, h} in % of the frame" : "a string";
 }
 
-// src/core/diff.ts
-function flatten(outline) {
-  const out = [];
-  const walk = (nodes) => {
-    for (const n of nodes) {
-      const { children: children2, ...own } = n;
-      out.push(own);
-      if (children2) walk(children2);
-    }
-  };
-  walk(outline.nodes);
-  return out;
-}
-function diff(before, after) {
-  const was = new Map(flatten(before).map((n) => [n.id, n]));
-  const now = new Map(flatten(after).map((n) => [n.id, n]));
-  const added = [];
-  const removed = [];
-  const changed = [];
-  for (const [id, n] of now) {
-    const w = was.get(id);
-    if (!w) {
-      added.push(n);
-      continue;
-    }
-    const fields = changedFields(w, n);
-    if (fields.length) changed.push({ before: w, after: n, fields });
-  }
-  for (const [id, w] of was) if (!now.has(id)) removed.push(w);
-  return { added, removed, changed };
-}
-function changedFields(a, b) {
-  const keys = /* @__PURE__ */ new Set([...Object.keys(a), ...Object.keys(b)]);
-  const out = [];
-  for (const k of [...keys].sort()) {
-    if (stable(a[k]) !== stable(b[k])) out.push(k);
-  }
-  return out;
-}
-function stable(v) {
-  if (v === void 0) return "";
-  if (v === null || typeof v !== "object") return JSON.stringify(v);
-  if (Array.isArray(v)) return `[${v.map(stable).join(",")}]`;
-  const o = v;
-  return `{${Object.keys(o).filter((k) => o[k] !== void 0).sort().map((k) => `${JSON.stringify(k)}:${stable(o[k])}`).join(",")}}`;
-}
-
 // src/core/xml.ts
 var import_xmldom = __toESM(require_lib(), 1);
 var NS = {
@@ -6677,7 +6608,7 @@ var NS = {
   w14: "http://schemas.microsoft.com/office/word/2010/wordml"
 };
 var DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
-function parseXml(text, part) {
+function parseXml(text, part2) {
   let failed = "";
   let doc;
   try {
@@ -6690,7 +6621,7 @@ function parseXml(text, part) {
     failed ||= e.message;
   }
   if (failed || !doc?.documentElement) {
-    throw new OfficeError("bad_xml", `${part} is not well-formed XML: ${failed || "no root element"}`);
+    throw new OfficeError("bad_xml", `${part2} is not well-formed XML: ${failed || "no root element"}`);
   }
   return doc;
 }
@@ -6754,8 +6685,8 @@ function contentTypes(zip) {
   for (const o of children(root, NS.ct, "Override")) overrides.set((attr(o, "PartName") ?? "").replace(/^\//, ""), attr(o, "ContentType") ?? "");
   return { defaults, overrides };
 }
-function typeOf(ct, part) {
-  const p = part.replace(/^\//, "");
+function typeOf(ct, part2) {
+  const p = part2.replace(/^\//, "");
   const ext = p.slice(p.lastIndexOf(".") + 1).toLowerCase();
   return ct.overrides.get(p) ?? ct.defaults.get(ext);
 }
@@ -6763,25 +6694,25 @@ function detect(zip) {
   const ct = contentTypes(zip);
   const officeDoc = rels(zip, "").find((r) => r.type.endsWith("/officeDocument") && !r.external);
   const candidates = officeDoc ? [officeDoc.target] : [...ct.overrides.keys()];
-  for (const part of candidates) {
-    const t = typeOf(ct, part);
+  for (const part2 of candidates) {
+    const t = typeOf(ct, part2);
     for (const kind of Object.keys(MAIN)) {
-      if (t && MAIN[kind].includes(t)) return { kind, main: part };
+      if (t && MAIN[kind].includes(t)) return { kind, main: part2 };
     }
   }
   throw new OfficeError("not_office", "a zip, but not an xlsx, pptx or docx (no workbook, presentation or document part)");
 }
-function relsPath(part) {
-  const p = part.replace(/^\//, "");
+function relsPath(part2) {
+  const p = part2.replace(/^\//, "");
   const slash = p.lastIndexOf("/");
   return `${p.slice(0, slash + 1)}_rels/${p.slice(slash + 1)}.rels`;
 }
-function rels(zip, part) {
-  const path = relsPath(part);
+function rels(zip, part2) {
+  const path = relsPath(part2);
   const text = zip.text(path);
   if (text === void 0) return [];
   const root = parseXml(text, path).documentElement;
-  const base = part.replace(/^\//, "").slice(0, part.lastIndexOf("/") + 1);
+  const base = part2.replace(/^\//, "").slice(0, part2.lastIndexOf("/") + 1);
   return children(root, NS.rel, "Relationship").map((r) => {
     const external = attr(r, "TargetMode") === "External";
     const raw = attr(r, "Target") ?? "";
@@ -7941,6 +7872,1879 @@ function checkPackage(zip) {
     out.push({ code: "broken_rel", severity: "error", message: `${from || "the package"} points at ${rel.target} (${rel.id}), which is not in the file` });
   }
   return out;
+}
+
+// src/docs/w.ts
+var W = NS.w;
+var W14 = NS.w14;
+var W15 = "http://schemas.microsoft.com/office/word/2012/wordml";
+var R = NS.r;
+var MC = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+var XMLNS = "http://www.w3.org/2000/xmlns/";
+var XML = "http://www.w3.org/XML/1998/namespace";
+var WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+var A = NS.a;
+function el(doc, local, attrs = {}, ns = W, prefix = "w") {
+  const e = doc.createElementNS(ns, `${prefix}:${local}`);
+  for (const [k, v] of Object.entries(attrs)) setW(e, k, v);
+  return e;
+}
+function getW(e, local) {
+  return e.hasAttributeNS(W, local) ? e.getAttributeNS(W, local) : void 0;
+}
+function setW(e, local, value) {
+  e.setAttributeNS(W, `w:${local}`, value);
+}
+function isW(n, local) {
+  return !!n && n.nodeType === 1 && n.namespaceURI === W && (local === void 0 || n.localName === local);
+}
+function wkids(node, local) {
+  return children(node, W, local);
+}
+function wkid(node, local) {
+  return child(node, W, local);
+}
+function textEl(doc, local, text) {
+  const t = el(doc, local);
+  t.setAttributeNS(XML, "xml:space", "preserve");
+  t.appendChild(doc.createTextNode(text));
+  return t;
+}
+var RPR = "rStyle rFonts b bCs i iCs caps smallCaps strike dstrike outline shadow emboss imprint noProof snapToGrid vanish webHidden color spacing w kern position sz szCs highlight u effect bdr shd fitText vertAlign rtl cs em lang eastAsianLayout specVanish oMath ins del moveFrom moveTo rPrChange".split(" ");
+var PPR = "pStyle keepNext keepLines pageBreakBefore framePr widowControl numPr suppressLineNumbers pBdr shd tabs suppressAutoHyphens kinsoku wordWrap overflowPunct topLinePunct autoSpaceDE autoSpaceDN bidi adjustRightInd snapToGrid spacing ind contextualSpacing mirrorIndents suppressOverlap jc textDirection textAlignment textboxTightWrap outlineLvl divId cnfStyle rPr sectPr pPrChange".split(" ");
+var TRPR = "cnfStyle divId gridBefore gridAfter wBefore wAfter cantSplit trHeight tblHeader tblCellSpacing jc hidden ins del trPrChange".split(" ");
+var ORDER = { rPr: RPR, pPr: PPR, trPr: TRPR };
+function setProp(props2, kid) {
+  const order = ORDER[props2.localName ?? ""] ?? [];
+  const old = wkid(props2, kid.localName ?? "");
+  if (old) {
+    props2.replaceChild(kid, old);
+    return kid;
+  }
+  const rank = order.indexOf(kid.localName ?? "");
+  const after = wkids(props2).find((c) => order.indexOf(c.localName ?? "") > rank);
+  props2.insertBefore(kid, after ?? null);
+  return kid;
+}
+function props(owner, local) {
+  const have = wkid(owner, local);
+  if (have) return have;
+  const made = el(owner.ownerDocument, local);
+  owner.insertBefore(made, owner.firstChild);
+  return made;
+}
+function unwrap(e) {
+  const parent = e.parentNode;
+  while (e.firstChild) parent.insertBefore(e.firstChild, e);
+  parent.removeChild(e);
+}
+function remove(n) {
+  n.parentNode?.removeChild(n);
+}
+function insertAfter(n, ref) {
+  ref.parentNode.insertBefore(n, ref.nextSibling);
+}
+function wordDate(d) {
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+// src/docs/styles.ts
+function readStyles(parts) {
+  const out = /* @__PURE__ */ new Map();
+  const path = parts.find("styles");
+  if (!path) return out;
+  for (const s of wkids(parts.dom(path).documentElement, "style")) {
+    const id = getW(s, "styleId") ?? "";
+    const pPr = wkid(s, "pPr");
+    const lvl = pPr && wkid(pPr, "outlineLvl");
+    const num = pPr && wkid(pPr, "numPr");
+    const numId = num && wkid(num, "numId");
+    out.set(id, {
+      id,
+      name: (wkid(s, "name") && getW(wkid(s, "name"), "val")) ?? id,
+      type: getW(s, "type") ?? "paragraph",
+      basedOn: (wkid(s, "basedOn") && getW(wkid(s, "basedOn"), "val")) ?? void 0,
+      outline: lvl ? Number(getW(lvl, "val")) : void 0,
+      numId: numId ? getW(numId, "val") : void 0
+    });
+  }
+  return out;
+}
+function headingLevel(styles, styleId, own) {
+  if (own !== void 0 && own < 9) return own + 1;
+  let id = styleId;
+  for (let hop = 0; id && hop < 10; hop++) {
+    const s = styles.get(id);
+    const name = (s?.name ?? id).toLowerCase();
+    if (name === "title" || id === "Title") return 0;
+    const m = /^heading ?(\d)$/.exec(name) ?? /^heading(\d)$/i.exec(id);
+    if (m) return Number(m[1]);
+    if (s?.outline !== void 0 && s.outline < 9) return s.outline + 1;
+    id = s?.basedOn;
+  }
+  return void 0;
+}
+var HEADING_SIZES = [0, 32, 26, 24, 22, 22, 22];
+function heading(n) {
+  return `<w:style w:type="paragraph" w:styleId="Heading${n}"><w:name w:val="heading ${n}"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="9"/><w:qFormat/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="${n === 1 ? 360 : 200}" w:after="80"/><w:outlineLvl w:val="${n - 1}"/></w:pPr><w:rPr><w:b/><w:sz w:val="${HEADING_SIZES[n]}"/><w:szCs w:val="${HEADING_SIZES[n]}"/></w:rPr></w:style>`;
+}
+var BUILTIN = {
+  Normal: `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>`,
+  Title: `<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="10"/><w:qFormat/><w:pPr><w:spacing w:after="160"/><w:contextualSpacing/></w:pPr><w:rPr><w:sz w:val="56"/><w:szCs w:val="56"/></w:rPr></w:style>`,
+  Heading1: heading(1),
+  Heading2: heading(2),
+  Heading3: heading(3),
+  Heading4: heading(4),
+  Heading5: heading(5),
+  Heading6: heading(6),
+  ListParagraph: `<w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:uiPriority w:val="34"/><w:qFormat/><w:pPr><w:ind w:left="720"/><w:contextualSpacing/></w:pPr></w:style>`,
+  Quote: `<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="29"/><w:qFormat/><w:pPr><w:ind w:left="720" w:right="720"/></w:pPr><w:rPr><w:i/><w:color w:val="404040"/></w:rPr></w:style>`,
+  TableNormal: `<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:uiPriority w:val="99"/><w:semiHidden/><w:unhideWhenUsed/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style>`,
+  TableGrid: `<w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/><w:basedOn w:val="TableNormal"/><w:uiPriority w:val="39"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:tblPr><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tblBorders></w:tblPr></w:style>`,
+  Hyperlink: `<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:uiPriority w:val="99"/><w:unhideWhenUsed/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style>`
+};
+var DEFAULTS = `<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:eastAsia="Aptos" w:cs="Aptos"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="259" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>`;
+function stylesXml(ids = Object.keys(BUILTIN)) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="${W}">${DEFAULTS}${ids.map((id) => BUILTIN[id]).join("")}</w:styles>`;
+}
+function ensureStyle(parts, id) {
+  if (!BUILTIN[id]) return readStyles(parts).has(id);
+  const path = parts.ensure("styles", () => stylesXml(["Normal", "TableNormal"]));
+  const doc = parts.dom(path);
+  const root = doc.documentElement;
+  const have = new Set(wkids(root, "style").map((s) => getW(s, "styleId")));
+  if (have.has(id)) return true;
+  const frag = parseXml(`<x xmlns:w="${W}">${BUILTIN[id]}</x>`, "style");
+  const made = frag.documentElement.firstChild;
+  root.appendChild(doc.importNode(made, true));
+  parts.touch(path);
+  const based = /w:basedOn w:val="([^"]+)"/.exec(BUILTIN[id])?.[1];
+  if (based) ensureStyle(parts, based);
+  return true;
+}
+var BULLETS = ["•", "◦", "▪", "•", "◦", "▪", "•", "◦", "▪"];
+var NUMBERS = ["decimal", "lowerLetter", "lowerRoman", "decimal", "lowerLetter", "lowerRoman", "decimal", "lowerLetter", "lowerRoman"];
+function abstractNum(id, ordered) {
+  const lvls = Array.from({ length: 9 }, (_, i2) => {
+    const fmt = ordered ? NUMBERS[i2] : "bullet";
+    const text = ordered ? `%${i2 + 1}.` : BULLETS[i2];
+    return `<w:lvl w:ilvl="${i2}"><w:start w:val="1"/><w:numFmt w:val="${fmt}"/><w:lvlText w:val="${text}"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="${720 * (i2 + 1)}" w:hanging="360"/></w:pPr></w:lvl>`;
+  }).join("");
+  return `<w:abstractNum w:abstractNumId="${id}"><w:multiLevelType w:val="hybridMultilevel"/><w:name w:val="bise ${ordered ? "numbered" : "bullets"}"/>${lvls}</w:abstractNum>`;
+}
+function listNumId(parts, ordered) {
+  const path = parts.ensure("numbering", () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:numbering xmlns:w="${W}"></w:numbering>`);
+  const doc = parts.dom(path);
+  const root = doc.documentElement;
+  const name = `bise ${ordered ? "numbered" : "bullets"}`;
+  const abs = wkids(root, "abstractNum");
+  const nums = wkids(root, "num");
+  const mine = abs.find((a2) => wkid(a2, "name") && getW(wkid(a2, "name"), "val") === name);
+  if (mine) {
+    const aid2 = getW(mine, "abstractNumId");
+    const num = nums.find((n2) => wkid(n2, "abstractNumId") && getW(wkid(n2, "abstractNumId"), "val") === aid2);
+    if (num) return getW(num, "numId");
+  }
+  const aid = Math.max(-1, ...abs.map((a2) => Number(getW(a2, "abstractNumId") ?? -1))) + 1;
+  const nid = Math.max(0, ...nums.map((n2) => Number(getW(n2, "numId") ?? 0))) + 1;
+  const frag = parseXml(`<x xmlns:w="${W}">${abstractNum(aid, ordered)}<w:num w:numId="${nid}"><w:abstractNumId w:val="${aid}"/></w:num></x>`, "numbering");
+  const [a, n] = children(frag.documentElement, W);
+  root.insertBefore(doc.importNode(a, true), nums[0] ?? null);
+  root.appendChild(doc.importNode(n, true));
+  parts.touch(path);
+  return String(nid);
+}
+function listOrdered(parts, numId, level) {
+  const path = parts.find("numbering");
+  if (!path) return void 0;
+  const root = parts.dom(path).documentElement;
+  const num = wkids(root, "num").find((n) => getW(n, "numId") === numId);
+  const aidEl = num && wkid(num, "abstractNumId");
+  if (!aidEl) return void 0;
+  const aid = getW(aidEl, "val");
+  const abs = wkids(root, "abstractNum").find((a) => getW(a, "abstractNumId") === aid);
+  const lvl = abs && wkids(abs, "lvl").find((l) => getW(l, "ilvl") === String(level));
+  const fmt = lvl && wkid(lvl, "numFmt");
+  return fmt ? getW(fmt, "val") !== "bullet" && getW(fmt, "val") !== "none" : void 0;
+}
+function numIds(parts) {
+  const path = parts.find("numbering");
+  if (!path) return /* @__PURE__ */ new Set();
+  return new Set(wkids(parts.dom(path).documentElement, "num").map((n) => getW(n, "numId") ?? ""));
+}
+
+// src/docs/text.ts
+var INLINE = /* @__PURE__ */ new Set(["ins", "hyperlink", "smartTag", "fldSimple", "customXml", "moveTo", "dir", "bdo"]);
+var MARKS = /* @__PURE__ */ new Set(["commentRangeStart", "commentRangeEnd", "commentReference"]);
+function scan(p) {
+  const atoms = [];
+  const marks = [];
+  let at = 0;
+  const run2 = (r) => {
+    for (const c of wkids(r)) {
+      let t;
+      switch (c.localName) {
+        case "t":
+          t = c.textContent ?? "";
+          break;
+        case "tab":
+        case "ptab":
+          t = "	";
+          break;
+        case "br":
+          t = getW(c, "type") === "page" || getW(c, "type") === "column" ? void 0 : "\n";
+          break;
+        case "cr":
+          t = "\n";
+          break;
+        case "noBreakHyphen":
+          t = "-";
+          break;
+        case "commentReference":
+          marks.push({ node: c, local: c.localName, id: getW(c, "id") ?? "", offset: at });
+          break;
+      }
+      if (t !== void 0 && t.length) {
+        atoms.push({ run: r, node: c, start: at, text: t });
+        at += t.length;
+      }
+    }
+  };
+  const walk = (parent) => {
+    for (const c of wkids(parent)) {
+      const l = c.localName ?? "";
+      if (l === "r") run2(c);
+      else if (INLINE.has(l)) walk(c);
+      else if (l === "sdt") {
+        const content = wkid(c, "sdtContent");
+        if (content) walk(content);
+      } else if (MARKS.has(l)) marks.push({ node: c, local: l, id: getW(c, "id") ?? "", offset: at });
+    }
+  };
+  walk(p);
+  return { atoms, marks, text: atoms.map((a) => a.text).join("") };
+}
+function textOfPara(p) {
+  return scan(p).text;
+}
+function splitAt(p, offset) {
+  const { atoms, text } = scan(p);
+  if (offset <= 0 || offset >= text.length) return;
+  const before = atoms.find((x2) => x2.start <= offset - 1 && offset - 1 < x2.start + x2.text.length);
+  const after = atoms.find((x2) => x2.start <= offset && offset < x2.start + x2.text.length);
+  if (before.run !== after.run) return;
+  const doc = p.ownerDocument;
+  let cut = before.node;
+  if (before === after) {
+    const k = offset - before.start;
+    const second = textEl(doc, "t", before.text.slice(k));
+    before.node.textContent = before.text.slice(0, k);
+    before.node.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
+    insertAfter(second, before.node);
+    cut = before.node;
+  }
+  const r = before.run;
+  const twin = r.cloneNode(false);
+  const rPr = wkid(r, "rPr");
+  if (rPr) twin.appendChild(rPr.cloneNode(true));
+  while (cut.nextSibling) twin.appendChild(cut.nextSibling);
+  insertAfter(twin, r);
+}
+function runsIn(p, a, b) {
+  splitAt(p, a);
+  splitAt(p, b);
+  const out = [];
+  for (const x2 of scan(p).atoms) {
+    if (x2.start >= a && x2.start + x2.text.length <= b && !out.includes(x2.run)) out.push(x2.run);
+  }
+  return out;
+}
+function makeRun(p, text, like) {
+  const doc = p.ownerDocument;
+  const r = el(doc, "r");
+  const rPr = like && wkid(like, "rPr");
+  if (rPr) {
+    const copy = rPr.cloneNode(true);
+    for (const c of wkids(copy, "rPrChange")) copy.removeChild(c);
+    r.appendChild(copy);
+  }
+  const parts = text.split(/(\t|\n)/);
+  for (const s of parts) {
+    if (s === "	") r.appendChild(el(doc, "tab"));
+    else if (s === "\n") r.appendChild(el(doc, "br"));
+    else if (s) r.appendChild(textEl(doc, "t", s));
+  }
+  return r;
+}
+function wrap(local, track, node) {
+  const w = el(node.ownerDocument, local, { id: track.nextId(), author: track.author, date: track.date });
+  node.parentNode.insertBefore(w, node);
+  w.appendChild(node);
+  return w;
+}
+function asDeleted(r) {
+  const doc = r.ownerDocument;
+  for (const c of wkids(r)) {
+    if (c.localName === "t" || c.localName === "instrText") {
+      const d = textEl(doc, c.localName === "t" ? "delText" : "delInstrText", c.textContent ?? "");
+      r.replaceChild(d, c);
+    }
+  }
+}
+function deleteRuns(runs, track) {
+  for (const r of runs) {
+    const parent = r.parentNode;
+    if (!track || isW(parent, "ins")) {
+      remove(r);
+      dropEmpty(parent);
+    } else {
+      asDeleted(r);
+      wrap("del", track, r);
+    }
+  }
+}
+function dropEmpty(e) {
+  if ((isW(e, "ins") || isW(e, "hyperlink") || isW(e, "smartTag")) && !wkids(e).some((c) => c.localName === "r" || INLINE.has(c.localName ?? ""))) {
+    const up = e.parentNode;
+    remove(e);
+    dropEmpty(up);
+  }
+}
+function insertText(p, offset, text, track) {
+  splitAt(p, offset);
+  const { atoms } = scan(p);
+  const prev = atoms.filter((x2) => x2.start + x2.text.length <= offset).pop();
+  const next = atoms.find((x2) => x2.start >= offset);
+  const like = prev?.run ?? next?.run;
+  const r = makeRun(p, text, like);
+  if (prev) insertAfter(r, outOfIns(prev.run, track));
+  else if (next) {
+    const ref = outOfIns(next.run, track);
+    ref.parentNode.insertBefore(r, ref);
+  } else p.appendChild(r);
+  return track ? wrap("ins", track, r) : r;
+}
+function outOfIns(r, track) {
+  const parent = r.parentNode;
+  return track && isW(parent, "ins") ? parent : r;
+}
+function replaceSpan(p, a, b, text, track) {
+  if (a === b) {
+    if (text) insertText(p, a, text, track);
+    return;
+  }
+  const runs = runsIn(p, a, b);
+  if (text) {
+    const first = runs[0];
+    const r = makeRun(p, text, first);
+    const ref = outOfIns(first, track);
+    ref.parentNode.insertBefore(r, ref);
+    if (track) wrap("ins", track, r);
+  }
+  deleteRuns(runs, track);
+}
+function matches(text, find2) {
+  const out = [];
+  if (typeof find2 === "string") {
+    if (!find2) return out;
+    let i2 = text.indexOf(find2);
+    while (i2 >= 0) {
+      out.push({ start: i2, end: i2 + find2.length, groups: [find2] });
+      i2 = text.indexOf(find2, i2 + find2.length);
+    }
+    return out;
+  }
+  const re = new RegExp(find2.source, find2.flags.includes("g") ? find2.flags : `${find2.flags}g`);
+  for (const m of text.matchAll(re)) {
+    if (m[0].length === 0) continue;
+    out.push({ start: m.index, end: m.index + m[0].length, groups: [...m] });
+  }
+  return out;
+}
+function formatRun(r, f, track, setProp2) {
+  const doc = r.ownerDocument;
+  let rPr = wkid(r, "rPr");
+  if (!rPr) {
+    rPr = el(doc, "rPr");
+    r.insertBefore(rPr, r.firstChild);
+  }
+  if (track && !wkid(rPr, "rPrChange")) {
+    const old = rPr.cloneNode(true);
+    const change = el(doc, "rPrChange", { id: track.nextId(), author: track.author, date: track.date });
+    change.appendChild(old);
+    setProp2(rPr, change);
+  }
+  const flag = (name, on) => {
+    if (on === void 0) return;
+    if (on) setProp2(rPr, el(doc, name));
+    else setProp2(rPr, el(doc, name, { val: "0" }));
+  };
+  flag("b", f.bold);
+  flag("i", f.italic);
+  flag("strike", f.strike);
+  if (f.underline !== void 0) setProp2(rPr, el(doc, "u", { val: f.underline ? "single" : "none" }));
+  if (f.color) setProp2(rPr, el(doc, "color", { val: f.color.replace(/^#/, "").toUpperCase() }));
+  if (f.highlight) setProp2(rPr, el(doc, "highlight", { val: f.highlight }));
+  if (f.size) {
+    setProp2(rPr, el(doc, "sz", { val: String(Math.round(f.size * 2)) }));
+    setProp2(rPr, el(doc, "szCs", { val: String(Math.round(f.size * 2)) }));
+  }
+  const font = f.font ?? (f.code ? "Consolas" : void 0);
+  if (font) setProp2(rPr, el(doc, "rFonts", { ascii: font, hAnsi: font, cs: font }));
+  if (f.style) setProp2(rPr, el(doc, "rStyle", { val: f.style }));
+  void setW;
+  void W;
+}
+
+// src/docs/blocks.ts
+var BLOCK_KINDS = ["para", "title", "heading", "bullet", "numbered", "quote", "table", "image", "pagebreak"];
+function fillRuns(m, p, text, track) {
+  const runs = typeof text === "string" ? [{ text }] : text;
+  const made = [];
+  for (const run2 of runs) {
+    if (typeof run2?.text !== "string") throw new OfficeError("bad_arg", `a run is {text, bold?, italic?, link?, ...}, got ${JSON.stringify(run2)}`);
+    if (!run2.text) continue;
+    const r = makeRun(p, run2.text);
+    const { text: _t, link, ...format } = run2;
+    if (Object.keys(format).length || link) formatRun(r, link ? { style: "Hyperlink", ...format } : format, null, setProp);
+    if (link) {
+      ensureStyle(m.parts, "Hyperlink");
+      const rid = m.parts.addRel("http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", link, true);
+      const h = el(m.doc, "hyperlink");
+      h.setAttributeNS(R, "r:id", rid);
+      h.appendChild(r);
+      made.push(h);
+    } else made.push(r);
+  }
+  if (!track || !made.length) {
+    for (const x2 of made) p.appendChild(x2);
+    return;
+  }
+  const ins = el(m.doc, "ins", { id: track.nextId(), author: track.author, date: track.date });
+  for (const x2 of made) ins.appendChild(x2);
+  p.appendChild(ins);
+}
+function markParaInserted(p, track) {
+  const pPr = props(p, "pPr");
+  const rPr = wkid(pPr, "rPr") ?? setProp(pPr, el(p.ownerDocument, "rPr"));
+  setProp(rPr, el(p.ownerDocument, "ins", { id: track.nextId(), author: track.author, date: track.date }));
+}
+function para(m, style, text, track, align) {
+  const p = el(m.doc, "p");
+  m.name(p, `new:${m.paras().length}:${JSON.stringify(text ?? "")}`);
+  if (style) {
+    if (!ensureStyle(m.parts, style)) throw new OfficeError("bad_arg", `no paragraph style "${style}" in this docx (and it is not one bise knows how to add: Title, Heading1-6, ListParagraph, Quote)`);
+    setProp(props(p, "pPr"), el(m.doc, "pStyle", { val: style }));
+  }
+  if (align) setProp(props(p, "pPr"), el(m.doc, "jc", { val: align === "justify" ? "both" : align }));
+  if (text !== void 0) fillRuns(m, p, text, track);
+  if (track) markParaInserted(p, track);
+  return p;
+}
+function buildBlock(m, spec, track) {
+  if (!spec || typeof spec !== "object" || !BLOCK_KINDS.includes(spec.kind)) {
+    throw new OfficeError("bad_arg", `a block is {kind: ${BLOCK_KINDS.join(" | ")}, ...}, got ${JSON.stringify(spec)?.slice(0, 120)}`);
+  }
+  switch (spec.kind) {
+    case "para":
+      return para(m, spec.style, spec.text ?? "", track, spec.align);
+    case "title":
+      return para(m, "Title", spec.text, track);
+    case "heading": {
+      const level = spec.level ?? 1;
+      if (!Number.isInteger(level) || level < 1 || level > 6) throw new OfficeError("bad_arg", `a heading's level is 1 to 6, got ${level}`);
+      return para(m, `Heading${level}`, spec.text, track);
+    }
+    case "quote":
+      return para(m, "Quote", spec.text, track);
+    case "bullet":
+    case "numbered": {
+      const p = para(m, "ListParagraph", spec.text, track);
+      const numId = listNumId(m.parts, spec.kind === "numbered");
+      const numPr = el(m.doc, "numPr");
+      numPr.appendChild(el(m.doc, "ilvl", { val: String(Math.max(0, Math.min(8, (spec.level ?? 1) - 1))) }));
+      numPr.appendChild(el(m.doc, "numId", { val: numId }));
+      setProp(props(p, "pPr"), numPr);
+      return p;
+    }
+    case "pagebreak": {
+      const p = para(m, void 0, void 0, track);
+      const r = el(m.doc, "r");
+      r.appendChild(el(m.doc, "br", { type: "page" }));
+      p.appendChild(track ? wrapNew(m, r, track) : r);
+      return p;
+    }
+    case "table":
+      return buildTable(m, spec.rows, spec.header ?? false, spec.widths, track);
+    case "image":
+      return buildImage(m, spec.bytes, spec.width, spec.alt, track);
+  }
+}
+function wrapNew(m, r, track) {
+  const ins = el(m.doc, "ins", { id: track.nextId(), author: track.author, date: track.date });
+  ins.appendChild(r);
+  return ins;
+}
+function buildTable(m, rows, header, widths, track) {
+  if (!Array.isArray(rows) || !rows.length || !rows.every(Array.isArray)) throw new OfficeError("bad_arg", "a table's rows are an array of arrays of cell texts, at least one row");
+  const cols = Math.max(...rows.map((r) => r.length));
+  if (cols < 1) throw new OfficeError("bad_arg", "a table needs at least one column");
+  ensureStyle(m.parts, "TableGrid");
+  const total = m.textWidth();
+  const pct = widths && widths.length === cols ? widths : Array.from({ length: cols }, () => 100 / cols);
+  const tw = pct.map((p) => Math.round(total * p / 100));
+  const tbl = el(m.doc, "tbl");
+  const tblPr = el(m.doc, "tblPr");
+  tblPr.appendChild(el(m.doc, "tblStyle", { val: "TableGrid" }));
+  tblPr.appendChild(el(m.doc, "tblW", { w: String(total), type: "dxa" }));
+  tblPr.appendChild(el(m.doc, "tblLook", { val: "04A0", firstRow: header ? "1" : "0", lastRow: "0", firstColumn: "1", lastColumn: "0", noHBand: "0", noVBand: "1" }));
+  tbl.appendChild(tblPr);
+  const grid = el(m.doc, "tblGrid");
+  for (const w of tw) grid.appendChild(el(m.doc, "gridCol", { w: String(w) }));
+  tbl.appendChild(grid);
+  rows.forEach((row, i2) => tbl.appendChild(buildRow(m, row, cols, tw, header && i2 === 0, track)));
+  return tbl;
+}
+function buildRow(m, row, cols, tw, isHeader, track) {
+  const tr = el(m.doc, "tr");
+  if (isHeader) setProp(props(tr, "trPr"), el(m.doc, "tblHeader"));
+  if (track) setProp(props(tr, "trPr"), el(m.doc, "ins", { id: track.nextId(), author: track.author, date: track.date }));
+  for (let c = 0; c < cols; c++) {
+    const tc = el(m.doc, "tc");
+    const tcPr = el(m.doc, "tcPr");
+    tcPr.appendChild(el(m.doc, "tcW", { w: String(tw[c] ?? tw[tw.length - 1]), type: "dxa" }));
+    tc.appendChild(tcPr);
+    const cell = row[c] ?? "";
+    const text = isHeader && typeof cell === "string" ? [{ text: cell, bold: true }] : cell;
+    tc.appendChild(para(m, void 0, text, track));
+    tr.appendChild(tc);
+  }
+  return tr;
+}
+var EMU_PER_PT = 12700;
+function imageInfo(b) {
+  if (!(b instanceof Uint8Array)) throw new OfficeError("bad_arg", "an image's bytes are a Uint8Array (run.read gives one)");
+  const u32 = (i2) => (b[i2] << 24 | b[i2 + 1] << 16 | b[i2 + 2] << 8 | b[i2 + 3]) >>> 0;
+  if (b[0] === 137 && b[1] === 80 && b[2] === 78 && b[3] === 71) return { ext: "png", mime: "image/png", w: u32(16), h: u32(20) };
+  if (b[0] === 71 && b[1] === 73 && b[2] === 70) return { ext: "gif", mime: "image/gif", w: b[6] | b[7] << 8, h: b[8] | b[9] << 8 };
+  if (b[0] === 255 && b[1] === 216) {
+    let i2 = 2;
+    while (i2 + 9 < b.length) {
+      if (b[i2] !== 255) break;
+      const marker = b[i2 + 1];
+      const len = b[i2 + 2] << 8 | b[i2 + 3];
+      if (marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204) {
+        return { ext: "jpeg", mime: "image/jpeg", h: b[i2 + 5] << 8 | b[i2 + 6], w: b[i2 + 7] << 8 | b[i2 + 8] };
+      }
+      i2 += 2 + len;
+    }
+  }
+  throw new OfficeError("bad_arg", "the image is not a PNG, JPEG or GIF this SDK can size");
+}
+function buildImage(m, bytes, widthPt, alt, track) {
+  const info2 = imageInfo(bytes);
+  const path = m.parts.freePath("media", "image", info2.ext);
+  m.parts.zip.set(path, bytes);
+  m.parts.addDefault(info2.ext, info2.mime);
+  const rid = m.parts.addRel("http://schemas.openxmlformats.org/officeDocument/2006/relationships/image", m.parts.relTarget(path));
+  const maxPt = m.textWidth() / 20;
+  const natural = info2.w * 0.75;
+  const wPt = Math.min(widthPt ?? natural, maxPt);
+  const cx = Math.round(wPt * EMU_PER_PT);
+  const cy = Math.round(cx * info2.h / Math.max(1, info2.w));
+  const used = m.doc.getElementsByTagNameNS(WP, "docPr");
+  let id = 1;
+  for (let i2 = 0; i2 < used.length; i2++) id = Math.max(id, Number(used.item(i2).getAttribute("id")) + 1 || id);
+  const name = `Picture ${id}`;
+  const descr = (alt ?? "").replace(/[<>&"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  const xml = `<w:r xmlns:w="${W}" xmlns:r="${R}" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${id}" name="${name}" descr="${descr}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="${name}" descr="${descr}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+  const r = m.doc.importNode(parseXml(xml, "image").documentElement, true);
+  const p = para(m, void 0, void 0, track);
+  p.appendChild(track ? wrapNew(m, r, track) : r);
+  return p;
+}
+
+// src/docs/parts.ts
+var RT = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+var KNOWN = {
+  styles: { rel: `${RT}/styles`, type: "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml", file: "styles.xml" },
+  numbering: { rel: `${RT}/numbering`, type: "application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml", file: "numbering.xml" },
+  comments: { rel: `${RT}/comments`, type: "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml", file: "comments.xml" },
+  commentsExtended: {
+    rel: "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
+    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml",
+    file: "commentsExtended.xml"
+  }
+};
+var Parts = class {
+  zip;
+  /** word/document.xml, or wherever the package points */
+  main;
+  doms = /* @__PURE__ */ new Map();
+  dirty = /* @__PURE__ */ new Set();
+  constructor(zip, main) {
+    this.zip = zip;
+    this.main = main;
+  }
+  /** A part's DOM, parsed once. */
+  dom(path) {
+    let d = this.doms.get(path);
+    if (!d) {
+      const text = this.zip.text(path);
+      if (text === void 0) throw new OfficeError("no_part", `the docx has no ${path}`);
+      d = parseXml(text, path);
+      this.doms.set(path, d);
+    }
+    return d;
+  }
+  /** Mark a part as edited: save() writes it. */
+  touch(path) {
+    this.dirty.add(path);
+  }
+  /** The main document's relationships. */
+  rels() {
+    return rels(this.zip, this.main);
+  }
+  /** Where a known part is (through the main part's relationship), or undefined. */
+  find(kind) {
+    const r = this.rels().find((x2) => x2.type === KNOWN[kind].rel && !x2.external);
+    return r && this.zip.has(r.target) ? r.target : void 0;
+  }
+  /** A known part, made from `xml` with its content type and relationship when the file has none. */
+  ensure(kind, xml) {
+    const have = this.find(kind);
+    if (have) return have;
+    const dir = this.main.slice(0, this.main.lastIndexOf("/") + 1);
+    const path = `${dir}${KNOWN[kind].file}`;
+    this.zip.set(path, xml());
+    this.addOverride(path, KNOWN[kind].type);
+    this.addRel(KNOWN[kind].rel, KNOWN[kind].file);
+    return path;
+  }
+  /** A new relationship from the main part; returns its id. */
+  addRel(type, target, external = false) {
+    const path = relsPath(this.main);
+    if (!this.zip.has(path)) {
+      this.zip.set(path, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="${NS.rel}"></Relationships>`);
+    }
+    const doc = this.dom(path);
+    const root = doc.documentElement;
+    const taken = new Set(children(root, NS.rel, "Relationship").map((r2) => attr(r2, "Id")));
+    let n = taken.size + 1;
+    while (taken.has(`rId${n}`)) n++;
+    const r = doc.createElementNS(NS.rel, "Relationship");
+    r.setAttribute("Id", `rId${n}`);
+    r.setAttribute("Type", type);
+    r.setAttribute("Target", target);
+    if (external) r.setAttribute("TargetMode", "External");
+    root.appendChild(r);
+    this.zip.set(path, writeXml(doc));
+    return `rId${n}`;
+  }
+  /** The target part of one of the main part's relationships. */
+  target(rid) {
+    return this.rels().find((r) => r.id === rid);
+  }
+  addOverride(path, type) {
+    const ct = "[Content_Types].xml";
+    const root = this.dom(ct).documentElement;
+    const name = `/${path.replace(/^\//, "")}`;
+    if (children(root, NS.ct, "Override").some((o2) => attr(o2, "PartName") === name)) return;
+    const o = this.dom(ct).createElementNS(NS.ct, "Override");
+    o.setAttribute("PartName", name);
+    o.setAttribute("ContentType", type);
+    root.appendChild(o);
+    this.touch(ct);
+  }
+  addDefault(ext, type) {
+    const ct = "[Content_Types].xml";
+    const root = this.dom(ct).documentElement;
+    if (children(root, NS.ct, "Default").some((d2) => (attr(d2, "Extension") ?? "").toLowerCase() === ext)) return;
+    const d = this.dom(ct).createElementNS(NS.ct, "Default");
+    d.setAttribute("Extension", ext);
+    d.setAttribute("ContentType", type);
+    root.insertBefore(d, root.firstChild);
+    this.touch(ct);
+  }
+  /** A free part path in the main part's folder: `media/image1.png`, ... */
+  freePath(sub, stem, ext) {
+    const dir = this.main.slice(0, this.main.lastIndexOf("/") + 1);
+    let n = 1;
+    while (this.zip.has(`${dir}${sub}/${stem}${n}.${ext}`)) n++;
+    return `${dir}${sub}/${stem}${n}.${ext}`;
+  }
+  /** The edited DOMs back into the zip. */
+  flush() {
+    for (const path of this.dirty) this.zip.set(path, writeXml(this.dom(path)));
+    this.dirty.clear();
+  }
+  /** A path relative to the main part's folder, as a relationship target. */
+  relTarget(path) {
+    const dir = this.main.slice(0, this.main.lastIndexOf("/") + 1);
+    return path.startsWith(dir) ? path.slice(dir.length) : `/${path}`;
+  }
+  resolveFromMain(target) {
+    return resolve(this.main.slice(0, this.main.lastIndexOf("/") + 1), target);
+  }
+};
+function declareW14(root) {
+  if (root.lookupNamespaceURI("w14") !== W14) root.setAttributeNS(XMLNS, "xmlns:w14", W14);
+  if (root.lookupNamespaceURI("mc") !== MC) root.setAttributeNS(XMLNS, "xmlns:mc", MC);
+  const ign = root.getAttributeNS(MC, "Ignorable") ?? "";
+  const list = ign.split(/\s+/).filter(Boolean);
+  if (!list.includes("w14")) root.setAttributeNS(MC, "mc:Ignorable", [...list, "w14"].join(" "));
+  void W;
+}
+
+// src/docs/model.ts
+var Model = class {
+  parts;
+  doc;
+  body;
+  author;
+  /** every edit is tracked unless the call says `track: false` */
+  tracking = false;
+  now;
+  ids = /* @__PURE__ */ new Set();
+  nextChange = 0;
+  constructor(parts, opts = {}) {
+    this.parts = parts;
+    this.doc = parts.dom(parts.main);
+    const body = wkid(this.doc.documentElement, "body");
+    if (!body) throw new OfficeError("no_part", `${parts.main} has no w:body`);
+    this.body = body;
+    this.author = opts.author ?? "bise";
+    this.now = opts.now ?? (() => /* @__PURE__ */ new Date());
+    this.nameParagraphs();
+  }
+  /** The body's blocks in document order; a table's cells hold blocks too (`blocksOf`). */
+  blocks() {
+    return blocksOf(this.body);
+  }
+  /** Every paragraph of the body, tables' cells included, in document order. */
+  paras() {
+    const out = [];
+    const walk = (bs) => {
+      for (const b of bs) {
+        if (b.kind === "p") out.push(b.el);
+        else for (const tc of cellsOf(b.el)) walk(blocksOf(tc));
+      }
+    };
+    walk(this.blocks());
+    return out;
+  }
+  paraId(p) {
+    return p.getAttributeNS(W14, "paraId") ?? "";
+  }
+  /** The paragraph with this id, else undefined. */
+  byId(id) {
+    const want = id.toUpperCase();
+    return this.paras().find((p) => this.paraId(p).toUpperCase() === want);
+  }
+  /** Give a new paragraph its id. */
+  name(p, seed) {
+    declareW14(this.doc.documentElement);
+    const id = this.freeId(seed);
+    p.setAttributeNS(W14, "w14:paraId", id);
+    p.setAttributeNS(W14, "w14:textId", "77777777");
+    return id;
+  }
+  /** Paragraphs whose paraId was another's: their old id and the new one (check() says so). */
+  renamed = [];
+  /**
+   * Paragraphs with no w14:paraId (or another's) get one, the same for the
+   * same bytes (a hash of the place and the text), so an outline read twice
+   * names them alike. They are written when an edit saves the part; a save
+   * with no edit keeps the bytes.
+   */
+  nameParagraphs() {
+    const comments = this.parts.find("comments");
+    if (comments) {
+      const list = this.parts.dom(comments).getElementsByTagNameNS(W, "p");
+      for (let i2 = 0; i2 < list.length; i2++) {
+        const id = list.item(i2).getAttributeNS(W14, "paraId");
+        if (id) this.ids.add(id.toUpperCase());
+      }
+    }
+    const all = this.paras();
+    const missing = [];
+    all.forEach((p, i2) => {
+      const id = this.paraId(p).toUpperCase();
+      if (id && !this.ids.has(id)) this.ids.add(id);
+      else missing.push([p, i2]);
+    });
+    for (const [p, i2] of missing) {
+      const old = this.paraId(p);
+      const id = this.name(p, `${i2}:${textOfPara(p)}`);
+      if (old) this.renamed.push({ from: old, to: id });
+    }
+  }
+  /** An unused paraId: 8 hex digits below 0x80000000 (Word's rule). */
+  freeId(seed) {
+    let h = 2166136261;
+    for (let i2 = 0; i2 < seed.length; i2++) h = Math.imul(h ^ seed.charCodeAt(i2), 16777619) >>> 0;
+    for (; ; ) {
+      h = h & 2147483647 || 1;
+      const id = h.toString(16).toUpperCase().padStart(8, "0");
+      if (!this.ids.has(id)) {
+        this.ids.add(id);
+        return id;
+      }
+      h = h + 2654435761 >>> 0;
+    }
+  }
+  /** The tracked-edit context, or null when this edit is not tracked. */
+  track(want) {
+    if (!(want ?? this.tracking)) return null;
+    if (!this.nextChange) this.nextChange = maxId(this.doc) + 1;
+    return {
+      author: this.author,
+      date: wordDate(this.now()),
+      nextId: () => String(this.nextChange++)
+    };
+  }
+  touch() {
+    this.parts.touch(this.parts.main);
+  }
+  /** The text width of the page (twips), for tables. */
+  textWidth() {
+    const sect = wkid(this.body, "sectPr");
+    const pg = sect && wkid(sect, "pgSz");
+    const mar = sect && wkid(sect, "pgMar");
+    const w = Number((pg && getW(pg, "w")) ?? 11906);
+    const l = Number((mar && getW(mar, "left")) ?? 1440);
+    const r = Number((mar && getW(mar, "right")) ?? 1440);
+    return Math.max(1440, w - l - r);
+  }
+};
+function blocksOf(parent) {
+  const out = [];
+  for (const c of wkids(parent)) {
+    if (c.localName === "p") out.push({ kind: "p", el: c });
+    else if (c.localName === "tbl") out.push({ kind: "tbl", el: c });
+    else if (c.localName === "sdt") {
+      const content = wkid(c, "sdtContent");
+      if (content) out.push(...blocksOf(content));
+    } else if (c.localName === "customXml") out.push(...blocksOf(c));
+  }
+  return out;
+}
+function rowsOf(tbl) {
+  const out = [];
+  const walk = (e) => {
+    for (const c of wkids(e)) {
+      if (c.localName === "tr") out.push(c);
+      else if (c.localName === "sdt" || c.localName === "customXml") walk(wkid(c, "sdtContent") ?? c);
+    }
+  };
+  walk(tbl);
+  return out;
+}
+function cellsOfRow(tr) {
+  const out = [];
+  const walk = (e) => {
+    for (const c of wkids(e)) {
+      if (c.localName === "tc") out.push(c);
+      else if (c.localName === "sdt" || c.localName === "customXml") walk(wkid(c, "sdtContent") ?? c);
+    }
+  };
+  walk(tr);
+  return out;
+}
+function cellsOf(tbl) {
+  return rowsOf(tbl).flatMap(cellsOfRow);
+}
+function maxId(doc) {
+  let max2 = 0;
+  for (const local of ["ins", "del", "moveFrom", "moveTo", "rPrChange", "pPrChange", "trPrChange", "tcPrChange", "tblPrChange", "sectPrChange", "bookmarkStart", "commentRangeStart"]) {
+    const list = doc.getElementsByTagNameNS(W, local);
+    for (let i2 = 0; i2 < list.length; i2++) {
+      const n = Number(getW(list.item(i2), "id"));
+      if (Number.isFinite(n) && n > max2) max2 = n;
+    }
+  }
+  return max2;
+}
+
+// src/docs/changes.ts
+var KIND = { ins: "insert", del: "delete", moveTo: "insert", moveFrom: "delete" };
+function runText(e) {
+  let out = "";
+  const list = e.getElementsByTagNameNS(W, "*");
+  for (let i2 = 0; i2 < list.length; i2++) {
+    const c = list.item(i2);
+    if (c.localName === "t" || c.localName === "delText") out += c.textContent ?? "";
+    else if (c.localName === "tab") out += "	";
+    else if (c.localName === "br" || c.localName === "cr") out += "\n";
+  }
+  return out;
+}
+function info(e, kind, p, m, text = "") {
+  return { id: getW(e, "id") ?? "", kind, author: getW(e, "author") ?? "", date: getW(e, "date"), text, para: m.paraId(p), el: e, p };
+}
+function find(m) {
+  const out = [];
+  const inPara = (p) => {
+    const pPr = wkid(p, "pPr");
+    const mark = pPr && wkid(pPr, "rPr");
+    if (mark) {
+      for (const c of wkids(mark)) {
+        if (c.localName === "ins") out.push(info(c, "para-insert", p, m));
+        if (c.localName === "del") out.push(info(c, "para-delete", p, m));
+      }
+    }
+    if (pPr && wkid(pPr, "pPrChange")) out.push(info(wkid(pPr, "pPrChange"), "format", p, m));
+    const walk = (parent) => {
+      for (const c of wkids(parent)) {
+        const kind = KIND[c.localName ?? ""];
+        if (kind) out.push(info(c, kind, p, m, runText(c)));
+        if (c.localName === "r") {
+          const rPr = wkid(c, "rPr");
+          const ch = rPr && wkid(rPr, "rPrChange");
+          if (ch) out.push(info(ch, "format", p, m, runText(c)));
+        }
+        if (c.localName === "ins" || c.localName === "moveTo" || c.localName === "hyperlink" || c.localName === "smartTag" || c.localName === "fldSimple") walk(c);
+        if (c.localName === "sdt" && wkid(c, "sdtContent")) walk(wkid(c, "sdtContent"));
+      }
+    };
+    walk(p);
+  };
+  const inBlocks = (parent) => {
+    for (const b of blocksOf(parent)) {
+      if (b.kind === "p") inPara(b.el);
+      else {
+        for (const tr of wkids(b.el, "tr")) {
+          const trPr = wkid(tr, "trPr");
+          const first = tr.getElementsByTagNameNS(W, "p").item(0);
+          for (const c of trPr ? wkids(trPr) : []) {
+            if (first && c.localName === "ins") out.push(info(c, "row-insert", first, m));
+            if (first && c.localName === "del") out.push(info(c, "row-delete", first, m));
+          }
+          for (const tc of wkids(tr, "tc")) inBlocks(tc);
+        }
+      }
+    }
+  };
+  inBlocks(m.body);
+  return out;
+}
+function listChanges(m) {
+  return find(m).map(({ el: _e, p: _p, ...c }) => c);
+}
+function settle(m, accept, ids) {
+  const want = ids === void 0 ? void 0 : new Set((Array.isArray(ids) ? ids : [ids]).map(String));
+  const all = find(m);
+  const chosen = want ? all.filter((c) => want.has(c.id)) : all;
+  if (want) {
+    const missing = [...want].filter((id) => !all.some((c) => c.id === id));
+    if (missing.length) throw new OfficeError("not_found", `no tracked change ${missing.join(", ")} in this docx (doc.changes.list() has their ids)`);
+  }
+  const merges = [];
+  for (const c of chosen) {
+    if (!c.el.parentNode) continue;
+    const keep = accept === (c.kind === "insert" || c.kind === "para-insert" || c.kind === "row-insert" || c.kind === "format");
+    switch (c.kind) {
+      case "insert":
+        if (keep) unwrap(c.el);
+        else remove(c.el);
+        break;
+      case "delete":
+        if (keep) {
+          undelete(c.el);
+          unwrap(c.el);
+        } else remove(c.el);
+        break;
+      case "para-insert":
+      case "para-delete":
+        remove(c.el);
+        if (!keep) merges.push(c.p);
+        break;
+      case "row-insert":
+      case "row-delete": {
+        const tr = c.el.parentNode.parentNode;
+        remove(c.el);
+        if (!keep) remove(tr);
+        break;
+      }
+      case "format":
+        if (accept) remove(c.el);
+        else restore(c.el);
+        break;
+    }
+  }
+  for (const p of merges.reverse()) mergeNext(m, p);
+  dropMoveMarks(m);
+  m.touch();
+  return chosen.length;
+}
+function undelete(e) {
+  const doc = e.ownerDocument;
+  for (const local of ["delText", "delInstrText"]) {
+    const list = e.getElementsByTagNameNS(W, local);
+    const all = [];
+    for (let i2 = 0; i2 < list.length; i2++) all.push(list.item(i2));
+    for (const d of all) d.parentNode.replaceChild(textEl(doc, local === "delText" ? "t" : "instrText", d.textContent ?? ""), d);
+  }
+}
+function restore(change) {
+  const owner = change.parentNode;
+  const old = wkid(change, owner.localName ?? "");
+  for (const c of wkids(owner)) {
+    if (owner.localName === "pPr" && (c.localName === "rPr" || c.localName === "sectPr")) continue;
+    owner.removeChild(c);
+  }
+  const first = owner.firstChild;
+  for (const c of old ? wkids(old) : []) owner.insertBefore(c, first);
+}
+function mergeNext(m, p) {
+  const parent = p.parentNode;
+  const empty = !scan(p).text && !wkids(p).some((c) => c.localName !== "pPr" && c.localName !== "bookmarkStart" && c.localName !== "bookmarkEnd");
+  const siblings = wkids(parent, "p");
+  if (empty && (siblings.length > 1 || isW(parent, "body"))) {
+    remove(p);
+    return;
+  }
+  let next = p.nextSibling;
+  while (next && next.nodeType !== 1) next = next.nextSibling;
+  if (!isW(next, "p")) return;
+  for (const c of wkids(next)) if (c.localName !== "pPr") p.appendChild(c);
+  remove(next);
+  void m;
+}
+function dropMoveMarks(m) {
+  for (const local of ["moveFromRangeStart", "moveFromRangeEnd", "moveToRangeStart", "moveToRangeEnd"]) {
+    const list = m.doc.getElementsByTagNameNS(W, local);
+    const all = [];
+    for (let i2 = 0; i2 < list.length; i2++) all.push(list.item(i2));
+    for (const e of all) remove(e);
+  }
+}
+
+// src/docs/comments.ts
+var X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+function part(m, make) {
+  if (!make) return m.parts.find("comments");
+  return m.parts.ensure("comments", () => `${X}<w:comments xmlns:w="${W}" xmlns:w14="${W14}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14"></w:comments>`);
+}
+function extPart(m, make) {
+  if (!make) return m.parts.find("commentsExtended");
+  return m.parts.ensure("commentsExtended", () => `${X}<w15:commentsEx xmlns:w15="${W15}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w15"></w15:commentsEx>`);
+}
+function commentEls(m) {
+  const path = part(m, false);
+  return path ? wkids(m.parts.dom(path).documentElement, "comment") : [];
+}
+function lastParaId(c) {
+  const ps = wkids(c, "p");
+  const p = ps[ps.length - 1];
+  return p ? p.getAttributeNS(W14, "paraId") ?? void 0 : void 0;
+}
+function extOf(m) {
+  const out = /* @__PURE__ */ new Map();
+  const path = extPart(m, false);
+  if (!path) return out;
+  const list = m.parts.dom(path).documentElement.getElementsByTagNameNS(W15, "commentEx");
+  for (let i2 = 0; i2 < list.length; i2++) {
+    const e = list.item(i2);
+    out.set((e.getAttributeNS(W15, "paraId") ?? "").toUpperCase(), e);
+  }
+  return out;
+}
+function places(m) {
+  const starts = /* @__PURE__ */ new Map();
+  const out = /* @__PURE__ */ new Map();
+  for (const p of m.paras()) {
+    const { marks, text } = scan(p);
+    for (const k of marks) {
+      if (k.local === "commentRangeStart") starts.set(k.id, { p, offset: k.offset });
+      else if (k.local === "commentRangeEnd" || k.local === "commentReference" && !out.has(k.id)) {
+        const s = starts.get(k.id);
+        if (s && s.p === p) out.set(k.id, { para: m.paraId(p), quote: text.slice(s.offset, k.offset) });
+        else if (s) out.set(k.id, { para: m.paraId(s.p), quote: scan(s.p).text.slice(s.offset) });
+        else if (!out.has(k.id)) out.set(k.id, { para: m.paraId(p), quote: "" });
+      }
+    }
+  }
+  return out;
+}
+function listComments(m) {
+  const ext = extOf(m);
+  const where = places(m);
+  const els = commentEls(m);
+  const byPara = /* @__PURE__ */ new Map();
+  for (const c of els) {
+    const pid = lastParaId(c);
+    if (pid) byPara.set(pid.toUpperCase(), getW(c, "id") ?? "");
+  }
+  return els.map((c) => {
+    const id = getW(c, "id") ?? "";
+    const pid = (lastParaId(c) ?? "").toUpperCase();
+    const ex = ext.get(pid);
+    const parent = ex?.getAttributeNS(W15, "paraIdParent");
+    const text = wkids(c, "p").map((p) => scan(p).text).join("\n");
+    const at = where.get(id);
+    return {
+      id,
+      author: getW(c, "author") ?? "",
+      date: getW(c, "date"),
+      text,
+      para: at?.para,
+      quote: at?.quote,
+      replyTo: parent ? byPara.get(parent.toUpperCase()) : void 0,
+      done: ex?.getAttributeNS(W15, "done") === "1"
+    };
+  });
+}
+function nextCommentId(m) {
+  return String(Math.max(-1, ...commentEls(m).map((c) => Number(getW(c, "id") ?? -1))) + 1);
+}
+function makeComment(m, id, text, initials) {
+  const path = part(m, true);
+  const cdoc = m.parts.dom(path);
+  declareW14(cdoc.documentElement);
+  const c = el(cdoc, "comment", { id, author: m.author, date: wordDate(m.now()), initials });
+  text.split("\n").forEach((line, i2) => {
+    const p = el(cdoc, "p");
+    p.setAttributeNS(W14, "w14:paraId", m.freeId(`comment:${id}:${i2}:${line}`));
+    p.setAttributeNS(W14, "w14:textId", "77777777");
+    if (i2 === 0) {
+      const ref = el(cdoc, "r");
+      ref.appendChild(el(cdoc, "annotationRef"));
+      p.appendChild(ref);
+    }
+    const r = el(cdoc, "r");
+    r.appendChild(textEl(cdoc, "t", line));
+    p.appendChild(r);
+    c.appendChild(p);
+  });
+  cdoc.documentElement.appendChild(c);
+  m.parts.touch(path);
+  return c;
+}
+function initialsOf(name) {
+  return name.split(/\s+/).filter(Boolean).map((w) => w[0].toUpperCase()).join("").slice(0, 4) || "B";
+}
+function topOf(p, n) {
+  let x2 = n;
+  while (x2.parentNode && x2.parentNode !== p) x2 = x2.parentNode;
+  return x2;
+}
+function addComment(m, p, text, span2) {
+  if (typeof text !== "string" || !text.trim()) throw new OfficeError("bad_arg", "a comment needs some text");
+  const id = nextCommentId(m);
+  makeComment(m, id, text, initialsOf(m.author));
+  placeRange(m, p, id, span2);
+  m.touch();
+  return listComments(m).find((c) => c.id === id);
+}
+function placeRange(m, p, id, span2) {
+  const start = el(m.doc, "commentRangeStart", { id });
+  const end = el(m.doc, "commentRangeEnd", { id });
+  const refRun = el(m.doc, "r");
+  refRun.appendChild(el(m.doc, "commentReference", { id }));
+  const { text } = scan(p);
+  const a = span2?.start ?? 0;
+  const b = span2?.end ?? text.length;
+  splitAt(p, a);
+  splitAt(p, b);
+  const atoms = scan(p).atoms;
+  const first = atoms.find((x2) => x2.start >= a && x2.start < b);
+  const last = atoms.filter((x2) => x2.start < b && x2.start >= a).pop();
+  if (!first || !last) {
+    p.appendChild(start);
+    p.appendChild(end);
+    p.appendChild(refRun);
+    return;
+  }
+  const s = topOf(p, first.run);
+  const e = topOf(p, last.run);
+  p.insertBefore(start, s);
+  insertAfter(end, e);
+  insertAfter(refRun, end);
+}
+function reply(m, parentId, text) {
+  const parent = commentEls(m).find((c2) => getW(c2, "id") === String(parentId));
+  if (!parent) throw new OfficeError("not_found", `no comment ${parentId} in this docx (doc.comments.list() has their ids)`);
+  if (typeof text !== "string" || !text.trim()) throw new OfficeError("bad_arg", "a reply needs some text");
+  const id = nextCommentId(m);
+  const c = makeComment(m, id, text, initialsOf(m.author));
+  const parentPid = ensureLastParaId(m, parent);
+  setExt(m, lastParaId(c), { paraIdParent: parentPid });
+  for (const p of m.paras()) {
+    for (const k of scan(p).marks) {
+      if (k.id !== String(parentId)) continue;
+      if (k.local === "commentRangeStart") insertAfter(el(m.doc, "commentRangeStart", { id }), k.node);
+      if (k.local === "commentRangeEnd") {
+        const end = el(m.doc, "commentRangeEnd", { id });
+        insertAfter(end, k.node);
+        const r = el(m.doc, "r");
+        r.appendChild(el(m.doc, "commentReference", { id }));
+        const parentRef = scan(p).marks.find((x2) => x2.local === "commentReference" && x2.id === String(parentId));
+        insertAfter(r, parentRef ? topOf(p, parentRef.node) : end);
+      }
+    }
+  }
+  m.touch();
+  return listComments(m).find((x2) => x2.id === id);
+}
+function ensureLastParaId(m, c) {
+  const have = lastParaId(c);
+  if (have) return have;
+  const ps = wkids(c, "p");
+  const p = ps[ps.length - 1];
+  if (!p) throw new OfficeError("bad_xml", `comment ${getW(c, "id")} has no paragraph`);
+  const id = m.freeId(`comment:${getW(c, "id")}`);
+  p.setAttributeNS(W14, "w14:paraId", id);
+  m.parts.touch(part(m, false));
+  return id;
+}
+function setExt(m, paraId, attrs) {
+  const path = extPart(m, true);
+  const doc = m.parts.dom(path);
+  const root = doc.documentElement;
+  if (root.lookupNamespaceURI("w15") !== W15) root.setAttributeNS(XMLNS, "xmlns:w15", W15);
+  let e = extOf(m).get(paraId.toUpperCase());
+  if (!e) {
+    e = doc.createElementNS(W15, "w15:commentEx");
+    e.setAttributeNS(W15, "w15:paraId", paraId);
+    e.setAttributeNS(W15, "w15:done", "0");
+    root.appendChild(e);
+  }
+  if (attrs.paraIdParent) e.setAttributeNS(W15, "w15:paraIdParent", attrs.paraIdParent);
+  if (attrs.done) e.setAttributeNS(W15, "w15:done", attrs.done);
+  m.parts.touch(path);
+}
+function resolve2(m, id, done = true) {
+  const c = commentEls(m).find((x2) => getW(x2, "id") === String(id));
+  if (!c) throw new OfficeError("not_found", `no comment ${id} in this docx (doc.comments.list() has their ids)`);
+  setExt(m, ensureLastParaId(m, c), { done: done ? "1" : "0" });
+}
+function removeComment(m, id) {
+  const all = listComments(m);
+  if (!all.some((c) => c.id === String(id))) throw new OfficeError("not_found", `no comment ${id} in this docx (doc.comments.list() has their ids)`);
+  const gone = /* @__PURE__ */ new Set([String(id), ...all.filter((c) => c.replyTo === String(id)).map((c) => c.id)]);
+  const ext = extOf(m);
+  for (const c of commentEls(m)) {
+    if (!gone.has(getW(c, "id") ?? "")) continue;
+    const pid = (lastParaId(c) ?? "").toUpperCase();
+    const ex = ext.get(pid);
+    if (ex) {
+      remove(ex);
+      m.parts.touch(extPart(m, false));
+    }
+    remove(c);
+  }
+  m.parts.touch(part(m, false));
+  for (const p of m.paras()) {
+    for (const k of scan(p).marks) {
+      if (!gone.has(k.id)) continue;
+      const host2 = k.node.parentNode;
+      remove(k.node);
+      if (k.local === "commentReference" && isW(host2, "r") && !wkids(host2).some((x2) => x2.localName !== "rPr")) remove(host2);
+    }
+  }
+  m.touch();
+}
+function commentIds(m) {
+  const used = /* @__PURE__ */ new Set();
+  for (const p of m.paras()) for (const k of scan(p).marks) used.add(k.id);
+  return { used, defined: new Set(commentEls(m).map((c) => getW(c, "id") ?? "")) };
+}
+
+// src/docs/outline.ts
+function inspect(m) {
+  const ctx = { m, styles: readStyles(m.parts), comments: /* @__PURE__ */ new Map(), changes: /* @__PURE__ */ new Map(), links: /* @__PURE__ */ new Map() };
+  for (const c of listComments(m)) if (c.para) push(ctx.comments, c.para, c);
+  for (const c of listChanges(m)) push(ctx.changes, c.para, c);
+  for (const r of m.parts.rels()) if (r.external) ctx.links.set(r.id, r.target);
+  return { kind: "docx", nodes: blocks(ctx, m.body) };
+}
+function push(map, k, v) {
+  const list = map.get(k);
+  if (list) list.push(v);
+  else map.set(k, [v]);
+}
+function blocks(ctx, parent, cell) {
+  const out = [];
+  for (const b of blocksOf(parent)) out.push(b.kind === "p" ? para2(ctx, b.el, cell) : table(ctx, b.el));
+  return out;
+}
+function paraAnchor(id, quote) {
+  return quote ? { kind: "para", para: id, quote } : { kind: "para", para: id };
+}
+function paraProps(ctx, p) {
+  const out = {};
+  const pPr = wkid(p, "pPr");
+  const styleEl = pPr && wkid(pPr, "pStyle");
+  const style = styleEl ? getW(styleEl, "val") : void 0;
+  if (style) out.style = style;
+  const lvlEl = pPr && wkid(pPr, "outlineLvl");
+  const level = headingLevel(ctx.styles, style, lvlEl ? Number(getW(lvlEl, "val")) : void 0);
+  if (level !== void 0) out.level = level;
+  const numPr = pPr && wkid(pPr, "numPr");
+  const numId = (numPr && wkid(numPr, "numId") && getW(wkid(numPr, "numId"), "val")) ?? (style ? ctx.styles.get(style)?.numId : void 0);
+  if (numId && numId !== "0") {
+    const ilvl = Number((numPr && wkid(numPr, "ilvl") && getW(wkid(numPr, "ilvl"), "val")) ?? 0);
+    const ordered = listOrdered(ctx.m.parts, numId, ilvl);
+    out.list = { level: ilvl + 1, ordered: ordered ?? false };
+  }
+  const jc = pPr && wkid(pPr, "jc");
+  const align = jc && getW(jc, "val");
+  if (align && align !== "left" && align !== "start") out.align = align === "both" ? "justify" : align;
+  const pics = p.getElementsByTagNameNS(WP, "docPr");
+  if (pics.length) {
+    const imgs = [];
+    for (let i2 = 0; i2 < pics.length; i2++) {
+      const d = pics.item(i2);
+      imgs.push(d.getAttribute("descr") ? { name: d.getAttribute("name") ?? "", alt: d.getAttribute("descr") } : { name: d.getAttribute("name") ?? "" });
+    }
+    out.images = imgs;
+  }
+  const hl = p.getElementsByTagNameNS(W, "hyperlink");
+  const urls = [];
+  for (let i2 = 0; i2 < hl.length; i2++) {
+    const rid = hl.item(i2).getAttributeNS(R, "id");
+    const url = rid ? ctx.links?.get(rid) : void 0;
+    if (url) urls.push(url);
+  }
+  if (urls.length) out.links = urls;
+  void A;
+  return out;
+}
+function para2(ctx, p, cell) {
+  const id = ctx.m.paraId(p);
+  const props2 = paraProps(ctx, p);
+  if (cell) props2.cell = cell;
+  const node = { id, type: "para", anchor: paraAnchor(id), text: scan(p).text };
+  if (Object.keys(props2).length) node.props = props2;
+  const kids = [];
+  for (const c of ctx.comments.get(id) ?? []) {
+    const cp = { author: c.author, done: c.done };
+    if (c.quote) cp.quote = c.quote;
+    if (c.replyTo) cp.replyTo = c.replyTo;
+    if (c.date) cp.date = c.date;
+    kids.push({ id: `comment:${c.id}`, type: "comment", anchor: paraAnchor(id, c.quote || void 0), text: c.text, props: cp });
+  }
+  const seen = /* @__PURE__ */ new Map();
+  for (const c of ctx.changes.get(id) ?? []) {
+    const n = (seen.get(c.id) ?? 0) + 1;
+    seen.set(c.id, n);
+    const cp = { kind: c.kind, author: c.author, change: c.id };
+    if (c.date) cp.date = c.date;
+    kids.push({ id: n > 1 ? `change:${c.id}#${n}` : `change:${c.id}`, type: "change", anchor: paraAnchor(id), text: c.text, props: cp });
+  }
+  if (kids.length) node.children = kids;
+  return node;
+}
+function table(ctx, tbl) {
+  const rows = rowsOf(tbl);
+  const kids = [];
+  let cols = 0;
+  rows.forEach((tr, r) => {
+    const cells = cellsOfRow(tr);
+    cols = Math.max(cols, cells.length);
+    cells.forEach((tc, c) => kids.push(...blocks(ctx, tc, { row: r + 1, col: c + 1 })));
+  });
+  const first = kids.find((k) => k.type === "para");
+  const id = `table:${first?.id ?? "empty"}`;
+  const props2 = { rows: rows.length, cols };
+  const st = wkid(tbl, "tblPr") && wkid(wkid(tbl, "tblPr"), "tblStyle");
+  if (st) props2.style = getW(st, "val");
+  return { id, type: "table", anchor: paraAnchor(first?.id ?? ""), props: props2, children: kids };
+}
+
+// src/docs/check.ts
+var PLACEHOLDER = /lorem ipsum|\bTODO\b|\bTBD\b|\bXXX\b|\[(?:insert|add|your|name|date|placeholder)[^\]]*\]|<(?:insert|placeholder)[^>]*>/i;
+function check(m) {
+  m.parts.flush();
+  const out = checkPackage(m.parts.zip);
+  const styles = readStyles(m.parts);
+  const nums = numIds(m.parts);
+  let prevLevel = 0;
+  let any = false;
+  for (const p of m.paras()) {
+    const id = m.paraId(p);
+    const at = paraAnchor(id);
+    const text = scan(p).text;
+    if (text.trim()) any = true;
+    const props2 = paraProps({ m, styles }, p);
+    const style = props2.style;
+    if (style && styles.size && !styles.has(style)) {
+      out.push({ code: "missing_style", severity: "warning", at, message: `paragraph ${id} uses style "${style}", which styles.xml does not define: Word shows it as Normal` });
+    }
+    const pPr = wkid(p, "pPr");
+    const numPr = pPr && wkid(pPr, "numPr");
+    const numId = numPr && wkid(numPr, "numId") && getW(wkid(numPr, "numId"), "val");
+    if (numId && numId !== "0" && !nums.has(numId)) {
+      out.push({ code: "missing_list", severity: "warning", at, message: `paragraph ${id} is in list ${numId}, which numbering.xml does not define: it shows no bullet or number` });
+    }
+    const level = props2.level;
+    if (level !== void 0 && level > 0) {
+      if (!text.trim()) out.push({ code: "empty_heading", severity: "warning", at, message: `heading ${id} has no text` });
+      if (level > prevLevel + 1) {
+        out.push({ code: "heading_skip", severity: "warning", at, message: `heading "${text.slice(0, 40)}" is level ${level} after level ${prevLevel}: a level is skipped` });
+      }
+      prevLevel = level;
+    }
+    const ph = PLACEHOLDER.exec(text);
+    if (ph) out.push({ code: "placeholder", severity: "warning", at: paraAnchor(id, ph[0]), message: `paragraph ${id} still says "${ph[0]}"` });
+  }
+  for (const r of m.renamed) {
+    out.push({
+      code: "para_id_renamed",
+      severity: "info",
+      at: paraAnchor(r.to),
+      message: `two paragraphs had the id ${r.from}: the second is now ${r.to} (a note on ${r.from} finds its paragraph by its quote)`
+    });
+  }
+  const { used, defined } = commentIds(m);
+  for (const id of used) {
+    if (!defined.has(id)) out.push({ code: "dangling_comment", severity: "error", message: `the text marks comment ${id}, which comments.xml does not have: Word may refuse the file` });
+  }
+  for (const id of defined) {
+    if (!used.has(id)) out.push({ code: "orphan_comment", severity: "warning", message: `comment ${id} is on no text: Word does not show it` });
+  }
+  out.push(...tableProblems(m));
+  const changes = listChanges(m);
+  if (changes.length) {
+    out.push({
+      code: "open_changes",
+      severity: "warning",
+      message: `${changes.length} tracked change${changes.length === 1 ? "" : "s"} still open: accept or reject them (doc.changes) unless the user wants to review them`
+    });
+  }
+  if (!any) out.push({ code: "empty", severity: "warning", message: "the document has no text" });
+  return out;
+}
+function tableProblems(m) {
+  const out = [];
+  const list = m.body.getElementsByTagNameNS(m.body.namespaceURI, "tbl");
+  for (let i2 = 0; i2 < list.length; i2++) {
+    const tbl = list.item(i2);
+    const grid = wkid(tbl, "tblGrid");
+    const cols = grid ? wkids(grid, "gridCol").length : 0;
+    if (!cols) continue;
+    rowsOf(tbl).forEach((tr, r) => {
+      let span2 = 0;
+      for (const tc of cellsOfRow(tr)) {
+        const tcPr = wkid(tc, "tcPr");
+        const gs = tcPr && wkid(tcPr, "gridSpan");
+        span2 += gs ? Number(getW(gs, "val") ?? 1) : 1;
+      }
+      const tr0 = wkid(tr, "trPr");
+      for (const k of ["gridBefore", "gridAfter"]) {
+        const g = tr0 && wkid(tr0, k);
+        if (g) span2 += Number(getW(g, "val") ?? 0);
+      }
+      if (span2 !== cols) {
+        const first = tr.getElementsByTagNameNS(m.body.namespaceURI, "p").item(0);
+        out.push({
+          code: "table_shape",
+          severity: "warning",
+          at: first ? paraAnchor(m.paraId(first)) : void 0,
+          message: `table row ${r + 1} spans ${span2} columns, its table has ${cols}`
+        });
+      }
+    });
+  }
+  return out;
+}
+
+// src/docs/create.ts
+var X2 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+var R2 = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+var PKG = "http://schemas.openxmlformats.org/package/2006/relationships";
+var OD = "application/vnd.openxmlformats-officedocument";
+function esc(s) {
+  return s.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]);
+}
+function blank(opts = {}) {
+  const [w, h] = opts.size === "letter" ? [12240, 15840] : [11906, 16838];
+  const when = (opts.now ?? (() => /* @__PURE__ */ new Date()))().toISOString().replace(/\.\d{3}Z$/, "Z");
+  const zip = Zip.empty();
+  zip.set(
+    "[Content_Types].xml",
+    `${X2}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="${OD}.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="${OD}.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="${OD}.wordprocessingml.settings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="${OD}.extended-properties+xml"/></Types>`
+  );
+  zip.set(
+    "_rels/.rels",
+    `${X2}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${R2}/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="${PKG}/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="${R2}/extended-properties" Target="docProps/app.xml"/></Relationships>`
+  );
+  zip.set(
+    "word/document.xml",
+    `${X2}<w:document xmlns:w="${W}" xmlns:r="${R2}" xmlns:w14="${W14}" xmlns:mc="${MC}" mc:Ignorable="w14"><w:body><w:sectPr><w:pgSz w:w="${w}" w:h="${h}"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/><w:cols w:space="708"/></w:sectPr></w:body></w:document>`
+  );
+  zip.set(
+    "word/_rels/document.xml.rels",
+    `${X2}<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${R2}/styles" Target="styles.xml"/><Relationship Id="rId2" Type="${R2}/settings" Target="settings.xml"/></Relationships>`
+  );
+  zip.set("word/styles.xml", stylesXml());
+  zip.set(
+    "word/settings.xml",
+    `${X2}<w:settings xmlns:w="${W}"><w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="doNotCompress"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>`
+  );
+  const author = esc(opts.author ?? "bise");
+  zip.set(
+    "docProps/core.xml",
+    `${X2}<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">` + (opts.title ? `<dc:title>${esc(opts.title)}</dc:title>` : "") + `<dc:creator>${author}</dc:creator><cp:lastModifiedBy>${author}</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${when}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${when}</dcterms:modified></cp:coreProperties>`
+  );
+  zip.set(
+    "docProps/app.xml",
+    `${X2}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>bise</Application></Properties>`
+  );
+  return zip.write();
+}
+
+// src/docs/index.ts
+var P = /* @__PURE__ */ Symbol("paragraph");
+var Doc = class {
+  kind = "docx";
+  m;
+  constructor(m) {
+    this.m = m;
+  }
+  /** who tracked changes and comments are by */
+  get author() {
+    return this.m.author;
+  }
+  set author(a) {
+    this.m.author = a;
+  }
+  /** when true, every edit is a tracked change unless it says `track: false` */
+  get tracking() {
+    return this.m.tracking;
+  }
+  set tracking(on) {
+    this.m.tracking = on;
+  }
+  inspect() {
+    return inspect(this.m);
+  }
+  check() {
+    return check(this.m);
+  }
+  async save() {
+    this.m.parts.flush();
+    return this.m.parts.zip.write();
+  }
+  /** The whole text, one paragraph per line (tables' cells too). */
+  text() {
+    return this.m.paras().map((p) => scan(p).text).join("\n");
+  }
+  /** Each place the text has this, as an anchor with the quote. */
+  find(what) {
+    const out = [];
+    for (const p of this.m.paras()) {
+      const text = scan(p).text;
+      for (const hit of matches(text, what)) out.push(paraAnchor(this.m.paraId(p), text.slice(hit.start, hit.end)));
+    }
+    return out;
+  }
+  /** Replace in every paragraph; returns how many. */
+  replaceAll(find2, by, opts) {
+    let n = 0;
+    for (const p of this.m.paras()) n += replaceIn(this.m, p, find2, by, opts?.track, true);
+    return n;
+  }
+  /** The paragraph under an anchor; by its id, else (an id Word renamed) the first with the anchor's quote. */
+  at(anchor) {
+    const a = anchorFor("docx", anchor);
+    if (a.kind !== "para") throw new OfficeError("anchor_kind_mismatch", "a docx takes para anchors");
+    let p = this.m.byId(a.para);
+    if (!p && a.quote) p = this.m.paras().find((x2) => scan(x2).text.includes(a.quote));
+    if (!p) {
+      throw new OfficeError("not_found", `no paragraph ${a.para}${a.quote ? ` and no paragraph with "${a.quote}"` : ""} in this docx: inspect() again for the ids`);
+    }
+    return this.sel(p, a.quote);
+  }
+  /** A new block at the end, or after / before an anchor's paragraph. */
+  add(spec, where, opts) {
+    const track = this.m.track(opts?.track);
+    const made = buildBlock(this.m, spec, track);
+    if (where?.after) insertAfter(made, this.paraOf(where.after));
+    else if (where?.before) {
+      const ref = this.paraOf(where.before);
+      ref.parentNode.insertBefore(made, ref);
+    } else this.m.body.insertBefore(made, wkid(this.m.body, "sectPr") ?? null);
+    this.m.touch();
+    return isW(made, "tbl") ? tableSel(this, this.m, made) : this.sel(made);
+  }
+  /** The table whose cell holds the anchor's paragraph (a table node's anchor is its first cell's). */
+  table(anchor) {
+    const t = this.at(anchor).table();
+    if (!t) throw new OfficeError("not_found", "that paragraph is not in a table");
+    return t;
+  }
+  comments = {
+    list: () => listComments(this.m),
+    /** a comment on an anchor's quote (or its whole paragraph) */
+    add: (anchor, text) => this.at(anchor).comment(text),
+    reply: (id, text) => reply(this.m, id, text),
+    resolve: (id, done = true) => resolve2(this.m, id, done),
+    remove: (id) => removeComment(this.m, id)
+  };
+  changes = {
+    list: () => listChanges(this.m),
+    /** accept these changes (ids from list()), or all of them; returns how many */
+    accept: (ids) => settle(this.m, true, ids),
+    reject: (ids) => settle(this.m, false, ids)
+  };
+  paraOf(anchor) {
+    return this.at(anchor)[P];
+  }
+  /** @internal a paragraph's selection */
+  sel(p, quote) {
+    return paraSel(this, this.m, p, quote);
+  }
+};
+function findNode(nodes, id) {
+  for (const n of nodes) {
+    if (n.id === id) return n;
+    const hit = n.children && findNode(n.children, id);
+    if (hit) return hit;
+  }
+  return void 0;
+}
+function replaceIn(m, p, find2, by, track, all) {
+  const text = scan(p).text;
+  let hits = matches(text, find2);
+  if (!all) hits = hits.slice(0, 1);
+  const t = m.track(track);
+  for (const h of [...hits].reverse()) {
+    const repl = typeof find2 === "string" ? by : by.replace(/\$(\d)/g, (_, d) => h.groups[Number(d)] ?? "");
+    replaceSpan(p, h.start, h.end, repl, t);
+  }
+  if (hits.length) m.touch();
+  return hits.length;
+}
+function span(p, quote) {
+  if (!quote) return void 0;
+  const i2 = scan(p).text.indexOf(quote);
+  return i2 < 0 ? void 0 : { start: i2, end: i2 + quote.length, text: quote };
+}
+function paraSel(doc, m, p, anchorQuote) {
+  const id = m.paraId(p);
+  const sel = {
+    [P]: p,
+    get node() {
+      return findNode(inspect(m).nodes, id) ?? { id, type: "para", anchor: paraAnchor(id), text: scan(p).text };
+    },
+    get text() {
+      return scan(p).text;
+    },
+    get quote() {
+      return span(p, anchorQuote);
+    },
+    setText(text, opts) {
+      replaceSpan(p, 0, scan(p).text.length, text, m.track(opts?.track));
+      m.touch();
+    },
+    replace(find2, by, opts) {
+      return replaceIn(m, p, find2, by, opts?.track, opts?.all ?? true);
+    },
+    insert(text, at = "end", opts) {
+      const len = scan(p).text.length;
+      const off = at === "start" ? 0 : at === "end" ? len : at;
+      if (!Number.isInteger(off) || off < 0 || off > len) throw new OfficeError("bad_arg", `insert at "start", "end" or an offset 0..${len}, got ${at}`);
+      insertText(p, off, text, m.track(opts?.track));
+      m.touch();
+    },
+    format(f, opts) {
+      const q = opts?.quote ?? anchorQuote;
+      const s = q ? span(p, q) : { start: 0, end: scan(p).text.length };
+      if (!s) throw new OfficeError("not_found", `"${q}" is not in paragraph ${id} any more`);
+      if (f.style && !ensureStyle(m.parts, f.style)) throw new OfficeError("bad_arg", `no character style "${f.style}" in this docx`);
+      const t = m.track(opts?.track);
+      for (const r of runsIn(p, s.start, s.end)) formatRun(r, f, t, setProp);
+      m.touch();
+    },
+    style(styleId) {
+      if (!ensureStyle(m.parts, styleId)) throw new OfficeError("bad_arg", `no style "${styleId}" in this docx (bise adds Title, Heading1-6, ListParagraph, Quote when missing)`);
+      setProp(props(p, "pPr"), el(m.doc, "pStyle", { val: styleId }));
+      m.touch();
+    },
+    align(a) {
+      setProp(props(p, "pPr"), el(m.doc, "jc", { val: a === "justify" ? "both" : a }));
+      m.touch();
+    },
+    comment(text, opts) {
+      const q = opts?.quote ?? anchorQuote;
+      const s = span(p, q);
+      if (opts?.quote && !s) throw new OfficeError("not_found", `"${opts.quote}" is not in paragraph ${id}`);
+      return addComment(m, p, text, s);
+    },
+    add(spec, where = "after", opts) {
+      const a = paraAnchor(id);
+      return doc.add(spec, where === "before" ? { before: a } : { after: a }, opts);
+    },
+    remove(opts) {
+      const t = m.track(opts?.track);
+      if (t) {
+        const len = scan(p).text.length;
+        if (len) deleteRuns(runsIn(p, 0, len), t);
+        const pPr = props(p, "pPr");
+        const rPr = wkid(pPr, "rPr") ?? setProp(pPr, el(m.doc, "rPr"));
+        setProp(rPr, el(m.doc, "del", { id: t.nextId(), author: t.author, date: t.date }));
+      } else {
+        const parent = p.parentNode;
+        remove(p);
+        if (isW(parent, "tc") && !wkids(parent, "p").length && !wkids(parent, "tbl").length) {
+          const empty = el(m.doc, "p");
+          m.name(empty, `empty:${id}`);
+          parent.appendChild(empty);
+        }
+      }
+      m.touch();
+    },
+    table() {
+      let x2 = p.parentNode;
+      while (x2 && !(x2.namespaceURI === W && x2.localName === "tbl")) x2 = x2.parentNode;
+      return x2 ? tableSel(doc, m, x2) : void 0;
+    }
+  };
+  return sel;
+}
+function tableSel(doc, m, tbl) {
+  const cellEl = (row, col) => {
+    const tr = rowsOf(tbl)[row - 1];
+    const tc = tr && cellsOfRow(tr)[col - 1];
+    if (!tc) throw new OfficeError("not_found", `no cell (${row}, ${col}) in this table (rows and columns count from 1)`);
+    return tc;
+  };
+  const firstPara = (tc) => {
+    const p = wkids(tc, "p")[0] ?? tc.getElementsByTagNameNS(W, "p").item(0);
+    if (!p) throw new OfficeError("bad_xml", "a table cell with no paragraph");
+    return p;
+  };
+  return {
+    get node() {
+      return findNode(inspect(m).nodes, `table:${m.paraId(firstPara(cellEl(1, 1)))}`);
+    },
+    get rows() {
+      return rowsOf(tbl).map(
+        (tr) => cellsOfRow(tr).map(
+          (tc) => wkids(tc, "p").map((p) => scan(p).text).join("\n")
+        )
+      );
+    },
+    cell(row, col) {
+      return doc.sel(firstPara(cellEl(row, col)));
+    },
+    setCell(row, col, text, opts) {
+      doc.sel(firstPara(cellEl(row, col))).setText(text, opts);
+    },
+    addRow(values, opts) {
+      if (!Array.isArray(values)) throw new OfficeError("bad_arg", "a row's values are an array of cell texts");
+      const rows = rowsOf(tbl);
+      const after = opts?.after ?? rows.length;
+      const ref = rows[after - 1];
+      if (!ref && after !== 0) throw new OfficeError("not_found", `no row ${after} in this table`);
+      const grid = wkid(tbl, "tblGrid");
+      const tw = grid ? wkids(grid, "gridCol").map((g) => Number(g.getAttributeNS(W, "w") ?? 0)) : [];
+      const cols = Math.max(tw.length, rows[0] ? cellsOfRow(rows[0]).length : 0, values.length);
+      const tr = buildRow(m, values, cols, tw.length ? tw : [Math.round(m.textWidth() / cols)], false, m.track(opts?.track));
+      if (ref) insertAfter(tr, ref);
+      else tbl.insertBefore(tr, rows[0] ?? null);
+      m.touch();
+    },
+    removeRow(row, opts) {
+      const tr = rowsOf(tbl)[row - 1];
+      if (!tr) throw new OfficeError("not_found", `no row ${row} in this table`);
+      const t = m.track(opts?.track);
+      if (t) {
+        const ps = tr.getElementsByTagNameNS(W, "p");
+        const all = [];
+        for (let i2 = 0; i2 < ps.length; i2++) all.push(ps.item(i2));
+        for (const p of all) {
+          const len = scan(p).text.length;
+          if (len) deleteRuns(runsIn(p, 0, len), t);
+        }
+        setProp(props(tr, "trPr"), el(m.doc, "del", { id: t.nextId(), author: t.author, date: t.date }));
+      } else {
+        remove(tr);
+        if (!rowsOf(tbl).length) remove(tbl);
+      }
+      m.touch();
+    }
+  };
+}
+async function open(bytes, opts) {
+  const pkg = openPackage(bytes);
+  if (pkg.kind !== "docx") throw new OfficeError("not_office", `this is a ${pkg.kind}, not a docx: open it with ${pkg.kind === "xlsx" ? "sheets" : "slides"}.open`);
+  return new Doc(new Model(new Parts(pkg.zip, pkg.main), opts));
+}
+async function create(opts = {}) {
+  return open(blank(opts), { author: opts.author, now: opts.now });
+}
+var docs = { open, create };
+
+// src/run.ts
+var KEY = "__biseOfficeHost";
+function host() {
+  const h = globalThis[KEY];
+  if (!h) {
+    throw new OfficeError("no_host", "run.read and run.write work inside `bise office run <script.ts>`; elsewhere call setHost({read, write}) first");
+  }
+  return h;
+}
+function setHost(h) {
+  globalThis[KEY] = h;
+}
+var run = {
+  /** a file's bytes, by path (relative: to the script's working folder) */
+  read: async (path) => host().read(path),
+  /** write a file; when it is an artifact, it becomes its next version */
+  write: async (path, bytes, opts) => host().write(path, bytes, opts)
+};
+
+// src/core/diff.ts
+function flatten(outline) {
+  const out = [];
+  const walk = (nodes) => {
+    for (const n of nodes) {
+      const { children: children2, ...own } = n;
+      out.push(own);
+      if (children2) walk(children2);
+    }
+  };
+  walk(outline.nodes);
+  return out;
+}
+function diff(before, after) {
+  const was = new Map(flatten(before).map((n) => [n.id, n]));
+  const now = new Map(flatten(after).map((n) => [n.id, n]));
+  const added = [];
+  const removed = [];
+  const changed = [];
+  for (const [id, n] of now) {
+    const w = was.get(id);
+    if (!w) {
+      added.push(n);
+      continue;
+    }
+    const fields = changedFields(w, n);
+    if (fields.length) changed.push({ before: w, after: n, fields });
+  }
+  for (const [id, w] of was) if (!now.has(id)) removed.push(w);
+  return { added, removed, changed };
+}
+function changedFields(a, b) {
+  const keys = /* @__PURE__ */ new Set([...Object.keys(a), ...Object.keys(b)]);
+  const out = [];
+  for (const k of [...keys].sort()) {
+    if (stable(a[k]) !== stable(b[k])) out.push(k);
+  }
+  return out;
+}
+function stable(v) {
+  if (v === void 0) return "";
+  if (v === null || typeof v !== "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return `[${v.map(stable).join(",")}]`;
+  const o = v;
+  return `{${Object.keys(o).filter((k) => o[k] !== void 0).sort().map((k) => `${JSON.stringify(k)}:${stable(o[k])}`).join(",")}}`;
 }
 
 // src/core/raw.ts
