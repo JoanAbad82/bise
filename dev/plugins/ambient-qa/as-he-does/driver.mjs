@@ -2655,15 +2655,17 @@ async function rows233B(harness, say) {
   await page.keyboard.type(`[[bash: ${seed.join(' && ')}]] seeded 233b`, { delay: 2 });
   await page.keyboard.press('Enter');
   const tips = HP ? await until(async () => {
+    // zqgone's branch may go with its drop (sb drop removes the place now): the orphan PR is then
+    // not reachable on the world (233b's run: architect/bar-rows), #501 and #503 still are
     const t = ['zqfails', 'zqgone', 'zqg1'].map((b) => git(['rev-parse', '--verify', '-q', `refs/heads/sb/${b}`]));
-    return t.every(Boolean) ? t : null;
+    return t[0] && t[2] ? t : null;
   }, 120000, 1000) : null;
   if (tips && GHW) {
     const prs = JSON.parse(fs.readFileSync(path.join(GHW, 'prs-harness.json'), 'utf8'));
     const pr = (number, branch, head, rollup, review) => ({ number, branch, head, title: `zq ${branch}`, draft: false, review, rollup,
       checks: [{ name: 'ci', conclusion: rollup }], reviews: review === 'APPROVED' ? [{ state: 'APPROVED', author: 'alice' }] : [], merge_state: rollup === 'SUCCESS' ? 'CLEAN' : 'BLOCKED', commits: 1 });
     prs.prs = [...(prs.prs ?? []).filter((p) => ![501, 502, 503].includes(p.number)),
-      pr(501, 'sb/zqfails', tips[0], 'FAILURE', 'REVIEW_REQUIRED'), pr(502, 'sb/zqgone', tips[1], 'SUCCESS', 'REVIEW_REQUIRED'), pr(503, 'sb/zqg1', tips[2], 'SUCCESS', 'REVIEW_REQUIRED')];
+      pr(501, 'sb/zqfails', tips[0], 'FAILURE', 'REVIEW_REQUIRED'), ...(tips[1] ? [pr(502, 'sb/zqgone', tips[1], 'SUCCESS', 'REVIEW_REQUIRED')] : []), pr(503, 'sb/zqg1', tips[2], 'SUCCESS', 'REVIEW_REQUIRED')];
     fs.writeFileSync(path.join(GHW, 'prs-harness.json'), JSON.stringify(prs, null, 1));
   }
   await idle();
@@ -2765,7 +2767,7 @@ async function rows233B(harness, say) {
     const ah = page.locator('[data-testid="app.right.archived.head"]').first();
     if ((await ah.getAttribute('aria-expanded').catch(() => null)) === 'false') await ah.click({ timeout: 3000 }).catch(() => {});
     const arch = await until(async () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.right.archived."]')]
-      .filter((e) => !/\.(head|all)$/.test(e.getAttribute('data-testid') ?? '') && e.getAttribute('data-testid') !== 'app.right.archived' && !/^all\s*›$/.test((e.textContent ?? '').trim()))
+      .filter((e) => !/\.(head|all|sign|role|time|pct|mark)$/.test(e.getAttribute('data-testid') ?? '') && e.getAttribute('data-testid') !== 'app.right.archived' && !/^all\s*›$/.test((e.textContent ?? '').trim()))
       .map((e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim())).then((r) => (r.length ? r : null)), 10000, 500);
     step("ARCHIVED open: each row the sign, the name and its age ('✓ zqold 4 min'), no state word",
       !!arch && arch.every((t) => /^[✓▲○–·]?\s*[a-z0-9-]+?\s*\d+ (s|min|h|d)$/.test(t)) && arch.some((t) => /zqgone/.test(t)), { rows: arch });
