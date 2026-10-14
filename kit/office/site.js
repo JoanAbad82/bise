@@ -14,7 +14,7 @@ import { foot } from "/kit/office/viewer.js";
 const MAX = 300;
 // the frame's script says hello on each page: none after this long, it was kept out
 const HELLO_MS = 4000;
-const W = { keptOut: "notes can't go on this site: its own rules keep bise's selection out." };
+const W = { keptOut: "notes can't go on this site: its own rules block bise." };
 
 /** A `site-select` message's selection read again: a block anchor and his quote (each at most
  * 300 characters), a rect of finite numbers; null for anything else. */
