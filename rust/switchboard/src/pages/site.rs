@@ -111,11 +111,20 @@ pub fn serves_copy(by: &str, copy: &str) -> bool {
 /// older one; any other copy at [`copy_href`]. Only for a copy that
 /// [`serves_copy`].
 pub fn frame_href(id: &str, v: u64, copy: &str, newest: bool) -> String {
-    match (office_kind(copy), newest) {
+    match (viewer_kind(copy), newest) {
         (Some(_), true) => format!("/a/{id}/view"),
         (Some(_), false) => format!("/a/{id}/{v}/view"),
         (None, _) => copy_href(id, v, copy),
     }
+}
+
+/// What bise's viewer draws a copy as (pages/artifact/view.rs): an office
+/// file ([`office_kind`]) or an image (`image`: png, jpg, gif, webp, where
+/// a note is a box drawn on it, art-notes). None: framed as itself.
+pub fn viewer_kind(copy: &str) -> Option<&'static str> {
+    let file = file_of(copy);
+    let ext = file.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+    office_kind(copy).or_else(|| (!file.is_empty() && bise_proto::parts::IMAGE_EXTS.contains(&ext.as_str())).then_some("image"))
 }
 
 /// The office file a copy is (`xlsx`, `pptx`, `docx`), by its extension:
@@ -299,6 +308,9 @@ mod tests {
             assert_eq!(office_kind(copy), None, "{copy}");
         }
         assert_eq!(frame_href("r", 3, "v3/r.html", true), "/a/r/3/r.html", "a site keeps its own link");
+        // an image too (art-notes: a note is a box drawn on it)
+        assert_eq!((viewer_kind("v1/shot.PNG"), viewer_kind("v1/q3.xlsx"), viewer_kind("v1/r.html")), (Some("image"), Some("xlsx"), None));
+        assert_eq!(frame_href("s", 1, "v1/shot.png", true), "/a/s/view");
         assert!(!serves_copy("page", "v1/q3.xlsx"), "a bise page is served at /p/");
         assert!(!serves_copy("x", "v1/a.xls"), "an old binary format is not sent");
     }

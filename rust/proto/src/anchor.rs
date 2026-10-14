@@ -89,6 +89,65 @@ pub enum Anchor {
     Unknown(Value),
 }
 
+impl Rect {
+    /// A box in % of its frame, each number clamped to `0..=100` (a NaN
+    /// becomes 0): the one way Rust code builds a rect.
+    pub fn new(x: f64, y: f64, w: f64, h: f64) -> Rect {
+        let pct = |v: f64| if v.is_nan() { 0.0 } else { v.clamp(0.0, 100.0) };
+        Rect { x: pct(x), y: pct(y), w: pct(w), h: pct(h) }
+    }
+}
+
+// Equality is total: a rect comes from JSON, where serde refuses NaN, or
+// from [`Rect::new`], which never makes one; Rust code never builds a Rect
+// with NaN otherwise. So an anchor can sit in a message part
+// (`parts::Part::Anchor`, which is Eq).
+impl Eq for Rect {}
+impl Eq for Anchor {}
+
+/// What a chip and a note's line call an anchor (designer signs the
+/// words): `Q3!B4:D9`, `slide 2`, `slide 2 · a box`, `slide 2 · shape 12`,
+/// `"net revenue…"` (a paragraph by its words), `page 1 · a box`,
+/// `line 40`. Both apps draw it from this rule (fixture anchor_label.json).
+pub fn label(a: &Anchor) -> String {
+    let quoted = |q: &str| format!("\"{}\"", short(q, 40));
+    match a {
+        Anchor::Block { block, quote } if quote.trim().is_empty() => format!("block {block}"),
+        Anchor::Block { quote, .. } => quoted(quote),
+        Anchor::Cell { sheet, range } => format!("{}!{range}", sheet_ref(sheet)),
+        Anchor::Slide { slide, rect: None } => format!("slide {slide}"),
+        Anchor::Slide { slide, rect: Some(_) } => format!("slide {slide} · a box"),
+        Anchor::Shape { slide, quote, .. } if !quote.trim().is_empty() => format!("slide {slide} · {}", quoted(quote)),
+        Anchor::Shape { slide, shape, .. } => format!("slide {slide} · shape {shape}"),
+        Anchor::Para { quote, .. } if !quote.trim().is_empty() => quoted(quote),
+        Anchor::Para { .. } => "a paragraph".into(),
+        Anchor::Region { page: Some(p), .. } => format!("page {p} · a box"),
+        Anchor::Region { page: None, .. } => "a box".into(),
+        Anchor::Text { line, .. } => format!("line {line}"),
+        Anchor::Unknown(_) => "a part".into(),
+    }
+}
+
+/// A sheet's name as a reference says it: `Q3`, `'My sheet'` (Excel's
+/// rule: quoted unless letters, digits, `_` and `.`, not starting with a
+/// digit; a `'` inside doubled).
+fn sheet_ref(sheet: &str) -> String {
+    let plain = !sheet.is_empty() && !sheet.starts_with(|c: char| c.is_ascii_digit()) && sheet.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '.');
+    match plain {
+        true => sheet.to_string(),
+        false => format!("'{}'", sheet.replace('\'', "''")),
+    }
+}
+
+/// One line, at most `max` characters, `…` when cut.
+fn short(s: &str, max: usize) -> String {
+    let one = s.split_whitespace().collect::<Vec<_>>().join(" ");
+    match one.chars().count() <= max {
+        true => one,
+        false => format!("{}…", one.chars().take(max - 1).collect::<String>().trim_end()),
+    }
+}
+
 impl Anchor {
     /// The kinds this version knows, as on the wire.
     pub const KINDS: &'static [&'static str] = &["block", "cell", "slide", "shape", "para", "region", "text"];
@@ -162,6 +221,12 @@ mod tests {
             assert!(Anchor::KINDS.contains(&a.kind()), "{line}");
             assert_eq!(serde_json::to_string(&a).unwrap(), line);
         }
+    }
+
+    #[test]
+    fn a_rect_is_clamped_to_its_frame() {
+        assert_eq!(Rect::new(-5.0, 20.0, 130.0, f64::NAN), Rect { x: 0.0, y: 20.0, w: 100.0, h: 0.0 });
+        assert!(serde_json::from_str::<Rect>(r#"{"x":NaN,"y":0,"w":1,"h":1}"#).is_err(), "JSON has no NaN");
     }
 
     #[test]

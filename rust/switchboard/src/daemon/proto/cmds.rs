@@ -115,16 +115,22 @@ impl Shell {
             // on his message (a part this hub doesn't know: refused)
             HubCmd::Send { agent, text, opts, cid, parts, .. } => {
                 text_beside_parts(&tag, cid, &text, &parts);
-                match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image, &crate::daemon::fn_context::file_exists) {
-                    Ok(s) => self.proto_input(id, &tag, agent, s.text, opts, cid, s.parts),
+                match crate::parts_in::said(&parts, &opts.files, &crate::parts_in::Door { store: &bise_home::Home::from_env().images_dir(), put: &crate::daemon::fn_context::store_image, exists: &crate::daemon::fn_context::file_exists, known: &self.artifact_known() }) {
+                    Ok(s) => {
+                        self.artifact_notes_said(&s.parts);
+                        self.proto_input(id, &tag, agent, s.text, opts, cid, s.parts)
+                    }
                     Err(e) => self.proto_error_cid(id, &tag, &e, cid, cid.map(|_| "refused")),
                 }
             }
             HubCmd::Answer { card, reply, files, parts, .. } => {
                 let (reply, parts) = match parts.is_empty() {
                     true => (reply, String::new()),
-                    false => match crate::parts_in::said(&parts, &files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image, &crate::daemon::fn_context::file_exists) {
-                        Ok(s) => (s.text, s.parts),
+                    false => match crate::parts_in::said(&parts, &files, &crate::parts_in::Door { store: &bise_home::Home::from_env().images_dir(), put: &crate::daemon::fn_context::store_image, exists: &crate::daemon::fn_context::file_exists, known: &self.artifact_known() }) {
+                        Ok(s) => {
+                            self.artifact_notes_said(&s.parts);
+                            (s.text, s.parts)
+                        }
                         Err(e) => return self.proto_error(id, &tag, &e),
                     },
                 };
@@ -454,7 +460,11 @@ impl Shell {
                 // before; a line that isn't refuses (never a command)
                 if !parts.is_empty() {
                     let refused = cid.map(|_| "refused");
-                    return match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir(), &crate::daemon::fn_context::store_image, &crate::daemon::fn_context::file_exists) {
+                    let said = crate::parts_in::said(&parts, &opts.files, &crate::parts_in::Door { store: &bise_home::Home::from_env().images_dir(), put: &crate::daemon::fn_context::store_image, exists: &crate::daemon::fn_context::file_exists, known: &self.artifact_known() });
+                    if let Ok(s) = &said {
+                        self.artifact_notes_said(&s.parts);
+                    }
+                    return match said {
                         // the line is the text of the parts he sent; the
                         // model gets the hub's (a file gone at send time
                         // is marked missing there, file-chips)

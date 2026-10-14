@@ -3,6 +3,11 @@
 //! `meta.json` and `notes.json`. Plain functions over a directory; the
 //! caller holds the lock ([`super::Pages`]) so the hub and the page
 //! server never write a page at the same time.
+//!
+//! The notes rules (drafts, send) are the same for every target
+//! ([`Target`], architect m_23701 §9.5): a page's notes in
+//! `pages/<id>/notes.json`, an artifact's in `artifacts/<id>/notes.json`
+//! (its routes and its message: `artifact::notes`).
 
 use super::lint::Block;
 use serde::{Deserialize, Serialize};
@@ -196,6 +201,22 @@ pub struct Store {
     pub dir: PathBuf,
 }
 
+/// Whose notes (architect m_23701 §9.5: one notes system for every
+/// target): a page's, or an artifact's (office-artifacts plan §5).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Target {
+    Page(String),
+    Artifact(String),
+}
+
+impl Target {
+    pub fn id(&self) -> &str {
+        match self {
+            Target::Page(id) | Target::Artifact(id) => id,
+        }
+    }
+}
+
 fn read_json<T: serde::de::DeserializeOwned + Default>(p: &Path) -> T {
     std::fs::read_to_string(p).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
 }
@@ -246,15 +267,36 @@ impl Store {
         write_json(&self.page_dir(&m.id).join("meta.json"), m)
     }
 
-    pub fn notes(&self, id: &str) -> Vec<Note> {
-        if !valid_id(id) {
-            return Vec::new();
+    /// Where a target's notes live: `pages/<id>/notes.json`,
+    /// `artifacts/<id>/notes.json` (None: not an id).
+    fn notes_file(&self, t: &Target) -> Option<PathBuf> {
+        match t {
+            Target::Page(id) if valid_id(id) => Some(self.page_dir(id).join("notes.json")),
+            Target::Artifact(id) if valid_id(id) => Some(self.dir.parent().unwrap_or(&self.dir).join("artifacts").join(id).join("notes.json")),
+            _ => None,
         }
-        read_json(&self.page_dir(id).join("notes.json"))
+    }
+
+    /// A page's notes ([`Store::notes_of`] its [`Target::Page`]).
+    pub fn notes(&self, id: &str) -> Vec<Note> {
+        self.notes_of(&Target::Page(id.to_string()))
+    }
+
+    /// The notes of a page or an artifact, as kept.
+    pub fn notes_of(&self, t: &Target) -> Vec<Note> {
+        self.notes_file(t).map(|p| read_json(&p)).unwrap_or_default()
     }
 
     pub fn save_notes(&self, id: &str, notes: &[Note]) -> Result<(), String> {
-        write_json(&self.page_dir(id).join("notes.json"), &notes)
+        self.save_notes_of(&Target::Page(id.to_string()), notes)
+    }
+
+    pub fn save_notes_of(&self, t: &Target, notes: &[Note]) -> Result<(), String> {
+        let p = self.notes_file(t).ok_or_else(|| format!("{} is not an id", t.id()))?;
+        if let Some(d) = p.parent() {
+            std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
+        }
+        write_json(&p, &notes)
     }
 
     /// The page's question blocks and their cards (§4.2).
@@ -375,8 +417,8 @@ impl Store {
     /// given replaces every draft (a draft left out is deleted); sent,
     /// done and answered notes never change here. A note without a
     /// usable id gets the next `n<k>`. The notes after.
-    pub fn set_drafts(&self, id: &str, given: &[Value], version: u64, now: u64) -> Result<Vec<Note>, String> {
-        let mut notes: Vec<Note> = self.notes(id).into_iter().filter(|x| x.status != "draft").collect();
+    pub fn set_drafts(&self, t: &Target, given: &[Value], version: u64, now: u64) -> Result<Vec<Note>, String> {
+        let mut notes: Vec<Note> = self.notes_of(t).into_iter().filter(|x| x.status != "draft").collect();
         for g in given {
             let mut n: Note = serde_json::from_value(g.clone()).map_err(|e| format!("a note: {e}"))?;
             if n.id.is_empty() || !n.id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') || n.id.len() > 40 {
@@ -396,14 +438,14 @@ impl Store {
             }
             notes.push(n);
         }
-        self.save_notes(id, &notes)?;
+        self.save_notes_of(t, &notes)?;
         Ok(notes)
     }
 
     /// `send`: the drafts become sent. The sent ones (empty: nothing to
     /// send) and every note after.
-    pub fn send(&self, id: &str, now: u64) -> Result<Vec<Note>, String> {
-        let mut notes = self.notes(id);
+    pub fn send(&self, t: &Target, now: u64) -> Result<Vec<Note>, String> {
+        let mut notes = self.notes_of(t);
         let mut sent = Vec::new();
         for x in notes.iter_mut().filter(|x| x.status == "draft") {
             x.status = "sent".into();
@@ -411,7 +453,7 @@ impl Store {
             sent.push(x.clone());
         }
         if !sent.is_empty() {
-            self.save_notes(id, &notes)?;
+            self.save_notes_of(t, &notes)?;
         }
         Ok(sent)
     }

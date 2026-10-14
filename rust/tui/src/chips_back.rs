@@ -57,6 +57,13 @@ pub(crate) fn of(parts: &[Part], text: &str, first: usize) -> (String, Vec<Attac
                 after_chip = false;
                 continue;
             }
+            // a part of an artifact he selected in its viewer: its tag,
+            // as the model read it (only the desktop's panel makes one)
+            Part::Anchor { .. } => {
+                out.push_str(&parts::render(std::slice::from_ref(p)));
+                after_chip = false;
+                continue;
+            }
             Part::Hint { .. } | Part::Unknown(_) => continue,
         };
         let (label, marker, info) = chip;

@@ -119,6 +119,25 @@ pub enum Part {
         #[serde(default)]
         notes: Vec<PageNote>,
     },
+    /// a part of an artifact he selected in its viewer (office-artifacts
+    /// plan §9b, architect m_23874): version `version` (and `rev`, the
+    /// save he looked at; 0: not said) of artifact `artifact`, where
+    /// ([`crate::anchor::Anchor`]: the agent passes it to the office SDK's
+    /// `at()`), and what he saw selected (`quote`, "" none). `n`: its chip's
+    /// number, placed like a [`Part::Quote`]'s (None: in front). The door
+    /// (`parts_in::said`) checks the artifact and the version, then records
+    /// it as a sent note of that artifact.
+    Anchor {
+        artifact: String,
+        version: u64,
+        #[serde(default, skip_serializing_if = "is_zero32")]
+        rev: u32,
+        anchor: crate::anchor::Anchor,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        quote: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        n: Option<u32>,
+    },
     /// a line the hub adds after his words for the model (ambient-lead
     /// m_22706, architect m_22715): `text` whole, its separator included,
     /// rendered after everything else; never drawn in his bubble. Only
@@ -146,6 +165,8 @@ pub enum HintKind {
     Capsule,
     CapsuleStart,
     Steps,
+    /// his notes on an artifact: how the agent answers them
+    Notes,
     #[default]
     #[serde(other)]
     Unknown,
@@ -155,6 +176,16 @@ pub enum HintKind {
 pub const CAPSULE_HINT: &str = "\n\n[from the capsule: answer in one short line]";
 /// The same for fn space + tab: main starts an agent on it.
 pub const CAPSULE_START_HINT: &str = "\n\n[from the capsule: start an agent; answer in one short line]";
+/// The line after his notes on an artifact (a [`Part::Anchor`] in his
+/// message): what answers them (art-notes; designer signs the words).
+pub const NOTES_HINT: &str = "\n\n[notes on an artifact: answer with its next version (bise office run, or sb artifact add <path>): that marks them done. a note you won't do: say why]";
+
+/// The notes hint when `parts` carry a part of an artifact; none
+/// otherwise.
+pub fn notes_hint(parts: &[Part]) -> Option<Part> {
+    parts.iter().any(|p| matches!(p, Part::Anchor { .. })).then(|| Part::Hint { of: HintKind::Notes, text: NOTES_HINT.into() })
+}
+
 const STEPS_HEAD: &str = "\n[his open steps: ";
 const STEPS_TAIL: &str = "; when he says one is done: sb page tick <page> <item>]";
 
@@ -231,6 +262,10 @@ pub struct PageNote {
 }
 
 fn is_zero(n: &u64) -> bool {
+    *n == 0
+}
+
+fn is_zero32(n: &u32) -> bool {
     *n == 0
 }
 
@@ -358,6 +393,8 @@ pub fn render(parts: &[Part]) -> String {
             Part::File { path, name, missing } if !name.is_empty() => body.push_str(&file_marker(name, path, *missing)),
             Part::File { path, .. } => files.push(path),
             Part::Page { text, .. } => body.push_str(text),
+            Part::Anchor { artifact, version, rev, anchor, quote, n: None } => head.push(anchor_tag(artifact, *version, *rev, anchor, quote, None)),
+            Part::Anchor { artifact, version, rev, anchor, quote, n: Some(n) } => body.push_str(&anchor_tag(artifact, *version, *rev, anchor, quote, Some(*n))),
             Part::Unknown(_) => {}
         }
     }
@@ -405,6 +442,38 @@ pub fn quote_tag(from: &str, file: &str, new: &str, old: &str, n: Option<u32>, t
     let text = unclosed(text, QUOTE_CLOSE);
     format!("{head}>\n{text}\n{QUOTE_CLOSE}")
 }
+
+/// The tag of a part of an artifact he selected ([`Part::Anchor`]): the
+/// anchor's JSON on its own line (the agent passes it to `at()` as is),
+/// then what he saw selected, when anything:
+///
+/// ```text
+/// <artifact-selection artifact="q3-xlsx" version="4" n="1">
+/// {"kind":"cell","sheet":"Q3","range":"B4:D9"}
+/// 1200 1350 1410
+/// </artifact-selection>
+/// ```
+///
+/// `rev` and `n` only when they have a value; the quote's own closing
+/// tag is broken, like a selection's.
+pub fn anchor_tag(artifact: &str, version: u64, rev: u32, anchor: &crate::anchor::Anchor, quote: &str, n: Option<u32>) -> String {
+    let mut head = format!("{ANCHOR_OPEN}{}\" version=\"{version}\"", marker_attr(artifact));
+    if rev > 0 {
+        head.push_str(&format!(" rev=\"{rev}\""));
+    }
+    if let Some(n) = n {
+        head.push_str(&format!(" n=\"{n}\""));
+    }
+    let json = serde_json::to_string(anchor).unwrap_or_else(|_| "{}".into());
+    let quote = match quote.trim().is_empty() {
+        true => String::new(),
+        false => format!("{}\n", unclosed(quote.trim_end_matches('\n'), ANCHOR_CLOSE)),
+    };
+    format!("{head}>\n{json}\n{quote}{ANCHOR_CLOSE}")
+}
+
+const ANCHOR_OPEN: &str = "<artifact-selection artifact=\"";
+const ANCHOR_CLOSE: &str = "</artifact-selection>";
 
 /// A block's text with its closing tag broken (`</pasted>` becomes
 /// `</pasted >`), so the block ends where its own closing tag is: the

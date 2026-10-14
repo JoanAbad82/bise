@@ -345,7 +345,17 @@ impl Shell {
                 // the last good public copy stays up; main hears it once (designer m_7509)
                 self.feed_rec(MAIN, Feed::warn(format!("▲ couldn't publish {id} to the public mirror: {error}")));
             }
-            crate::pages::PageMsg::Sent { id, agent, text, notes } => {
+            // notes on an artifact (office-artifacts §9b): to its maker, main
+            // when it is gone, as from the user, with their anchor parts
+            crate::pages::PageMsg::Sent { target: crate::pages::store::Target::Artifact(id), agent, text, notes } => {
+                if !text.is_empty() {
+                    let to = if self.page_agent_gone(&agent) { MAIN.to_string() } else { agent };
+                    let parts = crate::pages::artifact::notes::parts_json(&pages, &id, &notes);
+                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: false, parts });
+                }
+                self.state_now();
+            }
+            crate::pages::PageMsg::Sent { target: crate::pages::store::Target::Page(id), agent, text, notes } => {
                 // start notes (an item the user wants an agent on): main's,
                 // never the page's agent's (ambient-lead m_5006)
                 // a stop note (the frame's 'stop' of a watched page): the hub
@@ -399,6 +409,27 @@ impl Shell {
                 self.page_answers();
             }
         }
+    }
+
+    /// The desktop door of the notes on an artifact (office-artifacts
+    /// §9b): his message's anchor parts, taken at the door, become sent
+    /// notes of their artifacts; their open viewers hear it.
+    pub(super) fn artifact_notes_said(&mut self, parts_json: &str) {
+        let Some(pages) = self.pg.pages.clone() else { return };
+        if !parts_json.contains("\"anchor\"") {
+            return;
+        }
+        let Ok(ps) = serde_json::from_str::<Vec<bise_proto::parts::Part>>(parts_json) else { return };
+        for id in crate::pages::artifact::notes::record_said(&pages, &ps, now_ms()) {
+            crate::pages::artifact::notes::push(&pages, &id);
+        }
+    }
+
+    /// Whether version `v` of artifact `id` is here (`parts_in::said`'s
+    /// check of an anchor part); no page server: none is.
+    pub(super) fn artifact_known(&self) -> impl Fn(&str, u64) -> bool + 'static {
+        let pages = self.pg.pages.clone();
+        move |id: &str, v: u64| pages.as_ref().is_some_and(|p| crate::pages::artifact::notes::known(p.store.dir.parent().unwrap_or(&p.store.dir), id, v))
     }
 
     /// The parts' JSON of a page's message `text` to `to` (its one

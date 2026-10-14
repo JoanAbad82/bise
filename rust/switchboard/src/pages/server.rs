@@ -5,7 +5,7 @@
 //! `/api/*` needs the session token (`X-Bise-Token`, in the shell's
 //! `<meta name="bise-token">`) and the server's own `Origin`.
 
-use super::store::valid_id;
+use super::store::{valid_id, Target};
 use super::{PageMsg, Pages};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
@@ -106,13 +106,13 @@ fn reason(status: u16) -> &'static str {
 }
 
 impl Response {
-    fn json(status: u16, v: &Value) -> Response {
+    pub(crate) fn json(status: u16, v: &Value) -> Response {
         Response { status, ctype: "application/json", body: v.to_string().into_bytes(), csp: CSP }
     }
     fn html(body: String) -> Response {
         Response { status: 200, ctype: "text/html; charset=utf-8", body: body.into_bytes(), csp: CSP }
     }
-    fn err(status: u16, why: &str) -> Response {
+    pub(crate) fn err(status: u16, why: &str) -> Response {
         Response::json(status, &json!({"error": why}))
     }
     /// A missing file a page links (/kit, /a/, page.css): 404 text/plain, never
@@ -203,6 +203,10 @@ pub fn route(pages: &Pages, req: &Request) -> Response {
         if !token_ok || !origin_ok(pages, req) {
             return Response::err(403, "no token or another origin");
         }
+        // the notes on an artifact (pages/artifact/notes.rs)
+        if let Some(r) = super::artifact::post(pages, &segs, &req.body) {
+            return r;
+        }
         return match segs.as_slice() {
             ["api", "p", id, "notes"] if valid_id(id) => post_notes(pages, id, &req.body),
             ["api", "p", id, "send"] if valid_id(id) => post_send(pages, id),
@@ -239,6 +243,7 @@ pub fn esc(s: &str) -> String {
 fn shell(pages: &Pages, title: &str, head: &str, main_attrs: &str, inner: &str) -> String {
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<meta name=\"bise-token\" content=\"{}\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/kit/tokens.css\">\n<link rel=\"stylesheet\" href=\"/kit/kit.css\">\n<link rel=\"stylesheet\" href=\"/kit/notes.css\">\n<script src=\"/kit/kit.js\" defer></script>\n<script src=\"/kit/pearl.js\" defer></script>\n<script src=\"/kit/notelines.js\" defer></script>
+<script src=\"/kit/notes-anchors.js\" defer></script>
 <script src=\"/kit/notes.js\" defer></script>\n{head}</head>\n<body>\n<main {main_attrs}>\n{inner}\n</main>\n</body>\n</html>\n",
         pages.token,
         esc(title)
@@ -438,7 +443,7 @@ fn post_notes(pages: &Pages, id: &str, body: &[u8]) -> Response {
     let Ok(v) = serde_json::from_slice::<Value>(body) else { return Response::err(400, "not JSON") };
     let Some(list) = v.get("notes").and_then(Value::as_array) else { return Response::err(400, "no notes") };
     let now = crate::util::now_ms();
-    match pages.locked(|s| s.set_drafts(id, list, m.version(), now)) {
+    match pages.locked(|s| s.set_drafts(&Target::Page(id.to_string()), list, m.version(), now)) {
         Ok(notes) => {
             pages.push(id, "notes", &json!({"notes": notes}));
             pages.tell_hub(PageMsg::Notes { id: id.to_string() });
@@ -451,7 +456,7 @@ fn post_notes(pages: &Pages, id: &str, body: &[u8]) -> Response {
 fn post_send(pages: &Pages, id: &str) -> Response {
     let Some(m) = pages.store.meta(id) else { return Response::err(404, "no such page") };
     let now = crate::util::now_ms();
-    let sent = match pages.locked(|s| s.send(id, now)) {
+    let sent = match pages.locked(|s| s.send(&Target::Page(id.to_string()), now)) {
         Ok(s) => s,
         Err(e) => return Response::err(409, &e),
     };
@@ -461,7 +466,7 @@ fn post_send(pages: &Pages, id: &str) -> Response {
     let text = super::store::notes_message(&m, &pages.url(id), &sent);
     pages.push(id, "notes", &json!({"notes": pages.store.notes(id)}));
     let n = sent.len();
-    pages.tell_hub(PageMsg::Sent { id: id.to_string(), agent: m.agent.clone(), text, notes: sent });
+    pages.tell_hub(PageMsg::Sent { target: Target::Page(id.to_string()), agent: m.agent.clone(), text, notes: sent });
     Response::json(200, &json!({"sent": n, "agent": m.agent}))
 }
 
@@ -643,8 +648,8 @@ mod tests {
         assert!(t.contains("<title>weekly &lt;update&gt;</title>"));
         assert!(t.contains("<main id=\"bise-page\" data-page=\"w\" data-version=\"1\" data-latest=\"1\" data-agent=\"t1\""));
         assert!(t.contains(FRAG) && t.contains("/kit/kit.js") && t.contains("/kit/notes.js") && t.contains("/kit/tokens.css"));
-        let order: Vec<usize> = ["tokens.css", "kit.css", "notes.css", "kit.js", "pearl.js", "notelines.js", "notes.js"].iter().map(|f| t.find(f).unwrap()).collect();
-        assert!(order.windows(2).all(|w| w[0] < w[1]), "the shell's order: tokens, kit, notes css, then kit.js, pearl.js, notelines.js, notes.js");
+        let order: Vec<usize> = ["tokens.css", "kit.css", "notes.css", "kit.js", "pearl.js", "notelines.js", "notes-anchors.js", "notes.js"].iter().map(|f| t.find(f).unwrap()).collect();
+        assert!(order.windows(2).all(|w| w[0] < w[1]), "the shell's order: tokens, kit, notes css, then kit.js, pearl.js, notelines.js, notes-anchors.js, notes.js");
         assert!(String::from_utf8_lossy(&r.bytes()).contains(&format!("Content-Security-Policy: {CSP}\r\n")));
         assert_eq!(text(&get(&p, "/p/w/v/1/body")), FRAG);
         assert_eq!(get(&p, "/p/w/v/2").status, 404);
@@ -696,8 +701,8 @@ mod tests {
         let r = post(&p, "/api/p/w/send", Some(&tok), Some("http://localhost:47123"), json!({}));
         assert_eq!(r.status, 200);
         match rx.try_recv().unwrap() {
-            PageMsg::Sent { id, agent, text, .. } => {
-                assert_eq!((id.as_str(), agent.as_str()), ("w", "t1"));
+            PageMsg::Sent { target, agent, text, .. } => {
+                assert_eq!((target, agent.as_str()), (Target::Page("w".into()), "t1"));
                 assert!(text.starts_with("you sent 1 note on your page \"w\" (w v1, http://127.0.0.1:47123/p/w):\n1. on p1: shorter\n"), "{text}");
             }
             m => panic!("{m:?}"),

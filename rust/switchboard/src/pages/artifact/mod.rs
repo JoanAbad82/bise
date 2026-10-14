@@ -8,8 +8,12 @@
 //! - `GET /kit/office/office.js`, `/kit/office/office-view.js`: the office
 //!   SDK's bundles, read from `office/dist` in the app root (one copy, never
 //!   in `kit/`, architect m_23781); the renderers beside them
-//!   (`kit/office/*.js`) are kit files.
+//!   (`kit/office/*.js`) are kit files;
+//! - `GET /a/<id>/notes`, `POST /api/a/<id>/notes|send`: the notes on an
+//!   artifact ([`notes`]; the POSTs through [`post`], server.rs's `/api`
+//!   arm, after its token and origin checks).
 
+pub mod notes;
 pub mod view;
 
 use super::server::Response;
@@ -25,10 +29,21 @@ pub fn route(pages: &Pages, segs: &[&str]) -> Option<Response> {
     Some(match segs {
         ["kit", "office", f] if BUNDLES.contains(f) => bundle(pages, f),
         ["a", id, "view"] if valid_id(id) => view::serve(pages, id, None),
+        ["a", id, "notes"] if valid_id(id) => notes::get(pages, id),
         ["a", id, v, "view"] if valid_id(id) => match v.parse() {
             Ok(n) => view::serve(pages, id, Some(n)),
             Err(_) => Response::missing(&format!("no such version: a/{id}/{v}/view")),
         },
+        _ => return None,
+    })
+}
+
+/// An `/api/a/…` POST (server.rs checked the token and the origin), or
+/// None: not one of ours.
+pub fn post(pages: &Pages, segs: &[&str], body: &[u8]) -> Option<Response> {
+    Some(match segs {
+        ["api", "a", id, "notes"] if valid_id(id) => notes::post_notes(pages, id, body),
+        ["api", "a", id, "send"] if valid_id(id) => notes::post_send(pages, id),
         _ => return None,
     })
 }
@@ -120,7 +135,7 @@ mod tests {
             (format!("/a/{}/9/view", xlsx.id), "no such version"),
             (format!("/a/{}/x/view", xlsx.id), "no such version"),
             ("/a/nope/view".to_string(), "no such artifact"),
-            (format!("/a/{}/view", html.id), "not an xlsx, pptx or docx"),
+            (format!("/a/{}/view", html.id), "not an xlsx, pptx, docx or image"),
         ] {
             let r = get(&p, &path);
             assert_eq!((r.status, r.ctype), (404, "text/plain; charset=utf-8"), "{path}");

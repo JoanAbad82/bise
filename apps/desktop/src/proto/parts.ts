@@ -2,6 +2,8 @@
 // BISE_PROTO_BLESS=1 cargo test -p bise-proto --features ts --test ts
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
+import type { Anchor } from './anchor';
+
 /**
  * One thing he did on a page ([`Part::Page`]): on block `block`, a
  * `kind` (`pick`, `note`, `voice`, `tick`, `edit`, `keep`, `drop`,
@@ -23,4 +25,4 @@ export type HintKind = "capsule" | "capsule_start" | "steps" | "unknown";
 /**
  * One piece of his message.
  */
-export type Part = { "kind": "text", text: string, } | { "kind": "quote", from: string, text: string, file?: string, new?: string, old?: string, n?: number | null, } | { "kind": "paste", n: number, text: string, } | { "kind": "image", name: string, source: string, mime?: string, b64_file?: string, caption?: string, } | { "kind": "file", path: string, name?: string, missing?: boolean, } | { "kind": "page", text: string, to: string, page: string, title?: string, version: number, notes: Array<PageNote>, } | { "kind": "hint", of: HintKind, text: string, };
+export type Part = { "kind": "text", text: string, } | { "kind": "quote", from: string, text: string, file?: string, new?: string, old?: string, n?: number | null, } | { "kind": "paste", n: number, text: string, } | { "kind": "image", name: string, source: string, mime?: string, b64_file?: string, caption?: string, } | { "kind": "file", path: string, name?: string, missing?: boolean, } | { "kind": "page", text: string, to: string, page: string, title?: string, version: number, notes: Array<PageNote>, } | { "kind": "anchor", artifact: string, version: number, rev?: number, anchor: Anchor, quote?: string, n?: number | null, } | { "kind": "hint", of: HintKind, text: string, };

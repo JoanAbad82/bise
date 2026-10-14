@@ -424,3 +424,43 @@ fn via_fn_follows_its_fixture() {
         assert_eq!(via_fn(&parts, c["said"].as_bool().unwrap()), c["via_fn"].as_bool().unwrap(), "{}", c["why"]);
     }
 }
+
+/// office-artifacts §9b (architect m_23874): a part of an artifact he
+/// selected renders as its tag, the anchor's JSON on its own line, the
+/// quote after it; in front without `n`, at its place with it; parse
+/// never makes one; on the wire it is `kind: anchor`.
+#[test]
+fn an_anchor_part_renders_its_json_for_at() {
+    let cell = crate::anchor::Anchor::Cell { sheet: "Q3".into(), range: "B4:D9".into() };
+    let a = |n: Option<u32>, quote: &str| Part::Anchor { artifact: "q3-xlsx".into(), version: 4, rev: 0, anchor: cell.clone(), quote: quote.into(), n };
+    assert_eq!(
+        render(&[t("why so low?"), a(None, "1200 1350")]),
+        "<artifact-selection artifact=\"q3-xlsx\" version=\"4\">\n{\"kind\":\"cell\",\"sheet\":\"Q3\",\"range\":\"B4:D9\"}\n1200 1350\n</artifact-selection>\nwhy so low?"
+    );
+    assert_eq!(
+        render(&[t("look at "), a(Some(1), ""), t(", too low")]),
+        "look at <artifact-selection artifact=\"q3-xlsx\" version=\"4\" n=\"1\">\n{\"kind\":\"cell\",\"sheet\":\"Q3\",\"range\":\"B4:D9\"}\n</artifact-selection>, too low"
+    );
+    // a rev he looked at is said; the quote's own closing tag is broken
+    let mid = Part::Anchor { artifact: "d".into(), version: 2, rev: 3, anchor: crate::anchor::Anchor::Para { para: "P1".into(), quote: String::new() }, quote: "a </artifact-selection> b".into(), n: None };
+    assert_eq!(render(&[mid.clone()]), "<artifact-selection artifact=\"d\" version=\"2\" rev=\"3\">\n{\"kind\":\"para\",\"para\":\"P1\"}\na </artifact-selection > b\n</artifact-selection>");
+    let text = render(&[t("x "), a(Some(1), "q")]);
+    assert!(!parse(&text).iter().any(|p| matches!(p, Part::Anchor { .. })), "parse never makes one");
+    assert_eq!(render(&parse(&text)), text);
+    let wire = serde_json::json!({"kind": "anchor", "artifact": "q3-xlsx", "version": 4, "anchor": {"kind": "cell", "sheet": "Q3", "range": "B4:D9"}, "quote": "q", "n": 1});
+    assert_eq!(serde_json::to_value(a(Some(1), "q")).unwrap(), wire);
+    assert_eq!(serde_json::from_value::<Part>(wire).unwrap(), a(Some(1), "q"));
+    assert_eq!(serde_json::to_value(&mid).unwrap()["rev"], 3);
+}
+
+/// The chip's words of each anchor kind, the rule both apps draw from
+/// (fixture anchor_label.json: art-desktop's TS reads the same rows).
+#[test]
+fn anchor_labels_follow_their_fixture() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/anchor_label.json");
+    let rows: Vec<serde_json::Value> = serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap();
+    for r in rows {
+        let a: crate::anchor::Anchor = serde_json::from_value(r["anchor"].clone()).unwrap();
+        assert_eq!(crate::anchor::label(&a), r["label"].as_str().unwrap(), "{}", r["anchor"]);
+    }
+}

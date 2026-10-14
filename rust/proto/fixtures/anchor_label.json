@@ -1,0 +1,19 @@
+[
+  {"anchor": {"kind": "cell", "sheet": "Q3", "range": "B4:D9"}, "label": "Q3!B4:D9"},
+  {"anchor": {"kind": "cell", "sheet": "My sheet", "range": "A1"}, "label": "'My sheet'!A1"},
+  {"anchor": {"kind": "cell", "sheet": "Bob's", "range": "C2"}, "label": "'Bob''s'!C2"},
+  {"anchor": {"kind": "cell", "sheet": "2024", "range": "C2"}, "label": "'2024'!C2"},
+  {"anchor": {"kind": "slide", "slide": 2}, "label": "slide 2"},
+  {"anchor": {"kind": "slide", "slide": 2, "rect": {"x": 10, "y": 20, "w": 30, "h": 5}}, "label": "slide 2 · a box"},
+  {"anchor": {"kind": "shape", "slide": 3, "shape": "12"}, "label": "slide 3 · shape 12"},
+  {"anchor": {"kind": "shape", "slide": 3, "shape": "12", "quote": "Revenue grew 4%"}, "label": "slide 3 · \"Revenue grew 4%\""},
+  {"anchor": {"kind": "para", "para": "3F2A1B00", "quote": "net revenue"}, "label": "\"net revenue\""},
+  {"anchor": {"kind": "para", "para": "3F2A1B00", "quote": "the quarter closed with net revenue above the plan for the third time"}, "label": "\"the quarter closed with net revenue abo…\""},
+  {"anchor": {"kind": "para", "para": "3F2A1B00"}, "label": "a paragraph"},
+  {"anchor": {"kind": "region", "page": 1, "rect": {"x": 0, "y": 0, "w": 50, "h": 50}}, "label": "page 1 · a box"},
+  {"anchor": {"kind": "region", "rect": {"x": 0, "y": 0, "w": 50, "h": 50}}, "label": "a box"},
+  {"anchor": {"kind": "text", "line": 40}, "label": "line 40"},
+  {"anchor": {"kind": "block", "block": "b3", "quote": "the plan"}, "label": "\"the plan\""},
+  {"anchor": {"kind": "block", "block": "b3"}, "label": "block b3"},
+  {"anchor": {"kind": "voxel", "x": 1}, "label": "a part"}
+]

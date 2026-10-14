@@ -32,11 +32,13 @@ use store::{Meta, Publish, Store};
 /// What the page server tells the hub.
 #[derive(Debug, PartialEq)]
 pub enum PageMsg {
-    /// `send` on page `id`: `text` (the notes message) goes to `agent`
-    /// (the page's), as from the user; the hub picks main when it is gone.
-    /// `notes`: the notes in it, for the message's typed part
-    /// (`store::page_part`: the clients draw his words, never `text`)
-    Sent { id: String, agent: String, text: String, notes: Vec<store::Note> },
+    /// `send` on a page or an artifact (`target`): `text` (the notes
+    /// message) goes to `agent` (the page's, the artifact's maker), as
+    /// from the user; the hub picks main when it is gone. `notes`: the
+    /// notes in it, for the message's typed parts (a page's:
+    /// `store::page_part`; an artifact's: `artifact::notes::parts`; the
+    /// clients draw his words, never `text`)
+    Sent { target: store::Target, agent: String, text: String, notes: Vec<store::Note> },
     /// the drafts of page `id` changed (its open notes count)
     Notes { id: String },
     /// the user answered question `block` of page `id` on the page

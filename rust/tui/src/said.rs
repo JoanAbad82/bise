@@ -133,6 +133,8 @@ pub(crate) fn view_of(text: &str, parts: &[Part]) -> View {
             Part::Hint { .. } => {}
             // his notes on a page, never the hub's template
             Part::Page { notes, .. } => v.body.push_str(&page_words(notes, "\n")),
+            // a part of an artifact he selected: where, never its JSON
+            Part::Anchor { .. } => v.body.push_str(&anchor_words(p)),
             Part::Unknown(_) => {}
         }
     }
@@ -168,6 +170,7 @@ pub(crate) fn gist(parts: &[Part]) -> String {
             Part::File { path, name, .. } if !name.is_empty() => words.push_str(&format!("▯ {}", parts::file_name(path))),
             Part::File { path, .. } => words.push_str(&format!(" {path}")),
             Part::Page { notes, .. } => words.push_str(&page_words(notes, " · ")),
+            Part::Anchor { .. } => words.push_str(&anchor_words(p)),
             // the hub's line for the model, never his words (m_22706)
             Part::Hint { .. } | Part::Unknown(_) => {}
         }
@@ -175,6 +178,15 @@ pub(crate) fn gist(parts: &[Part]) -> String {
     quotes.push(words.split_whitespace().collect::<Vec<_>>().join(" "));
     quotes.retain(|s| !s.is_empty());
     quotes.join(" ")
+}
+
+/// A part of an artifact he selected, on one line: `❝ Q3!B4:D9 · q3-xlsx v4`
+/// (bise_proto's label, the desktop's chip words).
+fn anchor_words(p: &Part) -> String {
+    match p {
+        Part::Anchor { artifact, version, anchor, .. } => format!("❝ {} · {artifact} v{version}", bise_proto::anchor::label(anchor)),
+        _ => String::new(),
+    }
 }
 
 /// His notes on a page in bise-proto's words, joined by `sep`.

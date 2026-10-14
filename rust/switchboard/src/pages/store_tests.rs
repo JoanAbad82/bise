@@ -76,20 +76,20 @@ fn notes_draft_send_and_outcomes() {
     let s = Store::new(&d);
     s.publish(&publish("t1", Some("w"), None), vec![], 10, &|_| false).unwrap();
     let notes = s
-        .set_drafts("w", &[json!({"block": "t1", "quote": "Revenue", "kind": "note", "text": "use the March numbers"}), json!({"block": "p2", "kind": "drop", "x": 1})], 1, 11)
+        .set_drafts(&Target::Page("w".into()), &[json!({"block": "t1", "quote": "Revenue", "kind": "note", "text": "use the March numbers"}), json!({"block": "p2", "kind": "drop", "x": 1})], 1, 11)
         .unwrap();
     assert_eq!(notes.iter().map(|n| n.id.as_str()).collect::<Vec<_>>(), vec!["n1", "n2"]);
     assert_eq!(notes[1].extra.get("x"), Some(&json!(1)), "the layer's own fields are kept");
     // the whole draft list again: n1 edited, n2 left out (deleted), an edit added
-    s.set_drafts("w", &[json!({"id": "n1", "block": "t1", "quote": "Revenue", "kind": "note", "text": "use March"}), json!({"block": "p4", "kind": "edit", "before": "Q2", "after": "Q3"})], 1, 12)
+    s.set_drafts(&Target::Page("w".into()), &[json!({"id": "n1", "block": "t1", "quote": "Revenue", "kind": "note", "text": "use March"}), json!({"block": "p4", "kind": "edit", "before": "Q2", "after": "Q3"})], 1, 12)
         .unwrap();
-    let sent = s.send("w", 13).unwrap();
+    let sent = s.send(&Target::Page("w".into()), 13).unwrap();
     assert_eq!(sent.iter().map(|n| (n.id.as_str(), n.status.as_str())).collect::<Vec<_>>(), vec![("n1", "sent"), ("n2", "sent")]);
-    assert!(s.send("w", 14).unwrap().is_empty(), "nothing left to send");
+    assert!(s.send(&Target::Page("w".into()), 14).unwrap().is_empty(), "nothing left to send");
     // a sent note can't be edited as a draft
-    assert!(s.set_drafts("w", &[json!({"id": "n1", "text": "x"})], 1, 15).is_err());
+    assert!(s.set_drafts(&Target::Page("w".into()), &[json!({"id": "n1", "text": "x"})], 1, 15).is_err());
     // an empty list clears the drafts, never the sent ones
-    assert_eq!(s.set_drafts("w", &[], 1, 16).unwrap().len(), 2);
+    assert_eq!(s.set_drafts(&Target::Page("w".into()), &[], 1, 16).unwrap().len(), 2);
     let m = s.meta("w").unwrap();
     let msg = notes_message(&m, "http://127.0.0.1:47100/p/w", &sent);
     assert!(msg.starts_with("you sent 2 notes on your page \"w\" (w v1, http://127.0.0.1:47100/p/w):\n1. on \"Revenue\" (t1): use March\n2. on p4, you changed \"Q2\" → \"Q3\"\nanswer with: sb page publish <file> --id w --notes-done n1,n2 (or --note-answer n1=\"…\")\n<page-notes page=\"w\" version=\"1\">[{"), "{msg}");
@@ -112,8 +112,8 @@ fn a_note_on_a_diffs_lines_quotes_the_block_the_numbers_and_the_text() {
     let s = Store::new(&d);
     s.publish(&publish("t1", Some("w"), None), vec![], 10, &|_| false).unwrap();
     let lines = json!([{"old": 34, "text": "Skills contain"}, {"old": 35, "text": ""}, {"new": 34, "text": "Skills below"}]);
-    s.set_drafts("w", &[json!({"block": "diff", "quote": "Skills contain Skills below", "kind": "note", "text": "keep the old line", "lines": lines, "part": "main"})], 1, 11).unwrap();
-    let sent = s.send("w", 12).unwrap();
+    s.set_drafts(&Target::Page("w".into()), &[json!({"block": "diff", "quote": "Skills contain Skills below", "kind": "note", "text": "keep the old line", "lines": lines, "part": "main"})], 1, 11).unwrap();
+    let sent = s.send(&Target::Page("w".into()), 12).unwrap();
     let msg = notes_message(&s.meta("w").unwrap(), "http://127.0.0.1:47100/p/w", &sent);
     assert!(
         msg.contains("1. on diff main, old 34–35 → new 34: keep the old line\n     −34       │ Skills contain\n     −35       │ \n           +34 │ Skills below\nanswer with:"),
@@ -154,8 +154,8 @@ fn start_notes_go_to_main_not_in_the_agents_message() {
     let d = temp();
     let s = Store::new(&d);
     s.publish(&publish("t1", Some("bugs"), None), vec![], 10, &|_| false).unwrap();
-    s.set_drafts("bugs", &[json!({"block": "b2", "quote": "login fails on Safari", "kind": "start"}), json!({"block": "b3", "kind": "start", "text": "this one first"})], 1, 11).unwrap();
-    let sent = s.send("bugs", 12).unwrap();
+    s.set_drafts(&Target::Page("bugs".into()), &[json!({"block": "b2", "quote": "login fails on Safari", "kind": "start"}), json!({"block": "b3", "kind": "start", "text": "this one first"})], 1, 11).unwrap();
+    let sent = s.send(&Target::Page("bugs".into()), 12).unwrap();
     let m = s.meta("bugs").unwrap();
     assert_eq!(notes_message(&m, "u", &sent), "", "only start notes: nothing for the page's agent");
     let starts = s.route_starts("bugs").unwrap();
@@ -165,8 +165,8 @@ fn start_notes_go_to_main_not_in_the_agents_message() {
     assert!(msg.starts_with("you asked for an agent on these items of the page \"bugs\" (bugs v1, http://127.0.0.1:47100/p/bugs):\n1. item b2 \"login fails on Safari\"\n2. item b3: this one first\n"), "{msg}");
     assert!(msg.contains("ask t1 (the page's agent) to publish it again with data-agent=") && msg.contains("<page-start page=\"bugs\" version=\"1\">[{"), "{msg}");
     // a start note among others: the agent's message has the others only
-    s.set_drafts("bugs", &[json!({"block": "b4", "kind": "start"}), json!({"block": "p1", "kind": "note", "text": "shorter"})], 1, 13).unwrap();
-    let sent = s.send("bugs", 14).unwrap();
+    s.set_drafts(&Target::Page("bugs".into()), &[json!({"block": "b4", "kind": "start"}), json!({"block": "p1", "kind": "note", "text": "shorter"})], 1, 13).unwrap();
+    let sent = s.send(&Target::Page("bugs".into()), 14).unwrap();
     let text = notes_message(&m, "u", &sent);
     assert!(text.starts_with("you sent 1 note on your page") && text.contains("shorter") && !text.contains("b4"), "{text}");
     let _ = std::fs::remove_dir_all(d);
@@ -183,8 +183,8 @@ fn a_page_message_carries_his_notes_typed() {
     let m = s.meta("w").unwrap();
     let q = super::super::questions::Question { block: "q-live".into(), text: "Est-ce que bise lit les listes ?".into(), card: 516, ..Default::default() };
     let pick = s.add_pick("w", "q-live", "la table maintenant", 1, 11).unwrap();
-    s.set_drafts("w", &[json!({"block": "p1", "kind": "note", "text": "shorter", "quote": "Revenue grew"}), json!({"block": "p2", "kind": "edit", "before": "Q2", "after": "Q3"})], 1, 12).unwrap();
-    let sent = s.send("w", 13).unwrap();
+    s.set_drafts(&Target::Page("w".into()), &[json!({"block": "p1", "kind": "note", "text": "shorter", "quote": "Revenue grew"}), json!({"block": "p2", "kind": "edit", "before": "Q2", "after": "Q3"})], 1, 12).unwrap();
+    let sent = s.send(&Target::Page("w".into()), 13).unwrap();
     let mut all = vec![pick];
     all.extend(sent);
     let text = format!("{}\n\n[from the page: answer on the page; one short line at most]", notes_message(&m, "u", &all));
@@ -223,12 +223,12 @@ fn a_page_waits_for_review_until_the_users_go() {
     s.publish(&Publish { title: Some("replies".into()), ..publish("t1", Some("replies"), None) }, vec![block("r", "review"), block("m", "email")], 20, &|_| false).unwrap();
     assert_eq!(s.pending_review("t1").as_deref(), Some("\"replies\""));
     assert_eq!(s.pending_review("t2"), None, "another agent's page");
-    s.set_drafts("replies", &[json!({"block": "m", "kind": "note", "text": "shorter"})], 1, 21).unwrap();
-    s.send("replies", 22).unwrap();
+    s.set_drafts(&Target::Page("replies".into()), &[json!({"block": "m", "kind": "note", "text": "shorter"})], 1, 21).unwrap();
+    s.send(&Target::Page("replies".into()), 22).unwrap();
     assert!(s.pending_review("t1").is_some(), "a note is not his go");
-    s.set_drafts("replies", &[json!({"block": "m", "kind": "voice", "text": "ok put it in my drafts"})], 1, 23).unwrap();
+    s.set_drafts(&Target::Page("replies".into()), &[json!({"block": "m", "kind": "voice", "text": "ok put it in my drafts"})], 1, 23).unwrap();
     assert!(s.pending_review("t1").is_some(), "a draft note is not said yet");
-    s.send("replies", 24).unwrap();
+    s.send(&Target::Page("replies".into()), 24).unwrap();
     assert_eq!(s.pending_review("t1"), None, "his word: drafts run free");
     // an open question holds too, until answered
     s.publish(&publish("t3", Some("plan"), None), vec![block("q1", "question")], 30, &|_| false).unwrap();

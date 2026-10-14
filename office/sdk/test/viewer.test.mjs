@@ -72,3 +72,33 @@ test("drawn paragraphs pair with the outline's, passing over what it skips", asy
   // a paragraph docx-preview did not draw: the next ones still pair
   assert.deepEqual(matchParas(["Title", "Body"], outline.map((n) => n.text)), [0, 2]);
 });
+
+// art-notes: the notes layer's pure parts (kit/office/select.js, image.js, kit/notes-anchors.js)
+test("a note's anchor says its place in bise_proto's words (anchor_label.json)", async () => {
+  const { createRequire } = await import("node:module");
+  createRequire(import.meta.url)(join(root, "kit", "notes-anchors.js"));
+  const rows = JSON.parse(readFileSync(join(root, "rust", "proto", "fixtures", "anchor_label.json"), "utf8"));
+  for (const r of rows) assert.equal(globalThis.BiseAnchors.label(r.anchor), r.label, JSON.stringify(r.anchor));
+  const { message } = await helpers("select.js");
+  const m = message({ id: "q3-xlsx", version: 4, rev: 2 }, { kind: "cell", sheet: "Q3", range: "B4:D9" }, "1200 1350");
+  assert.deepEqual(m, { bise: "anchor", artifact: "q3-xlsx", version: 4, rev: 2, anchor: { kind: "cell", sheet: "Q3", range: "B4:D9" }, quote: "1200 1350", label: "Q3!B4:D9" });
+});
+
+test("marks: sent and drafts marked, ✓ only on the version that answered, then gone", async () => {
+  const { markOf, inRange, quoteOf } = await helpers("select.js");
+  assert.equal(markOf({ status: "sent" }, 3), "sent");
+  assert.equal(markOf({ status: "draft" }, 3), "draft");
+  assert.equal(markOf({ status: "done", done_in: 4 }, 4), "done");
+  assert.equal(markOf({ status: "done", done_in: 4 }, 5), null);
+  assert.equal(markOf({ status: "done", done_in: 4 }, 3), null);
+  assert.ok(inRange("C5", "B4:D9") && inRange("B4", "B4") && !inRange("E5", "B4:D9") && !inRange("A1", "nope"));
+  assert.ok(inRange("AA10", "Z9:AB12"));
+  assert.equal(quoteOf("  a\n b  "), "a b");
+  assert.equal(quoteOf("x".repeat(300)).length, 200);
+});
+
+test("a box drawn on an image is a region in % of it", async () => {
+  const { boxPct } = await helpers("image.js");
+  assert.deepEqual(boxPct({ x: 300, y: 100 }, { x: 100, y: 50 }, 400, 200), { x: 25, y: 25, w: 50, h: 25 });
+  assert.deepEqual(boxPct({ x: -10, y: 0 }, { x: 500, y: 300 }, 400, 200), { x: 0, y: 0, w: 100, h: 100 });
+});

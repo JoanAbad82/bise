@@ -9,6 +9,12 @@
 //! Which artifacts get the viewer is pages::site's one rule (serves_copy +
 //! office_kind), the same that gives the row its `frame_url`.
 //!
+//! The shell also carries the page server's token and loads the notes
+//! layer (kit/notes-anchors.js, kit/notes.js's model and words,
+//! kit/office/select.js: the selection, the marks, the browser's list;
+//! pages/artifact/notes.rs is its api). An image gets the same frame
+//! (`site::viewer_kind`), drawn by kit/office/image.js.
+//!
 //! [`shell`] is pure; [`serve`] reads the artifact store.
 
 use super::super::server::{esc, Response};
@@ -21,8 +27,8 @@ use super::super::Pages;
 /// data: or blob: urls; inline styles allowed (docx-preview draws a
 /// document with `<style>` and style attributes; a style runs no code and
 /// `connect-src 'self'` takes nothing out). No frame-ancestors: the desktop
-/// frames it from file:// (5243d2de). No token in the shell: the viewer
-/// has no `/api` yet; art-notes adds it under the same script rule.
+/// frames it from file:// (5243d2de). The token in the shell: the viewer
+/// has the notes' `/api` (art-notes) under the same script rule.
 pub const VIEW_CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'";
 
 /// What the shell says about the file it draws.
@@ -31,7 +37,7 @@ pub struct Shown<'a> {
     pub id: &'a str,
     pub title: &'a str,
     pub agent: &'a str,
-    /// `xlsx`, `pptx`, `docx`
+    /// `xlsx`, `pptx`, `docx`, `image` (site::viewer_kind)
     pub kind: &'static str,
     /// the version drawn, and the artifact's newest
     pub v: u64,
@@ -42,6 +48,8 @@ pub struct Shown<'a> {
     pub file: String,
     /// the file's name, for the words
     pub name: String,
+    /// the page server's token: the notes' `/api/a/<id>/notes|send`
+    pub token: &'a str,
 }
 
 /// The viewer's HTML: the kit's tokens, the viewer's CSS and script, and
@@ -54,10 +62,15 @@ pub fn shell(s: &Shown) -> String {
 <head>
 <meta charset=\"utf-8\">
 <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+<meta name=\"bise-token\" content=\"{token}\">
 <title>{title}</title>
 <link rel=\"stylesheet\" href=\"/kit/tokens.css\">
 <link rel=\"stylesheet\" href=\"/kit/office/viewer.css\">
+<link rel=\"stylesheet\" href=\"/kit/office/select.css\">
+<script src=\"/kit/notes-anchors.js\" defer></script>
+<script src=\"/kit/notes.js\" defer></script>
 <script type=\"module\" src=\"/kit/office/viewer.js\"></script>
+<script type=\"module\" src=\"/kit/office/select.js\"></script>
 </head>
 <body>
 <main id=\"bise-office\" data-artifact=\"{id}\" data-kind=\"{kind}\" data-version=\"{v}\" data-latest=\"{latest}\"{follows} data-file=\"{file}\" data-name=\"{name}\" data-agent=\"{agent}\" data-title=\"{title}\">
@@ -74,6 +87,7 @@ pub fn shell(s: &Shown) -> String {
         file = esc(&s.file),
         name = esc(&s.name),
         agent = esc(s.agent),
+        token = esc(s.token),
     )
 }
 
@@ -94,7 +108,7 @@ pub fn serve(pages: &Pages, id: &str, v: Option<u64>) -> Response {
         return Response::missing(&format!("no such version: {at}"));
     };
     let Some(copy) = ver.copy.as_deref().filter(|c| site::serves_copy(&m.by, c)) else { return Response::missing(&format!("no copy of it: {at}")) };
-    let Some(kind) = site::office_kind(copy) else { return Response::missing(&format!("not an xlsx, pptx or docx: {at}")) };
+    let Some(kind) = site::viewer_kind(copy) else { return Response::missing(&format!("not an xlsx, pptx, docx or image: {at}")) };
     let shown = Shown {
         id: &m.id,
         title: &m.title,
@@ -105,6 +119,7 @@ pub fn serve(pages: &Pages, id: &str, v: Option<u64>) -> Response {
         follows: v.is_none(),
         file: site::copy_href(&m.id, ver.v, copy),
         name: site::file_of(copy),
+        token: &pages.token,
     };
     Response { status: 200, ctype: "text/html; charset=utf-8", body: shell(&shown).into_bytes(), csp: VIEW_CSP }
 }
@@ -146,13 +161,17 @@ mod tests {
             follows: false,
             file: "/a/q3/2/q3.xlsx".into(),
             name: "q3.xlsx".into(),
+            token: "t0k",
         };
         let html = shell(&s);
         assert!(html.contains("data-artifact=\"q3\" data-kind=\"xlsx\" data-version=\"2\" data-latest=\"3\" data-file=\"/a/q3/2/q3.xlsx\""), "{html}");
         assert!(html.contains("<title>Q3 &lt;numbers&gt;</title>"));
         assert!(!html.contains("data-follows"));
         assert!(html.contains("<script type=\"module\" src=\"/kit/office/viewer.js\"></script>"));
-        assert!(!html.contains("bise-token"), "no token until the viewer has an /api");
+        // the notes' api (art-notes): the token, then notes.js's model and the selection layer
+        assert!(html.contains("<meta name=\"bise-token\" content=\"t0k\">"));
+        let order: Vec<usize> = ["notes-anchors.js", "/kit/notes.js", "office/viewer.js", "office/select.js"].iter().map(|f| html.find(f).unwrap()).collect();
+        assert!(order.windows(2).all(|w| w[0] < w[1]), "anchors, notes, viewer, select");
         assert!(!html.contains("<script>"), "no inline script: the CSP would refuse it");
         assert!(shell(&Shown { follows: true, ..s }).contains("data-follows"));
     }
