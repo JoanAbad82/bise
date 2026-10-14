@@ -32,7 +32,6 @@ concurrency:
 
 env:
   # THE command name (BISE-165): what test-install.sh installs and runs
-  # (bend-harness is its old-name link, one release)
   BISE_CMD: bise
   # pinned Bend: the release archive and its sha256 per arch (the values
   # of https://bend-lang.com/install.sh for this version)

@@ -1,5 +1,5 @@
 //! bise — the single-executable entry point (BISE-165: the command was
-//! `bend-harness`; a `bend-harness` link to it is kept for one release).
+//! `bend-harness`; its link went, debt-t3).
 //!
 //! The TUI is Switchboard's (`bise` alone, or `bise switchboard`): the hub
 //! (`sbd`) runs the agents' REPLs. There is no single-agent TUI any more

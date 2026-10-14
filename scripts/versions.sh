@@ -3,8 +3,7 @@
 #
 # A version is an immutable app root built from one git commit (or from
 # the working tree, uncommitted changes included):
-#   $SB_VERSIONS_DIR/<id>/  bise (+ bend-harness -> bise, one release;
-#                           sb -> bise, the agents' command; with the dev
+#   $SB_VERSIONS_DIR/<id>/  bise (+ sb -> bise, the agents' command; with the dev
 #                           identity, bise -> bise.app/Contents/MacOS/bise,
 #                           a signed bundle: scripts/dev-sign.sh),
 #                           repl-live, prompts/ (tool-desc-*.txt,
@@ -102,8 +101,7 @@ build_from() {
   (cd "$src/rust" && CARGO_TARGET_DIR="$target" cargo build -q --release -p bend-harness)
   # the command is bise since BISE-165: a commit before it builds
   # bend-harness (decided by its sources: the shared target dir may hold
-  # both names); either way the version dir has bise, and a bend-harness
-  # link for the switchers and scripts that still look for it
+  # both names); either way the version dir has bise
   local exe=bend-harness
   grep -q '^name = "bise"' "$src/rust/harness/Cargo.toml" && exe=bise
   # bise = a link to bise.app/Contents/MacOS/bise (dev-sign.sh app: bundle
@@ -121,7 +119,6 @@ build_from() {
   else
     cp "$target/release/$exe" "$tmp/bise"
   fi
-  ln -s bise "$tmp/bend-harness"
   # sb: the agents' command, the same binary called by that name
   ln -s bise "$tmp/sb"
 

@@ -174,9 +174,10 @@ pub fn running_root(paths: &Paths) -> Option<PathBuf> {
 /// The command's file in a version dir (BISE-165; was `bend-harness`).
 pub const EXE: &str = "bise";
 
-/// The executable of an app root: a version dir's `bise` (or the
-/// `bend-harness` of a version built before the rename), the dev tree's
-/// debug build.
+/// The executable of an app root: a version dir's `bise`, the dev tree's
+/// debug build. `bend-harness` is not a link kept for a release: it is the
+/// only executable of a version dir built from a commit before BISE-165
+/// (v2026.9.29), which a switch back to that version still runs.
 pub fn exe_of(root: &Path) -> Option<PathBuf> {
     [EXE, "bend-harness", "rust/target/debug/bise", "rust/target/debug/bend-harness"]
         .iter()
