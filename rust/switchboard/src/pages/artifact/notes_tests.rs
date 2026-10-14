@@ -17,7 +17,7 @@ fn artifact(d: &std::path::Path, n: u64) -> String {
     let mut id = String::new();
     for i in 1..=n {
         std::fs::write(work.join("q3.xlsx"), format!("bytes {i}")).unwrap();
-        let a = crate::artifacts::Add { target: "q3.xlsx".into(), title: None, kind: None, agent: "t1".into(), by: "t1".into(), cwd: work.to_string_lossy().to_string(), known_only: false };
+        let a = crate::artifacts::Add { target: "q3.xlsx".into(), title: None, kind: None, agent: "t1".into(), by: "t1".into(), cwd: work.to_string_lossy().to_string(), known_only: false, ..Default::default() };
         id = arts.add(&a, i * 100).unwrap().meta.id;
     }
     id
@@ -52,12 +52,16 @@ fn a_note_is_done_in_the_version_that_answers_it() {
 /// only by the next turn's version. Outside a turn: its first save.
 #[test]
 fn a_note_sent_mid_turn_waits_for_the_next_turn() {
-    let v3 = json!({"v": 3, "at_ms": 300, "turn": {"agent": "t1", "started_ms": 100}, "revs": [{"rev": 1, "at_ms": 120}, {"rev": 2, "at_ms": 300}]});
-    let v4 = json!({"v": 4, "at_ms": 520, "turn": {"agent": "t1", "started_ms": 400}, "revs": [{"rev": 1, "at_ms": 520}]});
-    let mine = json!({"v": 5, "at_ms": 700, "revs": [{"rev": 1, "at_ms": 650}, {"rev": 2, "at_ms": 700}]});
-    let old = json!({"v": 1, "at_ms": 50});
+    use crate::artifacts::Version;
+    use crate::artifacts_turns::{Rev, Turn};
+    let rev = |rev: u32, at_ms: u64| Rev { rev, at_ms, changed: None };
+    let turn = |started_ms: u64| Some(Turn { agent: "t1".into(), started_ms });
+    let v3 = Version { v: 3, at_ms: 300, turn: turn(100), revs: vec![rev(1, 120), rev(2, 300)], ..Default::default() };
+    let v4 = Version { v: 4, at_ms: 520, turn: turn(400), revs: vec![rev(1, 520)], ..Default::default() };
+    let mine = Version { v: 5, at_ms: 700, revs: vec![rev(1, 650), rev(2, 700)], ..Default::default() };
+    let old = Version { v: 1, at_ms: 50, ..Default::default() };
     assert_eq!([began(&v3), began(&v4), began(&mine), began(&old)], [100, 400, 650, 50]);
-    let versions: Vec<(u64, u64)> = [&v3, &v4, &mine].iter().map(|v| (v["v"].as_u64().unwrap(), began(v))).collect();
+    let versions: Vec<(u64, u64)> = [&v3, &v4, &mine].iter().map(|v| (v.v, began(v))).collect();
     let out = outcomes(&[note("n1", "sent", 200, cell()), note("n2", "sent", 600, cell())], &versions);
     assert_eq!(out[0].extra.get("done_in"), Some(&json!(4)), "v3's save at 300 came in the turn it was sent in");
     assert_eq!(out[1].extra.get("done_in"), Some(&json!(5)), "his own add, outside a turn: its first save");
@@ -132,7 +136,7 @@ fn the_browser_door_drafts_sends_and_reads_back() {
     // the maker answers with v2: done in v2
     std::thread::sleep(std::time::Duration::from_millis(2));
     std::fs::write(d.join("work/q3.xlsx"), "bytes 2").unwrap();
-    let a = crate::artifacts::Add { target: "q3.xlsx".into(), title: None, kind: None, agent: "t1".into(), by: "t1".into(), cwd: d.join("work").to_string_lossy().to_string(), known_only: false };
+    let a = crate::artifacts::Add { target: "q3.xlsx".into(), title: None, kind: None, agent: "t1".into(), by: "t1".into(), cwd: d.join("work").to_string_lossy().to_string(), known_only: false, ..Default::default() };
     crate::artifacts::Store::new(&d).add(&a, crate::util::now_ms() + 10).unwrap();
     let n = &body(&req(&p, "GET", &format!("/a/{id}/notes"), json!(null)))["notes"][0];
     assert_eq!((n["status"].as_str(), n["done_in"].as_u64()), (Some("done"), Some(2)));
@@ -166,7 +170,8 @@ fn the_desktop_door_records_a_sent_note() {
     assert_eq!((sent[0].extra["rev"].as_u64(), sent[0].extra["via"].as_str()), (Some(3), Some("app")));
     assert_eq!(anchored(sent[0]), serde_json::from_value(cell()).ok());
     assert_eq!(known(&d, &id, 2), Ok(1), "a version with no revs: rev 1");
-    let vs = [json!({"v": 2, "revs": [{"rev": 1, "at_ms": 1}, {"rev": 4, "at_ms": 9}]}), json!({"v": 3})];
+    let rev = |rev: u32, at_ms: u64| crate::artifacts_turns::Rev { rev, at_ms, changed: None };
+    let vs = [crate::artifacts::Version { v: 2, revs: vec![rev(1, 1), rev(4, 9)], ..Default::default() }, crate::artifacts::Version { v: 3, ..Default::default() }];
     assert_eq!((rev_of(&vs, 2), rev_of(&vs, 3), rev_of(&vs, 7)), (4, 1, 1));
     assert_eq!(known(&d, &id, 3), Err("q3.xlsx has no version 3 here, so the note can't go on it".into()));
     assert_eq!(known(&d, "nope", 1), Err("nope has no version 1 here, so the note can't go on it".into()));

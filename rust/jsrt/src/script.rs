@@ -19,12 +19,16 @@
 //!   `queueMicrotask`; the script's promises settle in one microtask drain.
 //! - stdout is `bise_proto::office::JsrtEv` lines; with `--host`, each
 //!   `wrote` waits for the harness's `answer` on stdin (it told the hub).
+//!   A `wrote` carries what the write changed from the file it replaced
+//!   (the SDK's `changedAnchors`, called by the prelude on the bundle's
+//!   namespace, `globalThis.__biseOffice`).
 
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 
+use bise_proto::anchor::Anchor;
 use bise_proto::office::{HarnessCmd, JsrtEv};
 use deno_core::v8;
 
@@ -124,8 +128,8 @@ fn with_state<T>(f: impl FnOnce(&State) -> T) -> T {
 
 /// `run.write`'s end: the file is written; the harness tells the hub and
 /// answers with its words.
-fn tell_host(path: &str, artifact: bool) -> Result<String, String> {
-    emit(&JsrtEv::Wrote { path: path.to_string(), artifact });
+fn tell_host(path: &str, artifact: bool, changed: Option<Vec<Anchor>>) -> Result<String, String> {
+    emit(&JsrtEv::Wrote { path: path.to_string(), artifact, changed });
     let mut line = String::new();
     std::io::stdin().lock().read_line(&mut line).map_err(|e| format!("run.write: no answer from bise: {e}"))?;
     match HarnessCmd::decode(line.trim()) {
@@ -141,12 +145,12 @@ fn op_read(path: &str) -> Result<Vec<u8>, String> {
     std::fs::read(&real).map_err(|e| format!("run.read: {path}: {e}"))
 }
 
-fn op_write(path: &str, bytes: &[u8], artifact: bool) -> Result<String, String> {
+fn op_write(path: &str, bytes: &[u8], artifact: bool, changed: Option<Vec<Anchor>>) -> Result<String, String> {
     let (target, host) = with_state(|s| (s.door.write(path, bytes.len() as u64), s.host));
     let target = target?;
     door::write_whole(&target, bytes)?;
     if host {
-        tell_host(&target.to_string_lossy(), artifact)
+        tell_host(&target.to_string_lossy(), artifact, changed)
     } else {
         Ok(String::new())
     }
@@ -196,7 +200,10 @@ unsafe extern "C" fn native(info: *const v8::FunctionCallbackInfo) {
             let mut bytes = vec![0u8; view.byte_length()];
             view.copy_contents(&mut bytes);
             let artifact = args.get(2).is_true();
-            match op_write(&path, &bytes, artifact) {
+            // the SDK's changedAnchors as JSON (the prelude): a list that
+            // does not read is no list, never a failed write
+            let changed = Some(args.get(3)).filter(|v| v.is_string()).and_then(|v| serde_json::from_str::<Vec<Anchor>>(&arg_string(&mut scope, v)).ok());
+            match op_write(&path, &bytes, artifact, changed) {
                 Ok(text) => {
                     if let Some(s) = v8::String::new(&scope, &text) {
                         rv.set(s.into());
@@ -334,6 +341,16 @@ fn run(bundle: &str, js: &str, name: &str) -> ! {
     });
     let global = v8::Global::new(tc, office);
     BUNDLE.with(|b| *b.borrow_mut() = Some(global));
+    // the bundle runs first, so run.write's prelude finds the SDK
+    // (`__biseOffice`: its changedAnchors, plan §9b)
+    if office.instantiate_module(tc, resolve).is_none() || office.evaluate(tc).is_none() {
+        let m = caught!(tc, "the office bundle failed to load");
+        fail(&m);
+    }
+    tc.perform_microtask_checkpoint();
+    let ns = office.get_module_namespace();
+    let key = v8::String::new(tc, "__biseOffice").unwrap();
+    let _ = context.global(tc).set(tc, key.into(), ns);
     let module = compile_module(tc, name, js).unwrap_or_else(|e| {
         let m = caught!(tc, &e);
         fail(&m)

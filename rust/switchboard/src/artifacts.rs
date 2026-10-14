@@ -12,6 +12,8 @@
 //! Plain functions over the state folder; the daemon's thread is the only
 //! writer, so there is no lock.
 
+use crate::artifacts_turns::{self, Place, Rev, Turn};
+use bise_proto::anchor::Anchor;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
@@ -42,6 +44,26 @@ pub struct Version {
     /// empty for a link.
     #[serde(default)]
     pub sig: String,
+    /// The turn of its first save, stamped by the hub (artifacts_turns):
+    /// a save in the same turn by the same agent replaces this version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn: Option<Turn>,
+    /// Its saves, oldest first (none in a store from before them: one).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub revs: Vec<Rev>,
+}
+
+impl Version {
+    /// Its newest save's number (1 for a version from before revs).
+    pub fn rev(&self) -> u32 {
+        self.revs.last().map_or(1, |r| r.rev)
+    }
+
+    /// What it changed from the version before, merged over its saves;
+    /// None: a save said nothing, so no detail.
+    pub fn changed(&self) -> Option<Vec<Anchor>> {
+        artifacts_turns::merged(&self.revs)
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -87,6 +109,12 @@ pub struct Add {
     /// (`bise office run`'s `run.write`, plan §2): another file is not
     /// added, the answer says so ([`Added::not_artifact`]).
     pub known_only: bool,
+    /// The turn it came in, stamped by the hub from sb-core's fact (never
+    /// from the request); None outside a turn.
+    pub turn: Option<Turn>,
+    /// What the save changed, as the writer said it (`bise office run`);
+    /// None: it said nothing.
+    pub changed: Option<Vec<Anchor>>,
 }
 
 /// The answer to an add.
@@ -100,6 +128,9 @@ pub struct Added {
     /// A `known_only` add of a file that is no artifact: nothing stored,
     /// `meta` is empty but for its `source`.
     pub not_artifact: bool,
+    /// A save in the same turn as the newest version (artifacts_turns):
+    /// its copy replaced, `v` the same, its rev grew.
+    pub replaced: bool,
 }
 
 /// A bise page as the page store keeps it (only what the list reads).
@@ -334,6 +365,22 @@ fn measure(p: &Path) -> (u64, u64, usize) {
     (bytes, newest, files)
 }
 
+/// Copy into a sibling `.<name>.part`, then rename over `to`: a reader
+/// (the viewer fetching the copy mid-save, architect m_23911) gets the
+/// old bytes or the new, never half a file.
+fn copy_whole(from: &Path, to: &Path) -> std::io::Result<()> {
+    let name = to.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let part = to.with_file_name(format!(".{name}.part"));
+    if part.is_dir() {
+        std::fs::remove_dir_all(&part)?;
+    }
+    copy_tree(from, &part)?;
+    if to.is_dir() {
+        std::fs::remove_dir_all(to)?;
+    }
+    std::fs::rename(&part, to)
+}
+
 fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
     if from.is_file() {
         if let Some(d) = to.parent() {
@@ -469,7 +516,7 @@ impl Store {
         if let Some(u) = &url {
             if let Some(id) = self.page_of_link(u) {
                 let p = pages.iter().find(|p| p.id == id).cloned().unwrap_or_default();
-                return Ok(Added { meta: page_meta(&p, self.pages_base().as_deref()), new_version: false, page: true, not_artifact: false });
+                return Ok(Added { meta: page_meta(&p, self.pages_base().as_deref()), new_version: false, page: true, not_artifact: false, replaced: false });
             }
         }
         let (source, target, kind) = match (&path, &url) {
@@ -482,7 +529,7 @@ impl Store {
         };
         if a.known_only && !stored.iter().any(|m| m.source == source) {
             let meta = Meta { source, ..Meta::default() };
-            return Ok(Added { meta, new_version: false, page: false, not_artifact: true });
+            return Ok(Added { meta, new_version: false, page: false, not_artifact: true, replaced: false });
         }
         let kind = a.kind.clone().unwrap_or_else(|| kind.to_string());
         let mut meta = match stored.iter().find(|m| m.source == source) {
@@ -535,10 +582,16 @@ impl Store {
             };
             if same_sig || same_bytes() {
                 self.save(&meta)?;
-                return Ok(Added { meta, new_version: false, page: false, not_artifact: false });
+                return Ok(Added { meta, new_version: false, page: false, not_artifact: false, replaced: false });
             }
         }
-        let v = meta.versions.last().map_or(1, |l| l.v + 1);
+        // a save in the same turn by the same agent: the newest version again
+        let same = artifacts_turns::place(meta.versions.last().and_then(|l| l.turn.as_ref()), a.turn.as_ref()) == Place::Same;
+        let v = match meta.versions.last() {
+            Some(l) if same => l.v,
+            Some(l) => l.v + 1,
+            None => 1,
+        };
         let (copy, no_copy) = match &path {
             Some(p) => {
                 let (bytes, _, files) = measure(p);
@@ -549,7 +602,7 @@ impl Store {
                 } else {
                     let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "file".into());
                     let rel = format!("v{}/{}", v, name);
-                    match copy_tree(p, &self.dir().join(&meta.id).join(&rel)) {
+                    match copy_whole(p, &self.dir().join(&meta.id).join(&rel)) {
                         Ok(()) => (Some(rel), None),
                         Err(e) => (None, Some(format!("copy failed: {}", e))),
                     }
@@ -557,9 +610,24 @@ impl Store {
             }
             None => (None, None),
         };
-        meta.versions.push(Version { v, at_ms: now, target, copy, no_copy, sig });
+        let rev = |revs: &[Rev]| Rev { rev: artifacts_turns::next_rev(revs), at_ms: now, changed: a.changed.clone() };
+        match meta.versions.last_mut() {
+            Some(last) if same => {
+                // the copy was replaced in place; the version moves to this save
+                if last.revs.is_empty() {
+                    last.revs.push(Rev { rev: 1, at_ms: last.at_ms, changed: None });
+                }
+                let r = rev(&last.revs);
+                last.revs.push(r);
+                *last = Version { at_ms: now, target, copy, no_copy, sig, ..last.clone() };
+            }
+            _ => {
+                let revs = vec![rev(&[])];
+                meta.versions.push(Version { v, at_ms: now, target, copy, no_copy, sig, turn: a.turn.clone(), revs });
+            }
+        }
         self.save(&meta)?;
-        Ok(Added { meta, new_version: true, page: false, not_artifact: false })
+        Ok(Added { meta, new_version: true, page: false, not_artifact: false, replaced: same })
     }
 
     /// Every artifact, stored ones and pages, newest first (the time of

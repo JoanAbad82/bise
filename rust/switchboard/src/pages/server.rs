@@ -161,13 +161,17 @@ fn handle(stream: TcpStream, pages: &Pages) {
     let _ = w.write_all(&resp.bytes());
 }
 
-/// `GET /p/<id>/events` (or `/events` for the home list): the page id.
+/// `GET /p/<id>/events` (or `/events` for the home list): the page id;
+/// `/a/<id>/events`: `a/<id>` (pages/artifact/events.rs).
 fn events_route(req: &Request) -> Option<String> {
     if req.method != "GET" {
         return None;
     }
     if req.path == "/events" {
         return Some(String::new());
+    }
+    if let Some(k) = super::artifact::events::route(&req.path) {
+        return Some(k);
     }
     let id = req.path.strip_prefix("/p/")?.strip_suffix("/events")?;
     valid_id(id).then(|| id.to_string())
@@ -509,7 +513,9 @@ fn events(w: &mut TcpStream, pages: &Pages, id: &str) {
     // frame) keeps the hub up; dropped when the stream ends
     let _hold = pages.holds.hold();
     let (tx, rx) = mpsc::channel::<String>();
-    let first = if id.is_empty() {
+    let first = if let Some(art) = id.strip_prefix("a/") {
+        super::artifact::events::first(pages, art)
+    } else if id.is_empty() {
         format!("event: pages\ndata: {}\n\n", json!({"pages": pages.list_json()}))
     } else {
         match pages.store.meta(id) {
@@ -728,7 +734,7 @@ mod tests {
         std::fs::write(work.join("notes.pdf"), b"%PDF-1.4").unwrap();
         let arts = crate::artifacts::Store::new(&d);
         let add = |target: &str| {
-            let a = crate::artifacts::Add { target: target.into(), title: None, kind: None, agent: "main".into(), by: "main".into(), cwd: work.to_string_lossy().to_string(), known_only: false };
+            let a = crate::artifacts::Add { target: target.into(), title: None, kind: None, agent: "main".into(), by: "main".into(), cwd: work.to_string_lossy().to_string(), known_only: false, ..Default::default() };
             arts.add(&a, 10).unwrap()
         };
         add("proof.html");

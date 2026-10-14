@@ -27020,14 +27020,14 @@ function shapeSel(deck, sldId, id, quote) {
     line(color2, width) {
       const { s, el: e } = el2();
       const spPr = shapeProps(e, s.index);
-      const outline2 = ensure(spPr, A6, "a:ln", [[A6, "effectLst"], [A6, "effectDag"], [A6, "scene3d"], [A6, "sp3d"], [A6, "extLst"]]);
-      for (const f2 of children(outline2, A6).filter((x2) => ["noFill", "solidFill", "gradFill", "pattFill"].includes(ln2(x2)))) remove(f2);
+      const outline3 = ensure(spPr, A6, "a:ln", [[A6, "effectLst"], [A6, "effectDag"], [A6, "scene3d"], [A6, "sp3d"], [A6, "extLst"]]);
+      for (const f2 of children(outline3, A6).filter((x2) => ["noFill", "solidFill", "gradFill", "pattFill"].includes(ln2(x2)))) remove(f2);
       if (width !== void 0) {
         if (!(typeof width === "number" && width >= 0 && width <= 100)) throw bad(`a line's width is in points, 0 to 100, got ${JSON.stringify(width)}`);
-        outline2.setAttribute("w", String(emu(width)));
+        outline3.setAttribute("w", String(emu(width)));
       }
       const f = frag(deck.store.doc(s.part), color2 === "none" ? "<a:noFill/>" : `<a:solidFill><a:srgbClr val="${hex2(color2)}"/></a:solidFill>`);
-      outline2.insertBefore(f, outline2.firstChild);
+      outline3.insertBefore(f, outline3.firstChild);
       return done(s);
     },
     rows: () => info2().rows ?? [],
@@ -29006,7 +29006,7 @@ var run = {
 };
 
 // src/core/diff.ts
-function flatten(outline2) {
+function flatten(outline3) {
   const out = [];
   const walk = (nodes) => {
     for (const n2 of nodes) {
@@ -29015,7 +29015,7 @@ function flatten(outline2) {
       if (children2) walk(children2);
     }
   };
-  walk(outline2.nodes);
+  walk(outline3.nodes);
   return out;
 }
 function diff(before, after) {
@@ -29052,6 +29052,137 @@ function stable(v) {
   return `{${Object.keys(o).filter((k) => o[k] !== void 0).sort().map((k) => `${JSON.stringify(k)}:${stable(o[k])}`).join(",")}}`;
 }
 
+// src/core/changed.ts
+var CHANGED_CAP = 24;
+function parents(outline3) {
+  const out = /* @__PURE__ */ new Map();
+  const walk = (nodes, parent) => {
+    for (const n2 of nodes) {
+      if (parent) out.set(n2.id, parent);
+      if (n2.children) walk(n2.children, n2);
+    }
+  };
+  walk(outline3.nodes);
+  return out;
+}
+var CONTAINERS = /* @__PURE__ */ new Set(["sheet", "slide", "table"]);
+function changedOf(before, after, cap2 = CHANGED_CAP) {
+  const d = diff(before, after);
+  const up = parents(after);
+  const upBefore = parents(before);
+  const listed = [...d.added, ...d.changed.map((c) => c.after)];
+  const childOf = new Set(listed.map((n2) => up.get(n2.id)?.id).filter((x2) => !!x2));
+  const out = [];
+  for (const n2 of listed) {
+    if (CONTAINERS.has(n2.type) && childOf.has(n2.id) && !d.added.some((a) => a.id === n2.id)) continue;
+    out.push(n2.anchor);
+  }
+  for (const n2 of d.removed) {
+    if (n2.anchor.kind === "cell" && n2.type === "cell") out.push(n2.anchor);
+    else if (n2.anchor.kind === "shape") {
+      const was = upBefore.get(n2.id);
+      const now = was && flatFind(after, was.id);
+      if (now) out.push(now.anchor);
+    }
+  }
+  return coarsen(dedupe(out), cap2);
+}
+function flatFind(o, id) {
+  const walk = (nodes) => {
+    for (const n2 of nodes) {
+      if (n2.id === id) return n2;
+      const c = n2.children && walk(n2.children);
+      if (c) return c;
+    }
+    return void 0;
+  };
+  return walk(o.nodes);
+}
+function dedupe(xs) {
+  const seen = /* @__PURE__ */ new Set();
+  return xs.filter((a) => {
+    const k = stable(a);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+function corners(range) {
+  const m = /^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/.exec(range.replace(/\$/g, "").toUpperCase());
+  if (!m) return null;
+  const c1 = colNum(m[1]);
+  const r1 = Number(m[2]);
+  const c2 = m[3] ? colNum(m[3]) : c1;
+  const r2 = m[4] ? Number(m[4]) : r1;
+  return [Math.min(c1, c2), Math.min(r1, r2), Math.max(c1, c2), Math.max(r1, r2)];
+}
+function colNum(s) {
+  let n2 = 0;
+  for (const ch of s) n2 = n2 * 26 + (ch.charCodeAt(0) - 64);
+  return n2;
+}
+function colName2(n2) {
+  let s = "";
+  while (n2 > 0) {
+    const r = (n2 - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n2 = Math.floor((n2 - 1) / 26);
+  }
+  return s;
+}
+function coarsen(xs, cap2) {
+  if (xs.length <= cap2) return xs;
+  const boxes = /* @__PURE__ */ new Map();
+  const out = [];
+  for (const a of xs) {
+    if (a.kind === "cell") {
+      const c = corners(a.range);
+      if (!c) continue;
+      const b = boxes.get(a.sheet);
+      if (!b) {
+        boxes.set(a.sheet, c);
+        out.push(a);
+      } else {
+        boxes.set(a.sheet, [Math.min(b[0], c[0]), Math.min(b[1], c[1]), Math.max(b[2], c[2]), Math.max(b[3], c[3])]);
+      }
+    } else if (a.kind === "shape") {
+      out.push({ kind: "slide", slide: a.slide });
+    } else {
+      out.push(a);
+    }
+  }
+  const boxed = out.map((a) => {
+    if (a.kind !== "cell") return a;
+    const [c1, r1, c2, r2] = boxes.get(a.sheet);
+    const range = c1 === c2 && r1 === r2 ? `${colName2(c1)}${r1}` : `${colName2(c1)}${r1}:${colName2(c2)}${r2}`;
+    return { kind: "cell", sheet: a.sheet, range };
+  });
+  return dedupe(boxed).slice(0, cap2);
+}
+
+// src/changed.ts
+async function outline2(bytes) {
+  switch (kindOf(bytes)) {
+    case "pptx":
+      return (await slides.open(bytes)).inspect();
+    case "xlsx":
+      return (await sheets.open(bytes)).inspect();
+    case "docx":
+      return (await docs.open(bytes)).inspect();
+    default:
+      return null;
+  }
+}
+async function changedAnchors(prev, next, cap2 = CHANGED_CAP) {
+  try {
+    if (kindOf(prev) === null || kindOf(prev) !== kindOf(next)) return null;
+    const [a, b] = await Promise.all([outline2(prev), outline2(next)]);
+    return a && b ? changedOf(a, b, cap2) : null;
+  } catch {
+    return null;
+  }
+}
+
 // src/core/raw.ts
 var raw_exports = {};
 __export(raw_exports, {
@@ -29079,9 +29210,12 @@ __export(raw_exports, {
 });
 export {
   ANCHOR_KINDS,
+  CHANGED_CAP,
   KINDS_OF,
   OfficeError,
   anchorFor,
+  changedAnchors,
+  changedOf,
   checkPackage,
   raw_exports as core,
   diff,

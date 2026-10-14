@@ -5,6 +5,8 @@
 //!
 //! - `GET /a/<id>/view`, `GET /a/<id>/<v>/view`: bise's viewer of an xlsx,
 //!   pptx or docx ([`view`]), the newest version or version `v`;
+//! - `GET /a/<id>/events`: the stream of its saves ([`events`]; server.rs
+//!   runs it, as `/p/<id>/events`);
 //! - `GET /kit/office/office.js`, `/kit/office/office-view.js`: the office
 //!   SDK's bundles, read from `office/dist` in the app root (one copy, never
 //!   in `kit/`, architect m_23781); the renderers beside them
@@ -13,6 +15,7 @@
 //!   artifact ([`notes`]; the POSTs through [`post`], server.rs's `/api`
 //!   arm, after its token and origin checks).
 
+pub mod events;
 pub mod notes;
 pub mod view;
 
@@ -89,7 +92,7 @@ mod tests {
         let p = Pages::new(&d, 47123, &d);
         let arts = crate::artifacts::Store::new(&d);
         let add = |file: &str, at: u64| {
-            let a = crate::artifacts::Add { target: file.into(), title: None, kind: None, agent: "office-lead".into(), by: "office-lead".into(), cwd: work.to_string_lossy().to_string(), known_only: false };
+            let a = crate::artifacts::Add { target: file.into(), title: None, kind: None, agent: "office-lead".into(), by: "office-lead".into(), cwd: work.to_string_lossy().to_string(), known_only: false, ..Default::default() };
             arts.add(&a, at).unwrap().meta
         };
         std::fs::write(work.join("q3.xlsx"), fixture("tiny.xlsx")).unwrap();

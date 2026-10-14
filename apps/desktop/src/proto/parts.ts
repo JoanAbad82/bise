@@ -20,7 +20,7 @@ export type PageNote = { block: string, kind: string, text?: string, quote?: str
  * with fn space: answer in one short line), the capsule's start (fn space
  * + tab: start an agent), his open steps (a capsule message).
  */
-export type HintKind = "capsule" | "capsule_start" | "steps" | "unknown";
+export type HintKind = "capsule" | "capsule_start" | "steps" | "notes" | "unknown";
 
 /**
  * One piece of his message.

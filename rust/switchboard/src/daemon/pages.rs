@@ -486,6 +486,8 @@ impl Shell {
     /// Push the `agent` frames that changed, on every page naming them;
     /// each page keeps its last frames for a new stream.
     pub(super) fn page_agent_push(&mut self) {
+        // the same typed state moves the artifacts' live words (art.rs)
+        self.art_live_watch();
         let Some(pages) = self.pg.pages.clone() else { return };
         let list: Vec<(String, Vec<String>)> = self.page_agents_now().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         // the agents at work on page items: their drafts wait; when one

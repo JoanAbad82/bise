@@ -12,7 +12,8 @@
 //! - a `wrote` line becomes the request `sb artifact add <path>` sends on
 //!   `SB_SOCKET` (built by `switchboard::cli::build`), with `known_only`
 //!   unless the script asked `{ artifact: true }`: whether the file is an
-//!   artifact is the hub's call. Its words go back to jsrt (`run.write`
+//!   artifact is the hub's call. Its `changed` (what the write changed,
+//!   from the SDK) goes on the request as `changed`. Its words go back to jsrt (`run.write`
 //!   resolves with them) and to stdout.
 //!
 //! stdout: the script's logs and the hub's words; stderr: the failure;
@@ -24,7 +25,8 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use bise_home::env::Child;
-use bise_proto::office::{HarnessCmd, JsrtEv};
+use bise_proto::anchor::Anchor;
+use bise_proto::office::{Changed, HarnessCmd, JsrtEv};
 use serde_json::{json, Value};
 
 const USAGE: &str = "usage: bise office run <script.ts> | bise office inspect <file> | bise office check <file>
@@ -79,7 +81,7 @@ pub fn main(args: &[String]) -> i32 {
         return 1;
     };
     let hub = Hub::from_env();
-    let end = relay(BufReader::new(from_jsrt), to_jsrt, |p, a| hub.tell(p, a), &mut std::io::stdout());
+    let end = relay(BufReader::new(from_jsrt), to_jsrt, |p, a, c| hub.tell(p, a, c), &mut std::io::stdout());
     let status = child.wait().ok().and_then(|s| s.code());
     match end {
         End::Done => 0,
@@ -126,15 +128,15 @@ enum End {
 
 /// Read jsrt's lines until it ends: logs to `out`, each `wrote` told to
 /// the hub (`tell`) and answered.
-fn relay(from: impl BufRead, mut to: impl Write, mut tell: impl FnMut(&str, bool) -> HarnessCmd, out: &mut impl Write) -> End {
+fn relay(from: impl BufRead, mut to: impl Write, mut tell: impl FnMut(&str, bool, Option<Vec<Anchor>>) -> HarnessCmd, out: &mut impl Write) -> End {
     for line in from.lines() {
         let Ok(line) = line else { break };
         match JsrtEv::decode(&line) {
             Ok(JsrtEv::Log { line }) => {
                 let _ = writeln!(out, "{line}");
             }
-            Ok(JsrtEv::Wrote { path, artifact }) => {
-                let answer = tell(&path, artifact);
+            Ok(JsrtEv::Wrote { path, artifact, changed }) => {
+                let answer = tell(&path, artifact, changed);
                 if let HarnessCmd::Answer { text, .. } = &answer {
                     if !text.is_empty() {
                         let _ = writeln!(out, "{text}");
@@ -167,11 +169,11 @@ impl Hub {
     }
 
     /// `sb artifact add <path>`'s request, the answer's words.
-    fn tell(&self, path: &str, artifact: bool) -> HarnessCmd {
+    fn tell(&self, path: &str, artifact: bool, changed: Option<Vec<Anchor>>) -> HarnessCmd {
         let Some((socket, agent)) = &self.socket else {
             return HarnessCmd::Answer { ok: true, text: format!("{path}: written; no bise agent here (no SB_SOCKET), so not an artifact") };
         };
-        let reply = add_request(path, artifact, agent).and_then(|req| {
+        let reply = add_request(path, artifact, changed, agent).and_then(|req| {
             switchboard::client::request_retry(Path::new(socket), &req, Duration::from_secs(180), false)
         });
         answer_of(reply)
@@ -179,13 +181,17 @@ impl Hub {
 }
 
 /// The request `sb artifact add <path>` sends, as `agent`; `known_only`
-/// unless the script asked for a new artifact.
-fn add_request(path: &str, artifact: bool, agent: &str) -> Result<Value, String> {
+/// unless the script asked for a new artifact; `changed`: what the write
+/// changed (`bise_proto::office::Changed`, read at the hub's door).
+fn add_request(path: &str, artifact: bool, changed: Option<Vec<Anchor>>, agent: &str) -> Result<Value, String> {
     let mut req = switchboard::cli::build(&["artifact".into(), "add".into(), path.into()])?;
     req["op"] = json!("agent");
     req["from"] = json!(agent);
     if !artifact {
         req["known_only"] = json!(true);
+    }
+    if let Some(c) = changed {
+        req["changed"] = json!(Changed(c));
     }
     Ok(req)
 }
@@ -224,11 +230,14 @@ mod tests {
     /// plain `run.write` (architect m_23785).
     #[test]
     fn a_write_is_the_sb_artifact_add_request() {
-        let r = add_request("/w/q3.pptx", false, "deck").unwrap();
+        let r = add_request("/w/q3.pptx", false, None, "deck").unwrap();
         assert_eq!((r["cmd"].as_str(), r["do"].as_str(), r["target"].as_str()), (Some("artifact"), Some("add"), Some("/w/q3.pptx")));
         assert_eq!((r["op"].as_str(), r["from"].as_str(), r["known_only"].as_bool()), (Some("agent"), Some("deck"), Some(true)));
-        let r = add_request("/w/q3.pptx", true, "deck").unwrap();
+        assert!(r.get("changed").is_none(), "no list: no field");
+        let r = add_request("/w/q3.pptx", true, Some(vec![Anchor::Slide { slide: 2, rect: None }]), "deck").unwrap();
         assert!(r.get("known_only").is_none());
+        assert_eq!(r["changed"], json!([{"kind": "slide", "slide": 2}]));
+        assert_eq!(Changed::of_request(&r).unwrap().0.len(), 1, "the hub reads what the harness sends");
     }
 
     #[test]
@@ -250,7 +259,7 @@ mod tests {
         ]
         .join("\n");
         let (mut to, mut out, mut told) = (Vec::new(), Vec::new(), Vec::new());
-        let end = relay(lines.as_bytes(), &mut to, |p, a| {
+        let end = relay(lines.as_bytes(), &mut to, |p, a, _| {
             told.push((p.to_string(), a));
             HarnessCmd::Answer { ok: true, text: "q3 · v2".into() }
         }, &mut out);
@@ -258,8 +267,8 @@ mod tests {
         assert_eq!(told, [("/w/q3.pptx".to_string(), false)]);
         assert_eq!(String::from_utf8(to).unwrap(), "{\"cmd\":\"answer\",\"ok\":true,\"text\":\"q3 · v2\"}\n");
         assert_eq!(String::from_utf8(out).unwrap(), "3 slides\nq3 · v2\n{\"ev\":\"progress\",\"n\":1}\n");
-        let end = relay(r#"{"ev":"error","message":"run.read: no file at x"}"#.as_bytes(), Vec::new(), |_, _| unreachable!(), &mut Vec::new());
+        let end = relay(r#"{"ev":"error","message":"run.read: no file at x"}"#.as_bytes(), Vec::new(), |_, _, _| unreachable!(), &mut Vec::new());
         assert_eq!(end, End::Failed("run.read: no file at x".into()));
-        assert_eq!(relay(&b""[..], Vec::new(), |_, _| unreachable!(), &mut Vec::new()), End::Silent);
+        assert_eq!(relay(&b""[..], Vec::new(), |_, _, _| unreachable!(), &mut Vec::new()), End::Silent);
     }
 }

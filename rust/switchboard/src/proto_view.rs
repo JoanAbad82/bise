@@ -330,12 +330,19 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>, frame_ba
                 .map(|b| format!("{b}{}", crate::pages::site::frame_href(&id, version, &s(r, "copy"), true)));
             let versions = r.get("versions").and_then(Value::as_array).map_or_else(Vec::new, |vs| {
                 vs.iter()
-                    .map(|v| ArtifactVersion {
-                        v: v.get("v").and_then(Value::as_u64).unwrap_or(0) as u32,
-                        at_ms: v.get("ts_ms").and_then(Value::as_u64).unwrap_or(0),
-                        note: Some(s(v, "note")).filter(|n| !n.is_empty()),
-                        target: s(v, "target"),
-                        copy: Some(s(v, "copy")).filter(|c| !c.is_empty()),
+                    .map(|x| {
+                        let n = x.get("v").and_then(Value::as_u64).unwrap_or(0);
+                        ArtifactVersion {
+                            v: n as u32,
+                            at_ms: x.get("ts_ms").and_then(Value::as_u64).unwrap_or(0),
+                            note: Some(s(x, "note")).filter(|n| !n.is_empty()),
+                            target: s(x, "target"),
+                            copy: Some(s(x, "copy")).filter(|c| !c.is_empty()),
+                            // the row's rule, per version (architect m_23970)
+                            frame_url: frame_base
+                                .filter(|_| !crate::artifacts::is_link(&s(x, "target")) && crate::pages::site::serves_copy(&s(r, "by"), &s(x, "copy")))
+                                .map(|b| format!("{b}{}", crate::pages::site::frame_href(&id, n, &s(x, "copy"), n == version))),
+                        }
                     })
                     .collect()
             });
@@ -361,6 +368,8 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>, frame_ba
                 detail: s(r, "detail"),
                 pr,
                 keys: r.get("keys").and_then(Value::as_array).map_or_else(Vec::new, |k| k.iter().filter_map(|x| x.as_str().map(String::from)).collect()),
+                // daemon/art.rs art_live_rows: bise_proto::office::live_words
+                live: r.get("live").and_then(|l| serde_json::from_value(l.clone()).ok()),
                 target,
             }
         })
@@ -755,6 +764,28 @@ mod tests {
         let notes: Vec<(u32, u64, Option<&str>)> = a[1].versions.iter().map(|x| (x.v, x.at_ms, x.note.as_deref())).collect();
         assert_eq!(notes, [(1, 80, None), (2, 90, Some("no copy: too big"))], "the store's versions, oldest first, its words");
         assert!(a[0].versions.is_empty(), "a row without versions has none");
+    }
+
+    /// architect m_23970: each version's frame_url is the row's rule
+    /// (pages::site::frame_href) for that version; art-live: the row's
+    /// live words come through as the store's row has them.
+    #[test]
+    fn each_version_gets_its_frame_url_and_the_row_its_live_words() {
+        let ev = json!({"ev": "artifacts", "seen_ms": 0, "rows": [
+            {"id": "q3", "kind": "slides", "title": "q3.pptx", "agent": "deck", "by": "deck", "ts_ms": 90, "v": 2,
+             "target": "/w/q3.pptx", "copy": "/st/artifacts/q3/v2/q3.pptx", "live": {"line": "v2 · 1 slide changed", "back": {"text": "← v1", "v": 1}}, "versions": [
+                {"v": 1, "ts_ms": 80, "target": "/w/q3.pptx", "copy": "/st/artifacts/q3/v1/q3.pptx"},
+                {"v": 2, "ts_ms": 90, "target": "/w/q3.pptx", "copy": "/st/artifacts/q3/v2/q3.pptx"},
+                {"v": 3, "ts_ms": 95, "target": "/w/q3.pptx", "copy": null}]}]});
+        let base = "http://127.0.0.1:47123";
+        let a = artifacts(&ev, |_| None, Some(base));
+        let urls: Vec<Option<String>> = a[0].versions.iter().map(|x| x.frame_url.clone()).collect();
+        let href = |v: u64, newest: bool| Some(format!("{base}{}", crate::pages::site::frame_href("q3", v, "/st/artifacts/q3/v1/q3.pptx", newest)));
+        assert_eq!(urls, [href(1, false), href(2, true), None], "older: /a/q3/1/view, newest: /a/q3/view, no copy: none");
+        assert_eq!(a[0].frame_url, urls[1], "the row's and its newest version's are the same");
+        assert_eq!(a[0].live.as_ref().and_then(|l| l.line.as_deref()), Some("v2 · 1 slide changed"));
+        assert_eq!(a[0].live.as_ref().and_then(|l| l.back.as_ref()).map(|b| b.v), Some(1));
+        assert!(artifacts(&ev, |_| None, None)[0].versions.iter().all(|x| x.frame_url.is_none()), "no page server: none");
     }
 
     #[test]

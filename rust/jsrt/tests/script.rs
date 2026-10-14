@@ -103,6 +103,25 @@ await run.write("plain.docx", bytes);
     assert_eq!(std::fs::read(work.join("copy.docx")).unwrap(), std::fs::read(work.join("tiny.docx")).unwrap());
 }
 
+/// plan §9b: a write over a file says what changed (the SDK's
+/// changedAnchors on the file as it was); a new file says nothing.
+#[test]
+fn a_write_over_a_file_says_what_changed() {
+    let (_d, work, tmp, _) = scratch("changed");
+    std::fs::copy(repo().join("office/fixtures/tiny.pptx"), work.join("q3.pptx")).unwrap();
+    let s = script(&work, r#"
+import { run, slides } from "@bise/office";
+const deck = await slides.open(await run.read("q3.pptx"));
+deck.at({ kind: "shape", slide: 1, shape: "3" }).replace("4%", "5%");
+await run.write("q3.pptx", await deck.save());
+"#);
+    let (code, lines) = run("script", &s, &work, &tmp, OK);
+    assert_eq!(code, 0, "{lines:?}");
+    let wrote: serde_json::Value = serde_json::from_str(&lines[0]).unwrap();
+    assert_eq!(wrote["ev"], "wrote", "{lines:?}");
+    assert_eq!(wrote["changed"], json!([{"kind": "shape", "slide": 1, "shape": "3"}]), "{lines:?}");
+}
+
 #[test]
 fn a_door_refusal_fails_the_script_with_the_roots() {
     let (_d, work, tmp, out) = scratch("door");

@@ -35,6 +35,13 @@ pub(super) struct Art {
     busy: BTreeSet<String>,
     /// An edit came while busy or too soon: ask again at the next idle.
     stale: BTreeSet<String>,
+    /// The artifacts whose newest version's turn still ran at their last
+    /// live frame: id -> (maker, its turn's start). When sb-core says that
+    /// turn is over, their `live` frame and the list go again.
+    live: BTreeMap<String, (String, u64)>,
+    /// The live words' cache was filled at the first state push after the
+    /// hub started (events::seed).
+    seeded: bool,
 }
 
 /// Where an agent works and what its changes are measured against.
@@ -64,14 +71,96 @@ impl Shell {
         }
     }
 
+    /// The turn `agent` is in now, from sb-core's view (its `turn_ms`):
+    /// the stamp of a save, never read from the request (artifacts_turns).
+    fn art_turn(&self, agent: &str) -> Option<crate::artifacts_turns::Turn> {
+        let a = self.hub.st.agents.get(agent)?;
+        a.turn_started_ms.map(|started_ms| crate::artifacts_turns::Turn { agent: a.name.clone(), started_ms })
+    }
+
+    /// When the turn of the agent that made `v` started, if it runs now.
+    fn art_maker_turn(&self, v: &artifacts::Version) -> Option<u64> {
+        let t = v.turn.as_ref()?;
+        self.hub.st.agents.get(&t.agent)?.turn_started_ms
+    }
+
+    /// Each stored artifact's live words, by id (the rows' `live`).
+    fn art_live_rows(&self, store: &Store, rows: &mut [Value]) {
+        let metas: BTreeMap<String, artifacts::Meta> = store.stored().into_iter().map(|m| (m.id.clone(), m)).collect();
+        for r in rows.iter_mut() {
+            let Some(v) = r.get("id").and_then(Value::as_str).and_then(|id| metas.get(id)).and_then(|m| m.current()) else { continue };
+            if let Some(live) = crate::artifacts_turns::live(v, self.art_maker_turn(v)) {
+                r["live"] = json!(live);
+            }
+        }
+    }
+
+    /// A new save of `m`: its `version` frame on the viewer's
+    /// `/a/<id>/events` (pages/artifact/events.rs), and its turn watched
+    /// for the frame that follows the turn's end.
+    fn art_live_push(&mut self, m: &artifacts::Meta) {
+        let Some(v) = m.current() else { return };
+        let maker = self.art_maker_turn(v);
+        match (&v.turn, maker) {
+            (Some(t), Some(at)) if t.started_ms == at => {
+                self.art.live.insert(m.id.clone(), (t.agent.clone(), at));
+            }
+            _ => {
+                self.art.live.remove(&m.id);
+            }
+        }
+        if let Some(pages) = self.pg.pages.clone() {
+            crate::pages::artifact::events::push_version(&pages, &m.id, v, crate::artifacts_turns::live(v, maker));
+        }
+    }
+
+    /// The state changed (push_state): an artifact whose maker's turn
+    /// ended since its last frame gets its `live` frame (the line now)
+    /// and the list goes again. Read from sb-core's view, never a line.
+    /// The first time with a page server: the words' cache seeded for
+    /// every artifact (a stream opened after a restart starts right).
+    pub(super) fn art_live_watch(&mut self) {
+        if !self.art.seeded {
+            if let Some(pages) = self.pg.pages.clone() {
+                self.art.seeded = true;
+                let running = crate::pages::artifact::events::seed(&pages, &self.art_store(), |v| self.art_maker_turn(v));
+                for (id, agent, at) in running {
+                    self.art.live.insert(id, (agent, at));
+                }
+            }
+        }
+        let ended: Vec<String> = self
+            .art
+            .live
+            .iter()
+            .filter(|(_, (agent, at))| self.hub.st.agents.get(agent).and_then(|a| a.turn_started_ms) != Some(*at))
+            .map(|(id, _)| id.clone())
+            .collect();
+        if ended.is_empty() {
+            return;
+        }
+        let store = self.art_store();
+        for id in &ended {
+            self.art.live.remove(id);
+            let Some(m) = store.get(id) else { continue };
+            let Some(v) = m.current() else { continue };
+            if let Some(pages) = self.pg.pages.clone() {
+                crate::pages::artifact::events::push_live(&pages, id, crate::artifacts_turns::live(v, self.art_maker_turn(v)));
+            }
+        }
+        self.artifacts_refresh(false);
+    }
+
     /// `{"ev":"artifacts","rows":[…],"new":N,"seen_ms":T}`.
     pub(super) fn artifacts_ev(&self) -> Value {
         let store = self.art_store();
         let who = self.art_who();
         let now = now_ms();
+        let mut rows = store.rows(&who, &self.hub.workspace);
+        self.art_live_rows(&store, &mut rows);
         json!({
             "ev": "artifacts",
-            "rows": store.rows(&who, &self.hub.workspace),
+            "rows": rows,
             "new": store.new_count(now),
             "seen_ms": store.seen_ms(now),
         })
@@ -118,7 +207,7 @@ impl Shell {
                 Where::Checkout { dir, .. } | Where::Shared { dir, .. } => dir.to_string_lossy().to_string(),
             })
             .unwrap_or_else(|| self.hub.workspace.clone());
-        let add = Add { target: target.to_string(), title, kind: None, agent, by: "you".into(), cwd, known_only: false };
+        let add = Add { target: target.to_string(), title, kind: None, agent, by: "you".into(), cwd, known_only: false, ..Default::default() };
         let a = self.art_store().add(&add, now_ms())?;
         if a.new_version {
             self.art_lines(&a);
@@ -140,11 +229,18 @@ impl Shell {
                     by: from.to_string(),
                     cwd: s("cwd"),
                     known_only: v.get("known_only") == Some(&json!(true)),
+                    // the turn from sb-core's fact, never from the request
+                    turn: self.art_turn(from),
+                    changed: bise_proto::office::Changed::of_request(v).map(|c| c.0),
                 };
                 match store.add(&add, now_ms()) {
                     Ok(a) => {
                         if a.new_version {
-                            self.art_lines(&a);
+                            // a save in the same turn is the same version: no new line
+                            if !a.replaced {
+                                self.art_lines(&a);
+                            }
+                            self.art_live_push(&a.meta);
                         }
                         self.artifacts_refresh(false);
                         json!({"ok": true, "text": artifacts::added_text(&a), "id": a.meta.id})

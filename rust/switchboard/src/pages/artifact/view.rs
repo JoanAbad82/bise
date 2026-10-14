@@ -71,6 +71,7 @@ pub fn shell(s: &Shown) -> String {
 <script src=\"/kit/notes.js\" defer></script>
 <script type=\"module\" src=\"/kit/office/viewer.js\"></script>
 <script type=\"module\" src=\"/kit/office/select.js\"></script>
+<script type=\"module\" src=\"/kit/office/swap.js\"></script>
 </head>
 <body>
 <main id=\"bise-office\" data-artifact=\"{id}\" data-kind=\"{kind}\" data-version=\"{v}\" data-latest=\"{latest}\"{follows} data-file=\"{file}\" data-name=\"{name}\" data-agent=\"{agent}\" data-title=\"{title}\">
@@ -172,6 +173,8 @@ mod tests {
         assert!(html.contains("<meta name=\"bise-token\" content=\"t0k\">"));
         let order: Vec<usize> = ["notes-anchors.js", "/kit/notes.js", "office/viewer.js", "office/select.js"].iter().map(|f| html.find(f).unwrap()).collect();
         assert!(order.windows(2).all(|w| w[0] < w[1]), "anchors, notes, viewer, select");
+        // art-live: the swap in place, after the viewer (window.biseOffice)
+        assert!(html.contains("<script type=\"module\" src=\"/kit/office/swap.js\"></script>"));
         assert!(!html.contains("<script>"), "no inline script: the CSP would refuse it");
         assert!(shell(&Shown { follows: true, ..s }).contains("data-follows"));
     }

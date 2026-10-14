@@ -21,6 +21,7 @@ fn add(store: &Store, cwd: &Path, target: &str, title: Option<&str>, now: u64) -
             by: "pricing-page".into(),
             cwd: cwd.to_string_lossy().to_string(),
             known_only: false,
+            ..Default::default()
         },
         now,
     )

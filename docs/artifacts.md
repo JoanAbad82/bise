@@ -61,6 +61,56 @@ only writer):
   says `no copy kept (over 50 MB)`.
 - `seen.json`: `{seen_ms}`, when the user last looked (the header's
   `↗ N new`). Missing: written as now.
+
+### Versions per turn, revs, changed (office-artifacts §6, art-live)
+
+An agent that saves a file 30 times in one turn makes one version, not
+30 rows (`artifacts_turns.rs`, pure, with its laws):
+
+- **The turn** is stamped by the hub at its door (`daemon/art.rs`
+  `art_turn`) from sb-core's fact, the agent's `turn_ms` (when its turn
+  started), never from the request: `turn: {agent, started_ms}` on the
+  version. The user's add and a save outside a turn have none.
+- **A save by the same agent in the same turn as the newest version**
+  replaces that version's copy (`v<n>/<name>`, written as a `.part` then
+  renamed: a reader never gets half a file); `v` stays n, `at_ms` moves
+  to the save, a rev is added. Anything else is v n+1. A save of the
+  same bytes is still "unchanged".
+- **Revs**: `versions[].revs: [{rev, at_ms, changed?}]`, oldest first (a
+  version from before revs reads as rev 1). The add's answer and the
+  thread line come once per version: a replace makes no new `sb
+  artifact` line.
+- **changed**: what a save changed from the file it replaced, as a short
+  list of `Anchor`s (bise_proto::anchor). `bise office run`'s `run.write`
+  reads the file on disk first and calls the SDK's `changedAnchors(prev,
+  next)` (office/sdk/src/core/changed.ts: an edited shape is its anchor,
+  a removed shape its slide, cells past 24 one box per sheet); jsrt's
+  `wrote` carries it, the harness puts it on the add request as
+  `changed`, the hub reads it with `bise_proto::office::Changed` (cut at
+  24; not a list: none). A version's list is its revs' together
+  (`artifacts_turns::merged`); a rev with none (`sb artifact add`) leaves
+  the version with none: no detail.
+- **The live words** (`bise_proto::office::live_words`, signed by
+  designer m_23868), one function for the row and the viewer: while the
+  turn that made the newest version runs, `strip` `∿ deck is updating ·
+  slide 2` (where its newest save was); after it, `line` `v3 · 2 slides
+  changed` (`v3` with no detail) and `back` `{text: "← v2", v: 2}`, a
+  link drawn 16 px after it that opens v2; v1 at rest: none. The row has
+  them as `live: {strip?, line?, back?}`; the windows draw them (text-2;
+  green is only the change mark) and decide only when `line` goes (he
+  switched or closed).
+- **Events**: the page server's `GET /a/<id>/events` (SSE,
+  `pages/artifact/events.rs`, on the pages' subs map under `a/<id>`):
+  `version {n, rev, changed, rev_changed, live}` at each save, `live
+  {strip?, line?, back?}` when sb-core says the maker's turn is over (the hub
+  watches its typed state at each state push, `art_live_watch`, never a
+  text line), and art-notes' `notes`. A new stream starts with the
+  newest `version`. The viewer (`kit/office/swap.js`) fetches
+  `/a/<id>/<n>/<file>?rev=<r>` (every response is `no-store`), swaps in
+  place keeping his place, outlines `rev_changed` in --term-ok for 2 s,
+  dots the rail thumbs and sheet tabs `changed` names until he looks
+  there, and draws the words in a 28 px strip unless the desktop's panel
+  frames it (`window.name` `bise-app`: the panel draws the row's).
 - `archived.json`: `{"<id>": <archived at ms>}`, the archived artifacts
   (stored ones and pages alike; `artifacts_archive.rs`).
 

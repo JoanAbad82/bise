@@ -11,6 +11,8 @@ export { OfficeError, type OfficeErrorCode } from "./core/errors.ts";
 export { ANCHOR_KINDS, KINDS_OF, readAnchor, anchorFor, type Anchor, type AnchorKind, type Rect } from "./core/anchor.ts";
 export type { Outline, OutlineNode, Problem, Selection, OfficeFile } from "./core/outline.ts";
 export { diff, flatten, type OutlineDiff, type Change } from "./core/diff.ts";
+export { changedOf, CHANGED_CAP } from "./core/changed.ts";
+export { changedAnchors } from "./changed.ts";
 export { openPackage, kindOf, checkPackage, type Package } from "./core/package.ts";
 
 // the core the modules build on, for an agent that needs a raw part

@@ -68,6 +68,10 @@ pub struct Pages {
     to_hub: Mutex<Option<ToHub>>,
     /// each page's last `progress` frames
     progress: Mutex<HashMap<String, std::collections::VecDeque<String>>>,
+    /// each artifact's last live words, for a new stream's first frame
+    /// (pages/artifact/events.rs; the hub knows the maker's turn, this
+    /// thread does not)
+    pub(crate) art_live: Mutex<HashMap<String, Value>>,
     /// the agents at work now (the hub sets it: `set_busy`)
     busy: Mutex<std::collections::BTreeSet<String>>,
     /// (page, agent) → the page's version when that agent became done
@@ -137,6 +141,7 @@ impl Pages {
             subs: Mutex::new(HashMap::new()),
             to_hub: Mutex::new(None),
             progress: Mutex::new(HashMap::new()),
+            art_live: Mutex::new(HashMap::new()),
             busy: Mutex::new(std::collections::BTreeSet::new()),
             done_at: Mutex::new(HashMap::new()),
             holds: crate::idle::Holds::default(),

@@ -1,5 +1,6 @@
 {"ev":"log","line":"3 slides"}
 {"ev":"wrote","path":"/w/q3.pptx"}
 {"ev":"wrote","path":"/w/plan.xlsx","artifact":true}
+{"ev":"wrote","path":"/w/q3.pptx","changed":[{"kind":"shape","slide":2,"shape":"3"},{"kind":"slide","slide":5}]}
 {"ev":"done"}
 {"ev":"error","message":"run.write: /etc/x.docx is outside the folders a script may use: /w, /t"}

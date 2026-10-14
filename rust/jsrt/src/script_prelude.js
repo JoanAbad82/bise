@@ -17,9 +17,20 @@
 
   g.__biseOfficeHost = {
     read: async (path) => __office_read(String(path)),
+    // what the write changed from the file it replaces (plan §9b): the
+    // SDK's changedAnchors (g.__biseOffice, set by script.rs once the
+    // bundle ran) on the file as it is on disk; none for a new file
     write: async (path, bytes, opts) => {
       if (!(bytes instanceof Uint8Array)) throw new TypeError('run.write(path, bytes): bytes must be a Uint8Array');
-      return __office_write(String(path), bytes, !!(opts && opts.artifact));
+      let changed;
+      const sdk = g.__biseOffice;
+      if (sdk && typeof sdk.changedAnchors === 'function') {
+        let prev = null;
+        try { prev = __office_read(String(path)); } catch (e) { prev = null; }
+        const list = prev ? await sdk.changedAnchors(prev, bytes) : null;
+        if (list) changed = JSON.stringify(list);
+      }
+      return __office_write(String(path), bytes, !!(opts && opts.artifact), changed);
     },
   };
 })();

@@ -685,7 +685,13 @@ pr?: ArtifactPr | null,
  * the words a search matches (its links, bare and full; its paths,
  * absolute and from the workspace)
  */
-keys?: Array<string>, };
+keys?: Array<string>, 
+/**
+ * the side panel's live words while its maker saves it
+ * (`bise_proto::office::live_words`, the same the viewer's
+ * `/a/<id>/events` sends); none for a page, a link, or v1 at rest
+ */
+live?: ArtifactLive | null, };
 
 /**
  * An artifact that is a pull request: its repo (`owner/name`) and number.
@@ -697,7 +703,43 @@ export type ArtifactPr = { repo: string, number: number, };
  * TUI's /artifacts words for it (a page's 'n notes open', 'no copy: …'),
  * printed as they are; its target and the store's copy of it.
  */
-export type ArtifactVersion = { v: number, at_ms: number, note?: string | null, target?: string, copy?: string | null, };
+export type ArtifactVersion = { v: number, at_ms: number, note?: string | null, target?: string, copy?: string | null, 
+/**
+ * where a window frames this version (the row's rule,
+ * pages::site::frame_href: `/a/<id>/view` for the newest office file,
+ * `/a/<id>/<v>/view` for an older one, else its copy's link); none
+ * with no copy served or no page server (architect m_23970)
+ */
+frame_url?: string | null, };
+
+/**
+ * The words a window draws over an artifact its maker saves while he
+ * looks (office-artifacts plan §6, designer m_23868): one of the two at
+ * a time. The window draws them as they are and decides nothing but
+ * when he switched away or closed it (then `line` goes).
+ */
+export type ArtifactLive = { 
+/**
+ * while the maker's turn that made the newest version runs: the
+ * 28 px strip, `∿ deck is updating · slide 2`
+ */
+strip?: string, 
+/**
+ * once that turn ended: `v3 · 2 slides changed`, drawn with
+ * [`ArtifactLive::back`] 16 px after it
+ */
+line?: string, 
+/**
+ * with `line`: the link to the version before (`← v2`, text-2,
+ * underline on hover, opens that version; designer m_24118)
+ */
+back?: ArtifactBack, };
+
+/**
+ * The `← v2` link after an artifact's live line: its words and the
+ * version it opens.
+ */
+export type ArtifactBack = { text: string, v: number, };
 
 /**
  * A live scheduled task of a project (`sb every`), the `scheduled`

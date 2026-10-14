@@ -70,6 +70,44 @@ pub struct Artifact {
     /// absolute and from the workspace)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub keys: Vec<String>,
+    /// the side panel's live words while its maker saves it
+    /// (`bise_proto::office::live_words`, the same the viewer's
+    /// `/a/<id>/events` sends); none for a page, a link, or v1 at rest
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub live: Option<ArtifactLive>,
+}
+
+/// The words a window draws over an artifact its maker saves while he
+/// looks (office-artifacts plan §6, designer m_23868): one of the two at
+/// a time. The window draws them as they are and decides nothing but
+/// when he switched away or closed it (then `line` goes).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ArtifactLive {
+    /// while the maker's turn that made the newest version runs: the
+    /// 28 px strip, `∿ deck is updating · slide 2`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub strip: Option<String>,
+    /// once that turn ended: `v3 · 2 slides changed`, drawn with
+    /// [`ArtifactLive::back`] 16 px after it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub line: Option<String>,
+    /// with `line`: the link to the version before (`← v2`, text-2,
+    /// underline on hover, opens that version; designer m_24118)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub back: Option<ArtifactBack>,
+}
+
+/// The `← v2` link after an artifact's live line: its words and the
+/// version it opens.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ArtifactBack {
+    pub text: String,
+    pub v: u32,
 }
 
 /// An artifact that is a pull request: its repo (`owner/name`) and number.
@@ -94,5 +132,11 @@ pub struct ArtifactVersion {
     pub target: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub copy: Option<String>,
+    /// where a window frames this version (the row's rule,
+    /// pages::site::frame_href: `/a/<id>/view` for the newest office file,
+    /// `/a/<id>/<v>/view` for an older one, else its copy's link); none
+    /// with no copy served or no page server (architect m_23970)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame_url: Option<String>,
 }
 

@@ -26,6 +26,7 @@ bise_home::test_home!();
 pub mod agents_md;
 pub mod approvals;
 pub mod artifacts;
+pub mod artifacts_turns;
 pub mod attached;
 pub mod board;
 pub mod boot;
