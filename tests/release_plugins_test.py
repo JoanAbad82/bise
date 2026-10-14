@@ -3,7 +3,8 @@
 
 scripts/versions.sh copies the whole repo `plugins/` into a version's app root, and bend_plugins
 (rust/plugins/src/resolve.rs builtin_root) loads that folder as built-in, on for every user. So
-whatever sits in `plugins/` ships. Only `computer` may be there. The repo's own QA plugin lives in
+whatever sits in `plugins/` ships. Only `computer` and the office plugins (`sheets`, `slides`,
+`docs`: docs/office.md, plan §3) may be there. The repo's own QA plugin lives in
 `dev/plugins/ambient-qa`, which versions.sh never copies (not .agents/plugins: the main checkout's
 .git/info/exclude hides that folder, so a land there silently dropped every file, 4e34639a).
 Offline, no build: `python3 tests/release_plugins_test.py`."""
@@ -12,7 +13,7 @@ import re
 import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SHIPPED = ["computer"]
+SHIPPED = ["computer", "docs", "sheets", "slides"]
 
 
 def main():

@@ -525,6 +525,8 @@ if [ "$mode" = full ]; then
   if [ $rc = 0 ]; then (cd rust && cargo test --offline -q -p bise-proto --features ts --test ts) || { echo "FAIL proto_ts"; rc=1; }; fi
   # the committed office SDK bundle is what its sources build (docs/office.md)
   if [ $rc = 0 ]; then tests/office_check.sh strict || { echo "FAIL office_check"; rc=1; }; fi
+  # the office skills' scripts run on the SDK of this tree (plugins/{sheets,slides,docs})
+  if [ $rc = 0 ]; then python3 tests/office_skills_check.py strict || { echo "FAIL office_skills"; rc=1; }; fi
   # and the desktop itself builds and passes its checks on those types (B3)
   if [ $rc = 0 ] && [ -n "$dwhy" ]; then desktop_check strict || rc=1; fi
   # every binary built runs on the macOS target (BISE-164): the Bend ones,
@@ -632,7 +634,10 @@ for f in $changed; do
     apps/desktop/src/proto/*) proto_ts=1 ;;
     # bise-proto's Anchor, generated for the SDK too (architect m_23712)
     office/sdk/src/anchor.gen.ts) proto_ts=1; office=1 ;;
-    office/*|kit/office/*) office=1 ;;
+    office/*) office=1; office_skills=1 ;;
+    kit/office/*) office=1 ;;
+    # the skills teach the SDK through bise office run (architect m_23951)
+    plugins/sheets/*|plugins/slides/*|plugins/docs/*|rust/jsrt/*) office_skills=1 ;;
   esac
 done
 step() {  # <name> <cmd...>: one line when green, the failures and the log when red
@@ -680,6 +685,8 @@ fi
 [ "${proto_ts:-0}" = 1 ] && step proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"
 # the office SDK: office/dist/office.js is what office/sdk/src builds, and its tests pass on it
 [ "${office:-0}" = 1 ] && step office_check tests/office_check.sh
+# the office skills' scripts, through bise office run (skipped with words when bise or bend-jsrt is not built)
+[ "${office_skills:-0}" = 1 ] && step office_skills python3 tests/office_skills_check.py
 # then the desktop's own checks, when the change reaches it (tests/test_map.py desktop)
 if [ -n "$changed" ] && [ -n "$(desktop_why $changed)" ]; then desktop_check || exit 1; fi
 wait "$clippy_pid"

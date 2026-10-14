@@ -1,0 +1,8 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "slides",
+  "version": "0.1.0",
+  "description": "pptx: make, read and edit PowerPoint decks (bise office run)",
+  "homepage": "https://bise.dev",
+  "license": "Apache-2.0"
+}

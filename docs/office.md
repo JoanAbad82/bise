@@ -336,6 +336,29 @@ The SDK's `readAnchor(v)` refuses an unknown kind (`anchor_kind`) or a bad
 field (`anchor_shape`) with words, never guesses; `anchorFor(fileKind, v)`
 also refuses another file type's anchor (`anchor_kind_mismatch`).
 
+## The plugins: how agents learn the SDK
+
+`plugins/sheets`, `plugins/slides`, `plugins/docs` (plan §3): built-in,
+on by default (no `dev.bise` default off), one skill each. `SKILL.md`
+(under 120 lines) is the loop: inspect, edit by id, `run.write` to the
+artifact's path (its next version), `check()`, fix; and how to answer
+the user's `<artifact-notes>` and `<artifact-selection>` by passing their
+anchor to `at()`. Beside it: `api.md`, `recipes.md`, `style.md`,
+`check.md` (and `comments.md` for docs), written against this SDK in our
+own words.
+
+- **They stay true**: `tests/office_skills_check.py` runs every whole
+  script of the skills (SKILL.md, recipes.md, comments.md) through
+  `bise office run` on fake files it seeds the same way. gate.sh quick
+  runs it when `office/`, `rust/jsrt/` or one of the three plugins
+  changed (skipped with words when bise or bend-jsrt is not built),
+  gate.sh full every time (strict). An SDK change that renames a call
+  fixes the skills in the same commit.
+- **Their cost**: the Plugins section of every agent's prompt (its header
+  and three one-line rows, +546 chars) is in `tests/prompt_size_e2e.py`'s
+  budgets; a longer `description` in a `plugin.json` needs its budget.
+- `tests/release_plugins_test.py` lists them in what a release ships.
+
 ## The viewer
 
 An xlsx, pptx or docx artifact opens in bise's viewer, a page of the pages

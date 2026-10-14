@@ -97,9 +97,13 @@ def main():
         # the prompt says what each plugin is for (the built-in computer
         # plugin: browser and Mac apps), the new one included
         first = json.dumps(reqs[0]) if reqs else ""
-        # computer use is opt-in: nothing of it before /computer-use
-        check("## Plugins" not in first and "computer:computer-use" not in first,
+        # computer use is opt-in: nothing of it before /computer-use (the
+        # built-in sheets, slides and docs plugins are on by default, so
+        # the Plugins section itself is there)
+        check("- `computer`" not in first and "computer:computer-use" not in first,
               "computer use is off by default: not in the first prompt")
+        check("- `sheets`" in first and "- `slides`" in first and "- `docs`" in first,
+              "the office plugins are on by default: in the first prompt")
         check("- `hello-plugin`: Test fixture" in last and "- `hello-plugin`" not in first,
               "the relaunched prompt names the new plugin")
         # the new REPL loaded the plugin: its skill is in the run's index

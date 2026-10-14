@@ -32,9 +32,12 @@ FULL = open(os.path.join(ROOT, "prompts", "tool-desc-run-typescript.txt")).read(
 # rule's estimate-low words +229 (f0c1b04f) and its wake words +34
 # (f681138e), sb artifact archive|unarchive +216 (ae7fcca8), the sb wake
 # row +548 (338dd46c) and its --then | --alarm +327 (df1bacdf), sb feature
-# retire +154 (d7e20a63): +1508
-TASK_BUDGET = 27000 + 2044
-MAIN_BUDGET = 38500 + 2184 + 229 + 34 + 216 + 548 + 327 + 154
+# retire +154 (d7e20a63): +1508. Then the built-in office plugins, on by
+# default (office-artifacts, 2026-10-14, architect m_23951): the Plugins
+# section in every agent's prompt, its header and the sheets, slides and
+# docs rows, measured from their plugin.json: +546 for each
+TASK_BUDGET = 27000 + 2044 + 546
+MAIN_BUDGET = 38500 + 2184 + 229 + 34 + 216 + 548 + 327 + 154 + 546
 fails = []
 
 

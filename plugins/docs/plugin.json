@@ -1,0 +1,8 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "docs",
+  "version": "0.1.0",
+  "description": "docx: make, read and edit Word documents, comments and tracked changes (bise office run)",
+  "homepage": "https://bise.dev",
+  "license": "Apache-2.0"
+}
