@@ -19,6 +19,8 @@ use crate::client::{Conn, Starter};
 use crate::paths::Paths;
 use crate::{b64, cli, host, mcp, nm, state};
 
+mod helper;
+
 static N: AtomicU64 = AtomicU64::new(0);
 
 /// A short folder (unix socket paths stop at 104 bytes): `$TMPDIR` when
@@ -46,6 +48,9 @@ fn opts(p: &Paths) -> Opts {
         release_after: Duration::from_secs(60),
         launch_helper: false,
         helper_app: None,
+        find_helper: |_| None,
+        // never `open`: nothing of a test opens on the user's screen
+        opener: PathBuf::from("/usr/bin/false"),
         slack: Duration::from_secs(2),
         helper_wait: Duration::from_millis(300),
         judge: fake_judge(p),
@@ -958,36 +963,6 @@ fn commands_without_a_broker_and_one_broker_only() {
     // resume with no broker clears it
     cli::control(&p, "resume", &json!({"agent": "x"})).unwrap();
     assert!(state::read(&p)["agents"].get("x").is_none());
-    let _ = std::fs::remove_dir_all(&d);
-}
-
-/// setup-check's apps rows (m_3897): a 1 s poll never relaunches the
-/// helper (one `open -g` per 20 s at most), sees a helper that comes back
-/// by itself at once (a plain connect each poll), and reads its grants.
-#[test]
-fn setup_check_polls_permissions_without_relaunching() {
-    let (d, p) = paths();
-    // a path that doesn't exist: `open -g` fails at once, nothing opens
-    // (a folder would open in Finder, in front of the user)
-    let app = d.join("no such helper.app");
-    let o = Opts { launch_helper: true, helper_app: Some(app.clone()), ..opts(&p) };
-    let brokers: Brokers = Default::default();
-    let start = starter(o, brokers.clone());
-    for _ in 0..5 {
-        let v = cli::setup_check(&p, Some(&app), Some(&*start));
-        assert_eq!(v["rows"][3]["state"], "checking", "{v}");
-        std::thread::sleep(Duration::from_millis(1000));
-    }
-    assert_eq!(brokers.lock().unwrap()[0].helper_launches(), 1);
-    // the helper comes back (macOS reopened it): the next poll sees it
-    let _helper = FakeHelper::start(&p, jpeg(&d));
-    let v = cli::setup_check(&p, Some(&app), Some(&*start));
-    assert_eq!(v["rows"][3]["id"], "accessibility");
-    assert_ne!(v["rows"][3]["state"], "checking", "{v}");
-    assert_eq!(brokers.lock().unwrap()[0].helper_launches(), 1);
-    for h in brokers.lock().unwrap().drain(..) {
-        h.shutdown();
-    }
     let _ = std::fs::remove_dir_all(&d);
 }
 

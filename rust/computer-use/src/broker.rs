@@ -30,9 +30,12 @@ use crate::proto::{err, short_host, str_of, Target, TOOLS};
 use crate::{image, refuse, state};
 
 mod ctl;
+mod helper;
 mod peek;
 mod status;
 use ctl::{ctl_loop, release, stop_agent};
+pub use helper::{find_helper, helper_candidates};
+use helper::{connect_helper, helper, helper_installed};
 use status::{full_status, status, write_state};
 
 /// The helper's bundle name and id (C5).
@@ -51,8 +54,14 @@ pub struct Opts {
     pub release_after: Duration,
     /// start the helper app when its socket is missing (never in tests)
     pub launch_helper: bool,
-    /// `bise Computer Use.app` (see [`find_helper`]); None: not installed
+    /// `bise Computer Use.app` at start (see [`find_helper`]); None: not
+    /// installed
     pub helper_app: Option<PathBuf>,
+    /// where to look again when that path is gone: the broker outlives
+    /// the version dir it started from (an update prunes it)
+    pub find_helper: fn(&std::path::Path) -> Option<PathBuf>,
+    /// what starts the helper: `open` (tests: a command that opens nothing)
+    pub opener: PathBuf,
     /// on top of an action's own `timeout_ms`, the wait for its reply
     pub slack: Duration,
     /// after `open -g` of the helper, how long its socket may take
@@ -71,6 +80,8 @@ impl Opts {
             release_after: Duration::from_secs(20),
             launch_helper: true,
             helper_app,
+            find_helper,
+            opener: PathBuf::from("open"),
             slack: Duration::from_secs(15),
             helper_wait: Duration::from_secs(8),
             judge: crate::who::JudgeFn::real(),
@@ -179,6 +190,11 @@ struct Shared {
     last_launch: Mutex<Option<Instant>>,
     /// how many times this broker ran `open -g` on the helper (tests)
     launches: AtomicUsize,
+    /// the helper paths it opened, in order (tests)
+    launched: Mutex<Vec<PathBuf>>,
+    /// where the helper app is: `Opts::helper_app`, found again when gone
+    /// (`helper::helper_app`)
+    helper_app: Mutex<Option<PathBuf>>,
 }
 
 /// `permissions` (the /computer-use rows' 1 s poll) starts the helper at
@@ -196,6 +212,11 @@ impl Handle {
     /// How many times this broker started the helper app (`open -g`).
     pub fn helper_launches(&self) -> usize {
         self.shared.launches.load(Ordering::SeqCst)
+    }
+
+    /// The helper paths it opened, in order.
+    pub fn helper_launched(&self) -> Vec<PathBuf> {
+        lock(&self.shared.launched).clone()
     }
 
     /// Close the socket and every connection, as if the process died.
@@ -274,7 +295,17 @@ pub fn start(opts: Opts) -> Result<Handle, StartError> {
     let ctl_listener = UnixListener::bind(&ctl_sock).map_err(StartError::Io)?;
     crate::paths::private(&ctl_sock, 0o600).map_err(StartError::Io)?;
     let inner = Inner { agents: state::restore(&opts.paths), quiet_since: Some(Instant::now()), ..Inner::default() };
-    let shared = Arc::new(Shared { opts, inner: Mutex::new(inner), stop: AtomicBool::new(false), started: Instant::now(), helper_gate: Mutex::new(()), last_launch: Mutex::new(None), launches: AtomicUsize::new(0) });
+    let shared = Arc::new(Shared {
+        helper_app: helper::new_cache(&opts),
+        opts,
+        inner: Mutex::new(inner),
+        stop: AtomicBool::new(false),
+        started: Instant::now(),
+        helper_gate: Mutex::new(()),
+        last_launch: Mutex::new(None),
+        launches: AtomicUsize::new(0),
+        launched: Mutex::new(Vec::new()),
+    });
     write_state(&shared);
     {
         let sh = shared.clone();
@@ -553,100 +584,6 @@ fn broadcast(sh: &Arc<Shared>, v: &Value) {
     for w in ws {
         send_line(&w, v);
     }
-}
-
-// ---- the helper (C5) ----
-
-/// Where `bise Computer Use.app` is: `$BISE_CU_HELPER`, the app root
-/// (`$BISE_APP_ROOT`, else next to this executable: the helper ships in
-/// the version dir), then /Applications and ~/Applications. Opened by path
-/// (`open -g <path>`): it registers the app with LaunchServices, where a
-/// bundle id lookup would fail before its first launch (cu-apps).
-pub fn find_helper(home: &std::path::Path) -> Option<PathBuf> {
-    let app = format!("{}.app", HELPER_APP);
-    let env = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
-    let exe_dir = std::env::current_exe().ok().and_then(|e| e.canonicalize().ok()).and_then(|e| e.parent().map(bise_home::exe_home_dir));
-    let mut c: Vec<PathBuf> = Vec::new();
-    c.extend(bise_home::env::test_setting("BISE_CU_HELPER").map(PathBuf::from));
-    c.extend(env("BISE_APP_ROOT").map(|r| r.join(&app)));
-    c.extend(exe_dir.map(|d| d.join(&app)));
-    c.push(PathBuf::from("/Applications").join(&app));
-    c.push(home.join("Applications").join(&app));
-    c.into_iter().find(|p| p.is_dir())
-}
-
-fn helper_installed(sh: &Shared) -> bool {
-    sh.opts.helper_app.is_some()
-}
-
-fn connect_helper(sh: &Arc<Shared>) -> Option<()> {
-    let s = UnixStream::connect(&sh.opts.paths.app_socket).ok()?;
-    s.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
-    let rd = s.try_clone().ok()?;
-    let mut lines = BufReader::new(rd).lines();
-    let hello: Value = serde_json::from_str(&lines.next()?.ok()?).ok()?;
-    let hello = hello.get("hello")?.clone();
-    s.set_read_timeout(None).ok()?;
-    let w: Writer = Arc::new(Mutex::new(s.try_clone().ok()?));
-    let id = {
-        let mut inner = lock(&sh.inner);
-        inner.next += 1;
-        let id = inner.next;
-        inner.helper = Some(HelperLink { id, w, hello });
-        inner.streams.push(s);
-        id
-    };
-    log("helper connected");
-    let sh2 = sh.clone();
-    std::thread::spawn(move || {
-        for line in lines {
-            let Ok(line) = line else { break };
-            if let Ok(msg) = serde_json::from_str::<Value>(&line) {
-                incoming(&sh2, id, &msg);
-            }
-        }
-        lock(&sh2.inner).helper.take_if(|h| h.id == id);
-        fail_link(&sh2, id, err("no_helper", "the bise Computer Use app quit during the action; try again"));
-        log("helper gone");
-        write_state(&sh2);
-    });
-    write_state(sh);
-    Some(())
-}
-
-/// The helper's link id: connected, else connect, else start it and wait.
-fn helper(sh: &Arc<Shared>) -> Result<u64, Value> {
-    if let Some(h) = &lock(&sh.inner).helper {
-        return Ok(h.id);
-    }
-    let _g = lock(&sh.helper_gate);
-    let id = || lock(&sh.inner).helper.as_ref().map(|h| h.id);
-    if let Some(i) = id() {
-        return Ok(i);
-    }
-    if connect_helper(sh).is_none() && sh.opts.launch_helper && helper_installed(sh) {
-        // -g: never in front (the user's rule: computer use never steals focus)
-        sh.launches.fetch_add(1, Ordering::SeqCst);
-        let _ = std::process::Command::new("open")
-            .arg("-g")
-            .arg(sh.opts.helper_app.as_deref().unwrap_or(std::path::Path::new("")))
-            .args(["--args", "--socket"])
-            .arg(&sh.opts.paths.app_socket)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status();
-        let t0 = Instant::now();
-        while t0.elapsed() < sh.opts.helper_wait && connect_helper(sh).is_none() {
-            std::thread::sleep(Duration::from_millis(200));
-        }
-    }
-    id().ok_or_else(|| {
-        if helper_installed(sh) || !sh.opts.launch_helper {
-            err("no_helper", "the bise Computer Use app doesn't answer; ask the user to run /computer-use")
-        } else {
-            err("no_helper", "the bise Computer Use app isn't installed; ask the user to run /computer-use")
-        }
-    })
 }
 
 // ---- requests ----

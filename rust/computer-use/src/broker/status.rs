@@ -78,6 +78,9 @@ pub(super) fn full_status(sh: &Arc<Shared>) -> Value {
     v["agents"] = state::render(&inner.agents, json!([]), json!({}))["agents"].clone();
     v["sessions"] = json!(inner.sessions.iter().filter(|(_, n)| **n > 0).map(|(k, _)| k.clone()).collect::<Vec<_>>());
     v["pid"] = json!(std::process::id());
+    drop(inner);
+    // where it starts the helper from (a pruned version dir shows here)
+    v["helper_app"] = json!(super::helper::helper_app_cached(sh));
     v
 }
 
