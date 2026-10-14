@@ -239,6 +239,9 @@ def Laws.resp_reply_maps():
 def Laws.resp_stream_reads_completed():
   {==}
 
+def Laws.resp_stream_items_when_completed_empty():
+  {==}
+
 def Laws.resp_stream_error():
   {==}
 

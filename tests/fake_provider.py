@@ -802,7 +802,7 @@ def whole_responses(turn, model, encrypted=False, status="completed"):
                       "total_tokens": u["input"] + u["output"]} if status == "completed" else None}
 
 
-def sse_responses(turn, model, encrypted=False, mid_error=False):
+def sse_responses(turn, model, encrypted=False, mid_error=False, plan=False):
     ev = []
 
     def add(t, **d):
@@ -847,7 +847,7 @@ def sse_responses(turn, model, encrypted=False, mid_error=False):
             add("response.function_call_arguments.done", item_id=iid, output_index=oi,
                 arguments=it["arguments"])
         add("response.output_item.done", output_index=oi, item=it)
-    add("response.completed", response=whole_responses(turn, model, encrypted))
+    add("response.completed", response=dict(whole_responses(turn, model, encrypted), **({"output": []} if plan else {})))
     return ev
 
 
@@ -895,8 +895,8 @@ def sse_gemini(turn, model, mid_error=False):
     return [(None, gem_chunk(p, model, "STOP" if i == len(ps) - 1 else None, turn)) for i, p in enumerate(ps)]
 
 
-def render(family, turn, model="fake", stream=True, body=None, mid_error=False):
-    """the events (stream) or the JSON body (whole) for a turn"""
+def render(family, turn, model="fake", stream=True, body=None, mid_error=False, plan=False):
+    """the events (stream) or the JSON body (whole) for a turn; plan: completed's output [] (issue 15)"""
     body = body or {}
     enc = "reasoning.encrypted_content" in (body.get("include") or [])
     if not stream:
@@ -908,7 +908,7 @@ def render(family, turn, model="fake", stream=True, body=None, mid_error=False):
     if family == "anthropic":
         return sse_anthropic(turn, model, mid_error)
     if family == "openai-responses":
-        return sse_responses(turn, model, enc, mid_error)
+        return sse_responses(turn, model, enc, mid_error, plan)
     return sse_gemini(turn, model, mid_error)
 
 
@@ -1249,10 +1249,10 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send(status, json.dumps(err).encode(), headers=hdr)
         else:
             mid = bool(turn["error"])
-            out = render(family, turn, model, stream, body, mid)
+            out = render(family, turn, model, stream, body, mid, bool(plan))
             if mid and turn["error"]["kind"] == "cut":
                 # the text streamed in, then the family's error event
-                full = render(family, turn, model, stream, body)
+                full = render(family, turn, model, stream, body, plan=bool(plan))
                 out = full[:len(full) * 2 // 3] + out[-1:]
             if not stream:
                 self.send(200, json.dumps(out).encode())

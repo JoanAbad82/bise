@@ -271,7 +271,11 @@ def t_servers():
         st, b = resp(plan_body())
         ev = sse_events(b)
         check(st == 200 and ev[-1]["type"] == "response.completed", "a plan turn: %s %r" % (st, b[-200:]))
-        call = [i for i in ev[-1]["response"]["output"] if i["type"] == "function_call"][0]
+        # the real route's response.completed has output [] (issue 15):
+        # the items are in the output_item.done events only
+        check(ev[-1]["response"]["output"] == [], "the plan's response.completed has no output: %r" % ev[-1])
+        items = [e["item"] for e in ev if e["type"] == "response.output_item.done"]
+        call = [i for i in items if i["type"] == "function_call"][0]
         check(call["name"] == "bash" and call["namespace"] == "bise", "a namespaced call back: %r" % call)
         for over, param in (({"store": True}, "store"), ({"store": None}, "store"), ({"stream": False}, "stream"),
                             ({"max_output_tokens": 100}, "max_output_tokens"), ({"temperature": 1}, "temperature"),

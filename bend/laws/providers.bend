@@ -663,6 +663,34 @@ law resp_stream_reads_completed:
   {Rs.reply_any("event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"hel\"}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"sequence_number\":9,\"response\":{\"error\":null,\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"hello\"}]}],\"usage\":{\"input_tokens\":12,\"input_tokens_details\":{\"cached_tokens\":8},\"output_tokens\":3}}}\n\n")
     == "OK hello\nEND\n" : String}
 
+# LAW: ChatGPT's plan route (chatgpt.com/backend-api/codex/responses)
+# ends its stream with a response.completed whose output is [] (status
+# and usage only): the items come in the response.output_item.done
+# events, in order, as Codex reads them (codex-api sse/responses.rs).
+# The reply is read from those, the usage still from response.completed
+# (issue 15: every plan turn read as an empty response).
+law resp_stream_items_when_completed_empty:
+  {Rs.reply_any("event: response.output_item.done
+data: {\"type\":\"response.output_item.done\",\"sequence_number\":3,\"output_index\":0,\"item\":{\"type\":\"reasoning\",\"id\":\"rs_1\",\"encrypted_content\":\"ENC2\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"think\"}]}}
+
+event: response.output_text.delta
+data: {\"type\":\"response.output_text.delta\",\"delta\":\"hel\"}
+
+event: response.output_item.done
+data: {\"type\":\"response.output_item.done\",\"sequence_number\":7,\"output_index\":1,\"item\":{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"hello\"}]}}
+
+event: response.output_item.done
+data: {\"type\":\"response.output_item.done\",\"sequence_number\":9,\"output_index\":2,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_x\",\"name\":\"bash\",\"namespace\":\"bise\",\"arguments\":\"{\\\"arg\\\":\\\"pwd\\\"}\"}}
+
+event: response.completed
+data: {\"type\":\"response.completed\",\"sequence_number\":10,\"response\":{\"id\":\"resp_1\",\"status\":\"completed\",\"error\":null,\"output\":[],\"usage\":{\"input_tokens\":12,\"output_tokens\":3}}}
+
+")
+    == "OK <think>think\\nBENDSIG::oair:ENC2</think>\\nhello
+CALL 1 bash : pwd
+END
+" : String}
+
 # LAW: an error event, or a stream cut before its end, is an error
 # reply (the retry policy retries a 200 error).
 law resp_stream_error:
