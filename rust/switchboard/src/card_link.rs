@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn a_card_links_its_page_its_block_or_its_item_like_a_step_card() {
         let d = std::env::temp_dir().join(format!("sb-card-link-{}", std::process::id()));
-        let p = Pages::new(&d, 47123, d.join("kit"));
+        let p = Pages::new(&d, 47123, &d);
         let pb = Publish { agent: "watch".into(), id: Some("launch-watch".into()), html: HTML.into(), ..Default::default() };
         p.publish(&pb, 1, &|_| false).unwrap();
         let u = "http://127.0.0.1:47123/p/launch-watch";

@@ -94,6 +94,12 @@ MANUAL = [
         dict(name="@xmldom/xmldom 0.9.12 (XML DOM)", license="MIT", url="https://github.com/xmldom/xmldom",
              files=["xmldom.LICENSE"]),
     ]),
+    ("office/dist/office-view.js: the office viewer's docx renderer (office/sdk/src/view, docs/office.md)", [
+        dict(name="docx-preview 0.4.1 (docx to HTML)", license="Apache-2.0", url="https://github.com/VolodymyrBaydalka/docxjs",
+             files=["docx-preview.LICENSE"]),
+        dict(name="jszip 3.10.2 (zip; dual MIT or GPL-3.0, taken under MIT)", license="MIT", url="https://github.com/Stuk/jszip",
+             files=["jszip.LICENSE"]),
+    ]),
     ("bise: data built in", [
         dict(name="gemoji (the emoji shortcode table, rust/tui/src/emoji.tsv)", license="MIT",
              url="https://github.com/github/gemoji", files=["gemoji.LICENSE"]),

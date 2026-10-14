@@ -632,7 +632,7 @@ for f in $changed; do
     apps/desktop/src/proto/*) proto_ts=1 ;;
     # bise-proto's Anchor, generated for the SDK too (architect m_23712)
     office/sdk/src/anchor.gen.ts) proto_ts=1; office=1 ;;
-    office/*) office=1 ;;
+    office/*|kit/office/*) office=1 ;;
   esac
 done
 step() {  # <name> <cmd...>: one line when green, the failures and the log when red

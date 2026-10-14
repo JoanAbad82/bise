@@ -1,0 +1,74 @@
+/* bise kit · the office viewer (kit/office/viewer.js): the frame around an xlsx, pptx or docx in
+   the side panel (55% column) or a tab. Colors, fonts and spaces from tokens.css only; what the
+   file itself says (a cell's fill, a slide's colors, the doc's styles) is set by the renderers. */
+
+html, body { margin: 0; height: 100%; background: var(--surface-made); color: var(--ink); }
+body { font: var(--text-ui) / 1.4 var(--font-ui); }
+#bise-office { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.office-stage { flex: 1; min-height: 0; display: flex; }
+
+.office-state { margin: 24px; color: var(--dim); }
+.office-state[data-state="failed"] { color: var(--risk); }
+.office-empty, .office-more { margin: 16px; color: var(--faint); }
+.office-foot { flex: none; border-top: 1px solid var(--line); padding: 6px 12px; color: var(--kick); font-size: var(--text-kicker); }
+.office-foot p { margin: 2px 0; }
+
+/* xlsx: the bar, the grid, the tabs */
+.office-sheet { flex-direction: column; }
+.office-bar { flex: none; display: flex; gap: 12px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: var(--text-kicker); min-height: 18px; }
+.office-bar .where { color: var(--faint); min-width: 8ch; }
+.office-bar .formula { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.office-grid { flex: 1; min-height: 0; overflow: auto; background: var(--surface-card); }
+.office-grid table { border-collapse: collapse; table-layout: fixed; font: var(--text-ui) / 1.3 var(--font-ui); color: #1d1a17; background: #ffffff; }
+.office-grid col.rn { width: 44px; }
+.office-grid th { position: sticky; background: var(--surface-made); color: var(--faint); font-weight: 400; border: 1px solid var(--line); padding: 2px 4px; }
+.office-grid thead th { top: 0; z-index: 2; }
+.office-grid th.rn { left: 0; z-index: 1; text-align: right; }
+.office-grid th.corner { left: 0; z-index: 3; }
+.office-grid td { border: 1px solid #1d1a1714; padding: 2px 4px; height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: cell; }
+.office-grid td.sel { outline: 2px solid var(--accent); outline-offset: -2px; background-image: linear-gradient(var(--accent-soft), var(--accent-soft)); }
+.office-grid td.novalue::after { content: "·"; color: var(--faint); }
+.office-grid td.error { color: var(--risk); }
+.office-tabs { flex: none; display: flex; gap: 2px; overflow-x: auto; border-top: 1px solid var(--line); padding: 0 8px; }
+.office-tabs button { font: inherit; color: var(--dim); background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 10px; cursor: pointer; white-space: nowrap; }
+.office-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+
+/* pptx: the rail and the slide */
+.office-deck { flex-direction: row; }
+.office-rail { flex: none; width: 148px; overflow-y: auto; border-right: 1px solid var(--line); padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.office-rail .thumb { display: flex; gap: 6px; align-items: flex-start; background: none; border: 0; padding: 0; cursor: pointer; color: var(--faint); font: inherit; }
+.office-rail .thumb .n { width: 14px; text-align: right; }
+.office-rail .thumb .holder { flex: 1; overflow: hidden; outline: 1px solid var(--line); pointer-events: none; }
+.office-rail .thumb[aria-current="true"] .holder { outline: 2px solid var(--accent); }
+.office-slide { flex: 1; min-width: 0; overflow: auto; padding: 8px; outline: none; }
+.office-slide .holder { overflow: hidden; box-shadow: 0 1px 4px var(--drop); }
+.slide { position: relative; transform-origin: 0 0; background: #ffffff; color: #1d1a17; overflow: hidden; font-family: var(--font-read); }
+.slide .shape { position: absolute; box-sizing: border-box; overflow: hidden; }
+.slide .shape.sel { outline: 2px solid var(--accent); }
+.slide .txt { display: flex; flex-direction: column; height: 100%; padding: 3.6pt 7.2pt; box-sizing: border-box; font-size: 18pt; }
+.slide .txt[data-valign="middle"], .slide .txt[data-valign="ctr"] { justify-content: center; }
+.slide .txt[data-valign="bottom"], .slide .txt[data-valign="b"] { justify-content: flex-end; }
+.slide .txt p { margin: 0 0 .2em; line-height: 1.15; }
+.slide .txt p[data-bullet]::before { content: attr(data-bullet) " "; }
+.slide .picture img { width: 100%; height: 100%; object-fit: fill; display: block; }
+.slide .missing { color: #8a8174; font-size: 12pt; }
+.slide table { width: 100%; height: 100%; border-collapse: collapse; font-size: 12pt; }
+.slide td { border: 1pt solid #1d1a1733; padding: 2pt 4pt; }
+.office-chart { width: 100%; height: 100%; }
+.office-chart text { font: 11px var(--font-ui); fill: #5a5349; }
+.office-chart .title { font-size: 13px; fill: #1d1a17; }
+.office-chart .axis { stroke: #1d1a1755; }
+.office-chart .s0 { fill: #c8264a; stroke: #c8264a; }
+.office-chart .s1 { fill: #3f6b35; stroke: #3f6b35; }
+.office-chart .s2 { fill: #5a5349; stroke: #5a5349; }
+.office-chart .s3 { fill: #b88a2e; stroke: #b88a2e; }
+.office-chart .s4 { fill: #2e6fb8; stroke: #2e6fb8; }
+.office-chart .s5 { fill: #8a8174; stroke: #8a8174; }
+.office-chart polyline { fill: none; stroke-width: 2; }
+
+/* docx: docx-preview's pages on the paper */
+.office-doc { flex-direction: column; overflow: auto; }
+.office-pages { flex: 1; }
+.office-pages .docx-wrapper { background: transparent; padding: 16px 0; }
+.office-pages .docx-wrapper > section.docx { box-shadow: 0 1px 4px var(--drop); margin-bottom: 16px; }
+.office-pages [data-para] { scroll-margin-top: 24px; }

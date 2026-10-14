@@ -118,7 +118,7 @@ impl Response {
     /// A missing file a page links (/kit, /a/, page.css): 404 text/plain, never
     /// JSON, which a browser reports as a stylesheet of the wrong MIME type
     /// (Benjamin's -31: "MIME type ('application/json')", the kit missing).
-    fn missing(why: &str) -> Response {
+    pub(crate) fn missing(why: &str) -> Response {
         Response { status: 404, ctype: "text/plain; charset=utf-8", body: why.as_bytes().to_vec(), csp: CSP }
     }
 
@@ -212,6 +212,10 @@ pub fn route(pages: &Pages, req: &Request) -> Response {
     }
     if req.method != "GET" {
         return Response::err(405, "GET only");
+    }
+    // the viewer of an office file and its bundles (pages/artifact)
+    if let Some(r) = super::artifact::route(pages, &segs) {
+        return r;
     }
     match segs.as_slice() {
         [""] => Response::html(home(pages)),
@@ -535,7 +539,7 @@ mod tests {
         let d = std::env::temp_dir().join(format!("sb-srv-{}-{}", std::process::id(), N.fetch_add(1, std::sync::atomic::Ordering::SeqCst)));
         std::fs::create_dir_all(d.join("kit")).unwrap();
         std::fs::write(d.join("kit/kit.css"), "main{}").unwrap();
-        (Pages::new(&d, 47123, d.join("kit")), d)
+        (Pages::new(&d, 47123, &d), d)
     }
 
     fn get(p: &Pages, path: &str) -> Response {
@@ -801,7 +805,7 @@ mod tests {
         let d = std::env::temp_dir().join(format!("sb-srv-hold-{}", std::process::id()));
         std::fs::create_dir_all(d.join("kit")).unwrap();
         let holds = crate::idle::Holds::default();
-        let p = std::sync::Arc::new(Pages { holds: holds.clone(), ..Pages::new(&d, port, d.join("kit")) });
+        let p = std::sync::Arc::new(Pages { holds: holds.clone(), ..Pages::new(&d, port, &d) });
         serve(listener, p.clone());
         let get = |path: &str| {
             let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
@@ -849,7 +853,7 @@ mod tests {
         let port = listener.local_addr().unwrap().port();
         let d = std::env::temp_dir().join(format!("sb-srv-pub-{}", std::process::id()));
         std::fs::create_dir_all(d.join("kit")).unwrap();
-        let p = std::sync::Arc::new(Pages::new(&d, port, d.join("kit")));
+        let p = std::sync::Arc::new(Pages::new(&d, port, &d));
         let pb = |n: u64| Publish {
             agent: "watch".into(),
             id: Some("launch-watch".into()),

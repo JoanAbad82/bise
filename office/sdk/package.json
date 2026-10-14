@@ -19,7 +19,9 @@
   },
   "dependencies": {
     "@xmldom/xmldom": "0.9.12",
-    "fflate": "0.8.3"
+    "docx-preview": "0.4.1",
+    "fflate": "0.8.3",
+    "jszip": "3.10.2"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

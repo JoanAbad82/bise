@@ -104,9 +104,36 @@ pub fn serves_copy(by: &str, copy: &str) -> bool {
     by != "page" && !copy.is_empty() && (file.is_empty() || ctype(&file).is_some())
 }
 
+/// Where an artifact's copy is framed (the typed row's `frame_url`,
+/// proto_view::artifacts): an xlsx, pptx or docx in bise's viewer
+/// (pages/artifact/view.rs), at `/a/<id>/view` for the newest version (the
+/// frame keeps that src when a new one lands) or `/a/<id>/<v>/view` for an
+/// older one; any other copy at [`copy_href`]. Only for a copy that
+/// [`serves_copy`].
+pub fn frame_href(id: &str, v: u64, copy: &str, newest: bool) -> String {
+    match (office_kind(copy), newest) {
+        (Some(_), true) => format!("/a/{id}/view"),
+        (Some(_), false) => format!("/a/{id}/{v}/view"),
+        (None, _) => copy_href(id, v, copy),
+    }
+}
+
+/// The office file a copy is (`xlsx`, `pptx`, `docx`), by its extension:
+/// the files bise's viewer draws. None: any other file, or a folder.
+pub fn office_kind(copy: &str) -> Option<&'static str> {
+    let file = file_of(copy);
+    match file.rsplit('.').next()?.to_ascii_lowercase().as_str() {
+        _ if file.is_empty() => None,
+        "xlsx" => Some("xlsx"),
+        "pptx" => Some("pptx"),
+        "docx" => Some("docx"),
+        _ => None,
+    }
+}
+
 /// The file a copy opens on: a copied file's name (`v2/plan.html` →
 /// `plan.html`), nothing for a folder (its index.html).
-fn file_of(copy: &str) -> String {
+pub fn file_of(copy: &str) -> String {
     let name = copy.rsplit('/').next().unwrap_or("");
     if name.contains('.') {
         name.to_string()
@@ -168,6 +195,10 @@ pub fn ctype(path: &str) -> Option<&'static str> {
         "webp" => "image/webp",
         "woff2" => "font/woff2",
         "txt" | "md" => "text/plain; charset=utf-8",
+        // the bytes bise's viewer fetches (frame_href); a browser downloads them
+        "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         _ => return None,
     })
 }
@@ -250,5 +281,25 @@ mod tests {
         assert!(d.contains(&"script-src 'self' 'unsafe-inline'"), "no remote scripts");
         assert!(d.contains(&"default-src 'self' data: blob:"));
         assert!(!ARTIFACT_CSP.contains("frame-ancestors"), "the desktop's file:// renderer frames it");
+    }
+
+    /// office-artifacts plan §4: an xlsx, pptx or docx is served (its bytes,
+    /// for the viewer) and framed in bise's viewer, the newest at a url
+    /// with no version (a new version never reloads the frame); any other
+    /// copy is framed as itself, by the same rule (serves_copy).
+    #[test]
+    fn an_office_file_is_framed_in_the_viewer() {
+        for (copy, kind) in [("v2/q3.xlsx", "xlsx"), ("v2/Deck.PPTX", "pptx"), ("v1/memo.docx", "docx")] {
+            assert_eq!(office_kind(copy), Some(kind));
+            assert!(serves_copy("office-lead", copy), "{copy}: its bytes are served");
+            assert_eq!(frame_href("q3", 2, copy, true), "/a/q3/view");
+            assert_eq!(frame_href("q3", 2, copy, false), "/a/q3/2/view");
+        }
+        for copy in ["v1/a.xls", "v1/a.ppt", "v1/a.doc", "v1/site", "v1/docx", "v1/r.html"] {
+            assert_eq!(office_kind(copy), None, "{copy}");
+        }
+        assert_eq!(frame_href("r", 3, "v3/r.html", true), "/a/r/3/r.html", "a site keeps its own link");
+        assert!(!serves_copy("page", "v1/q3.xlsx"), "a bise page is served at /p/");
+        assert!(!serves_copy("x", "v1/a.xls"), "an old binary format is not sent");
     }
 }

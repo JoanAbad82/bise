@@ -3,12 +3,16 @@
 //! ([`server`]). [`Pages`] is what the hub and the server share: the
 //! store behind one lock, the server's port and token, the SSE
 //! subscribers of each page, and the way back to the hub (the notes sent
-//! from a page become the agent's input there).
+//! from a page become the agent's input there). [`artifact`]: the
+//! server's artifact routes beyond a copy's own file (the office viewer,
+//! docs/office.md); the kit and the office bundles are read from the app
+//! root given to [`Pages::new`].
 
 pub mod checklist;
 pub mod drafts;
 pub mod export;
 pub mod lint;
+pub mod artifact;
 pub mod mirror;
 pub mod notelines;
 pub mod questions;
@@ -54,6 +58,9 @@ pub struct Pages {
     pub port: u16,
     pub token: String,
     pub kit_dir: PathBuf,
+    /// the office SDK's bundles (office/dist: office.js, office-view.js),
+    /// served at /kit/office/ for the viewer (pages/artifact)
+    pub office_dir: PathBuf,
     /// SSE streams of each page id ("" = the home list)
     subs: Mutex<HashMap<String, Vec<Sender<String>>>>,
     to_hub: Mutex<Option<ToHub>>,
@@ -115,14 +122,16 @@ pub fn new_token() -> String {
 
 impl Pages {
     /// The pages of a hub whose state folder is `state`; `port` 0: none
-    /// (tests of the store alone).
-    pub fn new(state: &Path, port: u16, kit_dir: PathBuf) -> Pages {
+    /// (tests of the store alone). `app_root`: where the kit (`kit/`) and
+    /// the office bundles (`office/dist/`) are, in the repo or a version.
+    pub fn new(state: &Path, port: u16, app_root: &Path) -> Pages {
         Pages {
             store: Store::new(state),
             lock: Mutex::new(()),
             port,
             token: new_token(),
-            kit_dir,
+            kit_dir: app_root.join("kit"),
+            office_dir: app_root.join("office").join("dist"),
             subs: Mutex::new(HashMap::new()),
             to_hub: Mutex::new(None),
             progress: Mutex::new(HashMap::new()),
@@ -408,12 +417,12 @@ pub fn raise_fd_limit(want: u64) -> u64 {
 
 /// Start the page server of a hub: the port, the listener, its thread.
 /// `holds`: the hub's idle-exit holds (an open event stream holds one).
-pub fn start(state: &Path, workspace_id: &str, kit_dir: PathBuf, holds: crate::idle::Holds) -> std::io::Result<Arc<Pages>> {
+pub fn start(state: &Path, workspace_id: &str, app_root: &Path, holds: crate::idle::Holds) -> std::io::Result<Arc<Pages>> {
     raise_fd_limit(10240);
     let free = |p: u16| std::net::TcpListener::bind(("127.0.0.1", p)).is_ok();
     let port = pick_port(state, workspace_id, &free).ok_or_else(|| std::io::Error::other("no free port in 47100-47899"))?;
     let listener = std::net::TcpListener::bind(("127.0.0.1", port))?;
-    let pages = Arc::new(Pages { holds, ..Pages::new(state, port, kit_dir) });
+    let pages = Arc::new(Pages { holds, ..Pages::new(state, port, app_root) });
     server::serve(listener, pages.clone());
     Ok(pages)
 }
@@ -460,7 +469,7 @@ mod tests {
     #[test]
     fn a_page_says_how_many_of_its_items_wait_for_him() {
         let d = std::env::temp_dir().join(format!("sb-wait-{}", std::process::id()));
-        let p = Pages::new(&d, 0, d.join("kit"));
+        let p = Pages::new(&d, 0, &d);
         let html = r#"<section data-kit="checklist" data-id="open"><ol>
 <li data-id="p1" data-who="yours">send Camille the pricing sheet</li>
 <li data-id="p2" data-who="Camille">sign the order</li></ol></section>"#;
@@ -479,7 +488,7 @@ mod tests {
     #[test]
     fn a_reply_is_held_until_the_version_after_its_agents_done() {
         let d = std::env::temp_dir().join(format!("sb-held-{}", std::process::id()));
-        let p = Pages::new(&d, 0, d.join("kit"));
+        let p = Pages::new(&d, 0, &d);
         let busy = |names: &[&str]| names.iter().map(|n| n.to_string()).collect::<std::collections::BTreeSet<_>>();
         assert_eq!(p.set_busy(busy(&["fix-fish"])), Some(vec![]));
         assert!(p.held("fb", "fix-fish", 2) && !p.held("fb", "fix-proxy", 2));

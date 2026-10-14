@@ -24,8 +24,16 @@ TextDecoder are used when the host has them, else its own UTF-8:
 
 - `bise office run <script.ts>` (bend-jsrt's script mode: V8 and deno_core,
   no web APIs; it reads the file from the app root, below);
-- the viewer in the side panel (the pages server serves the same file);
+- the viewer in the side panel (the pages server serves the same file at
+  `/kit/office/office.js`, from `office/dist` in the app root: one copy,
+  shipped by `scripts/versions.sh`, architect m_23781);
 - node, for the tests and for anyone who wants it.
+
+A second bundle, `office/dist/office-view.js`, is the viewer's alone:
+docx-preview (Apache-2.0) and jszip (taken under MIT) to draw a docx in a
+browser, `platform: "browser"`, a 2 MB budget `build.mjs` enforces. It
+never goes into `office.js`, which stays DOM-free
+(`test/viewer.test.mjs` imports it with no window).
 
 Cargo and nix never run pnpm, so the bundle is committed like generated
 code. `build.mjs` builds with esbuild `platform: "neutral"` (a node import
@@ -216,3 +224,38 @@ pnpm -C office/sdk build
 The SDK's `readAnchor(v)` refuses an unknown kind (`anchor_kind`) or a bad
 field (`anchor_shape`) with words, never guesses; `anchorFor(fileKind, v)`
 also refuses another file type's anchor (`anchor_kind_mismatch`).
+
+## The viewer
+
+An xlsx, pptx or docx artifact opens in bise's viewer, a page of the pages
+server (plan §4): its row's `frame_url` is `/a/<id>/view` (the newest
+version: the side panel keeps that src when a new version lands), and an
+older version is `/a/<id>/<v>/view`. `pages::site::frame_href` decides it,
+on the same rule that decides which copies the server sends
+(`serves_copy`), so the row and the route never disagree.
+
+| part | where |
+|---|---|
+| the routes, the bundles at `/kit/office/` | `rust/switchboard/src/pages/artifact/mod.rs` |
+| the shell (the file's facts as `data-` on `main#bise-office`) and its CSP | `pages/artifact/view.rs` |
+| fetch the copy, pick the renderer, the foot | `kit/office/viewer.js`, `viewer.css` |
+| xlsx: tabs, grid, formula bar, cell and range selection | `kit/office/sheet.js` (the sheets outline) |
+| pptx: slide rail, scaled slides, shapes, pictures, tables, charts as SVG | `kit/office/slides.js` (the slides outline) |
+| docx: docx-preview's pages, each body paragraph tagged `data-para` | `kit/office/docx.js` (+ the docs outline) |
+
+The renderers draw from each module's `inspect()` only: the props they
+read are named in each file's header (agreed with the module chunks). A
+renderer returns `{place, restore, selection, notes}`: the user's place,
+kept across a new version (`window.biseOffice.show(bytes)`, for the swap in
+place); the selection as an `Anchor`; and what it does not draw (charts and
+pivots of a sheet, SmartArt, formulas with no saved value), said in the
+frame's foot. A module not built yet: the frame says so in words.
+
+The CSP (`VIEW_CSP`): our scripts only (no inline, no eval), the file's
+images and fonts as `data:`/`blob:`, inline styles (docx-preview needs
+them), nothing from another origin, no `frame-ancestors` (the desktop frames
+it from file://). No token in the shell: the viewer has no `/api` yet.
+
+Tests: `office/sdk/test/viewer.test.mjs` (the renderers' pure parts, the
+bundles' split; `gate.sh` runs it when `office/` or `kit/office/` changed),
+`pages::artifact` and `pages::site` unit tests (routes, frame_url, CSP).
