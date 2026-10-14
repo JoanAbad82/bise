@@ -132,7 +132,10 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(page.getByTestId('app.right.top')).toContainText('storefront');
     await expect(page.getByTestId('app.right.top')).toContainText('⌥⌘0');
     expect(Math.round((await panel.boundingBox())?.width ?? 0), 'the panel is 320 px').toBe(320);
-    await expect(page.getByTestId('app.right.scheduled'), 'its scheduled tasks').toContainText('check the deploy');
+    // on perf's thread the section is perf's (bar-scope, main m_25024): deploy-watch's task is in 'all ›'
+    await expect(page.getByTestId('app.right.scheduled.scope')).toHaveText('for perf');
+    await expect(page.getByTestId('app.right.scheduled.none')).toHaveText('nothing wakes perf');
+    await expect(page.getByTestId('app.right.scheduled.all')).toBeVisible();
     await page.mouse.move(1, 400);
     await page.screenshot({ path: shot('w1400-light') });
     await core.send(prefs('dark') as never);
