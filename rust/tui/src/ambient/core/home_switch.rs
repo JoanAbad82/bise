@@ -1,7 +1,8 @@
 //! The core moves an older home hub to its own version (architect
-//! m_15476, client-protocol's one release): the home hub answers
-//! `initialize` as Older (a hub from before client-protocol, still
-//! running from an older install), so instead of refusing, the core asks
+//! m_15476): the home hub answers `initialize` as `NotRpc` (a hub from
+//! before client-protocol, still running from an older install). The app
+//! owns its home hub (architect m_23313: a product rule, not a shim), so
+//! instead of refusing, the core asks
 //! it to switch to this core's version (the binary's one move,
 //! `switchboard::switch::move_hub`, handed in as [`super::super::HomeMove`])
 //! and its connection says `initialize` again once the new hub listens.

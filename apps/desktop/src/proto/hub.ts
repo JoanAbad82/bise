@@ -142,16 +142,7 @@ export type SendOpts = { mode?: Mode | null, context?: FnContext | null, files?:
 /**
  * What a client asks a hub.
  */
-export type HubCmd = { "cmd": "hello", proto: number, 
-/**
- * typed events only on this connection: the hub's older events
- * (`state`, `line`, its own `artifacts`...) stop after this
- * hello (a window's connection; the capsule's mixed one says
- * false until S8). When S8 moves the capsule to typed events,
- * every typed connection is typed_only: S8 removes the mixed
- * case (and this flag's false)
- */
-typed_only?: boolean, } | { "cmd": "subscribe", project: string, agent: string, limit?: number | null, } | { "cmd": "unsubscribe", project: string, agent: string, } | { "cmd": "page", project: string, agent: string, before: number, limit?: number | null, } | { "cmd": "send", project: string, agent: string, text: string, 
+export type HubCmd = { "cmd": "subscribe", project: string, agent: string, limit?: number | null, } | { "cmd": "unsubscribe", project: string, agent: string, } | { "cmd": "page", project: string, agent: string, before: number, limit?: number | null, } | { "cmd": "send", project: string, agent: string, text: string, 
 /**
  * draft (G): the window's id for this send, echoed on its error
  * to this connection only (never journaled: view state)

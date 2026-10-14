@@ -1,7 +1,7 @@
 //! `follow_install`'s question to the folder's hub (BISE-255): switch to
 //! the launched version, and the hub's words back. A hub that serves
 //! JSON-RPC (client-protocol) gets `initialize` then `version/switch`; a
-//! hub from before it (`bise_proto::rpc::init_answer`'s `Older`) is not
+//! hub from before it (`bise_proto::rpc::init_answer`'s `NotRpc`) is not
 //! asked: its words back are `rpc::HUB_OLDER`.
 
 use bise_proto::hub::HubCmd;
@@ -28,7 +28,7 @@ pub(super) fn ask_switch(socket: &Path, to: &str) -> std::io::Result<String> {
         match rpc::init_answer(&serde_json::from_str(&line?).unwrap_or(Value::Null), &Id::Num(INIT)) {
             Init::Ready(res) => break res.project,
             Init::Refused(e) => return Ok(e),
-            Init::Older => return Ok(rpc::HUB_OLDER.to_string()),
+            Init::NotRpc => return Ok(rpc::HUB_OLDER.to_string()),
             Init::Other => {}
         }
     };

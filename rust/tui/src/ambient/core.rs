@@ -26,7 +26,7 @@ pub use self::computer::{peer_hub, ComputerPorts};
 pub use self::hubs::{branch_of_head, ProjectFacts, ProjectPorts, Spawn};
 pub use self::voice_mode::OpenVoiceMode;
 #[cfg(test)]
-pub use self::hubs::{HUB_OLDER, LINGER, START};
+pub use self::hubs::{HUB_LACKS, LINGER, START};
 pub use self::dictate::DICTATE_MAX;
 #[cfg(test)]
 pub use self::home::{MAIN_PAGE, QUIET_PAGE};

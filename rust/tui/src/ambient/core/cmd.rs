@@ -110,7 +110,7 @@ impl Cmd {
         let v: Value = serde_json::from_str(line).map_err(|e| format!("not JSON: {e}"))?;
         let cmd = v.get("cmd").and_then(Value::as_str).unwrap_or("").to_string();
         // a hub's command with its project: the window's (bise-proto)
-        if v.get("project").is_some() && cmd != "hello" && bise_proto::hub::HubCmd::TAGS.contains(&cmd.as_str()) {
+        if v.get("project").is_some() && bise_proto::hub::HubCmd::TAGS.contains(&cmd.as_str()) {
             return Ok(Cmd::Typed(v));
         }
         if !AppCmd::TAGS.contains(&cmd.as_str()) || bise_proto::app_rpc::NOT_SERVED.contains(&cmd.as_str()) {

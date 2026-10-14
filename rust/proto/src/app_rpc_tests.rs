@@ -25,7 +25,7 @@ fn every_tag_is_exactly_one_name() {
     let n = notifications();
     assert!(unique(&m), "a method twice: {m:?}");
     assert!(unique(&n), "a notification twice: {n:?}");
-    assert_eq!(m.len(), 1 + AppCmd::TAGS.len() - NOT_SERVED.len() + HubCmd::TAGS.len() - 1);
+    assert_eq!(m.len(), 1 + AppCmd::TAGS.len() - NOT_SERVED.len() + HubCmd::TAGS.len());
     assert_eq!(n.len(), CoreEv::TAGS.len() + HubEv::TAGS.len());
     for t in NOT_SERVED {
         assert!(AppCmd::TAGS.contains(t) && !m.contains(&format!("core/{t}")), "{t}");
@@ -33,7 +33,7 @@ fn every_tag_is_exactly_one_name() {
     for t in AppCmd::TAGS.iter().filter(|t| !NOT_SERVED.contains(t)) {
         assert!(m.contains(&format!("core/{t}")), "{t}");
     }
-    for t in HubCmd::TAGS.iter().filter(|t| **t != "hello") {
+    for t in HubCmd::TAGS {
         assert!(m.contains(&format!("hub/{t}")), "{t}");
     }
     for t in CoreEv::TAGS {
@@ -52,8 +52,8 @@ fn every_command_goes_through_its_request_and_back() {
     let mut id = 0;
     for file in ["app_cmd.jsonl", "hub_cmd.jsonl"] {
         for cmd in fixture(file) {
-            if cmd["cmd"] == "hello" || NOT_SERVED.contains(&cmd["cmd"].as_str().unwrap_or("")) {
-                assert!(method_of(&cmd).is_some_and(|m| !methods().contains(&m)), "hello is never a method");
+            if NOT_SERVED.contains(&cmd["cmd"].as_str().unwrap_or("")) {
+                assert!(method_of(&cmd).is_some_and(|m| !methods().contains(&m)), "{cmd} is never a method");
                 continue;
             }
             id += 1;

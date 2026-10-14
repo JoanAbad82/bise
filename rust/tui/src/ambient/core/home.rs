@@ -137,7 +137,7 @@ impl Core {
                 self.hub.send(&req);
             }
             Read::Refused(why) => self.hub(HubIn::Refused(why)),
-            Read::Older => self.home_older(),
+            Read::NotRpc => self.home_older(),
             Read::Nothing => {}
         }
     }

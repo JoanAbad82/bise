@@ -1,4 +1,3 @@
-{"cmd":"hello","proto":1}
 {"cmd":"subscribe","project":"acme-1a2b3c4d","agent":"perf"}
 {"cmd":"subscribe","project":"acme-1a2b3c4d","agent":"perf","limit":60}
 {"cmd":"unsubscribe","project":"acme-1a2b3c4d","agent":"perf"}
@@ -24,7 +23,6 @@
 {"cmd":"archive","project":"acme-1a2b3c4d","agent":"old-fix","force":false}
 {"cmd":"unarchive","project":"acme-1a2b3c4d","agent":"old-fix"}
 {"cmd":"artifacts_seen","project":"acme-1a2b3c4d"}
-{"cmd":"hello","proto":1,"typed_only":true}
 {"cmd":"diff","project":"acme-1a2b3c4d","agent":"perf"}
 {"cmd":"tool_out","project":"acme-1a2b3c4d","agent":"perf","pos":4}
 {"cmd":"queued_take","project":"acme-1a2b3c4d","agent":"perf","id":3}

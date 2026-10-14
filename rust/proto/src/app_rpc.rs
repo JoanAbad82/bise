@@ -51,9 +51,6 @@ pub const INITIALIZED: &str = "initialized";
 pub const CORE: &str = "core";
 pub const HUB: &str = "hub";
 
-/// `hello` is the hub connection's own (the core says it, never the app).
-const NOT_A_METHOD: &[&str] = &["hello"];
-
 /// The [`AppCmd`] tags no core reads yet (draft: `open` is the core's
 /// event to the window, its command has no producer): no method until one
 /// does (bend-tui's law: exactly these are unknown to the core's parser).
@@ -70,7 +67,7 @@ pub fn core_cmds() -> impl Iterator<Item = &'static str> {
 // become rpc::METHODS/NOTIFICATIONS' names (one owner); this module keeps
 // only core/<tag>.
 pub fn hub_cmds() -> impl Iterator<Item = &'static str> {
-    HubCmd::TAGS.iter().copied().filter(|t| !NOT_A_METHOD.contains(t))
+    HubCmd::TAGS.iter().copied()
 }
 
 /// Every method this core serves, for `initialize`'s result.

@@ -30,31 +30,18 @@ def log_lines(E):
         return []
 
 
-def switch_ev(E, timeout=20):
-    """The hub's typed `switch` event (architect m_20576), as a window
-    gets it at hello: `{"op":"hello"}`, then `{"cmd":"hello","proto":1}`
-    on the same connection, read until the `switch` line."""
-    import json
-    import socket
-    import time
-    s = socket.socket(socket.AF_UNIX)
-    s.settimeout(timeout)
-    s.connect(os.path.join(E.state, "hub.sock"))
+def switch_ev(E):
+    """The hub's `switch` row (architect m_20576), as a window gets it on
+    a new connection: `hub/switch` in `initialize`'s state (the older
+    hello that read it went with the hub's older door, debt-t3)."""
     try:
-        s.sendall(b'{"op":"hello"}\n{"cmd":"hello","proto":1}\n')
-        end = time.time() + timeout
-        for line in s.makefile("r"):
-            try:
-                v = json.loads(line)
-            except ValueError:
-                continue
-            if v.get("ev") == "switch":
-                return v
-            if time.time() > end:
-                break
+        c = Client(os.path.join(E.state, "hub.sock"), "repl-start-switch")
+    except (OSError, AssertionError):
+        return None
+    try:
+        return c.hub.get("hub/switch")
     finally:
-        s.close()
-    return None
+        c.s.close()
 
 
 def most_at_once(lines):

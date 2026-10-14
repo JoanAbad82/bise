@@ -476,7 +476,7 @@ impl Shell {
                 }
                 self.proto_slash(id, &tag, agent, &line, cid)
             }
-            HubCmd::Hello { .. } | HubCmd::Unknown { .. } => {}
+            HubCmd::Unknown { .. } => {}
         }
     }
 

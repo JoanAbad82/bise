@@ -5,8 +5,8 @@ edition = "2021"
 license.workspace = true
 
 # the command is `bise` (BISE-165); the package keeps its name (cargo -p
-# bend-harness). Version dirs and installs also get a `bend-harness` link
-# to it, for one release.
+# bend-harness). The installer still links `bend-harness` to it
+# (packaging/install.sh); version dirs no longer do (debt-t3).
 [[bin]]
 name = "bise"
 path = "src/main.rs"

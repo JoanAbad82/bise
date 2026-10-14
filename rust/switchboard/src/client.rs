@@ -187,7 +187,7 @@ fn stop_at(socket: &Path, keep_agents: bool, answer: Duration, wait: Duration) -
             // refused (it runs in an agent's process): the hub stays
             Init::Refused(_) => return Ok(true),
             // a hub from before client-protocol: never asked, it runs on
-            Init::Older => return Err(std::io::Error::other(rpc::HUB_OLDER)),
+            Init::NotRpc => return Err(std::io::Error::other(rpc::HUB_OLDER)),
             Init::Other => {}
         }
     };

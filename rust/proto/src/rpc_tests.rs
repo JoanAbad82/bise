@@ -23,8 +23,7 @@ fn every_command_has_exactly_one_method() {
     }
     for tag in HubCmd::TAGS {
         let n = METHODS.iter().filter(|r| r.cmd == *tag).count();
-        let want = usize::from(!ENVELOPE_CMDS.contains(tag));
-        assert_eq!(n, want, "HubCmd {tag}: {n} methods");
+        assert_eq!(n, 1, "HubCmd {tag}: {n} methods");
     }
 }
 
@@ -56,10 +55,7 @@ fn every_event_is_one_notification_or_a_result() {
 fn every_command_fixture_goes_through_a_request_unchanged() {
     for (i, v) in fixture("hub_cmd.jsonl").into_iter().enumerate() {
         let c = HubCmd::from_value(v.clone()).unwrap();
-        let Some(req) = request(Id::Num(i as u64), &c) else {
-            assert!(ENVELOPE_CMDS.contains(&v["cmd"].as_str().unwrap()), "no request for {v}");
-            continue;
-        };
+        let req = request(Id::Num(i as u64), &c).unwrap_or_else(|| panic!("no request for {v}"));
         let line = Message::Request(req).encode();
         let Ok(Message::Request(back)) = Message::read(&line) else { panic!("{line}") };
         assert_eq!(back.id, Id::Num(i as u64));

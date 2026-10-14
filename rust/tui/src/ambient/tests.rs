@@ -831,11 +831,11 @@ fn a_note_talk_goes_to_the_page_never_to_main() {
     assert!(t.hub.r.read_line(&mut more).is_err() || more.is_empty(), "more: {more}");
 }
 
-/// After `initialize` the core writes JSON-RPC only (architect m_15183):
-/// no `"op"` line in the core's code but the older door's hello to a hub
-/// before client-protocol (hubs.rs, HubIn::Up), the one release it stays.
+/// The core writes JSON-RPC only (architect m_15183): no `"op"` line in
+/// the core's code (the older door's hello went with v2026.10.2-30's
+/// window, debt-t3).
 #[test]
-fn the_core_writes_no_op_line_but_the_older_doors_hello() {
+fn the_core_writes_no_op_line() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/ambient");
     let mut files = vec![root.join("core.rs")];
     let mut dirs = vec![root.join("core")];
@@ -858,17 +858,13 @@ fn the_core_writes_no_op_line_but_the_older_doors_hello() {
             at.push(format!("{}: {}", f.strip_prefix(&root).unwrap().display(), l.trim()));
         }
     }
-    // TODO(client-protocol, the plan's 'after the release' step, with
-    // Hubs.older_door): none at all
-    assert_eq!(at, vec![r#"core/hubs.rs: c.hub.send(&json!({"op": "hello"}));"#.to_string()]);
+    assert_eq!(at, Vec::<String>::new());
 }
 
 /// Law (client-protocol step 5, proto-lead m_15443): an initialized
 /// connection is read as typed events only. The core's code never parses
-/// a feed line (`parse_line`) and never reads an event's `"ev"` tag but in
-/// the older door's typed line of a project hub before client-protocol
-/// (hubs.rs project_line, the one release it stays); its home connection
-/// has no older `state`, `ready`, `page` or `line` arm.
+/// a feed line (`parse_line`) and never reads an event's `"ev"` tag; its
+/// home connection has no older `state`, `ready`, `page` or `line` arm.
 #[test]
 fn an_initialized_connection_reads_no_older_event() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/ambient");
@@ -892,9 +888,7 @@ fn an_initialized_connection_reads_no_older_event() {
             at.push(format!("{}: {}", f.strip_prefix(&root).unwrap().display(), l.trim()));
         }
     }
-    // TODO(client-protocol, the plan's 'after the release' step, with
-    // Hubs.older_door): none at all
-    assert_eq!(at, vec![r#"core/hubs.rs: let ev = v.get("ev").and_then(Value::as_str).unwrap_or("");"#.to_string()]);
+    assert_eq!(at, Vec::<String>::new());
 }
 
 #[test]

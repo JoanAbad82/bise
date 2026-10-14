@@ -17,7 +17,7 @@
 //! The methods and notifications are tables over [`HubCmd`]'s and
 //! [`HubEv`]'s tags, one owner: a method's `params` are its command's
 //! fields as they are, a notification's its event's fields (no second
-//! type per message; laws in `rpc_tests.rs`). [`HubCmd::Hello`] and
+//! type per message; laws in `rpc_tests.rs`).
 //! [`HubEv::Welcome`]/`Refused`/`Error` are the envelope's own business
 //! (`initialize`, the error codes) and have no row.
 
@@ -220,8 +220,6 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("page/changed", "page_changed", Scope::Hub),
 ];
 
-/// The [`HubCmd`] tags the envelope replaces (`initialize`).
-pub const ENVELOPE_CMDS: &[&str] = &["hello"];
 /// The [`HubEv`] tags the envelope replaces (`initialize`'s result, the
 /// error codes).
 pub const ENVELOPE_EVS: &[&str] = &["welcome", "refused", "error"];
@@ -525,46 +523,46 @@ pub struct InitializeResult {
 }
 
 /// What a hub's line says to a connection's `initialize` (its request
-/// id `init`): the one reading of an older hub's door, for every client
-/// that may meet one (the desktop core, `bise`'s install follow).
+/// id `init`): the one reading, for every client (the desktop core,
+/// `bise stop`, the version switch at launch, the terminal).
 #[derive(Clone, Debug, PartialEq)]
 pub enum Init {
     /// the hub serves JSON-RPC: who it is, what it serves
     Ready(Box<InitializeResult>),
     /// the hub refused this client (REFUSED, docs/issues/16)
     Refused(String),
-    /// an older hub (one release, architect m_13089 Q2): it doesn't
-    /// serve `initialize` (accept.rs's `does not serve the op` before
-    /// client-protocol, or an error to the request); speak the older
-    /// door on a new connection
-    Older,
+    /// this hub doesn't serve `initialize`: a hub from before
+    /// client-protocol (v2026.10.2-30) answers `does not serve the op`,
+    /// an error to the request or a result that isn't
+    /// [`InitializeResult`]. Nothing more is said to it: the client
+    /// says [`HUB_OLDER`].
+    NotRpc,
     /// another line: not the answer to `initialize`
     Other,
 }
 
-/// What a client says when [`Init::Older`] answers it: a hub from before
+/// What a client says when [`Init::NotRpc`] answers it: a hub from before
 /// client-protocol (v2026.10.2-30) is no longer spoken to. The one
-/// sentence, for every client (`bise stop`, the version switch at launch).
+/// sentence, for every client (`bise stop`, the version switch at launch,
+/// the desktop core).
 pub const HUB_OLDER: &str = "this project's hub is older than this bise: stop it with `bise switchboard --stop`, then start bise again";
 
 /// [`Init`] of one line, `init` the `initialize` request's id.
-// TODO(client-protocol, the plan's 'after the release' step): Older goes
-// with the older door it detects, the release after client-protocol's.
 pub fn init_answer(v: &Value, init: &Id) -> Init {
     if !is_rpc(v) {
         let older = v.get("ok") == Some(&Value::Bool(false)) && v.get("error").and_then(Value::as_str).is_some_and(|e| e.contains("does not serve"));
-        return if older { Init::Older } else { Init::Other };
+        return if older { Init::NotRpc } else { Init::Other };
     }
     let Ok(Message::Response(r)) = Message::from_value(v.clone()) else { return Init::Other };
     if r.id.as_ref() != Some(init) {
         return Init::Other;
     }
     if let Some(e) = r.error {
-        return if e.code == code::REFUSED { Init::Refused(e.message) } else { Init::Older };
+        return if e.code == code::REFUSED { Init::Refused(e.message) } else { Init::NotRpc };
     }
     match r.result.and_then(|v| serde_json::from_value::<InitializeResult>(v).ok()) {
         Some(res) => Init::Ready(Box::new(res)),
-        None => Init::Older,
+        None => Init::NotRpc,
     }
 }
 

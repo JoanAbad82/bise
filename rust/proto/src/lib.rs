@@ -1,19 +1,19 @@
 //! bise's typed client protocol (bise desktop S3a; architect's review of
 //! the desktop plan, decision D, and of the S3a plan, m_8220).
 //!
-//! One JSON object per line on `hub.sock`, next to the hub's older feed
-//! events (`state`, `line`, …) that the TUI keeps reading for now:
+//! The messages a client and a hub exchange on `hub.sock`:
 //!
-//! - [`hub::HubEv`], tagged `"ev"`: what a hub sends a client that said
-//!   `{"cmd": "hello", "proto": 1}` (its agents, its cards, a thread's
-//!   pages and live entries, an agent's current step, errors);
+//! - [`hub::HubEv`], tagged `"ev"`: what a hub tells a client (its
+//!   agents, its cards, a thread's pages and live entries, an agent's
+//!   current step, errors);
 //! - [`hub::HubCmd`], tagged `"cmd"`: what a client asks a hub (subscribe
 //!   to a thread, an older page, send, answer, stop, archive, unarchive).
 //!
-//! [`rpc`] is the same protocol as JSON-RPC 2.0 (client-protocol, step 1):
-//! `initialize`, one method per `HubCmd`, one notification per `HubEv`
-//! (tables over their tags), numbered hub-wide notifications; the `cmd`
-//! door above goes when every client speaks it.
+//! [`rpc`] carries them as JSON-RPC 2.0 (client-protocol): `initialize`,
+//! one method per `HubCmd`, one notification per `HubEv` (tables over
+//! their tags), numbered hub-wide notifications. The older `cmd` door
+//! (a `hello` command) went once client-protocol's release (v2026.10.2-30)
+//! had shipped its one release after (debt-t3).
 //!
 //! The crate holds every JSON-line contract bise has, each in its own
 //! module (one TS generator, one fixtures convention): the hub protocol

@@ -2,7 +2,8 @@
 //! step 2): fake hubs, one socket pair per connection the core opens.
 
 use super::*;
-use crate::ambient::core::{ProjectFacts, ProjectPorts, HUB_OLDER, LINGER, START};
+use crate::ambient::core::{ProjectFacts, ProjectPorts, HUB_LACKS, LINGER, START};
+use bise_proto::rpc::HUB_OLDER;
 use bise_home::projects::Row;
 use std::collections::HashMap;
 
@@ -134,51 +135,14 @@ impl World {
     }
 
     /// [`welcome`] as a hub of another kind (hub-skew): `cmds` the
-    /// HubCmd tags it serves (its methods), or `proto` an older hub that
-    /// doesn't serve JSON-RPC: it refuses the `initialize` line and closes,
-    /// the core connects again with the hellos and gets this welcome.
+    /// HubCmd tags it serves (its methods).
     pub(super) fn welcome_as(&mut self, t: &mut T, id: &str, extra: Value) {
         self.until(t, |_| true);
-        if extra.get("proto").is_some() {
-            // a core that knows it already says the hellos; else it
-            // tries initialize first, refused here as an older hub does
-            let e = self.end(id);
-            let mut l = String::new();
-            e.r.read_line(&mut l).expect("the core's first line");
-            if l.contains("\"initialize\"") {
-                writeln!(e.w, "{}", json!({"ok": false, "error": "hub.sock does not serve the op \"\""})).unwrap();
-                e.w.shutdown(std::net::Shutdown::Both).unwrap();
-                self.open.remove(id);
-                self.opened(t, &[id]);
-                l.clear();
-                self.end(id).r.read_line(&mut l).expect("the hello");
-            }
-            assert!(l.contains("\"op\":\"hello\""), "the older hello first: {l}");
-            // then the typed hello, then its welcome
-            let e = self.end(id);
-            e.rpc = Some(false);
-            loop {
-                let mut l = String::new();
-                e.r.read_line(&mut l).expect("the typed hello");
-                let v: Value = serde_json::from_str(l.trim()).unwrap();
-                if v["cmd"] == "hello" {
-                    assert_eq!(v, json!({"cmd": "hello", "proto": 1, "typed_only": true}), "a window's connection: typed only");
-                    break;
-                }
-                assert_eq!(v["op"], "hello", "only the hello before it: {v}");
-            }
-            let mut welcome = json!({"ev": "welcome", "project": id, "proto": 1, "workspace": format!("/p/{id}"), "name": id});
-            for (k, v) in extra.as_object().into_iter().flatten() {
-                welcome[k] = v.clone();
-            }
-            self.end(id).say(welcome);
-        } else {
-            let methods = extra.get("cmds").and_then(Value::as_array).map(|tags| {
-                let tags: Vec<&str> = tags.iter().filter_map(Value::as_str).collect();
-                bise_proto::rpc::METHODS.iter().filter(|r| tags.contains(&r.cmd)).map(|r| r.method.to_string()).collect()
-            });
-            self.end(id).initialized(id, methods);
-        }
+        let methods = extra.get("cmds").and_then(Value::as_array).map(|tags| {
+            let tags: Vec<&str> = tags.iter().filter_map(Value::as_str).collect();
+            bise_proto::rpc::METHODS.iter().filter(|r| tags.contains(&r.cmd)).map(|r| r.method.to_string()).collect()
+        });
+        self.end(id).initialized(id, methods);
         self.until(t, |o| o.iter().any(|v| v["ev"] == "welcome" && v["project"] == id));
     }
 }
@@ -199,13 +163,13 @@ fn a_hub_that_lacks_a_command_never_gets_it() {
     typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
     w.opened(&mut t, &["home", "shop"]);
     let older = |out: &[Value], cid: u64| {
-        out.iter().any(|v| v["ev"] == "error" && v["kind"] == "hub_older" && v["cid"] == cid && v["cmd"] == "slash" && v["project"] == "shop" && v["text"] == HUB_OLDER)
+        out.iter().any(|v| v["ev"] == "error" && v["kind"] == "hub_older" && v["cid"] == cid && v["cmd"] == "slash" && v["project"] == "shop" && v["text"] == HUB_LACKS)
     };
     // waits for the welcome, then refused there
     typed(&mut t, json!({"cmd": "slash", "project": "shop", "agent": "main", "line": "/flow", "cid": 5}));
     let hi = json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now"});
     typed(&mut t, hi.clone());
-    w.welcome_as(&mut t, "shop", json!({"cmds": ["hello", "subscribe", "send"]}));
+    w.welcome_as(&mut t, "shop", json!({"cmds": ["subscribe", "send"]}));
     w.until(&mut t, |o| older(o, 5));
     assert_eq!(w.end("shop").next(), hi, "the slash never reached shop's hub; the send did");
     // after the welcome: refused at once, nothing written
@@ -216,30 +180,47 @@ fn a_hub_that_lacks_a_command_never_gets_it() {
     assert!(!t.take().iter().any(|v| v["ev"] == "notice"), "a hub that lists its commands is not 'older'");
 }
 
-/// hub-skew (architect m_11314 (3)): a hub too old to list its commands
-/// that speaks an older proto: one notice per project, its commands still
-/// go (its own errors pass as they are); the same proto: nothing.
+/// A project hub from before client-protocol (v2026.10.2-30) answers the
+/// core's `initialize` with its `does not serve the op`: refused like a
+/// refused hub (architect m_23313), with what to do
+/// (`bise_proto::rpc::HUB_OLDER`): one hub_refused, a command that waited
+/// fails with kind hub_older, nothing more is said to it and it is never
+/// connected again on its own; hub_retry opens it once more.
 #[test]
-fn a_hub_too_old_to_list_its_commands_says_so_once() {
+fn a_hub_without_initialize_is_refused_with_what_to_do() {
     let mut t = T::new();
     t.ready();
     let mut w = world(&mut t);
-    typed(&mut t, json!({"cmd": "shown", "projects": ["shop", "mail"]}));
-    w.opened(&mut t, &["home", "shop", "mail"]);
-    w.welcome_as(&mut t, "shop", json!({"proto": 0}));
-    w.welcome(&mut t, "mail");
-    let notices = |out: &[Value], p: &str| out.iter().filter(|v| v["ev"] == "notice" && v["project"] == p && v["text"] == HUB_OLDER).count();
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    typed(&mut t, json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now", "cid": 7}));
+    let e = w.end("shop");
+    let mut l = String::new();
+    e.r.read_line(&mut l).expect("the core's first line");
+    assert!(l.contains("\"initialize\""), "initialize first: {l}");
+    e.write(json!({"ok": false, "error": "hub.sock does not serve the op \"\""}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "hub_refused"));
     let out = t.take();
-    assert_eq!((notices(&out, "shop"), notices(&out, "mail")), (1, 0), "{out:#?}");
-    let slash = json!({"cmd": "slash", "project": "shop", "agent": "main", "line": "/flow", "cid": 7});
-    typed(&mut t, slash.clone());
-    assert_eq!(w.end("shop").next(), slash, "no list: no guessing, it goes");
-    // shop's hub restarts, still old: no second notice
-    w.end("shop").w.shutdown(std::net::Shutdown::Both).unwrap();
+    let older = HUB_OLDER;
+    let refused: Vec<&Value> = out.iter().filter(|v| v["ev"] == "hub_refused").collect();
+    assert_eq!(refused, [&json!({"ev": "hub_refused", "project": "shop", "error": older})], "{out:#?}");
+    assert!(
+        out.iter().any(|v| v["ev"] == "error" && v["kind"] == "hub_older" && v["cid"] == 7 && v["text"] == older),
+        "the waiting send failed with what to do: {out:#?}"
+    );
+    // nothing more written to it: the core closed its connection
+    let mut more = String::new();
+    assert_eq!(w.end("shop").r.read_line(&mut more).unwrap_or(0), 0, "more: {more}");
     w.open.remove("shop");
+    for _ in 0..5 {
+        t.core.poll_projects(true);
+        w.until(&mut t, |_| true);
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    assert!(w.ends.try_recv().is_err() && !w.open.contains_key("shop"), "never connected again on its own");
+    typed(&mut t, json!({"cmd": "hub_retry", "project": "shop"}));
     w.opened(&mut t, &["shop"]);
-    w.welcome_as(&mut t, "shop", json!({"proto": 0}));
-    assert_eq!(notices(&t.take(), "shop"), 0, "once per project");
+    w.welcome(&mut t, "shop");
 }
 
 /// G (architect m_10348): every send error the core makes itself echoes

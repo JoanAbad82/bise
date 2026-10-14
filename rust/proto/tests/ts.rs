@@ -298,9 +298,9 @@ fn the_typescript_types_are_fresh() {
 #[test]
 fn omitted_fields_are_optional_and_ids_are_numbers() {
     let cfg = Config::new().with_large_int("number");
-    // Hello's typed_only: default + skip_serializing_if, so absent on the wire
+    // PageVoice's text: default + skip_serializing_if, so absent on the wire
     let cmd = hub::HubCmd::decl(&cfg);
-    assert!(cmd.contains("typed_only?: boolean"), "{cmd}");
+    assert!(cmd.contains("text?: string"), "{cmd}");
     // Thread's before: an Option written as null when there is none
     let ev = hub::HubEv::decl(&cfg);
     assert!(ev.contains("before: number | null"), "{ev}");

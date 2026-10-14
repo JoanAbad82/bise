@@ -13,9 +13,9 @@
 //!   `hub/read` again, whose state replaces it;
 //! - an error response is the window's `error` with the request's `cid`
 //!   and the hub's `reason`/`kind`; `command/run`'s words its `notice`;
-//! - an older hub (one release, architect m_13089 Q2) answers the
-//!   `initialize` line with its `does not serve the op` refusal and
-//!   closes: the connection says hello the older way from then on.
+//! - a hub that doesn't serve `initialize` (from before client-protocol,
+//!   v2026.10.2-30) is [`Read::NotRpc`]: the connection is refused with
+//!   `bise_proto::rpc::HUB_OLDER`'s words, nothing more is said to it.
 
 use bise_proto::hub::{ErrorKind, HubCmd, HubEv};
 use bise_proto::rpc::{self, CommandRunResult, HubState, Id, Init, InitializeParams, InitializeResult, Message, Request, Take, Watermark};
@@ -47,8 +47,8 @@ pub enum Read {
     Resync,
     /// the hub refused this connection (REFUSED, docs/issues/16)
     Refused(String),
-    /// an older hub: it doesn't serve `initialize`
-    Older,
+    /// this hub doesn't serve `initialize` (`bise_proto::rpc::Init::NotRpc`)
+    NotRpc,
     Nothing,
 }
 
@@ -79,7 +79,7 @@ impl RpcConn {
     }
 
     /// The window's command (a `HubCmd`'s JSON) as its request; none: no
-    /// method for it (hello, an unknown tag).
+    /// method for it (an unknown tag).
     pub fn request(&mut self, v: &Value) -> Option<Value> {
         let cmd = HubCmd::from_value(v.clone()).ok()?;
         self.next += 1;
@@ -93,12 +93,12 @@ impl RpcConn {
     /// One line of the hub.
     pub fn read(&mut self, project: &str, v: Value) -> Read {
         if !self.ready {
-            // initialize's answer, or an older hub's refusal of its line
+            // initialize's answer, or a hub that doesn't serve it
             // (bise_proto::rpc::init_answer, the one reading)
             match rpc::init_answer(&v, &Id::Num(INIT)) {
                 Init::Ready(res) => return self.welcome(*res),
                 Init::Refused(e) => return Read::Refused(e),
-                Init::Older => return Read::Older,
+                Init::NotRpc => return Read::NotRpc,
                 Init::Other => {}
             }
         }
@@ -125,8 +125,7 @@ impl RpcConn {
         self.ready = true;
         self.wm = res.hub.watermark;
         self.pages_url = res.pages_url.clone();
-        let mut cmds: Vec<String> = res.methods.iter().filter_map(|m| rpc::method_row(m)).map(|r| r.cmd.to_string()).collect();
-        cmds.insert(0, "hello".into());
+        let cmds: Vec<String> = res.methods.iter().filter_map(|m| rpc::method_row(m)).map(|r| r.cmd.to_string()).collect();
         let welcome = HubEv::Welcome { project: res.project, proto: res.proto, workspace: res.workspace, name: res.name, cmds };
         Read::Welcome(welcome, state(&res.hub))
     }
@@ -209,7 +208,7 @@ mod tests {
         assert_eq!(c.initialize("v1")["method"], "initialize");
         let Read::Welcome(HubEv::Welcome { cmds, project, .. }, state) = c.read("shop", init_result(4)) else { panic!() };
         assert_eq!(project, "shop");
-        assert!(cmds.contains(&"send".to_string()) && cmds.contains(&"slash".to_string()) && cmds[0] == "hello");
+        assert!(cmds.contains(&"send".to_string()) && cmds.contains(&"slash".to_string()) && !cmds.contains(&"hello".to_string()));
         assert!(matches!(state.as_slice(), [HubEv::Agents { .. }]));
         assert!(c.ready);
     }
@@ -258,10 +257,10 @@ mod tests {
     }
 
     #[test]
-    fn an_older_hub_and_a_refusal_say_so() {
+    fn a_hub_without_initialize_and_a_refusal_say_so() {
         let mut c = RpcConn::default();
         c.initialize("v1");
-        assert_eq!(c.read("shop", json!({"ok": false, "error": "hub.sock does not serve the op \"\""})), Read::Older);
+        assert_eq!(c.read("shop", json!({"ok": false, "error": "hub.sock does not serve the op \"\""})), Read::NotRpc);
         let refused = serde_json::to_value(Response::err(Some(Id::Num(0)), RpcError::new(rpc::code::REFUSED, "an agent's process"))).unwrap();
         assert_eq!(c.read("shop", refused), Read::Refused("an agent's process".into()));
     }

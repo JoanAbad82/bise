@@ -14,7 +14,7 @@ import type { AnswerResult, CommandRunResult, SendResult } from './rpc';
 
 /** rust/proto/fixtures/hub_ev.jsonl */
 export const hub_ev: readonly HubEv[] = [
-  {"cmds":["hello","subscribe","send","slash"],"ev":"welcome","name":"acme","project":"acme-1a2b3c4d","proto":1,"workspace":"/Users/camille/acme"},
+  {"cmds":["subscribe","send","slash"],"ev":"welcome","name":"acme","project":"acme-1a2b3c4d","proto":1,"workspace":"/Users/camille/acme"},
   {"agents":[{"archived":false,"checkout_branch":"main","dir":"main","inbox":2,"last_pos":40,"main":true,"mode":"shared","name":"main","path":"/Users/me/acme","place_id":"shared","purpose":"","since_ms":1791100000000,"status":"idle","title":"","turns":3,"waits":0,"watching":[]},{"archived":false,"branch":"sb/perf","changes":{"add":42,"del":7,"files":3},"created_ms":1791100000000,"dir":"perf","effort":"high","efforts":["low","medium","high"],"last_pos":118,"main":false,"mode":"worktree","model":"mistral/codestral-latest","msgs_queued":1,"name":"perf","note":"profiling the hub","objective":"make the e2e fast\nfirst: find what the hub waits on","parent":"main","path":"/Users/camille/.bise/worktrees/acme-1a2b3c4d/perf/acme","place_id":"wt:perf","purpose":"make the e2e fast","report":{"at_ms":1791100250000,"kind":"progress","text":"signup 4.1 s → 0.9 s"},"role":"profiling the hub","since_ms":1791100300000,"status":"working","title":"profiling the hub","turn_ms":42000,"usage":{"context":42310,"model":"mistral/codestral-latest","short":"17%","window":256000,"words":"42k · 17%"},"vision":false,"waiting_on":{"name":"docs","who":"agent"},"waits":1,"watching":[{"id":3,"kind":"bg","resumes":true,"since_ms":1791100280000,"until_ms":1791186680000,"what":"cargo test"},{"id":4,"kind":"file","since_ms":1791100290000,"until_ms":1791103890000,"what":"build.rc"}],"worktree":"/Users/camille/.bise/worktrees/acme-1a2b3c4d/perf/acme"},{"archived":true,"dir":"old-fix","main":false,"name":"old-fix","purpose":"an old fix","report":{"at_ms":1791000000000,"kind":"done","text":"fixed in 0.4"},"since_ms":1791000000000,"status":"done","title":"fixed in 0.4","waits":0,"watching":[]},{"archived":false,"checkout_branch":"main","dir":"docs","main":false,"mode":"shared","name":"docs","path":"/Users/me/acme","phase":"starting","place_id":"shared","purpose":"write the docs","since_ms":1791100500000,"status":"working","title":"","waits":0,"watching":[]}],"ev":"agents","places":[{"agents":["perf","docs"],"branch":"sb/dark","id":"wt:dark","pr":{"agents":["perf","docs"],"branch":"sb/dark","checks":"fail","failing":["ci/test"],"in_review":true,"number":412,"review":"none","stale_ms":720000,"state":"open","text":"sb/dark · perf, docs · checks fail: ci/test","url":"https://github.com/acme/web/pull/412","words":"checks fail: ci/test"}},{"agents":["api"],"branch":"billing","feature":true,"id":"feature:billing","lid":"feature · 14 commits · not tried","trying":true},{"branch":"sb/old","id":"pt:/Users/me/acme-wt/old","pr":{"agents":[],"branch":"sb/old","checks":"pass","number":400,"review":"approved","state":"merged","text":"sb/old · no agent · merged · approved · checks pass","url":"https://github.com/acme/web/pull/400","words":"merged · approved · checks pass"}}],"project":"acme-1a2b3c4d"},
   {"ev":"flow","flow":"trunk","project":"acme-1a2b3c4d"},
   {"ev":"card_open","id":12,"project":"acme-1a2b3c4d"},
@@ -102,7 +102,6 @@ export const hub_ev: readonly HubEv[] = [
 
 /** rust/proto/fixtures/hub_cmd.jsonl */
 export const hub_cmd: readonly HubCmd[] = [
-  {"cmd":"hello","proto":1},
   {"agent":"perf","cmd":"subscribe","project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"subscribe","limit":60,"project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"unsubscribe","project":"acme-1a2b3c4d"},
@@ -128,7 +127,6 @@ export const hub_cmd: readonly HubCmd[] = [
   {"agent":"old-fix","cmd":"archive","force":false,"project":"acme-1a2b3c4d"},
   {"agent":"old-fix","cmd":"unarchive","project":"acme-1a2b3c4d"},
   {"cmd":"artifacts_seen","project":"acme-1a2b3c4d"},
-  {"cmd":"hello","proto":1,"typed_only":true},
   {"agent":"perf","cmd":"diff","project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"tool_out","pos":4,"project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"queued_take","id":3,"project":"acme-1a2b3c4d"},

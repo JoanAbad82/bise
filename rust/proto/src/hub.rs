@@ -481,19 +481,6 @@ impl SendOpts {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum HubCmd {
-    /// this connection speaks v`proto`: the hub answers `welcome`, then
-    /// sends `agents` and `cards` now and on each change
-    Hello {
-        proto: u32,
-        /// typed events only on this connection: the hub's older events
-        /// (`state`, `line`, its own `artifacts`...) stop after this
-        /// hello (a window's connection; the capsule's mixed one says
-        /// false until S8). When S8 moves the capsule to typed events,
-        /// every typed connection is typed_only: S8 removes the mixed
-        /// case (and this flag's false)
-        #[serde(default, skip_serializing_if = "crate::is_false")]
-        typed_only: bool,
-    },
     /// a thread's newest page (`thread`), then its `entry`/`typing` live
     Subscribe {
         project: Project,
@@ -799,7 +786,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
+    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -874,7 +861,7 @@ impl HubCmd {
             | HubCmd::ToolOut { project, .. }
             | HubCmd::Log { project, .. }
             | HubCmd::QueuedTake { project, .. } => project,
-            HubCmd::Hello { .. } | HubCmd::Unknown { .. } => return None,
+            HubCmd::Unknown { .. } => return None,
         };
         Some(v)
     }
@@ -905,8 +892,11 @@ mod tests {
     fn a_welcome_without_cmds_is_an_older_hub() {
         let old = HubEv::decode(r#"{"ev":"welcome","project":"p","proto":1,"workspace":"/w","name":"w"}"#).unwrap();
         assert!(matches!(&old, HubEv::Welcome { cmds, .. } if cmds.is_empty()));
-        let new = HubEv::decode(r#"{"ev":"welcome","project":"p","proto":1,"workspace":"/w","name":"w","cmds":["hello","slash"]}"#).unwrap();
-        assert!(matches!(&new, HubEv::Welcome { cmds, .. } if cmds == &["hello", "slash"]));
+        let new = HubEv::decode(r#"{"ev":"welcome","project":"p","proto":1,"workspace":"/w","name":"w","cmds":["subscribe","slash"]}"#).unwrap();
+        assert!(matches!(&new, HubEv::Welcome { cmds, .. } if cmds == &["subscribe", "slash"]));
+        // an older client's hello is no command any more: Unknown, refused
+        let hello = HubCmd::decode(r#"{"cmd":"hello","proto":1,"typed_only":true}"#).unwrap();
+        assert!(matches!(&hello, HubCmd::Unknown { tag, .. } if tag == "hello"));
     }
 }
 

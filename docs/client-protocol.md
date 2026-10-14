@@ -175,24 +175,29 @@ released key and value comes back unchanged. `fixtures.rs` checks that
 every tag has a fixture line and round-trips; `rpc_tests.rs` that every
 fixture goes through its notification or result unchanged.
 
-## For one release only
+## For one release only (gone)
 
-The release that ships this protocol keeps a few paths for a hub or a
-client of the release before it. Each has a TODO naming this list; they
-go in the release after:
+The release that shipped this protocol (v2026.10.2-30) kept a few paths
+for a hub or a client of the release before it. They went once the
+release after had shipped (debt-t3):
 
-- the desktop core falls back to the older typed hello (`{"cmd":
-  "hello","proto":1}`) when a hub doesn't answer `initialize`
-  (`older_door`, `Read::Older`: `rust/tui/src/ambient/core/hubs.rs`,
-  `hub_rpc.rs`), and says `this project's hub is older: update bise` for
-  a command that hub lacks.
+- the hub's hello stub and older door: an older client's
+  `{"op":"hello"}` gets `exe` and `reload`, then the connection closes;
+  `HubCmd::Hello` is no command any more (an older `{"cmd":"hello"}`
+  decodes as `Unknown`);
+- the fallbacks of `sb`'s version switch at launch (`switch/ask.rs`) and
+  of `bise stop` (`client::stop`) to an older hub's hello and op;
+- the desktop core's older door (`older_door`, its typed hello and
+  typed-line reader in `rust/tui/src/ambient/core/hubs.rs`).
 
-Gone (debt-t3): the hub's hello stub and older door (an older client's
-`{"op":"hello"}` gets `exe` and `reload`, then the connection closes);
-the fallbacks of `sb`'s version switch at launch (`switch/ask.rs`) and of
-`bise stop` (`client::stop`) to an older hub's hello and op: an older hub
-(`rpc::init_answer`'s `Older`) is not asked, and they say
-`rpc::HUB_OLDER` instead.
+A hub that doesn't serve `initialize` (`rpc::init_answer`'s `NotRpc`) is
+never asked anything: `bise stop` and the switch say `rpc::HUB_OLDER`,
+and the desktop core refuses that project's connection with those words
+(kind `hub_older`, no reconnect until he retries). The core's home hub
+is the one exception: the app owns it and moves it to its own version
+(`home_switch.rs`). A command a newer-than-it hub lacks is another fact,
+with its own words (`HUB_LACKS`: `this project's hub is older: update
+bise`).
 
 ## After the release
 

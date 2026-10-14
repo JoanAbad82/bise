@@ -60,7 +60,7 @@ pub(super) fn init(app: &mut App, v: &Value) -> bool {
             client::set_refused(why);
             app.should_quit = true;
         }
-        Init::Older => {
+        Init::NotRpc => {
             client::set_refused("the hub runs an older bise, which this terminal can't read: `bise stop`, then `bise` again".into());
             app.should_quit = true;
         }
