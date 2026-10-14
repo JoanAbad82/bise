@@ -11,7 +11,8 @@
 //   - the group: a 28 px 'ψ sb/flash-sale' head with '↑ #418', its rows with no mark, the 1 px rule
 //     in the margin, the TUI's order; the orphan PR: no sign, its '↑', opens its branch;
 //   - the 8-row cap never hides the agent that waits (its head shows with it); 'AGENTS · N' counts agents;
-//   - ARCHIVED: '✓ release-32 2 h', '▲ import 1 d'.
+//   - ARCHIVED: '✓ release-32 2 h', '▲ import 1 d'; ARTIFACTS: the title in art-chips' pink chip, cut
+//     after a word with '…', the hover's tint, 'new' in ink.
 // Shots: agents-bar-<theme>-<width>.png, agents-bar-<theme>-tip.png. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
@@ -27,7 +28,7 @@ const agent = (name: string, status: string, over: Record<string, unknown> = {})
   name, main: name === 'main', status, archived: false, title: '', purpose: `${name}'s job`, since_ms: NOW - 14 * MIN, waits: 0, watching: [], dir: name, ...over,
 });
 const use = (pct: number) => ({ usage: { model: 'm', context: pct * 1000, window: 100_000, words: '', short: `${String(pct)}%` } });
-const LONG = 'proofreading-product-pages';
+const LONG = 'proofreading-pages';
 const pr = (number: number, over: Record<string, unknown> = {}) => ({ number, url: `https://github.com/acme/shop/pull/${String(number)}`, branch: '', agents: [], state: 'open', checks: 'pass', review: 'none', words: 'checks pass', text: '', ...over });
 const world = (theme: string) => [
   prefs(theme),
@@ -49,7 +50,7 @@ const world = (theme: string) => [
       agent('pay', 'working', { purpose: 'mobile safari', turn_ms: 2 * MIN, ...use(12) }),
       agent('docs', 'done', { purpose: 'api examples', ...use(5) }),
       agent('launch', 'idle', { purpose: 'launch videos', ...use(29) }),
-      agent(LONG, 'idle', { purpose: 'the copy of every page, one by one', ...use(40) }),
+      agent(LONG, 'working', { purpose: 'the copy of every page, one by one', turn_ms: 6 * MIN, ...use(40) }),
       agent('broken', 'failed', { purpose: 'import the catalog' }),
       agent('bench', 'idle', { purpose: 'the nightly bench', watching: [{ id: 3, kind: 'bg', what: 'cargo bench', since_ms: NOW - 3 * MIN, resumes: true }] }),
       agent('stock', 'working', { purpose: 'replay the sale', turn_ms: MIN, ...use(9) }),
@@ -74,6 +75,14 @@ const world = (theme: string) => [
     cards: [{ id: 9, project: P, kind: 'merge', agent: 'search', question: 'merge #416?', options: [{ n: 1, label: 'merge' }], urgent: false, since_ms: NOW - MIN, place: 'wt:sb/search', pr: 416 }],
   },
   { ev: 'thread', project: P, agent: 'main', entries: [{ pos: 1, at_ms: NOW - 3 * MIN, kind: 'agent', text: 'search waits for your merge.' }], before: null, more: false },
+  {
+    ev: 'artifacts',
+    project: P,
+    items: [
+      { id: 'product-page', kind: 'page', title: 'product page, before / after the hero image went down to 180 KB', agent: 'perf', version: 2, at_ms: NOW - 5 * MIN, url: 'http://127.0.0.1:1/p/x', new: true },
+      { id: 'replay', kind: 'page', title: 'flash sale replay', agent: 'stock', version: 1, at_ms: NOW - 9 * 24 * 60 * MIN, url: 'http://127.0.0.1:1/p/y', new: false },
+    ],
+  },
 ];
 
 for (const theme of ['light', 'dark']) {
@@ -123,13 +132,39 @@ for (const theme of ['light', 'dark']) {
       await expect(row('perf').getByTestId('app.right.agent.perf.time')).toHaveText('4 min');
       await expect(row('perf').getByTestId('app.right.agent.perf.pct')).toHaveText('31%');
       await expect(row('launch').getByTestId('app.right.agent.launch.time')).toHaveText('');
-      // the long name: whole, its role cut away, its % gone (wrapped off the line), its mark there
-      const long = await row(LONG).evaluate((e) => {
-        const r = (q: string) => e.querySelector(q) as HTMLElement;
-        const cols = r('.app-rb-cols').getBoundingClientRect();
-        return { name: r('.app-rb-name').scrollWidth <= r('.app-rb-name').clientWidth, role: r('.app-rb-role').clientWidth, pctOff: r('.app-rb-pct').getBoundingClientRect().top >= cols.bottom, mark: r('.app-rb-mark').textContent };
+      // short on room (the row narrowed step by step): the role cuts first, then the % goes, then the
+      // time; the name is never cut while the role has room; the mark never goes
+      const steps = await row('perf').evaluate((e) => {
+        const q = (sel: string) => e.querySelector(sel) as HTMLElement;
+        const on = (sel: string) => q(sel).getBoundingClientRect().top < q('.app-rb-cols').getBoundingClientRect().bottom && q('.app-rb-cols').getBoundingClientRect().width > 0;
+        const out: { w: number; role: number; nameCut: boolean; pct: boolean; time: boolean; mark: boolean }[] = [];
+        const full = Math.round(e.getBoundingClientRect().width);
+        for (let w = full; w >= 100; w -= 2) {
+          e.style.width = `${String(w)}px`;
+          const name = q('.app-rb-name');
+          out.push({ w, role: q('.app-rb-role').clientWidth, nameCut: name.scrollWidth > name.clientWidth, pct: on('.app-rb-pct'), time: on('.app-rb-time'), mark: q('.app-rb-mark').getBoundingClientRect().width === 16 && q('.app-rb-mark').getBoundingClientRect().right <= e.getBoundingClientRect().right });
+        }
+        e.style.width = '';
+        return out;
       });
-      expect(long, 'room short: role first, then %, the mark stays').toEqual({ name: true, role: 0, pctOff: true, mark: '↑' });
+      const first = (f: (x: (typeof steps)[number]) => boolean) => steps.findIndex(f);
+      const [roleGone, pctGone, timeGone] = [first((x) => x.role === 0), first((x) => !x.pct), first((x) => !x.time)];
+      expect(steps[0], 'all there at full width').toMatchObject({ pct: true, time: true, mark: true, nameCut: false });
+      expect(roleGone, 'the role goes first').toBeGreaterThan(0);
+      expect(pctGone, 'then the % (once the role has no room left)').toBeGreaterThanOrEqual(roleGone);
+      expect(timeGone, 'then the time').toBeGreaterThan(pctGone);
+      expect(steps.every((x) => x.mark), 'the mark never goes').toBe(true);
+      expect(steps.filter((x) => x.nameCut).every((x) => x.role === 0 && !x.pct && !x.time), 'the name cuts last').toBe(true);
+      // the role cuts after a whole word with '…', or goes whole when not one word fits (designer m_23711)
+      const roles = await page.locator('[data-testid="app.right.agents"] .app-rb-arow:not(.app-rb-ghead):not(.app-rb-orphan) .app-rb-role').evaluateAll((es) =>
+        es.map((e) => ({ shown: e.textContent, full: e.getAttribute('title') ?? e.textContent })),
+      );
+      for (const r of roles) {
+        if (r.shown === r.full) continue;
+        expect(r.shown === '' || (r.shown.endsWith('…') && `${r.full} `.startsWith(`${r.shown.slice(0, -1)} `)), `'${r.shown}' of '${r.full}'`).toBe(true);
+      }
+      await expect(page.getByTestId('app.right.agent.broken.role')).toHaveText(/^import the…$|^import the catalog$/u);
+      await expect(page.getByTestId(`app.right.agent.${LONG}.role`)).toHaveText(/^(|the…|the copy…|the copy of…|the copy of every…)$/u);
       // marks and their tints
       const mark = (id: string) => page.getByTestId(`${id}.mark`);
       const markLook = async (id: string) => mark(id).evaluate((el) => ({ g: el.textContent, c: getComputedStyle(el).color }));
@@ -167,10 +202,33 @@ for (const theme of ['light', 'dark']) {
       await page.getByTestId('app.right.archived.head').click();
       await expect(page.getByTestId('app.right.archived.release-32')).toHaveText(/^✓\s*release-32\s*2 h$/u);
       await expect(page.getByTestId('app.right.archived.import')).toHaveText(/^▲\s*import\s*1 d$/u);
+      // ARTIFACTS: the title in the pink chip (accent on its 10 % tint, 24 px, the kind's glyph inside), cut
+      // after a whole word with one '…'; the row's hover lifts the tint; 'new' stays ink
+      const chip = page.getByTestId(`app.right.artifact.${P}.product-page.chip`);
+      const chipLook = async () => chip.evaluate((e) => ({ c: getComputedStyle(e).color, bg: getComputedStyle(e).backgroundColor, h: Math.round(e.getBoundingClientRect().height), t: e.textContent }));
+      const ink = await color('--c-text');
+      const rest = await chipLook();
+      expect(rest.c).toBe(acc);
+      expect(rest.h).toBe(24);
+      expect(rest.t).toMatch(/^↗ product page, before .*\S…$/u);
+      expect(rest.t, 'cut after a whole word').not.toMatch(/\s…$/u);
+      await expect(page.getByTestId(`app.right.artifact.${P}.replay.chip`)).toHaveText('↗ flash sale replay');
+      expect(await page.getByTestId(`app.right.artifact.${P}.product-page.new`).evaluate((e) => getComputedStyle(e).color)).toBe(ink);
+      await page.getByTestId(`app.right.artifact.${P}.replay`).hover();
+      await page.getByTestId(`app.right.artifact.${P}.product-page`).hover();
+      const hovered = await chipLook();
+      expect(hovered.bg, 'the hover lifts the tint').not.toBe(rest.bg);
+      expect(await page.getByTestId(`app.right.artifact.${P}.product-page`).evaluate((e) => getComputedStyle(e).cursor)).toBe('pointer');
       // shots at 1400, 1100, 800 (slid over)
       for (const w of [1400, 1100, 800]) {
         await page.setViewportSize({ width: w, height: 900 });
-        if (w === 800) await page.keyboard.press('Meta+Alt+Digit0');
+        await page.evaluate(() => new Promise<void>((done) => { requestAnimationFrame(() => { requestAnimationFrame(() => { done(); }); }); }));
+        if (w === 800) {
+          await expect(page.getByTestId('app.panel')).toHaveCount(0);
+          await page.mouse.click(600, 300);
+          await page.keyboard.press('Meta+Alt+Digit0');
+          await expect(page.getByTestId('app.over.right').getByTestId('app.panel'), 'it slides over the thread').toBeVisible();
+        }
         await expect(page.getByTestId('app.right.group.sb/flash-sale')).toBeVisible();
         await page.mouse.move(1, 400);
         await page.screenshot({ path: test.info().outputPath(`agents-bar-${theme}-${String(w)}.png`) });
@@ -178,6 +236,8 @@ for (const theme of ['light', 'dark']) {
       }
       // a click on the orphan opens its branch; on a mark, the PR in the review screen
       await page.setViewportSize({ width: 1400, height: 900 });
+      // docked again: a new bar at its cap, the orphan under '+ 2 more'
+      await page.getByTestId('app.right.agents.more').click();
       await page.getByTestId('app.right.pr.420').click();
       await expect(page.getByTestId('branch.screen')).toHaveAttribute('data-branch', 'sb/palette');
       await mark('app.right.agent.pay').click();

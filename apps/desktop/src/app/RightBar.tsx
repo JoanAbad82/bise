@@ -162,6 +162,9 @@ function Section({
   );
 }
 
+/** An artifact row's chip: art-chips' look, 8 px sides. */
+const CHIP = { className: 'b-artchip app-rb-chip', pad: 16 };
+
 /** Where a worktree's mark, an orphan PR or a head opens: its agent's review, else its branch. */
 type OpenPr = (r: BarRow) => void;
 
@@ -229,10 +232,8 @@ function Row({ r, onOpen, on, onTip, onOpenPr }: { r: BarRow; onOpen: () => void
             {r.cu.g}
           </span>
         )}
-        {/* the role takes what is left and cuts first; its whole words on hover */}
-        <span className="app-rb-role" title={r.sub === '' ? undefined : r.sub}>
-          {r.sub}
-        </span>
+        {/* the role takes what is left and cuts first, after a whole word (none fits: it goes); its words on hover */}
+        <FitWords className="app-rb-role" text={r.sub} testId={`${r.testId}.role`} whole />
         {!head && (
           // time 40 px, % 32 px, right-aligned; short on room the % wraps away first, then the time
           <span className="app-rb-cols">
@@ -251,8 +252,16 @@ function Row({ r, onOpen, on, onTip, onOpenPr }: { r: BarRow; onOpen: () => void
   }
   return (
     <Press look="app-rb-row" aria-current={on === true || undefined} title={r.title} onClick={onOpen} data-testid={r.testId}>
-      <span className={`app-rb-g ${r.tone}`}>{r.glyph}</span>
-      <span className="app-rb-name">{r.name}</span>
+      {r.id !== undefined ? (
+        // an artifact: its kind's glyph and title in the pink chip (desktop-agents-bar §5, art-chips'
+        // .b-artchip), cut after a whole word with '…'; hover on the row lifts its tint to 16 %
+        <FitWords className="app-rb-chipbox" text={`${r.glyph} ${r.name}`} testId={`${r.testId}.chip`} chip={CHIP} />
+      ) : (
+        <>
+          <span className={`app-rb-g ${r.tone}`}>{r.glyph}</span>
+          <span className="app-rb-name">{r.name}</span>
+        </>
+      )}
       {r.leaves === true && (
         <span className="app-rb-out" title="opens in your browser" data-testid={`${r.testId}.leaves`}>
           {LEAVES}

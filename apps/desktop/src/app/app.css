@@ -892,6 +892,21 @@ body:has(.app-shell) {
 .app-rb-ghead[data-group]::before {
   top: var(--s-1);
 }
+/* an artifact's title in its pink chip (§5): the room is the box, the chip hugs the words */
+.app-rb-chipbox {
+  display: flex;
+  min-width: 0;
+}
+.app-rb-chip {
+  display: block;
+  line-height: var(--s-6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-rb-row:hover .app-rb-chip,
+.app-rb-row:focus-visible .app-rb-chip {
+  background: color-mix(in srgb, var(--c-accent) 16%, transparent);
+}
 /* the mark's tip (§3): 280 px, the TUI's words, 'open the PR ↗' */
 .app-rb-tip {
   position: fixed;
