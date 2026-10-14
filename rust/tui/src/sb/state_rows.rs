@@ -57,6 +57,7 @@ impl Agent {
             path: a.path.clone(),
             note: a.note.clone(),
             queued: u64::from(a.msgs_queued),
+            mine_queued: a.queued.clone(),
             inbox: u64::from(a.inbox),
             turn_ms: a.turn_ms,
             turn_seen: Some(std::time::Instant::now()),

@@ -291,11 +291,11 @@ impl Shell {
                 use crate::model::MsgState;
                 let queued = |sh: &Self| matches!(sh.hub.st.msg_state().get(&msg), Some(MsgState::Queued { .. }));
                 let was = queued(self);
-                let text = self.hub.st.msgs().get(&msg).map(|m| m.text.clone()).unwrap_or_default();
+                let (text, parts) = self.hub.st.msgs().get(&msg).map(|m| (m.text.clone(), m.parts_list())).unwrap_or_default();
                 self.step_typed(id, &tag, Input::ClientUnqueue { client: id, id: msg });
                 let taken = matches!(self.hub.st.msg_state().get(&msg), Some(MsgState::Rejected { error }) if error == "taken_back");
                 if was && taken {
-                    self.proto_send(id, &HubEv::QueuedTaken { project, agent, id: msg, text });
+                    self.proto_send(id, &HubEv::QueuedTaken { project, agent, id: msg, text, parts });
                 }
             }
             // git in a thread (art.rs, the `branches` op's scan), to this client

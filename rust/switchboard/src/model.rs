@@ -274,6 +274,17 @@ pub struct Msg {
     pub parts: String,
 }
 
+impl Msg {
+    /// His parts (msg-parts), read from their JSON; none for a message
+    /// without (or an unreadable line, as the fold reads it).
+    pub fn parts_list(&self) -> Vec<bise_proto::parts::Part> {
+        match self.parts.is_empty() {
+            true => Vec::new(),
+            false => serde_json::from_str(&self.parts).unwrap_or_default(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "state")]
 pub enum MsgState {

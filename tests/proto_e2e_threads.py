@@ -18,8 +18,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
+from proto_parts import render  # noqa: E402
 from proto_rpc import (agent_row, check_keys, entries, hub_all, hub_now, idle, ok, raw_client, refused, req,  # noqa: E402
-                       subscribe, transcript, unsubscribe)
+                       run, subscribe, transcript, unsubscribe)
 
 
 def init_round(c, E, sock):
@@ -200,6 +201,19 @@ def queued_round(c, E):
     c.wait_line("main", "sleep 6", 30)
     c.wait_status("main", "working", 30)
     ok(req(c, "turn/send", agent="main", text="take me back", mode="queued"), "a queued send")
+    # the terminal's tab (command/run, mode queued, issue 23) and the
+    # window's send queued (turn/send) make the same queued message:
+    # same row (his words, his parts), from him, held for the turn's end
+    parts = [{"kind": "paste", "n": 1, "text": "two\nlines"}, {"kind": "text", "text": " both doors"}]
+    ok(req(c, "turn/send", agent="main", text=render(parts), parts=parts, mode="queued"), "the window's queued send")
+    ok(run(c, render(parts), parts=parts, mode="queued"), "the terminal's queued line")
+
+    def both_rows():
+        rows = [q for ev in hub_all(c, "hub/agents")[-1:] for a in ev["agents"] if a["name"] == "main"
+                for q in a.get("queued") or [] if q.get("parts") == parts]
+        return rows if len(rows) == 2 else None
+    a, b = c.wait(both_rows, 20, "both doors' queued rows")
+    check((a["text"], a["parts"]) == (b["text"], b["parts"]) and a["id"] < b["id"], "one queued message, two doors: %r %r" % (a, b))
     row = c.wait(lambda: queued_row("take me back"), 20, "his queued row")
     got = ok(req(c, "turn/unqueue", agent="main", id=row["id"]), "turn/unqueue")
     check(got["id"] == row["id"] and got["agent"] == "main" and got["text"] == "take me back", "queued_taken: %r" % got)

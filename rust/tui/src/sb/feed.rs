@@ -55,10 +55,6 @@ pub(super) struct View {
     pub(super) last_ts: Option<u64>,
     /// the agent's composer draft, kept while another is in focus
     pub(super) ed: crate::editor::Editor,
-    /// its queued messages (BISE-89)
-    pub(super) queued: Vec<crate::queue::Queued>,
-    /// its queued message sent, its turn not started (queue.rs)
-    pub(super) queue_out: Option<std::time::Instant>,
 }
 
 impl View {
@@ -77,8 +73,6 @@ impl View {
             last_line_at: 0,
             last_ts: None,
             ed: crate::editor::Editor::default(),
-            queued: Vec::new(),
-            queue_out: None,
         }
     }
 }
@@ -96,8 +90,6 @@ pub(super) fn swap_feed(app: &mut App, v: &mut View) {
     std::mem::swap(&mut app.interrupt_requested, &mut v.interrupt_requested);
     std::mem::swap(&mut app.last_line_at, &mut v.last_line_at);
     std::mem::swap(&mut app.last_ts, &mut v.last_ts);
-    std::mem::swap(&mut app.queued, &mut v.queued);
-    std::mem::swap(&mut app.queue_out, &mut v.queue_out);
 }
 
 pub(super) fn swap_draft(app: &mut App, v: &mut View) {

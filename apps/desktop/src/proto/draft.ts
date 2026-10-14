@@ -2,6 +2,7 @@
 // BISE_PROTO_BLESS=1 cargo test -p bise-proto --features ts --test ts
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
+import type { Part } from './parts';
 import type { Agent, Artifact, Card, ScheduledTask } from './rows';
 
 /**
@@ -14,7 +15,13 @@ export type Quote = { agent: string, pos: number, text: string, };
  * holds it, amb-hub m_8281): an [`Agent`] row's `queued`, draft until the
  * hub's mirror sends them.
  */
-export type Queued = { id: number, text: string, created_ms: number, };
+export type Queued = { id: number, text: string, created_ms: number, 
+/**
+ * his message as typed parts (msg-parts), when he sent some: a
+ * client edits it back from them (chips), never by parsing `text`;
+ * empty for an older message (then `text` is all there is)
+ */
+parts?: Array<Part>, };
 
 /**
  * Hub commands whose stream hasn't shipped.

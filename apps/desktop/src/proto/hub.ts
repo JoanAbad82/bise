@@ -34,7 +34,7 @@ cmds: Array<string>, } | { "ev": "agents", project: string, agents: Array<Agent>
  * of 18 KB shown'), when the session log answered; none for the
  * preview (the size isn't known)
  */
-total?: number, } | { "ev": "queued_taken", project: string, agent: string, id: number, text: string, } | { "ev": "log", project: string, agent: string, items: Array<LogItem>, more: boolean, } | { "ev": "diff", project: string, agent: string, base: string, head?: string | null, files: Array<DiffFile>, 
+total?: number, } | { "ev": "queued_taken", project: string, agent: string, id: number, text: string, parts?: Array<Part>, } | { "ev": "log", project: string, agent: string, items: Array<LogItem>, more: boolean, } | { "ev": "diff", project: string, agent: string, base: string, head?: string | null, files: Array<DiffFile>, 
 /**
  * what the change measured (none: nothing measured; boxed: the
  * enum stays small, the wire is the same)

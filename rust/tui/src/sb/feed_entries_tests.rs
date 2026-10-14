@@ -190,7 +190,7 @@ fn a_turns_edges_and_end_time_come_with_its_entries() {
 }
 
 /// The first row of an agent fires nothing, then its ends do (the edges'
-/// own laws: queue.rs turn_edges).
+/// own laws: turns.rs turn_edges).
 #[test]
 fn the_first_row_fires_nothing() {
     let mut app = subscribed("main");

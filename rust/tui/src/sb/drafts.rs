@@ -11,12 +11,14 @@
 //! - when the UI ends ([`flush`]): /quit, a version switch or a reload
 //!   (re-exec, BISE-131).
 //!
-//! The queued messages (BISE-89) go in the same file (BISE-131), with
-//! when it was written: a TUI started within [`QUEUE_KEPT`] (a reload,
-//! a version switch: a re-exec) takes them back once the hub's replay is
-//! over ([`requeue`], on `ready`); an agent idle by then gets the oldest
-//! at once (its turn ended while the TUI was away). Later, they are
-//! dropped: old lines never fire at an idle agent (book §8).
+//! The queued messages (BISE-89) are the hub's since issue 23: the
+//! journal keeps them, never this file. An older TUI wrote its own queue
+//! here (`queues`, BISE-131) with when it was written: a TUI started
+//! within [`QUEUE_KEPT`] of it (the reload that brings this version)
+//! sends them to the hub as queued messages, in order, once the hub's
+//! replay is over ([`requeue`], on `ready`), and the key goes with the
+//! next write. Later, they are dropped: old lines never fire at an idle
+//! agent (book §8).
 //!
 //! The inbox answers and what is open (the agent in view, the open item,
 //! the scroll, a popup and its query) go in the same file too
@@ -55,6 +57,14 @@ struct Draft {
     cursor: usize,
 }
 
+/// One message an older TUI kept in its own queue (before issue 23): the
+/// composer text as typed (its chips' labels) and the chips it names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OldQueued {
+    text: String,
+    attachments: Vec<crate::attach::Attachment>,
+}
+
 /// What goes on disk for one workspace.
 #[derive(Debug, Clone, PartialEq, Default)]
 struct Saved {
@@ -64,8 +74,9 @@ struct Saved {
     attachments: Vec<crate::attach::Attachment>,
     /// newest first
     history: Vec<String>,
-    /// agent → its queued messages, oldest first (the non-empty queues)
-    queues: BTreeMap<String, Vec<crate::queue::Queued>>,
+    /// agent → an older TUI's queued messages, oldest first, not yet
+    /// sent to the hub ([`requeue`]): kept on disk until then
+    queues: BTreeMap<String, Vec<OldQueued>>,
     /// card id → its inbox answer being written (sb/keep.rs)
     answers: BTreeMap<u64, keep::Text>,
     /// what is open (sb/keep.rs; back after a reload only)
@@ -99,7 +110,7 @@ struct State {
 thread_local! {
     static STATE: RefCell<State> = RefCell::new(State::default());
     /// The queues read at start, until the hub's `ready` ([`requeue`]).
-    static QUEUES: RefCell<BTreeMap<String, Vec<crate::queue::Queued>>> = const { RefCell::new(BTreeMap::new()) };
+    static QUEUES: RefCell<BTreeMap<String, Vec<OldQueued>>> = const { RefCell::new(BTreeMap::new()) };
     #[cfg(test)]
     static DIR: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
 }
@@ -226,11 +237,11 @@ fn from_json(v: &Value) -> Saved {
         .map(|m| {
             m.iter()
                 .map(|(a, l)| {
-                    let q: Vec<crate::queue::Queued> = l
+                    let q: Vec<OldQueued> = l
                         .as_array()
                         .into_iter()
                         .flatten()
-                        .map(|x| crate::queue::Queued { text: str_of(x, "text"), attachments: atts_of(x) })
+                        .map(|x| OldQueued { text: str_of(x, "text"), attachments: atts_of(x) })
                         .filter(|x| !x.text.is_empty())
                         .collect();
                     (a.clone(), q)
@@ -338,21 +349,9 @@ fn snapshot(app: &App) -> Saved {
         .collect();
     let mut history = app.history.clone();
     history.truncate(HISTORY_MAX);
-    let mut queues = BTreeMap::new();
-    if !app.queued.is_empty() {
-        queues.insert(app.sb.focus.clone(), app.queued.clone());
-    }
-    for (a, v) in &app.sb.views {
-        if !v.queued.is_empty() {
-            queues.insert(a.clone(), v.queued.clone());
-        }
-    }
-    // read at start, not back yet (no `ready`): still to keep
-    QUEUES.with(|q| {
-        for (a, l) in q.borrow().iter() {
-            queues.entry(a.clone()).or_insert_with(Vec::new).splice(0..0, l.iter().cloned());
-        }
-    });
+    // an older TUI's queue read at start, not sent yet (no `ready`):
+    // still to keep
+    let queues = QUEUES.with(|q| q.borrow().clone());
     Saved { drafts, attachments, history, queues, answers: keep::answers(app), view: keep::view(app) }
 }
 
@@ -404,22 +403,20 @@ pub(crate) fn restore(app: &mut App) {
     STATE.with(|st| *st.borrow_mut() = State { file: Some(file), written: Some(saved), seen: None, failed: false });
 }
 
-/// The hub's replay is over (`ready`): the queues read at start go back
-/// to their feeds, before what was queued since; an agent that is idle
-/// now gets its oldest queued message (its turn ended meanwhile).
+/// The hub's replay is over (`ready`): an older TUI's queues read at
+/// start go to the hub as queued messages (issue 23's upgrade), each
+/// agent's in order, each with its own chips; the hub holds them (or an
+/// idle agent gets them at once) and the file's key goes with the next
+/// write.
 pub(crate) fn requeue(app: &mut App) {
     let queues = QUEUES.with(|q| std::mem::take(&mut *q.borrow_mut()));
     for (agent, q) in queues {
-        let mut next = None;
-        super::with_feed(app, &agent, |app| {
-            app.queued.splice(0..0, q);
-            next = crate::queue::next(app);
-            if next.is_some() {
-                app.pending = true;
-            }
-        });
-        if let Some(m) = next {
-            app.sb.send_input_to(&agent, m);
+        for m in q {
+            // expanded with its own chips; the composer keeps its own
+            let mine = std::mem::replace(&mut app.attachments, m.attachments);
+            let said = crate::attach::expand(app, &m.text);
+            app.attachments = mine;
+            app.sb.send_queued(&agent, said.text, said.parts);
         }
     }
 }
@@ -554,35 +551,44 @@ mod tests {
         assert_eq!(b.ed.text, "for docs");
     }
 
+    /// Law (issue 23's upgrade, architect m_23376): an older TUI's queue
+    /// in the file is not lost: kept until the hub's `ready`, then sent
+    /// to the hub as queued messages, each agent's in order with its own
+    /// chips, and the key goes with the next write. A stale one (a real
+    /// restart, later) never comes back.
     #[test]
-    fn the_queues_survive_a_reload_and_an_idle_agent_gets_the_oldest() {
-        let q = |t: &str| crate::queue::Queued { text: t.into(), attachments: Vec::new() };
-        let (_d, mut app) = setup();
-        app.queued = vec![q("main one"), q("main two")];
-        focus(&mut app, "docs");
-        app.queued = vec![q("docs one")];
-        flush(&app);
-        assert_eq!(on_disk(&app)["queues"]["main"], json!([{"text": "main one", "attachments": []}, {"text": "main two", "attachments": []}]));
-        let mut b = restarted(&app);
-        // before the hub's replay is over: nowhere yet, still saved
-        assert!(b.queued.is_empty());
-        assert_eq!(snapshot(&b).queues.len(), 2, "not lost before ready");
-        // ready: main is busy (it keeps both), docs is idle (it gets its one)
-        b.pending = true;
-        requeue(&mut b);
-        assert_eq!(b.queued, vec![q("main one"), q("main two")]);
-        focus(&mut b, "docs");
-        assert!(b.queued.is_empty(), "sent at once: its turn ended meanwhile");
-        assert!(b.pending);
-        assert!(!snapshot(&b).queues.contains_key("docs"));
-        // a real restart, later: the old queue is dropped
+    fn an_older_tuis_queue_goes_to_the_hub_once() {
+        let (_d, app) = setup();
         let f = dir().unwrap().join(file_name(&app.sb.workspace));
-        let mut v = on_disk(&app);
+        let img = json!({"label": "[Image #1]", "marker": "<image name=\"[Image #1]\" b64=\"/x.b64\">"});
+        let old = json!({"workspace": app.sb.workspace, "drafts": {}, "attachments": [], "history": [],
+            "queues": {"main": [{"text": "main one", "attachments": []}, {"text": "look [Image #1]", "attachments": [img]}],
+                       "docs": [{"text": "docs one", "attachments": []}]},
+            "queues_ms": now_ms()});
+        std::fs::create_dir_all(f.parent().unwrap()).unwrap();
+        std::fs::write(&f, old.to_string()).unwrap();
+        let (mut b, mut hub) = crate::sb::bench::test_app_hub();
+        b.sb.workspace = app.sb.workspace.clone();
+        restore(&mut b);
+        // before the hub's replay is over: nowhere yet, still saved
+        assert_eq!(snapshot(&b).queues.len(), 2, "not lost before ready");
+        assert!(crate::sb::bench::hub_sent(&mut hub).is_empty());
+        requeue(&mut b);
+        let sent: Vec<(String, String, String)> = crate::sb::bench::hub_sent(&mut hub)
+            .iter()
+            .map(|r| (r["params"]["agent"].as_str().unwrap().into(), r["params"]["line"].as_str().unwrap().into(), r["params"]["mode"].as_str().unwrap().into()))
+            .collect();
+        let q = |a: &str, t: &str| (a.to_string(), t.to_string(), "queued".to_string());
+        assert_eq!(sent, [q("docs", "docs one"), q("main", "main one"), q("main", "look <image name=\"[Image #1]\" b64=\"/x.b64\">")]);
+        assert!(snapshot(&b).queues.is_empty());
+        flush(&b);
+        assert!(on_disk(&b).get("queues").is_none(), "the key went");
+        // a real restart, later: a stale queue is dropped
+        let mut v = old.clone();
         v["queues_ms"] = json!(now_ms() - QUEUE_KEPT.as_millis() as u64 - 1000);
         std::fs::write(&f, v.to_string()).unwrap();
         let c = restarted(&app);
         assert!(snapshot(&c).queues.is_empty(), "stale queues never come back");
-        assert_eq!(c.ed.text, "", "the drafts still do (none here)");
     }
 
     #[test]

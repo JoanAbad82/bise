@@ -36,6 +36,11 @@ pub struct Queued {
     pub id: u64,
     pub text: String,
     pub created_ms: u64,
+    /// his message as typed parts (msg-parts), when he sent some: a
+    /// client edits it back from them (chips), never by parsing `text`;
+    /// empty for an older message (then `text` is all there is)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parts: Vec<crate::parts::Part>,
 }
 
 /// Hub commands whose stream hasn't shipped.

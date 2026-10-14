@@ -315,8 +315,8 @@ fn agent_row(app: &App, sb: &Sb, a: &Agent, i: usize, num: Option<usize>, w: usi
     if a.queued > 0 {
         marks.push(Span::styled(format!(" {}{}", G_MSG, a.queued), Style::default().fg(dim())));
     }
-    // BISE-89: the messages queued here for after its turn
-    let mine = if focused { app.queued.len() } else { sb.views.get(&a.name).map_or(0, |v| v.queued.len()) };
+    // BISE-89: his messages the hub holds for after its turn (issue 23)
+    let mine = sb.queued_for(&a.name).len();
     if mine > 0 {
         marks.push(Span::styled(format!(" · {} queued", mine), Style::default().fg(faint())));
     }

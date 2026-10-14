@@ -1,7 +1,38 @@
 # 23 · two owners of a queued message: the terminal's queue and the hub's
 
-Status: agreed by architect (m_16252), not started. Written with
-queued_take (amb-feed). Label: hub, protocol, tui. Same area as issue 22.
+Status: done (debt-t4, T4 of architect's tech-debt-night list, plan
+signed m_23376). The hub owns every queued message; the terminal sends,
+draws and takes back, nothing more. Label: hub, protocol, tui. Same area
+as issue 22.
+
+What the user sees change in the terminal: messages queued with tab now
+all go in ONE turn when the current turn ends, in order (sb-core's law
+user_queued_said_at_idle, the window's behavior); before, the terminal
+sent one per turn. One per turn would be a separate sb-core law change
+for both apps. Also: a second terminal (and the window) shows the same
+queue, and a queue survives a terminal restart (the journal keeps it).
+
+What changed:
+
+- tab: `command/run {line, mode: queued, parts}` at once
+  (`rust/tui/src/sb/queued.rs`, `sb/send.rs`); the queue above the
+  composer and the panel's `· N queued` come from `rows::Agent.queued`
+  (`queue.rs` only draws);
+- ↑: `turn/unqueue` of the newest row; `queued_taken` now carries his
+  `parts` (and `rows::Agent.queued` too), so his chips come back from
+  them (`chips_back.rs`), parsed from the text only for an older message;
+- gone: `App.queued`, `queue_out` and the 766a28a6 guard (`next`,
+  `seen`, `TURN_WAIT`), the views' copies, `reads::queue_next`, the
+  drafts file's own queue; `turn_edges` moved to `turns.rs` (it still
+  drives the busy state and voice mode, never a send);
+- upgrade: an older terminal's `queues` key in the drafts file (fresh,
+  a reload) goes to the hub as queued messages at `ready`, in order, then
+  the key goes (`drafts.rs` an_older_tuis_queue_goes_to_the_hub_once).
+
+Proof: tui_queue_tmux (tab, ↑ edit, one turn in order, a second
+terminal on the same hub sees the same queue), proto_e2e_threads (the
+terminal's door and the window's make the same queued row; queued_take
+unchanged), tui_undelivered_tmux, proto_e2e_parts.
 
 ## The problem
 

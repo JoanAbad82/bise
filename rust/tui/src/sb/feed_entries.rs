@@ -91,7 +91,7 @@ pub(super) fn page(app: &mut App, agent: &str, older: Option<usize>, entries: Ve
 }
 
 fn first_page(app: &mut App, agent: &str, entries: &[Entry], more: bool) {
-    let keep = (app.ed.clone(), app.queued.clone());
+    let keep = app.ed.clone();
     // the connection's first page: what the feed holds came after the
     // connection emptied it and before any entry (a notice, a command's
     // answer: /update typed before `initialize` answered), so it stays,
@@ -107,7 +107,7 @@ fn first_page(app: &mut App, agent: &str, entries: &[Entry], more: bool) {
         push_event(&mut app.events, &mut app.cache, ev);
     }
     app.win.first_pos = Some(first_pos(entries, more));
-    (app.ed, app.queued) = keep;
+    app.ed = keep;
 }
 
 /// The oldest pos the feed holds; 1 when nothing is before it (no page
@@ -298,7 +298,7 @@ pub(super) fn want_older(app: &mut App, before: usize) {
 }
 
 /// An agent's row as the state reader applies it (zone-a's 4b): its turn
-/// edges since the row before (`queue::turn_edges`: its turn runs and its
+/// edges since the row before (`turns::turn_edges`: its turn runs and its
 /// ended turns, both from sb-core's one view, issue 22) go to its feed;
 /// the first row of an agent fires none.
 pub(crate) fn agent_row(app: &mut App, agent: &str, running: bool, turns: u64) {
@@ -306,7 +306,7 @@ pub(crate) fn agent_row(app: &mut App, agent: &str, running: bool, turns: u64) {
         app.sb.turns_seen.insert(agent.to_string(), (running, turns));
         return;
     };
-    let edges = crate::queue::turn_edges((w, t), (running, turns));
+    let edges = crate::turns::turn_edges((w, t), (running, turns));
     app.sb.turns_seen.insert(agent.to_string(), (running, turns));
     for started in edges {
         turn_edge(app, agent, started);
@@ -321,15 +321,12 @@ pub(crate) fn agent_row(app: &mut App, agent: &str, running: bool, turns: u64) {
 /// drawn, proto-lead m_14961).
 pub(crate) fn turn_edge(app: &mut App, agent: &str, working: bool) {
     with_feed(app, agent, |app| {
-        // the queued message that went has its turn: the next one may go
-        // at a turn's end (queue.rs, as the lines' turn_started/turn_done)
-        crate::queue::seen(app);
         if !working {
             app.pending = false;
             app.interrupt_requested = false;
         }
     });
-    // voice mode's turn, the queue's next message (outside with_feed)
+    // voice mode's turn (outside with_feed)
     crate::entry_reads::on_turn(app, agent, working);
 }
 

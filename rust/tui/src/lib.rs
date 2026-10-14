@@ -133,6 +133,8 @@ mod ctrlhint;
 mod optkeys;
 mod reach;
 mod queue;
+mod chips_back;
+mod turns;
 mod layout;
 mod chrome;
 mod topedge;

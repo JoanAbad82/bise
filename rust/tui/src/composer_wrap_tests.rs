@@ -470,7 +470,7 @@ fn the_typing_area_has_a_blank_bar_row_above_and_under_its_text() {
 /// `pane_rows` with `queued` messages waiting for the turn's end.
 fn pane_rows_queued(height: u16, images: usize, queued: &[&str]) -> Vec<String> {
     let mut app = sb::bench::test_app();
-    app.queued = queued.iter().map(|t| crate::queue::Queued { text: t.to_string(), attachments: Vec::new() }).collect();
+    sb::bench::queued_rows(&mut app, "main", queued);
     if images > 0 {
         with_images(&mut app, images, "hi");
     }

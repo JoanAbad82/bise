@@ -3,7 +3,7 @@
 //! read from the hub's fold are the ones the TUI read from the lines.
 
 use super::*;
-use crate::sb::bench::{test_app, test_app_drained};
+use crate::sb::bench::test_app;
 use crate::sb::test_view;
 use bise_proto::thread::{fold, Ctx, Line};
 
@@ -231,27 +231,18 @@ fn his_page_answer_is_one_answer_row() {
     assert!(matches!(evs.as_slice(), [Ev::Approval { text, note, .. }] if text == "you sent t1 a note on ↗ plan" && note == "shorter"), "a note's row");
 }
 
-/// Read 6: The queue: at a turn's end the oldest queued message goes, once
-/// (the next one waits for the turn it starts).
+/// Read 6: The queue (issue 23): a turn's edges send nothing, his queued
+/// messages are the hub's to send at the turn's end.
 #[test]
-fn a_turns_end_sends_the_oldest_queued() {
-    let mut app = test_app_drained();
+fn a_turns_end_sends_nothing() {
+    let (mut app, mut hub) = crate::sb::bench::test_app_hub();
     test_view(&mut app, "perf");
+    crate::sb::bench::queued_rows(&mut app, "perf", &["one", "two"]);
     app.pending = true;
-    for t in ["one", "two"] {
-        app.ed.insert(t);
-        crate::queue::push(&mut app);
-    }
     on_turn(&mut app, "perf", true);
-    assert_eq!(app.queued.len(), 2, "a turn that starts sends nothing");
     app.pending = false;
     on_turn(&mut app, "perf", false);
-    assert_eq!(app.queued.len(), 1, "the oldest went");
-    assert!(app.pending);
-    let e = entry(serde_json::json!({"pos": 9, "at_ms": 0, "kind": "agent", "text": "x"}));
-    on_entry(&mut app, "perf", &e, true);
-    on_turn(&mut app, "perf", false);
-    assert_eq!(app.queued.len(), 1, "the next one waits for its turn");
+    assert!(crate::sb::bench::hub_sent(&mut hub).is_empty());
 }
 
 /// Read 7: Voice mode: a live reply of his agent, once; never a message to

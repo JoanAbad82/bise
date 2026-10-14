@@ -18,7 +18,8 @@
 //! 3. zen (BISE-121): a live card or message to him, in any feed;
 //! 4. the activity dot: a live entry he would see, out of view;
 //! 5. the answer fold and BISE-307's asked (`ApprovalFold.card`);
-//! 6. the queue (BISE-89): at a turn's end the oldest queued message goes;
+//! 6. the queue (BISE-89): nothing here since issue 23 (the hub sends his
+//!    queued messages at the turn's end);
 //! 7. voice mode: the live replies and turns of an agent;
 //! 8. line mode (`sb/client.rs`): an entry printed as `[agent] …` lines.
 //!
@@ -183,7 +184,6 @@ pub(crate) fn on_entry(app: &mut App, agent: &str, e: &Entry, live: bool) {
     if let Some(text) = r.said {
         crate::voicemode::live::on_events(app, agent, &[Ev::Assistant(text)]);
     }
-    crate::sb::queue_next(app, agent);
     if r.level3 {
         crate::hints::once(app, crate::hints::Hint::FirstLevel3);
     }
@@ -214,14 +214,12 @@ pub(crate) fn on_head(app: &mut App, agent: &str, last_pos: Option<Pos>) {
 }
 
 /// `agent`'s turn `started` or ended (its feed drew it): voice mode
-/// hears it live; at its end the oldest queued message goes.
+/// hears it live (his queued messages go at its end from the hub, issue
+/// 23, never from here).
 pub(crate) fn on_turn(app: &mut App, agent: &str, started: bool) {
     if app.voice_mode.is_some() && app.sb.is_ready() {
         let ev = if started { Ev::Turn } else { Ev::TurnDone };
         crate::voicemode::live::on_events(app, agent, &[ev]);
-    }
-    if !started {
-        crate::sb::queue_next(app, agent);
     }
 }
 

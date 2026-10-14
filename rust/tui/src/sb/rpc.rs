@@ -51,9 +51,11 @@ pub(crate) enum Then {
     RuleRemoved,
     /// what he typed or sent (command/run, turn/send, card/*): the
     /// hub's words (its refusal, or a CommandRunResult's notice) show
-    /// as its notice did, and the queue moves on as on a notice (a
-    /// refused queued message starts no turn: the 766a28a6 guard)
+    /// as its notice did
     Line,
+    /// `turn/unqueue` for his queued message `id` (↑, issue 23): its
+    /// words back in the composer, or the hub's refusal (sb/queued.rs)
+    Taken(u64),
     /// `thread/subscribe` (None: the first page, it replaces the feed)
     /// or `thread/page` (the `before` asked) for this agent: entries
     /// placed by pos (sb/feed_entries.rs)
@@ -157,8 +159,8 @@ fn run(app: &mut App, then: Then, r: Response) {
             None => feed_entries::first_page_in(app, &agent),
             Some(_) => with_feed(app, &agent, |app| app.win.loading = false),
         },
+        (Then::Taken(id), answer) => super::queued::taken(app, id, answer),
         (Then::Line, Err(e)) => {
-            crate::queue::seen(app);
             match undelivered.then(|| above_undelivered(app)).flatten() {
                 Some(at) => {
                     for (k, l) in e.lines().enumerate() {
@@ -192,7 +194,6 @@ fn run(app: &mut App, then: Then, r: Response) {
         (Then::Line, Ok(v)) => {
             let said = serde_json::from_value::<bise_proto::rpc::CommandRunResult>(v).ok().and_then(|c| c.notice);
             if let Some(text) = said {
-                crate::queue::seen(app);
                 refused(app, &text);
             }
         }
@@ -203,7 +204,6 @@ fn run(app: &mut App, then: Then, r: Response) {
 /// hub's notice showed them; else the dim head and a PR line per row.
 fn prs(app: &mut App, result: &Value) {
     if let Some(none) = result.get("none").and_then(Value::as_str) {
-        crate::queue::seen(app);
         return refused(app, none);
     }
     for e in prs_events(result) {
@@ -212,10 +212,9 @@ fn prs(app: &mut App, result: &Value) {
 }
 
 /// A `CommandRunResult`'s words, as the hub's `notice` event showed
-/// them (sb.rs's `notice` arm, the queue's mark included).
+/// them (sb.rs's `notice` arm).
 fn said(app: &mut App, result: &Value) {
     let Some(text) = result.get("notice").and_then(Value::as_str) else { return };
-    crate::queue::seen(app);
     refused(app, text);
 }
 
@@ -229,7 +228,7 @@ fn above_undelivered(app: &App) -> Option<usize> {
 }
 
 /// The hub's refusal, as its notice showed it.
-fn refused(app: &mut App, text: &str) {
+pub(super) fn refused(app: &mut App, text: &str) {
     for l in text.lines() {
         push_event(&mut app.events, &mut app.cache, Ev::Info(l.to_string()));
     }
@@ -336,31 +335,28 @@ mod tests {
         assert_eq!(app.events.len(), n);
     }
 
-    /// Law (architect m_13450, the 766a28a6 queue guard): a queued
-    /// message's command/run refused by the hub, through the real
-    /// dispatch, lets the queue move on as the hub's notice did; its
-    /// words show; a bare `{}` keeps the mark (the turn will start).
+    /// Law (architect m_13450): a line's command/run refused by the hub,
+    /// through the real dispatch, shows its words as the hub's notice
+    /// did; the hub's words as its result too; a bare `{}` says nothing.
     #[test]
-    fn a_refused_queued_line_moves_the_queue_on() {
+    fn a_refused_line_shows_its_words() {
         let mut app = crate::sb::bench::test_app();
         app.sb.workspace = "/tmp/acme".into();
         let send = |app: &mut App| {
-            app.queue_out = Some(std::time::Instant::now());
             app.sb.call("command/run", json!({"agent": "main", "line": "/stop x"}), Then::Line);
             *app.sb.rpc.waiting.borrow().keys().last().unwrap()
         };
         let id = send(&mut app);
         let n = app.events.len();
         dispatch(&mut app, &json!({"jsonrpc": "2.0", "id": id, "error": {"code": -32010, "message": "commands run now, not queued"}}).to_string());
-        assert_eq!(app.queue_out, None, "refused: the queue moves on");
         assert!(matches!(app.events.get(n), Some(Ev::Info(t)) if t == "commands run now, not queued"));
-        // the hub's words as the result: shown, and the queue moves on
         let id = send(&mut app);
+        let n = app.events.len();
         dispatch(&mut app, &json!({"jsonrpc": "2.0", "id": id, "result": {"notice": "no agent x"}}).to_string());
-        assert_eq!(app.queue_out, None);
-        // done, nothing said: the turn it starts clears the mark
+        assert!(matches!(app.events.get(n), Some(Ev::Info(t)) if t == "no agent x"));
         let id = send(&mut app);
+        let n = app.events.len();
         dispatch(&mut app, &json!({"jsonrpc": "2.0", "id": id, "result": {}}).to_string());
-        assert!(app.queue_out.is_some());
+        assert_eq!(app.events.len(), n);
     }
 }

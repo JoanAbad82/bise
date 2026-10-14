@@ -161,8 +161,17 @@ pub enum HubEv {
     },
     /// his queued message taken back (the answer to `queued_take`, this
     /// connection only): it will never be delivered; `text` his words, for
-    /// the window's "edit" (put back in the composer)
-    QueuedTaken { project: Project, agent: String, id: u64, text: String },
+    /// the window's "edit" (put back in the composer); `parts` his typed
+    /// parts when he sent some (msg-parts: the chips come back from
+    /// them), empty for an older message
+    QueuedTaken {
+        project: Project,
+        agent: String,
+        id: u64,
+        text: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        parts: Vec<Part>,
+    },
     /// a page of an agent's raw session (the answer to `log`, this
     /// connection only; the window's `/log`): rows oldest first, every
     /// text redacted; `more`: older rows remain (ask with `before` = the

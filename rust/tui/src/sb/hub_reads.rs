@@ -295,11 +295,8 @@ fn keep_selection(app: &mut App) {
     }
 }
 
-/// The hub's words (`hub/notice`): one info line per line. The hub
-/// refused an input (it says so in a notice): a queued message that went
-/// starts no turn, so the queue moves on.
+/// The hub's words (`hub/notice`): one info line per line.
 fn notice(app: &mut App, text: &str) {
-    crate::queue::seen(app);
     for l in text.lines() {
         push_event(&mut app.events, &mut app.cache, Ev::Info(l.to_string()));
     }

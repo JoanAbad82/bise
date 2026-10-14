@@ -48,21 +48,6 @@ pub(crate) fn ask_answer(app: &mut App, agent: &str, id: u64, text: &str, here: 
     });
 }
 
-/// BISE-89: `agent`'s turn ended, the oldest queued message goes (and
-/// the next one waits for the turn it starts).
-pub(crate) fn queue_next(app: &mut App, agent: &str) {
-    let mut queued = None;
-    with_feed(app, agent, |app| {
-        queued = crate::queue::next(app);
-        if queued.is_some() {
-            app.pending = true;
-        }
-    });
-    if let Some(m) = queued {
-        app.sb.send_input_to(agent, m);
-    }
-}
-
 /// Tests: the hub's burst is over and `focus` is in view.
 #[cfg(test)]
 pub(crate) fn test_view(app: &mut App, focus: &str) {

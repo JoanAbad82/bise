@@ -775,10 +775,10 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
                 apply_md(app, e);
                 app.key_in_composer = true;
             } else if app.pending {
-                // BISE-89 (after Codex): the draft waits in the TUI for
-                // the end of the turn, shown above the composer; nothing
-                // goes to the hub before
-                crate::queue::push(app);
+                // BISE-89 (after Codex): the draft waits for the end of
+                // the turn, held by the hub (issue 23: sb/queued.rs),
+                // shown above the composer
+                crate::sb::queued::queue(app);
             }
         }
         // a newline in the composer: Shift+Enter (needs
@@ -859,9 +859,10 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
             }
         }
         // BISE-89: ↑ in an empty composer edits the newest queued
-        // message (the history comes after the queue)
-        (KeyCode::Up, KeyModifiers::NONE) if !popup_open && app.ed.text.is_empty() && !app.queued.is_empty() => {
-            crate::queue::pop_last(app);
+        // message, taken back from the hub (the history comes after the
+        // queue)
+        (KeyCode::Up, KeyModifiers::NONE) if !popup_open && app.ed.text.is_empty() && !app.sb.queued_for(&app.sb.focus).is_empty() => {
+            crate::sb::queued::take_newest(app);
             app.key_in_composer = true;
         }
         // the popup takes the plain arrows

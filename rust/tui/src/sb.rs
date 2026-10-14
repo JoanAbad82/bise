@@ -57,7 +57,9 @@ pub(crate) mod rpc;
 pub(crate) mod hub_reads;
 mod state_rows;
 mod reads;
-pub(crate) use reads::{ask_answer, queue_next};
+pub(crate) mod queued;
+mod send;
+pub(crate) use reads::ask_answer;
 #[cfg(test)]
 pub(crate) use client::{hub_event_lines, Printed};
 #[cfg(test)]
@@ -124,7 +126,13 @@ pub(super) struct Agent {
     branch: Option<String>,
     path: String,
     note: String,
+    /// the agents' messages waiting for its turn to end (the row's
+    /// `msgs_queued`)
     queued: u64,
+    /// issue 23: his messages the hub holds for its turn's end (the row's
+    /// `queued`, oldest first): the queue above the composer and the
+    /// panel's `· N queued` (queue.rs draws them, ↑ takes one back)
+    pub(crate) mine_queued: Vec<bise_proto::draft::Queued>,
     /// BISE-299: main's inbox, the agents' questions waiting for main (a
     /// quiet count on main's row: the user is not asked)
     inbox: u64,
@@ -255,6 +263,10 @@ pub(super) struct Sb {
     /// Each agent's last row as the turn edges read it: its turn runs,
     /// its ended turns (feed_entries::agent_row).
     turns_seen: HashMap<String, (bool, u64)>,
+    /// issue 23: his queued messages ↑ asked back (`turn/unqueue`) whose
+    /// answer has not come: view state, so a second ↑ takes the next one
+    /// and the queue no longer draws them (queue.rs).
+    pub(crate) taking: std::collections::BTreeSet<u64>,
     /// The agent whose first page `ready` waits for (the focus at the
     /// connection, sb/feed_entries.rs `on_ready`): none, it came.
     ready_page: Option<String>,
@@ -550,26 +562,6 @@ impl Sb {
     fn send_focus(&mut self) {
         let focus = self.focus.clone();
         self.call("client/focus", json!({"focus": focus}), rpc::Then::Shown);
-    }
-
-    /// A line typed to the agent in focus (the hub interprets it).
-    fn send_input(&mut self, text: String) {
-        let focus = self.focus.clone();
-        self.send_input_to(&focus, text);
-    }
-
-    /// What the user typed, for `agent` (in view or not).
-    fn send_input_to(&mut self, agent: &str, text: String) {
-        // computer use: the hub resumes a stopped or paused agent before
-        // his words reach it (Shell::resume_computer_use)
-        // msg-parts: his parts ride with the line that is their text (the
-        // hub keeps them on his message; an older hub ignores them)
-        let parts = std::mem::take(&mut self.parts_out);
-        let mut params = json!({"agent": agent, "line": text});
-        if !parts.is_empty() && text.ends_with(&bise_proto::parts::render(&parts)) {
-            params["parts"] = json!(parts);
-        }
-        self.call("command/run", params, rpc::Then::Line);
     }
 }
 

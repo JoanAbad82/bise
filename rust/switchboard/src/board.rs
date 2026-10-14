@@ -569,7 +569,15 @@ impl<'a> Waiting<'a> {
             .into_iter()
             .flatten()
             .filter(|m| m.queued && m.from == USER)
-            .map(|m| serde_json::json!({"id": m.id, "text": m.text, "created_ms": m.created_ms}))
+            .map(|m| {
+                let mut row = serde_json::json!({"id": m.id, "text": m.text, "created_ms": m.created_ms});
+                // his parts (msg-parts): a client edits it back from them
+                let parts = m.parts_list();
+                if !parts.is_empty() {
+                    row["parts"] = serde_json::json!(parts);
+                }
+                row
+            })
             .collect()
     }
 
@@ -600,6 +608,35 @@ mod tests {
             st.test_task(n, obj);
         }
         st
+    }
+
+    /// issue 23: his queued row carries his parts (msg-parts), so a client
+    /// edits it back with its chips; a message with none has no `parts`.
+    #[test]
+    fn a_queued_row_carries_his_parts() {
+        let mut st = state();
+        let parts = r#"[{"kind":"paste","n":1,"text":"long"},{"kind":"text","text":" why?"}]"#;
+        let m = |id: u64, parts: &str| Msg {
+            id,
+            thread: id,
+            from: USER.into(),
+            to: "docs".into(),
+            reply_to: None,
+            expect_reply: false,
+            auto: false,
+            text: format!("m{id}"),
+            created_ms: id,
+            plain: true,
+            queued: true,
+            via: None,
+            parts: parts.into(),
+        };
+        let busy = || Some(MsgState::Queued { reason: "busy".into() });
+        st.put_msg_judged(m(1, parts), busy(), false);
+        st.put_msg_judged(m(2, ""), busy(), false);
+        let rows = Waiting::of(&st).queued_inputs("docs");
+        assert_eq!(rows[0]["parts"], serde_json::from_str::<serde_json::Value>(parts).unwrap());
+        assert!(rows[1].get("parts").is_none(), "{:?}", rows[1]);
     }
 
     #[test]

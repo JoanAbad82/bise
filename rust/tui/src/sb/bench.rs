@@ -47,6 +47,43 @@ pub(crate) fn add_agent(app: &mut App, name: &str, objective: &str) {
     });
 }
 
+/// A test app whose hub end the test reads ([`hub_sent`]).
+pub(crate) fn test_app_hub() -> (App, UnixStream) {
+    let (a, b) = UnixStream::pair().unwrap();
+    b.set_nonblocking(true).unwrap();
+    let (tx, rx) = mpsc::channel::<String>();
+    std::mem::forget(tx);
+    let sb = new_sb(std::sync::Arc::new(std::sync::Mutex::new(a)), "bench".into());
+    (sb_app(sb, rx, false, 100, crate::voice::Voice::live(false)), b)
+}
+
+/// The requests the app sent its hub since the last call, as JSON.
+pub(crate) fn hub_sent(b: &mut UnixStream) -> Vec<Value> {
+    use std::io::Read;
+    let mut s = Vec::new();
+    let mut buf = [0u8; 4096];
+    while let Ok(n) = b.read(&mut buf) {
+        if n == 0 {
+            break;
+        }
+        s.extend_from_slice(&buf[..n]);
+    }
+    String::from_utf8_lossy(&s).lines().filter_map(|l| serde_json::from_str(l).ok()).collect()
+}
+
+/// Test setup: his messages the hub holds for `name` (its row's
+/// `queued`, ids 1, 2...), the agent added when it has no row.
+pub(crate) fn queued_rows(app: &mut App, name: &str, texts: &[&str]) {
+    if app.sb.agent(name).is_none() {
+        app.sb.agents.push(Agent { name: name.into(), main: name == "main", status: "idle".into(), ..Agent::default() });
+    }
+    let rows: Vec<bise_proto::draft::Queued> =
+        texts.iter().enumerate().map(|(i, t)| bise_proto::draft::Queued { id: i as u64 + 1, text: t.to_string(), created_ms: 0, parts: Vec::new() }).collect();
+    for a in app.sb.agents.iter_mut().filter(|a| a.name == name) {
+        a.mine_queued = rows.clone();
+    }
+}
+
 /// Test setup: the model and effort the hub says an agent runs
 /// (BISE-135), and the efforts its model takes.
 pub(crate) fn set_model(app: &mut App, name: &str, model: &str, effort: &str) {
