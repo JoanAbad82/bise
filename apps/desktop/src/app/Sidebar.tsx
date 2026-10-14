@@ -1,7 +1,8 @@
 // The sidebar (designer's desktop-screens v6/v7, signed): 'search or jump
 // ⌘K', bise, '↗ artifacts' and '◷ scheduled' for every project at once,
-// then his projects, each with its pearl (its bise: a click opens 'bise ·
-// storefront'), what works in it and his pink count; the archived agents
+// then his projects, each with its mark (desktop-delight v2: the '∿' gust at
+// work, '?' when it asks him, '·' quiet; a click opens 'bise · storefront')
+// and his pink count; bise's row leads with its ':*' (Marks.tsx); the archived agents
 // are in the project's ⋯ menu; '+ add a project' and settings at the foot.
 // Places only (designer's desktop-right-bar v5, ambient-lead m_20087): the
 // agents of the place shown are in the right bar (RightBar.tsx). Owner: amb-win.
@@ -9,7 +10,7 @@
 // It reads only projects, the route and counts (numbers, so a snapshot never
 // changes for nothing): a thread's entries never re-render it.
 import { memo, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { IconButton, Kbd, Menu, MenuItem, MenuSep, Pearl, SearchButton, SectionHead, Side, tipAttrs } from '@/ds';
+import { IconButton, Kbd, Menu, MenuItem, MenuSep, SearchButton, SectionHead, Side, tipAttrs } from '@/ds';
 import type { ProjectRow } from '@/proto';
 import { useAgents, useHubRefused, useProjects, useStore, type Store } from '@/store';
 import { RefusedLine } from './Refused';
@@ -19,9 +20,10 @@ import { addProject } from './addProject';
 import { useRoute, useRouter } from './router';
 import { projectSide } from './side';
 import { useKeptScroll } from './keep';
-import { BisePearl } from './BisePearl';
+import { LiveBiseMark, ProjectMark } from './Marks';
+import { whoOf } from './markstates';
 import { useModHeld } from './held';
-import { goneTip, newTip, QUIET_TIP, scheduledTip, waitsTip, workingTip } from './tipwords';
+import { goneTip, newTip, projectTip, scheduledTip, waitsTip } from './tipwords';
 
 /** His projects in his order, bise's own out (it is the bise row). Pure. */
 export function projectsOf(rows: readonly ProjectRow[]): ProjectRow[] {
@@ -142,15 +144,6 @@ function SRow({ kind, lead, name, end, endErr, endTip, count, countTip, hint, on
   );
 }
 
-/** A project's pearl, still (one live pearl per window is bise's own; a dozen would cost the GPU). */
-function StillPearl({ pink }: { pink?: boolean }) {
-  return (
-    <Pearl size={14}>
-      <i className={pink === true ? 'app-pearl pk' : 'app-pearl'} />
-    </Pearl>
-  );
-}
-
 /** The window in macOS full screen (amb-mac f58585d2: told at once, then on each enter/leave). */
 function useFullScreen(): boolean {
   const [full, setFull] = useState(false);
@@ -231,7 +224,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
       </div>
       <SRow
         kind="top"
-        lead={<BisePearl size={14} />}
+        lead={<LiveBiseMark testId="app.sidebar.bise.mark" />}
         name="bise"
         count={waits}
         countTip={waitsTip(waits, true)}
@@ -258,16 +251,17 @@ const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: Proje
   const router = useRouter();
   const refused = useHubRefused(p.project) !== null;
   const side = projectSide(p, refused);
+  const who = whoOf(useAgents(p.project));
   const [menu, setMenu] = useState(false);
   return (
     <>
       <SRow
         kind="pj"
-        lead={<StillPearl />}
+        lead={<ProjectMark p={p} tip={projectTip(p, who)} testId={`app.sidebar.project.${p.project}.mark`} />}
         name={p.name}
         end={side.text}
         endErr={side.err}
-        endTip={side.err ? (p.missing === true ? goneTip(p.path) : undefined) : side.text === 'all quiet' ? QUIET_TIP : workingTip(p.working)}
+        endTip={p.missing === true ? goneTip(p.path) : undefined}
         count={side.count}
         countTip={waitsTip(side.count)}
         hint={hint}

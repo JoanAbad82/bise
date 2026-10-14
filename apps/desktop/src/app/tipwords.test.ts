@@ -1,19 +1,16 @@
 // The hover tips' words for the bars' marks (tipwords.ts): one string per mark and state.
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
-import { archivedAgeTip, goneTip, madeTip, markTip, newTip, pctTip, QUIET_TIP, scheduledTip, signTip, timeTip, waitsTip, workingTip } from './tipwords';
+import { archivedAgeTip, goneTip, madeTip, markTip, newTip, pctTip, scheduledTip, signTip, timeTip, waitsTip } from './tipwords';
 
 const NOW = 1_791_100_600_000;
 const agent = (over: Partial<Agent>): Agent =>
   ({ name: 'perf', archived: false, main: false, status: 'idle', since_ms: NOW - 6 * 60_000, title: '', purpose: '', waits: 0, watching: [], ...over }) as Agent;
 
 describe('the sidebar marks', () => {
-  it("'∿ 4', the pink count, 'all quiet', 'folder gone'", () => {
-    expect(workingTip(4)).toBe('4 agents working');
-    expect(workingTip(1)).toBe('1 agent working');
+  it("the pink count, 'folder gone' (a project's state is its mark's tip: markstates.test.ts)", () => {
     expect(waitsTip(2)).toBe('2 waiting for you');
     expect(waitsTip(3, true)).toBe('3 waiting for you, in all your projects');
-    expect(QUIET_TIP).toBe('all quiet: no agent working, nothing waiting for you');
     expect(goneTip('/Users/me/acme')).toBe('folder gone: /Users/me/acme is no longer on disk');
   });
 

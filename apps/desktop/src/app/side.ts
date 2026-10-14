@@ -107,12 +107,14 @@ export function moreWords(folded: readonly Agent[], now: number): string {
   return folded.every((a) => a.since_ms >= today) ? `${n} more today` : `${n} more`;
 }
 
-/** A project row's right side: its words (dim or err) and his pink count. Pure. */
+/**
+ * A project row's right side: only what goes wrong in words (err) and his pink count; its state
+ * ('∿ 2', 'all quiet') is its mark's now (desktop-delight v2, Marks.tsx). Pure.
+ */
 export function projectSide(p: ProjectRow, refused = false): { text: string; err: boolean; count: number } {
   if (p.missing === true) return { text: 'folder gone', err: true, count: 0 };
   if (refused) return { text: 'refused', err: true, count: 0 };
-  const working = p.working > 0 ? `∿ ${String(p.working)}` : '';
-  return { text: working === '' && p.waits === 0 ? 'all quiet' : working, err: false, count: p.waits };
+  return { text: '', err: false, count: p.waits };
 }
 
 /**

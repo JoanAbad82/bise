@@ -5,27 +5,54 @@
 // (thread/wake.ts, words.rs's fixture), a worktree's (barplaces.ts tipWords). The new ones are
 // plain functions of numbers and names, so the TUI's twin can move them into words.rs as they are.
 // Pure: Sidebar.tsx and RightBar.tsx spread them with the ds's tipAttrs. Owner: amb-win.
-import type { Agent } from '@/proto';
+import type { Agent, ProjectRow } from '@/proto';
 import { shortAge } from '@/agents/model';
 import { pauseLine, waitLen } from '@/thread/wake';
 import { tilde, type Mark } from './barplaces';
+import { projectMark } from './markstates';
 
 const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
 
 // ---- the sidebar
 
-/** A project's '∿ 4': '4 agents working'. */
-export function workingTip(n: number): string {
-  return `${plural(n, 'agent', 'agents')} working`;
+/** 'perf', 'perf and search', 'perf, search and ui', 'perf, search and 2 more'. Pure. */
+export function namesWords(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  if (names.length <= 3) return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1] ?? ''}`;
+  return `${names.slice(0, 2).join(', ')} and ${String(names.length - 2)} more`;
+}
+
+/** bise's ':*', bise-presence's words (designer m_24644): 'bise: 1 thing waits for you', 'bise: working with 3 agents', 'bise: all quiet'. */
+export function biseTip(waits: number, working: number): string {
+  if (waits > 0) return `bise: ${plural(waits, 'thing waits', 'things wait')} for you`;
+  if (working > 0) return `bise: working with ${plural(working, 'agent', 'agents')}`;
+  return 'bise: all quiet';
+}
+
+/**
+ * A project's mark: 'storefront: perf and search are working · 2 agents', 'ts-pattern:
+ * pattern-error-dx waits for you', 'docs-site: all quiet'. The names from its agents when the
+ * window has them, else the counts. Pure.
+ */
+export function projectTip(p: Pick<ProjectRow, 'name' | 'waits' | 'working' | 'missing'>, who: { working: readonly string[]; asking: readonly string[] }): string {
+  const kind = projectMark(p);
+  if (kind === 'asks') {
+    const asks = who.asking.length > 0 ? `${namesWords(who.asking)} ${who.asking.length === 1 ? 'waits' : 'wait'} for you` : `${plural(p.waits, 'thing waits', 'things wait')} for you`;
+    return p.working > 0 ? `${p.name}: ${asks} · ${plural(p.working, 'agent', 'agents')} working` : `${p.name}: ${asks}`;
+  }
+  if (kind === 'works') {
+    const n = Math.max(p.working, who.working.length);
+    if (who.working.length === 0) return `${p.name}: ${plural(n, 'agent', 'agents')} working`;
+    const names = `${namesWords(who.working)} ${who.working.length === 1 ? 'is' : 'are'} working`;
+    return n > 1 ? `${p.name}: ${names} · ${plural(n, 'agent', 'agents')}` : `${p.name}: ${names}`;
+  }
+  return `${p.name}: all quiet`;
 }
 
 /** A pink count: '2 waiting for you'; bise's (every project's): '… in all your projects'. */
 export function waitsTip(n: number, everywhere = false): string {
   return everywhere ? `${String(n)} waiting for you, in all your projects` : `${String(n)} waiting for you`;
 }
-
-/** A project's 'all quiet'. */
-export const QUIET_TIP = 'all quiet: no agent working, nothing waiting for you';
 
 /** A project's 'folder gone': where it was. */
 export function goneTip(path: string): string {

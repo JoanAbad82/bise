@@ -120,6 +120,14 @@ export function pctOf(a: Agent): string {
   return n > 0 ? `${String(Math.min(n, 100))}%` : '';
 }
 
+/** The % column shows from this much context used: below it, the row's tip says it (desktop-delight v2). */
+export const PCT_LOUD = 70;
+
+/** Whether a '17%' is loud enough for the column. Pure. */
+export function pctLoud(pct: string): boolean {
+  return pct !== '' && Number.parseInt(pct, 10) >= PCT_LOUD;
+}
+
 /** The time column: the turn's length while it works, the wait's while it waits on an event; '' else. Never a state word. */
 export function timeOf(a: Agent, now: number): string {
   const pause = pauseLine(a, now);
@@ -134,7 +142,10 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
   const numbered = alt && n !== undefined && n >= 1 && n <= 9;
   const cu = computerDot(extras.computer?.find((r) => r.project === x.project && r.agent === x.a.name));
   const wake = extras.wakes?.get(`${x.project}/${x.a.name}`);
+  // its context used: in the column from 70 %, else in its sign's tip only (desktop-delight v2)
   const pct = pctOf(x.a);
+  const loud = pctLoud(pct);
+  const signWords = signTip(sign.g, x.a, now, wake === undefined ? '' : hm(wake));
   return {
     key: `a:${x.project}/${x.a.name}`,
     kind: 'agent',
@@ -147,9 +158,9 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
     end: '',
     endTone: 'dim',
     time: timeOf(x.a, now),
-    pct,
+    pct: loud ? pct : '',
     title: s.title,
-    tips: { glyph: signTip(sign.g, x.a, now, wake === undefined ? '' : hm(wake)), time: timeTip(x.a, now), pct: pctTip(x.a, pct) },
+    tips: { glyph: pct === '' || loud ? signWords : `${signWords} · ${pctTip(x.a, pct)}`, time: timeTip(x.a, now), pct: loud ? pctTip(x.a, pct) : '' },
     testId: `app.right.agent.${idOf(all, x.project, x.a.name)}`,
     waits: s.g === '?',
     ...(!numbered && sign.working ? { working: true } : {}),

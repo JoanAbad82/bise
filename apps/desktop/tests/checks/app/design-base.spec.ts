@@ -47,14 +47,13 @@ test("app/design-base: the window and the capsule in the DS's UI font; bise's ro
       expect(f.ui, '--font-ui is defined').not.toBe('');
       expect(first(f.got), `${sel} computes the DS's UI font, not Times`).toBe(first(f.ui));
     }
-    // bise's pearl, never ':*': nothing waits on him here, so the ink pearl at rest, still (no
-    // canvas); the live pink one only while bise waits on him (ambient's thread spec f, designer m_12127)
+    // bise's ':*' (desktop-delight v2: the orb left the window, the pearl is the capsule's): nothing
+    // waits on him here, so not the accent; no pearl in the sidebar or the head
     for (const where of ['.b-side', '.b-head']) {
-      const pearl = page.locator(`${where} [data-bise-pearl]`).first();
-      await expect(pearl, `${where}: bise's pearl`).toBeVisible();
-      await expect(pearl.getByTestId('bise.pearl.rest'), `${where}: the ink pearl at rest`).toHaveCount(1);
-      await expect(pearl.locator('canvas'), `${where}: no live pink pearl while nothing waits`).toHaveCount(0);
-      await expect(pearl, `${where}: no ':*' glyph`).not.toContainText(':*');
+      const mark = page.locator(`${where} .b-bise`).first();
+      await expect(mark, `${where}: bise's ':*'`).toBeVisible();
+      await expect(mark, `${where}: at rest, not the accent`).not.toHaveAttribute('data-waits', 'true');
+      await expect(page.locator(`${where} [data-bise-pearl]`), `${where}: no pearl`).toHaveCount(0);
     }
     await page.screenshot({ path: test.info().outputPath('base.png') });
     const cap = await capsulePage(s);

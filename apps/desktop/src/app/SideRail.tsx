@@ -1,9 +1,9 @@
 // The left bar folded to a 56 px icon rail while an artifact is open under 1200 px (designer's
-// artifact-open page, m_20435 (f)): bise's pearl, ↗ artifacts, ◷ scheduled, then each project's
+// artifact-open page, m_20435 (f)): bise's ':*', ↗ artifacts, ◷ scheduled, then each project's
 // initials. The title bar's sidebar button slides the whole bar back over it. Owner: amb-win.
 import { IconButton } from '@/ds';
 import { useProjects } from '@/store';
-import { BisePearl } from './BisePearl';
+import { LiveBiseMark } from './Marks';
 import { MAIN, projectOf } from './route';
 import { useRoute, useRouter } from './router';
 import { projectsOf, useWaitingTotal } from './Sidebar';
@@ -36,7 +36,7 @@ export function SideRail() {
         }}
         testId="app.rail.bise"
       >
-        <BisePearl size={14} />
+        <LiveBiseMark testId="app.rail.bise.mark" />
       </IconButton>
       <IconButton
         label="artifacts"

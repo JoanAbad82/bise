@@ -38,7 +38,7 @@ test("thread/head-fit: the role gets the head's room first and ends with '…'",
       // its context and branch are the composer tab's now (designer m_24325): the role has the head's room
       expect(m.usage === null && m.branch === null, `${String(w)}: no context note or branch in the head ${JSON.stringify(m)}`).toBe(true);
       expect(m.chip?.full, `${String(w)}: the state chip stays whole`).toBe(true);
-      expect(m.changes?.full, `${String(w)}: 'changes ⌘D' stays whole`).toBe(true);
+      expect(m.changes === null || m.changes.full, `${String(w)}: '± files' stays whole`).toBe(true);
       await page.getByTestId('thread.head').screenshot({ path: test.info().outputPath(`head-${String(w)}.png`) });
     }
   } finally {

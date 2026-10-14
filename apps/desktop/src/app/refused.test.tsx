@@ -72,7 +72,7 @@ describe('a refused project', () => {
   it("its sidebar row: the end 'refused' in err (a gone folder still says so first)", () => {
     const row = { project: P, name: 'shop', path: '/nowhere/shop', git: true, home: false, order: 1, agents: 2, working: 1, waits: 0, running: true } as ProjectRow;
     expect(projectSide(row, true)).toEqual({ text: 'refused', err: true, count: 0 });
-    expect(projectSide(row, false)).toEqual({ text: '∿ 1', err: false, count: 0 });
+    expect(projectSide(row, false)).toEqual({ text: '', err: false, count: 0 });
     expect(projectSide({ ...row, missing: true }, true).text).toBe('folder gone');
     expect(refusedLead('bise')).toBe("bise's hub refused bise");
   });

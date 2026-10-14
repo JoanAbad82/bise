@@ -1,9 +1,10 @@
 // thread/agent-head · the agent view's head, rows and composer words (designer's desktop-screens
 // v6 (1), (2), (3), (4)). Passes when, in storefront with the scripted core (FakeCore, fake data):
-//   - perf's head is one row: 'perf' in 600, its role 'product page speed', the chip '<breath> working ·
-//     14 min' (the TUI's 1-cell breath, designer's desktop-working page), at the right 'changes ⌘D' (opens the review), '⋯'; its branch is the composer tab's;
+//   - perf's head is one row: its role 'product page speed' (its name is the crumb's, desktop-delight
+//     v2), the chip '<breath> working · 14 min' (the TUI's 1-cell breath, designer's desktop-working
+//     page), at the right no '± files' before its diff, '⋯'; its branch is the composer tab's;
 //   - search, which waits on him, has the chip '? waiting for you' in the accent;
-//   - the project's bise reads 'bise · storefront' with its 14 px pearl and the chip '1 waiting
+//   - the project's bise reads 'bise · storefront' with its ':*' and the chip '1 waiting
 //     for you', which opens the agents list;
 //   - perf's rows: its commands as mono lines with their length ('$ lighthouse …  38 s'), its edits
 //     ('± web/product/Hero.tsx  4 s'), the reads counted and folded, the artifact made as a chip
@@ -151,7 +152,8 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     const head = page.getByTestId('thread.head');
     await expect(head).toBeVisible({ timeout: 10_000 });
     // (1) perf's head
-    await expect(page.getByTestId('thread.head.name')).toHaveText('perf');
+    await expect(page.getByTestId('thread.head.name'), "the name is the crumb's").toHaveCount(0);
+    await expect(page.getByTestId('app.title.crumb')).toHaveText(/›perf$/u);
     await expect(page.getByTestId('thread.head.role')).toHaveText('product page speed');
     await expect(page.getByTestId('thread.head.state')).toHaveText(/^[·~∿≈] working · 14 min$/);
     await expect(page.getByTestId('thread.head.state')).toHaveAttribute('data-needs', 'false');
@@ -159,7 +161,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     await expect(page.getByTestId('thread.head.branch')).toHaveCount(0);
     await expect(page.getByTestId('thread.usage')).toHaveCount(0);
     await expect(page.getByTestId('composer.tab.place')).toHaveText('ψsb/perf');
-    await expect(page.getByTestId('thread.head.changes')).toHaveText('changes ⌘D');
+    await expect(page.getByTestId('thread.head.changes'), "no '± files' before its diff").toHaveCount(0);
     await expect(page.getByTestId('thread.more')).toHaveText('⋯');
     const oneRow = await head.evaluate((el) => el.getBoundingClientRect().height);
     expect(oneRow, 'one row').toBeLessThan(60);
@@ -187,8 +189,8 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     await expect(page.getByTestId('app.art')).toBeVisible();
     // the artifact's screen has no right bar: back to perf's thread, ⌘[
     await page.keyboard.press('Meta+BracketLeft');
-    // 'changes ⌘D' opens the review
-    await page.getByTestId('thread.head.changes').click();
+    // ⌘D opens the review (no '± files' button before its diff: desktop-delight v2)
+    await page.keyboard.press('Meta+KeyD');
     expect(await core.waitCmd((c) => c.cmd === 'diff', 3000)).toMatchObject({ project: P, agent: 'perf' });
 
     const views: readonly [string, string][] = [
@@ -218,7 +220,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
           }
           if (label === 'bise · storefront') {
             await expect(page.getByTestId('thread.head.name')).toHaveText('bise · storefront');
-            await expect(page.locator('[data-testid="thread.head"] .b-pearl.s14')).toHaveCount(1);
+            await expect(page.getByTestId('thread.head.mark'), "bise's ':*'").toHaveCount(1);
             await expect(page.getByTestId('thread.head.state')).toHaveText('1 waiting for you');
             // (3) its handoffs
             await expect(page.getByTestId('thread.handoff.3')).toHaveText('✚new agent perf · product page speed');
@@ -241,10 +243,8 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
             expect(dx, 'the starting row starts on the column edge').toBeLessThan(1);
           }
           if (label === 'perf') {
-            if (w === 800) await expect(page.getByTestId('thread.head.name'), 'under 1000 px the name goes to the crumb').toBeHidden();
-            else await expect(page.getByTestId('thread.head.name')).toBeVisible();
+            await expect(page.getByTestId('thread.head.name'), 'at every width the name is the crumb\'s').toHaveCount(0);
             await expect(page.getByTestId('thread.head.state')).toBeVisible();
-            await expect(page.getByTestId('thread.head.changes')).toBeVisible();
           }
           // designer m_12013: each shot its own png at 2x
           await cdp.send('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 2, mobile: false });
@@ -259,7 +259,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     await size(1400, 900);
     await go(`app.sidebar.project.${P}`);
     await page.getByTestId('thread.handoff.3.name').click();
-    await expect(page.getByTestId('thread.head.name')).toHaveText('perf');
+    await expect(page.getByTestId('app.title.crumb')).toHaveText(/›perf$/u);
     // bise's chip opens the agents list
     await size(1400, 900);
     await go(`app.sidebar.project.${P}`);

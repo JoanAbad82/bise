@@ -39,7 +39,7 @@ describe('AGENTS signs and columns (§2)', () => {
     ]);
     for (const r of rows) expect([r.end, r.time, r.pct].join(' ')).not.toMatch(/done|idle|now|waits|failed|waiting/);
   });
-  it("time: the turn's or the wait's length, else empty; %: the context used, text-3, empty at 0", () => {
+  it("time: the turn's or the wait's length, else empty; %: the context used from 70 % only, else in its sign's tip, empty at 0", () => {
     const rows = agentRows(
       [
         ag('w', { status: 'working', turn_ms: 4 * 60_000, usage: { model: 'm', context: 31_000, window: 100_000, words: '', short: '' } }),
@@ -51,11 +51,15 @@ describe('AGENTS signs and columns (§2)', () => {
       false,
     );
     expect(rows.map((r) => [r.time, r.pct])).toEqual([
-      ['4 min', '31%'],
+      ['4 min', ''],
       ['12 s', ''],
       ['2 min', ''],
       ['', ''],
     ]);
+    expect(rows[0]?.tips?.glyph).toMatch(/ · 31% of w's context used/);
+    const loud = agentRows([ag('w', { status: 'working', usage: { model: 'm', context: 70_000, window: 100_000, words: '', short: '' } })], NOW, false);
+    expect(loud[0]?.pct).toBe('70%');
+    expect(loud[0]?.tips?.glyph).not.toMatch(/context/);
   });
 });
 

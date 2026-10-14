@@ -1,17 +1,17 @@
-// The agent view's head (designer's desktop-screens v6 (1) and (3)): one row, 16 px sides. An
-// agent: its name in 600, its role line, its state chip; at the right 'changes ⌘D' (opens the
-// review), '⋯'. Its context and its branch are the composer's tab's (designer m_24325). A project's bise: its 14 px pearl, 'bise ·
-// storefront', the project's chip. Under 1000 px the name goes to the titlebar's crumb (amb-win's)
-// and the head keeps the chip and the buttons. LiveLine: what it does now, at the thread's end.
+// The agent view's head (designer's desktop-screens v6 (1) and (3), desktop-delight v2): one row,
+// 16 px sides. An agent: its role line (its name is the titlebar's crumb), its state chip (none at
+// rest); at the right '± 3 files' when it changed some (opens the review, ⌘D), '⋯'. Its context
+// and its branch are the composer's tab's (designer m_24325). A project's bise: its ':*', 'bise ·
+// storefront', the project's chip. LiveLine: what it does now, at the thread's end.
 // StartingLine: the empty thread's line. The words are head.ts's. Owner: amb-home.
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { Agent } from '@/proto';
-import { useAgents, useComputerLive } from '@/store';
+import { useAgents, useComputerLive, useDiff } from '@/store';
 import { useNowFor } from '@/app/clock';
 import { pauseInSeconds } from './wake';
 import { Breath, Pulse } from '@/working/Signs';
 import { useRouter } from '@/app/router';
-import { BisePearl } from '@/app/BisePearl';
+import { LiveBiseMark } from '@/app/Marks';
 import { archivedFit, biseChip, roleOf, stateChip, type StateChip } from './head';
 import { Button, Press } from '@/ds';
 
@@ -19,6 +19,7 @@ import { Button, Press } from '@/ds';
 const HELD: StateChip = { text: '? waiting for you', needs: true, live: false };
 
 function Chip({ chip, testId }: { chip: StateChip; testId: string }) {
+  if (chip.text === '') return null;
   return (
     <span className={chip.needs ? 'ah-chip needs' : chip.live ? 'ah-chip live' : 'ah-chip'} data-testid={testId} data-needs={chip.needs}>
       {chip.breath === true && (
@@ -93,6 +94,9 @@ export function AgentHead({ project, a, more, note, starting = false, restore }:
   // its chip's pause under a minute reads in seconds: the second clock
   const now = useNowFor((t) => pauseInSeconds(a, t));
   const router = useRouter();
+  const diff = useDiff(project, a.name);
+  // its changes, only when there are some, and how many (desktop-delight v2): '± 3 files'
+  const files = diff?.files.length ?? 0;
   // S29/L19: he took the wheel: it waits for him until he gives it back (amb-win, designer m_16663)
   const held = useComputerLive().some((r) => r.project === project && r.agent === a.name && r.kind === 'paused');
   const review = () => {
@@ -104,9 +108,13 @@ export function AgentHead({ project, a, more, note, starting = false, restore }:
   return (
     <div className="ah" data-testid="thread.head" ref={headRef} data-arch={restore === undefined ? undefined : arch.stage}>
       <span className="ah-who">
-        <b className="ah-name" data-testid="thread.head.name" title={restore === undefined ? undefined : a.name} style={restore === undefined ? undefined : { minWidth: arch.nameMin }}>
-          {a.name}
-        </b>
+        {/* its name is the crumb's (desktop-delight v2): the head keeps its role; an archived maker
+            beside its artifact keeps it (that head stands for it there) */}
+        {restore !== undefined && (
+          <b className="ah-name" data-testid="thread.head.name" title={a.name} style={{ minWidth: arch.nameMin }}>
+            {a.name}
+          </b>
+        )}
         {roleOf(a) !== '' && (
           <span className="ah-role" data-testid="thread.head.role">
             {roleOf(a)}
@@ -132,9 +140,9 @@ export function AgentHead({ project, a, more, note, starting = false, restore }:
           m_24325: one place per fact): the composer's tab and its row say them */}
       <span className="ah-end">
         {restore !== undefined && <Restore icon={arch.stage === 2} onRestore={restore} />}
-        {restore === undefined && (
-          <Press look="ah-btn" onClick={review} data-testid="thread.head.changes">
-            changes <kbd>⌘D</kbd>
+        {restore === undefined && files > 0 && (
+          <Press look="ah-btn" onClick={review} data-testid="thread.head.changes" data-tip={`${String(files)} ${files === 1 ? 'file' : 'files'} changed: its review · ⌘D`}>
+            ± {String(files)} {files === 1 ? 'file' : 'files'}
           </Press>
         )}
         {restore === undefined && more}
@@ -150,8 +158,8 @@ export function BiseHead({ project, name, more }: { project: string; name: strin
   return (
     <div className="ah ah-bise" data-testid="thread.head">
       <span className="ah-who">
-        {/* ink at rest, pink only while bise waits on him (ambient's thread spec f, designer m_12127) */}
-        <BisePearl size={14} />
+        {/* bise's ':*': text-3 at rest, the accent while something waits on him (desktop-delight v2) */}
+        <LiveBiseMark testId="thread.head.mark" />
         <b className="ah-name" data-testid="thread.head.name">
           bise<span className="ah-project"> · {name}</span>
         </b>

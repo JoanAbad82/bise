@@ -1,7 +1,7 @@
 // app/sidebar-v6 · designer's desktop-screens v6/v7, signed (m_11834, lead m_11830): the sidebar,
 // the titlebar, the right panel A's frame, and under 1000 px the slide-over. Passes when, at 1400
 // px on perf's thread: the sidebar is 240 px with 'search or jump ⌘K', bise with his pink count,
-// '↗ artifacts 1 new', '◷ scheduled 1', 'projects', storefront's row '∿ 2' + 1, places only: no
+// '↗ artifacts 1 new', '◷ scheduled 1', 'projects', storefront's row its '?' mark + 1 (desktop-delight v2), places only: no
 // agent row in the sidebar (designer's desktop-right-bar v5: the agents are in the right bar, each
 // with its sign ∿ ? ✗ ◷ ✓, never a 'main' row, 8 then '+ 1 more'), the titlebar 'storefront › perf' and '↗ artifacts · 1
 // ⌥⌘0' tinted with the panel open (artifacts · storefront, all ›), ⌥⌘0 hides it and is kept, ⌘\
@@ -94,11 +94,14 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     });
     expect(rules.right, "the right bar's rule on the title bar's").toBe(rules.title);
     await expect(page.getByTestId('app.sidebar.bise').locator('.app-cnt'), "bise's pink count").toHaveText('2');
-    await expect(page.getByTestId('app.sidebar.bise').getByTestId('bise.pearl.rest'), 'something waits: the live pink pearl').toHaveCount(0);
+    await expect(page.getByTestId('app.sidebar.bise.mark'), "something waits: bise's ':*' in the accent").toHaveAttribute('data-waits', 'true');
     // tui-parity R17: who made it, until he opens the artifacts
     await expect(page.getByTestId('app.sidebar.artifacts')).toContainText('1 new · perf');
     await expect(page.getByTestId('app.sidebar.scheduled')).toContainText('1');
-    await expect(page.getByTestId(`app.sidebar.project.${P}`)).toContainText('∿ 2');
+    // it works and asks him: '?' in the accent wins, its tip says both (desktop-delight v2)
+    await expect(page.getByTestId(`app.sidebar.project.${P}.mark`), "it asks him: '?'").toHaveAttribute('data-mark', 'asks');
+    await expect(page.getByTestId(`app.sidebar.project.${P}.mark`)).toHaveAttribute('data-tip', 'storefront: search waits for you · 2 agents working');
+    await expect(page.getByTestId(`app.sidebar.project.${P}`), "no '∿ 2' words: the mark says it").not.toContainText('∿');
     // places only: the agents are in the right bar (designer's desktop-right-bar v5)
     await expect(side.locator('[data-testid^="app.sidebar.agent."]'), 'no agent row in the sidebar').toHaveCount(0);
     await expect(page.getByTestId('app.right.agent.main'), "never a 'main' row").toHaveCount(0);
@@ -192,8 +195,9 @@ test('app/sidebar-v6: no project yet: only bise, the top rows and add a project'
     await expect(page.locator('[data-testid^="app.sidebar.project."]')).toHaveCount(0);
     // designer m_12093: the centre, the composer stays, no panel and no panel button without a project
     await expect(page.getByTestId('thread.noproject')).toContainText('bise is here.');
-    // nothing waits on him: bise's pearl is the ink one at rest everywhere (designer m_12127)
-    await expect(page.getByTestId('app.sidebar.bise').getByTestId('bise.pearl.rest')).toBeVisible();
+    // nothing waits on him: bise's ':*' at rest (desktop-delight v2)
+    await expect(page.getByTestId('app.sidebar.bise.mark')).toBeVisible();
+    await expect(page.getByTestId('app.sidebar.bise.mark')).not.toHaveAttribute('data-waits', 'true');
     // bise's empty thread: the large ':*' written in mist, ink at rest (designer's bise-presence v10)
     await expect(page.getByTestId('thread.noproject').locator('[data-glyph][data-mood="rest"] canvas')).toBeVisible();
     await expect(page.getByTestId('thread.noproject.add')).toContainText('add a project');

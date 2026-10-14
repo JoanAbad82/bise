@@ -26,6 +26,7 @@ import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
 import { agentRows, archivedRows, artifactRows, capRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
 import { FitWords } from './FitWords';
+import { DoneSign } from './Marks';
 
 const lastAgents = new Map<string, { from: readonly (readonly Agent[])[]; items: readonly ProjAgent[] }>();
 
@@ -217,7 +218,14 @@ function Row({ r, onOpen, on, onOpenPr }: { r: BarRow; onOpen: () => void; on?: 
       >
         {/* each mark says itself in the ds tip (tipwords.ts); the row has none, its words are there */}
         <span className={`app-rb-g ${r.tone}`} {...tipAttrs(head ? r.title : r.tips?.glyph)} data-testid={`${r.testId}.sign`}>
-          {r.working === true ? <Dot state="wk" tip={r.tips?.glyph} /> : r.glyph}
+          {r.working === true ? (
+            <Dot state="wk" tip={r.tips?.glyph} />
+          ) : r.glyph === '✓' && r.agent !== undefined ? (
+            // it just finished: the kiss, ':*' lifts and fades into its '✓' (desktop-delight touch 1)
+            <DoneSign project={r.project} agent={r.agent} glyph={r.glyph} testId={`${r.testId}.kiss`} />
+          ) : (
+            r.glyph
+          )}
         </span>
         <span className="app-rb-name">{r.name}</span>
         {r.cu !== undefined && (

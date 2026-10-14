@@ -52,7 +52,8 @@ export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits' | 'wait
     case 'failed':
       return { text: '✗ failed', needs: false, live: false };
     default:
-      return { text: 'idle', needs: false, live: false };
+      // at rest is the default: no chip (desktop-delight v2); only working, waiting, failed or done
+      return { text: '', needs: false, live: false };
   }
 }
 

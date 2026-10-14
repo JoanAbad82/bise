@@ -45,7 +45,7 @@ const world = (theme: string) => [
     project: P,
     agents: [
       agent('main', 'idle'),
-      agent('perf', 'working', { purpose: 'product page speed', turn_ms: 4 * MIN, ...use(31) }),
+      agent('perf', 'working', { purpose: 'product page speed', turn_ms: 4 * MIN, ...use(71) }),
       agent('search', 'idle', { waits: 1, purpose: 'size filter', ...use(18) }),
       agent('pay', 'working', { purpose: 'mobile safari', turn_ms: 2 * MIN, ...use(12) }),
       agent('docs', 'done', { purpose: 'api examples', ...use(5) }),
@@ -130,7 +130,10 @@ for (const theme of ['light', 'dark']) {
       expect(new Set(cols.map((c) => c.mark)).size, 'mark column aligned').toBe(1);
       expect([normal[0]?.tw, normal[0]?.pw], 'time 40, % 32').toEqual([40, 32]);
       await expect(row('perf').getByTestId('app.right.agent.perf.time')).toHaveText('4 min');
-      await expect(row('perf').getByTestId('app.right.agent.perf.pct')).toHaveText('31%');
+      await expect(row('perf').getByTestId('app.right.agent.perf.pct')).toHaveText('71%');
+      // under 70 % the column is empty, the row's tip says it (desktop-delight v2)
+      await expect(row('pay').getByTestId('app.right.agent.pay.pct')).toHaveText('');
+      await expect(row('pay').getByTestId('app.right.agent.pay.sign')).toHaveAttribute('data-tip', /12% of pay's context used/u);
       await expect(row('launch').getByTestId('app.right.agent.launch.time')).toHaveText('');
       // short on room (the row narrowed step by step): the role cuts first, then the % goes, then the
       // time; the name is never cut while the role has room; the mark never goes

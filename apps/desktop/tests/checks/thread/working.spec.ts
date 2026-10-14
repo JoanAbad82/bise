@@ -239,7 +239,7 @@ test('thread/working: only the gust beside the label while it works, the step dr
       await page.mouse.move(2, 2);
       // (4) docs: the model's words about its call, the growing fold, once
       await page.getByTestId('app.right.agent.docs').click();
-      await expect(page.getByTestId('thread.head.name')).toHaveText('docs', { timeout: 10_000 });
+      await expect(page.getByTestId('app.title.crumb')).toHaveText(/›docs$/u, { timeout: 10_000 });
       await expect(page.getByTestId('thread.typing')).toContainText("lecture du PDF de tarifs d'Efficience");
       await expect(page.getByTestId('thread.typing.end')).toHaveText(/^∿ \d+ s$/);
       await expect(page.getByTestId('thread.tool.51'), 'no mono line for the same step').toHaveCount(0);
@@ -254,7 +254,7 @@ test('thread/working: only the gust beside the label while it works, the step dr
 
     // idle: no mark, the command's row loses its '∿'
     await page.getByTestId('app.right.agent.perf').click();
-    await expect(page.getByTestId('thread.head.name')).toHaveText('perf', { timeout: 10_000 });
+    await expect(page.getByTestId('app.title.crumb')).toHaveText(/›perf$/u, { timeout: 10_000 });
     await core.send(agents(now, 'idle') as never);
     await expect(mark).toHaveCount(0);
     await expect(page.getByTestId('thread.tool.42')).not.toHaveAttribute('data-live', 'true');
@@ -269,7 +269,7 @@ test('thread/working: only the gust beside the label while it works, the step dr
 
     // reduced motion: one still ∿ in ink (docs still works)
     await page.getByTestId('app.right.agent.docs').click();
-    await expect(page.getByTestId('thread.head.name')).toHaveText('docs', { timeout: 10_000 });
+    await expect(page.getByTestId('app.title.crumb')).toHaveText(/›docs$/u, { timeout: 10_000 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(gust).toHaveText('∿    ', { timeout: 2000 });
     const still = await sample(600);

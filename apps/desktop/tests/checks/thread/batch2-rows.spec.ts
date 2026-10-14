@@ -4,7 +4,7 @@
 // compaction as a line then its summary folded, notices with their level in a glyph (▲ warn,
 // ✗ err), a message not delivered with '⏎ send again' (reaching the core as a send to that agent)
 // and 'esc drop', a kind from a newer hub as its plain words; and perf's context gauge, the hub's
-// words '42k · 17%', in the thread's head and its sidebar row. The scripted core (FakeCore) with
+// words '42k · 17%', in the thread's head and its right-bar row's tip (under 70 %). The scripted core (FakeCore) with
 // the fixtures' entries. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
@@ -73,7 +73,9 @@ test("thread/batch2-rows: thinking, compaction, notices, not delivered and the c
     await expect(page.getByTestId('thread.unknown.27')).toHaveText('a row from a newer hub');
 
     await expect(page.getByTestId('composer.tab.context'), "the composer tab's gauge, the hub's words").toContainText('42k · 17%');
-    await expect(page.getByTestId('app.right.agent.perf.gauge'), "perf's row in the sidebar").toHaveText('17%');
+    // perf's row in the right bar: under 70 % its % is in the row's tip, not the column (desktop-delight v2)
+    await expect(page.getByTestId('app.right.agent.perf.pct'), "perf's row: no % under 70 %").toHaveText('');
+    await expect(page.getByTestId('app.right.agent.perf.sign'), "perf's sign's tip").toHaveAttribute('data-tip', /17% of perf's context used/u);
     await page.screenshot({ path: test.info().outputPath('batch2.png') });
 
     const nd = page.getByTestId('thread.notdelivered.26');

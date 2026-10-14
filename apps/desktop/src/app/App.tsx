@@ -60,6 +60,7 @@ import { ArtifactOpen, ArtifactsScreen } from '@/artifacts';
 import { ScheduledScreen } from '@/scheduled';
 import '@/ds/index.css';
 import './app.css';
+import { useKissWatch } from './Marks';
 
 export function App() {
   const [router] = useState(() => createRouter(firstRoute(), sessionHistory()));
@@ -174,6 +175,8 @@ function Shell() {
   // answer-in-thread A: his answer to another project's card takes the window to it
   useAnswerJumps(router);
   useStill();
+  // the done kiss: who just finished, for every mark of the window (Marks.tsx)
+  useKissWatch();
   const [palette, setPalette] = usePaletteOpen();
   const [help, setHelp] = useState(false);
   // L25: the demo tour's 'end' goes when he opens the agent list

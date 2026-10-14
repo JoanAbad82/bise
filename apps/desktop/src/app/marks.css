@@ -1,0 +1,94 @@
+/* The window's marks (designer's desktop-delight v2): a project's gust / '?' / '·', the done kiss
+   (bise's ':*' is the ds's, css/mark.css). Tokens only (text-2, text-3, the accent where
+   something waits on him). Under reduced motion: no animation, the final state only. Owner: amb-win (Marks.tsx). */
+
+.mk {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+/* ---- a project: the gust at work, '?' when it asks him, '·' quiet */
+.mk-pj {
+  width: 18px;
+  height: 14px;
+  color: var(--c-text-3);
+}
+.mk-pj.asks {
+  color: var(--c-accent);
+}
+.mk-gust {
+  display: block;
+  overflow: visible;
+}
+.mk-gust path {
+  fill: none;
+  stroke: var(--c-text-2);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  /* one travelling gap (designer m_24644): a still frame reads as one ∿ with a gap in the wind */
+  stroke-dasharray: 16 4;
+  animation: mk-drift 1.2s linear infinite;
+}
+@keyframes mk-drift {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+/* ---- the done kiss (touch 1): ':*' lifts 8 px, grows 1.2 and fades; '✓' fades in; 600 ms */
+.mk-kiss {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  /* its row's tone: the right bar's '✓' is pink */
+  color: inherit;
+}
+.mk-kiss > span {
+  grid-area: 1 / 1;
+  animation-duration: 600ms;
+  animation-timing-function: var(--ease-out, cubic-bezier(0.2, 0.7, 0.2, 1));
+  animation-fill-mode: both;
+}
+.mk-kiss-from {
+  animation-name: mk-kiss-from;
+  white-space: nowrap;
+}
+.mk-kiss-to {
+  animation-name: mk-kiss-to;
+}
+@keyframes mk-kiss-from {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(1.2);
+  }
+}
+@keyframes mk-kiss-to {
+  0%,
+  45% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-gust path {
+    animation: none;
+  }
+  .mk-kiss > span {
+    animation: none;
+  }
+  .mk-kiss-from {
+    opacity: 0;
+  }
+}

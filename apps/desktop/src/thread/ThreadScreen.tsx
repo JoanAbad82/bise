@@ -42,7 +42,7 @@ import { flashEntry, useAnswerReveal } from './useAnswerReveal';
 import { quoteSourcePos } from './quote';
 import { QUOTE_SOURCE_EVENT } from '@/composer/pm/AttachList';
 import { FindBar } from './FindBar';
-import { BisePearl } from '@/app/BisePearl';
+import { LiveBiseMark } from '@/app/Marks';
 import { createFindMark, FindMarkContext } from './findmark';
 import { trackRoutes, useHeld } from './routes';
 import { OpenArtifactContext } from './openArtifact';
@@ -374,7 +374,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
           <Head
             title={headTitle}
             sub={sub}
-            lead={bise ? <BisePearl size={14} /> : undefined}
+            lead={bise ? <LiveBiseMark testId="thread.head.mark" /> : undefined}
             dot={bise || !me ? undefined : dotOf(me.status)}
           />
         ) : agent === MAIN ? (

@@ -54,9 +54,9 @@ describe('the fold of quiet agents', () => {
 });
 
 describe("a project's row", () => {
-  it("'∿ 2' and his pink count; 'all quiet' when nothing moves; a gone folder or a refusal in err", () => {
-    expect(projectSide(row({ working: 2, waits: 1 }))).toEqual({ text: '∿ 2', err: false, count: 1 });
-    expect(projectSide(row())).toEqual({ text: 'all quiet', err: false, count: 0 });
+  it("only his pink count (its mark says the rest); a gone folder or a refusal in err", () => {
+    expect(projectSide(row({ working: 2, waits: 1 }))).toEqual({ text: '', err: false, count: 1 });
+    expect(projectSide(row())).toEqual({ text: '', err: false, count: 0 });
     expect(projectSide(row({ waits: 2 }))).toEqual({ text: '', err: false, count: 2 });
     expect(projectSide(row({ missing: true }))).toMatchObject({ text: 'folder gone', err: true });
   });

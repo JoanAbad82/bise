@@ -12,7 +12,8 @@ describe("the agent view's head (designer's desktop-screens v6)", () => {
     expect(stateChip({ status: 'blocked', since_ms: NOW, waits: 0 }, NOW).needs).toBe(true);
     expect(stateChip({ status: 'done', since_ms: NOW, waits: 0 }, NOW).text).toBe('✓ done');
     expect(stateChip({ status: 'failed', since_ms: NOW, waits: 0 }, NOW).text).toBe('✗ failed');
-    expect(stateChip({ status: 'idle', since_ms: NOW, waits: 0 }, NOW).text).toBe('idle');
+    // at rest: no chip (desktop-delight v2)
+    expect(stateChip({ status: 'idle', since_ms: NOW, waits: 0 }, NOW).text).toBe('');
   });
 
   it('the role line is its objective, else what it says it does', () => {
@@ -93,7 +94,7 @@ describe('agent-waiting-states A: the head chip of a pause, none for an alarm', 
     const bench = { id: 7, kind: 'bg' as const, what: 'cargo bench', since_ms: NOW3 - 180_000, resumes: true };
     const gate = { id: 4, kind: 'file' as const, what: 'the nightly gate goes red', noted: true, since_ms: NOW3 - 16 * 3_600_000 };
     expect(stateChip({ status: 'idle', since_ms: NOW3, waits: 0, watching: [bench] }, NOW3).text).toBe('… waiting · 3 min');
-    expect(stateChip({ status: 'idle', since_ms: NOW3, waits: 0, watching: [gate] }, NOW3).text).toBe('idle');
+    expect(stateChip({ status: 'idle', since_ms: NOW3, waits: 0, watching: [gate] }, NOW3).text).toBe('');
   });
 });
 
