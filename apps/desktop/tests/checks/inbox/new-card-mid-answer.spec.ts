@@ -54,9 +54,16 @@ const field = (page: Page) => page.locator('[data-testid="composer.field"]').fir
 const nine = (page: Page) => page.getByTestId(`inbox.block.card.${P}-9`);
 const HALF = 'warm, but only after the reindex';
 
+/** Card 9 open in the block: its row's click, else '+ N more' until it is the open one (H10 folds the
+ *  block to one row; the approval ranks first). */
 async function openNine(page: Page): Promise<void> {
   if ((await nine(page).count()) > 0) return;
-  await page.locator('[data-testid^="inbox.block.row."]', { hasText: 'which bench?' }).first().click();
+  const row = page.locator('[data-testid^="inbox.block.row."]', { hasText: 'which bench?' }).first();
+  if (await row.isVisible()) await row.click();
+  for (let i = 0; i < 6 && !(await nine(page).isVisible()); i++) {
+    await page.getByTestId('inbox.block.more').click({ timeout: 3000 }).catch(() => undefined);
+    await page.waitForTimeout(200);
+  }
   await expect(nine(page), 'card 9 open in the block').toBeVisible({ timeout: 5000 });
 }
 
