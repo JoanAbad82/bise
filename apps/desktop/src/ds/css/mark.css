@@ -1,0 +1,58 @@
+/* src/ds · bise's ':*' (mark.tsx): currentColor, the accent when something waits on him; the star
+   turns while bise works; the wink on hover. Still under reduced motion: the final state only. */
+.b-bise {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+.b-bise svg {
+  display: block;
+  overflow: visible;
+}
+.b-bise.waits {
+  color: var(--c-accent);
+}
+.b-bise-eyes rect {
+  fill: currentColor;
+}
+.b-bise-star line,
+.b-bise-wink {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+.b-bise-star {
+  transform-box: view-box;
+  transform-origin: 64px 56px;
+}
+.b-bise.working .b-bise-star {
+  animation: b-bise-turn 1.6s linear infinite;
+}
+.b-bise-wink {
+  opacity: 0;
+}
+/* the wink: ';*' once for 200 ms, each time the pointer comes on it */
+.b-bise.winks:hover .b-bise-wink {
+  animation: b-bise-wink 200ms steps(1, end) 1;
+}
+@keyframes b-bise-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes b-bise-wink {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .b-bise.working .b-bise-star,
+  .b-bise.winks:hover .b-bise-wink {
+    animation: none;
+  }
+}
