@@ -128,3 +128,31 @@ a38108e7's repl_start_e2e does. The lesson: a38108e7 (switcher-line,
 archived since; signed by designer) changed a visible line and moved one
 of its two tests. A change to a line a test waits on runs every test
 naming it (`rg` the words) before it lands.
+
+## feature_retire_e2e under load: two causes, and one stall to watch
+
+Reproduced with 6 copies in parallel (debt-t6, architect m_23328):
+
+- git's optional index lock. The hub's read-only git (a `status` poll
+  refreshes the index under `index.lock`) made a land's rebase in the
+  same worktree fail with `Unable to create .../index.lock: File exists`,
+  so its `landed` line never came (the 90 s timeout). Every hub git now
+  goes through `tools_env::git_command` with `GIT_OPTIONAL_LOCKS=0`
+  (laws `the_hub_runs_git_only_here`, `the_hubs_git_takes_no_optional_lock`).
+- the test's own order by sleeps. fr-c's check slept 8 s while fr-b's ask
+  came after `sleep 2` twice; under load the retire ran before fr-b
+  asked, or before fr-c's land began. Now by cause: fr-c's check touches
+  HELD then waits for GO; main sends fr-b and the retire only after HELD;
+  the test writes GO once fr-b asked. One margin stays: fr-b's `sleep 2`,
+  so the retire (main's next command, ms later) is queued before it.
+
+After: 3 batches of 6 in parallel, 18/18 green.
+
+Seen twice in 36 parallel runs, no cause yet, none since: a stall where
+an agent's `sb land` never returns (120-250 s, until the test ends; at
+the hub's stop it kills one `sh` and one `sleep`). Single runs never show
+it. A land that hangs is a product bug before a test bug: if it comes
+back, it gets its own item with the hub.log and the land queue's state at
+the hang. Kept dirs: /tmp/sb-e2e-19s0c5h5, b8dk62mi, 338aukor, vy4zc_lj
+(batch 1), 84ipz1mz, _qudidjq, e5u5rsnv, xcdskvxs, pfs1kgp5, z5gii4_m
+(batch 2, all at fr-b's first land on fr).
