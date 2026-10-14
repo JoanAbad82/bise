@@ -165,7 +165,9 @@ fn the_desktop_door_records_a_sent_note() {
     assert_eq!((sent[0].text.as_deref(), sent[0].quote.as_deref(), sent[0].version, sent[0].sent_ms), (Some("why so low?"), Some("1200"), 2, Some(50)));
     assert_eq!((sent[0].extra["rev"].as_u64(), sent[0].extra["via"].as_str()), (Some(3), Some("app")));
     assert_eq!(anchored(sent[0]), serde_json::from_value(cell()).ok());
-    assert_eq!(known(&d, &id, 2), Ok(()));
+    assert_eq!(known(&d, &id, 2), Ok(1), "a version with no revs: rev 1");
+    let vs = [json!({"v": 2, "revs": [{"rev": 1, "at_ms": 1}, {"rev": 4, "at_ms": 9}]}), json!({"v": 3})];
+    assert_eq!((rev_of(&vs, 2), rev_of(&vs, 3), rev_of(&vs, 7)), (4, 1, 1));
     assert_eq!(known(&d, &id, 3), Err("q3.xlsx has no version 3 here, so the note can't go on it".into()));
     assert_eq!(known(&d, "nope", 1), Err("nope has no version 1 here, so the note can't go on it".into()));
 }
@@ -176,13 +178,16 @@ fn the_desktop_door_records_a_sent_note() {
 fn the_door_checks_the_artifact_then_adds_the_hint() {
     let a = Part::Anchor { artifact: "q3".into(), version: 2, rev: 0, anchor: serde_json::from_value(cell()).unwrap(), quote: String::new(), n: None };
     let none = |_: &std::path::Path| -> Result<crate::parts_in::Stored, String> { Err("no".into()) };
-    let said = |known: &dyn Fn(&str, u64) -> Result<(), String>| crate::parts_in::said(&[a.clone(), Part::Text { text: "why?".into() }], &[], &crate::parts_in::Door { store: std::path::Path::new("/h/images"), put: &none, exists: &|_| true, known: known });
+    let said = |known: &dyn Fn(&str, u64) -> Result<u32, String>| crate::parts_in::said(&[a.clone(), Part::Text { text: "why?".into() }], &[], &crate::parts_in::Door { store: std::path::Path::new("/h/images"), put: &none, exists: &|_| true, known: known });
     assert_eq!(said(&|_, _| Err("no".into())), Err("no".into()), "the door's words, as they are");
     // an anchor it can't read: a known kind with bad fields, or a newer kind (architect m_23912)
-    let odd = |at: Value| crate::parts_in::said(&[Part::Anchor { artifact: "q3".into(), version: 2, rev: 0, anchor: serde_json::from_value(at).unwrap(), quote: String::new(), n: None }], &[], &crate::parts_in::Door { store: std::path::Path::new("/h/images"), put: &none, exists: &|_| true, known: &|_, _| Ok(()) });
+    let odd = |at: Value| crate::parts_in::said(&[Part::Anchor { artifact: "q3".into(), version: 2, rev: 0, anchor: serde_json::from_value(at).unwrap(), quote: String::new(), n: None }], &[], &crate::parts_in::Door { store: std::path::Path::new("/h/images"), put: &none, exists: &|_| true, known: &|_, _| Ok(1) });
     assert_eq!(odd(json!({"kind": "cell", "sheet": "Q3"})), Err("that part isn't in this version: the note can't go there".into()));
     assert_eq!(odd(json!({"kind": "voxel", "x": 1})), Err("this bise can't put a note on that kind of part (voxel): update bise".into()));
-    let s = said(&|id, v| if id == "q3" && v == 2 { Ok(()) } else { Err("no".into()) }).unwrap();
-    assert!(s.text.starts_with("<artifact-selection artifact=\"q3\" version=\"2\">\n{\"kind\":\"cell\""), "{}", s.text);
+    let s = said(&|id, v| if id == "q3" && v == 2 { Ok(3) } else { Err("no".into()) }).unwrap();
+    // architect m_24151: a note from the app (rev 0) is on that version's current rev
+    assert!(s.text.starts_with("<artifact-selection artifact=\"q3\" version=\"2\" rev=\"3\">"), "{}", s.text);
+    assert!(s.parts.contains("\"rev\":3"), "{}", s.parts);
+    assert!(s.text.contains("\n{\"kind\":\"cell\""), "{}", s.text);
     assert!(s.text.ends_with(&format!("why?{}", parts::NOTES_HINT)), "{}", s.text);
 }

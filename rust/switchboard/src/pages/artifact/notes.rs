@@ -79,13 +79,17 @@ pub fn outcomes(notes: &[Note], versions: &[(u64, u64)]) -> Vec<Note> {
 /// its `meta.json` as written (the fields art-live adds included).
 // TODO(art-live's Version fields, architect m_24038): a bridge. Once
 // `artifacts::Version` has `turn` and `revs`, read them typed through
-// `artifacts::Store::get` and delete this second reader of meta.json;
-// whoever lands second does it.
+// `artifacts::Store::get` (began, rev_of: `Version::rev`) and delete this
+// second reader of meta.json (`raw_versions`); whoever lands second does it.
 fn versions_began(pages: &Pages, id: &str) -> Vec<(u64, u64)> {
-    let state = pages.store.dir.parent().unwrap_or(&pages.store.dir);
-    let meta: Value = std::fs::read(state.join("artifacts").join(id).join("meta.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
-    let list = meta.get("versions").and_then(Value::as_array).cloned().unwrap_or_default();
+    let list = raw_versions(pages.store.dir.parent().unwrap_or(&pages.store.dir), id);
     list.iter().map(|v| (v.get("v").and_then(Value::as_u64).unwrap_or(0), began(v))).collect()
+}
+
+/// Artifact `id`'s versions as its meta.json has them (the bridge above).
+fn raw_versions(state: &std::path::Path, id: &str) -> Vec<Value> {
+    let meta: Value = std::fs::read(state.join("artifacts").join(id).join("meta.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
+    meta.get("versions").and_then(Value::as_array).cloned().unwrap_or_default()
 }
 
 /// A note's anchor (its `at`: notes.js keeps `anchor` for its own
@@ -215,14 +219,22 @@ pub fn post_send(pages: &Pages, id: &str) -> Response {
 }
 
 /// Version `v` of artifact `id` is here (the door's check of a
-/// `Part::Anchor`); Err: his words (designer m_24098), the artifact by
-/// its title.
-pub fn known(state: &std::path::Path, id: &str, v: u64) -> Result<(), String> {
+/// `Part::Anchor`): its current rev, the bytes his frame shows now
+/// (architect m_24151: the door fills a note's rev 0 with it); Err: his
+/// words (designer m_24098), the artifact by its title.
+pub fn known(state: &std::path::Path, id: &str, v: u64) -> Result<u32, String> {
     let m = crate::artifacts::Store::new(state).get(id);
     match &m {
-        Some(m) if m.versions.iter().any(|x| x.v == v) => Ok(()),
+        Some(m) if m.versions.iter().any(|x| x.v == v) => Ok(rev_of(&raw_versions(state, id), v)),
         _ => Err(format!("{} has no version {v} here, so the note can't go on it", m.as_ref().map_or(id, |m| m.title.as_str()))),
     }
+}
+
+/// Version `v`'s current rev in `versions` (meta.json's, as written):
+/// its last `revs[].rev`, 1 when it has none (art-live's `Version::rev`).
+pub fn rev_of(versions: &[Value], v: u64) -> u32 {
+    let ver = versions.iter().find(|x| x.get("v").and_then(Value::as_u64) == Some(v));
+    ver.and_then(|x| x.get("revs")?.as_array()?.last()?.get("rev")?.as_u64()).unwrap_or(1) as u32
 }
 
 /// His message's anchor parts (the desktop door), recorded as sent notes

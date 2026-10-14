@@ -230,8 +230,8 @@ try {
   await evaluate(`${fd}.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true }))`);
   await until("window.got.length > 0", "the parent got it");
   const got = await evaluate("window.got[0]");
-  assert.deepEqual(Object.keys(got).sort(), ["anchor", "artifact", "bise", "quote", "version"], "exactly the four facts and its tag");
-  assert.deepEqual({ ...got, quote: undefined }, { bise: "anchor", artifact: "q3-xlsx", version: VERSION, anchor: { kind: "cell", sheet, range: "A3:B4" }, quote: undefined });
+  assert.deepEqual(Object.keys(got).sort(), ["anchor", "artifact", "bise", "key", "quote", "version"], "the four facts, its tag and his first character");
+  assert.deepEqual({ ...got, quote: undefined }, { bise: "anchor", artifact: "q3-xlsx", version: VERSION, anchor: { kind: "cell", sheet, range: "A3:B4" }, quote: undefined, key: "w" });
   ok(`desktop door: the frame posted ${JSON.stringify(got.anchor)} with "${got.quote}"`);
 
   // ---- designer's screens: each kind, 1400 / 1100 / 800, light and dark

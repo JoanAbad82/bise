@@ -68,9 +68,18 @@ export function quoteOf(text) {
 }
 
 /** The message the frame posts to the desktop for a selection: its tag and exactly the four
- * facts (architect m_23971: no token, no list, no url), whatever window it is in. */
-export function message(info, anchor, quote) {
-  return { bise: "anchor", artifact: info.id, version: info.version, anchor, quote };
+ * facts (architect m_23971: no token, no list, no url), whatever window it is in; `key`: his
+ * first typed character when typing took it, so "why" never arrives as "hy" (architect m_24155). */
+export function message(info, anchor, quote, key) {
+  return { bise: "anchor", artifact: info.id, version: info.version, anchor, quote, ...(key ? { key } : {}) };
+}
+
+/** The character a keydown types, when it is exactly one printable grapheme and no shortcut, IME
+ * composition or dead key (those take the selection with no key); null otherwise. */
+export function typed(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing || e.key === "Dead" || typeof e.key !== "string") return null;
+  const g = typeof Intl !== "undefined" && Intl.Segmenter ? [...new Intl.Segmenter().segment(e.key)].length : [...e.key].length;
+  return g === 1 && !/[\u0000-\u001f\u007f]/.test(e.key) ? e.key : null;
 }
 
 // ======================================================================================
@@ -259,11 +268,11 @@ function mount() {
   });
   btn.addEventListener("mousedown", (e) => e.preventDefault()); // keep the text selection
   // his gesture only, never on load or a timer (architect m_23971)
-  function take() {
+  function take(key) {
     if (!picked) return;
     if (inApp) {
       // the desktop checks the source and the origin (art-desktop m_23900)
-      window.parent.postMessage(message(office.info, picked.anchor, picked.quote), "*");
+      window.parent.postMessage(message(office.info, picked.anchor, picked.quote, key), "*");
       btn.textContent = W.added;
       setTimeout(() => btn.remove(), 1200);
     } else {
@@ -272,12 +281,17 @@ function mount() {
     }
     picked = null;
   }
-  btn.addEventListener("click", take);
+  btn.addEventListener("click", () => take());
   // in the app, as on a thread's quote: typing adds it (his words go to the composer, which
   // takes the focus), ⌘C copies what is selected
   document.addEventListener("keydown", (e) => {
     if (!inApp || !picked || !btn.isConnected || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key.length === 1) take();
+    const key = typed(e);
+    // his first character goes with it (not typed here); a composition or a dead key: no key
+    if (key) {
+      e.preventDefault();
+      take(key);
+    } else if (e.isComposing || e.key === "Dead") take();
   });
   document.addEventListener("copy", (e) => {
     if (!picked || !picked.quote) return;

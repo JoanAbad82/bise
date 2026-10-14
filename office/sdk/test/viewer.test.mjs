@@ -79,11 +79,15 @@ test("a note's anchor says its place in bise_proto's words (anchor_label.json)",
   createRequire(import.meta.url)(join(root, "kit", "notes-anchors.js"));
   const rows = JSON.parse(readFileSync(join(root, "rust", "proto", "fixtures", "anchor_label.json"), "utf8"));
   for (const r of rows) assert.equal(globalThis.BiseAnchors.label(r.anchor), r.label, JSON.stringify(r.anchor));
-  const { message } = await helpers("select.js");
+  const { message, typed } = await helpers("select.js");
   const m = message({ id: "q3-xlsx", version: 4, rev: 2 }, { kind: "cell", sheet: "Q3", range: "B4:D9" }, "1200 1350");
   // exactly its tag and the four facts (architect m_23971), nothing else from the frame
   assert.deepEqual(Object.keys(m).sort(), ["anchor", "artifact", "bise", "quote", "version"]);
   assert.deepEqual(m, { bise: "anchor", artifact: "q3-xlsx", version: 4, anchor: { kind: "cell", sheet: "Q3", range: "B4:D9" }, quote: "1200 1350" });
+  // his first typed character (architect m_24155): {bise, artifact, version, anchor, quote, key?}
+  assert.deepEqual(Object.keys(message({ id: "q", version: 1 }, { kind: "slide", slide: 1 }, "", "w")).sort(), ["anchor", "artifact", "bise", "key", "quote", "version"]);
+  const k = (key, o = {}) => typed({ key, ...o });
+  assert.deepEqual([k("w"), k(" "), k("é"), k("👍🏽"), k("Enter"), k("Dead"), k("w", { metaKey: true }), k("w", { ctrlKey: true }), k("w", { altKey: true }), k("w", { isComposing: true }), k("\t")], ["w", " ", "é", "👍🏽", null, null, null, null, null, null, null]);
 });
 
 test("marks: sent and drafts marked, ✓ only on the version that answered, then gone", async () => {

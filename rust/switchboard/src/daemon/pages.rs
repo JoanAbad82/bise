@@ -427,7 +427,7 @@ impl Shell {
 
     /// Version `v` of artifact `id` is here (`parts_in::said`'s check of
     /// an anchor part), or his words why not; no page server: none is.
-    pub(super) fn artifact_known(&self) -> impl Fn(&str, u64) -> Result<(), String> + 'static {
+    pub(super) fn artifact_known(&self) -> impl Fn(&str, u64) -> Result<u32, String> + 'static {
         let pages = self.pg.pages.clone();
         move |id: &str, v: u64| match pages.as_ref() {
             Some(p) => crate::pages::artifact::notes::known(p.store.dir.parent().unwrap_or(&p.store.dir), id, v),
