@@ -17,7 +17,8 @@ import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
 import { Hint, hintUsed, useHint } from './hints';
 import { MAIN } from './route';
-import { useNow } from './clock';
+import { useNowFor } from './clock';
+import { pauseInSeconds } from '@/thread/wake';
 import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
 import { agentRows, archivedRows, artifactRows, capRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
@@ -269,13 +270,14 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   // a browser-only artifact (a PR, a link) opens his browser, the bar stays (leave.ts)
   const goArtifact = useGoArtifact();
   const route = useRoute();
-  const now = useNow();
   // ⌥ held alone for HINT_HOLD_MS: the agents' rows show ⌥1-⌥9 (designer: '⌥ tenu'; held.ts)
   const alt = useModHeld('Alt');
   const all = project === '';
   // back from an artifact (‹, esc, ✕): the bar as he left it, its scroll too (designer's desktop-history)
   useKeptScroll(`rb:${project}`, () => document.querySelector<HTMLElement>('[data-testid="app.panel"] .app-rb-body'));
   const agents = useBarAgents(project);
+  // a live row's pause under a minute ends on seconds: the second clock while one does
+  const now = useNowFor((t) => agents.some((x) => !x.a.archived && pauseInSeconds(x.a, t)));
   const artifacts = useAllArtifacts(all ? undefined : project);
   const tasks = useAllScheduled(all ? undefined : project);
   const features = useFeatures(project);

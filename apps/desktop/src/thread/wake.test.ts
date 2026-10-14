@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent, AgentWatch } from '@/proto';
-import { alarms, clockAhead, clockPast, paused, pauseLine, waitLen, wakeLine, wakeTail, watchEvent } from './wake';
+import { alarms, clockAhead, clockPast, paused, pauseInSeconds, pauseLine, waitLen, wakeLine, wakeTail, watchEvent } from './wake';
 import WAIT_WORDS from '../../../../rust/proto/fixtures/wait_words.json';
 
 // An agent row from the fixture's few fields, the rest an idle agent's (words.rs does the same).
@@ -36,6 +36,16 @@ describe("agent-waiting-states A: the wait words, words.rs's (wait_words.json)",
 
   it('an alarm: if the event, until a clock ahead, the hover says when it was set', () => {
     for (const c of WAIT_WORDS.alarms) expect(alarms(agent(c.agent as FxAgent), c.now_ms, () => c.off_s), c.why).toEqual(c.want);
+  });
+
+  it('a pause under a minute reads in seconds: its reader takes the second clock (reply-clock)', () => {
+    const asked = 1_000_000;
+    const a = agent({ name: 'search', watching: [{ id: 7, kind: 'reply', what: 'perf', since_ms: asked, resumes: true }] });
+    // a minute clock behind the ask: the duration clamps to 0 s, still seconds
+    expect(pauseInSeconds(a, asked - 30_000)).toBe(true);
+    expect(pauseInSeconds(a, asked + 59_000)).toBe(true);
+    expect(pauseInSeconds(a, asked + 60_000)).toBe(false);
+    expect(pauseInSeconds(agent({ name: 'idle' }), asked)).toBe(false);
   });
 
   it("a watch's event", () => {

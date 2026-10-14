@@ -7,7 +7,8 @@
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { Agent } from '@/proto';
 import { useAgents, useComputerLive, useDiff } from '@/store';
-import { useNow } from '@/app/clock';
+import { useNowFor } from '@/app/clock';
+import { pauseInSeconds } from './wake';
 import { Breath, Pulse } from '@/working/Signs';
 import { useRouter } from '@/app/router';
 import { BisePearl } from '@/app/BisePearl';
@@ -121,7 +122,8 @@ function Restore({ icon, onRestore }: { icon: boolean; onRestore: () => void }) 
 /** An agent's head (`starting`: its thread has nothing of its own yet). `more` is the '⋯' button (rename, model; the screen owns its panel); `note` a quiet word after the chip ('voice mode'); its context gauge after it. */
 export function AgentHead({ project, a, more, note, starting = false, restore }: { project: string; a: Agent; more?: ReactNode; note?: string | undefined; starting?: boolean; restore?: () => void }) {
   const usage = usageLine(a.usage?.words);
-  const now = useNow();
+  // its chip's pause under a minute reads in seconds: the second clock
+  const now = useNowFor((t) => pauseInSeconds(a, t));
   const router = useRouter();
   const diff = useDiff(project, a.name);
   const branch = branchLine(a.branch, diff?.files.length);

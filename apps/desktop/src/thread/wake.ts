@@ -119,6 +119,9 @@ export function pauseLine(a: Waits, nowMs: number, short = false): PauseLine | n
 /** It is paused: a pause line shows over its composer. */
 export const paused = (a: Waits): boolean => pauseLine(a, 0) !== null;
 
+/** Its pause reads in seconds at `now` ('· 12 s'): its reader needs the window's second clock (clock.ts useNowFor). */
+export const pauseInSeconds = (a: Waits, now: number): boolean => /\ds$/.test(pauseLine(a, now, true)?.len ?? '');
+
 /** An alarm (words::Alarm): 'if <event>', when it stops watching (the clock alone, '' unknown), the hover. */
 export interface Alarm {
   id: number;

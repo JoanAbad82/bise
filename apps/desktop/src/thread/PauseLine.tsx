@@ -8,11 +8,11 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Act } from '@/ds';
 import type { Agent } from '@/proto';
-import { useNow } from '@/app/clock';
+import { useNowFor } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { shownName } from '@/agents/model';
 import { textWidth } from '@/app/FitWords';
-import { digitRuns, fitNote, pauseLine } from './wake';
+import { digitRuns, fitNote, pauseInSeconds, pauseLine } from './wake';
 
 /** Words with their digits mono. */
 function Runs({ text }: { text: string }) {
@@ -32,7 +32,8 @@ function Runs({ text }: { text: string }) {
 }
 
 export function PauseLine({ a, project }: { a: Agent | undefined; project: string }) {
-  const now = useNow();
+  // under a minute it reads in seconds: the second clock (else '0 s' for up to a minute)
+  const now = useNowFor((t) => a !== undefined && pauseInSeconds(a, t));
   const router = useRouter();
   const line = a === undefined || a.archived ? null : pauseLine(a, now);
   const box = useRef<HTMLDivElement>(null);
