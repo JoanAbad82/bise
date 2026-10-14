@@ -511,17 +511,21 @@ def launch_chain(pid):
     return chain
 
 
-# macOS Screenshot (his ⌘⇧4/5): the one front change that is his with no launcher in its chain
-# (launchservicesd starts it, parent launchd: f8a0b301's run stopped on it, main m_25124)
-SCREENSHOT_UI = "com.apple.screencaptureui"
+# macOS's own UIs that come front with no launcher in their chain (launchservicesd starts them,
+# parent launchd) and are never the candidate's: Screenshot (his ⌘⇧4/5) and the account/setup
+# follow-up prompt (f8a0b301's runs stopped on each, main m_25124/m_25186). An allowlist: any other
+# front change with an empty chain stays a kill (UserNotificationCenter, CoreServicesUIAgent, the
+# Electron 'damaged' alert came through launchservicesd with an empty chain too).
+HIS_SYSTEM_UI = ("com.apple.screencaptureui", "com.apple.FollowUpUI")
+SCREENSHOT_UI = HIS_SYSTEM_UI[0]
 
 
 def his_screenshot(info, run_pids=None, cand_bundle=None, chain=None, cand_tcc=False):
-    """A front change to macOS Screenshot is his own ⌘⇧4/5 when nothing ties it to the run: no pid
-    of the run and not the candidate's bundle in its launch chain (an empty chain is fine: launchd
-    starts it), not a pid of ours itself, and no screen-capture TCC line from the run's pids
-    (`cand_tcc`). Anything else that comes front is judged by is_breach. Pure."""
-    if info.get("bundle") != SCREENSHOT_UI or cand_tcc:
+    """A front change to one of HIS_SYSTEM_UI (Screenshot, the follow-up prompt) is his, logged, when
+    nothing ties it to the run: no pid of the run and not the candidate's bundle in its launch chain
+    (an empty chain is fine: launchd starts it), not a pid of ours itself, and no screen-capture TCC
+    line from the run's pids (`cand_tcc`). Anything else that comes front is judged by is_breach. Pure."""
+    if info.get("bundle") not in HIS_SYSTEM_UI or cand_tcc:
         return False
     if run_pids and info.get("pid") in run_pids:
         return False
@@ -637,11 +641,11 @@ def front_gate(out, stop_file, bundle, every=0.1, pids_file=None):
                 except OSError:
                     run_pids = None
                 chain = launch_chain(cur["pid"]) if after and cur["pid"] else None
-                cand_tcc = run_screen_tcc(_jsonl(os.path.join(os.path.dirname(out), "tcc.jsonl")), run_pids) if cur.get("bundle") == SCREENSHOT_UI else False
+                cand_tcc = run_screen_tcc(_jsonl(os.path.join(os.path.dirname(out), "tcc.jsonl")), run_pids) if cur.get("bundle") in HIS_SYSTEM_UI else False
                 row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after, run_pids, cand_bundle, chain, cand_tcc))
                 if his_screenshot(cur, run_pids, cand_bundle, chain, cand_tcc):
                     row["his_screenshot"] = True
-                    print("%s his screenshot: %s (%s), no chain to the run, no screen TCC from it: logged, the run goes on"
+                    print("%s his system UI: %s (%s), no chain to the run, no screen TCC from it: logged, the run goes on"
                           % (time.strftime("%H:%M:%S"), cur["name"], cur.get("bundle")), flush=True)
                 if chain is not None:
                     row["chain"] = chain

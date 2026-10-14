@@ -868,7 +868,14 @@ def real_shape_pure():
     check(rs.run_screen_tcc([{"service": "kTCCServiceScreenCapture", "pid": 17193}], {17193})
           and not rs.run_screen_tcc([{"service": "kTCCServiceScreenCapture", "pid": 34387}], {17193})
           and not rs.run_screen_tcc([{"service": "kTCCServiceMicrophone", "pid": 17193}], {17193}), "screen TCC from the run's pids")
-    check(rs.is_breach({"name": "Grab", "pid": 61828, "bundle": "com.apple.Grab"}, True, {17193}, cand, []), "any other new app with no chain = breach")
+    follow = {"name": "?", "pid": 89327, "bundle": "com.apple.FollowUpUI"}
+    check(not rs.is_breach(follow, True, {17193}, cand, []) and rs.is_breach(follow, True, {17193}, cand, [{"name": "bise cand", "pid": 17193, "bundle": cand}]),
+          "macOS's follow-up prompt: his with no chain to the run, a breach with one")
+    check(rs.HIS_SYSTEM_UI == ("com.apple.screencaptureui", "com.apple.FollowUpUI"), "the allowlist is these two")
+    for other in ({"name": "Grab", "pid": 61828, "bundle": "com.apple.Grab"},
+                  {"name": "UserNotificationCenter", "pid": 61829, "bundle": "com.apple.UserNotificationCenter"},
+                  {"name": "CoreServicesUIAgent", "pid": 61830, "bundle": "com.apple.coreservices.uiagent"}):
+        check(rs.is_breach(other, True, {17193}, cand, []), "any other new app with no chain = breach: %s" % other["name"])
     # FRONT_BAD follows the same rule (ambient-lead m_21528; b51422c0's run stopped on his own Raycast -> System Settings)
     settings = {"name": "System Settings", "pid": 30883, "bundle": "com.apple.systempreferences"}
     check(not rs.is_breach(settings, True, {58465}, cand, raycast)

@@ -1948,7 +1948,7 @@ async function rowsE812(harness, say) {
   // the projects of the sidebar but bise and harness: {id, name}
   const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
     .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), name: (e.querySelector('.app-side-name, .name')?.textContent ?? e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
-    .filter((p) => p.id && !p.id.includes('.') && !/^harness\b/.test(p.name))).catch(() => []);
+    .filter((p) => p.id && !p.id.includes('.') && !/^\W*harness\b/.test(p.name))).catch(() => []);
   const openProject = async (id) => {
     await page.locator(`[data-testid="app.sidebar.project.${id}"]`).first().click({ timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(800);
@@ -2207,7 +2207,7 @@ async function rowsF2A7(harness, say) {
   });
   const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
     .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), name: (e.querySelector('.app-side-name, .name')?.textContent ?? e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
-    .filter((p) => p.id && !p.id.includes('.') && !/^harness\b/.test(p.name))).catch(() => []);
+    .filter((p) => p.id && !p.id.includes('.') && !/^\W*harness\b/.test(p.name))).catch(() => []);
   const openProject = async (id) => {
     await page.locator(`[data-testid="app.sidebar.project.${id}"]`).first().click({ timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(800);
@@ -2288,24 +2288,36 @@ async function rowsF2A7(harness, say) {
   await until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 90000, 1000);
   await cards(['digit', 'words', 'click'].map((w) => ({ q: `zqA${w}${T} which way?`, opts: [`1. zq${w}-one`, `2. zq${w}-two`] })), 'seeded f2a7');
   // folded under '+ N more' a card's words aren't in the block: main's 'card #N opened' x3 instead
-  const seeded = await until(async () => ((((await text('[data-testid="thread.list"]')) ?? '').match(/card #\d+ opened for the user/g) ?? []).length >= 3 ? true : null), 120000, 1000);
+  const seeded = await until(async () => ((((await text('[data-testid="thread.list"]')) ?? '').match(/(card|notification) #\d+ opened for the user/g) ?? []).length >= 3 ? true : null), 120000, 1000);
   step("rowsF2A7 seed: main's three cards (digit, words, click) in the inbox", !!seeded, { other: other ?? null, block: flat(await text('[data-testid="inbox.block"]')).slice(0, 300) });
 
   const took = {};
+  // answer-in-thread A (787e6ee82): an answer to another project's card takes the window to that
+  // project's thread at his answer, the hub's row there ('answered from <where>' under his bubble);
+  // no window aside in the thread he answered from (store/answered.ts)
+  const harnessPid = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
+    .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), t: (e.textContent ?? '').trim() }))
+    .find((p) => p.id && !p.id.includes('.') && /^\W*harness\b/.test(p.t))?.id ?? null).catch(() => null);
+  const HID = await harnessPid();
+  const inHarness = () => page.locator('[data-testid="thread.screen"]').first().getAttribute('data-project', { timeout: 1000 }).then((x) => x === HID, () => false);
+  const shownOther = otherName.replace(/^\W+|\W+$/g, '');
+  const hubRows = async (w) => (await rowsWith(w)).filter((x) => x.id.startsWith('thread.approval.'));
+  const asideRows = async (w) => (await rowsWith(w)).filter((x) => x.id.startsWith('thread.aside.'));
   await row('answer by a digit from another project', async () => {
     await goOther();
     await clear();
     await page.mouse.move(1, 300);
     const d = await dock(`zqAdigit${T}`, 60000);
     if (d.open) { await d.open.click({ position: { x: 4, y: 4 } }).catch(() => {}); await page.keyboard.press('2'); }
-    const rows = d.open ? await until(async () => { const r = (await rowsWith('zqdigit-two')).filter((x) => x.id.startsWith('thread.aside.')); return r.length ? r : null; }, 20000, 500) : null;
+    const moved = d.open ? await until(async () => ((await inHarness()) ? true : null), 20000, 500) : null;
+    const rows = moved ? await until(async () => { const r = await hubRows('zqdigit-two'); return r.length ? r : null; }, 20000, 500) : null;
     const gone = !(await present(`zqAdigit${T}`));
     await page.mouse.move(1, 300);
     await shot('f2a7-digit-other-project');
     took.digit = rows?.[0] ?? null;
-    step(`a digit ('2') on main's card from ${otherName}'s thread: '✓ you answered <agent> · harness' + 'zqdigit-two' there, once; the card gone`,
-      !!rows && rows.length === 1 && /✓/.test(rows[0].text) && /you answered \S+ · harness/.test(rows[0].text) && !/zqdigit-two.*\b2\b/.test(rows[0].text) && gone,
-      { listed: d.listed, opened: !!d.open, card: d.id, rows, gone, field: flat(await field.innerText().catch(() => '')) });
+    step(`a digit ('2') on main's card from ${shownOther}'s thread: the window goes to harness' thread at his answer, 'zqdigit-two' there once with 'answered from ${shownOther}'; the card gone`,
+      !!other && !!moved && !!rows && rows.length === 1 && new RegExp(`answered from ${shownOther}`).test(rows[0].text) && gone,
+      { other: shownOther, listed: d.listed, opened: !!d.open, card: d.id, moved: !!moved, rows, gone });
   });
 
   const SAID = `zqwords-said ${T} the small one please`;
@@ -2318,13 +2330,14 @@ async function rowsF2A7(harness, say) {
       await page.keyboard.type(SAID, { delay: 5 });
       await page.keyboard.press('Enter');
     }
-    const rows = d.open ? await until(async () => { const r = (await rowsWith(SAID)).filter((x) => x.id.startsWith('thread.aside.')); return r.length ? r : null; }, 20000, 500) : null;
+    const moved = d.open ? await until(async () => ((await inHarness()) ? true : null), 20000, 500) : null;
+    const rows = moved ? await until(async () => { const r = await hubRows(SAID); return r.length ? r : null; }, 20000, 500) : null;
     const gone = !(await present(`zqAwords${T}`));
     await page.mouse.move(1, 300);
     await shot('f2a7-words-bise');
     took.words = rows?.[0] ?? null;
-    step("words in the composer on main's open card from bise's view: '✓ you answered <agent> · harness' + his words there, once; the card gone",
-      !!rows && rows.length === 1 && /✓/.test(rows[0].text) && /you answered \S+ · harness/.test(rows[0].text) && gone, { listed: d.listed, opened: !!d.open, card: d.id, rows, gone });
+    step("words in the composer on main's open card from bise's view: the window goes to harness' thread at his answer, his words there once with 'answered from bise'; the card gone",
+      !!moved && !!rows && rows.length === 1 && /answered from bise/.test(rows[0].text) && gone, { listed: d.listed, opened: !!d.open, card: d.id, moved: !!moved, rows, gone });
   });
 
   await row('answer by a click in the asker project', async () => {
@@ -2353,11 +2366,14 @@ async function rowsF2A7(harness, say) {
     const check = async (when) => {
       const seen = {};
       await goOther();
-      seen[otherName] = (await until(async () => { const r = (await rowsWith('zqdigit-two')).filter((x) => x.id.startsWith('thread.aside.')); return r.length ? r : null; }, 10000, 500)) ?? [];
+      await page.waitForTimeout(1500);
+      seen[otherName] = await asideRows('zqdigit-two');
       await bise();
-      seen.bise = (await until(async () => { const r = (await rowsWith(SAID)).filter((x) => x.id.startsWith('thread.aside.')); return r.length ? r : null; }, 10000, 500)) ?? [];
+      await page.waitForTimeout(1500);
+      seen.bise = await asideRows(SAID);
       await harness();
-      seen.harness = (await until(async () => { const r = (await rowsWith('zqclick-one')).filter((x) => x.id.startsWith('thread.approval.')); return r.length ? r : null; }, 10000, 500)) ?? [];
+      seen.harness = {};
+      for (const [k, w] of [['digit', 'zqdigit-two'], ['words', SAID], ['click', 'zqclick-one']]) seen.harness[k] = (await until(async () => { const r = await hubRows(w); return r.length ? r : null; }, 10000, 500)) ?? [];
       const back = [];
       for (const w of ['digit', 'words', 'click']) if (await present(`zqA${w}${T}`)) back.push(w);
       return { when, seen, back };
@@ -2367,8 +2383,8 @@ async function rowsF2A7(harness, say) {
     const b = await check('after a reload');
     await page.mouse.move(1, 300);
     await shot('f2a7-answers-after-reload');
-    const ok = (s) => s.seen[otherName].length === 1 && s.seen.bise.length === 1 && s.seen.harness.length === 1 && s.back.length === 0;
-    step(`each answer's row where he was (${otherName}: digit, bise: words, harness: click), once, after a project switch and after a reload; no card back`, ok(a) && ok(b), { a, b });
+    const ok = (s) => s.seen[otherName].length === 0 && s.seen.bise.length === 0 && ['digit', 'words', 'click'].every((k) => s.seen.harness[k].length === 1) && s.back.length === 0;
+    step(`each answer once in harness' thread (where it was asked), no aside where he answered from (${otherName}, bise), after a project switch and after a reload; no card back`, ok(a) && ok(b), { a, b });
   });
 
   await row('a refused answer and close come back with the words', async () => {
@@ -2554,10 +2570,10 @@ async function rows233B(harness, say) {
   }).catch(() => null);
   const harnessId = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
     .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), t: (e.textContent ?? '').trim() }))
-    .find((p) => p.id && !p.id.includes('.') && /^harness\b/.test(p.t))?.id ?? null).catch(() => null);
+    .find((p) => p.id && !p.id.includes('.') && /^\W*harness\b/.test(p.t))?.id ?? null).catch(() => null);
   const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
     .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), name: (e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
-    .filter((p) => p.id && !p.id.includes('.') && !/^harness\b/.test(p.name))).catch(() => []);
+    .filter((p) => p.id && !p.id.includes('.') && !/^\W*harness\b/.test(p.name))).catch(() => []);
   const other = (await others())[0] ?? null;
   const goOther = async () => {
     if (other) { await page.locator(`[data-testid="app.sidebar.project.${other.id}"]`).first().click({ timeout: 5000 }).catch(() => {}); await page.waitForTimeout(800); }
