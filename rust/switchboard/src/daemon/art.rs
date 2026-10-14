@@ -507,7 +507,8 @@ pub(super) fn landed_rec(shared: &Path, agent: &str, target: &str, sha: &str, co
     if commits == 0 {
         return None;
     }
-    let out = std::process::Command::new("git")
+    let out = crate::tools_env::git_command()
+        .ok()?
         .arg("-C")
         .arg(shared)
         .args(["rev-parse", "--short", &format!("{}~{}", sha, commits)])

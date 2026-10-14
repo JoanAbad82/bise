@@ -1289,7 +1289,8 @@ impl Shell {
 
     /// The commit message style of the repo, from its last 50 subjects.
     fn commit_style(&self) -> Option<String> {
-        let out = Command::new("git")
+        let out = crate::tools_env::git_command()
+            .ok()?
             .args(["log", "-50", "--format=%s"])
             .current_dir(&self.opts.paths.workspace)
             .stderr(std::process::Stdio::null())

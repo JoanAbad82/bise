@@ -275,10 +275,19 @@ pub fn git() -> Git {
     g
 }
 
-/// A `git` command on the probed binary, or why git cannot be used.
+/// A `git` command on the probed binary, or why git cannot be used: the
+/// hub's one way to run git (law `the_hub_runs_git_only_here`).
+/// `GIT_OPTIONAL_LOCKS=0`: git takes no lock it doesn't need, so the
+/// hub's reads (a `status` refreshes the index under `index.lock`) never
+/// make a land's rebase or commit in that worktree fail on the lock
+/// (feature_retire_e2e under load); a write still takes its own lock.
 pub fn git_command() -> Result<Command, String> {
     match git() {
-        Git::Works { bin, .. } => Ok(Command::new(bin)),
+        Git::Works { bin, .. } => {
+            let mut c = Command::new(bin);
+            c.env("GIT_OPTIONAL_LOCKS", "0");
+            Ok(c)
+        }
         g => Err(g.problem().unwrap_or_default()),
     }
 }
@@ -743,5 +752,42 @@ mod tests {
         assert_eq!(g, Git::Works { bin: bin.clone(), version: "git version 9.9.9".into() });
         assert_eq!(g.problem(), None);
         assert_eq!(g.describe(), format!("git version 9.9.9 ({})", bin.display()));
+    }
+
+    /// The hub's git takes no optional lock: a `status` poll never holds
+    /// the `index.lock` a land's rebase needs (feature_retire_e2e).
+    #[test]
+    fn the_hubs_git_takes_no_optional_lock() {
+        let Ok(c) = git_command() else { return };
+        let envs: Vec<_> = c.get_envs().collect();
+        assert!(envs.contains(&(std::ffi::OsStr::new("GIT_OPTIONAL_LOCKS"), Some(std::ffi::OsStr::new("0")))), "{envs:?}");
+    }
+
+    /// One owner for the hub's git: no `Command::new("git")` in the
+    /// crate's sources but here (a test module or a tests file aside).
+    #[test]
+    fn the_hub_runs_git_only_here() {
+        fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    walk(&p, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push(p);
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut files);
+        let needle = ["Command::new(", "\"git\")"].concat();
+        for f in files {
+            let name = f.file_name().unwrap().to_string_lossy().to_string();
+            if name == "tools_env.rs" || name.ends_with("_tests.rs") || f.components().any(|c| c.as_os_str() == "tests") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&f).unwrap();
+            let code = text.split("#[cfg(test)]").next().unwrap_or("");
+            assert!(!code.contains(&needle), "{}: runs git without tools_env::git_command (GIT_OPTIONAL_LOCKS=0)", f.display());
+        }
     }
 }

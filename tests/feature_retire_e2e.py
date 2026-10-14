@@ -21,9 +21,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check, out, sh  # noqa: E402
 
-# the check sleeps then fails only where SLOW is (fr-c's worktree): a
-# land that holds its line for 4 s and moves nothing
-CHECK = "if [ -f SLOW ]; then sleep 8; exit 1; fi"
+# the check fails only where SLOW is (fr-c's worktree): it says HELD,
+# then holds fr-c's land on the line until the test writes GO, once it
+# saw fr-b ask to land. Ordered by cause, never by sleeps: under load a
+# fixed sleep ended before fr-b asked, or before fr-c's land began.
+CHECK = "if [ -f SLOW ]; then touch %s; while [ ! -f %s ]; do sleep 0.1; done; exit 1; fi"
 
 
 def land_cmd(name, f):
@@ -34,8 +36,9 @@ def main():
     if not os.path.exists(EXE):
         sys.exit("build first: cd rust && cargo build")
     E = e2e.Env()
+    held, go = os.path.join(E.tmp, "held"), os.path.join(E.tmp, "go")
     os.makedirs(os.path.join(E.ws, ".switchboard"))
-    open(os.path.join(E.ws, ".switchboard", "config.toml"), "w").write('[flow]\nmode = "trunk"\ncheck = "%s"\n' % CHECK)
+    open(os.path.join(E.ws, ".switchboard", "config.toml"), "w").write('[flow]\nmode = "trunk"\ncheck = "%s"\n' % (CHECK % (held, go)))
     sh(E.ws, "echo .switchboard/ > .gitignore && git add .gitignore && git commit -qm ignore")
     ok = True
     try:
@@ -71,15 +74,18 @@ def main():
         main_before = out(E.ws, "git rev-parse main")
         fr_tip = out(E.ws, "git rev-parse fr")
 
-        # fr-c's land holds fr's line (its check sleeps then fails), the
-        # retire waits behind it, fr-b's next land behind the retire (fr-b
-        # writes when it asks, to show it asked before the retire's step)
+        # fr-c's land holds fr's line (its check waits for GO, then
+        # fails), the retire waits behind it, fr-b's next land behind the
+        # retire (fr-b writes when it asks; GO comes only after that, so
+        # it asked before the retire's step)
         frb_at = os.path.join(E.tmp, "frb_at")
         frb = os.path.join(E.tmp, "frb.sh")
         open(frb, "w").write("sleep 2 && echo fr-b2 > b2.txt && git add b2.txt && git commit -qm fr-b2 && "
                              "python3 -c 'import time; print(int(time.time() * 1000))' > %s && sb land\n" % frb_at)
-        c.say("[[bash: sb send fr-c '{{bash: sb land}}' && sleep 2 && "
-              "sb send fr-b '{{bash: sh %s}}' && sb feature retire fr]]" % frb)
+        c.say("[[bash: sb send fr-c '{{bash: sb land}}' && while [ ! -f %s ]; do sleep 0.1; done && "
+              "sb send fr-b '{{bash: sh %s}}' && sb feature retire fr]]" % (held, frb))
+        e2e.wait.until(lambda: os.path.exists(frb_at), 90, "fr-b asking to land (%s)" % frb_at)
+        open(go, "w").write("go\n")
         c.wait_line("main", "fr retired: @fr-c, @fr-a, @fr-b land on main now, the branch renamed fr-retired, off the feature list.", 90)
         c.wait_line("main", "fr retired: its tip is in main · @fr-c, @fr-a, @fr-b land on main now · the branch kept as fr-retired", 30)
         c.wait_line("main", "@fr-c can't land", 30)

@@ -398,10 +398,9 @@ fn rule_of(tool: &str, repo: &Path, text: &str, outside: bool, from: &str) -> ru
 
 /// The git common root of `dir` (its repo), or `dir`.
 fn repo_of(dir: &str) -> PathBuf {
-    std::process::Command::new("git")
-        .args(["-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir"])
-        .output()
+    crate::tools_env::git_command()
         .ok()
+        .and_then(|mut c| c.args(["-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir"]).output().ok())
         .filter(|o| o.status.success())
         .map(|o| PathBuf::from(String::from_utf8_lossy(&o.stdout).trim()))
         .map(|g| if g.ends_with(".git") { g.parent().map(Path::to_path_buf).unwrap_or(g) } else { g })
