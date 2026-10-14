@@ -21,6 +21,8 @@ G=$HOME/.bise/gate/real-shape; H=$G/w/h
 # BISE_HOME is under ~/.bise/gate, never his), for dict1.mjs' ctrl+r take
 VOICE=$G/voice-cand.txt; FV=()
 [ "${AS_HE_DOES_FAKE_VOICE:-}" = 1 ] && { : > "$VOICE"; FV=(--env "BISE_AMBIENT_FAKE_VOICE=$VOICE"); export AS_HE_DOES_VOICE=$VOICE; }
+# the driver's f2a7 rows find the candidate's own ambient-core by this path (a SIGSTOP of its pid only)
+export AS_HE_DOES_APP=$A
 HIS="$HOME/.bise/dev/try-src/apps/desktop/dist/mac-arm64/bise try.app"
 # its main executable from its own Info.plist (amb-mac fb2e544f: candidates are "bise cand.app")
 EXE=$([ -f "$A/Contents/Info.plist" ] && /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$A/Contents/Info.plist" 2>/dev/null)

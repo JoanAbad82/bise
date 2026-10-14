@@ -55,6 +55,10 @@ res.pages = browser.contexts().flatMap((c) => c.pages().map((p) => p.url()));
 if (!page) { step('the window page', false, res.pages); process.exit(1); }
 
 page.on('close', () => closed());
+// a renderer gone is said apart from a window closed (try-gate-f2a7's first run: 'the page closed'
+// 9 s after two cards came, no crash report): its time and what went
+page.on('crash', () => step('the window renderer did not crash', false, { at: new Date().toISOString() }));
+browser.on('disconnected', () => { if (!ending) step('the app kept its CDP connection', false, { at: new Date().toISOString() }); });
 let n = 0;
 const shot = async (name) => {
   const f = path.join(out, `${mode}${tag}-${++n}-${name}.png`);
@@ -76,9 +80,13 @@ const click = async (name, loc) => {
 // the window can go away under a pass (7e691aef's rerun: the candidate quit at 07:48:09, rows2 then
 // crashed in page.waitForTimeout): say it as a red step and end the pass, never an uncaught error
 let ending = false;
+// pids a row holds with SIGSTOP (rowsF2A7): always SIGCONT'd, also when the pass ends early
+const HELD = new Set();
+const unhold = () => { for (const p of HELD) { try { process.kill(p, 'SIGCONT'); } catch { /* gone */ } } HELD.clear(); };
 const closed = () => {
   if (ending) return;
-  step('the window stayed open through the pass', false, 'the page closed');
+  unhold();
+  step('the window stayed open through the pass', false, { what: 'the page closed', at: new Date().toISOString() });
   process.exit(3);
 };
 const until = async (fn, ms, every = 1000) => {
@@ -1200,9 +1208,11 @@ if (mode === 'quick') {
     await newRows(harness, say);
     await rows37(harness, say);
     await rowsE812(harness, say);
+    await rowsF2A7(harness, say);
   } else {
     // first: ARCHIVED's fold is read on a fresh profile, and the PR poller gets the time the others take
     await rowsE812(harness, say);
+    await rowsF2A7(harness, say);
     await quickRows(harness, say);
     await newRows(harness, say);
     await rows37(harness, say);
@@ -2153,6 +2163,343 @@ async function rowsE812(harness, say) {
     const closedIt = await until(async () => (!(await cardShown('#384')) ? true : null), 15000, 500);
     res.notes = [...(res.notes ?? []), { what: "merge card closed with '3 not yet' after the rows", closed: !!closedIt, asides: await answeredAsides('zqmerge') }];
     save();
+  });
+  await harness();
+}
+
+// f2a72fd8's rows (ambient-lead m_23555, card #509): every way he answers an inbox card (a digit from
+// another project, words from bise's view, a click in the asker's project) leaves '✓ you answered
+// <agent> · <project>' where he is, from the hub's AnswerResult, kept across a switch and a reload;
+// a refused answer and a refused close bring that card back with the words (the harness hub held
+// with SIGSTOP past the core's 30 s ASK_LATE: the core's own refusal), and an answer to a card the
+// hub withdrew meanwhile gets the hub's own 'isn't open' (the candidate's ambient-core held with
+// SIGSTOP while main withdraws it); a pause under a minute counts its seconds on the line, the head
+// and the AGENTS row, then minutes. Every SIGSTOP is the world's or the candidate's own pid, always
+// SIGCONT'd. Each row is its own try.
+async function rowsF2A7(harness, say) {
+  const row = async (name, fn) => {
+    if (!wanted(name)) return;
+    try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
+  };
+  const flat = (s) => (s ?? '').replace(/\s+/g, ' ').trim();
+  const bise = () => click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const clear = async () => {
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+  };
+  const HP = process.env.AS_HE_DOES_HARNESS ?? null;
+  const APP = process.env.AS_HE_DOES_APP ?? null;
+  const { execFileSync, spawn } = await import('node:child_process');
+  const psLines = () => { try { return execFileSync('/bin/ps', ['-axww', '-o', 'pid=,command='], { encoding: 'utf8' }).split(String.fromCharCode(10)); } catch { return []; } };
+  const pidOf = (l) => Number(l.trim().split(/\s+/)[0]);
+  // the candidate's own ambient-core (under its bundle), and the world's harness hub (its workspace)
+  const coreLines = () => (APP ? psLines().filter((l) => l.includes(`${APP}/Contents/`) && / ambient-core( |$)/.test(l)) : []);
+  const hubLines = () => (HP ? psLines().filter((l) => l.includes(' sbd --workspace ') && (l.includes(`--workspace ${HP} `) || l.endsWith(`--workspace ${HP}`))) : []);
+  const signal = (pids, s) => pids.forEach((p) => {
+    if (s === 'SIGSTOP') HELD.add(p); else HELD.delete(p);
+    try { process.kill(p, s); } catch { /* gone */ }
+  });
+  const others = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="app.sidebar.project."]')]
+    .map((e) => ({ id: (e.getAttribute('data-testid') ?? '').slice('app.sidebar.project.'.length), name: (e.querySelector('.app-side-name, .name')?.textContent ?? e.textContent ?? '').replace(/\s+/g, ' ').trim() }))
+    .filter((p) => p.id && !p.id.includes('.') && !/^harness\b/.test(p.name))).catch(() => []);
+  const openProject = async (id) => {
+    await page.locator(`[data-testid="app.sidebar.project.${id}"]`).first().click({ timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(800);
+  };
+  const reload = async () => {
+    await page.reload().catch(() => {});
+    await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+  };
+  // a card's words anywhere a card shows (a failed read counts as shown: a red to look at)
+  const cardShown = (token) => page.evaluate((t) => [...document.querySelectorAll('[data-testid^="inbox."], [data-testid^="strip."], [data-testid^="dock."]')]
+    .some((e) => (e.textContent ?? '').includes(t)), token).catch(() => 'unread');
+  // the card holding `token` anywhere in the block: its words, else a walk through '+ N more' (each
+  // opens the next item; a folded card's words aren't in the block, try-gate-f2a7's second run)
+  const present = async (token) => {
+    const seen = await cardShown(token);
+    if (seen !== false) return true;
+    const n = Number(/(\d+) waiting/.exec(flat(await text('[data-testid="inbox.block"]')))?.[1] ?? 0);
+    for (let i = 0; i < n + 1; i++) {
+      const m = page.locator('[data-testid="inbox.block.more"]').first();
+      if (!(await m.count().catch(() => 0))) break;
+      await m.click({ timeout: 1000 }).catch(() => {});
+      await page.waitForTimeout(250);
+      if ((await cardShown(token)) !== false) return true;
+    }
+    return false;
+  };
+  // the block's card holding `token`, open in place: {listed, open, id}
+  const dock = async (token, ms) => {
+    const rowL = page.locator('[data-testid^="inbox.block.row."]', { hasText: token }).first();
+    const open = page.locator('[data-testid^="inbox.block.open."]').filter({ hasText: token }).first();
+    const listed = await until(async () => {
+      if ((await rowL.isVisible().catch(() => false)) || (await open.isVisible().catch(() => false))) return true;
+      await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 1000 }).catch(() => {});
+      return null;
+    }, ms, 1000);
+    for (let i = 0; listed && i < 20 && !(await open.isVisible().catch(() => false)); i++) {
+      if (await rowL.isVisible().catch(() => false)) await rowL.click({ timeout: 2000 }).catch(() => {});
+      else await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 2000 }).catch(() => {});
+      await page.waitForTimeout(400);
+    }
+    const isOpen = await open.isVisible().catch(() => false);
+    const id = isOpen ? await open.evaluate((el) => {
+      const c = el.matches('[data-testid^="inbox.block.card."]') ? el : el.querySelector('[data-testid^="inbox.block.card."]');
+      const m = /-(\d+)$/.exec(c?.getAttribute('data-testid') ?? '');
+      return m ? Number(m[1]) : null;
+    }).catch(() => null) : null;
+    return { listed: !!listed, open: isOpen ? open : null, id };
+  };
+  // the rows of the thread on screen holding `words`: his asides and the hub's approval rows, each once
+  const rowsWith = (words) => page.evaluate((w) => [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread."]')]
+    .filter((e) => /^thread\.(aside|approval)\.\d+$/.test(e.getAttribute('data-testid') ?? '') && (e.textContent ?? '').includes(w))
+    .map((e) => ({ id: e.getAttribute('data-testid'), text: (e.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200) })), words).catch(() => [{ id: 'unread', text: '' }]);
+  const bodyHas = async (re) => { const b = flat(await page.locator('body').innerText({ timeout: 3000 }).catch(() => '')); const m = re.exec(b); return m ? m[0] : null; };
+
+  const T = String(Date.now() % 100000);
+  const [other] = await others();
+  const goOther = async () => { if (other) await openProject(other.id); else await bise(); };
+  const otherName = other ? other.name : 'bise';
+
+  // main's cards in harness, each '<question>' then its options on their own lines (Shift+Enter, as
+  // rows37: sb card is main's alone, 'reserved for main' from an agent, try-gate-f2a7's first run)
+  const cards = async (list, tail) => {
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+    // one line, printf's \n: the composer continues a '1. …' list on Shift+Enter ('2. 2. zqlarge',
+    // and '5. 1. zqclick-one' on the third card of a message: no option 1 to click, try-gate-f2a7's
+    // second run)
+    const NL = String.fromCharCode(92) + 'n';
+    const one = (c) => `sb card "$(printf "%s${NL}" ${[c.q, ...c.opts].map((x) => `"${x}"`).join(' ')})"`;
+    await page.keyboard.type(`[[bash: ${list.map(one).join(' && ')}]] ${tail}`, { delay: 5 });
+    await page.keyboard.press('Enter');
+  };
+  // the seed: three cards (one per way), in harness
+  await closeArtifact();
+  await harness();
+  await until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 90000, 1000);
+  await cards(['digit', 'words', 'click'].map((w) => ({ q: `zqA${w}${T} which way?`, opts: [`1. zq${w}-one`, `2. zq${w}-two`] })), 'seeded f2a7');
+  // folded under '+ N more' a card's words aren't in the block: main's 'card #N opened' x3 instead
+  const seeded = await until(async () => ((((await text('[data-testid="thread.list"]')) ?? '').match(/card #\d+ opened for the user/g) ?? []).length >= 3 ? true : null), 120000, 1000);
+  step("rowsF2A7 seed: main's three cards (digit, words, click) in the inbox", !!seeded, { other: other ?? null, block: flat(await text('[data-testid="inbox.block"]')).slice(0, 300) });
+
+  const took = {};
+  await row('answer by a digit from another project', async () => {
+    await goOther();
+    await clear();
+    await page.mouse.move(1, 300);
+    const d = await dock(`zqAdigit${T}`, 60000);
+    if (d.open) { await d.open.click({ position: { x: 4, y: 4 } }).catch(() => {}); await page.keyboard.press('2'); }
+    const rows = d.open ? await until(async () => { const r = (await rowsWith('zqdigit-two')).filter((x) => x.id.startsWith('thread.aside.')); return r.length ? r : null; }, 20000, 500) : null;
+    const gone = !(await present(`zqAdigit${T}`));
+    await page.mouse.move(1, 300);
+    await shot('f2a7-digit-other-project');
+    took.digit = rows?.[0] ?? null;
+    step(`a digit ('2') on main's card from ${otherName}'s thread: '✓ you answered <agent> · harness' + 'zqdigit-two' there, once; the card gone`,
+      !!rows && rows.length === 1 && /✓/.test(rows[0].text) && /you answered \S+ · harness/.test(rows[0].text) && !/zqdigit-two.*\b2\b/.test(rows[0].text) && gone,
+      { listed: d.listed, opened: !!d.open, card: d.id, rows, gone, field: flat(await field.innerText().catch(() => '')) });
+  });
+
+  const SAID = `zqwords-said ${T} the small one please`;
+  await row('answer by words from bise', async () => {
+    await bise();
+    await clear();
+    const d = await dock(`zqAwords${T}`, 60000);
+    if (d.open) {
+      await field.click({ timeout: 3000 }).catch(() => {});
+      await page.keyboard.type(SAID, { delay: 5 });
+      await page.keyboard.press('Enter');
+    }
+    const rows = d.open ? await until(async () => { const r = (await rowsWith(SAID)).filter((x) => x.id.startsWith('thread.aside.')); return r.length ? r : null; }, 20000, 500) : null;
+    const gone = !(await present(`zqAwords${T}`));
+    await page.mouse.move(1, 300);
+    await shot('f2a7-words-bise');
+    took.words = rows?.[0] ?? null;
+    step("words in the composer on main's open card from bise's view: '✓ you answered <agent> · harness' + his words there, once; the card gone",
+      !!rows && rows.length === 1 && /✓/.test(rows[0].text) && /you answered \S+ · harness/.test(rows[0].text) && gone, { listed: d.listed, opened: !!d.open, card: d.id, rows, gone });
+  });
+
+  await row('answer by a click in the asker project', async () => {
+    await harness();
+    await clear();
+    const d = await dock(`zqAclick${T}`, 60000);
+    if (d.open) await d.open.locator('[data-testid$=".opt.1"]').first().click({ timeout: 3000 }).catch(() => {});
+    const rows = d.open ? await until(async () => { const r = (await rowsWith('zqclick-one')).filter((x) => x.id.startsWith('thread.approval.')); return r.length ? r : null; }, 20000, 500) : null;
+    const asides = await rowsWith('zqclick-one');
+    const gone = !(await present(`zqAclick${T}`));
+    await page.mouse.move(1, 300);
+    await shot('f2a7-click-harness');
+    took.click = rows?.[0] ?? null;
+    step("a click on option 1 from harness' own thread: the hub's row 'you answered <agent>' + 'zqclick-one' there, once, no window aside; the card gone",
+      !!rows && rows.length === 1 && /you answered \S+/.test(rows[0].text) && asides.filter((x) => x.id.startsWith('thread.aside.')).length === 0 && gone, { listed: d.listed, opened: !!d.open, card: d.id, rows, asides, gone });
+  });
+
+  await row('answers from the hub, kept across a switch and a reload', async () => {
+    // the hub took all three: its rows in harness' thread hold each option's words
+    await harness();
+    const hub = {};
+    for (const [k, w] of [['digit', 'zqdigit-two'], ['words', SAID], ['click', 'zqclick-one']]) {
+      hub[k] = await until(async () => { const r = (await rowsWith(w)).filter((x) => x.id.startsWith('thread.approval.')); return r.length ? r : null; }, 15000, 500);
+    }
+    step("the hub took each answer: its row in harness' thread for the digit, the words and the click", !!hub.digit && !!hub.words && !!hub.click, hub);
+    const check = async (when) => {
+      const seen = {};
+      await goOther();
+      seen[otherName] = (await until(async () => { const r = (await rowsWith('zqdigit-two')).filter((x) => x.id.startsWith('thread.aside.')); return r.length ? r : null; }, 10000, 500)) ?? [];
+      await bise();
+      seen.bise = (await until(async () => { const r = (await rowsWith(SAID)).filter((x) => x.id.startsWith('thread.aside.')); return r.length ? r : null; }, 10000, 500)) ?? [];
+      await harness();
+      seen.harness = (await until(async () => { const r = (await rowsWith('zqclick-one')).filter((x) => x.id.startsWith('thread.approval.')); return r.length ? r : null; }, 10000, 500)) ?? [];
+      const back = [];
+      for (const w of ['digit', 'words', 'click']) if (await present(`zqA${w}${T}`)) back.push(w);
+      return { when, seen, back };
+    };
+    const a = await check('after a switch through the three');
+    await reload();
+    const b = await check('after a reload');
+    await page.mouse.move(1, 300);
+    await shot('f2a7-answers-after-reload');
+    const ok = (s) => s.seen[otherName].length === 1 && s.seen.bise.length === 1 && s.seen.harness.length === 1 && s.back.length === 0;
+    step(`each answer's row where he was (${otherName}: digit, bise: words, harness: click), once, after a project switch and after a reload; no card back`, ok(a) && ok(b), { a, b });
+  });
+
+  await row('a refused answer and close come back with the words', async () => {
+    const R = `zqR${T}`;
+    await harness();
+    await until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 60000, 1000);
+    await clear();
+    await cards([{ q: `${R}a answer me?`, opts: ['1. zqra-one', '2. zqra-two'] }, { q: `${R}b close me?`, opts: ['1. zqrb-one', '2. zqrb-two'] }], 'seeded refusals');
+    const listed = await until(async () => ((await present(`${R}a`)) && (await present(`${R}b`)) ? true : null), 90000, 1000);
+    await until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 30000, 1000);
+    await goOther();
+    await clear();
+    const hubs = hubLines();
+    const pids = hubs.map(pidOf);
+    if (!listed || pids.length !== 1) { step('a refused answer and close (the harness hub held)', false, { listed: !!listed, hubs: hubs.map((l) => l.slice(0, 200)) }); return; }
+    const t0 = Date.now();
+    let hidden = null;
+    let back = null;
+    let words = null;
+    try {
+      signal(pids, 'SIGSTOP');
+      const a = await dock(`${R}a`, 10000);
+      if (a.open) { await a.open.click({ position: { x: 4, y: 4 } }).catch(() => {}); await page.keyboard.press('1'); }
+      await page.waitForTimeout(800);
+      const b = await dock(`${R}b`, 10000);
+      if (b.open) { await b.open.click({ position: { x: 4, y: 4 } }).catch(() => {}); await page.keyboard.press('Meta+Backspace'); }
+      await page.waitForTimeout(800);
+      hidden = { a: !(await present(`${R}a`)), b: !(await present(`${R}b`)), a_open: !!a.open, b_open: !!b.open, at_ms: Date.now() - t0 };
+      await page.mouse.move(1, 300);
+      await shot('f2a7-refusal-hidden');
+      back = await until(async () => {
+        return (await present(`${R}a`)) && (await present(`${R}b`)) ? { at_ms: Date.now() - t0 } : null;
+      }, 50000, 1000);
+      words = await bodyHas(/its hub (didn't answer|went away)[^.]*\.( try again in a moment\.)?/);
+      await page.mouse.move(1, 300);
+      await shot('f2a7-refusal-back');
+    } finally { signal(pids, 'SIGCONT'); }
+    const asides = [...(await rowsWith('zqra-one')), ...(await rowsWith('zqrb'))];
+    step(`a refused answer (digit) and a refused close (⌘⌫) from ${otherName}, the harness hub held past 30 s: both hidden at once, then both cards back with the words, no 'you answered'`,
+      !!hidden?.a && !!hidden?.b && !!back && !!words && asides.length === 0, { hidden, back, words, asides, hub: hubs[0].slice(0, 160) });
+    // the hub runs again: what it does with the late answer and close (info: the core dropped them)
+    await page.waitForTimeout(8000);
+    const after = { a: await present(`${R}a`), b: await present(`${R}b`), asides: [...(await rowsWith('zqra-one'))] };
+    await harness();
+    after.harness = [...(await rowsWith('zqra-one')), ...(await rowsWith(`${R}b`))];
+    await page.mouse.move(1, 300);
+    await shot('f2a7-refusal-hub-resumed');
+    res.notes = [...(res.notes ?? []), { what: 'refusal row: 8 s after SIGCONT of the harness hub', after }];
+    save();
+    // whatever stayed open, answered now (the hub runs), so the later rows see no open zqR card
+    for (const k of ['a', 'b']) {
+      if (!(await present(`${R}${k}`))) continue;
+      const d = await dock(`${R}${k}`, 5000);
+      if (d.open) await d.open.locator('[data-testid$=".opt.1"]').first().click({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(1500);
+    }
+  });
+
+  await row("an answer to a card the hub withdrew meanwhile: the hub's words", async () => {
+    const W = `zqW${T}`;
+    await harness();
+    await until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 60000, 1000);
+    await clear();
+    await cards([{ q: `${W} still needed?`, opts: ['1. zqw-one', '2. zqw-two'] }], 'seeded withdraw');
+    const d0 = await dock(W, 90000);
+    const card = d0.id;
+    await until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 30000, 1000);
+    if (card === null) { step("an answer to a withdrawn card", false, { listed: d0.listed, opened: !!d0.open }); return; }
+    await clear();
+    await say(`[[bash: sleep 30 && sb card --withdraw ${card} "zq the plan changed"]] withdrawing`);
+    const t0 = Date.now();
+    await goOther();
+    await clear();
+    const d = await dock(W, 20000);
+    const cores = coreLines();
+    const pids = cores.map(pidOf);
+    if (!d.open || pids.length !== 1) { step("an answer to a withdrawn card", false, { opened: !!d.open, cores: cores.map((l) => l.slice(0, 200)) }); return; }
+    await page.waitForTimeout(Math.max(0, 24000 - (Date.now() - t0)));
+    let words = null;
+    let hidden = null;
+    try {
+      signal(pids, 'SIGSTOP');
+      // the withdraw lands in the hub while the window still shows the card
+      await page.waitForTimeout(Math.max(0, 38000 - (Date.now() - t0)));
+      await d.open.locator('[data-testid$=".opt.1"]').first().click({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(500);
+      hidden = !(await present(W));
+    } finally { signal(pids, 'SIGCONT'); }
+    words = await until(async () => bodyHas(new RegExp(`card ${String(card)} isn't open`)), 15000, 500);
+    await page.mouse.move(1, 300);
+    await shot('f2a7-withdrawn-words');
+    const asides = await rowsWith('zqw-one');
+    const after = await present(W);
+    step(`an answer to card ${String(card)} withdrawn by its asker meanwhile (the candidate's core held ~14 s): the hub's own 'card ${String(card)} isn't open' on screen, no 'you answered', the card not back (the hub dropped it)`,
+      hidden === true && !!words && asides.length === 0 && after === false, { hidden, words, asides, after, core: cores[0].slice(0, 160) });
+  });
+
+  await row('a pause counts its seconds, then minutes', async () => {
+    const tick = spawn('/bin/sleep', ['600'], { detached: true, stdio: 'ignore' });
+    tick.unref();
+    fs.writeFileSync(path.join(out, 'zq-tick.pid'), String(tick.pid));
+    const head = async () => flat(await text('[data-testid="thread.head.state"]'));
+    const lineT = async () => flat(await page.locator('[data-testid="thread.waiting"]').first().innerText({ timeout: 1000 }).catch(() => null));
+    const agentRow = (name) => page.evaluate((nm) => {
+      const e = [...document.querySelectorAll('[data-testid^="app.right.agent."]')].find((x) => { const id = x.getAttribute('data-testid') ?? ''; return id === `app.right.agent.${nm}` || id.endsWith(`.${nm}`); });
+      return e ? { g: e.querySelector('.app-rb-g')?.textContent?.trim() ?? null, end: e.querySelector('.app-rb-end')?.textContent?.trim() ?? null } : null;
+    }, name).catch(() => null);
+    const read = async () => ({ line: await lineT(), head: await head(), row: await agentRow('zqtick'), at_ms: Date.now() });
+    const secs = (s) => { const m = /(\d+) s$/.exec(s ?? ''); return m ? Number(m[1]) : null; };
+    try {
+      await harness();
+      await until(async () => (/· idle\b/.test(flat(await text('[data-testid="composer"]'))) ? true : null), 60000, 1000);
+      await clear();
+      await say(`[[bash: sb spawn zqtick --objective 'zq tick {{bash: sb wake --on-exit ${String(tick.pid)} --then --note "the zq tick ends"}}']] seeded zqtick`);
+      await until(async () => ((await agentRow('zqtick')) ? true : null), 60000, 500);
+      const r = page.locator('[data-testid^="app.right.agent."][data-testid$=".zqtick"], [data-testid="app.right.agent.zqtick"]').first();
+      await r.click({ timeout: 5000 }).catch(() => {});
+      const first = await until(async () => { const s = await read(); return /zq tick ends · running for \d+ s$/.test(s.line) ? s : null; }, 30000, 250);
+      await page.mouse.move(1, 300);
+      await shot('f2a7-pause-seconds');
+      await page.waitForTimeout(10000);
+      const second = await read();
+      await shot('f2a7-pause-seconds-later');
+      const up = (k) => { const a = secs(k(first)), b = secs(k(second)); return a !== null && b !== null && b >= a + 8 && b <= a + 13; };
+      step("a pause under a minute counts up in seconds ('· N s', +10 s later): the line, the head '… waiting · N s' and the AGENTS row's end",
+        !!first && up((s) => s.line) && up((s) => s.head) && up((s) => s.row?.end) && /^… waiting · \d+ s$/.test(second.head) && second.row?.g === '…',
+        { first, second });
+      const mins = await until(async () => { const s = await read(); return /running for \d+ min$/.test(s.line) ? s : null; }, 70000, 1000);
+      await page.mouse.move(1, 300);
+      await shot('f2a7-pause-minutes');
+      step("past a minute: 'continues when the zq tick ends · running for 1 min' on the line, '… waiting · 1 min' on the head, '1 min' on the AGENTS row",
+        !!mins && /^continues when the zq tick ends · running for \d+ min$/.test(mins.line) && /^… waiting · \d+ min$/.test(mins.head) && /^\d+ min$/.test(mins.row?.end ?? ''), { mins });
+    } finally {
+      try { process.kill(tick.pid, 'SIGTERM'); } catch { /* gone */ }
+    }
   });
   await harness();
 }
