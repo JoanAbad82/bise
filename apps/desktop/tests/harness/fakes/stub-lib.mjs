@@ -38,6 +38,9 @@ function lines(on) {
 function rpcSide(write, hubEvs) {
   let ready = false;
   const held = [];
+  // FakeCore.refuse: the next request for that command (and card) gets this error, as the real
+  // core answers a hub's refusal to that very request (architect m_23524)
+  const refusals = [];
   const note = (line) => {
     let ev;
     try { ev = JSON.parse(line); } catch { return write(line); /* a test's raw line, as is */ }
@@ -47,16 +50,26 @@ function rpcSide(write, hubEvs) {
   };
   return {
     out: (line) => (ready ? note(line) : held.push(line)),
+    refuse: (r) => refusals.push(r),
     // a stdin message -> the command it carries (null: none), after answering it
     take(m) {
       if (m.method === 'initialize') { write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { proto: 1, methods: [], notifications: [] } })); return null; }
       if (m.method === 'initialized') { ready = true; for (const l of held.splice(0)) note(l); return null; }
       if (typeof m.method !== 'string' || m.id === undefined) return null;
-      write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: {} }));
-      return { cmd: m.method.slice(m.method.indexOf('/') + 1), ...(m.params ?? {}) };
+      const cmd = { cmd: m.method.slice(m.method.indexOf('/') + 1), ...(m.params ?? {}) };
+      const i = refusals.findIndex((r) => r.cmd === cmd.cmd && (r.card === undefined || r.card === cmd.card));
+      if (i >= 0) {
+        const [r] = refusals.splice(i, 1);
+        write(JSON.stringify({ jsonrpc: '2.0', id: m.id, error: { code: -32001, message: r.message } }));
+      } else write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: r0(cmd) }));
+      return cmd;
     },
   };
 }
+
+/** A request's result: card/answer's AnswerResult when a test set one (FakeCore.answers), else {}. */
+let answersBy = [];
+const r0 = (cmd) => answersBy.find((a) => a.cmd === cmd.cmd && a.card === cmd.card)?.result ?? {};
 
 /**
  * answer(cmd): the lines to write back for a command the app sent (a fake core answering a
@@ -70,6 +83,14 @@ export function runStub({ start = [], sock, log, quitCmd, answer, rpc }) {
   // a test's {"harness":"exit","code":n} line ends this process with that code (a core that
   // stops: the app restarts it, amb-win's app/keep); any other line goes out as is
   const relay = (line) => {
+    if (line.startsWith('{"harness":"refuse"') || line.startsWith('{"harness":"result"')) {
+      try {
+        const r = JSON.parse(line);
+        if (r.harness === 'refuse') side?.refuse(r);
+        else answersBy = [...answersBy, r];
+      } catch { /* a broken line: nothing */ }
+      return;
+    }
     if (line.startsWith('{"harness":"exit"')) {
       let code = 1;
       try { code = Number(JSON.parse(line).code ?? 1); } catch { /* the default */ }

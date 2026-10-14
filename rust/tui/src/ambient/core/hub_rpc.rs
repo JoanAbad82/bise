@@ -13,17 +13,32 @@
 //!   `hub/read` again, whose state replaces it;
 //! - an error response is the window's `error` with the request's `cid`
 //!   and the hub's `reason`/`kind`; `command/run`'s words its `notice`;
+//! - the app's own request for a command (`hub/<tag>`, its id kept in
+//!   `Waiting`) is answered with that response (architect m_23524): the
+//!   result as is (card/answer's `AnswerResult`, turn/send's `SendResult`),
+//!   `{}` when it came as an event, the hub's error as is; the connection
+//!   lost ([`GONE`]) or no answer in [`ASK_LATE`] ([`LATE`]): an error,
+//!   never a request left waiting ([`RpcConn::take_replies`]);
 //! - a hub that doesn't serve `initialize` (from before client-protocol,
 //!   v2026.10.2-30) is [`Read::NotRpc`]: the connection is refused with
 //!   `bise_proto::rpc::HUB_OLDER`'s words, nothing more is said to it.
 
 use bise_proto::hub::{ErrorKind, HubCmd, HubEv};
 use bise_proto::rpc::{self, CommandRunResult, HubState, Id, Init, InitializeParams, InitializeResult, Message, Request, Take, Watermark};
+use bise_proto::rpc::{Response, RpcError};
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::time::Instant;
 
 /// `initialize`'s id on every connection (the window's requests start at 1).
 const INIT: u64 = 0;
+
+/// An app request's error when its hub's connection went before it answered.
+pub const GONE: &str = "its hub went away before it answered. try again in a moment.";
+/// An app request's error when its hub didn't answer in [`ASK_LATE`].
+pub const LATE: &str = "its hub didn't answer. try again in a moment.";
+/// How long an app request waits for its hub's response.
+pub const ASK_LATE: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// One request waiting for its response.
 #[derive(Clone, Debug, PartialEq)]
@@ -31,6 +46,10 @@ struct Waiting {
     method: &'static str,
     tag: String,
     cid: Option<u64>,
+    /// the app's request it answers (none: the core's own, a subscribe
+    /// at a welcome, voice mode's)
+    app: Option<Id>,
+    at: Instant,
 }
 
 /// What a line of the hub means for the core.
@@ -56,6 +75,8 @@ pub enum Read {
 pub struct RpcConn {
     next: u64,
     waiting: BTreeMap<u64, Waiting>,
+    /// the app's requests answered, for the core to write ([`RpcConn::take_replies`])
+    replies: Vec<Response>,
     wm: Watermark,
     /// `initialize` answered on this connection
     pub ready: bool,
@@ -66,7 +87,9 @@ pub struct RpcConn {
 impl RpcConn {
     /// A new connection's first line.
     pub fn initialize(&mut self, version: &str) -> Value {
-        *self = RpcConn::default();
+        self.lost(GONE);
+        let replies = std::mem::take(&mut self.replies);
+        *self = RpcConn { replies, ..RpcConn::default() };
         let params = serde_json::to_value(InitializeParams::new("bise-ambient-core", version)).unwrap_or_default();
         Message::Request(Request::new(Id::Num(INIT), rpc::INITIALIZE, params)).to_value()
     }
@@ -74,20 +97,48 @@ impl RpcConn {
     /// `hub/read` (a gap): its result replaces the state.
     pub fn read_again(&mut self) -> Value {
         self.next += 1;
-        self.waiting.insert(self.next, Waiting { method: rpc::HUB_READ, tag: String::new(), cid: None });
+        self.waiting.insert(self.next, Waiting { method: rpc::HUB_READ, tag: String::new(), cid: None, app: None, at: Instant::now() });
         Message::Request(Request::new(Id::Num(self.next), rpc::HUB_READ, Value::Object(Default::default()))).to_value()
     }
 
     /// The window's command (a `HubCmd`'s JSON) as its request; none: no
-    /// method for it (an unknown tag).
-    pub fn request(&mut self, v: &Value) -> Option<Value> {
+    /// method for it (an unknown tag). `app`: the app's own request for
+    /// it, answered with the hub's response ([`RpcConn::take_replies`]).
+    pub fn request(&mut self, v: &Value, app: Option<Id>, now: Instant) -> Option<Value> {
         let cmd = HubCmd::from_value(v.clone()).ok()?;
         self.next += 1;
         let req = rpc::request(Id::Num(self.next), &cmd)?;
         let row = rpc::method_row(&req.method)?;
         let cid = v.get("cid").and_then(Value::as_u64);
-        self.waiting.insert(self.next, Waiting { method: row.method, tag: row.cmd.to_string(), cid });
+        self.waiting.insert(self.next, Waiting { method: row.method, tag: row.cmd.to_string(), cid, app, at: now });
         Some(Message::Request(req).to_value())
+    }
+
+    /// The app's requests answered since the last call, in order.
+    pub fn take_replies(&mut self) -> Vec<Response> {
+        std::mem::take(&mut self.replies)
+    }
+
+    /// The connection is lost (its hub went, a new `initialize`, the core
+    /// lets it go): every app request still waiting on it is answered with
+    /// `why` (the hub never said; it may or may not have acted).
+    pub fn lost(&mut self, why: &str) {
+        for (_, w) in std::mem::take(&mut self.waiting) {
+            if let Some(app) = w.app {
+                self.replies.push(Response::err(Some(app), RpcError::new(rpc::code::REFUSED, why)));
+            }
+        }
+    }
+
+    /// The app requests waiting since before `before` get `why` as their
+    /// error, and their hub's late response is dropped.
+    pub fn late(&mut self, before: Instant, why: &str) {
+        let late: Vec<u64> = self.waiting.iter().filter(|(_, w)| w.app.is_some() && w.at < before).map(|(id, _)| *id).collect();
+        for id in late {
+            if let Some(app) = self.waiting.remove(&id).and_then(|w| w.app) {
+                self.replies.push(Response::err(Some(app), RpcError::new(rpc::code::REFUSED, why)));
+            }
+        }
     }
 
     /// One line of the hub.
@@ -134,10 +185,26 @@ impl RpcConn {
         let Some(Id::Num(id)) = r.id else { return Read::Nothing };
         let Some(w) = self.waiting.remove(&id) else { return Read::Nothing };
         if let Some(e) = r.error {
+            // the app's request gets the hub's refusal as is (its words, reason, kind)
+            if let Some(app) = w.app.clone() {
+                self.replies.push(Response::err(Some(app), e.clone()));
+            }
             let data = e.data.unwrap_or_default();
             return Read::Error { tag: w.tag, text: e.message, cid: w.cid, reason: data.reason, kind: data.kind };
         }
         let result = r.result.unwrap_or(Value::Null);
+        let read = self.result(project, &w, result.clone());
+        // the app's request gets the hub's result as is (card/answer's
+        // AnswerResult, turn/send's SendResult), or `{}` when it came as an
+        // event already (a thread's page, command/run's words): never twice
+        if let Some(app) = w.app {
+            let r = if matches!(read, Read::Nothing) && w.method != rpc::COMMAND_RUN { result } else { Value::Object(Default::default()) };
+            self.replies.push(Response::ok(app, r));
+        }
+        read
+    }
+
+    fn result(&mut self, project: &str, w: &Waiting, result: Value) -> Read {
         if w.method == rpc::HUB_READ {
             let Ok(st) = serde_json::from_value::<HubState>(result) else { return Read::Nothing };
             self.wm = st.watermark;
@@ -146,7 +213,7 @@ impl RpcConn {
         if w.method == rpc::COMMAND_RUN {
             let notice = serde_json::from_value::<CommandRunResult>(result).ok().and_then(|r| r.notice);
             return match notice {
-                Some(text) => Read::Evs(vec![HubEv::Notice { project: project.to_string(), cmd: Some(w.tag), text, cid: w.cid }]),
+                Some(text) => Read::Evs(vec![HubEv::Notice { project: project.to_string(), cmd: Some(w.tag.clone()), text, cid: w.cid }]),
                 None => Read::Nothing,
             };
         }
@@ -237,7 +304,7 @@ mod tests {
         let mut c = RpcConn::default();
         c.initialize("v1");
         c.read("shop", init_result(0));
-        let req = c.request(&json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now", "cid": 12})).unwrap();
+        let req = c.request(&json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now", "cid": 12}), None, Instant::now()).unwrap();
         assert_eq!(req["method"], "turn/send");
         let id = req["id"].as_u64().unwrap();
         let mut e = RpcError::refused("no agent main", Some("undelivered"));
@@ -247,13 +314,62 @@ mod tests {
             c.read("shop", resp),
             Read::Error { tag: "send".into(), text: "no agent main".into(), cid: Some(12), reason: Some("undelivered".into()), kind: Some(ErrorKind::HubOlder) }
         );
-        let req = c.request(&json!({"cmd": "slash", "project": "shop", "agent": "main", "line": "/help", "cid": 3})).unwrap();
+        let req = c.request(&json!({"cmd": "slash", "project": "shop", "agent": "main", "line": "/help", "cid": 3}), None, Instant::now()).unwrap();
         let resp = serde_json::to_value(Response::ok(Id::Num(req["id"].as_u64().unwrap()), json!({"notice": "the help"}))).unwrap();
         assert_eq!(c.read("shop", resp), Read::Evs(vec![HubEv::Notice { project: "shop".into(), cmd: Some("slash".into()), text: "the help".into(), cid: Some(3) }]));
-        let req = c.request(&json!({"cmd": "scheduled", "project": "shop"})).unwrap();
+        let req = c.request(&json!({"cmd": "scheduled", "project": "shop"}), None, Instant::now()).unwrap();
         let resp = serde_json::to_value(Response::ok(Id::Num(req["id"].as_u64().unwrap()), json!({"project": "shop", "items": []}))).unwrap();
         assert_eq!(c.read("shop", resp), Read::Evs(vec![HubEv::Scheduled { project: "shop".into(), items: vec![], ended: vec![] }]));
-        assert_eq!(c.request(&json!({"cmd": "hello", "proto": 1})), None);
+        assert_eq!(c.request(&json!({"cmd": "hello", "proto": 1}), None, Instant::now()), None);
+    }
+
+    /// architect m_23524: the app's request is answered once, with its
+    /// hub's own response: the result as is, the refusal with its words
+    /// and reason, an error when the hub goes or never answers.
+    #[test]
+    fn an_app_request_gets_its_hubs_own_answer_once() {
+        let mut c = RpcConn::default();
+        c.initialize("v1");
+        c.read("shop", init_result(0));
+        let t0 = Instant::now();
+        let answer = json!({"cmd": "answer", "project": "shop", "card": 384, "reply": "1"});
+        let req = c.request(&answer, Some(Id::Num(7)), t0).unwrap();
+        assert_eq!(req["method"], "card/answer");
+        assert!(c.take_replies().is_empty(), "nothing before its hub said");
+        let got = json!({"answer": {"agent": "perf", "question": "merge?", "said": "1", "pick": "yes", "notice": "you answered perf"}});
+        let resp = serde_json::to_value(Response::ok(Id::Num(req["id"].as_u64().unwrap()), got.clone())).unwrap();
+        assert_eq!(c.read("shop", resp), Read::Nothing);
+        assert_eq!(c.take_replies(), vec![Response::ok(Id::Num(7), got)], "card/answer's AnswerResult as is");
+        // refused: the hub's words and reason to that very request, and the window's error event
+        let req = c.request(&json!({"cmd": "close", "project": "shop", "card": 12}), Some(Id::Num(8)), t0).unwrap();
+        let e = RpcError::refused("no card 12", Some("closed"));
+        let resp = serde_json::to_value(Response::err(Some(Id::Num(req["id"].as_u64().unwrap())), e.clone())).unwrap();
+        assert!(matches!(c.read("shop", resp), Read::Error { .. }));
+        assert_eq!(c.take_replies(), vec![Response::err(Some(Id::Num(8)), e)]);
+        // a result that came as an event: `{}`, never the page twice
+        let req = c.request(&json!({"cmd": "scheduled", "project": "shop"}), Some(Id::Num(9)), t0).unwrap();
+        let resp = serde_json::to_value(Response::ok(Id::Num(req["id"].as_u64().unwrap()), json!({"project": "shop", "items": []}))).unwrap();
+        assert!(matches!(c.read("shop", resp), Read::Evs(_)));
+        assert_eq!(c.take_replies(), vec![Response::ok(Id::Num(9), json!({}))]);
+        // the core's own request (a subscribe at a welcome): no reply
+        let req = c.request(&json!({"cmd": "close", "project": "shop", "card": 1}), None, t0).unwrap();
+        c.read("shop", serde_json::to_value(Response::ok(Id::Num(req["id"].as_u64().unwrap()), json!({}))).unwrap());
+        assert!(c.take_replies().is_empty());
+        // its hub never answers: an error at ASK_LATE, and the late response is dropped
+        let req = c.request(&answer, Some(Id::Num(10)), t0).unwrap();
+        c.late(t0, LATE);
+        assert!(c.take_replies().is_empty(), "not late yet");
+        c.late(t0 + ASK_LATE + std::time::Duration::from_millis(1), LATE);
+        let r = c.take_replies();
+        assert_eq!((r.len(), r[0].id.clone(), r[0].error.as_ref().map(|e| e.message.as_str())), (1, Some(Id::Num(10)), Some(LATE)));
+        let resp = serde_json::to_value(Response::ok(Id::Num(req["id"].as_u64().unwrap()), json!({}))).unwrap();
+        assert_eq!(c.read("shop", resp), Read::Nothing);
+        assert!(c.take_replies().is_empty(), "answered once");
+        // its hub goes (or a new initialize): every waiting app request gets GONE
+        c.request(&answer, Some(Id::Num(11)), t0).unwrap();
+        c.initialize("v1");
+        let r = c.take_replies();
+        assert_eq!((r.len(), r[0].id.clone(), r[0].error.as_ref().map(|e| e.message.as_str())), (1, Some(Id::Num(11)), Some(GONE)));
     }
 
     #[test]

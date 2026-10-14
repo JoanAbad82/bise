@@ -238,16 +238,19 @@ pub fn run(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write, log: &
                 }
                 let now = match stdio.line_in(&l) {
                     stdio::Took::Cmd { line, id } => {
-                        let parsed = Cmd::parse(&line);
-                        if let Err(e) = &parsed {
-                            let _ = writeln!(log, "{}", stdio::log_of(e, &line));
+                        // the answer goes before the events it causes: a
+                        // refusal at once, a command's own answer from the
+                        // core (a hub's command once its hub said)
+                        match Cmd::parse(&line) {
+                            Err(e) => {
+                                let _ = writeln!(log, "{}", stdio::log_of(&e, &line));
+                                vec![stdio.answer(id, Err(e))]
+                            }
+                            Ok(c) => {
+                                core.request(c, id, Instant::now());
+                                stdio::replies(core.take_replies())
+                            }
                         }
-                        // the answer goes before the events it causes
-                        let answer = stdio.answer(id, parsed.as_ref().map(|_| ()).map_err(Clone::clone));
-                        if let Ok(c) = parsed {
-                            core.cmd(c, Instant::now());
-                        }
-                        vec![answer]
                     }
                     stdio::Took::Write(w) => w,
                     stdio::Took::Refused { write, log: why } => {
@@ -269,12 +272,15 @@ pub fn run(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write, log: &
             last_tick = Instant::now();
             core.tick(last_tick);
         }
-        if !write_lines(out, stdio.out(core.take_out())) {
+        // a hub's answer to the app's request, then the events it caused
+        if !write_lines(out, stdio::replies(core.take_replies())) || !write_lines(out, stdio.out(core.take_out())) {
             break;
         }
     }
     core.shutdown();
-    // before `initialized` these stay held: dropped with the run
+    // the requests still waiting get their error; before `initialized`
+    // the events stay held: dropped with the run
+    let _ = write_lines(out, stdio::replies(core.take_replies()));
     let _ = write_lines(out, stdio.out(core.take_out()));
 }
 

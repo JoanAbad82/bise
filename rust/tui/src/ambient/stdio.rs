@@ -4,9 +4,11 @@
 //! `initialize` first (answered with what this core serves),
 //! then `initialized`; the events the core makes before it are held and
 //! written after it, in order. A request becomes the command line the
-//! core's parser reads (`Cmd::parse`, one parser for both ways); its
-//! response (`{}`, or the parser's refusal) is written before the events
-//! the command causes. Nothing here logs an event, so a computer-use
+//! core's parser reads (`Cmd::parse`, one parser for both ways); the
+//! parser's refusal is written at once, a read command's answer comes from
+//! the core ([`replies`]: `{}` for its own commands, a `hub/<tag>`'s its
+//! hub's own response, architect m_23524), before the events it causes.
+//! Nothing here logs an event, so a computer-use
 //! still (`core/computer_peek`) never reaches the log.
 
 use bise_proto::app_rpc::{self, AppInit, AppInitResult, INITIALIZE, INITIALIZED};
@@ -93,6 +95,7 @@ impl Stdio {
     }
 
     /// The answer to a request the parser read (`Ok`) or refused.
+    /// A read one is answered by the core ([`replies`]); `Ok` stays for tests.
     pub fn answer(&self, id: Id, parsed: Result<(), String>) -> String {
         let resp = match parsed {
             Ok(()) => Response::ok(id, json!({})),
@@ -109,6 +112,13 @@ impl Stdio {
         }
         evs.iter().filter_map(app_rpc::note).map(|n| Message::Notification(n).encode()).collect()
     }
+}
+
+/// The core's answers to the app's requests (`Core::take_replies`) as
+/// lines: written as they come, never held (a request comes only after
+/// `initialize`).
+pub fn replies(rs: Vec<Response>) -> Vec<String> {
+    rs.into_iter().map(|r| Message::Response(r).encode()).collect()
 }
 
 /// The log's line for a stdin line the core refused: why and the line,

@@ -31,6 +31,8 @@ export interface CoreHooks {
   readonly log: (line: string) => void;
   /** a request's result (not its error): the command as the window sent it, and what the core answered (A1) */
   readonly onAnswer?: (cmd: Readonly<Record<string, unknown>>, result: unknown) => void;
+  /** a request's error: the command as the window sent it, and the core's or its hub's words (architect m_23524) */
+  readonly onRefused?: (cmd: Readonly<Record<string, unknown>>, error: { readonly code: number; readonly message: string }) => void;
 }
 
 export interface CoreOptions {
@@ -176,8 +178,10 @@ export class CoreProcess {
     }
     const asked = l.id === null ? undefined : this.waiting.get(l.id);
     if (l.id !== null) this.waiting.delete(l.id);
-    if (l.error !== null) this.hooks.log(refusedLog(asked?.method ?? 'a request', l.error));
-    else if (asked !== undefined) this.hooks.onAnswer?.(asked.cmd, l.result);
+    if (l.error !== null) {
+      this.hooks.log(refusedLog(asked?.method ?? 'a request', l.error));
+      if (asked !== undefined) this.hooks.onRefused?.(asked.cmd, l.error);
+    } else if (asked !== undefined) this.hooks.onAnswer?.(asked.cmd, l.result);
   }
 
   private setState(s: CoreState): void {

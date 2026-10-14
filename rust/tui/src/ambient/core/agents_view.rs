@@ -117,7 +117,7 @@ impl Core {
     pub(super) fn typed(&mut self, mut v: Value, p: Option<Pending>) -> bool {
         let Some(project) = self.target.clone() else { return false };
         v["project"] = json!(project);
-        let Some(req) = self.home.rpc.request(&v) else { return false };
+        let Some(req) = self.home.rpc.request(&v, None, Instant::now()) else { return false };
         let ok = self.hub.send(&req);
         if let (true, Some(p)) = (ok, p) {
             self.pending.push_back(p);

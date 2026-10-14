@@ -34,10 +34,11 @@ const sendKey = (c: Readonly<Record<string, unknown>>): string | null =>
   c['cmd'] === 'send' && typeof c['cid'] === 'number' ? `${String(c['project'])}/${String(c['agent'])}/${String(c['cid'])}` : null;
 // inbox picks (3), architect m_22636: card/answer's result (AnswerResult) goes back only to the
 // window that answered (a card is answered once), as the window-local event 'card_answered': that
-// window shows his answer where he is when the asker's thread is elsewhere
-const answers = new Map<string, number>();
-// card-state (architect m_23450): card/close's result too, as 'card_closed': the window's store
-// settles its close (a refused one comes back first as the hub's error and shows the card again)
+// window shows his answer where he is when the asker's thread is elsewhere. architect m_23524: the
+// core answers that request with its hub's own response, so an answer's or a close's error is
+// that very card's: 'card_refused' to that window shows the card again with the words; a core gone
+// before it answered says so the same way (the hub's rows then say what it took)
+const answers = new Map<string, { readonly window: number; readonly project: unknown; readonly card: unknown }>();
 const answerKey = (c: Readonly<Record<string, unknown>>): string | null =>
   (c['cmd'] === 'answer' || c['cmd'] === 'close') && typeof c['card'] === 'number' ? `${c['cmd']}/${String(c['project'])}/${String(c['card'])}` : null;
 // how its last run ended (exit.ts), sent with every state: null until it ended once
@@ -116,7 +117,7 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
     const sk = typeof cmd === 'object' && cmd !== null ? sendKey(cmd as Record<string, unknown>) : null;
     if (sk !== null) sends.set(sk, e.sender.id);
     const ak = typeof cmd === 'object' && cmd !== null ? answerKey(cmd as Record<string, unknown>) : null;
-    if (ak !== null) answers.set(ak, e.sender.id);
+    if (ak !== null) answers.set(ak, { window: e.sender.id, project: (cmd as Record<string, unknown>)['project'], card: (cmd as Record<string, unknown>)['card'] });
     // a window whose mic, voice mode or held /model (R8) must end with it
     if (name === 'dictate_start' || name === 'voice_mode' || name === 'slash' || name === 'subscribe') watch(e.sender);
     // an unsubscribe another window still needs stays here (R18)
@@ -200,13 +201,11 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
         const by = ak === null ? undefined : answers.get(ak);
         if (ak !== null && by !== undefined) {
           answers.delete(ak);
-          if (cmd['cmd'] === 'close') {
-            toWindow({ to: 'window', window: by, ev: { ev: 'card_closed', project: cmd['project'], card: cmd['card'] } });
-            return;
-          }
-          // the step closed no card (or an older hub, a page took it) answers {}: answer null, no row
+          // a close taken: the hub's rows drop the card, nothing more to say
+          if (cmd['cmd'] === 'close') return;
+          // the step closed no card (or a page took it) answers {}: answer null, no row
           const answer = (result as AnswerResult | null)?.answer ?? null;
-          toWindow({ to: 'window', window: by, ev: { ev: 'card_answered', project: cmd['project'], card: cmd['card'], answer } });
+          toWindow({ to: 'window', window: by.window, ev: { ev: 'card_answered', project: cmd['project'], card: cmd['card'], answer } });
           return;
         }
         const sk = sendKey(cmd);
@@ -219,12 +218,23 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
         const ev = { ev: 'sent', project: cmd['project'], agent: cmd['agent'], cid: cmd['cid'], msg_id: id };
         toWindow({ to: 'window', window: to, ev });
       },
+      onRefused: (cmd, error) => {
+        const ak = answerKey(cmd);
+        const by = ak === null ? undefined : answers.get(ak);
+        if (ak === null || by === undefined) return;
+        answers.delete(ak);
+        toWindow({ to: 'window', window: by.window, ev: { ev: 'card_refused', project: by.project, card: by.card, text: error.message } });
+      },
       onState: (s) => {
         // a new core starts from nothing: it says its state again
         if (s === 'starting') {
           latest.clear();
           subs.clear();
           sends.clear();
+          // an answer or close the last core never answered: its card shows again (the hub's
+          // rows hide it if the hub took it)
+          for (const by of answers.values())
+            toWindow({ to: 'window', window: by.window, ev: { ev: 'card_refused', project: by.project, card: by.card, text: "bise restarted before your answer was confirmed: if the card is still here, answer it again." } });
           answers.clear();
         }
         // a core gone took its mic with it: its dictations end

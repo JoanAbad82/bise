@@ -29,6 +29,13 @@
 //! Never buffered (architect m_8433 D): a command to a hub that isn't
 //! connected yet gets `error {project, cmd, text}`; only subscriptions
 //! are kept (state, not commands) and sent again at each `welcome`.
+//!
+//! One request, one answer (architect m_23524): the app's `hub/<tag>`
+//! request is answered once (`Core::take_replies`), with its hub's own
+//! response (`hub_rpc.rs`), the core's refusal (the same words as its
+//! `error`), `{}` when the core keeps it, or an error when its hub goes or
+//! never answers. Not covered: the capsule's `answer` (core.rs, the home
+//! connection's `home_call`, whose answers are not read).
 
 use super::hub_rpc::{Read, RpcConn};
 use super::*;
@@ -37,6 +44,7 @@ use bise_home::projects::Row;
 use bise_proto::app_rows::ProjectRow;
 use bise_proto::draft::ProjectView;
 use bise_proto::hub::{ErrorKind, HubEv};
+use bise_proto::rpc::{Id, Response, RpcError};
 use bise_proto::rows::{Agent, Card};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -84,9 +92,10 @@ struct Conn {
     welcomed: bool,
     /// its own rows, as its hub sent them (fresher than its view.json)
     rows: Option<(Vec<Agent>, Vec<Card>)>,
-    /// commands for a hub not welcomed yet, each with its deadline (sent
-    /// at the welcome, else an error at the deadline)
-    pending: Vec<(Value, Instant)>,
+    /// commands for a hub not welcomed yet, each with its deadline and
+    /// the app's request (sent at the welcome, else an error at the
+    /// deadline)
+    pending: Vec<(Value, Instant, Option<Id>)>,
     /// held for a command only (a project not shown, not subscribed):
     /// closed once this passes with nothing pending
     until: Option<Instant>,
@@ -106,11 +115,11 @@ impl Conn {
 
     /// One window command (a `HubCmd`'s JSON) to its hub, as a request
     /// once `initialize` answered; false when nothing was written.
-    fn send(&mut self, v: &Value) -> bool {
+    fn send(&mut self, v: &Value, app: Option<Id>) -> bool {
         if !self.rpc.ready {
             return false;
         }
-        match self.rpc.request(v) {
+        match self.rpc.request(v, app, Instant::now()) {
             Some(req) => self.hub.send(&req),
             None => false,
         }
@@ -271,8 +280,16 @@ impl Core {
 
     /// `cid` (G): the failed send's, echoed so the window fails exactly
     /// that row (nothing reached a thread: reason refused). `kind`: what
-    /// failed, for the window to draw (bise_proto::hub::ErrorKind).
-    fn project_error(&mut self, project: &str, cmd: &str, text: &str, cid: Option<u64>, kind: Option<bise_proto::hub::ErrorKind>) {
+    /// failed, for the window to draw (bise_proto::hub::ErrorKind). `app`:
+    /// the app's request for it, answered with the same words.
+    fn project_error(&mut self, project: &str, cmd: &str, text: &str, cid: Option<u64>, kind: Option<bise_proto::hub::ErrorKind>, app: Option<Id>) {
+        if let Some(app) = app {
+            let mut e = RpcError::refused(text, Some("refused"));
+            if let Some(k) = kind {
+                e = e.with_kind(k);
+            }
+            self.replies.push(Response::err(Some(app), e));
+        }
         let mut ev = json!({"ev": "error", "project": project, "cmd": cmd, "text": text});
         if let Some(cid) = cid {
             ev["cid"] = json!(cid);
@@ -310,38 +327,47 @@ impl Core {
         }
     }
 
-    /// A window command for a project's hub (a `HubCmd` with `project`).
+    /// A command of the core's own for a project's hub (voice mode, a
+    /// held `/model`): no app request waits on it.
     pub(super) fn typed_cmd(&mut self, v: Value) {
+        self.typed_req(v, None);
+    }
+
+    /// A window command for a project's hub (a `HubCmd` with `project`).
+    /// `app`: the app's request (`hub/<tag>`), answered exactly once: with
+    /// its hub's response, the core's refusal, or `{}` when the core keeps
+    /// it (a subscription, a held `/model`) (architect m_23524).
+    pub(super) fn typed_req(&mut self, v: Value, app: Option<Id>) {
         let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
         let (project, cmd, agent) = (s("project"), s("cmd"), s("agent"));
         let cid = v.get("cid").and_then(Value::as_u64);
         if self.hubs.ports.is_none() {
-            return self.project_error(&project, &cmd, "this core has no projects", cid, None);
+            return self.project_error(&project, &cmd, "this core has no projects", cid, None, app);
         }
         let Some(row) = self.hubs.rows.iter().find(|r| r.id == project).cloned() else {
-            return self.project_error(&project, &cmd, &format!("there's no project {project}"), cid, None);
+            return self.project_error(&project, &cmd, &format!("there's no project {project}"), cid, None, app);
         };
         // before shown, home only (architect m_10133: its own words, so a
         // window that sends too early reads plainly in the logs)
         if !row.home && self.hubs.shown.is_none() {
-            return self.project_error(&project, &cmd, &format!("project {project} isn't shown yet"), cid, None);
+            return self.project_error(&project, &cmd, &format!("project {project} isn't shown yet"), cid, None, app);
         }
         // its hub refused this core: nothing goes until he retries
         if let Some(why) = self.hubs.refused.get(&project).cloned() {
             if cmd == "unsubscribe" {
                 track(&mut self.hubs.subs, &cmd, &project, &agent);
-                return;
+                return self.reply_ok(app);
             }
-            return self.project_error(&project, &cmd, &refused_text(&row.name, &why), cid, Some(bise_proto::hub::ErrorKind::HubRefused));
+            return self.project_error(&project, &cmd, &refused_text(&row.name, &why), cid, Some(bise_proto::hub::ErrorKind::HubRefused), app);
         }
         // never a hub for a folder that is gone (its hub would start on a
         // missing workspace)
         if cmd != "unsubscribe" && !self.folder_exists(&row.path) {
-            return self.project_error(&project, &cmd, &format!("{}: its folder is gone", row.name), cid, None);
+            return self.project_error(&project, &cmd, &format!("{}: its folder is gone", row.name), cid, None, app);
         }
         // R8: a /model whose provider has no key waits for its setup (setup.rs)
         if cmd == "slash" && self.hold_if_keyless(&project, &agent, &s("line"), cid) == super::setup::Hold::Held {
-            return;
+            return self.reply_ok(app);
         }
         if track(&mut self.hubs.subs, &cmd, &project, &agent) {
             self.hold();
@@ -349,7 +375,7 @@ impl Core {
         // voice mode still follows that thread: the window's unsubscribe
         // stays here (the core's own subscription goes when voice mode ends)
         if cmd == "unsubscribe" && self.hubs.voice.as_ref().is_some_and(|(p, a)| *p == project && *a == agent) {
-            return;
+            return self.reply_ok(app);
         }
         // his typed send while voice mode waits on his typing: its answer is said
         if cmd == "send" {
@@ -358,22 +384,29 @@ impl Core {
         let welcomed = self.hubs.conns.get(&project).is_some_and(|c| c.welcomed);
         match (cmd.as_str(), welcomed) {
             // kept: sent at its hub's welcome
-            ("subscribe" | "unsubscribe", false) => {}
+            ("subscribe" | "unsubscribe", false) => self.reply_ok(app),
             (_, true) => {
-                let Some(c) = self.hubs.conns.get_mut(&project) else { return };
+                let Some(c) = self.hubs.conns.get_mut(&project) else { return self.reply_ok(app) };
                 if lacks(&c.cmds, &cmd) {
-                    return self.project_error(&project, &cmd, HUB_LACKS, cid, Some(bise_proto::hub::ErrorKind::HubOlder));
+                    return self.project_error(&project, &cmd, HUB_LACKS, cid, Some(bise_proto::hub::ErrorKind::HubOlder), app);
                 }
                 // the write failed: its hub just went (its Down is on its
                 // way); the reader connects again, the command waits
-                if !c.send(&v) {
+                if !c.send(&v, app.clone()) {
                     c.welcomed = false;
-                    c.pending.push((v, Instant::now() + START));
+                    c.pending.push((v, Instant::now() + START, app));
                 }
             }
             // its hub connects on demand (started if needed), the command
             // goes at its welcome, then the hold goes (decision m_8720)
-            (_, false) => self.deliver_at_welcome(&project, &row.path, v),
+            (_, false) => self.deliver_at_welcome(&project, &row.path, v, app),
+        }
+    }
+
+    /// The app's request done here, the core's own way (nothing for its hub to say).
+    fn reply_ok(&mut self, app: Option<Id>) {
+        if let Some(app) = app {
+            self.replies.push(Response::ok(app, json!({})));
         }
     }
 
@@ -383,7 +416,7 @@ impl Core {
 
     /// `v` waits for `project`'s welcome on its connection, opened for it
     /// when no rule holds that project.
-    fn deliver_at_welcome(&mut self, project: &str, path: &Path, v: Value) {
+    fn deliver_at_welcome(&mut self, project: &str, path: &Path, v: Value, app: Option<Id>) {
         let now = Instant::now();
         if !self.hubs.conns.contains_key(project) {
             let Some(p) = self.hubs.ports.as_mut() else { return };
@@ -391,27 +424,32 @@ impl Core {
             self.hubs.conns.insert(project.to_string(), Conn::new(hub, Some(now + START + LINGER)));
         }
         if let Some(c) = self.hubs.conns.get_mut(project) {
-            c.pending.push((v, now + START));
+            c.pending.push((v, now + START, app));
         }
     }
 
     /// Commands past their deadline get their error; the hubs held for a
     /// command only go once it went.
     pub(super) fn tick_projects(&mut self, now: Instant) {
-        let mut late: Vec<(String, String, Option<u64>)> = Vec::new();
+        let mut late: Vec<(String, String, Option<u64>, Option<Id>)> = Vec::new();
         let mut close = false;
         for (id, c) in self.hubs.conns.iter_mut() {
-            c.pending.retain(|(v, deadline)| {
+            c.pending.retain(|(v, deadline, app)| {
                 let ok = *deadline > now;
                 if !ok {
-                    late.push((id.clone(), v.get("cmd").and_then(Value::as_str).unwrap_or("").to_string(), v.get("cid").and_then(Value::as_u64)));
+                    late.push((id.clone(), v.get("cmd").and_then(Value::as_str).unwrap_or("").to_string(), v.get("cid").and_then(Value::as_u64), app.clone()));
                 }
                 ok
             });
+            // an app request its hub never answered gets the core's words
+            if let Some(before) = now.checked_sub(super::hub_rpc::ASK_LATE) {
+                c.rpc.late(before, super::hub_rpc::LATE);
+            }
             close |= c.until.is_some_and(|u| u <= now) && c.pending.is_empty();
         }
-        for (id, cmd, cid) in late {
-            self.project_error(&id, &cmd, "its hub didn't start: nothing sent. try again in a moment.", cid, None);
+        self.take_rpc_replies();
+        for (id, cmd, cid, app) in late {
+            self.project_error(&id, &cmd, "its hub didn't start: nothing sent. try again in a moment.", cid, None, app);
         }
         if close {
             self.hold_at(now);
@@ -440,14 +478,14 @@ impl Core {
         if let Some((p, a)) = &old {
             if !window(self, p, a) {
                 if let Some(c) = self.hubs.conns.get_mut(p).filter(|c| c.welcomed) {
-                    c.send(&json!({"cmd": "unsubscribe", "project": p, "agent": a}));
+                    c.send(&json!({"cmd": "unsubscribe", "project": p, "agent": a}), None);
                 }
             }
         }
         if let Some((p, a)) = &want {
             if !window(self, p, a) {
                 if let Some(c) = self.hubs.conns.get_mut(p).filter(|c| c.welcomed) {
-                    c.send(&json!({"cmd": "subscribe", "project": p, "agent": a}));
+                    c.send(&json!({"cmd": "subscribe", "project": p, "agent": a}), None);
                 }
             }
         }
@@ -474,8 +512,10 @@ impl Core {
             .map(|(id, _)| id.clone())
             .collect();
         for id in gone {
-            if let Some(c) = self.hubs.conns.remove(&id) {
+            if let Some(mut c) = self.hubs.conns.remove(&id) {
                 c.hub.close();
+                c.rpc.lost(super::hub_rpc::GONE);
+                self.replies.extend(c.rpc.take_replies());
             }
         }
         for id in want {
@@ -493,6 +533,19 @@ impl Core {
 
     /// A project hub's connection said something.
     pub fn project_hub(&mut self, id: &str, h: HubIn) {
+        self.project_hub_in(id, h);
+        self.take_rpc_replies();
+    }
+
+    /// The app's requests the connections answered, for the run loop
+    /// ([`Core::take_replies`]), before the events they caused.
+    fn take_rpc_replies(&mut self) {
+        for c in self.hubs.conns.values_mut() {
+            self.replies.extend(c.rpc.take_replies());
+        }
+    }
+
+    fn project_hub_in(&mut self, id: &str, h: HubIn) {
         let Some(c) = self.hubs.conns.get_mut(id) else { return };
         match h {
             // JSON-RPC's `initialize` first (P1c), always
@@ -508,6 +561,7 @@ impl Core {
             HubIn::Down(cause) => {
                 c.welcomed = false;
                 c.rpc.ready = false;
+                c.rpc.lost(super::hub_rpc::GONE);
                 c.rows = None;
                 // a cause stays until it's up: a later bare loss keeps it
                 if cause.is_some() {
@@ -561,7 +615,7 @@ impl Core {
     /// the hub's words (`kind` hub_refused) or what to do with an older hub
     /// (hub_older), nothing more goes until he retries.
     fn project_refused(&mut self, id: &str, why: String, kind: ErrorKind) {
-        let Some(c) = self.hubs.conns.remove(id) else { return };
+        let Some(mut c) = self.hubs.conns.remove(id) else { return };
         c.hub.close();
         let name = self.hubs.rows.iter().find(|r| r.id == id).map(|r| r.name.clone()).unwrap_or_else(|| id.to_string());
         self.hubs.refused.insert(id.to_string(), why.clone());
@@ -569,10 +623,12 @@ impl Core {
             ErrorKind::HubRefused => refused_text(&name, &why),
             _ => why.clone(),
         };
-        for (cmd, _) in c.pending {
+        c.rpc.lost(&text);
+        self.replies.extend(c.rpc.take_replies());
+        for (cmd, _, app) in c.pending {
             let tag = cmd.get("cmd").and_then(Value::as_str).unwrap_or("").to_string();
             let cid = cmd.get("cid").and_then(Value::as_u64);
-            self.project_error(id, &tag, &text, cid, Some(kind));
+            self.project_error(id, &tag, &text, cid, Some(kind), app);
         }
         self.emit(json!({"ev": "hub_refused", "project": id, "error": why}));
         self.emit_projects();
@@ -596,29 +652,29 @@ impl Core {
                 let subs = self.hubs.subs.get(id);
                 let agents: Vec<String> = subs.into_iter().flatten().chain(voice.filter(|a| !subs.is_some_and(|s| s.contains(*a)))).cloned().collect();
                 for agent in agents {
-                    c.send(&json!({"cmd": "subscribe", "project": id, "agent": agent}));
+                    c.send(&json!({"cmd": "subscribe", "project": id, "agent": agent}), None);
                 }
                 // the commands that waited for it, in order; a hub
                 // held for them only stays a while for their answers
                 let mut failed = Vec::new();
                 let mut lacked = Vec::new();
-                for (cmd, _) in std::mem::take(&mut c.pending) {
+                for (cmd, _, app) in std::mem::take(&mut c.pending) {
                     let tag = cmd.get("cmd").and_then(Value::as_str).unwrap_or("").to_string();
                     let cid = cmd.get("cid").and_then(Value::as_u64);
                     if lacks(&c.cmds, &tag) {
-                        lacked.push((tag, cid));
-                    } else if !c.send(&cmd) {
-                        failed.push((tag, cid));
+                        lacked.push((tag, cid, app));
+                    } else if !c.send(&cmd, app.clone()) {
+                        failed.push((tag, cid, app));
                     }
                 }
                 if let Some(u) = c.until.as_mut() {
                     *u = Instant::now() + LINGER;
                 }
-                for (cmd, cid) in failed {
-                    self.project_error(id, &cmd, "its hub went away: nothing sent. try again in a moment.", cid, None);
+                for (cmd, cid, app) in failed {
+                    self.project_error(id, &cmd, "its hub went away: nothing sent. try again in a moment.", cid, None, app);
                 }
-                for (cmd, cid) in lacked {
-                    self.project_error(id, &cmd, HUB_LACKS, cid, Some(ErrorKind::HubOlder));
+                for (cmd, cid, app) in lacked {
+                    self.project_error(id, &cmd, HUB_LACKS, cid, Some(ErrorKind::HubOlder), app);
                 }
             }
             HubEv::Agents { agents, .. } => {
@@ -741,8 +797,10 @@ impl Core {
 
     /// Every project connection closed (the core's end).
     pub(super) fn close_projects(&mut self) {
-        for (_, c) in std::mem::take(&mut self.hubs.conns) {
+        for (_, mut c) in std::mem::take(&mut self.hubs.conns) {
             c.hub.close();
+            c.rpc.lost(super::hub_rpc::GONE);
+            self.replies.extend(c.rpc.take_replies());
         }
     }
 }

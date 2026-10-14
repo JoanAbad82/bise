@@ -215,6 +215,9 @@ pub struct Core {
     /// the move of an older home hub to this core's version (core/home_switch.rs)
     home_move: Option<home_switch::HomeMoveState>,
     out: Vec<Value>,
+    /// the app's `hub/<tag>` requests answered (hubs.rs): the run loop
+    /// writes them before the events
+    replies: Vec<bise_proto::rpc::Response>,
     /// the last `hub` said (None: nothing said yet)
     hub_up: Option<bool>,
     /// the hello replay is over (`ready`): main's lines are live
@@ -317,6 +320,7 @@ impl Core {
             ports,
             home_move: None,
             out: Vec::new(),
+            replies: Vec::new(),
             hub_up: None,
             ready: false,
             cards: Vec::new(),
@@ -360,6 +364,25 @@ impl Core {
             pages_url: None,
             quiet: false,
             voice_off: false,
+        }
+    }
+
+    /// The app's requests answered since the last call (a `hub/<tag>`
+    /// request is answered with its hub's response), in order.
+    pub fn take_replies(&mut self) -> Vec<bise_proto::rpc::Response> {
+        std::mem::take(&mut self.replies)
+    }
+
+    /// One app request (`id`): a `hub/<tag>` command is answered once its
+    /// hub said (or the core refused it), any other at once with `{}`
+    /// (architect m_23524: one request, one answer, end to end).
+    pub fn request(&mut self, c: Cmd, id: bise_proto::rpc::Id, now: Instant) {
+        match c {
+            Cmd::Typed(v) => self.typed_req(v, Some(id)),
+            c => {
+                self.replies.push(bise_proto::rpc::Response::ok(id, json!({})));
+                self.cmd(c, now);
+            }
         }
     }
 

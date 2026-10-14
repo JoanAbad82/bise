@@ -181,22 +181,24 @@ describe('CoreProcess', () => {
     expect(logs.filter((l) => l.includes('U0VDUkVU') || l.includes('"shot"'))).toEqual([]);
   });
 
-  it("hands a request's result back with the command as sent, never a refused one's (A1)", async () => {
+  it("hands a request's result back with the command as sent, and a refused one's error apart (A1, architect m_23524)", async () => {
     const dir = mkdtempSync(join(tmpdir(), 'bise-core-test-'));
     const answers: [Readonly<Record<string, unknown>>, unknown][] = [];
+    const refused: [Readonly<Record<string, unknown>>, string][] = [];
     const logs: string[] = [];
     const core = new CoreProcess(
       { config: { bise: fakeBise(dir), workspace: dir }, env: { PATH: process.env['PATH'] }, scale: 10 },
-      { onEvent: () => undefined, onState: () => undefined, log: (l) => logs.push(l), onAnswer: (c, r) => answers.push([c, r]) },
+      { onEvent: () => undefined, onState: () => undefined, log: (l) => logs.push(l), onAnswer: (c, r) => answers.push([c, r]), onRefused: (c, e) => refused.push([c, e.message]) },
     );
     core.start();
     await waitFor(() => core.state === 'up');
     const send = { cmd: 'send', project: 'p', agent: 'a', text: 'ok', cid: 4 };
     core.send(send);
     core.send({ cmd: 'nope' });
-    await waitFor(() => answers.length === 1 && logs.some((l) => l.includes('core/nope refused')));
+    await waitFor(() => answers.length === 1 && refused.length === 1 && logs.some((l) => l.includes('core/nope refused')));
     core.stop();
     expect(answers).toEqual([[send, {}]]);
+    expect(refused.map(([c]) => c)).toEqual([{ cmd: 'nope' }]);
   });
 
   it('a bise that cannot start is down and retried, never a crash', async () => {

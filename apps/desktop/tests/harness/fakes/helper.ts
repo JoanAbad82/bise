@@ -99,6 +99,19 @@ export class FakeCore extends Stub<CoreEv | HubEv, AppCmd | HubCmd> {
     await this.raw([JSON.stringify({ harness: 'exit', code })]);
   }
 
+  /**
+   * The next request for `cmd` (and `card`) is refused with `message`, as the real core answers its
+   * hub's refusal to that very request (architect m_23524: one request, one answer).
+   */
+  async refuse(cmd: string, card: number | undefined, message: string): Promise<void> {
+    await this.raw([JSON.stringify({ harness: 'refuse', cmd, ...(card === undefined ? {} : { card }), message })]);
+  }
+
+  /** `cmd` for `card` is answered with `result` (card/answer's AnswerResult: the hub took it). */
+  async result(cmd: string, card: number, result: unknown): Promise<void> {
+    await this.raw([JSON.stringify({ harness: 'result', cmd, card, result })]);
+  }
+
   env(): Record<string, string> {
     return {
       BISE_DESKTOP_BISE: this.stub,

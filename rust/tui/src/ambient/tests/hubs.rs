@@ -788,3 +788,63 @@ fn a_picked_file_is_remembered_for_its_project() {
     typed(&mut t, json!({"cmd": "file_picked", "project": "shop", "path": "src/b.rs"}));
     assert!(!t.take().iter().any(|v| v["ev"] == "error"));
 }
+
+/// architect m_23524 (inbox-fix): the app's `hub/<tag>` request is
+/// answered once, with its hub's own response: card/answer's result as is,
+/// a refusal to that very request with the hub's words, the core's own
+/// refusal at once, and an error when the hub goes before it answered.
+#[test]
+fn an_app_request_is_answered_with_its_hubs_own_response() {
+    use bise_proto::rpc::{Id, Response};
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    t.take();
+    let ask = |t: &mut T, v: Value, id: u64| t.core.request(Cmd::parse(&v.to_string()).unwrap(), Id::Num(id), Instant::now());
+    let replies = |w: &mut World, t: &mut T| -> Vec<Response> {
+        let t0 = Instant::now();
+        loop {
+            w.until(t, |_| true);
+            let r = t.core.take_replies();
+            if !r.is_empty() {
+                return r;
+            }
+            assert!(t0.elapsed() < Duration::from_secs(3), "no reply");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    };
+    // his answer: nothing until its hub said, then its AnswerResult as is
+    ask(&mut t, json!({"cmd": "answer", "project": "shop", "card": 7, "reply": "1"}), 41);
+    assert!(t.core.take_replies().is_empty(), "never {{}} before the hub said");
+    let req = w.end("shop").raw(Duration::from_secs(3)).expect("card/answer written");
+    assert_eq!(req["method"], "card/answer");
+    let got = json!({"answer": {"agent": "perf", "question": "merge?", "said": "1", "pick": "yes", "notice": "you answered perf"}});
+    w.end("shop").write(json!({"jsonrpc": "2.0", "id": req["id"], "result": got}));
+    assert_eq!(replies(&mut w, &mut t), vec![Response::ok(Id::Num(41), got)]);
+    // a close the hub refuses: that very request gets its words
+    ask(&mut t, json!({"cmd": "close", "project": "shop", "card": 8}), 42);
+    let req = w.end("shop").raw(Duration::from_secs(3)).expect("card/close written");
+    w.end("shop").write(json!({"jsonrpc": "2.0", "id": req["id"], "error": {"code": bise_proto::rpc::code::HUB_REFUSED, "message": "no card 8 here"}}));
+    let r = replies(&mut w, &mut t);
+    assert_eq!((r[0].id.clone(), r[0].error.as_ref().map(|e| e.message.clone())), (Some(Id::Num(42)), Some("no card 8 here".into())));
+    // the core refuses it itself: at once, with its words
+    ask(&mut t, json!({"cmd": "answer", "project": "nowhere", "card": 1, "reply": "1"}), 43);
+    let r = t.core.take_replies();
+    assert_eq!((r[0].id.clone(), r[0].error.as_ref().map(|e| e.message.clone())), (Some(Id::Num(43)), Some("there's no project nowhere".into())));
+    // its hub goes before it answered: an error, never silence
+    ask(&mut t, json!({"cmd": "answer", "project": "shop", "card": 9, "reply": "2"}), 44);
+    w.end("shop").raw(Duration::from_secs(3)).expect("written");
+    w.end("shop").w.shutdown(std::net::Shutdown::Both).unwrap();
+    let r = replies(&mut w, &mut t);
+    assert_eq!(r[0].id, Some(Id::Num(44)));
+    assert!(r[0].error.as_ref().is_some_and(|e| e.message.contains("went away")), "{r:?}");
+    // a subscription the core keeps for a hub not welcomed yet: `{}` at once
+    ask(&mut t, json!({"cmd": "subscribe", "project": "shop", "agent": "perf"}), 45);
+    assert_eq!(t.core.take_replies(), vec![Response::ok(Id::Num(45), json!({}))]);
+    // a core command (not a hub's): `{}` at once, as before
+    ask(&mut t, json!({"cmd": "quiet", "on": true}), 46);
+    assert_eq!(t.core.take_replies(), vec![Response::ok(Id::Num(46), json!({}))]);
+}
