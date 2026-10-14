@@ -3,7 +3,7 @@
 // place for 2 s, then fades. On the real shell with the scripted core (FakeCore, fake data), at 1100.
 // Passes when: after his answer the block is gone and the line shows; it is still there at 1.5 s and
 // gone by 3 s; the hub closing the last item without him shows nothing; reduced motion shows it with
-// no fade (the same opacity in every frame); ':*' sits on the content edge, the composer label's, 8 px to
+// no fade (the same opacity in every frame); ':*' sits on the content edge, the thread text's, 8 px to
 // its words (designer m_24516). Frames: a strip of the line's 2.4 s (zero-strip-*.png),
 // light, for designer. Owner: inbox-screen.
 import { writeFileSync } from 'node:fs';
@@ -88,8 +88,13 @@ for (const motion of ['full', 'reduced'] as const) {
           r.selectNodeContents(t);
           return Math.round(r.getBoundingClientRect().left);
         }, sel);
-      const [zl, cl] = [await textLeft('[data-testid="inbox.zero"]'), await textLeft('.b-composer .div')];
-      expect(zl, "':*' on the composer label's edge").toBe(cl);
+      // the content edge: where the thread's text starts (designer m_24516: the thread's text, one edge)
+      const edge = await page.getByText('two benches can tell why.').first().evaluate((e) => {
+        const r = document.createRange();
+        r.selectNodeContents(e);
+        return Math.round(r.getBoundingClientRect().left);
+      });
+      expect(await textLeft('[data-testid="inbox.zero"]'), "':*' on the thread's text edge").toBe(edge);
       const gap = await zero.evaluate((e) => {
         const [m, w] = [e.querySelector('.inbox-zero-mark'), e.querySelector('.inbox-zero-words')];
         return m && w ? Math.round(w.getBoundingClientRect().left - m.getBoundingClientRect().right) : -1;

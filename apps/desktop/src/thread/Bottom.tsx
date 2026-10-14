@@ -42,7 +42,9 @@ export function BottomBlock({ project, agent }: { project: string; agent: string
   }, [store, project, agent]);
   return (
     <div className="app-bottom th-screen" data-testid="app.bottom" data-project={project} data-agent={agent} data-answering={answering !== null}>
-      <InboxBlock here={row?.home === true && agent === MAIN ? HERE_BISE : { project, agent }} onAnswer={setAnswering} />
+      {/* on the inbox screen the list is the inbox: the block shows only an item he opens (designer m_25639) */}
+      <InboxBlock here={row?.home === true && agent === MAIN ? HERE_BISE : { project, agent }} onAnswer={setAnswering}
+        {...(route.screen === 'inbox' ? { rest: 'open-only' as const } : {})} />
       <ThreadComposer
         project={project}
         agent={agent}

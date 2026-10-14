@@ -115,7 +115,7 @@
 
 /* inbox zero (designer's desktop-delight TOUCH 3, Zero.tsx): in the folded block's place for 2 s, then
    fades; reduced motion: shown, no fade */
-.inbox-strip.inbox-zero { flex-direction: row; align-items: baseline; gap: var(--s-2); padding: var(--s-1); background: none; box-shadow: none; font: var(--t-13) var(--font-ui); animation: inbox-zero 2.4s linear forwards; }
+.inbox-strip.inbox-zero { flex-direction: row; align-items: baseline; gap: var(--s-2); padding: var(--s-1) 0; background: none; box-shadow: none; font: var(--t-13) var(--font-ui); animation: inbox-zero 2.4s linear forwards; }
 .inbox-zero .inbox-zero-mark { font: 600 var(--t-13) var(--font-mono); color: var(--c-accent); }
 .inbox-zero .inbox-zero-words { color: var(--c-text-2); }
 @keyframes inbox-zero {

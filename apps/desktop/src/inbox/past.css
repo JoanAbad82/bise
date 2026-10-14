@@ -19,6 +19,8 @@
 .ip-search .b-field { width: 100%; box-sizing: border-box; height: var(--h-control-sm); }
 
 .ip-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0 calc(-1 * var(--pad-row-x)); }
+/* a row cut by the list's end fades out over 16 px, like the thread's end (designer m_25639) */
+.ip-list { mask-image: linear-gradient(to bottom, #000 calc(100% - var(--s-4)), transparent); }
 /* the right bar's day heads */
 .ip-day-h { padding: var(--s-4) var(--pad-row-x) var(--gap-tight); font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
 /* the pink is only in 'waiting for you' */

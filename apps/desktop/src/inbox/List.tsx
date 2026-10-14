@@ -205,7 +205,8 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
           </>
         ) : (
           <>
-            <span><b>⏎</b> answer / go to it</span>
+            {/* the one ⏎ does on the selected row (designer m_25639) */}
+            <span data-testid="inbox.keys.enter"><b>⏎</b>{sel !== null && pastBy.has(sel) ? ' go to it' : ' answer'}</span>
             <span className="ip-wide-only"><b>space</b> details</span>
             <span><b>/</b> search</span>
             <span><b>esc</b> back</span>

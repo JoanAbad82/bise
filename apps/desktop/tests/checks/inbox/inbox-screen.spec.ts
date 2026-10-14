@@ -10,6 +10,8 @@
 //     history step: ⌘[ comes back to the inbox);
 //   - the history is asked of each project's hub (inbox_history) when the screen opens;
 //   - space opens the read-only detail, esc back; '/' searches;
+//   - no folded block above the composer at rest (the list is the inbox), only the item he opens; the key
+//     line says '⏎ answer' on a waiting row, '⏎ go to it' on a past one (designer m_25639);
 //   - 1400 / 1100 / 800 x 820: at 800 the agents filter and 'withdrawn' leave the head row, the rows drop
 //     the project and the 'where' whole; no text clipped.
 // Shots (for designer): the list at 1400/1100/800, the detail, the jump, each light + dark.
@@ -100,9 +102,10 @@ test('inbox/inbox-screen: the sidebar row, waiting first then the past by day, �
     });
 
     await test.step('waiting first, then the past by day, two lines each', async () => {
-      await expect(page.getByTestId('inbox.counts')).toHaveText('2 waiting · 2 answered');
-      await expect(page.getByTestId('inbox.waiting.head')).toHaveText('waiting for you · 2');
-      await expect(rows(page)).toHaveCount(5);
+      // a fresh test home: bise's notifications ask waits too, in the list and the count as in the block (one number)
+      await expect(page.getByTestId('inbox.counts')).toHaveText('3 waiting · 2 answered');
+      await expect(page.getByTestId('inbox.waiting.head')).toHaveText('waiting for you · 3');
+      await expect(rows(page)).toHaveCount(6);
       await expect(page.getByTestId(`inbox.row.p:${P}/7.said`)).toHaveText('you: only for Safari 16 · in the inbox');
       await expect(page.getByTestId(`inbox.row.p:${P}/5.said`)).toHaveText("you: after the bench · in perf's thread");
       await expect(page.getByTestId(`inbox.row.p:${P}/3`)).toHaveClass(/gone/);
@@ -110,6 +113,10 @@ test('inbox/inbox-screen: the sidebar row, waiting first then the past by day, �
       const h = await page.getByTestId(`inbox.row.w:${P}/9`).evaluate((e) => e.getBoundingClientRect().height);
       expect(h, 'a waiting row is one 32 px line').toBe(32);
       expect(await textProblems(page, '[data-testid="inbox.screen"]', 11)).toEqual([]);
+      // the list is the inbox here: no folded block above the composer at rest (designer m_25639)
+      await expect(page.getByTestId('inbox.block')).toHaveCount(0);
+      // the key line says what ⏎ does on the selected row
+      await expect(page.getByTestId('inbox.keys.enter')).toHaveText('⏎ answer');
     });
 
     for (const [w, name] of [[1400, '1400'], [1100, '1100'], [800, '800']] as const) {
@@ -134,9 +141,11 @@ test('inbox/inbox-screen: the sidebar row, waiting first then the past by day, �
     await test.step('space opens the read-only detail; esc back', async () => {
       await page.getByTestId('inbox.screen').focus();
       await page.keyboard.press('Home');
-      for (let i = 0; i < 2; i++) await page.keyboard.press('ArrowDown');
+      for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
+      await expect(page.getByTestId('inbox.keys.enter')).toHaveText('⏎ go to it');
       await page.keyboard.press(' ');
       await expect(page.getByTestId('inbox.detail.question')).toHaveText('keep the webp next to the avif?');
+      await expect(page.getByTestId('inbox.keys')).toContainText('o open in its thread');
       await expect(page.getByTestId('inbox.detail')).toContainText('perf went on: kept a webp fallback for Safari 16');
       await shoot(page, core, 'detail-1400');
       await page.keyboard.press('Escape');

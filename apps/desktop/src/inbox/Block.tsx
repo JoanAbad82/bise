@@ -62,6 +62,11 @@ export interface InboxBlockProps {
    * notifications ask stays out. Absent: every project's items.
    */
   readonly only?: (c: Card) => boolean;
+  /**
+   * 'open-only': at rest it shows nothing, only an item he opens (⏎, ⌘I): the inbox screen, whose list
+   * already shows the waiting items right above it (designer m_25639). Absent: folded as signed.
+   */
+  readonly rest?: 'open-only';
 }
 
 // ---- openInbox: ⌘I and a notification click (amb-win's keys and router call it; no route change)
@@ -273,7 +278,7 @@ function typing(t: EventTarget | null): boolean {
 // The block never folds, opens or changes height when he scrolls the thread (designer m_21505,
 // ambient-lead m_21498): only his hand (a click, esc, ctrl+o) or its content changes it. The H10
 // one-line form while he read up the thread (m_19835) is gone: the layout jumped under him.
-export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProps) {
+export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlockProps) {
   const cmd = useModHeld('Meta');
   const rows = useProjects();
   const store = useStore();
@@ -565,6 +570,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
   }, []);
 
   if (list.length === 0 && !isClosed) return zero ? <InboxZero /> : null;
+  if (rest === 'open-only' && openCard === undefined) return null;
   const openAt = openCard === undefined ? -1 : list.indexOf(openCard);
   // the closed card on top, open; the rows under it keep their ⌃N numbers
   const shown = [...(isClosed ? [openCard] : []), ...list.filter((_, i) => i < BLOCK_ROWS || i === openAt)];
