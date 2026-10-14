@@ -145,11 +145,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
   // his bug 3: a selection in the thread, then a key, quotes it in the composer
   const section = useRef<HTMLElement>(null);
   const composer = useRef<ComposerActions | null>(null);
-  // his queued message taken back to edit (QueuedRow): its words at the composer's caret, for him to resend
-  const takeBack = useCallback((text: string) => {
-    composer.current?.insertText(text);
-    composer.current?.focusEnd();
-  }, []);
   const onComposer = useCallback(
     (a: ComposerActions) => {
       composer.current = a;
@@ -420,7 +415,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
         {/* the list and, over an empty one, the first-run block centred in the column (his try:
             it sat bottom-left at the column's edge) */}
         <div className="th-main">
-          <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} onTakeBack={takeBack} onReading={setReading} />
+          <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} onReading={setReading} />
           {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} bise={bise} />}
           {/* files dragged over the window: 'drop to give this file to perf' over the rows, to the
               composer's agent (designer's office-artifacts pick 4); an archived thread takes none */}

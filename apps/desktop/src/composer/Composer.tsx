@@ -20,6 +20,10 @@ import { ComposerFrame, Press } from "@/ds";
 import "./composer.css";
 import type { ComposerActions, FieldBar } from "./actions";
 import { PmField } from "./pm/PmField";
+import { QueueDrawer, type QueueDrawerProps } from "./QueueDrawer";
+
+/** What the screen gives the drawer; the composer adds whether its field is empty. */
+export type QueueSlot = Omit<QueueDrawerProps, "fieldEmpty" | "testId">;
 import {
   barMode,
   barPairs,
@@ -68,6 +72,12 @@ export interface ComposerProps {
   /** Text is selected in the thread: typing asks about it (the key bar says so). */
   readonly quoting?: boolean;
   readonly onSend: (out: Outgoing) => void;
+  /** Tab during a turn: his message to the hub's queue (issue 23); unset: tab doesn't queue. */
+  readonly onQueue?: (out: Outgoing) => void;
+  /** ↑ in the empty field: the screen takes its newest queued message back into it; false: none. */
+  readonly onEditNewest?: () => boolean;
+  /** The queued messages' drawer above the tab (QueueDrawer.tsx); unset or no rows: none. */
+  readonly queue?: QueueSlot;
   /** A command line he ran (`/model opus`): the screen runs it (a core cmd or a screen). */
   readonly onCommand?: (name: string, args: string) => void;
   /** The send button while busy: stop the turn. */
@@ -244,7 +254,12 @@ export const Composer = memo(function Composer(
           )}
         </>
       }
-      quote={strip}
+      quote={
+        <>
+          {strip}
+          {props.queue !== undefined && <QueueDrawer {...props.queue} fieldEmpty={!canSend} testId={`${testId}.queue`} />}
+        </>
+      }
       send={busy && !canSend ? "stop" : canSend ? "on" : "off"}
       onSend={() => {
         if (busy && !canSend) cb.current.onStop?.();
@@ -263,6 +278,10 @@ export const Composer = memo(function Composer(
           cb.current.onSend(o);
           setSent((n) => n + 1);
         }}
+        queue={(o) => {
+          cb.current.onQueue?.(o);
+        }}
+        editNewest={() => cb.current.onEditNewest?.() ?? false}
         command={(name, args) => {
           cb.current.onCommand?.(name, args);
         }}

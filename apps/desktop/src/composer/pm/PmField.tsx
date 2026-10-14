@@ -29,18 +29,16 @@ import {
   buildMessage,
   nextChipNumber,
   noVisionLine,
-  preview,
   type Chip,
   type Outgoing,
   type Segment,
 } from "../message";
 import {
-  enqueue,
   keepUnread,
   load,
   remember,
   save,
-  takeOldest,
+  takeOldQueue,
   type Saved,
   type Store,
 } from "../drafts";
@@ -106,6 +104,10 @@ export interface PmFieldProps {
   readonly testId: string;
   readonly placeholder: string;
   readonly send: (o: Outgoing) => void;
+  /** tab during a turn: his message to the hub's queue (issue 23); the screen's drawer shows it */
+  readonly queue: (o: Outgoing) => void;
+  /** ↑ in the empty field: the screen takes its newest queued message back into it; false: none */
+  readonly editNewest: () => boolean;
   readonly command: (name: string, args: string) => void;
   readonly onCanSend: (on: boolean) => void;
   readonly onStrip: (strip: JSX.Element | null) => void;
@@ -553,8 +555,13 @@ export function PmField(p: PmFieldProps): JSX.Element {
     return true;
   };
 
+  // tab during a turn: his message goes to the hub's queue at once (issue 23: the hub owns every
+  // queued message, the drawer draws it); the field empties as on a send
   const queue = (): void => {
-    saved.current = enqueue(saved.current, entryNow());
+    const st = state();
+    if (st === null) return;
+    props.current.queue(buildMessage(segmentsOf(st.doc)));
+    saved.current = remember(saved.current, entryNow());
     clear();
     forget();
     writeNow();
@@ -575,7 +582,8 @@ export function PmField(p: PmFieldProps): JSX.Element {
   };
   useDropAnywhere(pasteCtx);
 
-  // ---- the strip above the box: the chips and the queue, re-drawn only when they change ----
+  // ---- the strip above the box: its one-line note, re-drawn only when the chips or it change
+  // (the queue is the hub's, drawn by the screen's drawer: QueueDrawer.tsx) ----
   const lastStrip = useRef("");
   const note = useRef<string | null>(null);
   const lastChips = useRef("[]");
@@ -585,22 +593,11 @@ export function PmField(p: PmFieldProps): JSX.Element {
       lastChips.current = ck;
       setChips(chips);
     }
-    const q = saved.current.queue;
     const n = note.current;
-    const key = JSON.stringify([chips, q, n]);
+    const key = JSON.stringify([chips, n]);
     if (key === lastStrip.current) return;
     lastStrip.current = key;
-    props.current.onStrip(
-      q.length === 0 && n === null ? null : (
-        <Strip
-          queued={q.map((e) =>
-            preview(buildMessage(entrySegments(e) ?? []).text, 48),
-          )}
-          note={n}
-          testId={props.current.testId}
-        />
-      ),
-    );
+    props.current.onStrip(n === null ? null : <Strip note={n} testId={props.current.testId} />);
   };
   const chipsNow = (): Chip[] => {
     const st = state();
@@ -822,6 +819,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
         folderUp,
         submit,
         queue,
+        editNewest: () => props.current.editNewest(),
         clear,
         writeNow,
         putAway,
@@ -887,21 +885,12 @@ export function PmField(p: PmFieldProps): JSX.Element {
     for (const el of dom.querySelectorAll<HTMLElement>(".b-chip[data-n]")) el.classList.toggle("lit", hoverN !== null && el.dataset.n === String(hoverN));
   }, [hoverN, chips]);
 
-  // ---- the turn ended: the oldest queued message leaves (queue.rs) ----
-  const wasBusy = useRef(p.busy);
+  // ---- an older window's own queue (before the hub owned it, issue 23): to the hub's queue once,
+  // in order, then gone from the drafts file ----
+  const { store: oldStore, target: oldTarget } = p;
   useEffect(() => {
-    if (wasBusy.current && !p.busy) {
-      const taken = takeOldest(saved.current);
-      if (taken !== null) {
-        saved.current = taken.rest;
-        save(p.store, p.target, saved.current);
-        p.send(buildMessage(entrySegments(taken.entry) ?? []));
-        pushStrip(chipsNow());
-      }
-    }
-    wasBusy.current = p.busy;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- pushStrip/chipsNow read refs and the editor
-  }, [p]);
+    for (const entry of takeOldQueue(oldStore, oldTarget)) props.current.queue(buildMessage(entrySegments(entry) ?? []));
+  }, [oldStore, oldTarget]);
 
   return (
     <>

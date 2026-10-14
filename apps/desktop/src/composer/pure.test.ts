@@ -11,7 +11,7 @@ import { noVisionLine } from './message';
 import { isDocPath, isImagePath } from './sources';
 import { codeRuns, colorLines, proseRuns } from './mdcolor';
 import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Chip, type Segment } from './message';
-import { enqueue, load, popNewest, remember, save, takeOldest, HISTORY_MAX, type Store } from './drafts';
+import { load, remember, save, takeOldQueue, HISTORY_MAX, type Store } from './drafts';
 import { argRows, commandLine, commandRows, completion, enterSends, move, type Row } from './pick';
 import { enterMakesNewline, indent, item, newline, outdentAtStart, subwordLeft, subwordRight, type Op } from './mdlive';
 
@@ -171,12 +171,12 @@ describe('the send', () => {
 describe('drafts', () => {
   it('one per target, kept across a reload, unreadable reads as empty', () => {
     const s = memStore();
-    save(s, 'p/main', { draft: '{"a":1}', history: [], queue: [] });
+    save(s, 'p/main', { draft: '{"a":1}', history: [] });
     expect(load(s, 'p/main').draft).toBe('{"a":1}');
     expect(load(s, 'p/other').draft).toBeNull();
     s.setItem('bise.composer.v1.p/bad', '{nope');
-    expect(load(s, 'p/bad')).toEqual({ draft: null, history: [], queue: [] });
-    save(s, 'p/main', { draft: null, history: [], queue: [] });
+    expect(load(s, 'p/bad')).toEqual({ draft: null, history: [] });
+    save(s, 'p/main', { draft: null, history: [] });
     expect(s.m.size).toBe(1);
   });
   it('history is newest first, deduplicated, 50 kept', () => {
@@ -186,11 +186,14 @@ describe('drafts', () => {
     expect(st.history.length).toBe(HISTORY_MAX);
     expect(st.history.slice(0, 2)).toEqual(['m55', 'm59']);
   });
-  it('the queue: ↑ pops the newest back, the turn end sends the oldest', () => {
-    const st = enqueue(enqueue(load(memStore(), 't'), 'a'), 'b');
-    expect(popNewest(st)?.entry).toBe('b');
-    expect(takeOldest(st)?.entry).toBe('a');
-    expect(takeOldest(st)?.rest.queue).toEqual(['b']);
+  it("an older window's own queue is taken once, in order, and leaves the file (issue 23)", () => {
+    const s = memStore();
+    s.setItem('bise.composer.v1.t', JSON.stringify({ draft: '{"d":1}', history: ['h'], queue: ['a', 'b'] }));
+    expect(takeOldQueue(s, 't')).toEqual(['a', 'b']);
+    expect(takeOldQueue(s, 't')).toEqual([]);
+    expect(load(s, 't')).toEqual({ draft: '{"d":1}', history: ['h'] });
+    expect(JSON.parse(s.getItem('bise.composer.v1.t') ?? '{}')).not.toHaveProperty('queue');
+    expect(takeOldQueue(s, 'none')).toEqual([]);
   });
 });
 

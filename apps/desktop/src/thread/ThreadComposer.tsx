@@ -20,6 +20,7 @@ import { emptyEnterAct } from './head';
 import { computerRowOf, computerState } from './ComputerLine';
 import type { Agent } from '@/proto';
 import { ComposerTab } from './ComposerTab';
+import { useThreadQueue } from './ThreadQueue';
 import { AttachTool, ModelTool, ModeTool } from './ComposerTools';
 import type { TabWords } from './tab';
 
@@ -138,6 +139,9 @@ export const ThreadComposer = memo(function ThreadComposer({
     },
     [onReady],
   );
+  // his queued messages, the hub's (issue 23): tab queues there, the drawer above the tab shows
+  // them with send now / edit / delete, ↑ in the empty field edits the newest (ThreadQueue.ts)
+  const queue = useThreadQueue(project, agent, actions);
   // the composer about an open artifact: a selection in its frame (artifacts/useFrameNote.ts)
   // comes as a numbered attachment at the caret, and the composer takes the focus for his words
   const aboutId = about?.id;
@@ -270,7 +274,7 @@ export const ThreadComposer = memo(function ThreadComposer({
     }
     const entry = load(keptStorage, was.key).draft;
     if (entry === null) return;
-    save(keptStorage, was.key, { draft: null, history: [], queue: [] });
+    save(keptStorage, was.key, { draft: null, history: [] });
     if (actions.current?.putBack(entry) === 'history') setNote({ level: 'info', text: `your words to ${shownName(was.asker)}'s closed question: ↑ brings them back` });
   }, [closedKey, answer?.asker]);
   // the box's row: '+' always; the mode and the model only for a message (an answer has neither)
@@ -292,7 +296,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   // context come back with a plain message (designer m_24517)
   const tabWords = useMemo(() => (answering ? { label: tab.label } : tab), [answering, tab]);
   const tabEl = <ComposerTab words={tabWords} mark={mark} end={end ?? undefined} testId="composer.tab" />;
-  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} tabAccent={answering} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} testId="composer" />;
+  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} tabAccent={answering} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} testId="composer" />;
   if (note === null) return field;
   return (
     <>

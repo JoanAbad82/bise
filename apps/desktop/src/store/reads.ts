@@ -250,6 +250,14 @@ export class StoreReads extends StoreBase {
     this.takeAsk.set(project, key);
     this.command({ cmd: "queued_take", project, agent, id });
   }
+  /**
+   * Send a queued message now (the drawer's 'send now', architect m_25139): the hub steers it into
+   * the agent's running turn with its own id; the row leaves Agent.queued at the next agents event.
+   * A refusal (delivered, taken, the agent down) is the hub's words on the line over the composer.
+   */
+  queuedSteer(project: string, agent: string, id: number): void {
+    this.command({ cmd: "queued_steer", project, agent, id });
+  }
   /** The latest diff of an agent's change, or of one commit (`commit`). */
   diff(project: string, agent: string, commit?: string): Diff | null {
     return this.slice<Diff | null>(diffKey(project, agent, commit), null);

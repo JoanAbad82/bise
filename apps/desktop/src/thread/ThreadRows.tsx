@@ -9,7 +9,7 @@ import { usePartialText } from '@/shared/partial';
 import { LIVE, liveKey, useLive, useStill } from './live';
 import { FirstRun, showsFirstRun } from '@/setup';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
-import { EntryRow, PendingRow, QueuedRow, gapOf, type RowCtx } from './rows';
+import { EntryRow, PendingRow, gapOf, type RowCtx } from './rows';
 import { entryKey, namedRows, pendingKey, placeSteered, posOfKey } from './entry';
 import { NoProject } from './NoProject';
 import { landedEchoes, retryRuns } from './tiers';
@@ -73,7 +73,7 @@ export function FirstRunSlot({ tkey, project, composer, bise }: { tkey: string; 
   );
 }
 
-export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onTakeBack, onReading }: { tkey: string; project: string; agent: string; bise: boolean; listRef: RefObject<ThreadListHandle | null>; onTakeBack?: (text: string) => void; onReading?: (reading: boolean) => void }) {
+export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, onReading }: { tkey: string; project: string; agent: string; bise: boolean; listRef: RefObject<ThreadListHandle | null>; onReading?: (reading: boolean) => void }) {
   const store = useStore();
   const view = useThreadOrder(tkey);
   const pending = usePending(tkey);
@@ -139,7 +139,6 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
       onArtifact: (id: string) => {
         goArtifact(project, id);
       },
-      ...(onTakeBack === undefined ? {} : { onTakeBack }),
       ...(base === undefined
         ? {}
         : {
@@ -148,7 +147,7 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
             },
           }),
     }),
-    [tkey, project, agent, bise, base, onTakeBack, goArtifact],
+    [tkey, project, agent, bise, base, goArtifact],
   );
   // each row reads the one before it: its group and its day (ambient m_11777)
   const prevOf = useMemo(() => new Map(shown.map((p, i) => [p, shown[i - 1]])), [shown]);
@@ -217,16 +216,12 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
     if (sent > last.current) listRef.current?.scrollToEnd();
     last.current = sent;
   }, [sent, listRef]);
-  // his messages the hub holds until this agent's turn ends (rows::Agent.queued, draft): dashed
-  // bubbles at the bottom, oldest first; a sent one becomes his normal bubble (messages-right v1)
-  const queued = useAgents(project).find((a) => a.name === agent)?.queued;
-  const tail = pending.length === 0 && (queued ?? []).length === 0 ? undefined : (
+  // his messages on their way; the ones the hub holds until the turn ends are the composer's
+  // drawer (QueueDrawer.tsx), never bubbles here: a sent one lands as his normal bubble
+  const tail = pending.length === 0 ? undefined : (
     <div className="th-tail">
       {pending.map((p) => (
         <PendingRow key={pendingKey(String(p.cid))} ctx={ctx} cid={p.cid} />
-      ))}
-      {(queued ?? []).map((q) => (
-        <QueuedRow key={`q:${String(q.id)}`} ctx={ctx} q={q} />
       ))}
     </div>
   );

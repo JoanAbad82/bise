@@ -15,7 +15,7 @@ import {
   NO_UNDO,
   type Op,
 } from "../mdlive";
-import { historyAt, popNewest, type Saved } from "../drafts";
+import { historyAt, type Saved } from "../drafts";
 import { completion, enterSends, move, type Pick, type Row } from "../pick";
 import type { Trigger } from "../tokens";
 import { freeEscape } from "../escape";
@@ -52,6 +52,8 @@ export interface KeyCtx {
   readonly folderUp: () => boolean;
   readonly submit: () => void;
   readonly queue: () => void;
+  /** ↑ in the empty field: the newest queued message back into it (the hub's take); false: none */
+  readonly editNewest: () => boolean;
   readonly clear: () => void;
   readonly writeNow: () => void;
   readonly putAway: () => void;
@@ -281,14 +283,9 @@ export function fieldKey(c: KeyCtx, e: KeyboardEvent): boolean {
         c.setIndex(move(l.index, -1, l.rows.length));
         return true;
       }
-      if (blankNow()) {
-        const popped = popNewest(c.saved.current);
-        if (popped !== null) {
-          e.preventDefault();
-          c.saved.current = popped.rest;
-          c.setContent(popped.entry);
-          return true;
-        }
+      if (blankNow() && c.editNewest()) {
+        e.preventDefault();
+        return true;
       }
       if (
         blankNow() ||

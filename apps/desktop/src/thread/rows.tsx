@@ -35,8 +35,6 @@ export interface RowCtx {
   readonly onArtifact: (id: string) => void;
   /** a file path named in an answer, relative to the agent's folder (M4, B14) */
   readonly onPath?: (path: string, line?: number) => void;
-  /** his queued message taken back to edit: its words go back in the composer */
-  readonly onTakeBack?: (text: string) => void;
 }
 
 export const EntryRow = memo(function EntryRow({
@@ -338,7 +336,7 @@ export { THOUGHT_MS };
 
 // the row families live in their own files; importers keep reading them here
 export { answeredMark, approvalParts, cardFollows, cardLine, fileUrl, imageLabel, toAgentName, withoutImageMarks } from './rows-cards';
-export { LONG_CHARS, LONG_LINES, PendingRow, QueuedRow, YouBubble, foldOf } from './rows-messages';
+export { LONG_CHARS, LONG_LINES, PendingRow, YouBubble, foldOf } from './rows-messages';
 export { NOTICE_MARK } from './rows-news';
 export { cutWords, thoughtFor } from './rows-tools';
 export { liveTime } from './live-step';

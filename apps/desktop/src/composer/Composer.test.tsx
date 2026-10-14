@@ -187,8 +187,9 @@ describe('the composer', () => {
     const queued = entryOf([{ kind: 'text', text: 'après ça 🎉' }]);
     store.setItem('bise.composer.v1.p/main', JSON.stringify({ draft: v2, history: [v2], queue: [queued] }));
     const onSend = vi.fn();
+    const onQueue = vi.fn();
     const got: { a: ComposerActions | null } = { a: null };
-    const el = (busy: boolean) => <Composer target="p/main" store={store} busy={busy} onSend={onSend} onReady={(a) => (got.a = a)} />;
+    const el = (busy: boolean) => <Composer target="p/main" store={store} busy={busy} onSend={onSend} onQueue={onQueue} onReady={(a) => (got.a = a)} />;
     const ui = render(el(true));
     await act(async () => {
       await Promise.resolve();
@@ -196,11 +197,14 @@ describe('the composer', () => {
     expect(ui.getByTestId('composer.field').textContent).toContain('café 👋 déjà');
     expect(ui.getByTestId('composer.field').textContent).toContain('ligne 2');
     expect(ui.getByTestId('composer.field').textContent).toContain('fin');
+    // an older window's queued one goes to the hub's queue once, whole (issue 23)
+    expect(onQueue).toHaveBeenCalledTimes(1);
+    expect(onQueue).toHaveBeenLastCalledWith(buildMessage([{ kind: 'text', text: 'après ça 🎉' }]));
     await act(async () => {
-      ui.rerender(el(false)); // the turn ends: the queued one leaves, whole
+      ui.rerender(el(false)); // the turn ends: the window sends nothing itself (the hub does)
       await Promise.resolve();
     });
-    expect(onSend).toHaveBeenLastCalledWith(buildMessage([{ kind: 'text', text: 'après ça 🎉' }]));
+    expect(onSend).not.toHaveBeenCalled();
     await act(async () => {
       got.a?.submit(); // the draft sends exactly what the TipTap engine would have sent
       await Promise.resolve();

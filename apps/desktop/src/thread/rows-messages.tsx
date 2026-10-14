@@ -5,7 +5,7 @@ import { memo, useContext, useEffect, useState, type ReactNode } from 'react';
 import { RouterContext } from '@/app/router';
 import { Button, Chip, Fold, Press } from '@/ds';
 import type { Entry } from '@/proto';
-import { useAgents, useArtifacts, useCoreState, useHubRefused, usePending, useProjects, useStore, useQueuedTake } from '@/store';
+import { useAgents, useArtifacts, useCoreState, useHubRefused, usePending, useProjects, useStore } from '@/store';
 import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
@@ -381,68 +381,6 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
         <Markdown text={p.text} onLink={ctx.onLink} onArtifact={ctx.onArtifact} breaks />
       </YouBubble>
       {hold?.state === 'held' && <HoldLine hold={hold} />}
-    </div>
-  );
-});
-
-/**
- * One of his messages the hub holds until the agent's turn ends (rows::Agent.queued, draft;
- * messages-right v1): a dashed bubble, dim words, 'queued · sends when perf's turn ends'. When it
- * goes, the hub drops it from the list and it lands as his normal bubble. No edit / drop yet: no
- * command takes a queued message back (asked of amb-feed).
- */
-/**
- * His message the hub holds until the agent's turn ends (designer's messages-right, amb-feed
- * 34c35175): a dashed bubble, 'queued · sends when perf's turn ends', then 'edit · drop'. Both take
- * it back (queued_take); edit puts its words back in the composer for him to resend, drop lets it
- * go. The row itself leaves when the agents event no longer lists it (nothing drawn before); a
- * refusal (already delivered, no longer waiting) shows the hub's words under it.
- */
-export const QueuedRow = memo(function QueuedRow({ ctx, q }: { ctx: RowCtx; q: { id: number; text: string } }) {
-  const who = shownName(ctx.agent);
-  const store = useStore();
-  const taken = useQueuedTake(ctx.project, ctx.agent, q.id);
-  const [asked, setAsked] = useState<'edit' | 'drop' | null>(null);
-  const [given, setGiven] = useState(false);
-  // edit: his words go back in the composer once, when the hub gave them back
-  if (asked === 'edit' && !given && taken !== null && 'text' in taken) {
-    setGiven(true);
-    ctx.onTakeBack?.(taken.text);
-  }
-  const take = (how: 'edit' | 'drop') => () => {
-    setAsked(how);
-    setGiven(false);
-    store.queuedTake(ctx.project, ctx.agent, q.id);
-  };
-  const id = `thread.queued.${String(q.id)}`;
-  const refused = asked !== null && taken !== null && 'error' in taken ? taken.error : null;
-  return (
-    <div className="th-row th-queued" data-side="you" data-testid={id}>
-      <YouBubble
-        under={
-          <>
-            <span>queued · sends when {who}'s turn ends</span>
-            <span className="th-queued-acts">
-              <Press look="th-queued-act" onClick={take('edit')} disabled={asked !== null && refused === null} data-testid={`${id}.edit`}>
-                edit
-              </Press>
-              <span aria-hidden="true"> · </span>
-              <Press look="th-queued-act" onClick={take('drop')} disabled={asked !== null && refused === null} data-testid={`${id}.drop`}>
-                drop
-              </Press>
-            </span>
-          </>
-        }
-        state="queued"
-        testId={`${id}.bubble`}
-      >
-        <Markdown text={q.text} onLink={ctx.onLink} onArtifact={ctx.onArtifact} breaks />
-      </YouBubble>
-      {refused !== null && (
-        <div className="th-queued-err" role="status" data-testid={`${id}.error`}>
-          {refused}
-        </div>
-      )}
     </div>
   );
 });

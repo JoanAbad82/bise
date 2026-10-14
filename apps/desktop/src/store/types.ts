@@ -253,7 +253,7 @@ export type ToolOut = { readonly out: string; readonly cut: boolean; readonly to
 
 /** The slice key of one call's output (pos is the key: ToolItem.id repeats). Pure. */
 /** A queued message taken back: its words, or the hub's refusal. */
-export type QueuedTake = { readonly text: string } | { readonly error: string };
+export type QueuedTake = { readonly text: string; readonly parts?: readonly Part[] } | { readonly error: string };
 
 export function takeKey(project: string, agent: string, id: number): string {
   return `queued_taken:${project}/${agent}/${String(id)}`;

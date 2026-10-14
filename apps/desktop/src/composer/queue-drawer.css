@@ -1,0 +1,146 @@
+/* The queued messages' drawer (QueueDrawer.tsx, designer m_25146): thread → drawer → tab → box,
+   one stacked object. The tab's width (16 px in from the box), its fill and 1 px line; the top r-3
+   corners while open, the tab's own top corners go square. A 28 px head, 32 px rows, 3 rows then
+   it scrolls inside with 16 px fades. Open/close: height + fade 160 ms; a row in: 120 ms; none
+   under reduced motion. */
+.b-composer:has(> .b-qdrawer) > .tab {
+  border-radius: 0;
+  box-shadow: inset 1px 0 0 var(--c-line), inset -1px 0 0 var(--c-line), inset 0 1px 0 var(--c-line);
+}
+.b-qdrawer {
+  display: flex;
+  flex-direction: column;
+  margin: var(--s-6) var(--s-4) 0;
+  border-radius: var(--r-3) var(--r-3) 0 0;
+  box-shadow: inset 1px 1px 0 var(--c-line), inset -1px 0 0 var(--c-line);
+  background: linear-gradient(color-mix(in srgb, var(--c-text) 2%, transparent), color-mix(in srgb, var(--c-text) 2%, transparent)), var(--c-raised);
+  overflow: hidden;
+  animation: b-qdrawer-open 160ms var(--ease-out);
+}
+.b-qdrawer .h {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--h-row-tight);
+  padding: 0 var(--s-1) 0 var(--s-3);
+  font: var(--t-12) / 1 var(--font-ui);
+  color: var(--c-text-3);
+}
+.b-qdrawer .h .hw {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 'undo': a button in ink, underlined on hover ('deleted ·' stays text-3) */
+.b-qdrawer .h .b-act {
+  color: var(--c-text);
+}
+/* folded to its head: no slide when it unfolds again (the rows fade in on their own) */
+.b-qdrawer.folded {
+  animation: none;
+}
+.b-qdrawer .caret {
+  transition: transform var(--d-fast) var(--ease-out);
+}
+.b-qdrawer .caret.folded {
+  transform: rotate(-90deg);
+}
+.b-qdrawer .rows {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(3 * var(--h-row));
+  overflow-y: auto;
+}
+/* the 16 px fades say rows wait out of sight: at the bottom while more are below, at the top once
+   scrolled (QueueDrawer's data-above / data-below) */
+.b-qdrawer .rows[data-below] {
+  mask-image: linear-gradient(#000 calc(100% - var(--s-4)), transparent);
+}
+.b-qdrawer .rows[data-above] {
+  mask-image: linear-gradient(transparent, #000 var(--s-4));
+}
+.b-qdrawer .rows[data-above][data-below] {
+  mask-image: linear-gradient(transparent, #000 var(--s-4), #000 calc(100% - var(--s-4)), transparent);
+}
+.b-qdrawer .r {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: none;
+  height: var(--h-row);
+  padding: 0 var(--s-1) 0 var(--s-3);
+  font: var(--t-13) / 1 var(--font-ui);
+  color: var(--c-text-2);
+  outline: 0;
+  animation: b-qdrawer-row 120ms var(--ease-out);
+}
+.b-qdrawer .r:focus-visible {
+  background: var(--c-hover);
+  box-shadow: inset 2px 0 0 var(--c-focus);
+}
+.b-qdrawer .r .w {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+.b-qdrawer .r .t {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.b-qdrawer .r .x {
+  flex: none;
+  color: var(--c-text-3);
+}
+.b-qdrawer .acts {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  flex: none;
+}
+.b-qdrawer .b-ibtn {
+  color: var(--c-text-3);
+  border-radius: var(--r-1);
+}
+.b-qdrawer .b-ibtn:hover,
+.b-qdrawer .b-ibtn:focus-visible {
+  color: var(--c-text);
+  background: var(--c-hover);
+}
+.b-qdrawer .b-ibtn.on {
+  background: none;
+}
+/* edit while a draft is in the field: the wrapper gets the hover and says why */
+.b-qdrawer .hold {
+  display: inline-flex;
+}
+.b-qdrawer .hold.off .b-ibtn {
+  pointer-events: none;
+}
+@keyframes b-qdrawer-open {
+  from {
+    max-height: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: calc(var(--h-row-tight) + 3 * var(--h-row));
+    opacity: 1;
+  }
+}
+@keyframes b-qdrawer-row {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .b-qdrawer,
+  .b-qdrawer .r {
+    animation: none;
+  }
+}

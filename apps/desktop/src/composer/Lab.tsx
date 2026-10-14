@@ -3,8 +3,12 @@
 // What they send shows in a visible log (`lab.sent`, one row per send or command), the effect a
 // check reads instead of a hook. Routes `lab/composer`, `lab/spotlight`, `lab/pearl` (amb-win's
 // shell draws them only in test mode).
-import { useState, type JSX } from "react";
-import { Composer } from "./Composer";
+import { useCallback, useEffect, useRef, useState, type JSX } from "react";
+import { Composer, type QueueSlot } from "./Composer";
+import type { ComposerActions } from "./actions";
+import { entryOf } from "./entry";
+import type { Outgoing } from "./message";
+import { segmentsOfParts } from "./partsback";
 import { prefixFirst } from "./tokens";
 import type {
   ArgKind,
@@ -386,9 +390,72 @@ function SentLog({ log }: { log: Log }): JSX.Element {
   );
 }
 
+/** The lab's stand-in for the hub's queue (issue 23): tab queues here, the turn's end sends them
+ *  all in order (sb-core's user_queued_said_at_idle), the drawer's buttons act on it. */
+function useLabQueue(busy: boolean, sent: (o: Outgoing) => void, actions: { current: ComposerActions | null }): { slot: QueueSlot; onQueue: (o: Outgoing) => void; onEditNewest: () => boolean } {
+  const [queued, setQueued] = useState<readonly { id: number; o: Outgoing }[]>([]);
+  const [deleted, setDeleted] = useState<Outgoing | null>(null);
+  const nextId = useRef(1);
+  const wasBusy = useRef(busy);
+  useEffect(() => {
+    if (wasBusy.current && !busy && queued.length > 0) {
+      for (const q of queued) sent(q.o);
+      setQueued([]);
+    }
+    wasBusy.current = busy;
+  }, [busy, queued, sent]);
+  const edit = (id: number): boolean => {
+    const q = queued.find((x) => x.id === id);
+    if (q === undefined) return false;
+    setQueued((l) => l.filter((x) => x.id !== id));
+    actions.current?.putBack(entryOf(q.o.parts === undefined ? [{ kind: "text", text: q.o.text }] : segmentsOfParts(q.o.parts)));
+    actions.current?.focusEnd();
+    return true;
+  };
+  return {
+    onQueue: (o) => {
+      const id = nextId.current++;
+      setQueued((l) => [...l, { id, o }]);
+    },
+    onEditNewest: () => {
+      const last = queued.at(-1);
+      return last === undefined ? false : edit(last.id);
+    },
+    slot: {
+      rows: queued.map((q) => ({ id: q.id, text: q.o.text, extra: "" })),
+      who: "bise",
+      deleted: deleted !== null,
+      onSteer: (id) => {
+        const q = queued.find((x) => x.id === id);
+        if (q === undefined) return;
+        setQueued((l) => l.filter((x) => x.id !== id));
+        sent(q.o);
+      },
+      onEdit: (id) => {
+        edit(id);
+      },
+      onDelete: (id) => {
+        setDeleted(queued.find((x) => x.id === id)?.o ?? null);
+        setQueued((l) => l.filter((x) => x.id !== id));
+      },
+      onUndo: () => {
+        if (deleted === null) return;
+        const id = nextId.current++;
+        setQueued((l) => [...l, { id, o: deleted }]);
+        setDeleted(null);
+      },
+    },
+  };
+}
+
 export function ComposerLab(): JSX.Element {
   const [log, setLog] = useState<Log>([]);
   const [busy, setBusy] = useState(false);
+  const actions = useRef<ComposerActions | null>(null);
+  const sent = useCallback((o: Outgoing) => {
+    setLog((l) => [...l, JSON.stringify(o)]);
+  }, []);
+  const queue = useLabQueue(busy, sent, actions);
   const [vision, setVision] = useState(true);
   const [voice, setVoice] = useState(false);
   const [busyMic, setBusyMic] = useState(false);
@@ -446,8 +513,12 @@ export function ComposerLab(): JSX.Element {
         sources={vision ? SOURCES : TEXT_ONLY}
         voice={voice ? "recording" : null}
         tab="to bise · lab"
-        onSend={(o) => {
-          setLog((l) => [...l, JSON.stringify(o)]);
+        onSend={sent}
+        onQueue={queue.onQueue}
+        onEditNewest={queue.onEditNewest}
+        queue={queue.slot}
+        onReady={(a) => {
+          actions.current = a;
         }}
         onCommand={(name, args) => {
           setLog((l) => [...l, JSON.stringify({ command: name, args })]);

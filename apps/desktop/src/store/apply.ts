@@ -163,7 +163,8 @@ export function applyTyped(s: Store, ev: Ev): void {
     case "queued_taken": {
       const key = takeKey(ev.project, ev.agent, ev.id);
       if (s.takeAsk.get(ev.project) === key) s.takeAsk.delete(ev.project);
-      s.put(key, { text: ev.text } satisfies QueuedTake);
+      // his parts too (msg-parts): the composer gets his chips back from them (partsback.ts)
+      s.put(key, { text: ev.text, ...(ev.parts == null ? {} : { parts: ev.parts }) } satisfies QueuedTake);
       return;
     }
     case "diff":
@@ -259,7 +260,9 @@ export function applyTyped(s: Store, ev: Ev): void {
       // from where he answered and stayed after the hub took it late): the window that sent it gets
       // 'card_refused' for that very card and says so on the card (store.ts cardRefused, refused.ts)
       if (ev.cmd === "answer" || ev.cmd === "close") return;
-      if (ev.cmd === "slash" && ev.project != null) {
+      // a slash the hub refused, or a queued message it couldn't send now (delivered, taken, the
+      // agent down): its words on the line over the composer
+      if ((ev.cmd === "slash" || ev.cmd === "queued_steer") && ev.project != null) {
         s.put(`notice:${ev.project}`, {
           text: ev.text,
           level: "error",

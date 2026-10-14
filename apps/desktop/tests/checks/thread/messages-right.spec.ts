@@ -117,7 +117,7 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
         const rows = await boxes();
         const his = rows.filter((r) => r.side === 'you');
         const theirs = rows.filter((r) => r.side === 'them');
-        expect(his.map((r) => r.id), `${t} ${String(w)}: his rows on his side`).toEqual(['thread.entry.1', 'thread.entry.3', 'thread.entry.4', 'thread.entry.6', 'thread.entry.8', 'thread.entry.10', 'thread.entry.14', 'thread.queued.1']);
+        expect(his.map((r) => r.id), `${t} ${String(w)}: his rows on his side`).toEqual(['thread.entry.1', 'thread.entry.3', 'thread.entry.4', 'thread.entry.6', 'thread.entry.8', 'thread.entry.10', 'thread.entry.14']);
         for (const r of his) {
           expect.soft(r.box, `${t} ${String(w)} ${r.id}: a bubble`).not.toBeNull();
           if (r.box === null) continue;
@@ -143,13 +143,11 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
     // the source by the name the thread shows ('bise' for a main, designer m_16360), as the steer and queued words
     await expect(page.getByTestId('thread.you.14.quote.1')).toContainText('bise');
     await expect(page.getByTestId('thread.you.10.under')).toHaveText('steered · bise read it mid-turn');
-    // (then 'edit · drop', amb-feed 34c35175)
-    await expect(page.getByTestId('thread.queued.1.bubble.under')).toHaveText("queued · sends when bise's turn endsedit · drop");
     await expect(page.getByTestId('thread.you.14.quote.1')).toContainText('webp saves another 30%.');
     expect(await page.getByTestId('thread.you.14').innerText()).not.toContain('<selection');
-    // queued: a dashed bubble, 'queued · sends when …'s turn ends'
-    await expect(page.getByTestId('thread.queued.1.bubble.under')).toHaveText(/^queued · sends when \S+'s turn endsedit · drop$/u);
-    expect(await page.getByTestId('thread.queued.1').locator('.th-bubble').evaluate((b) => getComputedStyle(b).borderTopStyle)).toBe('dashed');
+    // queued: never a bubble in the thread, the composer's drawer (thread/queue-drawer.spec.ts)
+    await expect(page.locator('[data-testid^="thread.queued."]')).toHaveCount(0);
+    await expect(page.getByTestId('composer.queue.1.text')).toHaveText('then open a PR');
     await page.mouse.move(1, 300);
     // the loop above ends on dark: light first, for real (designer m_16360: it was dark twice)
     await theme('light');
@@ -201,25 +199,6 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
     const ys = await page.evaluate(() => ['thread.toolrow.11', 'thread.you.10', 'thread.toolrow.12'].map((id) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect().top ?? -1));
     expect(ys[0] ?? -1, 'the first bench is drawn').toBeGreaterThan(0);
     expect((ys[0] ?? 0) < (ys[1] ?? 0) && (ys[1] ?? 0) < (ys[2] ?? 0), `bench 11, the steer, bench 12, top to bottom (${ys.join(', ')})`).toBe(true);
-
-    // queued: 'edit · drop' (amb-feed 34c35175): both take it back (queued_take); a refusal shows the
-    // hub's words; edit puts its words back in the composer; the bubble stays until the agents event moves
-    const q = page.getByTestId('thread.queued.1');
-    await q.evaluate((el) => { el.scrollIntoView({ block: 'center' }); });
-    await expect(page.getByTestId('thread.queued.1.edit')).toHaveText('edit');
-    await expect(page.getByTestId('thread.queued.1.drop')).toHaveText('drop');
-    await page.screenshot({ path: test.info().outputPath('queued-edit-drop-light-1100.png') });
-    await page.getByTestId('thread.queued.1.drop').click();
-    expect(await core.waitCmd((c) => c.cmd === 'queued_take', 3000)).toMatchObject({ project: P, agent: 'main', id: 1 });
-    await expect(q, 'nothing drawn before the agents event moves').toBeVisible();
-    await core.send({ ev: 'error', project: P, cmd: 'queued_take', text: 'already delivered: bise read it' } as never);
-    await expect(page.getByTestId('thread.queued.1.error')).toHaveText('already delivered: bise read it');
-    await page.getByTestId('thread.queued.1.edit').click();
-    await core.waitCmd((c) => c.cmd === 'queued_take' && (c as { id?: number }).id === 1, 3000);
-    await core.send({ ev: 'queued_taken', project: P, agent: 'main', id: 1, text: 'then open a PR' } as never);
-    await expect(page.locator('[data-testid="composer.field"]').first(), 'his words back in the composer').toContainText('then open a PR');
-    await core.send({ ev: 'agents', project: P, agents: [ag('main'), ag('perf')] } as never);
-    await expect(q, 'taken: the agents event no longer lists it').toHaveCount(0);
   } finally {
     await s.close();
     core.dispose();

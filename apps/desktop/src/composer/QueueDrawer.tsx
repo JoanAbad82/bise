@@ -1,0 +1,221 @@
+// The queued messages' drawer, glued above the composer's tab (designer m_25146, his « une petite
+// boîte avec les queued messages … qui se déplierait comme un tiroir »): a head that says when they
+// go ('2 queued · sent when perf's turn ends', ▾ folds it), then one row per message, oldest first,
+// each with three icon buttons: send now (steer), edit (back into the field), delete. Every icon
+// says what it does in the ds tip, on hover and on focus. A focused row takes ⏎ / e / ⌫.
+//
+// Drawing only: the rows and what each button does come from the screen (thread/ThreadQueue.ts:
+// the hub's Agent.queued and its queued_steer / queued_take). Pure parts: queueHead, rowExtra.
+import { useEffect, useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent } from "react";
+import { Act, cx, IconButton, tipAttrs } from "@/ds";
+import "./queue-drawer.css";
+
+/** One queued message as the drawer shows it. */
+export interface QueueRow {
+  readonly id: number;
+  /** his words on one line (the tip shows them whole) */
+  readonly text: string;
+  /** what goes with them, in text-3 after the words (' · 1 image'); '' none */
+  readonly extra: string;
+}
+
+export interface QueueDrawerProps {
+  readonly rows: readonly QueueRow[];
+  /** the agent's shown name ('bise' for main) */
+  readonly who: string;
+  /** the field is empty: edit can put a message back in it */
+  readonly fieldEmpty: boolean;
+  /** a row was just deleted: the head says 'deleted · undo' (4 s) */
+  readonly deleted: boolean;
+  readonly onSteer: (id: number) => void;
+  readonly onEdit: (id: number) => void;
+  readonly onDelete: (id: number) => void;
+  readonly onUndo: () => void;
+  readonly testId: string;
+}
+
+/** The head's words: 'queued · sent when perf's turn ends', '2 queued · …' for 2 and more. Pure. */
+export function queueHead(n: number, who: string): string {
+  return `${n > 1 ? `${String(n)} queued` : "queued"} · sent when ${who}'s turn ends`;
+}
+
+/** What goes with his words: ' · 1 image', ' · 2 images, 1 file'; '' for none. Pure. */
+export function rowExtra(images: number, others: number): string {
+  const bits: string[] = [];
+  if (images > 0) bits.push(`${String(images)} ${images > 1 ? "images" : "image"}`);
+  if (others > 0) bits.push(`${String(others)} ${others > 1 ? "attachments" : "attachment"}`);
+  return bits.length === 0 ? "" : ` · ${bits.join(", ")}`;
+}
+
+/** `text` cut to `room` px after a whole word, with one '…' (never mid-word); whole when it fits. Pure. */
+export function cutAfterWord(text: string, room: number, width: (s: string) => number): string {
+  if (width(text) <= room) return text;
+  const words = text.split(" ");
+  for (let n = words.length - 1; n >= 1; n--) {
+    const head = words.slice(0, n).join(" ").replace(/[\s·,:;]+$/u, "");
+    if (head !== "" && width(`${head}…`) <= room) return `${head}…`;
+  }
+  return `${words[0] ?? ""}…`;
+}
+
+const canvas = typeof document === "undefined" ? null : document.createElement("canvas");
+function widthIn(font: string): ((s: string) => number) | null {
+  const c = canvas?.getContext("2d") ?? null;
+  if (c === null) return null;
+  c.font = font;
+  return (s) => c.measureText(s).width;
+}
+
+/** the 14 px line icons (stroke 1.5): arrow up = send now, pencil = edit, x = delete */
+const ICONS = {
+  steer: "M7 11.5V2.5M3 6.5l4-4 4 4",
+  edit: "M9.5 2.5l2 2-7 7H2.5v-2l7-7z",
+  delete: "M3.5 3.5l7 7M10.5 3.5l-7 7",
+} as const;
+function Icon({ d }: { d: string }): JSX.Element {
+  return (
+    <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
+      <path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** One row: his words cut after a word, then its three buttons. */
+function Row({ row, who, fieldEmpty, onSteer, onEdit, onDelete, testId }: { row: QueueRow; who: string; fieldEmpty: boolean; onSteer: () => void; onEdit: () => void; onDelete: () => void; testId: string }): JSX.Element {
+  const words = useRef<HTMLSpanElement>(null);
+  const [cut, setCut] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    const el = words.current;
+    const box = el?.parentElement ?? null;
+    if (el === null || box === null) return;
+    const measure = (): void => {
+      const width = widthIn(getComputedStyle(el).font);
+      // the room is the row's words box less what goes with them, never the words' own width
+      // (that one shrinks with each cut: a loop down to the first word)
+      const extra = box.querySelector<HTMLElement>(":scope > .x");
+      const room = box.clientWidth - (extra === null ? 0 : extra.getBoundingClientRect().width);
+      const next = width === null || room <= 0 ? null : cutAfterWord(row.text, room, width);
+      setCut((c) => (c === next ? c : next === row.text ? null : next));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(box);
+    return () => {
+      ro.disconnect();
+    };
+  }, [row.text]);
+  const keys = (e: KeyboardEvent<HTMLDivElement>): void => {
+    if (e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "Enter") onSteer();
+    else if (e.key === "e" && fieldEmpty) onEdit();
+    else if (e.key === "Backspace" || e.key === "Delete") onDelete();
+    else return;
+    e.preventDefault();
+  };
+  return (
+    <div className="r" role="listitem" tabIndex={0} onKeyDown={keys} aria-label={row.text} data-testid={testId}>
+      <span className="w" {...tipAttrs(cut === null ? undefined : row.text)}>
+        <span ref={words} className="t" data-testid={`${testId}.text`}>
+          {cut ?? row.text}
+        </span>
+        {row.extra !== "" && <span className="x">{row.extra}</span>}
+      </span>
+      <span className="acts">
+        <IconButton size="bar" label={`send now: ${who} reads it mid-turn`} keys="⏎" onClick={onSteer} testId={`${testId}.steer`}>
+          <Icon d={ICONS.steer} />
+        </IconButton>
+        {/* a draft in the field: edit waits; the tip on its wrapper says why (a disabled button gets no hover) */}
+        <span className={cx("hold", !fieldEmpty && "off")} {...tipAttrs(fieldEmpty ? undefined : "empty the composer to edit it")}>
+          <IconButton size="bar" label="edit: back into the composer" keys="↑" disabled={!fieldEmpty} onClick={onEdit} testId={`${testId}.edit`}>
+            <Icon d={ICONS.edit} />
+          </IconButton>
+        </span>
+        <IconButton size="bar" label="delete it" keys="⌫" onClick={onDelete} testId={`${testId}.delete`}>
+          <Icon d={ICONS.delete} />
+        </IconButton>
+      </span>
+    </div>
+  );
+}
+
+/** The drawer: open while a message is queued (or a delete can be undone), folded to its head on a click. */
+export function QueueDrawer({ rows, who, fieldEmpty, deleted, onSteer, onEdit, onDelete, onUndo, testId }: QueueDrawerProps): JSX.Element | null {
+  const [folded, setFolded] = useState(false);
+  // the fades say rows wait out of sight: the top one once scrolled, the bottom one while more are below
+  const list = useRef<HTMLDivElement>(null);
+  const [hidden, setHidden] = useState({ above: false, below: false });
+  const look = (): void => {
+    const el = list.current;
+    if (el === null) return;
+    const next = { above: el.scrollTop > 0, below: el.scrollTop + el.clientHeight < el.scrollHeight - 1 };
+    setHidden((h) => (h.above === next.above && h.below === next.below ? h : next));
+  };
+  useLayoutEffect(look, [rows.length, folded]);
+  // ⌘Z while 'deleted · undo' shows, unless a field has words of its own to undo
+  useEffect(() => {
+    if (!deleted) return;
+    const key = (e: globalThis.KeyboardEvent): void => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
+      const a = document.activeElement;
+      const typing = a instanceof HTMLElement && (a.isContentEditable || a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement);
+      if (typing && !(a.isContentEditable && fieldEmpty)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onUndo();
+    };
+    window.addEventListener("keydown", key, true);
+    return () => {
+      window.removeEventListener("keydown", key, true);
+    };
+  }, [deleted, fieldEmpty, onUndo]);
+  if (rows.length === 0 && !deleted) return null;
+  return (
+    <div className={cx("b-qdrawer", folded && "folded")} data-testid={testId} data-count={rows.length}>
+      <div className="h" data-testid={`${testId}.head`}>
+        {deleted ? (
+          <span className="hw" role="status">
+            deleted ·{" "}
+            <Act onClick={onUndo} testId={`${testId}.undo`}>
+              undo
+            </Act>
+          </span>
+        ) : (
+          <span className="hw">{queueHead(rows.length, who)}</span>
+        )}
+        {rows.length > 0 && (
+          <IconButton size="bar" label={folded ? "show the queued messages" : "fold the queued messages"} pressed={!folded} onClick={() => {
+              setFolded((f) => !f);
+            }} testId={`${testId}.fold`}>
+            {/* the composer's 8x5 chevron: down while open, right while folded */}
+            <svg className={cx("caret", folded && "folded")} viewBox="0 0 8 5" width="8" height="5" aria-hidden="true">
+              <path d="M1 1l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </IconButton>
+        )}
+      </div>
+      {!folded && rows.length > 0 && (
+        <div ref={list} className="rows" role="list" onScroll={look} data-above={hidden.above || undefined} data-below={hidden.below || undefined} data-testid={`${testId}.rows`}>
+          {rows.map((r, i) => (
+            <Row
+              key={r.id}
+              row={r}
+              who={who}
+              fieldEmpty={fieldEmpty}
+              onSteer={() => {
+                onSteer(r.id);
+              }}
+              onEdit={() => {
+                onEdit(r.id);
+              }}
+              onDelete={() => {
+                onDelete(r.id);
+              }}
+              testId={`${testId}.${String(i + 1)}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

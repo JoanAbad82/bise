@@ -108,7 +108,7 @@ describe("(2) old drafts: nothing he typed is lost", () => {
       "bise.composer.v1.p/main",
       JSON.stringify({ draft, history: [sent], queue: [queued] }),
     );
-    const { getByTestId, a, onSend } = await mount({ store });
+    const { getByTestId, a, onSend, onQueue } = await mount({ store });
     expect(getByTestId("composer.field").textContent).toBe(
       "❝ 3why this order?",
     );
@@ -119,8 +119,10 @@ describe("(2) old drafts: nothing he typed is lost", () => {
     expect(onSend).toHaveBeenLastCalledWith(
       buildMessage(entrySegments(draft) ?? []),
     );
-    // the queue and the history kept their old entries untouched
-    expect(load(store, "p/main").queue).toEqual([queued]);
+    // the old queue went to the hub's queue once (issue 23), the history kept its old entries
+    expect(onQueue).toHaveBeenCalledTimes(1);
+    expect(onQueue).toHaveBeenCalledWith(buildMessage(entrySegments(queued) ?? []));
+    expect(store.getItem("bise.composer.v1.p/main") ?? "").not.toContain('"queue"');
     expect(load(store, "p/main").history[1]).toBe(sent);
   });
 
@@ -179,6 +181,7 @@ function testMic() {
 async function mount(extra: { store?: Store; sources?: ComposerSources } = {}) {
   const got: { a: ComposerActions | null } = { a: null };
   const onSend = vi.fn();
+  const onQueue = vi.fn();
   const store = extra.store ?? memStore();
   const ui = render(
     <PmField
@@ -189,6 +192,8 @@ async function mount(extra: { store?: Store; sources?: ComposerSources } = {}) {
       testId="composer"
       placeholder="write to bise"
       send={onSend}
+      queue={onQueue}
+      editNewest={() => false}
       command={() => undefined}
       onCanSend={() => undefined}
       onStrip={() => undefined}
@@ -200,7 +205,7 @@ async function mount(extra: { store?: Store; sources?: ComposerSources } = {}) {
     await Promise.resolve();
   });
   if (got.a === null) throw new Error("field not ready");
-  return { ...ui, onSend, store, a: got.a };
+  return { ...ui, onSend, onQueue, store, a: got.a };
 }
 
 describe("(3) the live dictation is in nothing he keeps or sends", () => {
@@ -261,6 +266,8 @@ describe("(4) a draft key of its own (an inbox card, amb-home m_20065)", () => {
         testId="composer"
         placeholder="write to bise"
         send={onSend}
+        queue={() => undefined}
+        editNewest={() => false}
         command={() => undefined}
         onCanSend={() => undefined}
         onStrip={() => undefined}
