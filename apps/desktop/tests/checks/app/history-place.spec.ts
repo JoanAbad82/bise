@@ -4,9 +4,9 @@
 //     artifact (its right bar row) → esc closes it: perf's thread is back at the row he read → ‹
 //     storefront's main → › perf, still at that row;
 //   - the scheduled list, scrolled down: away and ‹ back, it is where he left it;
-//   - the trackpad's two-finger swipe: fingers to the right (wheel deltaX < 0) go back, to the
-//     left forward, once per swipe; nothing while ⌘K is open; never over a box that scrolls
-//     sideways that way.
+//   - the trackpad's two-finger swipe (a stream of sideways wheel events) never walks, either
+//     way (his no-swipe: it took him away from what he was typing);
+//   - words typed in perf's composer come back after ‹ › (the arrows, at once) and ⌘[ ⌘].
 // Shots for designer: walk-1-perf-scrolled, walk-2-artifact, walk-3-esc, walk-4-back, walk-5-forward.
 // Owner: amb-web.
 import type { Page } from '@playwright/test';
@@ -89,7 +89,7 @@ async function swipe(page: Page, dx: number): Promise<void> {
   await page.waitForTimeout(400);
 }
 
-test("app/history-place: back on a place its scroll comes back (thread through an artifact, a list); the two-finger swipe walks", async () => {
+test("app/history-place: back on a place its scroll comes back (thread through an artifact, a list); a two-finger swipe never walks; a draft survives ‹ › ⌘[ ⌘]", async () => {
   test.setTimeout(120_000);
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: `project/${P}`, size: '1400x900' });
@@ -157,27 +157,37 @@ test("app/history-place: back on a place its scroll comes back (thread through a
       await expect.poll(() => page.getByTestId('scheduled.list').evaluate((el) => el.scrollTop), { message: 'the list where he left it', timeout: 5000 }).toBe(top);
     });
 
-    await test.step('the two-finger swipe: right goes back, left forward; none under ⌘K', async () => {
+    await test.step('the two-finger swipe never walks, either way (his no-swipe)', async () => {
+      await page.keyboard.press('Meta+BracketLeft');
+      await at('agent:perf', '‹ from the list: perf, with a step behind and one ahead');
       await page.mouse.move(700, 450);
       await swipe(page, -30);
-      await at('agent:perf', 'fingers to the right: back');
+      await page.waitForTimeout(300);
+      await at('agent:perf', 'fingers to the right: still perf');
       await swipe(page, 30);
-      await at('scheduled', 'fingers to the left: forward');
-      await swipe(page, -30);
-      await at('agent:perf', 'one swipe, one step');
-      await page.keyboard.press('Meta+k');
-      await expect(page.getByTestId('app.palette')).toBeVisible({ timeout: 3000 });
-      await swipe(page, -30);
-      await page.keyboard.press('Escape');
-      await expect(page.getByTestId('app.palette')).toHaveCount(0);
-      await at('agent:perf', 'under ⌘K the swipe does nothing');
-      // a vertical scroll that drifts sideways is a scroll
-      for (let i = 0; i < 12; i += 1) {
-        await page.mouse.wheel(-12, 60);
-        await page.waitForTimeout(16);
-      }
-      await page.waitForTimeout(400);
-      await at('agent:perf', 'a scroll is never a swipe');
+      await page.waitForTimeout(300);
+      await at('agent:perf', 'fingers to the left: still perf');
+    });
+
+    await test.step("his words in perf's composer survive ‹ › and ⌘[ ⌘]", async () => {
+      const field = page.getByTestId('composer.field').last();
+      await field.click();
+      await page.keyboard.type('half a thought for perf', { delay: 5 });
+      await expect(field).toHaveText('half a thought for perf');
+      // at once, inside the draft's debounce: the move itself keeps it
+      await page.getByTestId('app.title.back').click();
+      await at('agent:main', "‹: storefront's main");
+      await expect(page.getByTestId('composer.field').last(), "main's composer is not perf's").not.toHaveText('half a thought for perf');
+      await page.getByTestId('app.title.forward').click();
+      await at('agent:perf', '›: perf again');
+      await expect(page.getByTestId('composer.field').last(), '› brings his words back').toHaveText('half a thought for perf');
+      await page.getByTestId('composer.field').last().click();
+      await page.keyboard.type(', and more', { delay: 5 });
+      await page.keyboard.press('Meta+BracketLeft');
+      await at('agent:main', "⌘[ from perf's field: main");
+      await page.keyboard.press('Meta+BracketRight');
+      await at('agent:perf', '⌘]: perf again');
+      await expect(page.getByTestId('composer.field').last(), '⌘[ ⌘] keep his words').toHaveText('half a thought for perf, and more');
     });
   } finally {
     await s.close();

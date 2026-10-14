@@ -13,13 +13,13 @@
 // the DOM) notes whether a popup was open or a field held words; after the
 // whole dispatch, the hook reads whether anyone took it (composer/escape.ts:
 // the composer's field prevents every esc and marks the ones it left free).
-// ⌘[ ⌘], the mouse's side buttons and the trackpad's two-finger swipe
-// (swipe.ts) go back and forward; none of them acts while a sheet is open.
+// ⌘[ ⌘] and the mouse's side buttons go back and forward; none of them acts
+// while a sheet is open. A trackpad's sideways swipe never walks (his no-swipe:
+// it took him away from the words he was typing): it only scrolls.
 import { useEffect } from "react";
 import { escapeIsFree } from "@/composer/escape";
 import { homeOf, upOf } from "./route";
 import type { Router } from "./router";
-import { START, scrollsX, swipeStep } from "./swipe";
 
 /** Open, these keep esc and the history keys to themselves (a menu, a sheet, ⌘K, the keys sheet, a model list). */
 const POPUP =
@@ -82,7 +82,7 @@ export function escTarget(
   return router.canBack() ? "back" : homeOf(now);
 }
 
-/** Esc up, ⌘[ ⌘], the mouse's side buttons (3 back, 4 forward) and the two-finger swipe, mounted once in the shell. */
+/** Esc up, ⌘[ ⌘] and the mouse's side buttons (3 back, 4 forward), mounted once in the shell. */
 export function useHistoryWays(router: Router): void {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -123,36 +123,16 @@ export function useHistoryWays(router: Router): void {
       if (e.button === 3) router.back();
       else router.forward();
     };
-    // the trackpad's two-finger swipe (swipe.ts): read only, the page still scrolls as it would
-    let swipe = START;
-    const onWheel = (e: WheelEvent) => {
-      const { state, walk } = swipeStep(swipe, {
-        dx: e.deltaX,
-        dy: e.deltaY,
-        t: e.timeStamp,
-        ctrl: e.ctrlKey,
-        shift: e.shiftKey,
-        innerX:
-          e.deltaX !== 0 &&
-          scrollsX(e.target instanceof Element ? e.target : null, e.deltaX),
-      });
-      swipe = state;
-      if (walk === null || sheetOpen()) return;
-      if (walk === "back") router.back();
-      else router.forward();
-    };
     window.addEventListener("keydown", onEsc);
     window.addEventListener("keydown", onKey);
     window.addEventListener("mousedown", onDown);
     window.addEventListener("mouseup", onUp);
-    window.addEventListener("wheel", onWheel, { passive: true });
     return () => {
       clearTimeout(timer);
       window.removeEventListener("keydown", onEsc);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("mousedown", onDown);
       window.removeEventListener("mouseup", onUp);
-      window.removeEventListener("wheel", onWheel);
     };
   }, [router]);
 }

@@ -3,7 +3,7 @@
 // (FakeCore's fixture world: acme's artifacts, agents, scheduled tasks, perf's log, two cards; the
 // approvals rules sent by the check), real keys only. Passes when, on each page:
 //   - artifacts, scheduled, agents, archived, log, settings › approvals (the shared useListKeys or
-//     its stepOf): home is the first row, ↑ at the top stays, ↓↓ is the 3rd row (or the last when
+//     its stepOf): the focused list draws no browser focus ring (his m_24123), home is the first row, ↑ at the top stays, ↓↓ is the 3rd row (or the last when
 //     fewer), end is the last, ↑ steps back; and the page's ⏎ (or ⌫ on a rule) does its act:
 //     ⏎ opens the artifact, the task's pane, the agent's thread; ⌫ asks 'remove it?', esc keeps it;
 //   - ⌘I (the inbox block): ⌘I opens item 1, ↓ the next, ↓ at the end stays, ↑ back, ↑ at the top
@@ -112,6 +112,14 @@ async function walk(s: Session, name: string, w: Walk): Promise<string[]> {
   };
   await page.locator(w.focus).first().focus();
   await key('Home', at(0), 'home is the first row');
+  // the focused key container draws no browser ring around the whole page (his m_24123, ds base.css)
+  const ring = await page.evaluate(() => {
+    const el = document.activeElement;
+    if (!(el instanceof HTMLElement) || el === document.body) return 'nothing focused';
+    const cs = getComputedStyle(el);
+    return cs.outlineStyle === 'none' || cs.outlineWidth === '0px' ? 'none' : `${el.tagName} ${cs.outlineStyle} ${cs.outlineWidth}`;
+  });
+  expect(ring, `${name}: the focused list has no focus ring`).toBe('none');
   await key('ArrowUp', at(0), '↑ at the top stays');
   await key('ArrowDown', at(1), '↓ the 2nd');
   await key('ArrowDown', at(2), '↓↓ the 3rd (or the last)');
