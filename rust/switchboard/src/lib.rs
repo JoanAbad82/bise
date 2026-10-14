@@ -61,6 +61,7 @@ pub mod flow;
 pub mod fn_context;
 pub mod forge;
 pub mod idle;
+pub mod image_care;
 pub mod keeps;
 pub mod land;
 pub mod land_check;

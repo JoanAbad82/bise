@@ -111,6 +111,8 @@ impl Shell {
                     self.plan_prs();
                     w.phase("idle check");
                     self.idle_check();
+                    w.phase("images");
+                    self.image_care();
                     w.phase("computer use");
                     // computer use (design §7.3): each stop, one line in main's feed
                     for l in self.cu.poll() {
@@ -334,5 +336,29 @@ impl Shell {
             self.step(Input::ReplExited { agent: name, crashed: true, reason });
         }
         Flow::Go
+    }
+}
+
+impl Shell {
+    /// The image store's care on the tick (crate::image_care, D14): the
+    /// images this hub's hot messages and open cards name are touched
+    /// hourly, the store pruned at most once a day; hub.log says so.
+    fn image_care(&mut self) {
+        let home = bise_home::Home::from_env();
+        let st = &self.hub.st;
+        let texts = st.hot().map(|(m, _)| m.text.as_str()).chain(st.open_cards().map(|c| c.text.as_str()));
+        let paths = self.opts.paths.clone();
+        let care = crate::image_care::tick(&self.opts.paths, &home.images_dir(), &home.prefs_file(), texts, now_ms(), move |r| {
+            match r {
+                Ok(n) => log_line(&paths, &format!("images: pruned {n} file(s) from the store")),
+                Err(e) => log_line(&paths, &format!("images: the prune failed: {e}")),
+            }
+        });
+        if let Some(n) = care.touched {
+            log_line(&self.opts.paths, &format!("images: touched the {n} image(s) this hub names"));
+        }
+        if let Some(d) = care.pruning {
+            log_line(&self.opts.paths, &format!("images: pruning what is older than {d} day(s)"));
+        }
     }
 }

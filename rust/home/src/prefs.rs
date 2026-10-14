@@ -55,6 +55,18 @@ pub fn excluded_apps(v: Option<Value>) -> Vec<String> {
     }
 }
 
+/// `shots_keep_days`: the days an image stays in bise's image store
+/// (bend_images::prune). Unset: [`KEEP_DAYS_DEFAULT`], what settings ›
+/// privacy shows.
+pub const KEEP_DAYS: &str = "shots_keep_days";
+pub const KEEP_DAYS_DEFAULT: u64 = 7;
+
+/// The image store's retention in days, from `prefs.json`'s object: his
+/// number when it is one of at least 1, else the default.
+pub fn keep_days(prefs: Option<&Value>) -> u64 {
+    prefs.and_then(|p| p.get(KEEP_DAYS)).and_then(Value::as_u64).filter(|d| *d >= 1).unwrap_or(KEEP_DAYS_DEFAULT)
+}
+
 /// The top keys of `prefs.json` the window may set (`prefs_set`,
 /// architect m_9130): anything else is refused, never written.
 pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days", "desktop_channel", "bims"];

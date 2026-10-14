@@ -498,6 +498,12 @@ fn the_window_sets_known_prefs_by_dotted_key_and_keeps_their_types() {
     assert!(prefs::set_dotted(&o, "theme", json!("purple")).is_err());
     assert!(prefs::set_dotted(&o, "shots_keep_days.x", json!(1)).is_err());
     assert_eq!(prefs::set_dotted(&o, "shots_keep_days", json!(14)).unwrap()["shots_keep_days"], json!(14));
+    // the image store's retention: his number, else what settings shows
+    assert_eq!(prefs::keep_days(Some(&json!({"shots_keep_days": 30}))), 30);
+    assert_eq!(prefs::keep_days(Some(&json!({}))), prefs::KEEP_DAYS_DEFAULT);
+    assert_eq!(prefs::keep_days(None), 7);
+    assert_eq!(prefs::keep_days(Some(&json!({"shots_keep_days": 0}))), 7, "0 is not 'delete at once'");
+    assert_eq!(prefs::keep_days(Some(&json!({"shots_keep_days": "30"}))), 7);
     let w = prefs::for_window(Some(json!({"theme": "dark"})));
     assert_eq!(w["theme"], json!("dark"));
     assert!(w["excluded_apps"].as_array().is_some_and(|a| a.contains(&json!("com.apple.MobileSMS"))), "the seed, resolved");

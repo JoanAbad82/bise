@@ -109,6 +109,14 @@ impl Paths {
     pub fn log(&self) -> PathBuf {
         self.state.join("hub.log")
     }
+    /// The image store's care (image_care.rs): touched when this hub
+    /// last touched the images it names, and when it last pruned.
+    pub fn images_touched(&self) -> PathBuf {
+        self.state.join("images-touched")
+    }
+    pub fn images_pruned(&self) -> PathBuf {
+        self.state.join("images-pruned")
+    }
     pub fn bin_dir(&self) -> PathBuf {
         self.state.join("bin")
     }

@@ -1,0 +1,124 @@
+//! The hub's side of the image store's retention (D14, docs/images.md
+//! "Retention"; the rule is `bend_images::prune`'s). On its tick, a hub:
+//!
+//! - touches the images its hot messages and open cards name, at its
+//!   start and every `TOUCH_EVERY_MS` (the store is shared by every hub
+//!   of the home: the age is what keeps another hub's images);
+//! - prunes the store at most once a day, on a thread, with the user's
+//!   `shots_keep_days` (`bise_home::prefs::keep_days`), its own named
+//!   images kept.
+//!
+//! When each was last done is the mtime of a stamp in the hub's folder
+//! (`Paths::images_touched`, `Paths::images_pruned`): one stat each per
+//! tick, and a restart neither prunes twice in a day nor waits an hour
+//! to touch (a hub down for more than an hour finds its stamp old).
+
+use crate::paths::Paths;
+use bend_images::prune::{self, DAY_MS, TOUCH_EVERY_MS};
+use std::collections::BTreeSet;
+use std::path::Path;
+
+/// Due when the stamp is missing, unreadable, older than `every` or in
+/// the future (a clock moved back). Pure.
+pub fn due(stamp_ms: Option<u64>, now_ms: u64, every_ms: u64) -> bool {
+    match stamp_ms {
+        None => true,
+        Some(t) => t > now_ms || now_ms - t >= every_ms,
+    }
+}
+
+fn stamp_ms(p: &Path) -> Option<u64> {
+    let t = std::fs::metadata(p).ok()?.modified().ok()?;
+    Some(t.duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64)
+}
+
+fn stamp(p: &Path) {
+    // a rewrite moves the mtime (the content says what it is)
+    let _ = std::fs::write(p, b"bend_images::prune stamp\x0a");
+}
+
+/// What one tick did (the log's words).
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Care {
+    pub touched: Option<usize>,
+    /// The prune started on a thread, with this many days.
+    pub pruning: Option<u64>,
+}
+
+/// The tick's care: `texts` are the hub's live texts (hot messages, open
+/// cards); `store` the image store, `prefs` the user's `prefs.json`.
+/// Answers what it started; the prune's count goes to `done` on its
+/// thread.
+pub fn tick<'a>(
+    paths: &Paths,
+    store: &Path,
+    prefs: &Path,
+    texts: impl Iterator<Item = &'a str>,
+    now_ms: u64,
+    done: impl FnOnce(std::io::Result<usize>) + Send + 'static,
+) -> Care {
+    let touch_due = due(stamp_ms(&paths.images_touched()), now_ms, TOUCH_EVERY_MS);
+    let prune_due = due(stamp_ms(&paths.images_pruned()), now_ms, DAY_MS);
+    let mut care = Care::default();
+    if !touch_due && !prune_due {
+        return care;
+    }
+    let named: BTreeSet<String> = texts.flat_map(prune::named).collect();
+    if touch_due {
+        prune::touch(store, &named);
+        stamp(&paths.images_touched());
+        care.touched = Some(named.len());
+    }
+    if prune_due {
+        let p = std::fs::read_to_string(prefs).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+        let days = bise_home::prefs::keep_days(p.as_ref());
+        // stamped first: a crash mid-prune never makes it run at each tick
+        stamp(&paths.images_pruned());
+        let store = store.to_path_buf();
+        std::thread::spawn(move || done(prune::prune(&store, now_ms, days, &named)));
+        care.pruning = Some(days);
+    }
+    care
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn due_once_per_period() {
+        assert!(due(None, 10, DAY_MS), "never done: now");
+        assert!(!due(Some(10), 10 + DAY_MS - 1, DAY_MS));
+        assert!(due(Some(10), 10 + DAY_MS, DAY_MS));
+        assert!(due(Some(500), 10, DAY_MS), "a stamp in the future: the clock moved back");
+    }
+
+    #[test]
+    fn a_tick_touches_hourly_and_prunes_daily() {
+        let root = std::env::temp_dir().join(format!("sb-image-care-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let paths = Paths { workspace: root.join("ws"), state: root.join("hub"), worktrees: root.join("wt") };
+        let store = root.join("images");
+        std::fs::create_dir_all(&paths.state).expect("state");
+        std::fs::create_dir_all(&store).expect("store");
+        let prefs = root.join("prefs.json");
+        std::fs::write(&prefs, r#"{"shots_keep_days": 30}"#).expect("prefs");
+        let h = "0123456789abcdef0123456789abcdef";
+        std::fs::write(store.join(format!("{h}.png")), "x").expect("img");
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_millis() as u64;
+        let text = format!("<image name=\"[Image #1]\" path=\"a.png\" mime=\"image/png\" b64=\"{}/{h}.b64\">", store.display());
+        let (tx, rx) = std::sync::mpsc::channel();
+        let care = tick(&paths, &store, &prefs, [text.as_str()].into_iter(), now, move |r| {
+            let _ = tx.send(r.ok());
+        });
+        assert_eq!(care, Care { touched: Some(1), pruning: Some(30) });
+        assert_eq!(rx.recv().expect("done"), Some(0));
+        // the next tick: both stamps are fresh, nothing to do
+        let again = tick(&paths, &store, &prefs, [text.as_str()].into_iter(), now + 1000, |_| {});
+        assert_eq!(again, Care::default());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}

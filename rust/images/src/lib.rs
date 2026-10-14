@@ -11,9 +11,15 @@
 //! provider request (core/api.bend + runtime/provider.bend). The `b64`
 //! file lives in the image store: `$BEND_IMAGE_DIR`, else bise's
 //! `images/` (`bise_home`). Nothing here panics on any input.
+//!
+//! The store's retention is [`prune`]'s: an image goes after the user's
+//! `shots_keep_days` unless a live text names it; storing an image that
+//! is already there refreshes its age.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+pub mod prune;
 
 // the tests run on a temp HOME, never the user's (bise_home::test_home)
 bise_home::test_home!();
@@ -300,10 +306,16 @@ pub fn store_bytes(bytes: Vec<u8>) -> Result<Stored, String> {
     if !attr_safe(&b64.to_string_lossy()) {
         return Err(format!("image store path not usable: {}", dir.display()));
     }
-    if !file.exists() {
+    // an image already there is a fresh use: its age starts again (prune.rs)
+    let now = std::time::SystemTime::now();
+    if file.exists() {
+        prune::touch_file(&file, now);
+    } else {
         std::fs::write(&file, &bytes).map_err(|e| format!("image store: {e}"))?;
     }
-    if !b64.exists() {
+    if b64.exists() {
+        prune::touch_file(&b64, now);
+    } else {
         // write then rename: a reader never sees half a file
         let tmp = dir.join(format!("{h}.b64.tmp"));
         std::fs::write(&tmp, base64_encode(&bytes)).map_err(|e| format!("image store: {e}"))?;
