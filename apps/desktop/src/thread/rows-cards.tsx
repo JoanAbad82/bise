@@ -13,7 +13,7 @@ import { useAnsweredFrom, useEntry, useProjects, useStore, useThreadOrder } from
 import { Markdown } from './Markdown';
 import { clock, lastOfRun, reportStatus } from './entry';
 import { shownName } from '@/agents/model';
-import { partImageWords, YouBubble } from './rows-messages';
+import { PartChips, partImageWords, YouBubble } from './rows-messages';
 import { NewsLine, ReportRow } from './rows-news';
 import type { RowCtx } from './rows';
 import { drawnParts, pageAnswer, pageOf, youView } from './parts';
@@ -310,6 +310,7 @@ export function ToAgentRow({ e, ctx, chained = false }: { e: Entry; ctx: RowCtx;
       from={shownName(ctx.agent)}
       to={shownName(to)}
       text={e.text}
+      parts={e.parts}
       ctx={ctx}
       testId={`thread.to.${String(e.pos)}`}
       chip={!chained || e.asks === true}
@@ -336,7 +337,13 @@ const NOTE_CHARS = 160;
  * the chip or on '… ▸' opens it whole (markdown), again folds it. `chip` false: the message before
  * went the same way and its chip says it for both (designer m_19784 (2)); the words still open it.
  */
-export function AgentNote({ pos, from, to, text, ctx, testId, tag, chip = true }: { pos: number; from: string; to: string; text: string; ctx: RowCtx; testId: string; tag?: ReactNode; chip?: boolean }) {
+export function AgentNote({ pos, from, to, text: said, parts, ctx, testId, tag, chip = true }: { pos: number; from: string; to: string; text: string; parts?: Entry['parts']; ctx: RowCtx; testId: string; tag?: ReactNode; chip?: boolean }) {
+  // send-parts: an agent's attachments (`sb send --attach`) are his message's chips under its
+  // words, never their markers; a message without any: its text as ever
+  const drawn = drawnParts(parts);
+  const view = drawn !== null ? youView(drawn) : null;
+  const attached = view !== null && (view.images.length > 0 || view.files.length > 0);
+  const text = attached ? view.words : said;
   // ctrl+o / ⌘E open and close it with every fold; a click opens it in place (desktop-notices (c))
   const [open, setOpen] = useFold(false, pos);
   const lines = text.split('\n').filter((l) => l.trim() !== '');
@@ -384,6 +391,7 @@ export function AgentNote({ pos, from, to, text, ctx, testId, tag, chip = true }
             ))}
           </div>
         ))}
+      {attached && <PartChips view={view} ctx={ctx} pos={pos} />}
     </div>
   );
 }

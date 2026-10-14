@@ -14,6 +14,8 @@
 //! - `agents_md`: the AGENTS.md files an agent's prompt carries (BISE-232);
 //! - `parts_in`: his message's typed parts as a client sends them, checked
 //!   and rendered to the model's text (msg-parts);
+//! - `attach`: an agent's `sb send/spawn --attach` as its message's parts
+//!   (send-parts), the pure half of `daemon/attach.rs`;
 //! - `daemon`: the imperative shell (sockets, journal, feeds), with
 //!   `daemon/repl` (REPL processes) and `daemon/versions` (`/version`);
 //! - `transcript`: reading a thread (positions, cursors, origin);
@@ -28,6 +30,7 @@ pub mod approvals;
 pub mod artifacts;
 pub mod artifacts_assets;
 pub mod artifacts_turns;
+pub mod attach;
 pub mod attached;
 pub mod board;
 pub mod boot;

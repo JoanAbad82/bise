@@ -235,7 +235,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
  * glyph slot, and 'image 1' or its file name in ink). The artifact chip's look: 1 px line, r 9,
  * 6 px apart; never the accent (pink is for what waits on him). Never a tag.
  */
-function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos: number }) {
+export function PartChips({ view, ctx, pos }: { view: YouView; ctx: RowCtx; pos: number }) {
   const [shown, setShown] = useState<number | null>(null);
   const paste = view.pastes.find((p) => p.n === shown);
   if (view.pastes.length === 0 && view.images.length === 0 && view.files.length === 0) return null;

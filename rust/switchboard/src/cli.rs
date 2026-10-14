@@ -44,9 +44,9 @@ pub const COMMANDS: &[CmdDoc] = &[
     ),
     cmd("sb tasks", Who::Everyone, "every task in detail: what it is doing now, its last report, its open questions."),
     cmd(
-        "sb send <agent> \"<text>\" [--expect-reply] [--reply-to <id>] [--mode steer|queued]",
+        "sb send <agent> \"<text>\" [--expect-reply] [--reply-to <id>] [--mode steer|queued] [--attach <path|m_<n>>]...",
         Who::Everyone,
-        "send a message (never blocks). `--mode steer` (default): a busy recipient gets it at once, mid-turn. `--mode queued`: it waits until the recipient's turn ends, then starts its next turn.",
+        "send a message (never blocks). `--mode steer` (default): a busy recipient gets it at once, mid-turn. `--mode queued`: it waits until the recipient's turn ends, then starts its next turn. `--attach` (10 at most): an image its model sees, a file it reads by its path (one in your $TMPDIR is copied to its own), or `m_<n>`: the images and files of a message you got.",
     ),
     cmd(
         "sb ask <agent> \"<question>\" [--timeout <s>]",
@@ -120,7 +120,7 @@ pub const COMMANDS: &[CmdDoc] = &[
         "the user message that led to your creation, verbatim, and main's turn up to the spawn.",
     ),
     cmd(
-        "sb spawn <name> --objective \"…\" [--context \"…\"] [--constraint \"…\"]... [--done-when \"…\"] [--report-format \"…\"] [--place new|<agent>|<branch> [--with-changes]] [--feature <name>] [--model <provider/id>] [--effort low|medium|high] [--profile <name>]",
+        "sb spawn <name> --objective \"…\" [--context \"…\"] [--constraint \"…\"]... [--done-when \"…\"] [--report-format \"…\"] [--place new|<agent>|<branch> [--with-changes]] [--feature <name>] [--model <provider/id>] [--effort low|medium|high] [--profile <name>] [--attach <path|m_<n>>]...",
         Who::Main,
         "create a task (names: [a-z0-9-], at most 24 chars). Where it works: the shared folder by default; `--place new` a new git worktree (`--worktree` says the same); `--place <agent>` or `<branch>` the worktree of agents already on that change (they share it and its branch); `--feature <name>` its own worktree from that feature's tip, landing on the feature. Its model, for its whole life: `--model` the model the task runs on (default: the agents model, `bise config set agents`); `--effort` its reasoning effort (default: the model's); `--profile` a named model + effort from config.toml [profiles.<name>], e.g. fast, deep, review. A model that cannot run (unknown, no key) never fails the spawn: the task runs on the agents default and the answer says what was asked and why.",
     ),
@@ -317,6 +317,32 @@ fn list_of(v: Option<&Value>) -> Vec<String> {
     }
 }
 
+/// send-parts: `--attach <path|m_n>` (repeatable) as the request's
+/// `attach` list. sb runs in the sender's sandbox, so it opens every file
+/// here: one it can't read is refused with its path (architect m_23962:
+/// the hub never reads a path for an agent with its own authority, but
+/// an image it stores). A path is made absolute against the cwd; `m_<n>`
+/// (the parts of a message it got) goes as is, the hub checks it.
+fn attach_into(req: &mut Map<String, Value>, o: &Map<String, Value>) -> Result<(), String> {
+    let mut out = Vec::new();
+    for a in list_of(o.get("attach")) {
+        if crate::core::parse_msg_id(&a).is_some() {
+            out.push(a);
+            continue;
+        }
+        let p = std::env::current_dir().map(|d| d.join(&a)).unwrap_or_else(|_| a.clone().into());
+        match std::fs::File::open(&p).and_then(|f| f.metadata()) {
+            Ok(m) if m.is_file() => out.push(p.to_string_lossy().into_owned()),
+            Ok(_) => return Err(format!("--attach {a}: not a file")),
+            Err(e) => return Err(format!("--attach {a}: cannot read it ({e})")),
+        }
+    }
+    if !out.is_empty() {
+        req.insert("attach".into(), json!(out));
+    }
+    Ok(())
+}
+
 /// The first positional word, an agent name (`@name` accepted).
 fn agent_arg(pos: &[String], usage: impl Into<String>) -> Result<String, String> {
     pos.first()
@@ -491,7 +517,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
             req.insert("context".into(), json!(n));
         }
         "send" => {
-            let (pos, o) = parse_args(rest, &["reply-to", "mode", "why", "model", "effort"], &["expect-reply"])?;
+            let (pos, o) = parse_args(rest, &["reply-to", "mode", "why", "model", "effort", "attach"], &["expect-reply"])?;
             let to = agent_arg(&pos, "usage: sb send <agent> \"<text>\"")?;
             // desktop S2: `@bise` (bise's question in a project hub) is
             // a sender of its own, not the agent `bise`
@@ -509,6 +535,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
                 }
             }
             req.insert("text".into(), json!(text_of(&pos[1..])?));
+            attach_into(&mut req, &o)?;
             req.insert("expect_reply".into(), json!(o.contains_key("expect-reply")));
             if o.contains_key("mode") {
                 match str_of(&o, "mode").as_str() {
@@ -631,9 +658,11 @@ pub fn build(args: &[String]) -> Result<Value, String> {
                     "model",
                     "effort",
                     "profile",
+                    "attach",
                 ],
                 &["worktree", "with-changes"],
             )?;
+            attach_into(&mut req, &o)?;
             // issue #4: the task's model, all optional (none: the agents default)
             for k in ["model", "effort", "profile"] {
                 req.insert(k.into(), json!(str_of(&o, k)));

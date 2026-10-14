@@ -126,7 +126,7 @@ impl Hub {
         if self.flow == Some(crate::flow::FlowMode::Pr) {
             return Err("this repo ships through pull requests: a feature is a PR's branch here (`--place new`)".into());
         }
-        let base = new_task(name, brief, true, false)?.base;
+        let base = new_task(name, brief, "", true, false)?.base;
         let free = unique_name(&self.st, &base);
         env.worktree_feature(&free, feature)
     }

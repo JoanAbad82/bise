@@ -21,6 +21,7 @@
 mod accept;
 mod answers;
 mod art;
+mod attach;
 mod boot;
 mod capsule;
 mod choose;
@@ -690,6 +691,7 @@ impl Shell {
                 queued: true,
                 why: String::new(),
                 switch: None,
+                parts: String::new(),
             },
         });
         self.state_now();
@@ -1741,7 +1743,8 @@ impl Shell {
             "project_list" => {
                 write_json(&mut stream, &xhub::list_body());
             }
-            _ => match AgentReq::from_json(&v) {
+            // send-parts: `--attach` made parts (daemon/attach.rs)
+            _ => match AgentReq::from_json(&v).and_then(|req| self.attached(&from, &v, req)) {
                 Ok(req) => {
                     // `sb card --page`'s link, checked before the card opens
                     // (daemon/page_cards.rs)

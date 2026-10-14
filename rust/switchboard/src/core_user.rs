@@ -70,7 +70,7 @@ impl Hub {
                     objective: brief,
                     ..Brief::default()
                 };
-                match new_task(name.as_deref(), &b, worktree, with_changes) {
+                match new_task(name.as_deref(), &b, "", worktree, with_changes) {
                     Ok(new) => self.core(fx, env, c, In::New(new)),
                     Err(e) => fx.push(notice(client, &e)),
                 }

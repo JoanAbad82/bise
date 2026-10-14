@@ -106,6 +106,10 @@ pub enum AgentReq {
         /// `--model`/`--effort` with the text (issue #4): the task moves
         /// to that model from its next turn, then the message goes.
         switch: Option<(String, String)>,
+        /// send-parts: the message's parts as the hub checked them from
+        /// `--attach` (msg-parts JSON, "" none; `text` is their render).
+        /// Set by the daemon only (daemon/attach.rs), never by the CLI.
+        parts: String,
     },
     Wait {
         msg: u64,
@@ -163,6 +167,9 @@ pub enum AgentReq {
         /// `--model`, `--effort`, `--profile` (issue #4): all "" = the
         /// agents default, as before.
         ask: bise_catalog::spawn::Ask,
+        /// send-parts: the brief's parts from `--attach` (msg-parts JSON,
+        /// "" none; the context's text is their render), the daemon's
+        parts: String,
     },
     /// `sb send <task> --model <id> [--effort <e>]` without a text
     /// (issue #4): the task's model from its next turn.
@@ -316,6 +323,8 @@ impl AgentReq {
                 why: jstr(v, "why"),
                 switch: (v.get("model").is_some() || v.get("effort").is_some())
                     .then(|| (jstr(v, "model"), jstr(v, "effort"))),
+                // never the CLI's: the daemon fills it from `attach`
+                parts: String::new(),
             },
             "wait" => AgentReq::Wait {
                 msg: parse_msg_id(&jstr(v, "msg")).ok_or("invalid message id")?,
@@ -391,6 +400,7 @@ impl AgentReq {
                     effort: jstr(v, "effort"),
                     profile: jstr(v, "profile"),
                 },
+                parts: String::new(),
             },
             "switch" => AgentReq::Switch {
                 to: jstr(v, "to"),
@@ -2406,6 +2416,7 @@ impl Hub {
                 queued,
                 why,
                 switch,
+                parts,
             } => {
                 // issue #4: the model first, so the message's turn runs on it
                 if let Some((model, effort)) = switch {
@@ -2417,8 +2428,14 @@ impl Hub {
                         }
                     }
                 }
-                json!({"cmd": "send", "to": to, "text": text, "expect_reply": expect_reply,
-                        "reply_to": reply_to, "queued": queued, "why": why})
+                let mut q = json!({"cmd": "send", "to": to, "text": text, "expect_reply": expect_reply,
+                        "reply_to": reply_to, "queued": queued, "why": why});
+                // send-parts: only when it has some (an older core reads
+                // the same line as before)
+                if !parts.is_empty() {
+                    q["parts"] = json!(parts);
+                }
+                q
             }
             AgentReq::Switch { to, model, effort } => {
                 match self.switch_target(from, &to) {
@@ -2497,6 +2514,7 @@ impl Hub {
                 place,
                 feature,
                 ask,
+                parts,
             } => {
                 // issue #4: the answer waits for the daemon's pick of the model
                 if !ask.is_empty() {
@@ -2509,9 +2527,12 @@ impl Hub {
                     ("" | "new" | crate::place::SHARED, _) => Ok(None),
                     (p, _) => crate::place::find_worktree(&self.st, p).map(Some),
                 };
-                match join.and_then(|j| new_task(name, &brief, worktree || place == "new", with_changes).map(|v| (j, json!(v)))) {
+                match join.and_then(|j| new_task(name, &brief, &parts, worktree || place == "new", with_changes).map(|v| (j, json!(v)))) {
                     Ok((join, mut v)) => {
                         v["cmd"] = json!("spawn");
+                        if !parts.is_empty() {
+                            v["brief_parts"] = json!(parts);
+                        }
                         if let Some(ws) = join {
                             v["join"] = json!(ws);
                             v["worktree"] = json!(false);
@@ -2691,7 +2712,9 @@ pub(crate) fn not_in_a_repo(cmd: &str) -> String {
     format!("sb {}: not in a repo (this workspace has no git): files stay as you saved them, nothing to land", cmd)
 }
 
-fn new_task(name: Option<&str>, brief: &Brief, worktree: bool, with_changes: bool) -> Result<ci::New, String> {
+/// `parts`: the brief's parts (send-parts, `sb spawn --attach`; "" none):
+/// its text is then their render, the body and the markers after it.
+fn new_task(name: Option<&str>, brief: &Brief, parts: &str, worktree: bool, with_changes: bool) -> Result<ci::New, String> {
     if brief.objective.trim().is_empty() {
         return Err("empty objective".into());
     }
@@ -2707,7 +2730,10 @@ fn new_task(name: Option<&str>, brief: &Brief, worktree: bool, with_changes: boo
     Ok(ci::New {
         base,
         brief: json!(brief),
-        brief_text: prompts::brief_body(brief),
+        brief_text: match serde_json::from_str::<Vec<bise_proto::parts::Part>>(parts) {
+            Ok(p) if !p.is_empty() => bise_proto::parts::render(&p),
+            _ => prompts::brief_body(brief),
+        },
         objective: brief.objective.clone(),
         worktree,
         with_changes,

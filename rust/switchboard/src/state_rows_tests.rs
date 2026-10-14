@@ -33,6 +33,7 @@ fn a_real_hub() -> (T, u64) {
             place: String::new(),
             feature: String::new(),
             ask: Default::default(),
+            parts: String::new(),
         },
     );
     assert!(fx.iter().any(|e| matches!(e, Effect::Spawn { agent, .. } if agent == "dark")), "{fx:?}");

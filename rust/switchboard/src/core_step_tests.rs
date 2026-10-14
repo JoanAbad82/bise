@@ -62,7 +62,7 @@ fn an_answer_by_number_names_its_option_in_both_feeds() {
     t.spawn_task("docs");
     let (_, _) = t.req(
         "docs",
-        AgentReq::Send { to: MAIN.into(), text: "where?".into(), expect_reply: true, reply_to: None, queued: false, why: String::new(), switch: None },
+        AgentReq::Send { to: MAIN.into(), text: "where?".into(), expect_reply: true, reply_to: None, queued: false, why: String::new(), switch: None, parts: String::new() },
     );
     let id = t.hub.st.msgs().values().find(|m| m.text == "where?").unwrap().id;
     t.req(MAIN, AgentReq::Card { text: "where does the balance show?\n1. at every step\n2. only at checkout".into(), for_msg: Some(id) });
@@ -154,3 +154,7 @@ fn a_watch_is_a_pause_or_an_alarm_on_the_agents_row() {
 /// ask-wait's tests, out of core_tests.rs too.
 #[path = "core_ask_tests.rs"]
 mod core_ask_tests;
+
+/// send-parts' tests, out of core_tests.rs too.
+#[path = "core_attach_tests.rs"]
+mod core_attach_tests;

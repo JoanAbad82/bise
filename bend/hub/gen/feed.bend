@@ -22,6 +22,12 @@ def route_parts(+parts: J.Json) -> J.Json:
 def routed(+to: String, +name: String, +xid: Nat, +msg: Nat) -> J.Json:
   J.obj([J.kv("sb", J.JStr{"routed"}), J.kv("to", J.JStr{to}), J.kv("name", J.JStr{name}), J.kv("xid", J.JNum{xid}), J.kv("msg", J.JNum{msg})])
 
+def msg_parts(+id: Nat, +parts: J.Json) -> J.Json:
+  J.obj([J.kv("sb", J.JStr{"msg-parts"}), J.kv("id", J.JNum{id}), J.kv("parts", parts)])
+
+def sent_parts(+id: Nat, +parts: J.Json) -> J.Json:
+  J.obj([J.kv("sb", J.JStr{"sent-parts"}), J.kv("id", J.JNum{id}), J.kv("parts", parts)])
+
 def steered(+ids: List<&2, Nat>) -> J.Json:
   J.obj([J.kv("sb", J.JStr{"steered"}), J.kv("ids", J.JArr{K.jnats(ids)})])
 

@@ -59,7 +59,7 @@ type DropR is Data:
 
 type NewTask is Data:
   NewTask{parent: String, base: String, brief: J.Json, brief_text: String,
-    objective: String, worktree: Bool, with_changes: Bool}
+    objective: String, worktree: Bool, with_changes: Bool, parts: String}
 
 type Hub is Data:
   Hub{d: M.St, r: X.R}
@@ -248,6 +248,15 @@ def parts_json(+s: String) -> J.Json:
 # none, so those lines are what they always were (law no_parts_no_line)
 def you_parts(-o: M.St, +cx: X.Cx<o>, +agent: String, +parts: String) -> X.Cx<o>:
   pick_lazy(X.Cx<o>, String.is_empty(parts), u => cx, u => feed(o, cx, agent, FD.you_parts(parts_json(parts))))
+
+# an agent's message parts (send-parts: `sb send --attach`) in `agent`'s
+# feed, after its msg-in (`sent`: after its sent line), by its id; none
+# when it has none (law agent_no_parts_no_line)
+def msg_parts(-o: M.St, +cx: X.Cx<o>, +agent: String, +m: M.Msg) -> X.Cx<o>:
+  pick_lazy(X.Cx<o>, String.is_empty(M.Msg.parts(m)), u => cx, u => feed(o, cx, agent, FD.msg_parts(M.Msg.id(m), parts_json(M.Msg.parts(m)))))
+
+def sent_parts(-o: M.St, +cx: X.Cx<o>, +agent: String, +m: M.Msg) -> X.Cx<o>:
+  pick_lazy(X.Cx<o>, String.is_empty(M.Msg.parts(m)), u => cx, u => feed(o, cx, agent, FD.sent_parts(M.Msg.id(m), parts_json(M.Msg.parts(m)))))
 
 # a route's parts after it, likewise
 def route_parts(-o: M.St, +cx: X.Cx<o>, +parts: String) -> X.Cx<o>:
@@ -459,7 +468,7 @@ def waiter_reply(-o: M.St, +cx: X.Cx<o>, +w: X.Waiter, +m: M.Msg, +kind: String)
     J.kv("expects_reply", J.JBool{M.Msg.expect(m)}), J.kv("auto", J.JBool{M.Msg.auto(m)}),
     J.kv("asked", J.JStr{mid(X.Waiter.msg(w))}),
     J.kv("message", J.JStr{M.Msg.text(m)})]))
-  +cx4 = feed(o, cx3, X.Waiter.agent(w), FD.msg_in(M.Msg.from(m), Some{M.Msg.id(m)}, M.Msg.text(m)))
+  +cx4 = msg_parts(o, feed(o, cx3, X.Waiter.agent(w), FD.msg_in(M.Msg.from(m), Some{M.Msg.id(m)}, M.Msg.text(m))), X.Waiter.agent(w), m)
   +still = X.any_waiter(X.R.waiters(rr(o, cx4)), X.Waiter.agent(w))
   +x = X.Rt.with_waiting(rt(o, cx4, X.Waiter.agent(w)), still)
   dirty(o, upd_rt(o, cx4, x))
@@ -534,7 +543,7 @@ def deliver.line(-o: M.St, again: Bool, you: Bool, +cx: X.Cx<o>, +name: String, 
       +cx2 = feed(o, feed(o, cx, name, FD.you(M.Msg.text(m), M.Msg.via(m))), name, FD.you_id(M.Msg.id(m)))
       you_parts(o, cx2, name, M.Msg.parts(m))
     case False{} False{}:
-      feed(o, cx, name, FD.msg_in(M.Msg.from(m), Some{M.Msg.id(m)}, M.Msg.text(m)))
+      msg_parts(o, feed(o, cx, name, FD.msg_in(M.Msg.from(m), Some{M.Msg.id(m)}, M.Msg.text(m))), name, m)
 
 def deliver_each(-o: M.St, batch: List<&2, M.Msg>, +cx: X.Cx<o>, +name: String, +acc: List<&2, K.Delivered>) -> X.Cx<o> & List<&2, K.Delivered>:
   match batch:
@@ -746,22 +755,27 @@ def create.sent(-o: M.St, p: X.Cx<o> & SendR, +name: String) -> X.Cx<o> & TaskR:
 
 def NewTask.parent(x: NewTask) -> String:
   match x:
-    case NewTask{+parent, _, _, _, _, _, _}:
+    case NewTask{+parent, _, _, _, _, _, _, _}:
       parent
 
 def NewTask.objective(x: NewTask) -> String:
   match x:
-    case NewTask{_, _, _, _, +objective, _, _}:
+    case NewTask{_, _, _, _, +objective, _, _, _}:
       objective
 
 def NewTask.brief(x: NewTask) -> J.Json:
   match x:
-    case NewTask{_, _, +brief, _, _, _, _}:
+    case NewTask{_, _, +brief, _, _, _, _, _}:
       brief
+
+def NewTask.parts(x: NewTask) -> String:
+  match x:
+    case NewTask{_, _, _, _, _, _, _, +parts}:
+      parts
 
 def NewTask.brief_text(x: NewTask) -> String:
   match x:
-    case NewTask{_, _, _, +brief_text, _, _, _}:
+    case NewTask{_, _, _, +brief_text, _, _, _, _}:
       brief_text
 
 def branch_label(b: J.Json) -> String:
@@ -810,6 +824,24 @@ def Snd.parts(x: Snd) -> String:
   match x:
     case Snd{_, _, _, _, _, _, _, _, _, +parts}:
       parts
+
+def Snd.with_parts(x: Snd, +v: String) -> Snd:
+  match x:
+    case Snd{+from, +to, +text, +expect, +reply_to, +plain, +auto, +queued, +via, _}:
+      Snd{from, to, text, expect, reply_to, plain, auto, queued, via, v}
+
+# a brief's parts (send-parts: msg-parts JSON, "" none) with the task's
+# head in front as a text part, so they render to the brief's whole text;
+# none, or JSON that is no list: none
+def brief_parts.of(+head: String, r: Result<&2, &2, String, J.Json>) -> String:
+  match r:
+    case Done{J.JArr{+xs}}:
+      J.stringify(J.JArr{J.obj([J.kv("kind", J.JStr{"text"}), J.kv("text", J.JStr{head})]) <> xs})
+    case _:
+      ""
+
+def brief_parts(+head: String, +parts: String) -> String:
+  pick_lazy(String, String.is_empty(parts), u => "", u => brief_parts.of(head, J.parse(parts)))
 
 def Snd.with_to(x: Snd, +v: String) -> Snd:
   match x:
@@ -906,7 +938,7 @@ def feed_main(-o: M.St, +cx: X.Cx<o>, +m: M.Msg, +why: String) -> X.Cx<o>:
   pick_lazy(X.Cx<o>, answered,
     u => feed(o, cx, M.MAIN(), FD.answered(to, question_text(q), M.Msg.text(m), why)),
     u => pick_lazy(X.Cx<o>, agents,
-      v => feed(o, cx, M.MAIN(), FD.msg(from, to, Some{M.Msg.id(m)}, M.Msg.text(m))),
+      v => msg_parts(o, feed(o, cx, M.MAIN(), FD.msg(from, to, Some{M.Msg.id(m)}, M.Msg.text(m))), M.MAIN(), m),
       v => cx))
 
 # What a task sent is a fact of its own thread (desktop bar A.3, S16;
@@ -924,7 +956,7 @@ def feed_sender(-o: M.St, +cx: X.Cx<o>, +m: M.Msg) -> X.Cx<o>:
   +from = M.Msg.from(m)
   +to = M.Msg.to(m)
   pick_lazy(X.Cx<o>, is_task_send(o, cx, from, to),
-    u => feed(o, cx, from, FD.sent(to, M.Msg.id(m), M.Msg.expect(m), M.Msg.text(m))),
+    u => sent_parts(o, feed(o, cx, from, FD.sent(to, M.Msg.id(m), M.Msg.expect(m), M.Msg.text(m))), from, m),
     u => cx)
 
 def send.fed(-o: M.St, p: X.Cx<o> & SendR, +why: String) -> X.Cx<o> & SendR:
@@ -965,7 +997,11 @@ def create.go.new(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Jso
   +cx3 = feed(o, cx2, M.MAIN(), FD.spawn(cat([who, " → new agent @", name, label, " : ", obj])))
   +cx4 = pick_lazy(X.Cx<o>, String.eq(parent, M.USER()), u => note_main(o, cx3, cat(["the user created the agent @", name, label, ": ", obj])), u => cx3)
   +cx5 = spawn(o, cx4, name, False{})
-  create.sent(o, send(o, cx5, msg(parent, name, cat(["# Task `", name, "`\n\n", NewTask.brief_text(t)]), String.eq(parent, M.MAIN()), None{}, String.eq(parent, M.USER()), False{})), name)
+  +head = cat(["# Task `", name, "`\n\n"])
+  +m = msg(parent, name, String.append(head, NewTask.brief_text(t)), String.eq(parent, M.MAIN()), None{}, String.eq(parent, M.USER()), False{})
+  # send-parts: the brief's parts (`sb spawn --attach`), the head in front
+  # (law brief_keeps_parts)
+  create.sent(o, send(o, cx5, Snd.with_parts(m, brief_parts(head, NewTask.parts(t)))), name)
 
 def create.go.free(-o: M.St, taken: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_taken(X.d(o, cx), name) == taken : Bool}) -> X.Cx<o> & TaskR:
   match taken:
@@ -1005,7 +1041,7 @@ def create.ws(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +t: NewTask, +name: Stri
 
 def NewTask.with_changes(x: NewTask) -> Bool:
   match x:
-    case NewTask{_, _, _, _, _, _, +with_changes}:
+    case NewTask{_, _, _, _, _, _, +with_changes, _}:
       with_changes
 
 def create.git(-o: M.St, git: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String) -> X.Cx<o> & TaskR:
@@ -1029,12 +1065,12 @@ def create.wt(-o: M.St, wt: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String) -> X
 
 def NewTask.worktree(x: NewTask) -> Bool:
   match x:
-    case NewTask{_, _, _, _, _, +worktree, _}:
+    case NewTask{_, _, _, _, _, +worktree, _, _}:
       worktree
 
 def NewTask.base(x: NewTask) -> String:
   match x:
-    case NewTask{_, +base, _, _, _, _, _}:
+    case NewTask{_, +base, _, _, _, _, _, _}:
       base
 
 def strip_dash.go(s: String) -> String:
@@ -2701,13 +2737,19 @@ def open_question.go(m: Maybe<&2, String>, +s: M.St, +me: String) -> Maybe<&2, N
 def open_question(+s: M.St, +asker: String, +me: String) -> Maybe<&2, Nat>:
   open_question.go(M.resolve(s, asker), s, me)
 
+# an agent's `sb send` as the message it makes
+def req_send.snd(+from: String, +to: String, +expect: Bool, +reply_to: Maybe<&2, Nat>, +q: J.Json) -> Snd:
+  Snd{from, to, C.get_s(q, "text"), expect, reply_to, False{}, False{}, C.get_b(q, "queued"), None{}, C.get_s(q, "parts")}
+
 def req_send.go(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
   +to = C.get_s(q, "to")
   +expect = C.get_b(q, "expect_reply")
   # a plain message to an agent that asked us something answers it
   +reply_to = Maybe.or(&2, Nat, C.opt_nat(J.get(q, "reply_to")),
     Bool.pick(Maybe<&2, Nat>, expect, None{}, open_question(st(o, cx), to, from)))
-  req_send.res(o, send_why(o, cx, Snd{from, to, C.get_s(q, "text"), expect, reply_to, False{}, False{}, C.get_b(q, "queued"), None{}, ""}, C.get_s(q, "why")), token)
+  # send-parts: its parts as the hub checked them (`sb send --attach`;
+  # "" none), the text already theirs (law agent_send_keeps_parts)
+  req_send.res(o, send_why(o, cx, req_send.snd(from, to, expect, reply_to, q), C.get_s(q, "why")), token)
 
 
 # BISE-299: a question main escalated (`sb card --for`) is in the user's
@@ -2983,7 +3025,7 @@ def req_spawn.res(-o: M.St, p: X.Cx<o> & TaskR, +token: Nat) -> X.Cx<o>:
 
 def new_task(+parent: String, +q: J.Json) -> NewTask:
   NewTask{parent, C.get_s(q, "base"), Maybe.default(&2, J.Json, J.get(q, "brief"), J.JNull{}), C.get_s(q, "brief_text"),
-    C.get_s(q, "objective"), C.get_b(q, "worktree"), C.get_b(q, "with_changes")}
+    C.get_s(q, "objective"), C.get_b(q, "worktree"), C.get_b(q, "with_changes"), C.get_s(q, "brief_parts")}
 
 def req_spawn.pre(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
   match pre:
@@ -3668,7 +3710,7 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
         u => user_says(o, cx, M.MAIN(), text, queued, parts),
         u => route(o, cx, target, text, focus, queued, parts))
     case GI.INew{+base, +brief, +brief_text, +objective, +worktree, +with_changes}:
-      user_new.res(o, create_task(o, cx, NewTask{M.USER(), base, brief, brief_text, objective, worktree, with_changes}))
+      user_new.res(o, create_task(o, cx, NewTask{M.USER(), base, brief, brief_text, objective, worktree, with_changes, ""}))
     case GI.IDrop{+name, +force}:
       user_drop.res(o, drop_task(o, cx, name, force), name)
     case GI.IConfirmDrop{+name}:

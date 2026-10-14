@@ -1767,6 +1767,11 @@
   font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);
   color: var(--c-text-3);
 }
+/* send-parts (designer m_24147): an agent's attachments, the ink chips of his bubble, 4 px under
+   its words; they fold with the note */
+.th-note .th-parts {
+  margin-top: var(--s-1);
+}
 .th-note-head {
   display: flex;
   align-items: baseline;

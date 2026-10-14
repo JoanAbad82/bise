@@ -64,6 +64,15 @@ fn bounded_push(v: &mut Vec<u64>, m: u64) {
 }
 
 impl Fold<'_> {
+    /// An agent's message parts (send-parts) on the newest `kind` entry
+    /// of message `id`; none, or JSON that doesn't read: nothing.
+    fn agent_parts(&mut self, kind: EntryKind, id: u64, raw: &str) {
+        let Ok(p) = serde_json::from_str::<Vec<Part>>(raw) else { return };
+        if let Some(e) = self.out.iter_mut().rev().find(|e| e.kind == kind && e.msg == Some(id)) {
+            e.parts = p;
+        }
+    }
+
     fn push(&mut self, mut e: Entry) -> usize {
         e.turn_start = std::mem::take(&mut self.starting);
         // H9 (architect m_19836): what ends a run of retries says how it
@@ -519,6 +528,12 @@ impl Fold<'_> {
                     self.out[i].parts = p;
                 }
             }
+            // an agent's message with parts (send-parts): on the entry of
+            // that message id, received or sent, the newest first (the
+            // order of lines is not guaranteed: architect m_23962); none
+            // or unreadable: dropped, the entry stays its text
+            Hub::MsgParts { id, raw } => self.agent_parts(EntryKind::FromAgent, id, &raw),
+            Hub::SentParts { id, raw } => self.agent_parts(EntryKind::ToAgent, id, &raw),
             // the agent read these steered messages here, mid-turn: each
             // entry they name (his by msg_id, an agent's by msg) gets this
             // line's pos once; it makes no entry of its own
@@ -926,3 +941,7 @@ mod page_tests;
 #[cfg(test)]
 #[path = "fold_pick_tests.rs"]
 mod pick_tests;
+
+#[cfg(test)]
+#[path = "fold_attach_tests.rs"]
+mod attach_tests;

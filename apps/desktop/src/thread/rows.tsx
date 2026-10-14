@@ -266,7 +266,7 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
         return <ReportRow pos={e.pos} line={(e.from ?? ctx.agent) !== ctx.agent ? `${from}: ${report}` : report} text={e.text} next={next} ctx={ctx} waits={report.startsWith('blocked')} />;
       }
       const to = shownName(e.to != null && e.to !== '' ? e.to : ctx.agent);
-      return <AgentNote pos={e.pos} from={from} to={to} text={dropAuthor(e.text, e.from ?? '')} ctx={ctx} testId={`thread.from.${String(e.pos)}`} chip={!chained} />;
+      return <AgentNote pos={e.pos} from={from} to={to} text={dropAuthor(e.text, e.from ?? '')} parts={e.parts} ctx={ctx} testId={`thread.from.${String(e.pos)}`} chip={!chained} />;
     }
     case 'unknown':
       // a kind from a newer hub: its words, plain and dim

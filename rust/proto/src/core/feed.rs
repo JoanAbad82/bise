@@ -38,6 +38,13 @@ core_kinds! {
         /// bise's home hub: his message `msg` went to the project `to`
         /// (hub id; `name` its name) as out `xid`, not to main
         Routed = "routed" => RRouted { to: Str, name: Str, xid: Nat, msg: Nat },
+        /// the parts of message `id` the feed's owner received (send-parts:
+        /// `sb send --attach`), after its msg-in; the fold puts them on
+        /// the entry of that id
+        MsgParts = "msg-parts" => RMsgParts { id: Nat, parts: Json },
+        /// the parts of message `id` the feed's owner sent, after its sent
+        /// line; likewise by id
+        SentParts = "sent-parts" => RSentParts { id: Nat, parts: Json },
         /// the agent read these steered messages here, mid-turn
         Steered = "steered" => RSteered { ids: Nats },
         /// the agent's runtime received these steered messages

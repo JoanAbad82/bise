@@ -68,7 +68,7 @@ fn no_old_line_has_the_new_form() {
 
 /// The kinds born in the new form (`sb <kind> :: <json>`): no old line
 /// ever had them, so they have no old sample.
-const BORN_NEW: &[&str] = &["routed"];
+const BORN_NEW: &[&str] = &["routed", "msg-parts", "sent-parts"];
 
 /// Each kind of `Feed` has an old sample (but those born new), and the
 /// corpus has no two equal lines.
