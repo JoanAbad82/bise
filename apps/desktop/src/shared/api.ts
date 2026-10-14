@@ -36,13 +36,16 @@ export interface BiseApi {
    * His try app's swap to the staged gated build, from inside (src/main/update/tryswap.ts,
    * ambient-lead m_22832). update(): this app's build and whether a gated build waits. swap():
    * saves the route (reopened like update.install's), the keeps and the window frame, quits, and
-   * the staged build opens; his hubs keep running. Resolves {ok:false, why} when refused (nothing
-   * staged, not the try bundle...). Test mode: update() answers TEST_APP_UPDATE_ENV's JSON and
-   * swap() prints `APP_SWAP_LINE <route>` instead of quitting.
+   * the staged build opens (~1 s after the answer: the row says 'restarting on …'); his hubs keep
+   * running. Resolves {ok:false, refused, why} when refused (nothing staged, a test home...). Test
+   * mode: update() answers TEST_APP_UPDATE_ENV's JSON, swap() prints `APP_SWAP_LINE <route>`
+   * instead of quitting and restartLog() answers TEST_RESTART_LOG_ENV's text.
    */
   readonly app: {
     readonly update: () => Promise<AppUpdate>;
-    readonly swap: (route?: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly why: string }>;
+    readonly swap: (route?: string) => Promise<AppSwapResult>;
+    /** The last swap's restart.log (settings › general's 'show the log'), or null: none, or not the try's bundle. */
+    readonly restartLog: () => Promise<CrashReport | null>;
   };
   /**
    * Opens a link in his browser or mail app: http, https and mailto only
@@ -374,6 +377,7 @@ export const IPC = {
   updateRevert: 'bise:update-revert',
   appUpdate: 'bise:app-update',
   appSwap: 'bise:app-swap',
+  appRestartLog: 'bise:app-restart-log',
   /** the renderer's keep on disk (amb-win, src/main/keep.ts): read (sync) at start, write each change */
   keepRead: 'bise:keep-read',
   keepWrite: 'bise:keep-write',
@@ -401,10 +405,31 @@ export interface AppUpdate {
   readonly live: string | null;
   readonly staged: string | null;
   readonly why: string | null;
+  /** 'none' only: which (AppNone); absent from an older script: treated as 'not_try' */
+  readonly none?: AppNone | null;
+  /** 'staged' only: the staged build the last swap from this app didn't reach (it reopened on live) */
+  readonly failed?: string | null;
 }
+
+/**
+ * Why there is no swap from this app, as a fact (designer's app-swap v2): 'test_home' a test app
+ * (another home than his: 'updates come from the try'); 'not_try' not his try's bundle (a dev run,
+ * a candidate: no row); 'old_checkout' its try checkout predates the swap script; 'unreadable'
+ * the script answered nothing readable (`why` its first line); 'not_gated' what is staged isn't a
+ * promoted whole build (nothing to install).
+ */
+export type AppNone = 'test_home' | 'not_try' | 'old_checkout' | 'unreadable' | 'not_gated';
+
+/** Why swap() refused: AppNone's, 'newest' (nothing staged), 'not_started' (the script didn't spawn). */
+export type AppRefusal = AppNone | 'newest' | 'not_started';
+
+/** window.bise.app.swap's answer: `why` the refusal in his words (one line, the same on every surface). */
+export type AppSwapResult = { readonly ok: true } | { readonly ok: false; readonly refused: AppRefusal; readonly why: string };
 
 /** Test mode: window.bise.app.update()'s answer, an AppUpdate as JSON (else 'none'). */
 export const TEST_APP_UPDATE_ENV = 'BISE_DESKTOP_TEST_APP_UPDATE';
+/** Test mode: window.bise.app.restartLog()'s text (none: null). */
+export const TEST_RESTART_LOG_ENV = 'BISE_DESKTOP_TEST_RESTART_LOG';
 /** Test mode: window.bise.app.swap's line instead of the quit, `APP_SWAP_LINE <route>`. */
 export const APP_SWAP_LINE = 'bise-desktop: app swap';
 

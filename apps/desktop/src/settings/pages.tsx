@@ -11,6 +11,7 @@ import { Roles } from './roles';
 import { Approvals } from './approvals';
 import { modelRow, needsSetup } from './hold';
 import { Projects } from './projects';
+import { UpdateGroup } from './update';
 import { Plugins } from './plugins';
 import { Computer } from './computer';
 import { checks, SetupCheck } from './check';
@@ -93,6 +94,7 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
       const theme = str(prefs, 'theme', 'system');
       const on = Math.max(0, themes.indexOf(theme === 'auto' ? 'system' : (theme as (typeof themes)[number])));
       return (
+        <>
         <Group
           testId="settings.general"
           items={[
@@ -114,6 +116,8 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
             ...notifyItems(data.notify ?? null, ports.notify),
           ]}
         />
+        <UpdateGroup update={data.appUpdate ?? null} ports={ports.update} />
+        </>
       );
     }
     case 'voice': {

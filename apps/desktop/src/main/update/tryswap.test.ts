@@ -1,7 +1,7 @@
 // The try app's swap from inside, its pure part (tryswap.ts, ambient-lead m_22832): where the
 // swap script is, on which home it may run and with what, its answer read, the refusals.
 import { describe, expect, it } from 'vitest';
-import { parseState, swapEnv, swapRefusal, tryBundle, versionCommit } from './tryswap';
+import { firstLine, parseState, refusalWords, swapEnv, swapRefusal, tryBundle, versionCommit } from './tryswap';
 
 const ME = '/Users/me';
 const TRY = '/Users/me/.bise/dev/try-src/apps/desktop/dist/mac-arm64/bise try.app';
@@ -42,13 +42,11 @@ describe('swapEnv', () => {
     const r = swapEnv({ HOME: h, BISE_HOME: `${h}/.bise`, BISE_DESKTOP_OFFSCREEN: '1', PATH: '/usr/bin' }, ME);
     expect(r).toEqual({ env: { HOME: h, PATH: '/usr/bin', BISE_DESKTOP_OFFSCREEN: '1' } });
   });
-  it('the try home, a stand-in outside the gate, a mixed one: no swap from here', () => {
-    expect(swapEnv({ HOME: ME, BISE_HOME: '/Users/me/.bise/try/desktop' }, ME)).toEqual({
-      why: "this app runs on /Users/me/.bise/try/desktop, not on your home: 'bise-ambient --try --replace' swaps the try",
-    });
-    expect('why' in swapEnv({ HOME: '/tmp/h' }, ME)).toBe(true);
-    expect('why' in swapEnv({ HOME: '/Users/me/.bise/gate' }, ME)).toBe(true);
-    expect('why' in swapEnv({ HOME: '/Users/me/.bise/gate/x/h', BISE_HOME: ME + '/.bise' }, ME)).toBe(true);
+  it('the try home, a stand-in outside the gate, a mixed one: a test app, no swap from here', () => {
+    expect(swapEnv({ HOME: ME, BISE_HOME: '/Users/me/.bise/try/desktop' }, ME)).toEqual({ none: 'test_home' });
+    expect(swapEnv({ HOME: '/tmp/h' }, ME)).toEqual({ none: 'test_home' });
+    expect(swapEnv({ HOME: '/Users/me/.bise/gate' }, ME)).toEqual({ none: 'test_home' });
+    expect(swapEnv({ HOME: '/Users/me/.bise/gate/x/h', BISE_HOME: ME + '/.bise' }, ME)).toEqual({ none: 'test_home' });
   });
 });
 
@@ -59,9 +57,19 @@ describe('parseState', () => {
       live: 'aaa1111',
       staged: 'bbb2222',
       why: null,
+      none: null,
+      failed: null,
     });
     expect(parseState('{"state":"current","live":"aaa1111","staged":null,"why":null}')?.state).toBe('current');
     expect(parseState('{"state":"none","live":null,"staged":null,"why":"no try build here"}')?.why).toBe('no try build here');
+  });
+  it('none says which (an older script: not_try); failed only on a staged state', () => {
+    expect(parseState('{"state":"none","live":"a","staged":null,"why":"w"}')?.none).toBe('not_try');
+    expect(parseState('{"state":"none","live":"a","staged":null,"why":"w","none":"not_gated","failed":null,"log":"/b/restart.log"}')?.none).toBe('not_gated');
+    expect(parseState('{"state":"staged","live":"a","staged":"b","why":null,"none":null,"failed":"b"}')?.failed).toBe('b');
+    expect(parseState('{"state":"current","live":"a","staged":null,"why":null,"none":null,"failed":"b"}')?.failed).toBeNull();
+    expect(parseState('{"state":"none","live":"a","staged":null,"why":"w","none":"later"}')).toBeNull();
+    expect(parseState('{"state":"staged","live":"a","staged":"b","why":null,"failed":3}')).toBeNull();
   });
   it('junk, an unknown state, staged without its commit (or the reverse): null', () => {
     for (const t of ['', 'nope', '[]', '{"error": "Traceback"}', '{"state":"ready","live":null,"staged":null,"why":null}',
@@ -73,11 +81,25 @@ describe('parseState', () => {
 });
 
 describe('swapRefusal', () => {
-  it('only a staged build swaps; otherwise its words', () => {
+  it('only a staged build swaps; otherwise which refusal', () => {
     expect(swapRefusal({ state: 'staged', live: 'a', staged: 'b', why: null })).toBeNull();
-    expect(swapRefusal({ state: 'current', live: 'a', staged: null, why: null })).toBe('nothing is staged: this app is the newest gated build');
-    expect(swapRefusal({ state: 'none', live: null, staged: null, why: 'the staged bundle is dev.bise.desktop.cand, not dev.bise.desktop.try' })).toBe(
-      'the staged bundle is dev.bise.desktop.cand, not dev.bise.desktop.try',
-    );
+    expect(swapRefusal({ state: 'current', live: 'a', staged: null, why: null })).toBe('newest');
+    expect(swapRefusal({ state: 'none', live: null, staged: null, why: 'x', none: 'not_gated' })).toBe('not_gated');
+    expect(swapRefusal({ state: 'none', live: null, staged: null, why: 'x' })).toBe('not_try');
+  });
+});
+
+describe('refusalWords', () => {
+  it("designer's five rewritten sentences", () => {
+    expect(refusalWords('newest', null)).toBe('nothing new to install: this is the newest build.');
+    expect(refusalWords('not_gated', null)).toBe('nothing new to install: this is the newest build.');
+    expect(refusalWords('test_home', null)).toBe("this app runs on a test home, not yours: it can't update itself.");
+    expect(refusalWords('old_checkout', null)).toBe('this build is too old to update from here. the next try updates it.');
+    expect(refusalWords('unreadable', 'Traceback (most recent call last):')).toBe("couldn't read the update's state: Traceback (most recent call last):");
+    expect(refusalWords('not_started', 'spawn python3 ENOENT')).toBe("the update didn't start: spawn python3 ENOENT");
+  });
+  it('firstLine: the first non-empty line, trimmed', () => {
+    expect(firstLine('\n  boom  \nmore')).toBe('boom');
+    expect(firstLine('')).toBe('');
   });
 });

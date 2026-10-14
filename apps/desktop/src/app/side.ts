@@ -173,7 +173,7 @@ export function crumbOf(route: Route, name: (project: string) => string): string
       return ['not found'];
     case 'report':
       // the page's own words (designer m_17010)
-      return ['crash report'];
+      return [route.log === 'restart' ? 'update log' : 'crash report'];
     case 'lab':
       return ['lab', route.lab];
     default:

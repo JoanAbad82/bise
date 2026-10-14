@@ -440,7 +440,7 @@ function ScreenOf({ route }: { route: Route }) {
       return <ScheduledScreen />;
     case 'report':
       // the last crash report (CoreLine's 'show the report')
-      return <ReportScreen />;
+      return <ReportScreen log={route.log} />;
     case 'settings':
       return <SettingsScreen page={route.page} />;
     case 'onboarding':

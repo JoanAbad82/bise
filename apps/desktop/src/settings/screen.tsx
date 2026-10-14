@@ -8,6 +8,8 @@ import type { KeyError } from './accounts';
 import { holdForSetup, useHeld } from './hold';
 import { useHeldSetup } from './setup-first';
 import { useRouter } from '@/app/router';
+import { formatRoute } from '@/app/route';
+import type { AppUpdate } from '@/shared/api';
 import { useHelper } from '@/setup/helper';
 import { useNotifyAuth } from '@/inbox';
 import { Settings } from './Settings';
@@ -18,6 +20,39 @@ import type { Prefs } from './prefs';
 /** The prefs event's value as an object (anything else: none yet). */
 export function prefsOf(v: JsonValue | null): Prefs | null {
   return v !== null && typeof v === 'object' && !Array.isArray(v) ? v : null;
+}
+
+/**
+ * window.bise.app.update() while the general page shows: read when it opens and each time the
+ * window comes back to the front (a promote may have staged a build meanwhile), and on demand (a
+ * refusal). null: not known yet, or no window.bise.app (an older shell, a component test).
+ */
+export function useAppUpdate(on: boolean): readonly [AppUpdate | null, () => void] {
+  const [u, setU] = useState<AppUpdate | null>(null);
+  const [asks, setAsks] = useState(0);
+  useEffect(() => {
+    const api = (window.bise as typeof window.bise | undefined)?.app;
+    if (!on || typeof api?.update !== 'function') return undefined;
+    let live = true;
+    const read = () => {
+      api.update().then(
+        (next) => {
+          if (live) setU(next);
+        },
+        () => undefined,
+      );
+    };
+    read();
+    window.addEventListener('focus', read);
+    return () => {
+      live = false;
+      window.removeEventListener('focus', read);
+    };
+  }, [on, asks]);
+  const refresh = useCallback(() => {
+    setAsks((n) => n + 1);
+  }, []);
+  return [on ? u : null, refresh] as const;
 }
 
 /**
@@ -110,6 +145,9 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
   // macOS's notifications permission (amb-mac's window.bise.notify): the general page's row
   const [notify, setNotify] = useNotifyAuth();
   const notifyApi = bise?.notify;
+  // his try app against the newest promoted build (amb-mac's window.bise.app): the general page's update group
+  const [appUpdate, refreshUpdate] = useAppUpdate(page === undefined || pageOf(page).id === 'general');
+  const appApi = bise?.app;
   return (
     <Settings
       page={page}
@@ -130,7 +168,20 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
       approvalsError={approvalsError}
       signin={{ waiting, signing }}
       notify={notify}
+      appUpdate={appUpdate}
       ports={{
+        ...(appApi
+          ? {
+              update: {
+                // back on this page once the new build opens (run.ts takeRoute)
+                swap: () => appApi.swap(formatRoute({ screen: 'settings', page: 'general' })),
+                showLog: () => {
+                  router.go({ screen: 'report', log: 'restart' });
+                },
+                refresh: refreshUpdate,
+              },
+            }
+          : {}),
         ...(notifyApi
           ? {
               notify: (act: 'ask' | 'open') => {

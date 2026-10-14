@@ -42,8 +42,9 @@ export type Route =
   | { screen: 'artifacts'; project: string; id?: string }
   | { screen: 'environments'; project: string }
   | { screen: 'scheduled' }
-  /** the last crash report, opened in the window (designer's voice-window part 2) */
-  | { screen: 'report' }
+  /** the last crash report, opened in the window (designer's voice-window part 2); `log: 'restart'`
+   * the last update's restart.log (settings › general's 'show the log', designer's app-swap v2) */
+  | { screen: 'report'; log?: 'restart' }
   | { screen: 'settings'; page?: string }
   | { screen: 'onboarding' }
   | { screen: 'lab'; lab: Lab }
@@ -68,9 +69,10 @@ export function formatRoute(r: Route): string {
   switch (r.screen) {
     case 'bise':
     case 'scheduled':
-    case 'report':
     case 'onboarding':
       return r.screen;
+    case 'report':
+      return r.log === 'restart' ? 'report/restart' : 'report';
     case 'thread':
       return r.agent === MAIN ? `project/${r.project}` : `agent/${r.project}/${r.agent}`;
     case 'agents':
@@ -115,9 +117,11 @@ export function parseRoute(path: string): Route {
   switch (head) {
     case 'bise':
     case 'scheduled':
-    case 'report':
     case 'onboarding':
       return args.length === 0 ? { screen: head } : nf;
+    case 'report':
+      if (args.length === 0) return { screen: 'report' };
+      return one === 'restart' ? { screen: 'report', log: 'restart' } : nf;
     case 'project':
       return one !== undefined ? { screen: 'thread', project: one, agent: MAIN } : nf;
     case 'agent':

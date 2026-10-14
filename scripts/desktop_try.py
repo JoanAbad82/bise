@@ -788,6 +788,19 @@ def real_open_cmd(app, extra, environ):
     return cmd
 
 
+def open_bundle(real, app, extra, environ):
+    """--real's open of `app` on his home `real` (or a stand-in's), `extra` its variables
+    (real_app_env): BISE_TRY_OPEN's hook in tests on a stand-in, else real_open_cmd. The app's
+    failed swap reopens the bundle it left the same way (desktop_try_swap.reopen)."""
+    hook = os.environ.get("BISE_TRY_OPEN")
+    if hook:
+        if not under(real, GATE):
+            raise TryError("BISE_TRY_OPEN: for tests on a stand-in home under ~/.bise/gate only")
+        run([hook, app] + extra, his_env(environ))
+    else:
+        run(real_open_cmd(app, extra, environ), his_env(environ))
+
+
 def open_real(real, tryh, paths, environ=None, timeout=20):
     """bise-ambient --real (ambient-lead m_18348): the promoted bundle on his real bise home, his
     running hubs; no build, no try world. Any open try is stopped and any instance of the bundle
@@ -810,13 +823,7 @@ def open_real(real, tryh, paths, environ=None, timeout=20):
     if missing:
         raise TryError("the promoted bundle %s needs its runtime inside (Contents/Resources/bin lacks %s): "
                        "promote a candidate built with amb-core's self-contained pack" % (app, ", ".join(missing)))
-    hook = os.environ.get("BISE_TRY_OPEN")
-    if hook:
-        if not under(real, GATE):
-            raise TryError("BISE_TRY_OPEN: for tests on a stand-in home under ~/.bise/gate only")
-        run([hook, app] + extra, his_env(environ))
-    else:
-        run(real_open_cmd(app, extra, environ), his_env(environ))
+    open_bundle(real, app, extra, environ)
     t0, pids = time.time(), []
     while not pids and time.time() - t0 < timeout:
         pids = bundle_apps(app)

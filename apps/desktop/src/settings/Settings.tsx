@@ -16,7 +16,8 @@ import { PAGES, PageBody, pageOf, type Page } from './pages';
 import type { ComputerUse } from './computer';
 import type { Perms } from './check';
 import type { KeyError, SignIn } from './accounts';
-import type { NotifyAuth } from '@/shared/api';
+import type { AppUpdate, NotifyAuth } from '@/shared/api';
+import type { UpdatePorts } from './update';
 import './settings.css';
 
 export interface SettingsData {
@@ -50,6 +51,8 @@ export interface SettingsData {
   home?: string;
   /** macOS's notifications permission (window.bise.notify; none: no row on general) */
   notify?: NotifyAuth | null;
+  /** his try app against the newest promoted build (window.bise.app.update; none: no update group) */
+  appUpdate?: AppUpdate | null;
   /** N1: where his keys and sign-ins are kept and the last /keychain move (the core's keychain; none yet: null) */
   keychain?: KeychainState | null;
 }
@@ -82,6 +85,8 @@ export interface SettingsPorts {
   cancelSignIn?: (id: string) => void;
   /** macOS's notifications: ask (notify.ask(), macOS's alert) or open System Settings › Notifications */
   notify?: (act: 'ask' | 'open') => void;
+  /** the update group's acts: the swap, its log, the state read again (none: no act) */
+  update?: UpdatePorts;
 }
 
 export interface SettingsProps extends SettingsData {

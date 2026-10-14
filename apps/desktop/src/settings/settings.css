@@ -37,3 +37,15 @@
 .settings-ask { color: var(--c-accent); font-size: var(--t-13); }
 /* a never-sent app's bundle id is machine text: mono, text-3 (designer m_22582) */
 .settings-app-id { font-family: var(--font-mono); color: var(--c-text-3); }
+/* settings › general's update group (designer's app-swap v2): the row's words as the mock (the
+   title in ink at the row's size, its shas inline in mono), only the ▲ red; the test app's row all
+   in grey (it never shows in his app). The ds draws every span of a row's label as the sub (block,
+   12 px, text-2): the title and the shas undo it here. */
+.settings-update .b-gi .l span.settings-update-t { display: inline; font-size: inherit; color: inherit; }
+.settings-update .b-gi .l span span { display: inline; font-size: inherit; color: inherit; }
+.settings-update .b-gi .l .settings-update-err,
+.settings-update-why .settings-update-err { color: var(--c-err); }
+.settings-sha { font-family: var(--font-mono); }
+.settings-update-acts { display: inline-flex; gap: var(--s-2); flex: none; }
+.settings-update.is-test .b-gi .l,
+.settings-update.is-test .b-gi .l span.settings-update-t { color: var(--c-text-3); }
