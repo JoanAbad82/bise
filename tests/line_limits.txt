@@ -22,7 +22,7 @@
 1038 rust/switchboard/src/cli.rs
 2797 rust/switchboard/src/core.rs
 4724 rust/switchboard/src/core_tests.rs
-2451 rust/switchboard/src/daemon.rs
+2450 rust/switchboard/src/daemon.rs
 1188 rust/switchboard/src/daemon/gate.rs
 1207 rust/switchboard/src/daemon/versions.rs
 1379 rust/tui/src/attach.rs

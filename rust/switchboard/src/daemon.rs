@@ -167,6 +167,7 @@ enum Msg {
         token: Token,
         stream: UnixStream,
         v: Value,
+        asker: accept::Asker,
     },
     /// bise's cross-hub `xin` / `xreply` (daemon/xhub.rs).
     XHub {
@@ -178,6 +179,7 @@ enum Msg {
     Version {
         stream: UnixStream,
         v: Value,
+        asker: accept::Asker,
     },
     /// A `/version` build is over.
     BuildEnded {
@@ -1747,12 +1749,9 @@ impl Shell {
     }
 
     /// `sb inspect` and `sb history` read files; the rest goes to the core.
+    /// Its sender is checked first (`accept.rs` `agent_new`, docs/issues/17).
     fn agent_request(&mut self, token: Token, mut stream: UnixStream, v: Value) {
-        let from = v
-            .get("from")
-            .and_then(|x| x.as_str())
-            .unwrap_or("")
-            .to_string();
+        let from = v.get("from").and_then(|x| x.as_str()).unwrap_or("").to_string();
         let cmd = v.get("cmd").and_then(|x| x.as_str()).unwrap_or("");
         match cmd {
             // another project's thread (S2 C, xread.rs): `<p>/<agent>`

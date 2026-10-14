@@ -6,10 +6,15 @@
 //! peer's pid and the process table) gets one `{"ev":"refused","error"}`
 //! line (bise_proto's HubEv::Refused),
 //! is closed, and leaves one hub.log line naming the agent.
+//! An agent request (`agent`, `version`; agent.sock and hub.sock's shim)
+//! carries its sender's verdict ([`Asker`]) to the daemon thread, which
+//! checks its `from` against it before anything else (`Shell::speaks_as`,
+//! the rule `crate::peer::speaker`, docs/issues/17). The peer is read with
+//! `bise_peer::table::around`: only the processes the judge walks.
 
 use super::{log_line, write_json, Msg};
 use crate::paths::Paths;
-use crate::peer::{access, judge, Access, HubSide, Sock, Who};
+use crate::peer::{access, judge, speaker, Access, HubSide, Known, Sock, Who};
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader};
@@ -54,7 +59,9 @@ impl Doors {
         let Some(pid) = pid else {
             return (Who::Gone, "pid unknown".into());
         };
-        let table = crate::procs::snapshot();
+        // only what the judge walks (bise_peer::table::around): cheap
+        // enough for every agent request
+        let table = bise_peer::table::around(&[pid, self.hub.pid]);
         let hub = HubSide { siblings: self.siblings(), ..self.hub.clone() };
         let who = judge(&table, pid, &hub);
         let prog = table
@@ -63,6 +70,44 @@ impl Doors {
             .map(|p| Path::new(&p.command).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default())
             .unwrap_or_default();
         (who, format!("pid {pid} ({prog})"))
+    }
+
+    /// The sender of an agent request on `sock`, judged at its accept.
+    fn asker(&self, pid: Option<u32>, sock: &'static str) -> Asker {
+        let (who, peer) = self.who(pid);
+        Asker { who, peer, sock }
+    }
+}
+
+/// Who sent an agent request (docs/issues/17): its process's verdict and,
+/// for hub.log, its pid and program and the socket.
+#[derive(Debug)]
+pub(super) struct Asker {
+    pub(super) who: Who,
+    pub(super) peer: String,
+    pub(super) sock: &'static str,
+}
+
+impl super::Shell {
+    /// Whether the request that says `from` may be served (the pure rule
+    /// is `peer::speaker`); refused: one hub.log line, and the words the
+    /// caller prints. Both doors call it (agent.sock and hub.sock's shim).
+    pub(super) fn speaks_as(&self, asker: &Asker, from: &str, cmd: &str) -> Result<(), String> {
+        let agents: Vec<Known> =
+            self.hub.st.agents.values().map(|a| Known { name: &a.name, dir: &a.dir, aliases: &a.aliases }).collect();
+        speaker(&asker.who, from, &agents).inspect_err(|why| {
+            log_line(&self.opts.paths, &format!("agent request refused on {} ({cmd}): {}: {why}", asker.sock, asker.peer));
+        })
+    }
+
+    /// An agent request: served only when its sender speaks as itself.
+    pub(super) fn agent_new(&mut self, token: super::Token, mut stream: UnixStream, v: Value, asker: &Asker) {
+        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("");
+        if let Err(e) = self.speaks_as(asker, s("from"), s("cmd")) {
+            write_json(&mut stream, &json!({"ok": false, "error": e}));
+            return;
+        }
+        self.agent_request(token, stream, v);
     }
 }
 
@@ -102,14 +147,20 @@ fn serve(stream: UnixStream, pid: Option<u32>, id: u64, tx: &Sender<Msg>, doors:
     let init = bise_proto::rpc::is_rpc(&v) && v.get("method").and_then(|x| x.as_str()) == Some(bise_proto::rpc::INITIALIZE);
     let op = if init { "hello".to_string() } else { v.get("op").and_then(|x| x.as_str()).unwrap_or("").to_string() };
     let mut stream = stream;
+    let name = if sock == Sock::Agent { "agent.sock" } else { "hub.sock" };
+    // an agent request's sender, judged here for both doors (agent.sock
+    // and hub.sock's shim): the daemon thread maps it to an agent
+    // (`Shell::speaks_as`, docs/issues/17)
+    let mut asker = None;
     match access(sock, &op) {
         Access::No => {
-            let name = if sock == Sock::Agent { "agent.sock" } else { "hub.sock" };
             write_json(&mut stream, &json!({"ok": false, "error": format!("{name} does not serve the op {op:?}")}));
             return;
         }
-        Access::Open | Access::Agent => {}
+        Access::Open => {}
+        Access::Agent => asker = Some(doors.asker(pid, name)),
         Access::Shim => {
+            asker = Some(doors.asker(pid, name));
             let from = v.get("from").and_then(|x| x.as_str()).unwrap_or("");
             log_line(
                 &doors.paths,
@@ -153,10 +204,12 @@ fn serve(stream: UnixStream, pid: Option<u32>, id: u64, tx: &Sender<Msg>, doors:
             let _ = tx.send(Msg::ClientGone { id });
         }
         "agent" => {
-            let _ = tx.send(Msg::AgentNew { token: id, stream, v });
+            let asker = asker.unwrap_or_else(|| doors.asker(pid, name));
+            let _ = tx.send(Msg::AgentNew { token: id, stream, v, asker });
         }
         "version" => {
-            let _ = tx.send(Msg::Version { stream, v });
+            let asker = asker.unwrap_or_else(|| doors.asker(pid, name));
+            let _ = tx.send(Msg::Version { stream, v, asker });
         }
         "xin" | "xreply" | "xfollow" => {
             let _ = tx.send(Msg::XHub { token: id, stream, v });

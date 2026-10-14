@@ -238,12 +238,13 @@ impl Shell {
                     self.step(Input::ClientGone { client: id });
                 }
             }
-            Msg::AgentNew { token, stream, v } => self.agent_request(token, stream, v),
+            Msg::AgentNew { token, stream, v, asker } => self.agent_new(token, stream, v, &asker),
             Msg::XHub { token, stream, v } => self.xhub_op(token, stream, v),
-            Msg::Version { mut stream, v } => {
+            Msg::Version { mut stream, v, asker } => {
                 let from = v.get("from").and_then(|x| x.as_str()).unwrap_or("");
                 let what = v.get("do").and_then(|x| x.as_str()).unwrap_or("");
-                match version_allowed(from, what) {
+                // `from` is the judged agent's (docs/issues/17), then main's ops are main's
+                match self.speaks_as(&asker, from, &format!("version {what}")).and_then(|()| version_allowed(from, what)) {
                     Ok(()) => {
                         let text = self.version_op(&v);
                         write_json(&mut stream, &json!({"ok": true, "text": text}));
