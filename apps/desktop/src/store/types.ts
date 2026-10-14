@@ -87,6 +87,22 @@ export const TAGS = {
   switch: true,
   // the core can't start any hub (its runtime is missing): Rust's words, drawn by CoreLine
   broken: true,
+  // the core's capsule and agents-panel lines, typed in CoreEv (docs/issues/24): known, not
+  // applied (no window reads them; 'sent' is also the window-local echo, echo.ts reads its own shape)
+  state: true,
+  main: true,
+  hub: true,
+  sent: true,
+  agent_sent: true,
+  word: true,
+  phase: true,
+  page: true,
+  agent_entry: true,
+  agent_history: true,
+  agent_preview: true,
+  agent_queued: true,
+  agent_typing: true,
+  fake_voice: true,
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */

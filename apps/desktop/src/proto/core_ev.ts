@@ -2,8 +2,11 @@
 // BISE_PROTO_BLESS=1 cargo test -p bise-proto --features ts --test ts
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
-import type { Account, AwayProject, ComputerAgent, CuRow, Found, IndexRow, OpenWhat, PeekShot, PickCommand, PickFile, PickFolder, PickSkill, Plugin, ProjectRow, RoleRow, VoiceLit } from './app_rows';
+import type { Account, AwayProject, ComputerAgent, CuRow, Found, IndexRow, OpenWhat, PeekShot, PhasePage, PickCommand, PickFile, PickFolder, PickSkill, Plugin, PreviewAction, PreviewReport, PreviewWait, ProjectRow, RoleRow, StateAgent, StateCard, VoiceLit } from './app_rows';
+import type { Mode } from './hub';
 import type { JsonValue } from './json';
+import type { Page, ScheduledTask } from './rows';
+import type { Entry, PageRef } from './thread';
 
 /**
  * What the core sends the app besides the hubs' events (S3b).
@@ -14,4 +17,24 @@ export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev"
  * keeps this take's sound (memory only, its last 3 takes, 10 min
  * each) and `dictate_retry {id}` transcribes it again
  */
-kept?: boolean, } | { "ev": "app_update", version: string, url: string, sha256: string, } | { "ev": "hub_refused", project: string, error: string, } | { "ev": "index", projects: Array<IndexRow>, } | { "ev": "setup_first", project: string, agent: string, provider: string, name: string, model: string, cid?: number | null, } | { "ev": "computer_live", items: Array<ComputerAgent>, } | { "ev": "computer_peek", key: string, shot?: PeekShot | null, why?: string | null, } | { "ev": "keychain", store: string, moving: boolean, lines?: Array<string>, failed?: boolean, } | { "ev": "broken", reason: string, };
+kept?: boolean, } | { "ev": "app_update", version: string, url: string, sha256: string, } | { "ev": "hub_refused", project: string, error: string, } | { "ev": "index", projects: Array<IndexRow>, } | { "ev": "setup_first", project: string, agent: string, provider: string, name: string, model: string, cid?: number | null, } | { "ev": "computer_live", items: Array<ComputerAgent>, } | { "ev": "computer_peek", key: string, shot?: PeekShot | null, why?: string | null, } | { "ev": "keychain", store: string, moving: boolean, lines?: Array<string>, failed?: boolean, } | { "ev": "broken", reason: string, } | { "ev": "state", agents: Array<StateAgent>, cards: Array<StateCard>, pages: Array<Page>, pages_url?: string | null, timers?: Array<ScheduledTask>, } | { "ev": "main", text: string, turn: number, from?: string | null, } | { "ev": "hub", up: boolean, workspace: string, project?: string | null, note?: string | null, } | { "ev": "sent", text: string, voice: boolean, shot: boolean, } | { "ev": "agent_sent", agent: string, mode: Mode, } | { "ev": "word", turn: number, i: number, } | { "ev": "phase", phase: string, line?: string | null, page?: PhasePage | null, } | { "ev": "page", front: boolean, id: string, title: string, agent: string, version: number, url: string, at_ms: number, state: string, 
+/**
+ * his notes not answered yet
+ */
+open_notes?: number, 
+/**
+ * the version he last opened
+ */
+opened_version?: number | null, 
+/**
+ * what on it waits for him (`sb page waiting`'s lines of this page)
+ */
+waiting?: number, 
+/**
+ * the meta line of its first heading block
+ */
+kicker?: string | null, 
+/**
+ * it holds a question whose card is open (§4.2)
+ */
+asking?: boolean, } | { "ev": "agent_entry", agent: string, entry: Entry, } | { "ev": "agent_history", agent: string, entries: Array<Entry>, before: number | null, more: boolean, } | { "ev": "agent_preview", agent: string, now: string, actions: Array<PreviewAction>, waiting: Array<PreviewWait>, last_report: PreviewReport | null, pages: Array<PageRef>, } | { "ev": "agent_queued", agent: string, text: string, } | { "ev": "agent_typing", agent: string, text: string, } | { "ev": "fake_voice", on: boolean, words?: string | null, };

@@ -2,6 +2,9 @@
 //! `core/<tag>` on its stdio: [`crate::app_rpc`]).
 
 use crate::app_rows::*;
+use crate::hub::Mode;
+use crate::rows::{Page, ScheduledTask};
+use crate::thread::{Entry, PageRef};
 use crate::{decode, parse, Project};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -229,12 +232,93 @@ pub enum CoreEv {
     /// `initialized`. It still answers; every hub the window asks for is
     /// down with the same words, never a silent retry
     Broken { reason: String },
+    /// the main hub as the capsule draws it, on each change: his agents'
+    /// rows (main aside), his cards with their options, the pages, the
+    /// pages' address, the standing orders (live, then lately ended)
+    State {
+        agents: Vec<StateAgent>,
+        cards: Vec<StateCard>,
+        pages: Vec<Page>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pages_url: Option<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        timers: Vec<ScheduledTask>,
+    },
+    /// main's words for him: its answer to `turn` (his talk or send), or
+    /// an agent writing to him (`from`: who)
+    Main {
+        text: String,
+        turn: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<String>,
+    },
+    /// the main hub's connection: up or down (`workspace`: bise's home);
+    /// `project` and `note` while bise there is being updated
+    Hub {
+        up: bool,
+        workspace: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        note: Option<String>,
+    },
+    /// his talk's or send's words went to main: `voice` (said, so the
+    /// answer is said too), `shot` (with the talk's still)
+    Sent { text: String, voice: bool, shot: bool },
+    /// his `agent_send` reached the agent's hub, `now` or `queued`
+    AgentSent { agent: String, mode: Mode },
+    /// main's spoken answer of `turn`: the word `i` (0-based) is being
+    /// said now
+    Word { turn: u64, i: u64 },
+    /// the capsule's phase (listening, sending, thinking, speaking, idle,
+    /// failed, …), `line`: its words; `page`: a note talk on that page
+    Phase {
+        phase: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        line: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        page: Option<PhasePage>,
+    },
+    /// a page of the main hub changed (the hub's row), `front`: it answers
+    /// what he waited for, so the capsule brings it forward
+    Page {
+        #[serde(flatten)]
+        page: Page,
+        front: bool,
+    },
+    /// a history panel's new or changed entry (the hub's thread entry;
+    /// an open card not in the thread is one at `CARD_POS + id`)
+    AgentEntry { agent: String, entry: Box<Entry> },
+    /// a history panel's page: the newest (it opened) or the ones before
+    /// a pos; `before`: the next older page's pos, none at the start
+    AgentHistory { agent: String, entries: Vec<Entry>, before: Option<u64>, more: bool },
+    /// an agent's preview (`agent_preview`), again when it changes
+    AgentPreview {
+        agent: String,
+        now: String,
+        actions: Vec<PreviewAction>,
+        waiting: Vec<PreviewWait>,
+        last_report: Option<PreviewReport>,
+        pages: Vec<PageRef>,
+    },
+    /// a queued `agent_send` waits for the agent's turn to end
+    AgentQueued { agent: String, text: String },
+    /// what the agent shows it is doing now (its typing line), while its
+    /// history panel is open
+    AgentTyping { agent: String, text: String },
+    /// harness A: the fake voice is on (no mic, no sound), its words read
+    /// from `words` or `fake_words`
+    FakeVoice {
+        on: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        words: Option<String>,
+    },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken", "state", "main", "hub", "sent", "agent_sent", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview", "agent_queued", "agent_typing", "fake_voice"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })

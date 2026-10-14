@@ -12,11 +12,11 @@
 //!   is `{}` once the core took it, an error when it couldn't read it;
 //! - every event is a [`Notification`]: `hub/<ev tag>` for a [`HubEv`]
 //!   (relayed with its `project`, or the core's own error/notice/refused),
-//!   `core/<ev tag>` for a [`CoreEv`] or one of [`CORE_EVS`]; params are
-//!   its fields without `ev`.
+//!   `core/<ev tag>` for a [`CoreEv`]; params are its fields without
+//!   `ev`.
 //!
 //! One owner for the names: the tags of [`AppCmd`], [`CoreEv`], [`HubCmd`]
-//! and [`HubEv`] plus the list below of the core's untyped events;
+//! and [`HubEv`] (docs/issues/24: no untyped line left);
 //! laws in `app_rpc_tests.rs` (and bend-tui's ambient tests: every line the
 //! core writes or parses is in a list). A computer-use still
 //! (`core/computer_peek`) is never logged, by the core or the app.
@@ -28,25 +28,6 @@ use crate::jsonrpc::{code, Notification, Request, RpcError};
 use crate::PROTO;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-
-/// The core's events that have no [`CoreEv`] variant yet: each is
-/// `core/<tag>`. Shrink-only (docs/issues/24, law
-/// `the_untyped_lists_only_shrink`): never add a tag here.
-pub const CORE_EVS: &[&str] = &[
-    "state",
-    "main",
-    "hub",
-    "sent",
-    "word",
-    "phase",
-    "page",
-    "agent_entry",
-    "agent_history",
-    "agent_preview",
-    "agent_queued",
-    "agent_typing",
-    "fake_voice",
-];
 
 /// The methods and notifications whose params never reach a log, the
 /// core's or the app's (a key, a screenshot's place, a computer-use
@@ -101,7 +82,7 @@ pub fn methods() -> Vec<String> {
 
 /// Every notification this core sends.
 pub fn notifications() -> Vec<String> {
-    let core = CoreEv::TAGS.iter().chain(CORE_EVS).map(|t| format!("{CORE}/{t}"));
+    let core = CoreEv::TAGS.iter().map(|t| format!("{CORE}/{t}"));
     let hub = HubEv::TAGS.iter().map(|t| format!("{HUB}/{t}"));
     core.chain(hub).collect()
 }

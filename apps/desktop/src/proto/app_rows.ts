@@ -2,7 +2,7 @@
 // BISE_PROTO_BLESS=1 cargo test -p bise-proto --features ts --test ts
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
-import type { Agent, Artifact, Card, ScheduledTask } from './rows';
+import type { Agent, Artifact, Card, CardBatch, CardPage, Opt, ReportKind, ScheduledTask } from './rows';
 
 /**
  * One project in the window's sidebar.
@@ -292,3 +292,39 @@ export type IndexRow = { project: string, up: boolean, written_ms?: number | nul
  * none: a `next_ms` in the past is not coming)
  */
 scheduled?: Array<ScheduledTask>, };
+
+/**
+ * An agent's row in the capsule's `state` (main aside): `status` the
+ * row's word (idle, working, waiting, done, failed, blocked), `since_ms`
+ * when the core saw it change, `waits`: his open cards from it.
+ */
+export type StateAgent = { name: string, status: string, title: string, purpose: string, since_ms: number, waits: number, followed: boolean, archived: boolean, note: string, report: string, working: boolean, turn_ms: number | null, };
+
+/**
+ * One of his cards in the capsule's `state`: its words without the
+ * options it lists, its options, `urgent` (it asks even on a call),
+ * `label` (main's own question), the page block it is about, the batch
+ * of drafts it stands for.
+ */
+export type StateCard = { id: number, kind: string, agent: string, text: string, options: Array<Opt>, urgent: boolean, label?: string | null, page?: CardPage | null, batch?: CardBatch | null, };
+
+/**
+ * The page a note talk is about, as the capsule's `phase` says it.
+ */
+export type PhasePage = { id: string, title: string, };
+
+/**
+ * One of an agent's last actions in its preview: `kind` tool, land,
+ * message, report or page, one line.
+ */
+export type PreviewAction = { at_ms: number, kind: string, text: string, };
+
+/**
+ * A card of the agent's that waits on him, in its preview.
+ */
+export type PreviewWait = { card_id: number, question: string, };
+
+/**
+ * An agent's last report in its preview.
+ */
+export type PreviewReport = { kind: ReportKind, text: string, at_ms: number, };

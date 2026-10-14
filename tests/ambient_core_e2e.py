@@ -227,14 +227,14 @@ def main():
         core.wait(lambda e: e.get("ev") == "agent_history" and e["agent"] == "t1", 30, "t1's history")
         h = core.last("agent_history")
         kinds = [x["kind"] for x in h["entries"]]
-        check(kinds and set(kinds) <= {"you", "agent", "tools", "card", "page", "report", "from-agent", "to_agent", "approval"},
+        check(kinds and set(kinds) <= {"you", "agent", "tools", "card", "page", "report", "from_agent", "to_agent", "approval"},
               "its entries: %r" % kinds)
         # his card answer is in the asker's thread too, as its row (dffe9d15:
         # the route line goes in t1's feed, the 'you answered t1' entry)
         answers = [x for x in h["entries"] if x["kind"] == "approval"]
         check(len(answers) == 1 and "yes" in answers[0]["text"], "t1's thread has his answer 'yes': %r" % answers)
         core.cmd(cmd="agent_send", agent="t1", text="e2e ping from the panel", mode="now")
-        core.wait(lambda e: e.get("ev") == "sent" and e.get("agent") == "t1" and e.get("mode") == "now", 30, "sent to t1")
+        core.wait(lambda e: e.get("ev") == "agent_sent" and e.get("agent") == "t1" and e.get("mode") == "now", 30, "sent to t1")
         c.wait_line("t1", "e2e ping from the panel", 60)
         core.wait(lambda e: e.get("ev") == "agent_entry" and e["agent"] == "t1" and e["entry"]["kind"] == "you"
                   and "e2e ping from the panel" in e["entry"]["text"], 30, "his message live in t1's panel")

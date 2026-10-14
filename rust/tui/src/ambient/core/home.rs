@@ -18,6 +18,7 @@
 use super::agents_view::{Ask, Pending};
 use super::hub_rpc::Read;
 use super::*;
+use bise_proto::app_rows::{StateAgent, StateCard};
 use bise_proto::hub::HubEv;
 use bise_proto::rows;
 use bise_proto::thread::{Delivery, Entry, EntryKind};
@@ -86,8 +87,8 @@ fn card_info(c: &rows::Card) -> CardInfo {
         kind: c.kind.clone(),
         agent: c.agent.clone(),
         text: if c.text.is_empty() { c.question.clone() } else { c.text.clone() },
-        page: c.page.as_ref().and_then(|p| serde_json::to_value(p).ok()),
-        batch: c.batch.as_ref().and_then(|b| serde_json::to_value(b).ok()),
+        page: c.page.clone(),
+        batch: c.batch.clone(),
     }
 }
 
@@ -107,7 +108,7 @@ impl Core {
         }
         self.hub_up = Some(true);
         let ws = self.workspace.clone();
-        self.emit(json!({"ev": "hub", "up": true, "workspace": ws}));
+        self.ev(CoreEv::Hub { up: true, workspace: ws, project: None, note: None });
     }
 
     /// One line of the home hub.
@@ -290,7 +291,7 @@ impl Core {
         let text = super::super::plain::plain(text);
         if !text.is_empty() {
             let turn = self.turn;
-            self.emit(json!({"ev": "main", "text": text, "turn": turn, "from": from}));
+            self.ev(CoreEv::Main { text, turn, from: Some(from.to_string()) });
         }
     }
 
@@ -415,8 +416,7 @@ impl Core {
             Some(known) => !known.contains(&p.agent),
         };
         let front = p.state == "ready" && waited;
-        self.emit(json!({"ev": "page", "id": p.id, "title": p.title, "agent": p.agent, "version": p.version,
-            "url": p.url, "at_ms": p.at_ms, "state": p.state, "front": front}));
+        self.ev(CoreEv::Page { page: p.clone(), front });
     }
 
     /// The window's `state`: the agents' rows, his cards with their
@@ -451,34 +451,27 @@ impl Core {
             self.since.insert(a.name.clone(), (status.to_string(), since));
             let waits = self.cards.iter().filter(|c| c.agent == a.name).count();
             let purpose = if a.objective.is_empty() { &a.purpose } else { &a.objective };
-            rows.push(json!({
-                "name": a.name,
-                "status": status,
-                "title": row_title(a),
-                "purpose": super::super::agents::one_line(purpose, 200),
-                "since_ms": since,
-                "waits": waits,
-                "followed": self.followed.contains(&a.name),
-                "archived": archived,
-                "note": a.note,
-                "report": a.report.as_ref().map_or("", |r| r.text.as_str()),
-                "working": !archived && matches!(a.status, rows::Status::Working | rows::Status::Waiting),
-                "turn_ms": a.turn_ms,
-            }));
+            rows.push(StateAgent {
+                name: a.name.clone(),
+                status: status.to_string(),
+                title: row_title(a),
+                purpose: super::super::agents::one_line(purpose, 200),
+                since_ms: since,
+                waits: waits as u32,
+                followed: self.followed.contains(&a.name),
+                archived,
+                note: a.note.clone(),
+                report: a.report.as_ref().map_or("", |r| r.text.as_str()).to_string(),
+                working: !archived && matches!(a.status, rows::Status::Working | rows::Status::Waiting),
+                turn_ms: a.turn_ms,
+            });
         }
-        let cards: Vec<Value> = self.cards.iter().map(card_ev).collect();
+        let cards: Vec<StateCard> = self.cards.iter().map(card_ev).collect();
         self.page_titles = self.hub_pages.iter().map(|p| (p.id.clone(), p.title.clone())).collect();
-        let pages = serde_json::to_value(&self.hub_pages).unwrap_or(Value::Null);
-        let mut st = json!({"ev": "state", "agents": rows, "cards": cards, "pages": pages});
-        if let Some(u) = &self.pages_url {
-            st["pages_url"] = json!(u);
-        }
         // the standing orders (roadmap B), as the hub has them: the live
         // ones, then the ones ended lately
-        if !self.home.timers.is_empty() {
-            st["timers"] = serde_json::to_value(&self.home.timers).unwrap_or(Value::Null);
-        }
-        self.emit(st);
+        let (pages, pages_url, timers) = (self.hub_pages.clone(), self.pages_url.clone(), self.home.timers.clone());
+        self.ev(CoreEv::State { agents: rows, cards, pages, pages_url, timers });
         // round 10: what is shown of an agent follows its status, its
         // cards, its pages
         self.refresh_shown();
@@ -486,7 +479,7 @@ impl Core {
 }
 
 /// A card of his as the window's `state` has it.
-fn card_ev(c: &CardInfo) -> Value {
+fn card_ev(c: &CardInfo) -> StateCard {
     let mut options = crate::sb::ambient_options(&c.kind, &c.agent, &c.text);
     if options.is_empty() && c.page.is_some() {
         options = page_options(&c.text);
@@ -496,21 +489,20 @@ fn card_ev(c: &CardInfo) -> Value {
     // question stays
     let (body, listed) = crate::sb::split_choices(&c.text);
     let text = if !listed.is_empty() && listed.iter().eq(options.iter().map(|(_, l)| l)) { body } else { c.text.clone() };
-    let options: Vec<Value> = options.into_iter().map(|(n, label)| json!({"n": n, "label": label})).collect();
-    // urgent: it asks even on a call or in a meeting. A tool call waiting
-    // for a yes holds an agent's work now (best guess, told to
-    // ambient-lead)
-    let urgent = c.kind == "confirm";
-    let mut v = json!({"id": c.id, "kind": c.kind, "agent": c.agent, "text": text, "options": options, "urgent": urgent});
-    // main's own question (no page): its label (ambient m_6476)
-    if c.agent == "main" && c.kind == "question" && c.page.is_none() {
-        v["label"] = json!("? main needs you");
+    let options: Vec<rows::Opt> = options.into_iter().map(|(n, label)| rows::Opt { n: n as u32, label }).collect();
+    StateCard {
+        id: c.id,
+        kind: c.kind.clone(),
+        agent: c.agent.clone(),
+        text,
+        options,
+        // urgent: it asks even on a call or in a meeting. A tool call
+        // waiting for a yes holds an agent's work now (best guess, told
+        // to ambient-lead)
+        urgent: c.kind == "confirm",
+        // main's own question (no page): its label (ambient m_6476)
+        label: (c.agent == "main" && c.kind == "question" && c.page.is_none()).then(|| "? main needs you".to_string()),
+        page: c.page.clone(),
+        batch: c.batch.clone(),
     }
-    if let Some(p) = &c.page {
-        v["page"] = p.clone();
-    }
-    if let Some(b) = &c.batch {
-        v["batch"] = b.clone();
-    }
-    v
 }

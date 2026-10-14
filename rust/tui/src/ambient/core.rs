@@ -33,6 +33,7 @@ pub use self::home::{MAIN_PAGE, QUIET_PAGE};
 use super::hub::{Hub, HubIn};
 use super::speech::{Speech, Step};
 use crate::voicemode::{Heard, ListenJob, ListenMsg, Listener, Mic, MicBlock, MicStream, SayJob, Speaker, Synthesizer, UttId};
+use bise_proto::core_ev::CoreEv;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -196,10 +197,10 @@ struct CardInfo {
     agent: String,
     text: String,
     /// a page question's card: {id, block, url} (docs/ambient-pages.md §4.2)
-    page: Option<Value>,
+    page: Option<bise_proto::rows::CardPage>,
     /// a batch of drafts' card: {count, title, what, names} (amb-web
     /// m_6061: the capsule's words)
-    batch: Option<Value>,
+    batch: Option<bise_proto::rows::CardBatch>,
 }
 
 /// Milliseconds since the epoch.
@@ -375,17 +376,18 @@ impl Core {
         self.out.push(v);
     }
 
+    /// One of the core's own typed events (bise-proto's `CoreEv`).
+    fn ev(&mut self, e: CoreEv) {
+        self.emit(serde_json::to_value(e).unwrap_or_default());
+    }
+
     fn error(&mut self, text: &str) {
         self.emit(json!({"ev": "error", "text": text}));
     }
 
     fn set_phase(&mut self, p: Phase, line: Option<String>) {
         self.phase = p;
-        let mut v = json!({"ev": "phase", "phase": p.word()});
-        if let Some(l) = line {
-            v["line"] = json!(l);
-        }
-        self.emit(v);
+        self.ev(CoreEv::Phase { phase: p.word().into(), line, page: None });
     }
 
     // ---- the app's commands ----
@@ -567,7 +569,7 @@ impl Core {
         self.voice_out = voice.then_some(false);
         // the hub echoes it as `sb you` too; this one counts if it does not
         self.user_waiting = true;
-        self.emit(json!({"ev": "sent", "text": words, "voice": voice, "shot": had_shot}));
+        self.ev(CoreEv::Sent { text: words, voice, shot: had_shot });
         self.set_phase(Phase::Sending, None);
     }
 
@@ -650,7 +652,7 @@ impl Core {
     /// runtime): the window says why at once (CoreEv::Broken, held until
     /// `initialized` like every event).
     pub fn broken(&mut self, reason: String) {
-        self.emit(serde_json::to_value(bise_proto::core_ev::CoreEv::Broken { reason }).unwrap_or_default());
+        self.ev(CoreEv::Broken { reason });
     }
 
     // ---- the hub ----
@@ -673,7 +675,7 @@ impl Core {
                 if self.hub_up != Some(false) {
                     self.hub_up = Some(false);
                     let ws = self.workspace.clone();
-                    self.emit(json!({"ev": "hub", "up": false, "workspace": ws}));
+                    self.ev(CoreEv::Hub { up: false, workspace: ws, project: None, note: None });
                 }
             }
             HubIn::Line(l) => self.home_line(&l),
@@ -706,7 +708,7 @@ impl Core {
         // main's answer: its words after its last tool call
         if !self.main_text.is_empty() {
             let (text, turn) = (self.main_text.clone(), self.turn);
-            self.emit(json!({"ev": "main", "text": text, "turn": turn}));
+            self.ev(CoreEv::Main { text, turn, from: None });
         }
         if let Some(why) = fail {
             if self.voice_out == Some(true) {

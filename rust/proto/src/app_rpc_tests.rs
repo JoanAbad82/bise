@@ -18,11 +18,6 @@ fn unique(names: &[String]) -> bool {
 
 #[test]
 fn every_tag_is_exactly_one_name() {
-    // the untyped list never repeats a typed tag (typing one moves it)
-    for t in CORE_EVS {
-        assert!(!CoreEv::TAGS.contains(t), "{t}: a CoreEv tag listed untyped too");
-        assert!(!HubEv::TAGS.contains(t), "{t}: a HubEv tag listed as the core's");
-    }
     for t in CoreEv::TAGS {
         assert!(!HubEv::TAGS.contains(t), "{t}: both a CoreEv and a HubEv tag");
     }
@@ -31,7 +26,7 @@ fn every_tag_is_exactly_one_name() {
     assert!(unique(&m), "a method twice: {m:?}");
     assert!(unique(&n), "a notification twice: {n:?}");
     assert_eq!(m.len(), 1 + AppCmd::TAGS.len() - NOT_SERVED.len() + HubCmd::TAGS.len() - 1);
-    assert_eq!(n.len(), CoreEv::TAGS.len() + CORE_EVS.len() + HubEv::TAGS.len());
+    assert_eq!(n.len(), CoreEv::TAGS.len() + HubEv::TAGS.len());
     for t in NOT_SERVED {
         assert!(AppCmd::TAGS.contains(t) && !m.contains(&format!("core/{t}")), "{t}");
     }
@@ -41,7 +36,7 @@ fn every_tag_is_exactly_one_name() {
     for t in HubCmd::TAGS.iter().filter(|t| **t != "hello") {
         assert!(m.contains(&format!("hub/{t}")), "{t}");
     }
-    for t in CoreEv::TAGS.iter().chain(CORE_EVS) {
+    for t in CoreEv::TAGS {
         assert!(n.contains(&format!("core/{t}")), "{t}");
     }
     for t in HubEv::TAGS {
@@ -50,24 +45,6 @@ fn every_tag_is_exactly_one_name() {
     // S29's computer rows (amb-core 4c0a6249)
     assert!(m.contains(&"core/computer".to_string()));
     assert!(n.contains(&"core/computer_live".to_string()) && n.contains(&"core/computer_peek".to_string()));
-}
-
-/// docs/issues/24: the untyped list only shrinks. A new event is a
-/// `CoreEv` variant; typing a listed tag takes its row out of the list and
-/// out of this pin in the same sha. (The commands' list is gone: every
-/// command is an `AppCmd`.)
-#[test]
-fn the_untyped_lists_only_shrink() {
-    const EVS_PINNED: &[&str] = &[
-        "state", "main", "hub", "sent", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview",
-        "agent_queued", "agent_typing", "fake_voice",
-    ];
-    for t in CORE_EVS {
-        assert!(EVS_PINNED.contains(t), "CORE_EVS gained {t}: type it (a CoreEv variant), never a new untyped tag (docs/issues/24)");
-    }
-    for t in EVS_PINNED {
-        assert!(CORE_EVS.contains(t), "{t} left CORE_EVS: drop it from the pin here too, in the same sha (docs/issues/24)");
-    }
 }
 
 #[test]

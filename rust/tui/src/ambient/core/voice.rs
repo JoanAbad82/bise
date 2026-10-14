@@ -204,14 +204,14 @@ impl Core {
         match step {
             Step::Playing { word } => {
                 if let Some(i) = word {
-                    self.emit(json!({"ev": "word", "turn": turn, "i": i}));
+                    self.ev(CoreEv::Word { turn, i: i as u64 });
                 }
                 self.emit(json!({"ev": "level", "who": "main", "v": level}));
             }
             Step::Over { word } => {
                 self.speech = None;
                 if let Some(i) = word {
-                    self.emit(json!({"ev": "word", "turn": turn, "i": i}));
+                    self.ev(CoreEv::Word { turn, i: i as u64 });
                 }
                 self.emit(json!({"ev": "level", "who": "main", "v": 0.0}));
                 if self.talk.is_none() {
@@ -311,7 +311,7 @@ impl Core {
             _ => id.replace('-', " "),
         };
         self.phase = Phase::Listening;
-        self.emit(json!({"ev": "phase", "phase": "listening", "page": {"id": id, "title": title}}));
+        self.ev(CoreEv::Phase { phase: "listening".into(), line: None, page: Some(bise_proto::app_rows::PhasePage { id: id.to_string(), title }) });
     }
 
     /// A note talk is over: its last words to the page, the capsule idle

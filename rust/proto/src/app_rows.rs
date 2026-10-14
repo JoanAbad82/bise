@@ -2,7 +2,7 @@
 //! [`crate::app_cmd::AppCmd`]): the sidebar's projects, accounts, plugins,
 //! computer use, roles, the composer's pick lists and ⌘K's index.
 
-use crate::rows::{Agent, Artifact, Card, ScheduledTask};
+use crate::rows::{Agent, Artifact, Card, CardBatch, CardPage, Opt, ReportKind, ScheduledTask};
 use crate::{Pos, Project};
 use serde::{Deserialize, Serialize};
 
@@ -360,4 +360,80 @@ pub struct IndexRow {
     /// none: a `next_ms` in the past is not coming)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scheduled: Vec<ScheduledTask>,
+}
+
+/// An agent's row in the capsule's `state` (main aside): `status` the
+/// row's word (idle, working, waiting, done, failed, blocked), `since_ms`
+/// when the core saw it change, `waits`: his open cards from it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct StateAgent {
+    pub name: String,
+    pub status: String,
+    pub title: String,
+    pub purpose: String,
+    pub since_ms: u64,
+    pub waits: u32,
+    pub followed: bool,
+    pub archived: bool,
+    pub note: String,
+    pub report: String,
+    pub working: bool,
+    pub turn_ms: Option<u64>,
+}
+
+/// One of his cards in the capsule's `state`: its words without the
+/// options it lists, its options, `urgent` (it asks even on a call),
+/// `label` (main's own question), the page block it is about, the batch
+/// of drafts it stands for.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct StateCard {
+    pub id: u64,
+    pub kind: String,
+    pub agent: String,
+    pub text: String,
+    pub options: Vec<Opt>,
+    pub urgent: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<CardPage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub batch: Option<CardBatch>,
+}
+
+/// The page a note talk is about, as the capsule's `phase` says it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PhasePage {
+    pub id: String,
+    pub title: String,
+}
+
+/// One of an agent's last actions in its preview: `kind` tool, land,
+/// message, report or page, one line.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PreviewAction {
+    pub at_ms: u64,
+    pub kind: String,
+    pub text: String,
+}
+
+/// A card of the agent's that waits on him, in its preview.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PreviewWait {
+    pub card_id: u64,
+    pub question: String,
+}
+
+/// An agent's last report in its preview.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PreviewReport {
+    pub kind: ReportKind,
+    pub text: String,
+    pub at_ms: u64,
 }

@@ -194,7 +194,8 @@ fn ports_for_env(user_kind: fn(&str) -> bool, offscreen: bool) -> (Ports, Option
     match voice_of(fake, offscreen) {
         Voice::Fake(file) => {
             eprintln!("ambient-core: fake voice on: words from {} (or fake_words), no mic, no sound", file.display());
-            let ev = serde_json::json!({"ev": "fake_voice", "on": true, "words": file.to_string_lossy()});
+            let ev = bise_proto::core_ev::CoreEv::FakeVoice { on: true, words: Some(file.to_string_lossy().into_owned()) };
+            let ev = serde_json::to_value(ev).unwrap_or_default();
             (fake_ports(user_kind, fake::Words::new(file)), Some(ev))
         }
         Voice::NoMic => {

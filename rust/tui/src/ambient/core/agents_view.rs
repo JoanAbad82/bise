@@ -3,12 +3,15 @@
 //! panel come from `subscribe`/`page` and the live `entry`/`typing`
 //! events of the voice target's hub; the hub folds its transcript
 //! (bise_proto::thread), the core no more (its fold copy is gone). The
-//! panel's wire is unchanged: `agent_history`, `agent_entry`,
-//! `agent_typing`, `agent_preview`.
+//! panel's lines are bise-proto's `CoreEv`: `agent_history`,
+//! `agent_entry` (the hub's own `Entry`), `agent_typing`,
+//! `agent_preview`, `agent_sent`, `agent_queued`.
 
 use super::*;
-use bise_proto::hub::HubEv;
-use bise_proto::thread::Entry;
+use bise_proto::app_rows::{PreviewReport, PreviewWait};
+use bise_proto::hub::{HubEv, Mode};
+use bise_proto::rows::ReportKind;
+use bise_proto::thread::{Entry, EntryCard, EntryKind};
 use std::collections::{BTreeMap, HashMap};
 
 /// An agent shown on the app: its history panel open, its preview, or
@@ -19,14 +22,14 @@ pub(super) struct Feed {
     preview: bool,
     /// its first page came (or nothing can come: the hub away)
     loaded: bool,
-    /// its newest entries by pos, the panel's shape
-    entries: BTreeMap<u64, Value>,
-    /// what was sent of each entry (pos → its JSON): only changes go
-    emitted: HashMap<u64, String>,
+    /// its newest entries by pos
+    entries: BTreeMap<u64, Entry>,
+    /// what was sent of each entry (pos → it): only changes go
+    emitted: HashMap<u64, Entry>,
     /// the open cards sent as entries of their own (not in the thread)
     cards: Vec<u64>,
     /// the last preview sent
-    shown: String,
+    shown: Option<CoreEv>,
 }
 
 /// What a `thread` answers: a feed's first page (`resync`: again after a
@@ -49,18 +52,9 @@ pub(super) struct Pending {
 /// growing).
 const KEEP: usize = 8;
 
-/// An entry as the panel shows it (its `from-agent` kind is the panel's
-/// older word for bise-proto's `from_agent`).
-fn panel_entry(e: &Entry) -> Value {
-    let mut v = serde_json::to_value(e).unwrap_or(Value::Null);
-    if v["kind"] == "from_agent" {
-        v["kind"] = json!("from-agent");
-    }
-    v
-}
-
-fn pos_of(e: &Value) -> u64 {
-    e["pos"].as_u64().unwrap_or(0)
+/// The id of a card entry's card.
+fn card_id(e: &Entry) -> Option<u64> {
+    e.card.as_ref().map(|c| c.id)
 }
 
 impl Core {
@@ -92,10 +86,10 @@ impl Core {
         if !self.home_call("turn/send", v) {
             return self.error(&format!("{agent} didn't get it: bise isn't reachable. try again in a moment."));
         }
-        let mode = if queued { "queued" } else { "now" };
-        self.emit(json!({"ev": "sent", "agent": agent, "mode": mode}));
+        let mode = if queued { Mode::Queued } else { Mode::Now };
+        self.ev(CoreEv::AgentSent { agent: agent.clone(), mode });
         if queued && self.busy(&agent) {
-            self.emit(json!({"ev": "agent_queued", "agent": agent, "text": text}));
+            self.ev(CoreEv::AgentQueued { agent, text });
         }
     }
 
@@ -111,7 +105,7 @@ impl Core {
             entries: BTreeMap::new(),
             emitted: HashMap::new(),
             cards: Vec::new(),
-            shown: String::new(),
+            shown: None,
         });
         self.feeds.last_mut().expect("pushed")
     }
@@ -169,7 +163,7 @@ impl Core {
     pub(super) fn agent_preview(&mut self, agent: String) {
         for f in &mut self.feeds {
             f.preview = false;
-            f.shown.clear();
+            f.shown = None;
         }
         let f = self.feed(&agent);
         f.preview = true;
@@ -188,7 +182,7 @@ impl Core {
             let p = Pending { agent: agent.clone(), ask: Ask::Older };
             let sent = b > 1 && self.typed(json!({"cmd": "page", "agent": agent, "before": b, "limit": limit}), Some(p));
             if !sent {
-                self.emit(json!({"ev": "agent_history", "agent": agent, "entries": [], "before": null, "more": false}));
+                self.ev(CoreEv::AgentHistory { agent, entries: Vec::new(), before: None, more: false });
             }
             return;
         }
@@ -225,10 +219,9 @@ impl Core {
                 if matches!(p.ask, Ask::Main | Ask::Quiet) {
                     return self.capsule_page(&agent, &entries, matches!(p.ask, Ask::Main));
                 }
-                let entries: Vec<Value> = entries.iter().map(panel_entry).collect();
                 match p.ask {
                     Ask::Main | Ask::Quiet => {}
-                    Ask::Older => self.emit(json!({"ev": "agent_history", "agent": agent, "entries": entries, "before": before, "more": more})),
+                    Ask::Older => self.ev(CoreEv::AgentHistory { agent, entries, before, more }),
                     Ask::First { resync, .. } => {
                         let Some(f) = self.feeds.iter_mut().find(|f| f.agent == agent) else { return };
                         f.loaded = true;
@@ -244,7 +237,7 @@ impl Core {
             }
             HubEv::Entry { agent, entry, .. } => {
                 if self.feeds.iter().any(|f| f.agent == agent && f.loaded) {
-                    self.entry(&agent, panel_entry(&entry));
+                    self.entry(&agent, *entry);
                     self.refresh(&agent);
                 }
             }
@@ -252,7 +245,7 @@ impl Core {
                 if self.typing.get(&agent) != Some(&text) {
                     self.typing.insert(agent.clone(), text.clone());
                     if self.feeds.iter().any(|f| f.agent == agent && f.history) {
-                        self.emit(json!({"ev": "agent_typing", "agent": agent, "text": text}));
+                        self.ev(CoreEv::AgentTyping { agent: agent.clone(), text });
                     }
                     self.refresh(&agent);
                 }
@@ -263,7 +256,7 @@ impl Core {
                 match p.ask {
                     Ask::Main => self.home_ready(),
                     Ask::Quiet => {}
-                    Ask::Older => self.emit(json!({"ev": "agent_history", "agent": p.agent, "entries": [], "before": null, "more": false})),
+                    Ask::Older => self.ev(CoreEv::AgentHistory { agent: p.agent, entries: Vec::new(), before: None, more: false }),
                     Ask::First { resync, .. } => {
                         if let Some(f) = self.feeds.iter_mut().find(|f| f.agent == p.agent) {
                             f.loaded = true;
@@ -281,16 +274,14 @@ impl Core {
     }
 
     /// One entry into its feed; a panel gets it when it changed.
-    fn entry(&mut self, agent: &str, e: Value) {
+    fn entry(&mut self, agent: &str, e: Entry) {
         let Some(f) = self.feeds.iter_mut().find(|f| f.agent == agent) else { return };
-        let pos = pos_of(&e);
-        if f.history {
-            let s = e.to_string();
-            if f.emitted.get(&pos) != Some(&s) {
-                f.emitted.insert(pos, s);
-                self.out.push(json!({"ev": "agent_entry", "agent": agent, "entry": e}));
-            }
+        let pos = e.pos;
+        if f.history && f.emitted.get(&pos) != Some(&e) {
+            f.emitted.insert(pos, e.clone());
+            self.ev(CoreEv::AgentEntry { agent: agent.to_string(), entry: Box::new(e.clone()) });
         }
+        let Some(f) = self.feeds.iter_mut().find(|f| f.agent == agent) else { return };
         f.entries.insert(pos, e);
         while f.entries.len() > KEEP {
             let first = *f.entries.keys().next().expect("not empty");
@@ -299,29 +290,25 @@ impl Core {
         }
     }
 
-    fn first_page(&mut self, agent: &str, mut entries: Vec<Value>, before: Option<u64>, more: bool) {
+    fn first_page(&mut self, agent: &str, mut entries: Vec<Entry>, before: Option<u64>, more: bool) {
         let cards = self.agent_cards(agent, &entries);
         let Some(f) = self.feeds.iter_mut().find(|f| f.agent == agent) else { return };
-        f.emitted = entries.iter().map(|e| (pos_of(e), e.to_string())).collect();
-        f.cards = cards.iter().filter_map(|c| c["card"]["id"].as_u64()).collect();
+        f.emitted = entries.iter().map(|e| (e.pos, e.clone())).collect();
+        f.cards = cards.iter().filter_map(card_id).collect();
         let skip = entries.len().saturating_sub(KEEP);
-        f.entries = entries.iter().skip(skip).map(|e| (pos_of(e), e.clone())).collect();
+        f.entries = entries.iter().skip(skip).map(|e| (e.pos, e.clone())).collect();
         entries.extend(cards);
-        self.emit(json!({"ev": "agent_history", "agent": agent, "entries": entries, "before": before, "more": more}));
+        self.ev(CoreEv::AgentHistory { agent: agent.to_string(), entries, before, more });
         self.refresh(agent);
     }
 
     /// The agent's open cards not in its thread, as entries after it.
-    fn agent_cards(&self, agent: &str, entries: &[Value]) -> Vec<Value> {
-        let shown: Vec<u64> = entries.iter().filter_map(|e| e["card"]["id"].as_u64()).collect();
+    fn agent_cards(&self, agent: &str, entries: &[Entry]) -> Vec<Entry> {
+        let shown: Vec<u64> = entries.iter().filter_map(card_id).collect();
         self.cards
             .iter()
             .filter(|c| c.agent == agent && !shown.contains(&c.id))
-            .map(|c| {
-                let card = super::super::agents::card_ref(c.id, &c.kind, &c.agent, &c.text, true);
-                json!({"pos": super::super::agents::CARD_POS + c.id, "at_ms": 0, "kind": "card",
-                       "text": card["question"], "card": card})
-            })
+            .map(|c| super::super::agents::card_entry(super::super::agents::card_ref(c.id, &c.kind, &c.agent, &c.text, true)))
             .collect()
     }
 
@@ -338,7 +325,7 @@ impl Core {
     /// panel, its preview if it differs.
     fn refresh(&mut self, agent: &str) {
         let Some(i) = self.feeds.iter().position(|f| f.agent == agent && f.loaded) else { return };
-        let entries: Vec<Value> = self.feeds[i].entries.values().cloned().collect();
+        let entries: Vec<Entry> = self.feeds[i].entries.values().cloned().collect();
         let preview = self.feeds[i].preview.then(|| self.preview(agent, &entries));
         let history = self.feeds[i].history;
         let cards = if history { self.agent_cards(agent, &entries) } else { Vec::new() };
@@ -346,32 +333,32 @@ impl Core {
         let mut out = Vec::new();
         if history {
             // its own cards: a new one comes, an answered one says so
-            let now: Vec<u64> = cards.iter().filter_map(|c| c["card"]["id"].as_u64()).collect();
+            let now: Vec<u64> = cards.iter().filter_map(card_id).collect();
             for c in &cards {
-                if !f.cards.contains(&c["card"]["id"].as_u64().unwrap_or(0)) {
-                    out.push(json!({"ev": "agent_entry", "agent": agent, "entry": c}));
+                if !f.cards.contains(&card_id(c).unwrap_or(0)) {
+                    out.push(CoreEv::AgentEntry { agent: agent.to_string(), entry: Box::new(c.clone()) });
                 }
             }
             for id in f.cards.iter().filter(|id| !now.contains(id)) {
-                let mut e = json!({"pos": super::super::agents::CARD_POS + *id, "at_ms": 0, "kind": "card", "text": ""});
-                e["card"] = json!({"id": id, "answered": true});
-                out.push(json!({"ev": "agent_entry", "agent": agent, "entry": e}));
+                let answered = EntryCard { id: *id, question: String::new(), options: Vec::new(), answered: true, kind: None, agent: None, closed: None };
+                out.push(CoreEv::AgentEntry { agent: agent.to_string(), entry: Box::new(super::super::agents::card_entry(answered)) });
             }
             f.cards = now;
         }
         if let Some(p) = preview {
-            let s = p.to_string();
-            if f.shown != s {
-                f.shown = s;
+            if f.shown.as_ref() != Some(&p) {
+                f.shown = Some(p.clone());
                 out.push(p);
             }
         }
-        self.out.extend(out);
+        for e in out {
+            self.ev(e);
+        }
     }
 
     /// The preview (identity10 #data): what it does now, its last
     /// actions, what waits on him, its last report, its pages.
-    fn preview(&self, agent: &str, entries: &[Value]) -> Value {
+    fn preview(&self, agent: &str, entries: &[Entry]) -> CoreEv {
         use super::super::agents;
         let a = self.hub_agent(agent);
         let status = a.map_or("idle", |a| super::home::row_status(a).0);
@@ -380,28 +367,28 @@ impl Core {
             _ => a.map(super::home::row_title).unwrap_or_default(),
         };
         let report = a.and_then(|a| a.report.as_ref()).filter(|r| !r.text.is_empty());
-        let waiting: Vec<Value> = self
+        let waiting: Vec<PreviewWait> = self
             .cards
             .iter()
             .filter(|c| c.agent == agent)
-            .map(|c| json!({"card_id": c.id, "question": agents::card_ref(c.id, &c.kind, &c.agent, &c.text, true)["question"]}))
+            .map(|c| PreviewWait { card_id: c.id, question: agents::card_ref(c.id, &c.kind, &c.agent, &c.text, true).question })
             .collect();
-        let last_report = match entries.iter().rev().find(|e| e["kind"] == "report") {
-            Some(e) => json!({"kind": e["report"]["kind"], "text": e["text"], "at_ms": e["at_ms"]}),
-            None if report.is_some() => {
-                let kind = match status {
-                    "done" | "failed" | "blocked" => status,
-                    _ => "progress",
-                };
-                let r = report.expect("some");
-                json!({"kind": kind, "text": r.text, "at_ms": r.at_ms})
-            }
-            None => Value::Null,
-        };
+        let in_thread = entries.iter().rev().find_map(|e| match (&e.kind, &e.report) {
+            (EntryKind::Report, Some(r)) => Some(PreviewReport { kind: r.kind, text: e.text.clone(), at_ms: e.at_ms }),
+            _ => None,
+        });
+        let last_report = in_thread.or_else(|| {
+            let kind = match status {
+                "done" => ReportKind::Done,
+                "failed" => ReportKind::Failed,
+                "blocked" => ReportKind::Blocked,
+                _ => ReportKind::Progress,
+            };
+            report.map(|r| PreviewReport { kind, text: r.text.clone(), at_ms: r.at_ms })
+        });
         let mut pages: Vec<&bise_proto::rows::Page> = self.hub_pages.iter().filter(|p| p.agent == agent).collect();
         pages.sort_by_key(|p| std::cmp::Reverse(p.at_ms));
-        let pages: Vec<Value> = pages.into_iter().take(3).map(|p| agents::page_ref(&p.id, &self.hub_pages)).collect();
-        json!({"ev": "agent_preview", "agent": agent, "now": now, "actions": agents::actions(entries, 5),
-               "waiting": waiting, "last_report": last_report, "pages": pages})
+        let pages = pages.into_iter().take(3).map(|p| agents::page_ref(&p.id, &self.hub_pages)).collect();
+        CoreEv::AgentPreview { agent: agent.to_string(), now, actions: agents::actions(entries, 5), waiting, last_report, pages }
     }
 }

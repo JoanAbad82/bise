@@ -11,7 +11,7 @@
 
 use super::Core;
 use crate::ambient::MoveEnd;
-use serde_json::json;
+use bise_proto::core_ev::CoreEv;
 use std::path::Path;
 
 /// The move's ports and where it stands.
@@ -126,7 +126,7 @@ impl Core {
         let project = self.home_project();
         let Some(m) = self.home_move.as_mut() else {
             let why = "this folder's bise is older than this app: update bise".to_string();
-            self.emit(json!({"ev": "hub_refused", "project": project, "error": why}));
+            self.ev(CoreEv::HubRefused { project: project.to_string(), error: why.to_string() });
             return;
         };
         // while it moves, after it was refused or went back, or the old
@@ -147,7 +147,7 @@ impl Core {
             self.hub.backoff(false);
             self.hub.hold(true);
             self.hub_up = Some(false);
-            self.emit(json!({"ev": "hub_refused", "project": project, "error": why}));
+            self.ev(CoreEv::HubRefused { project: project.to_string(), error: why.to_string() });
             return;
         }
         self.home_move_start(from, to);
@@ -166,7 +166,7 @@ impl Core {
         (m.start)();
         self.hub_up = Some(false);
         let ws = self.workspace.clone();
-        self.emit(json!({"ev": "hub", "up": false, "workspace": ws, "project": project, "note": moving_words(&to)}));
+        self.ev(CoreEv::Hub { up: false, workspace: ws, project: Some(project), note: Some(moving_words(&to)) });
     }
 
     /// The move ended. There (or the new hub answered meanwhile): the
@@ -192,7 +192,7 @@ impl Core {
             self.hub.hold(true);
         }
         self.hub_up = Some(false);
-        self.emit(json!({"ev": "hub_refused", "project": project, "error": why}));
+        self.ev(CoreEv::HubRefused { project: project.to_string(), error: why.to_string() });
     }
 
     /// A home connection is up (home.rs home_up): counted; true while a
@@ -221,7 +221,7 @@ impl Core {
         if held && self.hub_up != Some(true) {
             self.hub_up = Some(true);
             let ws = self.workspace.clone();
-            self.emit(json!({"ev": "hub", "up": true, "workspace": ws}));
+            self.ev(CoreEv::Hub { up: true, workspace: ws, project: None, note: None });
         }
     }
 

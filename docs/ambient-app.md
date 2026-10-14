@@ -125,7 +125,8 @@ Commands to the core (stdin):
 | `quiet` | `on` (bool), `why`: `call`/`meeting` | the user is on a call or in a meeting (the app's read): answer in text only, no TTS |
 | `voice` | `on` (bool) | the settings' "voice answers" (amb-core 03821a37): off, main's answers are text only and a voice already playing stops |
 
-Events from the core (stdout):
+Events from the core (stdout); every one is a `CoreEv` variant
+(`rust/proto/src/core_ev.rs`, its TS generated: docs/issues/24), the shapes below in short:
 
 | ev | fields | meaning |
 |---|---|---|
@@ -137,6 +138,7 @@ Events from the core (stdout):
 | `main` | `text`, `turn` | main's message of this turn (whole, replaces the previous one) |
 | `word` | `turn`, `i` | main's voice reached word `i` |
 | `sent` | `text`, `voice` (bool), `shot` (bool) | the hub took the message |
+| `agent_sent` | `agent`, `mode`: `now` `queued` | the hub took his `agent_send` |
 | `error` | `text` | one sentence for the user (no key, no env) |
 | `page` | `id`, `title`, `agent`, `version`, `url`, `at_ms`, `state`, `front` (bool) | a page published or changed state (docs/ambient-pages.md §2.3); `front`: main published it in the user's turn, or its agent was born since the user's last turn started: open it without fn + o |
 

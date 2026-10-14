@@ -157,7 +157,7 @@ fn a_history_shows_the_hubs_entries_older_and_follows_live() {
     t.until(|o| has(o, "agent_history"));
     let h = t.take().into_iter().find(|v| v["ev"] == "agent_history").unwrap();
     let kinds: Vec<&str> = h["entries"].as_array().unwrap().iter().map(|e| e["kind"].as_str().unwrap()).collect();
-    assert_eq!(kinds, ["you", "agent", "tools", "from-agent", "report", "you", "card"], "from_agent is the panel's from-agent");
+    assert_eq!(kinds, ["you", "agent", "tools", "from_agent", "report", "you", "card"], "the hub's own Entry kinds (architect m_23230)");
     let e = &h["entries"];
     assert_eq!((e[0]["pos"].as_u64(), e[0]["at_ms"].as_u64(), e[0]["text"].as_str()), (Some(1), Some(1001), Some("make it fast")));
     assert_eq!(e[1]["text"], "on it", "no thinking");
@@ -199,7 +199,7 @@ fn a_history_shows_the_hubs_entries_older_and_follows_live() {
     t.until(|o| has(o, "agent_history"));
     let h = t.take().into_iter().find(|v| v["ev"] == "agent_history").unwrap();
     let kinds: Vec<&str> = h["entries"].as_array().unwrap().iter().map(|e| e["kind"].as_str().unwrap()).collect();
-    assert_eq!(kinds, ["tools", "from-agent"], "the hub's page, as the panel's");
+    assert_eq!(kinds, ["tools", "from_agent"], "the hub's page, as is");
     assert_eq!((h["before"].as_u64(), h["more"].as_bool()), (Some(4), Some(true)));
     // the panel closes: no more entries (its thread stays the capsule's)
     t.cmd(Cmd::AgentUnwatch { agent: "perf".into() });
@@ -251,7 +251,7 @@ fn acts_send_now_queued_stop_archive_unarchive() {
     t.take();
     t.cmd(Cmd::AgentSend { agent: "perf".into(), text: " look at the cold bench ".into(), queued: false });
     assert_eq!(t.hub.sent(), json!({"cmd": "send", "agent": "perf", "text": "look at the cold bench", "via": "ambient"}));
-    assert!(t.take().contains(&json!({"ev": "sent", "agent": "perf", "mode": "now"})));
+    assert!(t.take().contains(&json!({"ev": "agent_sent", "agent": "perf", "mode": "now"})));
     // queued while it works: the hub holds it (sb-core), never the core
     t.cmd(Cmd::AgentSend { agent: "perf".into(), text: "then the warm one".into(), queued: true });
     assert_eq!(t.hub.sent(), json!({"cmd": "send", "agent": "perf", "text": "then the warm one", "via": "ambient", "mode": "queued"}));

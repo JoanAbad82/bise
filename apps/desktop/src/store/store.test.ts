@@ -183,7 +183,7 @@ describe("store", () => {
     ).toBe(false);
     expect(store.apply({ cmd: "approve" })).toBe(false);
     expect(store.apply("not an object")).toBe(false);
-    expect(store.apply({ ev: "state", phase: "idle" })).toBe(false);
+    expect(store.apply({ ev: "orb", phase: "idle" })).toBe(false);
   });
 
   it("knows every tag of the fixtures (TAGS is the generated unions)", () => {
