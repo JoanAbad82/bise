@@ -320,7 +320,7 @@ mod tests {
             calls.set(calls.get() + 1);
             fake(p)
         };
-        let s = said(&[t("look"), img("")], &[], &Door { store: store, put: &counted, exists: &yes, known: &|_, _| Ok(1) }).unwrap();
+        let s = said(&[t("look"), img("")], &[], &Door { store, put: &counted, exists: &yes, known: &|_, _| Ok(1) }).unwrap();
         assert_eq!(calls.get(), 1, "one store call");
         let back: Vec<Part> = serde_json::from_str(&s.parts).unwrap();
         assert_eq!(back[1], Part::Image { name: "[Image #1]".into(), source: "/d/s.png".into(), mime: "image/jpeg".into(), b64_file: "/h/images/f00d.b64".into(), caption: String::new() });
@@ -328,13 +328,13 @@ mod tests {
         assert_eq!(s.text, parts::render(&back), "the text is the kept parts' render");
         // a stored one: untouched, no store call
         calls.set(0);
-        assert!(said(&[img("/h/images/ab12.b64")], &[], &Door { store: store, put: &counted, exists: &yes, known: &|_, _| Ok(1) }).is_ok());
+        assert!(said(&[img("/h/images/ab12.b64")], &[], &Door { store, put: &counted, exists: &yes, known: &|_, _| Ok(1) }).is_ok());
         assert_eq!(calls.get(), 0);
         // refused, with the store's words
         let bad = Part::Image { name: "[Image #1]".into(), source: "/d/notes.txt".into(), mime: String::new(), b64_file: String::new(), caption: String::new() };
-        assert_eq!(said(&[t("a"), bad], &[], &Door { store: store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }), Err("image /d/notes.txt: not a PNG, JPEG, GIF or WebP image".into()));
+        assert_eq!(said(&[t("a"), bad], &[], &Door { store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }), Err("image /d/notes.txt: not a PNG, JPEG, GIF or WebP image".into()));
         let rel = Part::Image { name: "[Image #1]".into(), source: "shot.png".into(), mime: String::new(), b64_file: String::new(), caption: String::new() };
-        assert_eq!(said(&[rel], &[], &Door { store: store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }), Err("an image part needs an absolute source: shot.png".into()));
+        assert_eq!(said(&[rel], &[], &Door { store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }), Err("an image part needs an absolute source: shot.png".into()));
     }
 
     #[test]
@@ -366,10 +366,10 @@ mod tests {
     #[test]
     fn an_image_outside_the_store_is_refused() {
         let store = Path::new("/h/images");
-        assert!(said(&[img("/h/images/ab12.b64")], &[], &Door { store: store, put: &none, exists: &yes, known: &|_, _| Ok(1) }).is_ok());
-        assert!(said(&[img("")], &[], &Door { store: store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }).is_ok(), "no b64 yet: stored by the hub");
+        assert!(said(&[img("/h/images/ab12.b64")], &[], &Door { store, put: &none, exists: &yes, known: &|_, _| Ok(1) }).is_ok());
+        assert!(said(&[img("")], &[], &Door { store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }).is_ok(), "no b64 yet: stored by the hub");
         for bad in ["/etc/passwd", "/h/images/../secrets/k.b64", "/h/images/sub/a.b64", "rel/a.b64", "/h/images/a.png", "/h/imagesx/a.b64"] {
-            assert!(said(&[img(bad)], &[], &Door { store: store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }).is_err(), "{bad}");
+            assert!(said(&[img(bad)], &[], &Door { store, put: &fake, exists: &yes, known: &|_, _| Ok(1) }).is_err(), "{bad}");
         }
     }
 

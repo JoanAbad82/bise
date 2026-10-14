@@ -308,9 +308,9 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
 /// the store gave it (the terminal's /artifacts reads it all).
 /// `frame_base`: the page server's base (`http://127.0.0.1:<port>`, None
 /// with no server): a copied file's `frame_url` is it plus where the page
-/// server frames it (pages::site::frame_href: an xlsx, pptx or docx in
-/// bise's viewer, `/a/<id>/view`; any other file at its own link); a link
-/// or a page gets none.
+/// server frames it (pages::site::frame_href: what bise's viewer draws, an
+/// office file, a site, an image or a pdf, at `/a/<id>/view`; any other
+/// file at its own link); a link or a page gets none.
 pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>, frame_base: Option<&str>) -> Vec<Artifact> {
     let seen = ev.get("seen_ms").and_then(Value::as_u64).unwrap_or(0);
     let rows = ev.get("rows").and_then(Value::as_array).cloned().unwrap_or_default();

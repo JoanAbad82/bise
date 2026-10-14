@@ -141,8 +141,9 @@ pub fn serves_copy(by: &str, copy: &str) -> bool {
 }
 
 /// Where an artifact's copy is framed (the typed row's `frame_url`,
-/// proto_view::artifacts): an xlsx, pptx or docx in bise's viewer
-/// (pages/artifact/view.rs), at `/a/<id>/view` for the newest version (the
+/// proto_view::artifacts): what bise's viewer draws ([`viewer_kind`]: an
+/// office file, a site, an image, a pdf; pages/artifact/view.rs), at
+/// `/a/<id>/view` for the newest version (the
 /// frame keeps that src when a new one lands) or `/a/<id>/<v>/view` for an
 /// older one; any other copy at [`copy_href`]. Only for a copy that
 /// [`serves_copy`].
