@@ -12,7 +12,6 @@
 1118 rust/catalog/src/chatgpt.rs
 1722 rust/catalog/src/lib.rs
 1251 rust/catalog/src/tests.rs
-1015 rust/computer-use/src/e2e.rs
 1112 rust/harness/src/doctor.rs
 1236 rust/harness/src/main.rs
 1052 rust/plugins/src/resolve.rs
