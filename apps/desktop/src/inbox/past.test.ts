@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Card } from '@/proto';
-import { ALL, endWords, headWords, jumpOf, lineTwo, listsOf, mergeRecords, saidWords, whereWords, type InboxRecord } from './past';
+import { ALL, dayHead, endWords, headWords, jumpOf, lineTwo, listsOf, mergeRecords, saidWords, whereWords, type InboxRecord } from './past';
 
 const NOW = new Date(2026, 9, 14, 15, 0).getTime();
 const at = (d: number, h: number, m: number) => new Date(2026, 9, 14 - d, h, m).getTime();
@@ -12,7 +12,7 @@ const card = (id: number, agent: string, q: string, page = false): Card => ({
 
 const rec = (card: number, over: Partial<InboxRecord>): InboxRecord => ({
   card, project: 'shop', asker: 'perf', kind: 'question', question: 'keep the webp next to the avif?', options: ['keep both', 'avif only'],
-  state: 'answered', asked_ms: at(0, 13, 58), at_ms: at(0, 14, 2), ...over,
+  state: 'answered', asked_ms: at(0, 13, 58), at_ms: at(0, 14, 2), line2: '', ...over,
 });
 
 const NAMES = { shop: 'storefront', bise: 'bise' };
@@ -49,17 +49,26 @@ describe('the rows words', () => {
     expect(saidWords(rec(1, { pick_n: 1 }))).toBe('keep both');
     expect(saidWords(rec(1, { said: 'only for Safari 16' }))).toBe('only for Safari 16');
   });
-  it('says where, and drops it whole when narrow', () => {
-    expect(whereWords({ kind: 'thread', agent: 'main' })).toBe("in bise's thread");
-    const r = rec(1, { said: 'yes', where: { kind: 'page', page: 'p' } });
+  it("says the record's second line, and drops the 'where' whole when narrow", () => {
+    expect(whereWords({ kind: 'thread', agent: 'old' })).toBe("in old's thread");
+    expect(whereWords({ kind: 'unknown' })).toBe('in the inbox');
+    const r = rec(1, { said: 'yes', where: { kind: 'page', page: 'p' }, line2: 'you: yes · on a page' });
     expect(lineTwo(r)).toBe('you: yes · on a page');
     expect(lineTwo(r, true)).toBe('you: yes');
-    expect(lineTwo(rec(1, { state: 'withdrawn', reason: 'agent stopped' }))).toBe('withdrawn: agent stopped');
+    const w = rec(1, { state: 'withdrawn', reason: 'agent stopped', line2: 'withdrawn: its agent stopped' });
+    expect(lineTwo(w, true)).toBe('withdrawn: its agent stopped');
   });
   it('drops the project when narrow', () => {
     expect(endWords('shop', at(0, 14, 2), NAMES, false, null)).toBe('storefront · 14:02');
     expect(endWords('shop', at(0, 14, 2), NAMES, true, null)).toBe('14:02');
   });
+});
+
+it('heads a day as words::day_head', () => {
+  expect(dayHead(at(0, 9, 0), NOW)).toBe('today');
+  expect(dayHead(at(1, 9, 0), NOW)).toBe('yesterday');
+  expect(dayHead(at(2, 9, 0), NOW)).toBe('oct 12');
+  expect(dayHead(new Date(2024, 11, 30, 9, 0).getTime(), NOW)).toBe('dec 30 2024');
 });
 
 describe('jumpOf: where a past row goes', () => {

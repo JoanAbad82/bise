@@ -16,6 +16,7 @@ export type * from './hub';
 export type * from './rpc';
 export type * from './commands';
 export type * from './draft';
+export type * from './inbox';
 export type * from './app_rows';
 export type * from './core_ev';
 export type * from './app_cmd';

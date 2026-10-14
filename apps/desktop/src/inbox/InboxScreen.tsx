@@ -30,7 +30,7 @@ export function InboxScreen() {
         router.go({ screen: 'thread', project: j.project, agent: j.agent });
         return;
       }
-      const url = j.url ?? store.pages(j.project)?.items.find((p) => p.id === j.page)?.url;
+      const url = store.pages(j.project)?.items.find((p) => p.id === j.page)?.url;
       if (url !== undefined) void window.bise.openExternal(j.block === undefined ? url : `${url.replace(/#.*$/u, '')}#${j.block}`);
     },
     [router, store],
@@ -58,10 +58,11 @@ export function InboxScreen() {
  * thread is its owner).
  */
 function nextLine(store: Store, r: InboxRecord): string | undefined {
-  if (r.thread === undefined) return undefined;
-  const key = threadKey(r.project, r.thread.agent);
+  const at = r.thread;
+  if (at == null) return undefined;
+  const key = threadKey(r.project, at.agent);
   for (const pos of store.threadOrder(key).order) {
-    if (pos <= r.thread.pos) continue;
+    if (pos <= at.pos) continue;
     const e = store.entry(key, pos);
     if (e?.kind === 'agent' && e.text.trim() !== '') return e.text.trim().split('\n')[0];
   }

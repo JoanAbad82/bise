@@ -13,7 +13,7 @@ import { useListKeys } from '@/app/listkeys';
 import { Button, Field, Menu, MenuItem, Press } from '@/ds';
 import { shownName } from '@/agents/model';
 import { timeOf } from '@/artifacts/model';
-import { ALL, askersOf, headWords, jumpOf, jumpWords, lineTwo, listsOf, saidWords, STATES, waitEnd, whenWhere, whereWords, type Filter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
+import { ALL, askersOf, headWords, jumpOf, jumpWords, lineTwo, listsOf, saidWords, STATES, waitEnd, whenWhere, type Filter, type InboxRecord, type Jump, type PastRow, type WaitRow } from './past';
 import './past.css';
 
 export interface InboxPorts {
@@ -219,9 +219,9 @@ function WaitLine({ w, on, end, narrowEnd, onClick }: { w: WaitRow; on: boolean;
 
 function PastLine({ p, on, project, onClick }: { p: PastRow; on: boolean; project: string; onClick: () => void }) {
   const r = p.r;
-  const where = r.state === 'answered' ? whereWords(r.where) : '';
+  const short = lineTwo(r, true);
   return (
-    <div className={`ip-row ip-past${on ? ' on' : ''}${r.state === 'withdrawn' ? ' gone' : ''}`} role="option" aria-selected={on} data-row={p.key}
+    <div className={`ip-row ip-past${on ? ' on' : ''}${r.state !== 'answered' ? ' gone' : ''}`} role="option" aria-selected={on} data-row={p.key}
       data-testid={`inbox.row.${p.key}`} onClick={onClick}>
       <span className="ip-g">{p.glyph}</span>
       <span className="ip-one">
@@ -230,7 +230,8 @@ function PastLine({ p, on, project, onClick }: { p: PastRow; on: boolean; projec
       </span>
       <span className="ip-end"><span className="ip-proj">{`${project} · `}</span>{timeOf(r.at_ms)}</span>
       <span className="ip-two" data-testid={`inbox.row.${p.key}.said`}>
-        {r.state === 'withdrawn' ? lineTwo(r) : <>{`you: ${saidWords(r)}`}{where !== '' && <span className="ip-where">{` · ${where}`}</span>}</>}
+        {/* the 'where' in its own span, which 800 drops whole (past.css) */}
+        {short}{short !== r.line2 && <span className="ip-where">{r.line2.slice(short.length)}</span>}
       </span>
     </div>
   );
@@ -252,7 +253,7 @@ function Detail({ row, now, names, next, onJump }: { row: PastRow; now: number; 
           ))}
         </ol>
       )}
-      {r.state === 'answered' ? <div className="ip-d-said" data-testid="inbox.detail.said">{said}</div> : <div className="ip-d-gone">{lineTwo(r)}</div>}
+      {r.state === 'answered' ? <div className="ip-d-said" data-testid="inbox.detail.said">{said}</div> : <div className="ip-d-gone">{r.line2}</div>}
       <div className="ip-d-k" data-testid="inbox.detail.where">{whenWhere(r, now)}</div>
       {next !== undefined && next !== '' && <div className="ip-d-next">{`${shownName(j.kind === 'thread' ? j.agent : r.asker)} went on: ${next}`}</div>}
       <Press look="ip-d-go" onClick={onJump} data-testid="inbox.detail.go">{jumpWords(j)}</Press>

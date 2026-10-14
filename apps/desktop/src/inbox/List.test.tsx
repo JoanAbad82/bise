@@ -12,9 +12,9 @@ const NOW = new Date(2026, 9, 14, 15, 0).getTime();
 const at = (d: number, h: number, m: number) => new Date(2026, 9, 14 - d, h, m).getTime();
 const CARDS: Card[] = [{ id: 3, project: 'shop', kind: 'question', agent: 'search', question: 'which size system should the filter use?', options: [], urgent: false, since_ms: NOW - 12 * 60_000 }];
 const RECORDS: InboxRecord[] = [
-  { card: 1, project: 'shop', asker: 'perf', kind: 'question', question: 'keep the webp next to the avif?', options: ['keep both', 'avif only'], state: 'answered', said: 'only for Safari 16', where: { kind: 'inbox' }, asked_ms: at(0, 13, 58), at_ms: at(0, 14, 2), thread: { agent: 'perf', pos: 40 } },
-  { card: 2, project: 'bise', asker: 'designer', kind: 'question', question: 'la ligne d’attente?', options: ['A', 'B'], state: 'answered', pick_n: 1, where: { kind: 'page', page: 'wait-line', block: 'q1' }, asked_ms: at(1, 23, 0), at_ms: at(1, 23, 12) },
-  { card: 5, project: 'shop', asker: 'checkout', kind: 'question', question: 'retry the failed payment test?', options: [], state: 'withdrawn', reason: 'checkout answered itself', asked_ms: at(1, 18, 0), at_ms: at(1, 18, 30) },
+  { card: 1, project: 'shop', asker: 'perf', kind: 'question', question: 'keep the webp next to the avif?', options: ['keep both', 'avif only'], state: 'answered', said: 'only for Safari 16', where: { kind: 'inbox' }, asked_ms: at(0, 13, 58), at_ms: at(0, 14, 2), thread: { agent: 'perf', pos: 40 }, line2: 'you: only for Safari 16 · in the inbox' },
+  { card: 2, project: 'bise', asker: 'designer', kind: 'question', question: 'la ligne d’attente?', options: ['A', 'B'], state: 'answered', said: 'A', pick_n: 1, where: { kind: 'page', page: 'wait-line', block: 'q1' }, asked_ms: at(1, 23, 0), at_ms: at(1, 23, 12), line2: 'you: A · on a page' },
+  { card: 5, project: 'shop', asker: 'checkout', kind: 'question', question: 'retry the failed payment test?', options: [], state: 'withdrawn', reason: 'checkout answered itself', asked_ms: at(1, 18, 0), at_ms: at(1, 18, 30), line2: 'withdrawn: checkout answered itself' },
 ];
 const NAMES = { shop: 'storefront', bise: 'bise' };
 const PROJECTS = [{ project: 'bise', name: 'bise' }, { project: 'shop', name: 'storefront' }];
