@@ -872,6 +872,17 @@ def real_shape_pure():
     check(not rs.is_breach(follow, True, {17193}, cand, []) and rs.is_breach(follow, True, {17193}, cand, [{"name": "bise cand", "pid": 17193, "bundle": cand}]),
           "macOS's follow-up prompt: his with no chain to the run, a breach with one")
     check(rs.HIS_SYSTEM_UI == ("com.apple.screencaptureui", "com.apple.FollowUpUI"), "the allowlist is these two")
+    # his own 'bise try' relaunched (he restarted his stuck hub, main m_25331): his when its exe is under his
+    # live app, it's no pid of ours and nothing of ours launched it; the candidate's id or path stays a breach
+    HA = "/Users/g/.bise/dev/try-src/apps/desktop/dist/mac-arm64/bise try.app"
+    tryapp = {"name": "bise try", "pid": 23418, "bundle": "dev.bise.desktop.try"}
+    hexe = HA + "/Contents/MacOS/bise try"
+    check(not rs.is_breach(tryapp, True, {17193}, cand, [], exe=hexe, his_apps=(HA,)), "his own relaunch = his")
+    check(rs.is_breach(tryapp, True, {17193}, cand, [], exe="/x/bise cand.app/Contents/MacOS/bise try", his_apps=(HA,))
+          and rs.is_breach(dict(tryapp, pid=17193), True, {17193}, cand, [], exe=hexe, his_apps=(HA,))
+          and rs.is_breach(tryapp, True, {17193}, cand, [{"name": "bise cand", "pid": 17193, "bundle": cand}], exe=hexe, his_apps=(HA,))
+          and rs.is_breach(tryapp, True, {17193}, cand, []), "his id from another path, a pid of ours, our chain, or no exe = breach")
+    check(rs.is_breach({"name": "bise cand", "pid": 900, "bundle": cand}, True, {17193}, cand, [], exe=hexe, his_apps=(HA,)), "the candidate's id = breach")
     for other in ({"name": "Grab", "pid": 61828, "bundle": "com.apple.Grab"},
                   {"name": "UserNotificationCenter", "pid": 61829, "bundle": "com.apple.UserNotificationCenter"},
                   {"name": "CoreServicesUIAgent", "pid": 61830, "bundle": "com.apple.coreservices.uiagent"}):

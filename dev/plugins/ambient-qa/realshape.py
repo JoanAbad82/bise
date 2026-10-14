@@ -532,12 +532,30 @@ def his_screenshot(info, run_pids=None, cand_bundle=None, chain=None, cand_tcc=F
     return not any((run_pids and link.get("pid") in run_pids) or (cand_bundle and link.get("bundle") == cand_bundle) for link in chain or [])
 
 
+# his promoted app (cand.sh's HIS): his own relaunch of it (he restarts his stuck hub and the app
+# comes back with it; main m_25331) is logged, never a stop, when nothing ties it to the run
+HIS_APP_ID = "dev.bise.desktop.try"
+HIS_APP = os.path.expanduser("~/.bise/dev/try-src/apps/desktop/dist/mac-arm64/bise try.app")
+
+
+def his_relaunch(info, exe, his_apps, run_pids=None, cand_bundle=None, chain=None):
+    """His own 'bise try' coming front after a relaunch is his: its bundle id is his app's, its
+    executable is under his live app's path (`his_apps`: the path and its resolved form), it is no pid
+    of the run, and its launch chain holds no pid of the run and not the candidate's bundle. A
+    candidate is never built with his id (cand.sh refuses it). Pure."""
+    if info.get("bundle") != HIS_APP_ID or not exe or (run_pids and info.get("pid") in run_pids):
+        return False
+    if not any(exe.startswith(a.rstrip("/") + "/Contents/") for a in his_apps if a):
+        return False
+    return not any((run_pids and link.get("pid") in run_pids) or (cand_bundle and link.get("bundle") == cand_bundle) for link in chain or [])
+
+
 def run_screen_tcc(tcc_rows, run_pids):
     """Whether the run's pids asked TCC for screen capture (tcc.jsonl's rows: {service, pid}). Pure."""
     return any(r.get("service") == "kTCCServiceScreenCapture" and r.get("pid") in (run_pids or ()) for r in tcc_rows)
 
 
-def is_breach(info, started_after, run_pids=None, cand_bundle=None, chain=None, cand_tcc=False):
+def is_breach(info, started_after, run_pids=None, cand_bundle=None, chain=None, cand_tcc=False, exe=None, his_apps=()):
     """A front change is a breach when it is one of FRONT_BAD or an app started after the run
     began; any other app is his own switch (he works next to the run). With the run's pids known,
     an app that is not one of them and was there before the run is his own too, even named like
@@ -554,6 +572,8 @@ def is_breach(info, started_after, run_pids=None, cand_bundle=None, chain=None, 
     if cand_bundle and info.get("bundle") == cand_bundle:
         return True
     if his_screenshot(info, run_pids, cand_bundle, chain, cand_tcc):
+        return False
+    if his_relaunch(info, exe, his_apps, run_pids, cand_bundle, chain):
         return False
     if run_pids is not None and info.get("pid") and int(info["pid"]) not in run_pids and not started_after:
         return False
@@ -642,7 +662,14 @@ def front_gate(out, stop_file, bundle, every=0.1, pids_file=None):
                     run_pids = None
                 chain = launch_chain(cur["pid"]) if after and cur["pid"] else None
                 cand_tcc = run_screen_tcc(_jsonl(os.path.join(os.path.dirname(out), "tcc.jsonl")), run_pids) if cur.get("bundle") in HIS_SYSTEM_UI else False
-                row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after, run_pids, cand_bundle, chain, cand_tcc))
+                exe = subprocess.run(["ps", "-o", "command=", "-p", str(cur["pid"])], capture_output=True, text=True).stdout.strip() if cur.get("bundle") == HIS_APP_ID and cur["pid"] else None
+                his_apps = (os.environ.get("AS_HE_DOES_HIS_APP") or HIS_APP,)
+                his_apps = his_apps + (os.path.realpath(his_apps[0]),)
+                row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after, run_pids, cand_bundle, chain, cand_tcc, exe, his_apps))
+                if his_relaunch(cur, exe, his_apps, run_pids, cand_bundle, chain):
+                    row["his_relaunch"] = True
+                    print("%s his relaunch: %s (pid %s) from his live app, no chain to the run: logged, the run goes on"
+                          % (time.strftime("%H:%M:%S"), cur["name"], cur["pid"]), flush=True)
                 if his_screenshot(cur, run_pids, cand_bundle, chain, cand_tcc):
                     row["his_screenshot"] = True
                     print("%s his system UI: %s (%s), no chain to the run, no screen TCC from it: logged, the run goes on"
