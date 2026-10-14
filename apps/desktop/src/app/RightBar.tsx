@@ -1,6 +1,6 @@
 // The right bar (designer's desktop-right-bar v5, ambient-lead m_20085/m_20087): what happens in the
 // place shown, as the terminal's panel: four foldable sections in his order, AGENTS (start order,
-// ⌥N = the TUI's), ARCHIVED, ARTIFACTS, SCHEDULED & WATCHING (an alarm: agent-waiting-states A). 320 px, it takes panel A's slots
+// ⌥N = the TUI's), ARCHIVED (folded until he opens it), ARTIFACTS, SCHEDULED & WATCHING (an alarm: agent-waiting-states A). 320 px, it takes panel A's slots
 // (docked from 1000 px, sliding over under it, ⌥⌘0). On bise's thread the same sections cover every
 // project, the project's name in place of the role. A click opens the agent full in the centre (his
 // pick), an artifact its view, a task the scheduled screen; 'all ›' the full list in the centre.
@@ -57,9 +57,13 @@ export function useBarAgents(project: string): readonly ProjAgent[] {
   );
 }
 
-/** A section folded or not, kept per window (designer: 'L'état replié est gardé par fenêtre'). */
-function useFolded(key: string): readonly [boolean, () => void] {
-  const [v, set] = useState<boolean>(() => keep.view(`frame.rb.${key}`) === true);
+/** A section folded or not, kept per window (designer: 'L'état replié est gardé par fenêtre');
+ *  `byDefault` until he changes it (ARCHIVED starts folded: his ask, main m_23467). */
+function useFolded(key: string, byDefault: boolean): readonly [boolean, () => void] {
+  const [v, set] = useState<boolean>(() => {
+    const kept = keep.view(`frame.rb.${key}`);
+    return typeof kept === 'boolean' ? kept : byDefault;
+  });
   return [
     v,
     () => {
@@ -90,7 +94,7 @@ function Section({
   onAll: () => void;
   children: (r: BarRow) => ReactNode;
 }) {
-  const [folded, toggle] = useFolded(id);
+  const [folded, toggle] = useFolded(id, id === 'archived');
   const [more, setMore] = useState(false);
   const head = useRef<HTMLDivElement>(null);
   const shut = folded && !noFold;

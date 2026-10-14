@@ -71,7 +71,8 @@ for (const theme of ['light', 'dark']) {
       expect(Math.round((await bar.boundingBox())?.width ?? 0), 'the column is 320 px').toBe(320);
       await expect(page.getByTestId('app.right.top')).toHaveText(/^storefront\s*2 working\s*⌥⌘0$/u);
       // four sections in his order
-      const heads = await page.locator('[data-testid^="app.right."][data-testid$=".head"]').allTextContents();
+      // (the labels: ARCHIVED starts folded, its summary beside its label)
+      const heads = await page.locator('[data-testid^="app.right."][data-testid$=".head"] .app-rb-label').allTextContents();
       expect(heads).toEqual(['AGENTS · 13', 'ARCHIVED · 2', 'ARTIFACTS · 2', 'SCHEDULED & WATCHING · 2']);
       // AGENTS: start order, 8 rows + the waiting 10th in its place, '+ 4 more'
       const names = async () => page.locator('[data-testid="app.right.agents"] [data-testid^="app.right.agent."]').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')?.replace('app.right.agent.', '')));
@@ -85,12 +86,20 @@ for (const theme of ['light', 'dark']) {
       await page.screenshot({ path: test.info().outputPath(`right-bar-${theme}-1400.png`) });
       await page.getByTestId('app.right.agents.more').click();
       expect(await names()).toEqual([...NAMES, 'bench']);
-      // ARCHIVED folds to its head and a summary, kept after a reload
-      await page.getByTestId('app.right.archived.head').click();
+      // ARCHIVED starts folded (his ask, main m_23467): its head and a summary, no rows, no '+ N more'
       await expect(page.getByTestId('app.right.archived.summary')).toHaveText('✓ hero-img');
+      await expect(page.getByTestId('app.right.archived.hero-img')).toHaveCount(0);
+      await expect(page.getByTestId('app.right.archived.more')).toHaveCount(0);
+      // a click opens it, kept after a reload; folded again, kept too
+      await page.getByTestId('app.right.archived.head').click();
+      await expect(page.getByTestId('app.right.archived.hero-img')).toContainText('done · 2 h');
+      await page.reload();
+      await expect(page.getByTestId('app.right.archived.hero-img')).toContainText('done · 2 h', { timeout: 10_000 });
+      await page.getByTestId('app.right.archived.head').click();
       await expect(page.getByTestId('app.right.archived.hero-img')).toHaveCount(0);
       await page.reload();
       await expect(page.getByTestId('app.right.archived.summary')).toHaveText('✓ hero-img', { timeout: 10_000 });
+      await expect(page.getByTestId('app.right.archived.hero-img')).toHaveCount(0);
       await page.getByTestId('app.right.archived.head').click();
       await expect(page.getByTestId('app.right.archived.hero-img')).toContainText('done · 2 h');
       // the rest of the sections
@@ -157,6 +166,11 @@ for (const theme of ['light', 'dark']) {
           };
         });
       const clear = 'rgba(0, 0, 0, 0)';
+      // ARCHIVED starts folded ('▸' at rest, main m_23467): opened first, to look at it open
+      await page.mouse.move(1, 400);
+      expect(await look('archived'), 'archived starts folded').toMatchObject({ cursor: 'pointer', tint: clear, chevron: '"▸"', shown: 'visible', h: 28 });
+      await page.getByTestId('app.right.archived.head').click();
+      await expect(page.getByTestId('app.right.archived.hero-img')).toBeVisible();
       // every head that folds: pointer, 28 px; at rest no tint and no chevron, hovered both
       for (const id of ['archived', 'artifacts', 'scheduled']) {
         await page.mouse.move(1, 400);
