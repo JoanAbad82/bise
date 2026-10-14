@@ -169,8 +169,8 @@ test("shapes, tables, charts and images round trip; removing them takes their pa
   const zip = core.Zip.read(await again.save());
   assert.ok(zip.has("ppt/charts/chart1.xml") && zip.has("ppt/media/image1.png"));
   // the chart's workbook, embedded as PowerPoint does: its cells are the chart's data
-  const wb = core.Zip.read(zip.bytes("ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx"));
-  assert.match(wb.text("xl/worksheets/sheet1.xml"), /<c r="B1" t="inlineStr"><is><t xml:space="preserve">Revenue<\/t><\/is><\/c>.*<c r="B4"><v>155<\/v><\/c>/);
+  const wb = await office.sheets.open(zip.bytes("ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx"));
+  assert.deepEqual(wb.range("Sheet1!A1:B4").values(), [["", "Revenue"], ["Jul", 120], ["Aug", 140], ["Sep", 155]]);
   assert.match(zip.text("ppt/charts/chart1.xml"), /<c:externalData r:id="rId1">/);
   assert.match(zip.text("[Content_Types].xml"), /Extension="png"/);
   again.at({ kind: "shape", slide: 1, shape: chart.id }).remove();
@@ -183,6 +183,24 @@ test("shapes, tables, charts and images round trip; removing them takes their pa
   assert.equal(await code(() => s.addImage(new Uint8Array([1, 2, 3]), [0, 0, 10, 10])), "bad_arg");
   assert.equal(await code(() => s.addText("x", [0, 0, 0, 10])), "bad_arg");
   assert.equal(await code(() => shape.fill("blue")), "bad_arg");
+});
+
+test("a chart's names with < & \" and a leading = reach its embedded workbook as text", async () => {
+  const deck = await slides.create();
+  const names = ['R&D <net> "Q3"', "=SUM(A1)"];
+  deck.addSlide({ layout: "blank" }).addChart({ type: "bar", categories: ["<a>", "b & c"], series: names.map((name, i) => ({ name, values: [i, i + 1] })) }, [48, 48, 600, 400]);
+  const bytes = await deck.save();
+  const zip = core.Zip.read(bytes);
+  assert.deepEqual(office.checkPackage(zip), []);
+  const wb = await office.sheets.open(zip.bytes("ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx"));
+  const cells = wb.range("Sheet1!A1:C3").values();
+  assert.equal(cells[0][1], names[0]);
+  assert.equal(cells[0][2], "'=SUM(A1)"); // Excel's quote prefix: text, not a formula
+  assert.deepEqual(cells.slice(1).map((r) => r[0]), ["<a>", "b & c"]);
+  // the chart itself keeps the names exactly
+  const chart = (await slides.open(bytes)).inspect().nodes[0].children[0].props.chart;
+  assert.deepEqual(chart.series.map((s) => s.name), names);
+  assert.deepEqual(chart.categories, ["<a>", "b & c"]);
 });
 
 test("slides move, duplicate (charts copied) and go; ids stay, diff says what changed", async () => {

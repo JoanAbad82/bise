@@ -10,6 +10,7 @@ import { attr, child, children, descendants, type Element } from "../core/xml.ts
 import { Zip } from "../core/zip.ts";
 import { brokenRels, rels as zipRels } from "../core/opc.ts";
 import { esc } from "./units.ts";
+import { chartWorkbook, type ChartInput } from "./chart.ts";
 import { frag, insertBefore, int, path, PNS, REL } from "./dom.ts";
 import { ctxOf, layoutPlaceholders, slideSize, type Ctx } from "./inherit.ts";
 import { cNvPr } from "./read.ts";
@@ -29,6 +30,8 @@ export type LayoutInfo = { name: string; type?: string; key?: string; part: stri
 export class DeckCore {
   readonly store: Store;
   readonly pres: string;
+  /** The embedded workbooks of new charts, written at save (by path: an empty placeholder until then). */
+  readonly workbooks = new Map<string, ChartInput>();
 
   constructor(store: Store, pres: string) {
     this.store = store;
@@ -227,6 +230,8 @@ export class DeckCore {
             const ext = cr.target.slice(cr.target.lastIndexOf(".") + 1);
             const copy = this.store.freePath("ppt/embeddings/", "Microsoft_Excel_Worksheet", ext);
             this.store.putBytes(copy, this.store.zip.bytes(cr.target)!);
+            const waiting = this.workbooks.get(cr.target);
+            if (waiting) this.workbooks.set(copy, waiting);
             ids.set(cr.id, this.store.addRel(target, cr.type, copy));
           } else ids.set(cr.id, this.store.addRel(target, cr.type, cr.target));
         }
@@ -274,9 +279,13 @@ export class DeckCore {
     }
   }
 
-  /** The deck's bytes. */
-  save(): Uint8Array {
+  /** The deck's bytes, with the workbooks of the charts added since the last save. */
+  async save(): Promise<Uint8Array> {
     this.collect();
+    for (const [path, data] of this.workbooks) {
+      if (this.store.zip.has(path)) this.store.putBytes(path, await chartWorkbook(data));
+    }
+    this.workbooks.clear();
     this.store.flush();
     return this.store.zip.write();
   }

@@ -8,7 +8,7 @@ import type { OutlineNode, Selection } from "../core/outline.ts";
 import type { Rect } from "../anchor.gen.ts";
 import { attr, child, children, type Element } from "../core/xml.ts";
 import { chartFrameXml, imageInfo, pictureXml, shapeXml, tableXml, textBoxXml, type ShapeLook, type TableOpts } from "./build.ts";
-import { chartWorkbook, writeChart, type ChartInput } from "./chart.ts";
+import { writeChart, type ChartInput } from "./chart.ts";
 import type { DeckCore, SlideRef } from "./deck.ts";
 import { ensure, frag, insertBefore, ln, path, PNS, REL, remove } from "./dom.ts";
 import { boxOf } from "./inherit.ts";
@@ -149,11 +149,13 @@ export function slideSel(deck: DeckCore, sldId: number, rect?: Rect): SlideSel {
     },
     addChart(chart, box, opts = {}) {
       const b = boxEmu(box);
-      const workbook = chartWorkbook(chart);
+      writeChart(chart, "rId1"); // checks the data now, so a bad chart throws here and not at save
       const s = ref();
       const part = deck.store.freePath("ppt/charts/", "chart", "xml");
       const emb = deck.store.freePath("ppt/embeddings/", "Microsoft_Excel_Worksheet", "xlsx");
-      deck.store.putBytes(emb, workbook);
+      // the workbook's bytes come at save (the sheets module's save is async): a placeholder holds its path
+      deck.store.putBytes(emb, new Uint8Array(0));
+      deck.workbooks.set(emb, chart);
       deck.store.contentType({ ext: "xlsx", type: XLSX });
       deck.store.put(part, writeChart(chart, deck.store.addRel(part, REL.package, emb)));
       deck.store.contentType({ part, type: "application/vnd.openxmlformats-officedocument.drawingml.chart+xml" });

@@ -7,7 +7,7 @@
 
 import { attr, child, children, descendants, type Element } from "../core/xml.ts";
 import { OfficeError } from "../core/errors.ts";
-import { Zip } from "../core/zip.ts";
+import { sheets } from "../sheets/index.ts";
 import { int, ln, PNS } from "./dom.ts";
 import { esc, hex } from "./units.ts";
 
@@ -152,33 +152,25 @@ export function writeChart(d: ChartInput, workbookRid: string): string {
   );
 }
 
+/** A fixed date for the embedded workbook: the same chart, the same bytes. */
+const WORKBOOK_DATE = new Date(Date.UTC(2000, 0, 1));
+
 /**
  * The chart's data as the small workbook PowerPoint embeds with a chart
  * (Sheet1: categories in A, one series per column from B, names in row 1):
  * the cells the chart's c:f formulas point at. Quick Look draws no chart
- * without it, and PowerPoint's "Edit Data" opens it.
+ * without it, and PowerPoint's "Edit Data" opens it. Written by the sheets
+ * module (one xlsx writer in the SDK, architect m_23861); its save only
+ * awaits microtasks, so it runs in bare V8 too.
  */
-export function chartWorkbook(d: ChartInput): Uint8Array {
+export async function chartWorkbook(d: ChartInput): Promise<Uint8Array> {
   checkChart(d);
-  const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
-  const S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-  const R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-  const PR = "http://schemas.openxmlformats.org/package/2006/relationships";
-  const str = (ref: string, v: string) => `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
-  const num = (ref: string, v: number) => `<c r="${ref}"><v>${v}</v></c>`;
-  const head = `<row r="1">${d.series.map((s, i) => str(`${col(i + 1)}1`, String(s.name ?? ""))).join("")}</row>`;
-  const body = d.categories
-    .map((c, r) => `<row r="${r + 2}">${str(`A${r + 2}`, String(c))}${d.series.map((s, i) => num(`${col(i + 1)}${r + 2}`, s.values[r])).join("")}</row>`)
-    .join("");
-  const zip = Zip.empty();
-  zip.set(
-    "[Content_Types].xml",
-    `${X}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>` +
-      `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`,
-  );
-  zip.set("_rels/.rels", `${X}<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="${R}/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
-  zip.set("xl/workbook.xml", `${X}<workbook xmlns="${S}" xmlns:r="${R}"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>`);
-  zip.set("xl/_rels/workbook.xml.rels", `${X}<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="${R}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`);
-  zip.set("xl/worksheets/sheet1.xml", `${X}<worksheet xmlns="${S}"><sheetData>${head}${body}</sheetData></worksheet>`);
-  return zip.write();
+  // a text that starts with "=" is a formula to the sheets module: Excel's quote prefix keeps it text
+  const text = (v: unknown) => {
+    const s = String(v ?? "");
+    return s.startsWith("=") ? `'${s}` : s;
+  };
+  const rows = [["", ...d.series.map((s) => text(s.name))], ...d.categories.map((c, r) => [text(c), ...d.series.map((s) => s.values[r])])];
+  const book = await sheets.create({ sheet: "Sheet1", rows, date: WORKBOOK_DATE });
+  return book.save();
 }

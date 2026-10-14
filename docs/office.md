@@ -236,6 +236,7 @@ deck.check();                                  // overflow, off_slide, empty_pla
   charts (column, bar, line, pie: the values cached in the chart part,
   plus the small workbook PowerPoint embeds with a chart, which its
   "Edit Data" opens; Quick Look draws no chart without that workbook. The
+  workbook is written by the sheets module when the deck is saved. The
   SDK makes and replaces charts, it does not edit an existing one's data),
   and moves, duplicates (charts copied, notes not) or removes itself; a
   shape sets or replaces its text (across runs, each run's style kept),

@@ -91,7 +91,7 @@ export class Deck implements OfficeFile<"pptx", SlideOps | ShapeOps> {
     return check(this.core);
   }
 
-  async save(): Promise<Uint8Array> {
+  save(): Promise<Uint8Array> {
     return this.core.save();
   }
 }

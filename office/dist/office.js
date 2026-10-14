@@ -25515,26 +25515,16 @@ function writeChart(d, workbookRid) {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chartSpace xmlns:c="${C}" xmlns:a="${A}" xmlns:r="${PNS.r}"><c:roundedCorners val="0"/><c:chart>${title}<c:plotArea><c:layout/>${plot}</c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1200"/></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr><c:externalData r:id="${workbookRid}"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>`;
 }
-function chartWorkbook(d) {
+var WORKBOOK_DATE = new Date(Date.UTC(2e3, 0, 1));
+async function chartWorkbook(d) {
   checkChart(d);
-  const X4 = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
-  const S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-  const R6 = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-  const PR = "http://schemas.openxmlformats.org/package/2006/relationships";
-  const str2 = (ref, v) => `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
-  const num2 = (ref, v) => `<c r="${ref}"><v>${v}</v></c>`;
-  const head = `<row r="1">${d.series.map((s, i2) => str2(`${col(i2 + 1)}1`, String(s.name ?? ""))).join("")}</row>`;
-  const body = d.categories.map((c, r) => `<row r="${r + 2}">${str2(`A${r + 2}`, String(c))}${d.series.map((s, i2) => num2(`${col(i2 + 1)}${r + 2}`, s.values[r])).join("")}</row>`).join("");
-  const zip = Zip.empty();
-  zip.set(
-    "[Content_Types].xml",
-    `${X4}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`
-  );
-  zip.set("_rels/.rels", `${X4}<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="${R6}/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
-  zip.set("xl/workbook.xml", `${X4}<workbook xmlns="${S}" xmlns:r="${R6}"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>`);
-  zip.set("xl/_rels/workbook.xml.rels", `${X4}<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="${R6}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`);
-  zip.set("xl/worksheets/sheet1.xml", `${X4}<worksheet xmlns="${S}"><sheetData>${head}${body}</sheetData></worksheet>`);
-  return zip.write();
+  const text2 = (v) => {
+    const s = String(v ?? "");
+    return s.startsWith("=") ? `'${s}` : s;
+  };
+  const rows = [["", ...d.series.map((s) => text2(s.name))], ...d.categories.map((c, r) => [text2(c), ...d.series.map((s) => s.values[r])])];
+  const book = await sheets.create({ sheet: "Sheet1", rows, date: WORKBOOK_DATE });
+  return book.save();
 }
 
 // src/slides/inherit.ts
@@ -26283,6 +26273,8 @@ var CT_CHART = "application/vnd.openxmlformats-officedocument.drawingml.chart+xm
 var DeckCore = class _DeckCore {
   store;
   pres;
+  /** The embedded workbooks of new charts, written at save (by path: an empty placeholder until then). */
+  workbooks = /* @__PURE__ */ new Map();
   constructor(store, pres) {
     this.store = store;
     this.pres = pres;
@@ -26456,6 +26448,8 @@ var DeckCore = class _DeckCore {
             const ext = cr.target.slice(cr.target.lastIndexOf(".") + 1);
             const copy = this.store.freePath("ppt/embeddings/", "Microsoft_Excel_Worksheet", ext);
             this.store.putBytes(copy, this.store.zip.bytes(cr.target));
+            const waiting = this.workbooks.get(cr.target);
+            if (waiting) this.workbooks.set(copy, waiting);
             ids.set(cr.id, this.store.addRel(target, cr.type, copy));
           } else ids.set(cr.id, this.store.addRel(target, cr.type, cr.target));
         }
@@ -26498,9 +26492,13 @@ var DeckCore = class _DeckCore {
       for (const p of orphans) this.dropPart(p);
     }
   }
-  /** The deck's bytes. */
-  save() {
+  /** The deck's bytes, with the workbooks of the charts added since the last save. */
+  async save() {
     this.collect();
+    for (const [path2, data] of this.workbooks) {
+      if (this.store.zip.has(path2)) this.store.putBytes(path2, await chartWorkbook(data));
+    }
+    this.workbooks.clear();
     this.store.flush();
     return this.store.zip.write();
   }
@@ -26917,11 +26915,12 @@ function slideSel(deck, sldId, rect) {
     },
     addChart(chart, box, opts = {}) {
       const b = boxEmu(box);
-      const workbook = chartWorkbook(chart);
+      writeChart(chart, "rId1");
       const s = ref();
       const part2 = deck.store.freePath("ppt/charts/", "chart", "xml");
       const emb = deck.store.freePath("ppt/embeddings/", "Microsoft_Excel_Worksheet", "xlsx");
-      deck.store.putBytes(emb, workbook);
+      deck.store.putBytes(emb, new Uint8Array(0));
+      deck.workbooks.set(emb, chart);
       deck.store.contentType({ ext: "xlsx", type: XLSX });
       deck.store.put(part2, writeChart(chart, deck.store.addRel(part2, REL.package, emb)));
       deck.store.contentType({ part: part2, type: "application/vnd.openxmlformats-officedocument.drawingml.chart+xml" });
@@ -27163,7 +27162,7 @@ var Deck = class {
   check() {
     return check(this.core);
   }
-  async save() {
+  save() {
     return this.core.save();
   }
 };
