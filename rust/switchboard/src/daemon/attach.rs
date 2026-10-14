@@ -102,5 +102,8 @@ fn path_item(p: &str, store: &Path, tmps: Option<&(std::path::PathBuf, std::path
 /// The parts checked and rendered, as his own (`parts_in::said`).
 fn said(text: &str, items: &[Item]) -> Result<crate::parts_in::Said, String> {
     let parts = attach::parts(text, items);
-    crate::parts_in::said(&parts, &[], &bise_home::Home::from_env().images_dir(), &super::fn_context::store_image, &super::fn_context::file_exists)
+    // an agent's attachments are images and files only: no artifact note
+    let known = |_: &str, _: u64| Err("an agent's message carries no note on an artifact".to_string());
+    let door = crate::parts_in::Door { store: &bise_home::Home::from_env().images_dir(), put: &super::fn_context::store_image, exists: &super::fn_context::file_exists, known: &known };
+    crate::parts_in::said(&parts, &[], &door)
 }
