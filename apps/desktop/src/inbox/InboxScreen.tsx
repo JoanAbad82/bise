@@ -11,6 +11,7 @@ import { useKeptScroll } from '@/app/keep';
 import { actedKeys, threadKey, type Store } from '@/store';
 import { blockList, openInbox } from './Block';
 import { InboxView } from './List';
+import { openAnswer } from '@/thread/answerlink';
 import { useInboxRecords } from './records';
 import type { InboxRecord, Jump } from './past';
 
@@ -27,7 +28,7 @@ export function InboxScreen() {
   const jump = useCallback(
     (j: Jump) => {
       if (j.kind === 'thread') {
-        router.go({ screen: 'thread', project: j.project, agent: j.agent });
+        openAnswer(router, { project: j.project, agent: j.agent, card: j.card });
         return;
       }
       const url = store.pages(j.project)?.items.find((p) => p.id === j.page)?.url;
