@@ -59,6 +59,29 @@ only writer):
   without its `.git`), when it is at most 50 MB (a folder: summed, at
   most 5000 files). Bigger: no copy, `no_copy: "over 50 MB"`, and the add
   says `no copy kept (over 50 MB)`.
+- **An html file's assets** (`artifacts_assets.rs`, art-assets, architect
+  m_25093): an `.html`/`.htm` file is copied with the local files it
+  links, at `v<n>/<rel>` beside `v<n>/<name>.html`, so it opens whole.
+  What counts: its `src`, `href`, `poster` and `srcset` values and its
+  `url(…)`s, then each linked `.css` file's `url(…)`s and quoted
+  `@import`s (theirs too); a query or fragment dropped, `%xx` decoded.
+  Kept: files at or below the html's folder (a symlink out of it is
+  outside). Skipped: links, `data:`, `/abs`, `//host`, `#frag`,
+  templates. The caps (50 MB, 5000 files) count the html and its files
+  together; over them nothing is copied (never a half set). The sig is
+  the set's (`<bytes>:<newest mtime>:<files>`): an image changed alone is
+  a new version, each version keeps its own files. The add says `· with
+  N files it links`, then one line for what it could not keep: `▲ 2
+  files it links are not kept: ../logo.png (outside its folder),
+  img/gone.png (missing)`. A heuristic: what a script loads at run time
+  (fetch, `import()`, a src built in JS) is not seen; when the html runs
+  a script of its own (a kept `.js`, or `fetch(`/`import(` in it) the add
+  says `▲ files its scripts load at run time are not seen: check it
+  opens whole`. Served by the page server from the version's path
+  (`/a/<id>/<v>/<rel>`, `framed/<rel>` too; `site::copy_file`, one rule
+  with a folder's files: plain names inside `v<n>/`, real path checked);
+  a folder artifact (`sb artifact add <dir>`) is copied whole, as
+  before.
 - `seen.json`: `{seen_ms}`, when the user last looked (the header's
   `↗ N new`). Missing: written as now.
 
@@ -344,6 +367,17 @@ agents on it.
   pick archives nothing), archives a page without touching its store,
   keeps its first time when archived again; unarchive brings the row
   back, the copies stay gone.
+- `artifacts_assets.rs`: each ref form (src, href, poster, srcset with
+  widths, url() quoted or not, @import), resolution (?query, #hash, %20,
+  `..` inside and outside) and the skips (scheme, data:, //, /abs, #);
+  gather follows css and names what it cannot keep, never past the cap,
+  flags scripts. `artifacts_tests.rs`: an html with its files over 50 MB
+  copies nothing. `pages/server.rs`: an html artifact's images, css and
+  the css's url() are 200 from its version path, plain and framed, byte
+  for byte (only the framed html gets the tag); a missing file, `..`,
+  an encoded `/`, a hidden file, a symlink out and a folder are 404; an
+  unchanged re-add stays, one image changed is v2 with its own files, v1
+  keeps its own.
 - `diff_tests.rs`: the parse of `git diff` (statuses M A D R, binary,
   renames with spaces, `\ No newline`, hunk heads and starts); a huge
   file is cut with whole counts; numstat; a real throwaway repo: a

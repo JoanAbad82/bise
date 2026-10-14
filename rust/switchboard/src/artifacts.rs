@@ -12,6 +12,7 @@
 //! Plain functions over the state folder; the daemon's thread is the only
 //! writer, so there is no lock.
 
+use crate::artifacts_assets;
 use crate::artifacts_turns::{self, Place, Rev, Turn};
 use bise_proto::anchor::Anchor;
 use serde::{Deserialize, Serialize};
@@ -131,6 +132,17 @@ pub struct Added {
     /// A save in the same turn as the newest version (artifacts_turns):
     /// its copy replaced, `v` the same, its rev grew.
     pub replaced: bool,
+    /// An html file's links: how many files were kept beside its copy,
+    /// what was not (artifacts_assets), and whether it runs scripts.
+    pub assets: usize,
+    pub unkept: Vec<String>,
+    pub scripts: bool,
+}
+
+impl Added {
+    fn none() -> Added {
+        Added { meta: Meta::default(), new_version: false, page: false, not_artifact: false, replaced: false, assets: 0, unkept: Vec::new(), scripts: false }
+    }
 }
 
 /// A bise page as the page store keeps it (only what the list reads).
@@ -516,7 +528,7 @@ impl Store {
         if let Some(u) = &url {
             if let Some(id) = self.page_of_link(u) {
                 let p = pages.iter().find(|p| p.id == id).cloned().unwrap_or_default();
-                return Ok(Added { meta: page_meta(&p, self.pages_base().as_deref()), new_version: false, page: true, not_artifact: false, replaced: false });
+                return Ok(Added { meta: page_meta(&p, self.pages_base().as_deref()), new_version: false, page: true, not_artifact: false, replaced: false, ..Added::none() });
             }
         }
         let (source, target, kind) = match (&path, &url) {
@@ -529,7 +541,7 @@ impl Store {
         };
         if a.known_only && !stored.iter().any(|m| m.source == source) {
             let meta = Meta { source, ..Meta::default() };
-            return Ok(Added { meta, new_version: false, page: false, not_artifact: true, replaced: false });
+            return Ok(Added { meta, new_version: false, page: false, not_artifact: true, replaced: false, ..Added::none() });
         }
         let kind = a.kind.clone().unwrap_or_else(|| kind.to_string());
         let mut meta = match stored.iter().find(|m| m.source == source) {
@@ -563,11 +575,19 @@ impl Store {
         if a.kind.is_some() {
             meta.kind = kind;
         }
-        let sig = match &path {
-            Some(p) => {
-                let (bytes, mtime, _) = measure(p);
-                format!("{}:{}", bytes, mtime)
-            }
+        // an html file: the files it links beside it go with it (artifacts_assets);
+        // its size, sig and caps count them all
+        let assets = path.as_deref().filter(|p| artifacts_assets::is_html(p)).map(|p| artifacts_assets::gather(p, MAX_COPY_FILES)).unwrap_or_default();
+        let root = path.as_deref().and_then(Path::parent).map(Path::to_path_buf).unwrap_or_default();
+        let size = path.as_deref().map(|p| {
+            assets.files.iter().fold(measure(p), |(b, t, n), f| {
+                let (fb, ft, _) = measure(&root.join(f));
+                (b + fb, t.max(ft), n + 1)
+            })
+        });
+        let sig = match size {
+            Some((bytes, mtime, _)) if assets.files.is_empty() => format!("{}:{}", bytes, mtime),
+            Some((bytes, mtime, n)) => format!("{}:{}:{}", bytes, mtime, n),
             None => String::new(),
         };
         // a file added again, unchanged: the same version
@@ -576,13 +596,13 @@ impl Store {
             let same_bytes = || {
                 let copy = last.copy.as_ref().map(|c| self.dir().join(&meta.id).join(c));
                 match copy {
-                    Some(c) if p.is_file() => std::fs::read(&c).ok().is_some_and(|b| std::fs::read(p).ok() == Some(b)),
+                    Some(c) if p.is_file() && assets.files.is_empty() => std::fs::read(&c).ok().is_some_and(|b| std::fs::read(p).ok() == Some(b)),
                     _ => false,
                 }
             };
             if same_sig || same_bytes() {
                 self.save(&meta)?;
-                return Ok(Added { meta, new_version: false, page: false, not_artifact: false, replaced: false });
+                return Ok(Added { meta, new_version: false, page: false, not_artifact: false, replaced: false, ..Added::none() });
             }
         }
         // a save in the same turn by the same agent: the newest version again
@@ -592,9 +612,8 @@ impl Store {
             Some(l) => l.v + 1,
             None => 1,
         };
-        let (copy, no_copy) = match &path {
-            Some(p) => {
-                let (bytes, _, files) = measure(p);
+        let (copy, no_copy) = match (&path, size) {
+            (Some(p), Some((bytes, _, files))) => {
                 if bytes > MAX_COPY {
                     (None, Some("over 50 MB".to_string()))
                 } else if files > MAX_COPY_FILES {
@@ -602,13 +621,16 @@ impl Store {
                 } else {
                     let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "file".into());
                     let rel = format!("v{}/{}", v, name);
-                    match copy_whole(p, &self.dir().join(&meta.id).join(&rel)) {
+                    let vdir = self.dir().join(&meta.id).join(format!("v{}", v));
+                    // its files first, the html last: a reader of the html finds them there
+                    let linked = assets.files.iter().try_for_each(|f| copy_whole(&root.join(f), &vdir.join(f)));
+                    match linked.and_then(|()| copy_whole(p, &self.dir().join(&meta.id).join(&rel))) {
                         Ok(()) => (Some(rel), None),
                         Err(e) => (None, Some(format!("copy failed: {}", e))),
                     }
                 }
             }
-            None => (None, None),
+            _ => (None, None),
         };
         let rev = |revs: &[Rev]| Rev { rev: artifacts_turns::next_rev(revs), at_ms: now, changed: a.changed.clone() };
         match meta.versions.last_mut() {
@@ -627,7 +649,7 @@ impl Store {
             }
         }
         self.save(&meta)?;
-        Ok(Added { meta, new_version: true, page: false, not_artifact: false, replaced: same })
+        Ok(Added { meta, new_version: true, page: false, not_artifact: false, replaced: same, assets: assets.files.len(), unkept: assets.unkept, scripts: assets.scripts })
     }
 
     /// Every artifact, stored ones and pages, newest first (the time of
@@ -877,7 +899,15 @@ pub fn added_text(a: &Added) -> String {
         Some(why) if a.new_version => format!(" · no copy kept ({})", why),
         _ => String::new(),
     };
-    format!("{}{} · link it as {}", what, copy, link)
+    let with = if a.new_version && a.assets > 0 && copy.is_empty() { format!(" · with {} files it links", a.assets) } else { String::new() };
+    let mut out = format!("{}{}{} · link it as {}", what, with, copy, link);
+    if a.new_version {
+        for line in artifacts_assets::unkept_line(&a.unkept).into_iter().chain(a.scripts.then(|| artifacts_assets::SCRIPTS_LINE.to_string())) {
+            out.push('\n');
+            out.push_str(&line);
+        }
+    }
+    out
 }
 
 #[path = "artifacts_archive.rs"]

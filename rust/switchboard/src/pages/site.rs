@@ -229,6 +229,28 @@ pub fn sidebar(items: &[Item], home: &str) -> String {
     )
 }
 
+/// The file a request under version `v`'s copy names (`rest`, after
+/// `/a/<id>/<v>/` and [`framed`]), `base` the copy (`<id>/v<n>/<name>`):
+/// a folder's file (none: its index.html); a copied file by its name (or
+/// none), or a file it links kept beside it (artifacts_assets). The one
+/// rule for both: inside the version's folder, plain names only
+/// ([`safe_rel`], after %-decoding), and its real path stays there (a
+/// symlink out is refused). None: not served.
+pub fn copy_file(base: &std::path::Path, rest: &[&str]) -> Option<std::path::PathBuf> {
+    let file = base.is_file();
+    let root = if file { base.parent()? } else { base };
+    let rest: &[&str] = match (file, rest) {
+        (true, []) => return Some(base.to_path_buf()),
+        (false, []) => &["index.html"],
+        _ => rest,
+    };
+    // a request's names come %-encoded (`a%20b.png`); a decoded `/` is refused
+    let names: Vec<String> = rest.iter().map(|s| crate::artifacts_assets::decode(s)).collect();
+    let names: Vec<&str> = names.iter().map(String::as_str).collect();
+    let real = root.join(safe_rel(&names)?).canonicalize().ok()?;
+    (real.is_file() && real.starts_with(root.canonicalize().ok()?)).then_some(real)
+}
+
 /// A path under an artifact's copy, safe to join: plain names, no `..`,
 /// no hidden files.
 pub fn safe_rel(rest: &[&str]) -> Option<String> {

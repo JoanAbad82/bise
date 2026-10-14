@@ -534,3 +534,21 @@ fn a_known_only_add_is_only_a_next_version() {
     assert_eq!(a.meta.current().unwrap().v, 2);
     assert_eq!(store.stored().len(), 1);
 }
+
+/// art-assets (architect m_25093): an html file's caps count the files it
+/// links too; a set over them copies nothing (never a half set) and says why.
+#[test]
+fn an_html_file_and_its_files_over_50_mb_have_no_copy() {
+    let root = tmp("html-big");
+    let (state, work) = (root.join("state"), root.join("work"));
+    std::fs::create_dir_all(&work).unwrap();
+    std::fs::write(work.join("deck.html"), r#"<img src="a.png"><img src="b.png">"#).unwrap();
+    for f in ["a.png", "b.png"] {
+        std::fs::File::create(work.join(f)).unwrap().set_len(MAX_COPY / 2 + 1).unwrap();
+    }
+    let s = Store::new(&state);
+    let a = add(&s, &work, "deck.html", Some("deck"), 10).unwrap();
+    assert_eq!((a.meta.versions[0].copy.as_deref(), a.meta.versions[0].no_copy.as_deref()), (None, Some("over 50 MB")));
+    assert_eq!(added_text(&a), "added deck (page) · v1 · no copy kept (over 50 MB) · link it as [deck](artifact:deck)");
+    assert!(!state.join("artifacts/deck/v1").exists(), "nothing copied");
+}

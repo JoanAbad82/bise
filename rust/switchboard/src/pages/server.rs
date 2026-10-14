@@ -326,7 +326,8 @@ fn home(pages: &Pages) -> String {
 
 /// An artifact's file, from bise's copy (`/a/<id>/<v>/<path>`), in its
 /// sandbox (site.rs): a site folder, or a copied file the server sends
-/// (site::serves_copy, the same rule as the typed row's frame_url).
+/// (site::serves_copy, the same rule as the typed row's frame_url) and
+/// the files an html file links kept beside it (site::copy_file).
 fn artifact_file(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Response {
     let state = pages.store.dir.parent().unwrap_or(&pages.store.dir);
     let store = crate::artifacts::Store::new(state);
@@ -340,20 +341,8 @@ fn artifact_file(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Response {
     // script in its html (site::framed, architect m_24172)
     let (select, rest) = super::site::framed(rest);
     let rest: Vec<&str> = rest.iter().copied().filter(|s| !s.is_empty()).collect();
-    let path = if base.is_file() {
-        // a copied file: only itself, by its name (or no name)
-        let name = base.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if !(rest.is_empty() || rest == [name]) {
-            return Response::missing(&format!("no such file: {at}"));
-        }
-        base.clone()
-    } else {
-        let Some(rel) = super::site::safe_rel(&rest) else {
-            let index: &[&str] = if select { &["framed", "index.html"] } else { &["index.html"] };
-            return if rest.is_empty() { artifact_file(pages, id, v, index) } else { Response::missing(&format!("no such file: {at}")) };
-        };
-        base.join(rel)
-    };
+    // a folder's file, or a copied file and the files it links beside it
+    let Some(path) = super::site::copy_file(&base, &rest) else { return Response::missing(&format!("no such file: {at}")) };
     let Some(ctype) = super::site::ctype(&path.to_string_lossy()) else { return Response::missing(&format!("not served: {at}")) };
     match std::fs::read(&path) {
         Ok(body) if select && ctype.starts_with("text/html") => Response { status: 200, ctype, body: super::site::with_select(&body), csp: super::site::ARTIFACT_CSP },
@@ -768,6 +757,55 @@ mod tests {
         assert!(shell.contains("data-kind=\"pdf\""), "{shell}");
         let r = get(&p, &crate::pages::site::copy_href(&pdf.id, 1, pdf.copy.as_deref().unwrap_or("")));
         assert_eq!((r.status, r.ctype), (200, "application/pdf"));
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    /// art-assets: an html artifact's images and css (and the css's
+    /// url()) are kept beside its copy and served from its version's
+    /// path, plain and framed, byte for byte; a later version keeps its
+    /// own; nothing outside the version's folder is served.
+    #[test]
+    fn an_html_artifacts_files_are_served_from_its_version() {
+        let (p, d) = pages();
+        let work = d.join("work");
+        std::fs::create_dir_all(work.join("img")).unwrap();
+        std::fs::create_dir_all(work.join("css")).unwrap();
+        std::fs::write(d.join("secret.txt"), b"no").unwrap();
+        std::fs::write(work.join("img/shot one@2x.png"), b"PNG1").unwrap();
+        std::fs::write(work.join("img/bg.png"), b"BG").unwrap();
+        std::fs::write(work.join("css/site.css"), b".x{background:url('../img/bg.png')}").unwrap();
+        std::fs::write(work.join("index.html"), br#"<link rel="stylesheet" href="css/site.css"><img src="img/shot%20one@2x.png"><img src="img/gone.png">"#).unwrap();
+        let arts = crate::artifacts::Store::new(&d);
+        let add = |at: u64| {
+            let a = crate::artifacts::Add { target: "index.html".into(), title: Some("menus".into()), agent: "main".into(), by: "main".into(), cwd: work.to_string_lossy().to_string(), ..Default::default() };
+            arts.add(&a, at).unwrap()
+        };
+        let a = add(10);
+        assert_eq!(
+            crate::artifacts::added_text(&a),
+            "added menus (page) · v1 · with 3 files it links · link it as [menus](artifact:menus)\n▲ 1 file it links is not kept: img/gone.png (missing)"
+        );
+        for (path, body) in [("img/shot%20one@2x.png", "PNG1"), ("img/bg.png", "BG"), ("css/site.css", ".x{background:url('../img/bg.png')}")] {
+            for at in [format!("/a/menus/1/{path}"), format!("/a/menus/1/framed/{path}")] {
+                let r = get(&p, &at);
+                assert_eq!((r.status, text(&r).as_str(), r.csp), (200, body, super::super::site::ARTIFACT_CSP), "{at}");
+            }
+        }
+        assert!(!text(&get(&p, "/a/menus/1/index.html")).contains("site-select"), "the plain copy as it is");
+        assert!(text(&get(&p, "/a/menus/1/framed/index.html")).contains("site-select"), "the framed html gets the tag");
+        // nothing outside the version's folder
+        std::os::unix::fs::symlink(d.join("secret.txt"), d.join("artifacts/menus/v1/img/out.png")).unwrap();
+        for bad in ["img/gone.png", "../v1/index.html", "..%2f..%2fsecret.txt", "img/.part", "img/out.png", "%2fetc%2fpasswd", "img"] {
+            assert_eq!(get(&p, &format!("/a/menus/1/{bad}")).status, 404, "{bad}");
+        }
+        // unchanged: the same version; one image changed: v2 with its own, v1 keeps its own
+        assert!(!add(20).new_version, "nothing changed");
+        std::fs::write(work.join("img/bg.png"), b"BG2").unwrap();
+        let b = add(30);
+        assert_eq!((b.new_version, b.meta.current().unwrap().v), (true, 2));
+        assert_eq!(text(&get(&p, "/a/menus/2/img/bg.png")), "BG2");
+        assert_eq!(text(&get(&p, "/a/menus/1/img/bg.png")), "BG");
+        assert_eq!(text(&get(&p, "/a/menus/2/img/shot%20one@2x.png")), "PNG1");
         let _ = std::fs::remove_dir_all(d);
     }
 
