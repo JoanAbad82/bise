@@ -200,9 +200,9 @@ for (const theme of ['light', 'dark']) {
       await expect(page.getByTestId('app.right.tip.words')).toHaveText('#416 · approved · checks pass · ψ worktree on sb/search');
       // wt-sign (designer m_24019): a lone ψ says it is a worktree, its branch and folder mono in text
       await mark('app.right.agent.perf').hover();
-      const words = page.getByTestId('app.right.tip.words');
-      await expect(words).toHaveText('ψ worktree: its own copy of the repo, on sb/perf · /tmp/wt/perf/shop');
-      const mono = words.locator('.app-rb-tip-mono');
+      const psiTip = page.getByTestId('app.right.tip.words');
+      await expect(psiTip).toHaveText('ψ worktree: its own copy of the repo, on sb/perf · /tmp/wt/perf/shop');
+      const mono = psiTip.locator('.app-rb-tip-mono');
       await expect(mono).toHaveText(['sb/perf', '/tmp/wt/perf/shop']);
       expect(await mono.first().evaluate((e) => getComputedStyle(e).color)).toBe(await color('--c-text'));
       expect(await mono.first().evaluate((e) => getComputedStyle(e).fontFamily)).toMatch(/mono/iu);
