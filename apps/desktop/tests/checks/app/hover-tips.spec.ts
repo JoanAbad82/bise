@@ -148,7 +148,7 @@ for (const theme of ['light', 'dark']) {
       await hover('app.right.agent.perf.time', 'working for 6 min on this turn', 'right-time');
       await hover('app.right.agent.perf.pct', "17% of perf's context used: 44k of 256k", 'right-pct');
       await hover('app.right.agent.search.sign', '? search waits for you', 'right-asks');
-      await hover('app.right.agent.pay.mark', '#415 · checks fail: e2e/login · ψ sb/checkout · click opens the PR', 'right-pr');
+      await hover('app.right.agent.pay.mark', '#415 · checks fail: e2e/login · ψ worktree on sb/checkout · click opens the PR', 'right-pr');
 
       // warm: the next mark at once, no blink
       await page.getByTestId('app.right.agent.perf.time').hover();

@@ -109,7 +109,7 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(sign('ci-fix')).toHaveText('▲');
     await expect(page.getByTestId('app.right.agent.ci-fix')).not.toContainText('failed');
     await expect(sign('deploy-watch')).toHaveText('○');
-    await expect(page.getByTestId('app.right.agent.deploy-watch')).toHaveAttribute('title', /^wakes at /u);
+    await expect(page.getByTestId('app.right.agent.deploy-watch')).toHaveAttribute('aria-label', /^wakes at /u);
     await expect(sign('size-filter')).toHaveText('✓');
     await expect(page.getByTestId('app.right.agent.perf')).toContainText('14 min');
     // 9 live agents: 8 then '+ 1 more'
