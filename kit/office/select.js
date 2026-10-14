@@ -1,6 +1,7 @@
 // bise kit · notes on an artifact in its viewer (office-artifacts plan §5, §9b; architect m_23874):
 // the selection layer and the marks, over every renderer (sheet.js, slides.js, docx.js,
-// image.js, site.js: a site draws its marks in its own frame through view.marks). One store (pages/artifact/notes.rs), two doors:
+// image.js, site.js: a site draws its marks in its own frame through view.marks; pdf.js places
+// its notes itself through view.where, re-anchored on the version's text). One store (pages/artifact/notes.rs), two doors:
 //
 // - in the desktop's side panel (the frame's name is `bise-app`, art-desktop m_23900) a
 //   selection's `note` button posts {bise: "anchor", artifact, version, anchor, quote} to the
@@ -35,6 +36,7 @@ const W = {
     docx: "no notes yet. select some text, then note.",
     image: "no notes yet. draw a box, then note.",
     site: "no notes yet. select some text, then note.",
+    pdf: "no notes yet. select some text or draw a box, then note.",
   },
 };
 
@@ -108,6 +110,9 @@ function mount() {
   function where(a) {
     const s = stage();
     if (!s || !a) return { els: [], found: false };
+    // a renderer that places its own notes (pdf.js: re-anchored on the version's text)
+    const own = office.view && office.view.where ? office.view.where(a) : null;
+    if (own) return own;
     const q = (sel) => [...s.querySelectorAll(sel)];
     const esc = (v) => CSS.escape(String(v));
     switch (a.kind) {
@@ -248,6 +253,7 @@ function mount() {
     if (a.kind === "cell") return quoteOf([...s.querySelectorAll("td.sel")].map((td) => td.textContent).filter(Boolean).join(" "));
     if (a.kind === "shape") return quoteOf((s.querySelector(".office-slide .shape.sel") || {}).textContent);
     if (a.kind === "para") return quoteOf(a.quote || (s.querySelector(`[data-para="${CSS.escape(a.para)}"]`) || {}).textContent);
+    if (a.kind === "region") return quoteOf(a.quote);
     return "";
   }
   function offer(e) {
@@ -388,7 +394,8 @@ function mount() {
         await api(`/api/a/${encodeURIComponent(info.id)}/notes`, M.payload());
         const r = await api(`/api/a/${encodeURIComponent(info.id)}/send`, {});
         M.sent(Date.now());
-        barText.textContent = NW.sent(N.spaced(r.agent || info.agent));
+        // the agent by its real name, office-lead (designer m_24905)
+        barText.textContent = NW.sent(r.agent || info.agent);
         load();
       } catch {
         barText.textContent = NW.failed;

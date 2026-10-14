@@ -158,7 +158,8 @@ pub fn frame_href(id: &str, v: u64, copy: &str, newest: bool) -> String {
 /// file ([`office_kind`]), an image (`image`: png, jpg, gif, webp, where
 /// a note is a box drawn on it) or a site (`site`: a folder or an html
 /// file, still served sandboxed at [`copy_href`], framed inside the viewer
-/// so notes can sit on its blocks; art-notes). None: framed as itself.
+/// so notes can sit on its blocks; art-notes) or a pdf (`pdf`: drawn by
+/// pdf.js, a note on a passage or a box; pdf-notes). None: framed as itself.
 pub fn viewer_kind(copy: &str) -> Option<&'static str> {
     let file = file_of(copy);
     let ext = file.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
@@ -169,6 +170,8 @@ pub fn viewer_kind(copy: &str) -> Option<&'static str> {
         // as itself inside the viewer (kit/office/site.js), notes on its blocks
         _ if file.is_empty() || ext == "html" || ext == "htm" => Some("site"),
         _ if bise_proto::parts::IMAGE_EXTS.contains(&ext.as_str()) => Some("image"),
+        // a pdf: drawn by pdf.js (kit/office/pdf.js), notes on a passage or a box (pdf-notes)
+        _ if ext == "pdf" => Some("pdf"),
         _ => None,
     }
 }
@@ -254,6 +257,8 @@ pub fn ctype(path: &str) -> Option<&'static str> {
         "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        // drawn by pdf.js in bise's viewer (pdf-notes)
+        "pdf" => "application/pdf",
         _ => return None,
     })
 }
@@ -361,6 +366,7 @@ mod tests {
         assert_eq!((framed_href("r", 3, "v3/r.html"), framed_href("f", 1, "v1/site")), ("/a/r/3/framed/r.html".to_string(), "/a/f/1/framed/".to_string()));
         // an image too (art-notes: a note is a box drawn on it)
         assert_eq!((viewer_kind("v1/shot.PNG"), viewer_kind("v1/q3.xlsx"), viewer_kind("v1/a.csv")), (Some("image"), Some("xlsx"), None));
+        assert_eq!((viewer_kind("v2/report.pdf"), viewer_kind("v2/R.PDF")), (Some("pdf"), Some("pdf")));
         assert_eq!(frame_href("s", 1, "v1/shot.png", true), "/a/s/view");
         assert!(!serves_copy("page", "v1/q3.xlsx"), "a bise page is served at /p/");
         assert!(!serves_copy("x", "v1/a.xls"), "an old binary format is not sent");

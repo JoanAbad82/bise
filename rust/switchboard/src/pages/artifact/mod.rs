@@ -7,8 +7,9 @@
 //!   pptx or docx ([`view`]), the newest version or version `v`;
 //! - `GET /a/<id>/events`: the stream of its saves ([`events`]; server.rs
 //!   runs it, as `/p/<id>/events`);
-//! - `GET /kit/office/office.js`, `/kit/office/office-view.js`: the office
-//!   SDK's bundles, read from `office/dist` in the app root (one copy, never
+//! - `GET /kit/office/office.js`, `/kit/office/office-view.js`,
+//!   `office-pdf.js`, `pdf.worker.js`: the office SDK's bundles (the last two
+//!   pdf.js and its worker, pdf-notes), read from `office/dist` in the app root (one copy, never
 //!   in `kit/`, architect m_23781); the renderers beside them
 //!   (`kit/office/*.js`) are kit files;
 //! - `GET /a/<id>/notes`, `POST /api/a/<id>/notes|send`: the notes on an
@@ -24,7 +25,7 @@ use super::store::valid_id;
 use super::Pages;
 
 /// The bundles the viewer loads, from `Pages::office_dir`.
-const BUNDLES: &[&str] = &["office.js", "office-view.js"];
+const BUNDLES: &[&str] = &["office.js", "office-view.js", "office-pdf.js", "pdf.worker.js"];
 
 /// The response for `segs` (the path's segments), or None: not an
 /// artifact route of this module.

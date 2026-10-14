@@ -23,6 +23,23 @@
 .office-mark-box { outline: 1px solid var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .office-mark-box[data-mark="draft"] { outline-style: dashed; }
 
+/* a pdf (kit/office/pdf.js): its pages in a column, a canvas and pdf.js's text layer each; a box
+   drawn off the words, a passage's mark on its words (a wash of accent, one 3 px bar down its lines) */
+.office-pdf { flex: 1; overflow: auto; padding: 12px; }
+.office-pdf .office-pages { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.office-pdf .page { position: relative; width: 100%; background: #fff; box-shadow: 0 1px 3px var(--drop); cursor: crosshair; user-select: none; --scale-round-x: 1px; --scale-round-y: 1px; }
+.office-pdf .page > canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.office-pdf .textLayer { position: absolute; inset: 0; overflow: clip; line-height: 1; transform-origin: 0 0; z-index: 0; --min-font-size: 1; --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size)); --min-font-size-inv: calc(1 / var(--min-font-size)); }
+.office-pdf .textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; user-select: text; }
+.office-pdf .textLayer > :not(.markedContent), .office-pdf .textLayer .markedContent span:not(.markedContent) { z-index: 1; --font-height: 0; font-size: calc(var(--text-scale-factor) * var(--font-height)); --scale-x: 1; --rotate: 0deg; transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)); }
+.office-pdf .textLayer .markedContent { display: contents; }
+.office-pdf .textLayer ::selection { background: color-mix(in srgb, var(--ink) 22%, transparent); }
+.office-pdf .office-box, .office-pdf .office-mark-box { z-index: 2; }
+.office-pdf .office-mark-words { outline: 0; box-shadow: none; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.office-pdf .office-mark-bar { outline: 0; width: 3px !important; background: var(--accent); box-shadow: none; }
+.office-pdf .office-mark-bar[data-mark="draft"] { background: var(--accent-soft); }
+.office-pdf .office-mark-words[data-mark="draft"] { background: color-mix(in srgb, var(--accent-soft) 16%, transparent); }
+
 /* the control by a selection, in ink (the accent is only for his notes): the browser's `note`
    button; in the app the thread's quote pill, 'type to ask about it · ⌘C copy' (designer m_24098) */
 .office-note-btn { position: fixed; z-index: 20; font: var(--text-kicker) / 1 var(--font-ui); color: var(--surface-card); background: var(--ink); border: 0; border-radius: 999px; padding: 6px 12px; cursor: pointer; box-shadow: 0 1px 4px var(--drop); white-space: nowrap; }
@@ -40,7 +57,6 @@ body.with-notes #bise-office { margin-right: 280px; }
 .office-notes .words { margin-top: 2px; white-space: pre-wrap; }
 .office-notes .tag { display: inline-block; margin-top: 4px; color: var(--dim); font-size: var(--text-kicker); }
 .office-notes .tag[data-tag="done"] { color: var(--accent); }
-.office-notes .tag[data-tag="moved"] { color: var(--risk); }
 .office-notes .remove { margin-left: 8px; font: inherit; font-size: var(--text-kicker); color: var(--faint); background: none; border: 0; cursor: pointer; padding: 0; }
 .office-notes .empty { padding: 12px; color: var(--faint); }
 .office-notes .composer { padding: 8px 12px; border-top: 1px solid var(--line); }

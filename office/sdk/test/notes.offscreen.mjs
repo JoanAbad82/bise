@@ -4,6 +4,7 @@
 // a headless Chrome driven over CDP: the marks (sent, draft, ✓ on the answering version), the
 // `note` button on a selection, the browser's list, a note typed and sent (the POSTs the server
 // gets), and the desktop's door (the frame named bise-app posts the anchor to its parent).
+// A pdf too (pdf-notes): pdf.js's pages, a passage re-anchored on v2, a passage and a box noted.
 // Screens for designer at 1400 / 1100 / 800, light and dark, in $OUT (default $TMPDIR/notes-shots).
 //
 //   node office/sdk/test/notes.offscreen.mjs        (under ~/.bise/run/heavy-run --low)
@@ -43,12 +44,38 @@ function png() {
 import { createRequire } from "node:module";
 const require_ = createRequire(import.meta.url);
 
+// a pdf of `pages`, each a list of lines in Helvetica (made here, no file; pdf-notes)
+function pdf(pages) {
+  const objs = [];
+  const add = (body) => objs.push(body) && objs.length;
+  const font = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const kids = [];
+  const pagesId = objs.length + 1 + pages.length * 2;
+  for (const lines of pages) {
+    const esc = (t) => t.replace(/[\\()]/g, (c) => "\\" + c);
+    const ops = lines.map((l, i) => `BT /F1 14 Tf 72 ${720 - i * 24} Td (${esc(l)}) Tj ET`).join("\n");
+    const content = add(`<< /Length ${Buffer.byteLength(ops)} >>\nstream\n${ops}\nendstream`);
+    kids.push(add(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${font} 0 R >> >> /Contents ${content} 0 R >>`));
+  }
+  add(`<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(" ")}] /Count ${kids.length} >>`);
+  const catalog = add(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+  let out = "%PDF-1.4\n";
+  const at = [];
+  objs.forEach((b, i) => { at.push(Buffer.byteLength(out)); out += `${i + 1} 0 obj\n${b}\nendobj\n`; });
+  const xref = Buffer.byteLength(out);
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${at.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`;
+  out += `trailer\n<< /Size ${objs.length + 1} /Root ${catalog} 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, "latin1");
+}
+
 const fixture = (f) => readFileSync(join(root, "office", "fixtures", f));
 const ARTS = {
   "q3-xlsx": { kind: "xlsx", name: "q3.xlsx", bytes: fixture("tiny.xlsx") },
   "deck-pptx": { kind: "pptx", name: "deck.pptx", bytes: fixture("tiny.pptx") },
   "memo-docx": { kind: "docx", name: "memo.docx", bytes: fixture("tiny.docx") },
   "shot-png": { kind: "image", name: "shot.png", bytes: png() },
+  // v2 of a report: a summary page put in front, so the passage noted on v1's page 1 is on page 2
+  "report-pdf": { kind: "pdf", name: "report.pdf", bytes: pdf([["Summary", "Revenue up, costs flat."], ["Quarterly report", "Net revenue grew 4% in Q3.", "Costs held at last year's level.", "Hiring resumes in January."]]) },
   // a site with its own script (it rewrites nothing, it counts clicks), and one whose own meta CSP
   // keeps every script out, ours too (architect m_24172)
   "site-html": { kind: "site", name: "site.html", bytes: Buffer.from(`<!doctype html><html><head><meta charset="utf-8"><title>launch</title><style>body{font:16px/1.5 Georgia,serif;margin:32px;max-width:640px}</style></head><body><h1 id="title">Launch plan</h1><p id="intro">We open the waitlist on Monday and send the first invites on Thursday.</p><p>Pricing stays at twelve euros a month for the first year.</p><ul><li>press kit</li><li>demo video</li></ul><script>let n=0;document.addEventListener("click",()=>{n++})</script></body></html>`) },
@@ -96,7 +123,7 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
-  if (segs[0] === "kit" && segs[1] === "office" && (segs[2] === "office.js" || segs[2] === "office-view.js")) return send(200, "text/javascript", readFileSync(join(root, "office", "dist", segs[2])));
+  if (segs[0] === "kit" && segs[1] === "office" && ["office.js", "office-view.js", "office-pdf.js", "pdf.worker.js"].includes(segs[2])) return send(200, "text/javascript", readFileSync(join(root, "office", "dist", segs[2])));
   if (segs[0] === "kit") {
     const p = join(root, ...segs);
     return existsSync(p) ? send(200, types[extname(p)] || "application/octet-stream", readFileSync(p)) : send(404, "text/plain", "no");
@@ -209,6 +236,12 @@ try {
   NOTES["site-html"] = [n("n1", "sent", { kind: "block", block: "#intro", quote: "open the waitlist" }, "say which Monday"), n("n2", "done", { kind: "block", block: "body>p:nth-of-type(2)", quote: "twelve euros" }, "fifteen?", { done_in: VERSION }), n("n3", "sent", { kind: "block", block: "#gone", quote: "a sentence no longer there" }, "lost one")];
   NOTES["strict-html"] = [];
   NOTES["shot-png"] = [n("n1", "sent", { kind: "region", rect: { x: 10, y: 15, w: 30, h: 40 } }, "this red is off")];
+  // pdf-notes: on v1 the passage was on page 1; v2 put a summary in front
+  NOTES["report-pdf"] = [
+    n("n1", "sent", { kind: "region", page: 1, rect: { x: 11.8, y: 11.5, w: 30, h: 2.5 }, quote: "grew 4% in Q3" }, "vs. plan?"),
+    n("n2", "sent", { kind: "region", page: 1, rect: { x: 60, y: 60, w: 25, h: 20 } }, "an empty corner"),
+    n("n3", "sent", { kind: "region", page: 1, rect: { x: 10, y: 20, w: 30, h: 3 }, quote: "a sentence no longer there" }, "lost one"),
+  ];
 
   // ---- the marks, each kind, in the browser (the list beside the drawing)
   await open("/a/q3-xlsx/view", 1100, false);
@@ -230,8 +263,83 @@ try {
   await until("document.querySelector('.office-mark-box')", "a box on the image");
   ok("image: a note's box drawn on it");
 
+  // ---- a pdf: its words found again on v2's page 2, a box on its page, a lost passage moved
+  await open("/a/report-pdf/view", 1100, false);
+  await until("document.querySelector('.office-pdf .page[data-page=\"2\"] .office-mark-words')", "the passage's mark on page 2", 20000);
+  assert.equal(await evaluate("document.querySelector('.office-pdf .page[data-page=\"1\"] .office-mark-box:not(.office-mark-words)') !== null"), true, "the box stays on page 1");
+  await until("[...document.querySelectorAll('.office-notes .tag')].some(t => t.textContent === 'moved')", "the lost passage moved");
+  assert.equal(await evaluate("[...document.querySelectorAll('.office-notes .where')].map(w => w.textContent).filter(Boolean).join('|')"), 'page 1 · "grew 4% in Q3"|page 1 · a box|page 1 · "a sentence no longer there"');
+  await until("document.querySelector('.office-pdf .page[data-page=\"2\"] .textLayer span')", "page 2's text layer");
+  await shot("pdf-marks-1100-light");
+  ok("pdf: a passage re-anchored on v2's page 2, a box on its page, a lost passage moved");
+  // he drags over words on page 2: a passage, noted and sent
+  const span = await evaluate(`(() => { const s = [...document.querySelectorAll('.office-pdf .page[data-page="2"] .textLayer span')].find(x => x.textContent.includes('Costs held')); s.scrollIntoView({ block: 'center' }); const r = s.getBoundingClientRect(); return { x: r.left, y: r.top + r.height / 2, w: r.width }; })()`);
+  const press = async (x0, x1, y) => {
+    await cdp("Input.dispatchMouseEvent", { type: "mousePressed", x: x0, y, button: "left", clickCount: 1 });
+    await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: (x0 + x1) / 2, y, button: "left" });
+    await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: x1, y, button: "left" });
+    await cdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: x1, y, button: "left", clickCount: 1 });
+  };
+  await press(span.x + 1, span.x + span.w * 0.6, span.y);
+  await until("document.querySelector('.office-note-btn')", "the note button by the passage");
+  await shot("pdf-note-button-1100-light");
+  await evaluate("document.querySelector('.office-note-btn').click()");
+  await until("!document.querySelector('.office-notes .composer').hidden", "the composer");
+  assert.match(await evaluate("document.querySelector('.office-notes .composer .where').textContent"), /^page 2 · "Costs held/);
+  await evaluate("(() => { const t = document.querySelector('.office-notes textarea'); t.value = 'which year?'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()");
+  await until("!document.querySelector('.office-notes .send').hidden", "the send bar");
+  await evaluate("document.querySelector('.office-notes .send').click()");
+  await until("document.querySelector('.office-notes .bar .text').textContent.startsWith('sent.')", "sent");
+  const pdfDraft = posts.filter((p) => p.id === "report-pdf" && p.what === "notes").pop();
+  const pat = pdfDraft.body.notes.find((x) => x.text === "which year?").at;
+  assert.equal(pat.kind, "region");
+  assert.equal(pat.page, 2);
+  assert.match(pat.quote, /^Costs held/);
+  assert.ok(pat.rect.w > 5 && pat.rect.h > 0.5 && pat.rect.y > 10 && pat.rect.y < 20, JSON.stringify(pat.rect));
+  assert.ok(posts.some((p) => p.id === "report-pdf" && p.what === "send" && p.token === "t0k"));
+  await until("document.querySelectorAll('.office-pdf .page[data-page=\"2\"] .office-mark-words').length >= 2", "his passage marked once sent");
+  await shot("pdf-sent-1100-light");
+  ok(`pdf browser door: a passage selected, noted, sent as ${JSON.stringify(pat)}, then marked`);
+  // a drag off the words: a box
+  const pg = await evaluate(`(() => { const p = document.querySelector('.office-pdf .page[data-page="2"]'); const s = document.querySelector('.office-pdf'); s.scrollTop += p.getBoundingClientRect().top + p.getBoundingClientRect().height * 0.55 - 300; const r = p.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; })()`);
+  const bx = pg.x + pg.w * 0.55, by = pg.y + pg.h * 0.55;
+  await cdp("Input.dispatchMouseEvent", { type: "mousePressed", x: bx, y: by, button: "left", clickCount: 1 });
+  await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: bx + 60, y: by + 40, button: "left" });
+  await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: bx + 120, y: by + 80, button: "left" });
+  await cdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: bx + 120, y: by + 80, button: "left", clickCount: 1 });
+  await until("document.querySelector('.office-pdf .office-box') && document.querySelector('.office-note-btn')", "a box drawn and its note button");
+  const boxAt = await evaluate("biseOffice.view.selection()");
+  assert.equal(boxAt.page, 2);
+  assert.equal(boxAt.quote, undefined, "a box has no words");
+  assert.ok(Math.abs(boxAt.rect.x - 55) < 1.5 && boxAt.rect.w > 5, JSON.stringify(boxAt));
+  ok(`pdf: a drag off the words draws a box ${JSON.stringify(boxAt)}`);
+  // the app: a passage posts to the desktop with his first key
+  await open("/app?id=report-pdf", 1100, false);
+  await until("document.querySelector('iframe').contentDocument?.querySelector('.office-pdf .page[data-page=\"2\"] .textLayer span')", "the framed pdf's words", 20000);
+  await evaluate("window.got = []; window.addEventListener('message', (e) => e.data && e.data.bise === 'anchor' && window.got.push(e.data))");
+  const appSpan = await evaluate(`(() => { const f = document.querySelector('iframe').getBoundingClientRect(); const d = document.querySelector('iframe').contentDocument; const s = [...d.querySelectorAll('.office-pdf .page[data-page="2"] .textLayer span')].find(x => x.textContent.includes('Net revenue')); s.scrollIntoView({ block: 'center' }); const r = s.getBoundingClientRect(); return { x: f.left + r.left, y: f.top + r.top + r.height / 2, w: r.width }; })()`);
+  await press(appSpan.x + 1, appSpan.x + appSpan.w * 0.5, appSpan.y);
+  await until(`${frameDoc(true)}.querySelector('.office-note-btn')`, "the pill in the app");
+  await cdp("Input.dispatchKeyEvent", { type: "keyDown", key: "w", text: "w" });
+  await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: "w" });
+  await until("window.got.length > 0", "the desktop got the passage");
+  const gotPdf = await evaluate("window.got[0]");
+  assert.deepEqual(Object.keys(gotPdf).sort(), ["anchor", "artifact", "bise", "key", "quote", "version"]);
+  assert.equal(gotPdf.anchor.kind, "region");
+  assert.equal(gotPdf.anchor.page, 2);
+  assert.match(gotPdf.anchor.quote, /^Net revenue/);
+  assert.equal(gotPdf.quote, gotPdf.anchor.quote);
+  ok(`pdf in the app: the passage and his first key go to the desktop (${JSON.stringify(gotPdf.anchor)})`);
+
   // ---- the browser's door: draw a box, note, type, send
-  await evaluate(`(() => { const f = document.querySelector('.office-image .frame'); const r = f.getBoundingClientRect(); const at = (x, y, t) => f.dispatchEvent(new PointerEvent(t, { bubbles: true, clientX: r.left + x, clientY: r.top + y, button: 0, pointerId: 1 })); at(220, 40, 'pointerdown'); at(330, 150, 'pointermove'); at(330, 150, 'pointerup'); document.querySelector('#bise-office').dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: r.left + 330, clientY: r.top + 150 })); })()`);
+  await open("/a/shot-png/view", 1100, false);
+  await until("document.querySelector('.office-image .frame img') && document.querySelector('.office-mark-box')", "the image again");
+  // a real drag (CDP input), as his mouse: the button comes from the mouseup it fires
+  const fr = await evaluate("(() => { const r = document.querySelector('.office-image .frame').getBoundingClientRect(); return { x: r.left, y: r.top }; })()");
+  await cdp("Input.dispatchMouseEvent", { type: "mousePressed", x: fr.x + 220, y: fr.y + 40, button: "left", clickCount: 1 });
+  await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: fr.x + 280, y: fr.y + 100, button: "left" });
+  await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: fr.x + 330, y: fr.y + 150, button: "left" });
+  await cdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: fr.x + 330, y: fr.y + 150, button: "left", clickCount: 1 });
   await until("document.querySelector('.office-note-btn')", "the note button");
   assert.equal(await evaluate("document.querySelector('.office-note-btn').textContent"), "note");
   await shot("image-note-button-1100-light");

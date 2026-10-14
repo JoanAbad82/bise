@@ -10,38 +10,39 @@ rust/Cargo.lock and rust/jsrt/Cargo.lock: do not edit by hand.
 
 1. Summary
 
-Rust crates (244), by license expression:
-   102  MIT OR Apache-2.0
-    51  MIT
-    25  Apache-2.0
+Rust crates (273), by license expression:
+   117  MIT OR Apache-2.0
+    57  MIT
+    27  Apache-2.0
     22  Unicode-3.0
-    15  Apache-2.0 OR MIT
-     7  Unlicense OR MIT
+    16  Apache-2.0 OR MIT
+     8  Unlicense OR MIT
+     4  Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
      3  BSD-3-Clause
      2  (MIT OR Apache-2.0) AND Unicode-3.0
      2  Apache-2.0 OR BSL-1.0
-     2  Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
+     2  BSD-2-Clause OR Apache-2.0 OR MIT
      2  CDLA-Permissive-2.0
      2  ISC
      2  MPL-2.0
+     2  Zlib
      1  Apache-2.0 AND ISC
      1  Apache-2.0 OR ISC OR MIT
      1  BSD-2-Clause OR Apache-2.0
-     1  BSD-2-Clause OR Apache-2.0 OR MIT
      1  BSD-2-Clause OR MIT OR Apache-2.0
      1  MPL-2.0+
-     1  Zlib
 
 Other components (section 3), by license:
-     7  MIT
+     9  MIT
+     4  Apache-2.0
      3  MIT-0
-     3  Apache-2.0
      1  Apache-2.0 OR MIT
      1  Apache-2.0 OR MIT OR BSL-1.0
      1  Apache-2.0 WITH LLVM-exception
      1  Apache-2.0 WITH LLVM-exception OR BSL-1.0
      1  BSD-3-Clause
      1  CC0-1.0
+     1  ISC
      1  LGPL-2.1-or-later
      1  Unicode-3.0
 
@@ -50,7 +51,7 @@ Other components (section 3), by license:
    Binary: bise = the `bise` command (rust/), jsrt = `bend-jsrt` (rust/jsrt).
    For a choice of licenses ("A OR B"), bise uses the one after "->".
 
-  ahash 0.8.12  [jsrt]  MIT OR Apache-2.0 -> MIT
+  ahash 0.8.12  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/tkaitchuck/ahash
   aho-corasick 1.1.5  [jsrt,bise]  Unlicense OR MIT -> MIT
       https://github.com/BurntSushi/aho-corasick
@@ -64,7 +65,7 @@ Other components (section 3), by license:
       https://github.com/tomprogrammer/rust-ascii
   az 1.3.0  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://gitlab.com/tspiteri/az
-  base64 0.22.1  [jsrt]  MIT OR Apache-2.0 -> MIT
+  base64 0.22.1  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/marshallpierce/rust-base64
   base64-simd 0.8.0  [jsrt]  MIT
       https://github.com/Nugine/simd
@@ -82,16 +83,26 @@ Other components (section 3), by license:
       https://github.com/bitflags/bitflags
   bitvec 1.1.1  [jsrt]  MIT
       https://github.com/bitvecto-rs/bitvec
-  block-buffer 0.10.4  [jsrt]  MIT OR Apache-2.0 -> MIT
+  block-buffer 0.10.4  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/RustCrypto/utils
+  bon 3.10.1  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/elastio/bon
+  brush-parser 0.4.0  [bise]  MIT
+      https://github.com/reubeno/brush
   bstr 1.13.1  [bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/BurntSushi/bstr
   bumpalo 3.20.3  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/fitzgen/bumpalo
-  bytes 1.12.1  [jsrt]  MIT
+  byteorder 1.5.0  [bise]  Unlicense OR MIT -> MIT
+      https://github.com/BurntSushi/byteorder
+  bytes 1.12.1  [jsrt,bise]  MIT
       https://github.com/tokio-rs/bytes
   bytes-str 0.2.9  [jsrt]  Apache-2.0
       https://github.com/dudykr/ddbase.git
+  cached 0.59.0  [bise]  MIT
+      https://github.com/jaemk/cached
+  cached_proc_macro_types 0.1.1  [bise]  MIT
+      https://github.com/jaemk/cached
   calendrical_calculations 0.2.4  [jsrt]  Apache-2.0
       https://github.com/unicode-org/icu4x
   capacity_builder 0.5.0  [jsrt]  MIT
@@ -106,6 +117,8 @@ Other components (section 3), by license:
       https://github.com/ParkMyCar/compact_str
   compact_str 0.8.2  [bise]  MIT
       https://github.com/ParkMyCar/compact_str
+  console 0.16.6  [bise]  MIT
+      https://github.com/console-rs/console
   cooked-waker 5.0.0  [jsrt]  MPL-2.0
       https://github.com/Lucretiel/cooked-waker
   core-foundation-sys 0.8.7  [bise]  MIT OR Apache-2.0 -> MIT
@@ -118,7 +131,7 @@ Other components (section 3), by license:
       https://github.com/RustAudio/coreaudio-sys.git
   cpal 0.15.3  [bise]  Apache-2.0
       https://github.com/rustaudio/cpal
-  cpufeatures 0.2.17  [jsrt]  MIT OR Apache-2.0 -> MIT
+  cpufeatures 0.2.17  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/RustCrypto/utils
   crossbeam-deque 0.8.8  [bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/crossbeam-rs/crossbeam
@@ -128,11 +141,11 @@ Other components (section 3), by license:
       https://github.com/crossbeam-rs/crossbeam
   crossterm 0.28.1  [bise]  MIT
       https://github.com/crossterm-rs/crossterm
-  crypto-common 0.1.7  [jsrt]  MIT OR Apache-2.0 -> MIT
+  crypto-common 0.1.7  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/RustCrypto/traits
   dasp_sample 0.11.0  [bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/rustaudio/sample.git
-  data-encoding 2.11.1  [jsrt]  MIT
+  data-encoding 2.11.1  [jsrt,bise]  MIT
       https://github.com/ia0/data-encoding
   data-url 0.3.2  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/servo/rust-url
@@ -152,7 +165,7 @@ Other components (section 3), by license:
       https://github.com/denoland/deno_terminal
   deno_unsync 0.4.4  [jsrt]  MIT
       https://github.com/denoland/deno_unsync
-  digest 0.10.7  [jsrt]  MIT OR Apache-2.0 -> MIT
+  digest 0.10.7  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/RustCrypto/traits
   diplomat-runtime 0.16.0  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/rust-diplomat/diplomat
@@ -166,9 +179,13 @@ Other components (section 3), by license:
       https://github.com/indexmap-rs/equivalent
   errno 0.3.14  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/lambda-fairy/rust-errno
+  fastrand 2.5.0  [bise]  Apache-2.0 OR MIT -> MIT
+      https://github.com/smol-rs/fastrand
   filedescriptor 0.8.3  [bise]  MIT
       https://github.com/wezterm/wezterm
   foldhash 0.1.5  [bise]  Zlib
+      https://github.com/orlp/foldhash
+  foldhash 0.2.0  [bise]  Zlib
       https://github.com/orlp/foldhash
   form_urlencoded 1.2.2  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/servo/rust-url
@@ -190,11 +207,11 @@ Other components (section 3), by license:
       https://github.com/rust-lang/futures-rs
   futures-util 0.3.34  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/rust-lang/futures-rs
-  generic-array 0.14.7  [jsrt]  MIT
+  generic-array 0.14.7  [jsrt,bise]  MIT
       https://github.com/fizyk20/generic-array.git
   getrandom 0.2.17  [bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/rust-random/getrandom
-  getrandom 0.4.3  [jsrt]  MIT OR Apache-2.0 -> MIT
+  getrandom 0.4.3  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/rust-random/getrandom
   globset 0.4.20  [bise]  Unlicense OR MIT -> MIT
       https://github.com/BurntSushi/ripgrep/tree/master/crates/globset
@@ -202,10 +219,16 @@ Other components (section 3), by license:
       https://github.com/rust-lang/hashbrown
   hashbrown 0.15.5  [bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/rust-lang/hashbrown
+  hashbrown 0.16.1  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/rust-lang/hashbrown
   hashbrown 0.17.1  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/rust-lang/hashbrown
   hstr 3.0.6  [jsrt]  Apache-2.0
       https://github.com/swc-project/swc.git
+  http 1.5.0  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/hyperium/http
+  httparse 1.10.1  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/seanmonstar/httparse
   icu_calendar 2.3.0  [jsrt]  Unicode-3.0
       https://github.com/unicode-org/icu4x
   icu_calendar_data 2.3.0  [jsrt]  Unicode-3.0
@@ -236,8 +259,12 @@ Other components (section 3), by license:
       https://github.com/lambda-fairy/if_chain
   ignore 0.4.33  [bise]  Unlicense OR MIT -> MIT
       https://github.com/BurntSushi/ripgrep/tree/master/crates/ignore
+  indenter 0.3.4  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/yaahc/indenter
   indexmap 2.14.2  [jsrt,bise]  Apache-2.0 OR MIT -> MIT
       https://github.com/indexmap-rs/indexmap
+  insta 1.48.0  [bise]  Apache-2.0
+      https://github.com/mitsuhiko/insta
   inventory 0.3.24  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/dtolnay/inventory
   itertools 0.13.0  [bise]  MIT OR Apache-2.0 -> MIT
@@ -250,6 +277,8 @@ Other components (section 3), by license:
       https://github.com/rust-lang/libc
   libm 0.2.16  [jsrt]  MIT
       https://github.com/rust-lang/compiler-builtins
+  linux-raw-sys 0.12.1  [bise]  Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT -> MIT
+      https://github.com/sunfishcode/linux-raw-sys
   linux-raw-sys 0.4.15  [bise]  Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT -> MIT
       https://github.com/sunfishcode/linux-raw-sys
   litemap 0.8.3  [jsrt]  Unicode-3.0
@@ -292,20 +321,28 @@ Other components (section 3), by license:
       https://github.com/Amanieu/parking_lot
   pathdiff 0.2.3  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/Manishearth/pathdiff
+  peg 0.8.6  [bise]  MIT
+      https://github.com/kevinmehall/rust-peg
+  peg-runtime 0.8.6  [bise]  MIT
+      https://github.com/kevinmehall/rust-peg
   percent-encoding 2.3.2  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/servo/rust-url/
+  pest 2.9.2  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/pest-parser/pest
   phf 0.11.3  [jsrt]  MIT
       https://github.com/rust-phf/rust-phf
   phf_shared 0.11.3  [jsrt]  MIT
       https://github.com/rust-phf/rust-phf
   pin-project 1.1.13  [jsrt]  Apache-2.0 OR MIT -> MIT
       https://github.com/taiki-e/pin-project
-  pin-project-lite 0.2.17  [jsrt]  Apache-2.0 OR MIT -> MIT
+  pin-project-lite 0.2.17  [jsrt,bise]  Apache-2.0 OR MIT -> MIT
       https://github.com/taiki-e/pin-project-lite
   portable-pty 0.9.0  [bise]  MIT
       https://github.com/wezterm/wezterm
   potential_utf 0.1.6  [jsrt]  Unicode-3.0
       https://github.com/unicode-org/icu4x
+  ppv-lite86 0.2.21  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/cryptocorrosion/cryptocorrosion
   proc-macro2 1.0.107  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/dtolnay/proc-macro2
   psm 0.1.32  [jsrt]  MIT OR Apache-2.0 -> MIT
@@ -314,9 +351,11 @@ Other components (section 3), by license:
       https://github.com/dtolnay/quote
   radium 0.7.0  [jsrt]  MIT
       https://github.com/bitvecto-rs/radium
-  rand 0.8.8  [jsrt]  MIT OR Apache-2.0 -> MIT
+  rand 0.8.8  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/rust-random/rand
-  rand_core 0.6.4  [jsrt]  MIT OR Apache-2.0 -> MIT
+  rand_chacha 0.3.1  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/rust-random/rand
+  rand_core 0.6.4  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/rust-random/rand
   ratatui 0.29.0  [bise]  MIT
       https://github.com/ratatui/ratatui
@@ -333,6 +372,8 @@ Other components (section 3), by license:
   rustc-hash 2.1.3  [jsrt]  Apache-2.0 OR MIT -> MIT
       https://github.com/rust-lang/rustc-hash
   rustix 0.38.44  [bise]  Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT -> MIT
+      https://github.com/bytecodealliance/rustix
+  rustix 1.1.5  [bise]  Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT -> MIT
       https://github.com/bytecodealliance/rustix
   rustls 0.23.45  [bise]  Apache-2.0 OR ISC OR MIT -> MIT
       https://github.com/rustls/rustls
@@ -362,7 +403,7 @@ Other components (section 3), by license:
       https://github.com/denoland/deno
   serial2 0.2.38  [bise]  BSD-2-Clause OR Apache-2.0 -> Apache-2.0
       https://github.com/de-vri-es/serial2-rs
-  sha1 0.10.7  [jsrt]  MIT OR Apache-2.0 -> MIT
+  sha1 0.10.7  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/RustCrypto/hashes
   shell-words 1.1.1  [bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/tmiasko/shell-words
@@ -372,6 +413,8 @@ Other components (section 3), by license:
       https://github.com/vorner/signal-hook
   signal-hook-registry 1.4.8  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/vorner/signal-hook
+  similar 2.7.0  [bise]  Apache-2.0
+      https://github.com/mitsuhiko/similar
   siphasher 0.3.11  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/jedisct1/rust-siphash
   siphasher 1.0.3  [jsrt]  MIT OR Apache-2.0 -> MIT
@@ -440,6 +483,8 @@ Other components (section 3), by license:
       https://github.com/dsherret/sys_traits
   tap 1.0.1  [jsrt]  MIT
       https://github.com/myrrlyn/tap
+  tempfile 3.27.0  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/Stebalien/tempfile
   temporal_capi 0.2.6  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/boa-dev/temporal
   temporal_rs 0.2.6  [jsrt]  MIT OR Apache-2.0 -> MIT
@@ -451,6 +496,8 @@ Other components (section 3), by license:
   thiserror 1.0.69  [bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/dtolnay/thiserror
   thiserror 2.0.20  [jsrt]  MIT OR Apache-2.0 -> MIT
+      https://github.com/dtolnay/thiserror
+  thiserror 2.0.21  [bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/dtolnay/thiserror
   timezone_provider 0.2.6  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/boa-dev/temporal
@@ -466,16 +513,20 @@ Other components (section 3), by license:
       https://github.com/toml-rs/toml
   toml_writer 1.1.2+spec-1.1.0  [bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/toml-rs/toml
-  tracing 0.1.44  [jsrt]  MIT
+  tracing 0.1.44  [jsrt,bise]  MIT
       https://github.com/tokio-rs/tracing
-  tracing-core 0.1.36  [jsrt]  MIT
+  tracing-core 0.1.36  [jsrt,bise]  MIT
       https://github.com/tokio-rs/tracing
   triomphe 0.1.16  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/Manishearth/triomphe
   tui-term 0.2.0  [bise]  MIT
       https://github.com/a-kenji/tui-term
-  typenum 1.20.1  [jsrt]  MIT OR Apache-2.0 -> MIT
+  tungstenite 0.24.0  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/snapview/tungstenite-rs
+  typenum 1.20.1  [jsrt,bise]  MIT OR Apache-2.0 -> MIT
       https://github.com/paholg/typenum
+  ucd-trie 0.1.7  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/BurntSushi/ucd-generate
   unicode-id-start 1.5.0  [jsrt]  (MIT OR Apache-2.0) AND Unicode-3.0
       https://github.com/Boshen/unicode-id-start
   unicode-ident 1.0.26  [jsrt]  (MIT OR Apache-2.0) AND Unicode-3.0
@@ -494,6 +545,10 @@ Other components (section 3), by license:
       https://github.com/briansmith/untrusted
   url 2.5.8  [jsrt]  MIT OR Apache-2.0 -> MIT
       https://github.com/servo/rust-url
+  utf-8 0.7.6  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/SimonSapin/rust-utf8
+  utf8-chars 3.0.7  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/A1-Triard/utf8-chars
   utf8_iter 1.0.4  [jsrt]  Apache-2.0 OR MIT -> MIT
       https://github.com/hsivonen/utf8_iter
   utf8parse 0.2.2  [bise]  Apache-2.0 OR MIT -> MIT
@@ -512,6 +567,8 @@ Other components (section 3), by license:
       https://github.com/BurntSushi/walkdir
   wasm_dep_analyzer 0.4.0  [jsrt]  MIT
       https://github.com/denoland/wasm_dep_analyzer
+  web-time 1.1.0  [bise]  MIT OR Apache-2.0 -> MIT
+      https://github.com/daxpedda/web-time
   webpki-roots 0.26.11  [bise]  CDLA-Permissive-2.0
       https://github.com/rustls/webpki-roots
   webpki-roots 1.0.9  [bise]  CDLA-Permissive-2.0
@@ -525,6 +582,8 @@ Other components (section 3), by license:
   yoke 0.8.3  [jsrt]  Unicode-3.0
       https://github.com/unicode-org/icu4x
   zerocopy 0.8.57  [jsrt]  BSD-2-Clause OR Apache-2.0 OR MIT -> MIT
+      https://github.com/google/zerocopy
+  zerocopy 0.8.59  [bise]  BSD-2-Clause OR Apache-2.0 OR MIT -> MIT
       https://github.com/google/zerocopy
   zerofrom 0.1.8  [jsrt]  Unicode-3.0
       https://github.com/unicode-org/icu4x
@@ -609,6 +668,11 @@ Other components (section 3), by license:
   jszip 3.10.2 (zip; dual MIT or GPL-3.0, taken under MIT)  MIT
       https://github.com/Stuk/jszip
 
+   office/dist/office-pdf.js and pdf.worker.js: the office viewer's pdf renderer and its worker (office/sdk/src/view, pdf-notes)
+
+  pdfjs-dist 6.4.299 (pdf.js: pdf to canvas and text)  Apache-2.0
+      https://github.com/mozilla/pdf.js
+
    bise: data built in
 
   gemoji (the emoji shortcode table, rust/tui/src/emoji.tsv)  MIT
@@ -658,7 +722,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-Used by: aho-corasick 1.1.5, globset 0.4.20, ignore 0.4.33, memchr 2.8.3, termcolor 1.4.1, walkdir 2.5.0
+Used by: aho-corasick 1.1.5, byteorder 1.5.0, globset 0.4.20, ignore 0.4.33, memchr 2.8.3, termcolor 1.4.1, ucd-trie 0.1.7, walkdir 2.5.0
 ------------------------------------------------------------------------------
 
 The MIT License (MIT)
@@ -684,7 +748,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-Used by: allocator-api2 0.2.21, anyhow 1.0.104, inventory 0.3.24, itoa 1.0.18, linux-raw-sys 0.4.15, once_cell 1.21.4, pathdiff 0.2.3, pin-project 1.1.13, pin-project-lite 0.2.17, proc-macro2 1.0.107, quote 1.0.47, rustc-hash 2.1.3, rustix 0.38.44, serde 1.0.229, serde_core 1.0.229, serde_json 1.0.151, syn 2.0.119, thiserror 1.0.69, thiserror 2.0.20, unicode-id-start 1.5.0, unicode-ident 1.0.26, winnow 1.0.4, zmij 1.0.23
+Used by: allocator-api2 0.2.21, anyhow 1.0.104, fastrand 2.5.0, indenter 0.3.4, inventory 0.3.24, itoa 1.0.18, linux-raw-sys 0.12.1, linux-raw-sys 0.4.15, once_cell 1.21.4, pathdiff 0.2.3, pest 2.9.2, pin-project 1.1.13, pin-project-lite 0.2.17, proc-macro2 1.0.107, quote 1.0.47, rustc-hash 2.1.3, rustix 0.38.44, rustix 1.1.5, serde 1.0.229, serde_core 1.0.229, serde_json 1.0.151, syn 2.0.119, thiserror 1.0.69, thiserror 2.0.20, thiserror 2.0.21, unicode-id-start 1.5.0, unicode-ident 1.0.26, utf-8 0.7.6, winnow 1.0.4, zmij 1.0.23
 ------------------------------------------------------------------------------
 
 Permission is hereby granted, free of charge, to any
@@ -851,7 +915,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
-Used by: better_scoped_tls 1.0.1, bytes-str 0.2.9, cpal 0.15.3, debugid 0.8.0, hstr 3.0.6, par-core 2.0.0, swc_allocator 4.0.1, swc_atoms 9.0.0, swc_common 17.0.1, swc_config 3.1.2, swc_ecma_ast 18.0.0, swc_ecma_codegen 20.0.2, swc_ecma_lexer 26.0.0, swc_ecma_loader 17.0.0, swc_ecma_parser 27.0.7, swc_ecma_transforms_base 30.0.1, swc_ecma_transforms_classes 30.0.0, swc_ecma_transforms_proposal 30.0.0, swc_ecma_transforms_react 33.0.0, swc_ecma_transforms_typescript 33.0.0, swc_ecma_utils 24.0.0, swc_ecma_visit 18.0.1, swc_macros_common 1.0.1, swc_visit 2.0.1, Bend
+Used by: better_scoped_tls 1.0.1, bytes-str 0.2.9, cpal 0.15.3, debugid 0.8.0, hstr 3.0.6, insta 1.48.0, par-core 2.0.0, similar 2.7.0, swc_allocator 4.0.1, swc_atoms 9.0.0, swc_common 17.0.1, swc_config 3.1.2, swc_ecma_ast 18.0.0, swc_ecma_codegen 20.0.2, swc_ecma_lexer 26.0.0, swc_ecma_loader 17.0.0, swc_ecma_parser 27.0.7, swc_ecma_transforms_base 30.0.1, swc_ecma_transforms_classes 30.0.0, swc_ecma_transforms_proposal 30.0.0, swc_ecma_transforms_react 33.0.0, swc_ecma_transforms_typescript 33.0.0, swc_ecma_utils 24.0.0, swc_ecma_visit 18.0.1, swc_macros_common 1.0.1, swc_visit 2.0.1, Bend
 ------------------------------------------------------------------------------
 
                                  Apache License
@@ -1199,6 +1263,64 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
+Used by: bon 3.10.1
+------------------------------------------------------------------------------
+
+The MIT License (MIT)
+
+Copyright (c) 2024 Elastio Software Inc
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------------
+Used by: brush-parser 0.4.0
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2024 reuben olinsky
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+------------------------------------------------------------------------------
 Used by: bstr 1.13.1
 ------------------------------------------------------------------------------
 
@@ -1283,6 +1405,43 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------------
+Used by: cached 0.59.0
+------------------------------------------------------------------------------
+
+Copyrights in the "cached" project are retained by their contributors. No
+copyright assignment is required to contribute to the "cached" project.
+
+Copyright attributions may be noted at the top of individual files.
+For full authorship information, see the version control history.
+https://github.com/jaemk/cached/graphs/contributors
+
+------------------------------------------------------------------------------
+Used by: cached 0.59.0, cached_proc_macro_types 0.1.1
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2017 James Kominick
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ------------------------------------------------------------------------------
 Used by: calendrical_calculations 0.2.4
@@ -1605,6 +1764,32 @@ Used by: compact_str 0.7.1, compact_str 0.8.2
 MIT License
 
 Copyright (c) 2021 Parker Timmerman
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+------------------------------------------------------------------------------
+Used by: console 0.16.6
+------------------------------------------------------------------------------
+
+The MIT License (MIT)
+
+Copyright (c) 2017 Armin Ronacher <armin.ronacher@active-4.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -2596,7 +2781,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
-Used by: foldhash 0.1.5
+Used by: foldhash 0.1.5, foldhash 0.2.0
 ------------------------------------------------------------------------------
 
 Copyright (c) 2024 Orson Peters
@@ -2795,7 +2980,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-Used by: hashbrown 0.14.5, hashbrown 0.15.5, hashbrown 0.17.1
+Used by: hashbrown 0.14.5, hashbrown 0.15.5, hashbrown 0.16.1, hashbrown 0.17.1
 ------------------------------------------------------------------------------
 
 Copyright (c) 2016 Amanieu d'Antras
@@ -2823,6 +3008,60 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------------
+Used by: http 1.5.0
+------------------------------------------------------------------------------
+
+Copyright (c) 2017 http-rs authors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------------
+Used by: httparse 1.10.1, num_cpus 1.17.0
+------------------------------------------------------------------------------
+
+Copyright (c) 2015-2025 Sean McArthur
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
 ------------------------------------------------------------------------------
 Used by: icu_calendar 2.3.0, icu_calendar_data 2.3.0, icu_collections 2.3.0, icu_locale_core 2.3.0, icu_locale_fallback 2.3.0, icu_locale_fallback_data 2.3.0, icu_normalizer 2.3.0, icu_normalizer_data 2.3.0, icu_properties 2.3.0, icu_properties_data 2.3.0, icu_provider 2.3.1, ixdtf 0.6.6, litemap 0.8.3, potential_utf 0.1.6, resb 0.1.2, tinystr 0.8.4, writeable 0.6.4, yoke 0.8.3, zerofrom 0.1.8, zerotrie 0.2.5, zerovec 0.11.8, zoneinfo64 0.3.0
@@ -3259,7 +3498,7 @@ have been licensed under extremely permissive terms.
 Copyright notices are retained in src/* files where relevant.
 
 ------------------------------------------------------------------------------
-Used by: linux-raw-sys 0.4.15
+Used by: linux-raw-sys 0.12.1, linux-raw-sys 0.4.15
 ------------------------------------------------------------------------------
 
 Short version for non-lawyers:
@@ -3459,30 +3698,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-Used by: num_cpus 1.17.0
-------------------------------------------------------------------------------
-
-Copyright (c) 2015-2025 Sean McArthur
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-
-------------------------------------------------------------------------------
 Used by: outref 0.5.2
 ------------------------------------------------------------------------------
 
@@ -3509,6 +3724,36 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
+Used by: peg 0.8.6, peg-runtime 0.8.6
+------------------------------------------------------------------------------
+
+Copyright (C) 2013 Kevin Mehall
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------------
 Used by: phf 0.11.3, phf_shared 0.11.3
 ------------------------------------------------------------------------------
 
@@ -3532,6 +3777,36 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------------
+Used by: ppv-lite86 0.2.21
+------------------------------------------------------------------------------
+
+Copyright (c) 2019 The CryptoCorrosion Contributors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
 Used by: psm 0.1.32
@@ -3581,7 +3856,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
-Used by: rand 0.8.8, rand_core 0.6.4
+Used by: rand 0.8.8, rand_chacha 0.3.1, rand_core 0.6.4
 ------------------------------------------------------------------------------
 
 Copyrights in the Rand project are retained by their contributors. No
@@ -3598,7 +3873,7 @@ The Rand project includes code from the Rust project
 published under these same licenses.
 
 ------------------------------------------------------------------------------
-Used by: rand 0.8.8, rand_core 0.6.4
+Used by: rand 0.8.8, rand_chacha 0.3.1, rand_core 0.6.4
 ------------------------------------------------------------------------------
 
 Copyright 2018 Developers of the Rand project
@@ -3964,7 +4239,7 @@ OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ------------------------------------------------------------------------------
-Used by: rustix 0.38.44
+Used by: rustix 0.38.44, rustix 1.1.5
 ------------------------------------------------------------------------------
 
 Short version for non-lawyers:
@@ -4082,7 +4357,7 @@ The files under third-party/chromium are licensed as described in
 third-party/chromium/LICENSE.
 
 ------------------------------------------------------------------------------
-Used by: ryu 1.0.23, ryu-js 1.0.3, unicode-id-start 1.5.0, unicode-ident 1.0.26
+Used by: ryu 1.0.23, ryu-js 1.0.3, unicode-id-start 1.5.0, unicode-ident 1.0.26, pdfjs-dist 6.4.299
 ------------------------------------------------------------------------------
 
                               Apache License
@@ -5089,6 +5364,36 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
+Used by: tempfile 3.27.0
+------------------------------------------------------------------------------
+
+Copyright (c) 2015 Steven Allen
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------------
 Used by: temporal_capi 0.2.6, temporal_rs 0.2.6, timezone_provider 0.2.6
 ------------------------------------------------------------------------------
 
@@ -5253,6 +5558,31 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+------------------------------------------------------------------------------
+Used by: tungstenite 0.24.0
+------------------------------------------------------------------------------
+
+Copyright (c) 2017 Alexey Galakhov
+Copyright (c) 2016 Jason Housley
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
 ------------------------------------------------------------------------------
 Used by: typenum 1.20.1
@@ -5605,6 +5935,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ------------------------------------------------------------------------------
+Used by: web-time 1.1.0
+------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2023 dAxpeDDa
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+------------------------------------------------------------------------------
 Used by: webpki-roots 0.26.11, webpki-roots 1.0.9
 ------------------------------------------------------------------------------
 
@@ -5671,7 +6027,7 @@ of Data, including for example machine learning models and models'
 insights.
 
 ------------------------------------------------------------------------------
-Used by: zerocopy 0.8.57
+Used by: zerocopy 0.8.57, zerocopy 0.8.59
 ------------------------------------------------------------------------------
 
 Copyright 2023 The Fuchsia Authors
@@ -7692,6 +8048,77 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+------------------------------------------------------------------------------
+Used by: exceljs 4.4.0
+------------------------------------------------------------------------------
+
+The MIT License (MIT)
+
+Copyright (c) 2014-2019 Guyon Roche
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+------------------------------------------------------------------------------
+Used by: saxes 5.0.1
+------------------------------------------------------------------------------
+
+The ISC License
+
+Copyright (c) Louis-Dominique Dubeau and contributors to saxes
+Copyright (c) Isaac Z. Schlueter and Contributors (sax, which saxes forks)
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+------------------------------------------------------------------------------
+Used by: xmlchars 2.2.0
+------------------------------------------------------------------------------
+
+Copyright Louis-Dominique Dubeau and contributors to xmlchars
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------------
 Used by: docx-preview 0.4.1
 ------------------------------------------------------------------------------
 
@@ -7926,77 +8353,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-
-------------------------------------------------------------------------------
-------------------------------------------------------------------------------
-Used by: exceljs 4.4.0
-------------------------------------------------------------------------------
-
-The MIT License (MIT)
-
-Copyright (c) 2014-2019 Guyon Roche
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-------------------------------------------------------------------------------
-Used by: saxes 5.0.1
-------------------------------------------------------------------------------
-
-The ISC License
-
-Copyright (c) Louis-Dominique Dubeau and contributors to saxes
-Copyright (c) Isaac Z. Schlueter and Contributors (sax, which saxes forks)
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
-IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-------------------------------------------------------------------------------
-Used by: xmlchars 2.2.0
-------------------------------------------------------------------------------
-
-Copyright Louis-Dominique Dubeau and contributors to xmlchars
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
 Used by: gemoji

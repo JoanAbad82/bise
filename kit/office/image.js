@@ -49,8 +49,11 @@ export async function draw(root, bytes, info) {
     if (e.button !== 0) return;
     start = at(e);
     frame.setPointerCapture(e.pointerId);
-    e.preventDefault();
+    // no preventDefault: it would cancel the mouseup the notes layer offers its button on
+    // (pdf-notes found it: a real drag drew the box but showed no button)
   });
+  // a box drawn selects nothing on the way
+  frame.addEventListener("selectstart", (e) => start && e.preventDefault());
   frame.addEventListener("pointermove", (e) => {
     if (!start) return;
     const p = at(e);

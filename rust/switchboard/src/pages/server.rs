@@ -729,7 +729,8 @@ mod tests {
     /// ambient-lead m_20287: 'sb artifact add proof.html' then GET its
     /// frame_url gives the file (the route served sites only, so the
     /// window's frame said 'no such artifact'); a type the server never
-    /// sends gets no frame_url and no file; a bise page and a link none.
+    /// sends gets no frame_url and no file; a bise page and a link none; a
+    /// pdf is framed in bise's viewer (pdf-notes).
     #[test]
     fn a_copied_file_is_served_at_its_frame_url() {
         let (p, d) = pages();
@@ -758,11 +759,15 @@ mod tests {
         assert_eq!((r.status, text(&r).as_str()), (200, "<h1>proof</h1>"), "{url}");
         assert_eq!(r.csp, super::super::site::ARTIFACT_CSP, "in its sandbox");
         assert_eq!(get(&p, &format!("/a/{}/1/framed/proof.html", html.id)).csp, super::super::site::ARTIFACT_CSP, "framed: the same sandbox");
-        for a in items.iter().filter(|a| a.id != html.id) {
+        for a in items.iter().filter(|a| a.id != html.id && !a.title.contains("notes")) {
             assert_eq!(a.frame_url, None, "{} has no frame_url", a.id);
         }
+        // a pdf in the viewer too (pdf-notes: drawn by pdf.js, notes on a passage or a box)
         let pdf = items.iter().find(|a| a.title.contains("notes")).expect("the pdf");
-        assert_eq!(get(&p, &crate::pages::site::copy_href(&pdf.id, 1, pdf.copy.as_deref().unwrap_or(""))).status, 404, "a type it never sends");
+        let shell = text(&get(&p, pdf.frame_url.as_deref().expect("a pdf has a frame_url").strip_prefix(&base).unwrap()));
+        assert!(shell.contains("data-kind=\"pdf\""), "{shell}");
+        let r = get(&p, &crate::pages::site::copy_href(&pdf.id, 1, pdf.copy.as_deref().unwrap_or("")));
+        assert_eq!((r.status, r.ctype), (200, "application/pdf"));
         let _ = std::fs::remove_dir_all(d);
     }
 

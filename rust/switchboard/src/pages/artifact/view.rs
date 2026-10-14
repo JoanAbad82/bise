@@ -13,7 +13,8 @@
 //! layer (kit/notes-anchors.js, kit/notes.js's model and words,
 //! kit/office/select.js: the selection, the marks, the browser's list;
 //! pages/artifact/notes.rs is its api). An image gets the same frame
-//! (`site::viewer_kind`), drawn by kit/office/image.js.
+//! (`site::viewer_kind`), drawn by kit/office/image.js; a pdf too, drawn
+//! by kit/office/pdf.js (pdf.js, `office-pdf.js` and `pdf.worker.js`).
 //!
 //! [`shell`] is pure; [`serve`] reads the artifact store.
 
@@ -37,7 +38,7 @@ pub struct Shown<'a> {
     pub id: &'a str,
     pub title: &'a str,
     pub agent: &'a str,
-    /// `xlsx`, `pptx`, `docx`, `image`, `site` (site::viewer_kind)
+    /// `xlsx`, `pptx`, `docx`, `image`, `site`, `pdf` (site::viewer_kind)
     pub kind: &'static str,
     /// the version drawn, and the artifact's newest
     pub v: u64,

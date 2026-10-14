@@ -122,3 +122,74 @@ test("a site's selection is read again before it counts (architect m_24172)", as
   assert.equal(long.rect, null);
   assert.deepEqual(Object.keys(long.anchor).sort(), ["block", "kind", "quote"], "nothing else the site put in it");
 });
+
+// pdf-notes: a pdf's notes (kit/notes-anchors.js's pdf, kit/office/pdf.js), architect m_24668
+const anchors = async () => {
+  const { createRequire } = await import("node:module");
+  return createRequire(import.meta.url)(join(root, "kit", "notes-anchors.js")).pdf;
+};
+// a page's text items as pdf.js gives them: a line's words, its end
+const items = (...lines) => lines.flatMap((l) => l.split("|").map((str, i, all) => ({ str, hasEOL: i === all.length - 1 })));
+
+test("a pdf page's text: its items in order, a line's end a space, each item's place in it", async () => {
+  const { pageText, itemsIn } = await anchors();
+  const t = pageText(items("Net revenue | grew 4%", "in  Q3."));
+  assert.equal(t.text, "Net revenue grew 4% in Q3.");
+  assert.deepEqual(t.ranges, [{ i: 0, start: 0, end: 11 }, { i: 1, start: 12, end: 19 }, { i: 2, start: 20, end: 26 }]);
+  assert.equal(t.text, globalThis.BiseAnchors.block.norm("Net revenue  grew 4%\nin  Q3."), "the same text a selection gives once collapsed");
+  assert.deepEqual(itemsIn(t.ranges, 4, 16), [0, 1]);
+  assert.deepEqual(pageText([{ str: "", hasEOL: true }, { str: "  " }]), { text: "", ranges: [] });
+});
+
+test("a pdf note re-anchors on a new version: its words where they are, a box on its page", async () => {
+  const { place, pageText } = await anchors();
+  const v1 = [pageText(items("Summary")).text, pageText(items("Net revenue grew 4% in Q3.", "Costs held.")).text];
+  const passage = { kind: "region", page: 2, rect: { x: 10, y: 20, w: 50, h: 3 }, quote: "revenue grew 4%" };
+  const box = { kind: "region", page: 2, rect: { x: 5, y: 5, w: 20, h: 20 } };
+  // the same version: the same place
+  assert.deepEqual(place(passage, v1), { page: 2, start: 4, end: 19 });
+  assert.deepEqual(place(box, v1), { page: 2, rect: box.rect });
+  // a page put in front: the words are found on page 3, the box stays on page 2 (a box never moves pages)
+  const v2 = [v1[0], "A new page", v1[1]];
+  assert.equal(place(passage, v2).page, 3);
+  assert.deepEqual(place(box, v2), { page: 2, rect: box.rect });
+  // the words gone: moved; the pdf shorter than its page: the box moved
+  assert.equal(place(passage, [v1[0], "Costs held."]), null);
+  assert.equal(place(box, [v1[0]]), null);
+  // the words on two pages: the one nearest its page
+  assert.equal(place(passage, ["revenue grew 4%", "x", "revenue grew 4%", "y"]).page, 1, "1 and 3 as near: the first");
+  assert.equal(place({ ...passage, page: 1 }, ["revenue grew 4%", "x", "revenue grew 4%"]).page, 1);
+  // the words twice on its page: the one nearest its old box
+  const twice = "revenue grew 4% " + "filler ".repeat(40) + "revenue grew 4%";
+  assert.equal(place({ ...passage, rect: { ...passage.rect, y: 95 } }, ["", twice]).start, twice.lastIndexOf("revenue grew 4%"));
+  assert.equal(place({ ...passage, rect: { ...passage.rect, y: 2 } }, ["", twice]).start, 0);
+  // an image's box (no page) is page 1; not a region: nothing
+  assert.deepEqual(place({ kind: "region", rect: box.rect }, ["a"]), { page: 1, rect: box.rect });
+  assert.equal(place({ kind: "cell", sheet: "Q3", range: "A1" }, v1), null);
+});
+
+test("pdf.js runs a pdf with no eval, no pdf JavaScript, nothing fetched (architect m_24668)", async () => {
+  const { OPTIONS, rectPct, footOf } = await helpers("pdf.js");
+  assert.equal(OPTIONS.isEvalSupported, false);
+  assert.equal(OPTIONS.enableScripting, false);
+  assert.equal(OPTIONS.enableXfa, false);
+  assert.equal(OPTIONS.useWorkerFetch, false);
+  for (const k of ["cMapUrl", "standardFontDataUrl", "wasmUrl"]) assert.equal(OPTIONS[k], null, k);
+  assert.ok(Object.isFrozen(OPTIONS));
+  const src = readFileSync(join(root, "kit", "office", "pdf.js"), "utf8");
+  assert.match(src, /getDocument\(\{ \.\.\.OPTIONS, data: bytes\.slice\(\), BinaryDataFactory: Unserved \}\)/, "the options and the factory that never fetches");
+  assert.match(src, /annotationMode: 0/, "no annotation layer: a link never navigates the frame");
+  assert.doesNotMatch(src, /https?:\/\//, "no CDN");
+  assert.match(src, /workerSrc = "\/kit\/office\/pdf\.worker\.js"/);
+  // a selection's box in % of its page
+  assert.deepEqual(rectPct({ left: 150, top: 120, width: 100, height: 20 }, { left: 100, top: 100, width: 400, height: 200 }), { x: 12.5, y: 10, w: 25, h: 10 });
+  assert.deepEqual(rectPct({ left: 0, top: 0, width: 900, height: 900 }, { left: 100, top: 100, width: 400, height: 200 }), { x: 0, y: 0, w: 100, h: 100 });
+  assert.deepEqual(footOf(new Set()), []);
+  assert.equal(footOf(new Set(["cMapUrl", "standardFontDataUrl", "wasmUrl"])).length, 3);
+  // the bundles: pdf.js and its worker, within their budgets, no eval of their own when told not to
+  const pdf = readFileSync(join(root, "office", "dist", "office-pdf.js"), "utf8");
+  const worker = readFileSync(join(root, "office", "dist", "pdf.worker.js"), "utf8");
+  assert.match(pdf, /export\s*\{[^}]*getDocument/);
+  assert.ok(pdf.length < 1024 * 1024 && worker.length < 1.5 * 1024 * 1024);
+  assert.ok(!readFileSync(join(root, "office", "dist", "office.js"), "utf8").includes("pdfjs"), "pdf.js stays out of office.js");
+});
