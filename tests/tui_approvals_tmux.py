@@ -27,7 +27,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
-from tui_tmux import tui_session, run, MAIN_IDLE  # noqa: E402
+from tui_tmux import tui_session, run, in_view, MAIN_IDLE  # noqa: E402
 
 COLS, ROWS = 140, 40
 
@@ -154,7 +154,10 @@ def session(E, env, home, bise, shot):
         open_card(t, "t2")
         t.wait("2 always allow ")
         t.keys("2")
-        t.wait("you allowed t2: curl -s -m 1 http://127.0.0.1:9/x")
+        # answered from main's view: t2's thread opens at the answer
+        # (answer-in-thread A, 787e6ee82); the rest of this run is there
+        sc = t.wait("you allowed t2: curl -s -m 1 http://127.0.0.1:9/x")
+        assert "you're talking to t2 directly" in sc, sc
         t.typed("/approvals")
         t.keys("Enter")
         sc = t.wait("today · from t2")
@@ -189,6 +192,10 @@ def session(E, env, home, bise, shot):
         if subprocess.run(["/usr/bin/sandbox-exec", "-p", "(version 1)(allow default)", "/usr/bin/true"],
                           stderr=subprocess.DEVNULL).returncode != 0:
             return
+        # back to main's view: the fold of t3's answer goes to t3's thread
+        # and main's, never to t2's (where the jump above left us)
+        t.keys("M-0")
+        t.wait_re(in_view("main"))
         t.typed("/new t3: {{bash: echo hi > ~/Desktop/x.txt}}")
         t.keys("Enter")
         t.wait("? t3 · $ echo hi > ~/Desktop/x.txt", timeout=60)
