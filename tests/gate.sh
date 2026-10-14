@@ -523,6 +523,8 @@ if [ "$mode" = full ]; then
   # apps/desktop/src/proto matches bise-proto every time (a generated file
   # changed by a merge or a rebase can't slip through; quick runs it on a change)
   if [ $rc = 0 ]; then (cd rust && cargo test --offline -q -p bise-proto --features ts --test ts) || { echo "FAIL proto_ts"; rc=1; }; fi
+  # the committed office SDK bundle is what its sources build (docs/office.md)
+  if [ $rc = 0 ]; then tests/office_check.sh strict || { echo "FAIL office_check"; rc=1; }; fi
   # and the desktop itself builds and passes its checks on those types (B3)
   if [ $rc = 0 ] && [ -n "$dwhy" ]; then desktop_check strict || rc=1; fi
   # every binary built runs on the macOS target (BISE-164): the Bend ones,
@@ -628,6 +630,9 @@ for f in $changed; do
     bend/hub/*|bend/vendor/*) add switchboard ;;
     rust/proto/*) add bise-proto; add bend-tui; add switchboard; add bend-harness; proto_ts=1 ;;
     apps/desktop/src/proto/*) proto_ts=1 ;;
+    # bise-proto's Anchor, generated for the SDK too (architect m_23712)
+    office/sdk/src/anchor.gen.ts) proto_ts=1; office=1 ;;
+    office/*) office=1 ;;
   esac
 done
 step() {  # <name> <cmd...>: one line when green, the failures and the log when red
@@ -673,6 +678,8 @@ fi
 # bise desktop's TS types (apps/desktop/src/proto) are bise-proto's, generated:
 # a stale or hand-edited file is red (BISE_PROTO_BLESS=1 on that test rewrites them)
 [ "${proto_ts:-0}" = 1 ] && step proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"
+# the office SDK: office/dist/office.js is what office/sdk/src builds, and its tests pass on it
+[ "${office:-0}" = 1 ] && step office_check tests/office_check.sh
 # then the desktop's own checks, when the change reaches it (tests/test_map.py desktop)
 if [ -n "$changed" ] && [ -n "$(desktop_why $changed)" ]; then desktop_check || exit 1; fi
 wait "$clippy_pid"

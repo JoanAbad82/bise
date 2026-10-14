@@ -3,6 +3,7 @@
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 // every line of rust/proto/fixtures, typed: a fixture that doesn't fit its type fails pnpm typecheck.
 
+import type { Anchor } from './anchor';
 import type { AppCmd } from './app_cmd';
 import type { FnContext } from './context';
 import type { CoreEv } from './core_ev';
@@ -441,4 +442,22 @@ export const answer_result: readonly AnswerResult[] = [
   {"answer":{"agent":"docs","notice":"you answered docs: only at checkout","pick":"only at checkout","question":"where does the balance show?\n1. at every step\n2. only at checkout","said":"2"}},
   {"answer":{"agent":"main","note":"not yet, the release notes first please","notice":"you answered main","question":"merge?","said":"not yet, the release notes first please"}},
   {},
+];
+
+/** rust/proto/fixtures/anchor.jsonl */
+export const anchor: readonly Anchor[] = [
+  {"block":"b3","kind":"block","quote":"the plan"},
+  {"block":"intro","kind":"block"},
+  {"kind":"cell","range":"B4:D9","sheet":"Q3"},
+  {"kind":"cell","range":"A1","sheet":"Sheet 1"},
+  {"kind":"slide","slide":2},
+  {"kind":"slide","rect":{"h":5.5,"w":30.0,"x":10.0,"y":20.0},"slide":2},
+  {"kind":"shape","shape":"12","slide":3},
+  {"kind":"shape","quote":"Revenue up 4%","shape":"12","slide":3},
+  {"kind":"para","para":"3F2A1B00","quote":"net revenue"},
+  {"kind":"para","para":"00000001"},
+  {"kind":"region","rect":{"h":50.0,"w":50.0,"x":0.0,"y":0.0}},
+  {"kind":"region","page":4,"rect":{"h":10.0,"w":40.0,"x":12.5,"y":60.0}},
+  {"kind":"text","line":40},
+  {"kind":"text","line":1,"quote":"# bise"},
 ];

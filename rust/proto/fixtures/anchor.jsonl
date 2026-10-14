@@ -1,0 +1,14 @@
+{"kind":"block","block":"b3","quote":"the plan"}
+{"kind":"block","block":"intro"}
+{"kind":"cell","sheet":"Q3","range":"B4:D9"}
+{"kind":"cell","sheet":"Sheet 1","range":"A1"}
+{"kind":"slide","slide":2}
+{"kind":"slide","slide":2,"rect":{"x":10.0,"y":20.0,"w":30.0,"h":5.5}}
+{"kind":"shape","slide":3,"shape":"12"}
+{"kind":"shape","slide":3,"shape":"12","quote":"Revenue up 4%"}
+{"kind":"para","para":"3F2A1B00","quote":"net revenue"}
+{"kind":"para","para":"00000001"}
+{"kind":"region","rect":{"x":0.0,"y":0.0,"w":50.0,"h":50.0}}
+{"kind":"region","page":4,"rect":{"x":12.5,"y":60.0,"w":40.0,"h":10.0}}
+{"kind":"text","line":40}
+{"kind":"text","line":1,"quote":"# bise"}

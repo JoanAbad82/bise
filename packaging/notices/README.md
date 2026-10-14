@@ -14,8 +14,12 @@ upstream repositories, at the version shipped where there is one:
 | simdutf.LICENSE-MIT, fp16.LICENSE, fast_float.LICENSE-MIT, dragonbox.LICENSE-Boost | their GitHub repos |
 | gemoji.LICENSE | github.com/github/gemoji (rust/tui/src/emoji.tsv) |
 | deno.LICENSE.md, nugine-simd.LICENSE, dasp.LICENSE-MIT, dprint-swc-ext.LICENSE | the repos of crates packaged without a license file |
+| fflate.LICENSE, xmldom.LICENSE | the npm packages at the version in office/sdk/pnpm-lock.yaml (bundled into office/dist/office.js) |
 | MIT.spdx.txt | spdx.org/licenses/MIT (sys_traits declares MIT and has no text anywhere) |
 
 After a V8 (v8 crate) upgrade: fetch the V8 files again at the new V8
 version (v8/include/v8-version.h in the crate) and update MANUAL in the
 script.
+
+After an office/sdk dependency is added or upgraded: copy its LICENSE from
+office/sdk/node_modules here and add or update its row in MANUAL.

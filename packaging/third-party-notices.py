@@ -88,6 +88,12 @@ MANUAL = [
         dict(name="BendHub package 0x1f4d6c03caf955232d0b0dc6e6f36cf4 (json, vendored and patched as bend/vendor/json.bend)",
              license="MIT-0", url="https://bend-lang.com (no LICENSE file: MIT-0 under the BendHub terms)", files=[]),
     ]),
+    ("office/dist/office.js: the office SDK's bundle (office/sdk, docs/office.md)", [
+        dict(name="fflate 0.8.3 (zip)", license="MIT", url="https://github.com/101arrowz/fflate",
+             files=["fflate.LICENSE"]),
+        dict(name="@xmldom/xmldom 0.9.12 (XML DOM)", license="MIT", url="https://github.com/xmldom/xmldom",
+             files=["xmldom.LICENSE"]),
+    ]),
     ("bise: data built in", [
         dict(name="gemoji (the emoji shortcode table, rust/tui/src/emoji.tsv)", license="MIT",
              url="https://github.com/github/gemoji", files=["gemoji.LICENSE"]),

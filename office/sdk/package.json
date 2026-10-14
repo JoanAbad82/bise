@@ -1,0 +1,28 @@
+{
+  "name": "@bise/office",
+  "private": true,
+  "version": "0.1.0",
+  "description": "bise's office SDK: read, create and edit xlsx, pptx and docx, bytes in and bytes out (docs/office.md)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@10.26.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "../dist/office.js",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:check": "node build.mjs --check",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test test/*.test.mjs",
+    "check": "pnpm typecheck && pnpm build:check && pnpm test"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "0.9.12",
+    "fflate": "0.8.3"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3"
+  }
+}

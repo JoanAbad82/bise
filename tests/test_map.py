@@ -10,7 +10,7 @@ this picks the e2e/tmux tests of run_all.sh. Every test still runs nightly
 (scripts/nightly_gate.sh) and in a release's gate (gate.sh full --all).
 
 The rules, per changed path, the union of all:
-  - docs/, site/, nix/, .github/, the notices and README: no test reads them
+  - docs/, site/, nix/, .github/, office/, the notices and README: no test reads them
     at run time; a test that names the very file (a fixture, a path it
     opens) runs.
   - rust/tui/, rust/vendor/crossterm/: the TUI. Every *_tmux test, and every
@@ -48,7 +48,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 # top-level paths no e2e/tmux test reads at run time
-NONE_PREFIXES = ("docs/", "site/", "nix/", ".github/")
+NONE_PREFIXES = ("docs/", "site/", "nix/", ".github/", "office/")
 NONE_FILES = {"LICENSE", "NOTICE", "THIRD_PARTY_NOTICES", "README.md", "flake.nix", "flake.lock",
               "default.nix", ".gitignore"}
 TUI_PREFIXES = ("rust/tui/", "rust/vendor/crossterm/")
@@ -64,6 +64,9 @@ TOP = {
     "rust": "mixed", "bend": "mixed", "tests": "mixed",
     "kit": "all", "prompts": "all", "plugins": "all", ".agents": "all", "scripts": "all",
     "packaging": "all", "computer-use": "all", "run.sh": "all", "apps": "mixed", "dev": "desktop",
+    # the office SDK: no e2e/tmux test loads it yet; the gate runs
+    # tests/office_check.sh on it instead (office-run moves this when bise embeds it)
+    "office": "none",
 }
 # the desktop app's own paths: its checks, no terminal test
 DESKTOP_PREFIXES = ("apps/desktop/", "dev/", "scripts/desktop", "tests/desktop_", "tests/ambient_qa")

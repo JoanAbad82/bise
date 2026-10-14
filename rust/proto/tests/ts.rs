@@ -6,6 +6,8 @@
 //!   thread, rows, diff, ops, context, helper, pty, rpc, commands, app_rpc) + `json.ts`
 //!   (serde_json's Value) + `index.ts`; `methods.gen.ts`: rpc's tables;
 //!   `app_methods.gen.ts`: app_rpc's names as constants;
+//! - `anchor.ts` also goes, the same bytes, to
+//!   `office/sdk/src/anchor.gen.ts` (the office SDK's `at()` takes it);
 //! - `fixtures.gen.ts`: every fixture line as a typed constant, so
 //!   `pnpm typecheck` fails when a fixture doesn't fit its generated type;
 //! - u64/i64 come out as `number` (ids, positions, `*_ms`: safe below 2^53),
@@ -17,7 +19,7 @@
 //! stale; `BISE_PROTO_BLESS=1` writes them.
 #![cfg(feature = "ts")]
 
-use bise_proto::{app_cmd, app_rows, app_rpc, commands, core_ev, context, diff, draft, helper, hub, log, ops, parts, pty, rows, rpc, thread};
+use bise_proto::{anchor, app_cmd, app_rows, app_rpc, commands, core_ev, context, diff, draft, helper, hub, log, ops, parts, pty, rows, rpc, thread};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -59,6 +61,7 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
     vec![
         module!(cfg, "json": serde_json::Value),
         module!(cfg, "context": context::FnContext),
+        module!(cfg, "anchor": anchor::Rect, anchor::Anchor),
         module!(cfg, "parts": parts::PageNote, parts::HintKind, parts::Part),
         module!(cfg, "diff": diff::LineKind, diff::DiffLine, diff::Hunk, diff::DiffFile, diff::DiffResult, diff::Series, diff::DiffView),
         module!(cfg, "rows": rows::Status, rows::Phase, rows::ReportKind, rows::Report, rows::Agent, rows::OptAct, rows::Opt, rows::CardPage, rows::Card, rows::CardBatch, rows::Merged, rows::DevServer, rows::Worktree, rows::FeatureTry, rows::Feature, rows::PrState, rows::PrChecks, rows::PrReview, rows::Pr, rows::Page, rows::Place, rows::ModelRole, rows::Model, rows::Artifact, rows::ArtifactPr, rows::ArtifactVersion, rows::ScheduledTask, rows::ScheduledEnd, rows::AgentUsage, rows::WaitingOn, rows::AgentMode, rows::Changes, rows::FlowMode, rows::ApprovalMode, rows::CheckerKind, rows::ApprovalRule, rows::WatchKind, rows::AgentWatch, rows::UsageSum, rows::UsageRow, rows::SwitchPhase, rows::SwitchRow),
@@ -95,6 +98,7 @@ const FIXTURES: &[(&str, &str, &str)] = &[
     ("command_run_result.jsonl", "CommandRunResult", "rpc"),
     ("send_result.jsonl", "SendResult", "rpc"),
     ("answer_result.jsonl", "AnswerResult", "rpc"),
+    ("anchor.jsonl", "Anchor", "anchor"),
 ];
 
 fn proto_dir() -> PathBuf {
@@ -234,7 +238,14 @@ fn render_all() -> BTreeMap<String, String> {
     header(&mut index);
     writeln!(index).unwrap();
     for (file, decls) in &modules {
-        out.insert(format!("{file}.ts"), render_module(file, decls, &home));
+        let mut text = render_module(file, decls, &home);
+        if *file == "anchor" {
+            // the kinds at run time too (architect m_23712: no list typed by hand in TS or kit/)
+            let kinds = anchor::Anchor::KINDS.iter().map(|k| format!("{k:?}")).collect::<Vec<_>>().join(", ");
+            writeln!(text, "\n/** the kinds this version knows (bise_proto::anchor::Anchor::KINDS) */").unwrap();
+            writeln!(text, "export const ANCHOR_KINDS = [{kinds}] as const;").unwrap();
+        }
+        out.insert(format!("{file}.ts"), text);
         writeln!(index, "export type * from './{file}';").unwrap();
     }
     out.insert("index.ts".to_string(), index);
@@ -293,6 +304,24 @@ fn the_typescript_types_are_fresh() {
         .collect();
     stale.extend(present.iter().filter(|n| !want.contains_key(*n)).map(|n| format!("{n} (not generated)")));
     assert!(stale.is_empty(), "apps/desktop/src/proto is stale: {stale:?}; run {BLESS}=1 cargo test -p bise-proto --features ts --test ts");
+}
+
+/// The office SDK's copy of `anchor.ts` (architect m_23712: one generator,
+/// two outputs, so office/sdk never imports from apps/desktop).
+fn sdk_anchor() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../office/sdk/src/anchor.gen.ts")
+}
+
+#[test]
+fn the_sdk_anchor_type_is_fresh() {
+    let want = render_all().remove("anchor.ts").expect("anchor.ts is rendered");
+    let p = sdk_anchor();
+    if std::env::var_os(BLESS).is_some_and(|v| v == "1") {
+        std::fs::write(&p, &want).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
+        return;
+    }
+    let have = std::fs::read_to_string(&p).unwrap_or_default();
+    assert!(have == want, "office/sdk/src/anchor.gen.ts is stale; run {BLESS}=1 cargo test -p bise-proto --features ts --test ts");
 }
 
 #[test]

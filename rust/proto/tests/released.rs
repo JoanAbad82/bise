@@ -5,7 +5,8 @@
 //! and the entries its fold made of message lines; today's types read
 //! each one and write it back with every released key and value
 //! unchanged (new keys may come on top), so a field, list or enum value
-//! that changes meaning goes red here.
+//! that changes meaning goes red here. A note's anchor has its own,
+//! `anchor_v1.jsonl` (its first version, office-artifacts).
 
 use bise_proto::core_ev::CoreEv;
 use bise_proto::hub::HubEv;
@@ -82,4 +83,25 @@ fn released_message_lines_fold_to_the_same_entries() {
             panic!("{line}: the released entry changed ({d}): {now}");
         }
     }
+}
+
+/// A note's anchor (bise_proto::anchor, office-artifacts): its first
+/// version's lines (`anchor_v1.jsonl`, frozen when it was written, never
+/// edited) read as the kind they said, never `Unknown`, and write back with
+/// every key and value unchanged.
+#[test]
+fn released_anchors_keep_their_meaning() {
+    use bise_proto::anchor::Anchor;
+    let mut n = 0;
+    for l in lines("anchor_v1.jsonl") {
+        let was: Value = serde_json::from_str(&l).unwrap();
+        let a: Anchor = serde_json::from_value(was.clone()).unwrap();
+        assert!(!matches!(a, Anchor::Unknown(_)), "a released anchor reads as unknown: {l}");
+        assert_eq!(Some(a.kind()), was["kind"].as_str(), "{l}");
+        if let Some(d) = lost(&was, &serde_json::to_value(&a).unwrap(), "") {
+            panic!("anchor_v1.jsonl: a released meaning changed ({d}):\n  {l}");
+        }
+        n += 1;
+    }
+    assert!(n >= Anchor::KINDS.len(), "{n} lines: one per kind at least");
 }
