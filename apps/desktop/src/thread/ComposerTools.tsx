@@ -88,7 +88,7 @@ export function AttachTool({ onPick }: { onPick: (paths: readonly string[]) => v
         });
       }}
       aria-label="attach files"
-      title="attach files"
+      data-tip="attach files"
       data-testid="composer.attach"
     >
       +

@@ -16,6 +16,14 @@
 .b-composer .send{width:var(--h-control);height:var(--h-control);border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--c-ink);color:var(--c-on-ink);font-size:var(--t-13);flex:none}
 .b-composer .send.off{background:var(--c-active);color:var(--c-text-3)}
 .b-composer .send.stop{border-radius:8px}
+/* the send's touch (designer's desktop-delight touch 2): the arrow lifts 4 px and comes back, a small ∿ rises 10 px over the button and fades, 240 ms; under reduced motion nothing moves */
+.b-composer .send{position:relative;overflow:visible}
+.b-composer .send .arr{display:inline-block}
+.b-composer .send .arr.lift{animation:b-send-lift var(--d-base) var(--ease-out)}
+.b-composer .send .send-fx{position:absolute;left:50%;bottom:100%;color:var(--c-text-2);pointer-events:none;opacity:0;transform:translate(-50%,0);animation:b-send-gust var(--d-base) var(--ease-out)}
+@keyframes b-send-lift{0%{transform:translateY(0)}45%{transform:translateY(-4px)}100%{transform:translateY(0)}}
+@keyframes b-send-gust{0%{opacity:.9;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-10px)}}
+@media (prefers-reduced-motion:reduce){.b-composer .send .arr.lift,.b-composer .send .send-fx{animation:none}}
 .b-composer.is-disabled .box{opacity:.55}
 .b-quote{display:inline-flex;margin:0 0 var(--gap-tight);padding:var(--s-1) var(--s-2);border-radius:var(--r-2);font-size:var(--t-12);color:var(--c-text-2);background:var(--c-active)}
 .b-dock{margin-bottom:var(--s-2);border-radius:var(--r-4);padding:var(--pad-card);background:var(--c-accent-soft);box-shadow:inset 0 0 0 1px var(--c-accent-line),0 6px 20px color-mix(in srgb,var(--c-accent) 12%,transparent);animation:b-rise var(--d-base) var(--ease-pop) both}

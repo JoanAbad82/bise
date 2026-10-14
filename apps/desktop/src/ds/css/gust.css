@@ -1,0 +1,31 @@
+/* src/ds · the gust '∿' (gust.tsx): currentColor, 1.6 round; drifting dashes while something works.
+   Still under reduced motion: the final state only. */
+.b-gust {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+.b-gust path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.b-gust.drift path {
+  stroke-dasharray: 7 3;
+  animation: b-gust-drift 1.2s linear infinite;
+}
+@keyframes b-gust-drift {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .b-gust.drift path {
+    animation: none;
+  }
+}

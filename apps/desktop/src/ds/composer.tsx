@@ -8,6 +8,7 @@
 import type { MouseEventHandler, ReactNode } from "react";
 import { cx, st, sub, type UiState } from "./cx";
 import { Dot, Help, type DotState } from "./prim";
+import { Gust } from "./gust";
 
 /** a quote from selected lines, above his words: ❝ 1 “workers: [Worker; 4],” decode_pool.rs:13-14 */
 export function Quote({ children, onClick, testId }: { children: ReactNode; onClick?: MouseEventHandler<HTMLDivElement>; testId?: string }) {
@@ -117,6 +118,9 @@ export interface ComposerFrameProps {
   tools?: ReactNode;
   /** the box's bottom row, right, before send: the model and effort menu */
   toolsEnd?: ReactNode;
+  /** how many sends so far: each new one lifts the arrow 4 px and rises a small ∿ over it, 240 ms
+   *  (designer's desktop-delight touch 2); 0: none yet */
+  sent?: number;
   /** on: something to send; off: nothing yet; stop: a turn runs, the button interrupts */
   send: Send;
   onSend?: MouseEventHandler<HTMLButtonElement>;
@@ -146,7 +150,7 @@ export function boxPress(target: EventTarget | null): boolean {
 }
 /** the composer's frame: tabs, dock, quote, the tab glued to the box, the box (the editor, then its
  *  32 px row: tools left, tools and send right), the keys */
-export function ComposerFrame({ children, tab, tabAccent, tools, toolsEnd, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, lead, testId }: ComposerFrameProps) {
+export function ComposerFrame({ children, tab, tabAccent, tools, toolsEnd, sent = 0, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, lead, testId }: ComposerFrameProps) {
   return (
     <div className={cx("b-composer", disabled && "is-disabled")} data-testid={testId}
       onMouseDown={onBoxDown && ((e) => {
@@ -170,7 +174,9 @@ export function ComposerFrame({ children, tab, tabAccent, tools, toolsEnd, send,
           {toolsEnd}
           <button type="button" className={cx("send", send === "stop" ? "stop" : send === "off" && "off")} onClick={onSend}
             disabled={send === "off" || disabled} aria-label={send === "stop" ? "stop" : "send"} data-testid={sub(testId, send === "stop" ? "stop" : "send")}>
-            {send === "stop" ? "■" : "↑"}
+            {/* keyed by the send count: each send plays the touch once, the button itself never remounts */}
+            <span key={sent} className={cx("arr", sent > 0 && "lift")}>{send === "stop" ? "■" : "↑"}</span>
+            {sent > 0 && <span key={`fx${String(sent)}`} className="send-fx" aria-hidden="true" data-testid={sub(testId, "sent")}><Gust /></span>}
           </button>
         </div>
       </div>

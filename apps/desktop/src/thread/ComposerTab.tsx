@@ -7,7 +7,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'reac
 import type { Agent } from '@/proto';
 import { usePlaces, useProjects } from '@/store';
 import { placeOf as placeOfAgent, tilde, worktreeParts } from '@/app/barplaces';
-import { tabFit, tabPlace, wordCut, type TabFit, type TabPlace, type TabWords } from './tab';
+import { contextOf, RING_CLEAR_PCT, ringTip, tabFit, tabPlace, wordCut, type TabFit, type TabPlace, type TabWords } from './tab';
 
 /** his home folder, for '~/…' in the tips (main's window.bise.home) */
 const HOME = (globalThis as { bise?: { home?: string } }).bise?.home;
@@ -23,11 +23,27 @@ export function useTabPlace(project: string, a: Agent | undefined, home: boolean
 
 /** The tab's words as one object while they hold (a memoised composer never draws again for an
  *  unrelated render of its screen). */
-export function useTabWords(label: string, place: TabPlace | undefined, context: string): TabWords {
+export function useTabWords(label: string, place: TabPlace | undefined, context: string, who: string): TabWords {
   const name = place?.name;
   const worktree = place?.worktree;
   const tip = place?.tip;
-  return useMemo(() => ({ label, place: name === undefined ? undefined : { name, worktree: worktree === true, tip: tip ?? '' }, context }), [label, name, worktree, tip, context]);
+  return useMemo(() => ({ label, place: name === undefined ? undefined : { name, worktree: worktree === true, tip: tip ?? '' }, context, who }), [label, name, worktree, tip, context, who]);
+}
+
+/** The context as a 12 px gauge (designer m_25940, never read as a spinner): a filled wedge in text-2
+ *  from 12 o'clock clockwise, inside a 1 px text-3 circle. */
+function Ring({ pct }: { pct: number }) {
+  const p = Math.max(0, Math.min(100, pct)) / 100;
+  const r = 4;
+  const a = p * 2 * Math.PI;
+  const x = (6 + r * Math.sin(a)).toFixed(3);
+  const y = (6 - r * Math.cos(a)).toFixed(3);
+  return (
+    <svg className="ring" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+      <circle className="track" cx="6" cy="6" r="5.5" />
+      {p >= 1 ? <circle className="used" cx="6" cy="6" r={r} /> : p > 0 && <path className="used" d={`M6 6 L6 ${String(6 - r)} A${String(r)} ${String(r)} 0 ${p > 0.5 ? 1 : 0} 1 ${x} ${y} Z`} />}
+    </svg>
+  );
 }
 
 const ALL: TabFit = { branch: true, project: true, context: true };
@@ -64,7 +80,7 @@ export function ComposerTab({ words, mark, end, testId }: { words: TabWords; mar
   // the label cut after a whole word when even alone it doesn't fit (designer m_24325); null: whole
   const [cut, setCut] = useState<string | null>(null);
   const context = words.context ?? '';
-  const ctxNum = context.replace(/^context\s*/u, '');
+  const ring = contextOf(context);
   const key = `${words.label}|${words.place?.name ?? '-'}|${words.project ?? ''}|${context}|${end === undefined ? '' : 'end'}`;
   useLayoutEffect(() => {
     const host = ref.current?.parentElement;
@@ -121,9 +137,11 @@ export function ComposerTab({ words, mark, end, testId }: { words: TabWords; mar
           {end}
         </span>
       ) : (
-        ctxNum !== '' && (
-          <span className={fit.context ? 'end' : 'end gone'} data-item="context" data-testid={`${testId}.context`} aria-hidden={!fit.context || undefined}>
-            context <span className="mono">{ctxNum}</span>
+        ring !== null && (
+          // the ring, its words in the tip; past 80% the numbers show in clear beside it
+          <span className={fit.context ? 'end ctx' : 'end ctx gone'} data-item="context" data-testid={`${testId}.context`} data-tip={ringTip(words.who ?? 'its', ring)} aria-label={ringTip(words.who ?? 'its', ring)} aria-hidden={!fit.context || undefined} data-pct={Math.round(ring.pct)}>
+            <Ring pct={ring.pct} />
+            {ring.pct > RING_CLEAR_PCT && <span className="num">{`${ring.tokens} · ${String(Math.round(ring.pct))}%`}</span>}
           </span>
         )
       )}

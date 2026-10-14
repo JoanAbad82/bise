@@ -22,8 +22,10 @@ export interface TabWords {
   readonly place?: TabPlace | undefined;
   /** the project's name, only where the screen's crumb doesn't name it */
   readonly project?: string | undefined;
-  /** 'context 42k · 17%' ('' or undefined: none, as at 0%) */
+  /** 'context 42k · 17%' ('' or undefined: none, as at 0%): the ring's */
   readonly context?: string | undefined;
+  /** whose context it is, as the ring's tip names it ('perf', 'bise') */
+  readonly who?: string | undefined;
 }
 
 /** A folder's own name: the last part of its path. Pure. */
@@ -100,4 +102,21 @@ export function wordCut(label: string, room: number, width: (s: string) => numbe
     if (width(cut) <= room) return cut;
   }
   return `${words[0] ?? ''}…`;
+}
+
+/** The context as the hub says it ('42k · 17%', or named 'context 42k · 17%'): its tokens and its
+ *  percent; null when it doesn't read so. Pure. */
+export function contextOf(words: string | undefined): { tokens: string; pct: number } | null {
+  const m = /^(?:context\s+)?(\S+)\s*·\s*(\d+(?:\.\d+)?)%$/u.exec((words ?? '').trim());
+  if (m === null) return null;
+  const pct = Number(m[2]);
+  return Number.isFinite(pct) ? { tokens: m[1] ?? '', pct: Math.min(100, Math.max(0, pct)) } : null;
+}
+
+/** Above this percent the ring's numbers show in clear beside it (designer m_24404 touch 4). */
+export const RING_CLEAR_PCT = 80;
+
+/** The ring's tip: '17% of perf's context used · 42k tokens · compacts at 90%'. Pure. */
+export function ringTip(who: string, c: { tokens: string; pct: number }): string {
+  return `${String(Math.round(c.pct))}% of ${who}'s context used · ${c.tokens} tokens · compacts at 90%`;
 }

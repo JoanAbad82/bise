@@ -23,3 +23,4 @@ export * from "./controls";
 export * from "./mark";
 export * from "./tip";
 export * from "./picker";
+export * from "./gust";

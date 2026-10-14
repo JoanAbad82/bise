@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { folderName, tabFit, tabPlace, wordCut, worktreeName } from './tab';
+import { contextOf, folderName, ringTip, tabFit, tabPlace, wordCut, worktreeName } from './tab';
 
 describe("the composer's tab (designer's composer-strip A)", () => {
   const w = { gap: 16, label: 60, branch: 80, project: 90, context: 120 };
@@ -44,5 +44,18 @@ describe("the tab's label cut (designer m_24325)", () => {
   });
   it('not even the first word: the first word and the …', () => {
     expect(wordCut(label, 20, w)).toBe('answering…');
+  });
+});
+
+describe("the tab's context ring (designer m_24404 touch 4)", () => {
+  it("reads the hub's words, named or not", () => {
+    expect(contextOf('42k · 17%')).toEqual({ tokens: '42k', pct: 17 });
+    expect(contextOf('context 263k · 26%')).toEqual({ tokens: '263k', pct: 26 });
+    expect(contextOf('')).toBeNull();
+    expect(contextOf(undefined)).toBeNull();
+    expect(contextOf('lots')).toBeNull();
+  });
+  it('its tip says what the ring means', () => {
+    expect(ringTip('perf', { tokens: '42k', pct: 17 })).toBe("17% of perf's context used · 42k tokens · compacts at 90%");
   });
 });

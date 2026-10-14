@@ -463,3 +463,14 @@ describe('live markdown colors (B9/W8)', () => {
     expect(lines.map(cls)).toEqual([['fence:```rust'], ['kw:fn', '-: x'], ['fence:```'], ['mark:- ', '-:a']]);
   });
 });
+
+describe("the tip line retires after 7 days of use (designer's desktop-delight tuck away)", () => {
+  it('counts each day once, and retires on an 8th', async () => {
+    const { countDay, TIP_DAYS } = await import('./keybar');
+    expect(countDay([], '2026-10-14')).toEqual({ days: ['2026-10-14'], retired: false });
+    expect(countDay(['2026-10-14'], '2026-10-14')).toEqual({ days: ['2026-10-14'], retired: false });
+    const seven = Array.from({ length: TIP_DAYS }, (_, i) => `2026-10-${String(10 + i)}`);
+    expect(countDay(seven, '2026-10-16').retired, 'a 7th day still shows').toBe(false);
+    expect(countDay(seven, '2026-10-30')).toEqual({ days: seven, retired: true });
+  });
+});

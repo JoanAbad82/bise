@@ -342,6 +342,10 @@
   padding-left: var(--s-3);
   white-space: nowrap;
 }
+/* the 'tip:' line only on an empty, focused composer (designer's desktop-delight tuck away) */
+.b-composer:not(:focus-within) .keys .rest-tip {
+  display: none;
+}
 /* the mic control (bar I): its key at rest, the meter alone while on ('listening…' is the field's); fixed width, so the
    key line never moves when it changes */
 .b-composer .keys .mic {

@@ -36,6 +36,7 @@ export function BottomBlock({ project, agent }: { project: string; agent: string
     place,
     project: crumbHas ? undefined : project_,
     context: usageLine(me?.usage?.words),
+    who: name,
   };
   const stop = useCallback(() => {
     store.stop(project, agent);

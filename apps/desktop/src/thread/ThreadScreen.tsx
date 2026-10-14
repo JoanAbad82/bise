@@ -343,7 +343,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
   const tabContext = usageLine(addr?.usage?.words);
   const tabLabel = voice === 'typing' ? typingLabelOf(agent) : answering !== null ? answering.label : artifact !== undefined ? artifact.to : composerWords(title).label;
   // one object while its words hold, so a new entry never draws the memoised composer again
-  const tab = useTabWords(tabLabel, tabPlace, tabContext);
+  const tab = useTabWords(tabLabel, tabPlace, tabContext, markName);
   // designer's desktop-screens v6 (1): '⋯' at the head's right (rename, model, reasoning)
   const more =
     me && !me.archived && !bise ? (

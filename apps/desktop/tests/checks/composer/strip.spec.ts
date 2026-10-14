@@ -113,7 +113,17 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     await expect(page.getByTestId('composer.tab.to')).toHaveText(/^to perf[ ·~∿≈]{5}$/u);
     await expect(page.locator('[data-testid="composer.tab.to"] [data-testid="thread.mark"]')).toHaveCount(1);
     await expect(page.getByTestId('composer.tab.place')).toHaveText('ψperf');
-    await expect(page.getByTestId('composer.tab.context')).toHaveText('context 42k · 17%');
+    // the context as a 14 px ring, its words in the tip; no numbers in clear under 80% (desktop-delight touch 4)
+    const ctx = page.getByTestId('composer.tab.context');
+    await expect(ctx).toHaveAttribute('data-pct', '17');
+    await expect(ctx).toHaveAttribute('data-tip', "17% of perf's context used · 42k tokens · compacts at 90%");
+    await expect(ctx).toHaveText('');
+    // a gauge, never a spinner (designer m_25940): 12 px, a filled wedge inside a 1 px circle
+    expect(await ctx.locator('svg.ring').evaluate((e) => Math.round(e.getBoundingClientRect().width)), 'a 12 px gauge').toBe(12);
+    expect(await ctx.locator('svg.ring .used').evaluate((e) => e.tagName.toLowerCase()), 'a filled wedge').toBe('path');
+    expect(await ctx.locator('svg.ring .used').evaluate((e) => getComputedStyle(e).fill), 'filled, not stroked').not.toBe('none');
+    expect(await ctx.locator('svg.ring .track').evaluate((e) => getComputedStyle(e).strokeWidth), 'its 1 px circle').toBe('1px');
+    await expect(page.getByTestId('composer.voice'), "voice gets its key like dictate").toContainText('⌃R⌃R voice');
     await expect(page.getByTestId('composer.tab.project'), 'the crumb names the project').toHaveCount(0);
     await expect(tab).not.toContainText(/idle|opus|yolo/u);
     await expect(page.locator('[data-testid="composer"] > .div'), 'the old label line is gone').toHaveCount(0);
@@ -247,7 +257,16 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
       page.evaluate((w) => {
         (document.querySelector('[data-testid="composer.tab"]') as HTMLElement).style.width = w === null ? '' : `${String(w)}px`;
       }, w);
-    await setTab(Math.min(natural, 300));
+    // half the ring and its gap short of the label, the place and the ring: the ring goes, the place
+    // stays (half: the gust's cells move a px or two while it works)
+    const fitAll = await page.evaluate(() => {
+      const tab = document.querySelector('[data-testid="composer.tab"]') as HTMLElement;
+      const cs = getComputedStyle(tab);
+      const w = (id: string) => Math.ceil((document.querySelector(`[data-testid="${id}"]`) as HTMLElement).scrollWidth);
+      const edges = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+      return edges + w('composer.tab.to') + w('composer.tab.place') + w('composer.tab.context') + 2 * (parseFloat(cs.columnGap) || 0);
+    });
+    await setTab(Math.min(natural, fitAll - 15));
     await expect.poll(() => shown(page, 'composer.tab.context')).toBe(false);
     expect(await shown(page, 'composer.tab.place'), 'the branch stays while it fits').toBe(true);
     await setTab(150);
@@ -284,7 +303,6 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     // (5) the key line is unchanged
     await expect(page.getByTestId('composer.keys')).toBeVisible();
 
-    // the shots for designer: every state at 1400, 1100, 800, light and dark
     const shot = async (t: string, w: number, label: string) => {
       await cdp.send('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 2, mobile: false });
       const png = await page.screenshot();
@@ -292,6 +310,64 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
       writeFileSync(test.info().outputPath(`strip-${t}-${String(w)}-${label.replace(/[^a-z0-9]+/gu, '-')}@2x.png`), png);
       shots.push({ label: `${t} · ${String(w)} · ${label}`, png });
     };
+    // (desktop-delight touch 4) past 80% the numbers show in clear beside the ring
+    const hot = world(now).find((e) => (e as { ev?: string }).ev === 'agents') as { agents: Record<string, unknown>[] };
+    const withPerf = (words: string) => ({ ...hot, agents: hot.agents.map((a) => (a['name'] === 'perf' ? { ...a, usage: usage(words) } : a)) });
+    await go('perf');
+    await core.send(withPerf('231k · 86%') as never);
+    await expect(page.getByTestId('composer.tab.context')).toHaveText('231k · 86%');
+    await shot('light', 1400, 'context past 80%');
+    // crops of the gauge for designer (m_25940): 86% and 17%, light and dark
+    const crop = async (pct: string) => {
+      for (const t of ['light', 'dark'] as const) {
+        await theme(t);
+        const b = await page.getByTestId('composer.tab').boundingBox();
+        if (b !== null) writeFileSync(test.info().outputPath(`gauge-${pct}-${t}.png`), await page.screenshot({ clip: { x: b.x + b.width - 180, y: b.y - 4, width: 184, height: b.height + 8 } }));
+      }
+      await theme('light');
+    };
+    await crop('86');
+    expect(await page.getByTestId('composer.tab.context').locator('.num').evaluate((e) => getComputedStyle(e).fontVariantNumeric), 'tabular figures').toContain('tabular-nums');
+    await core.send(withPerf('42k · 17%') as never);
+    await expect(page.getByTestId('composer.tab.context')).toHaveText('');
+    await crop('17');
+
+    // tuck away: the 'tip:' line only on an empty, focused composer
+    await go('docs');
+    const tipLine = page.getByTestId('composer.tip');
+    await page.getByTestId('composer.field').click();
+    await expect(tipLine, 'focused and empty: the tip shows').toBeVisible();
+    await page.getByTestId('thread.screen').click({ position: { x: 5, y: 120 } });
+    await expect(tipLine, 'not focused: no tip').toBeHidden();
+    await page.getByTestId('composer.field').click();
+    await page.keyboard.type('x');
+    await expect(tipLine, 'typing: no tip').toBeHidden();
+    await page.keyboard.press('Backspace');
+
+    // (desktop-delight touch 2) the send: the arrow lifts, a small ∿ rises and fades, 240 ms; a frame strip
+    await page.keyboard.type('run the readme check');
+    const send = page.getByTestId('composer.send');
+    const sb = await send.boundingBox();
+    const clip = sb === null ? undefined : { x: sb.x - 24, y: sb.y - 28, width: sb.width + 48, height: sb.height + 36 };
+    // at a tenth of the speed (CDP), so a loaded machine's slow screenshots still catch its steps
+    await cdp.send('Animation.enable');
+    await cdp.send('Animation.setPlaybackRate', { playbackRate: 0.1 });
+    await page.keyboard.press('Enter');
+    const frames: Buffer[] = [];
+    const t0 = Date.now();
+    while (Date.now() - t0 < 3200 && frames.length < 14) frames.push(await page.screenshot(clip === undefined ? {} : { clip }));
+    await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 });
+    expect(frames.length, 'a strip of the send, several frames').toBeGreaterThan(3);
+    await expect(page.getByTestId('composer.sent')).toHaveCount(1);
+    const fx = await page.getByTestId('composer.sent').evaluate((e) => ({ name: getComputedStyle(e).animationName, ms: getComputedStyle(e).animationDuration }));
+    expect(fx.name, 'the ∿ rises').toBe('b-send-gust');
+    const strip = frames.map((f, i) => `<figure><figcaption>${String(i)}</figcaption><img src="data:image/png;base64,${f.toString('base64')}"></figure>`).join('');
+    // reduced motion: the final state only
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    expect(await page.getByTestId('composer.sent').evaluate((e) => getComputedStyle(e).animationName), 'reduced motion: nothing moves').toBe('none');
+    await page.emulateMedia({ reducedMotion: null });
+
+    // the shots for designer: every state at 1400, 1100, 800, light and dark
     for (const t of ['light', 'dark'] as const) {
       await theme(t);
       for (const w of [1400, 1100, 800]) {
@@ -379,6 +455,8 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     const cells = shots.map((x) => `<figure><figcaption>${x.label}</figcaption><img src="data:image/png;base64,${x.png.toString('base64')}"></figure>`).join('');
     await page.setContent(`<style>body{margin:0;background:#777;font:12px ui-monospace,monospace;color:#eee}main{display:flex;flex-wrap:wrap;gap:10px;padding:10px;align-items:flex-start}figure{margin:0}figcaption{margin:0 0 3px}img{display:block;zoom:.3;border-radius:6px}</style><main>${cells}</main>`);
     writeFileSync(test.info().outputPath('strip-sheet.png'), await page.screenshot({ fullPage: true }));
+    await page.setContent(`<style>body{margin:0;background:#777;font:12px ui-monospace,monospace;color:#eee}main{display:flex;flex-wrap:wrap;gap:6px;padding:10px}figure{margin:0}figcaption{margin:0 0 3px}img{display:block;zoom:1.5}</style><main>${strip}</main>`);
+    writeFileSync(test.info().outputPath('send-frames.png'), await page.screenshot({ fullPage: true }));
   } finally {
     await s.close();
     core.dispose();

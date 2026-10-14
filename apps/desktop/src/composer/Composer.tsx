@@ -27,6 +27,7 @@ import {
   tickTip,
   tipShown,
   TIPS,
+  countDay,
   type TipClock,
 } from "./keybar";
 import type { Outgoing } from "./message";
@@ -80,6 +81,14 @@ export interface ComposerProps {
 
 /** The last tip shown (keybar.rs keeps it in the `tip` preference): the next session starts after it. */
 const TIP_KEY = "bise.composer.v1.tip";
+/** The days he used the composer, until the tips retire (keybar.ts countDay). */
+const TIP_DAYS_KEY = "bise.composer.v1.tipdays";
+
+/** Today as a local 'YYYY-MM-DD'. */
+function localDay(now: number): string {
+  const d = new Date(now);
+  return `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export const Composer = memo(function Composer(
   props: ComposerProps,
@@ -110,6 +119,8 @@ export const Composer = memo(function Composer(
   });
   const actions = useRef<ComposerActions | null>(null);
   const [canSend, setCanSend] = useState(false);
+  // each send plays the send's touch once (designer's desktop-delight touch 2)
+  const [sent, setSent] = useState(0);
   const [strip, setStrip] = useState<JSX.Element | null>(null);
   const [field, setField] = useState<FieldBar>({
     fileList: false,
@@ -123,6 +134,8 @@ export const Composer = memo(function Composer(
 
   // the tip: the one after the last session's, the next every 5 minutes, never while he types
   const [tip, setTip] = useState<TipClock | null>(null);
+  // after 7 days of use the tips retire (designer's desktop-delight tuck away)
+  const [retired, setRetired] = useState(false);
   const typing = useRef(false);
   useEffect(() => {
     typing.current = field.typing;
@@ -130,10 +143,20 @@ export const Composer = memo(function Composer(
   useEffect(() => {
     const raw = store.getItem(TIP_KEY);
     const saved = raw === null ? null : Number(raw);
+    let kept: string[] = [];
+    try {
+      const parsed: unknown = JSON.parse(store.getItem(TIP_DAYS_KEY) ?? "[]");
+      if (Array.isArray(parsed)) kept = parsed.filter((x): x is string => typeof x === "string");
+    } catch {
+      kept = [];
+    }
+    const day = countDay(kept, localDay(Date.now()));
+    store.setItem(TIP_DAYS_KEY, JSON.stringify(day.days));
     let clock = startTip(Number.isInteger(saved) ? saved : null, Date.now());
     store.setItem(TIP_KEY, String(clock.index));
     // the first tip shows on the next tick (no render cascade from inside the effect)
     const first = window.setTimeout(() => {
+      setRetired(day.retired);
       setTip(clock);
     }, 0);
     const timer = window.setInterval(() => {
@@ -148,8 +171,9 @@ export const Composer = memo(function Composer(
       window.clearInterval(timer);
     };
   }, [store]);
+  // one tip at a time, on an empty composer (focused: css/composer.css hides it otherwise), never once retired
   const tipText =
-    tip !== null && tipShown(mode, field.typing) ? TIPS[tip.index] : undefined;
+    tip !== null && !retired && tipShown(mode, field.typing) ? TIPS[tip.index] : undefined;
 
   return (
     <ComposerFrame
@@ -158,6 +182,7 @@ export const Composer = memo(function Composer(
       tabAccent={tabAccent}
       tools={tools}
       toolsEnd={toolsEnd}
+      sent={sent}
       // the whole box is the input: a press on its padding or empty area focuses the editor, caret at the end
       onBoxDown={() => {
         actions.current?.focusEnd();
@@ -189,7 +214,7 @@ export const Composer = memo(function Composer(
               hidden={dictating !== null}
               data-testid={`${testId}.voice`}
             >
-              <span className="kk">∿</span> voice
+              <span className="kk">⌃R⌃R</span> voice
             </Press>
           )}
           <span
@@ -212,7 +237,7 @@ export const Composer = memo(function Composer(
           ) : (
             keys === undefined &&
             tipText !== undefined && (
-              <span className="tip" data-testid={`${testId}.tip`}>
+              <span className="tip rest-tip" data-testid={`${testId}.tip`}>
                 tip: {tipText}
               </span>
             )
@@ -236,6 +261,7 @@ export const Composer = memo(function Composer(
         placeholder={placeholder}
         send={(o) => {
           cb.current.onSend(o);
+          setSent((n) => n + 1);
         }}
         command={(name, args) => {
           cb.current.onCommand?.(name, args);

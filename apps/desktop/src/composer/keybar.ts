@@ -128,3 +128,14 @@ export function tickTip(c: TipClock, now: number, typing: boolean): TipClock {
 
 /** The tip shows only at rest with an empty field. */
 export const tipShown = (mode: BarMode, typing: boolean): boolean => mode === 'rest' && !typing;
+
+/** The days he used the composer (local 'YYYY-MM-DD'), kept until the tips retire (designer's
+ *  desktop-delight tuck away: none after 7 days of use). */
+export const TIP_DAYS = 7;
+
+/** Today counted once: the days to keep, and whether the tips are retired (an 8th day of use). Pure. */
+export function countDay(days: readonly string[], today: string): { days: readonly string[]; retired: boolean } {
+  if (days.includes(today)) return { days, retired: false };
+  if (days.length >= TIP_DAYS) return { days, retired: true };
+  return { days: [...days, today], retired: false };
+}
