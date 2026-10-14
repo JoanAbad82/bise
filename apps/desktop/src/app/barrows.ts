@@ -12,6 +12,7 @@ import { alarms, pauseLine, waitLen } from '@/thread/wake';
 import type { Agent, Card, ComputerAgent, Place } from '@/proto';
 import { asksMerge, livePr, markOf, orphanPlaces, placeLabel, placeOf, sharedPlaces, tipWords, type Mark } from './barplaces';
 import { computerDot, signOf, type Sign, type Tone } from './side';
+import { archivedAgeTip, madeTip, NEW_CHIP_TIP, pctTip, signTip, timeTip } from './tipwords';
 
 /** One agent with its project, across the projects shown. */
 export interface ProjAgent {
@@ -60,6 +61,8 @@ export interface BarRow {
   readonly fit?: boolean;
   /** an alarm: its watch's id; the row opens its detail (stop watching) */
   readonly watch?: number;
+  /** the hover tips of its compact marks (tipwords.ts): its sign, its end, its time and % columns */
+  readonly tips?: { readonly glyph?: string; readonly end?: string; readonly time?: string; readonly pct?: string };
 }
 
 /** What AGENTS reads besides the agents: their next wakes ('<project>/<agent>' -> ms), the project's worktrees and cards, the computer rows, the ⌥ numbers. */
@@ -130,6 +133,8 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
   const sign = barSign(s);
   const numbered = alt && n !== undefined && n >= 1 && n <= 9;
   const cu = computerDot(extras.computer?.find((r) => r.project === x.project && r.agent === x.a.name));
+  const wake = extras.wakes?.get(`${x.project}/${x.a.name}`);
+  const pct = pctOf(x.a);
   return {
     key: `a:${x.project}/${x.a.name}`,
     kind: 'agent',
@@ -142,8 +147,9 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
     end: '',
     endTone: 'dim',
     time: timeOf(x.a, now),
-    pct: pctOf(x.a),
+    pct,
     title: s.title,
+    tips: { glyph: signTip(sign.g, x.a, now, wake === undefined ? '' : hm(wake)), time: timeTip(x.a, now), pct: pctTip(x.a, pct) },
     testId: `app.right.agent.${idOf(all, x.project, x.a.name)}`,
     waits: s.g === '?',
     ...(!numbered && sign.working ? { working: true } : {}),
@@ -261,6 +267,7 @@ export function archivedRows(agents: readonly ProjAgent[], now: number, all: boo
         title: `${st} · ${x.a.title !== '' ? x.a.title : x.a.purpose}`,
         testId: `app.right.archived.${idOf(all, x.project, x.a.name)}`,
         waits: false,
+        tips: { glyph: `${st === 'done' ? '✓' : st === 'failed' ? '▲' : '–'} ${x.a.name} ${st === 'done' ? 'is done' : st}`, end: archivedAgeTip(st, now - x.a.since_ms) },
       };
     });
 }
@@ -290,6 +297,7 @@ export function artifactRows(items: readonly Item[], now: number): BarRow[] {
       title: `${it.a.title} · ${it.projectName}`,
       testId: `app.right.artifact.${it.project}.${it.a.id}`,
       waits: false,
+      tips: { end: it.a.new ? NEW_CHIP_TIP : madeTip(now - it.a.at_ms < 86_400_000 ? hm(it.a.at_ms) : shortAge(now - it.a.at_ms)) },
     }));
 }
 

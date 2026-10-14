@@ -40,6 +40,7 @@ import { RAIL_PX, SideRail } from './SideRail';
 import { Over, Titlebar, useFrame } from './Frame';
 import { ART_FOLD_PX, ArtifactCentre, ArtifactColumn, artOf, artWidth, useArtPct, useInnerWidth } from './ArtifactView';
 import { RightBar } from './RightBar';
+import { TipLayer } from './TipLayer';
 import { numbersOf } from '@/agents/model';
 import { HubMoments } from './HubMoments';
 import { ReportScreen } from './ReportScreen';
@@ -350,6 +351,8 @@ function Shell() {
           }}
         />
       )}
+      {/* every compact mark's hover tip (data-tip): one layer for the window */}
+      <TipLayer />
     </div>
   );
 }

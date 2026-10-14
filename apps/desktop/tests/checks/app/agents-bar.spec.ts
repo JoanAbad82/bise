@@ -6,7 +6,7 @@
 //   - columns: time 40 and % 32 right-aligned at the same x on every row, the mark 16 last, empty
 //     columns keep their place; a long name: the role cut first, then the % goes, the mark stays;
 //   - marks: '↑' pink (merge card), red (checks fail), text-2 open, text-3 draft, '…' to land, 'ψ' no
-//     PR, none in the shared checkout; the tip: 280 px, the TUI's words, 'open the PR ↗'; a click
+//     PR, none in the shared checkout; the ds tip: the TUI's words, '· click opens the PR'; a click
 //     on the mark opens the review screen;
 //   - the group: a 28 px 'ψ sb/flash-sale' head with '↑ #418', its rows with no mark, the 1 px rule
 //     in the margin, the TUI's order; the orphan PR: no sign, its '↑', opens its branch;
@@ -189,20 +189,21 @@ for (const theme of ['light', 'dark']) {
       // the orphan PR: no sign, its branch text-3
       await expect(page.getByTestId('app.right.pr.420').locator('.app-rb-g')).toHaveText('');
       expect(await page.getByTestId('app.right.pr.420').locator('.app-rb-name').evaluate((e) => getComputedStyle(e).color)).toBe(t3);
-      // the tip: 280 px, the TUI's words with the branch last, 'open the PR ↗'
+      // the tip: the ds's (hover-tips), the TUI's words with the branch last, then where the click
+      // goes; 280 px at most, never interactive
       await mark('app.right.agent.pay').hover();
-      const tip = page.getByTestId('app.right.tip');
-      await expect(page.getByTestId('app.right.tip.words')).toHaveText('#415 · checks fail: e2e/login · ψ worktree on sb/checkout');
-      await expect(page.getByTestId('app.right.tip.open')).toHaveText('open the PR ↗');
-      expect(Math.round((await tip.boundingBox())?.width ?? 0)).toBe(280);
+      const tip = page.getByTestId('tip');
+      await expect(page.getByTestId('tip.words')).toHaveText('#415 · checks fail: e2e/login · ψ worktree on sb/checkout · click opens the PR');
+      expect(Math.round((await tip.boundingBox())?.width ?? 0)).toBeLessThanOrEqual(280);
+      expect(await tip.evaluate((e) => getComputedStyle(e).pointerEvents)).toBe('none');
       await page.screenshot({ path: test.info().outputPath(`agents-bar-${theme}-tip.png`) });
       await mark('app.right.agent.search').hover();
-      await expect(page.getByTestId('app.right.tip.words')).toHaveText('#416 · approved · checks pass · ψ worktree on sb/search');
+      await expect(page.getByTestId('tip.words')).toHaveText('#416 · approved · checks pass · ψ worktree on sb/search · click opens the PR');
       // wt-sign (designer m_24019): a lone ψ says it is a worktree, its branch and folder mono in text
       await mark('app.right.agent.perf').hover();
-      const psiTip = page.getByTestId('app.right.tip.words');
-      await expect(psiTip).toHaveText('ψ worktree: its own copy of the repo, on sb/perf · /tmp/wt/perf/shop');
-      const mono = psiTip.locator('.app-rb-tip-mono');
+      const psiTip = page.getByTestId('tip.words');
+      await expect(psiTip).toHaveText('ψ worktree: its own copy of the repo, on sb/perf · /tmp/wt/perf/shop · click opens its changes');
+      const mono = psiTip.locator('.m');
       await expect(mono).toHaveText(['sb/perf', '/tmp/wt/perf/shop']);
       expect(await mono.first().evaluate((e) => getComputedStyle(e).color)).toBe(await color('--c-text'));
       expect(await mono.first().evaluate((e) => getComputedStyle(e).fontFamily)).toMatch(/mono/iu);

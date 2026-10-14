@@ -6,7 +6,8 @@
 // pick), an artifact its view, a task the scheduled screen; 'all ›' the full list in the centre.
 // Owner: amb-win. The rows' words are pure (barrows.ts).
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Act, Dot, Press } from '@/ds';
+import { Act, Dot, Press, tipAttrs } from '@/ds';
+import { markTip } from './tipwords';
 import type { Agent } from '@/proto';
 import { useAllArtifacts } from '@/artifacts';
 import { LEAVES, useGoArtifact } from '@/artifacts/leave';
@@ -24,7 +25,6 @@ import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
 import { agentRows, archivedRows, artifactRows, capRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
 import { FitWords } from './FitWords';
-import { tilde } from './barplaces';
 
 const lastAgents = new Map<string, { from: readonly (readonly Agent[])[]; items: readonly ProjAgent[] }>();
 
@@ -171,23 +171,12 @@ const HOME = (globalThis as { bise?: { home?: string } }).bise?.home;
 /** Where a worktree's mark, an orphan PR or a head opens: its agent's review, else its branch. */
 type OpenPr = (r: BarRow) => void;
 
-/** His browser at a link (a PR's page). */
-const openExternal = (url: string) => {
-  void (globalThis as { bise?: { openExternal?: (u: string) => unknown } }).bise?.openExternal?.(url);
-};
-
-/** The tip over a mark (desktop-agents-bar §3): 280 px, the TUI's words, 'open the PR ↗'. */
-interface TipAt {
-  readonly r: BarRow;
-  readonly top: number;
-  readonly left: number;
-}
-
 /**
  * A row's last column (desktop-agents-bar §3): its worktree's mark, tinted; a head's carries its
- * PR's number ('↑ #418'). Hover: the tip; a click opens the PR in the review screen, not the row.
+ * PR's number ('↑ #418'). Hover: the ds tip, its words and where its click goes; a click opens
+ * the PR in the review screen (an orphan's: its branch), not the row.
  */
-function MarkCell({ r, onTip, onOpenPr, head = false }: { r: BarRow; onTip: (t: TipAt | null) => void; onOpenPr: OpenPr; head?: boolean }) {
+function MarkCell({ r, onOpenPr, head = false }: { r: BarRow; onOpenPr: OpenPr; head?: boolean }) {
   const m = r.mark;
   if (m === undefined) return <span className="app-rb-mark" />;
   return (
@@ -196,13 +185,7 @@ function MarkCell({ r, onTip, onOpenPr, head = false }: { r: BarRow; onTip: (t: 
       data-testid={`${r.testId}.mark`}
       data-tone={m.tone}
       aria-label={m.tip}
-      onMouseEnter={(e) => {
-        const b = e.currentTarget.getBoundingClientRect();
-        onTip({ r, top: b.bottom + 4, left: Math.max(8, b.right - 280) });
-      }}
-      onMouseLeave={() => {
-        onTip(null);
-      }}
+      {...tipAttrs(markTip(m, r.kind === 'orphan', HOME))}
       onClick={(e) => {
         e.stopPropagation();
         onOpenPr(r);
@@ -213,8 +196,7 @@ function MarkCell({ r, onTip, onOpenPr, head = false }: { r: BarRow; onTip: (t: 
   );
 }
 
-function Row({ r, onOpen, on, onTip, onOpenPr }: { r: BarRow; onOpen: () => void; on?: boolean; onTip?: (t: TipAt | null) => void; onOpenPr?: OpenPr }) {
-  const tip = onTip ?? (() => undefined);
+function Row({ r, onOpen, on, onOpenPr }: { r: BarRow; onOpen: () => void; on?: boolean; onOpenPr?: OpenPr }) {
   const openPr = onOpenPr ?? (() => undefined);
   // an agent's row, an orphan PR, a worktree's head: the TUI's columns (desktop-agents-bar §2-§4)
   if (r.kind !== undefined) {
@@ -223,15 +205,18 @@ function Row({ r, onOpen, on, onTip, onOpenPr }: { r: BarRow; onOpen: () => void
       <Press
         look={`app-rb-row app-rb-arow${head ? ' app-rb-ghead' : ''}${r.kind === 'orphan' ? ' app-rb-orphan' : ''}`}
         aria-current={on === true || undefined}
-        title={r.title}
+        aria-label={r.title}
         onClick={onOpen}
         data-testid={r.testId}
         data-group={r.group}
       >
-        <span className={`app-rb-g ${r.tone}`}>{r.working === true ? <Dot state="wk" /> : r.glyph}</span>
+        {/* each mark says itself in the ds tip (tipwords.ts); the row has none, its words are there */}
+        <span className={`app-rb-g ${r.tone}`} {...tipAttrs(head ? r.title : r.tips?.glyph)} data-testid={`${r.testId}.sign`}>
+          {r.working === true ? <Dot state="wk" tip={r.tips?.glyph} /> : r.glyph}
+        </span>
         <span className="app-rb-name">{r.name}</span>
         {r.cu !== undefined && (
-          <span className={`app-cu ${r.cu.tone}`} title={r.cu.title} data-testid={`${r.testId}.computer`}>
+          <span className={`app-cu ${r.cu.tone}`} {...tipAttrs(r.cu.title)} data-testid={`${r.testId}.computer`}>
             {r.cu.g}
           </span>
         )}
@@ -241,32 +226,35 @@ function Row({ r, onOpen, on, onTip, onOpenPr }: { r: BarRow; onOpen: () => void
           // time 40 px, % 32 px, right-aligned; short on room the % wraps away first, then the time
           <span className="app-rb-cols">
             <span className="app-rb-cols-0" />
-            <span className="app-rb-time" data-testid={`${r.testId}.time`}>
+            <span className="app-rb-time" {...tipAttrs(r.tips?.time)} data-testid={`${r.testId}.time`}>
               {r.time ?? ''}
             </span>
-            <span className="app-rb-pct" data-testid={`${r.testId}.pct`}>
+            <span className="app-rb-pct" {...tipAttrs(r.tips?.pct)} data-testid={`${r.testId}.pct`}>
               {r.pct ?? ''}
             </span>
           </span>
         )}
-        <MarkCell r={r} onTip={tip} onOpenPr={openPr} head={head} />
+        <MarkCell r={r} onOpenPr={openPr} head={head} />
       </Press>
     );
   }
+  // the other sections: the row's whole words in the tip (a cut title, an alarm's who and when), its marks their own
   return (
-    <Press look="app-rb-row" aria-current={on === true || undefined} title={r.title} onClick={onOpen} data-testid={r.testId}>
+    <Press look="app-rb-row" aria-current={on === true || undefined} {...tipAttrs(r.title)} onClick={onOpen} data-testid={r.testId}>
       {r.id !== undefined ? (
         // an artifact: its kind's glyph and title in the pink chip (desktop-agents-bar §5, art-chips'
         // .b-artchip), cut after a whole word with '…'; hover on the row lifts its tint to 16 %
         <FitWords className="app-rb-chipbox" text={`${r.glyph} ${r.name}`} testId={`${r.testId}.chip`} chip={CHIP} />
       ) : (
         <>
-          <span className={`app-rb-g ${r.tone}`}>{r.glyph}</span>
+          <span className={`app-rb-g ${r.tone}`} {...tipAttrs(r.tips?.glyph)}>
+            {r.glyph}
+          </span>
           <span className="app-rb-name">{r.name}</span>
         </>
       )}
       {r.leaves === true && (
-        <span className="app-rb-out" title="opens in your browser" data-testid={`${r.testId}.leaves`}>
+        <span className="app-rb-out" {...tipAttrs('↗ opens in your browser')} data-testid={`${r.testId}.leaves`}>
           {LEAVES}
         </span>
       )}
@@ -274,57 +262,16 @@ function Row({ r, onOpen, on, onTip, onOpenPr }: { r: BarRow; onOpen: () => void
       {/* a new artifact: the signed 'new' chip (designer m_20132: 1 px line, r 9, ink, t-11) */}
       {r.end === 'new' && r.id !== undefined ? (
         <span className="app-rb-end">
-          <span className="app-rb-new" data-testid={`${r.testId}.new`}>
+          <span className="app-rb-new" {...tipAttrs(r.tips?.end)} data-testid={`${r.testId}.new`}>
             new
           </span>
         </span>
       ) : (
-        <span className={`app-rb-end ${r.endTone}`}>{r.end}</span>
+        <span className={`app-rb-end ${r.endTone}`} {...tipAttrs(r.tips?.end)} data-testid={`${r.testId}.end`}>
+          {r.end}
+        </span>
       )}
     </Press>
-  );
-}
-
-/** The mark's tip, over the bar (fixed: the bar's body scrolls): the TUI's words, 'open the PR ↗'. */
-function MarkTip({ at, onKeep, onOpenUrl }: { at: TipAt; onKeep: (keep: boolean) => void; onOpenUrl: (url: string) => void }) {
-  const m = at.r.mark;
-  if (m === undefined) return null;
-  return (
-    <div
-      className="app-rb-tip"
-      role="tooltip"
-      style={{ top: at.top, left: at.left }}
-      data-testid="app.right.tip"
-      onMouseEnter={() => {
-        onKeep(true);
-      }}
-      onMouseLeave={() => {
-        onKeep(false);
-      }}
-    >
-      <span data-testid="app.right.tip.words">
-        {/* wt-sign: words text-2, the branch and the folder mono, his home folded to '~' */}
-        {m.parts.map((x, i) =>
-          x.mono === true ? (
-            <span key={i} className="app-rb-tip-mono">
-              {tilde(x.t, HOME)}
-            </span>
-          ) : (
-            <Fragment key={i}>{x.t}</Fragment>
-          ),
-        )}
-      </span>
-      {m.url !== undefined && (
-        <Act
-          onClick={() => {
-            onOpenUrl(m.url ?? '');
-          }}
-          testId="app.right.tip.open"
-        >
-          open the PR ↗
-        </Act>
-      )}
-    </div>
   );
 }
 
@@ -421,21 +368,8 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   // the TUI's ⌥ numbers: the rows' order and ⌥N (a project's only; bise's thread keeps start order)
   const numbers = all ? undefined : numbersOf(project, agents.map((x) => x.a));
   const live = agentRows(agents, now, all, alt, { wakes, places, cards, computer, ...(numbers === undefined ? {} : { numbers }) });
-  // the mark's tip: one at a time, kept while the pointer goes from the mark to it
-  const [tipAt, setTipAt] = useState<TipAt | null>(null);
-  const tipClose = useRef<number | null>(null);
-  const onTip = (t: TipAt | null) => {
-    if (tipClose.current !== null) window.clearTimeout(tipClose.current);
-    tipClose.current = null;
-    if (t !== null) setTipAt(t);
-    else tipClose.current = window.setTimeout(() => { setTipAt(null); }, 160);
-  };
-  const keepTip = (keep: boolean) => {
-    onTip(keep && tipAt !== null ? tipAt : null);
-  };
   // a mark, an orphan PR, a head: the PR in the review screen (its agent's), an orphan its branch
   const openPr: OpenPr = (r) => {
-    setTipAt(null);
     if (r.kind === 'orphan' && r.branch !== undefined) router.go({ screen: 'branch', project: r.project, branch: r.branch });
     else if (r.agent !== undefined) router.go({ screen: 'review', project: r.project, agent: r.agent });
   };
@@ -479,7 +413,6 @@ export function RightBar({ project, name, over }: { project: string; name: strin
                 key={r.key}
                 r={r}
                 on={r.feature !== undefined && route.screen === 'feature' && route.project === r.project && route.name === r.feature}
-                onTip={onTip}
                 onOpenPr={openPr}
                 onOpen={() => {
                   if (r.feature !== undefined) router.go({ screen: 'feature', project: r.project, name: r.feature });
@@ -488,7 +421,7 @@ export function RightBar({ project, name, over }: { project: string; name: strin
               />
             ) : (
               <Fragment key={r.key}>
-                <Row r={r} on={here(r.project, r.agent ?? '')} onTip={onTip} onOpenPr={openPr} onOpen={() => { openAgent(r.project, r.agent ?? ''); }} />
+                <Row r={r} on={here(r.project, r.agent ?? '')} onOpenPr={openPr} onOpen={() => { openAgent(r.project, r.agent ?? ''); }} />
                 {tipOf(r.agent ?? '')}
               </Fragment>
             )
@@ -564,7 +497,6 @@ export function RightBar({ project, name, over }: { project: string; name: strin
           }
         </Section>
       </div>
-      {tipAt !== null && <MarkTip at={tipAt} onKeep={keepTip} onOpenUrl={openExternal} />}
     </aside>
   );
 }

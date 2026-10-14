@@ -9,6 +9,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import * as RSelect from "@radix-ui/react-select";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent, MouseEventHandler, ReactNode, Ref, TextareaHTMLAttributes } from "react";
 import { cx, st, type UiState } from "./cx";
+import { tipAttrs } from "./tip";
 
 export interface PressProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className" | "type"> {
   /** the row's own signed look (a class with its rule in the screen's css: the ds lint checks it) */
@@ -65,7 +66,7 @@ export function IconButton({ label, children, keys, size, pressed, state, disabl
   const off = disabled || state === "disabled";
   return (
     <button ref={ref} type="button" className={cx("b-ibtn", size, pressed && "on", st(state))} aria-label={label}
-      title={keys !== undefined && keys !== "" ? `${label}  ${keys}` : label} aria-pressed={pressed} disabled={off}
+      {...tipAttrs(label, keys)} aria-pressed={pressed} disabled={off}
       onClick={onClick} data-testid={testId}>
       {children}
     </button>

@@ -5,7 +5,7 @@
 // (110 ms, half speed and a tone down while he types, still under reduced motion or a window that
 // isn't key) is the signs' own (working/gust.ts). Owner: amb-home.
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
+import { tipAttrs } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAgents } from '@/store';
 import { Gust, Pulse } from '@/working/Signs';
@@ -21,9 +21,9 @@ export function markTip(name: string, a: Pick<Agent, 'turn_ms' | 'since_ms'>, no
 /** The mark itself, or nothing; `starting`: the agent's empty thread says it is starting. */
 export function LabelMark({ project, agent, name, starting }: { project: string; agent: string; name: string; starting: boolean }) {
   const a = useAgents(project).find((x) => x.name === agent);
-  // the age is read when the pointer comes in, not ticked under a tooltip nobody sees; the tip
-  // goes in body, fixed over the gust (the label line clips its overflow)
-  const [hover, setHover] = useState<{ at: number; x: number; y: number } | null>(null);
+  // the age is read when the pointer comes in, not ticked under a tooltip nobody sees; the app's
+  // one tip layer draws the words (the ds tip, in body: the label line clips its overflow)
+  const [at, setAt] = useState<number | null>(null);
   if (starting && a !== undefined && !a.archived) {
     return (
       <span className="th-mark" data-testid="thread.mark" data-state="starting" role="img" aria-label={`${name} is starting`}>
@@ -39,22 +39,15 @@ export function LabelMark({ project, agent, name, starting }: { project: string;
       data-state="working"
       role="img"
       aria-label={`${name} is working`}
-      onMouseEnter={(e) => {
-        const r = e.currentTarget.getBoundingClientRect();
-        setHover({ at: Date.now(), x: r.left, y: r.top });
+      {...tipAttrs(at === null ? `${name} is working` : markTip(name, a, at))}
+      onMouseEnter={() => {
+        setAt(Date.now());
       }}
       onMouseLeave={() => {
-        setHover(null);
+        setAt(null);
       }}
     >
       <Gust testId="thread.mark.gust" />
-      {hover !== null &&
-        createPortal(
-          <span className="th-mark-tip" role="tooltip" data-testid="thread.mark.tip" style={{ left: hover.x, top: hover.y }}>
-            {markTip(name, a, hover.at)}
-          </span>,
-          document.body,
-        )}
     </span>
   );
 }

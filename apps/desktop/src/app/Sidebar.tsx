@@ -9,7 +9,7 @@
 // It reads only projects, the route and counts (numbers, so a snapshot never
 // changes for nothing): a thread's entries never re-render it.
 import { memo, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { IconButton, Kbd, Menu, MenuItem, MenuSep, Pearl, SearchButton, SectionHead, Side } from '@/ds';
+import { IconButton, Kbd, Menu, MenuItem, MenuSep, Pearl, SearchButton, SectionHead, Side, tipAttrs } from '@/ds';
 import type { ProjectRow } from '@/proto';
 import { useAgents, useHubRefused, useProjects, useStore, type Store } from '@/store';
 import { RefusedLine } from './Refused';
@@ -21,6 +21,7 @@ import { projectSide } from './side';
 import { useKeptScroll } from './keep';
 import { BisePearl } from './BisePearl';
 import { useModHeld } from './held';
+import { goneTip, newTip, QUIET_TIP, scheduledTip, waitsTip, workingTip } from './tipwords';
 
 /** His projects in his order, bise's own out (it is the bise row). Pure. */
 export function projectsOf(rows: readonly ProjectRow[]): ProjectRow[] {
@@ -83,14 +84,18 @@ function NewEnd({ words }: { words: string }) {
   );
 }
 
-/** One sidebar row: a lead (pearl or sign), the name, its end words, his pink count; ⌘ held: its number. */
-function SRow({ kind, lead, name, end, endErr, count, hint, on, title, onClick, testId, children }: {
+/** One sidebar row: a lead (pearl or sign), the name, its end words, his pink count, each mark with its tip; ⌘ held: its number. */
+function SRow({ kind, lead, name, end, endErr, endTip, count, countTip, hint, on, title, onClick, testId, children }: {
   kind: 'top' | 'pj' | 'ag' | 'more' | 'ft';
   lead: ReactNode;
   name: ReactNode;
   end?: ReactNode;
   endErr?: boolean;
+  /** the end's hover tip (tipwords.ts) */
+  endTip?: string | undefined;
   count?: number;
+  /** the count's hover tip */
+  countTip?: string;
   /** ⌘ held: its ⌘ digit, a 16 px kbd at the row's end in place of the count (held.ts) */
   hint?: number | undefined;
   on?: boolean;
@@ -107,8 +112,16 @@ function SRow({ kind, lead, name, end, endErr, count, hint, on, title, onClick, 
       </span>
     ) : (
       <>
-        {end != null && end !== '' && <span className={endErr === true ? 'app-m err' : 'app-m'}>{end}</span>}
-        {count !== undefined && count > 0 && <span className="app-cnt">{count}</span>}
+        {end != null && end !== '' && (
+          <span className={endErr === true ? 'app-m err' : 'app-m'} {...tipAttrs(endTip)} data-testid={testId === undefined ? undefined : `${testId}.end`}>
+            {end}
+          </span>
+        )}
+        {count !== undefined && count > 0 && (
+          <span className="app-cnt" {...tipAttrs(countTip)} data-testid={testId === undefined ? undefined : `${testId}.count`}>
+            {count}
+          </span>
+        )}
       </>
     );
   return (
@@ -221,16 +234,16 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         lead={<BisePearl size={14} />}
         name="bise"
         count={waits}
+        countTip={waitsTip(waits, true)}
         hint={cmd ? 0 : undefined}
-        title={waits > 0 ? `${String(waits)} waiting for you` : 'every project'}
         on={route.screen === 'bise' || (home !== undefined && inView === home.project && route.screen === 'thread' && route.agent === MAIN)}
         onClick={() => { router.go({ screen: 'bise' }); }}
         testId="app.sidebar.bise"
       />
-      <SRow kind="top" lead="↗" name="artifacts" end={<NewEnd words={newWords(fresh, makers)} />} title={makers.length > 0 ? `new from ${makers.join(', ')}` : undefined}
+      <SRow kind="top" lead="↗" name="artifacts" end={<NewEnd words={newWords(fresh, makers)} />} endTip={newTip(fresh, makers)}
         on={route.screen === 'artifacts' && route.project === ''}
         onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} testId="app.sidebar.artifacts" />
-      <SRow kind="top" lead="◷" name="scheduled" end={scheduled > 0 ? String(scheduled) : ''} on={route.screen === 'scheduled'}
+      <SRow kind="top" lead="◷" name="scheduled" end={scheduled > 0 ? String(scheduled) : ''} endTip={scheduledTip(scheduled)} on={route.screen === 'scheduled'}
         onClick={() => { router.go({ screen: 'scheduled' }); }} testId="app.sidebar.scheduled" />
       <SectionHead>projects</SectionHead>
       {projects.length === 0 && <SRow kind="more" lead="+" name="add a project" end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.empty-add" />}
@@ -254,9 +267,10 @@ const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: Proje
         name={p.name}
         end={side.text}
         endErr={side.err}
+        endTip={side.err ? (p.missing === true ? goneTip(p.path) : undefined) : side.text === 'all quiet' ? QUIET_TIP : workingTip(p.working)}
         count={side.count}
+        countTip={waitsTip(side.count)}
         hint={hint}
-        title={side.count > 0 ? `${String(side.count)} waiting for you` : undefined}
         on={on && route.screen === 'thread' && route.agent === MAIN}
         onClick={() => { router.go({ screen: 'thread', project: p.project, agent: MAIN }); }}
         testId={`app.sidebar.project.${p.project}`}

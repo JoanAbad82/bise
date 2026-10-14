@@ -8,6 +8,7 @@
 // :focus-within do it (css/live.css).
 import { useCallback, useState, type InputHTMLAttributes, type MouseEventHandler, type ReactNode, type Ref } from "react";
 import { cx, st, step5, sub, type UiState } from "./cx";
+import { tipAttrs } from "./tip";
 import { LivePearl, MOODS, type Mood } from "@/pearl";
 import { Breath } from "@/working/Signs";
 
@@ -234,11 +235,12 @@ export const DOT_WORDS: Record<DotState | "idle", string> = { wk: "working", nd:
  * a status dot: working, needs you, done, error, off (idle without a state); `lg` 16 px. Its state
  * is also a word (aria-label, title) and, with increase contrast, a glyph in a ring (css/live.css).
  */
-export function Dot({ state, lg }: { state?: DotState | undefined; lg?: boolean }) {
+export function Dot({ state, lg, tip }: { state?: DotState | undefined; lg?: boolean; /** its hover tip, when more than its state's word ('∿ perf is working') */ tip?: string | undefined }) {
   const word = DOT_WORDS[state ?? "idle"];
+  const hover = tipAttrs(tip ?? word);
   // working: the TUI's 1-cell breath on the window's one clock (designer's desktop-working page)
-  if (state === "wk") return <i className={cx("b-dot", state, lg && "lg")} role="img" aria-label={word} title={word}><Breath /></i>;
-  return <i className={cx("b-dot", state, lg && "lg")} role="img" aria-label={word} title={word} />;
+  if (state === "wk") return <i className={cx("b-dot", state, lg && "lg")} role="img" aria-label={word} {...hover}><Breath /></i>;
+  return <i className={cx("b-dot", state, lg && "lg")} role="img" aria-label={word} {...hover} />;
 }
 
 export type PearlSize = 14 | 22 | 40 | 56 | 120;

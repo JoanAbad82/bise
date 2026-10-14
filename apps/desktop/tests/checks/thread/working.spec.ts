@@ -197,12 +197,12 @@ test('thread/working: only the gust beside the label while it works, the step dr
     await expect(page.getByTestId('thread.typing')).toHaveCount(0);
     const toolEnd = await endGap('.th-list .th-row');
     expect(toolEnd, `the thread's end gap under the tool row (${String(toolEnd)})`).toBeGreaterThanOrEqual(18);
-    // (2) hover: the turn's age
-    await expect(page.getByTestId('thread.mark.tip')).toHaveCount(0);
+    // (2) hover: the turn's age, in the ds tip (hover-tips)
+    await expect(page.getByTestId('tip')).toHaveCount(0);
     await mark.hover();
-    await expect(page.getByTestId('thread.mark.tip')).toHaveText('perf is working · 14 min');
+    await expect(page.getByTestId('tip')).toHaveText('perf is working · 14 min');
     await page.mouse.move(2, 2);
-    await expect(page.getByTestId('thread.mark.tip')).toHaveCount(0);
+    await expect(page.getByTestId('tip')).toHaveCount(0);
     // (3) he types: calm (each tone one step down: no cell in ink)
     await page.locator('[data-testid="composer.field"]').first().click();
     await page.keyboard.type('compute it for 25 years too', { delay: 40 });
@@ -234,7 +234,7 @@ test('thread/working: only the gust beside the label while it works, the step dr
         el.scrollTop = el.scrollHeight;
       });
       await mark.hover();
-      await expect(page.getByTestId('thread.mark.tip')).toBeVisible();
+      await expect(page.getByTestId('tip')).toBeVisible();
       shots.push({ label: `${t}-hover`, png: await page.screenshot({ clip: { x: 0, y: H - 340, width: W, height: 340 } }) });
       await page.mouse.move(2, 2);
       // (4) docs: the model's words about its call, the growing fold, once

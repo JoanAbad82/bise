@@ -1,0 +1,10 @@
+/* bise desktop window · the hover tip (designer m_24359): never interactive, sans 12, text on
+   --c-solid, 1 px --c-line, r 6, padding 4/8, 280 px at most, one line preferred, 2 at most; a key at
+   its right in mono text-3. In 120 ms when it shows cold, out at once; no fade under reduced motion. */
+.b-tip{position:fixed;z-index:1000;left:0;top:0;display:flex;align-items:baseline;gap:var(--s-3);box-sizing:border-box;width:max-content;max-width:280px;padding:var(--s-1) var(--s-2);border:1px solid var(--c-line);border-radius:var(--r-1);background:var(--c-solid);color:var(--c-text);font:var(--t-12)/1.4 var(--font-ui);pointer-events:none;user-select:none}
+.b-tip .w{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere}
+.b-tip .m{font-family:var(--font-mono);color:var(--c-text)}
+.b-tip .k{flex:none;margin-left:auto;font:var(--t-11) var(--font-mono);color:var(--c-text-3);white-space:nowrap}
+.b-tip.in{animation:b-tip-in 120ms var(--ease-out)}
+@keyframes b-tip-in{from{opacity:0}}
+@media (prefers-reduced-motion: reduce){.b-tip.in{animation:none}}

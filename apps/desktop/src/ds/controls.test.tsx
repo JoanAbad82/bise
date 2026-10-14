@@ -7,13 +7,15 @@ import { Act, Button, IconButton, Row, Sheet, TextArea } from "./index";
 afterEach(cleanup);
 
 describe("src/ds controls (designer m_18343)", () => {
-  it("IconButton is a real button named by its label, its key in the tooltip, pressed when on", () => {
+  it("IconButton is a real button named by its label, its words and key in the ds tip, pressed when on", () => {
     const onClick = vi.fn();
     const { getByTestId } = render(<IconButton label="sidebar" keys="⌘\" pressed onClick={onClick} testId="ib">☰</IconButton>);
     const b = getByTestId("ib");
     expect(b.tagName).toBe("BUTTON");
     expect(b.getAttribute("aria-label")).toBe("sidebar");
-    expect(b.getAttribute("title")).toBe("sidebar  ⌘\\");
+    expect(b.getAttribute("title")).toBeNull();
+    expect(b.getAttribute("data-tip")).toBe("sidebar");
+    expect(b.getAttribute("data-tip-keys")).toBe("⌘\\");
     expect(b.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(b);
     expect(onClick).toHaveBeenCalledTimes(1);

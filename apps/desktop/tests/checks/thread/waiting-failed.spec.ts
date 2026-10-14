@@ -36,10 +36,10 @@ test('thread/waiting-failed: whom an agent waits on shows in the sidebar, the li
       const chip = page.getByTestId('thread.head.state');
       await expect(chip).toHaveText('⋯ waiting on bise', { timeout: 3000 });
       const perf = page.getByTestId('app.right.agent.perf');
-      await expect(perf).toHaveAttribute('title', 'waiting on bise · perf\'s job');
+      await expect(perf).toHaveAttribute('aria-label', 'waiting on bise · perf\'s job');
       await expect(perf).toContainText('⋯');
       const docs = page.getByTestId('app.right.agent.docs');
-      await expect(docs).toHaveAttribute('title', "asks you · docs's job");
+      await expect(docs).toHaveAttribute('aria-label', "asks you · docs's job");
       await expect(docs).toContainText('?');
     });
 

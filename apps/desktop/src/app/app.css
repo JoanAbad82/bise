@@ -907,32 +907,6 @@ body:has(.app-shell) {
 .app-rb-row:focus-visible .app-rb-chip {
   background: color-mix(in srgb, var(--c-accent) 16%, transparent);
 }
-/* the mark's tip (§3): 280 px, the TUI's words, 'open the PR ↗' */
-.app-rb-tip {
-  position: fixed;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-1);
-  box-sizing: border-box;
-  width: 280px;
-  padding: var(--s-2) var(--s-3);
-  border-radius: var(--r-2);
-  background: var(--c-solid, var(--c-window));
-  box-shadow: var(--e-2);
-  color: var(--c-text-2);
-  font-size: var(--t-12);
-  white-space: normal;
-}
-.app-rb-tip .b-act {
-  align-self: flex-start;
-}
-/* wt-sign (designer m_24019): a ψ's branch and folder, mono in the text's color */
-.app-rb-tip-mono {
-  font-family: var(--font-mono);
-  color: var(--c-text);
-  overflow-wrap: anywhere;
-}
 /* an alarm's detail under its row (agent-waiting-states A): its words one a line in text-3, then
    'open <agent>' and 'stop watching' */
 .app-rb-detail {

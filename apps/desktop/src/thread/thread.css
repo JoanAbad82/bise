@@ -966,20 +966,6 @@
 .th-mark .wk-sign {
   line-height: 1;
 }
-/* in body (the label line clips its overflow): fixed over the gust's left edge, 4 px above it */
-.th-mark-tip {
-  position: fixed;
-  z-index: 50;
-  transform: translate(calc(-1 * var(--s-2)), calc(-100% - var(--s-1)));
-  padding: var(--s-1) var(--s-2);
-  border-radius: var(--r-2);
-  background: var(--c-overlay);
-  box-shadow: var(--e-2);
-  color: var(--c-text);
-  font: var(--t-12) / 1.4 var(--font-ui);
-  white-space: nowrap;
-  pointer-events: none;
-}
 /* the dim rows: folds (thinking, compaction) at --lh-row, a tool chip 8 px under what's above
    (designer m_19359: b-tool's 6 -> 8) */
 .th-screen .b-fold {
