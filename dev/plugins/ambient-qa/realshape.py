@@ -511,7 +511,29 @@ def launch_chain(pid):
     return chain
 
 
-def is_breach(info, started_after, run_pids=None, cand_bundle=None, chain=None):
+# macOS Screenshot (his ⌘⇧4/5): the one front change that is his with no launcher in its chain
+# (launchservicesd starts it, parent launchd: f8a0b301's run stopped on it, main m_25124)
+SCREENSHOT_UI = "com.apple.screencaptureui"
+
+
+def his_screenshot(info, run_pids=None, cand_bundle=None, chain=None, cand_tcc=False):
+    """A front change to macOS Screenshot is his own ⌘⇧4/5 when nothing ties it to the run: no pid
+    of the run and not the candidate's bundle in its launch chain (an empty chain is fine: launchd
+    starts it), not a pid of ours itself, and no screen-capture TCC line from the run's pids
+    (`cand_tcc`). Anything else that comes front is judged by is_breach. Pure."""
+    if info.get("bundle") != SCREENSHOT_UI or cand_tcc:
+        return False
+    if run_pids and info.get("pid") in run_pids:
+        return False
+    return not any((run_pids and link.get("pid") in run_pids) or (cand_bundle and link.get("bundle") == cand_bundle) for link in chain or [])
+
+
+def run_screen_tcc(tcc_rows, run_pids):
+    """Whether the run's pids asked TCC for screen capture (tcc.jsonl's rows: {service, pid}). Pure."""
+    return any(r.get("service") == "kTCCServiceScreenCapture" and r.get("pid") in (run_pids or ()) for r in tcc_rows)
+
+
+def is_breach(info, started_after, run_pids=None, cand_bundle=None, chain=None, cand_tcc=False):
     """A front change is a breach when it is one of FRONT_BAD or an app started after the run
     began; any other app is his own switch (he works next to the run). With the run's pids known,
     an app that is not one of them and was there before the run is his own too, even named like
@@ -527,6 +549,8 @@ def is_breach(info, started_after, run_pids=None, cand_bundle=None, chain=None):
     front). Pure."""
     if cand_bundle and info.get("bundle") == cand_bundle:
         return True
+    if his_screenshot(info, run_pids, cand_bundle, chain, cand_tcc):
+        return False
     if run_pids is not None and info.get("pid") and int(info["pid"]) not in run_pids and not started_after:
         return False
     # any bise app (dev.bise.*, 'bise try', 'bise cand') coming front during a run, whatever its
@@ -613,7 +637,12 @@ def front_gate(out, stop_file, bundle, every=0.1, pids_file=None):
                 except OSError:
                     run_pids = None
                 chain = launch_chain(cur["pid"]) if after and cur["pid"] else None
-                row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after, run_pids, cand_bundle, chain))
+                cand_tcc = run_screen_tcc(_jsonl(os.path.join(os.path.dirname(out), "tcc.jsonl")), run_pids) if cur.get("bundle") == SCREENSHOT_UI else False
+                row = dict(cur, t=round(time.time() - t0, 2), started_after=after, breach=is_breach(cur, after, run_pids, cand_bundle, chain, cand_tcc))
+                if his_screenshot(cur, run_pids, cand_bundle, chain, cand_tcc):
+                    row["his_screenshot"] = True
+                    print("%s his screenshot: %s (%s), no chain to the run, no screen TCC from it: logged, the run goes on"
+                          % (time.strftime("%H:%M:%S"), cur["name"], cur.get("bundle")), flush=True)
                 if chain is not None:
                     row["chain"] = chain
                     row["his_launch"] = not row["breach"]
@@ -632,6 +661,20 @@ def front_gate(out, stop_file, bundle, every=0.1, pids_file=None):
             time.sleep(every)
         f.write(json.dumps({"t": round(time.time() - t0, 2), "end": True, "samples": n}) + "\n")
     return changes
+
+
+def _jsonl(path):
+    """A jsonl file's rows; [] when it is missing or unreadable (a row cut mid-write is skipped)."""
+    rows = []
+    try:
+        for line in open(path):
+            try:
+                rows.append(json.loads(line))
+            except ValueError:
+                pass
+    except OSError:
+        pass
+    return rows
 
 
 def tcc_requests(log_text):

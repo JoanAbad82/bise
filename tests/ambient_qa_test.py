@@ -856,6 +856,19 @@ def real_shape_pure():
     check(rs.is_breach(vibe, True, {17193}, cand, None) and rs.is_breach(vibe, True, {17193}, cand, [])
           and rs.is_breach(vibe, True, {17193}, cand, [{"name": "node", "pid": 777, "bundle": None}]), "unknown chain = breach")
     check(rs.is_breach(dict(vibe, pid=17193), True, {17193}, cand, raycast), "a pid of ours via Raycast = breach")
+    # macOS Screenshot (his ⌘⇧4/5, main m_25124; f8a0b301's run stopped on it): his, logged, when nothing
+    # ties it to the run (launchd starts it: an empty chain is fine); a pid of ours in its chain, the
+    # candidate's bundle there, or a screen-capture TCC line from the run's pids keeps it a breach
+    shot = {"name": "Screenshot", "pid": 61828, "bundle": "com.apple.screencaptureui"}
+    check(not rs.is_breach(shot, True, {17193}, cand, []) and rs.his_screenshot(shot, {17193}, cand, []), "his screenshot = his")
+    check(rs.is_breach(shot, True, {17193}, cand, [{"name": "bise cand", "pid": 17193, "bundle": cand}])
+          and rs.is_breach(shot, True, {17193}, cand, [{"name": "x", "pid": 5, "bundle": cand}])
+          and rs.is_breach(dict(shot, pid=17193), True, {17193}, cand, [])
+          and rs.is_breach(shot, True, {17193}, cand, [], cand_tcc=True), "a screenshot tied to the run = breach")
+    check(rs.run_screen_tcc([{"service": "kTCCServiceScreenCapture", "pid": 17193}], {17193})
+          and not rs.run_screen_tcc([{"service": "kTCCServiceScreenCapture", "pid": 34387}], {17193})
+          and not rs.run_screen_tcc([{"service": "kTCCServiceMicrophone", "pid": 17193}], {17193}), "screen TCC from the run's pids")
+    check(rs.is_breach({"name": "Grab", "pid": 61828, "bundle": "com.apple.Grab"}, True, {17193}, cand, []), "any other new app with no chain = breach")
     # FRONT_BAD follows the same rule (ambient-lead m_21528; b51422c0's run stopped on his own Raycast -> System Settings)
     settings = {"name": "System Settings", "pid": 30883, "bundle": "com.apple.systempreferences"}
     check(not rs.is_breach(settings, True, {58465}, cand, raycast)
