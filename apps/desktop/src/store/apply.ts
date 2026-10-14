@@ -222,8 +222,11 @@ export function applyTyped(s: Store, ev: Ev): void {
       return;
     case "error":
       if (ev.cmd === "sign_in" && s.signing() !== null) s.put("signing", null);
+      // card-state (architect m_23450): the hub refused his answer or close: the card is his
+      // again in every view (acted.ts), and the hub's words say why, as an error line
+      if ((ev.cmd === "answer" || ev.cmd === "close") && ev.project != null) s.cardRefused(ev.project, ev.cmd);
       // a typed line the hub's router refused (HubCmd slash): his words to fix, as an error line
-      if (ev.cmd === "slash" && ev.project != null) {
+      if ((ev.cmd === "slash" || ev.cmd === "answer" || ev.cmd === "close") && ev.project != null) {
         s.put(`notice:${ev.project}`, {
           text: ev.text,
           level: "error",

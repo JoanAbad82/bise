@@ -92,7 +92,7 @@ fn card(id: u64, kind: &str, text: &str) -> RowCard {
         kind: kind.into(),
         agent: "perf".into(),
         question: text.lines().next().unwrap_or("").into(),
-        options: vec![Opt { n: 1, label: "yes".into() }],
+        options: vec![Opt { n: 1, label: "yes".into(), act: None }],
         urgent: false,
         since_ms: 1_000,
         page: None,

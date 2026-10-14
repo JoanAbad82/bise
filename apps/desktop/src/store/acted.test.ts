@@ -63,6 +63,29 @@ describe("acted: the cards he answered or closed, one owner", () => {
     expect(s.acted()).toBe(same);
   });
 
+  it("a refused answer or close (the hub's error names the command) shows the card again and says why", () => {
+    const s = new Store({ send: () => undefined }, { now: () => 7 });
+    s.apply({ ev: "projects", projects: [row("shop", [2, 3, 4])] });
+    s.answer("shop", 2, "1");
+    s.answer("shop", 3, "1");
+    s.close("shop", 4);
+    // the first answer's result came: settled, the hub took it
+    s.apply({ ev: "card_answered", project: "shop", card: 2, answer: null });
+    // the next answer is refused: card 3 is his again, card 2 stays out until the rows drop it
+    s.apply({ ev: "error", project: "shop", cmd: "answer", text: "card 3 isn't open" });
+    expect(s.acted().map((a) => a.key)).toEqual(["shop-2", "shop-4"]);
+    expect(s.notice("shop")).toEqual({ text: "card 3 isn't open", level: "error" });
+    // a close refused: card 4 back too; another project's error touches nothing here
+    s.apply({ ev: "error", project: "other", cmd: "close", text: "no" });
+    s.apply({ ev: "error", project: "shop", cmd: "close", text: "no such card" });
+    expect(s.acted().map((a) => a.key)).toEqual(["shop-2"]);
+    // a close the hub took (its result) is settled: a later error refuses nothing of it
+    s.close("shop", 3);
+    s.apply({ ev: "card_closed", project: "shop", card: 3 });
+    s.apply({ ev: "error", project: "shop", cmd: "close", text: "late" });
+    expect(s.acted().map((a) => a.key)).toEqual(["shop-2", "shop-3"]);
+  });
+
   it("a reload keeps it until the rows drop it (his #384: never back once answered)", () => {
     const keep = keepOf();
     const s = new Store({ send: () => undefined }, { now: () => 7, asides: keep });

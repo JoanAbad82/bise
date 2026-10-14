@@ -24,7 +24,7 @@ import type {
   Part,
   ProjectRow,
 } from "@/proto";
-import { actedAdd, actedOf, actedPrune, type Acted } from "./acted";
+import { actedAdd, actedKey, actedKeys, actedOf, actedPrune, cardClosedOf, type Acted } from "./acted";
 import type { CoreState } from "@/shared/api";
 import {
   type Ev,
@@ -59,6 +59,8 @@ export class Store extends StoreVoice {
     if (sent !== null) return this.sendAnswered(sent);
     const done = cardAnsweredOf(raw);
     if (done !== null) return this.cardAnswered(done);
+    const closed = cardClosedOf(raw);
+    if (closed !== null) return this.cardClosed(closed.project, closed.card);
     const ev = typed(raw);
     if (ev === null) return false;
     this.applyTyped(ev);
@@ -207,6 +209,7 @@ export class Store extends StoreVoice {
    * his row there (asides.ts). Always a known event.
    */
   private cardAnswered(d: CardAnswered): true {
+    this.settle(d.project, d.card, "answer");
     const k = `${d.project}/${String(d.card)}`;
     const from = this.answering.get(k);
     this.answering.delete(k);
@@ -235,6 +238,39 @@ export class Store extends StoreVoice {
   /** @internal for apply.ts: a projects event; the cards its rows no longer list leave the set */
   rowsCame(rows: readonly ProjectRow[]): void {
     this.putActed(actedPrune(this.acted(), rows));
+    // an act whose card the rows dropped is settled: the hub took it
+    const hidden = actedKeys(this.acted());
+    for (const [project, list] of this.acting) this.acting.set(project, list.filter((a) => hidden.has(actedKey(project, a.card))));
+  }
+  /** His answers and closes on their way, per project, oldest first: the hub answers a connection in order. */
+  private readonly acting = new Map<string, readonly { card: number; cmd: "answer" | "close" }[]>();
+  /** He answered or closed it: out of every view, on its way until the hub's word. */
+  private acts(project: string, card: number, cmd: "answer" | "close"): void {
+    this.acting.set(project, [...(this.acting.get(project) ?? []), { card, cmd }]);
+    this.putActed(actedAdd(this.acted(), project, card, this.now()));
+  }
+  private settle(project: string, card: number, cmd: "answer" | "close"): void {
+    const list = this.acting.get(project) ?? [];
+    const i = list.findIndex((a) => a.card === card && a.cmd === cmd);
+    if (i >= 0) this.acting.set(project, list.filter((_, j) => j !== i));
+  }
+  /**
+   * @internal for apply.ts: the hub refused his oldest answer (or close) still on its way in that
+   * project (its error names the command, not the card; the hub answers a connection's commands
+   * in order): that card is his again in every view, never hidden while it waits (architect m_23450).
+   */
+  cardRefused(project: string, cmd: "answer" | "close"): void {
+    const list = this.acting.get(project) ?? [];
+    const a = list.find((x) => x.cmd === cmd);
+    if (a === undefined) return;
+    this.settle(project, a.card, cmd);
+    this.answering.delete(`${project}/${String(a.card)}`);
+    this.putActed(this.acted().filter((x) => x.key !== actedKey(project, a.card)));
+  }
+  /** The window-local 'card_closed' (main's ipc.ts): card/close's result, the hub took it. Always a known event. */
+  private cardClosed(project: string, card: number): true {
+    this.settle(project, card, "close");
+    return true;
   }
 
   /** His answers made from this thread to a card asked elsewhere (window-local, oldest first; kept across a reload). */
@@ -490,8 +526,8 @@ export class Store extends StoreVoice {
   ): void {
     // inbox picks (3): where he was, so the answer's result can leave his row there (asides.ts)
     if (from !== undefined) this.answering.set(`${project}/${String(card)}`, from);
-    // every view leaves it out until the hub's rows drop it (acted.ts)
-    this.putActed(actedAdd(this.acted(), project, card, this.now()));
+    // every view leaves it out until the hub's rows drop it (acted.ts), or the hub refuses it
+    this.acts(project, card, "answer");
     this.command({
       cmd: "answer",
       project,
@@ -520,7 +556,7 @@ export class Store extends StoreVoice {
   }
   /** Close a card without answering it (the TUI's /close N). */
   close(project: string, card: number): void {
-    this.putActed(actedAdd(this.acted(), project, card, this.now()));
+    this.acts(project, card, "close");
     this.command({ cmd: "close", project, card });
   }
   stop(project: string, agent: string): void {

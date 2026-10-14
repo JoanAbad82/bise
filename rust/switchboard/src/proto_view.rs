@@ -293,6 +293,8 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
                 text,
                 kind,
             }
+            // card-state (architect m_23450): each option says what a client does itself
+            .with_acts()
         })
         .partition(|c| his(&c.kind, user_kind))
 }
@@ -565,6 +567,42 @@ mod tests {
         let snap = json!({"cards": [{"id": 7, "kind": "question", "agent": "main", "text": "x", "age_ms": 0, "batch": none}]});
         let (his, _) = cards(&snap, "p", 10, uk);
         assert_eq!(his[0].batch.as_ref().map(|b| b.actions.clone()), Some(None));
+    }
+
+    /// Law (card-state, architect m_23450): each option of a card row says
+    /// what a client does itself, by bise-proto's one rule (`opt_act`, the
+    /// TUI's pick() calls it too): a merge's 2 opens its PR (the link line
+    /// of its text), an update's 3 its release page, a sign-in's 1 is the
+    /// client's sign-in; every other option answers (none). His #384 came
+    /// back because the window sent a merge's 2 as its answer.
+    #[test]
+    fn each_option_says_what_a_client_does_itself() {
+        use bise_proto::rows::{opt_act, OptAct};
+        let snap = json!({"cards": [
+            {"id": 384, "kind": "merge", "agent": "pattern-error-dx", "pr": 384, "place": "p1", "age_ms": 0,
+             "text": "#384 is ready to merge\nP2 errors\ngithub.com/gvergnaud/ts-pattern/pull/384\n\n1. squash and merge\n2. open it on GitHub\n3. not yet"},
+            {"id": 5, "kind": "update", "agent": "main", "link": "https://bise.dev/notes", "age_ms": 0,
+             "text": "bise 1.2 is out\n\n1. update now\n2. later\n3. release notes"},
+            {"id": 6, "kind": "signin", "agent": "main", "age_ms": 0, "text": "sign in again?\n\n1. sign in again\n2. later"},
+            {"id": 7, "kind": "question", "agent": "docs", "age_ms": 0, "text": "where?\n1. here\n2. there"}]});
+        let (his, _) = cards(&snap, "p", 10, |_| true);
+        let acts = |id: u64| his.iter().find(|c| c.id == id).unwrap().options.iter().map(|o| o.act.clone()).collect::<Vec<_>>();
+        let pr = Some(OptAct::Open { url: Some("https://github.com/gvergnaud/ts-pattern/pull/384".into()) });
+        assert_eq!(acts(384), vec![None, pr, None]);
+        assert_eq!(acts(5), vec![None, None, Some(OptAct::Open { url: Some("https://bise.dev/notes".into()) })]);
+        assert_eq!(acts(6), vec![Some(OptAct::SignIn), None]);
+        assert_eq!(acts(7), vec![None, None]);
+        // the row's act is the rule's for every kind and option (the TUI asks the same fn)
+        for c in &his {
+            let link = c.act_link();
+            for o in &c.options {
+                assert_eq!(o.act, opt_act(&c.kind, o.n, link.as_deref()), "{} {}", c.kind, o.n);
+            }
+        }
+        // a merge whose text has no link: still the app's own, nothing to open
+        let snap = json!({"cards": [{"id": 9, "kind": "merge", "agent": "x", "pr": 9, "age_ms": 0, "text": "#9 is ready\n\n1. merge\n2. open it on GitHub\n3. not yet"}]});
+        let (his, _) = cards(&snap, "p", 10, |_| true);
+        assert_eq!(his[0].options[1].act, Some(OptAct::Open { url: None }));
     }
 
     /// Law (architect m_11874): the `scheduled` row the hub builds from a

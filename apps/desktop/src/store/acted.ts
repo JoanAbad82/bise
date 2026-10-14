@@ -47,6 +47,14 @@ export function actedKeys(list: readonly Acted[]): ReadonlySet<string> {
   return new Set(list.map((a) => a.key));
 }
 
+/** The window-local 'card_closed' (never a hub event): card/close's result for a card this window closed. Pure. */
+export function cardClosedOf(raw: unknown): { project: string; card: number } | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  if (r["ev"] !== "card_closed" || typeof r["project"] !== "string" || typeof r["card"] !== "number") return null;
+  return { project: r["project"], card: r["card"] };
+}
+
 /** The kept set read back (a reload, a relaunch): anything unreadable is dropped. Pure. */
 export function actedOf(raw: unknown): readonly Acted[] {
   if (!Array.isArray(raw)) return [];

@@ -316,11 +316,11 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     expect(screen.getByTestId('inbox.block').textContent).toContain('1 waiting');
   });
 
-  it("card-state: a merge's '2 open it on GitHub' opens its PR, sends nothing, and the item stays", () => {
+  it("card-state: an option the hub's row marks as the app's own (a merge's '2 open it on GitHub') opens its page, sends nothing, the item stays", () => {
     const merge = core_ev.map((e) =>
       e.ev !== 'projects'
         ? e
-        : { ...e, projects: e.projects.map((r) => ({ ...r, cards: [{ id: 384, project: r.project, kind: 'merge', agent: 'pattern-error-dx', question: '#384 is ready to merge\ngithub.com/gvergnaud/ts-pattern/pull/384', options: [{ n: 1, label: 'squash and merge' }, { n: 2, label: 'open it on GitHub' }, { n: 3, label: 'not yet' }], urgent: false, since_ms: NOW - 1000, pr: 384 }] })) },
+        : { ...e, projects: e.projects.map((r) => ({ ...r, cards: [{ id: 384, project: r.project, kind: 'merge', agent: 'pattern-error-dx', question: '#384 is ready to merge\ngithub.com/gvergnaud/ts-pattern/pull/384', options: [{ n: 1, label: 'squash and merge' }, { n: 2, label: 'open it on GitHub', act: { act: 'open' as const, url: 'https://github.com/gvergnaud/ts-pattern/pull/384' } }, { n: 3, label: 'not yet' }], urgent: false, since_ms: NOW - 1000, pr: 384 }] })) },
     );
     const opened: string[] = [];
     const g = globalThis as { bise?: unknown };

@@ -79,23 +79,6 @@ export function pickWaits(c: Pick<Card, 'approval' | 'kind' | 'options'>): strin
   return `the ${noun} waits for ${digitWords(c.options.length)}`;
 }
 
-/**
- * An option the window does itself, as the TUI's pick() (rust/tui/src/sb/cards.rs): it opens a
- * page, sends nothing, and the item stays. A merge's '2 open it on GitHub' (its PR's link: the
- * body's '…/pull/<pr>' line, else the card's link), an update's '3 release notes ↗', a drafts
- * card's '1. review' (its page). His #384 came back because the window sent the merge's '2' as
- * its answer and hid it; the hub keeps the item on '2' (merge.rs). null: the option answers. Pure.
- */
-export function localAct(c: Pick<Card, 'kind' | 'question' | 'pr' | 'link' | 'batch' | 'page'>, n: number): { url: string | null } | null {
-  if (n === 1 && c.batch != null && c.page != null) return { url: c.page.url };
-  if (c.kind === 'update' && n === 3) return { url: c.link ?? null };
-  if (c.kind !== 'merge' || n !== 2) return null;
-  const tag = c.pr == null ? null : `/pull/${String(c.pr)}`;
-  const line = tag === null ? undefined : c.question.split(/\r?\n/u).map((l) => l.trim()).find((l) => l.endsWith(tag));
-  if (line !== undefined) return { url: line.startsWith('http') ? line : `https://${line}` };
-  return { url: c.link ?? null };
-}
-
 /** ⏎ with nothing typed and no option answers it (done, overlap). */
 export function noWords(c: Card): boolean {
   return c.kind === 'done' || c.kind === 'overlap';

@@ -523,17 +523,7 @@ pub(super) fn merge_link(sb: &Sb, c: &Card) -> Option<String> {
         .and_then(|p| p.pr.as_ref())
         .filter(|pr| c.pr.is_none_or(|n| n == pr.number))
         .map(|pr| pr.url.clone());
-    from_place.or_else(|| {
-        let (body, _) = split_choices(&c.text);
-        let tag = format!("/pull/{}", c.pr?);
-        body.lines().map(str::trim).find(|l| l.ends_with(&tag)).map(|l| {
-            if l.starts_with("http") {
-                l.to_string()
-            } else {
-                format!("https://{l}")
-            }
-        })
-    })
+    from_place.or_else(|| bise_proto::rows::pr_link(&c.text, c.pr))
 }
 
 /// A setup item (BISE-245): its look, written by setup.rs; without one
@@ -941,26 +931,24 @@ fn pick(app: &mut App, id: u64, i: usize) -> bool {
             _ => {}
         }
     }
-    if c.kind == "merge" && n == 2 {
-        // `open it on GitHub`: here, and the item stays (pr-design §6.3)
-        if let Some(url) = merge_link(&app.sb, &c) {
-            crate::links::open(&url);
+    // what this app does itself, never sent: bise-proto's one rule, the
+    // window's too (opt_act, architect m_23450): a merge's `2 open it on
+    // GitHub` and an update's `3 release notes ↗` open here and the item
+    // stays; `sign in again` is the TUI's own ChatGPT sign-in (resign.rs),
+    // the hub closes the item once auth.json says it's back
+    let link = if c.kind == "merge" { merge_link(&app.sb, &c) } else { c.link.clone() };
+    match bise_proto::rows::opt_act(&c.kind, n as u32, link.as_deref()) {
+        Some(bise_proto::rows::OptAct::Open { url }) => {
+            if let Some(url) = url {
+                crate::links::open(&url);
+            }
+            return true;
         }
-        return true;
-    }
-    if c.kind == "signin" && n == 1 {
-        // expired-ux `sign in again`: the TUI's own ChatGPT sign-in (the
-        // browser, resign.rs); the hub closes the item once auth.json
-        // says it's back
-        crate::resign::start(app);
-        return true;
-    }
-    if c.kind == "update" && n == 3 {
-        // update-card `release notes ↗`: here, and the item stays
-        if let Some(url) = c.link.as_deref() {
-            crate::links::open(url);
+        Some(bise_proto::rows::OptAct::SignIn) => {
+            crate::resign::start(app);
+            return true;
         }
-        return true;
+        None => {}
     }
     answer(app, id, &n.to_string(), Some(reply));
     true

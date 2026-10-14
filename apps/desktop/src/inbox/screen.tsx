@@ -60,6 +60,9 @@ export function ThreadInbox({ project }: { project: string }) {
         openPage: (url) => {
           void window.bise.openExternal(url);
         },
+        signIn: () => {
+          store.command({ cmd: 'sign_in', id: 'chatgpt' });
+        },
         inView,
       }}
     />

@@ -11,7 +11,6 @@ import { Dot, Kbd, Row } from '@/ds';
 import { age, dotOf, InboxCard, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { STRIP_KEYS, stripKey, stripList, stripOpen, stripView, stripWords } from './stripRows';
-import { localAct } from './model';
 import { actedKeys, useActed } from '@/store';
 import './inbox.css';
 
@@ -23,6 +22,8 @@ export interface StripPorts {
   /** 'type your answer below': the composer under the card takes the focus */
   typeAt?: () => void;
   openPage?: (url: string) => void;
+  /** a sign-in item's '1 sign in again': the app's own ChatGPT sign-in (the core opens his browser) */
+  signIn?: () => void;
   /** bar N14: the item open here while the window has focus, null when none */
   inView?: (card: { project: string; card: number } | null) => void;
 }
@@ -79,11 +80,13 @@ export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip
 
   // an item answered or closed leaves every view at once: the store's answer / close keep it out
   // until the hub's rows drop it (acted.ts); here it only folds. An option the window does itself
-  // (a merge's '2 open it on GitHub'...) opens its page, sends nothing, and the item stays.
+  // as the hub's row says (bise-proto opt_act, the TUI's rule: a merge's '2 open it on GitHub'...)
+  // opens its page or the app's sign-in, sends nothing, and the item stays.
   const answer = (c: Card, n: number) => {
-    const local = localAct(c, n);
-    if (local !== null) {
-      if (local.url !== null) ports.openPage?.(local.url);
+    const act = c.options.find((o) => o.n === n)?.act;
+    if (act != null) {
+      if (act.act === 'sign_in') ports.signIn?.();
+      else if (act.url != null) ports.openPage?.(act.url);
       return;
     }
     openTo(null);

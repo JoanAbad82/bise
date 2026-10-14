@@ -32,7 +32,7 @@ pub fn card_ref(id: u64, kind: &str, agent: &str, text: &str, open: bool) -> Ent
     let options = crate::sb::ambient_options(kind, agent, text);
     let (body, listed) = crate::sb::split_choices(text);
     let question = if !listed.is_empty() && listed.iter().eq(options.iter().map(|(_, l)| l)) { body } else { text.to_string() };
-    let options = options.into_iter().map(|(n, label)| Opt { n: n as u32, label }).collect();
+    let options = options.into_iter().map(|(n, label)| Opt { n: n as u32, label, act: None }).collect();
     EntryCard { id, question: question.trim().to_string(), options, answered: !open, kind: None, agent: None, closed: None }
 }
 

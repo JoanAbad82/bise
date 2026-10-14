@@ -36,8 +36,10 @@ const sendKey = (c: Readonly<Record<string, unknown>>): string | null =>
 // window that answered (a card is answered once), as the window-local event 'card_answered': that
 // window shows his answer where he is when the asker's thread is elsewhere
 const answers = new Map<string, number>();
+// card-state (architect m_23450): card/close's result too, as 'card_closed': the window's store
+// settles its close (a refused one comes back first as the hub's error and shows the card again)
 const answerKey = (c: Readonly<Record<string, unknown>>): string | null =>
-  c['cmd'] === 'answer' && typeof c['card'] === 'number' ? `${String(c['project'])}/${String(c['card'])}` : null;
+  (c['cmd'] === 'answer' || c['cmd'] === 'close') && typeof c['card'] === 'number' ? `${c['cmd']}/${String(c['project'])}/${String(c['card'])}` : null;
 // how its last run ended (exit.ts), sent with every state: null until it ended once
 let lastExit: CoreExit | null = null;
 
@@ -198,7 +200,11 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
         const by = ak === null ? undefined : answers.get(ak);
         if (ak !== null && by !== undefined) {
           answers.delete(ak);
-          // an older hub (or an answer a page took) answers {}: answer null, the window keeps its words
+          if (cmd['cmd'] === 'close') {
+            toWindow({ to: 'window', window: by, ev: { ev: 'card_closed', project: cmd['project'], card: cmd['card'] } });
+            return;
+          }
+          // the step closed no card (or an older hub, a page took it) answers {}: answer null, no row
           const answer = (result as AnswerResult | null)?.answer ?? null;
           toWindow({ to: 'window', window: by, ev: { ev: 'card_answered', project: cmd['project'], card: cmd['card'], answer } });
           return;

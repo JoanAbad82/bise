@@ -183,9 +183,21 @@ turns?: number,
 watching: Array<AgentWatch>, };
 
 /**
+ * An option a client does itself (card-state, architect m_23450): the
+ * hub never hears it and the item stays. One rule for the TUI's pick()
+ * and the window ([`opt_act`]).
+ */
+export type OptAct = { "act": "open", url?: string | null, } | { "act": "sign_in" };
+
+/**
  * A numbered option of a card.
  */
-export type Opt = { n: number, label: string, };
+export type Opt = { n: number, label: string, 
+/**
+ * what the client does itself for this option, never sent to the hub
+ * ([`opt_act`]); none: the option answers the card
+ */
+act?: OptAct | null, };
 
 /**
  * Where a card points on a page (a question block, a step of a plan).

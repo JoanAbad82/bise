@@ -10,6 +10,69 @@ use serde::{Deserialize, Serialize};
 pub struct Opt {
     pub n: u32,
     pub label: String,
+    /// what the client does itself for this option, never sent to the hub
+    /// ([`opt_act`]); none: the option answers the card
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub act: Option<OptAct>,
+}
+
+/// An option a client does itself (card-state, architect m_23450): the
+/// hub never hears it and the item stays. One rule for the TUI's pick()
+/// and the window ([`opt_act`]).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(tag = "act", rename_all = "snake_case")]
+pub enum OptAct {
+    /// open this page (none known: nothing opens, still nothing is sent)
+    Open {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        url: Option<String>,
+    },
+    /// the client's own ChatGPT sign-in; the hub closes the item once
+    /// the sign-in is back
+    SignIn,
+}
+
+/// Option `n` of a card of `kind`, done by the client and never sent:
+/// a merge's `2 open it on GitHub` (pr-design §6.3: the item stays), an
+/// update's `3 release notes ↗`, a sign-in's `1 sign in again`. `link`:
+/// the page that kind opens (a merge: its PR, [`pr_link`] or the place's
+/// box; an update: the card's link). None: the option answers the card.
+pub fn opt_act(kind: &str, n: u32, link: Option<&str>) -> Option<OptAct> {
+    match (kind, n) {
+        ("merge", 2) | ("update", 3) => Some(OptAct::Open { url: link.map(str::to_string) }),
+        ("signin", 1) => Some(OptAct::SignIn),
+        _ => None,
+    }
+}
+
+/// A merge item's PR link from its text: the body's line ending in
+/// `/pull/<pr>`, with `https://` when it has none.
+pub fn pr_link(text: &str, pr: Option<u64>) -> Option<String> {
+    let (body, _) = split_choices(text);
+    let tag = format!("/pull/{}", pr?);
+    body.lines().map(str::trim).find(|l| l.ends_with(&tag)).map(|l| if l.starts_with("http") { l.to_string() } else { format!("https://{l}") })
+}
+
+impl Card {
+    /// The link its client act opens: a merge's PR (from its text), else
+    /// its link (an update's release page).
+    pub fn act_link(&self) -> Option<String> {
+        match self.kind.as_str() {
+            "merge" => pr_link(&self.text, self.pr).or_else(|| self.link.clone()),
+            _ => self.link.clone(),
+        }
+    }
+
+    /// Its options with their client acts filled ([`opt_act`]): the hub's
+    /// rows carry them so every client reads the same rule.
+    pub fn with_acts(mut self) -> Card {
+        let link = self.act_link();
+        for o in &mut self.options {
+            o.act = opt_act(&self.kind, o.n, link.as_deref());
+        }
+        self
+    }
 }
 
 /// Where a card points on a page (a question block, a step of a plan).
@@ -218,7 +281,7 @@ fn split_inline(text: &str) -> Option<(String, Vec<String>)> {
 /// A question's text as a card shows it: the body and its options.
 pub fn question(text: &str) -> (String, Vec<Opt>) {
     let (body, options) = split_choices(text);
-    let opts = options.into_iter().enumerate().map(|(i, label)| Opt { n: i as u32 + 1, label }).collect();
+    let opts = options.into_iter().enumerate().map(|(i, label)| Opt { n: i as u32 + 1, label, act: None }).collect();
     (body.trim().to_string(), opts)
 }
 

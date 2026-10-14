@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Card } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
 import { cardKey, sortCards } from './order';
-import { current, digitWords, localAct, pickWaits, prune, START, step, takesWords, visible, withConfirmOptions, type InboxState, type Key } from './model';
+import { current, digitWords, pickWaits, prune, START, step, takesWords, visible, withConfirmOptions, type InboxState, type Key } from './model';
 
 const card = (id: number, kind: string, rank: number | undefined, since_ms: number, project = 'acme', extra: Partial<Card> = {}): Card => ({
   id,
@@ -167,26 +167,5 @@ describe('which items his words answer (ambient m_8773, the TUI and hub choice_k
     expect(pickWaits({ kind: 'feature_merge', options: [...two, { n: 3, label: 'drop' }] })).toBe('the merge waits for 1 to 3');
     expect(pickWaits({ kind: 'question', options: two })).toBeNull();
     expect(digitWords(1)).toBe('1');
-  });
-});
-
-describe("card-state: the options the window does itself (the TUI's pick())", () => {
-  const merge = card(384, 'merge', 1, 0, 'ts-pattern', {
-    question: '#384 is ready to merge\nP2 errors\napproved by alice · 6 of 6 checks pass\ngithub.com/gvergnaud/ts-pattern/pull/384',
-    pr: 384,
-  });
-  it("a merge's '2 open it on GitHub' opens its PR and answers nothing; '1' and '3' answer", () => {
-    expect(localAct(merge, 2)).toEqual({ url: 'https://github.com/gvergnaud/ts-pattern/pull/384' });
-    expect(localAct(merge, 1)).toBeNull();
-    expect(localAct(merge, 3)).toBeNull();
-    expect(localAct({ ...merge, question: 'no link', link: 'https://x/pull/384' }, 2)).toEqual({ url: 'https://x/pull/384' });
-    expect(localAct({ ...merge, question: 'no link' }, 2)).toEqual({ url: null });
-  });
-  it("an update's '3 release notes', a drafts card's '1. review'; a question's options all answer", () => {
-    expect(localAct(card(1, 'update', 1, 0, 'acme', { link: 'https://bise.dev/notes' }), 3)).toEqual({ url: 'https://bise.dev/notes' });
-    expect(localAct(card(1, 'update', 1, 0), 1)).toBeNull();
-    const page = { id: 'p', url: 'https://bise.dev/p/1' } as unknown as Card['page'];
-    expect(localAct(card(1, 'question', 1, 0, 'acme', { batch: { count: 1, title: 't', what: 'replies', names: [], topics: [], line: '' }, page }), 1)).toEqual({ url: 'https://bise.dev/p/1' });
-    expect(localAct(card(1, 'question', 1, 0), 2)).toBeNull();
   });
 });

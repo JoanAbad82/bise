@@ -489,7 +489,7 @@ fn card_ev(c: &CardInfo) -> StateCard {
     // question stays
     let (body, listed) = crate::sb::split_choices(&c.text);
     let text = if !listed.is_empty() && listed.iter().eq(options.iter().map(|(_, l)| l)) { body } else { c.text.clone() };
-    let options: Vec<rows::Opt> = options.into_iter().map(|(n, label)| rows::Opt { n: n as u32, label }).collect();
+    let options: Vec<rows::Opt> = options.into_iter().map(|(n, label)| rows::Opt { n: n as u32, label, act: None }).collect();
     StateCard {
         id: c.id,
         kind: c.kind.clone(),
