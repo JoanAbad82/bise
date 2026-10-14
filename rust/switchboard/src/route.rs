@@ -5,7 +5,9 @@
 //! candidates (daemon/routing.rs) and calls [`guess`] then [`target`] once per
 //! message, before any turn (the fast path: amb-hub's 2 s `route_hold`).
 //! [`target`] is the only place the threshold lives: sb-core gets a project or
-//! nothing, never a score. Nothing here sends anything.
+//! nothing, never a score. Nothing here sends anything. A name counts only as
+//! a plain word: inside a path or a URL in the words or the title it never
+//! names a project ([`plain`]; regress-25e5, architect m_23121).
 
 use bise_proto::context::FnContext;
 use std::path::{Path, PathBuf};
@@ -80,11 +82,12 @@ fn score(text: &str, ctx: &FnContext, c: &Candidate, all: &[Candidate]) -> (f32,
         }
     }
     let names = names_of(c);
-    if names.iter().any(|n| names_in(text, n)) {
+    let said = plain(text);
+    if names.iter().any(|n| names_in(&said, n)) {
         return (0.85, "named");
     }
-    if let Some(t) = ctx.title.as_deref() {
-        if names.iter().any(|n| names_in(t, n)) {
+    if let Some(t) = ctx.title.as_deref().map(plain) {
+        if names.iter().any(|n| names_in(&t, n)) {
             return (0.6, "title");
         }
     }
@@ -132,6 +135,35 @@ fn names_of(c: &Candidate) -> Vec<String> {
     v.retain(|n| n.chars().count() >= 3);
     v.dedup();
     v
+}
+
+/// The text without its paths and URLs: each piece (split on whitespace,
+/// quotes, backticks and brackets, so markdown links and `(see ~/x)` come
+/// apart) that holds a `/` or a `\` is blanked. A project's name inside
+/// `~/code/harness/x`, `https://…/harness` or `harness/` never names it; a
+/// missed name falls to the unclear path, a wrong route would not.
+fn plain(text: &str) -> String {
+    let wrap = |c: char| c.is_whitespace() || "`'\"()[]{}<>".contains(c);
+    let mut out = String::with_capacity(text.len());
+    let mut piece = String::new();
+    let flush = |piece: &mut String, out: &mut String| {
+        if piece.contains(['/', '\\']) {
+            out.push(' ');
+        } else {
+            out.push_str(piece);
+        }
+        piece.clear();
+    };
+    for ch in text.chars() {
+        if wrap(ch) {
+            flush(&mut piece, &mut out);
+            out.push(ch);
+        } else {
+            piece.push(ch);
+        }
+    }
+    flush(&mut piece, &mut out);
+    out
 }
 
 /// `name` appears in `text` as a whole word (not inside another word).
@@ -234,6 +266,78 @@ mod tests {
         // a window title names it, less surely
         let g = guess("look at this", &FnContext { title: Some("checkout — PR #42".into()), ..ctx() }, &world());
         assert_eq!((g.project.as_deref(), g.why, g.confidence), (Some("checkout"), "title", 0.6));
+    }
+
+    fn harness() -> Vec<Candidate> {
+        let mut all = world();
+        all.push(cand("harness", "/w/harness", "git@github.com:acme/harness.git", &[]));
+        all
+    }
+
+    fn named(text: &str) -> bool {
+        let g = guess(text, &ctx(), &harness());
+        g.why == "named" && g.project.as_deref() == Some("harness")
+    }
+
+    #[test]
+    fn a_name_only_inside_a_path_never_names() {
+        for t in [
+            "check /Users/g/code/harness/out.txt",
+            "check ~/code/harness/out.txt",
+            "check ./harness/out.txt",
+            "check ../harness",
+            "check code/harness/out.txt",
+            r"check C:\code\harness\out.txt",
+            // the trailing slash makes it a path: pinned
+            "check harness/",
+            // wrappers come apart: backticks, parens, quotes, markdown
+            "check `~/code/harness/x`",
+            "check (see ~/code/harness)",
+            "check \"~/code/harness/x\".",
+            // regress-25e5, verbatim: the gate's out dir sat under the hub's
+            "a long one please [[reply: ~/.bise/hubs/harness-3abb2bd8/agents/try-gate-25e5/tmp/full/long-reply.md]]",
+        ] {
+            assert!(!named(t), "{t}");
+            assert_eq!(target(&guess(t, &ctx(), &harness())), None, "{t}");
+        }
+    }
+
+    #[test]
+    fn a_name_only_inside_a_url_never_names() {
+        for t in [
+            "see https://github.com/acme/harness/pull/3",
+            "see github.com/acme/harness",
+            "see git@github.com:acme/harness.git",
+            "see [the pr](https://github.com/acme/harness/pull/3)",
+            "see <https://harness.example.com/x>",
+        ] {
+            assert!(!named(t), "{t}");
+        }
+    }
+
+    #[test]
+    fn the_plain_word_still_names_next_to_paths_and_punctuation() {
+        for t in [
+            "harness: see ~/code/harness/x",
+            "is harness, the one at ~/code/harness/, green?",
+            "how is harness?",
+            "ship harness.",
+            "the `harness` gate",
+            "see [harness](https://github.com/acme/harness)",
+            "(harness) is red",
+        ] {
+            assert!(named(t), "{t}");
+            assert_eq!(target(&guess(t, &ctx(), &harness())).as_deref(), Some("harness"), "{t}");
+        }
+    }
+
+    #[test]
+    fn the_title_follows_the_same_rule() {
+        let title = |t: &str| guess("look at this", &FnContext { title: Some(t.into()), ..ctx() }, &harness());
+        let g = title("x.rs — harness — Visual Studio Code");
+        assert_eq!((g.project.as_deref(), g.why), (Some("harness"), "title"));
+        assert_eq!(title("~/code/harness/x.rs — Code").why, "none");
+        assert_eq!(title("https://github.com/acme/harness — Arc").why, "none");
     }
 
     #[test]
