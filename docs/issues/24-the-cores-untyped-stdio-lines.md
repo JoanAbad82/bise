@@ -69,6 +69,14 @@ are older and not this issue's: `AppCmd::PrefsSet.value` and
 `CoreEv::Prefs.prefs` (his preferences, until `bise_home::prefs` types
 them).
 
+Left open (architect m_23256): six tags are both an `AppCmd` and a
+`HubCmd` (send, answer, stop, archive, unarchive, follow), so the app's
+command union `AppCmd | HubCmd` (`CoreCmd`, the harness's `FakeCore`)
+has two members per tag, and four playwright specs narrow them with
+`'project' in c`. A renamed field would break that silently. The fix:
+type each port with its own enum (AppCmd at the core's, HubCmd at a
+hub's) so no reader narrows by field presence.
+
 Lines only tests read (the core's Rust tests, `tests/ambient_core_e2e.py`
 and the other e2e, `dev/plugins/ambient-qa`), never the desktop app:
 ambient-lead's product call (delete or keep), as its own change:
