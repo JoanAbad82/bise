@@ -19,7 +19,8 @@ How a desktop build reaches Gabriel's app. Written by ambient-lead when the role
 | what | path |
 |---|---|
 | the try checkout (moved by --promote only) | `~/.bise/dev/try-src` |
-| the script | `scripts/desktop-try.sh` -> `scripts/desktop_try.py` (`~/.local/bin/bise-ambient` execs it) |
+| the script | `scripts/desktop-try.sh` -> `scripts/desktop_try.py` (`bise-ambient --real/--try` execs try-src's copy) |
+| `bise-ambient` | `scripts/bise-ambient`, installed as a copy: `install -m 755 scripts/bise-ambient ~/.local/bin/bise-ambient`. Its try checkout: `$BISE_TRY_CHECKOUT`, else `~/.bise/dev/try-src` (no agent's checkout: ambient-lead's is gone) |
 | candidates | `~/.bise/dev/build/desktop-cand/<sha12>/` (`dist/mac-arm64/bise cand.app`, `root-<sha12>`, `src/` worktree) |
 | staged / live try | `~/.bise/dev/build/desktop-try/` (`staged/mac-arm64/bise try.app`, `root-<sha8>-<recipe6>`, `try.stamp`) |
 | gate worlds and fixtures | `~/.bise/gate/real-shape/` (fx under `~/.bise/gate/real-shape/fx`, never a path naming a world project) |

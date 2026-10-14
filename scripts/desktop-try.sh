@@ -8,6 +8,7 @@
 #   scripts/desktop-try.sh --candidate <sha>   (a gate candidate in its own dir)
 #   scripts/desktop-try.sh --promote <sha>     (the gate passed: it becomes his try)
 #
-# ~/.local/bin/bise-ambient runs it for 'bise-ambient --try …'. Everything is in
+# ~/.local/bin/bise-ambient (scripts/bise-ambient) runs the try checkout's copy for
+# 'bise-ambient --try|--real …'. Everything is in
 # scripts/desktop_try.py (its header says what is isolated and why).
 exec /usr/bin/env python3 -B "$(cd "$(dirname "$0")" && pwd)/desktop_try.py" "$@"
