@@ -69,3 +69,39 @@ impl Small {
         got
     }
 }
+
+/// The longest a role-line call may take.
+const ONESHOT_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// One provider call through `repl-live`'s one-shot mode (BISE_ONESHOT,
+/// runtime/oneshot.bend) with `model`: the reply's text, or why not.
+/// `keys`: the REPLs' spawn env (the keys, BISE_MODELS_FILE). The
+/// provider's error text never holds a key.
+fn oneshot(repl: &Path, root: &Path, req_file: &Path, model: &str, keys: &[(String, Option<String>)]) -> Result<String, String> {
+    let mut cmd = Command::new(repl);
+    crate::approvals::check::oneshot_env(req_file, model, keys).apply(&mut cmd);
+    cmd.current_dir(root)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
+    let mut child = cmd.spawn().map_err(|e| format!("cannot start {}: {}", repl.display(), e))?;
+    let mut out = child.stdout.take().ok_or("no stdout")?;
+    let reader = std::thread::spawn(move || {
+        let mut s = String::new();
+        let _ = std::io::Read::read_to_string(&mut out, &mut s);
+        s
+    });
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if start.elapsed() < ONESHOT_TIMEOUT => std::thread::sleep(Duration::from_millis(100)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("no answer in {} s", ONESHOT_TIMEOUT.as_secs()));
+            }
+        }
+    }
+    crate::role::oneshot_reply(&reader.join().unwrap_or_default())
+}

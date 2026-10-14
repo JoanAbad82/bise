@@ -60,13 +60,14 @@ law req_interrupt_says_stopped_once:
 
 # LAW: a task's message to another agent writes exactly one 'sent' record
 # in the task's feed: to, the message id, whether it waits for a reply,
-# text.
+# text; then its parts when it has some (send-parts, law
+# agent_no_parts_no_sent_line: none, nothing more).
 law task_send_says_sent_once:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +m: HM.Msg
   for e: {HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)) == True{} : Bool}
-  {HC.feed_sender(o, cx, m) == HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))) : HX.Cx<o>}
+  {HC.feed_sender(o, cx, m) == HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m) : HX.Cx<o>}
 
 # LAW: main's messages, the user's, a message to the user, and a message
 # from a name that isn't an agent of this hub write no 'sent' line.

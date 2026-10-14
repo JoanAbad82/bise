@@ -12,6 +12,8 @@ import ./cx.bend as X
 
 import ./codec.bend as C
 
+import ./newtask.bend as NT
+
 import ./timers.bend as TM
 
 import ./wakes.bend as WK
@@ -778,13 +780,6 @@ def NewTask.brief_text(x: NewTask) -> String:
     case NewTask{_, _, _, +brief_text, _, _, _, _}:
       brief_text
 
-def branch_label(b: J.Json) -> String:
-  match b:
-    case J.JStr{+s}:
-      cat([" (worktree ", s, ")"])
-    case _:
-      ""
-
 def Snd.from(x: Snd) -> String:
   match x:
     case Snd{+from, _, _, _, _, _, _, _, _, _}:
@@ -829,19 +824,6 @@ def Snd.with_parts(x: Snd, +v: String) -> Snd:
   match x:
     case Snd{+from, +to, +text, +expect, +reply_to, +plain, +auto, +queued, +via, _}:
       Snd{from, to, text, expect, reply_to, plain, auto, queued, via, v}
-
-# a brief's parts (send-parts: msg-parts JSON, "" none) with the task's
-# head in front as a text part, so they render to the brief's whole text;
-# none, or JSON that is no list: none
-def brief_parts.of(+head: String, r: Result<&2, &2, String, J.Json>) -> String:
-  match r:
-    case Done{J.JArr{+xs}}:
-      J.stringify(J.JArr{J.obj([J.kv("kind", J.JStr{"text"}), J.kv("text", J.JStr{head})]) <> xs})
-    case _:
-      ""
-
-def brief_parts(+head: String, +parts: String) -> String:
-  pick_lazy(String, String.is_empty(parts), u => "", u => brief_parts.of(head, J.parse(parts)))
 
 def Snd.with_to(x: Snd, +v: String) -> Snd:
   match x:
@@ -990,7 +972,7 @@ def notify_main(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
 
 def create.go.new(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_taken(X.d(o, cx), name) == False{} : Bool}) -> X.Cx<o> & TaskR:
   +parent = NewTask.parent(t)
-  +label = branch_label(M.ws_branch(ws))
+  +label = NT.branch_label(M.ws_branch(ws))
   +obj = M.one_line(NewTask.objective(t))
   +cx2 = emit(o, cx, M.ETaskCreated{name, parent, NewTask.brief(t), ws, now(o, cx)}, e, Unit{}, Unit{})
   +who = Bool.pick(String, String.eq(parent, M.USER()), "you", parent)
@@ -1001,7 +983,7 @@ def create.go.new(-o: M.St, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Jso
   +m = msg(parent, name, String.append(head, NewTask.brief_text(t)), String.eq(parent, M.MAIN()), None{}, String.eq(parent, M.USER()), False{})
   # send-parts: the brief's parts (`sb spawn --attach`), the head in front
   # (law brief_keeps_parts)
-  create.sent(o, send(o, cx5, Snd.with_parts(m, brief_parts(head, NewTask.parts(t)))), name)
+  create.sent(o, send(o, cx5, Snd.with_parts(m, NT.brief_parts(head, NewTask.parts(t)))), name)
 
 def create.go.free(-o: M.St, taken: Bool, +cx: X.Cx<o>, +t: NewTask, +name: String, +ws: J.Json, +e: {M.name_taken(X.d(o, cx), name) == taken : Bool}) -> X.Cx<o> & TaskR:
   match taken:
@@ -1073,40 +1055,16 @@ def NewTask.base(x: NewTask) -> String:
     case NewTask{_, +base, _, _, _, _, _, _}:
       base
 
-def strip_dash.go(s: String) -> String:
-  match s:
-    case SNil{}:
-      SNil{}
-    case SCon{+c, +t}:
-      Bool.pick(String, Char.is_eq(c, '-'), strip_dash.go(t), SCon{c, t})
-
-def strip_dash(+s: String) -> String:
-  String.reverse(strip_dash.go(String.reverse(s)))
-
-def candidate(+base: String, +i: Nat) -> String:
-  +suffix = String.append("-", ns(i))
-  String.append(strip_dash(String.take(base, Nat.sub(24n, String.length(suffix)))), suffix)
-
-def unique_name.go(fuel: Nat, +s: M.St, +base: String, +i: Nat) -> String:
-  match fuel:
-    case 0n:
-      candidate(base, i)
-    case 1n+f:
-      Bool.pick(String, M.name_taken(s, candidate(base, i)), unique_name.go(f, s, base, 1n+i), candidate(base, i))
-
-def unique_name(+s: M.St, +base: String) -> String:
-  Bool.pick(String, M.name_taken(s, base), unique_name.go(1000n, s, base, 2n), base)
-
 # RFC 0001 §7.1 and RFC 0002 §3-4 (the name was validated by the daemon)
 def create_task(-o: M.St, +cx: X.Cx<o>, +t: NewTask) -> X.Cx<o> & TaskR:
-  create.wt(o, NewTask.worktree(t), cx, t, unique_name(st(o, cx), NewTask.base(t)))
+  create.wt(o, NewTask.worktree(t), cx, t, NT.unique_name(st(o, cx), NewTask.base(t)))
 
 # `sb spawn --place <agent>|<branch>` (dev-flow §3.1): the new task joins
 # that place (`join`: its ws, found by the daemon); else as create_task
 def create_in(-o: M.St, +cx: X.Cx<o>, +t: NewTask, j: Maybe<&2, J.Json>) -> X.Cx<o> & TaskR:
   match j:
     case Some{J.JObj{+kvs}}:
-      create.go(o, cx, t, unique_name(st(o, cx), NewTask.base(t)), J.JObj{kvs})
+      create.go(o, cx, t, NT.unique_name(st(o, cx), NewTask.base(t)), J.JObj{kvs})
     case _:
       create_task(o, cx, t)
 

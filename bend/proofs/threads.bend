@@ -63,11 +63,11 @@ def Laws.req_interrupt_says_stopped_once(o, cx, token, agent, n, e):
   {==}
 
 def Laws.task_send_says_sent_once(o, cx, m, e):
-  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), u => cx) == HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))) : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m), u => cx) == HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m) : HX.Cx<o>}
   {==}
 
 def Laws.other_send_says_no_sent(o, cx, m, e):
-  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), u => cx) == cx : HX.Cx<o>}
+  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.sent_parts(o, HC.feed(o, cx, HM.Msg.from(m), HFD.sent(HM.Msg.to(m), HM.Msg.id(m), HM.Msg.expect(m), HM.Msg.text(m))), HM.Msg.from(m), m), u => cx) == cx : HX.Cx<o>}
   {==}
 
 def Laws.task_card_shows_in_its_feed(o, cx, id, agent, text, e):

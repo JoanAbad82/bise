@@ -7,8 +7,6 @@ bend/hub/core.bend:rt_put
 bend/hub/cx.bend:waiter_pick
 bend/hub/cx.bend:waiter_drop
 bend/hub/keyed.bend:get_key
-bend/hub/core.bend:strip_dash.go
-bend/hub/core.bend:unique_name.go
 bend/hub/core.bend:wake_ans
 bend/hub/core.bend:question_card
 bend/hub/core.bend:first_from

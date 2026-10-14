@@ -480,18 +480,6 @@ def Laws.xin_input_keeps_parts(text, parts):
 def Laws.xin_ask_has_no_parts(text, parts):
   {==}
 
-def Laws.agent_send_keeps_parts(from, to, expect, reply_to, q):
-  {==}
-
-def Laws.agent_no_parts_no_line(o, cx, agent, id, thread, from, to, reply_to, expect, auto, text, ms, plain, queued, via):
-  {==}
-
-def Laws.agent_no_parts_no_sent_line(o, cx, agent, id, thread, from, to, reply_to, expect, auto, text, ms, plain, queued, via):
-  {==}
-
-def Laws.brief_no_parts(head):
-  {==}
-
 def Laws.follow_quiet_before_end(o, cx, from, summary):
   {==}
 

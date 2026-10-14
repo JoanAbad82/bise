@@ -6,8 +6,11 @@ use serde_json::{json, Map, Value};
 use std::io::Read;
 use std::time::Duration;
 
+mod attach;
 mod keeps;
 mod pages;
+mod report;
+use report::{result_of, step_of};
 mod wake;
 use keeps::keeps_req;
 use wake::wake_req;
@@ -317,55 +320,11 @@ fn list_of(v: Option<&Value>) -> Vec<String> {
     }
 }
 
-/// send-parts: `--attach <path|m_n>` (repeatable) as the request's
-/// `attach` list. sb runs in the sender's sandbox, so it opens every file
-/// here: one it can't read is refused with its path (architect m_23962:
-/// the hub never reads a path for an agent with its own authority, but
-/// an image it stores). A path is made absolute against the cwd; `m_<n>`
-/// (the parts of a message it got) goes as is, the hub checks it.
-fn attach_into(req: &mut Map<String, Value>, o: &Map<String, Value>) -> Result<(), String> {
-    let mut out = Vec::new();
-    for a in list_of(o.get("attach")) {
-        if crate::core::parse_msg_id(&a).is_some() {
-            out.push(a);
-            continue;
-        }
-        let p = std::env::current_dir().map(|d| d.join(&a)).unwrap_or_else(|_| a.clone().into());
-        match std::fs::File::open(&p).and_then(|f| f.metadata()) {
-            Ok(m) if m.is_file() => out.push(p.to_string_lossy().into_owned()),
-            Ok(_) => return Err(format!("--attach {a}: not a file")),
-            Err(e) => return Err(format!("--attach {a}: cannot read it ({e})")),
-        }
-    }
-    if !out.is_empty() {
-        req.insert("attach".into(), json!(out));
-    }
-    Ok(())
-}
-
 /// The first positional word, an agent name (`@name` accepted).
 fn agent_arg(pos: &[String], usage: impl Into<String>) -> Result<String, String> {
     pos.first()
         .map(|a| a.trim_start_matches('@').to_string())
         .ok_or_else(|| usage.into())
-}
-
-/// `--step 3/7`: (3, 7), 1 <= n <= m.
-fn step_of(s: &str) -> Result<(u32, u32), String> {
-    let bad = || format!("--step expects <n>/<m>, like 3/7 (not {s})");
-    let (n, m) = s.trim().split_once('/').ok_or_else(bad)?;
-    let (n, m): (u32, u32) = (n.trim().parse().map_err(|_| bad())?, m.trim().parse().map_err(|_| bad())?);
-    if n == 0 || m == 0 || n > m {
-        return Err(bad());
-    }
-    Ok((n, m))
-}
-
-/// `--result '<json>'`: proto's DiffResult, one shape for the review.
-fn result_of(s: &str) -> Result<Value, String> {
-    let ex = r#"--result '{"label":"p99","before":420,"after":290,"unit":"ms"}'"#;
-    let r: bise_proto::diff::DiffResult = serde_json::from_str(s).map_err(|e| format!("--result: {e}; like {ex}"))?;
-    serde_json::to_value(r).map_err(|e| e.to_string())
 }
 
 /// `--timeout <s>`, 20 s by default.
@@ -535,7 +494,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
                 }
             }
             req.insert("text".into(), json!(text_of(&pos[1..])?));
-            attach_into(&mut req, &o)?;
+            attach::into(&mut req, &o)?;
             req.insert("expect_reply".into(), json!(o.contains_key("expect-reply")));
             if o.contains_key("mode") {
                 match str_of(&o, "mode").as_str() {
@@ -662,7 +621,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
                 ],
                 &["worktree", "with-changes"],
             )?;
-            attach_into(&mut req, &o)?;
+            attach::into(&mut req, &o)?;
             // issue #4: the task's model, all optional (none: the agents default)
             for k in ["model", "effort", "profile"] {
                 req.insert(k.into(), json!(str_of(&o, k)));

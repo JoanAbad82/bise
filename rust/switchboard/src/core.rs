@@ -2712,35 +2712,6 @@ pub(crate) fn not_in_a_repo(cmd: &str) -> String {
     format!("sb {}: not in a repo (this workspace has no git): files stay as you saved them, nothing to land", cmd)
 }
 
-/// `parts`: the brief's parts (send-parts, `sb spawn --attach`; "" none):
-/// its text is then their render, the body and the markers after it.
-fn new_task(name: Option<&str>, brief: &Brief, parts: &str, worktree: bool, with_changes: bool) -> Result<ci::New, String> {
-    if brief.objective.trim().is_empty() {
-        return Err("empty objective".into());
-    }
-    let base = match name {
-        Some(n) if !n.is_empty() => {
-            if !router::valid_name(n) {
-                return Err(format!("invalid name: {} ([a-z0-9-], 24 characters max)", n));
-            }
-            n.to_string()
-        }
-        _ => router::slug(&brief.objective),
-    };
-    Ok(ci::New {
-        base,
-        brief: json!(brief),
-        brief_text: match serde_json::from_str::<Vec<bise_proto::parts::Part>>(parts) {
-            Ok(p) if !p.is_empty() => bise_proto::parts::render(&p),
-            _ => prompts::brief_body(brief),
-        },
-        objective: brief.objective.clone(),
-        worktree,
-        with_changes,
-    })
-}
-
-
 pub const HELP: &str = "\
 plain text        message to the agent in view (main by default)
 @agent text       direct message to an agent, without main (@main from an agent)
@@ -2768,6 +2739,7 @@ mod view;
 
 #[path = "core_user.rs"]
 mod user;
+use user::new_task;
 
 #[path = "core_wake.rs"]
 mod wake_link;

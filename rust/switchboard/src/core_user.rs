@@ -156,3 +156,33 @@ impl Hub {
         }
     }
 }
+
+/// A new task's sb-core input (`sb spawn`, the user's `/new`, a feature's
+/// worktree name): its name checked or made from the objective.
+/// `parts`: the brief's parts (send-parts, `sb spawn --attach`; "" none):
+/// its text is then their render, the body and the markers after it.
+pub(super) fn new_task(name: Option<&str>, brief: &Brief, parts: &str, worktree: bool, with_changes: bool) -> Result<ci::New, String> {
+    if brief.objective.trim().is_empty() {
+        return Err("empty objective".into());
+    }
+    let base = match name {
+        Some(n) if !n.is_empty() => {
+            if !router::valid_name(n) {
+                return Err(format!("invalid name: {} ([a-z0-9-], 24 characters max)", n));
+            }
+            n.to_string()
+        }
+        _ => router::slug(&brief.objective),
+    };
+    Ok(ci::New {
+        base,
+        brief: json!(brief),
+        brief_text: match serde_json::from_str::<Vec<bise_proto::parts::Part>>(parts) {
+            Ok(p) if !p.is_empty() => bise_proto::parts::render(&p),
+            _ => prompts::brief_body(brief),
+        },
+        objective: brief.objective.clone(),
+        worktree,
+        with_changes,
+    })
+}

@@ -709,37 +709,6 @@ pub(crate) fn cut_row(line: Line<'static>, room: usize, tail: &str) -> Line<'sta
 /// The dim text of a level-3 message in rows of `room` columns: closed,
 /// at most 2 rows then `… ▸` (`…` alone when it does not open); open,
 /// every line, `▾` at the end.
-/// The markers of an attachment (bise_proto::parts' image and file
-/// markers, as `parts::render` writes them).
-const ATTACH_OPENS: [&str; 2] = ["<image name=\"", "<file name=\""];
-
-/// `s` holds an image or file marker.
-fn has_attachment(s: &str) -> bool {
-    ATTACH_OPENS.iter().any(|m| s.contains(m))
-}
-
-/// A brief's words and its attachments after them (send-parts: the
-/// markers come last); none: (`body`, "").
-fn split_attachments(body: &str) -> (&str, &str) {
-    match ATTACH_OPENS.iter().filter_map(|m| body.find(m)).min() {
-        Some(i) => body.split_at(i),
-        None => (body, ""),
-    }
-}
-
-/// A level-3 line in `st`; its attachments (send-parts: the image and
-/// file markers `sb send --attach` put after the words) as his message's
-/// chips (`▣ shot.png`, `▯ deck.pptx`) in their quiet form: the same
-/// glyphs and names, all in `st`, never the accent (designer m_24147: a
-/// message between agents is not for him). A line without one: one span,
-/// as before.
-fn l3_spans(line: &str, st: Style) -> Vec<Span<'static>> {
-    match has_attachment(line) {
-        true => crate::attach::chip_spans(line, st).into_iter().map(|s| Span::styled(s.content, st)).collect(),
-        false => vec![Span::styled(line.to_string(), st)],
-    }
-}
-
 fn l3_text_rows(text: &str, open: bool, room: usize) -> Vec<Line<'static>> {
     use unicode_width::UnicodeWidthStr;
     let dim_st = Style::default().fg(dim());
@@ -749,7 +718,7 @@ fn l3_text_rows(text: &str, open: bool, room: usize) -> Vec<Line<'static>> {
         let mut rows: Vec<Line<'static>> = text
             .trim()
             .split('\n')
-            .flat_map(|l| wrap_line(Line::from(l3_spans(l, dim_st)), room))
+            .flat_map(|l| wrap_line(Line::from(crate::agent_parts::spans(l, dim_st)), room))
             .collect();
         let mark = format!(" {}", glyph(G_OPEN));
         match rows.last_mut() {
@@ -759,7 +728,7 @@ fn l3_text_rows(text: &str, open: bool, room: usize) -> Vec<Line<'static>> {
         return rows;
     }
     let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    let mut rows = wrap_line(Line::from(l3_spans(&flat, dim_st)), room);
+    let mut rows = wrap_line(Line::from(crate::agent_parts::spans(&flat, dim_st)), room);
     let more = if long { format!(" {}", glyph(G_CLOSED)) } else { String::new() };
     if rows.len() > L3_ROWS {
         rows.truncate(L3_ROWS);
@@ -1715,14 +1684,8 @@ fn brief_lines(brief: &str, open: bool, width: usize) -> Vec<Line<'static>> {
     ])];
     if open {
         let body = brief.split_once('\n').map(|(_, r)| r.trim_matches('\n')).unwrap_or("");
-        // send-parts: its attachments after the words, as chips
-        let (words, chips) = split_attachments(body);
-        let bar = Span::styled(" │ ", Style::default().fg(rule()));
-        let mut rows = md_lines(words.trim_end(), width.saturating_sub(3), width.saturating_sub(3));
-        if !chips.is_empty() {
-            rows.push(Line::from(l3_spans(chips, Style::default().fg(dim()))));
-        }
-        ls.extend(barred_rows(&bar, rows, width));
+        let rows = crate::agent_parts::with_chips(body, Style::default().fg(dim()), |w| md_lines(w, width.saturating_sub(3), width.saturating_sub(3)));
+        ls.extend(barred_rows(&Span::styled(" │ ", Style::default().fg(rule())), rows, width));
     }
     ls
 }
