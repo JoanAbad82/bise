@@ -23,10 +23,10 @@ def main():
     with tui_session(150, 42) as t:
         t.wait("bise :*")
         t.wait_re(MAIN_IDLE)
-        sc = close(t, "999", "no open card #999 ")
+        sc = close(t, "999", "no open notification #999 ")
         assert "1125899906842" not in sc, sc
-        close(t, "99999999999999999999999", "no open card #99999999999999999999999")
-        close(t, "281474976710656", "no open card #281474976710656")
+        close(t, "99999999999999999999999", "no open notification #99999999999999999999999")
+        close(t, "281474976710656", "no open notification #281474976710656")
         close(t, "abc", "not a card number: abc")
         # the hub is still up: a message reaches main
         t.typed("still there?")

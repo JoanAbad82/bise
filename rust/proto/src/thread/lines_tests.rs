@@ -390,3 +390,13 @@ fn a_records_line_break_reads_as_the_old_lines() {
     }
     assert_eq!(read(r#"sb you :: {"text":"a\\nb"}"#), Rec::Hub(Hub::You("a\\nb".into(), None)), "a typed backslash-n, as typed");
 }
+
+/// notif-rename (architect m_24654): main's note of his answer to its own
+/// notification is dropped by its head, the new one and, in transcripts
+/// written before, the old one; nothing else is.
+#[test]
+fn main_answer_notes_read_with_either_head() {
+    assert!(is_main_answer_note("the user answered notification #3 (\"ship?\"): \"yes\""));
+    assert!(is_main_answer_note("the user answered card #3 (\"ship?\"): \"yes\""));
+    assert!(!is_main_answer_note("the user answered a question"));
+}

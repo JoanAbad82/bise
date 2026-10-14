@@ -378,7 +378,7 @@ fn summary_of(call: &Call) -> String {
 
 /// The rule "always" saves for this card, as the rules file holds it; a
 /// sandbox card's runs outside the sandbox (`sandbox = false`). `from`:
-/// `card #12, api-v2, web` (what `/approvals` says of it).
+/// `notification #12, api-v2, web` (what `/approvals` says of it).
 fn rule_of(tool: &str, repo: &Path, text: &str, outside: bool, from: &str) -> rules::Rule {
     let mut r = rules::Rule {
         project: Some(repo.to_path_buf()),
@@ -826,7 +826,7 @@ impl Shell {
             Answer::Allow => (true, String::new()),
             Answer::Always => {
                 let bise = self.bise_root();
-                let from = std::iter::once(format!("card #{id}")).chain(names.iter().cloned()).collect::<Vec<_>>().join(", ");
+                let from = std::iter::once(format!("notification #{id}")).chain(names.iter().cloned()).collect::<Vec<_>>().join(", ");
                 for r in c.always.iter().flatten() {
                     if let Err(e) = rules::save(&rules::file(&bise), &rule_of(&c.tool, &c.repo, r, c.rerun.is_some(), &from)) {
                         log_line(&self.opts.paths, &format!("approvals: {e}"));

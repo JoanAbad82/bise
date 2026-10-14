@@ -28,7 +28,7 @@ pub fn card_arg(word: &str) -> Result<u64, String> {
     match w.trim_start_matches('#').parse::<u64>() {
         Ok(n) if n <= MAX => Ok(n),
         _ if w.is_empty() => Err("no card number".into()),
-        _ if w.trim_start_matches('#').bytes().all(|b| b.is_ascii_digit()) => Err(format!("no open card #{}", w.trim_start_matches('#'))),
+        _ if w.trim_start_matches('#').bytes().all(|b| b.is_ascii_digit()) => Err(format!("no open notification #{}", w.trim_start_matches('#'))),
         _ => Err(format!("not a card number: {}", w)),
     }
 }
@@ -54,8 +54,8 @@ mod tests {
         assert_eq!(card_arg(" #14 "), Ok(14));
         assert_eq!(card_arg("999"), Ok(999));
         assert_eq!(card_arg(&MAX.to_string()), Ok(MAX));
-        assert_eq!(card_arg(&(MAX + 1).to_string()), Err(format!("no open card #{}", MAX + 1)));
-        assert_eq!(card_arg("99999999999999999999999"), Err("no open card #99999999999999999999999".into()));
+        assert_eq!(card_arg(&(MAX + 1).to_string()), Err(format!("no open notification #{}", MAX + 1)));
+        assert_eq!(card_arg("99999999999999999999999"), Err("no open notification #99999999999999999999999".into()));
         assert_eq!(card_arg("-1"), Err("not a card number: -1".into()));
         assert_eq!(card_arg("abc"), Err("not a card number: abc".into()));
         assert_eq!(card_arg(""), Err("no card number".into()));

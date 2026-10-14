@@ -216,7 +216,7 @@ pub enum AgentReq {
         card: u64,
         note: String,
     },
-    /// `sb card --withdraw N "why"`: main takes back its own card
+    /// `sb notify --withdraw N "why"`: main takes back its own notification
     /// (BISE-299).
     Withdraw {
         card: u64,
@@ -449,7 +449,7 @@ impl AgentReq {
                 card: v
                     .get("card")
                     .and_then(|x| x.as_u64())
-                    .ok_or("usage: sb card --withdraw <card> \"<why>\"")?,
+                    .ok_or("usage: sb notify --withdraw <notification> \"<why>\"")?,
                 why: jstr(v, "why"),
             },
             "rename" => AgentReq::Rename {
@@ -2575,7 +2575,7 @@ impl Hub {
                 // while its card still asked him)
                 let name = self.st.resolve(&agent).unwrap_or_else(|| agent.clone());
                 if let Some(c) = self.st.open_cards().find(|c| c.kind == "drop" && c.agent == name) {
-                    let error = format!("@{name}: the user has not answered card #{} (archive it?) yet: wait for his answer", c.id);
+                    let error = format!("@{name}: the user has not answered notification #{} (archive it?) yet: wait for his answer", c.id);
                     reply(fx, json!({"ok": false, "error": error}));
                     return;
                 }

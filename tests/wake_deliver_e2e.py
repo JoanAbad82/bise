@@ -148,7 +148,7 @@ def main():
         c.say("/answer %d 1" % q1["id"])
         c.wait(lambda: not any(x["id"] == q1["id"] for x in c.cards()), 30, "the card closed")
         c.wait(lambda: any("ship today" in l for l in c.lines("t1")[nt:]), AT_ONCE * 2, "t1 gets the pick")
-        told = "the user answered card #%d on the page t1-plan" % q1["id"]
+        told = "the user answered notification #%d on the page t1-plan" % q1["id"]
         c.wait(lambda: any(l.startswith("sb msg-in") and told in l for l in c.lines("main")[nm:]), AT_ONCE * 2, "main told")
         c.wait_idle("t1", "main")
         ms = [m for m in journal(E, "message_sent") if told in m["msg"]["text"]]

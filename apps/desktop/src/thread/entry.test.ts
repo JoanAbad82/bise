@@ -230,6 +230,8 @@ describe("his answer to main's own card, the hub's raw line (designer m_15195)",
       question: 'merge checkout into main? (2 files, tests pass)',
       words: '[Image #1] this one',
     });
+    expect(answeredCardOf('the user answered notification #12 ("which bench?"): "the cold one"')).toEqual({ card: 12, question: 'which bench?', words: 'the cold one' });
+    // a transcript written before notif-rename keeps the old word, read for good
     expect(answeredCardOf('the user answered card #12 ("which bench?"): "the cold one"')).toEqual({ card: 12, question: 'which bench?', words: 'the cold one' });
     expect(answeredCardOf('the user answered a question')).toBeNull();
     expect(answeredCardOf('done: the build is green')).toBeNull();

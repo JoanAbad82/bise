@@ -213,7 +213,7 @@ def main():
                    lambda: "no drop card in the capsule: %r" % core.last("state")["cards"])
         c.wait_idle("main")
         c.say("[[bash: sb drop t2]]")
-        c.wait_line("main", "has not answered card #%d" % drop["id"], 60)
+        c.wait_line("main", "has not answered notification #%d" % drop["id"], 60)
         check(any(x["id"] == drop["id"] for x in others()), "the card still asks him")
 
         # round 10 (identity10 #data): t1's preview and history through the

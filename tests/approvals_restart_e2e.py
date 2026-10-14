@@ -10,7 +10,7 @@ sandbox off. In auto:
      them, reads the open gate line again from the wire log: the agent
      still waits on you, the journaled card is still there;
   2. "always" on that card reaches the waiting REPL: the call runs, the
-     rule is saved with its source (`card #<id>, tr`);
+     rule is saved with its source (`notification #<id>, tr`);
   3. the `approvals` event lists it; `remove_rule` with it removes it
      from approvals.toml (the rest kept) and every TUI hears the new
      list; removing it again says why;
@@ -89,12 +89,12 @@ def main():
         check(open(out).read() == "r\n", "it ran once")
         c.wait_feed("main", "approval", 10, how="allowed", who="tr", what="echo r >> " + out)
         rules = open(os.path.join(bise, "approvals.toml")).read()
-        check('from = "card #%d, tr"' % card["id"] in rules, "the rule says where it came from: %r" % rules)
+        check('from = "notification #%d, tr"' % card["id"] in rules, "the rule says where it came from: %r" % rules)
 
         # 3. /approvals: the rule listed, then removed
         ev = c.approvals_set()["result"]
         mine = [r for r in ev["rules"] if r["tool"] == "bash"]
-        check(len(mine) == 1 and mine[0]["from"] == "card #%d, tr" % card["id"], "the rule is listed: %r" % ev["rules"])
+        check(len(mine) == 1 and mine[0]["from"] == "notification #%d, tr" % card["id"], "the rule is listed: %r" % ev["rules"])
         check(any(r["tool"] == "gmail.send_email" and r.get("project") is None for r in ev["rules"]),
               "a rule of every project is listed: %r" % ev["rules"])
         check(ev["repo"] and ev["checker"] == "off", "the repo and the checker: %r" % ev)

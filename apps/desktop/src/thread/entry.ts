@@ -499,14 +499,16 @@ export function handoffOf(text: string): { agent: string; brief: string } | null
 }
 
 /**
- * The hub's raw line when he answered main's own card (sb-core's notify_main, until amb-feed folds it
- * to an approval entry): 'the user answered card #1 ("merge checkout into main? (2 files, tests
+ * The hub's raw line when he answered main's own notification (sb-core's notify_main, until amb-feed
+ * folds it to an approval entry): 'the user answered notification #1 ("merge checkout into main? (2 files, tests
  * pass) 1. merge 2. not yet"): "[Image #1] this one"'. Its card, the question without its numbered
  * options, and his words; none for any other text. Designer's must-fix (m_15195): never the raw
  * line or the old product name. Pure.
  */
 export function answeredCardOf(text: string): { card: number; question: string; words: string } | null {
-  const m = /^the user answered card #(\d+) \("([\s\S]*)"\):\s*"([\s\S]*)"\s*$/.exec(text.trim());
+  // 'card' in transcripts written before notif-rename, read for good. TODO(notif-rename): read the
+  // route line's typed card instead of these words.
+  const m = /^the user answered (?:notification|card) #(\d+) \("([\s\S]*)"\):\s*"([\s\S]*)"\s*$/.exec(text.trim());
   if (m === null) return null;
   const q = (m[2] ?? '').replace(/\s+/gu, ' ').trim();
   // the card's options ride after its question: ' 1. merge 2. not yet'

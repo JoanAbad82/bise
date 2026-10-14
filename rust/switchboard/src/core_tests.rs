@@ -720,7 +720,7 @@ fn an_unanswered_drop_card_never_acts() {
     let (tok, fx) = t.req(MAIN, AgentReq::Drop { agent: "fix".into() });
     let r = reply(&fx, tok).unwrap();
     assert_eq!(r["ok"], false, "{r}");
-    assert!(r["error"].as_str().unwrap().contains(&format!("card #{card}")), "{r}");
+    assert!(r["error"].as_str().unwrap().contains(&format!("notification #{card}")), "{r}");
     assert_ne!(t.status("fix"), Status::Archived);
     // his yes archives it
     t.user(MAIN, &format!("/answer {} oui", card));
@@ -1741,7 +1741,7 @@ fn answering_a_main_card_starts_a_main_turn_holding_the_answer() {
     let fx = t.user(MAIN, &format!("/answer {} oui, à 20h", card));
     assert!(t.hub.st.cards.is_empty());
     let said = say_to(&fx, MAIN).expect("the answer starts a main turn");
-    assert!(said.contains(&format!("card #{}", card)) && said.contains("on publie ce soir ?") && said.contains("oui, à 20h"), "{said}");
+    assert!(said.contains(&format!("notification #{}", card)) && said.contains("on publie ce soir ?") && said.contains("oui, à 20h"), "{said}");
     assert_eq!(t.status(MAIN), Status::Working);
     assert!(!t.hub.st.main_notes.iter().any(|n| n.contains("oui, à 20h")), "{:?}", t.hub.st.main_notes);
     // busy: a second answer steers the running turn
@@ -1870,7 +1870,7 @@ fn neither_main_nor_a_task_closes_a_user_card() {
     let (tok, fx) = t.req("docs", AgentReq::Close { card, note: "done".into() });
     assert!(err_of(&fx, tok).contains("reserved for main"));
     let (tok, fx) = t.req(MAIN, AgentReq::Close { card: 99, note: String::new() });
-    assert!(err_of(&fx, tok).contains("no open card #99"));
+    assert!(err_of(&fx, tok).contains("no open notification #99"));
     let (tok, fx) = t.req(MAIN, AgentReq::Close { card, note: "handled".into() });
     let e = err_of(&fx, tok);
     assert!(e.contains("only the user answers or closes it"), "{e}");

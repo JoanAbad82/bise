@@ -147,7 +147,7 @@ def cards_round(c):
     mine = [x for x in mthread if x["kind"] == "approval" and x["text"].startswith("you answered main")]
     check(len(mine) == 1 and "merge it\nthen tag v2" in mine[0]["text"] + "\n" + mine[0]["approval"].get("note", ""),
           "one 'you answered main' row with his whole answer: %r" % mine)
-    raw = [x for x in mthread if x.get("text", "").startswith("the user answered card #")]
+    raw = [x for x in mthread if x.get("text", "").startswith("the user answered notification #")]
     check(not raw, "no raw note to main in its thread: %r" % raw)
 
     c.say('[[bash: sb card "close me from the window?"]]')

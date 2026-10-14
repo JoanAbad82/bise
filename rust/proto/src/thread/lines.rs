@@ -922,17 +922,17 @@ pub fn is_stop_note(text: &str) -> bool {
 pub const STOP_NOTE: &str = "the user stopped timer #";
 
 /// The note bise sends main when the user answers one of main's own
-/// cards (core.bend `answer.q.main`): for main's model only. The same
-/// step writes the route line the thread shows ("you answered", his
-/// answer whole), so a client drops this twin.
+/// notifications (core.bend `answer.q.main`): for main's model only. The
+/// same step writes the route line the thread shows, so a client drops this
+/// twin, old head too. TODO(notif-rename): read the route line's typed card.
 pub fn is_main_answer_note(text: &str) -> bool {
-    text.starts_with(MAIN_ANSWER_NOTE)
+    text.starts_with(MAIN_ANSWER_NOTE) || text.starts_with("the user answered card #")
 }
 
 /// The head of that note: core.bend's `MAIN_ANSWER_HEAD` (pinned by the
 /// switchboard core test `answering_mains_card_routes_it_and_notes_main`
 /// against the real sb-core, so a wording change there goes red).
-pub const MAIN_ANSWER_NOTE: &str = "the user answered card #";
+pub const MAIN_ANSWER_NOTE: &str = "the user answered notification #";
 
 // an agent's context usage (architect m_10999): lines_usage.rs
 #[path = "lines_usage.rs"]

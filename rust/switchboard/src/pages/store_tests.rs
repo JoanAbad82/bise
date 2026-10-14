@@ -12,7 +12,7 @@ fn words_on_a_drafts_card_are_a_page_note() {
     s.publish(&publish("t1", Some("rel"), Some("release replies")), vec![], 10, &|_| false).unwrap();
     let m = s.meta("rel").unwrap();
     let (text, part) = batch_words(&m, "http://p/rel", 7, "2 drafts wait for you · release replies", "2 drafts wait for you · release replies\nreplies to Lucas and Marc", "t1", "Ou sont les drafts?");
-    assert_eq!(text, "on the drafts card \"2 drafts wait for you · release replies\" of your page \"release replies\" (http://p/rel), the user says: Ou sont les drafts?");
+    assert_eq!(text, "on the drafts notification \"2 drafts wait for you · release replies\" of your page \"release replies\" (http://p/rel), the user says: Ou sont les drafts?");
     assert_eq!(bise_proto::parts::render(std::slice::from_ref(&part)), text, "the model's text, byte for byte");
     let bise_proto::parts::Part::Page { to, page, title, version, notes, .. } = part else { panic!("{part:?}") };
     assert_eq!((to.as_str(), page.as_str(), title.as_str(), version), ("t1", "rel", "release replies", 1));

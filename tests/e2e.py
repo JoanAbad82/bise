@@ -624,8 +624,8 @@ def t_escalation_card(E, c):
     c.wait_idle("main")
     # escalated: main can neither answer nor close it
     c.say('[[bash: sb send t3 --reply-to %s "v1"; sb close %d; echo rc=$?]]' % (msg_id, card["id"]))
-    c.wait_line("main", "is in the user's inbox (card #%d): only the user answers it" % card["id"], 60)
-    c.wait_line("main", "card #%d is in the user's inbox: only the user answers or closes it" % card["id"], 60)
+    c.wait_line("main", "is in the user's inbox (notification #%d): only the user answers it" % card["id"], 60)
+    c.wait_line("main", "notification #%d is in the user's inbox: only the user answers or closes it" % card["id"], 60)
     c.wait_idle("main")
     check([cd["id"] for cd in c.cards()] == [card["id"]], "the card stays: %r" % c.cards())
     # only the user's answer resolves it, and it reaches t3

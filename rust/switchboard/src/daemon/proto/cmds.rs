@@ -144,7 +144,7 @@ impl Shell {
                     Page::Not => reply,
                 };
                 if !self.hub.st.open_cards().any(|c| c.id == card) {
-                    return self.proto_error(id, &tag, &format!("card {card} isn't open"));
+                    return self.proto_error(id, &tag, &format!("notification #{card} isn't open"));
                 }
                 // the reply as he wrote it, never read as a command (architect
                 // m_8366): the TUI's /answer handler with its fields
@@ -177,7 +177,7 @@ impl Shell {
             // text; step_typed: a card already gone comes back as error)
             HubCmd::Close { card, .. } => {
                 if !self.hub.st.open_cards().any(|c| c.id == card) {
-                    return self.proto_error(id, &tag, &format!("card {card} isn't open"));
+                    return self.proto_error(id, &tag, &format!("notification #{card} isn't open"));
                 }
                 self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd: UserCmd::Close { card } });
             }

@@ -842,7 +842,7 @@ def send.known(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o>
 def send.user(-o: M.St, user: Bool, +cx: X.Cx<o>, +s: Snd) -> X.Cx<o> & SendR:
   match user:
     case True{}:
-      serr(o, cx, "invalid_recipient: to talk to the user, go through main (sb card)")
+      serr(o, cx, "invalid_recipient: to talk to the user, go through main (sb notify)")
     case False{}:
       send.known(o, M.resolve(st(o, cx), Snd.to(s)), cx, s)
 
@@ -1902,7 +1902,7 @@ def answer.q.sent(-o: M.St, p: X.Cx<o> & SendR, +c: M.Card, +asker: String, +tex
     case (+cx, SOk{+m}):
       +id = M.Card.id(c)
       +mid = M.Msg.id(m)
-      +cx2 = note_main(o, cx, cat(["the user answered card #", ns(id), " (@", asker, " asked: \"", M.one_line(M.Card.text(c)), "\"): \"", M.one_line(text), "\""]))
+      +cx2 = note_main(o, cx, cat(["the user answered notification #", ns(id), " (@", asker, " asked: \"", M.one_line(M.Card.text(c)), "\"): \"", M.one_line(text), "\""]))
       +cx3 = answer_line(o, cx2, M.MAIN(), asker, c, text, parts, Some{mid})
       close_card_ans(o, A.due_add(o, asker_line(o, cx3, asker, c, text, parts, Some{mid}), id), id, "answered", A.his_ans(c, text, via))
 
@@ -1913,7 +1913,7 @@ def answer.q.sent(-o: M.St, p: X.Cx<o> & SendR, +c: M.Card, +asker: String, +tex
 # the head of main's note when the user answers one of main's own cards
 # (the clients match it to drop that note: lines.rs MAIN_ANSWER_HEAD)
 def MAIN_ANSWER_HEAD() -> String:
-  "the user answered card #"
+  "the user answered notification #"
 
 #
 # The same route line as an agent's card (answer.q.sent), his answer whole:
@@ -1975,7 +1975,7 @@ def card_kind(+k: String) -> CardK:
 
 # typed words on an approval card: the card stays open, nothing wakes
 def words_refused(-o: M.St, +cx: X.Cx<o>, +c: M.Card, +opts: String) -> X.Cx<o>:
-  notice(o, cx, cat(["card #", ns(M.Card.id(c)), " waits for ", opts, " — typed words don't answer it"]))
+  notice(o, cx, cat(["notification #", ns(M.Card.id(c)), " waits for ", opts, " — typed words don't answer it"]))
 
 def answer.confirm(-o: M.St, ok: Bool, +cx: X.Cx<o>, +c: M.Card, +text: String, +via: String) -> X.Cx<o>:
   match ok:
@@ -2016,7 +2016,7 @@ def answer.kind(-o: M.St, k: CardK, +cx: X.Cx<o>, +c: M.Card, +text: String, +pa
 def answer.card(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat, +text: String, +parts: String, +via: String) -> X.Cx<o>:
   match m:
     case None{}:
-      notice(o, cx, String.append("no open card #", ns(id)))
+      notice(o, cx, String.append("no open notification #", ns(id)))
     case Some{+c}:
       answer.kind(o, card_kind(M.Card.kind(c)), cx, c, text, parts, via)
 
@@ -2716,8 +2716,8 @@ def req_send.held(-o: M.St, held: Maybe<&2, Nat>, +cx: X.Cx<o>, +token: Nat, +fr
   match held:
     case Some{+id}:
       +r = C.get_nat(q, "reply_to")
-      reply_err(o, cx, token, cat([mid(r), " is in the user's inbox (card #", ns(id), "): only the user answers it",
-        Bool.pick(String, String.eq(from, M.MAIN()), cat([". It is moot? `sb card --withdraw ", ns(id), " \"why\"` takes it back first"]), "")]))
+      reply_err(o, cx, token, cat([mid(r), " is in the user's inbox (notification #", ns(id), "): only the user answers it",
+        Bool.pick(String, String.eq(from, M.MAIN()), cat([". It is moot? `sb notify --withdraw ", ns(id), " \"why\"` takes it back first"]), "")]))
     case None{}:
       req_send.go(o, cx, token, from, q)
 
@@ -3019,7 +3019,7 @@ def req_drop.res(-o: M.St, p: X.Cx<o> & DropR, +token: Nat, +agent: String) -> X
       +text = Bool.pick(String, String.ends_with(q, " [y/N]"), String.take(q, Nat.sub(String.length(q), 6n)), q)
       +cx2 = open_card(o, cx, "drop", n, cat(["main suggests: ", text, " (answer yes or no)"]), None{})
       reply(o, cx2, token, ok_body([J.kv("dropped", J.JBool{False{}}), J.kv("card", J.JNum{id}),
-        J.kv("reason", J.JStr{"the user must confirm: an attention card is open"})]))
+        J.kv("reason", J.JStr{"the user must confirm: a notification for it is open in the inbox"})]))
     case (+cx, DErr{+e}):
       reply_err(o, cx, token, e)
     case (+cx, DHalt{}):
@@ -3070,11 +3070,11 @@ def req_card(-o: M.St, for_msg: Maybe<&2, Nat>, +cx: X.Cx<o>, +token: Nat, +text
 def req_close(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +token: Nat, +id: Nat, +note: String) -> X.Cx<o>:
   match m:
     case None{}:
-      reply_err(o, cx, token, String.append("no open card #", ns(id)))
+      reply_err(o, cx, token, String.append("no open notification #", ns(id)))
     case Some{+c}:
       +res = Bool.pick(String, String.is_empty(M.one_line(note)), "closed by main", String.append("main: ", M.one_line(note)))
       pick_lazy(X.Cx<o>, M.user_kind(M.Card.kind(c)),
-        u => reply_err(o, cx, token, cat(["card #", ns(id), " is in the user's inbox: only the user answers or closes it (your own question, now moot: sb card --withdraw ", ns(id), " \"why\")"])),
+        u => reply_err(o, cx, token, cat(["notification #", ns(id), " is in the user's inbox: only the user answers or closes it (your own question, now moot: sb notify --withdraw ", ns(id), " \"why\")"])),
         u => reply(o, close_card(o, cx, id, res), token, ok_body([J.kv("card", J.JNum{id})])))
 
 # `sb card --withdraw N "why"` (BISE-299): main takes back its own
@@ -3084,14 +3084,14 @@ def req_close(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +token: Nat, +id: Na
 def req_withdraw(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +token: Nat, +id: Nat, +why: String) -> X.Cx<o>:
   match m:
     case None{}:
-      reply_err(o, cx, token, String.append("no open card #", ns(id)))
+      reply_err(o, cx, token, String.append("no open notification #", ns(id)))
     case Some{+c}:
       +k = M.Card.kind(c)
       pick_lazy(X.Cx<o>, String.eq(k, "question") || String.eq(k, "drop"),
         u => pick_lazy(X.Cx<o>, String.is_empty(M.one_line(why)),
-          u => reply_err(o, cx, token, "say why: sb card --withdraw N \"why\" (the user reads it)"),
+          u => reply_err(o, cx, token, "say why: sb notify --withdraw N \"why\" (the user reads it)"),
           u => reply(o, close_card(o, cx, id, String.append("withdrawn by main: ", M.one_line(why))), token, ok_body([J.kv("card", J.JNum{id})]))),
-        u => reply_err(o, cx, token, cat(["card #", ns(id), " is a ", k, ": only the user answers or closes it"])))
+        u => reply_err(o, cx, token, cat(["notification #", ns(id), " is a ", k, ": only the user answers or closes it"])))
 
 # `sb rename <task> <new-name>`: the same rules as the user's /rename
 def req_rename.go(-o: M.St, ok: Bool, +cx: X.Cx<o>, +token: Nat, +old: String, +new: String) -> X.Cx<o>:
@@ -3602,9 +3602,9 @@ def repl_idle(-o: M.St, +cx: X.Cx<o>, +agent: String, +leftover: Bool, +held: Bo
 def close_by_user(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
   match m:
     case None{}:
-      notice(o, cx, String.append("no open card #", ns(id)))
+      notice(o, cx, String.append("no open notification #", ns(id)))
     case Some{+c}:
-      note_main(o, close_card(o, cx, id, "closed"), cat(["the user closed card #", ns(id), " (", M.Card.kind(c), " @", M.Card.agent(c), ": \"", M.one_line(M.Card.text(c)), "\") without answering"]))
+      note_main(o, close_card(o, cx, id, "closed"), cat(["the user closed notification #", ns(id), " (", M.Card.kind(c), " @", M.Card.agent(c), ": \"", M.one_line(M.Card.text(c)), "\") without answering"]))
 
 # the gate's card closes without an answer (its agents were
 # interrupted): no card, nothing to do

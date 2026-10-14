@@ -780,7 +780,7 @@ pub fn page_part(m: &Meta, questions: &[super::questions::Question], sent: &[Not
 /// batch (block "") quoting the card's line, so the clients draw
 /// `you answered · <asked>` and his words, never the text.
 pub fn batch_words(m: &Meta, url: &str, card: u64, line: &str, asked: &str, to: &str, words: &str) -> (String, bise_proto::parts::Part) {
-    let text = format!("on the drafts card \"{line}\" of your page \"{}\" ({url}), the user says: {words}", m.title);
+    let text = format!("on the drafts notification \"{line}\" of your page \"{}\" ({url}), the user says: {words}", m.title);
     let note = bise_proto::parts::PageNote {
         block: super::checklist::BATCH.to_string(),
         kind: "note".into(),
