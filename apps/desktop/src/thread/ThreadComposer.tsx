@@ -172,7 +172,7 @@ export const ThreadComposer = memo(function ThreadComposer({
         // msg-parts: his quotes and pastes go typed (the hub renders the model's text from them)
         asked.current = { project: answer.project, text: out.text };
         // inbox picks (3): this thread, so his row shows here too when the asker's thread is elsewhere
-        const from = answer.asker === undefined ? undefined : { at: { project, agent }, asker: answer.asker, words: out.text };
+        const from = answer.asker === undefined ? undefined : { at: { project, agent } };
         store.answer(answer.project, answer.card, out.text, out.files, out.parts, from);
         onSent();
         return;

@@ -11,12 +11,9 @@ export interface AnswerAt {
   readonly agent: string;
 }
 
-/** What the window knew when he answered: where he was, who asked, and his words as it shows them. */
+/** What the window knew when he answered: where he was (the row's words are the hub's alone). */
 export interface AnswerFrom {
   readonly at: AnswerAt | null;
-  readonly asker: string;
-  /** his words as the inbox draws them: the option's words for a pick, else what he typed */
-  readonly words: string;
 }
 
 /** His answer, drawn in the thread he answered from: the hub's 'you answered' words. */
@@ -60,9 +57,10 @@ export function rowThere(at: AnswerAt, project: string, asker: string): boolean 
 }
 
 /**
- * The row for his answer where he was, or null when the hub's row is there already. `answer`
- * null: an older hub (or a page took it) answered {}: the window's own words, 'you answered
- * <asker>: <words>'. Pure.
+ * The row for his answer where he was, or null when the hub's row is there already. Only the
+ * hub's word that it took the answer draws 'you answered' (card-state): `answer` null ({}: the
+ * step closed no card, a hub item's digit it acts on later, words it refused, an older hub) draws
+ * nothing, never the window's own words (his #384: '✓ you answered' on a merge item the hub kept). Pure.
  */
 export function asideOf(
   from: AnswerFrom,
@@ -72,15 +70,11 @@ export function asideOf(
   atMs: number,
 ): { at: AnswerAt; aside: Aside } | null {
   const at = from.at;
-  if (at === null) return null;
-  const asker = answer?.agent ?? from.asker;
-  if (rowThere(at, project, asker)) return null;
-  const notice =
-    answer !== null ? answer.notice : oneLine(from.words) ? `you answered ${asker}: ${from.words.trim()}` : `you answered ${asker}`;
-  const note = answer !== null ? (answer.note ?? "") : oneLine(from.words) ? "" : from.words.trim();
+  if (at === null || answer === null) return null;
+  if (rowThere(at, project, answer.agent)) return null;
   return {
     at,
-    aside: { key: `${project}/${String(card)}`, project, card, notice, note, at_ms: atMs },
+    aside: { key: `${project}/${String(card)}`, project, card, notice: answer.notice, note: answer.note ?? "", at_ms: atMs },
   };
 }
 
@@ -108,11 +102,4 @@ export function asidesOf(raw: unknown): readonly Aside[] {
     );
   };
   return keptAsides(raw.filter(ok));
-}
-
-// words::answered_split's rule: one line, short enough to sit on the head's line
-const ON_THE_LINE = 48;
-function oneLine(words: string): boolean {
-  const w = words.trim();
-  return w !== "" && !w.includes("\n") && Array.from(w).length <= ON_THE_LINE;
 }

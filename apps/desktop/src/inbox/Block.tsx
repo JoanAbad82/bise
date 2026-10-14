@@ -12,12 +12,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
 import type { NotifyAuth } from '@/shared/api';
 import { Act, Dot, Kbd, Row } from '@/ds';
-import { useProjects, useStore, useVoiceAnswer, type AnswerAt } from '@/store';
+import { actedKeys, useActed, useProjects, useStore, useVoiceAnswer, type AnswerAt } from '@/store';
 import { shownName } from '@/agents/model';
 import { age, dotOf, folds, InboxCard } from './InboxCard';
 import { useMenuAction } from '@/app/menu';
 import { cardKey, sortCards } from './order';
-import { pickWaits, takesWords, withConfirmOptions } from './model';
+import { localAct, pickWaits, takesWords, withConfirmOptions } from './model';
 import { STRIP_KEYS, stripKey, stripWords } from './stripRows';
 import { cardKeyOf } from './Strip';
 import { pruneCardDrafts } from './drafts';
@@ -231,7 +231,9 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
   const cmd = useModHeld('Meta');
   const rows = useProjects();
   const store = useStore();
-  const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
+  // the cards he answered or closed, from any view: the store's one set (acted.ts), never this block's
+  const acted = useActed();
+  const gone = useMemo(() => actedKeys(acted), [acted]);
   const [open, setOpen] = useState<string | null>(null);
   const [on, setOn] = useState<number | null>(null);
   // the keys read the open item and the option they're on from here, written at once by each key:
@@ -355,10 +357,9 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
     };
   }, [store, openProject, openId]);
 
-  // an item acted on here stays out until the core's rows drop it
-  const leave = (c: Card) => {
-    const live = new Set(rows.flatMap((r) => (r.cards ?? []).map(cardKey)));
-    setGone((g) => new Set([...[...g].filter((k) => live.has(k)), cardKey(c)]));
+  // an item answered or closed leaves every view at once: store.answer / store.close keep it out
+  // until the hub's rows drop it (acted.ts); here it only folds
+  const leave = () => {
     openTo(null);
   };
   const pick = (c: Card, n: number) => {
@@ -368,16 +369,16 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
       else notify.later();
       return;
     }
-    // a drafts card's '1. review' does what it says: its page opens, nothing is sent, the card stays
-    // (amb-core m_21541; the hub's own answer to '1' is that url in a notice)
-    if (n === 1 && c.batch != null && c.page != null) {
-      void window.bise.openExternal(c.page.url);
+    // an option the window does itself (a drafts card's '1. review', a merge's '2 open it on GitHub',
+    // an update's '3 release notes'): its page opens, nothing is sent, the card stays (model.ts localAct)
+    const local = localAct(c, n);
+    if (local !== null) {
+      if (local.url !== null) void window.bise.openExternal(local.url);
       return;
     }
-    leave(c);
+    leave();
     // inbox picks (3): where he is, so his row shows here too when the asker's thread is elsewhere
-    const words = c.options.find((o) => o.n === n)?.label ?? String(n);
-    store.answer(c.project, c.id, String(n), undefined, undefined, { at: answerAt(here, home), asker: c.agent, words });
+    store.answer(c.project, c.id, String(n), undefined, undefined, { at: answerAt(here, home) });
   };
   const close = (c: Card) => {
     if (isNotify(c)) {
@@ -385,7 +386,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
       notify.later();
       return;
     }
-    leave(c);
+    leave();
     store.close(c.project, c.id);
   };
   useEffect(() => {

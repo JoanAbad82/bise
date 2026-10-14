@@ -11,6 +11,8 @@ import { Dot, Kbd, Row } from '@/ds';
 import { age, dotOf, InboxCard, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { STRIP_KEYS, stripKey, stripList, stripOpen, stripView, stripWords } from './stripRows';
+import { localAct } from './model';
+import { actedKeys, useActed } from '@/store';
 import './inbox.css';
 
 export interface StripPorts {
@@ -49,7 +51,9 @@ function typing(t: EventTarget | null): boolean {
 
 export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip }: InboxStripProps) {
   const [open, setOpen] = useState<string | null>(null);
-  const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
+  // the cards he answered or closed, from any view: the store's one set (acted.ts), never the strip's
+  const acted = useActed();
+  const gone = useMemo(() => actedKeys(acted), [acted]);
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const list = useMemo(() => stripList(cards, project, gone), [cards, project, gone]);
@@ -73,19 +77,20 @@ export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip
     [project],
   );
 
-  // an item acted on here stays out until the core's rows drop it (the
-  // keys the rows no longer have are forgotten on the next one)
-  const leave = (c: Card) => {
-    const live = new Set(cards.map(cardKey));
-    setGone((g) => new Set([...[...g].filter((k) => live.has(k)), cardKey(c)]));
-    openTo(null);
-  };
+  // an item answered or closed leaves every view at once: the store's answer / close keep it out
+  // until the hub's rows drop it (acted.ts); here it only folds. An option the window does itself
+  // (a merge's '2 open it on GitHub'...) opens its page, sends nothing, and the item stays.
   const answer = (c: Card, n: number) => {
-    leave(c);
+    const local = localAct(c, n);
+    if (local !== null) {
+      if (local.url !== null) ports.openPage?.(local.url);
+      return;
+    }
+    openTo(null);
     ports.answer(c.project, c.id, String(n));
   };
   const close = (c: Card) => {
-    leave(c);
+    openTo(null);
     ports.close(c.project, c.id);
   };
 

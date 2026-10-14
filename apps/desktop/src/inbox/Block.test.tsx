@@ -279,6 +279,64 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     }
   });
 
+  it("card-state: answered from another project, a project switch (a new block) and a reload (a new store) never bring it back", () => {
+    const sent: CoreCmd[] = [];
+    const kept = new Map<string, unknown>();
+    const asides = { read: (k: string) => kept.get(k), write: (k: string, v: unknown) => kept.set(k, v) };
+    const port: CorePort = { send: (c) => sent.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    const block = (store: Store, project: string) =>
+      render(
+        <StoreProvider store={store}>
+          <RouterContext value={createRouter({ screen: 'thread', project, agent: 'main' })}>
+            <InboxBlock here={{ project, agent: 'main' }} onAnswer={() => undefined} now={NOW} />
+          </RouterContext>
+        </StoreProvider>,
+      );
+    // the notifications' row stays out of the count ('not now' this launch)
+    localStorage.clear();
+    sessionStorage.setItem('bise.notify.notnow.launch', '1');
+    const store = new Store(port, { asides });
+    replay(store, core_ev);
+    block(store, 'other-project');
+    fireEvent.click(screen.getByTestId('inbox.block.more'));
+    fireEvent.keyDown(window, { key: '2' });
+    expect(sent.filter((c) => c.cmd === 'answer')).toEqual([{ cmd: 'answer', project: P, card: 9, reply: '2' }]);
+    expect(screen.getByTestId('inbox.block').textContent).toContain('1 waiting');
+    // he switches project: the block mounts again; the hub's rows still list card 9
+    cleanup();
+    replay(store, core_ev);
+    block(store, P);
+    expect(screen.getByTestId('inbox.block').textContent).toContain('1 waiting');
+    expect(screen.getByTestId('inbox.block').textContent).not.toContain('which bench?');
+    // a reload: a new store from the window's keep, the same rows
+    cleanup();
+    const again = new Store(port, { asides });
+    replay(again, core_ev);
+    block(again, P);
+    expect(screen.getByTestId('inbox.block').textContent).toContain('1 waiting');
+  });
+
+  it("card-state: a merge's '2 open it on GitHub' opens its PR, sends nothing, and the item stays", () => {
+    const merge = core_ev.map((e) =>
+      e.ev !== 'projects'
+        ? e
+        : { ...e, projects: e.projects.map((r) => ({ ...r, cards: [{ id: 384, project: r.project, kind: 'merge', agent: 'pattern-error-dx', question: '#384 is ready to merge\ngithub.com/gvergnaud/ts-pattern/pull/384', options: [{ n: 1, label: 'squash and merge' }, { n: 2, label: 'open it on GitHub' }, { n: 3, label: 'not yet' }], urgent: false, since_ms: NOW - 1000, pr: 384 }] })) },
+    );
+    const opened: string[] = [];
+    const g = globalThis as { bise?: unknown };
+    g.bise = { openExternal: (u: string) => opened.push(u) };
+    try {
+      const { hub } = mount({ project: null, agent: null }, merge);
+      fireEvent.keyDown(window, { key: '1', code: 'Digit1', ctrlKey: true });
+      fireEvent.keyDown(window, { key: '2' });
+      expect(opened).toEqual(['https://github.com/gvergnaud/ts-pattern/pull/384']);
+      expect(hub()).toEqual([]);
+      expect(screen.getByTestId('inbox.block').textContent).toContain('#384 is ready to merge');
+    } finally {
+      delete g.bise;
+    }
+  });
+
   it("'not now' (its 2) and it is gone for good: asked once; its words never reach the hub", async () => {
     localStorage.clear();
     sessionStorage.clear();

@@ -22,7 +22,9 @@ import type {
   Entry,
   Mode,
   Part,
+  ProjectRow,
 } from "@/proto";
+import { actedAdd, actedOf, actedPrune, type Acted } from "./acted";
 import type { CoreState } from "@/shared/api";
 import {
   type Ev,
@@ -217,6 +219,24 @@ export class Store extends StoreVoice {
     this.asideKeep?.write(`asides:${tkey}`, list);
     return true;
   }
+  /**
+   * The cards he answered or closed in this window that the hub's rows still list (acted.ts):
+   * every view leaves them out. Kept across a reload, as his asides.
+   */
+  acted(): readonly Acted[] {
+    if (!this.slices.has("acted") && this.asideKeep !== null) this.slices.set("acted", actedOf(this.asideKeep.read("acted")));
+    return this.slice<readonly Acted[]>("acted", EMPTY);
+  }
+  private putActed(list: readonly Acted[]): void {
+    if (list === this.acted()) return;
+    this.put("acted", list);
+    this.asideKeep?.write("acted", list);
+  }
+  /** @internal for apply.ts: a projects event; the cards its rows no longer list leave the set */
+  rowsCame(rows: readonly ProjectRow[]): void {
+    this.putActed(actedPrune(this.acted(), rows));
+  }
+
   /** His answers made from this thread to a card asked elsewhere (window-local, oldest first; kept across a reload). */
   asides(key: string): readonly Aside[] {
     const k = `asides:${key}`;
@@ -470,6 +490,8 @@ export class Store extends StoreVoice {
   ): void {
     // inbox picks (3): where he was, so the answer's result can leave his row there (asides.ts)
     if (from !== undefined) this.answering.set(`${project}/${String(card)}`, from);
+    // every view leaves it out until the hub's rows drop it (acted.ts)
+    this.putActed(actedAdd(this.acted(), project, card, this.now()));
     this.command({
       cmd: "answer",
       project,
@@ -498,6 +520,7 @@ export class Store extends StoreVoice {
   }
   /** Close a card without answering it (the TUI's /close N). */
   close(project: string, card: number): void {
+    this.putActed(actedAdd(this.acted(), project, card, this.now()));
     this.command({ cmd: "close", project, card });
   }
   stop(project: string, agent: string): void {

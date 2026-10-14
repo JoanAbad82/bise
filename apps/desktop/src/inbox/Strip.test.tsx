@@ -4,6 +4,8 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { Card } from '@/proto';
 import { InboxStrip, cardKeyOf, type StripPorts } from './Strip';
 import { PICKED_MS } from './InboxCard';
+import type { ReactNode } from 'react';
+import { Store, StoreProvider } from '@/store';
 
 afterEach(() => {
   cleanup();
@@ -25,14 +27,25 @@ const card = (id: number, rank: number, project = 'acme'): Card => ({
   rank,
 });
 
+// the ports as ThreadInbox wires them: through a store of the test's own (an answered or closed item
+// leaves every view by the store's acted set, never the strip's), each act also written in `did`
 const ports = () => {
   const did: string[] = [];
+  const store = new Store(null);
   const p: StripPorts = {
-    answer: (project, c, reply) => did.push(`answer ${project}-${String(c)} ${reply}`),
-    close: (project, c) => did.push(`close ${project}-${String(c)}`),
+    answer: (project, c, reply) => {
+      did.push(`answer ${project}-${String(c)} ${reply}`);
+      store.answer(project, c, reply);
+    },
+    close: (project, c) => {
+      did.push(`close ${project}-${String(c)}`);
+      store.close(project, c);
+    },
     openInbox: () => did.push('inbox'),
+    openPage: (url) => did.push(`open ${url}`),
   };
-  return { did, p };
+  const wrapper = ({ children }: { children: ReactNode }) => <StoreProvider store={store}>{children}</StoreProvider>;
+  return { did, p, wrapper, store };
 };
 
 const NOW = 1791100400000;
@@ -45,8 +58,8 @@ describe('InboxStrip (W7/K24)', () => {
 
   it("numbers the project's items, ctrl+2 docks item 2, a click on an option answers it", () => {
     vi.useFakeTimers();
-    const { did, p } = ports();
-    render(<InboxStrip project="acme" cards={[card(1, 2), card(2, 0), card(3, 1), card(4, 3), card(9, 0, 'other')]} ports={p} now={NOW} />);
+    const { did, p, wrapper } = ports();
+    render(<InboxStrip project="acme" cards={[card(1, 2), card(2, 0), card(3, 1), card(4, 3), card(9, 0, 'other')]} ports={p} now={NOW} />, { wrapper });
     expect(screen.getByTestId('strip.row.1').textContent).toContain('t2');
     expect(screen.getByTestId('strip.row.2').textContent).toContain('t3');
     expect(screen.getByTestId('strip.row.3').textContent).toContain('t1');
@@ -65,8 +78,8 @@ describe('InboxStrip (W7/K24)', () => {
   });
 
   it("a click docks a row; esc and 'esc later' put it off; '⌘⌫ close' and ⌘⌫ close it; a digit picks it", () => {
-    const { did, p } = ports();
-    render(<InboxStrip project="acme" cards={[card(1, 0), card(2, 1), card(3, 2)]} ports={p} now={NOW} />);
+    const { did, p, wrapper } = ports();
+    render(<InboxStrip project="acme" cards={[card(1, 0), card(2, 1), card(3, 2)]} ports={p} now={NOW} />, { wrapper });
     fireEvent.click(screen.getByTestId('strip.row.1'));
     expect(screen.getByTestId('strip.dock')).toBeTruthy();
     expect(screen.queryByTestId('strip')).toBeNull();
@@ -89,8 +102,8 @@ describe('InboxStrip (W7/K24)', () => {
   });
 
   it("a digit typed in the composer with his words in it is his, not an option (amb-win, item 7)", () => {
-    const { did, p } = ports();
-    render(<InboxStrip project="acme" cards={[card(1, 0)]} ports={p} now={NOW} />);
+    const { did, p, wrapper } = ports();
+    render(<InboxStrip project="acme" cards={[card(1, 0)]} ports={p} now={NOW} />, { wrapper });
     fireEvent.click(screen.getByTestId('strip.row.1'));
     const field = document.createElement('div');
     field.contentEditable = 'true';

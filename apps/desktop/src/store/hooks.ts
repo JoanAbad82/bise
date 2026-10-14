@@ -8,6 +8,7 @@ import type { Account, Agent, FlowMode, ReleaseEv, SwitchRow, UpdateEv, Artifact
 import type { CorePort, CoreState } from '@/shared/api';
 import { keep } from '@/app/keep';
 import type { Aside } from './asides';
+import type { Acted } from './acted';
 import { diffKey, takeKey, toolOutKey, Store, type QueuedTake, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadOrder, type VoiceModeState, type TalkShot } from './store';
 
 /**
@@ -199,6 +200,8 @@ export const useTyping = (key: string): string => useSlice(`typing:${key}`, (s) 
 export const usePending = (key: string): readonly Pending[] => useSlice(`pending:${key}`, (s) => s.pending(key));
 /** Inbox picks (3): his answers made from this thread to cards asked elsewhere (window-local, asides.ts). */
 export const useAsides = (key: string): readonly Aside[] => useSlice(`asides:${key}`, (s) => s.asides(key));
+/** The cards he answered or closed in this window that the hub's rows still list: every view leaves them out (acted.ts). */
+export const useActed = (): readonly Acted[] => useSlice('acted', (s) => s.acted());
 
 /** Calls `fn` on every applied event (one-shot things: open, route, job_end, error). Keep `fn` stable. */
 export function useCoreEvent(fn: (ev: Ev) => void): void {
