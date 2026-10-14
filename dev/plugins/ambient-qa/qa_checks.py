@@ -511,11 +511,9 @@ def _hub_sb(info, *args):
     """`sb <args>` as the QA hub's main would run it (its own state dir and sb)."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("SB_")}
     # sb finds its hub by SB_SOCKET + SB_AGENT (the caller's own SB_* were dropped above, so
-    # this never reaches the hub the QA tool runs in). An agent's socket is agent.sock since
-    # docs/issues/16 (hub.sock refuses sb's ops there); hub.sock only for a hub from before it
+    # this never reaches the hub the QA tool runs in). An agent's socket is agent.sock
+    # (docs/issues/16): hub.sock serves no agent request since debt-t3
     sock = os.path.join(info["state"], "agent.sock")
-    if not os.path.exists(sock):
-        sock = os.path.join(info["state"], "hub.sock")
     env.update(SB_STATE_DIR=info["state"], SB_SOCKET=sock, SB_AGENT="main")
     p = subprocess.run([os.path.join(info["state"], "bin", "sb")] + list(args), capture_output=True, text=True, env=env, timeout=30)
     return p.stdout + p.stderr

@@ -638,7 +638,7 @@ def promises_page_laws():
             os.environ.pop("SB_SOCKET", None)
         else:
             os.environ["SB_SOCKET"] = old
-    check(seen["cmd"][0] == "/q/st/bin/sb" and seen["env"]["SB_SOCKET"] == "/q/st/hub.sock" and seen["env"]["SB_AGENT"] == "main", seen)
+    check(seen["cmd"][0] == "/q/st/bin/sb" and seen["env"]["SB_SOCKET"] == "/q/st/agent.sock" and seen["env"]["SB_AGENT"] == "main", seen)
 
 
 @test

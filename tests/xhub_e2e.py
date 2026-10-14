@@ -38,7 +38,11 @@ def bise(env, *args):
 
 
 def sb_as_main(env, sock, *args):
-    return bise(dict(env, SB_SOCKET=sock, SB_AGENT="main"), "sb", *args)
+    """`sb` as that hub's main: on its agent.sock, next to `sock` (its
+    hub.sock), as a REPL's sb is (hub.sock serves no agent request since
+    debt-t3, docs/issues/16)."""
+    asock = os.path.join(os.path.dirname(sock), "agent.sock")
+    return bise(dict(env, SB_SOCKET=asock, SB_AGENT="main"), "sb", *args)
 
 
 def journal(state):
@@ -181,7 +185,7 @@ def main():
         check(r.returncode == 0, "bise follows %s/perf: %s %s" % (name, r.stdout, r.stderr))
         fol = [e for e in of_type(pstate, "follow") if e.get("name") == "perf"]
         check(fol and fol[-1].get("on") is True and fol[-1].get("hub") == home_row["id"], "the follow journaled with bise's hub: %r" % fol)
-        perf = dict(E.env, SB_SOCKET=psock, SB_AGENT="perf")
+        perf = dict(E.env, SB_SOCKET=os.path.join(pstate, "agent.sock"), SB_AGENT="perf")
         r = bise(perf, "sb", "report", "progress", "bench 3 of 7", "--step", "3/7")
         check(r.returncode == 0, "perf's progress: %s %s" % (r.stdout, r.stderr))
         check(not [x for x in of_type(pstate, "x_out") if x.get("out", {}).get("kind") == "job_end"], "progress stays quiet")
