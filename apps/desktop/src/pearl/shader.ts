@@ -62,6 +62,65 @@ export const FRAGMENT = `
 
 export const VERTEX = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
 
+const f = (n: number): string => (Number.isInteger(n) ? `${String(n)}.` : String(n));
+
+/**
+ * The large ':*' in mist (designer's bise-presence v10, the 5's matter; no ball anywhere): a breath
+ * of mist on glass, in ink, round and soft around the ':*' that a finger wrote through it (the
+ * glyph is wiped clean, the background shows through; designer m_24537: no grain, no specks). The mist breathes at rest, swells with his voice
+ * (listen, lvl), turns while bise works (think); waited on (need), the ':*' stays written in the
+ * accent. The hello (gather) writes it left to right while the mist comes. Its geometry is
+ * src/shared/mark.ts's (box 100, star of three). INK and ACC are the theme's text and accent.
+ */
+export function markFragment(g: { readonly eyes: readonly (readonly [number, number])[]; readonly eyeR: number; readonly star: readonly [number, number]; readonly arm: number; readonly stroke: number }): string {
+  const [e1, e2] = g.eyes;
+  if (e1 === undefined || e2 === undefined) throw new Error('two eyes');
+  const v = (p: readonly [number, number]): string => `vec2(${f(p[0])},${f(p[1])})`;
+  return `
+  precision highp float;
+  uniform vec2 res; uniform float t, flow, lvl, think, need, done, away, listen, still, gather, zoom;
+  uniform vec3 INK, ACC;
+  float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+  float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+    return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
+  float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*vn(p);p=mat2(1.6,1.2,-1.2,1.6)*p;a*=.5;}return s;}
+  mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
+  float seg(vec2 p, vec2 a, vec2 b){vec2 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.,1.); return length(pa-ba*h);}
+  // the distance to the ':*' (box units, negative inside); the hello writes it left to right
+  float glyph(vec2 p, float upto){
+    float d=min(length(p-${v(e1)}),length(p-${v(e2)}))-${f(g.eyeR)};
+    for(int i=0;i<3;i++){float a=float(i)*1.0471976; vec2 r=vec2(sin(a),-cos(a))*${f(g.arm)};
+      d=min(d,seg(p,${v(g.star)}-r,${v(g.star)}+r)-${f(g.stroke / 2)});}
+    return max(d,p.x-upto);}
+  void main(){
+    vec2 uv=(gl_FragCoord.xy-.5*res)/min(res.x,res.y)*2./max(zoom,.01);
+    vec2 p=vec2(uv.x*50.+51.,51.-uv.y*50.);
+    float upto=mix(200.,10.,gather);
+    // the finger's wipe: a clean edge, about a pixel of antialias (box units per pixel: 100 / the canvas)
+    float px=100./min(res.x,res.y)/max(zoom,.01);
+    float d=glyph(p,upto);
+    float wipe=1.-smoothstep(-.6*px,.6*px,d);
+    // the breath: round and soft around the ':*' (about 1.5x the glyph), fading to 0 before the
+    // canvas's edge; about 14% of the ink at its centre (24% in dark). It breathes at rest, swells with his voice,
+    // and a slow, smooth swirl in its density turns while bise works (no grain)
+    vec2 c=p-vec2(51.,52.);
+    float breath=.04*sin(t*6.283/7.)*(1.-still);
+    float R=min(48.,40.*(1.+breath+.15*lvl+.06*listen));
+    float fall=1.-smoothstep(R*.2,R,length(c));
+    vec2 q=rot(think*.8+flow*.3*think)*c*.03;
+    float swirl=vn(q+vec2(flow*.12,-flow*.08))*.6+vn(q*1.9+3.7)*.4;
+    // light ink is a dark theme: the mist goes to 24% there so the wiped ':*' still reads (designer m_24539)
+    float dark=step(.5,dot(INK,vec3(.2126,.7152,.0722)));
+    float a=mix(.14,.24,dark)*fall*(.8+.4*swirl)*(1.-away*.5)*(1.-gather);
+    // wiped clean where the finger went
+    a*=1.-wipe;
+    vec3 col=INK*a;
+    // waited on: the ':*' stays written in the accent
+    float acc=need*wipe;
+    col=col*(1.-acc)+ACC*acc; a=a*(1.-acc)+acc;
+    gl_FragColor=vec4(col,a);}`;
+}
+
 /** bise pink (SPEC §1): dark, body, light, needs you, done, away. */
 export const PINK = {
   UMBER: [0.14, 0.05, 0.11],

@@ -22,6 +22,8 @@ function sources(dir: string): Array<{ file: string; text: string }> {
 }
 
 const ALL = sources(MAIN);
+/** Files that read systemPreferences without asking him anything (checked below, by method). */
+const READS = ['tray.ts'];
 
 /** The body around `at`: from the nearest function or method start before it. */
 function enclosing(text: string, at: number): string {
@@ -45,8 +47,10 @@ function sites(token: string): Array<{ file: string; before: string }> {
 describe('an off-screen run asks him nothing (static)', () => {
   it('no main code asks macOS for a privacy permission directly', () => {
     for (const api of ['askForMediaAccess', 'getMediaAccessStatus', 'isTrustedAccessibilityClient', 'desktopCapturer', 'systemPreferences.', 'globalShortcut', 'powerMonitor.getSystemIdle']) {
-      expect(sites(api).map((s) => s.file), `${api} would ask him: put it behind noAsks first`).toEqual([]);
+      expect(sites(api).map((s) => s.file), `${api} would ask him: put it behind noAsks first`).toEqual(api === 'systemPreferences.' ? READS : []);
     }
+    // the one systemPreferences read that asks nothing: the tray's reduced motion (tray.ts)
+    expect(ALL.flatMap(({ file, text }) => (text.match(/systemPreferences\.\w+/g) ?? []).map((m) => `${file} ${m}`))).toEqual(['tray.ts systemPreferences.getAnimationSettings']);
   });
 
   it('every notification posted is behind the knob in its own function', () => {

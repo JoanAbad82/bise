@@ -2,12 +2,13 @@
 // data. It is the design system's dev route and the source of its visual check (check.mjs takes one
 // shot per section and theme). Sections are `data-testid="ds.gallery.<name>"`; `?only=a,b` keeps
 // those sections. Pure: no store, no core.
-import { type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { rasterMark, type Rgba } from "@/shared/mark";
 import { Markdown } from "@/thread/Markdown";
 // the thread's layout around the markdown (its code block's head, its pre), as the window draws it
 import "@/thread/thread.css";
 import {
-  Act, Answered, Art, ArtName, Bar, Board, BriefLine, Button, Capsule, Card, CardLine, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Empty, Err,
+  Act, Answered, Art, ArtName, Bar, BiseMark, Board, BriefLine, Button, Capsule, Card, CardLine, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Empty, Err,
   Field, Fold, Group, Head, Help, IconButton, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Quote, Route, Row,
   SchedHead, SectionHead, Seg, Select, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
   Win, type Opt,
@@ -91,8 +92,53 @@ function TuiMd() {
   );
 }
 
+/** the menu bar's ':*' as tray.ts draws it (src/shared/mark.ts's raster), 15 pt at 2x: a template one in the bar's ink */
+function TrayIcon({ turn, wait }: { turn?: number; wait?: boolean }) {
+  const cv = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = cv.current;
+    const ctx = c?.getContext("2d");
+    if (!c || !ctx) return;
+    const css = getComputedStyle(c);
+    const rgb = (v: string): Rgba => {
+      const m = /#(..)(..)(..)/.exec(css.getPropertyValue(v).trim());
+      return m ? [parseInt(m[1] ?? "0", 16), parseInt(m[2] ?? "0", 16), parseInt(m[3] ?? "0", 16), 255] : [128, 128, 128, 255];
+    };
+    const ink = rgb("--p-text");
+    const px = rasterMark(30, ink, wait ? rgb("--p-accent") : ink, { size: 15, turn: turn ?? 0 });
+    ctx.putImageData(new ImageData(new Uint8ClampedArray(px), 30, 30), 0, 0);
+  }, [turn, wait]);
+  return <canvas ref={cv} width={30} height={30} style={{ width: 15, height: 15 }} />;
+}
+
 /** the sections, in the reference's order; each draws in one theme */
 export const SECTIONS: Record<string, () => ReactNode> = {
+  // bise's presence, the living ':*' (designer's bise-presence v10): the capsule's states, the menu
+  // bar's, the two kisses frame by frame, the large ':*' in mist (onboarding hello, bise's empty thread)
+  presence: () => (
+    <div className="g-col">
+      <Capsule pearl={<BiseMark live wink={false} size={26} listening level={0.7} tip="bise: listening" />} words={<>raise the pool to 8 in <b>telemetry</b></>} typing wave="on" />
+      <Capsule pearl={<BiseMark live wink={false} size={26} working arms={["run", "run", "run"]} />} words={<span className="lo">bise is on it, with 3 agents…</span>} />
+      <Capsule pearl={<BiseMark live wink={false} size={26} beat={3} />} words="telemetry runs 8 workers now; the bench says p95 went from 41 ms to 18 ms." />
+      <Capsule pearl={<BiseMark live wink={false} size={26} waits kiss="c1" arms={["run", "wait", "run"]} />} words={<><b>checkout</b> <span className="lo">· waiting for you</span></>} />
+      <div className="g-row g-bar">
+        <span>⌁</span><TrayIcon /><span className="lo">rest</span>
+        <span>⌁</span><TrayIcon turn={20} /><span className="lo">working, a step</span>
+        <span>⌁</span><TrayIcon wait /><span className="lo">waits for you</span>
+        <span className="lo">10:42</span>
+      </div>
+      <div className="g-row g-kisses">
+        {[1, 1.12, 1.25, 1.12, 1, 1, 1.12, 1.25, 1.12, 1].map((k, i) => (
+          <span key={i} style={{ ["--k" as string]: k }}><BiseMark waits wink={false} size={56} /></span>
+        ))}
+      </div>
+      <div className="g-row g-top">
+        <div className="g-col g-center"><Pearl size={120} glyph /><span className="lo">bise is here.</span></div>
+        <div className="g-col g-center"><Pearl size={120} glyph mood="need" /><span className="lo">something waits</span></div>
+        <div className="g-col g-center"><Pearl size={120} glyph mood="work" /><span className="lo">working</span></div>
+      </div>
+    </div>
+  ),
   buttons: () => (
     <>
       <div className="g-row"><Button testId="ds.btn.default">default</Button><Button kind="pri">send</Button><Button kind="ghost">later</Button><Button kind="danger">stop it</Button></div>
@@ -394,7 +440,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
   ),
 };
 
-export const WIDE = new Set(["markdown", "thread", "composer", "dock", "board", "sideview", "settings", "onboarding", "window", "head", "rows"]);
+export const WIDE = new Set(["presence", "markdown", "thread", "composer", "dock", "board", "sideview", "settings", "onboarding", "window", "head", "rows"]);
 
 /** the gallery: each section, dark | light */
 export function Gallery({ only }: { only?: readonly string[] }) {

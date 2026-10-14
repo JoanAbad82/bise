@@ -4,7 +4,8 @@
 // message must not re-render the others.
 import { memo, type MouseEventHandler, type ReactNode, type Ref } from "react";
 import { cx, st, sub } from "./cx";
-import { Bar, Chip, Dot, Pearl } from "./prim";
+import { Bar, Chip, Dot } from "./prim";
+import { BiseMark } from "./mark";
 import { Quote } from "./composer";
 
 /** the thread column (a virtualized list goes here as one child) */
@@ -38,13 +39,13 @@ export interface MsgProps {
 /** a message */
 export const Msg = memo(function Msg({ from, name, time, via, head = true, indent, context, quote, state, children, after, testId, ref }: MsgProps) {
   const meta = [time, via].filter(Boolean).join(" · ");
-  // no avatars (ambient m_11777): the name line carries bise's pearl at 14 px, an agent's name in
+  // no avatars (ambient m_11777): the name line carries bise's ':*' at 14 px (bise-presence v10, ink), an agent's name in
   // 600, 'you' alone; his words sit in a quiet block
   return (
     <div ref={ref} className={cx("b-msg", from === "you" && "you", indent && "in", !head && "grouped", st(state))} data-testid={testId} aria-busy={state === "streaming" || undefined}>
       {head ? (
         <div className="b-who">
-          {from === "bise" && <Pearl size={14} />}
+          {from === "bise" && <BiseMark size={14} testId={testId === undefined ? undefined : `${testId}.mark`} />}
           <b>{name ?? from}</b>
           {meta !== "" && <span className="b-time">{meta}</span>}
         </div>

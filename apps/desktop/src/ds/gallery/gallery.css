@@ -19,3 +19,8 @@ html,body{margin:0;background:#777}
 .g-still *,.g-still *::before,.g-still *::after{animation:none !important;transition:none !important}
 .g-md{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--gap-section);align-items:start}
 .g-tui{margin:0;padding:var(--s-3);border-radius:8px;background:var(--c-solid);color:var(--md-text);font:var(--t-12) var(--font-mono);white-space:pre-wrap;overflow:hidden}
+/* the presence section: a fake menu bar, the two kisses' frames (each its scale), centred cells */
+.g-bar{gap:var(--s-2);padding:var(--s-1) var(--s-2);border-radius:6px;background:color-mix(in srgb,var(--c-text) 7%,var(--c-canvas));font-size:12px}
+.g-bar .lo,.g-center .lo{color:var(--c-dim)}
+.g-kisses .b-bise-kiss{transform:scale(var(--k))}
+.g-center{align-items:center}

@@ -164,7 +164,7 @@ export function FnKey({ down }: { down?: boolean }) {
 }
 
 export interface OnbProps {
-  /** the 120 px pearl; its mood */
+  /** bise's 120 px ':*' in mist (bise-presence v10); its mood */
   pearl?: boolean | { mood: string };
   title: ReactNode;
   sub?: ReactNode;
@@ -179,7 +179,7 @@ export interface OnbProps {
 export function Onb({ pearl, title, sub: subtitle, children, fn, cta, steps, step, testId }: OnbProps) {
   return (
     <div className="b-onb" data-testid={testId}>
-      {pearl && <Pearl size={120} mood={typeof pearl === "object" ? pearl.mood : undefined} />}
+      {pearl && <Pearl size={120} mood={typeof pearl === "object" ? pearl.mood : undefined} glyph />}
       <div className="t">{title}</div>
       {subtitle != null && <div className="s">{subtitle}</div>}
       {children}

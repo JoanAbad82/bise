@@ -223,8 +223,8 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
             // (3) its handoffs
             await expect(page.getByTestId('thread.handoff.3')).toHaveText('✚new agent perf · product page speed');
             await expect(page.getByTestId('thread.handoff.4')).toHaveText('✚new agent search · size filter on search');
-            // (1) bise's name line carries its 14 px pearl
-            await expect(page.locator('[data-testid="thread.entry.2"] .b-who .b-pearl.s14')).toHaveCount(1);
+            // (1) bise's name line carries its 14 px ':*' (bise-presence v10)
+            await expect(page.locator('[data-testid="thread.entry.2"] .b-who .b-bise')).toHaveCount(1);
           }
           if (label === 'checkout (empty)') {
             // (5) the empty thread: his first message, then the starting line; the chip says starting

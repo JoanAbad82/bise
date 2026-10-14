@@ -1,18 +1,20 @@
 // bise's own thread before he has any project (designer's desktop-screens v6/v7 'no project yet',
-// m_12093): its pearl, 'bise is here.', what a project gives, 'add a project ⌘N', and from the
+// m_12093): bise's ':*' written in mist (bise-presence v10, the 5's matter; in the accent when
+// something waits on him), 'bise is here.', what a project gives, 'add a project ⌘N', and from the
 // first-run text only its demo, as a quiet button. The composer stays under it: bise answers
 // without a project too. Owner: amb-win.
-import { Button, Press } from '@/ds';
-import { BisePearl } from '@/app/BisePearl';
+import { Button, Pearl, Press } from '@/ds';
+import { useProjects } from '@/store';
 import { DEMO } from '@/setup';
 import { useRouter } from '@/app/router';
 
 export function NoProject({ onDemo }: { onDemo: (text: string) => void }) {
   const router = useRouter();
+  const waits = useProjects().some((p) => p.waits > 0);
   return (
     <div className="th-noproj" data-testid="thread.noproject">
       <span className="th-noproj-pearl">
-        <BisePearl size={40} />
+        <Pearl size={120} mood={waits ? 'need' : 'rest'} glyph />
       </span>
       <p className="th-noproj-t">bise is here.</p>
       <p className="th-noproj-s">add a project to give it its own bise. bise will route what you ask to it.</p>

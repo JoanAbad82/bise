@@ -162,7 +162,7 @@ describe('the store mapping', () => {
 describe('the capsule', () => {
   it('keeps one live pearl node from the spotlight to the talk to the answer', () => {
     const base: CapsuleProps = {
-      view: { kind: 'spot' }, spot: { agents: [], projects: [], cards: [] }, answer: null, heard: '', level: 0, still: true,
+      view: { kind: 'spot' }, spot: { agents: [], projects: [], cards: [] }, answer: null, heard: '', level: 0,
       card: () => null, route: null, onRouteKeep: vi.fn(), onRouteTo: vi.fn(), onAsk: vi.fn(), onOpen: vi.fn(), onOpenWindow: vi.fn(), onClose: vi.fn(), onQuit: null, onSize: vi.fn(),
     };
     const ui = render(<Capsule {...base} />);
@@ -182,7 +182,7 @@ describe('the capsule', () => {
     const onOpenWindow = vi.fn();
     const ui = render(
       <Capsule
-        view={{ kind: 'menu' }} spot={{ agents: [], projects: [], cards }} answer={null} heard="" level={0} still
+        view={{ kind: 'menu' }} spot={{ agents: [], projects: [], cards }} answer={null} heard="" level={0}
         card={() => null} route={null} onRouteKeep={vi.fn()} onRouteTo={vi.fn()} onAsk={vi.fn()} onOpen={vi.fn()}
         onOpenCard={onOpenCard} onOpenWindow={onOpenWindow} onClose={vi.fn()} onQuit={null} onSize={vi.fn()}
       />,
@@ -200,7 +200,7 @@ describe('the capsule', () => {
 
 describe('the talk still (designer m_21903)', () => {
   const base: CapsuleProps = {
-    view: { kind: 'talk', phase: 'listen', handsFree: false }, spot: { agents: [], projects: [], cards: [] }, answer: null, heard: 'what does this cost', level: 0, still: true,
+    view: { kind: 'talk', phase: 'listen', handsFree: false }, spot: { agents: [], projects: [], cards: [] }, answer: null, heard: 'what does this cost', level: 0,
     card: () => null, route: null, onRouteKeep: vi.fn(), onRouteTo: vi.fn(), onAsk: vi.fn(), onOpen: vi.fn(), onOpenWindow: vi.fn(), onClose: vi.fn(), onQuit: null, onSize: vi.fn(),
   };
   const shot = { file: '/h/images/ab12.png', app: 'Safari', title: 'Stripe pricing: pay as you go, per transaction, no fees' };

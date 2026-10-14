@@ -30,7 +30,7 @@ import { installKeepIpc } from './keep';
 import { projectRoots } from './reveal';
 import { hasTestNotify, menuTemplate } from './menu';
 import { startTerms, type TermHost } from './term/host';
-import { startTray } from './tray';
+import { BiseTray } from './tray';
 import { testHomeProblem } from './testhome';
 import { standInPaths } from './userdata';
 import { themeSourceOf } from './theme';
@@ -203,7 +203,8 @@ void app.whenReady().then(() => {
   ipcMain.on(IPC.openWindow, (_e, route: unknown) => {
     main.open(typeof route === 'string' ? route : undefined);
   });
-  if (!testMode) startTray(capsule, main);
+  // the menu bar's ':*' (tray.ts), its look from the counts below
+  const tray = testMode ? null : new BiseTray(capsule, main);
   // his questions as macOS notifications when no bise window has the keys (notify/, card #476)
   const notifier = new Notifier({
     testMode,
@@ -237,6 +238,7 @@ void app.whenReady().then(() => {
     const c = counts.apply(ev);
     if (c === null) return;
     main.setTitle(titleOf(c));
+    tray?.show(c);
     // test mode has no Dock icon: the badge is a stdout line the harness reads
     if (testMode) process.stdout.write(`${BADGE_LINE} ${JSON.stringify(badgeOf(c))}
 `);

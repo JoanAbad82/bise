@@ -247,14 +247,16 @@ export interface PearlProps {
   mood?: string;
   /** the live pearl (src/pearl, amb-web) draws into this slot; without it, the reference's glyph */
   children?: ReactNode;
+  /** large only: bise's ':*' written in mist instead of the ball (bise-presence v10), written in once at mount */
+  glyph?: boolean;
 }
 /** a mood the live pearl knows, else rest */
 const moodOf = (m: string | undefined): Mood => (m !== undefined && m in MOODS ? (m as Mood) : "rest");
 /** bise's pearl: the slot and its size; without children the live pearl (src/pearl), floating free, never the old ':*' glyph (ambient m_10689) */
-export function Pearl({ size = 22, mood, children }: PearlProps) {
+export function Pearl({ size = 22, mood, children, glyph }: PearlProps) {
   return (
-    <span className={cx("b-pearl", `s${size}`)} data-bise-pearl={size} data-mood={mood} aria-hidden="true">
-      {children ?? <LivePearl mood={moodOf(mood)} size={size} />}
+    <span className={cx("b-pearl", `s${size}`)} data-bise-pearl={size} data-mood={mood} data-glyph={glyph === true ? "" : undefined} aria-hidden="true">
+      {children ?? <LivePearl mood={moodOf(mood)} size={size} glyph={glyph} hello={glyph} />}
     </span>
   );
 }

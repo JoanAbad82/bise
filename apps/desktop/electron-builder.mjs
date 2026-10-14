@@ -97,7 +97,6 @@ export default {
     { from: root, to: 'bin', filter: ['**/*', '!rust/**', '!bise'] },
     { from: bise, to: 'bin/bise' },
     ...(version === null ? [] : [{ from: version, to: 'VERSION' }]),
-    { from: 'resources/pearl', to: 'pearl', filter: ['*.png'] },
   ],
   mac: {
     category: 'public.app-category.developer-tools',

@@ -119,9 +119,9 @@ test('thread/reading: one column, no raw context, no empty thinking, one restore
     // (c) no 0.0 s thinking
     await expect(page.getByTestId('thread.think.2')).toHaveCount(0);
     expect(body).not.toContain('thought for 0.0s');
-    // (f) no avatars; bise's pearl on its name line
+    // (f) no avatars; bise's ':*' on its name line (bise-presence v10: still and ink, designer m_24599)
     await expect(page.locator('.b-av')).toHaveCount(0);
-    await expect(page.locator('[data-testid="thread.entry.3"] .b-who .b-pearl')).toHaveCount(1);
+    await expect(page.locator('[data-testid="thread.entry.3"] .b-who .b-bise')).toHaveCount(1);
     // (e) the name line opens a group, with its time; the next row is in the group
     const clockOf = (ms: number) => page.evaluate((ms) => new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).format(ms), ms);
     await expect(page.getByTestId('thread.entry.3')).toHaveAttribute('data-head', 'true');

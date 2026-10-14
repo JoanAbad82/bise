@@ -1,7 +1,7 @@
 // The capsule's content for one view (machine.ts): the spotlight, the talk, bise's answer, a
-// pushed card (amb-home's card, through `card`), the tray's dropdown. One live pearl at a fixed
-// place for every view, so a change of view never re-mounts it (bug 2); the spotlight gets a hole
-// where its own pearl would be. The content's size goes to the window (onSize): an answer that
+// pushed card (amb-home's card, through `card`), the tray's dropdown. bise's ':*' (its presence,
+// designer's bise-presence v10: presence.ts) at a fixed place for every view, so a change of view
+// never re-mounts it (bug 2); the spotlight gets a hole where it would be. The content's size goes to the window (onSize): an answer that
 // doesn't fit grows the panel, and past ANSWER_MAX_LINES it offers the rest in the window (bug 6).
 import {
   useEffect,
@@ -15,8 +15,7 @@ import {
   type UIEvent,
 } from "react";
 import { shownName } from "@/agents/model";
-import { Menu, MenuItem, MenuSep, Press, Row } from "@/ds";
-import { LivePearl, type Mood } from "@/pearl";
+import { BiseMark, Menu, MenuItem, MenuSep, Press, Row } from "@/ds";
 import {
   LiveText,
   RouteLine,
@@ -29,6 +28,7 @@ import {
   type SpotRoute,
 } from "@/spotlight";
 import type { View } from "./machine";
+import { beatOf, presenceOf } from "./presence";
 import type { PreviewLine } from "@/spotlight/preview";
 import type { Part } from "@/proto";
 import { ScreenAsk, ShotRow, type TalkShot } from "./shot";
@@ -68,7 +68,6 @@ export interface CapsuleProps {
   /** What bise heard so far while he talks. */
   readonly heard: string;
   readonly level: number;
-  readonly still: boolean;
   /** A routing hold on what he just sent (bar ⛔3): shown at once, in the spotlight or the talk. */
   readonly route: SpotRoute | null;
   readonly onRouteKeep: () => void;
@@ -119,11 +118,8 @@ export const isCorner = (v: View): boolean => v.kind === "talk" || v.kind === "a
 // half the screen, with a floor so a tiny or unknown screen still shows a few lines
 const halfScreen = (): number => Math.max(240, Math.round((window.screen.availHeight || 800) / 2));
 
-const moodOf = (v: View, answering: boolean): Mood => {
-  if (v.kind === "talk") return v.phase === "listen" ? "listen" : v.phase === "over" ? "rest" : "work";
-  if (v.kind === "answer") return answering ? "speak" : "rest";
-  return "rest";
-};
+/** The ':*' in the capsule, at designer's 26 px. */
+const MARK_PX = 26;
 
 export function Capsule(p: CapsuleProps): JSX.Element {
   const box = useRef<HTMLDivElement>(null);
@@ -157,6 +153,7 @@ export function Capsule(p: CapsuleProps): JSX.Element {
   const v = p.view;
   const answering = p.answer?.done === false;
   const pearl = v.kind === "spot" || v.kind === "talk" || v.kind === "answer";
+  const me = presenceOf(v, p.spot, answering);
   const corner = isCorner(v);
   const hover = p.onHover;
   return (
@@ -172,11 +169,18 @@ export function Capsule(p: CapsuleProps): JSX.Element {
       onMouseLeave={hover === undefined ? undefined : () => { hover(false); }}
     >
       <div className={`b-cap-pearl${pearl ? "" : " off"}`}>
-        <LivePearl
-          mood={moodOf(v, answering)}
+        <BiseMark
+          live
+          wink={false}
+          size={MARK_PX}
+          waits={me.waits}
+          kiss={me.kiss}
+          working={me.working}
+          listening={me.listening}
           level={p.level}
-          still={p.still}
-          size={corner ? 32 : 40}
+          beat={me.speaking ? beatOf(p.answer?.text ?? "") : undefined}
+          arms={me.arms}
+          tip={me.tip}
           testId="capsule.pearl"
         />
       </div>

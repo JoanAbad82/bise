@@ -56,17 +56,17 @@ test('spotlight/projects: the count and branch come first, the long path is what
       return false;
     });
     expect(fits, 'the count and branch are never cut').toBe(true);
-    // the pearl slot left of the field: the spot keeps a hole there and the capsule's own pearl
-    // (one LivePearl for every view, WebGL) sits over it, shown in the spot view
+    // the presence slot left of the field: the spot keeps a hole there and the capsule's own ':*'
+    // (one BiseMark for every view, SVG: bise-presence v10) sits over it, shown in the spot view
     const pearl = await cap.locator('[data-testid="capsule.pearl"]').evaluate((el) => {
       const slot = el.closest('.b-cap-pearl');
-      const cv = el.tagName === 'CANVAS' ? el : el.querySelector('canvas');
+      const svg = el.querySelector('svg');
       const box = (slot ?? el).getBoundingClientRect();
-      return { off: slot?.classList.contains('off') ?? true, canvas: cv !== null, gl: cv instanceof HTMLCanvasElement && cv.width > 0, w: box.width, x: box.left, y: box.top };
+      return { off: slot?.classList.contains('off') ?? true, mark: svg !== null && el.classList.contains('b-bise'), w: box.width, x: box.left, y: box.top };
     });
     test.info().annotations.push({ type: 'pearl', description: JSON.stringify(pearl) });
     expect(pearl.off, 'the capsule pearl is on in the spot view').toBe(false);
-    expect(pearl.canvas, 'the pearl draws in a canvas (WebGL)').toBe(true);
+    expect(pearl.mark, "the ':*' draws in SVG").toBe(true);
     await cap.screenshot({ path: test.info().outputPath('projects.png') });
   } finally {
     await s.close();

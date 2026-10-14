@@ -1149,10 +1149,9 @@
   padding: var(--s-12) var(--pad-column);
   text-align: center;
 }
-.th-noproj-pearl .b-pearl {
-  width: 28px;
-  height: auto;
-  aspect-ratio: 1;
+/* bise's 120 px ':*' in mist (NoProject.tsx, bise-presence v10) */
+.th-noproj-pearl {
+  display: inline-flex;
 }
 .th-noproj-t {
   margin: var(--s-1) 0 0;

@@ -194,7 +194,8 @@ test('app/sidebar-v6: no project yet: only bise, the top rows and add a project'
     await expect(page.getByTestId('thread.noproject')).toContainText('bise is here.');
     // nothing waits on him: bise's pearl is the ink one at rest everywhere (designer m_12127)
     await expect(page.getByTestId('app.sidebar.bise').getByTestId('bise.pearl.rest')).toBeVisible();
-    await expect(page.getByTestId('thread.noproject').getByTestId('bise.pearl.rest')).toBeVisible();
+    // bise's empty thread: the large ':*' written in mist, ink at rest (designer's bise-presence v10)
+    await expect(page.getByTestId('thread.noproject').locator('[data-glyph][data-mood="rest"] canvas')).toBeVisible();
     await expect(page.getByTestId('thread.noproject.add')).toContainText('add a project');
     await expect(page.getByTestId('composer')).toBeVisible();
     await expect(page.getByTestId('app.panel')).toHaveCount(0);

@@ -1,5 +1,8 @@
-/* src/ds · bise's ':*' (mark.tsx): currentColor, the accent when something waits on him; the star
-   turns while bise works; the wink on hover. Still under reduced motion: the final state only. */
+/* src/ds · bise's ':*' (mark.tsx; designer's bise-presence v10, page blocks v8-kiss, v8-team):
+   currentColor, the star in the accent when something waits on him (the eyes stay ink); the two
+   kisses once per new wait; the star turns in steps while bise works; the eyes follow his voice;
+   the star beats with the answer; at rest the presence blinks and sways; the wink on hover.
+   Under reduced motion: the colour and the still shapes only. */
 .b-bise {
   display: inline-flex;
   flex: none;
@@ -11,35 +14,135 @@
   display: block;
   overflow: visible;
 }
-.b-bise.waits {
-  color: var(--c-accent);
-}
-.b-bise-eyes rect {
+.b-bise-eye {
   fill: currentColor;
+  transform-box: fill-box;
+  transform-origin: center;
 }
-.b-bise-star line,
+.b-bise.listening .b-bise-eye {
+  transition: transform 60ms linear;
+}
+.b-bise-arm,
 .b-bise-wink {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
 }
-.b-bise-star {
+.b-bise.waits .b-bise-arm,
+.b-bise-arm.wait {
+  stroke: var(--c-accent);
+}
+.b-bise-star,
+.b-bise-beat,
+.b-bise-kiss {
   transform-box: view-box;
   transform-origin: 64px 56px;
 }
-.b-bise.working .b-bise-star {
-  animation: b-bise-turn 1.6s linear infinite;
-}
 .b-bise-wink {
   opacity: 0;
+}
+/* the two kisses: two beats of 140 ms, 120 ms apart, once (a new `kiss` key restarts it) */
+.b-bise.waits .b-bise-kiss {
+  animation: b-bise-kiss 400ms ease-out 1;
+}
+/* bise answers: one beat per chunk (a new `beat` key restarts it) */
+.b-bise-beat {
+  animation: b-bise-beat 220ms ease-out 1;
+}
+/* bise works: the star turns in steps, like the terminal's spinner */
+.b-bise.working .b-bise-star {
+  animation: b-bise-step 0.9s cubic-bezier(0.6, 0, 0.3, 1) infinite;
+}
+/* 1b: each branch at its agent's pace */
+.b-bise.working .b-bise-arm {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: b-bise-arm 1.7s ease-in-out infinite;
+}
+.b-bise.working .b-bise-arm.a1 {
+  animation-duration: 2.3s;
+  animation-delay: -0.7s;
+}
+.b-bise.working .b-bise-arm.a2 {
+  animation-duration: 1.3s;
+  animation-delay: -0.3s;
+}
+.b-bise.working .b-bise-arm.a3 {
+  animation-duration: 2.9s;
+}
+/* the presence at rest: it blinks, the star sways */
+.b-bise.live:not(.listening) .b-bise-eye {
+  animation: b-bise-blink 4s ease-in-out infinite;
+}
+.b-bise.live:not(.working, .listening) .b-bise-star {
+  animation: b-bise-sway 3s ease-in-out infinite alternate;
 }
 /* the wink: ';*' once for 200 ms, each time the pointer comes on it */
 .b-bise.winks:hover .b-bise-wink {
   animation: b-bise-wink 200ms steps(1, end) 1;
 }
-@keyframes b-bise-turn {
+@keyframes b-bise-kiss {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  17.5% {
+    transform: scale(1.25);
+  }
+  35%,
+  65% {
+    transform: scale(1);
+  }
+  82.5% {
+    transform: scale(1.25);
+  }
+}
+@keyframes b-bise-beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12);
+  }
+}
+@keyframes b-bise-step {
+  0% {
+    transform: rotate(0);
+  }
+  70%,
+  100% {
+    transform: rotate(60deg);
+  }
+}
+@keyframes b-bise-arm {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.45);
+  }
+}
+@keyframes b-bise-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  93% {
+    transform: scaleY(0.12);
+  }
+  96% {
+    transform: scaleY(1);
+  }
+}
+@keyframes b-bise-sway {
+  from {
+    transform: rotate(-7deg);
+  }
   to {
-    transform: rotate(360deg);
+    transform: rotate(7deg);
   }
 }
 @keyframes b-bise-wink {
@@ -51,8 +154,16 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .b-bise.working .b-bise-star,
+  .b-bise .b-bise-star,
+  .b-bise .b-bise-arm,
+  .b-bise .b-bise-eye,
+  .b-bise .b-bise-beat,
+  .b-bise .b-bise-kiss,
   .b-bise.winks:hover .b-bise-wink {
     animation: none;
+    transition: none;
+  }
+  .b-bise.listening .b-bise-eye {
+    transform: none !important;
   }
 }

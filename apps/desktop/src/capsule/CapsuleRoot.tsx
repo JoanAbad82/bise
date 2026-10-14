@@ -114,10 +114,6 @@ export function CapsuleRoot(): JSX.Element {
     view.kind === "spot" ? selAgent : null,
     home === null ? null : threadKey(home, "main"),
   );
-  const still = useMemo(
-    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    [],
-  );
 
   // bise's answer to what he asked: main's thread, subscribed in this window too (qa-flows: the
   // capsule's store never had it), streamed (typing) or arriving whole (a new agent entry after
@@ -501,7 +497,6 @@ export function CapsuleRoot(): JSX.Element {
       answer={last}
       heard={heard?.text ?? ""}
       level={level}
-      still={still}
       card={cardOf}
       route={route}
       shot={shot}
