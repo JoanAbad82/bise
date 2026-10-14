@@ -38,10 +38,17 @@ export function findAll(entries: Iterable<Findable>, needle: string): Match[] {
   if (n.trim() === '') return [];
   const out: Match[] = [];
   const sorted = [...entries].sort((a, b) => a.pos - b.pos);
-  for (const e of sorted) {
-    const t = e.text.toLocaleLowerCase();
-    for (let i = t.indexOf(n); i >= 0; i = t.indexOf(n, i + n.length)) out.push({ pos: e.pos, at: i });
-  }
+  for (const e of sorted) for (const at of offsetsIn(e.text, needle)) out.push({ pos: e.pos, at });
+  return out;
+}
+
+/** Where `needle` is in `text`, case-insensitive, without overlaps (find's own rule). */
+export function offsetsIn(text: string, needle: string): number[] {
+  const n = needle.toLocaleLowerCase();
+  if (n.trim() === '') return [];
+  const t = text.toLocaleLowerCase();
+  const out: number[] = [];
+  for (let i = t.indexOf(n); i >= 0; i = t.indexOf(n, i + n.length)) out.push(i);
   return out;
 }
 

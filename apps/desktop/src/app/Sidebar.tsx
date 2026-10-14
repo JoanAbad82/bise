@@ -24,7 +24,7 @@ import { useKeptScroll } from './keep';
 import { LiveBiseMark, ProjectMark } from './Marks';
 import { whoOf } from './markstates';
 import { useModHeld } from './held';
-import { goneTip, newTip, projectTip, scheduledTip, waitsTip } from './tipwords';
+import { goneTip, newTip, projectTip, scheduledTip, waitsTip, workingTip } from './tipwords';
 
 /** His projects in his order, bise's own out (it is the bise row). Pure. */
 export function projectsOf(rows: readonly ProjectRow[]): ProjectRow[] {
@@ -263,7 +263,7 @@ const ProjectItem = memo(function ProjectItem({ p, on, route, hint }: { p: Proje
         name={p.name}
         end={side.text}
         endErr={side.err}
-        endTip={p.missing === true ? goneTip(p.path) : undefined}
+        endTip={side.err ? (p.missing === true ? goneTip(p.path) : undefined) : workingTip(p.working)}
         count={side.count}
         countTip={waitsTip(side.count)}
         hint={hint}

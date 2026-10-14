@@ -1,6 +1,7 @@
-/* The window's marks (designer's desktop-delight v2): a project's gust / '?' / '·', the done kiss
+/* The window's marks (designer's desktop-delight v2): a project's breath / '?' / '·', the done kiss
    (bise's ':*' is the ds's, css/mark.css). Tokens only (text-2, text-3, the accent where
-   something waits on him). Under reduced motion: no animation, the final state only. Owner: amb-win (Marks.tsx). */
+   something waits on him). Under reduced motion: no animation, the final state only (the breath's
+   still '∿' is the clock's, working/clock.ts). Owner: amb-win (Marks.tsx). */
 
 .mk {
   display: inline-flex;
@@ -10,7 +11,7 @@
   line-height: 1;
 }
 
-/* ---- a project: the gust at work, '?' when it asks him, '·' quiet */
+/* ---- a project: the breath at work, '?' when it asks him, '·' quiet */
 .mk-pj {
   width: 18px;
   height: 14px;
@@ -19,23 +20,12 @@
 .mk-pj.asks {
   color: var(--c-accent);
 }
-.mk-gust {
-  display: block;
-  overflow: visible;
-}
-.mk-gust path {
-  fill: none;
-  stroke: var(--c-text-2);
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  /* one travelling gap (designer m_24644): a still frame reads as one ∿ with a gap in the wind */
-  stroke-dasharray: 16 4;
-  animation: mk-drift 1.2s linear infinite;
-}
-@keyframes mk-drift {
-  to {
-    stroke-dashoffset: -20;
-  }
+/* at work: the TUI's breath (his pick #9), one 12 px mono cell centred in the column, text-2
+   (working/Signs.tsx's MarkBreath writes its frames on the window's one clock) */
+.mk-pj.works .wk-sign {
+  font-size: var(--t-12);
+  line-height: 1;
+  text-align: center;
 }
 
 /* ---- the done kiss (touch 1): ':*' lifts 8 px, grows 1.2 and fades; '✓' fades in; 600 ms */
@@ -82,9 +72,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mk-gust path {
-    animation: none;
-  }
   .mk-kiss > span {
     animation: none;
   }

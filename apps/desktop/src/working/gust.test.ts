@@ -5,9 +5,11 @@ import {
   GUST5,
   GUST_MS,
   HUSH_MS,
+  MARK_MS,
   PULSE_MS,
   breathCell,
   gustCells,
+  markBreathCell,
   nextChange,
   pulseCell,
   toneOf,
@@ -85,6 +87,18 @@ describe("the breath and the hush", () => {
       g: "∿",
       tone: "ink",
     });
+  });
+});
+
+describe("a project's mark: the breath at 220 ms (his pick #9)", () => {
+  it("steps · ~ ∿ ≈ ∿ ~, 220 ms each, a 1.32 s loop, all in text-2; still: ∿ text-2", () => {
+    expect(MARK_MS).toBe(220);
+    expect(BREATH.map((_, i) => markBreathCell(at(i * MARK_MS + 219)).g).join("")).toBe("·~∿≈∿~");
+    expect(markBreathCell(at(1320)).g).toBe("·");
+    for (let i = 0; i < 6; i++) expect(markBreathCell(at(i * MARK_MS)).tone).toBe("t2");
+    expect(markBreathCell(at(660, { still: true }))).toEqual({ g: "∿", tone: "t2" });
+    // he typing changes nothing in the sidebar
+    expect(markBreathCell(at(660, { typing: true }))).toEqual(markBreathCell(at(660)));
   });
 });
 

@@ -1,8 +1,9 @@
 // app/delight-marks · designer's desktop-delight v2 (his yes on all of it), the marks and touches 1
 // and 5, and what the head and the right bar tuck away. Passes when: the sidebar's 18 px column has
-// bise's ':*' (the accent while something waits) and each project's mark (the gust SVG at work,
-// '?' accent when it asks him, '·' quiet), each with its tip words, and no 'all quiet' / '∿ 2' left
-// (the pink count stays); an agent that finishes gets the kiss (':*' lifts into '✓', 600 ms) in the
+// bise's ':*' (the accent while something waits) and each project's mark (at work the TUI's breath,
+// his pick #9: · ~ ∿ ≈ ∿ ~ at 220 ms, one 12 px cell centred, text-2, a still '∿' under reduced
+// motion; '?' accent when it asks him, '·' quiet), each with its tip words, and no 'all quiet' /
+// '∿ 2' left (the pink count stays; the working number is app/working-count's); an agent that finishes gets the kiss (':*' lifts into '✓', 600 ms) in the
 // right bar and on its project's mark, once, and under reduced motion only the final '✓'; the
 // pointer on bise's ':*' winks it; the head has no name (the crumb has it), no 'idle' chip, and
 // '± 3 files' only with changes; the right bar's % only from 70 %, else in the row's tip. Shots
@@ -93,7 +94,44 @@ test('app/delight-marks: the sidebar marks and their tips, the done kiss, the wi
     await expect(page.getByTestId('app.sidebar.bise').getByTestId('bise.pearl.rest'), 'the orb left the sidebar').toHaveCount(0);
     await expect(page.getByTestId('app.sidebar').locator('.b-pearl'), 'no pearl in the sidebar').toHaveCount(0);
     await expect(mark(P)).toHaveAttribute('data-mark', 'works');
-    await expect(mark(P).locator('svg path'), 'the gust is an SVG').toHaveCount(1);
+    // at work: the TUI's breath (his pick #9), one 12 px mono cell in text-2, 220 ms a frame
+    const breath = mark(P).locator('.wk-sign');
+    await expect(breath, 'the breath, one cell').toHaveCount(1);
+    await expect(mark(P).locator('svg'), 'no SVG gust left').toHaveCount(0);
+    const look = await breath.evaluate((el) => {
+      const cell = el.firstElementChild as HTMLElement;
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--c-text-2)';
+      document.body.append(probe);
+      const t2 = getComputedStyle(probe).color;
+      probe.remove();
+      const col = (el.closest('.mk-pj') as HTMLElement).getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      return { size: getComputedStyle(el).fontSize, color: getComputedStyle(cell).color, t2, off: Math.abs(r.x + r.width / 2 - (col.x + col.width / 2)) };
+    });
+    expect(look.size, '12 px').toBe('12px');
+    expect(look.color, 'text-2').toBe(look.t2);
+    expect(look.off, 'centred in the column').toBeLessThanOrEqual(1);
+    const seen = await breath.evaluate(async (el) => {
+      const out: { t: number; g: string }[] = [];
+      const t0 = performance.now();
+      while (performance.now() - t0 < 2700) {
+        const g = el.textContent;
+        if (out.length === 0 || out[out.length - 1]?.g !== g) out.push({ t: performance.now(), g });
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+      return out;
+    });
+    const steps = seen.map((x) => x.g).join('');
+    expect('·~∿≈∿~'.repeat(4), `the frames · ~ ∿ ≈ ∿ ~ in order (${steps})`).toContain(steps);
+    const gaps = seen.slice(2).map((x, i) => x.t - (seen[i + 1]?.t ?? 0));
+    expect(gaps.length, 'about 12 frames in 2.7 s').toBeGreaterThanOrEqual(9);
+    for (const g of gaps) expect(Math.abs(g - 220), `220 ms a frame (${String(Math.round(g))})`).toBeLessThan(60);
+    // reduced motion: one still '∿' in text-2
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(breath, "still: '∿'").toHaveText('∿');
+    expect(await breath.evaluate((el) => getComputedStyle(el.firstElementChild as HTMLElement).color), 'still in text-2').toBe(look.t2);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
     await expect(mark(P)).toHaveAttribute('data-tip', 'storefront: perf, search and docs are working · 3 agents');
     await expect(mark(TS)).toHaveAttribute('data-mark', 'asks');
     await expect(mark(TS)).toHaveText('?');

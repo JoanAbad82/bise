@@ -114,7 +114,7 @@ export const EntryRow = memo(function EntryRow({
           · {clock(e.at_ms)} ·
         </div>
       )}
-      <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={live === undefined ? `thread.entry.${pos}` : 'thread.stream'} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head} data-side={side} data-turn={turn || undefined} data-gap={gap}>
+      <div className="th-row" data-hit={hit || undefined} data-testid={live === undefined ? `thread.entry.${pos}` : 'thread.stream'} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head} data-side={side} data-turn={turn || undefined} data-gap={gap}>
         <EntryBody e={e} ctx={ctx} head={shown} next={n} live={live !== undefined} still={still} chained={chained} retries={retries} />
       </div>
     </>

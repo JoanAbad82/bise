@@ -373,10 +373,16 @@
   scrollbar-width: thin;
 }
 
-.th-hit {
-  outline: 2px solid var(--c-acc, currentColor);
-  outline-offset: 2px;
-  border-radius: 6px;
+/* ⌘F: only the matched words, in the selection's tint, the current match stronger (FindBar's CSS
+   highlights 'th-find' / 'th-find-at', as /log's find); the row's layout stays as drawn (designer
+   m_25774: the 2 px box around the current row stuck out of the column). the current match's row
+   only says so in data-hit (rows.tsx). */
+::highlight(th-find) {
+  /* the full tint: at 55 % the other matches vanished in light (designer m_25816) */
+  background-color: var(--c-selection);
+}
+::highlight(th-find-at) {
+  background-color: color-mix(in srgb, var(--c-accent) 35%, var(--c-selection));
 }
 
 .th-pending .b-msg {
@@ -404,19 +410,44 @@
   padding-left: var(--s-4);
 }
 
+/* ⌘F's bar: a compact panel over the list's top right, as a macOS find bar (his m_25471: it
+   spanned the width). A 4 px frame (the menu's surface), the field, its count, then ↑ ↓ × touching
+   (icon buttons part by their own hover tint); the field gives room first in a narrow column */
 .th-find {
+  position: absolute;
+  top: var(--s-2);
+  right: var(--s-4);
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: var(--gap-inline);
-  min-height: var(--h-row);
-  padding: 0 var(--pad-control-x);
-  border-bottom: 1px solid var(--c-line);
+  max-width: calc(100% - var(--s-8));
+  padding: var(--s-1);
+  border-radius: var(--r-3);
+  background: var(--c-overlay);
+  backdrop-filter: var(--glass);
+  box-shadow: var(--e-2);
+}
+.th-find .b-field {
+  flex: 0 1 auto;
+  width: calc(var(--s-16) * 3);
+  min-width: var(--s-16);
+  height: var(--h-control-sm);
+  padding: 0 var(--pad-control-x-sm);
 }
 
 .th-find-count {
-  min-width: 4em;
+  flex: none;
+  min-width: var(--s-8);
   color: var(--c-text-2);
+  font-size: var(--t-12);
   font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.th-find-acts {
+  flex: none;
+  display: flex;
+  align-items: center;
 }
 
 /* a send bise holds for a project (the routing hold): its own state */

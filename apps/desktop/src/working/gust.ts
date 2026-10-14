@@ -80,6 +80,19 @@ export function breathCell(m: Motion): Cell {
   return { g, tone: toneOf(g) };
 }
 
+/** a project's mark: the breath at half speed, 220 ms a frame (a 1.32 s loop; his pick, #9) */
+export const MARK_MS = CALM_MS;
+
+/**
+ * A project's working mark in the sidebar (motion-marks m_25501, his pick #9 'the TUI's breath'):
+ * the 1-cell breath at 220 ms a frame, all in text-2; still: one ∿ in text-2. He typing changes
+ * nothing here (the sidebar is not where he types).
+ */
+export function markBreathCell(m: Motion): Cell {
+  if (m.still) return { g: "∿", tone: "t2" };
+  return { g: BREATH[frame(m.elapsed, MARK_MS, BREATH.length)] ?? "∿", tone: "t2" };
+}
+
 /**
  * A pulse: 'tool' (a running call's '∿ 12 s': ink / text-2) or 'starting' (an agent starting:
  * '·' text-2 / text-3), 320 ms a phase. It holds its first phase while still or while he types.

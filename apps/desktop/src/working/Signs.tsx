@@ -1,5 +1,6 @@
 // The working signs as drawn (designer's desktop-working page): Gust (the working row's 5 cells),
-// Breath (one cell: right bar rows, the head chip, spotlight rows), Pulse (a running tool's '∿',
+// Breath (one cell: right bar rows, the head chip, spotlight rows), MarkBreath (a project's mark
+// in the sidebar: the breath at 220 ms, text-2), Pulse (a running tool's '∿',
 // a starting agent's '·'). Each draws its cells once, then the window's clock (clock.ts) writes
 // their text and tone in place at every change: no React render per frame. Mono, a fixed box
 // (5ch or 1ch): nothing around moves. aria-hidden: the words around say what it is.
@@ -11,6 +12,7 @@ import {
   type Motion,
   breathCell,
   gustCells,
+  markBreathCell,
   pulseCell,
 } from "./gust";
 import "./working.css";
@@ -78,6 +80,13 @@ export function Gust({ testId }: { testId?: string }) {
 /** The 1-cell breath of a working agent (· ~ ∿ ≈ ∿ ~), the hush while he types. */
 export function Breath({ testId }: { testId?: string }) {
   return <Cells cells={breath} size="one" testId={testId} />;
+}
+
+const markBreath = (m: Motion): readonly Cell[] => [markBreathCell(m)];
+
+/** A project's working mark in the sidebar: the breath at 220 ms a frame, in text-2. */
+export function MarkBreath({ testId }: { testId?: string }) {
+  return <Cells cells={markBreath} size="one" testId={testId} />;
 }
 
 /** A pulse: a running tool's '∿' (ink / text-2) or a starting agent's '·' (text-2 / text-3). */

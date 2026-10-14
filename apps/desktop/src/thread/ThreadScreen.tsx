@@ -390,18 +390,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
             }}
           />
         )}
-        {findOpen && (
-          <FindBar
-            tkey={tkey}
-            project={project}
-            agent={agent}
-            mark={mark}
-            onGo={(pos) => list.current?.scrollTo(entryKey(pos))}
-            onClose={() => {
-              setFindOpen(false);
-            }}
-          />
-        )}
         {answerMiss && (
           <div className="th-answer-miss" data-testid="thread.answer-miss">
             {MISS_WORDS}
@@ -421,6 +409,19 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
               composer's agent (designer's office-artifacts pick 4); an archived thread takes none */}
           {(me?.archived !== true || artifact !== undefined) && (
             <ThreadDrop project={project} agent={artifact?.agent ?? agent} to={bise ? 'bise' : shownName(artifact?.agent ?? agent)} />
+          )}
+          {/* ⌘F: a compact bar over the list's top right (his m_25471) */}
+          {findOpen && (
+            <FindBar
+              tkey={tkey}
+              project={project}
+              agent={agent}
+              mark={mark}
+              onGo={(pos) => list.current?.scrollTo(entryKey(pos))}
+              onClose={() => {
+                setFindOpen(false);
+              }}
+            />
           )}
         </div>
         {/* in the thread's column like the lines under it (amb-web m_17316: it sat flush left) */}

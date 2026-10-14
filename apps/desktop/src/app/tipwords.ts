@@ -49,6 +49,11 @@ export function projectTip(p: Pick<ProjectRow, 'name' | 'waits' | 'working' | 'm
   return `${p.name}: all quiet`;
 }
 
+/** A project's working count '3': '3 agents working'. */
+export function workingTip(n: number): string {
+  return `${plural(n, 'agent', 'agents')} working`;
+}
+
 /** A pink count: '2 waiting for you'; bise's (every project's): '… in all your projects'. */
 export function waitsTip(n: number, everywhere = false): string {
   return everywhere ? `${String(n)} waiting for you, in all your projects` : `${String(n)} waiting for you`;

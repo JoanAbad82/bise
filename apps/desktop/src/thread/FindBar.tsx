@@ -1,13 +1,16 @@
 // ⌘F's bar (bar 3.4; the TUI's find_bar.rs): its own field, so the
-// composer keeps its draft. ⏎ / ↑ older, shift+⏎ / ↓ newer, esc closes.
+// composer keeps its draft. A compact panel over the list's top right, as a
+// macOS find bar (his m_25471: it spanned the width): field, count, ↑ ↓ ×,
+// each button with its ds tip and key. ⏎ / ↑ older, shift+⏎ / ↓ newer, esc closes.
 // The whole thread is searched: while a needle is set and the thread has
 // more before, the older pages are asked one at a time. Owner: amb-win.
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Field } from '@/ds';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Field, IconButton } from '@/ds';
 import { useStore, useThreadOrder } from '@/store';
 import { findText } from './entry';
-import { counter, currentMatch, EMPTY, newer, older, refresh, search, wantsOlder, type FindState } from './find';
+import { counter, currentMatch, EMPTY, newer, offsetsIn, older, refresh, search, wantsOlder, type FindState } from './find';
 import type { FindMark } from './findmark';
+import { rangesIn } from './findranges';
 import { caretAtEnd, useKeptText } from '@/app/keep';
 
 export interface FindBarProps {
@@ -63,6 +66,47 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
     [mark],
   );
 
+  // the matched words only, in the selection's tint, the current one stronger (designer m_25774,
+  // as /log's find): CSS highlights over the drawn rows, again when the list draws other rows
+  const bar = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const reg = typeof CSS === 'undefined' ? undefined : CSS.highlights;
+    const list = bar.current?.closest('.th-main');
+    if (reg === undefined || list == null) return;
+    const needle = s.needle;
+    // the current match is the k-th of its entry
+    const k = cur === undefined ? -1 : s.matches.filter((m) => m.pos === cur.pos && m.at < cur.at).length;
+    const paint = (): void => {
+      const all = new Highlight();
+      const at = new Highlight();
+      if (needle.trim() !== '') {
+        for (const row of list.querySelectorAll<HTMLElement>('[data-testid^="thread.entry."]')) {
+          const rs = rangesIn(row, (t) => offsetsIn(t, needle), needle.length);
+          const mine = cur !== undefined && row.dataset.testid === `thread.entry.${String(cur.pos)}`;
+          rs.forEach((r, i) => {
+            // the entry's drawn words may differ from its find text: then all of its matches are current
+            (mine && (i === k || rs.length <= k) ? at : all).add(r);
+          });
+        }
+      }
+      reg.set('th-find', all);
+      reg.set('th-find-at', at);
+    };
+    paint();
+    let frame = 0;
+    const again = new MutationObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(paint);
+    });
+    again.observe(list, { childList: true, subtree: true, characterData: true });
+    return () => {
+      again.disconnect();
+      cancelAnimationFrame(frame);
+      reg.delete('th-find');
+      reg.delete('th-find-at');
+    };
+  }, [s, cur]);
+
   // a kept needle searches again once, at mount, with the caret at its end
   const [searched, setSearched] = useState(first === '');
   if (!searched) {
@@ -79,7 +123,7 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
   };
 
   return (
-    <div className="th-find" data-testid="thread.find" role="search">
+    <div ref={bar} className="th-find" data-testid="thread.find" role="search">
       <Field
         ref={field}
         testId="thread.find.field"
@@ -104,29 +148,31 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
       <span className="th-find-count" data-testid="thread.find.count">
         {counter(s, view.more)}
       </span>
-      <Button
-        kind="ghost"
-        title="older (⏎)"
-        onClick={() => {
-          setS(older);
-        }}
-        testId="thread.find.older"
-      >
-        ↑
-      </Button>
-      <Button
-        kind="ghost"
-        title="newer (⇧⏎)"
-        onClick={() => {
-          setS(newer);
-        }}
-        testId="thread.find.newer"
-      >
-        ↓
-      </Button>
-      <Button kind="ghost" title="close (esc)" onClick={close} testId="thread.find.close">
-        ×
-      </Button>
+      <span className="th-find-acts">
+        <IconButton
+          label="older match"
+          keys="⏎"
+          onClick={() => {
+            setS(older);
+          }}
+          testId="thread.find.older"
+        >
+          ↑
+        </IconButton>
+        <IconButton
+          label="newer match"
+          keys="⇧⏎"
+          onClick={() => {
+            setS(newer);
+          }}
+          testId="thread.find.newer"
+        >
+          ↓
+        </IconButton>
+        <IconButton label="close find" keys="esc" onClick={close} testId="thread.find.close">
+          ×
+        </IconButton>
+      </span>
     </div>
   );
 }

@@ -25,6 +25,7 @@ import { useRouter } from "@/app/router";
 import { stepOf } from "@/app/listkeys";
 import { Markdown } from "@/thread/Markdown";
 import { Code } from "@/thread/Code";
+import { rangesIn } from "@/thread/findranges";
 import {
   codeText,
   editDiff,
@@ -203,7 +204,7 @@ export function LogScreen({
       const current = hits[at];
       for (const row of el.querySelectorAll<HTMLElement>(".lg-e.hit")) {
         const mine = row.dataset.key === String(current) ? cur : all;
-        for (const r of rangesIn(row, needle)) mine.add(r);
+        for (const r of rangesIn(row, (t) => matchesIn(t, needle), needle.trim().length)) mine.add(r);
       }
     }
     reg.set("lg-find", all);
@@ -497,40 +498,6 @@ export function LogScreen({
       </div>
     </section>
   );
-}
-
-/** A needle's places in a row's words as DOM ranges (a match may span the code's colour spans). */
-function rangesIn(row: HTMLElement, needle: string): Range[] {
-  const nodes: Text[] = [];
-  const walk = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
-  for (let n = walk.nextNode(); n !== null; n = walk.nextNode())
-    nodes.push(n as Text);
-  const starts: number[] = [];
-  let text = "";
-  for (const n of nodes) {
-    starts.push(text.length);
-    text += n.data;
-  }
-  // the text node and offset at a place in the joined words
-  const at = (pos: number, end: boolean): [Text, number] | null => {
-    for (let i = nodes.length - 1; i >= 0; i--) {
-      const s = starts[i] ?? 0;
-      const node = nodes[i];
-      if (node !== undefined && (end ? pos > s : pos >= s))
-        return [node, pos - s];
-    }
-    return null;
-  };
-  const len = needle.trim().length;
-  return matchesIn(text, needle).flatMap((m) => {
-    const a = at(m, false);
-    const b = at(m + len, true);
-    if (a === null || b === null) return [];
-    const r = document.createRange();
-    r.setStart(a[0], a[1]);
-    r.setEnd(b[0], b[1]);
-    return [r];
-  });
 }
 
 /** ⏎ in the field: the first press goes to the current match, the next ones move on. */

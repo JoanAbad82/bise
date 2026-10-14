@@ -1,7 +1,7 @@
 // app/hover-tips · designer's tip rule (m_24359, his 'every compact mark explains itself'): one ds tip
 // for the window, never interactive. Storefront on FakeCore at 1400 px, light and dark. Passes when:
-//   - hovering a mark shows its words after the delay: the sidebar's '∿ 2' ('2 agents working'),
-//     the pink count, 'all quiet', '1 new', 'scheduled 1'; the right bar's sign, time, %, '↑';
+//   - hovering a mark shows its words after the delay: the sidebar's working count '2' ('2 agents
+//     working'), the pink count (a quiet project has no end words), '1 new', 'scheduled 1'; the right bar's sign, time, %, '↑';
 //   - the tip never takes the pointer: pointer-events none, and elementFromPoint under it is the
 //     page under it (a row, the screen), never the tip; it sits 8 px above or below its mark, never
 //     over it, inside the window;
@@ -138,24 +138,24 @@ for (const theme of ['light', 'dark']) {
       // the sidebar's marks
       await hover(`app.sidebar.project.${P}.end`, '2 agents working', 'sidebar-working');
       await hover(`app.sidebar.project.${P}.count`, '1 waiting for you', 'sidebar-count');
-      await hover('app.sidebar.project.docs-cff418c0.end', 'all quiet: no agent working, nothing waiting for you', 'sidebar-quiet');
+      await expect(page.getByTestId('app.sidebar.project.docs-cff418c0.end'), 'quiet: no end words (its mark says it)').toHaveCount(0);
       // the pink count is the inbox row's (inbox-history pick A)
       await hover('app.sidebar.inbox.count', '2 waiting for you, in all your projects', 'sidebar-inbox');
       await hover('app.sidebar.artifacts.end', "1 artifact you haven't opened yet, from perf", 'sidebar-new');
       await hover('app.sidebar.scheduled.end', '1 scheduled task, in all your projects', 'sidebar-scheduled');
 
       // the right bar's marks
-      await hover('app.right.agent.perf.sign', '∿ perf is working', 'right-sign');
+      // under 70 % the % is in the sign's tip, its column empty (desktop-delight v2)
+      await hover('app.right.agent.perf.sign', "∿ perf is working · 17% of perf's context used: 44k of 256k", 'right-sign');
       await hover('app.right.agent.perf.time', 'working for 6 min on this turn', 'right-time');
-      await hover('app.right.agent.perf.pct', "17% of perf's context used: 44k of 256k", 'right-pct');
-      await hover('app.right.agent.search.sign', '? search waits for you', 'right-asks');
+      await hover('app.right.agent.search.sign', "? search waits for you · 40% of search's context used: 102k of 256k", 'right-asks');
       await hover('app.right.agent.pay.mark', '#415 · checks fail: e2e/login · ψ worktree on sb/checkout · click opens the PR', 'right-pr');
 
       // warm: the next mark at once, no blink
       await page.getByTestId('app.right.agent.perf.time').hover();
       await expect(tip).toHaveText('working for 6 min on this turn');
-      await page.getByTestId('app.right.agent.perf.pct').hover();
-      await expect(tip).toHaveText(/^17% of perf's context used/u, { timeout: 100 });
+      await page.getByTestId('app.right.agent.perf.sign').hover();
+      await expect(tip).toHaveText(/^∿ perf is working/u, { timeout: 100 });
 
       // the pointer over the tip: the row under it still gets it (hover tint, the click)
       const box = await tip.boundingBox();

@@ -19,7 +19,7 @@ const T = {
   find: '[data-testid="thread.find"]',
   findField: '[data-testid="thread.find.field"]',
   count: '[data-testid="thread.find.count"]',
-  hit: '[data-testid="thread.list"] .th-hit',
+  hit: '[data-testid="thread.list"] [data-hit]',
 };
 
 test('thread/find: ⌘F finds every match of a word, ⏎ goes to the next, the draft is kept', async () => {
