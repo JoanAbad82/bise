@@ -93,22 +93,3 @@ fn a_bad_new_line_shows_its_json_and_an_unknown_kind_its_text() {
 }
 
 use crate::thread::lines::Rec;
-
-/// Law (architect m_19065): a record the released capsule reads, written
-/// in its old form for the older door, upgrades back to itself,
-/// newlines, ` : ` and escapes included (not a `\r` or a literal
-/// backslash-n: the old form never carried them); any other kind has
-/// no old form for the door.
-#[test]
-fn the_older_door_line_upgrades_back_to_its_record() {
-    use crate::core::feed;
-    for text in ["hi", "a\nb\n\nc", "x : y \\: z", "/answer 3 1", "{\"text\": \"json\"}", "", "  lead"] {
-        let r = Feed::You(feed::You { text: text.into() });
-        let old = older_line(&r).unwrap();
-        assert!(old.starts_with("sb you : ") && !old.contains('\n'), "{old}");
-        assert_eq!(upgrade(&old), Some(r), "{old}");
-        let m = Feed::MsgYou(feed::MsgYou { from: "docs".into(), body: text.into() });
-        assert_eq!(upgrade(&older_line(&m).unwrap()), Some(m));
-    }
-    assert_eq!(older_line(&Feed::info("x")), None);
-}

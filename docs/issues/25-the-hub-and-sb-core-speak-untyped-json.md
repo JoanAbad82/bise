@@ -165,7 +165,7 @@ values, the journal byte-equal on a replay, the e2e transcripts equal
   `line()`, `field_escape`, `join_fields` are gone. cost-pause's `paused`
   kind is a record too. An older door client (-28/-29 capsule) gets only
   his `you` and `msg-you` lines, in the old text form
-  (`legacy::older_line`, TODO(client-protocol)). Tests read hub lines
+  (`legacy::older_line`; it went with that door, debt-t3). Tests read hub lines
   through tests/e2e.py `feed_rec`/`Client.feed`/`wait_feed`. One visible
   change: a typed `\n` is drawn as typed, as the agent got it (the old
   line turned it into a line break); a real line break draws as before

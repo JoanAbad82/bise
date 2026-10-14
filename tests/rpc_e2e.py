@@ -70,8 +70,8 @@ class Rpc:
 
 def older_hello(sock_path):
     """An older client's hello (with step 4's `reads`): the hub's first
-    line, and what else it wrote in the next 2 s (the stub keeps the
-    connection for the released core's door: tests/older_door_e2e.py)."""
+    line, and what else it wrote before it closed the connection (or in
+    the next 2 s): tests/older_door_e2e.py."""
     s = socket.socket(socket.AF_UNIX)
     s.settimeout(2)
     s.connect(sock_path)

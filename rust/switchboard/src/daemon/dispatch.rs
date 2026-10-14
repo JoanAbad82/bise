@@ -228,8 +228,8 @@ impl Shell {
                 }
             }
             Msg::Page(m) => self.page_msg(m),
-            Msg::OlderHello { id, stream } => self.older_hello(id, stream),
-            Msg::RpcNew { id, stream, v } => self.rpc_new(id, stream, v),
+            Msg::OlderHello { stream, peer } => self.older_hello(stream, &peer),
+            Msg::RpcNew { id, stream, v, peer } => self.rpc_new(id, stream, v, peer),
             Msg::Typed { to, v } => self.typed_msg(to, v),
             Msg::ClientLine { id, v } => self.client_line(id, v),
             Msg::ClientGone { id } => {

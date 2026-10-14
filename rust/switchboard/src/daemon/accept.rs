@@ -152,6 +152,8 @@ fn serve(stream: UnixStream, pid: Option<u32>, id: u64, tx: &Sender<Msg>, doors:
     // and hub.sock's shim): the daemon thread maps it to an agent
     // (`Shell::speaks_as`, docs/issues/17)
     let mut asker = None;
+    // a client's pid and program, judged at its accept (hub.log names it)
+    let mut peer_of = String::new();
     match access(sock, &op) {
         Access::No => {
             write_json(&mut stream, &json!({"ok": false, "error": format!("{name} does not serve the op {op:?}")}));
@@ -180,15 +182,19 @@ fn serve(stream: UnixStream, pid: Option<u32>, id: u64, tx: &Sender<Msg>, doors:
                 }
                 return;
             }
+            peer_of = peer;
         }
     }
     match op.as_str() {
-        // `initialize`; or an older client's hello (client-protocol step
-        // 5's stub, architect m_13089 Q2, m_15183): the hub's exe and
-        // reload id, then only the released core's door lines
-        // (daemon/rpc.rs DOOR)
+        // `initialize`; or the hello of a client from before
+        // client-protocol (v2026.10.2-30): the hub's exe and reload id,
+        // then the connection closes (nothing more is read from it)
         "hello" => {
-            let _ = tx.send(if init { Msg::RpcNew { id, stream, v } } else { Msg::OlderHello { id, stream } });
+            if !init {
+                let _ = tx.send(Msg::OlderHello { stream, peer: peer_of });
+                return;
+            }
+            let _ = tx.send(Msg::RpcNew { id, stream, v, peer: peer_of });
             let mut line = String::new();
             loop {
                 line.clear();

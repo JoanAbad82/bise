@@ -181,33 +181,6 @@ The release that ships this protocol keeps a few paths for a hub or a
 client of the release before it. Each has a TODO naming this list; they
 go in the release after:
 
-- **the hello stub** (`rust/switchboard/src/daemon/rpc.rs`,
-  `older_hello`): a connection whose first line is not `initialize`
-  passes the same peer judge, then its `{"op":"hello"}` gets only
-  `{"ev":"hello","exe","reload"}`: an older terminal re-executes as the
-  hub's version (and gets this protocol). No burst and no older event
-  follow. The connection stays open for one client only: the released
-  desktop cores (v2026.10.2-28, and -29, the release cut from main before
-  client-protocol merges), through the **older door**, three tables
-  side by side in `daemon/rpc.rs` (one trigger: `Shell::door_events`,
-  that core's home connection: an older hello, then a typed hello
-  without `typed_only`); each table is the union of what both send:
-
-  | table | what that core may still do |
-  |---|---|
-  | `DOOR_CMDS` | send its typed `{"cmd": ...}` lines: those releases' `HubCmd` tags (-28's 31, and -29's `tool_out`), run as typed commands; any other tag gets `unknown command: <tag>` |
-  | `DOOR_OPS` | send its op lines, each renamed to the command its typed arm takes: `input` → `slash` (`focus`→`agent`, `text`→`line`), `interrupt` → `stop`, `every_stop` → `scheduled_stop`, `page_voice`, `stop_hub`; any other line is refused (one hub.log line, a typed notice to a typed connection) |
-  | `DOOR_EVENTS` | read the older events `state`, `ready`, `page` and `line`, on its home connection only, from today's writers (no writer of its own) |
-
-  Their law is held on those releases' real lines
-  (`rust/proto/fixtures/released/core_door.jsonl` for -28,
-  `core_door_v2026.10.2-29.jsonl` for -29,
-  `daemon::rpc::tests`, `tests/older_door_e2e.py`). To remove them, in
-  the release after: delete the three tables, `Shell::door_events`, the
-  door's burst and the older writers only they still need (the snapshot's
-  `state` line, `line_event` and its buffered lines, the pages' `page`
-  line); the stub then writes `exe` and `reload` and closes the
-  connection;
 - the desktop core falls back to the older typed hello (`{"cmd":
   "hello","proto":1}`) when a hub doesn't answer `initialize`
   (`older_door`, `Read::Older`: `rust/tui/src/ambient/core/hubs.rs`,

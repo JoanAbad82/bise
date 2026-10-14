@@ -151,10 +151,12 @@ enum Msg {
         reason: String,
         cause: repl_starts::Gone,
     },
-    /// an older client's `{"op":"hello"}` (accept.rs: the stub)
+    /// a client from before client-protocol said `{"op":"hello"}`
+    /// (accept.rs): exe and reload, then the connection closes
     OlderHello {
-        id: ClientId,
         stream: UnixStream,
+        /// its pid and program, for hub.log
+        peer: String,
     },
     ClientLine {
         id: ClientId,
@@ -240,6 +242,8 @@ enum Msg {
         id: ClientId,
         stream: UnixStream,
         v: Value,
+        /// its pid and program, for hub.log (accept.rs `Doors::who`)
+        peer: String,
     },
     /// S2 step 5: BISE_ROUTE_MODEL's answer for the unclear route `rid`
     /// (a project name, or None), from its thread (`daemon/routing.rs`).
@@ -882,13 +886,10 @@ impl Shell {
         self.partial_clear(name, line);
     }
 
-    /// One hub event to every client: its typed form (`proto_on`); its
-    /// older line only to the released core's home connection, for the
-    /// kinds it reads (client-protocol step 5, daemon/rpc.rs DOOR_EVENTS).
+    /// One hub event to every client, in its typed form (`proto_on`):
+    /// no client reads the older line.
     fn broadcast(&mut self, v: &Value) {
         self.proto_on(v);
-        // the released core's home connection, one release (rpc.rs DOOR_EVENTS)
-        self.door_write(v);
     }
 
     fn step(&mut self, input: Input) {
@@ -1699,54 +1700,27 @@ impl Shell {
         }
     }
 
-    /// An older client's hello (client-protocol step 5, the stub): the
-    /// hub's exe and reload id, so an older terminal re-executes as this
-    /// version (its `hello` arm follows `exe`); no burst, no older event,
-    /// ever. The connection stays for the released desktop core's door
-    /// (its typed hello, then the lines of daemon/rpc.rs's DOOR table).
-    /// Every client of this version says `initialize` (daemon/rpc.rs).
-    // TODO(client-protocol, the release after the one that ships it): exe
-    // and reload, then the connection closes (the door goes with DOOR)
-    fn older_hello(&mut self, id: ClientId, mut stream: UnixStream) {
-        log_line(&self.opts.paths, "an older client said hello on hub.sock: exe and reload, then the released door only (client-protocol's stub)");
-        if !write_json(&mut stream, &json!({"ev": "hello", "exe": self.opts.exe.to_string_lossy(), "reload": self.reload_id})) {
-            return;
-        }
-        self.clients.insert(id, stream);
-        self.rpc_older(id);
-        self.step(Input::ClientHello { client: id });
+    /// A client from before client-protocol (v2026.10.2-30) said the older
+    /// `{"op":"hello"}`: the hub's exe and reload id, so an older terminal
+    /// re-executes as this version (its `hello` arm follows `exe`), then
+    /// the connection closes (dropping `stream`, the last handle:
+    /// accept.rs reads nothing more from it). That is its refusal: no
+    /// older event, no older line is ever served. Every client of this
+    /// version says `initialize` (daemon/rpc.rs).
+    fn older_hello(&mut self, mut stream: UnixStream, peer: &str) {
+        log_line(&self.opts.paths, &format!("an older client said hello on hub.sock (before client-protocol, v2026.10.2-30): {peer}: exe and reload, then closed"));
+        write_json(&mut stream, &json!({"ev": "hello", "exe": self.opts.exe.to_string_lossy(), "reload": self.reload_id}));
     }
 
-    /// A line on a client connection: JSON-RPC (an initialized one), or
-    /// on an older hello's connection (the stub) a line of the released
-    /// door ([`rpc::DOOR`]) as its typed command; anything else is
-    /// refused (one hub.log line).
+    /// A line on a client connection: JSON-RPC (an initialized one);
+    /// anything else is refused (one hub.log line naming the peer, never
+    /// the line's body; a typed notice).
     fn client_line(&mut self, id: ClientId, v: Value) {
         if bise_proto::rpc::is_rpc(&v) {
             return self.rpc_line(id, v);
         }
-        match self.rpc_door(id, &v) {
-            // a typed line: as the typed door takes it (hello first)
-            Ok(cmd) if v.get("op").is_none() => self.proto_cmd(id, cmd),
-            // an op line: its typed arm, as that release took the op
-            // with no typed hello (that release's `bise stop`)
-            Ok(cmd) => {
-                let tag = cmd.get("cmd").and_then(Value::as_str).unwrap_or("").to_string();
-                match bise_proto::hub::HubCmd::from_value(cmd) {
-                    Ok(c) => self.proto_run(id, &tag, self.project(), c),
-                    Err(e) => log_line(&self.opts.paths, &format!("hub.sock: the released door's {tag} not typed: {e}")),
-                }
-            }
-            Err(what) => {
-                log_line(&self.opts.paths, &format!("hub.sock refused {what} (not the released door's: client-protocol step 5)"));
-                match v.get("cmd").and_then(Value::as_str) {
-                    // a typed line: its error, as that release's door
-                    // answered a tag it didn't know
-                    Some(tag) => self.proto_error(id, tag, &format!("unknown command: {tag}")),
-                    None => self.notice_out(id, None, &format!("unknown op: {what}")),
-                }
-            }
-        }
+        log_line(&self.opts.paths, &format!("hub.sock refused a line that is not JSON-RPC: {}", self.rpc_peer(id)));
+        self.notice_out(id, None, "not JSON-RPC: refused");
     }
 
     /// `sb inspect` and `sb history` read files; the rest goes to the core.
@@ -2368,7 +2342,7 @@ mod tests {
     #[test]
     fn a_clients_own_messages_take_the_urgent_lane() {
         let (a, _b) = UnixStream::pair().unwrap();
-        assert!(Msg::is_urgent(&Msg::RpcNew { id: 1, stream: a, v: Value::Null }));
+        assert!(Msg::is_urgent(&Msg::RpcNew { id: 1, stream: a, v: Value::Null, peer: String::new() }));
         assert!(Msg::is_urgent(&Msg::Typed { to: rpc::Typed::Answer(1), v: Value::Null }));
         assert!(Msg::is_urgent(&Msg::ClientGone { id: 1 }));
         assert!(!Msg::is_urgent(&Msg::In(Input::Tick)));

@@ -31,7 +31,6 @@ use super::*;
 use crate::proto_view::{self, Live, Since};
 use bise_proto::hub::{HubCmd, HubEv};
 use bise_proto::thread::{self as pthread, Ctx, PageRef};
-use bise_proto::PROTO;
 
 /// Every typed connection, by client.
 #[derive(Default)]
@@ -96,24 +95,17 @@ struct Stepping {
 struct Conn {
     /// its subscribed threads, by agent
     subs: BTreeMap<String, Live>,
-    /// it said `typed_only`: the hub's older events skip it
-    only: bool,
 }
 
 impl Proto {
-    /// The connection wants typed events only (`broadcast` skips it).
-    pub(super) fn typed_only(&self, id: ClientId) -> bool {
-        self.conns.get(&id).is_some_and(|c| c.only)
-    }
-
-    /// The connection said a typed hello (or `initialize`).
+    /// The connection said `initialize`.
     pub(super) fn has(&self, id: ClientId) -> bool {
         self.conns.contains_key(&id)
     }
 
-    /// A JSON-RPC connection after `initialize`: typed events only.
+    /// A JSON-RPC connection after `initialize`: it gets typed events.
     pub(super) fn typed(&mut self, id: ClientId) {
-        self.conns.entry(id).or_default().only = true;
+        self.conns.entry(id).or_default();
     }
 }
 
@@ -163,21 +155,10 @@ impl Shell {
     }
 
     /// A typed event for connection `id` (a command's answer, an event
-    /// for it alone): a JSON-RPC connection's answer or notification
-    /// (`daemon/rpc.rs`), else the event's line.
+    /// for it alone): its JSON-RPC answer or notification
+    /// (`daemon/rpc.rs`).
     pub(super) fn proto_send(&mut self, id: ClientId, ev: &HubEv) {
-        if self.rpc_out(id, ev, true) {
-            return;
-        }
-        self.proto_send_old(id, ev);
-    }
-
-    /// The event's line, as an older typed connection reads it (the
-    /// released core's door: an answer to a line it sent).
-    pub(super) fn proto_send_old(&mut self, id: ClientId, ev: &HubEv) {
-        if let Some(c) = self.clients.get_mut(&id) {
-            write_line(c, &ev.encode());
-        }
+        self.rpc_out(id, ev, true);
     }
 
     /// Steps sb-core for typed command `cmd` of connection `id`: its
@@ -246,8 +227,8 @@ impl Shell {
 
     /// `Effect::ToClient`'s body for `client` when it is sb-core's yes/no
     /// question (`confirm`, bar I9) and `client` is a typed connection:
-    /// sent as the typed `confirm`, to that connection only. True: a
-    /// typed-only connection is done with it.
+    /// sent as the typed `confirm`, to that connection only. True: done
+    /// with it.
     pub(super) fn typed_confirm(&mut self, client: ClientId, body: &Value) -> bool {
         if body.get("ev").and_then(Value::as_str) != Some("confirm") || !self.proto.conns.contains_key(&client) {
             return false;
@@ -256,7 +237,7 @@ impl Shell {
         let text = body.get("text").and_then(Value::as_str).unwrap_or("").to_string();
         let project = self.project();
         self.proto_send(client, &HubEv::Confirm { project, id, text });
-        self.proto.typed_only(client)
+        true
     }
 
     /// A handler's typed result for `client` when it is the typed
@@ -305,71 +286,5 @@ impl Shell {
         let cmd = Some(cmd.to_string()).filter(|c| !c.is_empty());
         let reason = reason.map(str::to_string);
         self.proto_send(id, &HubEv::Error { project, cmd, text: text.to_string(), cid, reason, kind: None });
-    }
-
-    /// A line on `hub.sock` with a `cmd`: one typed command.
-    pub(super) fn proto_cmd(&mut self, id: ClientId, v: Value) {
-        let tag = v.get("cmd").and_then(Value::as_str).unwrap_or("").to_string();
-        let cmd = match HubCmd::from_value(v) {
-            Ok(c) => c,
-            Err(e) => return self.proto_error(id, &tag, &e),
-        };
-        if let HubCmd::Hello { proto, typed_only } = cmd {
-            if proto != PROTO {
-                return self.proto_error(id, &tag, &format!("this hub speaks proto {PROTO}, not {proto}"));
-            }
-            self.proto.conns.entry(id).or_default().only = typed_only;
-            let ws = self.opts.paths.workspace.clone();
-            let name = ws.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-            let cmds = HubCmd::TAGS.iter().map(|t| t.to_string()).collect();
-            let welcome = HubEv::Welcome { project: self.project(), proto: PROTO, workspace: ws.to_string_lossy().to_string(), name, cmds };
-            self.proto_send(id, &welcome);
-            let snap = self.snapshot();
-            let (agents, cards) = self.proto_rows(&snap);
-            self.proto_send(id, &agents);
-            self.proto_send(id, &cards);
-            let jobs = HubEv::Jobs { project: self.project(), items: proto_view::jobs(&snap) };
-            self.proto_send(id, &jobs);
-            let arts = self.artifacts_ev();
-            let arts = self.proto_artifacts(&arts);
-            self.proto_send(id, &arts);
-            self.worktrees_typed(Typed::Answer(id));
-            self.dev_servers_typed(Typed::Answer(id));
-            self.merged_typed(Typed::Answer(id));
-            let feats = self.features_ev();
-            self.proto_send(id, &feats);
-            let prs = self.prs_ev();
-            self.proto_send(id, &prs);
-            let sched = self.scheduled_ev();
-            self.proto_send(id, &sched);
-            let models = self.models_ev();
-            self.proto_send(id, &models);
-            let appr = self.approvals_ev(false);
-            let appr = self.proto_approvals(&appr);
-            self.proto_send(id, &appr);
-            let flow = self.flow_ev();
-            self.proto_send(id, &flow);
-            let paused = self.paused_ev();
-            self.proto_send(id, &paused);
-            let switch = self.switch_ev();
-            self.proto_send(id, &switch);
-            // the released core's home connection (no typed_only): its
-            // older start, one release (daemon/rpc.rs DOOR_EVENTS)
-            if self.door_events(id) {
-                self.door_burst(id);
-            }
-            return;
-        }
-        if !self.proto.conns.contains_key(&id) {
-            return self.proto_error(id, &tag, "say hello {proto: 1} first");
-        }
-        let project = match cmd.project() {
-            Some(p) => p.to_string(),
-            None => return self.proto_error(id, &tag, &format!("unknown command: {tag}")),
-        };
-        if project != self.project() {
-            return self.proto_error(id, &tag, &format!("this hub is {}, not {project}", self.project()));
-        }
-        self.proto_run(id, &tag, project, cmd);
     }
 }
