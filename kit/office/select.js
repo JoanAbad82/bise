@@ -1,6 +1,6 @@
 // bise kit · notes on an artifact in its viewer (office-artifacts plan §5, §9b; architect m_23874):
 // the selection layer and the marks, over every renderer (sheet.js, slides.js, docx.js,
-// image.js). One store (pages/artifact/notes.rs), two doors:
+// image.js, site.js: a site draws its marks in its own frame through view.marks). One store (pages/artifact/notes.rs), two doors:
 //
 // - in the desktop's side panel (the frame's name is `bise-app`, art-desktop m_23900) a
 //   selection's `note` button posts {bise: "anchor", artifact, version, anchor, quote} to the
@@ -34,6 +34,7 @@ const W = {
     pptx: "no notes yet. click a shape, then note.",
     docx: "no notes yet. select some text, then note.",
     image: "no notes yet. draw a box, then note.",
+    site: "no notes yet. select some text, then note.",
   },
 };
 
@@ -151,6 +152,18 @@ function mount() {
   function marks() {
     const s = stage();
     if (!s) return;
+    const view = office.view;
+    // a site draws its marks inside its own frame (kit/office/site.js): what to draw, no words
+    if (view && view.marks) {
+      const v = version();
+      view.onFound = (found) => {
+        notes.forEach((n, i) => (n.here = found.has(i)));
+        if (list) list.render();
+      };
+      view.marks(notes.map((n) => ({ at: n.at, mark: markOf(n, v) })));
+      if (list) list.render();
+      return;
+    }
     drawing = true;
     for (const e of s.querySelectorAll("[data-mark]")) delete e.dataset.mark;
     for (const e of s.querySelectorAll(".office-mark-box")) e.remove();
@@ -220,6 +233,7 @@ function mount() {
   function selectedBox() {
     const s = stage();
     if (!s) return null;
+    if (office.view && office.view.box) return office.view.box();
     const parts = [...s.querySelectorAll("td.sel, .office-slide .shape.sel, .office-box")];
     const r = parts.length ? parts.map((e) => e.getBoundingClientRect()) : [];
     const sel = window.getSelection();
@@ -230,6 +244,7 @@ function mount() {
   function quoteNow(a) {
     const s = stage();
     if (!s || !a) return "";
+    if (office.view && office.view.quote) return quoteOf(office.view.quote());
     if (a.kind === "cell") return quoteOf([...s.querySelectorAll("td.sel")].map((td) => td.textContent).filter(Boolean).join(" "));
     if (a.kind === "shape") return quoteOf((s.querySelector(".office-slide .shape.sel") || {}).textContent);
     if (a.kind === "para") return quoteOf(a.quote || (s.querySelector(`[data-para="${CSS.escape(a.para)}"]`) || {}).textContent);

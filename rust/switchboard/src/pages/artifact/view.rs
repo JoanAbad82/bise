@@ -37,7 +37,7 @@ pub struct Shown<'a> {
     pub id: &'a str,
     pub title: &'a str,
     pub agent: &'a str,
-    /// `xlsx`, `pptx`, `docx`, `image` (site::viewer_kind)
+    /// `xlsx`, `pptx`, `docx`, `image`, `site` (site::viewer_kind)
     pub kind: &'static str,
     /// the version drawn, and the artifact's newest
     pub v: u64,
@@ -109,7 +109,7 @@ pub fn serve(pages: &Pages, id: &str, v: Option<u64>) -> Response {
         return Response::missing(&format!("no such version: {at}"));
     };
     let Some(copy) = ver.copy.as_deref().filter(|c| site::serves_copy(&m.by, c)) else { return Response::missing(&format!("no copy of it: {at}")) };
-    let Some(kind) = site::viewer_kind(copy) else { return Response::missing(&format!("not an xlsx, pptx, docx or image: {at}")) };
+    let Some(kind) = site::viewer_kind(copy) else { return Response::missing(&format!("not a file bise's viewer draws: {at}")) };
     let shown = Shown {
         id: &m.id,
         title: &m.title,
@@ -118,7 +118,8 @@ pub fn serve(pages: &Pages, id: &str, v: Option<u64>) -> Response {
         v: ver.v,
         latest: latest.v,
         follows: v.is_none(),
-        file: site::copy_href(&m.id, ver.v, copy),
+        // a site is framed with the selection script (site::framed_href)
+        file: if kind == "site" { site::framed_href(&m.id, ver.v, copy) } else { site::copy_href(&m.id, ver.v, copy) },
         name: site::file_of(copy),
         token: &pages.token,
     };

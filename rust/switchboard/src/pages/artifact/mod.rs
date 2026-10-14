@@ -118,7 +118,12 @@ mod tests {
             assert!(text(&r).contains(&format!("data-kind=\"{kind}\"")), "{}", text(&r));
         }
         let html = items.iter().find(|a| a.title.starts_with("r.html")).unwrap();
-        assert!(frame(&html.id).ends_with("/r.html"), "any other file is framed as itself");
+        assert_eq!(frame(&html.id), format!("{base}/a/{}/view", html.id), "a site in the viewer too (art-notes)");
+        let site = text(&get(&p, &format!("/a/{}/view", html.id)));
+        assert!(site.contains("data-kind=\"site\"") && site.contains(&format!("data-file=\"/a/{}/1/framed/r.html\"", html.id)), "{site}");
+        // the framed copy gets the selection script, the plain one never (architect m_24172)
+        assert!(text(&get(&p, &format!("/a/{}/1/framed/r.html", html.id))).ends_with("<h1>r</h1><script src=\"/kit/site-select.js\"></script>"));
+        assert_eq!(text(&get(&p, &format!("/a/{}/1/r.html", html.id))), "<h1>r</h1>");
 
         let r = get(&p, &format!("/a/{}/view", xlsx.id));
         assert_eq!((r.status, r.csp), (200, view::VIEW_CSP));
@@ -138,7 +143,7 @@ mod tests {
             (format!("/a/{}/9/view", xlsx.id), "no such version"),
             (format!("/a/{}/x/view", xlsx.id), "no such version"),
             ("/a/nope/view".to_string(), "no such artifact"),
-            (format!("/a/{}/view", html.id), "not an xlsx, pptx, docx or image"),
+            
         ] {
             let r = get(&p, &path);
             assert_eq!((r.status, r.ctype), (404, "text/plain; charset=utf-8"), "{path}");

@@ -108,3 +108,17 @@ test("a box drawn on an image is a region in % of it", async () => {
   assert.deepEqual(boxPct({ x: 300, y: 100 }, { x: 100, y: 50 }, 400, 200), { x: 25, y: 25, w: 50, h: 25 });
   assert.deepEqual(boxPct({ x: -10, y: 0 }, { x: 500, y: 300 }, 400, 200), { x: 0, y: 0, w: 100, h: 100 });
 });
+
+test("a site's selection is read again before it counts (architect m_24172)", async () => {
+  const { readSelect } = await helpers("site.js");
+  const ok = readSelect({ anchor: { kind: "block", block: "#intro", quote: "open the waitlist" }, quote: "open the waitlist", rect: { x: 1, y: 2, w: 3, h: 4 } });
+  assert.deepEqual(ok, { anchor: { kind: "block", block: "#intro", quote: "open the waitlist" }, quote: "open the waitlist", rect: { x: 1, y: 2, w: 3, h: 4 } });
+  assert.equal(readSelect({ anchor: { kind: "cell", sheet: "x", range: "A1" } }), null, "a site only makes block anchors");
+  assert.equal(readSelect({ anchor: { kind: "block", block: "x".repeat(301) } }), null);
+  assert.equal(readSelect({ anchor: { kind: "block", block: 7 } }), null);
+  const long = readSelect({ anchor: { kind: "block", block: "p", quote: "q".repeat(900), extra: "token?" }, quote: "q".repeat(900), rect: { x: Infinity, y: 0, w: 1, h: 1 } });
+  assert.equal(long.anchor.quote.length, 300);
+  assert.equal(long.quote.length, 300);
+  assert.equal(long.rect, null);
+  assert.deepEqual(Object.keys(long.anchor).sort(), ["block", "kind", "quote"], "nothing else the site put in it");
+});

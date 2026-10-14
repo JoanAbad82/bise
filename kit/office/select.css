@@ -55,3 +55,7 @@ body.with-notes #bise-office { margin-right: 280px; }
   body.with-notes #bise-office { margin-right: 0; height: 62vh; }
   .office-notes { top: auto; left: 0; width: auto; height: 38vh; border-left: 0; border-top: 1px solid var(--line); }
 }
+
+/* a site: framed as itself, the frame fills the stage (kit/office/site.js) */
+.office-site { flex: 1; display: flex; min-height: 0; }
+.office-site iframe.site { flex: 1; border: 0; width: 100%; height: 100%; background: #fff; }

@@ -8,7 +8,8 @@
 //
 //   node office/sdk/test/notes.offscreen.mjs        (under ~/.bise/run/heavy-run --low)
 //
-// Fakes only: no hub, no account, no window on screen (Chrome --headless=new, its own profile).
+// Fakes only: no hub, no account, no window on screen (Chrome --headless=new, its own profile;
+// site isolation off so the sandboxed site's frame is in the page's frame tree for CDP).
 
 import http from "node:http";
 import { spawn } from "node:child_process";
@@ -48,7 +49,15 @@ const ARTS = {
   "deck-pptx": { kind: "pptx", name: "deck.pptx", bytes: fixture("tiny.pptx") },
   "memo-docx": { kind: "docx", name: "memo.docx", bytes: fixture("tiny.docx") },
   "shot-png": { kind: "image", name: "shot.png", bytes: png() },
+  // a site with its own script (it rewrites nothing, it counts clicks), and one whose own meta CSP
+  // keeps every script out, ours too (architect m_24172)
+  "site-html": { kind: "site", name: "site.html", bytes: Buffer.from(`<!doctype html><html><head><meta charset="utf-8"><title>launch</title><style>body{font:16px/1.5 Georgia,serif;margin:32px;max-width:640px}</style></head><body><h1 id="title">Launch plan</h1><p id="intro">We open the waitlist on Monday and send the first invites on Thursday.</p><p>Pricing stays at twelve euros a month for the first year.</p><ul><li>press kit</li><li>demo video</li></ul><script>let n=0;document.addEventListener("click",()=>{n++})</script></body></html>`) },
+  "strict-html": { kind: "site", name: "strict.html", bytes: Buffer.from(`<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src 'none'"><title>strict</title></head><body><p>No scripts here, not even bise's.</p></body></html>`) },
 };
+// site.rs's ARTIFACT_CSP and SELECT_TAG, as the server sends them (its Rust tests pin them)
+const ARTIFACT_CSP = "sandbox allow-scripts allow-popups; default-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'";
+const SELECT_TAG = '<script src="/kit/site-select.js"></script>';
+const withSelect = (b) => { const t = b.toString(); const i = t.toLowerCase().lastIndexOf("</body>"); return i < 0 ? t + SELECT_TAG : t.slice(0, i) + SELECT_TAG + t.slice(i); };
 // the notes the hub would serve (outcomes decided: done_in), per artifact; filled after we read
 // the outlines' ids from the page
 const NOTES = {};
@@ -61,7 +70,7 @@ const shell = (id, a, v) => `<!doctype html>
 <link rel="stylesheet" href="/kit/tokens.css"><link rel="stylesheet" href="/kit/office/viewer.css"><link rel="stylesheet" href="/kit/office/select.css">
 <script src="/kit/notes-anchors.js" defer></script><script src="/kit/notes.js" defer></script>
 <script type="module" src="/kit/office/viewer.js"></script><script type="module" src="/kit/office/select.js"></script>
-</head><body><main id="bise-office" data-artifact="${id}" data-kind="${a.kind}" data-version="${v}" data-latest="${v}" data-follows data-file="/a/${id}/${v}/${a.name}" data-name="${a.name}" data-agent="office-lead" data-title="${a.name}">
+</head><body><main id="bise-office" data-artifact="${id}" data-kind="${a.kind}" data-version="${v}" data-latest="${v}" data-follows data-file="/a/${id}/${v}/${a.kind === "site" ? "framed/" : ""}${a.name}" data-name="${a.name}" data-agent="office-lead" data-title="${a.name}">
 <p class="office-state" data-state="opening">opening ${a.name}…</p></main></body></html>`;
 const VERSION = 2;
 
@@ -97,7 +106,8 @@ const server = http.createServer((req, res) => {
     if (segs[2] === "view") return send(200, "text/html", shell(segs[1], a, VERSION));
     if (segs[2] === "notes") return send(200, "application/json", JSON.stringify({ notes: NOTES[segs[1]] || [] }));
     if (segs[2] === "events") { res.writeHead(200, { "Content-Type": "text/event-stream" }); return; }
-    if (segs[3] === a.name) return send(200, "application/octet-stream", a.bytes);
+    if (segs[3] === "framed" && segs[4] === a.name) { res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": ARTIFACT_CSP }); return res.end(withSelect(a.bytes)); }
+    if (segs[3] === a.name) return send(200, a.kind === "site" ? "text/html" : "application/octet-stream", a.bytes);
   }
   if (u.pathname === "/app") {
     // the desktop's side panel, as far as the frame sees it: a parent that frames it named bise-app
@@ -110,7 +120,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 
 // ---- Chrome over CDP
 const profile = mkdtempSync(join(process.env.TMPDIR || tmpdir(), "chrome-"));
-const chrome = spawn(CHROME, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "--hide-scrollbars", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+const chrome = spawn(CHROME, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "--hide-scrollbars", "--disable-site-isolation-trials", "--disable-features=IsolateOrigins,site-per-process", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
 const wsUrl = await new Promise((ok, no) => {
   let err = "";
   chrome.stderr.on("data", (d) => { err += d; const m = /DevTools listening on (ws:\S+)/.exec(err); if (m) ok(m[1]); });
@@ -157,6 +167,28 @@ async function clickOn(doc, sel, opts = "{}") {
 
 await cdp("Page.enable");
 await cdp("Runtime.enable");
+// the site's frame is another origin (sandboxed): evaluated in its own context, found by its url
+async function inFrame(part, expr) {
+  const flat = (t) => [t.frame, ...(t.childFrames || []).flatMap(flat)];
+  const tree = (await cdp("Page.getFrameTree")).frameTree;
+  const f = flat(tree).find((x) => x.url.includes(part));
+  if (!f) throw new Error(`no frame ${part}`);
+  const ctx = events.filter((e) => e.method === "Runtime.executionContextCreated" && e.params.context.auxData && e.params.context.auxData.frameId === f.id && e.params.context.auxData.isDefault).pop();
+  if (!ctx) throw new Error(`no context for ${part}`);
+  const r = await cdp("Runtime.evaluate", { expression: expr, contextId: ctx.params.context.id, returnByValue: true, awaitPromise: true });
+  if (r.exceptionDetails) throw new Error(`${expr.slice(0, 60)}: ${r.exceptionDetails.text}`);
+  return r.result.value;
+}
+// a real drag over an element of the site (CDP input: the browser selects as for his mouse)
+async function dragOver(frameOffsetExpr, part, sel) {
+  const off = await evaluate(frameOffsetExpr);
+  const r = await inFrame(part, `(() => { const e = document.querySelector(${JSON.stringify(sel)}); const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; })()`);
+  const y = off.y + r.y + Math.min(10, r.h / 2), x0 = off.x + r.x + 2, x1 = off.x + r.x + Math.min(r.w - 4, 260);
+  await cdp("Input.dispatchMouseEvent", { type: "mousePressed", x: x0, y, button: "left", clickCount: 1 });
+  await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: (x0 + x1) / 2, y, button: "left" });
+  await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: x1, y, button: "left" });
+  await cdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: x1, y, button: "left", clickCount: 1 });
+}
 const results = [];
 const ok = (what) => { results.push(what); console.log(`ok · ${what}`); };
 try {
@@ -174,6 +206,8 @@ try {
   NOTES["q3-xlsx"] = [n("n1", "sent", { kind: "cell", sheet, range: "A2:B3" }, "these look low"), n("n2", "done", { kind: "cell", sheet, range: "A1" }, "say Q3", { done_in: VERSION })];
   NOTES["deck-pptx"] = [n("n1", "sent", { kind: "shape", ...shape }, "shorter title"), n("n2", "done", { kind: "slide", slide: 1 }, "old", { done_in: 1 })];
   NOTES["memo-docx"] = [n("n1", "sent", { kind: "para", para, quote: "" }, "too formal"), n("n2", "sent", { kind: "para", para: "GONE0000" }, "lost one")];
+  NOTES["site-html"] = [n("n1", "sent", { kind: "block", block: "#intro", quote: "open the waitlist" }, "say which Monday"), n("n2", "done", { kind: "block", block: "body>p:nth-of-type(2)", quote: "twelve euros" }, "fifteen?", { done_in: VERSION }), n("n3", "sent", { kind: "block", block: "#gone", quote: "a sentence no longer there" }, "lost one")];
+  NOTES["strict-html"] = [];
   NOTES["shot-png"] = [n("n1", "sent", { kind: "region", rect: { x: 10, y: 15, w: 30, h: 40 } }, "this red is off")];
 
   // ---- the marks, each kind, in the browser (the list beside the drawing)
@@ -234,10 +268,56 @@ try {
   assert.deepEqual({ ...got, quote: undefined }, { bise: "anchor", artifact: "q3-xlsx", version: VERSION, anchor: { kind: "cell", sheet, range: "A3:B4" }, quote: undefined, key: "w" });
   ok(`desktop door: the frame posted ${JSON.stringify(got.anchor)} with "${got.quote}"`);
 
+  // ---- a site: its marks drawn in its own frame, a lost one moved, a selection noted and sent
+  await open("/a/site-html/view", 1100, false);
+  await until("[...document.querySelectorAll('.office-notes .tag')].some(t => t.textContent === 'moved')", "the site's marks found, a lost one moved");
+  assert.equal(await inFrame("/framed/site.html", "document.querySelector('#intro').getAttribute('data-bise-mark')"), "sent");
+  assert.equal(await inFrame("/framed/site.html", "document.querySelectorAll('p')[1].getAttribute('data-bise-mark')"), "done");
+  assert.equal(await inFrame("/framed/site.html", "typeof BiseAnchors"), "undefined", "the site never gets bise's kit or token");
+  await shot("site-marks-1100-light");
+  const siteOff = "(() => { const r = document.querySelector('iframe.site').getBoundingClientRect(); return { x: r.left, y: r.top }; })()";
+  await dragOver(siteOff, "/framed/site.html", "#intro");
+  await until("document.querySelector('.office-note-btn')", "the note button by the site's selection");
+  await shot("site-note-button-1100-light");
+  await evaluate("document.querySelector('.office-note-btn').click()");
+  await until("!document.querySelector('.office-notes .composer').hidden", "the composer");
+  await evaluate("(() => { const t = document.querySelector('.office-notes textarea'); t.value = 'which Monday?'; t.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()");
+  await until("!document.querySelector('.office-notes .send').hidden", "the send bar");
+  // the drafts are saved 300 ms after he stops (notes.js's rule)
+  for (let t = 0; t < 50 && !posts.some((p) => p.id === "site-html" && p.what === "notes"); t++) await sleep(100);
+  const siteDraft = posts.filter((p) => p.id === "site-html" && p.what === "notes").pop();
+  const at = siteDraft.body.notes.find((x) => x.text === "which Monday?").at;
+  assert.equal(at.kind, "block");
+  assert.equal(at.block, "#intro");
+  assert.ok(at.quote && "We open the waitlist on Monday".startsWith(at.quote.slice(0, 10)), JSON.stringify(at));
+  ok(`site: marks in its frame, a lost one moved, his selection noted as ${JSON.stringify(at)}`);
+  // its own CSP keeps our script out: nothing breaks, the foot says so
+  await open("/a/strict-html/view", 1100, false);
+  await until("document.querySelector('.office-foot')", "the foot's words", 9000);
+  assert.match(await evaluate("document.querySelector('.office-foot').textContent"), /can't go on this site/);
+  await shot("site-strict-1100-light");
+  ok("a site that keeps scripts out: no selection, the foot says why");
+  // the app: the selection posts to the desktop, his first key with it
+  await open("/app?id=site-html", 1100, false);
+  await until("document.querySelector('iframe').contentDocument?.querySelector('iframe.site')", "the framed site in the app");
+  await sleep(800);
+  await evaluate("window.got = []; window.addEventListener('message', (e) => e.data && e.data.bise === 'anchor' && window.got.push(e.data))");
+  const appOff = "(() => { const o = document.querySelector('iframe').getBoundingClientRect(); const i = document.querySelector('iframe').contentDocument.querySelector('iframe.site').getBoundingClientRect(); return { x: o.left + i.left, y: o.top + i.top }; })()";
+  await dragOver(appOff, "/framed/site.html", "#intro");
+  await until(`${frameDoc(true)}.querySelector('.office-note-btn')`, "the pill in the app");
+  await cdp("Input.dispatchKeyEvent", { type: "keyDown", key: "w", text: "w" });
+  await cdp("Input.dispatchKeyEvent", { type: "keyUp", key: "w" });
+  await until("window.got.length > 0", "the desktop got the site's selection");
+  const gotSite = await evaluate("window.got[0]");
+  assert.deepEqual(Object.keys(gotSite).sort(), ["anchor", "artifact", "bise", "key", "quote", "version"]);
+  assert.equal(gotSite.key, "w");
+  assert.equal(gotSite.anchor.block, "#intro");
+  ok("site in the app: the selection and his first key go to the desktop");
+
   // ---- designer's screens: each kind, 1400 / 1100 / 800, light and dark
-  for (const dark of [false, true]) for (const w of [1400, 1100, 800]) for (const id of Object.keys(ARTS)) {
+  for (const dark of [false, true]) for (const w of [1400, 1100, 800]) for (const id of Object.keys(ARTS).filter((x) => x !== "strict-html")) {
     await open(`/a/${id}/view`, w, dark);
-    await until("document.querySelector('[data-mark], .office-mark-box')", `${id}'s marks`);
+    await until(id === "site-html" ? "document.querySelector('.office-notes .tag')" : "document.querySelector('[data-mark], .office-mark-box')", `${id}'s marks`);
     await sleep(150);
     await shot(`${id}-${w}-${dark ? "dark" : "light"}`);
   }

@@ -164,6 +164,26 @@ it as [<title>](artifact:<id>)` (words signed off by designer, m_7214). A stored
 page with the same id (only possible with an older store): the page's
 id gets `-page`.
 
+### Notes on an artifact (art-notes)
+
+Any artifact the viewer draws (xlsx, pptx, docx, an image, a site) takes
+notes: the page's notes system with an artifact as its target
+(`pages::store::Target`, `pages/artifact/notes.rs`).
+
+- `<state>/artifacts/<id>/notes.json`: the page's note shape, the anchor
+  in `at` (`bise_proto::anchor::Anchor`), `rev` the save he looked at.
+- Two doors: a browser's list beside the viewer (`POST
+  /api/a/<id>/notes|send`, one message to the maker) and the desktop's
+  composer (`Part::Anchor`, checked and recorded at `parts_in::said`).
+- A sent note is done in the first version whose maker's turn began after
+  it was sent (`notes::outcomes`, on read; `GET /a/<id>/notes` and the SSE
+  `notes` frame on `a/<id>`).
+- A site is framed at `/a/<id>/<v>/framed/…` with `kit/site-select.js` in
+  its html (the plain copy never has it); a site whose own CSP keeps that
+  script out takes no notes, and its viewer says so.
+- Not yet: the row's `detail` counts a page's open notes only; an
+  artifact's open notes are not counted on its row.
+
 ## The `sb` surface (every agent)
 
 ```

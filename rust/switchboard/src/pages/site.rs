@@ -67,7 +67,8 @@ pub fn items(pages: &[PageMeta], arts: &[ArtMeta]) -> Vec<Item> {
         let (href, outside) = if is_link(&cur.target) {
             (cur.target.clone(), true)
         } else if let Some(copy) = &cur.copy {
-            (copy_href(&a.id, cur.v, copy), false)
+            // in bise's viewer, where his notes go (art-notes)
+            (frame_href(&a.id, cur.v, copy, true), false)
         } else {
             continue;
         };
@@ -90,6 +91,41 @@ pub fn items(pages: &[PageMeta], arts: &[ArtMeta]) -> Vec<Item> {
 /// artifact links and the typed row's `frame_url` (proto_view::artifacts).
 pub fn copy_href(id: &str, v: u64, copy: &str) -> String {
     format!("/a/{}/{}/{}", id, v, file_of(copy))
+}
+
+/// Where bise's viewer frames a site's copy (kit/office/site.js):
+/// `/a/<id>/<v>/framed/<file>`, the copy as at [`copy_href`] with the
+/// notes' selection script in each html page ([`framed`], architect
+/// m_24172). A site's own relative links stay under `framed/`.
+pub fn framed_href(id: &str, v: u64, copy: &str) -> String {
+    format!("/a/{}/{}/framed/{}", id, v, file_of(copy))
+}
+
+/// The one rule for "does this request get the selection script?": a path
+/// under a copy (`rest`, after `/a/<id>/<v>/`) that starts with `framed`
+/// asks for it (the viewer's frame and the site's own links in it); the
+/// plain copy (a tab, a download, an older client) never does. The flag,
+/// and the path of the file without it.
+pub fn framed<'a>(rest: &'a [&'a str]) -> (bool, &'a [&'a str]) {
+    match rest.split_first() {
+        Some((&"framed", tail)) => (true, tail),
+        _ => (false, rest),
+    }
+}
+
+/// The tag a framed html page gets (kit/site-select.js).
+pub const SELECT_TAG: &str = "<script src=\"/kit/site-select.js\"></script>";
+
+/// An html page with [`SELECT_TAG`] before its last `</body>` (any case),
+/// or at its end when it has none; the rest of the bytes as they are.
+pub fn with_select(html: &[u8]) -> Vec<u8> {
+    let lower: Vec<u8> = html.iter().map(u8::to_ascii_lowercase).collect();
+    let at = lower.windows(7).rposition(|w| w == b"</body>").unwrap_or(html.len());
+    let mut out = Vec::with_capacity(html.len() + SELECT_TAG.len());
+    out.extend_from_slice(&html[..at]);
+    out.extend_from_slice(SELECT_TAG.as_bytes());
+    out.extend_from_slice(&html[at..]);
+    out
 }
 
 /// Whether the page server serves an artifact from its kept copy at
@@ -119,12 +155,22 @@ pub fn frame_href(id: &str, v: u64, copy: &str, newest: bool) -> String {
 }
 
 /// What bise's viewer draws a copy as (pages/artifact/view.rs): an office
-/// file ([`office_kind`]) or an image (`image`: png, jpg, gif, webp, where
-/// a note is a box drawn on it, art-notes). None: framed as itself.
+/// file ([`office_kind`]), an image (`image`: png, jpg, gif, webp, where
+/// a note is a box drawn on it) or a site (`site`: a folder or an html
+/// file, still served sandboxed at [`copy_href`], framed inside the viewer
+/// so notes can sit on its blocks; art-notes). None: framed as itself.
 pub fn viewer_kind(copy: &str) -> Option<&'static str> {
     let file = file_of(copy);
     let ext = file.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
-    office_kind(copy).or_else(|| (!file.is_empty() && bise_proto::parts::IMAGE_EXTS.contains(&ext.as_str())).then_some("image"))
+    match () {
+        _ if office_kind(copy).is_some() => office_kind(copy),
+        _ if copy.is_empty() => None,
+        // a site: a folder (its index.html) or a copied html file, framed
+        // as itself inside the viewer (kit/office/site.js), notes on its blocks
+        _ if file.is_empty() || ext == "html" || ext == "htm" => Some("site"),
+        _ if bise_proto::parts::IMAGE_EXTS.contains(&ext.as_str()) => Some("image"),
+        _ => None,
+    }
 }
 
 /// The office file a copy is (`xlsx`, `pptx`, `docx`), by its extension:
@@ -253,7 +299,8 @@ mod tests {
         ];
         let it = items(&pages, &arts);
         let hrefs: Vec<&str> = it.iter().map(|i| i.href.as_str()).collect();
-        assert_eq!(hrefs, vec!["https://bise.dev/m/timers", "/p/plan", "/a/mock/1/mock.html", "/p/arch", "/a/folder-site/1/"]);
+        // a local site opens in bise's viewer, where his notes go (art-notes)
+        assert_eq!(hrefs, vec!["https://bise.dev/m/timers", "/p/plan", "/a/mock/view", "/p/arch", "/a/folder-site/view"]);
         assert!(it[0].outside && !it[1].outside);
         assert_eq!((it[1].kind, it[1].version.as_str()), ("page", "v2"));
     }
@@ -307,11 +354,32 @@ mod tests {
         for copy in ["v1/a.xls", "v1/a.ppt", "v1/a.doc", "v1/site", "v1/docx", "v1/r.html"] {
             assert_eq!(office_kind(copy), None, "{copy}");
         }
-        assert_eq!(frame_href("r", 3, "v3/r.html", true), "/a/r/3/r.html", "a site keeps its own link");
+        // a site in the viewer too (art-notes: notes on its blocks); its copy keeps its own link
+        assert_eq!(frame_href("r", 3, "v3/r.html", true), "/a/r/view");
+        assert_eq!((viewer_kind("v3/r.html"), viewer_kind("v1/site"), viewer_kind("v1/a.HTM"), viewer_kind("v1/notes.txt"), viewer_kind("")), (Some("site"), Some("site"), Some("site"), None, None));
+        assert_eq!(copy_href("r", 3, "v3/r.html"), "/a/r/3/r.html");
+        assert_eq!((framed_href("r", 3, "v3/r.html"), framed_href("f", 1, "v1/site")), ("/a/r/3/framed/r.html".to_string(), "/a/f/1/framed/".to_string()));
         // an image too (art-notes: a note is a box drawn on it)
-        assert_eq!((viewer_kind("v1/shot.PNG"), viewer_kind("v1/q3.xlsx"), viewer_kind("v1/r.html")), (Some("image"), Some("xlsx"), None));
+        assert_eq!((viewer_kind("v1/shot.PNG"), viewer_kind("v1/q3.xlsx"), viewer_kind("v1/a.csv")), (Some("image"), Some("xlsx"), None));
         assert_eq!(frame_href("s", 1, "v1/shot.png", true), "/a/s/view");
         assert!(!serves_copy("page", "v1/q3.xlsx"), "a bise page is served at /p/");
         assert!(!serves_copy("x", "v1/a.xls"), "an old binary format is not sent");
+    }
+
+    /// architect m_24172: the selection script only for the viewer's frame
+    /// (and the site's own links in it), never the plain copy; the bytes
+    /// otherwise as they are.
+    #[test]
+    fn only_the_framed_path_gets_the_selection_script() {
+        assert_eq!(framed(&["framed", "docs", "a.html"]), (true, &["docs", "a.html"][..]));
+        assert_eq!(framed(&["r.html"]), (false, &["r.html"][..]));
+        assert_eq!(framed(&[]), (false, &[][..]));
+        assert_eq!(framed(&["docs", "framed"]), (false, &["docs", "framed"][..]), "only at the start");
+        let page = b"<html><body><p>hi</p></BODY></html>";
+        assert_eq!(String::from_utf8(with_select(page)).unwrap(), format!("<html><body><p>hi</p>{SELECT_TAG}</BODY></html>"));
+        assert_eq!(String::from_utf8(with_select(b"<p>no body")).unwrap(), format!("<p>no body{SELECT_TAG}"));
+        // the last </body> (one in a script's string comes before it)
+        let two = b"<script>'</body>'</script></body>";
+        assert!(String::from_utf8(with_select(two)).unwrap().ends_with(&format!("{SELECT_TAG}</body>")));
     }
 }

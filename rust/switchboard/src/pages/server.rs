@@ -336,6 +336,9 @@ fn artifact_file(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Response {
     let Some(ver) = v.parse::<u64>().ok().and_then(|n| m.versions.iter().find(|x| x.v == n)) else { return Response::missing(&format!("no such version: {at}")) };
     let Some(copy) = ver.copy.as_ref().filter(|c| super::site::serves_copy(&m.by, c)) else { return Response::missing(&format!("no copy of it: {at}")) };
     let base = state.join("artifacts").join(&m.id).join(copy);
+    // the viewer's frame of a site (and its own links): the selection
+    // script in its html (site::framed, architect m_24172)
+    let (select, rest) = super::site::framed(rest);
     let rest: Vec<&str> = rest.iter().copied().filter(|s| !s.is_empty()).collect();
     let path = if base.is_file() {
         // a copied file: only itself, by its name (or no name)
@@ -346,12 +349,14 @@ fn artifact_file(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Response {
         base.clone()
     } else {
         let Some(rel) = super::site::safe_rel(&rest) else {
-            return if rest.is_empty() { artifact_file(pages, id, v, &["index.html"]) } else { Response::missing(&format!("no such file: {at}")) };
+            let index: &[&str] = if select { &["framed", "index.html"] } else { &["index.html"] };
+            return if rest.is_empty() { artifact_file(pages, id, v, index) } else { Response::missing(&format!("no such file: {at}")) };
         };
         base.join(rel)
     };
     let Some(ctype) = super::site::ctype(&path.to_string_lossy()) else { return Response::missing(&format!("not served: {at}")) };
     match std::fs::read(&path) {
+        Ok(body) if select && ctype.starts_with("text/html") => Response { status: 200, ctype, body: super::site::with_select(&body), csp: super::site::ARTIFACT_CSP },
         Ok(body) => Response { status: 200, ctype, body, csp: super::site::ARTIFACT_CSP },
         Err(_) => Response::missing(&format!("no such file: {at}")),
     }
@@ -746,9 +751,13 @@ mod tests {
         let items = crate::proto_view::artifacts(&ev, |_| None, Some(&base));
         let html = items.iter().find(|a| a.title.contains("proof")).expect("the html artifact");
         let url = html.frame_url.clone().expect("a copied .html file has a frame_url");
-        let r = get(&p, url.strip_prefix(&base).unwrap());
+        // framed in bise's viewer (art-notes), which frames the copy, still in its sandbox
+        let shell = text(&get(&p, url.strip_prefix(&base).unwrap()));
+        assert!(shell.contains("data-kind=\"site\""), "{shell}");
+        let r = get(&p, &format!("/a/{}/1/proof.html", html.id));
         assert_eq!((r.status, text(&r).as_str()), (200, "<h1>proof</h1>"), "{url}");
         assert_eq!(r.csp, super::super::site::ARTIFACT_CSP, "in its sandbox");
+        assert_eq!(get(&p, &format!("/a/{}/1/framed/proof.html", html.id)).csp, super::super::site::ARTIFACT_CSP, "framed: the same sandbox");
         for a in items.iter().filter(|a| a.id != html.id) {
             assert_eq!(a.frame_url, None, "{} has no frame_url", a.id);
         }
