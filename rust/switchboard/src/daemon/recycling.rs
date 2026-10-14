@@ -47,6 +47,22 @@ impl Shell {
         }
     }
 
+    /// He is talking to main (crate::recycle::talking): its REPL is not
+    /// restarted now (`switch_idle_repls`). His last message to main: the
+    /// newest messages only, the ids grow with time.
+    pub(super) fn main_talking(&self) -> bool {
+        let now = crate::util::now_ms();
+        let st = &self.hub.st;
+        let last = st
+            .msgs()
+            .values()
+            .rev()
+            .take_while(|m| now.saturating_sub(m.created_ms) < crate::recycle::TALK_MS)
+            .find(|m| m.from == "user" && m.to == crate::model::MAIN)
+            .map(|m| m.created_ms);
+        crate::recycle::talking(crate::board::queued_count(st, crate::model::MAIN), last, now)
+    }
+
     /// A new process of `dir` is connected (spawned, adopted, switched).
     pub(super) fn recycle_started(&mut self, dir: &str) {
         self.recycle.churn.started(dir);

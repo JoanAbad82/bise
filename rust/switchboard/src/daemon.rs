@@ -49,7 +49,9 @@ mod dispatch;
 mod inbox;
 mod keys;
 use keys::hash_keys;
+mod loop_watch;
 mod merged;
+mod outbox;
 mod state_gate;
 mod usage;
 mod wakes;
@@ -271,7 +273,8 @@ impl Msg {
 }
 
 struct Repl {
-    stream: TcpStream,
+    /// its writer (daemon/outbox.rs): the loop only queues
+    stream: outbox::Outbox,
     steer: String,
     interrupt: String,
 }
@@ -295,7 +298,10 @@ struct Shell {
     starts: crate::repl_start::Starts,
     /// fresh spawns waiting for a slot
     start_queue: BTreeMap<String, repl_starts::Queued>,
-    clients: BTreeMap<ClientId, UnixStream>,
+    /// each client's writer (daemon/outbox.rs): the loop only queues
+    clients: BTreeMap<ClientId, outbox::Outbox>,
+    /// what the loop runs, said in hub.log when it holds (daemon/loop_watch.rs)
+    loop_watch: loop_watch::LoopWatch,
     replies: BTreeMap<Token, UnixStream>,
     /// The last lines of each feed, with their transcript positions and
     /// the time the transcript wrote them (ms since the epoch).
@@ -513,11 +519,10 @@ fn write_json(stream: &mut UnixStream, v: &Value) -> bool {
     write_line(stream, &v.to_string())
 }
 
+/// One reply to a one-request peer, off the loop (daemon/outbox.rs: a
+/// peer that reads nothing never holds the loop).
 fn write_line(stream: &mut UnixStream, line: &str) -> bool {
-    let mut s = String::with_capacity(line.len() + 1);
-    s.push_str(line);
-    s.push('\n');
-    stream.write_all(s.as_bytes()).is_ok()
+    outbox::reply(stream, line)
 }
 
 fn free_port() -> std::io::Result<u16> {
@@ -1400,8 +1405,12 @@ impl Shell {
             q.push(line.to_string());
             return true;
         }
-        match self.repls.get_mut(&dir) {
-            Some(r) => r.stream.write_all(line.as_bytes()).is_ok(),
+        match self.repls.get(&dir).map(|r| r.stream.write_all(line.as_bytes())) {
+            Some(Ok(())) => true,
+            Some(Err(e)) => {
+                log_line(&self.opts.paths, &format!("the REPL of {dir} takes no line: {e}"));
+                false
+            }
             None => false,
         }
     }
@@ -1522,6 +1531,7 @@ impl Shell {
             .values()
             .filter(|a| a.run == crate::model::Run::Idle)
             .filter(|a| !self.switching.contains_key(&a.dir) && self.repls.contains_key(&a.dir))
+            .filter(|a| !(a.is_main && self.main_talking()))
             .filter(|a| {
                 self.reload_repls.contains(&a.dir)
                     || self.recycle.is_due(&a.dir)
@@ -1971,6 +1981,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         starts: Default::default(),
         start_queue: BTreeMap::new(),
         clients: BTreeMap::new(),
+        loop_watch: loop_watch::LoopWatch::start(&paths),
         replies: BTreeMap::new(),
         buffers: BTreeMap::new(),
         positions: BTreeMap::new(),
@@ -2067,13 +2078,13 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     // hub-lag: one tick in the queue at most. A loop slower than the
     // clock (a big state, a loaded machine) queued a tick every 500 ms
     // anyway, and the user's lines waited behind the backlog.
-    let tick_queued = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let tick_queued = std::sync::Arc::new(dispatch::TickFlag::default());
     {
         let tx = tx.clone();
         let queued = tick_queued.clone();
         std::thread::spawn(move || loop {
             std::thread::sleep(Duration::from_millis(500));
-            if queued.swap(true, std::sync::atomic::Ordering::AcqRel) {
+            if !queued.take() {
                 continue;
             }
             if tx.send(Msg::In(Input::Tick)).is_err() {

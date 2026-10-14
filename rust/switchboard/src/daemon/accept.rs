@@ -103,6 +103,12 @@ impl super::Shell {
     /// An agent request: served only when its sender speaks as itself.
     pub(super) fn agent_new(&mut self, token: super::Token, mut stream: UnixStream, v: Value, asker: &Asker) {
         let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("");
+        // its sb gave up before the loop took it (a busy hub): not run
+        // late, or a send it will retry is delivered twice (hub-stall)
+        if super::outbox::peer_gone(&stream) {
+            log_line(&self.opts.paths, &format!("sb {} from {}: its sb gave up before the hub took it: not run", s("cmd"), s("from")));
+            return;
+        }
         if let Err(e) = self.speaks_as(asker, s("from"), s("cmd")) {
             write_json(&mut stream, &json!({"ok": false, "error": e}));
             return;

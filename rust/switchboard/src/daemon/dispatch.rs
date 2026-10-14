@@ -10,8 +10,7 @@ use crate::model::MAIN;
 use bise_proto::core::Feed;
 use crate::util::{now_ms, wire_escape};
 use serde_json::json;
-use std::io::Write;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::Receiver;
 
 /// What the loop does after a message.
@@ -22,13 +21,34 @@ pub(super) enum Flow {
     Stop { keep: bool },
 }
 
+/// The ticker's flag (hub-lag: one tick in the queue at most) and when
+/// that tick was sent: the starts are judged at that time (hub-stall,
+/// `check_starts`), not when a busy loop reaches the tick.
+#[derive(Default)]
+pub(super) struct TickFlag {
+    pub(super) queued: AtomicBool,
+    pub(super) sent_ms: AtomicU64,
+}
+
+impl TickFlag {
+    /// The ticker's turn: false when a tick waits already; else marked
+    /// queued and sent now (the caller sends it).
+    pub(super) fn take(&self) -> bool {
+        if self.queued.swap(true, Ordering::AcqRel) {
+            return false;
+        }
+        self.sent_ms.store(now_ms(), Ordering::Release);
+        true
+    }
+}
+
 impl Shell {
     /// The hub's loop, until a stop (its `keep`) or every sender gone:
     /// the clients' lane first (daemon/inbox.rs: a hello never waits
     /// behind the REPLs' lines), the state to the clients when its gate
     /// allows (daemon/state_gate.rs: at most once per 100 ms, the last
     /// change always sent, a pending one flushed at the stop).
-    pub(super) fn serve(&mut self, rx: Receiver<Msg>, tick_queued: &AtomicBool) -> bool {
+    pub(super) fn serve(&mut self, rx: Receiver<Msg>, tick_queued: &TickFlag) -> bool {
         let mut inbox = Inbox::new(rx, Msg::is_urgent);
         let keep = loop {
             if self.state_gate.due(now_ms()) {
@@ -39,7 +59,12 @@ impl Shell {
                 Next::Idle => continue,
                 Next::Closed => break false,
             };
-            if let Flow::Stop { keep } = self.dispatch(m, tick_queued) {
+            self.loop_watch.on(m.label());
+            let flow = self.dispatch(m, tick_queued);
+            if let Some(l) = self.loop_watch.idle() {
+                log_line(&self.opts.paths, &l);
+            }
+            if let Flow::Stop { keep } = flow {
                 break keep;
             }
         };
@@ -51,12 +76,12 @@ impl Shell {
 
     /// Run one message. `tick_queued`: the ticker's flag (one tick in the
     /// queue at most), cleared when a tick is taken.
-    pub(super) fn dispatch(&mut self, m: Msg, tick_queued: &AtomicBool) -> Flow {
+    pub(super) fn dispatch(&mut self, m: Msg, tick_queued: &TickFlag) -> Flow {
         match m {
             Msg::In(i) => {
                 let tick = matches!(i, Input::Tick);
                 if tick {
-                    tick_queued.store(false, Ordering::Release);
+                    tick_queued.queued.store(false, Ordering::Release);
                     self.flush_offsets();
                 }
                 self.step(i);
@@ -67,7 +92,7 @@ impl Shell {
                     }
                     self.page_waits_check();
                     self.wakes_look();
-                    self.check_starts();
+                    self.check_starts(tick_queued.sent_ms.load(Ordering::Acquire));
                     self.plugins_changed(false);
                     self.switch_idle_repls();
                     self.announce_update();
@@ -95,6 +120,14 @@ impl Shell {
                     kill_pid(pid);
                     return Flow::Go;
                 }
+                let stream = match super::outbox::of_tcp(&stream, super::outbox::REPL_MAX) {
+                    Ok(o) => o,
+                    Err(e) => {
+                        log_line(&self.opts.paths, &format!("repl {dir}: no writer for it: {e}"));
+                        kill_pid(pid);
+                        return Flow::Go;
+                    }
+                };
                 if !adopted {
                     let _ = std::fs::write(&steer, "");
                     let _ = std::fs::write(&interrupt, "");
@@ -180,53 +213,7 @@ impl Shell {
                     self.offsets.insert(dir, offset);
                 }
             }
-            Msg::ReplGone {
-                dir,
-                gen,
-                reason,
-                cause,
-            } => {
-                // a killed generation is not live anymore: its exit is
-                // expected; any exit of the live one is a crash (the hub
-                // never asks a REPL to quit)
-                if self.gens.get(&dir) != Some(&gen) {
-                    return Flow::Go;
-                }
-                self.start_gone(&dir, cause);
-                self.gens.remove(&dir);
-                self.repls.remove(&dir);
-                self.gate_forget(&dir);
-                self.pids.remove(&dir);
-                // its writer's lock goes with it (a respawn resumes the log)
-                self.recorders.remove(&dir);
-                if self.switching.contains_key(&dir) && !self.switch_spawned.contains(&dir) {
-                    // the reload a switch asked for: the same session on
-                    // this hub's binary, the same port
-                    let port = self.ports.get(&dir).copied();
-                    if let Some(name) = self.agent_by_dir(&dir).map(|a| a.name.clone()) {
-                        self.restored.insert(dir.clone());
-                        self.switch_spawned.insert(dir.clone());
-                        self.spawn_on(&name, true, None, port);
-                        return Flow::Go;
-                    }
-                }
-                // the new process of a switch died: a crash like any other
-                self.switching.remove(&dir);
-                self.switch_spawned.remove(&dir);
-                self.restored.remove(&dir);
-                // a new version on probation: a REPL that dies is a
-                // reason to roll back, a slow start is not (repl_start)
-                if cause.reports() {
-                    crate::switch::report_failure(&self.opts.paths, &format!("the REPL of {} stopped: {}", dir, reason));
-                }
-                if let Some(name) = self.agent_by_dir(&dir).map(|a| a.name.clone()) {
-                    self.step(Input::ReplExited {
-                        agent: name,
-                        crashed: true,
-                        reason,
-                    });
-                }
-            }
+            Msg::ReplGone { dir, gen, reason, cause } => return self.repl_gone(dir, gen, reason, cause),
             Msg::Page(m) => self.page_msg(m),
             Msg::OlderHello { stream, peer } => self.older_hello(stream, &peer),
             Msg::RpcNew { id, stream, v, peer } => self.rpc_new(id, stream, v, peer),
@@ -287,6 +274,49 @@ impl Shell {
                 self.state_now();
             }
             Msg::Shutdown { keep } => return Flow::Stop { keep },
+        }
+        Flow::Go
+    }
+
+    /// `dir`'s REPL of generation `gen` is gone (it exited, or its start
+    /// stalled: repl_starts.rs calls this at once, so a later message of
+    /// that generation finds it dead and kills its process).
+    pub(super) fn repl_gone(&mut self, dir: String, gen: u64, reason: String, cause: super::repl_starts::Gone) -> Flow {
+        // a killed generation is not live anymore: its exit is
+        // expected; any exit of the live one is a crash (the hub
+        // never asks a REPL to quit)
+        if self.gens.get(&dir) != Some(&gen) {
+            return Flow::Go;
+        }
+        self.start_gone(&dir, cause);
+        self.gens.remove(&dir);
+        self.repls.remove(&dir);
+        self.gate_forget(&dir);
+        self.pids.remove(&dir);
+        // its writer's lock goes with it (a respawn resumes the log)
+        self.recorders.remove(&dir);
+        if self.switching.contains_key(&dir) && !self.switch_spawned.contains(&dir) {
+            // the reload a switch asked for: the same session on
+            // this hub's binary, the same port
+            let port = self.ports.get(&dir).copied();
+            if let Some(name) = self.agent_by_dir(&dir).map(|a| a.name.clone()) {
+                self.restored.insert(dir.clone());
+                self.switch_spawned.insert(dir.clone());
+                self.spawn_on(&name, true, None, port);
+                return Flow::Go;
+            }
+        }
+        // the new process of a switch died: a crash like any other
+        self.switching.remove(&dir);
+        self.switch_spawned.remove(&dir);
+        self.restored.remove(&dir);
+        // a new version on probation: a REPL that dies is a
+        // reason to roll back, a slow start is not (repl_start)
+        if cause.reports() {
+            crate::switch::report_failure(&self.opts.paths, &format!("the REPL of {} stopped: {}", dir, reason));
+        }
+        if let Some(name) = self.agent_by_dir(&dir).map(|a| a.name.clone()) {
+            self.step(Input::ReplExited { agent: name, crashed: true, reason });
         }
         Flow::Go
     }

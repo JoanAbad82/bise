@@ -12,7 +12,7 @@ use super::{
     prompt_is_stale, skill_roots, skills_fingerprint, stall_for_tests, supervise, write_logged, Msg, PromptInputs,
     Shell, PROMPT_PLUGINS_FILE,
 };
-use crate::repl_start::{order, Cand, Kind};
+use crate::repl_start::{admit, Cand, Kind};
 use crate::util::now_ms;
 use std::path::PathBuf;
 use std::process::Command;
@@ -65,16 +65,22 @@ impl Shell {
 
     /// The queued spawns that get a free slot, in order.
     pub(super) fn admit_starts(&mut self) {
-        if self.start_queue.is_empty() || self.starts.free() == 0 {
+        if self.start_queue.is_empty() {
             return;
         }
         let cands: Vec<Cand> = self
             .start_queue
             .iter()
-            .map(|(dir, q)| Cand { dir: dir.clone(), kind: Kind::Start, urgent: self.urgent(&q.name, dir), asked_ms: q.asked_ms })
+            .map(|(dir, q)| Cand {
+                dir: dir.clone(),
+                kind: Kind::Start,
+                urgent: self.urgent(&q.name, dir),
+                asked_ms: q.asked_ms,
+                main: q.name == crate::model::MAIN,
+            })
             .collect();
         let free = self.starts.free();
-        for c in order(cands).into_iter().take(free) {
+        for c in admit(cands, free) {
             let Some(q) = self.start_queue.remove(&c.dir) else { continue };
             // killed or asked again meanwhile: not this start
             if self.gens.get(&c.dir) != Some(&q.gen) {
@@ -93,13 +99,13 @@ impl Shell {
             .map(|(name, dir)| {
                 let recycle = self.recycle.is_due(dir) && !self.reload_repls.contains(dir);
                 let kind = if recycle { Kind::Recycle } else { Kind::Switch };
-                Cand { dir: dir.clone(), kind, urgent: self.urgent(name, dir), asked_ms: 0 }
+                Cand { dir: dir.clone(), kind, urgent: self.urgent(name, dir), asked_ms: 0, main: name == crate::model::MAIN }
             })
             .collect();
         let free = self.starts.free();
         let now = now_ms();
         let mut out = Vec::new();
-        for c in order(cands).into_iter().take(free) {
+        for c in admit(cands, free) {
             if let Some(n) = stale.iter().find(|(_, d)| *d == c.dir) {
                 self.starts.begin(&c.dir, c.kind, now);
                 out.push(n.clone());
@@ -135,8 +141,16 @@ impl Shell {
 
     /// The starts without progress: killed and gone (a crash, restarted
     /// first); then the queue gets the freed slots.
-    pub(super) fn check_starts(&mut self) {
-        for s in self.starts.stalled(now_ms()) {
+    ///
+    /// Judged at `at_ms`, when the tick that asks was sent (hub-stall):
+    /// every progress message sent before it is applied by now (the
+    /// inbox keeps their order), so a loop that was busy never fails a
+    /// start whose progress still waited behind it. A stalled one is gone
+    /// at once (`repl_gone`): a later message of its generation (spawned,
+    /// connected) finds it dead and kills its process, never an orphan
+    /// that got the brief and shares the agent's session.
+    pub(super) fn check_starts(&mut self, at_ms: u64) {
+        for s in self.starts.stalled(at_ms) {
             let reason = format!(
                 "its REPL made no progress in {} s while starting ({} at once at most, the rest wait)",
                 s.secs,
@@ -147,7 +161,7 @@ impl Shell {
                 kill_pid(*pid);
             }
             if let Some(gen) = self.gens.get(&s.dir).copied() {
-                let _ = self.tx.send(Msg::ReplGone { dir: s.dir, gen, reason, cause: Gone::Stalled { reports: s.reports } });
+                let _ = self.repl_gone(s.dir, gen, reason, Gone::Stalled { reports: s.reports });
             }
         }
         self.admit_starts();

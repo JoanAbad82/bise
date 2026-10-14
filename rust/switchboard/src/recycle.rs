@@ -83,6 +83,30 @@ impl Churn {
     }
 }
 
+/// How long after his last line to main its REPL is left alone.
+pub const TALK_MS: u64 = 120_000;
+
+/// He is talking to main (hub-stall, @bise m_25297: main was recycled
+/// as he wrote to it and was down 4.5 min): a message queued for it, or
+/// one of his to it in the last [`TALK_MS`]. Main is then neither
+/// recycled nor switched; it is, once he is quiet.
+pub fn talking(queued: usize, last_user_ms: Option<u64>, now_ms: u64) -> bool {
+    queued > 0 || last_user_ms.is_some_and(|t| now_ms.saturating_sub(t) < TALK_MS)
+}
+
+#[cfg(test)]
+mod talking_tests {
+    use super::*;
+
+    #[test]
+    fn main_waits_while_he_talks_and_restarts_once_he_is_quiet() {
+        assert!(talking(1, None, 0));
+        assert!(talking(0, Some(1_000), 1_000 + TALK_MS - 1));
+        assert!(!talking(0, Some(1_000), 1_000 + TALK_MS));
+        assert!(!talking(0, None, 5));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

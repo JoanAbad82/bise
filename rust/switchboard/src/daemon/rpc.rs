@@ -138,7 +138,15 @@ impl Shell {
     /// stream joins the clients, sb-core hears it like a hello, then the
     /// request is answered. No hello burst.
     pub(super) fn rpc_new(&mut self, id: ClientId, stream: UnixStream, v: Value, peer: String) {
-        self.clients.insert(id, stream);
+        match super::outbox::of_unix(&stream, super::outbox::CLIENT_MAX) {
+            Ok(o) => {
+                self.clients.insert(id, o);
+            }
+            Err(e) => {
+                log_line(&self.opts.paths, &format!("client {peer}: no writer for it: {e}"));
+                return;
+            }
+        }
         self.rpc.peers.insert(id, peer);
         self.step(Input::ClientHello { client: id });
         self.rpc_line(id, v);
@@ -304,8 +312,14 @@ impl Shell {
                 return;
             }
         }
-        if let Some(c) = self.clients.get_mut(&id) {
-            write_line(c, line);
+        // queued, never written here (daemon/outbox.rs); a client that
+        // reads nothing is closed: its reader sees the end, ClientGone
+        if let Some(c) = self.clients.get(&id) {
+            if c.send(line) == super::outbox::Sent::Full {
+                let peer = self.rpc.peers.get(&id).cloned().unwrap_or_default();
+                log_line(&self.opts.paths, &format!("client {peer} reads nothing ({} bytes wait): closed", c.waiting()));
+                c.close();
+            }
         }
     }
 

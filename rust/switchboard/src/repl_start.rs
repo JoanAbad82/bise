@@ -47,16 +47,37 @@ pub struct Cand {
     /// The user's input waits on it.
     pub urgent: bool,
     pub asked_ms: u64,
+    /// main: it never waits for a slot (hub-stall, @bise m_25297: his
+    /// main sat 4.5 min behind route-name's and bar-scope's switches).
+    pub main: bool,
 }
 
-/// The order slots go in: recycles last; then the urgent ones; then
-/// fresh starts before switches; then the oldest.
+/// The order slots go in: main first; then the others, recycles last,
+/// then the urgent ones, fresh starts before switches, the oldest first.
 pub fn order(mut c: Vec<Cand>) -> Vec<Cand> {
     c.sort_by(|a, b| {
-        let key = |x: &Cand| (x.kind == Kind::Recycle, !x.urgent, x.kind, x.asked_ms);
+        let key = |x: &Cand| (!x.main, x.kind == Kind::Recycle, !x.urgent, x.kind, x.asked_ms);
         key(a).cmp(&key(b)).then_with(|| a.dir.cmp(&b.dir))
     });
     c
+}
+
+/// The starts that go now with `free` slots: main always (past the
+/// limit if it must), the others in [`order`] up to `free`.
+pub fn admit(c: Vec<Cand>, free: usize) -> Vec<Cand> {
+    let mut left = free;
+    order(c)
+        .into_iter()
+        .filter(|x| {
+            if x.main {
+                left = left.saturating_sub(1);
+                return true;
+            }
+            let go = left > 0;
+            left = left.saturating_sub(1);
+            go
+        })
+        .collect()
 }
 
 /// A start that stalled.
@@ -162,7 +183,19 @@ mod tests {
     use super::*;
 
     fn cand(dir: &str, kind: Kind, urgent: bool, at: u64) -> Cand {
-        Cand { dir: dir.into(), kind, urgent, asked_ms: at }
+        Cand { dir: dir.into(), kind, urgent, asked_ms: at, main: dir == "main" }
+    }
+
+    /// @bise m_25297: main's recycle waited 4.5 min behind other
+    /// switches. Main goes first and never waits for a slot.
+    #[test]
+    fn main_starts_first_even_when_every_slot_is_taken() {
+        let c = || vec![cand("route-name", Kind::Switch, false, 1), cand("main", Kind::Recycle, false, 9), cand("bar-scope", Kind::Switch, false, 2)];
+        let dirs = |v: Vec<Cand>| v.into_iter().map(|x| x.dir).collect::<Vec<_>>();
+        assert_eq!(dirs(admit(c(), 0)), ["main"]);
+        assert_eq!(dirs(admit(c(), 1)), ["main"]);
+        assert_eq!(dirs(admit(c(), 2)), ["main", "route-name"]);
+        assert_eq!(dirs(admit(vec![cand("t", Kind::Start, false, 0)], 0)), Vec::<String>::new());
     }
 
     #[test]
@@ -206,6 +239,24 @@ mod tests {
             assert!(s.stalled(t + 29_000).is_empty(), "at {} ms", t);
         }
         assert!(s.in_flight("amb-kit"));
+    }
+
+    /// hub-stall: the hub judges at the time its tick was sent. His loop,
+    /// busy 20:08:10 → 20:09:08, took route-name's progress after that
+    /// tick's time: judged then, it is no stall (judged at the loop's
+    /// late "now", it failed a start that had moved, and its REPL lived
+    /// on, orphaned).
+    #[test]
+    fn progress_the_loop_takes_late_never_fails_a_start_judged_at_the_tick_time() {
+        let mut s = Starts::default();
+        s.begin("route-name", Kind::Start, 0);
+        // the tick was sent at 40 s; the banner's progress, sent at 30 s,
+        // was taken at 59 s when the busy loop came back
+        s.progress("route-name", 59_000);
+        assert!(s.stalled(40_000).is_empty());
+        // a start that truly stands still still fails
+        s.begin("still", Kind::Start, 0);
+        assert_eq!(s.stalled(START_STILL_MS).iter().map(|x| x.dir.as_str()).collect::<Vec<_>>(), ["still"]);
     }
 
     #[test]
