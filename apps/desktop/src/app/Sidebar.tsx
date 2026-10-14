@@ -1,5 +1,5 @@
 // The sidebar (designer's desktop-screens v6/v7, signed): 'search or jump
-// ⌘K', bise, '↗ artifacts' and '◷ scheduled' for every project at once,
+// ⌘K', bise, '? inbox' (the pink waiting count), '↗ artifacts' and '◷ scheduled' for every project at once,
 // then his projects, each with its mark (desktop-delight v2: the '∿' gust at
 // work, '?' when it asks him, '·' quiet; a click opens 'bise · storefront')
 // and his pink count; bise's row leads with its ':*' (Marks.tsx); the archived agents
@@ -226,13 +226,13 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         kind="top"
         lead={<LiveBiseMark testId="app.sidebar.bise.mark" />}
         name="bise"
-        count={waits}
-        countTip={waitsTip(waits, true)}
         hint={cmd ? 0 : undefined}
         on={route.screen === 'bise' || (home !== undefined && inView === home.project && route.screen === 'thread' && route.agent === MAIN)}
         onClick={() => { router.go({ screen: 'bise' }); }}
         testId="app.sidebar.bise"
       />
+      <SRow kind="top" lead="?" name="inbox" count={waits} countTip={waitsTip(waits, true)}
+        on={route.screen === 'inbox'} onClick={() => { router.go({ screen: 'inbox' }); }} testId="app.sidebar.inbox" />
       <SRow kind="top" lead="↗" name="artifacts" end={<NewEnd words={newWords(fresh, makers)} />} endTip={newTip(fresh, makers)}
         on={route.screen === 'artifacts' && route.project === ''}
         onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} testId="app.sidebar.artifacts" />

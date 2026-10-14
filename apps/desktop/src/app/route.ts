@@ -20,8 +20,9 @@
 //   artifacts/<p>[/<id>]       a project's artifacts (one opened)
 //   environments/<p>           its worktrees and dev servers
 //   settings[/<page>] | onboarding    amb-home's screens
-//   (no 'inbox' screen: one inbox, the block at the bottom of every view; 'inbox' and
-//   'inbox?card=<p>/<id>' are asks to open it in place, read by inboxAtOf, never routes)
+//   inbox/all                  the inbox screen: what waits on him, then what he answered (inbox-screen)
+//   ('inbox' and 'inbox?card=<p>/<id>' stay asks to open the block above the composer in place,
+//   read by inboxAtOf, never routes)
 //   lab/<composer|spotlight|pearl>             amb-web's labs, test mode only
 // Anything else parses to `notfound` with the string kept, never to bise:
 // a wrong link says so.
@@ -42,6 +43,8 @@ export type Route =
   | { screen: 'artifacts'; project: string; id?: string }
   | { screen: 'environments'; project: string }
   | { screen: 'scheduled' }
+  /** every project's waiting items, then what he answered or what was withdrawn (inbox-history pick A) */
+  | { screen: 'inbox' }
   /** the last crash report, opened in the window (designer's voice-window part 2); `log: 'restart'`
    * the last update's restart.log (settings › general's 'show the log', designer's app-swap v2) */
   | { screen: 'report'; log?: 'restart' }
@@ -73,6 +76,8 @@ export function formatRoute(r: Route): string {
       return r.screen;
     case 'report':
       return r.log === 'restart' ? 'report/restart' : 'report';
+    case 'inbox':
+      return 'inbox/all';
     case 'thread':
       return r.agent === MAIN ? `project/${r.project}` : `agent/${r.project}/${r.agent}`;
     case 'agents':
@@ -122,6 +127,8 @@ export function parseRoute(path: string): Route {
     case 'report':
       if (args.length === 0) return { screen: 'report' };
       return one === 'restart' ? { screen: 'report', log: 'restart' } : nf;
+    case 'inbox':
+      return one === 'all' ? { screen: 'inbox' } : nf;
     case 'project':
       return one !== undefined ? { screen: 'thread', project: one, agent: MAIN } : nf;
     case 'agent':
