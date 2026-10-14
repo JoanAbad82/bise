@@ -124,6 +124,16 @@ def pure():
                       for e in ae), "the app's env: the try home, never a test variable: %s" % ae)
 
 
+def root_ships_what_a_version_dir_has():
+    """The app's runtime snapshot carries what scripts/versions.sh puts in a version dir for the
+    agents: the built-in plugins and the office SDK's bundles (without office/dist the app's
+    agents loaded the office skills and `bise office run` had no office.js). Pure."""
+    s = "\n".join(T.root_script("/r/root-abc"))
+    for what in ("cp -R plugins /r/root-abc.tmp/plugins", "cp -R office/dist /r/root-abc.tmp/office/dist",
+                 "cp -R kit /r/root-abc.tmp/kit", "cp -R prompts /r/root-abc.tmp/prompts"):
+        check(what in s, "root_script: %s" % what)
+
+
 def root_of(script):
     """The snapshot app root a build script makes (root_script's last line: rm -rf R && mv R.tmp R)."""
     for line in script.splitlines():
@@ -722,6 +732,7 @@ def candidate_then_promote():
 
 if __name__ == "__main__":
     pure()
+    root_ships_what_a_version_dir_has()
     stamp_skips_build()
     staged_never_over_a_running_try()
     legacy_old_retired()

@@ -22,7 +22,6 @@ provider (fake_provider.py), a fresh agent t1:
 Fake data only, a throwaway HOME; nothing of the user's is read.
 """
 import glob
-import json
 import os
 import shutil
 import subprocess
@@ -149,8 +148,8 @@ def main():
         pptx = os.path.join(wt, "otters.pptx")
         check(os.path.isfile(pptx) and open(pptx, "rb").read(2) == b"PK", "otters.pptx in t1's worktree")
         out = texts[3]
-        outline = json.loads(out[out.index("{"):]) if "{" in out else {}
-        n = len(outline.get("slides", []))
+        # the outline as the agent read it (its tool text: one node per slide)
+        n = out.count('"type":"slide"')
         check(n == 3, "bise office inspect: 3 slides, got %d: %s" % (n, out[:400]))
         check("Otters" in out and "Habitat" in out, "the slides' text is in the deck")
         print("ok: fresh install (%s): office skills listed and loaded, otters.pptx written with bise office run"

@@ -177,7 +177,7 @@ def root_script(root):
     BISE_APP_ROOT, copied like scripts/versions.sh makes a version dir, so his running try never
     reads this checkout (a checkout moved or rebuilt would change the runtime under his hubs):
     repl-live and sb-core from bins.sh's cache (immutable, one per source hash), bend-jsrt (a hard
-    link to its cache file), prompts/, plugins/, kit/, computer-use/extension, VERSION.
+    link to its cache file), prompts/, plugins/, kit/, office/dist, computer-use/extension, VERSION.
     Built in <root>.tmp, then one rename. Run from the checkout. Pure."""
     q = shlex.quote
     t = root + ".tmp"
@@ -190,6 +190,9 @@ def root_script(root):
             "cp -R prompts %s/prompts" % q(t),
             "if [ -d plugins ]; then cp -R plugins %s/plugins; fi" % q(t),
             "if [ -d kit ]; then cp -R kit %s/kit; fi" % q(t),
+            # the office SDK's bundles: the office skills' `bise office run` and the viewer
+            # (versions.sh copies them the same way; without them no agent of the app made a pptx)
+            "if [ -d office/dist ]; then mkdir -p %s/office && cp -R office/dist %s/office/dist; fi" % (q(t), q(t)),
             "if [ -d computer-use/extension ]; then cp -R computer-use/extension %s/computer-use/extension && rm -rf %s/computer-use/extension/test; fi"
             % (q(t), q(t)),
             "printf 'id=%%s\\ncommit=%%s\\nrepo=%%s\\n' %s \"$(git rev-parse HEAD)\" \"$PWD\" > %s/VERSION" % (q(os.path.basename(root)), q(t)),
