@@ -109,7 +109,8 @@ def main():
         wait.until(lambda: os.path.exists(sock), 30, "the hub's socket", poll=0.05)
         c = Client(sock)
         c.wait_status("main", "idle", 90)
-        check(open(os.path.join(E.state, "hub.root")).read().strip() == root, "the hub runs from the installed bise")
+        hub_root = open(os.path.join(E.state, "hub.root")).read().strip()
+        check(os.path.realpath(hub_root) == os.path.realpath(root), "the hub runs from the installed bise: %s" % hub_root)
 
         script = os.path.join(E.tmp, "deck.ts")
         open(script, "w").write(DECK)

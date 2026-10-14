@@ -11,7 +11,9 @@
 # and live), one headless turn answered by tests/fake_provider.py (the
 # installed REPL calls a provider and answers; needs python3, nothing
 # leaves the machine), the Switchboard hub start / sb list / stop on a
-# throwaway git workspace, a reinstall (idempotent), then uninstall
+# throwaway git workspace, the built-in office plugins (a new agent lists
+# and loads their skills and makes a pptx with `bise office run`:
+# tests/office_fresh_install_e2e.py), a reinstall (idempotent), then uninstall
 # (data kept). Exit 0 when every check passed (CI runs it on each arch).
 #
 # BISE_CMD: the command to test (the CI workflow's one variable for the
@@ -214,6 +216,16 @@ fi
 echo "== reinstall (same version: idempotent)"
 E sh "$bundle/install.sh" 2>&1 | sed 's/^/     /'
 [ "$(grep -c "$MARK" "$T/.zshrc")" = 1 ] && ok "one PATH line only" || ko "PATH line duplicated"
+
+# the built-in office plugins on a fresh install: a new agent lists their
+# skills, loads slides:slides and writes a pptx with `bise office run`
+# (its own temp HOME and hub, the fake provider; no node, pip or npm)
+echo "== office plugins (tests/office_fresh_install_e2e.py)"
+if python3 -u "$HERE/../tests/office_fresh_install_e2e.py" --tarball "$tarball" 2>&1 | tail -n 15 | sed 's/^/     /'; [ "${PIPESTATUS[0]}" = 0 ]; then
+  ok "office skills listed and loaded, a pptx made with bise office run"
+else
+  ko "office plugins on a fresh install"
+fi
 
 echo "== uninstall"
 E "$BIN" uninstall 2>&1 | sed 's/^/     /'
