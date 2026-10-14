@@ -123,8 +123,9 @@ mod tests {
         let site = text(&get(&p, &format!("/a/{}/view", html.id)));
         assert!(site.contains("data-kind=\"site\"") && site.contains(&format!("data-file=\"/a/{}/1/framed/r.html\"", html.id)), "{site}");
         // the framed copy gets the selection script, the plain one never (architect m_24172)
+        // and both the storage shim first (architect m_25527)
         assert!(text(&get(&p, &format!("/a/{}/1/framed/r.html", html.id))).ends_with("<h1>r</h1><script src=\"/kit/site-select.js\"></script>"));
-        assert_eq!(text(&get(&p, &format!("/a/{}/1/r.html", html.id))), "<h1>r</h1>");
+        assert_eq!(text(&get(&p, &format!("/a/{}/1/r.html", html.id))), format!("{}<h1>r</h1>", crate::pages::site::STORAGE_TAG));
 
         let r = get(&p, &format!("/a/{}/view", xlsx.id));
         assert_eq!((r.status, r.csp), (200, view::VIEW_CSP));

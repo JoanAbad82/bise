@@ -35,6 +35,9 @@ export const LAND = [
   'checks/spotlight/streaming.spec.ts',
   // the real pages server's CSP in the artifact view (ambient-lead m_20610, architect m_20628)
   'checks/artifacts/frame-csp.spec.ts',
+  // an html artifact its script builds shows whole, follows a new version and a reopen; '↗ browser'
+  // opens the hub's page (art-viewer, architect m_25527)
+  'checks/artifacts/script-page.spec.ts',
 ];
 
 const here = path.dirname(fileURLToPath(import.meta.url));

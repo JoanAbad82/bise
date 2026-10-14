@@ -116,16 +116,45 @@ pub fn framed<'a>(rest: &'a [&'a str]) -> (bool, &'a [&'a str]) {
 /// The tag a framed html page gets (kit/site-select.js).
 pub const SELECT_TAG: &str = "<script src=\"/kit/site-select.js\"></script>";
 
-/// An html page with [`SELECT_TAG`] before its last `</body>` (any case),
-/// or at its end when it has none; the rest of the bytes as they are.
-pub fn with_select(html: &[u8]) -> Vec<u8> {
+/// The tag every html page served under [`ARTIFACT_CSP`] gets, first
+/// (kit/storage.js): an in-memory localStorage/sessionStorage where the
+/// opaque origin forbids them, so a page that reads one at its top level
+/// still draws (art-viewer, architect m_25527).
+pub const STORAGE_TAG: &str = "<script src=\"/kit/storage.js\"></script>";
+
+/// The one rule for what an html page of a copy gets (architect m_24172,
+/// m_25527): [`STORAGE_TAG`] always, before the page's own scripts (just
+/// inside its `<head>`, else its `<html>`, else after its doctype, else
+/// at its start); [`SELECT_TAG`] before its last `</body>` (or at its
+/// end) only on the `framed` path. The kept copy never changes; the rest
+/// of the bytes as they are.
+pub fn tagged(html: &[u8], framed: bool) -> Vec<u8> {
     let lower: Vec<u8> = html.iter().map(u8::to_ascii_lowercase).collect();
-    let at = lower.windows(7).rposition(|w| w == b"</body>").unwrap_or(html.len());
-    let mut out = Vec::with_capacity(html.len() + SELECT_TAG.len());
-    out.extend_from_slice(&html[..at]);
-    out.extend_from_slice(SELECT_TAG.as_bytes());
-    out.extend_from_slice(&html[at..]);
+    let first = after_open(&lower, b"<head").or_else(|| after_open(&lower, b"<html")).or_else(|| after_open(&lower, b"<!doctype")).unwrap_or(0);
+    let end = if framed { lower.windows(7).rposition(|w| w == b"</body>").unwrap_or(html.len()).max(first) } else { html.len() };
+    let mut out = Vec::with_capacity(html.len() + STORAGE_TAG.len() + SELECT_TAG.len());
+    out.extend_from_slice(&html[..first]);
+    out.extend_from_slice(STORAGE_TAG.as_bytes());
+    out.extend_from_slice(&html[first..end]);
+    if framed {
+        out.extend_from_slice(SELECT_TAG.as_bytes());
+    }
+    out.extend_from_slice(&html[end..]);
     out
+}
+
+/// Just past the first `<name …>` open tag of `lower` (a lowercased page):
+/// `<head>` or `<head lang=…>`, never `<header>`. None: it has none.
+fn after_open(lower: &[u8], name: &[u8]) -> Option<usize> {
+    let mut from = 0;
+    while let Some(i) = lower[from..].windows(name.len()).position(|w| w == name).map(|i| i + from) {
+        let next = lower.get(i + name.len()).copied();
+        if matches!(next, Some(b'>' | b' ' | b'\t' | b'\n' | b'\r' | b'/')) {
+            return lower[i..].iter().position(|&b| b == b'>').map(|j| i + j + 1);
+        }
+        from = i + 1;
+    }
+    None
 }
 
 /// Whether the page server serves an artifact from its kept copy at
@@ -404,11 +433,30 @@ mod tests {
         assert_eq!(framed(&["r.html"]), (false, &["r.html"][..]));
         assert_eq!(framed(&[]), (false, &[][..]));
         assert_eq!(framed(&["docs", "framed"]), (false, &["docs", "framed"][..]), "only at the start");
-        let page = b"<html><body><p>hi</p></BODY></html>";
-        assert_eq!(String::from_utf8(with_select(page)).unwrap(), format!("<html><body><p>hi</p>{SELECT_TAG}</BODY></html>"));
-        assert_eq!(String::from_utf8(with_select(b"<p>no body")).unwrap(), format!("<p>no body{SELECT_TAG}"));
         // the last </body> (one in a script's string comes before it)
         let two = b"<script>'</body>'</script></body>";
-        assert!(String::from_utf8(with_select(two)).unwrap().ends_with(&format!("{SELECT_TAG}</body>")));
+        assert!(String::from_utf8(tagged(two, true)).unwrap().ends_with(&format!("{SELECT_TAG}</body>")));
+    }
+
+    /// architect m_25527: the one table of what an html copy gets. The
+    /// storage tag first on both paths, before the page's own scripts
+    /// (never before the doctype: quirks mode); the selection tag only
+    /// framed, before the last </body>.
+    #[test]
+    fn an_html_copy_gets_storage_first_and_selection_only_framed() {
+        let (s, x) = (STORAGE_TAG, SELECT_TAG);
+        let cases: [(&str, bool, String); 8] = [
+            ("<!doctype html><html><HEAD><script>localStorage</script></head><body><p>hi</p></BODY></html>", false, format!("<!doctype html><html><HEAD>{s}<script>localStorage</script></head><body><p>hi</p></BODY></html>")),
+            ("<!doctype html><html><HEAD><script>localStorage</script></head><body><p>hi</p></BODY></html>", true, format!("<!doctype html><html><HEAD>{s}<script>localStorage</script></head><body><p>hi</p>{x}</BODY></html>")),
+            ("<html lang=\"en\"><head data-x><title>t</title>", false, format!("<html lang=\"en\"><head data-x>{s}<title>t</title>")),
+            ("<html><body><header>h</header>", false, format!("<html>{s}<body><header>h</header>")),
+            ("<!DOCTYPE html>\n<script>a()</script>", false, format!("<!DOCTYPE html>{s}\n<script>a()</script>")),
+            ("<p>no body", false, format!("{s}<p>no body")),
+            ("<p>no body", true, format!("{s}<p>no body{x}")),
+            ("", true, format!("{s}{x}")),
+        ];
+        for (page, framed, want) in cases {
+            assert_eq!(String::from_utf8(tagged(page.as_bytes(), framed)).unwrap(), want, "{page} framed={framed}");
+        }
     }
 }

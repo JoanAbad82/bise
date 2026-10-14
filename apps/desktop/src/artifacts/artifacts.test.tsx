@@ -9,7 +9,7 @@ import { formatRoute, parseRoute } from '@/app/route';
 import { byDay, dayWords, filterItems, glyphOf, inApp, kindWords, leaves, ALL, splitArchived, timeOf, versions, whenWords, type Item } from './model';
 import { aboutWords, ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
 import { putInDraft } from './put';
-import { frameSrc, themedUrl } from './Open';
+import { browserUrl, frameSrc, themedUrl } from './Open';
 import { aboutText } from '@/thread/ThreadComposer';
 import { load } from '@/composer/drafts';
 import { entryOf, entrySegments } from '@/composer/entry';
@@ -278,6 +278,40 @@ describe('artifacts screens', () => {
     expect(frameSrc({ kind: 'page', url: 'http://127.0.0.1:47123/p/notes', version: 3 }, 1, 'light')).toBe('http://127.0.0.1:47123/p/notes/v/1?theme=light');
     expect(frameSrc({ kind: 'link', url: 'https://example.com/a', version: 1 }, 1, null)).toBe('https://example.com/a');
     expect(frameSrc({ kind: 'file', url: 'http://127.0.0.1:47123/x.csv', version: 1 }, 1, null)).toBeNull();
+  });
+
+  it("'↗ browser' opens what the panel frames, else an http(s) url, never a file path (art-viewer, architect m_25527)", () => {
+    const file = { kind: 'page', url: '/Users/x/.bise/hubs/h/artifacts/sign/v2/index.html', version: 2 };
+    const viewer = { ...file, frame_url: 'http://127.0.0.1:47123/a/sign/view', versions: [{ v: 1, frame_url: 'http://127.0.0.1:47123/a/sign/1/view' }, { v: 2, frame_url: 'http://127.0.0.1:47123/a/sign/view' }] };
+    // 1. the hub's frame_url of the shown version, no ?theme
+    expect(browserUrl(viewer, 2)).toBe('http://127.0.0.1:47123/a/sign/view');
+    expect(browserUrl(viewer, 1)).toBe('http://127.0.0.1:47123/a/sign/1/view');
+    // 2. an http(s) url at that version: a page, a deploy
+    expect(browserUrl({ kind: 'page', url: 'http://127.0.0.1:47123/p/notes', version: 3 }, 1)).toBe('http://127.0.0.1:47123/p/notes/v/1');
+    expect(browserUrl({ kind: 'file', url: 'https://shop.example.com/', version: 1 }, 1)).toBe('https://shop.example.com/');
+    // 3. a bare path (an older hub, no frame_url): nothing, so no button
+    expect(browserUrl(file, 2)).toBeNull();
+  });
+
+  it("'↗ browser' on a copied html file calls openExternal with the hub's page; a bare path shows no button", () => {
+    const opened: string[] = [];
+    const g = globalThis as { bise?: unknown };
+    g.bise = { openExternal: (u: string) => { opened.push(u); return Promise.resolve(true); } };
+    const sign = art('sign', 'page', { version: 2, url: '/Users/x/.bise/hubs/h/artifacts/sign/v2/index.html', frame_url: 'http://127.0.0.1:47123/a/sign/view' });
+    const bare = art('bare', 'page', { url: '/Users/x/w/bare.html' });
+    try {
+      const store = world();
+      store.apply({ ev: 'artifacts', project: 'shop-1', items: [sign, bare] });
+      const open = (id: string) => render(<StoreProvider store={store}><RouterContext.Provider value={createRouter({ screen: 'artifacts', project: 'shop-1', id })}><ArtifactOpen project="shop-1" id={id} /></RouterContext.Provider></StoreProvider>);
+      open('sign');
+      fireEvent.click(screen.getByTestId('artifact.browser'));
+      expect(opened).toEqual(['http://127.0.0.1:47123/a/sign/view']);
+      cleanup();
+      open('bare');
+      expect(screen.queryByTestId('artifact.browser')).toBeNull();
+    } finally {
+      delete g.bise;
+    }
   });
 
   it('browser-only (designer m_21714): no view in the window and a url his browser takes; every in-app kind stays', () => {

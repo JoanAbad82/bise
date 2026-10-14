@@ -345,7 +345,7 @@ fn artifact_file(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Response {
     let Some(path) = super::site::copy_file(&base, &rest) else { return Response::missing(&format!("no such file: {at}")) };
     let Some(ctype) = super::site::ctype(&path.to_string_lossy()) else { return Response::missing(&format!("not served: {at}")) };
     match std::fs::read(&path) {
-        Ok(body) if select && ctype.starts_with("text/html") => Response { status: 200, ctype, body: super::site::with_select(&body), csp: super::site::ARTIFACT_CSP },
+        Ok(body) if ctype.starts_with("text/html") => Response { status: 200, ctype, body: super::site::tagged(&body, select), csp: super::site::ARTIFACT_CSP },
         Ok(body) => Response { status: 200, ctype, body, csp: super::site::ARTIFACT_CSP },
         Err(_) => Response::missing(&format!("no such file: {at}")),
     }
@@ -745,7 +745,7 @@ mod tests {
         let shell = text(&get(&p, url.strip_prefix(&base).unwrap()));
         assert!(shell.contains("data-kind=\"site\""), "{shell}");
         let r = get(&p, &format!("/a/{}/1/proof.html", html.id));
-        assert_eq!((r.status, text(&r).as_str()), (200, "<h1>proof</h1>"), "{url}");
+        assert_eq!((r.status, text(&r)), (200, format!("{}<h1>proof</h1>", super::super::site::STORAGE_TAG)), "{url}");
         assert_eq!(r.csp, super::super::site::ARTIFACT_CSP, "in its sandbox");
         assert_eq!(get(&p, &format!("/a/{}/1/framed/proof.html", html.id)).csp, super::super::site::ARTIFACT_CSP, "framed: the same sandbox");
         for a in items.iter().filter(|a| a.id != html.id && !a.title.contains("notes")) {
@@ -791,8 +791,11 @@ mod tests {
                 assert_eq!((r.status, text(&r).as_str(), r.csp), (200, body, super::super::site::ARTIFACT_CSP), "{at}");
             }
         }
-        assert!(!text(&get(&p, "/a/menus/1/index.html")).contains("site-select"), "the plain copy as it is");
-        assert!(text(&get(&p, "/a/menus/1/framed/index.html")).contains("site-select"), "the framed html gets the tag");
+        // architect m_25527: the plain copy gets the storage tag only, the framed both; the kept copy never changes
+        let (plain, framed) = (text(&get(&p, "/a/menus/1/index.html")), text(&get(&p, "/a/menus/1/framed/index.html")));
+        assert!(plain.starts_with(super::super::site::STORAGE_TAG) && !plain.contains("site-select"), "{plain}");
+        assert!(framed.starts_with(super::super::site::STORAGE_TAG) && framed.contains("site-select"), "{framed}");
+        assert!(!std::fs::read_to_string(d.join("artifacts/menus/v1/index.html")).unwrap().contains("/kit/"), "the kept copy as it was");
         // nothing outside the version's folder
         std::os::unix::fs::symlink(d.join("secret.txt"), d.join("artifacts/menus/v1/img/out.png")).unwrap();
         for bad in ["img/gone.png", "../v1/index.html", "..%2f..%2fsecret.txt", "img/.part", "img/out.png", "%2fetc%2fpasswd", "img"] {
@@ -827,7 +830,7 @@ mod tests {
         for at in ["/a/menus/1/", "/a/menus/1", "/a/menus/1/framed/"] {
             let r = get(&p, at);
             assert_eq!(r.status, 200, "{at}");
-            assert!(text(&r).starts_with("<img src=\"a.png\">"), "{at}");
+            assert!(text(&r).starts_with(&format!("{}<img src=\"a.png\">", super::super::site::STORAGE_TAG)), "{at}");
         }
         assert_eq!(text(&get(&p, "/a/menus/1/a.png")), "A");
         let _ = std::fs::remove_dir_all(d);

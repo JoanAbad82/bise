@@ -123,6 +123,21 @@ export function frameSrc(
 }
 
 /**
+ * What '↗ browser' opens at version `shown`, or null (no button). Pure. What the panel frames (the
+ * hub's frame_url of that version, without the ?theme the window adds: his browser picks its own),
+ * else the row's http(s) url at that version (a deploy, a link). Never a file path: the shell's
+ * openExternal refuses it, so the button did nothing for a copied file (art-viewer, architect m_25527).
+ */
+export function browserUrl(
+  a: { kind: string; url: string; version: number; frame_url?: string | null; versions?: readonly { v: number; frame_url?: string | null }[] },
+  shown: number,
+): string | null {
+  const framed = frameSrc(a, shown, null);
+  if (framed !== null) return framed;
+  return /^https?:\/\//i.test(a.url) ? versionUrl(a.url, a.version, shown) : null;
+}
+
+/**
  * The hub's live words under the head (art-live, designer m_23868, the 28 px strip): '∿ deck is
  * updating · slide 2' while the maker's turn runs, then 'v3 · 2 slides changed' with '← v2' 16 px
  * after it, which opens that version. Drawn as they come; the one thing decided here: the line goes
@@ -241,6 +256,8 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   const a = it.a;
   const shown = v ?? a.version;
   const url = versionUrl(a.url, a.version, shown);
+  // '↗ browser': what the panel frames, else an http(s) url; none: no button
+  const out = browserUrl(a, shown);
   const path = pathOf(a);
   const finder = path !== null && bise?.showInFinder !== undefined ? bise.showInFinder : undefined;
   return (
@@ -265,9 +282,11 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
               </Menu>
             )}
           </span>
-          <Button kind="ghost" size="sm" onClick={() => { void bise?.openExternal?.(url); }} testId="artifact.browser" title="open in browser">
-            ↗ browser
-          </Button>
+          {out !== null && (
+            <Button kind="ghost" size="sm" onClick={() => { void bise?.openExternal?.(out); }} testId="artifact.browser" title="open in browser">
+              ↗ browser
+            </Button>
+          )}
           <span className="art-drop">
             <IconButton label="more" size="bar" pressed={menu === 'more'} onClick={() => { setMenu(menu === 'more' ? null : 'more'); }} testId="artifact.more">⋯</IconButton>
             {menu === 'more' && (

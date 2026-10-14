@@ -204,6 +204,12 @@ notes: the page's notes system with an artifact as its target
 - A site is framed at `/a/<id>/<v>/framed/…` with `kit/site-select.js` in
   its html (the plain copy never has it); a site whose own CSP keeps that
   script out takes no notes, and its viewer says so.
+- Every html page of a copy, plain or framed, gets `kit/storage.js` first
+  (`site::tagged`, architect m_25527): the sandbox's opaque origin makes
+  `localStorage`/`sessionStorage` throw, so a page whose script read one at
+  its top level stopped before it drew; the shim gives an in-memory one, for
+  that load only. indexedDB and cookies still throw. The kept copy never
+  changes.
 - Not yet: the row's `detail` counts a page's open notes only; an
   artifact's open notes are not counted on its row.
 
