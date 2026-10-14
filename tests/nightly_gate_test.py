@@ -32,6 +32,7 @@ echo "lockf: $HOME/.bise/run/heavy.lock: already locked"
 [ -n "${FAKE_SWEEP:-}" ] && rm -rf "$FAKE_SWEEP"
 [ -n "${FAKE_LAND:-}" ] && git -C "$FAKE_LAND" commit -q --allow-empty -m landed
 [ -n "${FAKE_HEAVY_FAIL:-}" ] && { echo "heavy-run: $FAKE_HEAVY_FAIL"; exit 2; }
+[ "${1:-}" = --alone ] && { echo "heavy-run: both slots"; shift; }
 exec "$@"
 """
 
@@ -93,6 +94,7 @@ def main():
               "first night: the tree %s and its owner file" % wt)
         check("fake gate %s in %s GATE_ALL=1 args=full --all" % (short(), wt) in log, "first night: the gate ran in the tree: %r" % log)
         check(log.startswith("QUEUED ") and "\nSTART " in log, "first night: QUEUED then START: %r" % log)
+        check("heavy-run: both slots" in log, "first night: heavy-run --alone, never beside an agent's job: %r" % log)
         check(last.split()[1:3] == [short(), "green"], "first night: last %r" % last)
         check(red is None, "first night: no red")
 

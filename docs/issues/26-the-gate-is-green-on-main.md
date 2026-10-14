@@ -156,3 +156,85 @@ back, it gets its own item with the hub.log and the land queue's state at
 the hang. Kept dirs: /tmp/sb-e2e-19s0c5h5, b8dk62mi, 338aukor, vy4zc_lj
 (batch 1), 84ipz1mz, _qudidjq, e5u5rsnv, xcdskvxs, pfs1kgp5, z5gii4_m
 (batch 2, all at fr-b's first land on fr).
+
+## The nightly of 2026-10-14: 7 reds on main 0aefecd2
+
+The first nightly full gate (scripts/nightly_gate.sh, 04:30) went red on 7
+tests. Each run alone on 0aefecd2 under heavy-run (nightly-reds, plan
+signed by architect):
+
+| test | alone | cause | fix |
+|---|---|---|---|
+| repl_start_e2e | 3 red of 6 (2 across a sleep, 1 unexplained, below); 5/5 green under caffeinate | the Mac slept (05:06:45-05:12:26) | the nightly under caffeinate |
+| subscriptions_e2e | green | the same sleep | the same |
+| partial_e2e | green | the same sleep | the same |
+| ambient_pages_e2e | green | both sleeps | the same |
+| tui_stuck_start_tmux | green | the sleep 05:13:11-05:20:30 | the same |
+| xhub_e2e | green | a read between two journal lines | the test waits for the answer |
+| tui_help_tmux | not run unfixed (the cause is on the nightly's screen) | the End page shows the ψ row | the test waits for the filter |
+
+## The Mac slept under the gate
+
+`pmset -g log` has `Entering Sleep state due to 'Maintenance Sleep'` five
+times during the run, on AC, the display off. Nothing in the gate holds a
+power assertion, so the Mac sleeps with the tests running; at the wake the
+wall clock jumped by minutes. Each of the 5 long reds ended at a wake
+(timings.tsv, the test's end time): repl_start, subscriptions and partial
+at 05:12:26-31 (sleep 05:06:45 -> 05:12:26), tui_stuck_start and
+ambient_pages at 05:20:30-31 (sleep 05:13:11 -> 05:20:30). Their
+"timeout after 404 s (load x1.0)" for a 120 s wait was the sleep, not
+the load. Two of repl_start's reds alone the same morning also spanned a
+sleep: hub.log silent 282 s, the switcher still in probation (it counts on
+`Instant`, which stops while asleep; the hub and the tests count on the
+wall clock).
+
+The nightly now runs the gate under `caffeinate -i`, and in both heavy
+slots (`heavy-run --alone`): never beside an agent's heavy job (on battery
+it waits for AC). The agents' own gates at night can sleep the same way:
+`~/.bise/run/heavy-run` is not in this repo, main applies `caffeinate -i`
+to every job there (nightly-reds m_23323, architect m_23320).
+
+Open, no owner, below the line unless a user hits it: **two clocks in a
+switch.** The switcher's probation (switch.rs `probation`) counts 120 s on
+`Instant`, which stops while the Mac sleeps; the hub (hub.log, the REPL
+start watch) and the tests count on the wall clock. A probation that spans
+a sleep takes longer than its words say ("120 s"), and the hub reports
+"no progress in 282 s" for a start that was asleep, not stuck.
+
+## load x1.0 at load 8-9 is right
+
+`wait.load_factor()` is the 1-minute load per core, at least 1: 8-9 on
+12 cores is 0.7, so x1.0. It is read at each poll. Not a bug; the 5
+timeouts above were the sleep.
+
+## xhub_e2e: a read between two lines of one step
+
+xanswer journals `x_settled` then the `@<project>` message to main, one
+write and flush each (daemon.rs `Effect::Journal`). The test waited for
+`x_settled`, then read the message at once: at load 7 the read fell
+between the two and saw none ("the answer to main: []", 4 s). Green alone.
+It now waits for the message, then checks the send settled.
+
+## tui_help_tmux: the list grew past the End page
+
+At 200 columns the End page of /shortcuts now shows the ψ row (the
+symbols list grew: ▯, the ✓✓ rows), with its `symbols` heading above the
+page. The test typed `worktree` and waited for `has its own worktree`,
+which matched the End page before the filter applied (the screen says
+`filter: w`). It now waits for `filter: worktree` too.
+
+## repl_start_e2e: one red alone, cause not found
+
+Run alone on 0aefecd2 the same morning: 11 runs (the first in the run
+of all 7, 05:32; then 1, then 4 in a loop; then 5 under `caffeinate -i`).
+3 red, all in the first 6. Two of them spanned a sleep (hub.log silent
+282 s, matching pmset's 05:51:04 -> 05:55:03 and 05:55:48 -> 06:00:03).
+The third, 05:32:09-05:34:18, did not: pmset shows the Mac awake from 05:20:30 to 05:51:04, load 3.9.
+It failed `follow`'s wait for "the new hub's socket" (120 s) after the
+first, slow (8 s a start) reload. Its kept hub (`/tmp/sb-e2e-vnj8xcgk`,
+e2e.short_tmp: the agent's own $TMPDIR is too deep) was gone when read
+minutes later, so its hub.log and the switcher's lines are lost; the
+cause is not known. The next 5 runs under caffeinate were green (187-202
+s). Next time it is red: keep the run in a short TMPDIR that nothing
+sweeps (`TMPDIR=~/.bise/gate/<name>`), and read hub.log for the new
+hub's start and the switcher's `start_failure` line.

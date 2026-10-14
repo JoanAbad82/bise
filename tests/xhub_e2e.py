@@ -108,8 +108,14 @@ def main():
         said = [m["msg"] for m in of_type(pstate, "message_sent") if m["msg"]["id"] == pin[0]["in"]["msg"]][0]
         check(said["from"] == "user" and said.get("via") == "bise" and "the login is broken" in said["text"], "as his words via bise: %r" % said)
         # the project's main answers at its turn's end; bise's main hears @<name>
-        wait.until(lambda: of_type(hstate, "x_settled"), 90, "the answer settles the send")
-        ans = [m["msg"] for m in of_type(hstate, "message_sent") if m["msg"]["from"] == "@" + name]
+        # waited for by its last line: xanswer journals x_settled, then the
+        # message, one write each; a read between the two (the nightly at
+        # load 8-9) saw the send settled and no answer yet
+        def answers():
+            return [m["msg"] for m in of_type(hstate, "message_sent") if m["msg"]["from"] == "@" + name]
+        wait.until(answers, 90, "the answer to main")
+        check(of_type(hstate, "x_settled"), "the answer settles the send")
+        ans = answers()
         check(len(ans) == 1 and ans[0]["to"] == "main" and ("m_%d" % his) in ans[0]["text"], "the answer to main: %r" % ans)
         check(len(of_type(pstate, "x_replied")) == 1, "answered once")
 

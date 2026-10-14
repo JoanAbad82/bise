@@ -8,7 +8,8 @@
 #                                       (default 04:30; a Mac asleep then
 #                                       runs it at its wake)
 #   scripts/nightly_gate.sh --uninstall
-# It waits for a heavy slot (~/.bise/run/heavy-run, hours on a busy night),
+# It waits for both heavy slots (~/.bise/run/heavy-run --alone: no agent's
+# heavy job beside it; hours on a busy night; on battery it waits for AC),
 # then, in the slot, checks main's tip out in its tree and runs the gate:
 # the sha tested is main's tip when the slot came, and a tree removed while
 # it waited is made again.
@@ -78,13 +79,18 @@ if [ "${1:-}" = --in-slot ]; then
     || { echo "NOSTART cannot check out main ($tip) in $wt"; exit 1; }
   [ -f "$wt/tests/gate.sh" ] || { echo "NOSTART no tests/gate.sh in $wt"; exit 1; }
   echo "START $(date) $(git -C "$wt" rev-parse --short HEAD)"
-  cd "$wt" && GATE_ALL=1 exec bash tests/gate.sh full --all
+  # caffeinate -i: the Mac never idle-sleeps under the gate. On 2026-10-14
+  # it took 'Maintenance Sleep' 5 times during the run (pmset -g log): each
+  # test running across one ended at the wake, a timeout (5 reds; issue 26)
+  cd "$wt" && GATE_ALL=1 exec /usr/bin/caffeinate -i bash tests/gate.sh full --all
   echo "NOSTART cannot enter $wt"; exit 1
 fi
 
 day="$(date +%F)" log="$out/$(date +%F).log" s=$SECONDS
 echo "QUEUED $(date): waiting for a heavy slot" >"$log"
-"${NIGHTLY_HEAVY_RUN:-$HOME/.bise/run/heavy-run}" /bin/bash "$here/scripts/nightly_gate.sh" --in-slot >>"$log" 2>&1
+# --alone: both heavy slots, never beside an agent's heavy job (2026-10-14:
+# beside one, at load 8-9, 5 long tests timed out that pass alone; issue 26)
+"${NIGHTLY_HEAVY_RUN:-$HOME/.bise/run/heavy-run}" --alone /bin/bash "$here/scripts/nightly_gate.sh" --in-slot >>"$log" 2>&1
 rc=$?
 sha="$(awk '/^START /{print $NF; exit}' "$log")"
 if [ -z "$sha" ]; then

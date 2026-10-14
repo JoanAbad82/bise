@@ -44,9 +44,11 @@ def check(cols, rows):
         t.keys("End")
         sc = t.wait("folded lines: click, space or ctrl+o")
         print("---- /keys, End at %d columns ----\n%s" % (cols, sc))
-        # the filter finds a symbol by its words
+        # the filter finds a symbol by its words. The End page shows the ψ
+        # row too (the symbols list grew past one page at 200 columns): wait
+        # for the filter as well, else the wait matches the page before it
         t.typed("worktree")
-        sc = t.wait("has its own worktree")
+        sc = t.wait_all(["filter: worktree", "has its own worktree"])
         assert "ψ" in sc and "symbols" in sc, sc
         print("---- filter 'worktree' at %d columns ----\n%s" % (cols, sc))
         t.keys("Escape")
