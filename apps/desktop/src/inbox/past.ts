@@ -72,9 +72,9 @@ export function askersOf(cards: readonly Card[], records: readonly InboxRecord[]
   return [...new Set([...cards.map((c) => c.agent), ...records.map((r) => r.asker)])].sort();
 }
 
-/** The head's counts: '3 waiting · 41 answered' (withdrawn ones are not 'answered'). Pure. */
-export function headWords(cards: readonly Card[], records: readonly InboxRecord[]): string {
-  const answered = records.filter((r) => r.state === 'answered').length;
+/** The head's counts: '3 waiting · 41 answered' (the hubs' total when given; withdrawn ones are not 'answered'). Pure. */
+export function headWords(cards: readonly Card[], records: readonly InboxRecord[], total?: number): string {
+  const answered = total ?? records.filter((r) => r.state === 'answered').length;
   return `${String(cards.length)} waiting · ${String(answered)} answered`;
 }
 

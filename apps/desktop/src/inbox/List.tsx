@@ -26,6 +26,10 @@ export interface InboxPorts {
 export interface InboxViewProps {
   readonly cards: readonly Card[];
   readonly records: readonly InboxRecord[];
+  /** the hubs' answered total for the head (none: the records given) */
+  readonly answered?: number;
+  /** older records wait in the hubs: called when he reaches the list's end */
+  readonly onEnd?: () => void;
   /** project id → its name */
   readonly names: Readonly<Record<string, string>>;
   /** the projects, in the sidebar's order, for the menu */
@@ -37,7 +41,7 @@ export interface InboxViewProps {
   readonly now?: number;
 }
 
-export function InboxView({ cards, records, names, projects, ports, nextOf, now: pinned }: InboxViewProps) {
+export function InboxView({ cards, records, answered, onEnd, names, projects, ports, nextOf, now: pinned }: InboxViewProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [f, setF] = useState<Filter>(ALL);
@@ -101,7 +105,7 @@ export function InboxView({ cards, records, names, projects, ports, nextOf, now:
     <section ref={ref} tabIndex={-1} className="ip-screen" data-testid="inbox.screen" onKeyDown={onKeyDown}>
       <header className="ip-head">
         <div className="ip-h1">{cur ? <><Press look="ip-crumb" onClick={() => { setDetail(null); }} data-testid="inbox.detail.back">inbox</Press>{` › ${shownName(cur.r.asker)} · ${whenShort(cur.r, now)}`}</> : 'inbox'}</div>
-        {!cur && <div className="ip-h2" data-testid="inbox.counts">{headWords(cards, records)}</div>}
+        {!cur && <div className="ip-h2" data-testid="inbox.counts">{headWords(cards, records, answered)}</div>}
       </header>
       {!cur && (
         <div className="ip-filters">
@@ -161,7 +165,11 @@ export function InboxView({ cards, records, names, projects, ports, nextOf, now:
       ) : none ? (
         <div className="ip-empty" data-testid="inbox.none">nothing matches. esc clears the search.</div>
       ) : (
-        <div className="ip-list" role="listbox" data-testid="inbox.list">
+        <div className="ip-list" role="listbox" data-testid="inbox.list"
+          onScroll={onEnd === undefined ? undefined : (e) => {
+            const el = e.currentTarget;
+            if (el.scrollHeight - el.scrollTop - el.clientHeight < 240) onEnd();
+          }}>
           {lists.waiting.length > 0 && (
             <>
               <div className="ip-day-h ip-wait-h" data-testid="inbox.waiting.head">{`waiting for you · ${String(lists.waiting.length)}`}</div>

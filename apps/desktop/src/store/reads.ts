@@ -38,6 +38,7 @@ import {
   diffKey,
   type EvOf,
   type HubLine,
+  type InboxList,
   type PagesList,
   type Pending,
   type PrsList,
@@ -206,6 +207,10 @@ export class StoreReads extends StoreBase {
   /** ask bise's versions again (the answer: versions) */
   askVersions(project: string): void {
     this.command({ cmd: "versions", project });
+  }
+  /** a hub's answered and withdrawn records (inbox/history); null before it said */
+  inbox(project: string): InboxList | null {
+    return this.slice<InboxList | null>(`inbox:${project}`, null);
   }
   prs(project: string): PrsList | null {
     return this.slice<PrsList | null>(`prs:${project}`, null);

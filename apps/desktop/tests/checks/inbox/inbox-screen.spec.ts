@@ -6,7 +6,9 @@
 //     past by day (today, yesterday), two lines each ('you: <his words> · in the inbox'), the withdrawn
 //     one dim with its reason;
 //   - ⏎ on a waiting item opens it above this screen's composer ('answering perf · which bench?'), as ⌘I;
-//   - ⏎ on a past one goes to perf's thread (a history step: ⌘[ comes back to the inbox);
+//   - ⏎ on a past one goes to perf's thread at his answer, flashed once (answered-link's openAnswer; a
+//     history step: ⌘[ comes back to the inbox);
+//   - the history is asked of each project's hub (inbox_history) when the screen opens;
 //   - space opens the read-only detail, esc back; '/' searches;
 //   - 1400 / 1100 / 800 x 820: at 800 the agents filter and 'withdrawn' leave the head row, the rows drop
 //     the project and the 'where' whole; no text clipped.
@@ -59,8 +61,8 @@ const world = () => [
   {
     ev: 'thread', project: P, agent: 'perf', before: null, more: false,
     entries: [
-      { pos: 1, at_ms: today(11, 40), kind: 'you', text: 'after the bench' },
-      { pos: 2, at_ms: today(13, 58), kind: 'you', text: 'only for Safari 16' },
+      { pos: 1, at_ms: today(11, 40), kind: 'approval', text: 'you answered perf: after the bench', approval: { ok: true, text: 'you answered perf: after the bench', card: 5 } },
+      { pos: 2, at_ms: today(13, 58), kind: 'approval', text: 'you answered perf: only for Safari 16', approval: { ok: true, text: 'you answered perf: only for Safari 16', card: 7 } },
       { pos: 3, at_ms: today(14, 0), kind: 'agent', text: 'kept a webp fallback for Safari 16' },
     ],
   },
@@ -94,6 +96,7 @@ test('inbox/inbox-screen: the sidebar row, waiting first then the past by day, �
       await expect(page.getByTestId('app.sidebar.bise').locator('.app-cnt')).toHaveCount(0);
       await row.click();
       await expect(page.getByTestId('inbox.screen')).toBeVisible();
+      await core.waitCmd((c) => (c as { cmd?: string; project?: string }).cmd === 'inbox_history' && (c as { project?: string }).project === P, 3000);
     });
 
     await test.step('waiting first, then the past by day, two lines each', async () => {
@@ -153,6 +156,9 @@ test('inbox/inbox-screen: the sidebar row, waiting first then the past by day, �
       await page.getByTestId(`inbox.row.p:${P}/7`).click();
       await expect(page.getByTestId('inbox.screen')).toHaveCount(0);
       await expect(page.getByText('only for Safari 16').first()).toBeVisible({ timeout: 5000 });
+      // his answer flashed once (answered-link's openAnswer, the one jump)
+      await expect(page.locator('.th-flash')).toHaveCount(1, { timeout: 3000 });
+      await expect(page.locator('.th-flash')).toContainText('only for Safari 16');
       await page.waitForTimeout(150);
       await page.screenshot({ path: test.info().outputPath('jump-light.png') });
       await page.keyboard.press('Meta+BracketLeft');

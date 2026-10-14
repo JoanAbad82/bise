@@ -8,6 +8,7 @@ import {
   diffKey,
   type Ev,
   type HubLine,
+  type InboxList,
   type PagesList,
   type PrsList,
   type QueuedTake,
@@ -102,6 +103,35 @@ export function applyTyped(s: Store, ev: Ev): void {
       // where the hub's version switch is (/reload, /restart): at hello and when it moved; none = no switch yet
       s.put(`switch:${ev.project}`, ev.switch ?? null);
       return;
+    case "inbox_history": {
+      // a page: the first one (no older held) replaces, an older one (its items older than the
+      // held ones) goes after them; one record per card, newest first
+      const held = (s.slices.get(`inbox:${ev.project}`) as InboxList | undefined) ?? null;
+      const oldest = held?.items[held.items.length - 1]?.card;
+      const older = held !== null && oldest !== undefined && ev.items.every((r) => r.card < oldest);
+      s.put(`inbox:${ev.project}`, {
+        items: older ? [...held.items, ...ev.items] : ev.items,
+        more: ev.more,
+        answered: ev.answered,
+        withdrawn: ev.withdrawn,
+      } satisfies InboxList);
+      return;
+    }
+    case "inbox_recorded": {
+      const held = (s.slices.get(`inbox:${ev.project}`) as InboxList | undefined) ?? null;
+      if (held === null) return;
+      const r = ev.record;
+      const items = [r, ...held.items.filter((x) => x.card !== r.card)];
+      const was = held.items.find((x) => x.card === r.card);
+      const count = (st: string) => (was?.state === st ? -1 : 0) + (r.state === st ? 1 : 0);
+      s.put(`inbox:${ev.project}`, {
+        ...held,
+        items,
+        answered: held.answered + count("answered"),
+        withdrawn: held.withdrawn + count("withdrawn"),
+      } satisfies InboxList);
+      return;
+    }
     case "pages":
       s.put(`pages:${ev.project}`, {
         items: ev.items,

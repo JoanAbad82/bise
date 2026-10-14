@@ -20,7 +20,7 @@ export function InboxScreen() {
   const acted = useActed();
   const store = useStore();
   const router = useRouter();
-  const records = useInboxRecords();
+  const records = useInboxRecords(rows);
   useKeptScroll('inbox', () => document.querySelector<HTMLElement>('[data-testid="inbox.list"]'));
   const cards = useMemo(() => blockList(rows, actedKeys(acted)), [rows, acted]);
   const names = useMemo(() => Object.fromEntries(rows.map((r) => [r.project, r.name])), [rows]);
@@ -39,7 +39,9 @@ export function InboxScreen() {
   return (
     <InboxView
       cards={cards}
-      records={records}
+      records={records.items}
+      answered={records.answered}
+      {...(records.more ? { onEnd: records.older } : {})}
       names={names}
       projects={projects}
       nextOf={(r) => nextLine(store, r)}

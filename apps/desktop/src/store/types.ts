@@ -2,7 +2,7 @@
 // checked complete at compile time), the slices' list types, and the key and
 // compare helpers. Pure, no state. Split out of store.ts (pure move). Owner:
 // amb-core (the hub slices with amb-win).
-import type { AwayProject, CoreEv, HubEv, Mode, Part, Pr, PickFile, PickFolder, BranchRow, Page, VersionItem } from '@/proto';
+import type { AwayProject, CoreEv, HubEv, InboxRecord, Mode, Part, Pr, PickFile, PickFolder, BranchRow, Page, VersionItem } from '@/proto';
 export type Ev = HubEv | CoreEv;
 export type EvOf<T extends Ev['ev']> = Extract<Ev, { ev: T }>;
 
@@ -78,8 +78,8 @@ export const TAGS = {
   release: true,
   update: true,
   versions: true,
-  // the inbox's history (inbox-record d22e2c0ff): a page of answered and withdrawn notifications
-  // and a record that changed; recognised only, inbox-screen applies them
+  // inbox-history pick A (inbox-record d22e2c0ff): a page of a hub's answered and withdrawn
+  // records, and each new one as it closes (the inbox screen, inbox-screen's src/inbox)
   inbox_history: true,
   inbox_recorded: true,
   // cost-pause (main 09b6d551): the hub's pause state and its usage sums; recognised only, the
@@ -138,6 +138,15 @@ export interface PagesList {
 }
 
 /** A project's PR list (the prs event without its tag). */
+/** A hub's answered and withdrawn records (inbox/history), newest first, with its totals. */
+export interface InboxList {
+  readonly items: readonly InboxRecord[];
+  /** older records match too (ask again with `before` the last card) */
+  readonly more: boolean;
+  readonly answered: number;
+  readonly withdrawn: number;
+}
+
 export interface PrsList {
   readonly head: string;
   readonly items: readonly Pr[];

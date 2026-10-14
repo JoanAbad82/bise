@@ -642,6 +642,7 @@ export type {
   PagesList,
   Pending,
   PrsList,
+  InboxList,
   QueuedTake,
   TalkShot,
   ThreadOrder,
