@@ -3,7 +3,10 @@
 // to storefront'), AddButton in the list's head (the macOS picker through window.bise.pickFiles).
 // Each file goes through the hub's do: add (store.addArtifact), by you. The zones draw only while
 // files are dragged over the window (useFileDrag). Owner: art-desktop.
-import { useCallback, type DragEvent, type ReactNode } from 'react';
+import { useCallback, useState, type DragEvent, type ReactNode } from 'react';
+
+/** Under this height a list's drop zone hides what is under it whole (designer m_24293). */
+export const SHORT_ZONE_PX = 120;
 import { Button } from '@/ds';
 import { useProjects, useStore } from '@/store';
 import { addDropWords, addPlace, addTitle, carriesFiles, droppedPaths, giveWords, useFileDrag, type AddPlace } from './give';
@@ -85,11 +88,17 @@ export function AddDrop({ place, testId, children }: { place: AddPlace | null; t
     e.stopPropagation();
     for (const p of pathsOf(e)) store.addArtifact(place.project, place.agent, p);
   };
+  // a zone under SHORT_ZONE_PX (the right bar's ARTIFACTS): what is under it hides whole, only the
+  // words show (designer m_24293); measured when the zone appears
+  const [short, setShort] = useState(false);
+  const measure = useCallback((el: HTMLDivElement | null) => {
+    if (el !== null) setShort(el.getBoundingClientRect().height < SHORT_ZONE_PX);
+  }, []);
   return (
-    <div className="art-add-drop" data-testid={testId} onDragOver={place === null ? undefined : over} onDrop={onDrop}>
+    <div className="art-add-drop" data-testid={testId} data-short={(drag.on && short) || undefined} onDragOver={place === null ? undefined : over} onDrop={onDrop}>
       {children}
       {drag.on && place !== null && (
-        <div className="art-give" data-testid={`${testId}.zone`}>
+        <div ref={measure} className="art-give" data-testid={`${testId}.zone`}>
           <span className="art-give-words">{addDropWords(drag.count, place)}</span>
         </div>
       )}

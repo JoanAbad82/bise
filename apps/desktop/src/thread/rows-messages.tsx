@@ -4,7 +4,7 @@
 import { memo, useEffect, useState, type ReactNode } from 'react';
 import { Button, Chip, Fold, Press } from '@/ds';
 import type { Entry } from '@/proto';
-import { useAgents, useCoreState, useHubRefused, usePending, useProjects, useStore, useQueuedTake } from '@/store';
+import { useAgents, useArtifacts, useCoreState, useHubRefused, usePending, useProjects, useStore, useQueuedTake } from '@/store';
 import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
@@ -15,7 +15,7 @@ import { saidFor, useSaidMs } from '@/voicemode';
 import type { RowCtx } from './rows';
 import { Thumb } from './rows-cards';
 import { AttachChip, FileThumb } from './AttachChip';
-import { drawnParts, viaFn, youView, type YouView } from './parts';
+import { anchorMeta, drawnParts, viaFn, youView, type YouView } from './parts';
 import { lineCount, quoteAbout } from '@/composer/message';
 /** A message of his longer than this folds to its first lines (tui-parity B11, the TUI's You(_, _, open)). */
 export const LONG_LINES = 12;
@@ -118,7 +118,10 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   // a part of a kind this window doesn't know (a newer hub's): drawn from its text, never empty
   const drawn = drawnParts(e.parts);
   const view = drawn !== null ? youView(drawn) : null;
-  const quotes = view !== null ? view.quotes.map((q) => ({ source: q.from, text: q.text, n: q.n, about: q.about ?? (q.file !== '' ? quoteAbout(q.from, q.text, q) : '') })) : [];
+  // a part of an artifact says the artifact's name, as his composer's row did (designer m_24208)
+  const arts = useArtifacts(ctx.project);
+  const titles = new Map(arts.map((a) => [a.id, a.title]));
+  const quotes = view !== null ? view.quotes.map((q) => ({ source: q.from, text: q.text, n: q.n, about: q.anchor !== undefined ? anchorMeta(q.anchor, titles.get(q.anchor.artifact)) : q.file !== '' ? quoteAbout(q.from, q.text, q) : '' })) : [];
   const text = view !== null ? view.words : stripContext(e.text);
   const fold = foldOf(text);
   const toggle = () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Part } from '@/proto';
 import VIA_FN from '../../../../rust/proto/fixtures/via_fn.json';
-import { drawnParts, pageAnswer, pageOf, partsGist, viaFn, youView } from './parts';
+import { anchorMeta, drawnParts, pageAnswer, pageOf, partsGist, viaFn, youView } from './parts';
 
 // msg-parts (architect m_17621): his message drawn from its typed parts, never a tag; the TUI's
 // said.rs view_of / gist are the rule
@@ -48,9 +48,12 @@ describe('his message from its parts (msg-parts)', () => {
     const v = youView([text('why is '), cell, text(' so low?'), slide]);
     expect(v.words).toBe('why is ❝ 1 so low?');
     expect(v.quotes).toEqual([
-      { from: '', text: '1200 1350', file: '', new: '', old: '', about: 'Q3!B4:D9 · q3-xlsx v4', n: 1 },
-      { from: '', text: 'slide 5', file: '', new: '', old: '', about: 'slide 5 · deck v2' },
+      { from: '', text: '1200 1350', file: '', new: '', old: '', anchor: { artifact: 'q3-xlsx', version: 4, label: 'Q3!B4:D9' }, n: 1 },
+      { from: '', text: 'slide 5', file: '', new: '', old: '', anchor: { artifact: 'deck', version: 2, label: 'slide 5' } },
     ]);
+    // the bubble names it as his composer's row did (designer m_24208); an artifact gone: its id
+    expect(anchorMeta({ artifact: 'q3-xlsx', version: 4, label: 'Q3!B4:D9' }, 'q3-forecast.xlsx')).toBe('Q3!B4:D9 · q3-forecast.xlsx · v4');
+    expect(anchorMeta({ artifact: 'q3-xlsx', version: 4, label: 'Q3!B4:D9' }, undefined)).toBe('Q3!B4:D9 · q3-xlsx · v4');
     expect(drawnParts([cell])).not.toBeNull();
     expect(partsGist([text('why is '), cell, slide])).toBe('why is ❝ 1❝ slide 5 · deck v2');
   });

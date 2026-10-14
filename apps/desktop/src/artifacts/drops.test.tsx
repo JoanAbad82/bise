@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Store, StoreProvider } from '@/store';
 import { AddButton, AddDrop, ThreadDrop, useAddPlace } from './Drops';
+import { LiveStrip } from './Open';
 
 afterEach(() => {
   cleanup();
@@ -101,5 +102,22 @@ describe('giving files (designer m_23868, m_23898)', () => {
     const { store } = world();
     render(<StoreProvider store={store}><Listed project="shop-1" /></StoreProvider>);
     expect(screen.queryByTestId('t.add')).toBeNull();
+  });
+});
+
+describe("the hub's live words under the head (art-live)", () => {
+  it('draws the strip while the maker works, then the line and its back link; the line goes once he moved away', () => {
+    const backs: number[][] = [];
+    const { rerender } = render(<LiveStrip live={{ strip: '∿ analyst is updating · Summary' }} gone={null} onBack={() => undefined} />);
+    expect(screen.getByTestId('artifact.live').textContent).toBe('∿ analyst is updating · Summary');
+    const live = { line: 'v5 · 3 cells changed', back: { text: '← v4', v: 4 } };
+    rerender(<LiveStrip live={live} gone={null} onBack={(v, line) => { backs.push([v, line.length]); }} />);
+    expect(screen.getByTestId('artifact.live').textContent).toBe('v5 · 3 cells changed← v4');
+    fireEvent.click(screen.getByTestId('artifact.live.back'));
+    expect(backs).toEqual([[4, live.line.length]]);
+    rerender(<LiveStrip live={live} gone={live.line} onBack={() => undefined} />);
+    expect(screen.queryByTestId('artifact.live')).toBeNull();
+    rerender(<LiveStrip live={null} gone={null} onBack={() => undefined} />);
+    expect(screen.queryByTestId('artifact.live')).toBeNull();
   });
 });

@@ -91,7 +91,10 @@ describe('the frame keeps its src across versions (plan §6)', () => {
     expect(frameSrc({ ...sheet, version: 5 }, 5, 'dark')).toBe(frameSrc(sheet, 4, 'dark'));
   });
 
-  it('the window never builds a url: an older version of a file frames nothing from the newest one', () => {
+  it("an older version frames the hub's url for it (ArtifactVersion.frame_url), never one built here", () => {
+    expect(frameSrc({ ...sheet, versions: [{ v: 2, frame_url: `${SERVER}/a/q3-xlsx/2/view` }, { v: 4, frame_url: `${SERVER}/a/q3-xlsx/view` }] }, 2, 'light')).toBe(`${SERVER}/a/q3-xlsx/2/view?theme=light`);
+    // a version the hub gives no url for (an older hub): nothing, never a guess from the newest one
+    expect(frameSrc({ ...sheet, versions: [{ v: 2 }] }, 2, null)).toBeNull();
     expect(frameSrc(sheet, 2, null)).toBeNull();
     expect(frameSrc({ kind: 'file', url: '/w/plan.html', version: 3, frame_url: `${SERVER}/a/plan/3/plan.html` }, 2, null)).toBeNull();
   });

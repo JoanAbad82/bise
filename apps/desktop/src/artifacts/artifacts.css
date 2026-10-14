@@ -1,6 +1,8 @@
 /* src/artifacts (amb-kit): the artifacts screen, panel A's list, one artifact open (desktop-screens v6,
    designer m_11837). ds tokens only; real px as signed. */
 .art-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: var(--s-5) var(--pad-column) 0; box-sizing: border-box; }
+/* the screen takes the focus for its keys: never a ring around it (designer m_24208) */
+.art-screen:focus { outline: 0; }
 .art-head { flex: none; }
 .art-h1 { font: 600 22px/1.2 var(--font-ui); color: var(--c-text); }
 .art-h2 { margin-top: 0; font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
@@ -133,6 +135,8 @@
 /* giving files (give.ts, designer's pick 4 m_23868): the dashed zone over a thread's rows or an
    artifacts list, only while he drags files; '+ add' in a list's head */
 .art-add-drop { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+/* not for him, so never accent (designer m_24208): text-3 dashes, the ink's 4% tint, words in
+   text-2, r 12, 8 px in from the area's edge; what is under it dims to 20% */
 .art-give {
   position: absolute;
   inset: var(--s-2);
@@ -140,11 +144,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px dashed var(--c-accent-line);
-  border-radius: var(--r-3);
-  background: color-mix(in srgb, var(--c-accent-soft) 85%, transparent);
+  border: 1.5px dashed var(--c-text-3);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-text) 4%, transparent);
 }
-.art-give-words { pointer-events: none; padding: 0 var(--s-4); text-align: center; font: 500 var(--t-14) var(--font-ui); color: var(--c-accent); }
+.art-give-words { pointer-events: none; padding: 0 var(--s-4); text-align: center; white-space: nowrap; font: 500 var(--t-14) var(--font-ui); color: var(--c-text-2); }
+:is(.th-main, .art-add-drop):has(> .art-give) > :not(.art-give) { opacity: 0.2; }
+/* a zone under 120 px (the right bar's ARTIFACTS, Drops.tsx SHORT_ZONE_PX): what is under it hides
+   whole, its head too; only the words show, centred (designer m_24293) */
+.art-add-drop[data-short] > :not(.art-give) { opacity: 0; }
 .art-add { flex: none; display: inline-flex; }
 .art-h1-row { display: flex; align-items: center; gap: var(--s-3); }
 .art-h1-row .art-add { margin-left: auto; }
+/* the hub's live words under the head (art-live, designer m_23868): 28 px, text-2; '← v2' 16 px
+   after the line, text-2, underlined on hover */
+.art-live { flex: none; display: flex; align-items: center; gap: var(--s-4); height: var(--h-control-sm); padding: 0 var(--s-4); border-bottom: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-2); white-space: nowrap; overflow: hidden; }
+.art-live-back { border: 0; padding: 0; background: none; font: inherit; color: var(--c-text-2); cursor: pointer; }
+.art-live-back:hover { text-decoration: underline; text-underline-offset: 3px; }
+.art-live-back:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; border-radius: 3px; }

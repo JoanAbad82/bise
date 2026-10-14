@@ -9,7 +9,8 @@ import { isImageSrc } from './zoom';
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { APP_FRAME_NAME } from './frameNote';
 import { useFrameNote } from './useFrameNote';
-import { Button, IconButton, Menu, MenuItem } from '@/ds';
+import { Button, IconButton, Menu, MenuItem, Press } from '@/ds';
+import type { ArtifactLive } from '@/proto';
 import { useRouter } from '@/app/router';
 import { useAgents, usePrefs, useStore } from '@/store';
 import { themeOf } from '@/theme';
@@ -86,13 +87,50 @@ export function themedUrl(url: string, theme: 'light' | 'dark' | null): string {
  * show; it names the current version only. Else a page's http(s) url (an older version at /v/<n>).
  * A bare local path from an older hub frames nothing: the guard blocks file:// (ambient-lead m_19544).
  */
-export function frameSrc(a: { kind: string; url: string; version: number; frame_url?: string | null }, shown: number, theme: 'light' | 'dark' | null): string | null {
+export function frameSrc(
+  a: { kind: string; url: string; version: number; frame_url?: string | null; versions?: readonly { v: number; frame_url?: string | null }[] },
+  shown: number,
+  theme: 'light' | 'dark' | null,
+): string | null {
   const local = a.frame_url ?? '';
   // the newest version of an xlsx, pptx or docx: bise's viewer at /a/<id>/view, the src the frame
   // keeps while new versions land (pages::site::frame_href); never built here (architect m_23970)
   if (shown === a.version && local !== '') return themedUrl(local, theme);
+  // an older version: the hub's own url for it (ArtifactVersion.frame_url, art-live 929ead94f)
+  const older = shown === a.version ? '' : (a.versions?.find((x) => x.v === shown)?.frame_url ?? '');
+  if (older !== '') return themedUrl(older, theme);
   if (kindOf(a.kind) !== 'page' || !/^https?:\/\//i.test(a.url)) return null;
   return themedUrl(versionUrl(a.url, a.version, shown), theme);
+}
+
+/**
+ * The hub's live words under the head (art-live, designer m_23868, the 28 px strip): '∿ deck is
+ * updating · slide 2' while the maker's turn runs, then 'v3 · 2 slides changed' with '← v2' 16 px
+ * after it, which opens that version. Drawn as they come; the one thing decided here: the line goes
+ * once he moved to another version (`gone` is that line).
+ */
+export function LiveStrip({ live, gone, onBack }: { live: ArtifactLive | null; gone: string | null; onBack: (v: number, line: string) => void }) {
+  if (live === null) return null;
+  if (live.strip !== undefined && live.strip !== '') {
+    return (
+      <div className="art-live" data-testid="artifact.live" data-state="strip">
+        {live.strip}
+      </div>
+    );
+  }
+  const line = live.line;
+  if (line === undefined || line === '' || line === gone) return null;
+  const back = live.back;
+  return (
+    <div className="art-live" data-testid="artifact.live" data-state="line">
+      <span>{line}</span>
+      {back !== undefined && (
+        <Press look="art-live-back" onClick={() => { onBack(back.v, line); }} data-testid="artifact.live.back">
+          {back.text}
+        </Press>
+      )}
+    </div>
+  );
 }
 
 export interface ArtifactOpenProps {
@@ -121,6 +159,8 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   // 'v' on a row of the list opens it with its versions shown
   const [menu, setMenu] = useState<'versions' | 'more' | null>(() => (takeVersions(`${project}/${id}`) ? 'versions' : null));
   const [v, setV] = useState<number | null>(null);
+  // the live line he moved away from (another version picked): it goes; a new line shows again
+  const [goneLine, setGoneLine] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
   const theme = themeOf(usePrefs());
   const bise = bridge();
@@ -194,7 +234,7 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
             {menu === 'versions' && (
               <Menu testId="artifact.versions">
                 {versions(a, now).map((r) => (
-                  <MenuItem key={r.v} on={r.v === shown} onClick={() => { setV(r.v); setMenu(null); }} testId={`artifact.versions.v${String(r.v)}`}>
+                  <MenuItem key={r.v} on={r.v === shown} onClick={() => { setV(r.v); setMenu(null); setGoneLine(a.live?.line ?? null); }} testId={`artifact.versions.v${String(r.v)}`}>
                     <span className="art-v">{`v${String(r.v)}`}</span>
                     <span className="art-v-words">{r.words}</span>
                     {r.when !== undefined && <span className="art-v-when">{r.when}</span>}
@@ -221,6 +261,7 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
           {x}
         </span>
       </div>
+      <LiveStrip live={a.live ?? null} gone={goneLine} onBack={(back, line) => { setV(back); setGoneLine(line); }} />
       <div className="art-open-body">
         {/* the page follows his theme: opened with ?theme=<his pref>, the kit wears it (kit.js puts
             it on <html data-theme>); with no pref, the system's. A browser-only kind never gets

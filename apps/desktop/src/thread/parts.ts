@@ -16,14 +16,18 @@ export interface PartQuote {
   /** its chip's number when he put it in his words ('❝ 1' sits there, his m_22231); none: a quote
    *  in front (an older client) */
   readonly n?: number;
-  /** a part of an artifact (Part::Anchor): where, 'Q3!B4:D9 · q3-xlsx v4' */
-  readonly about?: string;
+  /** a part of an artifact (Part::Anchor): which one, which version, where ('Q3!B4:D9') */
+  readonly anchor?: { readonly artifact: string; readonly version: number; readonly label: string };
 }
 
 type AnchorPart = Extract<Part, { kind: 'anchor' }>;
 
 /** Where an anchor part is, the TUI's words (said.rs anchor_words without its ❝): 'Q3!B4:D9 · q3-xlsx v4'. Pure. */
 export const anchorAbout = (p: AnchorPart): string => `${anchorLabel(p.anchor)} · ${p.artifact} v${String(p.version)}`;
+
+/** The bubble's words for an anchor, as the composer's row (designer m_24208): 'Q3!B4:D9 · q3-forecast.xlsx · v4'; `title` the artifact's, else its id. Pure. */
+export const anchorMeta = (a: NonNullable<PartQuote['anchor']>, title: string | undefined): string =>
+  `${a.label} · ${title !== undefined && title !== '' ? title : a.artifact} · v${String(a.version)}`;
 
 /** His message as the bubble draws it. */
 export interface YouView {
@@ -65,8 +69,8 @@ export function youView(parts: readonly Part[]): YouView {
         break;
       case 'anchor':
         // a part of an artifact he picked in the side panel: a quote line that says where
-        // ('❝ 2 “1200 1350” · Q3!B4:D9 · q3-xlsx v4', said.rs anchor_words), its number in his words
-        quotes.push({ from: '', text: p.quote ?? anchorLabel(p.anchor), file: '', new: '', old: '', about: anchorAbout(p), ...(p.n == null ? {} : { n: p.n }) });
+        // ('❝ 2 1200 1350 · Q3!B4:D9 · q3-forecast.xlsx · v4', anchorMeta), its number in his words
+        quotes.push({ from: '', text: p.quote ?? anchorLabel(p.anchor), file: '', new: '', old: '', anchor: { artifact: p.artifact, version: p.version, label: anchorLabel(p.anchor) }, ...(p.n == null ? {} : { n: p.n }) });
         if (p.n != null) words += `❝ ${String(p.n)}`;
         break;
       case 'text':
