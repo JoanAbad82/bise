@@ -1,5 +1,5 @@
 /* bise kit · notes on an artifact in its viewer (kit/office/select.js): the marks on the parts that
-   carry a note, the `note` button by a selection, the browser's list beside the drawing, the box
+   carry a note (the accent: only what is his), the control by a selection (ink), the browser's list beside the drawing, the box
    drawn on an image. Colors and type from tokens.css only. */
 
 /* the marks: 3 px of accent on the part (sent, or a draft of his), ✓ on the version that answered */
@@ -19,12 +19,13 @@
 .office-image .frame { position: relative; max-width: 100%; cursor: crosshair; user-select: none; }
 .office-image img { display: block; max-width: 100%; height: auto; }
 .office-box, .office-mark-box { position: absolute; box-sizing: border-box; pointer-events: none; }
-.office-box { outline: 2px solid var(--accent); background: var(--accent-soft); }
+.office-box { outline: 1px solid var(--ink); background: color-mix(in srgb, var(--ink) 9%, transparent); }
 .office-mark-box { outline: 1px solid var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .office-mark-box[data-mark="draft"] { outline-style: dashed; }
 
-/* the button by a selection */
-.office-note-btn { position: fixed; z-index: 20; font: var(--text-kicker) / 1 var(--font-ui); color: var(--surface-card); background: var(--accent); border: 0; border-radius: 4px; padding: 6px 10px; cursor: pointer; box-shadow: 0 1px 4px var(--drop); }
+/* the control by a selection, in ink (the accent is only for his notes): the browser's `note`
+   button; in the app the thread's quote pill, 'type to ask about it · ⌘C copy' (designer m_24098) */
+.office-note-btn { position: fixed; z-index: 20; font: var(--text-kicker) / 1 var(--font-ui); color: var(--surface-card); background: var(--ink); border: 0; border-radius: 999px; padding: 6px 12px; cursor: pointer; box-shadow: 0 1px 4px var(--drop); white-space: nowrap; }
 .office-note-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 /* the browser's list: a column beside the drawing */
@@ -48,3 +49,9 @@ body.with-notes #bise-office { margin-right: 280px; }
 .office-notes .bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); color: var(--dim); font-size: var(--text-kicker); }
 .office-notes .bar .text { flex: 1; }
 .office-notes .send { font: inherit; color: var(--surface-card); background: var(--accent); border: 0; border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+
+/* a narrow window: the list goes under the drawing, the drawing keeps the width */
+@media (max-width: 900px) {
+  body.with-notes #bise-office { margin-right: 0; height: 62vh; }
+  .office-notes { top: auto; left: 0; width: auto; height: 38vh; border-left: 0; border-top: 1px solid var(--line); }
+}

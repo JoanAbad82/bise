@@ -3,8 +3,8 @@
 // image.js). One store (pages/artifact/notes.rs), two doors:
 //
 // - in the desktop's side panel (the frame's name is `bise-app`, art-desktop m_23900) a
-//   selection's `note` button posts {bise: "anchor", artifact, version, rev, anchor, quote, label}
-//   to the parent: it becomes a chip in the maker's composer, and the hub records the note when
+//   selection's `note` button posts {bise: "anchor", artifact, version, anchor, quote} to the
+//   parent, on his click only (architect m_23971): it becomes a chip in the maker's composer, and the hub records the note when
 //   he sends his message;
 // - in a browser the same button opens notes.js's note: the model, the words and the send of a
 //   page's notes (BiseNotes.core), drafts saved to /api/a/<id>/notes, sent with /api/a/<id>/send.
@@ -24,7 +24,8 @@ const N = globalThis.BiseNotes && globalThis.BiseNotes.core;
 // ---- the words (art-notes'; designer signs them)
 const W = {
   note: "note",
-  toMessage: "add to message",
+  // the thread's quote pill (apps/desktop QuotePop's words): typing or a click adds it
+  toMessage: "type to ask about it · ⌘C copy",
   added: "added to your message",
   moved: N ? N.NW.moved : "moved",
   doneIn: (v) => `✓ done in v${v}`,
@@ -66,9 +67,10 @@ export function quoteOf(text) {
   return one.length > 200 ? `${one.slice(0, 199)}…` : one;
 }
 
-/** The message the frame posts to the desktop for a selection. */
+/** The message the frame posts to the desktop for a selection: its tag and exactly the four
+ * facts (architect m_23971: no token, no list, no url), whatever window it is in. */
 export function message(info, anchor, quote) {
-  return { bise: "anchor", artifact: info.id, version: info.version, ...(info.rev ? { rev: info.rev } : {}), anchor, quote, label: A ? A.label(anchor) : "" };
+  return { bise: "anchor", artifact: info.id, version: info.version, anchor, quote };
 }
 
 // ======================================================================================
@@ -239,7 +241,10 @@ function mount() {
         picked = null;
         return;
       }
-      picked = { anchor: a, quote: quoteNow(a) };
+      const quote = quoteNow(a);
+      // a shape is said by its words, never its id (designer m_24098): they go in its anchor
+      if (a.kind === "shape" && quote && !a.quote) a = { ...a, quote: quote.length > 80 ? `${quote.slice(0, 79)}…` : quote };
+      picked = { anchor: a, quote };
       btn.textContent = inApp ? W.toMessage : W.note;
       Object.assign(btn.style, { left: `${Math.max(8, Math.min(window.innerWidth - 140, r.left))}px`, top: `${Math.min(window.innerHeight - 36, r.bottom + 6)}px` });
       if (!btn.isConnected) document.body.append(btn);
@@ -253,7 +258,8 @@ function mount() {
     }
   });
   btn.addEventListener("mousedown", (e) => e.preventDefault()); // keep the text selection
-  btn.addEventListener("click", () => {
+  // his gesture only, never on load or a timer (architect m_23971)
+  function take() {
     if (!picked) return;
     if (inApp) {
       // the desktop checks the source and the origin (art-desktop m_23900)
@@ -265,6 +271,20 @@ function mount() {
       btn.remove();
     }
     picked = null;
+  }
+  btn.addEventListener("click", take);
+  // in the app, as on a thread's quote: typing adds it (his words go to the composer, which
+  // takes the focus), ⌘C copies what is selected
+  document.addEventListener("keydown", (e) => {
+    if (!inApp || !picked || !btn.isConnected || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key.length === 1) take();
+  });
+  document.addEventListener("copy", (e) => {
+    if (!picked || !picked.quote) return;
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) return;
+    e.clipboardData.setData("text/plain", picked.quote);
+    e.preventDefault();
   });
 
   // ---- the browser's door: notes.js's model and words, a list beside the drawing

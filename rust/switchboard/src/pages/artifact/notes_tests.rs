@@ -82,11 +82,13 @@ fn the_sent_notes_make_one_message_with_their_anchors() {
     assert!(matches!(ps.last(), Some(Part::Hint { of: bise_proto::parts::HintKind::Notes, .. })));
     let text = parts::render(&ps);
     let want = concat!(
-        "you sent 2 notes on \"q3.pptx\" (v4, http://127.0.0.1:47438/a/q3-pptx/view):\n",
+        "you sent 2 notes on \"q3.pptx\" (artifact q3-pptx v4, http://127.0.0.1:47438/a/q3-pptx/view):\n",
         "1. <artifact-selection artifact=\"q3-pptx\" version=\"4\" n=\"1\">\n{\"kind\":\"shape\",\"slide\":2,\"shape\":\"12\"}\nRevenue grew 4%\n</artifact-selection> say Q3, not Q2\n",
         "2. <artifact-selection artifact=\"q3-pptx\" version=\"4\" n=\"2\">\n{\"kind\":\"slide\",\"slide\":5}\n</artifact-selection> too dense, split it"
     );
-    assert_eq!(text, format!("{want}{}", parts::NOTES_HINT));
+    // (an anchor kept as JSON: its keys sorted, any order reads the same in at())
+    let list = r#"[{"id":"n1","anchor":{"kind":"shape","shape":"12","slide":2},"text":"say Q3, not Q2","quote":"Revenue grew 4%"},{"id":"n2","anchor":{"kind":"slide","slide":5},"text":"too dense, split it"}]"#;
+    assert_eq!(text, format!("{want}{}\n<artifact-notes artifact=\"q3-pptx\" version=\"4\">{list}</artifact-notes>", parts::NOTES_HINT));
     assert!(parts("x", "x", "u", &[]).is_empty());
 }
 
@@ -163,7 +165,9 @@ fn the_desktop_door_records_a_sent_note() {
     assert_eq!((sent[0].text.as_deref(), sent[0].quote.as_deref(), sent[0].version, sent[0].sent_ms), (Some("why so low?"), Some("1200"), 2, Some(50)));
     assert_eq!((sent[0].extra["rev"].as_u64(), sent[0].extra["via"].as_str()), (Some(3), Some("app")));
     assert_eq!(anchored(sent[0]), serde_json::from_value(cell()).ok());
-    assert!(known(&d, &id, 2) && !known(&d, &id, 3) && !known(&d, "nope", 1));
+    assert_eq!(known(&d, &id, 2), Ok(()));
+    assert_eq!(known(&d, &id, 3), Err("q3.xlsx has no version 3 here, so the note can't go on it".into()));
+    assert_eq!(known(&d, "nope", 1), Err("nope has no version 1 here, so the note can't go on it".into()));
 }
 
 /// The door refuses an anchor on an artifact or a version it doesn't
@@ -172,9 +176,13 @@ fn the_desktop_door_records_a_sent_note() {
 fn the_door_checks_the_artifact_then_adds_the_hint() {
     let a = Part::Anchor { artifact: "q3".into(), version: 2, rev: 0, anchor: serde_json::from_value(cell()).unwrap(), quote: String::new(), n: None };
     let none = |_: &std::path::Path| -> Result<crate::parts_in::Stored, String> { Err("no".into()) };
-    let said = |known: &dyn Fn(&str, u64) -> bool| crate::parts_in::said(&[a.clone(), Part::Text { text: "why?".into() }], &[], &crate::parts_in::Door { store: std::path::Path::new("/h/images"), put: &none, exists: &|_| true, known: known });
-    assert_eq!(said(&|_, _| false), Err("no version 2 of artifact q3 here: it can't take a note".into()));
-    let s = said(&|id, v| id == "q3" && v == 2).unwrap();
+    let said = |known: &dyn Fn(&str, u64) -> Result<(), String>| crate::parts_in::said(&[a.clone(), Part::Text { text: "why?".into() }], &[], &crate::parts_in::Door { store: std::path::Path::new("/h/images"), put: &none, exists: &|_| true, known: known });
+    assert_eq!(said(&|_, _| Err("no".into())), Err("no".into()), "the door's words, as they are");
+    // an anchor it can't read: a known kind with bad fields, or a newer kind (architect m_23912)
+    let odd = |at: Value| crate::parts_in::said(&[Part::Anchor { artifact: "q3".into(), version: 2, rev: 0, anchor: serde_json::from_value(at).unwrap(), quote: String::new(), n: None }], &[], &crate::parts_in::Door { store: std::path::Path::new("/h/images"), put: &none, exists: &|_| true, known: &|_, _| Ok(()) });
+    assert_eq!(odd(json!({"kind": "cell", "sheet": "Q3"})), Err("that part isn't in this version: the note can't go there".into()));
+    assert_eq!(odd(json!({"kind": "voxel", "x": 1})), Err("this bise can't put a note on that kind of part (voxel): update bise".into()));
+    let s = said(&|id, v| if id == "q3" && v == 2 { Ok(()) } else { Err("no".into()) }).unwrap();
     assert!(s.text.starts_with("<artifact-selection artifact=\"q3\" version=\"2\">\n{\"kind\":\"cell\""), "{}", s.text);
     assert!(s.text.ends_with(&format!("why?{}", parts::NOTES_HINT)), "{}", s.text);
 }

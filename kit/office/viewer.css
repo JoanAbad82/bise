@@ -1,6 +1,8 @@
 /* bise kit · the office viewer (kit/office/viewer.js): the frame around an xlsx, pptx or docx in
    the side panel (55% column) or a tab. Colors, fonts and spaces from tokens.css only; what the
-   file itself says (a cell's fill, a slide's colors, the doc's styles) is set by the renderers. */
+   file itself says (a cell's fill, a slide's colors, the doc's styles) is set by the renderers.
+   A selection, a picked tab or slide is ink; the accent is only for what is his (a note's mark,
+   kit/office/select.css; designer m_24098). */
 
 html, body { margin: 0; height: 100%; background: var(--surface-made); color: var(--ink); }
 body { font: var(--text-ui) / 1.4 var(--font-ui); }
@@ -26,12 +28,12 @@ body { font: var(--text-ui) / 1.4 var(--font-ui); }
 .office-grid th.rn { left: 0; z-index: 1; text-align: right; }
 .office-grid th.corner { left: 0; z-index: 3; }
 .office-grid td { border: 1px solid #1d1a1714; padding: 2px 4px; height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: cell; }
-.office-grid td.sel { outline: 2px solid var(--accent); outline-offset: -2px; background-image: linear-gradient(var(--accent-soft), var(--accent-soft)); }
+.office-grid td.sel { outline: 1px solid var(--ink); outline-offset: -1px; background-image: linear-gradient(color-mix(in srgb, var(--ink) 9%, transparent), color-mix(in srgb, var(--ink) 9%, transparent)); }
 .office-grid td.novalue::after { content: "·"; color: var(--faint); }
 .office-grid td.error { color: var(--risk); }
 .office-tabs { flex: none; display: flex; gap: 2px; overflow-x: auto; border-top: 1px solid var(--line); padding: 0 8px; }
 .office-tabs button { font: inherit; color: var(--dim); background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 10px; cursor: pointer; white-space: nowrap; }
-.office-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.office-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
 
 /* pptx: the rail and the slide */
 .office-deck { flex-direction: row; }
@@ -39,12 +41,12 @@ body { font: var(--text-ui) / 1.4 var(--font-ui); }
 .office-rail .thumb { display: flex; gap: 6px; align-items: flex-start; background: none; border: 0; padding: 0; cursor: pointer; color: var(--faint); font: inherit; }
 .office-rail .thumb .n { width: 14px; text-align: right; }
 .office-rail .thumb .holder { flex: 1; overflow: hidden; outline: 1px solid var(--line); pointer-events: none; }
-.office-rail .thumb[aria-current="true"] .holder { outline: 2px solid var(--accent); }
+.office-rail .thumb[aria-current="true"] .holder { outline: 2px solid var(--ink); }
 .office-slide { flex: 1; min-width: 0; overflow: auto; padding: 8px; outline: none; }
 .office-slide .holder { overflow: hidden; box-shadow: 0 1px 4px var(--drop); }
 .slide { position: relative; transform-origin: 0 0; background: #ffffff; color: #1d1a17; overflow: hidden; font-family: var(--font-read); }
 .slide .shape { position: absolute; box-sizing: border-box; overflow: hidden; }
-.slide .shape.sel { outline: 2px solid var(--accent); }
+.slide .shape.sel { outline: 1px solid var(--ink); background-image: linear-gradient(color-mix(in srgb, var(--ink) 9%, transparent), color-mix(in srgb, var(--ink) 9%, transparent)); }
 .slide .txt { display: flex; flex-direction: column; height: 100%; padding: 3.6pt 7.2pt; box-sizing: border-box; font-size: 18pt; }
 .slide .txt[data-valign="middle"], .slide .txt[data-valign="ctr"] { justify-content: center; }
 .slide .txt[data-valign="bottom"], .slide .txt[data-valign="b"] { justify-content: flex-end; }

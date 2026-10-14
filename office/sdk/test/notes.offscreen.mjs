@@ -171,7 +171,7 @@ try {
   await until("document.querySelector('[data-para]')", "the doc's paragraphs");
   const para = await evaluate("document.querySelectorAll('[data-para]')[0].dataset.para");
   const n = (id, status, at, text, extra = {}) => ({ id, status, at, text, version: 1, kind: "note", at_ms: 1, ...extra });
-  NOTES["q3-xlsx"] = [n("n1", "sent", { kind: "cell", sheet, range: "B2:C3" }, "these look low"), n("n2", "done", { kind: "cell", sheet, range: "A1" }, "say Q3", { done_in: VERSION })];
+  NOTES["q3-xlsx"] = [n("n1", "sent", { kind: "cell", sheet, range: "A2:B3" }, "these look low"), n("n2", "done", { kind: "cell", sheet, range: "A1" }, "say Q3", { done_in: VERSION })];
   NOTES["deck-pptx"] = [n("n1", "sent", { kind: "shape", ...shape }, "shorter title"), n("n2", "done", { kind: "slide", slide: 1 }, "old", { done_in: 1 })];
   NOTES["memo-docx"] = [n("n1", "sent", { kind: "para", para, quote: "" }, "too formal"), n("n2", "sent", { kind: "para", para: "GONE0000" }, "lost one")];
   NOTES["shot-png"] = [n("n1", "sent", { kind: "region", rect: { x: 10, y: 15, w: 30, h: 40 } }, "this red is off")];
@@ -179,9 +179,9 @@ try {
   // ---- the marks, each kind, in the browser (the list beside the drawing)
   await open("/a/q3-xlsx/view", 1100, false);
   await until("document.querySelector('td[data-mark]')", "a cell's mark");
-  assert.equal(await evaluate("document.querySelectorAll('td[data-mark=\"sent\"]').length"), 4, "B2:C3 marked sent");
+  assert.equal(await evaluate("document.querySelectorAll('td[data-mark=\"sent\"]').length"), 4, "A2:B3 marked sent");
   assert.equal(await evaluate("document.querySelector('td[data-ref=\"A1\"]').dataset.mark"), "done", "✓ on the answering version");
-  assert.equal(await evaluate("document.querySelector('.office-notes .head').textContent"), "notes for q3.xlsx · 2");
+  assert.equal(await evaluate("document.querySelector('.office-notes .head').textContent"), await evaluate("BiseNotes.core.NW.listTitle('q3.xlsx', 2)"), "notes.js's own words");
   ok("sheet: a range sent, a cell ✓ in the version that answered it, the list");
   await open("/a/deck-pptx/view", 1100, false);
   await until("document.querySelector('.office-slide .shape[data-mark]')", "a shape's mark");
@@ -217,19 +217,21 @@ try {
 
   // ---- the desktop's door: the frame named bise-app posts the anchor to its parent
   await open("/app?id=q3-xlsx", 1100, false);
-  await until("document.querySelector('iframe').contentDocument?.querySelector('td[data-ref=\"B2\"]')", "the framed grid");
+  await until("document.querySelector('iframe').contentDocument?.querySelector('td[data-ref=\"B4\"]')", "the framed grid");
   await evaluate("window.got = []; window.addEventListener('message', (e) => window.got.push(e.data))");
   const fd = frameDoc(true);
-  await clickOn(fd, 'td[data-ref="B2"]');
-  await clickOn(fd, 'td[data-ref="C4"]', "{ shiftKey: true }");
+  await clickOn(fd, 'td[data-ref="A3"]');
+  await clickOn(fd, 'td[data-ref="B4"]', "{ shiftKey: true }");
   await until(`${fd}.querySelector('.office-note-btn')`, "the button in the frame");
-  assert.equal(await evaluate(`${fd}.querySelector('.office-note-btn').textContent`), "add to message");
+  assert.equal(await evaluate(`${fd}.querySelector('.office-note-btn').textContent`), "type to ask about it · ⌘C copy");
   assert.equal(await evaluate(`!!${fd}.querySelector('.office-notes')`), false, "no list in the app: the composer is the maker's");
   await shot("sheet-app-button-1100-light");
-  await evaluate(`${fd}.querySelector('.office-note-btn').click()`);
+  // typing adds it, as on a thread's quote (designer m_24098)
+  await evaluate(`${fd}.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true }))`);
   await until("window.got.length > 0", "the parent got it");
   const got = await evaluate("window.got[0]");
-  assert.deepEqual({ ...got, quote: undefined }, { bise: "anchor", artifact: "q3-xlsx", version: VERSION, anchor: { kind: "cell", sheet, range: "B2:C4" }, quote: undefined, label: `${sheet}!B2:C4` });
+  assert.deepEqual(Object.keys(got).sort(), ["anchor", "artifact", "bise", "quote", "version"], "exactly the four facts and its tag");
+  assert.deepEqual({ ...got, quote: undefined }, { bise: "anchor", artifact: "q3-xlsx", version: VERSION, anchor: { kind: "cell", sheet, range: "A3:B4" }, quote: undefined });
   ok(`desktop door: the frame posted ${JSON.stringify(got.anchor)} with "${got.quote}"`);
 
   // ---- designer's screens: each kind, 1400 / 1100 / 800, light and dark

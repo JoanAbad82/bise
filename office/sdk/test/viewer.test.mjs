@@ -81,7 +81,9 @@ test("a note's anchor says its place in bise_proto's words (anchor_label.json)",
   for (const r of rows) assert.equal(globalThis.BiseAnchors.label(r.anchor), r.label, JSON.stringify(r.anchor));
   const { message } = await helpers("select.js");
   const m = message({ id: "q3-xlsx", version: 4, rev: 2 }, { kind: "cell", sheet: "Q3", range: "B4:D9" }, "1200 1350");
-  assert.deepEqual(m, { bise: "anchor", artifact: "q3-xlsx", version: 4, rev: 2, anchor: { kind: "cell", sheet: "Q3", range: "B4:D9" }, quote: "1200 1350", label: "Q3!B4:D9" });
+  // exactly its tag and the four facts (architect m_23971), nothing else from the frame
+  assert.deepEqual(Object.keys(m).sort(), ["anchor", "artifact", "bise", "quote", "version"]);
+  assert.deepEqual(m, { bise: "anchor", artifact: "q3-xlsx", version: 4, anchor: { kind: "cell", sheet: "Q3", range: "B4:D9" }, quote: "1200 1350" });
 });
 
 test("marks: sent and drafts marked, ✓ only on the version that answered, then gone", async () => {

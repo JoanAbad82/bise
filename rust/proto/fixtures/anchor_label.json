@@ -5,7 +5,7 @@
   {"anchor": {"kind": "cell", "sheet": "2024", "range": "C2"}, "label": "'2024'!C2"},
   {"anchor": {"kind": "slide", "slide": 2}, "label": "slide 2"},
   {"anchor": {"kind": "slide", "slide": 2, "rect": {"x": 10, "y": 20, "w": 30, "h": 5}}, "label": "slide 2 · a box"},
-  {"anchor": {"kind": "shape", "slide": 3, "shape": "12"}, "label": "slide 3 · shape 12"},
+  {"anchor": {"kind": "shape", "slide": 3, "shape": "12"}, "label": "slide 3 · a shape"},
   {"anchor": {"kind": "shape", "slide": 3, "shape": "12", "quote": "Revenue grew 4%"}, "label": "slide 3 · \"Revenue grew 4%\""},
   {"anchor": {"kind": "para", "para": "3F2A1B00", "quote": "net revenue"}, "label": "\"net revenue\""},
   {"anchor": {"kind": "para", "para": "3F2A1B00", "quote": "the quarter closed with net revenue above the plan for the third time"}, "label": "\"the quarter closed with net revenue abo…\""},

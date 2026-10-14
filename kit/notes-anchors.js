@@ -93,7 +93,7 @@
       case "block": return has(a.quote) ? q(a.quote) : `block ${a.block}`;
       case "cell": return `${sheetRef(a.sheet)}!${a.range}`;
       case "slide": return a.rect ? `slide ${a.slide} · a box` : `slide ${a.slide}`;
-      case "shape": return has(a.quote) ? `slide ${a.slide} · ${q(a.quote)}` : `slide ${a.slide} · shape ${a.shape}`;
+      case "shape": return has(a.quote) ? `slide ${a.slide} · ${q(a.quote)}` : `slide ${a.slide} · a shape`;
       case "para": return has(a.quote) ? q(a.quote) : "a paragraph";
       case "region": return a.page != null ? `page ${a.page} · a box` : "a box";
       case "text": return `line ${a.line}`;

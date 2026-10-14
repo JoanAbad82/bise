@@ -106,7 +106,8 @@ impl Eq for Rect {}
 impl Eq for Anchor {}
 
 /// What a chip and a note's line call an anchor (designer signs the
-/// words): `Q3!B4:D9`, `slide 2`, `slide 2 · a box`, `slide 2 · shape 12`,
+/// words, designer m_24098: never a machine id): `Q3!B4:D9`, `slide 2`,
+/// `slide 2 · a box`, `slide 2 · "Revenue"`, `slide 2 · a shape`,
 /// `"net revenue…"` (a paragraph by its words), `page 1 · a box`,
 /// `line 40`. Both apps draw it from this rule (fixture anchor_label.json).
 pub fn label(a: &Anchor) -> String {
@@ -118,7 +119,7 @@ pub fn label(a: &Anchor) -> String {
         Anchor::Slide { slide, rect: None } => format!("slide {slide}"),
         Anchor::Slide { slide, rect: Some(_) } => format!("slide {slide} · a box"),
         Anchor::Shape { slide, quote, .. } if !quote.trim().is_empty() => format!("slide {slide} · {}", quoted(quote)),
-        Anchor::Shape { slide, shape, .. } => format!("slide {slide} · shape {shape}"),
+        Anchor::Shape { slide, .. } => format!("slide {slide} · a shape"),
         Anchor::Para { quote, .. } if !quote.trim().is_empty() => quoted(quote),
         Anchor::Para { .. } => "a paragraph".into(),
         Anchor::Region { page: Some(p), .. } => format!("page {p} · a box"),

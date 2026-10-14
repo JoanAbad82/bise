@@ -95,16 +95,21 @@ pub fn anchored(n: &Note) -> Option<Anchor> {
 }
 
 /// The message his sent notes make (designer signs the words): a line
-/// that says where, then each note as its anchor's part and his words,
-/// then the notes hint. Its text is `parts::render` of these parts.
+/// that says where, then each note as its anchor's part and his words
+/// (what his bubble draws), then the notes hint with the notes as one
+/// JSON list `{id, anchor, text, quote?}` (what the office skills read).
+/// Its text is `parts::render` of these parts.
 ///
 /// ```text
-/// you sent 2 notes on "q3.pptx" (v4, http://127.0.0.1:47438/a/q3-pptx/view):
+/// you sent 2 notes on "q3.pptx" (artifact q3-pptx v4, http://127.0.0.1:47438/a/q3-pptx/view):
 /// 1. <artifact-selection artifact="q3-pptx" version="4" n="1">
 /// {"kind":"shape","slide":2,"shape":"12"}
 /// Revenue grew 4%
 /// </artifact-selection> say Q3, not Q2
 /// 2. …
+///
+/// [notes on an artifact: answer with its next version …]
+/// <artifact-notes artifact="q3-pptx" version="4">[{"id":"n1","anchor":{…},"text":"say Q3, not Q2","quote":"Revenue grew 4%"},…]</artifact-notes>
 /// ```
 pub fn parts(id: &str, title: &str, url: &str, notes: &[Note]) -> Vec<Part> {
     let notes: Vec<&Note> = notes.iter().filter(|n| anchored(n).is_some()).collect();
@@ -113,7 +118,7 @@ pub fn parts(id: &str, title: &str, url: &str, notes: &[Note]) -> Vec<Part> {
     }
     let count = if notes.len() == 1 { "1 note".to_string() } else { format!("{} notes", notes.len()) };
     let version = notes.iter().map(|n| n.version).max().unwrap_or(0);
-    let mut out = vec![Part::Text { text: format!("you sent {count} on \"{title}\" (v{version}, {url}):\n") }];
+    let mut out = vec![Part::Text { text: format!("you sent {count} on \"{title}\" (artifact {id} v{version}, {url}):\n") }];
     for (i, n) in notes.iter().enumerate() {
         let lead = if i == 0 { format!("{}. ", i + 1) } else { format!("\n{}. ", i + 1) };
         out.push(Part::Text { text: lead });
@@ -125,7 +130,19 @@ pub fn parts(id: &str, title: &str, url: &str, notes: &[Note]) -> Vec<Part> {
             out.push(Part::Text { text: format!(" {words}") });
         }
     }
-    out.extend(parts::notes_hint(&out));
+    // for the model, after his words (the skills read it: plugins/*/SKILL.md):
+    // the hint, then the notes as one JSON list, like a page's <page-notes>
+    #[derive(serde::Serialize)]
+    struct Item<'a> {
+        id: &'a str,
+        anchor: Option<&'a Value>,
+        text: &'a str,
+        #[serde(skip_serializing_if = "str::is_empty")]
+        quote: &'a str,
+    }
+    let list: Vec<Item> = notes.iter().map(|n| Item { id: &n.id, anchor: n.extra.get("at"), text: n.text.as_deref().unwrap_or("").trim(), quote: n.quote.as_deref().unwrap_or("").trim() }).collect();
+    let data = serde_json::to_string(&list).unwrap_or_else(|_| "[]".into());
+    out.push(Part::Hint { of: parts::HintKind::Notes, text: format!("{}\n<artifact-notes artifact=\"{id}\" version=\"{version}\">{data}</artifact-notes>", parts::NOTES_HINT) });
     out
 }
 
@@ -197,10 +214,15 @@ pub fn post_send(pages: &Pages, id: &str) -> Response {
     Response::json(200, &json!({"sent": n, "agent": m.agent}))
 }
 
-/// Whether version `v` of artifact `id` exists (the door's check of a
-/// `Part::Anchor`).
-pub fn known(state: &std::path::Path, id: &str, v: u64) -> bool {
-    crate::artifacts::Store::new(state).get(id).is_some_and(|m| m.versions.iter().any(|x| x.v == v))
+/// Version `v` of artifact `id` is here (the door's check of a
+/// `Part::Anchor`); Err: his words (designer m_24098), the artifact by
+/// its title.
+pub fn known(state: &std::path::Path, id: &str, v: u64) -> Result<(), String> {
+    let m = crate::artifacts::Store::new(state).get(id);
+    match &m {
+        Some(m) if m.versions.iter().any(|x| x.v == v) => Ok(()),
+        _ => Err(format!("{} has no version {v} here, so the note can't go on it", m.as_ref().map_or(id, |m| m.title.as_str()))),
+    }
 }
 
 /// His message's anchor parts (the desktop door), recorded as sent notes

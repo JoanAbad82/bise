@@ -425,11 +425,14 @@ impl Shell {
         }
     }
 
-    /// Whether version `v` of artifact `id` is here (`parts_in::said`'s
-    /// check of an anchor part); no page server: none is.
-    pub(super) fn artifact_known(&self) -> impl Fn(&str, u64) -> bool + 'static {
+    /// Version `v` of artifact `id` is here (`parts_in::said`'s check of
+    /// an anchor part), or his words why not; no page server: none is.
+    pub(super) fn artifact_known(&self) -> impl Fn(&str, u64) -> Result<(), String> + 'static {
         let pages = self.pg.pages.clone();
-        move |id: &str, v: u64| pages.as_ref().is_some_and(|p| crate::pages::artifact::notes::known(p.store.dir.parent().unwrap_or(&p.store.dir), id, v))
+        move |id: &str, v: u64| match pages.as_ref() {
+            Some(p) => crate::pages::artifact::notes::known(p.store.dir.parent().unwrap_or(&p.store.dir), id, v),
+            None => Err(format!("{id} has no version {v} here, so the note can't go on it")),
+        }
     }
 
     /// The parts' JSON of a page's message `text` to `to` (its one
