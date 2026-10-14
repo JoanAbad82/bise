@@ -809,6 +809,30 @@ mod tests {
         let _ = std::fs::remove_dir_all(d);
     }
 
+    /// art-assets: a folder artifact's root (its frame_url, copy_href with
+    /// no file) is its index.html, with or without the slash, plain and
+    /// framed; before site::copy_file it was a 404.
+    #[test]
+    fn a_folder_artifacts_root_is_its_index() {
+        let (p, d) = pages();
+        let site = d.join("work/menus");
+        std::fs::create_dir_all(&site).unwrap();
+        std::fs::write(site.join("index.html"), b"<img src=\"a.png\">").unwrap();
+        std::fs::write(site.join("a.png"), b"A").unwrap();
+        let arts = crate::artifacts::Store::new(&d);
+        let a = crate::artifacts::Add { target: site.to_string_lossy().to_string(), title: Some("menus".into()), agent: "main".into(), by: "main".into(), cwd: "/".into(), ..Default::default() };
+        let m = arts.add(&a, 10).unwrap().meta;
+        let root = crate::pages::site::copy_href(&m.id, 1, m.versions[0].copy.as_deref().unwrap());
+        assert_eq!(root, "/a/menus/1/");
+        for at in ["/a/menus/1/", "/a/menus/1", "/a/menus/1/framed/"] {
+            let r = get(&p, at);
+            assert_eq!(r.status, 200, "{at}");
+            assert!(text(&r).starts_with("<img src=\"a.png\">"), "{at}");
+        }
+        assert_eq!(text(&get(&p, "/a/menus/1/a.png")), "A");
+        let _ = std::fs::remove_dir_all(d);
+    }
+
     #[test]
     fn versions_list_what_changed() {
         let (p, d) = pages();
