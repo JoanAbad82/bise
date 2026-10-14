@@ -207,6 +207,11 @@ slots (`heavy-run --alone`): never beside an agent's heavy job (on battery
 it waits for AC). The agents' own gates at night can sleep the same way:
 `~/.bise/run/heavy-run` is not in this repo, main applies `caffeinate -i`
 to every job there (nightly-reds m_23323, architect m_23320).
+Corrected the same morning (partial-red, below): `-i` did not keep the
+Mac awake. With the display off it is in a DarkWake, which goes back to
+maintenance sleep with PreventUserIdleSystemSleep held (08:25:05 and
+09:07:27, under heavy-run's `-i`). The waits now count awake time, and
+the gate, the nightly and heavy-run hold `-is`.
 
 Open, no owner, below the line unless a user hits it: **two clocks in a
 switch.** The switcher's probation (switch.rs `probation`) counts 120 s on
@@ -252,6 +257,41 @@ cause is not known. The next 5 runs under caffeinate were green (187-202
 s). Next time it is red: keep the run in a short TMPDIR that nothing
 sweeps (`TMPDIR=~/.bise/gate/<name>`), and read hub.log for the new
 hub's start and the switcher's `start_failure` line.
+
+## partial_e2e 4 of 20 on 2026-10-14: the sleep again, under caffeinate -i
+
+partial-red, plan signed by architect. audit-blind's count: partial_e2e
+red 4 of 20 runs that night, each one "timeout after 365 s (load x1.0)
+waiting for main's answer; last seen: []", cpu 1 s. Not the test: every
+red batch of run_all (repl_start, ambient_pages, partial, subscriptions,
+started together) began less than 20 s before a `Maintenance Sleep`
+(pmset -g log), and each test ended at the wake plus what was left of
+its budget:
+
+| batch start | sleep -> wake | reds |
+|---|---|---|
+| 05:05:42 (nightly, 0aefecd2) | 05:06:45 -> 05:12:26 | repl_start, subscriptions, partial, ambient_pages |
+| 08:24:50 (audit-blind full) | 08:25:05 -> 08:30:54 (349 s) | the same 4 |
+| 09:07:06 and 09:07:19 (audit-blind rerun, --only) | 09:07:27 -> 09:13:21 (354 s) | repl_start, subscriptions, partial; partial and ambient_pages of the other batch green at 444 s and 1127 s |
+
+heavy-run held `caffeinate -i` for these jobs: the log has the
+assertion live when the Mac went to sleep at 08:25:05 (`[System:
+PrevIdle]`). The display was off from 03:39 to 09:55 (the user away),
+so the Mac was in a DarkWake, and a DarkWake goes back into
+maintenance sleep whatever PreventUserIdleSystemSleep says: `-i` stops
+only an idle sleep with the user there. 24 of 24 green here with the Mac
+awake, 4 and 8 in parallel.
+
+Fix: `tests/wait.py` counts every timeout and window in awake time
+(`wait.now` = time.monotonic, the mach clock, which stops while the Mac
+sleeps): a test that spans a sleep goes on after the wake with what was
+left of its wait. `tests/wait_test.py` (quick gate, run_all) moves the
+wall clock 1000 s mid-wait: red before, green after. Extra guard, not
+proven (proving it would mean putting his Mac to sleep): `tests/gate.sh` holds
+`caffeinate -s -i -w <gate pid>` for its whole run, the nightly goes from
+`-i` to `-is`, and heavy-run (outside the repo, main) too; `-s` holds on
+AC power only. The hub and the REPL still count on the wall clock: the
+"two clocks" item above stays open, this fix does not touch it.
 
 ## T3: the expired one-release shims went (closed)
 

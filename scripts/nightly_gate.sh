@@ -79,10 +79,12 @@ if [ "${1:-}" = --in-slot ]; then
     || { echo "NOSTART cannot check out main ($tip) in $wt"; exit 1; }
   [ -f "$wt/tests/gate.sh" ] || { echo "NOSTART no tests/gate.sh in $wt"; exit 1; }
   echo "START $(date) $(git -C "$wt" rev-parse --short HEAD)"
-  # caffeinate -i: the Mac never idle-sleeps under the gate. On 2026-10-14
+  # caffeinate -is: the Mac never sleeps under the gate. On 2026-10-14
   # it took 'Maintenance Sleep' 5 times during the run (pmset -g log): each
-  # test running across one ended at the wake, a timeout (5 reds; issue 26)
-  cd "$wt" && GATE_ALL=1 exec /usr/bin/caffeinate -i bash tests/gate.sh full --all
+  # test running across one ended at the wake, a timeout (5 reds; issue 26).
+  # -i alone is not enough: at night the display is off, the Mac is in a
+  # DarkWake, which ignores it; -s (PreventSystemSleep) holds on AC only
+  cd "$wt" && GATE_ALL=1 exec /usr/bin/caffeinate -is bash tests/gate.sh full --all
   echo "NOSTART cannot enter $wt"; exit 1
 fi
 

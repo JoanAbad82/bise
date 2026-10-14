@@ -334,6 +334,12 @@ if mkdir -p "$glogs" 2>/dev/null; then
     exec > >(tee -a "$glog") 2> >(tee -a "$glog" >&2)
   else glog=""; fi
 fi
+# the Mac stays awake while the gate runs: -s (PreventSystemSleep, honoured
+# on AC power only) on top of -i, which a DarkWake ignores (display off,
+# the user away: 'Maintenance Sleep' under heavy-run's caffeinate -i, issue
+# 26). -w $$: it ends with this gate. Out of the job table (a subshell's):
+# the bare `wait` below never waits for it.
+[ -x /usr/bin/caffeinate ] && ( /usr/bin/caffeinate -s -i -w $$ >/dev/null 2>&1 & )
 LOCK="${gpre}full-$(id -u).lock"
 locked="" out=""
 on_exit() {
@@ -534,6 +540,9 @@ t0=$SECONDS
 # waits for a state with tests/wait.py; the check proves itself first
 python3 "$root/tests/sleep_check.py" --self-test >/dev/null && python3 "$root/tests/sleep_check.py" >/dev/null \
   || { python3 "$root/tests/sleep_check.py"; echo "GATE quick FAILED"; exit 1; }
+# wait.py's timeouts count awake time: a Mac sleep under the gate is no
+# timeout (issue 26)
+python3 -B "$root/tests/wait_test.py" >/dev/null || { python3 -B "$root/tests/wait_test.py"; echo "GATE quick FAILED"; exit 1; }
 # a test's env never keeps the caller's path overrides with an own HOME, and
 # its hub's BEND_RUN_DIR is under its tmp (tests/bise_env.py's self-test)
 python3 "$root/tests/bise_env.py" >/dev/null || { python3 "$root/tests/bise_env.py"; echo "GATE quick FAILED"; exit 1; }

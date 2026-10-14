@@ -27,6 +27,8 @@ done
 if [ -z "$only" ]; then
 echo "== No blind sleep in tests/ (tests/sleep_check.py: wait for a state with tests/wait.py)"
 python3 tests/sleep_check.py --self-test && python3 tests/sleep_check.py || exit 1
+echo "== Waits count awake time, not the wall clock (tests/wait_test.py)"
+python3 -B tests/wait_test.py || exit 1
 echo "== The terminal and the desktop app release apart (tests/release_split_test.py)"
 python3 tests/release_split_test.py || exit 1
 echo "== publish-release.sh tags unsigned and says each step (tests/publish_release_test.py)"
