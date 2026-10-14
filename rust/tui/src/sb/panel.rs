@@ -1016,7 +1016,7 @@ struct View {
 /// to (screen row, target): a click on an agent row focuses the agent.
 #[derive(Debug, Default, Clone)]
 pub(crate) struct PanelHits {
-    area: Rect,
+    pub(super) area: Rect,
     rows: Vec<(u16, Hit)>,
     /// The panel's numbers (Alt+N): agent name → number, kept while the
     /// agent lives (see [`Sb::numbers`]).
@@ -1077,7 +1077,7 @@ fn assign(mut slots: Vec<(String, usize)>, live: &[&Agent]) -> Vec<(String, usiz
 
 impl PanelHits {
     /// What is drawn at screen cell (`x`, `y`), if anything.
-    fn hit_at(&self, x: u16, y: u16) -> Option<&Hit> {
+    pub(super) fn hit_at(&self, x: u16, y: u16) -> Option<&Hit> {
         if !self.contains(x, y) {
             return None;
         }

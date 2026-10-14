@@ -538,7 +538,11 @@ feature?: boolean,
 /**
  * its try build builds or is on trial
  */
-trying?: boolean, };
+trying?: boolean, 
+/**
+ * the worktree's folder (the ψ's hover names it); none for a feature
+ */
+path?: string | null, };
 
 /**
  * The role a model is config.toml's default for.

@@ -927,6 +927,12 @@ body:has(.app-shell) {
 .app-rb-tip .b-act {
   align-self: flex-start;
 }
+/* wt-sign (designer m_24019): a ψ's branch and folder, mono in the text's color */
+.app-rb-tip-mono {
+  font-family: var(--font-mono);
+  color: var(--c-text);
+  overflow-wrap: anywhere;
+}
 /* an alarm's detail under its row (agent-waiting-states A): its words one a line in text-3, then
    'open <agent>' and 'stop watching' */
 .app-rb-detail {

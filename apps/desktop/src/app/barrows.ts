@@ -181,7 +181,7 @@ export function agentRows(agents: readonly ProjAgent[], now: number, all: boolea
     .sort(byNum)
     .map((x) => {
       const p = placeOf(x.a, places);
-      return agentRow(x, now, all, num(x.a.name), alt, extras, p === undefined ? undefined : markOf(p, asksMerge(p, cards), x.a.name), undefined);
+      return agentRow(x, now, all, num(x.a.name), alt, extras, p === undefined ? undefined : markOf(p, asksMerge(p, cards)), undefined);
     });
   for (const p of orphanPlaces(places, liveA)) {
     const label = placeLabel(p);

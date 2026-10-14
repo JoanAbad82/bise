@@ -432,7 +432,7 @@ pub(crate) const LEGEND: &[Symbol] = &[
     sym(AGENTS, G_IDLE, Tone::Dim, "idle"),
     sym(AGENTS, G_STOPPED, Tone::Dim, "stopped"),
     sym(AGENTS, G_UNREAD, Tone::Accent, "unread activity in that agent"),
-    sym(AGENTS, G_WORKTREE, Tone::Dim, "has its own worktree (its own copy of the files)"),
+    sym(AGENTS, G_WORKTREE, Tone::Dim, "worktree: an agent's own copy of the repo, on its own branch (hover a ψ to see which)"),
     Symbol { group: AGENTS, glyph: G_PR, tone: Tone::Dim, ascii: "P", meaning: "a pull request (dim open, faint draft, red checks fail)" },
     sym(AGENTS, "opus·hi", Tone::Dim, "model · reasoning (dim: not the same as main's)"),
     sym(AGENTS, G_OVERLAP, Tone::Text, "two agents changed the same file"),

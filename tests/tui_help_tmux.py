@@ -48,7 +48,7 @@ def check(cols, rows):
         # row too (the symbols list grew past one page at 200 columns): wait
         # for the filter as well, else the wait matches the page before it
         t.typed("worktree")
-        sc = t.wait_all(["filter: worktree", "has its own worktree"])
+        sc = t.wait_all(["filter: worktree", "an agent's own copy of the repo"])
         assert "ψ" in sc and "symbols" in sc, sc
         print("---- filter 'worktree' at %d columns ----\n%s" % (cols, sc))
         t.keys("Escape")

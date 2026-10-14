@@ -134,6 +134,7 @@ impl Place {
             landing: p.landing,
             feature: p.feature,
             trying: p.trying,
+            path: p.path.clone().filter(|p| !p.is_empty()),
         }
     }
 }

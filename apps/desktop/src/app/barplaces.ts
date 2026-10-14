@@ -12,8 +12,10 @@ export interface Mark {
   /** '↑' a PR, '…' its land waits, 'ψ' a worktree, 'Δ' a feature's try build */
   readonly g: string;
   readonly tone: MarkTone;
-  /** the TUI's words for it: '#415 · checks fail: e2e/login · ψ sb/checkout' */
+  /** the TUI's words for it: '#415 · checks fail: e2e/login · ψ worktree on sb/checkout' */
   readonly tip: string;
+  /** the same, its branch and folder apart (mono in the tip) */
+  readonly parts: readonly TipPart[];
   /** its open PR's number and link, when it has one */
   readonly pr?: number;
   readonly url?: string;
@@ -62,36 +64,70 @@ export function placeOf(a: Agent, places: readonly Place[]): Place | undefined {
   return places.find((p) => (p.agents ?? []).includes(a.name) || (a.place_id !== undefined && a.place_id !== '' && p.id === a.place_id));
 }
 
-/**
- * The tip's words (places.rs words_line): the hub's lid, else '#415 · ' and the PR's words; then
- * 'ψ <branch>' when the branch isn't the agent's own ('sb/<name>'), last so a cut eats it first.
- * `name`: the row's agent; none (a head, an orphan PR) the row already says the branch.
- */
-export function tipWords(p: Place, name?: string): string {
-  const pr = livePr(p);
-  const parts: string[] = [];
-  if (p.lid != null && p.lid !== '') parts.push(p.lid);
-  else if (pr !== null) parts.push(`#${String(pr.number)} · ${pr.words !== '' ? pr.words : 'open'}`);
-  const label = placeLabel(p);
-  if (name !== undefined && label.split('/').at(-1) !== name) parts.push(`ψ ${label}`);
-  // nothing else to say (no PR yet, its own sb/<name>): the worktree it is in
-  return parts.length > 0 ? parts.join(' · ') : `ψ ${label}`;
+/** A piece of a tip: words (text-2), or a branch or a folder (`mono`, text). */
+export interface TipPart {
+  readonly t: string;
+  readonly mono?: boolean;
 }
+
+/** A tip's parts as one string (aria-label, title). */
+export const tipString = (parts: readonly TipPart[]): string => parts.map((x) => x.t).join('');
+
+/** A path with `home` folded to '~'. */
+export function tilde(path: string, home: string | undefined): string {
+  return home !== undefined && home !== '' && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
+}
+
+/**
+ * What a ψ is (wt-sign, designer m_24019; the TUI's sb/psi_tip.rs): 'ψ worktree: its own copy of the
+ * repo, on sb/fix-login · ~/.bise/worktrees/harness/fix-login'; 2 or more agents 'ψ worktree shared by
+ * 3 agents, on …'; detached ', no branch'; a feature 'ψ feature branch ven: its agents land on it',
+ * 'Δ feature ven: its try build is running'. The folder: `Place.path`, else a private one's id. Pure.
+ */
+export function worktreeParts(p: Place, home?: string): TipPart[] {
+  const label = placeLabel(p);
+  if (p.feature === true) {
+    return p.trying === true
+      ? [{ t: 'Δ feature ' }, { t: label, mono: true }, { t: ': its try build is running' }]
+      : [{ t: 'ψ feature branch ' }, { t: label, mono: true }, { t: ': its agents land on it' }];
+  }
+  const n = (p.agents ?? []).length;
+  const who = n >= 2 ? `ψ worktree shared by ${String(n)} agents` : 'ψ worktree: its own copy of the repo';
+  const out: TipPart[] = p.branch != null && p.branch !== '' ? [{ t: `${who}, on ` }, { t: p.branch, mono: true }] : [{ t: `${who}, no branch` }];
+  const path = p.path ?? (p.id.startsWith('pt:') ? p.id.slice(3) : undefined);
+  if (path !== undefined && path !== '') out.push({ t: ' · ' }, { t: tilde(path, home), mono: true });
+  return out;
+}
+
+/**
+ * The tip (places.rs words_line): the hub's lid, else '#415 · ' and the PR's words, then ' · ψ worktree
+ * on <branch>'; nothing of a PR or a land to say: what the worktree is ([`worktreeParts`]).
+ */
+export function tipParts(p: Place, home?: string): TipPart[] {
+  const pr = livePr(p);
+  const said = p.lid != null && p.lid !== '' ? p.lid : pr !== null ? `#${String(pr.number)} · ${pr.words !== '' ? pr.words : 'open'}` : null;
+  if (said === null) return worktreeParts(p, home);
+  return [{ t: `${said} · ψ worktree on ` }, { t: placeLabel(p), mono: true }];
+}
+
+/** [`tipParts`] as one string. */
+export const tipWords = (p: Place, home?: string): string => tipString(tipParts(p, home));
 
 /**
  * Its mark (places.rs row_mark), first that applies: '…' text-2 while its land waits; no open PR:
  * 'ψ' text-2 ('Δ' a feature's try build); '↑' text-3 when the forge is late, red when its checks
  * fail, accent when a card asks him to merge it, text-3 a draft, text-2 open. Pure.
  */
-export function markOf(p: Place, asks: boolean, name?: string): Mark {
-  const tip = tipWords(p, name);
-  if (waitsToLand(p)) return { g: '…', tone: 'mid', tip };
+export function markOf(p: Place, asks: boolean, home?: string): Mark {
+  const parts = tipParts(p, home);
+  const tip = tipString(parts);
+  if (waitsToLand(p)) return { g: '…', tone: 'mid', tip, parts };
   const pr = livePr(p);
-  if (pr === null) return { g: p.feature === true && p.trying === true ? 'Δ' : 'ψ', tone: 'mid', tip };
+  if (pr === null) return { g: p.feature === true && p.trying === true ? 'Δ' : 'ψ', tone: 'mid', tip, parts };
   const stale = pr.stale_ms != null;
   const fails = pr.checks === 'fail';
   const tone: MarkTone = !stale && !fails && asks ? 'acc' : stale || pr.state === 'draft' ? 'dim' : fails ? 'err' : 'mid';
-  return { g: '↑', tone, tip, pr: pr.number, url: pr.url };
+  return { g: '↑', tone, tip, parts, pr: pr.number, url: pr.url };
 }
 
 /** The worktrees whose live agents are 2 or more: a group each (sb.rs shared). */

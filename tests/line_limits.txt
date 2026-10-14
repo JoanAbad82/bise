@@ -20,8 +20,8 @@
 1132 rust/proto/src/thread/lines.rs
 1655 rust/switchboard/src/approvals/tiers.rs
 1038 rust/switchboard/src/cli.rs
-2797 rust/switchboard/src/core.rs
-4716 rust/switchboard/src/core_tests.rs
+2783 rust/switchboard/src/core.rs
+4669 rust/switchboard/src/core_tests.rs
 2425 rust/switchboard/src/daemon.rs
 1187 rust/switchboard/src/daemon/gate.rs
 1207 rust/switchboard/src/daemon/versions.rs

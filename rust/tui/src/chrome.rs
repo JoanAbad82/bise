@@ -421,6 +421,7 @@ fn divider_rule(buf: &mut Buffer, area: Rect, cols: Cols, y: u16) -> bool {
 /// `you → ? perf · your answer`); returns (no state, the label).
 pub(crate) fn draw_divider_label(buf: &mut Buffer, area: Rect, cols: Cols, y: u16, label: Vec<Span<'static>>) -> (Rect, Rect) {
     let area = area.intersection(buf.area);
+    crate::sb::places::psi_tip::mark(None); // no ψ in this label
     if !divider_rule(buf, area, cols, y) {
         return (Rect::default(), Rect::default());
     }
@@ -500,6 +501,9 @@ pub(crate) fn draw_divider(
     };
     put(buf, lx, y, &label, end + 1);
     let label_rect = Rect { x: lx, y, width: width_of(&label).min((end + 1).saturating_sub(lx)), height: 1 };
+    // wt-sign: the ψ (and its place's name) says what it is on hover
+    let psi = psi_span(&label).map(|(x, w)| (Rect { x: lx + x, y, width: w, height: 1 }.intersection(label_rect), name));
+    crate::sb::places::psi_tip::mark(psi);
     let w = width_of(&state);
     if w == 0 {
         return (Rect::default(), label_rect);
@@ -511,6 +515,22 @@ pub(crate) fn draw_divider(
         put(buf, end, y, &[Span::raw(" ")], end + 1);
     }
     (Rect { x, y, width: w, height: 1 }, label_rect)
+}
+
+/// Where the label's `ψ` (or `ψ fix-login`) is: its column from the
+/// label's start and its width; None when the tail has none. After the
+/// name (the first 3 spans), so a name cannot be taken for it.
+fn psi_span(label: &[Span]) -> Option<(u16, u16)> {
+    let psi = theme::glyph(theme::G_WORKTREE);
+    let mut x = 0u16;
+    for (i, s) in label.iter().enumerate() {
+        let w = s.content.width() as u16;
+        if i >= 3 && (s.content == psi || s.content.starts_with(&format!("{psi} "))) {
+            return Some((x, w));
+        }
+        x += w;
+    }
+    None
 }
 
 /// The divider's forms, richest first (BISE-303): (the state, the tail,

@@ -46,6 +46,25 @@ pub fn private_path(id: &str) -> Option<&str> {
     id.strip_prefix("pt:")
 }
 
+/// BISE-136 fallback: the linked git worktree a bash call starts in
+/// (`cd /tmp/x-wt && …`), when it is not `own` (the agent's workspace).
+/// A linked worktree has a `.git` file (the main checkout a directory).
+/// Never asked for main (core.rs): main works in the workspace.
+pub fn bash_worktree(args: &str, own: &str) -> Option<String> {
+    // the bare command, or the JSON of a call with a description (BISE-223)
+    let cmd = match serde_json::from_str::<serde_json::Value>(args) {
+        Ok(v) => v["arg"].as_str()?.to_string(),
+        Err(_) => args.to_string(),
+    };
+    let rest = cmd.trim_start().strip_prefix("cd ")?;
+    let path = rest.split(|c: char| c.is_whitespace() || c == ';' || c == '&' || c == '|').next()?;
+    let path = path.trim_matches(|c| c == '"' || c == '\'').trim_end_matches('/');
+    if !path.starts_with('/') || path == own.trim_end_matches('/') {
+        return None;
+    }
+    std::path::Path::new(path).join(".git").is_file().then(|| path.to_string())
+}
+
 /// The id of the place agent `a` works in: its private worktree when it
 /// told one (live agents only), else its workspace's place.
 pub fn id_of(a: &crate::model::Agent) -> String {
@@ -201,6 +220,10 @@ pub struct PlaceView {
     pub feature: bool,
     #[serde(default)]
     pub trying: bool,
+    /// the worktree's folder (wt-sign: the ψ's hover names it); None for
+    /// a feature (its agents' worktrees are theirs)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 /// The PR as the TUI shows it. `stale_ms`: how old the last answer of
@@ -393,6 +416,7 @@ pub fn views(
             landing: landing.get(&p.id).copied(),
             feature: p.kind == PlaceKind::Feature,
             trying: trying.contains(&p.id),
+            path: (p.kind == PlaceKind::Worktree && !p.path.is_empty()).then(|| p.path.clone()),
         })
         .collect()
 }
@@ -553,6 +577,7 @@ mod tests {
             landing: None,
             feature: false,
             trying: false,
+            path: None,
         };
         let j = serde_json::to_value(&v).unwrap();
         assert_eq!(

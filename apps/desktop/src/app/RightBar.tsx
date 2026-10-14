@@ -24,6 +24,7 @@ import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
 import { agentRows, archivedRows, artifactRows, capRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
 import { FitWords } from './FitWords';
+import { tilde } from './barplaces';
 
 const lastAgents = new Map<string, { from: readonly (readonly Agent[])[]; items: readonly ProjAgent[] }>();
 
@@ -164,6 +165,8 @@ function Section({
 
 /** An artifact row's chip: art-chips' look, 8 px sides. */
 const CHIP = { className: 'b-artchip app-rb-chip', pad: 16 };
+/** His home folder (the preload's), for the tip's '~'. */
+const HOME = (globalThis as { bise?: { home?: string } }).bise?.home;
 
 /** Where a worktree's mark, an orphan PR or a head opens: its agent's review, else its branch. */
 type OpenPr = (r: BarRow) => void;
@@ -300,7 +303,16 @@ function MarkTip({ at, onKeep, onOpenUrl }: { at: TipAt; onKeep: (keep: boolean)
       }}
     >
       <span data-testid="app.right.tip.words">
-        {m.tip}
+        {/* wt-sign: words text-2, the branch and the folder mono, his home folded to '~' */}
+        {m.parts.map((x, i) =>
+          x.mono === true ? (
+            <span key={i} className="app-rb-tip-mono">
+              {tilde(x.t, HOME)}
+            </span>
+          ) : (
+            <Fragment key={i}>{x.t}</Fragment>
+          ),
+        )}
       </span>
       {m.url !== undefined && (
         <Act

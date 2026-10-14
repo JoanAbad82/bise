@@ -33,6 +33,8 @@ pub(crate) struct Place {
     /// try build builds or is on trial: `Δ` dim, else `ψ`; never `↑`.
     pub(crate) feature: bool,
     pub(crate) trying: bool,
+    /// the worktree's folder (its ψ's hover); None for a feature
+    pub(crate) path: Option<String>,
 }
 
 /// The PR of a worktree's branch (`PrView`): the enums as their JSON
@@ -369,6 +371,9 @@ pub(crate) fn flow_words(flow: &str) -> &'static str {
         _ => "",
     }
 }
+
+/// What a ψ says under the mouse (wt-sign).
+pub(crate) mod psi_tip;
 
 #[cfg(test)]
 mod tests {

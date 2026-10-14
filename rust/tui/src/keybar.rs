@@ -194,6 +194,10 @@ pub(crate) fn line(app: &App, width: u16) -> Line<'static> {
     {
         return Line::from(Span::styled(cut(&words, usize::from(width)), dimmed));
     }
+    // a ψ under the mouse (wt-sign, designer m_24019): what it is
+    if let Some(tip) = app.hover.and_then(|(x, y)| crate::sb::places::psi_tip::at(app, x, y)) {
+        return crate::sb::places::psi_tip::line(&tip, usize::from(width));
+    }
     // an attachment's chip under the mouse (open_file.rs, designer m_21765)
     if app.hover.and_then(|(x, y)| crate::links::hit_url(x, y)).is_some_and(|u| crate::open_file::path_of_url(&u).is_some()) {
         return pairs_line(&CHIP_HOVER, usize::from(width)).0;

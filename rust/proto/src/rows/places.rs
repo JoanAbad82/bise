@@ -222,5 +222,8 @@ pub struct Place {
     /// its try build builds or is on trial
     #[serde(default, skip_serializing_if = "crate::is_false")]
     pub trying: bool,
+    /// the worktree's folder (the ψ's hover names it); none for a feature
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 

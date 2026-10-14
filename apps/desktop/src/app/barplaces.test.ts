@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent, Card, Place, Pr } from '@/proto';
 import { agentRows, capRows, type ProjAgent } from './barrows';
-import { asksMerge, markOf, tipWords, waitsToLand } from './barplaces';
+import { asksMerge, markOf, tilde, tipWords, waitsToLand, worktreeParts } from './barplaces';
 
 const NOW = 1_791_100_000_000;
 const ag = (name: string, over: Partial<Agent> = {}): ProjAgent => ({
@@ -77,11 +77,22 @@ describe('marks (§3)', () => {
     expect(markOf(place('sb/a', ['a']), false, 'a')).toMatchObject({ g: 'ψ', tone: 'mid' });
     expect(markOf(place('sb/a', ['a'], { pr: pr({ state: 'merged' }) }), false, 'a').g).toBe('ψ');
   });
-  it("the tip: the TUI's words, the branch only when it isn't sb/<name>, always last", () => {
+  it("the tip: the TUI's words, then the worktree it is, last", () => {
     const p = place('sb/checkout', ['pay'], { pr: pr({ checks: 'fail', words: 'checks fail: e2e/login' }) });
-    expect(tipWords(p, 'pay')).toBe('#415 · checks fail: e2e/login · ψ sb/checkout');
-    expect(tipWords(place('sb/checkout', ['checkout'], { pr: pr({ words: 'approved · checks pass' }) }), 'checkout')).toBe('#415 · approved · checks pass');
-    expect(tipWords(place('sb/a', ['a'], { lid: 'waits to land · 2nd' }), 'a')).toBe('waits to land · 2nd');
+    expect(tipWords(p)).toBe('#415 · checks fail: e2e/login · ψ worktree on sb/checkout');
+    expect(tipWords(place('sb/a', ['a'], { lid: 'waits to land · 2nd' }))).toBe('waits to land · 2nd · ψ worktree on sb/a');
+    expect(markOf(p, false).parts.filter((x) => x.mono === true).map((x) => x.t)).toEqual(['sb/checkout']);
+  });
+  it("wt-sign: a ψ says it is a worktree (designer m_24019), the branch and folder mono, home as '~'", () => {
+    const own = place('sb/fix-login', ['fix'], { path: '/Users/g/.bise/worktrees/harness/fix-login' });
+    expect(tipWords(own, '/Users/g')).toBe('ψ worktree: its own copy of the repo, on sb/fix-login · ~/.bise/worktrees/harness/fix-login');
+    expect(markOf(own, false).tip).toBe('ψ worktree: its own copy of the repo, on sb/fix-login · /Users/g/.bise/worktrees/harness/fix-login');
+    expect(worktreeParts(own).filter((x) => x.mono === true).map((x) => x.t)).toEqual(['sb/fix-login', '/Users/g/.bise/worktrees/harness/fix-login']);
+    expect(tipWords(place('sb/dark', ['a', 'b', 'c'], { path: '/d' }))).toBe('ψ worktree shared by 3 agents, on sb/dark · /d');
+    expect(tipWords({ id: 'pt:/tmp/fix-wt', agents: ['x'] })).toBe('ψ worktree: its own copy of the repo, no branch · /tmp/fix-wt');
+    expect(tipWords({ id: 'feature:ven', branch: 'ven', agents: ['a'], feature: true })).toBe('ψ feature branch ven: its agents land on it');
+    expect(tipWords({ id: 'feature:ven', branch: 'ven', agents: ['a'], feature: true, trying: true })).toBe('Δ feature ven: its try build is running');
+    expect(tilde('/Users/g/x', '/Users/g')).toBe('~/x');
   });
   it('the shared checkout: an empty mark; a solo worktree: its mark in the row', () => {
     const rows = agentRows([ag('docs'), ag('perf', { place_id: 'wt:sb/perf' })], NOW, false, false, { places: [place('sb/perf', ['perf'])], numbers: nums('docs', 'perf') });

@@ -218,6 +218,7 @@ pub fn places(snap: &Value) -> Vec<bise_proto::rows::Place> {
             landing: p.landing,
             feature: p.feature,
             trying: p.trying,
+            path: p.path,
         })
         .collect()
 }

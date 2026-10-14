@@ -1255,24 +1255,6 @@ struct Place {
     branch: Option<String>,
 }
 
-/// BISE-136 fallback: the linked git worktree a bash call starts in
-/// (`cd /tmp/x-wt && …`), when it is not `own` (the agent's workspace).
-/// A linked worktree has a `.git` file (the main checkout a directory).
-fn bash_worktree(args: &str, own: &str) -> Option<String> {
-    // the bare command, or the JSON of a call with a description (BISE-223)
-    let cmd = match serde_json::from_str::<Value>(args) {
-        Ok(v) => v["arg"].as_str()?.to_string(),
-        Err(_) => args.to_string(),
-    };
-    let rest = cmd.trim_start().strip_prefix("cd ")?;
-    let path = rest.split(|c: char| c.is_whitespace() || c == ';' || c == '&' || c == '|').next()?;
-    let path = path.trim_matches(|c| c == '"' || c == '\'').trim_end_matches('/');
-    if !path.starts_with('/') || path == own.trim_end_matches('/') {
-        return None;
-    }
-    std::path::Path::new(path).join(".git").is_file().then(|| path.to_string())
-}
-
 /// A task's role line (BISE-126) and its calls.
 #[derive(Clone, Debug, Default)]
 struct Role {
@@ -2278,7 +2260,11 @@ impl Hub {
                 if let Some(own) = self.st.agents.get(agent).map(|a| a.ws.path.clone()) {
                     self.set_activity(agent, now, format!("{} `{}`", name, clip(&one_line(&args), 120)));
                     self.dirty = true;
-                    if let Some(p) = (name == "bash").then(|| bash_worktree(&args, &own)).flatten() {
+                    // main works in the workspace (`sb worktree` refuses it
+                    // too): its `cd <a task's worktree> && …` to look at
+                    // a task's work is no move (Benjamin's 'ψ ven-bots')
+                    let guess = name == "bash" && agent != MAIN;
+                    if let Some(p) = guess.then(|| crate::place::bash_worktree(&args, &own)).flatten() {
                         self.set_place(agent, p, false);
                     }
                 }
