@@ -7,6 +7,7 @@
 // memo'd, so moving the keyboard's row re-renders two rows, not the list.
 import { memo, type MouseEventHandler, type ReactNode, type Ref } from "react";
 import { cx } from "./cx";
+import { BiseMark } from "./mark";
 import { PickerCut } from "./picker";
 import { tipAttrs } from "./tip";
 import { Button, Dot, Pearl, type DotState } from "./prim";
@@ -149,16 +150,17 @@ export function Menu({ children, testId }: { children: ReactNode; testId?: strin
 export interface ToastProps {
   children: ReactNode;
   err?: boolean;
-  dot?: DotState | undefined;
+  /** its lead mark (designer's desktop-delight, m_25147): 'done', a '✓' text-2; 'bise', bise's ':*'; never a sphere */
+  lead?: "done" | "bise" | undefined;
   /** its one action, a ghost button */
   action?: { text: ReactNode; onClick?: MouseEventHandler<HTMLButtonElement>; testId?: string };
   testId?: string;
 }
 /** a toast */
-export function Toast({ children, err, dot, action, testId }: ToastProps) {
+export function Toast({ children, err, lead, action, testId }: ToastProps) {
   return (
     <div className={cx("b-toast", err && "err")} role={err ? "alert" : "status"} data-testid={testId}>
-      {err ? <><span className="m">▲</span> </> : dot !== undefined ? <><Dot state={dot} /> </> : null}
+      {err ? <span className="m">▲</span> : lead === "done" ? <span className="ok">✓</span> : lead === "bise" ? <BiseMark size={14} wink={false} /> : null}
       {children}
       {action && <span className="end"><Button kind="ghost" onClick={action.onClick} testId={action.testId}>{action.text}</Button></span>}
     </div>

@@ -3,3 +3,5 @@
 .b-toast .end{margin-left:auto;display:flex;gap:var(--gap-inline)}
 .b-toast.err{box-shadow:var(--e-2),inset 3px 0 0 var(--c-err)}
 .b-toast .m{color:var(--c-err);font-weight:700}
+/* a done toast leads with a '✓' text-2, bise's own with its ':*' (designer's desktop-delight, m_25147) */
+.b-toast .ok{color:var(--c-text-2)}

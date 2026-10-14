@@ -314,7 +314,8 @@ export const SECTIONS: Record<string, () => ReactNode> = {
       ] }]} />
       <Picker testId="ds.picker.empty" groups={[]} empty="no match" onPick={() => undefined} />
       <div className="g-col">
-        <Toast dot="ok" action={{ text: "open" }}>flash-sale is done</Toast>
+        <Toast lead="done" action={{ text: "open" }}>flash-sale is done</Toast>
+        <Toast lead="bise">bise 2026.10.2 is ready: restart to update</Toast>
         <Toast err action={{ text: "retry" }}>the send failed: the core is offline</Toast>
         <Toast>copied</Toast>
       </div>
