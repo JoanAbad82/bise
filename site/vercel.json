@@ -69,6 +69,16 @@
       "source": "/screens",
       "destination": "/book/screens",
       "permanent": false
+    },
+    {
+      "source": "/download/mac",
+      "destination": "https://github.com/gvergnaud/bise/releases/download/desktop-latest/bise-mac-arm64.dmg",
+      "permanent": false
+    },
+    {
+      "source": "/download/mac-beta",
+      "destination": "https://github.com/gvergnaud/bise/releases/download/desktop-beta/bise-mac-arm64.dmg",
+      "permanent": false
     }
   ]
 }

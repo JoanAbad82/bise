@@ -1,0 +1,13 @@
+{
+  "tag_name": "desktop-beta",
+  "name": "desktop-v2026.10.3",
+  "draft": false,
+  "prerelease": true,
+  "published_at": "2026-10-14T18:00:00Z",
+  "html_url": "https://github.com/gvergnaud/bise/releases/tag/desktop-beta",
+  "body": "- the queued messages sit in a drawer above the composer",
+  "assets": [
+    { "name": "desktop.json", "size": 905, "updated_at": "2026-10-14T18:00:00Z", "browser_download_url": "https://github.com/gvergnaud/bise/releases/download/desktop-beta/desktop.json" },
+    { "name": "bise-mac-arm64.dmg", "size": 206104000, "updated_at": "2026-10-14T18:00:00Z", "browser_download_url": "https://github.com/gvergnaud/bise/releases/download/desktop-beta/bise-mac-arm64.dmg" }
+  ]
+}

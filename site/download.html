@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bise :* · download for Mac</title>
+<meta name="description" content="bise for Mac, the desktop app. talk to one agent, it runs the team, you stay in flow. Apple silicon, macOS 13 or later.">
+<link rel="canonical" href="https://bise.dev/download">
+<meta name="theme-color" content="#f2ede2">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="bise">
+<meta property="og:url" content="https://bise.dev/download">
+<meta property="og:title" content="bise :* · download for Mac">
+<meta property="og:description" content="talk to one agent. it runs the team. you stay in flow.">
+<meta property="og:image" content="https://bise.dev/og.png?v=paper">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://api.github.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@700&display=swap" rel="stylesheet">
+<!-- The landing's paper (index.html, landing-b), light by default, dark paper
+     (.pd) when the system or his pick on the landing says so (localStorage
+     bise-theme). The download works without JS: the button is a plain link to
+     /download/mac (vercel.json redirects it to the DMG on the desktop-latest
+     tag). download.js reads the release for the version, size and notes. -->
+<style>
+  html[data-theme] { --bg:#f2ede2; --soft:#ebe4d6; --text:#1d1a17; --dim:#5a5349; --faint:#cfc5b4; --kick:#8a8174; --chip:#e3dac8; --pen:#c8264a; --hl:#f4a6b0bb; --hl2:#f4a6b0; }
+  html.pd[data-theme] { --bg:#171513; --soft:#1e1b18; --text:#ece6da; --dim:#b8b0a3; --faint:#3d3935; --kick:#8a8276; --chip:#262220; --pen:#f4a6b0; --hl:#f4a6b055; --hl2:#f4a6b088; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html { -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  body { color:var(--text); font-family:Newsreader, Georgia, serif; font-size:20px; line-height:1.6;
+    background:#f2ede2 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence baseFrequency='.85' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .25 0 0 0 .08 0'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>"); }
+  html.pd body { background:#171513 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence baseFrequency='.85' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 .95 0 0 0 0 .9 0 0 0 .05 0'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>"); }
+  a { color:inherit; text-decoration:none; }
+  .acc { color:var(--pen); }
+  code, .mono { font-family:"JetBrains Mono", ui-monospace, Menlo, monospace; }
+  code { font-size:.78em; background:var(--chip); border-radius:4px; padding:1px 6px; }
+
+  header { display:flex; justify-content:space-between; align-items:center; padding:22px 5vw; font-size:16px; font-style:italic; color:var(--dim); }
+  header .logo { font-style:normal; font-weight:600; color:var(--text); }
+  header .logo .acc { font-family:Caveat, cursive; font-weight:700; font-size:1.25em; }
+  header nav { display:flex; gap:3ch; align-items:center; }
+  header nav a:hover, header button:hover { color:var(--text); }
+  header button { font:inherit; font-style:normal; background:none; border:0; color:inherit; cursor:pointer; }
+
+  main { max-width:36em; margin:0 auto; padding:9vh 6vw 6vh; }
+  .hero { text-align:center; }
+  h1 { font-weight:600; font-size:clamp(48px, 8vw, 88px); line-height:1; letter-spacing:-.04em; }
+  h1 .acc { font-family:Caveat, cursive; font-weight:700; letter-spacing:0; font-size:.9em; }
+  .t2 { font-style:italic; font-size:clamp(19px, 1.8vw, 23px); color:var(--dim); margin-top:18px; }
+
+  .get { margin-top:44px; display:flex; flex-direction:column; align-items:center; gap:12px; }
+  a.dl { font-weight:600; font-size:24px; border-radius:2px; padding:6px 16px; transition:background .3s;
+    background:linear-gradient(100deg, transparent 0, var(--hl) 6px, var(--hl) calc(100% - 8px), transparent 100%); }
+  a.dl:hover { background:linear-gradient(100deg, transparent 0, var(--hl2) 6px, var(--hl2) calc(100% - 8px), transparent 100%); }
+  a.dl .ar { font-family:"JetBrains Mono", monospace; font-size:.8em; margin-left:.4ch; }
+  .meta { font-style:italic; font-size:16px; color:var(--dim); }
+  .meta .sep { color:var(--kick); margin:0 .6ch; }
+  .meta a { text-decoration:underline; text-decoration-color:var(--faint); text-underline-offset:3px; } .meta a:hover { color:var(--text); }
+  .note { font-style:italic; font-size:16px; color:var(--dim); max-width:30em; margin:6px auto 0; }
+  [hidden] { display:none !important; }
+
+  .or { margin-top:34px; font-style:italic; font-size:16px; color:var(--dim); }
+  .install { margin:10px auto 0; width:fit-content; max-width:100%; color:var(--text); font-family:"JetBrains Mono", ui-monospace, monospace; font-size:15px; cursor:pointer;
+    display:flex; align-items:center; gap:2.5ch; padding:11px 12px 11px 20px; border-top:1px solid var(--text); border-bottom:1px solid var(--text); transition:border-color .3s; }
+  .install:hover { border-color:var(--pen); }
+  .install .p { color:var(--pen); }
+  .install .c { font-family:Newsreader, serif; font-style:italic; font-size:15px; color:var(--dim); }
+  .install.done .c { color:var(--pen); }
+
+  section { margin-top:9vh; }
+  h2 { font-weight:600; font-size:clamp(26px, 3vw, 34px); line-height:1.1; letter-spacing:-.02em; margin-bottom:20px; }
+  h2 .v { font-weight:400; font-style:italic; font-size:.6em; color:var(--dim); letter-spacing:0; margin-left:.5ch; }
+  ol.steps { list-style:none; }
+  ol.steps li { display:grid; grid-template-columns:2ch 1fr; gap:0 1ch; margin:0 0 14px; }
+  ol.steps .n { font-family:Caveat, cursive; font-weight:700; font-size:1.3em; line-height:1.25; color:var(--pen); }
+  ol.steps .d { display:block; color:var(--dim); font-style:italic; font-size:17px; }
+  ul.new { list-style:none; }
+  ul.new li { display:grid; grid-template-columns:2ch 1fr; gap:0 1ch; margin:0 0 8px; }
+  ul.new li::before { content:"·"; color:var(--pen); font-weight:600; text-align:center; }
+  ul.new a, .more a, .beta a { text-decoration:underline; text-decoration-color:var(--pen); text-underline-offset:3px; }
+  .more { margin-top:8px; font-style:italic; font-size:17px; color:var(--dim); }
+  .beta { color:var(--dim); font-size:18px; }
+  .beta b { color:var(--text); font-weight:600; }
+
+  footer { max-width:36em; margin:0 auto; padding:6vh 6vw 8vh; display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; font-style:italic; font-size:15px; color:var(--kick); }
+  footer a:hover { color:var(--text); }
+  /* phones: no install box (nobody pipes curl on a phone), as on the landing */
+  @media (max-width:600px) { .install, .or { display:none; } }
+</style>
+<script>{ const r = document.documentElement; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if ((d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1') r.classList.add('pd'); }</script>
+</head>
+<body>
+<header>
+  <a class="logo" href="/">bise <span class="acc">:*</span></a>
+  <nav>
+    <a href="/docs/">docs</a>
+    <button id="theme" title="light / dark">◐</button>
+    <a href="https://github.com/gvergnaud/bise">GitHub</a>
+  </nav>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>bise for Mac <span class="acc">:*</span></h1>
+    <p class="t2">talk to one agent. it runs the team. you stay in flow.</p>
+
+    <div class="get">
+      <a class="dl" id="dl" href="/download/mac">download for Mac<span class="ar">↓</span></a>
+      <p class="meta" id="meta">Apple silicon<span class="sep">·</span>macOS 13 or later<span class="sep">·</span>signed and notarized by Apple</p>
+      <p class="note" id="soon" hidden>bise for Mac isn't out yet. the terminal app is, and it's the same bise: same agents, same pages.</p>
+      <p class="note" id="intel" hidden>this Mac has an Intel chip. bise for Mac runs on Apple silicon (M1 and later) for now. the terminal app runs on any Mac.</p>
+    </div>
+
+    <p class="or" id="or">or in the terminal, on any Mac or Linux</p>
+    <div class="install" id="install" title="click to copy" role="button" tabindex="0"><span><span class="p">$</span> <span id="cmd">curl -fsSL bise.dev/install | sh</span></span><span class="c">copy</span></div>
+  </div>
+
+  <section id="how">
+    <h2>install</h2>
+    <ol class="steps">
+      <li><span class="n">1</span><span>open <code>bise-mac-arm64.dmg</code> from your Downloads.</span></li>
+      <li><span class="n">2</span><span>drag bise to Applications.</span></li>
+      <li><span class="n">3</span><span>open bise from Applications.<span class="d">macOS asks once if you want to open an app from the internet: Open. after that, bise updates itself when you quit it or while you're away, and your agents keep working through it.</span></span></li>
+    </ol>
+  </section>
+
+  <section id="new" hidden>
+    <h2>what's new <span class="v" id="new-v"></span></h2>
+    <ul class="new" id="new-list"></ul>
+    <p class="more"><a id="new-all" href="https://github.com/gvergnaud/bise/releases">all the release notes</a></p>
+  </section>
+
+  <section id="beta" hidden>
+    <h2>the beta</h2>
+    <p class="beta">want what's next before everyone? <b id="beta-v"></b> is out on the beta. it's newer and less tested. <a href="/download/mac-beta">download the beta</a><span id="beta-size"></span>, or turn on beta updates in bise's Settings › General.</p>
+  </section>
+</main>
+
+<footer>
+  <span>bise <span class="acc">:*</span> · open source under <a href="https://github.com/gvergnaud/bise/blob/main/LICENSE">Apache-2.0</a></span>
+  <span><a href="/">bise.dev</a> · <a href="https://github.com/gvergnaud/bise/releases">releases</a> · <a href="/docs/">docs</a></span>
+</footer>
+
+<script>
+{
+  const r = document.documentElement;
+  document.getElementById('theme').onclick = () => {
+    const on = !r.classList.contains('pd'); r.classList.toggle('pd', on);
+    try { localStorage.setItem('bise-theme', on ? '1' : '0'); } catch {}
+    document.querySelector('meta[name=theme-color]').content = on ? '#171513' : '#f2ede2';
+  };
+  const box = document.getElementById('install');
+  box.onclick = () => {
+    navigator.clipboard?.writeText(document.getElementById('cmd').textContent);
+    const c = box.querySelector('.c'); c.textContent = 'copied :*'; box.classList.add('done');
+    setTimeout(() => { c.textContent = 'copy'; box.classList.remove('done'); }, 1600);
+  };
+  box.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); box.click(); } };
+  // an Intel Mac: the WebGL renderer names no Apple GPU. It only says so, the button stays.
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+    const gpu = ext && gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+    if (/Mac/.test(navigator.platform) && gpu && !/Apple/.test(gpu)) document.getElementById('intel').hidden = false;
+  } catch {}
+}
+</script>
+<script type="module">
+import { TAGS, apiUrl, view, formatSize, formatDate, shortVersion, notesItems } from "/download.js";
+
+// ?api=<base> (on localhost only): read fixtures instead of api.github.com,
+// <base>/<tag>.json (tests/fixtures/site-download/).
+const local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+const base = local && new URLSearchParams(location.search).get("api");
+const url = (tag) => base ? `${base.replace(/\/$/, "")}/${tag}.json` : apiUrl(tag);
+
+// an object, null (404: no such release yet), undefined (couldn't ask)
+const get = (tag) => fetch(url(tag), { headers: { Accept: "application/vnd.github+json" } })
+  .then((res) => res.ok ? res.json() : res.status === 404 ? null : undefined, () => undefined);
+
+const [stableRel, betaRel] = await Promise.all([get(TAGS.stable), get(TAGS.beta)]);
+const v = view(stableRel, betaRel);
+const $ = (id) => document.getElementById(id);
+const sep = '<span class="sep">·</span>';
+
+if (v.state === "soon") {
+  $("dl").hidden = true; $("meta").hidden = true; $("how").hidden = true; $("intel").hidden = true;
+  $("soon").hidden = false;
+  $("or").textContent = "install it in one line";
+}
+if (v.stable) {
+  const s = v.stable;
+  $("meta").innerHTML = [`<a href="${s.notesUrl}">${shortVersion(s.version)}</a>`, formatDate(s.date), "Apple silicon", formatSize(s.size), "macOS 13 or later"]
+    .filter(Boolean).join(sep) + `<br>signed and notarized by Apple`;
+  const n = notesItems(s.notes);
+  if (n.items.length) {
+    $("new-v").textContent = shortVersion(s.version);
+    $("new-list").innerHTML = n.items.map((h) => `<li><span>${h}</span></li>`).join("");
+    $("new-all").href = s.notesUrl;
+    $("new-all").textContent = n.more ? `and ${n.more} more in the release notes` : "the full release notes";
+    $("new").hidden = false;
+  }
+}
+if (v.beta) {
+  $("beta-v").textContent = shortVersion(v.beta.version);
+  $("beta-size").textContent = v.beta.size ? ` (${formatSize(v.beta.size)})` : "";
+  $("beta").hidden = false;
+}
+document.body.dataset.state = v.state;  // the tests wait on it
+</script>
+</body>
+</html>
