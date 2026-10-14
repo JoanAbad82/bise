@@ -39,6 +39,11 @@
   }
 }
 .b-picker-head,
+.b-picker-foot,
+.b-picker-keys {
+  flex: none;
+}
+.b-picker-head,
 .b-picker-ghead {
   display: flex;
   align-items: center;
@@ -54,6 +59,9 @@
   font-family: var(--font-mono);
 }
 .b-picker-list {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;

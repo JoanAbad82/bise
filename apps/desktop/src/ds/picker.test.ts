@@ -25,15 +25,20 @@ describe("ds/picker", () => {
     expect(stepActive([], null, "ArrowDown")).toBeNull();
   });
 
-  it("sits 8 px above its anchor, on its trigger's edge, in the window", () => {
+  it("sits 8 px from its anchor, on its trigger's edge, above unless below has more room, its height fitted", () => {
     const win = { width: 1100, height: 820 };
-    const start = pickerPlace({ top: 700 }, { left: 300, right: 360 }, "start", win);
+    const start = pickerPlace({ top: 700, bottom: 780 }, { left: 300, right: 360 }, "start", win);
     expect(start.style).toEqual({ position: "fixed", left: 300, bottom: 128 });
-    expect(start.maxHeight).toBe(676);
-    const end = pickerPlace({ top: 700 }, { left: 900, right: 1000 }, "end", win);
+    expect(start.maxHeight).toBe(684);
+    const end = pickerPlace({ top: 700, bottom: 780 }, { left: 900, right: 1000 }, "end", win);
     expect(end.style).toEqual({ position: "fixed", right: 100, bottom: 128 });
-    expect(pickerPlace({ top: 700 }, { left: 2, right: 40 }, "start", win).style).toMatchObject({ left: 8 });
-    expect(pickerPlace({ top: 60 }, { left: 2, right: 40 }, "start", win).maxHeight).toBe(120);
+    expect(pickerPlace({ top: 700, bottom: 780 }, { left: 2, right: 40 }, "start", win).style).toMatchObject({ left: 8 });
+    // little room above, more below: it flips under the anchor
+    const flip = pickerPlace({ top: 100, bottom: 130 }, { left: 10, right: 60 }, "start", win);
+    expect(flip.style).toEqual({ position: "fixed", left: 10, top: 138 });
+    expect(flip.maxHeight).toBe(820 - 130 - 16);
+    // a short window: never taller than the room
+    expect(pickerPlace({ top: 300, bottom: 380 }, { left: 10, right: 60 }, "start", { width: 800, height: 420 }).maxHeight).toBe(284);
   });
 
   it("shows the glyph column only when the list mixes kinds", () => {

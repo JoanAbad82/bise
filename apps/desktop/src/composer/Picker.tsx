@@ -38,7 +38,7 @@ export function Picker({ rows, index, testId, onPick }: { rows: readonly Row[]; 
   const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined);
   useLayoutEffect(() => {
     const top = box.current?.parentElement?.getBoundingClientRect().top;
-    if (top !== undefined) setMaxHeight(Math.max(120, top - 8 - 16));
+    if (top !== undefined) setMaxHeight(Math.max(96, top - 16));
   }, []);
   const groups = useMemo(() => [{ id: 'rows', rows: rows.map((r) => pickerRow(r, testId)) }], [rows, testId]);
   return (

@@ -58,7 +58,8 @@ export interface PickerProps {
   /** one-line rows with the secondary inline after the name (text-3 12, 12 px after, cut after a
    *  whole word with '…'): the / and @ lists. One height per list: 32 px every row (designer m_25011) */
   inline?: boolean;
-  /** the room toward the anchor, less 16 (pickerPlace) */
+  /** the whole picker's height at most (pickerPlace: the room toward the anchor, less 16); its
+   *  list scrolls, its head, footer and key line stay */
   maxHeight?: number;
   /** its place (pickerPlace) */
   style?: CSSProperties;
@@ -94,15 +95,19 @@ export function stepActive(ids: readonly string[], active: string | null, key: s
 }
 
 /**
- * A picker's place (designer m_24793): 8 px above its anchor (the composer's box), aligned to its
- * trigger's left edge, or its right edge when the trigger sits right, clamped 8 px inside the window;
- * its height up to the room above, less 16. Fixed coordinates. Pure.
+ * A picker's place (designer m_24793, his m_25470): 8 px from its anchor (the composer's box),
+ * aligned to its trigger's left edge, or its right edge when the trigger sits right, 8 px inside the
+ * window. Above the anchor when the room there takes 240 px or is the larger; else below. Its whole
+ * height fits that room (8 px from the anchor, 8 from the window's edge): the list scrolls inside,
+ * the footer stays. Fixed coordinates. Pure.
  */
-export function pickerPlace(anchor: { top: number }, trigger: { left: number; right: number }, align: "start" | "end", win: { width: number; height: number }): { style: CSSProperties; maxHeight: number } {
-  const bottom = win.height - anchor.top + 8;
-  const maxHeight = Math.max(120, anchor.top - 8 - 16);
-  const style: CSSProperties = align === "start" ? { position: "fixed", left: Math.max(8, trigger.left), bottom } : { position: "fixed", right: Math.max(8, win.width - trigger.right), bottom };
-  return { style, maxHeight };
+export function pickerPlace(anchor: { top: number; bottom: number }, trigger: { left: number; right: number }, align: "start" | "end", win: { width: number; height: number }): { style: CSSProperties; maxHeight: number } {
+  const above = anchor.top - 16;
+  const below = win.height - anchor.bottom - 16;
+  const up = above >= 240 || above >= below;
+  const x: CSSProperties = align === "start" ? { left: Math.max(8, trigger.left) } : { right: Math.max(8, win.width - trigger.right) };
+  const y: CSSProperties = up ? { bottom: win.height - anchor.top + 8 } : { top: anchor.bottom + 8 };
+  return { style: { position: "fixed", ...x, ...y }, maxHeight: Math.max(96, up ? above : below) };
 }
 
 /** The glyph column shows only when the list mixes kinds: every row with the same glyph (or none)
@@ -160,7 +165,12 @@ export function Picker({ title, titleKeys, groups, footer, keyline, empty, activ
   // the active row stays in view (never the page)
   useLayoutEffect(() => {
     if (on === null) return;
-    list.current?.querySelector<HTMLElement>(`[data-row="${CSS.escape(on)}"]`)?.scrollIntoView({ block: "nearest" });
+    // in the list's own scroll only (never the window's): the current row in view on open
+    const l = list.current;
+    const row = l?.querySelector<HTMLElement>(`[data-row="${CSS.escape(on)}"]`);
+    if (l == null || row == null) return;
+    if (row.offsetTop < l.scrollTop) l.scrollTop = row.offsetTop;
+    else if (row.offsetTop + row.offsetHeight > l.scrollTop + l.clientHeight) l.scrollTop = row.offsetTop + row.offsetHeight - l.clientHeight;
   }, [on]);
   // the fades at the clipped edges
   const onScroll = () => {
@@ -193,7 +203,7 @@ export function Picker({ title, titleKeys, groups, footer, keyline, empty, activ
   const rows = groups.reduce((n, g) => n + g.rows.length, 0);
   const glyphs = glyphColumn(groups);
   return (
-    <div ref={shell} className={cx("b-picker", wide && "wide", inline && "inline")} role="menu" tabIndex={ownKeys ? -1 : undefined} style={style} onKeyDown={onKeyDown}
+    <div ref={shell} className={cx("b-picker", wide && "wide", inline && "inline")} role="menu" tabIndex={ownKeys ? -1 : undefined} style={maxHeight === undefined ? style : { ...style, maxHeight }} onKeyDown={onKeyDown}
       onMouseDown={(e) => { e.preventDefault(); }} data-testid={testId}>
       {title != null && (
         <div className="b-picker-head">
@@ -201,7 +211,7 @@ export function Picker({ title, titleKeys, groups, footer, keyline, empty, activ
           {titleKeys != null && <span className="k">{titleKeys}</span>}
         </div>
       )}
-      <div ref={list} className={cx("b-picker-list", edges.top && "fade-top", edges.bottom && "fade-bottom")} style={maxHeight === undefined ? undefined : { maxHeight }} onScroll={onScroll}>
+      <div ref={list} className={cx("b-picker-list", edges.top && "fade-top", edges.bottom && "fade-bottom")} onScroll={onScroll}>
         {rows === 0 && empty != null && <div className="b-picker-row none">{empty}</div>}
         {groups.map((g) => (
           <div key={g.id} className="b-picker-group" role="group">
