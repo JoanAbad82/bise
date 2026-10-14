@@ -32,8 +32,40 @@ pub(crate) fn split(body: &str) -> (&str, &str) {
 /// as before.
 pub(crate) fn spans(line: &str, st: Style) -> Vec<Span<'static>> {
     match has(line) {
-        true => crate::attach::chip_spans(line, st).into_iter().map(|s| Span::styled(s.content, st)).collect(),
+        true => spaced(crate::attach::chip_spans(line, st).into_iter().map(|s| Span::styled(s.content, st)).collect(), st),
         false => vec![Span::styled(line.to_string(), st)],
+    }
+}
+
+/// A chip's first span: its image or file glyph.
+fn is_chip(s: &Span) -> bool {
+    [crate::theme::G_IMAGE, crate::theme::glyph(crate::theme::G_FILE), crate::theme::G_FILE].iter().any(|g| s.content.starts_with(g))
+}
+
+/// One space before a chip glued to what comes before it: `sb send
+/// --attach` puts its markers back to back (his composer spaces his).
+fn spaced(spans: Vec<Span<'static>>, st: Style) -> Vec<Span<'static>> {
+    let mut out: Vec<Span<'static>> = Vec::with_capacity(spans.len() * 2);
+    for s in spans {
+        let glued = out.last().is_some_and(|p| !p.content.ends_with(char::is_whitespace));
+        if glued && is_chip(&s) {
+            out.push(Span::styled(" ", st));
+        }
+        out.push(s);
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chips_sent_back_to_back_read_one_space_apart() {
+        let line = "<image name=\"[Image #1]\" path=\"/x/flame.png\" mime=\"image/png\" b64=\"\"><file name=\"[File #2]\" path=\"/x/cold.csv\">";
+        let flat: String = spans(line, Style::default()).iter().map(|s| s.content.as_ref()).collect();
+        assert!(flat.contains("flame.png ") && !flat.contains("flame.png▯"), "{flat}");
+        assert!(!flat.starts_with(' '), "{flat}");
     }
 }
 
