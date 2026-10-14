@@ -13,6 +13,7 @@
 // rust/proto/fixtures/wait_words.json (wake.test.ts here, words.rs wait_words_follow_the_fixture).
 // A wake line's head is the hub's own text (the entry's text is words::wake_head). Pure.
 import type { Agent, AgentWatch, Entry, WatchKind } from '@/proto';
+import { shownName } from '@/agents/model';
 
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'] as const;
@@ -114,6 +115,20 @@ export function pauseLine(a: Waits, nowMs: number, short = false): PauseLine | n
     len: len(first),
     title: ws.map((w) => `${state} ${event(w)} · ${dur(w)}`).join('\n'),
   };
+}
+
+/**
+ * The pause's words as the window names agents (shownName: main is 'bise'): 'continues when bise
+ * answers', never 'main answers'. `who` stays the hub's name (a click opens it). The hub's words
+ * (words::pause_line, the shared fixture) name it raw; the line over the composer, the bar row's
+ * label and its tip say it this way. Pure.
+ */
+export function shownPause(p: PauseLine): PauseLine {
+  const shown = shownName(p.who);
+  if (p.who === '' || shown === p.who) return p;
+  const raw = `${p.who} answers`;
+  const said = `${shown} answers`;
+  return { ...p, note: p.note === raw ? said : p.note, title: p.title.split(`${p.state} ${raw}`).join(`${p.state} ${said}`) };
 }
 
 /** It is paused: a pause line shows over its composer. */

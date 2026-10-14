@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent, AgentWatch } from '@/proto';
-import { alarms, clockAhead, clockPast, paused, pauseInSeconds, pauseLine, waitLen, wakeLine, wakeTail, watchEvent } from './wake';
+import { alarms, clockAhead, clockPast, paused, pauseInSeconds, pauseLine, shownPause, waitLen, wakeLine, wakeTail, watchEvent } from './wake';
 import WAIT_WORDS from '../../../../rust/proto/fixtures/wait_words.json';
 
 // An agent row from the fixture's few fields, the rest an idle agent's (words.rs does the same).
@@ -71,5 +71,15 @@ describe('event-wake: the wake line (designer page event-wake, words.rs)', () =>
     expect(wakeLine({ text: 'stopped waiting for npm run dev after 24h', wake: { id: 1, ev: 'expired', kind: 'bg', what: 'npm run dev', after_ms: 86_400_000 } }).mark).toBe('–');
     expect(wakeLine({ text: 'the reindex still running after 1h00m', wake: { id: 1, ev: 'still', kind: 'pid', what: 'the reindex', after_ms: 3_600_000 } }).mark).toBe('·');
     expect([wakeTail(0), wakeTail(1), wakeTail(3)]).toEqual([null, 'its last line', 'its last 3 lines']);
+  });
+});
+
+describe("shownPause: the window's name for whom it waits on (shownName)", () => {
+  const NOW = 1791700000000;
+  it("main is 'bise' in the note and the title; who stays 'main' (its click opens it); another agent as is", () => {
+    const p = pauseLine({ status: 'working', since_ms: NOW - 60_000, waiting_on: { who: 'agent', name: 'main' } }, NOW);
+    expect(p && shownPause(p)).toMatchObject({ note: 'bise answers', who: 'main', title: 'continues when bise answers · 1 min' });
+    const q = pauseLine({ status: 'working', since_ms: NOW - 60_000, waiting_on: { who: 'agent', name: 'perf' } }, NOW);
+    expect(q && shownPause(q)).toEqual(q);
   });
 });

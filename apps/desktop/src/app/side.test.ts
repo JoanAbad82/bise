@@ -111,6 +111,9 @@ describe('R9/S3: an agent waiting on someone, in the sidebar (the TUI panel)', (
     expect(signOf(agent('search', 'waiting', { waiting_on: { who: 'agent', name: 'perf' } }), NOW)).toMatchObject({ g: '…', tone: 'ink', end: '1 min', count: 0, title: 'continues when perf answers · 1 min · product page speed' });
     expect(signOf(agent('perf', 'idle', { waiting_on: { who: 'you' } }), NOW)).toMatchObject({ g: '?', tone: 'acc', count: 0, title: 'asks you · product page speed' });
   });
+  it("waiting on main: the row's words name it 'bise', as everywhere in the window (shownName)", () => {
+    expect(signOf(agent('search', 'waiting', { waiting_on: { who: 'agent', name: 'main' } }), NOW).title).toBe('continues when bise answers · 1 min · product page speed');
+  });
 });
 
 describe('agent-waiting-states A: a pause in AGENTS, an alarm leaves it idle', () => {

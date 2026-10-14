@@ -7,7 +7,7 @@
 import type { Agent, ComputerAgent, ProjectRow } from '@/proto';
 import { MAIN, type Route } from './route';
 import { shortAge } from '@/agents/model';
-import { pauseLine } from '@/thread/wake';
+import { pauseLine, shownPause } from '@/thread/wake';
 
 /** A sign's tone: ink (at work), accent (asks him), err (failed), dim (the rest). */
 export type Tone = 'ink' | 'acc' | 'err' | 'dim';
@@ -50,7 +50,9 @@ export function signOf(a: Agent, now: number, wake?: number): Sign {
   // a pause (agent-waiting-states A): it continues when a command ends or another agent answers:
   // '…' in ink, how long on the right ('3 min'), the pause line on hover; never the accent (it
   // doesn't wait on him). An alarm leaves it idle: it is free.
-  const pause = pauseLine(a, now);
+  // whom it waits on by the name the window gives it ('bise answers', never 'main answers')
+  const raw = pauseLine(a, now);
+  const pause = raw === null ? null : shownPause(raw);
   if (pause !== null) return { g: '…', tone: 'ink', end: pause.len, endTone: 'dim', count: 0, title: `${pause.title} · ${what}` };
   switch (a.status) {
     case 'working':

@@ -37,10 +37,10 @@ test('thread/waiting-failed: whom an agent waits on shows in the sidebar, the li
       // whom it waits on is the line over the composer
       const chip = page.getByTestId('thread.head.state');
       await expect(chip).toHaveText(/^… waiting · \d+ (s|min|h|d)$/u, { timeout: 3000 });
-      await expect(page.getByTestId('thread.waiting')).toContainText(/^continues when (bise|main) answers · /u);
+      await expect(page.getByTestId('thread.waiting')).toContainText(/^continues when bise answers · /u);
       const perf = page.getByTestId('app.right.agent.perf');
-      // the right bar's row: the pause's words and its '…' sign (desktop-agents-bar §2)
-      await expect(perf).toHaveAttribute('aria-label', /^continues when (bise|main) answers · \d+ (s|min|h|d) · perf's job$/u);
+      // the right bar's row: the pause's words, main named 'bise' (shownPause), and its '…' sign
+      await expect(perf).toHaveAttribute('aria-label', /^continues when bise answers · \d+ (s|min|h|d) · perf's job$/u);
       await expect(perf.getByTestId('app.right.agent.perf.sign')).toHaveText('…');
       const docs = page.getByTestId('app.right.agent.docs');
       await expect(docs).toHaveAttribute('aria-label', "asks you · docs's job");
@@ -59,7 +59,8 @@ test('thread/waiting-failed: whom an agent waits on shows in the sidebar, the li
         document.documentElement.setAttribute('data-theme', 'dark');
         document.documentElement.style.setProperty('color-scheme', 'dark');
       });
-      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))));
+      // finite animations only: a looping one (the working ∿, bise's turning mark) never finishes
+      await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))));
       await page.waitForTimeout(250);
       await page.screenshot({ path: test.info().outputPath('waiting-failed-dark.png') });
       await page.evaluate(() => {

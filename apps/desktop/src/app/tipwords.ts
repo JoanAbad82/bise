@@ -7,7 +7,7 @@
 // Pure: Sidebar.tsx and RightBar.tsx spread them with the ds's tipAttrs. Owner: amb-win.
 import type { Agent, ProjectRow } from '@/proto';
 import { shortAge } from '@/agents/model';
-import { pauseLine, waitLen } from '@/thread/wake';
+import { pauseLine, shownPause, waitLen } from '@/thread/wake';
 import { tilde, type Mark } from './barplaces';
 import { projectMark } from './markstates';
 
@@ -86,7 +86,8 @@ export function signTip(g: string, a: Agent, now: number, wake = ''): string {
       case '?':
         return `${n} waits for you`;
       case '…': {
-        const p = pauseLine(a, now);
+        const raw = pauseLine(a, now);
+        const p = raw === null ? null : shownPause(raw);
         return p === null ? `${n} is waiting` : `${n} ${p.state} ${p.note}${p.more}`;
       }
       case '▲':
