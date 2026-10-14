@@ -551,23 +551,77 @@ fn the_card_view_divider_shows_a_fresh_note() {
     assert!(rows[d].contains("your answer  ✓ copied 9 chars "), "{}", rows[d]);
 }
 
-/// The card in view answered elsewhere: the view moves on, its draft
-/// goes to the history; no card left: back to the thread.
+/// The hub's next snapshot: `cards` replace the last one's.
+fn snapshot(app: &mut App, cards: Vec<Card>) {
+    let before = std::mem::replace(&mut app.sb.cards, cards);
+    sync(app, &before);
+}
+
+/// The card in view closed elsewhere with nothing typed: the view moves
+/// on; no card left: back to the thread.
 #[test]
 fn a_card_closed_elsewhere_moves_the_view_on() {
     let (mut app, _hub) = app_with_hub();
     app.sb.cards = vec![card(1, "question", "a", "one?"), card(2, "question", "b", "two?")];
     app.ed.insert("mine");
     open(&mut app);
-    app.ed.insert("half an answer");
-    app.sb.cards.remove(0);
-    sync(&mut app);
+    snapshot(&mut app, vec![card(2, "question", "b", "two?")]);
     assert_eq!(app.sb.current_card().map(|c| c.id), Some(2));
-    assert_eq!(app.history.first().map(String::as_str), Some("half an answer"));
-    app.sb.cards.clear();
-    sync(&mut app);
+    snapshot(&mut app, Vec::new());
     assert!(!app.sb.card.open);
     assert_eq!(app.ed.text, "mine");
+}
+
+/// Benjamin's lost answer: main withdrew the card he was answering and
+/// asked a new one. With his words typed the closed card stays in view,
+/// `· closed`, his words stay; the new card waits in the box. esc: the
+/// card goes, his words to the history with one line; ⏎ instead sends
+/// them to the asker as a message, and the view moves on.
+#[test]
+fn a_card_closed_mid_answer_keeps_the_card_and_the_words() {
+    let (mut app, mut hub) = app_with_hub();
+    app.sb.cards = vec![card(1, "question", "perf", "which bench?\n1. cold\n2. warm")];
+    app.ed.insert("to main");
+    open(&mut app);
+    app.ed.insert("warm, after the reindex");
+    snapshot(&mut app, vec![card(2, "question", "perf", "and the p99?")]);
+    assert!(app.sb.card.open);
+    assert_eq!(app.sb.current_card().map(|c| c.id), Some(1));
+    assert_eq!(app.ed.text, "warm, after the reindex");
+    let rows = draw(&mut app, 120, 30).join("\n");
+    assert!(rows.contains("· closed"), "{rows}");
+    assert!(rows.contains("you → perf · the question is closed: ⏎ sends your words as a message"), "{rows}");
+    assert!(bar(&app).contains("⏎ sends your words as a message"), "{}", bar(&app));
+    // another snapshot: it stays
+    snapshot(&mut app, vec![card(2, "question", "perf", "and the p99?"), card(3, "question", "x", "three?")]);
+    assert_eq!(app.sb.current_card().map(|c| c.id), Some(1));
+    // esc: the closed card goes, the words to the history, one line
+    key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+    assert!(!app.sb.card.open);
+    assert_eq!(app.ed.text, "to main");
+    assert_eq!(app.history.first().map(String::as_str), Some("warm, after the reindex"));
+    assert!(matches!(app.events.last(), Some(Ev::Info(t)) if t == "your words to perf's closed question: ↑ brings them back"));
+    // again, and ⏎: a plain message to perf, the view on the next card
+    open(&mut app);
+    ctrl(&mut app, '1');
+    let _ = sent(&mut hub);
+    app.ed.insert("both, really");
+    let id = app.sb.current_card().map(|c| c.id).unwrap();
+    let rest: Vec<Card> = app.sb.cards.iter().filter(|c| c.id != id).cloned().collect();
+    snapshot(&mut app, rest);
+    assert_eq!(app.sb.current_card().map(|c| c.id), Some(id));
+    let mut b = String::new();
+    key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
+    let mut buf = [0u8; 4096];
+    while let Ok(n) = hub.read(&mut buf) {
+        if n == 0 {
+            break;
+        }
+        b.push_str(&String::from_utf8_lossy(&buf[..n]));
+    }
+    assert!(b.contains("\"turn/send\"") && b.contains("both, really"), "{b}");
+    assert!(app.sb.card.open && app.sb.current_card().is_some_and(|c| c.id != id));
+    assert_eq!(app.ed.text, "");
 }
 
 /// ⌥N in the view: to that agent; the view goes, the drafts stay.
@@ -859,4 +913,26 @@ fn a_card_title_never_shows_its_kind_id() {
     }
     assert_eq!(kind_title("question", "perf"), "perf asks");
     assert_eq!(kind_title("done", "perf"), "perf is done");
+}
+
+/// Benjamin: a new card while he answers one never takes his text or
+/// the card he answers (through the hub's real hub/cards line).
+#[test]
+fn a_new_card_mid_answer_keeps_the_text_and_the_card() {
+    use super::super::hub_reads::rows_for_tests as rows;
+    let (mut app, _hub) = app_with_hub();
+    let a = || rows::agent("main", "idle", "");
+    rows::apply(&mut app, vec![a()], vec![rows::card(5, "question", "perf", "which bench?\n1. cold\n2. warm")]);
+    open(&mut app);
+    for c in "warm, but only after".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    rows::apply(
+        &mut app,
+        vec![a()],
+        vec![rows::card(5, "question", "perf", "which bench?\n1. cold\n2. warm"), rows::card(6, "approval", "release", "npm publish\n\nwhy")],
+    );
+    assert!(app.sb.card.open);
+    assert_eq!(app.sb.current_card().map(|c| c.id), Some(5));
+    assert_eq!(app.ed.text, "warm, but only after");
 }

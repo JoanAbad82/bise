@@ -397,3 +397,88 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     }
   });
 });
+
+// card-draft-keep (Benjamin's lost answer): the open card the hub closes while his words are typed
+describe('the open card closed by the hub mid answer', () => {
+  afterEach(() => {
+    document.querySelectorAll('[data-testid="composer.field"]').forEach((f) => {
+      f.remove();
+    });
+  });
+  const rowsWith = (cards: unknown[]) => core_ev.filter((e) => e.ev === 'projects').map((e) => ({ ...e, projects: e.projects.map((r) => (r.project === P ? { ...r, cards } : r)) })) as unknown as typeof core_ev;
+  const nine = { agent: 'perf', id: 9, kind: 'question', options: [{ label: 'cold', n: 1 }, { label: 'warm', n: 2 }], project: P, question: 'which bench?', rank: 1, since_ms: NOW - 60_000, urgent: false };
+  const next = { ...nine, id: 21, question: 'and the p99 too?' };
+  const field = (words: string) => {
+    const f = document.createElement('div');
+    f.setAttribute('data-testid', 'composer.field');
+    f.textContent = words;
+    document.body.append(f);
+    return f;
+  };
+
+  it('a new card never moves it; closed with his words typed, it stays open, closed, and his words go to its asker as a message', () => {
+    sessionStorage.setItem('bise.notify.notnow.launch', '1');
+    const sent: CoreCmd[] = [];
+    const port: CorePort = { send: (c) => sent.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    const store = new Store(port);
+    replay(store, rowsWith([nine]));
+    const told: (Answering | null)[] = [];
+    render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter({ screen: 'thread', project: P, agent: 'main' })}>
+          <InboxBlock here={{ project: P, agent: 'main' }} onAnswer={(a) => told.push(a)} now={NOW} />
+        </RouterContext>
+      </StoreProvider>,
+    );
+    fireEvent.click(screen.getByTestId('inbox.block.row.1'));
+    expect(told.at(-1)?.answer).toBe(9);
+    const f = field('warm, after the reindex');
+    // a new card: card 9 stays the open one, nothing told again
+    const n = told.length;
+    act(() => {
+      replay(store, rowsWith([nine, next]));
+    });
+    expect(screen.getByTestId(`inbox.block.card.${P}-9`)).toBeTruthy();
+    expect(told.length).toBe(n);
+    // main withdraws card 9 and asks again: card 9 stays open, closed; never a 'none' told between
+    act(() => {
+      replay(store, rowsWith([next]));
+    });
+    expect(told.slice(n)).toEqual([{ project: P, card: 9, label: 'to perf · the question is closed', end: 'esc write to bise instead', answer: null, asker: 'perf', closed: true }]);
+    const card = screen.getByTestId(`inbox.block.card.${P}-9`);
+    expect(card.getAttribute('data-closed')).toBe('true');
+    expect(card.textContent).toContain('· closed');
+    expect(screen.getByTestId('inbox.block').textContent).toContain('1 waiting');
+    // its options pick nothing
+    fireEvent.keyDown(window, { key: '2' });
+    expect(sent.filter((c) => c.cmd === 'answer')).toEqual([]);
+    // esc: it goes
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(told.at(-1)).toBeNull();
+    expect(screen.queryByTestId(`inbox.block.card.${P}-9`)).toBeNull();
+    f.remove();
+  });
+
+  it('closed with nothing typed: it goes, as before', () => {
+    sessionStorage.setItem('bise.notify.notnow.launch', '1');
+    const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    const store = new Store(port);
+    replay(store, rowsWith([nine]));
+    const told: (Answering | null)[] = [];
+    render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter({ screen: 'thread', project: P, agent: 'main' })}>
+          <InboxBlock here={{ project: P, agent: 'main' }} onAnswer={(a) => told.push(a)} now={NOW} />
+        </RouterContext>
+      </StoreProvider>,
+    );
+    fireEvent.click(screen.getByTestId('inbox.block.row.1'));
+    const f = field('');
+    act(() => {
+      replay(store, rowsWith([next]));
+    });
+    expect(told.at(-1)).toBeNull();
+    expect(screen.queryByTestId(`inbox.block.card.${P}-9`)).toBeNull();
+    f.remove();
+  });
+});

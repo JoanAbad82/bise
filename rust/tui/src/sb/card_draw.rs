@@ -340,6 +340,8 @@ fn head_line(sb: &Sb, c: &Card, s: &Shape, w: usize) -> Drawn {
     let (_, glyph, _) = kind_look(&c.kind);
     let meta = match &s.meta {
         Some(own) => own.clone(),
+        // the hub closed it while your words were typed (designer m_24087)
+        None if sb.closed_in_view().is_some_and(|g| g.id == c.id) => format!("{} · closed", short_age(c.age_now())),
         None => {
             let ids: Vec<u64> = sb.sorted_cards().iter().map(|c| c.id).collect();
             let pos = ids.iter().position(|x| *x == c.id).unwrap_or(0) + 1;
@@ -426,7 +428,7 @@ fn picked() -> Style {
 /// don't fit; the one highlighted (`hi`) accent on the ground. `typing`:
 /// the composer answers, the digits dim and no highlight. Then the hint,
 /// faint: `or type why not, ⏎ says no`.
-fn option_lines(s: &Shape, id: u64, w: usize, hi: Option<usize>, typing: bool) -> Vec<Drawn> {
+fn option_lines(s: &Shape, id: u64, w: usize, hi: Option<usize>, typing: bool, closed: bool) -> Vec<Drawn> {
     let mut out = Vec::new();
     let num_st = fg(if typing { theme::dim() } else { theme::accent() });
     let label_st = fg(theme::dim());
@@ -467,7 +469,7 @@ fn option_lines(s: &Shape, id: u64, w: usize, hi: Option<usize>, typing: bool) -
             }
         }
     }
-    if let Some(h) = hint(s) {
+    if let Some(h) = hint(s).filter(|_| !closed) {
         out.push(Drawn::plain(Line::from(Span::styled(cut(h, w), fg(theme::faint())))));
     }
     out
@@ -500,7 +502,7 @@ fn item_block(app: &App, c: &Card, w: usize, cap: usize) -> Vec<Drawn> {
     let tw = w.saturating_sub(3).max(1);
     let typing = !app.ed.text.is_empty();
     let mut middle = middle_lines(app, c, &s, tw);
-    let opts = option_lines(&s, c.id, tw, sb.card.opt, typing);
+    let opts = option_lines(&s, c.id, tw, sb.card.opt, typing, sb.closed_in_view().is_some_and(|g| g.id == c.id));
     let fixed = 4 + opts.len();
     let room = cap.saturating_sub(fixed);
     if middle.len() > room {
@@ -540,7 +542,15 @@ fn item_block(app: &App, c: &Card, w: usize, cap: usize) -> Vec<Drawn> {
 /// where it stood (past the third: in the third's place).
 fn box_lines(app: &App, w: usize, max: usize, half: usize) -> Vec<Drawn> {
     let sb = &app.sb;
-    let es = entries(sb);
+    let mut es = entries(sb);
+    // the card the hub closed while your words were typed stays open on
+    // top; the rows keep their ctrl+N numbers
+    let closed = sb.closed_in_view().filter(|_| !sb.card.full);
+    let off = usize::from(closed.is_some());
+    if let Some(g) = closed {
+        es.insert(0, Entry::One(g));
+    }
+    let num = |i: usize| i + 1 - off;
     if es.is_empty() || max == 0 {
         return Vec::new();
     }
@@ -558,14 +568,14 @@ fn box_lines(app: &App, w: usize, max: usize, half: usize) -> Vec<Drawn> {
         if need > max {
             return vec![box_row(app, &es[0], 1, w, es.len() - 1)];
         }
-        let mut out: Vec<Drawn> = shown.iter().map(|&i| box_row(app, &es[i], i + 1, w, 0)).collect();
+        let mut out: Vec<Drawn> = shown.iter().map(|&i| box_row(app, &es[i], num(i), w, 0)).collect();
         let hidden: Vec<usize> = (shown.len()..es.len()).collect();
         if !hidden.is_empty() {
             out.push(more_row(&es, &hidden, w));
         }
         return out;
     };
-    let Some(c) = sb.card_by_id(id) else { return Vec::new() };
+    let Some(c) = sb.card_by_id(id).or(closed) else { return Vec::new() };
     // the other rows step out when the item would be cramped
     let others = |shown: &[usize]| shown.len() - 1 + usize::from(es.len() > shown.len()) + usize::from(fold.is_some());
     if max.saturating_sub(others(&shown)) < ITEM_MIN {
@@ -580,7 +590,7 @@ fn box_lines(app: &App, w: usize, max: usize, half: usize) -> Vec<Drawn> {
         if i == at {
             out.extend(item_block(app, c, w, cap));
         } else {
-            out.push(box_row(app, &es[i], i + 1, w, 0));
+            out.push(box_row(app, &es[i], num(i), w, 0));
         }
     }
     let hidden: Vec<usize> = (0..es.len()).filter(|i| !shown.contains(i)).collect();
@@ -827,7 +837,7 @@ pub(crate) fn draw_view(app: &mut App, frame: &mut Frame, area: Rect) {
     // the body: from 2 rows under the head, scrolled
     let typing = !app.ed.text.is_empty();
     let mut lines = middle_lines(app, &c, &s, tw);
-    let opts = option_lines(&s, c.id, tw, sb.card.opt, typing);
+    let opts = option_lines(&s, c.id, tw, sb.card.opt, typing, sb.closed_in_view().is_some_and(|g| g.id == c.id));
     if !opts.is_empty() {
         lines.push(Drawn::blank());
         lines.extend(opts);
@@ -911,6 +921,17 @@ pub(crate) fn divider_label(app: &App) -> Option<Vec<Span<'static>>> {
     }
     let c = app.sb.current_card()?;
     let arrow = if theme::ascii_mode() { "->" } else { "→" };
+    // its question closed while your words were typed: they go as a
+    // message (designer m_24087)
+    if app.sb.closed_in_view().is_some() {
+        return Some(vec![
+            Span::raw(" "),
+            Span::styled(format!("you {} ", arrow), fg(theme::dim())),
+            Span::styled(c.agent.clone(), fg(theme::text())),
+            Span::styled(" · the question is closed: ⏎ sends your words as a message", fg(theme::dim())),
+            Span::raw(" "),
+        ]);
+    }
     Some(vec![
         Span::raw(" "),
         Span::styled(format!("you {} ", arrow), fg(theme::dim())),
@@ -942,6 +963,11 @@ pub(crate) fn key_pairs(app: &App) -> Vec<(&'static str, String)> {
     }
     let mut v = Vec::new();
     let back = p("esc", "back to your message");
+    if sb.closed_in_view().is_some() {
+        v.push(p("⏎", "sends your words as a message"));
+        v.push(back);
+        return v;
+    }
     if !app.ed.text.is_empty() {
         v.push(p("⏎", if s.enter == Enter::Deny { "says no, with your note" } else { "sends your answer" }));
         v.push(if full { p("ctrl+o", "back in place") } else { p("ctrl+o", "full screen") });

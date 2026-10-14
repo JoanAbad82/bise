@@ -663,6 +663,16 @@ export function PmField(p: PmFieldProps): JSX.Element {
       dispatch(tr);
       view()?.focus();
     },
+    putBack: (entry) => {
+      const st = state();
+      if (st !== null && isBlank(st.doc) && setContent(entry)) {
+        writeNow();
+        return "field";
+      }
+      saved.current = remember(saved.current, entry);
+      writeNow();
+      return "history";
+    },
     focus: () => {
       view()?.focus();
     },

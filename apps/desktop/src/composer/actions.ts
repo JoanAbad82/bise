@@ -12,6 +12,11 @@ export interface ComposerActions {
    * "show me what you can do", BISE-284): typing replaces it, ⏎ sends it; never a send.
    */
   fill(text: string): void;
+  /**
+   * His words from elsewhere (an entry: a closed card's half answer, card-draft-keep), never lost:
+   * into the field when it is empty, else on top of its history (↑ brings them back). Says where.
+   */
+  putBack(entry: string): 'field' | 'history';
   focus(): void;
   /** The focus with the caret at the draft's end (a press on the frame's padding or empty area, his round 2). */
   focusEnd(): void;

@@ -23,6 +23,13 @@
 //! moves to the next card, or back to the thread when none are left,
 //! with `✓ you answered perf: both` in the history.
 //!
+//! The card you answer stays yours while your words are typed: closed
+//! elsewhere (withdrawn, answered via main, its agent stopped) it stays
+//! in view, `· closed`, your words in the composer; ⏎ sends them to its
+//! asker as a plain message, esc or another card leaves it and your
+//! words go to the history (`↑ brings them back`). Benjamin lost a half
+//! answer when the view jumped to the new card (designer m_24087).
+//!
 //! Approvals (docs/approvals.md §7, approvals-plan.md round 2) plug in
 //! as the kind `approval`: its text is the command (or a patch), a blank
 //! line, then the reason; the options are allow once / always here /
@@ -179,6 +186,10 @@ pub(super) struct CardView {
     pub(super) drafts: HashMap<u64, Editor>,
     /// The thread's draft while the view is open.
     pub(super) thread: Option<Editor>,
+    /// The card in view the hub closed (withdrawn, answered via main,
+    /// its agent stopped) while your words were typed: it stays in view,
+    /// `· closed`, until you send them as a message or leave it.
+    pub(super) gone: Option<Card>,
     /// Answered or closed here, still in the hub's last snapshot: hidden.
     answered: Vec<u64>,
     /// The cards whose fold line this TUI wrote, and the feed it went
@@ -633,12 +644,20 @@ impl Sb {
 
     /// The card in the view while it is open, else the top card.
     pub(super) fn current_card(&self) -> Option<&Card> {
+        if let Some(g) = self.closed_in_view() {
+            return Some(g);
+        }
         let v = self.sorted_cards();
         self.card
             .sel
             .filter(|_| self.card.open)
             .and_then(|id| v.iter().find(|c| c.id == id).copied())
             .or_else(|| v.first().copied())
+    }
+
+    /// The card in view the hub closed while your words were typed.
+    pub(super) fn closed_in_view(&self) -> Option<&Card> {
+        self.card.gone.as_ref().filter(|g| self.card.open && self.card.sel == Some(g.id))
     }
 
     pub(super) fn card_by_id(&self, id: u64) -> Option<&Card> {
@@ -725,8 +744,20 @@ pub(super) fn close_view(app: &mut App) {
     cv.scroll = 0;
 }
 
-/// The composer's draft goes to the card in view's slot.
+/// The composer's draft goes to the card in view's slot. A card the hub
+/// closed has none: leaving it, your words go to the history (↑ brings
+/// them back) and one line says so.
 fn park_draft(app: &mut App) {
+    if let Some(g) = app.sb.card.gone.take().filter(|g| app.sb.card.sel == Some(g.id)) {
+        app.sb.card.sel = None;
+        let d = std::mem::take(&mut app.ed);
+        if !d.text.trim().is_empty() {
+            app.history.insert(0, d.text);
+            let line = format!("your words to {}'s closed question: ↑ brings them back", g.agent);
+            push_event(&mut app.events, &mut app.cache, Ev::Info(line));
+        }
+        return;
+    }
     let cv = &mut app.sb.card;
     if let Some(old) = cv.sel.take() {
         let d = std::mem::take(&mut app.ed);
@@ -958,6 +989,9 @@ fn pick(app: &mut App, id: u64, i: usize) -> bool {
 /// text as a note); an empty composer acknowledges a card that needs no
 /// words, else does nothing.
 fn submit(app: &mut App) {
+    if app.sb.closed_in_view().is_some() {
+        return send_to_asker(app);
+    }
     let Some((id, enter)) = app.sb.current_card().map(|c| (c.id, shape(c).enter)) else { return };
     let text = app.ed.text.trim().to_string();
     // a setup card: never in the history (the key card's text is a key)
@@ -986,8 +1020,41 @@ fn submit(app: &mut App) {
     }
 }
 
-/// ctrl+x: close card `id` without answering.
+/// ⏎ on a card the hub closed: your words go to its asker as a plain
+/// message (the hub routes it, as a message typed in its thread), then
+/// the view moves on as after an answer. No words: it just goes.
+fn send_to_asker(app: &mut App) {
+    let Some(g) = app.sb.card.gone.take() else { return };
+    let text = app.ed.text.trim().to_string();
+    if !text.is_empty() {
+        app.history.insert(0, app.ed.text.clone());
+        let said = crate::attach::expand(app, &text);
+        let mut params = json!({"agent": g.agent, "text": said.text});
+        if !said.parts.is_empty() {
+            params["parts"] = json!(said.parts);
+        }
+        app.sb.call("turn/send", params, super::rpc::Then::Line);
+    }
+    app.ed = Editor::default();
+    leave_closed(app);
+}
+
+/// The view leaves the closed card in it: to the first card, or back to
+/// the thread.
+fn leave_closed(app: &mut App) {
+    park_draft(app);
+    match app.sb.card_ids().first() {
+        Some(&n) => show(app, n),
+        None => close_view(app),
+    }
+}
+
+/// ctrl+x: close card `id` without answering (a card the hub closed
+/// already: the view leaves it, your words to the history).
 fn close_card(app: &mut App, id: u64) {
+    if app.sb.closed_in_view().is_some() {
+        return leave_closed(app);
+    }
     if app.sb.card_by_id(id).is_none() {
         return;
     }
@@ -1000,10 +1067,13 @@ fn close_card(app: &mut App, id: u64) {
     retire(app, id);
 }
 
-/// A new snapshot: forget what the hub closed; the card in view went
-/// away (answered elsewhere): its draft goes to the history (↑ brings it
-/// back) and the view moves on.
-pub(super) fn sync(app: &mut App) {
+/// A new snapshot (`before`: the last one's cards): forget what the hub
+/// closed. A new card never touches the card in view nor your words.
+/// The card in view went away (withdrawn, answered via main, its agent
+/// stopped): with your words typed it stays in view, closed, until you
+/// send them or leave it (Benjamin's lost answer: the view jumped to the
+/// new card); with none, the view moves on.
+pub(super) fn sync(app: &mut App, before: &[Card]) {
     let live: Vec<u64> = app.sb.cards.iter().map(|c| c.id).collect();
     let cv = &mut app.sb.card;
     cv.answered.retain(|x| live.contains(x));
@@ -1012,8 +1082,14 @@ pub(super) fn sync(app: &mut App) {
         return;
     }
     let ids = app.sb.card_ids();
+    if app.sb.card.sel.is_some_and(|s| ids.contains(&s)) || app.sb.closed_in_view().is_some() {
+        return;
+    }
     let cv = &mut app.sb.card;
-    if cv.sel.is_some_and(|s| ids.contains(&s)) {
+    let was = cv.sel.and_then(|s| before.iter().find(|c| c.id == s));
+    if let Some(c) = was.filter(|_| !app.ed.text.trim().is_empty()) {
+        cv.gone = Some(c.clone());
+        cv.opt = None;
         return;
     }
     let d = std::mem::take(&mut app.ed);

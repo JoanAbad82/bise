@@ -2,7 +2,9 @@
 // and slash commands), also mounted under an open artifact and in the bottom block; and its pure
 // helpers (about-an-artifact words, the docked card's target). Split out of ThreadScreen.tsx (the
 // file cap). Owner: amb-win.
-import { memo, useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { load, save } from '@/composer/drafts';
+import { shownName } from '@/agents/model';
 import { Composer, flashWords, useApprovalsFlash, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer';
 import type { Part } from '@/proto';
@@ -12,7 +14,7 @@ import { useRouter } from '@/app/router';
 import { pickCommands, slashLine, slashOf, windowRun } from './commands';
 import { HELP_EVENT } from '@/app/keys';
 import { keptStorage } from '@/app/keep';
-import { cardDraftKey, openInbox } from '@/inbox';
+import { cardDraftKey, leaveClosed, openInbox } from '@/inbox';
 import { emptyEnterAct } from './head';
 import { computerRowOf, computerState } from './ComputerLine';
 
@@ -171,6 +173,15 @@ export const ThreadComposer = memo(function ThreadComposer({
       // the open card's answer (any project's: the block lists them all): his words and the images
       // he attached, the hub's one /answer path (R41)
       setNote(null);
+      // the card he answered was closed by the hub while he typed (card-draft-keep): his words go
+      // to its asker as a plain message, then the block lets the card go
+      if (answer !== null && answer.closed === true && answer.asker !== undefined) {
+        store.send({ project: answer.project, agent: answer.asker, text: out.text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}), ...(out.parts === undefined ? {} : { parts: out.parts }) });
+        sentClosed.current = true;
+        leaveClosed();
+        onSent();
+        return;
+      }
       if (answer !== null) {
         // msg-parts: his quotes and pastes go typed (the hub renders the model's text from them)
         asked.current = { project: answer.project, text: out.text };
@@ -226,6 +237,25 @@ export const ThreadComposer = memo(function ThreadComposer({
   // the open card that takes words keeps his half answer apart, the thread's draft never moves
   // (amb-home 2b, amb-web's draftKey): the card's own key, the same wherever the block opens it
   const draftKey = answer === null ? undefined : cardDraftKey(answer);
+  // he left a closed card without sending (esc, another item): its words come to this thread's
+  // composer when it is empty, else on top of its history, with one line (designer m_24087). The
+  // field already swapped (its effect, the child's, ran first) and kept them under the card's key.
+  const closedKey = answer !== null && answer.closed === true ? draftKey : undefined;
+  const wasClosed = useRef<{ key: string; asker: string } | null>(null);
+  const sentClosed = useRef(false);
+  useEffect(() => {
+    const was = wasClosed.current;
+    wasClosed.current = closedKey === undefined ? null : { key: closedKey, asker: answer?.asker ?? '' };
+    if (was === null || was.key === closedKey) return;
+    if (sentClosed.current) {
+      sentClosed.current = false;
+      return;
+    }
+    const entry = load(keptStorage, was.key).draft;
+    if (entry === null) return;
+    save(keptStorage, was.key, { draft: null, history: [], queue: [] });
+    if (actions.current?.putBack(entry) === 'history') setNote({ level: 'info', text: `your words to ${shownName(was.asker)}'s closed question: ↑ brings them back` });
+  }, [closedKey, answer?.asker]);
   const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} to={to} {...(end === undefined ? {} : { toEnd: end })} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} mark={mark} testId="composer" />;
   if (note === null) return field;
   return (
@@ -284,14 +314,19 @@ export interface CardAt {
   readonly card: number;
   /** who asked it (inbox picks (3): his row in this thread when the asker's is elsewhere) */
   readonly asker?: string;
+  /** the hub closed it while his words were typed: they go to `asker` as a plain message */
+  readonly closed?: boolean;
 }
 
 /** The inbox block's 'where am i' on bise's own view (no project, no agent: 'esc write a plain message'). */
 export const HERE_BISE = { project: null, agent: null } as const;
 
 /** The card his words answer while the block has one open, else none (an approval: none). Pure. */
-export function answerOf(a: { project: string; answer: number | null; asker?: string } | null): CardAt | null {
-  if (a === null || a.answer === null) return null;
+export function answerOf(a: { project: string; card?: number; answer: number | null; asker?: string; closed?: boolean } | null): CardAt | null {
+  if (a === null) return null;
+  // closed by the hub while he typed: its draft key stays, his words go to the asker (card-draft-keep)
+  if (a.closed === true && a.card !== undefined) return { project: a.project, card: a.card, closed: true, ...(a.asker === undefined ? {} : { asker: a.asker }) };
+  if (a.answer === null) return null;
   return { project: a.project, card: a.answer, ...(a.asker === undefined ? {} : { asker: a.asker }) };
 }
 

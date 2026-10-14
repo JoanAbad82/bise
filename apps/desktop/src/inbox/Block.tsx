@@ -38,6 +38,9 @@ export interface Answering {
   readonly answer: number | null;
   /** who asked the card his words answer (inbox picks (3): his row where he is names it) */
   readonly asker?: string;
+  /** the hub closed the open card while his words were typed: they stay in its draft and go to
+   *  `asker` as a plain message (card-draft-keep) */
+  readonly closed?: boolean;
 }
 
 /** Where the block is: the screen's project and agent (none: bise's view, settings, review…). */
@@ -207,6 +210,36 @@ export function answeringOf(c: Card, here: Here, pname?: string): Answering {
   return { project: c.project, card: c.id, label: `to ${to} · ${waits}`, answer: null };
 }
 
+/**
+ * What his words do while `c` is open after the hub closed it (withdrawn, answered via main, its
+ * agent stopped) with his words typed: a plain message to its asker; the tab leaves the accent,
+ * nothing waits on him (designer m_24087: 'to perf · the question is closed', 'esc write to bise
+ * instead'). Pure.
+ */
+export function closedAnswering(c: Card, here: Here, pname?: string): Answering {
+  const to = here.agent === null ? 'bise' : shownName(here.agent);
+  const other = here.project !== null && here.project !== c.project ? `${shownName(c.agent)} · ${pname ?? c.project}` : shownName(c.agent);
+  return { project: c.project, card: c.id, label: `to ${other} · the question is closed`, end: here.agent === null ? 'esc write a plain message' : `esc write to ${to} instead`, answer: null, asker: c.agent, closed: true };
+}
+
+/**
+ * The open card `c` left the hub's rows: it stays, closed, when it took words, he did not act on it
+ * here (`gone`: answered or closed in this window fold as before) and the composer under the block
+ * holds his words (its field still shows that card's draft).
+ */
+function keepsWords(c: Card, gone: ReadonlySet<string>): boolean {
+  if (gone.has(cardKey(c)) || isNotify(c) || !takesWords(c)) return false;
+  return (document.querySelector('[data-testid="composer.field"]')?.textContent ?? '').trim() !== '';
+}
+
+// ---- leaveClosed: his words to a closed card went (the composer's send): the block lets it go
+const leavers = new Set<() => void>();
+
+/** The composer sent his words from the closed card: it leaves the block. */
+export function leaveClosed(): void {
+  for (const f of [...leavers]) f();
+}
+
 /** An item's project as its row and its card say it: bise's home is 'bise', else its name. Pure. */
 export function projectWord(row: Pick<ProjectRow, 'name' | 'home'> | undefined, project: string): string {
   return row?.home === true ? 'bise' : (row?.name ?? project);
@@ -258,10 +291,34 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
   const asks = notify.show && only === undefined;
   const list = useMemo(() => (asks ? [...real, notifyCard(home, opened)] : real), [real, asks, home, opened]);
   const names = useMemo(() => new Map(rows.map((r) => [r.project, r])), [rows]);
-  const openCard = list.find((c) => cardKey(c) === open);
+  // Benjamin's lost answer (card-draft-keep): a new card never moves the open one; the open one
+  // closed by the hub (withdrawn, answered via main, its agent stopped) while his words are typed
+  // stays open, closed, his words in its draft, until he sends them (to its asker) or leaves it
+  const [closed, setClosed] = useState<Card | null>(null);
+  const [seen, setSeen] = useState<Card | null>(null);
+  const listed = list.find((c) => cardKey(c) === open);
+  // decided while rendering, before the composer hears a thing: an effect would tell it 'none'
+  // for one commit, and the swap and the prune would take his words with them
+  if (listed !== undefined && seen !== listed) setSeen(listed);
+  if (listed === undefined && open !== null && seen !== null && cardKey(seen) === open && closed === null && keepsWords(seen, gone)) setClosed(seen);
+  const openCard = listed ?? (closed !== null && cardKey(closed) === open ? closed : undefined);
+  useEffect(() => {
+    const f = () => {
+      setClosed(null);
+      keyAt.current = { open: null, on: null };
+      setOpen(null);
+      setOn(null);
+    };
+    leavers.add(f);
+    return () => {
+      leavers.delete(f);
+    };
+  }, []);
 
-  // a card answered or closed anywhere takes its half answer with it (drafts.ts; 2b)
-  const liveKeys = rows.flatMap((r) => (r.cards ?? []).map(cardKey)).join(' ');
+  // a card answered or closed anywhere takes its half answer with it (drafts.ts; 2b); the closed
+  // one in view keeps it until he sends it or leaves
+  const keptKey = closed !== null && cardKey(closed) === open ? cardKey(closed) : null;
+  const liveKeys = [...rows.flatMap((r) => (r.cards ?? []).map(cardKey)), ...(keptKey === null ? [] : [keptKey])].join(' ');
   useEffect(() => {
     pruneCardDrafts(keep, new Set(liveKeys === '' ? [] : liveKeys.split(' ')));
   }, [liveKeys]);
@@ -309,6 +366,8 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
 
   const openTo = (k: string | null) => {
     keyAt.current = { open: k, on: null };
+    // leaving the closed card: it goes (the composer keeps his words, ThreadComposer)
+    if (closed !== null && k !== cardKey(closed)) setClosed(null);
     setOpen(k);
     setOn(null);
     setWhole(null);
@@ -346,8 +405,9 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
 
   // what his words do: told on each change, and none once the block goes
   const { project: hp, agent: ha } = here;
-  const told = openCard === undefined ? null : answeringOf(openCard, { project: hp, agent: ha }, projectWord(names.get(openCard.project), openCard.project));
-  const tellKey = told === null ? '' : `${told.project}/${String(told.card)}/${told.label}/${told.end ?? ''}/${String(told.answer)}`;
+  const isClosed = openCard !== undefined && openCard === closed;
+  const told = openCard === undefined ? null : (isClosed ? closedAnswering : answeringOf)(openCard, { project: hp, agent: ha }, projectWord(names.get(openCard.project), openCard.project));
+  const tellKey = told === null ? '' : `${told.project}/${String(told.card)}/${told.label}/${told.end ?? ''}/${String(told.answer)}/${String(told.closed === true)}`;
   const tell = useRef(onAnswer);
   useEffect(() => {
     tell.current = onAnswer;
@@ -380,6 +440,8 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
     openTo(null);
   };
   const pick = (c: Card, n: number) => {
+    // a closed card picks nothing: its options are dim
+    if (c === closed) return;
     if (isNotify(c)) {
       openTo(null);
       if (n === 1) notify.on();
@@ -406,6 +468,11 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
     store.answer(c.project, c.id, String(n), undefined, undefined, { at: answerAt(here, home) });
   };
   const close = (c: Card) => {
+    // closed already: it just goes, his words to the thread's composer (ThreadComposer)
+    if (c === closed) {
+      openTo(null);
+      return;
+    }
     if (isNotify(c)) {
       openTo(null);
       notify.later();
@@ -438,7 +505,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
         return;
       }
       const { open, on } = keyAt.current;
-      const openCard = list.find((c) => cardKey(c) === open);
+      const openCard = list.find((c) => cardKey(c) === open) ?? (closed !== null && cardKey(closed) === open ? closed : undefined);
       if (openCard === undefined) return;
       if (e.key === 'Enter' && e.metaKey && !e.ctrlKey && !e.altKey && on !== null) {
         e.preventDefault();
@@ -493,10 +560,11 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
     };
   }, []);
 
-  if (list.length === 0) return null;
+  if (list.length === 0 && !isClosed) return null;
   const openAt = openCard === undefined ? -1 : list.indexOf(openCard);
-  const shown = list.filter((_, i) => i < BLOCK_ROWS || i === openAt);
-  const more = list.length - shown.length;
+  // the closed card on top, open; the rows under it keep their ⌃N numbers
+  const shown = [...(isClosed ? [openCard] : []), ...list.filter((_, i) => i < BLOCK_ROWS || i === openAt)];
+  const more = list.length - shown.length + (isClosed ? 1 : 0);
   // '+ N more' walks on past the open item, then wraps: never back and forth between two
   const next = list.find((_, i) => i >= BLOCK_ROWS && i > openAt) ?? list.find((_, i) => i >= BLOCK_ROWS && i !== openAt);
   const keys = list.length > 1 ? `⌃1–${String(Math.min(list.length, STRIP_KEYS))}` : '⌃1';
@@ -565,6 +633,16 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
                   },
                 }}
                 testId={isNotify(c) ? 'inbox.block.notify' : `inbox.block.card.${cardKey(c)}`}
+                {...(c === closed
+                  ? {
+                      closed: true,
+                      keys: (
+                        <span className="ic-keys" data-testid="inbox.block.closed.keys">
+                          <Kbd>⏎</Kbd> sends your words as a message <Kbd>esc</Kbd> back
+                        </span>
+                      ),
+                    }
+                  : {})}
               />
             </div>
           );

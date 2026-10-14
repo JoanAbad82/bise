@@ -69,6 +69,9 @@
 .ic-opt.picked { background: var(--c-ink); color: var(--c-on-ink); box-shadow: none; }
 .ic-opt.picked .ic-n { color: var(--c-on-ink); }
 .ic-n { font: 600 12px var(--font-mono); color: var(--c-accent); text-align: center; }
+/* the hub closed it while his words were typed (card-draft-keep, designer m_24087): its options dim, never picked */
+.ic.closed .ic-opt { color: var(--c-text-3); pointer-events: none; }
+.ic.closed .ic-n { color: var(--c-text-3); }
 .ic-l { min-width: 0; }
 .ic .inbox-answer { flex: none; }
 .ic-note { flex: none; margin-top: var(--s-2); font-size: var(--t-12); }

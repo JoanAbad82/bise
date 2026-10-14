@@ -267,14 +267,14 @@ fn agents(app: &mut App, rows: &[bise_proto::rows::Agent], places: &[bise_proto:
 fn cards(app: &mut App, his: &[bise_proto::rows::Card], others: &[bise_proto::rows::Card]) {
     let sb = &mut app.sb;
     let known: Vec<u64> = sb.cards.iter().map(|c| c.id).collect();
-    sb.cards = super::state_rows::cards_of_rows(his, others, sb.feature_drop_ask, crate::when::now_ms());
+    let before = std::mem::replace(&mut sb.cards, super::state_rows::cards_of_rows(his, others, sb.feature_drop_ask, crate::when::now_ms()));
     // the setup cards are the TUI's own: not in the hub's rows
     super::setup::put_back(sb);
     // zen (BISE-121): a card that was not there
     if sb.cards.iter().any(|c| !known.contains(&c.id)) {
         sb.calls += 1;
     }
-    super::cards::sync(app);
+    super::cards::sync(app, &before);
     keep_selection(app);
     // BISE-61: the first card (a one-time hint)
     if app.sb.cards.is_empty() {

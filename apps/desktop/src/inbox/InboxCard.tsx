@@ -60,9 +60,11 @@ export interface InboxCardProps {
   surface?: 'dock' | 'glass';
   /** default `inbox.card.<project>-<id>`; its options are `<testId>.opt.<n>` */
   testId?: string;
+  /** the hub closed it while his words were typed (card-draft-keep): '· closed', its options dim, no pick */
+  closed?: boolean;
 }
 
-export function InboxCard({ card, project, home, acts, on = null, now, keys, note, children, stacked, full, surface = 'dock', testId }: InboxCardProps) {
+export function InboxCard({ card, project, home, acts, on = null, now, keys, note, children, stacked, full, surface = 'dock', testId, closed = false }: InboxCardProps) {
   const id = testId ?? `inbox.card.${cardKey(card)}`;
   const [picked, setPicked] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,7 +75,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
     [],
   );
   const pick = (n: number) => {
-    if (picked !== null) return;
+    if (picked !== null || closed) return;
     setPicked(n);
     timer.current = setTimeout(() => {
       timer.current = null;
@@ -92,9 +94,10 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
   const where = project ?? card.project;
   const el = (
     <div
-      className={`ic ${surface}${driving ? ' driving' : ''}${full === true ? ' whole' : ''}`}
+      className={`ic ${surface}${driving ? ' driving' : ''}${full === true ? ' whole' : ''}${closed ? ' closed' : ''}`}
       role="group"
       data-testid={id}
+      data-closed={closed || undefined}
       onMouseMove={
         driving
           ? () => {
@@ -109,7 +112,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
         </span>
         <b>{titleOf(card)}</b>
         {home !== true && <span className="ic-p" data-testid={`${id}.project`}>{`· ${where}`}</span>}
-        <span className="ic-k">{age(now - card.since_ms)}</span>
+        <span className="ic-k">{closed ? `${age(now - card.since_ms)} · closed` : age(now - card.since_ms)}</span>
       </div>
       <div className="ic-q" data-testid={`${id}.q`}>
         {full === false ? <Folded text={card.question} project={card.project} testId={`${id}.more`} q={`${id}.q`} /> : <ArtWords text={card.question} project={card.project} testId={`${id}.q`} />}
