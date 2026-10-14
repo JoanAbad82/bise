@@ -12,6 +12,7 @@ import { mkdirSync, mkdtempSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { _electron as electron, type CDPSession, type ElectronApplication, type Page } from '@playwright/test';
 import { DESKTOP_DIR, harnessElectron } from './electron';
+import { appEntryMissing } from './appentry';
 import type { FakeCore, FakeHelper } from './fakes/helper';
 import { adoptHome, harnessEnv, Sentinel, testHome } from './isolation';
 import { prove, Watch, watcherBinary, type Proof } from './proof';
@@ -148,6 +149,9 @@ export async function surfacePage(app: ElectronApplication, surface = 'window', 
 const mainWindow = (app: ElectronApplication): Promise<Page> => surfacePage(app, 'window');
 
 async function start(args: string[], env: Record<string, string>, o: LaunchOptions): Promise<Session> {
+  // no build, no launch: Electron's 'Error launching app' alert would land on his screen (main m_24105)
+  const missing = args[0] === undefined ? 'harness: no app to launch' : appEntryMissing(args[0]);
+  if (missing !== null) throw new Error(missing);
   watcherBinary(); // compiled before the app starts, so the watch starts within ms of the launch
   // every launch's own throwaway home, made here and never taken from the caller (isolation.ts)
   const h = o.home !== undefined ? adoptHome(o.home) : testHome();
