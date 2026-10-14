@@ -97,6 +97,8 @@ for (const size of ['1400x900', '1100x760', '800x700']) {
       const from = page.getByTestId('thread.approval.32.from');
       await expect(from).toHaveText(/^answered from bise · \d\d:\d\d$/u);
       await expect(from).toHaveAttribute('data-tip', /^you answered this from bise's thread at \d\d:\d\d$/u);
+      // one fact, one row (designer m_24812): no quiet '✓ answered: #384…' line over his own row
+      await expect(page.getByTestId('thread.card.384')).toHaveCount(0);
       await shots(page, core, `${w}-2-landed`);
 
       // esc on the empty composer: back to bise's view, where nothing says it

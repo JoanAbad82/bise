@@ -8,8 +8,8 @@ import { openInbox } from '@/inbox/Block';
 import { ArtWords } from '@/inbox/artWords';
 import type { Entry, EntryCard } from '@/proto';
 import { RouterContext } from '@/app/router';
-import { answeredFromWords, approvalTarget, cardTarget, openAnswer, type AnswerAt } from './answerlink';
-import { useAnsweredFrom, useEntry, useProjects, useThreadOrder } from '@/store';
+import { answeredFromWords, answerPos, approvalTarget, cardTarget, openAnswer, type AnswerAt } from './answerlink';
+import { useAnsweredFrom, useEntry, useProjects, useStore, useThreadOrder } from '@/store';
 import { Markdown } from './Markdown';
 import { clock, lastOfRun, reportStatus } from './entry';
 import { shownName } from '@/agents/model';
@@ -438,7 +438,11 @@ export function CardRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
  * his answer (answered-link, designer m_24211; the asker's own thread: the jump alone).
  */
 function AnsweredCard({ c, ctx, follows }: { c: EntryCard; ctx: RowCtx; follows: boolean }) {
+  const store = useStore();
+  const { order } = useThreadOrder(ctx.tkey);
   const at = cardTarget(ctx.project, ctx.agent, c);
+  // one fact, one row (designer m_24812): his own '✓ you answered' row in this thread says it
+  if (answerPos(order, (p) => store.entry(ctx.tkey, p), c.id) !== null) return null;
   const row = <Answered testId={`thread.card.${String(c.id)}`}>{follows ? '✓ answered' : `✓ answered: ${c.question}`}</Answered>;
   if (at === null) return row;
   return (

@@ -32,7 +32,8 @@ const world = () => [
     entries: [
       { pos: 1, at_ms: NOW - 50 * MIN, kind: 'agent', text: 'docs needs your word on the folder.' },
       { pos: 2, at_ms: NOW - 49 * MIN, kind: 'card', text: 'comment lui donner accès ?', card: { id: 7, question: 'comment lui donner accès ?', options: [], answered: true, kind: 'question', agent: 'docs', closed: 'answered' } },
-      { pos: 3, at_ms: NOW - 48 * MIN, kind: 'approval', text: 'you answered docs: share it with him', approval: { ok: true, text: 'you answered docs: share it with him', card: 7, to: 'docs' } },
+      // his answer to docs' card #8: its own row here (one fact, one row: no '✓ answered' line for #8)
+      { pos: 3, at_ms: NOW - 48 * MIN, kind: 'approval', text: 'you answered docs: the shared drive', approval: { ok: true, text: 'you answered docs: the shared drive', card: 8, to: 'docs' } },
       { pos: 4, at_ms: NOW - 40 * MIN, kind: 'card', text: 'which folder?', card: { id: 9, question: 'which folder?', options: [], answered: true, kind: 'question', agent: 'docs', closed: 'answered' } },
       { pos: 5, at_ms: NOW - 2 * MIN, kind: 'agent', text: 'le dossier est partagé.' },
     ],
@@ -46,7 +47,8 @@ const docs = () => [
   { pos: 1, at_ms: NOW - 50 * MIN, kind: 'agent', text: 'i need access to the folder.' },
   { pos: 2, at_ms: NOW - 49 * MIN, kind: 'to_agent', to: 'main', asks: true, text: 'comment lui donner accès ?' },
   { pos: 3, at_ms: NOW - 48 * MIN, kind: 'approval', text: 'you answered docs: share it with him', approval: { ok: true, text: 'you answered docs: share it with him', card: 7, to: 'docs' } },
-  ...Array.from({ length: 40 }, (_, i) => ({ pos: 4 + i, at_ms: NOW - (47 - i) * MIN, kind: 'agent', text: `step ${String(i + 1)}: ${'the folder is being shared, one more check. '.repeat(4)}` })),
+  { pos: 4, at_ms: NOW - 47 * MIN, kind: 'approval', text: 'you answered docs: the shared drive', approval: { ok: true, text: 'you answered docs: the shared drive', card: 8, to: 'docs' } },
+  ...Array.from({ length: 40 }, (_, i) => ({ pos: 5 + i, at_ms: NOW - (47 - i) * MIN, kind: 'agent', text: `step ${String(i + 1)}: ${'the folder is being shared, one more check. '.repeat(4)}` })),
 ];
 
 test("thread/answered-link: '✓ answered' in main's thread opens the asker's thread at his answer; ⌘[ back", async () => {
@@ -74,9 +76,9 @@ test("thread/answered-link: '✓ answered' in main's thread opens the asker's th
     await page.keyboard.press('Meta+BracketLeft');
     await expect(page.getByTestId('thread.card.7')).toBeVisible({ timeout: 5000 });
 
-    // the '✓ you answered docs' head: the same jump
+    // the '✓ you answered docs' head (his answer to #8): the same jump, to that answer
     await page.getByTestId('thread.approval.3.link').click();
-    await expect(page.getByTestId('thread.entry.3'), 'his answer in view again').toBeInViewport({ timeout: 5000 });
+    await expect(page.getByTestId('thread.entry.4'), 'his answer to #8 in view').toBeInViewport({ timeout: 5000 });
     await page.keyboard.press('Meta+BracketLeft');
 
     // card #9: no answer for it in docs' thread, no older page: its end, and the miss line
