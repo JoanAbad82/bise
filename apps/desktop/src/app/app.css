@@ -885,7 +885,7 @@ body:has(.app-shell) {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(var(--s-2) / -2 - 0.5px);
+  left: calc(var(--s-1) * -1);
   width: 1px;
   background: var(--c-line);
 }

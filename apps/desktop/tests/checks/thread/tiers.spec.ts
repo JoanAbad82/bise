@@ -169,7 +169,8 @@ for (const theme of ['light', 'dark']) {
       expect(wake, 'its wake: sans').not.toMatch(/mono/i);
       // one state: the sidebar says the head chip's word (designer m_19784 (5))
       await expect(page.getByTestId('thread.head.state')).toHaveText('idle');
-      await expect(page.getByTestId('app.right.agent.perf')).toContainText('idle');
+      // the right bar says it with its sign, no word (desktop-agents-bar §2)
+      await expect(page.getByTestId('app.right.agent.perf').locator('.app-rb-g')).toHaveText('○');
       await page.mouse.move(1, 400);
       await page.screenshot({ path: test.info().outputPath(`tiers-${theme}-wake.png`) });
     } finally {

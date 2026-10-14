@@ -299,7 +299,7 @@ function MarkTip({ at, onKeep, onOpenUrl }: { at: TipAt; onKeep: (keep: boolean)
         onKeep(false);
       }}
     >
-      <span className="app-rb-tip-words" data-testid="app.right.tip.words">
+      <span data-testid="app.right.tip.words">
         {m.tip}
       </span>
       {m.url !== undefined && (

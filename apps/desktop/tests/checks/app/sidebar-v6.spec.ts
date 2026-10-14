@@ -104,10 +104,12 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(page.getByTestId('app.right.agent.main'), "never a 'main' row").toHaveCount(0);
     const sign = (n: string) => page.locator(`[data-testid="app.right.agent.${n}"] .app-rb-g`);
     await expect(sign('search')).toHaveText('?');
-    await expect(page.getByTestId('app.right.agent.search')).toContainText('waits');
-    await expect(sign('ci-fix')).toHaveText('✗');
-    await expect(page.getByTestId('app.right.agent.ci-fix')).toContainText('failed');
-    await expect(sign('deploy-watch')).toHaveText('◷');
+    // the bar's signs say it, no state words (desktop-agents-bar §2); a next wake is in the hover
+    await expect(page.getByTestId('app.right.agent.search')).not.toContainText('waits');
+    await expect(sign('ci-fix')).toHaveText('▲');
+    await expect(page.getByTestId('app.right.agent.ci-fix')).not.toContainText('failed');
+    await expect(sign('deploy-watch')).toHaveText('○');
+    await expect(page.getByTestId('app.right.agent.deploy-watch')).toHaveAttribute('title', /^wakes at /u);
     await expect(sign('size-filter')).toHaveText('✓');
     await expect(page.getByTestId('app.right.agent.perf')).toContainText('14 min');
     // 9 live agents: 8 then '+ 1 more'
