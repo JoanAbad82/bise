@@ -14,7 +14,6 @@ import os
 import re
 import socket
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
@@ -86,8 +85,7 @@ def main():
         got, closed = older_client(sock, lines)
         check(len(got) == 1 and got[0].get("ev") == "hello", "the older core got more than exe and reload: %r" % got[1:3])
         check(closed, "the hub kept an older core's connection open")
-        time.sleep(2)
-        check(not any("older core says hi" in l for l in c.lines("main")[n:]), "an older core's input reached main")
+        wait.holds(lambda: not any("older core says hi" in l for l in c.lines("main")[n:]), 2, "an older core's input never reaches main")
         wait.until(lambda: hub_log(E).count("an older client said hello on hub.sock") >= 2, 10, "the older hellos in hub.log")
 
         # a JSON-RPC client's line that is not JSON-RPC: refused, logged
