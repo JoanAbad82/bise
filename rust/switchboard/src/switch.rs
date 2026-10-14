@@ -249,7 +249,7 @@ fn replace_hub(paths: &Paths, root: &Path, same: bool, late: Late) -> Result<(),
     let _ = std::fs::remove_file(paths.socket());
     if !same {
         // an older version's hub would write its sb script through the link
-        crate::daemon::drop_sb_link(&paths.bin_dir());
+        crate::tools_env::drop_agent_links(&paths.bin_dir());
     }
     // what the new hub writes: only its own lines name why it failed
     // (an older line of hub.err once passed for the cause)

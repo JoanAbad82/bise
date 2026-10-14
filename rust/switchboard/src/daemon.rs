@@ -1823,31 +1823,6 @@ fn kill_stale_repls(sh: &Shell) {
     }
 }
 
-/// `sb` for the agents' bash tool: `bin/sb`, a link to this hub's
-/// executable, which runs `sb` when called by that name (busybox style).
-/// Replaced in one rename: an agent of the previous hub calling `sb`
-/// meanwhile finds the old one or the new one, never none.
-pub fn write_sb_link(bin_dir: &Path, exe: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(bin_dir)?;
-    let exe = std::fs::canonicalize(exe).unwrap_or_else(|_| exe.to_path_buf());
-    let tmp = bin_dir.join(format!(".sb.{}.tmp", std::process::id()));
-    let _ = std::fs::remove_file(&tmp);
-    std::os::unix::fs::symlink(&exe, &tmp)?;
-    std::fs::rename(&tmp, bin_dir.join("sb")).inspect_err(|_| {
-        let _ = std::fs::remove_file(&tmp);
-    })
-}
-
-/// Before a hub of another version starts: a hub older than the link
-/// writes its `sb` script with a plain write, which would go through the
-/// link into this executable. Without `bin/sb`, it writes a new file.
-pub fn drop_sb_link(bin_dir: &Path) {
-    let p = bin_dir.join("sb");
-    if p.symlink_metadata().is_ok_and(|m| m.file_type().is_symlink()) {
-        let _ = std::fs::remove_file(p);
-    }
-}
-
 pub fn run(opts: Opts) -> std::io::Result<()> {
     let paths = opts.paths.clone();
     std::fs::create_dir_all(&paths.state)?;
@@ -1878,7 +1853,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     }
     // who may say hello (docs/issues/16): the tags left are its owners'
     let doors = accept::Doors::new(paths.clone(), proc_hub.clone(), &std::env::var(crate::procs::ENV).unwrap_or_default());
-    write_sb_link(&paths.bin_dir(), &opts.exe)?;
+    crate::tools_env::write_agent_links(&paths.bin_dir(), &opts.exe)?;
     // the agents' mktemp reads their TMPDIR (macOS's does not)
     if let Err(e) = crate::tools_env::write_mktemp_shim(&paths.bin_dir()) {
         log_line(&paths, &format!("mktemp shim not written: {}", e));
@@ -2325,32 +2300,6 @@ mod tests {
             _ => panic!("nothing in the inbox"),
         }
         assert!(Msg::is_urgent(&Msg::Shutdown { keep: true }));
-    }
-
-    /// one rename (no temp file left); only a link is dropped for an
-    /// older version's hub.
-    #[test]
-    fn the_sb_link_replaces_the_script() {
-        let d = std::env::temp_dir().join(format!("sb-link-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&d);
-        let bin = d.join("bin");
-        std::fs::create_dir_all(&bin).unwrap();
-        let exe = d.join("bise");
-        std::fs::write(&exe, "exe").unwrap();
-        std::fs::write(bin.join("sb"), "#!/bin/sh\nexec old sb \"$@\"\n").unwrap();
-        write_sb_link(&bin, &exe).unwrap();
-        write_sb_link(&bin, &exe).unwrap();
-        let sb = bin.join("sb");
-        assert!(sb.symlink_metadata().unwrap().file_type().is_symlink());
-        assert_eq!(std::fs::read_link(&sb).unwrap(), std::fs::canonicalize(&exe).unwrap());
-        let names: Vec<_> = std::fs::read_dir(&bin).unwrap().map(|e| e.unwrap().file_name()).collect();
-        assert_eq!(names, vec![std::ffi::OsString::from("sb")]);
-        drop_sb_link(&bin);
-        assert!(!sb.exists() && std::fs::read_to_string(&exe).unwrap() == "exe");
-        std::fs::write(&sb, "a file").unwrap();
-        drop_sb_link(&bin);
-        assert!(sb.exists());
-        let _ = std::fs::remove_dir_all(&d);
     }
 
     /// A line that is not a JSON object (a half-written last line) is

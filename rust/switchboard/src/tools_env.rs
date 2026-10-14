@@ -12,6 +12,9 @@
 //!   while `xcode-select -p` names no developer dir: the hub would pop
 //!   the dialog at every git call.
 //! - `rg` is not shipped: agents use it when it is on PATH, else grep.
+//! - The hub's `bin` dir holds `sb` and `bise`, links to the hub's own
+//!   executable (`write_agent_links`): the office skills' `bise office
+//!   run` is the hub's version, with or without the CLI installed.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -342,10 +345,16 @@ pub fn tools_note_for(path: &str) -> String {
 /// for [`plugins_note`]: built-in, user and workspace ones, the enable
 /// state applied (`bend_plugins::resolve`).
 pub fn loaded_plugins(workspace: &Path) -> Vec<(String, String, Vec<String>)> {
-    let res = bend_plugins::resolve::resolve(&bend_plugins::resolve::Roots::standard(Some(workspace)));
-    res.loaded()
+    loaded_plugins_in(&bend_plugins::resolve::Roots::standard(Some(workspace)))
+}
+
+fn loaded_plugins_in(roots: &bend_plugins::resolve::Roots) -> Vec<(String, String, Vec<String>)> {
+    bend_plugins::resolve::resolve(roots)
+        .loaded()
         .map(|p| {
-            let skills = p.skills.iter().map(|s| format!("{}:{}", p.namespace, s.name)).collect();
+            // a plugin skill's name is already `<namespace>:<name>`, the
+            // one `<available-skills>` and the skill tool take
+            let skills = p.skills.iter().map(|s| s.name.clone()).collect();
             (p.name.clone(), p.description.clone().unwrap_or_default(), skills)
         })
         .collect()
@@ -436,6 +445,44 @@ if [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ]; then exec /usr/bin/mktemp -p "$TMPD
 exec /usr/bin/mktemp "$@"
 "#;
 
+/// The links in `bin_dir` to the hub's executable: `sb` (it runs `sb`
+/// when called by that name, busybox style) and `bise`, so an agent's
+/// `bise office run` (the office skills) is the hub's own version, whose
+/// office.js and bend-jsrt match the skills it loaded, even for a desktop
+/// user with no CLI on PATH. Nothing new for agents: a client command
+/// they could misuse is refused by hub.sock's peer judge (issue 17).
+pub const AGENT_LINKS: [&str; 2] = ["sb", "bise"];
+
+/// Write the [`AGENT_LINKS`]. Each replaced in one rename: an agent of
+/// the previous hub calling `sb` meanwhile finds the old one or the new
+/// one, never none.
+pub fn write_agent_links(bin_dir: &Path, exe: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(bin_dir)?;
+    let exe = std::fs::canonicalize(exe).unwrap_or_else(|_| exe.to_path_buf());
+    for name in AGENT_LINKS {
+        let tmp = bin_dir.join(format!(".{}.{}.tmp", name, std::process::id()));
+        let _ = std::fs::remove_file(&tmp);
+        std::os::unix::fs::symlink(&exe, &tmp)?;
+        std::fs::rename(&tmp, bin_dir.join(name)).inspect_err(|_| {
+            let _ = std::fs::remove_file(&tmp);
+        })?;
+    }
+    Ok(())
+}
+
+/// Before a hub of another version starts: a hub older than the links
+/// writes its `sb` script with a plain write, which would go through the
+/// link into this executable. Without them, it writes a new file. Only a
+/// link is dropped.
+pub fn drop_agent_links(bin_dir: &Path) {
+    for name in AGENT_LINKS {
+        let p = bin_dir.join(name);
+        if p.symlink_metadata().is_ok_and(|m| m.file_type().is_symlink()) {
+            let _ = std::fs::remove_file(p);
+        }
+    }
+}
+
 /// Write the mktemp shim in `bin_dir` (macOS only: GNU mktemp reads
 /// TMPDIR), in one rename.
 pub fn write_mktemp_shim(bin_dir: &Path) -> std::io::Result<()> {
@@ -487,6 +534,36 @@ pub fn make_agent_dirs(tmp: &Path, run: &Path) -> std::io::Result<()> {
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
+
+    /// `bin/sb` and `bin/bise`: links to the exe, the old sb script
+    /// replaced, in one rename (no temp file left); only a link is
+    /// dropped for an older version's hub.
+    #[test]
+    fn the_agent_links_replace_the_script() {
+        let d = std::env::temp_dir().join(format!("sb-link-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let bin = d.join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let exe = d.join("bise");
+        std::fs::write(&exe, "exe").unwrap();
+        std::fs::write(bin.join("sb"), "#!/bin/sh\nexec old sb \"$@\"\n").unwrap();
+        write_agent_links(&bin, &exe).unwrap();
+        write_agent_links(&bin, &exe).unwrap();
+        let (sb, bise) = (bin.join("sb"), bin.join("bise"));
+        for l in [&sb, &bise] {
+            assert!(l.symlink_metadata().unwrap().file_type().is_symlink());
+            assert_eq!(std::fs::read_link(l).unwrap(), std::fs::canonicalize(&exe).unwrap());
+        }
+        let mut names: Vec<_> = std::fs::read_dir(&bin).unwrap().map(|e| e.unwrap().file_name()).collect();
+        names.sort();
+        assert_eq!(names, vec![std::ffi::OsString::from("bise"), std::ffi::OsString::from("sb")]);
+        drop_agent_links(&bin);
+        assert!(!sb.exists() && !bise.exists() && std::fs::read_to_string(&exe).unwrap() == "exe");
+        std::fs::write(&sb, "a file").unwrap();
+        drop_agent_links(&bin);
+        assert!(sb.exists());
+        let _ = std::fs::remove_dir_all(&d);
+    }
 
     /// mktemp, python's tempfile and tmux read TMPDIR/TMP/TEMP and
     /// TMUX_TMPDIR: all four name the agent's tmp/; the runtime gets
@@ -704,6 +781,30 @@ mod tests {
         for w in ["computer use", "browser", "tab", "mac apps", "click", "type"] {
             assert!(d.contains(w), "{} not in {}", w, d);
         }
+    }
+
+    /// The repo's built-in plugins as a fresh install loads them: the
+    /// office ones on by default, each skill named as `<available-skills>`
+    /// and the skill tool name it (`slides:slides`; the note said
+    /// `slides:slides:slides`, a name the skill tool refuses).
+    #[test]
+    fn the_built_in_office_plugins_are_noted_with_their_skill_names() {
+        let builtin = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../plugins");
+        let roots = bend_plugins::resolve::Roots {
+            builtin: Some(builtin),
+            user: None,
+            workspace: None,
+            data: std::env::temp_dir(),
+            disabled: vec![],
+            enabled: vec![],
+        };
+        let note = plugins_note(&loaded_plugins_in(&roots)).unwrap();
+        for (p, kind) in [("slides", "pptx"), ("sheets", "xlsx"), ("docs", "docx")] {
+            let line = note.lines().find(|l| l.starts_with(&format!("- `{}`", p))).unwrap_or_else(|| panic!("{}", note));
+            assert!(line.contains(kind) && line.ends_with(&format!("(skills: `{p}:{p}`)")), "{}", line);
+        }
+        // computer is opt-in: off on a fresh install
+        assert!(!note.contains("`computer`"), "{}", note);
     }
 
     #[test]
