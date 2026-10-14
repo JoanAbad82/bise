@@ -56,7 +56,11 @@ def main():
               "/tmp/bise-<uid> is a private folder of ours")
         c = e2e.Client(short)
         c.wait(lambda: c.state is not None, 30, "the hub's state over the short socket")
-        sb = subprocess.run([EXE, "sb", "list"], env={**env, "SB_SOCKET": short, "SB_AGENT": "main"},
+        # an agent's sb: agent.sock, in the same short folder (hub.sock
+        # serves no agent request since debt-t3, docs/issues/16)
+        asock = os.path.join(link, "agent.sock")
+        check(len(asock) <= MAX, asock)
+        sb = subprocess.run([EXE, "sb", "list"], env={**env, "SB_SOCKET": asock, "SB_AGENT": "main"},
                             capture_output=True, text=True, timeout=60)
         check(sb.returncode == 0 and "main" in sb.stdout, "sb list over the short socket: %r %r" % (sb.stdout, sb.stderr))
         # the agents get the short path (SB_SOCKET), and hub.pid next to it
