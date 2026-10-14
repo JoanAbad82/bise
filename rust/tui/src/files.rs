@@ -173,7 +173,8 @@ pub(crate) fn rank(entries: &[Entry], query: &str, recent: &[String], limit: usi
             break;
         }
         // (recent, score, mtime, -depth, -len): bigger is better
-        let mut v: Vec<((bool, u32, u64, i32, i32), usize)> = ids
+        type Key = ((bool, u32, u64, i32, i32), usize);
+        let mut v: Vec<Key> = ids
             .iter()
             .map(|&i| {
                 let e = &entries[i];
@@ -185,7 +186,6 @@ pub(crate) fn rank(entries: &[Entry], query: &str, recent: &[String], limit: usi
                 ((is_recent(e), score.unwrap_or(0), e.mtime, -(e.depth as i32), -(e.path.len() as i32)), i)
             })
             .collect();
-        type Key = ((bool, u32, u64, i32, i32), usize);
         let cmp = |a: &Key, b: &Key| {
             b.0.cmp(&a.0).then(a.1.cmp(&b.1))
         };

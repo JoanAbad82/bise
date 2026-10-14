@@ -412,10 +412,9 @@ impl Fold<'_> {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn approval(&mut self, pos: u64, ms: u64, ok: bool, text: String, note: String, card: Option<u64>, to: Option<String>) {
-        let mut e = Entry::new(pos, ms, EntryKind::Approval, text.clone());
-        e.approval = Some(ApprovalFold { ok, text, note, card, to });
+    fn approval(&mut self, pos: u64, ms: u64, a: ApprovalFold) {
+        let mut e = Entry::new(pos, ms, EntryKind::Approval, a.text.clone());
+        e.approval = Some(a);
         self.push(e);
     }
 
@@ -667,7 +666,7 @@ impl Fold<'_> {
             // a gate's card answered, folded (approvals-design.md §9)
             Hub::Approval { how, who, what, note } => {
                 let (ok, text, note) = words::approval(&how, &who, &what, &note);
-                self.approval(pos, ms, ok, text, note, None, None);
+                self.approval(pos, ms, ApprovalFold { ok, text, note, card: None, to: None });
             }
             // an answer to an item, its fold line (BISE-305/307); the item
             // it answers, so a client that folded it itself skips it.
@@ -709,7 +708,7 @@ impl Fold<'_> {
                         i
                     }
                     None => {
-                        self.approval(pos, ms, true, text, note, Some(card), Some(who.clone()));
+                        self.approval(pos, ms, ApprovalFold { ok: true, text, note, card: Some(card), to: Some(who.clone()) });
                         self.out.len() - 1
                     }
                 };
