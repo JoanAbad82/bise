@@ -14,10 +14,10 @@ morning": one page you keep current, not a new page each time.
   14:10` and what came), the items still to handle under it, the handled ones gone or folded into
   one line (`12 answered earlier`). Keep each item's `data-id` (the comment's id, the PR's
   number) so the user's notes stay on it. Nothing new: don't publish.
-- **A card**, once the item is published: `sb card` is main's, so send main the exact command,
-  `sb send main "card: sb card --page <id>#<item id> \"<question>\""` (the card opens the page
+- **A notification**, once the item is published: `sb notify` is main's, so send main the exact command,
+  `sb send main "notification: sb notify --page <id>#<item id> \"<question>\""` (the notification opens the page
   at that item), only for what the user asked to be told about, in their
-  words ("tell me if Simon posts"); everything else waits on the page. Numbers never get a card.
+  words ("tell me if Simon posts"); everything else waits on the page. Numbers never get a notification.
 
 ## The launch: comments on Hacker News, Reddit, X, Bluesky
 

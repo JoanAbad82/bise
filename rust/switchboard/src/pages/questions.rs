@@ -19,8 +19,9 @@ pub struct Question {
     /// the user's answer (on the page, in the capsule or the TUI)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reply: Option<String>,
-    /// `data-card="none"`: a page-only question (promises, meeting
-    /// pages; ambient-lead m_6091): never a card, still in sb page
+    /// `data-notify="none"` (`data-card="none"` in pages published before
+    /// it): a page-only question (promises, meeting pages; ambient-lead
+    /// m_6091): never a notification, still in sb page
     /// waiting and answered on the page
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub page_only: bool,
@@ -97,7 +98,8 @@ pub fn of_fragment(html: &str) -> Vec<Question> {
             })
             .filter(|o| !o.is_empty())
             .collect();
-        let page_only = attr("data-card").as_deref() == Some("none");
+        // data-notify="none"; data-card="none", its old name, in pages published before it
+        let page_only = [attr("data-notify"), attr("data-card")].iter().any(|v| v.as_deref() == Some("none"));
         out.push(Question { block: id, text, options, page_only, ..Question::default() });
     }
     out
@@ -193,19 +195,21 @@ mod tests {
         assert_eq!(p.close, vec![(8, "replaced"), (9, "withdrawn")]);
     }
 
-    /// Law (ambient-lead m_6091): data-card="none" is a page-only
+    /// Law (ambient-lead m_6091): data-notify="none" is a page-only
     /// question (no card; an open one it had goes); a card closed with no
     /// answer stays closed on a republish until the question's words or
     /// options change.
     #[test]
     fn page_only_and_dismissed_questions_open_no_card() {
         let h = |extra: &str, text: &str| format!(r#"<section data-kit="question" data-id="q-cc"{extra}><p>{text}</p><ol><li>lelio@acme.test</li><li>without the cc</li></ol></section>"#);
-        let q = &of_fragment(&h(r#" data-card="none""#, "which address?"))[0];
+        let q = &of_fragment(&h(r#" data-notify="none""#, "which address?"))[0];
         assert!(q.page_only && q.card == 0);
+        // a page published before notif-rename: its old data-card="none" still reads page-only
+        assert!(of_fragment(&h(r#" data-card="none""#, "which address?"))[0].page_only);
         assert!(!of_fragment(&h("", "which address?"))[0].page_only);
         // it had a card, now page-only: the card goes
         let old = vec![Question { card: 3, ..of_fragment(&h("", "which address?"))[0].clone() }];
-        let p = plan(&old, of_fragment(&h(r#" data-card="none""#, "which address?")), &|_| true);
+        let p = plan(&old, of_fragment(&h(r#" data-notify="none""#, "which address?")), &|_| true);
         assert_eq!(p.close, vec![(3, "withdrawn")]);
         assert!(p.questions[0].page_only && p.questions[0].card == 0);
         // dismissed: the same words keep it so, new words clear it

@@ -11,7 +11,7 @@ each from this repo. It is short. The architect agent keeps it current.
 
 ## Before you touch an area, read
 
-- the hub's decisions (messages, cards, waits, delivery): `bend/hub/core.bend`,
+- the hub's decisions (messages, notifications (cards in the code), waits, delivery): `bend/hub/core.bend`,
   `bend/laws/hub.bend` (its proofs: `bend/proofs/hub.bend`, the shared
   helpers in `bend/proofs/lib/`), `docs/bend-laws-report.md`;
 - the hub shell: the `//!` headers of `rust/switchboard/src/lib.rs`,

@@ -25,12 +25,12 @@ new mentions in the `reply` review, newest on top. Everything he has already see
 `<h2>earlier · 4</h2>` in a second `reply` review with the same item ids; the ones he sent or
 skipped stay there with their went line (the kit dims them). Nothing new: don't publish.
 
-**A card only for what his team asks him:** a direct question OR request from someone `sb
+**A notification only for what his team asks him:** a direct question OR request from someone `sb
 people` marks as team (`- Léa Martin: team · design lead`); "can you check why…" counts. After
-each publish, the first one and every tick's, if it added such items: ONE card for that batch,
+each publish, the first one and every tick's, if it added such items: ONE notification for that batch,
 on its first item, its words the first ask and how many more (`Nora asks: why does the CSV
-export drop due dates? · 1 more`). `sb card` is main's, so send main the exact command, once:
-`sb send main "card: sb card --page mentions-2026-05-19#s-303 \"Nora asks: why does the CSV
+export drop due dates? · 1 more`). `sb notify` is main's, so send main the exact command, once:
+`sb send main "notification: sb notify --page mentions-2026-05-19#s-303 \"Nora asks: why does the CSV
 export drop due dates? · 1 more\""`. Never again for an item already carded. Everything else
 waits on the page and in the menu-bar count.
 

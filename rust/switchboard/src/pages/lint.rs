@@ -143,8 +143,8 @@ pub fn lint(html: &str) -> Result<Vec<Block>, Vec<String>> {
 }
 
 /// The lint with the rules that depend on the page's id (ambient-lead m_6092): on a page that
-/// never makes cards (`promises-…`, `meeting-…`), every question is page-only,
-/// `data-card="none"`.
+/// never makes notifications (`promises-…`, `meeting-…`), every question is page-only,
+/// `data-notify="none"`.
 pub fn lint_page(id: &str, html: &str) -> Result<Vec<Block>, Vec<String>> {
     let (blocks, carded) = lint_full(html)?;
     if !(id.starts_with("promises-") || id.starts_with("meeting-")) || carded.is_empty() {
@@ -152,11 +152,11 @@ pub fn lint_page(id: &str, html: &str) -> Result<Vec<Block>, Vec<String>> {
     }
     Err(carded
         .iter()
-        .map(|q| format!("{q}: a question on this page never makes a card: write <section data-kit=\"question\" data-id=\"{q}\" data-card=\"none\"> (it waits on the page and in sb page waiting)"))
+        .map(|q| format!("{q}: a question on this page never makes a notification: write <section data-kit=\"question\" data-id=\"{q}\" data-notify=\"none\"> (it waits on the page and in sb page waiting)"))
         .collect())
 }
 
-/// The lint, and the question blocks that make a card (no `data-card="none"`).
+/// The lint, and the question blocks that make a notification (no `data-notify="none"`).
 fn lint_full(html: &str) -> Result<(Vec<Block>, Vec<String>), Vec<String>> {
     if html.len() > MAX_BYTES {
         return Err(vec![format!(
@@ -238,7 +238,7 @@ struct Linter<'a> {
     unsendable: Vec<String>,
     /// checklist rows with a data-draft and no data-question: (block, item, draft)
     drafted_rows: Vec<(String, String, String)>,
-    /// question blocks that make a card (no data-card="none")
+    /// question blocks that make a notification (no data-notify="none")
     carded: Vec<String>,
     /// the text of the raw element just read (a ui block's <style>)
     raw: Option<String>,
@@ -598,14 +598,19 @@ impl<'a> Linter<'a> {
                     .into(),
             );
         }
-        // a page-only question (lead m_6092): data-card="none", no card, it waits on the page
-        let card = tag.attrs.iter().find(|(n, _)| n == "data-card").map(|(_, v)| v.clone().unwrap_or_default());
-        match (&card, kit.as_deref()) {
-            (None, Some("question")) => self.carded.push(at.clone()),
+        // a page-only question (lead m_6092): data-notify="none", no notification, it waits on
+        // the page. data-card="none", its old name, is read for good in pages already published
+        // (questions.rs) but never written again (notif-rename, architect m_24654)
+        if tag.attrs.iter().any(|(n, _)| n == "data-card") {
+            self.err(&at, "data-card is now data-notify: a question that waits on the page takes data-notify=\"none\"".into());
+        }
+        let notify = tag.attrs.iter().find(|(n, _)| n == "data-notify").map(|(_, v)| v.clone().unwrap_or_default());
+        match (&notify, kit.as_deref()) {
+            (None, Some("question")) if !tag.attrs.iter().any(|(n, _)| n == "data-card") => self.carded.push(at.clone()),
             (None, _) => {}
             (Some(c), Some("question")) if c == "none" => {}
-            (Some(c), Some("question")) => self.err(&at, format!("data-card=\"{c}\" is not a card setting: a question that waits on the page takes data-card=\"none\"; without it, it makes a card")),
-            (Some(_), _) => self.err(&at, "data-card is not a kit attribute here: only a question block takes it (data-card=\"none\")".into()),
+            (Some(c), Some("question")) => self.err(&at, format!("data-notify=\"{c}\" is not a setting: a question that waits on the page takes data-notify=\"none\"; without it, it makes a notification")),
+            (Some(_), _) => self.err(&at, "data-notify is not a kit attribute here: only a question block takes it (data-notify=\"none\")".into()),
         }
         // a plan worked through with him (lead m_5988): its yours rows become step cards in turn;
         // a bare attribute, only on a checklist
@@ -810,6 +815,7 @@ impl<'a> Linter<'a> {
                             | "data-open"
                             | "data-verb"
                             | "data-plan"
+                            | "data-notify"
                             | "data-card"
                             | "data-do"
                     )
@@ -818,7 +824,7 @@ impl<'a> Linter<'a> {
                 };
                 if !ok {
                     let hint = if block {
-                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message, email), data-open (message), data-verb (review), data-plan (checklist), data-card=\"none\" (question), data-do (action)"
+                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message, email), data-open (message), data-verb (review), data-plan (checklist), data-notify=\"none\" (question), data-do (action)"
                     } else {
                         "inside a block only a review's <li data-id> and an email's <p data-field> take one"
                     };

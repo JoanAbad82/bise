@@ -418,22 +418,24 @@ fn a_write_his_word_triggers_is_an_action_block() {
 }
 
 #[test]
-fn a_page_only_question_takes_data_card_none_and_promises_and_meetings_need_it() {
+fn a_page_only_question_takes_data_notify_none_and_promises_and_meetings_need_it() {
     let q = |a: &str| format!(r#"<section data-kit="question" data-id="q-cc"{a}><p>which address for Lélio?</p><ol><li>lelio@acme.test</li><li>without the cc</li></ol></section>"#);
-    ok(&q(r#" data-card="none""#));
+    ok(&q(r#" data-notify="none""#));
     ok(&q(""));
-    has(&errs(&q(r#" data-card="all""#)), "q-cc: data-card=\"all\" is not a card setting");
+    has(&errs(&q(r#" data-notify="all""#)), "q-cc: data-notify=\"all\" is not a setting");
     has(
-        &errs(r#"<section data-kit="prose" data-id="p" data-card="none"><p>x</p></section>"#),
-        "p: data-card is not a kit attribute here: only a question block takes it",
+        &errs(r#"<section data-kit="prose" data-id="p" data-notify="none"><p>x</p></section>"#),
+        "p: data-notify is not a kit attribute here: only a question block takes it",
     );
-    // the page's id: promises and meeting pages never make cards
+    // notif-rename (architect m_24654): the old name is read in stored pages, never written again
+    has(&errs(&q(r#" data-card="none""#)), "q-cc: data-card is now data-notify");
+    // the page's id: promises and meeting pages never make notifications
     let page = |id: &str, a: &str| crate::pages::lint::lint_page(id, &q(a));
-    assert!(page("promises-2026-w41", r#" data-card="none""#).is_ok());
-    assert!(page("buy-domain", "").is_ok(), "a plan's question makes its card");
+    assert!(page("promises-2026-w41", r#" data-notify="none""#).is_ok());
+    assert!(page("buy-domain", "").is_ok(), "a plan's question makes its notification");
     for id in ["promises-2026-w41", "meeting-q3-renewal-2026-05-19"] {
         let e = page(id, "").unwrap_err();
-        assert!(e[0].starts_with("q-cc: a question on this page never makes a card"), "{e:?}");
+        assert!(e[0].starts_with("q-cc: a question on this page never makes a notification") && e[0].contains("data-notify=\"none\""), "{e:?}");
     }
 }
 

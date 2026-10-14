@@ -73,7 +73,7 @@ pub fn task_line(a: &Agent, now: u64) -> String {
 
 /// `/agents`: the board of the live agents the user reads (an archived
 /// one stays under `/archived`, with one line that says how many), then
-/// the open cards.
+/// the open notifications.
 pub fn user_board(st: &State, now: u64) -> String {
     let (live, archived): (Vec<&Agent>, Vec<&Agent>) =
         st.tasks().partition(|a| a.lifecycle != Lifecycle::Archived);
@@ -85,7 +85,7 @@ pub fn user_board(st: &State, now: u64) -> String {
         lines.push(format!("{} archived: /archived", archived.len()));
     }
     lines.extend(st.open_cards().map(|c| {
-        format!("card #{} {} @{}: {}", c.id, c.kind, c.agent, clip(&one_line(&c.text), 100))
+        format!("notification #{} {} @{}: {}", c.id, c.kind, c.agent, clip(&one_line(&c.text), 100))
     }));
     lines.join("\n")
 }
@@ -234,7 +234,7 @@ pub fn main_context(st: &State, now: u64, threads: &[String], questions: &[Strin
             )
         })
         .collect();
-    push_block(&mut s, "open_cards", &cards);
+    push_block(&mut s, "open_notifications", &cards);
     push_block(&mut s, "questions_for_you", questions);
     s.push_str("</bise_state>");
     s
@@ -399,7 +399,7 @@ pub fn tasks_detail(st: &State, now: u64, models: &Models) -> String {
         }
         for c in st.open_cards().filter(|c| c.agent == a.name) {
             b.push(format!(
-                "open card #{} {}: {}",
+                "open notification #{} {}: {}",
                 c.id,
                 c.kind,
                 clip(&one_line(&c.text), 150)

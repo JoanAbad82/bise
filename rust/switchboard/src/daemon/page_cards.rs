@@ -153,7 +153,7 @@ impl Shell {
             self.step(Input::ConfirmClose { card: *card, res: res.to_string() });
         }
         let mut qs = plan.questions;
-        // a page-only question (data-card="none") never opens one; a
+        // a page-only question (data-notify="none") never opens one; a
         // dismissed one not again until its words change (m_6091)
         for q in qs.iter_mut().filter(|q| q.card == 0 && q.reply.is_none() && !q.page_only && !q.dismissed) {
             let before: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();

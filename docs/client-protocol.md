@@ -8,7 +8,16 @@ write. JSON-RPC 2.0, one JSON object per line, on the hub's `hub.sock`.
 never speaks this protocol.
 
 The code is the reference; this page tells you where to look and what
-holds:
+holds.
+
+**A notification is a card on the wire and in the code.** What waits in
+the user's inbox for his answer is a *notification* in every word he and
+the agents read (`sb notify`, `notification #12`); its methods, events,
+journal lines and fields keep the name `card` (`card/answer`,
+`hub/cards`, `card_opened`, `"card": 12`) so old journals and older apps
+keep working. Never rename them to match the words
+(`docs/issues/27-notif-rename-aliases.md`).
+
 
 | what | where |
 |---|---|

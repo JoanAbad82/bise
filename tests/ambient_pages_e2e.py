@@ -577,8 +577,8 @@ def main():
         settle(c)
 
         # a promises page (ambient-lead m_6091, amb-tools' promises run):
-        # a carded question is refused there; data-card="none" makes no
-        # card yet waits in sb page waiting; every promise's draft waits,
+        # a question that notifies is refused there; data-notify="none" makes no
+        # notification yet waits in sb page waiting; every promise's draft waits,
         # the first row's (d-sso) too
         pp = os.path.join(E.tmp, "promises.html")
         pem = lambda i, to: ('<section data-kit="email" data-id="%s" data-verb="draft"><p data-field="to">%s</p>'
@@ -591,9 +591,9 @@ def main():
                 + pem("d-sso", "helene@northwind.test") + pem("d-nda", "paul@girard.test"))
         open(pp, "w").write(body + pq(""))
         c.say('[[bash: sb page publish %s --id promises-e2e --title "your promises"]]' % pp)
-        c.wait_line("main", "q-cc: a question on this page never makes a card", 90)
+        c.wait_line("main", "q-cc: a question on this page never makes a notification", 90)
         settle(c)
-        open(pp, "w").write(body + pq(' data-card="none"'))
+        open(pp, "w").write(body + pq(' data-notify="none"'))
         c.say('[[bash: sb page publish %s --id promises-e2e --title "your promises"]]' % pp)
         c.wait_line("main", "published promises-e2e v1", 90)
         wait.holds(lambda: not [x for x in c.cards() if (x.get("page") or {}).get("id") == "promises-e2e"], 2,

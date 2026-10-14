@@ -35,9 +35,12 @@ FULL = open(os.path.join(ROOT, "prompts", "tool-desc-run-typescript.txt")).read(
 # retire +154 (d7e20a63): +1508. Then the built-in office plugins, on by
 # default (office-artifacts, 2026-10-14, architect m_23951): the Plugins
 # section in every agent's prompt, its header and the sheets, slides and
-# docs rows, measured from their plugin.json: +546 for each
-TASK_BUDGET = 27000 + 2044 + 546
-MAIN_BUDGET = 38500 + 2184 + 229 + 34 + 216 + 548 + 327 + 154 + 546
+# docs rows, measured from their plugin.json: +546 for each. Then
+# notif-rename (architect m_24654: raise by the measured delta): 'card'
+# became 'notification' in the words every agent reads, +8 for a task (the
+# sb page row) and +154 for main, measured on main_role_desktop.txt
+TASK_BUDGET = 27000 + 2044 + 546 + 8
+MAIN_BUDGET = 38500 + 2184 + 229 + 34 + 216 + 548 + 327 + 154 + 546 + 154
 fails = []
 
 

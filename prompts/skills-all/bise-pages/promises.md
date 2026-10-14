@@ -11,7 +11,7 @@ with its went line: `i'll send an invite` is a promise, its source that item). N
 promised him, never a vague "let's talk".
 
 **The page:** a heading (`your promises`, meta line `3 open · 1 overdue · 1 kept this week`),
-then one `checklist` (never `data-plan`: these rows never make cards), one row per open promise:
+then one `checklist` (never `data-plan`: these rows never make notifications), one row per open promise:
 `<li data-id="p-sso" data-who="yours" data-due="2026-05-16">send Hélène the SSO timeline in
 writing<sup>1</sup></li>`, the kit showing `you · friday` or `late · 2 days`. A promise without
 a date gets the date it implies (`tomorrow`, `this week`: friday), else none. Under the list, the
@@ -21,8 +21,8 @@ renewal`).
 **A draft ready when it's due:** a promise due today or overdue gets its draft in its own `email`
 or `message` block (it waits for his word, `leaving.md`), and its row points at it
 (`data-draft`). Read `sb people` and the thread before you ask him for an address or a
-name. A doubt left (the address, a cc) is a page-only `question`, `data-card="none"`, its row
-pointing at it (`data-question`): it waits on the page and in the morning, never a card (the
+name. A doubt left (the address, a cc) is a page-only `question`, `data-notify="none"`, its row
+pointing at it (`data-question`): it waits on the page and in the morning, never a notification (the
 lint refuses a question without it on this page).
 
 **Each refresh** (same id all week): read what is new since the last one; add new promises; tick
@@ -31,5 +31,5 @@ message shows it done, or he ticked it; fold kept ones into one line at the end 
 week: 2`). Nothing new: don't publish. A new week: a new page, the open rows carried over with
 their ids.
 
-**No card, ever:** an overdue promise leads the morning page's `needs you` with its draft
+**No notification, ever:** an overdue promise leads the morning page's `needs you` with its draft
 (`sb page waiting` lists overdue rows first). See `examples/promises.html`.

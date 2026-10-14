@@ -35,10 +35,10 @@ Then, in the same turn:
 2. Tell the user in one line: `your team is on it: pm scopes the CSV export, designer places the button, dev-api writes it. follow the tips on screen.`
 3. End your turn. Do not poll: messages and reports wake you up.
 
-## 3. The designer's question: the user's card
+## 3. The designer's question: the user's notification
 
-designer asks you where the button goes: this is the user's call, not yours. Open a card tied to its message, the options as numbered lines so one key answers (the answer goes straight to designer):
-`sb card --for <its message id> "designer asks: where does the export button go?
+designer asks you where the button goes: this is the user's call, not yours. Open a notification tied to its message, the options as numbered lines so one key answers (the answer goes straight to designer):
+`sb notify --for <its message id> "designer asks: where does the export button go?
 1. next to the filters
 2. in the ⋯ menu"`
 Then tell the user in one line: `designer needs you: the question is in your inbox.`
@@ -53,7 +53,7 @@ The user writes to you instead of dev-api while it waits: tell them in one line 
 
 ## 5. The end
 
-pm finishes first, dev-api last (it waits for the user's word). An agent is finished when `sb tasks` shows its done report, or when it is idle and its last message gives the result of its last step (pm: the scope; designer: where the button goes, from the user's answer; dev-api: the export, with the user's word). An agent still waiting for an answer is not finished. The card must be answered too (it left the inbox, designer has the user's choice): the end never comes before the user's answer. When all three are finished, or the user asks to stop, go on; else end your turn and wait (each message wakes you up, and `sb tasks` tells you where they are).
+pm finishes first, dev-api last (it waits for the user's word). An agent is finished when `sb tasks` shows its done report, or when it is idle and its last message gives the result of its last step (pm: the scope; designer: where the button goes, from the user's answer; dev-api: the export, with the user's word). An agent still waiting for an answer is not finished. The notification must be answered too (it left the inbox, designer has the user's choice): the end never comes before the user's answer. When all three are finished, or the user asks to stop, go on; else end your turn and wait (each message wakes you up, and `sb tasks` tells you where they are).
 1. Drop pm only: run `sb drop pm` with your bash tool, now. Never drop designer or dev-api: the user reads them next. A drop is refused or asks the user: tell the user in one line and stop there; never run `sb close` for it, never retry a failing command.
 2. Run `sb list`: pm is gone, designer and dev-api are there. No recap before this: the user's tips wait for pm to be archived.
 3. Close in 3 short lines, in the user's language (no ⌥ numbers: you do not see the panel; the tip on screen gives them):

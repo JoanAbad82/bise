@@ -40,7 +40,7 @@ pub const COMMANDS: &[CmdDoc] = &[
     cmd(
         "sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"<answer>\"]... [--went <kind>:<ref>[@<block>]=<url>]... [--taste] [--public|--private] | sb page start <id> [--title <t>] [--agent <name>] [--ask <words>] | sb page tick <page> <item> [words] | sb page waiting | sb page list | sb page notes <id>",
         Who::Everyone,
-        "publish a page for the user (a fragment of bise kit blocks; the kit's lint checks it): its URL comes back. `sb page start` shows the page at once, empty, while you (or --agent) write it; your first publish is v1. `sb page tick` ticks a step of the user's (a checklist row with data-who=\"yours\") when he says it's done; other words go as a note on that row. `sb page waiting` lists what waits on him across every page, one line each: `<page>#<item> · step|draft|question|notes · <text>`, his overdue promises first (a row of his past its `data-due`: `<page>#<item> · overdue 2 days · <text>`; never a card). A new version of your page answers the user's notes: `--notes-done` the ones you did, `--note-answer` one line for the others. `--taste`: you followed ~/bise/taste.md (the frame says so).",
+        "publish a page for the user (a fragment of bise kit blocks; the kit's lint checks it): its URL comes back. `sb page start` shows the page at once, empty, while you (or --agent) write it; your first publish is v1. `sb page tick` ticks a step of the user's (a checklist row with data-who=\"yours\") when he says it's done; other words go as a note on that row. `sb page waiting` lists what waits on him across every page, one line each: `<page>#<item> · step|draft|question|notes · <text>`, his overdue promises first (a row of his past its `data-due`: `<page>#<item> · overdue 2 days · <text>`; never a notification). A new version of your page answers the user's notes: `--notes-done` the ones you did, `--note-answer` one line for the others. `--taste`: you followed ~/bise/taste.md (the frame says so).",
     ),
     cmd("sb tasks", Who::Everyone, "every task in detail: what it is doing now, its last report, its open questions."),
     cmd(
@@ -152,14 +152,14 @@ pub const COMMANDS: &[CmdDoc] = &[
         "answer an agent's question on the user's behalf; the user sees the answer and the one-sentence why.",
     ),
     cmd(
-        "sb card \"<question for the user>\" [--for <id>]",
+        "sb notify \"<question for the user>\" [--for <id>]",
         Who::Main,
-        "escalate to the user's inbox (only you can); with `--for`, the user's answer goes straight to the task that asked. From then on only the user answers or closes it: a reply to that message is refused.",
+        "escalate to the user's inbox as a notification (only you can); with `--for`, the user's answer goes straight to the task that asked. From then on only the user answers or closes it: a reply to that message is refused.",
     ),
     cmd(
-        "sb card --withdraw <card> \"<why>\"",
+        "sb notify --withdraw <notification> \"<why>\"",
         Who::Main,
-        "take back your own card when it became moot (the task stopped, the user answered you in chat); the user sees it withdrawn with your why, and the question is yours again. Never to answer in the user's place.",
+        "take back your own notification when it became moot (the task stopped, the user answered you in chat); the user sees it withdrawn with your why, and the question is yours again. Never to answer in the user's place.",
     ),
     cmd(
         "sb flow [pr|trunk]",
@@ -726,7 +726,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
             let card = pos
                 .first()
                 .and_then(|c| c.trim_start_matches('#').parse::<u64>().ok())
-                .ok_or("usage: sb close <card> [\"<note>\"]")?;
+                .ok_or("usage: sb close <notification> [\"<note>\"]")?;
             req.insert("card".into(), json!(card));
             req.insert("note".into(), json!(pos[1..].join(" ")));
         }
@@ -740,30 +740,30 @@ pub fn build(args: &[String]) -> Result<Value, String> {
                 _ => return Err("usage: sb rename <agent> <new-name>".into()),
             }
         }
-        "card" if rest.iter().any(|a| a == "--withdraw" || a.starts_with("--withdraw=")) => {
-            // BISE-299: `sb card --withdraw N "why"`, the hub's own command
+        // BISE-299 `sb notify --withdraw N "why"`; TODO(notif-rename): "card", its old name, goes one release after (docs/issues/27)
+        "notify" | "card" if rest.iter().any(|a| a == "--withdraw" || a.starts_with("--withdraw=")) => {
             let (pos, o) = parse_args(rest, &["withdraw"], &[])?;
             let card = o
                 .get("withdraw")
                 .and_then(|c| c.as_str())
                 .and_then(|c| c.trim_start_matches('#').parse::<u64>().ok())
-                .ok_or("usage: sb card --withdraw <card> \"<why>\"")?;
+                .ok_or("usage: sb notify --withdraw <notification> \"<why>\"")?;
             req.insert("cmd".into(), json!("withdraw"));
             req.insert("card".into(), json!(card));
             req.insert("why".into(), json!(pos.join(" ")));
         }
-        "card" => {
+        "notify" | "card" => {
+            // a notification is a card on the wire: the hub's command keeps its name
+            req.insert("cmd".into(), json!("card"));
             let (pos, o) = parse_args(rest, &["for", "page"], &[])?;
             req.insert("text".into(), json!(text_of(&pos)?));
-            if o.contains_key("for") {
-                req.insert("for".into(), json!(str_of(&o, "for")));
-            }
-            // `--page <id>[#<item>]`: the card opens that page at the item
+            if o.contains_key("for") { req.insert("for".into(), json!(str_of(&o, "for"))); }
+            // `--page <id>[#<item>]`: the notification opens that page at the item
             // (fn + o in the capsule), pm's B m_6008
             if o.contains_key("page") {
                 let page = str_of(&o, "page");
                 if page.trim().trim_start_matches('#').is_empty() || page.trim().starts_with('#') {
-                    return Err("usage: sb card [--for <msg>] [--page <id>[#<item>]] \"<question>\"".into());
+                    return Err("usage: sb notify [--for <msg>] [--page <id>[#<item>]] \"<question>\"".into());
                 }
                 req.insert("page".into(), json!(page.trim()));
             }
@@ -901,15 +901,15 @@ pub fn render(cmd: &str, v: &Value) -> (bool, String) {
             if v.get("dropped") == Some(&json!(true)) {
                 "dropped".to_string()
             } else {
-                format!("not dropped: {} (card #{})", s("reason"), v.get("card").and_then(|c| c.as_u64()).unwrap_or(0))
+                format!("not dropped: {} (notification #{})", s("reason"), v.get("card").and_then(|c| c.as_u64()).unwrap_or(0))
             }
         }
-        "card" => format!("card #{} opened for the user", v.get("card").and_then(|c| c.as_u64()).unwrap_or(0)),
+        "withdraw" => format!("notification #{} withdrawn: the user sees why; the question is yours again", v.get("card").and_then(|c| c.as_u64()).unwrap_or(0)),
+        "notify" | "card" => format!("notification #{} opened for the user", v.get("card").and_then(|c| c.as_u64()).unwrap_or(0)),
         "report" => format!("reported ({})", s("message_id")),
         "follow" if v.get("on") == Some(&json!(false)) => format!("@{} no longer followed", s("agent")),
         "follow" => format!("following @{}: the user hears once when it ends", s("agent")),
-        "close" => format!("card #{} closed", v.get("card").and_then(|c| c.as_u64()).unwrap_or(0)),
-        "withdraw" => format!("card #{} withdrawn: the user sees why; the question is yours again", v.get("card").and_then(|c| c.as_u64()).unwrap_or(0)),
+        "close" => format!("notification #{} closed", v.get("card").and_then(|c| c.as_u64()).unwrap_or(0)),
         "rename" => format!("renamed: now @{} (the old name still works)", s("name")),
         "restore" => format!("@{} restored", s("name")),
         "isolate" => format!("@{} now works in its own git worktree", s("name")),
@@ -1000,7 +1000,7 @@ pub fn main(args: &[String]) -> i32 {
     let mut req = req;
     req["op"] = json!("agent");
     req["from"] = json!(from);
-    let cmd = args[0].clone();
+    let cmd = if req["cmd"] == "withdraw" { "withdraw".to_string() } else { args[0].clone() };
     let idempotent = matches!(
         cmd.as_str(),
         "list" | "tasks" | "history" | "show" | "inspect" | "wait"
