@@ -1396,121 +1396,15 @@ fn one_line(s: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-// ---- answers by voice (voice mode, design §5) ----
-//
-// In voice mode the turn after a question or an approval is matched
-// first (`voicemode::answers`): a match shows `heard "the first one" →
-// 1 smaller` on the item for 1.5 s (esc undoes), then counts.
-// (allow(dead_code) on the entry points until voice mode's integration
-// calls them; voicemode/mod.rs has the same.)
+#[path = "card_voice.rs"]
+mod card_voice;
+#[allow(unused_imports)] // voice mode's integration calls some only in tests yet
+pub(crate) use card_voice::{answer_by_voice, heard_on, show_heard, undo_heard, voice_question, VoiceQuestion};
+use card_voice::with_heard;
 
-thread_local! {
-    /// The item an answer was heard for, the line, and since when.
-    static HEARD: RefCell<Option<(u64, String, std::time::Instant)>> = const { RefCell::new(None) };
-}
-
-/// What voice mode can answer: the item in the view (else the top one),
-/// an approval or not, its options' words.
-#[allow(dead_code)]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct VoiceQuestion {
-    pub(crate) id: u64,
-    pub(crate) approval: bool,
-    pub(crate) options: Vec<String>,
-}
-
-#[allow(dead_code)]
-pub(crate) fn voice_question(app: &App) -> Option<VoiceQuestion> {
-    let c = app.sb.current_card()?;
-    let s = shape(c);
-    (!s.options.is_empty()).then(|| VoiceQuestion { id: c.id, approval: c.kind == "approval", options: s.options })
-}
-
-/// `heard "…" → 1 smaller` on item `id` from `now` for
-/// [`crate::voicemode::answers::HEARD_FOR`].
-#[allow(dead_code)]
-pub(crate) fn show_heard(id: u64, line: String, now: std::time::Instant) {
-    HEARD.with(|h| *h.borrow_mut() = Some((id, line, now)));
-}
-
-/// esc: the heard answer does not count.
-#[allow(dead_code)]
-pub(crate) fn undo_heard() {
-    HEARD.with(|h| *h.borrow_mut() = None);
-}
-
-/// The heard line on item `id`, while it shows.
-pub(crate) fn heard_on(id: u64, now: std::time::Instant) -> Option<String> {
-    HEARD.with(|h| {
-        h.borrow().as_ref().and_then(|(at_id, line, at)| {
-            (*at_id == id && now.saturating_duration_since(*at) < crate::voicemode::answers::HEARD_FOR).then(|| line.clone())
-        })
-    })
-}
-
-/// The heard answer counts: option `i` of item `id`, as a key would
-/// pick it; the line goes.
-#[allow(dead_code)]
-pub(crate) fn answer_by_voice(app: &mut App, id: u64, i: usize) -> bool {
-    undo_heard();
-    pick(app, id, i)
-}
-
-/// The item's shape with the heard line under its body, while it shows.
-fn with_heard(c: &Card, mut s: Shape) -> Shape {
-    if let Some(line) = heard_on(c.id, std::time::Instant::now()) {
-        s.parts.push(Part::Note(line));
-    }
-    s
-}
-
-// ---- bise ambient (docs/ambient-app.md §4): the same options and replies ----
-
-/// A hub card as the ambient core gets it (no TUI state on it).
-fn ambient_card(kind: &str, agent: &str, text: &str) -> Card {
-    Card {
-        id: 0,
-        kind: kind.into(),
-        agent: agent.into(),
-        text: text.into(),
-        age_ms: 0,
-        seen_at: std::time::Instant::now(),
-        note: String::new(),
-        look: None,
-        place: None,
-        pr: None,
-        link: None,
-        asking: false,
-        waiting: Vec::new(),
-    }
-}
-
-/// A card's numbered options as the inbox box shows them: `(digit,
-/// whole label)` (a hard confirm's `no` is 3, like the box's).
-pub(crate) fn ambient_options(kind: &str, agent: &str, text: &str) -> Vec<(usize, String)> {
-    let s = base_shape(&ambient_card(kind, agent, text));
-    s.options.iter().enumerate().map(|(i, o)| (s.num(i), o.clone())).collect()
-}
-
-/// What digit `d` sends as `/answer <id> <reply>`, as the box's `pick`
-/// does: a hub item's digit itself, else the option's words. None: no
-/// such option, or one the box acts on locally (a PR or release page to
-/// open, the feature drop's second ask).
-pub(crate) fn ambient_reply(kind: &str, agent: &str, text: &str, d: usize) -> Option<String> {
-    let s = base_shape(&ambient_card(kind, agent, text));
-    let i = s.by_digit(d)?;
-    if !choice_kind(kind) {
-        return s.options.get(i).cloned();
-    }
-    (!ambient_local(kind, d)).then(|| d.to_string())
-}
-
-/// Digit `d` of a `kind` card is one the box acts on itself (a PR or
-/// release page to open, the feature drop's second ask).
-pub(crate) fn ambient_local(kind: &str, d: usize) -> bool {
-    matches!((kind, d), ("merge", 2) | ("update", 3) | ("feature_merge", 3))
-}
-
+#[path = "card_ambient.rs"]
+mod card_ambient;
+pub(crate) use card_ambient::{ambient_local, ambient_options, ambient_reply};
 
 #[cfg(test)]
 #[path = "cards_tests.rs"]

@@ -1,5 +1,6 @@
 use super::*;
 use crate::rows::ReportKind;
+use crate::thread::words::{one_line, summary};
 
 #[test]
 fn runtime_lines_read_as_their_kind() {
@@ -127,6 +128,8 @@ fn bash_calls_read_as_reports_and_publishes() {
     assert_eq!(report_in("sb report nope x"), None);
     assert_eq!(publish_in("sb page publish ./weekly.html"), Some("weekly".into()));
     assert_eq!(publish_in("sb page publish a.html --id perf-notes"), Some("perf-notes".into()));
+    assert_eq!(summary(&[]), "");
+    assert_eq!(one_line("  \nabcdef", 4), "abc…");
 }
 
 /// architect m_10999: the current usage is the last usage line unless a

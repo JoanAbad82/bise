@@ -601,7 +601,7 @@ def candidate_then_promote():
     git = lambda *a, cwd=repo: subprocess.run(["git"] + list(a), cwd=cwd, env=genv, check=True, capture_output=True, text=True).stdout.strip()  # noqa: E731
     os.makedirs(os.path.join(repo, "scripts"))
     os.makedirs(os.path.join(repo, "tests"))
-    for f in ("desktop_try.py", "desktop_try_env.py"):
+    for f in ("desktop_try.py", "desktop_try_env.py", "heavy_slot.py"):
         shutil.copy(os.path.join(ROOT, "scripts", f), os.path.join(repo, "scripts", f))
     shutil.copy(os.path.join(ROOT, "tests", "bise_env.py"), os.path.join(repo, "tests", "bise_env.py"))
     with open(os.path.join(repo, ".gitignore"), "w") as f:

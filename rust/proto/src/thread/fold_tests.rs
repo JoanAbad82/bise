@@ -1,7 +1,5 @@
 use super::*;
 use crate::rows::ReportKind;
-use crate::thread::lines::{publish_in, report_in};
-use crate::thread::words::{one_line, summary};
 use crate::thread::{page, EntryKind, Line, PageRef, ReportRef};
 
 fn lines() -> Vec<Line> {
@@ -463,16 +461,6 @@ fn a_page_cut_before_the_receipt_still_shows_the_steer() {
     // without the lines ahead (the old page): nothing guessed
     let (e, _, _) = page(&all[..cut], &[], &ctx, 60);
     assert!(e.iter().all(|x| x.steered_at.is_none()), "{e:?}");
-}
-
-#[test]
-fn bash_calls_read_as_reports_and_publishes() {
-    assert_eq!(report_in(r#"cd x && sb report done "landed \"a\"" --decision y"#), Some((ReportKind::Done, "landed \"a\"".into())));
-    assert_eq!(report_in("sb report progress 'half'"), Some((ReportKind::Progress, "half".into())));
-    assert_eq!(report_in("sb report nope x"), None);
-    assert_eq!(publish_in("sb page publish ./weekly.html"), Some("weekly".into()));
-    assert_eq!(summary(&[]), "");
-    assert_eq!(one_line("  \nabcdef", 4), "abc…");
 }
 
 /// Batch 2 (bar T): thinking (its time from the line before), the

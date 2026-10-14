@@ -64,6 +64,7 @@ import time
 from desktop_try_env import (GATE, SELF_CONTAINED, TryError, clone_names, config_for_try, guard, his_env,  # one module,
                              his_bise, his_repos, homes, keep_old_root, live_build, not_swapped, self_contained, try_env,
                              under)  # split for its size
+from heavy_slot import HEAVY_RUN, heavy_argv, under_heavy_slot  # noqa: F401  (desktop_dmg, the tests read them here)
 
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 DESKTOP = os.path.join(REPO, "apps", "desktop")
@@ -200,40 +201,6 @@ def root_path(paths, stamp):
     one per source and recipe, so a staged build never writes the root a running try reads."""
     name = "root-%s%s-%s" % (stamp["head"][:8], "-" + stamp["changes"][:8] if stamp["changes"] else "", stamp["recipe"][:6])
     return os.path.join(os.path.dirname(paths["helper"]), name)
-
-
-HEAVY_RUN = os.path.expanduser("~/.bise/run/heavy-run")
-HEAVY_LOCKS = ("heavy.lock", "heavy2.lock")
-
-
-def under_heavy_slot(pid=None):
-    """True when this process runs under a `lockf … heavy.lock|heavy2.lock` of its own ancestry
-    (a `heavy-run` around it): taking a slot again would hold both, or wait on itself."""
-    pid = pid or os.getpid()
-    for _ in range(32):
-        r = subprocess.run(["ps", "-o", "ppid=,command=", "-p", str(pid)], capture_output=True, text=True)
-        line = r.stdout.strip()
-        if not line:
-            return False
-        ppid, _, cmd = line.partition(" ")
-        head = cmd.split(" ", 1)[0]
-        if head.endswith("lockf") and any("/.bise/run/" + n in cmd for n in HEAVY_LOCKS):
-            return True
-        pid = int(ppid.strip() or 0)
-        if pid <= 1:
-            return False
-    return False
-
-
-def heavy_argv(cmd, lock, under=None, heavy_run=HEAVY_RUN):
-    """The argv that runs `cmd` as one heavy job (main m_13151, ambient-lead m_13161): already in a
-    heavy slot, at nice 10 alone (never a second slot, never nested); else through heavy-run (the
-    first of its two slots that is free); else, on a Mac without heavy-run, the old single lock."""
-    if under_heavy_slot() if under is None else under:
-        return ["nice", "-n", "10"] + cmd
-    if os.access(heavy_run, os.X_OK):
-        return [heavy_run] + cmd
-    return ["/usr/bin/lockf", "-k", lock, "nice", "-n", "10"] + cmd
 
 
 def stamp_path(paths):
