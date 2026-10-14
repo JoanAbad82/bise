@@ -79,17 +79,16 @@ side panel, and the unit tests.
 | pptx read/edit | ours, on fflate + xmldom | — | no open JS library edits an existing deck |
 | docx create | ours: a template + the edit layer (architect m_23763) | — | `docx` 9.10 needs node globals and timers; one write path |
 
-The runtime (architect m_23769): `bise office run`'s script mode gives
-`setTimeout/setInterval/setImmediate/queueMicrotask` + `clear*` on the
-script's own loop inside the 5 min cap (office-run; a test pins that
-`run_typescript` still has none). `build.mjs` allows only `buffer`,
-`events`, `readable-stream` (or `stream-browserify`) and a `process` stub
-whose `env` is `{}` forever (a test checks no real env leaks); pure JS,
-MIT/BSD/Apache, notices in the same commit; `office.js` stays under 3 MB
-(build.mjs fails past it). Owner of build.mjs's list: office-sheets. The
-bundle runs in the viewer too: only the save paths may use script-mode
-timers. Slides: create = our template + the edit layer, like docs;
-`pptxgenjs` stays only if its charts save real work.
+The runtime (architect m_23799, replacing m_23769): no polyfills and no
+timers. Sheets runs exceljs's workbook model through our own xlsx driver
+(fflate, saxes), with a build-time stub table in `build.mjs` (each stub a
+`{module, reason}` row that throws; an unknown node import still fails the
+build; owner: office-sheets). Docs and slides create and edit on our own
+OOXML layer (slides: no `pptxgenjs`, a small chart writer of ours). Script
+mode has no virtual clock. A module that needs a polyfill or a timer later
+goes back to architect. `office.js` stays under 3 MB. Sheets keeps the
+parts exceljs does not model (charts, pivots, external links, slicers)
+through a save, or refuses the save without `{allowLoss: true}`.
 | docx read/edit | ours, on fflate + xmldom | — | `docx` cannot read; `mammoth` (BSD-2) reads to HTML only |
 | docx view | `docx-preview` 0.4 | Apache-2.0 | what the Codex app uses |
 
