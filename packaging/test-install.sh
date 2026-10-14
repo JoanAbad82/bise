@@ -55,7 +55,7 @@ MARK='added by the [a-z-]* installer'
 E sh "$bundle/install.sh" 2>&1 | sed 's/^/     /'
 BIN="$T/.local/bin/$CMD"
 check "launcher linked in ~/.local/bin" test -x "$BIN"
-check "old name linked too (bend-harness)" test -x "$T/.local/bin/bend-harness"
+check "old name not linked by a new install (bend-harness)" test ! -e "$T/.local/bin/bend-harness"
 check "PATH line in ~/.zshrc" grep -q "$MARK" "$T/.zshrc"
 found="$(E /bin/zsh -ic "command -v $CMD" 2>/dev/null | tail -n 1)"
 [ "$found" = "$BIN" ] && ok "new shell finds $CMD ($found)" || ko "new shell finds $CMD (got '$found')"

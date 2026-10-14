@@ -13,7 +13,6 @@
 #     install.sh           the installer (the same file curl | sh fetches)
 #     app/                 the app root, exactly as versions.sh builds it:
 #       bise                 Rust: TUI + Switchboard daemon + sb CLI
-#       bend-harness         -> bise (the old name, kept one release)
 #       sb                   -> bise (the agents' command: bise called as sb)
 #       repl-live            native Bend REPL (runtime/repl-live.bend)
 #       repl-scripted        native Bend REPL, no provider (runtime/repl.bend)
@@ -112,9 +111,9 @@ jsrt_at=bend-jsrt
   | grep -c BEND_JSRT_BIN >/dev/null || jsrt_at=rust/jsrt/target/debug/bend-jsrt
 mkdir -p "$app/$(dirname "$jsrt_at")"
 # the command (BISE-165): bise, or the bend-harness of a version dir
-# built before the rename; the old name stays as a link one release
+# built before the rename (v2026.9.29), its real executable. No
+# bend-harness link in the app any more: its one release has shipped.
 if [ -e "$vdir/bise" ]; then cp "$vdir/bise" "$app/bise"; else cp "$vdir/bend-harness" "$app/bise"; fi
-ln -s bise "$app/bend-harness"
 # sb: the agents' command, the same binary called by that name
 ln -s bise "$app/sb"
 for f in repl-live sb-core; do cp "$vdir/$f" "$app/$f"; done
@@ -187,7 +186,7 @@ fi
 # 6. verify: a missing piece must fail here, not on the user's machine
 #    (wait a moment: a quarantine by security software is not instant)
 sleep 2
-for f in bise bend-harness sb repl-live repl-scripted sb-core "$jsrt_at" \
+for f in bise sb repl-live repl-scripted sb-core "$jsrt_at" \
          "${pr}tool-desc-bash.txt" "${pr}prompt-tool-use.txt" "${pr}prompt-tone.txt" VERSION \
          LICENSE NOTICE THIRD_PARTY_NOTICES; do
   [ -e "$app/$f" ] || { say "INCOMPLETE: app/$f missing"; exit 1; }

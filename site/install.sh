@@ -35,7 +35,6 @@
 #   $PREFIX/install.sh       the installer of the current version (uninstall)
 #   $PREFIX/dist-url         the release channel it came from
 #   $BIN_DIR/bise -> $PREFIX/bin/bise
-#   $BIN_DIR/bend-harness -> $PREFIX/bin/bise   (the old name, one release)
 # Defaults: PREFIX=~/.local/share/bise, BIN_DIR=~/.local/bin.
 # Your data is never inside $PREFIX: ~/.bise (keys, config, hubs,
 # sessions) and the older ~/.bend-harness, ~/.local/state/switchboard
@@ -44,7 +43,7 @@
 set -eu
 
 CMD=bise                  # the command name (BISE-165)
-OLD_CMD=bend-harness      # its old name: a second link, kept one release
+OLD_CMD=bend-harness      # its old name: no longer linked; an older install's link stays (uninstall removes it)
 # the release channel, stamped by make-release.sh ('' = none published)
 DIST_URL_DEFAULT='https://github.com/gvergnaud/bise/releases/latest/download'
 DIST_URL="${BISE_DIST_URL:-$DIST_URL_DEFAULT}"
@@ -420,12 +419,10 @@ if [ -e "$BIN_DIR/$CMD" ] && [ ! -L "$BIN_DIR/$CMD" ]; then
   die "$BIN_DIR/$CMD exists and is not our link; remove it or pass --bin-dir"
 fi
 ln -sfn "$PREFIX/bin/$CMD" "$BIN_DIR/$CMD"
-# the old name, for one release: the same launcher (it prints the name it
-# was called by); an install before BISE-165 left a launcher file there
+# the old name's link (BISE-165) is no longer made: its one release has
+# shipped. One an older install made stays: it points at bin/bise, which
+# stays. An install before BISE-165 left a launcher file in the prefix.
 rm -f "$PREFIX/bin/$OLD_CMD"
-if [ ! -e "$BIN_DIR/$OLD_CMD" ] || [ -L "$BIN_DIR/$OLD_CMD" ]; then
-  ln -sfn "$PREFIX/bin/$CMD" "$BIN_DIR/$OLD_CMD"
-fi
 
 # ---- keep the last $KEEP versions, never the current one nor one a hub runs ----
 in_use="$(ps -axo command= 2>/dev/null | grep -F "$PREFIX/versions/" | grep -v grep || true)"
