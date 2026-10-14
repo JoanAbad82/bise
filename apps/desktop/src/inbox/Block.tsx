@@ -148,6 +148,11 @@ export function notifyCard(home: string, since: number): Card {
 }
 const isNotify = (c: Card): boolean => c.id === NOTIFY_ID;
 
+/** Whether the block lists bise's notifications ask now: the inbox screen lists and counts it too (one inbox, one number; designer m_25639). */
+export function useNotifyAsks(items: number): boolean {
+  return useNotifyRow(items).show;
+}
+
 function useNotifyRow(items: number): { show: boolean; on: () => void; later: () => void } {
   const [auth, setAuth] = useNotifyAuth();
   const [said, setSaid] = useState(() => sessionStorage.getItem(NOT_NOW_LAUNCH) === '1');

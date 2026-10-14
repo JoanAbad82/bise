@@ -9,7 +9,7 @@ import { useActed, useProjects, useStore, useThreadOrder } from '@/store';
 import { useRouter } from '@/app/router';
 import { useKeptScroll } from '@/app/keep';
 import { actedKeys, threadKey, type Store } from '@/store';
-import { blockList, openInbox } from './Block';
+import { blockList, notifyCard, openInbox, useNotifyAsks } from './Block';
 import { InboxView } from './List';
 import { openAnswer } from '@/thread/answerlink';
 import { useInboxRecords } from './records';
@@ -22,7 +22,12 @@ export function InboxScreen() {
   const router = useRouter();
   const records = useInboxRecords(rows);
   useKeptScroll('inbox', () => document.querySelector<HTMLElement>('[data-testid="inbox.list"]'));
-  const cards = useMemo(() => blockList(rows, actedKeys(acted)), [rows, acted]);
+  // the block's own list, bise's notifications ask included: one inbox, one number (designer m_25639)
+  const real = useMemo(() => blockList(rows, actedKeys(acted)), [rows, acted]);
+  const asks = useNotifyAsks(real.length);
+  const home = rows.find((r) => r.home)?.project ?? '';
+  const [since] = useState(() => Date.now());
+  const cards = useMemo(() => (asks ? [...real, notifyCard(home, since)] : real), [real, asks, home, since]);
   const names = useMemo(() => Object.fromEntries(rows.map((r) => [r.project, r.name])), [rows]);
   const projects = useMemo(() => rows.map((r) => ({ project: r.project, name: r.name })), [rows]);
   // the detail's thread, read while it shows: its next line ('perf went on: …') comes with it
