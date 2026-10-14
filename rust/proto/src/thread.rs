@@ -280,7 +280,10 @@ impl Attached {
 /// target`, `you answered perf: both`); `note` the words under it;
 /// `card`: the item it answers, for an answer to an item (the hub's
 /// `route` line, BISE-305/307), so a client that folded the answer
-/// itself knows it is the same one.
+/// itself knows it is the same one; `to`: the agent that answer went to
+/// (the route line's asker), so a click on the row opens that agent's
+/// thread at the answer (answered-link, architect m_24206); none for a
+/// gate's approval.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ApprovalFold {
@@ -290,6 +293,8 @@ pub struct ApprovalFold {
     pub note: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub card: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
 }
 
 /// A `scheduled` entry (batch 3b): a task set or ended (the hub's

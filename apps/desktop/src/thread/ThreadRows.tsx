@@ -228,7 +228,7 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   const tail = pending.length === 0 && (queued ?? []).length === 0 && asides.length === 0 ? undefined : (
     <div className="th-tail">
       {asides.map((a) => (
-        <AsideRow key={`a:${a.key}`} a={a} here={project} />
+        <AsideRow key={`a:${a.key}`} a={a} here={project} agent={agent} />
       ))}
       {pending.map((p) => (
         <PendingRow key={pendingKey(String(p.cid))} ctx={ctx} cid={p.cid} />

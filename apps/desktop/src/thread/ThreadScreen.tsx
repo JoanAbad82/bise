@@ -36,6 +36,8 @@ import { SignInLine, useThreadSignIn } from './signin';
 import { type ThreadListHandle } from './ThreadList';
 import { ComputerLine } from './ComputerLine';
 import { entryKey } from './entry';
+import { MISS_WORDS } from './answerlink';
+import { flashEntry, useAnswerReveal } from './useAnswerReveal';
 import { quoteSourcePos } from './quote';
 import { QUOTE_SOURCE_EVENT } from '@/composer/pm/AttachList';
 import { FindBar } from './FindBar';
@@ -127,11 +129,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
       if (pos === null) return;
       list.current?.scrollTo(entryKey(pos));
       window.setTimeout(() => {
-        const el = document.querySelector<HTMLElement>(`[data-testid="thread.entry.${String(pos)}"]`);
-        if (el === null) return;
-        el.classList.remove('th-flash');
-        el.getBoundingClientRect(); // a reflow: the flash runs again on a second click
-        el.classList.add('th-flash');
+        flashEntry(pos);
       }, 120);
     };
     window.addEventListener(QUOTE_SOURCE_EVENT, go);
@@ -139,6 +137,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
       window.removeEventListener(QUOTE_SOURCE_EVENT, go);
     };
   }, [store, tkey]);
+  // answered-link: a '✓ answered' row's click brings his answer here into view (answerlink.ts)
+  const answerMiss = useAnswerReveal(store, project, agent, list);
   // H10 (designer m_19835): scrolled up to read, the inbox block is one line and the composer's keys line hides
   const [reading, setReading] = useState(false);
   // his bug 3: a selection in the thread, then a key, quotes it in the composer
@@ -424,6 +424,11 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
               setFindOpen(false);
             }}
           />
+        )}
+        {answerMiss && (
+          <div className="th-answer-miss" data-testid="thread.answer-miss">
+            {MISS_WORDS}
+          </div>
         )}
         {topTip !== null && (
           <div className="th-tip">

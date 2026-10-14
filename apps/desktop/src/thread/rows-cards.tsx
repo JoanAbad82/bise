@@ -1,12 +1,14 @@
 // A thread's card rows: cards and their answers, approvals, 'you answered' rows,
 // image chips, and one agent's message to another. Owner: amb-win. Split out of
 // rows.tsx (pure move).
-import { useState, type ReactNode } from 'react';
+import { useContext, useState, type ReactNode } from 'react';
 import { useFold } from './folds';
 import { Act, Answered, ArtName, CardLine, Chip, Marker, Press } from '@/ds';
 import { openInbox } from '@/inbox/Block';
 import { ArtWords } from '@/inbox/artWords';
-import type { Entry } from '@/proto';
+import type { Entry, EntryCard } from '@/proto';
+import { RouterContext } from '@/app/router';
+import { approvalTarget, asideTarget, cardTarget, openAnswer, type AnswerAt } from './answerlink';
 import { useEntry, useProjects, useThreadOrder, type Aside } from '@/store';
 import { Markdown } from './Markdown';
 import { clock, lastOfRun, reportStatus } from './entry';
@@ -224,8 +226,10 @@ export function withoutImageMarks(words: string): string {
  * this thread: the asker's '✓ you answered' row word for word (card/answer's result), with the
  * card's project when it isn't this one. Window-local (asides.ts): the hub writes no row here.
  */
-export function AsideRow({ a, here }: { a: Aside; here: string }) {
+export function AsideRow({ a, here, agent }: { a: Aside; here: string; agent: string }) {
   const parts = approvalParts(a.notice);
+  // answered-link: the head opens the asker's thread at his answer
+  const at = asideTarget(a);
   const words = [parts.words, a.note].filter((w) => w !== '').join('\n');
   const id = `thread.aside.${String(a.card)}`;
   // another project's card: its project's name after the asker ('you answered gift-ui · shop')
@@ -233,7 +237,17 @@ export function AsideRow({ a, here }: { a: Aside; here: string }) {
   const where = a.project === here ? '' : ` · ${pname}`;
   return (
     <div className="th-approval" data-ok data-project={a.project} data-testid={id}>
-      <YouBubble head={<AnsweredHead ok>{`${shownHead(parts.head)}${where}`}</AnsweredHead>} under={clock(a.at_ms)} timeAlways testId={`${id}.row`}>
+      <YouBubble
+        head={
+          at === null || (at.project === here && at.agent === agent) ? (
+            <AnsweredHead ok>{`${shownHead(parts.head)}${where}`}</AnsweredHead>
+          ) : (
+            <AnswerLink at={at} here={agent} testId={`${id}.link`}>
+              <AnsweredHead ok>{`${shownHead(parts.head)}${where}`}</AnsweredHead>
+            </AnswerLink>
+          )
+        }
+        under={clock(a.at_ms)} timeAlways testId={`${id}.row`}>
         {words === '' ? undefined : <div className="th-you-words" data-testid={`${id}.words`}>{words}</div>}
       </YouBubble>
     </div>
@@ -241,9 +255,11 @@ export function AsideRow({ a, here }: { a: Aside; here: string }) {
 }
 
 /** His answer to an approval, folded: allowed or said no, and his words under it. */
-export function ApprovalRow({ e, next }: { e: Entry; next: Entry | undefined }) {
+export function ApprovalRow({ e, next, ctx }: { e: Entry; next: Entry | undefined; ctx: RowCtx }) {
   const a = e.approval;
   if (a == null) return <Marker>{e.text}</Marker>;
+  // answered-link: his answer to another agent's card (main's thread): the head opens it there
+  const at = approvalTarget(ctx.project, ctx.agent, e);
   // msg-parts: his answer's own parts (the note's), when the hub sent them: his words and images
   // from them, never from the templated text (no tag shows); the head stays the hub's words
   const drawn = drawnParts(e.parts);
@@ -261,7 +277,15 @@ export function ApprovalRow({ e, next }: { e: Entry; next: Entry | undefined }) 
   return (
     <div className="th-approval" data-ok={a.ok}>
       <YouBubble
-        head={<AnsweredHead ok={a.ok}>{shownHead(parts.head)}</AnsweredHead>}
+        head={
+          at === null ? (
+            <AnsweredHead ok={a.ok}>{shownHead(parts.head)}</AnsweredHead>
+          ) : (
+            <AnswerLink at={at} here={ctx.agent} testId={`thread.approval.${e.pos}.link`}>
+              <AnsweredHead ok={a.ok}>{shownHead(parts.head)}</AnsweredHead>
+            </AnswerLink>
+          )
+        }
         under={e.at_ms > 0 ? clock(e.at_ms) : undefined}
         timeAlways={lastOfRun(e, next)}
         testId={`thread.approval.${e.pos}`}
@@ -407,7 +431,7 @@ export function CardRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const c = e.card;
   if (!c) return <Marker>{e.text}</Marker>;
   const follows = prev !== undefined && cardFollows(prev, e);
-  if (c.answered) return <Answered testId={`thread.card.${String(c.id)}`}>{follows ? '✓ answered' : `✓ answered: ${c.question}`}</Answered>;
+  if (c.answered) return <AnsweredCard c={c} ctx={ctx} follows={follows} />;
   // b (his card #476, designer m_15612): the inbox block is the one place to answer; the thread says
   // one dim line that points there, never a second copy with its options. A click opens it there.
   // an artifact link in the question is its pink name (art-chips), a click opens its view, not the inbox
@@ -421,6 +445,48 @@ export function CardRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
     >
       <ArtWords text={cardLine(shownName(ctx.agent), c.question, follows).replace(/^\? /u, '')} project={ctx.project} testId={testId} />
     </CardLine>
+  );
+}
+
+/**
+ * An answered card: '✓ answered: <question>'. A click opens the thread of the agent that asked it at
+ * his answer (answered-link, designer m_24211; the asker's own thread: the jump alone).
+ */
+function AnsweredCard({ c, ctx, follows }: { c: EntryCard; ctx: RowCtx; follows: boolean }) {
+  const at = cardTarget(ctx.project, ctx.agent, c);
+  const row = <Answered testId={`thread.card.${String(c.id)}`}>{follows ? '✓ answered' : `✓ answered: ${c.question}`}</Answered>;
+  if (at === null) return row;
+  return (
+    <AnswerLink at={at} here={ctx.agent}>
+      {row}
+    </AnswerLink>
+  );
+}
+
+/** A '✓ answered' row as a link to his answer: its tooltip says where it goes. Pure. */
+export function answerLinkTitle(at: AnswerAt, here: string): string {
+  return at.agent === here ? 'show your answer' : `open it in ${shownName(at.agent)}'s thread`;
+}
+
+function AnswerLink({ at, here, children, testId }: { at: AnswerAt; here: string; children: ReactNode; testId?: string }) {
+  // no router (a row drawn alone, a test): the row as it is, no link
+  const router = useContext(RouterContext);
+  if (router === null) return <>{children}</>;
+  return (
+    <span
+      className="th-answer-link"
+      role="link"
+      title={answerLinkTitle(at, here)}
+      data-testid={testId}
+      onClick={(ev) => {
+        // a drag that selected words isn't a click
+        if (!(window.getSelection()?.isCollapsed ?? true)) return;
+        ev.stopPropagation();
+        openAnswer(router, at);
+      }}
+    >
+      {children}
+    </span>
   );
 }
 

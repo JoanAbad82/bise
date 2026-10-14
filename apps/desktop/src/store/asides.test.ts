@@ -17,7 +17,7 @@ describe("inbox picks (3): his answer where he was", () => {
     const from = { at: { project: "telemetry", agent: "p99" } };
     const got = asideOf(from, "shop", 4, gift, 1000);
     expect(got?.at).toEqual({ project: "telemetry", agent: "p99" });
-    expect(got?.aside).toEqual({ key: "shop/4", project: "shop", card: 4, notice: "you answered docs: only at checkout", note: "", at_ms: 1000, by: "hub" });
+    expect(got?.aside).toEqual({ key: "shop/4", project: "shop", card: 4, agent: "docs", notice: "you answered docs: only at checkout", note: "", at_ms: 1000, by: "hub" });
     expect(asideOf({ ...from, at: { project: "shop", agent: "docs" } }, "shop", 4, gift, 1000)).toBeNull();
     expect(asideOf({ ...from, at: null }, "shop", 4, gift, 1000)).toBeNull();
   });

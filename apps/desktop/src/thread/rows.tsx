@@ -250,7 +250,7 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
     case 'answered':
       return <AnsweredRow e={e} />;
     case 'approval':
-      return <ApprovalRow e={e} next={next} />;
+      return <ApprovalRow e={e} next={next} ctx={ctx} />;
     // batch 3b (6e9d68f8): a scheduled task's ◷ line
     case 'scheduled':
       return <ScheduledRow e={e} ctx={ctx} />;

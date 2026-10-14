@@ -412,9 +412,9 @@ impl Fold<'_> {
         }
     }
 
-    fn approval(&mut self, pos: u64, ms: u64, ok: bool, text: String, note: String, card: Option<u64>) {
+    fn approval(&mut self, pos: u64, ms: u64, ok: bool, text: String, note: String, card: Option<u64>, to: Option<String>) {
         let mut e = Entry::new(pos, ms, EntryKind::Approval, text.clone());
-        e.approval = Some(ApprovalFold { ok, text, note, card });
+        e.approval = Some(ApprovalFold { ok, text, note, card, to });
         self.push(e);
     }
 
@@ -656,7 +656,7 @@ impl Fold<'_> {
             // a gate's card answered, folded (approvals-design.md §9)
             Hub::Approval { how, who, what, note } => {
                 let (ok, text, note) = words::approval(&how, &who, &what, &note);
-                self.approval(pos, ms, ok, text, note, None);
+                self.approval(pos, ms, ok, text, note, None, None);
             }
             // an answer to an item, its fold line (BISE-305/307); the item
             // it answers, so a client that folded it itself skips it.
@@ -690,7 +690,7 @@ impl Fold<'_> {
                         let mut e = Entry::new(self.out[i].pos, self.out[i].at_ms, EntryKind::Approval, text.clone());
                         e.turn_start = self.out[i].turn_start;
                         e.msg = msg;
-                        e.approval = Some(ApprovalFold { ok: true, text, note, card: Some(card) });
+                        e.approval = Some(ApprovalFold { ok: true, text, note, card: Some(card), to: Some(who.clone()) });
                         self.out[i] = e;
                         if self.cont == Some(i) {
                             self.cont = None;
@@ -698,7 +698,7 @@ impl Fold<'_> {
                         i
                     }
                     None => {
-                        self.approval(pos, ms, true, text, note, Some(card));
+                        self.approval(pos, ms, true, text, note, Some(card), Some(who.clone()));
                         self.out.len() - 1
                     }
                 };

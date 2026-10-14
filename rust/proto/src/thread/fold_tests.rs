@@ -578,6 +578,8 @@ fn the_hubs_news_lines_are_entries_of_their_kind() {
     assert_eq!(hand.iter().map(|e| (e.kind, e.text.as_str())).collect::<Vec<_>>(), [(EntryKind::Notice, "→ you → @docs : thanks")]);
     // an answer to an item says which one (a client that folded it itself skips it); a gate's fold says none
     assert_eq!((ap(6).card, ap(7).card, ap(8).card), (None, None, Some(4)));
+    // and the agent it went to (answered-link: the row opens its thread at the answer); a gate's, none
+    assert_eq!((ap(6).to, ap(7).to, ap(8).to.as_deref()), (None, None, Some("perf")));
     assert_eq!((e[9].from.as_deref(), e[9].to.as_deref(), e[9].msg), (Some("perf"), Some("docs"), Some(7)));
 }
 

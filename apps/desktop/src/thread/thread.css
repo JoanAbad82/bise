@@ -173,6 +173,27 @@
   padding: var(--s-2) var(--pad-column) 0;
 }
 
+/* answered-link: his answer wasn't in the pages loaded (designer m_24211): dim, top of the thread, no accent */
+.th-answer-miss {
+  flex: 0 0 auto;
+  padding: var(--s-2) var(--pad-column) 0;
+  font-size: var(--t-12);
+  color: var(--c-text-3);
+}
+
+/* answered-link: a '✓ answered' row or a '✓ you answered <agent>' head that opens the asker's
+   thread at his answer (designer m_24211): one step brighter on hover, pointer, no underline, as
+   the card line (the row keeps its color at rest: the '✓ answered' line is text-2, the head text-3) */
+.th-answer-link {
+  cursor: pointer;
+}
+.th-answer-link:hover .b-answered {
+  color: var(--c-text);
+}
+.th-you-head .th-answer-link:hover {
+  color: var(--c-text-2);
+}
+
 .th-loading {
   flex: 1 1 auto;
 }

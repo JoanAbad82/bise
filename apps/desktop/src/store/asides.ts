@@ -23,6 +23,11 @@ export interface Aside {
   /** the card's project, and its name as the window draws it */
   readonly project: string;
   readonly card: number;
+  /**
+   * the agent his answer went to (card/answer's `agent`): a click opens its thread at the answer
+   * (answered-link); none in a row kept before it was kept (it opens nothing)
+   */
+  readonly agent?: string;
   /** 'you answered gift-ui' (the hub's head; words after ':' are his) */
   readonly notice: string;
   /** his words when they don't fit on the head's line */
@@ -81,7 +86,7 @@ export function asideOf(
   if (rowThere(at, project, answer.agent)) return null;
   return {
     at,
-    aside: { key: `${project}/${String(card)}`, project, card, notice: answer.notice, note: answer.note ?? "", at_ms: atMs, by: "hub" },
+    aside: { key: `${project}/${String(card)}`, project, card, agent: answer.agent, notice: answer.notice, note: answer.note ?? "", at_ms: atMs, by: "hub" },
   };
 }
 
@@ -106,6 +111,7 @@ export function asidesOf(raw: unknown): readonly Aside[] {
       typeof r["key"] === "string" &&
       typeof r["project"] === "string" &&
       typeof r["card"] === "number" &&
+      (r["agent"] === undefined || typeof r["agent"] === "string") &&
       typeof r["notice"] === "string" &&
       typeof r["note"] === "string" &&
       typeof r["at_ms"] === "number" &&

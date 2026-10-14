@@ -29,6 +29,8 @@ const START = 1_000_000_000;
 export interface ThreadListHandle {
   /** bring a row into view (⌘F's current match, a card's entry) */
   scrollTo(key: string): void;
+  /** bring a row into view only when it isn't whole in it already (answered-link: his answer) */
+  reveal(key: string): void;
   /** to the newest row */
   scrollToEnd(): void;
   /**
@@ -90,6 +92,11 @@ export function nextFirstIndex(prev: { first: string | undefined; index: number 
 export function anchorRow(rows: readonly { index: number; top: number; bottom: number }[], edge: number): { index: number; top: number } | undefined {
   const r = rows.find((x) => x.bottom > edge);
   return r === undefined ? undefined : { index: r.index, top: r.top };
+}
+
+/** A row whole inside the list's box (reveal: no scroll then). Pure. */
+export function rowWhole(row: { top: number; bottom: number }, view: { top: number; bottom: number }): boolean {
+  return row.top >= view.top && row.bottom <= view.bottom;
 }
 
 /**
@@ -431,12 +438,43 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         const i = keys.indexOf(key);
         if (i >= 0) virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
       },
+      reveal(key) {
+        const i = keys.indexOf(key);
+        if (i < 0) return;
+        // a row drawn and whole in the view stays where it is (his ask: only when it is outside)
+        const el = scroller.current;
+        const row = el?.querySelector<HTMLElement>(`[data-item-index="${String(next.index + i)}"]`) ?? null;
+        if (el !== null && row !== null && rowWhole(row.getBoundingClientRect(), el.getBoundingClientRect())) return;
+        // he reads up there now: no growth takes the list back to its end
+        setStick(false);
+        virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
+        // Virtuoso lands on its estimated sizes (far off in a long thread of unmeasured rows): once
+        // the row is drawn, its centre is nudged to the view's over the next frames, until it shows
+        // whole, he moves the list, or HOLD_MS
+        const until = Date.now() + HOLD_MS;
+        moved.current = false;
+        const settle = () => {
+          if (moved.current || Date.now() >= until) return;
+          const box = scroller.current;
+          const r = box?.querySelector<HTMLElement>(`[data-item-index="${String(firstIndex.current + i)}"]`) ?? null;
+          if (box === null || r === null) virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
+          else {
+            const b = r.getBoundingClientRect();
+            const v = box.getBoundingClientRect();
+            const d = b.top + b.height / 2 - (v.top + v.height / 2);
+            if (rowWhole(b, v) && Math.abs(d) < 2) return;
+            box.scrollTop += b.height > v.height ? b.top - v.top : d;
+          }
+          requestAnimationFrame(settle);
+        };
+        requestAnimationFrame(settle);
+      },
       scrollToEnd: toEnd,
       holdView() {
         holdRow(null);
       },
     }),
-    [keys, toEnd, holdRow],
+    [keys, next.index, toEnd, holdRow, setStick],
   );
 
   return (

@@ -217,9 +217,12 @@ files?: Array<string>, };
  * target`, `you answered perf: both`); `note` the words under it;
  * `card`: the item it answers, for an answer to an item (the hub's
  * `route` line, BISE-305/307), so a client that folded the answer
- * itself knows it is the same one.
+ * itself knows it is the same one; `to`: the agent that answer went to
+ * (the route line's asker), so a click on the row opens that agent's
+ * thread at the answer (answered-link, architect m_24206); none for a
+ * gate's approval.
  */
-export type ApprovalFold = { ok: boolean, text: string, note?: string, card?: number | null, };
+export type ApprovalFold = { ok: boolean, text: string, note?: string, card?: number | null, to?: string | null, };
 
 /**
  * A `scheduled` entry (batch 3b): a task set or ended (the hub's
