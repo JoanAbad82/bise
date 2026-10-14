@@ -1,32 +1,61 @@
 // The composer's tab (designer's composer-strip A, his pick, m_23965): who and where his words go,
 // glued to the box's top. 'to perf' + the gust while it works, 'ψ sb/perf' (or 'shared folder'),
 // the project where the crumb doesn't name it, and on the right 'context 42k · 17%'. Short, it
-// drops whole items: the project, then the context, then the branch; the label always stays.
+// drops whole items: the project, then the context, then the place; the label always stays.
 // Answering a card: 'answering search · <question>' and 'esc write to search' on the right.
 // Pure: ComposerTab.tsx draws and measures it. Owner: amb-win.
+
+/** Where its words go, as the tab names it (designer m_24790): his checkout by its folder's name,
+ *  a worktree by its own folder's name after the ψ; the tip says what it is. */
+export interface TabPlace {
+  readonly name: string;
+  /** a worktree: the ψ before its name, the name mono */
+  readonly worktree: boolean;
+  readonly tip: string;
+}
 
 /** What the tab says. */
 export interface TabWords {
   /** 'to perf', 'answering search · which size…', 'to perf · voice paused', 'to perf · about “…”' */
   readonly label: string;
-  /** where it works: its worktree's branch, '' for the shared folder; undefined: not said (bise) */
-  readonly branch?: string | undefined;
+  /** where it works; undefined: not said (bise's own main) */
+  readonly place?: TabPlace | undefined;
   /** the project's name, only where the screen's crumb doesn't name it */
   readonly project?: string | undefined;
   /** 'context 42k · 17%' ('' or undefined: none, as at 0%) */
   readonly context?: string | undefined;
 }
 
-/** The branch item's words: 'sb/perf', or 'shared folder' in his own checkout. Pure. */
-export function placeWords(branch: string): string {
-  return branch === '' ? 'shared folder' : branch;
+/** A folder's own name: the last part of its path. Pure. */
+export function folderName(path: string): string {
+  return path.replace(/\/+$/u, '').split('/').at(-1) ?? path;
 }
 
-/** Where an agent works, as the tab says it: its worktree's branch, else '' (the shared folder);
- *  undefined for bise's own main (no folder of a project). Pure. */
-export function placeOf(a: { branch?: string | null } | undefined, home: boolean): string | undefined {
+/** A worktree's name: its folder under ~/.bise/worktrees/<hub>/<name>/<repo>, else its folder's own name. Pure. */
+export function worktreeName(path: string): string {
+  const parts = path.replace(/\/+$/u, '').split('/');
+  const i = parts.lastIndexOf('worktrees');
+  return (i >= 0 && parts.length >= i + 3 ? parts[i + 2] : parts.at(-1)) ?? path;
+}
+
+/**
+ * Where an agent works, as the tab says it (designer m_24790, his m_24782): in a worktree 'ψ <its
+ * folder's name>' with wt-sign's signed tip (`wt`, its Place's path and tip words); in his checkout
+ * the project folder's name and 'your own folder: <path>'; nothing for bise's own main. Pure.
+ */
+export function tabPlace(
+  a: { branch?: string | null; worktree?: string | null } | undefined,
+  home: boolean,
+  wt: { path?: string | null; tip: string } | undefined,
+  project: string | undefined,
+  tilde: (path: string) => string,
+): TabPlace | undefined {
   if (a === undefined || home) return undefined;
-  return a.branch ?? '';
+  if (wt !== undefined && wt.path != null && wt.path !== '') return { name: worktreeName(wt.path), worktree: true, tip: wt.tip };
+  if (a.worktree != null && a.worktree !== '') return { name: worktreeName(a.worktree), worktree: true, tip: wt?.tip ?? `ψ worktree: ${tilde(a.worktree)}` };
+  if (a.branch != null && a.branch !== '') return { name: a.branch, worktree: true, tip: wt?.tip ?? `ψ worktree, on ${a.branch}` };
+  if (project === undefined || project === '') return undefined;
+  return { name: folderName(project), worktree: false, tip: `your own folder: ${tilde(project)}` };
 }
 
 /** Which optional items fit beside the label. */

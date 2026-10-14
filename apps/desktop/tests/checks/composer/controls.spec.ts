@@ -96,7 +96,9 @@ test('composer/controls: every composer control is hit at its center and hovers,
     await page.keyboard.type('/');
     const rows = page.locator('[data-testid^="composer.pick."]:not(.on):not(.dis)');
     await expect(rows.first(), 'the / list').toBeVisible({ timeout: 5000 });
-    seen['the / list'] = [await probe(page, rows.first()), await probe(page, mic)];
+    // the row by its own id: once hovered it is the active one (.on), out of `rows`
+    const first = page.getByTestId((await rows.first().getAttribute('data-testid')) ?? '');
+    seen['the / list'] = [await probe(page, first), await probe(page, mic)];
     await page.screenshot({ path: test.info().outputPath('slash-list.png') });
   } finally {
     test.info().annotations.push({ type: 'controls', description: JSON.stringify(seen) });

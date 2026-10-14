@@ -360,6 +360,9 @@ export function PmField(p: PmFieldProps): JSX.Element {
   const [sel, setSel] = useState({ key: "", i: 0 });
   const [dismissed, setDismissed] = useState("");
   const tkey = triggerKey(trigger);
+  // an esc closes the list for that trigger only: once its word is gone, the same '@' or '/' at the
+  // same place opens it again
+  if (trigger === null && dismissed !== "") setDismissed("");
 
   useEffect(() => {
     if (trigger?.kind !== "at") return;

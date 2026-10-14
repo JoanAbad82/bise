@@ -307,16 +307,6 @@
   left: var(--pad-card-x);
   bottom: calc(100% - var(--s-2));
   z-index: 10;
-  max-height: 280px;
-  overflow-y: auto;
-}
-.b-composer-pick .b-menu {
-  width: min(520px, 90vw);
-}
-.b-composer-pick .b-mi .k {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 60%;
 }
 .b-composer {
   position: relative;
@@ -389,10 +379,6 @@
 .b-composer .send:not(:disabled):not(.off):hover {
   background: color-mix(in srgb, var(--c-ink) 88%, var(--c-solid));
 }
-/* the @ $ / list: the row under the pointer (the picked one keeps its ink) */
-.b-composer-pick .b-mi:not(.on):not(.dis):hover {
-  background: var(--c-hover);
-}
 /* voice mode's ∿ (designer's voice-window page (1)): next to dictate, as wide as its words */
 .b-composer .keys .mic.voice {
   min-width: 0;
@@ -403,8 +389,8 @@
   font-weight: 600;
 }
 /* the box's row (designer's composer-strip A, thread/ComposerTools.tsx): '+' 28 px and the menus
-   28 px high, text-2, the 6% hover; the model in ink 500; a menu opens above the box, from its
-   button's side. Short (the box under 440 px), the effort leaves the model's button: it stays in
+   28 px high, text-2, the 6% hover; the model in ink 500; their pickers (ds Picker) open above the
+   box, placed by the screen. Short (the box under 440 px), the effort leaves the model's button: it stays in
    its menu; the mode never drops */
 .b-composer .box {
   container: cmp-box / inline-size;
@@ -442,7 +428,18 @@
   font-weight: 500;
   color: var(--c-text);
 }
+.b-composer .cmp-menu {
+  gap: var(--s-2);
+}
+.b-composer .cmp-menu .w {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: pre;
+}
+/* the caret: an 8x5 chevron, text-3, centered on the words' line box, 8 px after them (m_24786) */
 .b-composer .cmp-menu .v {
+  flex: none;
+  display: block;
   color: var(--c-text-3);
 }
 @container cmp-box (max-width: 440px) {
@@ -452,22 +449,4 @@
 }
 .b-composer .box {
   position: relative;
-}
-.b-composer .cmp-drop {
-  display: inline-flex;
-}
-/* above the box (never over his words): from the box's left for the mode, its right for the model */
-.b-composer .cmp-up {
-  position: absolute;
-  bottom: calc(100% + var(--s-2));
-  left: var(--s-3);
-  z-index: 5;
-}
-.b-composer .box .row .sp ~ .cmp-drop .cmp-up {
-  left: auto;
-  right: var(--s-3);
-}
-.b-composer .cmp-up .b-menu {
-  max-height: 50vh;
-  overflow-y: auto;
 }

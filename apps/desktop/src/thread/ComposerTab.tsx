@@ -4,12 +4,30 @@
 // flash, 'tab back to voice'). The items that don't fit go whole (tab.ts tabFit): measured here,
 // on a resize or new words, never per keystroke (the composer above it is memoised). Owner: amb-win.
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { placeWords, tabFit, wordCut, type TabFit, type TabWords } from './tab';
+import type { Agent } from '@/proto';
+import { usePlaces, useProjects } from '@/store';
+import { placeOf as placeOfAgent, tilde, worktreeParts } from '@/app/barplaces';
+import { tabFit, tabPlace, wordCut, type TabFit, type TabPlace, type TabWords } from './tab';
+
+/** his home folder, for '~/…' in the tips (main's window.bise.home) */
+const HOME = (globalThis as { bise?: { home?: string } }).bise?.home;
+
+/** Where `a` works, as the tab names it (tab.ts tabPlace): its worktree's Place and his checkout's path. */
+export function useTabPlace(project: string, a: Agent | undefined, home: boolean): TabPlace | undefined {
+  const places = usePlaces(project);
+  const path = useProjects().find((p) => p.project === project)?.path;
+  const wt = a === undefined ? undefined : placeOfAgent(a, places);
+  const tip = wt === undefined ? '' : worktreeParts(wt, HOME).map((x) => x.t).join('');
+  return tabPlace(a, home, wt === undefined ? undefined : { path: wt.path ?? (wt.id.startsWith('pt:') ? wt.id.slice(3) : null), tip }, path, (x) => tilde(x, HOME));
+}
 
 /** The tab's words as one object while they hold (a memoised composer never draws again for an
  *  unrelated render of its screen). */
-export function useTabWords(label: string, branch: string | undefined, context: string): TabWords {
-  return useMemo(() => ({ label, branch, context }), [label, branch, context]);
+export function useTabWords(label: string, place: TabPlace | undefined, context: string): TabWords {
+  const name = place?.name;
+  const worktree = place?.worktree;
+  const tip = place?.tip;
+  return useMemo(() => ({ label, place: name === undefined ? undefined : { name, worktree: worktree === true, tip: tip ?? '' }, context }), [label, name, worktree, tip, context]);
 }
 
 const ALL: TabFit = { branch: true, project: true, context: true };
@@ -47,7 +65,7 @@ export function ComposerTab({ words, mark, end, testId }: { words: TabWords; mar
   const [cut, setCut] = useState<string | null>(null);
   const context = words.context ?? '';
   const ctxNum = context.replace(/^context\s*/u, '');
-  const key = `${words.label}|${words.branch ?? '-'}|${words.project ?? ''}|${context}|${end === undefined ? '' : 'end'}`;
+  const key = `${words.label}|${words.place?.name ?? '-'}|${words.project ?? ''}|${context}|${end === undefined ? '' : 'end'}`;
   useLayoutEffect(() => {
     const host = ref.current?.parentElement;
     if (host == null) return;
@@ -85,11 +103,11 @@ export function ComposerTab({ words, mark, end, testId }: { words: TabWords; mar
       <span ref={ref} className="lbl" data-testid={`${testId}.to`}>
         <MarkedLabel label={cut ?? words.label} mark={mark} />
       </span>
-      {words.branch !== undefined && (
-        <span className={fit.branch ? 'it' : 'it gone'} data-item="place" data-testid={`${testId}.place`} aria-hidden={!fit.branch || undefined}>
-          {/* ψ is a worktree's sign (wt-sign): his own checkout reads 'shared folder' alone (designer m_24325) */}
-          {words.branch !== '' && <span className="g">ψ</span>}
-          <span className={words.branch === '' ? undefined : 'mono'}>{placeWords(words.branch)}</span>
+      {words.place !== undefined && (
+        // his checkout by its folder's name, a worktree as 'ψ <its folder>' (designer m_24790); the tip says what it is
+        <span className={fit.branch ? 'it' : 'it gone'} data-item="place" data-testid={`${testId}.place`} data-tip={words.place.tip} aria-label={words.place.tip} aria-hidden={!fit.branch || undefined}>
+          {words.place.worktree && <span className="g">ψ</span>}
+          <span className={words.place.worktree ? 'mono' : undefined}>{words.place.name}</span>
         </span>
       )}
       {words.project !== undefined && words.project !== '' && (

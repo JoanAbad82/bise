@@ -1,5 +1,5 @@
 // Bar O.6 (every control hovers): each control the composer draws has a hover in composer.css,
-// even where the ds part has none of its own (the send, the menu's rows). The harness check
+// even where the ds part has none of its own (the send). The harness check
 // composer/controls proves it on screen (hit at its center, a change under the pointer).
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,9 +12,13 @@ describe('composer controls hover (bar O.6)', () => {
   it.each([
     ['the mic', /\.keys \.mic:hover\s*\{[^}]*background:/],
     ['the send (on or stop, never off)', /\.send:not\(:disabled\):not\(\.off\):hover\s*\{[^}]*background:/],
-    ['a row of the @ $ / list (not the picked one)', /\.b-composer-pick \.b-mi:not\(\.on\):not\(\.dis\):hover\s*\{[^}]*background:/],
   ])('%s has a hover', (_, rule) => {
     expect(rules).toMatch(rule);
+  });
+
+  it('a row of the @ $ / list: the ds Picker tints the row under the pointer (its active row)', () => {
+    const picker = readFileSync(join(__dirname, '../ds/css/picker.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(picker).toMatch(/\.b-picker-row\.on\s*\{[^}]*background:/);
   });
 
   it("the mic's hover padding sits in a negative margin: the key line never moves", () => {

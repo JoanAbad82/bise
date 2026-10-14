@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { placeOf, placeWords, tabFit, wordCut } from './tab';
+import { folderName, tabFit, tabPlace, wordCut, worktreeName } from './tab';
 
 describe("the composer's tab (designer's composer-strip A)", () => {
   const w = { gap: 16, label: 60, branch: 80, project: 90, context: 120 };
@@ -15,15 +15,18 @@ describe("the composer's tab (designer's composer-strip A)", () => {
   it('an item that is not there takes no room and no gap', () => {
     expect(tabFit({ gap: 16, label: 60, branch: 80, project: 0, context: 120, avail: 60 + 80 + 120 + 2 * 16 })).toEqual({ branch: true, project: true, context: true });
   });
-  it("says where it works: its branch, 'shared folder' in his checkout, nothing for bise's own main", () => {
-    expect(placeWords('sb/perf')).toBe('sb/perf');
-    expect(placeWords('')).toBe('shared folder');
-    expect(placeOf({ branch: 'sb/perf' }, false)).toBe('sb/perf');
-    expect(placeOf({ branch: null }, false)).toBe('');
-    expect(placeOf({}, false)).toBe('');
-    expect(placeOf({ branch: 'x' }, true)).toBeUndefined();
-    expect(placeOf(undefined, false)).toBeUndefined();
+  it("says where it works by its folder's name: a worktree after the ψ, his checkout bare, nothing for bise's own main (his m_24782)", () => {
+    const t = (p: string) => p.replace('/Users/g', '~');
+    const wt = { path: '/Users/g/.bise/worktrees/harness-3abb2bd8/composer-strip/harness', tip: 'ψ worktree: its own copy of the repo, on sb/composer-strip · ~/.bise/worktrees/harness-3abb2bd8/composer-strip/harness' };
+    expect(tabPlace({ branch: 'sb/composer-strip' }, false, wt, '/Users/g/code/harness', t)).toEqual({ name: 'composer-strip', worktree: true, tip: wt.tip });
+    expect(tabPlace({ branch: null }, false, undefined, '/Users/g/lab/bend-lab/harness', t)).toEqual({ name: 'harness', worktree: false, tip: 'your own folder: ~/lab/bend-lab/harness' });
+    expect(tabPlace({ branch: 'sb/ui', worktree: '/Users/g/.bise/worktrees/h-1/ui/storefront' }, false, undefined, '/p', t)).toEqual({ name: 'ui', worktree: true, tip: 'ψ worktree: ~/.bise/worktrees/h-1/ui/storefront' });
+    expect(tabPlace({ branch: 'x' }, true, wt, '/p', t)).toBeUndefined();
+    expect(tabPlace(undefined, false, wt, '/p', t)).toBeUndefined();
+    expect(worktreeName('/w/x/repo')).toBe('repo');
+    expect(folderName('/a/b/harness/')).toBe('harness');
   });
+
 });
 
 describe("the tab's label cut (designer m_24325)", () => {

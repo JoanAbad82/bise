@@ -59,10 +59,10 @@ const world = (now: number) => {
       project: P,
       agents: [
         ag('main', { usage: usage('263k · 26%') }),
-        ag('perf', { status: 'working', since_ms: now - 40_000, turn_ms: 40_000, purpose: 'product page speed', branch: 'sb/perf', worktree: '/nowhere/wt/perf', usage: usage('42k · 17%') }),
-        ag('search', { purpose: 'size filter on search', waits: 1, branch: 'sb/search', usage: usage('58k · 23%') }),
+        ag('perf', { status: 'working', since_ms: now - 40_000, turn_ms: 40_000, purpose: 'product page speed', branch: 'sb/perf', worktree: '/nowhere/.bise/worktrees/storefront-1/perf/storefront', usage: usage('42k · 17%') }),
+        ag('search', { purpose: 'size filter on search', waits: 1, branch: 'sb/search', worktree: '/nowhere/.bise/worktrees/storefront-1/search/storefront', usage: usage('58k · 23%') }),
         ag('docs', { purpose: 'the readme', usage: usage('12k · 5%') }),
-        ag('ui', { purpose: 'the product card', branch: 'sb/ui', usage: usage('31k · 12%') }),
+        ag('ui', { purpose: 'the product card', branch: 'sb/ui', worktree: '/nowhere/.bise/worktrees/storefront-1/ui/storefront', usage: usage('31k · 12%') }),
       ],
     },
     { ev: 'thread', project: P, agent: 'perf', entries: long, before: null, more: false },
@@ -112,7 +112,7 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     // (2) the tab: 'to perf' + the gust, its branch, its context; never 'idle' or the model
     await expect(page.getByTestId('composer.tab.to')).toHaveText(/^to perf[ ·~∿≈]{5}$/u);
     await expect(page.locator('[data-testid="composer.tab.to"] [data-testid="thread.mark"]')).toHaveCount(1);
-    await expect(page.getByTestId('composer.tab.place')).toHaveText('ψsb/perf');
+    await expect(page.getByTestId('composer.tab.place')).toHaveText('ψperf');
     await expect(page.getByTestId('composer.tab.context')).toHaveText('context 42k · 17%');
     await expect(page.getByTestId('composer.tab.project'), 'the crumb names the project').toHaveCount(0);
     await expect(tab).not.toContainText(/idle|opus|yolo/u);
@@ -154,12 +154,42 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     // (1) no band: the bottom ::after draws nothing, the scroller's end is an opacity mask
     expect(g.after === 'none' || g.after === 'normal', 'no ::after band').toBe(true);
     expect(g.mask, 'an opacity mask at the bottom').toContain('linear-gradient');
-    expect(Math.round(g.gap), 'the thread ends 24 px above what sits under it (the tab, or the inbox block)').toBe(24);
+    // the thread settles at its end after its rows load (virtuoso): poll the gap, not one read
+    if (Math.round(g.gap) !== 24) {
+      await expect
+        .poll(
+          () =>
+            page.evaluate(() => {
+              const rows = document.querySelectorAll('.th-list [data-item-index]');
+              const lastEl = rows.length === 0 ? null : (rows.item(rows.length - 1).querySelector('.th-row') ?? rows.item(rows.length - 1));
+              const main = document.querySelector('.th-main');
+              let next = main?.nextElementSibling ?? null;
+              while (next !== null && next.getBoundingClientRect().height === 0) next = next.nextElementSibling;
+              const under = next?.matches('.b-composer') === true ? document.querySelector('[data-testid="composer.tab"]')?.getBoundingClientRect() : next?.getBoundingClientRect();
+              return under && lastEl ? Math.round(under.top - (lastEl.getBoundingClientRect().bottom - parseFloat(getComputedStyle(lastEl).paddingBottom))) : -1;
+            }),
+          { message: 'the thread ends 24 px above what sits under it (the tab, or the inbox block)', timeout: 5000 },
+        )
+        .toBe(24);
+    }
 
     // (4) the row: '+', the mode, the model + effort, send (stop while it works)
     await expect(page.getByTestId('composer.attach')).toHaveText('+');
-    await expect(page.getByTestId('composer.mode')).toHaveText('yolo ⌄');
-    await expect(page.getByTestId('composer.model')).toHaveText('opus 5.5 high ⌄');
+    await expect(page.getByTestId('composer.mode')).toHaveText('yolo');
+    await expect(page.getByTestId('composer.model')).toHaveText('opus 5.5 high');
+    await expect(page.getByTestId('composer.mode')).toHaveAttribute('data-tip', 'yolo: everything runs, nothing asks · ⇧⇥ switches');
+    await expect(page.getByTestId('composer.model')).toHaveAttribute('data-tip', 'opus 5.5 · Anthropic · effort high');
+    // the caret: an 8x5 chevron centered on the words' line, 8 px after them (designer m_24786)
+    for (const id of ['composer.mode', 'composer.model']) {
+      const c = await page.getByTestId(id).evaluate((el) => {
+        const w = (el.querySelector('.w') ?? el).getBoundingClientRect();
+        const v = (el.querySelector('svg.v') ?? el).getBoundingClientRect();
+        return { dy: Math.abs(v.top + v.height / 2 - (w.top + w.height / 2)), gap: v.left - w.right, vw: v.width, vh: v.height, h: el.getBoundingClientRect().height };
+      });
+      expect(c.dy, `${id}: the caret on the words' middle`).toBeLessThanOrEqual(1);
+      expect(Math.round(c.gap), `${id}: 8 px after the words`).toBe(8);
+      expect([c.vw, c.vh, c.h]).toEqual([8, 5, 28]);
+    }
     await expect(page.locator('[data-testid="composer.row"] [data-testid="composer.stop"]')).toHaveCount(1);
     // the mode menu opens above the box; approvals sends the hub's 'auto'
     await page.getByTestId('composer.mode').click();
@@ -168,15 +198,41 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
       const b = await box.boundingBox();
       expect(m && b ? m.y + m.height : 9999, `${id} opens above the box`).toBeLessThanOrEqual(b?.y ?? 0);
     };
+    // sized to its content, 240 to 420; never an x scroll (his m_24774)
+    const fitsMenu = async (id: string) => {
+      const f = await page.getByTestId(id).evaluate((el) => {
+        const list = el.querySelector('.b-picker-list') ?? el;
+        return { w: el.getBoundingClientRect().width, xs: list.scrollWidth - list.clientWidth, ox: getComputedStyle(list).overflowX };
+      });
+      expect(f.w, `${id} at least 240`).toBeGreaterThanOrEqual(240);
+      expect(f.w, `${id} at most 420`).toBeLessThanOrEqual(420);
+      expect(f.xs, `${id}: no x scroll`).toBeLessThanOrEqual(0);
+      expect(f.ox).toBe('hidden');
+    };
     await menuAbove('composer.mode.menu');
+    await fitsMenu('composer.mode.menu');
+    await expect(page.getByTestId('composer.mode.menu')).toContainText('mode⇧⇥');
+    await expect(page.getByTestId('composer.mode.yolo')).toHaveText('yoloeverything runs, nothing asks✓');
+    await expect(page.getByTestId('composer.mode.auto')).toHaveText('approvalssafe calls run, risky ones ask you');
+    // keys: the picker has the focus; ↓ walks, esc closes and gives the focus back to the chip
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByTestId('composer.mode.auto')).toHaveClass(/\bon\b/u);
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('composer.mode.menu')).toHaveCount(0);
+    await expect(page.getByTestId('composer.mode')).toBeFocused();
+    await page.getByTestId('composer.mode').click();
     await page.getByTestId('composer.mode.auto').click();
     expect(await core.waitCmd((c) => c.cmd === 'approvals', 3000)).toMatchObject({ project: P, mode: 'auto' });
     await expect(page.getByTestId('composer.mode.menu')).toHaveCount(0);
     await core.send({ ev: 'approvals', project: P, mode: 'auto', env: false, checker: 'off', checker_who: '', repo: '/nowhere/storefront', rules: [] } as never);
-    await expect(page.getByTestId('composer.mode')).toHaveText('approvals ⌄');
+    await expect(page.getByTestId('composer.mode')).toHaveText('approvals');
     // the model menu opens above; an effort sends it
     await page.getByTestId('composer.model').click();
     await menuAbove('composer.model.menu');
+    await fitsMenu('composer.model.menu');
+    await expect(page.getByTestId('composer.model.menu')).toContainText('Anthropic');
+    await expect(page.locator('[data-testid="composer.model.menu"] .b-picker-row[aria-checked="true"]')).toContainText('opus 5.5✓');
+    await expect(page.locator('[data-testid="composer.model.menu"] .b-picker-seg .it.on')).toHaveText('high');
     await page.getByTestId('composer.effort.max').click();
     expect(await core.waitCmd((c) => c.cmd === 'effort', 3000)).toMatchObject({ project: P, agent: 'perf', effort: 'max' });
     // esc closes a menu and leaves the field alone
@@ -204,12 +260,13 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     await go('ui');
     await page.getByTestId('composer.attach').click();
     await expect(page.locator('[data-testid="composer"] .b-attach-row')).toHaveCount(2);
-    await expect(page.getByTestId('composer.tab.place')).toHaveText('ψsb/ui');
+    await expect(page.getByTestId('composer.tab.place')).toHaveText('ψui');
 
     // shared folder
     await go('docs');
-    // ψ is a worktree's sign: his own checkout reads 'shared folder' alone (designer m_24325)
-    await expect(page.getByTestId('composer.tab.place')).toHaveText('shared folder');
+    // ψ is a worktree's sign: his own checkout reads its folder's name alone (his m_24782, designer m_24790)
+    await expect(page.getByTestId('composer.tab.place')).toHaveText('storefront');
+    await expect(page.getByTestId('composer.tab.place')).toHaveAttribute('data-tip', 'your own folder: /nowhere/storefront');
 
     // (3) answering: the accent tab, the way back on its right, '+' and send only
     await go('search');
@@ -279,6 +336,42 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
         }
       }
     }
+    // the four pickers (ds Picker, designer m_24793): mode, model, / and @, light + dark at 1100, one at 800
+    const menus = async (t: 'light' | 'dark', w: number) => {
+      await theme(t);
+      await size(1400, 900);
+      await go('perf');
+      await size(w, 900);
+      const field = page.getByTestId('composer.field');
+      await page.getByTestId('composer.mode').click();
+      await expect(page.getByTestId('composer.mode.menu')).toBeVisible();
+      await page.waitForTimeout(250); // past the picker's 120 ms fade-in
+      await shot(t, w, 'menu mode');
+      await page.keyboard.press('Escape');
+      await page.getByTestId('composer.model').click();
+      await expect(page.getByTestId('composer.model.menu')).toBeVisible();
+      await page.waitForTimeout(250); // past the picker's 120 ms fade-in
+      await shot(t, w, 'menu model');
+      await page.keyboard.press('Escape');
+      for (const [k, label] of [['/', 'menu slash'], ['@', 'menu at']] as const) {
+        await field.click();
+        await page.keyboard.press('Meta+A');
+        await page.keyboard.press('Backspace');
+        await page.keyboard.type(k);
+        await expect(page.getByTestId('composer.pick')).toBeVisible();
+        const xs = await page.getByTestId('composer.pick').evaluate((el) => { const l = el.querySelector('.b-picker-list') ?? el; return l.scrollWidth - l.clientWidth; });
+        expect(xs, `${label}: no x scroll`).toBeLessThanOrEqual(0);
+        await page.waitForTimeout(250); // past the picker's 120 ms fade-in
+        await shot(t, w, label);
+        await page.keyboard.press('Escape');
+      }
+      await field.click();
+      await page.keyboard.press('Meta+A');
+      await page.keyboard.press('Backspace');
+    };
+    await menus('light', 1100);
+    await menus('dark', 1100);
+    await menus('light', 800);
     await s.app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows().sort((a, b) => (b.getSize()[0] ?? 0) - (a.getSize()[0] ?? 0))[0];
       w?.setContentSize(2400, 1500);

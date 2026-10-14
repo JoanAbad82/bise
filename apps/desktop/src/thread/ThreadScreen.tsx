@@ -31,8 +31,7 @@ import { PauseLine } from './PauseLine';
 import { LabelMark } from './LabelMark';
 import { StepLine } from './live-step';
 import { composerWords, emptyEnter, nothingOwnYet, usageLine, workingRowShows } from './head';
-import { placeOf } from './tab';
-import { useTabWords } from './ComposerTab';
+import { useTabPlace, useTabWords } from './ComposerTab';
 import { SignInLine, useThreadSignIn } from './signin';
 import { type ThreadListHandle } from './ThreadList';
 import { ComputerLine } from './ComputerLine';
@@ -340,7 +339,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
   // names the project on a thread, so the tab never does; 'idle' and the model are gone from it
   // (the model is the box's menu, working is the gust)
   const addr = markAgent === agent ? me : addressee;
-  const tabPlace = placeOf(addr, bise);
+  const tabPlace = useTabPlace(project, addr, bise);
   const tabContext = usageLine(addr?.usage?.words);
   const tabLabel = voice === 'typing' ? typingLabelOf(agent) : answering !== null ? answering.label : artifact !== undefined ? artifact.to : composerWords(title).label;
   // one object while its words hold, so a new entry never draws the memoised composer again

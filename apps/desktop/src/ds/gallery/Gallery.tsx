@@ -9,7 +9,7 @@ import { Markdown } from "@/thread/Markdown";
 import "@/thread/thread.css";
 import {
   Act, Answered, Art, ArtName, Bar, BiseMark, Board, BriefLine, Button, Capsule, Card, CardLine, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Empty, Err,
-  Field, Fold, Group, Head, Help, IconButton, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Quote, Route, Row,
+  Field, Fold, Group, Head, Help, IconButton, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Picker, PickerSeg, Quote, Route, Row,
   SchedHead, SectionHead, Seg, Select, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
   Win, type Opt,
 } from "../index";
@@ -295,6 +295,22 @@ export const SECTIONS: Record<string, () => ReactNode> = {
         <MenuSep />
         <MenuItem danger>stop the agent</MenuItem>
       </Menu>
+      <Picker title="mode" titleKeys="⇧⇥" testId="ds.picker.mode" onPick={() => undefined} groups={[{ id: "m", rows: [
+        { id: "yolo", name: "yolo", secondary: "everything runs, nothing asks", current: true },
+        { id: "auto", name: "approvals", secondary: "safe calls run, risky ones ask you" },
+      ] }]} />
+      <Picker testId="ds.picker.model" active="sonnet" onPick={() => undefined}
+        groups={[
+          { id: "a", head: "Anthropic", rows: [{ id: "opus", name: "opus 5.5", current: true }, { id: "sonnet", name: "sonnet 5" }] },
+          { id: "f", head: "Anthropic (foundry proxy)", rows: [{ id: "fopus", name: "opus 5.5" }, { id: "off", name: "haiku 5", disabled: true, tip: "set it up first" }] },
+        ]}
+        footer={<PickerSeg head="effort" items={["low", "medium", "high", "max"]} on="high" onPick={() => undefined} />} />
+      <Picker testId="ds.picker.slash" active="review" onPick={() => undefined} groups={[{ id: "c", rows: [
+        { id: "review", glyph: "/", name: "review", secondary: "an agent reads the branch's changes and says what to fix" },
+        { id: "compact", glyph: "/", name: "compact", secondary: "summarize this thread to free its context" },
+        { id: "new", glyph: "/", name: "new", secondary: "start a task with its own agent", disabled: true },
+      ] }]} />
+      <Picker testId="ds.picker.empty" groups={[]} empty="no match" onPick={() => undefined} />
       <div className="g-col">
         <Toast dot="ok" action={{ text: "open" }}>flash-sale is done</Toast>
         <Toast err action={{ text: "retry" }}>the send failed: the core is offline</Toast>

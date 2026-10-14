@@ -30,7 +30,8 @@ test('composer/at-files: a picked path ranks first in its tier next time', async
   await onTarget(async ({ page }) => {
     const field = page.locator(T.field);
     const picker = page.locator(T.picker);
-    const paths = async (): Promise<string[]> => (await picker.locator(T.pickerRow).allInnerTexts()).map((r) => r.split('\n')[0]?.trim() ?? '').filter((r) => r.includes('/') || /\.[a-z]+$/i.test(r));
+    // a row shows the file's name and its folder apart (ds Picker, designer m_24793): its tip has the whole path
+    const paths = async (): Promise<string[]> => (await picker.locator(T.pickerRow).evaluateAll((els) => els.map((e) => e.getAttribute('data-tip') ?? ''))).filter((r) => !r.includes(' · ') && (r.includes('/') || /\.[a-z]+$/i.test(r)));
     await field.click();
     await page.keyboard.type('@src/');
     await expect(picker).toBeVisible({ timeout: 1500 });

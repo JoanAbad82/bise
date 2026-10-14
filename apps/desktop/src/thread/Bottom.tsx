@@ -12,7 +12,7 @@ import { useAgents, useProjects, useStore } from '@/store';
 import { MAIN } from '@/app/route';
 import { answerOf, HERE_BISE, ThreadComposer } from './ThreadComposer';
 import { composerWords, usageLine } from './head';
-import { placeOf } from './tab';
+import { useTabPlace } from './ComposerTab';
 import { useRoute } from '@/app/router';
 import { crumbOf } from '@/app/side';
 
@@ -28,11 +28,12 @@ export function BottomBlock({ project, agent }: { project: string; agent: string
   const words = composerWords(name);
   // the tab (designer's composer-strip A): the project only where this screen's crumb doesn't name it
   const route = useRoute();
+  const place = useTabPlace(project, me, row?.home === true);
   const project_ = row === undefined || row.home ? undefined : row.name;
   const crumbHas = project_ !== undefined && crumbOf(route, () => project_).includes(project_);
   const tab = {
     label: answering?.label ?? words.label,
-    branch: placeOf(me, row?.home === true),
+    place,
     project: crumbHas ? undefined : project_,
     context: usageLine(me?.usage?.words),
   };
