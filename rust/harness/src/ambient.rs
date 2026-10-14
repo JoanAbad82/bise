@@ -277,12 +277,19 @@ fn ambient_setup() -> bend_tui::ambient::setup::SetupPorts {
         switchboard::flow::save_mode(&switchboard::paths::Paths::for_workspace(path), mode)
     }));
     // bar S.6: the desktop app's update check reads its own channel
-    // (desktop.json), never bise update's
-    p.manifest = Box::new(|tx| {
+    // (desktop.json, stable or beta), never bise update's
+    p.manifest = Box::new(|channel, tx| {
         std::thread::spawn(move || {
-            let (text, base, target) = crate::update::desktop_manifest();
+            let (text, base, target) = crate::update::desktop_manifest(channel);
             let _ = tx.send(bend_tui::ambient::setup::Done::Manifest { text, base, target });
         });
+    });
+    // a hub newer than the app's runtime (architect m_25198): this core's
+    // build, from its app root found the one way (approot::locate)
+    p.own_built = Box::new(|| {
+        crate::approot::locate("repl-live")
+            .map(|(r, _)| bise_home::release::read_version(&r).get("built").cloned().unwrap_or_default())
+            .unwrap_or_default()
     });
     p
 }

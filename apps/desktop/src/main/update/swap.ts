@@ -25,12 +25,12 @@ export async function swapIn(
   target: string,
   staged: string,
   recFile: string,
-  versions: { readonly from: string; readonly to: string },
+  versions: { readonly from: string; readonly to: string; readonly quiet?: boolean },
   after: (step: SwapStep) => void = () => undefined,
 ): Promise<void> {
   const old = `${target}.old`;
   await rm(old, { recursive: true, force: true });
-  const rec: SwapRecord = { phase: 'staged', old_path: old, from_version: versions.from, to_version: versions.to, attempts: 0, ok: false };
+  const rec: SwapRecord = { phase: 'staged', old_path: old, from_version: versions.from, to_version: versions.to, attempts: 0, ok: false, ...(versions.quiet === true ? { quiet: true } : {}) };
   await writeRecord(recFile, rec);
   after('record');
   await rename(target, old);

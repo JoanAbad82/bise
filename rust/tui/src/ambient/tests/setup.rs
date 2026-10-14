@@ -36,6 +36,8 @@ struct World {
     /// S.6: the release channel's reads (the channel of the last one)
     manifest_reads: usize,
     manifest: Option<std::sync::mpsc::Sender<Done>>,
+    /// the channel each read asked for (stable or beta, from his prefs)
+    channels: Vec<bise_home::release::DesktopChannel>,
     /// N1: where the fake keeps the secrets ('file' at start), the moves asked (true: to the
     /// keychain) and the running move's channel, to end it from the test
     keychain: Option<String>,
@@ -173,9 +175,11 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             y.borrow_mut().role_sets.push((role.into(), model.map(String::from), effort.map(String::from)));
             Ok(())
         }),
-        manifest: Box::new(move |tx| {
+        own_built: Box::new(String::new),
+        manifest: Box::new(move |channel, tx| {
             let mut w = mf.borrow_mut();
             w.manifest_reads += 1;
+            w.channels.push(channel);
             w.manifest = Some(tx);
         }),
         keychain: KeychainPort {
@@ -584,6 +588,29 @@ fn app_version_reads_the_channel_and_a_newer_app_is_said_once_per_asking() {
     t.until(|o| !evs(o, "commands").is_empty());
     assert!(evs(&t.take(), "app_update").is_empty());
     assert_eq!(w.borrow().manifest_reads, 4);
+    assert!(w.borrow().channels.iter().all(|c| *c == bise_home::release::DesktopChannel::Stable), "no pref: stable");
+}
+
+/// desktop-dist v7 (his pick: stable + beta): the channel is his pref,
+/// read at each check; turning beta on reads the channel at once (no
+/// waiting for the next hour), on beta's own tag.
+#[test]
+fn turning_beta_on_reads_the_beta_channel_at_once() {
+    use bise_home::release::DesktopChannel;
+    let mut t = T::new();
+    let w = setup(&mut t);
+    app(&mut t, r#"{"cmd":"app_version","id":"d25","built":"2026-10-07T10:00:00Z"}"#);
+    assert_eq!(w.borrow().channels, [DesktopChannel::Stable]);
+    let tx = w.borrow().manifest.clone().unwrap();
+    tx.send(Done::Manifest { text: Err("offline".into()), base: "file:///feed".into(), target: "darwin-arm64".into() }).unwrap();
+    t.until(|_| true);
+    app(&mut t, r#"{"cmd":"prefs_set","key":"desktop_channel","value":"beta"}"#);
+    t.until(|o| !evs(o, "prefs").is_empty());
+    assert_eq!(w.borrow().channels, [DesktopChannel::Stable, DesktopChannel::Beta], "read again at once, on beta");
+    // another pref: no read
+    app(&mut t, r#"{"cmd":"prefs_set","key":"theme","value":"dark"}"#);
+    t.until(|o| !evs(o, "prefs").is_empty());
+    assert_eq!(w.borrow().manifest_reads, 2);
 }
 
 /// N1: the fake move ends: where the secrets are now, and its lines.

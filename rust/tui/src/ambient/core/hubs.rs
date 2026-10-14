@@ -686,9 +686,12 @@ impl Core {
         // voice mode hears its agent's turn and messages
         let for_voice = (self.voice_on.is_some() && matches!(typed, HubEv::Agents { .. } | HubEv::Entry { .. })).then(|| typed.clone());
         match typed {
-            HubEv::Welcome { cmds, .. } => {
+            HubEv::Welcome { cmds, built, .. } => {
                 c.welcomed = true;
                 c.cmds = cmds;
+                // a hub newer than this app's own runtime: the app's update channel, now
+                self.hub_built(built.as_deref());
+                let Some(c) = self.hubs.conns.get_mut(id) else { return };
                 let voice = self.hubs.voice.as_ref().filter(|(p, _)| p == id).map(|(_, a)| a);
                 let subs = self.hubs.subs.get(id);
                 let agents: Vec<String> = subs.into_iter().flatten().chain(voice.filter(|a| !subs.is_some_and(|s| s.contains(*a)))).cloned().collect();

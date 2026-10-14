@@ -5,7 +5,7 @@
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
-import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type AppSwapResult, type AppUpdate, type BiseApi, type CrashReport, type CapsuleState, type MenuAction, type NotifyAuth, type Surface, type TermOpened, type UpdateState } from '../shared/api';
+import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type AppSwapResult, type AppUpdate, type BiseApi, type CrashReport, type CapsuleState, type MenuAction, type NotifyAuth, type Surface, type TermOpened, type UpdateInfo, type UpdateState } from '../shared/api';
 import { argValue } from './args';
 import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
 import { coreBridge } from './core/bridge';
@@ -67,6 +67,16 @@ const api: BiseApi = {
     onState: (listener) => listen(IPC.updateState, listener),
     install: async (route) => (await ipcRenderer.invoke(IPC.updateInstall, route)) === true,
     revert: async () => (await ipcRenderer.invoke(IPC.updateRevert)) === true,
+    info: () => ipcRenderer.invoke(IPC.updateInfo) as Promise<UpdateInfo>,
+    onAsk: (answer) => {
+      const h = (_e: unknown, id: unknown): void => {
+        ipcRenderer.send(IPC.updateAnswer, id, answer());
+      };
+      ipcRenderer.on(IPC.updateAsk, h);
+      return () => {
+        ipcRenderer.removeListener(IPC.updateAsk, h);
+      };
+    },
   },
   app: {
     update: () => ipcRenderer.invoke(IPC.appUpdate) as Promise<AppUpdate>,

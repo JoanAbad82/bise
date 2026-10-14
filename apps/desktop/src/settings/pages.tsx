@@ -11,7 +11,8 @@ import { Roles } from './roles';
 import { Approvals } from './approvals';
 import { modelRow, needsSetup } from './hold';
 import { Projects } from './projects';
-import { UpdateGroup } from './update';
+import { UpdateGroup, updateRow } from './update';
+import { DistUpdateGroup } from './appupdate';
 import { Plugins } from './plugins';
 import { Computer } from './computer';
 import { checks, SetupCheck } from './check';
@@ -116,7 +117,20 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
             ...notifyItems(data.notify ?? null, ports.notify),
           ]}
         />
-        <UpdateGroup update={data.appUpdate ?? null} ports={ports.update} />
+        {updateRow(data.appUpdate ?? null, null) !== null || !data.dist ? (
+          <UpdateGroup update={data.appUpdate ?? null} ports={ports.update} />
+        ) : (
+          <DistUpdateGroup
+            state={data.dist.state}
+            info={data.dist.info}
+            now={data.dist.readAt}
+            beta={str(prefs, 'desktop_channel', 'stable') === 'beta'}
+            setBeta={(on) => {
+              setPref('desktop_channel', on ? 'beta' : 'stable');
+            }}
+            ports={ports.dist}
+          />
+        )}
         </>
       );
     }

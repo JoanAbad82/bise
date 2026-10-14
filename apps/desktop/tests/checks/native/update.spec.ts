@@ -27,7 +27,8 @@ const UPDATE = 'bise-desktop: update';
 const RELAUNCH = 'bise-desktop: relaunch';
 
 type State = { state: string; version?: string; why?: string };
-const states = (out: Lines): State[] => out.of(UPDATE).map((l) => JSON.parse(l) as State);
+// the state lines only ('bise-desktop: update moment …' and '… update at quit …' share the prefix)
+const states = (out: Lines): State[] => out.of(UPDATE).filter((l) => l.startsWith('{')).map((l) => JSON.parse(l) as State);
 
 /** One launch on the world's home with the feed's env and a userData of the test's own (kept across launches). */
 async function launch(w: World, env: Record<string, string>, userData: string): Promise<{ s: Session; out: Lines }> {
@@ -115,7 +116,7 @@ test('setup/update (S.6, real core) good: offered, ready, nothing by itself; his
     expect(JSON.parse(readFileSync(path.join(updates, 'swap.json'), 'utf8')), 'swap.json records the swap, naming its .old').toMatchObject({
       phase: 'swapped', old_path: `${f.target}.old`, to_version: OFFERED.version, attempts: 0, ok: false,
     });
-    expect(JSON.parse(readFileSync(path.join(updates, 'route.json'), 'utf8')), 'route.json holds his screen').toEqual({ route: 'settings' });
+    expect(JSON.parse(readFileSync(path.join(updates, 'route.json'), 'utf8')), 'route.json holds his screen').toEqual({ route: 'settings', quiet: false, shown: true });
     expect(states(out).filter((x) => x.state === 'failed'), 'no failure on the way').toEqual([]);
   } finally {
     await first.s.close();

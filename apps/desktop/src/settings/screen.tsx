@@ -9,7 +9,7 @@ import { holdForSetup, useHeld } from './hold';
 import { useHeldSetup } from './setup-first';
 import { useRouter } from '@/app/router';
 import { formatRoute } from '@/app/route';
-import type { AppUpdate } from '@/shared/api';
+import type { AppUpdate, UpdateInfo, UpdateState } from '@/shared/api';
 import { useHelper } from '@/setup/helper';
 import { useNotifyAuth } from '@/inbox';
 import { Settings } from './Settings';
@@ -53,6 +53,41 @@ export function useAppUpdate(on: boolean): readonly [AppUpdate | null, () => voi
     setAsks((n) => n + 1);
   }, []);
   return [on ? u : null, refresh] as const;
+}
+
+/**
+ * A distributed app's own update (window.bise.update) while the general page shows: its state as
+ * it changes, its version and last quiet install read when the page opens. null: no updater (a dev
+ * run, a component test).
+ */
+export function useDistUpdate(on: boolean): { readonly state: UpdateState; readonly info: UpdateInfo; readonly readAt: number } | null {
+  const [state, setState] = useState<UpdateState>({ state: 'none' });
+  const [info, setInfo] = useState<{ i: UpdateInfo; at: number } | null>(null);
+  useEffect(() => {
+    const u = (window.bise as typeof window.bise | undefined)?.update;
+    if (!on || u === undefined) return undefined;
+    let live = true;
+    const off = u.onState((s) => {
+      setState(s);
+      void u.info().then((i) => {
+        if (live) setInfo({ i, at: Date.now() });
+      });
+    });
+    void u.now().then((s) => {
+      if (live) setState(s);
+    });
+    void u.info().then(
+      (i) => {
+        if (live) setInfo({ i, at: Date.now() });
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+      off();
+    };
+  }, [on]);
+  return on && info !== null && info.i.version !== null ? { state, info: info.i, readAt: info.at } : null;
 }
 
 /**
@@ -147,6 +182,9 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
   const notifyApi = bise?.notify;
   // his try app against the newest promoted build (amb-mac's window.bise.app): the general page's update group
   const [appUpdate, refreshUpdate] = useAppUpdate(page === undefined || pageOf(page).id === 'general');
+  // a distributed app's own update (window.bise.update): the same group's other shape
+  const dist = useDistUpdate(page === undefined || pageOf(page).id === 'general');
+  const updateApi = bise?.update;
   const appApi = bise?.app;
   return (
     <Settings
@@ -169,7 +207,18 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
       signin={{ waiting, signing }}
       notify={notify}
       appUpdate={appUpdate}
+      dist={dist}
       ports={{
+        ...(updateApi
+          ? {
+              dist: {
+                // back on this page once the new app opens
+                install: () => void updateApi.install(formatRoute({ screen: 'settings', page: 'general' })),
+                revert: () => void updateApi.revert(),
+                open: (url: string) => void bise.openExternal(url),
+              },
+            }
+          : {}),
         ...(appApi
           ? {
               update: {

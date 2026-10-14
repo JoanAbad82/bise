@@ -712,8 +712,7 @@ pub fn should_follow_install(me: &Path, hub: &Path, failed: Option<&Path>) -> bo
         _ => return false,
     }
     let built = |r: &Path| read_version(r).get("built").cloned().unwrap_or_default();
-    let (b_me, b_hub) = (built(&me), built(&hub));
-    !b_me.is_empty() && b_me > b_hub
+    bise_home::release::built_after(&built(&me), &built(&hub))
 }
 
 /// Before a `bise` TUI attaches to the hub of its workspace (BISE-255):

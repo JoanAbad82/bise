@@ -459,6 +459,10 @@ fn the_window_sets_known_prefs_by_dotted_key_and_keeps_their_types() {
     assert_eq!(prefs::set_dotted(&json!({"voice": "old"}), "voice.fn_hold", json!(true)).unwrap()["voice"], json!({"fn_hold": true}));
     assert_eq!(prefs::set_dotted(&o, "quiet.call", Value::Null).unwrap()["quiet"], json!({"batch_min": 20}), "null takes it out");
     assert!(prefs::set_dotted(&o, "hints", json!({})).is_err(), "never hints whole");
+    // the desktop app's update channel: stable or beta, nothing else
+    assert_eq!(prefs::set_dotted(&o, "desktop_channel", json!("beta")).unwrap()["desktop_channel"], json!("beta"));
+    assert!(prefs::set_dotted(&o, "desktop_channel", json!("nightly")).is_err());
+    assert!(prefs::set_dotted(&o, "desktop_channel.x", json!(true)).is_err());
     // S36: a one-time hint marked seen, the TUI's key in the same object
     let h = prefs::set_dotted(&json!({"hints": {"first_agent": true}}), "hints.first_card", json!(true)).unwrap();
     assert_eq!(h["hints"], json!({"first_agent": true, "first_card": true}));

@@ -260,6 +260,7 @@ impl Core {
                 let res = bise_home::prefs::set_dotted(&now, &key, value).and_then(|v| (p.write_prefs)(&v));
                 if res.is_ok() {
                     self.emit_prefs();
+                    self.update_pref_set(&key);
                 }
                 ("prefs_set", res)
             }

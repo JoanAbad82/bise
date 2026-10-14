@@ -177,7 +177,8 @@ impl RpcConn {
         self.wm = res.hub.watermark;
         self.pages_url = res.pages_url.clone();
         let cmds: Vec<String> = res.methods.iter().filter_map(|m| rpc::method_row(m)).map(|r| r.cmd.to_string()).collect();
-        let welcome = HubEv::Welcome { project: res.project, proto: res.proto, workspace: res.workspace, name: res.name, cmds };
+        let built = res.version.get("built").and_then(Value::as_str).map(str::trim).filter(|b| !b.is_empty()).map(String::from);
+        let welcome = HubEv::Welcome { project: res.project, proto: res.proto, workspace: res.workspace, name: res.name, cmds, built };
         Read::Welcome(welcome, state(&res.hub))
     }
 

@@ -62,6 +62,11 @@ export class DictationRoutes {
     return window === undefined ? { to: 'none' } : { to: 'window', window, ev };
   }
 
+  /** A dictation or voice mode holds the mic now (the app's update waits: update/moment.ts). */
+  holding(): boolean {
+    return this.owners.size > 0 || this.voice !== null;
+  }
+
   /** A window is gone: the `dictate_cancel` commands for its dictations. */
   gone(window: number): Ev[] {
     const cmds: Ev[] = [];

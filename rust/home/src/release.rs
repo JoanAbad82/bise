@@ -271,10 +271,38 @@ pub fn is_update(release: &Release, current_id: &str, current_built: Option<&str
 /// release is never GitHub's 'latest' (that is [`DIST_URL`], every
 /// terminal's `bise update`), and `latest.json` never names the app.
 pub const DESKTOP_DIST_URL: &str = "https://github.com/gvergnaud/bise/releases/download/desktop-latest";
+/// The desktop's beta channel (desktop-dist v7, his pick: stable + beta):
+/// the rolling `desktop-beta` tag. Every build goes there first and
+/// `promote` moves `desktop-latest` to the same build (dist-ci m_25179),
+/// so beta is always the same as stable or newer: a beta app reads this
+/// one alone.
+pub const DESKTOP_BETA_DIST_URL: &str = "https://github.com/gvergnaud/bise/releases/download/desktop-beta";
 /// Overrides the desktop channel (tests). Never under `BISE_DESKTOP_`: the
 /// app keeps those names for itself and never hands one to the core
 /// (apps/desktop/src/main/childenv.ts), which is who reads this one.
 pub const DESKTOP_DIST_URL_ENV: &str = "BISE_DIST_URL_DESKTOP";
+/// Overrides the desktop's beta channel (tests), as [`DESKTOP_DIST_URL_ENV`].
+pub const DESKTOP_BETA_DIST_URL_ENV: &str = "BISE_DIST_URL_DESKTOP_BETA";
+
+/// The desktop channel he follows (prefs.json `desktop_channel`, Settings ›
+/// General's beta toggle): stable unless he said beta.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DesktopChannel {
+    #[default]
+    Stable,
+    Beta,
+}
+
+impl DesktopChannel {
+    /// prefs.json's word: `beta` is beta, anything else (none, junk) stable.
+    pub fn from_pref(v: Option<&str>) -> DesktopChannel {
+        if v == Some("beta") {
+            DesktopChannel::Beta
+        } else {
+            DesktopChannel::Stable
+        }
+    }
+}
 /// The desktop manifest's name at its channel's base URL.
 pub const DESKTOP_MANIFEST: &str = "desktop.json";
 
@@ -298,12 +326,19 @@ pub struct DesktopRelease {
 }
 
 /// `desktop.json`'s build for `target`. Err: one line (not a desktop
-/// manifest, no build for this Mac, or a field missing). A terminal
-/// `latest.json` is refused: it has no `kind: "desktop"`.
+/// manifest, the channel paused, no build for this Mac, or a field
+/// missing). A terminal `latest.json` is refused: it has no `kind:
+/// "desktop"`. `paused: true` (set while a release is looked at) offers
+/// nothing, whatever its targets say. Other keys (`channel`, `pub_date`,
+/// `notes_url`, a target's `size`, `dmg`, `min_macos`: the site's and
+/// the CI's) are not read here.
 pub fn parse_desktop(text: &str, target: &str) -> Result<DesktopRelease, String> {
     let v: Value = serde_json::from_str(text).map_err(|e| format!("{} is not valid JSON: {}", DESKTOP_MANIFEST, e))?;
     if v.get("kind").and_then(Value::as_str) != Some("desktop") {
         return Err(format!("{} is not the desktop app's manifest (no kind: desktop)", DESKTOP_MANIFEST));
+    }
+    if v.get("paused").and_then(Value::as_bool) == Some(true) {
+        return Err("the desktop channel is paused".into());
     }
     let t = v
         .pointer(&format!("/targets/{}", target))
@@ -326,13 +361,25 @@ pub fn parse_desktop(text: &str, target: &str) -> Result<DesktopRelease, String>
     })
 }
 
-/// The desktop channel: `BISE_DIST_URL_DESKTOP`, else [`DESKTOP_DIST_URL`]
-/// (never the terminal's channel, nor an install's recorded one).
-pub fn desktop_dist_url(env: crate::Lookup) -> String {
-    env(DESKTOP_DIST_URL_ENV)
-        .map(|u| u.trim().trim_end_matches('/').to_string())
-        .filter(|u| !u.is_empty())
-        .unwrap_or_else(|| DESKTOP_DIST_URL.to_string())
+/// The desktop channel's base URL: stable `BISE_DIST_URL_DESKTOP`, else
+/// [`DESKTOP_DIST_URL`]; beta `BISE_DIST_URL_DESKTOP_BETA`, else
+/// [`DESKTOP_BETA_DIST_URL`] (never the terminal's channel, nor an
+/// install's recorded one).
+pub fn desktop_dist_url(env: crate::Lookup, channel: DesktopChannel) -> String {
+    let (var, default) = match channel {
+        DesktopChannel::Stable => (DESKTOP_DIST_URL_ENV, DESKTOP_DIST_URL),
+        DesktopChannel::Beta => (DESKTOP_BETA_DIST_URL_ENV, DESKTOP_BETA_DIST_URL),
+    };
+    env(var).map(|u| u.trim().trim_end_matches('/').to_string()).filter(|u| !u.is_empty()).unwrap_or_else(|| default.to_string())
+}
+
+/// Whether a build made at `a` (VERSION `built=`) is later than one made
+/// at `b`: the one ordering of two builds of bise, for an install's hub
+/// moving to the launched bise (switchboard's should_follow_install) and
+/// for a hub newer than the desktop app's own runtime. An unknown `a` (a
+/// dev build) is never later; an unknown `b` is older than any.
+pub fn built_after(a: &str, b: &str) -> bool {
+    !a.is_empty() && a > b
 }
 
 /// Whether the desktop `release` replaces the running app (`current_id`,
@@ -694,12 +741,53 @@ mod tests {
         assert_eq!((r.id.as_str(), r.url.as_str()), ("top", "b.tar.gz"), "bise update: the tarball, never the app");
         // the channels: the desktop's own, never the terminal's
         let none = |_: &str| None;
-        assert_eq!(desktop_dist_url(&none), DESKTOP_DIST_URL);
+        assert_eq!(desktop_dist_url(&none, DesktopChannel::Stable), DESKTOP_DIST_URL);
         assert!(!DESKTOP_DIST_URL.contains("/latest/"), "a desktop release is never GitHub's latest");
         let term = |k: &str| (k == DIST_URL_ENV).then(|| "https://x".to_string());
-        assert_eq!(desktop_dist_url(&term), DESKTOP_DIST_URL);
+        assert_eq!(desktop_dist_url(&term, DesktopChannel::Stable), DESKTOP_DIST_URL);
         let ours = |k: &str| (k == DESKTOP_DIST_URL_ENV).then(|| "file:///d/ ".to_string());
-        assert_eq!(desktop_dist_url(&ours), "file:///d");
+        assert_eq!(desktop_dist_url(&ours, DesktopChannel::Stable), "file:///d");
+    }
+
+    /// Stable and beta are two rolling tags, each with its own test
+    /// override; the pref's word picks one, anything but `beta` is stable.
+    #[test]
+    fn beta_reads_its_own_tag_and_only_beta_is_beta() {
+        let none = |_: &str| None;
+        assert_eq!(desktop_dist_url(&none, DesktopChannel::Beta), DESKTOP_BETA_DIST_URL);
+        assert!(DESKTOP_BETA_DIST_URL.ends_with("/download/desktop-beta"));
+        let both = |k: &str| match k {
+            DESKTOP_DIST_URL_ENV => Some("file:///s".to_string()),
+            DESKTOP_BETA_DIST_URL_ENV => Some("file:///b/".to_string()),
+            _ => None,
+        };
+        assert_eq!(desktop_dist_url(&both, DesktopChannel::Stable), "file:///s");
+        assert_eq!(desktop_dist_url(&both, DesktopChannel::Beta), "file:///b");
+        assert_eq!(DesktopChannel::from_pref(Some("beta")), DesktopChannel::Beta);
+        for w in [None, Some("stable"), Some("Beta"), Some("")] {
+            assert_eq!(DesktopChannel::from_pref(w), DesktopChannel::Stable, "{w:?}");
+        }
+    }
+
+    /// `paused: true` offers nothing, whatever its targets; the CI's and
+    /// the site's extra keys are ignored.
+    #[test]
+    fn a_paused_channel_offers_nothing_and_extra_keys_are_ignored() {
+        let entry = format!(
+            r#"{{"darwin-arm64":{{"id":"d26","url":"a.zip","sha256":"{SHA}","built":"2026-10-08T10:00:00Z","size":1,"min_macos":"13.0","dmg":{{"url":"a.dmg","sha256":"{SHA}","size":2}}}}}}"#
+        );
+        let with = |extra: &str| format!(r#"{{"kind":"desktop","channel":"beta","pub_date":"x","notes_url":"y",{extra}"version":"v","targets":{entry}}}"#);
+        assert_eq!(parse_desktop(&with(r#""paused":true,"#), "darwin-arm64").unwrap_err(), "the desktop channel is paused");
+        assert_eq!(parse_desktop(&with(r#""paused":false,"#), "darwin-arm64").unwrap().id, "d26");
+        assert_eq!(parse_desktop(&with(""), "darwin-arm64").unwrap().id, "d26");
+    }
+
+    #[test]
+    fn a_build_is_after_another_only_when_its_time_is_known_and_later() {
+        assert!(built_after("2026-10-08T10:00:00Z", "2026-10-07T10:00:00Z"));
+        assert!(built_after("2026-10-08T10:00:00Z", ""), "an unknown other is older");
+        assert!(!built_after("", "2026-10-07T10:00:00Z"), "a dev build is never later");
+        assert!(!built_after("2026-10-07T10:00:00Z", "2026-10-07T10:00:00Z"));
     }
 
     #[test]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bundleOf, designated, leftovers, localFeed, readSwap, readVersion, startup, zipName } from './plan';
+import { bundleOf, cantSwapAt, designated, developerId, leftovers, localFeed, readAfter, readSwap, readVersion, signerChange, startup, zipName } from './plan';
 
 describe('readVersion (the app bundle VERSION)', () => {
   it('reads id and built; a dev build has no built; no id is no build', () => {
@@ -71,5 +71,42 @@ describe('files and feeds', () => {
   it('a version is a safe file name', () => {
     expect(zipName('2026.10.2-26')).toBe('bise-2026.10.2-26.zip');
     expect(zipName('../x y')).toBe('bise-.._x_y.zip');
+  });
+});
+
+describe('the signature rule (architect m_25198 Q2: the running signature decides)', () => {
+  const SELF = 'identifier "dev.bise.desktop" and certificate leaf = H"0123456789abcdef0123456789abcdef01234567"';
+  const DEVID = 'identifier "dev.bise.desktop" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = "ABCDE12345"';
+  const ADHOC = 'cdhash H"89abcdef0123456789abcdef0123456789abcdef"';
+  it('a Developer ID requirement asks Gatekeeper too; a self-signed or ad-hoc one only codesign', () => {
+    expect(developerId(DEVID)).toBe(true);
+    expect(developerId(SELF)).toBe(false);
+    expect(developerId(ADHOC)).toBe(false);
+  });
+  it('a self-signed app meeting its first Developer ID build is refused with its own reason; any other pair goes to codesign', () => {
+    expect(signerChange(SELF, DEVID)).toBe('new_signer');
+    expect(signerChange(ADHOC, DEVID)).toBe('new_signer');
+    expect(signerChange(DEVID, DEVID)).toBeNull();
+    expect(signerChange(SELF, SELF)).toBeNull();
+    expect(signerChange(SELF, null)).toBeNull();
+    expect(signerChange(DEVID, SELF)).toBeNull();
+  });
+});
+
+describe('cantSwapAt (Q3: said now, moved later)', () => {
+  it('a disk image or a translocated copy cannot replace itself; Applications or a home folder can', () => {
+    expect(cantSwapAt('/Volumes/bise/bise.app')).toBe('disk_image');
+    expect(cantSwapAt('/private/var/folders/xy/T/AppTranslocation/1234-ABCD/d/bise.app')).toBe('translocated');
+    expect(cantSwapAt('/Applications/bise.app')).toBeNull();
+    expect(cantSwapAt('/Users/g/Applications/bise.app')).toBeNull();
+  });
+});
+
+describe('readAfter (route.json)', () => {
+  it("a click's: the route, in front; a quiet moment's: the route and whether its window was shown", () => {
+    expect(readAfter('{"route":"settings"}')).toEqual({ route: 'settings', quiet: false, shown: true });
+    expect(readAfter('{"route":"inbox","quiet":true,"shown":false}')).toEqual({ route: 'inbox', quiet: true, shown: false });
+    expect(readAfter('{"quiet":true}')).toEqual({ quiet: true, shown: true });
+    expect(readAfter('nope')).toBeNull();
   });
 });

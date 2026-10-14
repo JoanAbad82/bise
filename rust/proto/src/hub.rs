@@ -56,6 +56,13 @@ pub enum HubEv {
         /// the core then compares `proto` with its own.
         #[serde(default)]
         cmds: Vec<String>,
+        /// when this hub's bise was built (its VERSION `built=`, from
+        /// `initialize`'s version); none: a dev build or an older hub. The
+        /// core compares it with its own (bise_home::release::built_after):
+        /// a hub newer than the app reads the app's update channel at once
+        /// (desktop-dist, architect m_25198)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        built: Option<String>,
     },
     /// every agent of the hub, on change; `places` (P4c-4a, none from an
     /// older hub): the project's worktrees as the terminal's panel draws

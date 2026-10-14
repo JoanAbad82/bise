@@ -141,6 +141,7 @@ pub const VARS: &[Var] = &[
     user("BISE_DEV", "/log outside the dev build"),
     user("BISE_DIST_URL", "the release channel's download URL"),
     test("BISE_DIST_URL_DESKTOP", "the desktop app's release channel, where its desktop.json is (tests; the core reads it, so never a BISE_DESKTOP_ name: the app keeps those)"),
+    test("BISE_DIST_URL_DESKTOP_BETA", "the desktop app's beta channel, where its desktop.json is (tests; as BISE_DIST_URL_DESKTOP)"),
     user("BISE_EDITOR", "the editor a file link opens"),
     internal("BISE_EXPORTS_FOR", "the stamp of the exported Home paths"),
     test("BISE_GITHUB_API", "the GitHub API base (tests: a stub server)"),

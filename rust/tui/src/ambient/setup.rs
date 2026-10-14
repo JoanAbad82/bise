@@ -39,9 +39,9 @@ pub enum Done {
     CuCheck(Value),
     /// a computer-use fix went wrong later (its line)
     CuSaid(String),
-    /// bise's release channel read (bar S.6, core/app_update.rs): its
-    /// `latest.json` (Err: why not), the channel's base URL, this Mac's
-    /// target
+    /// the desktop app's release channel read (bar S.6,
+    /// core/app_update.rs): its `desktop.json` (Err: why not), the
+    /// channel's base URL, this Mac's target
     Manifest { text: Result<String, String>, base: String, target: String },
     /// N1: a /keychain move ended: its lines (item names and counts,
     /// never a secret) and whether it failed
@@ -71,8 +71,9 @@ pub type IdFn = Box<dyn Fn(&str) -> Result<(), String>>;
 pub type KeySetFn = Box<dyn Fn(&str, &str) -> Result<(), String>>;
 pub type SignInFn = Box<dyn Fn(&str, Sender<Done>) -> Result<(), String>>;
 pub type PathFn = Box<dyn Fn(&Path) -> Result<(), String>>;
-/// Reads bise's release channel on its own thread, `Done::Manifest` at its end.
-pub type ManifestFn = Box<dyn Fn(Sender<Done>)>;
+/// Reads the desktop app's release channel he follows (stable or beta) on
+/// its own thread, `Done::Manifest` at its end.
+pub type ManifestFn = Box<dyn Fn(bise_home::release::DesktopChannel, Sender<Done>)>;
 /// A workspace's plugins (`pending`: the logins whose browser is open).
 pub type PluginsFn = Box<dyn Fn(&Path, &[String]) -> Vec<Plugin>>;
 pub type PluginSetFn = Box<dyn Fn(&str, bool) -> Result<(), String>>;
@@ -142,10 +143,14 @@ pub struct SetupPorts {
     /// a role's model and effort, checked ([`check_role_set`]) then
     /// written by bise_catalog's roles::save_role
     pub role_set: RoleSetFn,
-    /// bise's release channel, for the desktop app's updates (bar S.6):
-    /// the binary wires `bise update`'s own fetch; none here (a core
-    /// without it never offers an update)
+    /// the desktop app's release channel (stable or beta), for its updates
+    /// (bar S.6): the binary wires its fetch; none here (a core without
+    /// it never offers an update)
     pub manifest: ManifestFn,
+    /// this core's own build time (its app root's VERSION `built=`, found
+    /// the way bise finds its app root everywhere: the binary wires
+    /// approot::locate); empty: a dev build, none here
+    pub own_built: Box<dyn Fn() -> String>,
     /// N1 (the TUI's /keychain): where the secrets are and the move
     pub keychain: KeychainPort,
 }
@@ -526,7 +531,8 @@ pub fn live(flow: FlowFn) -> SetupPorts {
         }),
         plugin_logout: Box::new(|ws, name| crate::plugins::logout(ws, name).map(|_| ())),
         // the harness binary sets bise update's fetch (crate harness)
-        manifest: Box::new(|_| {}),
+        manifest: Box::new(|_, _| {}),
+        own_built: Box::new(String::new),
         keychain: live_keychain(),
         cu: CuPorts {
             is_on: Box::new(crate::computer_use::is_on),

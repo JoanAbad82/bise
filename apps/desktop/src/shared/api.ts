@@ -22,7 +22,7 @@ export interface BiseApi {
    * The app's own update (bar S.6, src/main/update): its state now and on
    * every change. 'ready': the window shows 'bise <version> is ready ·
    * restart'; 'went_bad': the new app didn't start right last time, 'go
-   * back'. Nothing installs without his click.
+   * back'. It installs at quit, at a quiet moment (update/moment.ts) or on his click.
    */
   readonly update: {
     readonly now: () => Promise<UpdateState>;
@@ -31,6 +31,10 @@ export interface BiseApi {
     readonly install: (route?: string) => Promise<boolean>;
     /** his click on 'go back' (went_bad): the previous app again */
     readonly revert: () => Promise<boolean>;
+    /** this app's version and the last quiet install (the settings' update group) */
+    readonly info: () => Promise<UpdateInfo>;
+    /** the window answers main before a quiet moment's install (its route, a send in flight); the returned function stops answering */
+    readonly onAsk: (answer: () => UpdateAsk) => () => void;
   };
   /**
    * His try app's swap to the staged gated build, from inside (src/main/update/tryswap.ts,
@@ -379,6 +383,9 @@ export const IPC = {
   updateNow: 'bise:update-now',
   updateInstall: 'bise:update-install',
   updateRevert: 'bise:update-revert',
+  updateAsk: 'bise:update-ask',
+  updateInfo: 'bise:update-info',
+  updateAnswer: 'bise:update-answer',
   appUpdate: 'bise:app-update',
   appSwap: 'bise:app-swap',
   appRestartLog: 'bise:app-restart-log',
@@ -393,11 +400,36 @@ export const IPC = {
  * swapped-in app was started and never said it ran fine, so 'go back'.
  */
 export type UpdateState =
-  | { readonly state: 'none' }
+  | { readonly state: 'none'; readonly cant?: UpdateCant }
   | { readonly state: 'downloading'; readonly version: string }
   | { readonly state: 'ready'; readonly version: string }
-  | { readonly state: 'failed'; readonly version: string; readonly why: string }
+  | { readonly state: 'failed'; readonly version: string; readonly why: string; readonly reason?: UpdateFail }
   | { readonly state: 'went_bad'; readonly version: string };
+
+/**
+ * Why this app can't replace itself where it runs (desktop-dist, architect m_25198 Q3): from a
+ * disk image, from a copy macOS translocated (opened from Downloads), or a folder it can't write.
+ * Nothing is downloaded; 'Move to Applications' is a follow-up.
+ */
+export type UpdateCant = 'disk_image' | 'translocated' | 'read_only';
+
+/**
+ * What failed: the download (or its sha256), the signature, a self-signed build meeting its first
+ * Developer ID one ('new_signer': download it once from bise.dev), or the swap on disk.
+ */
+export type UpdateFail = 'download' | 'signature' | 'new_signer' | 'swap';
+
+/** The settings' update group besides the state: this app's version (null: no updater here), the last quiet install for 7 days. */
+export interface UpdateInfo {
+  readonly version: string | null;
+  readonly updated: { readonly version: string; readonly at: number } | null;
+}
+
+/** Main asks the main window before a quiet moment's install: its screen, and whether a send of his is on its way. */
+export interface UpdateAsk {
+  readonly route: string | null;
+  readonly sending: boolean;
+}
 
 /**
  * His try app against the staged gated build (window.bise.app.update): 'staged' a --promote'd
@@ -441,6 +473,9 @@ export const APP_SWAP_LINE = 'bise-desktop: app swap';
 export const TEST_PICK_FOLDER_ENV = 'BISE_DESKTOP_TEST_PICK_FOLDER';
 /** Test mode: the files window.bise.pickFiles answers (absolute paths, one per line), never a panel. */
 export const TEST_PICK_FILES_ENV = 'BISE_DESKTOP_TEST_PICK_FILES';
+
+/** Test mode: window.bise.update's now() and info() answers, `{state, info}` JSON (the settings group's shots); else the updater's. */
+export const TEST_DIST_UPDATE_ENV = 'BISE_DESKTOP_TEST_DIST_UPDATE';
 
 /** Test mode: the fake .app (inside the test HOME) the updater swaps; never his bundle. */
 export const UPDATE_TARGET_ENV = 'BISE_DESKTOP_UPDATE_TARGET';
@@ -503,6 +538,10 @@ export const TEST_USER_DATA_ENV = 'BISE_DESKTOP_USER_DATA';
 export const READY_LINE = 'bise-desktop: ready';
 /** Test mode: the update's state on each change (`<line> <json>`). */
 export const UPDATE_LINE = 'bise-desktop: update';
+/** Test mode: a ready update's tick, when its answer changes: `<line> now` (it installs) or `<line> <Busy>` (moment.ts). */
+export const MOMENT_LINE = 'bise-desktop: update moment';
+/** Test mode: the swap done as the app quits (`<line> <version>`), or why not (`<line> failed <why>`). */
+export const QUIT_SWAP_LINE = 'bise-desktop: update at quit';
 
 /**
  * Whether his questions may reach him as macOS notifications: 'never' asked yet, 'asked' (macOS

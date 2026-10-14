@@ -16,8 +16,9 @@ import { PAGES, PageBody, pageOf, type Page } from './pages';
 import type { ComputerUse } from './computer';
 import type { Perms } from './check';
 import type { KeyError, SignIn } from './accounts';
-import type { AppUpdate, NotifyAuth } from '@/shared/api';
+import type { AppUpdate, NotifyAuth, UpdateInfo, UpdateState } from '@/shared/api';
 import type { UpdatePorts } from './update';
+import type { DistPorts } from './appupdate';
 import './settings.css';
 
 export interface SettingsData {
@@ -53,6 +54,8 @@ export interface SettingsData {
   notify?: NotifyAuth | null;
   /** his try app against the newest promoted build (window.bise.app.update; none: no update group) */
   appUpdate?: AppUpdate | null;
+  /** a distributed app's own update (window.bise.update: its state and info; none: no updater, no group) */
+  dist?: { readonly state: UpdateState; readonly info: UpdateInfo; readonly readAt: number } | null;
   /** N1: where his keys and sign-ins are kept and the last /keychain move (the core's keychain; none yet: null) */
   keychain?: KeychainState | null;
 }
@@ -87,6 +90,8 @@ export interface SettingsPorts {
   notify?: (act: 'ask' | 'open') => void;
   /** the update group's acts: the swap, its log, the state read again (none: no act) */
   update?: UpdatePorts;
+  /** a distributed app's update group: restart to update, go back */
+  dist?: DistPorts;
 }
 
 export interface SettingsProps extends SettingsData {

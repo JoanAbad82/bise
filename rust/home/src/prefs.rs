@@ -57,7 +57,7 @@ pub fn excluded_apps(v: Option<Value>) -> Vec<String> {
 
 /// The top keys of `prefs.json` the window may set (`prefs_set`,
 /// architect m_9130): anything else is refused, never written.
-pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days"];
+pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days", "desktop_channel"];
 
 /// The one-time hints the window may mark seen (`prefs_set {key:
 /// "hints.<name>", value: true}`, S36): the TUI's own keys (tui hints.rs
@@ -72,6 +72,8 @@ fn typed(key: &str, v: &Value) -> Result<(), String> {
         "onboarded" => v.is_boolean(),
         "theme" => v.as_str().is_some_and(|t| ["auto", "light", "dark", "system"].contains(&t)),
         "shots_keep_days" => v.as_u64().is_some(),
+        // the desktop app's update channel (release::DesktopChannel)
+        "desktop_channel" => v.as_str().is_some_and(|c| ["stable", "beta"].contains(&c)),
         "excluded_apps" => v.as_array().is_some_and(|a| a.iter().all(Value::is_string)),
         _ => true,
     };
@@ -104,7 +106,7 @@ pub fn set_dotted(obj: &Value, key: &str, value: Value) -> Result<Value, String>
         if !value.is_null() {
             typed(top, &value)?;
         }
-    } else if ["onboarded", "theme", "shots_keep_days", "excluded_apps"].contains(&top) {
+    } else if ["onboarded", "theme", "shots_keep_days", "excluded_apps", "desktop_channel"].contains(&top) {
         return Err(format!("{top} has no {}", parts[1..].join(".")));
     }
     let mut out = if obj.is_object() { obj.clone() } else { Value::Object(Default::default()) };

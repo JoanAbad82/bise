@@ -1,23 +1,31 @@
 // The app's own update in one line at the top of the window (bar S.6, amb-mac's updater 7140f8e4,
 // window.bise.update). 'ready': 'bise <version> is ready · restart', his click swaps the app and
-// reopens it on the screen he is on (nothing installs without the click); 'went_bad': the new app
+// reopens it on the screen he is on (it also installs at quit or at a quiet moment, main's
+// update/run.ts, after asking this window its screen and whether a send is on its way); 'went_bad': the new app
 // didn't start right, 'go back' to the previous one. Downloading and failed say nothing to him
 // (failed's why is for the log). HubUpdateLine: bise's own /update build (the hub's update event).
 // Owner: amb-win.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { BiseApi, UpdateState } from '@/shared/api';
 import type { UpdateEv } from '@/proto';
-import { useHubUpdate, useProjects } from '@/store';
+import { useHubUpdate, useProjects, useStore } from '@/store';
 import { ShaWords } from './ReloadLine';
 import { useRoute } from './router';
 import { formatRoute } from './route';
 import { RANK, type StatusPart } from './status';
 
+/** A release's name as he reads it: the version, not the tag ('desktop-v2026.10.2' → '2026.10.2', designer m_25699). Pure. */
+export function shortVersion(v: string): string {
+  return v.replace(/^desktop-v/, '').replace(/^v(?=\d)/, '');
+}
+
 /** The line's words and its one action, or none. Pure. */
 export function updateLine(s: UpdateState): { text: string; act: 'restart' | 'go back' } | null {
   switch (s.state) {
     case 'ready':
-      return { text: `bise ${s.version} is ready`, act: 'restart' };
+      // it installs by itself now (desktop-dist v7, designer m_25362/m_25699): the click is
+      // 'restart now'; when it installs is the popover's line (the pill never cuts inside a word)
+      return { text: `bise ${shortVersion(s.version)} is ready`, act: 'restart' };
     case 'went_bad':
       return { text: "the new bise didn't start right", act: 'go back' };
     default:
@@ -49,6 +57,14 @@ function useUpdate(): UpdateState {
 export function useUpdateLine(): StatusPart | null {
   const s = useUpdate();
   const route = useRoute();
+  const store = useStore();
+  // a quiet moment's install asks first (main's update/run.ts): the screen to reopen, and whether
+  // a message of his is on its way (it waits for it)
+  const routeNow = useRef(route);
+  useEffect(() => {
+    routeNow.current = route;
+  }, [route]);
+  useEffect(() => bise()?.update.onAsk(() => ({ route: formatRoute(routeNow.current), sending: store.sending() })), [store]);
   const [busy, setBusy] = useState(false);
   const line = updateLine(s);
   if (line === null) return null;
@@ -71,10 +87,19 @@ export function useUpdateLine(): StatusPart | null {
     tone: bad ? 'err' : 'quiet',
     words: bad ? `▲ ${line.text}` : line.text,
     short: bad ? "▲ bise didn't start right" : 'update ready',
+    ...(bad
+      ? {}
+      : {
+          more: (
+            <div className="app-core-last" data-testid="app.update.when">
+              installs by itself when you quit or step away
+            </div>
+          ),
+        }),
     acts: [
       {
         id: line.act === 'restart' ? 'restart' : 'back',
-        text: busy ? (line.act === 'restart' ? 'restarting…' : 'going back…') : line.act,
+        text: busy ? (line.act === 'restart' ? 'restarting…' : 'going back…') : line.act === 'restart' ? 'restart now' : line.act,
         onClick: go,
         disabled: busy,
       },

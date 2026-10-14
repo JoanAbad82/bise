@@ -14,7 +14,7 @@ import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, ipcMain, Menu, nativeTheme, session } from 'electron';
-import { BADGE_LINE, CORE_IPC, IPC, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
+import { BADGE_LINE, CORE_IPC, IPC, TEST_DIST_UPDATE_ENV, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
 import { Capsule, installCapsuleIpc } from './capsule';
 import { capsuleFramesDir } from './capsuleframe';
 import { badgeOf, CountKeeper, titleOf, type Counts } from './counts';
@@ -22,10 +22,10 @@ import { installGuard } from './guard';
 import { startHelper } from './helper/run';
 import { adoptLoginEnv } from './loginenv';
 import { appName } from './appname';
-import { onCoreEvent, sendToCore, startCore, stopCore } from './core/ipc';
+import { micHeld, onCoreEvent, sendToCore, startCore, stopCore } from './core/ipc';
 import { configOfPrefs } from './helper/config';
 import { Shots } from './helper/shot';
-import { installIpc, sendClip, sendMenu, setProjectRoots } from './ipc';
+import { installIpc, panelShown, sendClip, sendMenu, setProjectRoots } from './ipc';
 import { installKeepIpc } from './keep';
 import { projectRoots } from './reveal';
 import { hasTestNotify, menuTemplate } from './menu';
@@ -34,7 +34,8 @@ import { BiseTray } from './tray';
 import { testHomeProblem } from './testhome';
 import { standInPaths } from './userdata';
 import { themeSourceOf } from './theme';
-import { takeRoute, Updates, updateTarget } from './update/run';
+import { drivingOf } from './update/moment';
+import { askWindow, bounded, fakeDistUpdate, QUIT_SWAP_MS, systemIdleS, takeAfter, Updates, updateTarget } from './update/run';
 import { installTrySwapIpc } from './update/tryrun';
 import { MainWindow } from './windows';
 import { fenceOffscreen, isOffscreen, noAsks, OFFSCREEN_DISABLED_BLINK, OFFSCREEN_DISABLED_FEATURES, offscreenActivation } from './offscreen';
@@ -250,10 +251,24 @@ void app.whenReady().then(() => {
   ipcMain.on(IPC.notifyListed, (_e, on: unknown) => {
     showCounts(counts.ask(on === true));
   });
-  // the app's own update (update/run.ts, bar S.6): only a packed app (or a
-  // test's fake bundle in its test home) updates itself, on his click
+  // the app's own update (update/run.ts, bar S.6, desktop-dist v7): only a packed app (or a
+  // test's fake bundle in its test home) updates itself, at quit, at a quiet moment or on his click
   const updatesDir = join(app.getPath('userData'), 'updates');
   const target = updateTarget(testMode, process.env, app.isPackaged, process.execPath);
+  // a quiet moment's facts (update/moment.ts): when a bise window was last in front, an agent driving
+  let front = false;
+  let frontAt = Date.now();
+  app.on('browser-window-focus', () => {
+    front = true;
+  });
+  app.on('browser-window-blur', () => {
+    front = false;
+    frontAt = Date.now();
+  });
+  let driving = false;
+  onCoreEvent((ev) => {
+    if (ev['ev'] === 'computer_live' && Array.isArray(ev['items'])) driving = drivingOf(ev['items'] as Array<{ kind?: unknown }>);
+  });
   const updates =
     target === null
       ? null
@@ -264,10 +279,35 @@ void app.whenReady().then(() => {
           broadcast: (s) => {
             for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(IPC.updateState, s);
           },
+          facts: () => ({
+            sinceFrontMs: front ? 0 : Date.now() - frontAt,
+            idleS: systemIdleS(testMode, process.env),
+            picker: panelShown(),
+            mic: micHeld(),
+            driving,
+          }),
+          ask: () => askWindow(main.window),
+          shown: () => {
+            const w = main.window;
+            return w !== null && !w.isDestroyed() && w.isVisible() && !w.isMinimized();
+          },
         });
-  ipcMain.handle(IPC.updateNow, () => updates?.now() ?? { state: 'none' });
+  // his quit with an update ready: the swap first, bounded (a quit never hangs on an update)
+  let swappedAtQuit = false;
+  app.on('before-quit', (e) => {
+    if (swappedAtQuit || updates === null || !updates.readyAtQuit()) return;
+    e.preventDefault();
+    swappedAtQuit = true;
+    void bounded(updates.atQuit(), QUIT_SWAP_MS).finally(() => {
+      app.quit();
+    });
+  });
+  // test mode: the settings group's states from the test (TEST_DIST_UPDATE_ENV), never the updater's
+  const fakeDist = testMode ? fakeDistUpdate(process.env[TEST_DIST_UPDATE_ENV]) : null;
+  ipcMain.handle(IPC.updateNow, () => fakeDist?.state ?? updates?.now() ?? { state: 'none' });
   ipcMain.handle(IPC.updateInstall, (_e, route: unknown) => updates?.install(typeof route === 'string' ? route : null) ?? false);
   ipcMain.handle(IPC.updateRevert, () => updates?.revert() ?? false);
+  ipcMain.handle(IPC.updateInfo, () => fakeDist?.info ?? updates?.info() ?? { version: null, updated: null });
   // his try's swap to the staged gated build, from inside (update/tryrun.ts)
   installTrySwapIpc({ testMode, env: process.env, execPath: process.execPath, packaged: app.isPackaged, realHome: userInfo().homedir, updatesDir });
   if (updates !== null) {
@@ -277,8 +317,9 @@ void app.whenReady().then(() => {
       });
     });
   }
-  // after a swap, the screen he was on (written at his click)
-  main.create(target === null ? undefined : takeRoute(updatesDir));
+  // after a swap, the screen he was on (written before it); a quiet moment's reopens without focus
+  const after = target === null ? null : takeAfter(updatesDir);
+  main.create(after?.route, after?.quiet === true ? (after.shown ? 'inactive' : 'hidden') : 'front');
   app.on('activate', () => {
     main.open();
   });

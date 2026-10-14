@@ -255,6 +255,11 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
   core.start();
 }
 
+/** A dictation or voice mode holds the mic (the app's update waits for its end: update/moment.ts). */
+export function micHeld(): boolean {
+  return dictations.holding();
+}
+
 /** Main's own command to the core (amb-mac, S.6: app_version); false when no core runs. */
 export function sendToCore(cmd: unknown): boolean {
   return core?.send(cmd) ?? false;

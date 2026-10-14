@@ -256,8 +256,25 @@ export async function fileIcon(raw: unknown, testMode: boolean): Promise<string 
 export async function pickFolder(win: BrowserWindow | null, testMode: boolean): Promise<string | null> {
   if (testMode) return pickedInTest(process.env[TEST_PICK_FOLDER_ENV]);
   const opts: OpenDialogOptions = { properties: ['openDirectory', 'createDirectory'], defaultPath: homedir() };
-  const r = win === null ? await dialog.showOpenDialog(opts) : await dialog.showOpenDialog(win, opts);
+  const r = await panelOpen(() => (win === null ? dialog.showOpenDialog(opts) : dialog.showOpenDialog(win, opts)));
   return r.canceled ? null : (r.filePaths[0] ?? null);
+}
+
+/** The open panels now (his picks): the app's update never installs under one (update/moment.ts). */
+let panels = 0;
+
+/** A panel is open. */
+export function panelShown(): boolean {
+  return panels > 0;
+}
+
+async function panelOpen<T>(show: () => Promise<T>): Promise<T> {
+  panels += 1;
+  try {
+    return await show();
+  } finally {
+    panels -= 1;
+  }
 }
 
 /**
@@ -268,7 +285,7 @@ export async function pickFolder(win: BrowserWindow | null, testMode: boolean): 
 export async function pickFiles(win: BrowserWindow | null, testMode: boolean): Promise<readonly string[]> {
   if (testMode) return pickedFilesInTest(process.env[TEST_PICK_FILES_ENV]);
   const opts: OpenDialogOptions = { properties: ['openFile', 'multiSelections'], defaultPath: homedir() };
-  const r = win === null ? await dialog.showOpenDialog(opts) : await dialog.showOpenDialog(win, opts);
+  const r = await panelOpen(() => (win === null ? dialog.showOpenDialog(opts) : dialog.showOpenDialog(win, opts)));
   return r.canceled ? [] : r.filePaths;
 }
 

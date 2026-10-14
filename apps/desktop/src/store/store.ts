@@ -319,6 +319,12 @@ export class Store extends StoreVoice {
     return this.slice<AnswerJump | null>("answer_jump", null);
   }
 
+  /** A message of his is on its way (a pending row still sending): the app's update waits for it (update/moment.ts). */
+  sending(): boolean {
+    for (const t of this.threads.values()) if (t.pending.some((p) => p.state === "sending")) return true;
+    return false;
+  }
+
   /** A1: the window-local 'sent' (main's ipc.ts): the send `cid` has its message id. Always a known event. */
   private sendAnswered(s: Sent): true {
     const key = threadKey(s.project, s.agent);

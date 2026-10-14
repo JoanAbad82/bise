@@ -122,7 +122,11 @@ export class MainWindow {
     this.win?.setTitle(title);
   }
 
-  create(route?: string): BrowserWindow {
+  /**
+   * `how`: 'front' as always; after a quiet moment's update (update/run.ts) 'inactive' (on screen,
+   * never taking focus from what he is in) or 'hidden' (its window wasn't shown: the Dock's click shows it).
+   */
+  create(route?: string, how: 'front' | 'inactive' | 'hidden' = 'front'): BrowserWindow {
     const test = this.testMode;
     const win = new BrowserWindow({
       // his kept frame, else 1280 x 720 centred on the pointer's screen; an off-screen
@@ -174,7 +178,9 @@ export class MainWindow {
       });
     } else {
       win.once('ready-to-show', () => {
-        if (!this.offscreen) win.show();
+        if (this.offscreen || how === 'hidden') return;
+        if (how === 'inactive') win.showInactive();
+        else win.show();
       });
     }
     loadRenderer(win, 'window', route ?? (test ? process.env[ROUTE_ENV] : undefined));

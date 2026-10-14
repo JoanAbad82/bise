@@ -1,10 +1,12 @@
 //! The desktop app's updates, core side (bar S.6; architect m_11169):
 //! the app says its own build (`app_version {id, built?}`, its VERSION),
-//! the core reads the desktop's own release channel (`desktop.json` on
-//! the `desktop-latest` tag, never the terminal's `latest.json`: the two
-//! cycles are apart; through
+//! the core reads the desktop's own release channel he follows
+//! (`desktop.json` on the `desktop-latest` tag, or `desktop-beta` when
+//! his prefs say `desktop_channel: beta`; never the terminal's
+//! `latest.json`: the two cycles are apart; through
 //! [`crate::ambient::setup::SetupPorts::manifest`] on its own thread) at
-//! once and every [`RECHECK`], and when bise_home::release says the
+//! once, every [`RECHECK`], and at once again when he changes the
+//! channel; a `paused` channel offers nothing. When bise_home::release says the
 //! channel's desktop build replaces the running one it sends the app
 //! `app_update {version, url, sha256}`, once per version between two
 //! `app_version`s (each one is a window asking again). The manifest's
@@ -33,6 +35,9 @@ pub(crate) struct UpdateCheck {
     /// the version last said since the last app_version (the hourly
     /// reads never say it twice)
     said: Option<String>,
+    /// the newest hub build that made the channel be read at once (each
+    /// newer hub does it once, never at every hello)
+    hub_seen: Option<String>,
 }
 
 /// The `app_update` to send for this manifest, if any: `(version, url,
@@ -40,6 +45,22 @@ pub(crate) struct UpdateCheck {
 pub(crate) fn offer(text: &str, base: &str, target: &str, id: &str, built: Option<&str>) -> Option<(String, String, String)> {
     let r = release::parse_desktop(text, target).ok()?;
     release::is_desktop_update(&r, id, built).then(|| (r.version, release::resolve_url(base, &r.url), r.sha256))
+}
+
+/// The channel prefs.json names (`desktop_channel`): stable unless beta.
+pub(crate) fn channel_of(prefs: Option<&serde_json::Value>) -> release::DesktopChannel {
+    release::DesktopChannel::from_pref(prefs.and_then(|p| p.get("desktop_channel")).and_then(|v| v.as_str()))
+}
+
+/// A hub built at `hub` is newer than this core's runtime (`own`) and
+/// hasn't made the channel be read yet (`seen`): the one ordering of
+/// builds, bise_home::release::built_after (architect m_25198). A dev
+/// core (no build time) never reads for it.
+pub(crate) fn hub_ahead(hub: Option<&str>, own: &str, seen: Option<&str>) -> bool {
+    match hub {
+        Some(h) => !own.is_empty() && release::built_after(h, own) && seen.is_none_or(|s| release::built_after(h, s)),
+        None => false,
+    }
 }
 
 /// A read is due: none runs, and none started in the last [`RECHECK`].
@@ -61,8 +82,8 @@ impl Core {
         self.update_tick();
     }
 
-    /// On the tick: read the channel when a read is due (only once the app
-    /// said its build).
+    /// On the tick: read the channel he follows when a read is due (only
+    /// once the app said its build).
     pub(super) fn update_tick(&mut self) {
         let Some(s) = self.setup.as_mut() else { return };
         if s.update.app.is_none() || !due(s.update.last, s.update.running, Instant::now()) {
@@ -70,7 +91,43 @@ impl Core {
         }
         s.update.running = true;
         s.update.last = Some(Instant::now());
-        (s.ports.manifest)(s.tx.clone());
+        let prefs = (s.ports.prefs)();
+        let channel = channel_of(prefs.as_ref());
+        (s.ports.manifest)(channel, s.tx.clone());
+    }
+
+    /// A hub said its build (its welcome): newer than this app's runtime,
+    /// the channel is read at once, once per newer build (the app may
+    /// have an update that knows it).
+    pub(super) fn hub_built(&mut self, built: Option<&str>) {
+        let Some(s) = self.setup.as_mut() else { return };
+        if built.is_none() {
+            return;
+        }
+        let own = (s.ports.own_built)();
+        if !hub_ahead(built, &own, s.update.hub_seen.as_deref()) {
+            return;
+        }
+        s.update.hub_seen = built.map(String::from);
+        s.update.said = None;
+        if !s.update.running {
+            s.update.last = None;
+        }
+        self.update_tick();
+    }
+
+    /// His prefs changed `key`: a new channel (Settings' beta toggle) is
+    /// read at once, never at the next hour.
+    pub(super) fn update_pref_set(&mut self, key: &str) {
+        if key.split('.').next() != Some("desktop_channel") {
+            return;
+        }
+        let Some(s) = self.setup.as_mut() else { return };
+        s.update.said = None;
+        if !s.update.running {
+            s.update.last = None;
+        }
+        self.update_tick();
     }
 
     /// The channel's answer: `app_update` when it offers a newer app.
@@ -113,6 +170,19 @@ mod tests {
         assert_eq!(offer(&m, "b", "darwin-arm64", "dev", None), None);
         assert_eq!(offer(&m, "b", "darwin-x86_64", "d25", Some("2026-10-07T10:00:00Z")), None);
         assert_eq!(offer("{", "b", "darwin-arm64", "d25", Some("2026-10-07T10:00:00Z")), None);
+    }
+
+    #[test]
+    fn a_newer_hub_reads_the_channel_once_per_newer_build_never_from_a_dev_core() {
+        let own = "2026-10-07T10:00:00Z";
+        let newer = "2026-10-08T10:00:00Z";
+        assert!(hub_ahead(Some(newer), own, None));
+        assert!(!hub_ahead(Some(newer), own, Some(newer)), "once per build");
+        assert!(hub_ahead(Some("2026-10-09T10:00:00Z"), own, Some(newer)), "a newer one again");
+        assert!(!hub_ahead(Some(own), own, None), "the same build");
+        assert!(!hub_ahead(Some("2026-10-06T10:00:00Z"), own, None), "an older hub");
+        assert!(!hub_ahead(Some(newer), "", None), "a dev core");
+        assert!(!hub_ahead(None, own, None), "a hub that says no build");
     }
 
     #[test]

@@ -146,3 +146,10 @@ export function madeTip(end: string): string {
   if (end === '') return '';
   return /^\d\d:\d\d$/.test(end) ? `made at ${end}` : end === 'now' ? 'made just now' : `made ${end} ago`;
 }
+
+// ---- the app's own update (desktop-dist v7, designer m_25362)
+
+/** Settings' 'updated to <version> · <when>' line, after a quiet install. */
+export function updatedTip(): string {
+  return 'installed while you were away';
+}

@@ -46,9 +46,14 @@ function sites(token: string): Array<{ file: string; before: string }> {
 
 describe('an off-screen run asks him nothing (static)', () => {
   it('no main code asks macOS for a privacy permission directly', () => {
-    for (const api of ['askForMediaAccess', 'getMediaAccessStatus', 'isTrustedAccessibilityClient', 'desktopCapturer', 'systemPreferences.', 'globalShortcut', 'powerMonitor.getSystemIdle']) {
+    for (const api of ['askForMediaAccess', 'getMediaAccessStatus', 'isTrustedAccessibilityClient', 'desktopCapturer', 'systemPreferences.', 'globalShortcut']) {
       expect(sites(api).map((s) => s.file), `${api} would ask him: put it behind noAsks first`).toEqual(api === 'systemPreferences.' ? READS : []);
     }
+    // his idle time asks nothing, but an off-screen run reads nothing of his Mac: the update's quiet
+    // moment (update/run.ts systemIdleS) reads it only past test mode, else the test's idle file
+    const idle = sites('powerMonitor.getSystemIdle');
+    expect(idle.map((s) => s.file)).toEqual([join('update', 'run.ts')]);
+    for (const s of idle) expect(s.before, 'systemIdleS returns the test file first in test mode').toMatch(/if \(testMode\) \{[\s\S]*return[\s\S]*\}\s*return $/);
     // the one systemPreferences read that asks nothing: the tray's reduced motion (tray.ts)
     expect(ALL.flatMap(({ file, text }) => (text.match(/systemPreferences\.\w+/g) ?? []).map((m) => `${file} ${m}`))).toEqual(['tray.ts systemPreferences.getAnimationSettings']);
   });

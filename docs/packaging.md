@@ -378,6 +378,22 @@ desktop` and names the terminal version of the runtime it carries
 (`runtime_id`). A terminal release never waits on the desktop app, and
 the desktop app ships only when the user says so.
 
+**The desktop app's own updates** (desktop-dist v7, his picks). Two
+rolling tags, same `desktop.json` shape (dist-ci's
+`scripts/desktop_feed.py` writes it): `desktop-latest` (stable) and
+`desktop-beta`. Every build goes to beta first and "promote" moves
+`desktop-latest` to the same build, so beta is always stable or newer
+and a beta app reads `desktop-beta` alone (his pref `desktop_channel`,
+Settings › General's 'beta builds'). `"paused": true` offers nothing.
+The app downloads in the background, checks the zip's sha256 and the
+new app's signature against its own designated requirement (a Developer
+ID app also needs Gatekeeper's yes), then installs at the first of: his
+quit, a quiet moment (`apps/desktop/src/main/update/moment.ts`), his
+click. `<name>.app.old` stays until the new app ran; the hubs never stop.
+A hub newer than the app's runtime makes the core read the channel at
+once. A self-signed test build refuses the first Developer ID one: it is
+downloaded once by hand.
+
 - **The channel** is the latest release's download URL,
   `https://github.com/gvergnaud/bise/releases/latest/download` (the
   Rust const `release::DIST_URL`, stamped into install.sh by
