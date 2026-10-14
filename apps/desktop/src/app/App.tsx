@@ -10,6 +10,7 @@ import { takeZoomKey } from '@/artifacts/zoomKeys';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter, type SavedHistory } from './router';
 import { useHistoryWays } from './esc-up';
+import { useAnswerJumps } from '@/thread/useAnswerJumps';
 import { bottomTarget, formatRoute, inboxAtOf, MAIN, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
 import { BottomBlock } from '@/thread/Bottom';
 import { askInbox, useInboxAsks } from './inboxAsk';
@@ -169,6 +170,8 @@ function useStill(): void {
 function Shell() {
   const router = useRouter();
   useHistoryWays(router);
+  // answer-in-thread A: his answer to another project's card takes the window to it
+  useAnswerJumps(router);
   useStill();
   const [palette, setPalette] = usePaletteOpen();
   const [help, setHelp] = useState(false);

@@ -7,7 +7,8 @@ import { createContext, createElement, useContext, useEffect, useSyncExternalSto
 import type { Account, Agent, FlowMode, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, Place, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
 import { keep } from '@/app/keep';
-import type { Aside } from './asides';
+import type { AnsweredFrom } from './answered';
+import type { AnswerJump } from './store';
 import type { Acted } from './acted';
 import { refusedOf, type Refused } from './refused';
 import { diffKey, takeKey, toolOutKey, Store, type QueuedTake, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadOrder, type VoiceModeState, type TalkShot } from './store';
@@ -200,8 +201,10 @@ export const useEntry = (key: string, pos: number): Entry | undefined => useSlic
 export const useTyping = (key: string): string => useSlice(`typing:${key}`, (s) => s.typing(key));
 /** His sends on their way or failed, oldest first. */
 export const usePending = (key: string): readonly Pending[] => useSlice(`pending:${key}`, (s) => s.pending(key));
-/** Inbox picks (3): his answers made from this thread to cards asked elsewhere (window-local, asides.ts). */
-export const useAsides = (key: string): readonly Aside[] => useSlice(`asides:${key}`, (s) => s.asides(key));
+/** Where he made his answer to card `card` of `project` (window-local, answered.ts); null when this window didn't send it. */
+export const useAnsweredFrom = (project: string, card: number): AnsweredFrom | null => useSlice('answered-from', (s) => s.answeredFrom(project, card));
+/** The newest jump to an answer the hub took (answer-in-thread A); null before any. */
+export const useAnswerJump = (): AnswerJump | null => useSlice('answer_jump', (s) => s.answerJump());
 /** The cards he answered or closed in this window that the hub's rows still list: every view leaves them out (acted.ts). */
 export const useActed = (): readonly Acted[] => useSlice('acted', (s) => s.acted());
 /** The refusal of his answer or close of this card in this window (refused.ts), or null: every view that draws the card says it. */

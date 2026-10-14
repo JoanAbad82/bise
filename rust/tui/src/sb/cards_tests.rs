@@ -936,3 +936,18 @@ fn a_new_card_mid_answer_keeps_the_text_and_the_card() {
     assert_eq!(app.sb.current_card().map(|c| c.id), Some(5));
     assert_eq!(app.ed.text, "warm, but only after");
 }
+
+/// Answer-in-thread A (designer m_24425 (7)): an answer made in main's
+/// view goes to the asker's view (esc back to main); from an agent's own
+/// view, to main's own card, to a gone agent, or while the card view moves
+/// on to the next card, the view stays.
+#[test]
+fn an_answer_from_mains_view_opens_the_askers_thread() {
+    let ag = |name: &str| Agent { name: name.into(), main: name == "main", status: "idle".into(), ..Agent::default() };
+    let agents = vec![ag("main"), ag("perf")];
+    assert_eq!(asker_view("main", "perf", &agents, false).as_deref(), Some("perf"));
+    assert_eq!(asker_view("docs", "perf", &agents, false), None);
+    assert_eq!(asker_view("main", "main", &agents, false), None);
+    assert_eq!(asker_view("main", "gone", &agents, false), None);
+    assert_eq!(asker_view("main", "perf", &agents, true), None);
+}

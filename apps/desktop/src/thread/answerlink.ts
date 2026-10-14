@@ -6,6 +6,8 @@
 // one pending jump the thread screen takes (useAnswerReveal). Owner: amb-win.
 import type { Entry, EntryCard } from '@/proto';
 import type { Router } from '@/app/router';
+import { sameRoute, type Route } from '@/app/route';
+import { shownName } from '@/agents/model';
 
 /** His answer to card `card` of `project`, in `agent`'s thread (the agent it went to). */
 export interface AnswerAt {
@@ -43,9 +45,26 @@ export function approvalTarget(project: string, here: string, e: Entry): AnswerA
   return { project, agent: a.to, card: a.card };
 }
 
-/** A window-local aside: the asker it names (an aside kept before it named one: none). Pure. */
-export function asideTarget(a: { project: string; card: number; agent?: string }): AnswerAt | null {
-  return a.agent === undefined || a.agent === '' ? null : { project: a.project, agent: a.agent, card: a.card };
+/**
+ * The line under his answer's bubble when the window knows where he made it (answer-in-thread A,
+ * designer m_24628): 'answered from bise · 09:55', its tip 'you answered this from bise's thread
+ * at 09:55'. The thread is named as the window draws it: bise's view 'bise', a project's main its
+ * project's name, an agent its name; the inbox screen 'the inbox screen'. Null when he made it in
+ * this very thread (the time alone, as before). Pure.
+ */
+export function answeredFromWords(
+  from: { project: string; agent: string } | 'inbox',
+  here: { project: string; agent: string },
+  home: string,
+  projectName: (project: string) => string,
+  time: string,
+): { words: string; tip: string } | null {
+  if (from !== 'inbox' && from.project === here.project && from.agent === here.agent) return null;
+  const at = time === '' ? '' : ` at ${time}`;
+  const tail = time === '' ? '' : ` · ${time}`;
+  if (from === 'inbox') return { words: `answered from the inbox screen${tail}`, tip: `you answered this from the inbox screen${at}` };
+  const name = from.agent !== 'main' ? shownName(from.agent) : from.project === home ? shownName('main') : projectName(from.project);
+  return { words: `answered from ${name}${tail}`, tip: `you answered this from ${name}'s thread${at}` };
 }
 
 /** The answer's pos among a thread's loaded entries: the newest approval for that card. Pure. */
@@ -102,5 +121,16 @@ export function subscribeAnswer(l: () => void): () => void {
 export function openAnswer(router: Pick<Router, 'go'>, at: AnswerAt): void {
   pending = at;
   for (const l of [...listeners]) l();
-  router.go({ screen: 'thread', project: at.project, agent: at.agent });
+  const to: Route = { screen: 'thread', project: at.project, agent: at.agent };
+  jumped = to;
+  router.go(to);
+}
+
+// the thread a jump to his answer went to: there, an esc nobody took goes back where he was
+// (answer-in-thread A: '‹ or esc, composer empty, brings you back'), not up to bise
+let jumped: Route | null = null;
+
+/** On the thread a jump to his answer opened, esc goes back (esc-up.ts). */
+export function escGoesBack(now: Route): boolean {
+  return jumped !== null && sameRoute(jumped, now);
 }

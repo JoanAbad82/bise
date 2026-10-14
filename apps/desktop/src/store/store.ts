@@ -42,11 +42,20 @@ import {
 import { applyTyped } from "./apply";
 import { answered, echoOf, keepLanded, sentOf, ECHO_SLACK_MS, type Sent } from "./echo";
 import { EMPTY, type Thread } from "./base";
-import { asideOf, asidesOf, cardAnsweredOf, keptAsides, type AnswerFrom, type Aside, type CardAnswered } from "./asides";
+import { answeredFromOf, answersOf, cardAnsweredOf, cardKeyOf, jumpOf, keptAnswers, type AnswerAt, type AnswerFrom, type AnsweredFrom, type CardAnswered } from "./answered";
 import { StoreVoice } from "./voice";
 
 export { DICTATE_STOP_WAIT_MS } from "./voice";
 export type { StoreOptions } from "./base";
+
+/** The keep's key of where he made his answers (answered.ts). */
+const ANSWERS = "answered-from";
+
+/** Where the window goes for an answer the hub took: that thread, at that card's answer; `seq` counts them. */
+export interface AnswerJump extends AnswerAt {
+  readonly card: number;
+  readonly seq: number;
+}
 
 export class Store extends StoreVoice {
   /** inbox picks (3): where he was for each card he answered, until its result comes */
@@ -207,12 +216,13 @@ export class Store extends StoreVoice {
   }
 
   /**
-   * Inbox picks (3): the window-local 'card_answered' (main's ipc.ts): his answer to a card this
-   * window sent, as sb-core wrote it. Answered from a thread the hub writes no row in, it leaves
-   * his row there (asides.ts). Always a known event.
+   * answer-in-thread A: the window-local 'card_answered' (main's ipc.ts): his answer to a card this
+   * window sent, as sb-core wrote it. The hub took it: where he made it is kept (the row's
+   * 'answered from …'), and when it came from another project's thread (or bise's), the window
+   * goes to the asking project's main thread at his answer (answered.ts). Always a known event.
    */
   private cardAnswered(d: CardAnswered): true {
-    const k = `${d.project}/${String(d.card)}`;
+    const k = cardKeyOf(d.project, d.card);
     // the hub took it: no refusal of it holds
     this.putRefused(refusedDrop(this.refused(), d.project, d.card));
     this.attempts.delete(actedKey(d.project, d.card));
@@ -221,12 +231,15 @@ export class Store extends StoreVoice {
     const from = this.answering.get(k);
     this.answering.delete(k);
     if (from === undefined) return true;
-    const got = asideOf(from, d.project, d.card, d.answer, this.now());
-    if (got === null) return true;
-    const tkey = threadKey(got.at.project, got.at.agent);
-    const list = keptAsides([...this.asides(tkey).filter((a) => a.key !== got.aside.key), got.aside]);
-    this.put(`asides:${tkey}`, list);
-    this.asideKeep?.write(`asides:${tkey}`, list);
+    const got = answeredFromOf(from, d.project, d.card, d.answer, this.now());
+    if (got !== null) {
+      const list = keptAnswers(this.answersFrom(), got);
+      this.put(ANSWERS, list);
+      this.asideKeep?.write(ANSWERS, list);
+    }
+    const home = this.projects().find((p) => p.home)?.project ?? "";
+    const to = jumpOf(from, d.project, home, d.answer !== null);
+    if (to !== null) this.put("answer_jump", { ...to, card: d.card, seq: (this.slice<AnswerJump | null>("answer_jump", null)?.seq ?? 0) + 1 });
     return true;
   }
   /**
@@ -291,17 +304,19 @@ export class Store extends StoreVoice {
     else this.answer(project, card, a.reply, a.files, a.parts, a.from);
   }
 
-  /** His answers made from this thread to a card asked elsewhere (window-local, oldest first; kept across a reload). */
-  asides(key: string): readonly Aside[] {
-    const k = `asides:${key}`;
-    if (!this.slices.has(k) && this.asideKeep !== null) {
-      const raw = this.asideKeep.read(k);
-      const list = asidesOf(raw);
-      this.slices.set(k, list);
-      // a row the read dropped (the old build's own words, junk) leaves the keep too, once
-      if (Array.isArray(raw) && raw.length !== list.length) this.asideKeep.write(k, list);
-    }
-    return this.slice<readonly Aside[]>(k, EMPTY);
+  /** Where he made each answer this window sent (window-local, oldest first; kept across a reload). */
+  answersFrom(): readonly AnsweredFrom[] {
+    if (!this.slices.has(ANSWERS) && this.asideKeep !== null) this.slices.set(ANSWERS, answersOf(this.asideKeep.read(ANSWERS)));
+    return this.slice<readonly AnsweredFrom[]>(ANSWERS, EMPTY);
+  }
+  /** Where he made his answer to card `card` of `project`, when this window sent it. */
+  answeredFrom(project: string, card: number): AnsweredFrom | null {
+    const k = cardKeyOf(project, card);
+    return this.answersFrom().find((a) => a.key === k) ?? null;
+  }
+  /** The newest jump to an answer the hub took (answer-in-thread A); null before any. */
+  answerJump(): AnswerJump | null {
+    return this.slice<AnswerJump | null>("answer_jump", null);
   }
 
   /** A1: the window-local 'sent' (main's ipc.ts): the send `cid` has its message id. Always a known event. */
@@ -548,7 +563,7 @@ export class Store extends StoreVoice {
     parts?: readonly Part[],
     from?: AnswerFrom,
   ): void {
-    // inbox picks (3): where he was, so the answer's result can leave his row there (asides.ts)
+    // answer-in-thread A: where he was, for the row's 'answered from …' and the jump (answered.ts)
     if (from !== undefined) this.answering.set(`${project}/${String(card)}`, from);
     // every view leaves it out until the hub's rows drop it (acted.ts), or the hub refuses it
     this.acts(project, card, {

@@ -18,6 +18,7 @@
 // it took him away from the words he was typing): it only scrolls.
 import { useEffect } from "react";
 import { escapeIsFree } from "@/composer/escape";
+import { escGoesBack } from "@/thread/answerlink";
 import { homeOf, upOf } from "./route";
 import type { Router } from "./router";
 
@@ -77,6 +78,8 @@ export function escTarget(
   router: Pick<Router, "get" | "canBack">,
 ): "back" | ReturnType<typeof homeOf> | null {
   const now = router.get();
+  // the thread a jump to his answer opened: back where he answered from (answer-in-thread A)
+  if (escGoesBack(now) && router.canBack()) return "back";
   const up = upOf(now);
   if (up !== "back") return up;
   return router.canBack() ? "back" : homeOf(now);

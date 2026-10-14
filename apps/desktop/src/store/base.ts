@@ -18,7 +18,8 @@ export interface Thread {
 export type Listener = () => void;
 
 /**
- * Where the window keeps his answers' rows (asides.ts) across a reload and a relaunch: they are
+ * Where the window keeps its own facts about his answers (where he made them: answered.ts; the
+ * cards he acted on: acted.ts; the refused ones: refused.ts) across a reload and a relaunch: they are
  * the window's own, no hub has them. The app passes its keep (hooks.ts); tests a map or nothing.
  */
 export interface AsideKeep {

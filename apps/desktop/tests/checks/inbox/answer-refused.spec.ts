@@ -105,14 +105,17 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
       await page.keyboard.press('Escape');
     });
 
-    await test.step("an answer the hub takes, to search's card from perf's thread: out of the block, '✓ you answered search' here", async () => {
+    await test.step("an answer the hub takes, to search's card from perf's thread (same project): out of the block, the window stays, no row here", async () => {
       // the hub's step drops card 11 from its rows before it answers (the real hub's order)
       await core.result('answer', 11, { answer: { agent: 'search', question: 'reindex tonight or now?', said: '1', pick: 'tonight', notice: 'you answered search: tonight' } }, [projects(CARDS.filter((c) => c.id !== 11))]);
       await open(page, 11, 'reindex tonight or now?');
       await page.keyboard.press('1');
       await core.waitCmd((c) => (c as Cmd).cmd === 'answer' && (c as Cmd).card === 11, 5000);
       await expect.poll(async () => (await unfold(page), await inBlock(page, 11, 'reindex tonight or now?')), { message: 'card 11 leaves the block', timeout: 3000 }).toBe(false);
-      await expect(page.getByTestId('thread.aside.11')).toContainText('you answered search', { timeout: 3000 });
+      // answer-in-thread A: his answer lives in search's and acme's main threads (the hub's rows);
+      // a card of the project he is in moves nothing, and the thread he answered from shows nothing
+      await expect(page.getByTestId('thread.list'), "still perf's thread").toContainText('p95 is 900 ms on mobile.');
+      await expect(page.getByTestId('thread.list')).not.toContainText('you answered search');
     });
 
     await test.step('a close the hub refuses: card 13 is back with the words', async () => {
@@ -140,10 +143,10 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
       await expect(page.locator('[data-testid="confirm.notice"][data-level="error"]'), `${why}: no project error line`).toHaveCount(0);
     };
 
-    await test.step('a reload: the same (the hub dropped card 11), his row stays', async () => {
+    await test.step('a reload: the same (the hub dropped card 11), still no row of the window here', async () => {
       await page.reload();
       await settled('after a reload');
-      await expect(page.getByTestId('thread.aside.11')).toContainText('you answered search', { timeout: 5000 });
+      await expect(page.getByTestId('thread.list')).not.toContainText('you answered search');
     });
 
     await test.step("a project switch (bise's main) and back: the same", async () => {

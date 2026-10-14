@@ -8,8 +8,8 @@ import { openInbox } from '@/inbox/Block';
 import { ArtWords } from '@/inbox/artWords';
 import type { Entry, EntryCard } from '@/proto';
 import { RouterContext } from '@/app/router';
-import { approvalTarget, asideTarget, cardTarget, openAnswer, type AnswerAt } from './answerlink';
-import { useEntry, useProjects, useThreadOrder, type Aside } from '@/store';
+import { answeredFromWords, approvalTarget, cardTarget, openAnswer, type AnswerAt } from './answerlink';
+import { useAnsweredFrom, useEntry, useProjects, useThreadOrder } from '@/store';
 import { Markdown } from './Markdown';
 import { clock, lastOfRun, reportStatus } from './entry';
 import { shownName } from '@/agents/model';
@@ -222,35 +222,20 @@ export function withoutImageMarks(words: string): string {
 }
 
 /**
- * Inbox picks (3): his answer to a card asked elsewhere (another project, bise's view), made from
- * this thread: the asker's '✓ you answered' row word for word (card/answer's result), with the
- * card's project when it isn't this one. Window-local (asides.ts): the hub writes no row here.
+ * The line under his answer to a card: 'answered from bise · 09:55' (its tip says it whole) when
+ * this window sent it from another thread (answer-in-thread A, designer m_24628), else the time.
  */
-export function AsideRow({ a, here, agent }: { a: Aside; here: string; agent: string }) {
-  const parts = approvalParts(a.notice);
-  // answered-link: the head opens the asker's thread at his answer
-  const at = asideTarget(a);
-  const words = [parts.words, a.note].filter((w) => w !== '').join('\n');
-  const id = `thread.aside.${String(a.card)}`;
-  // another project's card: its project's name after the asker ('you answered gift-ui · shop')
-  const pname = useProjects().find((r) => r.project === a.project)?.name ?? a.project;
-  const where = a.project === here ? '' : ` · ${pname}`;
+function AnsweredUnder({ project, here, card, at, testId }: { project: string; here: { project: string; agent: string }; card: number | null | undefined; at: number; testId: string }) {
+  const rows = useProjects();
+  const made = useAnsweredFrom(project, card ?? -1);
+  const time = clock(at);
+  const home = rows.find((r) => r.home)?.project ?? '';
+  const said = made === null ? null : answeredFromWords(made.from, here, home, (p) => rows.find((r) => r.project === p)?.name ?? p, time === '' ? clock(made.at_ms) : time);
+  if (said === null) return time === '' ? null : <>{time}</>;
   return (
-    <div className="th-approval" data-ok data-project={a.project} data-testid={id}>
-      <YouBubble
-        head={
-          at === null || (at.project === here && at.agent === agent) ? (
-            <AnsweredHead ok>{`${shownHead(parts.head)}${where}`}</AnsweredHead>
-          ) : (
-            <AnswerLink at={at} here={agent} testId={`${id}.link`}>
-              <AnsweredHead ok>{`${shownHead(parts.head)}${where}`}</AnsweredHead>
-            </AnswerLink>
-          )
-        }
-        under={clock(a.at_ms)} timeAlways testId={`${id}.row`}>
-        {words === '' ? undefined : <div className="th-you-words" data-testid={`${id}.words`}>{words}</div>}
-      </YouBubble>
-    </div>
+    <span data-tip={said.tip} data-testid={testId}>
+      {said.words}
+    </span>
   );
 }
 
@@ -286,8 +271,8 @@ export function ApprovalRow({ e, next, ctx }: { e: Entry; next: Entry | undefine
             </AnswerLink>
           )
         }
-        under={e.at_ms > 0 ? clock(e.at_ms) : undefined}
-        timeAlways={lastOfRun(e, next)}
+        under={<AnsweredUnder project={ctx.project} here={{ project: ctx.project, agent: ctx.agent }} card={a.card} at={e.at_ms} testId={`thread.approval.${e.pos}.from`} />}
+        timeAlways={lastOfRun(e, next) || a.card != null}
         testId={`thread.approval.${e.pos}`}
       >
         {words === '' && !chips ? undefined : (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry, EntryCard } from '@/proto';
-import { ANSWER_PAGES, answerDone, answerPos, approvalTarget, asideTarget, cardTarget, openAnswer, pendingAnswer, revealStep } from './answerlink';
+import { ANSWER_PAGES, answerDone, answeredFromWords, answerPos, approvalTarget, cardTarget, escGoesBack, openAnswer, pendingAnswer, revealStep } from './answerlink';
 import { answerLinkTitle } from './rows-cards';
 import { rowWhole } from './ThreadList';
 
@@ -22,9 +22,14 @@ describe('answered-link: where a row goes', () => {
     expect(approvalTarget('shop', 'main', entry(4, { approval: { ok: true, text: 'you answered docs', card: 7 } }))).toBeNull();
   });
 
-  it('an aside: the agent it names; one kept before it named one: none', () => {
-    expect(asideTarget({ project: 'shop', card: 4, agent: 'docs' })).toEqual({ project: 'shop', agent: 'docs', card: 4 });
-    expect(asideTarget({ project: 'shop', card: 4 })).toBeNull();
+  it("the line under his answer: 'answered from <the thread he was in> · time', its tip whole; made here: none", () => {
+    const name = (p: string) => (p === 'ts' ? 'ts-pattern' : p);
+    const here = { project: 'ts', agent: 'main' };
+    expect(answeredFromWords({ project: 'home', agent: 'main' }, here, 'home', name, '09:55')).toEqual({ words: 'answered from bise · 09:55', tip: "you answered this from bise's thread at 09:55" });
+    expect(answeredFromWords({ project: 'shop', agent: 'main' }, here, 'home', name, '09:55')?.words).toBe('answered from shop · 09:55');
+    expect(answeredFromWords({ project: 'shop', agent: 'docs' }, here, 'home', name, '09:55')?.words).toBe('answered from docs · 09:55');
+    expect(answeredFromWords('inbox', here, 'home', name, '09:55')).toEqual({ words: 'answered from the inbox screen · 09:55', tip: 'you answered this from the inbox screen at 09:55' });
+    expect(answeredFromWords({ project: 'ts', agent: 'main' }, here, 'home', name, '09:55')).toBeNull();
   });
 
   it('its tooltip says where it goes', () => {
@@ -77,5 +82,8 @@ describe('answered-link: the jump', () => {
     expect(pendingAnswer()).toBe(at);
     answerDone(at);
     expect(pendingAnswer()).toBeNull();
+    // there, esc goes back where he was; anywhere else, up as before
+    expect(escGoesBack({ screen: 'thread', project: 'shop', agent: 'docs' })).toBe(true);
+    expect(escGoesBack({ screen: 'thread', project: 'shop', agent: 'main' })).toBe(false);
   });
 });

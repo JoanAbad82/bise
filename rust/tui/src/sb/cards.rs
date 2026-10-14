@@ -838,6 +838,13 @@ fn answer_with(app: &mut App, id: u64, said: &crate::said::Said, picked: Option<
     }
     let open = app.sb.card.open && app.sb.card.sel == Some(id);
     retire(app, id);
+    // answer-in-thread A (designer m_24425 (7)): answered from main's view,
+    // the asker's thread opens at his answer (its end: the hub's row comes
+    // there), esc back to main; not while the card view moves on to the next
+    if let Some(to) = asker_view(&app.sb.focus, &c.agent, &app.sb.agents, app.sb.card.open) {
+        super::focus(app, &to);
+        return;
+    }
     if !open {
         return;
     }
@@ -848,6 +855,14 @@ fn answer_with(app: &mut App, id: u64, said: &crate::said::Said, picked: Option<
     } else {
         app.flash = Some(("inbox clear".into(), std::time::Instant::now()));
     }
+}
+
+/// Answer-in-thread A: the view an answer made in main's view goes to,
+/// the asker's (a live agent of this hub, not main); none from any other
+/// view, or while the card view shows the next card.
+fn asker_view(focus: &str, asker: &str, agents: &[Agent], next_open: bool) -> Option<String> {
+    let live = agents.iter().any(|a| a.name == asker && !a.main && !a.archived());
+    (focus == "main" && !next_open && live).then(|| asker.to_string())
 }
 
 /// The one line an answer folds into (the hub's words for a gate's

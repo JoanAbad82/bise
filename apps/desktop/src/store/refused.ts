@@ -9,7 +9,7 @@
 // Owner: amb-home.
 import type { Part, ProjectRow } from "@/proto";
 import { actedKey } from "./acted";
-import type { AnswerFrom } from "./asides";
+import type { AnswerFrom } from "./answered";
 
 /** What he sent, to send it again ('try again'). */
 export type Attempt =

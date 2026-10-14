@@ -46,7 +46,8 @@ export function ThreadInbox({ project }: { project: string }) {
       tip={<CardTip project={project} />}
       ports={{
         answer: (p, card, reply, parts) => {
-          store.answer(p, card, reply, undefined, parts);
+          // answer-in-thread A: the row says 'answered from the inbox screen'; the window stays here
+          store.answer(p, card, reply, undefined, parts, { at: null, inbox: true });
         },
         close: (p, card) => {
           store.close(p, card);
