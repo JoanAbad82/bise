@@ -637,7 +637,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
                   ? {
                       closed: true,
                       keys: (
-                        <span className="ic-keys" data-testid="inbox.block.closed.keys">
+                        <span data-testid="inbox.block.closed.keys">
                           <Kbd>⏎</Kbd> sends your words as a message <Kbd>esc</Kbd> back
                         </span>
                       ),

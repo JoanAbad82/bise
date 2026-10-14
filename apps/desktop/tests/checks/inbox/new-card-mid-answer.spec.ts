@@ -73,7 +73,9 @@ test('inbox/new-card-mid-answer: a new card never takes the card he answers nor 
 
     await test.step('two new cards come in, one ranked first: card 9 stays open, his words stay', async () => {
       await core.send(projects([NINE, ...NEW]) as never);
-      await expect(page.getByTestId('inbox.block'), 'the block counts the new ones').toContainText('3', { timeout: 5000 });
+      // the new ones wait as rows in the block (its head counts them, bise's notifications ask too)
+      await expect(page.getByTestId('inbox.block'), 'the new approval waits as a row').toContainText('release wants to run npm publish', { timeout: 5000 });
+      await expect(page.getByTestId('inbox.block')).toContainText('+ 2 more');
       await page.waitForTimeout(500);
       await expect(nine(page), 'card 9 is still the open one').toBeVisible();
       await expect(field(page), 'his half answer is all there').toHaveText(HALF);
