@@ -93,6 +93,13 @@ MANUAL = [
              files=["fflate.LICENSE"]),
         dict(name="@xmldom/xmldom 0.9.12 (XML DOM)", license="MIT", url="https://github.com/xmldom/xmldom",
              files=["xmldom.LICENSE"]),
+        dict(name="exceljs 4.4.0 (xlsx model and parts, src/sheets)", license="MIT", url="https://github.com/exceljs/exceljs",
+             files=["exceljs.LICENSE"]),
+        dict(name="saxes 5.0.1 (XML parser, used by exceljs's parts)", license="ISC",
+             url="https://github.com/lddubeau/saxes (the npm package has no LICENSE file: ISC as its package.json says)",
+             files=["saxes.LICENSE"]),
+        dict(name="xmlchars 2.2.0 (XML character classes, used by saxes)", license="MIT", url="https://github.com/lddubeau/xmlchars",
+             files=["xmlchars.LICENSE"]),
     ]),
     ("office/dist/office-view.js: the office viewer's docx renderer (office/sdk/src/view, docs/office.md)", [
         dict(name="docx-preview 0.4.1 (docx to HTML)", license="Apache-2.0", url="https://github.com/VolodymyrBaydalka/docxjs",

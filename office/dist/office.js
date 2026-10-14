@@ -6,6 +6,14 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res, err3) => function __init() {
+  if (err3) throw err3[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err3 = [e], e;
+  }
+};
 var __commonJS = (cb, mod) => function __require() {
   try {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
@@ -33,6 +41,4206 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/under-dash.js
+var require_under_dash = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/under-dash.js"(exports, module) {
+    var { toString } = Object.prototype;
+    var escapeHtmlRegex = /["&<>]/;
+    var _ = {
+      each: function each(obj, cb) {
+        if (obj) {
+          if (Array.isArray(obj)) {
+            obj.forEach(cb);
+          } else {
+            Object.keys(obj).forEach((key) => {
+              cb(obj[key], key);
+            });
+          }
+        }
+      },
+      some: function some(obj, cb) {
+        if (obj) {
+          if (Array.isArray(obj)) {
+            return obj.some(cb);
+          }
+          return Object.keys(obj).some((key) => cb(obj[key], key));
+        }
+        return false;
+      },
+      every: function every(obj, cb) {
+        if (obj) {
+          if (Array.isArray(obj)) {
+            return obj.every(cb);
+          }
+          return Object.keys(obj).every((key) => cb(obj[key], key));
+        }
+        return true;
+      },
+      map: function map(obj, cb) {
+        if (obj) {
+          if (Array.isArray(obj)) {
+            return obj.map(cb);
+          }
+          return Object.keys(obj).map((key) => cb(obj[key], key));
+        }
+        return [];
+      },
+      keyBy(a, p) {
+        return a.reduce((o, v) => {
+          o[v[p]] = v;
+          return o;
+        }, {});
+      },
+      isEqual: function isEqual(a, b) {
+        const aType = typeof a;
+        const bType = typeof b;
+        const aArray = Array.isArray(a);
+        const bArray = Array.isArray(b);
+        let keys;
+        if (aType !== bType) {
+          return false;
+        }
+        switch (typeof a) {
+          case "object":
+            if (aArray || bArray) {
+              if (aArray && bArray) {
+                return a.length === b.length && a.every((aValue, index) => {
+                  const bValue = b[index];
+                  return _.isEqual(aValue, bValue);
+                });
+              }
+              return false;
+            }
+            if (a === null || b === null) {
+              return a === b;
+            }
+            keys = Object.keys(a);
+            if (Object.keys(b).length !== keys.length) {
+              return false;
+            }
+            for (const key of keys) {
+              if (!b.hasOwnProperty(key)) {
+                return false;
+              }
+            }
+            return _.every(a, (aValue, key) => {
+              const bValue = b[key];
+              return _.isEqual(aValue, bValue);
+            });
+          default:
+            return a === b;
+        }
+      },
+      escapeHtml(html) {
+        const regexResult = escapeHtmlRegex.exec(html);
+        if (!regexResult) return html;
+        let result = "";
+        let escape = "";
+        let lastIndex = 0;
+        let i2 = regexResult.index;
+        for (; i2 < html.length; i2++) {
+          switch (html.charAt(i2)) {
+            case '"':
+              escape = "&quot;";
+              break;
+            case "&":
+              escape = "&amp;";
+              break;
+            case "'":
+              escape = "&apos;";
+              break;
+            case "<":
+              escape = "&lt;";
+              break;
+            case ">":
+              escape = "&gt;";
+              break;
+            default:
+              continue;
+          }
+          if (lastIndex !== i2) result += html.substring(lastIndex, i2);
+          lastIndex = i2 + 1;
+          result += escape;
+        }
+        if (lastIndex !== i2) return result + html.substring(lastIndex, i2);
+        return result;
+      },
+      strcmp(a, b) {
+        if (a < b) return -1;
+        if (a > b) return 1;
+        return 0;
+      },
+      isUndefined(val) {
+        return toString.call(val) === "[object Undefined]";
+      },
+      isObject(val) {
+        return toString.call(val) === "[object Object]";
+      },
+      deepMerge() {
+        const target = arguments[0] || {};
+        const { length } = arguments;
+        let src, clone, copyIsArray;
+        function assignValue(val, key) {
+          src = target[key];
+          copyIsArray = Array.isArray(val);
+          if (_.isObject(val) || copyIsArray) {
+            if (copyIsArray) {
+              copyIsArray = false;
+              clone = src && Array.isArray(src) ? src : [];
+            } else {
+              clone = src && _.isObject(src) ? src : {};
+            }
+            target[key] = _.deepMerge(clone, val);
+          } else if (!_.isUndefined(val)) {
+            target[key] = val;
+          }
+        }
+        for (let i2 = 0; i2 < length; i2++) {
+          _.each(arguments[i2], assignValue);
+        }
+        return target;
+      }
+    };
+    module.exports = _;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/col-cache.js
+var require_col_cache = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/col-cache.js"(exports, module) {
+    var addressRegex = /^[A-Z]+\d+$/;
+    var colCache = {
+      _dictionary: [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "R",
+        "S",
+        "T",
+        "U",
+        "V",
+        "W",
+        "X",
+        "Y",
+        "Z"
+      ],
+      _l2nFill: 0,
+      _l2n: {},
+      _n2l: [],
+      _level(n2) {
+        if (n2 <= 26) {
+          return 1;
+        }
+        if (n2 <= 26 * 26) {
+          return 2;
+        }
+        return 3;
+      },
+      _fill(level2) {
+        let c;
+        let v;
+        let l1;
+        let l2;
+        let l3;
+        let n2 = 1;
+        if (level2 >= 4) {
+          throw new Error("Out of bounds. Excel supports columns from 1 to 16384");
+        }
+        if (this._l2nFill < 1 && level2 >= 1) {
+          while (n2 <= 26) {
+            c = this._dictionary[n2 - 1];
+            this._n2l[n2] = c;
+            this._l2n[c] = n2;
+            n2++;
+          }
+          this._l2nFill = 1;
+        }
+        if (this._l2nFill < 2 && level2 >= 2) {
+          n2 = 27;
+          while (n2 <= 26 + 26 * 26) {
+            v = n2 - (26 + 1);
+            l1 = v % 26;
+            l2 = Math.floor(v / 26);
+            c = this._dictionary[l2] + this._dictionary[l1];
+            this._n2l[n2] = c;
+            this._l2n[c] = n2;
+            n2++;
+          }
+          this._l2nFill = 2;
+        }
+        if (this._l2nFill < 3 && level2 >= 3) {
+          n2 = 26 + 26 * 26 + 1;
+          while (n2 <= 16384) {
+            v = n2 - (26 * 26 + 26 + 1);
+            l1 = v % 26;
+            l2 = Math.floor(v / 26) % 26;
+            l3 = Math.floor(v / (26 * 26));
+            c = this._dictionary[l3] + this._dictionary[l2] + this._dictionary[l1];
+            this._n2l[n2] = c;
+            this._l2n[c] = n2;
+            n2++;
+          }
+          this._l2nFill = 3;
+        }
+      },
+      l2n(l) {
+        if (!this._l2n[l]) {
+          this._fill(l.length);
+        }
+        if (!this._l2n[l]) {
+          throw new Error(`Out of bounds. Invalid column letter: ${l}`);
+        }
+        return this._l2n[l];
+      },
+      n2l(n2) {
+        if (n2 < 1 || n2 > 16384) {
+          throw new Error(`${n2} is out of bounds. Excel supports columns from 1 to 16384`);
+        }
+        if (!this._n2l[n2]) {
+          this._fill(this._level(n2));
+        }
+        return this._n2l[n2];
+      },
+      // =========================================================================
+      // Address processing
+      _hash: {},
+      // check if value looks like an address
+      validateAddress(value) {
+        if (!addressRegex.test(value)) {
+          throw new Error(`Invalid Address: ${value}`);
+        }
+        return true;
+      },
+      // convert address string into structure
+      decodeAddress(value) {
+        const addr = value.length < 5 && this._hash[value];
+        if (addr) {
+          return addr;
+        }
+        let hasCol = false;
+        let col2 = "";
+        let colNumber2 = 0;
+        let hasRow = false;
+        let row = "";
+        let rowNumber = 0;
+        for (let i2 = 0, char; i2 < value.length; i2++) {
+          char = value.charCodeAt(i2);
+          if (!hasRow && char >= 65 && char <= 90) {
+            hasCol = true;
+            col2 += value[i2];
+            colNumber2 = colNumber2 * 26 + char - 64;
+          } else if (char >= 48 && char <= 57) {
+            hasRow = true;
+            row += value[i2];
+            rowNumber = rowNumber * 10 + char - 48;
+          } else if (hasRow && hasCol && char !== 36) {
+            break;
+          }
+        }
+        if (!hasCol) {
+          colNumber2 = void 0;
+        } else if (colNumber2 > 16384) {
+          throw new Error(`Out of bounds. Invalid column letter: ${col2}`);
+        }
+        if (!hasRow) {
+          rowNumber = void 0;
+        }
+        value = col2 + row;
+        const address = {
+          address: value,
+          col: colNumber2,
+          row: rowNumber,
+          $col$row: `$${col2}$${row}`
+        };
+        if (colNumber2 <= 100 && rowNumber <= 100) {
+          this._hash[value] = address;
+          this._hash[address.$col$row] = address;
+        }
+        return address;
+      },
+      // convert r,c into structure (if only 1 arg, assume r is address string)
+      getAddress(r, c) {
+        if (c) {
+          const address = this.n2l(c) + r;
+          return this.decodeAddress(address);
+        }
+        return this.decodeAddress(r);
+      },
+      // convert [address], [tl:br] into address structures
+      decode(value) {
+        const parts = value.split(":");
+        if (parts.length === 2) {
+          const tl = this.decodeAddress(parts[0]);
+          const br = this.decodeAddress(parts[1]);
+          const result = {
+            top: Math.min(tl.row, br.row),
+            left: Math.min(tl.col, br.col),
+            bottom: Math.max(tl.row, br.row),
+            right: Math.max(tl.col, br.col)
+          };
+          result.tl = this.n2l(result.left) + result.top;
+          result.br = this.n2l(result.right) + result.bottom;
+          result.dimensions = `${result.tl}:${result.br}`;
+          return result;
+        }
+        return this.decodeAddress(value);
+      },
+      // convert [sheetName!][$]col[$]row[[$]col[$]row] into address or range structures
+      decodeEx(value) {
+        const groups = value.match(/(?:(?:(?:'((?:[^']|'')*)')|([^'^ !]*))!)?(.*)/);
+        const sheetName = groups[1] || groups[2];
+        const reference = groups[3];
+        const parts = reference.split(":");
+        if (parts.length > 1) {
+          let tl = this.decodeAddress(parts[0]);
+          let br = this.decodeAddress(parts[1]);
+          const top = Math.min(tl.row, br.row);
+          const left = Math.min(tl.col, br.col);
+          const bottom = Math.max(tl.row, br.row);
+          const right = Math.max(tl.col, br.col);
+          tl = this.n2l(left) + top;
+          br = this.n2l(right) + bottom;
+          return {
+            top,
+            left,
+            bottom,
+            right,
+            sheetName,
+            tl: { address: tl, col: left, row: top, $col$row: `$${this.n2l(left)}$${top}`, sheetName },
+            br: {
+              address: br,
+              col: right,
+              row: bottom,
+              $col$row: `$${this.n2l(right)}$${bottom}`,
+              sheetName
+            },
+            dimensions: `${tl}:${br}`
+          };
+        }
+        if (reference.startsWith("#")) {
+          return sheetName ? { sheetName, error: reference } : { error: reference };
+        }
+        const address = this.decodeAddress(reference);
+        return sheetName ? { sheetName, ...address } : address;
+      },
+      // convert row,col into address string
+      encodeAddress(row, col2) {
+        return colCache.n2l(col2) + row;
+      },
+      // convert row,col into string address or t,l,b,r into range
+      encode() {
+        switch (arguments.length) {
+          case 2:
+            return colCache.encodeAddress(arguments[0], arguments[1]);
+          case 4:
+            return `${colCache.encodeAddress(arguments[0], arguments[1])}:${colCache.encodeAddress(
+              arguments[2],
+              arguments[3]
+            )}`;
+          default:
+            throw new Error("Can only encode with 2 or 4 arguments");
+        }
+      },
+      // return true if address is contained within range
+      inRange(range, address) {
+        const [left, top, , right, bottom] = range;
+        const [col2, row] = address;
+        return col2 >= left && col2 <= right && row >= top && row <= bottom;
+      }
+    };
+    module.exports = colCache;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/range.js
+var require_range = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/range.js"(exports, module) {
+    var colCache = require_col_cache();
+    var Range = class _Range {
+      constructor() {
+        this.decode(arguments);
+      }
+      setTLBR(t, l, b, r, s) {
+        if (arguments.length < 4) {
+          const tl = colCache.decodeAddress(t);
+          const br = colCache.decodeAddress(l);
+          this.model = {
+            top: Math.min(tl.row, br.row),
+            left: Math.min(tl.col, br.col),
+            bottom: Math.max(tl.row, br.row),
+            right: Math.max(tl.col, br.col),
+            sheetName: b
+          };
+          this.setTLBR(tl.row, tl.col, br.row, br.col, s);
+        } else {
+          this.model = {
+            top: Math.min(t, b),
+            left: Math.min(l, r),
+            bottom: Math.max(t, b),
+            right: Math.max(l, r),
+            sheetName: s
+          };
+        }
+      }
+      decode(argv) {
+        switch (argv.length) {
+          case 5:
+            this.setTLBR(argv[0], argv[1], argv[2], argv[3], argv[4]);
+            break;
+          case 4:
+            this.setTLBR(argv[0], argv[1], argv[2], argv[3]);
+            break;
+          case 3:
+            this.setTLBR(argv[0], argv[1], argv[2]);
+            break;
+          case 2:
+            this.setTLBR(argv[0], argv[1]);
+            break;
+          case 1: {
+            const value = argv[0];
+            if (value instanceof _Range) {
+              this.model = {
+                top: value.model.top,
+                left: value.model.left,
+                bottom: value.model.bottom,
+                right: value.model.right,
+                sheetName: value.sheetName
+              };
+            } else if (value instanceof Array) {
+              this.decode(value);
+            } else if (value.top && value.left && value.bottom && value.right) {
+              this.model = {
+                top: value.top,
+                left: value.left,
+                bottom: value.bottom,
+                right: value.right,
+                sheetName: value.sheetName
+              };
+            } else {
+              const tlbr = colCache.decodeEx(value);
+              if (tlbr.top) {
+                this.model = {
+                  top: tlbr.top,
+                  left: tlbr.left,
+                  bottom: tlbr.bottom,
+                  right: tlbr.right,
+                  sheetName: tlbr.sheetName
+                };
+              } else {
+                this.model = {
+                  top: tlbr.row,
+                  left: tlbr.col,
+                  bottom: tlbr.row,
+                  right: tlbr.col,
+                  sheetName: tlbr.sheetName
+                };
+              }
+            }
+            break;
+          }
+          case 0:
+            this.model = {
+              top: 0,
+              left: 0,
+              bottom: 0,
+              right: 0
+            };
+            break;
+          default:
+            throw new Error(`Invalid number of arguments to _getDimensions() - ${argv.length}`);
+        }
+      }
+      get top() {
+        return this.model.top || 1;
+      }
+      set top(value) {
+        this.model.top = value;
+      }
+      get left() {
+        return this.model.left || 1;
+      }
+      set left(value) {
+        this.model.left = value;
+      }
+      get bottom() {
+        return this.model.bottom || 1;
+      }
+      set bottom(value) {
+        this.model.bottom = value;
+      }
+      get right() {
+        return this.model.right || 1;
+      }
+      set right(value) {
+        this.model.right = value;
+      }
+      get sheetName() {
+        return this.model.sheetName;
+      }
+      set sheetName(value) {
+        this.model.sheetName = value;
+      }
+      get _serialisedSheetName() {
+        const { sheetName } = this.model;
+        if (sheetName) {
+          if (/^[a-zA-Z0-9]*$/.test(sheetName)) {
+            return `${sheetName}!`;
+          }
+          return `'${sheetName}'!`;
+        }
+        return "";
+      }
+      expand(top, left, bottom, right) {
+        if (!this.model.top || top < this.top) this.top = top;
+        if (!this.model.left || left < this.left) this.left = left;
+        if (!this.model.bottom || bottom > this.bottom) this.bottom = bottom;
+        if (!this.model.right || right > this.right) this.right = right;
+      }
+      expandRow(row) {
+        if (row) {
+          const { dimensions, number: number2 } = row;
+          if (dimensions) {
+            this.expand(number2, dimensions.min, number2, dimensions.max);
+          }
+        }
+      }
+      expandToAddress(addressStr) {
+        const address = colCache.decodeEx(addressStr);
+        this.expand(address.row, address.col, address.row, address.col);
+      }
+      get tl() {
+        return colCache.n2l(this.left) + this.top;
+      }
+      get $t$l() {
+        return `$${colCache.n2l(this.left)}$${this.top}`;
+      }
+      get br() {
+        return colCache.n2l(this.right) + this.bottom;
+      }
+      get $b$r() {
+        return `$${colCache.n2l(this.right)}$${this.bottom}`;
+      }
+      get range() {
+        return `${this._serialisedSheetName + this.tl}:${this.br}`;
+      }
+      get $range() {
+        return `${this._serialisedSheetName + this.$t$l}:${this.$b$r}`;
+      }
+      get shortRange() {
+        return this.count > 1 ? this.range : this._serialisedSheetName + this.tl;
+      }
+      get $shortRange() {
+        return this.count > 1 ? this.$range : this._serialisedSheetName + this.$t$l;
+      }
+      get count() {
+        return (1 + this.bottom - this.top) * (1 + this.right - this.left);
+      }
+      toString() {
+        return this.range;
+      }
+      intersects(other) {
+        if (other.sheetName && this.sheetName && other.sheetName !== this.sheetName) return false;
+        if (other.bottom < this.top) return false;
+        if (other.top > this.bottom) return false;
+        if (other.right < this.left) return false;
+        if (other.left > this.right) return false;
+        return true;
+      }
+      contains(addressStr) {
+        const address = colCache.decodeEx(addressStr);
+        return this.containsEx(address);
+      }
+      containsEx(address) {
+        if (address.sheetName && this.sheetName && address.sheetName !== this.sheetName) return false;
+        return address.row >= this.top && address.row <= this.bottom && address.col >= this.left && address.col <= this.right;
+      }
+      forEachAddress(cb) {
+        for (let col2 = this.left; col2 <= this.right; col2++) {
+          for (let row = this.top; row <= this.bottom; row++) {
+            cb(colCache.encodeAddress(row, col2), row, col2);
+          }
+        }
+      }
+    };
+    module.exports = Range;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/enums.js
+var require_enums = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/enums.js"(exports, module) {
+    "use strict";
+    module.exports = {
+      ValueType: {
+        Null: 0,
+        Merge: 1,
+        Number: 2,
+        String: 3,
+        Date: 4,
+        Hyperlink: 5,
+        Formula: 6,
+        SharedString: 7,
+        RichText: 8,
+        Boolean: 9,
+        Error: 10
+      },
+      FormulaType: {
+        None: 0,
+        Master: 1,
+        Shared: 2
+      },
+      RelationshipType: {
+        None: 0,
+        OfficeDocument: 1,
+        Worksheet: 2,
+        CalcChain: 3,
+        SharedStrings: 4,
+        Styles: 5,
+        Theme: 6,
+        Hyperlink: 7
+      },
+      DocumentType: {
+        Xlsx: 1
+      },
+      ReadingOrder: {
+        LeftToRight: 1,
+        RightToLeft: 2
+      },
+      ErrorValue: {
+        NotApplicable: "#N/A",
+        Ref: "#REF!",
+        Name: "#NAME?",
+        DivZero: "#DIV/0!",
+        Null: "#NULL!",
+        Value: "#VALUE!",
+        Num: "#NUM!"
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/shared-formula.js
+var require_shared_formula = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/shared-formula.js"(exports, module) {
+    var colCache = require_col_cache();
+    var replacementCandidateRx = /(([a-z_\-0-9]*)!)?([a-z0-9_$]{2,})([(])?/gi;
+    var CRrx = /^([$])?([a-z]+)([$])?([1-9][0-9]*)$/i;
+    function slideFormula(formula, fromCell, toCell) {
+      const offset = colCache.decode(fromCell);
+      const to = colCache.decode(toCell);
+      return formula.replace(
+        replacementCandidateRx,
+        (refMatch, sheet, sheetMaybe, addrPart, trailingParen) => {
+          if (trailingParen) {
+            return refMatch;
+          }
+          const match = CRrx.exec(addrPart);
+          if (match) {
+            const colDollar = match[1];
+            const colStr = match[2].toUpperCase();
+            const rowDollar = match[3];
+            const rowStr = match[4];
+            if (colStr.length > 3 || colStr.length === 3 && colStr > "XFD") {
+              return refMatch;
+            }
+            let col2 = colCache.l2n(colStr);
+            let row = parseInt(rowStr, 10);
+            if (!colDollar) {
+              col2 += to.col - offset.col;
+            }
+            if (!rowDollar) {
+              row += to.row - offset.row;
+            }
+            const res = (sheet || "") + (colDollar || "") + colCache.n2l(col2) + (rowDollar || "") + row;
+            return res;
+          }
+          return refMatch;
+        }
+      );
+    }
+    module.exports = {
+      slideFormula
+    };
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/note.js
+var require_note = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/note.js"(exports, module) {
+    var _ = require_under_dash();
+    var Note = class _Note {
+      constructor(note) {
+        this.note = note;
+      }
+      get model() {
+        let value = null;
+        switch (typeof this.note) {
+          case "string":
+            value = {
+              type: "note",
+              note: {
+                texts: [
+                  {
+                    text: this.note
+                  }
+                ]
+              }
+            };
+            break;
+          default:
+            value = {
+              type: "note",
+              note: this.note
+            };
+            break;
+        }
+        return _.deepMerge({}, _Note.DEFAULT_CONFIGS, value);
+      }
+      set model(value) {
+        const { note } = value;
+        const { texts } = note;
+        if (texts.length === 1 && Object.keys(texts[0]).length === 1) {
+          this.note = texts[0].text;
+        } else {
+          this.note = note;
+        }
+      }
+      static fromModel(model) {
+        const note = new _Note();
+        note.model = model;
+        return note;
+      }
+    };
+    Note.DEFAULT_CONFIGS = {
+      note: {
+        margins: {
+          insetmode: "auto",
+          inset: [0.13, 0.13, 0.25, 0.25]
+        },
+        protection: {
+          locked: "True",
+          lockText: "True"
+        },
+        editAs: "absolute"
+      }
+    };
+    module.exports = Note;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/cell.js
+var require_cell = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/cell.js"(exports, module) {
+    var colCache = require_col_cache();
+    var _ = require_under_dash();
+    var Enums = require_enums();
+    var { slideFormula } = require_shared_formula();
+    var Note = require_note();
+    var Cell = class _Cell {
+      constructor(row, column, address) {
+        if (!row || !column) {
+          throw new Error("A Cell needs a Row");
+        }
+        this._row = row;
+        this._column = column;
+        colCache.validateAddress(address);
+        this._address = address;
+        this._value = Value.create(_Cell.Types.Null, this);
+        this.style = this._mergeStyle(row.style, column.style, {});
+        this._mergeCount = 0;
+      }
+      get worksheet() {
+        return this._row.worksheet;
+      }
+      get workbook() {
+        return this._row.worksheet.workbook;
+      }
+      // help GC by removing cyclic (and other) references
+      destroy() {
+        delete this.style;
+        delete this._value;
+        delete this._row;
+        delete this._column;
+        delete this._address;
+      }
+      // =========================================================================
+      // Styles stuff
+      get numFmt() {
+        return this.style.numFmt;
+      }
+      set numFmt(value) {
+        this.style.numFmt = value;
+      }
+      get font() {
+        return this.style.font;
+      }
+      set font(value) {
+        this.style.font = value;
+      }
+      get alignment() {
+        return this.style.alignment;
+      }
+      set alignment(value) {
+        this.style.alignment = value;
+      }
+      get border() {
+        return this.style.border;
+      }
+      set border(value) {
+        this.style.border = value;
+      }
+      get fill() {
+        return this.style.fill;
+      }
+      set fill(value) {
+        this.style.fill = value;
+      }
+      get protection() {
+        return this.style.protection;
+      }
+      set protection(value) {
+        this.style.protection = value;
+      }
+      _mergeStyle(rowStyle, colStyle, style) {
+        const numFmt = rowStyle && rowStyle.numFmt || colStyle && colStyle.numFmt;
+        if (numFmt) style.numFmt = numFmt;
+        const font = rowStyle && rowStyle.font || colStyle && colStyle.font;
+        if (font) style.font = font;
+        const alignment = rowStyle && rowStyle.alignment || colStyle && colStyle.alignment;
+        if (alignment) style.alignment = alignment;
+        const border = rowStyle && rowStyle.border || colStyle && colStyle.border;
+        if (border) style.border = border;
+        const fill2 = rowStyle && rowStyle.fill || colStyle && colStyle.fill;
+        if (fill2) style.fill = fill2;
+        const protection = rowStyle && rowStyle.protection || colStyle && colStyle.protection;
+        if (protection) style.protection = protection;
+        return style;
+      }
+      // =========================================================================
+      // return the address for this cell
+      get address() {
+        return this._address;
+      }
+      get row() {
+        return this._row.number;
+      }
+      get col() {
+        return this._column.number;
+      }
+      get $col$row() {
+        return `$${this._column.letter}$${this.row}`;
+      }
+      // =========================================================================
+      // Value stuff
+      get type() {
+        return this._value.type;
+      }
+      get effectiveType() {
+        return this._value.effectiveType;
+      }
+      toCsvString() {
+        return this._value.toCsvString();
+      }
+      // =========================================================================
+      // Merge stuff
+      addMergeRef() {
+        this._mergeCount++;
+      }
+      releaseMergeRef() {
+        this._mergeCount--;
+      }
+      get isMerged() {
+        return this._mergeCount > 0 || this.type === _Cell.Types.Merge;
+      }
+      merge(master, ignoreStyle) {
+        this._value.release();
+        this._value = Value.create(_Cell.Types.Merge, this, master);
+        if (!ignoreStyle) {
+          this.style = master.style;
+        }
+      }
+      unmerge() {
+        if (this.type === _Cell.Types.Merge) {
+          this._value.release();
+          this._value = Value.create(_Cell.Types.Null, this);
+          this.style = this._mergeStyle(this._row.style, this._column.style, {});
+        }
+      }
+      isMergedTo(master) {
+        if (this._value.type !== _Cell.Types.Merge) return false;
+        return this._value.isMergedTo(master);
+      }
+      get master() {
+        if (this.type === _Cell.Types.Merge) {
+          return this._value.master;
+        }
+        return this;
+      }
+      get isHyperlink() {
+        return this._value.type === _Cell.Types.Hyperlink;
+      }
+      get hyperlink() {
+        return this._value.hyperlink;
+      }
+      // return the value
+      get value() {
+        return this._value.value;
+      }
+      // set the value - can be number, string or raw
+      set value(v) {
+        if (this.type === _Cell.Types.Merge) {
+          this._value.master.value = v;
+          return;
+        }
+        this._value.release();
+        this._value = Value.create(Value.getType(v), this, v);
+      }
+      get note() {
+        return this._comment && this._comment.note;
+      }
+      set note(note) {
+        this._comment = new Note(note);
+      }
+      get text() {
+        return this._value.toString();
+      }
+      get html() {
+        return _.escapeHtml(this.text);
+      }
+      toString() {
+        return this.text;
+      }
+      _upgradeToHyperlink(hyperlink) {
+        if (this.type === _Cell.Types.String) {
+          this._value = Value.create(_Cell.Types.Hyperlink, this, {
+            text: this._value.value,
+            hyperlink
+          });
+        }
+      }
+      // =========================================================================
+      // Formula stuff
+      get formula() {
+        return this._value.formula;
+      }
+      get result() {
+        return this._value.result;
+      }
+      get formulaType() {
+        return this._value.formulaType;
+      }
+      // =========================================================================
+      // Name stuff
+      get fullAddress() {
+        const { worksheet } = this._row;
+        return {
+          sheetName: worksheet.name,
+          address: this.address,
+          row: this.row,
+          col: this.col
+        };
+      }
+      get name() {
+        return this.names[0];
+      }
+      set name(value) {
+        this.names = [value];
+      }
+      get names() {
+        return this.workbook.definedNames.getNamesEx(this.fullAddress);
+      }
+      set names(value) {
+        const { definedNames } = this.workbook;
+        definedNames.removeAllNames(this.fullAddress);
+        value.forEach((name) => {
+          definedNames.addEx(this.fullAddress, name);
+        });
+      }
+      addName(name) {
+        this.workbook.definedNames.addEx(this.fullAddress, name);
+      }
+      removeName(name) {
+        this.workbook.definedNames.removeEx(this.fullAddress, name);
+      }
+      removeAllNames() {
+        this.workbook.definedNames.removeAllNames(this.fullAddress);
+      }
+      // =========================================================================
+      // Data Validation stuff
+      get _dataValidations() {
+        return this.worksheet.dataValidations;
+      }
+      get dataValidation() {
+        return this._dataValidations.find(this.address);
+      }
+      set dataValidation(value) {
+        this._dataValidations.add(this.address, value);
+      }
+      // =========================================================================
+      // Model stuff
+      get model() {
+        const { model } = this._value;
+        model.style = this.style;
+        if (this._comment) {
+          model.comment = this._comment.model;
+        }
+        return model;
+      }
+      set model(value) {
+        this._value.release();
+        this._value = Value.create(value.type, this);
+        this._value.model = value;
+        if (value.comment) {
+          switch (value.comment.type) {
+            case "note":
+              this._comment = Note.fromModel(value.comment);
+              break;
+          }
+        }
+        if (value.style) {
+          this.style = value.style;
+        } else {
+          this.style = {};
+        }
+      }
+    };
+    Cell.Types = Enums.ValueType;
+    var NullValue = class {
+      constructor(cell) {
+        this.model = {
+          address: cell.address,
+          type: Cell.Types.Null
+        };
+      }
+      get value() {
+        return null;
+      }
+      set value(value) {
+      }
+      get type() {
+        return Cell.Types.Null;
+      }
+      get effectiveType() {
+        return Cell.Types.Null;
+      }
+      get address() {
+        return this.model.address;
+      }
+      set address(value) {
+        this.model.address = value;
+      }
+      toCsvString() {
+        return "";
+      }
+      release() {
+      }
+      toString() {
+        return "";
+      }
+    };
+    var NumberValue = class {
+      constructor(cell, value) {
+        this.model = {
+          address: cell.address,
+          type: Cell.Types.Number,
+          value
+        };
+      }
+      get value() {
+        return this.model.value;
+      }
+      set value(value) {
+        this.model.value = value;
+      }
+      get type() {
+        return Cell.Types.Number;
+      }
+      get effectiveType() {
+        return Cell.Types.Number;
+      }
+      get address() {
+        return this.model.address;
+      }
+      set address(value) {
+        this.model.address = value;
+      }
+      toCsvString() {
+        return this.model.value.toString();
+      }
+      release() {
+      }
+      toString() {
+        return this.model.value.toString();
+      }
+    };
+    var StringValue = class {
+      constructor(cell, value) {
+        this.model = {
+          address: cell.address,
+          type: Cell.Types.String,
+          value
+        };
+      }
+      get value() {
+        return this.model.value;
+      }
+      set value(value) {
+        this.model.value = value;
+      }
+      get type() {
+        return Cell.Types.String;
+      }
+      get effectiveType() {
+        return Cell.Types.String;
+      }
+      get address() {
+        return this.model.address;
+      }
+      set address(value) {
+        this.model.address = value;
+      }
+      toCsvString() {
+        return `"${this.model.value.replace(/"/g, '""')}"`;
+      }
+      release() {
+      }
+      toString() {
+        return this.model.value;
+      }
+    };
+    var RichTextValue = class {
+      constructor(cell, value) {
+        this.model = {
+          address: cell.address,
+          type: Cell.Types.String,
+          value
+        };
+      }
+      get value() {
+        return this.model.value;
+      }
+      set value(value) {
+        this.model.value = value;
+      }
+      toString() {
+        return this.model.value.richText.map((t) => t.text).join("");
+      }
+      get type() {
+        return Cell.Types.RichText;
+      }
+      get effectiveType() {
+        return Cell.Types.RichText;
+      }
+      get address() {
+        return this.model.address;
+      }
+      set address(value) {
+        this.model.address = value;
+      }
+      toCsvString() {
+        return `"${this.text.replace(/"/g, '""')}"`;
+      }
+      release() {
+      }
+    };
+    var DateValue = class {
+      constructor(cell, value) {
+        this.model = {
+          address: cell.address,
+          type: Cell.Types.Date,
+          value
+        };
+      }
+      get value() {
+        return this.model.value;
+      }
+      set value(value) {
+        this.model.value = value;
+      }
+      get type() {
+        return Cell.Types.Date;
+      }
+      get effectiveType() {
+        return Cell.Types.Date;
+      }
+      get address() {
+        return this.model.address;
+      }
+      set address(value) {
+        this.model.address = value;
+      }
+      toCsvString() {
+        return this.model.value.toISOString();
+      }
+      release() {
+      }
+      toString() {
+        return this.model.value.toString();
+      }
+    };
+    var HyperlinkValue = class {
+      constructor(cell, value) {
+        this.model = {
+          address: cell.address,
+          type: Cell.Types.Hyperlink,
+          text: value ? value.text : void 0,
+          hyperlink: value ? value.hyperlink : void 0
+        };
+        if (value && value.tooltip) {
+          this.model.tooltip = value.tooltip;
+        }
+      }
+      get value() {
+        const v = {
+          text: this.model.text,
+          hyperlink: this.model.hyperlink
+        };
+        if (this.model.tooltip) {
+          v.tooltip = this.model.tooltip;
+        }
+        return v;
+      }
+      set value(value) {
+        this.model = {
+          text: value.text,
+          hyperlink: value.hyperlink
+        };
+        if (value.tooltip) {
+          this.model.tooltip = value.tooltip;
+        }
+      }
+      get text() {
+        return this.model.text;
+      }
+      set text(value) {
+        this.model.text = value;
+      }
+      /*
+        get tooltip() {
+          return this.model.tooltip;
+        }
+      
+        set tooltip(value) {
+          this.model.tooltip = value;
+        } */
+      get hyperlink() {
+        return this.model.hyperlink;
+      }
+      set hyperlink(value) {
+        this.model.hyperlink = value;
+      }
+      get type() {
+        return Cell.Types.Hyperlink;
+      }
+      get effectiveType() {
+        return Cell.Types.Hyperlink;
+      }
+      get address() {
+        return this.model.address;
+      }
+      set address(value) {
+        this.model.address = value;
+      }
+      toCsvString() {
+        return this.model.hyperlink;
+      }
+      release() {
+      }
+      toString() {
+        return this.model.text;
+      }
+    };
+    var MergeValue = class {
+      constructor(cell, master) {
+        this.model = {
+          address: cell.address,
+          type: Cell.Types.Merge,
+          master: master ? master.address : void 0
+        };
+        this._master = master;
+        if (master) {
+          master.addMergeRef();
+        }
+      }
+      get value() {
+        return this._master.value;
+      }
+      set value(value) {
+        if (value instanceof Cell) {
+          if (this._master) {
+            this._master.releaseMergeRef();
+          }
+          value.addMergeRef();
+          this._master = value;
+        } else {
+          this._master.value = value;
+        }
+      }
+      isMergedTo(master) {
+        return master === this._master;
+      }
+      get master() {
+        return this._master;
+      }
+      get type() {
+        return Cell.Types.Merge;
+      }
+      get effectiveType() {
+        return this._master.effectiveType;
+      }
+      get address() {
+        return this.model.address;
+      }
+      set address(value) {
+        this.model.address = value;
+      }
+      toCsvString() {
+        return "";
+      }
+      release() {
+        this._master.releaseMergeRef();
+      }
+      toString() {
+        return this.value.toString();
+      }
+    };
+    var FormulaValue = class {
+      constructor(cell, value) {
+        this.cell = cell;
+        this.model = {
+          address: cell.address,
+          type: Cell.Types.Formula,
+          shareType: value ? value.shareType : void 0,
+          ref: value ? value.ref : void 0,
+          formula: value ? value.formula : void 0,
+          sharedFormula: value ? value.sharedFormula : void 0,
+          result: value ? value.result : void 0
+        };
+      }
+      _copyModel(model) {
+        const copy = {};
+        const cp = (name) => {
+          const value = model[name];
+          if (value) {
+            copy[name] = value;
+          }
+        };
+        cp("formula");
+        cp("result");
+        cp("ref");
+        cp("shareType");
+        cp("sharedFormula");
+        return copy;
+      }
+      get value() {
+        return this._copyModel(this.model);
+      }
+      set value(value) {
+        this.model = this._copyModel(value);
+      }
+      validate(value) {
+        switch (Value.getType(value)) {
+          case Cell.Types.Null:
+          case Cell.Types.String:
+          case Cell.Types.Number:
+          case Cell.Types.Date:
+            break;
+          case Cell.Types.Hyperlink:
+          case Cell.Types.Formula:
+          default:
+            throw new Error("Cannot process that type of result value");
+        }
+      }
+      get dependencies() {
+        const ranges = this.formula.match(/([a-zA-Z0-9]+!)?[A-Z]{1,3}\d{1,4}:[A-Z]{1,3}\d{1,4}/g);
+        const cells = this.formula.replace(/([a-zA-Z0-9]+!)?[A-Z]{1,3}\d{1,4}:[A-Z]{1,3}\d{1,4}/g, "").match(/([a-zA-Z0-9]+!)?[A-Z]{1,3}\d{1,4}/g);
+        return {
+          ranges,
+          cells
+        };
+      }
+      get formula() {
+        return this.model.formula || this._getTranslatedFormula();
+      }
+      set formula(value) {
+        this.model.formula = value;
+      }
+      get formulaType() {
+        if (this.model.formula) {
+          return Enums.FormulaType.Master;
+        }
+        if (this.model.sharedFormula) {
+          return Enums.FormulaType.Shared;
+        }
+        return Enums.FormulaType.None;
+      }
+      get result() {
+        return this.model.result;
+      }
+      set result(value) {
+        this.model.result = value;
+      }
+      get type() {
+        return Cell.Types.Formula;
+      }
+      get effectiveType() {
+        const v = this.model.result;
+        if (v === null || v === void 0) {
+          return Enums.ValueType.Null;
+        }
+        if (v instanceof String || typeof v === "string") {
+          return Enums.ValueType.String;
+        }
+        if (typeof v === "number") {
+          return Enums.ValueType.Number;
+        }
+        if (v instanceof Date) {
+          return Enums.ValueType.Date;
+        }
+        if (v.text && v.hyperlink) {
+          return Enums.ValueType.Hyperlink;
+        }
+        if (v.formula) {
+          return Enums.ValueType.Formula;
+        }
+        return Enums.ValueType.Null;
+      }
+      get address() {
+        return this.model.address;
+      }
+      set address(value) {
+        this.model.address = value;
+      }
+      _getTranslatedFormula() {
+        if (!this._translatedFormula && this.model.sharedFormula) {
+          const { worksheet } = this.cell;
+          const master = worksheet.findCell(this.model.sharedFormula);
+          this._translatedFormula = master && slideFormula(master.formula, master.address, this.model.address);
+        }
+        return this._translatedFormula;
+      }
+      toCsvString() {
+        return `${this.model.result || ""}`;
+      }
+      release() {
+      }
+      toString() {
+        return this.model.result ? this.model.result.toString() : "";
+      }
+    };
+    var SharedStringValue = class {
+      constructor(cell, value) {
+        this.model = {
+          address: cell.address,
+          type: Cell.Types.SharedString,
+          value
+        };
+      }
+      get value() {
+        return this.model.value;
+      }
+      set value(value) {
+        this.model.value = value;
+      }
+      get type() {
+        return Cell.Types.SharedString;
+      }
+      get effectiveType() {
+        return Cell.Types.SharedString;
+      }
+      get address() {
+        return this.model.address;
+      }
+      set address(value) {
+        this.model.address = value;
+      }
+      toCsvString() {
+        return this.model.value.toString();
+      }
+      release() {
+      }
+      toString() {
+        return this.model.value.toString();
+      }
+    };
+    var BooleanValue = class {
+      constructor(cell, value) {
+        this.model = {
+          address: cell.address,
+          type: Cell.Types.Boolean,
+          value
+        };
+      }
+      get value() {
+        return this.model.value;
+      }
+      set value(value) {
+        this.model.value = value;
+      }
+      get type() {
+        return Cell.Types.Boolean;
+      }
+      get effectiveType() {
+        return Cell.Types.Boolean;
+      }
+      get address() {
+        return this.model.address;
+      }
+      set address(value) {
+        this.model.address = value;
+      }
+      toCsvString() {
+        return this.model.value ? 1 : 0;
+      }
+      release() {
+      }
+      toString() {
+        return this.model.value.toString();
+      }
+    };
+    var ErrorValue = class {
+      constructor(cell, value) {
+        this.model = {
+          address: cell.address,
+          type: Cell.Types.Error,
+          value
+        };
+      }
+      get value() {
+        return this.model.value;
+      }
+      set value(value) {
+        this.model.value = value;
+      }
+      get type() {
+        return Cell.Types.Error;
+      }
+      get effectiveType() {
+        return Cell.Types.Error;
+      }
+      get address() {
+        return this.model.address;
+      }
+      set address(value) {
+        this.model.address = value;
+      }
+      toCsvString() {
+        return this.toString();
+      }
+      release() {
+      }
+      toString() {
+        return this.model.value.error.toString();
+      }
+    };
+    var JSONValue = class {
+      constructor(cell, value) {
+        this.model = {
+          address: cell.address,
+          type: Cell.Types.String,
+          value: JSON.stringify(value),
+          rawValue: value
+        };
+      }
+      get value() {
+        return this.model.rawValue;
+      }
+      set value(value) {
+        this.model.rawValue = value;
+        this.model.value = JSON.stringify(value);
+      }
+      get type() {
+        return Cell.Types.String;
+      }
+      get effectiveType() {
+        return Cell.Types.String;
+      }
+      get address() {
+        return this.model.address;
+      }
+      set address(value) {
+        this.model.address = value;
+      }
+      toCsvString() {
+        return this.model.value;
+      }
+      release() {
+      }
+      toString() {
+        return this.model.value;
+      }
+    };
+    var Value = {
+      getType(value) {
+        if (value === null || value === void 0) {
+          return Cell.Types.Null;
+        }
+        if (value instanceof String || typeof value === "string") {
+          return Cell.Types.String;
+        }
+        if (typeof value === "number") {
+          return Cell.Types.Number;
+        }
+        if (typeof value === "boolean") {
+          return Cell.Types.Boolean;
+        }
+        if (value instanceof Date) {
+          return Cell.Types.Date;
+        }
+        if (value.text && value.hyperlink) {
+          return Cell.Types.Hyperlink;
+        }
+        if (value.formula || value.sharedFormula) {
+          return Cell.Types.Formula;
+        }
+        if (value.richText) {
+          return Cell.Types.RichText;
+        }
+        if (value.sharedString) {
+          return Cell.Types.SharedString;
+        }
+        if (value.error) {
+          return Cell.Types.Error;
+        }
+        return Cell.Types.JSON;
+      },
+      // map valueType to constructor
+      types: [
+        { t: Cell.Types.Null, f: NullValue },
+        { t: Cell.Types.Number, f: NumberValue },
+        { t: Cell.Types.String, f: StringValue },
+        { t: Cell.Types.Date, f: DateValue },
+        { t: Cell.Types.Hyperlink, f: HyperlinkValue },
+        { t: Cell.Types.Formula, f: FormulaValue },
+        { t: Cell.Types.Merge, f: MergeValue },
+        { t: Cell.Types.JSON, f: JSONValue },
+        { t: Cell.Types.SharedString, f: SharedStringValue },
+        { t: Cell.Types.RichText, f: RichTextValue },
+        { t: Cell.Types.Boolean, f: BooleanValue },
+        { t: Cell.Types.Error, f: ErrorValue }
+      ].reduce((p, t) => {
+        p[t.t] = t.f;
+        return p;
+      }, []),
+      create(type, cell, value) {
+        const T3 = this.types[type];
+        if (!T3) {
+          throw new Error(`Could not create Value of type ${type}`);
+        }
+        return new T3(cell, value);
+      }
+    };
+    module.exports = Cell;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/row.js
+var require_row = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/row.js"(exports, module) {
+    "use strict";
+    var _ = require_under_dash();
+    var Enums = require_enums();
+    var colCache = require_col_cache();
+    var Cell = require_cell();
+    var Row = class {
+      constructor(worksheet, number2) {
+        this._worksheet = worksheet;
+        this._number = number2;
+        this._cells = [];
+        this.style = {};
+        this.outlineLevel = 0;
+      }
+      // return the row number
+      get number() {
+        return this._number;
+      }
+      get worksheet() {
+        return this._worksheet;
+      }
+      // Inform Streaming Writer that this row (and all rows before it) are complete
+      // and ready to write. Has no effect on Worksheet document
+      commit() {
+        this._worksheet._commitRow(this);
+      }
+      // helps GC by breaking cyclic references
+      destroy() {
+        delete this._worksheet;
+        delete this._cells;
+        delete this.style;
+      }
+      findCell(colNumber2) {
+        return this._cells[colNumber2 - 1];
+      }
+      // given {address, row, col}, find or create new cell
+      getCellEx(address) {
+        let cell = this._cells[address.col - 1];
+        if (!cell) {
+          const column = this._worksheet.getColumn(address.col);
+          cell = new Cell(this, column, address.address);
+          this._cells[address.col - 1] = cell;
+        }
+        return cell;
+      }
+      // get cell by key, letter or column number
+      getCell(col2) {
+        if (typeof col2 === "string") {
+          const column = this._worksheet.getColumnKey(col2);
+          if (column) {
+            col2 = column.number;
+          } else {
+            col2 = colCache.l2n(col2);
+          }
+        }
+        return this._cells[col2 - 1] || this.getCellEx({
+          address: colCache.encodeAddress(this._number, col2),
+          row: this._number,
+          col: col2
+        });
+      }
+      // remove cell(s) and shift all higher cells down by count
+      splice(start, count2, ...inserts) {
+        const nKeep = start + count2;
+        const nExpand = inserts.length - count2;
+        const nEnd = this._cells.length;
+        let i2;
+        let cSrc;
+        let cDst;
+        if (nExpand < 0) {
+          for (i2 = start + inserts.length; i2 <= nEnd; i2++) {
+            cDst = this._cells[i2 - 1];
+            cSrc = this._cells[i2 - nExpand - 1];
+            if (cSrc) {
+              cDst = this.getCell(i2);
+              cDst.value = cSrc.value;
+              cDst.style = cSrc.style;
+              cDst._comment = cSrc._comment;
+            } else if (cDst) {
+              cDst.value = null;
+              cDst.style = {};
+              cDst._comment = void 0;
+            }
+          }
+        } else if (nExpand > 0) {
+          for (i2 = nEnd; i2 >= nKeep; i2--) {
+            cSrc = this._cells[i2 - 1];
+            if (cSrc) {
+              cDst = this.getCell(i2 + nExpand);
+              cDst.value = cSrc.value;
+              cDst.style = cSrc.style;
+              cDst._comment = cSrc._comment;
+            } else {
+              this._cells[i2 + nExpand - 1] = void 0;
+            }
+          }
+        }
+        for (i2 = 0; i2 < inserts.length; i2++) {
+          cDst = this.getCell(start + i2);
+          cDst.value = inserts[i2];
+          cDst.style = {};
+          cDst._comment = void 0;
+        }
+      }
+      // Iterate over all non-null cells in this row
+      eachCell(options, iteratee) {
+        if (!iteratee) {
+          iteratee = options;
+          options = null;
+        }
+        if (options && options.includeEmpty) {
+          const n2 = this._cells.length;
+          for (let i2 = 1; i2 <= n2; i2++) {
+            iteratee(this.getCell(i2), i2);
+          }
+        } else {
+          this._cells.forEach((cell, index) => {
+            if (cell && cell.type !== Enums.ValueType.Null) {
+              iteratee(cell, index + 1);
+            }
+          });
+        }
+      }
+      // ===========================================================================
+      // Page Breaks
+      addPageBreak(lft, rght) {
+        const ws = this._worksheet;
+        const left = Math.max(0, lft - 1) || 0;
+        const right = Math.max(0, rght - 1) || 16838;
+        const pb = {
+          id: this._number,
+          max: right,
+          man: 1
+        };
+        if (left) pb.min = left;
+        ws.rowBreaks.push(pb);
+      }
+      // return a sparse array of cell values
+      get values() {
+        const values = [];
+        this._cells.forEach((cell) => {
+          if (cell && cell.type !== Enums.ValueType.Null) {
+            values[cell.col] = cell.value;
+          }
+        });
+        return values;
+      }
+      // set the values by contiguous or sparse array, or by key'd object literal
+      set values(value) {
+        this._cells = [];
+        if (!value) {
+        } else if (value instanceof Array) {
+          let offset = 0;
+          if (value.hasOwnProperty("0")) {
+            offset = 1;
+          }
+          value.forEach((item, index) => {
+            if (item !== void 0) {
+              this.getCellEx({
+                address: colCache.encodeAddress(this._number, index + offset),
+                row: this._number,
+                col: index + offset
+              }).value = item;
+            }
+          });
+        } else {
+          this._worksheet.eachColumnKey((column, key) => {
+            if (value[key] !== void 0) {
+              this.getCellEx({
+                address: colCache.encodeAddress(this._number, column.number),
+                row: this._number,
+                col: column.number
+              }).value = value[key];
+            }
+          });
+        }
+      }
+      // returns true if the row includes at least one cell with a value
+      get hasValues() {
+        return _.some(this._cells, (cell) => cell && cell.type !== Enums.ValueType.Null);
+      }
+      get cellCount() {
+        return this._cells.length;
+      }
+      get actualCellCount() {
+        let count2 = 0;
+        this.eachCell(() => {
+          count2++;
+        });
+        return count2;
+      }
+      // get the min and max column number for the non-null cells in this row or null
+      get dimensions() {
+        let min = 0;
+        let max2 = 0;
+        this._cells.forEach((cell) => {
+          if (cell && cell.type !== Enums.ValueType.Null) {
+            if (!min || min > cell.col) {
+              min = cell.col;
+            }
+            if (max2 < cell.col) {
+              max2 = cell.col;
+            }
+          }
+        });
+        return min > 0 ? {
+          min,
+          max: max2
+        } : null;
+      }
+      // =========================================================================
+      // styles
+      _applyStyle(name, value) {
+        this.style[name] = value;
+        this._cells.forEach((cell) => {
+          if (cell) {
+            cell[name] = value;
+          }
+        });
+        return value;
+      }
+      get numFmt() {
+        return this.style.numFmt;
+      }
+      set numFmt(value) {
+        this._applyStyle("numFmt", value);
+      }
+      get font() {
+        return this.style.font;
+      }
+      set font(value) {
+        this._applyStyle("font", value);
+      }
+      get alignment() {
+        return this.style.alignment;
+      }
+      set alignment(value) {
+        this._applyStyle("alignment", value);
+      }
+      get protection() {
+        return this.style.protection;
+      }
+      set protection(value) {
+        this._applyStyle("protection", value);
+      }
+      get border() {
+        return this.style.border;
+      }
+      set border(value) {
+        this._applyStyle("border", value);
+      }
+      get fill() {
+        return this.style.fill;
+      }
+      set fill(value) {
+        this._applyStyle("fill", value);
+      }
+      get hidden() {
+        return !!this._hidden;
+      }
+      set hidden(value) {
+        this._hidden = value;
+      }
+      get outlineLevel() {
+        return this._outlineLevel || 0;
+      }
+      set outlineLevel(value) {
+        this._outlineLevel = value;
+      }
+      get collapsed() {
+        return !!(this._outlineLevel && this._outlineLevel >= this._worksheet.properties.outlineLevelRow);
+      }
+      // =========================================================================
+      get model() {
+        const cells = [];
+        let min = 0;
+        let max2 = 0;
+        this._cells.forEach((cell) => {
+          if (cell) {
+            const cellModel = cell.model;
+            if (cellModel) {
+              if (!min || min > cell.col) {
+                min = cell.col;
+              }
+              if (max2 < cell.col) {
+                max2 = cell.col;
+              }
+              cells.push(cellModel);
+            }
+          }
+        });
+        return this.height || cells.length ? {
+          cells,
+          number: this.number,
+          min,
+          max: max2,
+          height: this.height,
+          style: this.style,
+          hidden: this.hidden,
+          outlineLevel: this.outlineLevel,
+          collapsed: this.collapsed
+        } : null;
+      }
+      set model(value) {
+        if (value.number !== this._number) {
+          throw new Error("Invalid row number in model");
+        }
+        this._cells = [];
+        let previousAddress;
+        value.cells.forEach((cellModel) => {
+          switch (cellModel.type) {
+            case Cell.Types.Merge:
+              break;
+            default: {
+              let address;
+              if (cellModel.address) {
+                address = colCache.decodeAddress(cellModel.address);
+              } else if (previousAddress) {
+                const { row } = previousAddress;
+                const col2 = previousAddress.col + 1;
+                address = {
+                  row,
+                  col: col2,
+                  address: colCache.encodeAddress(row, col2),
+                  $col$row: `$${colCache.n2l(col2)}$${row}`
+                };
+              }
+              previousAddress = address;
+              const cell = this.getCellEx(address);
+              cell.model = cellModel;
+              break;
+            }
+          }
+        });
+        if (value.height) {
+          this.height = value.height;
+        } else {
+          delete this.height;
+        }
+        this.hidden = value.hidden;
+        this.outlineLevel = value.outlineLevel || 0;
+        this.style = value.style && JSON.parse(JSON.stringify(value.style)) || {};
+      }
+    };
+    module.exports = Row;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/column.js
+var require_column = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/column.js"(exports, module) {
+    "use strict";
+    var _ = require_under_dash();
+    var Enums = require_enums();
+    var colCache = require_col_cache();
+    var DEFAULT_COLUMN_WIDTH = 9;
+    var Column = class _Column {
+      constructor(worksheet, number2, defn) {
+        this._worksheet = worksheet;
+        this._number = number2;
+        if (defn !== false) {
+          this.defn = defn;
+        }
+      }
+      get number() {
+        return this._number;
+      }
+      get worksheet() {
+        return this._worksheet;
+      }
+      get letter() {
+        return colCache.n2l(this._number);
+      }
+      get isCustomWidth() {
+        return this.width !== void 0 && this.width !== DEFAULT_COLUMN_WIDTH;
+      }
+      get defn() {
+        return {
+          header: this._header,
+          key: this.key,
+          width: this.width,
+          style: this.style,
+          hidden: this.hidden,
+          outlineLevel: this.outlineLevel
+        };
+      }
+      set defn(value) {
+        if (value) {
+          this.key = value.key;
+          this.width = value.width !== void 0 ? value.width : DEFAULT_COLUMN_WIDTH;
+          this.outlineLevel = value.outlineLevel;
+          if (value.style) {
+            this.style = value.style;
+          } else {
+            this.style = {};
+          }
+          this.header = value.header;
+          this._hidden = !!value.hidden;
+        } else {
+          delete this._header;
+          delete this._key;
+          delete this.width;
+          this.style = {};
+          this.outlineLevel = 0;
+        }
+      }
+      get headers() {
+        return this._header && this._header instanceof Array ? this._header : [this._header];
+      }
+      get header() {
+        return this._header;
+      }
+      set header(value) {
+        if (value !== void 0) {
+          this._header = value;
+          this.headers.forEach((text2, index) => {
+            this._worksheet.getCell(index + 1, this.number).value = text2;
+          });
+        } else {
+          this._header = void 0;
+        }
+      }
+      get key() {
+        return this._key;
+      }
+      set key(value) {
+        const column = this._key && this._worksheet.getColumnKey(this._key);
+        if (column === this) {
+          this._worksheet.deleteColumnKey(this._key);
+        }
+        this._key = value;
+        if (value) {
+          this._worksheet.setColumnKey(this._key, this);
+        }
+      }
+      get hidden() {
+        return !!this._hidden;
+      }
+      set hidden(value) {
+        this._hidden = value;
+      }
+      get outlineLevel() {
+        return this._outlineLevel || 0;
+      }
+      set outlineLevel(value) {
+        this._outlineLevel = value;
+      }
+      get collapsed() {
+        return !!(this._outlineLevel && this._outlineLevel >= this._worksheet.properties.outlineLevelCol);
+      }
+      toString() {
+        return JSON.stringify({
+          key: this.key,
+          width: this.width,
+          headers: this.headers.length ? this.headers : void 0
+        });
+      }
+      equivalentTo(other) {
+        return this.width === other.width && this.hidden === other.hidden && this.outlineLevel === other.outlineLevel && _.isEqual(this.style, other.style);
+      }
+      get isDefault() {
+        if (this.isCustomWidth) {
+          return false;
+        }
+        if (this.hidden) {
+          return false;
+        }
+        if (this.outlineLevel) {
+          return false;
+        }
+        const s = this.style;
+        if (s && (s.font || s.numFmt || s.alignment || s.border || s.fill || s.protection)) {
+          return false;
+        }
+        return true;
+      }
+      get headerCount() {
+        return this.headers.length;
+      }
+      eachCell(options, iteratee) {
+        const colNumber2 = this.number;
+        if (!iteratee) {
+          iteratee = options;
+          options = null;
+        }
+        this._worksheet.eachRow(options, (row, rowNumber) => {
+          iteratee(row.getCell(colNumber2), rowNumber);
+        });
+      }
+      get values() {
+        const v = [];
+        this.eachCell((cell, rowNumber) => {
+          if (cell && cell.type !== Enums.ValueType.Null) {
+            v[rowNumber] = cell.value;
+          }
+        });
+        return v;
+      }
+      set values(v) {
+        if (!v) {
+          return;
+        }
+        const colNumber2 = this.number;
+        let offset = 0;
+        if (v.hasOwnProperty("0")) {
+          offset = 1;
+        }
+        v.forEach((value, index) => {
+          this._worksheet.getCell(index + offset, colNumber2).value = value;
+        });
+      }
+      // =========================================================================
+      // styles
+      _applyStyle(name, value) {
+        this.style[name] = value;
+        this.eachCell((cell) => {
+          cell[name] = value;
+        });
+        return value;
+      }
+      get numFmt() {
+        return this.style.numFmt;
+      }
+      set numFmt(value) {
+        this._applyStyle("numFmt", value);
+      }
+      get font() {
+        return this.style.font;
+      }
+      set font(value) {
+        this._applyStyle("font", value);
+      }
+      get alignment() {
+        return this.style.alignment;
+      }
+      set alignment(value) {
+        this._applyStyle("alignment", value);
+      }
+      get protection() {
+        return this.style.protection;
+      }
+      set protection(value) {
+        this._applyStyle("protection", value);
+      }
+      get border() {
+        return this.style.border;
+      }
+      set border(value) {
+        this._applyStyle("border", value);
+      }
+      get fill() {
+        return this.style.fill;
+      }
+      set fill(value) {
+        this._applyStyle("fill", value);
+      }
+      // =============================================================================
+      // static functions
+      static toModel(columns) {
+        const cols = [];
+        let col2 = null;
+        if (columns) {
+          columns.forEach((column, index) => {
+            if (column.isDefault) {
+              if (col2) {
+                col2 = null;
+              }
+            } else if (!col2 || !column.equivalentTo(col2)) {
+              col2 = {
+                min: index + 1,
+                max: index + 1,
+                width: column.width !== void 0 ? column.width : DEFAULT_COLUMN_WIDTH,
+                style: column.style,
+                isCustomWidth: column.isCustomWidth,
+                hidden: column.hidden,
+                outlineLevel: column.outlineLevel,
+                collapsed: column.collapsed
+              };
+              cols.push(col2);
+            } else {
+              col2.max = index + 1;
+            }
+          });
+        }
+        return cols.length ? cols : void 0;
+      }
+      static fromModel(worksheet, cols) {
+        cols = cols || [];
+        const columns = [];
+        let count2 = 1;
+        let index = 0;
+        cols = cols.sort(function(pre, next) {
+          return pre.min - next.min;
+        });
+        while (index < cols.length) {
+          const col2 = cols[index++];
+          while (count2 < col2.min) {
+            columns.push(new _Column(worksheet, count2++));
+          }
+          while (count2 <= col2.max) {
+            columns.push(new _Column(worksheet, count2++, col2));
+          }
+        }
+        return columns.length ? columns : null;
+      }
+    };
+    module.exports = Column;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/anchor.js
+var require_anchor = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/anchor.js"(exports, module) {
+    "use strict";
+    var colCache = require_col_cache();
+    var Anchor = class _Anchor {
+      constructor(worksheet, address, offset = 0) {
+        this.worksheet = worksheet;
+        if (!address) {
+          this.nativeCol = 0;
+          this.nativeColOff = 0;
+          this.nativeRow = 0;
+          this.nativeRowOff = 0;
+        } else if (typeof address === "string") {
+          const decoded = colCache.decodeAddress(address);
+          this.nativeCol = decoded.col + offset;
+          this.nativeColOff = 0;
+          this.nativeRow = decoded.row + offset;
+          this.nativeRowOff = 0;
+        } else if (address.nativeCol !== void 0) {
+          this.nativeCol = address.nativeCol || 0;
+          this.nativeColOff = address.nativeColOff || 0;
+          this.nativeRow = address.nativeRow || 0;
+          this.nativeRowOff = address.nativeRowOff || 0;
+        } else if (address.col !== void 0) {
+          this.col = address.col + offset;
+          this.row = address.row + offset;
+        } else {
+          this.nativeCol = 0;
+          this.nativeColOff = 0;
+          this.nativeRow = 0;
+          this.nativeRowOff = 0;
+        }
+      }
+      static asInstance(model) {
+        return model instanceof _Anchor || model == null ? model : new _Anchor(model);
+      }
+      get col() {
+        return this.nativeCol + Math.min(this.colWidth - 1, this.nativeColOff) / this.colWidth;
+      }
+      set col(v) {
+        this.nativeCol = Math.floor(v);
+        this.nativeColOff = Math.floor((v - this.nativeCol) * this.colWidth);
+      }
+      get row() {
+        return this.nativeRow + Math.min(this.rowHeight - 1, this.nativeRowOff) / this.rowHeight;
+      }
+      set row(v) {
+        this.nativeRow = Math.floor(v);
+        this.nativeRowOff = Math.floor((v - this.nativeRow) * this.rowHeight);
+      }
+      get colWidth() {
+        return this.worksheet && this.worksheet.getColumn(this.nativeCol + 1) && this.worksheet.getColumn(this.nativeCol + 1).isCustomWidth ? Math.floor(this.worksheet.getColumn(this.nativeCol + 1).width * 1e4) : 64e4;
+      }
+      get rowHeight() {
+        return this.worksheet && this.worksheet.getRow(this.nativeRow + 1) && this.worksheet.getRow(this.nativeRow + 1).height ? Math.floor(this.worksheet.getRow(this.nativeRow + 1).height * 1e4) : 18e4;
+      }
+      get model() {
+        return {
+          nativeCol: this.nativeCol,
+          nativeColOff: this.nativeColOff,
+          nativeRow: this.nativeRow,
+          nativeRowOff: this.nativeRowOff
+        };
+      }
+      set model(value) {
+        this.nativeCol = value.nativeCol;
+        this.nativeColOff = value.nativeColOff;
+        this.nativeRow = value.nativeRow;
+        this.nativeRowOff = value.nativeRowOff;
+      }
+    };
+    module.exports = Anchor;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/image.js
+var require_image = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/image.js"(exports, module) {
+    var colCache = require_col_cache();
+    var Anchor = require_anchor();
+    var Image = class {
+      constructor(worksheet, model) {
+        this.worksheet = worksheet;
+        this.model = model;
+      }
+      get model() {
+        switch (this.type) {
+          case "background":
+            return {
+              type: this.type,
+              imageId: this.imageId
+            };
+          case "image":
+            return {
+              type: this.type,
+              imageId: this.imageId,
+              hyperlinks: this.range.hyperlinks,
+              range: {
+                tl: this.range.tl.model,
+                br: this.range.br && this.range.br.model,
+                ext: this.range.ext,
+                editAs: this.range.editAs
+              }
+            };
+          default:
+            throw new Error("Invalid Image Type");
+        }
+      }
+      set model({ type, imageId, range, hyperlinks }) {
+        this.type = type;
+        this.imageId = imageId;
+        if (type === "image") {
+          if (typeof range === "string") {
+            const decoded = colCache.decode(range);
+            this.range = {
+              tl: new Anchor(this.worksheet, { col: decoded.left, row: decoded.top }, -1),
+              br: new Anchor(this.worksheet, { col: decoded.right, row: decoded.bottom }, 0),
+              editAs: "oneCell"
+            };
+          } else {
+            this.range = {
+              tl: new Anchor(this.worksheet, range.tl, 0),
+              br: range.br && new Anchor(this.worksheet, range.br, 0),
+              ext: range.ext,
+              editAs: range.editAs,
+              hyperlinks: hyperlinks || range.hyperlinks
+            };
+          }
+        }
+      }
+    };
+    module.exports = Image;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/table.js
+var require_table = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/table.js"(exports, module) {
+    var colCache = require_col_cache();
+    var Column = class {
+      // wrapper around column model, allowing access and manipulation
+      constructor(table2, column, index) {
+        this.table = table2;
+        this.column = column;
+        this.index = index;
+      }
+      _set(name, value) {
+        this.table.cacheState();
+        this.column[name] = value;
+      }
+      /* eslint-disable lines-between-class-members */
+      get name() {
+        return this.column.name;
+      }
+      set name(value) {
+        this._set("name", value);
+      }
+      get filterButton() {
+        return this.column.filterButton;
+      }
+      set filterButton(value) {
+        this.column.filterButton = value;
+      }
+      get style() {
+        return this.column.style;
+      }
+      set style(value) {
+        this.column.style = value;
+      }
+      get totalsRowLabel() {
+        return this.column.totalsRowLabel;
+      }
+      set totalsRowLabel(value) {
+        this._set("totalsRowLabel", value);
+      }
+      get totalsRowFunction() {
+        return this.column.totalsRowFunction;
+      }
+      set totalsRowFunction(value) {
+        this._set("totalsRowFunction", value);
+      }
+      get totalsRowResult() {
+        return this.column.totalsRowResult;
+      }
+      set totalsRowResult(value) {
+        this._set("totalsRowResult", value);
+      }
+      get totalsRowFormula() {
+        return this.column.totalsRowFormula;
+      }
+      set totalsRowFormula(value) {
+        this._set("totalsRowFormula", value);
+      }
+      /* eslint-enable lines-between-class-members */
+    };
+    var Table = class {
+      constructor(worksheet, table2) {
+        this.worksheet = worksheet;
+        if (table2) {
+          this.table = table2;
+          this.validate();
+          this.store();
+        }
+      }
+      getFormula(column) {
+        switch (column.totalsRowFunction) {
+          case "none":
+            return null;
+          case "average":
+            return `SUBTOTAL(101,${this.table.name}[${column.name}])`;
+          case "countNums":
+            return `SUBTOTAL(102,${this.table.name}[${column.name}])`;
+          case "count":
+            return `SUBTOTAL(103,${this.table.name}[${column.name}])`;
+          case "max":
+            return `SUBTOTAL(104,${this.table.name}[${column.name}])`;
+          case "min":
+            return `SUBTOTAL(105,${this.table.name}[${column.name}])`;
+          case "stdDev":
+            return `SUBTOTAL(106,${this.table.name}[${column.name}])`;
+          case "var":
+            return `SUBTOTAL(107,${this.table.name}[${column.name}])`;
+          case "sum":
+            return `SUBTOTAL(109,${this.table.name}[${column.name}])`;
+          case "custom":
+            return column.totalsRowFormula;
+          default:
+            throw new Error(`Invalid Totals Row Function: ${column.totalsRowFunction}`);
+        }
+      }
+      get width() {
+        return this.table.columns.length;
+      }
+      get height() {
+        return this.table.rows.length;
+      }
+      get filterHeight() {
+        return this.height + (this.table.headerRow ? 1 : 0);
+      }
+      get tableHeight() {
+        return this.filterHeight + (this.table.totalsRow ? 1 : 0);
+      }
+      validate() {
+        const { table: table2 } = this;
+        const assign = (o, name, dflt2) => {
+          if (o[name] === void 0) {
+            o[name] = dflt2;
+          }
+        };
+        assign(table2, "headerRow", true);
+        assign(table2, "totalsRow", false);
+        assign(table2, "style", {});
+        assign(table2.style, "theme", "TableStyleMedium2");
+        assign(table2.style, "showFirstColumn", false);
+        assign(table2.style, "showLastColumn", false);
+        assign(table2.style, "showRowStripes", false);
+        assign(table2.style, "showColumnStripes", false);
+        const assert = (test, message) => {
+          if (!test) {
+            throw new Error(message);
+          }
+        };
+        assert(table2.ref, "Table must have ref");
+        assert(table2.columns, "Table must have column definitions");
+        assert(table2.rows, "Table must have row definitions");
+        table2.tl = colCache.decodeAddress(table2.ref);
+        const { row, col: col2 } = table2.tl;
+        assert(row > 0, "Table must be on valid row");
+        assert(col2 > 0, "Table must be on valid col");
+        const { width, filterHeight, tableHeight } = this;
+        table2.autoFilterRef = colCache.encode(row, col2, row + filterHeight - 1, col2 + width - 1);
+        table2.tableRef = colCache.encode(row, col2, row + tableHeight - 1, col2 + width - 1);
+        table2.columns.forEach((column, i2) => {
+          assert(column.name, `Column ${i2} must have a name`);
+          if (i2 === 0) {
+            assign(column, "totalsRowLabel", "Total");
+          } else {
+            assign(column, "totalsRowFunction", "none");
+            column.totalsRowFormula = this.getFormula(column);
+          }
+        });
+      }
+      store() {
+        const assignStyle = (cell, style) => {
+          if (style) {
+            Object.keys(style).forEach((key) => {
+              cell[key] = style[key];
+            });
+          }
+        };
+        const { worksheet, table: table2 } = this;
+        const { row, col: col2 } = table2.tl;
+        let count2 = 0;
+        if (table2.headerRow) {
+          const r = worksheet.getRow(row + count2++);
+          table2.columns.forEach((column, j) => {
+            const { style, name } = column;
+            const cell = r.getCell(col2 + j);
+            cell.value = name;
+            assignStyle(cell, style);
+          });
+        }
+        table2.rows.forEach((data) => {
+          const r = worksheet.getRow(row + count2++);
+          data.forEach((value, j) => {
+            const cell = r.getCell(col2 + j);
+            cell.value = value;
+            assignStyle(cell, table2.columns[j].style);
+          });
+        });
+        if (table2.totalsRow) {
+          const r = worksheet.getRow(row + count2++);
+          table2.columns.forEach((column, j) => {
+            const cell = r.getCell(col2 + j);
+            if (j === 0) {
+              cell.value = column.totalsRowLabel;
+            } else {
+              const formula = this.getFormula(column);
+              if (formula) {
+                cell.value = {
+                  formula: column.totalsRowFormula,
+                  result: column.totalsRowResult
+                };
+              } else {
+                cell.value = null;
+              }
+            }
+            assignStyle(cell, column.style);
+          });
+        }
+      }
+      load(worksheet) {
+        const { table: table2 } = this;
+        const { row, col: col2 } = table2.tl;
+        let count2 = 0;
+        if (table2.headerRow) {
+          const r = worksheet.getRow(row + count2++);
+          table2.columns.forEach((column, j) => {
+            const cell = r.getCell(col2 + j);
+            cell.value = column.name;
+          });
+        }
+        table2.rows.forEach((data) => {
+          const r = worksheet.getRow(row + count2++);
+          data.forEach((value, j) => {
+            const cell = r.getCell(col2 + j);
+            cell.value = value;
+          });
+        });
+        if (table2.totalsRow) {
+          const r = worksheet.getRow(row + count2++);
+          table2.columns.forEach((column, j) => {
+            const cell = r.getCell(col2 + j);
+            if (j === 0) {
+              cell.value = column.totalsRowLabel;
+            } else {
+              const formula = this.getFormula(column);
+              if (formula) {
+                cell.value = {
+                  formula: column.totalsRowFormula,
+                  result: column.totalsRowResult
+                };
+              }
+            }
+          });
+        }
+      }
+      get model() {
+        return this.table;
+      }
+      set model(value) {
+        this.table = value;
+      }
+      // ================================================================
+      // TODO: Mutating methods
+      cacheState() {
+        if (!this._cache) {
+          this._cache = {
+            ref: this.ref,
+            width: this.width,
+            tableHeight: this.tableHeight
+          };
+        }
+      }
+      commit() {
+        if (!this._cache) {
+          return;
+        }
+        this.validate();
+        const ref = colCache.decodeAddress(this._cache.ref);
+        if (this.ref !== this._cache.ref) {
+          for (let i2 = 0; i2 < this._cache.tableHeight; i2++) {
+            const row = this.worksheet.getRow(ref.row + i2);
+            for (let j = 0; j < this._cache.width; j++) {
+              const cell = row.getCell(ref.col + j);
+              cell.value = null;
+            }
+          }
+        } else {
+          for (let i2 = this.tableHeight; i2 < this._cache.tableHeight; i2++) {
+            const row = this.worksheet.getRow(ref.row + i2);
+            for (let j = 0; j < this._cache.width; j++) {
+              const cell = row.getCell(ref.col + j);
+              cell.value = null;
+            }
+          }
+          for (let i2 = 0; i2 < this.tableHeight; i2++) {
+            const row = this.worksheet.getRow(ref.row + i2);
+            for (let j = this.width; j < this._cache.width; j++) {
+              const cell = row.getCell(ref.col + j);
+              cell.value = null;
+            }
+          }
+        }
+        this.store();
+      }
+      addRow(values, rowNumber) {
+        this.cacheState();
+        if (rowNumber === void 0) {
+          this.table.rows.push(values);
+        } else {
+          this.table.rows.splice(rowNumber, 0, values);
+        }
+      }
+      removeRows(rowIndex, count2 = 1) {
+        this.cacheState();
+        this.table.rows.splice(rowIndex, count2);
+      }
+      getColumn(colIndex) {
+        const column = this.table.columns[colIndex];
+        return new Column(this, column, colIndex);
+      }
+      addColumn(column, values, colIndex) {
+        this.cacheState();
+        if (colIndex === void 0) {
+          this.table.columns.push(column);
+          this.table.rows.forEach((row, i2) => {
+            row.push(values[i2]);
+          });
+        } else {
+          this.table.columns.splice(colIndex, 0, column);
+          this.table.rows.forEach((row, i2) => {
+            row.splice(colIndex, 0, values[i2]);
+          });
+        }
+      }
+      removeColumns(colIndex, count2 = 1) {
+        this.cacheState();
+        this.table.columns.splice(colIndex, count2);
+        this.table.rows.forEach((row) => {
+          row.splice(colIndex, count2);
+        });
+      }
+      _assign(target, prop, value) {
+        this.cacheState();
+        target[prop] = value;
+      }
+      /* eslint-disable lines-between-class-members */
+      get ref() {
+        return this.table.ref;
+      }
+      set ref(value) {
+        this._assign(this.table, "ref", value);
+      }
+      get name() {
+        return this.table.name;
+      }
+      set name(value) {
+        this.table.name = value;
+      }
+      get displayName() {
+        return this.table.displyName || this.table.name;
+      }
+      set displayNamename(value) {
+        this.table.displayName = value;
+      }
+      get headerRow() {
+        return this.table.headerRow;
+      }
+      set headerRow(value) {
+        this._assign(this.table, "headerRow", value);
+      }
+      get totalsRow() {
+        return this.table.totalsRow;
+      }
+      set totalsRow(value) {
+        this._assign(this.table, "totalsRow", value);
+      }
+      get theme() {
+        return this.table.style.name;
+      }
+      set theme(value) {
+        this.table.style.name = value;
+      }
+      get showFirstColumn() {
+        return this.table.style.showFirstColumn;
+      }
+      set showFirstColumn(value) {
+        this.table.style.showFirstColumn = value;
+      }
+      get showLastColumn() {
+        return this.table.style.showLastColumn;
+      }
+      set showLastColumn(value) {
+        this.table.style.showLastColumn = value;
+      }
+      get showRowStripes() {
+        return this.table.style.showRowStripes;
+      }
+      set showRowStripes(value) {
+        this.table.style.showRowStripes = value;
+      }
+      get showColumnStripes() {
+        return this.table.style.showColumnStripes;
+      }
+      set showColumnStripes(value) {
+        this.table.style.showColumnStripes = value;
+      }
+      /* eslint-enable lines-between-class-members */
+    };
+    module.exports = Table;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/data-validations.js
+var require_data_validations = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/data-validations.js"(exports, module) {
+    var DataValidations = class {
+      constructor(model) {
+        this.model = model || {};
+      }
+      add(address, validation) {
+        return this.model[address] = validation;
+      }
+      find(address) {
+        return this.model[address];
+      }
+      remove(address) {
+        this.model[address] = void 0;
+      }
+    };
+    module.exports = DataValidations;
+  }
+});
+
+// office-stub:../utils/encryptor
+var require_encryptor = __commonJS({
+  "office-stub:../utils/encryptor"(exports, module) {
+    module.exports = (function(words) {
+      const fail = () => {
+        throw new Error(words);
+      };
+      const make = () => new Proxy(function() {
+      }, {
+        apply: fail,
+        construct: fail,
+        set: fail,
+        defineProperty: fail,
+        get: (_t, k) => k === "then" || k === "__esModule" || typeof k === "symbol" ? void 0 : make()
+      });
+      return make();
+    })("office: ../utils/encryptor is not available (exceljs sheet-password hashing (node crypto and Buffer): protect() without a password works)");
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/copy-style.js
+var require_copy_style = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/copy-style.js"(exports) {
+    var oneDepthCopy = (obj, nestKeys) => ({
+      ...obj,
+      ...nestKeys.reduce((memo, key) => {
+        if (obj[key]) memo[key] = { ...obj[key] };
+        return memo;
+      }, {})
+    });
+    var setIfExists = (src, dst, key, nestKeys = []) => {
+      if (src[key]) dst[key] = oneDepthCopy(src[key], nestKeys);
+    };
+    var isEmptyObj = (obj) => Object.keys(obj).length === 0;
+    var copyStyle = (style) => {
+      if (!style) return style;
+      if (isEmptyObj(style)) return {};
+      const copied = { ...style };
+      setIfExists(style, copied, "font", ["color"]);
+      setIfExists(style, copied, "alignment");
+      setIfExists(style, copied, "protection");
+      if (style.border) {
+        setIfExists(style, copied, "border");
+        setIfExists(style.border, copied.border, "top", ["color"]);
+        setIfExists(style.border, copied.border, "left", ["color"]);
+        setIfExists(style.border, copied.border, "bottom", ["color"]);
+        setIfExists(style.border, copied.border, "right", ["color"]);
+        setIfExists(style.border, copied.border, "diagonal", ["color"]);
+      }
+      if (style.fill) {
+        setIfExists(style, copied, "fill", ["fgColor", "bgColor", "center"]);
+        if (style.fill.stops) {
+          copied.fill.stops = style.fill.stops.map((s) => oneDepthCopy(s, ["color"]));
+        }
+      }
+      return copied;
+    };
+    exports.copyStyle = copyStyle;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/worksheet.js
+var require_worksheet = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/worksheet.js"(exports, module) {
+    var _ = require_under_dash();
+    var colCache = require_col_cache();
+    var Range = require_range();
+    var Row = require_row();
+    var Column = require_column();
+    var Enums = require_enums();
+    var Image = require_image();
+    var Table = require_table();
+    var DataValidations = require_data_validations();
+    var Encryptor = require_encryptor();
+    var { copyStyle } = require_copy_style();
+    var Worksheet = class {
+      constructor(options) {
+        options = options || {};
+        this._workbook = options.workbook;
+        this.id = options.id;
+        this.orderNo = options.orderNo;
+        this.name = options.name;
+        this.state = options.state || "visible";
+        this._rows = [];
+        this._columns = null;
+        this._keys = {};
+        this._merges = {};
+        this.rowBreaks = [];
+        this.properties = Object.assign(
+          {},
+          {
+            defaultRowHeight: 15,
+            dyDescent: 55,
+            outlineLevelCol: 0,
+            outlineLevelRow: 0
+          },
+          options.properties
+        );
+        this.pageSetup = Object.assign(
+          {},
+          {
+            margins: { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 },
+            orientation: "portrait",
+            horizontalDpi: 4294967295,
+            verticalDpi: 4294967295,
+            fitToPage: !!(options.pageSetup && (options.pageSetup.fitToWidth || options.pageSetup.fitToHeight) && !options.pageSetup.scale),
+            pageOrder: "downThenOver",
+            blackAndWhite: false,
+            draft: false,
+            cellComments: "None",
+            errors: "displayed",
+            scale: 100,
+            fitToWidth: 1,
+            fitToHeight: 1,
+            paperSize: void 0,
+            showRowColHeaders: false,
+            showGridLines: false,
+            firstPageNumber: void 0,
+            horizontalCentered: false,
+            verticalCentered: false,
+            rowBreaks: null,
+            colBreaks: null
+          },
+          options.pageSetup
+        );
+        this.headerFooter = Object.assign(
+          {},
+          {
+            differentFirst: false,
+            differentOddEven: false,
+            oddHeader: null,
+            oddFooter: null,
+            evenHeader: null,
+            evenFooter: null,
+            firstHeader: null,
+            firstFooter: null
+          },
+          options.headerFooter
+        );
+        this.dataValidations = new DataValidations();
+        this.views = options.views || [];
+        this.autoFilter = options.autoFilter || null;
+        this._media = [];
+        this.sheetProtection = null;
+        this.tables = {};
+        this.conditionalFormattings = [];
+      }
+      get name() {
+        return this._name;
+      }
+      set name(name) {
+        if (name === void 0) {
+          name = `sheet${this.id}`;
+        }
+        if (this._name === name) return;
+        if (typeof name !== "string") {
+          throw new Error("The name has to be a string.");
+        }
+        if (name === "") {
+          throw new Error("The name can't be empty.");
+        }
+        if (name === "History") {
+          throw new Error('The name "History" is protected. Please use a different name.');
+        }
+        if (/[*?:/\\[\]]/.test(name)) {
+          throw new Error(`Worksheet name ${name} cannot include any of the following characters: * ? : \\ / [ ]`);
+        }
+        if (/(^')|('$)/.test(name)) {
+          throw new Error(`The first or last character of worksheet name cannot be a single quotation mark: ${name}`);
+        }
+        if (name && name.length > 31) {
+          console.warn(`Worksheet name ${name} exceeds 31 chars. This will be truncated`);
+          name = name.substring(0, 31);
+        }
+        if (this._workbook._worksheets.find((ws) => ws && ws.name.toLowerCase() === name.toLowerCase())) {
+          throw new Error(`Worksheet name already exists: ${name}`);
+        }
+        this._name = name;
+      }
+      get workbook() {
+        return this._workbook;
+      }
+      // when you're done with this worksheet, call this to remove from workbook
+      destroy() {
+        this._workbook.removeWorksheetEx(this);
+      }
+      // Get the bounding range of the cells in this worksheet
+      get dimensions() {
+        const dimensions = new Range();
+        this._rows.forEach((row) => {
+          if (row) {
+            const rowDims = row.dimensions;
+            if (rowDims) {
+              dimensions.expand(row.number, rowDims.min, row.number, rowDims.max);
+            }
+          }
+        });
+        return dimensions;
+      }
+      // =========================================================================
+      // Columns
+      // get the current columns array.
+      get columns() {
+        return this._columns;
+      }
+      // set the columns from an array of column definitions.
+      // Note: any headers defined will overwrite existing values.
+      set columns(value) {
+        this._headerRowCount = value.reduce((pv, cv) => {
+          const headerCount = cv.header && 1 || cv.headers && cv.headers.length || 0;
+          return Math.max(pv, headerCount);
+        }, 0);
+        let count2 = 1;
+        const columns = this._columns = [];
+        value.forEach((defn) => {
+          const column = new Column(this, count2++, false);
+          columns.push(column);
+          column.defn = defn;
+        });
+      }
+      getColumnKey(key) {
+        return this._keys[key];
+      }
+      setColumnKey(key, value) {
+        this._keys[key] = value;
+      }
+      deleteColumnKey(key) {
+        delete this._keys[key];
+      }
+      eachColumnKey(f) {
+        _.each(this._keys, f);
+      }
+      // get a single column by col number. If it doesn't exist, create it and any gaps before it
+      getColumn(c) {
+        if (typeof c === "string") {
+          const col2 = this._keys[c];
+          if (col2) return col2;
+          c = colCache.l2n(c);
+        }
+        if (!this._columns) {
+          this._columns = [];
+        }
+        if (c > this._columns.length) {
+          let n2 = this._columns.length + 1;
+          while (n2 <= c) {
+            this._columns.push(new Column(this, n2++));
+          }
+        }
+        return this._columns[c - 1];
+      }
+      spliceColumns(start, count2, ...inserts) {
+        const rows = this._rows;
+        const nRows = rows.length;
+        if (inserts.length > 0) {
+          for (let i2 = 0; i2 < nRows; i2++) {
+            const rowArguments = [start, count2];
+            inserts.forEach((insert2) => {
+              rowArguments.push(insert2[i2] || null);
+            });
+            const row = this.getRow(i2 + 1);
+            row.splice.apply(row, rowArguments);
+          }
+        } else {
+          this._rows.forEach((r) => {
+            if (r) {
+              r.splice(start, count2);
+            }
+          });
+        }
+        const nExpand = inserts.length - count2;
+        const nKeep = start + count2;
+        const nEnd = this._columns.length;
+        if (nExpand < 0) {
+          for (let i2 = start + inserts.length; i2 <= nEnd; i2++) {
+            this.getColumn(i2).defn = this.getColumn(i2 - nExpand).defn;
+          }
+        } else if (nExpand > 0) {
+          for (let i2 = nEnd; i2 >= nKeep; i2--) {
+            this.getColumn(i2 + nExpand).defn = this.getColumn(i2).defn;
+          }
+        }
+        for (let i2 = start; i2 < start + inserts.length; i2++) {
+          this.getColumn(i2).defn = null;
+        }
+        this.workbook.definedNames.spliceColumns(this.name, start, count2, inserts.length);
+      }
+      get lastColumn() {
+        return this.getColumn(this.columnCount);
+      }
+      get columnCount() {
+        let maxCount = 0;
+        this.eachRow((row) => {
+          maxCount = Math.max(maxCount, row.cellCount);
+        });
+        return maxCount;
+      }
+      get actualColumnCount() {
+        const counts = [];
+        let count2 = 0;
+        this.eachRow((row) => {
+          row.eachCell(({ col: col2 }) => {
+            if (!counts[col2]) {
+              counts[col2] = true;
+              count2++;
+            }
+          });
+        });
+        return count2;
+      }
+      // =========================================================================
+      // Rows
+      _commitRow() {
+      }
+      get _lastRowNumber() {
+        const rows = this._rows;
+        let n2 = rows.length;
+        while (n2 > 0 && rows[n2 - 1] === void 0) {
+          n2--;
+        }
+        return n2;
+      }
+      get _nextRow() {
+        return this._lastRowNumber + 1;
+      }
+      get lastRow() {
+        if (this._rows.length) {
+          return this._rows[this._rows.length - 1];
+        }
+        return void 0;
+      }
+      // find a row (if exists) by row number
+      findRow(r) {
+        return this._rows[r - 1];
+      }
+      // find multiple rows (if exists) by row number
+      findRows(start, length) {
+        return this._rows.slice(start - 1, start - 1 + length);
+      }
+      get rowCount() {
+        return this._lastRowNumber;
+      }
+      get actualRowCount() {
+        let count2 = 0;
+        this.eachRow(() => {
+          count2++;
+        });
+        return count2;
+      }
+      // get a row by row number.
+      getRow(r) {
+        let row = this._rows[r - 1];
+        if (!row) {
+          row = this._rows[r - 1] = new Row(this, r);
+        }
+        return row;
+      }
+      // get multiple rows by row number.
+      getRows(start, length) {
+        if (length < 1) return void 0;
+        const rows = [];
+        for (let i2 = start; i2 < start + length; i2++) {
+          rows.push(this.getRow(i2));
+        }
+        return rows;
+      }
+      addRow(value, style = "n") {
+        const rowNo = this._nextRow;
+        const row = this.getRow(rowNo);
+        row.values = value;
+        this._setStyleOption(rowNo, style[0] === "i" ? style : "n");
+        return row;
+      }
+      addRows(value, style = "n") {
+        const rows = [];
+        value.forEach((row) => {
+          rows.push(this.addRow(row, style));
+        });
+        return rows;
+      }
+      insertRow(pos, value, style = "n") {
+        this.spliceRows(pos, 0, value);
+        this._setStyleOption(pos, style);
+        return this.getRow(pos);
+      }
+      insertRows(pos, values, style = "n") {
+        this.spliceRows(pos, 0, ...values);
+        if (style !== "n") {
+          for (let i2 = 0; i2 < values.length; i2++) {
+            if (style[0] === "o" && this.findRow(values.length + pos + i2) !== void 0) {
+              this._copyStyle(values.length + pos + i2, pos + i2, style[1] === "+");
+            } else if (style[0] === "i" && this.findRow(pos - 1) !== void 0) {
+              this._copyStyle(pos - 1, pos + i2, style[1] === "+");
+            }
+          }
+        }
+        return this.getRows(pos, values.length);
+      }
+      // set row at position to same style as of either pervious row (option 'i') or next row (option 'o')
+      _setStyleOption(pos, style = "n") {
+        if (style[0] === "o" && this.findRow(pos + 1) !== void 0) {
+          this._copyStyle(pos + 1, pos, style[1] === "+");
+        } else if (style[0] === "i" && this.findRow(pos - 1) !== void 0) {
+          this._copyStyle(pos - 1, pos, style[1] === "+");
+        }
+      }
+      _copyStyle(src, dest, styleEmpty = false) {
+        const rSrc = this.getRow(src);
+        const rDst = this.getRow(dest);
+        rDst.style = copyStyle(rSrc.style);
+        rSrc.eachCell({ includeEmpty: styleEmpty }, (cell, colNumber2) => {
+          rDst.getCell(colNumber2).style = copyStyle(cell.style);
+        });
+        rDst.height = rSrc.height;
+      }
+      duplicateRow(rowNum, count2, insert2 = false) {
+        const rSrc = this._rows[rowNum - 1];
+        const inserts = new Array(count2).fill(rSrc.values);
+        this.spliceRows(rowNum + 1, insert2 ? 0 : count2, ...inserts);
+        for (let i2 = 0; i2 < count2; i2++) {
+          const rDst = this._rows[rowNum + i2];
+          rDst.style = rSrc.style;
+          rDst.height = rSrc.height;
+          rSrc.eachCell({ includeEmpty: true }, (cell, colNumber2) => {
+            rDst.getCell(colNumber2).style = cell.style;
+          });
+        }
+      }
+      spliceRows(start, count2, ...inserts) {
+        const nKeep = start + count2;
+        const nInserts = inserts.length;
+        const nExpand = nInserts - count2;
+        const nEnd = this._rows.length;
+        let i2;
+        let rSrc;
+        if (nExpand < 0) {
+          if (start === nEnd) {
+            this._rows[nEnd - 1] = void 0;
+          }
+          for (i2 = nKeep; i2 <= nEnd; i2++) {
+            rSrc = this._rows[i2 - 1];
+            if (rSrc) {
+              const rDst = this.getRow(i2 + nExpand);
+              rDst.values = rSrc.values;
+              rDst.style = rSrc.style;
+              rDst.height = rSrc.height;
+              rSrc.eachCell({ includeEmpty: true }, (cell, colNumber2) => {
+                rDst.getCell(colNumber2).style = cell.style;
+              });
+              this._rows[i2 - 1] = void 0;
+            } else {
+              this._rows[i2 + nExpand - 1] = void 0;
+            }
+          }
+        } else if (nExpand > 0) {
+          for (i2 = nEnd; i2 >= nKeep; i2--) {
+            rSrc = this._rows[i2 - 1];
+            if (rSrc) {
+              const rDst = this.getRow(i2 + nExpand);
+              rDst.values = rSrc.values;
+              rDst.style = rSrc.style;
+              rDst.height = rSrc.height;
+              rSrc.eachCell({ includeEmpty: true }, (cell, colNumber2) => {
+                rDst.getCell(colNumber2).style = cell.style;
+                if (cell._value.constructor.name === "MergeValue") {
+                  const cellToBeMerged = this.getRow(cell._row._number + nInserts).getCell(colNumber2);
+                  const prevMaster = cell._value._master;
+                  const newMaster = this.getRow(prevMaster._row._number + nInserts).getCell(prevMaster._column._number);
+                  cellToBeMerged.merge(newMaster);
+                }
+              });
+            } else {
+              this._rows[i2 + nExpand - 1] = void 0;
+            }
+          }
+        }
+        for (i2 = 0; i2 < nInserts; i2++) {
+          const rDst = this.getRow(start + i2);
+          rDst.style = {};
+          rDst.values = inserts[i2];
+        }
+        this.workbook.definedNames.spliceRows(this.name, start, count2, nInserts);
+      }
+      // iterate over every row in the worksheet, including maybe empty rows
+      eachRow(options, iteratee) {
+        if (!iteratee) {
+          iteratee = options;
+          options = void 0;
+        }
+        if (options && options.includeEmpty) {
+          const n2 = this._rows.length;
+          for (let i2 = 1; i2 <= n2; i2++) {
+            iteratee(this.getRow(i2), i2);
+          }
+        } else {
+          this._rows.forEach((row) => {
+            if (row && row.hasValues) {
+              iteratee(row, row.number);
+            }
+          });
+        }
+      }
+      // return all rows as sparse array
+      getSheetValues() {
+        const rows = [];
+        this._rows.forEach((row) => {
+          if (row) {
+            rows[row.number] = row.values;
+          }
+        });
+        return rows;
+      }
+      // =========================================================================
+      // Cells
+      // returns the cell at [r,c] or address given by r. If not found, return undefined
+      findCell(r, c) {
+        const address = colCache.getAddress(r, c);
+        const row = this._rows[address.row - 1];
+        return row ? row.findCell(address.col) : void 0;
+      }
+      // return the cell at [r,c] or address given by r. If not found, create a new one.
+      getCell(r, c) {
+        const address = colCache.getAddress(r, c);
+        const row = this.getRow(address.row);
+        return row.getCellEx(address);
+      }
+      // =========================================================================
+      // Merge
+      // convert the range defined by ['tl:br'], [tl,br] or [t,l,b,r] into a single 'merged' cell
+      mergeCells(...cells) {
+        const dimensions = new Range(cells);
+        this._mergeCellsInternal(dimensions);
+      }
+      mergeCellsWithoutStyle(...cells) {
+        const dimensions = new Range(cells);
+        this._mergeCellsInternal(dimensions, true);
+      }
+      _mergeCellsInternal(dimensions, ignoreStyle) {
+        _.each(this._merges, (merge) => {
+          if (merge.intersects(dimensions)) {
+            throw new Error("Cannot merge already merged cells");
+          }
+        });
+        const master = this.getCell(dimensions.top, dimensions.left);
+        for (let i2 = dimensions.top; i2 <= dimensions.bottom; i2++) {
+          for (let j = dimensions.left; j <= dimensions.right; j++) {
+            if (i2 > dimensions.top || j > dimensions.left) {
+              this.getCell(i2, j).merge(master, ignoreStyle);
+            }
+          }
+        }
+        this._merges[master.address] = dimensions;
+      }
+      _unMergeMaster(master) {
+        const merge = this._merges[master.address];
+        if (merge) {
+          for (let i2 = merge.top; i2 <= merge.bottom; i2++) {
+            for (let j = merge.left; j <= merge.right; j++) {
+              this.getCell(i2, j).unmerge();
+            }
+          }
+          delete this._merges[master.address];
+        }
+      }
+      get hasMerges() {
+        return _.some(this._merges, Boolean);
+      }
+      // scan the range defined by ['tl:br'], [tl,br] or [t,l,b,r] and if any cell is part of a merge,
+      // un-merge the group. Note this function can affect multiple merges and merge-blocks are
+      // atomic - either they're all merged or all un-merged.
+      unMergeCells(...cells) {
+        const dimensions = new Range(cells);
+        for (let i2 = dimensions.top; i2 <= dimensions.bottom; i2++) {
+          for (let j = dimensions.left; j <= dimensions.right; j++) {
+            const cell = this.findCell(i2, j);
+            if (cell) {
+              if (cell.type === Enums.ValueType.Merge) {
+                this._unMergeMaster(cell.master);
+              } else if (this._merges[cell.address]) {
+                this._unMergeMaster(cell);
+              }
+            }
+          }
+        }
+      }
+      // ===========================================================================
+      // Shared/Array Formula
+      fillFormula(range, formula, results, shareType = "shared") {
+        const decoded = colCache.decode(range);
+        const { top, left, bottom, right } = decoded;
+        const width = right - left + 1;
+        const masterAddress = colCache.encodeAddress(top, left);
+        const isShared = shareType === "shared";
+        let getResult;
+        if (typeof results === "function") {
+          getResult = results;
+        } else if (Array.isArray(results)) {
+          if (Array.isArray(results[0])) {
+            getResult = (row, col2) => results[row - top][col2 - left];
+          } else {
+            getResult = (row, col2) => results[(row - top) * width + (col2 - left)];
+          }
+        } else {
+          getResult = () => void 0;
+        }
+        let first = true;
+        for (let r = top; r <= bottom; r++) {
+          for (let c = left; c <= right; c++) {
+            if (first) {
+              this.getCell(r, c).value = {
+                shareType,
+                formula,
+                ref: range,
+                result: getResult(r, c)
+              };
+              first = false;
+            } else {
+              this.getCell(r, c).value = isShared ? {
+                sharedFormula: masterAddress,
+                result: getResult(r, c)
+              } : getResult(r, c);
+            }
+          }
+        }
+      }
+      // =========================================================================
+      // Images
+      addImage(imageId, range) {
+        const model = {
+          type: "image",
+          imageId,
+          range
+        };
+        this._media.push(new Image(this, model));
+      }
+      getImages() {
+        return this._media.filter((m) => m.type === "image");
+      }
+      addBackgroundImage(imageId) {
+        const model = {
+          type: "background",
+          imageId
+        };
+        this._media.push(new Image(this, model));
+      }
+      getBackgroundImageId() {
+        const image = this._media.find((m) => m.type === "background");
+        return image && image.imageId;
+      }
+      // =========================================================================
+      // Worksheet Protection
+      protect(password, options) {
+        return new Promise((resolve3) => {
+          this.sheetProtection = {
+            sheet: true
+          };
+          if (options && "spinCount" in options) {
+            options.spinCount = Number.isFinite(options.spinCount) ? Math.round(Math.max(0, options.spinCount)) : 1e5;
+          }
+          if (password) {
+            this.sheetProtection.algorithmName = "SHA-512";
+            this.sheetProtection.saltValue = Encryptor.randomBytes(16).toString("base64");
+            this.sheetProtection.spinCount = options && "spinCount" in options ? options.spinCount : 1e5;
+            this.sheetProtection.hashValue = Encryptor.convertPasswordToHash(
+              password,
+              "SHA512",
+              this.sheetProtection.saltValue,
+              this.sheetProtection.spinCount
+            );
+          }
+          if (options) {
+            this.sheetProtection = Object.assign(this.sheetProtection, options);
+            if (!password && "spinCount" in options) {
+              delete this.sheetProtection.spinCount;
+            }
+          }
+          resolve3();
+        });
+      }
+      unprotect() {
+        this.sheetProtection = null;
+      }
+      // =========================================================================
+      // Tables
+      addTable(model) {
+        const table2 = new Table(this, model);
+        this.tables[model.name] = table2;
+        return table2;
+      }
+      getTable(name) {
+        return this.tables[name];
+      }
+      removeTable(name) {
+        delete this.tables[name];
+      }
+      getTables() {
+        return Object.values(this.tables);
+      }
+      // ===========================================================================
+      // Conditional Formatting
+      addConditionalFormatting(cf) {
+        this.conditionalFormattings.push(cf);
+      }
+      removeConditionalFormatting(filter) {
+        if (typeof filter === "number") {
+          this.conditionalFormattings.splice(filter, 1);
+        } else if (filter instanceof Function) {
+          this.conditionalFormattings = this.conditionalFormattings.filter(filter);
+        } else {
+          this.conditionalFormattings = [];
+        }
+      }
+      // ===========================================================================
+      // Deprecated
+      get tabColor() {
+        console.trace("worksheet.tabColor property is now deprecated. Please use worksheet.properties.tabColor");
+        return this.properties.tabColor;
+      }
+      set tabColor(value) {
+        console.trace("worksheet.tabColor property is now deprecated. Please use worksheet.properties.tabColor");
+        this.properties.tabColor = value;
+      }
+      // ===========================================================================
+      // Model
+      get model() {
+        const model = {
+          id: this.id,
+          name: this.name,
+          dataValidations: this.dataValidations.model,
+          properties: this.properties,
+          state: this.state,
+          pageSetup: this.pageSetup,
+          headerFooter: this.headerFooter,
+          rowBreaks: this.rowBreaks,
+          views: this.views,
+          autoFilter: this.autoFilter,
+          media: this._media.map((medium) => medium.model),
+          sheetProtection: this.sheetProtection,
+          tables: Object.values(this.tables).map((table2) => table2.model),
+          conditionalFormattings: this.conditionalFormattings
+        };
+        model.cols = Column.toModel(this.columns);
+        const rows = model.rows = [];
+        const dimensions = model.dimensions = new Range();
+        this._rows.forEach((row) => {
+          const rowModel = row && row.model;
+          if (rowModel) {
+            dimensions.expand(rowModel.number, rowModel.min, rowModel.number, rowModel.max);
+            rows.push(rowModel);
+          }
+        });
+        model.merges = [];
+        _.each(this._merges, (merge) => {
+          model.merges.push(merge.range);
+        });
+        return model;
+      }
+      _parseRows(model) {
+        this._rows = [];
+        model.rows.forEach((rowModel) => {
+          const row = new Row(this, rowModel.number);
+          this._rows[row.number - 1] = row;
+          row.model = rowModel;
+        });
+      }
+      _parseMergeCells(model) {
+        _.each(model.mergeCells, (merge) => {
+          this.mergeCellsWithoutStyle(merge);
+        });
+      }
+      set model(value) {
+        this.name = value.name;
+        this._columns = Column.fromModel(this, value.cols);
+        this._parseRows(value);
+        this._parseMergeCells(value);
+        this.dataValidations = new DataValidations(value.dataValidations);
+        this.properties = value.properties;
+        this.pageSetup = value.pageSetup;
+        this.headerFooter = value.headerFooter;
+        this.views = value.views;
+        this.autoFilter = value.autoFilter;
+        this._media = value.media.map((medium) => new Image(this, medium));
+        this.sheetProtection = value.sheetProtection;
+        this.tables = value.tables.reduce((tables, table2) => {
+          const t = new Table();
+          t.model = table2;
+          tables[table2.name] = t;
+          return tables;
+        }, {});
+        this.conditionalFormattings = value.conditionalFormattings;
+      }
+    };
+    module.exports = Worksheet;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/cell-matrix.js
+var require_cell_matrix = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/cell-matrix.js"(exports, module) {
+    var _ = require_under_dash();
+    var colCache = require_col_cache();
+    var CellMatrix = class {
+      constructor(template) {
+        this.template = template;
+        this.sheets = {};
+      }
+      addCell(addressStr) {
+        this.addCellEx(colCache.decodeEx(addressStr));
+      }
+      getCell(addressStr) {
+        return this.findCellEx(colCache.decodeEx(addressStr), true);
+      }
+      findCell(addressStr) {
+        return this.findCellEx(colCache.decodeEx(addressStr), false);
+      }
+      findCellAt(sheetName, rowNumber, colNumber2) {
+        const sheet = this.sheets[sheetName];
+        const row = sheet && sheet[rowNumber];
+        return row && row[colNumber2];
+      }
+      addCellEx(address) {
+        if (address.top) {
+          for (let row = address.top; row <= address.bottom; row++) {
+            for (let col2 = address.left; col2 <= address.right; col2++) {
+              this.getCellAt(address.sheetName, row, col2);
+            }
+          }
+        } else {
+          this.findCellEx(address, true);
+        }
+      }
+      getCellEx(address) {
+        return this.findCellEx(address, true);
+      }
+      findCellEx(address, create2) {
+        const sheet = this.findSheet(address, create2);
+        const row = this.findSheetRow(sheet, address, create2);
+        return this.findRowCell(row, address, create2);
+      }
+      getCellAt(sheetName, rowNumber, colNumber2) {
+        const sheet = this.sheets[sheetName] || (this.sheets[sheetName] = []);
+        const row = sheet[rowNumber] || (sheet[rowNumber] = []);
+        const cell = row[colNumber2] || (row[colNumber2] = {
+          sheetName,
+          address: colCache.n2l(colNumber2) + rowNumber,
+          row: rowNumber,
+          col: colNumber2
+        });
+        return cell;
+      }
+      removeCellEx(address) {
+        const sheet = this.findSheet(address);
+        if (!sheet) {
+          return;
+        }
+        const row = this.findSheetRow(sheet, address);
+        if (!row) {
+          return;
+        }
+        delete row[address.col];
+      }
+      forEachInSheet(sheetName, callback) {
+        const sheet = this.sheets[sheetName];
+        if (sheet) {
+          sheet.forEach((row, rowNumber) => {
+            if (row) {
+              row.forEach((cell, colNumber2) => {
+                if (cell) {
+                  callback(cell, rowNumber, colNumber2);
+                }
+              });
+            }
+          });
+        }
+      }
+      forEach(callback) {
+        _.each(this.sheets, (sheet, sheetName) => {
+          this.forEachInSheet(sheetName, callback);
+        });
+      }
+      map(callback) {
+        const results = [];
+        this.forEach((cell) => {
+          results.push(callback(cell));
+        });
+        return results;
+      }
+      findSheet(address, create2) {
+        const name = address.sheetName;
+        if (this.sheets[name]) {
+          return this.sheets[name];
+        }
+        if (create2) {
+          return this.sheets[name] = [];
+        }
+        return void 0;
+      }
+      findSheetRow(sheet, address, create2) {
+        const { row } = address;
+        if (sheet && sheet[row]) {
+          return sheet[row];
+        }
+        if (create2) {
+          return sheet[row] = [];
+        }
+        return void 0;
+      }
+      findRowCell(row, address, create2) {
+        const { col: col2 } = address;
+        if (row && row[col2]) {
+          return row[col2];
+        }
+        if (create2) {
+          return row[col2] = this.template ? Object.assign(address, JSON.parse(JSON.stringify(this.template))) : address;
+        }
+        return void 0;
+      }
+      spliceRows(sheetName, start, numDelete, numInsert) {
+        const sheet = this.sheets[sheetName];
+        if (sheet) {
+          const inserts = [];
+          for (let i2 = 0; i2 < numInsert; i2++) {
+            inserts.push([]);
+          }
+          sheet.splice(start, numDelete, ...inserts);
+        }
+      }
+      spliceColumns(sheetName, start, numDelete, numInsert) {
+        const sheet = this.sheets[sheetName];
+        if (sheet) {
+          const inserts = [];
+          for (let i2 = 0; i2 < numInsert; i2++) {
+            inserts.push(null);
+          }
+          _.each(sheet, (row) => {
+            row.splice(start, numDelete, ...inserts);
+          });
+        }
+      }
+    };
+    module.exports = CellMatrix;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/defined-names.js
+var require_defined_names = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/defined-names.js"(exports, module) {
+    "use strict";
+    var _ = require_under_dash();
+    var colCache = require_col_cache();
+    var CellMatrix = require_cell_matrix();
+    var Range = require_range();
+    var rangeRegexp = /[$](\w+)[$](\d+)(:[$](\w+)[$](\d+))?/;
+    var DefinedNames = class {
+      constructor() {
+        this.matrixMap = {};
+      }
+      getMatrix(name) {
+        const matrix = this.matrixMap[name] || (this.matrixMap[name] = new CellMatrix());
+        return matrix;
+      }
+      // add a name to a cell. locStr in the form SheetName!$col$row or SheetName!$c1$r1:$c2:$r2
+      add(locStr, name) {
+        const location = colCache.decodeEx(locStr);
+        this.addEx(location, name);
+      }
+      addEx(location, name) {
+        const matrix = this.getMatrix(name);
+        if (location.top) {
+          for (let col2 = location.left; col2 <= location.right; col2++) {
+            for (let row = location.top; row <= location.bottom; row++) {
+              const address = {
+                sheetName: location.sheetName,
+                address: colCache.n2l(col2) + row,
+                row,
+                col: col2
+              };
+              matrix.addCellEx(address);
+            }
+          }
+        } else {
+          matrix.addCellEx(location);
+        }
+      }
+      remove(locStr, name) {
+        const location = colCache.decodeEx(locStr);
+        this.removeEx(location, name);
+      }
+      removeEx(location, name) {
+        const matrix = this.getMatrix(name);
+        matrix.removeCellEx(location);
+      }
+      removeAllNames(location) {
+        _.each(this.matrixMap, (matrix) => {
+          matrix.removeCellEx(location);
+        });
+      }
+      forEach(callback) {
+        _.each(this.matrixMap, (matrix, name) => {
+          matrix.forEach((cell) => {
+            callback(name, cell);
+          });
+        });
+      }
+      // get all the names of a cell
+      getNames(addressStr) {
+        return this.getNamesEx(colCache.decodeEx(addressStr));
+      }
+      getNamesEx(address) {
+        return _.map(this.matrixMap, (matrix, name) => matrix.findCellEx(address) && name).filter(
+          Boolean
+        );
+      }
+      _explore(matrix, cell) {
+        cell.mark = false;
+        const { sheetName } = cell;
+        const range = new Range(cell.row, cell.col, cell.row, cell.col, sheetName);
+        let x2;
+        let y;
+        function vGrow(yy, edge) {
+          const c = matrix.findCellAt(sheetName, yy, cell.col);
+          if (!c || !c.mark) {
+            return false;
+          }
+          range[edge] = yy;
+          c.mark = false;
+          return true;
+        }
+        for (y = cell.row - 1; vGrow(y, "top"); y--) ;
+        for (y = cell.row + 1; vGrow(y, "bottom"); y++) ;
+        function hGrow(xx, edge) {
+          const cells = [];
+          for (y = range.top; y <= range.bottom; y++) {
+            const c = matrix.findCellAt(sheetName, y, xx);
+            if (c && c.mark) {
+              cells.push(c);
+            } else {
+              return false;
+            }
+          }
+          range[edge] = xx;
+          for (let i2 = 0; i2 < cells.length; i2++) {
+            cells[i2].mark = false;
+          }
+          return true;
+        }
+        for (x2 = cell.col - 1; hGrow(x2, "left"); x2--) ;
+        for (x2 = cell.col + 1; hGrow(x2, "right"); x2++) ;
+        return range;
+      }
+      getRanges(name, matrix) {
+        matrix = matrix || this.matrixMap[name];
+        if (!matrix) {
+          return { name, ranges: [] };
+        }
+        matrix.forEach((cell) => {
+          cell.mark = true;
+        });
+        const ranges = matrix.map((cell) => cell.mark && this._explore(matrix, cell)).filter(Boolean).map((range) => range.$shortRange);
+        return {
+          name,
+          ranges
+        };
+      }
+      normaliseMatrix(matrix, sheetName) {
+        matrix.forEachInSheet(sheetName, (cell, row, col2) => {
+          if (cell) {
+            if (cell.row !== row || cell.col !== col2) {
+              cell.row = row;
+              cell.col = col2;
+              cell.address = colCache.n2l(col2) + row;
+            }
+          }
+        });
+      }
+      spliceRows(sheetName, start, numDelete, numInsert) {
+        _.each(this.matrixMap, (matrix) => {
+          matrix.spliceRows(sheetName, start, numDelete, numInsert);
+          this.normaliseMatrix(matrix, sheetName);
+        });
+      }
+      spliceColumns(sheetName, start, numDelete, numInsert) {
+        _.each(this.matrixMap, (matrix) => {
+          matrix.spliceColumns(sheetName, start, numDelete, numInsert);
+          this.normaliseMatrix(matrix, sheetName);
+        });
+      }
+      get model() {
+        return _.map(this.matrixMap, (matrix, name) => this.getRanges(name, matrix)).filter(
+          (definedName) => definedName.ranges.length
+        );
+      }
+      set model(value) {
+        const matrixMap = this.matrixMap = {};
+        value.forEach((definedName) => {
+          const matrix = matrixMap[definedName.name] = new CellMatrix();
+          definedName.ranges.forEach((rangeStr) => {
+            if (rangeRegexp.test(rangeStr.split("!").pop() || "")) {
+              matrix.addCell(rangeStr);
+            }
+          });
+        });
+      }
+    };
+    module.exports = DefinedNames;
+  }
+});
+
+// office-stub:../xlsx/xlsx
+var require_xlsx = __commonJS({
+  "office-stub:../xlsx/xlsx"(exports, module) {
+    module.exports = (function(words) {
+      const fail = () => {
+        throw new Error(words);
+      };
+      const make = () => new Proxy(function() {
+      }, {
+        apply: fail,
+        construct: fail,
+        set: fail,
+        defineProperty: fail,
+        get: (_t, k) => k === "then" || k === "__esModule" || typeof k === "symbol" ? void 0 : make()
+      });
+      return make();
+    })("office: ../xlsx/xlsx is not available (exceljs's XLSX class (JSZip and streams): src/sheets/io.ts replaces it)");
+  }
+});
+
+// office-stub:../csv/csv
+var require_csv = __commonJS({
+  "office-stub:../csv/csv"(exports, module) {
+    module.exports = (function(words) {
+      const fail = () => {
+        throw new Error(words);
+      };
+      const make = () => new Proxy(function() {
+      }, {
+        apply: fail,
+        construct: fail,
+        set: fail,
+        defineProperty: fail,
+        get: (_t, k) => k === "then" || k === "__esModule" || typeof k === "symbol" ? void 0 : make()
+      });
+      return make();
+    })("office: ../csv/csv is not available (exceljs CSV (fast-csv and fs): not in the SDK)");
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/workbook.js
+var require_workbook = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/doc/workbook.js"(exports, module) {
+    "use strict";
+    var Worksheet = require_worksheet();
+    var DefinedNames = require_defined_names();
+    var XLSX2 = require_xlsx();
+    var CSV = require_csv();
+    var Workbook3 = class {
+      constructor() {
+        this.category = "";
+        this.company = "";
+        this.created = /* @__PURE__ */ new Date();
+        this.description = "";
+        this.keywords = "";
+        this.manager = "";
+        this.modified = this.created;
+        this.properties = {};
+        this.calcProperties = {};
+        this._worksheets = [];
+        this.subject = "";
+        this.title = "";
+        this.views = [];
+        this.media = [];
+        this._definedNames = new DefinedNames();
+      }
+      get xlsx() {
+        if (!this._xlsx) this._xlsx = new XLSX2(this);
+        return this._xlsx;
+      }
+      get csv() {
+        if (!this._csv) this._csv = new CSV(this);
+        return this._csv;
+      }
+      get nextId() {
+        for (let i2 = 1; i2 < this._worksheets.length; i2++) {
+          if (!this._worksheets[i2]) {
+            return i2;
+          }
+        }
+        return this._worksheets.length || 1;
+      }
+      addWorksheet(name, options) {
+        const id = this.nextId;
+        if (options) {
+          if (typeof options === "string") {
+            console.trace(
+              'tabColor argument is now deprecated. Please use workbook.addWorksheet(name, {properties: { tabColor: { argb: "rbg value" } }'
+            );
+            options = {
+              properties: {
+                tabColor: { argb: options }
+              }
+            };
+          } else if (options.argb || options.theme || options.indexed) {
+            console.trace(
+              "tabColor argument is now deprecated. Please use workbook.addWorksheet(name, {properties: { tabColor: { ... } }"
+            );
+            options = {
+              properties: {
+                tabColor: options
+              }
+            };
+          }
+        }
+        const lastOrderNo = this._worksheets.reduce((acc, ws) => (ws && ws.orderNo) > acc ? ws.orderNo : acc, 0);
+        const worksheetOptions = Object.assign({}, options, {
+          id,
+          name,
+          orderNo: lastOrderNo + 1,
+          workbook: this
+        });
+        const worksheet = new Worksheet(worksheetOptions);
+        this._worksheets[id] = worksheet;
+        return worksheet;
+      }
+      removeWorksheetEx(worksheet) {
+        delete this._worksheets[worksheet.id];
+      }
+      removeWorksheet(id) {
+        const worksheet = this.getWorksheet(id);
+        if (worksheet) {
+          worksheet.destroy();
+        }
+      }
+      getWorksheet(id) {
+        if (id === void 0) {
+          return this._worksheets.find(Boolean);
+        }
+        if (typeof id === "number") {
+          return this._worksheets[id];
+        }
+        if (typeof id === "string") {
+          return this._worksheets.find((worksheet) => worksheet && worksheet.name === id);
+        }
+        return void 0;
+      }
+      get worksheets() {
+        return this._worksheets.slice(1).sort((a, b) => a.orderNo - b.orderNo).filter(Boolean);
+      }
+      eachSheet(iteratee) {
+        this.worksheets.forEach((sheet) => {
+          iteratee(sheet, sheet.id);
+        });
+      }
+      get definedNames() {
+        return this._definedNames;
+      }
+      clearThemes() {
+        this._themes = void 0;
+      }
+      addImage(image) {
+        const id = this.media.length;
+        this.media.push(Object.assign({}, image, { type: "image" }));
+        return id;
+      }
+      getImage(id) {
+        return this.media[id];
+      }
+      get model() {
+        return {
+          creator: this.creator || "Unknown",
+          lastModifiedBy: this.lastModifiedBy || "Unknown",
+          lastPrinted: this.lastPrinted,
+          created: this.created,
+          modified: this.modified,
+          properties: this.properties,
+          worksheets: this.worksheets.map((worksheet) => worksheet.model),
+          sheets: this.worksheets.map((ws) => ws.model).filter(Boolean),
+          definedNames: this._definedNames.model,
+          views: this.views,
+          company: this.company,
+          manager: this.manager,
+          title: this.title,
+          subject: this.subject,
+          keywords: this.keywords,
+          category: this.category,
+          description: this.description,
+          language: this.language,
+          revision: this.revision,
+          contentStatus: this.contentStatus,
+          themes: this._themes,
+          media: this.media,
+          calcProperties: this.calcProperties
+        };
+      }
+      set model(value) {
+        this.creator = value.creator;
+        this.lastModifiedBy = value.lastModifiedBy;
+        this.lastPrinted = value.lastPrinted;
+        this.created = value.created;
+        this.modified = value.modified;
+        this.company = value.company;
+        this.manager = value.manager;
+        this.title = value.title;
+        this.subject = value.subject;
+        this.keywords = value.keywords;
+        this.category = value.category;
+        this.description = value.description;
+        this.language = value.language;
+        this.revision = value.revision;
+        this.contentStatus = value.contentStatus;
+        this.properties = value.properties;
+        this.calcProperties = value.calcProperties;
+        this._worksheets = [];
+        value.worksheets.forEach((worksheetModel) => {
+          const { id, name, state } = worksheetModel;
+          const orderNo = value.sheets && value.sheets.findIndex((ws) => ws.id === id);
+          const worksheet = this._worksheets[id] = new Worksheet({
+            id,
+            name,
+            orderNo,
+            state,
+            workbook: this
+          });
+          worksheet.model = worksheetModel;
+        });
+        this._definedNames.model = value.definedNames;
+        this.views = value.views;
+        this._themes = value.themes;
+        this.media = value.media || [];
+      }
+    };
+    module.exports = Workbook3;
+  }
+});
 
 // node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/conventions.js
 var require_conventions = __commonJS({
@@ -737,9 +4945,9 @@ var require_dom = __commonJS({
     function commonAncestor(a, b) {
       if (b.length < a.length) return commonAncestor(b, a);
       var c = null;
-      for (var n in a) {
-        if (a[n] !== b[n]) return c;
-        c = a[n];
+      for (var n2 in a) {
+        if (a[n2] !== b[n2]) return c;
+        c = a[n2];
       }
       return c;
     }
@@ -1729,9 +5937,9 @@ var require_dom = __commonJS({
         while (el2) {
           var map = el2._nsMap;
           if (map) {
-            for (var n in map) {
-              if (hasOwn(map, n) && map[n] === namespaceURI) {
-                return n;
+            for (var n2 in map) {
+              if (hasOwn(map, n2) && map[n2] === namespaceURI) {
+                return n2;
               }
             }
           }
@@ -1859,8 +6067,8 @@ var require_dom = __commonJS({
         }
         chain2.reverse();
         var ca = commonAncestor(chain1, chain2);
-        for (var n in ca.childNodes) {
-          var child2 = ca.childNodes[n];
+        for (var n2 in ca.childNodes) {
+          var child2 = ca.childNodes[n2];
           if (child2 === node2) return DocumentPosition.DOCUMENT_POSITION_FOLLOWING;
           if (child2 === node1) return DocumentPosition.DOCUMENT_POSITION_PRECEDING;
           if (chain2.indexOf(child2) >= 0) return DocumentPosition.DOCUMENT_POSITION_FOLLOWING;
@@ -1878,8 +6086,8 @@ var require_dom = __commonJS({
     copy(DocumentPosition, Node.prototype);
     function _visitNode(node, callback) {
       walkDOM(node, null, {
-        enter: function(n) {
-          return callback(n) ? walkDOM.STOP : true;
+        enter: function(n2) {
+          return callback(n2) ? walkDOM.STOP : true;
         }
       });
     }
@@ -2691,26 +6899,26 @@ var require_dom = __commonJS({
     }
     CharacterData.prototype = {
       data: "",
-      substringData: function(offset, count) {
-        return this.data.substring(offset, offset + count);
+      substringData: function(offset, count2) {
+        return this.data.substring(offset, offset + count2);
       },
-      appendData: function(text) {
-        text = this.data + text;
-        this.nodeValue = this.data = text;
-        this.length = text.length;
+      appendData: function(text2) {
+        text2 = this.data + text2;
+        this.nodeValue = this.data = text2;
+        this.length = text2.length;
       },
-      insertData: function(offset, text) {
-        this.replaceData(offset, 0, text);
+      insertData: function(offset, text2) {
+        this.replaceData(offset, 0, text2);
       },
-      deleteData: function(offset, count) {
-        this.replaceData(offset, count, "");
+      deleteData: function(offset, count2) {
+        this.replaceData(offset, count2, "");
       },
-      replaceData: function(offset, count, text) {
+      replaceData: function(offset, count2, text2) {
         var start = this.data.substring(0, offset);
-        var end = this.data.substring(offset + count);
-        text = start + text + end;
-        this.nodeValue = this.data = text;
-        this.length = text.length;
+        var end = this.data.substring(offset + count2);
+        text2 = start + text2 + end;
+        this.nodeValue = this.data = text2;
+        this.length = text2.length;
       }
     };
     _extends(CharacterData, Node);
@@ -2721,11 +6929,11 @@ var require_dom = __commonJS({
       nodeName: "#text",
       nodeType: TEXT_NODE,
       splitText: function(offset) {
-        var text = this.data;
-        var newText = text.substring(offset);
-        text = text.substring(0, offset);
-        this.data = this.nodeValue = text;
-        this.length = text.length;
+        var text2 = this.data;
+        var newText = text2.substring(offset);
+        text2 = text2.substring(0, offset);
+        this.data = this.nodeValue = text2;
+        this.length = text2.length;
         var newNode = this.ownerDocument.createTextNode(newText);
         if (this.parentNode) {
           this.parentNode.insertBefore(newNode, this.nextSibling);
@@ -2856,26 +7064,26 @@ var require_dom = __commonJS({
         node,
         { ns: visibleNamespaces },
         {
-          enter: function(n, ctx) {
+          enter: function(n2, ctx) {
             var namespaces = ctx.ns;
             if (nodeFilter) {
-              n = nodeFilter(n);
-              if (n) {
-                if (typeof n == "string") {
-                  buf.push(n);
+              n2 = nodeFilter(n2);
+              if (n2) {
+                if (typeof n2 == "string") {
+                  buf.push(n2);
                   return null;
                 }
               } else {
                 return null;
               }
             }
-            switch (n.nodeType) {
+            switch (n2.nodeType) {
               case ELEMENT_NODE:
-                var attrs = n.attributes;
+                var attrs = n2.attributes;
                 var len = attrs.length;
-                var nodeName = n.tagName;
+                var nodeName = n2.tagName;
                 var prefixedNodeName = nodeName;
-                if (!isHTML && !n.prefix && n.namespaceURI) {
+                if (!isHTML && !n2.prefix && n2.namespaceURI) {
                   var defaultNS;
                   for (var ai = 0; ai < attrs.length; ai++) {
                     if (attrs.item(ai).name === "xmlns") {
@@ -2886,16 +7094,16 @@ var require_dom = __commonJS({
                   if (!defaultNS) {
                     for (var nsi = namespaces.length - 1; nsi >= 0; nsi--) {
                       var nsEntry = namespaces[nsi];
-                      if (nsEntry.prefix === "" && nsEntry.namespace === n.namespaceURI) {
+                      if (nsEntry.prefix === "" && nsEntry.namespace === n2.namespaceURI) {
                         defaultNS = nsEntry.namespace;
                         break;
                       }
                     }
                   }
-                  if (defaultNS !== n.namespaceURI) {
+                  if (defaultNS !== n2.namespaceURI) {
                     for (var nsi = namespaces.length - 1; nsi >= 0; nsi--) {
                       var nsEntry = namespaces[nsi];
-                      if (nsEntry.namespace === n.namespaceURI) {
+                      if (nsEntry.namespace === n2.namespaceURI) {
                         if (nsEntry.prefix) {
                           prefixedNodeName = nsEntry.prefix + ":" + nodeName;
                         }
@@ -2940,14 +7148,14 @@ var require_dom = __commonJS({
                     }
                   }
                 }
-                if (nodeName === prefixedNodeName && needNamespaceDefine(n, isHTML, childNamespaces)) {
-                  var nodePrefix = n.prefix || "";
-                  var uri = n.namespaceURI;
+                if (nodeName === prefixedNodeName && needNamespaceDefine(n2, isHTML, childNamespaces)) {
+                  var nodePrefix = n2.prefix || "";
+                  var uri = n2.namespaceURI;
                   addSerializedAttribute(buf, nodePrefix ? "xmlns:" + nodePrefix : "xmlns", uri, requireWellFormed);
                   childNamespaces.push({ prefix: nodePrefix, namespace: uri });
                 }
-                var canCloseTag = !n.firstChild;
-                if (canCloseTag && (isHTML || n.namespaceURI === NAMESPACE.HTML)) {
+                var canCloseTag = !n2.firstChild;
+                if (canCloseTag && (isHTML || n2.namespaceURI === NAMESPACE.HTML)) {
                   canCloseTag = isHTMLVoidElement(nodeName);
                 }
                 if (canCloseTag) {
@@ -2956,7 +7164,7 @@ var require_dom = __commonJS({
                 }
                 buf.push(">");
                 if (isHTML && isHTMLRawTextElement(nodeName)) {
-                  var child2 = n.firstChild;
+                  var child2 = n2.firstChild;
                   while (child2) {
                     if (child2.data) {
                       buf.push(child2.data);
@@ -2971,56 +7179,56 @@ var require_dom = __commonJS({
                 return { ns: childNamespaces, tag: prefixedNodeName };
               case DOCUMENT_NODE:
               case DOCUMENT_FRAGMENT_NODE:
-                if (requireWellFormed && n.nodeType === DOCUMENT_NODE && n.documentElement == null) {
+                if (requireWellFormed && n2.nodeType === DOCUMENT_NODE && n2.documentElement == null) {
                   throw new DOMException("The Document has no documentElement", DOMExceptionName.InvalidStateError);
                 }
                 return { ns: namespaces };
               case ATTRIBUTE_NODE:
-                addSerializedAttribute(buf, n.name, n.value, requireWellFormed);
+                addSerializedAttribute(buf, n2.name, n2.value, requireWellFormed);
                 return null;
               case TEXT_NODE:
-                if (requireWellFormed && g.InvalidChar.test(n.data)) {
+                if (requireWellFormed && g.InvalidChar.test(n2.data)) {
                   throw new DOMException(
                     "The Text node data contains characters outside the XML Char production",
                     DOMExceptionName.InvalidStateError
                   );
                 }
-                buf.push(n.data.replace(/[<&>]/g, _xmlEncoder));
+                buf.push(n2.data.replace(/[<&>]/g, _xmlEncoder));
                 return null;
               case CDATA_SECTION_NODE:
-                if (requireWellFormed && n.data.indexOf("]]>") !== -1) {
+                if (requireWellFormed && n2.data.indexOf("]]>") !== -1) {
                   throw new DOMException('The CDATASection data contains "]]>"', DOMExceptionName.InvalidStateError);
                 }
                 if (splitCDATASections) {
-                  buf.push(g.CDATA_START, n.data.replace(/]]>/g, "]]]]><![CDATA[>"), g.CDATA_END);
+                  buf.push(g.CDATA_START, n2.data.replace(/]]>/g, "]]]]><![CDATA[>"), g.CDATA_END);
                 } else {
-                  buf.push(g.CDATA_START, n.data, g.CDATA_END);
+                  buf.push(g.CDATA_START, n2.data, g.CDATA_END);
                 }
                 return null;
               case COMMENT_NODE:
                 if (requireWellFormed) {
-                  if (g.InvalidChar.test(n.data)) {
+                  if (g.InvalidChar.test(n2.data)) {
                     throw new DOMException(
                       "The comment node data contains characters outside the XML Char production",
                       DOMExceptionName.InvalidStateError
                     );
                   }
-                  if (n.data.indexOf("--") !== -1 || n.data[n.data.length - 1] === "-") {
+                  if (n2.data.indexOf("--") !== -1 || n2.data[n2.data.length - 1] === "-") {
                     throw new DOMException(
                       'The comment node data contains "--" or ends with "-"',
                       DOMExceptionName.InvalidStateError
                     );
                   }
                 }
-                buf.push(g.COMMENT_START, n.data, g.COMMENT_END);
+                buf.push(g.COMMENT_START, n2.data, g.COMMENT_END);
                 return null;
               case DOCUMENT_TYPE_NODE:
-                var pubid = n.publicId;
-                var sysid = n.systemId;
+                var pubid = n2.publicId;
+                var sysid = n2.systemId;
                 if (requireWellFormed) {
-                  if (!g.Name_exact.test(n.name)) {
+                  if (!g.Name_exact.test(n2.name)) {
                     throw new DOMException(
-                      'The doctype name "' + n.name + '" is not a valid XML Name',
+                      'The doctype name "' + n2.name + '" is not a valid XML Name',
                       DOMExceptionName.InvalidStateError
                     );
                   }
@@ -3030,11 +7238,11 @@ var require_dom = __commonJS({
                   if (sysid && sysid !== "." && !g.SystemLiteral_match.test(sysid)) {
                     throw new DOMException("DocumentType systemId is not a valid SystemLiteral", DOMExceptionName.InvalidStateError);
                   }
-                  if (n.internalSubset && n.internalSubset.indexOf("]>") !== -1) {
+                  if (n2.internalSubset && n2.internalSubset.indexOf("]>") !== -1) {
                     throw new DOMException('DocumentType internalSubset contains "]>"', DOMExceptionName.InvalidStateError);
                   }
                 }
-                buf.push(g.DOCTYPE_DECL_START, " ", n.name);
+                buf.push(g.DOCTYPE_DECL_START, " ", n2.name);
                 if (pubid) {
                   buf.push(" ", g.PUBLIC, " ", pubid);
                   if (sysid && sysid !== ".") {
@@ -3043,48 +7251,48 @@ var require_dom = __commonJS({
                 } else if (sysid && sysid !== ".") {
                   buf.push(" ", g.SYSTEM, " ", sysid);
                 }
-                if (n.internalSubset) {
-                  buf.push(" [", n.internalSubset, "]");
+                if (n2.internalSubset) {
+                  buf.push(" [", n2.internalSubset, "]");
                 }
                 buf.push(">");
                 return null;
               case PROCESSING_INSTRUCTION_NODE:
                 if (requireWellFormed) {
-                  if (!g.NCName_exact.test(n.target) || n.target.toLowerCase() === "xml") {
+                  if (!g.NCName_exact.test(n2.target) || n2.target.toLowerCase() === "xml") {
                     throw new DOMException(
-                      'The processing instruction target "' + n.target + '" is not a valid XML NCName or is reserved',
+                      'The processing instruction target "' + n2.target + '" is not a valid XML NCName or is reserved',
                       DOMExceptionName.InvalidStateError
                     );
                   }
-                  if (g.InvalidChar.test(n.data)) {
+                  if (g.InvalidChar.test(n2.data)) {
                     throw new DOMException(
                       "The ProcessingInstruction data contains characters outside the XML Char production",
                       DOMExceptionName.InvalidStateError
                     );
                   }
-                  if (n.data.indexOf("?>") !== -1) {
+                  if (n2.data.indexOf("?>") !== -1) {
                     throw new DOMException('The ProcessingInstruction data contains "?>"', DOMExceptionName.InvalidStateError);
                   }
                 }
-                buf.push("<?", n.target, " ", n.data, "?>");
+                buf.push("<?", n2.target, " ", n2.data, "?>");
                 return null;
               case ENTITY_REFERENCE_NODE:
-                if (requireWellFormed && !g.Name_exact.test(n.nodeName)) {
+                if (requireWellFormed && !g.Name_exact.test(n2.nodeName)) {
                   throw new DOMException(
-                    'The entity reference name "' + n.nodeName + '" is not a valid XML Name',
+                    'The entity reference name "' + n2.nodeName + '" is not a valid XML Name',
                     DOMExceptionName.InvalidStateError
                   );
                 }
-                buf.push("&", n.nodeName, ";");
+                buf.push("&", n2.nodeName, ";");
                 return null;
               //case ENTITY_NODE:
               //case NOTATION_NODE:
               default:
-                buf.push("??", n.nodeName);
+                buf.push("??", n2.nodeName);
                 return null;
             }
           },
-          exit: function(n, childCtx) {
+          exit: function(n2, childCtx) {
             if (childCtx && childCtx.tag) {
               buf.push("</", childCtx.tag, ">");
             }
@@ -3115,12 +7323,12 @@ var require_dom = __commonJS({
       walkDOM(node, null, {
         enter: function(srcNode, destParent) {
           var destNode = new srcNode.constructor(PDC);
-          for (var n in srcNode) {
-            if (hasOwn(srcNode, n)) {
-              var v = srcNode[n];
+          for (var n2 in srcNode) {
+            if (hasOwn(srcNode, n2)) {
+              var v = srcNode[n2];
               if (typeof v != "object") {
-                if (v != destNode[n]) {
-                  destNode[n] = v;
+                if (v != destNode[n2]) {
+                  destNode[n2] = v;
                 }
               }
             }
@@ -3180,14 +7388,14 @@ var require_dom = __commonJS({
             if (this.nodeType === ELEMENT_NODE || this.nodeType === DOCUMENT_FRAGMENT_NODE) {
               var buf = [];
               walkDOM(this, null, {
-                enter: function(n) {
-                  if (n.nodeType === ELEMENT_NODE || n.nodeType === DOCUMENT_FRAGMENT_NODE) {
+                enter: function(n2) {
+                  if (n2.nodeType === ELEMENT_NODE || n2.nodeType === DOCUMENT_FRAGMENT_NODE) {
                     return true;
                   }
-                  if (n.nodeType === PROCESSING_INSTRUCTION_NODE || n.nodeType === COMMENT_NODE) {
+                  if (n2.nodeType === PROCESSING_INSTRUCTION_NODE || n2.nodeType === COMMENT_NODE) {
                     return null;
                   }
-                  buf.push(n.nodeValue);
+                  buf.push(n2.nodeValue);
                 }
               });
               return buf.join("");
@@ -5448,12 +9656,12 @@ var require_sax = __commonJS({
         var domBuilder = this.domBuilder;
         domBuilder.startDocument();
         _copy(defaultNSMap, defaultNSMap = /* @__PURE__ */ Object.create(null));
-        parse(source, defaultNSMap, entityMap, domBuilder, this.errorHandler);
+        parse2(source, defaultNSMap, entityMap, domBuilder, this.errorHandler);
         domBuilder.endDocument();
       }
     };
     var ENTITY_REG = /&#?\w+;?/g;
-    function parse(source, defaultNSMapCopy, entityMap, domBuilder, errorHandler) {
+    function parse2(source, defaultNSMapCopy, entityMap, domBuilder, errorHandler) {
       var isHTML = isHTMLMimeType(domBuilder.mimeType);
       if (source.indexOf(g.UNICODE_REPLACEMENT_CHARACTER) >= 0) {
         errorHandler.warning("Unicode replacement character detected, source encoding issues?");
@@ -5520,12 +9728,12 @@ var require_sax = __commonJS({
             }
             if (!source.substring(start).match(/^\s*$/)) {
               var doc = domBuilder.doc;
-              var text = doc.createTextNode(source.substring(start));
+              var text2 = doc.createTextNode(source.substring(start));
               if (doc.documentElement) {
                 return errorHandler.error("Extra content at the end of the document");
               }
-              doc.appendChild(text);
-              domBuilder.currentElement = text;
+              doc.appendChild(text2);
+              domBuilder.currentElement = text2;
             }
             return;
           }
@@ -5910,31 +10118,31 @@ var require_sax = __commonJS({
         if (elEndStart < 0) {
           return elStartEnd + 1;
         }
-        var text = source.substring(elStartEnd + 1, elEndStart);
+        var text2 = source.substring(elStartEnd + 1, elEndStart);
         if (isEscapableRaw) {
-          text = text.replace(ENTITY_REG, entityReplacer);
+          text2 = text2.replace(ENTITY_REG, entityReplacer);
         }
-        domBuilder.characters(text, 0, text.length);
+        domBuilder.characters(text2, 0, text2.length);
         return elEndStart;
       }
       return elStartEnd + 1;
     }
     function _copy(source, target) {
-      for (var n in source) {
-        if (hasOwn(source, n)) {
-          target[n] = source[n];
+      for (var n2 in source) {
+        if (hasOwn(source, n2)) {
+          target[n2] = source[n2];
         }
       }
     }
     function parseUtils(source, start) {
       var index = start;
-      function char(n) {
-        n = n || 0;
-        return source.charAt(index + n);
+      function char(n2) {
+        n2 = n2 || 0;
+        return source.charAt(index + n2);
       }
-      function skip(n) {
-        n = n || 1;
-        index += n;
+      function skip(n2) {
+        n2 = n2 || 1;
+        index += n2;
       }
       function skipBlanks() {
         var blanks = 0;
@@ -5951,11 +10159,11 @@ var require_sax = __commonJS({
       function substringFromIndex() {
         return source.substring(index);
       }
-      function substringStartsWith(text) {
-        return source.substring(index, index + text.length) === text;
+      function substringStartsWith(text2) {
+        return source.substring(index, index + text2.length) === text2;
       }
-      function substringStartsWithCaseInsensitive(text) {
-        return source.substring(index, index + text.length).toUpperCase() === text.toUpperCase();
+      function substringStartsWithCaseInsensitive(text2) {
+        return source.substring(index, index + text2.length).toUpperCase() === text2.toUpperCase();
       }
       function getMatch(args) {
         var expr = g.reg("^", args);
@@ -6513,6 +10721,11520 @@ var require_lib = __commonJS({
   }
 });
 
+// node_modules/.pnpm/xmlchars@2.2.0/node_modules/xmlchars/xml/1.0/ed5.js
+var require_ed5 = __commonJS({
+  "node_modules/.pnpm/xmlchars@2.2.0/node_modules/xmlchars/xml/1.0/ed5.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.CHAR = "	\n\r -퟿-�𐀀-􏿿";
+    exports.S = " 	\r\n";
+    exports.NAME_START_CHAR = ":A-Z_a-zÀ-ÖØ-öø-˿Ͱ-ͽͿ-῿‌‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�𐀀-󯿿";
+    exports.NAME_CHAR = "-" + exports.NAME_START_CHAR + ".0-9·̀-ͯ‿-⁀";
+    exports.CHAR_RE = new RegExp("^[" + exports.CHAR + "]$", "u");
+    exports.S_RE = new RegExp("^[" + exports.S + "]+$", "u");
+    exports.NAME_START_CHAR_RE = new RegExp("^[" + exports.NAME_START_CHAR + "]$", "u");
+    exports.NAME_CHAR_RE = new RegExp("^[" + exports.NAME_CHAR + "]$", "u");
+    exports.NAME_RE = new RegExp("^[" + exports.NAME_START_CHAR + "][" + exports.NAME_CHAR + "]*$", "u");
+    exports.NMTOKEN_RE = new RegExp("^[" + exports.NAME_CHAR + "]+$", "u");
+    var TAB = 9;
+    var NL = 10;
+    var CR = 13;
+    var SPACE = 32;
+    exports.S_LIST = [SPACE, NL, CR, TAB];
+    function isChar(c) {
+      return c >= SPACE && c <= 55295 || c === NL || c === CR || c === TAB || c >= 57344 && c <= 65533 || c >= 65536 && c <= 1114111;
+    }
+    exports.isChar = isChar;
+    function isS(c) {
+      return c === SPACE || c === NL || c === CR || c === TAB;
+    }
+    exports.isS = isS;
+    function isNameStartChar(c) {
+      return c >= 65 && c <= 90 || c >= 97 && c <= 122 || c === 58 || c === 95 || c === 8204 || c === 8205 || c >= 192 && c <= 214 || c >= 216 && c <= 246 || c >= 248 && c <= 767 || c >= 880 && c <= 893 || c >= 895 && c <= 8191 || c >= 8304 && c <= 8591 || c >= 11264 && c <= 12271 || c >= 12289 && c <= 55295 || c >= 63744 && c <= 64975 || c >= 65008 && c <= 65533 || c >= 65536 && c <= 983039;
+    }
+    exports.isNameStartChar = isNameStartChar;
+    function isNameChar(c) {
+      return isNameStartChar(c) || c >= 48 && c <= 57 || c === 45 || c === 46 || c === 183 || c >= 768 && c <= 879 || c >= 8255 && c <= 8256;
+    }
+    exports.isNameChar = isNameChar;
+  }
+});
+
+// node_modules/.pnpm/xmlchars@2.2.0/node_modules/xmlchars/xml/1.1/ed2.js
+var require_ed2 = __commonJS({
+  "node_modules/.pnpm/xmlchars@2.2.0/node_modules/xmlchars/xml/1.1/ed2.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.CHAR = "-퟿-�𐀀-􏿿";
+    exports.RESTRICTED_CHAR = "-\b\v\f---";
+    exports.S = " 	\r\n";
+    exports.NAME_START_CHAR = ":A-Z_a-zÀ-ÖØ-öø-˿Ͱ-ͽͿ-῿‌‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�𐀀-󯿿";
+    exports.NAME_CHAR = "-" + exports.NAME_START_CHAR + ".0-9·̀-ͯ‿-⁀";
+    exports.CHAR_RE = new RegExp("^[" + exports.CHAR + "]$", "u");
+    exports.RESTRICTED_CHAR_RE = new RegExp("^[" + exports.RESTRICTED_CHAR + "]$", "u");
+    exports.S_RE = new RegExp("^[" + exports.S + "]+$", "u");
+    exports.NAME_START_CHAR_RE = new RegExp("^[" + exports.NAME_START_CHAR + "]$", "u");
+    exports.NAME_CHAR_RE = new RegExp("^[" + exports.NAME_CHAR + "]$", "u");
+    exports.NAME_RE = new RegExp("^[" + exports.NAME_START_CHAR + "][" + exports.NAME_CHAR + "]*$", "u");
+    exports.NMTOKEN_RE = new RegExp("^[" + exports.NAME_CHAR + "]+$", "u");
+    var TAB = 9;
+    var NL = 10;
+    var CR = 13;
+    var SPACE = 32;
+    exports.S_LIST = [SPACE, NL, CR, TAB];
+    function isChar(c) {
+      return c >= 1 && c <= 55295 || c >= 57344 && c <= 65533 || c >= 65536 && c <= 1114111;
+    }
+    exports.isChar = isChar;
+    function isRestrictedChar(c) {
+      return c >= 1 && c <= 8 || c === 11 || c === 12 || c >= 14 && c <= 31 || c >= 127 && c <= 132 || c >= 134 && c <= 159;
+    }
+    exports.isRestrictedChar = isRestrictedChar;
+    function isCharAndNotRestricted(c) {
+      return c === 9 || c === 10 || c === 13 || c > 31 && c < 127 || c === 133 || c > 159 && c <= 55295 || c >= 57344 && c <= 65533 || c >= 65536 && c <= 1114111;
+    }
+    exports.isCharAndNotRestricted = isCharAndNotRestricted;
+    function isS(c) {
+      return c === SPACE || c === NL || c === CR || c === TAB;
+    }
+    exports.isS = isS;
+    function isNameStartChar(c) {
+      return c >= 65 && c <= 90 || c >= 97 && c <= 122 || c === 58 || c === 95 || c === 8204 || c === 8205 || c >= 192 && c <= 214 || c >= 216 && c <= 246 || c >= 248 && c <= 767 || c >= 880 && c <= 893 || c >= 895 && c <= 8191 || c >= 8304 && c <= 8591 || c >= 11264 && c <= 12271 || c >= 12289 && c <= 55295 || c >= 63744 && c <= 64975 || c >= 65008 && c <= 65533 || c >= 65536 && c <= 983039;
+    }
+    exports.isNameStartChar = isNameStartChar;
+    function isNameChar(c) {
+      return isNameStartChar(c) || c >= 48 && c <= 57 || c === 45 || c === 46 || c === 183 || c >= 768 && c <= 879 || c >= 8255 && c <= 8256;
+    }
+    exports.isNameChar = isNameChar;
+  }
+});
+
+// node_modules/.pnpm/xmlchars@2.2.0/node_modules/xmlchars/xmlns/1.0/ed3.js
+var require_ed3 = __commonJS({
+  "node_modules/.pnpm/xmlchars@2.2.0/node_modules/xmlchars/xmlns/1.0/ed3.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.NC_NAME_START_CHAR = "A-Z_a-zÀ-ÖØ-öø-˿Ͱ-ͽͿ-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�𐀀-󯿿";
+    exports.NC_NAME_CHAR = "-" + exports.NC_NAME_START_CHAR + ".0-9·̀-ͯ‿-⁀";
+    exports.NC_NAME_START_CHAR_RE = new RegExp("^[" + exports.NC_NAME_START_CHAR + "]$", "u");
+    exports.NC_NAME_CHAR_RE = new RegExp("^[" + exports.NC_NAME_CHAR + "]$", "u");
+    exports.NC_NAME_RE = new RegExp("^[" + exports.NC_NAME_START_CHAR + "][" + exports.NC_NAME_CHAR + "]*$", "u");
+    function isNCNameStartChar(c) {
+      return c >= 65 && c <= 90 || c === 95 || c >= 97 && c <= 122 || c >= 192 && c <= 214 || c >= 216 && c <= 246 || c >= 248 && c <= 767 || c >= 880 && c <= 893 || c >= 895 && c <= 8191 || c >= 8204 && c <= 8205 || c >= 8304 && c <= 8591 || c >= 11264 && c <= 12271 || c >= 12289 && c <= 55295 || c >= 63744 && c <= 64975 || c >= 65008 && c <= 65533 || c >= 65536 && c <= 983039;
+    }
+    exports.isNCNameStartChar = isNCNameStartChar;
+    function isNCNameChar(c) {
+      return isNCNameStartChar(c) || (c === 45 || c === 46 || c >= 48 && c <= 57 || c === 183 || c >= 768 && c <= 879 || c >= 8255 && c <= 8256);
+    }
+    exports.isNCNameChar = isNCNameChar;
+  }
+});
+
+// node_modules/.pnpm/saxes@5.0.1/node_modules/saxes/saxes.js
+var require_saxes = __commonJS({
+  "node_modules/.pnpm/saxes@5.0.1/node_modules/saxes/saxes.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    var ed5 = require_ed5();
+    var ed2 = require_ed2();
+    var NSed3 = require_ed3();
+    var isS = ed5.isS;
+    var isChar10 = ed5.isChar;
+    var isNameStartChar = ed5.isNameStartChar;
+    var isNameChar = ed5.isNameChar;
+    var S_LIST = ed5.S_LIST;
+    var NAME_RE = ed5.NAME_RE;
+    var isChar11 = ed2.isChar;
+    var isNCNameStartChar = NSed3.isNCNameStartChar;
+    var isNCNameChar = NSed3.isNCNameChar;
+    var NC_NAME_RE = NSed3.NC_NAME_RE;
+    var XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
+    var XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/";
+    var rootNS = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      __proto__: null,
+      xml: XML_NAMESPACE,
+      xmlns: XMLNS_NAMESPACE
+    };
+    var XML_ENTITIES = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      __proto__: null,
+      amp: "&",
+      gt: ">",
+      lt: "<",
+      quot: '"',
+      apos: "'"
+    };
+    var EOC = -1;
+    var NL_LIKE = -2;
+    var S_BEGIN = 0;
+    var S_BEGIN_WHITESPACE = 1;
+    var S_DOCTYPE = 2;
+    var S_DOCTYPE_QUOTE = 3;
+    var S_DTD = 4;
+    var S_DTD_QUOTED = 5;
+    var S_DTD_OPEN_WAKA = 6;
+    var S_DTD_OPEN_WAKA_BANG = 7;
+    var S_DTD_COMMENT = 8;
+    var S_DTD_COMMENT_ENDING = 9;
+    var S_DTD_COMMENT_ENDED = 10;
+    var S_DTD_PI = 11;
+    var S_DTD_PI_ENDING = 12;
+    var S_TEXT = 13;
+    var S_ENTITY = 14;
+    var S_OPEN_WAKA = 15;
+    var S_OPEN_WAKA_BANG = 16;
+    var S_COMMENT = 17;
+    var S_COMMENT_ENDING = 18;
+    var S_COMMENT_ENDED = 19;
+    var S_CDATA = 20;
+    var S_CDATA_ENDING = 21;
+    var S_CDATA_ENDING_2 = 22;
+    var S_PI_FIRST_CHAR = 23;
+    var S_PI_REST = 24;
+    var S_PI_BODY = 25;
+    var S_PI_ENDING = 26;
+    var S_XML_DECL_NAME_START = 27;
+    var S_XML_DECL_NAME = 28;
+    var S_XML_DECL_EQ = 29;
+    var S_XML_DECL_VALUE_START = 30;
+    var S_XML_DECL_VALUE = 31;
+    var S_XML_DECL_SEPARATOR = 32;
+    var S_XML_DECL_ENDING = 33;
+    var S_OPEN_TAG = 34;
+    var S_OPEN_TAG_SLASH = 35;
+    var S_ATTRIB = 36;
+    var S_ATTRIB_NAME = 37;
+    var S_ATTRIB_NAME_SAW_WHITE = 38;
+    var S_ATTRIB_VALUE = 39;
+    var S_ATTRIB_VALUE_QUOTED = 40;
+    var S_ATTRIB_VALUE_CLOSED = 41;
+    var S_ATTRIB_VALUE_UNQUOTED = 42;
+    var S_CLOSE_TAG = 43;
+    var S_CLOSE_TAG_SAW_WHITE = 44;
+    var TAB = 9;
+    var NL = 10;
+    var CR = 13;
+    var SPACE = 32;
+    var BANG = 33;
+    var DQUOTE = 34;
+    var AMP = 38;
+    var SQUOTE = 39;
+    var MINUS = 45;
+    var FORWARD_SLASH = 47;
+    var SEMICOLON = 59;
+    var LESS = 60;
+    var EQUAL = 61;
+    var GREATER = 62;
+    var QUESTION = 63;
+    var OPEN_BRACKET = 91;
+    var CLOSE_BRACKET = 93;
+    var NEL = 133;
+    var LS = 8232;
+    var isQuote = (c) => c === DQUOTE || c === SQUOTE;
+    var QUOTES = [DQUOTE, SQUOTE];
+    var DOCTYPE_TERMINATOR = [...QUOTES, OPEN_BRACKET, GREATER];
+    var DTD_TERMINATOR = [...QUOTES, LESS, CLOSE_BRACKET];
+    var XML_DECL_NAME_TERMINATOR = [EQUAL, QUESTION, ...S_LIST];
+    var ATTRIB_VALUE_UNQUOTED_TERMINATOR = [...S_LIST, GREATER, AMP, LESS];
+    function nsPairCheck(parser, prefix, uri) {
+      switch (prefix) {
+        case "xml":
+          if (uri !== XML_NAMESPACE) {
+            parser.fail(`xml prefix must be bound to ${XML_NAMESPACE}.`);
+          }
+          break;
+        case "xmlns":
+          if (uri !== XMLNS_NAMESPACE) {
+            parser.fail(`xmlns prefix must be bound to ${XMLNS_NAMESPACE}.`);
+          }
+          break;
+        default:
+      }
+      switch (uri) {
+        case XMLNS_NAMESPACE:
+          parser.fail(prefix === "" ? `the default namespace may not be set to ${uri}.` : `may not assign a prefix (even "xmlns") to the URI ${XMLNS_NAMESPACE}.`);
+          break;
+        case XML_NAMESPACE:
+          switch (prefix) {
+            case "xml":
+              break;
+            case "":
+              parser.fail(`the default namespace may not be set to ${uri}.`);
+              break;
+            default:
+              parser.fail("may not assign the xml namespace to another prefix.");
+          }
+          break;
+        default:
+      }
+    }
+    function nsMappingCheck(parser, mapping) {
+      for (const local of Object.keys(mapping)) {
+        nsPairCheck(parser, local, mapping[local]);
+      }
+    }
+    var isNCName = (name) => NC_NAME_RE.test(name);
+    var isName = (name) => NAME_RE.test(name);
+    var FORBIDDEN_START = 0;
+    var FORBIDDEN_BRACKET = 1;
+    var FORBIDDEN_BRACKET_BRACKET = 2;
+    exports.EVENTS = [
+      "xmldecl",
+      "text",
+      "processinginstruction",
+      "doctype",
+      "comment",
+      "opentagstart",
+      "attribute",
+      "opentag",
+      "closetag",
+      "cdata",
+      "error",
+      "end",
+      "ready"
+    ];
+    var EVENT_NAME_TO_HANDLER_NAME = {
+      xmldecl: "xmldeclHandler",
+      text: "textHandler",
+      processinginstruction: "piHandler",
+      doctype: "doctypeHandler",
+      comment: "commentHandler",
+      opentagstart: "openTagStartHandler",
+      attribute: "attributeHandler",
+      opentag: "openTagHandler",
+      closetag: "closeTagHandler",
+      cdata: "cdataHandler",
+      error: "errorHandler",
+      end: "endHandler",
+      ready: "readyHandler"
+    };
+    var SaxesParser2 = class {
+      /**
+       * @param opt The parser options.
+       */
+      constructor(opt) {
+        this.opt = opt !== null && opt !== void 0 ? opt : {};
+        this.fragmentOpt = !!this.opt.fragment;
+        const xmlnsOpt = this.xmlnsOpt = !!this.opt.xmlns;
+        this.trackPosition = this.opt.position !== false;
+        this.fileName = this.opt.fileName;
+        if (xmlnsOpt) {
+          this.nameStartCheck = isNCNameStartChar;
+          this.nameCheck = isNCNameChar;
+          this.isName = isNCName;
+          this.processAttribs = this.processAttribsNS;
+          this.pushAttrib = this.pushAttribNS;
+          this.ns = Object.assign({ __proto__: null }, rootNS);
+          const additional = this.opt.additionalNamespaces;
+          if (additional != null) {
+            nsMappingCheck(this, additional);
+            Object.assign(this.ns, additional);
+          }
+        } else {
+          this.nameStartCheck = isNameStartChar;
+          this.nameCheck = isNameChar;
+          this.isName = isName;
+          this.processAttribs = this.processAttribsPlain;
+          this.pushAttrib = this.pushAttribPlain;
+        }
+        this.stateTable = [
+          /* eslint-disable @typescript-eslint/unbound-method */
+          this.sBegin,
+          this.sBeginWhitespace,
+          this.sDoctype,
+          this.sDoctypeQuote,
+          this.sDTD,
+          this.sDTDQuoted,
+          this.sDTDOpenWaka,
+          this.sDTDOpenWakaBang,
+          this.sDTDComment,
+          this.sDTDCommentEnding,
+          this.sDTDCommentEnded,
+          this.sDTDPI,
+          this.sDTDPIEnding,
+          this.sText,
+          this.sEntity,
+          this.sOpenWaka,
+          this.sOpenWakaBang,
+          this.sComment,
+          this.sCommentEnding,
+          this.sCommentEnded,
+          this.sCData,
+          this.sCDataEnding,
+          this.sCDataEnding2,
+          this.sPIFirstChar,
+          this.sPIRest,
+          this.sPIBody,
+          this.sPIEnding,
+          this.sXMLDeclNameStart,
+          this.sXMLDeclName,
+          this.sXMLDeclEq,
+          this.sXMLDeclValueStart,
+          this.sXMLDeclValue,
+          this.sXMLDeclSeparator,
+          this.sXMLDeclEnding,
+          this.sOpenTag,
+          this.sOpenTagSlash,
+          this.sAttrib,
+          this.sAttribName,
+          this.sAttribNameSawWhite,
+          this.sAttribValue,
+          this.sAttribValueQuoted,
+          this.sAttribValueClosed,
+          this.sAttribValueUnquoted,
+          this.sCloseTag,
+          this.sCloseTagSawWhite
+        ];
+        this._init();
+      }
+      /**
+       * Indicates whether or not the parser is closed. If ``true``, wait for
+       * the ``ready`` event to write again.
+       */
+      get closed() {
+        return this._closed;
+      }
+      _init() {
+        var _a2;
+        this.openWakaBang = "";
+        this.text = "";
+        this.name = "";
+        this.piTarget = "";
+        this.entity = "";
+        this.q = null;
+        this.tags = [];
+        this.tag = null;
+        this.topNS = null;
+        this.chunk = "";
+        this.chunkPosition = 0;
+        this.i = 0;
+        this.prevI = 0;
+        this.carriedFromPrevious = void 0;
+        this.forbiddenState = FORBIDDEN_START;
+        this.attribList = [];
+        const { fragmentOpt } = this;
+        this.state = fragmentOpt ? S_TEXT : S_BEGIN;
+        this.reportedTextBeforeRoot = this.reportedTextAfterRoot = this.closedRoot = this.sawRoot = fragmentOpt;
+        this.xmlDeclPossible = !fragmentOpt;
+        this.xmlDeclExpects = ["version"];
+        this.entityReturnState = void 0;
+        let { defaultXMLVersion } = this.opt;
+        if (defaultXMLVersion === void 0) {
+          if (this.opt.forceXMLVersion === true) {
+            throw new Error("forceXMLVersion set but defaultXMLVersion is not set");
+          }
+          defaultXMLVersion = "1.0";
+        }
+        this.setXMLVersion(defaultXMLVersion);
+        this.positionAtNewLine = 0;
+        this.doctype = false;
+        this._closed = false;
+        this.xmlDecl = {
+          version: void 0,
+          encoding: void 0,
+          standalone: void 0
+        };
+        this.line = 1;
+        this.column = 0;
+        this.ENTITIES = Object.create(XML_ENTITIES);
+        (_a2 = this.readyHandler) === null || _a2 === void 0 ? void 0 : _a2.call(this);
+      }
+      /**
+       * The stream position the parser is currently looking at. This field is
+       * zero-based.
+       *
+       * This field is not based on counting Unicode characters but is to be
+       * interpreted as a plain index into a JavaScript string.
+       */
+      get position() {
+        return this.chunkPosition + this.i;
+      }
+      /**
+       * The column number of the next character to be read by the parser.  *
+       * This field is zero-based. (The first column in a line is 0.)
+       *
+       * This field reports the index at which the next character would be in the
+       * line if the line were represented as a JavaScript string.  Note that this
+       * *can* be different to a count based on the number of *Unicode characters*
+       * due to how JavaScript handles astral plane characters.
+       *
+       * See [[column]] for a number that corresponds to a count of Unicode
+       * characters.
+       */
+      get columnIndex() {
+        return this.position - this.positionAtNewLine;
+      }
+      /**
+       * Set an event listener on an event. The parser supports one handler per
+       * event type. If you try to set an event handler over an existing handler,
+       * the old handler is silently overwritten.
+       *
+       * @param name The event to listen to.
+       *
+       * @param handler The handler to set.
+       */
+      on(name, handler) {
+        this[EVENT_NAME_TO_HANDLER_NAME[name]] = handler;
+      }
+      /**
+       * Unset an event handler.
+       *
+       * @parma name The event to stop listening to.
+       */
+      off(name) {
+        this[EVENT_NAME_TO_HANDLER_NAME[name]] = void 0;
+      }
+      /**
+       * Make an error object. The error object will have a message that contains
+       * the ``fileName`` option passed at the creation of the parser. If position
+       * tracking was turned on, it will also have line and column number
+       * information.
+       *
+       * @param message The message describing the error to report.
+       *
+       * @returns An error object with a properly formatted message.
+       */
+      makeError(message) {
+        var _a2;
+        let msg = (_a2 = this.fileName) !== null && _a2 !== void 0 ? _a2 : "";
+        if (this.trackPosition) {
+          if (msg.length > 0) {
+            msg += ":";
+          }
+          msg += `${this.line}:${this.column}`;
+        }
+        if (msg.length > 0) {
+          msg += ": ";
+        }
+        return new Error(msg + message);
+      }
+      /**
+       * Report a parsing error. This method is made public so that client code may
+       * check for issues that are outside the scope of this project and can report
+       * errors.
+       *
+       * @param message The error to report.
+       *
+       * @returns this
+       */
+      fail(message) {
+        const err3 = this.makeError(message);
+        const handler = this.errorHandler;
+        if (handler === void 0) {
+          throw err3;
+        } else {
+          handler(err3);
+        }
+        return this;
+      }
+      /**
+       * Write a XML data to the parser.
+       *
+       * @param chunk The XML data to write.
+       *
+       * @returns this
+       */
+      write(chunk) {
+        if (this.closed) {
+          return this.fail("cannot write after close; assign an onready handler.");
+        }
+        let end = false;
+        if (chunk === null) {
+          end = true;
+          chunk = "";
+        } else if (typeof chunk === "object") {
+          chunk = chunk.toString();
+        }
+        if (this.carriedFromPrevious !== void 0) {
+          chunk = `${this.carriedFromPrevious}${chunk}`;
+          this.carriedFromPrevious = void 0;
+        }
+        let limit = chunk.length;
+        const lastCode = chunk.charCodeAt(limit - 1);
+        if (!end && // A trailing CR or surrogate must be carried over to the next
+        // chunk.
+        (lastCode === CR || lastCode >= 55296 && lastCode <= 56319)) {
+          this.carriedFromPrevious = chunk[limit - 1];
+          limit--;
+          chunk = chunk.slice(0, limit);
+        }
+        const { stateTable } = this;
+        this.chunk = chunk;
+        this.i = 0;
+        while (this.i < limit) {
+          stateTable[this.state].call(this);
+        }
+        this.chunkPosition += limit;
+        return end ? this.end() : this;
+      }
+      /**
+       * Close the current stream. Perform final well-formedness checks and reset
+       * the parser tstate.
+       *
+       * @returns this
+       */
+      close() {
+        return this.write(null);
+      }
+      /**
+       * Get a single code point out of the current chunk. This updates the current
+       * position if we do position tracking.
+       *
+       * This is the algorithm to use for XML 1.0.
+       *
+       * @returns The character read.
+       */
+      getCode10() {
+        const { chunk, i: i2 } = this;
+        this.prevI = i2;
+        this.i = i2 + 1;
+        if (i2 >= chunk.length) {
+          return EOC;
+        }
+        const code = chunk.charCodeAt(i2);
+        this.column++;
+        if (code < 55296) {
+          if (code >= SPACE || code === TAB) {
+            return code;
+          }
+          switch (code) {
+            case NL:
+              this.line++;
+              this.column = 0;
+              this.positionAtNewLine = this.position;
+              return NL;
+            case CR:
+              if (chunk.charCodeAt(i2 + 1) === NL) {
+                this.i = i2 + 2;
+              }
+              this.line++;
+              this.column = 0;
+              this.positionAtNewLine = this.position;
+              return NL_LIKE;
+            default:
+              this.fail("disallowed character.");
+              return code;
+          }
+        }
+        if (code > 56319) {
+          if (!(code >= 57344 && code <= 65533)) {
+            this.fail("disallowed character.");
+          }
+          return code;
+        }
+        const final = 65536 + (code - 55296) * 1024 + (chunk.charCodeAt(i2 + 1) - 56320);
+        this.i = i2 + 2;
+        if (final > 1114111) {
+          this.fail("disallowed character.");
+        }
+        return final;
+      }
+      /**
+       * Get a single code point out of the current chunk. This updates the current
+       * position if we do position tracking.
+       *
+       * This is the algorithm to use for XML 1.1.
+       *
+       * @returns {number} The character read.
+       */
+      getCode11() {
+        const { chunk, i: i2 } = this;
+        this.prevI = i2;
+        this.i = i2 + 1;
+        if (i2 >= chunk.length) {
+          return EOC;
+        }
+        const code = chunk.charCodeAt(i2);
+        this.column++;
+        if (code < 55296) {
+          if (code > 31 && code < 127 || code > 159 && code !== LS || code === TAB) {
+            return code;
+          }
+          switch (code) {
+            case NL:
+              this.line++;
+              this.column = 0;
+              this.positionAtNewLine = this.position;
+              return NL;
+            case CR: {
+              const next = chunk.charCodeAt(i2 + 1);
+              if (next === NL || next === NEL) {
+                this.i = i2 + 2;
+              }
+            }
+            /* yes, fall through */
+            case NEL:
+            // 0x85
+            case LS:
+              this.line++;
+              this.column = 0;
+              this.positionAtNewLine = this.position;
+              return NL_LIKE;
+            default:
+              this.fail("disallowed character.");
+              return code;
+          }
+        }
+        if (code > 56319) {
+          if (!(code >= 57344 && code <= 65533)) {
+            this.fail("disallowed character.");
+          }
+          return code;
+        }
+        const final = 65536 + (code - 55296) * 1024 + (chunk.charCodeAt(i2 + 1) - 56320);
+        this.i = i2 + 2;
+        if (final > 1114111) {
+          this.fail("disallowed character.");
+        }
+        return final;
+      }
+      /**
+       * Like ``getCode`` but with the return value normalized so that ``NL`` is
+       * returned for ``NL_LIKE``.
+       */
+      getCodeNorm() {
+        const c = this.getCode();
+        return c === NL_LIKE ? NL : c;
+      }
+      unget() {
+        this.i = this.prevI;
+        this.column--;
+      }
+      /**
+       * Capture characters into a buffer until encountering one of a set of
+       * characters.
+       *
+       * @param chars An array of codepoints. Encountering a character in the array
+       * ends the capture. (``chars`` may safely contain ``NL``.)
+       *
+       * @return The character code that made the capture end, or ``EOC`` if we hit
+       * the end of the chunk. The return value cannot be NL_LIKE: NL is returned
+       * instead.
+       */
+      captureTo(chars) {
+        let { i: start } = this;
+        const { chunk } = this;
+        while (true) {
+          const c = this.getCode();
+          const isNLLike = c === NL_LIKE;
+          const final = isNLLike ? NL : c;
+          if (final === EOC || chars.includes(final)) {
+            this.text += chunk.slice(start, this.prevI);
+            return final;
+          }
+          if (isNLLike) {
+            this.text += `${chunk.slice(start, this.prevI)}
+`;
+            start = this.i;
+          }
+        }
+      }
+      /**
+       * Capture characters into a buffer until encountering a character.
+       *
+       * @param char The codepoint that ends the capture. **NOTE ``char`` MAY NOT
+       * CONTAIN ``NL``.** Passing ``NL`` will result in buggy behavior.
+       *
+       * @return ``true`` if we ran into the character. Otherwise, we ran into the
+       * end of the current chunk.
+       */
+      captureToChar(char) {
+        let { i: start } = this;
+        const { chunk } = this;
+        while (true) {
+          let c = this.getCode();
+          switch (c) {
+            case NL_LIKE:
+              this.text += `${chunk.slice(start, this.prevI)}
+`;
+              start = this.i;
+              c = NL;
+              break;
+            case EOC:
+              this.text += chunk.slice(start);
+              return false;
+            default:
+          }
+          if (c === char) {
+            this.text += chunk.slice(start, this.prevI);
+            return true;
+          }
+        }
+      }
+      /**
+       * Capture characters that satisfy ``isNameChar`` into the ``name`` field of
+       * this parser.
+       *
+       * @return The character code that made the test fail, or ``EOC`` if we hit
+       * the end of the chunk. The return value cannot be NL_LIKE: NL is returned
+       * instead.
+       */
+      captureNameChars() {
+        const { chunk, i: start } = this;
+        while (true) {
+          const c = this.getCode();
+          if (c === EOC) {
+            this.name += chunk.slice(start);
+            return EOC;
+          }
+          if (!isNameChar(c)) {
+            this.name += chunk.slice(start, this.prevI);
+            return c === NL_LIKE ? NL : c;
+          }
+        }
+      }
+      /**
+       * Skip white spaces.
+       *
+       * @return The character that ended the skip, or ``EOC`` if we hit
+       * the end of the chunk. The return value cannot be NL_LIKE: NL is returned
+       * instead.
+       */
+      skipSpaces() {
+        while (true) {
+          const c = this.getCodeNorm();
+          if (c === EOC || !isS(c)) {
+            return c;
+          }
+        }
+      }
+      setXMLVersion(version) {
+        this.currentXMLVersion = version;
+        if (version === "1.0") {
+          this.isChar = isChar10;
+          this.getCode = this.getCode10;
+        } else {
+          this.isChar = isChar11;
+          this.getCode = this.getCode11;
+        }
+      }
+      // STATE ENGINE METHODS
+      // This needs to be a state separate from S_BEGIN_WHITESPACE because we want
+      // to be sure never to come back to this state later.
+      sBegin() {
+        if (this.chunk.charCodeAt(0) === 65279) {
+          this.i++;
+          this.column++;
+        }
+        this.state = S_BEGIN_WHITESPACE;
+      }
+      sBeginWhitespace() {
+        const iBefore = this.i;
+        const c = this.skipSpaces();
+        if (this.prevI !== iBefore) {
+          this.xmlDeclPossible = false;
+        }
+        switch (c) {
+          case LESS:
+            this.state = S_OPEN_WAKA;
+            if (this.text.length !== 0) {
+              throw new Error("no-empty text at start");
+            }
+            break;
+          case EOC:
+            break;
+          default:
+            this.unget();
+            this.state = S_TEXT;
+            this.xmlDeclPossible = false;
+        }
+      }
+      sDoctype() {
+        var _a2;
+        const c = this.captureTo(DOCTYPE_TERMINATOR);
+        switch (c) {
+          case GREATER: {
+            (_a2 = this.doctypeHandler) === null || _a2 === void 0 ? void 0 : _a2.call(this, this.text);
+            this.text = "";
+            this.state = S_TEXT;
+            this.doctype = true;
+            break;
+          }
+          case EOC:
+            break;
+          default:
+            this.text += String.fromCodePoint(c);
+            if (c === OPEN_BRACKET) {
+              this.state = S_DTD;
+            } else if (isQuote(c)) {
+              this.state = S_DOCTYPE_QUOTE;
+              this.q = c;
+            }
+        }
+      }
+      sDoctypeQuote() {
+        const q = this.q;
+        if (this.captureToChar(q)) {
+          this.text += String.fromCodePoint(q);
+          this.q = null;
+          this.state = S_DOCTYPE;
+        }
+      }
+      sDTD() {
+        const c = this.captureTo(DTD_TERMINATOR);
+        if (c === EOC) {
+          return;
+        }
+        this.text += String.fromCodePoint(c);
+        if (c === CLOSE_BRACKET) {
+          this.state = S_DOCTYPE;
+        } else if (c === LESS) {
+          this.state = S_DTD_OPEN_WAKA;
+        } else if (isQuote(c)) {
+          this.state = S_DTD_QUOTED;
+          this.q = c;
+        }
+      }
+      sDTDQuoted() {
+        const q = this.q;
+        if (this.captureToChar(q)) {
+          this.text += String.fromCodePoint(q);
+          this.state = S_DTD;
+          this.q = null;
+        }
+      }
+      sDTDOpenWaka() {
+        const c = this.getCodeNorm();
+        this.text += String.fromCodePoint(c);
+        switch (c) {
+          case BANG:
+            this.state = S_DTD_OPEN_WAKA_BANG;
+            this.openWakaBang = "";
+            break;
+          case QUESTION:
+            this.state = S_DTD_PI;
+            break;
+          default:
+            this.state = S_DTD;
+        }
+      }
+      sDTDOpenWakaBang() {
+        const char = String.fromCodePoint(this.getCodeNorm());
+        const owb = this.openWakaBang += char;
+        this.text += char;
+        if (owb !== "-") {
+          this.state = owb === "--" ? S_DTD_COMMENT : S_DTD;
+          this.openWakaBang = "";
+        }
+      }
+      sDTDComment() {
+        if (this.captureToChar(MINUS)) {
+          this.text += "-";
+          this.state = S_DTD_COMMENT_ENDING;
+        }
+      }
+      sDTDCommentEnding() {
+        const c = this.getCodeNorm();
+        this.text += String.fromCodePoint(c);
+        this.state = c === MINUS ? S_DTD_COMMENT_ENDED : S_DTD_COMMENT;
+      }
+      sDTDCommentEnded() {
+        const c = this.getCodeNorm();
+        this.text += String.fromCodePoint(c);
+        if (c === GREATER) {
+          this.state = S_DTD;
+        } else {
+          this.fail("malformed comment.");
+          this.state = S_DTD_COMMENT;
+        }
+      }
+      sDTDPI() {
+        if (this.captureToChar(QUESTION)) {
+          this.text += "?";
+          this.state = S_DTD_PI_ENDING;
+        }
+      }
+      sDTDPIEnding() {
+        const c = this.getCodeNorm();
+        this.text += String.fromCodePoint(c);
+        if (c === GREATER) {
+          this.state = S_DTD;
+        }
+      }
+      sText() {
+        if (this.tags.length !== 0) {
+          this.handleTextInRoot();
+        } else {
+          this.handleTextOutsideRoot();
+        }
+      }
+      sEntity() {
+        let { i: start } = this;
+        const { chunk } = this;
+        loop:
+          while (true) {
+            switch (this.getCode()) {
+              case NL_LIKE:
+                this.entity += `${chunk.slice(start, this.prevI)}
+`;
+                start = this.i;
+                break;
+              case SEMICOLON: {
+                const { entityReturnState } = this;
+                const entity = this.entity + chunk.slice(start, this.prevI);
+                this.state = entityReturnState;
+                let parsed;
+                if (entity === "") {
+                  this.fail("empty entity name.");
+                  parsed = "&;";
+                } else {
+                  parsed = this.parseEntity(entity);
+                  this.entity = "";
+                }
+                if (entityReturnState !== S_TEXT || this.textHandler !== void 0) {
+                  this.text += parsed;
+                }
+                break loop;
+              }
+              case EOC:
+                this.entity += chunk.slice(start);
+                break loop;
+              default:
+            }
+          }
+      }
+      sOpenWaka() {
+        const c = this.getCode();
+        if (isNameStartChar(c)) {
+          this.state = S_OPEN_TAG;
+          this.unget();
+          this.xmlDeclPossible = false;
+        } else {
+          switch (c) {
+            case FORWARD_SLASH:
+              this.state = S_CLOSE_TAG;
+              this.xmlDeclPossible = false;
+              break;
+            case BANG:
+              this.state = S_OPEN_WAKA_BANG;
+              this.openWakaBang = "";
+              this.xmlDeclPossible = false;
+              break;
+            case QUESTION:
+              this.state = S_PI_FIRST_CHAR;
+              break;
+            default:
+              this.fail("disallowed character in tag name");
+              this.state = S_TEXT;
+              this.xmlDeclPossible = false;
+          }
+        }
+      }
+      sOpenWakaBang() {
+        this.openWakaBang += String.fromCodePoint(this.getCodeNorm());
+        switch (this.openWakaBang) {
+          case "[CDATA[":
+            if (!this.sawRoot && !this.reportedTextBeforeRoot) {
+              this.fail("text data outside of root node.");
+              this.reportedTextBeforeRoot = true;
+            }
+            if (this.closedRoot && !this.reportedTextAfterRoot) {
+              this.fail("text data outside of root node.");
+              this.reportedTextAfterRoot = true;
+            }
+            this.state = S_CDATA;
+            this.openWakaBang = "";
+            break;
+          case "--":
+            this.state = S_COMMENT;
+            this.openWakaBang = "";
+            break;
+          case "DOCTYPE":
+            this.state = S_DOCTYPE;
+            if (this.doctype || this.sawRoot) {
+              this.fail("inappropriately located doctype declaration.");
+            }
+            this.openWakaBang = "";
+            break;
+          default:
+            if (this.openWakaBang.length >= 7) {
+              this.fail("incorrect syntax.");
+            }
+        }
+      }
+      sComment() {
+        if (this.captureToChar(MINUS)) {
+          this.state = S_COMMENT_ENDING;
+        }
+      }
+      sCommentEnding() {
+        var _a2;
+        const c = this.getCodeNorm();
+        if (c === MINUS) {
+          this.state = S_COMMENT_ENDED;
+          (_a2 = this.commentHandler) === null || _a2 === void 0 ? void 0 : _a2.call(this, this.text);
+          this.text = "";
+        } else {
+          this.text += `-${String.fromCodePoint(c)}`;
+          this.state = S_COMMENT;
+        }
+      }
+      sCommentEnded() {
+        const c = this.getCodeNorm();
+        if (c !== GREATER) {
+          this.fail("malformed comment.");
+          this.text += `--${String.fromCodePoint(c)}`;
+          this.state = S_COMMENT;
+        } else {
+          this.state = S_TEXT;
+        }
+      }
+      sCData() {
+        if (this.captureToChar(CLOSE_BRACKET)) {
+          this.state = S_CDATA_ENDING;
+        }
+      }
+      sCDataEnding() {
+        const c = this.getCodeNorm();
+        if (c === CLOSE_BRACKET) {
+          this.state = S_CDATA_ENDING_2;
+        } else {
+          this.text += `]${String.fromCodePoint(c)}`;
+          this.state = S_CDATA;
+        }
+      }
+      sCDataEnding2() {
+        var _a2;
+        const c = this.getCodeNorm();
+        switch (c) {
+          case GREATER: {
+            (_a2 = this.cdataHandler) === null || _a2 === void 0 ? void 0 : _a2.call(this, this.text);
+            this.text = "";
+            this.state = S_TEXT;
+            break;
+          }
+          case CLOSE_BRACKET:
+            this.text += "]";
+            break;
+          default:
+            this.text += `]]${String.fromCodePoint(c)}`;
+            this.state = S_CDATA;
+        }
+      }
+      // We need this separate state to check the first character fo the pi target
+      // with this.nameStartCheck which allows less characters than this.nameCheck.
+      sPIFirstChar() {
+        const c = this.getCodeNorm();
+        if (this.nameStartCheck(c)) {
+          this.piTarget += String.fromCodePoint(c);
+          this.state = S_PI_REST;
+        } else if (c === QUESTION || isS(c)) {
+          this.fail("processing instruction without a target.");
+          this.state = c === QUESTION ? S_PI_ENDING : S_PI_BODY;
+        } else {
+          this.fail("disallowed character in processing instruction name.");
+          this.piTarget += String.fromCodePoint(c);
+          this.state = S_PI_REST;
+        }
+      }
+      sPIRest() {
+        const { chunk, i: start } = this;
+        while (true) {
+          const c = this.getCodeNorm();
+          if (c === EOC) {
+            this.piTarget += chunk.slice(start);
+            return;
+          }
+          if (!this.nameCheck(c)) {
+            this.piTarget += chunk.slice(start, this.prevI);
+            const isQuestion = c === QUESTION;
+            if (isQuestion || isS(c)) {
+              if (this.piTarget === "xml") {
+                if (!this.xmlDeclPossible) {
+                  this.fail("an XML declaration must be at the start of the document.");
+                }
+                this.state = isQuestion ? S_XML_DECL_ENDING : S_XML_DECL_NAME_START;
+              } else {
+                this.state = isQuestion ? S_PI_ENDING : S_PI_BODY;
+              }
+            } else {
+              this.fail("disallowed character in processing instruction name.");
+              this.piTarget += String.fromCodePoint(c);
+            }
+            break;
+          }
+        }
+      }
+      sPIBody() {
+        if (this.text.length === 0) {
+          const c = this.getCodeNorm();
+          if (c === QUESTION) {
+            this.state = S_PI_ENDING;
+          } else if (!isS(c)) {
+            this.text = String.fromCodePoint(c);
+          }
+        } else if (this.captureToChar(QUESTION)) {
+          this.state = S_PI_ENDING;
+        }
+      }
+      sPIEnding() {
+        var _a2;
+        const c = this.getCodeNorm();
+        if (c === GREATER) {
+          const { piTarget } = this;
+          if (piTarget.toLowerCase() === "xml") {
+            this.fail("the XML declaration must appear at the start of the document.");
+          }
+          (_a2 = this.piHandler) === null || _a2 === void 0 ? void 0 : _a2.call(this, {
+            target: piTarget,
+            body: this.text
+          });
+          this.piTarget = this.text = "";
+          this.state = S_TEXT;
+        } else if (c === QUESTION) {
+          this.text += "?";
+        } else {
+          this.text += `?${String.fromCodePoint(c)}`;
+          this.state = S_PI_BODY;
+        }
+        this.xmlDeclPossible = false;
+      }
+      sXMLDeclNameStart() {
+        const c = this.skipSpaces();
+        if (c === QUESTION) {
+          this.state = S_XML_DECL_ENDING;
+          return;
+        }
+        if (c !== EOC) {
+          this.state = S_XML_DECL_NAME;
+          this.name = String.fromCodePoint(c);
+        }
+      }
+      sXMLDeclName() {
+        const c = this.captureTo(XML_DECL_NAME_TERMINATOR);
+        if (c === QUESTION) {
+          this.state = S_XML_DECL_ENDING;
+          this.name += this.text;
+          this.text = "";
+          this.fail("XML declaration is incomplete.");
+          return;
+        }
+        if (!(isS(c) || c === EQUAL)) {
+          return;
+        }
+        this.name += this.text;
+        this.text = "";
+        if (!this.xmlDeclExpects.includes(this.name)) {
+          switch (this.name.length) {
+            case 0:
+              this.fail("did not expect any more name/value pairs.");
+              break;
+            case 1:
+              this.fail(`expected the name ${this.xmlDeclExpects[0]}.`);
+              break;
+            default:
+              this.fail(`expected one of ${this.xmlDeclExpects.join(", ")}`);
+          }
+        }
+        this.state = c === EQUAL ? S_XML_DECL_VALUE_START : S_XML_DECL_EQ;
+      }
+      sXMLDeclEq() {
+        const c = this.getCodeNorm();
+        if (c === QUESTION) {
+          this.state = S_XML_DECL_ENDING;
+          this.fail("XML declaration is incomplete.");
+          return;
+        }
+        if (isS(c)) {
+          return;
+        }
+        if (c !== EQUAL) {
+          this.fail("value required.");
+        }
+        this.state = S_XML_DECL_VALUE_START;
+      }
+      sXMLDeclValueStart() {
+        const c = this.getCodeNorm();
+        if (c === QUESTION) {
+          this.state = S_XML_DECL_ENDING;
+          this.fail("XML declaration is incomplete.");
+          return;
+        }
+        if (isS(c)) {
+          return;
+        }
+        if (!isQuote(c)) {
+          this.fail("value must be quoted.");
+          this.q = SPACE;
+        } else {
+          this.q = c;
+        }
+        this.state = S_XML_DECL_VALUE;
+      }
+      sXMLDeclValue() {
+        const c = this.captureTo([this.q, QUESTION]);
+        if (c === QUESTION) {
+          this.state = S_XML_DECL_ENDING;
+          this.text = "";
+          this.fail("XML declaration is incomplete.");
+          return;
+        }
+        if (c === EOC) {
+          return;
+        }
+        const value = this.text;
+        this.text = "";
+        switch (this.name) {
+          case "version": {
+            this.xmlDeclExpects = ["encoding", "standalone"];
+            const version = value;
+            this.xmlDecl.version = version;
+            if (!/^1\.[0-9]+$/.test(version)) {
+              this.fail("version number must match /^1\\.[0-9]+$/.");
+            } else if (!this.opt.forceXMLVersion) {
+              this.setXMLVersion(version);
+            }
+            break;
+          }
+          case "encoding":
+            if (!/^[A-Za-z][A-Za-z0-9._-]*$/.test(value)) {
+              this.fail("encoding value must match /^[A-Za-z0-9][A-Za-z0-9._-]*$/.");
+            }
+            this.xmlDeclExpects = ["standalone"];
+            this.xmlDecl.encoding = value;
+            break;
+          case "standalone":
+            if (value !== "yes" && value !== "no") {
+              this.fail('standalone value must match "yes" or "no".');
+            }
+            this.xmlDeclExpects = [];
+            this.xmlDecl.standalone = value;
+            break;
+          default:
+        }
+        this.name = "";
+        this.state = S_XML_DECL_SEPARATOR;
+      }
+      sXMLDeclSeparator() {
+        const c = this.getCodeNorm();
+        if (c === QUESTION) {
+          this.state = S_XML_DECL_ENDING;
+          return;
+        }
+        if (!isS(c)) {
+          this.fail("whitespace required.");
+          this.unget();
+        }
+        this.state = S_XML_DECL_NAME_START;
+      }
+      sXMLDeclEnding() {
+        var _a2;
+        const c = this.getCodeNorm();
+        if (c === GREATER) {
+          if (this.piTarget !== "xml") {
+            this.fail("processing instructions are not allowed before root.");
+          } else if (this.name !== "version" && this.xmlDeclExpects.includes("version")) {
+            this.fail("XML declaration must contain a version.");
+          }
+          (_a2 = this.xmldeclHandler) === null || _a2 === void 0 ? void 0 : _a2.call(this, this.xmlDecl);
+          this.name = "";
+          this.piTarget = this.text = "";
+          this.state = S_TEXT;
+        } else {
+          this.fail("The character ? is disallowed anywhere in XML declarations.");
+        }
+        this.xmlDeclPossible = false;
+      }
+      sOpenTag() {
+        var _a2;
+        const c = this.captureNameChars();
+        if (c === EOC) {
+          return;
+        }
+        const tag = this.tag = {
+          name: this.name,
+          attributes: /* @__PURE__ */ Object.create(null)
+        };
+        this.name = "";
+        if (this.xmlnsOpt) {
+          this.topNS = tag.ns = /* @__PURE__ */ Object.create(null);
+        }
+        (_a2 = this.openTagStartHandler) === null || _a2 === void 0 ? void 0 : _a2.call(this, tag);
+        this.sawRoot = true;
+        if (!this.fragmentOpt && this.closedRoot) {
+          this.fail("documents may contain only one root.");
+        }
+        switch (c) {
+          case GREATER:
+            this.openTag();
+            break;
+          case FORWARD_SLASH:
+            this.state = S_OPEN_TAG_SLASH;
+            break;
+          default:
+            if (!isS(c)) {
+              this.fail("disallowed character in tag name.");
+            }
+            this.state = S_ATTRIB;
+        }
+      }
+      sOpenTagSlash() {
+        if (this.getCode() === GREATER) {
+          this.openSelfClosingTag();
+        } else {
+          this.fail("forward-slash in opening tag not followed by >.");
+          this.state = S_ATTRIB;
+        }
+      }
+      sAttrib() {
+        const c = this.skipSpaces();
+        if (c === EOC) {
+          return;
+        }
+        if (isNameStartChar(c)) {
+          this.unget();
+          this.state = S_ATTRIB_NAME;
+        } else if (c === GREATER) {
+          this.openTag();
+        } else if (c === FORWARD_SLASH) {
+          this.state = S_OPEN_TAG_SLASH;
+        } else {
+          this.fail("disallowed character in attribute name.");
+        }
+      }
+      sAttribName() {
+        const c = this.captureNameChars();
+        if (c === EQUAL) {
+          this.state = S_ATTRIB_VALUE;
+        } else if (isS(c)) {
+          this.state = S_ATTRIB_NAME_SAW_WHITE;
+        } else if (c === GREATER) {
+          this.fail("attribute without value.");
+          this.pushAttrib(this.name, this.name);
+          this.name = this.text = "";
+          this.openTag();
+        } else if (c !== EOC) {
+          this.fail("disallowed character in attribute name.");
+        }
+      }
+      sAttribNameSawWhite() {
+        const c = this.skipSpaces();
+        switch (c) {
+          case EOC:
+            return;
+          case EQUAL:
+            this.state = S_ATTRIB_VALUE;
+            break;
+          default:
+            this.fail("attribute without value.");
+            this.text = "";
+            this.name = "";
+            if (c === GREATER) {
+              this.openTag();
+            } else if (isNameStartChar(c)) {
+              this.unget();
+              this.state = S_ATTRIB_NAME;
+            } else {
+              this.fail("disallowed character in attribute name.");
+              this.state = S_ATTRIB;
+            }
+        }
+      }
+      sAttribValue() {
+        const c = this.getCodeNorm();
+        if (isQuote(c)) {
+          this.q = c;
+          this.state = S_ATTRIB_VALUE_QUOTED;
+        } else if (!isS(c)) {
+          this.fail("unquoted attribute value.");
+          this.state = S_ATTRIB_VALUE_UNQUOTED;
+          this.unget();
+        }
+      }
+      sAttribValueQuoted() {
+        const { q, chunk } = this;
+        let { i: start } = this;
+        while (true) {
+          switch (this.getCode()) {
+            case q:
+              this.pushAttrib(this.name, this.text + chunk.slice(start, this.prevI));
+              this.name = this.text = "";
+              this.q = null;
+              this.state = S_ATTRIB_VALUE_CLOSED;
+              return;
+            case AMP:
+              this.text += chunk.slice(start, this.prevI);
+              this.state = S_ENTITY;
+              this.entityReturnState = S_ATTRIB_VALUE_QUOTED;
+              return;
+            case NL:
+            case NL_LIKE:
+            case TAB:
+              this.text += `${chunk.slice(start, this.prevI)} `;
+              start = this.i;
+              break;
+            case LESS:
+              this.text += chunk.slice(start, this.prevI);
+              this.fail("disallowed character.");
+              return;
+            case EOC:
+              this.text += chunk.slice(start);
+              return;
+            default:
+          }
+        }
+      }
+      sAttribValueClosed() {
+        const c = this.getCodeNorm();
+        if (isS(c)) {
+          this.state = S_ATTRIB;
+        } else if (c === GREATER) {
+          this.openTag();
+        } else if (c === FORWARD_SLASH) {
+          this.state = S_OPEN_TAG_SLASH;
+        } else if (isNameStartChar(c)) {
+          this.fail("no whitespace between attributes.");
+          this.unget();
+          this.state = S_ATTRIB_NAME;
+        } else {
+          this.fail("disallowed character in attribute name.");
+        }
+      }
+      sAttribValueUnquoted() {
+        const c = this.captureTo(ATTRIB_VALUE_UNQUOTED_TERMINATOR);
+        switch (c) {
+          case AMP:
+            this.state = S_ENTITY;
+            this.entityReturnState = S_ATTRIB_VALUE_UNQUOTED;
+            break;
+          case LESS:
+            this.fail("disallowed character.");
+            break;
+          case EOC:
+            break;
+          default:
+            if (this.text.includes("]]>")) {
+              this.fail('the string "]]>" is disallowed in char data.');
+            }
+            this.pushAttrib(this.name, this.text);
+            this.name = this.text = "";
+            if (c === GREATER) {
+              this.openTag();
+            } else {
+              this.state = S_ATTRIB;
+            }
+        }
+      }
+      sCloseTag() {
+        const c = this.captureNameChars();
+        if (c === GREATER) {
+          this.closeTag();
+        } else if (isS(c)) {
+          this.state = S_CLOSE_TAG_SAW_WHITE;
+        } else if (c !== EOC) {
+          this.fail("disallowed character in closing tag.");
+        }
+      }
+      sCloseTagSawWhite() {
+        switch (this.skipSpaces()) {
+          case GREATER:
+            this.closeTag();
+            break;
+          case EOC:
+            break;
+          default:
+            this.fail("disallowed character in closing tag.");
+        }
+      }
+      // END OF STATE ENGINE METHODS
+      handleTextInRoot() {
+        let { i: start, forbiddenState } = this;
+        const { chunk, textHandler: handler } = this;
+        scanLoop:
+          while (true) {
+            switch (this.getCode()) {
+              case LESS: {
+                this.state = S_OPEN_WAKA;
+                if (handler !== void 0) {
+                  const { text: text2 } = this;
+                  const slice = chunk.slice(start, this.prevI);
+                  if (text2.length !== 0) {
+                    handler(text2 + slice);
+                    this.text = "";
+                  } else if (slice.length !== 0) {
+                    handler(slice);
+                  }
+                }
+                forbiddenState = FORBIDDEN_START;
+                break scanLoop;
+              }
+              case AMP:
+                this.state = S_ENTITY;
+                this.entityReturnState = S_TEXT;
+                if (handler !== void 0) {
+                  this.text += chunk.slice(start, this.prevI);
+                }
+                forbiddenState = FORBIDDEN_START;
+                break scanLoop;
+              case CLOSE_BRACKET:
+                switch (forbiddenState) {
+                  case FORBIDDEN_START:
+                    forbiddenState = FORBIDDEN_BRACKET;
+                    break;
+                  case FORBIDDEN_BRACKET:
+                    forbiddenState = FORBIDDEN_BRACKET_BRACKET;
+                    break;
+                  case FORBIDDEN_BRACKET_BRACKET:
+                    break;
+                  default:
+                    throw new Error("impossible state");
+                }
+                break;
+              case GREATER:
+                if (forbiddenState === FORBIDDEN_BRACKET_BRACKET) {
+                  this.fail('the string "]]>" is disallowed in char data.');
+                }
+                forbiddenState = FORBIDDEN_START;
+                break;
+              case NL_LIKE:
+                if (handler !== void 0) {
+                  this.text += `${chunk.slice(start, this.prevI)}
+`;
+                }
+                start = this.i;
+                forbiddenState = FORBIDDEN_START;
+                break;
+              case EOC:
+                if (handler !== void 0) {
+                  this.text += chunk.slice(start);
+                }
+                break scanLoop;
+              default:
+                forbiddenState = FORBIDDEN_START;
+            }
+          }
+        this.forbiddenState = forbiddenState;
+      }
+      handleTextOutsideRoot() {
+        let { i: start } = this;
+        const { chunk, textHandler: handler } = this;
+        let nonSpace = false;
+        outRootLoop:
+          while (true) {
+            const code = this.getCode();
+            switch (code) {
+              case LESS: {
+                this.state = S_OPEN_WAKA;
+                if (handler !== void 0) {
+                  const { text: text2 } = this;
+                  const slice = chunk.slice(start, this.prevI);
+                  if (text2.length !== 0) {
+                    handler(text2 + slice);
+                    this.text = "";
+                  } else if (slice.length !== 0) {
+                    handler(slice);
+                  }
+                }
+                break outRootLoop;
+              }
+              case AMP:
+                this.state = S_ENTITY;
+                this.entityReturnState = S_TEXT;
+                if (handler !== void 0) {
+                  this.text += chunk.slice(start, this.prevI);
+                }
+                nonSpace = true;
+                break outRootLoop;
+              case NL_LIKE:
+                if (handler !== void 0) {
+                  this.text += `${chunk.slice(start, this.prevI)}
+`;
+                }
+                start = this.i;
+                break;
+              case EOC:
+                if (handler !== void 0) {
+                  this.text += chunk.slice(start);
+                }
+                break outRootLoop;
+              default:
+                if (!isS(code)) {
+                  nonSpace = true;
+                }
+            }
+          }
+        if (!nonSpace) {
+          return;
+        }
+        if (!this.sawRoot && !this.reportedTextBeforeRoot) {
+          this.fail("text data outside of root node.");
+          this.reportedTextBeforeRoot = true;
+        }
+        if (this.closedRoot && !this.reportedTextAfterRoot) {
+          this.fail("text data outside of root node.");
+          this.reportedTextAfterRoot = true;
+        }
+      }
+      pushAttribNS(name, value) {
+        var _a2;
+        const { prefix, local } = this.qname(name);
+        const attr2 = { name, prefix, local, value };
+        this.attribList.push(attr2);
+        (_a2 = this.attributeHandler) === null || _a2 === void 0 ? void 0 : _a2.call(this, attr2);
+        if (prefix === "xmlns") {
+          const trimmed = value.trim();
+          if (this.currentXMLVersion === "1.0" && trimmed === "") {
+            this.fail("invalid attempt to undefine prefix in XML 1.0");
+          }
+          this.topNS[local] = trimmed;
+          nsPairCheck(this, local, trimmed);
+        } else if (name === "xmlns") {
+          const trimmed = value.trim();
+          this.topNS[""] = trimmed;
+          nsPairCheck(this, "", trimmed);
+        }
+      }
+      pushAttribPlain(name, value) {
+        var _a2;
+        const attr2 = { name, value };
+        this.attribList.push(attr2);
+        (_a2 = this.attributeHandler) === null || _a2 === void 0 ? void 0 : _a2.call(this, attr2);
+      }
+      /**
+       * End parsing. This performs final well-formedness checks and resets the
+       * parser to a clean state.
+       *
+       * @returns this
+       */
+      end() {
+        var _a2, _b2;
+        if (!this.sawRoot) {
+          this.fail("document must contain a root element.");
+        }
+        const { tags } = this;
+        while (tags.length > 0) {
+          const tag = tags.pop();
+          this.fail(`unclosed tag: ${tag.name}`);
+        }
+        if (this.state !== S_BEGIN && this.state !== S_TEXT) {
+          this.fail("unexpected end.");
+        }
+        const { text: text2 } = this;
+        if (text2.length !== 0) {
+          (_a2 = this.textHandler) === null || _a2 === void 0 ? void 0 : _a2.call(this, text2);
+          this.text = "";
+        }
+        this._closed = true;
+        (_b2 = this.endHandler) === null || _b2 === void 0 ? void 0 : _b2.call(this);
+        this._init();
+        return this;
+      }
+      /**
+       * Resolve a namespace prefix.
+       *
+       * @param prefix The prefix to resolve.
+       *
+       * @returns The namespace URI or ``undefined`` if the prefix is not defined.
+       */
+      resolve(prefix) {
+        var _a2, _b2;
+        let uri = this.topNS[prefix];
+        if (uri !== void 0) {
+          return uri;
+        }
+        const { tags } = this;
+        for (let index = tags.length - 1; index >= 0; index--) {
+          uri = tags[index].ns[prefix];
+          if (uri !== void 0) {
+            return uri;
+          }
+        }
+        uri = this.ns[prefix];
+        if (uri !== void 0) {
+          return uri;
+        }
+        return (_b2 = (_a2 = this.opt).resolvePrefix) === null || _b2 === void 0 ? void 0 : _b2.call(_a2, prefix);
+      }
+      /**
+       * Parse a qname into its prefix and local name parts.
+       *
+       * @param name The name to parse
+       *
+       * @returns
+       */
+      qname(name) {
+        const colon = name.indexOf(":");
+        if (colon === -1) {
+          return { prefix: "", local: name };
+        }
+        const local = name.slice(colon + 1);
+        const prefix = name.slice(0, colon);
+        if (prefix === "" || local === "" || local.includes(":")) {
+          this.fail(`malformed name: ${name}.`);
+        }
+        return { prefix, local };
+      }
+      processAttribsNS() {
+        var _a2;
+        const { attribList } = this;
+        const tag = this.tag;
+        {
+          const { prefix, local } = this.qname(tag.name);
+          tag.prefix = prefix;
+          tag.local = local;
+          const uri = tag.uri = (_a2 = this.resolve(prefix)) !== null && _a2 !== void 0 ? _a2 : "";
+          if (prefix !== "") {
+            if (prefix === "xmlns") {
+              this.fail('tags may not have "xmlns" as prefix.');
+            }
+            if (uri === "") {
+              this.fail(`unbound namespace prefix: ${JSON.stringify(prefix)}.`);
+              tag.uri = prefix;
+            }
+          }
+        }
+        if (attribList.length === 0) {
+          return;
+        }
+        const { attributes } = tag;
+        const seen = /* @__PURE__ */ new Set();
+        for (const attr2 of attribList) {
+          const { name, prefix, local } = attr2;
+          let uri;
+          let eqname;
+          if (prefix === "") {
+            uri = name === "xmlns" ? XMLNS_NAMESPACE : "";
+            eqname = name;
+          } else {
+            uri = this.resolve(prefix);
+            if (uri === void 0) {
+              this.fail(`unbound namespace prefix: ${JSON.stringify(prefix)}.`);
+              uri = prefix;
+            }
+            eqname = `{${uri}}${local}`;
+          }
+          if (seen.has(eqname)) {
+            this.fail(`duplicate attribute: ${eqname}.`);
+          }
+          seen.add(eqname);
+          attr2.uri = uri;
+          attributes[name] = attr2;
+        }
+        this.attribList = [];
+      }
+      processAttribsPlain() {
+        const { attribList } = this;
+        const attributes = this.tag.attributes;
+        for (const { name, value } of attribList) {
+          if (attributes[name] !== void 0) {
+            this.fail(`duplicate attribute: ${name}.`);
+          }
+          attributes[name] = value;
+        }
+        this.attribList = [];
+      }
+      /**
+       * Handle a complete open tag. This parser code calls this once it has seen
+       * the whole tag. This method checks for well-formeness and then emits
+       * ``onopentag``.
+       */
+      openTag() {
+        var _a2;
+        this.processAttribs();
+        const { tags } = this;
+        const tag = this.tag;
+        tag.isSelfClosing = false;
+        (_a2 = this.openTagHandler) === null || _a2 === void 0 ? void 0 : _a2.call(this, tag);
+        tags.push(tag);
+        this.state = S_TEXT;
+        this.name = "";
+      }
+      /**
+       * Handle a complete self-closing tag. This parser code calls this once it has
+       * seen the whole tag. This method checks for well-formeness and then emits
+       * ``onopentag`` and ``onclosetag``.
+       */
+      openSelfClosingTag() {
+        var _a2, _b2, _c;
+        this.processAttribs();
+        const { tags } = this;
+        const tag = this.tag;
+        tag.isSelfClosing = true;
+        (_a2 = this.openTagHandler) === null || _a2 === void 0 ? void 0 : _a2.call(this, tag);
+        (_b2 = this.closeTagHandler) === null || _b2 === void 0 ? void 0 : _b2.call(this, tag);
+        const top = this.tag = (_c = tags[tags.length - 1]) !== null && _c !== void 0 ? _c : null;
+        if (top === null) {
+          this.closedRoot = true;
+        }
+        this.state = S_TEXT;
+        this.name = "";
+      }
+      /**
+       * Handle a complete close tag. This parser code calls this once it has seen
+       * the whole tag. This method checks for well-formeness and then emits
+       * ``onclosetag``.
+       */
+      closeTag() {
+        const { tags, name } = this;
+        this.state = S_TEXT;
+        this.name = "";
+        if (name === "") {
+          this.fail("weird empty close tag.");
+          this.text += "</>";
+          return;
+        }
+        const handler = this.closeTagHandler;
+        let l = tags.length;
+        while (l-- > 0) {
+          const tag = this.tag = tags.pop();
+          this.topNS = tag.ns;
+          handler === null || handler === void 0 ? void 0 : handler(tag);
+          if (tag.name === name) {
+            break;
+          }
+          this.fail("unexpected close tag.");
+        }
+        if (l === 0) {
+          this.closedRoot = true;
+        } else if (l < 0) {
+          this.fail(`unmatched closing tag: ${name}.`);
+          this.text += `</${name}>`;
+        }
+      }
+      /**
+       * Resolves an entity. Makes any necessary well-formedness checks.
+       *
+       * @param entity The entity to resolve.
+       *
+       * @returns The parsed entity.
+       */
+      parseEntity(entity) {
+        if (entity[0] !== "#") {
+          const defined = this.ENTITIES[entity];
+          if (defined !== void 0) {
+            return defined;
+          }
+          this.fail(this.isName(entity) ? "undefined entity." : "disallowed character in entity name.");
+          return `&${entity};`;
+        }
+        let num2 = NaN;
+        if (entity[1] === "x" && /^#x[0-9a-f]+$/i.test(entity)) {
+          num2 = parseInt(entity.slice(2), 16);
+        } else if (/^#[0-9]+$/.test(entity)) {
+          num2 = parseInt(entity.slice(1), 10);
+        }
+        if (!this.isChar(num2)) {
+          this.fail("malformed character entity.");
+          return `&${entity};`;
+        }
+        return String.fromCodePoint(num2);
+      }
+    };
+    exports.SaxesParser = SaxesParser2;
+  }
+});
+
+// office-stub:fs
+var require_fs = __commonJS({
+  "office-stub:fs"(exports, module) {
+    module.exports = (function(words) {
+      const fail = () => {
+        throw new Error(words);
+      };
+      const make = () => new Proxy(function() {
+      }, {
+        apply: fail,
+        construct: fail,
+        set: fail,
+        defineProperty: fail,
+        get: (_t, k) => k === "then" || k === "__esModule" || typeof k === "symbol" ? void 0 : make()
+      });
+      return make();
+    })("office: fs is not available (exceljs file helpers: the SDK takes bytes, never paths)");
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/utils.js
+var require_utils = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/utils.js"(exports, module) {
+    var fs = require_fs();
+    var inherits = function(cls, superCtor, statics, prototype) {
+      cls.super_ = superCtor;
+      if (!prototype) {
+        prototype = statics;
+        statics = null;
+      }
+      if (statics) {
+        Object.keys(statics).forEach((i2) => {
+          Object.defineProperty(cls, i2, Object.getOwnPropertyDescriptor(statics, i2));
+        });
+      }
+      const properties = {
+        constructor: {
+          value: cls,
+          enumerable: false,
+          writable: false,
+          configurable: true
+        }
+      };
+      if (prototype) {
+        Object.keys(prototype).forEach((i2) => {
+          properties[i2] = Object.getOwnPropertyDescriptor(prototype, i2);
+        });
+      }
+      cls.prototype = Object.create(superCtor.prototype, properties);
+    };
+    var xmlDecodeRegex = /[<>&'"\x7F\x00-\x08\x0B-\x0C\x0E-\x1F]/;
+    var utils = {
+      nop() {
+      },
+      promiseImmediate(value) {
+        return new Promise((resolve3) => {
+          if (global.setImmediate) {
+            setImmediate(() => {
+              resolve3(value);
+            });
+          } else {
+            setTimeout(() => {
+              resolve3(value);
+            }, 1);
+          }
+        });
+      },
+      inherits,
+      dateToExcel(d, date1904) {
+        return 25569 + d.getTime() / (24 * 3600 * 1e3) - (date1904 ? 1462 : 0);
+      },
+      excelToDate(v, date1904) {
+        const millisecondSinceEpoch = Math.round((v - 25569 + (date1904 ? 1462 : 0)) * 24 * 3600 * 1e3);
+        return new Date(millisecondSinceEpoch);
+      },
+      parsePath(filepath) {
+        const last = filepath.lastIndexOf("/");
+        return {
+          path: filepath.substring(0, last),
+          name: filepath.substring(last + 1)
+        };
+      },
+      getRelsPath(filepath) {
+        const path2 = utils.parsePath(filepath);
+        return `${path2.path}/_rels/${path2.name}.rels`;
+      },
+      xmlEncode(text2) {
+        const regexResult = xmlDecodeRegex.exec(text2);
+        if (!regexResult) return text2;
+        let result = "";
+        let escape = "";
+        let lastIndex = 0;
+        let i2 = regexResult.index;
+        for (; i2 < text2.length; i2++) {
+          const charCode = text2.charCodeAt(i2);
+          switch (charCode) {
+            case 34:
+              escape = "&quot;";
+              break;
+            case 38:
+              escape = "&amp;";
+              break;
+            case 39:
+              escape = "&apos;";
+              break;
+            case 60:
+              escape = "&lt;";
+              break;
+            case 62:
+              escape = "&gt;";
+              break;
+            case 127:
+              escape = "";
+              break;
+            default: {
+              if (charCode <= 31 && (charCode <= 8 || charCode >= 11 && charCode !== 13)) {
+                escape = "";
+                break;
+              }
+              continue;
+            }
+          }
+          if (lastIndex !== i2) result += text2.substring(lastIndex, i2);
+          lastIndex = i2 + 1;
+          if (escape) result += escape;
+        }
+        if (lastIndex !== i2) return result + text2.substring(lastIndex, i2);
+        return result;
+      },
+      xmlDecode(text2) {
+        return text2.replace(/&([a-z]*);/g, (c) => {
+          switch (c) {
+            case "&lt;":
+              return "<";
+            case "&gt;":
+              return ">";
+            case "&amp;":
+              return "&";
+            case "&apos;":
+              return "'";
+            case "&quot;":
+              return '"';
+            default:
+              return c;
+          }
+        });
+      },
+      validInt(value) {
+        const i2 = parseInt(value, 10);
+        return !Number.isNaN(i2) ? i2 : 0;
+      },
+      isDateFmt(fmt) {
+        if (!fmt) {
+          return false;
+        }
+        fmt = fmt.replace(/\[[^\]]*]/g, "");
+        fmt = fmt.replace(/"[^"]*"/g, "");
+        const result = fmt.match(/[ymdhMsb]+/) !== null;
+        return result;
+      },
+      fs: {
+        exists(path2) {
+          return new Promise((resolve3) => {
+            fs.access(path2, fs.constants.F_OK, (err3) => {
+              resolve3(!err3);
+            });
+          });
+        }
+      },
+      toIsoDateString(dt) {
+        return dt.toIsoString().subsstr(0, 10);
+      },
+      parseBoolean(value) {
+        return value === true || value === "true" || value === 1 || value === "1";
+      }
+    };
+    module.exports = utils;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/xml-stream.js
+var require_xml_stream = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/xml-stream.js"(exports, module) {
+    var _ = require_under_dash();
+    var utils = require_utils();
+    var OPEN_ANGLE = "<";
+    var CLOSE_ANGLE = ">";
+    var OPEN_ANGLE_SLASH = "</";
+    var CLOSE_SLASH_ANGLE = "/>";
+    function pushAttribute(xml2, name, value) {
+      xml2.push(` ${name}="${utils.xmlEncode(value.toString())}"`);
+    }
+    function pushAttributes(xml2, attributes) {
+      if (attributes) {
+        const tmp = [];
+        _.each(attributes, (value, name) => {
+          if (value !== void 0) {
+            pushAttribute(tmp, name, value);
+          }
+        });
+        xml2.push(tmp.join(""));
+      }
+    }
+    var XmlStream2 = class {
+      constructor() {
+        this._xml = [];
+        this._stack = [];
+        this._rollbacks = [];
+      }
+      get tos() {
+        return this._stack.length ? this._stack[this._stack.length - 1] : void 0;
+      }
+      get cursor() {
+        return this._xml.length;
+      }
+      openXml(docAttributes) {
+        const xml2 = this._xml;
+        xml2.push("<?xml");
+        pushAttributes(xml2, docAttributes);
+        xml2.push("?>\n");
+      }
+      openNode(name, attributes) {
+        const parent = this.tos;
+        const xml2 = this._xml;
+        if (parent && this.open) {
+          xml2.push(CLOSE_ANGLE);
+        }
+        this._stack.push(name);
+        xml2.push(OPEN_ANGLE);
+        xml2.push(name);
+        pushAttributes(xml2, attributes);
+        this.leaf = true;
+        this.open = true;
+      }
+      addAttribute(name, value) {
+        if (!this.open) {
+          throw new Error("Cannot write attributes to node if it is not open");
+        }
+        if (value !== void 0) {
+          pushAttribute(this._xml, name, value);
+        }
+      }
+      addAttributes(attrs) {
+        if (!this.open) {
+          throw new Error("Cannot write attributes to node if it is not open");
+        }
+        pushAttributes(this._xml, attrs);
+      }
+      writeText(text2) {
+        const xml2 = this._xml;
+        if (this.open) {
+          xml2.push(CLOSE_ANGLE);
+          this.open = false;
+        }
+        this.leaf = false;
+        xml2.push(utils.xmlEncode(text2.toString()));
+      }
+      writeXml(xml2) {
+        if (this.open) {
+          this._xml.push(CLOSE_ANGLE);
+          this.open = false;
+        }
+        this.leaf = false;
+        this._xml.push(xml2);
+      }
+      closeNode() {
+        const node = this._stack.pop();
+        const xml2 = this._xml;
+        if (this.leaf) {
+          xml2.push(CLOSE_SLASH_ANGLE);
+        } else {
+          xml2.push(OPEN_ANGLE_SLASH);
+          xml2.push(node);
+          xml2.push(CLOSE_ANGLE);
+        }
+        this.open = false;
+        this.leaf = false;
+      }
+      leafNode(name, attributes, text2) {
+        this.openNode(name, attributes);
+        if (text2 !== void 0) {
+          this.writeText(text2);
+        }
+        this.closeNode();
+      }
+      closeAll() {
+        while (this._stack.length) {
+          this.closeNode();
+        }
+      }
+      addRollback() {
+        this._rollbacks.push({
+          xml: this._xml.length,
+          stack: this._stack.length,
+          leaf: this.leaf,
+          open: this.open
+        });
+        return this.cursor;
+      }
+      commit() {
+        this._rollbacks.pop();
+      }
+      rollback() {
+        const r = this._rollbacks.pop();
+        if (this._xml.length > r.xml) {
+          this._xml.splice(r.xml, this._xml.length - r.xml);
+        }
+        if (this._stack.length > r.stack) {
+          this._stack.splice(r.stack, this._stack.length - r.stack);
+        }
+        this.leaf = r.leaf;
+        this.open = r.open;
+      }
+      get xml() {
+        this.closeAll();
+        return this._xml.join("");
+      }
+    };
+    XmlStream2.StdDocAttributes = {
+      version: "1.0",
+      encoding: "UTF-8",
+      standalone: "yes"
+    };
+    module.exports = XmlStream2;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xml/theme1.js
+var require_theme1 = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xml/theme1.js"(exports, module) {
+    module.exports = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme"> <a:themeElements> <a:clrScheme name="Office"> <a:dk1> <a:sysClr val="windowText" lastClr="000000"/> </a:dk1> <a:lt1> <a:sysClr val="window" lastClr="FFFFFF"/> </a:lt1> <a:dk2> <a:srgbClr val="1F497D"/> </a:dk2> <a:lt2> <a:srgbClr val="EEECE1"/> </a:lt2> <a:accent1> <a:srgbClr val="4F81BD"/> </a:accent1> <a:accent2> <a:srgbClr val="C0504D"/> </a:accent2> <a:accent3> <a:srgbClr val="9BBB59"/> </a:accent3> <a:accent4> <a:srgbClr val="8064A2"/> </a:accent4> <a:accent5> <a:srgbClr val="4BACC6"/> </a:accent5> <a:accent6> <a:srgbClr val="F79646"/> </a:accent6> <a:hlink> <a:srgbClr val="0000FF"/> </a:hlink> <a:folHlink> <a:srgbClr val="800080"/> </a:folHlink> </a:clrScheme> <a:fontScheme name="Office"> <a:majorFont> <a:latin typeface="Cambria"/> <a:ea typeface=""/> <a:cs typeface=""/> <a:font script="Jpan" typeface="ＭＳ Ｐゴシック"/> <a:font script="Hang" typeface="맑은 고딕"/> <a:font script="Hans" typeface="宋体"/> <a:font script="Hant" typeface="新細明體"/> <a:font script="Arab" typeface="Times New Roman"/> <a:font script="Hebr" typeface="Times New Roman"/> <a:font script="Thai" typeface="Tahoma"/> <a:font script="Ethi" typeface="Nyala"/> <a:font script="Beng" typeface="Vrinda"/> <a:font script="Gujr" typeface="Shruti"/> <a:font script="Khmr" typeface="MoolBoran"/> <a:font script="Knda" typeface="Tunga"/> <a:font script="Guru" typeface="Raavi"/> <a:font script="Cans" typeface="Euphemia"/> <a:font script="Cher" typeface="Plantagenet Cherokee"/> <a:font script="Yiii" typeface="Microsoft Yi Baiti"/> <a:font script="Tibt" typeface="Microsoft Himalaya"/> <a:font script="Thaa" typeface="MV Boli"/> <a:font script="Deva" typeface="Mangal"/> <a:font script="Telu" typeface="Gautami"/> <a:font script="Taml" typeface="Latha"/> <a:font script="Syrc" typeface="Estrangelo Edessa"/> <a:font script="Orya" typeface="Kalinga"/> <a:font script="Mlym" typeface="Kartika"/> <a:font script="Laoo" typeface="DokChampa"/> <a:font script="Sinh" typeface="Iskoola Pota"/> <a:font script="Mong" typeface="Mongolian Baiti"/> <a:font script="Viet" typeface="Times New Roman"/> <a:font script="Uigh" typeface="Microsoft Uighur"/> <a:font script="Geor" typeface="Sylfaen"/> </a:majorFont> <a:minorFont> <a:latin typeface="Calibri"/> <a:ea typeface=""/> <a:cs typeface=""/> <a:font script="Jpan" typeface="ＭＳ Ｐゴシック"/> <a:font script="Hang" typeface="맑은 고딕"/> <a:font script="Hans" typeface="宋体"/> <a:font script="Hant" typeface="新細明體"/> <a:font script="Arab" typeface="Arial"/> <a:font script="Hebr" typeface="Arial"/> <a:font script="Thai" typeface="Tahoma"/> <a:font script="Ethi" typeface="Nyala"/> <a:font script="Beng" typeface="Vrinda"/> <a:font script="Gujr" typeface="Shruti"/> <a:font script="Khmr" typeface="DaunPenh"/> <a:font script="Knda" typeface="Tunga"/> <a:font script="Guru" typeface="Raavi"/> <a:font script="Cans" typeface="Euphemia"/> <a:font script="Cher" typeface="Plantagenet Cherokee"/> <a:font script="Yiii" typeface="Microsoft Yi Baiti"/> <a:font script="Tibt" typeface="Microsoft Himalaya"/> <a:font script="Thaa" typeface="MV Boli"/> <a:font script="Deva" typeface="Mangal"/> <a:font script="Telu" typeface="Gautami"/> <a:font script="Taml" typeface="Latha"/> <a:font script="Syrc" typeface="Estrangelo Edessa"/> <a:font script="Orya" typeface="Kalinga"/> <a:font script="Mlym" typeface="Kartika"/> <a:font script="Laoo" typeface="DokChampa"/> <a:font script="Sinh" typeface="Iskoola Pota"/> <a:font script="Mong" typeface="Mongolian Baiti"/> <a:font script="Viet" typeface="Arial"/> <a:font script="Uigh" typeface="Microsoft Uighur"/> <a:font script="Geor" typeface="Sylfaen"/> </a:minorFont> </a:fontScheme> <a:fmtScheme name="Office"> <a:fillStyleLst> <a:solidFill> <a:schemeClr val="phClr"/> </a:solidFill> <a:gradFill rotWithShape="1"> <a:gsLst> <a:gs pos="0"> <a:schemeClr val="phClr"> <a:tint val="50000"/> <a:satMod val="300000"/> </a:schemeClr> </a:gs> <a:gs pos="35000"> <a:schemeClr val="phClr"> <a:tint val="37000"/> <a:satMod val="300000"/> </a:schemeClr> </a:gs> <a:gs pos="100000"> <a:schemeClr val="phClr"> <a:tint val="15000"/> <a:satMod val="350000"/> </a:schemeClr> </a:gs> </a:gsLst> <a:lin ang="16200000" scaled="1"/> </a:gradFill> <a:gradFill rotWithShape="1"> <a:gsLst> <a:gs pos="0"> <a:schemeClr val="phClr"> <a:tint val="100000"/> <a:shade val="100000"/> <a:satMod val="130000"/> </a:schemeClr> </a:gs> <a:gs pos="100000"> <a:schemeClr val="phClr"> <a:tint val="50000"/> <a:shade val="100000"/> <a:satMod val="350000"/> </a:schemeClr> </a:gs> </a:gsLst> <a:lin ang="16200000" scaled="0"/> </a:gradFill> </a:fillStyleLst> <a:lnStyleLst> <a:ln w="9525" cap="flat" cmpd="sng" algn="ctr"> <a:solidFill> <a:schemeClr val="phClr"> <a:shade val="95000"/> <a:satMod val="105000"/> </a:schemeClr> </a:solidFill> <a:prstDash val="solid"/> </a:ln> <a:ln w="25400" cap="flat" cmpd="sng" algn="ctr"> <a:solidFill> <a:schemeClr val="phClr"/> </a:solidFill> <a:prstDash val="solid"/> </a:ln> <a:ln w="38100" cap="flat" cmpd="sng" algn="ctr"> <a:solidFill> <a:schemeClr val="phClr"/> </a:solidFill> <a:prstDash val="solid"/> </a:ln> </a:lnStyleLst> <a:effectStyleLst> <a:effectStyle> <a:effectLst> <a:outerShdw blurRad="40000" dist="20000" dir="5400000" rotWithShape="0"> <a:srgbClr val="000000"> <a:alpha val="38000"/> </a:srgbClr> </a:outerShdw> </a:effectLst> </a:effectStyle> <a:effectStyle> <a:effectLst> <a:outerShdw blurRad="40000" dist="23000" dir="5400000" rotWithShape="0"> <a:srgbClr val="000000"> <a:alpha val="35000"/> </a:srgbClr> </a:outerShdw> </a:effectLst> </a:effectStyle> <a:effectStyle> <a:effectLst> <a:outerShdw blurRad="40000" dist="23000" dir="5400000" rotWithShape="0"> <a:srgbClr val="000000"> <a:alpha val="35000"/> </a:srgbClr> </a:outerShdw> </a:effectLst> <a:scene3d> <a:camera prst="orthographicFront"> <a:rot lat="0" lon="0" rev="0"/> </a:camera> <a:lightRig rig="threePt" dir="t"> <a:rot lat="0" lon="0" rev="1200000"/> </a:lightRig> </a:scene3d> <a:sp3d> <a:bevelT w="63500" h="25400"/> </a:sp3d> </a:effectStyle> </a:effectStyleLst> <a:bgFillStyleLst> <a:solidFill> <a:schemeClr val="phClr"/> </a:solidFill> <a:gradFill rotWithShape="1"> <a:gsLst> <a:gs pos="0"> <a:schemeClr val="phClr"> <a:tint val="40000"/> <a:satMod val="350000"/> </a:schemeClr> </a:gs> <a:gs pos="40000"> <a:schemeClr val="phClr"> <a:tint val="45000"/> <a:shade val="99000"/> <a:satMod val="350000"/> </a:schemeClr> </a:gs> <a:gs pos="100000"> <a:schemeClr val="phClr"> <a:shade val="20000"/> <a:satMod val="255000"/> </a:schemeClr> </a:gs> </a:gsLst> <a:path path="circle"> <a:fillToRect l="50000" t="-80000" r="50000" b="180000"/> </a:path> </a:gradFill> <a:gradFill rotWithShape="1"> <a:gsLst> <a:gs pos="0"> <a:schemeClr val="phClr"> <a:tint val="80000"/> <a:satMod val="300000"/> </a:schemeClr> </a:gs> <a:gs pos="100000"> <a:schemeClr val="phClr"> <a:shade val="30000"/> <a:satMod val="200000"/> </a:schemeClr> </a:gs> </a:gsLst> <a:path path="circle"> <a:fillToRect l="50000" t="50000" r="50000" b="50000"/> </a:path> </a:gradFill> </a:bgFillStyleLst> </a:fmtScheme> </a:themeElements> <a:objectDefaults> <a:spDef> <a:spPr/> <a:bodyPr/> <a:lstStyle/> <a:style> <a:lnRef idx="1"> <a:schemeClr val="accent1"/> </a:lnRef> <a:fillRef idx="3"> <a:schemeClr val="accent1"/> </a:fillRef> <a:effectRef idx="2"> <a:schemeClr val="accent1"/> </a:effectRef> <a:fontRef idx="minor"> <a:schemeClr val="lt1"/> </a:fontRef> </a:style> </a:spDef> <a:lnDef> <a:spPr/> <a:bodyPr/> <a:lstStyle/> <a:style> <a:lnRef idx="2"> <a:schemeClr val="accent1"/> </a:lnRef> <a:fillRef idx="0"> <a:schemeClr val="accent1"/> </a:fillRef> <a:effectRef idx="1"> <a:schemeClr val="accent1"/> </a:effectRef> <a:fontRef idx="minor"> <a:schemeClr val="tx1"/> </a:fontRef> </a:style> </a:lnDef> </a:objectDefaults> <a:extraClrSchemeLst/> </a:theme>';
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/rel-type.js
+var require_rel_type = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/rel-type.js"(exports, module) {
+    "use strict";
+    module.exports = {
+      OfficeDocument: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+      Worksheet: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+      CalcChain: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain",
+      SharedStrings: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings",
+      Styles: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+      Theme: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+      Hyperlink: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+      Image: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+      CoreProperties: "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
+      ExtenderProperties: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
+      Comments: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
+      VmlDrawing: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing",
+      Table: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table"
+    };
+  }
+});
+
+// office-stub:readable-stream
+var require_readable_stream = __commonJS({
+  "office-stub:readable-stream"(exports, module) {
+    module.exports = (function(words) {
+      const fail = () => {
+        throw new Error(words);
+      };
+      const make = () => new Proxy(function() {
+      }, {
+        apply: fail,
+        construct: fail,
+        set: fail,
+        defineProperty: fail,
+        get: (_t, k) => k === "then" || k === "__esModule" || typeof k === "symbol" ? void 0 : make()
+      });
+      return make();
+    })("office: readable-stream is not available (exceljs parse-sax's old-stream branch: the SDK parses whole parts)");
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/browser-buffer-decode.js
+var require_browser_buffer_decode = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/browser-buffer-decode.js"(exports) {
+    var textDecoder = typeof TextDecoder === "undefined" ? null : new TextDecoder("utf-8");
+    function bufferToString(chunk) {
+      if (typeof chunk === "string") {
+        return chunk;
+      }
+      if (textDecoder) {
+        return textDecoder.decode(chunk);
+      }
+      return chunk.toString();
+    }
+    exports.bufferToString = bufferToString;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/parse-sax.js
+var require_parse_sax = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/utils/parse-sax.js"(exports, module) {
+    var { SaxesParser: SaxesParser2 } = require_saxes();
+    var { PassThrough } = require_readable_stream();
+    var { bufferToString } = require_browser_buffer_decode();
+    module.exports = async function* (iterable) {
+      if (iterable.pipe && !iterable[Symbol.asyncIterator]) {
+        iterable = iterable.pipe(new PassThrough());
+      }
+      const saxesParser = new SaxesParser2();
+      let error;
+      saxesParser.on("error", (err3) => {
+        error = err3;
+      });
+      let events2 = [];
+      saxesParser.on("opentag", (value) => events2.push({ eventType: "opentag", value }));
+      saxesParser.on("text", (value) => events2.push({ eventType: "text", value }));
+      saxesParser.on("closetag", (value) => events2.push({ eventType: "closetag", value }));
+      for await (const chunk of iterable) {
+        saxesParser.write(bufferToString(chunk));
+        if (error) throw error;
+        yield events2;
+        events2 = [];
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/base-xform.js
+var require_base_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/base-xform.js"(exports, module) {
+    var parseSax = require_parse_sax();
+    var XmlStream2 = require_xml_stream();
+    var BaseXform = class _BaseXform {
+      // constructor(/* model, name */) {}
+      // ============================================================
+      // Virtual Interface
+      prepare() {
+      }
+      render() {
+      }
+      parseOpen(node) {
+      }
+      parseText(text2) {
+      }
+      parseClose(name) {
+      }
+      reconcile(model, options) {
+      }
+      // ============================================================
+      reset() {
+        this.model = null;
+        if (this.map) {
+          Object.values(this.map).forEach((xform) => {
+            if (xform instanceof _BaseXform) {
+              xform.reset();
+            } else if (xform.xform) {
+              xform.xform.reset();
+            }
+          });
+        }
+      }
+      mergeModel(obj) {
+        this.model = Object.assign(this.model || {}, obj);
+      }
+      async parse(saxParser) {
+        for await (const events2 of saxParser) {
+          for (const { eventType, value } of events2) {
+            if (eventType === "opentag") {
+              this.parseOpen(value);
+            } else if (eventType === "text") {
+              this.parseText(value);
+            } else if (eventType === "closetag") {
+              if (!this.parseClose(value.name)) {
+                return this.model;
+              }
+            }
+          }
+        }
+        return this.model;
+      }
+      async parseStream(stream) {
+        return this.parse(parseSax(stream));
+      }
+      get xml() {
+        return this.toXml(this.model);
+      }
+      toXml(model) {
+        const xmlStream = new XmlStream2();
+        this.render(xmlStream, model);
+        return xmlStream.xml;
+      }
+      // ============================================================
+      // Useful Utilities
+      static toAttribute(value, dflt2, always = false) {
+        if (value === void 0) {
+          if (always) {
+            return dflt2;
+          }
+        } else if (always || value !== dflt2) {
+          return value.toString();
+        }
+        return void 0;
+      }
+      static toStringAttribute(value, dflt2, always = false) {
+        return _BaseXform.toAttribute(value, dflt2, always);
+      }
+      static toStringValue(attr2, dflt2) {
+        return attr2 === void 0 ? dflt2 : attr2;
+      }
+      static toBoolAttribute(value, dflt2, always = false) {
+        if (value === void 0) {
+          if (always) {
+            return dflt2;
+          }
+        } else if (always || value !== dflt2) {
+          return value ? "1" : "0";
+        }
+        return void 0;
+      }
+      static toBoolValue(attr2, dflt2) {
+        return attr2 === void 0 ? dflt2 : attr2 === "1";
+      }
+      static toIntAttribute(value, dflt2, always = false) {
+        return _BaseXform.toAttribute(value, dflt2, always);
+      }
+      static toIntValue(attr2, dflt2) {
+        return attr2 === void 0 ? dflt2 : parseInt(attr2, 10);
+      }
+      static toFloatAttribute(value, dflt2, always = false) {
+        return _BaseXform.toAttribute(value, dflt2, always);
+      }
+      static toFloatValue(attr2, dflt2) {
+        return attr2 === void 0 ? dflt2 : parseFloat(attr2);
+      }
+    };
+    module.exports = BaseXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/static-xform.js
+var require_static_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/static-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var XmlStream2 = require_xml_stream();
+    function build(xmlStream, model) {
+      xmlStream.openNode(model.tag, model.$);
+      if (model.c) {
+        model.c.forEach((child2) => {
+          build(xmlStream, child2);
+        });
+      }
+      if (model.t) {
+        xmlStream.writeText(model.t);
+      }
+      xmlStream.closeNode();
+    }
+    var StaticXform = class extends BaseXform {
+      constructor(model) {
+        super();
+        this._model = model;
+      }
+      render(xmlStream) {
+        if (!this._xml) {
+          const stream = new XmlStream2();
+          build(stream, this._model);
+          this._xml = stream.xml;
+        }
+        xmlStream.writeXml(this._xml);
+      }
+      parseOpen() {
+        return true;
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        switch (name) {
+          case this._model.tag:
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = StaticXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/list-xform.js
+var require_list_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/list-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var ListXform = class extends BaseXform {
+      constructor(options) {
+        super();
+        this.tag = options.tag;
+        this.always = !!options.always;
+        this.count = options.count;
+        this.empty = options.empty;
+        this.$count = options.$count || "count";
+        this.$ = options.$;
+        this.childXform = options.childXform;
+        this.maxItems = options.maxItems;
+      }
+      prepare(model, options) {
+        const { childXform } = this;
+        if (model) {
+          model.forEach((childModel, index) => {
+            options.index = index;
+            childXform.prepare(childModel, options);
+          });
+        }
+      }
+      render(xmlStream, model) {
+        if (this.always || model && model.length) {
+          xmlStream.openNode(this.tag, this.$);
+          if (this.count) {
+            xmlStream.addAttribute(this.$count, model && model.length || 0);
+          }
+          const { childXform } = this;
+          (model || []).forEach((childModel, index) => {
+            childXform.render(xmlStream, childModel, index);
+          });
+          xmlStream.closeNode();
+        } else if (this.empty) {
+          xmlStream.leafNode(this.tag);
+        }
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.tag:
+            this.model = [];
+            return true;
+          default:
+            if (this.childXform.parseOpen(node)) {
+              this.parser = this.childXform;
+              return true;
+            }
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.model.push(this.parser.model);
+            this.parser = void 0;
+            if (this.maxItems && this.model.length > this.maxItems) {
+              throw new Error(`Max ${this.childXform.tag} count (${this.maxItems}) exceeded`);
+            }
+          }
+          return true;
+        }
+        return false;
+      }
+      reconcile(model, options) {
+        if (model) {
+          const { childXform } = this;
+          model.forEach((childModel) => {
+            childXform.reconcile(childModel, options);
+          });
+        }
+      }
+    };
+    module.exports = ListXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/book/defined-name-xform.js
+var require_defined_name_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/book/defined-name-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var colCache = require_col_cache();
+    var DefinedNamesXform = class extends BaseXform {
+      render(xmlStream, model) {
+        xmlStream.openNode("definedName", {
+          name: model.name,
+          localSheetId: model.localSheetId
+        });
+        xmlStream.writeText(model.ranges.join(","));
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case "definedName":
+            this._parsedName = node.attributes.name;
+            this._parsedLocalSheetId = node.attributes.localSheetId;
+            this._parsedText = [];
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        this._parsedText.push(text2);
+      }
+      parseClose() {
+        this.model = {
+          name: this._parsedName,
+          ranges: extractRanges(this._parsedText.join(""))
+        };
+        if (this._parsedLocalSheetId !== void 0) {
+          this.model.localSheetId = parseInt(this._parsedLocalSheetId, 10);
+        }
+        return false;
+      }
+    };
+    function isValidRange(range) {
+      try {
+        colCache.decodeEx(range);
+        return true;
+      } catch (err3) {
+        return false;
+      }
+    }
+    function extractRanges(parsedText) {
+      const ranges = [];
+      let quotesOpened = false;
+      let last = "";
+      parsedText.split(",").forEach((item) => {
+        if (!item) {
+          return;
+        }
+        const quotes = (item.match(/'/g) || []).length;
+        if (!quotes) {
+          if (quotesOpened) {
+            last += `${item},`;
+          } else if (isValidRange(item)) {
+            ranges.push(item);
+          }
+          return;
+        }
+        const quotesEven = quotes % 2 === 0;
+        if (!quotesOpened && quotesEven && isValidRange(item)) {
+          ranges.push(item);
+        } else if (quotesOpened && !quotesEven) {
+          quotesOpened = false;
+          if (isValidRange(last + item)) {
+            ranges.push(last + item);
+          }
+          last = "";
+        } else {
+          quotesOpened = true;
+          last += `${item},`;
+        }
+      });
+      return ranges;
+    }
+    module.exports = DefinedNamesXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/book/sheet-xform.js
+var require_sheet_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/book/sheet-xform.js"(exports, module) {
+    var utils = require_utils();
+    var BaseXform = require_base_xform();
+    var WorksheetXform2 = class extends BaseXform {
+      render(xmlStream, model) {
+        xmlStream.leafNode("sheet", {
+          sheetId: model.id,
+          name: model.name,
+          state: model.state,
+          "r:id": model.rId
+        });
+      }
+      parseOpen(node) {
+        if (node.name === "sheet") {
+          this.model = {
+            name: utils.xmlDecode(node.attributes.name),
+            id: parseInt(node.attributes.sheetId, 10),
+            state: node.attributes.state,
+            rId: node.attributes["r:id"]
+          };
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = WorksheetXform2;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/book/workbook-view-xform.js
+var require_workbook_view_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/book/workbook-view-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var WorkbookViewXform = class extends BaseXform {
+      render(xmlStream, model) {
+        const attributes = {
+          xWindow: model.x || 0,
+          yWindow: model.y || 0,
+          windowWidth: model.width || 12e3,
+          windowHeight: model.height || 24e3,
+          firstSheet: model.firstSheet,
+          activeTab: model.activeTab
+        };
+        if (model.visibility && model.visibility !== "visible") {
+          attributes.visibility = model.visibility;
+        }
+        xmlStream.leafNode("workbookView", attributes);
+      }
+      parseOpen(node) {
+        if (node.name === "workbookView") {
+          const model = this.model = {};
+          const addS = function(name, value, dflt2) {
+            const s = value !== void 0 ? model[name] = value : dflt2;
+            if (s !== void 0) {
+              model[name] = s;
+            }
+          };
+          const addN = function(name, value, dflt2) {
+            const n2 = value !== void 0 ? model[name] = parseInt(value, 10) : dflt2;
+            if (n2 !== void 0) {
+              model[name] = n2;
+            }
+          };
+          addN("x", node.attributes.xWindow, 0);
+          addN("y", node.attributes.yWindow, 0);
+          addN("width", node.attributes.windowWidth, 25e3);
+          addN("height", node.attributes.windowHeight, 1e4);
+          addS("visibility", node.attributes.visibility, "visible");
+          addN("activeTab", node.attributes.activeTab, void 0);
+          addN("firstSheet", node.attributes.firstSheet, void 0);
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = WorkbookViewXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/book/workbook-properties-xform.js
+var require_workbook_properties_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/book/workbook-properties-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var WorksheetPropertiesXform = class extends BaseXform {
+      render(xmlStream, model) {
+        xmlStream.leafNode("workbookPr", {
+          date1904: model.date1904 ? 1 : void 0,
+          defaultThemeVersion: 164011,
+          filterPrivacy: 1
+        });
+      }
+      parseOpen(node) {
+        if (node.name === "workbookPr") {
+          this.model = {
+            date1904: node.attributes.date1904 === "1"
+          };
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = WorksheetPropertiesXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/book/workbook-calc-properties-xform.js
+var require_workbook_calc_properties_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/book/workbook-calc-properties-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var WorkbookCalcPropertiesXform = class extends BaseXform {
+      render(xmlStream, model) {
+        xmlStream.leafNode("calcPr", {
+          calcId: 171027,
+          fullCalcOnLoad: model.fullCalcOnLoad ? 1 : void 0
+        });
+      }
+      parseOpen(node) {
+        if (node.name === "calcPr") {
+          this.model = {};
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = WorkbookCalcPropertiesXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/book/workbook-xform.js
+var require_workbook_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/book/workbook-xform.js"(exports, module) {
+    var _ = require_under_dash();
+    var colCache = require_col_cache();
+    var XmlStream2 = require_xml_stream();
+    var BaseXform = require_base_xform();
+    var StaticXform = require_static_xform();
+    var ListXform = require_list_xform();
+    var DefinedNameXform = require_defined_name_xform();
+    var SheetXform = require_sheet_xform();
+    var WorkbookViewXform = require_workbook_view_xform();
+    var WorkbookPropertiesXform = require_workbook_properties_xform();
+    var WorkbookCalcPropertiesXform = require_workbook_calc_properties_xform();
+    var WorkbookXform2 = class _WorkbookXform extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          fileVersion: _WorkbookXform.STATIC_XFORMS.fileVersion,
+          workbookPr: new WorkbookPropertiesXform(),
+          bookViews: new ListXform({
+            tag: "bookViews",
+            count: false,
+            childXform: new WorkbookViewXform()
+          }),
+          sheets: new ListXform({ tag: "sheets", count: false, childXform: new SheetXform() }),
+          definedNames: new ListXform({
+            tag: "definedNames",
+            count: false,
+            childXform: new DefinedNameXform()
+          }),
+          calcPr: new WorkbookCalcPropertiesXform()
+        };
+      }
+      prepare(model) {
+        model.sheets = model.worksheets;
+        const printAreas = [];
+        let index = 0;
+        model.sheets.forEach((sheet) => {
+          if (sheet.pageSetup && sheet.pageSetup.printArea) {
+            sheet.pageSetup.printArea.split("&&").forEach((printArea) => {
+              const printAreaComponents = printArea.split(":");
+              const definedName = {
+                name: "_xlnm.Print_Area",
+                ranges: [`'${sheet.name}'!$${printAreaComponents[0]}:$${printAreaComponents[1]}`],
+                localSheetId: index
+              };
+              printAreas.push(definedName);
+            });
+          }
+          if (sheet.pageSetup && (sheet.pageSetup.printTitlesRow || sheet.pageSetup.printTitlesColumn)) {
+            const ranges = [];
+            if (sheet.pageSetup.printTitlesColumn) {
+              const titlesColumns = sheet.pageSetup.printTitlesColumn.split(":");
+              ranges.push(`'${sheet.name}'!$${titlesColumns[0]}:$${titlesColumns[1]}`);
+            }
+            if (sheet.pageSetup.printTitlesRow) {
+              const titlesRows = sheet.pageSetup.printTitlesRow.split(":");
+              ranges.push(`'${sheet.name}'!$${titlesRows[0]}:$${titlesRows[1]}`);
+            }
+            const definedName = {
+              name: "_xlnm.Print_Titles",
+              ranges,
+              localSheetId: index
+            };
+            printAreas.push(definedName);
+          }
+          index++;
+        });
+        if (printAreas.length) {
+          model.definedNames = model.definedNames.concat(printAreas);
+        }
+        (model.media || []).forEach((medium, i2) => {
+          medium.name = medium.type + (i2 + 1);
+        });
+      }
+      render(xmlStream, model) {
+        xmlStream.openXml(XmlStream2.StdDocAttributes);
+        xmlStream.openNode("workbook", _WorkbookXform.WORKBOOK_ATTRIBUTES);
+        this.map.fileVersion.render(xmlStream);
+        this.map.workbookPr.render(xmlStream, model.properties);
+        this.map.bookViews.render(xmlStream, model.views);
+        this.map.sheets.render(xmlStream, model.sheets);
+        this.map.definedNames.render(xmlStream, model.definedNames);
+        this.map.calcPr.render(xmlStream, model.calcProperties);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "workbook":
+            return true;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            return true;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case "workbook":
+            this.model = {
+              sheets: this.map.sheets.model,
+              properties: this.map.workbookPr.model || {},
+              views: this.map.bookViews.model,
+              calcProperties: {}
+            };
+            if (this.map.definedNames.model) {
+              this.model.definedNames = this.map.definedNames.model;
+            }
+            return false;
+          default:
+            return true;
+        }
+      }
+      reconcile(model) {
+        const rels3 = (model.workbookRels || []).reduce((map, rel) => {
+          map[rel.Id] = rel;
+          return map;
+        }, {});
+        const worksheets = [];
+        let worksheet;
+        let index = 0;
+        (model.sheets || []).forEach((sheet) => {
+          const rel = rels3[sheet.rId];
+          if (!rel) {
+            return;
+          }
+          worksheet = model.worksheetHash[`xl/${rel.Target.replace(/^(\s|\/xl\/)+/, "")}`];
+          if (worksheet) {
+            worksheet.name = sheet.name;
+            worksheet.id = sheet.id;
+            worksheet.state = sheet.state;
+            worksheets[index++] = worksheet;
+          }
+        });
+        const definedNames = [];
+        _.each(model.definedNames, (definedName) => {
+          if (definedName.name === "_xlnm.Print_Area") {
+            worksheet = worksheets[definedName.localSheetId];
+            if (worksheet) {
+              if (!worksheet.pageSetup) {
+                worksheet.pageSetup = {};
+              }
+              const range = colCache.decodeEx(definedName.ranges[0]);
+              worksheet.pageSetup.printArea = worksheet.pageSetup.printArea ? `${worksheet.pageSetup.printArea}&&${range.dimensions}` : range.dimensions;
+            }
+          } else if (definedName.name === "_xlnm.Print_Titles") {
+            worksheet = worksheets[definedName.localSheetId];
+            if (worksheet) {
+              if (!worksheet.pageSetup) {
+                worksheet.pageSetup = {};
+              }
+              const rangeString = definedName.ranges.join(",");
+              const dollarRegex = /\$/g;
+              const rowRangeRegex = /\$\d+:\$\d+/;
+              const rowRangeMatches = rangeString.match(rowRangeRegex);
+              if (rowRangeMatches && rowRangeMatches.length) {
+                const range = rowRangeMatches[0];
+                worksheet.pageSetup.printTitlesRow = range.replace(dollarRegex, "");
+              }
+              const columnRangeRegex = /\$[A-Z]+:\$[A-Z]+/;
+              const columnRangeMatches = rangeString.match(columnRangeRegex);
+              if (columnRangeMatches && columnRangeMatches.length) {
+                const range = columnRangeMatches[0];
+                worksheet.pageSetup.printTitlesColumn = range.replace(dollarRegex, "");
+              }
+            }
+          } else {
+            definedNames.push(definedName);
+          }
+        });
+        model.definedNames = definedNames;
+        model.media.forEach((media, i2) => {
+          media.index = i2;
+        });
+      }
+    };
+    WorkbookXform2.WORKBOOK_ATTRIBUTES = {
+      xmlns: "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+      "xmlns:r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+      "xmlns:mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+      "mc:Ignorable": "x15",
+      "xmlns:x15": "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"
+    };
+    WorkbookXform2.STATIC_XFORMS = {
+      fileVersion: new StaticXform({
+        tag: "fileVersion",
+        $: { appName: "xl", lastEdited: 5, lowestEdited: 5, rupBuild: 9303 }
+      })
+    };
+    module.exports = WorkbookXform2;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/merges.js
+var require_merges = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/merges.js"(exports, module) {
+    var _ = require_under_dash();
+    var Range = require_range();
+    var colCache = require_col_cache();
+    var Enums = require_enums();
+    var Merges = class {
+      constructor() {
+        this.merges = {};
+      }
+      add(merge) {
+        if (this.merges[merge.master]) {
+          this.merges[merge.master].expandToAddress(merge.address);
+        } else {
+          const range = `${merge.master}:${merge.address}`;
+          this.merges[merge.master] = new Range(range);
+        }
+      }
+      get mergeCells() {
+        return _.map(this.merges, (merge) => merge.range);
+      }
+      reconcile(mergeCells, rows) {
+        _.each(mergeCells, (merge) => {
+          const dimensions = colCache.decode(merge);
+          for (let i2 = dimensions.top; i2 <= dimensions.bottom; i2++) {
+            const row = rows[i2 - 1];
+            for (let j = dimensions.left; j <= dimensions.right; j++) {
+              const cell = row.cells[j - 1];
+              if (!cell) {
+                row.cells[j] = {
+                  type: Enums.ValueType.Null,
+                  address: colCache.encodeAddress(i2, j)
+                };
+              } else if (cell.type === Enums.ValueType.Merge) {
+                cell.master = dimensions.tl;
+              }
+            }
+          }
+        });
+      }
+      getMasterAddress(address) {
+        const range = this.hash[address];
+        return range && range.tl;
+      }
+    };
+    module.exports = Merges;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/strings/text-xform.js
+var require_text_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/strings/text-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var TextXform = class extends BaseXform {
+      get tag() {
+        return "t";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode("t");
+        if (/^\s|\n|\s$/.test(model)) {
+          xmlStream.addAttribute("xml:space", "preserve");
+        }
+        xmlStream.writeText(model);
+        xmlStream.closeNode();
+      }
+      get model() {
+        return this._text.join("").replace(/_x([0-9A-F]{4})_/g, ($0, $1) => String.fromCharCode(parseInt($1, 16)));
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case "t":
+            this._text = [];
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        this._text.push(text2);
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = TextXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/color-xform.js
+var require_color_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/color-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var ColorXform = class extends BaseXform {
+      constructor(name) {
+        super();
+        this.name = name || "color";
+      }
+      get tag() {
+        return this.name;
+      }
+      render(xmlStream, model) {
+        if (model) {
+          xmlStream.openNode(this.name);
+          if (model.argb) {
+            xmlStream.addAttribute("rgb", model.argb);
+          } else if (model.theme !== void 0) {
+            xmlStream.addAttribute("theme", model.theme);
+            if (model.tint !== void 0) {
+              xmlStream.addAttribute("tint", model.tint);
+            }
+          } else if (model.indexed !== void 0) {
+            xmlStream.addAttribute("indexed", model.indexed);
+          } else {
+            xmlStream.addAttribute("auto", "1");
+          }
+          xmlStream.closeNode();
+          return true;
+        }
+        return false;
+      }
+      parseOpen(node) {
+        if (node.name === this.name) {
+          if (node.attributes.rgb) {
+            this.model = { argb: node.attributes.rgb };
+          } else if (node.attributes.theme) {
+            this.model = { theme: parseInt(node.attributes.theme, 10) };
+            if (node.attributes.tint) {
+              this.model.tint = parseFloat(node.attributes.tint);
+            }
+          } else if (node.attributes.indexed) {
+            this.model = { indexed: parseInt(node.attributes.indexed, 10) };
+          } else {
+            this.model = void 0;
+          }
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = ColorXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/simple/boolean-xform.js
+var require_boolean_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/simple/boolean-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var BooleanXform = class extends BaseXform {
+      constructor(options) {
+        super();
+        this.tag = options.tag;
+        this.attr = options.attr;
+      }
+      render(xmlStream, model) {
+        if (model) {
+          xmlStream.openNode(this.tag);
+          xmlStream.closeNode();
+        }
+      }
+      parseOpen(node) {
+        if (node.name === this.tag) {
+          this.model = true;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = BooleanXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/simple/integer-xform.js
+var require_integer_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/simple/integer-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var IntegerXform = class extends BaseXform {
+      constructor(options) {
+        super();
+        this.tag = options.tag;
+        this.attr = options.attr;
+        this.attrs = options.attrs;
+        this.zero = options.zero;
+      }
+      render(xmlStream, model) {
+        if (model || this.zero) {
+          xmlStream.openNode(this.tag);
+          if (this.attrs) {
+            xmlStream.addAttributes(this.attrs);
+          }
+          if (this.attr) {
+            xmlStream.addAttribute(this.attr, model);
+          } else {
+            xmlStream.writeText(model);
+          }
+          xmlStream.closeNode();
+        }
+      }
+      parseOpen(node) {
+        if (node.name === this.tag) {
+          if (this.attr) {
+            this.model = parseInt(node.attributes[this.attr], 10);
+          } else {
+            this.text = [];
+          }
+          return true;
+        }
+        return false;
+      }
+      parseText(text2) {
+        if (!this.attr) {
+          this.text.push(text2);
+        }
+      }
+      parseClose() {
+        if (!this.attr) {
+          this.model = parseInt(this.text.join("") || 0, 10);
+        }
+        return false;
+      }
+    };
+    module.exports = IntegerXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/simple/string-xform.js
+var require_string_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/simple/string-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var StringXform = class extends BaseXform {
+      constructor(options) {
+        super();
+        this.tag = options.tag;
+        this.attr = options.attr;
+        this.attrs = options.attrs;
+      }
+      render(xmlStream, model) {
+        if (model !== void 0) {
+          xmlStream.openNode(this.tag);
+          if (this.attrs) {
+            xmlStream.addAttributes(this.attrs);
+          }
+          if (this.attr) {
+            xmlStream.addAttribute(this.attr, model);
+          } else {
+            xmlStream.writeText(model);
+          }
+          xmlStream.closeNode();
+        }
+      }
+      parseOpen(node) {
+        if (node.name === this.tag) {
+          if (this.attr) {
+            this.model = node.attributes[this.attr];
+          } else {
+            this.text = [];
+          }
+        }
+      }
+      parseText(text2) {
+        if (!this.attr) {
+          this.text.push(text2);
+        }
+      }
+      parseClose() {
+        if (!this.attr) {
+          this.model = this.text.join("");
+        }
+        return false;
+      }
+    };
+    module.exports = StringXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/underline-xform.js
+var require_underline_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/underline-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var UnderlineXform = class _UnderlineXform extends BaseXform {
+      constructor(model) {
+        super();
+        this.model = model;
+      }
+      get tag() {
+        return "u";
+      }
+      render(xmlStream, model) {
+        model = model || this.model;
+        if (model === true) {
+          xmlStream.leafNode("u");
+        } else {
+          const attr2 = _UnderlineXform.Attributes[model];
+          if (attr2) {
+            xmlStream.leafNode("u", attr2);
+          }
+        }
+      }
+      parseOpen(node) {
+        if (node.name === "u") {
+          this.model = node.attributes.val || true;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    UnderlineXform.Attributes = {
+      single: {},
+      double: { val: "double" },
+      singleAccounting: { val: "singleAccounting" },
+      doubleAccounting: { val: "doubleAccounting" }
+    };
+    module.exports = UnderlineXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/font-xform.js
+var require_font_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/font-xform.js"(exports, module) {
+    "use strict";
+    var ColorXform = require_color_xform();
+    var BooleanXform = require_boolean_xform();
+    var IntegerXform = require_integer_xform();
+    var StringXform = require_string_xform();
+    var UnderlineXform = require_underline_xform();
+    var _ = require_under_dash();
+    var BaseXform = require_base_xform();
+    var FontXform = class _FontXform extends BaseXform {
+      constructor(options) {
+        super();
+        this.options = options || _FontXform.OPTIONS;
+        this.map = {
+          b: { prop: "bold", xform: new BooleanXform({ tag: "b", attr: "val" }) },
+          i: { prop: "italic", xform: new BooleanXform({ tag: "i", attr: "val" }) },
+          u: { prop: "underline", xform: new UnderlineXform() },
+          charset: { prop: "charset", xform: new IntegerXform({ tag: "charset", attr: "val" }) },
+          color: { prop: "color", xform: new ColorXform() },
+          condense: { prop: "condense", xform: new BooleanXform({ tag: "condense", attr: "val" }) },
+          extend: { prop: "extend", xform: new BooleanXform({ tag: "extend", attr: "val" }) },
+          family: { prop: "family", xform: new IntegerXform({ tag: "family", attr: "val" }) },
+          outline: { prop: "outline", xform: new BooleanXform({ tag: "outline", attr: "val" }) },
+          vertAlign: { prop: "vertAlign", xform: new StringXform({ tag: "vertAlign", attr: "val" }) },
+          scheme: { prop: "scheme", xform: new StringXform({ tag: "scheme", attr: "val" }) },
+          shadow: { prop: "shadow", xform: new BooleanXform({ tag: "shadow", attr: "val" }) },
+          strike: { prop: "strike", xform: new BooleanXform({ tag: "strike", attr: "val" }) },
+          sz: { prop: "size", xform: new IntegerXform({ tag: "sz", attr: "val" }) }
+        };
+        this.map[this.options.fontNameTag] = {
+          prop: "name",
+          xform: new StringXform({ tag: this.options.fontNameTag, attr: "val" })
+        };
+      }
+      get tag() {
+        return this.options.tagName;
+      }
+      render(xmlStream, model) {
+        const { map } = this;
+        xmlStream.openNode(this.options.tagName);
+        _.each(this.map, (defn, tag) => {
+          map[tag].xform.render(xmlStream, model[defn.prop]);
+        });
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        if (this.map[node.name]) {
+          this.parser = this.map[node.name].xform;
+          return this.parser.parseOpen(node);
+        }
+        switch (node.name) {
+          case this.options.tagName:
+            this.model = {};
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser && !this.parser.parseClose(name)) {
+          const item = this.map[name];
+          if (this.parser.model) {
+            this.model[item.prop] = this.parser.model;
+          }
+          this.parser = void 0;
+          return true;
+        }
+        switch (name) {
+          case this.options.tagName:
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    FontXform.OPTIONS = {
+      tagName: "font",
+      fontNameTag: "name"
+    };
+    module.exports = FontXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/strings/rich-text-xform.js
+var require_rich_text_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/strings/rich-text-xform.js"(exports, module) {
+    var TextXform = require_text_xform();
+    var FontXform = require_font_xform();
+    var BaseXform = require_base_xform();
+    var RichTextXform = class _RichTextXform extends BaseXform {
+      constructor(model) {
+        super();
+        this.model = model;
+      }
+      get tag() {
+        return "r";
+      }
+      get textXform() {
+        return this._textXform || (this._textXform = new TextXform());
+      }
+      get fontXform() {
+        return this._fontXform || (this._fontXform = new FontXform(_RichTextXform.FONT_OPTIONS));
+      }
+      render(xmlStream, model) {
+        model = model || this.model;
+        xmlStream.openNode("r");
+        if (model.font) {
+          this.fontXform.render(xmlStream, model.font);
+        }
+        this.textXform.render(xmlStream, model.text);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "r":
+            this.model = {};
+            return true;
+          case "t":
+            this.parser = this.textXform;
+            this.parser.parseOpen(node);
+            return true;
+          case "rPr":
+            this.parser = this.fontXform;
+            this.parser.parseOpen(node);
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        switch (name) {
+          case "r":
+            return false;
+          case "t":
+            this.model.text = this.parser.model;
+            this.parser = void 0;
+            return true;
+          case "rPr":
+            this.model.font = this.parser.model;
+            this.parser = void 0;
+            return true;
+          default:
+            if (this.parser) {
+              this.parser.parseClose(name);
+            }
+            return true;
+        }
+      }
+    };
+    RichTextXform.FONT_OPTIONS = {
+      tagName: "rPr",
+      fontNameTag: "rFont"
+    };
+    module.exports = RichTextXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cell-xform.js
+var require_cell_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cell-xform.js"(exports, module) {
+    var utils = require_utils();
+    var BaseXform = require_base_xform();
+    var Range = require_range();
+    var Enums = require_enums();
+    var RichTextXform = require_rich_text_xform();
+    function getValueType(v) {
+      if (v === null || v === void 0) {
+        return Enums.ValueType.Null;
+      }
+      if (v instanceof String || typeof v === "string") {
+        return Enums.ValueType.String;
+      }
+      if (typeof v === "number") {
+        return Enums.ValueType.Number;
+      }
+      if (typeof v === "boolean") {
+        return Enums.ValueType.Boolean;
+      }
+      if (v instanceof Date) {
+        return Enums.ValueType.Date;
+      }
+      if (v.text && v.hyperlink) {
+        return Enums.ValueType.Hyperlink;
+      }
+      if (v.formula) {
+        return Enums.ValueType.Formula;
+      }
+      if (v.error) {
+        return Enums.ValueType.Error;
+      }
+      throw new Error("I could not understand type of value");
+    }
+    function getEffectiveCellType(cell) {
+      switch (cell.type) {
+        case Enums.ValueType.Formula:
+          return getValueType(cell.result);
+        default:
+          return cell.type;
+      }
+    }
+    var CellXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.richTextXForm = new RichTextXform();
+      }
+      get tag() {
+        return "c";
+      }
+      prepare(model, options) {
+        const styleId = options.styles.addStyleModel(model.style || {}, getEffectiveCellType(model));
+        if (styleId) {
+          model.styleId = styleId;
+        }
+        if (model.comment) {
+          options.comments.push({ ...model.comment, ref: model.address });
+        }
+        switch (model.type) {
+          case Enums.ValueType.String:
+          case Enums.ValueType.RichText:
+            if (options.sharedStrings) {
+              model.ssId = options.sharedStrings.add(model.value);
+            }
+            break;
+          case Enums.ValueType.Date:
+            if (options.date1904) {
+              model.date1904 = true;
+            }
+            break;
+          case Enums.ValueType.Hyperlink:
+            if (options.sharedStrings && model.text !== void 0 && model.text !== null) {
+              model.ssId = options.sharedStrings.add(model.text);
+            }
+            options.hyperlinks.push({
+              address: model.address,
+              target: model.hyperlink,
+              tooltip: model.tooltip
+            });
+            break;
+          case Enums.ValueType.Merge:
+            options.merges.add(model);
+            break;
+          case Enums.ValueType.Formula:
+            if (options.date1904) {
+              model.date1904 = true;
+            }
+            if (model.shareType === "shared") {
+              model.si = options.siFormulae++;
+            }
+            if (model.formula) {
+              options.formulae[model.address] = model;
+            } else if (model.sharedFormula) {
+              const master = options.formulae[model.sharedFormula];
+              if (!master) {
+                throw new Error(
+                  `Shared Formula master must exist above and or left of clone for cell ${model.address}`
+                );
+              }
+              if (master.si === void 0) {
+                master.shareType = "shared";
+                master.si = options.siFormulae++;
+                master.range = new Range(master.address, model.address);
+              } else if (master.range) {
+                master.range.expandToAddress(model.address);
+              }
+              model.si = master.si;
+            }
+            break;
+          default:
+            break;
+        }
+      }
+      renderFormula(xmlStream, model) {
+        let attrs = null;
+        switch (model.shareType) {
+          case "shared":
+            attrs = {
+              t: "shared",
+              ref: model.ref || model.range.range,
+              si: model.si
+            };
+            break;
+          case "array":
+            attrs = {
+              t: "array",
+              ref: model.ref
+            };
+            break;
+          default:
+            if (model.si !== void 0) {
+              attrs = {
+                t: "shared",
+                si: model.si
+              };
+            }
+            break;
+        }
+        switch (getValueType(model.result)) {
+          case Enums.ValueType.Null:
+            xmlStream.leafNode("f", attrs, model.formula);
+            break;
+          case Enums.ValueType.String:
+            xmlStream.addAttribute("t", "str");
+            xmlStream.leafNode("f", attrs, model.formula);
+            xmlStream.leafNode("v", null, model.result);
+            break;
+          case Enums.ValueType.Number:
+            xmlStream.leafNode("f", attrs, model.formula);
+            xmlStream.leafNode("v", null, model.result);
+            break;
+          case Enums.ValueType.Boolean:
+            xmlStream.addAttribute("t", "b");
+            xmlStream.leafNode("f", attrs, model.formula);
+            xmlStream.leafNode("v", null, model.result ? 1 : 0);
+            break;
+          case Enums.ValueType.Error:
+            xmlStream.addAttribute("t", "e");
+            xmlStream.leafNode("f", attrs, model.formula);
+            xmlStream.leafNode("v", null, model.result.error);
+            break;
+          case Enums.ValueType.Date:
+            xmlStream.leafNode("f", attrs, model.formula);
+            xmlStream.leafNode("v", null, utils.dateToExcel(model.result, model.date1904));
+            break;
+          // case Enums.ValueType.Hyperlink: // ??
+          // case Enums.ValueType.Formula:
+          default:
+            throw new Error("I could not understand type of value");
+        }
+      }
+      render(xmlStream, model) {
+        if (model.type === Enums.ValueType.Null && !model.styleId) {
+          return;
+        }
+        xmlStream.openNode("c");
+        xmlStream.addAttribute("r", model.address);
+        if (model.styleId) {
+          xmlStream.addAttribute("s", model.styleId);
+        }
+        switch (model.type) {
+          case Enums.ValueType.Null:
+            break;
+          case Enums.ValueType.Number:
+            xmlStream.leafNode("v", null, model.value);
+            break;
+          case Enums.ValueType.Boolean:
+            xmlStream.addAttribute("t", "b");
+            xmlStream.leafNode("v", null, model.value ? "1" : "0");
+            break;
+          case Enums.ValueType.Error:
+            xmlStream.addAttribute("t", "e");
+            xmlStream.leafNode("v", null, model.value.error);
+            break;
+          case Enums.ValueType.String:
+          case Enums.ValueType.RichText:
+            if (model.ssId !== void 0) {
+              xmlStream.addAttribute("t", "s");
+              xmlStream.leafNode("v", null, model.ssId);
+            } else if (model.value && model.value.richText) {
+              xmlStream.addAttribute("t", "inlineStr");
+              xmlStream.openNode("is");
+              model.value.richText.forEach((text2) => {
+                this.richTextXForm.render(xmlStream, text2);
+              });
+              xmlStream.closeNode("is");
+            } else {
+              xmlStream.addAttribute("t", "str");
+              xmlStream.leafNode("v", null, model.value);
+            }
+            break;
+          case Enums.ValueType.Date:
+            xmlStream.leafNode("v", null, utils.dateToExcel(model.value, model.date1904));
+            break;
+          case Enums.ValueType.Hyperlink:
+            if (model.ssId !== void 0) {
+              xmlStream.addAttribute("t", "s");
+              xmlStream.leafNode("v", null, model.ssId);
+            } else {
+              xmlStream.addAttribute("t", "str");
+              xmlStream.leafNode("v", null, model.text);
+            }
+            break;
+          case Enums.ValueType.Formula:
+            this.renderFormula(xmlStream, model);
+            break;
+          case Enums.ValueType.Merge:
+            break;
+          default:
+            break;
+        }
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "c":
+            this.model = {
+              address: node.attributes.r
+            };
+            this.t = node.attributes.t;
+            if (node.attributes.s) {
+              this.model.styleId = parseInt(node.attributes.s, 10);
+            }
+            return true;
+          case "f":
+            this.currentNode = "f";
+            this.model.si = node.attributes.si;
+            this.model.shareType = node.attributes.t;
+            this.model.ref = node.attributes.ref;
+            return true;
+          case "v":
+            this.currentNode = "v";
+            return true;
+          case "t":
+            this.currentNode = "t";
+            return true;
+          case "r":
+            this.parser = this.richTextXForm;
+            this.parser.parseOpen(node);
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+          return;
+        }
+        switch (this.currentNode) {
+          case "f":
+            this.model.formula = this.model.formula ? this.model.formula + text2 : text2;
+            break;
+          case "v":
+          case "t":
+            if (this.model.value && this.model.value.richText) {
+              this.model.value.richText.text = this.model.value.richText.text ? this.model.value.richText.text + text2 : text2;
+            } else {
+              this.model.value = this.model.value ? this.model.value + text2 : text2;
+            }
+            break;
+          default:
+            break;
+        }
+      }
+      parseClose(name) {
+        switch (name) {
+          case "c": {
+            const { model } = this;
+            if (model.formula || model.shareType) {
+              model.type = Enums.ValueType.Formula;
+              if (model.value) {
+                if (this.t === "str") {
+                  model.result = utils.xmlDecode(model.value);
+                } else if (this.t === "b") {
+                  model.result = parseInt(model.value, 10) !== 0;
+                } else if (this.t === "e") {
+                  model.result = { error: model.value };
+                } else {
+                  model.result = parseFloat(model.value);
+                }
+                model.value = void 0;
+              }
+            } else if (model.value !== void 0) {
+              switch (this.t) {
+                case "s":
+                  model.type = Enums.ValueType.String;
+                  model.value = parseInt(model.value, 10);
+                  break;
+                case "str":
+                  model.type = Enums.ValueType.String;
+                  model.value = utils.xmlDecode(model.value);
+                  break;
+                case "inlineStr":
+                  model.type = Enums.ValueType.String;
+                  break;
+                case "b":
+                  model.type = Enums.ValueType.Boolean;
+                  model.value = parseInt(model.value, 10) !== 0;
+                  break;
+                case "e":
+                  model.type = Enums.ValueType.Error;
+                  model.value = { error: model.value };
+                  break;
+                default:
+                  model.type = Enums.ValueType.Number;
+                  model.value = parseFloat(model.value);
+                  break;
+              }
+            } else if (model.styleId) {
+              model.type = Enums.ValueType.Null;
+            } else {
+              model.type = Enums.ValueType.Merge;
+            }
+            return false;
+          }
+          case "f":
+          case "v":
+          case "is":
+            this.currentNode = void 0;
+            return true;
+          case "t":
+            if (this.parser) {
+              this.parser.parseClose(name);
+              return true;
+            }
+            this.currentNode = void 0;
+            return true;
+          case "r":
+            this.model.value = this.model.value || {};
+            this.model.value.richText = this.model.value.richText || [];
+            this.model.value.richText.push(this.parser.model);
+            this.parser = void 0;
+            this.currentNode = void 0;
+            return true;
+          default:
+            if (this.parser) {
+              this.parser.parseClose(name);
+              return true;
+            }
+            return false;
+        }
+      }
+      reconcile(model, options) {
+        const style = model.styleId && options.styles && options.styles.getStyleModel(model.styleId);
+        if (style) {
+          model.style = style;
+        }
+        if (model.styleId !== void 0) {
+          model.styleId = void 0;
+        }
+        switch (model.type) {
+          case Enums.ValueType.String:
+            if (typeof model.value === "number") {
+              if (options.sharedStrings) {
+                model.value = options.sharedStrings.getString(model.value);
+              }
+            }
+            if (model.value.richText) {
+              model.type = Enums.ValueType.RichText;
+            }
+            break;
+          case Enums.ValueType.Number:
+            if (style && utils.isDateFmt(style.numFmt)) {
+              model.type = Enums.ValueType.Date;
+              model.value = utils.excelToDate(model.value, options.date1904);
+            }
+            break;
+          case Enums.ValueType.Formula:
+            if (model.result !== void 0 && style && utils.isDateFmt(style.numFmt)) {
+              model.result = utils.excelToDate(model.result, options.date1904);
+            }
+            if (model.shareType === "shared") {
+              if (model.ref) {
+                options.formulae[model.si] = model.address;
+              } else {
+                model.sharedFormula = options.formulae[model.si];
+                delete model.shareType;
+              }
+              delete model.si;
+            }
+            break;
+          default:
+            break;
+        }
+        const hyperlink = options.hyperlinkMap[model.address];
+        if (hyperlink) {
+          if (model.type === Enums.ValueType.Formula) {
+            model.text = model.result;
+            model.result = void 0;
+          } else {
+            model.text = model.value;
+            model.value = void 0;
+          }
+          model.type = Enums.ValueType.Hyperlink;
+          model.hyperlink = hyperlink;
+        }
+        const comment = options.commentsMap && options.commentsMap[model.address];
+        if (comment) {
+          model.comment = comment;
+        }
+      }
+    };
+    module.exports = CellXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/row-xform.js
+var require_row_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/row-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var utils = require_utils();
+    var CellXform = require_cell_xform();
+    var RowXform = class extends BaseXform {
+      constructor(options) {
+        super();
+        this.maxItems = options && options.maxItems;
+        this.map = {
+          c: new CellXform()
+        };
+      }
+      get tag() {
+        return "row";
+      }
+      prepare(model, options) {
+        const styleId = options.styles.addStyleModel(model.style);
+        if (styleId) {
+          model.styleId = styleId;
+        }
+        const cellXform = this.map.c;
+        model.cells.forEach((cellModel) => {
+          cellXform.prepare(cellModel, options);
+        });
+      }
+      render(xmlStream, model, options) {
+        xmlStream.openNode("row");
+        xmlStream.addAttribute("r", model.number);
+        if (model.height) {
+          xmlStream.addAttribute("ht", model.height);
+          xmlStream.addAttribute("customHeight", "1");
+        }
+        if (model.hidden) {
+          xmlStream.addAttribute("hidden", "1");
+        }
+        if (model.min > 0 && model.max > 0 && model.min <= model.max) {
+          xmlStream.addAttribute("spans", `${model.min}:${model.max}`);
+        }
+        if (model.styleId) {
+          xmlStream.addAttribute("s", model.styleId);
+          xmlStream.addAttribute("customFormat", "1");
+        }
+        xmlStream.addAttribute("x14ac:dyDescent", "0.25");
+        if (model.outlineLevel) {
+          xmlStream.addAttribute("outlineLevel", model.outlineLevel);
+        }
+        if (model.collapsed) {
+          xmlStream.addAttribute("collapsed", "1");
+        }
+        const cellXform = this.map.c;
+        model.cells.forEach((cellModel) => {
+          cellXform.render(xmlStream, cellModel, options);
+        });
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        if (node.name === "row") {
+          this.numRowsSeen += 1;
+          const spans = node.attributes.spans ? node.attributes.spans.split(":").map((span2) => parseInt(span2, 10)) : [void 0, void 0];
+          const model = this.model = {
+            number: parseInt(node.attributes.r, 10),
+            min: spans[0],
+            max: spans[1],
+            cells: []
+          };
+          if (node.attributes.s) {
+            model.styleId = parseInt(node.attributes.s, 10);
+          }
+          if (utils.parseBoolean(node.attributes.hidden)) {
+            model.hidden = true;
+          }
+          if (utils.parseBoolean(node.attributes.bestFit)) {
+            model.bestFit = true;
+          }
+          if (node.attributes.ht) {
+            model.height = parseFloat(node.attributes.ht);
+          }
+          if (node.attributes.outlineLevel) {
+            model.outlineLevel = parseInt(node.attributes.outlineLevel, 10);
+          }
+          if (utils.parseBoolean(node.attributes.collapsed)) {
+            model.collapsed = true;
+          }
+          return true;
+        }
+        this.parser = this.map[node.name];
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        return false;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.model.cells.push(this.parser.model);
+            if (this.maxItems && this.model.cells.length > this.maxItems) {
+              throw new Error(`Max column count (${this.maxItems}) exceeded`);
+            }
+            this.parser = void 0;
+          }
+          return true;
+        }
+        return false;
+      }
+      reconcile(model, options) {
+        model.style = model.styleId ? options.styles.getStyleModel(model.styleId) : {};
+        if (model.styleId !== void 0) {
+          model.styleId = void 0;
+        }
+        const cellXform = this.map.c;
+        model.cells.forEach((cellModel) => {
+          cellXform.reconcile(cellModel, options);
+        });
+      }
+    };
+    module.exports = RowXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/col-xform.js
+var require_col_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/col-xform.js"(exports, module) {
+    var utils = require_utils();
+    var BaseXform = require_base_xform();
+    var ColXform = class extends BaseXform {
+      get tag() {
+        return "col";
+      }
+      prepare(model, options) {
+        const styleId = options.styles.addStyleModel(model.style || {});
+        if (styleId) {
+          model.styleId = styleId;
+        }
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode("col");
+        xmlStream.addAttribute("min", model.min);
+        xmlStream.addAttribute("max", model.max);
+        if (model.width) {
+          xmlStream.addAttribute("width", model.width);
+        }
+        if (model.styleId) {
+          xmlStream.addAttribute("style", model.styleId);
+        }
+        if (model.hidden) {
+          xmlStream.addAttribute("hidden", "1");
+        }
+        if (model.bestFit) {
+          xmlStream.addAttribute("bestFit", "1");
+        }
+        if (model.outlineLevel) {
+          xmlStream.addAttribute("outlineLevel", model.outlineLevel);
+        }
+        if (model.collapsed) {
+          xmlStream.addAttribute("collapsed", "1");
+        }
+        xmlStream.addAttribute("customWidth", "1");
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (node.name === "col") {
+          const model = this.model = {
+            min: parseInt(node.attributes.min || "0", 10),
+            max: parseInt(node.attributes.max || "0", 10),
+            width: node.attributes.width === void 0 ? void 0 : parseFloat(node.attributes.width || "0")
+          };
+          if (node.attributes.style) {
+            model.styleId = parseInt(node.attributes.style, 10);
+          }
+          if (utils.parseBoolean(node.attributes.hidden)) {
+            model.hidden = true;
+          }
+          if (utils.parseBoolean(node.attributes.bestFit)) {
+            model.bestFit = true;
+          }
+          if (node.attributes.outlineLevel) {
+            model.outlineLevel = parseInt(node.attributes.outlineLevel, 10);
+          }
+          if (utils.parseBoolean(node.attributes.collapsed)) {
+            model.collapsed = true;
+          }
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+      reconcile(model, options) {
+        if (model.styleId) {
+          model.style = options.styles.getStyleModel(model.styleId);
+        }
+      }
+    };
+    module.exports = ColXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/dimension-xform.js
+var require_dimension_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/dimension-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var DimensionXform = class extends BaseXform {
+      get tag() {
+        return "dimension";
+      }
+      render(xmlStream, model) {
+        if (model) {
+          xmlStream.leafNode("dimension", { ref: model });
+        }
+      }
+      parseOpen(node) {
+        if (node.name === "dimension") {
+          this.model = node.attributes.ref;
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = DimensionXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/hyperlink-xform.js
+var require_hyperlink_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/hyperlink-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var HyperlinkXform = class extends BaseXform {
+      get tag() {
+        return "hyperlink";
+      }
+      render(xmlStream, model) {
+        if (this.isInternalLink(model)) {
+          xmlStream.leafNode("hyperlink", {
+            ref: model.address,
+            "r:id": model.rId,
+            tooltip: model.tooltip,
+            location: model.target
+          });
+        } else {
+          xmlStream.leafNode("hyperlink", {
+            ref: model.address,
+            "r:id": model.rId,
+            tooltip: model.tooltip
+          });
+        }
+      }
+      parseOpen(node) {
+        if (node.name === "hyperlink") {
+          this.model = {
+            address: node.attributes.ref,
+            rId: node.attributes["r:id"],
+            tooltip: node.attributes.tooltip
+          };
+          if (node.attributes.location) {
+            this.model.target = node.attributes.location;
+          }
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+      isInternalLink(model) {
+        return model.target && /^[^!]+![a-zA-Z]+[\d]+$/.test(model.target);
+      }
+    };
+    module.exports = HyperlinkXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/merge-cell-xform.js
+var require_merge_cell_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/merge-cell-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var MergeCellXform = class extends BaseXform {
+      get tag() {
+        return "mergeCell";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode("mergeCell", { ref: model });
+      }
+      parseOpen(node) {
+        if (node.name === "mergeCell") {
+          this.model = node.attributes.ref;
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = MergeCellXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/data-validations-xform.js
+var require_data_validations_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/data-validations-xform.js"(exports, module) {
+    var _ = require_under_dash();
+    var utils = require_utils();
+    var colCache = require_col_cache();
+    var BaseXform = require_base_xform();
+    var Range = require_range();
+    function assign(definedName, attributes, name, defaultValue) {
+      const value = attributes[name];
+      if (value !== void 0) {
+        definedName[name] = value;
+      } else if (defaultValue !== void 0) {
+        definedName[name] = defaultValue;
+      }
+    }
+    function assignBool(definedName, attributes, name, defaultValue) {
+      const value = attributes[name];
+      if (value !== void 0) {
+        definedName[name] = utils.parseBoolean(value);
+      } else if (defaultValue !== void 0) {
+        definedName[name] = defaultValue;
+      }
+    }
+    function optimiseDataValidations(model) {
+      const dvList = _.map(model, (dataValidation, address) => ({
+        address,
+        dataValidation,
+        marked: false
+      })).sort((a, b) => _.strcmp(a.address, b.address));
+      const dvMap = _.keyBy(dvList, "address");
+      const matchCol = (addr, height, col2) => {
+        for (let i2 = 0; i2 < height; i2++) {
+          const otherAddress = colCache.encodeAddress(addr.row + i2, col2);
+          if (!model[otherAddress] || !_.isEqual(model[addr.address], model[otherAddress])) {
+            return false;
+          }
+        }
+        return true;
+      };
+      return dvList.map((dv) => {
+        if (!dv.marked) {
+          const addr = colCache.decodeEx(dv.address);
+          if (addr.dimensions) {
+            dvMap[addr.dimensions].marked = true;
+            return {
+              ...dv.dataValidation,
+              sqref: dv.address
+            };
+          }
+          let height = 1;
+          let otherAddress = colCache.encodeAddress(addr.row + height, addr.col);
+          while (model[otherAddress] && _.isEqual(dv.dataValidation, model[otherAddress])) {
+            height++;
+            otherAddress = colCache.encodeAddress(addr.row + height, addr.col);
+          }
+          let width = 1;
+          while (matchCol(addr, height, addr.col + width)) {
+            width++;
+          }
+          for (let i2 = 0; i2 < height; i2++) {
+            for (let j = 0; j < width; j++) {
+              otherAddress = colCache.encodeAddress(addr.row + i2, addr.col + j);
+              dvMap[otherAddress].marked = true;
+            }
+          }
+          if (height > 1 || width > 1) {
+            const bottom = addr.row + (height - 1);
+            const right = addr.col + (width - 1);
+            return {
+              ...dv.dataValidation,
+              sqref: `${dv.address}:${colCache.encodeAddress(bottom, right)}`
+            };
+          }
+          return {
+            ...dv.dataValidation,
+            sqref: dv.address
+          };
+        }
+        return null;
+      }).filter(Boolean);
+    }
+    var DataValidationsXform = class extends BaseXform {
+      get tag() {
+        return "dataValidations";
+      }
+      render(xmlStream, model) {
+        const optimizedModel = optimiseDataValidations(model);
+        if (optimizedModel.length) {
+          xmlStream.openNode("dataValidations", { count: optimizedModel.length });
+          optimizedModel.forEach((value) => {
+            xmlStream.openNode("dataValidation");
+            if (value.type !== "any") {
+              xmlStream.addAttribute("type", value.type);
+              if (value.operator && value.type !== "list" && value.operator !== "between") {
+                xmlStream.addAttribute("operator", value.operator);
+              }
+              if (value.allowBlank) {
+                xmlStream.addAttribute("allowBlank", "1");
+              }
+            }
+            if (value.showInputMessage) {
+              xmlStream.addAttribute("showInputMessage", "1");
+            }
+            if (value.promptTitle) {
+              xmlStream.addAttribute("promptTitle", value.promptTitle);
+            }
+            if (value.prompt) {
+              xmlStream.addAttribute("prompt", value.prompt);
+            }
+            if (value.showErrorMessage) {
+              xmlStream.addAttribute("showErrorMessage", "1");
+            }
+            if (value.errorStyle) {
+              xmlStream.addAttribute("errorStyle", value.errorStyle);
+            }
+            if (value.errorTitle) {
+              xmlStream.addAttribute("errorTitle", value.errorTitle);
+            }
+            if (value.error) {
+              xmlStream.addAttribute("error", value.error);
+            }
+            xmlStream.addAttribute("sqref", value.sqref);
+            (value.formulae || []).forEach((formula, index) => {
+              xmlStream.openNode(`formula${index + 1}`);
+              if (value.type === "date") {
+                xmlStream.writeText(utils.dateToExcel(new Date(formula)));
+              } else {
+                xmlStream.writeText(formula);
+              }
+              xmlStream.closeNode();
+            });
+            xmlStream.closeNode();
+          });
+          xmlStream.closeNode();
+        }
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case "dataValidations":
+            this.model = {};
+            return true;
+          case "dataValidation": {
+            this._address = node.attributes.sqref;
+            const dataValidation = { type: node.attributes.type || "any", formulae: [] };
+            if (node.attributes.type) {
+              assignBool(dataValidation, node.attributes, "allowBlank");
+            }
+            assignBool(dataValidation, node.attributes, "showInputMessage");
+            assignBool(dataValidation, node.attributes, "showErrorMessage");
+            switch (dataValidation.type) {
+              case "any":
+              case "list":
+              case "custom":
+                break;
+              default:
+                assign(dataValidation, node.attributes, "operator", "between");
+                break;
+            }
+            assign(dataValidation, node.attributes, "promptTitle");
+            assign(dataValidation, node.attributes, "prompt");
+            assign(dataValidation, node.attributes, "errorStyle");
+            assign(dataValidation, node.attributes, "errorTitle");
+            assign(dataValidation, node.attributes, "error");
+            this._dataValidation = dataValidation;
+            return true;
+          }
+          case "formula1":
+          case "formula2":
+            this._formula = [];
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this._formula) {
+          this._formula.push(text2);
+        }
+      }
+      parseClose(name) {
+        switch (name) {
+          case "dataValidations":
+            return false;
+          case "dataValidation": {
+            if (!this._dataValidation.formulae || !this._dataValidation.formulae.length) {
+              delete this._dataValidation.formulae;
+              delete this._dataValidation.operator;
+            }
+            const list = this._address.split(/\s+/g) || [];
+            list.forEach((addr) => {
+              if (addr.includes(":")) {
+                const range = new Range(addr);
+                range.forEachAddress((address) => {
+                  this.model[address] = this._dataValidation;
+                });
+              } else {
+                this.model[addr] = this._dataValidation;
+              }
+            });
+            return true;
+          }
+          case "formula1":
+          case "formula2": {
+            let formula = this._formula.join("");
+            switch (this._dataValidation.type) {
+              case "whole":
+              case "textLength":
+                formula = parseInt(formula, 10);
+                break;
+              case "decimal":
+                formula = parseFloat(formula);
+                break;
+              case "date":
+                formula = utils.excelToDate(parseFloat(formula));
+                break;
+              default:
+                break;
+            }
+            this._dataValidation.formulae.push(formula);
+            this._formula = void 0;
+            return true;
+          }
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = DataValidationsXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/page-setup-properties-xform.js
+var require_page_setup_properties_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/page-setup-properties-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var PageSetupPropertiesXform = class extends BaseXform {
+      get tag() {
+        return "pageSetUpPr";
+      }
+      render(xmlStream, model) {
+        if (model && model.fitToPage) {
+          xmlStream.leafNode(this.tag, {
+            fitToPage: model.fitToPage ? "1" : void 0
+          });
+          return true;
+        }
+        return false;
+      }
+      parseOpen(node) {
+        if (node.name === this.tag) {
+          this.model = {
+            fitToPage: node.attributes.fitToPage === "1"
+          };
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = PageSetupPropertiesXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/outline-properties-xform.js
+var require_outline_properties_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/outline-properties-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var isDefined = (attr2) => typeof attr2 !== "undefined";
+    var OutlinePropertiesXform = class extends BaseXform {
+      get tag() {
+        return "outlinePr";
+      }
+      render(xmlStream, model) {
+        if (model && (isDefined(model.summaryBelow) || isDefined(model.summaryRight))) {
+          xmlStream.leafNode(this.tag, {
+            summaryBelow: isDefined(model.summaryBelow) ? Number(model.summaryBelow) : void 0,
+            summaryRight: isDefined(model.summaryRight) ? Number(model.summaryRight) : void 0
+          });
+          return true;
+        }
+        return false;
+      }
+      parseOpen(node) {
+        if (node.name === this.tag) {
+          this.model = {
+            summaryBelow: isDefined(node.attributes.summaryBelow) ? Boolean(Number(node.attributes.summaryBelow)) : void 0,
+            summaryRight: isDefined(node.attributes.summaryRight) ? Boolean(Number(node.attributes.summaryRight)) : void 0
+          };
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = OutlinePropertiesXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/sheet-properties-xform.js
+var require_sheet_properties_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/sheet-properties-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var ColorXform = require_color_xform();
+    var PageSetupPropertiesXform = require_page_setup_properties_xform();
+    var OutlinePropertiesXform = require_outline_properties_xform();
+    var SheetPropertiesXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          tabColor: new ColorXform("tabColor"),
+          pageSetUpPr: new PageSetupPropertiesXform(),
+          outlinePr: new OutlinePropertiesXform()
+        };
+      }
+      get tag() {
+        return "sheetPr";
+      }
+      render(xmlStream, model) {
+        if (model) {
+          xmlStream.addRollback();
+          xmlStream.openNode("sheetPr");
+          let inner = false;
+          inner = this.map.tabColor.render(xmlStream, model.tabColor) || inner;
+          inner = this.map.pageSetUpPr.render(xmlStream, model.pageSetup) || inner;
+          inner = this.map.outlinePr.render(xmlStream, model.outlineProperties) || inner;
+          if (inner) {
+            xmlStream.closeNode();
+            xmlStream.commit();
+          } else {
+            xmlStream.rollback();
+          }
+        }
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        if (node.name === this.tag) {
+          this.reset();
+          return true;
+        }
+        if (this.map[node.name]) {
+          this.parser = this.map[node.name];
+          this.parser.parseOpen(node);
+          return true;
+        }
+        return false;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+          return true;
+        }
+        return false;
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        if (this.map.tabColor.model || this.map.pageSetUpPr.model || this.map.outlinePr.model) {
+          this.model = {};
+          if (this.map.tabColor.model) {
+            this.model.tabColor = this.map.tabColor.model;
+          }
+          if (this.map.pageSetUpPr.model) {
+            this.model.pageSetup = this.map.pageSetUpPr.model;
+          }
+          if (this.map.outlinePr.model) {
+            this.model.outlineProperties = this.map.outlinePr.model;
+          }
+        } else {
+          this.model = null;
+        }
+        return false;
+      }
+    };
+    module.exports = SheetPropertiesXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/sheet-format-properties-xform.js
+var require_sheet_format_properties_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/sheet-format-properties-xform.js"(exports, module) {
+    var _ = require_under_dash();
+    var BaseXform = require_base_xform();
+    var SheetFormatPropertiesXform = class extends BaseXform {
+      get tag() {
+        return "sheetFormatPr";
+      }
+      render(xmlStream, model) {
+        if (model) {
+          const attributes = {
+            defaultRowHeight: model.defaultRowHeight,
+            outlineLevelRow: model.outlineLevelRow,
+            outlineLevelCol: model.outlineLevelCol,
+            "x14ac:dyDescent": model.dyDescent
+          };
+          if (model.defaultColWidth) {
+            attributes.defaultColWidth = model.defaultColWidth;
+          }
+          if (!model.defaultRowHeight || model.defaultRowHeight !== 15) {
+            attributes.customHeight = "1";
+          }
+          if (_.some(attributes, (value) => value !== void 0)) {
+            xmlStream.leafNode("sheetFormatPr", attributes);
+          }
+        }
+      }
+      parseOpen(node) {
+        if (node.name === "sheetFormatPr") {
+          this.model = {
+            defaultRowHeight: parseFloat(node.attributes.defaultRowHeight || "0"),
+            dyDescent: parseFloat(node.attributes["x14ac:dyDescent"] || "0"),
+            outlineLevelRow: parseInt(node.attributes.outlineLevelRow || "0", 10),
+            outlineLevelCol: parseInt(node.attributes.outlineLevelCol || "0", 10)
+          };
+          if (node.attributes.defaultColWidth) {
+            this.model.defaultColWidth = parseFloat(node.attributes.defaultColWidth);
+          }
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = SheetFormatPropertiesXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/sheet-view-xform.js
+var require_sheet_view_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/sheet-view-xform.js"(exports, module) {
+    var colCache = require_col_cache();
+    var BaseXform = require_base_xform();
+    var VIEW_STATES = {
+      frozen: "frozen",
+      frozenSplit: "frozen",
+      split: "split"
+    };
+    var SheetViewXform = class extends BaseXform {
+      get tag() {
+        return "sheetView";
+      }
+      prepare(model) {
+        switch (model.state) {
+          case "frozen":
+          case "split":
+            break;
+          default:
+            model.state = "normal";
+            break;
+        }
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode("sheetView", {
+          workbookViewId: model.workbookViewId || 0
+        });
+        const add = function(name, value, included) {
+          if (included) {
+            xmlStream.addAttribute(name, value);
+          }
+        };
+        add("rightToLeft", "1", model.rightToLeft === true);
+        add("tabSelected", "1", model.tabSelected);
+        add("showRuler", "0", model.showRuler === false);
+        add("showRowColHeaders", "0", model.showRowColHeaders === false);
+        add("showGridLines", "0", model.showGridLines === false);
+        add("zoomScale", model.zoomScale, model.zoomScale);
+        add("zoomScaleNormal", model.zoomScaleNormal, model.zoomScaleNormal);
+        add("view", model.style, model.style);
+        let topLeftCell;
+        let xSplit;
+        let ySplit;
+        let activePane;
+        switch (model.state) {
+          case "frozen":
+            xSplit = model.xSplit || 0;
+            ySplit = model.ySplit || 0;
+            topLeftCell = model.topLeftCell || colCache.getAddress(ySplit + 1, xSplit + 1).address;
+            activePane = model.xSplit && model.ySplit && "bottomRight" || model.xSplit && "topRight" || "bottomLeft";
+            xmlStream.leafNode("pane", {
+              xSplit: model.xSplit || void 0,
+              ySplit: model.ySplit || void 0,
+              topLeftCell,
+              activePane,
+              state: "frozen"
+            });
+            xmlStream.leafNode("selection", {
+              pane: activePane,
+              activeCell: model.activeCell,
+              sqref: model.activeCell
+            });
+            break;
+          case "split":
+            if (model.activePane === "topLeft") {
+              model.activePane = void 0;
+            }
+            xmlStream.leafNode("pane", {
+              xSplit: model.xSplit || void 0,
+              ySplit: model.ySplit || void 0,
+              topLeftCell: model.topLeftCell,
+              activePane: model.activePane
+            });
+            xmlStream.leafNode("selection", {
+              pane: model.activePane,
+              activeCell: model.activeCell,
+              sqref: model.activeCell
+            });
+            break;
+          case "normal":
+            if (model.activeCell) {
+              xmlStream.leafNode("selection", {
+                activeCell: model.activeCell,
+                sqref: model.activeCell
+              });
+            }
+            break;
+          default:
+            break;
+        }
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case "sheetView":
+            this.sheetView = {
+              workbookViewId: parseInt(node.attributes.workbookViewId, 10),
+              rightToLeft: node.attributes.rightToLeft === "1",
+              tabSelected: node.attributes.tabSelected === "1",
+              showRuler: !(node.attributes.showRuler === "0"),
+              showRowColHeaders: !(node.attributes.showRowColHeaders === "0"),
+              showGridLines: !(node.attributes.showGridLines === "0"),
+              zoomScale: parseInt(node.attributes.zoomScale || "100", 10),
+              zoomScaleNormal: parseInt(node.attributes.zoomScaleNormal || "100", 10),
+              style: node.attributes.view
+            };
+            this.pane = void 0;
+            this.selections = {};
+            return true;
+          case "pane":
+            this.pane = {
+              xSplit: parseInt(node.attributes.xSplit || "0", 10),
+              ySplit: parseInt(node.attributes.ySplit || "0", 10),
+              topLeftCell: node.attributes.topLeftCell,
+              activePane: node.attributes.activePane || "topLeft",
+              state: node.attributes.state
+            };
+            return true;
+          case "selection": {
+            const name = node.attributes.pane || "topLeft";
+            this.selections[name] = {
+              pane: name,
+              activeCell: node.attributes.activeCell
+            };
+            return true;
+          }
+          default:
+            return false;
+        }
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        let model;
+        let selection;
+        switch (name) {
+          case "sheetView":
+            if (this.sheetView && this.pane) {
+              model = this.model = {
+                workbookViewId: this.sheetView.workbookViewId,
+                rightToLeft: this.sheetView.rightToLeft,
+                state: VIEW_STATES[this.pane.state] || "split",
+                // split is default
+                xSplit: this.pane.xSplit,
+                ySplit: this.pane.ySplit,
+                topLeftCell: this.pane.topLeftCell,
+                showRuler: this.sheetView.showRuler,
+                showRowColHeaders: this.sheetView.showRowColHeaders,
+                showGridLines: this.sheetView.showGridLines,
+                zoomScale: this.sheetView.zoomScale,
+                zoomScaleNormal: this.sheetView.zoomScaleNormal
+              };
+              if (this.model.state === "split") {
+                model.activePane = this.pane.activePane;
+              }
+              selection = this.selections[this.pane.activePane];
+              if (selection && selection.activeCell) {
+                model.activeCell = selection.activeCell;
+              }
+              if (this.sheetView.style) {
+                model.style = this.sheetView.style;
+              }
+            } else {
+              model = this.model = {
+                workbookViewId: this.sheetView.workbookViewId,
+                rightToLeft: this.sheetView.rightToLeft,
+                state: "normal",
+                showRuler: this.sheetView.showRuler,
+                showRowColHeaders: this.sheetView.showRowColHeaders,
+                showGridLines: this.sheetView.showGridLines,
+                zoomScale: this.sheetView.zoomScale,
+                zoomScaleNormal: this.sheetView.zoomScaleNormal
+              };
+              selection = this.selections.topLeft;
+              if (selection && selection.activeCell) {
+                model.activeCell = selection.activeCell;
+              }
+              if (this.sheetView.style) {
+                model.style = this.sheetView.style;
+              }
+            }
+            return false;
+          default:
+            return true;
+        }
+      }
+      reconcile() {
+      }
+    };
+    module.exports = SheetViewXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/sheet-protection-xform.js
+var require_sheet_protection_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/sheet-protection-xform.js"(exports, module) {
+    var _ = require_under_dash();
+    var BaseXform = require_base_xform();
+    function booleanToXml(model, value) {
+      return model ? value : void 0;
+    }
+    function xmlToBoolean(value, equals) {
+      return value === equals ? true : void 0;
+    }
+    var SheetProtectionXform = class extends BaseXform {
+      get tag() {
+        return "sheetProtection";
+      }
+      render(xmlStream, model) {
+        if (model) {
+          const attributes = {
+            sheet: booleanToXml(model.sheet, "1"),
+            selectLockedCells: model.selectLockedCells === false ? "1" : void 0,
+            selectUnlockedCells: model.selectUnlockedCells === false ? "1" : void 0,
+            formatCells: booleanToXml(model.formatCells, "0"),
+            formatColumns: booleanToXml(model.formatColumns, "0"),
+            formatRows: booleanToXml(model.formatRows, "0"),
+            insertColumns: booleanToXml(model.insertColumns, "0"),
+            insertRows: booleanToXml(model.insertRows, "0"),
+            insertHyperlinks: booleanToXml(model.insertHyperlinks, "0"),
+            deleteColumns: booleanToXml(model.deleteColumns, "0"),
+            deleteRows: booleanToXml(model.deleteRows, "0"),
+            sort: booleanToXml(model.sort, "0"),
+            autoFilter: booleanToXml(model.autoFilter, "0"),
+            pivotTables: booleanToXml(model.pivotTables, "0")
+          };
+          if (model.sheet) {
+            attributes.algorithmName = model.algorithmName;
+            attributes.hashValue = model.hashValue;
+            attributes.saltValue = model.saltValue;
+            attributes.spinCount = model.spinCount;
+            attributes.objects = booleanToXml(model.objects === false, "1");
+            attributes.scenarios = booleanToXml(model.scenarios === false, "1");
+          }
+          if (_.some(attributes, (value) => value !== void 0)) {
+            xmlStream.leafNode(this.tag, attributes);
+          }
+        }
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.model = {
+              sheet: xmlToBoolean(node.attributes.sheet, "1"),
+              objects: node.attributes.objects === "1" ? false : void 0,
+              scenarios: node.attributes.scenarios === "1" ? false : void 0,
+              selectLockedCells: node.attributes.selectLockedCells === "1" ? false : void 0,
+              selectUnlockedCells: node.attributes.selectUnlockedCells === "1" ? false : void 0,
+              formatCells: xmlToBoolean(node.attributes.formatCells, "0"),
+              formatColumns: xmlToBoolean(node.attributes.formatColumns, "0"),
+              formatRows: xmlToBoolean(node.attributes.formatRows, "0"),
+              insertColumns: xmlToBoolean(node.attributes.insertColumns, "0"),
+              insertRows: xmlToBoolean(node.attributes.insertRows, "0"),
+              insertHyperlinks: xmlToBoolean(node.attributes.insertHyperlinks, "0"),
+              deleteColumns: xmlToBoolean(node.attributes.deleteColumns, "0"),
+              deleteRows: xmlToBoolean(node.attributes.deleteRows, "0"),
+              sort: xmlToBoolean(node.attributes.sort, "0"),
+              autoFilter: xmlToBoolean(node.attributes.autoFilter, "0"),
+              pivotTables: xmlToBoolean(node.attributes.pivotTables, "0")
+            };
+            if (node.attributes.algorithmName) {
+              this.model.algorithmName = node.attributes.algorithmName;
+              this.model.hashValue = node.attributes.hashValue;
+              this.model.saltValue = node.attributes.saltValue;
+              this.model.spinCount = parseInt(node.attributes.spinCount, 10);
+            }
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = SheetProtectionXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/page-margins-xform.js
+var require_page_margins_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/page-margins-xform.js"(exports, module) {
+    var _ = require_under_dash();
+    var BaseXform = require_base_xform();
+    var PageMarginsXform = class extends BaseXform {
+      get tag() {
+        return "pageMargins";
+      }
+      render(xmlStream, model) {
+        if (model) {
+          const attributes = {
+            left: model.left,
+            right: model.right,
+            top: model.top,
+            bottom: model.bottom,
+            header: model.header,
+            footer: model.footer
+          };
+          if (_.some(attributes, (value) => value !== void 0)) {
+            xmlStream.leafNode(this.tag, attributes);
+          }
+        }
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.model = {
+              left: parseFloat(node.attributes.left || 0.7),
+              right: parseFloat(node.attributes.right || 0.7),
+              top: parseFloat(node.attributes.top || 0.75),
+              bottom: parseFloat(node.attributes.bottom || 0.75),
+              header: parseFloat(node.attributes.header || 0.3),
+              footer: parseFloat(node.attributes.footer || 0.3)
+            };
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = PageMarginsXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/page-setup-xform.js
+var require_page_setup_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/page-setup-xform.js"(exports, module) {
+    var _ = require_under_dash();
+    var BaseXform = require_base_xform();
+    function booleanToXml(model) {
+      return model ? "1" : void 0;
+    }
+    function pageOrderToXml(model) {
+      switch (model) {
+        case "overThenDown":
+          return model;
+        default:
+          return void 0;
+      }
+    }
+    function cellCommentsToXml(model) {
+      switch (model) {
+        case "atEnd":
+        case "asDisplyed":
+          return model;
+        default:
+          return void 0;
+      }
+    }
+    function errorsToXml(model) {
+      switch (model) {
+        case "dash":
+        case "blank":
+        case "NA":
+          return model;
+        default:
+          return void 0;
+      }
+    }
+    function pageSizeToModel(value) {
+      return value !== void 0 ? parseInt(value, 10) : void 0;
+    }
+    var PageSetupXform = class extends BaseXform {
+      get tag() {
+        return "pageSetup";
+      }
+      render(xmlStream, model) {
+        if (model) {
+          const attributes = {
+            paperSize: model.paperSize,
+            orientation: model.orientation,
+            horizontalDpi: model.horizontalDpi,
+            verticalDpi: model.verticalDpi,
+            pageOrder: pageOrderToXml(model.pageOrder),
+            blackAndWhite: booleanToXml(model.blackAndWhite),
+            draft: booleanToXml(model.draft),
+            cellComments: cellCommentsToXml(model.cellComments),
+            errors: errorsToXml(model.errors),
+            scale: model.scale,
+            fitToWidth: model.fitToWidth,
+            fitToHeight: model.fitToHeight,
+            firstPageNumber: model.firstPageNumber,
+            useFirstPageNumber: booleanToXml(model.firstPageNumber),
+            usePrinterDefaults: booleanToXml(model.usePrinterDefaults),
+            copies: model.copies
+          };
+          if (_.some(attributes, (value) => value !== void 0)) {
+            xmlStream.leafNode(this.tag, attributes);
+          }
+        }
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.model = {
+              paperSize: pageSizeToModel(node.attributes.paperSize),
+              orientation: node.attributes.orientation || "portrait",
+              horizontalDpi: parseInt(node.attributes.horizontalDpi || "4294967295", 10),
+              verticalDpi: parseInt(node.attributes.verticalDpi || "4294967295", 10),
+              pageOrder: node.attributes.pageOrder || "downThenOver",
+              blackAndWhite: node.attributes.blackAndWhite === "1",
+              draft: node.attributes.draft === "1",
+              cellComments: node.attributes.cellComments || "None",
+              errors: node.attributes.errors || "displayed",
+              scale: parseInt(node.attributes.scale || "100", 10),
+              fitToWidth: parseInt(node.attributes.fitToWidth || "1", 10),
+              fitToHeight: parseInt(node.attributes.fitToHeight || "1", 10),
+              firstPageNumber: parseInt(node.attributes.firstPageNumber || "1", 10),
+              useFirstPageNumber: node.attributes.useFirstPageNumber === "1",
+              usePrinterDefaults: node.attributes.usePrinterDefaults === "1",
+              copies: parseInt(node.attributes.copies || "1", 10)
+            };
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = PageSetupXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/print-options-xform.js
+var require_print_options_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/print-options-xform.js"(exports, module) {
+    var _ = require_under_dash();
+    var BaseXform = require_base_xform();
+    function booleanToXml(model) {
+      return model ? "1" : void 0;
+    }
+    var PrintOptionsXform = class extends BaseXform {
+      get tag() {
+        return "printOptions";
+      }
+      render(xmlStream, model) {
+        if (model) {
+          const attributes = {
+            headings: booleanToXml(model.showRowColHeaders),
+            gridLines: booleanToXml(model.showGridLines),
+            horizontalCentered: booleanToXml(model.horizontalCentered),
+            verticalCentered: booleanToXml(model.verticalCentered)
+          };
+          if (_.some(attributes, (value) => value !== void 0)) {
+            xmlStream.leafNode(this.tag, attributes);
+          }
+        }
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.model = {
+              showRowColHeaders: node.attributes.headings === "1",
+              showGridLines: node.attributes.gridLines === "1",
+              horizontalCentered: node.attributes.horizontalCentered === "1",
+              verticalCentered: node.attributes.verticalCentered === "1"
+            };
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = PrintOptionsXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/auto-filter-xform.js
+var require_auto_filter_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/auto-filter-xform.js"(exports, module) {
+    var colCache = require_col_cache();
+    var BaseXform = require_base_xform();
+    var AutoFilterXform = class extends BaseXform {
+      get tag() {
+        return "autoFilter";
+      }
+      render(xmlStream, model) {
+        if (model) {
+          if (typeof model === "string") {
+            xmlStream.leafNode("autoFilter", { ref: model });
+          } else {
+            const getAddress = function(addr) {
+              if (typeof addr === "string") {
+                return addr;
+              }
+              return colCache.getAddress(addr.row, addr.column).address;
+            };
+            const firstAddress = getAddress(model.from);
+            const secondAddress = getAddress(model.to);
+            if (firstAddress && secondAddress) {
+              xmlStream.leafNode("autoFilter", { ref: `${firstAddress}:${secondAddress}` });
+            }
+          }
+        }
+      }
+      parseOpen(node) {
+        if (node.name === "autoFilter") {
+          this.model = node.attributes.ref;
+        }
+      }
+    };
+    module.exports = AutoFilterXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/picture-xform.js
+var require_picture_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/picture-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var PictureXform = class extends BaseXform {
+      get tag() {
+        return "picture";
+      }
+      render(xmlStream, model) {
+        if (model) {
+          xmlStream.leafNode(this.tag, { "r:id": model.rId });
+        }
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.model = {
+              rId: node.attributes["r:id"]
+            };
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = PictureXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/drawing-xform.js
+var require_drawing_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/drawing-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var DrawingXform2 = class extends BaseXform {
+      get tag() {
+        return "drawing";
+      }
+      render(xmlStream, model) {
+        if (model) {
+          xmlStream.leafNode(this.tag, { "r:id": model.rId });
+        }
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.model = {
+              rId: node.attributes["r:id"]
+            };
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = DrawingXform2;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/table-part-xform.js
+var require_table_part_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/table-part-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var TablePartXform = class extends BaseXform {
+      get tag() {
+        return "tablePart";
+      }
+      render(xmlStream, model) {
+        if (model) {
+          xmlStream.leafNode(this.tag, { "r:id": model.rId });
+        }
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.model = {
+              rId: node.attributes["r:id"]
+            };
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = TablePartXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/page-breaks-xform.js
+var require_page_breaks_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/page-breaks-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var PageBreaksXform = class extends BaseXform {
+      get tag() {
+        return "brk";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode("brk", model);
+      }
+      parseOpen(node) {
+        if (node.name === "brk") {
+          this.model = node.attributes.ref;
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = PageBreaksXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/row-breaks-xform.js
+var require_row_breaks_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/row-breaks-xform.js"(exports, module) {
+    "use strict";
+    var PageBreaksXform = require_page_breaks_xform();
+    var ListXform = require_list_xform();
+    var RowBreaksXform = class extends ListXform {
+      constructor() {
+        const options = {
+          tag: "rowBreaks",
+          count: true,
+          childXform: new PageBreaksXform()
+        };
+        super(options);
+      }
+      // get tag() { return 'rowBreaks'; }
+      render(xmlStream, model) {
+        if (model && model.length) {
+          xmlStream.openNode(this.tag, this.$);
+          if (this.count) {
+            xmlStream.addAttribute(this.$count, model.length);
+            xmlStream.addAttribute("manualBreakCount", model.length);
+          }
+          const { childXform } = this;
+          model.forEach((childModel) => {
+            childXform.render(xmlStream, childModel);
+          });
+          xmlStream.closeNode();
+        } else if (this.empty) {
+          xmlStream.leafNode(this.tag);
+        }
+      }
+    };
+    module.exports = RowBreaksXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/header-footer-xform.js
+var require_header_footer_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/header-footer-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var HeaderFooterXform = class extends BaseXform {
+      get tag() {
+        return "headerFooter";
+      }
+      render(xmlStream, model) {
+        if (model) {
+          xmlStream.addRollback();
+          let createTag = false;
+          xmlStream.openNode("headerFooter");
+          if (model.differentFirst) {
+            xmlStream.addAttribute("differentFirst", "1");
+            createTag = true;
+          }
+          if (model.differentOddEven) {
+            xmlStream.addAttribute("differentOddEven", "1");
+            createTag = true;
+          }
+          if (model.oddHeader && typeof model.oddHeader === "string") {
+            xmlStream.leafNode("oddHeader", null, model.oddHeader);
+            createTag = true;
+          }
+          if (model.oddFooter && typeof model.oddFooter === "string") {
+            xmlStream.leafNode("oddFooter", null, model.oddFooter);
+            createTag = true;
+          }
+          if (model.evenHeader && typeof model.evenHeader === "string") {
+            xmlStream.leafNode("evenHeader", null, model.evenHeader);
+            createTag = true;
+          }
+          if (model.evenFooter && typeof model.evenFooter === "string") {
+            xmlStream.leafNode("evenFooter", null, model.evenFooter);
+            createTag = true;
+          }
+          if (model.firstHeader && typeof model.firstHeader === "string") {
+            xmlStream.leafNode("firstHeader", null, model.firstHeader);
+            createTag = true;
+          }
+          if (model.firstFooter && typeof model.firstFooter === "string") {
+            xmlStream.leafNode("firstFooter", null, model.firstFooter);
+            createTag = true;
+          }
+          if (createTag) {
+            xmlStream.closeNode();
+            xmlStream.commit();
+          } else {
+            xmlStream.rollback();
+          }
+        }
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case "headerFooter":
+            this.model = {};
+            if (node.attributes.differentFirst) {
+              this.model.differentFirst = parseInt(node.attributes.differentFirst, 0) === 1;
+            }
+            if (node.attributes.differentOddEven) {
+              this.model.differentOddEven = parseInt(node.attributes.differentOddEven, 0) === 1;
+            }
+            return true;
+          case "oddHeader":
+            this.currentNode = "oddHeader";
+            return true;
+          case "oddFooter":
+            this.currentNode = "oddFooter";
+            return true;
+          case "evenHeader":
+            this.currentNode = "evenHeader";
+            return true;
+          case "evenFooter":
+            this.currentNode = "evenFooter";
+            return true;
+          case "firstHeader":
+            this.currentNode = "firstHeader";
+            return true;
+          case "firstFooter":
+            this.currentNode = "firstFooter";
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        switch (this.currentNode) {
+          case "oddHeader":
+            this.model.oddHeader = text2;
+            break;
+          case "oddFooter":
+            this.model.oddFooter = text2;
+            break;
+          case "evenHeader":
+            this.model.evenHeader = text2;
+            break;
+          case "evenFooter":
+            this.model.evenFooter = text2;
+            break;
+          case "firstHeader":
+            this.model.firstHeader = text2;
+            break;
+          case "firstFooter":
+            this.model.firstFooter = text2;
+            break;
+          default:
+            break;
+        }
+      }
+      parseClose() {
+        switch (this.currentNode) {
+          case "oddHeader":
+          case "oddFooter":
+          case "evenHeader":
+          case "evenFooter":
+          case "firstHeader":
+          case "firstFooter":
+            this.currentNode = void 0;
+            return true;
+          default:
+            return false;
+        }
+      }
+    };
+    module.exports = HeaderFooterXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/composite-xform.js
+var require_composite_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/composite-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var CompositeXform = class extends BaseXform {
+      createNewModel(node) {
+        return {};
+      }
+      parseOpen(node) {
+        this.parser = this.parser || this.map[node.name];
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        if (node.name === this.tag) {
+          this.model = this.createNewModel(node);
+          return true;
+        }
+        return false;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      onParserClose(name, parser) {
+        this.model[name] = parser.model;
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.onParserClose(name, this.parser);
+            this.parser = void 0;
+          }
+          return true;
+        }
+        return name !== this.tag;
+      }
+    };
+    module.exports = CompositeXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/cfvo-xform.js
+var require_cfvo_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/cfvo-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var CfvoXform = class extends BaseXform {
+      get tag() {
+        return "cfvo";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode(this.tag, {
+          type: model.type,
+          val: model.value
+        });
+      }
+      parseOpen(node) {
+        this.model = {
+          type: node.attributes.type,
+          value: BaseXform.toFloatValue(node.attributes.val)
+        };
+      }
+      parseClose(name) {
+        return name !== this.tag;
+      }
+    };
+    module.exports = CfvoXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/databar-xform.js
+var require_databar_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/databar-xform.js"(exports, module) {
+    var CompositeXform = require_composite_xform();
+    var ColorXform = require_color_xform();
+    var CfvoXform = require_cfvo_xform();
+    var DatabarXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          cfvo: this.cfvoXform = new CfvoXform(),
+          color: this.colorXform = new ColorXform()
+        };
+      }
+      get tag() {
+        return "dataBar";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag);
+        model.cfvo.forEach((cfvo) => {
+          this.cfvoXform.render(xmlStream, cfvo);
+        });
+        this.colorXform.render(xmlStream, model.color);
+        xmlStream.closeNode();
+      }
+      createNewModel() {
+        return {
+          cfvo: []
+        };
+      }
+      onParserClose(name, parser) {
+        switch (name) {
+          case "cfvo":
+            this.model.cfvo.push(parser.model);
+            break;
+          case "color":
+            this.model.color = parser.model;
+            break;
+        }
+      }
+    };
+    module.exports = DatabarXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/ext-lst-ref-xform.js
+var require_ext_lst_ref_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/ext-lst-ref-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var CompositeXform = require_composite_xform();
+    var X14IdXform = class extends BaseXform {
+      get tag() {
+        return "x14:id";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode(this.tag, null, model);
+      }
+      parseOpen() {
+        this.model = "";
+      }
+      parseText(text2) {
+        this.model += text2;
+      }
+      parseClose(name) {
+        return name !== this.tag;
+      }
+    };
+    var ExtXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          "x14:id": this.idXform = new X14IdXform()
+        };
+      }
+      get tag() {
+        return "ext";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          uri: "{B025F937-C7B1-47D3-B67F-A62EFF666E3E}",
+          "xmlns:x14": "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
+        });
+        this.idXform.render(xmlStream, model.x14Id);
+        xmlStream.closeNode();
+      }
+      createNewModel() {
+        return {};
+      }
+      onParserClose(name, parser) {
+        this.model.x14Id = parser.model;
+      }
+    };
+    var ExtLstRefXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          ext: new ExtXform()
+        };
+      }
+      get tag() {
+        return "extLst";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag);
+        this.map.ext.render(xmlStream, model);
+        xmlStream.closeNode();
+      }
+      createNewModel() {
+        return {};
+      }
+      onParserClose(name, parser) {
+        Object.assign(this.model, parser.model);
+      }
+    };
+    module.exports = ExtLstRefXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/formula-xform.js
+var require_formula_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/formula-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var FormulaXform = class extends BaseXform {
+      get tag() {
+        return "formula";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode(this.tag, null, model);
+      }
+      parseOpen() {
+        this.model = "";
+      }
+      parseText(text2) {
+        this.model += text2;
+      }
+      parseClose(name) {
+        return name !== this.tag;
+      }
+    };
+    module.exports = FormulaXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/color-scale-xform.js
+var require_color_scale_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/color-scale-xform.js"(exports, module) {
+    var CompositeXform = require_composite_xform();
+    var ColorXform = require_color_xform();
+    var CfvoXform = require_cfvo_xform();
+    var ColorScaleXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          cfvo: this.cfvoXform = new CfvoXform(),
+          color: this.colorXform = new ColorXform()
+        };
+      }
+      get tag() {
+        return "colorScale";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag);
+        model.cfvo.forEach((cfvo) => {
+          this.cfvoXform.render(xmlStream, cfvo);
+        });
+        model.color.forEach((color2) => {
+          this.colorXform.render(xmlStream, color2);
+        });
+        xmlStream.closeNode();
+      }
+      createNewModel(node) {
+        return {
+          cfvo: [],
+          color: []
+        };
+      }
+      onParserClose(name, parser) {
+        this.model[name].push(parser.model);
+      }
+    };
+    module.exports = ColorScaleXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/icon-set-xform.js
+var require_icon_set_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/icon-set-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var CompositeXform = require_composite_xform();
+    var CfvoXform = require_cfvo_xform();
+    var IconSetXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          cfvo: this.cfvoXform = new CfvoXform()
+        };
+      }
+      get tag() {
+        return "iconSet";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          iconSet: BaseXform.toStringAttribute(model.iconSet, "3TrafficLights"),
+          reverse: BaseXform.toBoolAttribute(model.reverse, false),
+          showValue: BaseXform.toBoolAttribute(model.showValue, true)
+        });
+        model.cfvo.forEach((cfvo) => {
+          this.cfvoXform.render(xmlStream, cfvo);
+        });
+        xmlStream.closeNode();
+      }
+      createNewModel({ attributes }) {
+        return {
+          iconSet: BaseXform.toStringValue(attributes.iconSet, "3TrafficLights"),
+          reverse: BaseXform.toBoolValue(attributes.reverse),
+          showValue: BaseXform.toBoolValue(attributes.showValue),
+          cfvo: []
+        };
+      }
+      onParserClose(name, parser) {
+        this.model[name].push(parser.model);
+      }
+    };
+    module.exports = IconSetXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/cf-rule-xform.js
+var require_cf_rule_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/cf-rule-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var CompositeXform = require_composite_xform();
+    var Range = require_range();
+    var DatabarXform = require_databar_xform();
+    var ExtLstRefXform = require_ext_lst_ref_xform();
+    var FormulaXform = require_formula_xform();
+    var ColorScaleXform = require_color_scale_xform();
+    var IconSetXform = require_icon_set_xform();
+    var extIcons = {
+      "3Triangles": true,
+      "3Stars": true,
+      "5Boxes": true
+    };
+    var getTextFormula = (model) => {
+      if (model.formulae && model.formulae[0]) {
+        return model.formulae[0];
+      }
+      const range = new Range(model.ref);
+      const { tl } = range;
+      switch (model.operator) {
+        case "containsText":
+          return `NOT(ISERROR(SEARCH("${model.text}",${tl})))`;
+        case "containsBlanks":
+          return `LEN(TRIM(${tl}))=0`;
+        case "notContainsBlanks":
+          return `LEN(TRIM(${tl}))>0`;
+        case "containsErrors":
+          return `ISERROR(${tl})`;
+        case "notContainsErrors":
+          return `NOT(ISERROR(${tl}))`;
+        default:
+          return void 0;
+      }
+    };
+    var getTimePeriodFormula = (model) => {
+      if (model.formulae && model.formulae[0]) {
+        return model.formulae[0];
+      }
+      const range = new Range(model.ref);
+      const { tl } = range;
+      switch (model.timePeriod) {
+        case "thisWeek":
+          return `AND(TODAY()-ROUNDDOWN(${tl},0)<=WEEKDAY(TODAY())-1,ROUNDDOWN(${tl},0)-TODAY()<=7-WEEKDAY(TODAY()))`;
+        case "lastWeek":
+          return `AND(TODAY()-ROUNDDOWN(${tl},0)>=(WEEKDAY(TODAY())),TODAY()-ROUNDDOWN(${tl},0)<(WEEKDAY(TODAY())+7))`;
+        case "nextWeek":
+          return `AND(ROUNDDOWN(${tl},0)-TODAY()>(7-WEEKDAY(TODAY())),ROUNDDOWN(${tl},0)-TODAY()<(15-WEEKDAY(TODAY())))`;
+        case "yesterday":
+          return `FLOOR(${tl},1)=TODAY()-1`;
+        case "today":
+          return `FLOOR(${tl},1)=TODAY()`;
+        case "tomorrow":
+          return `FLOOR(${tl},1)=TODAY()+1`;
+        case "last7Days":
+          return `AND(TODAY()-FLOOR(${tl},1)<=6,FLOOR(${tl},1)<=TODAY())`;
+        case "lastMonth":
+          return `AND(MONTH(${tl})=MONTH(EDATE(TODAY(),0-1)),YEAR(${tl})=YEAR(EDATE(TODAY(),0-1)))`;
+        case "thisMonth":
+          return `AND(MONTH(${tl})=MONTH(TODAY()),YEAR(${tl})=YEAR(TODAY()))`;
+        case "nextMonth":
+          return `AND(MONTH(${tl})=MONTH(EDATE(TODAY(),0+1)),YEAR(${tl})=YEAR(EDATE(TODAY(),0+1)))`;
+        default:
+          return void 0;
+      }
+    };
+    var opType = (attributes) => {
+      const { type, operator } = attributes;
+      switch (type) {
+        case "containsText":
+        case "containsBlanks":
+        case "notContainsBlanks":
+        case "containsErrors":
+        case "notContainsErrors":
+          return {
+            type: "containsText",
+            operator: type
+          };
+        default:
+          return { type, operator };
+      }
+    };
+    var CfRuleXform = class _CfRuleXform extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          dataBar: this.databarXform = new DatabarXform(),
+          extLst: this.extLstRefXform = new ExtLstRefXform(),
+          formula: this.formulaXform = new FormulaXform(),
+          colorScale: this.colorScaleXform = new ColorScaleXform(),
+          iconSet: this.iconSetXform = new IconSetXform()
+        };
+      }
+      get tag() {
+        return "cfRule";
+      }
+      static isPrimitive(rule) {
+        if (rule.type === "iconSet") {
+          if (rule.custom || extIcons[rule.iconSet]) {
+            return false;
+          }
+        }
+        return true;
+      }
+      render(xmlStream, model) {
+        switch (model.type) {
+          case "expression":
+            this.renderExpression(xmlStream, model);
+            break;
+          case "cellIs":
+            this.renderCellIs(xmlStream, model);
+            break;
+          case "top10":
+            this.renderTop10(xmlStream, model);
+            break;
+          case "aboveAverage":
+            this.renderAboveAverage(xmlStream, model);
+            break;
+          case "dataBar":
+            this.renderDataBar(xmlStream, model);
+            break;
+          case "colorScale":
+            this.renderColorScale(xmlStream, model);
+            break;
+          case "iconSet":
+            this.renderIconSet(xmlStream, model);
+            break;
+          case "containsText":
+            this.renderText(xmlStream, model);
+            break;
+          case "timePeriod":
+            this.renderTimePeriod(xmlStream, model);
+            break;
+        }
+      }
+      renderExpression(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          type: "expression",
+          dxfId: model.dxfId,
+          priority: model.priority
+        });
+        this.formulaXform.render(xmlStream, model.formulae[0]);
+        xmlStream.closeNode();
+      }
+      renderCellIs(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          type: "cellIs",
+          dxfId: model.dxfId,
+          priority: model.priority,
+          operator: model.operator
+        });
+        model.formulae.forEach((formula) => {
+          this.formulaXform.render(xmlStream, formula);
+        });
+        xmlStream.closeNode();
+      }
+      renderTop10(xmlStream, model) {
+        xmlStream.leafNode(this.tag, {
+          type: "top10",
+          dxfId: model.dxfId,
+          priority: model.priority,
+          percent: BaseXform.toBoolAttribute(model.percent, false),
+          bottom: BaseXform.toBoolAttribute(model.bottom, false),
+          rank: BaseXform.toIntValue(model.rank, 10, true)
+        });
+      }
+      renderAboveAverage(xmlStream, model) {
+        xmlStream.leafNode(this.tag, {
+          type: "aboveAverage",
+          dxfId: model.dxfId,
+          priority: model.priority,
+          aboveAverage: BaseXform.toBoolAttribute(model.aboveAverage, true)
+        });
+      }
+      renderDataBar(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          type: "dataBar",
+          priority: model.priority
+        });
+        this.databarXform.render(xmlStream, model);
+        this.extLstRefXform.render(xmlStream, model);
+        xmlStream.closeNode();
+      }
+      renderColorScale(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          type: "colorScale",
+          priority: model.priority
+        });
+        this.colorScaleXform.render(xmlStream, model);
+        xmlStream.closeNode();
+      }
+      renderIconSet(xmlStream, model) {
+        if (!_CfRuleXform.isPrimitive(model)) {
+          return;
+        }
+        xmlStream.openNode(this.tag, {
+          type: "iconSet",
+          priority: model.priority
+        });
+        this.iconSetXform.render(xmlStream, model);
+        xmlStream.closeNode();
+      }
+      renderText(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          type: model.operator,
+          dxfId: model.dxfId,
+          priority: model.priority,
+          operator: BaseXform.toStringAttribute(model.operator, "containsText")
+        });
+        const formula = getTextFormula(model);
+        if (formula) {
+          this.formulaXform.render(xmlStream, formula);
+        }
+        xmlStream.closeNode();
+      }
+      renderTimePeriod(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          type: "timePeriod",
+          dxfId: model.dxfId,
+          priority: model.priority,
+          timePeriod: model.timePeriod
+        });
+        const formula = getTimePeriodFormula(model);
+        if (formula) {
+          this.formulaXform.render(xmlStream, formula);
+        }
+        xmlStream.closeNode();
+      }
+      createNewModel({ attributes }) {
+        return {
+          ...opType(attributes),
+          dxfId: BaseXform.toIntValue(attributes.dxfId),
+          priority: BaseXform.toIntValue(attributes.priority),
+          timePeriod: attributes.timePeriod,
+          percent: BaseXform.toBoolValue(attributes.percent),
+          bottom: BaseXform.toBoolValue(attributes.bottom),
+          rank: BaseXform.toIntValue(attributes.rank),
+          aboveAverage: BaseXform.toBoolValue(attributes.aboveAverage)
+        };
+      }
+      onParserClose(name, parser) {
+        switch (name) {
+          case "dataBar":
+          case "extLst":
+          case "colorScale":
+          case "iconSet":
+            Object.assign(this.model, parser.model);
+            break;
+          case "formula":
+            this.model.formulae = this.model.formulae || [];
+            this.model.formulae.push(parser.model);
+            break;
+        }
+      }
+    };
+    module.exports = CfRuleXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/conditional-formatting-xform.js
+var require_conditional_formatting_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/conditional-formatting-xform.js"(exports, module) {
+    var CompositeXform = require_composite_xform();
+    var CfRuleXform = require_cf_rule_xform();
+    var ConditionalFormattingXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          cfRule: new CfRuleXform()
+        };
+      }
+      get tag() {
+        return "conditionalFormatting";
+      }
+      render(xmlStream, model) {
+        if (!model.rules.some(CfRuleXform.isPrimitive)) {
+          return;
+        }
+        xmlStream.openNode(this.tag, { sqref: model.ref });
+        model.rules.forEach((rule) => {
+          if (CfRuleXform.isPrimitive(rule)) {
+            rule.ref = model.ref;
+            this.map.cfRule.render(xmlStream, rule);
+          }
+        });
+        xmlStream.closeNode();
+      }
+      createNewModel({ attributes }) {
+        return {
+          ref: attributes.sqref,
+          rules: []
+        };
+      }
+      onParserClose(name, parser) {
+        this.model.rules.push(parser.model);
+      }
+    };
+    module.exports = ConditionalFormattingXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/conditional-formattings-xform.js
+var require_conditional_formattings_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf/conditional-formattings-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var ConditionalFormattingXform = require_conditional_formatting_xform();
+    var ConditionalFormattingsXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.cfXform = new ConditionalFormattingXform();
+      }
+      get tag() {
+        return "conditionalFormatting";
+      }
+      reset() {
+        this.model = [];
+      }
+      prepare(model, options) {
+        let nextPriority = model.reduce(
+          (p, cf) => Math.max(p, ...cf.rules.map((rule) => rule.priority || 0)),
+          1
+        );
+        model.forEach((cf) => {
+          cf.rules.forEach((rule) => {
+            if (!rule.priority) {
+              rule.priority = nextPriority++;
+            }
+            if (rule.style) {
+              rule.dxfId = options.styles.addDxfStyle(rule.style);
+            }
+          });
+        });
+      }
+      render(xmlStream, model) {
+        model.forEach((cf) => {
+          this.cfXform.render(xmlStream, cf);
+        });
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "conditionalFormatting":
+            this.parser = this.cfXform;
+            this.parser.parseOpen(node);
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.model.push(this.parser.model);
+            this.parser = void 0;
+            return false;
+          }
+          return true;
+        }
+        return false;
+      }
+      reconcile(model, options) {
+        model.forEach((cf) => {
+          cf.rules.forEach((rule) => {
+            if (rule.dxfId !== void 0) {
+              rule.style = options.styles.getDxfStyle(rule.dxfId);
+              delete rule.dxfId;
+            }
+          });
+        });
+      }
+    };
+    module.exports = ConditionalFormattingsXform;
+  }
+});
+
+// src/sheets/ids.ts
+var ids_exports = {};
+__export(ids_exports, {
+  resetIds: () => resetIds,
+  v4: () => v4
+});
+function resetIds() {
+  n = 0;
+}
+function v4() {
+  n += 1;
+  const tail = n.toString(16).padStart(12, "0");
+  return `00000000-0000-4000-8000-${tail}`.toUpperCase();
+}
+var n;
+var init_ids = __esm({
+  "src/sheets/ids.ts"() {
+    "use strict";
+    n = 0;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/f-ext-xform.js
+var require_f_ext_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/f-ext-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var FExtXform = class extends BaseXform {
+      get tag() {
+        return "xm:f";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode(this.tag, null, model);
+      }
+      parseOpen() {
+        this.model = "";
+      }
+      parseText(text2) {
+        this.model += text2;
+      }
+      parseClose(name) {
+        return name !== this.tag;
+      }
+    };
+    module.exports = FExtXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/cfvo-ext-xform.js
+var require_cfvo_ext_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/cfvo-ext-xform.js"(exports, module) {
+    var CompositeXform = require_composite_xform();
+    var FExtXform = require_f_ext_xform();
+    var CfvoExtXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          "xm:f": this.fExtXform = new FExtXform()
+        };
+      }
+      get tag() {
+        return "x14:cfvo";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          type: model.type
+        });
+        if (model.value !== void 0) {
+          this.fExtXform.render(xmlStream, model.value);
+        }
+        xmlStream.closeNode();
+      }
+      createNewModel(node) {
+        return {
+          type: node.attributes.type
+        };
+      }
+      onParserClose(name, parser) {
+        switch (name) {
+          case "xm:f":
+            this.model.value = parser.model ? parseFloat(parser.model) : 0;
+            break;
+        }
+      }
+    };
+    module.exports = CfvoExtXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/databar-ext-xform.js
+var require_databar_ext_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/databar-ext-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var CompositeXform = require_composite_xform();
+    var ColorXform = require_color_xform();
+    var CfvoExtXform = require_cfvo_ext_xform();
+    var DatabarExtXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          "x14:cfvo": this.cfvoXform = new CfvoExtXform(),
+          "x14:borderColor": this.borderColorXform = new ColorXform("x14:borderColor"),
+          "x14:negativeBorderColor": this.negativeBorderColorXform = new ColorXform(
+            "x14:negativeBorderColor"
+          ),
+          "x14:negativeFillColor": this.negativeFillColorXform = new ColorXform(
+            "x14:negativeFillColor"
+          ),
+          "x14:axisColor": this.axisColorXform = new ColorXform("x14:axisColor")
+        };
+      }
+      static isExt(rule) {
+        return !rule.gradient;
+      }
+      get tag() {
+        return "x14:dataBar";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          minLength: BaseXform.toIntAttribute(model.minLength, 0, true),
+          maxLength: BaseXform.toIntAttribute(model.maxLength, 100, true),
+          border: BaseXform.toBoolAttribute(model.border, false),
+          gradient: BaseXform.toBoolAttribute(model.gradient, true),
+          negativeBarColorSameAsPositive: BaseXform.toBoolAttribute(
+            model.negativeBarColorSameAsPositive,
+            true
+          ),
+          negativeBarBorderColorSameAsPositive: BaseXform.toBoolAttribute(
+            model.negativeBarBorderColorSameAsPositive,
+            true
+          ),
+          axisPosition: BaseXform.toAttribute(model.axisPosition, "auto"),
+          direction: BaseXform.toAttribute(model.direction, "leftToRight")
+        });
+        model.cfvo.forEach((cfvo) => {
+          this.cfvoXform.render(xmlStream, cfvo);
+        });
+        this.borderColorXform.render(xmlStream, model.borderColor);
+        this.negativeBorderColorXform.render(xmlStream, model.negativeBorderColor);
+        this.negativeFillColorXform.render(xmlStream, model.negativeFillColor);
+        this.axisColorXform.render(xmlStream, model.axisColor);
+        xmlStream.closeNode();
+      }
+      createNewModel({ attributes }) {
+        return {
+          cfvo: [],
+          minLength: BaseXform.toIntValue(attributes.minLength, 0),
+          maxLength: BaseXform.toIntValue(attributes.maxLength, 100),
+          border: BaseXform.toBoolValue(attributes.border, false),
+          gradient: BaseXform.toBoolValue(attributes.gradient, true),
+          negativeBarColorSameAsPositive: BaseXform.toBoolValue(
+            attributes.negativeBarColorSameAsPositive,
+            true
+          ),
+          negativeBarBorderColorSameAsPositive: BaseXform.toBoolValue(
+            attributes.negativeBarBorderColorSameAsPositive,
+            true
+          ),
+          axisPosition: BaseXform.toStringValue(attributes.axisPosition, "auto"),
+          direction: BaseXform.toStringValue(attributes.direction, "leftToRight")
+        };
+      }
+      onParserClose(name, parser) {
+        const [, prop] = name.split(":");
+        switch (prop) {
+          case "cfvo":
+            this.model.cfvo.push(parser.model);
+            break;
+          default:
+            this.model[prop] = parser.model;
+            break;
+        }
+      }
+    };
+    module.exports = DatabarExtXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/cf-icon-ext-xform.js
+var require_cf_icon_ext_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/cf-icon-ext-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var CfIconExtXform = class extends BaseXform {
+      get tag() {
+        return "x14:cfIcon";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode(this.tag, {
+          iconSet: model.iconSet,
+          iconId: model.iconId
+        });
+      }
+      parseOpen({ attributes }) {
+        this.model = {
+          iconSet: attributes.iconSet,
+          iconId: BaseXform.toIntValue(attributes.iconId)
+        };
+      }
+      parseClose(name) {
+        return name !== this.tag;
+      }
+    };
+    module.exports = CfIconExtXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/icon-set-ext-xform.js
+var require_icon_set_ext_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/icon-set-ext-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var CompositeXform = require_composite_xform();
+    var CfvoExtXform = require_cfvo_ext_xform();
+    var CfIconExtXform = require_cf_icon_ext_xform();
+    var IconSetExtXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          "x14:cfvo": this.cfvoXform = new CfvoExtXform(),
+          "x14:cfIcon": this.cfIconXform = new CfIconExtXform()
+        };
+      }
+      get tag() {
+        return "x14:iconSet";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          iconSet: BaseXform.toStringAttribute(model.iconSet),
+          reverse: BaseXform.toBoolAttribute(model.reverse, false),
+          showValue: BaseXform.toBoolAttribute(model.showValue, true),
+          custom: BaseXform.toBoolAttribute(model.icons, false)
+        });
+        model.cfvo.forEach((cfvo) => {
+          this.cfvoXform.render(xmlStream, cfvo);
+        });
+        if (model.icons) {
+          model.icons.forEach((icon, i2) => {
+            icon.iconId = i2;
+            this.cfIconXform.render(xmlStream, icon);
+          });
+        }
+        xmlStream.closeNode();
+      }
+      createNewModel({ attributes }) {
+        return {
+          cfvo: [],
+          iconSet: BaseXform.toStringValue(attributes.iconSet, "3TrafficLights"),
+          reverse: BaseXform.toBoolValue(attributes.reverse, false),
+          showValue: BaseXform.toBoolValue(attributes.showValue, true)
+        };
+      }
+      onParserClose(name, parser) {
+        const [, prop] = name.split(":");
+        switch (prop) {
+          case "cfvo":
+            this.model.cfvo.push(parser.model);
+            break;
+          case "cfIcon":
+            if (!this.model.icons) {
+              this.model.icons = [];
+            }
+            this.model.icons.push(parser.model);
+            break;
+          default:
+            this.model[prop] = parser.model;
+            break;
+        }
+      }
+    };
+    module.exports = IconSetExtXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/cf-rule-ext-xform.js
+var require_cf_rule_ext_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/cf-rule-ext-xform.js"(exports, module) {
+    var { v4: uuidv4 } = (init_ids(), __toCommonJS(ids_exports));
+    var BaseXform = require_base_xform();
+    var CompositeXform = require_composite_xform();
+    var DatabarExtXform = require_databar_ext_xform();
+    var IconSetExtXform = require_icon_set_ext_xform();
+    var extIcons = {
+      "3Triangles": true,
+      "3Stars": true,
+      "5Boxes": true
+    };
+    var CfRuleExtXform = class _CfRuleExtXform extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          "x14:dataBar": this.databarXform = new DatabarExtXform(),
+          "x14:iconSet": this.iconSetXform = new IconSetExtXform()
+        };
+      }
+      get tag() {
+        return "x14:cfRule";
+      }
+      static isExt(rule) {
+        if (rule.type === "dataBar") {
+          return DatabarExtXform.isExt(rule);
+        }
+        if (rule.type === "iconSet") {
+          if (rule.custom || extIcons[rule.iconSet]) {
+            return true;
+          }
+        }
+        return false;
+      }
+      prepare(model) {
+        if (_CfRuleExtXform.isExt(model)) {
+          model.x14Id = `{${uuidv4()}}`.toUpperCase();
+        }
+      }
+      render(xmlStream, model) {
+        if (!_CfRuleExtXform.isExt(model)) {
+          return;
+        }
+        switch (model.type) {
+          case "dataBar":
+            this.renderDataBar(xmlStream, model);
+            break;
+          case "iconSet":
+            this.renderIconSet(xmlStream, model);
+            break;
+        }
+      }
+      renderDataBar(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          type: "dataBar",
+          id: model.x14Id
+        });
+        this.databarXform.render(xmlStream, model);
+        xmlStream.closeNode();
+      }
+      renderIconSet(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          type: "iconSet",
+          priority: model.priority,
+          id: model.x14Id || `{${uuidv4()}}`
+        });
+        this.iconSetXform.render(xmlStream, model);
+        xmlStream.closeNode();
+      }
+      createNewModel({ attributes }) {
+        return {
+          type: attributes.type,
+          x14Id: attributes.id,
+          priority: BaseXform.toIntValue(attributes.priority)
+        };
+      }
+      onParserClose(name, parser) {
+        Object.assign(this.model, parser.model);
+      }
+    };
+    module.exports = CfRuleExtXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/sqref-ext-xform.js
+var require_sqref_ext_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/sqref-ext-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var SqrefExtXform = class extends BaseXform {
+      get tag() {
+        return "xm:sqref";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode(this.tag, null, model);
+      }
+      parseOpen() {
+        this.model = "";
+      }
+      parseText(text2) {
+        this.model += text2;
+      }
+      parseClose(name) {
+        return name !== this.tag;
+      }
+    };
+    module.exports = SqrefExtXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/conditional-formatting-ext-xform.js
+var require_conditional_formatting_ext_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/conditional-formatting-ext-xform.js"(exports, module) {
+    var CompositeXform = require_composite_xform();
+    var SqRefExtXform = require_sqref_ext_xform();
+    var CfRuleExtXform = require_cf_rule_ext_xform();
+    var ConditionalFormattingExtXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          "xm:sqref": this.sqRef = new SqRefExtXform(),
+          "x14:cfRule": this.cfRule = new CfRuleExtXform()
+        };
+      }
+      get tag() {
+        return "x14:conditionalFormatting";
+      }
+      prepare(model, options) {
+        model.rules.forEach((rule) => {
+          this.cfRule.prepare(rule, options);
+        });
+      }
+      render(xmlStream, model) {
+        if (!model.rules.some(CfRuleExtXform.isExt)) {
+          return;
+        }
+        xmlStream.openNode(this.tag, {
+          "xmlns:xm": "http://schemas.microsoft.com/office/excel/2006/main"
+        });
+        model.rules.filter(CfRuleExtXform.isExt).forEach((rule) => this.cfRule.render(xmlStream, rule));
+        this.sqRef.render(xmlStream, model.ref);
+        xmlStream.closeNode();
+      }
+      createNewModel() {
+        return {
+          rules: []
+        };
+      }
+      onParserClose(name, parser) {
+        switch (name) {
+          case "xm:sqref":
+            this.model.ref = parser.model;
+            break;
+          case "x14:cfRule":
+            this.model.rules.push(parser.model);
+            break;
+        }
+      }
+    };
+    module.exports = ConditionalFormattingExtXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/conditional-formattings-ext-xform.js
+var require_conditional_formattings_ext_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/conditional-formattings-ext-xform.js"(exports, module) {
+    var CompositeXform = require_composite_xform();
+    var CfRuleExtXform = require_cf_rule_ext_xform();
+    var ConditionalFormattingExtXform = require_conditional_formatting_ext_xform();
+    var ConditionalFormattingsExtXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          "x14:conditionalFormatting": this.cfXform = new ConditionalFormattingExtXform()
+        };
+      }
+      get tag() {
+        return "x14:conditionalFormattings";
+      }
+      hasContent(model) {
+        if (model.hasExtContent === void 0) {
+          model.hasExtContent = model.some((cf) => cf.rules.some(CfRuleExtXform.isExt));
+        }
+        return model.hasExtContent;
+      }
+      prepare(model, options) {
+        model.forEach((cf) => {
+          this.cfXform.prepare(cf, options);
+        });
+      }
+      render(xmlStream, model) {
+        if (this.hasContent(model)) {
+          xmlStream.openNode(this.tag);
+          model.forEach((cf) => this.cfXform.render(xmlStream, cf));
+          xmlStream.closeNode();
+        }
+      }
+      createNewModel() {
+        return [];
+      }
+      onParserClose(name, parser) {
+        this.model.push(parser.model);
+      }
+    };
+    module.exports = ConditionalFormattingsExtXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/ext-lst-xform.js
+var require_ext_lst_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/ext-lst-xform.js"(exports, module) {
+    var CompositeXform = require_composite_xform();
+    var ConditionalFormattingsExt = require_conditional_formattings_ext_xform();
+    var ExtXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          "x14:conditionalFormattings": this.conditionalFormattings = new ConditionalFormattingsExt()
+        };
+      }
+      get tag() {
+        return "ext";
+      }
+      hasContent(model) {
+        return this.conditionalFormattings.hasContent(model.conditionalFormattings);
+      }
+      prepare(model, options) {
+        this.conditionalFormattings.prepare(model.conditionalFormattings, options);
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode("ext", {
+          uri: "{78C0D931-6437-407d-A8EE-F0AAD7539E65}",
+          "xmlns:x14": "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
+        });
+        this.conditionalFormattings.render(xmlStream, model.conditionalFormattings);
+        xmlStream.closeNode();
+      }
+      createNewModel() {
+        return {};
+      }
+      onParserClose(name, parser) {
+        this.model[name] = parser.model;
+      }
+    };
+    var ExtLstXform = class extends CompositeXform {
+      constructor() {
+        super();
+        this.map = {
+          ext: this.ext = new ExtXform()
+        };
+      }
+      get tag() {
+        return "extLst";
+      }
+      prepare(model, options) {
+        this.ext.prepare(model, options);
+      }
+      hasContent(model) {
+        return this.ext.hasContent(model);
+      }
+      render(xmlStream, model) {
+        if (!this.hasContent(model)) {
+          return;
+        }
+        xmlStream.openNode("extLst");
+        this.ext.render(xmlStream, model);
+        xmlStream.closeNode();
+      }
+      createNewModel() {
+        return {};
+      }
+      onParserClose(name, parser) {
+        Object.assign(this.model, parser.model);
+      }
+    };
+    module.exports = ExtLstXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/worksheet-xform.js
+var require_worksheet_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/sheet/worksheet-xform.js"(exports, module) {
+    var _ = require_under_dash();
+    var colCache = require_col_cache();
+    var XmlStream2 = require_xml_stream();
+    var RelType2 = require_rel_type();
+    var Merges = require_merges();
+    var BaseXform = require_base_xform();
+    var ListXform = require_list_xform();
+    var RowXform = require_row_xform();
+    var ColXform = require_col_xform();
+    var DimensionXform = require_dimension_xform();
+    var HyperlinkXform = require_hyperlink_xform();
+    var MergeCellXform = require_merge_cell_xform();
+    var DataValidationsXform = require_data_validations_xform();
+    var SheetPropertiesXform = require_sheet_properties_xform();
+    var SheetFormatPropertiesXform = require_sheet_format_properties_xform();
+    var SheetViewXform = require_sheet_view_xform();
+    var SheetProtectionXform = require_sheet_protection_xform();
+    var PageMarginsXform = require_page_margins_xform();
+    var PageSetupXform = require_page_setup_xform();
+    var PrintOptionsXform = require_print_options_xform();
+    var AutoFilterXform = require_auto_filter_xform();
+    var PictureXform = require_picture_xform();
+    var DrawingXform2 = require_drawing_xform();
+    var TablePartXform = require_table_part_xform();
+    var RowBreaksXform = require_row_breaks_xform();
+    var HeaderFooterXform = require_header_footer_xform();
+    var ConditionalFormattingsXform = require_conditional_formattings_xform();
+    var ExtListXform = require_ext_lst_xform();
+    var mergeRule = (rule, extRule) => {
+      Object.keys(extRule).forEach((key) => {
+        const value = rule[key];
+        const extValue = extRule[key];
+        if (value === void 0 && extValue !== void 0) {
+          rule[key] = extValue;
+        }
+      });
+    };
+    var mergeConditionalFormattings = (model, extModel) => {
+      if (!extModel || !extModel.length) {
+        return model;
+      }
+      if (!model || !model.length) {
+        return extModel;
+      }
+      const cfMap = {};
+      const ruleMap = {};
+      model.forEach((cf) => {
+        cfMap[cf.ref] = cf;
+        cf.rules.forEach((rule) => {
+          const { x14Id } = rule;
+          if (x14Id) {
+            ruleMap[x14Id] = rule;
+          }
+        });
+      });
+      extModel.forEach((extCf) => {
+        extCf.rules.forEach((extRule) => {
+          const rule = ruleMap[extRule.x14Id];
+          if (rule) {
+            mergeRule(rule, extRule);
+          } else if (cfMap[extCf.ref]) {
+            cfMap[extCf.ref].rules.push(extRule);
+          } else {
+            model.push({
+              ref: extCf.ref,
+              rules: [extRule]
+            });
+          }
+        });
+      });
+      return model;
+    };
+    var WorkSheetXform = class _WorkSheetXform extends BaseXform {
+      constructor(options) {
+        super();
+        const { maxRows, maxCols, ignoreNodes } = options || {};
+        this.ignoreNodes = ignoreNodes || [];
+        this.map = {
+          sheetPr: new SheetPropertiesXform(),
+          dimension: new DimensionXform(),
+          sheetViews: new ListXform({
+            tag: "sheetViews",
+            count: false,
+            childXform: new SheetViewXform()
+          }),
+          sheetFormatPr: new SheetFormatPropertiesXform(),
+          cols: new ListXform({ tag: "cols", count: false, childXform: new ColXform() }),
+          sheetData: new ListXform({
+            tag: "sheetData",
+            count: false,
+            empty: true,
+            childXform: new RowXform({ maxItems: maxCols }),
+            maxItems: maxRows
+          }),
+          autoFilter: new AutoFilterXform(),
+          mergeCells: new ListXform({ tag: "mergeCells", count: true, childXform: new MergeCellXform() }),
+          rowBreaks: new RowBreaksXform(),
+          hyperlinks: new ListXform({
+            tag: "hyperlinks",
+            count: false,
+            childXform: new HyperlinkXform()
+          }),
+          pageMargins: new PageMarginsXform(),
+          dataValidations: new DataValidationsXform(),
+          pageSetup: new PageSetupXform(),
+          headerFooter: new HeaderFooterXform(),
+          printOptions: new PrintOptionsXform(),
+          picture: new PictureXform(),
+          drawing: new DrawingXform2(),
+          sheetProtection: new SheetProtectionXform(),
+          tableParts: new ListXform({ tag: "tableParts", count: true, childXform: new TablePartXform() }),
+          conditionalFormatting: new ConditionalFormattingsXform(),
+          extLst: new ExtListXform()
+        };
+      }
+      prepare(model, options) {
+        options.merges = new Merges();
+        model.hyperlinks = options.hyperlinks = [];
+        model.comments = options.comments = [];
+        options.formulae = {};
+        options.siFormulae = 0;
+        this.map.cols.prepare(model.cols, options);
+        this.map.sheetData.prepare(model.rows, options);
+        this.map.conditionalFormatting.prepare(model.conditionalFormattings, options);
+        model.mergeCells = options.merges.mergeCells;
+        const rels3 = model.rels = [];
+        function nextRid(r) {
+          return `rId${r.length + 1}`;
+        }
+        model.hyperlinks.forEach((hyperlink) => {
+          const rId = nextRid(rels3);
+          hyperlink.rId = rId;
+          rels3.push({
+            Id: rId,
+            Type: RelType2.Hyperlink,
+            Target: hyperlink.target,
+            TargetMode: "External"
+          });
+        });
+        if (model.comments.length > 0) {
+          const comment = {
+            Id: nextRid(rels3),
+            Type: RelType2.Comments,
+            Target: `../comments${model.id}.xml`
+          };
+          rels3.push(comment);
+          const vmlDrawing = {
+            Id: nextRid(rels3),
+            Type: RelType2.VmlDrawing,
+            Target: `../drawings/vmlDrawing${model.id}.vml`
+          };
+          rels3.push(vmlDrawing);
+          model.comments.forEach((item) => {
+            item.refAddress = colCache.decodeAddress(item.ref);
+          });
+          options.commentRefs.push({
+            commentName: `comments${model.id}`,
+            vmlDrawing: `vmlDrawing${model.id}`
+          });
+        }
+        const drawingRelsHash = [];
+        let bookImage;
+        model.media.forEach((medium) => {
+          if (medium.type === "background") {
+            const rId = nextRid(rels3);
+            bookImage = options.media[medium.imageId];
+            rels3.push({
+              Id: rId,
+              Type: RelType2.Image,
+              Target: `../media/${bookImage.name}.${bookImage.extension}`
+            });
+            model.background = {
+              rId
+            };
+            model.image = options.media[medium.imageId];
+          } else if (medium.type === "image") {
+            let { drawing } = model;
+            bookImage = options.media[medium.imageId];
+            if (!drawing) {
+              drawing = model.drawing = {
+                rId: nextRid(rels3),
+                name: `drawing${++options.drawingsCount}`,
+                anchors: [],
+                rels: []
+              };
+              options.drawings.push(drawing);
+              rels3.push({
+                Id: drawing.rId,
+                Type: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing",
+                Target: `../drawings/${drawing.name}.xml`
+              });
+            }
+            let rIdImage = this.preImageId === medium.imageId ? drawingRelsHash[medium.imageId] : drawingRelsHash[drawing.rels.length];
+            if (!rIdImage) {
+              rIdImage = nextRid(drawing.rels);
+              drawingRelsHash[drawing.rels.length] = rIdImage;
+              drawing.rels.push({
+                Id: rIdImage,
+                Type: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+                Target: `../media/${bookImage.name}.${bookImage.extension}`
+              });
+            }
+            const anchor = {
+              picture: {
+                rId: rIdImage
+              },
+              range: medium.range
+            };
+            if (medium.hyperlinks && medium.hyperlinks.hyperlink) {
+              const rIdHyperLink = nextRid(drawing.rels);
+              drawingRelsHash[drawing.rels.length] = rIdHyperLink;
+              anchor.picture.hyperlinks = {
+                tooltip: medium.hyperlinks.tooltip,
+                rId: rIdHyperLink
+              };
+              drawing.rels.push({
+                Id: rIdHyperLink,
+                Type: RelType2.Hyperlink,
+                Target: medium.hyperlinks.hyperlink,
+                TargetMode: "External"
+              });
+            }
+            this.preImageId = medium.imageId;
+            drawing.anchors.push(anchor);
+          }
+        });
+        model.tables.forEach((table2) => {
+          const rId = nextRid(rels3);
+          table2.rId = rId;
+          rels3.push({
+            Id: rId,
+            Type: RelType2.Table,
+            Target: `../tables/${table2.target}`
+          });
+          table2.columns.forEach((column) => {
+            const { style } = column;
+            if (style) {
+              column.dxfId = options.styles.addDxfStyle(style);
+            }
+          });
+        });
+        this.map.extLst.prepare(model, options);
+      }
+      render(xmlStream, model) {
+        xmlStream.openXml(XmlStream2.StdDocAttributes);
+        xmlStream.openNode("worksheet", _WorkSheetXform.WORKSHEET_ATTRIBUTES);
+        const sheetFormatPropertiesModel = model.properties ? {
+          defaultRowHeight: model.properties.defaultRowHeight,
+          dyDescent: model.properties.dyDescent,
+          outlineLevelCol: model.properties.outlineLevelCol,
+          outlineLevelRow: model.properties.outlineLevelRow
+        } : void 0;
+        if (model.properties && model.properties.defaultColWidth) {
+          sheetFormatPropertiesModel.defaultColWidth = model.properties.defaultColWidth;
+        }
+        const sheetPropertiesModel = {
+          outlineProperties: model.properties && model.properties.outlineProperties,
+          tabColor: model.properties && model.properties.tabColor,
+          pageSetup: model.pageSetup && model.pageSetup.fitToPage ? {
+            fitToPage: model.pageSetup.fitToPage
+          } : void 0
+        };
+        const pageMarginsModel = model.pageSetup && model.pageSetup.margins;
+        const printOptionsModel = {
+          showRowColHeaders: model.pageSetup && model.pageSetup.showRowColHeaders,
+          showGridLines: model.pageSetup && model.pageSetup.showGridLines,
+          horizontalCentered: model.pageSetup && model.pageSetup.horizontalCentered,
+          verticalCentered: model.pageSetup && model.pageSetup.verticalCentered
+        };
+        const sheetProtectionModel = model.sheetProtection;
+        this.map.sheetPr.render(xmlStream, sheetPropertiesModel);
+        this.map.dimension.render(xmlStream, model.dimensions);
+        this.map.sheetViews.render(xmlStream, model.views);
+        this.map.sheetFormatPr.render(xmlStream, sheetFormatPropertiesModel);
+        this.map.cols.render(xmlStream, model.cols);
+        this.map.sheetData.render(xmlStream, model.rows);
+        this.map.sheetProtection.render(xmlStream, sheetProtectionModel);
+        this.map.autoFilter.render(xmlStream, model.autoFilter);
+        this.map.mergeCells.render(xmlStream, model.mergeCells);
+        this.map.conditionalFormatting.render(xmlStream, model.conditionalFormattings);
+        this.map.dataValidations.render(xmlStream, model.dataValidations);
+        this.map.hyperlinks.render(xmlStream, model.hyperlinks);
+        this.map.printOptions.render(xmlStream, printOptionsModel);
+        this.map.pageMargins.render(xmlStream, pageMarginsModel);
+        this.map.pageSetup.render(xmlStream, model.pageSetup);
+        this.map.headerFooter.render(xmlStream, model.headerFooter);
+        this.map.rowBreaks.render(xmlStream, model.rowBreaks);
+        this.map.drawing.render(xmlStream, model.drawing);
+        this.map.picture.render(xmlStream, model.background);
+        this.map.tableParts.render(xmlStream, model.tables);
+        this.map.extLst.render(xmlStream, model);
+        if (model.rels) {
+          model.rels.forEach((rel) => {
+            if (rel.Type === RelType2.VmlDrawing) {
+              xmlStream.leafNode("legacyDrawing", { "r:id": rel.Id });
+            }
+          });
+        }
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        if (node.name === "worksheet") {
+          _.each(this.map, (xform) => {
+            xform.reset();
+          });
+          return true;
+        }
+        if (this.map[node.name] && !this.ignoreNodes.includes(node.name)) {
+          this.parser = this.map[node.name];
+          this.parser.parseOpen(node);
+        }
+        return true;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case "worksheet": {
+            const properties = this.map.sheetFormatPr.model || {};
+            if (this.map.sheetPr.model && this.map.sheetPr.model.tabColor) {
+              properties.tabColor = this.map.sheetPr.model.tabColor;
+            }
+            if (this.map.sheetPr.model && this.map.sheetPr.model.outlineProperties) {
+              properties.outlineProperties = this.map.sheetPr.model.outlineProperties;
+            }
+            const sheetProperties = {
+              fitToPage: this.map.sheetPr.model && this.map.sheetPr.model.pageSetup && this.map.sheetPr.model.pageSetup.fitToPage || false,
+              margins: this.map.pageMargins.model
+            };
+            const pageSetup = Object.assign(sheetProperties, this.map.pageSetup.model, this.map.printOptions.model);
+            const conditionalFormattings = mergeConditionalFormattings(
+              this.map.conditionalFormatting.model,
+              this.map.extLst.model && this.map.extLst.model["x14:conditionalFormattings"]
+            );
+            this.model = {
+              dimensions: this.map.dimension.model,
+              cols: this.map.cols.model,
+              rows: this.map.sheetData.model,
+              mergeCells: this.map.mergeCells.model,
+              hyperlinks: this.map.hyperlinks.model,
+              dataValidations: this.map.dataValidations.model,
+              properties,
+              views: this.map.sheetViews.model,
+              pageSetup,
+              headerFooter: this.map.headerFooter.model,
+              background: this.map.picture.model,
+              drawing: this.map.drawing.model,
+              tables: this.map.tableParts.model,
+              conditionalFormattings
+            };
+            if (this.map.autoFilter.model) {
+              this.model.autoFilter = this.map.autoFilter.model;
+            }
+            if (this.map.sheetProtection.model) {
+              this.model.sheetProtection = this.map.sheetProtection.model;
+            }
+            return false;
+          }
+          default:
+            return true;
+        }
+      }
+      reconcile(model, options) {
+        const rels3 = (model.relationships || []).reduce((h, rel) => {
+          h[rel.Id] = rel;
+          if (rel.Type === RelType2.Comments) {
+            model.comments = options.comments[rel.Target].comments;
+          }
+          if (rel.Type === RelType2.VmlDrawing && model.comments && model.comments.length) {
+            const vmlComment = options.vmlDrawings[rel.Target].comments;
+            model.comments.forEach((comment, index) => {
+              comment.note = Object.assign({}, comment.note, vmlComment[index]);
+            });
+          }
+          return h;
+        }, {});
+        options.commentsMap = (model.comments || []).reduce((h, comment) => {
+          if (comment.ref) {
+            h[comment.ref] = comment;
+          }
+          return h;
+        }, {});
+        options.hyperlinkMap = (model.hyperlinks || []).reduce((h, hyperlink) => {
+          if (hyperlink.rId) {
+            h[hyperlink.address] = rels3[hyperlink.rId].Target;
+          }
+          return h;
+        }, {});
+        options.formulae = {};
+        model.rows = model.rows && model.rows.filter(Boolean) || [];
+        model.rows.forEach((row) => {
+          row.cells = row.cells && row.cells.filter(Boolean) || [];
+        });
+        this.map.cols.reconcile(model.cols, options);
+        this.map.sheetData.reconcile(model.rows, options);
+        this.map.conditionalFormatting.reconcile(model.conditionalFormattings, options);
+        model.media = [];
+        if (model.drawing) {
+          const drawingRel = rels3[model.drawing.rId];
+          const match = drawingRel.Target.match(/\/drawings\/([a-zA-Z0-9]+)[.][a-zA-Z]{3,4}$/);
+          if (match) {
+            const drawingName = match[1];
+            const drawing = options.drawings[drawingName];
+            drawing.anchors.forEach((anchor) => {
+              if (anchor.medium) {
+                const image = {
+                  type: "image",
+                  imageId: anchor.medium.index,
+                  range: anchor.range,
+                  hyperlinks: anchor.picture.hyperlinks
+                };
+                model.media.push(image);
+              }
+            });
+          }
+        }
+        const backgroundRel = model.background && rels3[model.background.rId];
+        if (backgroundRel) {
+          const target = backgroundRel.Target.split("/media/")[1];
+          const imageId = options.mediaIndex && options.mediaIndex[target];
+          if (imageId !== void 0) {
+            model.media.push({
+              type: "background",
+              imageId
+            });
+          }
+        }
+        model.tables = (model.tables || []).map((tablePart) => {
+          const rel = rels3[tablePart.rId];
+          return options.tables[rel.Target];
+        });
+        delete model.relationships;
+        delete model.hyperlinks;
+        delete model.comments;
+      }
+    };
+    WorkSheetXform.WORKSHEET_ATTRIBUTES = {
+      xmlns: "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+      "xmlns:r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+      "xmlns:mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+      "mc:Ignorable": "x14ac",
+      "xmlns:x14ac": "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"
+    };
+    module.exports = WorkSheetXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/fill-xform.js
+var require_fill_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/fill-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var ColorXform = require_color_xform();
+    var StopXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          color: new ColorXform()
+        };
+      }
+      get tag() {
+        return "stop";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode("stop");
+        xmlStream.addAttribute("position", model.position);
+        this.map.color.render(xmlStream, model.color);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "stop":
+            this.model = {
+              position: parseFloat(node.attributes.position)
+            };
+            return true;
+          case "color":
+            this.parser = this.map.color;
+            this.parser.parseOpen(node);
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.model.color = this.parser.model;
+            this.parser = void 0;
+          }
+          return true;
+        }
+        return false;
+      }
+    };
+    var PatternFillXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          fgColor: new ColorXform("fgColor"),
+          bgColor: new ColorXform("bgColor")
+        };
+      }
+      get name() {
+        return "pattern";
+      }
+      get tag() {
+        return "patternFill";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode("patternFill");
+        xmlStream.addAttribute("patternType", model.pattern);
+        if (model.fgColor) {
+          this.map.fgColor.render(xmlStream, model.fgColor);
+        }
+        if (model.bgColor) {
+          this.map.bgColor.render(xmlStream, model.bgColor);
+        }
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "patternFill":
+            this.model = {
+              type: "pattern",
+              pattern: node.attributes.patternType
+            };
+            return true;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+              return true;
+            }
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            if (this.parser.model) {
+              this.model[name] = this.parser.model;
+            }
+            this.parser = void 0;
+          }
+          return true;
+        }
+        return false;
+      }
+    };
+    var GradientFillXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          stop: new StopXform()
+        };
+      }
+      get name() {
+        return "gradient";
+      }
+      get tag() {
+        return "gradientFill";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode("gradientFill");
+        switch (model.gradient) {
+          case "angle":
+            xmlStream.addAttribute("degree", model.degree);
+            break;
+          case "path":
+            xmlStream.addAttribute("type", "path");
+            if (model.center.left) {
+              xmlStream.addAttribute("left", model.center.left);
+              if (model.center.right === void 0) {
+                xmlStream.addAttribute("right", model.center.left);
+              }
+            }
+            if (model.center.right) {
+              xmlStream.addAttribute("right", model.center.right);
+            }
+            if (model.center.top) {
+              xmlStream.addAttribute("top", model.center.top);
+              if (model.center.bottom === void 0) {
+                xmlStream.addAttribute("bottom", model.center.top);
+              }
+            }
+            if (model.center.bottom) {
+              xmlStream.addAttribute("bottom", model.center.bottom);
+            }
+            break;
+          default:
+            break;
+        }
+        const stopXform = this.map.stop;
+        model.stops.forEach((stopModel) => {
+          stopXform.render(xmlStream, stopModel);
+        });
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "gradientFill": {
+            const model = this.model = {
+              stops: []
+            };
+            if (node.attributes.degree) {
+              model.gradient = "angle";
+              model.degree = parseInt(node.attributes.degree, 10);
+            } else if (node.attributes.type === "path") {
+              model.gradient = "path";
+              model.center = {
+                left: node.attributes.left ? parseFloat(node.attributes.left) : 0,
+                top: node.attributes.top ? parseFloat(node.attributes.top) : 0
+              };
+              if (node.attributes.right !== node.attributes.left) {
+                model.center.right = node.attributes.right ? parseFloat(node.attributes.right) : 0;
+              }
+              if (node.attributes.bottom !== node.attributes.top) {
+                model.center.bottom = node.attributes.bottom ? parseFloat(node.attributes.bottom) : 0;
+              }
+            }
+            return true;
+          }
+          case "stop":
+            this.parser = this.map.stop;
+            this.parser.parseOpen(node);
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.model.stops.push(this.parser.model);
+            this.parser = void 0;
+          }
+          return true;
+        }
+        return false;
+      }
+    };
+    var FillXform = class _FillXform extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          patternFill: new PatternFillXform(),
+          gradientFill: new GradientFillXform()
+        };
+      }
+      get tag() {
+        return "fill";
+      }
+      render(xmlStream, model) {
+        xmlStream.addRollback();
+        xmlStream.openNode("fill");
+        switch (model.type) {
+          case "pattern":
+            this.map.patternFill.render(xmlStream, model);
+            break;
+          case "gradient":
+            this.map.gradientFill.render(xmlStream, model);
+            break;
+          default:
+            xmlStream.rollback();
+            return;
+        }
+        xmlStream.closeNode();
+        xmlStream.commit();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "fill":
+            this.model = {};
+            return true;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+              return true;
+            }
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.model = this.parser.model;
+            this.model.type = this.parser.name;
+            this.parser = void 0;
+          }
+          return true;
+        }
+        return false;
+      }
+      validStyle(value) {
+        return _FillXform.validPatternValues[value];
+      }
+    };
+    FillXform.validPatternValues = [
+      "none",
+      "solid",
+      "darkVertical",
+      "darkGray",
+      "mediumGray",
+      "lightGray",
+      "gray125",
+      "gray0625",
+      "darkHorizontal",
+      "darkVertical",
+      "darkDown",
+      "darkUp",
+      "darkGrid",
+      "darkTrellis",
+      "lightHorizontal",
+      "lightVertical",
+      "lightDown",
+      "lightUp",
+      "lightGrid",
+      "lightTrellis",
+      "lightGrid"
+    ].reduce((p, v) => {
+      p[v] = true;
+      return p;
+    }, {});
+    FillXform.StopXform = StopXform;
+    FillXform.PatternFillXform = PatternFillXform;
+    FillXform.GradientFillXform = GradientFillXform;
+    module.exports = FillXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/border-xform.js
+var require_border_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/border-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var utils = require_utils();
+    var ColorXform = require_color_xform();
+    var EdgeXform = class _EdgeXform extends BaseXform {
+      constructor(name) {
+        super();
+        this.name = name;
+        this.map = {
+          color: new ColorXform()
+        };
+      }
+      get tag() {
+        return this.name;
+      }
+      render(xmlStream, model, defaultColor) {
+        const color2 = model && model.color || defaultColor || this.defaultColor;
+        xmlStream.openNode(this.name);
+        if (model && model.style) {
+          xmlStream.addAttribute("style", model.style);
+          if (color2) {
+            this.map.color.render(xmlStream, color2);
+          }
+        }
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.name: {
+            const { style } = node.attributes;
+            if (style) {
+              this.model = {
+                style
+              };
+            } else {
+              this.model = void 0;
+            }
+            return true;
+          }
+          case "color":
+            this.parser = this.map.color;
+            this.parser.parseOpen(node);
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        if (name === this.name) {
+          if (this.map.color.model) {
+            if (!this.model) {
+              this.model = {};
+            }
+            this.model.color = this.map.color.model;
+          }
+        }
+        return false;
+      }
+      validStyle(value) {
+        return _EdgeXform.validStyleValues[value];
+      }
+    };
+    EdgeXform.validStyleValues = [
+      "thin",
+      "dashed",
+      "dotted",
+      "dashDot",
+      "hair",
+      "dashDotDot",
+      "slantDashDot",
+      "mediumDashed",
+      "mediumDashDotDot",
+      "mediumDashDot",
+      "medium",
+      "double",
+      "thick"
+    ].reduce((p, v) => {
+      p[v] = true;
+      return p;
+    }, {});
+    var BorderXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          top: new EdgeXform("top"),
+          left: new EdgeXform("left"),
+          bottom: new EdgeXform("bottom"),
+          right: new EdgeXform("right"),
+          diagonal: new EdgeXform("diagonal")
+        };
+      }
+      render(xmlStream, model) {
+        const { color: color2 } = model;
+        xmlStream.openNode("border");
+        if (model.diagonal && model.diagonal.style) {
+          if (model.diagonal.up) {
+            xmlStream.addAttribute("diagonalUp", "1");
+          }
+          if (model.diagonal.down) {
+            xmlStream.addAttribute("diagonalDown", "1");
+          }
+        }
+        function add(edgeModel, edgeXform) {
+          if (edgeModel && !edgeModel.color && model.color) {
+            edgeModel = {
+              ...edgeModel,
+              color: model.color
+            };
+          }
+          edgeXform.render(xmlStream, edgeModel, color2);
+        }
+        add(model.left, this.map.left);
+        add(model.right, this.map.right);
+        add(model.top, this.map.top);
+        add(model.bottom, this.map.bottom);
+        add(model.diagonal, this.map.diagonal);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "border":
+            this.reset();
+            this.diagonalUp = utils.parseBoolean(node.attributes.diagonalUp);
+            this.diagonalDown = utils.parseBoolean(node.attributes.diagonalDown);
+            return true;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+              return true;
+            }
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        if (name === "border") {
+          const model = this.model = {};
+          const add = function(key, edgeModel, extensions) {
+            if (edgeModel) {
+              if (extensions) {
+                Object.assign(edgeModel, extensions);
+              }
+              model[key] = edgeModel;
+            }
+          };
+          add("left", this.map.left.model);
+          add("right", this.map.right.model);
+          add("top", this.map.top.model);
+          add("bottom", this.map.bottom.model);
+          add("diagonal", this.map.diagonal.model, { up: this.diagonalUp, down: this.diagonalDown });
+        }
+        return false;
+      }
+    };
+    module.exports = BorderXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/defaultnumformats.js
+var require_defaultnumformats = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/defaultnumformats.js"(exports, module) {
+    module.exports = {
+      0: { f: "General" },
+      1: { f: "0" },
+      2: { f: "0.00" },
+      3: { f: "#,##0" },
+      4: { f: "#,##0.00" },
+      9: { f: "0%" },
+      10: { f: "0.00%" },
+      11: { f: "0.00E+00" },
+      12: { f: "# ?/?" },
+      13: { f: "# ??/??" },
+      14: { f: "mm-dd-yy" },
+      15: { f: "d-mmm-yy" },
+      16: { f: "d-mmm" },
+      17: { f: "mmm-yy" },
+      18: { f: "h:mm AM/PM" },
+      19: { f: "h:mm:ss AM/PM" },
+      20: { f: "h:mm" },
+      21: { f: "h:mm:ss" },
+      22: { f: 'm/d/yy "h":mm' },
+      27: {
+        "zh-tw": "[$-404]e/m/d",
+        "zh-cn": 'yyyy"年"m"月"',
+        "ja-jp": "[$-411]ge.m.d",
+        "ko-kr": 'yyyy"年" mm"月" dd"日"'
+      },
+      28: {
+        "zh-tw": '[$-404]e"年"m"月"d"日"',
+        "zh-cn": 'm"月"d"日"',
+        "ja-jp": '[$-411]ggge"年"m"月"d"日"',
+        "ko-kr": "mm-dd"
+      },
+      29: {
+        "zh-tw": '[$-404]e"年"m"月"d"日"',
+        "zh-cn": 'm"月"d"日"',
+        "ja-jp": '[$-411]ggge"年"m"月"d"日"',
+        "ko-kr": "mm-dd"
+      },
+      30: { "zh-tw": "m/d/yy ", "zh-cn": "m-d-yy", "ja-jp": "m/d/yy", "ko-kr": "mm-dd-yy" },
+      31: {
+        "zh-tw": 'yyyy"年"m"月"d"日"',
+        "zh-cn": 'yyyy"年"m"月"d"日"',
+        "ja-jp": 'yyyy"年"m"月"d"日"',
+        "ko-kr": 'yyyy"년" mm"월" dd"일"'
+      },
+      32: {
+        "zh-tw": 'hh"時"mm"分"',
+        "zh-cn": 'h"时"mm"分"',
+        "ja-jp": 'h"時"mm"分"',
+        "ko-kr": 'h"시" mm"분"'
+      },
+      33: {
+        "zh-tw": 'hh"時"mm"分"ss"秒"',
+        "zh-cn": 'h"时"mm"分"ss"秒"',
+        "ja-jp": 'h"時"mm"分"ss"秒"',
+        "ko-kr": 'h"시" mm"분" ss"초"'
+      },
+      34: {
+        "zh-tw": '上午/下午 hh"時"mm"分"',
+        "zh-cn": '上午/下午 h"时"mm"分"',
+        "ja-jp": 'yyyy"年"m"月"',
+        "ko-kr": "yyyy-mm-dd"
+      },
+      35: {
+        "zh-tw": '上午/下午 hh"時"mm"分"ss"秒"',
+        "zh-cn": '上午/下午 h"时"mm"分"ss"秒"',
+        "ja-jp": 'm"月"d"日"',
+        "ko-kr": "yyyy-mm-dd"
+      },
+      36: {
+        "zh-tw": "[$-404]e/m/d",
+        "zh-cn": 'yyyy"年"m"月"',
+        "ja-jp": "[$-411]ge.m.d",
+        "ko-kr": 'yyyy"年" mm"月" dd"日"'
+      },
+      37: { f: "#,##0 ;(#,##0)" },
+      38: { f: "#,##0 ;[Red](#,##0)" },
+      39: { f: "#,##0.00 ;(#,##0.00)" },
+      40: { f: "#,##0.00 ;[Red](#,##0.00)" },
+      45: { f: "mm:ss" },
+      46: { f: "[h]:mm:ss" },
+      47: { f: "mmss.0" },
+      48: { f: "##0.0E+0" },
+      49: { f: "@" },
+      50: {
+        "zh-tw": "[$-404]e/m/d",
+        "zh-cn": 'yyyy"年"m"月"',
+        "ja-jp": "[$-411]ge.m.d",
+        "ko-kr": 'yyyy"年" mm"月" dd"日"'
+      },
+      51: {
+        "zh-tw": '[$-404]e"年"m"月"d"日"',
+        "zh-cn": 'm"月"d"日"',
+        "ja-jp": '[$-411]ggge"年"m"月"d"日"',
+        "ko-kr": "mm-dd"
+      },
+      52: {
+        "zh-tw": '上午/下午 hh"時"mm"分"',
+        "zh-cn": 'yyyy"年"m"月"',
+        "ja-jp": 'yyyy"年"m"月"',
+        "ko-kr": "yyyy-mm-dd"
+      },
+      53: {
+        "zh-tw": '上午/下午 hh"時"mm"分"ss"秒"',
+        "zh-cn": 'm"月"d"日"',
+        "ja-jp": 'm"月"d"日"',
+        "ko-kr": "yyyy-mm-dd"
+      },
+      54: {
+        "zh-tw": '[$-404]e"年"m"月"d"日"',
+        "zh-cn": 'm"月"d"日"',
+        "ja-jp": '[$-411]ggge"年"m"月"d"日"',
+        "ko-kr": "mm-dd"
+      },
+      55: {
+        "zh-tw": '上午/下午 hh"時"mm"分"',
+        "zh-cn": '上午/下午 h"时"mm"分"',
+        "ja-jp": 'yyyy"年"m"月"',
+        "ko-kr": "yyyy-mm-dd"
+      },
+      56: {
+        "zh-tw": '上午/下午 hh"時"mm"分"ss"秒"',
+        "zh-cn": '上午/下午 h"时"mm"分"ss"秒"',
+        "ja-jp": 'm"月"d"日"',
+        "ko-kr": "yyyy-mm-dd"
+      },
+      57: {
+        "zh-tw": "[$-404]e/m/d",
+        "zh-cn": 'yyyy"年"m"月"',
+        "ja-jp": "[$-411]ge.m.d",
+        "ko-kr": 'yyyy"年" mm"月" dd"日"'
+      },
+      58: {
+        "zh-tw": '[$-404]e"年"m"月"d"日"',
+        "zh-cn": 'm"月"d"日"',
+        "ja-jp": '[$-411]ggge"年"m"月"d"日"',
+        "ko-kr": "mm-dd"
+      },
+      59: { "th-th": "t0" },
+      60: { "th-th": "t0.00" },
+      61: { "th-th": "t#,##0" },
+      62: { "th-th": "t#,##0.00" },
+      67: { "th-th": "t0%" },
+      68: { "th-th": "t0.00%" },
+      69: { "th-th": "t# ?/?" },
+      70: { "th-th": "t# ??/??" },
+      81: { "th-th": "d/m/bb" }
+    };
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/numfmt-xform.js
+var require_numfmt_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/numfmt-xform.js"(exports, module) {
+    var _ = require_under_dash();
+    var defaultNumFormats = require_defaultnumformats();
+    var BaseXform = require_base_xform();
+    function hashDefaultFormats() {
+      const hash = {};
+      _.each(defaultNumFormats, (dnf, id) => {
+        if (dnf.f) {
+          hash[dnf.f] = parseInt(id, 10);
+        }
+      });
+      return hash;
+    }
+    var defaultFmtHash = hashDefaultFormats();
+    var NumFmtXform = class extends BaseXform {
+      constructor(id, formatCode) {
+        super();
+        this.id = id;
+        this.formatCode = formatCode;
+      }
+      get tag() {
+        return "numFmt";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode("numFmt", { numFmtId: model.id, formatCode: model.formatCode });
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case "numFmt":
+            this.model = {
+              id: parseInt(node.attributes.numFmtId, 10),
+              formatCode: node.attributes.formatCode.replace(/[\\](.)/g, "$1")
+            };
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    NumFmtXform.getDefaultFmtId = function getDefaultFmtId(formatCode) {
+      return defaultFmtHash[formatCode];
+    };
+    NumFmtXform.getDefaultFmtCode = function getDefaultFmtCode(numFmtId) {
+      return defaultNumFormats[numFmtId] && defaultNumFormats[numFmtId].f;
+    };
+    module.exports = NumFmtXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/alignment-xform.js
+var require_alignment_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/alignment-xform.js"(exports, module) {
+    var Enums = require_enums();
+    var utils = require_utils();
+    var BaseXform = require_base_xform();
+    var validation = {
+      horizontalValues: [
+        "left",
+        "center",
+        "right",
+        "fill",
+        "centerContinuous",
+        "distributed",
+        "justify"
+      ].reduce((p, v) => {
+        p[v] = true;
+        return p;
+      }, {}),
+      horizontal(value) {
+        return this.horizontalValues[value] ? value : void 0;
+      },
+      verticalValues: ["top", "middle", "bottom", "distributed", "justify"].reduce((p, v) => {
+        p[v] = true;
+        return p;
+      }, {}),
+      vertical(value) {
+        if (value === "middle") return "center";
+        return this.verticalValues[value] ? value : void 0;
+      },
+      wrapText(value) {
+        return value ? true : void 0;
+      },
+      shrinkToFit(value) {
+        return value ? true : void 0;
+      },
+      textRotation(value) {
+        switch (value) {
+          case "vertical":
+            return value;
+          default:
+            value = utils.validInt(value);
+            return value >= -90 && value <= 90 ? value : void 0;
+        }
+      },
+      indent(value) {
+        value = utils.validInt(value);
+        return Math.max(0, value);
+      },
+      readingOrder(value) {
+        switch (value) {
+          case "ltr":
+            return Enums.ReadingOrder.LeftToRight;
+          case "rtl":
+            return Enums.ReadingOrder.RightToLeft;
+          default:
+            return void 0;
+        }
+      }
+    };
+    var textRotationXform = {
+      toXml(textRotation) {
+        textRotation = validation.textRotation(textRotation);
+        if (textRotation) {
+          if (textRotation === "vertical") {
+            return 255;
+          }
+          const tr = Math.round(textRotation);
+          if (tr >= 0 && tr <= 90) {
+            return tr;
+          }
+          if (tr < 0 && tr >= -90) {
+            return 90 - tr;
+          }
+        }
+        return void 0;
+      },
+      toModel(textRotation) {
+        const tr = utils.validInt(textRotation);
+        if (tr !== void 0) {
+          if (tr === 255) {
+            return "vertical";
+          }
+          if (tr >= 0 && tr <= 90) {
+            return tr;
+          }
+          if (tr > 90 && tr <= 180) {
+            return 90 - tr;
+          }
+        }
+        return void 0;
+      }
+    };
+    var AlignmentXform = class extends BaseXform {
+      get tag() {
+        return "alignment";
+      }
+      render(xmlStream, model) {
+        xmlStream.addRollback();
+        xmlStream.openNode("alignment");
+        let isValid = false;
+        function add(name, value) {
+          if (value) {
+            xmlStream.addAttribute(name, value);
+            isValid = true;
+          }
+        }
+        add("horizontal", validation.horizontal(model.horizontal));
+        add("vertical", validation.vertical(model.vertical));
+        add("wrapText", validation.wrapText(model.wrapText) ? "1" : false);
+        add("shrinkToFit", validation.shrinkToFit(model.shrinkToFit) ? "1" : false);
+        add("indent", validation.indent(model.indent));
+        add("textRotation", textRotationXform.toXml(model.textRotation));
+        add("readingOrder", validation.readingOrder(model.readingOrder));
+        xmlStream.closeNode();
+        if (isValid) {
+          xmlStream.commit();
+        } else {
+          xmlStream.rollback();
+        }
+      }
+      parseOpen(node) {
+        const model = {};
+        let valid = false;
+        function add(truthy, name, value) {
+          if (truthy) {
+            model[name] = value;
+            valid = true;
+          }
+        }
+        add(node.attributes.horizontal, "horizontal", node.attributes.horizontal);
+        add(
+          node.attributes.vertical,
+          "vertical",
+          node.attributes.vertical === "center" ? "middle" : node.attributes.vertical
+        );
+        add(node.attributes.wrapText, "wrapText", utils.parseBoolean(node.attributes.wrapText));
+        add(node.attributes.shrinkToFit, "shrinkToFit", utils.parseBoolean(node.attributes.shrinkToFit));
+        add(node.attributes.indent, "indent", parseInt(node.attributes.indent, 10));
+        add(
+          node.attributes.textRotation,
+          "textRotation",
+          textRotationXform.toModel(node.attributes.textRotation)
+        );
+        add(
+          node.attributes.readingOrder,
+          "readingOrder",
+          node.attributes.readingOrder === "2" ? "rtl" : "ltr"
+        );
+        this.model = valid ? model : null;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = AlignmentXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/protection-xform.js
+var require_protection_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/protection-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var validation = {
+      boolean(value, dflt2) {
+        if (value === void 0) {
+          return dflt2;
+        }
+        return value;
+      }
+    };
+    var ProtectionXform = class extends BaseXform {
+      get tag() {
+        return "protection";
+      }
+      render(xmlStream, model) {
+        xmlStream.addRollback();
+        xmlStream.openNode("protection");
+        let isValid = false;
+        function add(name, value) {
+          if (value !== void 0) {
+            xmlStream.addAttribute(name, value);
+            isValid = true;
+          }
+        }
+        add("locked", validation.boolean(model.locked, true) ? void 0 : "0");
+        add("hidden", validation.boolean(model.hidden, false) ? "1" : void 0);
+        xmlStream.closeNode();
+        if (isValid) {
+          xmlStream.commit();
+        } else {
+          xmlStream.rollback();
+        }
+      }
+      parseOpen(node) {
+        const model = {
+          locked: !(node.attributes.locked === "0"),
+          hidden: node.attributes.hidden === "1"
+        };
+        const isSignificant = !model.locked || model.hidden;
+        this.model = isSignificant ? model : null;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = ProtectionXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/style-xform.js
+var require_style_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/style-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var AlignmentXform = require_alignment_xform();
+    var ProtectionXform = require_protection_xform();
+    var StyleXform = class extends BaseXform {
+      constructor(options) {
+        super();
+        this.xfId = !!(options && options.xfId);
+        this.map = {
+          alignment: new AlignmentXform(),
+          protection: new ProtectionXform()
+        };
+      }
+      get tag() {
+        return "xf";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode("xf", {
+          numFmtId: model.numFmtId || 0,
+          fontId: model.fontId || 0,
+          fillId: model.fillId || 0,
+          borderId: model.borderId || 0
+        });
+        if (this.xfId) {
+          xmlStream.addAttribute("xfId", model.xfId || 0);
+        }
+        if (model.numFmtId) {
+          xmlStream.addAttribute("applyNumberFormat", "1");
+        }
+        if (model.fontId) {
+          xmlStream.addAttribute("applyFont", "1");
+        }
+        if (model.fillId) {
+          xmlStream.addAttribute("applyFill", "1");
+        }
+        if (model.borderId) {
+          xmlStream.addAttribute("applyBorder", "1");
+        }
+        if (model.alignment) {
+          xmlStream.addAttribute("applyAlignment", "1");
+        }
+        if (model.protection) {
+          xmlStream.addAttribute("applyProtection", "1");
+        }
+        if (model.alignment) {
+          this.map.alignment.render(xmlStream, model.alignment);
+        }
+        if (model.protection) {
+          this.map.protection.render(xmlStream, model.protection);
+        }
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "xf":
+            this.model = {
+              numFmtId: parseInt(node.attributes.numFmtId, 10),
+              fontId: parseInt(node.attributes.fontId, 10),
+              fillId: parseInt(node.attributes.fillId, 10),
+              borderId: parseInt(node.attributes.borderId, 10)
+            };
+            if (this.xfId) {
+              this.model.xfId = parseInt(node.attributes.xfId, 10);
+            }
+            return true;
+          case "alignment":
+            this.parser = this.map.alignment;
+            this.parser.parseOpen(node);
+            return true;
+          case "protection":
+            this.parser = this.map.protection;
+            this.parser.parseOpen(node);
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            if (this.map.protection === this.parser) {
+              this.model.protection = this.parser.model;
+            } else {
+              this.model.alignment = this.parser.model;
+            }
+            this.parser = void 0;
+          }
+          return true;
+        }
+        return name !== "xf";
+      }
+    };
+    module.exports = StyleXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/dxf-xform.js
+var require_dxf_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/dxf-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var AlignmentXform = require_alignment_xform();
+    var BorderXform = require_border_xform();
+    var FillXform = require_fill_xform();
+    var FontXform = require_font_xform();
+    var NumFmtXform = require_numfmt_xform();
+    var ProtectionXform = require_protection_xform();
+    var DxfXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          alignment: new AlignmentXform(),
+          border: new BorderXform(),
+          fill: new FillXform(),
+          font: new FontXform(),
+          numFmt: new NumFmtXform(),
+          protection: new ProtectionXform()
+        };
+      }
+      get tag() {
+        return "dxf";
+      }
+      // how do we generate dxfid?
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag);
+        if (model.font) {
+          this.map.font.render(xmlStream, model.font);
+        }
+        if (model.numFmt && model.numFmtId) {
+          const numFmtModel = { id: model.numFmtId, formatCode: model.numFmt };
+          this.map.numFmt.render(xmlStream, numFmtModel);
+        }
+        if (model.fill) {
+          this.map.fill.render(xmlStream, model.fill);
+        }
+        if (model.alignment) {
+          this.map.alignment.render(xmlStream, model.alignment);
+        }
+        if (model.border) {
+          this.map.border.render(xmlStream, model.border);
+        }
+        if (model.protection) {
+          this.map.protection.render(xmlStream, model.protection);
+        }
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.tag:
+            this.reset();
+            return true;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            return true;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        if (name === this.tag) {
+          this.model = {
+            alignment: this.map.alignment.model,
+            border: this.map.border.model,
+            fill: this.map.fill.model,
+            font: this.map.font.model,
+            numFmt: this.map.numFmt.model,
+            protection: this.map.protection.model
+          };
+          return false;
+        }
+        return true;
+      }
+    };
+    module.exports = DxfXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/styles-xform.js
+var require_styles_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/style/styles-xform.js"(exports, module) {
+    var Enums = require_enums();
+    var XmlStream2 = require_xml_stream();
+    var BaseXform = require_base_xform();
+    var StaticXform = require_static_xform();
+    var ListXform = require_list_xform();
+    var FontXform = require_font_xform();
+    var FillXform = require_fill_xform();
+    var BorderXform = require_border_xform();
+    var NumFmtXform = require_numfmt_xform();
+    var StyleXform = require_style_xform();
+    var DxfXform = require_dxf_xform();
+    var NUMFMT_BASE = 164;
+    var StylesXform2 = class _StylesXform extends BaseXform {
+      constructor(initialise) {
+        super();
+        this.map = {
+          numFmts: new ListXform({ tag: "numFmts", count: true, childXform: new NumFmtXform() }),
+          fonts: new ListXform({
+            tag: "fonts",
+            count: true,
+            childXform: new FontXform(),
+            $: { "x14ac:knownFonts": 1 }
+          }),
+          fills: new ListXform({ tag: "fills", count: true, childXform: new FillXform() }),
+          borders: new ListXform({ tag: "borders", count: true, childXform: new BorderXform() }),
+          cellStyleXfs: new ListXform({ tag: "cellStyleXfs", count: true, childXform: new StyleXform() }),
+          cellXfs: new ListXform({
+            tag: "cellXfs",
+            count: true,
+            childXform: new StyleXform({ xfId: true })
+          }),
+          dxfs: new ListXform({ tag: "dxfs", always: true, count: true, childXform: new DxfXform() }),
+          // for style manager
+          numFmt: new NumFmtXform(),
+          font: new FontXform(),
+          fill: new FillXform(),
+          border: new BorderXform(),
+          style: new StyleXform({ xfId: true }),
+          cellStyles: _StylesXform.STATIC_XFORMS.cellStyles,
+          tableStyles: _StylesXform.STATIC_XFORMS.tableStyles,
+          extLst: _StylesXform.STATIC_XFORMS.extLst
+        };
+        if (initialise) {
+          this.init();
+        }
+      }
+      initIndex() {
+        this.index = {
+          style: {},
+          numFmt: {},
+          numFmtNextId: 164,
+          // start custom format ids here
+          font: {},
+          border: {},
+          fill: {}
+        };
+      }
+      init() {
+        this.model = {
+          styles: [],
+          numFmts: [],
+          fonts: [],
+          borders: [],
+          fills: [],
+          dxfs: []
+        };
+        this.initIndex();
+        this._addBorder({});
+        this._addStyle({ numFmtId: 0, fontId: 0, fillId: 0, borderId: 0, xfId: 0 });
+        this._addFill({ type: "pattern", pattern: "none" });
+        this._addFill({ type: "pattern", pattern: "gray125" });
+        this.weakMap = /* @__PURE__ */ new WeakMap();
+      }
+      render(xmlStream, model) {
+        model = model || this.model;
+        xmlStream.openXml(XmlStream2.StdDocAttributes);
+        xmlStream.openNode("styleSheet", _StylesXform.STYLESHEET_ATTRIBUTES);
+        if (this.index) {
+          if (model.numFmts && model.numFmts.length) {
+            xmlStream.openNode("numFmts", { count: model.numFmts.length });
+            model.numFmts.forEach((numFmtXml) => {
+              xmlStream.writeXml(numFmtXml);
+            });
+            xmlStream.closeNode();
+          }
+          if (!model.fonts.length) {
+            this._addFont({ size: 11, color: { theme: 1 }, name: "Calibri", family: 2, scheme: "minor" });
+          }
+          xmlStream.openNode("fonts", { count: model.fonts.length, "x14ac:knownFonts": 1 });
+          model.fonts.forEach((fontXml) => {
+            xmlStream.writeXml(fontXml);
+          });
+          xmlStream.closeNode();
+          xmlStream.openNode("fills", { count: model.fills.length });
+          model.fills.forEach((fillXml) => {
+            xmlStream.writeXml(fillXml);
+          });
+          xmlStream.closeNode();
+          xmlStream.openNode("borders", { count: model.borders.length });
+          model.borders.forEach((borderXml) => {
+            xmlStream.writeXml(borderXml);
+          });
+          xmlStream.closeNode();
+          this.map.cellStyleXfs.render(xmlStream, [{ numFmtId: 0, fontId: 0, fillId: 0, borderId: 0, xfId: 0 }]);
+          xmlStream.openNode("cellXfs", { count: model.styles.length });
+          model.styles.forEach((styleXml) => {
+            xmlStream.writeXml(styleXml);
+          });
+          xmlStream.closeNode();
+        } else {
+          this.map.numFmts.render(xmlStream, model.numFmts);
+          this.map.fonts.render(xmlStream, model.fonts);
+          this.map.fills.render(xmlStream, model.fills);
+          this.map.borders.render(xmlStream, model.borders);
+          this.map.cellStyleXfs.render(xmlStream, [{ numFmtId: 0, fontId: 0, fillId: 0, borderId: 0, xfId: 0 }]);
+          this.map.cellXfs.render(xmlStream, model.styles);
+        }
+        _StylesXform.STATIC_XFORMS.cellStyles.render(xmlStream);
+        this.map.dxfs.render(xmlStream, model.dxfs);
+        _StylesXform.STATIC_XFORMS.tableStyles.render(xmlStream);
+        _StylesXform.STATIC_XFORMS.extLst.render(xmlStream);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "styleSheet":
+            this.initIndex();
+            return true;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            return true;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case "styleSheet": {
+            this.model = {};
+            const add = (propName, xform) => {
+              if (xform.model && xform.model.length) {
+                this.model[propName] = xform.model;
+              }
+            };
+            add("numFmts", this.map.numFmts);
+            add("fonts", this.map.fonts);
+            add("fills", this.map.fills);
+            add("borders", this.map.borders);
+            add("styles", this.map.cellXfs);
+            add("dxfs", this.map.dxfs);
+            this.index = {
+              model: [],
+              numFmt: []
+            };
+            if (this.model.numFmts) {
+              const numFmtIndex = this.index.numFmt;
+              this.model.numFmts.forEach((numFmt) => {
+                numFmtIndex[numFmt.id] = numFmt.formatCode;
+              });
+            }
+            return false;
+          }
+          default:
+            return true;
+        }
+      }
+      // add a cell's style model to the collection
+      // each style property is processed and cross-referenced, etc.
+      // the styleId is returned. Note: cellType is used when numFmt not defined
+      addStyleModel(model, cellType) {
+        if (!model) {
+          return 0;
+        }
+        if (!this.model.fonts.length) {
+          this._addFont({ size: 11, color: { theme: 1 }, name: "Calibri", family: 2, scheme: "minor" });
+        }
+        if (this.weakMap && this.weakMap.has(model)) {
+          return this.weakMap.get(model);
+        }
+        const style = {};
+        cellType = cellType || Enums.ValueType.Number;
+        if (model.numFmt) {
+          style.numFmtId = this._addNumFmtStr(model.numFmt);
+        } else {
+          switch (cellType) {
+            case Enums.ValueType.Number:
+              style.numFmtId = this._addNumFmtStr("General");
+              break;
+            case Enums.ValueType.Date:
+              style.numFmtId = this._addNumFmtStr("mm-dd-yy");
+              break;
+            default:
+              break;
+          }
+        }
+        if (model.font) {
+          style.fontId = this._addFont(model.font);
+        }
+        if (model.border) {
+          style.borderId = this._addBorder(model.border);
+        }
+        if (model.fill) {
+          style.fillId = this._addFill(model.fill);
+        }
+        if (model.alignment) {
+          style.alignment = model.alignment;
+        }
+        if (model.protection) {
+          style.protection = model.protection;
+        }
+        const styleId = this._addStyle(style);
+        if (this.weakMap) {
+          this.weakMap.set(model, styleId);
+        }
+        return styleId;
+      }
+      // given a styleId (i.e. s="n"), get the cell's style model
+      // objects are shared where possible.
+      getStyleModel(id) {
+        const style = this.model.styles[id];
+        if (!style) return null;
+        let model = this.index.model[id];
+        if (model) return model;
+        model = this.index.model[id] = {};
+        if (style.numFmtId) {
+          const numFmt = this.index.numFmt[style.numFmtId] || NumFmtXform.getDefaultFmtCode(style.numFmtId);
+          if (numFmt) {
+            model.numFmt = numFmt;
+          }
+        }
+        function addStyle(name, group, styleId) {
+          if (styleId || styleId === 0) {
+            const part2 = group[styleId];
+            if (part2) {
+              model[name] = part2;
+            }
+          }
+        }
+        addStyle("font", this.model.fonts, style.fontId);
+        addStyle("border", this.model.borders, style.borderId);
+        addStyle("fill", this.model.fills, style.fillId);
+        if (style.alignment) {
+          model.alignment = style.alignment;
+        }
+        if (style.protection) {
+          model.protection = style.protection;
+        }
+        return model;
+      }
+      addDxfStyle(style) {
+        if (style.numFmt) {
+          style.numFmtId = this._addNumFmtStr(style.numFmt);
+        }
+        this.model.dxfs.push(style);
+        return this.model.dxfs.length - 1;
+      }
+      getDxfStyle(id) {
+        return this.model.dxfs[id];
+      }
+      // =========================================================================
+      // Private Interface
+      _addStyle(style) {
+        const xml2 = this.map.style.toXml(style);
+        let index = this.index.style[xml2];
+        if (index === void 0) {
+          index = this.index.style[xml2] = this.model.styles.length;
+          this.model.styles.push(xml2);
+        }
+        return index;
+      }
+      // =========================================================================
+      // Number Formats
+      _addNumFmtStr(formatCode) {
+        let index = NumFmtXform.getDefaultFmtId(formatCode);
+        if (index !== void 0) return index;
+        index = this.index.numFmt[formatCode];
+        if (index !== void 0) return index;
+        index = this.index.numFmt[formatCode] = NUMFMT_BASE + this.model.numFmts.length;
+        const xml2 = this.map.numFmt.toXml({ id: index, formatCode });
+        this.model.numFmts.push(xml2);
+        return index;
+      }
+      // =========================================================================
+      // Fonts
+      _addFont(font) {
+        const xml2 = this.map.font.toXml(font);
+        let index = this.index.font[xml2];
+        if (index === void 0) {
+          index = this.index.font[xml2] = this.model.fonts.length;
+          this.model.fonts.push(xml2);
+        }
+        return index;
+      }
+      // =========================================================================
+      // Borders
+      _addBorder(border) {
+        const xml2 = this.map.border.toXml(border);
+        let index = this.index.border[xml2];
+        if (index === void 0) {
+          index = this.index.border[xml2] = this.model.borders.length;
+          this.model.borders.push(xml2);
+        }
+        return index;
+      }
+      // =========================================================================
+      // Fills
+      _addFill(fill2) {
+        const xml2 = this.map.fill.toXml(fill2);
+        let index = this.index.fill[xml2];
+        if (index === void 0) {
+          index = this.index.fill[xml2] = this.model.fills.length;
+          this.model.fills.push(xml2);
+        }
+        return index;
+      }
+      // =========================================================================
+    };
+    StylesXform2.STYLESHEET_ATTRIBUTES = {
+      xmlns: "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+      "xmlns:mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+      "mc:Ignorable": "x14ac x16r2",
+      "xmlns:x14ac": "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac",
+      "xmlns:x16r2": "http://schemas.microsoft.com/office/spreadsheetml/2015/02/main"
+    };
+    StylesXform2.STATIC_XFORMS = {
+      cellStyles: new StaticXform({
+        tag: "cellStyles",
+        $: { count: 1 },
+        c: [{ tag: "cellStyle", $: { name: "Normal", xfId: 0, builtinId: 0 } }]
+      }),
+      dxfs: new StaticXform({ tag: "dxfs", $: { count: 0 } }),
+      tableStyles: new StaticXform({
+        tag: "tableStyles",
+        $: { count: 0, defaultTableStyle: "TableStyleMedium2", defaultPivotStyle: "PivotStyleLight16" }
+      }),
+      extLst: new StaticXform({
+        tag: "extLst",
+        c: [
+          {
+            tag: "ext",
+            $: {
+              uri: "{EB79DEF2-80B8-43e5-95BD-54CBDDF9020C}",
+              "xmlns:x14": "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
+            },
+            c: [{ tag: "x14:slicerStyles", $: { defaultSlicerStyle: "SlicerStyleLight1" } }]
+          },
+          {
+            tag: "ext",
+            $: {
+              uri: "{9260A510-F301-46a8-8635-F512D64BE5F5}",
+              "xmlns:x15": "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"
+            },
+            c: [{ tag: "x15:timelineStyles", $: { defaultTimelineStyle: "TimeSlicerStyleLight1" } }]
+          }
+        ]
+      })
+    };
+    var StylesXformMock = class extends StylesXform2 {
+      constructor() {
+        super();
+        this.model = {
+          styles: [{ numFmtId: 0, fontId: 0, fillId: 0, borderId: 0, xfId: 0 }],
+          numFmts: [],
+          fonts: [{ size: 11, color: { theme: 1 }, name: "Calibri", family: 2, scheme: "minor" }],
+          borders: [{}],
+          fills: [
+            { type: "pattern", pattern: "none" },
+            { type: "pattern", pattern: "gray125" }
+          ]
+        };
+      }
+      // =========================================================================
+      // Style Manager Interface
+      // override normal behaviour - consume and dispose
+      parseStream(stream) {
+        stream.autodrain();
+        return Promise.resolve();
+      }
+      // add a cell's style model to the collection
+      // each style property is processed and cross-referenced, etc.
+      // the styleId is returned. Note: cellType is used when numFmt not defined
+      addStyleModel(model, cellType) {
+        switch (cellType) {
+          case Enums.ValueType.Date:
+            return this.dateStyleId;
+          default:
+            return 0;
+        }
+      }
+      get dateStyleId() {
+        if (!this._dateStyleId) {
+          const dateStyle = {
+            numFmtId: NumFmtXform.getDefaultFmtId("mm-dd-yy")
+          };
+          this._dateStyleId = this.model.styles.length;
+          this.model.styles.push(dateStyle);
+        }
+        return this._dateStyleId;
+      }
+      // given a styleId (i.e. s="n"), get the cell's style model
+      // objects are shared where possible.
+      getStyleModel() {
+        return {};
+      }
+    };
+    StylesXform2.Mock = StylesXformMock;
+    module.exports = StylesXform2;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/strings/phonetic-text-xform.js
+var require_phonetic_text_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/strings/phonetic-text-xform.js"(exports, module) {
+    var TextXform = require_text_xform();
+    var RichTextXform = require_rich_text_xform();
+    var BaseXform = require_base_xform();
+    var PhoneticTextXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          r: new RichTextXform(),
+          t: new TextXform()
+        };
+      }
+      get tag() {
+        return "rPh";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          sb: model.sb || 0,
+          eb: model.eb || 0
+        });
+        if (model && model.hasOwnProperty("richText") && model.richText) {
+          const { r } = this.map;
+          model.richText.forEach((text2) => {
+            r.render(xmlStream, text2);
+          });
+        } else if (model) {
+          this.map.t.render(xmlStream, model.text);
+        }
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        const { name } = node;
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        if (name === this.tag) {
+          this.model = {
+            sb: parseInt(node.attributes.sb, 10),
+            eb: parseInt(node.attributes.eb, 10)
+          };
+          return true;
+        }
+        this.parser = this.map[name];
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        return false;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            switch (name) {
+              case "r": {
+                let rt = this.model.richText;
+                if (!rt) {
+                  rt = this.model.richText = [];
+                }
+                rt.push(this.parser.model);
+                break;
+              }
+              case "t":
+                this.model.text = this.parser.model;
+                break;
+              default:
+                break;
+            }
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = PhoneticTextXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/strings/shared-string-xform.js
+var require_shared_string_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/strings/shared-string-xform.js"(exports, module) {
+    var TextXform = require_text_xform();
+    var RichTextXform = require_rich_text_xform();
+    var PhoneticTextXform = require_phonetic_text_xform();
+    var BaseXform = require_base_xform();
+    var SharedStringXform = class extends BaseXform {
+      constructor(model) {
+        super();
+        this.model = model;
+        this.map = {
+          r: new RichTextXform(),
+          t: new TextXform(),
+          rPh: new PhoneticTextXform()
+        };
+      }
+      get tag() {
+        return "si";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag);
+        if (model && model.hasOwnProperty("richText") && model.richText) {
+          if (model.richText.length) {
+            model.richText.forEach((text2) => {
+              this.map.r.render(xmlStream, text2);
+            });
+          } else {
+            this.map.t.render(xmlStream, "");
+          }
+        } else if (model !== void 0 && model !== null) {
+          this.map.t.render(xmlStream, model);
+        }
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        const { name } = node;
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        if (name === this.tag) {
+          this.model = {};
+          return true;
+        }
+        this.parser = this.map[name];
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        return false;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            switch (name) {
+              case "r": {
+                let rt = this.model.richText;
+                if (!rt) {
+                  rt = this.model.richText = [];
+                }
+                rt.push(this.parser.model);
+                break;
+              }
+              case "t":
+                this.model = this.parser.model;
+                break;
+              default:
+                break;
+            }
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = SharedStringXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/strings/shared-strings-xform.js
+var require_shared_strings_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/strings/shared-strings-xform.js"(exports, module) {
+    var XmlStream2 = require_xml_stream();
+    var BaseXform = require_base_xform();
+    var SharedStringXform = require_shared_string_xform();
+    var SharedStringsXform2 = class extends BaseXform {
+      constructor(model) {
+        super();
+        this.model = model || {
+          values: [],
+          count: 0
+        };
+        this.hash = /* @__PURE__ */ Object.create(null);
+        this.rich = /* @__PURE__ */ Object.create(null);
+      }
+      get sharedStringXform() {
+        return this._sharedStringXform || (this._sharedStringXform = new SharedStringXform());
+      }
+      get values() {
+        return this.model.values;
+      }
+      get uniqueCount() {
+        return this.model.values.length;
+      }
+      get count() {
+        return this.model.count;
+      }
+      getString(index) {
+        return this.model.values[index];
+      }
+      add(value) {
+        return value.richText ? this.addRichText(value) : this.addText(value);
+      }
+      addText(value) {
+        let index = this.hash[value];
+        if (index === void 0) {
+          index = this.hash[value] = this.model.values.length;
+          this.model.values.push(value);
+        }
+        this.model.count++;
+        return index;
+      }
+      addRichText(value) {
+        const xml2 = this.sharedStringXform.toXml(value);
+        let index = this.rich[xml2];
+        if (index === void 0) {
+          index = this.rich[xml2] = this.model.values.length;
+          this.model.values.push(value);
+        }
+        this.model.count++;
+        return index;
+      }
+      // <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+      // <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="<%=totalRefs%>" uniqueCount="<%=count%>">
+      //   <si><t><%=text%></t></si>
+      //   <si><r><rPr></rPr><t></t></r></si>
+      // </sst>
+      render(xmlStream, model) {
+        model = model || this._values;
+        xmlStream.openXml(XmlStream2.StdDocAttributes);
+        xmlStream.openNode("sst", {
+          xmlns: "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+          count: model.count,
+          uniqueCount: model.values.length
+        });
+        const sx = this.sharedStringXform;
+        model.values.forEach((sharedString) => {
+          sx.render(xmlStream, sharedString);
+        });
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "sst":
+            return true;
+          case "si":
+            this.parser = this.sharedStringXform;
+            this.parser.parseOpen(node);
+            return true;
+          default:
+            throw new Error(`Unexpected xml node in parseOpen: ${JSON.stringify(node)}`);
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.model.values.push(this.parser.model);
+            this.model.count++;
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case "sst":
+            return false;
+          default:
+            throw new Error(`Unexpected xml node in parseClose: ${name}`);
+        }
+      }
+    };
+    module.exports = SharedStringsXform2;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/relationship-xform.js
+var require_relationship_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/relationship-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var RelationshipXform = class extends BaseXform {
+      render(xmlStream, model) {
+        xmlStream.leafNode("Relationship", model);
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case "Relationship":
+            this.model = node.attributes;
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = RelationshipXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/relationships-xform.js
+var require_relationships_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/relationships-xform.js"(exports, module) {
+    var XmlStream2 = require_xml_stream();
+    var BaseXform = require_base_xform();
+    var RelationshipXform = require_relationship_xform();
+    var RelationshipsXform2 = class _RelationshipsXform extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          Relationship: new RelationshipXform()
+        };
+      }
+      render(xmlStream, model) {
+        model = model || this._values;
+        xmlStream.openXml(XmlStream2.StdDocAttributes);
+        xmlStream.openNode("Relationships", _RelationshipsXform.RELATIONSHIPS_ATTRIBUTES);
+        model.forEach((relationship) => {
+          this.map.Relationship.render(xmlStream, relationship);
+        });
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "Relationships":
+            this.model = [];
+            return true;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+              return true;
+            }
+            throw new Error(`Unexpected xml node in parseOpen: ${JSON.stringify(node)}`);
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.model.push(this.parser.model);
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case "Relationships":
+            return false;
+          default:
+            throw new Error(`Unexpected xml node in parseClose: ${name}`);
+        }
+      }
+    };
+    RelationshipsXform2.RELATIONSHIPS_ATTRIBUTES = {
+      xmlns: "http://schemas.openxmlformats.org/package/2006/relationships"
+    };
+    module.exports = RelationshipsXform2;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/content-types-xform.js
+var require_content_types_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/content-types-xform.js"(exports, module) {
+    var XmlStream2 = require_xml_stream();
+    var BaseXform = require_base_xform();
+    var ContentTypesXform2 = class _ContentTypesXform extends BaseXform {
+      render(xmlStream, model) {
+        xmlStream.openXml(XmlStream2.StdDocAttributes);
+        xmlStream.openNode("Types", _ContentTypesXform.PROPERTY_ATTRIBUTES);
+        const mediaHash = {};
+        (model.media || []).forEach((medium) => {
+          if (medium.type === "image") {
+            const imageType = medium.extension;
+            if (!mediaHash[imageType]) {
+              mediaHash[imageType] = true;
+              xmlStream.leafNode("Default", { Extension: imageType, ContentType: `image/${imageType}` });
+            }
+          }
+        });
+        xmlStream.leafNode("Default", {
+          Extension: "rels",
+          ContentType: "application/vnd.openxmlformats-package.relationships+xml"
+        });
+        xmlStream.leafNode("Default", { Extension: "xml", ContentType: "application/xml" });
+        xmlStream.leafNode("Override", {
+          PartName: "/xl/workbook.xml",
+          ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
+        });
+        model.worksheets.forEach((worksheet) => {
+          const name = `/xl/worksheets/sheet${worksheet.id}.xml`;
+          xmlStream.leafNode("Override", {
+            PartName: name,
+            ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"
+          });
+        });
+        xmlStream.leafNode("Override", {
+          PartName: "/xl/theme/theme1.xml",
+          ContentType: "application/vnd.openxmlformats-officedocument.theme+xml"
+        });
+        xmlStream.leafNode("Override", {
+          PartName: "/xl/styles.xml",
+          ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"
+        });
+        const hasSharedStrings = model.sharedStrings && model.sharedStrings.count;
+        if (hasSharedStrings) {
+          xmlStream.leafNode("Override", {
+            PartName: "/xl/sharedStrings.xml",
+            ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"
+          });
+        }
+        if (model.tables) {
+          model.tables.forEach((table2) => {
+            xmlStream.leafNode("Override", {
+              PartName: `/xl/tables/${table2.target}`,
+              ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"
+            });
+          });
+        }
+        if (model.drawings) {
+          model.drawings.forEach((drawing) => {
+            xmlStream.leafNode("Override", {
+              PartName: `/xl/drawings/${drawing.name}.xml`,
+              ContentType: "application/vnd.openxmlformats-officedocument.drawing+xml"
+            });
+          });
+        }
+        if (model.commentRefs) {
+          xmlStream.leafNode("Default", {
+            Extension: "vml",
+            ContentType: "application/vnd.openxmlformats-officedocument.vmlDrawing"
+          });
+          model.commentRefs.forEach(({ commentName }) => {
+            xmlStream.leafNode("Override", {
+              PartName: `/xl/${commentName}.xml`,
+              ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"
+            });
+          });
+        }
+        xmlStream.leafNode("Override", {
+          PartName: "/docProps/core.xml",
+          ContentType: "application/vnd.openxmlformats-package.core-properties+xml"
+        });
+        xmlStream.leafNode("Override", {
+          PartName: "/docProps/app.xml",
+          ContentType: "application/vnd.openxmlformats-officedocument.extended-properties+xml"
+        });
+        xmlStream.closeNode();
+      }
+      parseOpen() {
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    ContentTypesXform2.PROPERTY_ATTRIBUTES = {
+      xmlns: "http://schemas.openxmlformats.org/package/2006/content-types"
+    };
+    module.exports = ContentTypesXform2;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/app-heading-pairs-xform.js
+var require_app_heading_pairs_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/app-heading-pairs-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var AppHeadingPairsXform = class extends BaseXform {
+      render(xmlStream, model) {
+        xmlStream.openNode("HeadingPairs");
+        xmlStream.openNode("vt:vector", { size: 2, baseType: "variant" });
+        xmlStream.openNode("vt:variant");
+        xmlStream.leafNode("vt:lpstr", void 0, "Worksheets");
+        xmlStream.closeNode();
+        xmlStream.openNode("vt:variant");
+        xmlStream.leafNode("vt:i4", void 0, model.length);
+        xmlStream.closeNode();
+        xmlStream.closeNode();
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        return node.name === "HeadingPairs";
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        return name !== "HeadingPairs";
+      }
+    };
+    module.exports = AppHeadingPairsXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/app-titles-of-parts-xform.js
+var require_app_titles_of_parts_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/app-titles-of-parts-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var AppTitlesOfPartsXform = class extends BaseXform {
+      render(xmlStream, model) {
+        xmlStream.openNode("TitlesOfParts");
+        xmlStream.openNode("vt:vector", { size: model.length, baseType: "lpstr" });
+        model.forEach((sheet) => {
+          xmlStream.leafNode("vt:lpstr", void 0, sheet.name);
+        });
+        xmlStream.closeNode();
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        return node.name === "TitlesOfParts";
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        return name !== "TitlesOfParts";
+      }
+    };
+    module.exports = AppTitlesOfPartsXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/app-xform.js
+var require_app_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/app-xform.js"(exports, module) {
+    var XmlStream2 = require_xml_stream();
+    var BaseXform = require_base_xform();
+    var StringXform = require_string_xform();
+    var AppHeadingPairsXform = require_app_heading_pairs_xform();
+    var AppTitleOfPartsXform = require_app_titles_of_parts_xform();
+    var AppXform2 = class _AppXform extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          Company: new StringXform({ tag: "Company" }),
+          Manager: new StringXform({ tag: "Manager" }),
+          HeadingPairs: new AppHeadingPairsXform(),
+          TitleOfParts: new AppTitleOfPartsXform()
+        };
+      }
+      render(xmlStream, model) {
+        xmlStream.openXml(XmlStream2.StdDocAttributes);
+        xmlStream.openNode("Properties", _AppXform.PROPERTY_ATTRIBUTES);
+        xmlStream.leafNode("Application", void 0, "Microsoft Excel");
+        xmlStream.leafNode("DocSecurity", void 0, "0");
+        xmlStream.leafNode("ScaleCrop", void 0, "false");
+        this.map.HeadingPairs.render(xmlStream, model.worksheets);
+        this.map.TitleOfParts.render(xmlStream, model.worksheets);
+        this.map.Company.render(xmlStream, model.company || "");
+        this.map.Manager.render(xmlStream, model.manager);
+        xmlStream.leafNode("LinksUpToDate", void 0, "false");
+        xmlStream.leafNode("SharedDoc", void 0, "false");
+        xmlStream.leafNode("HyperlinksChanged", void 0, "false");
+        xmlStream.leafNode("AppVersion", void 0, "16.0300");
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "Properties":
+            return true;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+              return true;
+            }
+            return false;
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case "Properties":
+            this.model = {
+              worksheets: this.map.TitleOfParts.model,
+              company: this.map.Company.model,
+              manager: this.map.Manager.model
+            };
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    AppXform2.DateFormat = function(dt) {
+      return dt.toISOString().replace(/[.]\d{3,6}/, "");
+    };
+    AppXform2.DateAttrs = { "xsi:type": "dcterms:W3CDTF" };
+    AppXform2.PROPERTY_ATTRIBUTES = {
+      xmlns: "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties",
+      "xmlns:vt": "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"
+    };
+    module.exports = AppXform2;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/simple/date-xform.js
+var require_date_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/simple/date-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var DateXform = class extends BaseXform {
+      constructor(options) {
+        super();
+        this.tag = options.tag;
+        this.attr = options.attr;
+        this.attrs = options.attrs;
+        this._format = options.format || function(dt) {
+          try {
+            if (Number.isNaN(dt.getTime())) return "";
+            return dt.toISOString();
+          } catch (e) {
+            return "";
+          }
+        };
+        this._parse = options.parse || function(str2) {
+          return new Date(str2);
+        };
+      }
+      render(xmlStream, model) {
+        if (model) {
+          xmlStream.openNode(this.tag);
+          if (this.attrs) {
+            xmlStream.addAttributes(this.attrs);
+          }
+          if (this.attr) {
+            xmlStream.addAttribute(this.attr, this._format(model));
+          } else {
+            xmlStream.writeText(this._format(model));
+          }
+          xmlStream.closeNode();
+        }
+      }
+      parseOpen(node) {
+        if (node.name === this.tag) {
+          if (this.attr) {
+            this.model = this._parse(node.attributes[this.attr]);
+          } else {
+            this.text = [];
+          }
+        }
+      }
+      parseText(text2) {
+        if (!this.attr) {
+          this.text.push(text2);
+        }
+      }
+      parseClose() {
+        if (!this.attr) {
+          this.model = this._parse(this.text.join(""));
+        }
+        return false;
+      }
+    };
+    module.exports = DateXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/core-xform.js
+var require_core_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/core/core-xform.js"(exports, module) {
+    var XmlStream2 = require_xml_stream();
+    var BaseXform = require_base_xform();
+    var DateXform = require_date_xform();
+    var StringXform = require_string_xform();
+    var IntegerXform = require_integer_xform();
+    var CoreXform2 = class _CoreXform extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          "dc:creator": new StringXform({ tag: "dc:creator" }),
+          "dc:title": new StringXform({ tag: "dc:title" }),
+          "dc:subject": new StringXform({ tag: "dc:subject" }),
+          "dc:description": new StringXform({ tag: "dc:description" }),
+          "dc:identifier": new StringXform({ tag: "dc:identifier" }),
+          "dc:language": new StringXform({ tag: "dc:language" }),
+          "cp:keywords": new StringXform({ tag: "cp:keywords" }),
+          "cp:category": new StringXform({ tag: "cp:category" }),
+          "cp:lastModifiedBy": new StringXform({ tag: "cp:lastModifiedBy" }),
+          "cp:lastPrinted": new DateXform({ tag: "cp:lastPrinted", format: _CoreXform.DateFormat }),
+          "cp:revision": new IntegerXform({ tag: "cp:revision" }),
+          "cp:version": new StringXform({ tag: "cp:version" }),
+          "cp:contentStatus": new StringXform({ tag: "cp:contentStatus" }),
+          "cp:contentType": new StringXform({ tag: "cp:contentType" }),
+          "dcterms:created": new DateXform({
+            tag: "dcterms:created",
+            attrs: _CoreXform.DateAttrs,
+            format: _CoreXform.DateFormat
+          }),
+          "dcterms:modified": new DateXform({
+            tag: "dcterms:modified",
+            attrs: _CoreXform.DateAttrs,
+            format: _CoreXform.DateFormat
+          })
+        };
+      }
+      render(xmlStream, model) {
+        xmlStream.openXml(XmlStream2.StdDocAttributes);
+        xmlStream.openNode("cp:coreProperties", _CoreXform.CORE_PROPERTY_ATTRIBUTES);
+        this.map["dc:creator"].render(xmlStream, model.creator);
+        this.map["dc:title"].render(xmlStream, model.title);
+        this.map["dc:subject"].render(xmlStream, model.subject);
+        this.map["dc:description"].render(xmlStream, model.description);
+        this.map["dc:identifier"].render(xmlStream, model.identifier);
+        this.map["dc:language"].render(xmlStream, model.language);
+        this.map["cp:keywords"].render(xmlStream, model.keywords);
+        this.map["cp:category"].render(xmlStream, model.category);
+        this.map["cp:lastModifiedBy"].render(xmlStream, model.lastModifiedBy);
+        this.map["cp:lastPrinted"].render(xmlStream, model.lastPrinted);
+        this.map["cp:revision"].render(xmlStream, model.revision);
+        this.map["cp:version"].render(xmlStream, model.version);
+        this.map["cp:contentStatus"].render(xmlStream, model.contentStatus);
+        this.map["cp:contentType"].render(xmlStream, model.contentType);
+        this.map["dcterms:created"].render(xmlStream, model.created);
+        this.map["dcterms:modified"].render(xmlStream, model.modified);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "cp:coreProperties":
+          case "coreProperties":
+            return true;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+              return true;
+            }
+            throw new Error(`Unexpected xml node in parseOpen: ${JSON.stringify(node)}`);
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case "cp:coreProperties":
+          case "coreProperties":
+            this.model = {
+              creator: this.map["dc:creator"].model,
+              title: this.map["dc:title"].model,
+              subject: this.map["dc:subject"].model,
+              description: this.map["dc:description"].model,
+              identifier: this.map["dc:identifier"].model,
+              language: this.map["dc:language"].model,
+              keywords: this.map["cp:keywords"].model,
+              category: this.map["cp:category"].model,
+              lastModifiedBy: this.map["cp:lastModifiedBy"].model,
+              lastPrinted: this.map["cp:lastPrinted"].model,
+              revision: this.map["cp:revision"].model,
+              contentStatus: this.map["cp:contentStatus"].model,
+              contentType: this.map["cp:contentType"].model,
+              created: this.map["dcterms:created"].model,
+              modified: this.map["dcterms:modified"].model
+            };
+            return false;
+          default:
+            throw new Error(`Unexpected xml node in parseClose: ${name}`);
+        }
+      }
+    };
+    CoreXform2.DateFormat = function(dt) {
+      return dt.toISOString().replace(/[.]\d{3}/, "");
+    };
+    CoreXform2.DateAttrs = { "xsi:type": "dcterms:W3CDTF" };
+    CoreXform2.CORE_PROPERTY_ATTRIBUTES = {
+      "xmlns:cp": "http://schemas.openxmlformats.org/package/2006/metadata/core-properties",
+      "xmlns:dc": "http://purl.org/dc/elements/1.1/",
+      "xmlns:dcterms": "http://purl.org/dc/terms/",
+      "xmlns:dcmitype": "http://purl.org/dc/dcmitype/",
+      "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+    };
+    module.exports = CoreXform2;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/base-cell-anchor-xform.js
+var require_base_cell_anchor_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/base-cell-anchor-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var BaseCellAnchorXform = class extends BaseXform {
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.tag:
+            this.reset();
+            this.model = {
+              range: {
+                editAs: node.attributes.editAs || "oneCell"
+              }
+            };
+            break;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            break;
+        }
+        return true;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      reconcilePicture(model, options) {
+        if (model && model.rId) {
+          const rel = options.rels[model.rId];
+          const match = rel.Target.match(/.*\/media\/(.+[.][a-zA-Z]{3,4})/);
+          if (match) {
+            const name = match[1];
+            const mediaId = options.mediaIndex[name];
+            return options.media[mediaId];
+          }
+        }
+        return void 0;
+      }
+    };
+    module.exports = BaseCellAnchorXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/cell-position-xform.js
+var require_cell_position_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/cell-position-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var IntegerXform = require_integer_xform();
+    var CellPositionXform = class extends BaseXform {
+      constructor(options) {
+        super();
+        this.tag = options.tag;
+        this.map = {
+          "xdr:col": new IntegerXform({ tag: "xdr:col", zero: true }),
+          "xdr:colOff": new IntegerXform({ tag: "xdr:colOff", zero: true }),
+          "xdr:row": new IntegerXform({ tag: "xdr:row", zero: true }),
+          "xdr:rowOff": new IntegerXform({ tag: "xdr:rowOff", zero: true })
+        };
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag);
+        this.map["xdr:col"].render(xmlStream, model.nativeCol);
+        this.map["xdr:colOff"].render(xmlStream, model.nativeColOff);
+        this.map["xdr:row"].render(xmlStream, model.nativeRow);
+        this.map["xdr:rowOff"].render(xmlStream, model.nativeRowOff);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.tag:
+            this.reset();
+            break;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            break;
+        }
+        return true;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            this.model = {
+              nativeCol: this.map["xdr:col"].model,
+              nativeColOff: this.map["xdr:colOff"].model,
+              nativeRow: this.map["xdr:row"].model,
+              nativeRowOff: this.map["xdr:rowOff"].model
+            };
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = CellPositionXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/blip-xform.js
+var require_blip_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/blip-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var BlipXform = class extends BaseXform {
+      get tag() {
+        return "a:blip";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode(this.tag, {
+          "xmlns:r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+          "r:embed": model.rId,
+          cstate: "print"
+        });
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.model = {
+              rId: node.attributes["r:embed"]
+            };
+            return true;
+          default:
+            return true;
+        }
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        switch (name) {
+          case this.tag:
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = BlipXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/blip-fill-xform.js
+var require_blip_fill_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/blip-fill-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var BlipXform = require_blip_xform();
+    var BlipFillXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          "a:blip": new BlipXform()
+        };
+      }
+      get tag() {
+        return "xdr:blipFill";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag);
+        this.map["a:blip"].render(xmlStream, model);
+        xmlStream.openNode("a:stretch");
+        xmlStream.leafNode("a:fillRect");
+        xmlStream.closeNode();
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.tag:
+            this.reset();
+            break;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            break;
+        }
+        return true;
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            this.model = this.map["a:blip"].model;
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = BlipFillXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/hlink-click-xform.js
+var require_hlink_click_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/hlink-click-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var HLinkClickXform = class extends BaseXform {
+      get tag() {
+        return "a:hlinkClick";
+      }
+      render(xmlStream, model) {
+        if (!(model.hyperlinks && model.hyperlinks.rId)) {
+          return;
+        }
+        xmlStream.leafNode(this.tag, {
+          "xmlns:r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+          "r:id": model.hyperlinks.rId,
+          tooltip: model.hyperlinks.tooltip
+        });
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.model = {
+              hyperlinks: {
+                rId: node.attributes["r:id"],
+                tooltip: node.attributes.tooltip
+              }
+            };
+            return true;
+          default:
+            return true;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = HLinkClickXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/ext-lst-xform.js
+var require_ext_lst_xform2 = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/ext-lst-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var ExtLstXform = class extends BaseXform {
+      get tag() {
+        return "a:extLst";
+      }
+      render(xmlStream) {
+        xmlStream.openNode(this.tag);
+        xmlStream.openNode("a:ext", {
+          uri: "{FF2B5EF4-FFF2-40B4-BE49-F238E27FC236}"
+        });
+        xmlStream.leafNode("a16:creationId", {
+          "xmlns:a16": "http://schemas.microsoft.com/office/drawing/2014/main",
+          id: "{00000000-0008-0000-0000-000002000000}"
+        });
+        xmlStream.closeNode();
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            return true;
+          default:
+            return true;
+        }
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        switch (name) {
+          case this.tag:
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = ExtLstXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/c-nv-pr-xform.js
+var require_c_nv_pr_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/c-nv-pr-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var HlickClickXform = require_hlink_click_xform();
+    var ExtLstXform = require_ext_lst_xform2();
+    var CNvPrXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          "a:hlinkClick": new HlickClickXform(),
+          "a:extLst": new ExtLstXform()
+        };
+      }
+      get tag() {
+        return "xdr:cNvPr";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag, {
+          id: model.index,
+          name: `Picture ${model.index}`
+        });
+        this.map["a:hlinkClick"].render(xmlStream, model);
+        this.map["a:extLst"].render(xmlStream, model);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.tag:
+            this.reset();
+            break;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            break;
+        }
+        return true;
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            this.model = this.map["a:hlinkClick"].model;
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = CNvPrXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/c-nv-pic-pr-xform.js
+var require_c_nv_pic_pr_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/c-nv-pic-pr-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var CNvPicPrXform = class extends BaseXform {
+      get tag() {
+        return "xdr:cNvPicPr";
+      }
+      render(xmlStream) {
+        xmlStream.openNode(this.tag);
+        xmlStream.leafNode("a:picLocks", {
+          noChangeAspect: "1"
+        });
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            return true;
+          default:
+            return true;
+        }
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        switch (name) {
+          case this.tag:
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = CNvPicPrXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/nv-pic-pr-xform.js
+var require_nv_pic_pr_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/nv-pic-pr-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var CNvPrXform = require_c_nv_pr_xform();
+    var CNvPicPrXform = require_c_nv_pic_pr_xform();
+    var NvPicPrXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          "xdr:cNvPr": new CNvPrXform(),
+          "xdr:cNvPicPr": new CNvPicPrXform()
+        };
+      }
+      get tag() {
+        return "xdr:nvPicPr";
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag);
+        this.map["xdr:cNvPr"].render(xmlStream, model);
+        this.map["xdr:cNvPicPr"].render(xmlStream, model);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.tag:
+            this.reset();
+            break;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            break;
+        }
+        return true;
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            this.model = this.map["xdr:cNvPr"].model;
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = NvPicPrXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/sp-pr.js
+var require_sp_pr = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/sp-pr.js"(exports, module) {
+    module.exports = {
+      tag: "xdr:spPr",
+      c: [
+        {
+          tag: "a:xfrm",
+          c: [
+            { tag: "a:off", $: { x: "0", y: "0" } },
+            { tag: "a:ext", $: { cx: "0", cy: "0" } }
+          ]
+        },
+        {
+          tag: "a:prstGeom",
+          $: { prst: "rect" },
+          c: [{ tag: "a:avLst" }]
+        }
+      ]
+    };
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/pic-xform.js
+var require_pic_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/pic-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var StaticXform = require_static_xform();
+    var BlipFillXform = require_blip_fill_xform();
+    var NvPicPrXform = require_nv_pic_pr_xform();
+    var spPrJSON = require_sp_pr();
+    var PicXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          "xdr:nvPicPr": new NvPicPrXform(),
+          "xdr:blipFill": new BlipFillXform(),
+          "xdr:spPr": new StaticXform(spPrJSON)
+        };
+      }
+      get tag() {
+        return "xdr:pic";
+      }
+      prepare(model, options) {
+        model.index = options.index + 1;
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag);
+        this.map["xdr:nvPicPr"].render(xmlStream, model);
+        this.map["xdr:blipFill"].render(xmlStream, model);
+        this.map["xdr:spPr"].render(xmlStream, model);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.tag:
+            this.reset();
+            break;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            break;
+        }
+        return true;
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.mergeModel(this.parser.model);
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = PicXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/two-cell-anchor-xform.js
+var require_two_cell_anchor_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/two-cell-anchor-xform.js"(exports, module) {
+    var BaseCellAnchorXform = require_base_cell_anchor_xform();
+    var StaticXform = require_static_xform();
+    var CellPositionXform = require_cell_position_xform();
+    var PicXform = require_pic_xform();
+    var TwoCellAnchorXform = class extends BaseCellAnchorXform {
+      constructor() {
+        super();
+        this.map = {
+          "xdr:from": new CellPositionXform({ tag: "xdr:from" }),
+          "xdr:to": new CellPositionXform({ tag: "xdr:to" }),
+          "xdr:pic": new PicXform(),
+          "xdr:clientData": new StaticXform({ tag: "xdr:clientData" })
+        };
+      }
+      get tag() {
+        return "xdr:twoCellAnchor";
+      }
+      prepare(model, options) {
+        this.map["xdr:pic"].prepare(model.picture, options);
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag, { editAs: model.range.editAs || "oneCell" });
+        this.map["xdr:from"].render(xmlStream, model.range.tl);
+        this.map["xdr:to"].render(xmlStream, model.range.br);
+        this.map["xdr:pic"].render(xmlStream, model.picture);
+        this.map["xdr:clientData"].render(xmlStream, {});
+        xmlStream.closeNode();
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            this.model.range.tl = this.map["xdr:from"].model;
+            this.model.range.br = this.map["xdr:to"].model;
+            this.model.picture = this.map["xdr:pic"].model;
+            return false;
+          default:
+            return true;
+        }
+      }
+      reconcile(model, options) {
+        model.medium = this.reconcilePicture(model.picture, options);
+      }
+    };
+    module.exports = TwoCellAnchorXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/ext-xform.js
+var require_ext_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/ext-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var EMU_PER_PIXEL_AT_96_DPI = 9525;
+    var ExtXform = class extends BaseXform {
+      constructor(options) {
+        super();
+        this.tag = options.tag;
+        this.map = {};
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag);
+        const width = Math.floor(model.width * EMU_PER_PIXEL_AT_96_DPI);
+        const height = Math.floor(model.height * EMU_PER_PIXEL_AT_96_DPI);
+        xmlStream.addAttribute("cx", width);
+        xmlStream.addAttribute("cy", height);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (node.name === this.tag) {
+          this.model = {
+            width: parseInt(node.attributes.cx || "0", 10) / EMU_PER_PIXEL_AT_96_DPI,
+            height: parseInt(node.attributes.cy || "0", 10) / EMU_PER_PIXEL_AT_96_DPI
+          };
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = ExtXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/one-cell-anchor-xform.js
+var require_one_cell_anchor_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/one-cell-anchor-xform.js"(exports, module) {
+    var BaseCellAnchorXform = require_base_cell_anchor_xform();
+    var StaticXform = require_static_xform();
+    var CellPositionXform = require_cell_position_xform();
+    var ExtXform = require_ext_xform();
+    var PicXform = require_pic_xform();
+    var OneCellAnchorXform = class extends BaseCellAnchorXform {
+      constructor() {
+        super();
+        this.map = {
+          "xdr:from": new CellPositionXform({ tag: "xdr:from" }),
+          "xdr:ext": new ExtXform({ tag: "xdr:ext" }),
+          "xdr:pic": new PicXform(),
+          "xdr:clientData": new StaticXform({ tag: "xdr:clientData" })
+        };
+      }
+      get tag() {
+        return "xdr:oneCellAnchor";
+      }
+      prepare(model, options) {
+        this.map["xdr:pic"].prepare(model.picture, options);
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag, { editAs: model.range.editAs || "oneCell" });
+        this.map["xdr:from"].render(xmlStream, model.range.tl);
+        this.map["xdr:ext"].render(xmlStream, model.range.ext);
+        this.map["xdr:pic"].render(xmlStream, model.picture);
+        this.map["xdr:clientData"].render(xmlStream, {});
+        xmlStream.closeNode();
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            this.model.range.tl = this.map["xdr:from"].model;
+            this.model.range.ext = this.map["xdr:ext"].model;
+            this.model.picture = this.map["xdr:pic"].model;
+            return false;
+          default:
+            return true;
+        }
+      }
+      reconcile(model, options) {
+        model.medium = this.reconcilePicture(model.picture, options);
+      }
+    };
+    module.exports = OneCellAnchorXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/drawing-xform.js
+var require_drawing_xform2 = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/drawing/drawing-xform.js"(exports, module) {
+    var colCache = require_col_cache();
+    var XmlStream2 = require_xml_stream();
+    var BaseXform = require_base_xform();
+    var TwoCellAnchorXform = require_two_cell_anchor_xform();
+    var OneCellAnchorXform = require_one_cell_anchor_xform();
+    function getAnchorType(model) {
+      const range = typeof model.range === "string" ? colCache.decode(model.range) : model.range;
+      return range.br ? "xdr:twoCellAnchor" : "xdr:oneCellAnchor";
+    }
+    var DrawingXform2 = class _DrawingXform extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          "xdr:twoCellAnchor": new TwoCellAnchorXform(),
+          "xdr:oneCellAnchor": new OneCellAnchorXform()
+        };
+      }
+      prepare(model) {
+        model.anchors.forEach((item, index) => {
+          item.anchorType = getAnchorType(item);
+          const anchor = this.map[item.anchorType];
+          anchor.prepare(item, { index });
+        });
+      }
+      get tag() {
+        return "xdr:wsDr";
+      }
+      render(xmlStream, model) {
+        xmlStream.openXml(XmlStream2.StdDocAttributes);
+        xmlStream.openNode(this.tag, _DrawingXform.DRAWING_ATTRIBUTES);
+        model.anchors.forEach((item) => {
+          const anchor = this.map[item.anchorType];
+          anchor.render(xmlStream, item);
+        });
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.tag:
+            this.reset();
+            this.model = {
+              anchors: []
+            };
+            break;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            break;
+        }
+        return true;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.model.anchors.push(this.parser.model);
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            return false;
+          default:
+            return true;
+        }
+      }
+      reconcile(model, options) {
+        model.anchors.forEach((anchor) => {
+          if (anchor.br) {
+            this.map["xdr:twoCellAnchor"].reconcile(anchor, options);
+          } else {
+            this.map["xdr:oneCellAnchor"].reconcile(anchor, options);
+          }
+        });
+      }
+    };
+    DrawingXform2.DRAWING_ATTRIBUTES = {
+      "xmlns:xdr": "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing",
+      "xmlns:a": "http://schemas.openxmlformats.org/drawingml/2006/main"
+    };
+    module.exports = DrawingXform2;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/custom-filter-xform.js
+var require_custom_filter_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/custom-filter-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var CustomFilterXform = class extends BaseXform {
+      get tag() {
+        return "customFilter";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode(this.tag, {
+          val: model.val,
+          operator: model.operator
+        });
+      }
+      parseOpen(node) {
+        if (node.name === this.tag) {
+          this.model = {
+            val: node.attributes.val,
+            operator: node.attributes.operator
+          };
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = CustomFilterXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/filter-xform.js
+var require_filter_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/filter-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var FilterXform = class extends BaseXform {
+      get tag() {
+        return "filter";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode(this.tag, {
+          val: model.val
+        });
+      }
+      parseOpen(node) {
+        if (node.name === this.tag) {
+          this.model = {
+            val: node.attributes.val
+          };
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = FilterXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/filter-column-xform.js
+var require_filter_column_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/filter-column-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var ListXform = require_list_xform();
+    var CustomFilterXform = require_custom_filter_xform();
+    var FilterXform = require_filter_xform();
+    var FilterColumnXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          customFilters: new ListXform({
+            tag: "customFilters",
+            count: false,
+            empty: true,
+            childXform: new CustomFilterXform()
+          }),
+          filters: new ListXform({
+            tag: "filters",
+            count: false,
+            empty: true,
+            childXform: new FilterXform()
+          })
+        };
+      }
+      get tag() {
+        return "filterColumn";
+      }
+      prepare(model, options) {
+        model.colId = options.index.toString();
+      }
+      render(xmlStream, model) {
+        if (model.customFilters) {
+          xmlStream.openNode(this.tag, {
+            colId: model.colId,
+            hiddenButton: model.filterButton ? "0" : "1"
+          });
+          this.map.customFilters.render(xmlStream, model.customFilters);
+          xmlStream.closeNode();
+          return true;
+        }
+        xmlStream.leafNode(this.tag, {
+          colId: model.colId,
+          hiddenButton: model.filterButton ? "0" : "1"
+        });
+        return true;
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        const { attributes } = node;
+        switch (node.name) {
+          case this.tag:
+            this.model = {
+              filterButton: attributes.hiddenButton === "0"
+            };
+            return true;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parseOpen(node);
+              return true;
+            }
+            throw new Error(`Unexpected xml node in parseOpen: ${JSON.stringify(node)}`);
+        }
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            this.model.customFilters = this.map.customFilters.model;
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = FilterColumnXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/auto-filter-xform.js
+var require_auto_filter_xform2 = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/auto-filter-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var FilterColumnXform = require_filter_column_xform();
+    var AutoFilterXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          filterColumn: new FilterColumnXform()
+        };
+      }
+      get tag() {
+        return "autoFilter";
+      }
+      prepare(model) {
+        model.columns.forEach((column, index) => {
+          this.map.filterColumn.prepare(column, { index });
+        });
+      }
+      render(xmlStream, model) {
+        xmlStream.openNode(this.tag, { ref: model.autoFilterRef });
+        model.columns.forEach((column) => {
+          this.map.filterColumn.render(xmlStream, column);
+        });
+        xmlStream.closeNode();
+        return true;
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.tag:
+            this.model = {
+              autoFilterRef: node.attributes.ref,
+              columns: []
+            };
+            return true;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parseOpen(node);
+              return true;
+            }
+            throw new Error(`Unexpected xml node in parseOpen: ${JSON.stringify(node)}`);
+        }
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.model.columns.push(this.parser.model);
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            return false;
+          default:
+            throw new Error(`Unexpected xml node in parseClose: ${name}`);
+        }
+      }
+    };
+    module.exports = AutoFilterXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/table-column-xform.js
+var require_table_column_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/table-column-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var TableColumnXform = class extends BaseXform {
+      get tag() {
+        return "tableColumn";
+      }
+      prepare(model, options) {
+        model.id = options.index + 1;
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode(this.tag, {
+          id: model.id.toString(),
+          name: model.name,
+          totalsRowLabel: model.totalsRowLabel,
+          totalsRowFunction: model.totalsRowFunction,
+          dxfId: model.dxfId
+        });
+        return true;
+      }
+      parseOpen(node) {
+        if (node.name === this.tag) {
+          const { attributes } = node;
+          this.model = {
+            name: attributes.name,
+            totalsRowLabel: attributes.totalsRowLabel,
+            totalsRowFunction: attributes.totalsRowFunction,
+            dxfId: attributes.dxfId
+          };
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = TableColumnXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/table-style-info-xform.js
+var require_table_style_info_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/table-style-info-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var TableStyleInfoXform = class extends BaseXform {
+      get tag() {
+        return "tableStyleInfo";
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode(this.tag, {
+          name: model.theme ? model.theme : void 0,
+          showFirstColumn: model.showFirstColumn ? "1" : "0",
+          showLastColumn: model.showLastColumn ? "1" : "0",
+          showRowStripes: model.showRowStripes ? "1" : "0",
+          showColumnStripes: model.showColumnStripes ? "1" : "0"
+        });
+        return true;
+      }
+      parseOpen(node) {
+        if (node.name === this.tag) {
+          const { attributes } = node;
+          this.model = {
+            theme: attributes.name ? attributes.name : null,
+            showFirstColumn: attributes.showFirstColumn === "1",
+            showLastColumn: attributes.showLastColumn === "1",
+            showRowStripes: attributes.showRowStripes === "1",
+            showColumnStripes: attributes.showColumnStripes === "1"
+          };
+          return true;
+        }
+        return false;
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = TableStyleInfoXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/table-xform.js
+var require_table_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/table/table-xform.js"(exports, module) {
+    var XmlStream2 = require_xml_stream();
+    var BaseXform = require_base_xform();
+    var ListXform = require_list_xform();
+    var AutoFilterXform = require_auto_filter_xform2();
+    var TableColumnXform = require_table_column_xform();
+    var TableStyleInfoXform = require_table_style_info_xform();
+    var TableXform2 = class _TableXform extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          autoFilter: new AutoFilterXform(),
+          tableColumns: new ListXform({
+            tag: "tableColumns",
+            count: true,
+            empty: true,
+            childXform: new TableColumnXform()
+          }),
+          tableStyleInfo: new TableStyleInfoXform()
+        };
+      }
+      prepare(model, options) {
+        this.map.autoFilter.prepare(model);
+        this.map.tableColumns.prepare(model.columns, options);
+      }
+      get tag() {
+        return "table";
+      }
+      render(xmlStream, model) {
+        xmlStream.openXml(XmlStream2.StdDocAttributes);
+        xmlStream.openNode(this.tag, {
+          ..._TableXform.TABLE_ATTRIBUTES,
+          id: model.id,
+          name: model.name,
+          displayName: model.displayName || model.name,
+          ref: model.tableRef,
+          totalsRowCount: model.totalsRow ? "1" : void 0,
+          totalsRowShown: model.totalsRow ? void 0 : "1",
+          headerRowCount: model.headerRow ? "1" : "0"
+        });
+        this.map.autoFilter.render(xmlStream, model);
+        this.map.tableColumns.render(xmlStream, model.columns);
+        this.map.tableStyleInfo.render(xmlStream, model.style);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        const { name, attributes } = node;
+        switch (name) {
+          case this.tag:
+            this.reset();
+            this.model = {
+              name: attributes.name,
+              displayName: attributes.displayName || attributes.name,
+              tableRef: attributes.ref,
+              totalsRow: attributes.totalsRowCount === "1",
+              headerRow: attributes.headerRowCount === "1"
+            };
+            break;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            break;
+        }
+        return true;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            this.model.columns = this.map.tableColumns.model;
+            if (this.map.autoFilter.model) {
+              this.model.autoFilterRef = this.map.autoFilter.model.autoFilterRef;
+              this.map.autoFilter.model.columns.forEach((column, index) => {
+                this.model.columns[index].filterButton = column.filterButton;
+              });
+            }
+            this.model.style = this.map.tableStyleInfo.model;
+            return false;
+          default:
+            return true;
+        }
+      }
+      reconcile(model, options) {
+        model.columns.forEach((column) => {
+          if (column.dxfId !== void 0) {
+            column.style = options.styles.getDxfStyle(column.dxfId);
+          }
+        });
+      }
+    };
+    TableXform2.TABLE_ATTRIBUTES = {
+      xmlns: "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+      "xmlns:mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+      "mc:Ignorable": "xr xr3",
+      "xmlns:xr": "http://schemas.microsoft.com/office/spreadsheetml/2014/revision",
+      "xmlns:xr3": "http://schemas.microsoft.com/office/spreadsheetml/2016/revision3"
+      // 'xr:uid': '{00000000-000C-0000-FFFF-FFFF00000000}',
+    };
+    module.exports = TableXform2;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/comment-xform.js
+var require_comment_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/comment-xform.js"(exports, module) {
+    var RichTextXform = require_rich_text_xform();
+    var utils = require_utils();
+    var BaseXform = require_base_xform();
+    var CommentXform = module.exports = function(model) {
+      this.model = model;
+    };
+    utils.inherits(CommentXform, BaseXform, {
+      get tag() {
+        return "r";
+      },
+      get richTextXform() {
+        if (!this._richTextXform) {
+          this._richTextXform = new RichTextXform();
+        }
+        return this._richTextXform;
+      },
+      render(xmlStream, model) {
+        model = model || this.model;
+        xmlStream.openNode("comment", {
+          ref: model.ref,
+          authorId: 0
+        });
+        xmlStream.openNode("text");
+        if (model && model.note && model.note.texts) {
+          model.note.texts.forEach((text2) => {
+            this.richTextXform.render(xmlStream, text2);
+          });
+        }
+        xmlStream.closeNode();
+        xmlStream.closeNode();
+      },
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case "comment":
+            this.model = {
+              type: "note",
+              note: {
+                texts: []
+              },
+              ...node.attributes
+            };
+            return true;
+          case "r":
+            this.parser = this.richTextXform;
+            this.parser.parseOpen(node);
+            return true;
+          default:
+            return false;
+        }
+      },
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      },
+      parseClose(name) {
+        switch (name) {
+          case "comment":
+            return false;
+          case "r":
+            this.model.note.texts.push(this.parser.model);
+            this.parser = void 0;
+            return true;
+          default:
+            if (this.parser) {
+              this.parser.parseClose(name);
+            }
+            return true;
+        }
+      }
+    });
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/comments-xform.js
+var require_comments_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/comments-xform.js"(exports, module) {
+    var XmlStream2 = require_xml_stream();
+    var utils = require_utils();
+    var BaseXform = require_base_xform();
+    var CommentXform = require_comment_xform();
+    var CommentsXform2 = module.exports = function() {
+      this.map = {
+        comment: new CommentXform()
+      };
+    };
+    utils.inherits(
+      CommentsXform2,
+      BaseXform,
+      {
+        COMMENTS_ATTRIBUTES: {
+          xmlns: "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+        }
+      },
+      {
+        render(xmlStream, model) {
+          model = model || this.model;
+          xmlStream.openXml(XmlStream2.StdDocAttributes);
+          xmlStream.openNode("comments", CommentsXform2.COMMENTS_ATTRIBUTES);
+          xmlStream.openNode("authors");
+          xmlStream.leafNode("author", null, "Author");
+          xmlStream.closeNode();
+          xmlStream.openNode("commentList");
+          model.comments.forEach((comment) => {
+            this.map.comment.render(xmlStream, comment);
+          });
+          xmlStream.closeNode();
+          xmlStream.closeNode();
+        },
+        parseOpen(node) {
+          if (this.parser) {
+            this.parser.parseOpen(node);
+            return true;
+          }
+          switch (node.name) {
+            case "commentList":
+              this.model = {
+                comments: []
+              };
+              return true;
+            case "comment":
+              this.parser = this.map.comment;
+              this.parser.parseOpen(node);
+              return true;
+            default:
+              return false;
+          }
+        },
+        parseText(text2) {
+          if (this.parser) {
+            this.parser.parseText(text2);
+          }
+        },
+        parseClose(name) {
+          switch (name) {
+            case "commentList":
+              return false;
+            case "comment":
+              this.model.comments.push(this.parser.model);
+              this.parser = void 0;
+              return true;
+            default:
+              if (this.parser) {
+                this.parser.parseClose(name);
+              }
+              return true;
+          }
+        }
+      }
+    );
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/vml-textbox-xform.js
+var require_vml_textbox_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/vml-textbox-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var VmlTextboxXform = class extends BaseXform {
+      get tag() {
+        return "v:textbox";
+      }
+      conversionUnit(value, multiple, unit) {
+        return `${parseFloat(value) * multiple.toFixed(2)}${unit}`;
+      }
+      reverseConversionUnit(inset) {
+        return (inset || "").split(",").map((margin) => {
+          return Number(parseFloat(this.conversionUnit(parseFloat(margin), 0.1, "")).toFixed(2));
+        });
+      }
+      render(xmlStream, model) {
+        const attributes = {
+          style: "mso-direction-alt:auto"
+        };
+        if (model && model.note) {
+          let { inset } = model.note && model.note.margins;
+          if (Array.isArray(inset)) {
+            inset = inset.map((margin) => {
+              return this.conversionUnit(margin, 10, "mm");
+            }).join(",");
+          }
+          if (inset) {
+            attributes.inset = inset;
+          }
+        }
+        xmlStream.openNode("v:textbox", attributes);
+        xmlStream.leafNode("div", { style: "text-align:left" });
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.model = {
+              inset: this.reverseConversionUnit(node.attributes.inset)
+            };
+            return true;
+          default:
+            return true;
+        }
+      }
+      parseText() {
+      }
+      parseClose(name) {
+        switch (name) {
+          case this.tag:
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    module.exports = VmlTextboxXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/vml-anchor-xform.js
+var require_vml_anchor_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/vml-anchor-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var VmlAnchorXform = class extends BaseXform {
+      get tag() {
+        return "x:Anchor";
+      }
+      getAnchorRect(anchor) {
+        const l = Math.floor(anchor.left);
+        const lf = Math.floor((anchor.left - l) * 68);
+        const t = Math.floor(anchor.top);
+        const tf = Math.floor((anchor.top - t) * 18);
+        const r = Math.floor(anchor.right);
+        const rf = Math.floor((anchor.right - r) * 68);
+        const b = Math.floor(anchor.bottom);
+        const bf = Math.floor((anchor.bottom - b) * 18);
+        return [l, lf, t, tf, r, rf, b, bf];
+      }
+      getDefaultRect(ref) {
+        const l = ref.col;
+        const lf = 6;
+        const t = Math.max(ref.row - 2, 0);
+        const tf = 14;
+        const r = l + 2;
+        const rf = 2;
+        const b = t + 4;
+        const bf = 16;
+        return [l, lf, t, tf, r, rf, b, bf];
+      }
+      render(xmlStream, model) {
+        const rect = model.anchor ? this.getAnchorRect(model.anchor) : this.getDefaultRect(model.refAddress);
+        xmlStream.leafNode("x:Anchor", null, rect.join(", "));
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.text = "";
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        this.text = text2;
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = VmlAnchorXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/style/vml-protection-xform.js
+var require_vml_protection_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/style/vml-protection-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var VmlProtectionXform = class extends BaseXform {
+      constructor(model) {
+        super();
+        this._model = model;
+      }
+      get tag() {
+        return this._model && this._model.tag;
+      }
+      render(xmlStream, model) {
+        xmlStream.leafNode(this.tag, null, model);
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.text = "";
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText(text2) {
+        this.text = text2;
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = VmlProtectionXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/style/vml-position-xform.js
+var require_vml_position_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/style/vml-position-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var VmlPositionXform = class extends BaseXform {
+      constructor(model) {
+        super();
+        this._model = model;
+      }
+      get tag() {
+        return this._model && this._model.tag;
+      }
+      render(xmlStream, model, type) {
+        if (model === type[2]) {
+          xmlStream.leafNode(this.tag);
+        } else if (this.tag === "x:SizeWithCells" && model === type[1]) {
+          xmlStream.leafNode(this.tag);
+        }
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.model = {};
+            this.model[this.tag] = true;
+            return true;
+          default:
+            return false;
+        }
+      }
+      parseText() {
+      }
+      parseClose() {
+        return false;
+      }
+    };
+    module.exports = VmlPositionXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/vml-client-data-xform.js
+var require_vml_client_data_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/vml-client-data-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var VmlAnchorXform = require_vml_anchor_xform();
+    var VmlProtectionXform = require_vml_protection_xform();
+    var VmlPositionXform = require_vml_position_xform();
+    var POSITION_TYPE = ["twoCells", "oneCells", "absolute"];
+    var VmlClientDataXform = class extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          "x:Anchor": new VmlAnchorXform(),
+          "x:Locked": new VmlProtectionXform({ tag: "x:Locked" }),
+          "x:LockText": new VmlProtectionXform({ tag: "x:LockText" }),
+          "x:SizeWithCells": new VmlPositionXform({ tag: "x:SizeWithCells" }),
+          "x:MoveWithCells": new VmlPositionXform({ tag: "x:MoveWithCells" })
+        };
+      }
+      get tag() {
+        return "x:ClientData";
+      }
+      render(xmlStream, model) {
+        const { protection, editAs } = model.note;
+        xmlStream.openNode(this.tag, { ObjectType: "Note" });
+        this.map["x:MoveWithCells"].render(xmlStream, editAs, POSITION_TYPE);
+        this.map["x:SizeWithCells"].render(xmlStream, editAs, POSITION_TYPE);
+        this.map["x:Anchor"].render(xmlStream, model);
+        this.map["x:Locked"].render(xmlStream, protection.locked);
+        xmlStream.leafNode("x:AutoFill", null, "False");
+        this.map["x:LockText"].render(xmlStream, protection.lockText);
+        xmlStream.leafNode("x:Row", null, model.refAddress.row - 1);
+        xmlStream.leafNode("x:Column", null, model.refAddress.col - 1);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        switch (node.name) {
+          case this.tag:
+            this.reset();
+            this.model = {
+              anchor: [],
+              protection: {},
+              editAs: ""
+            };
+            break;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            break;
+        }
+        return true;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            this.normalizeModel();
+            return false;
+          default:
+            return true;
+        }
+      }
+      normalizeModel() {
+        const position = Object.assign(
+          {},
+          this.map["x:MoveWithCells"].model,
+          this.map["x:SizeWithCells"].model
+        );
+        const len = Object.keys(position).length;
+        this.model.editAs = POSITION_TYPE[len];
+        this.model.anchor = this.map["x:Anchor"].text;
+        this.model.protection.locked = this.map["x:Locked"].text;
+        this.model.protection.lockText = this.map["x:LockText"].text;
+      }
+    };
+    module.exports = VmlClientDataXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/vml-shape-xform.js
+var require_vml_shape_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/vml-shape-xform.js"(exports, module) {
+    var BaseXform = require_base_xform();
+    var VmlTextboxXform = require_vml_textbox_xform();
+    var VmlClientDataXform = require_vml_client_data_xform();
+    var VmlShapeXform = class _VmlShapeXform extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          "v:textbox": new VmlTextboxXform(),
+          "x:ClientData": new VmlClientDataXform()
+        };
+      }
+      get tag() {
+        return "v:shape";
+      }
+      render(xmlStream, model, index) {
+        xmlStream.openNode("v:shape", _VmlShapeXform.V_SHAPE_ATTRIBUTES(model, index));
+        xmlStream.leafNode("v:fill", { color2: "infoBackground [80]" });
+        xmlStream.leafNode("v:shadow", { color: "none [81]", obscured: "t" });
+        xmlStream.leafNode("v:path", { "o:connecttype": "none" });
+        this.map["v:textbox"].render(xmlStream, model);
+        this.map["x:ClientData"].render(xmlStream, model);
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.tag:
+            this.reset();
+            this.model = {
+              margins: {
+                insetmode: node.attributes["o:insetmode"]
+              },
+              anchor: "",
+              editAs: "",
+              protection: {}
+            };
+            break;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            break;
+        }
+        return true;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            this.model.margins.inset = this.map["v:textbox"].model && this.map["v:textbox"].model.inset;
+            this.model.protection = this.map["x:ClientData"].model && this.map["x:ClientData"].model.protection;
+            this.model.anchor = this.map["x:ClientData"].model && this.map["x:ClientData"].model.anchor;
+            this.model.editAs = this.map["x:ClientData"].model && this.map["x:ClientData"].model.editAs;
+            return false;
+          default:
+            return true;
+        }
+      }
+    };
+    VmlShapeXform.V_SHAPE_ATTRIBUTES = (model, index) => ({
+      id: `_x0000_s${1025 + index}`,
+      type: "#_x0000_t202",
+      style: "position:absolute; margin-left:105.3pt;margin-top:10.5pt;width:97.8pt;height:59.1pt;z-index:1;visibility:hidden",
+      fillcolor: "infoBackground [80]",
+      strokecolor: "none [81]",
+      "o:insetmode": model.note.margins && model.note.margins.insetmode
+    });
+    module.exports = VmlShapeXform;
+  }
+});
+
+// node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/vml-notes-xform.js
+var require_vml_notes_xform = __commonJS({
+  "node_modules/.pnpm/exceljs@4.4.0/node_modules/exceljs/lib/xlsx/xform/comment/vml-notes-xform.js"(exports, module) {
+    var XmlStream2 = require_xml_stream();
+    var BaseXform = require_base_xform();
+    var VmlShapeXform = require_vml_shape_xform();
+    var VmlNotesXform2 = class _VmlNotesXform extends BaseXform {
+      constructor() {
+        super();
+        this.map = {
+          "v:shape": new VmlShapeXform()
+        };
+      }
+      get tag() {
+        return "xml";
+      }
+      render(xmlStream, model) {
+        xmlStream.openXml(XmlStream2.StdDocAttributes);
+        xmlStream.openNode(this.tag, _VmlNotesXform.DRAWING_ATTRIBUTES);
+        xmlStream.openNode("o:shapelayout", { "v:ext": "edit" });
+        xmlStream.leafNode("o:idmap", { "v:ext": "edit", data: 1 });
+        xmlStream.closeNode();
+        xmlStream.openNode("v:shapetype", {
+          id: "_x0000_t202",
+          coordsize: "21600,21600",
+          "o:spt": 202,
+          path: "m,l,21600r21600,l21600,xe"
+        });
+        xmlStream.leafNode("v:stroke", { joinstyle: "miter" });
+        xmlStream.leafNode("v:path", { gradientshapeok: "t", "o:connecttype": "rect" });
+        xmlStream.closeNode();
+        model.comments.forEach((item, index) => {
+          this.map["v:shape"].render(xmlStream, item, index);
+        });
+        xmlStream.closeNode();
+      }
+      parseOpen(node) {
+        if (this.parser) {
+          this.parser.parseOpen(node);
+          return true;
+        }
+        switch (node.name) {
+          case this.tag:
+            this.reset();
+            this.model = {
+              comments: []
+            };
+            break;
+          default:
+            this.parser = this.map[node.name];
+            if (this.parser) {
+              this.parser.parseOpen(node);
+            }
+            break;
+        }
+        return true;
+      }
+      parseText(text2) {
+        if (this.parser) {
+          this.parser.parseText(text2);
+        }
+      }
+      parseClose(name) {
+        if (this.parser) {
+          if (!this.parser.parseClose(name)) {
+            this.model.comments.push(this.parser.model);
+            this.parser = void 0;
+          }
+          return true;
+        }
+        switch (name) {
+          case this.tag:
+            return false;
+          default:
+            return true;
+        }
+      }
+      reconcile(model, options) {
+        model.anchors.forEach((anchor) => {
+          if (anchor.br) {
+            this.map["xdr:twoCellAnchor"].reconcile(anchor, options);
+          } else {
+            this.map["xdr:oneCellAnchor"].reconcile(anchor, options);
+          }
+        });
+      }
+    };
+    VmlNotesXform2.DRAWING_ATTRIBUTES = {
+      "xmlns:v": "urn:schemas-microsoft-com:vml",
+      "xmlns:o": "urn:schemas-microsoft-com:office:office",
+      "xmlns:x": "urn:schemas-microsoft-com:office:excel"
+    };
+    module.exports = VmlNotesXform2;
+  }
+});
+
+// src/sheets/index.ts
+var import_workbook2 = __toESM(require_workbook(), 1);
+
 // src/core/errors.ts
 var OfficeError = class extends Error {
   code;
@@ -6522,75 +22244,6 @@ var OfficeError = class extends Error {
     this.code = code;
   }
 };
-
-// src/core/stub.ts
-function notBuilt(name, ext) {
-  const refuse = () => Promise.reject(new OfficeError("not_built", `the ${name} module (${ext}) is not in this bise yet: office.inspect() reads its outline of parts, nothing edits it`));
-  return { open: refuse, create: refuse };
-}
-
-// src/sheets/index.ts
-var sheets = notBuilt("sheets", "xlsx");
-
-// src/anchor.gen.ts
-var ANCHOR_KINDS = ["block", "cell", "slide", "shape", "para", "region", "text"];
-
-// src/core/anchor.ts
-var KINDS_OF = {
-  xlsx: ["cell"],
-  pptx: ["slide", "shape"],
-  docx: ["para"]
-};
-var FIELDS = {
-  block: { block: "string", quote: "string?" },
-  cell: { sheet: "string", range: "string" },
-  slide: { slide: "count", rect: "rect?" },
-  shape: { slide: "count", shape: "string", quote: "string?" },
-  para: { para: "string", quote: "string?" },
-  region: { page: "count?", rect: "rect" },
-  text: { line: "count", quote: "string?" }
-};
-function readAnchor(v) {
-  if (!v || typeof v !== "object" || Array.isArray(v)) throw new OfficeError("anchor_shape", `an anchor is an object with a "kind", not ${JSON.stringify(v)}`);
-  const o = v;
-  const kind = o.kind;
-  if (typeof kind !== "string" || !ANCHOR_KINDS.includes(kind)) {
-    throw new OfficeError(
-      "anchor_kind",
-      `this bise does not know anchors of kind ${JSON.stringify(kind)} (it knows ${ANCHOR_KINDS.join(", ")}): update bise, or work from the note's text and quote`
-    );
-  }
-  for (const [field, want] of Object.entries(FIELDS[kind])) {
-    const val = o[field];
-    const optional = want.endsWith("?");
-    if (val === void 0 && optional) continue;
-    if (!fits(val, want.replace("?", ""))) {
-      throw new OfficeError("anchor_shape", `a ${kind} anchor needs ${field} as ${describe(want)}, got ${JSON.stringify(val)}`);
-    }
-  }
-  return o;
-}
-function anchorFor(file, v) {
-  const a = readAnchor(v);
-  if (!KINDS_OF[file].includes(a.kind)) {
-    throw new OfficeError("anchor_kind_mismatch", `a ${a.kind} anchor does not point into a ${file} (a ${file} takes ${KINDS_OF[file].join(" or ")})`);
-  }
-  return a;
-}
-function fits(v, want) {
-  if (want === "string") return typeof v === "string";
-  if (want === "count") return typeof v === "number" && Number.isInteger(v) && v >= 1;
-  if (want === "rect") {
-    if (!v || typeof v !== "object") return false;
-    const r = v;
-    return ["x", "y", "w", "h"].every((k) => typeof r[k] === "number" && Number.isFinite(r[k]));
-  }
-  return false;
-}
-function describe(want) {
-  const w = want.replace("?", "");
-  return w === "count" ? "a whole number from 1" : w === "rect" ? "{x, y, w, h} in % of the frame" : "a string";
-}
 
 // src/core/xml.ts
 var import_xmldom = __toESM(require_lib(), 1);
@@ -6605,7 +22258,7 @@ var NS = {
   w14: "http://schemas.microsoft.com/office/word/2010/wordml"
 };
 var DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
-function parseXml(text, part2) {
+function parseXml(text2, part2) {
   let failed = "";
   let doc;
   try {
@@ -6613,7 +22266,7 @@ function parseXml(text, part2) {
       onError: (level2, msg) => {
         if (level2 !== "warning" && !failed) failed = msg;
       }
-    }).parseFromString(text, "application/xml");
+    }).parseFromString(text2, "application/xml");
   } catch (e) {
     failed ||= e.message;
   }
@@ -6673,9 +22326,9 @@ var MAIN = {
   ]
 };
 function contentTypes(zip) {
-  const text = zip.text("[Content_Types].xml");
-  if (text === void 0) throw new OfficeError("not_office", "a zip with no [Content_Types].xml: not an xlsx, pptx or docx");
-  const root = parseXml(text, "[Content_Types].xml").documentElement;
+  const text2 = zip.text("[Content_Types].xml");
+  if (text2 === void 0) throw new OfficeError("not_office", "a zip with no [Content_Types].xml: not an xlsx, pptx or docx");
+  const root = parseXml(text2, "[Content_Types].xml").documentElement;
   const defaults = /* @__PURE__ */ new Map();
   const overrides = /* @__PURE__ */ new Map();
   for (const d of children(root, NS.ct, "Default")) defaults.set((attr(d, "Extension") ?? "").toLowerCase(), attr(d, "ContentType") ?? "");
@@ -6706,9 +22359,9 @@ function relsPath(part2) {
 }
 function rels(zip, part2) {
   const path2 = relsPath(part2);
-  const text = zip.text(path2);
-  if (text === void 0) return [];
-  const root = parseXml(text, path2).documentElement;
+  const text2 = zip.text(path2);
+  if (text2 === void 0) return [];
+  const root = parseXml(text2, path2).documentElement;
   const base = part2.replace(/^\//, "").slice(0, part2.lastIndexOf("/") + 1);
   return children(root, NS.rel, "Relationship").map((r) => {
     const external = attr(r, "TargetMode") === "External";
@@ -7010,14 +22663,14 @@ var inflt = function(dat, st, buf, dict) {
           if (s < 16) {
             ldt[i2++] = s;
           } else {
-            var c = 0, n = 0;
+            var c = 0, n2 = 0;
             if (s == 16)
-              n = 3 + bits(dat, pos, 3), pos += 2, c = ldt[i2 - 1];
+              n2 = 3 + bits(dat, pos, 3), pos += 2, c = ldt[i2 - 1];
             else if (s == 17)
-              n = 3 + bits(dat, pos, 7), pos += 3;
+              n2 = 3 + bits(dat, pos, 7), pos += 3;
             else if (s == 18)
-              n = 11 + bits(dat, pos, 127), pos += 7;
-            while (n--)
+              n2 = 11 + bits(dat, pos, 127), pos += 7;
+            while (n2--)
               ldt[i2++] = c;
           }
         }
@@ -7173,8 +22826,8 @@ var hTree = function(d, mb) {
   }
   return { t: new u8(tr), l: mbt };
 };
-var ln = function(n, l, d) {
-  return n.s == -1 ? Math.max(ln(n.l, l, d + 1), ln(n.r, l, d + 1)) : l[n.s] = d;
+var ln = function(n2, l, d) {
+  return n2.s == -1 ? Math.max(ln(n2.l, l, d + 1), ln(n2.r, l, d + 1)) : l[n2.s] = d;
 };
 var lc = function(c) {
   var s = c.length;
@@ -7304,7 +22957,7 @@ var dflt = function(dat, lvl, plvl, pre, post, st) {
     if (pos)
       w[0] = st.r >> 3;
     var opt = deo[lvl - 1];
-    var n = opt >> 13, c = opt & 8191;
+    var n2 = opt >> 13, c = opt & 8191;
     var msk_1 = (1 << plvl) - 1;
     var prev = st.p || new u16(32768), head = st.h || new u16(msk_1 + 1);
     var bs1_1 = Math.ceil(plvl / 3), bs2_1 = 2 * bs1_1;
@@ -7331,7 +22984,7 @@ var dflt = function(dat, lvl, plvl, pre, post, st) {
         }
         var l = 2, d = 0, ch_1 = c, dif = imod - pimod & 32767;
         if (rem > 2 && hv == hsh(i2 - dif)) {
-          var maxn = Math.min(n, rem) - 1;
+          var maxn = Math.min(n2, rem) - 1;
           var maxd = Math.min(32767, i2);
           var ml = Math.min(258, rem);
           while (dif <= maxd && --ch_1 && imod != pimod) {
@@ -7462,14 +23115,14 @@ function inflateSync(data, opts) {
 }
 var fltn = function(d, p, t, o) {
   for (var k in d) {
-    var val = d[k], n = p + k, op = o;
+    var val = d[k], n2 = p + k, op = o;
     if (Array.isArray(val))
       op = mrg(o, val[1]), val = val[0];
     if (ArrayBuffer.isView(val))
-      t[n] = [val, op];
+      t[n2] = [val, op];
     else {
-      t[n += "/"] = [new u8(0), op];
-      fltn(val, n, t, o);
+      t[n2 += "/"] = [new u8(0), op];
+      fltn(val, n2, t, o);
     }
   }
 };
@@ -7497,34 +23150,34 @@ var dutf8 = function(d) {
       r += String.fromCharCode((c & 15) << 12 | (d[i2++] & 63) << 6 | d[i2++] & 63);
   }
 };
-function strToU8(str, latin1) {
+function strToU8(str2, latin1) {
   if (latin1) {
-    var ar_1 = new u8(str.length);
-    for (var i2 = 0; i2 < str.length; ++i2)
-      ar_1[i2] = str.charCodeAt(i2);
+    var ar_1 = new u8(str2.length);
+    for (var i2 = 0; i2 < str2.length; ++i2)
+      ar_1[i2] = str2.charCodeAt(i2);
     return ar_1;
   }
   if (te)
-    return te.encode(str);
-  var l = str.length;
-  var ar = new u8(str.length + (str.length >> 1));
+    return te.encode(str2);
+  var l = str2.length;
+  var ar = new u8(str2.length + (str2.length >> 1));
   var ai = 0;
   var w = function(v) {
     ar[ai++] = v;
   };
   for (var i2 = 0; i2 < l; ++i2) {
     if (ai + 5 > ar.length) {
-      var n = new u8(ai + 8 + (l - i2 << 1));
-      n.set(ar);
-      ar = n;
+      var n2 = new u8(ai + 8 + (l - i2 << 1));
+      n2.set(ar);
+      ar = n2;
     }
-    var c = str.charCodeAt(i2);
+    var c = str2.charCodeAt(i2);
     if (c < 128 || latin1)
       w(c);
     else if (c < 2048)
       w(192 | c >> 6), w(128 | c & 63);
     else if (c > 55295 && c < 57344)
-      c = 65536 + (c & 1023 << 10) | str.charCodeAt(++i2) & 1023, w(240 | c >> 18), w(128 | c >> 12 & 63), w(128 | c >> 6 & 63), w(128 | c & 63);
+      c = 65536 + (c & 1023 << 10) | str2.charCodeAt(++i2) & 1023, w(240 | c >> 18), w(128 | c >> 12 & 63), w(128 | c >> 6 & 63), w(128 | c & 63);
     else
       w(224 | c >> 12), w(128 | c >> 6 & 63), w(128 | c & 63);
   }
@@ -7871,6 +23524,1817 @@ function checkPackage(zip) {
   return out;
 }
 
+// src/anchor.gen.ts
+var ANCHOR_KINDS = ["block", "cell", "slide", "shape", "para", "region", "text"];
+
+// src/core/anchor.ts
+var KINDS_OF = {
+  xlsx: ["cell"],
+  pptx: ["slide", "shape"],
+  docx: ["para"]
+};
+var FIELDS = {
+  block: { block: "string", quote: "string?" },
+  cell: { sheet: "string", range: "string" },
+  slide: { slide: "count", rect: "rect?" },
+  shape: { slide: "count", shape: "string", quote: "string?" },
+  para: { para: "string", quote: "string?" },
+  region: { page: "count?", rect: "rect" },
+  text: { line: "count", quote: "string?" }
+};
+function readAnchor(v) {
+  if (!v || typeof v !== "object" || Array.isArray(v)) throw new OfficeError("anchor_shape", `an anchor is an object with a "kind", not ${JSON.stringify(v)}`);
+  const o = v;
+  const kind = o.kind;
+  if (typeof kind !== "string" || !ANCHOR_KINDS.includes(kind)) {
+    throw new OfficeError(
+      "anchor_kind",
+      `this bise does not know anchors of kind ${JSON.stringify(kind)} (it knows ${ANCHOR_KINDS.join(", ")}): update bise, or work from the note's text and quote`
+    );
+  }
+  for (const [field, want] of Object.entries(FIELDS[kind])) {
+    const val = o[field];
+    const optional = want.endsWith("?");
+    if (val === void 0 && optional) continue;
+    if (!fits(val, want.replace("?", ""))) {
+      throw new OfficeError("anchor_shape", `a ${kind} anchor needs ${field} as ${describe(want)}, got ${JSON.stringify(val)}`);
+    }
+  }
+  return o;
+}
+function anchorFor(file, v) {
+  const a = readAnchor(v);
+  if (!KINDS_OF[file].includes(a.kind)) {
+    throw new OfficeError("anchor_kind_mismatch", `a ${a.kind} anchor does not point into a ${file} (a ${file} takes ${KINDS_OF[file].join(" or ")})`);
+  }
+  return a;
+}
+function fits(v, want) {
+  if (want === "string") return typeof v === "string";
+  if (want === "count") return typeof v === "number" && Number.isInteger(v) && v >= 1;
+  if (want === "rect") {
+    if (!v || typeof v !== "object") return false;
+    const r = v;
+    return ["x", "y", "w", "h"].every((k) => typeof r[k] === "number" && Number.isFinite(r[k]));
+  }
+  return false;
+}
+function describe(want) {
+  const w = want.replace("?", "");
+  return w === "count" ? "a whole number from 1" : w === "rect" ? "{x, y, w, h} in % of the frame" : "a string";
+}
+
+// src/sheets/addr.ts
+var MAX_ROW = 1048576;
+var MAX_COL = 16384;
+function colName(col2) {
+  let s = "";
+  for (let n2 = col2; n2 > 0; n2 = Math.floor((n2 - 1) / 26)) s = String.fromCharCode(65 + (n2 - 1) % 26) + s;
+  return s;
+}
+function colNumber(name) {
+  let n2 = 0;
+  for (const ch of name.toUpperCase()) n2 = n2 * 26 + (ch.charCodeAt(0) - 64);
+  return n2;
+}
+function cellName(c) {
+  return `${colName(c.col)}${c.row}`;
+}
+function readCell(s) {
+  const m = /^\$?([A-Za-z]{1,3})\$?(\d{1,7})$/.exec(s.trim());
+  if (!m) return void 0;
+  const c = { col: colNumber(m[1]), row: Number(m[2]) };
+  return c.row >= 1 && c.row <= MAX_ROW && c.col >= 1 && c.col <= MAX_COL ? c : void 0;
+}
+function readBox(range) {
+  const [a, b = a] = range.split(":");
+  const p = readCell(a ?? "");
+  const q = readCell(b);
+  if (!p || !q || range.split(":").length > 2) {
+    throw new OfficeError("bad_arg", `${JSON.stringify(range)} is not a cell range: write one like "B4" or "B4:D9"`);
+  }
+  return { top: Math.min(p.row, q.row), left: Math.min(p.col, q.col), bottom: Math.max(p.row, q.row), right: Math.max(p.col, q.col) };
+}
+function boxName(b) {
+  const a = cellName({ row: b.top, col: b.left });
+  return b.top === b.bottom && b.left === b.right ? a : `${a}:${cellName({ row: b.bottom, col: b.right })}`;
+}
+function splitRef(ref) {
+  const bang = ref.lastIndexOf("!");
+  if (bang < 0) return { range: ref };
+  let sheet = ref.slice(0, bang);
+  if (sheet.startsWith("'") && sheet.endsWith("'")) sheet = sheet.slice(1, -1).replace(/''/g, "'");
+  return { sheet, range: ref.slice(bang + 1) };
+}
+function refName(sheet, range) {
+  return /^[A-Za-z_][A-Za-z0-9_.]*$/.test(sheet) ? `${sheet}!${range}` : `'${sheet.replace(/'/g, "''")}'!${range}`;
+}
+
+// src/sheets/numfmt.ts
+var DAY_MS = 864e5;
+var EPOCH_1900 = Date.UTC(1899, 11, 30);
+var EPOCH_1904 = Date.UTC(1904, 0, 1);
+var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+var BUILTIN = {
+  0: "General",
+  1: "0",
+  2: "0.00",
+  3: "#,##0",
+  4: "#,##0.00",
+  9: "0%",
+  10: "0.00%",
+  11: "0.00E+00",
+  14: "m/d/yyyy",
+  15: "d-mmm-yy",
+  16: "d-mmm",
+  17: "mmm-yy",
+  18: "h:mm AM/PM",
+  19: "h:mm:ss AM/PM",
+  20: "h:mm",
+  21: "h:mm:ss",
+  22: "m/d/yyyy h:mm",
+  37: "#,##0 ;(#,##0)",
+  38: "#,##0 ;[Red](#,##0)",
+  39: "#,##0.00;(#,##0.00)",
+  40: "#,##0.00;[Red](#,##0.00)",
+  45: "mm:ss",
+  46: "[h]:mm:ss",
+  47: "mmss.0",
+  48: "##0.0E+0",
+  49: "@"
+};
+function serial(d, date1904 = false) {
+  return (d.getTime() - (date1904 ? EPOCH_1904 : EPOCH_1900)) / DAY_MS;
+}
+function formatValue(v, fmt, date1904 = false) {
+  if (v === null || v === void 0) return "";
+  if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+  if (typeof v === "string") return textSection(fmt, v);
+  if (v instanceof Date) return formatNumber(serial(v, date1904), fmt && fmt !== "General" ? fmt : "yyyy-mm-dd");
+  if (typeof v === "number") return formatNumber(v, fmt);
+  return String(v);
+}
+function textSection(fmt, s) {
+  const parts = fmt ? split(fmt) : [];
+  const t = parts[3] ?? (parts.length === 1 && parts[0].includes("@") ? parts[0] : void 0);
+  return t ? literal(t).replace("@", s) : s;
+}
+function formatNumber(n2, fmt) {
+  if (!Number.isFinite(n2)) return "#NUM!";
+  if (!fmt || /^general$/i.test(fmt)) return general(n2);
+  const parts = split(fmt);
+  let sec = parts[0];
+  let x2 = n2;
+  if (n2 < 0 && parts.length > 1) {
+    sec = parts[1];
+    x2 = -n2;
+  } else if (n2 === 0 && parts.length > 2) sec = parts[2];
+  sec = sec.replace(/\[(Red|Black|Blue|Green|White|Yellow|Cyan|Magenta|Color\s*\d+)\]/gi, "").replace(/\[\$([^\]-]*)(-[^\]]*)?\]/g, '"$1"');
+  if (/^general$/i.test(sec.trim())) return general(x2);
+  if (isDate(sec)) return date(x2, sec);
+  return number(x2, sec, n2 < 0 && parts.length === 1);
+}
+function general(n2) {
+  if (Number.isInteger(n2) && Math.abs(n2) < 1e11) return String(n2);
+  const a = Math.abs(n2);
+  if (a !== 0 && (a < 1e-9 || a >= 1e11)) return n2.toExponential(5).replace(/\.?0+e/, "E").replace("E+", "E+").replace(/E([+-])(\d)$/, "E$10$2");
+  return String(Number(n2.toPrecision(11)));
+}
+function split(fmt) {
+  const out = [];
+  let cur = "";
+  let q = false;
+  for (let i2 = 0; i2 < fmt.length; i2++) {
+    const c = fmt[i2];
+    if (c === '"') q = !q;
+    if (c === "\\" && i2 + 1 < fmt.length) {
+      cur += c + fmt[++i2];
+      continue;
+    }
+    if (c === ";" && !q) {
+      out.push(cur);
+      cur = "";
+    } else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+function literal(s) {
+  return s.replace(/"([^"]*)"|\\(.)|_(.)|\*(.)/g, (_m, q, e, u) => q !== void 0 ? q : e !== void 0 ? e : u !== void 0 ? " " : "");
+}
+function isDate(sec) {
+  const bare = sec.replace(/"[^"]*"|\\./g, "");
+  return /[ymdhs]/i.test(bare) && !/[0#?]/.test(bare.replace(/s+\.0+/i, ""));
+}
+function number(x2, sec, neg) {
+  const m = /^(.*?)([#0?,]*(?:\.[#0?]*)?(?:[Ee][+-][0#]+)?)([^#0?]*)$/.exec(sec.replace(/"[^"]*"|\\./g, (t) => "\0".repeat(t.length)));
+  if (!m || !m[2]) return literal(sec);
+  const pre = literal(sec.slice(0, m[1].length));
+  const post = literal(sec.slice(m[1].length + m[2].length));
+  let pat = m[2];
+  let v = x2;
+  const pct = (sec.replace(/"[^"]*"/g, "").match(/%/g) ?? []).length;
+  v *= 100 ** pct;
+  while (/,$/.test(pat)) {
+    pat = pat.slice(0, -1);
+    v /= 1e3;
+  }
+  let body;
+  const e = /[Ee]([+-])([0#]+)$/.exec(pat);
+  if (e) {
+    const mant = pat.slice(0, e.index);
+    const dec = (mant.split(".")[1] ?? "").length;
+    let exp = v === 0 ? 0 : Math.floor(Math.log10(Math.abs(v)));
+    let mv = v / 10 ** exp;
+    if (Number(mv.toFixed(dec)) >= 10) {
+      exp++;
+      mv /= 10;
+    }
+    const es = String(Math.abs(exp)).padStart(e[2].length, "0");
+    body = `${mv.toFixed(dec)}E${exp < 0 ? "-" : e[1] === "+" ? "+" : ""}${es}`;
+  } else {
+    const [ip, dp = ""] = pat.split(".");
+    const dec = dp.length;
+    const fixed = Math.abs(v).toFixed(dec);
+    let [int2, frac = ""] = fixed.split(".");
+    const minInt = (ip.replace(/,/g, "").match(/0/g) ?? []).length;
+    if (int2 === "0" && minInt === 0) int2 = "";
+    int2 = int2.padStart(minInt, "0");
+    if (ip.includes(",")) int2 = int2.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    const minDec = (dp.match(/0/g) ?? []).length;
+    while (frac.length > minDec && frac.endsWith("0")) frac = frac.slice(0, -1);
+    body = frac ? `${int2}.${frac}` : dp.length && minDec === 0 && pat.endsWith(".") ? `${int2}.` : int2;
+    if (!body) body = "0";
+  }
+  return `${neg && x2 !== 0 ? "-" : ""}${pre}${body}${post}`;
+}
+function date(x2, sec) {
+  const ms = Math.round(x2 * DAY_MS);
+  const d = new Date(EPOCH_1900 + ms);
+  const ampm = /AM\/PM|A\/P/i.test(sec);
+  const tokens2 = sec.match(/"[^"]*"|\\.|\[h+\]|\[m+\]|\[s+\]|yyyy|yy|m{1,5}|d{1,4}|h{1,2}|s{1,2}(?:\.0+)?|AM\/PM|A\/P|./gi) ?? [];
+  const out = [];
+  tokens2.forEach((t, i2) => {
+    const lower = t.toLowerCase();
+    const prev = tokens2.slice(0, i2).reverse().find((p) => /^[hs]|^\[/i.test(p) || /^[dy]/i.test(p));
+    const next = tokens2.slice(i2 + 1).find((p) => /^[a-z[]/i.test(p));
+    const minute = /^m{1,2}$/.test(lower) && (prev && /^\[?h/i.test(prev) || next && /^s/i.test(next));
+    if (t.startsWith('"')) out.push(t.slice(1, -1));
+    else if (t.startsWith("\\")) out.push(t.slice(1));
+    else if (lower === "yyyy") out.push(String(d.getUTCFullYear()));
+    else if (lower === "yy") out.push(String(d.getUTCFullYear() % 100).padStart(2, "0"));
+    else if (minute) out.push(String(d.getUTCMinutes()).padStart(lower.length, "0"));
+    else if (lower === "mmmmm") out.push(MONTHS[d.getUTCMonth()][0]);
+    else if (lower === "mmmm") out.push(MONTHS[d.getUTCMonth()]);
+    else if (lower === "mmm") out.push(MONTHS[d.getUTCMonth()].slice(0, 3));
+    else if (/^m{1,2}$/.test(lower)) out.push(String(d.getUTCMonth() + 1).padStart(lower.length, "0"));
+    else if (lower === "dddd") out.push(DAYS[d.getUTCDay()]);
+    else if (lower === "ddd") out.push(DAYS[d.getUTCDay()].slice(0, 3));
+    else if (/^d{1,2}$/.test(lower)) out.push(String(d.getUTCDate()).padStart(lower.length, "0"));
+    else if (/^\[h+\]$/.test(lower)) out.push(String(Math.floor(ms / 36e5)));
+    else if (/^\[m+\]$/.test(lower)) out.push(String(Math.floor(ms / 6e4)));
+    else if (/^\[s+\]$/.test(lower)) out.push(String(Math.floor(ms / 1e3)));
+    else if (/^h{1,2}$/.test(lower)) {
+      let h = d.getUTCHours();
+      if (ampm) h = h % 12 || 12;
+      out.push(String(h).padStart(lower.length, "0"));
+    } else if (/^s{1,2}/.test(lower)) {
+      const [, frac] = lower.split(".");
+      out.push(String(d.getUTCSeconds()).padStart(2, "0").slice(-Math.max(lower.split(".")[0].length, 1)));
+      if (frac) out.push(`.${String(d.getUTCMilliseconds()).padStart(3, "0").slice(0, frac.length)}`);
+    } else if (lower === "am/pm") out.push(d.getUTCHours() < 12 ? "AM" : "PM");
+    else if (lower === "a/p") out.push(d.getUTCHours() < 12 ? "A" : "P");
+    else if (t === "_" || t === "*") out.push("");
+    else out.push(t);
+  });
+  return out.join("");
+}
+
+// src/sheets/cells.ts
+var VT = { Null: 0, Merge: 1, Number: 2, String: 3, Date: 4, Hyperlink: 5, Formula: 6, SharedString: 7, RichText: 8, Boolean: 9, Error: 10 };
+function scalarOf(cell, date1904 = false) {
+  if (!cell || cell.type === VT.Merge) return null;
+  return toScalar(cell.type === VT.Formula ? resultOf(cell) : cell.value, date1904);
+}
+function toScalar(v, date1904) {
+  if (v === null || v === void 0) return null;
+  if (typeof v === "number" || typeof v === "string" || typeof v === "boolean") return v;
+  if (v instanceof Date) return serial(v, date1904);
+  const o = v;
+  if (typeof o.error === "string") return { error: o.error };
+  if (Array.isArray(o.richText)) return o.richText.map((r) => r.text).join("");
+  if (typeof o.text === "string") return o.text;
+  return null;
+}
+function formulaOf(cell) {
+  if (cell.type !== VT.Formula) return void 0;
+  const f = cell.formula;
+  return f ? f.replace(/^=/, "") : void 0;
+}
+function hasNoValue(cell) {
+  if (cell.type !== VT.Formula) return false;
+  const r = resultOf(cell);
+  return r === void 0 || r === null;
+}
+function resultOf(cell) {
+  return cell.result;
+}
+function numFmtOf(cell) {
+  const f = cell.numFmt;
+  if (typeof f === "string") return f;
+  if (typeof f === "number") return BUILTIN[f];
+  return void 0;
+}
+function textOf2(cell, date1904 = false) {
+  if (cell.type === VT.Merge) return "";
+  const v = cell.type === VT.Formula ? resultOf(cell) : cell.value;
+  if (v === null || v === void 0) return "";
+  if (v instanceof Date) return formatValue(v, numFmtOf(cell), date1904);
+  const s = toScalar(v, date1904);
+  if (s && typeof s === "object") return s.error;
+  return formatValue(s, numFmtOf(cell), date1904);
+}
+function hex(argb2) {
+  if (typeof argb2 !== "string" || !/^[0-9a-f]{6,8}$/i.test(argb2)) return void 0;
+  return `#${argb2.slice(-6).toLowerCase()}`;
+}
+
+// src/sheets/formula.ts
+var Unsupported = class extends Error {
+};
+var err2 = (e) => ({ error: e });
+var isError = (v) => !!v && typeof v === "object" && "error" in v;
+function tokens(src) {
+  const out = [];
+  const re = /\s+|(\d+\.?\d*(?:[Ee][+-]?\d+)?|\.\d+)|("(?:[^"]|"")*")|((?:'(?:[^']|'')+'|[A-Za-z_][\w.]*)!\$?[A-Za-z]{1,3}\$?\d+(?::\$?[A-Za-z]{1,3}\$?\d+)?|\$?[A-Za-z]{1,3}\$?\d+(?::\$?[A-Za-z]{1,3}\$?\d+)?(?![\w(]))|(TRUE|FALSE)(?![\w(])|(#(?:DIV\/0!|N\/A|NAME\?|NULL!|NUM!|REF!|VALUE!))|([A-Za-z_][\w.]*)|(<=|>=|<>|[-+*/^&=<>%])|([(),])/giy;
+  let m;
+  let i2 = 0;
+  while (i2 < src.length) {
+    re.lastIndex = i2;
+    m = re.exec(src);
+    if (!m || m[0].length === 0) throw new Unsupported(`cannot read the formula at "${src.slice(i2, i2 + 10)}"`);
+    i2 = re.lastIndex;
+    if (m[1]) out.push({ t: "num", v: m[1] });
+    else if (m[2]) out.push({ t: "str", v: m[2].slice(1, -1).replace(/""/g, '"') });
+    else if (m[3]) out.push({ t: "ref", v: m[3] });
+    else if (m[4]) out.push({ t: "bool", v: m[4].toUpperCase() });
+    else if (m[5]) out.push({ t: "err", v: m[5].toUpperCase() });
+    else if (m[6]) out.push({ t: "name", v: m[6].toUpperCase() });
+    else if (m[7]) out.push({ t: "op", v: m[7] });
+    else if (m[8]) out.push({ t: m[8], v: m[8] });
+  }
+  return out;
+}
+var BIN = { "=": 1, "<>": 1, "<": 1, ">": 1, "<=": 1, ">=": 1, "&": 2, "+": 3, "-": 3, "*": 4, "/": 4, "^": 5 };
+function parseFormula(src) {
+  const ts = tokens(src.replace(/^=/, ""));
+  let p = 0;
+  const peek = () => ts[p];
+  const expr = (min) => {
+    let a = unary();
+    for (; ; ) {
+      const t = peek();
+      if (t?.t === "op" && t.v === "%") {
+        p++;
+        a = { k: "bin", op: "/", a, b: { k: "lit", v: 100 } };
+        continue;
+      }
+      if (!t || t.t !== "op" || !(t.v in BIN) || BIN[t.v] < min) return a;
+      p++;
+      const prec = BIN[t.v];
+      a = { k: "bin", op: t.v, a, b: expr(prec + 1) };
+    }
+  };
+  const unary = () => {
+    const t = peek();
+    if (t?.t === "op" && (t.v === "-" || t.v === "+")) {
+      p++;
+      return { k: "un", op: t.v, a: unary() };
+    }
+    return atom();
+  };
+  const atom = () => {
+    const t = ts[p++];
+    if (!t) throw new Unsupported("the formula ends too soon");
+    if (t.t === "num") return { k: "lit", v: Number(t.v) };
+    if (t.t === "str") return { k: "lit", v: t.v };
+    if (t.t === "bool") return { k: "lit", v: t.v === "TRUE" };
+    if (t.t === "err") return { k: "lit", v: err2(t.v) };
+    if (t.t === "ref") return { k: "ref", v: t.v };
+    if (t.t === "(") {
+      const e2 = expr(0);
+      if (ts[p++]?.t !== ")") throw new Unsupported("a ( without its )");
+      return e2;
+    }
+    if (t.t === "name" && peek()?.t === "(") {
+      p++;
+      const args = [];
+      if (peek()?.t === ")") p++;
+      else
+        for (; ; ) {
+          args.push(expr(0));
+          const s = ts[p++];
+          if (s?.t === ")") break;
+          if (s?.t !== ",") throw new Unsupported("a function call without its )");
+        }
+      return { k: "call", name: t.v.replace(/^_XLFN\./, ""), args };
+    }
+    throw new Unsupported(`"${t.v}" (a defined name or a syntax this evaluator does not know)`);
+  };
+  const e = expr(0);
+  if (p !== ts.length) throw new Unsupported(`unexpected "${ts[p].v}"`);
+  return e;
+}
+function evaluate(src, sheet, lookup) {
+  const v = ev(parseFormula(src), sheet, lookup);
+  return isRange(v) ? v.range[0]?.[0] ?? null : v;
+}
+var isRange = (v) => !!v && typeof v === "object" && "range" in v;
+function ev(n2, sheet, look) {
+  switch (n2.k) {
+    case "lit":
+      return n2.v;
+    case "ref": {
+      const { sheet: s = sheet, range } = splitRef(n2.v);
+      const c = readCell(range);
+      if (c) return { range: [[look(s, c.row, c.col) ?? null]] };
+      const b = readBox(range);
+      if ((b.bottom - b.top + 1) * (b.right - b.left + 1) > 1e6) throw new Unsupported("a range over a million cells");
+      const rows = [];
+      for (let r = b.top; r <= b.bottom; r++) {
+        const row = [];
+        for (let col2 = b.left; col2 <= b.right; col2++) row.push(look(s, r, col2) ?? null);
+        rows.push(row);
+      }
+      return { range: rows };
+    }
+    case "un": {
+      const a = num(scalar(ev(n2.a, sheet, look)));
+      return isError(a) ? a : n2.op === "-" ? -a : a;
+    }
+    case "bin":
+      return binary(n2.op, scalar(ev(n2.a, sheet, look)), scalar(ev(n2.b, sheet, look)));
+    case "call": {
+      if (n2.name === "IF") {
+        const c = bool(scalar(ev(n2.args[0], sheet, look)));
+        if (isError(c)) return c;
+        const branch = c ? n2.args[1] : n2.args[2];
+        return branch ? ev(branch, sheet, look) : c ? true : false;
+      }
+      if (n2.name === "IFERROR") {
+        const v = scalar(ev(n2.args[0], sheet, look));
+        return isError(v) ? ev(n2.args[1], sheet, look) : v;
+      }
+      const f = FUNCS[n2.name];
+      if (!f) throw new Unsupported(`the function ${n2.name}`);
+      return f(n2.args.map((a) => ev(a, sheet, look)));
+    }
+  }
+}
+function scalar(v) {
+  return isRange(v) ? v.range.length === 1 && v.range[0].length === 1 ? v.range[0][0] : err2("#VALUE!") : v;
+}
+function num(v) {
+  if (isError(v)) return v;
+  if (v === null || v === "") return 0;
+  if (typeof v === "boolean") return v ? 1 : 0;
+  if (typeof v === "number") return v;
+  const n2 = Number(v);
+  return Number.isFinite(n2) && v.trim() !== "" ? n2 : err2("#VALUE!");
+}
+function bool(v) {
+  if (isError(v)) return v;
+  if (typeof v === "string") {
+    const u = v.toUpperCase();
+    return u === "TRUE" ? true : u === "FALSE" ? false : err2("#VALUE!");
+  }
+  return !!v;
+}
+function text(v) {
+  if (isError(v)) return v;
+  if (v === null) return "";
+  if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+  if (typeof v === "number") {
+    const t = String(sig15(v));
+    if (t.includes("e")) throw new Unsupported("the text of a number this large or small");
+    return t;
+  }
+  return v;
+}
+function sig15(x2) {
+  return x2 === 0 ? 0 : Number(x2.toPrecision(15));
+}
+function power(x2, y) {
+  if (x2 === 0 && y < 0) return err2("#DIV/0!");
+  if (x2 === 0 && y === 0) return err2("#NUM!");
+  const r = x2 ** y;
+  return Number.isFinite(r) ? r : err2("#NUM!");
+}
+function binary(op, a, b) {
+  if (isError(a)) return a;
+  if (isError(b)) return b;
+  if (op === "&") return `${text(a)}${text(b)}`;
+  if (["=", "<>", "<", ">", "<=", ">="].includes(op)) {
+    const c = compare(a, b);
+    return { "=": c === 0, "<>": c !== 0, "<": c < 0, ">": c > 0, "<=": c <= 0, ">=": c >= 0 }[op];
+  }
+  const x2 = num(a);
+  const y = num(b);
+  if (isError(x2)) return x2;
+  if (isError(y)) return y;
+  switch (op) {
+    case "+":
+      return x2 + y;
+    case "-":
+      return x2 - y;
+    case "*":
+      return x2 * y;
+    case "/":
+      return y === 0 ? err2("#DIV/0!") : x2 / y;
+    case "^":
+      return power(x2, y);
+  }
+  throw new Unsupported(`the operator ${op}`);
+}
+function compare(a, b) {
+  const rank = (v) => typeof v === "number" || v === null ? 0 : typeof v === "string" ? 1 : 2;
+  const ra = rank(a);
+  const rb = rank(b);
+  if (a === null && typeof b === "string") return "".localeCompare(b.toLowerCase());
+  if (ra !== rb) return ra - rb;
+  if (ra === 0) return (a ?? 0) - (b ?? 0);
+  if (ra === 1) {
+    const x2 = a.toLowerCase();
+    const y = b.toLowerCase();
+    return x2 < y ? -1 : x2 > y ? 1 : 0;
+  }
+  return Number(a) - Number(b);
+}
+function flat(args) {
+  const out = [];
+  for (const a of args) {
+    if (isRange(a)) for (const row of a.range) for (const v of row) out.push({ v, fromRange: true });
+    else out.push({ v: a, fromRange: false });
+  }
+  return out;
+}
+function numbers(args) {
+  const out = [];
+  for (const { v, fromRange } of flat(args)) {
+    if (isError(v)) return v;
+    if (fromRange) {
+      if (typeof v === "number") out.push(v);
+    } else {
+      const n2 = num(v);
+      if (isError(n2)) return n2;
+      out.push(n2);
+    }
+  }
+  return out;
+}
+var withNums = (f) => (args) => {
+  const ns = numbers(args);
+  return isError(ns) ? ns : f(ns);
+};
+var one = (f) => (args) => {
+  const x2 = num(scalar(args[0] ?? null));
+  const y = num(scalar(args[1] ?? 0));
+  if (isError(x2)) return x2;
+  if (isError(y)) return y;
+  return f(x2, y);
+};
+var str = (f) => (args) => {
+  const s = text(scalar(args[0] ?? null));
+  return isError(s) ? s : f(s, args);
+};
+function roundTo(x2, d, mode) {
+  const m = 10 ** d;
+  const v = Math.abs(x2) * m;
+  const r = mode === "near" ? Math.round(Number(v.toPrecision(15))) : mode === "up" ? Math.ceil(Number(v.toPrecision(15))) : Math.floor(Number(v.toPrecision(15)));
+  return Math.sign(x2) * r / m;
+}
+function logical(args, f) {
+  const bs = [];
+  for (const { v, fromRange } of flat(args)) {
+    if (isError(v)) return v;
+    if (v === null || fromRange && typeof v === "string") continue;
+    const b = bool(v);
+    if (isError(b)) return b;
+    bs.push(b);
+  }
+  return bs.length ? f(bs) : err2("#VALUE!");
+}
+function count(a, dflt2) {
+  if (a === void 0) return dflt2;
+  const n2 = num(scalar(a));
+  if (isError(n2)) return n2;
+  return n2 < 0 ? err2("#VALUE!") : Math.floor(n2);
+}
+var FUNCS = {
+  SUM: withNums((ns) => ns.reduce((a, b) => a + b, 0)),
+  PRODUCT: withNums((ns) => ns.length ? ns.reduce((a, b) => a * b, 1) : 0),
+  AVERAGE: withNums((ns) => ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : err2("#DIV/0!")),
+  MIN: withNums((ns) => ns.length ? Math.min(...ns) : 0),
+  MAX: withNums((ns) => ns.length ? Math.max(...ns) : 0),
+  MEDIAN: withNums((ns) => {
+    if (!ns.length) return err2("#NUM!");
+    const s = [...ns].sort((a, b) => a - b);
+    const h = s.length >> 1;
+    return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2;
+  }),
+  COUNT: (args) => flat(args).filter(({ v, fromRange }) => typeof v === "number" || !fromRange && !isError(num(v)) && v !== null).length,
+  COUNTA: (args) => flat(args).filter(({ v }) => v !== null).length,
+  COUNTBLANK: (args) => flat(args).filter(({ v }) => v === null || v === "").length,
+  ROUND: one((x2, d) => roundTo(x2, d, "near")),
+  ROUNDUP: one((x2, d) => roundTo(x2, d, "up")),
+  ROUNDDOWN: one((x2, d) => roundTo(x2, d, "down")),
+  INT: one((x2) => Math.floor(x2)),
+  ABS: one((x2) => Math.abs(x2)),
+  SQRT: one((x2) => x2 < 0 ? err2("#NUM!") : Math.sqrt(x2)),
+  POWER: one(power),
+  MOD: one((x2, y) => y === 0 ? err2("#DIV/0!") : x2 - y * Math.floor(x2 / y)),
+  AND: (args) => logical(args, (bs) => bs.every(Boolean)),
+  OR: (args) => logical(args, (bs) => bs.some(Boolean)),
+  NOT: (args) => {
+    const b = bool(scalar(args[0] ?? null));
+    return isError(b) ? b : !b;
+  },
+  CONCAT: (args) => {
+    let s = "";
+    for (const { v } of flat(args)) {
+      const t = text(v);
+      if (isError(t)) return t;
+      s += t;
+    }
+    return s;
+  },
+  LEN: str((s) => s.length),
+  UPPER: str((s) => s.toUpperCase()),
+  LOWER: str((s) => s.toLowerCase()),
+  TRIM: str((s) => s.trim().replace(/ +/g, " ")),
+  LEFT: str((s, a) => {
+    const n2 = count(a[1], 1);
+    return isError(n2) ? n2 : s.slice(0, n2);
+  }),
+  RIGHT: str((s, a) => {
+    const n2 = count(a[1], 1);
+    return isError(n2) ? n2 : n2 === 0 ? "" : s.slice(-n2);
+  }),
+  MID: str((s, a) => {
+    const start = count(a[1], 1);
+    const n2 = count(a[2], 0);
+    if (isError(start)) return start;
+    if (isError(n2)) return n2;
+    return start < 1 ? err2("#VALUE!") : s.slice(start - 1, start - 1 + n2);
+  })
+};
+FUNCS.CONCATENATE = FUNCS.CONCAT;
+
+// src/sheets/calc.ts
+function recalc(book) {
+  const date1904 = !!book.properties?.date1904;
+  const memo = /* @__PURE__ */ new Map();
+  const busy = /* @__PURE__ */ new Set();
+  const failed = /* @__PURE__ */ new Map();
+  let computed = 0;
+  const sheetOf = /* @__PURE__ */ new Map();
+  book.eachSheet((ws) => sheetOf.set(ws.name.toLowerCase(), ws));
+  const valueAt = (sheet, row, col2) => {
+    const ws = sheetOf.get(sheet.toLowerCase());
+    if (!ws) return { error: "#REF!" };
+    const cell = ws.findCell(row, col2);
+    if (!cell || cell.type !== VT.Formula) return scalarOf(cell, date1904);
+    return compute(ws, cell);
+  };
+  const compute = (ws, cell) => {
+    const key = `${ws.name}!${cell.address}`;
+    if (memo.has(key)) return memo.get(key);
+    if (failed.has(key)) return scalarOf(cell, date1904);
+    const f = formulaOf(cell);
+    const v = cell.value;
+    if (!f || cell.formulaType === 2 || v.shareType === "array") {
+      failed.set(key, "an array formula");
+      return scalarOf(cell, date1904);
+    }
+    if (busy.has(key)) throw new Unsupported("a circular reference");
+    busy.add(key);
+    try {
+      const out = evaluate(f, ws.name, valueAt);
+      memo.set(key, out);
+      return out;
+    } catch (e) {
+      if (!(e instanceof Unsupported)) throw e;
+      failed.set(key, e.message);
+      return scalarOf(cell, date1904);
+    } finally {
+      busy.delete(key);
+    }
+  };
+  book.eachSheet((ws) => {
+    ws.eachRow({ includeEmpty: false }, (row) => {
+      row.eachCell({ includeEmpty: false }, (cell) => {
+        if (cell.type !== VT.Formula) return;
+        const out = compute(ws, cell);
+        if (failed.has(`${ws.name}!${cell.address}`)) return;
+        const result = isError(out) ? { error: out.error } : out === null ? 0 : typeof out === "number" ? sig15(out) : out;
+        cell._value.result = result;
+        computed++;
+      });
+    });
+  });
+  const unsupported = [...failed].map(([key, why]) => {
+    const bang = key.lastIndexOf("!");
+    return { ref: refName(key.slice(0, bang), key.slice(bang + 1)), why };
+  });
+  return { computed, unsupported };
+}
+
+// src/sheets/io.ts
+var import_saxes = __toESM(require_saxes(), 1);
+var import_workbook = __toESM(require_workbook(), 1);
+var import_xml_stream = __toESM(require_xml_stream(), 1);
+var import_theme1 = __toESM(require_theme1(), 1);
+var import_rel_type = __toESM(require_rel_type(), 1);
+var import_workbook_xform = __toESM(require_workbook_xform(), 1);
+var import_worksheet_xform = __toESM(require_worksheet_xform(), 1);
+var import_styles_xform = __toESM(require_styles_xform(), 1);
+var import_shared_strings_xform = __toESM(require_shared_strings_xform(), 1);
+var import_relationships_xform = __toESM(require_relationships_xform(), 1);
+var import_content_types_xform = __toESM(require_content_types_xform(), 1);
+var import_app_xform = __toESM(require_app_xform(), 1);
+var import_core_xform = __toESM(require_core_xform(), 1);
+var import_drawing_xform = __toESM(require_drawing_xform2(), 1);
+var import_table_xform = __toESM(require_table_xform(), 1);
+var import_comments_xform = __toESM(require_comments_xform(), 1);
+var import_vml_notes_xform = __toESM(require_vml_notes_xform(), 1);
+init_ids();
+var XDR = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
+async function* events(text2) {
+  const p = new import_saxes.SaxesParser();
+  const out = [];
+  let failed;
+  p.on("error", (e) => failed ??= e);
+  p.on("opentag", (v) => out.push({ eventType: "opentag", value: v }));
+  p.on("text", (v) => out.push({ eventType: "text", value: v }));
+  p.on("closetag", (v) => out.push({ eventType: "closetag", value: v }));
+  p.write(text2).close();
+  if (failed) throw failed;
+  yield out;
+}
+async function parse(xform, zip, path2) {
+  const text2 = zip.text(path2) ?? "";
+  try {
+    return await xform.parse(events(text2));
+  } catch (e) {
+    throw new OfficeError("bad_xml", `${path2} does not read as a spreadsheet part: ${e.message}`);
+  }
+}
+function picturesOnly(zip, path2) {
+  const text2 = zip.text(path2);
+  if (text2 === void 0) return true;
+  const root = parseXml(text2, path2).documentElement;
+  for (const anchor of children(root, XDR)) {
+    const body = children(anchor).filter((e) => !["from", "to", "pos", "ext", "clientData"].includes(e.localName ?? ""));
+    if (body.some((e) => e.localName !== "pic")) return false;
+  }
+  return true;
+}
+async function load(zip) {
+  const model = {
+    worksheets: [],
+    worksheetHash: {},
+    worksheetRels: [],
+    themes: {},
+    media: [],
+    mediaIndex: {},
+    drawings: {},
+    drawingRels: {},
+    comments: {},
+    tables: {},
+    vmlDrawings: {}
+  };
+  const origin = { zip, sheetPart: /* @__PURE__ */ new Map(), keptDrawing: /* @__PURE__ */ new Map(), imagesAtLoad: /* @__PURE__ */ new Map() };
+  const kept = /* @__PURE__ */ new Set();
+  for (const path2 of zip.list()) {
+    const m = /^xl\/drawings\/([a-zA-Z0-9]+)\.xml$/.exec(path2);
+    if (m && !picturesOnly(zip, path2)) kept.add(m[1]);
+  }
+  for (const name of zip.list()) {
+    let m;
+    if (name === "_rels/.rels") model.globalRels = await parse(new import_relationships_xform.default(), zip, name);
+    else if (name === "xl/workbook.xml") {
+      const wb = await parse(new import_workbook_xform.default(), zip, name);
+      Object.assign(model, { sheets: wb.sheets, definedNames: wb.definedNames, views: wb.views, properties: wb.properties, calcProperties: wb.calcProperties });
+    } else if (name === "xl/_rels/workbook.xml.rels") model.workbookRels = await parse(new import_relationships_xform.default(), zip, name);
+    else if (name === "xl/sharedStrings.xml") {
+      model.sharedStrings = new import_shared_strings_xform.default();
+      await parse(model.sharedStrings, zip, name);
+    } else if (name === "xl/styles.xml") {
+      model.styles = new import_styles_xform.default();
+      await parse(model.styles, zip, name);
+    } else if (name === "docProps/app.xml") {
+      const app = await parse(new import_app_xform.default(), zip, name);
+      model.company = app.company;
+      model.manager = app.manager;
+    } else if (name === "docProps/core.xml") Object.assign(model, await parse(new import_core_xform.default(), zip, name));
+    else if (m = /^xl\/worksheets\/sheet(\d+)\.xml$/.exec(name)) {
+      const ws = await parse(new import_worksheet_xform.default({}), zip, name);
+      ws.sheetNo = m[1];
+      model.worksheetHash[name] = ws;
+      model.worksheets.push(ws);
+    } else if (m = /^xl\/worksheets\/_rels\/sheet(\d+)\.xml\.rels$/.exec(name)) model.worksheetRels[m[1]] = await parse(new import_relationships_xform.default(), zip, name);
+    else if (m = /^xl\/theme\/([a-zA-Z0-9]+)\.xml$/.exec(name)) model.themes[m[1]] = zip.text(name);
+    else if (m = /^xl\/media\/([a-zA-Z0-9]+[.][a-zA-Z0-9]{3,4})$/.exec(name)) {
+      const file = m[1];
+      const dot = file.lastIndexOf(".");
+      model.mediaIndex[file] = model.media.length;
+      model.mediaIndex[file.slice(0, dot)] = model.media.length;
+      model.media.push({ type: "image", name: file.slice(0, dot), extension: file.slice(dot + 1), buffer: zip.bytes(name) });
+    } else if (m = /^xl\/drawings\/([a-zA-Z0-9]+)\.xml$/.exec(name)) {
+      if (!kept.has(m[1])) model.drawings[m[1]] = await parse(new import_drawing_xform.default(), zip, name);
+    } else if (m = /^xl\/(comments\d+)\.xml$/.exec(name)) model.comments[`../${m[1]}.xml`] = await parse(new import_comments_xform.default(), zip, name);
+    else if (m = /^xl\/tables\/(table\d+)\.xml$/.exec(name)) model.tables[`../tables/${m[1]}.xml`] = await parse(new import_table_xform.default(), zip, name);
+    else if (m = /^xl\/drawings\/_rels\/([a-zA-Z0-9]+)\.xml\.rels$/.exec(name)) {
+      if (!kept.has(m[1])) model.drawingRels[m[1]] = await parse(new import_relationships_xform.default(), zip, name);
+    } else if (m = /^xl\/drawings\/(vmlDrawing\d+)\.vml$/.exec(name)) model.vmlDrawings[`../drawings/${m[1]}.vml`] = await parse(new import_vml_notes_xform.default(), zip, name);
+  }
+  if (!model.sheets) throw new OfficeError("no_part", "this xlsx has no xl/workbook.xml");
+  model.styles ??= new import_styles_xform.default();
+  for (const [path2, ws] of Object.entries(model.worksheetHash)) {
+    if (!ws.drawing) continue;
+    const rel = (model.worksheetRels[ws.sheetNo] ?? []).find((r) => r.Id === ws.drawing.rId);
+    const name = rel && /\/drawings\/([a-zA-Z0-9]+)\.xml$/.exec(rel.Target)?.[1];
+    if (name && kept.has(name)) {
+      origin.keptDrawing.set(path2, ws.drawing.rId);
+      delete ws.drawing;
+    }
+  }
+  reconcile(model);
+  for (const ws of model.worksheets) {
+    const path2 = Object.keys(model.worksheetHash).find((p) => model.worksheetHash[p] === ws);
+    if (path2) origin.sheetPart.set(ws.id, path2);
+  }
+  delete model.worksheetHash;
+  delete model.sheetDefs;
+  const book = new import_workbook.default();
+  book.model = model;
+  for (const [id, path2] of origin.sheetPart) {
+    if (origin.keptDrawing.has(path2)) origin.imagesAtLoad.set(id, images(book, id));
+  }
+  return { book, origin };
+}
+function images(book, sheetId) {
+  const ws = book.getWorksheet(sheetId);
+  return ws ? ws.getImages().length : 0;
+}
+function reconcile(model) {
+  const worksheetXform = new import_worksheet_xform.default({});
+  new import_workbook_xform.default().reconcile(model);
+  const drawingXform = new import_drawing_xform.default();
+  const drawingOptions = { media: model.media, mediaIndex: model.mediaIndex };
+  for (const name of Object.keys(model.drawings)) {
+    const drawing = model.drawings[name];
+    const drawingRel = model.drawingRels[name];
+    if (!drawingRel) continue;
+    drawingOptions.rels = Object.fromEntries(drawingRel.map((r) => [r.Id, r]));
+    for (const anchor of drawing.anchors ?? []) {
+      const hl = anchor.picture?.hyperlinks;
+      if (hl && drawingOptions.rels[hl.rId]) {
+        hl.hyperlink = drawingOptions.rels[hl.rId].Target;
+        delete hl.rId;
+      }
+    }
+    drawingXform.reconcile(drawing, drawingOptions);
+  }
+  const tableXform = new import_table_xform.default();
+  for (const table2 of Object.values(model.tables)) tableXform.reconcile(table2, { styles: model.styles });
+  const sheetOptions = {
+    styles: model.styles,
+    sharedStrings: model.sharedStrings,
+    media: model.media,
+    mediaIndex: model.mediaIndex,
+    date1904: model.properties?.date1904,
+    drawings: model.drawings,
+    comments: model.comments,
+    tables: model.tables,
+    vmlDrawings: model.vmlDrawings
+  };
+  for (const ws of model.worksheets) {
+    ws.relationships = model.worksheetRels[ws.sheetNo];
+    worksheetXform.reconcile(ws, sheetOptions);
+  }
+  for (const k of ["worksheetRels", "globalRels", "sharedStrings", "workbookRels", "styles", "mediaIndex", "drawings", "drawingRels", "vmlDrawings"]) delete model[k];
+}
+function render(book) {
+  resetIds();
+  const model = book.model;
+  const parts = /* @__PURE__ */ new Map();
+  const sheetPath = /* @__PURE__ */ new Map();
+  model.creator ||= "bise";
+  model.lastModifiedBy ||= "bise";
+  model.useSharedStrings = true;
+  model.useStyles = true;
+  model.sharedStrings = new import_shared_strings_xform.default();
+  model.styles = new import_styles_xform.default(true);
+  new import_workbook_xform.default().prepare(model);
+  const worksheetXform = new import_worksheet_xform.default();
+  const options = {
+    sharedStrings: model.sharedStrings,
+    styles: model.styles,
+    date1904: model.properties.date1904,
+    drawingsCount: 0,
+    media: model.media
+  };
+  options.drawings = model.drawings = [];
+  options.commentRefs = model.commentRefs = [];
+  let tableCount = 0;
+  model.tables = [];
+  for (const ws of model.worksheets) {
+    for (const table2 of ws.tables) {
+      tableCount++;
+      table2.target = `table${tableCount}.xml`;
+      table2.id = tableCount;
+      model.tables.push(table2);
+    }
+    worksheetXform.prepare(ws, options);
+  }
+  parts.set("[Content_Types].xml", new import_content_types_xform.default().toXml(model));
+  const rels3 = new import_relationships_xform.default();
+  parts.set(
+    "_rels/.rels",
+    rels3.toXml([
+      { Id: "rId1", Type: import_rel_type.default.OfficeDocument, Target: "xl/workbook.xml" },
+      { Id: "rId2", Type: import_rel_type.default.CoreProperties, Target: "docProps/core.xml" },
+      { Id: "rId3", Type: import_rel_type.default.ExtenderProperties, Target: "docProps/app.xml" }
+    ])
+  );
+  let count2 = 1;
+  const bookRels = [
+    { Id: `rId${count2++}`, Type: import_rel_type.default.Styles, Target: "styles.xml" },
+    { Id: `rId${count2++}`, Type: import_rel_type.default.Theme, Target: "theme/theme1.xml" }
+  ];
+  const sheets2 = model.worksheets;
+  const ssId = `rId${count2++}`;
+  for (const ws of sheets2) {
+    ws.rId = `rId${count2++}`;
+    bookRels.push({ Id: ws.rId, Type: import_rel_type.default.Worksheet, Target: `worksheets/sheet${ws.id}.xml` });
+  }
+  const relsXform = new import_relationships_xform.default();
+  const commentsXform = new import_comments_xform.default();
+  const vmlXform = new import_vml_notes_xform.default();
+  for (const ws of sheets2) {
+    const path2 = `xl/worksheets/sheet${ws.id}.xml`;
+    sheetPath.set(ws.id, path2);
+    parts.set(path2, xml((x2) => worksheetXform.render(x2, ws)));
+    if (ws.rels?.length) parts.set(`xl/worksheets/_rels/sheet${ws.id}.xml.rels`, xml((x2) => relsXform.render(x2, ws.rels)));
+    if (ws.comments.length > 0) {
+      parts.set(`xl/comments${ws.id}.xml`, xml((x2) => commentsXform.render(x2, ws)));
+      parts.set(`xl/drawings/vmlDrawing${ws.id}.vml`, xml((x2) => vmlXform.render(x2, ws)));
+    }
+  }
+  if (model.sharedStrings.count) {
+    bookRels.splice(2, 0, { Id: ssId, Type: import_rel_type.default.SharedStrings, Target: "sharedStrings.xml" });
+    parts.set("xl/sharedStrings.xml", model.sharedStrings.xml);
+  }
+  parts.set("xl/_rels/workbook.xml.rels", rels3.toXml(bookRels));
+  const drawingXform = new import_drawing_xform.default();
+  for (const ws of sheets2) {
+    const { drawing } = ws;
+    if (!drawing) continue;
+    drawingXform.prepare(drawing, {});
+    parts.set(`xl/drawings/${drawing.name}.xml`, drawingXform.toXml(drawing));
+    parts.set(`xl/drawings/_rels/${drawing.name}.xml.rels`, rels3.toXml(drawing.rels));
+  }
+  const tableXform = new import_table_xform.default();
+  for (const ws of sheets2) {
+    for (const table2 of ws.tables) {
+      tableXform.prepare(table2, {});
+      parts.set(`xl/tables/${table2.target}`, tableXform.toXml(table2));
+    }
+  }
+  const themes = model.themes && Object.keys(model.themes).length ? model.themes : { theme1: import_theme1.default };
+  for (const name of Object.keys(themes)) parts.set(`xl/theme/${name}.xml`, themes[name]);
+  if (model.styles.xml) parts.set("xl/styles.xml", model.styles.xml);
+  for (const medium of model.media) {
+    if (medium.type !== "image") continue;
+    const path2 = `xl/media/${medium.name}.${medium.extension}`;
+    if (medium.buffer) parts.set(path2, new Uint8Array(medium.buffer));
+    else if (medium.base64) parts.set(path2, fromBase64(medium.base64.slice(medium.base64.indexOf(",") + 1)));
+    else throw new OfficeError("bad_arg", `the image ${medium.name} has no bytes: add images with { buffer } or { base64 }, not a filename`);
+  }
+  parts.set("docProps/app.xml", new import_app_xform.default().toXml(model));
+  parts.set("docProps/core.xml", new import_core_xform.default().toXml(model));
+  parts.set("xl/workbook.xml", new import_workbook_xform.default().toXml(model));
+  return { parts, sheetPath };
+}
+function xml(fill2) {
+  const x2 = new import_xml_stream.default();
+  fill2(x2);
+  return x2.xml;
+}
+var B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function fromBase64(s) {
+  const clean2 = s.replace(/[^A-Za-z0-9+/]/g, "");
+  const out = new Uint8Array(Math.floor(clean2.length * 3 / 4));
+  let o = 0;
+  for (let i2 = 0; i2 < clean2.length; i2 += 4) {
+    const n2 = [0, 1, 2, 3].map((k) => B64.indexOf(clean2[i2 + k] ?? "A"));
+    const v = n2[0] << 18 | n2[1] << 12 | n2[2] << 6 | n2[3];
+    if (o < out.length) out[o++] = v >> 16 & 255;
+    if (o < out.length) out[o++] = v >> 8 & 255;
+    if (o < out.length) out[o++] = v & 255;
+  }
+  return out;
+}
+
+// src/sheets/carry.ts
+var T = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+var PKG_OWNED = /* @__PURE__ */ new Set([`${T}officeDocument`, "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties", `${T}extended-properties`]);
+var BOOK_OWNED = /* @__PURE__ */ new Set([`${T}worksheet`, `${T}styles`, `${T}theme`, `${T}sharedStrings`, `${T}calcChain`]);
+var SHEET_OWNED = /* @__PURE__ */ new Set([`${T}hyperlink`, `${T}comments`, `${T}table`, `${T}image`]);
+var WS_ORDER = "sheetPr dimension sheetViews sheetFormatPr cols sheetData sheetCalcPr sheetProtection protectedRanges scenarios autoFilter sortState dataConsolidate customSheetViews mergeCells phoneticPr conditionalFormatting dataValidations hyperlinks printOptions pageMargins pageSetup headerFooter rowBreaks colBreaks customProperties cellWatches ignoredErrors smartTags drawing legacyDrawing legacyDrawingHF drawingHF picture oleObjects controls webPublishItems tableParts extLst".split(" ");
+var WB_ORDER = "fileVersion fileSharing workbookPr workbookProtection bookViews sheets functionGroups externalReferences definedNames calcPr oleSize customWorkbookViews pivotCaches smartTagPr smartTagTypes webPublishing fileRecoveryPr webPublishObjects extLst".split(" ");
+var WS_CARRY = new Set("sheetCalcPr protectedRanges scenarios sortState dataConsolidate customSheetViews phoneticPr colBreaks customProperties cellWatches ignoredErrors smartTags drawing legacyDrawing legacyDrawingHF drawingHF oleObjects controls webPublishItems".split(" "));
+var WB_CARRY = new Set("fileSharing workbookProtection functionGroups externalReferences oleSize customWorkbookViews pivotCaches smartTagPr smartTagTypes webPublishing fileRecoveryPr webPublishObjects".split(" "));
+var EXT_OWNED = /* @__PURE__ */ new Set(["{78C0D931-6437-407d-A8EE-F0AAD7539E65}"]);
+function sheetRelOwned(origin, sheetPart, rel, all) {
+  if (SHEET_OWNED.has(rel.type)) return true;
+  if (rel.type === `${T}drawing`) return origin.keptDrawing.get(sheetPart) !== rel.id;
+  if (rel.type === `${T}vmlDrawing`) return all.some((r) => r.type === `${T}comments`);
+  return false;
+}
+function originalNames(zip) {
+  const out = /* @__PURE__ */ new Map();
+  const root = parseXml(zip.text("xl/workbook.xml") ?? "", "xl/workbook.xml").documentElement;
+  for (const s of children(child1(root, "sheets") ?? root, NS.s, "sheet")) out.set(Number(attr(s, "sheetId")), attr(s, "name") ?? "");
+  return out;
+}
+function child1(e, local) {
+  return children(e).find((c) => c.localName === local);
+}
+function losses(origin, book) {
+  const out = [];
+  const names = originalNames(origin.zip);
+  for (const [id, part2] of origin.sheetPart) {
+    const all = rels(origin.zip, part2);
+    const carried2 = all.filter((r) => !r.external && !sheetRelOwned(origin, part2, r, all));
+    const sheet = names.get(id) ?? `#${id}`;
+    if (!book.getWorksheet(id)) {
+      for (const r of carried2) out.push({ part: r.target, sheet, why: `it hangs on sheet "${sheet}", which was deleted` });
+      continue;
+    }
+    const kept = origin.keptDrawing.get(part2);
+    if (kept && images(book, id) !== origin.imagesAtLoad.get(id)) {
+      const target = all.find((r) => r.id === kept)?.target ?? kept;
+      out.push({ part: target, sheet, why: `sheet "${sheet}" has a chart or shapes in it, and its pictures changed: v1 cannot merge new pictures into that drawing` });
+    }
+  }
+  return out;
+}
+function assemble(origin, rendered, book, drop = []) {
+  const zip = Zip.empty();
+  for (const [path2, data] of rendered.parts) zip.set(path2, data);
+  if (!origin) return zip;
+  const lost = losses(origin, book);
+  const refused = lost.filter((l) => !drop.includes(l.part));
+  if (refused.length) {
+    const list = refused.map((l) => `${l.part} (${l.why})`).join("; ");
+    throw new OfficeError("would_lose", `this save would drop ${list}. Undo the change, or pass save({ drop: [${refused.map((l) => JSON.stringify(l.part)).join(", ")}] }) to accept the loss`);
+  }
+  const dropped = new Set(lost.map((l) => l.part));
+  new Carrier(origin, rendered, zip, dropped).run();
+  return zip;
+}
+var Carrier = class {
+  constructor(origin, rendered, out, dropped) {
+    this.origin = origin;
+    this.rendered = rendered;
+    this.out = out;
+    this.dropped = dropped;
+    this.orig = origin.zip;
+    this.origCt = contentTypes(this.orig);
+    this.owned = ownedParts(origin);
+  }
+  origin;
+  rendered;
+  out;
+  dropped;
+  orig;
+  origCt;
+  copied = /* @__PURE__ */ new Map();
+  // original path -> final path
+  owned;
+  run() {
+    this.packageLevel();
+    this.bookLevel();
+    for (const [id, origPart] of this.origin.sheetPart) {
+      const outPart = this.rendered.sheetPath.get(id);
+      if (outPart) this.sheetLevel(origPart, outPart);
+    }
+    this.contentTypes();
+  }
+  /** Copy a part and what its rels reach; its final path (renamed on a clash). */
+  copy(path2) {
+    const done = this.copied.get(path2);
+    if (done !== void 0) return done;
+    const bytes = this.orig.bytes(path2);
+    if (bytes === void 0) return path2;
+    if (this.owned.has(path2) && this.out.has(path2)) return path2;
+    let final = path2;
+    const have = this.out.bytes(path2);
+    if (have && !same(have, bytes)) final = this.freeName(path2);
+    this.copied.set(path2, final);
+    if (!have || final !== path2) this.out.set(final, bytes);
+    const relsText = this.orig.text(relsPath(path2));
+    if (relsText !== void 0) {
+      const doc = parseXml(relsText, relsPath(path2));
+      for (const r of children(doc.documentElement, NS.rel, "Relationship")) {
+        if (attr(r, "TargetMode") === "External") continue;
+        const target = rels(this.orig, path2).find((x2) => x2.id === attr(r, "Id")).target;
+        const now = this.copy(target);
+        if (now !== target) r.setAttribute("Target", relative(final, now));
+      }
+      this.out.set(relsPath(final), writeXml(doc));
+    }
+    return final;
+  }
+  freeName(path2) {
+    const m = /^(.*?)(\d*)(\.[^./]+)$/.exec(path2);
+    for (let n2 = 1001; ; n2++) {
+      const p = `${m[1]}${n2}${m[3]}`;
+      if (!this.out.has(p) && !this.orig.has(p)) return p;
+    }
+  }
+  /** Carry `rels` (original ids) from `fromOrig` into `toOut`'s rels; old id -> new id. */
+  carryRels(fromOrig, toOut, carried2) {
+    const map = /* @__PURE__ */ new Map();
+    if (!carried2.length) return map;
+    const path2 = relsPath(toOut);
+    const text2 = this.out.text(path2) ?? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${NS.rel}"/>`;
+    const doc = parseXml(text2, path2);
+    const root = doc.documentElement;
+    const ids = new Set(children(root, NS.rel, "Relationship").map((r) => attr(r, "Id")));
+    let n2 = ids.size + 1;
+    const origDoc = parseXml(this.orig.text(relsPath(fromOrig)), relsPath(fromOrig));
+    const origById = new Map(children(origDoc.documentElement, NS.rel, "Relationship").map((r) => [attr(r, "Id"), r]));
+    for (const rel of carried2) {
+      while (ids.has(`rId${n2}`)) n2++;
+      const id = `rId${n2}`;
+      ids.add(id);
+      map.set(rel.id, id);
+      const el2 = doc.importNode(origById.get(rel.id), true);
+      el2.setAttribute("Id", id);
+      if (!rel.external) el2.setAttribute("Target", relative(toOut, this.copy(rel.target)));
+      root.appendChild(el2);
+    }
+    this.out.set(path2, writeXml(doc));
+    return map;
+  }
+  packageLevel() {
+    const carried2 = rels(this.orig, "").filter((r) => !PKG_OWNED.has(r.type));
+    if (!carried2.length) return;
+    const path2 = relsPath("");
+    const doc = parseXml(this.out.text(path2), path2);
+    const ids = new Set(children(doc.documentElement, NS.rel, "Relationship").map((r) => attr(r, "Id")));
+    const origDoc = parseXml(this.orig.text(path2), path2);
+    let n2 = ids.size + 1;
+    for (const r of children(origDoc.documentElement, NS.rel, "Relationship")) {
+      const rel = carried2.find((c) => c.id === attr(r, "Id"));
+      if (!rel) continue;
+      while (ids.has(`rId${n2}`)) n2++;
+      const el2 = doc.importNode(r, true);
+      el2.setAttribute("Id", `rId${n2}`);
+      ids.add(`rId${n2}`);
+      if (!rel.external) el2.setAttribute("Target", this.copy(rel.target));
+      doc.documentElement.appendChild(el2);
+    }
+    this.out.set(path2, writeXml(doc));
+  }
+  bookLevel() {
+    const book = "xl/workbook.xml";
+    const carried2 = rels(this.orig, book).filter((r) => !BOOK_OWNED.has(r.type));
+    const map = this.carryRels(book, book, carried2);
+    const doc = parseXml(this.out.text(book), book);
+    const origRoot = parseXml(this.orig.text(book), book).documentElement;
+    const root = doc.documentElement;
+    const have = new Set(children(root).map((e) => e.localName));
+    for (const e of children(origRoot)) {
+      if (WB_CARRY.has(e.localName ?? "") && !have.has(e.localName)) insert(root, doc, e, WB_ORDER, map);
+    }
+    this.mergeExt(doc, root, child1(origRoot, "extLst"), WB_ORDER, map);
+    scopes(root, origRoot);
+    this.chartsheets(doc, root, origRoot, map);
+    this.out.set(book, writeXml(doc));
+  }
+  /** A chartsheet's `<sheet>` row back at its place; definedNames and views re-indexed. */
+  chartsheets(doc, root, origRoot, map) {
+    const outSheets = child1(root, "sheets");
+    const origSheets = child1(origRoot, "sheets");
+    if (!outSheets || !origSheets) return;
+    const before = children(outSheets, NS.s, "sheet");
+    const rid = (e) => attr(e, "id", NS.r) ?? "";
+    const rows = children(origSheets, NS.s, "sheet");
+    const ids = new Set(before.map((e) => attr(e, "sheetId")));
+    let maxId2 = Math.max(0, ...[...ids].map(Number), ...rows.map((e) => Number(attr(e, "sheetId"))));
+    let added = false;
+    rows.forEach((row, i2) => {
+      if (!map.has(rid(row))) return;
+      const el2 = doc.importNode(row, true);
+      el2.setAttributeNS(NS.r, "r:id", map.get(rid(row)));
+      if (ids.has(attr(el2, "sheetId") ?? "")) el2.setAttribute("sheetId", String(++maxId2));
+      let anchor;
+      for (let j = i2 - 1; j >= 0 && !anchor; j--) {
+        const id = attr(rows[j], "sheetId");
+        anchor = children(outSheets, NS.s, "sheet").find((e) => attr(e, "sheetId") === id && e !== el2);
+      }
+      if (anchor) outSheets.insertBefore(el2, anchor.nextSibling);
+      else outSheets.insertBefore(el2, outSheets.firstChild);
+      added = true;
+    });
+    if (!added) return;
+    const after = children(outSheets, NS.s, "sheet");
+    const index = (old) => old === void 0 ? void 0 : String(after.indexOf(before[Number(old)]));
+    for (const dn of root.getElementsByTagNameNS(NS.s, "definedName")) {
+      const i2 = index(attr(dn, "localSheetId"));
+      if (i2 !== void 0) dn.setAttribute("localSheetId", i2);
+    }
+    for (const v of root.getElementsByTagNameNS(NS.s, "workbookView")) {
+      for (const a of ["activeTab", "firstSheet"]) {
+        const i2 = index(attr(v, a));
+        if (i2 !== void 0) v.setAttribute(a, i2);
+      }
+    }
+  }
+  sheetLevel(origPart, outPart) {
+    const all = rels(this.orig, origPart);
+    const carried2 = all.filter((r) => !sheetRelOwned(this.origin, origPart, r, all) && !this.dropped.has(r.target));
+    const map = this.carryRels(origPart, outPart, carried2);
+    const origText = this.orig.text(origPart);
+    if (origText === void 0) return;
+    const doc = parseXml(this.out.text(outPart), outPart);
+    const origRoot = parseXml(origText, origPart).documentElement;
+    const root = doc.documentElement;
+    const have = new Set(children(root).map((e) => e.localName));
+    for (const e of children(origRoot)) {
+      if (WS_CARRY.has(e.localName ?? "") && !have.has(e.localName)) insert(root, doc, e, WS_ORDER, map);
+    }
+    this.mergeExt(doc, root, child1(origRoot, "extLst"), WS_ORDER, map);
+    this.out.set(outPart, writeXml(doc));
+  }
+  /** The original extLst's entries exceljs did not write, by uri. */
+  mergeExt(doc, root, origExt, order, map) {
+    if (!origExt) return;
+    let ext = child1(root, "extLst");
+    const have = new Set(ext ? children(ext).map((e) => attr(e, "uri")) : []);
+    for (const e of children(origExt)) {
+      const uri = attr(e, "uri");
+      if (!uri || EXT_OWNED.has(uri) || have.has(uri) || !idsCarried(e, map)) continue;
+      if (!ext) {
+        ext = doc.createElementNS(NS.s, "extLst");
+        place(root, ext, order);
+      }
+      ext.appendChild(remap(doc.importNode(e, true), map));
+    }
+  }
+  /** Every part in the zip has a content type: the carried ones get theirs from the original. */
+  contentTypes() {
+    const path2 = "[Content_Types].xml";
+    const doc = parseXml(this.out.text(path2), path2);
+    const root = doc.documentElement;
+    const now = contentTypes(this.out);
+    for (const part2 of this.out.list()) {
+      if (part2 === path2 || typeOf(now, part2)) continue;
+      const from = [...this.copied].find(([, f]) => f === part2)?.[0] ?? part2;
+      const ext = part2.slice(part2.lastIndexOf(".") + 1).toLowerCase();
+      const override = this.origCt.overrides.get(from);
+      if (override) {
+        const o = doc.createElementNS(NS.ct, "Override");
+        o.setAttribute("PartName", `/${part2}`);
+        o.setAttribute("ContentType", override);
+        root.appendChild(o);
+        now.overrides.set(part2, override);
+      } else {
+        const d = this.origCt.defaults.get(ext) ?? (ext === "rels" ? "application/vnd.openxmlformats-package.relationships+xml" : void 0);
+        if (!d) continue;
+        const e = doc.createElementNS(NS.ct, "Default");
+        e.setAttribute("Extension", ext);
+        e.setAttribute("ContentType", d);
+        root.insertBefore(e, children(root, NS.ct, "Override")[0] ?? null);
+        now.defaults.set(ext, d);
+      }
+    }
+    this.out.set(path2, writeXml(doc));
+  }
+};
+function scopes(root, origRoot) {
+  const origIds = children(child1(origRoot, "sheets") ?? origRoot, NS.s, "sheet").map((s) => attr(s, "sheetId"));
+  const nowIds = children(child1(root, "sheets") ?? root, NS.s, "sheet").map((s) => attr(s, "sheetId"));
+  const nowNames = children(child1(root, "definedNames") ?? root, NS.s, "definedName");
+  for (const d of children(child1(origRoot, "definedNames") ?? origRoot, NS.s, "definedName")) {
+    const local = attr(d, "localSheetId");
+    if (local === void 0) continue;
+    const index = nowIds.indexOf(origIds[Number(local)]);
+    if (index < 0) continue;
+    const same2 = nowNames.find((n2) => attr(n2, "name") === attr(d, "name") && attr(n2, "localSheetId") === void 0 && n2.textContent === d.textContent);
+    same2?.setAttribute("localSheetId", String(index));
+  }
+}
+function ownedParts(origin) {
+  const zip = origin.zip;
+  const out = /* @__PURE__ */ new Set(["[Content_Types].xml", "_rels/.rels", "docProps/core.xml", "docProps/app.xml", "xl/workbook.xml", "xl/_rels/workbook.xml.rels", "xl/styles.xml", "xl/sharedStrings.xml", "xl/calcChain.xml"]);
+  for (const p of zip.list()) {
+    if (/^xl\/(theme|media|tables)\//.test(p) || /^xl\/comments\d+\.xml$/.test(p)) out.add(p);
+  }
+  for (const part2 of origin.sheetPart.values()) {
+    out.add(part2);
+    out.add(relsPath(part2));
+    const all = rels(zip, part2);
+    for (const r of all) {
+      if (r.external || !sheetRelOwned(origin, part2, r, all)) continue;
+      out.add(r.target);
+      out.add(relsPath(r.target));
+    }
+  }
+  return out;
+}
+function idsCarried(e, map) {
+  for (const el2 of [e, ...e.getElementsByTagName("*")]) {
+    for (let i2 = 0; i2 < el2.attributes.length; i2++) {
+      const a = el2.attributes.item(i2);
+      if (a.namespaceURI === NS.r && !map.has(a.value)) return false;
+    }
+  }
+  return true;
+}
+function remap(e, map) {
+  for (const el2 of [e, ...e.getElementsByTagName("*")]) {
+    for (let i2 = 0; i2 < el2.attributes.length; i2++) {
+      const a = el2.attributes.item(i2);
+      if (a.namespaceURI === NS.r && map.has(a.value)) a.value = map.get(a.value);
+    }
+  }
+  return e;
+}
+function insert(root, doc, e, order, map) {
+  if (!idsCarried(e, map)) return;
+  place(root, remap(doc.importNode(e, true), map), order);
+}
+function place(root, el2, order) {
+  const rank = order.indexOf(el2.localName ?? "");
+  const next = children(root).find((c) => order.indexOf(c.localName ?? "") > rank);
+  root.insertBefore(el2, next ?? null);
+}
+function relative(from, to) {
+  const a = from.split("/").slice(0, -1);
+  const b = to.split("/");
+  let i2 = 0;
+  while (i2 < a.length && i2 < b.length - 1 && a[i2] === b[i2]) i2++;
+  return [...a.slice(i2).map(() => ".."), ...b.slice(i2)].join("/");
+}
+function same(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i2 = 0; i2 < a.length; i2++) if (a[i2] !== b[i2]) return false;
+  return true;
+}
+
+// src/sheets/check.ts
+var CAP = 50;
+function cellProblems(book, recalc2) {
+  const errors = [];
+  const empty = [];
+  const date1904 = !!book.properties?.date1904;
+  const unsupported = new Map((recalc2?.unsupported ?? []).map((u) => [u.ref, u.why]));
+  book.eachSheet((ws) => {
+    ws.eachRow({ includeEmpty: false }, (row) => {
+      row.eachCell({ includeEmpty: false }, (cell) => {
+        if (cell.type === VT.Merge) return;
+        const ref = refName(ws.name, cell.address);
+        const at2 = { kind: "cell", sheet: ws.name, range: cell.address };
+        const f = formulaOf(cell);
+        const v = scalarOf(cell, date1904);
+        if (v && typeof v === "object") {
+          errors.push({ code: "formula_error", severity: "error", at: at2, message: `${ref} shows ${v.error}${f ? ` (=${f})` : ""}` });
+        } else if (hasNoValue(cell)) {
+          const why = unsupported.get(ref);
+          empty.push({
+            code: "no_value",
+            severity: "warning",
+            at: at2,
+            message: `${ref} has a formula with no value (=${f}): blank in the viewer and Quick Look until Excel computes it${why ? `; the SDK cannot: ${why}` : ""}`
+          });
+        }
+      });
+    });
+  });
+  const stale = (recalc2?.unsupported ?? []).filter((u) => !empty.some((p) => p.message.startsWith(`${u.ref} `))).map((u) => ({
+    code: "not_recomputed",
+    severity: "warning",
+    message: `${u.ref} keeps its old value after this edit (the SDK cannot compute ${u.why}); Excel recomputes it on open`
+  }));
+  return [...cap(errors), ...cap(empty), ...cap(stale)];
+}
+function lossProblems(losses2) {
+  return losses2.map((l) => ({
+    code: "would_lose",
+    severity: "error",
+    ...l.sheet ? { at: { kind: "cell", sheet: l.sheet, range: "A1" } } : {},
+    message: `${l.part}: save() would drop it (${l.why}); undo that change, or save({ drop: ["${l.part}"] })`
+  }));
+}
+function cap(list) {
+  if (list.length <= CAP) return list;
+  const rest = list.length - CAP;
+  return [...list.slice(0, CAP), { code: list[0].code, severity: list[0].severity, message: `and ${rest} more like these` }];
+}
+
+// src/sheets/inspect.ts
+var T2 = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+var CHART_NS = "http://schemas.openxmlformats.org/drawingml/2006/chart";
+var widthPx = (chars) => Math.round(chars * 7 + 5);
+var heightPx = (pt2) => Math.round(pt2 * 96 / 72);
+function sheetNodes(book, origin, opts = {}) {
+  const out = [];
+  const date1904 = !!book.properties?.date1904;
+  book.eachSheet((ws) => {
+    if (opts.sheet !== void 0 && ws.name !== opts.sheet) return;
+    out.push(sheetNode(ws, origin, date1904, opts.maxCells));
+  });
+  return out;
+}
+function sheetNode(ws, origin, date1904, max2) {
+  const cells = [];
+  let count2 = 0;
+  ws.eachRow({ includeEmpty: false }, (row) => {
+    row.eachCell({ includeEmpty: false }, (cell) => {
+      if (cell.type === VT.Merge || cell.type === VT.Null && !cell.style?.fill) return;
+      count2++;
+      if (max2 === void 0 || cells.length < max2) cells.push(cellNode(ws.name, cell, date1904));
+    });
+  });
+  const dims = count2 ? ws.dimensions?.range : void 0;
+  const props2 = { cells: count2 };
+  if (dims && count2) props2.dims = dims;
+  if (ws.state && ws.state !== "visible") props2.hidden = ws.state;
+  const widths = [];
+  const lastCol = Math.max(ws.columnCount, ws._columns?.length ?? 0);
+  for (let c = 1; c <= lastCol; c++) {
+    const col2 = ws.getColumn(c);
+    widths.push(col2.hidden ? 0 : widthPx(col2.width ?? ws.properties.defaultColWidth ?? 8.43));
+  }
+  if (widths.length) props2.widths = widths;
+  const heights = {};
+  ws.eachRow({ includeEmpty: true }, (row, n2) => {
+    if (row.hidden) heights[n2] = 0;
+    else if (row.height) heights[n2] = heightPx(row.height);
+  });
+  if (Object.keys(heights).length) props2.heights = heights;
+  const merged = Object.values(ws._merges ?? {}).map((m) => m.range);
+  if (merged.length) props2.merged = merged.sort();
+  const view = ws.views?.[0];
+  if (view?.state === "frozen") props2.frozen = { rows: view.ySplit ?? 0, cols: view.xSplit ?? 0 };
+  const tables = Object.keys(ws.tables ?? {});
+  if (tables.length) props2.tables = tables;
+  if (origin) Object.assign(props2, carried(ws, origin));
+  return {
+    id: refName(ws.name, "A1").replace(/!A1$/, ""),
+    type: "sheet",
+    name: ws.name,
+    anchor: { kind: "cell", sheet: ws.name, range: count2 && dims || "A1" },
+    props: props2,
+    children: cells
+  };
+}
+function cellNode(sheet, cell, date1904) {
+  const props2 = {};
+  const value = scalarOf(cell, date1904);
+  if (value !== null) props2.value = value;
+  if (value && typeof value === "object") props2.error = value.error;
+  const f = formulaOf(cell);
+  if (f) props2.formula = `=${f}`;
+  if (hasNoValue(cell)) props2.noValue = true;
+  const fmt = numFmtOf(cell);
+  if (fmt && fmt !== "General") props2.numFmt = fmt;
+  const font = cell.font ?? {};
+  if (font.bold) props2.bold = true;
+  if (font.italic) props2.italic = true;
+  const color2 = hex(font.color?.argb);
+  if (color2) props2.color = color2;
+  const fill2 = cell.fill;
+  const fillHex = fill2?.type === "pattern" && fill2.pattern === "solid" ? hex(fill2.fgColor?.argb) : void 0;
+  if (fillHex) props2.fill = fillHex;
+  const align = cell.alignment?.horizontal;
+  if (align === "left" || align === "center" || align === "right") props2.align = align;
+  if (cell.isMerged && cell.master === cell) {
+    const m = Object.values(cell.worksheet._merges).find((x2) => x2.tl === cell.address);
+    if (m) props2.merged = m.range;
+  }
+  return {
+    id: refName(sheet, cell.address),
+    type: "cell",
+    anchor: { kind: "cell", sheet, range: cell.address },
+    text: textOf2(cell, date1904),
+    props: props2
+  };
+}
+function carried(ws, origin) {
+  const part2 = origin.sheetPart.get(ws.id);
+  if (!part2) return {};
+  const out = {};
+  const all = rels(origin.zip, part2);
+  const pivots = all.filter((r) => r.type === `${T2}pivotTable`).length;
+  if (pivots) out.pivots = pivots;
+  const drawing = all.find((r) => r.type === `${T2}drawing` && !r.external);
+  if (drawing) {
+    const charts = rels(origin.zip, drawing.target).filter((r) => r.type === `${T2}chart` && !r.external).map((r) => ({ title: chartTitle(origin, r.target), part: r.target }));
+    if (charts.length) out.charts = charts;
+  }
+  return out;
+}
+function chartTitle(origin, part2) {
+  const text2 = origin.zip.text(part2);
+  if (!text2) return "chart";
+  try {
+    const doc = parseXml(text2, part2);
+    const title = doc.getElementsByTagNameNS(CHART_NS, "title").item(0);
+    return title && textOf(title, NS.a) || "chart";
+  } catch {
+    return "chart";
+  }
+}
+
+// src/sheets/book.ts
+var Book = class {
+  constructor(x2, origin, bytes) {
+    this.x = x2;
+    this.origin = origin;
+    this.bytes = bytes;
+    if (!origin) this.edited = true;
+  }
+  x;
+  origin;
+  bytes;
+  kind = "xlsx";
+  edited = false;
+  last;
+  /** The sheet names, in tab order. */
+  get sheetNames() {
+    return this.x.worksheets.map((ws) => ws.name);
+  }
+  /** Was anything changed since open (a save of an unchanged file gives its bytes back)? */
+  get changed() {
+    return this.edited;
+  }
+  /** exceljs's Workbook, for what this API does not do. Using it counts as an edit. */
+  get exceljs() {
+    this.edited = true;
+    return this.x;
+  }
+  inspect(opts) {
+    if (opts?.sheet !== void 0) this.sheet(opts.sheet);
+    return { kind: "xlsx", nodes: sheetNodes(this.x, this.origin, opts) };
+  }
+  at(anchor) {
+    const a = anchorFor("xlsx", anchor);
+    if (a.kind !== "cell") throw new OfficeError("anchor_kind_mismatch", `a ${a.kind} anchor does not point into a sheet`);
+    return this.select(this.sheet(a.sheet), readBox(a.range));
+  }
+  /** A range by reference: "Q3!B4", "'My sheet'!B4:D9" (a bare "B4" on the first sheet). */
+  range(ref) {
+    const { sheet, range } = splitRef(ref);
+    const ws = sheet === void 0 ? this.x.worksheets[0] : this.sheet(sheet);
+    if (!ws) throw new OfficeError("not_found", "this workbook has no sheet");
+    return this.select(ws, readBox(range));
+  }
+  /** A new sheet (at the end, or at `index` from 0), filled from A1 with `rows` when given. */
+  addSheet(name, opts = {}) {
+    if (this.x.getWorksheet(name)) throw new OfficeError("bad_arg", `a sheet named "${name}" already exists`);
+    let ws;
+    try {
+      ws = this.x.addWorksheet(name);
+    } catch (e) {
+      throw new OfficeError("bad_arg", `"${name}" cannot be a sheet name: ${e.message}`);
+    }
+    this.edited = true;
+    if (opts.index !== void 0) this.moveSheet(name, opts.index);
+    const sel = this.select(ws, { top: 1, left: 1, bottom: 1, right: 1 });
+    if (opts.rows?.length) sel.set(opts.rows);
+    const width = Math.max(1, ...(opts.rows ?? []).map((r) => r.length));
+    return this.select(ws, { top: 1, left: 1, bottom: Math.max(1, opts.rows?.length ?? 1), right: width });
+  }
+  /** Remove a sheet. What hangs on it that exceljs does not model makes save() refuse (would_lose) unless dropped. */
+  removeSheet(name) {
+    this.x.removeWorksheet(this.sheet(name).id);
+    this.edited = true;
+  }
+  renameSheet(from, to) {
+    if (this.x.getWorksheet(to)) throw new OfficeError("bad_arg", `a sheet named "${to}" already exists`);
+    const ws = this.sheet(from);
+    try {
+      ws.name = to;
+    } catch (e) {
+      throw new OfficeError("bad_arg", `"${to}" cannot be a sheet name: ${e.message}`);
+    }
+    this.edited = true;
+  }
+  /** Move a sheet to tab position `index` (from 0). */
+  moveSheet(name, index) {
+    const list = this.x.worksheets;
+    const ws = this.sheet(name);
+    if (!Number.isInteger(index) || index < 0 || index >= list.length) throw new OfficeError("bad_arg", `a sheet index goes from 0 to ${list.length - 1}, not ${index}`);
+    const order = list.filter((w) => w !== ws);
+    order.splice(index, 0, ws);
+    order.forEach((w, i2) => w.orderNo = i2);
+    this.edited = true;
+  }
+  /** Compute every formula the SDK can (save does it too); what it cannot is listed. */
+  recalc() {
+    this.last = recalc(this.x);
+    return this.last;
+  }
+  check() {
+    if (!this.edited) return [...this.origin ? checkPackage(this.origin.zip) : [], ...cellProblems(this.x, void 0)];
+    const r = this.recalc();
+    const lost = this.origin ? losses(this.origin, this.x) : [];
+    const out = [...lossProblems(lost), ...cellProblems(this.x, r)];
+    const zip = assemble(this.origin, render(this.x), this.x, lost.map((l) => l.part));
+    return [...checkPackage(zip), ...out];
+  }
+  async save(opts = {}) {
+    if (!this.edited && this.bytes) return this.bytes;
+    this.recalc();
+    this.x.calcProperties = { ...this.x.calcProperties ?? {}, fullCalcOnLoad: true };
+    return assemble(this.origin, render(this.x), this.x, opts.drop).write();
+  }
+  // ---- inside ----
+  sheet(name) {
+    const ws = this.x.worksheets.find((w) => w.name === name) ?? this.x.worksheets.find((w) => w.name.toLowerCase() === name.toLowerCase());
+    if (!ws) throw new OfficeError("not_found", `no sheet "${name}" in this workbook (it has ${this.sheetNames.map((n2) => `"${n2}"`).join(", ")})`);
+    return ws;
+  }
+  select(ws, box) {
+    const book = this;
+    const ref = refName(ws.name, boxName(box));
+    const cells = (fn) => {
+      for (let r = box.top; r <= box.bottom; r++) for (let c = box.left; c <= box.right; c++) fn(ws.getCell(r, c), r, c);
+    };
+    const edit = (fn) => {
+      fn();
+      book.edited = true;
+      return sel;
+    };
+    const sel = {
+      node: book.node(ws, box),
+      ref,
+      values() {
+        const date1904 = !!book.x.properties?.date1904;
+        const out = [];
+        for (let r = box.top; r <= box.bottom; r++) {
+          const row = [];
+          for (let c = box.left; c <= box.right; c++) row.push(scalarOf(ws.findCell(r, c), date1904));
+          out.push(row);
+        }
+        return out;
+      },
+      set: (values) => edit(() => {
+        const grid = toGrid(values, box);
+        grid.forEach((row, i2) => row.forEach((v, j) => ws.getCell(box.top + i2, box.left + j).value = cellValue(v)));
+      }),
+      formula: (f) => edit(() => cells((c) => c.value = { formula: f.replace(/^=/, "") })),
+      style: (s) => edit(() => cells((c) => applyStyle(c, s))),
+      merge: () => edit(() => {
+        try {
+          ws.mergeCells(box.top, box.left, box.bottom, box.right);
+        } catch (e) {
+          throw new OfficeError("bad_arg", `${ref} cannot be merged: ${e.message}`);
+        }
+      }),
+      unmerge: () => edit(() => ws.unMergeCells(box.top, box.left, box.bottom, box.right)),
+      width: (chars) => edit(() => {
+        if (!(chars >= 0 && chars <= 255)) throw new OfficeError("bad_arg", `a column width is 0 to 255 characters, not ${chars}`);
+        for (let c = box.left; c <= box.right; c++) ws.getColumn(c).width = chars;
+      }),
+      height: (points2) => edit(() => {
+        if (!(points2 >= 0 && points2 <= 409)) throw new OfficeError("bad_arg", `a row height is 0 to 409 points, not ${points2}`);
+        for (let r = box.top; r <= box.bottom; r++) ws.getRow(r).height = points2;
+      }),
+      note: (text2) => edit(() => ws.getCell(box.top, box.left).note = text2 ?? void 0),
+      clear: () => edit(
+        () => cells((c) => {
+          c.value = null;
+          c.style = {};
+        })
+      )
+    };
+    return sel;
+  }
+  node(ws, box) {
+    const date1904 = !!this.x.properties?.date1904;
+    if (box.top === box.bottom && box.left === box.right) return cellNode(ws.name, ws.getCell(box.top, box.left), date1904);
+    const rows = [];
+    const kids = [];
+    for (let r = box.top; r <= box.bottom; r++) {
+      const row = [];
+      for (let c = box.left; c <= box.right; c++) {
+        const cell = ws.findCell(r, c);
+        if (cell && cell.type !== VT.Null && cell.type !== VT.Merge) kids.push(cellNode(ws.name, cell, date1904));
+        row.push(cell ? cellNode(ws.name, cell, date1904).text ?? "" : "");
+      }
+      rows.push(row.join("	"));
+    }
+    const range = boxName(box);
+    return { id: refName(ws.name, range), type: "range", anchor: { kind: "cell", sheet: ws.name, range }, text: rows.join("\n"), children: kids };
+  }
+};
+function toGrid(values, box) {
+  if (Array.isArray(values)) {
+    if (values.every((r) => Array.isArray(r))) return values;
+    if (values.some((r) => Array.isArray(r))) throw new OfficeError("bad_arg", "set() takes one value, a row [a, b], or rows [[a, b], [c, d]], not a mix");
+    return [values];
+  }
+  const rows = box.bottom - box.top + 1;
+  const cols = box.right - box.left + 1;
+  return Array.from({ length: rows }, () => Array.from({ length: cols }, () => values));
+}
+function cellValue(v) {
+  if (v === void 0 || v === null) return null;
+  if (typeof v === "string" && v.startsWith("=") && v.length > 1) return { formula: v.slice(1) };
+  if (typeof v === "number" && !Number.isFinite(v)) throw new OfficeError("bad_arg", `a cell takes a finite number, not ${v}`);
+  if (typeof v === "object" && !(v instanceof Date)) {
+    if ("formula" in v && typeof v.formula === "string") return { formula: v.formula.replace(/^=/, "") };
+    if ("error" in v && typeof v.error === "string") return { error: v.error };
+    throw new OfficeError("bad_arg", `a cell takes a number, text, a boolean, a Date, null, "=FORMULA" or {formula}; not ${JSON.stringify(v)}`);
+  }
+  return v;
+}
+function argb(color2, what) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(color2.trim());
+  if (!m) throw new OfficeError("bad_arg", `${what} is a color like "#1f6feb", not ${JSON.stringify(color2)}`);
+  return `FF${m[1].toUpperCase()}`;
+}
+function applyStyle(c, s) {
+  const font = { ...c.font ?? {} };
+  let fontChanged = false;
+  for (const k of ["bold", "italic", "underline"]) {
+    if (s[k] !== void 0) {
+      font[k] = s[k];
+      fontChanged = true;
+    }
+  }
+  if (s.size !== void 0) {
+    if (!(s.size > 0 && s.size < 410)) throw new OfficeError("bad_arg", `a font size is in points (1 to 409), not ${s.size}`);
+    font.size = s.size;
+    fontChanged = true;
+  }
+  if (s.font !== void 0) {
+    font.name = s.font;
+    fontChanged = true;
+  }
+  if (s.color !== void 0) {
+    font.color = { argb: argb(s.color, "color") };
+    fontChanged = true;
+  }
+  if (fontChanged) c.font = font;
+  if (s.fill !== void 0) {
+    c.fill = s.fill === null ? { type: "pattern", pattern: "none" } : { type: "pattern", pattern: "solid", fgColor: { argb: argb(s.fill, "fill") } };
+  }
+  if (s.align !== void 0 || s.valign !== void 0 || s.wrap !== void 0) {
+    const a = { ...c.alignment ?? {} };
+    if (s.align !== void 0) a.horizontal = s.align;
+    if (s.valign !== void 0) a.vertical = s.valign;
+    if (s.wrap !== void 0) a.wrapText = s.wrap;
+    c.alignment = a;
+  }
+  if (s.numFmt !== void 0) c.numFmt = s.numFmt;
+  if (s.border !== void 0) {
+    const side = s.border === "none" ? void 0 : { style: s.border };
+    c.border = side ? { top: side, left: side, bottom: side, right: side } : {};
+  }
+}
+
+// src/sheets/index.ts
+var sheets = {
+  /** An xlsx's bytes as a workbook; throws OfficeError (not_a_zip, not_office, bad_xml). */
+  async open(bytes) {
+    const pkg = openPackage(bytes);
+    if (pkg.kind !== "xlsx") throw new OfficeError("not_office", `this is a ${pkg.kind}, not an xlsx: open it with ${pkg.kind === "pptx" ? "slides" : "docs"}.open`);
+    const { book, origin } = await load(pkg.zip);
+    return new Book(book, origin, bytes);
+  },
+  /** A new workbook with one sheet. */
+  async create(opts = {}) {
+    const x2 = new import_workbook2.default();
+    const date2 = opts.date ?? /* @__PURE__ */ new Date();
+    x2.created = date2;
+    x2.modified = date2;
+    x2.creator = "bise";
+    x2.lastModifiedBy = "bise";
+    const book = new Book(x2);
+    book.addSheet(opts.sheet ?? "Sheet1", { rows: opts.rows });
+    return book;
+  }
+};
+
 // src/slides/dom.ts
 var PNS = {
   ...NS,
@@ -7890,10 +25354,10 @@ var REL = {
   package: `${NS.r}/package`
 };
 var DECLS = `xmlns:a="${PNS.a}" xmlns:p="${PNS.p}" xmlns:r="${PNS.r}" xmlns:c="${PNS.c}" xmlns:pic="${PNS.pic}"`;
-function frag(doc, xml) {
-  const wrap2 = parseXml(`<w ${DECLS}>${xml}</w>`, "a new element");
+function frag(doc, xml2) {
+  const wrap2 = parseXml(`<w ${DECLS}>${xml2}</w>`, "a new element");
   const el2 = children(wrap2.documentElement)[0];
-  if (!el2) throw new Error(`frag: no element in ${xml.slice(0, 60)}`);
+  if (!el2) throw new Error(`frag: no element in ${xml2.slice(0, 60)}`);
   return doc.importNode(el2, true);
 }
 function path(el2, ...steps) {
@@ -7906,8 +25370,8 @@ function path(el2, ...steps) {
 }
 function int(el2, name) {
   if (!el2 || !el2.hasAttribute(name)) return void 0;
-  const n = Number.parseInt(el2.getAttribute(name), 10);
-  return Number.isFinite(n) ? n : void 0;
+  const n2 = Number.parseInt(el2.getAttribute(name), 10);
+  return Number.isFinite(n2) ? n2 : void 0;
 }
 function insertBefore(parent, el2, before) {
   for (let c = parent.firstChild; c; c = c.nextSibling) {
@@ -7942,7 +25406,7 @@ function boxEmu(box, what = "box") {
   return { x: emu(b.x), y: emu(b.y), w: emu(b.w), h: emu(b.h) };
 }
 var boxPt = (e) => [pt(e.x), pt(e.y), pt(e.w), pt(e.h)];
-function hex(color2) {
+function hex2(color2) {
   const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(String(color2).trim());
   if (!m) throw new OfficeError("bad_arg", `a color is "#rrggbb" (like "#1f6feb"), got ${JSON.stringify(color2)}`);
   const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join("") : m[1];
@@ -7987,8 +25451,8 @@ function points(holder) {
   if (direct) return [direct.textContent ?? ""];
   const cache = descendants(holder, C, "strCache")[0] ?? descendants(holder, C, "numCache")[0] ?? child(holder, C, "strLit") ?? child(holder, C, "numLit") ?? descendants(holder, C, "lvl")[0];
   if (!cache) return [];
-  const n = int(child(cache, C, "ptCount"), "val") ?? 0;
-  const out = new Array(n).fill(void 0);
+  const n2 = int(child(cache, C, "ptCount"), "val") ?? 0;
+  const out = new Array(n2).fill(void 0);
   for (const pt2 of children(cache, C, "pt")) {
     const i2 = int(pt2, "idx") ?? 0;
     out[i2] = child(pt2, C, "v")?.textContent ?? "";
@@ -7997,12 +25461,12 @@ function points(holder) {
 }
 var cacheStrings = (h) => points(h).map((v) => v ?? "");
 var cacheNumbers = (h) => points(h).map((v) => {
-  const n = v === void 0 || v === "" ? NaN : Number(v);
-  return Number.isFinite(n) ? n : null;
+  const n2 = v === void 0 || v === "" ? NaN : Number(v);
+  return Number.isFinite(n2) ? n2 : null;
 });
-var col = (n) => {
+var col = (n2) => {
   let s = "";
-  for (let i2 = n + 1; i2 > 0; i2 = Math.floor((i2 - 1) / 26)) s = String.fromCharCode(65 + (i2 - 1) % 26) + s;
+  for (let i2 = n2 + 1; i2 > 0; i2 = Math.floor((i2 - 1) / 26)) s = String.fromCharCode(65 + (i2 - 1) % 26) + s;
   return s;
 };
 function checkChart(d) {
@@ -8019,15 +25483,15 @@ function checkChart(d) {
 }
 var strCache = (vals) => `<c:strCache><c:ptCount val="${vals.length}"/>${vals.map((v, i2) => `<c:pt idx="${i2}"><c:v>${esc(v)}</c:v></c:pt>`).join("")}</c:strCache>`;
 var numCache = (vals) => `<c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${vals.length}"/>${vals.map((v, i2) => `<c:pt idx="${i2}"><c:v>${v}</c:v></c:pt>`).join("")}</c:numCache>`;
-var fill = (s, i2) => s.color ? `<a:srgbClr val="${hex(s.color)}"/>` : `<a:schemeClr val="accent${i2 % 6 + 1}"/>`;
+var fill = (s, i2) => s.color ? `<a:srgbClr val="${hex2(s.color)}"/>` : `<a:schemeClr val="accent${i2 % 6 + 1}"/>`;
 function writeChart(d, workbookRid) {
   checkChart(d);
-  const n = d.categories.length;
-  const cat = `<c:cat><c:strRef><c:f>Sheet1!$A$2:$A$${n + 1}</c:f>${strCache(d.categories.map(String))}</c:strRef></c:cat>`;
+  const n2 = d.categories.length;
+  const cat = `<c:cat><c:strRef><c:f>Sheet1!$A$2:$A$${n2 + 1}</c:f>${strCache(d.categories.map(String))}</c:strRef></c:cat>`;
   const ser = d.series.map((s, i2) => {
     const c = col(i2 + 1);
     const head = `<c:idx val="${i2}"/><c:order val="${i2}"/><c:tx><c:strRef><c:f>Sheet1!$${c}$1</c:f>${strCache([String(s.name ?? "")])}</c:strRef></c:tx>`;
-    const val = `<c:val><c:numRef><c:f>Sheet1!$${c}$2:$${c}$${n + 1}</c:f>${numCache(s.values)}</c:numRef></c:val>`;
+    const val = `<c:val><c:numRef><c:f>Sheet1!$${c}$2:$${c}$${n2 + 1}</c:f>${numCache(s.values)}</c:numRef></c:val>`;
     if (d.type === "line") {
       return `<c:ser>${head}<c:spPr><a:ln w="28575" cap="rnd"><a:solidFill>${fill(s, i2)}</a:solidFill><a:round/></a:ln></c:spPr><c:marker><c:symbol val="none"/></c:marker>${cat}${val}<c:smooth val="0"/></c:ser>`;
     }
@@ -8057,10 +25521,10 @@ function chartWorkbook(d) {
   const S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
   const R6 = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
   const PR = "http://schemas.openxmlformats.org/package/2006/relationships";
-  const str = (ref, v) => `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
-  const num = (ref, v) => `<c r="${ref}"><v>${v}</v></c>`;
-  const head = `<row r="1">${d.series.map((s, i2) => str(`${col(i2 + 1)}1`, String(s.name ?? ""))).join("")}</row>`;
-  const body = d.categories.map((c, r) => `<row r="${r + 2}">${str(`A${r + 2}`, String(c))}${d.series.map((s, i2) => num(`${col(i2 + 1)}${r + 2}`, s.values[r])).join("")}</row>`).join("");
+  const str2 = (ref, v) => `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
+  const num2 = (ref, v) => `<c r="${ref}"><v>${v}</v></c>`;
+  const head = `<row r="1">${d.series.map((s, i2) => str2(`${col(i2 + 1)}1`, String(s.name ?? ""))).join("")}</row>`;
+  const body = d.categories.map((c, r) => `<row r="${r + 2}">${str2(`A${r + 2}`, String(c))}${d.series.map((s, i2) => num2(`${col(i2 + 1)}${r + 2}`, s.values[r])).join("")}</row>`).join("");
   const zip = Zip.empty();
   zip.set(
     "[Content_Types].xml",
@@ -8258,7 +25722,7 @@ function runStyle(ctx, shape, para3, rPr) {
   };
   const scale = (int(path(shape, [P, "txBody"], [A2, "bodyPr"], [A2, "normAutofit"]), "fontScale") ?? 1e5) / 1e5;
   const size = (first((e) => int(e, "sz"), rprs) ?? 1800) / 100 * scale;
-  const flag = (n) => first((e) => e.hasAttribute(n) ? ["1", "true"].includes(e.getAttribute(n)) : void 0, rprs) ?? false;
+  const flag = (n2) => first((e) => e.hasAttribute(n2) ? ["1", "true"].includes(e.getAttribute(n2)) : void 0, rprs) ?? false;
   const fontRef = shape ? path(shape, [P, "style"], [A2, "fontRef"]) : void 0;
   const color2 = first((e) => colorIn(ctx, child(e, A2, "solidFill")), rprs.slice(0, 1)) ?? colorIn(ctx, fontRef) ?? first((e) => colorIn(ctx, child(e, A2, "solidFill")), defs);
   const font = first((e) => attr(child(e, A2, "latin") ?? e, "typeface"), rprs);
@@ -8386,19 +25850,19 @@ function readText(ctx, el2, info2) {
   info2.text = info2.paras.map((p) => p.text).join("\n");
 }
 function readPara(ctx, shape, p) {
-  let text = "";
+  let text2 = "";
   let firstRPr;
   let seen = false;
   for (const r of children(p, A3)) {
     if (r.localName === "r" || r.localName === "fld") {
       if (!seen) firstRPr = child(r, A3, "rPr"), seen = true;
-      text += child(r, A3, "t")?.textContent ?? "";
-    } else if (r.localName === "br") text += "\v";
+      text2 += child(r, A3, "t")?.textContent ?? "";
+    } else if (r.localName === "br") text2 += "\v";
   }
   if (!seen) firstRPr = child(p, A3, "endParaRPr");
   const s = runStyle(ctx, shape, p, firstRPr);
   const level2 = (int(child(p, A3, "pPr"), "lvl") ?? 0) + 1;
-  return { text, level: level2, ...s, bullet: s.bullet && text.length > 0 };
+  return { text: text2, level: level2, ...s, bullet: s.bullet && text2.length > 0 };
 }
 function readFrame(ctx, el2, info2) {
   const data = path(el2, [A3, "graphic"], [A3, "graphicData"]);
@@ -8437,8 +25901,8 @@ function notesOf(ctx) {
     const ph2 = phOf(el2);
     if (ph2?.type !== "body") continue;
     const body = child(el2, P2, "txBody");
-    const text = body ? children(body, A3, "p").map((p) => children(p, A3, "r").map((r) => child(r, A3, "t")?.textContent ?? "").join("")).join("\n") : "";
-    return text.trim() ? text : void 0;
+    const text2 = body ? children(body, A3, "p").map((p) => children(p, A3, "r").map((r) => child(r, A3, "t")?.textContent ?? "").join("")).join("\n") : "";
+    return text2.trim() ? text2 : void 0;
   }
   return void 0;
 }
@@ -8466,23 +25930,23 @@ function glyphEm(ch) {
   if (/[\u3000-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(ch)) return 1;
   return 0.52;
 }
-function linesOf(text, size, width, wrap2 = true) {
+function linesOf(text2, size, width, wrap2 = true) {
   let lines = 0;
   let widest = 0;
-  for (const hard of text.split("\v")) {
+  for (const hard of text2.split("\v")) {
     const words = hard.split(/(\s+)/);
     let line = 0;
-    let n = 1;
+    let n2 = 1;
     for (const w of words) {
       const ww = [...w].reduce((s, c) => s + glyphEm(c), 0) * size;
       if (wrap2 && line > 0 && line + ww > width && w.trim()) {
         widest = Math.max(widest, line);
-        n++;
+        n2++;
         line = ww;
       } else line += ww;
     }
     widest = Math.max(widest, line);
-    lines += n;
+    lines += n2;
   }
   return { lines, widest };
 }
@@ -8507,12 +25971,12 @@ function check(deck) {
   for (const s of deck.slides()) {
     const ctx = deck.ctx(s);
     const top = readShapes(ctx);
-    const flat2 = [];
-    const walk = (list) => list.forEach((i2) => (flat2.push(i2), i2.children && walk(i2.children)));
+    const flat3 = [];
+    const walk = (list) => list.forEach((i2) => (flat3.push(i2), i2.children && walk(i2.children)));
     walk(top);
     const at2 = (i2) => ({ kind: "shape", slide: s.index, shape: i2.id });
     if (!top.length) out.push({ code: "empty_slide", severity: "warning", at: { kind: "slide", slide: s.index }, message: `slide ${s.index} has nothing on it` });
-    for (const i2 of flat2) {
+    for (const i2 of flat3) {
       const where = `slide ${s.index}: ${label(i2)}`;
       if (i2.box && (i2.box.w > 0 || i2.box.h > 0)) {
         const inside = overlapArea(i2.box, slideBox);
@@ -8528,8 +25992,8 @@ function check(deck) {
       if (i2.ph && i2.type === "shape" && !(i2.text ?? "").trim() && !["pic", "chart", "tbl", "media", "clipArt", "dgm", "dt", "ftr", "sldNum", "hdr"].includes(i2.ph.type)) {
         out.push({ code: "empty_placeholder", severity: "warning", at: at2(i2), message: `${where} is an empty ${i2.ph.type} placeholder: fill it or remove it (PowerPoint shows "Click to add text" there)` });
       }
-      const text = i2.paras.some((p) => p.text.trim());
-      if (text && i2.box) {
+      const text2 = i2.paras.some((p) => p.text.trim());
+      if (text2 && i2.box) {
         const width = pt(i2.box.w - i2.inset[0] - i2.inset[2]);
         const height = pt(i2.box.h - i2.inset[1] - i2.inset[3]);
         const need = textHeight(i2.paras, width, i2.wrap);
@@ -8550,7 +26014,7 @@ function check(deck) {
       }
       if (i2.type === "picture" && !i2.image) out.push({ code: "broken_image", severity: "error", at: at2(i2), message: `${where} is a picture whose image is missing` });
     }
-    const texts = flat2.filter((i2) => i2.box && i2.type !== "group" && (i2.text ?? "").trim());
+    const texts = flat3.filter((i2) => i2.box && i2.type !== "group" && (i2.text ?? "").trim());
     for (let a = 0; a < texts.length; a++) {
       for (let b = a + 1; b < texts.length; b++) {
         const A8 = texts[a];
@@ -8582,9 +26046,9 @@ var Store = class {
   doc(path2) {
     let d = this.docs.get(path2);
     if (!d) {
-      const text = this.zip.text(path2);
-      if (text === void 0) throw new OfficeError("no_part", `the deck has no ${path2}`);
-      d = parseXml(text, path2);
+      const text2 = this.zip.text(path2);
+      if (text2 === void 0) throw new OfficeError("no_part", `the deck has no ${path2}`);
+      d = parseXml(text2, path2);
       this.docs.set(path2, d);
     }
     return d;
@@ -8597,8 +26061,8 @@ var Store = class {
     this.dirty.add(path2);
   }
   /** A new part from its XML text. */
-  put(path2, xml) {
-    this.docs.set(path2, parseXml(xml, path2));
+  put(path2, xml2) {
+    this.docs.set(path2, parseXml(xml2, path2));
     this.dirty.add(path2);
   }
   /** A new binary part (an image). */
@@ -8649,15 +26113,15 @@ var Store = class {
     const d = this.relsDoc(part2, true);
     const root = d.documentElement;
     const used = new Set(children(root, NS.rel, "Relationship").map((r) => attr(r, "Id")));
-    let n = 1;
-    while (used.has(`rId${n}`)) n++;
+    let n2 = 1;
+    while (used.has(`rId${n2}`)) n2++;
     const el2 = d.createElementNS(NS.rel, "Relationship");
-    el2.setAttribute("Id", `rId${n}`);
+    el2.setAttribute("Id", `rId${n2}`);
     el2.setAttribute("Type", type);
-    el2.setAttribute("Target", relative(part2, target));
+    el2.setAttribute("Target", relative2(part2, target));
     root.appendChild(el2);
     this.touch(relsPath(part2));
-    return `rId${n}`;
+    return `rId${n2}`;
   }
   removeRel(part2, id) {
     const r = this.rel(part2, id);
@@ -8704,13 +26168,13 @@ var Store = class {
   }
   /** The first free `<dir><stem>N.<ext>` path, N from 1. */
   freePath(dir, stem, ext) {
-    for (let n = 1; ; n++) {
-      const p = `${dir}${stem}${n}.${ext}`;
+    for (let n2 = 1; ; n2++) {
+      const p = `${dir}${stem}${n2}.${ext}`;
       if (!this.has(p)) return p;
     }
   }
 };
-function relative(from, target) {
+function relative2(from, target) {
   const a = from.split("/").slice(0, -1);
   const b = target.split("/");
   let i2 = 0;
@@ -8765,10 +26229,10 @@ function layoutShapes(type, w) {
       return "";
   }
 }
-var level = (n, size, bullet) => {
-  const indent = bullet ? ` marL="${emu(18 + 22 * (n - 1))}" indent="${emu(-18)}"` : "";
+var level = (n2, size, bullet) => {
+  const indent = bullet ? ` marL="${emu(18 + 22 * (n2 - 1))}" indent="${emu(-18)}"` : "";
   const bu = bullet ? `<a:buFont typeface="Arial"/><a:buChar char="&#8226;"/>` : "<a:buNone/>";
-  return `<a:lvl${n}pPr${indent} algn="l"><a:spcBef><a:spcPts val="${n === 1 ? 1e3 : 500}"/></a:spcBef>${bu}<a:defRPr sz="${size * 100}"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/></a:defRPr></a:lvl${n}pPr>`;
+  return `<a:lvl${n2}pPr${indent} algn="l"><a:spcBef><a:spcPts val="${n2 === 1 ? 1e3 : 500}"/></a:spcBef>${bu}<a:defRPr sz="${size * 100}"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/></a:defRPr></a:lvl${n2}pPr>`;
 };
 var txStyles = `<p:txStyles><p:titleStyle><a:lvl1pPr algn="l"><a:lnSpc><a:spcPct val="90000"/></a:lnSpc><a:buNone/><a:defRPr sz="3600" b="1"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mj-lt"/></a:defRPr></a:lvl1pPr></p:titleStyle><p:bodyStyle>${[24, 20, 18, 16, 16, 16, 16, 16, 16].map((s, i2) => level(i2 + 1, s, true)).join("")}</p:bodyStyle><p:otherStyle>${[18, 18, 18, 18, 18, 18, 18, 18, 18].map((s, i2) => level(i2 + 1, s, false)).join("")}</p:otherStyle></p:txStyles>`;
 var clrMap = `<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>`;
@@ -8830,7 +26294,7 @@ var DeckCore = class _DeckCore {
   }
   static create(size) {
     const zip = Zip.empty();
-    for (const [p, xml] of newDeck(size)) zip.set(p, xml);
+    for (const [p, xml2] of newDeck(size)) zip.set(p, xml2);
     return new _DeckCore(new Store(zip), "ppt/presentation.xml");
   }
   /** The slide size in EMU. */
@@ -8858,12 +26322,12 @@ var DeckCore = class _DeckCore {
     return out;
   }
   /** The slide at `n` (from 1); throws not_found with the count. */
-  slideAt(n) {
+  slideAt(n2) {
     const all = this.slides();
-    if (!Number.isInteger(n) || n < 1 || n > all.length) {
-      throw new OfficeError("not_found", `there is no slide ${n}: the deck has ${all.length} slide${all.length === 1 ? "" : "s"}${all.length ? ` (1 to ${all.length})` : ""}`);
+    if (!Number.isInteger(n2) || n2 < 1 || n2 > all.length) {
+      throw new OfficeError("not_found", `there is no slide ${n2}: the deck has ${all.length} slide${all.length === 1 ? "" : "s"}${all.length ? ` (1 to ${all.length})` : ""}`);
     }
-    return all[n - 1];
+    return all[n2 - 1];
   }
   /** The slide with that stable id; throws not_found when it was removed. */
   slideById(sldId) {
@@ -8909,15 +26373,15 @@ var DeckCore = class _DeckCore {
   /** Add a slide on a layout, with the layout's placeholders (empty) on it, at position `at` (default: last). */
   addSlide(opts = {}) {
     const layout = this.layout(opts.layout);
-    const count = this.slides().length;
-    const at2 = opts.at ?? count + 1;
-    if (!Number.isInteger(at2) || at2 < 1 || at2 > count + 1) throw new OfficeError("bad_arg", `at is a slide position from 1 to ${count + 1}, got ${JSON.stringify(opts.at)}`);
+    const count2 = this.slides().length;
+    const at2 = opts.at ?? count2 + 1;
+    if (!Number.isInteger(at2) || at2 < 1 || at2 > count2 + 1) throw new OfficeError("bad_arg", `at is a slide position from 1 to ${count2 + 1}, got ${JSON.stringify(opts.at)}`);
     const part2 = this.store.freePath("ppt/slides/", "slide", "xml");
     let id = 1;
     const phs = layoutPlaceholders(this.store, layout.part).map((el2) => {
       const ph2 = path(el2, [P3, "nvSpPr"], [P3, "nvPr"], [P3, "ph"]);
       if (!ph2) return "";
-      const attrs = ["type", "orient", "sz", "idx", "hasCustomPrompt"].filter((n) => ph2.hasAttribute(n) && n !== "hasCustomPrompt").map((n) => ` ${n}="${esc(ph2.getAttribute(n))}"`).join("");
+      const attrs = ["type", "orient", "sz", "idx", "hasCustomPrompt"].filter((n2) => ph2.hasAttribute(n2) && n2 !== "hasCustomPrompt").map((n2) => ` ${n2}="${esc(ph2.getAttribute(n2))}"`).join("");
       const name = attr(cNvPr(el2) ?? el2, "name") ?? "Placeholder";
       id++;
       return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${esc(name)}"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph${attrs}/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody></p:sp>`;
@@ -8972,11 +26436,11 @@ var DeckCore = class _DeckCore {
     const part2 = this.store.freePath("ppt/slides/", "slide", "xml");
     this.store.put(part2, this.store.zip.text(s.part));
     const doc = this.store.doc(part2);
-    const remap = /* @__PURE__ */ new Map();
+    const remap2 = /* @__PURE__ */ new Map();
     for (const rel of this.store.rels(s.part)) {
       if (rel.type === REL.notesSlide) continue;
       if (rel.external) {
-        remap.set(rel.id, this.addExternalRel(part2, rel.type, rel.target));
+        remap2.set(rel.id, this.addExternalRel(part2, rel.type, rel.target));
         continue;
       }
       let target = rel.target;
@@ -8998,9 +26462,9 @@ var DeckCore = class _DeckCore {
         remapRels(chartDoc.documentElement, ids);
         this.store.touch(target);
       }
-      remap.set(rel.id, this.store.addRel(part2, rel.type, target));
+      remap2.set(rel.id, this.store.addRel(part2, rel.type, target));
     }
-    remapRels(doc.documentElement, remap);
+    remapRels(doc.documentElement, remap2);
     this.store.contentType({ part: part2, type: CT_SLIDE });
     return this.insertSlide(part2, s.index + 1);
   }
@@ -9074,7 +26538,7 @@ function remapRels(root, ids) {
 var GEOMETRIES = ["rect", "roundRect", "ellipse", "triangle", "rightArrow", "leftArrow", "upArrow", "downArrow", "chevron", "homePlate", "diamond", "hexagon", "star5", "line"];
 var xfrm = (b) => `<a:xfrm><a:off x="${b.x}" y="${b.y}"/><a:ext cx="${b.w}" cy="${b.h}"/></a:xfrm>`;
 var nv = (tag, id, name, inner, alt) => `<p:nv${tag}Pr><p:cNvPr id="${id}" name="${esc(name)}"${alt ? ` descr="${esc(alt)}"` : ""}/>${inner}<p:nvPr/></p:nv${tag}Pr>`;
-var color = (c) => c === "none" ? "<a:noFill/>" : `<a:solidFill><a:srgbClr val="${hex(c)}"/></a:solidFill>`;
+var color = (c) => c === "none" ? "<a:noFill/>" : `<a:solidFill><a:srgbClr val="${hex2(c)}"/></a:solidFill>`;
 var ANCHOR = { top: "t", middle: "ctr", bottom: "b" };
 function checkLook(l) {
   if (l.lineWidth !== void 0 && !(typeof l.lineWidth === "number" && l.lineWidth >= 0 && l.lineWidth <= 100)) {
@@ -9220,14 +26684,14 @@ var AFTER_FILL = ["effectLst", "effectDag", "highlight", "uLnTx", "uLn", "uFillT
 var AFTER_LATIN = ["ea", "cs", "sym", "hlinkClick", "hlinkMouseOver", "rtl", "extLst"];
 var BULLETS = ["buNone", "buAutoNum", "buChar", "buBlip"];
 var AFTER_BULLET = ["tabLst", "defRPr", "extLst"];
-var at = (names) => names.map((n) => [A5, n]);
+var at = (names) => names.map((n2) => [A5, n2]);
 function checkStyle(s) {
   if (!s) return;
   if (s.size !== void 0 && !(typeof s.size === "number" && s.size >= 1 && s.size <= 400)) {
     throw new OfficeError("bad_arg", `a text size is in points, 1 to 400, got ${JSON.stringify(s.size)}`);
   }
   if (s.align !== void 0 && !ALIGN[s.align]) throw new OfficeError("bad_arg", `align is left, center, right or justify, got ${JSON.stringify(s.align)}`);
-  if (s.color !== void 0) hex(s.color);
+  if (s.color !== void 0) hex2(s.color);
 }
 function styleRun(rPr, s) {
   if (s.size !== void 0) rPr.setAttribute("sz", String(Math.round(s.size * 100)));
@@ -9237,7 +26701,7 @@ function styleRun(rPr, s) {
     for (const f of children(rPr, A5).filter((e) => FILLS.includes(ln2(e)))) remove(f);
     const fill2 = rPr.ownerDocument.createElementNS(A5, "a:solidFill");
     const c = rPr.ownerDocument.createElementNS(A5, "a:srgbClr");
-    c.setAttribute("val", hex(s.color));
+    c.setAttribute("val", hex2(s.color));
     fill2.appendChild(c);
     insertBefore(rPr, fill2, at(AFTER_FILL));
   }
@@ -9298,10 +26762,10 @@ function setText(body, input, style) {
     const rPr = () => {
       const r = rPrT ? rPrT.cloneNode(true) : doc.createElementNS(A5, "a:rPr");
       if (r.localName !== "rPr") {
-        const n = doc.createElementNS(A5, "a:rPr");
-        for (let i2 = 0; i2 < r.attributes.length; i2++) n.setAttribute(r.attributes.item(i2).name, r.attributes.item(i2).value);
-        for (let c = r.firstChild; c; c = c.nextSibling) n.appendChild(c.cloneNode(true));
-        return n;
+        const n2 = doc.createElementNS(A5, "a:rPr");
+        for (let i2 = 0; i2 < r.attributes.length; i2++) n2.setAttribute(r.attributes.item(i2).name, r.attributes.item(i2).value);
+        for (let c = r.firstChild; c; c = c.nextSibling) n2.appendChild(c.cloneNode(true));
+        return n2;
       }
       return r;
     };
@@ -9351,7 +26815,7 @@ function styleText(body, style) {
 }
 function replaceText(body, find2, by) {
   if (typeof find2 !== "string" || !find2) throw new OfficeError("bad_arg", "replace needs the text to find, not an empty string");
-  let count = 0;
+  let count2 = 0;
   for (const p of children(body, A5, "p")) {
     const ts = children(p, A5).filter((e) => e.localName === "r" || e.localName === "fld").map((r) => child(r, A5, "t")).filter((t) => !!t);
     const texts = ts.map((t) => t.textContent ?? "");
@@ -9359,7 +26823,7 @@ function replaceText(body, find2, by) {
     const hits = [];
     for (let i2 = whole.indexOf(find2); i2 >= 0; i2 = whole.indexOf(find2, i2 + find2.length)) hits.push(i2);
     if (!hits.length) continue;
-    count += hits.length;
+    count2 += hits.length;
     for (const start of hits.reverse()) {
       const end = start + find2.length;
       let pos = 0;
@@ -9379,7 +26843,7 @@ function replaceText(body, find2, by) {
       if (t.textContent !== texts[k]) t.textContent = texts[k];
     });
   }
-  return count;
+  return count2;
 }
 
 // src/slides/ops.ts
@@ -9389,10 +26853,10 @@ var XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 function slideSel(deck, sldId, rect) {
   const ref = () => deck.slideById(sldId);
   const s0 = ref();
-  const add = (xml, name) => {
+  const add = (xml2, name) => {
     const s = ref();
     const id = deck.nextId(s);
-    const el2 = frag(deck.store.doc(s.part), xml(id, name.replace("#", String(id - 1))));
+    const el2 = frag(deck.store.doc(s.part), xml2(id, name.replace("#", String(id - 1))));
     insertBefore(spTree(deck.ctx(s)), el2, [[P4, "extLst"]]);
     deck.store.touch(s.part);
     return shapeSel(deck, sldId, String(id));
@@ -9405,7 +26869,7 @@ function slideSel(deck, sldId, rect) {
     ...rect ? { rect } : {},
     shapes: () => top().map((i2) => shapeSel(deck, sldId, i2.id)),
     shape(idOrName) {
-      const all = flat(top());
+      const all = flat2(top());
       const hit = all.find((i2) => i2.id === String(idOrName)) ?? all.find((i2) => i2.name === idOrName);
       if (!hit) {
         throw new OfficeError("not_found", `slide ${ref().index} has no shape ${JSON.stringify(idOrName)}; it has: ${all.map((i2) => `${i2.id} "${i2.name}"`).join(", ") || "nothing"}`);
@@ -9423,15 +26887,15 @@ function slideSel(deck, sldId, rect) {
       const r = { x: rect.x / 100 * size.w, y: rect.y / 100 * size.h, w: rect.w / 100 * size.w, h: rect.h / 100 * size.h };
       return top().filter((i2) => i2.box && overlapArea(i2.box, r) > 0).sort((a, b) => overlapArea(b.box, r) - overlapArea(a.box, r)).map((i2) => shapeSel(deck, sldId, i2.id));
     },
-    addText(text, box, style = {}) {
+    addText(text2, box, style = {}) {
       const { fill: fill2, line, lineWidth, valign, name, ...ts } = style;
       const b = boxEmu(box);
-      const s = add((id, n) => textBoxXml(id, n, b, { fill: fill2, line, lineWidth, valign }), name ?? "TextBox #");
-      return s.setText(text, ts);
+      const s = add((id, n2) => textBoxXml(id, n2, b, { fill: fill2, line, lineWidth, valign }), name ?? "TextBox #");
+      return s.setText(text2, ts);
     },
     addShape(geometry, box, opts = {}) {
       const b = boxEmu(box);
-      const s = add((id, n) => shapeXml(id, n, geometry, b, opts), opts.name ?? `${geometry} #`);
+      const s = add((id, n2) => shapeXml(id, n2, geometry, b, opts), opts.name ?? `${geometry} #`);
       return opts.text !== void 0 ? s.setText(opts.text, opts.style) : s;
     },
     addImage(bytes, box, opts = {}) {
@@ -9445,11 +26909,11 @@ function slideSel(deck, sldId, rect) {
       deck.store.putBytes(media, bytes);
       deck.store.contentType({ ext: media.slice(media.lastIndexOf(".") + 1), type: info2.mime });
       const rid = deck.store.addRel(s.part, REL.image, media);
-      return add((id, n) => pictureXml(id, n, rid, b, opts.alt), opts.name ?? "Picture #");
+      return add((id, n2) => pictureXml(id, n2, rid, b, opts.alt), opts.name ?? "Picture #");
     },
     addTable(rows, box, opts = {}) {
       const b = boxEmu(box);
-      return add((id, n) => tableXml(id, n, rows, b, opts), opts.name ?? "Table #");
+      return add((id, n2) => tableXml(id, n2, rows, b, opts), opts.name ?? "Table #");
     },
     addChart(chart, box, opts = {}) {
       const b = boxEmu(box);
@@ -9462,7 +26926,7 @@ function slideSel(deck, sldId, rect) {
       deck.store.put(part2, writeChart(chart, deck.store.addRel(part2, REL.package, emb)));
       deck.store.contentType({ part: part2, type: "application/vnd.openxmlformats-officedocument.drawingml.chart+xml" });
       const rid = deck.store.addRel(s.part, REL.chart, part2);
-      return add((id, n) => chartFrameXml(id, n, rid, b), opts.name ?? "Chart #");
+      return add((id, n2) => chartFrameXml(id, n2, rid, b), opts.name ?? "Chart #");
     },
     remove: () => deck.removeSlide(ref()),
     moveTo: (position) => slideSel(deck, deck.moveSlide(ref(), position).sldId),
@@ -9470,8 +26934,8 @@ function slideSel(deck, sldId, rect) {
   };
   return sel;
 }
-function flat(list) {
-  return list.flatMap((i2) => [i2, ...i2.children ? flat(i2.children) : []]);
+function flat2(list) {
+  return list.flatMap((i2) => [i2, ...i2.children ? flat2(i2.children) : []]);
 }
 function shapeSel(deck, sldId, id, quote) {
   const slide = () => deck.slideById(sldId);
@@ -9483,7 +26947,7 @@ function shapeSel(deck, sldId, id, quote) {
   };
   const info2 = () => {
     const s = slide();
-    const hit = flat(readShapes(deck.ctx(s))).find((i2) => i2.id === id);
+    const hit = flat2(readShapes(deck.ctx(s))).find((i2) => i2.id === id);
     if (!hit) throw new OfficeError("not_found", `slide ${s.index} has no shape ${id} (any more): inspect() again for its shapes`);
     return hit;
   };
@@ -9511,9 +26975,9 @@ function shapeSel(deck, sldId, id, quote) {
     id,
     ...quote !== void 0 ? { quote } : {},
     text: () => info2().text ?? "",
-    setText(text, style) {
+    setText(text2, style) {
       const { s, body: b } = body("set");
-      setText(b, text, style);
+      setText(b, text2, style);
       return done(s);
     },
     replace(find2, by) {
@@ -9550,7 +27014,7 @@ function shapeSel(deck, sldId, id, quote) {
       const { s, el: e } = el2();
       const spPr = shapeProps(e, s.index);
       for (const f2 of children(spPr, A6).filter((x2) => ["noFill", "solidFill", "gradFill", "blipFill", "pattFill", "grpFill"].includes(ln2(x2)))) remove(f2);
-      const f = frag(deck.store.doc(s.part), color2 === "none" ? "<a:noFill/>" : `<a:solidFill><a:srgbClr val="${hex(color2)}"/></a:solidFill>`);
+      const f = frag(deck.store.doc(s.part), color2 === "none" ? "<a:noFill/>" : `<a:solidFill><a:srgbClr val="${hex2(color2)}"/></a:solidFill>`);
       insertBefore(spPr, f, [[A6, "ln"], [A6, "effectLst"], [A6, "effectDag"], [A6, "scene3d"], [A6, "sp3d"], [A6, "extLst"]]);
       return done(s);
     },
@@ -9563,12 +27027,12 @@ function shapeSel(deck, sldId, id, quote) {
         if (!(typeof width === "number" && width >= 0 && width <= 100)) throw bad(`a line's width is in points, 0 to 100, got ${JSON.stringify(width)}`);
         outline2.setAttribute("w", String(emu(width)));
       }
-      const f = frag(deck.store.doc(s.part), color2 === "none" ? "<a:noFill/>" : `<a:solidFill><a:srgbClr val="${hex(color2)}"/></a:solidFill>`);
+      const f = frag(deck.store.doc(s.part), color2 === "none" ? "<a:noFill/>" : `<a:solidFill><a:srgbClr val="${hex2(color2)}"/></a:solidFill>`);
       outline2.insertBefore(f, outline2.firstChild);
       return done(s);
     },
     rows: () => info2().rows ?? [],
-    setCell(row, col2, text, style) {
+    setCell(row, col2, text2, style) {
       const { s, el: e } = el2();
       const tbl = path(e, [A6, "graphic"], [A6, "graphicData"], [A6, "tbl"]);
       if (!tbl) throw bad(`shape ${id} on slide ${s.index} is a ${describe2(e)}, not a table`);
@@ -9581,7 +27045,7 @@ function shapeSel(deck, sldId, id, quote) {
         b = frag(deck.store.doc(s.part), `<a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></a:txBody>`);
         tc.insertBefore(b, tc.firstChild);
       }
-      setText(b, text, style);
+      setText(b, text2, style);
       return done(s);
     },
     replaceImage(bytes) {
@@ -9638,12 +27102,12 @@ function setXfrm(deck, s, e, b) {
 }
 function relIds(e) {
   const out = [];
-  const walk = (n) => {
-    for (let i2 = 0; i2 < n.attributes.length; i2++) {
-      const a = n.attributes.item(i2);
+  const walk = (n2) => {
+    for (let i2 = 0; i2 < n2.attributes.length; i2++) {
+      const a = n2.attributes.item(i2);
       if (a.namespaceURI === R3) out.push(a.value);
     }
-    for (const c of children(n)) walk(c);
+    for (const c of children(n2)) walk(c);
   };
   walk(e);
   return out;
@@ -9673,8 +27137,8 @@ var Deck = class {
     return this.core.layouts().map(({ part: _part, ...l }) => l);
   }
   /** Slide `n`, from 1. */
-  slide(n) {
-    return slideSel(this.core, this.core.slideAt(n).sldId);
+  slide(n2) {
+    return slideSel(this.core, this.core.slideAt(n2).sldId);
   }
   slides() {
     return this.core.slides().map((s) => slideSel(this.core, s.sldId));
@@ -9737,8 +27201,8 @@ function getW(e, local) {
 function setW(e, local, value) {
   e.setAttributeNS(W, `w:${local}`, value);
 }
-function isW(n, local) {
-  return !!n && n.nodeType === 1 && n.namespaceURI === W && (local === void 0 || n.localName === local);
+function isW(n2, local) {
+  return !!n2 && n2.nodeType === 1 && n2.namespaceURI === W && (local === void 0 || n2.localName === local);
 }
 function wkids(node, local) {
   return children(node, W, local);
@@ -9746,10 +27210,10 @@ function wkids(node, local) {
 function wkid(node, local) {
   return child(node, W, local);
 }
-function textEl(doc, local, text) {
+function textEl(doc, local, text2) {
   const t = el(doc, local);
   t.setAttributeNS(XML, "xml:space", "preserve");
-  t.appendChild(doc.createTextNode(text));
+  t.appendChild(doc.createTextNode(text2));
   return t;
 }
 var RPR = "rStyle rFonts b bCs i iCs caps smallCaps strike dstrike outline shadow emboss imprint noProof snapToGrid vanish webHidden color spacing w kern position sz szCs highlight u effect bdr shd fitText vertAlign rtl cs em lang eastAsianLayout specVanish oMath ins del moveFrom moveTo rPrChange".split(" ");
@@ -9780,11 +27244,11 @@ function unwrap(e) {
   while (e.firstChild) parent.insertBefore(e.firstChild, e);
   parent.removeChild(e);
 }
-function remove2(n) {
-  n.parentNode?.removeChild(n);
+function remove2(n2) {
+  n2.parentNode?.removeChild(n2);
 }
-function insertAfter(n, ref) {
-  ref.parentNode.insertBefore(n, ref.nextSibling);
+function insertAfter(n2, ref) {
+  ref.parentNode.insertBefore(n2, ref.nextSibling);
 }
 function wordDate(d) {
   return d.toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -9799,8 +27263,8 @@ function readStyles(parts) {
     const id = getW(s, "styleId") ?? "";
     const pPr = wkid(s, "pPr");
     const lvl = pPr && wkid(pPr, "outlineLvl");
-    const num = pPr && wkid(pPr, "numPr");
-    const numId = num && wkid(num, "numId");
+    const num2 = pPr && wkid(pPr, "numPr");
+    const numId = num2 && wkid(num2, "numId");
     out.set(id, {
       id,
       name: (wkid(s, "name") && getW(wkid(s, "name"), "val")) ?? id,
@@ -9827,10 +27291,10 @@ function headingLevel(styles, styleId, own) {
   return void 0;
 }
 var HEADING_SIZES = [0, 32, 26, 24, 22, 22, 22];
-function heading(n) {
-  return `<w:style w:type="paragraph" w:styleId="Heading${n}"><w:name w:val="heading ${n}"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="9"/><w:qFormat/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="${n === 1 ? 360 : 200}" w:after="80"/><w:outlineLvl w:val="${n - 1}"/></w:pPr><w:rPr><w:b/><w:sz w:val="${HEADING_SIZES[n]}"/><w:szCs w:val="${HEADING_SIZES[n]}"/></w:rPr></w:style>`;
+function heading(n2) {
+  return `<w:style w:type="paragraph" w:styleId="Heading${n2}"><w:name w:val="heading ${n2}"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="9"/><w:qFormat/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="${n2 === 1 ? 360 : 200}" w:after="80"/><w:outlineLvl w:val="${n2 - 1}"/></w:pPr><w:rPr><w:b/><w:sz w:val="${HEADING_SIZES[n2]}"/><w:szCs w:val="${HEADING_SIZES[n2]}"/></w:rPr></w:style>`;
 }
-var BUILTIN = {
+var BUILTIN2 = {
   Normal: `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>`,
   Title: `<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="10"/><w:qFormat/><w:pPr><w:spacing w:after="160"/><w:contextualSpacing/></w:pPr><w:rPr><w:sz w:val="56"/><w:szCs w:val="56"/></w:rPr></w:style>`,
   Heading1: heading(1),
@@ -9846,22 +27310,22 @@ var BUILTIN = {
   Hyperlink: `<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:uiPriority w:val="99"/><w:unhideWhenUsed/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style>`
 };
 var DEFAULTS = `<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:eastAsia="Aptos" w:cs="Aptos"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="259" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>`;
-function stylesXml(ids = Object.keys(BUILTIN)) {
+function stylesXml(ids = Object.keys(BUILTIN2)) {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:styles xmlns:w="${W}">${DEFAULTS}${ids.map((id) => BUILTIN[id]).join("")}</w:styles>`;
+<w:styles xmlns:w="${W}">${DEFAULTS}${ids.map((id) => BUILTIN2[id]).join("")}</w:styles>`;
 }
 function ensureStyle(parts, id) {
-  if (!BUILTIN[id]) return readStyles(parts).has(id);
+  if (!BUILTIN2[id]) return readStyles(parts).has(id);
   const path2 = parts.ensure("styles", () => stylesXml(["Normal", "TableNormal"]));
   const doc = parts.dom(path2);
   const root = doc.documentElement;
   const have = new Set(wkids(root, "style").map((s) => getW(s, "styleId")));
   if (have.has(id)) return true;
-  const frag2 = parseXml(`<x xmlns:w="${W}">${BUILTIN[id]}</x>`, "style");
+  const frag2 = parseXml(`<x xmlns:w="${W}">${BUILTIN2[id]}</x>`, "style");
   const made = frag2.documentElement.firstChild;
   root.appendChild(doc.importNode(made, true));
   parts.touch(path2);
-  const based = /w:basedOn w:val="([^"]+)"/.exec(BUILTIN[id])?.[1];
+  const based = /w:basedOn w:val="([^"]+)"/.exec(BUILTIN2[id])?.[1];
   if (based) ensureStyle(parts, based);
   return true;
 }
@@ -9870,8 +27334,8 @@ var NUMBERS = ["decimal", "lowerLetter", "lowerRoman", "decimal", "lowerLetter",
 function abstractNum(id, ordered) {
   const lvls = Array.from({ length: 9 }, (_, i2) => {
     const fmt = ordered ? NUMBERS[i2] : "bullet";
-    const text = ordered ? `%${i2 + 1}.` : BULLETS2[i2];
-    return `<w:lvl w:ilvl="${i2}"><w:start w:val="1"/><w:numFmt w:val="${fmt}"/><w:lvlText w:val="${text}"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="${720 * (i2 + 1)}" w:hanging="360"/></w:pPr></w:lvl>`;
+    const text2 = ordered ? `%${i2 + 1}.` : BULLETS2[i2];
+    return `<w:lvl w:ilvl="${i2}"><w:start w:val="1"/><w:numFmt w:val="${fmt}"/><w:lvlText w:val="${text2}"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="${720 * (i2 + 1)}" w:hanging="360"/></w:pPr></w:lvl>`;
   }).join("");
   return `<w:abstractNum w:abstractNumId="${id}"><w:multiLevelType w:val="hybridMultilevel"/><w:name w:val="bise ${ordered ? "numbered" : "bullets"}"/>${lvls}</w:abstractNum>`;
 }
@@ -9886,15 +27350,15 @@ function listNumId(parts, ordered) {
   const mine = abs.find((a2) => wkid(a2, "name") && getW(wkid(a2, "name"), "val") === name);
   if (mine) {
     const aid2 = getW(mine, "abstractNumId");
-    const num = nums.find((n2) => wkid(n2, "abstractNumId") && getW(wkid(n2, "abstractNumId"), "val") === aid2);
-    if (num) return getW(num, "numId");
+    const num2 = nums.find((n3) => wkid(n3, "abstractNumId") && getW(wkid(n3, "abstractNumId"), "val") === aid2);
+    if (num2) return getW(num2, "numId");
   }
   const aid = Math.max(-1, ...abs.map((a2) => Number(getW(a2, "abstractNumId") ?? -1))) + 1;
-  const nid = Math.max(0, ...nums.map((n2) => Number(getW(n2, "numId") ?? 0))) + 1;
+  const nid = Math.max(0, ...nums.map((n3) => Number(getW(n3, "numId") ?? 0))) + 1;
   const frag2 = parseXml(`<x xmlns:w="${W}">${abstractNum(aid, ordered)}<w:num w:numId="${nid}"><w:abstractNumId w:val="${aid}"/></w:num></x>`, "numbering");
-  const [a, n] = children(frag2.documentElement, W);
+  const [a, n2] = children(frag2.documentElement, W);
   root.insertBefore(doc.importNode(a, true), nums[0] ?? null);
-  root.appendChild(doc.importNode(n, true));
+  root.appendChild(doc.importNode(n2, true));
   parts.touch(path2);
   return String(nid);
 }
@@ -9902,8 +27366,8 @@ function listOrdered(parts, numId, level2) {
   const path2 = parts.find("numbering");
   if (!path2) return void 0;
   const root = parts.dom(path2).documentElement;
-  const num = wkids(root, "num").find((n) => getW(n, "numId") === numId);
-  const aidEl = num && wkid(num, "abstractNumId");
+  const num2 = wkids(root, "num").find((n2) => getW(n2, "numId") === numId);
+  const aidEl = num2 && wkid(num2, "abstractNumId");
   if (!aidEl) return void 0;
   const aid = getW(aidEl, "val");
   const abs = wkids(root, "abstractNum").find((a) => getW(a, "abstractNumId") === aid);
@@ -9914,7 +27378,7 @@ function listOrdered(parts, numId, level2) {
 function numIds(parts) {
   const path2 = parts.find("numbering");
   if (!path2) return /* @__PURE__ */ new Set();
-  return new Set(wkids(parts.dom(path2).documentElement, "num").map((n) => getW(n, "numId") ?? ""));
+  return new Set(wkids(parts.dom(path2).documentElement, "num").map((n2) => getW(n2, "numId") ?? ""));
 }
 
 // src/docs/text.ts
@@ -9972,8 +27436,8 @@ function textOfPara(p) {
   return scan(p).text;
 }
 function splitAt(p, offset) {
-  const { atoms, text } = scan(p);
-  if (offset <= 0 || offset >= text.length) return;
+  const { atoms, text: text2 } = scan(p);
+  if (offset <= 0 || offset >= text2.length) return;
   const before = atoms.find((x2) => x2.start <= offset - 1 && offset - 1 < x2.start + x2.text.length);
   const after = atoms.find((x2) => x2.start <= offset && offset < x2.start + x2.text.length);
   if (before.run !== after.run) return;
@@ -10003,7 +27467,7 @@ function runsIn(p, a, b) {
   }
   return out;
 }
-function makeRun(p, text, like) {
+function makeRun(p, text2, like) {
   const doc = p.ownerDocument;
   const r = el(doc, "r");
   const rPr = like && wkid(like, "rPr");
@@ -10012,7 +27476,7 @@ function makeRun(p, text, like) {
     for (const c of wkids(copy, "rPrChange")) copy.removeChild(c);
     r.appendChild(copy);
   }
-  const parts = text.split(/(\t|\n)/);
+  const parts = text2.split(/(\t|\n)/);
   for (const s of parts) {
     if (s === "	") r.appendChild(el(doc, "tab"));
     else if (s === "\n") r.appendChild(el(doc, "br"));
@@ -10054,13 +27518,13 @@ function dropEmpty(e) {
     dropEmpty(up);
   }
 }
-function insertText(p, offset, text, track) {
+function insertText(p, offset, text2, track) {
   splitAt(p, offset);
   const { atoms } = scan(p);
   const prev = atoms.filter((x2) => x2.start + x2.text.length <= offset).pop();
   const next = atoms.find((x2) => x2.start >= offset);
   const like = prev?.run ?? next?.run;
-  const r = makeRun(p, text, like);
+  const r = makeRun(p, text2, like);
   if (prev) insertAfter(r, outOfIns(prev.run, track));
   else if (next) {
     const ref = outOfIns(next.run, track);
@@ -10072,34 +27536,34 @@ function outOfIns(r, track) {
   const parent = r.parentNode;
   return track && isW(parent, "ins") ? parent : r;
 }
-function replaceSpan(p, a, b, text, track) {
+function replaceSpan(p, a, b, text2, track) {
   if (a === b) {
-    if (text) insertText(p, a, text, track);
+    if (text2) insertText(p, a, text2, track);
     return;
   }
   const runs = runsIn(p, a, b);
-  if (text) {
+  if (text2) {
     const first = runs[0];
-    const r = makeRun(p, text, first);
+    const r = makeRun(p, text2, first);
     const ref = outOfIns(first, track);
     ref.parentNode.insertBefore(r, ref);
     if (track) wrap("ins", track, r);
   }
   deleteRuns(runs, track);
 }
-function matches(text, find2) {
+function matches(text2, find2) {
   const out = [];
   if (typeof find2 === "string") {
     if (!find2) return out;
-    let i2 = text.indexOf(find2);
+    let i2 = text2.indexOf(find2);
     while (i2 >= 0) {
       out.push({ start: i2, end: i2 + find2.length, groups: [find2] });
-      i2 = text.indexOf(find2, i2 + find2.length);
+      i2 = text2.indexOf(find2, i2 + find2.length);
     }
     return out;
   }
   const re = new RegExp(find2.source, find2.flags.includes("g") ? find2.flags : `${find2.flags}g`);
-  for (const m of text.matchAll(re)) {
+  for (const m of text2.matchAll(re)) {
     if (m[0].length === 0) continue;
     out.push({ start: m.index, end: m.index + m[0].length, groups: [...m] });
   }
@@ -10142,8 +27606,8 @@ function formatRun(r, f, track, setProp2) {
 
 // src/docs/blocks.ts
 var BLOCK_KINDS = ["para", "title", "heading", "bullet", "numbered", "quote", "table", "image", "pagebreak"];
-function fillRuns(m, p, text, track) {
-  const runs = typeof text === "string" ? [{ text }] : text;
+function fillRuns(m, p, text2, track) {
+  const runs = typeof text2 === "string" ? [{ text: text2 }] : text2;
   const made = [];
   for (const run2 of runs) {
     if (typeof run2?.text !== "string") throw new OfficeError("bad_arg", `a run is {text, bold?, italic?, link?, ...}, got ${JSON.stringify(run2)}`);
@@ -10173,15 +27637,15 @@ function markParaInserted(p, track) {
   const rPr = wkid(pPr, "rPr") ?? setProp(pPr, el(p.ownerDocument, "rPr"));
   setProp(rPr, el(p.ownerDocument, "ins", { id: track.nextId(), author: track.author, date: track.date }));
 }
-function para(m, style, text, track, align) {
+function para(m, style, text2, track, align) {
   const p = el(m.doc, "p");
-  m.name(p, `new:${m.paras().length}:${JSON.stringify(text ?? "")}`);
+  m.name(p, `new:${m.paras().length}:${JSON.stringify(text2 ?? "")}`);
   if (style) {
     if (!ensureStyle(m.parts, style)) throw new OfficeError("bad_arg", `no paragraph style "${style}" in this docx (and it is not one bise knows how to add: Title, Heading1-6, ListParagraph, Quote)`);
     setProp(props(p, "pPr"), el(m.doc, "pStyle", { val: style }));
   }
   if (align) setProp(props(p, "pPr"), el(m.doc, "jc", { val: align === "justify" ? "both" : align }));
-  if (text !== void 0) fillRuns(m, p, text, track);
+  if (text2 !== void 0) fillRuns(m, p, text2, track);
   if (track) markParaInserted(p, track);
   return p;
 }
@@ -10259,8 +27723,8 @@ function buildRow(m, row, cols, tw, isHeader, track) {
     tcPr.appendChild(el(m.doc, "tcW", { w: String(tw[c] ?? tw[tw.length - 1]), type: "dxa" }));
     tc.appendChild(tcPr);
     const cell = row[c] ?? "";
-    const text = isHeader && typeof cell === "string" ? [{ text: cell, bold: true }] : cell;
-    tc.appendChild(para(m, void 0, text, track));
+    const text2 = isHeader && typeof cell === "string" ? [{ text: cell, bold: true }] : cell;
+    tc.appendChild(para(m, void 0, text2, track));
     tr.appendChild(tc);
   }
   return tr;
@@ -10301,8 +27765,8 @@ function buildImage(m, bytes, widthPt, alt, track) {
   for (let i2 = 0; i2 < used.length; i2++) id = Math.max(id, Number(used.item(i2).getAttribute("id")) + 1 || id);
   const name = `Picture ${id}`;
   const descr = (alt ?? "").replace(/[<>&"]/g, (c) => `&#${c.charCodeAt(0)};`);
-  const xml = `<w:r xmlns:w="${W}" xmlns:r="${R4}" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${id}" name="${name}" descr="${descr}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="${name}" descr="${descr}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
-  const r = m.doc.importNode(parseXml(xml, "image").documentElement, true);
+  const xml2 = `<w:r xmlns:w="${W}" xmlns:r="${R4}" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${id}" name="${name}" descr="${descr}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="${name}" descr="${descr}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+  const r = m.doc.importNode(parseXml(xml2, "image").documentElement, true);
   const p = para(m, void 0, void 0, track);
   p.appendChild(track ? wrapNew(m, r, track) : r);
   return p;
@@ -10334,9 +27798,9 @@ var Parts = class {
   dom(path2) {
     let d = this.doms.get(path2);
     if (!d) {
-      const text = this.zip.text(path2);
-      if (text === void 0) throw new OfficeError("no_part", `the docx has no ${path2}`);
-      d = parseXml(text, path2);
+      const text2 = this.zip.text(path2);
+      if (text2 === void 0) throw new OfficeError("no_part", `the docx has no ${path2}`);
+      d = parseXml(text2, path2);
       this.doms.set(path2, d);
     }
     return d;
@@ -10355,12 +27819,12 @@ var Parts = class {
     return r && this.zip.has(r.target) ? r.target : void 0;
   }
   /** A known part, made from `xml` with its content type and relationship when the file has none. */
-  ensure(kind, xml) {
+  ensure(kind, xml2) {
     const have = this.find(kind);
     if (have) return have;
     const dir = this.main.slice(0, this.main.lastIndexOf("/") + 1);
     const path2 = `${dir}${KNOWN[kind].file}`;
-    this.zip.set(path2, xml());
+    this.zip.set(path2, xml2());
     this.addOverride(path2, KNOWN[kind].type);
     this.addRel(KNOWN[kind].rel, KNOWN[kind].file);
     return path2;
@@ -10375,16 +27839,16 @@ var Parts = class {
     const doc = this.dom(path2);
     const root = doc.documentElement;
     const taken = new Set(children(root, NS.rel, "Relationship").map((r2) => attr(r2, "Id")));
-    let n = taken.size + 1;
-    while (taken.has(`rId${n}`)) n++;
+    let n2 = taken.size + 1;
+    while (taken.has(`rId${n2}`)) n2++;
     const r = doc.createElementNS(NS.rel, "Relationship");
-    r.setAttribute("Id", `rId${n}`);
+    r.setAttribute("Id", `rId${n2}`);
     r.setAttribute("Type", type);
     r.setAttribute("Target", target);
     if (external) r.setAttribute("TargetMode", "External");
     root.appendChild(r);
     this.zip.set(path2, writeXml(doc));
-    return `rId${n}`;
+    return `rId${n2}`;
   }
   /** The target part of one of the main part's relationships. */
   target(rid) {
@@ -10414,9 +27878,9 @@ var Parts = class {
   /** A free part path in the main part's folder: `media/image1.png`, ... */
   freePath(sub, stem, ext) {
     const dir = this.main.slice(0, this.main.lastIndexOf("/") + 1);
-    let n = 1;
-    while (this.zip.has(`${dir}${sub}/${stem}${n}.${ext}`)) n++;
-    return `${dir}${sub}/${stem}${n}.${ext}`;
+    let n2 = 1;
+    while (this.zip.has(`${dir}${sub}/${stem}${n2}.${ext}`)) n2++;
+    return `${dir}${sub}/${stem}${n2}.${ext}`;
   }
   /** The edited DOMs back into the zip. */
   flush() {
@@ -10604,8 +28068,8 @@ function maxId(doc) {
   for (const local of ["ins", "del", "moveFrom", "moveTo", "rPrChange", "pPrChange", "trPrChange", "tcPrChange", "tblPrChange", "sectPrChange", "bookmarkStart", "commentRangeStart"]) {
     const list = doc.getElementsByTagNameNS(W, local);
     for (let i2 = 0; i2 < list.length; i2++) {
-      const n = Number(getW(list.item(i2), "id"));
-      if (Number.isFinite(n) && n > max2) max2 = n;
+      const n2 = Number(getW(list.item(i2), "id"));
+      if (Number.isFinite(n2) && n2 > max2) max2 = n2;
     }
   }
   return max2;
@@ -10624,8 +28088,8 @@ function runText(e) {
   }
   return out;
 }
-function info(e, kind, p, m, text = "") {
-  return { id: getW(e, "id") ?? "", kind, author: getW(e, "author") ?? "", date: getW(e, "date"), text, para: m.paraId(p), el: e, p };
+function info(e, kind, p, m, text2 = "") {
+  return { id: getW(e, "id") ?? "", kind, author: getW(e, "author") ?? "", date: getW(e, "date"), text: text2, para: m.paraId(p), el: e, p };
 }
 function find(m) {
   const out = [];
@@ -10799,12 +28263,12 @@ function places(m) {
   const starts = /* @__PURE__ */ new Map();
   const out = /* @__PURE__ */ new Map();
   for (const p of m.paras()) {
-    const { marks, text } = scan(p);
+    const { marks, text: text2 } = scan(p);
     for (const k of marks) {
       if (k.local === "commentRangeStart") starts.set(k.id, { p, offset: k.offset });
       else if (k.local === "commentRangeEnd" || k.local === "commentReference" && !out.has(k.id)) {
         const s = starts.get(k.id);
-        if (s && s.p === p) out.set(k.id, { para: m.paraId(p), quote: text.slice(s.offset, k.offset) });
+        if (s && s.p === p) out.set(k.id, { para: m.paraId(p), quote: text2.slice(s.offset, k.offset) });
         else if (s) out.set(k.id, { para: m.paraId(s.p), quote: scan(s.p).text.slice(s.offset) });
         else if (!out.has(k.id)) out.set(k.id, { para: m.paraId(p), quote: "" });
       }
@@ -10826,13 +28290,13 @@ function listComments(m) {
     const pid = (lastParaId(c) ?? "").toUpperCase();
     const ex = ext.get(pid);
     const parent = ex?.getAttributeNS(W15, "paraIdParent");
-    const text = wkids(c, "p").map((p) => scan(p).text).join("\n");
+    const text2 = wkids(c, "p").map((p) => scan(p).text).join("\n");
     const at2 = where.get(id);
     return {
       id,
       author: getW(c, "author") ?? "",
       date: getW(c, "date"),
-      text,
+      text: text2,
       para: at2?.para,
       quote: at2?.quote,
       replyTo: parent ? byPara.get(parent.toUpperCase()) : void 0,
@@ -10843,12 +28307,12 @@ function listComments(m) {
 function nextCommentId(m) {
   return String(Math.max(-1, ...commentEls(m).map((c) => Number(getW(c, "id") ?? -1))) + 1);
 }
-function makeComment(m, id, text, initials) {
+function makeComment(m, id, text2, initials) {
   const path2 = part(m, true);
   const cdoc = m.parts.dom(path2);
   declareW14(cdoc.documentElement);
   const c = el(cdoc, "comment", { id, author: m.author, date: wordDate(m.now()), initials });
-  text.split("\n").forEach((line, i2) => {
+  text2.split("\n").forEach((line, i2) => {
     const p = el(cdoc, "p");
     p.setAttributeNS(W14, "w14:paraId", m.freeId(`comment:${id}:${i2}:${line}`));
     p.setAttributeNS(W14, "w14:textId", "77777777");
@@ -10869,15 +28333,15 @@ function makeComment(m, id, text, initials) {
 function initialsOf(name) {
   return name.split(/\s+/).filter(Boolean).map((w) => w[0].toUpperCase()).join("").slice(0, 4) || "B";
 }
-function topOf(p, n) {
-  let x2 = n;
+function topOf(p, n2) {
+  let x2 = n2;
   while (x2.parentNode && x2.parentNode !== p) x2 = x2.parentNode;
   return x2;
 }
-function addComment(m, p, text, span2) {
-  if (typeof text !== "string" || !text.trim()) throw new OfficeError("bad_arg", "a comment needs some text");
+function addComment(m, p, text2, span2) {
+  if (typeof text2 !== "string" || !text2.trim()) throw new OfficeError("bad_arg", "a comment needs some text");
   const id = nextCommentId(m);
-  makeComment(m, id, text, initialsOf(m.author));
+  makeComment(m, id, text2, initialsOf(m.author));
   placeRange(m, p, id, span2);
   m.touch();
   return listComments(m).find((c) => c.id === id);
@@ -10887,9 +28351,9 @@ function placeRange(m, p, id, span2) {
   const end = el(m.doc, "commentRangeEnd", { id });
   const refRun = el(m.doc, "r");
   refRun.appendChild(el(m.doc, "commentReference", { id }));
-  const { text } = scan(p);
+  const { text: text2 } = scan(p);
   const a = span2?.start ?? 0;
-  const b = span2?.end ?? text.length;
+  const b = span2?.end ?? text2.length;
   splitAt(p, a);
   splitAt(p, b);
   const atoms = scan(p).atoms;
@@ -10907,12 +28371,12 @@ function placeRange(m, p, id, span2) {
   insertAfter(end, e);
   insertAfter(refRun, end);
 }
-function reply(m, parentId, text) {
+function reply(m, parentId, text2) {
   const parent = commentEls(m).find((c2) => getW(c2, "id") === String(parentId));
   if (!parent) throw new OfficeError("not_found", `no comment ${parentId} in this docx (doc.comments.list() has their ids)`);
-  if (typeof text !== "string" || !text.trim()) throw new OfficeError("bad_arg", "a reply needs some text");
+  if (typeof text2 !== "string" || !text2.trim()) throw new OfficeError("bad_arg", "a reply needs some text");
   const id = nextCommentId(m);
-  const c = makeComment(m, id, text, initialsOf(m.author));
+  const c = makeComment(m, id, text2, initialsOf(m.author));
   const parentPid = ensureLastParaId(m, parent);
   setExt(m, lastParaId(c), { paraIdParent: parentPid });
   for (const p of m.paras()) {
@@ -11072,11 +28536,11 @@ function para2(ctx, p, cell) {
   }
   const seen = /* @__PURE__ */ new Map();
   for (const c of ctx.changes.get(id) ?? []) {
-    const n = (seen.get(c.id) ?? 0) + 1;
-    seen.set(c.id, n);
+    const n2 = (seen.get(c.id) ?? 0) + 1;
+    seen.set(c.id, n2);
     const cp = { kind: c.kind, author: c.author, change: c.id };
     if (c.date) cp.date = c.date;
-    kids.push({ id: n > 1 ? `change:${c.id}#${n}` : `change:${c.id}`, type: "change", anchor: paraAnchor(id), text: c.text, props: cp });
+    kids.push({ id: n2 > 1 ? `change:${c.id}#${n2}` : `change:${c.id}`, type: "change", anchor: paraAnchor(id), text: c.text, props: cp });
   }
   if (kids.length) node.children = kids;
   return node;
@@ -11110,8 +28574,8 @@ function check2(m) {
   for (const p of m.paras()) {
     const id = m.paraId(p);
     const at2 = paraAnchor(id);
-    const text = scan(p).text;
-    if (text.trim()) any = true;
+    const text2 = scan(p).text;
+    if (text2.trim()) any = true;
     const props2 = paraProps({ m, styles }, p);
     const style = props2.style;
     if (style && styles.size && !styles.has(style)) {
@@ -11125,13 +28589,13 @@ function check2(m) {
     }
     const level2 = props2.level;
     if (level2 !== void 0 && level2 > 0) {
-      if (!text.trim()) out.push({ code: "empty_heading", severity: "warning", at: at2, message: `heading ${id} has no text` });
+      if (!text2.trim()) out.push({ code: "empty_heading", severity: "warning", at: at2, message: `heading ${id} has no text` });
       if (level2 > prevLevel + 1) {
-        out.push({ code: "heading_skip", severity: "warning", at: at2, message: `heading "${text.slice(0, 40)}" is level ${level2} after level ${prevLevel}: a level is skipped` });
+        out.push({ code: "heading_skip", severity: "warning", at: at2, message: `heading "${text2.slice(0, 40)}" is level ${level2} after level ${prevLevel}: a level is skipped` });
       }
       prevLevel = level2;
     }
-    const ph2 = PLACEHOLDER.exec(text);
+    const ph2 = PLACEHOLDER.exec(text2);
     if (ph2) out.push({ code: "placeholder", severity: "warning", at: paraAnchor(id, ph2[0]), message: `paragraph ${id} still says "${ph2[0]}"` });
   }
   for (const r of m.renamed) {
@@ -11280,16 +28744,16 @@ var Doc = class {
   find(what) {
     const out = [];
     for (const p of this.m.paras()) {
-      const text = scan(p).text;
-      for (const hit of matches(text, what)) out.push(paraAnchor(this.m.paraId(p), text.slice(hit.start, hit.end)));
+      const text2 = scan(p).text;
+      for (const hit of matches(text2, what)) out.push(paraAnchor(this.m.paraId(p), text2.slice(hit.start, hit.end)));
     }
     return out;
   }
   /** Replace in every paragraph; returns how many. */
   replaceAll(find2, by, opts) {
-    let n = 0;
-    for (const p of this.m.paras()) n += replaceIn(this.m, p, find2, by, opts?.track, true);
-    return n;
+    let n2 = 0;
+    for (const p of this.m.paras()) n2 += replaceIn(this.m, p, find2, by, opts?.track, true);
+    return n2;
   }
   /** The paragraph under an anchor; by its id, else (an id Word renamed) the first with the anchor's quote. */
   at(anchor) {
@@ -11323,8 +28787,8 @@ var Doc = class {
   comments = {
     list: () => listComments(this.m),
     /** a comment on an anchor's quote (or its whole paragraph) */
-    add: (anchor, text) => this.at(anchor).comment(text),
-    reply: (id, text) => reply(this.m, id, text),
+    add: (anchor, text2) => this.at(anchor).comment(text2),
+    reply: (id, text2) => reply(this.m, id, text2),
     resolve: (id, done = true) => resolve2(this.m, id, done),
     remove: (id) => removeComment(this.m, id)
   };
@@ -11343,16 +28807,16 @@ var Doc = class {
   }
 };
 function findNode(nodes, id) {
-  for (const n of nodes) {
-    if (n.id === id) return n;
-    const hit = n.children && findNode(n.children, id);
+  for (const n2 of nodes) {
+    if (n2.id === id) return n2;
+    const hit = n2.children && findNode(n2.children, id);
     if (hit) return hit;
   }
   return void 0;
 }
 function replaceIn(m, p, find2, by, track, all) {
-  const text = scan(p).text;
-  let hits = matches(text, find2);
+  const text2 = scan(p).text;
+  let hits = matches(text2, find2);
   if (!all) hits = hits.slice(0, 1);
   const t = m.track(track);
   for (const h of [...hits].reverse()) {
@@ -11380,18 +28844,18 @@ function paraSel(doc, m, p, anchorQuote) {
     get quote() {
       return span(p, anchorQuote);
     },
-    setText(text, opts) {
-      replaceSpan(p, 0, scan(p).text.length, text, m.track(opts?.track));
+    setText(text2, opts) {
+      replaceSpan(p, 0, scan(p).text.length, text2, m.track(opts?.track));
       m.touch();
     },
     replace(find2, by, opts) {
       return replaceIn(m, p, find2, by, opts?.track, opts?.all ?? true);
     },
-    insert(text, at2 = "end", opts) {
+    insert(text2, at2 = "end", opts) {
       const len = scan(p).text.length;
       const off = at2 === "start" ? 0 : at2 === "end" ? len : at2;
       if (!Number.isInteger(off) || off < 0 || off > len) throw new OfficeError("bad_arg", `insert at "start", "end" or an offset 0..${len}, got ${at2}`);
-      insertText(p, off, text, m.track(opts?.track));
+      insertText(p, off, text2, m.track(opts?.track));
       m.touch();
     },
     format(f, opts) {
@@ -11412,11 +28876,11 @@ function paraSel(doc, m, p, anchorQuote) {
       setProp(props(p, "pPr"), el(m.doc, "jc", { val: a === "justify" ? "both" : a }));
       m.touch();
     },
-    comment(text, opts) {
+    comment(text2, opts) {
       const q = opts?.quote ?? anchorQuote;
       const s = span(p, q);
       if (opts?.quote && !s) throw new OfficeError("not_found", `"${opts.quote}" is not in paragraph ${id}`);
-      return addComment(m, p, text, s);
+      return addComment(m, p, text2, s);
     },
     add(spec, where = "after", opts) {
       const a = paraAnchor(id);
@@ -11475,8 +28939,8 @@ function tableSel(doc, m, tbl) {
     cell(row, col2) {
       return doc.sel(firstPara(cellEl(row, col2)));
     },
-    setCell(row, col2, text, opts) {
-      doc.sel(firstPara(cellEl(row, col2))).setText(text, opts);
+    setCell(row, col2, text2, opts) {
+      doc.sel(firstPara(cellEl(row, col2))).setText(text2, opts);
     },
     addRow(values, opts) {
       if (!Array.isArray(values)) throw new OfficeError("bad_arg", "a row's values are an array of cell texts");
@@ -11546,8 +29010,8 @@ var run = {
 function flatten(outline2) {
   const out = [];
   const walk = (nodes) => {
-    for (const n of nodes) {
-      const { children: children2, ...own } = n;
+    for (const n2 of nodes) {
+      const { children: children2, ...own } = n2;
       out.push(own);
       if (children2) walk(children2);
     }
@@ -11556,19 +29020,19 @@ function flatten(outline2) {
   return out;
 }
 function diff(before, after) {
-  const was = new Map(flatten(before).map((n) => [n.id, n]));
-  const now = new Map(flatten(after).map((n) => [n.id, n]));
+  const was = new Map(flatten(before).map((n2) => [n2.id, n2]));
+  const now = new Map(flatten(after).map((n2) => [n2.id, n2]));
   const added = [];
   const removed = [];
   const changed = [];
-  for (const [id, n] of now) {
+  for (const [id, n2] of now) {
     const w = was.get(id);
     if (!w) {
-      added.push(n);
+      added.push(n2);
       continue;
     }
-    const fields = changedFields(w, n);
-    if (fields.length) changed.push({ before: w, after: n, fields });
+    const fields = changedFields(w, n2);
+    if (fields.length) changed.push({ before: w, after: n2, fields });
   }
   for (const [id, w] of was) if (!now.has(id)) removed.push(w);
   return { added, removed, changed };
@@ -11632,3 +29096,32 @@ export {
   sheets,
   slides
 };
+/*! Bundled license information:
+
+xmlchars/xml/1.0/ed5.js:
+  (**
+   * Character classes and associated utilities for the 5th edition of XML 1.0.
+   *
+   * @author Louis-Dominique Dubeau
+   * @license MIT
+   * @copyright Louis-Dominique Dubeau
+   *)
+
+xmlchars/xml/1.1/ed2.js:
+  (**
+   * Character classes and associated utilities for the 2nd edition of XML 1.1.
+   *
+   * @author Louis-Dominique Dubeau
+   * @license MIT
+   * @copyright Louis-Dominique Dubeau
+   *)
+
+xmlchars/xmlns/1.0/ed3.js:
+  (**
+   * Character class utilities for XML NS 1.0 edition 3.
+   *
+   * @author Louis-Dominique Dubeau
+   * @license MIT
+   * @copyright Louis-Dominique Dubeau
+   *)
+*/

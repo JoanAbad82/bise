@@ -20,8 +20,10 @@
   "dependencies": {
     "@xmldom/xmldom": "0.9.12",
     "docx-preview": "0.4.1",
+    "exceljs": "4.4.0",
     "fflate": "0.8.3",
-    "jszip": "3.10.2"
+    "jszip": "3.10.2",
+    "saxes": "5.0.1"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

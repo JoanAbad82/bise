@@ -13,6 +13,7 @@ export type OfficeErrorCode =
   | "bad_arg" // an edit's argument is wrong (the message says which and what it takes)
   | "no_host" // run.read/run.write outside `bise office run` with no host set
   | "bad_arg" // an edit's argument is wrong (a block of an unknown kind, a heading level 9)
+  | "would_lose" // save() would drop parts of the file it cannot carry (the message names them; pass { drop: [...] } to accept)
   | "not_built"; // a module of the SDK that is not built yet
 
 export class OfficeError extends Error {

@@ -105,6 +105,13 @@ bise office check q3.pptx        # the problems as JSON
 - **Output**: the script's lines and the hub's words on stdout; a failure
   (an exception, a refusal, the cap) on stderr, exit 1.
 
+No polyfills and no timers in the bundle (architect m_23798). A module a
+library requires but the SDK never runs is a row of `build.mjs`'s `STUBS`
+table (`{module, reason}`): the bundle gets a stub that throws
+`office: <module> is not available (<reason>)` on any use. A module we
+replace with our own code is a row of `REPLACED`. Any other node import
+still fails the build; `build.mjs` also fails past 3 MB.
+
 ## The API every module shares
 
 ```ts
@@ -243,6 +250,55 @@ deck.check();                                  // overflow, off_slide, empty_pla
   edited fixture, and fails when `qlmanage -t` draws no thumbnail of one.
 - Not in v1: editing a chart's series, SmartArt, animations, speaker
   notes (read only), a second master's own layouts by key.
+
+## Sheets (`src/sheets/`)
+
+```ts
+const book = await sheets.open(bytes);          // or sheets.create({ sheet: "Q3", rows: [["Item", "Amount"], ["a", 1200]] })
+book.range("Q3!B4").set(1300);                   // "Q3!B4:D9", "'My sheet'!A1"; a bare "B4" is on the first sheet
+book.at(note.anchor).style({ bold: true, fill: "#fff3c4", numFmt: "#,##0" });
+book.range("B6").set("=SUM(B2:B5)");             // a string starting with "=" is a formula
+book.addSheet("Totals", { rows: [["=Q3!B6"]] });
+book.check();                                    // formula_error, no_value, not_recomputed, would_lose, broken_rel
+await run.write("q3.xlsx", await book.save());
+```
+
+- On exceljs 4.4's workbook model and xforms, not its XLSX class: `io.ts`
+  reads and writes the parts over our zip with a sync SAX pass, so no
+  stream, timer or `Buffer` is ever reached (`test/sheets-bare.test.mjs`
+  runs it in a context with no host globals). `book.exceljs` is the raw
+  Workbook for what the API does not do (using it counts as an edit).
+- **Nothing lost silently** (`carry.ts`). What exceljs does not model
+  (chart drawings and charts, pivot tables and caches, external links,
+  slicers, chartsheets, custom properties, printer settings, the sheet and
+  workbook elements exceljs never writes, extLst entries) is copied
+  through unchanged with its rels and content types, and the elements that
+  point at it go back into exceljs's XML in schema order with new r:ids;
+  a scoped defined name keeps its `localSheetId`. What cannot be carried
+  (parts on a deleted sheet, a chart drawing on a sheet whose pictures
+  changed) makes `save()` refuse with `would_lose` naming the parts, unless
+  the script passes `save({ drop: [...] })`. `check()` names them first.
+- A file opened and saved with no edit gives its bytes back. The same
+  workbook saves to the same bytes (exceljs's uuids come from `ids.ts`).
+- **Formulas get values** (`formula.ts`, `calc.ts`): arithmetic, `&`,
+  comparisons, references across sheets, and SUM, AVERAGE, MIN, MAX,
+  MEDIAN, COUNT(A/BLANK/IF), SUMIF, AVERAGEIF, IF, IFERROR, AND, OR, NOT,
+  ROUND(UP/DOWN), INT, ABS, SQRT, POWER, MOD, PRODUCT, CONCAT(ENATE), LEN,
+  LEFT, RIGHT, MID, UPPER, LOWER, TRIM. Others keep their old result and
+  `check()` says so; an edited file is saved with `fullCalcOnLoad`, so
+  Excel recomputes everything on open.
+- `inspect()` (options `{ sheet, maxCells }`): a node per sheet (props
+  `dims`, `cells`, `widths` px from column A, `heights` {row: px},
+  `merged`, `frozen`, `tables`, `charts` [{title, part}], `pivots`,
+  `hidden`), its cells as children (`Q3!B4`, text as Excel shows it with
+  its number format, props `value`, `formula`, `noValue`, `error`,
+  `numFmt`, `bold`, `italic`, `color`, `fill`, `align`, `merged`).
+- Not in v1: editing charts or pivots (they are carried, not edited),
+  array formulas and functions outside the list above (Excel computes
+  them), a sheet password (`protect()` without one works).
+- Off-screen check on a Mac: `~/.bise/run/heavy-run --low node --test
+  office/sdk/test/sheets.quicklook.mjs` (Quick Look thumbnails of a made
+  workbook, the rich fixture edited and tiny.xlsx edited).
 
 ## Anchors
 
