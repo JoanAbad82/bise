@@ -3,7 +3,8 @@
 // place for 2 s, then fades. On the real shell with the scripted core (FakeCore, fake data), at 1100.
 // Passes when: after his answer the block is gone and the line shows; it is still there at 1.5 s and
 // gone by 3 s; the hub closing the last item without him shows nothing; reduced motion shows it with
-// no fade (the same opacity in every frame). Frames: a strip of the line's 2.4 s (zero-strip-*.png),
+// no fade (the same opacity in every frame); ':*' sits on the content edge, the composer label's, 8 px to
+// its words (designer m_24516). Frames: a strip of the line's 2.4 s (zero-strip-*.png),
 // light, for designer. Owner: inbox-screen.
 import { writeFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
@@ -76,6 +77,24 @@ for (const motion of ['full', 'reduced'] as const) {
       await expect(page.getByTestId('inbox.block')).toHaveCount(0);
       const mark = await zero.locator('.inbox-zero-mark').evaluate((e) => getComputedStyle(e).fontFamily);
       expect(mark, ':* is mono').toMatch(/mono|Menlo|SF Mono|monospace/i);
+      // one content edge (designer m_24516): ':*' starts where the composer's label starts, no hanging glyph
+      const textLeft = (sel: string) =>
+        page.evaluate((q) => {
+          const el = document.querySelector(q);
+          const walk = el ? document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.textContent?.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) }) : null;
+          const t = walk?.nextNode();
+          if (!t) return null;
+          const r = document.createRange();
+          r.selectNodeContents(t);
+          return Math.round(r.getBoundingClientRect().left);
+        }, sel);
+      const [zl, cl] = [await textLeft('[data-testid="inbox.zero"]'), await textLeft('.b-composer .div')];
+      expect(zl, "':*' on the composer label's edge").toBe(cl);
+      const gap = await zero.evaluate((e) => {
+        const [m, w] = [e.querySelector('.inbox-zero-mark'), e.querySelector('.inbox-zero-words')];
+        return m && w ? Math.round(w.getBoundingClientRect().left - m.getBoundingClientRect().right) : -1;
+      });
+      expect(gap, '8 px to its words').toBe(8);
       await page.waitForTimeout(1500);
       await expect(zero).toBeVisible();
       const op = await zero.evaluate((e) => Number(getComputedStyle(e).opacity));
