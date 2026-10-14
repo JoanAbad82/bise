@@ -24,7 +24,7 @@ import type {
   Part,
   ProjectRow,
 } from "@/proto";
-import { actedAdd, actedKey, actedOf, actedPrune, cardRefusedOf, type Acted } from "./acted";
+import { actedAdd, actedAnswered, actedKey, actedOf, actedPrune, cardRefusedOf, type Acted } from "./acted";
 import { refusedAdd, refusedDrop, refusedListOf, refusedOf, refusedPrune, type Attempt, type Refused } from "./refused";
 import type { CoreState } from "@/shared/api";
 import {
@@ -216,6 +216,8 @@ export class Store extends StoreVoice {
     // the hub took it: no refusal of it holds
     this.putRefused(refusedDrop(this.refused(), d.project, d.card));
     this.attempts.delete(actedKey(d.project, d.card));
+    // the hub's rows came before its answer: still listed, the hub kept the card open (acted.ts)
+    this.putActed(actedAnswered(this.acted(), d.project, d.card, this.projects()));
     const from = this.answering.get(k);
     this.answering.delete(k);
     if (from === undefined) return true;
@@ -242,7 +244,7 @@ export class Store extends StoreVoice {
   }
   /** @internal for apply.ts: a projects event; the cards its rows no longer list leave the set */
   rowsCame(rows: readonly ProjectRow[]): void {
-    this.putActed(actedPrune(this.acted(), rows));
+    this.putActed(actedPrune(this.acted(), rows, this.now()));
     this.putRefused(refusedPrune(this.refused(), rows));
     // what he sent matters only while it is on its way (acted)
     const on = new Set(this.acted().map((a) => a.key));

@@ -145,7 +145,10 @@ export const ThreadComposer = memo(function ThreadComposer({
       const w = windowRun(name, args, at);
       if (w !== undefined) {
         if ('go' in w) router.go(w.go);
-        else if ('inbox' in w) openInbox();
+        // nothing waits anywhere: say so where he typed it, never a silent nothing (ghost-badge)
+        else if ('inbox' in w) {
+          if (!openInbox()) setNote({ level: 'info', text: 'nothing waits for you.' });
+        }
         else if ('app' in w) store.command(w.app);
         else if ('quit' in w) window.bise.quit();
         else window.dispatchEvent(new Event(HELP_EVENT));

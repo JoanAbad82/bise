@@ -171,7 +171,10 @@ describe('code colors (tui-parity B15)', () => {
     expect(v.getByTestId('thread.card.2').textContent).toBe('? waits for you · in the inbox below');
     expect(v.queryByTestId('thread.card.2.opt.2')).toBeNull();
     const opened: unknown[] = [];
-    const off = onOpenInbox((at) => opened.push(at));
+    const off = onOpenInbox((at) => {
+      opened.push(at);
+      return true;
+    });
     fireEvent.click(v.getByTestId('thread.card.2'));
     off();
     expect(opened).toEqual([{ project: P, card: 2 }]);

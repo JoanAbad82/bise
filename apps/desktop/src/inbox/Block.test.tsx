@@ -200,6 +200,47 @@ describe("'only' (task-panel m_20455: the artifact view docks its maker's questi
     });
     expect(screen.getByTestId('inbox.block.open.1').textContent).toContain('which bench?');
   });
+
+  it("ghost-badge: '/inbox' beside an artifact opens another project's item the filter left out; esc folds back", () => {
+    const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    const store = new Store(port);
+    replay(store, core_ev);
+    render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter({ screen: 'thread', project: P, agent: 'perf' })}>
+          <InboxBlock here={{ project: P, agent: 'perf' }} onAnswer={() => undefined} now={NOW} only={() => false} />
+        </RouterContext>
+      </StoreProvider>,
+    );
+    // the maker has nothing: the block is not there, yet items wait elsewhere
+    expect(screen.queryByTestId('inbox.block')).toBeNull();
+    let opened = false;
+    act(() => {
+      opened = openInbox();
+    });
+    expect(opened).toBe(true);
+    expect(screen.getByTestId('inbox.block.open.1').textContent).toContain('run rm -rf target?');
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(screen.queryByTestId('inbox.block')).toBeNull();
+  });
+
+  it("ghost-badge: nothing waits anywhere: openInbox says so (false), the composer's '/inbox' tells him", () => {
+    const store = new Store({ send: () => undefined });
+    render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter({ screen: 'thread', project: P, agent: 'perf' })}>
+          <InboxBlock here={{ project: P, agent: 'perf' }} onAnswer={() => undefined} now={NOW} />
+        </RouterContext>
+      </StoreProvider>,
+    );
+    let opened = true;
+    act(() => {
+      opened = openInbox();
+    });
+    expect(opened).toBe(false);
+  });
 });
 
 describe('one inbox (designer m_19631)', () => {

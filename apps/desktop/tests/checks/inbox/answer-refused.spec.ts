@@ -6,8 +6,8 @@
 //   - an answer the hub takes (its AnswerResult) to a card asked by another agent leaves '✓ you answered
 //     search' in perf's thread, where he is, and the card leaves the block;
 //   - a close the hub refuses: that card is back too, with the words;
-//   - a reload and a project switch and back: the answered card stays out while the hub's rows still
-//     list it, the refused ones stay in, his row stays; the rows drop the answered card: gone for good.
+//   - a reload and a project switch and back: the answered card stays out (the hub's rows dropped it
+//     before its answer, as the real hub's step does), the refused ones stay in, his row stays.
 // Owner: amb-home.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
@@ -106,7 +106,8 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
     });
 
     await test.step("an answer the hub takes, to search's card from perf's thread: out of the block, '✓ you answered search' here", async () => {
-      await core.result('answer', 11, { answer: { agent: 'search', question: 'reindex tonight or now?', said: '1', pick: 'tonight', notice: 'you answered search: tonight' } });
+      // the hub's step drops card 11 from its rows before it answers (the real hub's order)
+      await core.result('answer', 11, { answer: { agent: 'search', question: 'reindex tonight or now?', said: '1', pick: 'tonight', notice: 'you answered search: tonight' } }, [projects(CARDS.filter((c) => c.id !== 11))]);
       await open(page, 11, 'reindex tonight or now?');
       await page.keyboard.press('1');
       await core.waitCmd((c) => (c as Cmd).cmd === 'answer' && (c as Cmd).card === 11, 5000);
@@ -139,7 +140,7 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
       await expect(page.locator('[data-testid="confirm.notice"][data-level="error"]'), `${why}: no project error line`).toHaveCount(0);
     };
 
-    await test.step('a reload: the same (the hub still lists card 11, the window keeps it out), his row stays', async () => {
+    await test.step('a reload: the same (the hub dropped card 11), his row stays', async () => {
       await page.reload();
       await settled('after a reload');
       await expect(page.getByTestId('thread.aside.11')).toContainText('you answered search', { timeout: 5000 });
@@ -172,6 +173,8 @@ test('inbox/answer-refused: a refused answer or close shows that card again with
     await test.step("'try again' on card 9 sends his answer once more: the card and its words go", async () => {
       const nine = () => core.cmds().filter((c) => (c as Cmd).cmd === 'answer' && (c as Cmd).card === 9) as Cmd[];
       const before = nine().length;
+      // taken this time: the hub's rows drop card 9 before its answer
+      await core.result('answer', 9, {}, [projects([])]);
       await open(page, 9, 'which bench?');
       await cardIn(page, 9).getByTestId(`inbox.block.card.${P}-9.retry`).click();
       await expect.poll(() => nine().length, { message: 'his answer to card 9 goes again', timeout: 5000 }).toBe(before + 1);

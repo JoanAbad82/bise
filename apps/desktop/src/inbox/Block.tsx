@@ -62,15 +62,20 @@ export interface InboxBlockProps {
 // ---- openInbox: ⌘I and a notification click (amb-win's keys and router call it; no route change)
 
 type OpenAt = { readonly project: string; readonly card: number } | undefined;
-const openers = new Set<(at: OpenAt) => void>();
+const openers = new Set<(at: OpenAt) => boolean>();
 
-/** Open the block in place: on that card (a notification's), else on its first item. */
-export function openInbox(at?: { project: string; card: number }): void {
-  for (const f of [...openers]) f(at);
+/**
+ * Open the block in place: on that card (a notification's), else on its first item. True when a
+ * block opened one; false: nothing waits (or no block is mounted), the caller says so ('/inbox').
+ */
+export function openInbox(at?: { project: string; card: number }): boolean {
+  let opened = false;
+  for (const f of [...openers]) opened = f(at) || opened;
+  return opened;
 }
 
 /** Hear openInbox (the block itself, a test): returns the unsubscribe. */
-export function onOpenInbox(f: (at: OpenAt) => void): () => void {
+export function onOpenInbox(f: (at: OpenAt) => boolean): () => void {
   openers.add(f);
   return () => {
     openers.delete(f);
@@ -242,7 +247,12 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
   const keyAt = useRef<{ open: string | null; on: number | null }>({ open, on });
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
-  const real = useMemo(() => (only === undefined ? blockList(rows, gone) : blockList(rows, gone).filter(only)), [rows, gone, only]);
+  // an explicit ask ('/inbox', ⌘I, a notification) for an item the `only` filter leaves out widens
+  // the block to every project's items until he folds it (ghost-badge: '/inbox' beside an artifact
+  // did nothing while another project's item waited)
+  const [wide, setWide] = useState(false);
+  const all = useMemo(() => blockList(rows, gone), [rows, gone]);
+  const real = useMemo(() => (only === undefined || wide ? all : all.filter(only)), [all, only, wide]);
   const notify = useNotifyRow(real.length);
   const home = rows.find((r) => r.home)?.project ?? '';
   const asks = notify.show && only === undefined;
@@ -302,25 +312,31 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
     setOpen(k);
     setOn(null);
     setWhole(null);
+    if (k === null) setWide(false);
   };
   const onTo = (n: number) => {
     keyAt.current = { ...keyAt.current, on: n };
     setOn(n);
   };
 
-  // ⌘I and a notification click: that card, else the first item
-  const latest = useRef(list);
+  // ⌘I, '/inbox' and a notification click: that card, else the first item; one the filter leaves
+  // out widens the block (wide). False: nothing waits anywhere, the caller says so
+  const latest = useRef({ list, all });
   useEffect(() => {
-    latest.current = list;
+    latest.current = { list, all };
   });
   useEffect(() => {
-    const f = (at: OpenAt) => {
-      const l = latest.current;
-      const want = at !== undefined ? l.find((c) => c.project === at.project && c.id === at.card) : l[0];
-      if (want === undefined) return;
+    const f = (at: OpenAt): boolean => {
+      const { list: l, all: every } = latest.current;
+      const find = (xs: readonly Card[]) => (at !== undefined ? xs.find((c) => c.project === at.project && c.id === at.card) : xs[0]);
+      const inView = find(l);
+      const want = inView ?? find(every);
+      if (want === undefined) return false;
+      if (inView === undefined) setWide(true);
       keyAt.current = { open: cardKey(want), on: null };
       setOpen(cardKey(want));
       setOn(null);
+      return true;
     };
     openers.add(f);
     return () => {

@@ -2,6 +2,7 @@
 // #384 came back on a project switch). One owner: the Store sets an entry in answer() and close(),
 // whichever view he acted from (the inbox block, a thread's strip, the capsule, a review), and
 // a project's rows take it out (once that project's row is loaded and no longer lists the card),
+// the hub's answer to that request while its rows still list the card (it kept it open: actedAnswered),
 // or the error to that very request (the window-local 'card_refused', architect m_23524: the card
 // shows again). Every view reads the same set (useActed), so a remount, a project switch or a reload (the
 // set is kept with his asides) never shows a card he answered while the hub drops it. The hub
@@ -21,6 +22,9 @@ export interface Acted {
 /** How many the window keeps (the newest): a hub that never answers can't grow it. */
 export const ACTED_KEPT = 50;
 
+/** How long an entry may hide a card the hub's rows still list (the hub answers in ms). */
+export const ACTED_STALE_MS = 60_000;
+
 /** The inbox's cardKey (inbox/order.ts), word for word: the views filter their cards on it. */
 export const actedKey = (project: string, card: number): string => `${project}-${String(card)}`;
 
@@ -33,14 +37,35 @@ export function actedAdd(list: readonly Acted[], project: string, card: number, 
 /**
  * The hub's rows came: an entry goes once its project's row is there and lists the card no more
  * (the hub closed it). A project not in the rows, or whose row has no cards field yet (not loaded:
- * a reload, a hub starting), keeps its entries. The same list back when nothing went (the slice's
- * reference holds). Pure.
+ * a reload, a hub starting), keeps its entries. An entry older than ACTED_STALE_MS whose loaded
+ * row still lists the card goes too: the hub answers in milliseconds, so the hub kept it open and
+ * its answer never came here (a window reloaded before it, a set kept by an older build). The same
+ * list back when nothing went (the slice's reference holds). Pure.
  */
-export function actedPrune(list: readonly Acted[], rows: readonly Pick<ProjectRow, "project" | "cards">[]): readonly Acted[] {
+export function actedPrune(list: readonly Acted[], rows: readonly Pick<ProjectRow, "project" | "cards">[], nowMs: number): readonly Acted[] {
   if (list.length === 0) return list;
   const open = new Map(rows.flatMap((r) => (r.cards == null ? [] : [[r.project, new Set(r.cards.map((c) => c.id))] as const])));
-  const next = list.filter((a) => open.get(a.project)?.has(a.card) ?? true);
+  const next = list.filter((a) => {
+    const listed = open.get(a.project)?.has(a.card);
+    if (listed === undefined) return true;
+    return listed && nowMs - a.at_ms < ACTED_STALE_MS;
+  });
   return next.length === list.length ? list : next;
+}
+
+/**
+ * The hub answered his answer to `card` (the window-local 'card_answered'): the rows it sent before
+ * its answer say what the answer did (the hub broadcasts a step's cards before it answers the
+ * request, the core emits the rows on them). A loaded row that still lists the card: the hub kept
+ * it open (a drafts card's '1. review' or his words on it, an older hub's no-op), so the entry goes
+ * and the card is his again in every view. The ghost it fixes: the sidebar counted the card from
+ * the rows while every inbox hid it, until a relaunch. Pure.
+ */
+export function actedAnswered(list: readonly Acted[], project: string, card: number, rows: readonly Pick<ProjectRow, "project" | "cards">[]): readonly Acted[] {
+  const key = actedKey(project, card);
+  if (!list.some((a) => a.key === key)) return list;
+  const open = rows.find((r) => r.project === project)?.cards?.some((c) => c.id === card) ?? false;
+  return open ? list.filter((a) => a.key !== key) : list;
 }
 
 /** The keys, for a view's filter. Pure. */

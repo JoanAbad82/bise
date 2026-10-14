@@ -2,7 +2,7 @@
 // hub's rows take them out (his #384 came back on a project switch: a view's own copy). Owner: amb-home.
 import { describe, expect, it } from "vitest";
 import type { Card, ProjectRow } from "@/proto";
-import { ACTED_KEPT, actedAdd, actedKeys, actedOf, actedPrune } from "./acted";
+import { ACTED_KEPT, ACTED_STALE_MS, actedAdd, actedAnswered, actedKeys, actedOf, actedPrune } from "./acted";
 import { Store } from "./store";
 
 const card = (project: string, id: number): Card => ({ id, project, kind: "question", agent: "docs", question: "?", options: [], urgent: false, since_ms: 0 });
@@ -26,13 +26,30 @@ describe("acted: the cards he answered or closed, one owner", () => {
   it("only a loaded row that no longer lists the card takes it out; the same list when nothing goes", () => {
     const a = actedAdd(actedAdd([], "shop", 2, 1), "ts-pattern", 384, 2);
     // the hub still lists both: nothing goes, the same reference
-    expect(actedPrune(a, [row("shop", [2]), row("ts-pattern", [384])])).toBe(a);
+    expect(actedPrune(a, [row("shop", [2]), row("ts-pattern", [384])], 10)).toBe(a);
     // ts-pattern not loaded yet (a reload), or its row without its cards yet: its entry stays
-    expect(actedPrune(a, [row("shop", [])]).map((x) => x.key)).toEqual(["ts-pattern-384"]);
-    expect(actedPrune(a, [row("shop", []), { project: "ts-pattern" }]).map((x) => x.key)).toEqual(["ts-pattern-384"]);
+    expect(actedPrune(a, [row("shop", [])], 10).map((x) => x.key)).toEqual(["ts-pattern-384"]);
+    expect(actedPrune(a, [row("shop", []), { project: "ts-pattern" }], 10).map((x) => x.key)).toEqual(["ts-pattern-384"]);
     // its row came without the card: the hub closed it
-    expect(actedPrune(a, [row("shop", []), row("ts-pattern", [])])).toEqual([]);
+    expect(actedPrune(a, [row("shop", []), row("ts-pattern", [])], 10)).toEqual([]);
     expect(actedKeys(a)).toEqual(new Set(["shop-2", "ts-pattern-384"]));
+  });
+
+  it("ghost-badge: an entry never hides a card the hub kept open (the sidebar's 1, an empty inbox)", () => {
+    const a = actedAdd(actedAdd([], "ai-docs", 19, 1_000), "shop", 2, 1_000);
+    // the hub's answer came while its rows still list the card: it kept it open, the entry goes
+    expect(actedAnswered(a, "ai-docs", 19, [row("ai-docs", [19])]).map((x) => x.key)).toEqual(["shop-2"]);
+    // its rows had dropped it before the answer: nothing to undo (the next rows prune it)
+    expect(actedAnswered(a, "ai-docs", 19, [row("ai-docs", [])])).toBe(a);
+    // not loaded, or a card he never acted on: the same list
+    expect(actedAnswered(a, "ai-docs", 19, [])).toBe(a);
+    expect(actedAnswered(a, "ai-docs", 20, [row("ai-docs", [19, 20])])).toBe(a);
+    // no answer ever came (a set kept by an older build, his live keep): past ACTED_STALE_MS the
+    // hub's rows win; a row not loaded keeps its entry still
+    const rows = [row("ai-docs", [19]), row("shop", [2])];
+    expect(actedPrune(a, rows, 1_000 + ACTED_STALE_MS - 1)).toBe(a);
+    expect(actedPrune(a, rows, 1_000 + ACTED_STALE_MS)).toEqual([]);
+    expect(actedPrune(a, [row("ai-docs", [19])], 1_000 + ACTED_STALE_MS).map((x) => x.key)).toEqual(["shop-2"]);
   });
 
   it("reads the kept list back, junk dropped", () => {
@@ -69,22 +86,47 @@ describe("acted: the cards he answered or closed, one owner", () => {
     s.answer("shop", 2, "1");
     s.answer("shop", 3, "1");
     s.close("shop", 4);
-    // the first answer's result came: the hub took it, card 2 stays out until the rows drop it
+    // the first answer's result came after rows that dropped card 2 (the hub broadcasts a step's
+    // cards before it answers): the hub took it, the entry goes with those rows
+    s.apply({ ev: "projects", projects: [row("shop", [3, 4])] });
     s.apply({ ev: "card_answered", project: "shop", card: 2, answer: null });
+    expect(s.acted().map((a) => a.key)).toEqual(["shop-3", "shop-4"]);
     // card 4's close is refused (an older request than card 3's, answered later): card 4 alone is back
     s.apply({ ev: "card_refused", project: "shop", card: 4, text: "no such card" });
-    expect(s.acted().map((a) => a.key)).toEqual(["shop-2", "shop-3"]);
+    expect(s.acted().map((a) => a.key)).toEqual(["shop-3"]);
     // the words go on that card (refused.ts), never on the project's line (try-gate-f2a7)
     expect(s.notice("shop")).toBeNull();
     // the error event every window gets un-hides nothing and says nothing: only its request names the card
     s.apply({ ev: "error", project: "shop", cmd: "answer", text: "card 3 isn't open" });
-    expect(s.acted().map((a) => a.key)).toEqual(["shop-2", "shop-3"]);
+    expect(s.acted().map((a) => a.key)).toEqual(["shop-3"]);
     expect(s.notice("shop")).toBeNull();
     s.apply({ ev: "card_refused", project: "shop", card: 3, text: "card 3 isn't open" });
-    expect(s.acted().map((a) => a.key)).toEqual(["shop-2"]);
+    expect(s.acted()).toEqual([]);
     // another project's refusal touches nothing here
+    s.answer("shop", 2, "1");
     s.apply({ ev: "card_refused", project: "other", card: 2, text: "no" });
     expect(s.acted().map((a) => a.key)).toEqual(["shop-2"]);
+  });
+
+  it("ghost-badge: answered on the page, then from the inbox: the hub keeps the card, every view shows it again", () => {
+    // his live ai-docs #19 (a page's '2 drafts wait for you'): he answered the page, then the
+    // re-asked card from the inbox; the hub answered ok and kept it open
+    const s = new Store({ send: () => undefined }, { now: () => 5_000 });
+    s.apply({ ev: "projects", projects: [row("ai-docs", [19])] });
+    s.answer("ai-docs", 19, "the words he typed");
+    expect(s.acted().map((a) => a.key)).toEqual(["ai-docs-19"]);
+    // the step's rows (still #19), then the hub's answer
+    s.apply({ ev: "projects", projects: [row("ai-docs", [19])] });
+    s.apply({ ev: "card_answered", project: "ai-docs", card: 19, answer: null });
+    expect(s.acted()).toEqual([]);
+  });
+
+  it("ghost-badge: a set kept by an older build no longer hides a card the hub still lists", () => {
+    const keep = keepOf();
+    keep.write("acted", [{ key: "ai-docs-19", project: "ai-docs", card: 19, at_ms: 1_000 }]);
+    const s = new Store({ send: () => undefined }, { now: () => 1_000 + ACTED_STALE_MS, asides: keep });
+    s.apply({ ev: "projects", projects: [row("ai-docs", [19])] });
+    expect(s.acted()).toEqual([]);
   });
 
   it("a reload keeps it until the rows drop it (his #384: never back once answered)", () => {

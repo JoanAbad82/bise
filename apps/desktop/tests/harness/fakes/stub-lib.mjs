@@ -61,7 +61,12 @@ function rpcSide(write, hubEvs) {
       if (i >= 0) {
         const [r] = refusals.splice(i, 1);
         write(JSON.stringify({ jsonrpc: '2.0', id: m.id, error: { code: -32001, message: r.message } }));
-      } else write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: r0(cmd) }));
+      } else {
+        // the events the hub's step sent before it answered (its rows without the card it closed):
+        // the real hub broadcasts a step's cards before the request's response (FakeCore.result)
+        for (const ev of before0(cmd)) note(JSON.stringify(ev));
+        write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: r0(cmd) }));
+      }
       return cmd;
     },
   };
@@ -70,6 +75,7 @@ function rpcSide(write, hubEvs) {
 /** A request's result: card/answer's AnswerResult when a test set one (FakeCore.answers), else {}. */
 let answersBy = [];
 const r0 = (cmd) => answersBy.find((a) => a.cmd === cmd.cmd && a.card === cmd.card)?.result ?? {};
+const before0 = (cmd) => answersBy.find((a) => a.cmd === cmd.cmd && a.card === cmd.card)?.before ?? [];
 
 /**
  * answer(cmd): the lines to write back for a command the app sent (a fake core answering a
