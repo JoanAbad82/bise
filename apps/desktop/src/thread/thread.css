@@ -27,18 +27,14 @@
   pointer-events: none;
   background: linear-gradient(var(--c-window, var(--paper)), transparent);
 }
-/* and at the bottom edge, over the inbox block and the composer, the same 16 px (designer m_21505 (2)):
-   at the end it lies on the list's own bottom space, never on the last row */
-.th-list::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 16px;
-  z-index: 1;
-  pointer-events: none;
-  background: linear-gradient(transparent, var(--c-window, var(--paper)));
+/* and at the bottom edge no band and no shadow (designer's composer-strip A, m_23965 (1)): what
+   scrolls under the scroller's last 12 px fades out (an opacity mask); at the end that is the
+   list's own end (.th-list-end), never the last row */
+.th-list > [data-virtuoso-scroller] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--s-3)), transparent);
+}
+.th-list-end {
+  height: var(--s-3);
 }
 
 /* scrolled up: back to the newest, with what came meanwhile */
@@ -273,14 +269,16 @@
      composer, the inbox box's inside and the sidebar keep --lh-ui */
   --lh-read: 1.65;
   --lh-row: 1.5;
-  --s-thread-end: var(--gap-turn);
+  /* the thread's end to the composer's tab: 24 (designer's composer-strip A, m_23965 (1)) */
+  --s-thread-end: var(--s-6);
   /* a quiet row's lead mark column (✓ ↗ ◷ ■), one em of its text: what sits under such a row
      (its note, its images, a schedule's words) starts after it, on the words */
   --th-mark: 1em;
 }
 .th-screen .th-list {
-  /* each row ends with its own 2 px: the list adds the rest of the 20 */
-  padding-bottom: calc(var(--s-thread-end) - var(--th-row-end));
+  /* each row ends with its own 2 px, the list's end inside the scroller 12 (.th-list-end): the list
+   adds the rest of the 24 to the composer's tab (designer's composer-strip A) */
+  padding-bottom: calc(var(--s-thread-end) - var(--th-row-end) - var(--s-3));
 }
 .th-row,
 .th-day,
@@ -687,8 +685,7 @@
   font-weight: 400;
 }
 .ah-role {
-  /* the role first (designer N1, m_17181, m_17194): the context note and the branch drop whole before
-     it (useHeadFit), then it ends with '…', never clipped silently */
+  /* the role ends with '…' when the row is short, never clipped silently (designer N1, m_17194) */
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -740,8 +737,8 @@
   color: var(--c-text-3);
   font-size: var(--t-12);
 }
-/* a meta item that can't show whole drops whole (designer m_17194; AgentHead's useHeadFit): out of the
-   flow, unseen, still measured */
+/* an archived maker's chip and its whole restore, when they don't fit (AgentHead's useArchivedFit): out
+   of the flow, unseen, still measured */
 .ah .ah-gone {
   position: absolute;
   visibility: hidden;
@@ -755,11 +752,10 @@
   min-width: 0;
   margin-left: auto;
 }
-/* the end's items never shrink: the branch drops whole when the row is short (useHeadFit) */
+/* the end's items never shrink */
 .ah-end > * {
   flex: none;
 }
-.ah-quiet,
 .ah-btn {
   padding: var(--s-1) var(--pad-control-x-sm);
   border: 0;
@@ -776,7 +772,6 @@
   font: inherit;
   color: var(--c-text-3);
 }
-.ah-quiet:hover,
 .ah-btn:hover {
   background: var(--c-hover);
   color: var(--c-text);
@@ -913,7 +908,7 @@
   gap: var(--gap-inline);
   min-width: 0;
   min-height: var(--h-row-tight);
-  /* the list's own end (--s-thread-end) is the 20 above; the thread's end gap is the 20 under it,
+  /* the list's own end (--s-thread-end) is the 24 above; the thread's end gap is the 24 under it,
      to the composer's label or the inbox box (designer m_20262 (2), the 931f5c94 rule) */
   padding: 0;
   margin-bottom: var(--s-thread-end);
@@ -1063,63 +1058,48 @@
   padding: var(--s-2) 0 var(--th-row-end);
 }
 
-/* his words answer the docked card (designer's v6 s-wait): the label line in the accent, the way
-   back at its right */
-.th-screen[data-answering='true'] .b-composer .div {
-  display: flex;
+/* the composer's tab (designer's composer-strip A, ComposerTab.tsx): the label in ink, cut with …
+   only when nothing else is left; 'ψ sb/perf' and the project in text-2, their sign text-3; the
+   context on the right in text-3, its digits mono; an item that doesn't fit is gone whole (kept
+   in the flow's measure, never drawn). Answering: the accent, the way back on the right in text-2 */
+.b-composer .tab .lbl {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c-text);
+}
+.b-composer .tab .it {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.b-composer .tab .g {
+  color: var(--c-text-3);
+}
+.b-composer .tab .mono {
+  font-family: var(--font-mono);
+  font-size: var(--t-12);
+}
+.b-composer .tab .end {
+  flex: none;
+  margin-left: auto;
+  color: var(--c-text-3);
+}
+.b-composer .tab .gone {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+.b-composer .tab {
+  position: relative;
+}
+.b-composer .tab.acc .lbl {
   color: var(--c-accent);
 }
-.th-screen[data-answering='true'] .b-composer .div .end {
-  flex: none;
-}
-/* the label line, one line always (designer m_14031): 'to perf' (or the question, cut with '…')
-   left, on the right the TUI's divider words (S40/W3: model · effort · approvals mode · state ·
-   context) or the way back ('esc write a plain message', which keeps its room) */
-.th-screen .b-composer .div {
-  display: flex;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-/* the label wins (designer m_14523): it keeps its words, the divider words on the right give way
-   first, cut from their right end; only a label longer than the whole line is cut */
-.th-screen .b-composer .div .lbl {
-  flex: 0 0 auto;
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.th-screen .b-composer .div .end {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  margin-left: auto;
-  padding-left: var(--s-3);
-  color: var(--c-text-3);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-/* the divider's parts (model · effort · mode · …) show whole or drop whole from the end
-   (desktop-status-line A): a part that doesn't fit wraps to a second line, clipped */
-.th-end-parts {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  height: 1lh;
-  overflow: hidden;
-}
-.th-end-parts > span {
-  white-space: pre;
-}
-
-/* the composer about an open artifact (designer m_20435 (d)): 'to perf · about “…”' gives way,
-   cut with …, and the state on the right ('idle') keeps its words */
-.th-screen[data-about='true'] .b-composer .div .lbl {
-  flex: 0 1 auto;
-}
-.th-screen[data-about='true'] .b-composer .div .end {
-  flex: none;
+.b-composer .tab.acc .end {
+  color: var(--c-text-2);
 }
 /* an archived maker beside its artifact (designer m_20453): its own thread, dim; '↺ restore' in
    its head; the composer goes to the project's main */

@@ -66,6 +66,12 @@ export interface BiseApi {
    */
   readonly pickFolder: () => Promise<string | null>;
   /**
+   * His files pick (macOS's open panel: files, several at once, starting in his home, attached
+   * to the asking window): their absolute paths, [] when he cancels. Test mode never opens a
+   * panel: BISE_DESKTOP_TEST_PICK_FILES (absolute paths, one per line) is the answer at once.
+   */
+  readonly pickFiles: () => Promise<readonly string[]>;
+  /**
    * macOS's Quick Look on a file, from the asking window (its own panel);
    * true when shown. Only a path under his home or a project folder; test
    * mode prints QUICKLOOK_LINE <path> instead.
@@ -320,6 +326,7 @@ export const IPC = {
   openExternal: 'bise:open-external',
   openPath: 'bise:open-path',
   pickFolder: 'bise:pick-folder',
+  pickFiles: 'bise:pick-files',
   quickLook: 'bise:quick-look',
   showInFinder: 'bise:show-in-finder',
   fileIcon: 'bise:file-icon',
@@ -403,6 +410,8 @@ export const APP_SWAP_LINE = 'bise-desktop: app swap';
 
 /** Test mode: the folder window.bise.pickFolder answers (an absolute path), never a panel. */
 export const TEST_PICK_FOLDER_ENV = 'BISE_DESKTOP_TEST_PICK_FOLDER';
+/** Test mode: the files window.bise.pickFiles answers (absolute paths, one per line), never a panel. */
+export const TEST_PICK_FILES_ENV = 'BISE_DESKTOP_TEST_PICK_FILES';
 
 /** Test mode: the fake .app (inside the test HOME) the updater swaps; never his bundle. */
 export const UPDATE_TARGET_ENV = 'BISE_DESKTOP_UPDATE_TARGET';

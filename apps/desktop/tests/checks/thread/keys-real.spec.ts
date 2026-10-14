@@ -18,9 +18,12 @@ const T = {
   setupSkip: '[data-testid="setup.skip"]',
   thread: '[data-testid="thread.list"]',
   screen: '[data-testid="thread.screen"]',
-  end: '[data-testid="composer"] .div .end',
+  // the mode is the box's menu now (designer's composer-strip A): 'yolo ⌄' / 'approvals ⌄'
+  end: '[data-testid="composer.mode"]',
   flash: '[data-testid="composer.flash"]',
 };
+/** the mode menu's word for a hub mode ('auto' reads 'approvals') */
+const menuWord = (m: string): string => (m === 'auto' ? 'approvals' : m);
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 const flat = (s: string): string => s.replace(/[│╭╮╰╯─┃├┤┬┴]/g, ' ').replace(/\s+/g, ' ');
 
@@ -72,7 +75,7 @@ test("thread/keys-real: ⇧⇥ flips approvals yolo ↔ auto like the TUI's, bot
     await tuiReady(t);
     note('start', { hub: start, checker, env });
     expect(['yolo', 'auto'], 'the hub has a mode').toContain(start);
-    await expect(page.locator(T.end), 'the divider reads the hub mode').toContainText(start, { timeout: 5000 });
+    await expect(page.locator(T.end), 'the mode menu reads the hub mode').toContainText(menuWord(start), { timeout: 5000 });
     await field.click();
     await page.keyboard.type('a draft');
     await page.screenshot({ path: test.info().outputPath('0-start.png') });
@@ -93,7 +96,7 @@ test("thread/keys-real: ⇧⇥ flips approvals yolo ↔ auto like the TUI's, bot
       expect.soft(tuiFlash, `the TUI on the same hub flashes '${to} · ${words(to)}' too`).not.toBe('');
       await expect(field, 'his draft is untouched').toHaveText('a draft');
       await expect(page.locator(T.flash), 'the flash lasts 3 s').toHaveCount(0, { timeout: 4500 });
-      await expect(page.locator(T.end), 'then the divider reads the new mode').toContainText(to);
+      await expect(page.locator(T.end), 'then the mode menu reads the new mode').toContainText(menuWord(to));
       await page.screenshot({ path: test.info().outputPath('2-window-divider.png') });
       await sleep(500);
       const sc = t?.screen() ?? '';
@@ -109,7 +112,7 @@ test("thread/keys-real: ⇧⇥ flips approvals yolo ↔ auto like the TUI's, bot
         throw e;
       });
       await page.screenshot({ path: test.info().outputPath('3-window-flash-from-tui.png') });
-      await expect(page.locator(T.end)).toContainText(start, { timeout: 4500 });
+      await expect(page.locator(T.end)).toContainText(menuWord(start), { timeout: 4500 });
     });
   } finally {
     if ((await hubMode(w).catch(() => start)) !== start) await hubCall(hubOf(w, 'bise').sock, 'approvals/set', { mode: start }).catch(() => undefined);

@@ -17,6 +17,10 @@ import { keptStorage } from '@/app/keep';
 import { cardDraftKey, leaveClosed, openInbox } from '@/inbox';
 import { emptyEnterAct } from './head';
 import { computerRowOf, computerState } from './ComputerLine';
+import type { Agent } from '@/proto';
+import { ComposerTab } from './ComposerTab';
+import { AttachTool, ModelTool, ModeTool } from './ComposerTools';
+import type { TabWords } from './tab';
 
 /**
  * The thread's composer, also mounted under an open artifact (amb-kit's src/artifacts/Open.tsx,
@@ -26,9 +30,9 @@ export const ThreadComposer = memo(function ThreadComposer({
   project,
   agent,
   busy,
-  to,
-  toEnd,
-  divider,
+  tab,
+  tabEnd,
+  me,
   placeholder,
   answer,
   onStop,
@@ -44,14 +48,14 @@ export const ThreadComposer = memo(function ThreadComposer({
   project: string;
   agent: string;
   busy: boolean;
-  to: string;
+  /** the tab over the box (designer's composer-strip A): 'to perf', where it works, the context */
+  tab: TabWords;
   /** after the label's first part: the addressee's working gust (LabelMark), else none */
   mark?: ReactNode;
-  /** the label line's right: 'esc write a plain message' while it answers (designer v6 s-wait) */
-  toEnd?: string | undefined;
-  /** else the divider's parts (model · effort · mode · …), '\u0000' between them: each shows whole
-   *  or drops whole from the end (desktop-status-line A, thread.css .th-end-parts) */
-  divider?: string | undefined;
+  /** the tab's right instead of the context: 'esc write to search' while it answers, 'tab back to voice' */
+  tabEnd?: string | undefined;
+  /** the addressee's row: its model menu in the box's row (none: no menu) */
+  me?: Agent | undefined;
   /** the field's words when empty (the composer's own 'write to …' when none) */
   placeholder: string | undefined;
   /** the open card his words answer (the inbox block's, any project's), else none */
@@ -76,16 +80,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   // the TUI; for 3 s after a switch the label line's right says it (the TUI's key bar flash)
   const approvals = useApprovals(project);
   const flash = useApprovalsFlash(approvals) && approvals !== null ? flashWords(approvals.mode, approvals.checker, approvals.env) : null;
-  const parts =
-    divider === undefined || divider === '' ? undefined : (
-      <span className="th-end-parts">
-        {divider.split('\u0000').map((w, i) => (
-          <span key={i}>{i === 0 ? w : ` · ${w}`}</span>
-        ))}
-      </span>
-    );
   const end: ReactNode =
-    flash === null ? (toEnd ?? parts) : (
+    flash === null ? tabEnd : (
       <span data-testid="composer.flash">
         <span className="flash-word">{flash.word}</span>
         {flash.rest}
@@ -256,7 +252,26 @@ export const ThreadComposer = memo(function ThreadComposer({
     save(keptStorage, was.key, { draft: null, history: [], queue: [] });
     if (actions.current?.putBack(entry) === 'history') setNote({ level: 'info', text: `your words to ${shownName(was.asker)}'s closed question: ↑ brings them back` });
   }, [closedKey, answer?.asker]);
-  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} to={to} {...(end === undefined ? {} : { toEnd: end })} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} mark={mark} testId="composer" />;
+  // the box's row: '+' always; the mode and the model only for a message (an answer has neither)
+  const answering = answer !== null;
+  const attach = useCallback((paths: readonly string[]) => {
+    actions.current?.attach(paths);
+  }, []);
+  const tools = useMemo(
+    () => (
+      <>
+        <AttachTool onPick={attach} />
+        {!answering && <ModeTool project={project} />}
+      </>
+    ),
+    [attach, answering, project],
+  );
+  const toolsEnd = answering || me === undefined ? undefined : <ModelTool project={project} a={me} />;
+  // answering, the tab holds only 'answering <agent> · <question>' and the way back: its place and
+  // context come back with a plain message (designer m_24517)
+  const tabWords = useMemo(() => (answering ? { label: tab.label } : tab), [answering, tab]);
+  const tabEl = <ComposerTab words={tabWords} mark={mark} end={end ?? undefined} testId="composer.tab" />;
+  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} tabAccent={answering} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} testId="composer" />;
   if (note === null) return field;
   return (
     <>

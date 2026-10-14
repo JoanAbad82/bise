@@ -95,6 +95,10 @@ const api: BiseApi = {
     const p: unknown = await ipcRenderer.invoke(IPC.pickFolder);
     return typeof p === 'string' ? p : null;
   },
+  pickFiles: async () => {
+    const p: unknown = await ipcRenderer.invoke(IPC.pickFiles);
+    return Array.isArray(p) ? p.filter((x): x is string => typeof x === 'string') : [];
+  },
   copy: async (text) => {
     fence?.put(text);
     await ipcRenderer.invoke(IPC.copy, text);

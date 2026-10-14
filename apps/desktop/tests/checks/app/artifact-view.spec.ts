@@ -109,7 +109,7 @@ for (const theme of ['light', 'dark']) {
       // the centre: perf's thread, its artifact row marked 'open', the one composer is perf's, about it
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'perf');
       await expect(page.getByTestId('thread.artifact.3')).toHaveAttribute('data-open', 'true');
-      await expect(page.locator('.th-screen .b-composer .div .lbl')).toContainText('about');
+      await expect(page.getByTestId('composer.tab.to')).toContainText('about');
       await expect(page.locator('[data-testid="composer.field"]'), 'one composer on the screen').toHaveCount(1);
       // the page itself, drawn by the pages server
       await expect(page.frameLocator('[data-testid="artifact.page"]').locator('h1'), 'the page is drawn').toHaveText('product page, before / after', { timeout: 10_000 });
@@ -125,11 +125,11 @@ for (const theme of ['light', 'dark']) {
       });
       expect(chip.bg, 'the open chip is tinted').not.toBe('rgba(0, 0, 0, 0)');
       expect(chip.border, 'no outline').toBe('0px');
-      // the composer's label gives way: 'idle' stays whole on its right
-      const lbl = page.locator('.th-screen .b-composer .div');
-      await expect(lbl.locator('.end')).toContainText('idle');
-      const [db, eb] = await Promise.all([lbl.boundingBox(), lbl.locator('.end').boundingBox()]);
-      expect((eb?.x ?? 0) + (eb?.width ?? 0), "'idle' inside the line").toBeLessThanOrEqual((db?.x ?? 0) + (db?.width ?? 0) + 0.5);
+      // the composer's tab (designer's composer-strip A): never 'idle'; its label cut inside the tab
+      const lbl = page.getByTestId('composer.tab');
+      await expect(lbl).not.toContainText('idle');
+      const [db, eb] = await Promise.all([lbl.boundingBox(), lbl.getByTestId('composer.tab.to').boundingBox()]);
+      expect((eb?.x ?? 0) + (eb?.width ?? 0), 'the label inside the tab').toBeLessThanOrEqual((db?.x ?? 0) + (db?.width ?? 0) + 0.5);
       await page.mouse.move(1, 400);
       await settle(page);
       await page.screenshot({ path: test.info().outputPath(`artifact-${theme}-1400.png`) });
@@ -222,7 +222,7 @@ for (const theme of ['light', 'dark']) {
       await expect(page.getByTestId('thread.head.changes')).toHaveCount(0);
       expect(await widthOf(page, '[data-testid="thread.head"]') > 0 && Math.round((await page.getByTestId('thread.head').boundingBox())?.height ?? 0), 'one line, 44 px').toBe(44);
       await expect(page.getByTestId('thread.archived'), 'no history foot: the one composer is there').toHaveCount(0);
-      await expect(page.locator('.th-screen .b-composer .div .lbl'), 'the composer goes to the project\'s main').toContainText('to main · about');
+      await expect(page.getByTestId('composer.tab.to'), 'the composer goes to the project\'s main').toContainText('to main · about');
       await expect(page.locator('.b-head, .ah').first(), 'never a workspace id in a head').not.toContainText(P);
       await expect(page.getByTestId('inbox.block'), "no other agent's question here").toHaveCount(0);
       await page.mouse.move(1, 400);
@@ -372,7 +372,7 @@ test("app/artifact-view: esc closes the open artifact first, after a menu, his w
     const { page } = s;
     await page.setViewportSize({ width: 1400, height: 900 });
     const field = page.getByTestId('composer.field');
-    const label = page.locator('.th-screen .b-composer .div .lbl');
+    const label = page.getByTestId('composer.tab.to');
     const art = page.getByTestId('app.art');
     const row = page.getByTestId(`app.right.artifact.${P}.product-page`);
     await expect(row).toBeVisible({ timeout: 10_000 });

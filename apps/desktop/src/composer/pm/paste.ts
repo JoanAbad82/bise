@@ -12,7 +12,7 @@ import {
 import type { EditorView } from "@tiptap/pm/view";
 import type { Slice } from "@tiptap/pm/model";
 import { chipLabel, isLongPaste, nextChipNumber, type Chip } from "../message";
-import { type ComposerSources } from "../sources";
+import { isImagePath, type ComposerSources } from "../sources";
 import { fileIconOf, filePathOf, imageDims, isImageFile, thumbnail } from "../attach";
 import { insertChip, insertText, nodeType, segmentsOf } from "./pmtext";
 
@@ -94,6 +94,29 @@ const addAll = (c: PasteCtx, list: readonly File[]): void => {
     }
   })();
 };
+
+/** A file picked by its path (the box's '+'), as its chip: an image by its extension (the model
+ *  reads it where it is), any other a file chip with its system icon. */
+const pathChip = async (path: string): Promise<(n: number) => Chip> => {
+  const name = path.split("/").at(-1) ?? path;
+  if (isImagePath(path)) return (n) => ({ kind: "image", n, path, name });
+  const icon = await fileIconOf(path);
+  return (n) => ({ kind: "file", n, path, ...(icon === null ? {} : { icon }) });
+};
+
+/** Picked files, in their order, each where the one before it ended (as addAll). */
+export function addPaths(c: PasteCtx, paths: readonly string[]): void {
+  void (async () => {
+    let added = false;
+    for (const p of paths) {
+      const make = await pathChip(p);
+      const st = c.state();
+      if (added && st !== null) c.dispatch(insertText(st, " "));
+      addChip(c, make);
+      added = true;
+    }
+  })();
+}
 
 const droppedFiles = (e: DragEvent): File[] =>
   Array.from(e.dataTransfer?.files ?? []);

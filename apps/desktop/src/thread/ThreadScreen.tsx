@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { Button, Head, Marker } from '@/ds';
 import type { ComposerActions } from '@/composer';
 import type { Card } from '@/proto';
-import { threadKey, useAgents, useApprovals, useModels, useCards, useCoreState, useProjects, useStore, useThreadOrder, useTyping } from '@/store';
+import { threadKey, useAgents, useCards, useCoreState, useProjects, useStore, useThreadOrder, useTyping } from '@/store';
 import { usePartialText } from '@/shared/partial';
 import { useMenuAction } from '@/app/menu';
 import { useRouter } from '@/app/router';
@@ -30,8 +30,9 @@ import { AgentHead, BiseHead, StartingLine } from './AgentHead';
 import { PauseLine } from './PauseLine';
 import { LabelMark } from './LabelMark';
 import { StepLine } from './live-step';
-import { composerWords, dividerParts, emptyEnter, nothingOwnYet, usageLine, workingRowShows } from './head';
-import { paused } from './wake';
+import { composerWords, emptyEnter, nothingOwnYet, usageLine, workingRowShows } from './head';
+import { placeOf } from './tab';
+import { useTabWords } from './ComposerTab';
 import { SignInLine, useThreadSignIn } from './signin';
 import { type ThreadListHandle } from './ThreadList';
 import { ComputerLine } from './ComputerLine';
@@ -97,10 +98,10 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
   trackRoutes(store);
   const held = useHeld(store, tkey);
 
-  const me = useAgents(project).find((a) => a.name === agent);
-  // S40/W3: the TUI's divider on the composer's label line: model · effort · approvals mode · state · context
-  const approvals = useApprovals(project);
-  const models = useModels(project);
+  const agents = useAgents(project);
+  const me = agents.find((a) => a.name === agent);
+  // beside an open artifact the composer writes to its maker: its row for the tab and the model menu
+  const addressee = artifact?.agent == null ? me : agents.find((a) => a.name === artifact.agent);
   // voice mode on this agent: its pane takes the composer's place (amb-home's src/voicemode)
   const voice = useVoiceHere(project, agent);
   const typing = useTyping(tkey);
@@ -291,8 +292,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
       </a>
     );
   const lead = bise ? 'every project' : agent === 'main' ? '' : (projectName ?? project);
-  // its context gauge, named ('context 42k · 17%'), none while it says nothing ('0%': designer D7b)
-  const gauge = bise ? '' : usageLine(me?.usage?.words);
   const sub = (
     <>
       {/* bise's own head: 'every project' alone (designer D7b) */}
@@ -309,12 +308,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
       ) : (
         [lead, agent !== 'main' && me ? lineOf(me) : ''].filter(Boolean).join(' · ')
       )}
-      {gauge !== '' && (
-        <span className="th-gauge" data-testid="thread.usage">
-          {' · '}
-          {gauge}
-        </span>
-      )}
+      {/* its context is the composer tab's (designer m_24325: one place per fact) */}
       {/* voice mode on this agent (ambient's spec m_11632, amb-home m_11684) */}
       {voice !== 'off' && (
         <span className="th-voice" data-testid="thread.voice">
@@ -332,9 +326,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
   const [wrote, setWrote] = useState<string | null>(null);
   if (writing && wrote !== tkey) setWrote(tkey);
   const fresh = !bise && agent !== MAIN && me !== undefined && !me.archived && order.loaded && nothingOwnYet(order.order.map((pos) => store.entry(tkey, pos)?.kind)) && me.status === 'working' && me.waits === 0 && !writing && wrote !== tkey;
-  // the working row at the thread's end says 'working' and its age: the label drops its state then
-  // (designer m_20262 (1): one place only; the head chip keeps it)
-  const rowSays = !fresh && workingRowShows(me);
   // the gust beside 'to bise' (designer's desktop-working v2): the composer's addressee's, kept
   // stable so the memoised composer doesn't draw again for it (the mark reads its agent itself)
   const markAgent = artifact?.agent ?? agent;
@@ -344,24 +335,15 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
     () => <LabelMark project={project} agent={markAgent} name={markName} starting={startingMark} />,
     [project, markAgent, markName, startingMark],
   );
-  // each part whole or not at all, dropped from the end when the line is short (desktop-status-line
-  // A: never 'waitin'): ThreadComposer draws them (thread.css .th-end-parts); one string, so a new
-  // entry never draws the memoised composer again
-  const dividerKey =
-    me === undefined
-      ? ''
-      : dividerParts({
-          model: me.model,
-          modelLabel: models.find((m) => m.id === me.model)?.label,
-          effort: me.effort,
-          mode: approvals?.mode,
-          // a pause (agent-waiting-states A): the line over the composer says it, never this
-          // row (desktop-status-line A: no double), and never 'idle', the word he misread
-          status: rowSays || paused(me) ? null : me.status,
-          // named like the head's gauge ('context 42k · 17%'), none at 0% (designer m_14523: a bare
-          // '15 · 0%' read as nothing)
-          context: usageLine(me.usage?.words),
-        }).join('\u0000');
+  // the composer's tab (designer's composer-strip A): the addressee's place and context; the crumb
+  // names the project on a thread, so the tab never does; 'idle' and the model are gone from it
+  // (the model is the box's menu, working is the gust)
+  const addr = markAgent === agent ? me : addressee;
+  const tabPlace = placeOf(addr, bise);
+  const tabContext = usageLine(addr?.usage?.words);
+  const tabLabel = voice === 'typing' ? typingLabelOf(agent) : answering !== null ? answering.label : artifact !== undefined ? artifact.to : composerWords(title).label;
+  // one object while its words hold, so a new entry never draws the memoised composer again
+  const tab = useTabWords(tabLabel, tabPlace, tabContext);
   // designer's desktop-screens v6 (1): '⋯' at the head's right (rename, model, reasoning)
   const more =
     me && !me.archived && !bise ? (
@@ -482,9 +464,9 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
             // an open item: the block's words (a question's 'answering perf · …', or an approval's
             // 'to bise · the merge waits for 1 or 2' where his words stay a plain message, ambient m_8773);
             // voice mode while he types: 'to perf · voice paused', 'tab back to voice' (designer's voice-window (1))
-            to={voice === 'typing' ? typingLabelOf(agent) : answering !== null ? answering.label : artifact !== undefined ? artifact.to : composerWords(title).label}
-            toEnd={voice === 'typing' ? TYPING_END : answering?.end}
-            divider={dividerKey}
+            tab={tab}
+            tabEnd={voice === 'typing' ? TYPING_END : answering?.end}
+            me={addr}
             keys={voice === 'typing' ? VOICE_TYPING_KEYS : undefined}
             lead={voice === 'typing' ? <VoiceTypePearl /> : undefined}
             mark={labelMark}

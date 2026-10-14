@@ -25,7 +25,8 @@ const T = {
   thread: '[data-testid="thread.screen"]',
   think: '[data-testid^="thread.think."][data-testid$=".head"]',
   notice: '[data-testid^="thread.notice."]',
-  usage: '[data-testid="thread.usage"]',
+  // the gauge is the composer tab's (designer m_24325: never the head's too)
+  usage: '[data-testid="composer.tab.context"]',
   compacting: '[data-testid^="thread.compacting."]',
   compacted: '[data-testid^="thread.compacted."][data-testid$=".head"]',
   nd: '[data-testid^="thread.notdelivered."]:not([data-testid$=".again"]):not([data-testid$=".drop"])',
@@ -206,10 +207,10 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
       expect.soft(got, "the window's gauge is the TUI panel's").toBe(tuiPct);
       await page.locator('[data-testid="app.right.agent.search"]').click({ timeout: 5000 });
       // the agent head shows each meta item whole or not at all (69192579): search's long purpose
-      // line fills it, so its gauge goes; the composer's label line ('… · context 44k · 17%') keeps it
+      // line fills it, so its gauge goes; the composer's tab ('context 44k · 17%') keeps it
       const head = page.locator(T.usage);
-      const label = page.locator('[data-testid="composer"] .div .end');
-      await expect.soft(label, "search's label line").toBeVisible({ timeout: 10_000 });
+      const label = page.getByTestId('composer.tab.context');
+      await expect.soft(label, "search's tab").toBeVisible({ timeout: 10_000 });
       const inHead = await head.isVisible();
       const where = inHead ? head : label;
       const words = ((await where.textContent().catch(() => '')) ?? '').trim();

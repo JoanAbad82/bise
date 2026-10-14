@@ -35,16 +35,16 @@ test('thread/dock-choice: a docked merge is decided only by 1/2; typed words go 
   const s = await launchDesktop({ core, route: `project/${P}` });
   const { page } = s;
   try {
-    const label = page.locator('[data-testid="composer"] .div');
+    const label = page.getByTestId('composer.tab');
 
     await test.step("the merge docked: 'to bise · the merge waits for 1 or 2', no type hint, words go as a send", async () => {
       await expect(page.getByTestId('inbox.block.row.1')).toBeVisible({ timeout: 10_000 });
       await page.getByTestId('inbox.block.row.1').click();
       await expect(page.getByTestId('inbox.block.open.1')).toBeVisible({ timeout: 3000 });
       // the label's left (its right is the S40/W3 divider, here 'waiting')
-      await expect(label.locator('.lbl')).toHaveText('to bise · the merge waits for 1 or 2');
+      await expect(label.getByTestId('composer.tab.to')).toHaveText('to bise · the merge waits for 1 or 2');
       // the label wins over the divider words (designer m_14523): never cut while they're there
-      expect(await label.locator('.lbl').evaluate((el) => el.scrollWidth - el.clientWidth), 'the label whole').toBeLessThanOrEqual(1);
+      expect(await label.getByTestId('composer.tab.to').evaluate((el) => el.scrollWidth - el.clientWidth), 'the label whole').toBeLessThanOrEqual(1);
       await expect(page.getByTestId('inbox.block.open.1'), 'no type hint on a choice item').not.toContainText('type your answer');
       await page.screenshot({ path: test.info().outputPath('dock-merge.png') });
       await page.locator('[data-testid="composer.field"]').first().click();
@@ -62,7 +62,7 @@ test('thread/dock-choice: a docked merge is decided only by 1/2; typed words go 
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'perf', { timeout: 5000 });
       await page.getByTestId('inbox.block.row.1').click();
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-answering', 'true', { timeout: 3000 });
-      await expect(label.locator('.lbl')).toContainText('answering perf · which bench');
+      await expect(label.getByTestId('composer.tab.to')).toContainText('answering perf · which bench');
       // on perf's own thread the block says whom esc writes to instead (amb-home's answeringOf)
       await expect(label.locator('.end')).toHaveText('esc write to perf instead');
       const box = await label.evaluate((el) => {

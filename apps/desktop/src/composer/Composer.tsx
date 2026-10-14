@@ -46,18 +46,19 @@ export interface ComposerProps {
   readonly sources?: ComposerSources;
   /** Where drafts live (localStorage by default; tests pass their own). */
   readonly store?: Store;
-  /** "you → bise · opus · high" */
-  readonly to?: string;
+  /** the tab glued to the box's top (who and where: thread/ComposerTab.tsx); none: the box alone */
+  readonly tab?: ReactNode;
+  /** the tab in the accent: his words answer a card */
+  readonly tabAccent?: boolean;
+  /** the box's bottom row, left ('+', the mode menu), and right before send (the model menu) */
+  readonly tools?: ReactNode;
+  readonly toolsEnd?: ReactNode;
   /** K2: ⏎ on an empty field: the screen's act (the TUI's: sign in again after expiry, ...) */
   readonly onEmptyEnter?: () => void;
   /** R18: an esc no list took, while busy or on a blank field: the screen's (a route hold; never a stop: ctrl+c, main m_22205). */
   readonly onEscape?: () => boolean;
   /** TP-R6, ⇧⇥ (no list open): the screen's (the TUI's: switch the approvals mode yolo ↔ auto). */
   readonly onShiftTab?: () => void;
-  /** a key hint at the label line's right ('esc write a plain message' while it answers a docked card) */
-  readonly toEnd?: ReactNode;
-  /** a sign after the label's first part ('to bise' + the working gust; 'answering perf' + it + ' · …') */
-  readonly mark?: ReactNode;
   readonly placeholder?: string;
   /** A fixed key bar (a screen of its own); unset: the bar follows the composer's mode (W9). */
   readonly keys?: string;
@@ -77,29 +78,6 @@ export interface ComposerProps {
   readonly testId?: string;
 }
 
-/** 'write to perf' under 'you → perf' (ambient m_10689); 'write to bise' with no target line. */
-export function writeTo(to: string | undefined): string {
-  const name = /→\s*([^·]+)/u.exec(to ?? "")?.[1]?.trim();
-  return `write to ${name !== undefined && name !== "" ? name : "bise"}`;
-}
-
-/** The label with its mark after the first part: 'to bise' ∿, 'answering perf' ∿ ' · the question'. */
-function MarkedLabel({ to, mark }: { to: string; mark: ReactNode }) {
-  const cut = to.indexOf(" · ");
-  return cut < 0 ? (
-    <>
-      {to}
-      {mark}
-    </>
-  ) : (
-    <>
-      {to.slice(0, cut)}
-      {mark}
-      {to.slice(cut)}
-    </>
-  );
-}
-
 /** The last tip shown (keybar.rs keeps it in the `tip` preference): the next session starts after it. */
 const TIP_KEY = "bise.composer.v1.tip";
 
@@ -110,10 +88,11 @@ export const Composer = memo(function Composer(
     target,
     busy = false,
     sources = NO_SOURCES,
-    to,
-    toEnd,
-    mark,
-    placeholder = writeTo(to),
+    tab,
+    tabAccent,
+    tools,
+    toolsEnd,
+    placeholder = "write to bise",
     keys,
     voice = null,
     quoting = false,
@@ -175,15 +154,10 @@ export const Composer = memo(function Composer(
   return (
     <ComposerFrame
       testId={testId}
-      to={
-        // the label keeps its markup with or without a right side (the working row can empty the right)
-        to === undefined ? undefined : (
-          <>
-            <span className="lbl">{mark == null ? to : <MarkedLabel to={to} mark={mark} />}</span>
-            {toEnd !== undefined && <span className="end">{toEnd}</span>}
-          </>
-        )
-      }
+      tab={tab}
+      tabAccent={tabAccent}
+      tools={tools}
+      toolsEnd={toolsEnd}
       // the whole box is the input: a press on its padding or empty area focuses the editor, caret at the end
       onBoxDown={() => {
         actions.current?.focusEnd();

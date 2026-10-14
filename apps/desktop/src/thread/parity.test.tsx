@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -13,7 +14,8 @@ import { countsOf, ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
 
 vi.mock('@/composer', () => ({
-  Composer: () => <div data-testid="composer" />,
+  // the tab is the screen's words (ComposerTab): drawn, the field is not
+  Composer: ({ tab }: { tab?: ReactNode }) => <div data-testid="composer">{tab}</div>,
   useComposerSources: () => ({ agents: [], skills: [], commands: [], files: () => Promise.resolve([]), saveImage: () => Promise.resolve(null) }),
   useApprovalsFlash: () => false,
   flashWords: () => ({ word: '', rest: '' }),
@@ -336,7 +338,7 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
     expect(w.queryByTestId('thread.notdelivered.26')).toBeNull();
   });
 
-  it("usage: the hub's gauge words in the head, named (designer D7: 'context 42k · 17%')", () => {
+  it("usage: the hub's gauge words in the composer's tab, named, never twice (designer D7, m_24325: 'context 42k · 17%')", () => {
     const store = new Store(null);
     act(() => {
       store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('perf', { usage: { model: 'm', context: 42310, window: 256000, words: '42k · 17%', short: '17%' } })] });
@@ -346,7 +348,8 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
         <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="perf" /></RouterContext>
       </StoreProvider>,
     );
-    expect(v.getByTestId('thread.usage').textContent).toBe('context 42k · 17%');
+    expect(v.getByTestId('composer.tab.context').textContent).toBe('context 42k · 17%');
+    expect(v.queryByTestId('thread.usage'), 'not in the head too').toBeNull();
   });
 });
 

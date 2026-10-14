@@ -469,7 +469,7 @@ test('gate/right: messages right, type anywhere, inbox drafts + ctrl+o, folds, t
           };
           const hr = h.getBoundingClientRect();
           const over = Array.from(h.querySelectorAll<HTMLElement>('*')).some((e) => !e.classList.contains('ah-gone') && e.getBoundingClientRect().right > hr.right + 1);
-          return `drop=${h.dataset['drop'] ?? '?'}; name ${it('thread.head.name')}; role ${it('thread.head.role')}; context ${it('thread.usage')}; branch ${it('thread.head.branch')}; changes ${it('thread.head.changes')}; past the head's right edge: ${String(over)}`;
+          return `name ${it('thread.head.name')}; role ${it('thread.head.role')}; changes ${it('thread.head.changes')}; past the head's right edge: ${String(over)}`;
         });
       for (const t of ['light', 'dark'] as const) {
         await theme(t);

@@ -6,14 +6,14 @@ import { appendFile, existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, extname, isAbsolute, join } from 'node:path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, session, shell, type OpenDialogOptions } from 'electron';
-import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FOLDER_ENV, type MenuAction } from '../shared/api';
+import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FILES_ENV, TEST_PICK_FOLDER_ENV, type MenuAction } from '../shared/api';
 import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
 import { menuTarget } from './menu';
 import { externalUrl } from './external';
 import { isOffscreen, noAsks, offscreenGrants } from './offscreen';
 import { imageDir, saveImage } from './images';
-import { pickedInTest } from './pick';
+import { pickedFilesInTest, pickedInTest } from './pick';
 import { allowedPath } from './reveal';
 
 // the page's async clipboard API (navigator.clipboard): its permissions
@@ -140,6 +140,7 @@ export function installIpc(testMode: boolean): void {
   // a window's full screen now (window.bise.onFullScreen's first call)
   ipcMain.handle(IPC.fullScreen, (e): boolean => BrowserWindow.fromWebContents(e.sender)?.isFullScreen() ?? false);
   ipcMain.handle(IPC.pickFolder, (e): Promise<string | null> => pickFolder(BrowserWindow.fromWebContents(e.sender), testMode));
+  ipcMain.handle(IPC.pickFiles, (e): Promise<readonly string[]> => pickFiles(BrowserWindow.fromWebContents(e.sender), testMode));
   // R41: a pasted or dropped image into the TUI's image store (the test home's under test)
   ipcMain.handle(IPC.saveImage, (_e, bytes: unknown): string | null => saveImage(imageDir(process.env), bytes));
   ipcMain.handle(IPC.copy, async (_e, text: unknown): Promise<void> => {
@@ -257,6 +258,18 @@ export async function pickFolder(win: BrowserWindow | null, testMode: boolean): 
   const opts: OpenDialogOptions = { properties: ['openDirectory', 'createDirectory'], defaultPath: homedir() };
   const r = win === null ? await dialog.showOpenDialog(opts) : await dialog.showOpenDialog(win, opts);
   return r.canceled ? null : (r.filePaths[0] ?? null);
+}
+
+/**
+ * His files pick (window.bise.pickFiles, the composer's '+'): macOS's open panel for files, several
+ * at once, attached to `win`, starting in his home; [] on cancel. Test mode: the env's
+ * TEST_PICK_FILES_ENV paths at once, never a panel.
+ */
+export async function pickFiles(win: BrowserWindow | null, testMode: boolean): Promise<readonly string[]> {
+  if (testMode) return pickedFilesInTest(process.env[TEST_PICK_FILES_ENV]);
+  const opts: OpenDialogOptions = { properties: ['openFile', 'multiSelections'], defaultPath: homedir() };
+  const r = win === null ? await dialog.showOpenDialog(opts) : await dialog.showOpenDialog(win, opts);
+  return r.canceled ? [] : r.filePaths;
 }
 
 /** Test mode: a clipboard item of the menu, played in the focused window's fence. */

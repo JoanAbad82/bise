@@ -115,7 +115,7 @@ test("voice/voice-mode: ∿ and ctrl+r twice, every state in the composer's box,
         if (state === 'typing') {
           await expect(field).toBeVisible({ timeout: 2000 });
           await expect(page.getByTestId('voice.pane')).toHaveCount(0);
-          await expect(page.locator('[data-testid="composer"] .div')).toHaveText('to perf · voice paused' + 'tab back to voice');
+          await expect(page.getByTestId('composer.tab')).toHaveText(/^to perf · voice paused.*tab back to voice$/u);
           await expect(page.getByTestId('composer.keys')).toHaveText('⏎ send   tab back to voice   esc leave');
           await expect(page.getByTestId('voice.typing.pearl')).toBeVisible();
           await field.click();

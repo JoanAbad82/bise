@@ -16,7 +16,7 @@
 .b-field:focus-within{box-shadow:inset 0 0 0 1px var(--c-focus),0 0 0 3px color-mix(in srgb,var(--c-focus) 25%,transparent)}
 
 /* the composer's box shows focus while the editor inside has it; the editor's own caret, in the text color */
-.b-composer .box:focus-within{box-shadow:0 0 0 1px var(--c-focus),0 4px 16px var(--c-shadow)}
+.b-composer .box:focus-within{box-shadow:0 0 0 1px var(--c-focus)}
 .b-composer .in{min-width:0;caret-color:var(--c-text);color:var(--c-text)}
 .b-composer .in [contenteditable]{outline:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .b-composer button.send{padding:0;border:0;font-family:var(--font-ui);cursor:default}

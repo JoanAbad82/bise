@@ -151,7 +151,7 @@ for (const w of [1400, 1100, 800]) {
             });
             expect(whole, `${theme}: the state whole, the line fits`).toBe(true);
             await expect(page.getByTestId('thread.head.state')).toHaveText(view === 'pause' ? '… waiting · 3 min' : '… waiting · 1 min');
-            await expect(page.locator('[data-testid="composer"] .div')).not.toHaveText(/waiting|idle|since/u);
+            await expect(page.getByTestId('composer.tab')).not.toHaveText(/waiting|idle|since/u);
             const bar = await openBar();
             const row = bar.getByTestId(`app.right.agent.${agent}`);
             await expect(row.locator('.app-rb-g')).toHaveText('…');

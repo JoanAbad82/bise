@@ -187,13 +187,3 @@ describe("the take's chip", () => {
     }
   });
 });
-
-describe('the placeholder', () => {
-  it("says who he writes to: 'write to perf' under 'you → perf', 'write to bise' with no target line", async () => {
-    const { writeTo } = await import('./Composer');
-    expect(writeTo('you → perf · opus · high')).toBe('write to perf');
-    expect(writeTo('you → bise · lab')).toBe('write to bise');
-    expect(writeTo('you → main')).toBe('write to main');
-    expect(writeTo(undefined)).toBe('write to bise');
-  });
-});

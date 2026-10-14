@@ -41,7 +41,7 @@ describe('the composer', () => {
       a.insertText('ça va ?\nsecond line');
       await Promise.resolve();
     });
-    rerender(<Composer target="p/main" store={store} onSend={onSend} busy to="you → bise" />);
+    rerender(<Composer target="p/main" store={store} onSend={onSend} busy tab="to bise" />);
     expect(getByTestId('composer.field')).toBe(field);
     await act(async () => {
       a.submit();

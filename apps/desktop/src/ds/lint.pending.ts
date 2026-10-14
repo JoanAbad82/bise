@@ -24,7 +24,6 @@ export const PENDING_CLASSES: readonly string[] = [
   'tag',
   'th-answered',
   'th-code-lang',
-  'th-gauge',
   'th-link-off',
   'th-queued',
   'th-restored',

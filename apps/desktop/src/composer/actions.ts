@@ -20,6 +20,8 @@ export interface ComposerActions {
   focus(): void;
   /** The focus with the caret at the draft's end (a press on the frame's padding or empty area, his round 2). */
   focusEnd(): void;
+  /** Files he picked by path (the '+' in the box's row): each a chip at the caret, an image as an image chip. */
+  attach(paths: readonly string[]): void;
   /** The mic control: on, or off when on (bar I). */
   dictate(): void;
   /**

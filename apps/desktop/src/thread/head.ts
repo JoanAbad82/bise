@@ -71,13 +71,6 @@ export function usageLine(words: string | null | undefined): string {
   return `context ${w}`;
 }
 
-/** The branch line: 'sb/perf · ± 2 files' (no files known yet: the branch alone; no branch: none). */
-export function branchLine(branch: string | null | undefined, files: number | undefined): string {
-  if (branch == null || branch === '') return '';
-  if (files === undefined || files === 0) return branch;
-  return `${branch} · ± ${String(files)} ${files === 1 ? 'file' : 'files'}`;
-}
-
 /** A project's bise chip: '2 agents at work', '1 waiting for you', 'all quiet'. */
 export function biseChip(agents: readonly Pick<Agent, 'main' | 'archived' | 'status' | 'waits'>[]): StateChip {
   const waits = agents.reduce((n, a) => n + a.waits, 0);
@@ -95,38 +88,6 @@ export function biseChip(agents: readonly Pick<Agent, 'main' | 'archived' | 'sta
 export function workingRowShows(a: Agent | undefined): boolean {
   return a !== undefined && !a.archived && !paused(a) && a.status === 'working' && a.waits === 0 && a.waiting_on?.who !== 'you';
 }
-
-/**
- * S40/W3, the TUI's divider (`you → main · model · effort · approvals mode · state · context`,
- * chrome.rs + sb/panel.rs status_state): what the composer's label line says on its right. The
- * model as the catalog names it (its label, else the id's last part), its effort, the hub's
- * approvals mode (yolo / auto), its state ('working · 4 min', 'idle'), its context ('42k · 17%',
- * the hub's words). Any part it doesn't know is left out. Pure.
- */
-type DividerWords = {
-  model?: string | null;
-  modelLabel?: string | null;
-  effort?: string | null;
-  mode?: string | null;
-  status?: string | null;
-  context?: string | null;
-};
-
-export function dividerEnd(a: DividerWords): string {
-  return dividerParts(a).join(' · ');
-}
-
-/** The divider's parts, in order: the label drops them whole, from the end (desktop-status-line A). */
-export function dividerParts(a: DividerWords): string[] {
-  const model = (a.modelLabel ?? '').trim() || (a.model ?? '').split('/').at(-1)?.trim() || '';
-  const mode = a.mode === 'yolo' || a.mode === 'auto' ? a.mode : '';
-  // working is never in the label: the gust after 'to <agent>' is its one sign (desktop-working v2,
-  // designer m_22403)
-  const status = (a.status ?? '').trim();
-  const state = status === 'working' ? '' : status;
-  return [model, (a.effort ?? '').trim(), mode, state, (a.context ?? '').trim()].filter((x) => x !== '');
-}
-
 
 export function composerWords(name: string): { label: string; placeholder: string } {
   return { label: `to ${name}`, placeholder: `write to ${name}, then ⏎` };
@@ -154,25 +115,6 @@ export function emptyEnterAct(
 
 export function emptyEnter(cards: readonly { kind: string; waiting?: readonly string[] | null }[], agent: string): { cmd: 'sign_in'; id: 'chatgpt' } | null {
   return cards.some((c) => c.kind === 'signin' && (c.waiting ?? []).includes(agent)) ? { cmd: 'sign_in', id: 'chatgpt' } : null;
-}
-
-/**
- * What the head drops so the rest fits (designer m_17194): a meta item shows whole or not at all, never
- * cut. The context note goes first, then the branch; the role takes the room they leave and ends with '…'
- * only if it still doesn't fit. Dropped items stay in the DOM out of the flow ('ah-gone'), so their
- * width is still read; the head re-measures when it resizes or its words change. 0: all shown, 1: no
- * context note, 2: no branch either.
- */
-export function dropsFor(widths: { avail: number; who: number; chip: number; notes: number[]; usage: number; branch: number; end: number }): 0 | 1 | 2 {
-  const GAP = 10;
-  const END_GAP = 6;
-  const items = [widths.who, widths.chip, ...widths.notes].filter((w) => w > 0);
-  const base = items.reduce((n, w) => n + w, 0) + GAP * items.length + widths.end;
-  const withUsage = widths.usage > 0 ? widths.usage + GAP : 0;
-  const withBranch = widths.branch > 0 ? widths.branch + END_GAP : 0;
-  if (base + withUsage + withBranch <= widths.avail) return 0;
-  if (base + withBranch <= widths.avail) return 1;
-  return 2;
 }
 
 /**

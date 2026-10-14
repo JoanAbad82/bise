@@ -108,8 +108,15 @@ export type Send = "on" | "off" | "stop";
 export interface ComposerFrameProps {
   /** the editor (src/composer): mounted once, never re-created by the frame */
   children: ReactNode;
-  /** "you → bise · opus · high" */
-  to?: ReactNode;
+  /** the tab glued to the box's top (designer's composer-strip A): who and where he writes to,
+   *  'to perf  ψ sb/perf  context 42k · 17%'; none: the box alone */
+  tab?: ReactNode;
+  /** the tab in the accent on its 7% tint: his words answer a card ('answering search · …') */
+  tabAccent?: boolean;
+  /** the box's bottom row, left: what he changes ('+', the mode menu) */
+  tools?: ReactNode;
+  /** the box's bottom row, right, before send: the model and effort menu */
+  toolsEnd?: ReactNode;
   /** on: something to send; off: nothing yet; stop: a turn runs, the button interrupts */
   send: Send;
   onSend?: MouseEventHandler<HTMLButtonElement>;
@@ -135,10 +142,11 @@ export function boxPress(target: EventTarget | null): boolean {
   const el = target as { closest?: (s: string) => unknown } | null;
   if (el === null || typeof el.closest !== "function") return true;
   // a disabled control (send while the draft is empty) does nothing of its own: the press focuses the field
-  return el.closest('[contenteditable="true"], button:not(:disabled), a, input, textarea, [role=button], .b-chip, .b-dock, .b-tabs, .b-quote') === null;
+  return el.closest('[contenteditable="true"], button:not(:disabled), a, input, textarea, [role=button], [role=menu], .b-chip, .b-dock, .b-tabs, .b-quote') === null;
 }
-/** the composer's frame: tabs, dock, quote, the to-line, the box with the editor and send, the keys */
-export function ComposerFrame({ children, to, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, lead, testId }: ComposerFrameProps) {
+/** the composer's frame: tabs, dock, quote, the tab glued to the box, the box (the editor, then its
+ *  32 px row: tools left, tools and send right), the keys */
+export function ComposerFrame({ children, tab, tabAccent, tools, toolsEnd, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, lead, testId }: ComposerFrameProps) {
   return (
     <div className={cx("b-composer", disabled && "is-disabled")} data-testid={testId}
       onMouseDown={onBoxDown && ((e) => {
@@ -150,14 +158,21 @@ export function ComposerFrame({ children, to, send, onSend, disabled, keys, quot
       {tabs}
       {dock}
       {quote}
-      {to != null && <div className="div">{to}</div>}
+      {tab != null && <div className={cx("tab", tabAccent && "acc")} data-testid={sub(testId, "tab")}>{tab}</div>}
       <div className={cx("box", focus && "is-focus")} data-testid={sub(testId, "box")}>
-        {lead}
-        <div className="in">{children}</div>
-        <button type="button" className={cx("send", send === "stop" ? "stop" : send === "off" && "off")} onClick={onSend}
-          disabled={send === "off" || disabled} aria-label={send === "stop" ? "stop" : "send"} data-testid={sub(testId, send === "stop" ? "stop" : "send")}>
-          {send === "stop" ? "■" : "↑"}
-        </button>
+        <div className="line">
+          {lead}
+          <div className="in">{children}</div>
+        </div>
+        <div className="row" data-testid={sub(testId, "row")}>
+          {tools}
+          <span className="sp" />
+          {toolsEnd}
+          <button type="button" className={cx("send", send === "stop" ? "stop" : send === "off" && "off")} onClick={onSend}
+            disabled={send === "off" || disabled} aria-label={send === "stop" ? "stop" : "send"} data-testid={sub(testId, send === "stop" ? "stop" : "send")}>
+            {send === "stop" ? "■" : "↑"}
+          </button>
+        </div>
       </div>
       {keys != null && <div className="keys">{keys}</div>}
     </div>

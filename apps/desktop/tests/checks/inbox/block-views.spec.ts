@@ -12,7 +12,7 @@
 //   - the permission ask (macOS never asked in a fresh test home) is an ordinary item from bise, the last
 //     one (H10, designer m_19835: '? bise · let questions reach you as macOS notifications?', 1 turn on ·
 //     2 not now): its 1 asks (the test answers 'on') and it goes;
-//   - H10 at 1400/1100/800 x 820: ≤ 180 px under the thread at rest; scrolled up, the block stays as it
+//   - H10 at 1400/1100/800 x 820: ≤ 224 px under the thread at rest (composer A); scrolled up, the block stays as it
 //     was, no fold and the same height (designer m_21505: nothing around the composer changes on scroll),
 //     the rows he reads stay put; back at the bottom the last row whole.
 // Shots (looked at, for designer): folded, question opened, merge opened, ⌘I from settings, each light + dark.
@@ -246,7 +246,7 @@ test("inbox/block-views: the permission row asks macOS once ('turn on'), then go
 });
 
 // H10 (tui-parity's thread-hierarchy, ambient-lead m_19826, designer m_19835): at 820 high the block +
-// the composer take ≤ 180 px at rest (the thread's bottom), ≤ 120 px while he reads scrolled up: the
+// the composer take ≤ 224 px at rest (the thread's bottom), ≤ 120 px while he reads scrolled up: the
 // block is one 36 px line then, the composer's keys line hides, and the rows he reads don't move; back
 // at the bottom both come back and the last row shows whole. Frames at 1400, 1100 and 800, light + dark.
 const LONG = Array.from({ length: 60 }, (_, i) => ({ pos: i + 1, at_ms: NOW - 3_600_000 + i * 1000, kind: 'agent', text: `bench note ${String(i + 1)}: p95 moved by ${String(i % 7)} ms on the cold path, nothing else changed.` }));
@@ -264,10 +264,12 @@ for (const size of ['1400x820', '1100x820', '800x820'] as const) {
       const block = page.getByTestId('inbox.block');
       await expect(block).toBeVisible({ timeout: 10_000 });
       await expect(page.getByText('bench note 60:')).toBeVisible({ timeout: 5000 });
-      await test.step('at rest: the head + one line, the composer whole, ≤ 180 px', async () => {
+      // the composer is the tab + the box with its 32 px row now (designer's composer-strip A, signed
+      // m_24325): 44 px more than the old label line and box, so the budget is 180 + 44
+      await test.step('at rest: the head + one line, the composer whole, ≤ 224 px', async () => {
         await expect(page.getByTestId('inbox.block.row.1')).toBeVisible();
         expect(await block.evaluate((e) => e.getBoundingClientRect().height), 'the head + one line').toBeLessThan(90);
-        expect(await bottomPart(page), 'the block + the composer at rest').toBeLessThanOrEqual(180);
+        expect(await bottomPart(page), 'the block + the composer at rest').toBeLessThanOrEqual(224);
         await expect(page.getByTestId('composer.keys')).toBeVisible();
         await shoot(page, core, `h10-${w}-rest`);
       });

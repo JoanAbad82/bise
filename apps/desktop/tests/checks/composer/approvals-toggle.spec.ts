@@ -2,7 +2,7 @@
 // input.rs + keybar.rs, approvals-design.md §8.1): ⇧⇥ in a thread's composer sends the hub
 // `approvals {project, mode: 'toggle'}`, the caret stays in the field, and when the hub answers
 // with its switch (`approvals` with `flash`), the label line's right says it for 3 s (the mode
-// word in accent, then its sentence), then the divider reads the new mode. FakeCore records the
+// word in accent, then its sentence), then the box's mode menu reads the new mode. FakeCore records the
 // window's commands and stands in for the hub's answer. Owner: amb-web.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
@@ -25,10 +25,11 @@ test('composer/approvals-toggle: ⇧⇥ switches yolo ↔ auto and the label lin
   try {
     const { page } = s;
     const field = page.locator('[data-testid="composer.field"]');
-    const end = page.locator('[data-testid="composer"] .div .end');
+    // the mode is the box's menu (designer's composer-strip A): 'yolo ⌄' / 'approvals ⌄'
+    const end = page.getByTestId('composer.mode');
     const flash = page.getByTestId('composer.flash');
     await expect(field).toBeVisible({ timeout: 10_000 });
-    await expect(end, 'the divider reads the mode the hub said').toContainText('yolo', { timeout: 5000 });
+    await expect(end, 'the mode menu reads the mode the hub said').toContainText('yolo', { timeout: 5000 });
     await expect(flash, 'the mode it had at start never flashes').toHaveCount(0);
     await field.click();
     await page.keyboard.type('a draft');
@@ -57,7 +58,7 @@ test('composer/approvals-toggle: ⇧⇥ switches yolo ↔ auto and the label lin
     await page.screenshot({ path: test.info().outputPath('1-flash-auto.png') });
     // after 3 s: the divider again, with the new mode
     await expect(flash, 'the flash lasts 3 s').toHaveCount(0, { timeout: 4500 });
-    await expect(end).toContainText('auto');
+    await expect(end).toContainText('approvals');
     await expect(end).not.toContainText('yolo');
     await page.screenshot({ path: test.info().outputPath('2-divider-auto.png') });
 

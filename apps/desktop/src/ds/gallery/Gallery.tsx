@@ -192,20 +192,20 @@ export const SECTIONS: Record<string, () => ReactNode> = {
   ),
   composer: () => (
     <div className="g-main">
-      <ComposerFrame send="off" to="you → bise · opus · high" keys="@ file   $ skills   / commands   ⌘I inbox" testId="ds.composer">
+      <ComposerFrame send="off" tab="you → bise · opus · high" keys="@ file   $ skills   / commands   ⌘I inbox" testId="ds.composer">
         <ComposerStill placeholder="ask bise, or tell it what to do" />
       </ComposerFrame>
-      <ComposerFrame send="on" to="you → telemetry · main" focus quote={<Quote>1 “workers: [Worker; 4],” decode_pool.rs:13-14 · 2 lines</Quote>}>
+      <ComposerFrame send="on" tab="you → telemetry · main" focus quote={<Quote>1 “workers: [Worker; 4],” decode_pool.rs:13-14 · 2 lines</Quote>}>
         <ComposerStill text="raise it to 8 and bench it" caret />
       </ComposerFrame>
-      <ComposerFrame send="stop" to="you → alerts">
+      <ComposerFrame send="stop" tab="you → alerts">
         <ComposerStill placeholder="a turn runs: what you send waits for its end" />
       </ComposerFrame>
     </div>
   ),
   dock: () => (
     <div className="g-main">
-      <ComposerFrame send="off" to="you → search"
+      <ComposerFrame send="off" tab="you → search"
         tabs={<Tabs testId="ds.tabs" items={[{ id: "search", text: "search", dot: "nd", on: true }, { id: "review", text: "the review", dot: "nd" }, { id: "alerts", text: "alerts" }]} />}
         dock={<Dock head="? search needs you" keys="1 of 3   ← →   esc back" q="rebuild the index from scratch, or keep the old one?"
           ctx={{ body: "the nightly build ran out of disk at 92%; the old index still answers.", origin: "search · 10:43" }}
@@ -389,7 +389,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
     <Win
       side={<Side foot="+ add a project"><Row kind="me" name="bise" sub="every project" /><SectionHead>projects</SectionHead><Row kind="pj" name="telemetry" dot="nd" end="2" needs on /></Side>}
       main={<Main><Head title="telemetry" sub="main · 3 agents" dot="nd" /><Thread><Msg from="bise" name="bise" time="10:41">i asked alerts to bench 8 workers.</Msg></Thread>
-        <ComposerFrame send="off" to="you → telemetry · main"><ComposerStill placeholder="ask telemetry" /></ComposerFrame></Main>}
+        <ComposerFrame send="off" tab="you → telemetry · main"><ComposerStill placeholder="ask telemetry" /></ComposerFrame></Main>}
     />
   ),
 };

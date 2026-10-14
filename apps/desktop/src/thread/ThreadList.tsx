@@ -15,8 +15,13 @@ import { keep } from '@/app/keep';
 import './thread.css';
 import { Press } from '@/ds';
 
-// no extra parts (Virtuoso reads its `components` object: never undefined)
-const NONE = {};
+// the list's own end, inside the scroller (designer's composer-strip A): the 12 px the bottom fade
+// lies on at the end, so it never fades the last row (thread.css .th-list-end)
+function ListEnd() {
+  return <div className="th-list-end" aria-hidden="true" />;
+}
+// Virtuoso reads its `components` object (never undefined): the end always, the head when it has one
+const END = { Footer: ListEnd };
 // Virtuoso measures its own box: it must fill the list's flex area
 const FILL = { flex: '1 1 auto', minHeight: 0 };
 // it opens on the newest row's end (a long answer's last line, not its
@@ -525,7 +530,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
             setStick(true);
           }
         }}
-        components={head !== undefined && more ? { Header: () => head } : NONE}
+        components={head !== undefined && more ? { Header: () => head, Footer: ListEnd } : END}
         increaseViewportBy={{ top: 600, bottom: 300 }}
       />
       {tail}

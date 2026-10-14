@@ -3,16 +3,14 @@
 .b-composer .in {
   position: relative;
 }
-/* one line high when empty (designer's try gate D18): the frame's min-height 48 px is the box's
-   whole height (border-box: as content-box it made a 72 px box with the line at its bottom), and
-   the field's line gets half of what it misses above and below so one line is the send button's
-   --h-control-sm: empty or one line, the text sits in the middle of the box; longer drafts grow
-   with send at the bottom */
+/* the field's line over the box's controls row (designer's composer-strip A): one line when empty,
+   longer drafts grow above the row */
 .b-composer .box {
   box-sizing: border-box;
 }
 .b-composer .box .in {
-  padding-block: calc((var(--h-control-sm) - 1lh) / 2);
+  flex: 1;
+  min-width: 0;
 }
 /* one frame (ambient m_10689): the box is the frame, the field inside it is borderless (not the
    design system's .b-field input frame) */
@@ -403,4 +401,73 @@
 .b-composer .flash-word {
   color: var(--c-text);
   font-weight: 600;
+}
+/* the box's row (designer's composer-strip A, thread/ComposerTools.tsx): '+' 28 px and the menus
+   28 px high, text-2, the 6% hover; the model in ink 500; a menu opens above the box, from its
+   button's side. Short (the box under 440 px), the effort leaves the model's button: it stays in
+   its menu; the mode never drops */
+.b-composer .box {
+  container: cmp-box / inline-size;
+}
+.b-composer .cmp-tool {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: var(--h-control-sm);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-2);
+  background: none;
+  font: var(--t-13) var(--font-ui);
+  color: var(--c-text-2);
+  white-space: nowrap;
+  cursor: default;
+  transition:
+    background var(--d-fast) var(--ease-out),
+    color var(--d-fast) var(--ease-out);
+}
+.b-composer .cmp-tool:hover,
+.b-composer .cmp-tool[aria-expanded='true'] {
+  background: var(--c-hover);
+  color: var(--c-text);
+}
+.b-composer .cmp-plus {
+  justify-content: center;
+  width: var(--h-control-sm);
+  padding: 0;
+  font-size: var(--t-17);
+}
+.b-composer .cmp-menu b {
+  font-weight: 500;
+  color: var(--c-text);
+}
+.b-composer .cmp-menu .v {
+  color: var(--c-text-3);
+}
+@container cmp-box (max-width: 440px) {
+  .b-composer .cmp-menu .eff {
+    display: none;
+  }
+}
+.b-composer .box {
+  position: relative;
+}
+.b-composer .cmp-drop {
+  display: inline-flex;
+}
+/* above the box (never over his words): from the box's left for the mode, its right for the model */
+.b-composer .cmp-up {
+  position: absolute;
+  bottom: calc(100% + var(--s-2));
+  left: var(--s-3);
+  z-index: 5;
+}
+.b-composer .box .row .sp ~ .cmp-drop .cmp-up {
+  left: auto;
+  right: var(--s-3);
+}
+.b-composer .cmp-up .b-menu {
+  max-height: 50vh;
+  overflow-y: auto;
 }

@@ -1,8 +1,9 @@
 // thread/head-fit · the agent head's room (designer N1, m_17181 on 29ec1b92's shots): 'perf  make t' cut the
-// role to 6 letters with no '…' while 'context 42k · 17%' and 'sb/perf' kept their room. Passes when, on the
+// role to 6 letters with no '…' while 'context 42k · 17%' and 'sb/perf' kept their room (both moved to the
+// composer's tab since, designer m_24325). Passes when, on the
 // built app with the scripted core (FakeCore's default world, fake data), in perf's thread at 1400, at 1100
-// with the panel open, and at 800 (under 1000 the name and role go to the titlebar's crumb): the role ends with '…' when it is cut (never clipped silently), and it is cut
-// only once the context note and the branch are gone, each of them shown whole or not at all (m_17194); the state chip and 'changes ⌘D' stay whole.
+// with the panel open, and at 800 (under 1000 the name and role go to the titlebar's crumb): the role ends with '…' when it is cut (never clipped silently), the head has
+// no context note and no branch, the state chip and 'changes ⌘D' stay whole.
 // Owner: amb-home.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
@@ -34,14 +35,8 @@ test("thread/head-fit: the role gets the head's room first and ends with '…'",
       });
       test.info().annotations.push({ type: `head ${String(w)}`, description: JSON.stringify(m) });
       expect(m.ellipsis, `${String(w)}: a cut role ends with '…'`).toBe('ellipsis');
-      // a meta item shows whole or not at all, never cut (designer m_17194): the context note first, then the branch
-      for (const [k, v] of [['usage', m.usage], ['branch', m.branch]] as const) {
-        expect(v === null || v.gone || v.full, `${String(w)}: the ${k} is whole or gone ${JSON.stringify(m)}`).toBe(true);
-      }
-      expect(!(m.usage !== null && !m.usage.gone && m.branch !== null && m.branch.gone), `${String(w)}: the context note goes before the branch ${JSON.stringify(m)}`).toBe(true);
-      if (m.role !== null && m.role.w > 0 && !m.role.full) {
-        expect((m.usage === null || m.usage.gone) && (m.branch === null || m.branch.gone), `${String(w)}: the role is cut only once the context note and the branch are gone ${JSON.stringify(m)}`).toBe(true);
-      }
+      // its context and branch are the composer tab's now (designer m_24325): the role has the head's room
+      expect(m.usage === null && m.branch === null, `${String(w)}: no context note or branch in the head ${JSON.stringify(m)}`).toBe(true);
       expect(m.chip?.full, `${String(w)}: the state chip stays whole`).toBe(true);
       expect(m.changes?.full, `${String(w)}: 'changes ⌘D' stays whole`).toBe(true);
       await page.getByTestId('thread.head').screenshot({ path: test.info().outputPath(`head-${String(w)}.png`) });

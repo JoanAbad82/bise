@@ -137,13 +137,13 @@ test('thread/working: only the gust beside the label while it works, the step dr
     };
     const mark = page.getByTestId('thread.mark');
     const gust = page.getByTestId('thread.mark.gust');
-    const label = page.locator('.th-screen .b-composer .div').first();
+    const label = page.locator('.th-screen [data-testid="composer.tab"]').first();
     /** px from the bottom of the last element matching `sel` (the thread's last row) to the label's top */
     const endGap = (sel: string) =>
       page.evaluate((s) => {
         const all = document.querySelectorAll(s);
         const last = all.item(all.length - 1) as Element | null;
-        const lbl = document.querySelector('.th-screen .b-composer .div');
+        const lbl = document.querySelector('.th-screen [data-testid="composer.tab"]');
         if (!last || !lbl) return -1;
         return Math.round(lbl.getBoundingClientRect().top - last.getBoundingClientRect().bottom);
       }, sel);
@@ -167,9 +167,9 @@ test('thread/working: only the gust beside the label while it works, the step dr
     await expect(page.getByTestId('thread.screen')).not.toContainText('is working');
     // (2) the gust on the label line, 8 px after 'to perf', nothing else beside it
     await expect(mark).toHaveAttribute('data-state', 'working');
-    await expect(label.locator('.lbl [data-testid="thread.mark"]')).toHaveCount(1);
+    await expect(label.locator('[data-testid="composer.tab.to"] [data-testid="thread.mark"]')).toHaveCount(1);
     const gap = await page.evaluate(() => {
-      const lbl = document.querySelector('.th-screen .b-composer .div .lbl');
+      const lbl = document.querySelector('.th-screen [data-testid="composer.tab.to"]');
       const words = lbl?.firstChild;
       const m = lbl?.querySelector('[data-testid="thread.mark"]');
       if (!words || !m) return { words: '', gap: -1 };
@@ -248,7 +248,7 @@ test('thread/working: only the gust beside the label while it works, the step dr
       // the thread's end gap is the same under the fold as under a tool row (designer m_21721)
       const foldEnd = await endGap('[data-testid="thread.typing"]');
       expect(Math.abs(foldEnd - toolEnd), `the end gap under the fold (${String(foldEnd)}) is the tool row's (${String(toolEnd)})`).toBeLessThanOrEqual(1);
-      await expect(page.locator('.th-screen .b-composer .div .lbl [data-testid="thread.mark"]')).toHaveCount(1);
+      await expect(page.locator('.th-screen [data-testid="composer.tab.to"] [data-testid="thread.mark"]')).toHaveCount(1);
       await shot(`${t}-working-fold`);
     }
 

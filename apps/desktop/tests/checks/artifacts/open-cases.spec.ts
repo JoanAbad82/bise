@@ -89,7 +89,7 @@ for (const c of ['archived', 'question'] as const) {
         await page.setViewportSize({ width: 1400, height: 900 });
         await expect(page.getByTestId('artifact.title')).toHaveText('product page, before / after', { timeout: 10_000 });
         await expect(page.locator('[data-testid="composer.field"]'), 'one composer').toHaveCount(1);
-        if (c === 'archived') await expect(page.locator('.b-composer .div .lbl').first()).toContainText('to main · about');
+        if (c === 'archived') await expect(page.getByTestId('composer.tab.to').first()).toContainText('to main · about');
         await page.mouse.move(1, 400);
         await expect(page.frameLocator('[data-testid="artifact.page"]').locator('h1')).toHaveText('product page, before / after', { timeout: 10_000 });
         await settle(page);

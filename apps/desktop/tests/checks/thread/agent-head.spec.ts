@@ -1,7 +1,7 @@
 // thread/agent-head · the agent view's head, rows and composer words (designer's desktop-screens
 // v6 (1), (2), (3), (4)). Passes when, in storefront with the scripted core (FakeCore, fake data):
 //   - perf's head is one row: 'perf' in 600, its role 'product page speed', the chip '<breath> working ·
-//     14 min' (the TUI's 1-cell breath, designer's desktop-working page), at the right 'sb/perf' (opens the review), 'changes ⌘D', '⋯';
+//     14 min' (the TUI's 1-cell breath, designer's desktop-working page), at the right 'changes ⌘D' (opens the review), '⋯'; its branch is the composer tab's;
 //   - search, which waits on him, has the chip '? waiting for you' in the accent;
 //   - the project's bise reads 'bise · storefront' with its 14 px pearl and the chip '1 waiting
 //     for you', which opens the agents list;
@@ -155,7 +155,10 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     await expect(page.getByTestId('thread.head.role')).toHaveText('product page speed');
     await expect(page.getByTestId('thread.head.state')).toHaveText(/^[·~∿≈] working · 14 min$/);
     await expect(page.getByTestId('thread.head.state')).toHaveAttribute('data-needs', 'false');
-    await expect(page.getByTestId('thread.head.branch')).toHaveText('sb/perf');
+    // its branch and context are the composer tab's, never the head's too (designer m_24325)
+    await expect(page.getByTestId('thread.head.branch')).toHaveCount(0);
+    await expect(page.getByTestId('thread.usage')).toHaveCount(0);
+    await expect(page.getByTestId('composer.tab.place')).toHaveText('ψsb/perf');
     await expect(page.getByTestId('thread.head.changes')).toHaveText('changes ⌘D');
     await expect(page.getByTestId('thread.more')).toHaveText('⋯');
     const oneRow = await head.evaluate((el) => el.getBoundingClientRect().height);
@@ -174,9 +177,9 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     expect(art.w, 'fit-content').toBeLessThan(400);
     // working: no row at the thread's end, the gust beside 'to perf' (designer's desktop-working v2)
     await expect(page.getByTestId('thread.live')).toHaveCount(0);
-    await expect(page.locator('.th-screen .b-composer .div .lbl [data-testid="thread.mark"]')).toHaveCount(1);
+    await expect(page.locator('.th-screen [data-testid="composer.tab.to"] [data-testid="thread.mark"]')).toHaveCount(1);
     // (4) the composer's words: the label's left, then the gust's cells
-    await expect(page.locator('.th-screen .b-composer .div .lbl')).toHaveText(/^to perf[ ·~∿≈]{5}$/);
+    await expect(page.getByTestId('composer.tab.to')).toHaveText(/^to perf[ ·~∿≈]{5}$/);
     await expect(page.locator('[data-testid="composer.field"][aria-placeholder]')).toHaveAttribute('aria-placeholder', 'write to perf, then ⏎');
     // the artifact opens in the window
     await page.getByTestId('thread.artifact.10').click();
@@ -184,8 +187,8 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     await expect(page.getByTestId('app.art')).toBeVisible();
     // the artifact's screen has no right bar: back to perf's thread, ⌘[
     await page.keyboard.press('Meta+BracketLeft');
-    // the branch opens the review
-    await page.getByTestId('thread.head.branch').click();
+    // 'changes ⌘D' opens the review
+    await page.getByTestId('thread.head.changes').click();
     expect(await core.waitCmd((c) => c.cmd === 'diff', 3000)).toMatchObject({ project: P, agent: 'perf' });
 
     const views: readonly [string, string][] = [
@@ -209,8 +212,8 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
             if (!(await page.getByTestId('inbox.block.open.1').isVisible())) await page.getByTestId('inbox.block.row.1').click();
             await expect(page.getByTestId('inbox.block.open.1')).toBeVisible();
             await expect(page.getByTestId('thread.starting'), 'a waiting agent is not starting').toHaveCount(0);
-            await expect(page.locator('.th-screen .b-composer .div .lbl')).toHaveText(/^answering search · which sizes/);
-            await expect(page.locator('.th-screen .b-composer .div .end')).toHaveText('esc write to search instead');
+            await expect(page.getByTestId('composer.tab.to')).toHaveText(/^answering search · which sizes/);
+            await expect(page.getByTestId('composer.tab.end')).toHaveText('esc write to search instead');
             await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-answering', 'true');
           }
           if (label === 'bise · storefront') {

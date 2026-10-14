@@ -1,18 +1,18 @@
 // The agent view's head (designer's desktop-screens v6 (1) and (3)): one row, 16 px sides. An
-// agent: its name in 600, its role line, its state chip; at the right, quiet, its branch and
-// files (opens the review), 'changes ⌘D', '⋯'. A project's bise: its 14 px pearl, 'bise ·
+// agent: its name in 600, its role line, its state chip; at the right 'changes ⌘D' (opens the
+// review), '⋯'. Its context and its branch are the composer's tab's (designer m_24325). A project's bise: its 14 px pearl, 'bise ·
 // storefront', the project's chip. Under 1000 px the name goes to the titlebar's crumb (amb-win's)
 // and the head keeps the chip and the buttons. LiveLine: what it does now, at the thread's end.
 // StartingLine: the empty thread's line. The words are head.ts's. Owner: amb-home.
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { Agent } from '@/proto';
-import { useAgents, useComputerLive, useDiff } from '@/store';
+import { useAgents, useComputerLive } from '@/store';
 import { useNowFor } from '@/app/clock';
 import { pauseInSeconds } from './wake';
 import { Breath, Pulse } from '@/working/Signs';
 import { useRouter } from '@/app/router';
 import { BisePearl } from '@/app/BisePearl';
-import { archivedFit, biseChip, branchLine, dropsFor, roleOf, stateChip, usageLine, type StateChip } from './head';
+import { archivedFit, biseChip, roleOf, stateChip, type StateChip } from './head';
 import { Button, Press } from '@/ds';
 
 /** an agent whose wheel he took waits for him, like any agent that asks him */
@@ -29,36 +29,6 @@ function Chip({ chip, testId }: { chip: StateChip; testId: string }) {
       {chip.text}
     </span>
   );
-}
-
-function useHeadFit(ref: RefObject<HTMLDivElement | null>, words: string): 0 | 1 | 2 {
-  const [drop, setDrop] = useState<0 | 1 | 2>(0);
-  useLayoutEffect(() => {
-    const head = ref.current;
-    if (head === null) return;
-    const measure = () => {
-      const q = (id: string) => head.querySelector<HTMLElement>(`[data-testid="${id}"]`);
-      const nat = (e: HTMLElement | null) => (e === null ? 0 : Math.ceil(e.scrollWidth));
-      const cs = getComputedStyle(head);
-      const avail = head.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      const name = q('thread.head.name');
-      const role = q('thread.head.role');
-      const who = nat(name) + (role === null ? 0 : 8 + nat(role));
-      const end = head.querySelector<HTMLElement>('.ah-end');
-      const endFixed = end === null ? 0 : [...end.children].filter((c) => !(c as HTMLElement).dataset['testid']?.startsWith('thread.head.branch') && !c.classList.contains('ah-gone')).reduce((n, c, i) => n + Math.ceil((c as HTMLElement).offsetWidth) + (i > 0 ? 6 : 0), 0);
-      const voice = q('thread.voice');
-      const next = dropsFor({ avail, who, chip: nat(q('thread.head.state')), notes: voice === null ? [] : [nat(voice)], usage: nat(q('thread.usage')), branch: nat(q('thread.head.branch')), end: endFixed });
-      setDrop((d) => (d === next ? d : next));
-    };
-    measure();
-    if (typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(head);
-    return () => {
-      ro.disconnect();
-    };
-  }, [ref, words]);
-  return drop;
 }
 
 /** a name cuts with '…' down to its first 12 chars, never shorter while something else can go */
@@ -82,8 +52,7 @@ function useArchivedFit(ref: RefObject<HTMLDivElement | null>, on: boolean, word
       // its first 12 chars and the '…' (an average char's width: the name's own font)
       const nameMin = chars > NAME_KEEP ? Math.ceil((nat / chars) * (NAME_KEEP + 1)) : nat;
       const role = one('[data-testid="thread.head.role"]');
-      const usage = one('[data-testid="thread.usage"]:not(.ah-gone)');
-      const who = nameMin + (role === null ? 0 : gap) + (usage === null ? 0 : gap + Math.ceil(usage.offsetWidth));
+      const who = nameMin + (role === null ? 0 : gap);
       const width = (sel: string) => Math.ceil(one(sel)?.offsetWidth ?? 0);
       const stage = archivedFit({ avail, gap, who, chip: width('.ah-archived'), restore: width('.ah-restore-full') });
       const next = { stage, nameMin: stage === 2 ? 0 : nameMin };
@@ -119,25 +88,21 @@ function Restore({ icon, onRestore }: { icon: boolean; onRestore: () => void }) 
   );
 }
 
-/** An agent's head (`starting`: its thread has nothing of its own yet). `more` is the '⋯' button (rename, model; the screen owns its panel); `note` a quiet word after the chip ('voice mode'); its context gauge after it. */
+/** An agent's head (`starting`: its thread has nothing of its own yet). `more` is the '⋯' button (rename, model; the screen owns its panel); `note` a quiet word after the chip ('voice mode'). */
 export function AgentHead({ project, a, more, note, starting = false, restore }: { project: string; a: Agent; more?: ReactNode; note?: string | undefined; starting?: boolean; restore?: () => void }) {
-  const usage = usageLine(a.usage?.words);
   // its chip's pause under a minute reads in seconds: the second clock
   const now = useNowFor((t) => pauseInSeconds(a, t));
   const router = useRouter();
-  const diff = useDiff(project, a.name);
-  const branch = branchLine(a.branch, diff?.files.length);
   // S29/L19: he took the wheel: it waits for him until he gives it back (amb-win, designer m_16663)
   const held = useComputerLive().some((r) => r.project === project && r.agent === a.name && r.kind === 'paused');
   const review = () => {
     router.go({ screen: 'review', project, agent: a.name });
   };
   const headRef = useRef<HTMLDivElement>(null);
-  const words = `${a.name}|${roleOf(a)}|${usage}|${branch}|${note ?? ''}`;
-  const drop = useHeadFit(headRef, words);
+  const words = `${a.name}|${roleOf(a)}|${note ?? ''}`;
   const arch = useArchivedFit(headRef, restore !== undefined, words);
   return (
-    <div className="ah" data-testid="thread.head" ref={headRef} data-drop={drop} data-arch={restore === undefined ? undefined : arch.stage}>
+    <div className="ah" data-testid="thread.head" ref={headRef} data-arch={restore === undefined ? undefined : arch.stage}>
       <span className="ah-who">
         <b className="ah-name" data-testid="thread.head.name" title={restore === undefined ? undefined : a.name} style={restore === undefined ? undefined : { minWidth: arch.nameMin }}>
           {a.name}
@@ -163,21 +128,10 @@ export function AgentHead({ project, a, more, note, starting = false, restore }:
           {note}
         </span>
       )}
-      {/* its model, effort and approvals mode ('opus · high · auto') are not in the head (designer N1):
-          they are in its tune panel (⋯) and the TUI's divider */}
-      {/* its context gauge, the hub's words as sent (the TUI's divider: '42k · 17%') */}
-      {usage !== '' && (
-        <span className={drop >= 1 ? 'ah-note ah-gone' : 'ah-note'} data-testid="thread.usage" aria-hidden={drop >= 1 || undefined}>
-          {usage}
-        </span>
-      )}
+      {/* its model, effort, context and place are not in the head (designer N1, composer-strip A
+          m_24325: one place per fact): the composer's tab and its row say them */}
       <span className="ah-end">
         {restore !== undefined && <Restore icon={arch.stage === 2} onRestore={restore} />}
-        {restore === undefined && branch !== '' && (
-          <Press look={drop >= 2 ? 'ah-quiet ah-gone' : 'ah-quiet'} onClick={review} data-testid="thread.head.branch" title="its changes" tabIndex={drop >= 2 ? -1 : undefined} aria-hidden={drop >= 2 || undefined}>
-            {branch}
-          </Press>
-        )}
         {restore === undefined && (
           <Press look="ah-btn" onClick={review} data-testid="thread.head.changes">
             changes <kbd>⌘D</kbd>

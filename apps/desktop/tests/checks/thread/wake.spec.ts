@@ -107,8 +107,8 @@ test('thread/wake: an agent waiting for an event says what and how long; its wak
     // says already (desktop-status-line A); (2) a turn that opens on its work keeps a new turn's gap
     // under a wake line; (3) a blank row over the live line
     // (no model, effort or mode in this world: the label line is 'to perf' alone)
-    await expect(page.locator('[data-testid="composer"] .div')).toHaveText(/^to perf/u);
-    await expect(page.locator('[data-testid="composer"] .div')).not.toHaveText(/waiting|idle/u);
+    await expect(page.getByTestId('composer.tab.to')).toHaveText(/^to perf/u);
+    await expect(page.getByTestId('composer.tab')).not.toHaveText(/waiting|idle/u);
     const gaps = await page.evaluate(() => {
       const txt = (id: string) => {
         const el = document.querySelector(`[data-testid="${id}"]`);

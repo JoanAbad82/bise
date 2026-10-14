@@ -445,7 +445,7 @@ export function ComposerLab(): JSX.Element {
         busy={busy}
         sources={vision ? SOURCES : TEXT_ONLY}
         voice={voice ? "recording" : null}
-        to="you → bise · lab"
+        tab="to bise · lab"
         onSend={(o) => {
           setLog((l) => [...l, JSON.stringify(o)]);
         }}

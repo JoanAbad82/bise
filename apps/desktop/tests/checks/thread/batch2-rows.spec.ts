@@ -72,7 +72,7 @@ test("thread/batch2-rows: thinking, compaction, notices, not delivered and the c
     await expect(page.getByTestId('thread.notice.25'), 'a warning, said with ▲').toContainText('▲');
     await expect(page.getByTestId('thread.unknown.27')).toHaveText('a row from a newer hub');
 
-    await expect(page.getByTestId('thread.usage'), "the head's gauge, the hub's words").toContainText('42k · 17%');
+    await expect(page.getByTestId('composer.tab.context'), "the composer tab's gauge, the hub's words").toContainText('42k · 17%');
     await expect(page.getByTestId('app.right.agent.perf.gauge'), "perf's row in the sidebar").toHaveText('17%');
     await page.screenshot({ path: test.info().outputPath('batch2.png') });
 

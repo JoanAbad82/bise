@@ -63,7 +63,7 @@ for (const theme of ['light', 'dark']) {
           await page.setViewportSize({ width: w, height: 800 });
           await page.waitForTimeout(250);
           // what sits under the last row: the inbox box, else the composer's to-line ('to main')
-          const under = card ? page.getByTestId('inbox.block') : page.locator('.th-screen .b-composer > .div').first();
+          const under = card ? page.getByTestId('inbox.block') : page.locator('.th-screen [data-testid="composer.tab"]').first();
           await expect(under).toBeVisible();
           const line = tool.locator('.th-tool-line').last();
           const lb = await line.boundingBox();

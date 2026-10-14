@@ -88,7 +88,7 @@ import {
 } from "./pmtext";
 import { useDictation } from "./dictation";
 import { fieldKey } from "./keys";
-import { clipboardText, dropInto, pasteInto, useDropAnywhere, type PasteCtx } from "./paste";
+import { addPaths, clipboardText, dropInto, pasteInto, useDropAnywhere, type PasteCtx } from "./paste";
 import { Strip } from "./Strip";
 import { AttachList, QUOTE_SOURCE_EVENT } from "./AttachList";
 
@@ -672,6 +672,11 @@ export function PmField(p: PmFieldProps): JSX.Element {
       saved.current = remember(saved.current, entry);
       writeNow();
       return "history";
+    },
+    attach: (paths) => {
+      if (paths.length === 0) return;
+      addPaths(pasteCtx, paths);
+      view()?.focus();
     },
     focus: () => {
       view()?.focus();

@@ -1,13 +1,19 @@
 /* bise desktop window · the composer and the dock above it: quote, dock (question, approval, inbox), options, tabs */
 .b-composer{padding:var(--s-2) var(--pad-column) var(--s-4)}
-.b-composer .div{font:var(--t-11) var(--font-mono);color:var(--c-text-3);padding:0 var(--s-1) var(--gap-tight)}
-.b-composer .box{display:flex;align-items:flex-end;gap:var(--gap-inline);min-height:var(--h-composer);padding:var(--s-3) var(--s-3) var(--s-3) var(--s-4);border-radius:var(--r-4);background:var(--c-raised);box-shadow:var(--e-1),0 4px 16px var(--c-shadow);transition:box-shadow var(--d-fast) var(--ease-out)}
-.b-composer .box.is-focus{box-shadow:0 0 0 1px var(--c-focus),0 4px 16px var(--c-shadow)}
+/* the tab glued to the box's top (designer's composer-strip A): 32 px, 16 px in from each side, r 12 on top, a 1 px line with none at the bottom (the box's line is its edge), 2% of the text over the box's fill; sans 13, its items 16 px apart; the accent on its 7% tint while his words answer a card */
+.b-composer .tab{display:flex;align-items:center;gap:var(--s-4);box-sizing:border-box;height:var(--h-control);margin:0 var(--s-4);padding:0 var(--s-3);border-radius:var(--r-3) var(--r-3) 0 0;box-shadow:inset 1px 1px 0 var(--c-line),inset -1px 0 0 var(--c-line);background:linear-gradient(color-mix(in srgb,var(--c-text) 2%,transparent),color-mix(in srgb,var(--c-text) 2%,transparent)),var(--c-raised);font:var(--t-13) var(--font-ui);color:var(--c-text-2);white-space:nowrap;overflow:hidden}
+.b-composer .tab.acc{color:var(--c-accent);background:linear-gradient(color-mix(in srgb,var(--c-accent) 7%,transparent),color-mix(in srgb,var(--c-accent) 7%,transparent)),var(--c-raised)}
+/* the box: r 16, padding 12/12/8/16, a 1 px line and no shadow; the field over its 32 px row of controls */
+.b-composer .box{display:flex;flex-direction:column;gap:var(--s-2);padding:var(--s-3) var(--s-3) var(--s-2) var(--s-4);border-radius:var(--r-4);background:var(--c-raised);box-shadow:0 0 0 1px var(--c-line);transition:box-shadow var(--d-fast) var(--ease-out)}
+.b-composer .box.is-focus{box-shadow:0 0 0 1px var(--c-focus)}
+.b-composer .box .line{display:flex;align-items:flex-start;gap:var(--gap-inline);min-width:0}
+.b-composer .box .row{display:flex;align-items:center;gap:var(--gap-inline);height:var(--h-control);min-width:0}
+.b-composer .box .row .sp{flex:1;min-width:0}
 .b-composer .in{flex:1;font:var(--t-15)/1.45 var(--font-read)}
 .b-composer .in .ph{color:var(--c-text-3)}
 .b-composer .in .cur{display:inline-block;width:2px;height:1.1em;background:var(--c-text);vertical-align:-.2em;animation:b-blink 1s steps(1) infinite}
 .b-composer .keys{font:var(--t-11) var(--font-mono);color:var(--c-text-3);padding:var(--s-2) var(--s-1) 0;white-space:pre}
-.b-composer .send{width:var(--h-control-sm);height:var(--h-control-sm);border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--c-ink);color:var(--c-on-ink);font-size:var(--t-13);flex:none}
+.b-composer .send{width:var(--h-control);height:var(--h-control);border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--c-ink);color:var(--c-on-ink);font-size:var(--t-13);flex:none}
 .b-composer .send.off{background:var(--c-active);color:var(--c-text-3)}
 .b-composer .send.stop{border-radius:8px}
 .b-composer.is-disabled .box{opacity:.55}

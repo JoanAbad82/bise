@@ -12,6 +12,8 @@ import { useRouter } from '@/app/router';
 import { useAgents, usePrefs, useStore } from '@/store';
 import { themeOf } from '@/theme';
 import { answerOf, ThreadComposer } from '@/thread/ThreadComposer';
+import { placeOf } from '@/thread/tab';
+import { usageLine } from '@/thread/head';
 import { InboxBlock, type Answering } from '@/inbox';
 import { useAllArtifacts } from './hooks';
 import { kindOf, pathOf, versions } from './model';
@@ -123,7 +125,10 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   const words = useAboutWords(project, id);
   const [answering, setAnswering] = useState<Answering | null>(null);
   const agent = words?.agent ?? '';
-  const busy = useAgents(project).find((x) => x.name === agent)?.status === 'working';
+  const agents = useAgents(project);
+  const busy = agents.find((x) => x.name === agent)?.status === 'working';
+  // the maker its composer writes to: its place, context and model in the tab and the box's row
+  const maker = words === undefined ? undefined : agents.find((x) => x.name === words.agent);
   const onStop = useCallback(() => {
     store.stop(project, agent);
   }, [store, project, agent]);
@@ -229,8 +234,10 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
             project={project}
             agent={words.agent}
             busy={busy}
-            to={answering?.label ?? words.to}
-            {...(answering?.end === undefined ? {} : { toEnd: answering.end })}
+            // the crumb names the project here: the tab says who and where (designer's composer-strip A)
+            tab={{ label: answering?.label ?? words.to, branch: placeOf(maker, false), context: usageLine(maker?.usage?.words) }}
+            tabEnd={answering?.end}
+            me={maker}
             placeholder={answering?.answer != null ? 'your answer, then ⏎' : words.placeholder}
             answer={answerOf(answering)}
             onStop={onStop}
