@@ -63,7 +63,7 @@ def short_sock(natural):
 
 def tiny_png():
     """A 1x1 PNG (the image store sniffs it): a file he attached or
-    pasted (route_e2e, proto_e2e)."""
+    pasted (route_e2e, proto_e2e_*)."""
     import struct
     import zlib
 

@@ -29,6 +29,18 @@ Not fixed here, owned elsewhere:
 
 - **tui_queue_tmux**: 2 of 3 alone under load. T4 removes its cause
   (owner: T4 of architect's tech-debt-night list); green in this run.
+- **proto_e2e_threads, queued round** (T4's area, issue 23; seen by T3,
+  architect m_23279): once, under load, after `turn/unqueue` answered
+  with the row and the row left hub/agents (so the take came while main
+  worked its `sleep 6` turn), main's row stayed `working` for 438 s
+  (90 s x load). Cause not found: 58 reruns green, 0 stalls (15
+  take-backs early in a 6 s turn, 36 near the end of 1, 2 and 3 s
+  turns, the whole file 4 times alone and 3 in parallel). The waiter is
+  e2e.Client's own wait on hub/agents, as in the old proto_e2e. The
+  window that fits is a take racing the turn's end (issue 23). A repeat
+  now fails in 30 s (x load) with its own trace: main's row (status,
+  phase, since, queued) and the client's last 10 notifications
+  (tests/proto_rpc.py `idle`).
 - **apps/desktop delivery.spec** (not in gate.sh full): amb-win's
   ef74cc92 on main fixed it (the check scrolled the wrong element).
 

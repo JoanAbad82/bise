@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from e2e import EXE, ROOT, check  # noqa: E402
-from proto_e2e import Door  # noqa: E402
+from proto_rpc import ok as answered, req  # noqa: E402
 
 PROJECTS = ["shop", "atlas", "ledger"]
 
@@ -173,22 +173,19 @@ def main():
         # to shop: the route holds his parts, the out carries them, shop's
         # message keeps them with its b64 in the store, and shop main's
         # model gets the image as an image part, not '[image unavailable]'
-        d = Door(hsock)
-        d.send({"cmd": "hello", "proto": 1})
-        wait.until(lambda: [e for e in d.events if e.get("ev") == "welcome"], 20, "the home hub's welcome")
-        hproject = [e for e in d.events if e.get("ev") == "welcome"][0]["project"]
+        d = e2e.Client(hsock, name="window")
         c.wait_idle("main")
         shelf = os.path.join(E.tmp, "shelf.png")
         with open(shelf, "wb") as f:
             f.write(tiny_png())
         iparts = [{"kind": "text", "text": "look at the shelf on shop "}, {"kind": "image", "name": "[Image #1]", "source": shelf}]
         n_req = len(E.fake_requests())
-        d.send({"cmd": "send", "project": hproject, "agent": "main", "text": "", "parts": iparts, "mode": "now"})
+        answered(req(d, "turn/send", agent="main", text="", parts=iparts, mode="now"), "his parts sent")
         wait.until(lambda: [e for e in of_type(hstate, "x_out") if "look at the shelf" in e["out"]["text"]], 15, "the parts' route sent")
         out = [e["out"] for e in of_type(hstate, "x_out") if "look at the shelf" in e["out"]["text"]][0]
         sent_parts = json.loads(out.get("parts", "[]"))
         check([p.get("source") for p in sent_parts if p["kind"] == "image"] == [shelf], "the out carries his parts: %r" % out)
-        home_msg = [m["msg"] for m in of_type(hstate, "message_sent") if "look at the shelf" in m["msg"]["text"]]
+        home_msg = [m["msg"] for m in of_type(hstate, "message_sent") if m["msg"]["from"] == "user" and "look at the shelf" in m["msg"]["text"]]
         check(home_msg and home_msg[-1].get("parts"), "his message at home keeps his parts: %r" % home_msg[-1:])
         wait.until(lambda: [m for m in of_type(pstate["shop"], "message_sent")
                             if m["msg"]["from"] == "user" and "look at the shelf" in m["msg"]["text"]], 60, "shop got the parts")
@@ -210,11 +207,11 @@ def main():
 
         # a cancel keeps his parts: his words reach bise's main with them
         c.wait_idle("main")
-        d.send({"cmd": "send", "project": hproject, "agent": "main", "text": "", "mode": "now",
-                "parts": [{"kind": "text", "text": "the shelf again on shop "}, {"kind": "image", "name": "[Image #1]", "source": shelf}]})
-        wait.until(lambda: [e for e in d.events if e.get("ev") == "route" and "the shelf again" in e.get("text", "")], 10, "the second route held")
-        rid = [e for e in d.events if e.get("ev") == "route" and "the shelf again" in e.get("text", "")][0]["rid"]
-        d.send({"cmd": "route_cancel", "project": hproject, "rid": rid})
+        answered(req(d, "turn/send", agent="main", text="", mode="now",
+               parts=[{"kind": "text", "text": "the shelf again on shop "}, {"kind": "image", "name": "[Image #1]", "source": shelf}]), "his parts sent again")
+        held = lambda: [e for e in d.notes("route/held") if "the shelf again" in e.get("text", "")]
+        wait.until(held, 10, "the second route held")
+        answered(req(d, "route/cancel", rid=held()[0]["rid"]), "route/cancel")
         wait.until(lambda: [m for m in of_type(hstate, "message_sent") if "the shelf again" in m["msg"]["text"]], 15, "the cancel said it to main")
         cm = [m["msg"] for m in of_type(hstate, "message_sent") if "the shelf again" in m["msg"]["text"]][-1]
         check(any(p["kind"] == "image" for p in json.loads(cm.get("parts") or "[]")), "the cancel keeps his parts: %r" % cm)
