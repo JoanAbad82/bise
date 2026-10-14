@@ -59,6 +59,25 @@ function takeVersions(key: string): boolean {
   return on;
 }
 
+// an inbox option that opens this artifact at a block (notif-open, bise-proto OptAct::Open's
+// `at`): the next open of it scrolls its page there (one open, then it's spent)
+let anchorFor: { key: string; at: string } | null = null;
+/** The next open of this artifact ('project/id') shows it at block or item `at`. */
+export function openAtAnchor(key: string, at: string): void {
+  anchorFor = { key, at };
+}
+function takeAnchor(key: string): string | null {
+  const at = anchorFor?.key === key ? anchorFor.at : null;
+  anchorFor = null;
+  return at;
+}
+
+/** A frame's src at block or item `at` (the kit scrolls to its hash); none: as is. Pure. */
+export function anchoredSrc(src: string | null, at: string | null): string | null {
+  if (src === null || at === null || at === '') return src;
+  return `${src.split('#', 1)[0] ?? ''}#${encodeURIComponent(at)}`;
+}
+
 /** ⌘C on a row: its link (the bridge's copy, else the clipboard). */
 export function copyLink(url: string): void {
   const copy = bridge()?.copy;
@@ -158,6 +177,7 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   const it = useAllArtifacts(project).find((x) => x.a.id === id);
   // 'v' on a row of the list opens it with its versions shown
   const [menu, setMenu] = useState<'versions' | 'more' | null>(() => (takeVersions(`${project}/${id}`) ? 'versions' : null));
+  const [at] = useState(() => takeAnchor(`${project}/${id}`));
   const [v, setV] = useState<number | null>(null);
   // the live line he moved away from (another version picked): it goes; a new line shows again
   const [goneLine, setGoneLine] = useState<string | null>(null);
@@ -178,8 +198,9 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
     store.stop(project, agent);
   }, [store, project, agent]);
   const about = useMemo(() => (it === undefined ? undefined : { id: it.a.id, title: it.a.title, url: it.a.url }), [it]);
-  // the frame's src, from the hub's row (hooks before the early return)
-  const src = it === undefined ? null : frameSrc(it.a, v ?? it.a.version, theme);
+  // the frame's src, from the hub's row (hooks before the early return), at the block an inbox
+  // option opened it at, on its current version only
+  const src = it === undefined ? null : anchoredSrc(frameSrc(it.a, v ?? it.a.version, theme), (v ?? it.a.version) === it.a.version ? at : null);
   const frame = useRef<HTMLIFrameElement>(null);
   useFrameNote(frame, src, project, id, it?.a.title ?? '');
   const close = () => {

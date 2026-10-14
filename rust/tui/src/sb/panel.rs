@@ -1569,6 +1569,7 @@ mod tests {
             link: None,
             asking: false,
             waiting: Vec::new(),
+            acts: Vec::new(),
         });
         sb.activity.insert("auth-fix".into());
         app

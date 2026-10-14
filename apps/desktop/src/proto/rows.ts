@@ -187,7 +187,16 @@ watching: Array<AgentWatch>, };
  * hub never hears it and the item stays. One rule for the TUI's pick()
  * and the window ([`opt_act`]).
  */
-export type OptAct = { "act": "open", url?: string | null, } | { "act": "sign_in" };
+export type OptAct = { "act": "open", url?: string | null, 
+/**
+ * an artifact id (a page's is its page id), set by the asker
+ * (`sb notify --open`, a page's drafts notification)
+ */
+artifact?: string | null, 
+/**
+ * where in it: a block's or an item's id on a page
+ */
+at?: string | null, } | { "act": "sign_in" };
 
 /**
  * A numbered option of a card.

@@ -162,6 +162,7 @@ pub(super) fn cards_of_rows(his: &[rows::Card], others: &[rows::Card], asking: O
             link: c.link.clone(),
             asking: asking == Some(c.id),
             waiting: c.waiting.clone().unwrap_or_default(),
+            acts: c.options.iter().filter_map(|o| Some((o.n, o.act.clone()?))).collect(),
         })
         .collect()
 }

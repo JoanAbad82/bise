@@ -267,7 +267,7 @@ impl Pages {
         let waiting = self
             .store
             .html(&m.id, m.version())
-            .map_or(0, |h| waiting::of_page_on(&m.id, &h, &notes, &self.store.questions(&m.id), today, &|a| self.held(&m.id, a, m.version())).len());
+            .map_or(0, |h| waiting::of_page_on(&m.id, &h, &notes, &self.store.questions(&m.id), &m.went_blocks(), today, &|a| self.held(&m.id, a, m.version())).len());
         let mut v = json!({
             "id": m.id, "title": m.title, "agent": m.agent, "version": m.version(),
             "url": self.url(&m.id), "at_ms": m.at_ms(), "state": m.state, "open_notes": open,
@@ -289,7 +289,7 @@ impl Pages {
         let mut out = Vec::new();
         for m in self.store.list() {
             let Some(html) = self.store.html(&m.id, m.version()) else { continue };
-            out.extend(waiting::of_page_on(&m.id, &html, &self.store.notes(&m.id), &self.store.questions(&m.id), today, &|a| self.held(&m.id, a, m.version())));
+            out.extend(waiting::of_page_on(&m.id, &html, &self.store.notes(&m.id), &self.store.questions(&m.id), &m.went_blocks(), today, &|a| self.held(&m.id, a, m.version())));
         }
         // his late promises first, across every page (ambient-lead m_5982)
         out.sort_by_key(|w| w.days.is_none());

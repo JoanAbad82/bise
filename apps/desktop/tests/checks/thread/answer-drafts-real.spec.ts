@@ -6,8 +6,9 @@
 //   - his free words on that card ('Ou sont les drafts?'), sent from the composer in 'answering'
 //     mode, reach the card's asker (shop's main transcript holds them), the card stays open, and
 //     the window still shows his words somewhere (never a field that just empties);
-//   - '1. review' does what it says: the page opens (test-mode stdout 'bise-desktop: external
-//     <url>' with the page's id, never his browser), nothing is sent (the card stays);
+//   - '1. review' does what it says (notif-open): the option's typed act (OptAct::Open with the
+//     page as its artifact, at its first draft) opens the page in the window's artifact view,
+//     framed at that draft, never his browser; nothing is sent (the card stays);
 //   - the TUI on the same hub: '/answer <card> <words>' reaches shop's main too (one answer path).
 // Before the fix the hub's page_drafts_answer (switchboard daemon/page_cards.rs) took any words
 // that were not 'send all' as done: no message, no notice, no error.
@@ -116,8 +117,9 @@ test('thread/answer-drafts-real: his words on a drafts card stay on screen, said
   }
 });
 
-// the window half (amb-win): '1. review' on a batch card opens card.page.url
-test("thread/answer-drafts-real: '1. review' on a drafts card opens its page on the real core", async () => {
+// the window half (notif-open): '1. review' on a batch card opens its page (an artifact) in the
+// window, beside the thread, at the first draft; nothing goes to his browser, nothing to the hub
+test("thread/answer-drafts-real: '1. review' on a drafts card opens its page in the app at its drafts on the real core", async () => {
   test.setTimeout(300_000);
   const w = realWorld();
   const n = `r${String(Date.now() % 1_000_000)}`;
@@ -130,12 +132,19 @@ test("thread/answer-drafts-real: '1. review' on a drafts card opens its page on 
   });
   try {
     const { page } = s;
+    // the hub's row: option 1 carries the page as its artifact, at the first draft's step
+    type Row = HubCard & { options?: { n: number; act?: { act: string; artifact?: string; at?: string } }[] };
+    const row = ((await hubState(hubOf(w, 'shop').sock))['cards'] as Row[] | undefined)?.find((x) => x.id === c.id);
+    expect.soft(row?.options?.find((o) => o.n === 1)?.act, "the hub's row: '1 review' opens the page at b1").toMatchObject({ act: 'open', artifact: c.pageId, at: 'b1' });
     await openThread(s);
     await openCard(s, `${c.project}-${String(c.id)}`, c.title);
+    await page.screenshot({ path: test.info().outputPath('card.png') });
     await page.keyboard.press('1');
-    const url = await out.wait('bise-desktop: external', (u) => u.includes(c.pageId), 10_000);
-    test.info().annotations.push({ type: 'opened', description: url });
+    await expect(page.getByTestId('artifact.open'), 'the page opens in the window').toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('artifact.page'), 'framed at its first draft').toHaveAttribute('src', new RegExp(`/p/${c.pageId}.*#b1$`), { timeout: 10_000 });
+    await page.waitForTimeout(1500);
     await page.screenshot({ path: test.info().outputPath('review.png') });
+    expect.soft(out.of('bise-desktop: external'), 'never his browser').toEqual([]);
     const open = ((await hubState(hubOf(w, 'shop').sock))['cards'] as HubCard[] | undefined) ?? [];
     expect.soft(open.some((x) => x.id === c.id), 'review sends nothing: the card stays open').toBe(true);
   } finally {

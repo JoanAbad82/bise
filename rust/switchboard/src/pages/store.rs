@@ -98,6 +98,11 @@ fn ready() -> String {
 }
 
 impl Meta {
+    /// The blocks its `--went` names: their text left (posted, sent).
+    pub fn went_blocks(&self) -> Vec<String> {
+        self.went.iter().filter_map(|w| w.block.clone()).collect()
+    }
+
     pub fn version(&self) -> u64 {
         self.versions.last().map_or(0, |v| v.n)
     }

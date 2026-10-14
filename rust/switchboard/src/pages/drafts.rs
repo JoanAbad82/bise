@@ -63,7 +63,10 @@ fn note_item(n: &Note) -> Option<&str> {
 /// a plan's drafted steps whose turn came (sendable, no question of the
 /// page open), review items with no verdict of his, then emails and
 /// messages with no go word that are no step's draft and can leave.
-pub fn pending(html: &str, notes: &[Note], questions: &[Question]) -> Vec<Draft> {
+/// `went`: the blocks the page's `--went` names (they left: posted, sent);
+/// an approved action takes the message or email it posts with it
+/// ([`posted_by`]; issue-15, main m_24663).
+pub fn pending(html: &str, notes: &[Note], questions: &[Question], went: &[String]) -> Vec<Draft> {
     let mut out = Vec::new();
     let rows = judged(html, questions);
     let closed = |r: &super::checklist::Row| closed_by(r, notes);
@@ -107,9 +110,13 @@ pub fn pending(html: &str, notes: &[Note], questions: &[Question]) -> Vec<Draft>
             out.push(Draft { block: r.block.clone(), item: Some(r.item.clone()), text: r.text.clone(), step: None, kind: "reply", to, topic: None, detail: None, rank: None });
         }
     }
+    // what left already: a --went block, the message an approved action posts
+    let approved = |a: &str| notes.iter().any(|n| n.block == a && note_item(n).is_none() && (n.kind == "approve" || is_go_word(n)));
+    let posted: Vec<String> = super::waiting::blocks_of(html, "action").into_iter().filter(|(a, _)| approved(a)).filter_map(|(a, _)| posted_by(html, &a)).collect();
+    let left = |b: &str| went.iter().any(|w| w == b) || posted.iter().any(|p| p == b);
     for kit in ["email", "message"] {
         for (b, text) in super::waiting::blocks_of(html, kit) {
-            if !verdict(&b, None) && !of_steps.contains(&b) && draft_sendable(html, &b) {
+            if !verdict(&b, None) && !left(&b) && !of_steps.contains(&b) && draft_sendable(html, &b) {
                 let (to, topic) = recipient(html, &b);
                 // a message in a thread (data-open) is a reply
                 let kind = match kit_word(kit) {
@@ -133,7 +140,7 @@ pub fn pending(html: &str, notes: &[Note], questions: &[Question]) -> Vec<Draft>
     let actions = super::waiting::blocks_of(html, "action");
     let total = actions.len();
     for (i, (b, text)) in actions.into_iter().enumerate() {
-        if !verdict(&b, None) {
+        if !verdict(&b, None) && !left(&b) {
             let todo = head_of(html, &b).and_then(|(h, _)| h.split("data-do=\"").nth(1).and_then(|r| r.split('"').next()).map(String::from));
             let detail = detail_of(html, &b);
             out.push(Draft { block: b, item: None, text: todo.unwrap_or(text), step: None, kind: "action", to: None, topic: None, detail, rank: Some((i + 1, total)) });
@@ -196,6 +203,31 @@ fn kit_word(kit: &str) -> &'static str {
 }
 
 /// The open tag of block `id`.
+/// The message or email action `a` posts: the one whose id ends like
+/// its own after the first '-' (`a-pr16` → `m-pr16`), else the block
+/// right before it when that is a message or an email. Pure.
+pub fn posted_by(html: &str, a: &str) -> Option<String> {
+    let mut sends: Vec<(String, usize)> = Vec::new();
+    for kit in ["message", "email"] {
+        for (b, _) in super::waiting::blocks_of(html, kit) {
+            if let Some(at) = html.find(&format!("data-id=\"{b}\"")) {
+                sends.push((b, at));
+            }
+        }
+    }
+    let tail = |id: &str| id.split_once('-').map(|(_, t)| t.to_string()).filter(|t| !t.is_empty());
+    if let Some(t) = tail(a) {
+        if let Some((b, _)) = sends.iter().find(|(b, _)| tail(b).as_deref() == Some(t.as_str())) {
+            return Some(b.clone());
+        }
+    }
+    // the block right before it: no other section between
+    let at = html.find(&format!("data-id=\"{a}\""))?;
+    let start = html[..at].rfind("<section")?;
+    let prev = html[..start].rfind("<section")?;
+    sends.into_iter().find(|(_, p)| html[..*p].rfind("<section") == Some(prev)).map(|(b, _)| b)
+}
+
 fn head_of<'a>(html: &'a str, id: &str) -> Option<(&'a str, &'a str)> {
     let at = html.find(&format!("data-id=\"{id}\""))?;
     let start = html[..at].rfind("<section")?;
@@ -608,13 +640,13 @@ mod tests {
     /// its turn; sent drafts leave the batch.
     #[test]
     fn drafts_in_a_row_wait_together() {
-        let p = pending(PAGE, &[], &[]);
+        let p = pending(PAGE, &[], &[], &[]);
         assert_eq!(p.iter().map(Draft::anchor).collect::<Vec<_>>(), vec!["s5", "s6"], "s8 waits behind his s7");
         assert_eq!(p.iter().map(Draft::key).collect::<Vec<_>>(), vec!["mail-lucas", "mail-marc"]);
         assert_eq!(batch_text(&p, "launch plan"), "launch plan: send these 2 emails?\n- to lucas: add the DNS records\n- to marc: tell Marc it's done");
         assert_eq!(summary(&p), "2 drafts wait for you: emails to lucas and marc");
         let sent = [note(json!({"id": "n1", "block": "mail-lucas", "kind": "approve", "text": "send", "status": "sent"}))];
-        assert_eq!(pending(PAGE, &sent, &[]).iter().map(Draft::anchor).collect::<Vec<_>>(), vec!["s6"]);
+        assert_eq!(pending(PAGE, &sent, &[], &[]).iter().map(Draft::anchor).collect::<Vec<_>>(), vec!["s6"]);
     }
 
     /// Replies and mails of a feedback or inbox page batch the same way;
@@ -625,7 +657,7 @@ mod tests {
 <section data-kit="message" data-id="slack-1" data-to="Slack · #lyon"><p>bonjour</p></section>
 <section data-kit="email" data-id="mail-x"><p data-field="to">legal: address missing</p><p data-field="subject">s</p><p>x</p></section>"#;
         let skip = [note(json!({"id": "n1", "block": "replies", "item": "r2", "kind": "skip", "status": "sent"}))];
-        let p = pending(html, &skip, &[]);
+        let p = pending(html, &skip, &[], &[]);
         assert_eq!(p.iter().map(Draft::key).collect::<Vec<_>>(), vec!["replies/r1", "slack-1"]);
         assert_eq!(what(&p), "drafts", "a reply and a message: mixed");
         assert_eq!(names(&p), vec!["Nina".to_string(), "#lyon".to_string()]);
@@ -645,7 +677,7 @@ mod tests {
             )
         };
         let html = [item("s212"), item("s213"), item("s214")].concat();
-        let p = pending(&html, &[], &[]);
+        let p = pending(&html, &[], &[], &[]);
         assert_eq!(p.iter().map(Draft::key).collect::<Vec<_>>(), vec!["reply-s212", "reply-s213", "reply-s214"]);
         // messages in a thread (data-open) are replies
         assert_eq!(what(&p), "replies");
@@ -665,7 +697,7 @@ mod tests {
     /// address three times; several recipients read as before.
     #[test]
     fn one_recipients_drafts_are_grouped() {
-        let p = pending(FEEDBACK, &[], &[]);
+        let p = pending(FEEDBACK, &[], &[], &[]);
         assert_eq!(p.iter().map(|d| (d.to.as_deref(), d.topic.as_deref())).collect::<Vec<_>>(), vec![
             (Some("Benjamin"), Some("proxy")),
             (Some("Benjamin"), Some("fish")),
@@ -683,7 +715,7 @@ mod tests {
         assert_eq!(addressee("reply to Benjamin, in French"), (Some("Benjamin".into()), None));
         let c = r#"<section data-kit="message" data-id="r1" data-to="Slack · reply to Benjamin in #acme-feedback" data-verb="send"><p>a</p></section>
 <section data-kit="message" data-id="r2" data-to="Slack · reply to Benjamin, in French" data-verb="send"><p>b</p></section>"#;
-        assert_eq!(line(&pending(c, &[], &[])), "2 replies to Benjamin");
+        assert_eq!(line(&pending(c, &[], &[], &[])), "2 replies to Benjamin");
     }
 
     /// Law (ambient-lead m_6192, amb-kit m_6198): an account change
@@ -694,7 +726,7 @@ mod tests {
     fn account_changes_are_counted_apart() {
         let act = |id: &str, todo: &str| format!(r#"<section data-kit="action" data-id="{id}" data-do="{todo}"><p>{todo} in Linear · fixed in 0.4.2</p></section>"#);
         let html = format!("{FEEDBACK}{}{}", act("a-ops12", "close OPS-12"), act("a-ops13", "close OPS-13"));
-        let p = pending(&html, &[], &[]);
+        let p = pending(&html, &[], &[], &[]);
         assert_eq!(p.iter().filter(|d| d.kind == "action").map(|d| (d.key(), d.text.clone())).collect::<Vec<_>>(), vec![
             ("a-ops12".to_string(), "close OPS-12".to_string()),
             ("a-ops13".to_string(), "close OPS-13".to_string()),
@@ -703,7 +735,7 @@ mod tests {
         assert_eq!(batch_text(&p, "t"), "t: send these 3 replies?\n- to Benjamin (proxy): a\n- to Benjamin (fish): b\n- to Benjamin (French): c");
         assert_eq!(choices(&p), vec![Choice { label: "send all 3".into(), keys: vec!["r-s213".into(), "r-s212".into(), "r-s214".into()] }]);
         let sent: Vec<Note> = ["r-s213", "r-s212", "r-s214"].iter().map(|b| note(json!({"id": b, "block": b, "kind": "approve", "status": "sent"}))).collect();
-        let changes = pending(&html, &sent, &[]);
+        let changes = pending(&html, &sent, &[], &[]);
         assert_eq!(batch_text(&changes, "t"), "t: close OPS-12? (1 of 2, in order)\nclose OPS-12 in Linear · fixed in 0.4.2\nafter it, one at a time: close OPS-13");
         assert_eq!(choices(&changes), vec![Choice { label: "close OPS-12".into(), keys: vec!["a-ops12".into()] }]);
         assert_eq!(line(&p), "3 replies to Benjamin: proxy, fish and French · 2 to close");
@@ -711,9 +743,9 @@ mod tests {
         assert_eq!(info(&p, "t")["actions"], json!("2 to close"));
         assert_eq!(what(&p), "replies");
         let one = format!("{}{}", act("a-ops12", "close OPS-12"), act("a-x", "archive the old board"));
-        assert_eq!(line(&pending(&one, &[], &[])), "2 actions");
+        assert_eq!(line(&pending(&one, &[], &[], &[])), "2 actions");
         let skipped = [note(json!({"id": "n1", "block": "a-x", "kind": "skip", "status": "sent"}))];
-        let left = pending(&one, &skipped, &[]);
+        let left = pending(&one, &skipped, &[], &[]);
         assert_eq!((line(&left), what(&left)), ("close OPS-12".to_string(), "actions"));
     }
 
@@ -722,13 +754,13 @@ mod tests {
     /// batch and of sb page waiting; the agent done, it waits again.
     #[test]
     fn a_draft_waits_for_its_items_agent() {
-        let p = pending(FEEDBACK, &[], &[]);
+        let p = pending(FEEDBACK, &[], &[], &[]);
         assert_eq!(agent_of(FEEDBACK, &p[0]).as_deref(), Some("fix-proxy"));
         assert_eq!(agent_of(FEEDBACK, &p[2]), None);
         let fixing = |a: &str| a == "fix-proxy";
         assert_eq!(ready(FEEDBACK, p.clone(), &fixing).iter().map(Draft::key).collect::<Vec<_>>(), vec!["r-s212", "r-s214"]);
         assert_eq!(ready(FEEDBACK, p.clone(), &|_| false).len(), 3);
-        let lines = |busy: &dyn Fn(&str) -> bool| super::super::waiting::of_page("fb", FEEDBACK, &[], &[], busy).iter().map(|w| w.line()).collect::<Vec<_>>();
+        let lines = |busy: &dyn Fn(&str) -> bool| super::super::waiting::of_page("fb", FEEDBACK, &[], &[], &[], busy).iter().map(|w| w.line()).collect::<Vec<_>>();
         assert_eq!(lines(&|a| a.starts_with("fix-")), vec!["fb#r-s214 · draft · c"]);
         assert_eq!(lines(&|_| false), vec!["fb#r-s213 · draft · 3 drafts wait for you: 3 replies to Benjamin: proxy, fish and French"]);
     }
@@ -795,7 +827,7 @@ mod tests {
         let old = super::super::checklist::Step { text: "t".into(), batch: vec!["a".into(), "b".into()], ..Default::default() };
         assert_eq!(old.card_text(), "t\n1. open the page\n2. send both");
         // steps with no recipient: their words alone
-        let p = pending(PAGE, &[], &[]);
+        let p = pending(PAGE, &[], &[], &[]);
         let bare: Vec<Draft> = p.into_iter().map(|d| Draft { to: None, kind: "step", ..d }).collect();
         assert_eq!(batch_text(&bare, ""), "send these 2 drafts?\n- add the DNS records\n- tell Marc it's done");
     }
@@ -814,7 +846,7 @@ mod tests {
             act("a-var", 3, "turn DESKTOP_RELEASE on", "the variable DESKTOP_RELEASE=on."),
         ]
         .concat();
-        let p = pending(&html, &[], &[]);
+        let p = pending(&html, &[], &[], &[]);
         assert_eq!(
             batch_text(&p, "distribuer bise desktop"),
             "distribuer bise desktop: create the desktop-release env? (1 of 3, in order)\nthe GitHub env desktop-release: you as required reviewer, desktop-v* tags and main only.\nafter it, one at a time: set the 6 GitHub secrets and turn DESKTOP_RELEASE on"
@@ -823,10 +855,36 @@ mod tests {
         assert!(!is_send_all("create the desktop-release env"));
         // approved: the next one is next, the words follow
         let ok = [note(json!({"id": "n1", "block": "a-env", "kind": "approve", "text": "send", "status": "sent"}))];
-        let left = pending(&html, &ok, &[]);
+        let left = pending(&html, &ok, &[], &[]);
         assert_eq!(choices(&left)[0].keys, vec!["a-secrets".to_string()]);
         assert!(batch_text(&left, "d").starts_with("d: set the 6 GitHub secrets? (2 of 3, in order)\n"));
-        let last = pending(&html, &[ok[0].clone(), note(json!({"id": "n2", "block": "a-secrets", "kind": "approve", "status": "sent"}))], &[]);
+        let last = pending(&html, &[ok[0].clone(), note(json!({"id": "n2", "block": "a-secrets", "kind": "approve", "status": "sent"}))], &[], &[]);
         assert_eq!(batch_text(&last, "d"), "d: turn DESKTOP_RELEASE on? (3 of 3, in order)\nthe variable DESKTOP_RELEASE=on.");
+    }
+
+    /// Law (issue-15, main m_24663): a message posted elsewhere leaves
+    /// the batch: a block its page's --went names, or the message an
+    /// approved action posts (`a-pr16` → `m-pr16`, else the block right
+    /// before it), with that action; an action not approved keeps both.
+    #[test]
+    fn posted_drafts_leave_the_batch() {
+        let html = r#"<section data-kit="message" data-id="m-pr16" data-to="GitHub · PR #16 review" data-open="https://x.test/pull/16"><p>thanks</p></section>
+<section data-kit="action" data-id="a-pr16" data-do="post the review, close #16"><p>post it</p></section>
+<section data-kit="message" data-id="m-issue15" data-to="GitHub · issue #15 reply" data-open="https://x.test/issues/15"><p>fixed</p></section>
+<section data-kit="action" data-id="post-it" data-do="post the reply on #15"><p>post it</p></section>"#;
+        let keys = |p: Vec<Draft>| p.iter().map(Draft::key).collect::<Vec<_>>();
+        assert_eq!(keys(pending(html, &[], &[], &[])), vec!["m-pr16", "m-issue15", "a-pr16", "post-it"]);
+        assert_eq!((posted_by(html, "a-pr16").as_deref(), posted_by(html, "post-it").as_deref()), (Some("m-pr16"), Some("m-issue15")));
+        // --went names the messages: they left, their actions too
+        let went = vec!["m-pr16".to_string(), "m-issue15".to_string(), "a-pr16".to_string(), "post-it".to_string()];
+        assert!(pending(html, &[], &[], &went).is_empty());
+        assert_eq!(keys(pending(html, &[], &[], &went[..1])), vec!["m-issue15", "a-pr16", "post-it"]);
+        // his approves on the actions: each takes its message with it
+        let ok = |b: &str| note(json!({"id": b, "block": b, "kind": "approve", "text": "post", "status": "done"}));
+        assert_eq!(keys(pending(html, &[ok("a-pr16")], &[], &[])), vec!["m-issue15", "post-it"]);
+        assert!(pending(html, &[ok("a-pr16"), ok("post-it")], &[], &[]).is_empty());
+        // a skip is no post: the message still waits
+        let skip = note(json!({"id": "s", "block": "a-pr16", "kind": "skip", "status": "sent"}));
+        assert_eq!(keys(pending(html, &[skip], &[], &[])), vec!["m-pr16", "m-issue15", "post-it"]);
     }
 }

@@ -378,6 +378,40 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     }
   });
 
+  it("notif-open: a drafts card's '1 review' opens its page (an artifact) beside the thread at the first draft; nothing is sent, the item stays", () => {
+    const url = 'http://127.0.0.1:47123/p/issue-15#m-pr16';
+    const drafts = core_ev.map((e) =>
+      e.ev !== 'projects'
+        ? e
+        : { ...e, projects: e.projects.map((r) => ({ ...r, cards: [{ id: 540, project: r.project, kind: 'question', agent: 'main', question: '4 drafts wait for you · issue #15: chatgpt plan fix', options: [{ n: 1, label: 'review', act: { act: 'open' as const, url, artifact: 'issue-15', at: 'm-pr16' } }, { n: 2, label: 'send all 4' }], urgent: false, since_ms: NOW - 1000, page: { id: 'issue-15', url }, batch: { count: 4, title: 'issue #15: chatgpt plan fix', what: 'replies', names: [], topics: [], line: '' } }] })) },
+    );
+    const sent: CoreCmd[] = [];
+    const store = new Store({ send: (c) => sent.push(c) });
+    replay(store, drafts);
+    store.apply({ ev: 'artifacts', project: P, items: [{ id: 'issue-15', kind: 'page', title: 'issue #15: chatgpt plan fix', agent: 'issue-15', url: 'http://127.0.0.1:47123/p/issue-15', version: 1, at_ms: NOW, new: false }] });
+    const router = createRouter({ screen: 'thread', project: P, agent: 'main' });
+    const opened: string[] = [];
+    const g = globalThis as { bise?: unknown };
+    g.bise = { openExternal: (u: string) => opened.push(u) };
+    try {
+      render(
+        <StoreProvider store={store}>
+          <RouterContext value={router}>
+            <InboxBlock here={{ project: null, agent: null }} onAnswer={() => undefined} now={NOW} />
+          </RouterContext>
+        </StoreProvider>,
+      );
+      fireEvent.keyDown(window, { key: '1', code: 'Digit1', ctrlKey: true });
+      fireEvent.keyDown(window, { key: '1' });
+      expect(router.get()).toEqual({ screen: 'artifacts', project: P, id: 'issue-15' });
+      expect(opened).toEqual([]);
+      expect(sent.filter((c) => c.cmd !== 'card_in_view')).toEqual([]);
+      expect(screen.getByTestId('inbox.block').textContent).toContain('4 drafts wait for you');
+    } finally {
+      delete g.bise;
+    }
+  });
+
   it("'not now' (its 2) and it is gone for good: asked once; its words never reach the hub", async () => {
     localStorage.clear();
     sessionStorage.clear();

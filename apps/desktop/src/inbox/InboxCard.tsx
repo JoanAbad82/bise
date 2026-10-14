@@ -10,11 +10,12 @@
 // row shows picked for PICKED_MS, then picks. Owner: amb-home.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Card as CardRow } from '@/proto';
-import { Act, Kbd } from '@/ds';
+import { Act, Kbd, tipAttrs } from '@/ds';
 import { refusedLine, useRefused, useStore } from '@/store';
 import { cardKey } from './order';
 import { ArtWords } from './artWords';
 import { takesWords } from './model';
+import { optTip } from './optAct';
 
 /** A clicked row stays picked (ink) this long before it leaves. */
 export const PICKED_MS = 300;
@@ -92,6 +93,9 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
     if (on !== null) setDriving(true);
   }
   const where = project ?? card.project;
+  // an option that opens an artifact says where it goes (designer m_24724, law 6)
+  const store = useStore();
+  const artTitle = (aid: string) => store.artifacts(card.project).find((a) => a.id === aid)?.title;
   const el = (
     <div
       className={`ic ${surface}${driving ? ' driving' : ''}${full === true ? ' whole' : ''}${closed ? ' closed' : ''}`}
@@ -129,6 +133,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
                 pick(o.n);
               }}
               data-testid={`${id}.opt.${String(o.n)}`}
+              {...tipAttrs(optTip(o.act, artTitle) ?? undefined)}
             >
               <span className="ic-n">{o.n}</span>
               <span className="ic-l">{o.label}</span>

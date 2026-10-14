@@ -295,8 +295,9 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
                 text,
                 kind,
             }
-            // card-state (architect m_23450): each option says what a client does itself
-            .with_acts()
+            // card-state (architect m_23450): each option says what a client does itself;
+            // an option its asker set to open an artifact (notif-open) says that
+            .with_acts(&bise_proto::rows::opens_of(c.get("opens")))
         })
         .partition(|c| his(&c.kind, user_kind))
 }
@@ -600,9 +601,9 @@ mod tests {
             {"id": 7, "kind": "question", "agent": "docs", "age_ms": 0, "text": "where?\n1. here\n2. there"}]});
         let (his, _) = cards(&snap, "p", 10, |_| true);
         let acts = |id: u64| his.iter().find(|c| c.id == id).unwrap().options.iter().map(|o| o.act.clone()).collect::<Vec<_>>();
-        let pr = Some(OptAct::Open { url: Some("https://github.com/gvergnaud/ts-pattern/pull/384".into()) });
+        let pr = Some(OptAct::link(Some("https://github.com/gvergnaud/ts-pattern/pull/384")));
         assert_eq!(acts(384), vec![None, pr, None]);
-        assert_eq!(acts(5), vec![None, None, Some(OptAct::Open { url: Some("https://bise.dev/notes".into()) })]);
+        assert_eq!(acts(5), vec![None, None, Some(OptAct::link(Some("https://bise.dev/notes")))]);
         assert_eq!(acts(6), vec![Some(OptAct::SignIn), None]);
         assert_eq!(acts(7), vec![None, None]);
         // the row's act is the rule's for every kind and option (the TUI asks the same fn)
@@ -615,7 +616,7 @@ mod tests {
         // a merge whose text has no link: still the app's own, nothing to open
         let snap = json!({"cards": [{"id": 9, "kind": "merge", "agent": "x", "pr": 9, "age_ms": 0, "text": "#9 is ready\n\n1. merge\n2. open it on GitHub\n3. not yet"}]});
         let (his, _) = cards(&snap, "p", 10, |_| true);
-        assert_eq!(his[0].options[1].act, Some(OptAct::Open { url: None }));
+        assert_eq!(his[0].options[1].act, Some(OptAct::link(None)));
     }
 
     /// Law (architect m_11874): the `scheduled` row the hub builds from a

@@ -22,6 +22,7 @@ fn ambient_card(kind: &str, agent: &str, text: &str) -> Card {
         link: None,
         asking: false,
         waiting: Vec::new(),
+        acts: Vec::new(),
     }
 }
 

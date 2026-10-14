@@ -3,6 +3,7 @@
 
 use crate::Project;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// A numbered option of a card.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -23,10 +24,22 @@ pub struct Opt {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "act", rename_all = "snake_case")]
 pub enum OptAct {
-    /// open this page (none known: nothing opens, still nothing is sent)
+    /// open this artifact at `at` in the app (the desktop's artifact view
+    /// beside the thread, the terminal's /artifacts open), else this page
+    /// in his browser; none known: nothing opens, still nothing is sent.
+    /// An older client reads `url` only and still opens the page.
     Open {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         url: Option<String>,
+        /// an artifact id (a page's is its page id), set by the asker
+        /// (`sb notify --open`, a page's drafts notification)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        artifact: Option<String>,
+        /// where in it: a block's or an item's id on a page
+        // TODO(notif-open): bise_proto::anchor::Anchor once
+        // office-artifacts lands on main (architect m_24679)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        at: Option<String>,
     },
     /// the client's own ChatGPT sign-in; the hub closes the item once
     /// the sign-in is back
@@ -40,7 +53,7 @@ pub enum OptAct {
 /// box; an update: the card's link). None: the option answers the card.
 pub fn opt_act(kind: &str, n: u32, link: Option<&str>) -> Option<OptAct> {
     match (kind, n) {
-        ("merge", 2) | ("update", 3) => Some(OptAct::Open { url: link.map(str::to_string) }),
+        ("merge", 2) | ("update", 3) => Some(OptAct::link(link)),
         ("signin", 1) => Some(OptAct::SignIn),
         _ => None,
     }
@@ -64,15 +77,37 @@ impl Card {
         }
     }
 
-    /// Its options with their client acts filled ([`opt_act`]): the hub's
-    /// rows carry them so every client reads the same rule.
-    pub fn with_acts(mut self) -> Card {
+    /// Its options with their client acts filled: what the asker set for
+    /// an option (`opens`: `sb notify --open`, a drafts notification's
+    /// review) wins over its kind's default ([`opt_act`]). The hub's rows
+    /// carry them so every client reads the same rule.
+    pub fn with_acts(mut self, opens: &BTreeMap<u32, OptAct>) -> Card {
         let link = self.act_link();
         for o in &mut self.options {
-            o.act = opt_act(&self.kind, o.n, link.as_deref());
+            o.act = opens.get(&o.n).cloned().or_else(|| opt_act(&self.kind, o.n, link.as_deref()));
         }
         self
     }
+}
+
+impl OptAct {
+    /// Open a page in his browser (a merge's PR, an update's notes).
+    pub fn link(url: Option<&str>) -> OptAct {
+        OptAct::Open { url: url.map(str::to_string), artifact: None, at: None }
+    }
+
+    /// Open artifact `id` at `at` in the app; `url` for a client that
+    /// can't (or when it is gone).
+    pub fn artifact(id: &str, at: Option<&str>, url: Option<&str>) -> OptAct {
+        OptAct::Open { url: url.map(str::to_string), artifact: Some(id.to_string()), at: at.map(str::to_string) }
+    }
+}
+
+/// A card's `opens` as the hub's snapshot holds them (`{"<n>": <act>}`):
+/// the ones that read, keyed by option. Pure.
+pub fn opens_of(v: Option<&serde_json::Value>) -> BTreeMap<u32, OptAct> {
+    let Some(m) = v.and_then(serde_json::Value::as_object) else { return BTreeMap::new() };
+    m.iter().filter_map(|(k, a)| Some((k.parse().ok()?, serde_json::from_value(a.clone()).ok()?))).collect()
 }
 
 /// Where a card points on a page (a question block, a step of a plan).
@@ -285,3 +320,38 @@ pub fn question(text: &str) -> (String, Vec<Opt>) {
     (body.trim().to_string(), opts)
 }
 
+
+#[cfg(test)]
+mod open_tests {
+    use super::*;
+    use serde_json::json;
+
+    /// notif-open (architect m_24679): an option the asker set to open an
+    /// artifact carries it typed, at its anchor, with its url for an
+    /// older client; it wins over its kind's default; one with no
+    /// artifact reads as before.
+    #[test]
+    fn an_option_opens_the_artifact_its_asker_set() {
+        let a = OptAct::artifact("issue-15", Some("m-pr16"), Some("http://127.0.0.1:1/p/issue-15#m-pr16"));
+        let wire = json!({"act": "open", "url": "http://127.0.0.1:1/p/issue-15#m-pr16", "artifact": "issue-15", "at": "m-pr16"});
+        assert_eq!(serde_json::to_value(&a).unwrap(), wire);
+        assert_eq!(serde_json::to_value(OptAct::link(Some("https://x.test/pull/1"))).unwrap(), json!({"act": "open", "url": "https://x.test/pull/1"}));
+        // an older hub's Open {url} still reads
+        assert_eq!(serde_json::from_value::<OptAct>(json!({"act": "open", "url": "u"})).unwrap(), OptAct::link(Some("u")));
+        // the snapshot's opens: bad keys and shapes are dropped
+        let opens = opens_of(Some(&json!({"1": wire, "x": wire, "2": {"act": "nope"}})));
+        assert_eq!(opens.into_iter().collect::<Vec<_>>(), vec![(1, a.clone())]);
+        assert!(opens_of(None).is_empty());
+        // hub-given wins over opt_act's default; the others keep theirs
+        let (question, options) = question("#384 is ready\n1. squash and merge\n2. open it on GitHub\n3. not yet");
+        let card = Card {
+            id: 1, project: "p".into(), kind: "merge".into(), agent: "a".into(), question, options, urgent: false, since_ms: 0, page: None,
+            approval: false, rank: None, waiting: None, text: String::new(), note: None, place: None, pr: None, link: Some("https://x.test/pull/1".into()),
+            for_msg: None, batch: None,
+        };
+        let acts = |c: Card| c.options.into_iter().map(|o| o.act).collect::<Vec<_>>();
+        assert_eq!(acts(card.clone().with_acts(&BTreeMap::new())), vec![None, Some(OptAct::link(Some("https://x.test/pull/1"))), None]);
+        let set = BTreeMap::from([(2, a.clone()), (3, a.clone())]);
+        assert_eq!(acts(card.with_acts(&set)), vec![None, Some(a.clone()), Some(a)]);
+    }
+}

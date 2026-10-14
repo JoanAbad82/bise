@@ -13,6 +13,7 @@ import { useProjects, useStore } from '@/store';
 import { InboxStrip } from './Strip';
 import { openInbox } from './Block';
 import { withConfirmOptions } from './model';
+import { useOptAct } from './optAct';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
 
@@ -30,6 +31,7 @@ export function inboxOf(rows: readonly ProjectRow[]) {
 export function ThreadInbox({ project }: { project: string }) {
   const rows = useProjects();
   const store = useStore();
+  const doAct = useOptAct();
   const row = rows.find((r) => r.project === project);
   const cards = useMemo(() => (row?.cards ?? []).map(withConfirmOptions), [row]);
   const inView = useCallback(
@@ -61,9 +63,7 @@ export function ThreadInbox({ project }: { project: string }) {
         openPage: (url) => {
           void window.bise.openExternal(url);
         },
-        signIn: () => {
-          store.command({ cmd: 'sign_in', id: 'chatgpt' });
-        },
+        act: doAct,
         inView,
       }}
     />

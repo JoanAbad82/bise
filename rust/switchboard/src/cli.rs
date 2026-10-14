@@ -155,9 +155,9 @@ pub const COMMANDS: &[CmdDoc] = &[
         "answer an agent's question on the user's behalf; the user sees the answer and the one-sentence why.",
     ),
     cmd(
-        "sb notify \"<question for the user>\" [--for <id>]",
+        "sb notify \"<question for the user>\" [--for <id>] [--open <n>=<artifact>[#<anchor>]]...",
         Who::Main,
-        "escalate to the user's inbox as a notification (only you can); with `--for`, the user's answer goes straight to the task that asked. From then on only the user answers or closes it: a reply to that message is refused.",
+        "escalate to the user's inbox as a notification (only you can); with `--for`, the user's answer goes straight to the task that asked. From then on only the user answers or closes it: a reply to that message is refused. `--open 1=<artifact id>[#<block>]`: picking option 1 opens that artifact (a page at that block) in his app and sends nothing; the notification stays until he answers.",
     ),
     cmd(
         "sb notify --withdraw <notification> \"<why>\"",
@@ -743,15 +743,27 @@ pub fn build(args: &[String]) -> Result<Value, String> {
         "notify" | "card" => {
             // a notification is a card on the wire: the hub's command keeps its name
             req.insert("cmd".into(), json!("card"));
-            let (pos, o) = parse_args(rest, &["for", "page"], &[])?;
+            let (pos, o) = parse_args(rest, &["for", "page", "open"], &[])?;
             req.insert("text".into(), json!(text_of(&pos)?));
+            // `--open <n>=<artifact>[#<anchor>]` (repeatable): option n
+            // opens that artifact in his app, nothing sent (notif-open)
+            if let Some(v) = o.get("open") {
+                let specs: Vec<String> = match v {
+                    Value::Array(a) => a.iter().filter_map(Value::as_str).map(str::to_string).collect(),
+                    v => vec![v.as_str().unwrap_or_default().to_string()],
+                };
+                for s in &specs {
+                    crate::card_link::parse_open(s)?;
+                }
+                req.insert("open".into(), json!(specs));
+            }
             if o.contains_key("for") { req.insert("for".into(), json!(str_of(&o, "for"))); }
             // `--page <id>[#<item>]`: the notification opens that page at the item
             // (fn + o in the capsule), pm's B m_6008
             if o.contains_key("page") {
                 let page = str_of(&o, "page");
                 if page.trim().trim_start_matches('#').is_empty() || page.trim().starts_with('#') {
-                    return Err("usage: sb notify [--for <msg>] [--page <id>[#<item>]] \"<question>\"".into());
+                    return Err("usage: sb notify [--for <msg>] [--page <id>[#<item>]] [--open <n>=<artifact>[#<anchor>]]... \"<question>\"".into());
                 }
                 req.insert("page".into(), json!(page.trim()));
             }

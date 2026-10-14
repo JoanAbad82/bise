@@ -70,6 +70,9 @@ pub(crate) struct Card {
     /// expired-ux: a `signin` item's agents, stopped on the expired
     /// ChatGPT sign-in (the hub's snapshot): ⏎ in their thread signs in.
     pub(super) waiting: Vec<String>,
+    /// the options this app does itself, as the hub's row says (an
+    /// asker's artifact, a merge's PR...; opt_open.rs)
+    pub(super) acts: Vec<(u32, bise_proto::rows::OptAct)>,
 }
 
 /// A paragraph of an item the TUI writes itself.
@@ -115,6 +118,7 @@ impl Default for Card {
             link: None,
             asking: false,
             waiting: Vec::new(),
+            acts: Vec::new(),
         }
     }
 }
@@ -938,6 +942,12 @@ fn pick(app: &mut App, id: u64, i: usize) -> bool {
     let Some(c) = app.sb.card_by_id(id).cloned() else { return false };
     let s = shape(&c);
     let (Some(reply), Some(said)) = (s.options.get(i), s.short.get(i)) else { return false };
+    // the asker set this option to open an artifact (a drafts notification's
+    // `1 review`): it opens, nothing is sent, the item stays (opt_open.rs)
+    if let Some(act) = super::opt_open::asker_act(&c.acts, s.num(i) as u32) {
+        super::opt_open::run(app, act);
+        return true;
+    }
     // an approval answers with its digit (the composer rule: sb-core takes
     // only 1, 2 or 3 on it, never words), the history says the option's
     if matches!(c.kind.as_str(), "confirm" | "approval") {
@@ -977,24 +987,13 @@ fn pick(app: &mut App, id: u64, i: usize) -> bool {
             _ => {}
         }
     }
-    // what this app does itself, never sent: bise-proto's one rule, the
-    // window's too (opt_act, architect m_23450): a merge's `2 open it on
-    // GitHub` and an update's `3 release notes ↗` open here and the item
-    // stays; `sign in again` is the TUI's own ChatGPT sign-in (resign.rs),
-    // the hub closes the item once auth.json says it's back
+    // what this app does itself, never sent, the item stays (opt_open.rs):
+    // bise-proto's one rule, the window's too (a merge's `2 open it on
+    // GitHub`, an update's notes, `sign in again`)
     let link = if c.kind == "merge" { merge_link(&app.sb, &c) } else { c.link.clone() };
-    match bise_proto::rows::opt_act(&c.kind, n as u32, link.as_deref()) {
-        Some(bise_proto::rows::OptAct::Open { url }) => {
-            if let Some(url) = url {
-                crate::links::open(&url);
-            }
-            return true;
-        }
-        Some(bise_proto::rows::OptAct::SignIn) => {
-            crate::resign::start(app);
-            return true;
-        }
-        None => {}
+    if let Some(act) = bise_proto::rows::opt_act(&c.kind, n as u32, link.as_deref()) {
+        super::opt_open::run(app, &act);
+        return true;
     }
     answer(app, id, &n.to_string(), Some(reply));
     true

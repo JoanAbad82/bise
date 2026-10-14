@@ -7,6 +7,7 @@
 // mounts, fed by the store. Owner: amb-home.
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Card, Part } from '@/proto';
+import type { OptAct } from '@/proto/rows';
 import { Dot, Kbd, Row } from '@/ds';
 import { age, dotOf, InboxCard, RefusedMark, titleOf } from './InboxCard';
 import { cardKey } from './order';
@@ -23,8 +24,9 @@ export interface StripPorts {
   /** 'type your answer below': the composer under the card takes the focus */
   typeAt?: () => void;
   openPage?: (url: string) => void;
-  /** a sign-in item's '1 sign in again': the app's own ChatGPT sign-in (the core opens his browser) */
-  signIn?: () => void;
+  /** an option the window does itself (optAct.ts): the asker's artifact at its block, a link, the
+   * app's own ChatGPT sign-in; nothing is sent, the item stays */
+  act?: (project: string, act: OptAct) => void;
   /** bar N14: the item open here while the window has focus, null when none */
   inView?: (card: { project: string; card: number } | null) => void;
 }
@@ -81,13 +83,12 @@ export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip
 
   // an item answered or closed leaves every view at once: the store's answer / close keep it out
   // until the hub's rows drop it (acted.ts); here it only folds. An option the window does itself
-  // as the hub's row says (bise-proto opt_act, the TUI's rule: a merge's '2 open it on GitHub'...)
-  // opens its page or the app's sign-in, sends nothing, and the item stays.
+  // as the hub's row says (optAct.ts, the TUI's rule: the asker's artifact, a merge's '2 open it on
+  // GitHub'...) opens it or the app's sign-in, sends nothing, and the item stays.
   const answer = (c: Card, n: number) => {
     const act = c.options.find((o) => o.n === n)?.act;
     if (act != null) {
-      if (act.act === 'sign_in') ports.signIn?.();
-      else if (act.url != null) ports.openPage?.(act.url);
+      ports.act?.(c.project, act);
       return;
     }
     openTo(null);

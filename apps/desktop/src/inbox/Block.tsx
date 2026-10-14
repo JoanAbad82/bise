@@ -22,6 +22,7 @@ import { STRIP_KEYS, stripKey, stripWords } from './stripRows';
 import { cardKeyOf } from './Strip';
 import { ArtWords } from './artWords';
 import { InboxZero, useInboxZero } from './Zero';
+import { useOptAct } from './optAct';
 import { pruneCardDrafts } from './drafts';
 import { keep } from '@/app/keep';
 import { useModHeld } from '@/app/held';
@@ -276,6 +277,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
   const cmd = useModHeld('Meta');
   const rows = useProjects();
   const store = useStore();
+  const doAct = useOptAct();
   // the cards he answered or closed, from any view: the store's one set (acted.ts), never this block's
   const acted = useActed();
   const gone = useMemo(() => actedKeys(acted), [acted]);
@@ -456,19 +458,13 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
       else notify.later();
       return;
     }
-    // a drafts card's '1. review' does what it says: its page opens, nothing is sent, the card stays
-    // (amb-core m_21541; the hub's own answer to '1' is that url in a notice)
-    if (n === 1 && c.batch != null && c.page != null) {
-      void window.bise.openExternal(c.page.url);
-      return;
-    }
-    // an option the window does itself, as the hub's row says (bise-proto opt_act, the TUI's rule):
-    // a merge's '2 open it on GitHub', an update's '3 release notes' open their page, a sign-in's
-    // '1' is the app's own sign-in; nothing is sent, the card stays (his #384 came back when it was)
+    // an option the window does itself, as the hub's row says (optAct.ts, the TUI's rule): the
+    // asker's artifact (a drafts card's '1 review': its page at the first draft) opens beside the
+    // thread, a merge's '2 open it on GitHub' or an update's '3 release notes' their page, a
+    // sign-in's '1' the app's own sign-in; nothing is sent, the card stays (his #384 came back when it was)
     const act = c.options.find((o) => o.n === n)?.act;
     if (act != null) {
-      if (act.act === 'sign_in') store.command({ cmd: 'sign_in', id: 'chatgpt' });
-      else if (act.url != null) void window.bise.openExternal(act.url);
+      doAct(c.project, act);
       return;
     }
     leave();

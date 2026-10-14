@@ -37,15 +37,25 @@ impl Shell {
             }
             if let Some(cards) = snap["cards"].as_array_mut() {
                 for c in cards {
-                    // an agent's card linked with `sb card --page`
+                    // an agent's card linked with `sb notify --page`, its
+                    // options' artifacts with `--open` (card_link.rs)
                     if let Some(link) = c["id"].as_u64().and_then(|n| self.pg.card_links.get(&n)) {
-                        c["page"] = link.clone();
+                        if let Some(page) = link.get("page") {
+                            c["page"] = page.clone();
+                        }
+                        if let Some(opens) = link.get("opens") {
+                            c["opens"] = opens.clone();
+                        }
                     }
                     let Some((id, block)) = c["id"].as_u64().and_then(|n| qs.get(&n)) else { continue };
                     // drafts batched in one card: the page opens at the
                     // first (ambient-lead m_5977)
                     if let Some((b, anchor)) = block.strip_prefix("drafts:").and_then(|k| k.split_once(':')) {
-                        c["page"] = json!({"id": id, "block": b, "item": anchor, "drafts": true, "url": format!("{}#{}", p.url(id), anchor)});
+                        let url = format!("{}#{}", p.url(id), anchor);
+                        // its 1 review opens the page (an artifact) at
+                        // the first, in the app, nothing sent (notif-open)
+                        c["opens"] = crate::card_link::opens_json(&[(1, bise_proto::rows::OptAct::artifact(id, Some(anchor), Some(&url)))]);
+                        c["page"] = json!({"id": id, "block": b, "item": anchor, "drafts": true, "url": url});
                         // its fields for the capsule's words (amb-web
                         // m_6061): {count, title, what, names}
                         let card = c["id"].as_u64();
@@ -64,23 +74,31 @@ impl Shell {
         }
     }
 
-    /// `sb card --page <id>[#<item>]`: a page that isn't there is refused
-    /// before the card opens (pm's B m_6008). Ok(None): not a card with a
-    /// page; Err: the refusal's words. Moved out of daemon.rs unchanged
-    /// (architect m_12280).
+    /// `sb notify --page <id>[#<item>]` and `--open <n>=<artifact>[#<anchor>]`:
+    /// a page, an artifact or an anchor that isn't there is refused before
+    /// the card opens (pm's B m_6008). Ok(None): neither; Ok(Some): the
+    /// card's link `{page?, opens?}` (card_link.rs); Err: the refusal's words.
     pub(super) fn card_page_link(&self, cmd: &str, v: &Value) -> Result<Option<Value>, String> {
-        match (cmd, v.get("page").and_then(Value::as_str)) {
-            ("card", Some(spec)) => match self.pg.pages.as_ref().map(|p| crate::card_link::link(p, spec)) {
-                Some(Ok(l)) => Ok(Some(l)),
-                Some(Err(e)) => Err(e),
-                None => Err("no pages on this hub".into()),
-            },
-            _ => Ok(None),
+        if cmd != "card" {
+            return Ok(None);
         }
+        let mut link = serde_json::Map::new();
+        if let Some(spec) = v.get("page").and_then(Value::as_str) {
+            let pages = self.pg.pages.as_ref().ok_or("no pages on this hub")?;
+            link.insert("page".into(), crate::card_link::link(pages, spec)?);
+        }
+        let specs: Vec<&str> = v.get("open").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+        if !specs.is_empty() {
+            let store = crate::artifacts::Store::new(&self.opts.paths.state);
+            let art = |id: &str| store.get(id);
+            let opens = specs.iter().map(|s| crate::card_link::open_act(self.pg.pages.as_deref(), &art, s)).collect::<Result<Vec<_>, _>>()?;
+            link.insert("opens".into(), crate::card_link::opens_json(&opens));
+        }
+        Ok((!link.is_empty()).then_some(Value::Object(link)))
     }
 
     /// The card that step opened (an open card not in `before`) gets its
-    /// page link, saved, and the clients see it at once.
+    /// link (`{page?, opens?}`), saved, and the clients see it at once.
     pub(super) fn link_new_card(&mut self, before: &[u64], l: Value) {
         let new = self.hub.st.open_cards().map(|c| c.id).filter(|c| !before.contains(c)).max();
         if let Some(card) = new {
@@ -233,7 +251,7 @@ impl Shell {
         // 42: 3 Slack replies and no card)
         let drafts = match crate::pages::drafts::carded(id) {
             // (a draft whose item's agent is still at work waits: m_6168)
-            true => crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &notes, &pages.store.questions(id)), &|a| pages.held(id, a, meta.version())),
+            true => crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &notes, &pages.store.questions(id), &meta.went_blocks()), &|a| pages.held(id, a, meta.version())),
             false => Vec::new(),
         };
         if steps.is_empty() && !rows.iter().any(|r| r.his() && r.plan) && drafts.len() < 2 {
@@ -498,7 +516,7 @@ impl Shell {
         let Some(pages) = self.pg.pages.clone() else { return Vec::new() };
         let Some(meta) = pages.store.meta(id) else { return Vec::new() };
         let html = pages.store.html(id, meta.version()).unwrap_or_default();
-        let drafts = crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &pages.store.notes(id), &pages.store.questions(id)), &|a| pages.held(id, a, meta.version()));
+        let drafts = crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &pages.store.notes(id), &pages.store.questions(id), &meta.went_blocks()), &|a| pages.held(id, a, meta.version()));
         let mut sent = Vec::new();
         for d in drafts.iter().filter(|d| keys.is_none_or(|k| k.contains(&d.key()))) {
             match pages.locked(|s| s.add_sent(id, &d.block, d.item.as_deref(), "approve", "send", meta.version(), now_ms())) {

@@ -83,6 +83,7 @@ fn mock() -> App {
         link: None,
         asking: false,
         waiting: Vec::new(),
+        acts: Vec::new(),
     });
     app
 }
