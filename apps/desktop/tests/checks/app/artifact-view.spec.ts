@@ -87,7 +87,6 @@ const widthOf = async (page: Page, sel: string) => Math.round((await page.locato
 // a finished animation, or one cancelled on the way (its promise rejects with AbortError)
 const settle = (page: Page) => page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))).then(() => undefined));
 
-const rgbOf = (c: string) => c.replace(/\s/gu, '');
 
 for (const theme of ['light', 'dark']) {
   test(`app/artifact-view: the maker's thread and the artifact on 55%, one composer, ✕ back; 1100 folds the left bar; 800 the artifact alone with '◧ perf' (${theme})`, async () => {
@@ -119,19 +118,13 @@ for (const theme of ['light', 'dark']) {
       const block = page.getByTestId('inbox.block');
       await expect(block, "perf's question over its composer").toContainText('keep the webp next to the avif?');
       await expect(block, "another agent's question is not on this screen").not.toContainText('ship the search index');
-      // the open chip: a tint on its own line, never an ink outline
+      // the open chip: the pink chip at its hover tint (desktop-agents-bar §5), never an outline
       const chip = await page.getByTestId('thread.artifact.3').evaluate((e) => {
         const c = getComputedStyle(e);
-        const line = getComputedStyle(document.body).getPropertyValue('--c-line').trim();
-        const probe = document.createElement('i');
-        probe.style.color = line;
-        document.body.append(probe);
-        const lineRgb = getComputedStyle(probe).color;
-        probe.remove();
-        return { bg: c.backgroundColor, border: c.borderTopColor, lineRgb, openColor: getComputedStyle(e.querySelector('.th-art-open') ?? e).color };
+        return { bg: c.backgroundColor, border: c.borderTopWidth };
       });
       expect(chip.bg, 'the open chip is tinted').not.toBe('rgba(0, 0, 0, 0)');
-      expect(rgbOf(chip.border), "its line stays --c-line").toBe(rgbOf(chip.lineRgb));
+      expect(chip.border, 'no outline').toBe('0px');
       // the composer's label gives way: 'idle' stays whole on its right
       const lbl = page.locator('.th-screen .b-composer .div');
       await expect(lbl.locator('.end')).toContainText('idle');

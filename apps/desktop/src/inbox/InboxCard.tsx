@@ -13,6 +13,7 @@ import type { Card as CardRow } from '@/proto';
 import { Act, Kbd } from '@/ds';
 import { refusedLine, useRefused, useStore } from '@/store';
 import { cardKey } from './order';
+import { ArtWords } from './artWords';
 import { takesWords } from './model';
 
 /** A clicked row stays picked (ink) this long before it leaves. */
@@ -111,7 +112,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
         <span className="ic-k">{age(now - card.since_ms)}</span>
       </div>
       <div className="ic-q" data-testid={`${id}.q`}>
-        {full === false ? <Folded text={card.question} testId={`${id}.more`} /> : card.question}
+        {full === false ? <Folded text={card.question} project={card.project} testId={`${id}.more`} q={`${id}.q`} /> : <ArtWords text={card.question} project={card.project} testId={`${id}.q`} />}
       </div>
       {card.options.length > 0 && (
         <div className="ic-opts" role="listbox" data-testid={`${id}.opt`}>
@@ -231,13 +232,13 @@ export function folds(text: string): boolean {
   return text.split('\n').length > FOLD_AT;
 }
 
-function Folded({ text, testId }: { text: string; testId: string }) {
+function Folded({ text, project, testId, q }: { text: string; project: string; testId: string; q: string }) {
   const lines = text.split('\n');
-  if (lines.length <= FOLD_AT) return <>{text}</>;
+  if (lines.length <= FOLD_AT) return <ArtWords text={text} project={project} testId={q} />;
   const more = lines.length - FOLD_SHOW;
   return (
     <>
-      {lines.slice(0, FOLD_SHOW).join('\n')}
+      <ArtWords text={lines.slice(0, FOLD_SHOW).join('\n')} project={project} testId={q} />
       <span data-testid={testId}>
         {`\n… ${String(more)} more lines `}
         <Kbd>ctrl o</Kbd>

@@ -10,6 +10,7 @@ import type { Card, Part } from '@/proto';
 import { Dot, Kbd, Row } from '@/ds';
 import { age, dotOf, InboxCard, RefusedMark, titleOf } from './InboxCard';
 import { cardKey } from './order';
+import { ArtWords } from './artWords';
 import { STRIP_KEYS, stripKey, stripList, stripOpen, stripView, stripWords } from './stripRows';
 import { actedKeys, useActed } from '@/store';
 import './inbox.css';
@@ -261,7 +262,12 @@ function StripRow({ c, n, now, onOpen }: { c: Card; n: number; now: number; onOp
       name={
         <>
           <span className="strip-who">{who}</span>
-          {what !== '' && <span className="strip-what">{` · ${what}`}</span>}
+          {what !== '' && (
+            <span className="strip-what">
+              {' · '}
+              <ArtWords text={what} project={c.project} testId={`strip.row.${String(n)}`} />
+            </span>
+          )}
           <RefusedMark card={c} />
         </>
       }

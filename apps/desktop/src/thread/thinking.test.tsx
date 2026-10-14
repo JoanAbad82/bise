@@ -34,7 +34,7 @@ ${SIG}` })).toBe(false);
 
   it('an open thinking entry and a reply carrying one show their words, never BENDSIG::', () => {
     const store = new Store(null);
-    const ctx: RowCtx = { tkey: threadKey(P, 'epargne-offre'), project: P, agent: 'epargne-offre', bise: false, onLink: () => undefined };
+    const ctx: RowCtx = { tkey: threadKey(P, 'epargne-offre'), project: P, agent: 'epargne-offre', bise: false, onLink: () => undefined, onArtifact: () => undefined };
     store.apply({ ev: 'entry', project: P, agent: 'epargne-offre', entry: { pos: 31, at_ms: 1, kind: 'thinking', text: 'thought for 12s', thinking: { ms: 12_000, text: `framed tactfully.\n\n${SIG}` } } });
     store.apply({ ev: 'entry', project: P, agent: 'epargne-offre', entry: { pos: 32, at_ms: 2, kind: 'agent', text: 'Oui, demande-la.', thinking: { ms: 12_000, text: `protects me.\n${SIG}` } } });
     for (const [pos, words] of [

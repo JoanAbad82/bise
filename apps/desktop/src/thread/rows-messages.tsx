@@ -177,7 +177,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
       {quotes.map((q, i) => (
         <QuoteLine key={i} source={q.source} about={q.about} text={q.text} n={q.n} testId={`thread.you.${String(e.pos)}.quote.${String(i + 1)}`} />
       ))}
-      {text !== '' && <Markdown text={fold === undefined || open ? text : fold.head} onLink={ctx.onLink} onPath={ctx.onPath} breaks />}
+      {text !== '' && <Markdown text={fold === undefined || open ? text : fold.head} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} breaks />}
       {fold !== undefined && (
         <Fold open={open} onToggle={toggle} testId={`thread.fold.${e.pos}`}>
           {open ? 'fold it' : `show all · ${String(fold.lines)} lines`}
@@ -343,7 +343,7 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
   return (
     <div className={failed ? 'th-row th-pending th-failed' : hold?.state === 'sent' ? 'th-row th-routed' : 'th-row th-pending'} data-testid={`thread.pending.${cid}`} data-state={state} data-side="you">
       <YouBubble under={under} state={failed ? 'failed' : queued ? 'queued' : 'sending'}>
-        <Markdown text={p.text} onLink={ctx.onLink} breaks />
+        <Markdown text={p.text} onLink={ctx.onLink} onArtifact={ctx.onArtifact} breaks />
       </YouBubble>
       {hold?.state === 'held' && <HoldLine hold={hold} />}
     </div>
@@ -401,7 +401,7 @@ export const QueuedRow = memo(function QueuedRow({ ctx, q }: { ctx: RowCtx; q: {
         state="queued"
         testId={`${id}.bubble`}
       >
-        <Markdown text={q.text} onLink={ctx.onLink} breaks />
+        <Markdown text={q.text} onLink={ctx.onLink} onArtifact={ctx.onArtifact} breaks />
       </YouBubble>
       {refused !== null && (
         <div className="th-queued-err" role="status" data-testid={`${id}.error`}>

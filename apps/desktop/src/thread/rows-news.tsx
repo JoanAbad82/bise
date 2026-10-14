@@ -3,7 +3,7 @@
 // Split out of rows.tsx (pure move).
 import { useOpenArtifact } from './openArtifact';
 import { useState, type ReactNode } from 'react';
-import { Act, BriefLine, Button, Fold, Marker, Press, SchedHead } from '@/ds';
+import { Act, ArtChip, BriefLine, Button, Fold, Marker, Press, SchedHead } from '@/ds';
 import type { Entry } from '@/proto';
 import { useAgents, useArtifacts, useStore } from '@/store';
 import { leaves, LEAVES, useGoArtifact } from '@/artifacts/leave';
@@ -125,27 +125,12 @@ export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       glyph={glyphOf(m.kind)}
       title={m.title}
       meta={out ? LEAVES : [m.kind_word, m.v > 1 ? `v${String(m.v)}` : ''].filter(Boolean).join(' · ')}
-      onOpen={() => {
+      onClick={() => {
         // designer's v6 (2): an artifact opens in the window, its own screen; a browser-only one his browser
         goArtifact(ctx.project, m.id, m);
       }}
       testId={`thread.artifact.${String(e.pos)}`}
     />
-  );
-}
-
-/** An artifact or a page as one line (designer m_12065 (2)): '↗ product page, before / after   page · v2', 1 px line, r 9, fit-content, no thumbnail box. */
-// its front glyph is its kind's, as the list's left column draws it; '↗' at the end says it leaves the app (designer m_21742)
-export function ArtChip({ title, meta, onOpen, testId, open = false, glyph = '↗' }: { title: string; meta: string; onOpen: () => void; testId: string; open?: boolean; glyph?: string }) {
-  return (
-    <Press look={open ? 'th-art open' : 'th-art'} onClick={onOpen} data-testid={testId} data-open={open || undefined}>
-      <span className="th-art-title">
-        {glyph} {title}
-      </span>
-      {meta !== '' && <span className="th-art-meta">{meta}</span>}
-      {/* the artifact open beside the thread (designer's artifact-open page): 'open', an ink outline */}
-      {open && <span className="th-art-open">open</span>}
-    </Press>
   );
 }
 
@@ -302,7 +287,7 @@ export function BriefRow({ pos, name, objective, body, ctx }: { pos: number; nam
       </BriefLine>
       {open && (
         <div className="th-brief-body" data-testid={`thread.brief.${String(pos)}.body`}>
-          <Markdown text={body} onLink={ctx.onLink} onPath={ctx.onPath} />
+          <Markdown text={body} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} />
         </div>
       )}
     </div>
@@ -395,7 +380,7 @@ export function ReportRow({ pos, line, text, next, ctx, waits }: { pos: number; 
   };
   const whole = open && body !== '' && (
     <div className="th-report-body" data-testid={`thread.report.${String(pos)}.body`}>
-      <Markdown text={body} onLink={ctx.onLink} onPath={ctx.onPath} />
+      <Markdown text={body} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} />
     </div>
   );
   if (dup) {

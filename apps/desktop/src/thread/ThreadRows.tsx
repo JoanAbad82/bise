@@ -17,6 +17,7 @@ import { landedEchoes, retryRuns } from './tiers';
 import { foldedRuns, runKey, runWords, withRuns } from './runs';
 import { absolute } from './paths';
 import { FoldsContext } from './folds';
+import { useGoArtifact } from '@/artifacts/leave';
 
 /** The agent's folder: its worktree, else its project's checkout; none until the rows come. */
 function useBase(project: string, agent: string): string | undefined {
@@ -132,6 +133,7 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   );
   // relative paths in its answers are under the agent's folder: its worktree, else the project's
   const base = useBase(project, agent);
+  const goArtifact = useGoArtifact();
   const ctx = useMemo<RowCtx>(
     () => ({
       tkey,
@@ -139,6 +141,9 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
       agent,
       bise,
       onLink: openLink,
+      onArtifact: (id: string) => {
+        goArtifact(project, id);
+      },
       ...(onTakeBack === undefined ? {} : { onTakeBack }),
       ...(base === undefined
         ? {}
@@ -148,7 +153,7 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
             },
           }),
     }),
-    [tkey, project, agent, bise, base, onTakeBack],
+    [tkey, project, agent, bise, base, onTakeBack, goArtifact],
   );
   // each row reads the one before it: its group and its day (ambient m_11777)
   const prevOf = useMemo(() => new Map(shown.map((p, i) => [p, shown[i - 1]])), [shown]);

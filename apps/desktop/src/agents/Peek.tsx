@@ -5,6 +5,7 @@
 import { useEffect, useMemo } from 'react';
 import { threadKey, useStore, useThreadOrder } from '@/store';
 import { EntryRow, type RowCtx } from '@/thread/rows';
+import { useGoArtifact } from '@/artifacts/leave';
 import '@/thread/thread.css';
 
 /** How many of its last entries the preview shows. */
@@ -25,6 +26,7 @@ export function Peek({ project, agent }: { project: string; agent: string }) {
     };
   }, [store, project, agent]);
   const { order } = useThreadOrder(tkey);
+  const goArtifact = useGoArtifact();
   const ctx = useMemo<RowCtx>(
     () => ({
       tkey,
@@ -34,8 +36,11 @@ export function Peek({ project, agent }: { project: string; agent: string }) {
       onLink: (url) => {
         void (window as Partial<Window>).bise?.openExternal(url);
       },
+      onArtifact: (id) => {
+        goArtifact(project, id);
+      },
     }),
-    [tkey, project, agent],
+    [tkey, project, agent, goArtifact],
   );
   const rows = lastOf(order);
   return (

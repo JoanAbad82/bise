@@ -8,7 +8,7 @@
 // calls, thinking), rows-cards (cards, approvals, answers, agent-to-agent),
 // rows-news (landed, PRs, artifacts, scheduled, notices, briefs, not delivered).
 import { memo, type ReactNode } from 'react';
-import { Marker, Msg } from '@/ds';
+import { ArtChip, Marker, Msg } from '@/ds';
 import type { Entry } from '@/proto';
 import { useEntry } from '@/store';
 import { Answer } from './Markdown';
@@ -21,7 +21,7 @@ import { pageOf } from './parts';
 import { shownName } from '@/agents/model';
 import { BODY_KINDS, NAMELESS_KINDS, NOTE_KINDS, QUIET_KINDS, QUIET_REPORT, ROW_KINDS, sameRoute } from './tiers';
 import { YouRow } from './rows-messages';
-import { ArtChip, BriefRow, CompactedRow, LandedRow, MadeRow, NotDeliveredRow, NOTICE_MARK, NoticeRow, PrRow, ReportRow, ScheduledRow, WakeRow } from './rows-news';
+import { BriefRow, CompactedRow, LandedRow, MadeRow, NotDeliveredRow, NOTICE_MARK, NoticeRow, PrRow, ReportRow, ScheduledRow, WakeRow } from './rows-news';
 import { ThinkingLine, thoughtFor, ToolsRow } from './rows-tools';
 /** What a row needs of its thread. */
 export interface RowCtx {
@@ -31,6 +31,8 @@ export interface RowCtx {
   /** bise's own main (the pearl, 'bise') */
   readonly bise: boolean;
   readonly onLink: (url: string) => void;
+  /** an artifact named in a row (its chip, an `artifact:` link, a note's page): its view */
+  readonly onArtifact: (id: string) => void;
   /** a file path named in an answer, relative to the agent's folder (M4, B14) */
   readonly onPath?: (path: string, line?: number) => void;
   /** his queued message taken back to edit: its words go back in the composer */
@@ -173,8 +175,8 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
         <ArtChip
           title={e.page.title}
           meta={[e.page.v == null ? '' : `v${String(e.page.v)}`, clock(e.at_ms)].filter(Boolean).join(' · ')}
-          onOpen={() => {
-            if (e.page) ctx.onLink(e.page.url);
+          onClick={() => {
+            if (e.page) ctx.onArtifact(e.page.id);
           }}
           testId={`thread.page.${String(e.pos)}`}
         />
@@ -200,7 +202,7 @@ function EntryBody({ e, ctx, head, next, live, still, chained = false, retries }
     }
     case 'you':
       // what he did on a page (his pick, note, tick): its answer row, never the hub's template
-      return pageOf(e.parts) !== null ? <PageAnswerRow e={e} next={next} /> : <YouRow e={e} ctx={ctx} next={next} />;
+      return pageOf(e.parts) !== null ? <PageAnswerRow e={e} ctx={ctx} next={next} /> : <YouRow e={e} ctx={ctx} next={next} />;
     case 'to_agent':
       return <ToAgentRow e={e} ctx={ctx} chained={chained} />;
     // amb-feed's batch 2 (b8cb4b1e): the lines the hub's fold used to drop
@@ -322,10 +324,10 @@ function AgentMsg({ e, ctx, who, head, live, still }: { e: Entry; ctx: RowCtx; w
         // their place and dim (0.7, designer m_18084); the turn's end follows it, '▲ turn
         // interrupted (by main)' dim as the TUI's (rows-news NoticeRow) or the failure's row
         <div className="th-cut" data-testid={`thread.cut.${String(e.pos)}`}>
-          <Answer text={text} live={false} still={still} onLink={ctx.onLink} onPath={ctx.onPath} />
+          <Answer text={text} live={false} still={still} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} />
         </div>
       ) : (
-        <Answer text={text} live={live} still={still} onLink={ctx.onLink} onPath={ctx.onPath} />
+        <Answer text={text} live={live} still={still} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} />
       )}
     </Msg>
   );

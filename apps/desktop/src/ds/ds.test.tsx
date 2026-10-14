@@ -3,7 +3,7 @@
 // re-render never replaces the editor in its slot, nor the rows of a list).
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ComposerFrame, Dock, Dot, Field, Msg, Opts, Row, Seg, Spot, SpotRow, Tabs, Toggle } from "./index";
+import { ArtChip, ArtName, ComposerFrame, Dock, Dot, Field, Msg, Opts, Row, Seg, Spot, SpotRow, Tabs, Toggle } from "./index";
 
 afterEach(cleanup);
 
@@ -111,5 +111,24 @@ describe("src/ds", () => {
     const { container } = render(<Msg from="agent" name="x">{"<img src=x onerror=alert(1)>"}</Msg>);
     expect(container.querySelector("img")).toBeNull();
     expect(container.textContent).toContain("<img src=x");
+  });
+
+  it("an artifact's chip and its inline name: pink classes, the open state, a click (desktop-agents-bar §5)", () => {
+    const open = vi.fn();
+    const named = vi.fn();
+    const { getByTestId } = render(<><ArtChip title="product page" meta="page · v2" open onClick={open} testId="a" /><ArtName onClick={named} testId="n">product page</ArtName></>);
+    const chip = getByTestId("a");
+    expect(chip.tagName).toBe("BUTTON");
+    expect(chip.className).toBe("b-artchip open");
+    expect(chip.querySelector(".b-artchip-title")?.textContent).toBe("↗ product page");
+    expect(chip.querySelector(".b-artchip-meta")?.textContent).toBe("page · v2");
+    expect(chip.querySelector(".b-artchip-open")?.textContent).toBe("open");
+    fireEvent.click(chip);
+    expect(open).toHaveBeenCalledTimes(1);
+    const n = getByTestId("n");
+    expect(n.className).toBe("b-artname");
+    fireEvent.click(n);
+    fireEvent.keyDown(n, { key: "Enter" });
+    expect(named).toHaveBeenCalledTimes(2);
   });
 });

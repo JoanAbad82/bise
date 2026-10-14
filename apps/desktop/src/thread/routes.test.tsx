@@ -43,7 +43,7 @@ describe("bise's routing hold", () => {
       { project: 'shop-2', name: 'shop', path: '/s', git: true, home: false, order: 2, agents: 1, working: 0, waits: 0, running: true },
     ] });
     const cid = store.send({ project: H, agent: 'main', text: 'why does p99 rise' });
-    const ctx: RowCtx = { tkey: K, project: H, agent: 'main', bise: true, onLink: () => undefined };
+    const ctx: RowCtx = { tkey: K, project: H, agent: 'main', bise: true, onLink: () => undefined, onArtifact: () => undefined };
     const v = render(
       <StoreProvider store={store}>
         <PendingRow ctx={ctx} cid={cid} />

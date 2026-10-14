@@ -3,7 +3,7 @@
 // rows.tsx (pure move).
 import { useState, type ReactNode } from 'react';
 import { useFold } from './folds';
-import { Act, Answered, CardLine, Chip, Marker, Press } from '@/ds';
+import { Act, Answered, ArtName, CardLine, Chip, Marker, Press } from '@/ds';
 import { openInbox } from '@/inbox/Block';
 import type { Entry } from '@/proto';
 import { useEntry, useProjects, useThreadOrder, type Aside } from '@/store';
@@ -133,12 +133,33 @@ export function CardAnsweredRow({ pos, a, at, timeAlways }: { pos: number; a: { 
  * carries a typed page part; the row is '✓ you answered main · <what the card asked>' over his
  * words, the TUI's row word for word (bise-proto words::page_answer), never the hub's template.
  */
-export function PageAnswerRow({ e, next }: { e: Entry; next: Entry | undefined }) {
+export function PageAnswerRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | undefined }) {
   const p = pageOf(e.parts);
   if (p === null) return <Marker>{e.text}</Marker>;
   // the agent's name as the thread draws its author (a project's main is 'bise'; designer m_21035)
   const a = pageAnswer({ ...p, to: shownName(p.to) });
-  const head = a.asked !== '' ? `${a.head} · ${a.asked}` : a.head;
+  // the page's name pink and clickable, its view (desktop-agents-bar §5)
+  const on =
+    a.on === '' ? null : (
+      <>
+        {' '}
+        <ArtName
+          onClick={() => {
+            ctx.onArtifact(p.page);
+          }}
+          testId={`thread.pageanswer.${String(e.pos)}.page`}
+        >
+          {a.on}
+        </ArtName>
+      </>
+    );
+  const head = (
+    <>
+      {a.head}
+      {on}
+      {a.asked !== '' ? ` · ${a.asked}` : ''}
+    </>
+  );
   return (
     <div className="th-approval" data-ok>
       <YouBubble head={<AnsweredHead ok>{head}</AnsweredHead>} under={e.at_ms > 0 ? clock(e.at_ms) : undefined} timeAlways={lastOfRun(e, next)} testId={`thread.pageanswer.${String(e.pos)}`}>
@@ -335,7 +356,7 @@ export function AgentNote({ pos, from, to, text, ctx, testId, tag, chip = true }
       {text !== '' &&
         (open ? (
           <div className="th-note-text" data-testid={`${testId}.text`}>
-            <Markdown text={text} onLink={ctx.onLink} onPath={ctx.onPath} />
+            <Markdown text={text} onLink={ctx.onLink} onArtifact={ctx.onArtifact} onPath={ctx.onPath} />
           </div>
         ) : (
           <div className="th-note-line" data-testid={`${testId}.text`}>

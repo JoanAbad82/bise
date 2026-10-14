@@ -142,9 +142,9 @@ test("artifacts/browser-only: the thread's PR chip says '↗' and opens his brow
     const chip = page.getByTestId('thread.artifact.2');
     await expect(chip, 'the PR chip').toBeVisible({ timeout: 10_000 });
     // designer m_21742 (a): its kind's glyph in front, one '↗' only, at the end
-    await expect(chip.locator('.th-art-title'), "the PR's glyph in front").toHaveText(/^⇡ PR #381/);
+    await expect(chip.locator('.b-artchip-title'), "the PR's glyph in front").toHaveText(/^⇡ PR #381/);
     expect((await chip.innerText()).split('↗').length - 1, "one '↗'").toBe(1);
-    await expect(chip.locator('.th-art-meta')).toHaveText('↗');
+    await expect(chip.locator('.b-artchip-meta')).toHaveText('↗');
     await expect(chip).not.toContainText('PR · ');
     await page.screenshot({ path: test.info().outputPath('light-1100-chip.png') });
     await chip.click();

@@ -74,6 +74,55 @@ export function Chip({ children, tone, kind, thumb, of, title, expanded, state, 
   );
 }
 
+export interface ArtChipProps {
+  /** the artifact's title, after its glyph */
+  title: ReactNode;
+  /** its kind's glyph in front: '↗' a page (artifacts/model glyphOf) */
+  glyph?: string;
+  /** "page · v2", the same pink at 70 % */
+  meta?: ReactNode;
+  /** open beside the thread: the hover tint, and 'open' text-3 */
+  open?: boolean;
+  state?: "hover";
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  testId?: string;
+}
+/**
+ * An artifact as one chip (desktop-agents-bar §5): its glyph and title in --c-accent on a 10 %
+ * accent tint, r 6, 24 px high, 8 px sides; kind and version in the same pink at 70 %; hover 16 %.
+ */
+export function ArtChip({ title, glyph = "↗", meta, open = false, state, onClick, testId }: ArtChipProps) {
+  return (
+    <button type="button" className={cx("b-artchip", open && "open", state === "hover" && "is-hover")} onClick={onClick}
+      data-testid={testId} data-open={open || undefined}>
+      <span className="b-artchip-title">{glyph} {title}</span>
+      {meta != null && meta !== "" && <span className="b-artchip-meta">{meta}</span>}
+      {open && <span className="b-artchip-open">open</span>}
+    </button>
+  );
+}
+
+export interface ArtNameProps {
+  children: ReactNode;
+  state?: "hover";
+  onClick?: () => void;
+  testId?: string;
+}
+/**
+ * An artifact's name inside a line of text (an answer, a note, an inbox line; desktop-agents-bar
+ * §5): the chip's highlight inline, 4 px sides, wrapping with its words; a link when it opens.
+ */
+export function ArtName({ children, state, onClick, testId }: ArtNameProps) {
+  return (
+    <span className={cx("b-artname", state === "hover" && "is-hover")} role={onClick ? "link" : undefined} tabIndex={onClick ? 0 : undefined}
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onClick(); } } : undefined}
+      data-testid={testId}>
+      {children}
+    </span>
+  );
+}
+
 /** a key as drawn in the UI ("⌘I", "esc") */
 export function Kbd({ children }: { children: ReactNode }) {
   return <span className="b-kbd">{children}</span>;

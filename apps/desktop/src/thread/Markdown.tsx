@@ -8,19 +8,31 @@
 //
 // A link never navigates the window: a click goes to `onLink` (the thread
 // hands it the shell's open-in-browser), and only http(s) and mailto links
-// are links at all.
+// are links at all. An `artifact:<id>[@vN]` link is the artifact's name,
+// pink inline (ArtName, desktop-agents-bar §5): a click goes to `onArtifact`.
 import { memo, useEffect, useState, type MouseEvent } from 'react';
-import ReactMarkdown, { type Components } from 'react-markdown';
+import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { pathOf } from './paths';
 import { Code, PlainCode, known } from './Code';
 import { fade, type FadeOpts } from './fade';
 import { streamView } from './stream';
-import { Press } from '@/ds';
+import { ArtName, Press } from '@/ds';
 
 /** A link he may open from an answer: http, https or mailto. */
 export function openable(href: string | undefined): href is string {
   return href !== undefined && /^(https?:|mailto:)/i.test(href);
+}
+
+/** The artifact an `artifact:<id>[@vN]` link names: its id, else undefined. Pure. */
+export function artifactOf(href: string | undefined): string | undefined {
+  const m = href === undefined ? null : /^artifact:([^@\s]+)(?:@v?\d+)?$/u.exec(href);
+  return m === null ? undefined : m[1];
+}
+
+/** The hrefs react-markdown keeps: its safe ones, and an artifact's. Pure. */
+export function keptUrl(url: string): string {
+  return artifactOf(url) === undefined ? defaultUrlTransform(url) : url;
 }
 
 const plugins = [remarkGfm];
@@ -69,12 +81,15 @@ export function textOf(n: { type: string; value?: unknown; children?: readonly u
 export const Markdown = memo(function Markdown({
   text,
   onLink,
+  onArtifact,
   onPath,
   breaks = false,
   fading,
 }: {
   text: string;
   onLink?: (url: string) => void;
+  /** an `artifact:` link's click: the artifact's view */
+  onArtifact?: (id: string) => void;
   onPath?: (path: string, line?: number) => void;
   /** every line he typed stays a line (his own messages); answers stay standard markdown */
   breaks?: boolean;
@@ -107,6 +122,23 @@ export const Markdown = memo(function Markdown({
       );
     },
     a({ href, children }) {
+      const art = artifactOf(href);
+      if (art !== undefined) {
+        return (
+          <ArtName
+            onClick={
+              onArtifact === undefined
+                ? undefined
+                : () => {
+                    onArtifact(art);
+                  }
+            }
+            testId="thread.artname"
+          >
+            {children}
+          </ArtName>
+        );
+      }
       if (!openable(href)) return <span className="th-link-off">{children}</span>;
       const open = (e: MouseEvent) => {
         e.preventDefault();
@@ -160,7 +192,7 @@ export const Markdown = memo(function Markdown({
   return (
     // b-md: the ds's markdown colors, the TUI's (src/ds/css/md.css); th-md: the thread's layout
     <div className="th-md b-md">
-      <ReactMarkdown remarkPlugins={breaks ? withBreaks : plugins} rehypePlugins={fading === undefined ? undefined : [[fade, fading]]} components={components} skipHtml>
+      <ReactMarkdown remarkPlugins={breaks ? withBreaks : plugins} rehypePlugins={fading === undefined ? undefined : [[fade, fading]]} components={components} urlTransform={keptUrl} skipHtml>
         {text}
       </ReactMarkdown>
     </div>
@@ -183,7 +215,21 @@ export const FADE_MS = 480;
  * `still`: no fade (reduced motion, or the window not in front); the text
  * still comes with each update.
  */
-export function Answer({ text, live = false, still = false, onLink, onPath }: { text: string; live?: boolean; still?: boolean; onLink?: (url: string) => void; onPath?: (path: string, line?: number) => void }) {
+export function Answer({
+  text,
+  live = false,
+  still = false,
+  onLink,
+  onArtifact,
+  onPath,
+}: {
+  text: string;
+  live?: boolean;
+  still?: boolean;
+  onLink?: (url: string) => void;
+  onArtifact?: (id: string) => void;
+  onPath?: (path: string, line?: number) => void;
+}) {
   const shown = live ? streamView(text) : text;
   // the text's rendered length after each pass (fade.ts onTotal): the next update's `from`
   const [me] = useState(() => ({}));
@@ -215,7 +261,7 @@ export function Answer({ text, live = false, still = false, onLink, onPath }: { 
       : undefined;
   return (
     <div className={still ? 'th-answer th-still' : 'th-answer'} data-live={live || undefined}>
-      <Markdown text={shown} onLink={onLink} onPath={onPath} fading={fading} />
+      <Markdown text={shown} onLink={onLink} onArtifact={onArtifact} onPath={onPath} fading={fading} />
     </div>
   );
 }

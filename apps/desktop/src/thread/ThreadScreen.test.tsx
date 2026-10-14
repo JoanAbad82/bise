@@ -38,7 +38,7 @@ function setup() {
   return { store, cmds };
 }
 
-const ctx: RowCtx = { tkey: K, project: P, agent: 'perf', bise: false, onLink: () => undefined };
+const ctx: RowCtx = { tkey: K, project: P, agent: 'perf', bise: false, onLink: () => undefined, onArtifact: () => undefined };
 
 afterEach(() => {
   cleanup();

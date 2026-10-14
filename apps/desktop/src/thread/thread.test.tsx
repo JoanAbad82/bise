@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/react';
-import { Markdown, openable } from './Markdown';
+import { artifactOf, Markdown, openable } from './Markdown';
 import { anchorRow, nextFirstIndex, placeOf } from './ThreadList';
 
 afterEach(cleanup);
@@ -69,6 +69,23 @@ describe('answers in markdown', () => {
     // file: is not a link; raw HTML is not rendered as HTML
     expect(container.querySelectorAll('a')).toHaveLength(1);
     expect(container.querySelector('b')).toBeNull();
+  });
+
+  it("an artifact: link is the artifact's pink name inline, its view on a click (desktop-agents-bar §5)", () => {
+    const onLink = vi.fn();
+    const onArtifact = vi.fn();
+    const { getByTestId, container } = render(<Markdown text="the numbers are in [product page, before / after](artifact:product-page@v2)." onLink={onLink} onArtifact={onArtifact} />);
+    const name = getByTestId('thread.artname');
+    expect(name.className).toContain('b-artname');
+    expect(name.textContent).toBe('product page, before / after');
+    expect(name.getAttribute('role')).toBe('link');
+    fireEvent.click(name);
+    expect(onArtifact).toHaveBeenCalledWith('product-page');
+    expect(onLink).not.toHaveBeenCalled();
+    expect(container.querySelectorAll('a')).toHaveLength(0);
+    expect(artifactOf('artifact:q3')).toBe('q3');
+    expect(artifactOf('artifact:q3@v1')).toBe('q3');
+    expect(artifactOf('https://x')).toBeUndefined();
   });
 
   it('only http(s) and mailto open', () => {

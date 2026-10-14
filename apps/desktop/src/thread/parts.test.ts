@@ -63,7 +63,7 @@ describe('his answer on a page (page part)', () => {
     const p = pageOf([page([{ block: 'q-live', kind: 'pick', text: "la table maintenant, la lecture de l'API juste après", card: 516, asked: "Est-ce que bise lit les listes dans l'API ?" }])]);
     expect(p).not.toBeNull();
     if (p === null) return;
-    expect(pageAnswer(p)).toEqual({ head: 'you answered main', asked: "Est-ce que bise lit les listes dans l'API ?", words: "la table maintenant, la lecture de l'API juste après" });
+    expect(pageAnswer(p)).toEqual({ head: 'you answered main', on: '', asked: "Est-ce que bise lit les listes dans l'API ?", words: "la table maintenant, la lecture de l'API juste après" });
     const short = pageOf([page([{ block: 'q', kind: 'pick', text: 'xhigh', card: 514, asked: 'le nom ?' }])]);
     expect(short === null ? '' : pageAnswer(short).head).toBe('you answered main: xhigh');
   });
@@ -76,11 +76,11 @@ describe('his answer on a page (page part)', () => {
         { block: 'k', kind: 'keep' },
       ]),
     ]);
-    expect(p === null ? null : pageAnswer(p)).toEqual({ head: 'you sent main 4 notes on ↗ efforts', asked: '', words: '"Revenue grew": shorter\n✓ done\n"Q2" → "Q3"\n♡ keep' });
+    expect(p === null ? null : pageAnswer(p)).toEqual({ head: 'you sent main 4 notes on', on: 'efforts', asked: '', words: '"Revenue grew": shorter\n✓ done\n"Q2" → "Q3"\n♡ keep' });
     const start = pageOf([page([{ block: 'ideas', kind: 'start', text: 'go' }])]);
-    expect(start === null ? '' : pageAnswer(start).head).toBe('you asked main for an agent on ↗ efforts');
+    expect(start === null ? '' : pageAnswer(start).head).toBe('you asked main for an agent on');
     const one = pageOf([page([{ block: 'p1', kind: 'note', text: 'shorter' }])]);
-    expect(one === null ? '' : pageAnswer(one).head).toBe('you sent main a note on ↗ efforts');
+    expect(one === null ? '' : pageAnswer(one).head).toBe('you sent main a note on');
   });
   it('a part kind this window does not know: the entry draws from its text', () => {
     expect(drawnParts([text('a'), { kind: 'voice', secs: 3 } as unknown as Part])).toBeNull();

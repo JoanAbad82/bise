@@ -155,23 +155,25 @@ export function pageNoteWords(n: PageNoteOf, on: boolean): string {
 /** What he did on a page as its row, bise-proto's words::page_answer word for word: one answer to
  *  a card reads as any card answer (head 'you answered main', what it asked, his words); a start
  *  asks for an agent; else the page's name and his notes one per line. Pure. */
-export function pageAnswer(p: PagePart): { head: string; asked: string; words: string } {
+export function pageAnswer(p: PagePart): { head: string; on: string; asked: string; words: string } {
   const title = p.title != null && p.title !== '' ? p.title : p.page;
   const only = p.notes.length === 1 ? p.notes[0] : undefined;
   if (only !== undefined && (only.asked ?? '') !== '') {
     const w = pageNoteWords(only, false).trim();
     const short = !w.includes('\n') && Array.from(w).length <= ON_THE_LINE;
-    return short ? { head: `you answered ${p.to}: ${w}`, asked: (only.asked ?? '').trim(), words: '' } : { head: `you answered ${p.to}`, asked: (only.asked ?? '').trim(), words: w };
+    return short ? { head: `you answered ${p.to}: ${w}`, on: '', asked: (only.asked ?? '').trim(), words: '' } : { head: `you answered ${p.to}`, on: '', asked: (only.asked ?? '').trim(), words: w };
   }
-  // a note is not an answer (designer m_20985): what he sent, the page as its ↗ link
+  // a note is not an answer (designer m_20985): what he sent, then the page's name, `on`, which the
+  // row draws pink and clickable (desktop-agents-bar §5)
   const n = p.notes.length;
   const head = p.notes.every((x) => x.kind === 'start')
-    ? `you asked ${p.to} for an agent on ↗ ${title}`
+    ? `you asked ${p.to} for an agent on`
     : n === 1
-      ? `you sent ${p.to} a note on ↗ ${title}`
-      : `you sent ${p.to} ${String(n)} notes on ↗ ${title}`;
+      ? `you sent ${p.to} a note on`
+      : `you sent ${p.to} ${String(n)} notes on`;
   return {
     head,
+    on: title,
     asked: '',
     words: p.notes
       .map((n) => pageNoteWords(n, true))

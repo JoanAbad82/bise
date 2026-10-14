@@ -31,7 +31,7 @@ function row(status: Agent['status']) {
   const store = new Store(null);
   store.apply({ ev: 'agents', project: P, agents: [ag(status)] });
   store.apply({ ev: 'thread', project: P, agent: 'perf', entries: [tools], before: null, more: false });
-  const ctx: RowCtx = { tkey: threadKey(P, 'perf'), project: P, agent: 'perf', bise: false, onLink: () => undefined };
+  const ctx: RowCtx = { tkey: threadKey(P, 'perf'), project: P, agent: 'perf', bise: false, onLink: () => undefined, onArtifact: () => undefined };
   return render(
     <StoreProvider store={store}>
       <EntryRow ctx={ctx} pos={4} />
@@ -60,7 +60,7 @@ describe('the call at work (S9)', () => {
     const described = { ...tools, tools: { ...tools.tools, items: [tools.tools.items[0], { ...tools.tools.items[1], intent: 'lecture du PDF', text: 'lecture du PDF' }] } };
     store.apply({ ev: 'agents', project: P, agents: [ag('working')] });
     store.apply({ ev: 'thread', project: P, agent: 'perf', entries: [described], before: null, more: false });
-    const ctx: RowCtx = { tkey: threadKey(P, 'perf'), project: P, agent: 'perf', bise: false, onLink: () => undefined };
+    const ctx: RowCtx = { tkey: threadKey(P, 'perf'), project: P, agent: 'perf', bise: false, onLink: () => undefined, onArtifact: () => undefined };
     const v = render(
       <StoreProvider store={store}>
         <EntryRow ctx={ctx} pos={4} />

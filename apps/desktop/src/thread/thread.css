@@ -879,43 +879,6 @@
   padding-top: var(--s-2);
   border-top: 1px solid var(--c-line);
 }
-.th-art {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--s-3);
-  width: fit-content;
-  max-width: 100%;
-  margin-top: var(--s-2);
-  padding: var(--s-1) var(--s-3);
-  border: 1px solid var(--c-line);
-  border-radius: 9px;
-  background: none;
-  color: var(--c-text);
-  font: var(--t-13) var(--font-ui);
-  white-space: nowrap;
-  cursor: pointer;
-}
-/* the artifact open beside this thread (designer m_20435 (c)): a 9% text tint, its line stays
-   --c-line, 'open' text-3; never an ink outline */
-.th-art.open {
-  background: color-mix(in srgb, var(--c-text) 9%, transparent);
-}
-.th-art-open {
-  color: var(--c-text-3);
-  font-size: var(--t-11);
-}
-.th-art:hover {
-  background: var(--c-hover);
-}
-.th-art-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.th-art-meta {
-  flex: none;
-  color: var(--c-text-3);
-  font-size: var(--t-12);
-}
 .th-live {
   color: var(--c-text-2);
   font: var(--t-13) / var(--lh-row, 1.5) var(--font-ui);

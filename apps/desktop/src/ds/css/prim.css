@@ -65,6 +65,16 @@
 button.b-chip{margin:0;border:0;font:inherit;font-size:var(--t-12);cursor:default}
 button.b-chip:hover,button.b-chip.is-hover{background:var(--c-active)}
 button.b-chip:focus-visible{outline:2px solid var(--c-focus);outline-offset:2px}
+/* an artifact's name (desktop-agents-bar §5): pink for him, on a 10 % accent tint, 16 % on hover, a
+   hand; the chip 24 px, r 6, 8 px sides, kind and version the same pink at 70 %; inline 4 px sides */
+.b-artchip{display:inline-flex;align-items:center;gap:var(--s-2);min-width:0;max-width:100%;height:var(--s-6);margin:0;padding:0 var(--s-2);border:0;border-radius:var(--r-1);background:color-mix(in srgb,var(--c-accent) 10%,transparent);color:var(--c-accent);font:var(--t-13) var(--font-ui);white-space:nowrap;cursor:pointer}
+.b-artchip:hover,.b-artchip.is-hover,.b-artchip.open,.b-artname:hover,.b-artname.is-hover{background:color-mix(in srgb,var(--c-accent) 16%,transparent)}
+.b-artchip-title{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.b-artchip-meta{flex:none;color:color-mix(in srgb,var(--c-accent) 70%,transparent);font-size:var(--t-12)}
+.b-artchip-open{flex:none;color:var(--c-text-3);font-size:var(--t-11)}
+.b-artname{padding:0 var(--s-1);border-radius:var(--r-1);background:color-mix(in srgb,var(--c-accent) 10%,transparent);color:var(--c-accent);-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.b-artname[role=link]{cursor:pointer}
+.b-artchip:focus-visible,.b-artname:focus-visible{outline:2px solid var(--c-focus);outline-offset:2px}
 /* kind 'part': a part of his message under its words (designer m_17969): the artifact chip's look,
    1 px line, r 9, text-2, never the accent; an image's words in ink beside its 16 px thumb */
 .b-chip.part{gap:var(--s-1);min-width:0;max-width:100%;height:var(--s-6);padding:0 var(--pad-control-x-sm);border:1px solid var(--c-line);border-radius:9px;background:none;color:var(--c-text-2);font:var(--t-12) var(--font-ui);overflow:hidden;text-overflow:ellipsis}

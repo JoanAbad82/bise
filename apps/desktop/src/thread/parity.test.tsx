@@ -49,7 +49,7 @@ describe('thread parity rows (tui-parity M2 N11 M8 B15 B11 C47 W2 W5)', () => {
     expect(foldOf(long)?.lines).toBe(30);
     const store = new Store(null);
     store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 5, at_ms: 1, kind: 'you', text: long } });
-    const ctx: RowCtx = { tkey: threadKey(P, 'perf'), project: P, agent: 'perf', bise: false, onLink: () => undefined };
+    const ctx: RowCtx = { tkey: threadKey(P, 'perf'), project: P, agent: 'perf', bise: false, onLink: () => undefined, onArtifact: () => undefined };
     const v = render(
       <StoreProvider store={store}>
         <EntryRow ctx={ctx} pos={5} />
@@ -151,7 +151,7 @@ describe('code colors (tui-parity B15)', () => {
       agent: 'gift-ui',
       entry: { pos: 9, at_ms: 3, kind: 'card', text: ask, card: { id: 2, question: ask, options: [{ n: 1, label: 'on the cart page' }, { n: 2, label: 'only at checkout' }], answered: false } },
     });
-    const ctx: RowCtx = { tkey: threadKey(P, 'gift-ui'), project: P, agent: 'gift-ui', bise: false, onLink: () => undefined };
+    const ctx: RowCtx = { tkey: threadKey(P, 'gift-ui'), project: P, agent: 'gift-ui', bise: false, onLink: () => undefined, onArtifact: () => undefined };
     const v = render(
       <StoreProvider store={store}>
         <EntryRow ctx={ctx} pos={7} />
@@ -195,7 +195,7 @@ describe('who a question waits for (ambient m_10689)', () => {
   it("an ask with no card waits for main, dim; the digits that answer a card read '1 or 2', '1, 2 or 3'", () => {
     const store = new Store(null);
     store.apply({ ev: 'entry', project: P, agent: 'gift-ui', entry: { pos: 4, at_ms: 1, kind: 'to_agent', text: 'which label?', to: 'main', asks: true, msg: 3 } });
-    const ctx: RowCtx = { tkey: threadKey(P, 'gift-ui'), project: P, agent: 'gift-ui', bise: false, onLink: () => undefined };
+    const ctx: RowCtx = { tkey: threadKey(P, 'gift-ui'), project: P, agent: 'gift-ui', bise: false, onLink: () => undefined, onArtifact: () => undefined };
     const v = render(
       <StoreProvider store={store}>
         <EntryRow ctx={ctx} pos={4} />
@@ -214,7 +214,7 @@ describe('who a question waits for (ambient m_10689)', () => {
 });
 
 describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not delivered, usage)", () => {
-  const ctx: RowCtx = { tkey: threadKey(P, 'perf'), project: P, agent: 'perf', bise: false, onLink: () => undefined };
+  const ctx: RowCtx = { tkey: threadKey(P, 'perf'), project: P, agent: 'perf', bise: false, onLink: () => undefined, onArtifact: () => undefined };
   const rowOf = (store: Store, pos: number) =>
     render(
       <StoreProvider store={store}>
