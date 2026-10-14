@@ -788,6 +788,129 @@ body:has(.app-shell) {
 .app-rb-end.err {
   color: var(--c-err);
 }
+/* an agent's row (desktop-agents-bar §2): the sign 16 + 8, the name in ink never cut before the
+   role, the role text-3 taking what is left (cut first), time 40 and % 32 right-aligned, the mark
+   16 last. The columns keep their place empty; short on room the % wraps away, then the time (the
+   0-wide first item keeps the time from staying on its line alone); the mark never goes */
+.app-rb-arow .app-rb-g {
+  width: 16px;
+}
+.app-rb-g.mid {
+  color: var(--c-text-2);
+}
+.app-rb-arow .app-rb-name {
+  flex: 0 1 auto;
+  max-width: none;
+  min-width: 0;
+}
+.app-rb-role {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c-text-3);
+  font-size: var(--t-12);
+}
+.app-rb-cols {
+  display: flex;
+  flex: 0 1000 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+  height: var(--h-row);
+  overflow: hidden;
+  font-size: var(--t-12);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--h-row);
+}
+.app-rb-cols-0 {
+  width: 0;
+  height: var(--h-row);
+}
+.app-rb-time {
+  width: 40px;
+  color: var(--c-text-2);
+  text-align: right;
+}
+.app-rb-pct {
+  width: 32px;
+  margin-left: var(--s-2);
+  color: var(--c-text-3);
+  text-align: right;
+}
+.app-rb-mark {
+  flex: none;
+  width: 16px;
+  font: var(--t-12) var(--font-mono);
+  text-align: center;
+}
+.app-rb-mark.acc {
+  color: var(--c-accent);
+}
+.app-rb-mark.err {
+  color: var(--c-err);
+}
+.app-rb-mark.mid {
+  color: var(--c-text-2);
+}
+.app-rb-mark.dim {
+  color: var(--c-text-3);
+}
+.app-rb-mark[data-tone] {
+  cursor: pointer;
+}
+/* a worktree's head (§4): 28 px, 'ψ' and the branch in mono, its PR's '↑ #418' at the right */
+.app-rb-ghead {
+  min-height: var(--h-row-tight);
+}
+.app-rb-ghead .app-rb-name {
+  color: var(--c-text-2);
+  font: var(--t-12) var(--font-mono);
+}
+.app-rb-mark.head {
+  width: auto;
+  white-space: nowrap;
+}
+/* an open PR with no live agent: no sign, its branch text-3 */
+.app-rb-orphan .app-rb-name {
+  color: var(--c-text-3);
+}
+/* a worktree's group: a 1 px --c-line rule along it, in the body's 8 px margin (the rows keep the
+   sign column) */
+.app-rb-arow[data-group] {
+  position: relative;
+}
+.app-rb-arow[data-group]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--s-2) / -2 - 0.5px);
+  width: 1px;
+  background: var(--c-line);
+}
+.app-rb-ghead[data-group]::before {
+  top: var(--s-1);
+}
+/* the mark's tip (§3): 280 px, the TUI's words, 'open the PR ↗' */
+.app-rb-tip {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  width: 280px;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-2);
+  background: var(--c-solid, var(--c-window));
+  box-shadow: var(--e-2);
+  color: var(--c-text-2);
+  font-size: var(--t-12);
+  white-space: normal;
+}
+.app-rb-tip .b-act {
+  align-self: flex-start;
+}
 /* an alarm's detail under its row (agent-waiting-states A): its words one a line in text-3, then
    'open <agent>' and 'stop watching' */
 .app-rb-detail {

@@ -4,7 +4,7 @@
 // The store comes from StoreContext: the app's one store (bound to
 // window.bise.core) by default, a test's own store through the provider.
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import type { Account, Agent, FlowMode, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
+import type { Account, Agent, FlowMode, ReleaseEv, SwitchRow, UpdateEv, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, Place, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
 import { keep } from '@/app/keep';
 import type { Aside } from './asides';
@@ -111,6 +111,7 @@ export const useRelease = (project: string): ReleaseEv | null => useSlice(`relea
 export const usePrs = (project: string): PrsList | null => useSlice(`prs:${project}`, (s) => s.prs(project));
 export const useModels = (project: string): readonly Model[] => useSlice(`models:${project}`, (s) => s.models(project));
 export const useFeatures = (project: string): readonly Feature[] => useSlice(`features:${project}`, (s) => s.features(project));
+export const usePlaces = (project: string): readonly Place[] => useSlice(`places:${project}`, (s) => s.places(project));
 export const useJobs = (project: string): readonly Job[] => useSlice(`jobs:${project}`, (s) => s.jobs(project));
 export const useDiff = (project: string, agent: string, commit?: string): Diff | null =>
   useSlice(diffKey(project, agent, commit), (s) => s.diff(project, agent, commit));

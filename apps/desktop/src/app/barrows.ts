@@ -1,15 +1,17 @@
-// The right bar's rows (designer's desktop-right-bar v5): one shape for the four sections, glyph,
-// name, a dim second word (the role, or the project's name on bise's thread), the end on the right.
+// The right bar's rows (designer's desktop-right-bar v5, desktop-agents-bar): one shape for the four
+// sections, glyph, name, a dim second word (the role, or the project's name on bise's thread), the
+// end on the right; an agent's row has the TUI's columns instead of an end (its time, its %, its
+// worktree's mark: barplaces.ts), and its worktree's group head when it shares one.
 // Pure: RightBar.tsx draws these (barrows.ts: a rightbar.ts would clash with RightBar.tsx on macOS's case-blind disk). Owner: amb-win.
 import type { Item } from '@/artifacts/model';
 import { glyphOf, leaves } from '@/artifacts/model';
 import type { Task } from '@/scheduled/model';
 import { howOften, nextWords } from '@/scheduled/model';
 import { shortAge } from '@/agents/model';
-import { alarms } from '@/thread/wake';
-import type { Agent, ComputerAgent, Feature } from '@/proto';
-import { groupsOf } from '@/review/feature';
-import { computerDot, gaugeSays, signOf, type Tone } from './side';
+import { alarms, pauseLine, waitLen } from '@/thread/wake';
+import type { Agent, Card, ComputerAgent, Place } from '@/proto';
+import { asksMerge, livePr, markOf, orphanPlaces, placeLabel, placeOf, sharedPlaces, tipWords, type Mark } from './barplaces';
+import { computerDot, signOf, type Sign, type Tone } from './side';
 
 /** One agent with its project, across the projects shown. */
 export interface ProjAgent {
@@ -25,8 +27,10 @@ export interface BarRow {
   readonly agent?: string;
   /** the artifact it opens */
   readonly id?: string;
+  /** an agent's row, a worktree's head, an open PR with no agent; none: the other sections' rows */
+  readonly kind?: 'agent' | 'group' | 'orphan';
   readonly glyph: string;
-  readonly tone: 'ink' | 'acc' | 'err' | 'dim';
+  readonly tone: 'ink' | 'acc' | 'err' | 'dim' | 'mid';
   readonly name: string;
   readonly sub: string;
   readonly end: string;
@@ -35,14 +39,21 @@ export interface BarRow {
   readonly testId: string;
   /** it waits on him: never hidden by a cap (designer v5) */
   readonly waits: boolean;
-  /** the feature it opens (its 'ψ' head in AGENTS) */
+  /** a feature's group head: the feature it opens */
   readonly feature?: string;
+  /** an agent's columns (desktop-agents-bar §2): its turn's or wait's length, its context used; '' empty, the column stays */
+  readonly time?: string;
+  readonly pct?: string;
+  /** its worktree's mark, last (§3): '↑' '…' 'ψ', tinted, its tip */
+  readonly mark?: Mark;
+  /** the worktree group it is in (its head's too): the 1 px rule in the margin */
+  readonly group?: string;
+  /** an orphan PR's or a head's branch (an orphan opens it) */
+  readonly branch?: string;
   /** at work: the DS's breeze '∿' (a Dot) in the glyph's place */
   readonly working?: boolean;
   /** it uses his computer: the core's mark after its name (S29/L19 W3) */
   readonly cu?: { readonly g: string; readonly tone: Tone; readonly title: string };
-  /** its context gauge, the hub's short words, only when it says something (designer D12) */
-  readonly gauge?: string;
   /** a browser-only artifact: '↗' 4 px after its title, text-3 (designer m_21742) */
   readonly leaves?: boolean;
   /** its sub cuts after a whole word with '…' (an alarm's note, agent-waiting-states A) */
@@ -51,11 +62,16 @@ export interface BarRow {
   readonly watch?: number;
 }
 
-/** What AGENTS reads besides the agents: their next wakes ('<project>/<agent>' -> ms), the project's features, the computer rows. */
+/** What AGENTS reads besides the agents: their next wakes ('<project>/<agent>' -> ms), the project's worktrees and cards, the computer rows, the ⌥ numbers. */
 export interface AgentExtras {
   readonly wakes?: ReadonlyMap<string, number>;
-  readonly features?: readonly Feature[];
+  /** the project's worktrees and their PRs (hub/agents places); none on bise's thread */
+  readonly places?: readonly Place[];
+  /** the project's cards: a 'merge' one tints its PR's '↑' pink */
+  readonly cards?: readonly Card[];
   readonly computer?: readonly ComputerAgent[];
+  /** the TUI's ⌥ numbers (agents/model numbersOf): the order and ⌥N; none: start order */
+  readonly numbers?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -67,93 +83,182 @@ export function roleWords(t: string): string {
   return /<\/?[a-z][a-z0-9_-]*(\s[^>]*)?>/i.test(t) ? 'thinking' : t;
 }
 
-/** A feature's end: what it waits for, else how far it is. Pure. */
-export function featureEnd(f: Feature): string {
-  if (f.building) return 'building';
-  if (f.trial) return 'on trial';
-  return `${String(f.ahead)} ahead`;
-}
-
 const idOf = (all: boolean, project: string, name: string) => (all ? `${project}.${name}` : name);
 
 /**
- * AGENTS: the live ones but main, in start order (the TUI panel's: ⌥N = the TUI's, ambient-lead
- * m_20087): the ones in no feature, then each feature's head ('ψ gift-cards', opens the feature)
- * with its agents, as the TUI's panel. What waits on him says it with '?' and 'waits' in the accent,
- * never by moving. `alt`: ⌥ held, the agents' glyphs become ⌥1-⌥9 (heads take no number). Pure.
+ * The bar's sign (desktop-agents-bar §2), the TUI's: the breeze while it works, '?' pink when it
+ * waits for him, '✓' pink done, '▲' red failed, '…' when it waits on an event or another agent,
+ * '○' text-3 at rest (a next wake too: its time is in the hover). No state words. Pure.
+ */
+export function barSign(s: Sign): { g: string; tone: BarRow['tone']; working: boolean } {
+  switch (s.g) {
+    case '?':
+      return { g: '?', tone: 'acc', working: false };
+    case '∿':
+      return { g: '∿', tone: 'ink', working: true };
+    case '…':
+      return { g: '…', tone: 'ink', working: false };
+    case '⋯':
+      return { g: '…', tone: 'dim', working: false };
+    case '✗':
+      return { g: '▲', tone: 'err', working: false };
+    case '✓':
+      return { g: '✓', tone: 'acc', working: false };
+    default:
+      return { g: '○', tone: 'dim', working: false };
+  }
+}
+
+/** Its context used, in the % column: '17%'; '' when nothing worth saying (none, 0%). Pure. */
+export function pctOf(a: Agent): string {
+  const u = a.usage;
+  if (u == null || u.window == null || u.window <= 0) return '';
+  const n = Math.round((u.context / u.window) * 100);
+  return n > 0 ? `${String(Math.min(n, 100))}%` : '';
+}
+
+/** The time column: the turn's length while it works, the wait's while it waits on an event; '' else. Never a state word. */
+export function timeOf(a: Agent, now: number): string {
+  const pause = pauseLine(a, now);
+  if (pause !== null) return pause.len;
+  if (a.status === 'working') return waitLen(a.turn_ms ?? now - a.since_ms);
+  return '';
+}
+
+function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined, alt: boolean, extras: AgentExtras, mark: Mark | undefined, group: string | undefined): BarRow {
+  const s = signOf(x.a, now, extras.wakes?.get(`${x.project}/${x.a.name}`));
+  const sign = barSign(s);
+  const numbered = alt && n !== undefined && n >= 1 && n <= 9;
+  const cu = computerDot(extras.computer?.find((r) => r.project === x.project && r.agent === x.a.name));
+  return {
+    key: `a:${x.project}/${x.a.name}`,
+    kind: 'agent',
+    project: x.project,
+    agent: x.a.name,
+    glyph: numbered ? `⌥${String(n)}` : sign.g,
+    tone: numbered ? 'dim' : sign.tone,
+    name: x.a.name,
+    sub: all ? x.projectName : roleWords(x.a.title !== '' ? x.a.title : x.a.purpose),
+    end: '',
+    endTone: 'dim',
+    time: timeOf(x.a, now),
+    pct: pctOf(x.a),
+    title: s.title,
+    testId: `app.right.agent.${idOf(all, x.project, x.a.name)}`,
+    waits: s.g === '?',
+    ...(!numbered && sign.working ? { working: true } : {}),
+    ...(cu === null ? {} : { cu }),
+    ...(mark === undefined ? {} : { mark }),
+    ...(group === undefined ? {} : { group }),
+  };
+}
+
+/**
+ * AGENTS (desktop-agents-bar §2-§4), the TUI panel's order (sb.rs blocks, designer m_23651): the
+ * live agents but main that share no worktree, by their ⌥ number (the shared checkout's and the
+ * ones alone in theirs, each with its mark), then the open PRs with no live agent (no sign, the
+ * branch text-3, its '↑'), then each worktree 2 or more live agents share: a 'ψ <branch>' head with
+ * its PR's '↑ #418', its rows with no mark, in the order of their smallest number. A head waits on
+ * him when one of its agents does: the cap never hides it. `alt`: ⌥ held, ⌥1-⌥9 for the signs.
+ * On bise's thread (`all`) the agents stay in start order, no worktrees. Pure.
  */
 export function agentRows(agents: readonly ProjAgent[], now: number, all: boolean, alt = false, extras: AgentExtras = {}): BarRow[] {
   const live = agents.filter((x) => !x.a.archived && !x.a.main);
-  const byName = new Map(live.map((x) => [x.a.name, x] as const));
-  const pick = (list: readonly Agent[]) => list.flatMap((a) => byName.get(a.name) ?? []);
-  // features are a project's: on bise's thread (every project) the agents stay in start order
-  const { solo, groups } = all ? { solo: live.map((x) => x.a), groups: [] } : groupsOf(live.map((x) => x.a), extras.features ?? []);
-  const seq: (ProjAgent | Feature)[] = [...pick(solo), ...groups.flatMap((g) => [g.feature, ...pick(g.agents)])];
-  let n = 0;
-  return seq.map((x): BarRow => {
-    if (!('a' in x)) {
-      const project = agents[0]?.project ?? '';
-      return {
-        key: `ψ:${project}/${x.name}`,
-        project,
-        feature: x.name,
-        glyph: 'ψ',
-        tone: 'dim',
-        name: x.name,
-        sub: '',
-        end: featureEnd(x),
-        endTone: 'dim',
-        title: `feature ${x.name} · ${x.branch}`,
-        testId: `app.right.feature.${x.name}`,
-        waits: false,
-      };
-    }
-    const i = n++;
-    const s = signOf(x.a, now, extras.wakes?.get(`${x.project}/${x.a.name}`));
-    const waits = s.g === '?';
-    const role = roleWords(x.a.title !== '' ? x.a.title : x.a.purpose);
-    const numbered = alt && i < 9;
-    const cu = computerDot(extras.computer?.find((r) => r.project === x.project && r.agent === x.a.name));
-    const short = x.a.usage?.short;
-    return {
-      key: `a:${x.project}/${x.a.name}`,
-      project: x.project,
-      agent: x.a.name,
-      glyph: numbered ? `⌥${String(i + 1)}` : s.g,
-      tone: numbered ? 'dim' : s.tone,
-      name: x.a.name,
-      sub: all ? x.projectName : role,
-      end: waits ? 'waits' : s.end,
-      endTone: waits ? 'acc' : s.endTone,
-      title: s.title,
-      testId: `app.right.agent.${idOf(all, x.project, x.a.name)}`,
-      waits,
-      ...(!numbered && x.a.status === 'working' && s.g === '∿' ? { working: true } : {}),
-      ...(cu === null ? {} : { cu }),
-      ...(short != null && gaugeSays(short) ? { gauge: short } : {}),
-    };
-  });
+  const num = (name: string) => extras.numbers?.get(name);
+  const byNum = (a: ProjAgent, b: ProjAgent) => (num(a.a.name) ?? Number.MAX_SAFE_INTEGER) - (num(b.a.name) ?? Number.MAX_SAFE_INTEGER);
+  const places = all ? [] : (extras.places ?? []);
+  const cards = extras.cards ?? [];
+  if (places.length === 0) {
+    const order = extras.numbers === undefined ? live : live.slice().sort(byNum);
+    return order.map((x, i) => agentRow(x, now, all, num(x.a.name) ?? i + 1, alt, extras, undefined, undefined));
+  }
+  const liveA = live.map((x) => x.a);
+  const shared = sharedPlaces(places, liveA);
+  const inGroup = new Set([...shared.values()].flat().map((a) => a.name));
+  const project = live[0]?.project ?? agents[0]?.project ?? '';
+  const rows: BarRow[] = live
+    .filter((x) => !inGroup.has(x.a.name))
+    .sort(byNum)
+    .map((x) => {
+      const p = placeOf(x.a, places);
+      return agentRow(x, now, all, num(x.a.name), alt, extras, p === undefined ? undefined : markOf(p, asksMerge(p, cards), x.a.name), undefined);
+    });
+  for (const p of orphanPlaces(places, liveA)) {
+    const label = placeLabel(p);
+    rows.push({
+      key: `pr:${project}/${p.id}`,
+      kind: 'orphan',
+      project,
+      branch: p.branch ?? undefined,
+      glyph: '',
+      tone: 'dim',
+      name: label,
+      sub: '',
+      end: '',
+      endTone: 'dim',
+      title: tipWords(p),
+      testId: `app.right.pr.${String(livePr(p)?.number ?? label)}`,
+      waits: false,
+      mark: markOf(p, asksMerge(p, cards)),
+    });
+  }
+  const groups = places
+    .flatMap((p) => {
+      const members = live.filter((x) => shared.get(p.id)?.some((a) => a.name === x.a.name) === true).sort(byNum);
+      return members.length >= 2 ? [{ p, members }] : [];
+    })
+    .sort((a, b) => byNum(a.members[0] as ProjAgent, b.members[0] as ProjAgent));
+  for (const { p, members } of groups) {
+    const head = markOf(p, asksMerge(p, cards));
+    const memberRows = members.map((x) => agentRow(x, now, all, num(x.a.name), alt, extras, undefined, p.id));
+    rows.push({
+      key: `ψ:${project}/${p.id}`,
+      kind: 'group',
+      project,
+      group: p.id,
+      agent: members[0]?.a.name,
+      branch: p.branch ?? undefined,
+      ...(p.feature === true ? { feature: p.id.replace(/^feature:/, '') } : {}),
+      glyph: p.feature === true && p.trying === true ? 'Δ' : 'ψ',
+      tone: 'mid',
+      name: placeLabel(p),
+      sub: '',
+      end: '',
+      endTone: 'dim',
+      title: tipWords(p),
+      testId: `app.right.group.${placeLabel(p)}`,
+      // one of its agents waits on him: the head shows past the cap too
+      waits: memberRows.some((r) => r.waits),
+      // the head's mark: the PR's '↑' with its number, or its land's '…'; nothing for a lone 'ψ'
+      ...(head.g === 'ψ' || head.g === 'Δ' ? {} : { mark: head }),
+    });
+    rows.push(...memberRows);
+  }
+  return rows;
 }
 
-/** ARCHIVED: ✓ done or – stopped, dim, newest first: 'done · 2 h'. Pure. */
+/**
+ * ARCHIVED (desktop-agents-bar): its sign, its name, its age, newest first: '✓ release-32 2 h' done,
+ * '▲ import 1 d' red failed, '– old 3 d' stopped; no state words (the hover says it). Pure.
+ */
 export function archivedRows(agents: readonly ProjAgent[], now: number, all: boolean): BarRow[] {
   return agents
     .filter((x) => x.a.archived)
     .slice()
     .sort((a, b) => b.a.since_ms - a.a.since_ms)
     .map((x) => {
-      const done = x.a.status === 'done';
+      const st = x.a.status === 'done' ? 'done' : x.a.status === 'failed' ? 'failed' : 'stopped';
       return {
         key: `r:${x.project}/${x.a.name}`,
         project: x.project,
         agent: x.a.name,
-        glyph: done ? '✓' : '–',
-        tone: 'dim',
+        glyph: st === 'done' ? '✓' : st === 'failed' ? '▲' : '–',
+        tone: st === 'failed' ? 'err' : 'dim',
         name: x.a.name,
         sub: all ? x.projectName : '',
-        end: `${done ? 'done' : 'stopped'} · ${shortAge(now - x.a.since_ms)}`,
+        end: shortAge(now - x.a.since_ms),
         endTone: 'dim',
-        title: `${done ? 'done' : 'stopped'} · ${x.a.title !== '' ? x.a.title : x.a.purpose}`,
+        title: `${st} · ${x.a.title !== '' ? x.a.title : x.a.purpose}`,
         testId: `app.right.archived.${idOf(all, x.project, x.a.name)}`,
         waits: false,
       };

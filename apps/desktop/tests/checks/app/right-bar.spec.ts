@@ -4,7 +4,7 @@
 //   - the column is 320 px with its head 'storefront · N working ⌥⌘0' and four sections in his
 //     order, each head 'NAME · count' with 'all ›';
 //   - AGENTS keeps start order, shows 8 rows plus the waiting 10th in its place, '+ 4 more' unfolds
-//     the rest; it never folds while one waits; the waiting row says 'waits' in the accent;
+//     the rest; it never folds while one waits; the waiting row's sign is '?' (desktop-agents-bar: no state words);
 //   - ARCHIVED folds to its head and a summary on the same line, kept after a reload;
 //   - ⌥ held shows ⌥1-⌥9 on the agents; a click opens the agent full in the centre;
 //   - on bise's thread the same sections cover every project, the project's name in place of the role;
@@ -77,7 +77,7 @@ for (const theme of ['light', 'dark']) {
       // AGENTS: start order, 8 rows + the waiting 10th in its place, '+ 4 more'
       const names = async () => page.locator('[data-testid="app.right.agents"] [data-testid^="app.right.agent."]').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')?.replace('app.right.agent.', '')));
       expect(await names()).toEqual([...NAMES.slice(0, 8), 'search']);
-      await expect(page.getByTestId('app.right.agent.search')).toContainText('waits');
+      await expect(page.getByTestId('app.right.agent.search').locator('.app-rb-g')).toHaveText('?');
       await expect(page.getByTestId('app.right.agents.more')).toHaveText('+ 4 more');
       // it never folds while one waits
       await page.getByTestId('app.right.agents.head').click();
@@ -92,7 +92,7 @@ for (const theme of ['light', 'dark']) {
       await expect(page.getByTestId('app.right.archived.more')).toHaveCount(0);
       // a click opens it, kept after a reload; folded again, kept too
       await page.getByTestId('app.right.archived.head').click();
-      await expect(page.getByTestId('app.right.archived.hero-img')).toContainText('done · 2 h');
+      await expect(page.getByTestId('app.right.archived.hero-img')).toContainText('2 h');
       await page.reload();
       await expect(page.getByTestId('app.right.archived.hero-img')).toContainText('done · 2 h', { timeout: 10_000 });
       await page.getByTestId('app.right.archived.head').click();
@@ -101,7 +101,7 @@ for (const theme of ['light', 'dark']) {
       await expect(page.getByTestId('app.right.archived.summary')).toHaveText('✓ hero-img', { timeout: 10_000 });
       await expect(page.getByTestId('app.right.archived.hero-img')).toHaveCount(0);
       await page.getByTestId('app.right.archived.head').click();
-      await expect(page.getByTestId('app.right.archived.hero-img')).toContainText('done · 2 h');
+      await expect(page.getByTestId('app.right.archived.hero-img')).toContainText('2 h');
       // the rest of the sections
       await expect(page.getByTestId(`app.right.artifact.${P}.product-page`)).toContainText('new');
       await expect(page.getByTestId(`app.right.scheduled.${P}.4`)).toContainText('nightly replay');

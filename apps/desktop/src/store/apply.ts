@@ -40,6 +40,8 @@ export function applyTyped(s: Store, ev: Ev): void {
       return;
     case "agents":
       s.put(`agents:${ev.project}`, ev.agents);
+      // its worktrees and their PRs (the TUI's places, P4c-4a): the right bar's marks and groups
+      s.put(`places:${ev.project}`, ev.places ?? EMPTY);
       return;
     case "cards":
       s.slices.set(`hubcards:${ev.project}`, true);

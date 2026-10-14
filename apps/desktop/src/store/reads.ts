@@ -14,6 +14,7 @@ import type {
   Job,
   JsonValue,
   Feature,
+  Place,
   Merged,
   Model,
   PickCommand,
@@ -160,6 +161,10 @@ export class StoreReads extends StoreBase {
   /** a project's features (amb-feed 5f436473: at hello, on change, on HubCmd features) */
   features(project: string): readonly Feature[] {
     return this.slice(`features:${project}`, EMPTY);
+  }
+  /** a project's worktrees and their PRs, with hub/agents (the TUI's places): none until the hub said */
+  places(project: string): readonly Place[] {
+    return this.slice(`places:${project}`, EMPTY);
   }
   /** the models a project's agents can run, the TUI's /model list (amb-feed 7dfd1c74) */
   models(project: string): readonly Model[] {

@@ -12,7 +12,8 @@ import { useAllArtifacts } from '@/artifacts';
 import { LEAVES, useGoArtifact } from '@/artifacts/leave';
 import { useModHeld } from './held';
 import { useAllScheduled } from '@/scheduled';
-import { useComputerLive, useFeatures, useStore, type Store } from '@/store';
+import { useCards, useComputerLive, usePlaces, useStore, type Store } from '@/store';
+import { numbersOf } from '@/agents/model';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
 import { Hint, hintUsed, useHint } from './hints';
@@ -83,6 +84,7 @@ function Section({
   cap,
   summary,
   noFold = false,
+  count,
   onAll,
   children,
 }: {
@@ -90,6 +92,8 @@ function Section({
   title: string;
   rows: readonly BarRow[];
   cap: number;
+  /** what the head counts when it isn't every row ('AGENTS · N': the agents, no head, no PR) */
+  count?: number;
   summary: string;
   noFold?: boolean;
   onAll: () => void;
@@ -108,7 +112,7 @@ function Section({
       <div className="app-rb-head" ref={head} data-folds={!noFold || undefined}>
         <Press look="app-rb-title" aria-expanded={!shut} onClick={noFold ? undefined : toggle} data-testid={`app.right.${id}.head`}>
           <span className="app-rb-label">
-            {title} · {String(rows.length)}
+            {title} · {String(count ?? rows.length)}
           </span>
           {shut && summary !== '' && (
             <span className="app-rb-sum" data-testid={`app.right.${id}.summary`}>
@@ -158,25 +162,100 @@ function Section({
   );
 }
 
-function Row({ r, onOpen, on }: { r: BarRow; onOpen: () => void; on?: boolean }) {
+/** Where a worktree's mark, an orphan PR or a head opens: its agent's review, else its branch. */
+type OpenPr = (r: BarRow) => void;
+
+/** His browser at a link (a PR's page). */
+const openExternal = (url: string) => {
+  void (globalThis as { bise?: { openExternal?: (u: string) => unknown } }).bise?.openExternal?.(url);
+};
+
+/** The tip over a mark (desktop-agents-bar §3): 280 px, the TUI's words, 'open the PR ↗'. */
+interface TipAt {
+  readonly r: BarRow;
+  readonly top: number;
+  readonly left: number;
+}
+
+/**
+ * A row's last column (desktop-agents-bar §3): its worktree's mark, tinted; a head's carries its
+ * PR's number ('↑ #418'). Hover: the tip; a click opens the PR in the review screen, not the row.
+ */
+function MarkCell({ r, onTip, onOpenPr, head = false }: { r: BarRow; onTip: (t: TipAt | null) => void; onOpenPr: OpenPr; head?: boolean }) {
+  const m = r.mark;
+  if (m === undefined) return <span className="app-rb-mark" />;
+  return (
+    <span
+      className={`app-rb-mark ${m.tone}${head ? ' head' : ''}`}
+      data-testid={`${r.testId}.mark`}
+      data-tone={m.tone}
+      aria-label={m.tip}
+      onMouseEnter={(e) => {
+        const b = e.currentTarget.getBoundingClientRect();
+        onTip({ r, top: b.bottom + 4, left: Math.max(8, b.right - 280) });
+      }}
+      onMouseLeave={() => {
+        onTip(null);
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpenPr(r);
+      }}
+    >
+      {head && m.pr !== undefined ? `${m.g} #${String(m.pr)}` : m.g}
+    </span>
+  );
+}
+
+function Row({ r, onOpen, on, onTip, onOpenPr }: { r: BarRow; onOpen: () => void; on?: boolean; onTip?: (t: TipAt | null) => void; onOpenPr?: OpenPr }) {
+  const tip = onTip ?? (() => undefined);
+  const openPr = onOpenPr ?? (() => undefined);
+  // an agent's row, an orphan PR, a worktree's head: the TUI's columns (desktop-agents-bar §2-§4)
+  if (r.kind !== undefined) {
+    const head = r.kind === 'group';
+    return (
+      <Press
+        look={`app-rb-row app-rb-arow${head ? ' app-rb-ghead' : ''}${r.kind === 'orphan' ? ' app-rb-orphan' : ''}`}
+        aria-current={on === true || undefined}
+        title={r.title}
+        onClick={onOpen}
+        data-testid={r.testId}
+        data-group={r.group}
+      >
+        <span className={`app-rb-g ${r.tone}`}>{r.working === true ? <Dot state="wk" /> : r.glyph}</span>
+        <span className="app-rb-name">{r.name}</span>
+        {r.cu !== undefined && (
+          <span className={`app-cu ${r.cu.tone}`} title={r.cu.title} data-testid={`${r.testId}.computer`}>
+            {r.cu.g}
+          </span>
+        )}
+        {/* the role takes what is left and cuts first; its whole words on hover */}
+        <span className="app-rb-role" title={r.sub === '' ? undefined : r.sub}>
+          {r.sub}
+        </span>
+        {!head && (
+          // time 40 px, % 32 px, right-aligned; short on room the % wraps away first, then the time
+          <span className="app-rb-cols">
+            <span className="app-rb-cols-0" />
+            <span className="app-rb-time" data-testid={`${r.testId}.time`}>
+              {r.time ?? ''}
+            </span>
+            <span className="app-rb-pct" data-testid={`${r.testId}.pct`}>
+              {r.pct ?? ''}
+            </span>
+          </span>
+        )}
+        <MarkCell r={r} onTip={tip} onOpenPr={openPr} head={head} />
+      </Press>
+    );
+  }
   return (
     <Press look="app-rb-row" aria-current={on === true || undefined} title={r.title} onClick={onOpen} data-testid={r.testId}>
-      {/* at work: the DS's breeze '∿' (it pulses on the open row, murmurs on the others, still with reduced motion) */}
-      <span className={`app-rb-g ${r.tone}`}>{r.working === true ? <Dot state="wk" /> : r.glyph}</span>
+      <span className={`app-rb-g ${r.tone}`}>{r.glyph}</span>
       <span className="app-rb-name">{r.name}</span>
       {r.leaves === true && (
         <span className="app-rb-out" title="opens in your browser" data-testid={`${r.testId}.leaves`}>
           {LEAVES}
-        </span>
-      )}
-      {r.cu !== undefined && (
-        <span className={`app-cu ${r.cu.tone}`} title={r.cu.title} data-testid={`${r.testId}.computer`}>
-          {r.cu.g}
-        </span>
-      )}
-      {r.gauge !== undefined && (
-        <span className="app-gauge" data-testid={`${r.testId}.gauge`}>
-          {r.gauge}
         </span>
       )}
       {r.sub !== '' && (r.fit === true ? <FitWords className="app-rb-sub" text={r.sub} testId={`${r.testId}.sub`} /> : <span className="app-rb-sub">{r.sub}</span>)}
@@ -191,6 +270,40 @@ function Row({ r, onOpen, on }: { r: BarRow; onOpen: () => void; on?: boolean })
         <span className={`app-rb-end ${r.endTone}`}>{r.end}</span>
       )}
     </Press>
+  );
+}
+
+/** The mark's tip, over the bar (fixed: the bar's body scrolls): the TUI's words, 'open the PR ↗'. */
+function MarkTip({ at, onKeep, onOpenUrl }: { at: TipAt; onKeep: (keep: boolean) => void; onOpenUrl: (url: string) => void }) {
+  const m = at.r.mark;
+  if (m === undefined) return null;
+  return (
+    <div
+      className="app-rb-tip"
+      role="tooltip"
+      style={{ top: at.top, left: at.left }}
+      data-testid="app.right.tip"
+      onMouseEnter={() => {
+        onKeep(true);
+      }}
+      onMouseLeave={() => {
+        onKeep(false);
+      }}
+    >
+      <span className="app-rb-tip-words" data-testid="app.right.tip.words">
+        {m.tip}
+      </span>
+      {m.url !== undefined && (
+        <Act
+          onClick={() => {
+            onOpenUrl(m.url ?? '');
+          }}
+          testId="app.right.tip.open"
+        >
+          open the PR ↗
+        </Act>
+      )}
+    </div>
   );
 }
 
@@ -280,10 +393,31 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   const now = useNowFor((t) => agents.some((x) => !x.a.archived && pauseInSeconds(x.a, t)));
   const artifacts = useAllArtifacts(all ? undefined : project);
   const tasks = useAllScheduled(all ? undefined : project);
-  const features = useFeatures(project);
+  const places = usePlaces(project);
+  const cards = useCards(project);
   const computer = useComputerLive();
   const wakes = useMemo(() => wakesOf(tasks), [tasks]);
-  const live = agentRows(agents, now, all, alt, { wakes, features, computer });
+  // the TUI's ⌥ numbers: the rows' order and ⌥N (a project's only; bise's thread keeps start order)
+  const numbers = all ? undefined : numbersOf(project, agents.map((x) => x.a));
+  const live = agentRows(agents, now, all, alt, { wakes, places, cards, computer, ...(numbers === undefined ? {} : { numbers }) });
+  // the mark's tip: one at a time, kept while the pointer goes from the mark to it
+  const [tipAt, setTipAt] = useState<TipAt | null>(null);
+  const tipClose = useRef<number | null>(null);
+  const onTip = (t: TipAt | null) => {
+    if (tipClose.current !== null) window.clearTimeout(tipClose.current);
+    tipClose.current = null;
+    if (t !== null) setTipAt(t);
+    else tipClose.current = window.setTimeout(() => { setTipAt(null); }, 160);
+  };
+  const keepTip = (keep: boolean) => {
+    onTip(keep && tipAt !== null ? tipAt : null);
+  };
+  // a mark, an orphan PR, a head: the PR in the review screen (its agent's), an orphan its branch
+  const openPr: OpenPr = (r) => {
+    setTipAt(null);
+    if (r.kind === 'orphan' && r.branch !== undefined) router.go({ screen: 'branch', project: r.project, branch: r.branch });
+    else if (r.agent !== undefined) router.go({ screen: 'review', project: r.project, agent: r.agent });
+  };
   const tipOf = useAgentTip(project, live, route);
   const archived = archivedRows(agents, now, all);
   const made = artifactRows(artifacts, now);
@@ -293,6 +427,7 @@ export function RightBar({ project, name, over }: { project: string; name: strin
   const [watchOpen, setWatchOpen] = useState<string | null>(null);
   const working = agents.filter((x) => !x.a.archived && !x.a.main && x.a.status === 'working').length;
   const waits = live.some((r) => r.waits);
+  const agentCount = live.filter((r) => r.kind === undefined || r.kind === 'agent').length;
   const openAgent = (p: string, agent: string) => {
     router.go({ screen: 'thread', project: p, agent });
   };
@@ -309,6 +444,7 @@ export function RightBar({ project, name, over }: { project: string; name: strin
           id="agents"
           title="AGENTS"
           rows={live}
+          count={agentCount}
           cap={8}
           summary={live.length === 0 ? '' : `${String(working)} working`}
           noFold={waits}
@@ -317,16 +453,21 @@ export function RightBar({ project, name, over }: { project: string; name: strin
           }}
         >
           {(r) =>
-            r.feature !== undefined ? (
+            r.kind === 'group' || r.kind === 'orphan' ? (
               <Row
                 key={r.key}
                 r={r}
-                on={route.screen === 'feature' && route.project === r.project && route.name === r.feature}
-                onOpen={() => { router.go({ screen: 'feature', project: r.project, name: r.feature ?? '' }); }}
+                on={r.feature !== undefined && route.screen === 'feature' && route.project === r.project && route.name === r.feature}
+                onTip={onTip}
+                onOpenPr={openPr}
+                onOpen={() => {
+                  if (r.feature !== undefined) router.go({ screen: 'feature', project: r.project, name: r.feature });
+                  else openPr(r);
+                }}
               />
             ) : (
               <Fragment key={r.key}>
-                <Row r={r} on={here(r.project, r.agent ?? '')} onOpen={() => { openAgent(r.project, r.agent ?? ''); }} />
+                <Row r={r} on={here(r.project, r.agent ?? '')} onTip={onTip} onOpenPr={openPr} onOpen={() => { openAgent(r.project, r.agent ?? ''); }} />
                 {tipOf(r.agent ?? '')}
               </Fragment>
             )
@@ -402,6 +543,7 @@ export function RightBar({ project, name, over }: { project: string; name: strin
           }
         </Section>
       </div>
+      {tipAt !== null && <MarkTip at={tipAt} onKeep={keepTip} onOpenUrl={openExternal} />}
     </aside>
   );
 }

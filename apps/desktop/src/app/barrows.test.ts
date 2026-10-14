@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Agent, Feature } from '@/proto';
+import type { Agent } from '@/proto';
 import { agentRows, archivedRows, capRows, roleWords, watchRows, type ProjAgent } from './barrows';
 
 const NOW = 1_791_100_000_000;
@@ -13,7 +13,7 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
   it('AGENTS: live ones but main, start order, the waiting one says waits in the accent', () => {
     const rows = agentRows([ag('main', { main: true }), ag('perf', { status: 'working' }), ag('search', { waits: 1 }), ag('old', { archived: true })], NOW, false);
     expect(rows.map((r) => r.name)).toEqual(['perf', 'search']);
-    expect(rows[1]).toMatchObject({ glyph: '?', end: 'waits', endTone: 'acc', waits: true, sub: "search's job" });
+    expect(rows[1]).toMatchObject({ glyph: '?', tone: 'acc', end: '', waits: true, sub: "search's job" });
   });
   it("bise's thread: the project's name in place of the role; ⌥ held: ⌥1-⌥9", () => {
     const rows = agentRows([ag('perf'), ag('docs')], NOW, true, true);
@@ -21,20 +21,6 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
       ['⌥1', 'storefront', 'app.right.agent.shop.perf'],
       ['⌥2', 'storefront', 'app.right.agent.shop.docs'],
     ]);
-  });
-  it("a project's features: its solo agents, then each 'ψ' head with its agents, as the TUI's panel; ⌥N skips the heads", () => {
-    const f = { name: 'gift-cards', branch: 'feature/gift-cards', agents: ['gift-ui'], ahead: 2, building: false, trial: false } as unknown as Feature;
-    const rows = agentRows([ag('gift-ui'), ag('perf', { status: 'working' })], NOW, false, true, { features: [f] });
-    expect(rows.map((r) => [r.glyph, r.name])).toEqual([['⌥1', 'perf'], ['ψ', 'gift-cards'], ['⌥2', 'gift-ui']]);
-    expect(rows[1]).toMatchObject({ feature: 'gift-cards', end: '2 ahead', testId: 'app.right.feature.gift-cards' });
-  });
-  it('at work: the breeze dot; a next wake: ◷; a gauge only when it says something', () => {
-    const rows = agentRows([ag('perf', { status: 'working', usage: { short: '42k · 17%' } } as Partial<Agent>), ag('watch', { usage: { short: '0%' } } as Partial<Agent>)], NOW, false, false, {
-      wakes: new Map([['shop/watch', NOW + 600_000]]),
-    });
-    expect(rows[0]).toMatchObject({ working: true, gauge: '42k · 17%' });
-    expect(rows[1]?.glyph).toBe('◷');
-    expect(rows[1]?.gauge).toBeUndefined();
   });
   it("SCHEDULED & WATCHING: an alarm, '◌', its agent, 'if …', until a clock ahead; a pause is no row here", () => {
     const off = () => 7200;
@@ -55,9 +41,19 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
       watch: 4,
     });
   });
-  it("ARCHIVED: ✓ done / – stopped with its age", () => {
-    const rows = archivedRows([ag('a', { archived: true, status: 'done', since_ms: NOW - 2 * 3_600_000 }), ag('b', { archived: true, since_ms: NOW - 2 * 86_400_000 })], NOW, false);
-    expect(rows.map((r) => `${r.glyph} ${r.name} ${r.end}`)).toEqual(['✓ a done · 2 h', '– b stopped · 2 d']);
+  it("ARCHIVED: sign, name, age, no 'done ·': ✓ done, ▲ red failed, – stopped", () => {
+    const rows = archivedRows(
+      [
+        ag('release-32', { archived: true, status: 'done', since_ms: NOW - 2 * 3_600_000 }),
+        ag('import', { archived: true, status: 'failed', since_ms: NOW - 86_400_000 }),
+        ag('b', { archived: true, since_ms: NOW - 2 * 86_400_000 }),
+      ],
+      NOW,
+      false,
+    );
+    expect(rows.map((r) => `${r.glyph} ${r.name} ${r.end}`)).toEqual(['✓ release-32 2 h', '▲ import 1 d', '– b 2 d']);
+    expect(rows.map((r) => r.tone)).toEqual(['dim', 'err', 'dim']);
+    expect(rows[0]?.title).toBe("done · release-32's job");
   });
   it('the cap never hides what waits on him: 12 agents, the 10th waits', () => {
     const list = Array.from({ length: 12 }, (_, i) => ag(`a${String(i + 1)}`, i === 9 ? { waits: 1 } : {}));
