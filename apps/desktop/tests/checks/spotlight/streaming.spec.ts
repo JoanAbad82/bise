@@ -176,8 +176,11 @@ test("spotlight/streaming: the '∿' after a block moves nothing, tables as the 
     await expect(input).toBeVisible({ timeout: 5000 });
 
     // main's card rows read 'bise' (shownName, as the window)
-    await expect(cap.locator(`[data-testid="spot.row.card.${HOME}.11"]`), "main's question card reads '? bise'").toContainText('? bise', { timeout: 2000 });
-    await expect(cap.locator(`[data-testid="spot.row.card.${HOME}.12"]`), "main's approval reads '! bise'").toContainText('! bise');
+    // its sign in the Picker's glyph column, the name beside it (designer m_25150)
+    await expect(cap.locator(`[data-testid="spot.row.card.${HOME}.11"]`).locator(':scope > .t > .n'), "main's question card reads 'bise'").toHaveText('bise', { timeout: 2000 });
+    await expect(cap.locator(`[data-testid="spot.row.card.${HOME}.11"]`).locator(':scope > .g'), "with the question's '?'").toHaveText('?');
+    await expect(cap.locator(`[data-testid="spot.row.card.${HOME}.12"]`).locator(':scope > .t > .n'), "main's approval reads 'bise'").toHaveText('bise');
+    await expect(cap.locator(`[data-testid="spot.row.card.${HOME}.12"]`).locator(':scope > .g'), "with the approval's '!'").toHaveText('!');
     expect(await cap.getByText(/^[?!] main$/).count(), "no '? main' row").toBe(0);
     await cap.screenshot({ path: test.info().outputPath('8-cards.png') });
 

@@ -124,12 +124,18 @@ describe("the spotlight list", () => {
 });
 
 describe("the spotlight", () => {
-  it("a waiting row shows its own key, like the other rows (ambient-pm's try gate)", () => {
+  it("a waiting row's trailing item: its project, or its key once it is the active row (designer m_25150)", () => {
     const ui = render(
       <Spotlight data={D} onAsk={vi.fn()} onOpen={vi.fn()} onClose={vi.fn()} />,
     );
     const row = ui.getByTestId("spot.row.card.c1");
-    expect(row.querySelector(".ky")?.textContent).toBe("↵ answer");
+    const trail = row.querySelector(".k")?.textContent;
+    if (row.getAttribute("aria-selected") === "true") {
+      expect(trail).toBe("⏎ answer");
+    } else {
+      expect(trail).not.toBe("⏎ answer");
+      expect(trail ?? "").not.toBe("");
+    }
   });
   it("keeps one input node while the list changes, ⏎ on a sentence asks bise", async () => {
     const onAsk = vi.fn();

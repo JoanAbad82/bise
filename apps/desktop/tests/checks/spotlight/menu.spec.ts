@@ -82,7 +82,7 @@ test('spotlight/menu: the tray menu lists the inbox block rows, 5 at most, a cli
     await expect(item(4).locator('.ib-sign'), "an approval's sign").toHaveText('!');
     for (let n = 1; n <= 5; n++) {
       const h = await item(n).evaluate((el) => el.getBoundingClientRect().height);
-      expect(h, `row ${String(n)} is the tight row (28 px)`).toBe(28);
+      expect(h, `row ${String(n)} is the tight row (28 px)`).toBeCloseTo(28, 2);
       await expect(item(n), 'no age on a row').not.toContainText(/\d+ ?(s|min|h|d) ago|\b\d+(m|h|d)\b/u);
     }
     for (const t of ['light', 'dark'] as const) {

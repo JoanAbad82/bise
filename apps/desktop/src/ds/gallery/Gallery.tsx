@@ -277,11 +277,13 @@ export const SECTIONS: Record<string, () => ReactNode> = {
   spotlight: () => (
     <div className="g-col">
       <Spot input={<SpotStill placeholder="ask bise, or jump to a project" />} keys="↵ open   ⌘↵ ask bise   esc close" testId="ds.spot">
-        <SpotRow lead="bise" name="ask bise" what="“why only 4 workers”" hotkey="⌘↵" on />
+        <SpotRow glyph={<BiseMark size={14} wink={false} />} name="ask bise" what="“why only 4 workers”" hotkey="⌘⏎ ask" on />
         <SpotGroup>agents</SpotGroup>
-        <SpotRow lead="nd" name="search" where="telemetry" what="needs you: rebuild the index?" hotkey="⌥2" />
-        <SpotRow lead="wk" name="alerts" where="telemetry" what="benching 8 workers" hotkey="⌥1" />
-        <SpotRow lead="ok" name="flash-sale" where="stock" what="done 10:40" />
+        <SpotRow glyph="?" name="search" where="telemetry" what="needs you: rebuild the index?" hotkey="⏎ answer" />
+        <SpotRow glyph="∿" name="alerts" where="telemetry" what="benching 8 workers on the staging cluster before the flash sale" hotkey="⏎ open" />
+        <SpotRow glyph="✓" name="flash-sale" where="stock" what="done 10:40" />
+        <SpotGroup>projects</SpotGroup>
+        <SpotRow glyph="·" name="stock" what="2 agents" hotkey="⌘2" />
       </Spot>
       <Spot input={<SpotStill text="why only 4 workers" />} to="to telemetry" />
     </div>

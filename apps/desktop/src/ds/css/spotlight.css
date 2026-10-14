@@ -4,10 +4,15 @@
 .b-spot .in .tx{flex:1}
 .b-spot .in .lo{color:var(--c-text-3)}
 .b-spot .in .to{font:var(--t-12) var(--font-ui);color:var(--c-text-3)}
-.b-spot .g{font-size:var(--t-11);letter-spacing:.07em;color:var(--c-text-3);padding:var(--s-2) var(--s-5) var(--gap-tight);text-transform:uppercase}
-.b-spot .r{display:grid;grid-template-columns:22px 7.5em 7em minmax(0,1fr) auto;gap:0 var(--gap-inline);align-items:center;height:var(--h-row);padding:0 var(--s-3);margin:0 var(--pad-list);border-radius:var(--r-3);white-space:nowrap;font-size:var(--t-14)}
-.b-spot .r .pp{color:var(--c-text-3);font-size:var(--t-12)}
-.b-spot .r .dm{color:var(--c-text-2);overflow:hidden;text-overflow:ellipsis}
-.b-spot .r .ky{font:var(--t-11) var(--font-mono);color:var(--c-text-3)}
-.b-spot .r.on{background:var(--c-active)}
 .b-spot .keys{margin-top:var(--s-2);padding:var(--s-2) var(--s-5);font:var(--t-11) var(--font-mono);color:var(--c-text-3);white-space:pre;border-top:1px solid var(--c-line)}
+
+/* the list: ds Picker rows in the palette (designer m_25150): names 14 (every other Picker 13),
+   'what' inline text-3 12 cut after a word, the project the one trailing item (text-3 12 sans),
+   the key in its place on the active row; heads 28 px, 8 above all but the first */
+.b-spot .b-picker-pal{padding:0 var(--s-2) var(--s-2)}
+.b-spot .b-picker-pal .b-picker-row .t{flex-direction:row;align-items:baseline;gap:var(--s-3);overflow-wrap:normal}
+.b-spot .b-picker-pal .b-picker-row .n{flex:none;font-size:var(--t-14);white-space:nowrap}
+.b-spot .b-picker-pal .b-picker-row .s{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.b-spot .b-picker-pal .b-picker-row .k.w{font-family:var(--font-ui)}
+.b-spot .b-picker-pal .b-picker-ghead{margin-top:var(--s-2)}
+.b-spot .b-picker-pal > :first-child .b-picker-ghead,.b-spot .b-picker-pal > .b-picker-ghead:first-child{margin-top:0}

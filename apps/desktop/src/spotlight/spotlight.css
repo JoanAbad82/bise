@@ -71,14 +71,14 @@
 /* R07-a: the selected agent's last actions in its right column (designer m_13271): the row grows to
    fit, no height tween; name and project stay on the first line; newest last in --c-text, the
    older dim; the time right-aligned dim; a question that waits on him in accent; each line cut with … */
-.b-spot .r:has(.b-spot-acts) {
+.b-spot .b-picker-row:has(.b-spot-acts) {
   height: auto;
   min-height: var(--h-row);
   align-items: start;
   padding-top: var(--s-2);
   padding-bottom: var(--s-2);
 }
-.b-spot .r:has(.b-spot-acts) > :is(b, .pp, .ky) {
+.b-spot .b-picker-row:has(.b-spot-acts) > :is(.t > .n, .k) {
   line-height: 18px;
 }
 .b-spot-acts {
@@ -104,6 +104,10 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* in the palette a row has one trailing item (designer m_25724): an action's time drops */
+.b-spot .b-picker-row .b-spot-acts .tm {
+  display: none;
 }
 .b-spot-acts .tm {
   flex: none;
@@ -244,7 +248,7 @@
   }
 }
 /* one-inbox 3: a waiting row's sign as the inbox block and the tray menu draw it (accent, mono) */
-.b-spot .r .ib-sign {
+.b-spot .b-picker-row .ib-sign {
   display: inline-block;
   width: 1em;
   text-align: center;

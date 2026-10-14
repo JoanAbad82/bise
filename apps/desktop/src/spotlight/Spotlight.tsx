@@ -15,7 +15,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { type DotState, Input, Press, Spot, SpotGroup, SpotRow } from "@/ds";
+import { BiseMark, Input, Press, Spot, SpotGroup, SpotRow } from "@/ds";
 import { cx } from "@/ds/cx";
 import { LivePearl, type Mood } from "@/pearl";
 import {
@@ -172,14 +172,16 @@ export interface SpotlightProps {
 /** An answer longer than this many lines shows its start and 'the rest in bise'. */
 export const ANSWER_MAX_LINES = 18;
 
-const DOT: Record<AgentStatus, DotState> = {
-  waiting: "nd",
-  blocked: "off",
-  working: "wk",
-  idle: "off",
-  done: "ok",
-  failed: "er",
+/** An agent's state mark in its row's glyph column (designer m_25150, the delight-marks set; never a sphere). */
+const MARK: Record<AgentStatus, string> = {
+  waiting: "?",
+  blocked: "…",
+  working: "∿",
+  idle: "○",
+  done: "✓",
+  failed: "✗",
 };
+const BISE = <BiseMark size={14} wink={false} />;
 
 /** The selected agent's last actions in its right column, newest last (the newest in the text's
  *  color, the older dim), each with its time at the right; a question that waits on him in accent. */
@@ -230,7 +232,7 @@ const Row = memo(function Row({
       // with chips in the spot it says they go too ('2 images · what is wrong in these', designer m_13808)
       return (
         <SpotRow
-          lead="bise"
+          glyph={BISE}
           name={W.askBise}
           what={
             withFiles === undefined || withFiles === ""
@@ -239,7 +241,7 @@ const Row = memo(function Row({
                 ? withFiles
                 : `${withFiles} · ${item.text}`
           }
-          hotkey="↵"
+          hotkey={W.askKey}
           on={on}
           onClick={click}
           testId={id}
@@ -248,10 +250,10 @@ const Row = memo(function Row({
     case "new":
       return (
         <SpotRow
-          lead="bise"
+          glyph={BISE}
           name={W.startAgent}
           what={item.brief}
-          hotkey="↵"
+          hotkey={W.startKey}
           on={on}
           onClick={click}
           testId={id}
@@ -260,13 +262,9 @@ const Row = memo(function Row({
     case "card":
       return (
         <SpotRow
-          lead="nd"
           // the inbox block's sign (one-inbox 3: the tray menu and the window draw the same row)
-          name={
-            <>
-              <span className="ib-sign">{item.mark}</span> {shownName(item.agent)}
-            </>
-          }
+          glyph={<span className="ib-sign">{item.mark}</span>}
+          name={shownName(item.agent)}
           where={item.pname}
           what={item.text}
           hotkey={W.answerKey}
@@ -278,7 +276,8 @@ const Row = memo(function Row({
     case "agent":
       return (
         <SpotRow
-          lead={DOT[item.status]}
+          glyph={MARK[item.status]}
+          hotkey={W.openKey}
           name={item.name}
           where={item.pname}
           what={
@@ -296,7 +295,7 @@ const Row = memo(function Row({
     case "env":
       return (
         <SpotRow
-          lead="off"
+          glyph="·"
           name={item.name}
           what={item.sub}
           hotkey={item.n === null ? undefined : `⌘${item.n}`}
@@ -308,8 +307,8 @@ const Row = memo(function Row({
     case "front":
       return (
         <SpotRow
-          lead="off"
-          name={`◦ ${item.name}`}
+          glyph="◦"
+          name={item.name}
           what={item.sub}
           on={on}
           testId={id}

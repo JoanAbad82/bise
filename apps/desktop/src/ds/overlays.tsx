@@ -7,6 +7,8 @@
 // memo'd, so moving the keyboard's row re-renders two rows, not the list.
 import { memo, type MouseEventHandler, type ReactNode, type Ref } from "react";
 import { cx } from "./cx";
+import { PickerCut } from "./picker";
+import { tipAttrs } from "./tip";
 import { Button, Dot, Pearl, type DotState } from "./prim";
 
 export interface CardProps {
@@ -47,11 +49,16 @@ export function Card({ plain, lead = "bise", who, rest, k, q, children, keys, st
 }
 
 export interface SpotRowProps {
-  lead: "bise" | DotState;
+  /** its 16 px glyph (designer m_25150, the delight-marks set): an agent's state mark (∿ ? … ✓ ○),
+   *  a project's (∿ ? ·), bise's ':*', ↗ an artifact, ◷ scheduled, '/' a command; never a sphere */
+  glyph?: ReactNode;
   name: ReactNode;
+  /** the project: the row's one trailing item, right-aligned (on the active row its key takes the
+   *  place and the project goes into the tip) */
   where?: ReactNode;
+  /** inline after the name, text-3 12, cut after a whole word */
   what?: ReactNode;
-  /** its key ("⌥1", "↵") */
+  /** its key ("⏎ open", "⏎ answer"), shown on the active row */
   hotkey?: ReactNode;
   /** the keyboard's */
   on?: boolean;
@@ -59,22 +66,26 @@ export interface SpotRowProps {
   testId?: string;
   ref?: Ref<HTMLDivElement>;
 }
-/** a spotlight row */
-export const SpotRow = memo(function SpotRow({ lead, name, where, what, hotkey, on, onClick, testId, ref }: SpotRowProps) {
+/** a spotlight row: a ds Picker row in the palette (picker.css): glyph | name + what | where or the key */
+export const SpotRow = memo(function SpotRow({ glyph, name, where, what, hotkey, on, onClick, testId, ref }: SpotRowProps) {
+  const key = on === true && hotkey != null && hotkey !== "";
+  const trail = key ? hotkey : where;
   return (
-    <div ref={ref} className={cx("r", on && "on")} role="option" aria-selected={on || false} onClick={onClick} data-testid={testId}>
-      {lead === "bise" ? <Pearl size={22} /> : <Dot state={lead} />}
-      <b>{name}</b>
-      <span className="pp">{where}</span>
-      <span className="dm">{what}</span>
-      <span className="ky">{hotkey}</span>
+    <div ref={ref} className={cx("b-picker-row", on && "on")} role="option" aria-selected={on || false} onClick={onClick} data-testid={testId}
+      {...tipAttrs(key && typeof where === "string" ? where : undefined)}>
+      <span className="g">{glyph}</span>
+      <span className="t">
+        <span className="n">{name}</span>
+        {what != null && what !== "" && (typeof what === "string" ? <PickerCut text={what} /> : <span className="s">{what}</span>)}
+      </span>
+      {trail != null && trail !== "" && <span className={cx("k", !key && "w")}>{trail}</span>}
     </div>
   );
 });
 
-/** a group head in the spotlight's list */
+/** a group head in the spotlight's list: the Picker's (text-3 12, 28 px) */
 export function SpotGroup({ children }: { children: ReactNode }) {
-  return <div className="g">{children}</div>;
+  return <div className="b-picker-ghead">{children}</div>;
 }
 
 export interface SpotProps {
@@ -93,7 +104,7 @@ export function Spot({ input, to = "to bise", pearl, children, keys, testId }: S
   return (
     <div className="b-spot" data-testid={testId}>
       <div className="in">{pearl ?? <Pearl size={40} />}<span className="tx">{input}</span><span className="to">{to}</span></div>
-      <div role="listbox">{children}</div>
+      <div role="listbox" className="b-picker-pal">{children}</div>
       {keys != null && <div className="keys">{keys}</div>}
     </div>
   );

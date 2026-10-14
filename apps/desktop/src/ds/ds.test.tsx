@@ -45,9 +45,9 @@ describe("src/ds", () => {
 
   it("the spotlight's input slot survives its rows changing", () => {
     const input = <input data-testid="spot.input" />;
-    const { getByTestId, rerender } = render(<Spot input={input}><SpotRow lead="bise" name="a" on testId="spot.row.a" /></Spot>);
+    const { getByTestId, rerender } = render(<Spot input={input}><SpotRow glyph=":*" name="a" on testId="spot.row.a" /></Spot>);
     const before = getByTestId("spot.input");
-    rerender(<Spot input={input}><SpotRow lead="bise" name="a" testId="spot.row.a" /><SpotRow lead="wk" name="b" on testId="spot.row.b" /></Spot>);
+    rerender(<Spot input={input}><SpotRow glyph=":*" name="a" testId="spot.row.a" /><SpotRow glyph="∿" name="b" on testId="spot.row.b" /></Spot>);
     expect(getByTestId("spot.input")).toBe(before);
     expect(getByTestId("spot.row.b").className).toContain("on");
   });

@@ -11,14 +11,18 @@ export const W = {
   found: 'found',
   askBise: 'ask bise',
   /** a waiting row's own key, like the other rows' (ambient-pm's try gate): ⏎ answers it */
-  answerKey: '↵ answer',
+  answerKey: '⏎ answer',
+  /** the key on an agent's or a project's active row (designer m_25150) */
+  openKey: '⏎ open',
+  askKey: '⏎ ask',
+  startKey: '⏎ start',
   openInBise: 'open in bise',
   close: 'close',
   inFront: (what: string): string => (what ? `in front: ${what}` : 'in front'),
   /** the count first: a long path is the part that gets cut (designer N4) */
   envSub: (branch: string, n: number): string => `${n} agent${n === 1 ? '' : 's'} · ${branch}`,
   sendQ: (q: string): string => `send “${q}” to bise`,
-  keysEmpty: '⏎ open in bise   esc close',
+  keysEmpty: '⏎ open in bise   ↑↓ move   esc close',
   keysAsk: '⏎ send to bise   ↑↓ move   esc close',
   // R41: an image or a file in the spot: ⏎ asks bise with it, ⌫ at the start takes the last one away
   keysFiles: '⏎ send to bise   ⌫ remove   esc close',

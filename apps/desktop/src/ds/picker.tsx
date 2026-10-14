@@ -130,7 +130,7 @@ export function cutWords(text: string, fits: (t: string) => boolean): string {
 }
 
 /** An inline secondary, cut after a whole word to the room left (its full words in the row's tip). */
-function WordCut({ text }: { text: string }) {
+export function PickerCut({ text }: { text: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -230,7 +230,7 @@ export function Picker({ title, titleKeys, groups, footer, keyline, empty, activ
                 {glyphs && <span className="g">{r.glyph}</span>}
                 <span className="t">
                   <span className="n">{r.name}</span>
-                  {r.secondary != null && (inline && typeof r.secondary === "string" ? <WordCut text={r.secondary} /> : <span className="s">{r.secondary}</span>)}
+                  {r.secondary != null && (inline && typeof r.secondary === "string" ? <PickerCut text={r.secondary} /> : <span className="s">{r.secondary}</span>)}
                 </span>
                 {r.current === true ? <span className="ok" aria-hidden="true">✓</span> : r.trailing != null && <span className="k">{r.trailing}</span>}
               </div>
