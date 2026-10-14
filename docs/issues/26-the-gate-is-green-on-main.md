@@ -185,6 +185,8 @@ signed by architect):
 | xhub_e2e | green | a read between two journal lines | the test waits for the answer |
 | tui_help_tmux | not run unfixed (the cause is on the nightly's screen) | the End page shows the ψ row | the test waits for the filter |
 
+partial_e2e is still an open red after the sleep fix (audit-blind, timings.tsv): 4 of 20 runs on 2026-10-14, the nightly on 0aefecd2 at 05:12 (409 s) and three on ae097097 at 08:30, 09:13 and alone (365-369 s, `timeout after 360 s waiting for main's answer`), at load x1.0, so not a sleep; owner: partial-red.
+
 ## The Mac slept under the gate
 
 `pmset -g log` has `Entering Sleep state due to 'Maintenance Sleep'` five

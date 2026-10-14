@@ -8,9 +8,12 @@ time goes between "change written" and "landed", from their traces.
 Read only. Sources, all under the bise home ($BISE_HOME, else ~/.bise):
   sessions/*/events.jsonl   each agent's turns and tool calls, timed
   hubs/<hub>/journal.jsonl  the wakes (sb wake): set, ended, why
-  hubs/<hub>/agents/*/tmp/  the agents' gate logs (gate.sh quick/full)
-  run/*.log                 the release gates' logs
-  gate/timings.tsv          run_all.sh's per-test wall and CPU history
+  gate/logs/*.log           the gate runs: gate.sh's own log of each
+                            quick/full/rerun (7 days, agent and rc in it)
+  run/**/*.log              the nightly's (run/nightly/) and release gates' logs,
+                            only before the first gate/logs one (one source a run)
+  gate/timings.tsv          the tests: run_all.sh's per-test wall, CPU and rc
+                            (the logs' test lines for the others)
   run/heavy.log             heavy-run's slot waits (one line per job)
 Prints a report (markdown) and the health checks with their thresholds;
 --json writes the numbers for the loop-speed page.
@@ -281,34 +284,63 @@ def wakes(h, hub, since):
     return out
 
 
-def gate_logs(h, hub, since):
-    """[(agent, path, mtime, birth, run)] of the gate logs written since."""
-    pats = [os.path.join(h, "hubs", hub, "agents", "*", "tmp", "**", "*"), os.path.join(h, "run", "*.log")]
-    out, seen = [], set()
-    for pat in pats:
-        for f in glob.glob(pat, recursive=True):
-            try:
-                st = os.stat(f)
-            except OSError:
-                continue
-            if not os.path.isfile(f) or st.st_mtime < since or st.st_size > 5_000_000 or f.endswith((".jsonl", ".json", ".png")):
-                continue
-            try:
-                with open(f, errors="replace") as fh:
-                    text = fh.read()
-            except OSError:
-                continue
-            if "GATE " not in text and "E2E (real hub" not in text:
-                continue
-            key = (text[-2000:], st.st_size)
-            if key in seen:  # a copy (x.out and x_gate.out)
-                continue
-            seen.add(key)
-            r = gate_run(text)
+HEAD_RX = re.compile(r"# gate (quick|full|rerun) agent=(\S*)")
+END_RX = re.compile(r"^# gate end rc=(\d+) secs=(\d+)", re.M)
+
+
+def own_log_run(text):
+    """A gate.sh log's run (<gate dir>/logs): its agent from the header;
+    its end from the GATE line, else from the rc line gate.sh writes last
+    (a run red before its GATE line: a build that failed, a kill)."""
+    h = HEAD_RX.match(text)
+    if not h:
+        return None, None
+    r = gate_run(text)
+    e = END_RX.search(text)
+    if r is None or not r["ended"]:
+        if not e:
+            return h.group(2) or "?", r
+        r = r or {"steps": {}, "tests": {}, "queue": 0}
+        r.update({"mode": h.group(1), "green": e.group(1) == "0", "ended": True,
+                  "secs": int(e.group(2)) if e.group(1) == "0" else None})
+    return h.group(2) or "?", r
+
+
+def read_small(f, since):
+    """(text, mtime) of a log written since, or None."""
+    try:
+        st = os.stat(f)
+        if not os.path.isfile(f) or st.st_mtime < since or st.st_size > 5_000_000:
+            return None
+        with open(f, errors="replace") as fh:
+            return fh.read(), st.st_mtime
+    except OSError:
+        return None
+
+
+def gate_logs(h, since):
+    """([(agent, path, mtime, run)], start): the gate runs ended since, and
+    when gate.sh's own logs start (None: none yet). One source per run:
+    <gate dir>/logs (gate.sh writes one per quick/full/rerun, kept 7 days);
+    the nightly's and the release gates' logs (run/**/*.log) only before
+    that start (since, their gate.sh run has its own log)."""
+    own = glob.glob(os.path.join(h, "gate", "logs", "*.log"))
+    start = min((os.path.getmtime(f) for f in own if os.path.exists(f)), default=None)
+    out = []
+    for f in own:
+        got = read_small(f, since)
+        if got:
+            agent, r = own_log_run(got[0])
             if r:
-                m = re.search(r"/agents/([^/]+)/", f)
-                out.append((m.group(1) if m else "release", f, st.st_mtime, getattr(st, "st_birthtime", st.st_mtime), r))
-    return out
+                out.append((agent, f, got[1], r))
+    for f in glob.glob(os.path.join(h, "run", "**", "*.log"), recursive=True):
+        got = read_small(f, since)
+        if not got or (start is not None and got[1] >= start):
+            continue
+        r = gate_run(got[0])
+        if r:
+            out.append(("nightly" if "/nightly/" in f else "release", f, got[1], r))
+    return out, start
 
 
 def timings(h, since):
@@ -341,10 +373,10 @@ def heavy_waits(h, since):
 def audit(h, hub, since):
     ss = sessions(h, since, hub)
     ws = wakes(h, hub, since)
-    gl = gate_logs(h, hub, since)
+    gl, logs_start = gate_logs(h, since)
     tm = timings(h, since)
     hv = heavy_waits(h, since)
-    rep = {"since": since, "hub": hub, "agents": {}, "cycles": [], "gates": {}, "tests": {}, "waits": {}, "heavy": {}}
+    rep = {"since": since, "hub": hub, "gate_logs_start": logs_start, "agents": {}, "cycles": [], "gates": {}, "tests": {}, "waits": {}, "heavy": {}}
     # change written -> landed, per agent
     tot = {}
     for agent, views in ss.items():
@@ -374,28 +406,30 @@ def audit(h, hub, since):
                               "queue_p50": med([r["queue"] for r in runs]), "queue_max": max([r["queue"] for r in runs] or [0]),
                               "steps_p50": {s: med([r["steps"][s] for r in runs if s in r["steps"]])
                                             for s in sorted({s for r in runs for s in r["steps"]})}}
-    # red full gates: what failed
-    reds = {}
-    for *_, r in gl:
-        for t, (ok, w, c) in r["tests"].items():
-            if not ok:
-                reds[t] = reds.get(t, 0) + 1
-    # tests: logs + timings history
+    # tests: run_all.sh's timings.tsv (every e2e/tmux run, wherever its
+    # log went), the gate logs' lines for the others (quick's steps, PROOF)
     per = {}
-    for *_, r in gl:
-        for t, (ok, w, c) in r["tests"].items():
-            per.setdefault(t, {"wall": [], "cpu": [], "runs": 0, "fails": 0})
-            per[t]["wall"].append(w)
-            per[t]["runs"] += 1
-            per[t]["fails"] += 0 if ok else 1
-            if c is not None:
-                per[t]["cpu"].append(c)
     for row in tm:
         if row["rev"] == "import":
             continue
         p = per.setdefault(row["test"], {"wall": [], "cpu": [], "runs": 0, "fails": 0})
+        p["wall"].append(row["wall"])
+        p["runs"] += 1
+        p["fails"] += 0 if row["rc"] == "0" else 1
         if row["cpu"] is not None:
             p["cpu"].append(row["cpu"])
+    timed = set(per)
+    for *_, r in gl:
+        for t, (ok, w, c) in r["tests"].items():
+            if t in timed:
+                continue
+            p = per.setdefault(t, {"wall": [], "cpu": [], "runs": 0, "fails": 0})
+            p["wall"].append(w)
+            p["runs"] += 1
+            p["fails"] += 0 if ok else 1
+            if c is not None:
+                p["cpu"].append(c)
+    reds = {t: p["fails"] for t, p in per.items() if p["fails"]}
     rep["tests"] = {t: {"wall_p50": med(p["wall"]), "wall_p90": pct(p["wall"], 0.9), "cpu_p50": med(p["cpu"]),
                         "runs": p["runs"], "fails": p["fails"]} for t, p in per.items()}
     # waits
@@ -473,18 +507,22 @@ def report(rep):
                 ((a, len(v), med(v)) for a, v in group(cs).items()), key=lambda r: -r[1])))
     w("")
     w("## gates")
+    st = rep["gate_logs_start"]
+    if st is None or st > rep["since"]:
+        w("- gate logs start %s: the agents' runs before are not counted (the nightly's and releases' are)" % (
+            "now (none yet)" if st is None else datetime.fromtimestamp(st).strftime("%Y-%m-%d %H:%M")))
     for mode, g in rep["gates"].items():
         w("- %s: %d runs, %d green; green p50 %s, p90 %s; queue p50 %s, max %s; steps p50 %s" % (
             mode, g["runs"], g["green"], fmt_s(g["secs_p50"]), fmt_s(g["secs_p90"]), fmt_s(g["queue_p50"]),
             fmt_s(g["queue_max"]), ", ".join("%s %s" % (s, fmt_s(v)) for s, v in g["steps_p50"].items())))
     w("")
-    w("## slowest tests (wall p50 of the gate logs)")
+    w("## slowest tests (wall p50: timings.tsv, else the gate logs)")
     tests = sorted(rep["tests"].items(), key=lambda kv: -(kv[1]["wall_p50"] or 0))
     for name, s in tests[:15]:
         w("- %-28s p50 %-8s p90 %-8s cpu %-6s fails %d/%d" % (name, fmt_s(s["wall_p50"]), fmt_s(s["wall_p90"]),
                                                              fmt_s(s["cpu_p50"]), s["fails"], s["runs"]))
     w("")
-    w("## failing tests (gate logs)")
+    w("## failing tests (timings.tsv, else the gate logs)")
     for name, n in sorted(rep["reds"].items(), key=lambda kv: -kv[1])[:12]:
         w("- %-28s %d of %d runs" % (name, n, rep["tests"].get(name, {}).get("runs", 0)))
     w("")

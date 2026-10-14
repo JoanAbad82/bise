@@ -68,6 +68,13 @@
 # (approvals-design.md §7) and short (the test hubs' sockets live under it:
 # an agent's $TMPDIR is too deep for a unix socket path); /tmp/bise-gate-
 # where there is no ~/.bise yet.
+# Each quick/full/rerun keeps its output (stdout and stderr, teed) in
+# <gate dir>/logs/<mode>-<epoch>-<pid>.log for 7 days, first line "# gate
+# <mode> agent=<SB_AGENT> sha=<HEAD> start=<epoch> root=<repo>", last "#
+# gate end rc=<n> secs=<n>" (after its tees drained): the gate runs'
+# record, scripts/loop_audit.py's one source of them (a task's $TMPDIR,
+# where its own copy went, is deleted at its drop; a green run's folder
+# at its end).
 # Each quick/full run has its own TMPDIR <gate dir>/<pid>/: at its end,
 # ctrl-c or kill included, it kills what it started (the test hubs, their
 # sb-core and REPLs, the tmux tests' shells), and each run first kills what
@@ -249,8 +256,8 @@ fi
 gate_procs() {  # <marker> <pid whose descendants go too | ""> <worktree binary prefixes... >: pids to kill
   local m="$1" me="$2"; shift 2
   # the marker goes through the environment: in awk's argv it would match awk
-  ps -axww -o pid=,ppid=,pgid=,command= | GATE_M="$m" GATE_BINS="$*" awk -v me="$me" -v self=$$ '
-    BEGIN { m = ENVIRON["GATE_M"]; bins = ENVIRON["GATE_BINS"] }
+  ps -axww -o pid=,ppid=,pgid=,command= | GATE_M="$m" GATE_BINS="$*" GATE_KEEP="${glog:-}" awk -v me="$me" -v self=$$ '
+    BEGIN { m = ENVIRON["GATE_M"]; bins = ENVIRON["GATE_BINS"]; keep = ENVIRON["GATE_KEEP"] }
     { p = $1 + 0; pp[p] = $2 + 0; pg[p] = $3 + 0; c = $0; sub(/^ *[0-9]+ +[0-9]+ +[0-9]+ /, "", c); cmd[p] = c; ids[++n] = p }
     function tmux(c) { return c ~ /^([^ ]*\/)?tmux( |$)/ }
     function orphan_bin(p,   i, k, b) {  # an orphan (ppid 1) of the worktree s binaries
@@ -264,12 +271,13 @@ gate_procs() {  # <marker> <pid whose descendants go too | ""> <worktree binary 
       for (i = 1; i <= n; i++) if (cmd[ids[i]] == "ps -axww -o pid=,ppid=,pgid=,command=") sub_sh = pp[ids[i]]
       for (i = 1; i <= n; i++) { p = ids[i]; if (p == sub_sh || pp[p] == sub_sh) anc[p] = 1 }
       for (i = 1; i <= n; i++) { p = ids[i]
-        if (tmux(cmd[p])) continue
+        # the tees of the run log (gate dir/logs): they end with its output
+        if (tmux(cmd[p]) || (keep != "" && index(cmd[p], keep))) continue
         if (index(cmd[p], m) || (me != "" && pp[p] == me) || orphan_bin(p)) { k[p] = 1; if (pg[p] != pg[self]) g[pg[p]] = 1 }
       }
       for (i = 1; i <= n; i++) { p = ids[i]; if (pg[p] in g) k[p] = 1 }
       do { ch = 0; for (i = 1; i <= n; i++) { p = ids[i]; if (!(p in k) && (pp[p] in k)) { k[p] = 1; ch = 1 } } } while (ch)
-      for (p in k) if (!(p in anc) && !tmux(cmd[p])) print p
+      for (p in k) if (!(p in anc) && !tmux(cmd[p]) && !(keep != "" && index(cmd[p], keep))) print p
     }'
 }
 gate_kill() {  # <pids>: TERM, then KILL what is left half a second later
@@ -315,6 +323,17 @@ done
 run="$gpre$$"
 rm -rf "$run"; mkdir -p "$run" && proc_start $$ >"$run/.owner" || { echo "gate: cannot write $run"; exit 1; }
 export TMPDIR="$run" BISE_GATE_RUN=$$
+# every quick/full/rerun keeps its output in <gate dir>/logs/ for 7 days,
+# whatever the caller did with it (a task's tmp goes at its drop, a green
+# run's folder at its end): the loop audit's record (scripts/loop_audit.py)
+glogs="$gdir/logs" glog=""
+if mkdir -p "$glogs" 2>/dev/null; then
+  find "$glogs" -name '*.log' -mtime +7 -delete 2>/dev/null
+  gstart="$(date +%s)" glog="$glogs/$mode-$gstart-$$.log"
+  if echo "# gate $mode agent=${SB_AGENT:-} sha=$(git rev-parse --short HEAD 2>/dev/null || echo none) start=$gstart root=$root" >"$glog" 2>/dev/null; then
+    exec > >(tee -a "$glog") 2> >(tee -a "$glog" >&2)
+  else glog=""; fi
+fi
 LOCK="${gpre}full-$(id -u).lock"
 locked="" out=""
 on_exit() {
@@ -327,6 +346,12 @@ on_exit() {
   # a red run keeps run_all's logs for a day, nothing else (the tests'
   # workspaces: ~100 MB a run)
   if [ $rc = 0 ]; then rm -rf "$run"; else gate_prune "$run"; fi
+  # the run log's last line, its rc: after the tees drained what we wrote
+  if [ -n "$glog" ]; then
+    exec >&- 2>&-
+    for _ in $(seq 20); do pgrep -f "tee -a $glog" >/dev/null 2>&1 || break; sleep 0.1; done
+    echo "# gate end rc=$rc secs=$(( $(date +%s) - gstart ))" >>"$glog" 2>/dev/null
+  fi
   exit $rc
 }
 trap on_exit EXIT

@@ -23,9 +23,13 @@ parsing on synthetic traces.
 |---|---|
 | `~/.bise/sessions/*/events.jsonl` | each agent's turns and tool calls with their times; edits (`edit`, `write_file`) and lands (`sb land` that answered "landed") |
 | `~/.bise/hubs/<hub>/journal.jsonl` | the wakes: `wake_set` (kind job, file, bg, pid), `wake_end` (hit, max, stopped) |
-| `~/.bise/hubs/<hub>/agents/*/tmp/**` | the agents' gate logs: `GATE quick/full/rerun GREEN (Ns)` or `FAILED`, each step and test line, `got the gate after Ns` |
-| `~/.bise/run/*.log` | the release gates' logs, same lines |
-| `~/.bise/gate/timings.tsv` | run_all.sh's history: one line per e2e/tmux test run (time, commit, test, rc, wall s, CPU s, load) |
+| `~/.bise/gate/logs/*.log` | the gate runs: gate.sh's own log of each quick/full/rerun, kept 7 days. First line `# gate <mode> agent=<a> sha=<HEAD> start=<epoch> root=<repo>`, last `# gate end rc=<n> secs=<n>`; between, `GATE quick/full/rerun GREEN (Ns)` or `FAILED`, each step and test line, `got the gate after Ns`. A run red before its GATE line counts by its rc |
+| `~/.bise/run/**/*.log` | the nightly's (`run/nightly/<date>.log`) and the release gates' logs, same lines: only those older than the first gate log (since then their gate.sh run has its own) |
+| `~/.bise/gate/timings.tsv` | the tests: run_all.sh's history, one line per e2e/tmux test run (time, commit, test, rc, wall s, CPU s, load). A gate log's test lines only for a test it lacks (quick's steps, PROOF) |
+
+One source per fact: the agents' own copies of a gate's output (their
+`$TMPDIR`, deleted at the task's drop) are not read. Runs before the first
+gate log are lost; the report says so (`gate logs start <date>`).
 | `~/.bise/run/heavy.log` | heavy-run: when each job was submitted and when it got its slot |
 
 ## What it computes
