@@ -16,7 +16,7 @@
 
 use super::Core;
 use crate::ambient::setup::{rank, CuBusy, Done, RegistryOp, SetupPorts};
-use bise_proto::draft::AppCmd;
+use bise_proto::app_cmd::AppCmd;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};

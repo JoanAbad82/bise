@@ -12,7 +12,8 @@
 //! a stopped hub starts it on its own, so routing takes no hold.
 
 use bise_home::projects::Row;
-use bise_proto::draft::{ProjectRow, ProjectView};
+use bise_proto::app_rows::ProjectRow;
+use bise_proto::draft::ProjectView;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 

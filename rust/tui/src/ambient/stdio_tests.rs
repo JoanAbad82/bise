@@ -113,7 +113,7 @@ fn every_command_the_core_parses_has_its_method() {
         assert!(!e.starts_with("unknown cmd"), "{m}: cmd.rs doesn't read {tag}");
     }
     // and the AppCmd tags no method serves are exactly the ones it doesn't read
-    for tag in bise_proto::draft::AppCmd::TAGS {
+    for tag in bise_proto::app_cmd::AppCmd::TAGS {
         let e = crate::ambient::Cmd::parse(&json!({"cmd": tag}).to_string()).err().unwrap_or_default();
         assert_eq!(e.starts_with("unknown cmd"), app_rpc::NOT_SERVED.contains(tag), "{tag}: {e}");
     }

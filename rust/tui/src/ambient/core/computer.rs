@@ -23,7 +23,8 @@ use bise_computer_use::cli::StopOutcome;
 use bise_computer_use::live as cu_live;
 use bise_computer_use::state::{self as cu_state, Live};
 use bise_home::projects::Row;
-use bise_proto::draft::{ComputerAgent, CoreEv, LiveKind, PeekShot};
+use bise_proto::app_rows::{ComputerAgent, LiveKind, PeekShot};
+use bise_proto::core_ev::CoreEv;
 use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 

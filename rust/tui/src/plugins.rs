@@ -18,13 +18,13 @@ use std::path::Path;
 /// state `/plugins login` shows (needs a login, logged in, not logged in;
 /// `pending`: a login whose browser is open, by name). The TUI's popup
 /// reads the same resolution ([`choices`]).
-pub(crate) fn rows(workspace: &Path, pending: &[String]) -> Vec<bise_proto::draft::Plugin> {
+pub(crate) fn rows(workspace: &Path, pending: &[String]) -> Vec<bise_proto::app_rows::Plugin> {
     let res = bend_plugins::resolve::resolve(&bend_plugins::resolve::Roots::standard(Some(workspace)));
     let (secrets, sd) = (bend_plugins::oauth::store_dir(), bend_plugins::status::dir());
     let targets = bend_plugins::login::targets(workspace);
     res.plugins
         .iter()
-        .map(|p| bise_proto::draft::Plugin {
+        .map(|p| bise_proto::app_rows::Plugin {
             name: p.name.clone(),
             state: p.state.as_str().into(),
             scope: p.scope.as_str().into(),
@@ -35,7 +35,7 @@ pub(crate) fn rows(workspace: &Path, pending: &[String]) -> Vec<bise_proto::draf
 }
 
 /// One server's login as a row: what `/plugins login`'s popup says, as data.
-fn login_row(t: &bend_plugins::login::Target, secrets: &Path, sd: &Path, pending: &[String]) -> bise_proto::draft::PluginLogin {
+fn login_row(t: &bend_plugins::login::Target, secrets: &Path, sd: &Path, pending: &[String]) -> bise_proto::app_rows::PluginLogin {
     let last = bend_plugins::status::read(sd, &t.plugin, &t.server.id);
     let state = if pending.contains(&t.name) {
         "pending"
@@ -46,7 +46,7 @@ fn login_row(t: &bend_plugins::login::Target, secrets: &Path, sd: &Path, pending
     } else {
         "out"
     };
-    bise_proto::draft::PluginLogin {
+    bise_proto::app_rows::PluginLogin {
         name: t.name.clone(),
         host: t.server.host(),
         state: state.into(),

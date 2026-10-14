@@ -20,7 +20,7 @@
 
 use super::*;
 use crate::commands::{Arg, COMMANDS};
-use bise_proto::draft::{PickArg, PickChoice, PickCommand, PickFile, PickFolder, PickSkill, Runs};
+use bise_proto::app_rows::{PickArg, PickChoice, PickCommand, PickFile, PickFolder, PickSkill, Runs};
 use std::collections::HashMap;
 
 /// At most this many `@` rows (the TUI's popup holds as many).

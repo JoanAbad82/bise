@@ -87,9 +87,9 @@ pub enum Cmd {
     /// with its `project`), routed as is.
     Typed(Value),
     /// The window's setup commands (S11, core/setup.rs).
-    App(bise_proto::draft::AppCmd),
+    App(bise_proto::app_cmd::AppCmd),
     /// voice mode's commands (core/voice_mode.rs)
-    VoiceMode(bise_proto::draft::AppCmd),
+    VoiceMode(bise_proto::app_cmd::AppCmd),
     /// try a refused project's hub again (his action)
     HubRetry { project: String },
     /// S29: his act on an agent's computer use (core/computer.rs)
@@ -111,48 +111,48 @@ impl Cmd {
             return Ok(Cmd::Typed(v));
         }
         if super::setup::TAGS.contains(&cmd.as_str()) {
-            return bise_proto::draft::AppCmd::decode(line).map(Cmd::App).map_err(|e| format!("{cmd}: {e}"));
+            return bise_proto::app_cmd::AppCmd::decode(line).map(Cmd::App).map_err(|e| format!("{cmd}: {e}"));
         }
         Ok(match cmd.as_str() {
             // bise-proto's AppCmd talk_* (qa-native m_9726): the proto's shapes are the ones parsed
-            "talk_start" | "talk_end" | "talk_cancel" | "shot_drop" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
-                bise_proto::draft::AppCmd::TalkStart { page } => match page.as_ref().map(|p| p.id.trim()) {
+            "talk_start" | "talk_end" | "talk_cancel" | "shot_drop" => match bise_proto::app_cmd::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+                bise_proto::app_cmd::AppCmd::TalkStart { page } => match page.as_ref().map(|p| p.id.trim()) {
                     Some(id) if !id.is_empty() => Cmd::PageTalk { page: id.to_string() },
                     _ => Cmd::TalkStart,
                 },
-                bise_proto::draft::AppCmd::TalkEnd => Cmd::TalkEnd,
-                bise_proto::draft::AppCmd::TalkCancel => Cmd::TalkCancel,
-                bise_proto::draft::AppCmd::ShotDrop => Cmd::ShotDrop,
+                bise_proto::app_cmd::AppCmd::TalkEnd => Cmd::TalkEnd,
+                bise_proto::app_cmd::AppCmd::TalkCancel => Cmd::TalkCancel,
+                bise_proto::app_cmd::AppCmd::ShotDrop => Cmd::ShotDrop,
                 other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
-            "dictate_start" | "dictate_stop" | "dictate_cancel" | "dictate_retry" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
-                bise_proto::draft::AppCmd::DictateStart { id } if !id.trim().is_empty() => Cmd::DictateStart { id },
-                bise_proto::draft::AppCmd::DictateStop { id } if !id.trim().is_empty() => Cmd::DictateStop { id },
-                bise_proto::draft::AppCmd::DictateCancel { id } if !id.trim().is_empty() => Cmd::DictateCancel { id },
-                bise_proto::draft::AppCmd::DictateRetry { id } if !id.trim().is_empty() => Cmd::DictateRetry { id },
+            "dictate_start" | "dictate_stop" | "dictate_cancel" | "dictate_retry" => match bise_proto::app_cmd::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+                bise_proto::app_cmd::AppCmd::DictateStart { id } if !id.trim().is_empty() => Cmd::DictateStart { id },
+                bise_proto::app_cmd::AppCmd::DictateStop { id } if !id.trim().is_empty() => Cmd::DictateStop { id },
+                bise_proto::app_cmd::AppCmd::DictateCancel { id } if !id.trim().is_empty() => Cmd::DictateCancel { id },
+                bise_proto::app_cmd::AppCmd::DictateRetry { id } if !id.trim().is_empty() => Cmd::DictateRetry { id },
                 _ => return Err(format!("{cmd}: no id")),
             },
             "voice_mode" | "voice_mute" | "voice_type" | "voice_send" | "voice_cut" => {
-                Cmd::VoiceMode(bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))?)
+                Cmd::VoiceMode(bise_proto::app_cmd::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))?)
             }
-            "hub_retry" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
-                bise_proto::draft::AppCmd::HubRetry { project } => Cmd::HubRetry { project },
+            "hub_retry" => match bise_proto::app_cmd::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+                bise_proto::app_cmd::AppCmd::HubRetry { project } => Cmd::HubRetry { project },
                 other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
-            "card_in_view" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
-                bise_proto::draft::AppCmd::CardInView { project, card } => Cmd::CardInView { project, card },
+            "card_in_view" => match bise_proto::app_cmd::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+                bise_proto::app_cmd::AppCmd::CardInView { project, card } => Cmd::CardInView { project, card },
                 other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
-            "commands" | "index" | "skills" | "files" | "file_picked" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
-                bise_proto::draft::AppCmd::Commands => Cmd::Commands,
-                bise_proto::draft::AppCmd::Index => Cmd::Index,
-                bise_proto::draft::AppCmd::Skills { project } => Cmd::Skills { project },
-                bise_proto::draft::AppCmd::Files { project, q, rid, limit } => Cmd::Files { project, q, rid, limit },
-                bise_proto::draft::AppCmd::FilePicked { project, path } => Cmd::FilePicked { project, path },
+            "commands" | "index" | "skills" | "files" | "file_picked" => match bise_proto::app_cmd::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+                bise_proto::app_cmd::AppCmd::Commands => Cmd::Commands,
+                bise_proto::app_cmd::AppCmd::Index => Cmd::Index,
+                bise_proto::app_cmd::AppCmd::Skills { project } => Cmd::Skills { project },
+                bise_proto::app_cmd::AppCmd::Files { project, q, rid, limit } => Cmd::Files { project, q, rid, limit },
+                bise_proto::app_cmd::AppCmd::FilePicked { project, path } => Cmd::FilePicked { project, path },
                 other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
-            "computer" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
-                bise_proto::draft::AppCmd::Computer { act, key, max_width } => Cmd::Computer { act, key, max_width },
+            "computer" => match bise_proto::app_cmd::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+                bise_proto::app_cmd::AppCmd::Computer { act, key, max_width } => Cmd::Computer { act, key, max_width },
                 other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
             "away_back" => Cmd::AwayBack { away_ms: v.get("away_ms").and_then(Value::as_u64).ok_or("away_back: no away_ms")? },
@@ -194,8 +194,8 @@ impl Cmd {
             }
             "fake_words" => Cmd::FakeWords { text: s("text") },
             // bise-proto's AppCmd shown: its shape is the one parsed
-            "shown" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("shown: {e}"))? {
-                bise_proto::draft::AppCmd::Shown { projects } => Cmd::Shown { projects },
+            "shown" => match bise_proto::app_cmd::AppCmd::decode(line).map_err(|e| format!("shown: {e}"))? {
+                bise_proto::app_cmd::AppCmd::Shown { projects } => Cmd::Shown { projects },
                 other => return Err(format!("shown: decoded as {other:?}")),
             },
             c @ ("agent_preview" | "agent_history" | "agent_unwatch" | "agent_send" | "follow" | "stop" | "archive" | "unarchive") => {

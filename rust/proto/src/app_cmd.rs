@@ -1,0 +1,274 @@
+//! The app's commands to its desktop core itself, never forwarded to a hub
+//! (`core/<tag>` on its stdio: [`crate::app_rpc`]).
+
+use crate::app_rows::*;
+use crate::{decode, parse, Project};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+/// What the app asks the core itself (never forwarded to a hub).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(tag = "cmd", rename_all = "snake_case")]
+pub enum AppCmd {
+    Open {
+        project: Project,
+        what: OpenWhat,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        agent: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+    },
+    /// add a folder to his projects (S1's registry); `land`: the add
+    /// sheet's 'agents land their work', the repo's flow mode (true trunk,
+    /// false pr, absent: devflow decides; architect m_9130)
+    ProjectAdd {
+        path: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        land: Option<bool>,
+    },
+    ProjectRemove { project: Project },
+    ProjectMove { project: Project, order: u32 },
+    ProjectRename { project: Project, name: String },
+    /// one preference by its dotted key (`quiet.call`)
+    PrefsSet { key: String, value: Value },
+    /// opens his browser for that account, then `accounts` again
+    SignIn { id: String },
+    /// draft (V14): ends the open sign-in of that account (its browser
+    /// page and local listener go); its end is error {cmd: sign_in,
+    /// text: '<id>: cancelled'}
+    SignInCancel { id: String },
+    KeySet { id: String, key: String },
+    KeyRemove { id: String },
+    /// folders that could be projects (none: his home folder, depth 2)
+    FoundScan {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dir: Option<String>,
+    },
+    /// he's back at his Mac after `away_ms` (the app's read): the core
+    /// answers `away_summary`
+    AwayBack { away_ms: u64 },
+    /// bar S.6: the running app's own build (its VERSION's `id` and
+    /// `built`; none in a dev run): the core checks bise's release channel
+    /// now and hourly, and says `app_update` when a newer app is there
+    AppVersion {
+        id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        built: Option<String>,
+    },
+    /// the plugins of `project`'s workspace (none: bise's home): `plugins`
+    Plugins {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+    },
+    /// turn a plugin on or off (plugins.json, bend_plugins' one writer)
+    PluginSet {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        name: String,
+        on: bool,
+    },
+    /// log in to a plugin's remote MCP server: opens his browser (his
+    /// click only, never a test), `plugins` again at its end
+    PluginLogin {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        name: String,
+    },
+    PluginLogout {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        name: String,
+    },
+    /// a role's model (V17, config.toml's `[roles]`, written by the same
+    /// locked writer as the TUI's roles screen): `model` none = it
+    /// follows its fallback again, `effort` none = the model's default;
+    /// a bad role or an unknown model is an error and writes nothing
+    RoleSet {
+        role: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effort: Option<String>,
+    },
+    /// check again (S.8, the TUI's `/setup`): `prefs`, `accounts` and
+    /// `projects` come again, read fresh
+    SetupCheck,
+    /// computer use (P.2): `act` on | off | uninstall | check (its page is
+    /// open: the setup check runs, once a second, until leave or 2 min
+    /// without a check) | leave | fix (`fix`: a row's fix, his click only)
+    ComputerUse {
+        act: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fix: Option<String>,
+    },
+    /// the projects the window shows now (replaces the set; on load and on
+    /// each route change): the core holds their hubs and sends their
+    /// `projects`/`agents`/`cards` only after the first one (core/hubs.rs)
+    Shown { projects: Vec<Project> },
+    /// fn held (the helper's talk): the core opens the mic and starts a
+    /// talk to main; `page`: a note talk on that bise page instead, its
+    /// words to the page, never to main (docs/ambient-pages.md §4.1)
+    TalkStart {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        page: Option<TalkPage>,
+    },
+    /// fn released: the talk's words go
+    TalkEnd,
+    /// the talk is dropped, nothing sent
+    TalkCancel,
+    /// the talk's still is dropped (his ✕ on it, ambient-lead m_21912):
+    /// the core forgets it, says `shot {file: null}`, and the talk goes on
+    /// with his words only
+    ShotDrop,
+    /// the composer's mic (bar I): the core opens the mic and dictates
+    /// into the window that sent this, never to main, never journaled;
+    /// `id`: the window's short-lived id, echoed on each `dictation`. One
+    /// mic user at a time: refused while a talk or another dictation
+    /// runs; fn (talk_start) ends a dictation first
+    DictateStart { id: String },
+    /// the words so far stay: the mic goes off, one final `dictation`
+    DictateStop { id: String },
+    /// dropped: the mic goes off, one final `dictation` with `cancelled`
+    DictateCancel { id: String },
+    /// a `kept` take transcribed again from its sound, with a fresh
+    /// listener: one final `dictation` for that id, no partials; an id
+    /// the core no longer keeps: a final with error 'nothing to try again.'
+    DictateRetry { id: String },
+    /// voice mode (draft, the TUI's ctrl+r twice): `on` with `agent` of
+    /// `project`: the core opens the mic and the speaker (voicemode's own
+    /// controller), his turns go to that agent (never main unless main is
+    /// in view), its answers are said aloud (nothing aloud while quiet).
+    /// Another agent while on: it follows him there; `on: false` leaves.
+    /// One mic owner: refused while a talk or a dictation runs; while on,
+    /// fn and dictation are refused. Its state comes as `voice_mode`
+    VoiceMode { project: Project, agent: String, on: bool },
+    /// his mic off (m) or on again; the agent still speaks
+    VoiceMute { on: bool },
+    /// he types (tab): the mic waits; his typed send is the window's
+    /// normal `send`, then `voice_type {on: false}`: its answer is said
+    VoiceType { on: bool },
+    /// send what he said now (the TUI's space tap)
+    VoiceSend,
+    /// cut the agent off (its voice stops, its turn is stopped)
+    VoiceCut,
+    /// try a refused project's hub again (his action, `hub_refused`); a
+    /// project that isn't refused: nothing
+    HubRetry { project: Project },
+    /// bar N14: the card in front of him in the focused window (the ⌘I
+    /// inbox's current item), or none (both absent: the window blurred,
+    /// closed or left the inbox); fn's talk answers it by voice when its
+    /// words name an option (`voice_answer`), else they go to main
+    CardInView {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        card: Option<u64>,
+    },
+    /// the slash commands: `commands` answers
+    Commands,
+    /// ⌘K opened: `index` answers, then again on change (at most every 5 s)
+    Index,
+    /// a workspace's skills: `skills` answers
+    Skills { project: Project },
+    /// an `@` query on a workspace's files: `files` answers with this
+    /// `rid` (a newer rid's answer wins; `limit`: 50 if none)
+    Files {
+        project: Project,
+        q: String,
+        rid: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        limit: Option<u32>,
+    },
+    /// R14: he took `path` (as `files` answered it) from a workspace's
+    /// `@` list: it ranks first in that list's next answers (the TUI's
+    /// memory, per workspace, in the core's memory). A folder is browsed,
+    /// never picked
+    FilePicked { project: Project, path: String },
+    /// R8: the setup a `setup_first` opened closed without the provider
+    /// working: the held `/model` line is dropped
+    SetupFirstCancel,
+    /// N1 (the TUI's /keychain [on|off]): `on` moves his keys and sign-ins
+    /// to the macOS keychain, `off` back to files in ~/.bise, none just
+    /// asks where they are; answered by `keychain` (a second move while
+    /// one runs: `error {cmd: keychain}`, never queued)
+    Keychain {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to: Option<String>,
+    },
+    /// S29: his act on an agent's computer use, by its `computer_live`
+    /// key: `take` (he takes over: it pauses), `hand_back` (it goes on),
+    /// `stop` (as the TUI's /stop), `peek` (a still, `max_width` px wide
+    /// at most, answered by `computer_peek`). A key not in the last
+    /// `computer_live`, or of no project of his: `error {cmd: computer}`
+    Computer {
+        act: String,
+        key: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        max_width: Option<u32>,
+    },
+    #[serde(skip)]
+    Unknown { tag: String, raw: Value },
+}
+
+/// The bise page a note talk is about (`talk_start {page}`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct TalkPage {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+impl AppCmd {
+    pub const TAGS: &'static [&'static str] = &[
+        "open",
+        "project_add",
+        "project_remove",
+        "project_move",
+        "project_rename",
+        "prefs_set",
+        "sign_in",
+        "sign_in_cancel",
+        "key_set",
+        "key_remove",
+        "found_scan",
+        "away_back",
+        "app_version",
+        "plugins",
+        "plugin_set",
+        "plugin_login",
+        "plugin_logout",
+        "computer_use",
+        "shown",
+        "talk_start",
+        "talk_end",
+        "talk_cancel",
+        "shot_drop",
+        "dictate_start",
+        "dictate_stop",
+        "dictate_cancel",
+        "dictate_retry",
+        "voice_mode",
+        "voice_mute",
+        "voice_type",
+        "voice_send",
+        "voice_cut",
+        "hub_retry",
+        "card_in_view",
+        "commands",
+        "index",
+        "skills",
+        "files",
+        "file_picked",
+        "setup_first_cancel",
+        "keychain",
+        "setup_check",
+        "role_set",
+        "computer",
+    ];
+
+    pub fn decode(line: &str) -> Result<AppCmd, String> {
+        decode(parse(line)?, "cmd", Self::TAGS, |tag, raw| AppCmd::Unknown { tag, raw })
+    }
+}

@@ -17,7 +17,8 @@
 //!
 //! The crate holds every JSON-line contract bise has, each in its own
 //! module (one TS generator, one fixtures convention): the hub protocol
-//! ([`hub`]), the core ↔ app lines (the draft `CoreEv`/`AppCmd`), and
+//! ([`hub`]), the desktop core ↔ app lines ([`core_ev`], [`app_cmd`],
+//! their rows in [`app_rows`], their JSON-RPC in [`app_rpc`]), and
 //! bise-mac-helper ↔ Electron's main ([`helper`]), `bise pty` ↔ Electron's
 //! main ([`pty`], the terminal panel).
 //!
@@ -62,8 +63,11 @@
 //! The fixtures (`fixtures/*.jsonl`) are the one source for the Rust
 //! tests, the native helper's laws and the Python e2e.
 
+pub mod app_cmd;
+pub mod app_rows;
 pub mod app_rpc;
 pub mod approvals;
+pub mod core_ev;
 pub mod commands;
 pub mod context;
 pub mod core;

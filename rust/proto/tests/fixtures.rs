@@ -2,7 +2,9 @@
 //! known message and encodes back to the same JSON value, every known tag
 //! of every type appears in a fixture, and the unknown ones stay unknown.
 
-use bise_proto::draft::{AppCmd, CoreEv, DraftHubCmd, ProjectView};
+use bise_proto::app_cmd::AppCmd;
+use bise_proto::core_ev::CoreEv;
+use bise_proto::draft::{DraftHubCmd, ProjectView};
 use bise_proto::hub::{HubCmd, HubEv};
 use serde_json::Value;
 use std::path::Path;

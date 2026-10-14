@@ -1,0 +1,242 @@
+//! The desktop core's events to the app besides the hubs' (S3b,
+//! `core/<tag>` on its stdio: [`crate::app_rpc`]).
+
+use crate::app_rows::*;
+use crate::{decode, parse, Project};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+/// What the core sends the app besides the hubs' events (S3b).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(tag = "ev", rename_all = "snake_case")]
+pub enum CoreEv {
+    /// every registered project (bise's first), on change
+    Projects { projects: Vec<ProjectRow> },
+    /// open this in the window (a capsule's or a card's ⏎)
+    Open {
+        project: Project,
+        what: OpenWhat,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        agent: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+    },
+    /// his preferences (`bise_home::prefs`, its one owner): kept as JSON
+    /// here until that module types them
+    Prefs { prefs: Value },
+    Accounts { items: Vec<Account> },
+    /// draft (V14): a sign-in started: the link it opened in his browser
+    /// (the window copies it); once per sign-in, its end as before
+    /// (accounts, or error {cmd: sign_in})
+    Signing { id: String, url: String },
+    /// the answer to `found_scan`
+    Found { dir: String, items: Vec<Found> },
+    /// the answer to `away_back` (S9, amb-mac m_9038): what happened while
+    /// he was away, since `since_ms`: agents that turned done or failed,
+    /// his cards (questions and approvals) that came; `projects`: each
+    /// project where one of those happened, in his projects' order
+    AwaySummary { since_ms: u64, done: u32, questions: u32, failed: u32, projects: Vec<AwayProject> },
+    /// his agent plugins for `project`'s workspace (none: bise's home),
+    /// the answer to `plugins` and to each change; a change applies to
+    /// the sessions that start after it (the TUI's `/reload`)
+    Plugins {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        items: Vec<Plugin>,
+    },
+    /// computer use (P.2): on (the built-in `computer` plugin), its setup's
+    /// steps while the window's page checks them (none until a check
+    /// came), ready (browser, extension and live test done), `said`: what
+    /// went wrong with a fix, `flash`: what a fix just did
+    ComputerUse {
+        on: bool,
+        ready: bool,
+        rows: Vec<CuRow>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        said: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        flash: Option<String>,
+    },
+    /// a voice's loudness, 0..1, ~30 Hz while it sounds, then a 0: `you`
+    /// (the mic: his talk or a dictation, for a meter) or `main` (main's
+    /// spoken answer). No words, to every window
+    Level { who: String, v: f64 },
+    /// fn's talk (`talk_start`): what bise has heard so far, the WHOLE
+    /// text each time (`final` false, ~as the words come), then all of it
+    /// once (`final` true) when the talk ends; to every window (the
+    /// capsule's talk view draws it). Never journaled, never in a log
+    Heard {
+        text: String,
+        #[serde(rename = "final")]
+        is_final: bool,
+    },
+    /// fn's talk: the still of his front window the talk will send
+    /// (ambient-lead m_21912, amb-web m_21935): `file` its stored path in
+    /// the image store, `app` and `title` the front app and window; once
+    /// it is stored, then `file: null` when it goes (he dropped it with
+    /// `shot_drop`, the talk sent or cancelled it). To every window (the
+    /// capsule's talk view shows it). Never journaled, never in a log
+    Shot {
+        #[serde(default)]
+        file: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        app: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+    },
+    /// a dictation's words (bar I, `dictate_start {id}`), only to the
+    /// window that started it (the app's main routes it by `id`), never
+    /// to main, never journaled, never in a log. `text` is the WHOLE text
+    /// so far (replace, never append): a dropped or late partial can't
+    /// duplicate words; the composer's text is the last event's. Partials
+    /// have `final: false`; exactly one `final: true` ends it (stop, the
+    /// time limit, fn's talk, `cancelled` with an empty text, or `error`:
+    /// the start refused (the mic is busy, no mic, no voice model) or the
+    /// listener failed, with the words heard so far)
+    /// each role's model and effort (V17): at the start, after each
+    /// `role_set`, at `setup_check`
+    Roles { items: Vec<RoleRow> },
+    /// the slash commands (answer to `commands`, and once at the start):
+    /// the TUI's `/` list as data
+    Commands { items: Vec<PickCommand> },
+    /// a workspace's skills (answer to `skills {project}`): the TUI's `$`
+    Skills { project: Project, items: Vec<PickSkill> },
+    /// an `@` query's files (answer to `files {project, q, rid}`), ranked
+    /// by the TUI's own files.rs: `partial` while the workspace's first
+    /// walk runs (one more answer with the same rid follows), `folder`:
+    /// the browsed folder's own row (`@src/`)
+    Files {
+        project: Project,
+        rid: u64,
+        q: String,
+        items: Vec<PickFile>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        folder: Option<PickFolder>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        partial: bool,
+    },
+    /// bar N14: his talk answered the card in view (`card_in_view`): the
+    /// window shows `line` on that card for `ms` (esc undoes, nothing
+    /// sent), then answers option `n` (1-based) through the hub's one
+    /// answer path; the words did not go to main
+    VoiceAnswer { project: Project, card: u64, n: u32, line: String, ms: u64 },
+    /// voice mode with the agent in view (bar V12/W24/L21/N13, the
+    /// TUI's ctrl+r twice): its state, on each change, only to the window
+    /// that turned it on (the app's main routes it), never journaled,
+    /// never in a log. `state`: listening, hearing (he talks, `heard`:
+    /// his words so far), sending, thinking (the agent works), speaking
+    /// (`said`: the sentence being said), muted, typing, failed (`fail`:
+    /// why, voice mode stays on). `on: false` is its last (he left, his
+    /// window went, the core stopped; `note`: how long, how many turns).
+    /// `lit`: the agent message being said and how far, while it speaks
+    /// and after (a cut too), until his next turn
+    VoiceMode {
+        project: Project,
+        agent: String,
+        on: bool,
+        state: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        heard: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        said: Option<String>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        muted: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        note: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fail: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        lit: Option<VoiceLit>,
+    },
+    Dictation {
+        id: String,
+        text: String,
+        #[serde(rename = "final")]
+        is_final: bool,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        cancelled: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+        /// on a final that failed, timed out or came back empty: the core
+        /// keeps this take's sound (memory only, its last 3 takes, 10 min
+        /// each) and `dictate_retry {id}` transcribes it again
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        kept: bool,
+    },
+    /// bar S.6: a newer desktop app on bise's release channel than the one
+    /// running (`app_version`), read from `latest.json` by
+    /// bise_home::release (its one reader, the one version rule): `url` is
+    /// the zip's, absolute; the app downloads it, checks `sha256` and its
+    /// signature, and swaps itself only on his click. Sent once per
+    /// version, never for the same build or an older one
+    AppUpdate { version: String, url: String, sha256: String },
+    /// a project's hub refused this core's connection (its words): the
+    /// core never reconnects to it until he retries (`hub_retry`) or a
+    /// new core starts; commands to it get error {kind: hub_refused}
+    HubRefused { project: Project, error: String },
+    /// ⌘K's index (his unified search): the projects this core does NOT
+    /// hold, read from each one's `view.json`, never by starting its hub;
+    /// sent on `index`, then on change at most every 5 s (a held project
+    /// is never in it: its live events say the same)
+    Index { projects: Vec<IndexRow> },
+    /// R8 (the TUI's sb.rs /model): his `/model <model>` in `agent`'s
+    /// view needs `provider`'s key: the line is held, not sent; the window
+    /// opens that provider's setup (`name` for people). It runs once the
+    /// provider works (its `cid` answered as any slash), or is dropped by
+    /// `setup_first_cancel`, the window that sent it closing, the project
+    /// removed, or the core restarting
+    SetupFirst {
+        project: Project,
+        agent: String,
+        provider: String,
+        name: String,
+        model: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cid: Option<u64>,
+    },
+    /// S29: every agent using computer use on this machine now (all of
+    /// them, each with its project when its hub is one of his): sent on
+    /// change (state.json read at most every 500 ms) and once at start
+    ComputerLive { items: Vec<ComputerAgent> },
+    /// S29: the answer to `computer {act: peek, key}`: the still, or why
+    /// none (`not_found`: it drives nothing now or he took over;
+    /// `too_soon`: one per 2 s per agent; `no_broker`: computer use
+    /// isn't running)
+    ComputerPeek {
+        key: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        shot: Option<PeekShot>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        why: Option<String>,
+    },
+    /// N1 (the TUI's /keychain): where his keys and sign-ins are kept,
+    /// `keychain` (the macOS keychain) or `file` (files in ~/.bise), and
+    /// the last move's lines (item names and counts, never a secret);
+    /// `moving` while a move runs on its own thread (a locked keychain
+    /// asks ~2 s an item). Sent at the core's start, on `keychain`, and at
+    /// a move's start and end
+    Keychain {
+        store: String,
+        moving: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        lines: Vec<String>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        failed: bool,
+    },
+    /// this core can't start any hub (its runtime is missing): why, in
+    /// plain words (the binary's `approot::missing_words`), once after
+    /// `initialized`. It still answers; every hub the window asks for is
+    /// down with the same words, never a silent retry
+    Broken { reason: String },
+    #[serde(skip)]
+    Unknown { tag: String, raw: Value },
+}
+
+impl CoreEv {
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "shot", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain", "broken"];
+
+    pub fn decode(line: &str) -> Result<CoreEv, String> {
+        decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
+    }
+}

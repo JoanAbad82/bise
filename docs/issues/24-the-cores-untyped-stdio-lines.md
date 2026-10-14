@@ -7,7 +7,7 @@ amb-core. Label: protocol, desktop.
 
 The desktop app talks to `bise ambient-core` in JSON-RPC
 (`rust/proto/src/app_rpc.rs`). Most names come from typed enums:
-`AppCmd` and `CoreEv` (`rust/proto/src/draft.rs`), `HubCmd` and `HubEv`.
+`AppCmd` and `CoreEv` (`rust/proto/src/app_cmd.rs`, `core_ev.rs`), `HubCmd` and `HubEv`.
 Their fields have a Rust type and a generated TS type
 (`apps/desktop/src/proto/*.ts`), and a field that changes on one side
 breaks the other side's build.

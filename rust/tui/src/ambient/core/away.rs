@@ -11,7 +11,8 @@
 //! the jobs then, exactly, instead of from the current status.
 
 use super::Core;
-use bise_proto::draft::{AwayProject, CoreEv};
+use bise_proto::app_rows::AwayProject;
+use bise_proto::core_ev::CoreEv;
 use bise_proto::rows::{Agent, Card, Status};
 
 /// The summary since `since_ms` of each project's (id, agents, cards), in

@@ -21,7 +21,8 @@
 //! core writes or parses is in a list). A computer-use still
 //! (`core/computer_peek`) is never logged, by the core or the app.
 
-use crate::draft::{AppCmd, CoreEv};
+use crate::app_cmd::AppCmd;
+use crate::core_ev::CoreEv;
 use crate::hub::{HubCmd, HubEv};
 use crate::jsonrpc::{code, Notification, Request, RpcError};
 use crate::PROTO;

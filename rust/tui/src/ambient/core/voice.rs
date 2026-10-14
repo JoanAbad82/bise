@@ -433,8 +433,8 @@ impl Core {
 pub(super) fn shot_ev(shot: Option<&Shot>) -> Value {
     let some = |s: &str| Some(s.trim().to_string()).filter(|s| !s.is_empty());
     let ev = match shot {
-        Some(s) => bise_proto::draft::CoreEv::Shot { file: Some(s.stored.file.display().to_string()), app: some(&s.app), title: some(&s.title) },
-        None => bise_proto::draft::CoreEv::Shot { file: None, app: None, title: None },
+        Some(s) => bise_proto::core_ev::CoreEv::Shot { file: Some(s.stored.file.display().to_string()), app: some(&s.app), title: some(&s.title) },
+        None => bise_proto::core_ev::CoreEv::Shot { file: None, app: None, title: None },
     };
     serde_json::to_value(ev).unwrap_or_default()
 }
@@ -442,7 +442,7 @@ pub(super) fn shot_ev(shot: Option<&Shot>) -> Value {
 /// fn's talk words as the app reads them: bise-proto's CoreEv::Heard, its
 /// one owner (architect m_11629), the whole text so far or, `done`, all of it.
 fn heard(text: &str, done: bool) -> Value {
-    serde_json::to_value(bise_proto::draft::CoreEv::Heard { text: text.to_string(), is_final: done }).unwrap_or_default()
+    serde_json::to_value(bise_proto::core_ev::CoreEv::Heard { text: text.to_string(), is_final: done }).unwrap_or_default()
 }
 
 #[cfg(test)]

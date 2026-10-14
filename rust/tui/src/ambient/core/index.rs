@@ -10,7 +10,7 @@
 //! that stops being held moves into it at the next send.
 
 use super::*;
-use bise_proto::draft::IndexRow;
+use bise_proto::app_rows::IndexRow;
 
 /// At most one `index` per this long after the first.
 pub const EVERY: Duration = Duration::from_secs(5);

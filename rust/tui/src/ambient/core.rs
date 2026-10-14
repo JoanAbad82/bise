@@ -650,7 +650,7 @@ impl Core {
     /// runtime): the window says why at once (CoreEv::Broken, held until
     /// `initialized` like every event).
     pub fn broken(&mut self, reason: String) {
-        self.emit(serde_json::to_value(bise_proto::draft::CoreEv::Broken { reason }).unwrap_or_default());
+        self.emit(serde_json::to_value(bise_proto::core_ev::CoreEv::Broken { reason }).unwrap_or_default());
     }
 
     // ---- the hub ----

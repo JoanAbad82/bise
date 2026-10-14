@@ -7,7 +7,7 @@
 //! unchanged (new keys may come on top), so a field, list or enum value
 //! that changes meaning goes red here.
 
-use bise_proto::draft::CoreEv;
+use bise_proto::core_ev::CoreEv;
 use bise_proto::hub::HubEv;
 use bise_proto::thread::{fold, Ctx};
 use serde_json::Value;

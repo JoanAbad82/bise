@@ -12,7 +12,7 @@
 //! A key never goes out in an event or a log line ([`redact`]).
 
 use bise_home::projects::Row;
-use bise_proto::draft::{Account, Found, Plugin, RoleRow};
+use bise_proto::app_rows::{Account, Found, Plugin, RoleRow};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;

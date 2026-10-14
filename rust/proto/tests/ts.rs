@@ -2,8 +2,8 @@
 //! from the Rust types with ts-rs (feature `ts`, so bise and sb never
 //! compile ts-rs), never hand-edited (architect m_9476).
 //!
-//! - one `.ts` per wire module (hub, draft, thread, rows, diff, ops,
-//!   context, helper, pty, rpc, commands, app_rpc) + `json.ts`
+//! - one `.ts` per wire module (hub, draft, core_ev, app_cmd, app_rows,
+//!   thread, rows, diff, ops, context, helper, pty, rpc, commands, app_rpc) + `json.ts`
 //!   (serde_json's Value) + `index.ts`; `methods.gen.ts`: rpc's tables;
 //!   `app_methods.gen.ts`: app_rpc's names as constants;
 //! - `fixtures.gen.ts`: every fixture line as a typed constant, so
@@ -17,7 +17,7 @@
 //! stale; `BISE_PROTO_BLESS=1` writes them.
 #![cfg(feature = "ts")]
 
-use bise_proto::{app_rpc, commands, context, diff, draft, helper, hub, log, ops, parts, pty, rows, rpc, thread};
+use bise_proto::{app_cmd, app_rows, app_rpc, commands, core_ev, context, diff, draft, helper, hub, log, ops, parts, pty, rows, rpc, thread};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -68,7 +68,10 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
         module!(cfg, "hub": hub::JobState, hub::Job, hub::HubEv, hub::Mode, hub::SendOpts, hub::HubCmd, hub::ErrorKind),
         module!(cfg, "rpc": rpc::Id, rpc::Request, rpc::Notification, rpc::Response, rpc::ErrorData, rpc::RpcError, rpc::Watermark, rpc::ClientInfo, rpc::InitializeParams, rpc::HubState, rpc::InitializeResult, rpc::CommandsList, rpc::CommandRunResult, rpc::SendResult, rpc::CardAnswer, rpc::AnswerResult),
         module!(cfg, "commands": commands::WordRow, commands::ArgRow, commands::CommandRow),
-        module!(cfg, "draft": draft::Quote, draft::Queued, draft::DraftHubCmd, draft::ProjectRow, draft::OpenWhat, draft::Account, draft::Found, draft::AwayProject, draft::Plugin, draft::PluginLogin, draft::CuRow, draft::ComputerAgent, draft::LiveKind, draft::PeekShot, draft::VoiceLit, draft::RoleRow, draft::Runs, draft::PickChoice, draft::PickArg, draft::PickCommand, draft::PickSkill, draft::PickFile, draft::PickFolder, draft::CoreEv, draft::AppCmd, draft::TalkPage, draft::ProjectView, draft::IndexRow),
+        module!(cfg, "draft": draft::Quote, draft::Queued, draft::DraftHubCmd, draft::ProjectView),
+        module!(cfg, "app_rows": app_rows::ProjectRow, app_rows::OpenWhat, app_rows::Account, app_rows::Found, app_rows::AwayProject, app_rows::Plugin, app_rows::PluginLogin, app_rows::CuRow, app_rows::ComputerAgent, app_rows::LiveKind, app_rows::PeekShot, app_rows::VoiceLit, app_rows::RoleRow, app_rows::Runs, app_rows::PickChoice, app_rows::PickArg, app_rows::PickCommand, app_rows::PickSkill, app_rows::PickFile, app_rows::PickFolder, app_rows::IndexRow),
+        module!(cfg, "core_ev": core_ev::CoreEv),
+        module!(cfg, "app_cmd": app_cmd::AppCmd, app_cmd::TalkPage),
         module!(cfg, "helper": helper::HelperEv, helper::Responsible, helper::FnAct, helper::TalkKey, helper::Grant, helper::QuietWhy, helper::Perm, helper::PermAction, helper::HelperCmd),
         module!(cfg, "pty": pty::PtyEv, pty::PtyCmd),
         module!(cfg, "app_rpc": app_rpc::AppClient, app_rpc::AppInit, app_rpc::AppInitResult),
@@ -80,8 +83,8 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
 const FIXTURES: &[(&str, &str, &str)] = &[
     ("hub_ev.jsonl", "HubEv", "hub"),
     ("hub_cmd.jsonl", "HubCmd", "hub"),
-    ("core_ev.jsonl", "CoreEv", "draft"),
-    ("app_cmd.jsonl", "AppCmd", "draft"),
+    ("core_ev.jsonl", "CoreEv", "core_ev"),
+    ("app_cmd.jsonl", "AppCmd", "app_cmd"),
     ("draft_hub_cmd.jsonl", "DraftHubCmd", "draft"),
     ("project_view.json", "ProjectView", "draft"),
     ("context.jsonl", "FnContext", "context"),

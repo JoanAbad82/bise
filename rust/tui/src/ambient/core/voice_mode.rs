@@ -29,7 +29,7 @@ use super::*;
 use crate::voicemode::config::VoiceModeConfig;
 use crate::voicemode::turn::{self, Act, Jobs, SpaceKey, VoiceMode};
 use crate::voicemode::{Phase as Pane, Who};
-use bise_proto::draft::AppCmd;
+use bise_proto::app_cmd::AppCmd;
 use bise_proto::hub::HubEv;
 use bise_proto::thread::EntryKind;
 

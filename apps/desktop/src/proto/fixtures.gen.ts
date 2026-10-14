@@ -3,8 +3,10 @@
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 // every line of rust/proto/fixtures, typed: a fixture that doesn't fit its type fails pnpm typecheck.
 
+import type { AppCmd } from './app_cmd';
 import type { FnContext } from './context';
-import type { AppCmd, CoreEv, DraftHubCmd, ProjectView } from './draft';
+import type { CoreEv } from './core_ev';
+import type { DraftHubCmd, ProjectView } from './draft';
 import type { HelperCmd, HelperEv } from './helper';
 import type { HubCmd, HubEv } from './hub';
 import type { PtyCmd, PtyEv } from './pty';

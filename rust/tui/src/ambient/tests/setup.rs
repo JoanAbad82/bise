@@ -4,7 +4,7 @@
 use super::*;
 use crate::ambient::setup::{CuPorts, Done, Entry, KeychainPort, RegistryOp, SetupPorts};
 use bise_home::projects::Row;
-use bise_proto::draft::{Account, Plugin, PluginLogin, RoleRow};
+use bise_proto::app_rows::{Account, Plugin, PluginLogin, RoleRow};
 use std::cell::RefCell;
 use std::rc::Rc;
 

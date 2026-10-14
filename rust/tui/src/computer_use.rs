@@ -758,7 +758,7 @@ pub(crate) fn settle(b: &mut Busy, check: &Value) {
 }
 
 /// A row as the desktop's `computer_use` event carries it.
-pub(crate) fn row_data(r: &Row) -> bise_proto::draft::CuRow {
+pub(crate) fn row_data(r: &Row) -> bise_proto::app_rows::CuRow {
     let state = match r.st {
         St::Done => "done",
         St::Waits => "waits",
@@ -766,7 +766,7 @@ pub(crate) fn row_data(r: &Row) -> bise_proto::draft::CuRow {
         St::Failed => "failed",
         St::NotYet => "not_yet",
     };
-    bise_proto::draft::CuRow {
+    bise_proto::app_rows::CuRow {
         id: r.id.clone(),
         label: r.label.clone(),
         state: state.into(),
