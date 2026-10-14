@@ -6,6 +6,10 @@ as skipped, never misread) and rebuilds the rest of the state.
 
     python3 -u tests/old_core_replay.py [<base sha>]   (default: HEAD~1)
 
+It first replays a journal this tree's own sb-core writes (a message, a
+card, a timer, a watch, a held route: WRITE, real ms timestamps) with the
+base's sb-core, which must bring them back and skip only new kinds.
+
 The base's sb-core comes from scripts/bins.sh in a throwaway worktree of
 the base (cached by its sources' key). The other direction, a new sb-core
 on an old journal, is every replay test of the current one.
@@ -78,8 +82,89 @@ FIXTURE = [
     dict(msg(6, "user", "perf"), msg=dict(msg(6, "user", "perf")["msg"], plain=True,
          parts='[{"kind":"paste","n":1,"text":"x"},{"kind":"text","text":"m6"}]')),
 ]
-NEW = [i for i, e in enumerate(FIXTURE)
-       if e["type"].startswith(("x_", "act_", "wake_")) or e["type"] in ("follow", "job_end", "every_name")]
+
+
+def is_new(e):
+    """A kind an older sb-core may not know (it skips it, never misreads it)."""
+    return e["type"].startswith(("x_", "act_", "wake_", "route_")) or e["type"] in ("follow", "job_end", "every_name")
+
+
+NEW = [i for i, e in enumerate(FIXTURE) if is_new(e)]
+
+
+class Core:
+    """One sb-core on its link port."""
+
+    def __init__(self, binary):
+        s0 = socket.socket()
+        s0.bind(("127.0.0.1", 0))
+        port = s0.getsockname()[1]
+        s0.close()
+        self.proc = subprocess.Popen([binary], env=dict(os.environ, SB_CORE_PORT=str(port)),
+                                     stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        banner = self.proc.stdout.readline()
+        assert banner.startswith("sb-core on"), "banner: %r" % banner
+        self.f = socket.create_connection(("127.0.0.1", port)).makefile("rw")
+        self.call({"t": "init", "workspace": "/w"})
+
+    def call(self, v):
+        self.f.write(json.dumps(v) + "\n")
+        self.f.flush()
+        return json.loads(self.f.readline())
+
+    def kill(self):
+        self.proc.kill()
+
+
+# D1 (architect m_23192): the journal a NEW core writes (this tree's
+# sb-core, its journal effects), real ms timestamps
+WRITE = [
+    {"t": "boot"},
+    {"t": "say", "focus": "main", "text": "ship the docs", "queued": False},
+    {"t": "confirm_open", "agent": "main", "text": "drop docs?"},
+    {"t": "every_set", "agent": "main", "by": "user", "text": "check the deploy", "next_ms": 1760000600000, "every_ms": 600000},
+    {"t": "wake_set", "agent": "main", "spec": {"kind": "pid", "pid": 4242}, "max_text": "1h", "max_ms": 3600000, "quiet": False},
+    {"t": "route_hold", "text": "tell shop to deploy", "via": "spotlight", "to": "shop-1", "name": "shop", "why": "named shop", "context": ""},
+]
+
+
+def written_by_this_tree(path):
+    """This tree's sb-core runs WRITE; its journal lines go to `path`."""
+    out = subprocess.run(["bash", "scripts/bins.sh", "path", "sb-core"], cwd=ROOT, capture_output=True, text=True)
+    core = Core(out.stdout.strip().splitlines()[-1])
+    lines = []
+    try:
+        for i, st in enumerate(WRITE):
+            ans = core.call(dict(st, now=1760000000000 + i * 1000, git=False, ans=[]))
+            lines += [x["ev"] for x in ans.get("fx", []) if x.get("fx") == "journal"]
+    finally:
+        core.kill()
+    with open(path, "w") as f:
+        f.writelines(json.dumps(l) + "\n" for l in lines)
+    kinds = [l["type"] for l in lines]
+    assert kinds == ["message_sent", "card_opened", "every_set", "wake_set", "route_held", "act_set"], kinds
+    return lines
+
+
+def replay_written(core, path):
+    """The base's sb-core replays the new core's journal file: the message,
+    the card, the timer and the watch come back; it skips only new kinds."""
+    with open(path) as f:
+        evs = [json.loads(l) for l in f if l.strip()]
+    core.call({"t": "init", "workspace": "/w"})
+    out = core.call({"t": "replay_many", "evs": evs})
+    assert isinstance(out, dict) and "error" not in out and "err" not in out, "the replay of the new journal failed: %r" % out
+    skipped = out.get("skipped", [])
+    assert all(is_new(evs[i]) for i in skipped), "the base skips only new kinds: %r" % [evs[i]["type"] for i in skipped]
+    view = core.call({"t": "view_all"})
+    view = view.get("view", view)
+    assert "ship the docs" in json.dumps(view.get("msgs", [])), "the message: %r" % view.get("msgs")
+    assert [c["id"] for c in view.get("cards", [])] == [1], "the card: %r" % view.get("cards")
+    assert [t["id"] for t in view.get("timers", [])] == [1], "the timer: %r" % view.get("timers")
+    assert [w["id"] for w in view.get("wakes", [])] == [1] or 3 in skipped, "the watch: %r" % view.get("wakes")
+    print("ok   new journal: %d lines written by this tree's sb-core, %d skipped (%s), message, card, timer%s back"
+          % (len(evs), len(skipped), ", ".join(evs[i]["type"] for i in skipped) or "none",
+             "" if 3 in skipped else ", watch"))
 
 
 def main():
@@ -111,6 +196,8 @@ def main():
             return json.loads(f.readline())
 
         call({"t": "init", "workspace": "/w"})
+        written_by_this_tree(os.path.join(tmp, "journal.jsonl"))
+        replay_written(Core(binary), os.path.join(tmp, "journal.jsonl"))
         out = call({"t": "replay_many", "evs": FIXTURE})
         # the replay succeeds and no line it does not know fails it: a kind
         # newer than the base is skipped, a kind the base knows is applied
