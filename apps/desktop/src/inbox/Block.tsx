@@ -20,6 +20,7 @@ import { cardKey, sortCards } from './order';
 import { pickWaits, takesWords, withConfirmOptions } from './model';
 import { STRIP_KEYS, stripKey, stripWords } from './stripRows';
 import { cardKeyOf } from './Strip';
+import { ArtWords } from './artWords';
 import { pruneCardDrafts } from './drafts';
 import { keep } from '@/app/keep';
 import { useModHeld } from '@/app/held';
@@ -567,7 +568,11 @@ export function InboxBlock({ here, onAnswer, now: pinned, only }: InboxBlockProp
             name={
               <>
                 <span className="strip-who">{shownName(who)}</span>
-                {what !== '' && <span className="strip-what">{what}</span>}
+                {what !== '' && (
+                  <span className="strip-what">
+                    <ArtWords text={what} project={c.project} testId={`inbox.block.row.${String(n)}`} />
+                  </span>
+                )}
                 {!isNotify(c) && <RefusedMark card={c} />}
               </>
             }
