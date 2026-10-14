@@ -7,7 +7,7 @@ import { Markdown } from "@/thread/Markdown";
 // the thread's layout around the markdown (its code block's head, its pre), as the window draws it
 import "@/thread/thread.css";
 import {
-  Act, Answered, Art, Bar, Board, BriefLine, Button, Capsule, Card, CardLine, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Empty, Err,
+  Act, Answered, Art, ArtName, Bar, Board, BriefLine, Button, Capsule, Card, CardLine, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Empty, Err,
   Field, Fold, Group, Head, Help, IconButton, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Quote, Route, Row,
   SchedHead, SectionHead, Seg, Select, Settings, Side, SideView, Skel, Spot, SpotGroup, SpotRow, SpotStill, Tabs, TextArea, Thread, Thumbs, Toast, Toggle, Tool,
   Win, type Opt,
@@ -371,8 +371,9 @@ export const SECTIONS: Record<string, () => ReactNode> = {
         <span>◷ <SchedHead>main scheduled nightly · every day 02:00</SchedHead></span>
         <BriefLine open={false} onClick={() => undefined} testId="ds.brief">bise started gift-ui · make the gift card page load under a second</BriefLine>
         <BriefLine open onClick={() => undefined}>bise started perf · product page speed</BriefLine>
-        <CardLine text="? bise asks: which branch first? · in the inbox below" onClick={() => undefined} testId="ds.cardline" />
-        <CardLine text="? waits for you · in the inbox below" onClick={() => undefined} />
+        <CardLine onClick={() => undefined} testId="ds.cardline">bise asks: which branch first? · in the inbox below</CardLine>
+        <CardLine onClick={() => undefined}>bise asks: keep the webp in <ArtName onClick={() => undefined}>product page, before / after</ArtName>? · in the inbox below</CardLine>
+        <CardLine onClick={() => undefined}>waits for you · in the inbox below</CardLine>
       </div>
     </div>
   ),

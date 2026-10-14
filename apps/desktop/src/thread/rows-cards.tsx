@@ -5,6 +5,7 @@ import { useState, type ReactNode } from 'react';
 import { useFold } from './folds';
 import { Act, Answered, ArtName, CardLine, Chip, Marker, Press } from '@/ds';
 import { openInbox } from '@/inbox/Block';
+import { ArtWords } from '@/inbox/artWords';
 import type { Entry } from '@/proto';
 import { useEntry, useProjects, useThreadOrder, type Aside } from '@/store';
 import { Markdown } from './Markdown';
@@ -409,14 +410,17 @@ export function CardRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   if (c.answered) return <Answered testId={`thread.card.${String(c.id)}`}>{follows ? '✓ answered' : `✓ answered: ${c.question}`}</Answered>;
   // b (his card #476, designer m_15612): the inbox block is the one place to answer; the thread says
   // one dim line that points there, never a second copy with its options. A click opens it there.
+  // an artifact link in the question is its pink name (art-chips), a click opens its view, not the inbox
+  const testId = `thread.card.${String(c.id)}`;
   return (
     <CardLine
-      text={cardLine(shownName(ctx.agent), c.question, follows)}
-      testId={`thread.card.${String(c.id)}`}
+      testId={testId}
       onClick={() => {
         openInbox({ project: ctx.project, card: c.id });
       }}
-    />
+    >
+      <ArtWords text={cardLine(shownName(ctx.agent), c.question, follows).replace(/^\? /u, '')} project={ctx.project} testId={testId} />
+    </CardLine>
   );
 }
 

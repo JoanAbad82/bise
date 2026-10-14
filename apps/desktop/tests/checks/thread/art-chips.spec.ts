@@ -4,8 +4,9 @@
 //     24 px high, r 6, 8 px sides, kind and version the same pink at 70 %; hover raises the tint
 //     (16 %), the pointer is a hand;
 //   - an `artifact:` link in perf's answer, the note's page ('✓ you sent perf a note on <title>')
-//     and an inbox line's artifact link are the same highlight inline, 4 px sides, a hand;
-//   - a click on the answer's name opens the artifact view.
+//     an inbox line's artifact link and the thread's 'perf asks: …' card row (ask-chip) are the same
+//     highlight inline, 4 px sides, a hand; the asks row never shows the raw `[name](artifact:…)`;
+//   - a click on the answer's name (light) or the asks row's name (dark) opens the artifact view.
 // Shots: art-chips-<theme>-1400/1100/800, for designer. Owner: art-chips.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import type { Locator, Page } from '@playwright/test';
@@ -17,6 +18,7 @@ const P = 'acme-1a2b3c4d';
 const NOW = Date.now();
 const MIN = 60_000;
 const TITLE = 'product page, before / after';
+const ASK = `keep the webp next to the avif in [${TITLE}](artifact:product-page)?`;
 const prefs = (theme: string) => ({
   ev: 'prefs',
   prefs: { onboarded: true, theme, context: { shot: true, url: true, file: true, window_text: false }, excluded_apps: [], quiet: { call: true, share: true, fullscreen: true, focus: true, batch_min: 20, away_card: true }, voice: { fn_hold: true, fn_twice: 'spotlight', language: 'auto' }, shots_keep_days: 7 },
@@ -38,7 +40,7 @@ const world = (theme: string, pages: string) => [
       { project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true },
       {
         project: P, name: 'storefront', path: '/nowhere/storefront', git: true, home: false, order: 1, agents: 2, working: 0, waits: 1, running: true,
-        cards: [{ id: 1, project: P, kind: 'question', agent: 'perf', question: `keep the webp next to the avif in [${TITLE}](artifact:product-page)?`, options: [{ n: 1, label: 'yes' }, { n: 2, label: 'no' }], urgent: false, since_ms: NOW - 2 * MIN }],
+        cards: [{ id: 1, project: P, kind: 'question', agent: 'perf', question: ASK, options: [{ n: 1, label: 'yes' }, { n: 2, label: 'no' }], urgent: false, since_ms: NOW - 2 * MIN }],
       },
     ],
   },
@@ -61,6 +63,7 @@ const world = (theme: string, pages: string) => [
         text: 'you sent 1 note on your page',
         parts: [{ kind: 'page', text: 'you sent 1 note on your page', to: 'perf', page: 'product-page', title: TITLE, version: 2, notes: [{ block: 'p1', kind: 'note', text: 'say the paint time too', quote: 'before: 2.4 MB hero' }] }],
       },
+      { pos: 5, at_ms: NOW - 2 * MIN, kind: 'card', text: ASK, card: { id: 1, question: ASK, options: [{ n: 1, label: 'yes' }, { n: 2, label: 'no' }], answered: false } },
     ],
     before: null,
     more: false,
@@ -118,8 +121,11 @@ for (const theme of ['light', 'dark']) {
         answer: page.getByTestId('thread.artname'),
         note: page.getByTestId('thread.pageanswer.4.page'),
         inbox: page.locator('[data-testid="inbox.block"] .b-artname').first(),
+        card: page.getByTestId('thread.card.1.art.product-page'),
       };
       await expect(page.getByTestId('thread.pageanswer.4')).toContainText(`you sent perf a note on ${TITLE}`);
+      // the 'perf asks' row: the name, never the raw link
+      await expect(page.getByTestId('thread.card.1')).toHaveText(`? perf asks: keep the webp next to the avif in ${TITLE}? · in the inbox below`);
       for (const [where, l] of Object.entries(inline)) {
         await expect(l, `${where}: the name`).toHaveText(TITLE);
         await page.mouse.move(1, 400);
@@ -137,9 +143,9 @@ for (const theme of ['light', 'dark']) {
         await settle(page);
         await page.screenshot({ path: test.info().outputPath(`art-chips-${theme}-${String(w)}.png`) });
       }
-      // a click on the answer's name: the artifact's view
+      // a click on a name: the artifact's view (the answer's in light, the asks row's in dark, not the inbox)
       await page.setViewportSize({ width: 1400, height: 900 });
-      await inline.answer.click();
+      await (theme === 'light' ? inline.answer : inline.card).click();
       await expect(page.getByTestId('app.art')).toBeVisible({ timeout: 5000 });
       await expect(page.getByTestId('artifact.title')).toHaveText(TITLE);
     } finally {

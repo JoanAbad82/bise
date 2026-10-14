@@ -205,17 +205,17 @@ export function BriefLine({ children, open, onClick, testId }: BriefLineProps) {
 }
 
 export interface CardLineProps {
-  /** '? bise asks: which branch first? · in the inbox below': its first '?' in the accent, the rest dim */
-  text: string;
+  /** the words after its '?' (drawn in the accent): 'bise asks: which branch first? · in the inbox below';
+   *  an artifact's name in them is an ArtName (its click opens the artifact, not the line's) */
+  children: ReactNode;
   onClick?: MouseEventHandler<HTMLButtonElement>;
   testId?: string;
 }
 /** an open card in the thread: one dim line pointing at the inbox block, the one place to answer (designer m_15612) */
-export function CardLine({ text, onClick, testId }: CardLineProps) {
+export function CardLine({ children, onClick, testId }: CardLineProps) {
   return (
     <button type="button" className="b-card-line" onClick={onClick} data-testid={testId}>
-      <span className="mark">{text.slice(0, 1)}</span>
-      {text.slice(1)}
+      <span className="mark">?</span> {children}
     </button>
   );
 }
