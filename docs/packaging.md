@@ -446,3 +446,47 @@ the desktop app ships only when the user says so.
   against a stateful stub `gh` whose `run watch` runs ci-release.sh
   (tag, draft, `--publish`, a failed run, `--local`), then an install
   and an update from the published files.
+
+## 12. The desktop app's release: signed, notarized, two channels (desktop-dist)
+
+The page desktop-dist (his go). One workflow, `.github/workflows/desktop-release.yml`,
+OFF until the repository variable `DESKTOP_RELEASE` is `on`.
+
+- **The runtime**: a desktop release carries a published terminal release, the
+  `v*` tag on its commit (or the input `runtime`): its darwin-arm64 archive,
+  sha256 checked (`scripts/desktop-release.sh runtime`). Its commit is in the
+  app's history and the seams (`rust/proto`, `rust/home`,
+  `rust/tui/src/ambient`) are unchanged since, else refused (a dry run says it
+  and goes on).
+- **The build** (`scripts/desktop-release.sh build`, `scripts/desktop_release.py`):
+  the native helper (macOS 14 floor), `pnpm build`, electron-builder `--dir`
+  (ad hoc), then `scripts/desktop_sign.py`: every piece of code signed on its
+  own, deepest first, never `--deep`, hardened runtime, a timestamp, the
+  entitlements (`apps/desktop/resources/entitlements.mac.plist`: JIT, the
+  microphone, Apple Events) on the executables and the apps. Then
+  notarytool (App Store Connect API key) and stapler on the app, the zip for the
+  updater (`ditto`), the DMG (dmgbuild: the designer's window,
+  `apps/desktop/resources/dmg/layout.json` and `background.png` + `@2x`),
+  signed, notarized, stapled. Gates: `codesign --verify --deep --strict`, the
+  runtime flag, the mounted DMG; signed: `spctl` on the app and the DMG,
+  `stapler validate`, `syspolicy_check distribution`.
+- **Runs**: a `desktop-vYYYY.M.N` tag (or action `build`): signed + a DRAFT
+  release (prerelease, never latest; its body the annotated tag's message).
+  Action `dry-run`: ad hoc, no secret, no release, the files as a run
+  artifact. Action `publish` (tag, beta|stable), `pause`, `resume` (channel):
+  `scripts/desktop_publish.py`.
+- **The feed** (`scripts/desktop_feed.py`, agreed with dist-updater and
+  dist-site): `desktop.json` on two rolling releases, `desktop-beta` and
+  `desktop-latest`, each with `bise-mac-arm64.dmg` (the site's static link)
+  uploaded before the feed. A build goes to beta first; stable never ahead of
+  beta; no channel goes back (N+1 from N's commit instead); `paused: true`
+  stops every offer. `built` is the app's VERSION `built=` byte for byte.
+  Every `gh release create/edit` says `--latest=false`: GitHub's latest is
+  the terminal's channel.
+- **Secrets** (environment `desktop-release`, his approval on each run):
+  `MAC_CERT_P12_BASE64`, `MAC_CERT_PASSWORD`, `APPLE_API_KEY_P8`,
+  `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_TEAM_ID`. The certificate
+  lives in a throwaway keychain, the key in a 0600 file, both deleted at the
+  end of the run.
+- **Test**: `tests/desktop_release_test.py` (pure parts + an ad hoc signing of
+  a fake bundle), `tests/release_split_test.py`.

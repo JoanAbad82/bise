@@ -1,49 +1,228 @@
 # The desktop app's own release (apps/desktop), apart from the terminal's
-# (release.yml, v* tags, latest.json): desktop-on-main, architect m_19472.
+# (release.yml, v* tags, latest.json): desktop-on-main, architect m_19472;
+# signed, notarized and on two channels per the page desktop-dist (his go).
 #
-# OFF until the user says the desktop app is ready: every job runs only
-# when the repository variable DESKTOP_RELEASE is 'on' (Settings >
-# Secrets and variables > Actions > Variables). Unset: a run does nothing.
+# OFF until the user says: every job runs only when the repository
+# variable DESKTOP_RELEASE is 'on' (Settings > Secrets and variables >
+# Actions > Variables). Unset: a run does nothing.
 #
-# Its scheme: tags desktop-vYYYY.M.N (its own counter, never a terminal
-# 2026.10.2-N). Its channel: desktop.json on the rolling tag
-# desktop-latest (bise_home::release::DESKTOP_DIST_URL), pointing at the
-# immutable assets of a desktop-v* release. Its rules, pinned by
-# tests/release_split_test.py:
-#   - a desktop release is a DRAFT, and never GitHub's 'latest'
-#     (--latest=false): 'latest' is every terminal's bise update channel;
-#   - it never uploads latest.json, install.sh or a bise-*.tar.gz;
-#   - release.yml's tag filter (v*) never matches desktop-v*.
+# What runs:
+#   - a desktop-vYYYY.M.N tag (or Actions > desktop-release > action
+#     'build', tag): the build, signed with his Developer ID, notarized and
+#     stapled, then a DRAFT release of the tag (bise-mac-arm64.dmg and .zip
+#     + .sha256, desktop.json, VERSION; its body the annotated tag's message);
+#   - action 'dry-run': the same build ad hoc, no secret, no release: the
+#     DMG and zip as a run artifact;
+#   - action 'publish' (tag, channel beta|stable), 'pause', 'resume'
+#     (channel): the channels (scripts/desktop_publish.py).
+# Signing, notarizing and every publish run in the protected environment
+# desktop-release: he approves each run; its secrets: MAC_CERT_P12_BASE64,
+# MAC_CERT_PASSWORD, APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER,
+# APPLE_TEAM_ID.
 #
-# The build (Electron app + its runtime, signed, zipped) is not wired yet
-# (owner: the desktop lead, when the app is ready): the build job says so
-# and fails, so even with the variable on nothing half-made ships.
+# Its rules (scripts/desktop_feed.py, desktop_publish.py; pinned by
+# tests/release_split_test.py and tests/desktop_release_test.py): a desktop
+# release is never GitHub's 'latest' (--latest=false on every create and
+# edit: 'latest' is every terminal's bise update channel); it never uploads
+# the terminal's files; a build goes to desktop-beta first, desktop-latest
+# never ahead of it, no channel ever goes back. The app carries a published
+# terminal release (the v* tag on its commit, or input runtime).
 name: desktop-release
 
 on:
   push:
     tags: ["desktop-v*"]
   workflow_dispatch:
+    inputs:
+      action:
+        description: "dry-run: build ad hoc, no release. build: signed + draft. publish: the tag on a channel. pause / resume: a channel's offers"
+        type: choice
+        options: [dry-run, build, publish, pause, resume]
+        default: dry-run
+      tag:
+        description: "desktop-vYYYY.M.N (build, publish)"
+        type: string
+        default: ""
+      channel:
+        description: "publish, pause, resume"
+        type: choice
+        options: [beta, stable]
+        default: beta
+      runtime:
+        description: "the terminal release it carries (default: the v* tag on the commit)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}
   cancel-in-progress: false
+
+env:
+  ACTION: ${{ github.event_name == 'push' && 'build' || inputs.action }}
+  TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+  CHANNEL: ${{ inputs.channel }}
+  RUNTIME: ${{ inputs.runtime }}
+  GH_REPO: ${{ github.repository }}
 
 jobs:
   build:
     name: build the desktop app
-    if: ${{ vars.DESKTOP_RELEASE == 'on' }}
+    if: ${{ vars.DESKTOP_RELEASE == 'on' && (github.event_name == 'push' || inputs.action == 'build' || inputs.action == 'dry-run') }}
     runs-on: macos-15
+    timeout-minutes: 120
+    # the secrets only for a signed build; a dry run asks for nothing
+    environment: ${{ (github.event_name == 'push' || inputs.action == 'build') && 'desktop-release' || '' }}
+    steps:
+      - name: The tag
+        run: |
+          case "$ACTION" in
+            build) [[ "$TAG" =~ ^desktop-v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,4}$ ]] || { echo "a build needs a tag desktop-vYYYY.M.N (got '$TAG')"; exit 1; } ;;
+            dry-run) [ -z "$TAG" ] || { echo "a dry run takes no tag"; exit 1; } ;;
+          esac
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || (inputs.tag != '' && format('refs/tags/{0}', inputs.tag) || github.ref) }}
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/desktop/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: dmgbuild (pinned)
+        run: |
+          python3 -m venv "$RUNNER_TEMP/py"
+          "$RUNNER_TEMP/py/bin/pip" install --quiet dmgbuild==1.6.7
+          echo "PY=$RUNNER_TEMP/py/bin/python" >> "$GITHUB_ENV"
+
+      - name: The runtime (a published terminal release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dry=(); [ "$ACTION" = dry-run ] && dry=(--dry-run)
+          root="$("$PY" -B scripts/desktop_release.py runtime --out "$RUNNER_TEMP/desk" ${RUNTIME:+--tag "$RUNTIME"} "${dry[@]}")"
+          echo "RUNTIME_ROOT=$root" >> "$GITHUB_ENV"
+          cat "$root/VERSION"
+
+      # his Developer ID in a throwaway keychain, the API key in a 0600 file;
+      # both gone in the last step, whatever happened
+      - name: The signing keychain
+        if: ${{ env.ACTION == 'build' }}
+        env:
+          MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for s in MAC_CERT_P12_BASE64 MAC_CERT_PASSWORD APPLE_API_KEY_P8 APPLE_TEAM_ID; do
+            [ -n "${!s}" ] || { echo "the environment desktop-release has no secret $s"; exit 1; }
+          done
+          kc="$RUNNER_TEMP/desktop-sign.keychain-db"
+          pass="$(openssl rand -hex 24)"
+          security create-keychain -p "$pass" "$kc"
+          security set-keychain-settings -lut 7200 "$kc"
+          security unlock-keychain -p "$pass" "$kc"
+          umask 077
+          printf '%s' "$MAC_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$MAC_CERT_PASSWORD" -f pkcs12 -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          curl -fsSL -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$kc" || true
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pass" "$kc" > /dev/null
+          read -r -a kcs <<< "$(security list-keychains -d user | tr -d '"' | xargs)"
+          security list-keychains -d user -s "$kc" "${kcs[@]}"
+          id="$(security find-identity -v -p codesigning "$kc" | grep -F "Developer ID Application:" | grep -F "($APPLE_TEAM_ID)" | awk '{print $2}' | head -n 1)"
+          [ -n "$id" ] || { echo "no Developer ID Application identity of team $APPLE_TEAM_ID in MAC_CERT_P12_BASE64"; exit 1; }
+          printf '%s\n' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+          {
+            echo "SIGN_ID=$id"
+            echo "SIGN_KEYCHAIN=$kc"
+          } >> "$GITHUB_ENV"
+
+      - name: Build, sign${{ env.ACTION == 'build' && ', notarize, staple' || ' (ad hoc)' }}
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          args=(--out "$RUNNER_TEMP/desk" --runtime-root "$RUNTIME_ROOT" --repo "$GH_REPO")
+          if [ "$ACTION" = build ]; then
+            export APPLE_API_KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+            args+=(--tag "$TAG" --identity "$SIGN_ID" --keychain "$SIGN_KEYCHAIN" --notarize)
+          fi
+          "$PY" -B scripts/desktop_release.py build "${args[@]}"
+          ls -la "$RUNNER_TEMP/desk/release"
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ env.ACTION }}
+          path: ${{ runner.temp }}/desk/release/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Forget the keychain and the key
+        if: ${{ always() }}
+        run: |
+          if [ -n "${SIGN_KEYCHAIN:-}" ]; then security delete-keychain "$SIGN_KEYCHAIN" || true; fi
+          rm -f "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/cert.p12"
+
+  # the build's draft: nothing reads a draft; his word publishes it (action publish)
+  draft:
+    name: draft release
+    if: ${{ vars.DESKTOP_RELEASE == 'on' && (github.event_name == 'push' || inputs.action == 'build') }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: not wired yet
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          fetch-depth: 1
+
+      - name: The tag's notes
+        run: git fetch --force --no-tags origin "refs/tags/$TAG:refs/tags/$TAG"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-build
+          path: ${{ runner.temp }}/release
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B scripts/desktop_publish.py draft "$TAG" "$RUNNER_TEMP/release"
+
+  # the channels: his approval on every run (the environment's reviewers)
+  publish:
+    name: ${{ inputs.action }} ${{ inputs.channel }}
+    if: ${{ vars.DESKTOP_RELEASE == 'on' && (github.event_name == 'workflow_dispatch' && (inputs.action == 'publish' || inputs.action == 'pause' || inputs.action == 'resume')) }}
+    runs-on: ubuntu-latest
+    environment: desktop-release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ${{ inputs.action }}
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "desktop-release: the desktop app's build isn't wired yet (apps/desktop, electron-builder + its runtime)."
-          echo "Nothing is built or published. Wire it, then the draft step below, when the user says the app is ready."
-          exit 1
-  # the draft, once the build makes its zip (left for the build's owner):
-  #   gh release create "$tag" --draft --latest=false <zip> <zip>.sha256
-  #   then desktop.json {kind: desktop, version, runtime_id, targets} on desktop-latest
+          if [ "$ACTION" = publish ]; then
+            python3 -B scripts/desktop_publish.py publish "$TAG" "$CHANNEL"
+          else
+            python3 -B scripts/desktop_publish.py "$ACTION" "$CHANNEL"
+          fi

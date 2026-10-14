@@ -1,0 +1,9 @@
+{
+  "volume_name": "bise",
+  "background": "background.png",
+  "window": { "x": 200, "y": 120, "width": 660, "height": 400 },
+  "icon_size": 128,
+  "text_size": 13,
+  "icons": { "app": [180, 200], "applications": [480, 200] },
+  "format": "ULMO"
+}

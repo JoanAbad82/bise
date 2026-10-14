@@ -86,7 +86,8 @@ def main():
     if not js:
         fails.append("desktop-release.yml has no jobs block this test can read")
     for name, text in js.items():
-        if not re.search(r"^\s+if:\s*\$\{\{\s*vars\.DESKTOP_RELEASE\s*==\s*'on'\s*\}\}", text, re.M):
+        # the gate first: `vars.DESKTOP_RELEASE == 'on'` alone, or `... == 'on' && (<which action>)`
+        if not re.search(r"^\s+if:\s*\$\{\{\s*vars\.DESKTOP_RELEASE\s*==\s*'on'\s*(\}\}|&&\s*\()", text, re.M):
             fails.append("desktop-release.yml job %s isn't gated on vars.DESKTOP_RELEASE == 'on' (OFF until he says)" % name)
     code = "\n".join(code_lines(d))
     if re.search(r"--latest(?!=false)", code):
