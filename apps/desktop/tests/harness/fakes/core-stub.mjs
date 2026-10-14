@@ -43,7 +43,7 @@ const start = again ? all.filter((l) => !ONCE.has(JSON.parse(l).ev)) : all;
 // The world is written at spawn: the app's main keeps the newest state events and replays them to
 // a window that loads later (amb-core 162ec18b). A thread's lines aren't state: like the real core,
 // the stub sends them when the window asks (subscribe, page) and answers the per-project asks
-// (diff, worktrees, dev_servers, merged) from the same world.
+// (diff, worktrees, dev_servers, merged, inbox_history) from the same world.
 const evs = start.map((l) => JSON.parse(l));
 const same = (ev, cmd) => ev.project === cmd.project && (cmd.agent === undefined || ev.agent === undefined || ev.agent === cmd.agent);
 function answer(cmd) {
@@ -53,6 +53,9 @@ function answer(cmd) {
     case 'page': return of(['thread'], (ev) => ev.before !== null && ev.before !== undefined);
     case 'diff': return of(['diff'], (ev) => (cmd.commit ? ev.merged === cmd.commit : !ev.merged));
     case 'worktrees': case 'dev_servers': case 'merged': return of([cmd.cmd]);
+    // the inbox screen's history (inbox/history): the world's page of that project; an older one
+    // (before) has none
+    case 'inbox_history': return cmd.before == null ? of(['inbox_history']) : [];
     // /log: the world's pages of that agent's session, the newest (no before) or the one before a seq
     case 'log': return of(['log'], (ev) => (cmd.before === undefined ? (ev.items[0]?.seq ?? 0) >= Math.max(...evs.filter((e) => e.ev === 'log' && same(e, cmd)).map((e) => e.items[0]?.seq ?? 0)) : (ev.items.at(-1)?.seq ?? 0) < cmd.before)).slice(-1);
     default: return [];

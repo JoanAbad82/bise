@@ -4,8 +4,8 @@
 // (List.tsx). ⏎ on a waiting item opens it above this screen's composer (openInbox, as ⌘I); a past
 // one goes to his answer: the thread at it with one th-flash, a history step (answered-link's
 // openAnswer, the one jump), or the page at its block. Owner: inbox-screen.
-import { useCallback, useMemo } from 'react';
-import { useActed, useProjects, useStore } from '@/store';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useActed, useProjects, useStore, useThreadOrder } from '@/store';
 import { useRouter } from '@/app/router';
 import { useKeptScroll } from '@/app/keep';
 import { actedKeys, threadKey, type Store } from '@/store';
@@ -25,6 +25,18 @@ export function InboxScreen() {
   const cards = useMemo(() => blockList(rows, actedKeys(acted)), [rows, acted]);
   const names = useMemo(() => Object.fromEntries(rows.map((r) => [r.project, r.name])), [rows]);
   const projects = useMemo(() => rows.map((r) => ({ project: r.project, name: r.name })), [rows]);
+  // the detail's thread, read while it shows: its next line ('perf went on: …') comes with it
+  const [looked, setLooked] = useState<InboxRecord | null>(null);
+  const at = looked?.thread ?? null;
+  const lookKey = at === null || looked === null ? '' : threadKey(looked.project, at.agent);
+  useThreadOrder(lookKey);
+  useEffect(() => {
+    if (looked === null || at === null) return;
+    store.subscribeThread(looked.project, at.agent);
+    return () => {
+      store.unsubscribeThread(looked.project, at.agent);
+    };
+  }, [store, looked, at]);
   const jump = useCallback(
     (j: Jump) => {
       if (j.kind === 'thread') {
@@ -45,6 +57,7 @@ export function InboxScreen() {
       names={names}
       projects={projects}
       nextOf={(r) => nextLine(store, r)}
+      onDetail={setLooked}
       ports={{
         answer: (project, card) => {
           openInbox({ project, card });

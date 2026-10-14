@@ -7,7 +7,7 @@
 // 800 the agents go into the projects menu, 'withdrawn' too, and the rows drop the project and
 // the 'where', whole (past.css). From props: the store's wiring is InboxScreen
 // (InboxScreen.tsx). Owner: inbox-screen.
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import type { Card } from '@/proto';
 import { useListKeys } from '@/app/listkeys';
 import { Button, Field, Menu, MenuItem, Press } from '@/ds';
@@ -37,11 +37,13 @@ export interface InboxViewProps {
   readonly ports: InboxPorts;
   /** the asker's first line after his answer, when its thread holds it (the detail's 'went on') */
   readonly nextOf?: (r: InboxRecord) => string | undefined;
+  /** the record the detail shows (none: the list): the screen reads its thread meanwhile */
+  readonly onDetail?: (r: InboxRecord | null) => void;
   /** now (a test or a shot pins it) */
   readonly now?: number;
 }
 
-export function InboxView({ cards, records, answered, onEnd, names, projects, ports, nextOf, now: pinned }: InboxViewProps) {
+export function InboxView({ cards, records, answered, onEnd, names, projects, ports, nextOf, onDetail, now: pinned }: InboxViewProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [f, setF] = useState<Filter>(ALL);
@@ -57,6 +59,10 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
     if (p) ports.jump(jumpOf(p.r));
   };
   const cur = detail === null ? undefined : pastBy.get(detail);
+  const looked = cur?.r ?? null;
+  useEffect(() => {
+    onDetail?.(looked);
+  }, [onDetail, looked]);
   const screenKey = (e: KeyboardEvent, k: string | null): boolean => {
     if (e.metaKey || e.ctrlKey || e.altKey) return false;
     if (cur) {

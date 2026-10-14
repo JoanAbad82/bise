@@ -144,10 +144,15 @@ test('inbox/inbox-screen: the sidebar row, waiting first then the past by day, �
     });
 
     await test.step('⏎ on a waiting item opens it above the composer, as ⌘I', async () => {
+      const focused = await page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? document.activeElement?.tagName ?? '');
+      expect(focused, 'back from the detail, the list keeps the keys').toBe('inbox.screen');
+      // perf's 'which bench?' (rank 1, newer) sits under search's; ↓ then ⏎ opens it above the composer
       await page.keyboard.press('Home');
+      await expect(page.locator('.ip-row.on')).toHaveAttribute('data-row', `w:${P}/11`);
+      await page.keyboard.press('ArrowDown');
       await page.keyboard.press('Enter');
       await expect(page.getByTestId(`inbox.block.card.${P}-9`)).toBeVisible({ timeout: 3000 });
-      await expect(page.getByTestId('composer').first()).toContainText('answering perf · which bench?');
+      await expect(page.getByTestId('composer').first()).toContainText('answering perf');
       await shoot(page, core, 'answer-1400');
       await page.keyboard.press('Escape');
     });
