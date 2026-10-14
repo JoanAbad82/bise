@@ -250,3 +250,38 @@ cause is not known. The next 5 runs under caffeinate were green (187-202
 s). Next time it is red: keep the run in a short TMPDIR that nothing
 sweeps (`TMPDIR=~/.bise/gate/<name>`), and read hub.log for the new
 hub's start and the switcher's `start_failure` line.
+
+## T3: the expired one-release shims went (closed)
+
+Rule 7, checked against the tags (main at v2026.10.2-34) and the desktop
+(no desktop release out; the dev app runs this tree's core). Each sha
+names the release that last needed its shim:
+
+- the hub's older door and hello stub (DOOR_* tables, Conn.older, the
+  typed hello): its last client was v2026.10.2-29's core; client-protocol
+  shipped in -30. An older client now gets `exe` + `reload`, then the
+  close (`tests/older_door_e2e.py` pins it). `HubCmd::Hello` went too.
+- hub.sock's agent requests (`peer::Access::Shim`): REPLs adopted from
+  before -26; his hub.log's last use was Oct 7, before -26 (issue 16).
+- `bise stop`'s and the launch version switch's older fallbacks, and the
+  desktop core's older door: a hub that doesn't serve `initialize`
+  (`Init::NotRpc`) is never asked; the client says `rpc::HUB_OLDER`
+  (stop it with `bise switchboard --stop`, then start bise again); the
+  core refuses that project's connection with those words.
+- the `bend-harness` link (BISE-165, v2026.9.29): out of version dirs,
+  the release tarball and new installs; an old dir's own bend-harness is
+  still read, and an existing `~/.local/bin/bend-harness` is untouched.
+
+What `rg 'release after|one release'` still lists, each inside its window:
+
+- parts-text: `daemon/proto/cmds.rs:39`;
+- file-chips: `rust/proto/src/hub.rs:447,524`, `parts_in.rs:95`,
+  `daemon/proto/cmds.rs:150,491`, `apps/desktop/src/proto/hub.ts:131`;
+- A1's words fallback: `apps/desktop/src/store/echo.ts:44` (and its test);
+- the composer's Lexical reader: `apps/desktop/src/composer/entry.ts:6`
+  (counts desktop releases; none has shipped: architect m_23296);
+- `rust/harness/src/update.rs:325` (the release after his next app update);
+- LEGACY_ID (no 'release after' words; not expired).
+
+The rest are prose (principles, research, brand, the site's demo) or the
+lines above that say a shim went.
