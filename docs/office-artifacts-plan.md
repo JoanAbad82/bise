@@ -320,7 +320,29 @@ Also:
   `heavy-run --low`, lands on `office-artifacts` with `sb land --here`, and
   sends architect its sha before landing.
 
-## 10. Design questions for Gabriel (designer's page)
+## 9b. Gabriel's picks and the notes seam (card #537, architect m_23874)
+
+Gabriel took designer's picks on all four (page `office-artifacts` v2):
+deck with a slide rail, doc as pages, sheet as drawn; notes through the
+maker's composer; each save live in place, one version per turn; drop on a
+thread or the list, `+ add`.
+
+- **One store, two doors.** Browser: notes.js's list + `/api/a/<id>/send`.
+  Desktop: the frame posts `{artifact, version, anchor, quote}` to its
+  parent (origin and source checked); it becomes a composer attachment and
+  is sent as a new message part, `Part::Anchor` in `bise_proto::parts`
+  (`Unknown` kept). At the door `parts_in::said` checks the artifact and
+  version, then the pages module records the note `sent` in
+  `artifacts/<id>/notes.json`. Marks and ✓ come from that one store.
+- **What changed** is computed by the writer: `run.write` sends
+  `diff(prev, new)` as a short `[Anchor]` list, an added field of the add
+  request; `artifacts.rs` keeps it per rev and merges a turn's revs. The
+  hub runs no JS.
+- Owners: `Part::Anchor`, `parts_in`, `render()` and the notes words:
+  art-notes. The changed list (jsrt + the add request field) and the live
+  words: art-live. Drawing them in the app: art-desktop.
+
+## 10. Design questions for Gabriel (designer's page, answered)
 
 1. The viewer per format in the side panel (55% column): the sheet grid
    and its tabs, the deck with a slide rail or one slide at a time, the doc
