@@ -568,7 +568,7 @@ impl Shell {
             },
             (None, true) => {
                 let html = pages.store.html(&id, meta.version()).unwrap_or_default();
-                let sends: Vec<String> = crate::pages::drafts::pending(&html, &pages.store.notes(&id), &pages.store.questions(&id))
+                let sends: Vec<String> = crate::pages::drafts::pending(&html, &pages.store.notes(&id), &pages.store.questions(&id), &meta.went_blocks())
                     .iter()
                     .filter(|d| d.kind != "action")
                     .map(|d| d.key())
