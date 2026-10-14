@@ -1,6 +1,6 @@
 // app/sidebar-v6 · designer's desktop-screens v6/v7, signed (m_11834, lead m_11830): the sidebar,
 // the titlebar, the right panel A's frame, and under 1000 px the slide-over. Passes when, at 1400
-// px on perf's thread: the sidebar is 240 px with 'search or jump ⌘K', bise with his pink count,
+// px on perf's thread: the sidebar is 240 px with 'search or jump ⌘K', bise, '? inbox' with his pink count,
 // '↗ artifacts 1 new', '◷ scheduled 1', 'projects', storefront's row its '?' mark + 1 (desktop-delight v2), places only: no
 // agent row in the sidebar (designer's desktop-right-bar v5: the agents are in the right bar, each
 // with its sign ∿ ? ✗ ◷ ✓, never a 'main' row, 8 then '+ 1 more'), the titlebar 'storefront › perf' and '↗ artifacts · 1
@@ -68,23 +68,25 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     expect(Math.round((await side.boundingBox())?.width ?? 0), 'the sidebar is 240 px').toBe(240);
     await expect(page.getByTestId('app.sidebar.search')).toContainText('search or jump');
     // the grid (designer m_21057, desktop-spacing): the title bar's band 40; the field 28 px, 4 under
-    // it (44-72); the place rows on 28 from 76; 'projects' 16 above, a 16 px line, 4 below; the
-    // first project at 196; the right bar's rule is the title bar's (one line across the columns)
+    // it (44-72); the place rows on 28 from 76 (bise, inbox, artifacts, scheduled); 'projects' 16 above, a 16 px line, 4 below; the
+    // first project at 224 (the inbox row under bise); the right bar's rule is the title bar's (one line across the columns)
     const box = async (id: string) => {
       const b = await page.getByTestId(id).boundingBox();
       return { top: Math.round(b?.y ?? -1), bottom: Math.round((b?.y ?? -1) + (b?.height ?? 0)) };
     };
     expect(await box('app.sidebar.search'), 'the field: 28 px, 4 under the lights band').toEqual({ top: 44, bottom: 72 });
     expect((await box('app.sidebar.bise')).top, 'bise at 76').toBe(76);
-    expect((await box('app.sidebar.artifacts')).top, 'artifacts at 104').toBe(104);
-    expect((await box('app.sidebar.scheduled')).top, 'scheduled at 132').toBe(132);
+    // inbox-history pick A: '? inbox' under bise, then artifacts and scheduled
+    expect((await box('app.sidebar.inbox')).top, 'inbox at 104').toBe(104);
+    expect((await box('app.sidebar.artifacts')).top, 'artifacts at 132').toBe(132);
+    expect((await box('app.sidebar.scheduled')).top, 'scheduled at 160').toBe(160);
     const head = await side.locator('.b-sh').first().evaluate((el) => {
       const r = el.getBoundingClientRect();
       const cs = getComputedStyle(el);
       return { textTop: Math.round(r.top + parseFloat(cs.paddingTop)), line: cs.lineHeight };
     });
-    expect(head, "'projects': 16 above (176), a 16 px line").toEqual({ textTop: 176, line: '16px' });
-    expect((await box(`app.sidebar.project.${P}`)).top, 'the first project at 196').toBe(196);
+    expect(head, "'projects': 16 above (204), a 16 px line").toEqual({ textTop: 204, line: '16px' });
+    expect((await box(`app.sidebar.project.${P}`)).top, 'the first project at 224').toBe(224);
     const rules = await page.evaluate(() => {
       const bottom = (sel: string) => {
         const el = document.querySelector(sel);
@@ -93,7 +95,9 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
       return { title: bottom('[data-testid="app.title"]'), right: bottom('[data-testid="app.right.top"]') };
     });
     expect(rules.right, "the right bar's rule on the title bar's").toBe(rules.title);
-    await expect(page.getByTestId('app.sidebar.bise').locator('.app-cnt'), "bise's pink count").toHaveText('2');
+    // the pink count is the inbox row's (inbox-history pick A); bise keeps its ':*'
+    await expect(page.getByTestId('app.sidebar.inbox').locator('.app-cnt'), "the inbox row's pink count").toHaveText('2');
+    await expect(page.getByTestId('app.sidebar.bise').locator('.app-cnt')).toHaveCount(0);
     await expect(page.getByTestId('app.sidebar.bise.mark'), "something waits: bise's ':*' in the accent").toHaveAttribute('data-waits', 'true');
     // tui-parity R17: who made it, until he opens the artifacts
     await expect(page.getByTestId('app.sidebar.artifacts')).toContainText('1 new · perf');
