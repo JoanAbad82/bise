@@ -1,0 +1,38 @@
+{"type":"task_created","name":"docs","parent":"main","brief":{"objective":"write the docs","done_when":["a page"]},"ws":{"kind":"worktree","dir":"/Users/camille/acme/.bise/docs"},"at_ms":1000000}
+{"type":"lifecycle","name":"docs","lifecycle":"stopped","reason":"dropped by main"}
+{"type":"workspace_changed","name":"docs","ws":{"kind":"shared","dir":"/Users/camille/acme"}}
+{"type":"snapshot","name":"docs","snapshot_ref":"refs/bise/snap/docs-1"}
+{"type":"declared","name":"docs","status":"blocked","note":"needs the API key"}
+{"type":"reported","name":"docs","report":{"kind":"done","summary":"the page is up"}}
+{"type":"file_touched","name":"docs","path":"docs/index.md"}
+{"type":"renamed","name":"docs","new_name":"docs-site"}
+{"type":"message_sent","msg":{"id":7,"thread":7,"from":"user","to":"main","reply_to":null,"expect_reply":true,"auto":false,"text":"ship the docs","created_ms":1000100,"plain":false,"queued":true,"via":"desktop","parts":"[]"}}
+{"type":"message_state","id":7,"state":"queued","reason":"main is busy"}
+{"type":"message_settled","id":7}
+{"type":"card_opened","card":{"id":3,"kind":"question","agent":"docs","text":"which theme?","for_msg":7,"created_ms":1000200,"place":null,"pr":null}}
+{"type":"card_closed","id":3,"resolution":"answered"}
+{"type":"main_note","text":"docs is blocked","at_ms":1000300}
+{"type":"main_notes_flushed"}
+{"type":"every_set","id":2,"agent":"main","by":"user","text":"check the deploy","next_ms":1600000,"every_ms":600000,"until_ms":87400000,"times":5,"page":"deploy","name":"deploy check","held":true,"at":1000400}
+{"type":"every_fired","id":2,"fired":1,"next_ms":2200000,"at":1600000,"undelivered":true}
+{"type":"every_run","id":2,"at":1600100}
+{"type":"every_stop","id":2,"why":"until","at":87400000}
+{"type":"every_name","id":2,"name":"deploy check","at":1000500,"announce":true}
+{"type":"x_out","out":{"xid":1,"project":"shop-1a2b3c4d","kind":"ask","msg":7,"text":"is the shop up?","state":"pending","tries":0,"context":"from bise","parts":"[]"}}
+{"type":"x_acked","xid":1}
+{"type":"x_failed","xid":1}
+{"type":"x_settled","xid":1}
+{"type":"x_in","in":{"hub":"home-00000000","xid":4,"msg":9,"kind":"job_end","replied":true}}
+{"type":"x_replied","hub":"home-00000000","xid":4}
+{"type":"route_held","route":{"rid":2,"text":"tell shop to deploy","via":"spotlight","to":"shop-1a2b3c4d","name":"shop","due_ms":1003000,"act":5,"why":"named shop","state":"held","context":"","parts":"[]"}}
+{"type":"route_set","rid":2,"to":"acme-1a2b3c4d","name":"acme"}
+{"type":"route_sent","rid":2}
+{"type":"route_cancelled","rid":3}
+{"type":"act_set","act":{"id":5,"due":1003000,"what":{"kind":"route_send","rid":2}}}
+{"type":"act_done","id":5}
+{"type":"follow","name":"docs","on":true,"hub":"home-00000000"}
+{"type":"job_end","name":"docs","state":"done"}
+{"type":"wake_set","watch":{"id":1,"agent":"docs","spec":{"kind":"pid","pid":4242},"max_text":"1h","set_at":1000600,"max_at":4600600,"quiet":false,"resumes":true}}
+{"type":"wake_end","id":1,"why":"exited","at":1100000}
+{"type":"paused","at":1200000}
+{"type":"resumed","at":1300000}

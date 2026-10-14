@@ -604,8 +604,9 @@ step() {  # <name> <cmd...>: one line when green, the failures and the log when 
 }
 # sb-core's side of bise_proto::core is generated too (issue 25): a change to
 # the schema, its generator or bend/hub/gen/ runs bise-proto's tests (core_gen:
-# a stale or hand-edited gen file is red) and gen/laws.bend (decode∘encode,
-# the tag table) must check; a bend/ change still runs PROOF above
+# a stale or hand-edited gen file is red) and gen/laws.bend and
+# gen/journal-laws.bend (decode∘encode, the tag table, the journal fixture)
+# must check; a bend/ change still runs PROOF above
 if printf '%s\n' "$changed" | grep -qE '^(rust/proto/src/core/|rust/proto/tests/core_gen\.rs|bend/hub/gen/)'; then
   add bise-proto; core_gen=1
 fi
@@ -634,7 +635,7 @@ else
   echo "no Rust or hub change vs $base: no Rust tests run"
 fi
 # the generated codecs' laws (issue 25, mapped above)
-[ "${core_gen:-0}" = 1 ] && step core_gen_laws bash -c 'r=$(BEND_NO_TELEMETRY=1 bend bend/hub/gen/laws.bend 2>&1); echo "$r"; grep -q "ALL PROOFS CHECK" <<<"$r"'
+[ "${core_gen:-0}" = 1 ] && step core_gen_laws bash -c 'for f in laws journal-laws; do r=$(BEND_NO_TELEMETRY=1 bend bend/hub/gen/$f.bend 2>&1); echo "$f: $r"; grep -q "ALL PROOFS CHECK" <<<"$r" || exit 1; done'
 # bise desktop's TS types (apps/desktop/src/proto) are bise-proto's, generated:
 # a stale or hand-edited file is red (BISE_PROTO_BLESS=1 on that test rewrites them)
 [ "${proto_ts:-0}" = 1 ] && step proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"

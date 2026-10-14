@@ -33,6 +33,7 @@ fn full(k: FieldKind, name: &str) -> Value {
         Ver => json!(2),
         Recs(r) => json!([full_rec(&VIEW, r)]),
         OptJsonsOmit => json!([{"id": 4}, "x"]),
+        Flag | Rec(_) | Inline(_) | InlineOpt(_) => unreachable!("a journal field: no serde type (journal.rs)"),
     }
 }
 
@@ -53,6 +54,7 @@ fn empty(k: FieldKind) -> Option<Value> {
         Strs | Nats | Jsons | Msgs | Recs(_) => Some(json!([])),
         Ver => Some(json!(1)),
         StrOmit | OptStrOmit | OptNatOmit | OptBoolOmit | OptStrsOmit | OptJsonsOmit => None,
+        Flag | Rec(_) | Inline(_) | InlineOpt(_) => unreachable!("a journal field: no serde type (journal.rs)"),
     }
 }
 

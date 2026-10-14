@@ -186,6 +186,14 @@ def omit_mjs(+k: String, m: Maybe<&2, List<&2, J.Json>>) -> List<&2, Sigma<&2, &
     case Some{+xs}:
       [J.kv(k, J.JArr{xs})]
 
+# a flag, written only when true (an old line has none: false)
+def flag(+k: String, +b: Bool) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match b:
+    case True{}:
+      [J.kv(k, J.JBool{True{}})]
+    case False{}:
+      Nil{}
+
 def cat(xss: List<&2, List<&2, Sigma<&2, &2, String, _ => J.Json>>>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   match xss:
     case Nil{}:

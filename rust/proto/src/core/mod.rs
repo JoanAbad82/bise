@@ -13,6 +13,8 @@
 //! - [`Fx`] (tag `"fx"`): one variant per effect sb-core answers with;
 //! - [`Feed`] (tag `"sb"`, DRAFT): the typed records of an agent's
 //!   transcript, the hub's `sb <kind> : …` lines.
+//! - [`JOURNAL`] (tag `"type"`): sb-core's journal lines, a table only
+//!   (journal.rs: each row's Bend `M.Ev` pattern; no Rust type yet).
 //!
 //! Each field is today's JSON exactly: its name, whether it is written
 //! when empty or none, null or absent. Each enum has `Unknown { tag, raw }`:
@@ -35,12 +37,14 @@
 pub mod feed;
 pub mod fx;
 pub mod input;
+pub mod journal;
 pub mod link;
 pub mod view;
 
 pub use feed::Feed;
 pub use fx::Fx;
 pub use input::{In, Step};
+pub use journal::JOURNAL;
 pub use link::{Answer, Link};
 pub use view::{View, ViewAgent, ViewMsg, VIEW};
 
@@ -92,6 +96,31 @@ pub enum FieldKind {
     /// `Option<Vec<Value>>`, absent when none (the view's parts a step
     /// did not change).
     OptJsonsOmit,
+    /// `bool`, written only when true; missing reads false (the
+    /// journal's `undelivered`, `announce`).
+    Flag,
+    /// one of sb-core's own records or enums under its key, read and
+    /// written by its hand codec ([`Codec`]; the journal's `msg`, `card`,
+    /// `lifecycle`...).
+    Rec(&'static Codec),
+    /// a record of sb-core whose keys sit in the line's own object (the
+    /// journal's message state: `state` with `reason` or `error`).
+    Inline(&'static Codec),
+    /// like [`FieldKind::Inline`], but its read may fail and the whole line
+    /// is then skipped (an `every_set` without a schedule).
+    InlineOpt(&'static Codec),
+}
+
+/// A hand codec of sb-core (bend/hub/codec.bend, imported as `C`): its
+/// Bend type, `C.<name>_of` and `C.<name>_json` (a [`FieldKind::Rec`]:
+/// the value under its key) or `C.<name>_kvs` (inline: its keys). `cases`:
+/// the value's constructors, when a decode∘encode proof splits on them
+/// instead of using the codec's own law `C.<name>_round`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Codec {
+    pub name: &'static str,
+    pub ty: &'static str,
+    pub cases: &'static [&'static str],
 }
 
 /// One field of a kind.

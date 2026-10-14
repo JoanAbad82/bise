@@ -237,12 +237,12 @@ def opt_str(m: Maybe<&2, J.Json>) -> Maybe<&2, String>:
     case _:
       None{}
 
-def life_of(+s: String) -> M.Life:
+def life.of_s(+s: String) -> M.Life:
   Bool.pick(M.Life, String.eq(s, "stopped"), M.LStopped{},
     Bool.pick(M.Life, String.eq(s, "archived"), M.LArchived{},
       Bool.pick(M.Life, String.eq(s, "failed"), M.LFailed{}, M.LActive{})))
 
-def decl_of(m: Maybe<&2, String>) -> Maybe<&2, M.Decl>:
+def decl.of_s(m: Maybe<&2, String>) -> Maybe<&2, M.Decl>:
   match m:
     case None{}:
       None{}
@@ -390,6 +390,68 @@ def timer_set_of(s: Maybe<&2, TM.Sched>, +j: J.Json) -> Maybe<&2, M.Ev>:
         get_nat(j, "next_ms"), opt_nat(J.get(j, "until_ms")), opt_nat(J.get(j, "times")), 0n,
         opt_str(J.get(j, "page")), 0n, Nil{}, get_s(j, "name"), get_b(j, "held")}, get_nat(j, "at")}}
 
+# ---- the records inside a journal line, for gen/journal.bend (one codec
+# per record; journal.rs's Codec rows name them) ----
+
+def life_of(j: J.Json) -> M.Life:
+  match j:
+    case J.JStr{+s}:
+      life.of_s(s)
+    case _:
+      M.LActive{}
+
+def life_json(l: M.Life) -> J.Json:
+  J.JStr{life_str(l)}
+
+def decl_of(j: J.Json) -> Maybe<&2, M.Decl>:
+  match j:
+    case J.JStr{+s}:
+      decl.of_s(Some{s})
+    case _:
+      None{}
+
+def decl_json(m: Maybe<&2, M.Decl>) -> J.Json:
+  jmaybe_decl(m)
+
+# an every_set's timer: its keys but `at` (the line's), its schedule as
+# every.rs wrote it; no schedule: no timer (the line is skipped)
+def timer.with(s: Maybe<&2, TM.Sched>, +j: J.Json) -> Maybe<&2, TM.Timer>:
+  match s:
+    case None{}:
+      None{}
+    case Some{+sc}:
+      Some{TM.Timer{get_nat(j, "id"), get_s(j, "agent"), get_s(j, "by"), get_s(j, "text"), sc,
+        get_nat(j, "next_ms"), opt_nat(J.get(j, "until_ms")), opt_nat(J.get(j, "times")), 0n,
+        opt_str(J.get(j, "page")), 0n, Nil{}, get_s(j, "name"), get_b(j, "held")}}
+
+def timer_of(+j: J.Json) -> Maybe<&2, TM.Timer>:
+  timer.with(sched_of(opt_nat(J.get(j, "every_ms")), opt_nat(J.get(j, "daily_min"))), j)
+
+def timer_kvs(+t: TM.Timer) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  List.append(&2, Sigma<&2, &2, String, _ => J.Json>,
+    [J.kv("id", J.JNum{TM.Timer.id(t)}), J.kv("agent", J.JStr{TM.Timer.agent(t)}),
+      J.kv("by", J.JStr{TM.Timer.by(t)}), J.kv("text", J.JStr{TM.Timer.text(t)}),
+      J.kv("next_ms", J.JNum{TM.Timer.next(t)}), TM.sched_kv(TM.Timer.sched(t))],
+    List.append(&2, Sigma<&2, &2, String, _ => J.Json>, TM.opt_kvs(t), TM.flag_kv("held", TM.Timer.held(t))))
+
+def out_json(+o: XH.Out) -> J.Json:
+  XH.out_json(o)
+
+def xin_json(+i: XH.XIn) -> J.Json:
+  XH.xin_json(i)
+
+def route_json(+r: XH.Route) -> J.Json:
+  XH.route_json(r)
+
+def act_json(+a: TM.Act) -> J.Json:
+  TM.act_json(a)
+
+def watch_of(+j: J.Json) -> WK.Watch:
+  WK.watch_of(j)
+
+def watch_json(+w: WK.Watch) -> J.Json:
+  WK.watch_json(w)
+
 # a match on the kind, not a Bool.pick chain: the chain decoded the event
 # as every kind, then kept one
 def ev_of.kind(k: EvK, +j: J.Json, +n: String) -> Maybe<&2, M.Ev>:
@@ -397,13 +459,13 @@ def ev_of.kind(k: EvK, +j: J.Json, +n: String) -> Maybe<&2, M.Ev>:
     case KTaskCreated{}:
       Some{M.ETaskCreated{n, get_s(j, "parent"), get_j(j, "brief"), get_j(j, "ws"), get_nat(j, "at_ms")}}
     case KLifecycle{}:
-      Some{M.ELifecycle{n, life_of(get_s(j, "lifecycle")), opt_str(J.get(j, "reason"))}}
+      Some{M.ELifecycle{n, life_of(get_j(j, "lifecycle")), opt_str(J.get(j, "reason"))}}
     case KWorkspace{}:
       Some{M.EWorkspace{n, get_j(j, "ws")}}
     case KSnapshot{}:
       Some{M.ESnapshot{n, opt_str(J.get(j, "snapshot_ref"))}}
     case KDeclared{}:
-      Some{M.EDeclared{n, decl_of(opt_str(J.get(j, "status"))), get_s(j, "note")}}
+      Some{M.EDeclared{n, decl_of(get_j(j, "status")), get_s(j, "note")}}
     case KReported{}:
       Some{M.EReported{n, get_j(j, "report")}}
     case KFileTouched{}:
@@ -476,3 +538,166 @@ def ev_of.kind(k: EvK, +j: J.Json, +n: String) -> Maybe<&2, M.Ev>:
 
 def ev_of(+j: J.Json) -> Maybe<&2, M.Ev>:
   ev_of.kind(ev_kind(get_s(j, "type")), j, get_s(j, "name"))
+
+# ---- each record reads back what it writes (gen/journal-laws.bend's
+# round laws go through these) ----
+
+law msg_round:
+  for m: M.Msg
+  {msg_of(msg_json(m)) == m : M.Msg}
+
+def msg_round(m):
+  match m:
+    case M.Msg{id, th, fr, to, None{}, ex, au, tx, cr, pl, qu, None{}, SNil{}}:
+      {==}
+    case M.Msg{id, th, fr, to, None{}, ex, au, tx, cr, pl, qu, None{}, SCon{h, t}}:
+      {==}
+    case M.Msg{id, th, fr, to, None{}, ex, au, tx, cr, pl, qu, Some{v}, SNil{}}:
+      {==}
+    case M.Msg{id, th, fr, to, None{}, ex, au, tx, cr, pl, qu, Some{v}, SCon{h, t}}:
+      {==}
+    case M.Msg{id, th, fr, to, Some{r}, ex, au, tx, cr, pl, qu, None{}, SNil{}}:
+      {==}
+    case M.Msg{id, th, fr, to, Some{r}, ex, au, tx, cr, pl, qu, None{}, SCon{h, t}}:
+      {==}
+    case M.Msg{id, th, fr, to, Some{r}, ex, au, tx, cr, pl, qu, Some{v}, SNil{}}:
+      {==}
+    case M.Msg{id, th, fr, to, Some{r}, ex, au, tx, cr, pl, qu, Some{v}, SCon{h, t}}:
+      {==}
+
+law card_round:
+  for c: M.Card
+  {card_of(card_json(c)) == c : M.Card}
+
+def card_round(c):
+  match c:
+    case M.Card{id, k, a, tx, None{}, cr, None{}, None{}}:
+      {==}
+    case M.Card{id, k, a, tx, None{}, cr, None{}, Some{p}}:
+      {==}
+    case M.Card{id, k, a, tx, None{}, cr, Some{pl}, None{}}:
+      {==}
+    case M.Card{id, k, a, tx, None{}, cr, Some{pl}, Some{p}}:
+      {==}
+    case M.Card{id, k, a, tx, Some{f}, cr, None{}, None{}}:
+      {==}
+    case M.Card{id, k, a, tx, Some{f}, cr, None{}, Some{p}}:
+      {==}
+    case M.Card{id, k, a, tx, Some{f}, cr, Some{pl}, None{}}:
+      {==}
+    case M.Card{id, k, a, tx, Some{f}, cr, Some{pl}, Some{p}}:
+      {==}
+
+law out_round.k:
+  for x: Nat
+  for p: String
+  for k: XH.XKind
+  for m: Nat
+  for tx: String
+  for st: XH.OutSt
+  for tr: Nat
+  for cx: String
+  for pa: String
+  {out_of(out_json(XH.Out{x, p, k, m, tx, st, tr, cx, pa})) == XH.Out{x, p, k, m, tx, st, tr, cx, pa} : XH.Out}
+
+def out_round.k(x, p, k, m, tx, st, tr, cx, pa):
+  match k st pa:
+    case XH.KInput{} XH.OPending{} SNil{}:
+      {==}
+    case XH.KInput{} XH.OPending{} SCon{h, t}:
+      {==}
+    case XH.KInput{} XH.OAcked{} SNil{}:
+      {==}
+    case XH.KInput{} XH.OAcked{} SCon{h, t}:
+      {==}
+    case XH.KInput{} XH.OSettled{} SNil{}:
+      {==}
+    case XH.KInput{} XH.OSettled{} SCon{h, t}:
+      {==}
+    case XH.KAsk{} XH.OPending{} SNil{}:
+      {==}
+    case XH.KAsk{} XH.OPending{} SCon{h, t}:
+      {==}
+    case XH.KAsk{} XH.OAcked{} SNil{}:
+      {==}
+    case XH.KAsk{} XH.OAcked{} SCon{h, t}:
+      {==}
+    case XH.KAsk{} XH.OSettled{} SNil{}:
+      {==}
+    case XH.KAsk{} XH.OSettled{} SCon{h, t}:
+      {==}
+    case XH.KJobEnd{} XH.OPending{} SNil{}:
+      {==}
+    case XH.KJobEnd{} XH.OPending{} SCon{h, t}:
+      {==}
+    case XH.KJobEnd{} XH.OAcked{} SNil{}:
+      {==}
+    case XH.KJobEnd{} XH.OAcked{} SCon{h, t}:
+      {==}
+    case XH.KJobEnd{} XH.OSettled{} SNil{}:
+      {==}
+    case XH.KJobEnd{} XH.OSettled{} SCon{h, t}:
+      {==}
+
+law out_round:
+  for o: XH.Out
+  {out_of(out_json(o)) == o : XH.Out}
+
+def out_round(o):
+  match o:
+    case XH.Out{x, p, k, m, tx, st, tr, cx, SNil{}}:
+      out_round.k(x, p, k, m, tx, st, tr, cx, SNil{})
+    case XH.Out{x, p, k, m, tx, st, tr, cx, SCon{h, t}}:
+      out_round.k(x, p, k, m, tx, st, tr, cx, SCon{h, t})
+
+law xin_round:
+  for i: XH.XIn
+  {xin_of(xin_json(i)) == i : XH.XIn}
+
+def xin_round(i):
+  match i:
+    case XH.XIn{h, x, m, XH.KInput{}, r}:
+      {==}
+    case XH.XIn{h, x, m, XH.KAsk{}, r}:
+      {==}
+    case XH.XIn{h, x, m, XH.KJobEnd{}, r}:
+      {==}
+
+law route_round:
+  for r: XH.Route
+  {route_of(route_json(r)) == r : XH.Route}
+
+def route_round(r):
+  match r:
+    case XH.Route{id, tx, v, to, n, d, a, w, XH.RHeld{}, cx, SNil{}}:
+      {==}
+    case XH.Route{id, tx, v, to, n, d, a, w, XH.RHeld{}, cx, SCon{h, t}}:
+      {==}
+    case XH.Route{id, tx, v, to, n, d, a, w, XH.RSent{}, cx, SNil{}}:
+      {==}
+    case XH.Route{id, tx, v, to, n, d, a, w, XH.RSent{}, cx, SCon{h, t}}:
+      {==}
+    case XH.Route{id, tx, v, to, n, d, a, w, XH.RCancelled{}, cx, SNil{}}:
+      {==}
+    case XH.Route{id, tx, v, to, n, d, a, w, XH.RCancelled{}, cx, SCon{h, t}}:
+      {==}
+
+law act_round:
+  for a: TM.Act
+  {act_of(act_json(a)) == a : TM.Act}
+
+def act_round(a):
+  match a:
+    case TM.Act{id, d, TM.RouteSend{r}}:
+      {==}
+    case TM.Act{id, d, TM.Retry{x}}:
+      {==}
+
+law watch_round:
+  for w: WK.Watch
+  {watch_of(watch_json(w)) == w : WK.Watch}
+
+def watch_round(w):
+  match w:
+    case WK.Watch{id, a, sp, mt, sa, ma, q, r}:
+      {==}

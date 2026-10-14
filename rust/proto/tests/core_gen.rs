@@ -11,6 +11,17 @@
 //!   shape returning the key-value list sb-core's `out` takes, in wire order;
 //! - `feed.bend`: one encoder per `Feed` record (the JSON object sb-core's
 //!   `feed` effect carries as `rec`), `Ver` written as 1;
+//! - `journal.bend`: sb-core's journal lines (`core::journal::JOURNAL`,
+//!   tag "type"): each row's `M.Ev` pattern read from a line (the tag
+//!   looked up like In's, an unknown or missing tag: None, the line
+//!   skipped) and written by one match on `M.Ev` with no catch-all; the
+//!   records inside a line go through their hand codecs in
+//!   bend/hub/codec.bend (`C.<name>_of`, `_json`, `_kvs`);
+//! - `journal-laws.bend`: per row, its tag alone reads its defaults and
+//!   its write reads back as itself (a record through its codec's own
+//!   law `C.<name>_round`; `every_set`, whose read may skip it, has its
+//!   tag law only); each line of fixtures/core_journal.jsonl reads back
+//!   as itself (an every_set's `at` after the timer's keys);
 //! - `laws.bend`: per record, decode∘encode is the identity, and an object
 //!   with only its tag decodes to the record's defaults (so the tag table
 //!   is the enum's, tag for tag); an unknown and a missing tag give the
@@ -24,6 +35,10 @@ use bise_proto::core::{fx, link, Feed, FieldKind, Fx, In, Kind, Link, Step, Tabl
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
+
+#[path = "core_gen/journal.rs"]
+mod journal;
+use journal::{journal_codec, journal_laws};
 
 const BLESS: &str = "BISE_PROTO_BLESS";
 const KV: &str = "Sigma<&2, &2, String, _ => J.Json>";
@@ -104,6 +119,8 @@ fn bend_ty(k: FieldKind) -> &'static str {
         Jsons | Recs(_) => "List<&2, J.Json>",
         Msgs => "List<&2, K.Delivered>",
         OptJsonsOmit => "Maybe<&2, List<&2, J.Json>>",
+        Flag => "Bool",
+        Rec(c) | Inline(c) | InlineOpt(c) => c.ty,
     }
 }
 
@@ -137,6 +154,10 @@ fn decode(k: FieldKind, name: &str) -> String {
         Jsons => format!("K.get_js(i, \"{name}\")"),
         Msgs => format!("K.get_ms(i, \"{name}\")"),
         Recs(_) | OptJsonsOmit => unreachable!("{name}: a view field, never decoded (decodable)"),
+        Flag => format!("K.get_b(i, \"{name}\")"),
+        Rec(c) => format!("C.{}_of(K.get_j(i, \"{name}\"))", c.name),
+        Inline(c) => format!("C.{}_of(i)", c.name),
+        InlineOpt(_) => unreachable!("{name}: read by its row's own def (journal_codec)"),
     }
 }
 
@@ -152,6 +173,8 @@ fn default(k: FieldKind) -> &'static str {
         Json => "J.JNull{}",
         Strs | Nats | Jsons | Msgs => "Nil{}",
         Recs(_) | OptJsonsOmit => unreachable!("a view field, never decoded (decodable)"),
+        Flag => "False{}",
+        Rec(_) | Inline(_) | InlineOpt(_) => unreachable!("a hand codec's default is its read of nothing (journal_laws)"),
     }
 }
 
@@ -176,6 +199,9 @@ fn encode(k: FieldKind, name: &str, v: &str) -> Result<String, String> {
         Jsons | Recs(_) => Ok(format!("J.kv(\"{name}\", J.JArr{{{v}}})")),
         Msgs => Ok(format!("J.kv(\"{name}\", J.JArr{{K.jmsgs({v})}})")),
         OptJsonsOmit => Err(format!("K.omit_mjs(\"{name}\", {v})")),
+        Flag => Err(format!("K.flag(\"{name}\", {v})")),
+        Rec(c) => Ok(format!("J.kv(\"{name}\", C.{}_json({v}))", c.name)),
+        Inline(c) | InlineOpt(c) => Err(format!("C.{}_kvs({v})", c.name)),
     }
 }
 
@@ -227,16 +253,31 @@ fn field_vars(k: &Kind) -> Vec<String> {
 
 /// The binary search over the sorted tags: one def per node, leaves first.
 fn lookup(s: &mut String, g: &Gen) {
-    let mut tags: Vec<&Kind> = g.t.kinds.iter().collect();
+    let fallback = format!("{}{{}}", g.fallback);
+    lookup_in(s, g.t.kinds, g.ty, &fallback, &|k| format!("{}.of(i)", k.bend));
+}
+
+/// What the binary search writes: the type its defs return, what any
+/// other tag reads, the read of a tag's record.
+struct Search<'a> {
+    ty: &'a str,
+    fallback: &'a str,
+    leaf: &'a dyn Fn(&Kind) -> String,
+}
+
+/// The binary search over the sorted tags of `kinds`.
+fn lookup_in(s: &mut String, kinds: &[Kind], ty: &str, fallback: &str, leaf: &dyn Fn(&Kind) -> String) {
+    let g = &Search { ty, fallback, leaf };
+    let mut tags: Vec<&Kind> = kinds.iter().collect();
     tags.sort_by(|a, b| a.tag.as_bytes().cmp(b.tag.as_bytes()));
-    fn node(s: &mut String, g: &Gen, tags: &[&Kind], lo: usize, hi: usize) -> Option<(usize, &'static str)> {
+    fn node(s: &mut String, g: &Search, tags: &[&Kind], lo: usize, hi: usize) -> Option<(usize, &'static str)> {
         if lo >= hi {
             return None;
         }
         let mid = (lo + hi) / 2;
         let call = |n: Option<(usize, &str)>| match n {
             Some((m, tag)) => format!("of.t{m}(String.order(t, \"{tag}\"), t, i)"),
-            None => format!("{}{{}}", g.fallback),
+            None => g.fallback.to_string(),
         };
         let left = node(s, g, tags, lo, mid);
         let right = node(s, g, tags, mid + 1, hi);
@@ -244,13 +285,13 @@ fn lookup(s: &mut String, g: &Gen) {
         writeln!(s, "def of.t{mid}(c: Cmp, +t: String, +i: J.Json) -> {}:", g.ty).unwrap();
         writeln!(s, "  match c:").unwrap();
         writeln!(s, "    case LT{{}}:\n      {}", call(left)).unwrap();
-        writeln!(s, "    case EQ{{}}:\n      {}.of(i)", k.bend).unwrap();
+        writeln!(s, "    case EQ{{}}:\n      {}", (g.leaf)(k)).unwrap();
         writeln!(s, "    case GT{{}}:\n      {}\n", call(right)).unwrap();
         Some((mid, k.tag))
     }
     let root = node(s, g, &tags, 0, tags.len()).expect("a table has a kind");
     writeln!(s, "# the record of a tag (a binary search over the {} sorted tags); any", tags.len()).unwrap();
-    writeln!(s, "# other tag: {}", g.fallback).unwrap();
+    writeln!(s, "# other tag: {}", g.fallback.trim_end_matches("{}")).unwrap();
     writeln!(s, "def of_tag(+t: String, +i: J.Json) -> {}:", g.ty).unwrap();
     writeln!(s, "  of.t{}(String.order(t, \"{}\"), t, i)\n", root.0, root.1).unwrap();
 }
@@ -604,6 +645,14 @@ def omit_mjs(+k: String, m: Maybe<&2, List<&2, J.Json>>) -> List<&2, Sigma<&2, &
     case Some{+xs}:
       [J.kv(k, J.JArr{xs})]
 
+# a flag, written only when true (an old line has none: false)
+def flag(+k: String, +b: Bool) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  match b:
+    case True{}:
+      [J.kv(k, J.JBool{True{}})]
+    case False{}:
+      Nil{}
+
 def cat(xss: List<&2, List<&2, Sigma<&2, &2, String, _ => J.Json>>>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   match xss:
     case Nil{}:
@@ -793,6 +842,8 @@ fn files() -> BTreeMap<String, String> {
     out.insert("bend/hub/gen/feed.bend".into(), feed_codec());
     out.insert("bend/hub/gen/view.bend".into(), view_codec());
     out.insert("bend/hub/gen/laws.bend".into(), laws());
+    out.insert("bend/hub/gen/journal.bend".into(), journal_codec());
+    out.insert("bend/hub/gen/journal-laws.bend".into(), journal_laws());
     out
 }
 
