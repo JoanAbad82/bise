@@ -48,6 +48,7 @@ def main():
         move(t, x, y)
         sc = t.wait(WORDS, 20)
         assert folder in sc.splitlines()[-2] or folder in sc, sc
+        shot(t, "psi-hover-150-panel")
         print("---- hover on the panel's ψ ----\n" + sc)
         move(t, 5, 3)
         t.wait_gone(WORDS)
@@ -57,6 +58,7 @@ def main():
         x, y = psi_on_row(t, lambda r: "you → t1" in r)
         move(t, x, y)
         sc = t.wait(WORDS, 20)
+        shot(t, "psi-hover-150-composer")
         print("---- hover on the composer line's ψ ----\n" + sc)
         move(t, 5, 3)
         t.wait_gone(WORDS)
@@ -74,7 +76,37 @@ def main():
         assert line and "ψ" not in line[-1], "\n".join(rows)
         mrow = [r for r in rows if " main" in r[COLS // 2:] and r.strip().startswith("0 ")]
         assert all("ψ" not in r for r in mrow), "\n".join(rows)
-        print("PASS tui psi hover")
+    narrow()
+    print("PASS tui psi hover")
+
+
+def shot(t, name):
+    """The screen with its colors, for the designer (SB_SHOTS: a folder)."""
+    d = os.environ.get("SB_SHOTS")
+    if d:
+        with open(os.path.join(d, name + ".ansi"), "w") as f:
+            f.write(t.screen(colors=True))
+
+
+def narrow():
+    """80 columns: the composer line's ψ in t1's view; the key bar's line
+    fits, the folder shortened from the left or gone, the branch whole."""
+    with tui_session(80, 30) as t:
+        t.wait("bise :*")
+        t.wait_re(MAIN_IDLE)
+        t.typed("/new -w t1: idle")
+        t.keys("Enter")
+        t.wait("@t1", 30)
+        e2e.Client(os.path.join(t.E.state, "hub.sock")).wait_idle("t1", timeout=60)
+        t.keys("M-1")
+        t.wait_re(in_view("t1"))
+        x, y = psi_on_row(t, lambda r: "you → t1" in r)
+        move(t, x, y)
+        sc = t.wait(WORDS, 20)
+        line = [r for r in sc.splitlines() if WORDS in r][-1]
+        assert len(line.rstrip()) <= 80, line
+        shot(t, "psi-hover-80")
+        print("---- 80 columns ----\n" + sc)
 
 
 if __name__ == "__main__":

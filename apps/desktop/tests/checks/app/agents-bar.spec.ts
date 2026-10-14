@@ -59,7 +59,7 @@ const world = (theme: string) => [
       agent('import', 'failed', { archived: true, since_ms: NOW - 24 * 60 * MIN - MIN }),
     ],
     places: [
-      { id: 'wt:sb/perf', branch: 'sb/perf', agents: ['perf'] },
+      { id: 'wt:sb/perf', branch: 'sb/perf', agents: ['perf'], path: '/tmp/wt/perf/shop' },
       { id: 'wt:sb/search', branch: 'sb/search', agents: ['search'], pr: pr(416, { branch: 'sb/search', words: 'approved · checks pass', review: 'approved' }) },
       { id: 'wt:sb/checkout', branch: 'sb/checkout', agents: ['pay'], pr: pr(415, { branch: 'sb/checkout', checks: 'fail', failing: ['e2e/login'], words: 'checks fail: e2e/login' }) },
       { id: 'wt:sb/launch', branch: 'sb/launch', agents: ['launch'], lid: 'waits to land · 2nd', landing: 2 },
@@ -192,12 +192,21 @@ for (const theme of ['light', 'dark']) {
       // the tip: 280 px, the TUI's words with the branch last, 'open the PR ↗'
       await mark('app.right.agent.pay').hover();
       const tip = page.getByTestId('app.right.tip');
-      await expect(page.getByTestId('app.right.tip.words')).toHaveText('#415 · checks fail: e2e/login · ψ sb/checkout');
+      await expect(page.getByTestId('app.right.tip.words')).toHaveText('#415 · checks fail: e2e/login · ψ worktree on sb/checkout');
       await expect(page.getByTestId('app.right.tip.open')).toHaveText('open the PR ↗');
       expect(Math.round((await tip.boundingBox())?.width ?? 0)).toBe(280);
       await page.screenshot({ path: test.info().outputPath(`agents-bar-${theme}-tip.png`) });
       await mark('app.right.agent.search').hover();
-      await expect(page.getByTestId('app.right.tip.words')).toHaveText('#416 · approved · checks pass');
+      await expect(page.getByTestId('app.right.tip.words')).toHaveText('#416 · approved · checks pass · ψ worktree on sb/search');
+      // wt-sign (designer m_24019): a lone ψ says it is a worktree, its branch and folder mono in text
+      await mark('app.right.agent.perf').hover();
+      const words = page.getByTestId('app.right.tip.words');
+      await expect(words).toHaveText('ψ worktree: its own copy of the repo, on sb/perf · /tmp/wt/perf/shop');
+      const mono = words.locator('.app-rb-tip-mono');
+      await expect(mono).toHaveText(['sb/perf', '/tmp/wt/perf/shop']);
+      expect(await mono.first().evaluate((e) => getComputedStyle(e).color)).toBe(await color('--c-text'));
+      expect(await mono.first().evaluate((e) => getComputedStyle(e).fontFamily)).toMatch(/mono/iu);
+      await page.screenshot({ path: test.info().outputPath(`agents-bar-${theme}-psi-tip.png`) });
       // ARCHIVED: sign + name + age
       await page.getByTestId('app.right.archived.head').click();
       await expect(page.getByTestId('app.right.archived.release-32')).toHaveText(/^✓\s*release-32\s*2 h$/u);
