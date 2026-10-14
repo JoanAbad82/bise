@@ -78,6 +78,10 @@ export const TAGS = {
   release: true,
   update: true,
   versions: true,
+  // the inbox's history (inbox-record d22e2c0ff): a page of answered and withdrawn notifications
+  // and a record that changed; recognised only, inbox-screen applies them
+  inbox_history: true,
+  inbox_recorded: true,
   // cost-pause (main 09b6d551): the hub's pause state and its usage sums; recognised only, the
   // settings pause/usage screen draws them later (amb-home)
   paused: true,
