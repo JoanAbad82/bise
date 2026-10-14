@@ -25,7 +25,15 @@ const prefs = (theme: string) => ({
   prefs: { onboarded: true, theme, context: { shot: true, url: true, file: true, window_text: false }, excluded_apps: [], quiet: { call: true, share: true, fullscreen: true, focus: true, batch_min: 20, away_card: true }, voice: { fn_hold: true, fn_twice: 'spotlight', language: 'auto' }, shots_keep_days: 7 },
 });
 const ag = (name: string, over: Record<string, unknown> = {}) => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: `${name}'s job`, since_ms: NOW - 30 * MIN, waits: 0, watching: [], model: 'anthropic/claude-opus-5-5', effort: 'high', ...over });
-const GATE = { id: 4, kind: 'file', what: 'the nightly gate goes red', noted: true, since_ms: NOW - 16 * HOUR, until_ms: NOW + 8 * HOUR };
+// set yesterday at noon, local time: 'set yesterday hh:mm' at any hour of the run (NOW - 16 h read
+// 'set at 02:36' after 16:00)
+const YESTERDAY_NOON = (() => {
+  const d = new Date(NOW);
+  d.setDate(d.getDate() - 1);
+  d.setHours(12, 0, 0, 0);
+  return d.getTime();
+})();
+const GATE = { id: 4, kind: 'file', what: 'the nightly gate goes red', noted: true, since_ms: YESTERDAY_NOON, until_ms: NOW + 8 * HOUR };
 const BENCH = { id: 9, kind: 'bg', what: 'cargo bench', since_ms: NOW - 3 * MIN - 5000, resumes: true };
 const agents = {
   ev: 'agents',
@@ -155,7 +163,8 @@ for (const w of [1400, 1100, 800]) {
             const bar = await openBar();
             const row = bar.getByTestId(`app.right.agent.${agent}`);
             await expect(row.locator('.app-rb-g')).toHaveText('…');
-            await expect(row.locator('.app-rb-end')).toHaveText(view === 'pause' ? '3 min' : '1 min');
+            // an agent row's time column (desktop-agents-bar §2: .app-rb-time, never .app-rb-end)
+            await expect(bar.getByTestId(`app.right.agent.${agent}.time`)).toHaveText(view === 'pause' ? '3 min' : '1 min');
             // perf's pause is no alarm: SCHEDULED & WATCHING has main's alarm alone
             await expect(bar.locator('[data-testid^="app.right.watching."]').first()).toHaveAttribute('data-testid', 'app.right.watching.main.4');
             await closeBar();
