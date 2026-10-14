@@ -27,7 +27,7 @@ const agent = (name: string, status: string, over: Record<string, unknown> = {})
   name, main: name === 'main', status, archived: false, title: '', purpose: `${name}'s job`, since_ms: NOW - 14 * MIN, waits: 0, watching: [], dir: name, ...over,
 });
 const use = (pct: number) => ({ usage: { model: 'm', context: pct * 1000, window: 100_000, words: '', short: `${String(pct)}%` } });
-const LONG = 'proofreading-every-product-page';
+const LONG = 'proofreading-product-pages';
 const pr = (number: number, over: Record<string, unknown> = {}) => ({ number, url: `https://github.com/acme/shop/pull/${String(number)}`, branch: '', agents: [], state: 'open', checks: 'pass', review: 'none', words: 'checks pass', text: '', ...over });
 const world = (theme: string) => [
   prefs(theme),
@@ -61,7 +61,7 @@ const world = (theme: string) => [
       { id: 'wt:sb/perf', branch: 'sb/perf', agents: ['perf'] },
       { id: 'wt:sb/search', branch: 'sb/search', agents: ['search'], pr: pr(416, { branch: 'sb/search', words: 'approved · checks pass', review: 'approved' }) },
       { id: 'wt:sb/checkout', branch: 'sb/checkout', agents: ['pay'], pr: pr(415, { branch: 'sb/checkout', checks: 'fail', failing: ['e2e/login'], words: 'checks fail: e2e/login' }) },
-      { id: 'wt:sb/launch', branch: 'sb/launch', agents: ['launch'], lid: 'waits to land · 2nd' },
+      { id: 'wt:sb/launch', branch: 'sb/launch', agents: ['launch'], lid: 'waits to land · 2nd', landing: 2 },
       { id: `wt:sb/${LONG}`, branch: `sb/${LONG}`, agents: [LONG], pr: pr(417, { state: 'draft', words: 'draft · checks running', checks: 'running' }) },
       { id: 'wt:sb/flash-sale', branch: 'sb/flash-sale', agents: ['stock', 'pricing'], pr: pr(418, { branch: 'sb/flash-sale', words: 'changes asked · checks pass', review: 'changes' }) },
       { id: 'wt:sb/palette', branch: 'sb/palette', agents: [], pr: pr(420, { branch: 'sb/palette' }) },
@@ -176,12 +176,12 @@ for (const theme of ['light', 'dark']) {
         await page.screenshot({ path: test.info().outputPath(`agents-bar-${theme}-${String(w)}.png`) });
         if (w === 800) await page.keyboard.press('Escape');
       }
-      // a click on a mark opens the PR in the review screen; on the orphan, its branch
+      // a click on the orphan opens its branch; on a mark, the PR in the review screen
       await page.setViewportSize({ width: 1400, height: 900 });
-      await mark('app.right.agent.pay').click();
-      await expect(page.getByTestId('review.screen')).toHaveAttribute('data-agent', 'pay');
       await page.getByTestId('app.right.pr.420').click();
       await expect(page.getByTestId('branch.screen')).toHaveAttribute('data-branch', 'sb/palette');
+      await mark('app.right.agent.pay').click();
+      await expect(page.getByTestId('review.screen')).toHaveAttribute('data-agent', 'pay');
     } finally {
       await s.close();
     }

@@ -25,12 +25,9 @@ export function livePr(p: Place): Pr | null {
   return p.feature !== true && pr != null && (pr.state === 'open' || pr.state === 'draft') ? pr : null;
 }
 
-/**
- * Its land waits in the queue to main. The hub says it only in its lid's words today ('waits to
- * land · 2nd'), as the TUI reads it (places.rs waits_to_land); `Place.landing` replaces this test.
- */
+/** Its land waits in the queue to main: its rank in the line is 2 or more (`Place.landing`, 1 lands now). */
 export function waitsToLand(p: Place): boolean {
-  return (p.lid ?? '').startsWith('waits to land');
+  return p.landing != null && p.landing >= 2;
 }
 
 /** Its name: the branch, else a private worktree's folder ('pt:<path>'), else its id. */

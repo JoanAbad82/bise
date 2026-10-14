@@ -70,8 +70,9 @@ describe('marks (§3)', () => {
     expect(markOf(place('sb/a', ['a'], { pr: pr({ state: 'draft' }) }), false, 'a').tone).toBe('dim');
     for (const review of ['changes', 'approved'] as const) expect(markOf(place('sb/a', ['a'], { pr: pr({ review }) }), false, 'a').tone).toBe('mid');
     expect(markOf(place('sb/a', ['a'], { pr: pr({ checks: 'running' }) }), false, 'a').tone).toBe('mid');
-    const land = place('sb/a', ['a'], { lid: 'waits to land · 2nd' });
+    const land = place('sb/a', ['a'], { lid: 'waits to land · 2nd', landing: 2 });
     expect(waitsToLand(land)).toBe(true);
+    expect(waitsToLand(place('sb/a', ['a'], { lid: 'landing', landing: 1 }))).toBe(false);
     expect(markOf(land, false, 'a')).toMatchObject({ g: '…', tone: 'mid' });
     expect(markOf(place('sb/a', ['a']), false, 'a')).toMatchObject({ g: 'ψ', tone: 'mid' });
     expect(markOf(place('sb/a', ['a'], { pr: pr({ state: 'merged' }) }), false, 'a').g).toBe('ψ');

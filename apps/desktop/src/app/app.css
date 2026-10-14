@@ -899,6 +899,7 @@ body:has(.app-shell) {
   display: flex;
   flex-direction: column;
   gap: var(--s-1);
+  box-sizing: border-box;
   width: 280px;
   padding: var(--s-2) var(--s-3);
   border-radius: var(--r-2);

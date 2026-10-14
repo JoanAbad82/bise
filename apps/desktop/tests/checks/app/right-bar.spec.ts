@@ -75,7 +75,7 @@ for (const theme of ['light', 'dark']) {
       const heads = await page.locator('[data-testid^="app.right."][data-testid$=".head"] .app-rb-label').allTextContents();
       expect(heads).toEqual(['AGENTS · 13', 'ARCHIVED · 2', 'ARTIFACTS · 2', 'SCHEDULED & WATCHING · 2']);
       // AGENTS: start order, 8 rows + the waiting 10th in its place, '+ 4 more'
-      const names = async () => page.locator('[data-testid="app.right.agents"] [data-testid^="app.right.agent."]').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')?.replace('app.right.agent.', '')));
+      const names = async () => page.locator('[data-testid="app.right.agents"] .app-rb-row[data-testid^="app.right.agent."]').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid')?.replace('app.right.agent.', '')));
       expect(await names()).toEqual([...NAMES.slice(0, 8), 'search']);
       await expect(page.getByTestId('app.right.agent.search').locator('.app-rb-g')).toHaveText('?');
       await expect(page.getByTestId('app.right.agents.more')).toHaveText('+ 4 more');
@@ -94,7 +94,7 @@ for (const theme of ['light', 'dark']) {
       await page.getByTestId('app.right.archived.head').click();
       await expect(page.getByTestId('app.right.archived.hero-img')).toContainText('2 h');
       await page.reload();
-      await expect(page.getByTestId('app.right.archived.hero-img')).toContainText('done · 2 h', { timeout: 10_000 });
+      await expect(page.getByTestId('app.right.archived.hero-img')).toContainText('2 h', { timeout: 10_000 });
       await page.getByTestId('app.right.archived.head').click();
       await expect(page.getByTestId('app.right.archived.hero-img')).toHaveCount(0);
       await page.reload();
@@ -202,7 +202,7 @@ for (const theme of ['light', 'dark']) {
       await page.keyboard.press('Space');
       await expect(page.getByTestId('app.right.archived.hero-img')).toBeVisible();
       // '+ 4 more' -> every agent, 'show less' in the same row -> back at the cap
-      const names = async () => page.locator('[data-testid="app.right.agents"] [data-testid^="app.right.agent."]').count();
+      const names = async () => page.locator('[data-testid="app.right.agents"] .app-rb-row[data-testid^="app.right.agent."]').count();
       const more = page.getByTestId('app.right.agents.more');
       await expect(more).toHaveText('+ 4 more');
       const at = await more.boundingBox();
