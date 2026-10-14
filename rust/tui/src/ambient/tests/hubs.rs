@@ -71,6 +71,8 @@ pub(super) fn world(t: &mut T) -> World {
                 web: shop.then(|| "https://github.com/acme/shop".into()),
             }
         }),
+        // mail's hub runs from his install (shop's from no install: HUB_OLDER)
+        older: Box::new(|id| (id == "mail").then(|| MAIL_OLDER.to_string())),
     };
     t.core.set_projects(ProjectPorts { spawn, facts });
     World { ends, rx, open: HashMap::new(), gone }
@@ -221,6 +223,33 @@ fn a_hub_without_initialize_is_refused_with_what_to_do() {
     typed(&mut t, json!({"cmd": "hub_retry", "project": "shop"}));
     w.opened(&mut t, &["shop"]);
     w.welcome(&mut t, "shop");
+}
+
+const MAIL_OLDER: &str = "this project's hub runs an older bise: in a terminal, in that project, run `bise switchboard --stop`, then `bise update`, then `bise`";
+
+/// ambient-lead m_23937: an older hub that runs from his install says his
+/// install's steps (`ProjectFacts::older`) instead of HUB_OLDER, in the
+/// refusal and in the error of a command that waited.
+#[test]
+fn an_older_hub_of_his_install_says_the_update_steps() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["mail"]}));
+    w.opened(&mut t, &["home", "mail"]);
+    typed(&mut t, json!({"cmd": "send", "project": "mail", "agent": "main", "text": "hi", "mode": "now", "cid": 8}));
+    let e = w.end("mail");
+    let mut l = String::new();
+    e.r.read_line(&mut l).expect("the core's first line");
+    e.write(json!({"ok": false, "error": "hub.sock does not serve the op \"\""}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "hub_refused"));
+    let out = t.take();
+    let refused: Vec<&Value> = out.iter().filter(|v| v["ev"] == "hub_refused").collect();
+    assert_eq!(refused, [&json!({"ev": "hub_refused", "project": "mail", "error": MAIL_OLDER})], "{out:#?}");
+    assert!(
+        out.iter().any(|v| v["ev"] == "error" && v["kind"] == "hub_older" && v["cid"] == 8 && v["text"] == MAIL_OLDER),
+        "the waiting send failed with his install's steps: {out:#?}"
+    );
 }
 
 /// G (architect m_10348): every send error the core makes itself echoes

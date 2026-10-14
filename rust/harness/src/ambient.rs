@@ -259,6 +259,12 @@ fn ambient_projects(how: Connector) -> (bend_tui::ambient::ConnectFor, bend_tui:
             let branch = std::fs::read_to_string(d.join("HEAD")).ok().and_then(|h| bend_tui::ambient::branch_of_head(&h));
             Checkout { branch, git: true, web }
         }),
+        // the root its hub wrote at start (daemon.rs: hub.root)
+        older: Box::new(|id| {
+            let home = bise_home::Home::from_env();
+            let root = std::fs::read_to_string(home.hub_dir(id).join("hub.root")).ok()?;
+            bise_home::release::older_hub_words(std::path::Path::new(root.trim()), home.user_home())
+        }),
     };
     (connect_for, facts)
 }

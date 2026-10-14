@@ -1,7 +1,8 @@
 //! The core as a client of every project's hub (bise desktop S3b step 2):
 //! one JSON-RPC connection (`initialize` first, client-protocol P1c,
 //! `hub_rpc.rs`; a hub that doesn't serve it is refused with
-//! `bise_proto::rpc::HUB_OLDER`'s words) per held project, the
+//! `bise_proto::rpc::HUB_OLDER`'s words, or his install's steps when it
+//! runs from one: `ProjectFacts::older`) per held project, the
 //! window's commands with a `project` routed to it, its typed events out
 //! to the app as they are (they carry `project`), and `projects` (the
 //! sidebar's rows) from the registry, the held hubs' own `agents`/`cards`
@@ -56,6 +57,9 @@ pub const POLL: Duration = Duration::from_secs(2);
 pub type Spawn = Box<dyn FnMut(&Path, &str) -> Hub>;
 /// A hub's `view.json` by hub id.
 pub type ViewOf = Box<dyn Fn(&str) -> Option<ProjectView>>;
+/// What to do with a hub id's hub from before client-protocol, when it
+/// runs from an install (`ProjectFacts::older`).
+pub type OlderOf = Box<dyn Fn(&str) -> Option<String>>;
 /// A checkout's branch and whether it is a git repo.
 pub type GitOf = Box<dyn Fn(&Path) -> Checkout>;
 
@@ -71,6 +75,10 @@ pub struct ProjectFacts {
     pub exists: Box<dyn Fn(&Path) -> bool>,
     /// its checkout's branch and whether it is a git repo
     pub git: GitOf,
+    /// what to do with this hub id's hub from before client-protocol when
+    /// it runs from an install (`bise_home::release::older_hub_words`);
+    /// None: `rpc::HUB_OLDER`
+    pub older: OlderOf,
 }
 
 pub struct ProjectPorts {
@@ -603,8 +611,12 @@ impl Core {
                     }
                     Read::Refused(why) => self.project_refused(id, why, ErrorKind::HubRefused),
                     // a hub from before client-protocol: refused the same
-                    // way, with what to do (nothing more is said to it)
-                    Read::NotRpc => self.project_refused(id, bise_proto::rpc::HUB_OLDER.to_string(), ErrorKind::HubOlder),
+                    // way, with what to do (nothing more is said to it):
+                    // his install's steps when it runs from one
+                    Read::NotRpc => {
+                        let older = self.hubs.ports.as_ref().and_then(|p| (p.facts.older)(id));
+                        self.project_refused(id, older.unwrap_or_else(|| bise_proto::rpc::HUB_OLDER.to_string()), ErrorKind::HubOlder)
+                    }
                     Read::Nothing => {}
                 }
             }
