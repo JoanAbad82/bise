@@ -225,6 +225,12 @@ law in_hub_msg_bare:
 def in_hub_msg_bare():
   {==}
 
+law in_shared_wip_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"shared_wip"})])) == IN.ISharedWip{"", 0n, 0n, "", ""} : IN.In}
+
+def in_shared_wip_bare():
+  {==}
+
 law in_page_answered_bare:
   {IN.of(J.obj([J.kv("t", J.JStr{"page_answered"})])) == IN.IPageAnswered{0n, "", "", "", ""} : IN.In}
 
@@ -649,6 +655,17 @@ law in_IHubMsg_round:
   {IN.of(IN.json(IN.IHubMsg{to, text})) == IN.IHubMsg{to, text} : IN.In}
 
 def in_IHubMsg_round(to, text):
+  {==}
+
+law in_ISharedWip_round:
+  for agent: String
+  for n: Nat
+  for age_min: Nat
+  for text: String
+  for note: String
+  {IN.of(IN.json(IN.ISharedWip{agent, n, age_min, text, note})) == IN.ISharedWip{agent, n, age_min, text, note} : IN.In}
+
+def in_ISharedWip_round(agent, n, age_min, text, note):
   {==}
 
 law in_IPageAnswered_round:

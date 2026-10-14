@@ -315,10 +315,10 @@ fn agent_row(app: &App, sb: &Sb, a: &Agent, i: usize, num: Option<usize>, w: usi
     if a.queued > 0 {
         marks.push(Span::styled(format!(" {}{}", G_MSG, a.queued), Style::default().fg(dim())));
     }
-    // BISE-89: his messages the hub holds for after its turn (issue 23)
+    // BISE-89: his messages held for after its turn (issue 23); shared-guard: its unlanded shared files
     let mine = sb.queued_for(&a.name).len();
-    if mine > 0 {
-        marks.push(Span::styled(format!(" · {} queued", mine), Style::default().fg(faint())));
+    for t in [(mine > 0).then(|| format!("{} queued", mine)), bise_proto::rows::unlanded(a.shared_wip)].into_iter().flatten() {
+        marks.push(Span::styled(format!(" · {}", t), Style::default().fg(faint())));
     }
     let bg = selected.then(selection_bg);
     // the name takes all the room left of the marks and the columns; it

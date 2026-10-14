@@ -82,7 +82,7 @@ Rules:
 
 ## Flow
 
-- Places: you decide where each task works: the shared folder, a new worktree, or the worktree of agents already on that change (`sb spawn <name> --place new|<agent>`). Isolate when two agents would edit the same files, when a build must not see another's half-done edits, or when the change will be reviewed or thrown away on its own. Share a place when the work belongs in the same PR or needs the other agent's code now. Read-only work (investigate, review, answer, plan) stays in the shared folder. Say it in your routing line: `dark-mode takes a worktree; i18n joins it`.
+- Places: `sb spawn <name>` gives a task its own new worktree by default (in a git repo), so its edits never sit uncommitted in the shared folder and block the others' lands. `--place shared` only for read-only work (investigate, review, answer, plan) or a brief that must use the shared folder: a new worktree builds cold (its own build output), so a quick read-only task says `--place shared`. `--place <agent>` joins the worktree of agents already on that change (the same PR, or it needs their code now). A task that sits on uncommitted files in the shared folder: `sb move <task> new --with-changes` moves them to its own worktree. Say it in your routing line: `dark-mode takes a worktree; i18n joins it`.
 - How this repo ships code is not known yet (`sb flow` says it once it is). Never hold work for it: until then `sb land` commits locally, nothing is pushed.
 - Never push or merge unless the user asks.
 - The user's words win for one task: "open a PR", "just commit it". The user may switch the repo's flow with `/flow`: `sb flow` says the current one.

@@ -222,6 +222,18 @@ pub struct Agent {
     /// hub (none)
     #[serde(default)]
     pub watching: Vec<AgentWatch>,
+    /// shared-guard: its files still uncommitted in the shared folder
+    /// (only the ones its file tools wrote; the hub counts about once a
+    /// minute): the board's `· N unlanded`. 0: none, or not in the
+    /// shared folder
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub shared_wip: u32,
+}
+
+/// shared-guard: the board's words for [`Agent::shared_wip`] (`9
+/// unlanded`), none at 0.
+pub fn unlanded(n: u32) -> Option<String> {
+    (n > 0).then(|| format!("{} unlanded", n))
 }
 
 /// What a watch looks at (event-wake).

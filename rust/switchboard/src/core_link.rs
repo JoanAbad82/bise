@@ -114,8 +114,14 @@ impl Hub {
         };
         match jstr(q, "q").as_str() {
             "worktree_create" => {
-                let wc = q.get("with_changes").and_then(|x| x.as_bool()).unwrap_or(false);
-                res(env.worktree_create(&name, wc).map(|w| json!(w)))
+                // /new --with-changes: his edits; `carry`: a moved agent's files
+                let moved: Vec<String> = q["carry"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(str::to_string)).collect();
+                let what = match (q.get("with_changes").and_then(|x| x.as_bool()).unwrap_or(false), moved.is_empty()) {
+                    (_, false) => crate::carry::Carry::Moved(moved),
+                    (true, true) => crate::carry::Carry::All,
+                    _ => crate::carry::Carry::Nothing,
+                };
+                res(env.worktree_create(&name, &what).map(|w| json!(w)))
             }
             "worktree_loss" => {
                 let l = ws.map(|w| env.worktree_loss(&w)).unwrap_or_default();

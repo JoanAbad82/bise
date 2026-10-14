@@ -39,6 +39,8 @@ import ./gen/feed.bend as FD
 import ./keyed.bend as KL
 import ./feature.bend as FT
 import ./status.bend as ST
+import ./wip.bend as W
+import ./places.bend as PL
 
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
@@ -1461,35 +1463,9 @@ def drop.snap(j: J.Json) -> Maybe<&2, String>:
 
 # ---- places (dev-flow §3.1): a worktree shared by agents ----
 
-def is_gone(l: M.Life) -> Bool:
-  match l:
-    case M.LArchived{}:
-      True{}
-    case _:
-      False{}
-
-# `b` is another agent of `place`'s live folder: still in it (`live`), or
-# archived with its ws still on that folder (it left before the others)
-def mate.hit(m: Maybe<&2, M.Agent>, +name: String, +place: String, +live: Bool) -> Bool:
-  match m:
-    case None{}:
-      False{}
-    case Some{+b}:
-      +gone = is_gone(M.Agent.life(b))
-      Bool.not(String.eq(M.Agent.name(b), name)) && M.ws_worktree(M.Agent.ws(b)) && Bool.not(M.ws_dropped(M.Agent.ws(b)))
-        && String.eq(M.Agent.place(b), place) && Bool.pick(Bool, live, Bool.not(gone), gone)
-
-def mates(xs: List<&2, String>, +s: M.St, +name: String, +place: String, +live: Bool) -> List<&2, String>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+n, +t}:
-      +rest = mates(t, s, name, place, live)
-      Bool.pick(List<&2, String>, mate.hit(M.get_agent(s, n), name, place, live), n <> rest, rest)
-
-# the other agents of a's worktree (none for the shared folder)
+# the other agents of a's worktree (none for the shared folder; hub/places.bend)
 def mates_of(+s: M.St, +a: M.Agent, +live: Bool) -> List<&2, String>:
-  mates(M.St.order(s), s, M.Agent.name(a), M.Agent.place(a), live)
+  PL.mates(M.St.order(s), s, M.Agent.name(a), M.Agent.place(a), live)
 
 def first_agent(+s: M.St, ns: List<&2, String>) -> Maybe<&2, M.Agent>:
   match ns:
@@ -1701,28 +1677,29 @@ def isolate.ans(-o: M.St, p: X.Cx<o> & Maybe<&2, J.Json>, +n: String) -> X.Cx<o>
     case (+cx, Some{+ans}):
       isolate.res(o, ans_ok(ans), cx, n)
 
-def isolate.pre(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +n: String) -> X.Cx<o> & TaskR:
+# `carry`: `sb move <agent> new --with-changes`'s claimed files (Rust carry.rs moves them)
+def isolate.pre(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +n: String, +carry: List<&2, String>) -> X.Cx<o> & TaskR:
   match pre:
     case Some{+e}:
       (cx, TErr{e})
     case None{}:
-      isolate.ans(o, ask(o, cx, J.obj([J.kv("q", J.JStr{"worktree_create"}), J.kv("name", J.JStr{n}), J.kv("with_changes", J.JBool{False{}})])), n)
+      isolate.ans(o, ask(o, cx, J.obj([J.kv("q", J.JStr{"worktree_create"}), J.kv("name", J.JStr{n}), J.kv("with_changes", J.JBool{False{}}), J.kv("carry", J.JArr{jstrs(carry)})])), n)
 
-def isolate.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
+def isolate.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String, +wc: Bool) -> X.Cx<o> & TaskR:
   match m:
     case None{}:
       (cx, TErr{String.append("no agent named ", name)})
     case Some{+a}:
       +n = M.Agent.name(a)
       +pre = Bool.pick(Maybe<&2, String>, M.Agent.is_main(a) || M.ws_worktree(M.Agent.ws(a)), Some{cat(["@", n, " already has its own folder"])},
-        Bool.pick(Maybe<&2, String>, Bool.not(List.is_empty(&2, String, M.Agent.files(a))),
+        Bool.pick(Maybe<&2, String>, Bool.not(wc) && Bool.not(List.is_empty(&2, String, M.Agent.files(a))),
           Some{cat(["@", n, " already changed files of the workspace (", String.join(List.take(&2, String, M.Agent.files(a), 3n), ", "), "): its work cannot be separated from yours"])},
           Bool.pick(Maybe<&2, String>, is_busy(X.Rt.run(rt(o, cx, n))), Some{cat(["@", n, " is mid-turn: wait for the end of its turn"])},
             Bool.pick(Maybe<&2, String>, X.R.git(rr(o, cx)), None{}, Some{"the workspace is not a git repository"}))))
-      isolate.pre(o, pre, cx, n)
+      isolate.pre(o, pre, cx, n, Bool.pick(List<&2, String>, wc, M.Agent.files(a), Nil{}))
 
-def isolate_task(-o: M.St, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
-  isolate.agent(o, agent_of(st(o, cx), M.resolve(st(o, cx), name)), cx, name)
+def isolate_task(-o: M.St, +cx: X.Cx<o>, +name: String, wc: Bool) -> X.Cx<o> & TaskR:
+  isolate.agent(o, agent_of(st(o, cx), M.resolve(st(o, cx), name)), cx, name, wc)
 
 # ---- `sb move <agent> <place>` (dev-flow §3.1, /isolate generalized) ----
 
@@ -1760,21 +1737,21 @@ def move.agent(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String, +ws
             Bool.pick(Maybe<&2, String>, is_busy(X.Rt.run(rt(o, cx, n))), Some{cat(["@", n, " is mid-turn: wait for the end of its turn"])}, None{}))))
       pick_lazy(X.Cx<o> & TaskR, Maybe.is_some(&2, String, pre), u => (cx, TErr{Maybe.default(&2, String, pre, "")}), u => move.res(o, cx, n, ws))
 
-def move.to(-o: M.St, j: Maybe<&2, J.Json>, +cx: X.Cx<o>, +name: String) -> X.Cx<o> & TaskR:
+def move.to(-o: M.St, j: Maybe<&2, J.Json>, +cx: X.Cx<o>, +name: String, wc: Bool) -> X.Cx<o> & TaskR:
   match j:
     case Some{J.JObj{+kvs}}:
       move.agent(o, agent_of(st(o, cx), M.resolve(st(o, cx), name)), cx, name, J.JObj{kvs})
     case _:
-      isolate_task(o, cx, name)
+      isolate_task(o, cx, name, wc)
 
 # `ws`: the target place's (the daemon finds it; none: a new worktree,
-# /isolate); `pre_err`: the daemon refused (no such place...)
-def move_task(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +j: Maybe<&2, J.Json>) -> X.Cx<o> & TaskR:
+# /isolate); `pre_err`: the daemon refused (no such place...); `wc`: --with-changes
+def move_task(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +j: Maybe<&2, J.Json>, wc: Bool) -> X.Cx<o> & TaskR:
   match pre:
     case Some{+e}:
       (cx, TErr{e})
     case None{}:
-      move.to(o, j, cx, name)
+      move.to(o, j, cx, name, wc)
 
 # ---- `sb feature retire <name>` (hub/feature.bend: who, the words) ----
 
@@ -1803,6 +1780,19 @@ def feature_retire(-o: M.St, +cx: X.Cx<o>, +name: String, +kept: String, +main: 
   +xs = FT.retirees(st(o, cx), name)
   +cx2 = feature_retire.all(o, xs, cx, FT.note(name, kept, main))
   feed(o, cx2, M.MAIN(), FD.info(FT.line(name, kept, main, xs)))
+
+# ---- uncommitted files in the shared folder (hub/wip.bend decides; Rust shared_wip.rs counts) ----
+def shared_wip.tell(-o: M.St, go: Bool, +cx: X.Cx<o>, +agent: String, +text: String, +note: String) -> X.Cx<o>:
+  match go:
+    case False{}:
+      cx
+    case True{}:
+      note_main(o, fst(o, send.thread(o, None{}, cx, Snd{M.HUB(), agent, text, False{}, None{}, True{}, False{}, True{}, None{}, ""})), note)
+
+def shared_wip(-o: M.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +age_min: Nat, +text: String, +note: String) -> X.Cx<o>:
+  +r = rr(o, cx)
+  +go = W.nudge(n, age_min, M.str_in(X.R.wip(r), agent))
+  shared_wip.tell(o, go, set_r(o, cx, X.R.with_wip(r, W.next(n, X.R.wip(r), agent, go))), agent, text, note)
 
 # ---- the user ----
 
@@ -2971,16 +2961,17 @@ def req_spawn.res(-o: M.St, p: X.Cx<o> & TaskR, +token: Nat) -> X.Cx<o>:
     case (+cx, THalt{}):
       cx
 
-def new_task(+parent: String, +q: J.Json) -> NewTask:
+# where it works: hub/wip.bend spawn_wt (no place named: a worktree in git)
+def new_task(+parent: String, +q: J.Json, git: Bool) -> NewTask:
   NewTask{parent, C.get_s(q, "base"), Maybe.default(&2, J.Json, J.get(q, "brief"), J.JNull{}), C.get_s(q, "brief_text"),
-    C.get_s(q, "objective"), C.get_b(q, "worktree"), C.get_b(q, "with_changes"), C.get_s(q, "brief_parts")}
+    C.get_s(q, "objective"), W.spawn_wt(C.get_b(q, "worktree"), C.get_b(q, "place_auto"), git), C.get_b(q, "with_changes"), C.get_s(q, "brief_parts")}
 
 def req_spawn.pre(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
   match pre:
     case Some{+e}:
       reply_err(o, cx, token, e)
     case None{}:
-      req_spawn.res(o, create_in(o, cx, new_task(M.MAIN(), q), J.get(q, "join")), token)
+      req_spawn.res(o, create_in(o, cx, new_task(M.MAIN(), q, X.R.git(rr(o, cx))), J.get(q, "join")), token)
 
 def req_interrupt(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +agent: String) -> X.Cx<o>:
   match m:
@@ -3147,9 +3138,9 @@ def req.main.go(-o: M.St, c: Cmd, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx
     case CRestore{}:
       req_task.res(o, restore_task(o, cx, C.get_s(q, "agent")), token)
     case CIsolate{}:
-      req_task.res(o, isolate_task(o, cx, C.get_s(q, "agent")), token)
+      req_task.res(o, isolate_task(o, cx, C.get_s(q, "agent"), False{}), token)
     case CMove{}:
-      req_task.res(o, move_task(o, C.opt_str(J.get(q, "pre_err")), cx, C.get_s(q, "agent"), J.get(q, "ws")), token)
+      req_task.res(o, move_task(o, C.opt_str(J.get(q, "pre_err")), cx, C.get_s(q, "agent"), J.get(q, "ws"), C.get_b(q, "with_changes")), token)
     case CWithdraw{}:
       req_withdraw(o, M.card_of(M.St.cards(st(o, cx)), C.get_nat(q, "card")), cx, token, C.get_nat(q, "card"), C.get_s(q, "why"))
     case CProjectSend{}:
@@ -3206,7 +3197,7 @@ def Hub.r(x: Hub) -> X.R:
       r
 
 def hub_new(+workspace: String) -> Hub:
-  Hub{M.init(workspace), X.R{Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, workspace, False{}, 0n, False{}, Nil{}, None{}, None{}, Nil{}}}
+  Hub{M.init(workspace), X.R{Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, Nil{}, workspace, False{}, 0n, False{}, Nil{}, None{}, None{}, Nil{}, Nil{}}}
 
 # the context of one input over the hub
 def start(+h: Hub, +i: J.Json) -> X.Cx<Hub.d(h)>:
@@ -3318,32 +3309,13 @@ def touch.others(-o: M.St, others: List<&2, String>, +cx: X.Cx<o>, +agent: Strin
       +text = cat([path, " is changed by @", agent, " and by @", String.join({h <> t : List<&2, String>}, ", @")])
       note_main(o, cx, String.append("file overlap: ", text))
 
-# an overlap is within one place (dev-flow §3.1): the shared folder, or
-# one worktree its agents share
-def overlap_hit(m: Maybe<&2, M.Agent>, +agent: String, +path: String, +place: String) -> Bool:
-  match m:
-    case None{}:
-      False{}
-    case Some{+a}:
-      Bool.not(M.Agent.is_main(a)) && Bool.not(String.eq(M.Agent.name(a), agent))
-        && String.eq(M.Agent.place(a), place) && is_active(M.Agent.life(a))
-        && M.str_in(M.Agent.files(a), path)
-
-def overlap_others(xs: List<&2, String>, +s: M.St, +agent: String, +path: String, +place: String) -> List<&2, String>:
-  match xs:
-    case Nil{}:
-      Nil{}
-    case Con{+n, +t}:
-      +rest = overlap_others(t, s, agent, path, place)
-      Bool.pick(List<&2, String>, overlap_hit(M.get_agent(s, n), agent, path, place), n <> rest, rest)
-
 def touch.new(-o: M.St, known: Bool, +cx: X.Cx<o>, +agent: String, +path: String, +place: String) -> X.Cx<o>:
   match known:
     case True{}:
       cx
     case False{}:
       +cx2 = emit(o, cx, M.EFileTouched{agent, path}, Unit{}, Unit{}, Unit{})
-      touch.others(o, overlap_others(M.St.order(st(o, cx2)), st(o, cx2), agent, path, place), cx2, agent, path)
+      touch.others(o, PL.overlap_others(M.St.order(st(o, cx2)), st(o, cx2), agent, path, place), cx2, agent, path)
 
 def touch.task(-o: M.St, task: Bool, +cx: X.Cx<o>, +agent: String, +path: String, +known: Bool, +place: String) -> X.Cx<o>:
   match task:
@@ -3666,7 +3638,7 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
     case GI.IRestore{+name}:
       user_restore.res(o, restore_task(o, cx, name))
     case GI.IIsolate{+name}:
-      user_isolate.res(o, isolate_task(o, cx, name))
+      user_isolate.res(o, isolate_task(o, cx, name, False{}))
     case GI.IFeatureRetire{+name, +kept, +main}:
       feature_retire(o, cx, name, kept, main)
     case GI.IRename{+name, +new_name, +valid}:
@@ -3705,6 +3677,8 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       hub_card(o, cx, kind, agent, text, place, pr)
     case GI.IHubMsg{+to, +text}:
       fst(o, send(o, cx, msg(M.HUB(), to, text, False{}, None{}, False{}, False{})))
+    case GI.ISharedWip{+agent, +n, +age_min, +text, +note}:
+      shared_wip(o, cx, agent, n, age_min, text, note)
     case GI.IEverySet{+agent, +by, +text, +next_ms, +name, +every_ms, +daily_min, +until_ms, +times, +page}:
       timer_set(o, cx, agent, every_ms, daily_min, GI.IEverySet{agent, by, text, next_ms, name, every_ms, daily_min, until_ms, times, page})
     case GI.IEveryStop{+id, +why, +wake}:

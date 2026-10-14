@@ -13,6 +13,14 @@ repl
 # Rust build output
 target/
 
+# this checkout's own dev flow (`/flow`, `sb flow` write it: trunk or PR,
+# per user and per clone, never shared through the repo)
+/.switchboard/
+
+# the archived ambient agent's mockups, spec, sounds and paintings (Oct
+# 2-7): kept on disk on purpose, out of the public repo
+/site/content/ambient/
+
 # Logs
 logs/
 

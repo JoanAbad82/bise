@@ -3,6 +3,25 @@
 
 use super::*;
 
+/// shared-guard: `sb spawn` with no place gives a task its own worktree in
+/// a git repo (sb-core's spawn_wt); `--place shared` keeps it in the
+/// shared folder; no git: the shared folder.
+#[test]
+fn a_spawn_with_no_place_gets_its_own_worktree() {
+    let spawn = |t: &mut T, name: &str, place: &str| {
+        let brief = Brief { objective: format!("objective of {}", name), ..Brief::default() };
+        let ask = Default::default();
+        t.req(MAIN, AgentReq::Spawn { name: name.into(), brief, worktree: false, with_changes: false, place: place.into(), feature: String::new(), ask, parts: String::new() });
+        t.hub.st.agents[name].ws.mode.clone()
+    };
+    let mut t = T::new();
+    t.env.git = true;
+    assert_eq!(spawn(&mut t, "coder", ""), Mode::Worktree);
+    assert_eq!(spawn(&mut t, "reader", "shared"), Mode::Shared);
+    t.env.git = false;
+    assert_eq!(spawn(&mut t, "plain", ""), Mode::Shared);
+}
+
 /// BISE-136: `sb worktree <path>` (gate.sh new) puts the private worktree
 /// in the snapshot and `sb tasks`; `none` takes it back. Before any
 /// `sb worktree`, a bash call that starts in a linked worktree (a `.git`

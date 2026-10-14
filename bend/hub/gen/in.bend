@@ -76,6 +76,8 @@ type In is Data:
   ICardOpen{kind: String, agent: String, text: String, place: Maybe<&2, String>, pr: Maybe<&2, Nat>}
   # hub_msg
   IHubMsg{to: String, text: String}
+  # shared_wip
+  ISharedWip{agent: String, n: Nat, age_min: Nat, text: String, note: String}
   # page_answered
   IPageAnswered{card: Nat, agent: String, page: String, text: String, block: String}
   # answer_pos
@@ -227,6 +229,9 @@ def ICardOpen.of(+i: J.Json) -> In:
 
 def IHubMsg.of(+i: J.Json) -> In:
   IHubMsg{K.get_s(i, "to"), K.get_s(i, "text")}
+
+def ISharedWip.of(+i: J.Json) -> In:
+  ISharedWip{K.get_s(i, "agent"), K.get_n(i, "n"), K.get_n(i, "age_min"), K.get_s(i, "text"), K.get_s(i, "note")}
 
 def IPageAnswered.of(+i: J.Json) -> In:
   IPageAnswered{K.get_n(i, "card"), K.get_s(i, "agent"), K.get_s(i, "page"), K.get_s(i, "text"), K.get_s(i, "block")}
@@ -623,7 +628,7 @@ def of.t40(c: Cmp, +t: String, +i: J.Json) -> In:
     case LT{}:
       of.t39(String.order(t, "say"), t, i)
     case EQ{}:
-      ISteerQueued.of(i)
+      ISharedWip.of(i)
     case GT{}:
       INone{}
 
@@ -634,7 +639,7 @@ def of.t38(c: Cmp, +t: String, +i: J.Json) -> In:
     case EQ{}:
       IRouteHold.of(i)
     case GT{}:
-      of.t40(String.order(t, "steer_queued"), t, i)
+      of.t40(String.order(t, "shared_wip"), t, i)
 
 def of.t34(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
@@ -650,7 +655,7 @@ def of.t42(c: Cmp, +t: String, +i: J.Json) -> In:
     case LT{}:
       INone{}
     case EQ{}:
-      ISteered.of(i)
+      ISteerRx.of(i)
     case GT{}:
       INone{}
 
@@ -659,65 +664,74 @@ def of.t44(c: Cmp, +t: String, +i: J.Json) -> In:
     case LT{}:
       INone{}
     case EQ{}:
-      ITouch.of(i)
+      ITick.of(i)
     case GT{}:
       INone{}
 
 def of.t43(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t42(String.order(t, "steered"), t, i)
+      of.t42(String.order(t, "steer_rx"), t, i)
     case EQ{}:
-      ITick.of(i)
+      ISteered.of(i)
     case GT{}:
-      of.t44(String.order(t, "touch"), t, i)
+      of.t44(String.order(t, "tick"), t, i)
 
 def of.t46(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
       INone{}
     case EQ{}:
-      IUnqueue.of(i)
+      ITurnStarted.of(i)
     case GT{}:
       INone{}
 
 def of.t47(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t46(String.order(t, "unqueue"), t, i)
+      of.t46(String.order(t, "turn_started"), t, i)
     case EQ{}:
-      IWakeHit.of(i)
+      IUnqueue.of(i)
     case GT{}:
       INone{}
 
 def of.t45(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t43(String.order(t, "tick"), t, i)
+      of.t43(String.order(t, "steered"), t, i)
     case EQ{}:
-      ITurnStarted.of(i)
+      ITouch.of(i)
     case GT{}:
-      of.t47(String.order(t, "wake_hit"), t, i)
+      of.t47(String.order(t, "unqueue"), t, i)
 
 def of.t49(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
       INone{}
     case EQ{}:
-      IWakeStop.of(i)
+      IWakeSet.of(i)
+    case GT{}:
+      INone{}
+
+def of.t51(c: Cmp, +t: String, +i: J.Json) -> In:
+  match c:
+    case LT{}:
+      INone{}
+    case EQ{}:
+      IXAck.of(i)
     case GT{}:
       INone{}
 
 def of.t50(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t49(String.order(t, "wake_stop"), t, i)
+      of.t49(String.order(t, "wake_set"), t, i)
     case EQ{}:
-      IXAck.of(i)
+      IWakeStop.of(i)
     case GT{}:
-      INone{}
+      of.t51(String.order(t, "x_ack"), t, i)
 
-def of.t52(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t53(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
       INone{}
@@ -726,41 +740,41 @@ def of.t52(c: Cmp, +t: String, +i: J.Json) -> In:
     case GT{}:
       INone{}
 
-def of.t53(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t54(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t52(String.order(t, "x_in"), t, i)
+      of.t53(String.order(t, "x_in"), t, i)
     case EQ{}:
       IXReply.of(i)
     case GT{}:
       INone{}
 
-def of.t51(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t52(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t50(String.order(t, "x_ack"), t, i)
+      of.t50(String.order(t, "wake_stop"), t, i)
     case EQ{}:
       IXFail.of(i)
     case GT{}:
-      of.t53(String.order(t, "x_reply"), t, i)
+      of.t54(String.order(t, "x_reply"), t, i)
 
 def of.t48(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t45(String.order(t, "turn_started"), t, i)
+      of.t45(String.order(t, "touch"), t, i)
     case EQ{}:
-      IWakeSet.of(i)
+      IWakeHit.of(i)
     case GT{}:
-      of.t51(String.order(t, "x_fail"), t, i)
+      of.t52(String.order(t, "x_fail"), t, i)
 
 def of.t41(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
       of.t34(String.order(t, "resume"), t, i)
     case EQ{}:
-      ISteerRx.of(i)
+      ISteerQueued.of(i)
     case GT{}:
-      of.t48(String.order(t, "wake_set"), t, i)
+      of.t48(String.order(t, "wake_hit"), t, i)
 
 def of.t27(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
@@ -769,9 +783,9 @@ def of.t27(c: Cmp, +t: String, +i: J.Json) -> In:
     case EQ{}:
       IPageAnswered.of(i)
     case GT{}:
-      of.t41(String.order(t, "steer_rx"), t, i)
+      of.t41(String.order(t, "steer_queued"), t, i)
 
-# the record of a tag (a binary search over the 54 sorted tags); any
+# the record of a tag (a binary search over the 55 sorted tags); any
 # other tag: INone
 def of_tag(+t: String, +i: J.Json) -> In:
   of.t27(String.order(t, "page_answered"), t, i)
@@ -852,6 +866,8 @@ def kvs(x: In) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("t", J.JStr{"card_open"}), J.kv("kind", J.JStr{kind}), J.kv("agent", J.JStr{agent}), J.kv("text", J.JStr{text}), J.kv("place", K.jmaybe_s(place)), J.kv("pr", K.jmaybe_n(pr))]
     case IHubMsg{+to, +text}:
       [J.kv("t", J.JStr{"hub_msg"}), J.kv("to", J.JStr{to}), J.kv("text", J.JStr{text})]
+    case ISharedWip{+agent, +n, +age_min, +text, +note}:
+      [J.kv("t", J.JStr{"shared_wip"}), J.kv("agent", J.JStr{agent}), J.kv("n", J.JNum{n}), J.kv("age_min", J.JNum{age_min}), J.kv("text", J.JStr{text}), J.kv("note", J.JStr{note})]
     case IPageAnswered{+card, +agent, +page, +text, +block}:
       K.cat([[J.kv("t", J.JStr{"page_answered"}), J.kv("card", J.JNum{card}), J.kv("agent", J.JStr{agent}), J.kv("page", J.JStr{page}), J.kv("text", J.JStr{text})], K.omit_s("block", block)])
     case IAnswerPos{+card, +agent, +pos}:

@@ -180,7 +180,14 @@ turns?: number,
  * empty included, so a client tells "no watch now" from an older
  * hub (none)
  */
-watching: Array<AgentWatch>, };
+watching: Array<AgentWatch>, 
+/**
+ * shared-guard: its files still uncommitted in the shared folder
+ * (only the ones its file tools wrote; the hub counts about once a
+ * minute): the board's `· N unlanded`. 0: none, or not in the
+ * shared folder
+ */
+shared_wip?: number, };
 
 /**
  * An option a client does itself (card-state, architect m_23450): the

@@ -128,8 +128,7 @@ pub(super) struct Agent {
     branch: Option<String>,
     path: String,
     note: String,
-    /// the agents' messages waiting for its turn to end (the row's
-    /// `msgs_queued`)
+    /// the agents' messages waiting for its turn to end (the row's `msgs_queued`)
     queued: u64,
     /// issue 23: his messages the hub holds for its turn's end (the row's
     /// `queued`, oldest first): the queue above the composer and the
@@ -145,8 +144,7 @@ pub(super) struct Agent {
     /// task: what it did, and about when it stopped).
     report: String,
     report_ms: Option<u64>,
-    /// What it is doing now, one line (BISE-126): the hub's role line, ""
-    /// for main.
+    /// What it is doing now, one line (BISE-126): the hub's role line, "" for main.
     role: String,
     created_ms: u64,
     /// Who it waits on (`sb wait` / `sb ask`), "" when no one.
@@ -178,6 +176,8 @@ pub(super) struct Agent {
     /// event-wake: the events it waits for now (the hub's row,
     /// `watching`), oldest first: the panel's `…`, the live line
     watching: Vec<bise_proto::rows::AgentWatch>,
+    /// shared-guard: its uncommitted files in the shared folder (the row's `shared_wip`)
+    shared_wip: u32,
 }
 
 impl Agent {
