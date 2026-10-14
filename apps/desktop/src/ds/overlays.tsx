@@ -114,24 +114,25 @@ export interface MenuItemProps {
   onClick?: MouseEventHandler<HTMLDivElement>;
   testId?: string;
 }
-/** a menu item */
+/** a menu item: a ds Picker row (picker.css, designer m_24793): name | its key, the 6% tint on */
 export const MenuItem = memo(function MenuItem({ children, hotkey, on, disabled, danger, onClick, testId }: MenuItemProps) {
   return (
-    <div className={cx("b-mi", on && "on", disabled && "dis", danger && "danger")} role="menuitem" aria-disabled={disabled || undefined}
+    <div className={cx("b-picker-row", "b-mi", on && "on", disabled && "dis", danger && "danger")} role="menuitem" aria-disabled={disabled || undefined}
       onClick={disabled ? undefined : onClick} data-testid={testId}>
-      <span>{children}</span><span className="k">{hotkey}</span>
+      <span className="t"><span className="n">{children}</span></span>
+      {hotkey != null && <span className="k">{hotkey}</span>}
     </div>
   );
 });
 
 /** a separator in a menu */
 export function MenuSep() {
-  return <div className="b-sep" role="separator" />;
+  return <div className="b-picker-sep" role="separator" />;
 }
 
-/** a menu: MenuItem and MenuSep children */
+/** a menu (the ⋯ menus): MenuItem and MenuSep children in the ds Picker's shell (picker.css) */
 export function Menu({ children, testId }: { children: ReactNode; testId?: string }) {
-  return <div className="b-menu" role="menu" data-testid={testId}>{children}</div>;
+  return <div className="b-picker b-menu" role="menu" data-testid={testId}>{children}</div>;
 }
 
 export interface ToastProps {

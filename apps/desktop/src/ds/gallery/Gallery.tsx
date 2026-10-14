@@ -305,7 +305,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
           { id: "f", head: "Anthropic (foundry proxy)", rows: [{ id: "fopus", name: "opus 5.5" }, { id: "off", name: "haiku 5", disabled: true, tip: "set it up first" }] },
         ]}
         footer={<PickerSeg head="effort" items={["low", "medium", "high", "max"]} on="high" onPick={() => undefined} />} />
-      <Picker testId="ds.picker.slash" active="review" onPick={() => undefined} groups={[{ id: "c", rows: [
+      <Picker testId="ds.picker.slash" active="review" inline onPick={() => undefined} groups={[{ id: "c", rows: [
         { id: "review", glyph: "/", name: "review", secondary: "an agent reads the branch's changes and says what to fix" },
         { id: "compact", glyph: "/", name: "compact", secondary: "summarize this thread to free its context" },
         { id: "new", glyph: "/", name: "new", secondary: "start a task with its own agent", disabled: true },

@@ -85,6 +85,18 @@
 .b-picker-row.on {
   background: var(--c-hover);
 }
+.b-picker-row.danger {
+  color: var(--c-err);
+}
+/* a stateless row (the ⋯ menus' MenuItem) tints under the pointer */
+.b-picker-row.b-mi:not(.dis):not(.on):hover {
+  background: var(--c-hover);
+}
+.b-picker-sep {
+  height: 1px;
+  margin: var(--s-1) var(--s-3);
+  background: var(--c-line);
+}
 .b-picker-row.dis,
 .b-picker-row.none {
   color: var(--c-text-3);

@@ -70,7 +70,6 @@
 .b-composer .box{cursor:text}
 .b-composer .box .send{cursor:default}
 .b-chip[role=button]:hover,.b-chip[role=button].is-hover{background:var(--c-active)}
-.b-mi:not(.dis):not(.on):hover{background:var(--c-hover)}
 .b-tabs>span:not(.on):hover{background:var(--c-active)}
 .b-task:focus-visible{outline:0}
 

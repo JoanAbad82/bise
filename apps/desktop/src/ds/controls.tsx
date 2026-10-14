@@ -192,8 +192,8 @@ export interface SelectProps {
   testId?: string;
 }
 /**
- * the settings picker: a Field with '⌄' that opens the ds menu under it; typeahead, ↑↓ ⏎ esc
- * (Radix Select). Each option's test id is `<testId>.opt.<value>`.
+ * the settings picker: a Field with '⌄' that opens a ds Picker under it (its shell, rows, inline
+ * hint and ✓, picker.css; designer m_24793); typeahead, ↑↓ ⏎ esc (Radix Select). Each option's test id is `<testId>.opt.<value>`.
  */
 export function Select({ value, options, onChange, label, placeholder, state, testId }: SelectProps) {
   return (
@@ -205,13 +205,15 @@ export function Select({ value, options, onChange, label, placeholder, state, te
         </RSelect.Icon>
       </RSelect.Trigger>
       <RSelect.Portal>
-        <RSelect.Content className="b-menu b-select-menu" position="popper" sideOffset={4}>
-          <RSelect.Viewport>
+        <RSelect.Content className="b-picker inline b-select-menu" position="popper" sideOffset={8}>
+          <RSelect.Viewport className="b-picker-list">
             {options.map((o) => (
-              <RSelect.Item key={o.value} value={o.value} className="b-mi" data-testid={testId === undefined ? undefined : `${testId}.opt.${o.value}`}>
-                <RSelect.ItemText>{o.label}</RSelect.ItemText>
-                {o.hint != null && <span className="k">{o.hint}</span>}
-                <RSelect.ItemIndicator className="mark" aria-hidden="true">✓</RSelect.ItemIndicator>
+              <RSelect.Item key={o.value} value={o.value} className="b-picker-row" data-testid={testId === undefined ? undefined : `${testId}.opt.${o.value}`}>
+                <span className="t">
+                  <span className="n"><RSelect.ItemText>{o.label}</RSelect.ItemText></span>
+                  {o.hint != null && <span className="s">{o.hint}</span>}
+                </span>
+                <RSelect.ItemIndicator className="ok" aria-hidden="true">✓</RSelect.ItemIndicator>
               </RSelect.Item>
             ))}
           </RSelect.Viewport>

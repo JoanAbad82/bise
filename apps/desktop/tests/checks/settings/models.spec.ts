@@ -66,6 +66,13 @@ test('settings/models: the roles are the TUI\'s; a model and a reasoning picked 
     // the picker's options (its menu opens in a portal): value from the test id, label, and which is on
     const prefix = `settings.role.${R}.model.opt.`;
     await sel.click();
+    // the select's list is a ds Picker (designer m_24793): its shot, light and dark
+    await expect(page.locator(`[data-testid^="${prefix}"]`).first()).toBeVisible();
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: test.info().outputPath('select-open-light.png') });
+    await page.evaluate(() => { document.documentElement.dataset['theme'] = 'dark'; });
+    await page.screenshot({ path: test.info().outputPath('select-open-dark.png') });
+    await page.evaluate(() => { document.documentElement.dataset['theme'] = 'light'; });
     const options = await page.locator(`[data-testid^="${prefix}"]`).evaluateAll((os, pre) => os.map((o) => ({ v: (o.getAttribute('data-testid') ?? '').slice(pre.length), t: o.textContent, on: o.getAttribute('data-state') === 'checked' })), prefix);
     const was = options.find((o) => o.on)?.v ?? '';
     const pick = options.find((o) => o.v !== '(fallback)' && !o.on && !o.t.includes('set up first'));
