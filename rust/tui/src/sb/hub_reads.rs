@@ -277,6 +277,10 @@ fn cards(app: &mut App, his: &[bise_proto::rows::Card], others: &[bise_proto::ro
     }
     super::cards::sync(app, &before);
     keep_selection(app);
+    // designer m_25918: `✓ inbox clear` only while it is (a new one came)
+    if app.flash.as_ref().is_some_and(|(t, _)| t == "inbox clear") && !app.sb.card_ids().is_empty() {
+        app.flash = None;
+    }
     // BISE-61: the first card (a one-time hint)
     if app.sb.cards.is_empty() {
         crate::hints::used(crate::hints::Hint::FirstCard);

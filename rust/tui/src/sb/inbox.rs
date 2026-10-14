@@ -28,7 +28,7 @@ pub(crate) fn waiting(app: &App) -> Vec<Waiting> {
         .map(|c| {
             let s = shape(c);
             let agent = if matches!(c.kind.as_str(), "approval" | "confirm" | "question") { c.agent.clone() } else { s.who.clone() };
-            Waiting { n: n(c.id), id: c.id, agent, text: s.summary }
+            Waiting { n: n(c.id), id: c.id, agent, text: s.summary, age: super::card_draw::short_age(c.age_now()) }
         })
         .collect()
 }
@@ -63,6 +63,8 @@ pub(crate) fn to_answer(app: &mut App, agent: &str, pos: Option<u64>, inbox: boo
         crate::inbox_screen::park(app);
     }
     app.inbox = None;
+    // a note of the view he leaves (`✓ inbox clear`) is not the new one's
+    app.flash = None;
     JUMP.with(|j| {
         let mut j = j.borrow_mut();
         j.back = Some((agent.to_string(), before, inbox));
@@ -103,6 +105,7 @@ pub(crate) fn esc_back(app: &mut App) -> bool {
         return false;
     }
     JUMP.with(|j| *j.borrow_mut() = Jump::default());
+    app.flash = None;
     super::focus(app, &before);
     app.follow = true;
     if inbox {

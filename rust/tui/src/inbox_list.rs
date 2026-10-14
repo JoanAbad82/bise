@@ -20,6 +20,8 @@ pub(crate) struct Waiting {
     pub(crate) id: u64,
     pub(crate) agent: String,
     pub(crate) text: String,
+    /// its age as the strip says it (`now`, `6m`), in the time column
+    pub(crate) age: String,
 }
 
 /// What the selection can land on.
@@ -116,7 +118,8 @@ pub(crate) fn text(r: &Row, width: usize) -> (String, String) {
         Row::WaitHead(n) => (format!("waiting for you · {n}"), String::new()),
         Row::Wait(w) => {
             let head = format!("{}  {}  ", w.n, w.agent);
-            (format!("{head}{}", cut(&one_line(&w.text), width.saturating_sub(head.width()))), String::new())
+            let room = width.saturating_sub(head.width() + w.age.width() + 2);
+            (format!("{head}{}", cut(&one_line(&w.text), room)), w.age.clone())
         }
         Row::Day(d) => (d.clone(), String::new()),
         Row::Past { done, asker, question, time, .. } => {
@@ -130,8 +133,15 @@ pub(crate) fn text(r: &Row, width: usize) -> (String, String) {
     }
 }
 
-/// The keys under the list.
-pub(crate) const KEYS: &str = "⏎ answer / go to it   ↑↓ move   esc back";
+/// The keys under the list: what ⏎ does on the selected row (designer
+/// m_25918, the desktop's rule).
+pub(crate) fn keys(sel: Option<Pick>) -> &'static str {
+    match sel {
+        Some(Pick::Card(_)) => "⏎ answer   ↑↓ move   esc back",
+        Some(Pick::Past(_)) => "⏎ go to it   ↑↓ move   esc back",
+        None => "esc back",
+    }
+}
 
 fn one_line(s: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
@@ -183,7 +193,7 @@ mod tests {
     }
 
     fn wait(n: usize, id: u64) -> Waiting {
-        Waiting { n, id, agent: "docs".into(), text: "ship the readme?".into() }
+        Waiting { n, id, agent: "docs".into(), text: "ship the readme?".into(), age: "now".into() }
     }
 
     #[test]

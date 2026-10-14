@@ -31,18 +31,23 @@ fn texts(ls: &[Line]) -> Vec<String> {
 
 #[test]
 fn waiting_on_top_and_the_keys_at_the_bottom() {
-    let w = [Waiting { n: 1, id: 30, agent: "docs".into(), text: "ship the readme?".into() }];
+    let w = [Waiting { n: 1, id: 30, agent: "docs".into(), text: "ship the readme?".into(), age: "6m".into() }];
     let rows = list::rows(&w, &[rec(3, true), rec(2, false)], false, NOW, 0);
     for width in [80, 150] {
         let mut sc = Screen::default();
         let t = texts(&lines(&mut sc, &rows, width, 14));
         assert_eq!(sc.sel, Some(Pick::Card(30)));
         assert_eq!(t[0], "  waiting for you · 1");
-        assert_eq!(t[1], "› 1  docs  ship the readme?");
+        // its age in the time column: no hole under the answers' times
+        assert!(t[1].starts_with("› 1  docs  ship the readme?") && t[1].ends_with("6m"), "{}", t[1]);
         assert!(t[3].starts_with("  ✓ perf  webp or avif for hero 3?") && t[3].ends_with("12:38"), "{}", t[3]);
         assert_eq!(t[4], "    you: avif · in the inbox");
         assert_eq!(t[6], "    withdrawn: moot");
-        assert_eq!(t.last().unwrap(), list::KEYS);
+        // ⏎ says what it does on the selected row
+        assert_eq!(t.last().unwrap(), "⏎ answer   ↑↓ move   esc back");
+        sc.sel = Some(Pick::Past(3));
+        let t = texts(&lines(&mut sc, &rows, width, 14));
+        assert_eq!(t.last().unwrap(), "⏎ go to it   ↑↓ move   esc back");
         assert!(t.iter().all(|l| l.width() <= width), "{t:#?}");
     }
 }

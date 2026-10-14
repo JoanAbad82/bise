@@ -194,7 +194,7 @@ fn lines() -> Lines {
 }
 
 /// An item's age, short (`12s`, `2m`, `3h`, `2d`; `now` under 10 s).
-fn short_age(ms: u64) -> String {
+pub(super) fn short_age(ms: u64) -> String {
     let s = ms / 1000;
     match s {
         0..=9 => "now".into(),

@@ -133,7 +133,7 @@ pub(crate) fn lines(sc: &mut Screen, rows: &[Row], width: usize, height: usize) 
     let mut out: Vec<Line> = rows.iter().skip(sc.top).take(room).map(|r| line(r, r.pick().is_some() && r.pick() == sc.sel && !matches!(r, Row::Said { .. }), width)).collect();
     out.resize(room, Line::default());
     out.push(Line::default());
-    out.push(Line::from(Span::styled(list::KEYS, Style::default().fg(dim()))));
+    out.push(Line::from(Span::styled(list::keys(sc.sel), Style::default().fg(dim()))));
     out
 }
 
