@@ -1,6 +1,6 @@
 // bise's presence in the capsule (designer's bise-presence v10): the ':*' where the pearl stood,
 // its state from the view and the store. Pure, for the checks; Capsule.tsx draws it (src/ds's
-// BiseMark). Listening: the eyes follow his voice. Thinking: the star turns in steps. Answering:
+// BiseMark). Listening: the eyes follow his voice. Thinking: the star breathes. Answering:
 // the star beats with each chunk of the answer. Something waits on him: the star in the accent,
 // the two kisses on each new wait. The star is the team (1b): one branch per running agent (a
 // waiting one's in the accent), none the plain star. Its tip says it in words (law 6).

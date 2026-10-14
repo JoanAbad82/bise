@@ -6,8 +6,12 @@
 // right bar and on its project's mark, once, and under reduced motion only the final '✓'; the
 // pointer on bise's ':*' winks it; the head has no name (the crumb has it), no 'idle' chip, and
 // '± 3 files' only with changes; the right bar's % only from 70 %, else in the row's tip. Shots
-// light and dark at 1400, 1100 and 800, and a frame strip per touch, for designer's sign. The
-// scripted core (FakeCore). Owner: amb-win.
+// light and dark at 1400, 1100 and 800, and a frame strip per touch, for designer's sign. And
+// bise's ':*' while bise works (his pick #5 on bise-s-mark-25-variations): the star breathes,
+// scale 1 → .72 → 1 over 2.64 s, no turn and no branch of its own moving; asks wins (waits and
+// works: the pink star, still); <html data-still> (the window away) pauses it; reduced motion, none.
+// Close-ups at 2x DPR, enlarged 2×, of quiet / working (full and .72) / asks / both, light and dark. The scripted
+// core (FakeCore). Owner: amb-win.
 import { writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { FakeCore, Recorder, launchDesktop, test, expect } from '../../harness';
@@ -27,12 +31,12 @@ const prefs = (theme: string) => ({
   ev: 'prefs',
   prefs: { onboarded: true, theme, context: { shot: true, url: true, file: true, window_text: false }, excluded_apps: [], quiet: { call: true, share: true, fullscreen: true, focus: true, batch_min: 20, away_card: true }, voice: { fn_hold: true, fn_twice: 'spotlight', language: 'auto' }, shots_keep_days: 7 },
 });
-const projects = (storefrontWorking: number) => ({
+const projects = (storefrontWorking: number, tsWaits = 1) => ({
   ev: 'projects',
   projects: [
     { project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true },
     { project: P, name: 'storefront', path: '/nowhere/storefront', git: true, home: false, order: 1, agents: 4, working: storefrontWorking, waits: 0, running: true },
-    { project: TS, name: 'ts-pattern', path: '/nowhere/ts-pattern', git: true, home: false, order: 2, agents: 1, working: 0, waits: 1, running: true },
+    { project: TS, name: 'ts-pattern', path: '/nowhere/ts-pattern', git: true, home: false, order: 2, agents: 1, working: 0, waits: tsWaits, running: true },
     { project: DOCS, name: 'docs-site', path: '/nowhere/docs-site', git: true, home: false, order: 3, agents: 0, working: 0, waits: 0, running: true },
   ],
 });
@@ -184,6 +188,114 @@ test('app/delight-marks: the sidebar marks and their tips, the done kiss, the wi
       await page.waitForTimeout(300);
       await page.screenshot({ path: shot(`w${String(w)}-dark`) });
       await core.send(prefs('light') as never);
+    }
+  } finally {
+    await s.close();
+    core.dispose();
+  }
+});
+
+/** Crops of the page (CSS px), each enlarged `k`× (nearest), side by side with a 12 px gutter: a close-up sheet. */
+function sheet(crops: PNG[], k: number, name: string): void {
+  const gut = 12;
+  const w = crops.reduce((n, c) => n + c.width * k, 0) + gut * (crops.length - 1);
+  const h = Math.max(...crops.map((c) => c.height * k));
+  const out = new PNG({ width: w, height: h });
+  out.data.fill(255);
+  let x0 = 0;
+  for (const c of crops) {
+    for (let y = 0; y < c.height * k; y++)
+      for (let x = 0; x < c.width * k; x++) {
+        const s = (Math.floor(y / k) * c.width + Math.floor(x / k)) * 4;
+        const d = (y * w + x0 + x) * 4;
+        for (let j = 0; j < 4; j++) out.data[d + j] = c.data[s + j] ?? 255;
+      }
+    x0 += c.width * k + gut;
+  }
+  writeFileSync(test.info().outputPath(`${name}.png`), PNG.sync.write(out));
+}
+
+test("app/delight-marks: bise's ':*' breathes while bise works (#5), asks wins, holds when away and under reduced motion; close-ups", async () => {
+  const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
+  const s = await launchDesktop({ core, route: `agent/${P}/perf`, size: '1400x860' });
+  try {
+    const { page } = s;
+    const bise = page.getByTestId('app.sidebar.bise.mark');
+    await expect(page.getByTestId('app.right.agent.perf')).toBeVisible({ timeout: 10_000 });
+    const motion = () => bise.evaluate((el) => {
+      const star = getComputedStyle(el.querySelector('.b-bise-star') as Element);
+      const arms = Array.from(el.querySelectorAll('.b-bise-arm'), (a) => getComputedStyle(a).animationName);
+      return { name: star.animationName, dur: star.animationDuration, play: star.animationPlayState, arms: [...new Set(arms)] };
+    });
+
+    // both (storefront works, ts-pattern waits): asks wins, the pink star, no breath
+    await expect(bise).toHaveAttribute('data-waits', 'true');
+    await expect(bise).toHaveAttribute('data-working', 'true');
+    expect((await motion()).name, 'both: asks wins, the star holds').toBe('none');
+    // working only: the star breathes, 2.64 s, and no branch moves on its own (no tumble)
+    await core.send(projects(3, 0) as never);
+    await expect(bise).not.toHaveAttribute('data-waits', 'true');
+    expect(await motion()).toEqual({ name: 'b-bise-breathe', dur: '2.64s', play: 'running', arms: ['none'] });
+    const scales = await bise.evaluate((el) => {
+      const star = el.querySelector('.b-bise-star') as SVGGElement;
+      const anim = star.getAnimations()[0] as Animation;
+      anim.pause();
+      const at = (ms: number) => { anim.currentTime = ms; return getComputedStyle(star).transform; };
+      const out = [at(0), at(1320)];
+      anim.play();
+      return out;
+    });
+    expect(scales, 'scale 1 at the start, .72 at the middle, no rotation').toEqual(['matrix(1, 0, 0, 1, 0, 0)', 'matrix(0.72, 0, 0, 0.72, 0, 0)']);
+    // the window away: it holds where it is
+    await page.evaluate(() => { document.documentElement.dataset.still = ''; });
+    expect((await motion()).play, '<html data-still>: paused').toBe('paused');
+    await page.evaluate(() => { delete document.documentElement.dataset.still; });
+    expect((await motion()).play).toBe('running');
+    // reduced motion: the still ':*'
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    expect((await motion()).name, 'reduced motion: still').toBe('none');
+    await page.emulateMedia({ reducedMotion: null });
+    // quiet: nothing moves
+    await core.send(projects(0, 0) as never);
+    await expect(bise).not.toHaveAttribute('data-working', 'true');
+    expect((await motion()).name).toBe('none');
+
+    // close-ups at his Retina's 2x, enlarged 2× (4× the CSS px), light then dark: quiet, working at
+    // 1, working at .72, asks, both
+    await s.cdp.send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 860, deviceScaleFactor: 2, mobile: false });
+    await page.mouse.move(700, 500);
+    for (const theme of ['light', 'dark']) {
+      await core.send(prefs(theme) as never);
+      await page.waitForTimeout(300);
+      const crops: PNG[] = [];
+      const grab = async () => {
+        await page.waitForTimeout(450); // past the kisses
+        const b = await bise.boundingBox();
+        if (b === null) throw new Error('no mark');
+        crops.push(PNG.sync.read(await page.screenshot({ clip: { x: b.x - 6, y: b.y - 6, width: b.width + 12, height: b.height + 12 } })));
+      };
+      await core.send(projects(0, 0) as never);
+      await grab();
+      await core.send(projects(3, 0) as never);
+      await expect(bise).toHaveAttribute('data-working', 'true');
+      for (const ms of [0, 1320]) {
+        await bise.evaluate((el, t) => { const a = (el.querySelector('.b-bise-star') as SVGGElement).getAnimations()[0]; if (a) { a.pause(); a.currentTime = t; } }, ms);
+        await grab();
+      }
+      // crisp: at scale 1 the breathing star draws like the still one, give or take a few edge
+      // pixels of anti-aliasing (9 seen at 2x); a composited layer resamples it soft (168 seen)
+      const [still, breath] = crops as [PNG, PNG];
+      let soft = 0;
+      for (let i = 0; i < still.data.length; i += 4)
+        if ([0, 1, 2].some((j) => Math.abs((still.data[i + j] ?? 0) - (breath.data[i + j] ?? 0)) > 24)) soft++;
+      expect(soft, `${theme}: the breath at 1 draws like the still star, not a soft layer`).toBeLessThan(40);
+      await core.send(projects(0, 1) as never);
+      await expect(bise).toHaveAttribute('data-waits', 'true');
+      await grab();
+      await core.send(projects(3, 1) as never);
+      await expect(bise).toHaveAttribute('data-working', 'true');
+      await grab();
+      sheet(crops, 2, `closeup-${theme}`);
     }
   } finally {
     await s.close();

@@ -4,7 +4,9 @@
 // heads at 14 px, the presence (the capsule at 26 px; the tray draws the same numbers as images).
 //   - waits: the star in the accent (the eyes stay ink); `kiss` changing while it waits gives the
 //     two kisses, two short beats (1 → 1.25 → 1, 140 ms each, 120 ms apart), once, then still;
-//   - working: the star turns in steps, like the terminal's spinner;
+//   - working: the star breathes, 1 → .72 → 1 over 2.64 s, no turn (his pick #5, page
+//     bise-s-mark-25-variations); waits wins over it: the pink star holds still with its kisses;
+//     the window away (<html data-still>) holds it where it is;
 //   - listening: the eyes follow his voice like a meter (`level`, 0..1);
 //   - speaking: the star beats once per `beat` change (a chunk of the answer);
 //   - live (the presence): at rest the eyes blink (4 s) and the star sways ±7° (3 s); not under 16 px;
@@ -25,7 +27,7 @@ export interface BiseMarkProps {
   waits?: boolean;
   /** the current wait's key: a new one while `waits` plays the two kisses once */
   kiss?: string | number;
-  /** bise works: its star turns in steps */
+  /** bise works: its star breathes */
   working?: boolean;
   /** he talks: the eyes follow `level` */
   listening?: boolean;
@@ -79,10 +81,10 @@ export function BiseMark({ waits = false, kiss, working = false, listening = fal
         <g className="b-bise-kiss" key={waits ? `k${String(kiss ?? "")}` : "k"}>
           <g className="b-bise-beat" key={`b${String(beat ?? "")}`}>
             <g className="b-bise-star" strokeWidth={w}>
-              {/* the rotation on a group: a branch's own CSS animation (1b's pace) would replace a transform on the line */}
+              {/* each branch's angle on its own group: the star's breath scales them all together */}
               {angles.map((a, i) => (
                 <g key={i} transform={a === 0 ? undefined : `rotate(${String(a)} ${String(CX)} ${String(CY)})`}>
-                  <line className={cx("b-bise-arm", `a${String(i % 4)}`, branches[i] === "wait" && "wait")} x1={CX} y1={CY - ARM} x2={CX} y2={CY + ARM} />
+                  <line className={cx("b-bise-arm", branches[i] === "wait" && "wait")} x1={CX} y1={CY - ARM} x2={CX} y2={CY + ARM} />
                 </g>
               ))}
             </g>
