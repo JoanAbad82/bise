@@ -95,7 +95,10 @@
       case "slide": return a.rect ? `slide ${a.slide} · a box` : `slide ${a.slide}`;
       case "shape": return has(a.quote) ? `slide ${a.slide} · ${q(a.quote)}` : `slide ${a.slide} · a shape`;
       case "para": return has(a.quote) ? q(a.quote) : "a paragraph";
-      case "region": return a.page != null ? `page ${a.page} · a box` : "a box";
+      case "region":
+        // a pdf passage is said by its words (pdf-notes)
+        if (has(a.quote)) return a.page != null ? `page ${a.page} · ${q(a.quote)}` : q(a.quote);
+        return a.page != null ? `page ${a.page} · a box` : "a box";
       case "text": return `line ${a.line}`;
       default: return "a part";
     }

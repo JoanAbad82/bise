@@ -10,5 +10,6 @@
 {"kind":"para","para":"00000001"}
 {"kind":"region","rect":{"x":0.0,"y":0.0,"w":50.0,"h":50.0}}
 {"kind":"region","page":4,"rect":{"x":12.5,"y":60.0,"w":40.0,"h":10.0}}
+{"kind":"region","page":2,"rect":{"x":10.0,"y":30.0,"w":60.0,"h":4.0},"quote":"net revenue grew"}
 {"kind":"text","line":40}
 {"kind":"text","line":1,"quote":"# bise"}

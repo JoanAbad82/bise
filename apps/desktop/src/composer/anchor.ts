@@ -23,7 +23,8 @@ const has = (q: string | undefined): q is string => q !== undefined && q.trim() 
 
 /**
  * Where in the artifact: `Q3!B4:D9`, `slide 2`, `slide 2 · a box`, `slide 2 · a shape`,
- * `"net revenue…"`, `page 1 · a box`, `line 40`; a kind this window doesn't know: `a part`. Pure.
+ * `"net revenue…"`, `page 1 · a box`, `page 1 · "net revenue…"`, `line 40`; a kind this window
+ * doesn't know: `a part`. Pure.
  */
 export function anchorLabel(a: Anchor): string {
   switch (a.kind) {
@@ -39,6 +40,8 @@ export function anchorLabel(a: Anchor): string {
     case 'para':
       return has(a.quote) ? quoted(a.quote) : 'a paragraph';
     case 'region':
+      // a pdf passage is said by its words (pdf-notes): `page 2 · "net revenue…"`
+      if (has(a.quote)) return a.page === undefined ? quoted(a.quote) : `page ${String(a.page)} · ${quoted(a.quote)}`;
       return a.page === undefined ? 'a box' : `page ${String(a.page)} · a box`;
     case 'text':
       return `line ${String(a.line)}`;

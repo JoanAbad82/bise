@@ -12,6 +12,8 @@
   {"anchor": {"kind": "para", "para": "3F2A1B00"}, "label": "a paragraph"},
   {"anchor": {"kind": "region", "page": 1, "rect": {"x": 0, "y": 0, "w": 50, "h": 50}}, "label": "page 1 · a box"},
   {"anchor": {"kind": "region", "rect": {"x": 0, "y": 0, "w": 50, "h": 50}}, "label": "a box"},
+  {"anchor": {"kind": "region", "page": 2, "rect": {"x": 10, "y": 30, "w": 60, "h": 4}, "quote": "net revenue grew"}, "label": "page 2 · \"net revenue grew\""},
+  {"anchor": {"kind": "region", "rect": {"x": 10, "y": 30, "w": 60, "h": 4}, "quote": "net revenue grew"}, "label": "\"net revenue grew\""},
   {"anchor": {"kind": "text", "line": 40}, "label": "line 40"},
   {"anchor": {"kind": "block", "block": "b3", "quote": "the plan"}, "label": "\"the plan\""},
   {"anchor": {"kind": "block", "block": "b3"}, "label": "block b3"},

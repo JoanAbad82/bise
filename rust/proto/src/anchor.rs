@@ -9,7 +9,8 @@
 //! - `shape`: a shape of a slide, `{slide, shape, quote?}` (`shape` is the
 //!   shape's `p:cNvPr/@id`, as the SDK's `inspect()` says it);
 //! - `para`: a paragraph of a document, `{para, quote?}` (its `w14:paraId`);
-//! - `region`: a box on an image or a pdf page, `{page?, rect}`;
+//! - `region`: a box on an image or a pdf page, `{page?, rect, quote?}`
+//!   (a pdf passage: its words' box and its words);
 //! - `text`: a line of any text file, `{line, quote?}`.
 //!
 //! Slides, pages and lines count from 1. A [`Rect`] is in % of the
@@ -69,12 +70,15 @@ pub enum Anchor {
         #[serde(default, skip_serializing_if = "String::is_empty")]
         quote: String,
     },
-    /// a box on an image, or on a page of a pdf
+    /// a box on an image, or on a page of a pdf; a passage of a pdf is
+    /// its words' box with the words in `quote` (pdf-notes, architect m_24668)
     Region {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[cfg_attr(feature = "ts", ts(optional))]
         page: Option<u32>,
         rect: Rect,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        quote: String,
     },
     /// a line of a text file
     Text {
@@ -109,7 +113,7 @@ impl Eq for Anchor {}
 /// words, designer m_24098: never a machine id): `Q3!B4:D9`, `slide 2`,
 /// `slide 2 · a box`, `slide 2 · "Revenue"`, `slide 2 · a shape`,
 /// `"net revenue…"` (a paragraph by its words), `page 1 · a box`,
-/// `line 40`. Both apps draw it from this rule (fixture anchor_label.json).
+/// `page 1 · "net revenue…"` (a pdf passage), `line 40`. Both apps draw it from this rule (fixture anchor_label.json).
 pub fn label(a: &Anchor) -> String {
     let quoted = |q: &str| format!("\"{}\"", short(q, 40));
     match a {
@@ -122,6 +126,8 @@ pub fn label(a: &Anchor) -> String {
         Anchor::Shape { slide, .. } => format!("slide {slide} · a shape"),
         Anchor::Para { quote, .. } if !quote.trim().is_empty() => quoted(quote),
         Anchor::Para { .. } => "a paragraph".into(),
+        Anchor::Region { page: Some(p), quote, .. } if !quote.trim().is_empty() => format!("page {p} · {}", quoted(quote)),
+        Anchor::Region { page: None, quote, .. } if !quote.trim().is_empty() => quoted(quote),
         Anchor::Region { page: Some(p), .. } => format!("page {p} · a box"),
         Anchor::Region { page: None, .. } => "a box".into(),
         Anchor::Text { line, .. } => format!("line {line}"),
@@ -186,6 +192,7 @@ mod tests {
             json!({"kind": "shape", "slide": 3, "shape": "12"}),
             json!({"kind": "para", "para": "3F2A1B00", "quote": "net revenue"}),
             json!({"kind": "region", "page": 1, "rect": {"x": 0.0, "y": 0.0, "w": 50.0, "h": 50.0}}),
+            json!({"kind": "region", "page": 2, "rect": {"x": 10.0, "y": 30.0, "w": 60.0, "h": 4.0}, "quote": "net revenue grew"}),
             json!({"kind": "text", "line": 40}),
         ];
         let mut seen = std::collections::BTreeSet::new();

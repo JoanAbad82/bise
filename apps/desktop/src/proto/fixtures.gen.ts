@@ -458,6 +458,7 @@ export const anchor: readonly Anchor[] = [
   {"kind":"para","para":"00000001"},
   {"kind":"region","rect":{"h":50.0,"w":50.0,"x":0.0,"y":0.0}},
   {"kind":"region","page":4,"rect":{"h":10.0,"w":40.0,"x":12.5,"y":60.0}},
+  {"kind":"region","page":2,"quote":"net revenue grew","rect":{"h":4.0,"w":60.0,"x":10.0,"y":30.0}},
   {"kind":"text","line":40},
   {"kind":"text","line":1,"quote":"# bise"},
 ];
