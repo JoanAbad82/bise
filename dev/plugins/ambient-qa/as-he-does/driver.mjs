@@ -87,6 +87,13 @@ const until = async (fn, ms, every = 1000) => {
     await new Promise((r) => setTimeout(r, every));
   }
 };
+// the alarm rows of the right bar's SCHEDULED & WATCHING whose words hold `words` (agent-waiting-states
+// A: app.right.watching.<agent>.<id>, never its .detail/.stop/.open parts): {id, text, title, g, sub, end}
+const alarmRows = (words) => page.evaluate((w) => [...document.querySelectorAll('[data-testid^="app.right.watching."]')]
+  .filter((e) => /\.\d+$/.test(e.getAttribute('data-testid') ?? '') && (e.textContent ?? '').includes(w))
+  .map((e) => ({ id: e.getAttribute('data-testid'), text: (e.textContent ?? '').replace(/\s+/g, ' ').trim(), title: e.getAttribute('title'),
+    g: e.querySelector('.app-rb-g')?.textContent?.trim() ?? null, sub: e.querySelector('.app-rb-sub')?.textContent?.trim() ?? null,
+    end: e.querySelector('.app-rb-end')?.textContent?.trim() ?? null })), words).catch(() => []);
 
 await page.locator('[data-testid="app.sidebar"]').first().waitFor({ timeout: 20000 }).catch(() => {});
 // the status pill (e41cd3c2): 'starting bise…' and the core's words sit IN the title bar, no row
@@ -419,7 +426,9 @@ if (mode === 'cut') {
   await page.locator('[data-testid="app.main"]').first().click({ position: { x: 40, y: 140 } }).catch(() => {});
   const before = (await text('[data-testid="composer"]')) ?? '';
   await page.keyboard.press('Control+r');
-  const line = await until(async () => { const t = (await text('[data-testid="composer"]')) ?? ''; return t !== before && /dictat|listen|mic|speak|voice/i.test(t) ? t : null; }, 8000, 500);
+  const line = await until(async () => { const t = (await text('[data-testid="composer"]')) ?? ''; return t !== before && /dictat|listen|mic|speak|voice|any key stop|esc cancel/i.test(t) ? t : null; }, 8000, 500);
+  // (with AS_HE_DOES_FAKE_VOICE=1 the take really records: the composer is the recording pill, '0:03',
+  // 'any key stop', 'esc cancel', none of the no-mic words: try-gate-0170's full pass)
   await shot('ctrl-r');
   await page.keyboard.press('Escape');
   const after = (await text('[data-testid="composer"]')) ?? '';
@@ -1185,6 +1194,7 @@ if (mode === 'quick') {
   await newRows(harness, say);
   await rows37(harness, say);
   await rows25(harness, say);
+  await rows0170(harness, say);
 }
 
 // d0d45f92's rows (ambient-lead m_22519): the help sheet opaque, esc never stops a turn and ctrl+c
@@ -1631,17 +1641,16 @@ async function rows37(harness, say) {
     await harness();
     await clear();
     await say(`[[bash: sb wake --on-file ${RC} --note "zq status line watch"]]`);
-    const line = await until(async () => {
-      const t = await page.locator('[data-testid="thread.waiting"]').first().innerText({ timeout: 1000 }).catch(() => null);
-      return t && /zq status line/.test(t) ? t.replace(/\s+/g, ' ').trim() : null;
-    }, 60000, 1000);
+    // agent-waiting-states A (f5a0394a): a file watch is an alarm, never a line over the composer;
+    // it sits in the right bar's SCHEDULED & WATCHING until its file appears
+    const there = await until(async () => (await alarmRows('zq status line'))[0] ?? null, 60000, 1000);
+    const line = await page.locator('[data-testid="thread.waiting"]').first().innerText({ timeout: 1000 }).catch(() => null);
     await shot('waiting-line');
-    const bareH = line ? /(^|\s)\d+[hmsd](\s|$|·)/.test(line) : null;
-    step("the status line over the composer: 'waiting since HH:MM' or 'waiting for N min', then the note; no bare 'Nh'", !!line && /^waiting (since \d{1,2}:\d{2}|for \d+ (s|sec|min|h|hours?)\b)/.test(line) && !bareH, { line, bareH });
-    // the watch's file appears: the wake comes and the line goes
+    step("an alarm (sb wake --on-file): no line over the composer, its row in SCHEDULED & WATCHING", !!there && line === null, { row: there, line });
+    // the watch's file appears: the wake comes and the row goes
     fs.writeFileSync(RC, '0');
-    const gone = await until(async () => ((await page.locator('[data-testid="thread.waiting"]').count()) === 0 ? true : null), 30000, 1000);
-    step('the line goes when the watch ends', !!gone, { gone: !!gone });
+    const gone = await until(async () => ((await alarmRows('zq status line')).length === 0 ? true : null), 30000, 1000);
+    step('the alarm row goes when the watch ends', !!gone, { gone: !!gone });
   });
 
   await row('right bar heads', async () => {
@@ -1873,6 +1882,212 @@ async function rows25(harness, say) {
       n0 >= 1 && /archived/.test(h1 ?? '') && n1 >= 1 && old > 0 && n2 === n0 && onScreen > 0 && !/archived/.test(h1b ?? ''),
       { n0, archived_row: arch, focused_on: focusedOn, how, h1, n1, old, n2, onScreen, h1b });
   });
+  await harness();
+}
+
+// 0170ed3f's rows (main m_23135, agent-waiting-states A f5a0394a/7d97d7a2/d6ece40b, the switcher's
+// silence a38108e7, the route's paths 0170ed3f), on the real hubs of the world, seeded by one
+// message to harness' main: zqbench is paused on a pid the driver started (sb wake --on-exit
+// --then), zqsearch waits on zqdocs' reply (an sb ask whose question holds a [[slow]] marker, built
+// by printf so no message carries it whole: zqdocs answers 240 s later), main sets an alarm (a file
+// watch). Rows: the pause over the composer and in the head, the reply line and its name, the
+// alarm only in the right bar (hover words, detail, stop watching), never 'since', and a path that
+// holds a project's name stays in bise's thread. Each row is its own try; the pid is killed at the end.
+async function rows0170(harness, say) {
+  const row = async (name, fn) => {
+    try { await fn(); } catch (e) { step(name, false, String(e).slice(0, 300)); }
+  };
+  const field = page.locator('[data-testid="composer.field"]:visible').first();
+  const clear = async () => {
+    await field.click({ timeout: 3000 }).catch(() => {});
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+  };
+  const bise = () => click('bise', page.locator('[data-testid="app.sidebar.bise"]').first());
+  const flat = (s) => (s ?? '').replace(/\s+/g, ' ').trim();
+  const noSince = async (where) => {
+    const body = flat(await page.locator('body').innerText({ timeout: 3000 }).catch(() => ''));
+    const m = /\bsince\b.{0,40}/.exec(body);
+    return { where, since: m ? m[0] : null };
+  };
+  // an agent's thread from the right bar's AGENTS row (as he does), else its sidebar row
+  const openAgent = async (name) => {
+    const r = page.locator(`[data-testid^="app.right.agent."][data-testid$=".${name}"], [data-testid="app.right.agent.${name}"]`).first();
+    if (await r.count()) await r.click({ timeout: 5000 }).catch(() => {});
+    let on = await until(async () => ((await page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent')) === name ? true : null), 5000, 250);
+    if (!on) {
+      await page.locator('[data-testid="app.sidebar"]').getByText(name, { exact: true }).first().click({ timeout: 3000 }).catch(() => {});
+      on = await until(async () => ((await page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent')) === name ? true : null), 5000, 250);
+    }
+    return !!on;
+  };
+  const agentRow = (name) => page.evaluate((n) => {
+    const e = [...document.querySelectorAll('[data-testid^="app.right.agent."]')].find((x) => { const id = x.getAttribute('data-testid') ?? ''; return id === `app.right.agent.${n}` || id.endsWith(`.${n}`); });
+    return e ? { id: e.getAttribute('data-testid'), g: e.querySelector('.app-rb-g')?.textContent?.trim() ?? null, end: e.querySelector('.app-rb-end')?.textContent?.trim() ?? null, text: (e.textContent ?? '').replace(/\s+/g, ' ').trim() } : null;
+  }, name).catch(() => null);
+  const waitLine = async () => {
+    const l = page.locator('[data-testid="thread.waiting"]').first();
+    if (!(await l.count())) return null;
+    return {
+      text: flat(await l.innerText({ timeout: 2000 }).catch(() => null)),
+      title: await l.getAttribute('title').catch(() => null),
+      whole: await l.evaluate((el) => { const st = el.querySelector('.th-wait-state'); return st !== null && st.scrollWidth <= st.clientWidth + 0.5 && el.scrollWidth <= el.clientWidth + 1; }).catch(() => null),
+    };
+  };
+  const head = async () => flat(await text('[data-testid="thread.head.state"]'));
+  const label = async () => flat(await text('[data-testid="composer"] .lbl'));
+
+  // the seed: a process of the driver's own for the pause, killed at the end
+  const { spawn } = await import('node:child_process');
+  const bench = spawn('/bin/sleep', ['900'], { detached: true, stdio: 'ignore' });
+  bench.unref();
+  fs.writeFileSync(path.join(out, 'zq-bench.pid'), String(bench.pid));
+  const RC = path.join(FX, `zq-gate-${String(Date.now() % 100000)}.rc`);
+  // the hub holds an sb ask (or sb wait) 25 s at most (core.bend WAIT_CAP): zqsearch asks twice in
+  // a row, ~50 s of 'continues when zqdocs answers', read as soon as it shows (try-gate-0170's first
+  // quick run: one ask with --timeout 300 timed out at 25 s, the line was gone at 65 s)
+  const ASK = 'sb ask zqdocs "$(printf %s "[" "[slow: 240]" "]") zq which page weights"';
+  await closeArtifact();
+  await harness();
+  await clear();
+  const t0 = Date.now();
+  // the alarm first, the spawns in one call: an agent's reply that steers main mid-turn is its new
+  // last message, and the fake model drops the markers left (the first quick run lost the alarm)
+  await say(`[[bash: sb wake --on-file ${RC} --note "the zq nightly gate goes red"]] [[bash: sb spawn zqbench --objective 'the zq bench {{bash: sb wake --on-exit ${String(bench.pid)} --then --note "the zq bench ends"}}' && sb spawn zqdocs --objective 'zq docs: nothing to do yet']] seeded 0170`);
+  const seeded = await until(async () => ((await agentRow('zqbench')) && (await agentRow('zqdocs')) && (await alarmRows('zq nightly')).length ? true : null), 90000, 1000);
+  step('rows0170 seed: zqbench and zqdocs in AGENTS, main\'s alarm in SCHEDULED & WATCHING', !!seeded,
+    { bench: await agentRow('zqbench'), docs: await agentRow('zqdocs'), alarm: await alarmRows('zq nightly'), pid: bench.pid });
+
+  await row('alarm only in the right bar', async () => {
+    await harness();
+    await page.waitForTimeout(800);
+    const a = (await alarmRows('zq nightly'))[0] ?? null;
+    const line = await waitLine();
+    const h = await head();
+    const sched = flat(await text('[data-testid="app.right.scheduled.head"]'));
+    await page.mouse.move(1, 300);
+    await shot('alarm-main');
+    const full = 'if the zq nightly gate goes red';
+    const subOk = !!a?.sub && (a.sub === full || (a.sub.endsWith('…') && full.startsWith(a.sub.slice(0, -1)) && full[a.sub.length - 1] === ' '));
+    step("an alarm-only agent (harness' main): idle, NO line over the composer, never 'waiting' in its head",
+      !!a && line === null && !/waiting/.test(h), { line, head: h, label: await label() });
+    step("its alarm in SCHEDULED & WATCHING: '◌ main · if the zq nightly gate goes red · until HH:MM', the note whole or cut on a word",
+      !!a && /^SCHEDULED & WATCHING/.test(sched) && a.g === '◌' && subOk && /^until (tomorrow )?\d\d:\d\d$/.test(a.end ?? ''), { sched, alarm: a });
+    step("its hover: 'bise wakes main if the zq nightly gate goes red · set at HH:MM · stops watching at HH:MM'",
+      /^bise wakes main if the zq nightly gate goes red · set at \d\d:\d\d · stops watching (tomorrow )?at \d\d:\d\d$/.test(a?.title ?? ''), { title: a?.title ?? null });
+    if (!a) return;
+    const r = page.locator(`[data-testid="${a.id}"]`).first();
+    await r.hover({ timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    await shot('alarm-hover');
+    await r.click({ timeout: 5000 });
+    const detail = page.locator(`[data-testid="${a.id}.detail"]`).first();
+    const dOk = await detail.waitFor({ timeout: 5000 }).then(() => true, () => false);
+    const dText = dOk ? flat(await detail.innerText().catch(() => null)) : null;
+    const stopT = flat(await text(`[data-testid="${a.id}.stop"]`));
+    await page.mouse.move(1, 300);
+    await shot('alarm-detail');
+    step("a click opens its detail: its words, 'stop watching'", dOk && /bise wakes main if the zq nightly gate goes red/.test(dText ?? '') && /set at \d\d:\d\d/.test(dText ?? '') && stopT === 'stop watching', { detail: dText, stop: stopT });
+    await click('stop watching', page.locator(`[data-testid="${a.id}.stop"]`).first());
+    const gone = await until(async () => ((await alarmRows('zq nightly')).length === 0 ? true : null), 20000, 500);
+    await page.waitForTimeout(500);
+    await shot('alarm-stopped');
+    step("'stop watching' ends it: the row leaves SCHEDULED & WATCHING", !!gone, { left: await alarmRows('zq nightly') });
+    step("no 'since' on main's view", (await noSince('main')).since === null, await noSince('main'));
+  });
+
+  await row('a path naming a project stays home', async () => {
+    await bise();
+    await clear();
+    const W = 'zqroute please look at ~/code/harness/x when you can';
+    const notices = [];
+    await say(W);
+    const ack = await until(async () => {
+      const n = flat(await text('[data-testid="confirm.notice"]'));
+      if (n && !notices.includes(n)) notices.push(n);
+      // the fake main's answer quotes the message whole: 'ack: <user_message id="m_3"> zqroute …'
+      return /ack: (<user_message[^>]*>\s*)?zqroute/.test((await text('[data-testid="thread.list"]')) ?? '') ? true : null;
+    }, ANSWER_MS, 500);
+    const sent = await page.evaluate(() => [...document.querySelectorAll('[data-testid="thread.list"] [data-testid^="thread.notice."]')]
+      .map((e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim()).filter((t) => /sent to|routed|zqroute/.test(t))).catch(() => []);
+    await page.mouse.move(1, 300);
+    await shot('route-stays-home');
+    await harness();
+    await page.waitForTimeout(1000);
+    const inHarness = /zqroute/.test((await text('[data-testid="thread.list"]')) ?? '');
+    step("bise's thread: words with ~/code/harness/x stay home (main answers there, no 'sent to harness', not in harness' thread)",
+      !!ack && !notices.some((n) => /sent to/.test(n)) && sent.filter((t) => /sent to/.test(t)).length === 0 && !inHarness, { ack: !!ack, notices, sent, inHarness });
+  });
+
+  // the pause and the reply read in minutes: from 65 s after the seed
+  const left = 65000 - (Date.now() - t0);
+  if (left > 0) await page.waitForTimeout(left);
+
+  await row('pause over the composer', async () => {
+    const on = await openAgent('zqbench');
+    // the pause runs from zqbench's sb wake, some seconds after the seed (round 2: 54 s at t0 + 65 s):
+    // its words under a minute ('running for 54 s') kept, then read again once in minutes
+    const under = await waitLine();
+    const line = (await until(async () => { const l = await waitLine(); return l && /running for \d+ min$/.test(l.text) ? l : null; }, 60000, 1000)) ?? (await waitLine());
+    step("the pause under a minute says seconds: 'running for N s'", /^continues when the zq bench ends · running for \d+ (s|min)$/.test(under?.text ?? ''), { under });
+    const h = await head();
+    const r = await agentRow('zqbench');
+    const lbl = await label();
+    await page.mouse.move(1, 300);
+    await shot('pause-zqbench');
+    step("a paused agent (zqbench, sb wake --on-exit --then): 'continues when the zq bench ends · running for N min' over the composer, whole",
+      on && /^continues when the zq bench ends · running for \d+ min$/.test(line?.text ?? '') && line?.whole === true, { on, line });
+    step("its head: '… waiting · N min'; its AGENTS row '…' ending on 'N min'; the composer's label never says waiting",
+      /^… waiting · \d+ min$/.test(h) && r?.g === '…' && /^\d+ min$/.test(r?.end ?? '') && !/waiting|idle|since/.test(lbl), { head: h, row: r, label: lbl });
+    step("its pause is no alarm: not in SCHEDULED & WATCHING", (await alarmRows('zq bench')).length === 0, { alarms: await alarmRows('zq bench') });
+    step("no 'since' on zqbench's view", (await noSince('zqbench')).since === null, await noSince('zqbench'));
+  });
+
+  await row('waiting on another agent', async () => {
+    await harness();
+    await clear();
+    // the hub holds an ask 25 s at most (core.bend WAIT_CAP) and the line's duration runs from the
+    // ask's start (round 2: '· 0 s', gone at 25 s): read it, its head and its name while it holds
+    await say(`[[bash: sb spawn zqsearch --objective 'zq search {{bash: ${ASK}}}']] seeded zqsearch`);
+    await until(async () => ((await agentRow('zqsearch')) ? true : null), 60000, 500);
+    const on = await openAgent('zqsearch');
+    const line = await until(async () => { const l = await waitLine(); return l && /answers/.test(l.text) ? l : null; }, 60000, 250);
+    const at = Date.now();
+    const h = await head();
+    const r = await agentRow('zqsearch');
+    const who = flat(await text('[data-testid="thread.waiting.who"]'));
+    await page.mouse.move(1, 300);
+    await shot('reply-zqsearch');
+    step("an agent waiting on another (zqsearch's sb ask): 'continues when zqdocs answers · N s|min', the name a link",
+      on && /^continues when zqdocs answers · \d+ (s|min)$/.test(line?.text ?? '') && who === 'zqdocs', { on, line, who });
+    step("its head: '… waiting · N s|min'; its AGENTS row '…' ending on the same", /^… waiting · \d+ (s|min)$/.test(h) && r?.g === '…' && /^\d+ (s|min)$/.test(r?.end ?? ''), { head: h, row: r });
+    step("no 'since' on zqsearch's view", (await noSince('zqsearch')).since === null, await noSince('zqsearch'));
+    await click('the waited-on name', page.locator('[data-testid="thread.waiting.who"]').first());
+    const went = await until(async () => ((await page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent')) === 'zqdocs' ? true : null), 5000, 250);
+    await page.mouse.move(1, 300);
+    await shot('reply-name-opens-zqdocs');
+    step('the name opens zqdocs', !!went, { at: await page.locator('[data-testid="thread.screen"]').first().getAttribute('data-agent').catch(() => null), ms_after_line: Date.now() - at });
+    // what he sees once the ask gave up (25 s) and zqdocs still hasn't answered: logged, not a gate
+    // row (the reply wakes zqsearch later; nothing says it waits)
+    await openAgent('zqsearch');
+    await page.waitForTimeout(Math.max(0, 30000 - (Date.now() - at)));
+    const later = await waitLine();
+    await page.mouse.move(1, 300);
+    await shot('reply-after-ask-cap');
+    res.notes = [...(res.notes ?? []), { what: "zqsearch 30 s after its ask's line showed, zqdocs not answered yet", line: later, head: await head(), row: await agentRow('zqsearch') }];
+    save();
+  });
+
+  // the pause's pid ends: the wake comes, zqbench's line goes
+  await row('pause ends', async () => {
+    try { process.kill(bench.pid, 'SIGTERM'); } catch { /* gone */ }
+    await openAgent('zqbench');
+    const gone = await until(async () => ((await page.locator('[data-testid="thread.waiting"]').count()) === 0 ? true : null), 45000, 1000);
+    await page.mouse.move(1, 300);
+    await shot('pause-ended');
+    step("the pid ends: zqbench's line over the composer goes", !!gone, { head: await head() });
+  });
+  try { process.kill(bench.pid, 'SIGKILL'); } catch { /* gone */ }
   await harness();
 }
 
