@@ -153,6 +153,12 @@ law in_unqueue_bare:
 def in_unqueue_bare():
   {==}
 
+law in_steer_queued_bare:
+  {IN.of(J.obj([J.kv("t", J.JStr{"steer_queued"})])) == IN.ISteerQueued{0n} : IN.In}
+
+def in_steer_queued_bare():
+  {==}
+
 law in_passthrough_bare:
   {IN.of(J.obj([J.kv("t", J.JStr{"passthrough"})])) == IN.IPassthrough{"", ""} : IN.In}
 
@@ -541,6 +547,13 @@ law in_IUnqueue_round:
   {IN.of(IN.json(IN.IUnqueue{id})) == IN.IUnqueue{id} : IN.In}
 
 def in_IUnqueue_round(id):
+  {==}
+
+law in_ISteerQueued_round:
+  for id: Nat
+  {IN.of(IN.json(IN.ISteerQueued{id})) == IN.ISteerQueued{id} : IN.In}
+
+def in_ISteerQueued_round(id):
   {==}
 
 law in_IPassthrough_round:

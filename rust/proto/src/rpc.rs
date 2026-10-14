@@ -76,6 +76,9 @@ pub const METHODS: &[MethodRow] = &[
     m("log/read", "log", Some("log")),
     // his queued message taken back (the window's "edit · drop")
     m("turn/unqueue", "queued_take", Some("queued_taken")),
+    // his queued message said now (the window's "send now"): sb-core
+    // steers it in, its id kept; the agents event drops it from the queue
+    m("turn/steerQueued", "queued_steer", None),
     m("worktrees/list", "worktrees", Some("worktrees")),
     m("devServers/list", "dev_servers", Some("dev_servers")),
     m("merged/list", "merged", Some("merged")),

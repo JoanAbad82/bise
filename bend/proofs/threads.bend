@@ -291,6 +291,34 @@ def Laws.unqueue_never_takes_anothers(o, cx, r, id, e):
   %Equal.sym(Bool, String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HC.pick_lazy(HX.Cx<o>, _, u => HC.unqueue.take(o, HM.MRec.st(r), cx, id, HM.Msg.to(HM.MRec.msg(r))), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HM.St}
   hub_d_notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"]))
 
+def Laws.steer_queued_steers_into_the_turn(o, cx, m, name, im):
+  {==}
+
+def Laws.steer_queued_starts_a_turn_when_idle(o, cx, m, name, im):
+  {==}
+
+def Laws.steer_queued_waits_for_a_down_agent(o, cx, m, name, im):
+  hub_d_notice(o, cx, HC.cat([HC.mid(HM.Msg.id(m)), " stays queued: @", name, " isn't running"]))
+
+def Laws.steer_queued_waits_for_a_starting_agent(o, cx, m, name, im):
+  hub_d_notice(o, cx, HC.cat([HC.mid(HM.Msg.id(m)), " stays queued: @", name, " isn't running"]))
+
+def Laws.steer_queued_leaves_it_for_a_gone_agent(o, cx, m):
+  hub_d_notice(o, cx, HC.cat([HC.mid(HM.Msg.id(m)), " stays queued: @", HM.Msg.to(m), " is gone"]))
+
+def Laws.steer_queued_leaves_a_delivered_one(o, cx, m):
+  hub_d_notice(o, cx, HC.cat([HC.mid(HM.Msg.id(m)), " isn't waiting any more"]))
+
+def Laws.steer_queued_leaves_a_rejected_one(o, cx, m, r):
+  hub_d_notice(o, cx, HC.cat([HC.mid(HM.Msg.id(m)), " isn't waiting any more"]))
+
+def Laws.steer_queued_leaves_an_unknown_id(o, cx, id):
+  hub_d_notice(o, cx, HC.cat(["no message ", HC.mid(id), " to send now"]))
+
+def Laws.steer_queued_never_steers_anothers(o, cx, r, id, e):
+  %Equal.sym(Bool, String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.USER()), False{}, e) : {HX.d(o, HC.pick_lazy(HX.Cx<o>, _, u => HC.steer_queued.take(o, HM.MRec.st(r), cx, HM.MRec.msg(r)), u => HC.notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"])))) == HX.d(o, cx) : HM.St}
+  hub_d_notice(o, cx, HC.cat([HC.mid(id), " isn't one of your messages"]))
+
 # Nat.is_eq says equal: they are
 def hub_nat_eq_sound(+a: Nat, +b: Nat, e: {Nat.is_eq(a, b) == True{} : Bool}) -> {a == b : Nat}:
   match a b:

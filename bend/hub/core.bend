@@ -38,6 +38,7 @@ import ./reach.bend as R
 import ./gen/feed.bend as FD
 import ./keyed.bend as KL
 import ./feature.bend as FT
+import ./status.bend as ST
 
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
@@ -338,60 +339,6 @@ def ask.go(-o: M.St, ans: List<&2, J.Json>, +cx: X.Cx<o>, +q: J.Json) -> X.Cx<o>
 def ask(-o: M.St, +cx: X.Cx<o>, +q: J.Json) -> X.Cx<o> & Maybe<&2, J.Json>:
   ask.go(o, X.R.ans(rr(o, cx)), cx, q)
 
-# ---- status and relation ----
-
-def status_of_decl(d: Maybe<&2, M.Decl>) -> String:
-  match d:
-    case Some{M.DDone{}}:
-      "done"
-    case Some{M.DBlocked{}}:
-      "blocked"
-    case _:
-      "idle"
-
-def status_of_run(+a: M.Agent, x: X.Rt) -> String:
-  match x:
-    case X.Rt{_, run, +w, _, _}:
-      match run:
-        case M.RDown{}:
-          "starting"
-        case M.RStarting{}:
-          "starting"
-        case M.RBusy{}:
-          Bool.pick(String, w, "waiting", "working")
-        case M.RIdle{}:
-          status_of_decl(M.Agent.declared(a))
-
-# the status every view shows (model.rs Agent::status)
-def status_str(a: M.Agent, +x: X.Rt) -> String:
-  match a:
-    case M.Agent{+n, +im, +pa, life, +de, +al, +fi, +ws, +di, +br, +cr, +fa, +no, +rp, +sn, +fo}:
-      match life:
-        case M.LArchived{}:
-          "archived"
-        case M.LStopped{}:
-          "stopped"
-        case M.LFailed{}:
-          "failed"
-        case M.LActive{}:
-          status_of_run(M.Agent{n, im, pa, M.LActive{}, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}, x)
-
-# the relation of the sender to the recipient, as the recipient reads it
-# (prompts.rs relation)
-def relation(+from: String, +to: String, +fp: Maybe<&2, String>, +tp: Maybe<&2, String>) -> String:
-  Bool.pick(String, String.eq(from, M.USER()), "user",
-    Bool.pick(String, String.eq(from, M.HUB()), "hub",
-      Bool.pick(String, String.eq(from, M.GITHUB()), "peer",
-      Bool.pick(String, M.maybe_str_is(tp, from) || (String.eq(from, M.MAIN()) && Bool.not(String.eq(to, M.MAIN()))), "parent",
-        Bool.pick(String, M.maybe_str_is(fp, to) || String.eq(to, M.MAIN()), "child", "peer")))))
-
-def parent_of(m: Maybe<&2, M.Agent>) -> Maybe<&2, String>:
-  match m:
-    case None{}:
-      None{}
-    case Some{+a}:
-      M.Agent.parent(a)
-
 # ---- notes and cards ----
 
 def note_main(-o: M.St, +cx: X.Cx<o>, +text: String) -> X.Cx<o>:
@@ -553,7 +500,7 @@ def deliver_each(-o: M.St, batch: List<&2, M.Msg>, +cx: X.Cx<o>, +name: String, 
       (cx, acc)
     case Con{+m, +rest}:
       +s = st(o, cx)
-      +rel = relation(M.Msg.from(m), M.Msg.to(m), parent_of(M.get_agent(s, M.Msg.from(m))), parent_of(M.get_agent(s, M.Msg.to(m))))
+      +rel = ST.relation(M.Msg.from(m), M.Msg.to(m), ST.parent_of(M.get_agent(s, M.Msg.from(m))), ST.parent_of(M.get_agent(s, M.Msg.to(m))))
       +cx2 = mark_delivered(o, cx, M.Msg.id(m))
       +cx3 = deliver.line(o, leftover_at(s, M.Msg.id(m)), M.Msg.plain(m) || Maybe.is_some(&2, String, M.Msg.via(m)), cx2, name, m)
       deliver_each(o, rest, cx3, name, M.snoc(K.Delivered, acc, K.Delivered{M.Msg.id(m), rel}))
@@ -745,7 +692,7 @@ def dropped_wt(+a: M.Agent) -> Bool:
   M.ws_worktree(M.Agent.ws(a)) && M.ws_dropped(M.Agent.ws(a))
 
 def unavailable(-o: M.St, +cx: X.Cx<o>, +s: Snd, +a: M.Agent) -> String:
-  cat(["recipient_unavailable: @", Snd.to(s), " is ", status_str(a, rt(o, cx, Snd.to(s))),
+  cat(["recipient_unavailable: @", Snd.to(s), " is ", ST.status_str(a, rt(o, cx, Snd.to(s))),
     Bool.pick(String, dropped_wt(a), " (its worktree was deleted: /restore)", "")])
 
 def create.sent(-o: M.St, p: X.Cx<o> & SendR, +name: String) -> X.Cx<o> & TaskR:
@@ -2291,6 +2238,49 @@ def st_after(m: Maybe<&2, M.MRec>, +x: M.MSt) -> Maybe<&2, M.MSt>:
 def unqueue(-o: M.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
   unqueue.go(o, M.rec_of(M.St.msgs(st(o, cx)), id), cx, id)
 
+# his queued message said now (the window's 'send now', architect
+# m_25139): the pump's own delivery of that one message, its id and parts
+# kept, steered into the running turn or a turn of its own (laws
+# steer_queued_*); the agent can't take it (down, starting, gone, the
+# project paused): a notice, and it stays queued
+def steer_queued.run(-o: M.St, run: M.Run, +cx: X.Cx<o>, +m: M.Msg, +name: String, +is_main: Bool) -> X.Cx<o>:
+  match run:
+    case M.RBusy{}:
+      pump.batch(o, [m], cx, name, True{}, is_main)
+    case M.RIdle{}:
+      pump.batch(o, [m], cx, name, False{}, is_main)
+    case _:
+      notice(o, cx, cat([mid(M.Msg.id(m)), " stays queued: @", name, " isn't running"]))
+
+def steer_queued.agent(-o: M.St, a: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +m: M.Msg) -> X.Cx<o>:
+  match a:
+    case None{}:
+      notice(o, cx, cat([mid(M.Msg.id(m)), " stays queued: @", M.Msg.to(m), " is gone"]))
+    case Some{+g}:
+      pick_lazy(X.Cx<o>, is_active(M.Agent.life(g)) && Bool.not(P.is_paused(st(o, cx))),
+        u => steer_queued.run(o, X.Rt.run(rt(o, cx, M.Agent.name(g))), cx, m, M.Agent.name(g), M.Agent.is_main(g)),
+        u => notice(o, cx, cat([mid(M.Msg.id(m)), " stays queued: @", M.Agent.name(g), " can't take it now"])))
+
+def steer_queued.take(-o: M.St, s: M.MSt, +cx: X.Cx<o>, +m: M.Msg) -> X.Cx<o>:
+  match s:
+    case M.Queued{_}:
+      +to = M.Msg.to(m)
+      steer_queued.agent(o, M.get_agent(st(o, cx), Maybe.default(&2, String, M.resolve(st(o, cx), to), to)), cx, m)
+    case _:
+      notice(o, cx, cat([mid(M.Msg.id(m)), " isn't waiting any more"]))
+
+def steer_queued.go(-o: M.St, r: Maybe<&2, M.MRec>, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
+  match r:
+    case None{}:
+      notice(o, cx, cat(["no message ", mid(id), " to send now"]))
+    case Some{+x}:
+      pick_lazy(X.Cx<o>, String.eq(M.Msg.from(M.MRec.msg(x)), M.USER()),
+        u => steer_queued.take(o, M.MRec.st(x), cx, M.MRec.msg(x)),
+        u => notice(o, cx, cat([mid(id), " isn't one of your messages"])))
+
+def steer_queued(-o: M.St, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
+  steer_queued.go(o, M.rec_of(M.St.msgs(st(o, cx)), id), cx, id)
+
 def passthrough(-o: M.St, +cx: X.Cx<o>, +focus: String, +l: String) -> X.Cx<o>:
   pick_lazy(X.Cx<o>, has_agent(o, cx, focus) && is_idle(X.Rt.run(rt(o, cx, focus))),
     u => out(o, dirty(o, set_run(o, cx, focus, M.RBusy{})), F.passthrough(focus, l)),
@@ -2957,7 +2947,7 @@ def req_report.go(-o: M.St, is_main: Bool, +cx: X.Cx<o>, +token: Nat, +from: Str
         J.kv("step", Maybe.default(&2, J.Json, J.get(q, "step"), J.JNull{})), J.kv("of", Maybe.default(&2, J.Json, J.get(q, "of"), J.JNull{})),
         J.kv("result", Maybe.default(&2, J.Json, J.get(q, "result"), J.JNull{}))])}, Unit{}, Unit{}, Unit{})
       +cx3 = req_report.kind(o, cx2, from, kind, summary)
-      +parent = Maybe.default(&2, String, parent_of(M.get_agent(st(o, cx3), from)), M.MAIN())
+      +parent = Maybe.default(&2, String, ST.parent_of(M.get_agent(st(o, cx3), from)), M.MAIN())
       +to = Bool.pick(String, String.eq(parent, M.USER()), M.MAIN(), parent)
       # the report answers the parent's open request, if any: no
       # automatic reply repeats it at the end of the turn
@@ -3689,6 +3679,8 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       interrupt.go(o, M.resolve(st(o, cx), agent), cx)
     case GI.IUnqueue{+id}:
       unqueue(o, cx, id)
+    case GI.ISteerQueued{+id}:
+      steer_queued(o, cx, id)
     case GI.IPassthrough{+focus, +line}:
       passthrough(o, cx, focus, line)
     case GI.IFocus{+to, +note, +direct}:

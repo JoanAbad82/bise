@@ -229,6 +229,25 @@ def queued_round(c, E):
     r = req(c, "turn/unqueue", agent="main", id=ls[i + 1][1]["id"])
     check("already reached @main" in refused(r, "a take after delivery")["message"], "the refusal says why: %r" % r)
     check(not any(l.startswith("sb ") and "taken" in l for l in c.lines("main")), "nothing taken: %r" % c.lines("main")[-5:])
+    # turn/steerQueued (the window's drawer 'send now', architect
+    # m_25139): his queued message goes into the running turn with its
+    # own id (his 'you' line then its 'you-id'), the row leaves the queue;
+    # a second steer of it is refused, nothing changes
+    ok(req(c, "turn/send", agent="main", text="[[bash: sleep 6]] busy for the steer", mode="now"), "a long turn")
+    c.wait_line("main", "busy for the steer", 30)
+    c.wait_status("main", "working", 30)
+    ok(req(c, "turn/send", agent="main", text="steer me now", mode="queued"), "a queued send")
+    row = c.wait(lambda: queued_row("steer me now"), 20, "the row to steer")
+    ok(req(c, "turn/steerQueued", agent="main", id=row["id"]), "turn/steerQueued")
+    c.wait(lambda: queued_row("steer me now") is None, 20, "the steered row gone")
+    c.wait_line("main", "steer me now", 30)
+    ls = [e2e.feed_rec(l) or ("", {}) for l in c.lines("main")]
+    i = ls.index(("you", {"text": "steer me now"}))
+    check(ls[i + 1] == ("you-id", {"id": row["id"]}), "steered with its own id: %r" % ls[i : i + 2])
+    r = req(c, "turn/steerQueued", agent="main", id=row["id"])
+    check("isn't waiting any more" in refused(r, "a second steer")["message"], "the refusal says why: %r" % r)
+    idle(c, "main")
+    check(sum(1 for r in c.feed("main", "you") if r.get("text") == "steer me now") == 1, "said once")
 
 
 def tools_round(c, E):

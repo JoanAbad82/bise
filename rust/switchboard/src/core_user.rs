@@ -8,6 +8,23 @@
 
 use super::*;
 
+/// `/help`'s words (the TUI's typed line and the window's slash).
+pub const HELP: &str = "\
+plain text        message to the agent in view (main by default)
+@agent text       direct message to an agent, without main (@main from an agent)
+/new [-w] [name:] objective   create an agent (-w: its own git worktree, --with-changes: with your changes)
+/archive [agent] [--force]    stop an agent and archive it, with its worktree
+/restore agent    bring an archived agent back (and its saved worktree)
+/isolate agent    give a worktree to an agent that has not changed anything yet
+/rename a b       rename an agent (the old name still works)
+/answer N text    answer card N
+/agents           list the agents and what they do
+/interrupt        interrupt the turn of the agent in view
+/compact          compact the conversation of the agent in view
+/model [m] [default]  the model of the agent in view (default: also config.toml's)
+/flow [pr|trunk]  how this repo ships code (PRs or straight to main), why, and switch it
+/reasoning [effort]   its reasoning effort (none, low, medium, high, max...)";
+
 impl Hub {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn user_input(

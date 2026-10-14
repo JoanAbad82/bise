@@ -158,3 +158,7 @@ mod core_ask_tests;
 /// send-parts' tests, out of core_tests.rs too.
 #[path = "core_attach_tests.rs"]
 mod core_attach_tests;
+
+/// queued_steer's tests, out of core_tests.rs too.
+#[path = "core_queue_tests.rs"]
+mod core_queue_tests;

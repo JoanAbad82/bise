@@ -438,6 +438,94 @@ law unqueue_keeps_every_other_record:
 # (unqueue_leaves_a_delivered_one). So exactly one of delivered or
 # taken_back.
 
+# ---- his queued message said now (HubCmd queued_steer, architect m_25139) ----
+# No new state and no new journal kind: a steered queued message is the
+# pump's own delivery of that one message (deliver_each: mark_delivered,
+# its feed line with its id and parts), so it keeps its id, is delivered
+# once (delivered_once: only while queued) and is never both queued and
+# steered (Delivered is not Queued, queued_in leaves it).
+
+# LAW: a queued message of his to a busy agent goes into its running turn:
+# the pump's busy delivery of that message alone (steered, its id kept).
+law steer_queued_steers_into_the_turn:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +m: HM.Msg
+  for +name: String
+  for +im: Bool
+  {HC.steer_queued.run(o, HM.RBusy{}, cx, m, name, im) == HC.pump.batch(o, [m], cx, name, True{}, im) : HX.Cx<o>}
+
+# LAW: to an idle agent, it is a turn of its own: the pump's idle delivery.
+law steer_queued_starts_a_turn_when_idle:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +m: HM.Msg
+  for +name: String
+  for +im: Bool
+  {HC.steer_queued.run(o, HM.RIdle{}, cx, m, name, im) == HC.pump.batch(o, [m], cx, name, False{}, im) : HX.Cx<o>}
+
+# LAW: an agent that can't take it (down, starting) leaves it queued: a
+# notice, the state unchanged; so does an agent that is gone.
+law steer_queued_waits_for_a_down_agent:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +m: HM.Msg
+  for +name: String
+  for +im: Bool
+  {HX.d(o, HC.steer_queued.run(o, HM.RDown{}, cx, m, name, im)) == HX.d(o, cx) : HM.St}
+
+law steer_queued_waits_for_a_starting_agent:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +m: HM.Msg
+  for +name: String
+  for +im: Bool
+  {HX.d(o, HC.steer_queued.run(o, HM.RStarting{}, cx, m, name, im)) == HX.d(o, cx) : HM.St}
+
+law steer_queued_leaves_it_for_a_gone_agent:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +m: HM.Msg
+  {HX.d(o, HC.steer_queued.agent(o, None{}, cx, m)) == HX.d(o, cx) : HM.St}
+
+# LAW: a message no longer queued (delivered, taken back, rejected,
+# cancelled) is left as it is, as are an unknown id and a message that
+# isn't his.
+law steer_queued_leaves_a_delivered_one:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +m: HM.Msg
+  {HX.d(o, HC.steer_queued.take(o, HM.Delivered{}, cx, m)) == HX.d(o, cx) : HM.St}
+
+law steer_queued_leaves_a_rejected_one:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +m: HM.Msg
+  for +r: String
+  {HX.d(o, HC.steer_queued.take(o, HM.Rejected{r}, cx, m)) == HX.d(o, cx) : HM.St}
+
+law steer_queued_leaves_an_unknown_id:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +id: Nat
+  {HX.d(o, HC.steer_queued.go(o, None{}, cx, id)) == HX.d(o, cx) : HM.St}
+
+law steer_queued_never_steers_anothers:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +r: HM.MRec
+  for +id: Nat
+  for e: {String.eq(HM.Msg.from(HM.MRec.msg(r)), HM.USER()) == False{} : Bool}
+  {HX.d(o, HC.steer_queued.go(o, Some{r}, cx, id)) == HX.d(o, cx) : HM.St}
+
+# LAW (the races, sb-core steps one input at a time): steered first, the
+# record is Delivered, so the turn's end never says it again
+# (delivered_once) and a take-back after it is a notice
+# (unqueue_leaves_a_delivered_one). Taken back first, it is Rejected and a
+# steer after it is a notice (steer_queued_leaves_a_rejected_one). The
+# turn's end first, it is Delivered and a steer after it is a notice
+# (steer_queued_leaves_a_delivered_one). So exactly one outcome each time.
+
 # ---- his send answered with its message's id (A1, architect m_21450) ----
 # sb-core makes his message (m_N) when his input arrives, queued too, and
 # answers its id with the step (AStep.msg = HSD.said_id(HSD.said(journal))):

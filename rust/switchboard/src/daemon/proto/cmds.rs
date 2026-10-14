@@ -304,6 +304,10 @@ impl Shell {
                     self.proto_send(id, &HubEv::QueuedTaken { project, agent, id: msg, text, parts });
                 }
             }
+            // his queued message said now (the window's "send now"; this
+            // socket's clients only): sb-core's steer_queued decides; a
+            // refusal is its notice as this command's error
+            HubCmd::QueuedSteer { id: msg, .. } => self.step_typed(id, &tag, Input::ClientSteerQueued { client: id, id: msg }),
             // git in a thread (art.rs, the `branches` op's scan), to this client
             HubCmd::Branches { .. } => self.branches_scan(id),
             // git in a thread (worktrees.rs), to this client

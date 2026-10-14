@@ -562,6 +562,12 @@ pub enum Input {
         client: ClientId,
         id: u64,
     },
+    /// his queued message `id` said now (HubCmd queued_steer; a client's
+    /// only): sb-core's steer_queued, delivered with its id or a notice
+    ClientSteerQueued {
+        client: ClientId,
+        id: u64,
+    },
     Agent {
         token: Token,
         from: String,
@@ -2182,6 +2188,7 @@ impl Hub {
                 self.interrupt_by = None;
             }
             Input::ClientUnqueue { client, id } => self.core(&mut fx, env, Some(client), In::Unqueue(ci::Unqueue { id })),
+            Input::ClientSteerQueued { client, id } => self.core(&mut fx, env, Some(client), In::SteerQueued(ci::SteerQueued { id })),
             Input::Agent { token, from, req } => self.agent_req(&mut fx, env, token, &from, req),
             // the waits' timeouts, then sb every's timers (sb-core decides)
             Input::Tick => self.core(&mut fx, env, None, In::Tick(ci::Tick {})),
@@ -2712,22 +2719,6 @@ pub(crate) fn not_in_a_repo(cmd: &str) -> String {
     format!("sb {}: not in a repo (this workspace has no git): files stay as you saved them, nothing to land", cmd)
 }
 
-pub const HELP: &str = "\
-plain text        message to the agent in view (main by default)
-@agent text       direct message to an agent, without main (@main from an agent)
-/new [-w] [name:] objective   create an agent (-w: its own git worktree, --with-changes: with your changes)
-/archive [agent] [--force]    stop an agent and archive it, with its worktree
-/restore agent    bring an archived agent back (and its saved worktree)
-/isolate agent    give a worktree to an agent that has not changed anything yet
-/rename a b       rename an agent (the old name still works)
-/answer N text    answer card N
-/agents           list the agents and what they do
-/interrupt        interrupt the turn of the agent in view
-/compact          compact the conversation of the agent in view
-/model [m] [default]  the model of the agent in view (default: also config.toml's)
-/flow [pr|trunk]  how this repo ships code (PRs or straight to main), why, and switch it
-/reasoning [effort]   its reasoning effort (none, low, medium, high, max...)";
-
 #[path = "core_link.rs"]
 mod link;
 
@@ -2740,6 +2731,7 @@ mod view;
 #[path = "core_user.rs"]
 mod user;
 use user::new_task;
+pub use user::HELP;
 
 #[path = "core_wake.rs"]
 mod wake_link;

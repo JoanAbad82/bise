@@ -29,6 +29,7 @@ export const METHODS = {
   "tool/output": { cmd: "tool_out", result: "tool_out" },
   "log/read": { cmd: "log", result: "log" },
   "turn/unqueue": { cmd: "queued_take", result: "queued_taken" },
+  "turn/steerQueued": { cmd: "queued_steer", result: null },
   "worktrees/list": { cmd: "worktrees", result: "worktrees" },
   "devServers/list": { cmd: "dev_servers", result: "dev_servers" },
   "merged/list": { cmd: "merged", result: "merged" },

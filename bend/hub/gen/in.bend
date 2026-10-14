@@ -54,6 +54,8 @@ type In is Data:
   IInterrupt{agent: String}
   # unqueue
   IUnqueue{id: Nat}
+  # steer_queued
+  ISteerQueued{id: Nat}
   # passthrough
   IPassthrough{focus: String, line: String}
   # focus
@@ -192,6 +194,9 @@ def IInterrupt.of(+i: J.Json) -> In:
 
 def IUnqueue.of(+i: J.Json) -> In:
   IUnqueue{K.get_n(i, "id")}
+
+def ISteerQueued.of(+i: J.Json) -> In:
+  ISteerQueued{K.get_n(i, "id")}
 
 def IPassthrough.of(+i: J.Json) -> In:
   IPassthrough{K.get_s(i, "focus"), K.get_s(i, "line")}
@@ -460,6 +465,15 @@ def of.t21(c: Cmp, +t: String, +i: J.Json) -> In:
     case GT{}:
       INone{}
 
+def of.t23(c: Cmp, +t: String, +i: J.Json) -> In:
+  match c:
+    case LT{}:
+      INone{}
+    case EQ{}:
+      IIdle.of(i)
+    case GT{}:
+      INone{}
+
 def of.t22(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
@@ -467,34 +481,34 @@ def of.t22(c: Cmp, +t: String, +i: J.Json) -> In:
     case EQ{}:
       IHubMsg.of(i)
     case GT{}:
-      INone{}
-
-def of.t24(c: Cmp, +t: String, +i: J.Json) -> In:
-  match c:
-    case LT{}:
-      INone{}
-    case EQ{}:
-      IInterrupt.of(i)
-    case GT{}:
-      INone{}
+      of.t23(String.order(t, "idle"), t, i)
 
 def of.t25(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t24(String.order(t, "interrupt"), t, i)
+      INone{}
     case EQ{}:
       IIsolate.of(i)
     case GT{}:
       INone{}
 
-def of.t23(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t26(c: Cmp, +t: String, +i: J.Json) -> In:
+  match c:
+    case LT{}:
+      of.t25(String.order(t, "isolate"), t, i)
+    case EQ{}:
+      INew.of(i)
+    case GT{}:
+      INone{}
+
+def of.t24(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
       of.t22(String.order(t, "hub_msg"), t, i)
     case EQ{}:
-      IIdle.of(i)
+      IInterrupt.of(i)
     case GT{}:
-      of.t25(String.order(t, "isolate"), t, i)
+      of.t26(String.order(t, "new"), t, i)
 
 def of.t20(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
@@ -503,7 +517,7 @@ def of.t20(c: Cmp, +t: String, +i: J.Json) -> In:
     case EQ{}:
       IForge.of(i)
     case GT{}:
-      of.t23(String.order(t, "idle"), t, i)
+      of.t24(String.order(t, "interrupt"), t, i)
 
 def of.t13(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
@@ -514,124 +528,124 @@ def of.t13(c: Cmp, +t: String, +i: J.Json) -> In:
     case GT{}:
       of.t20(String.order(t, "forge"), t, i)
 
-def of.t27(c: Cmp, +t: String, +i: J.Json) -> In:
-  match c:
-    case LT{}:
-      INone{}
-    case EQ{}:
-      IPageAnswered.of(i)
-    case GT{}:
-      INone{}
-
-def of.t29(c: Cmp, +t: String, +i: J.Json) -> In:
-  match c:
-    case LT{}:
-      INone{}
-    case EQ{}:
-      IPause.of(i)
-    case GT{}:
-      INone{}
-
 def of.t28(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t27(String.order(t, "page_answered"), t, i)
+      INone{}
     case EQ{}:
       IPassthrough.of(i)
-    case GT{}:
-      of.t29(String.order(t, "pause"), t, i)
-
-def of.t31(c: Cmp, +t: String, +i: J.Json) -> In:
-  match c:
-    case LT{}:
-      INone{}
-    case EQ{}:
-      IRename.of(i)
-    case GT{}:
-      INone{}
-
-def of.t32(c: Cmp, +t: String, +i: J.Json) -> In:
-  match c:
-    case LT{}:
-      of.t31(String.order(t, "rename"), t, i)
-    case EQ{}:
-      IReq.of(i)
     case GT{}:
       INone{}
 
 def of.t30(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t28(String.order(t, "passthrough"), t, i)
+      INone{}
     case EQ{}:
       IReady.of(i)
     case GT{}:
+      INone{}
+
+def of.t29(c: Cmp, +t: String, +i: J.Json) -> In:
+  match c:
+    case LT{}:
+      of.t28(String.order(t, "passthrough"), t, i)
+    case EQ{}:
+      IPause.of(i)
+    case GT{}:
+      of.t30(String.order(t, "ready"), t, i)
+
+def of.t32(c: Cmp, +t: String, +i: J.Json) -> In:
+  match c:
+    case LT{}:
+      INone{}
+    case EQ{}:
+      IReq.of(i)
+    case GT{}:
+      INone{}
+
+def of.t33(c: Cmp, +t: String, +i: J.Json) -> In:
+  match c:
+    case LT{}:
       of.t32(String.order(t, "req"), t, i)
-
-def of.t34(c: Cmp, +t: String, +i: J.Json) -> In:
-  match c:
-    case LT{}:
-      INone{}
     case EQ{}:
-      IResume.of(i)
+      IRestore.of(i)
     case GT{}:
       INone{}
 
-def of.t36(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t31(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      INone{}
+      of.t29(String.order(t, "pause"), t, i)
     case EQ{}:
-      IRouteCancel.of(i)
+      IRename.of(i)
     case GT{}:
-      INone{}
+      of.t33(String.order(t, "restore"), t, i)
 
 def of.t35(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t34(String.order(t, "resume"), t, i)
+      INone{}
     case EQ{}:
       IRoute.of(i)
-    case GT{}:
-      of.t36(String.order(t, "route_cancel"), t, i)
-
-def of.t38(c: Cmp, +t: String, +i: J.Json) -> In:
-  match c:
-    case LT{}:
-      INone{}
-    case EQ{}:
-      IRouteHold.of(i)
-    case GT{}:
-      INone{}
-
-def of.t39(c: Cmp, +t: String, +i: J.Json) -> In:
-  match c:
-    case LT{}:
-      of.t38(String.order(t, "route_hold"), t, i)
-    case EQ{}:
-      ISay.of(i)
     case GT{}:
       INone{}
 
 def of.t37(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t35(String.order(t, "route"), t, i)
+      INone{}
     case EQ{}:
       IRouteCorrect.of(i)
     case GT{}:
-      of.t39(String.order(t, "say"), t, i)
+      INone{}
 
-def of.t33(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t36(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t30(String.order(t, "ready"), t, i)
+      of.t35(String.order(t, "route"), t, i)
     case EQ{}:
-      IRestore.of(i)
+      IRouteCancel.of(i)
     case GT{}:
       of.t37(String.order(t, "route_correct"), t, i)
 
-def of.t41(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t39(c: Cmp, +t: String, +i: J.Json) -> In:
+  match c:
+    case LT{}:
+      INone{}
+    case EQ{}:
+      ISay.of(i)
+    case GT{}:
+      INone{}
+
+def of.t40(c: Cmp, +t: String, +i: J.Json) -> In:
+  match c:
+    case LT{}:
+      of.t39(String.order(t, "say"), t, i)
+    case EQ{}:
+      ISteerQueued.of(i)
+    case GT{}:
+      INone{}
+
+def of.t38(c: Cmp, +t: String, +i: J.Json) -> In:
+  match c:
+    case LT{}:
+      of.t36(String.order(t, "route_cancel"), t, i)
+    case EQ{}:
+      IRouteHold.of(i)
+    case GT{}:
+      of.t40(String.order(t, "steer_queued"), t, i)
+
+def of.t34(c: Cmp, +t: String, +i: J.Json) -> In:
+  match c:
+    case LT{}:
+      of.t31(String.order(t, "rename"), t, i)
+    case EQ{}:
+      IResume.of(i)
+    case GT{}:
+      of.t38(String.order(t, "route_hold"), t, i)
+
+def of.t42(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
       INone{}
@@ -640,7 +654,7 @@ def of.t41(c: Cmp, +t: String, +i: J.Json) -> In:
     case GT{}:
       INone{}
 
-def of.t43(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t44(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
       INone{}
@@ -649,16 +663,16 @@ def of.t43(c: Cmp, +t: String, +i: J.Json) -> In:
     case GT{}:
       INone{}
 
-def of.t42(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t43(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t41(String.order(t, "steered"), t, i)
+      of.t42(String.order(t, "steered"), t, i)
     case EQ{}:
       ITick.of(i)
     case GT{}:
-      of.t43(String.order(t, "touch"), t, i)
+      of.t44(String.order(t, "touch"), t, i)
 
-def of.t45(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t46(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
       INone{}
@@ -667,25 +681,25 @@ def of.t45(c: Cmp, +t: String, +i: J.Json) -> In:
     case GT{}:
       INone{}
 
-def of.t46(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t47(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t45(String.order(t, "unqueue"), t, i)
+      of.t46(String.order(t, "unqueue"), t, i)
     case EQ{}:
       IWakeHit.of(i)
     case GT{}:
       INone{}
 
-def of.t44(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t45(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t42(String.order(t, "tick"), t, i)
+      of.t43(String.order(t, "tick"), t, i)
     case EQ{}:
       ITurnStarted.of(i)
     case GT{}:
-      of.t46(String.order(t, "wake_hit"), t, i)
+      of.t47(String.order(t, "wake_hit"), t, i)
 
-def of.t48(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t49(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
       INone{}
@@ -694,16 +708,16 @@ def of.t48(c: Cmp, +t: String, +i: J.Json) -> In:
     case GT{}:
       INone{}
 
-def of.t49(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t50(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t48(String.order(t, "wake_stop"), t, i)
+      of.t49(String.order(t, "wake_stop"), t, i)
     case EQ{}:
       IXAck.of(i)
     case GT{}:
       INone{}
 
-def of.t51(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t52(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
       INone{}
@@ -712,55 +726,55 @@ def of.t51(c: Cmp, +t: String, +i: J.Json) -> In:
     case GT{}:
       INone{}
 
-def of.t52(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t53(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t51(String.order(t, "x_in"), t, i)
+      of.t52(String.order(t, "x_in"), t, i)
     case EQ{}:
       IXReply.of(i)
     case GT{}:
       INone{}
 
-def of.t50(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t51(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t49(String.order(t, "x_ack"), t, i)
+      of.t50(String.order(t, "x_ack"), t, i)
     case EQ{}:
       IXFail.of(i)
     case GT{}:
-      of.t52(String.order(t, "x_reply"), t, i)
+      of.t53(String.order(t, "x_reply"), t, i)
 
-def of.t47(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t48(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t44(String.order(t, "turn_started"), t, i)
+      of.t45(String.order(t, "turn_started"), t, i)
     case EQ{}:
       IWakeSet.of(i)
     case GT{}:
-      of.t50(String.order(t, "x_fail"), t, i)
+      of.t51(String.order(t, "x_fail"), t, i)
 
-def of.t40(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t41(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
-      of.t33(String.order(t, "restore"), t, i)
+      of.t34(String.order(t, "resume"), t, i)
     case EQ{}:
       ISteerRx.of(i)
     case GT{}:
-      of.t47(String.order(t, "wake_set"), t, i)
+      of.t48(String.order(t, "wake_set"), t, i)
 
-def of.t26(c: Cmp, +t: String, +i: J.Json) -> In:
+def of.t27(c: Cmp, +t: String, +i: J.Json) -> In:
   match c:
     case LT{}:
       of.t13(String.order(t, "every_set"), t, i)
     case EQ{}:
-      INew.of(i)
+      IPageAnswered.of(i)
     case GT{}:
-      of.t40(String.order(t, "steer_rx"), t, i)
+      of.t41(String.order(t, "steer_rx"), t, i)
 
-# the record of a tag (a binary search over the 53 sorted tags); any
+# the record of a tag (a binary search over the 54 sorted tags); any
 # other tag: INone
 def of_tag(+t: String, +i: J.Json) -> In:
-  of.t26(String.order(t, "new"), t, i)
+  of.t27(String.order(t, "page_answered"), t, i)
 
 # one In from its JSON object
 def of(+i: J.Json) -> In:
@@ -816,6 +830,8 @@ def kvs(x: In) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("t", J.JStr{"interrupt"}), J.kv("agent", J.JStr{agent})]
     case IUnqueue{+id}:
       [J.kv("t", J.JStr{"unqueue"}), J.kv("id", J.JNum{id})]
+    case ISteerQueued{+id}:
+      [J.kv("t", J.JStr{"steer_queued"}), J.kv("id", J.JNum{id})]
     case IPassthrough{+focus, +line}:
       [J.kv("t", J.JStr{"passthrough"}), J.kv("focus", J.JStr{focus}), J.kv("line", J.JStr{line})]
     case IFocus{+focus, +note, +direct}:

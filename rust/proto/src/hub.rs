@@ -638,6 +638,12 @@ pub enum HubCmd {
     /// this connection with its words, or an error says why (delivered,
     /// not his, unknown). The user's authority: a client's only (issue 16)
     QueuedTake { project: Project, agent: String, id: u64 },
+    /// his queued message `id` said now (the window's "send now"): sb-core
+    /// delivers it into the agent's running turn (or a turn of its own),
+    /// its id and parts kept; the agents event no longer lists it. An
+    /// error says why it stayed (delivered, taken, not his, the agent
+    /// down). The user's authority: a client's only (issue 16)
+    QueuedSteer { project: Project, agent: String, id: u64 },
     /// `/diff`'s picker opened: `branches` answers
     Branches { project: Project },
     /// the environments screen opened: `worktrees` comes again
@@ -821,7 +827,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
+    pub const TAGS: &'static [&'static str] = &["subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "tool_out", "log", "queued_take", "queued_steer", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "inbox_history", "scheduled", "scheduled_stop", "wake_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash", "branches", "scheduled_run", "artifacts_add", "focus", "versions", "version_info", "version_switch", "version_rollback", "version_restart", "version_update", "release_plan", "release_run", "stop_hub", "page_voice", "usage", "pause", "resume"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -896,7 +902,8 @@ impl HubCmd {
             | HubCmd::Diff { project, .. }
             | HubCmd::ToolOut { project, .. }
             | HubCmd::Log { project, .. }
-            | HubCmd::QueuedTake { project, .. } => project,
+            | HubCmd::QueuedTake { project, .. }
+            | HubCmd::QueuedSteer { project, .. } => project,
             HubCmd::Unknown { .. } => return None,
         };
         Some(v)

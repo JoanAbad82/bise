@@ -62,6 +62,8 @@ core_kinds! {
         Interrupt = "interrupt" => IInterrupt { agent: Str },
         /// his queued message taken back (HubCmd queued_take)
         Unqueue = "unqueue" => IUnqueue { id: Nat },
+        /// his queued message said now (HubCmd queued_steer)
+        SteerQueued = "steer_queued" => ISteerQueued { id: Nat },
         Passthrough = "passthrough" => IPassthrough { focus: Str, line: Str },
         /// a client's view moved (`note`, `direct`: what he decided
         /// directly with the agent he leaves, RFC 0001 §7.4)
