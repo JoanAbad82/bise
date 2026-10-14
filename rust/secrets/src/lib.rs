@@ -194,6 +194,8 @@ fn datas_absent(kc: &Keychain, path: &Path) -> Result<bool, ReadError> {
 /// Every part's data, read in parallel (one round); None when one is
 /// missing.
 fn find_parts(kc: &Keychain, path: &Path, n: usize) -> Result<Option<Vec<String>>, ReadError> {
+    #[cfg(test)]
+    tests::KEYCHAIN_ROUNDS.with(|c| c.set(c.get() + 1));
     let results: Vec<Result<Option<String>, ReadError>> = std::thread::scope(|s| {
         let hs: Vec<_> = (0..n).map(|i| s.spawn(move || kc.find(&security::account(path, i)))).collect();
         hs.into_iter().map(|h| h.join().unwrap_or_else(|_| Err(ReadError::Keychain("a read failed".into())))).collect()

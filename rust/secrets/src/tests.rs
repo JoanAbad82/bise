@@ -30,8 +30,22 @@ fn throwaway() -> &'static Path {
     })
 }
 
-fn forget_cache() {
-    CACHE.lock().unwrap().clear();
+thread_local! {
+    /// This test thread's keychain read rounds (`find_parts`): a cache hit
+    /// is proven by count, never by time (a loaded machine stalls any
+    /// thread for 100 ms).
+    pub(super) static KEYCHAIN_ROUNDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+fn rounds() -> usize {
+    KEYCHAIN_ROUNDS.with(|c| c.get())
+}
+
+/// Forget this path's cached secret, only it: the tests run in parallel
+/// in this binary and share the process's cache (clearing all of it made
+/// another test's cache hit a keychain read).
+fn forget_cache(path: &Path) {
+    CACHE.lock().unwrap().remove(path);
 }
 
 fn writer(path: &Path, text: &str) -> impl Fn() -> std::io::Result<()> {
@@ -75,19 +89,19 @@ fn the_keychain_holds_a_big_secret_and_the_file_none() {
     assert!(!on_disk.contains("tok"), "no secret in the stub: {on_disk}");
     let Place::Keychain(stub) = place(&f).unwrap() else { panic!("a stub") };
     assert!(stub.parts >= 4, "{stub:?}");
-    forget_cache();
+    forget_cache(&f);
     let t = std::time::Instant::now();
     assert_eq!(read(&f).unwrap().as_deref(), Some(secret.as_str()));
     eprintln!("read of {} parts from the keychain: {:?}", stub.parts, t.elapsed());
     // the cache: the same generation, no keychain call
-    let t = std::time::Instant::now();
+    let before = rounds();
     assert_eq!(read(&f).unwrap().as_deref(), Some(secret.as_str()));
-    assert!(t.elapsed() < Duration::from_millis(15), "{:?}", t.elapsed());
+    assert_eq!(rounds(), before, "a cache hit reads no keychain item");
     // a smaller secret: the old parts beyond it are deleted
     write_to(Store::Keychain, &f, "{}\n", &|| panic!("not a file")).unwrap();
     assert_eq!(place(&f).unwrap(), Place::Keychain(Stub { gen: Stub::parse(&std::fs::read_to_string(&f).unwrap()).unwrap().gen, parts: 1, at: At::Bise }));
     assert_eq!(kc.find(&security::account(&f, 1)).unwrap(), None);
-    forget_cache();
+    forget_cache(&f);
     assert_eq!(read(&f).unwrap().as_deref(), Some("{}\n"));
     // back to a file: the items go
     write_to(Store::File, &f, "{}\n", &writer(&f, "{}\n")).unwrap();
@@ -104,13 +118,13 @@ fn another_processs_write_is_seen_and_a_deleted_item_is_no_secret() {
     write_to(Store::Keychain, &f, "one", &|| panic!()).unwrap();
     assert_eq!(read(&f).unwrap().as_deref(), Some("one"));
     // another process writes: a new generation in the stub
-    forget_cache();
+    forget_cache(&f);
     write_to(Store::Keychain, &f, "two", &|| panic!()).unwrap();
     CACHE.lock().unwrap().insert(f.clone(), ("0000".into(), "one".into()));
     assert_eq!(read(&f).unwrap().as_deref(), Some("two"));
     // the item deleted by hand (Keychain Access): no secret, not an error
     Keychains::here().unwrap().bise.delete(&security::account(&f, 0));
-    forget_cache();
+    forget_cache(&f);
     assert_eq!(read(&f).unwrap(), None);
     remove(&f).unwrap();
     assert!(!f.exists());
@@ -231,7 +245,7 @@ fn the_items_go_to_bises_own_keychain_file() {
     assert!(kcs.bise.find(&security::account(&f, 0)).unwrap().is_some());
     assert_eq!(kcs.login.find(&security::account(&f, 0)).unwrap(), None, "nothing of the secret in the login keychain");
     assert!(kcs.login.find(keychain::PASSWORD_ACCOUNT).unwrap().is_some_and(|p| p.len() == 64));
-    forget_cache();
+    forget_cache(&f);
     assert_eq!(read(&f).unwrap().as_deref(), Some("mine"));
     remove(&f).unwrap();
 }
@@ -282,7 +296,7 @@ fn a_stub_of_before_is_read_then_moved_on_write() {
         let s = Stub::parse(&std::fs::read_to_string(&f).unwrap()).unwrap();
         std::fs::write(&f, Stub { at: At::Login, ..s }.to_text()).unwrap();
         assert!(std::fs::read_to_string(&f).unwrap().starts_with("bise-secret keychain gen="));
-        forget_cache();
+        forget_cache(&f);
         assert_eq!(read(&f).unwrap().as_deref(), Some("old"));
         if by_move {
             assert!(move_to(Store::Keychain, &f).unwrap());
@@ -292,7 +306,7 @@ fn a_stub_of_before_is_read_then_moved_on_write() {
         let Place::Keychain(now) = place(&f).unwrap() else { panic!("a stub") };
         assert_eq!(now.at, At::Bise);
         assert_eq!(kcs.login.find(&security::account(&f, 0)).unwrap(), None, "the login item went");
-        forget_cache();
+        forget_cache(&f);
         assert_eq!(read(&f).unwrap().as_deref(), Some(if by_move { "old" } else { "new" }));
         // moved already: a second move does nothing
         assert!(!move_to(Store::Keychain, &f).unwrap());
