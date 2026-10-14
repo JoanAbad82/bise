@@ -90,12 +90,12 @@ def Laws.main_card_answer_routes_once(o, cx, c, text, parts):
   {==}
 
 def Laws.you_line_carries_its_id(o, cx, name, m, e):
-  +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m)))
+  +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m), HM.Msg.via(m))), name, HFD.you_id(HM.Msg.id(m)))
   %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, name, HFD.you_parts(HC.parts_json(HM.Msg.parts(m))))) == ln : HX.Cx<o>}
   {==}
 
 def Laws.you_parts_follow_the_id(o, cx, name, m, e):
-  +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m)))
+  +ln = HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m), HM.Msg.via(m))), name, HFD.you_id(HM.Msg.id(m)))
   +rec = HFD.you_parts(HC.parts_json(HM.Msg.parts(m)))
   %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.feed(o, ln, name, rec)) == HC.feed(o, ln, name, rec) : HX.Cx<o>}
   {==}

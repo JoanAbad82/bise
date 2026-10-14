@@ -217,45 +217,11 @@ def held(+x: XH.Xs, +rid: Nat) -> Maybe<&2, XH.Route>:
 def via_of(+v: String) -> Maybe<&2, String>:
   Bool.pick(Maybe<&2, String>, String.is_empty(v), None{}, Some{v})
 
-# ---- unclear routes (S2 step 5, architect m_9321) ----
-# His words the shell's guess can't place, with BISE_ROUTE_MODEL set: a
-# held route with no target yet (`to` ""), due PICK_MS from the hold, while
-# the shell asks the model; a pick (input route_pick) replaces it with a
-# held route to that project (his 2 s start then); its act firing with no
-# target says them to bise's main as a plain message. A plain input to
-# bise's main meanwhile waits behind it, due at the latest unclear due.
-
-# how long his unclear words wait for the model's pick
-def PICK_MS() -> Nat:
-  1500n
-
-# a new held route due at `due` (an unclear one, or one behind it)
-def new_route_at(+x: XH.Xs, +tm: TM.Tms, +text: String, +via: String, +to: String, +name: String, +why: String, +due: Nat, +context: String, +parts: String) -> XH.Route:
-  XH.Route{XH.Xs.next_rid(x), text, via, to, name, due, TM.Tms.next_act(tm), why, XH.RHeld{}, context, parts}
+# ---- a held route with no target ----
+# Only an older hub's route model held one (S2 step 5, gone: only his
+# explicit `@<project>` routes now); one left in a journal fires plain to
+# bise's main (law route_unclear_goes_plain).
 
 # held, with no target yet
 def is_unclear(+r: XH.Route) -> Bool:
   is_held(XH.Route.st(r)) && String.is_empty(XH.Route.to(r))
-
-def unclear_due.max(+d: Nat, m: Maybe<&2, Nat>) -> Maybe<&2, Nat>:
-  match m:
-    case None{}:
-      Some{d}
-    case Some{+e}:
-      Some{Nat.max(d, e)}
-
-def unclear_due.add(b: Bool, +d: Nat, m: Maybe<&2, Nat>) -> Maybe<&2, Nat>:
-  match b:
-    case True{}:
-      unclear_due.max(d, m)
-    case False{}:
-      m
-
-# the latest due of the unclear routes (None: none waits): a plain input
-# to bise's main is held behind it (law route_plain_waits_behind_unclear)
-def unclear_due(xs: List<&2, XH.Route>) -> Maybe<&2, Nat>:
-  match xs:
-    case Nil{}:
-      None{}
-    case Con{+h, +t}:
-      unclear_due.add(is_unclear(h), XH.Route.due(h), unclear_due(t))

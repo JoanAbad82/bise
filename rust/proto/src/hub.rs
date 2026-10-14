@@ -229,13 +229,14 @@ pub enum HubEv {
     /// its end ([`UpdateEv`], boxed as `Release`), to every client
     Update(Box<UpdateEv>),
     /// bise's home hub holds his words for a project's main (desktop S2,
-    /// decision B): `to` the project picked (its hub id), `name` its name,
-    /// `why` the guess's reason; until `correct_until_ms` (2 s after) a
+    /// decision B): `to` the project he addressed (`@<project> …`, its hub
+    /// id), `name` its name, `why` the reason; until `correct_until_ms` (2 s after) a
     /// `route_correct` or `route_cancel` with this `rid` still changes it;
     /// `route` comes again after a correction (same rid, same time)
     Route { project: Project, rid: u64, to: Project, name: String, text: String, correct_until_ms: u64, why: String },
-    /// the route's end: `state` "sent" (forwarded: `xid` its delivery) or
-    /// "cancelled" (his words stayed with bise's main)
+    /// the route's end: `state` "sent" (forwarded: `xid` its delivery,
+    /// `msg` his message it became in bise's main: his pending send there
+    /// settles by it) or "cancelled" (his words stayed with bise's main)
     RouteDone {
         project: Project,
         rid: u64,
@@ -243,6 +244,8 @@ pub enum HubEv {
         to: Project,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         xid: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        msg: Option<u64>,
     },
     /// the followed tasks (S10), at hello and on change: a follow ends
     /// with its job (`job_end`), so every row runs

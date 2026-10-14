@@ -47,7 +47,13 @@ fn kind_evs(e: &Entry) -> Vec<Ev> {
         // G1: the mark the fold moved, by the TUI's own rule
         // msg-parts: drawn from its parts (none from an older hub: read
         // back from its text, once)
-        EntryKind::You => vec![Ev::You(crate::said::Said::new(text, e.parts.clone()), e.delivery.unwrap_or(Mark::Sent), false, e.msg_id)],
+        // routed (bise's home hub): `via bise` in the project, `sent to
+        // <project>` in bise's main
+        EntryKind::You => {
+            let mut said = crate::said::Said::new(text, e.parts.clone());
+            said.tag = crate::said::Tag::of(e.via.as_deref(), e.went.as_ref().map(|w| w.name.as_str()));
+            vec![Ev::You(said, e.delivery.unwrap_or(Mark::Sent), false, e.msg_id)]
+        }
         // G5: an agent writing to him, level 2
         EntryKind::Agent | EntryKind::FromAgent if e.to_you => vec![msg(e.from.clone().unwrap_or_default(), "you".into(), 2)],
         EntryKind::Agent => {

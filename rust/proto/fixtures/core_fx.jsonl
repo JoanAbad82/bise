@@ -16,9 +16,8 @@
 {"fx": "renamed", "old": "t9", "new": "t9b"}
 {"fx": "reply", "token": 1, "body": {"ok": true}}
 {"fx": "route", "rid": 1, "to": "shop-1", "name": "shop", "text": "look", "due_ms": 1002000, "why": "you named shop"}
-{"fx": "route_ask", "rid": 1, "text": "first words"}
 {"fx": "route_done", "rid": 1, "state": "cancelled", "to": "shop-1", "xid": null}
-{"fx": "route_done", "rid": 1, "state": "sent", "to": "docs-2", "xid": 1}
+{"fx": "route_done", "rid": 1, "state": "sent", "to": "docs-2", "xid": 1, "msg": 4}
 {"fx": "rt", "agent": "w", "run": "idle", "waiting": false, "turn_ms": null, "turns": 0}
 {"fx": "rt", "agent": "a", "run": "busy", "waiting": true, "turn_ms": 1000000, "turns": 0}
 {"fx": "say", "agent": "main", "text": "[bise] The message(s) just above arrived while you were writing your last answer: you have not answered them yet. Answer them now."}

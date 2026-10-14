@@ -256,8 +256,8 @@ pub enum GateStep {
 /// view of a [`Feed`] record ([`view`]), whichever form the line has.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Hub {
-    /// his message
-    You(String),
+    /// his message, and the view that brought it (`bise`: routed here)
+    You(String, Option<String>),
     /// `you-id : m_<n>`: the id of the 'you' line right before it
     /// (sb-core writes it in the same step; the feed only)
     YouId(u64),
@@ -278,6 +278,9 @@ pub enum Hub {
     /// `route-parts : <json>`: the parts of the route line right before
     /// it (his answer to a card, his message to another agent)
     RouteParts(String),
+    /// bise's home hub: his message `msg` went to the project `to`
+    /// (`name` its name) as out `xid`, not to main
+    Routed { to: String, name: String, xid: u64, msg: u64 },
     /// BISE-86: `undelivered : {name} : {text}`
     Undelivered { to: String, text: String },
     /// what the feed's owner received: `{from} m_<n> : {text}`; `from`
@@ -730,10 +733,11 @@ pub fn view(f: Feed) -> Hub {
     let m = |id: Option<u64>| id.map(|n| format!("m_{n}")).unwrap_or_default();
     let other = |kind: &str, text: String| Hub::Other { kind: kind.to_string(), text };
     match f {
-        Feed::You(r) => Hub::You(r.text),
+        Feed::You(r) => Hub::You(r.text, r.via),
         Feed::YouId(r) => Hub::YouId(r.id),
         Feed::YouParts(r) => Hub::YouParts(r.parts.to_string()),
         Feed::RouteParts(r) => Hub::RouteParts(r.parts.to_string()),
+        Feed::Routed(r) => Hub::Routed { to: r.to, name: r.name, xid: r.xid, msg: r.msg },
         Feed::Steered(r) => Hub::Steered(r.ids),
         Feed::SteerRx(r) => Hub::SteerRx(r.ids),
         Feed::Context(r) => Hub::Context(r.context.to_string()),
@@ -922,38 +926,10 @@ pub fn is_main_answer_note(text: &str) -> bool {
 /// against the real sb-core, so a wording change there goes red).
 pub const MAIN_ANSWER_NOTE: &str = "the user answered card #";
 
-/// What one feed item says about an agent's context: a usage after a
-/// call, a compaction's end, or nothing.
-#[derive(Clone, Debug, PartialEq)]
-pub enum UsageMark<T> {
-    Usage(T),
-    Compacted,
-    Other,
-}
-
-/// The usage of an agent's current context (architect m_10999, the one
-/// rule): the last usage, unless a compaction ended after it. The TUI
-/// calls it over its feed events, the hub over a transcript tail.
-pub fn current_usage<T>(marks: impl DoubleEndedIterator<Item = UsageMark<T>>) -> Option<T> {
-    for m in marks.rev() {
-        match m {
-            UsageMark::Usage(u) => return Some(u),
-            UsageMark::Compacted => return None,
-            UsageMark::Other => {}
-        }
-    }
-    None
-}
-
-/// A transcript line as a [`UsageMark`]: its usage text (after `obs:
-/// usage: `, for bise_session's parser).
-pub fn usage_mark(line: &str) -> UsageMark<String> {
-    match read(line) {
-        Rec::Obs(Obs::Usage(t)) => UsageMark::Usage(t),
-        Rec::Obs(Obs::CompactionDone(_)) => UsageMark::Compacted,
-        _ => UsageMark::Other,
-    }
-}
+// an agent's context usage (architect m_10999): lines_usage.rs
+#[path = "lines_usage.rs"]
+mod usage;
+pub use usage::{current_usage, usage_mark, UsageMark};
 
 // ---- his message's mark (G1, contract C3, BISE-86): the one rule ----
 

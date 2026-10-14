@@ -86,12 +86,12 @@ impl Shell {
         use bise_proto::core::{feed, Feed};
         use bise_proto::thread::lines::{read, Hub, Rec};
         let Some((_, json)) = self.fn_ctx.as_ref().filter(|(a, _)| a == name) else { return vec![line.to_string()] };
-        let Rec::Hub(Hub::You(said)) = read(line) else { return vec![line.to_string()] };
+        let Rec::Hub(Hub::You(said, via)) = read(line) else { return vec![line.to_string()] };
         // no block: a context with a shot only (the core's marker is in
         // his words), or a line sb-core cut before it
         let words = crate::fn_context::strip_block(&said).unwrap_or(&said).to_string();
         let context = serde_json::from_str(json).unwrap_or_default();
-        let lines = vec![Feed::You(feed::You { text: words }).line(), Feed::Context(feed::Context { context }).line()];
+        let lines = vec![Feed::You(feed::You { text: words, via }).line(), Feed::Context(feed::Context { context }).line()];
         self.fn_ctx = None;
         lines
     }

@@ -386,7 +386,7 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
             rows.extend(glyph_line(G_NOTE, Style::default().fg(faint()), "held until /resume".into(), dim_st, width));
             rows
         }
-        Ev::MarkYou { .. } | Ev::YouId(_) => vec![],
+        Ev::MarkYou { .. } | Ev::YouId(_) | Ev::YouWent { .. } => vec![],
         // BISE-86 (book §13, §17): `✗ not delivered: {name} stopped.`, and
         // while it waits for an answer `⏎ send again · esc drop`
         Ev::Undelivered { name, open, .. } => {
@@ -1041,14 +1041,14 @@ pub(crate) fn user_block_lines(said_msg: &Said, mark: Mark, open: bool, width: u
         }
         let mut hint = vec![bar.clone(), Span::styled(crate::toolbox::more_label(units.len() - shown), d)];
         hint.extend(said_span(said));
-        hint.extend(mark_span(mark));
+        hint.extend(crate::said::you_end(mark_span(mark), said_msg.tag.as_ref()));
         rows.push(Line::from(hint));
     } else {
         // its mark at the end (C3): `·` sent, `✓` got, `✓✓` read (accent);
         // said in voice mode: `said ✓✓`
         if let Some(last) = all.last_mut() {
             last.spans.extend(said_span(said));
-            last.spans.extend(mark_span(mark));
+            last.spans.extend(crate::said::you_end(mark_span(mark), said_msg.tag.as_ref()));
         }
         rows = hung_rows(&bar, &bar, all, width);
     }

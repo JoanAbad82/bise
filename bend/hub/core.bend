@@ -530,7 +530,7 @@ def deliver.line(-o: M.St, again: Bool, you: Bool, +cx: X.Cx<o>, +name: String, 
     # his parts when he sent some (msg-parts: written at the delivery, so
     # a queued or steered message gets them when it is said)
     case False{} True{}:
-      +cx2 = feed(o, feed(o, cx, name, FD.you(M.Msg.text(m))), name, FD.you_id(M.Msg.id(m)))
+      +cx2 = feed(o, feed(o, cx, name, FD.you(M.Msg.text(m), M.Msg.via(m))), name, FD.you_id(M.Msg.id(m)))
       you_parts(o, cx2, name, M.Msg.parts(m))
     case False{} False{}:
       feed(o, cx, name, FD.msg_in(M.Msg.from(m), Some{M.Msg.id(m)}, M.Msg.text(m)))
@@ -2440,8 +2440,8 @@ def xretry(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
 def route_ev(-o: M.St, +cx: X.Cx<o>, +r: XH.Route) -> X.Cx<o>:
   out(o, cx, F.route(XH.Route.rid(r), XH.Route.to(r), XH.Route.name(r), XH.Route.text(r), XH.Route.due(r), XH.Route.why(r)))
 
-def route_done(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +state: String, +to: String, +xid: Maybe<&2, Nat>) -> X.Cx<o>:
-  out(o, cx, F.route_done(rid, state, to, xid))
+def route_done(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +state: String, +to: String, +xid: Maybe<&2, Nat>, +msg: Maybe<&2, Nat>) -> X.Cx<o>:
+  out(o, cx, F.route_done(rid, state, to, xid, msg))
 
 # home: the input route_hold (the shell's route.rs picked `to`, a project
 # hub id, `name` its name): held, its act set, the window told
@@ -2450,58 +2450,35 @@ def route_hold.to(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +to: Stri
   +cx2 = xemit(o, cx, XH.XRouteHeld{r})
   route_ev(o, aemit(o, cx2, TM.ActSet{XB.route_act(r)}), r)
 
-# S2 step 5: his unclear words (no `to`: the shell asks BISE_ROUTE_MODEL):
-# held PICK_MS with no target, the shell asked for a pick (fx route_ask),
-# the window told nothing until a project is picked
-def route_unclear(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +context: String, +parts: String) -> X.Cx<o>:
-  +r = XB.new_route_at(xst(o, cx), tms(o, cx), text, via, "", "", "", Nat.add(now(o, cx), XB.PICK_MS()), context, parts)
-  +cx2 = aemit(o, xemit(o, cx, XH.XRouteHeld{r}), TM.ActSet{XB.route_act(r)})
-  out(o, cx2, F.route_ask(XH.Route.rid(r), text))
-
 # `parts`: his message's parts (msg-parts JSON, "" none): held with his
 # words and carried wherever they go (R41 (6): his images reach the
-# project, and bise's main keeps them on his message)
+# project, and bise's main keeps them on his message). No `to` (only an
+# older shell sent one): his words go to bise's main now, never held.
 def route_hold(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +to: String, +name: String, +why: String, +context: String, +parts: String) -> X.Cx<o>:
   pick_lazy(X.Cx<o>, String.is_empty(to),
-    u => route_unclear(o, cx, text, via, context, parts),
+    u => user_says(o, cx, M.MAIN(), text, False{}, parts),
     u => route_hold.to(o, cx, text, via, to, name, why, context, parts))
 
-# his plain words to main behind an unclear route: held with no target,
-# due `d` (the latest unclear due), never asked about: at its fire it goes
-# plain to main like the unclear one before it
-def route_behind(-o: M.St, +cx: X.Cx<o>, +text: String, +d: Nat, +parts: String) -> X.Cx<o>:
-  +r = XB.new_route_at(xst(o, cx), tms(o, cx), text, "", "", "", "", d, "", parts)
-  aemit(o, xemit(o, cx, XH.XRouteHeld{r}), TM.ActSet{XB.route_act(r)})
-
-def user_input.behind(-o: M.St, m: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
-  match m:
-    case None{}:
-      user_says(o, cx, to, text, queued, parts)
-    case Some{+d}:
-      route_behind(o, cx, text, d, parts)
-
-# his plain words (inputs say, and route to main): to bise's main while an
-# unclear route of his waits for the model's pick, held behind it, due at
-# the latest unclear due, so both reach main in order (law
-# route_plain_waits_behind_unclear); else user_says. A queued input waits
-# for main's turn end already: never held here. `parts`: his message's
-# parts (msg-parts, "" none), held with his words (R41 (6))
-def user_input(-o: M.St, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool, +parts: String) -> X.Cx<o>:
-  user_input.behind(o, Bool.pick(Maybe<&2, Nat>, Bool.not(queued) && String.eq(to, M.MAIN()), XB.unclear_due(XH.Xs.routes(xst(o, cx))), None{}), cx, to, text, queued, parts)
-
-# an unclear route's act fired with no target: it ends, and his words
-# reach bise's main as a plain message (the cancel path, no route_done:
-# the window never saw it)
+# a held route with no target (left by an older hub's route model in its
+# journal) whose act fired: it ends, and his words reach bise's main as a
+# plain message (the cancel path, no route_done: the window never saw it)
 def route_plain(-o: M.St, +cx: X.Cx<o>, +r: XH.Route) -> X.Cx<o>:
   +cx2 = xemit(o, cx, XH.XRoute{XH.Route.rid(r), XH.REnd{XH.RCancelled{}}})
   says.sent(o, send(o, cx2, Snd{M.USER(), M.MAIN(), XH.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(XH.Route.via(r)), XH.Route.parts(r)}), M.MAIN(), XH.Route.text(r))
 
+# his routed words in bise's main thread, where he wrote them: his line,
+# its id, his parts, then where they went (the window and the TUI fold
+# the `routed` record onto his entry by the id; law route_fire_says_where)
+def route_fire.lines(-o: M.St, +cx: X.Cx<o>, +r: XH.Route, +id: Nat, +xid: Nat) -> X.Cx<o>:
+  +cx2 = feed(o, feed(o, cx, M.MAIN(), FD.you(XH.Route.text(r), XB.via_of(XH.Route.via(r)))), M.MAIN(), FD.you_id(id))
+  feed(o, you_parts(o, cx2, M.MAIN(), XH.Route.parts(r)), M.MAIN(), FD.routed(XH.Route.to(r), XH.Route.name(r), xid, id))
+
 def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: XH.Route, +id: Nat) -> X.Cx<o>:
   +cx2 = emit(o, mark_delivered(o, cx, id), M.ESettled{id}, Unit{}, Unit{}, Unit{})
   +ob = XB.new_out(xst(o, cx2), XH.Route.to(r), XH.KInput{}, id, XH.Route.text(r), XH.Route.context(r), XH.Route.parts(r))
-  +cx3 = xdeliver(o, xemit(o, cx2, XH.XOut{ob}), ob)
+  +cx3 = xdeliver(o, xemit(o, route_fire.lines(o, cx2, r, id, XH.Out.xid(ob)), XH.XOut{ob}), ob)
   +cx4 = xemit(o, cx3, XH.XRoute{XH.Route.rid(r), XH.REnd{XH.RSent{}}})
-  +cx5 = route_done(o, cx4, XH.Route.rid(r), "sent", XH.Route.to(r), Some{XH.Out.xid(ob)})
+  +cx5 = route_done(o, cx4, XH.Route.rid(r), "sent", XH.Route.to(r), Some{XH.Out.xid(ob)}, Some{id})
   note_main(o, cx5, cat(["the user's words went to the project ", XH.Route.name(r), " (", mid(id), ", routed by bise): \"",
     M.clip(M.one_line(XH.Route.text(r)), 300n), "\"; its answer comes back to you from @", XH.Route.name(r)]))
 
@@ -2534,7 +2511,7 @@ def route_cancel.go(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>, +rid: Nat) -
     case Some{+r}:
       +cx2 = aemit(o, cx, TM.ActDone{XH.Route.act(r)})
       +cx3 = xemit(o, cx2, XH.XRoute{rid, XH.REnd{XH.RCancelled{}}})
-      +cx4 = route_done(o, cx3, rid, "cancelled", XH.Route.to(r), None{})
+      +cx4 = route_done(o, cx3, rid, "cancelled", XH.Route.to(r), None{}, None{})
       says.sent(o, send(o, cx4, Snd{M.USER(), M.MAIN(), XH.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(XH.Route.via(r)), XH.Route.parts(r)}), M.MAIN(), XH.Route.text(r))
 
 def route_cancel(-o: M.St, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
@@ -2556,8 +2533,8 @@ def route_correct(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String)
     u => route_cancel(o, cx, rid),
     u => route_correct.go(o, XB.held(xst(o, cx), rid), cx, rid, to, name))
 
-# a held route's act fired: with no target, plain to main (law
-# route_unclear_goes_plain); else forwarded (route_fire)
+# a held route's act fired: with no target (an older hub's), plain to
+# main (law route_unclear_goes_plain); else forwarded (route_fire)
 def route_go(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
   match m:
     case None{}:
@@ -2566,23 +2543,6 @@ def route_go(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
       pick_lazy(X.Cx<o>, XB.is_unclear(r),
         u => route_plain(o, cx, r),
         u => route_fire(o, Some{r}, cx))
-
-# the model's pick (the shell checked `to` in the registry) for an unclear
-# route still held: it ends, its act with it, and a held route to that
-# project starts (his 2 s to correct start now); a route that already
-# went or got a target: nothing (law route_pick_only_unclear)
-def route_pick.go(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>, +to: String, +name: String, +why: String) -> X.Cx<o>:
-  match m:
-    case None{}:
-      cx
-    case Some{+r}:
-      pick_lazy(X.Cx<o>, XB.is_unclear(r) && Bool.not(String.is_empty(to)),
-        u => route_hold.to(o, xemit(o, aemit(o, cx, TM.ActDone{XH.Route.act(r)}), XH.XRoute{XH.Route.rid(r), XH.REnd{XH.RCancelled{}}}),
-          XH.Route.text(r), XH.Route.via(r), to, name, why, XH.Route.context(r), XH.Route.parts(r)),
-        u => cx)
-
-def route_pick(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String, +why: String) -> X.Cx<o>:
-  route_pick.go(o, XB.held(xst(o, cx), rid), cx, to, name, why)
 
 def act_fire(-o: M.St, w: TM.What, +cx: X.Cx<o>) -> X.Cx<o>:
   match w:
@@ -3717,10 +3677,10 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
     case GI.IBoot{}:
       xboot(o, boot(o, cx))
     case GI.ISay{+focus, +text, +queued, +parts}:
-      user_input(o, cx, focus, text, queued, parts)
+      user_says(o, cx, focus, text, queued, parts)
     case GI.IRoute{+target, +text, +focus, +queued, +parts}:
       pick_lazy(X.Cx<o>, String.eq(target, M.MAIN()),
-        u => user_input(o, cx, M.MAIN(), text, queued, parts),
+        u => user_says(o, cx, M.MAIN(), text, queued, parts),
         u => route(o, cx, target, text, focus, queued, parts))
     case GI.INew{+base, +brief, +brief_text, +objective, +worktree, +with_changes}:
       user_new.res(o, create_task(o, cx, NewTask{M.USER(), base, brief, brief_text, objective, worktree, with_changes}))
@@ -3788,8 +3748,6 @@ def dispatch(-o: M.St, +cx: X.Cx<o>, +i: GI.In) -> X.Cx<o>:
       route_correct(o, cx, rid, to, name)
     case GI.IRouteCancel{+rid}:
       route_cancel(o, cx, rid)
-    case GI.IRoutePick{+rid, +to, +name, +why}:
-      route_pick(o, cx, rid, to, name, why)
     case GI.IFollow{+agent, +on}:
       follow_in(o, follow_err(st(o, cx), agent), cx, agent, on)
     case GI.IWakeSet{+agent, +spec, +max_text, +max_ms, +quiet, +then}:

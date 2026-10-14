@@ -3,7 +3,7 @@
 // 2 s to change it. Owner: amb-win.
 //
 // The hub sends `route {rid, to, name, text, correct_until_ms, why}` (again
-// after a correction, same rid) then `route_done {rid, state, to}`; both are
+// after a correction, same rid) then `route_done {rid, state, to, msg}`; both are
 // one-shot events the store doesn't keep (store.ts: "read through
 // onEvent"), so this module keeps, per store, which of his sends each hold
 // is: the oldest pending send of bise's thread (home project, main) with the
@@ -50,6 +50,16 @@ export function applyRoute(holds: readonly Hold[], ev: EvOf<'route'> | EvOf<'rou
   return [...holds, { rid: ev.rid, key: threadKey(ev.project, 'main'), cid: p.cid, home: ev.project, to: ev.to, name: ev.name, why: ev.why, until: ev.correct_until_ms, state: 'held' }];
 }
 
+/** A sent route's answer for his pending send (the window-local 'sent', echo.ts), or null. Pure. */
+export function settleOf(
+  holds: readonly Hold[],
+  ev: EvOf<'route'> | EvOf<'route_done'>,
+): { ev: 'sent'; project: string; agent: 'main'; cid: number; msg_id: number } | null {
+  if (ev.ev !== 'route_done' || ev.state !== 'sent' || typeof ev.msg !== 'number') return null;
+  const h = holds.find((x) => x.rid === ev.rid && x.home === ev.project);
+  return h === undefined ? null : { ev: 'sent', project: ev.project, agent: 'main', cid: h.cid, msg_id: ev.msg };
+}
+
 interface Tracker {
   holds: readonly Hold[];
   listeners: Set<() => void>;
@@ -68,6 +78,11 @@ function trackerOf(store: Store): Tracker {
     // the last 50 are enough for any thread on screen
     tr.holds = next.slice(-50);
     for (const l of [...tr.listeners]) l();
+    // sent: his message in bise's main has its id now (the send's own answer had none: the
+    // hub makes it when the route fires), so its pending row meets its 'you' entry by that id
+    // and leaves (the entry says 'sent to <project>'), never a bubble stuck under the thread
+    const settle = settleOf(next, ev);
+    if (settle !== null) store.apply(settle);
   });
   trackers.set(store, tr);
   t = tr;

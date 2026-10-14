@@ -51,7 +51,7 @@ pub fn readable(line: &str) -> Option<String> {
     }
     if let Some(rest) = line.strip_prefix("sb ") {
         return Some(match lines::hub(rest) {
-            Hub::You(t) => format!("user: {t}"),
+            Hub::You(t, _) => format!("user: {t}"),
             Hub::MsgIn { from, id, body } if from.is_empty() => format!("message from {}", with_id(&id, &body)),
             Hub::MsgIn { from, id, body } => format!("message from {} {}", from, with_id(&id, &body)),
             // hub line protocol v2 (C2)
@@ -336,7 +336,7 @@ pub fn origin(raw: &[Raw], task: &str, created_ms: u64) -> Option<Origin> {
     } else {
         raw.iter()
             .rev()
-            .filter(|(p, _, l)| *p < spawn && matches!(lines::read(l), Rec::Hub(Hub::You(_))))
+            .filter(|(p, _, l)| *p < spawn && matches!(lines::read(l), Rec::Hub(Hub::You(..))))
             .map(|(p, _, _)| *p)
             .next()
     };

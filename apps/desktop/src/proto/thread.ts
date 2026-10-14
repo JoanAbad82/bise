@@ -289,6 +289,12 @@ msg?: number | null,
 agent?: string, };
 
 /**
+ * Where bise sent his words (a `you` entry's `went`): the project's hub
+ * id and its name.
+ */
+export type Went = { to: string, name: string, };
+
+/**
  * One entry of a thread.
  */
 export type Entry = { 
@@ -377,7 +383,18 @@ parts?: Array<Part>,
  * kept when its turn failed before the answer came (the hub's `sb
  * kept` line); drawn dim, the failure's notice after it
  */
-cut?: boolean, };
+cut?: boolean, 
+/**
+ * a `you` entry: the view that brought his words (`bise`: bise's
+ * home hub routed them here, his own words; the window and the TUI
+ * say 'via bise'), from the `you` line's `via`
+ */
+via?: string | null, 
+/**
+ * a `you` entry in bise's main: his words went to a project, not
+ * to main (the `routed` line with its id)
+ */
+went?: Went | null, };
 
 /**
  * How a run of retries ended: the agent's text, its thinking or a tool

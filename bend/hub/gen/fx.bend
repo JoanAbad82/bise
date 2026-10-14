@@ -37,9 +37,7 @@ type Fx is Data:
   # route
   FRoute{rid: Nat, to: String, name: String, text: String, due_ms: Nat, why: String}
   # route_done
-  FRouteDone{rid: Nat, state: String, to: String, xid: Maybe<&2, Nat>}
-  # route_ask
-  FRouteAsk{rid: Nat, text: String}
+  FRouteDone{rid: Nat, state: String, to: String, xid: Maybe<&2, Nat>, msg: Maybe<&2, Nat>}
   # job_end
   FJobEnd{agent: String, state: String, label: String, summary: String, key: Nat, hub: String}
   # followed_end
@@ -102,10 +100,7 @@ def FRoute.of(+i: J.Json) -> Fx:
   FRoute{K.get_n(i, "rid"), K.get_s(i, "to"), K.get_s(i, "name"), K.get_s(i, "text"), K.get_n(i, "due_ms"), K.get_s(i, "why")}
 
 def FRouteDone.of(+i: J.Json) -> Fx:
-  FRouteDone{K.get_n(i, "rid"), K.get_s(i, "state"), K.get_s(i, "to"), K.opt_n(J.get(i, "xid"))}
-
-def FRouteAsk.of(+i: J.Json) -> Fx:
-  FRouteAsk{K.get_n(i, "rid"), K.get_s(i, "text")}
+  FRouteDone{K.get_n(i, "rid"), K.get_s(i, "state"), K.get_s(i, "to"), K.opt_n(J.get(i, "xid")), K.opt_n(J.get(i, "msg"))}
 
 def FJobEnd.of(+i: J.Json) -> Fx:
   FJobEnd{K.get_s(i, "agent"), K.get_s(i, "state"), K.get_s(i, "label"), K.get_s(i, "summary"), K.get_n(i, "key"), K.get_s(i, "hub")}
@@ -250,16 +245,16 @@ def of.t15(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case LT{}:
       FNone{}
     case EQ{}:
-      FRouteAsk.of(i)
+      FRouteDone.of(i)
     case GT{}:
       FNone{}
 
 def of.t16(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t15(String.order(t, "route_ask"), t, i)
+      of.t15(String.order(t, "route_done"), t, i)
     case EQ{}:
-      FRouteDone.of(i)
+      FRt.of(i)
     case GT{}:
       FNone{}
 
@@ -270,23 +265,23 @@ def of.t14(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case EQ{}:
       FRoute.of(i)
     case GT{}:
-      of.t16(String.order(t, "route_done"), t, i)
+      of.t16(String.order(t, "rt"), t, i)
 
 def of.t18(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       FNone{}
     case EQ{}:
-      FSay.of(i)
+      FSpawn.of(i)
     case GT{}:
       FNone{}
 
 def of.t19(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t18(String.order(t, "say"), t, i)
+      of.t18(String.order(t, "spawn"), t, i)
     case EQ{}:
-      FSpawn.of(i)
+      FUserSent.of(i)
     case GT{}:
       FNone{}
 
@@ -295,15 +290,6 @@ def of.t21(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case LT{}:
       FNone{}
     case EQ{}:
-      FXDeliver.of(i)
-    case GT{}:
-      FNone{}
-
-def of.t22(c: Cmp, +t: String, +i: J.Json) -> Fx:
-  match c:
-    case LT{}:
-      of.t21(String.order(t, "xdeliver"), t, i)
-    case EQ{}:
       FXReply.of(i)
     case GT{}:
       FNone{}
@@ -311,20 +297,20 @@ def of.t22(c: Cmp, +t: String, +i: J.Json) -> Fx:
 def of.t20(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
-      of.t19(String.order(t, "spawn"), t, i)
+      of.t19(String.order(t, "user_sent"), t, i)
     case EQ{}:
-      FUserSent.of(i)
+      FXDeliver.of(i)
     case GT{}:
-      of.t22(String.order(t, "xreply"), t, i)
+      of.t21(String.order(t, "xreply"), t, i)
 
 def of.t17(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
     case LT{}:
       of.t14(String.order(t, "route"), t, i)
     case EQ{}:
-      FRt.of(i)
+      FSay.of(i)
     case GT{}:
-      of.t20(String.order(t, "user_sent"), t, i)
+      of.t20(String.order(t, "xdeliver"), t, i)
 
 def of.t11(c: Cmp, +t: String, +i: J.Json) -> Fx:
   match c:
@@ -333,9 +319,9 @@ def of.t11(c: Cmp, +t: String, +i: J.Json) -> Fx:
     case EQ{}:
       FPassthrough.of(i)
     case GT{}:
-      of.t17(String.order(t, "rt"), t, i)
+      of.t17(String.order(t, "say"), t, i)
 
-# the record of a tag (a binary search over the 23 sorted tags); any
+# the record of a tag (a binary search over the 22 sorted tags); any
 # other tag: FNone
 def of_tag(+t: String, +i: J.Json) -> Fx:
   of.t11(String.order(t, "passthrough"), t, i)
@@ -376,10 +362,8 @@ def kvs(x: Fx) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
       [J.kv("fx", J.JStr{"xreply"}), J.kv("hub", J.JStr{hub}), J.kv("xid", J.JNum{xid}), J.kv("text", J.JStr{text})]
     case FRoute{+rid, +to, +name, +text, +due_ms, +why}:
       [J.kv("fx", J.JStr{"route"}), J.kv("rid", J.JNum{rid}), J.kv("to", J.JStr{to}), J.kv("name", J.JStr{name}), J.kv("text", J.JStr{text}), J.kv("due_ms", J.JNum{due_ms}), J.kv("why", J.JStr{why})]
-    case FRouteDone{+rid, +state, +to, +xid}:
-      [J.kv("fx", J.JStr{"route_done"}), J.kv("rid", J.JNum{rid}), J.kv("state", J.JStr{state}), J.kv("to", J.JStr{to}), J.kv("xid", K.jmaybe_n(xid))]
-    case FRouteAsk{+rid, +text}:
-      [J.kv("fx", J.JStr{"route_ask"}), J.kv("rid", J.JNum{rid}), J.kv("text", J.JStr{text})]
+    case FRouteDone{+rid, +state, +to, +xid, +msg}:
+      K.cat([[J.kv("fx", J.JStr{"route_done"}), J.kv("rid", J.JNum{rid}), J.kv("state", J.JStr{state}), J.kv("to", J.JStr{to}), J.kv("xid", K.jmaybe_n(xid))], K.omit_mn("msg", msg)])
     case FJobEnd{+agent, +state, +label, +summary, +key, +hub}:
       [J.kv("fx", J.JStr{"job_end"}), J.kv("agent", J.JStr{agent}), J.kv("state", J.JStr{state}), J.kv("label", J.JStr{label}), J.kv("summary", J.JStr{summary}), J.kv("key", J.JNum{key}), J.kv("hub", J.JStr{hub})]
     case FFollowedEnd{+project, +agent, +key, +state, +label, +summary}:
@@ -445,11 +429,8 @@ def xreply(+hub: String, +xid: Nat, +text: String) -> List<&2, Sigma<&2, &2, Str
 def route(+rid: Nat, +to: String, +name: String, +text: String, +due_ms: Nat, +why: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   kvs(FRoute{rid, to, name, text, due_ms, why})
 
-def route_done(+rid: Nat, +state: String, +to: String, +xid: Maybe<&2, Nat>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  kvs(FRouteDone{rid, state, to, xid})
-
-def route_ask(+rid: Nat, +text: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  kvs(FRouteAsk{rid, text})
+def route_done(+rid: Nat, +state: String, +to: String, +xid: Maybe<&2, Nat>, +msg: Maybe<&2, Nat>) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+  kvs(FRouteDone{rid, state, to, xid, msg})
 
 def job_end(+agent: String, +state: String, +label: String, +summary: String, +key: Nat, +hub: String) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
   kvs(FJobEnd{agent, state, label, summary, key, hub})

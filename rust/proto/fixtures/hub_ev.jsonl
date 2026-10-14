@@ -51,7 +51,7 @@
 {"ev":"queued_taken","project":"acme-1a2b3c4d","agent":"perf","id":3,"text":"then the cold run"}
 {"ev":"diff","project":"acme-1a2b3c4d","agent":"old","base":"main","files":[],"merged":"e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e","note":"old is archived and its folder is gone"}
 {"ev":"route","project":"bise-home-00000000","rid":3,"to":"acme-1a2b3c4d","name":"acme","text":"why does p99 rise","correct_until_ms":1791100402000,"why":"Safari: grafana.acme.test"}
-{"ev":"route_done","project":"bise-home-00000000","rid":3,"state":"sent","to":"acme-1a2b3c4d","xid":7}
+{"ev":"route_done","project":"bise-home-00000000","rid":3,"state":"sent","to":"acme-1a2b3c4d","xid":7,"msg":12}
 {"ev":"route_done","project":"bise-home-00000000","rid":4,"state":"cancelled","to":"acme-1a2b3c4d"}
 {"ev":"merged","project":"acme-1a2b3c4d","items":[{"sha":"e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e","title":"perf: sort_unstable in the hot query","by":"perf","at_ms":1791100400000},{"sha":"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678","title":"fix typo in README","at_ms":1791100100000}]}
 {"ev":"features","project":"acme-1a2b3c4d","items":[{"name":"gift-cards","branch":"gift-cards","base":"main","agents":["gift-api","gift-ui"],"ahead":2,"behind":1,"adds":42,"dels":3,"tip":"4b825dc642cb6eb9a060e54bf8d69288fbee4904","checked":true,"tried":{"sha":"4b825dc","run":"~/.bise/dev/versions/4b825dc/bise","at_ms":1791100400000},"trial":true,"building":false,"created_ms":1791100000000,"card":7},{"name":"old-ui","branch":"old-ui","base":"main","agents":[],"ahead":0,"behind":3,"adds":0,"dels":0,"tip":"","checked":false,"trial":false,"building":true,"adopted":true,"created_ms":1791000000000}]}

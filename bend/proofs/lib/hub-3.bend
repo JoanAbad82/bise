@@ -650,14 +650,6 @@ def hub_x_seen(+xs: List<&2, HXH.XIn>, +i: HXH.XIn) -> {HXB.seen.of(HXH.xin_of(L
     case Con{h, t}:
       hub_x_seen.go(Bool.and(String.eq(HXH.XIn.hub(h), HXH.XIn.hub(i)), Nat.is_eq(HXH.XIn.xid(h), HXH.XIn.xid(i))), h, t, i, {==}, hub_x_seen(t, i))
 
-# the latest unclear due with `d` folded in is no earlier than `d`
-def hub_unclear_max_ge(+d: Nat, m: Maybe<&2, Nat>) -> {Nat.is_ge(Maybe.default(&2, Nat, HXB.unclear_due.max(d, m), 0n), d) == True{} : Bool}:
-  match m:
-    case None{}:
-      Nat.ge_refl(d)
-    case Some{e}:
-      Nat.max_ge_l(d, e)
-
 def hub_act_gone.go(c: Bool, +h: HTM.Act, +t: List<&2, HTM.Act>, +id: Nat, +e: {Nat.is_eq(HTM.Act.id(h), id) == c : Bool},
     ih: {HTM.act_find(HTM.act_drop(t, id), id) == None{} : Maybe<&2, HTM.Act>})
     -> {HTM.act_find(HTM.act_drop(h <> t, id), id) == None{} : Maybe<&2, HTM.Act>}:

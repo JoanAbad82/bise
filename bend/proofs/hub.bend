@@ -459,18 +459,8 @@ def Laws.route_unclear_goes_plain(o, cx, r, e):
   %Equal.sym(Bool, HXB.is_unclear(r), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.route_plain(o, cx, r), u => HC.route_fire(o, Some{r}, cx)) == HC.route_plain(o, cx, r) : HX.Cx<o>}
   {==}
 
-def Laws.route_unclear_waits_pick_ms(x, tm, text, via, now, context, parts):
+def Laws.route_fire_says_where(o, cx, r, id, xid):
   {==}
-
-def Laws.route_pick_only_unclear(o, cx, to, name, why):
-  {==}
-
-def Laws.route_plain_waits_behind_unclear(o, cx, d, to, text, queued, parts):
-  {==}
-
-def Laws.route_behind_is_latest(r, t, e):
-  %Equal.sym(Bool, HXB.is_unclear(r), True{}, e) : {Nat.is_ge(Maybe.default(&2, Nat, HXB.unclear_due.add(_, HXH.Route.due(r), HXB.unclear_due(t)), 0n), HXH.Route.due(r)) == True{} : Bool}
-  PL3.hub_unclear_max_ge(HXH.Route.due(r), HXB.unclear_due(t))
 
 def Laws.route_to_keeps_parts(r, to, name):
   match r:

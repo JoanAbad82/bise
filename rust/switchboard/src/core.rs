@@ -658,8 +658,9 @@ pub enum Input {
         text: String,
     },
     /// desktop S2 step 2, bise's home hub: his words to bise's main that
-    /// route.rs sends to project `to` (a hub id, `name` its name, `why`
-    /// the guess's reason, `via` his view): held 2 s, then forwarded.
+    /// he addressed to project `to` (`@<project> …`, route.rs; a hub id,
+    /// `name` its name, `why` the reason, `via` his view): held 2 s, then
+    /// forwarded.
     RouteHold {
         text: String,
         via: String,
@@ -687,16 +688,6 @@ pub enum Input {
     RouteCancel {
         client: Option<ClientId>,
         rid: u64,
-    },
-    /// S2 step 5: BISE_ROUTE_MODEL picked project `to` (checked in the
-    /// registry by the shell, `name` its name) for the unclear route
-    /// `rid`; sb-core holds it 2 s for `to` if it still waits, else
-    /// nothing.
-    RoutePick {
-        rid: u64,
-        to: String,
-        name: String,
-        why: String,
     },
     /// S10: follow a task (the typed `follow`; `client` gets the refusal).
     Follow {
@@ -923,20 +914,14 @@ pub enum Effect {
         due_ms: u64,
         why: String,
     },
-    /// S2 step 5: his unclear words, held as route `rid` with no target
-    /// (1.5 s), wait for BISE_ROUTE_MODEL's pick (`route_ask`): the shell
-    /// asks it and steps `Input::RoutePick`, or nothing (then they go
-    /// plain to bise's main).
-    RouteAsk {
-        rid: u64,
-        text: String,
-    },
-    /// Its end: `state` "sent" (`xid` its delivery) or "cancelled".
+    /// Its end: `state` "sent" (`xid` its delivery, `msg` his message
+    /// it became in bise's main) or "cancelled".
     RouteDone {
         rid: u64,
         state: String,
         to: String,
         xid: Option<u64>,
+        msg: Option<u64>,
     },
     /// A feature merged into the trunk (T1 run 5 step 9): today's merged
     /// list goes again to the typed connections, as after a land (a
@@ -2216,7 +2201,6 @@ impl Hub {
                 self.core(&mut fx, env, client, In::RouteCorrect(ci::RouteCorrect { rid, to, name }))
             }
             Input::RouteCancel { client, rid } => self.core(&mut fx, env, client, In::RouteCancel(ci::RouteCancel { rid })),
-            Input::RoutePick { rid, to, name, why } => self.core(&mut fx, env, None, In::RoutePick(ci::RoutePick { rid, to, name, why })),
             Input::Follow { client, agent, on } => self.core(&mut fx, env, client, In::Follow(ci::Follow { agent, on })),
         }
         self.refresh_contexts(&mut fx, env.now());

@@ -41,10 +41,10 @@ core_kinds! {
         XReply = "xreply" => FXReply { hub: Str, xid: Nat, text: Str },
         /// his words held for a project (S2 step 2)
         Route = "route" => FRoute { rid: Nat, to: Str, name: Str, text: Str, due_ms: Nat, why: Str },
-        /// a held route ended (`xid`: the out it became, none when cancelled)
-        RouteDone = "route_done" => FRouteDone { rid: Nat, state: Str, to: Str, xid: OptNat },
-        /// his unclear words: ask the model for a project
-        RouteAsk = "route_ask" => FRouteAsk { rid: Nat, text: Str },
+        /// a held route ended (`xid`: the out it became, none when
+        /// cancelled; `msg`: his message it became in bise's main, the
+        /// window's pending row settles by it)
+        RouteDone = "route_done" => FRouteDone { rid: Nat, state: Str, to: Str, xid: OptNat, msg: OptNatOmit },
         /// a task ended (`hub`: the following hub to tell, "" none)
         JobEnd = "job_end" => FJobEnd { agent: Str, state: Str, label: Str, summary: Str, key: Nat, hub: Str },
         /// bise's home hub: a task it follows in `project` ended

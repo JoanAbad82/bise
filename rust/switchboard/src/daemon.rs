@@ -245,12 +245,6 @@ enum Msg {
         /// its pid and program, for hub.log (accept.rs `Doors::who`)
         peer: String,
     },
-    /// S2 step 5: BISE_ROUTE_MODEL's answer for the unclear route `rid`
-    /// (a project name, or None), from its thread (`daemon/routing.rs`).
-    RoutePick {
-        rid: u64,
-        pick: Option<String>,
-    },
     /// `keep`: leave the REPLs running for the next hub to adopt.
     Shutdown {
         keep: bool,
@@ -418,8 +412,6 @@ struct Shell {
     projects: projects::Projects,
     /// when the state goes to the clients (daemon/state_gate.rs)
     state_gate: state_gate::StateGate,
-    /// bise's home hub: the projects its routing guesses from (daemon/routing.rs)
-    routing: routing::Routing,
     /// S9: the fn context of the input being stepped: (agent, its JSON).
     /// Its 'you' line goes to the transcript without the rendered block,
     /// with an `sb context : <json>` line after it in the same append
@@ -1197,10 +1189,9 @@ impl Shell {
             Effect::JobEnd { agent, state, label, summary, key } => self.job_end(agent, &state, label, summary, key),
             Effect::FollowedEnd { project, agent, key, state, label, summary } => self.followed_end(project, agent, key, &state, label, summary),
             Effect::MergedChanged => self.merged_all(),
-            Effect::RouteAsk { rid, text } => self.route_ask(rid, text),
-            Effect::RouteDone { rid, state, to, xid } => {
+            Effect::RouteDone { rid, state, to, xid, msg } => {
                 let project = self.project();
-                self.proto_route(bise_proto::hub::HubEv::RouteDone { project, rid, state, to, xid })
+                self.proto_route(bise_proto::hub::HubEv::RouteDone { project, rid, state, to, xid, msg })
             }
         }
     }
@@ -2035,7 +2026,6 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         rpc: rpc::Rpcs::default(),
         projects: projects::Projects::boot(&paths),
         state_gate: state_gate::StateGate::default(),
-        routing: routing::Routing::default(),
         search: search::Index::default(),
         xsearch: search::Index::default(),
         offsets: BTreeMap::new(),

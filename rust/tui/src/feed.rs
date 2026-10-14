@@ -592,13 +592,9 @@ pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>
             return false;
         }
     }
-    // his message's id (`sb you-id`, written by sb-core right after his
-    // 'you' line; the context line between them shows nothing): on the
-    // newest event if it is his message without one, else nothing
-    if let Ev::YouId(id) = ev {
-        if let Some(Ev::You(_, _, _, slot @ None)) = events.last_mut() {
-            *slot = Some(id);
-        }
+    // his message's id, or where bise sent it: on his row (said.rs), no row
+    if matches!(ev, Ev::YouId(_) | Ev::YouWent { .. }) {
+        crate::said::on_you(events, cache, ev);
         return false;
     }
     // annotations enrich the matching tool event instead of stacking

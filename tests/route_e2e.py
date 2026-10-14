@@ -3,15 +3,17 @@
 ~/bise): home + 3 registered projects (shop, atlas, ledger), their hubs
 stopped.
 
-- his words to bise's main naming a project ("... on shop ...") are
-  routed by the shell (daemon/routing.rs: route::guess + route::target):
-  sb-core holds them (route_held, to shop's hub id, why 'you named shop'),
-  sends them at 2 s (route_sent), the home hub starts shop's hub and
-  delivers them once as his words via bise; the other projects' hubs are
-  never started; shop's main's answer comes back to bise's main from
-  @shop;
-- words naming no project stay home: plain user input to bise's main, no
-  route.
+- route-name (his m_75, architect m_24939): words that only NAME a project
+  ("je les voie pas dans shop non plus") stay with bise's main: no route;
+- his words addressed to a project ("@shop ...") are routed by the shell
+  (daemon/routing.rs: route::addressed): sb-core holds them (route_held,
+  to shop's hub id, why 'you wrote @shop'), sends them at 2 s
+  (route_sent), the home hub starts shop's hub and delivers them once as
+  his words via bise (shop's main thread: his `you` line with via bise,
+  once); bise's main thread has his line and where it went (`routed`, by
+  his message's id) and the window's route/done carries that id (its
+  pending row settles); the other projects' hubs are never started;
+  shop's main's answer comes back to bise's main from @shop.
 
 Run: python3 -u tests/route_e2e.py
 """
@@ -72,8 +74,6 @@ def main():
     E.env.pop("SB_STATE_DIR")
     E.env["BISE_HOME"] = os.path.join(home, "b")
     E.env["BISE_HOME_WORKSPACE"] = home_ws
-    # S2 step 5: unclear words ask the route model (the fake provider)
-    E.env["BISE_ROUTE_MODEL"] = "mistral/mistral-small-latest"
     hubs_dir = os.path.join(E.env["BISE_HOME"], "hubs")
     hubs = []
     ok = True
@@ -99,20 +99,60 @@ def main():
         c = e2e.Client(hsock)
         c.wait_status("main", "idle", 60)
 
-        # his words about shop: held, then sent to shop's main
-        c.say("the checkout on shop is broken again")
+        # his m_75, verbatim but for the name: words ABOUT a project stay
+        # with bise's main, whatever they name
+        d = e2e.Client(hsock, name="window")
+        answered(req(d, "thread/subscribe", agent="main"), "the window follows bise's main")
+        for words in ["je les voie pas dans shop non plus", "the checkout on shop is broken again", "tell @shop it's fine"]:
+            c.wait_idle("main")
+            c.say(words)
+            wait.until(lambda: [m for m in of_type(hstate, "message_sent")
+                                if m["msg"]["from"] == "user" and words in m["msg"]["text"]], 20, "his message home: %s" % words)
+        check(not of_type(hstate, "route_held"), "no route for words that name a project: %r" % of_type(hstate, "route_held"))
+
+        # his words addressed to shop: held, then sent to shop's main
+        c.wait_idle("main")
+        cid_said = "@shop the checkout is broken again"
+        answered(req(d, "turn/send", agent="main", text=cid_said, mode="now"), "his addressed words sent")
         wait.until(lambda: of_type(hstate, "route_held"), 10, "the route held")
         held = of_type(hstate, "route_held")
         route = held[0]["route"]
         check(len(held) == 1 and route["to"] == by_name["shop"]["id"] and route["name"] == "shop", "held for shop: %r" % held)
-        check("you named shop" in route.get("why", ""), "why: %r" % route)
+        check("you wrote @shop" in route.get("why", ""), "why: %r" % route)
         wait.until(lambda: of_type(hstate, "route_sent"), 15, "the route sent at 2 s")
         wait.until(lambda: of_type(hstate, "x_acked"), 60, "the delivery's ack")
         pin = of_type(pstate["shop"], "x_in")
         check(len(pin) == 1 and pin[0]["in"]["hub"] == home_row["id"], "shop received it once: %r" % pin)
         said = [m["msg"] for m in of_type(pstate["shop"], "message_sent") if m["msg"]["id"] == pin[0]["in"]["msg"]][0]
-        check(said["from"] == "user" and said.get("via") == "bise" and "the checkout on shop is broken again" in said["text"],
+        check(said["from"] == "user" and said.get("via") == "bise" and cid_said in said["text"],
               "as his words via bise: %r" % said)
+        # shop's main thread: his words once, via bise (what the window and the TUI fold)
+        # (its main's folder: whichever agents/<dir> holds its thread)
+        def shop_you():
+            logs = [os.path.join(pstate["shop"], "agents", a, "transcript.log") for a in os.listdir(os.path.join(pstate["shop"], "agents"))]
+            return [l for f in logs if os.path.exists(f) for l in open(f).read().splitlines()
+                    if l.split("\t", 1)[-1].startswith("sb you :: ") and cid_said in l]
+        try:
+            wait.until(shop_you, 60, "shop's main delivered it")
+        except Exception:
+            pass
+        mine = shop_you()
+        logs = {a: open(os.path.join(pstate["shop"], "agents", a, "transcript.log")).read()[-1500:]
+                for a in os.listdir(os.path.join(pstate["shop"], "agents")) if os.path.exists(os.path.join(pstate["shop"], "agents", a, "transcript.log"))}
+        check(len(mine) == 1 and '"via":"bise"' in mine[0], "shop's thread shows his words once via bise: %r in %r" % (mine, logs))
+        # bise's main thread: his line, its id, and where it went by that id
+        his = [m["msg"]["id"] for m in of_type(hstate, "message_sent") if m["msg"]["from"] == "user" and cid_said in m["msg"]["text"]]
+        check(len(his) == 1, "one message of his at home: %r" % his)
+        home_main = open(os.path.join(hstate, "agents", "main", "transcript.log")).read()
+        routed = [json.loads(l.split("sb routed :: ", 1)[1]) for l in home_main.splitlines() if "\tsb routed :: " in l]
+        check(('sb you-id :: {"id":%d}' % his[0]) in home_main
+              and routed == [{"to": by_name["shop"]["id"], "name": "shop", "xid": 1, "msg": his[0]}],
+              "bise's main thread says where it went: %r" % home_main[-1500:])
+        went = [e for e in d.notes("thread/entry") if e.get("agent") == "main" and e["entry"].get("msg_id") == his[0]]
+        check(went and went[-1]["entry"].get("went") == {"to": by_name["shop"]["id"], "name": "shop"} and "delivery" not in went[-1]["entry"],
+              "the window's entry: sent to shop, no mark: %r" % went)
+        done = [e for e in d.notes("route/done") if e.get("rid") == route["rid"]]
+        check(done and done[-1].get("msg") == his[0], "route/done carries his message's id (his pending row settles): %r" % done)
         for p in ("atlas", "ledger"):
             check(not of_type(pstate[p], "x_in") and not os.path.exists(os.path.join(pstate[p], "hub.sock")),
                   "%s's hub never started" % p)
@@ -120,26 +160,10 @@ def main():
         ans = [m["msg"] for m in of_type(hstate, "message_sent") if m["msg"]["from"] == "@shop"]
         check(len(ans) == 1 and ans[0]["to"] == "main", "shop's answer to bise's main: %r" % ans)
 
-        # words naming no project: bise's main, as today
+        # an address to atlas goes there, to no other project
         c.wait_idle("main")
-        c.say("what is on my list today?")
-        wait.until(lambda: [m for m in of_type(hstate, "message_sent")
-                            if m["msg"]["from"] == "user" and "on my list today" in m["msg"]["text"]], 20, "his message home")
-        targeted = [e for e in of_type(hstate, "route_held") if e["route"]["to"]]
-        check(len(targeted) == 1, "no route for it: %r" % of_type(hstate, "route_held"))
-        # S2 step 5: unclear words waited 1.5 s for BISE_ROUTE_MODEL (the
-        # fake answered none), then went plain to bise's main
-        unclear = [e for e in of_type(hstate, "route_held") if not e["route"]["to"]]
-        check(len(unclear) == 1 and "on my list today" in unclear[0]["route"]["text"], "held unclear first: %r" % unclear)
-
-        # S2 step 5: unclear words the route model places (the fake picks
-        # the 2nd project listed): held 2 s for it, then sent there
-        c.wait_idle("main")
-        c.say("the build is red again [[route: 2]]")
-        wait.until(lambda: [e for e in of_type(hstate, "route_held") if e["route"]["to"] == by_name["atlas"]["id"]], 15, "the model's pick held")
-        picked = [e["route"] for e in of_type(hstate, "route_held") if e["route"]["to"] == by_name["atlas"]["id"]][0]
-        check(picked["name"] == "atlas" and "bise's model picked atlas" in picked["why"], "picked atlas: %r" % picked)
-        wait.until(lambda: len(of_type(hstate, "route_sent")) >= 2, 15, "sent to atlas at 2 s")
+        c.say("@atlas the build is red again")
+        wait.until(lambda: [e for e in of_type(hstate, "x_out") if "build is red" in e["out"]["text"]], 15, "sent to atlas at 2 s")
         outs = [e["out"] for e in of_type(hstate, "x_out") if "build is red" in e["out"]["text"]]
         check(len(outs) == 1 and outs[0]["project"] == by_name["atlas"]["id"], "forwarded once, to atlas: %r" % outs)
 
@@ -154,7 +178,7 @@ def main():
         notes = os.path.join(E.tmp, "q3-notes.md")
         with open(notes, "w") as f:
             f.write("q3")
-        c.say("look at the cart on shop", files=[png, notes, png])
+        c.say("@shop look at the cart", files=[png, notes, png])
         wait.until(lambda: [e for e in of_type(hstate, "x_out") if "look at the cart" in e["out"]["text"]], 15, "the files' route sent")
         sent = [e["out"]["text"] for e in of_type(hstate, "x_out") if "look at the cart" in e["out"]["text"]][0]
         nl = chr(10)
@@ -173,12 +197,11 @@ def main():
         # to shop: the route holds his parts, the out carries them, shop's
         # message keeps them with its b64 in the store, and shop main's
         # model gets the image as an image part, not '[image unavailable]'
-        d = e2e.Client(hsock, name="window")
         c.wait_idle("main")
         shelf = os.path.join(E.tmp, "shelf.png")
         with open(shelf, "wb") as f:
             f.write(tiny_png())
-        iparts = [{"kind": "text", "text": "look at the shelf on shop "}, {"kind": "image", "name": "[Image #1]", "source": shelf}]
+        iparts = [{"kind": "text", "text": "@shop look at the shelf "}, {"kind": "image", "name": "[Image #1]", "source": shelf}]
         n_req = len(E.fake_requests())
         answered(req(d, "turn/send", agent="main", text="", parts=iparts, mode="now"), "his parts sent")
         wait.until(lambda: [e for e in of_type(hstate, "x_out") if "look at the shelf" in e["out"]["text"]], 15, "the parts' route sent")
@@ -208,7 +231,7 @@ def main():
         # a cancel keeps his parts: his words reach bise's main with them
         c.wait_idle("main")
         answered(req(d, "turn/send", agent="main", text="", mode="now",
-               parts=[{"kind": "text", "text": "the shelf again on shop "}, {"kind": "image", "name": "[Image #1]", "source": shelf}]), "his parts sent again")
+               parts=[{"kind": "text", "text": "@shop the shelf again "}, {"kind": "image", "name": "[Image #1]", "source": shelf}]), "his parts sent again")
         held = lambda: [e for e in d.notes("route/held") if "the shelf again" in e.get("text", "")]
         wait.until(held, 10, "the second route held")
         answered(req(d, "route/cancel", rid=held()[0]["rid"]), "route/cancel")

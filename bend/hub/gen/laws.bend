@@ -291,12 +291,6 @@ law in_route_cancel_bare:
 def in_route_cancel_bare():
   {==}
 
-law in_route_pick_bare:
-  {IN.of(J.obj([J.kv("t", J.JStr{"route_pick"})])) == IN.IRoutePick{0n, "", "", ""} : IN.In}
-
-def in_route_pick_bare():
-  {==}
-
 law in_follow_bare:
   {IN.of(J.obj([J.kv("t", J.JStr{"follow"})])) == IN.IFollow{"", False{}} : IN.In}
 
@@ -890,16 +884,6 @@ law in_IRouteCancel_round:
 def in_IRouteCancel_round(rid):
   {==}
 
-law in_IRoutePick_round:
-  for rid: Nat
-  for to: String
-  for name: String
-  for why: String
-  {IN.of(IN.json(IN.IRoutePick{rid, to, name, why})) == IN.IRoutePick{rid, to, name, why} : IN.In}
-
-def in_IRoutePick_round(rid, to, name, why):
-  {==}
-
 law in_IFollow_round:
   for agent: String
   for on: Bool
@@ -1121,15 +1105,9 @@ def fx_route_bare():
   {==}
 
 law fx_route_done_bare:
-  {FX.of(J.obj([J.kv("fx", J.JStr{"route_done"})])) == FX.FRouteDone{0n, "", "", None{}} : FX.Fx}
+  {FX.of(J.obj([J.kv("fx", J.JStr{"route_done"})])) == FX.FRouteDone{0n, "", "", None{}, None{}} : FX.Fx}
 
 def fx_route_done_bare():
-  {==}
-
-law fx_route_ask_bare:
-  {FX.of(J.obj([J.kv("fx", J.JStr{"route_ask"})])) == FX.FRouteAsk{0n, ""} : FX.Fx}
-
-def fx_route_ask_bare():
   {==}
 
 law fx_job_end_bare:
@@ -1330,22 +1308,19 @@ law fx_FRouteDone_round:
   for state: String
   for to: String
   for xid: Maybe<&2, Nat>
-  {FX.of(FX.json(FX.FRouteDone{rid, state, to, xid})) == FX.FRouteDone{rid, state, to, xid} : FX.Fx}
+  for msg: Maybe<&2, Nat>
+  {FX.of(FX.json(FX.FRouteDone{rid, state, to, xid, msg})) == FX.FRouteDone{rid, state, to, xid, msg} : FX.Fx}
 
-def fx_FRouteDone_round(rid, state, to, xid):
-  match xid:
-    case None{}:
+def fx_FRouteDone_round(rid, state, to, xid, msg):
+  match xid msg:
+    case None{} None{}:
       {==}
-    case Some{x_xid}:
+    case None{} Some{x_msg}:
       {==}
-
-law fx_FRouteAsk_round:
-  for rid: Nat
-  for text: String
-  {FX.of(FX.json(FX.FRouteAsk{rid, text})) == FX.FRouteAsk{rid, text} : FX.Fx}
-
-def fx_FRouteAsk_round(rid, text):
-  {==}
+    case Some{x_xid} None{}:
+      {==}
+    case Some{x_xid} Some{x_msg}:
+      {==}
 
 law fx_FJobEnd_round:
   for agent: String

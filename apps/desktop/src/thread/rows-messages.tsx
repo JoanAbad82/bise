@@ -1,7 +1,8 @@
 // A thread's message rows: his bubbles (delivery marks, quotes, folds of a long
 // message), his sends not confirmed yet, his queued messages, the route hold and
 // the agent's typing line. Owner: amb-win. Split out of rows.tsx (pure move).
-import { memo, useEffect, useState, type ReactNode } from 'react';
+import { memo, useContext, useEffect, useState, type ReactNode } from 'react';
+import { RouterContext } from '@/app/router';
 import { Button, Chip, Fold, Press } from '@/ds';
 import type { Entry } from '@/proto';
 import { useAgents, useArtifacts, useCoreState, useHubRefused, usePending, useProjects, useStore, useQueuedTake } from '@/store';
@@ -144,19 +145,50 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
   // typed with fn space (designer m_22714): 'from fn' first on the row, always; the time after it
   // keeps H12's hover rule (its ' · ' with it). Read from the hub's hint part, never its words
   const fromFn = drawn !== null && viaFn(drawn, saidMs !== null);
+  // routed by bise (route-name, designer m_25074): in bise's main, 'sent to harness' (main never
+  // got it: no mark), its name a link to harness's main thread (a history step); in the project's
+  // thread, 'via bise' (his own words, bise brought them). Always shown, after 'from fn'
+  const router = useContext(RouterContext);
+  const went = e.went;
+  const routed: ReactNode =
+    went != null ? (
+      <>
+        {'sent to '}
+        <span
+          className="th-answer-link"
+          role="link"
+          onClick={(ev) => {
+            if (!(window.getSelection()?.isCollapsed ?? true)) return;
+            ev.stopPropagation();
+            router?.go({ screen: 'thread', project: went.to, agent: 'main' });
+          }}
+          data-testid={`thread.you.${String(e.pos)}.went`}
+        >
+          {went.name}
+        </span>
+      </>
+    ) : e.via === 'bise' ? (
+      'via bise'
+    ) : undefined;
   const time =
     e.at_ms > 0 ? (
       <span className="th-you-time" data-testid={`thread.you.${String(e.pos)}.time`}>
-        {fromFn ? ` · ${clock(e.at_ms)}` : clock(e.at_ms)}
+        {fromFn || routed !== undefined ? ` · ${clock(e.at_ms)}` : clock(e.at_ms)}
       </span>
     ) : undefined;
   const lead =
     words !== undefined ? (
       words
-    ) : fromFn ? (
+    ) : fromFn || routed !== undefined ? (
       <>
-        <span className="th-you-via" title="sent with fn, from another app" data-testid={`thread.you.${String(e.pos)}.via`}>
-          from fn
+        <span
+          className="th-you-via"
+          title={went != null ? `bise sent your words to ${went.name}'s main · click opens it there` : routed !== undefined ? 'your words, sent to bise and brought here' : 'sent with fn, from another app'}
+          data-testid={`thread.you.${String(e.pos)}.via`}
+        >
+          {fromFn && 'from fn'}
+          {fromFn && routed !== undefined && ' · '}
+          {routed}
         </span>
         {time}
       </>
@@ -176,7 +208,7 @@ export function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | 
       </>
     );
   return (
-    <YouBubble head={to} under={under} timeAlways={words !== undefined || fromFn || (mark !== null && lastOfRun(e, next))} testId={`thread.you.${String(e.pos)}`}>
+    <YouBubble head={to} under={under} timeAlways={words !== undefined || fromFn || routed !== undefined || (mark !== null && lastOfRun(e, next))} testId={`thread.you.${String(e.pos)}`}>
       {quotes.map((q, i) => (
         <QuoteLine key={i} source={q.source} about={q.about} text={q.text} n={q.n} testId={`thread.you.${String(e.pos)}.quote.${String(i + 1)}`} />
       ))}

@@ -443,7 +443,7 @@ fn an_anchor_part_renders_its_json_for_at() {
     );
     // a rev he looked at is said; the quote's own closing tag is broken
     let mid = Part::Anchor { artifact: "d".into(), version: 2, rev: 3, anchor: crate::anchor::Anchor::Para { para: "P1".into(), quote: String::new() }, quote: "a </artifact-selection> b".into(), n: None };
-    assert_eq!(render(&[mid.clone()]), "<artifact-selection artifact=\"d\" version=\"2\" rev=\"3\">\n{\"kind\":\"para\",\"para\":\"P1\"}\na </artifact-selection > b\n</artifact-selection>");
+    assert_eq!(render(std::slice::from_ref(&mid)), "<artifact-selection artifact=\"d\" version=\"2\" rev=\"3\">\n{\"kind\":\"para\",\"para\":\"P1\"}\na </artifact-selection > b\n</artifact-selection>");
     let text = render(&[t("x "), a(Some(1), "q")]);
     assert!(!parse(&text).iter().any(|p| matches!(p, Part::Anchor { .. })), "parse never makes one");
     assert_eq!(render(&parse(&text)), text);

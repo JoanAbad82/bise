@@ -125,6 +125,10 @@ pub(crate) enum Ev {
     // in memory only: the id of your message right before it (`sb you-id
     // : m_N`); push_event sets it on that message, never appended
     YouId(u64),
+    // in memory only: your message `msg` went to the project `name`
+    // (bise's home hub, `sb routed`); push_event tags that message,
+    // never appended
+    YouWent { msg: u64, name: String },
     // the answer he read as it streamed in, kept when its turn failed
     // before it came (`sb kept`, escaped like a reply): the reply's rows,
     // dim (livetext::kept_rows, designer m_13334)

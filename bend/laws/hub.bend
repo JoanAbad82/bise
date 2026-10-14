@@ -12,6 +12,7 @@ import ../hub/timers.bend as HTM
 import ../hub/wakes.bend as HWK
 import ../hub/xhub-model.bend as HXH
 import ../hub/xhub.bend as HXB
+import ../hub/gen/feed.bend as HFD
 import ../hub/pause.bend as HP
 import ../hub/feature.bend as HFT
 import ../hub/reach.bend as HR
@@ -628,12 +629,11 @@ law route_fire_makes_no_turn:
   for +r: HXH.Route
   {HC.route_fire(o, Some{r}, cx) == HC.route_fire.sent(o, HC.route_said(o, cx, r), r, HM.St.next_msg(HC.st(o, cx))) : HX.Cx<o>}
 
-# ---- unclear routes (desktop S2 step 5, architect m_9321: his words the
-# guess can't place wait PICK_MS for BISE_ROUTE_MODEL's pick in sb-core's
-# hold, never in the shell) ----
+# ---- a held route with no target (an older hub's route model left it
+# in its journal; S2 step 5 is gone, only his `@<project>` routes now) ----
 
-# LAW: an unclear route (held, no target) whose act fires goes plain to
-# bise's main (the cancel path), never to a project's outbox.
+# LAW: such a route whose act fires goes plain to bise's main (the cancel
+# path), never to a project's outbox: his words are never lost.
 law route_unclear_goes_plain:
   for -o: HM.St
   for +cx: HX.Cx<o>
@@ -641,48 +641,17 @@ law route_unclear_goes_plain:
   for e: {HXB.is_unclear(r) == True{} : Bool}
   {HC.route_go(o, Some{r}, cx) == HC.route_plain(o, cx, r) : HX.Cx<o>}
 
-# LAW: an unclear route's act is due PICK_MS (1.5 s) after the hold: the
-# model's time, after which his words stay with bise.
-law route_unclear_waits_pick_ms:
-  for +x: HXH.Xs
-  for +tm: HTM.Tms
-  for +text: String
-  for +via: String
-  for +now: Nat
-  for +context: String
-  for +parts: String
-  {HTM.Act.due(HXB.route_act(HXB.new_route_at(x, tm, text, via, "", "", "", Nat.add(now, HXB.PICK_MS()), context, parts))) == Nat.add(now, 1500n) : Nat}
-
-# LAW: a pick acts only on a route still held: one that went (its due
-# passed, plain to main) or got a target changes nothing.
-law route_pick_only_unclear:
+# LAW (route-name, architect m_24939): a fire says where his words went in
+# bise's main thread, by his message's id: his line, its id and parts,
+# then the `routed` record naming the project, the out and that id (the
+# window and the TUI fold it on his entry by the id, never by position).
+law route_fire_says_where:
   for -o: HM.St
   for +cx: HX.Cx<o>
-  for +to: String
-  for +name: String
-  for +why: String
-  {HC.route_pick.go(o, None{}, cx, to, name, why) == cx : HX.Cx<o>}
-
-# LAW: a plain input to bise's main while an unclear route of his waits is
-# held behind it (no send now), due at the latest unclear due ...
-law route_plain_waits_behind_unclear:
-  for -o: HM.St
-  for +cx: HX.Cx<o>
-  for +d: Nat
-  for +to: String
-  for +text: String
-  for +queued: Bool
-  for +parts: String
-  {HC.user_input.behind(o, Some{d}, cx, to, text, queued, parts) == HC.route_behind(o, cx, text, d, parts) : HX.Cx<o>}
-
-# LAW: ... which is no earlier than any unclear route's due, so the
-# unclear one fires first (acts_due keeps the acts' order) and both reach
-# main in order.
-law route_behind_is_latest:
   for +r: HXH.Route
-  for +t: List<&2, HXH.Route>
-  for e: {HXB.is_unclear(r) == True{} : Bool}
-  {Nat.is_ge(Maybe.default(&2, Nat, HXB.unclear_due(r <> t), 0n), HXH.Route.due(r)) == True{} : Bool}
+  for +id: Nat
+  for +xid: Nat
+  {HC.route_fire.lines(o, cx, r, id, xid) == HC.feed(o, HC.you_parts(o, HC.feed(o, HC.feed(o, cx, HM.MAIN(), HFD.you(HXH.Route.text(r), HXB.via_of(HXH.Route.via(r)))), HM.MAIN(), HFD.you_id(id)), HM.MAIN(), HXH.Route.parts(r)), HM.MAIN(), HFD.routed(HXH.Route.to(r), HXH.Route.name(r), xid, id)) : HX.Cx<o>}
 
 # ---- his parts go with his routed words (R41 (6), architect m_18164) ----
 

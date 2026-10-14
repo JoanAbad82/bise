@@ -7,8 +7,8 @@ import ../../vendor/json.bend as J
 
 import ./kit.bend as K
 
-def you(+text: String) -> J.Json:
-  J.obj([J.kv("sb", J.JStr{"you"}), J.kv("text", J.JStr{text})])
+def you(+text: String, +via: Maybe<&2, String>) -> J.Json:
+  J.obj(K.cat([[J.kv("sb", J.JStr{"you"})], [J.kv("text", J.JStr{text})], K.omit_ms("via", via)]))
 
 def you_id(+id: Nat) -> J.Json:
   J.obj([J.kv("sb", J.JStr{"you-id"}), J.kv("id", J.JNum{id})])
@@ -18,6 +18,9 @@ def you_parts(+parts: J.Json) -> J.Json:
 
 def route_parts(+parts: J.Json) -> J.Json:
   J.obj([J.kv("sb", J.JStr{"route-parts"}), J.kv("parts", parts)])
+
+def routed(+to: String, +name: String, +xid: Nat, +msg: Nat) -> J.Json:
+  J.obj([J.kv("sb", J.JStr{"routed"}), J.kv("to", J.JStr{to}), J.kv("name", J.JStr{name}), J.kv("xid", J.JNum{xid}), J.kv("msg", J.JNum{msg})])
 
 def steered(+ids: List<&2, Nat>) -> J.Json:
   J.obj([J.kv("sb", J.JStr{"steered"}), J.kv("ids", J.JArr{K.jnats(ids)})])

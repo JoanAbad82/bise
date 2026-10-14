@@ -800,7 +800,7 @@ fn step(app: &mut App, d: isize, wrap: bool) {
 /// (`✓ you answered perf: both`); the view moves on.
 /// `picked`: the short label of the option picked (on the line).
 fn answer(app: &mut App, id: u64, reply: &str, picked: Option<&str>) {
-    answer_with(app, id, &crate::said::Said { text: reply.to_string(), parts: Vec::new() }, picked);
+    answer_with(app, id, &crate::said::Said { text: reply.to_string(), ..Default::default() }, picked);
 }
 
 /// [`answer`] with his typed words (msg-parts): the parts go to the hub

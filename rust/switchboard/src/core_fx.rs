@@ -82,8 +82,7 @@ pub(super) fn plain(f: CoreFx) -> Plain {
         CoreFx::XDeliver(x) => Effect::XDeliver { xid: x.xid, project: x.project, kind: x.kind, text: x.text, context: x.context, parts: x.parts },
         CoreFx::XReply(x) => Effect::XReply { hub: x.hub, xid: x.xid, text: x.text },
         CoreFx::Route(r) => Effect::Route { rid: r.rid, to: r.to, name: r.name, text: r.text, due_ms: r.due_ms, why: r.why },
-        CoreFx::RouteAsk(r) => Effect::RouteAsk { rid: r.rid, text: r.text },
-        CoreFx::RouteDone(r) => Effect::RouteDone { rid: r.rid, state: r.state, to: r.to, xid: r.xid },
+        CoreFx::RouteDone(r) => Effect::RouteDone { rid: r.rid, state: r.state, to: r.to, xid: r.xid, msg: r.msg },
         CoreFx::JobEnd(j) => Effect::JobEnd { agent: j.agent, state: j.state, label: j.label, summary: j.summary, key: j.key },
         CoreFx::FollowedEnd(j) => Effect::FollowedEnd {
             project: j.project,
@@ -170,7 +169,7 @@ mod tests {
         );
         assert_eq!(
             eff(json!({"fx": "route_done", "rid": 1, "state": "cancelled", "to": "shop-1", "xid": null})),
-            Effect::RouteDone { rid: 1, state: "cancelled".into(), to: "shop-1".into(), xid: None }
+            Effect::RouteDone { rid: 1, state: "cancelled".into(), to: "shop-1".into(), xid: None, msg: None }
         );
         assert_eq!(
             eff(json!({"fx": "xdeliver", "xid": 1, "project": "p", "kind": "ask", "msg": 0, "text": "t", "context": ""})),

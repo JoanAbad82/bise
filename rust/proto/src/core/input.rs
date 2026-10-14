@@ -107,8 +107,6 @@ core_kinds! {
         RouteHold = "route_hold" => IRouteHold { text: Str, via: Str, to: Str, name: Str, why: Str, context: Str, parts: StrOmit },
         RouteCorrect = "route_correct" => IRouteCorrect { rid: Nat, to: Str, name: Str },
         RouteCancel = "route_cancel" => IRouteCancel { rid: Nat },
-        /// S2 step 5: the model's pick for his unclear words
-        RoutePick = "route_pick" => IRoutePick { rid: Nat, to: Str, name: Str, why: Str },
         /// S10: follow a task
         Follow = "follow" => IFollow { agent: Str, on: Bool },
         /// `sb wake`: `spec` is the watch's spec as the hub wrote it;

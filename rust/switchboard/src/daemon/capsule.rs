@@ -32,7 +32,7 @@ impl Shell {
                 _ => {
                     // his attached files are his parts already (proto_input)
                     let said = s("text");
-                    // bise's home hub: words about a project go there (daemon/routing.rs)
+                    // bise's home hub: words he addressed to a project (`@<project> …`) go there (daemon/routing.rs)
                     // his parts (msg-parts) go with his routed words (R41 (6))
                     if self.route_input(&s("focus"), &s("text"), &said, &s("via"), queued, v.get("context"), &s("parts")) {
                         return self.page_answers();

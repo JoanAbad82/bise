@@ -147,7 +147,7 @@ law you_line_carries_its_id:
   for +m: HM.Msg
   for e: {String.is_empty(HM.Msg.parts(m)) == True{} : Bool}
   {HC.deliver.line(o, False{}, True{}, cx, name, m)
-    == HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m))) : HX.Cx<o>}
+    == HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m), HM.Msg.via(m))), name, HFD.you_id(HM.Msg.id(m))) : HX.Cx<o>}
 
 # ---- his message's parts (msg-parts) ----
 # The clients send his message as typed parts (bise_proto::parts: his
@@ -165,7 +165,7 @@ law you_parts_follow_the_id:
   for +m: HM.Msg
   for e: {String.is_empty(HM.Msg.parts(m)) == False{} : Bool}
   {HC.deliver.line(o, False{}, True{}, cx, name, m)
-    == HC.feed(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m))), name, HFD.you_parts(HC.parts_json(HM.Msg.parts(m)))) : HX.Cx<o>}
+    == HC.feed(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m), HM.Msg.via(m))), name, HFD.you_id(HM.Msg.id(m))), name, HFD.you_parts(HC.parts_json(HM.Msg.parts(m)))) : HX.Cx<o>}
 
 # LAW: parts never change what he said: the same message with or without
 # parts writes the same lines (his text, its id), the parts only after
@@ -472,7 +472,7 @@ law said_you_id:
   for +name: String
   for +m: HM.Msg
   {HC.deliver.line(o, False{}, True{}, cx, name, m)
-    == HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m))), name, HFD.you_id(HM.Msg.id(m))), name, HM.Msg.parts(m)) : HX.Cx<o>}
+    == HC.you_parts(o, HC.feed(o, HC.feed(o, cx, name, HFD.you(HM.Msg.text(m), HM.Msg.via(m))), name, HFD.you_id(HM.Msg.id(m))), name, HM.Msg.parts(m)) : HX.Cx<o>}
 
 law said_id_is_the_msg_id:
   for +m: HM.Msg

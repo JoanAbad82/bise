@@ -1,9 +1,9 @@
-{"src": "you, every writer", "line": "sb you : make it fast", "feed": {"sb": "you", "text": "make it fast"}, "hub": "Hub(You(\"make it fast\"))"}
-{"src": "you, escaped newlines", "line": "sb you : ajoute le mode sombre\\n\\navec un toggle", "feed": {"sb": "you", "text": "ajoute le mode sombre\n\navec un toggle"}, "hub": "Hub(You(\"ajoute le mode sombre\\n\\navec un toggle\"))"}
-{"src": "you, his text is JSON", "line": "sb you : {\"text\": \"json he typed\"}", "feed": {"sb": "you", "text": "{\"text\": \"json he typed\"}"}, "hub": "Hub(You(\"{\\\"text\\\": \\\"json he typed\\\"}\"))"}
-{"src": "you, his text has a : and ::", "line": "sb you : a : b :: c", "feed": {"sb": "you", "text": "a : b :: c"}, "hub": "Hub(You(\"a : b :: c\"))"}
-{"src": "you, empty", "line": "sb you : ", "feed": {"sb": "you", "text": ""}, "hub": "Hub(You(\"\"))"}
-{"src": "you, no separator", "line": "sb you", "feed": {"sb": "you", "text": ""}, "hub": "Hub(You(\"\"))"}
+{"src": "you, every writer", "line": "sb you : make it fast", "feed": {"sb": "you", "text": "make it fast"}, "hub": "Hub(You(\"make it fast\", None))"}
+{"src": "you, escaped newlines", "line": "sb you : ajoute le mode sombre\\n\\navec un toggle", "feed": {"sb": "you", "text": "ajoute le mode sombre\n\navec un toggle"}, "hub": "Hub(You(\"ajoute le mode sombre\\n\\navec un toggle\", None))"}
+{"src": "you, his text is JSON", "line": "sb you : {\"text\": \"json he typed\"}", "feed": {"sb": "you", "text": "{\"text\": \"json he typed\"}"}, "hub": "Hub(You(\"{\\\"text\\\": \\\"json he typed\\\"}\", None))"}
+{"src": "you, his text has a : and ::", "line": "sb you : a : b :: c", "feed": {"sb": "you", "text": "a : b :: c"}, "hub": "Hub(You(\"a : b :: c\", None))"}
+{"src": "you, empty", "line": "sb you : ", "feed": {"sb": "you", "text": ""}, "hub": "Hub(You(\"\", None))"}
+{"src": "you, no separator", "line": "sb you", "feed": {"sb": "you", "text": ""}, "hub": "Hub(You(\"\", None))"}
 {"src": "you-id, core.bend", "line": "sb you-id : m_7", "feed": {"id": 7, "sb": "you-id"}, "hub": "Hub(YouId(7))"}
 {"src": "you-id, not an id", "line": "sb you-id : 7", "feed": null, "hub": "Hub(Other { kind: \"you-id\", text: \"7\" })"}
 {"src": "you-id, empty", "line": "sb you-id : ", "feed": null, "hub": "Hub(Other { kind: \"you-id\", text: \"\" })"}

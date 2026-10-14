@@ -412,6 +412,7 @@ impl Fold<'_> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn approval(&mut self, pos: u64, ms: u64, ok: bool, text: String, note: String, card: Option<u64>, to: Option<String>) {
         let mut e = Entry::new(pos, ms, EntryKind::Approval, text.clone());
         e.approval = Some(ApprovalFold { ok, text, note, card, to });
@@ -470,9 +471,10 @@ impl Fold<'_> {
             // his message: its parts read back from its text (an old
             // journal, an older client); a you-parts line after it, the
             // parts he sent, replaces them
-            Hub::You(text) => {
+            Hub::You(text, via) => {
                 let mut e = Entry::new(pos, ms, EntryKind::You, text);
                 e.parts = read_parts(&e.text);
+                e.via = via;
                 let i = self.push(e);
                 (self.cont, self.you) = (Some(i), Some(i));
             }
@@ -502,6 +504,15 @@ impl Fold<'_> {
             Hub::YouParts(raw) => {
                 if let (Some(i), Ok(p)) = (id_you, serde_json::from_str::<Vec<Part>>(&raw)) {
                     self.out[i].parts = p;
+                }
+            }
+            // bise's home hub: his words went to a project, not to main:
+            // on his entry by its id (never by the line before it); no
+            // delivery mark, main never got them
+            Hub::Routed { to, name, msg, .. } => {
+                if let Some(e) = self.out.iter_mut().rev().find(|e| e.kind == EntryKind::You && e.msg_id == Some(msg)) {
+                    e.went = Some(crate::thread::Went { to, name });
+                    e.delivery = None;
                 }
             }
             Hub::RouteParts(raw) => {

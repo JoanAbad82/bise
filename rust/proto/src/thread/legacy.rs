@@ -51,7 +51,7 @@ fn of(kind: &str, raw: &str) -> Option<Feed> {
     let json = |s: &str| serde_json::from_str::<serde_json::Value>(s).unwrap_or_default();
     let ids = || raw.split_whitespace().map(msg_id).collect::<Option<Vec<u64>>>().filter(|ids| !ids.is_empty());
     Some(match kind {
-        "you" => Feed::You(feed::You { text }),
+        "you" => Feed::You(feed::You { text, via: None }),
         "you-id" => Feed::YouId(feed::YouId { id: msg_id(raw.trim())? }),
         // the JSON as written: its own `\n` escapes are the JSON's
         "you-parts" => Feed::YouParts(feed::YouParts { parts: json(raw) }),

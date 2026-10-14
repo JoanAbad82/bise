@@ -87,7 +87,7 @@ pub fn classify(line: &str) -> Option<(Role, String)> {
     let text = readable(line)?;
     use bise_proto::thread::lines::{read, Hub, Rec};
     let role = match read(line) {
-        Rec::Hub(Hub::You(_)) => Role::User,
+        Rec::Hub(Hub::You(..)) => Role::User,
         Rec::Obs(bise_proto::thread::lines::Obs::Assistant(_)) => Role::Assistant,
         Rec::Hub(Hub::MsgIn { .. } | Hub::Msg { .. } | Hub::MsgYou { .. } | Hub::Answered { .. }) => Role::Message,
         _ => Role::Hub,

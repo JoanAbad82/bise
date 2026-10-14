@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, threadKey } from '@/store';
-import { applyRoute } from './routes';
+import { applyRoute, settleOf, trackRoutes } from './routes';
 import { PendingRow, type RowCtx } from './rows';
 
 const H = 'bise-home-00000000';
@@ -65,5 +65,30 @@ describe("bise's routing hold", () => {
     expect(v.getByTestId(`thread.pending.${cid}`).dataset.state).toBe('sent');
     expect(v.getByTestId(`thread.pending.${cid}`).textContent).toContain('sent to acme');
     expect(v.queryByTestId('thread.route')).toBeNull();
+  });
+
+  it('a sent route answers his pending send with its message id; a cancel or an older hub: nothing', () => {
+    const h = applyRoute([], route(3, 'acme-1', 'fix it'), [{ cid: 5, text: 'fix it' }]);
+    expect(settleOf(h, { ev: 'route_done', project: H, rid: 3, state: 'sent', to: 'acme-1', xid: 7, msg: 12 })).toEqual({ ev: 'sent', project: H, agent: 'main', cid: 5, msg_id: 12 });
+    expect(settleOf(h, { ev: 'route_done', project: H, rid: 3, state: 'cancelled', to: 'acme-1' })).toBeNull();
+    expect(settleOf(h, { ev: 'route_done', project: H, rid: 3, state: 'sent', to: 'acme-1', xid: 7 })).toBeNull();
+    expect(settleOf(h, { ev: 'route_done', project: H, rid: 9, state: 'sent', to: 'acme-1', xid: 7, msg: 12 })).toBeNull();
+  });
+
+  // his screenshot (route-name): routed bubbles stuck under the thread, read as 'never sent'
+  it("his routed send leaves the pending rows once its 'you' entry lands, whichever comes first", () => {
+    for (const entryFirst of [false, true]) {
+      const port: CorePort = { send: () => undefined, onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+      const store = new Store(port);
+      store.setCore('up');
+      trackRoutes(store);
+      const cid = store.send({ project: H, agent: 'main', text: '@acme fix it' });
+      store.apply({ ev: 'sent', project: H, agent: 'main', cid, msg_id: null });
+      store.apply(route(3, 'acme-1', '@acme fix it'));
+      const you = { ev: 'entry' as const, project: H, agent: 'main', entry: { pos: 4, at_ms: Date.now(), kind: 'you' as const, text: '@acme fix it', msg_id: 12, went: { to: 'acme-1', name: 'acme' } } };
+      const done = { ev: 'route_done' as const, project: H, rid: 3, state: 'sent', to: 'acme-1', xid: 7, msg: 12 };
+      for (const e of entryFirst ? [you, done] : [done, you]) store.apply(e);
+      expect(store.pending(K).map((p) => p.cid), `entry first: ${String(entryFirst)}`).toEqual([]);
+    }
   });
 });

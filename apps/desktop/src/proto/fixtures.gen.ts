@@ -68,7 +68,7 @@ export const hub_ev: readonly HubEv[] = [
   {"agent":"perf","ev":"queued_taken","id":3,"project":"acme-1a2b3c4d","text":"then the cold run"},
   {"agent":"old","base":"main","ev":"diff","files":[],"merged":"e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e","note":"old is archived and its folder is gone","project":"acme-1a2b3c4d"},
   {"correct_until_ms":1791100402000,"ev":"route","name":"acme","project":"bise-home-00000000","rid":3,"text":"why does p99 rise","to":"acme-1a2b3c4d","why":"Safari: grafana.acme.test"},
-  {"ev":"route_done","project":"bise-home-00000000","rid":3,"state":"sent","to":"acme-1a2b3c4d","xid":7},
+  {"ev":"route_done","msg":12,"project":"bise-home-00000000","rid":3,"state":"sent","to":"acme-1a2b3c4d","xid":7},
   {"ev":"route_done","project":"bise-home-00000000","rid":4,"state":"cancelled","to":"acme-1a2b3c4d"},
   {"ev":"merged","items":[{"at_ms":1791100400000,"by":"perf","sha":"e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e","title":"perf: sort_unstable in the hot query"},{"at_ms":1791100100000,"sha":"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678","title":"fix typo in README"}],"project":"acme-1a2b3c4d"},
   {"ev":"features","items":[{"adds":42,"agents":["gift-api","gift-ui"],"ahead":2,"base":"main","behind":1,"branch":"gift-cards","building":false,"card":7,"checked":true,"created_ms":1791100000000,"dels":3,"name":"gift-cards","tip":"4b825dc642cb6eb9a060e54bf8d69288fbee4904","trial":true,"tried":{"at_ms":1791100400000,"run":"~/.bise/dev/versions/4b825dc/bise","sha":"4b825dc"}},{"adds":0,"adopted":true,"agents":[],"ahead":0,"base":"main","behind":3,"branch":"old-ui","building":true,"checked":false,"created_ms":1791000000000,"dels":0,"name":"old-ui","tip":"","trial":false}],"project":"acme-1a2b3c4d"},

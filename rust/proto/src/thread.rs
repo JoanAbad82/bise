@@ -660,6 +660,24 @@ pub struct Entry {
     /// kept` line); drawn dim, the failure's notice after it
     #[serde(default, skip_serializing_if = "is_false")]
     pub cut: bool,
+    /// a `you` entry: the view that brought his words (`bise`: bise's
+    /// home hub routed them here, his own words; the window and the TUI
+    /// say 'via bise'), from the `you` line's `via`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<String>,
+    /// a `you` entry in bise's main: his words went to a project, not
+    /// to main (the `routed` line with its id)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub went: Option<Went>,
+}
+
+/// Where bise sent his words (a `you` entry's `went`): the project's hub
+/// id and its name.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Went {
+    pub to: String,
+    pub name: String,
 }
 
 impl Entry {
@@ -697,6 +715,8 @@ impl Entry {
             turn_end_ms: None,
             parts: Vec::new(),
             cut: false,
+            via: None,
+            went: None,
         }
     }
 

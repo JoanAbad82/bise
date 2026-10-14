@@ -25,8 +25,9 @@ use serde_json::Value;
 core_kinds! {
     /// One hub record of a transcript.
     pub enum Feed, tag "sb" {
-        /// his message
-        You = "you" => RYou { text: Str },
+        /// his message (`via`: the view that brought it, `bise` when bise
+        /// routed his words here; none on older lines)
+        You = "you" => RYou { text: Str, via: OptStrOmit },
         /// the id of the `you` record right before it (same step)
         YouId = "you-id" => RYouId { id: Nat },
         /// the parts of the `you` record before it (msg-parts, a
@@ -34,6 +35,9 @@ core_kinds! {
         YouParts = "you-parts" => RYouParts { parts: Json },
         /// the parts of the route record right before it
         RouteParts = "route-parts" => RRouteParts { parts: Json },
+        /// bise's home hub: his message `msg` went to the project `to`
+        /// (hub id; `name` its name) as out `xid`, not to main
+        Routed = "routed" => RRouted { to: Str, name: Str, xid: Nat, msg: Nat },
         /// the agent read these steered messages here, mid-turn
         Steered = "steered" => RSteered { ids: Nats },
         /// the agent's runtime received these steered messages

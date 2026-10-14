@@ -53,7 +53,7 @@ fn hub_lines_read_their_fields() {
         Rec::Hub(h) => h,
         r => panic!("{r:?}"),
     };
-    assert_eq!(h("you : a\\nb"), Hub::You("a\nb".into()));
+    assert_eq!(h("you : a\\nb"), Hub::You("a\nb".into(), None));
     assert_eq!(h("undelivered : fix : d'abord \\: les tests"), Hub::Undelivered { to: "fix".into(), text: "d'abord : les tests".into() });
     assert_eq!(h("msg-in : docs m_3 : hi : there"), Hub::MsgIn { from: "docs".into(), id: "m_3".into(), body: "hi : there".into() });
     assert_eq!(h("msg : a → b m_9 : hello"), Hub::Msg { from: "a".into(), to: "b".into(), id: "m_9".into(), body: "hello".into() });
@@ -385,5 +385,5 @@ fn a_records_line_break_reads_as_the_old_lines() {
         assert_eq!(read(rec), read(old), "{rec}");
         assert!(format!("{:?}", read(rec)).contains("a\\nb") || format!("{:?}", read(rec)).contains("pick\\n1. a"), "{rec}: a real line break");
     }
-    assert_eq!(read(r#"sb you :: {"text":"a\\nb"}"#), Rec::Hub(Hub::You("a\\nb".into())), "a typed backslash-n, as typed");
+    assert_eq!(read(r#"sb you :: {"text":"a\\nb"}"#), Rec::Hub(Hub::You("a\\nb".into(), None)), "a typed backslash-n, as typed");
 }

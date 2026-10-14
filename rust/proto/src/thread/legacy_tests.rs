@@ -66,13 +66,17 @@ fn no_old_line_has_the_new_form() {
     }
 }
 
-/// Each kind of `Feed` has an old sample (a kind with no old shape would
-/// be new: none yet), and the corpus has no two equal lines.
+/// The kinds born in the new form (`sb <kind> :: <json>`): no old line
+/// ever had them, so they have no old sample.
+const BORN_NEW: &[&str] = &["routed"];
+
+/// Each kind of `Feed` has an old sample (but those born new), and the
+/// corpus has no two equal lines.
 #[test]
 fn the_corpus_covers_every_kind() {
     let rows = rows();
     let kinds: std::collections::BTreeSet<String> = rows.iter().filter_map(|r| r["feed"]["sb"].as_str().map(String::from)).collect();
-    let missing: Vec<&&str> = crate::core::Feed::TAGS.iter().filter(|t| !kinds.contains(**t)).collect();
+    let missing: Vec<&&str> = crate::core::Feed::TAGS.iter().filter(|t| !kinds.contains(**t) && !BORN_NEW.contains(t)).collect();
     assert!(missing.is_empty(), "no old sample of {missing:?}");
     let lines: std::collections::BTreeSet<&str> = rows.iter().map(|r| s(r, "line")).collect();
     assert_eq!(lines.len(), rows.len(), "a line twice");
@@ -89,7 +93,7 @@ fn a_bad_new_line_shows_its_json_and_an_unknown_kind_its_text() {
     assert_eq!(h(r#"sb dance :: {"text":"a newer hub's words","n":2}"#), Hub::Other { kind: "dance".into(), text: "a newer hub's words".into() });
     assert_eq!(h(r#"sb dance :: {"n":2}"#), Hub::Other { kind: "dance".into(), text: r#"{"n":2}"#.into() });
     // a newer hub's added field: still the record
-    assert!(matches!(h(r#"sb you :: {"text":"hi","lang":"fr"}"#), Hub::You(t) if t == "hi"));
+    assert!(matches!(h(r#"sb you :: {"text":"hi","lang":"fr"}"#), Hub::You(t, None) if t == "hi"));
 }
 
 use crate::thread::lines::Rec;

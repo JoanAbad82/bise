@@ -1085,12 +1085,12 @@ pub(super) fn parse_hub_line(rest: &str) -> Option<Ev> {
 pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
     let msg = |from: String, to: String, text: String, level: u8, id: String| Ev::AgentMsg { from, to, text, level, id, open: false, fold: false };
     Some(match h {
-        Hub::You(text) => Ev::You(text.into(), Mark::Sent, false, None),
+        Hub::You(text, via) => Ev::You(crate::said::Said::via(text, via.as_deref()), Mark::Sent, false, None),
+        Hub::Routed { name, msg, .. } => Ev::YouWent { msg, name },
         // S9: the fn context of the 'you' line before it (the window's
         // thread shows it on his message; the TUI doesn't)
         Hub::Context(_) => return None,
-        // his parts (msg-parts): the hub's fold puts them on his entry;
-        // the line itself is no row
+        // his parts (msg-parts): on his entry by the hub's fold, no row
         Hub::YouParts(_) | Hub::RouteParts(_) => return None,
         // his message's id: on his message right before it (no row)
         Hub::YouId(id) => Ev::YouId(id),

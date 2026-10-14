@@ -5,13 +5,46 @@
 
 use crate::pasted::{Pasted, MARK_CLOSE, MARK_OPEN};
 use crate::quote::{Quote, Where};
+use crate::wire::Ev;
 use bise_proto::parts::{self, Part};
+use ratatui::style::Style;
+use ratatui::text::Span;
 
 /// His message: the model's text and its parts (none: plain words).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Said {
     pub(crate) text: String,
     pub(crate) parts: Vec<Part>,
+    /// where bise took his words, dim after them (none: here, as typed)
+    pub(crate) tag: Option<Tag>,
+}
+
+/// Where bise took his words: they came routed by bise (a project's
+/// thread: his own words, via bise), or they went to a project (bise's
+/// main: not to main, no delivery mark).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Tag {
+    ViaBise,
+    Went(String),
+}
+
+impl Tag {
+    /// The entry's `via` and `went` (bise_proto::thread::Entry) as a tag.
+    pub(crate) fn of(via: Option<&str>, went: Option<&str>) -> Option<Tag> {
+        match (went, via) {
+            (Some(name), _) => Some(Tag::Went(name.to_string())),
+            (None, Some("bise")) => Some(Tag::ViaBise),
+            _ => None,
+        }
+    }
+
+    /// Its words (designer signs them).
+    pub(crate) fn words(&self) -> String {
+        match self {
+            Tag::ViaBise => "via bise".to_string(),
+            Tag::Went(name) => format!("sent to {name}"),
+        }
+    }
 }
 
 impl Said {
@@ -22,7 +55,7 @@ impl Said {
             true => parts::of_text(&text),
             false => parts,
         };
-        Said { text, parts }
+        Said { text, parts, tag: None }
     }
 
     /// His message from its parts: the text is theirs (the composers'
@@ -31,8 +64,8 @@ impl Said {
         let parts = parts::canonical(&parts);
         let text = parts::render(&parts);
         match parts.iter().all(|p| matches!(p, Part::Text { .. })) {
-            true => Said { text, parts: Vec::new() },
-            false => Said { text, parts },
+            true => Said { text, parts: Vec::new(), tag: None },
+            false => Said { text, parts, tag: None },
         }
     }
 
@@ -42,6 +75,50 @@ impl Said {
             true => self.text.clone(),
             false => parts::words(&self.parts),
         }
+    }
+}
+
+impl Said {
+    /// His words from a `you` line, tagged `via bise` when bise brought them.
+    pub(crate) fn via(text: String, via: Option<&str>) -> Said {
+        Said { tag: Tag::of(via, None), ..Said::from(text) }
+    }
+}
+
+/// The end of his message's last row: its mark, then where bise took it
+/// (dim, `· via bise`); words that went to a project have no mark (main
+/// never got them), only `· sent to <project>`.
+pub(crate) fn you_end(mark: Option<Span<'static>>, tag: Option<&Tag>) -> Vec<Span<'static>> {
+    let tag_span = |t: &Tag| Span::styled(format!(" · {}", t.words()), Style::default().fg(crate::theme::dim()));
+    match tag {
+        Some(t @ Tag::Went(_)) => vec![tag_span(t)],
+        Some(t) => mark.into_iter().chain([tag_span(t)]).collect(),
+        None => mark.into_iter().collect(),
+    }
+}
+
+/// A feed line about his message, never a row of its own (feed.rs's
+/// push_event): its id (`sb you-id`, right after his 'you' line; the
+/// context line between them shows nothing) on the newest event if it is
+/// his message without one; where bise sent it (`sb routed`, bise's home
+/// hub) on his message with that id.
+pub(crate) fn on_you(events: &mut [Ev], cache: &mut [Option<crate::feed::EventRows>], ev: Ev) {
+    match ev {
+        Ev::YouId(id) => {
+            if let Some(Ev::You(_, _, _, slot @ None)) = events.last_mut() {
+                *slot = Some(id);
+            }
+        }
+        Ev::YouWent { msg, name } => {
+            let Some(i) = events.iter().rposition(|e| matches!(e, Ev::You(_, _, _, Some(id)) if *id == msg)) else { return };
+            if let Ev::You(said, ..) = &mut events[i] {
+                said.tag = Some(Tag::Went(name));
+            }
+            if let Some(c) = cache.get_mut(i) {
+                *c = None;
+            }
+        }
+        _ => {}
     }
 }
 

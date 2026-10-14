@@ -3807,6 +3807,8 @@ fn a_project_says_bise_message_once_and_answers_it_once() {
     assert_eq!(reply(&fx, 900).unwrap()["ok"], true, "{:?}", fx);
     let said = say_to(&fx, MAIN).expect("main hears it");
     assert!(said.contains("<user_message via=\"bise\">") && said.contains("fix the login"), "{}", said);
+    // his thread here shows them as his words, via bise (route-name)
+    assert!(fx.iter().any(|e| matches!(e, Effect::Line { agent, line } if agent == MAIN && line == r#"sb you :: {"text":"fix the login","via":"bise"}"#)), "{:?}", fx);
     // the same origin again: acked, not said again
     let fx = t.go(Input::XIn { token: 901, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "fix the login".into(), name: String::new(), parts: String::new() });
     assert_eq!(reply(&fx, 901).unwrap()["seen"], true);
@@ -3846,7 +3848,7 @@ fn routes(fx: &[Effect]) -> Vec<(u64, String, String, u64)> {
 fn route_dones(fx: &[Effect]) -> Vec<(u64, String, String, Option<u64>)> {
     fx.iter()
         .filter_map(|e| match e {
-            Effect::RouteDone { rid, state, to, xid } => Some((*rid, state.clone(), to.clone(), *xid)),
+            Effect::RouteDone { rid, state, to, xid, .. } => Some((*rid, state.clone(), to.clone(), *xid)),
             _ => None,
         })
         .collect()
@@ -3896,6 +3898,36 @@ fn a_held_route_goes_at_two_seconds_once_with_no_turn() {
         assert!(fx.iter().any(|e| matches!(e, Effect::ToClient { client: 5, body } if body["ev"] == "notice"
             && body["text"].as_str().unwrap_or("").contains("route 1 already went or was cancelled"))), "{:?}", fx);
     }
+}
+
+// route-name (his screenshot: routed bubbles stuck, read as never sent):
+// bise's main thread gets his words where he wrote them, their id, and
+// where they went by that id (law route_fire_says_where); the window's
+// route_done carries the same id
+#[test]
+fn a_fired_route_says_where_it_went_in_bises_main_thread() {
+    let mut t = T::new();
+    t.go(Input::RouteHold { text: "@shop why does p99 rise".into(), via: "capsule".into(), to: "shop-1".into(), name: "shop".into(), why: "you wrote @shop".into(), context: None, parts: String::new() });
+    t.env.now += 2_100;
+    let fx = t.go(Input::Tick);
+    let his = last_msg(&t);
+    let main_lines: Vec<&str> = fx.iter().filter_map(|e| match e {
+        Effect::Line { agent, line } if agent == MAIN => Some(line.as_str()),
+        _ => None,
+    }).collect();
+    let want = [
+        r#"sb you :: {"text":"@shop why does p99 rise","via":"capsule"}"#.to_string(),
+        format!(r#"sb you-id :: {{"id":{his}}}"#),
+        format!(r#"sb routed :: {{"msg":{his},"name":"shop","to":"shop-1","xid":1}}"#),
+    ];
+    let at: Vec<usize> = want.iter().map(|w| main_lines.iter().position(|l| l == w).unwrap_or_else(|| panic!("{w} in {main_lines:?}"))).collect();
+    assert!(at.windows(2).all(|p| p[0] < p[1]), "in order: {main_lines:?}");
+    assert!(fx.iter().any(|e| matches!(e, Effect::RouteDone { state, msg: Some(m), .. } if state == "sent" && *m == his)), "{:?}", fx);
+    // a cancel became no message of a route: no id on its end
+    let mut t = T::new();
+    hold(&mut t, "never mind");
+    let fx = t.go(Input::RouteCancel { client: None, rid: 1 });
+    assert!(fx.iter().any(|e| matches!(e, Effect::RouteDone { state, msg: None, .. } if state == "cancelled")), "{:?}", fx);
 }
 
 // a correction changes the project, not the time; `bise` is a cancel
@@ -4332,95 +4364,6 @@ fn a_feature_merge_refreshes_merged_today() {
     }
 }
 
-// ---- desktop S2 step 5: unclear routes (BISE_ROUTE_MODEL's pick) ----
-
-fn asks(fx: &[Effect]) -> Vec<(u64, String)> {
-    fx.iter()
-        .filter_map(|e| match e {
-            Effect::RouteAsk { rid, text } => Some((*rid, text.clone())),
-            _ => None,
-        })
-        .collect()
-}
-
-fn unclear(t: &mut T, text: &str) -> Vec<Effect> {
-    t.go(Input::RouteHold { text: text.into(), via: String::new(), to: String::new(), name: String::new(), why: String::new(), context: None, parts: String::new() })
-}
-
-// held 1.5 s with no target, the shell asked; the window sees nothing;
-// with no pick his words reach bise's main as a plain message at the due
-#[test]
-fn an_unclear_route_with_no_pick_goes_plain_to_main_at_its_due() {
-    let mut t = T::new();
-    let fx = unclear(&mut t, "fix it please");
-    assert_eq!(asks(&fx), vec![(1, "fix it please".into())]);
-    assert!(routes(&fx).is_empty() && say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none(), "{:?}", fx);
-    t.env.now += 1_400;
-    let fx = t.go(Input::Tick);
-    assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none());
-    t.env.now += 200;
-    let fx = t.go(Input::Tick);
-    let said = say_to(&fx, MAIN).or_else(|| steer_to(&fx, MAIN)).expect("main hears his words");
-    assert!(said.contains("fix it please"), "{said}");
-    assert!(xdelivers(&fx).is_empty() && route_dones(&fx).is_empty(), "{:?}", fx);
-    // once: a late pick changes nothing
-    let fx = t.go(Input::RoutePick { rid: 1, to: "shop-1".into(), name: "shop".into(), why: "bise's model picked shop".into() });
-    assert!(routes(&fx).is_empty() && xdelivers(&fx).is_empty(), "{:?}", fx);
-}
-
-// a pick in time: a held route to that project, his 2 s from the pick,
-// then forwarded like any route; the unclear one never goes plain
-#[test]
-fn a_picked_route_is_held_two_seconds_for_that_project() {
-    let mut t = T::new();
-    unclear(&mut t, "is the checkout still slow");
-    t.env.now += 900;
-    let picked = t.env.now;
-    let fx = t.go(Input::RoutePick { rid: 1, to: "shop-1".into(), name: "shop".into(), why: "bise's model picked shop".into() });
-    assert_eq!(routes(&fx), vec![(2, "shop-1".into(), "shop".into(), picked + 2000)]);
-    t.env.now += 1_000;
-    let fx = t.go(Input::Tick);
-    assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none() && xdelivers(&fx).is_empty(), "the unclear act is gone: {:?}", fx);
-    t.env.now += 1_100;
-    let fx = t.go(Input::Tick);
-    assert_eq!(xdelivers(&fx), vec![(1, "shop-1".into(), "input".into(), "is the checkout still slow".into())]);
-    assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none());
-    // a second pick for it: nothing
-    assert!(routes(&t.go(Input::RoutePick { rid: 1, to: "docs-2".into(), name: "docs".into(), why: String::new() })).is_empty());
-}
-
-// law route_plain_waits_behind_unclear: a plain input to bise's main
-// while an unclear route waits is held behind it, and both reach main
-// in order; a queued input isn't held (it waits for the turn end)
-#[test]
-fn a_plain_input_waits_behind_an_unclear_route() {
-    let mut t = T::new();
-    unclear(&mut t, "first words");
-    t.env.now += 500;
-    let fx = t.user(MAIN, "second words");
-    assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none() && asks(&fx).is_empty(), "held behind: {:?}", fx);
-    t.env.now += 1_100;
-    let fx = t.go(Input::Tick);
-    let said: Vec<String> = fx
-        .iter()
-        .filter_map(|e| match e {
-            Effect::Say { agent, text } | Effect::Steer { agent, text } if agent == MAIN => Some(text.clone()),
-            _ => None,
-        })
-        .collect();
-    let all = said.join("
-");
-    let (a, b) = (all.find("first words"), all.find("second words"));
-    assert!(a.is_some() && b.is_some() && a < b, "both, in order: {:?}", fx);
-    // nothing waits now: the next input goes at once
-    let fx = t.user(MAIN, "third words");
-    assert!(say_to(&fx, MAIN).or_else(|| steer_to(&fx, MAIN)).is_some_and(|s| s.contains("third words")), "{:?}", fx);
-}
-
-/// bar A.1 / A.5 (architect m_10331): a window's typed `new` reaches the
-/// same handler as the TUI's /new with its fields, never parsed again: a
-/// brief that starts with `-w ` or `x: ` stays the objective, word for
-/// word, and makes no worktree and no name of it.
 #[test]
 fn a_typed_new_takes_its_brief_as_written() {
     let mut t = T::new();
