@@ -1,9 +1,12 @@
 //! Questions in two places (docs/ambient-pages.md §4.2): a `question`
-//! block of a published page is one hub card (kind `question`, the
-//! page's agent asking), its options the block's `<li>` items. The page
-//! keeps `questions.json`: which card each block opened and its answer.
-//! Pure here: the blocks' words from the fragment, and what a publish
-//! changes (the hub opens and closes the cards).
+//! block of a published page, or a drawn pick (`k-pick` in a `ui` block,
+//! notif-artifact: its options the h3s, each with its why, the agent's
+//! `my pick`), is one hub card (kind `question`, a page card the page's
+//! agent asks), its options the block's `<li>` items. The page keeps
+//! `questions.json`: which card each block opened and its answer, which
+//! door took it (`inbox` or `page`) and when. Pure here: the blocks'
+//! words from the fragment, what a publish changes (the hub opens and
+//! closes the cards), and what the page hears of its asks.
 
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +22,13 @@ pub struct Question {
     /// the user's answer (on the page, in the capsule or the TUI)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reply: Option<String>,
+    /// which door took the answer, the hub's own fact: `inbox` (the
+    /// card, the TUI, `/answer`) or `page`; and when (notif-artifact: the
+    /// page says '✓ you picked A in the inbox · 11:42')
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at_ms: Option<u64>,
     /// `data-notify="none"` (`data-card="none"` in pages published before
     /// it): a page-only question (promises, meeting pages; ambient-lead
     /// m_6091): never a notification, still in sb page
@@ -29,6 +39,30 @@ pub struct Question {
     /// again until its words or options change (ambient-lead m_6091)
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub dismissed: bool,
+    /// a drawn pick (`k-pick` in a ui block, notif-artifact): its
+    /// options' keys, why lines and the agent's pick; None: a question
+    /// block (its options are the list's items)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pick: Option<Pick>,
+}
+
+/// What a drawn pick adds to a question: per option, its `data-pick`
+/// key and its one line why; and the option the agent marked `my pick`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Pick {
+    pub options: Vec<PickOption>,
+    /// the agent's pick (1-based), when it marked one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mine: Option<usize>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PickOption {
+    /// its `data-pick` (`a`): the page marks the answer on it
+    pub key: String,
+    /// its first `<p>`: the card's line under the option
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub why: String,
 }
 
 impl Question {
@@ -36,16 +70,108 @@ impl Question {
     /// inbox and the capsule read the options from these lines).
     pub fn card_text(&self) -> String {
         let mut t = self.text.clone();
-        for (i, o) in self.options.iter().enumerate() {
+        let shown = self.on_card();
+        for (i, o) in self.options.iter().take(shown).enumerate() {
             t.push_str(&format!("\n{}. {}", i + 1, o));
         }
+        if let Some((n, others)) = self.more() {
+            t.push_str(&format!("\n{n}. open the page for the other {others}"));
+        }
         t
+    }
+
+    /// How many of its options the card carries: all, or the first 3
+    /// of a drawn pick of more than 4 (designer m_26776).
+    pub fn on_card(&self) -> usize {
+        match self.pick.is_some() && self.options.len() > 4 {
+            true => 3,
+            false => self.options.len(),
+        }
+    }
+
+    /// A drawn pick of more than 4 options: the card's last option (its
+    /// number) opens the page for the others (how many).
+    pub fn more(&self) -> Option<(usize, usize)> {
+        let shown = self.on_card();
+        (shown < self.options.len()).then(|| (shown + 1, self.options.len() - shown))
     }
 
     /// The words of option `n` (1-based).
     pub fn option(&self, n: usize) -> Option<&str> {
         n.checked_sub(1).and_then(|i| self.options.get(i)).map(String::as_str)
     }
+
+    /// What the page hears and keeps of its answer (SSE `answered`, the
+    /// meta's `asks`): the block, the words, which option it is (and its
+    /// pick key), the door and when.
+    pub fn answered_json(&self) -> serde_json::Value {
+        let reply = self.reply.clone().unwrap_or_default();
+        let n = self.option_of(&reply);
+        let key = n.and_then(|n| self.pick.as_ref()?.options.get(n - 1)).map(|o| o.key.clone());
+        serde_json::json!({"block": self.block, "reply": reply, "n": n, "key": key, "via": self.via, "at_ms": self.at_ms})
+    }
+
+    /// The page's state of this question (meta's `asks`): `open` while
+    /// its notification waits in the inbox, else its answer.
+    pub fn ask_json(&self, open: bool) -> serde_json::Value {
+        match &self.reply {
+            Some(_) => self.answered_json(),
+            None => serde_json::json!({"block": self.block, "open": open && self.card != 0 && !self.page_only, "count": self.on_card()}),
+        }
+    }
+
+    /// Which option an answer is (1-based): its number, or its words.
+    pub fn option_of(&self, reply: &str) -> Option<usize> {
+        let r = reply.trim();
+        match r.parse::<usize>() {
+            Ok(n) => self.option(n).map(|_| n),
+            Err(_) => self.options.iter().position(|o| o == r).map(|i| i + 1),
+        }
+    }
+}
+
+/// The attribute `k` of a tag's head (`<div class="x" data-pick="a"`).
+fn attr_of(head: &str, k: &str) -> Option<String> {
+    head.split(&format!(" {k}=\"")).nth(1).and_then(|r| r.split('"').next()).map(String::from)
+}
+
+/// The text of the first `<tag>…</tag>` in `html` (`<p>` or `<p …>`,
+/// never `<path`).
+fn first_text(html: &str, tag: &str) -> Option<String> {
+    let open = [format!("<{tag}>"), format!("<{tag} ")];
+    let at = open.iter().filter_map(|o| html.find(o.as_str())).min()?;
+    let rest = &html[at..];
+    let body = &rest[rest.find('>')? + 1..];
+    let t = text_of(&body[..body.find(&format!("</{tag}>")).unwrap_or(body.len())]);
+    (!t.is_empty()).then_some(t)
+}
+
+/// A ui block's drawn pick (`data-ui="pick"`, one per block): its
+/// options' h3s, keys and why lines, the agent's `my pick`. Its words:
+/// `data-ask` on the pick (or the block), else empty (the hub asks with
+/// the page's title). None: no pick, or fewer than two options.
+fn pick_of(head: &str, body: &str) -> Option<(String, Vec<String>, Pick)> {
+    let at = body.find("data-ui=\"pick\"")?;
+    let tag_start = body[..at].rfind('<').unwrap_or(0);
+    let tag_head = &body[tag_start..at + body[at..].find('>').unwrap_or(0)];
+    let ask = attr_of(tag_head, "data-ask").or_else(|| attr_of(head, "data-ask")).map(|a| text_of(&a)).unwrap_or_default();
+    let inner = &body[at..];
+    let mut names = Vec::new();
+    let mut pick = Pick::default();
+    let parts: Vec<&str> = inner.split(" data-pick=\"").skip(1).collect();
+    for part in parts {
+        let key = part.split('"').next().unwrap_or_default().to_string();
+        // the option runs to the next data-pick; its h3 is its name
+        let Some(name) = first_text(part, "h3") else { continue };
+        let after = &part[part.find("</h3>").map_or(0, |e| e + "</h3>".len())..];
+        let why = first_text(after, "p").unwrap_or_default();
+        if part[..part.find("<h3").unwrap_or(0)].contains("k-mark") {
+            pick.mine = Some(names.len() + 1);
+        }
+        names.push(name);
+        pick.options.push(PickOption { key, why });
+    }
+    (names.len() >= 2).then_some((ask, names, pick))
 }
 
 /// The text of some HTML: tags dropped, the common entities decoded,
@@ -82,11 +208,21 @@ pub fn of_fragment(html: &str) -> Vec<Question> {
         let head_end = block.find('>').unwrap_or(0);
         let head = &block[..head_end];
         let attr = |k: &str| head.split(&format!("{k}=\"")).nth(1).and_then(|r| r.split('"').next()).map(String::from);
-        if attr("data-kit").as_deref() != Some("question") {
-            continue;
-        }
+        // data-notify="none"; data-card="none", its old name, in pages published before it
+        let page_only = [attr("data-notify"), attr("data-card")].iter().any(|v| v.as_deref() == Some("none"));
         let Some(id) = attr("data-id") else { continue };
         let body = &block[head_end + 1..block.len().saturating_sub("</section>".len())];
+        match attr("data-kit").as_deref() {
+            Some("question") => {}
+            // a drawn pick asks like a question (notif-artifact)
+            Some("ui") => {
+                if let Some((text, options, pick)) = pick_of(head, body) {
+                    out.push(Question { block: id, text, options, page_only, pick: Some(pick), ..Question::default() });
+                }
+                continue;
+            }
+            _ => continue,
+        }
         let list_at = body.find("<ol").or_else(|| body.find("<ul")).unwrap_or(body.len());
         let text = text_of(&body[..list_at]);
         let options: Vec<String> = body[list_at..]
@@ -98,8 +234,6 @@ pub fn of_fragment(html: &str) -> Vec<Question> {
             })
             .filter(|o| !o.is_empty())
             .collect();
-        // data-notify="none"; data-card="none", its old name, in pages published before it
-        let page_only = [attr("data-notify"), attr("data-card")].iter().any(|v| v.as_deref() == Some("none"));
         out.push(Question { block: id, text, options, page_only, ..Question::default() });
     }
     out
@@ -216,6 +350,50 @@ mod tests {
         let old = vec![Question { dismissed: true, ..of_fragment(&h("", "which address?"))[0].clone() }];
         assert!(plan(&old, of_fragment(&h("", "which address?")), &|_| false).questions[0].dismissed);
         assert!(!plan(&old, of_fragment(&h("", "which address for Lelio?")), &|_| false).questions[0].dismissed);
+    }
+
+    /// notif-artifact: a k-pick in a ui block asks like a question: its
+    /// options are the h3s, each with its key and its first p (the why),
+    /// the agent's `my pick` named; data-notify="none" opts out the same.
+    #[test]
+    fn a_drawn_pick_is_a_question() {
+        let ui = |head: &str, ask: &str| {
+            format!(
+                r#"<section data-kit="ui" data-id="look"{head}>
+<div class="k-pick" data-ui="pick"{ask}>
+<div class="k-option" data-pick="a"><span class="k-mark">my pick</span><h3>A · a pink border</h3><p>and a clear <b>label</b>.</p><ul><li>clear</li></ul></div>
+<div class="k-option" data-pick="b"><svg><path d="M0"/></svg><h3>B · one frame</h3><ul><li>no why</li></ul></div>
+<div class="k-option" data-pick="c"><h3>C · a reply chip</h3><p>in the field.</p></div>
+</div></section>"#
+            )
+        };
+        let q = &of_fragment(&ui("", r#" data-ask="which composer look?""#))[0];
+        assert_eq!((q.block.as_str(), q.text.as_str()), ("look", "which composer look?"));
+        assert_eq!(q.options, vec!["A · a pink border", "B · one frame", "C · a reply chip"]);
+        let p = q.pick.as_ref().unwrap();
+        assert_eq!(p.options.iter().map(|o| (o.key.as_str(), o.why.as_str())).collect::<Vec<_>>(), vec![("a", "and a clear label ."), ("b", ""), ("c", "in the field.")]);
+        assert_eq!(p.mine, Some(1));
+        assert!(!q.page_only);
+        assert_eq!(q.option_of("2"), Some(2));
+        assert_eq!(q.option_of("C · a reply chip"), Some(3));
+        assert_eq!(q.option_of("neither"), None);
+        assert_eq!(q.card_text(), "which composer look?\n1. A · a pink border\n2. B · one frame\n3. C · a reply chip");
+        assert_eq!((q.on_card(), q.more()), (3, None));
+        // more than 4: the card carries the first 3 and opens the page for the others
+        let six = Question { options: (b'a'..=b'f').map(|k| format!("{} · x", (k as char).to_ascii_uppercase())).collect(), ..q.clone() };
+        assert_eq!((six.on_card(), six.more()), (3, Some((4, 3))));
+        assert!(six.card_text().ends_with("\n3. C · x\n4. open the page for the other 3"), "{}", six.card_text());
+        assert_eq!(six.ask_json(true)["count"], 3);
+        // no data-ask: empty words (the hub asks with the page's title); on the block works too
+        assert_eq!(of_fragment(&ui("", ""))[0].text, "");
+        assert_eq!(of_fragment(&ui(r#" data-ask="which?""#, ""))[0].text, "which?");
+        assert!(of_fragment(&ui(r#" data-notify="none""#, ""))[0].page_only);
+        // a ui block without a pick, or a pick of one option, asks nothing
+        assert!(of_fragment(r#"<section data-kit="ui" data-id="t"><div data-ui="tabs"><p>x</p></div></section>"#).is_empty());
+        assert!(of_fragment(r#"<section data-kit="ui" data-id="t"><div data-ui="pick"><div data-pick="a"><h3>A</h3></div></div></section>"#).is_empty());
+        // the old questions.json (no pick) still reads
+        let old: Question = serde_json::from_str(r#"{"block":"q1","text":"t","options":["a"],"card":3}"#).unwrap();
+        assert!(old.pick.is_none());
     }
 
     #[test]

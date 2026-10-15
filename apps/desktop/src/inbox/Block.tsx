@@ -92,6 +92,13 @@ export function openInbox(at?: { project: string; card: number }): boolean {
   return opened;
 }
 
+/** A page-linked item opened beside (notif-artifact, designer m_26776): the block that mounts with
+ * the artifact view opens it again, so he decides while he reads the page. Taken once. */
+let reopen: OpenAt = undefined;
+export function keepOpenBeside(at: { project: string; card: number }): void {
+  reopen = at;
+}
+
 /** Hear openInbox (the block itself, a test): returns the unsubscribe. */
 export function onOpenInbox(f: (at: OpenAt) => boolean): () => void {
   openers.add(f);
@@ -244,9 +251,11 @@ export function answeringOf(c: Card, here: Here, pname?: string): Answering {
   if (takesWords(c)) {
     // composer-target A (designer m_26531): '↳ answering search · <question>' (the tab cuts it after
     // a whole word), 'esc to bise instead', the field names who gets his words, the border's tip
+    // on the asker's own thread there is no esc end (designer m_26776, m_26818)
     const who = shownName(c.agent);
     const label = `${ANSWERING_HEAD} ${other ?? who} · ${cutWords(c.question, 40)}`;
-    return { project: c.project, card: c.id, label, end: `esc to ${to} instead`, answer: c.id, asker: c.agent, placeholder: `your answer to ${who}, then ⏎`, tip: answerTip(who, to) };
+    const end = other === null && who === to ? {} : { end: `esc to ${to} instead` };
+    return { project: c.project, card: c.id, label, ...end, answer: c.id, asker: c.agent, placeholder: `your answer to ${who}, then ⏎`, tip: answerTip(who, to) };
   }
   // an approval or a choice never takes his words (designer m_26683): typed, they go to its asker as
   // a plain message, and the label says so ('to perf · the merge waits for 1 or 2'); esc names the
@@ -437,6 +446,28 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
     keyAt.current = { ...keyAt.current, on: n };
     setOn(n);
   };
+  // the item he opened beside its page stays open in the block the artifact view mounts
+  useEffect(() => {
+    const at = reopen;
+    const c = at === undefined ? undefined : list.find((x) => x.project === at.project && x.id === at.card);
+    if (c === undefined) return;
+    reopen = undefined;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- set by the view that unmounted in this commit: known only after it
+    openTo(cardKey(c));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openTo is this render's; the list is the trigger
+  }, [list]);
+  // and when that view closes, the block that mounts back keeps a page's item open too
+  const openNow = useRef<Card | undefined>(undefined);
+  useEffect(() => {
+    openNow.current = openCard;
+  });
+  useEffect(
+    () => () => {
+      const c = openNow.current;
+      if (c?.page != null) keepOpenBeside({ project: c.project, card: c.id });
+    },
+    [],
+  );
 
   // ⌘I, '/inbox' and a notification click: that card, else the first item; one the filter leaves
   // out widens the block (wide). False: nothing waits anywhere, the caller says so
@@ -502,6 +533,14 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   // until the hub's rows drop it (acted.ts); here it only folds
   const leave = () => {
     openTo(null);
+  };
+  // a card linked to a page (notif-artifact, designer m_26560): its chip or 'o' opens the page beside
+  // the thread at its block, the act an option's --open takes (optAct.ts); nothing sent, it stays
+  const openPage = (c: Card) => {
+    const p = c.page;
+    if (p == null) return;
+    keepOpenBeside({ project: c.project, card: c.id });
+    doAct(c.project, { act: 'open', artifact: p.id, at: p.item ?? p.block ?? null, url: p.url });
   };
   const pick = (c: Card, n: number) => {
     // a closed card picks nothing: its options are dim
@@ -605,6 +644,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
       if (k.t === 'later') openTo(null);
       else if (k.t === 'on') onTo(k.n);
       else if (k.t === 'pick') pick(openCard, k.n);
+      else if (k.t === 'page') openPage(openCard);
       else close(openCard);
     };
   });
@@ -711,6 +751,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
                   later: () => {
                     openTo(null);
                   },
+                  ...(c.page != null ? { openPage: () => { openPage(c); } } : {}),
                 }}
                 testId={isNotify(c) ? 'inbox.block.notify' : `inbox.block.card.${cardKey(c)}`}
                 {...(c === closed

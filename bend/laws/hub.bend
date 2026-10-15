@@ -383,6 +383,16 @@ law page_card_opens:
   for +text: String
   {HC.page_card(o, cx, agents, "plan", text) == HC.page_card.open(o, cx, "plan", HR.page_asker(HX.d(o, cx), agents), text) : HX.Cx<o>}
 
+# LAW (notif-artifact, architect m_26569): a page's question or drawn
+# pick is a page card too: one card, asked by the page's agent (main when
+# it is gone), never main's by default.
+law page_card_opens_question:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +agents: List<&2, String>
+  for +text: String
+  {HC.page_card(o, cx, agents, "question", text) == HC.page_card.open(o, cx, "question", HR.page_asker(HX.d(o, cx), agents), text) : HX.Cx<o>}
+
 law page_card_other_kind:
   for -o: HM.St
   for +cx: HX.Cx<o>

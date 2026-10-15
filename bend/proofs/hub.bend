@@ -366,6 +366,9 @@ def Laws.page_card_asker_next(s, h, t, q):
 def Laws.page_card_opens(o, cx, agents, text):
   {==}
 
+def Laws.page_card_opens_question(o, cx, agents, text):
+  {==}
+
 def Laws.page_card_other_kind(o, cx, agents, text):
   {==}
 

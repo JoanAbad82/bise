@@ -163,6 +163,7 @@ pub(super) fn cards_of_rows(his: &[rows::Card], others: &[rows::Card], asking: O
             asking: asking == Some(c.id),
             waiting: c.waiting.clone().unwrap_or_default(),
             acts: c.options.iter().filter_map(|o| Some((o.n, o.act.clone()?))).collect(),
+            page: super::cards::PageLink::of(c),
         })
         .collect()
 }

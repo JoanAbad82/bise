@@ -4,7 +4,7 @@
 //   - on perf's thread, 4 waiting items fold into the head + one line (who, what, project · age), the rest
 //     '+ 3 more' in the head (H10, tui-parity's thread-hierarchy: under 90 px, was ~200);
 //   - a click opens the question IN PLACE (its options in the block, nothing floats) and the composer says
-//     '↳ answering perf · which bench?' + 'esc to perf instead'; his words + ⏎ answer it (answer {card 9});
+//     '↳ answering perf · which bench?', no esc end on perf's own thread; his words + ⏎ answer it (answer {card 9});
 //   - the merge item opened says 'to perf · the merge waits for 1 or 2': his words go as a plain message
 //     (send, never an answer), its 2 picks it (answer {card 10, reply '2'}); esc folds the block;
 //   - on settings (the bottom block), ⌘I (the app menu's CmdOrCtrl+I) opens the first item in place;
@@ -118,7 +118,7 @@ test("inbox/block-views: on perf's thread the block folds 4 items, opens a quest
       await expect(page.getByTestId('inbox.block.open.1')).toBeVisible({ timeout: 3000 });
       await expect(page.getByTestId(`inbox.block.card.${P}-9`)).toContainText('cold');
       await expect(composer(page)).toContainText('↳ answering perf · which bench?');
-      await expect(composer(page)).toContainText('esc to perf instead');
+      await expect(composer(page)).not.toContainText('esc to perf instead');
       await shoot(page, core, 'question-open');
       await field(page).click();
       await page.keyboard.type('cold, on the m2');

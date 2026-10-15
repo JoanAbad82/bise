@@ -27,6 +27,8 @@ body {
   box-shadow: var(--talk-stroke);
   color: var(--talk-ink); font: var(--text-ui)/1.2 var(--font-ui); white-space: nowrap;
 }
+/* a block scrolled to (a link at its id) lands under the frame, never under it (designer m_26818) */
+#bise-page > [data-kit] { scroll-margin-top: 68px; }
 /* the pearl at 36 px (amb-web's pearl.js draws into it); ':*' in the accent until it does */
 .bise-frame .k { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; font: 700 14px var(--font-mono); color: var(--talk-accent); }
 /* two groups (page-head, his m_26492): the words give way, the controls never do. The words take
@@ -397,6 +399,15 @@ body:has(#bise-page > [data-kit="ui"]) #bise-page > [data-kit]:not([data-kit="ui
 /* 'my pick': a small ink label at the card's top right, read at a glance (never the accent) */
 .k-option > .k-mark { position: absolute; top: var(--space-3); right: var(--space-3); font: 600 var(--text-kicker)/1.5 var(--font-ui); color: var(--ink); padding: 0 7px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--ink); }
 #bise-page .k-option:has(> .k-mark) > h3 { padding-right: 8ch; }
+/* an ask linked to its notification (notif-artifact): '? waits in your inbox' in the accent while
+   it waits, the decided line in ink after; 'your pick' takes the place of the agent's 'my pick' */
+#bise-page .k-ask { display: block; width: fit-content; font: 600 var(--text-kicker)/1.5 var(--font-ui); color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 6px; margin: 0 0 8px; }
+#bise-page .k-ask[data-done] { color: var(--dim); background: none; padding: 2px 0; font-weight: 400; }
+#bise-page .k-ask[data-done] > .k-ask-mark { color: var(--accent); font-weight: 600; }
+.k-option:has(> .k-mark[data-yours]) > .k-mark:not([data-yours]) { display: none; }
+[data-ui="pick"]:has(.k-option[data-verdict="pick"] > .k-mark[data-yours]) .k-option:not([data-verdict="pick"]) { opacity: .55; }
+[data-answer] [data-ui="pick"][data-ready] .k-option { cursor: default; }
+[data-kit="question"][data-asks]::before, [data-kit="question"]:has(> .k-ask)::before { content: none; }
 .k-mine { font: var(--text-kicker) var(--font-mono); color: var(--kick); }
 
 /* k-timeline: steps in order; data-state done, now, next */

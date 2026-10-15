@@ -139,7 +139,7 @@ impl Row {
     }
 }
 
-fn fg(c: Color) -> Style {
+pub(super) fn fg(c: Color) -> Style {
     Style::default().fg(c)
 }
 
@@ -152,11 +152,11 @@ pub(super) fn digits(n: usize) -> &'static str {
 /// A line of the box or of an item, and what a click on its cells does
 /// (from which column, how wide).
 #[derive(Clone)]
-struct Drawn {
-    line: Line<'static>,
-    hits: Vec<(usize, usize, CardHit)>,
+pub(super) struct Drawn {
+    pub(super) line: Line<'static>,
+    pub(super) hits: Vec<(usize, usize, CardHit)>,
     /// a line of the open item: on its tint, after its accent bar
-    item: bool,
+    pub(super) item: bool,
 }
 
 impl Drawn {
@@ -168,7 +168,7 @@ impl Drawn {
         Drawn::plain(Line::from(""))
     }
 
-    fn width(&self) -> usize {
+    pub(super) fn width(&self) -> usize {
         self.line.spans.iter().map(|s| s.content.width()).sum()
     }
 }
@@ -428,13 +428,17 @@ fn picked() -> Style {
 /// don't fit; the one highlighted (`hi`) accent on the ground. `typing`:
 /// the composer answers, the digits dim and no highlight. Then the hint,
 /// faint: `or type why not, ⏎ says no`.
-fn option_lines(s: &Shape, id: u64, w: usize, hi: Option<usize>, typing: bool, closed: bool) -> Vec<Drawn> {
+fn option_lines(c: &Card, s: &Shape, w: usize, hi: Option<usize>, typing: bool, closed: bool) -> Vec<Drawn> {
+    let id = c.id;
     let mut out = Vec::new();
     let num_st = fg(if typing { theme::dim() } else { theme::accent() });
     let label_st = fg(theme::dim());
     let texts: Vec<String> = s.options.iter().enumerate().map(|(i, l)| format!("{} {}", s.num(i), l)).collect();
     let one = texts.iter().map(|t| t.width()).sum::<usize>() + 3 * texts.len().saturating_sub(1);
-    if !texts.is_empty() && one <= w {
+    // the asker's own pick (notif-artifact): one option per line, `my pick` at its end
+    const MINE: &str = "   my pick";
+    let mine = super::cards::page_mine(c, s);
+    if !texts.is_empty() && one <= w && mine.is_empty() {
         let mut r = Row::default();
         let mut hits = Vec::new();
         for (i, label) in s.options.iter().enumerate() {
@@ -454,37 +458,47 @@ fn option_lines(s: &Shape, id: u64, w: usize, hi: Option<usize>, typing: bool, c
     } else {
         for (i, label) in s.options.iter().enumerate() {
             let on = !typing && hi == Some(i);
-            let rows = wrap_line(Line::from(label.clone()), w.saturating_sub(2).max(1));
+            let mine = mine.contains(&i);
+            let room = w.saturating_sub(2 + if mine { MINE.width() } else { 0 }).max(1);
+            let rows = wrap_line(Line::from(label.clone()), room);
+            let last = rows.len().saturating_sub(1);
             for (j, row) in rows.into_iter().enumerate() {
                 let text: String = row.spans.iter().map(|s| s.content.as_ref()).collect();
                 let lead = if j == 0 { format!("{} ", s.num(i)) } else { "  ".to_string() };
-                let line = if on {
+                let mut line = if on {
                     Line::from(Span::styled(format!("{lead}{text}"), picked()))
                 } else {
                     Line::from(vec![Span::styled(lead, num_st), Span::styled(text, label_st)])
                 };
+                if mine && j == last {
+                    line.spans.push(Span::styled(MINE, fg(theme::faint())));
+                }
                 let d = Drawn { line, hits: Vec::new(), item: false };
                 let wd = d.width();
                 out.push(Drawn { hits: vec![(0, wd, CardHit::Pick(id, i))], ..d });
             }
         }
     }
-    if let Some(h) = hint(s).filter(|_| !closed) {
-        out.push(Drawn::plain(Line::from(Span::styled(cut(h, w), fg(theme::faint())))));
+    if let Some(h) = hint(c, s).filter(|_| !closed) {
+        out.push(Drawn::plain(Line::from(Span::styled(cut(&h, w), fg(theme::faint())))));
     }
     out
 }
 
-/// The hint under the options: how words answer.
-fn hint(s: &Shape) -> Option<&'static str> {
+/// The hint under the options: how words answer (a page's card: who
+/// reads them, card_page.rs).
+fn hint(c: &Card, s: &Shape) -> Option<String> {
     if !s.keys.is_empty() {
         return None;
     }
+    if let Some(h) = super::cards::page_hint(c, s) {
+        return Some(h);
+    }
     match s.enter {
-        Enter::Deny => Some("or type why not, ⏎ says no"),
-        Enter::Answer if s.words && !s.options.is_empty() => Some("or type your answer, ⏎ sends it"),
-        Enter::Answer if s.words => Some("type your answer, ⏎ sends it"),
-        Enter::Ack => Some("⏎ got it"),
+        Enter::Deny => Some("or type why not, ⏎ says no".into()),
+        Enter::Answer if s.words && !s.options.is_empty() => Some("or type your answer, ⏎ sends it".into()),
+        Enter::Answer if s.words => Some("type your answer, ⏎ sends it".into()),
+        Enter::Ack => Some("⏎ got it".into()),
         Enter::Answer => None,
     }
 }
@@ -502,8 +516,9 @@ fn item_block(app: &App, c: &Card, w: usize, cap: usize) -> Vec<Drawn> {
     let tw = w.saturating_sub(3).max(1);
     let typing = !app.ed.text.is_empty();
     let mut middle = middle_lines(app, c, &s, tw);
-    let opts = option_lines(&s, c.id, tw, sb.card.opt, typing, sb.closed_in_view().is_some_and(|g| g.id == c.id));
-    let fixed = 4 + opts.len();
+    let opts = option_lines(c, &s, tw, sb.card.opt, typing, sb.closed_in_view().is_some_and(|g| g.id == c.id));
+    let link = super::cards::page_link_line(c, tw);
+    let fixed = 4 + opts.len() + usize::from(link.is_some());
     let room = cap.saturating_sub(fixed);
     if middle.len() > room {
         let keep = room.saturating_sub(1);
@@ -523,6 +538,7 @@ fn item_block(app: &App, c: &Card, w: usize, cap: usize) -> Vec<Drawn> {
     }
     let mut out = vec![Drawn::blank(), head_line(sb, c, &s, tw)];
     out.extend(middle);
+    out.extend(link);
     if !opts.is_empty() {
         out.push(Drawn::blank());
         out.extend(opts);
@@ -837,7 +853,8 @@ pub(crate) fn draw_view(app: &mut App, frame: &mut Frame, area: Rect) {
     // the body: from 2 rows under the head, scrolled
     let typing = !app.ed.text.is_empty();
     let mut lines = middle_lines(app, &c, &s, tw);
-    let opts = option_lines(&s, c.id, tw, sb.card.opt, typing, sb.closed_in_view().is_some_and(|g| g.id == c.id));
+    lines.extend(super::cards::page_link_line(&c, tw));
+    let opts = option_lines(&c, &s, tw, sb.card.opt, typing, sb.closed_in_view().is_some_and(|g| g.id == c.id));
     if !opts.is_empty() {
         lines.push(Drawn::blank());
         lines.extend(opts);

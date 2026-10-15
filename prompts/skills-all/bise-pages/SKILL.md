@@ -68,9 +68,9 @@ label. Then `leaving.md`. Any other write (close an issue, an invite) is on the 
 its own `action` block (`data-do="close OPS-12"`); on his word, do exactly what he approved.
 Code work is never an action: it is a `start an agent` item.
 
-A question, his row whose turn comes, the drafts and actions waiting: each becomes a
-notification he reads alone, page closed. Write each to be enough to act on ("notifications"
-in `blocks.md`).
+A question, a drawn pick, his row whose turn comes, the drafts and actions waiting: each becomes
+a notification he reads alone, page closed. Write each to be enough to act on ("notifications"
+in `blocks.md`; page, notification or both: its last table).
 
 ## The blocks
 
@@ -88,7 +88,8 @@ Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kep
 - `message`: a draft for a channel, `data-to="Slack · #launch"`, `<p>`s; never `<pre>`.
 - `email`: `data-to`, `<p data-field="to">`, `subject`, the body; `data-verb="draft"` for his drafts.
 - `compare`: 2 to 4 `<li data-id>` side by side: `<h3>`, `<ul>` of facts, `<p>` why.
-- `ui`: a mock, terminal cells, states side by side, a rich picker, a timeline: `ui.md`.
+- `ui`: a mock, terminal cells, states side by side, a rich picker (asks like a `question`), a
+  timeline: `ui.md`.
 - `checklist`: `<li data-id data-who data-due="2026-05-20">`, `data-done` when done. A plan
   worked through with him (buy the domain, set up the offsite): read "a plan" in `blocks.md`
   before you publish one.

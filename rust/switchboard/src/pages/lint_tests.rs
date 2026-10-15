@@ -425,7 +425,7 @@ fn a_page_only_question_takes_data_notify_none_and_promises_and_meetings_need_it
     has(&errs(&q(r#" data-notify="all""#)), "q-cc: data-notify=\"all\" is not a setting");
     has(
         &errs(r#"<section data-kit="prose" data-id="p" data-notify="none"><p>x</p></section>"#),
-        "p: data-notify is not a kit attribute here: only a question block takes it",
+        "p: data-notify is not a kit attribute here: only a question block or a ui block with a pick takes it",
     );
     // notif-rename (architect m_24654): the old name is read in stored pages, never written again
     has(&errs(&q(r#" data-card="none""#)), "q-cc: data-card is now data-notify");
@@ -437,6 +437,13 @@ fn a_page_only_question_takes_data_notify_none_and_promises_and_meetings_need_it
         let e = page(id, "").unwrap_err();
         assert!(e[0].starts_with("q-cc: a question on this page never makes a notification") && e[0].contains("data-notify=\"none\""), "{e:?}");
     }
+    // notif-artifact: a ui block's drawn pick notifies like a question, with the same opt-out
+    let pick = |a: &str| format!(r#"<section data-kit="ui" data-id="look"{a}><div class="k-pick" data-ui="pick"><div class="k-option" data-pick="a"><h3>A</h3><p>x</p></div><div class="k-option" data-pick="b"><h3>B</h3><p>y</p></div></div></section>"#);
+    ok(&pick(r#" data-notify="none""#));
+    has(&errs(&pick(r#" data-notify="all""#)), "look: data-notify=\"all\" is not a setting");
+    assert!(crate::pages::lint::lint_page("promises-2026-w41", &pick(r#" data-notify="none""#)).is_ok());
+    let e = crate::pages::lint::lint_page("meeting-q3", &pick("")).unwrap_err();
+    assert!(e[0].starts_with("look: a pick on this page never makes a notification"), "{e:?}");
 }
 
 #[test]

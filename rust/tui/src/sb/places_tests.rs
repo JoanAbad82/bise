@@ -84,6 +84,7 @@ fn mock() -> App {
         asking: false,
         waiting: Vec::new(),
         acts: Vec::new(),
+        page: None,
     });
     app
 }

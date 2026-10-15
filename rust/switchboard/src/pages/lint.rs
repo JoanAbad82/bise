@@ -147,16 +147,17 @@ pub fn lint(html: &str) -> Result<Vec<Block>, Vec<String>> {
 }
 
 /// The lint with the rules that depend on the page's id (ambient-lead m_6092): on a page that
-/// never makes notifications (`promises-…`, `meeting-…`), every question is page-only,
-/// `data-notify="none"`.
+/// never makes notifications (`promises-…`, `meeting-…`), every question and pick is page-only.
 pub fn lint_page(id: &str, html: &str) -> Result<Vec<Block>, Vec<String>> {
     let (blocks, carded) = lint_full(html)?;
-    if !(id.starts_with("promises-") || id.starts_with("meeting-")) || carded.is_empty() {
+    let picks: Vec<String> = super::questions::of_fragment(html).into_iter().filter(|q| q.pick.is_some() && !q.page_only).map(|q| q.block).collect(); // a drawn pick notifies too
+    if !(id.starts_with("promises-") || id.starts_with("meeting-")) || (carded.is_empty() && picks.is_empty()) {
         return Ok(blocks);
     }
     Err(carded
         .iter()
         .map(|q| format!("{q}: a question on this page never makes a notification: write <section data-kit=\"question\" data-id=\"{q}\" data-notify=\"none\"> (it waits on the page and in sb page waiting)"))
+        .chain(picks.iter().map(|q| format!("{q}: a pick on this page never makes a notification: write <section data-kit=\"ui\" data-id=\"{q}\" data-notify=\"none\"> (it waits on the page and in sb page waiting)")))
         .collect())
 }
 
@@ -630,9 +631,9 @@ impl<'a> Linter<'a> {
         match (&notify, kit.as_deref()) {
             (None, Some("question")) if !tag.attrs.iter().any(|(n, _)| n == "data-card") => self.carded.push(at.clone()),
             (None, _) => {}
-            (Some(c), Some("question")) if c == "none" => {}
-            (Some(c), Some("question")) => self.err(&at, format!("data-notify=\"{c}\" is not a setting: a question that waits on the page takes data-notify=\"none\"; without it, it makes a notification")),
-            (Some(_), _) => self.err(&at, "data-notify is not a kit attribute here: only a question block takes it (data-notify=\"none\")".into()),
+            (Some(c), Some("question" | "ui")) if c == "none" => {}
+            (Some(c), Some("question" | "ui")) => self.err(&at, format!("data-notify=\"{c}\" is not a setting: a question or a pick that waits on the page takes data-notify=\"none\"; without it, it makes a notification")),
+            (Some(_), _) => self.err(&at, "data-notify is not a kit attribute here: only a question block or a ui block with a pick takes it (data-notify=\"none\")".into()),
         }
         // a plan worked through with him (lead m_5988): its yours rows become step cards in turn;
         // a bare attribute, only on a checklist

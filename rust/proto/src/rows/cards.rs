@@ -15,6 +15,20 @@ pub struct Opt {
     /// ([`opt_act`]); none: the option answers the card
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub act: Option<OptAct>,
+    /// a page's pick (notif-artifact): the option's one line why, under
+    /// its label in the card
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub why: Option<String>,
+    /// a page's pick: the option the asking agent marked as its own
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub mine: bool,
+}
+
+impl Opt {
+    /// Option `n`, `label`, answering the card.
+    pub fn new(n: u32, label: impl Into<String>) -> Opt {
+        Opt { n, label: label.into(), act: None, why: None, mine: false }
+    }
 }
 
 /// An option a client does itself (card-state, architect m_23450): the
@@ -120,6 +134,12 @@ pub struct CardPage {
     pub block: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub item: Option<String>,
+    /// the page's title and version: the card's chip `↗ <title> · page ·
+    /// v<n>` (notif-artifact); none from an older hub
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub v: Option<u64>,
 }
 
 /// One open card: what waits on him.
@@ -317,7 +337,7 @@ fn split_inline(text: &str) -> Option<(String, Vec<String>)> {
 /// A question's text as a card shows it: the body and its options.
 pub fn question(text: &str) -> (String, Vec<Opt>) {
     let (body, options) = split_choices(text);
-    let opts = options.into_iter().enumerate().map(|(i, label)| Opt { n: i as u32 + 1, label, act: None }).collect();
+    let opts = options.into_iter().enumerate().map(|(i, label)| Opt::new(i as u32 + 1, label)).collect();
     (body.trim().to_string(), opts)
 }
 

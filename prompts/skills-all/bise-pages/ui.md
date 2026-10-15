@@ -75,9 +75,13 @@ reads (tabs show every pane).
   ```
 - `k-ba`: two `figure`s, each a first `figcaption` (`<b>today</b> · …`) and its picture.
 - `k-states`: `figure`s, each a `figcaption` with the state's name and a small `k-term`.
-- `k-pick` with `data-ui="pick"`: `k-option`s with `data-pick="a"`, each an `h3`, a `p`, a
-  `ul` of trade-offs; on your pick, first, `<span class="k-mark">my pick</span>`. A click is a
-  pick note, like a compare's pick; one per block.
+- `k-pick` with `data-ui="pick"` and `data-ask="<the question, naming the thing>"`: `k-option`s
+  with `data-pick="a"`, each an `h3` (its short name first: `A · a pink border`), a `p` (one line
+  why: the notification shows it under the option), a `ul` of trade-offs; on your pick, first,
+  `<span class="k-mark">my pick</span>`. One per block. It asks like a `question`: it makes a
+  notification linked to the page, and his pick, in the inbox or on the page, answers both and
+  comes to you as a pick note. `data-notify="none"` on the section when it only waits on the
+  page.
 - `k-timeline` (an `ol`): `<li data-state="done|now">` with `<b>step</b><span class="k-who">who</span><p>…</p>`;
   a step that waits on the user takes `data-who="yours"` (it gets the accent).
 - `k-grid` of `k-card`s, `k-kicker`, `k-tag`, `k-big` (a number).

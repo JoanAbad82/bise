@@ -148,3 +148,18 @@ More examples, each passing the lint, in the bise app's `kit/examples/`:
 writing), `launch-post.html` (a Slack post), `offsite-plan.html` (venues to compare, what's left),
 `offsite-todo.html` (who does what by when), `launch-watch.html`, `feedback-bridge.html`,
 `newsletter.html`, `morning.html`, `about-you.html`.
+
+## A page and its notification
+
+| what you have | what you make |
+|---|---|
+| a decision with trade-offs, designs or more than 3 facts | a page with the pick (a `question`, or a `k-pick` in a `ui` block): the pick makes its notification, linked to the page |
+| a page with a question for him | the notification comes with it: `data-notify="none"` only when it can wait for his next visit |
+| a yes or no, or a short choice the card can carry whole | a notification alone (main's `sb notify`), no page |
+| something to read or keep, no decision | a page alone: its chip in the thread |
+| a notification about something complex, with no page | never: make the page first |
+
+The notification and the page are one thing: it carries the page as a chip and the page's own
+options, `o` opens the page beside the thread, and one answer, in the inbox or on the page,
+closes both. A notification main opens by hand about a page links it with
+`sb notify --page <id>#<block>`.

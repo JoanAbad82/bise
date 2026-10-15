@@ -674,7 +674,7 @@
         opt.setAttribute("role", "button");
         opt.setAttribute("tabindex", "0");
         if (!opt.hasAttribute("aria-pressed")) opt.setAttribute("aria-pressed", String(opt.getAttribute("data-verdict") === "pick"));
-        const go = () => doc.dispatchEvent(new root.CustomEvent("bise:react", { detail: pickOption(block, opt) }));
+        const go = () => (root.BiseAsk && root.BiseAsk.takes(doc, block, opt, () => pickOption(block, opt))) || doc.dispatchEvent(new root.CustomEvent("bise:react", { detail: pickOption(block, opt) })); // ask.js: an ask's pick answers its notification
         opt.addEventListener("click", (e) => { if (!(e.target.closest && e.target.closest("a"))) go(); });
         opt.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
       }
@@ -967,7 +967,7 @@
     // lit a moment; a block id works the same
     const target = targetOf(blocks(), decodeURIComponent(String((root.location && root.location.hash) || "").slice(1)));
     if (target) {
-      target.scrollIntoView({ block: "center" });
+      target.scrollIntoView({ block: target.offsetHeight > (root.innerHeight || 0) / 2 ? "start" : "center" });
       target.setAttribute("data-lit", "");
       setTimeout(() => target.removeAttribute("data-lit"), 2400);
     }
@@ -1092,7 +1092,7 @@
       es.addEventListener("progress", (e) => progress(String(data(e).text || "")));
       const relay = (ev, name) => es.addEventListener(ev, (e) => doc.dispatchEvent(new root.CustomEvent(name, { detail: data(e) })));
       es.addEventListener("notes", (e) => doc.dispatchEvent(new root.CustomEvent("bise:notes", { detail: { notes: data(e).notes || [] } })));
-      relay("voice", "bise:voice"); // slice 2 (§4.1): {phase, text}, notes.js pins it
+      relay("voice", "bise:voice"); relay("asks", "bise:asks"); relay("answered", "bise:hub-answered"); // voice: notes.js pins it (§4.1); asks, answered: ask.js
       // the taste line (amb-home d75aefe4): {rules: N} or null after each publish and at connect
       es.addEventListener("taste", (e) => {
         let x = null;

@@ -174,9 +174,19 @@ export function pageNoteWords(n: PageNoteOf, on: boolean): string {
 /** What he did on a page as its row, bise-proto's words::page_answer word for word: one answer to
  *  a card reads as any card answer (head 'you answered main', what it asked, his words); a start
  *  asks for an agent; else the page's name and his notes one per line. Pure. */
+/** A drawn pick's option's short name, before ' · ' ('A · a pink border' → 'A'); '' none (bise-proto words::page_answer). */
+export function pickedName(text: string): string {
+  const at = text.indexOf(' · ');
+  const k = at < 0 ? '' : text.slice(0, at).trim();
+  return Array.from(k).length <= 12 ? k : '';
+}
+
 export function pageAnswer(p: PagePart): { head: string; on: string; asked: string; words: string } {
   const title = p.title != null && p.title !== '' ? p.title : p.page;
   const only = p.notes.length === 1 ? p.notes[0] : undefined;
+  // a drawn pick's option (notif-artifact, designer m_26560): 'you picked A' (its name before ' · ')
+  const name = only !== undefined && only.kind === 'pick' && (only.asked ?? '') !== '' ? pickedName(only.text ?? '') : '';
+  if (only !== undefined && name !== '') return { head: `you picked ${name}`, on: '', asked: (only.asked ?? '').trim(), words: '' };
   if (only !== undefined && (only.asked ?? '') !== '') {
     const w = pageNoteWords(only, false).trim();
     const short = !w.includes('\n') && Array.from(w).length <= ON_THE_LINE;

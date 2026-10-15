@@ -206,12 +206,26 @@ export type Opt = { n: number, label: string,
  * what the client does itself for this option, never sent to the hub
  * ([`opt_act`]); none: the option answers the card
  */
-act?: OptAct | null, };
+act?: OptAct | null, 
+/**
+ * a page's pick (notif-artifact): the option's one line why, under
+ * its label in the card
+ */
+why?: string | null, 
+/**
+ * a page's pick: the option the asking agent marked as its own
+ */
+mine?: boolean, };
 
 /**
  * Where a card points on a page (a question block, a step of a plan).
  */
-export type CardPage = { id: string, url: string, block?: string | null, item?: string | null, };
+export type CardPage = { id: string, url: string, block?: string | null, item?: string | null, 
+/**
+ * the page's title and version: the card's chip `↗ <title> · page ·
+ * v<n>` (notif-artifact); none from an older hub
+ */
+title?: string | null, v?: number | null, };
 
 /**
  * One open card: what waits on him.

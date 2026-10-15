@@ -249,7 +249,7 @@ def main():
         c.wait(lambda: card("q1") and card("q2"), 30, "the question cards")
         q1, q2 = card("q1"), card("q2")
         check(q1["kind"] == "question" and q1["agent"] == "main", "q1's card: %r" % q1)
-        check(q1["page"] == {"id": "weekly-update", "block": "q1", "url": "%s/p/weekly-update#q1" % origin}, "q1's link: %r" % q1["page"])
+        check(q1["page"] == {"id": "weekly-update", "block": "q1", "url": "%s/p/weekly-update#q1" % origin, "title": "weekly update", "v": 3}, "q1's link: %r" % q1["page"])
         check("1. post now" in q1["text"] and "2. wait for Marc" in q1["text"], "q1's options: %r" % q1["text"])
         st, _, home = request(port, "GET", "/")
         li = [l for l in home.split("<li") if 'data-page="weekly-update"' in l]
@@ -265,14 +265,14 @@ def main():
         check(st == 403, "an answer without the token: %d" % st)
         st, _, r = request(port, "POST", "/api/p/weekly-update/answer", {"block": "q1", "option": 2}, {"Origin": origin, "X-Bise-Token": token})
         check(st == 200 and json.loads(r)["reply"] == "wait for Marc", "the answer: %d %s" % (st, r))
-        c.wait(lambda: sse.seen("answered", lambda d: d == {"block": "q1", "reply": "wait for Marc"}), 30, "SSE answered q1")
+        c.wait(lambda: sse.seen("answered", lambda d: (d["block"], d["reply"]) == ("q1", "wait for Marc")), 30, "SSE answered q1")
         c.wait(lambda: card("q1") is None, 30, "q1's card closed")
         c.wait(lambda: any("wait for Marc" in l for l in c.lines("main")), 30, "main reads the answer")
         st, _, _ = request(port, "POST", "/api/p/weekly-update/answer", {"block": "q1", "option": 1}, {"Origin": origin, "X-Bise-Token": token})
         check(st == 409, "answered twice: %d" % st)
         # answered from the capsule or the TUI (/answer N 1): its words on the page
         c.say("/answer %d 1" % q2["id"])
-        c.wait(lambda: sse.seen("answered", lambda d: d == {"block": "q2", "reply": "yes"}), 30, "SSE answered q2")
+        c.wait(lambda: sse.seen("answered", lambda d: (d["block"], d["reply"]) == ("q2", "yes")), 30, "SSE answered q2")
         c.wait(lambda: card("q2") is None, 30, "q2's card closed")
         st, _, home = request(port, "GET", "/")
         li = [l for l in home.split("<li") if 'data-page="weekly-update"' in l]
@@ -323,7 +323,7 @@ def main():
         fq = Sse(port, "/p/fixture-q/events")
         st, _, r = request(port, "POST", "/api/p/fixture-q/answer", {"block": "q1", "option": 1}, {"Origin": origin, "X-Bise-Token": token})
         check(st == 200, "a pick with no card: %d %s" % (st, r))
-        c.wait(lambda: fq.seen("answered", lambda d: d == {"block": "q1", "reply": "post now"}), 30, "SSE answered with no card")
+        c.wait(lambda: fq.seen("answered", lambda d: (d["block"], d["reply"]) == ("q1", "post now")), 30, "SSE answered with no card")
         c.wait(lambda: any("you sent 1 note" in l and "fixture-q" in l for l in c.lines("main")), 30, "the pick note in main's feed")
         notes = json.loads(request(port, "GET", "/p/fixture-q/meta")[2])["notes"]
         check([(n["kind"], n["block"], n["text"], n["status"]) for n in notes] == [("pick", "q1", "post now", "sent")], "the pick note: %r" % notes)
@@ -490,7 +490,7 @@ def main():
         tq = next(x for x in c.cards() if (x.get("page") or {}).get("id") == "task-plan" and (x.get("page") or {}).get("block") == "q1")
         tps = Sse(port, "/p/task-plan/events")
         c.say("/answer %d 2" % tq["id"])
-        c.wait(lambda: tps.seen("answered", lambda d: d == {"block": "q1", "reply": "wait for Marc"}), 30, "the task page's answer on the page")
+        c.wait(lambda: tps.seen("answered", lambda d: (d["block"], d["reply"]) == ("q1", "wait for Marc")), 30, "the task page's answer on the page")
         # t4's turn ended with a plain answer (no sb report): his tick on
         # its page still wakes it (pm's D fail 37). That first turn's end
         # first: on a loaded machine t4 was still in its sb page publish,
@@ -794,7 +794,7 @@ def main():
         fss = Sse(port, "/p/fixture-stale/events")
         st, _, r = request(port, "POST", "/api/p/fixture-stale/answer", {"block": "q1", "option": 2}, {"Origin": origin, "X-Bise-Token": token})
         check(st == 200, "the first pick on a stale card: %d %s" % (st, r))
-        c.wait(lambda: fss.seen("answered", lambda d: d == {"block": "q1", "reply": "wait for Marc"}), 30, "SSE answered on the stale page")
+        c.wait(lambda: fss.seen("answered", lambda d: (d["block"], d["reply"]) == ("q1", "wait for Marc")), 30, "SSE answered on the stale page")
 
         # pm's B (m_5765): a reader polling a page while its agent republishes
         # it 20 times always gets a whole answer, never a dropped connection
@@ -861,7 +861,7 @@ def main():
         # with a batch)
         linked = lambda: next((x for x in c.cards() if (x.get("page") or {}).get("id") == "bugs-watch" and not batch_of(x)), None)
         c.wait(linked, 60, "the watch's card, linked to its page")
-        want = {"id": "bugs-watch", "block": "bugs", "item": "b2", "url": "http://127.0.0.1:%d/p/bugs-watch#b2" % port}
+        want = {"id": "bugs-watch", "block": "bugs", "item": "b2", "url": "http://127.0.0.1:%d/p/bugs-watch#b2" % port, "title": "bugs watch", "v": 1}
         check(linked()["page"] == want, "the card's page: %r" % linked())
         check("reply to the CSV report?" in linked().get("text", ""), "the card's words: %r" % linked())
     except AssertionError as e:

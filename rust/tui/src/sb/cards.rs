@@ -73,6 +73,8 @@ pub(crate) struct Card {
     /// the options this app does itself, as the hub's row says (an
     /// asker's artifact, a merge's PR...; opt_open.rs)
     pub(super) acts: Vec<(u32, bise_proto::rows::OptAct)>,
+    /// the page it is linked to and the asker's pick (card_page.rs)
+    pub(super) page: Option<Box<PageLink>>,
 }
 
 /// A paragraph of an item the TUI writes itself.
@@ -119,6 +121,7 @@ impl Default for Card {
             asking: false,
             waiting: Vec::new(),
             acts: Vec::new(),
+            page: None,
         }
     }
 }
@@ -141,6 +144,8 @@ pub(super) enum CardHit {
     Tab(u64),
     /// open the card view on the top card
     Open,
+    /// open this card's linked page in the browser (its page line)
+    Page(u64),
 }
 
 /// The last answer, folded into one line on top of the box for 2 s
@@ -878,7 +883,7 @@ pub(super) fn fold_of(c: &Card, reply: &str, picked: Option<&str>) -> Fold {
     if !gate {
         // a picked option: its short label on the line (`both`)
         let (text, note) = match picked {
-            Some(p) => (format!("you answered {}: {}", c.agent, p), String::new()),
+            Some(p) => (picked_fold(c, reply).unwrap_or_else(|| format!("you answered {}: {}", c.agent, p)), String::new()),
             None => answered(&c.agent, reply),
         };
         return Fold { ok: true, text, note, asked: c.text.trim().to_string() };
@@ -1222,6 +1227,7 @@ pub(super) fn key(app: &mut App, k: &crossterm::event::KeyEvent, popup_open: boo
             }
             _ => submit(app),
         },
+        (KeyCode::Char('t'), KeyModifiers::CONTROL) if sel.is_some_and(|id| open_page(app, id)) => {}
         // 1-9 picks on an empty composer; once you typed, digits are text
         (KeyCode::Char(c @ '1'..='9'), KeyModifiers::NONE) if empty => {
             return sel.is_some_and(|id| pick_digit(app, id, c as usize - '0' as usize));
@@ -1264,6 +1270,7 @@ pub(crate) fn card_mouse(app: &mut App, m: &crossterm::event::MouseEvent) -> boo
             match hit {
                 CardHit::Row(id) => open_view(app, Some(id)),
                 CardHit::Open => open_view(app, None),
+                CardHit::Page(id) => _ = open_page(app, id),
                 CardHit::Tab(id) => show(app, id),
                 CardHit::Pick(id, i) => {
                     pick(app, id, i);
@@ -1356,45 +1363,13 @@ fn split_inline(text: &str) -> Option<(String, Vec<String>)> {
     None
 }
 
-/// The open cards matching `q` (their number, kind, agent or text):
-/// the card argument of `/close` and `/answer`.
-pub(crate) fn card_choices(app: &App, q: &str) -> Vec<Choice> {
-    app.sb
-        .sorted_cards()
-        .into_iter()
-        .filter(|c| card_matches(q, c.id, &[&c.kind, &c.agent, &c.text]))
-        .map(|c| {
-            let (_, icon, _) = kind_look(&c.kind);
-            Choice {
-                value: c.id.to_string(),
-                label: if super::setup::is_local(c.id) { "setup".into() } else { format!("#{}", c.id) },
-                desc: format!("{} @{} · {}", c.kind, c.agent, truncate_chars(&one_line(&c.text), 80)),
-                mark: Some((icon, glyph_color(&c.kind))),
-            }
-        })
-        .collect()
-}
-
-/// A card for the typed `q`: a number is the start of the card's number
-/// (`99` finds #994, never #1999), and a setup card's number (2^50 + n,
-/// setup::LOCAL) is not the user's: it matches `setup` instead (`/close
-/// 999` had picked a setup card whose id holds "999", and the hub then
-/// answered `no open card #1125899906842624`).
-fn card_matches(q: &str, id: u64, fields: &[&str]) -> bool {
-    let q = q.trim_start_matches('#');
-    let local = super::setup::is_local(id);
-    if !q.is_empty() && q.bytes().all(|b| b.is_ascii_digit()) {
-        return !local && id.to_string().starts_with(q);
-    }
-    let num = if local { "setup".to_string() } else { id.to_string() };
-    crate::commands::matches(q, &[&num, fields[0], fields[1], fields[2]])
-}
-
-/// The text on one line: runs of whitespace become one space.
-fn one_line(s: &str) -> String {
-    s.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
+#[path = "card_page.rs"]
+mod card_page;
+pub(crate) use card_page::linked_page;
+pub(super) use card_page::{open_page, page_hint, page_link_line, page_mine, picked_fold, remember_pages, PageLink};
+#[path = "card_choices.rs"]
+mod card_choices;
+pub(crate) use card_choices::card_choices;
 #[path = "card_voice.rs"]
 mod card_voice;
 #[allow(unused_imports)] // voice mode's integration calls some only in tests yet

@@ -399,12 +399,12 @@ impl Shell {
             crate::pages::PageMsg::Answer { id, block, reply } => {
                 // the same path as the capsule's and the TUI's answer
                 if let Some(card) = self.page_card(&id, &block) {
-                    self.page_question_answer(&id, &block, card, &reply);
+                    self.page_question_answer(&id, &block, card, &reply, "page");
                 } else {
                     // no open card for it (it never opened, or the store
                     // was written another way): the loop still closes,
                     // the answer to the page's agent as from the user
-                    self.page_answer_without_card(&id, &block, &reply);
+                    self.page_answer_without_card(&id, &block, &reply, "page");
                 }
                 self.page_answers();
             }

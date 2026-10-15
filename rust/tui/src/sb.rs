@@ -21,7 +21,7 @@ pub(crate) mod palette;
 pub(super) use mention::mentions;
 mod cards;
 mod opt_open;
-pub(super) use cards::{card_choices, card_mouse, proves_ctrl_digits};
+pub(super) use cards::{card_choices, card_mouse, linked_page, proves_ctrl_digits};
 pub(crate) use cards::{answer_by_voice, show_heard, voice_question};
 pub(crate) use cards::{ambient_local, ambient_options, ambient_reply, split_choices};
 use cards::{Card, CardView};

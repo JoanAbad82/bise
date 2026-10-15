@@ -265,13 +265,23 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
         .map(|c| {
             let kind = s(c, "kind");
             let text = c.get("text").and_then(Value::as_str).unwrap_or("").to_string();
-            let (q, options) = question(&text);
+            let (q, mut options) = question(&text);
             let page = c.get("page").filter(|p| p.is_object()).map(|p| CardPage {
                 id: s(p, "id"),
                 url: s(p, "url"),
                 block: Some(s(p, "block")).filter(|b| !b.is_empty()),
                 item: Some(s(p, "item")).filter(|i| !i.is_empty()),
+                title: Some(s(p, "title")).filter(|t| !t.is_empty()),
+                v: n(p, "v"),
             });
+            // a page's pick: each option's why, the agent's own (snapshot_pages)
+            if let Some(p) = c.get("pick").and_then(|p| serde_json::from_value::<crate::pages::questions::Pick>(p.clone()).ok()) {
+                for o in &mut options {
+                    let i = o.n as usize;
+                    o.why = p.options.get(i.wrapping_sub(1)).map(|x| x.why.clone()).filter(|w| !w.is_empty());
+                    o.mine = p.mine == Some(i);
+                }
+            }
             Card {
                 id: n(c, "id").unwrap_or(0),
                 project: project.to_string(),

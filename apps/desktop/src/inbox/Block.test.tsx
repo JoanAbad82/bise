@@ -93,7 +93,7 @@ describe('the inbox block (b2)', () => {
     fireEvent.click(screen.getByTestId('inbox.block.row.2'));
     expect(screen.getByTestId('inbox.block.open.2')).toBeTruthy();
     expect(screen.getByTestId('inbox.block.keys').textContent).toContain('esc');
-    expect(told.at(-1)).toEqual({ project: P, card: 9, label: '↳ answering perf · which bench?', end: 'esc to perf instead', answer: 9, asker: 'perf', placeholder: 'your answer to perf, then ⏎', tip: "your words answer perf's question · esc writes to perf" });
+    expect(told.at(-1)).toEqual({ project: P, card: 9, label: '↳ answering perf · which bench?', answer: 9, asker: 'perf', placeholder: 'your answer to perf, then ⏎', tip: "your words answer perf's question · esc writes to perf" });
     fireEvent.keyDown(window, { key: '2' });
     expect(hub()).toEqual([{ cmd: 'answer', project: P, card: 9, reply: '2' }]);
     expect(screen.queryByTestId('inbox.block.open.2')).toBeNull();

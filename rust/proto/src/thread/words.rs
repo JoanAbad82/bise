@@ -267,6 +267,11 @@ pub fn answered_split(who: &str, words: &str, width: &dyn Fn(&str) -> usize) -> 
 pub fn page_answer(p: &crate::parts::PageSaid<'_>, width: &dyn Fn(&str) -> usize) -> (String, String, String) {
     let (to, title, notes) = (p.to, p.title, p.notes);
     if let [n] = notes {
+        // a drawn pick's option (notif-artifact, designer m_26560): `you
+        // picked A` (its name before ` · `), what it asked beside
+        if let Some(name) = Some(n).filter(|n| n.kind == "pick" && !n.asked.is_empty()).and_then(|n| n.text.split_once(" · ")).map(|(k, _)| k.trim()).filter(|k| !k.is_empty() && width(k) <= 12) {
+            return (format!("you picked {name}"), n.asked.trim().to_string(), String::new());
+        }
         if !n.asked.is_empty() {
             let (head, note) = answered_split(to, &page_note_words(n, false), width);
             return (head, n.asked.trim().to_string(), note);
@@ -803,7 +808,10 @@ mod tests {
         let pick = PageNote { card: 516, asked: "Est-ce que bise lit les listes dans l'API ?".into(), ..note("pick", "la table maintenant, la lecture de l'API juste après", "") };
         assert_eq!(said(std::slice::from_ref(&pick)), ("you answered main".into(), "Est-ce que bise lit les listes dans l'API ?".into(), "la table maintenant, la lecture de l'API juste après".into()));
         let short = PageNote { text: "xhigh".into(), ..pick };
-        assert_eq!(said(&[short]).0, "you answered main: xhigh");
+        assert_eq!(said(std::slice::from_ref(&short)).0, "you answered main: xhigh");
+        // a drawn pick's option (notif-artifact): you picked its name, what it asked beside
+        let drawn = PageNote { text: "A · a pink border and a clear label".into(), asked: "which composer look?".into(), ..short };
+        assert_eq!(said(&[drawn]), ("you picked A".into(), "which composer look?".into(), String::new()));
         // a note, a tick, an edit, a keep: the page named, his words one per line
         let notes = [note("note", "shorter", "Revenue grew"), note("tick", "done", ""), note("edit", "Q3", "Q2"), note("keep", "", "")];
         assert_eq!(said(&notes[..1]).0, "you sent main a note on ↗ efforts");

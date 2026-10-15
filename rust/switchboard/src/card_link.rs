@@ -96,12 +96,14 @@ pub fn link(pages: &Pages, spec: &str) -> Result<Value, String> {
     };
     let meta = pages.store.meta(id).ok_or_else(|| format!("no page {id:?} (sb page list)"))?;
     let url = pages.url(id);
-    let Some(item) = item else { return Ok(json!({"id": id, "url": url})) };
-    let html = pages.store.html(id, meta.version()).unwrap_or_default();
+    // the card's chip, '↗ <title> · page · v<n>' (notif-artifact)
+    let (title, v) = (meta.title.clone(), meta.version());
+    let Some(item) = item else { return Ok(json!({"id": id, "url": url, "title": title, "v": v})) };
+    let html = pages.store.html(id, v).unwrap_or_default();
     match block_of(&html, item) {
-        Some(b) if b == item => Ok(json!({"id": id, "block": b, "url": format!("{url}#{item}")})),
-        Some(b) => Ok(json!({"id": id, "block": b, "item": item, "url": format!("{url}#{item}")})),
-        None => Err(format!("page {id:?} has no block or item {item:?} in v{}", meta.version())),
+        Some(b) if b == item => Ok(json!({"id": id, "block": b, "url": format!("{url}#{item}"), "title": title, "v": v})),
+        Some(b) => Ok(json!({"id": id, "block": b, "item": item, "url": format!("{url}#{item}"), "title": title, "v": v})),
+        None => Err(format!("page {id:?} has no block or item {item:?} in v{v}")),
     }
 }
 
@@ -188,14 +190,15 @@ mod tests {
         let pb = Publish { agent: "watch".into(), id: Some("launch-watch".into()), html: HTML.into(), ..Default::default() };
         p.publish(&pb, 1, &|_| false).unwrap();
         let u = "http://127.0.0.1:47123/p/launch-watch";
-        assert_eq!(link(&p, "launch-watch").unwrap(), json!({"id": "launch-watch", "url": u}));
+        let t = p.store.meta("launch-watch").unwrap().title;
+        assert_eq!(link(&p, "launch-watch").unwrap(), json!({"id": "launch-watch", "url": u, "title": t, "v": 1}));
         assert_eq!(
             link(&p, "launch-watch#hn-41").unwrap(),
-            json!({"id": "launch-watch", "block": "comments", "item": "hn-41", "url": format!("{u}#hn-41")})
+            json!({"id": "launch-watch", "block": "comments", "item": "hn-41", "url": format!("{u}#hn-41"), "title": t, "v": 1})
         );
         assert_eq!(
             link(&p, " launch-watch#next ").unwrap(),
-            json!({"id": "launch-watch", "block": "next", "url": format!("{u}#next")})
+            json!({"id": "launch-watch", "block": "next", "url": format!("{u}#next"), "title": t, "v": 1})
         );
         assert_eq!(link(&p, "launch-watch#").unwrap()["url"], u, "an empty item: the page");
         assert!(link(&p, "launch-watch#gone").unwrap_err().contains("no block or item \"gone\""));

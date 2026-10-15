@@ -68,7 +68,11 @@ pub(crate) fn key_pairs(app: &App) -> Vec<(&'static str, String)> {
             Some(i) => v.push(("⏎", cut(&s.options[i], 32))),
             None => {
                 if n > 0 && !typed {
-                    v.push(p(digits(n), "answer"));
+                    v.push(p(digits(n), if c.page.is_some() { "pick" } else { "answer" }));
+                }
+                // a page's card (notif-artifact): `1-2 pick   ctrl+t open`
+                if c.page.is_some() && !typed {
+                    v.push(p("ctrl+t", "open"));
                 }
                 v.push(p("⏎", "send the answer"));
             }
@@ -96,9 +100,14 @@ pub(crate) fn key_pairs(app: &App) -> Vec<(&'static str, String)> {
         Some(i) => v.push(("⏎", cut(&s.options[i], 32))),
         // a hard rule's card: 1 allow, 3 no (designer)
         None if n > 0 && s.nums == [1, 3] => v.push(p("1 3", "answer")),
+        // a page's card (notif-artifact): its options pick, ctrl+t opens the page
+        None if n > 0 && c.page.is_some() => v.push(p(digits(n), "pick")),
         None if n > 0 => v.push(p(digits(n), "answer")),
         None if s.enter == Enter::Ack => v.push(p("⏎", "got it")),
         None => {}
+    }
+    if c.page.is_some() {
+        v.push(p("ctrl+t", "open"));
     }
     if n > 0 && !full {
         v.push(p("←→", "choose"));

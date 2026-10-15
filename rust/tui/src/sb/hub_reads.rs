@@ -271,6 +271,11 @@ fn cards(app: &mut App, his: &[bise_proto::rows::Card], others: &[bise_proto::ro
     let before = std::mem::replace(&mut sb.cards, super::state_rows::cards_of_rows(his, others, sb.feature_drop_ask, crate::when::now_ms()));
     // the setup cards are the TUI's own: not in the hub's rows
     super::setup::put_back(sb);
+    // a card linked to a page: its thread line is one line (render.rs)
+    if super::cards::remember_pages(&sb.cards) {
+        app.cache.iter_mut().for_each(|c| *c = None);
+    }
+    let sb = &mut app.sb;
     // zen (BISE-121): a card that was not there
     if sb.cards.iter().any(|c| !known.contains(&c.id)) {
         sb.calls += 1;

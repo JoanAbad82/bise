@@ -42,7 +42,7 @@ const ports = () => {
       store.close(project, c);
     },
     openInbox: () => did.push('inbox'),
-    openPage: (url) => did.push(`open ${url}`),
+    act: (project, a) => did.push(`act ${project} ${JSON.stringify(a)}`),
   };
   const wrapper = ({ children }: { children: ReactNode }) => <StoreProvider store={store}>{children}</StoreProvider>;
   return { did, p, wrapper, store };
@@ -157,6 +157,39 @@ describe('InboxStrip (W7/K24)', () => {
     expect(screen.getByTestId('tip').compareDocumentPosition(screen.getByTestId('strip')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     rerender(<InboxStrip project="acme" cards={[]} ports={ports().p} now={NOW} tip={<span data-testid="tip" />} />);
     expect(screen.queryByTestId('tip')).toBeNull();
+  });
+
+  // notif-artifact (designer m_26560): a card linked to a page carries it as a chip under the
+  // question, each option's why and the asker's own pick; the chip, 'o open beside' and o open it
+  // beside the thread at its block (nothing sent, the item stays); typed words say who reads them
+  it('a page-linked card: the chip opens the page at its block, o too, the options say why', () => {
+    const { did, p, wrapper } = ports();
+    const linked: Card = {
+      ...card(1, 1),
+      agent: 'designer',
+      page: { id: 'notif-artifact', url: 'http://127.0.0.1:1/p/notif-artifact#look', block: 'look', title: 'where does my answer go', v: 4 },
+      options: [
+        { n: 1, label: 'A · a pink border', why: 'and a clear label', mine: true },
+        { n: 2, label: 'B · one frame' },
+      ],
+    };
+    render(<InboxStrip project="acme" cards={[linked]} ports={p} now={NOW} />, { wrapper });
+    fireEvent.keyDown(window, { code: 'Digit1', key: '1', ctrlKey: true });
+    const id = 'strip.card.acme-1';
+    expect(screen.getByTestId(`${id}.page.chip`).textContent).toBe('↗ where does my answer gopage · v4');
+    expect(screen.getByTestId(`${id}.page.open`).textContent).toBe('⌘Oopen beside');
+    expect(screen.getByTestId(`${id}.opt.1`).textContent).toBe('1A · a pink borderand a clear labelmy pick');
+    expect(screen.getByTestId(`${id}.opt.2`).textContent).toBe('2B · one frame');
+    expect(screen.getByTestId(`${id}.keys`).textContent).toContain('or type: designer reads it');
+    expect(screen.getByTestId(`${id}.keys`).textContent).not.toContain('open its page');
+    const opened = `act acme {"act":"open","artifact":"notif-artifact","at":"look","url":"http://127.0.0.1:1/p/notif-artifact#look"}`;
+    fireEvent.click(screen.getByTestId(`${id}.page.chip`));
+    // a bare o is his words (no bare letter takes an empty composer, designer m_26776); ⌘O opens it
+    fireEvent.keyDown(window, { key: 'o' });
+    expect(did).toEqual([opened]);
+    fireEvent.keyDown(window, { key: 'o', metaKey: true });
+    expect(did).toEqual([opened, opened]);
+    expect(screen.getByTestId(id)).toBeTruthy();
   });
 
   it('ctrl+N past the last row does nothing and leaves the key alone', () => {

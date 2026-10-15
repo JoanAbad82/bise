@@ -23,7 +23,6 @@ export interface StripPorts {
   openInbox: () => void;
   /** 'type your answer below': the composer under the card takes the focus */
   typeAt?: () => void;
-  openPage?: (url: string) => void;
   /** an option the window does itself (optAct.ts): the asker's artifact at its block, a link, the
    * app's own ChatGPT sign-in; nothing is sent, the item stays */
   act?: (project: string, act: OptAct) => void;
@@ -94,6 +93,13 @@ export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip
     openTo(null);
     ports.answer(c.project, c.id, String(n));
   };
+  // a card linked to a page (notif-artifact): the chip or 'o' opens it beside the thread at its
+  // block, the act an option's --open takes (optAct.ts); nothing is sent, the item stays
+  const openPage = (c: Card) => {
+    const p = c.page;
+    if (p == null) return;
+    ports.act?.(c.project, { act: 'open', artifact: p.id, at: p.item ?? p.block ?? null, url: p.url });
+  };
   const close = (c: Card) => {
     openTo(null);
     ports.close(c.project, c.id);
@@ -121,6 +127,7 @@ export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip
       if (k.t === 'later') openTo(null);
       else if (k.t === 'on') setOn(k.n);
       else if (k.t === 'pick') answer(openCard, k.n);
+      else if (k.t === 'page') openPage(openCard);
       else close(openCard);
     };
     window.addEventListener('keydown', onKey, true);
@@ -166,7 +173,7 @@ export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip
                 openTo(null);
               },
               ...(ports.typeAt ? { type: ports.typeAt } : {}),
-              ...(ports.openPage ? { openPage: ports.openPage } : {}),
+              ...(c.page != null && ports.act ? { openPage: () => { openPage(c); } } : {}),
             }}
             testId={`strip.card.${cardKey(c)}`}
           />
@@ -210,12 +217,14 @@ export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip
   );
 }
 
-type CardKey = { t: 'pick' | 'on'; n: number } | { t: 'close' } | { t: 'later' };
+type CardKey = { t: 'pick' | 'on'; n: number } | { t: 'close' } | { t: 'later' } | { t: 'page' };
 
 /** A key on the open card (no words typed): its act, or none. Pure. */
 export function cardKeyOf(e: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>, c: Card, on: number | null): CardKey | null {
   if (e.key === 'Escape') return { t: 'later' };
   if (e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'Backspace') return { t: 'close' };
+  // ⌘O: a page's item opens its page beside (notif-artifact); no bare letter takes an empty composer
+  if (e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'o' && c.page != null) return { t: 'page' };
   if (e.metaKey || e.ctrlKey || e.altKey) return null;
   const ns = c.options.map((o) => o.n);
   if (/^[1-9]$/.test(e.key) && ns.includes(Number(e.key))) return { t: 'pick', n: Number(e.key) };

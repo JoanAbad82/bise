@@ -3,8 +3,8 @@
 // Passes when, on the scripted core (FakeCore, fake data):
 //   - main's merge item docked: the label reads 'to bise · the merge waits for 1 or 2', the card has no
 //     'or type your answer below', and his typed line + ⏎ goes as a plain send to main, never an answer;
-//   - a question docked with a long question: the label is one line ('↳ answering perf · <cut>…' and
-//     'esc to perf instead' whole at its right).
+//   - a question docked with a long question: the label is one line ('↳ answering perf · <cut>…'),
+//     no esc end on perf's own thread (designer m_26818).
 // Shots: light, both docks. Owner: amb-home.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
@@ -56,21 +56,19 @@ test('thread/dock-choice: a docked merge is decided only by 1/2; typed words go 
       expect((core.cmds() as Cmd[]).filter((c) => c.cmd === 'answer'), 'a typed line never answers the merge').toHaveLength(0);
     });
 
-    await test.step("a long question docked: the label is one line, 'esc to perf instead' whole", async () => {
+    await test.step("a long question docked: the label is one line, no esc end on perf's own thread", async () => {
       await core.send(projects([long]) as never);
       await page.getByTestId('app.right.agent.perf').click();
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-agent', 'perf', { timeout: 5000 });
       await page.getByTestId('inbox.block.row.1').click();
       await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-answering', 'true', { timeout: 3000 });
       await expect(label.getByTestId('composer.tab.to')).toContainText('↳ answering perf · which bench');
-      // on perf's own thread the block says whom esc writes to instead (amb-home's answeringOf)
-      await expect(label.locator('.end')).toHaveText('esc to perf instead');
+      // on perf's own thread there is no esc end (designer m_26818)
+      await expect(label.locator('.end:not(.gone)')).toHaveCount(0);
       const box = await label.evaluate((el) => {
         const end = el.querySelector('.end');
         return { h: el.getBoundingClientRect().height, lineH: Number.parseFloat(getComputedStyle(el).lineHeight) || 16, endH: end ? end.getBoundingClientRect().height : 0, endW: end ? end.scrollWidth - end.clientWidth : -1 };
       });
-      expect(box.endW, "'esc to perf instead' not cut").toBe(0);
-      expect(box.endH, 'its words on one line').toBeLessThan(box.lineH * 1.6);
       expect(box.h, 'the label one line (its padding below)').toBeLessThan(box.lineH * 1.6 + 8);
       await page.screenshot({ path: test.info().outputPath('dock-long-question.png') });
     });

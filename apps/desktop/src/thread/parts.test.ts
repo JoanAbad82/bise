@@ -97,6 +97,9 @@ describe('his answer on a page (page part)', () => {
     expect(pageAnswer(p)).toEqual({ head: 'you answered main', on: '', asked: "Est-ce que bise lit les listes dans l'API ?", words: "la table maintenant, la lecture de l'API juste après" });
     const short = pageOf([page([{ block: 'q', kind: 'pick', text: 'xhigh', card: 514, asked: 'le nom ?' }])]);
     expect(short === null ? '' : pageAnswer(short).head).toBe('you answered main: xhigh');
+    // a drawn pick's option (notif-artifact): 'you picked A', what it asked beside
+    const drawn = pageOf([page([{ block: 'look', kind: 'pick', text: 'A · a pink border and a clear label', card: 9, asked: 'which composer look?' }])]);
+    expect(drawn === null ? null : pageAnswer(drawn)).toEqual({ head: 'you picked A', on: '', asked: 'which composer look?', words: '' });
   });
   it('notes, a tick, an edit: the page named, his words one per line', () => {
     const p = pageOf([

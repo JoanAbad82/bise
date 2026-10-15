@@ -875,12 +875,11 @@ pub(crate) fn card_parts(t: &str) -> Option<(&str, &str, &str)> {
     Some((kind, name, text))
 }
 
-// a card in the history (book §9): a question or a blocker is level 1,
-// an accent bar `┃`, the bold accent title `? {name} needs you`, the
-// body in text; a done or failed card is one line for you (`✓` accent, `✗`).
-// Answered (`closed`: the hub's word, book §10, §12), a level-1 card
-// fades in place: dim bar, dim title with ` · answered`, dim body; the
-// answer follows as its own line.
+// a card in the history (book §9): a question or a blocker is level 1, an accent bar `┃`, the
+// bold accent title `? {name} needs you`, the body in text; a page's card is its head alone,
+// `? main asks: <question> ↗ <page>`; a done or failed card is one line for you (`✓`, `✗`).
+// Answered (`closed`: the hub's word, book §10, §12), a level-1 card fades in place (dim bar,
+// dim title with ` · answered`, dim body); the answer follows as its own line.
 fn card_lines(card: &crate::wire::CardParts, closed: &str, width: usize) -> Vec<Line<'static>> {
     let text_st = Style::default().fg(text());
     let body = card.body();
@@ -897,7 +896,8 @@ fn card_lines(card: &crate::wire::CardParts, closed: &str, width: usize) -> Vec<
         }
         _ => {}
     }
-    let mut title = if name.is_empty() { "needs you".to_string() } else { format!("{} needs you", name) };
+    let page = card.id.and_then(crate::sb::linked_page).map(|p| format!("{name} asks: {} ↗ {p}", card.question.lines().next().unwrap_or("")));
+    let mut title = page.clone().unwrap_or_else(|| if name.is_empty() { "needs you".to_string() } else { format!("{} needs you", name) });
     let (bar_st, title_st, body_st) = if closed.is_empty() {
         let accent_st = Style::default().fg(accent()).add_modifier(Modifier::BOLD);
         (Style::default().fg(accent()), accent_st, text_st)
@@ -911,7 +911,7 @@ fn card_lines(card: &crate::wire::CardParts, closed: &str, width: usize) -> Vec<
         Span::styled(format!("{} ", G_CARD), title_st),
         Span::styled(title, title_st),
     ])];
-    lines.extend(body.split('\n').map(|l| Line::from(Span::styled(l.to_string(), body_st))));
+    lines.extend(body.split('\n').filter(|_| page.is_none()).map(|l| Line::from(Span::styled(l.to_string(), body_st))));
     barred_rows(&bar, lines, width)
 }
 

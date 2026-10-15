@@ -80,6 +80,10 @@
 .art-open-composer { flex: none; display: flex; flex-direction: column; align-items: stretch; width: 100%; max-width: 712px; margin: 0 auto; padding: 0 var(--pad-panel) var(--pad-panel); box-sizing: border-box; }
 /* it wears .th-screen for the docked inbox's look, never its full height: the page keeps the room (designer m_20594) */
 .art-open-composer.th-screen { height: auto; }
+/* under 1000 px the page keeps at least half the height: an open item scrolls under it, the composer
+   stays (designer m_26818) */
+.art-open-composer { max-height: 50%; }
+.art-open-composer > .inbox-block { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
 .art-paper { width: 100%; height: 100%; border: 0; border-radius: var(--r-3); background: var(--c-solid); box-shadow: var(--e-1); }
 /* an image artifact, zoomable (his m_22822): the image in its own box, drawn at its zoom from the
    top-left; a pinch never zooms the window. The chip while not fit: bottom right, quiet */

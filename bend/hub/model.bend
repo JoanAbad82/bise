@@ -526,10 +526,11 @@ def put_card(xs: List<&2, Card>, +c: Card) -> List<&2, Card>:
 def choice_kind(+k: String) -> Bool:
   String.eq(k, "merge") || String.eq(k, "feature_try") || String.eq(k, "feature_merge") || String.eq(k, "update") || String.eq(k, "signin")
 
-# a page's own card (plan-ok): a plan an agent proposes, asked by that
-# agent (core.bend page_card); his answer is the hub's page path
+# a page's own card (plan-ok): a plan an agent proposes, or a page's
+# question or drawn pick (notif-artifact), asked by that agent (core.bend
+# page_card); his answer is the hub's page path
 def page_kind(+k: String) -> Bool:
-  String.eq(k, "plan")
+  String.eq(k, "plan") || String.eq(k, "question")
 
 # BISE-299: the user's inbox holds only what needs the user, by kind, set
 # at the card's creation: main's escalations (`question`: `sb card`,

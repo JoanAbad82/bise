@@ -60,9 +60,6 @@ export function ThreadInbox({ project }: { project: string }) {
         typeAt: () => {
           document.querySelector<HTMLElement>('[data-testid="composer.field"]')?.focus();
         },
-        openPage: (url) => {
-          void window.bise.openExternal(url);
-        },
         act: doAct,
         inView,
       }}

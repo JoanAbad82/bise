@@ -1,6 +1,10 @@
 //! The pages' cards (docs/ambient-pages.md §2.4-§2.6): the links from
 //! cards to pages, a page's questions and step cards and their answers,
-//! drafts batches and ticks, and the hint main's page replies carry.
+//! drafts batches and ticks, and the hint main's page replies carry. A
+//! question or a drawn pick is a page card its page's agent asks (sb-core
+//! page_card, notif-artifact); its card carries the page's chip (title,
+//! version) and the pick's why lines; the page hears its asks (`asks`,
+//! `answered` with the door and the time).
 //! Moved out of daemon/pages.rs unchanged (architect's 1,000-line rule).
 
 use super::*;
@@ -69,6 +73,20 @@ impl Shell {
                         Some((b, item)) => json!({"id": id, "block": b, "item": item, "url": format!("{}#{}", p.url(id), item)}),
                         None => json!({"id": id, "block": block, "url": format!("{}#{}", p.url(id), block)}),
                     };
+                    // the card's chip, '↗ <title> · page · v<n>' (notif-artifact)
+                    if let Some(meta) = p.store.meta(id) {
+                        c["page"]["title"] = json!(meta.title);
+                        c["page"]["v"] = json!(meta.version());
+                    }
+                    // a drawn pick: its options' why lines, the agent's own;
+                    // past 4 options its last one opens the page for the rest
+                    if let Some(q) = p.store.questions(id).into_iter().find(|q| q.block == *block && q.pick.is_some()) {
+                        if let Some((n, _)) = q.more() {
+                            let url = format!("{}#{}", p.url(id), block);
+                            c["opens"] = crate::card_link::opens_json(&[(n as u32, bise_proto::rows::OptAct::artifact(id, Some(block), Some(&url)))]);
+                        }
+                        c["pick"] = json!(q.pick);
+                    }
                 }
             }
         }
@@ -160,7 +178,12 @@ impl Shell {
     pub(super) fn page_questions(&mut self, id: &str, agent: &str, html: &str) {
         let Some(pages) = self.pg.pages.clone() else { return };
         let old = pages.store.questions(id);
-        let new = crate::pages::questions::of_fragment(html);
+        let mut new = crate::pages::questions::of_fragment(html);
+        // a drawn pick with no data-ask asks with the page's title
+        let title = pages.store.meta(id).map(|m| m.title).unwrap_or_default();
+        for q in new.iter_mut().filter(|q| q.text.is_empty()) {
+            q.text = title.clone();
+        }
         if old.is_empty() && new.is_empty() {
             return;
         }
@@ -175,16 +198,11 @@ impl Shell {
         // dismissed one not again until its words change (m_6091)
         for q in qs.iter_mut().filter(|q| q.card == 0 && q.reply.is_none() && !q.page_only && !q.dismissed) {
             let before: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
-            // sb-core opens cards for main only (a task's request is
-            // refused: pm's 25), so main asks; the hub answers it itself
-            // (page_card_answer: the pick goes to the page's agent `agent`).
-            // No client waits for the reply (token 0: never a connection's)
-            let _ = agent;
-            self.step(Input::Agent {
-                token: 0,
-                from: MAIN.to_string(),
-                req: crate::core::AgentReq::Card { text: q.card_text(), for_msg: None },
-            });
+            // a page card (notif-artifact, architect m_26569): asked by the
+            // page's agent (main when it is gone: page_asker), a question or
+            // a drawn pick alike; his answer is the hub's own page path
+            // (page_card_answer: the pick goes to the page's agent)
+            self.step(Input::PageCard { agents: vec![agent.to_string()], kind: "question".into(), text: q.card_text(), key: format!("question:{}", q.block) });
             let card = self.hub.st.open_cards().filter(|c| !before.contains(&c.id) && c.kind == "question").map(|c| c.id).max();
             match card {
                 Some(card) => {
@@ -197,23 +215,35 @@ impl Shell {
         if let Err(e) = pages.locked(|s| s.save_questions(id, &qs)) {
             log_line(&self.opts.paths, &format!("page {id}: questions not saved: {e}"));
         }
+        Self::push_asks(&pages, id);
         pages.push("", "pages", &json!({"pages": pages.list_json()}));
+    }
+
+    /// The page's asks as the kit draws them (notif-artifact): '? waits
+    /// in your inbox' while a notification is open, its answer after.
+    fn push_asks(pages: &crate::pages::Pages, id: &str) {
+        let asks: Vec<Value> = pages.store.questions(id).iter().map(|q| q.ask_json(true)).collect();
+        pages.push(id, "asks", &json!({"asks": asks}));
     }
 
     /// A page question answered with no open card (amb-kit m_5336,
     /// ambient-lead m_5343): the answer is kept, the page hears
     /// `answered`, and the pick is a `pick` note on that block, sent to
     /// the page's agent (main when it is gone) like any notes.
-    pub(super) fn page_answer_without_card(&mut self, id: &str, block: &str, reply: &str) {
+    /// `via`: the door that took it (`inbox` or `page`), kept with it.
+    pub(super) fn page_answer_without_card(&mut self, id: &str, block: &str, reply: &str, via: &str) {
         let Some(pages) = self.pg.pages.clone() else { return };
         let Some(meta) = pages.store.meta(id) else { return };
         let mut qs = pages.store.questions(id);
         let Some(q) = qs.iter_mut().find(|q| q.block == block && q.reply.is_none()) else { return };
         q.reply = Some(reply.to_string());
+        q.via = Some(via.to_string());
+        q.at_ms = Some(now_ms());
+        let answered = q.answered_json();
         if let Err(e) = pages.locked(|s| s.save_questions(id, &qs)) {
             log_line(&self.opts.paths, &format!("page {id}: questions not saved: {e}"));
         }
-        pages.push(id, "answered", &json!({"block": block, "reply": reply}));
+        pages.push(id, "answered", &answered);
         let note = match pages.locked(|s| s.add_pick(id, block, reply, meta.version(), now_ms())) {
             Ok(n) => n,
             Err(e) => return log_line(&self.opts.paths, &format!("page {id}: the pick not saved: {e}")),
@@ -674,7 +704,7 @@ impl Shell {
         }
         match key.strip_prefix("row:").and_then(|k| k.split_once('/')).map(|(_, i)| i.to_string()) {
             Some(item) => self.page_tick(&id, &item, reply),
-            None => self.page_question_answer(&id, &key, card, reply),
+            None => self.page_question_answer(&id, &key, card, reply, "inbox"),
         }
     }
 
@@ -685,7 +715,7 @@ impl Shell {
     /// main, the card's asker (pm's 25: a task's page); sb-core's
     /// `page_answered` closes it and tells the asker in one message when
     /// the pick went to another agent (wake-deliver).
-    pub(super) fn page_question_answer(&mut self, id: &str, block: &str, card: u64, reply: &str) -> bool {
+    pub(super) fn page_question_answer(&mut self, id: &str, block: &str, card: u64, reply: &str, via: &str) -> bool {
         let Some(pages) = self.pg.pages.clone() else { return false };
         let reply = reply.trim();
         let words = match reply.parse::<usize>() {
@@ -702,7 +732,7 @@ impl Shell {
         let agent = pages.store.meta(id).map(|m| m.agent).unwrap_or_default();
         let to = if self.page_agent_gone(&agent) { MAIN.to_string() } else { agent };
         self.step(Input::PageAnswered { card, agent: to, page: id.to_string(), text: words.clone(), block: block.to_string() });
-        self.page_answer_without_card(id, block, &words);
+        self.page_answer_without_card(id, block, &words, via);
         true
     }
 
@@ -764,7 +794,11 @@ impl Shell {
             let mut qs = pages.store.questions(&id);
             if let Some(q) = qs.iter_mut().find(|q| q.card == card) {
                 match &reply {
-                    Some(r) => q.reply = Some(r.clone()),
+                    Some(r) => {
+                        q.reply = Some(r.clone());
+                        q.via = Some("inbox".into());
+                        q.at_ms = Some(now_ms());
+                    }
                     // closed with no answer (withdrawn, closed by the user,
                     // a card this hub never had: a copied page, pm's 409):
                     // the question stays open on the page, a pick there
@@ -779,8 +813,10 @@ impl Shell {
             if let Err(e) = pages.locked(|s| s.save_questions(&id, &qs)) {
                 log_line(&self.opts.paths, &format!("page {id}: questions not saved: {e}"));
             }
-            if let Some(r) = reply {
-                pages.push(&id, "answered", &json!({"block": block, "reply": r}));
+            match (reply, qs.iter().find(|q| q.card == card)) {
+                (Some(_), Some(q)) => pages.push(&id, "answered", &q.answered_json()),
+                // closed unanswered: the page no longer says it waits in the inbox
+                _ => Self::push_asks(&pages, &id),
             }
         }
         pages.push("", "pages", &json!({"pages": pages.list_json()}));
