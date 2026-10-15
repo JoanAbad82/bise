@@ -9,6 +9,7 @@ import type { MouseEventHandler, ReactNode } from "react";
 import { cx, st, sub, type UiState } from "./cx";
 import { Dot, Help, type DotState } from "./prim";
 import { Gust } from "./gust";
+import { tipAttrs } from "./tip";
 
 /** a quote from selected lines, above his words: ❝ 1 “workers: [Worker; 4],” decode_pool.rs:13-14 */
 export function Quote({ children, onClick, testId }: { children: ReactNode; onClick?: MouseEventHandler<HTMLDivElement>; testId?: string }) {
@@ -112,8 +113,11 @@ export interface ComposerFrameProps {
   /** the tab glued to the box's top (designer's composer-strip A): who and where he writes to,
    *  'to perf  ψ sb/perf  context 42k · 17%'; none: the box alone */
   tab?: ReactNode;
-  /** the tab in the accent on its 7% tint: his words answer a card ('answering search · …') */
-  tabAccent?: boolean;
+  /** his words answer a question (composer-target A, designer m_26531): the tab in the accent on its
+   *  7% tint ('↳ answering search · …'), the box's 1.5 px accent border with `answerTip` as its tip,
+   *  the send filled accent; off in 120 ms (esc). An approval never sets it: words never approve */
+  answering?: boolean;
+  answerTip?: string | undefined;
   /** the box's bottom row, left: what he changes ('+', the mode menu) */
   tools?: ReactNode;
   /** the box's bottom row, right, before send: the model and effort menu */
@@ -150,7 +154,7 @@ export function boxPress(target: EventTarget | null): boolean {
 }
 /** the composer's frame: tabs, dock, quote, the tab glued to the box, the box (the editor, then its
  *  32 px row: tools left, tools and send right), the keys */
-export function ComposerFrame({ children, tab, tabAccent, tools, toolsEnd, sent = 0, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, lead, testId }: ComposerFrameProps) {
+export function ComposerFrame({ children, tab, answering, answerTip, tools, toolsEnd, sent = 0, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, lead, testId }: ComposerFrameProps) {
   return (
     <div className={cx("b-composer", disabled && "is-disabled")} data-testid={testId}
       onMouseDown={onBoxDown && ((e) => {
@@ -162,8 +166,9 @@ export function ComposerFrame({ children, tab, tabAccent, tools, toolsEnd, sent 
       {tabs}
       {dock}
       {quote}
-      {tab != null && <div className={cx("tab", tabAccent && "acc")} data-testid={sub(testId, "tab")}>{tab}</div>}
-      <div className={cx("box", focus && "is-focus")} data-testid={sub(testId, "box")}>
+      {tab != null && <div className={cx("tab", answering && "acc")} data-testid={sub(testId, "tab")}>{tab}</div>}
+      <div className={cx("box", focus && "is-focus", answering && "ans")} data-testid={sub(testId, "box")} data-answering={answering || undefined}
+        {...(answering ? tipAttrs(answerTip) : {})}>
         <div className="line">
           {lead}
           <div className="in">{children}</div>

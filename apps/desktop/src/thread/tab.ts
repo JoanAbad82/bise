@@ -2,7 +2,8 @@
 // glued to the box's top. 'to perf' + the gust while it works, 'ψ sb/perf' (or 'shared folder'),
 // the project where the crumb doesn't name it, and on the right 'context 42k · 17%'. Short, it
 // drops whole items: the project, then the context, then the place; the label always stays.
-// Answering a card: 'answering search · <question>' and 'esc write to search' on the right.
+// Answering a card: '↳ answering search · <question>' and 'esc to bise instead' on the right; short,
+// the question goes first, then that end; '↳ answering search' never goes (answerFit).
 // Pure: ComposerTab.tsx draws and measures it. Owner: amb-win.
 
 /** Where its words go, as the tab names it (designer m_24790): his checkout by its folder's name,
@@ -102,6 +103,27 @@ export function wordCut(label: string, room: number, width: (s: string) => numbe
     if (width(cut) <= room) return cut;
   }
   return `${words[0] ?? ''}…`;
+}
+
+/** The answering tab's head ('↳ answering search'), the label up to its first ' · ': never cut. */
+export function answerHead(label: string): string {
+  const i = label.indexOf(' · ');
+  return i < 0 ? label : label.slice(0, i);
+}
+
+/**
+ * The answering tab in `room` px (composer-target A, designer m_26531): the label and its end ('esc
+ * to bise instead', `endW` px with its gap) both whole when they fit; short, the question goes first
+ * (cut after a whole word, down to '↳ answering search…'), then the end; the head itself never goes
+ * (past that, the tab's own clip). Pure.
+ */
+export function answerFit(label: string, room: number, endW: number, width: (s: string) => number): { label: string; end: boolean } {
+  const head = answerHead(label);
+  const keeps = (cut: string) => cut === label || (cut.startsWith(head) && Array.from(cut).length > Array.from(head).length);
+  const withEnd = wordCut(label, room - endW, width);
+  if (keeps(withEnd) && width(withEnd) <= room - endW) return { label: withEnd, end: true };
+  const alone = wordCut(label, room, width);
+  return { label: keeps(alone) ? alone : head, end: false };
 }
 
 /** The context as the hub says it ('42k · 17%', or named 'context 42k · 17%'): its tokens and its

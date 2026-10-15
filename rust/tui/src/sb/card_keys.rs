@@ -1,6 +1,7 @@
 //! The open item's divider label and key bar (split out of card_draw.rs, its
-//! line limit): `you → ? t3 · your answer`, the keys it takes and the
-//! pairs that fit the width.
+//! line limit): `you → ? t3 · your answer` (a question his words answer:
+//! answer_target.rs draws its own), the keys it takes and the pairs that
+//! fit the width.
 
 use super::*;
 
@@ -59,6 +60,32 @@ pub(crate) fn key_pairs(app: &App) -> Vec<(&'static str, String)> {
         v.push(back);
         return v;
     }
+    // his words answer it (composer-target A): `1-2 answer   ⏎ send the
+    // answer   esc to main`, esc names whom his words go to instead
+    if let Some(a) = answer_target::answering(app) {
+        let typed = !app.ed.text.is_empty();
+        match sb.card.opt.filter(|i| *i < n && !typed) {
+            Some(i) => v.push(("⏎", cut(&s.options[i], 32))),
+            None => {
+                if n > 0 && !typed {
+                    v.push(p(digits(n), "answer"));
+                }
+                v.push(p("⏎", "send the answer"));
+            }
+        }
+        if n > 0 && !full && !typed {
+            v.push(p("←→", "choose"));
+        }
+        if more && !typed {
+            v.push(p("↑↓", "other items"));
+        }
+        if full {
+            v.push(p("pgup pgdn", "scroll"));
+        }
+        v.push(if full { p("ctrl+o", "back in place") } else { p("ctrl+o", "full screen") });
+        v.push(p("esc", &format!("to {}", a.esc_to)));
+        return v;
+    }
     if !app.ed.text.is_empty() {
         v.push(p("⏎", if s.enter == Enter::Deny { "says no, with your note" } else { "sends your answer" }));
         v.push(if full { p("ctrl+o", "back in place") } else { p("ctrl+o", "full screen") });
@@ -106,8 +133,9 @@ pub(crate) fn fit_pairs(mut v: Vec<(&'static str, String)>, width: usize) -> Vec
         v.retain(|(key, _)| *key != k);
     }
     if w(&v) > width || width < 100 {
+        // `esc to main` (answering) keeps its words: it says where they go
         for (k, l) in v.iter_mut() {
-            if *k == "esc" {
+            if *k == "esc" && l == "back to your message" {
                 *l = "back".into();
             }
         }

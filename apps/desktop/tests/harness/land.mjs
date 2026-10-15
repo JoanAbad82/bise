@@ -38,6 +38,7 @@ export const LAND = [
   'checks/composer/at-files.spec.ts',
   // the @ / $ lists stay the same node, visible with rows, on every frame while he types (his flicker, at-steady)
   'checks/composer/picker-steady.spec.ts',
+  'checks/composer/answer-target.spec.ts',
   // any file a chip like an image's, in place in the parts, the bubble opens it (file-chips)
   'checks/thread/file-chips.spec.ts',
   'checks/spotlight/streaming.spec.ts',

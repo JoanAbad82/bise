@@ -1,15 +1,6 @@
-// inbox card v2 item 7: the composer's label while it answers the docked card.
+// the hub's word on the answer the composer sent (its label: inbox/Block.tsx answeringOf).
 import { describe, expect, it } from 'vitest';
-import { answeringLabel, answerNoteOf } from './ThreadComposer';
-
-describe('answering a docked card', () => {
-  it("names who asks (main is bise) and cuts the question to one short line", () => {
-    expect(answeringLabel({ agent: 'perf', question: 'which bench?' })).toBe('answering perf · which bench?');
-    expect(answeringLabel({ agent: 'main', question: 'merge  gift-cards\ninto main?' })).toBe('answering bise · merge gift-cards into main?');
-    const long = answeringLabel({ agent: 'perf', question: 'a'.repeat(80) });
-    expect(long).toBe(`answering perf · ${'a'.repeat(39)}…`);
-  });
-});
+import { answerNoteOf } from './ThreadComposer';
 
 describe("the hub's word on his answer (main m_21514)", () => {
   const asked = { project: 'shop-ab9f3c3b' };

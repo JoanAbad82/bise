@@ -56,8 +56,9 @@ export interface ComposerProps {
   readonly store?: Store;
   /** the tab glued to the box's top (who and where: thread/ComposerTab.tsx); none: the box alone */
   readonly tab?: ReactNode;
-  /** the tab in the accent: his words answer a card */
-  readonly tabAccent?: boolean;
+  /** his words answer a question: the frame's accent (tab, border, send) and the border's tip */
+  readonly answering?: boolean;
+  readonly answerTip?: string | undefined;
   /** the box's bottom row, left ('+', the mode menu), and right before send (the model menu) */
   readonly tools?: ReactNode;
   readonly toolsEnd?: ReactNode;
@@ -114,7 +115,8 @@ export const Composer = memo(function Composer(
     busy = false,
     sources = NO_SOURCES,
     tab,
-    tabAccent,
+    answering,
+    answerTip,
     tools,
     toolsEnd,
     placeholder = "write to bise",
@@ -200,7 +202,8 @@ export const Composer = memo(function Composer(
     <ComposerFrame
       testId={testId}
       tab={tab}
-      tabAccent={tabAccent}
+      answering={answering}
+      answerTip={answerTip}
       tools={tools}
       toolsEnd={toolsEnd}
       sent={sent}

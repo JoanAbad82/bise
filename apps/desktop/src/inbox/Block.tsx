@@ -6,7 +6,7 @@
 // click (openInbox({project, card})) opens that item IN PLACE (the block grows, nothing floats over
 // what he reads): its options, 1-9 pick, ←→ walk them, ⌘⏎ the one the keys are on, ⌘⌫ close, ↑↓ the
 // next item, esc folds. It tells the composer under it what his words do (onAnswer): a question takes
-// them as its answer ('answering search · …', 'esc write to perf instead'); an approval or a choice item
+// them as its answer ('↳ answering search · …', 'esc to perf instead'); an approval or a choice item
 // never (ambient m_8773: 'to perf · the merge waits for 1 or 2', his words go as a plain message).
 // Owner: amb-home.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -27,16 +27,21 @@ import { useOptAct } from './optAct';
 import { pruneCardDrafts } from './drafts';
 import { keep } from '@/app/keep';
 import { useModHeld } from '@/app/held';
+import { answerTip } from '@/app/tipwords';
 import './inbox.css';
 
 /** What the composer under the block does with his words while an item is open. */
 export interface Answering {
   readonly project: string;
   readonly card: number;
-  /** the label line's left: 'answering search · reindex tonight…', 'to perf · the merge waits for 1 or 2' */
+  /** the label line's left: '↳ answering search · reindex tonight…', 'to perf · the merge waits for 1 or 2' */
   readonly label: string;
-  /** the label line's right ('esc write to perf instead'); none: the composer's own words */
+  /** the label line's right ('esc to perf instead'); none: the composer's own words */
   readonly end?: string;
+  /** a question his words answer (composer-target A): the field's words ('your answer to search, then ⏎')
+   *  and the pink border's tip; none: the screen's own placeholder, no pink */
+  readonly placeholder?: string;
+  readonly tip?: string;
   /** his words answer this card (store.answer); null: they go as a plain message (never an approval) */
   readonly answer: number | null;
   /** who asked the card his words answer (inbox picks (3): his row where he is names it) */
@@ -204,6 +209,25 @@ const cut = (s: string, max: number): string => {
   return Array.from(one).length > max ? `${Array.from(one).slice(0, max - 1).join('').trimEnd()}…` : one;
 };
 
+/** The composer's head while his words answer a question: '↳ answering' (never cut). */
+export const ANSWERING_HEAD = '↳ answering';
+
+/** A question on one line, cut after a whole word within `max` characters with one '…' (designer
+ *  m_24325: never mid-word; a word longer than `max` alone: cut there). Pure. */
+export function cutWords(s: string, max: number): string {
+  const one = s.replace(/\s+/gu, ' ').trim();
+  if (Array.from(one).length <= max) return one;
+  const words = one.split(' ');
+  let head = '';
+  for (const w of words) {
+    const next = head === '' ? w : `${head} ${w}`;
+    if (Array.from(next).length > max - 1) break;
+    head = next;
+  }
+  head = head.replace(/[\s·,:;]+$/u, '');
+  return head === '' ? cut(one, max) : `${head}…`;
+}
+
 /**
  * What his words do while `c` is open, seen from `here`. An item of another project than the
  * screen's names its agent and project (designer m_19631: 'answering p99 · telemetry · …', 'to p99
@@ -216,24 +240,27 @@ export function answeringOf(c: Card, here: Here, pname?: string): Answering {
   if (isNotify(c)) return { project: c.project, card: c.id, label: `to ${to} · bise's ask waits for 1 or 2`, answer: null };
   const other = here.project !== null && here.project !== c.project ? `${shownName(c.agent)} · ${pname ?? c.project}` : null;
   if (takesWords(c)) {
-    const label = `answering ${other ?? shownName(c.agent)} · ${cut(c.question, 40)}`;
-    return { project: c.project, card: c.id, label, end: here.agent === null ? 'esc write a plain message' : `esc write to ${to} instead`, answer: c.id, asker: c.agent };
+    // composer-target A (designer m_26531): '↳ answering search · <question>' (the tab cuts it after
+    // a whole word), 'esc to bise instead', the field names who gets his words, the border's tip
+    const who = shownName(c.agent);
+    const label = `${ANSWERING_HEAD} ${other ?? who} · ${cutWords(c.question, 40)}`;
+    return { project: c.project, card: c.id, label, end: `esc to ${to} instead`, answer: c.id, asker: c.agent, placeholder: `your answer to ${who}, then ⏎`, tip: answerTip(who, to) };
   }
   const waits = pickWaits(c) ?? 'it waits for its options';
-  if (other !== null) return { project: c.project, card: c.id, label: `to ${other} · ${waits}`, end: `esc write to ${to} instead`, answer: null };
+  if (other !== null) return { project: c.project, card: c.id, label: `to ${other} · ${waits}`, end: `esc to ${to} instead`, answer: null };
   return { project: c.project, card: c.id, label: `to ${to} · ${waits}`, answer: null };
 }
 
 /**
  * What his words do while `c` is open after the hub closed it (withdrawn, answered via main, its
  * agent stopped) with his words typed: a plain message to its asker; the tab leaves the accent,
- * nothing waits on him (designer m_24087: 'to perf · the question is closed', 'esc write to bise
+ * nothing waits on him (designer m_24087: 'to perf · the question is closed', 'esc to bise
  * instead'). Pure.
  */
 export function closedAnswering(c: Card, here: Here, pname?: string): Answering {
   const to = here.agent === null ? 'bise' : shownName(here.agent);
   const other = here.project !== null && here.project !== c.project ? `${shownName(c.agent)} · ${pname ?? c.project}` : shownName(c.agent);
-  return { project: c.project, card: c.id, label: `to ${other} · the question is closed`, end: here.agent === null ? 'esc write a plain message' : `esc write to ${to} instead`, answer: null, asker: c.agent, closed: true };
+  return { project: c.project, card: c.id, label: `to ${other} · the question is closed`, end: `esc to ${to} instead`, answer: null, asker: c.agent, closed: true };
 }
 
 /**
@@ -651,7 +678,8 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
         const row = names.get(c.project);
         if (c === openCard) {
           return (
-            <div key={cardKey(c)} className="inbox-block-open" data-testid={`inbox.block.open.${String(n)}`}>
+            // the card his words answer wears the composer's pink as a 2 px rail (composer-target A)
+            <div key={cardKey(c)} className="inbox-block-open" data-testid={`inbox.block.open.${String(n)}`} data-answering={(told?.answer != null && told.closed !== true) || undefined}>
               <InboxCard
                 card={c}
                 project={projectWord(row, c.project)}

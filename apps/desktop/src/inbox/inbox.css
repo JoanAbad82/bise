@@ -99,6 +99,12 @@
 .inbox-block .ib-sign { flex: none; width: 1em; text-align: center; font: 600 var(--t-12) var(--font-mono); color: var(--c-accent); }
 .inbox-block .ib-sign.acc { color: var(--c-accent); }
 .inbox-block-open { margin: var(--gap-tight) 0; }
+/* its question takes his words (composer-target A, designer m_26531): a 2 px accent rail on its left,
+   the pair of the composer's pink border; 120 ms as the border */
+.inbox-block-open .ic { transition: box-shadow 120ms var(--ease-out); }
+.inbox-block-open[data-answering] .ic {
+  box-shadow: inset 2px 0 0 var(--c-accent), 0 0 0 1px var(--c-line), 0 6px 18px color-mix(in srgb, var(--p-shadow) 14%, transparent);
+}
 /* H10 (tui-parity's thread-hierarchy, designer m_19835): folded at the thread's bottom, the block is
    its head (28) and one item line (32): the rest is '+ N more' in the head. The notifications' ask is
    an ordinary item from bise (Block.tsx notifyCard), never a line of its own. */

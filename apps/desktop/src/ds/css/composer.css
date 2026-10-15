@@ -4,8 +4,17 @@
 .b-composer .tab{display:flex;align-items:center;gap:var(--s-4);box-sizing:border-box;height:var(--h-control);margin:0 var(--s-4);padding:0 var(--s-3);border-radius:var(--r-3) var(--r-3) 0 0;box-shadow:inset 1px 1px 0 var(--c-line),inset -1px 0 0 var(--c-line);background:linear-gradient(color-mix(in srgb,var(--c-text) 2%,transparent),color-mix(in srgb,var(--c-text) 2%,transparent)),var(--c-raised);font:var(--t-13) var(--font-ui);color:var(--c-text-2);white-space:nowrap;overflow:hidden}
 .b-composer .tab.acc{color:var(--c-accent);background:linear-gradient(color-mix(in srgb,var(--c-accent) 7%,transparent),color-mix(in srgb,var(--c-accent) 7%,transparent)),var(--c-raised)}
 /* the box: r 16, padding 12/12/8/16, a 1 px line and no shadow; the field over its 32 px row of controls */
-.b-composer .box{display:flex;flex-direction:column;gap:var(--s-2);padding:var(--s-3) var(--s-3) var(--s-2) var(--s-4);border-radius:var(--r-4);background:var(--c-raised);box-shadow:0 0 0 1px var(--c-line);transition:box-shadow var(--d-fast) var(--ease-out)}
+.b-composer .box{display:flex;flex-direction:column;gap:var(--s-2);padding:var(--s-3) var(--s-3) var(--s-2) var(--s-4);border-radius:var(--r-4);background:var(--c-raised);box-shadow:0 0 0 1px var(--c-line);transition:box-shadow 120ms var(--ease-out)}
 .b-composer .box.is-focus{box-shadow:0 0 0 1px var(--c-focus)}
+/* his words answer a question (composer-target A, designer m_26531): the tab's line, the box's 1.5 px border and the send in the accent; 120 ms both ways (esc drops it). An approval never: words never approve */
+.b-composer .tab{transition:color 120ms var(--ease-out),box-shadow 120ms var(--ease-out),background-color 120ms var(--ease-out)}
+.b-composer .tab.acc{box-shadow:inset 1px 1px 0 var(--c-accent),inset -1px 0 0 var(--c-accent)}
+.b-composer .tab.acc .lbl{color:var(--c-accent)}
+.b-composer .tab.acc .who{font-weight:600}
+.b-composer .box.ans,.b-composer .box.ans.is-focus,.b-composer .box.ans:focus-within{box-shadow:0 0 0 1.5px var(--c-accent)}
+.b-composer .send{transition:background-color 120ms var(--ease-out),color 120ms var(--ease-out)}
+.b-composer .box.ans .send:not(.stop){background:var(--c-accent);color:var(--c-on-ink)}
+.b-composer .box.ans .send.off{opacity:.5}
 .b-composer .box .line{display:flex;align-items:flex-start;gap:var(--gap-inline);min-width:0}
 .b-composer .box .row{display:flex;align-items:center;gap:var(--gap-inline);height:var(--h-control);min-width:0}
 .b-composer .box .row .sp{flex:1;min-width:0}

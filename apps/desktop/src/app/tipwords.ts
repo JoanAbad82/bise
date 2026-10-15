@@ -158,3 +158,10 @@ export function madeTip(end: string): string {
 export function updatedTip(): string {
   return 'installed while you were away';
 }
+
+// ---- the composer answering a question (composer-target A, designer m_26531)
+
+/** The pink border's tip while his words answer `who`'s question: 'your words answer search's question · esc writes to bise'. */
+export function answerTip(who: string, escTo: string): string {
+  return `your words answer ${who}'s question · esc writes to ${escTo}`;
+}

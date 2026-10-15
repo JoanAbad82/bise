@@ -418,8 +418,19 @@ fn divider_rule(buf: &mut Buffer, area: Rect, cols: Cols, y: u16) -> bool {
 }
 
 /// The divider with a label of its own and no state (the card view:
-/// `you → ? perf · your answer`); returns (no state, the label).
-pub(crate) fn draw_divider_label(buf: &mut Buffer, area: Rect, cols: Cols, y: u16, label: Vec<Span<'static>>) -> (Rect, Rect) {
+/// `you → ? perf · your answer`); returns (no state, the label). While
+/// his words answer the open item, `answering` gives, for the label's
+/// room, its two sides instead (sb/answer_target.rs: ` ↳ answering
+/// search · … ` and ` esc to main instead `): the rule in the accent,
+/// the end on the right where the state goes.
+pub(crate) fn draw_divider_label(
+    buf: &mut Buffer,
+    area: Rect,
+    cols: Cols,
+    y: u16,
+    label: Vec<Span<'static>>,
+    answering: impl Fn(usize) -> Option<(Vec<Span<'static>>, Vec<Span<'static>>)>,
+) -> (Rect, Rect) {
     let area = area.intersection(buf.area);
     crate::sb::places::psi_tip::mark(None); // no ψ in this label
     if !divider_rule(buf, area, cols, y) {
@@ -428,7 +439,21 @@ pub(crate) fn draw_divider_label(buf: &mut Buffer, area: Rect, cols: Cols, y: u1
     let (l, r) = (area.x, area.right() - 1);
     let lx = l + cols.margin - 1;
     let end = r + 1 - cols.margin;
-    let label = fit(label, (end + 1).saturating_sub(lx) as usize);
+    let room = (end + 1).saturating_sub(lx);
+    let (label, right) = match answering(room as usize) {
+        Some((left, right)) => {
+            for x in l..=r {
+                buf[(x, y)].set_style(Style::default().fg(crate::theme::accent()));
+            }
+            (left, right)
+        }
+        None => (label, Vec::new()),
+    };
+    let w = width_of(&right);
+    if w > 0 && w < room {
+        put(buf, end + 1 - w, y, &right, end + 1);
+    }
+    let label = fit(label, room as usize);
     put(buf, lx, y, &label, end + 1);
     let label_rect = Rect { x: lx, y, width: width_of(&label).min((end + 1).saturating_sub(lx)), height: 1 };
     (Rect::default(), label_rect)

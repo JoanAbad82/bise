@@ -1,7 +1,7 @@
 // thread/answer-docked · inbox card v2 item 7 (ambient m_11273, amb-home 98ac9ea7): while the
 // strip's card is docked over the composer, the composer answers it. Passes when, with perf's
-// question open from the strip, the composer's label says 'answering perf · which bench?' and its
-// placeholder 'your answer, then ⏎', his words + ⏎ go as the hub's answer to card 9 (no message),
+// question open from the strip, the composer's label says '↳ answering perf · which bench?' and its
+// placeholder 'your answer to perf, then ⏎', his words + ⏎ go as the hub's answer to card 9 (no message),
 // and esc in the field makes the composer a plain message to acme's main again. The scripted
 // core (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
@@ -46,9 +46,9 @@ test("thread/answer-docked: the docked card's composer answers it; esc makes it 
     await page.getByTestId('inbox.block.row.1').click();
     await expect(page.getByTestId('inbox.block.open.1'), 'the card opens in place').toBeVisible({ timeout: 3000 });
     const composer = page.getByTestId('composer');
-    await expect(composer, 'the label').toContainText('answering perf · which bench?');
+    await expect(composer, 'the label').toContainText('↳ answering perf · which bench?');
     const field = page.locator('[data-testid="composer.field"]').first();
-    await expect(field).toHaveAttribute('aria-placeholder', 'your answer, then ⏎');
+    await expect(field).toHaveAttribute('aria-placeholder', 'your answer to perf, then ⏎');
     await page.screenshot({ path: test.info().outputPath('answering.png') });
     await field.click();
     await page.keyboard.type('cold, on the m2');

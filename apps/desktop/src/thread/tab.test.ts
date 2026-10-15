@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contextOf, folderName, ringTip, tabFit, tabPlace, wordCut, worktreeName } from './tab';
+import { answerFit, answerHead, contextOf, folderName, ringTip, tabFit, tabPlace, wordCut, worktreeName } from './tab';
 
 describe("the composer's tab (designer's composer-strip A)", () => {
   const w = { gap: 16, label: 60, branch: 80, project: 90, context: 120 };
@@ -44,6 +44,28 @@ describe("the tab's label cut (designer m_24325)", () => {
   });
   it('not even the first word: the first word and the …', () => {
     expect(wordCut(label, 20, w)).toBe('answering…');
+  });
+});
+
+describe("the answering tab at a narrow width (composer-target A, designer m_26531)", () => {
+  const w = (s: string) => s.length * 10;
+  const label = '↳ answering search · which size system…';
+  const end = 200; // 'esc to bise instead' and its gap
+  it("its head is the label's first part, never cut", () => {
+    expect(answerHead(label)).toBe('↳ answering search');
+    expect(answerHead('↳ answering perf · telemetry · which bench?')).toBe('↳ answering perf');
+  });
+  it('both whole when they fit', () => {
+    expect(answerFit(label, 10_000, end, w)).toEqual({ label, end: true });
+  });
+  it('the question goes first, after a whole word, the end stays', () => {
+    expect(answerFit(label, 330 + end, end, w)).toEqual({ label: '↳ answering search · which size…', end: true });
+    expect(answerFit(label, 190 + end, end, w)).toEqual({ label: '↳ answering search…', end: true });
+  });
+  it("then the end; '↳ answering search' never goes", () => {
+    expect(answerFit(label, 270, end, w)).toEqual({ label: '↳ answering search · which…', end: false });
+    expect(answerFit(label, 190, end, w)).toEqual({ label: '↳ answering search…', end: false });
+    expect(answerFit(label, 60, end, w)).toEqual({ label: '↳ answering search', end: false });
   });
 });
 

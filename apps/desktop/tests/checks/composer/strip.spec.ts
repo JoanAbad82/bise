@@ -5,7 +5,7 @@
 //   (2) the tab glued to the box: 32 px high, 16 px in from each side, 'to perf' + the gust while it
 //       works, 'ψ sb/perf' ('shared folder' in his checkout), right 'context 42k · 17%'; no
 //       'idle', no model in it; short, it drops the context, then the branch, never 'to perf';
-//   (3) answering a card: the tab in the accent, 'answering search · …' and 'esc write to search
+//   (3) answering a card: the tab in the accent, '↳ answering search · …' and 'esc to search
 //       instead'; the box's row is '+' and send only;
 //   (4) the box's row: '+' (his files by the panel: two picked files are two chips), 'yolo ⌄'
 //       (its menu opens above the box and sends the approvals mode), '<b>opus 5.5</b> high ⌄'
@@ -298,8 +298,8 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     if (!(await page.getByTestId('inbox.block.open.1').isVisible())) await page.getByTestId('inbox.block.row.1').click();
     await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-answering', 'true');
     await expect(tab).toHaveClass(/\bacc\b/u);
-    await expect(page.getByTestId('composer.tab.to')).toHaveText(/^answering search · which size/u);
-    await expect(page.getByTestId('composer.tab.end')).toHaveText('esc write to search instead');
+    await expect(page.getByTestId('composer.tab.to')).toHaveText(/^↳ answering search · which size/u);
+    await expect(page.getByTestId('composer.tab.end')).toHaveText('esc to search instead');
     // answering, the tab holds only the question and the way back (designer m_24517)
     await expect(page.getByTestId('composer.tab.place')).toHaveCount(0);
     await expect(page.getByTestId('composer.tab.context')).toHaveCount(0);
@@ -403,12 +403,15 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
         await expect(tab).toHaveClass(/\bacc\b/u);
         // cut, the question ends after a whole word with one '…' (designer m_24325)
         const shownLabel = ((await page.getByTestId('composer.tab.to').textContent()) ?? '').replace(/[ ·~∿≈]{5}(?= ·|…|$)/u, '');
-        const full = `answering search · ${QUESTION}`;
+        // the label's question is cut after a whole word within 40 characters (Block.tsx cutWords), the
+        // tab may cut it more; '↳ answering search' never goes (answerFit)
+        const full = `↳ answering search · ${QUESTION}`;
+        expect(shownLabel.startsWith('↳ answering search'), `${String(w)}: the head stays`).toBe(true);
         expect(shownLabel, 'one … glyph, never three dots').not.toContain('...');
         if (shownLabel.endsWith('…')) {
           const head = shownLabel.slice(0, -1);
           expect(full.startsWith(head) && /^[\s·,:;]/u.test(full.slice(head.length)), `${String(w)}: '${shownLabel}' cut after a whole word`).toBe(true);
-        } else expect(shownLabel).toBe(full);
+        } else expect(full.startsWith(shownLabel)).toBe(true);
         await shot(t, w, 'answering');
         // at 800 the model menu still says its model; the mode never drops
         if (w === 800) {

@@ -441,7 +441,7 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
             tab={{ label: answering?.label ?? words.to, place: makerPlace, context: usageLine(maker?.usage?.words), who: words.agent }}
             tabEnd={answering?.end}
             me={maker}
-            placeholder={answering?.answer != null ? 'your answer, then ⏎' : words.placeholder}
+            placeholder={answering?.placeholder ?? words.placeholder}
             answer={answerOf(answering)}
             onStop={onStop}
             quoting={false}

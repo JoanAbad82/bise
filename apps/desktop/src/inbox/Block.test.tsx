@@ -9,7 +9,7 @@ import { replay, Store, StoreProvider } from '@/store';
 import { createRouter, RouterContext } from '@/app/router';
 import { emitAction } from '@/app/menu';
 import type { Card } from '@/proto';
-import { answeringOf, asksNotify, headWords, InboxBlock, openInbox, projectWord, type Answering, type Here } from './Block';
+import { answeringOf, asksNotify, cutWords, headWords, InboxBlock, openInbox, projectWord, type Answering, type Here } from './Block';
 import { PICKED_MS } from './InboxCard';
 
 afterEach(cleanup);
@@ -93,7 +93,7 @@ describe('the inbox block (b2)', () => {
     fireEvent.click(screen.getByTestId('inbox.block.row.2'));
     expect(screen.getByTestId('inbox.block.open.2')).toBeTruthy();
     expect(screen.getByTestId('inbox.block.keys').textContent).toContain('esc');
-    expect(told.at(-1)).toEqual({ project: P, card: 9, label: 'answering perf · which bench?', end: 'esc write to perf instead', answer: 9, asker: 'perf' });
+    expect(told.at(-1)).toEqual({ project: P, card: 9, label: '↳ answering perf · which bench?', end: 'esc to perf instead', answer: 9, asker: 'perf', placeholder: 'your answer to perf, then ⏎', tip: "your words answer perf's question · esc writes to perf" });
     fireEvent.keyDown(window, { key: '2' });
     expect(hub()).toEqual([{ cmd: 'answer', project: P, card: 9, reply: '2' }]);
     expect(screen.queryByTestId('inbox.block.open.2')).toBeNull();
@@ -296,20 +296,44 @@ describe('one inbox (designer m_19631)', () => {
 
   it("answering another project than the screen's names the agent and the project", () => {
     const here: Here = { project: P, agent: 'main' };
-    expect(answeringOf(card('t-1'), here, 'telemetry')).toEqual({ project: 't-1', card: 9, label: 'answering perf · telemetry · which bench?', end: 'esc write to bise instead', answer: 9, asker: 'perf' });
+    expect(answeringOf(card('t-1'), here, 'telemetry')).toEqual({
+      project: 't-1',
+      card: 9,
+      label: '↳ answering perf · telemetry · which bench?',
+      end: 'esc to bise instead',
+      answer: 9,
+      asker: 'perf',
+      placeholder: 'your answer to perf, then ⏎',
+      tip: "your words answer perf's question · esc writes to bise",
+    });
     expect(answeringOf(card('t-1', true), here, 'telemetry')).toEqual({
       project: 't-1',
       card: 10,
       label: 'to perf · telemetry · the approval waits for 1 or 2',
-      end: 'esc write to bise instead',
+      end: 'esc to bise instead',
       answer: null,
     });
   });
 
   it("the screen's own project and bise's view: as before", () => {
-    expect(answeringOf(card(P), { project: P, agent: 'main' }, 'acme').label).toBe('answering perf · which bench?');
-    expect(answeringOf(card('t-1'), { project: null, agent: null }, 'telemetry')).toEqual({ project: 't-1', card: 9, label: 'answering perf · which bench?', end: 'esc write a plain message', answer: 9, asker: 'perf' });
-    expect(answeringOf(card('t-1', true), { project: null, agent: null }, 'telemetry').label).toBe('to bise · the approval waits for 1 or 2');
+    expect(answeringOf(card(P), { project: P, agent: 'main' }, 'acme').label).toBe('↳ answering perf · which bench?');
+    expect(answeringOf(card('t-1'), { project: null, agent: null }, 'telemetry')).toMatchObject({ label: '↳ answering perf · which bench?', end: 'esc to bise instead', answer: 9, asker: 'perf' });
+    expect(answeringOf(card('t-1'), { project: P, agent: 'search' }, 'acme').end).toBe('esc to search instead');
+  });
+
+  it('an approval never takes his words: no placeholder, no tip (composer-target A: no pink)', () => {
+    const a = answeringOf(card('t-1', true), { project: null, agent: null }, 'telemetry');
+    expect(a.label).toBe('to bise · the approval waits for 1 or 2');
+    expect(a.answer).toBeNull();
+    expect(a.placeholder).toBeUndefined();
+    expect(a.tip).toBeUndefined();
+  });
+
+  it('the question is cut after a whole word within 40 characters, one line', () => {
+    expect(cutWords('which size system should the filter use: EU, or US too?', 40)).toBe('which size system should the filter…');
+    expect(cutWords('merge  gift-cards\ninto main?', 40)).toBe('merge gift-cards into main?');
+    expect(cutWords('a'.repeat(80), 40)).toBe(`${'a'.repeat(39)}…`);
+    expect(cutWords('reindex tonight, or wait: it costs 2 hours of downtime', 30)).toBe('reindex tonight, or wait: it…');
   });
 });
 
@@ -508,7 +532,7 @@ describe('the open card closed by the hub mid answer', () => {
     act(() => {
       replay(store, rowsWith([next]));
     });
-    expect(told.slice(n)).toEqual([{ project: P, card: 9, label: 'to perf · the question is closed', end: 'esc write to bise instead', answer: null, asker: 'perf', closed: true }]);
+    expect(told.slice(n)).toEqual([{ project: P, card: 9, label: 'to perf · the question is closed', end: 'esc to bise instead', answer: null, asker: 'perf', closed: true }]);
     const card = screen.getByTestId(`inbox.block.card.${P}-9`);
     expect(card.getAttribute('data-closed')).toBe('true');
     expect(card.textContent).toContain('· closed');

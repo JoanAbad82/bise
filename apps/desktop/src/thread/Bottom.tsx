@@ -53,7 +53,7 @@ export function BottomBlock({ project, agent }: { project: string; agent: string
         tab={tab}
         tabEnd={answering?.end}
         me={me}
-        placeholder={answering?.answer != null ? 'your answer, then ⏎' : words.placeholder}
+        placeholder={answering?.placeholder ?? words.placeholder}
         answer={answerOf(answering)}
         onStop={stop}
         quoting={false}

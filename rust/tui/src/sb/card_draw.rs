@@ -916,3 +916,5 @@ fn lines_bar() -> &'static str {
 #[path = "card_keys.rs"]
 mod card_keys;
 pub(crate) use card_keys::{divider_label, fit_pairs, key_pairs};
+#[path = "answer_target.rs"]
+pub(crate) mod answer_target;

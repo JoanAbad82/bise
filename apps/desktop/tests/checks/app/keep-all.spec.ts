@@ -218,7 +218,7 @@ test('app/keep-all: agents: Tune with a half-typed rename and model id, then the
  * place, ↓ on the empty field walks past the approvals (options only) until the composer answers.
  */
 async function toWords(page: Page): Promise<void> {
-  const answering = page.locator('[data-testid="composer"] .lbl', { hasText: /^answering / });
+  const answering = page.locator('[data-testid="composer"] .lbl', { hasText: /^↳ answering / });
   if ((await page.locator('[data-testid^="inbox.block.open."]').count()) === 0) await page.getByTestId('inbox.block.row.1').click({ timeout: 10_000 });
   await expect(page.locator('[data-testid^="inbox.block.open."]'), 'the block opens in place').toBeVisible({ timeout: 5000 });
   for (let i = 0; i < 6 && !(await answering.isVisible()); i++) {

@@ -1,6 +1,6 @@
 // The composer's tab (designer's composer-strip A, m_23965): the label ('to perf' + its working
 // gust after the first part), 'ψ sb/perf' or 'shared folder', the project where the crumb lacks
-// it, and on the right the context, or the screen's own words ('esc write to search', the approvals
+// it, and on the right the context, or the screen's own words ('esc to bise instead', the approvals
 // flash, 'tab back to voice'). The items that don't fit go whole (tab.ts tabFit): measured here,
 // on a resize or new words, never per keystroke (the composer above it is memoised). Owner: amb-win.
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -8,7 +8,7 @@ import type { Agent } from '@/proto';
 import { Ring } from '@/ds';
 import { usePlaces, useProjects } from '@/store';
 import { placeOf as placeOfAgent, tilde, worktreeParts } from '@/app/barplaces';
-import { contextOf, RING_CLEAR_PCT, ringTip, tabFit, tabPlace, wordCut, type TabFit, type TabPlace, type TabWords } from './tab';
+import { answerFit, contextOf, RING_CLEAR_PCT, ringTip, tabFit, tabPlace, wordCut, type TabFit, type TabPlace, type TabWords } from './tab';
 
 /** his home folder, for '~/…' in the tips (main's window.bise.home) */
 const HOME = (globalThis as { bise?: { home?: string } }).bise?.home;
@@ -41,18 +41,18 @@ function widthIn(font: string): ((s: string) => number) | null {
   return (s) => Math.ceil(ctx.measureText(s).width);
 }
 
-/** The label with its mark after the first part: 'to bise' ∿, 'answering perf' ∿ ' · the question'. */
+/** The label with its mark after the first part: 'to bise' ∿, '↳ answering perf' ∿ ' · the question';
+ *  the first part is its own span (answering, it is bold: '↳ answering perf'). */
 function MarkedLabel({ label, mark }: { label: string; mark: ReactNode }) {
-  if (mark == null) return <>{label}</>;
   const cut = label.indexOf(' · ');
   return cut < 0 ? (
     <>
-      {label}
+      <span className="who">{label}</span>
       {mark}
     </>
   ) : (
     <>
-      {label.slice(0, cut)}
+      <span className="who">{label.slice(0, cut)}</span>
       {mark}
       {label.slice(cut)}
     </>
@@ -64,6 +64,9 @@ export function ComposerTab({ words, mark, end, testId }: { words: TabWords; mar
   const [fit, setFit] = useState<TabFit>(ALL);
   // the label cut after a whole word when even alone it doesn't fit (designer m_24325); null: whole
   const [cut, setCut] = useState<string | null>(null);
+  // answering, the end ('esc to bise instead') goes once the question has gone (answerFit)
+  const [endIn, setEndIn] = useState(true);
+  const answering = words.label.startsWith('↳ ');
   const context = words.context ?? '';
   const ring = contextOf(context);
   const key = `${words.label}|${words.place?.name ?? '-'}|${words.project ?? ''}|${context}|${end === undefined ? '' : 'end'}`;
@@ -76,11 +79,22 @@ export function ComposerTab({ words, mark, end, testId }: { words: TabWords; mar
       const cs = getComputedStyle(host);
       const gap = parseFloat(cs.columnGap) || 0;
       const fixedEnd = q(':scope > [data-item="end"]');
-      const avail = host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - (fixedEnd === null ? 0 : nat(fixedEnd) + gap);
+      const inner = host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const endW = fixedEnd === null ? 0 : nat(fixedEnd) + gap;
+      const avail = inner - endW;
       const lbl = q(':scope > .lbl');
       const markEl = lbl?.querySelector<HTMLElement>('[data-testid="thread.mark"]') ?? null;
       const markW = markEl === null ? 0 : Math.ceil(markEl.getBoundingClientRect().width + (parseFloat(getComputedStyle(markEl).marginLeft) || 0));
       const width = lbl === null ? null : widthIn(getComputedStyle(lbl).font);
+      if (answering && width !== null) {
+        // the question first, then the end; '↳ answering search' never goes
+        const f = answerFit(words.label, inner - markW, endW, width);
+        const nextCut = f.label === words.label ? null : f.label;
+        setCut((c) => (c === nextCut ? c : nextCut));
+        setEndIn(f.end);
+        return;
+      }
+      setEndIn(true);
       const labelW = width === null ? nat(lbl) : width(words.label) + markW;
       const w = { branch: nat(q(':scope > [data-item="place"]')), project: nat(q(':scope > [data-item="project"]')), context: nat(q(':scope > [data-item="context"]')) };
       const next = tabFit({ avail, gap, label: labelW, ...w });
@@ -98,7 +112,7 @@ export function ComposerTab({ words, mark, end, testId }: { words: TabWords; mar
     return () => {
       ro.disconnect();
     };
-  }, [key, words.label]);
+  }, [key, words.label, answering]);
   return (
     <>
       <span ref={ref} className="lbl" data-testid={`${testId}.to`}>
@@ -118,7 +132,7 @@ export function ComposerTab({ words, mark, end, testId }: { words: TabWords; mar
         </span>
       )}
       {end !== undefined ? (
-        <span className="end" data-item="end" data-testid={`${testId}.end`}>
+        <span className={endIn ? 'end' : 'end gone'} data-item="end" data-testid={`${testId}.end`} aria-hidden={!endIn || undefined}>
           {end}
         </span>
       ) : (

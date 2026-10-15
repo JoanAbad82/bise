@@ -471,7 +471,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
             keys={voice === 'typing' ? VOICE_TYPING_KEYS : undefined}
             lead={voice === 'typing' ? <VoiceTypePearl /> : undefined}
             mark={labelMark}
-            placeholder={answering?.answer != null ? 'your answer, then ⏎' : artifact !== undefined ? artifact.placeholder : composerWords(title).placeholder}
+            placeholder={answering?.placeholder ?? (artifact !== undefined ? artifact.placeholder : composerWords(title).placeholder)}
             {...(artifact === undefined ? {} : { about: { id: artifact.id, title: artifact.title, url: artifact.url } })}
             answer={answerOf(answering)}
             onStop={stop}

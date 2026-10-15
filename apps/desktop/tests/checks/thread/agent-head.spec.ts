@@ -214,8 +214,8 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
             if (!(await page.getByTestId('inbox.block.open.1').isVisible())) await page.getByTestId('inbox.block.row.1').click();
             await expect(page.getByTestId('inbox.block.open.1')).toBeVisible();
             await expect(page.getByTestId('thread.starting'), 'a waiting agent is not starting').toHaveCount(0);
-            await expect(page.getByTestId('composer.tab.to')).toHaveText(/^answering search · which sizes/);
-            await expect(page.getByTestId('composer.tab.end')).toHaveText('esc write to search instead');
+            await expect(page.getByTestId('composer.tab.to')).toHaveText(/^↳ answering search · which sizes/);
+            await expect(page.getByTestId('composer.tab.end')).toHaveText('esc to search instead');
             await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-answering', 'true');
           }
           if (label === 'bise · storefront') {

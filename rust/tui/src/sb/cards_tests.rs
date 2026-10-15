@@ -288,8 +288,9 @@ fn the_card_view_takes_the_history_place() {
     let pad = col_of(&rows[t], "6m  │") + 2;
     assert_eq!(term.backend().buffer()[(pad, t as u16)].bg, theme::item_tint(), "the padding after the age is tinted");
     assert!(!rows.iter().any(|r| r.contains('▸')), "nothing highlighted on open");
-    assert!(rows.iter().any(|r| r.contains("you → ? perf · your answer")), "{}", rows.join("\n"));
-    assert_eq!(bar(&app), "1-2 answer   ←→ choose   ↑↓ other items   ctrl+o full screen   esc back to your message");
+    assert!(rows.iter().any(|r| r.contains("↳ answering perf · ")), "{}", rows.join("\n"));
+    // a question his words answer (composer-target A): ⏎ sends them, esc names whom they go to instead
+    assert_eq!(bar(&app), "1-2 answer   ⏎ send the answer   ←→ choose   ↑↓ other items   ctrl+o full screen   esc to main");
     // ctrl+o: full screen, the items as numbered tabs; again: in place
     ctrl(&mut app, 'o');
     let rows = draw(&mut app, 140, 40);
@@ -297,7 +298,7 @@ fn the_card_view_takes_the_history_place() {
     assert!(rows[tabs].contains("2 ? perf") && rows[tabs].contains("3 ? dark-mode") && rows[tabs].contains("↑↓"), "{}", rows[tabs]);
     assert!(!rows.iter().any(|r| r.contains("waiting for you")), "no box: {}", rows.join("\n"));
     assert!(rows[row_of(&rows, "? perf asks")].contains("┃ ? perf asks"));
-    assert_eq!(bar(&app), "1-2 answer   ↑↓ other items   pgup pgdn scroll   ctrl+o back in place   esc back to your message");
+    assert_eq!(bar(&app), "1-2 answer   ⏎ send the answer   ↑↓ other items   pgup pgdn scroll   ctrl+o back in place   esc to main");
     ctrl(&mut app, 'o');
     let rows = draw(&mut app, 140, 40);
     row_of(&rows, "waiting for you");
@@ -397,7 +398,7 @@ fn a_long_card_scrolls() {
     assert!(rows[more].contains("more lines · ctrl+o full screen"), "{}", rows.join("\n"));
     assert!(rows[more + 2].contains("┃ 1 yes   2 no"), "{}", rows.join("\n"));
     let top = row_of(&rows, "╭─ inbox");
-    let div = row_of(&rows, "you → ? t1");
+    let div = row_of(&rows, "↳ answering t1");
     assert!(more + 6 - top <= 2 + (div - 1) / 2 + 2, "about half the feed: {}", rows.join("\n"));
     // pgdn is the thread's in place
     assert!(!key(&mut app, KeyCode::PageDown, KeyModifiers::NONE));
@@ -452,7 +453,7 @@ fn the_arrows_choose_an_option() {
     press(&mut app, KeyCode::Char('m'));
     press(&mut app, KeyCode::Left);
     assert_eq!((app.ed.cursor, app.sb.current_card().map(|c| c.id)), (0, Some(12)), "← moved the caret");
-    assert_eq!(bar(&app), "⏎ sends your answer   ctrl+o full screen   esc back to your message");
+    assert_eq!(bar(&app), "⏎ send the answer   ctrl+o full screen   esc to main");
     // emptied: the arrows and the highlight are back
     press(&mut app, KeyCode::Delete);
     assert_eq!(app.ed.text, "");

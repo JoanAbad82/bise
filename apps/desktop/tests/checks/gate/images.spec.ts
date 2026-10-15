@@ -240,7 +240,7 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
     };
     // the open card's answer from the composer: ⌘V the checker, his words, ⏎
     const answerFromComposer = async (words: string, shotName: string): Promise<string> => {
-      const label = (await p.locator('body').innerText()).split('\n').find((l) => l.startsWith('answering')) ?? '(no answering label)';
+      const label = (await p.locator('body').innerText()).split('\n').find((l) => l.startsWith('↳ answering')) ?? '(no answering label)';
       await p.locator(FIELD).click();
       const staged = await stage(s);
       await p.keyboard.press('Meta+V');
@@ -375,7 +375,7 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
         // 4ccfa1d2: a docked item only its options decide (main's merge card) is never answered by typed words:
         // they go as a plain message, the card stays open, and the docked label is one line
         const label = await p.evaluate(() => {
-          const el = Array.from(document.querySelectorAll('*')).find((e) => e.children.length === 0 && /^answering /.test(e.textContent.trim()));
+          const el = Array.from(document.querySelectorAll('*')).find((e) => e.children.length === 0 && /^↳ answering /.test(e.textContent.trim()));
           const r = el?.getBoundingClientRect();
           return el ? `${el.textContent.trim().slice(0, 60)} (${String(Math.round(r?.height ?? 0))} px tall)` : 'none';
         });

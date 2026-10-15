@@ -55,7 +55,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   tab: TabWords;
   /** after the label's first part: the addressee's working gust (LabelMark), else none */
   mark?: ReactNode;
-  /** the tab's right instead of the context: 'esc write to search' while it answers, 'tab back to voice' */
+  /** the tab's right instead of the context: 'esc to bise instead' while it answers, 'tab back to voice' */
   tabEnd?: string | undefined;
   /** the addressee's row: its model menu in the box's row (none: no menu) */
   me?: Agent | undefined;
@@ -280,6 +280,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   }, [closedKey, answer?.asker]);
   // the box's row: '+' always; the mode and the model only for a message (an answer has neither)
   const answering = answer !== null;
+  // pink only while his words answer a question (composer-target A): a closed one takes them as a message
+  const pink = answering && answer.closed !== true;
   const attach = useCallback((paths: readonly string[]) => {
     actions.current?.attach(paths);
   }, []);
@@ -299,7 +301,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   const tabEl = <ComposerTab words={tabWords} mark={mark} end={end ?? undefined} testId="composer.tab" />;
   // a modifier held alone: the key line lists its keys (the TUI's ctrlhint.rs key bar)
   const held = useComposerHeld();
-  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} tabAccent={answering} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
+  const field = <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} {...(draftKey === undefined ? {} : { draftKey })} busy={busy} sources={sources} store={keptStorage} tab={tabEl} answering={pink} answerTip={answer?.tip} tools={tools} toolsEnd={toolsEnd} onShiftTab={onShiftTab} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} {...(answering ? {} : { onQueue: queue.onQueue, onEditNewest: queue.onEditNewest, queue: queue.slot })} onCommand={onCommand} onStop={onStop} onReady={ready} {...(keys === undefined ? {} : { keys })} lead={lead} held={held} testId="composer" />;
   if (note === null) return field;
   return (
     <>
@@ -359,24 +361,18 @@ export interface CardAt {
   readonly asker?: string;
   /** the hub closed it while his words were typed: they go to `asker` as a plain message */
   readonly closed?: boolean;
+  /** the pink border's tip ('your words answer search's question · esc writes to bise') */
+  readonly tip?: string;
 }
 
-/** The inbox block's 'where am i' on bise's own view (no project, no agent: 'esc write a plain message'). */
+/** The inbox block's 'where am i' on bise's own view (no project, no agent: 'esc to bise instead'). */
 export const HERE_BISE = { project: null, agent: null } as const;
 
 /** The card his words answer while the block has one open, else none (an approval: none). Pure. */
-export function answerOf(a: { project: string; card?: number; answer: number | null; asker?: string; closed?: boolean } | null): CardAt | null {
+export function answerOf(a: { project: string; card?: number; answer: number | null; asker?: string; closed?: boolean; tip?: string } | null): CardAt | null {
   if (a === null) return null;
   // closed by the hub while he typed: its draft key stays, his words go to the asker (card-draft-keep)
   if (a.closed === true && a.card !== undefined) return { project: a.project, card: a.card, closed: true, ...(a.asker === undefined ? {} : { asker: a.asker }) };
   if (a.answer === null) return null;
-  return { project: a.project, card: a.answer, ...(a.asker === undefined ? {} : { asker: a.asker }) };
-}
-
-/** The composer's label while it answers a docked card: 'answering perf · which bench do you…' (main is bise). Pure. */
-export function answeringLabel(c: { agent: string; question: string }): string {
-  const who = c.agent === 'main' ? 'bise' : c.agent;
-  const one = c.question.replace(/\s+/gu, ' ').trim();
-  const cut = Array.from(one).length > 40 ? `${Array.from(one).slice(0, 39).join('').trimEnd()}…` : one;
-  return `answering ${who} · ${cut}`;
+  return { project: a.project, card: a.answer, ...(a.asker === undefined ? {} : { asker: a.asker }), ...(a.tip === undefined ? {} : { tip: a.tip }) };
 }
