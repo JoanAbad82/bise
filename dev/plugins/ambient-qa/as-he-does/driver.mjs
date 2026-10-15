@@ -3822,15 +3822,21 @@ async function rowsC2BA(harness, say) {
     await harness();
     await clear();
     await page.keyboard.press('Escape');
+    // the stack shows 3 rows; the item can sit past them. Its own row, else the '+ N more · <next>' row
+    // once it names it: either click opens it, and his key comes right after that click
+    // (cand-3ce7t: its row never showed, the more row's clicks walked past it)
     const rowL = page.locator('[data-testid^="inbox.block.row."]', { hasText: F1 }).first();
-    const listed = await until(async () => {
-      if (await rowL.isVisible().catch(() => false)) return true;
-      await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 1000 }).catch(() => {});
+    const moreL = page.locator('[data-testid="inbox.block.more"]').first();
+    const opener = await until(async () => {
+      if (await rowL.isVisible().catch(() => false)) return rowL;
+      if (await moreL.filter({ hasText: F1 }).isVisible().catch(() => false)) return moreL;
+      await moreL.click({ timeout: 1000 }).catch(() => {});
+      await page.waitForTimeout(300);
       return null;
-    }, 30000, 1000);
-    let got = { listed: !!listed };
-    if (listed) {
-      await rowL.click({ timeout: 3000 });
+    }, 30000, 500);
+    let got = { listed: !!opener, block: flat(await text('[data-testid="inbox.block"]')).slice(0, 300) };
+    if (opener) {
+      await opener.click({ timeout: 3000 });
       // no wait: his key comes right after the click
       await page.keyboard.type('zqk', { delay: 0 });
       await page.waitForTimeout(400);
