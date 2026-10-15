@@ -25,6 +25,23 @@ const withLong = (lines: number): typeof core_ev =>
       : { ...e, projects: e.projects.map((r) => ({ ...r, cards: r.cards?.map((c) => (c.id === 9 ? { ...c, question: Array.from({ length: lines }, (_, i) => `line ${String(i + 1)} of the long ask`).join(String.fromCharCode(10)) } : c)) })) },
   );
 
+/** core_ev with `n` items in acme: copies of card 9 from id 12 on ('which port 12?'), `patch` on any id. */
+const withCards = (n: number, patch: Record<number, Partial<Card>> = {}): typeof core_ev =>
+  core_ev.map((e) =>
+    e.ev !== 'projects'
+      ? e
+      : {
+          ...e,
+          projects: e.projects.map((r) => {
+            const cards = r.cards ?? [];
+            const nine = cards.find((c) => c.id === 9);
+            if (nine === undefined) return r;
+            const extra = Array.from({ length: Math.max(0, n - cards.length) }, (_, i) => ({ ...nine, id: 12 + i, question: `which port ${String(12 + i)}?` }));
+            return { ...r, cards: [...cards, ...extra].map((c) => ({ ...c, ...(patch[c.id] ?? {}) })) };
+          }),
+        },
+  );
+
 const mount = (here: Here = { project: P, agent: 'perf' }, events: typeof core_ev = core_ev) => {
   const sent: CoreCmd[] = [];
   const port: CorePort = { send: (c) => sent.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
@@ -48,15 +65,32 @@ describe('the inbox block (b2)', () => {
     expect(screen.getByTestId('inbox.block').textContent).toContain('2 waiting');
     expect(screen.getByTestId('inbox.block.keys').textContent).toContain('⌃1–2');
     expect(screen.getByTestId('inbox.block.row.1').textContent).toContain('run rm -rf target?');
-    // H10: folded, one item line; the rest is '+ N more' in the head
-    expect(screen.queryByTestId('inbox.block.row.2')).toBeNull();
-    expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 1 more');
+    // the TUI's box: a line per item up to 3; 2 items, no '+ N more'
+    expect(screen.getByTestId('inbox.block.row.2').textContent).toContain('which bench?');
+    expect(screen.queryByTestId('inbox.block.more')).toBeNull();
     expect(told.filter((a) => a !== null)).toEqual([]);
+  });
+
+  it("inbox-stack: 3 items stacked as the TUI's rows (n, sign, who · first line, its note, project · age), then '+ N more · ? who · words'", () => {
+    mount({ project: P, agent: 'perf' }, withCards(5, { 9: { note: 'perf heard from main since' }, 12: { kind: 'approval', approval: true, question: 'npm publish\n--tag next\n\nto ship 2.5.0' }, 13: { note: 'not in the more line' } }));
+    expect(screen.getByTestId('inbox.block.row.3')).toBeTruthy();
+    expect(screen.queryByTestId('inbox.block.row.4')).toBeNull();
+    const text = (n: number) => screen.getByTestId(`inbox.block.row.${String(n)}`).textContent;
+    expect(text(1)).toBe('1!perfrun rm -rf target?acme · 1 min');
+    expect(text(2)).toBe('2?perfwhich bench? perf heard from main sinceacme · 1 min');
+    // an approval's command: '$ ', its first line, how many lines it has (card_draw.rs box_row)
+    expect(text(3)).toBe('3!perf$ npm publish · 2 linesacme · 1 min');
+    // '+ 2 more · ? perf · which port 13?' (more_row): the first of the hidden ones, its note left to its row
+    expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 2 more · ? perf · which port 13?');
+    fireEvent.click(screen.getByTestId('inbox.block.more'));
+    expect(screen.getByTestId('inbox.block.open.4')).toBeTruthy();
+    // open further down: rows 1-3 stay, the open item where its number puts it, the last one folds
+    expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 1 more · ? perf · which port 14?');
   });
 
   it('a question opens in place: its options, and the composer answers it; a digit picks, the line leaves', () => {
     const { hub, told } = mount();
-    fireEvent.click(screen.getByTestId('inbox.block.more'));
+    fireEvent.click(screen.getByTestId('inbox.block.row.2'));
     expect(screen.getByTestId('inbox.block.open.2')).toBeTruthy();
     expect(screen.getByTestId('inbox.block.keys').textContent).toContain('esc');
     expect(told.at(-1)).toEqual({ project: P, card: 9, label: 'answering perf · which bench?', end: 'esc write to perf instead', answer: 9, asker: 'perf' });
@@ -67,21 +101,17 @@ describe('the inbox block (b2)', () => {
   });
 
   it("'+ N more' walks on past the open item to the last, then wraps (never back and forth between two)", () => {
-    // a third card, a copy of card 9 with its own id and words
-    const three = core_ev.map((e) =>
-      e.ev !== 'projects'
-        ? e
-        : { ...e, projects: e.projects.map((r) => ({ ...r, cards: r.cards?.flatMap((c) => (c.id === 9 ? [c, { ...c, id: 11, question: 'which port?' }] : [c])) })) },
-    );
-    mount({ project: P, agent: 'perf' }, three);
-    expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 2 more');
+    mount({ project: P, agent: 'perf' }, withCards(6));
+    expect(screen.getByTestId('inbox.block.more').textContent).toContain('+ 3 more');
     const openN = () => screen.getByTestId('inbox.block').querySelector('[data-testid^="inbox.block.open."]')?.getAttribute('data-testid');
     fireEvent.click(screen.getByTestId('inbox.block.more'));
-    expect(openN()).toBe('inbox.block.open.2');
+    expect(openN()).toBe('inbox.block.open.4');
     fireEvent.click(screen.getByTestId('inbox.block.more'));
-    expect(openN()).toBe('inbox.block.open.3');
+    expect(openN()).toBe('inbox.block.open.5');
     fireEvent.click(screen.getByTestId('inbox.block.more'));
-    expect(openN()).toBe('inbox.block.open.2');
+    expect(openN()).toBe('inbox.block.open.6');
+    fireEvent.click(screen.getByTestId('inbox.block.more'));
+    expect(openN()).toBe('inbox.block.open.4');
   });
 
   it('an approval: only its options decide; the composer says what it waits for and sends plain words', () => {
@@ -96,7 +126,7 @@ describe('the inbox block (b2)', () => {
 
   it("ctrl+o (the window's 'fold-all'), focus anywhere, opens the open item's long ask whole, again folds it (I8, qa-native f640424d)", () => {
     mount({ project: P, agent: 'perf' }, withLong(16));
-    fireEvent.click(screen.getByTestId('inbox.block.more'));
+    fireEvent.click(screen.getByTestId('inbox.block.row.2'));
     const card = () => screen.getByTestId('inbox.block.open.2').textContent;
     expect(card()).not.toContain('line 14 of the long ask');
     act(() => {
@@ -303,7 +333,7 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     try {
       mount();
       // H10 (designer m_19835): an ordinary item from bise, the last one, never a line of its own
-      expect(await screen.findByText('+ 2 more')).toBeTruthy();
+      expect((await screen.findByTestId('inbox.block.row.3')).textContent).toContain('let questions reach you');
       fireEvent.keyDown(window, { key: '3', code: 'Digit3', ctrlKey: true });
       // waits: under a loaded run the open can land a tick later (it passed alone, failed once in pnpm check)
       expect((await screen.findByTestId('inbox.block.notify')).textContent).toContain('let questions reach you as macOS notifications?');
@@ -314,7 +344,7 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
       });
       expect(asked).toBe(1);
       expect(screen.queryByTestId('inbox.block.notify')).toBeNull();
-      expect(screen.getByTestId('inbox.block.more').textContent).toBe('+ 1 more');
+      expect(screen.queryByTestId('inbox.block.row.3')).toBeNull();
     } finally {
       delete g.bise;
     }
@@ -339,7 +369,7 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     const store = new Store(port, { asides });
     replay(store, core_ev);
     block(store, 'other-project');
-    fireEvent.click(screen.getByTestId('inbox.block.more'));
+    fireEvent.click(screen.getByTestId('inbox.block.row.2'));
     fireEvent.keyDown(window, { key: '2' });
     expect(sent.filter((c) => c.cmd === 'answer')).toEqual([{ cmd: 'answer', project: P, card: 9, reply: '2' }]);
     expect(screen.getByTestId('inbox.block').textContent).toContain('1 waiting');
@@ -419,7 +449,7 @@ describe("the notifications' permission row (amb-mac's notify.ask)", () => {
     g.bise = { notify: { state: () => Promise.resolve('never'), onState: () => () => undefined, ask: () => Promise.resolve('on') } };
     try {
       const { hub, told } = mount();
-      expect(await screen.findByText('+ 2 more')).toBeTruthy();
+      expect((await screen.findByTestId('inbox.block.row.3')).textContent).toContain('let questions reach you');
       fireEvent.keyDown(window, { key: '3', code: 'Digit3', ctrlKey: true });
       expect(told.at(-1)).toMatchObject({ answer: null });
       fireEvent.keyDown(window, { key: '2' });

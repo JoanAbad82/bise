@@ -53,6 +53,33 @@ export function stripView(list: readonly Card[], open: string | null): StripView
   return { rows, more: list.length - rows.length, next };
 }
 
+/** The block + the composer leave the thread at least this share of the window (designer m_26234). */
+export const THREAD_MIN = 0.4;
+
+export interface Fit {
+  /** the window's height */
+  readonly win: number;
+  /** the folded block's height and what is under it, its rows left out (its head, the composer…) */
+  readonly fixed: number;
+  /** one row's height ('+ n more' as much) */
+  readonly row: number;
+  /** the items waiting */
+  readonly items: number;
+}
+
+/**
+ * How many item rows the folded block shows: STRIP_ROWS, fewer (3 → 2 → 1) while it and the
+ * composer, with the '+ n more' row when one is left out, would leave the thread less than THREAD_MIN
+ * of the window; never 0, never a scroll inside the block (designer m_26234). Pure.
+ */
+export function fitRows(f: Fit): number {
+  for (let r = STRIP_ROWS; r > 1; r--) {
+    const lines = Math.min(r, f.items) + (f.items > r ? 1 : 0);
+    if (f.win - (f.fixed + lines * f.row) >= THREAD_MIN * f.win) return r;
+  }
+  return 1;
+}
+
 export interface CtrlDigit {
   readonly code: string;
   readonly metaKey: boolean;
@@ -72,6 +99,44 @@ export function stripKey(e: CtrlDigit): number | undefined {
 export function stripOpen(list: readonly Card[], n: number): string | undefined {
   const c = n >= 1 && n <= STRIP_KEYS ? list[n - 1] : undefined;
   return c ? cardKey(c) : undefined;
+}
+
+export interface RowWords {
+  /** the agent alone, on every row: its sign says what it is (designer m_26234) */
+  readonly who: string;
+  /** a tool call's command: '$ ' before it, in accent */
+  readonly cmd: boolean;
+  /** its first line ('npm publish', 'a.rs +1 file · +3 −1', 'make test · 3 lines'), '' when none */
+  readonly what: string;
+  /** the hub's second line ('approved · checks pass'), faint after it; '' when none */
+  readonly note: string;
+}
+
+/**
+ * A row's words as the TUI's box_row and its shape (rust/tui/src/sb/card_draw.rs, cards.rs): the
+ * agent (never the TUI's 't3 failed' title: designer m_26234), then a tool call's command (`$ npm publish`, `· n lines` when it has more), a patch's first file and
+ * its +/− counts, else the first line that has words; the hub's note after it. Pure.
+ */
+export function rowWords(c: Card): RowWords {
+  const who = c.agent;
+  const note = (c.note ?? '').replace(/\s+/gu, ' ').trim();
+  const nl = String.fromCharCode(10);
+  if (c.kind !== 'approval') {
+    const what = c.question.split(nl).map((l) => l.trim()).find((l) => l !== '') ?? '';
+    return { who, cmd: false, what, note };
+  }
+  // an approval: the command (or a patch) up to the first blank line, then its reason
+  const head = c.question.replace(/^\n+|\n+$/gu, '').split(nl + nl)[0] ?? '';
+  const lines = head.split(nl);
+  if (head.startsWith('diff --git') || head.startsWith('--- ')) {
+    const files = lines.filter((l) => l.startsWith('+++ ')).map((l) => l.slice(4).trim().replace(/^b\//u, ''));
+    const plus = lines.filter((l) => l.startsWith('+') && !l.startsWith('+++')).length;
+    const minus = lines.filter((l) => l.startsWith('-') && !l.startsWith('---')).length;
+    const more = files.length > 1 ? ` +${String(files.length - 1)} file${files.length > 2 ? 's' : ''} ·` : '';
+    return { who, cmd: false, what: `${files[0] ?? 'a file'}${more} +${String(plus)} −${String(minus)}`, note };
+  }
+  const first = (lines[0] ?? '').trim();
+  return { who, cmd: first !== '', what: lines.length > 1 ? `${first} · ${String(lines.length)} lines` : first, note };
 }
 
 /** A row's words: who, then the question's first line (the TUI's `? t3 · npm publish`). */

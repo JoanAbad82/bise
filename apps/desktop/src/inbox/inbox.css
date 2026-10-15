@@ -33,7 +33,9 @@
 .inbox-block[data-ctrl] .strip-n { color: var(--c-accent); }
 .strip-who { flex: none; }
 .strip-what { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--c-text-2); }
-.strip-more { color: var(--c-text-3); font-size: var(--t-12); }
+.strip-more { color: var(--c-text-3); font-size: var(--t-12); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
+.strip-cmd { color: var(--c-accent); font-family: var(--font-mono); }
+.strip-note { color: var(--c-text-3); }
 /* inbox card v2 (InboxCard.tsx; ambient m_11273, its mock's values): opaque, docked in the flow; pink is the glyph and the numbers only */
 .ic {
   box-sizing: border-box; display: flex; flex-direction: column; width: 100%; max-height: 55vh; padding: var(--pad-card);

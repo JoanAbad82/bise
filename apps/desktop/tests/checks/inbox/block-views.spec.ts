@@ -100,14 +100,14 @@ test("inbox/block-views: on perf's thread the block folds 4 items, opens a quest
     await expect(block).toBeVisible({ timeout: 10_000 });
 
     // a fresh test home: macOS never asked, so bise's notifications ask is the 5th item (H10)
-    await test.step("folded (H10): the head and one line, '+ 4 more' in the head, the keys", async () => {
+    await test.step("folded (inbox-stack, the TUI's box): the head, 3 lines, '+ 2 more · …' under them, the keys", async () => {
       await expect(block).toContainText('5 waiting');
-      await expect(page.getByTestId('inbox.block.row.1')).toBeVisible();
-      for (const n of [2, 3]) await expect(page.getByTestId(`inbox.block.row.${String(n)}`)).toHaveCount(0);
+      for (const n of [1, 2, 3]) await expect(page.getByTestId(`inbox.block.row.${String(n)}`)).toBeVisible();
+      await expect(page.getByTestId('inbox.block.row.4')).toHaveCount(0);
       await expect(page.getByTestId('inbox.block.row.1')).toContainText('which bench?');
-      await expect(page.getByTestId('inbox.block.more')).toContainText('+ 4 more');
+      await expect(page.getByTestId('inbox.block.more')).toContainText('+ 2 more · ');
       const h = await block.evaluate((e) => e.getBoundingClientRect().height);
-      expect(h, 'folded, the block is two lines high, not five').toBeLessThan(90);
+      expect(h, 'folded, the block is five lines high (head, 3 rows, more), not more').toBeLessThan(BLOCK_H);
       await expect(page.getByTestId('inbox.block.keys')).toContainText('⌃1–5');
       expect(await page.getByTestId('inbox.block').count(), 'one block, never two').toBe(1);
       await shoot(page, core, 'folded');
@@ -229,8 +229,8 @@ test("inbox/block-views: the permission row asks macOS once ('turn on'), then go
   const s = await launchDesktop({ core, route: `agent/${P}/perf`, size: '1100x720' });
   try {
     const { page } = s;
-    // H10 (designer m_19835): an ordinary item from bise, the last one ('+ 4 more': 4 cards + the ask)
-    await expect(page.getByTestId('inbox.block.more'), 'a fresh home: macOS never asked').toContainText('+ 4 more', { timeout: 10_000 });
+    // H10 (designer m_19835): an ordinary item from bise, the last one ('+ 2 more': 4 cards + the ask, 3 shown)
+    await expect(page.getByTestId('inbox.block.more'), 'a fresh home: macOS never asked').toContainText('+ 2 more', { timeout: 10_000 });
     await page.keyboard.press('Control+5');
     const row = page.getByTestId('inbox.block.notify');
     await expect(row).toBeVisible({ timeout: 3000 });
@@ -238,7 +238,7 @@ test("inbox/block-views: the permission row asks macOS once ('turn on'), then go
     await expect(page.getByTestId('inbox.block.notify.opt.1')).toContainText('turn on');
     await page.getByTestId('inbox.block.notify.opt.1').click();
     await expect(row, "the test's answer is 'on': it goes").toHaveCount(0, { timeout: 5000 });
-    await expect(page.getByTestId('inbox.block.more')).toContainText('+ 3 more');
+    await expect(page.getByTestId('inbox.block.more')).toContainText('+ 1 more');
   } finally {
     await s.close();
     core.dispose();
@@ -249,13 +249,18 @@ test("inbox/block-views: the permission row asks macOS once ('turn on'), then go
 // the composer take ≤ 224 px at rest (the thread's bottom), ≤ 120 px while he reads scrolled up: the
 // block is one 36 px line then, the composer's keys line hides, and the rows he reads don't move; back
 // at the bottom both come back and the last row shows whole. Frames at 1400, 1100 and 800, light + dark.
+// inbox-stack (his ask: up to 3 items stacked, as the TUI's box): the folded block is its head, 3
+// rows and the '+ N more' row (148 px measured); the block + the composer at rest 308 px (was 224
+// with one line: 3 more 28 px lines)
+const BLOCK_H = 160;
+const BOTTOM_H = 320;
 const LONG = Array.from({ length: 60 }, (_, i) => ({ pos: i + 1, at_ms: NOW - 3_600_000 + i * 1000, kind: 'agent', text: `bench note ${String(i + 1)}: p95 moved by ${String(i % 7)} ms on the cold path, nothing else changed.` }));
 const longWorld = () => world().map((e) => ((e as { ev: string; agent?: string }).ev === 'thread' && (e as { agent?: string }).agent === 'perf' ? { ...e, entries: LONG } : e));
 /** the inbox block's top to the window's bottom: the block, the composer and its lines */
 const bottomPart = (page: Page) => page.evaluate(() => window.innerHeight - (document.querySelector('[data-testid="inbox.block"]')?.getBoundingClientRect().top ?? window.innerHeight));
 
 for (const size of ['1400x820', '1100x820', '800x820'] as const) {
-  test(`inbox/block-views: H10 at ${size}: the head + one line at rest, the same while he reads`, async () => {
+  test(`inbox/block-views: H10 at ${size}: the head + 3 lines + more at rest, the same while he reads`, async () => {
     const core = new FakeCore(longWorld() as unknown as ConstructorParameters<typeof FakeCore>[0]);
     const s = await launchDesktop({ core, route: `agent/${P}/perf`, size });
     const w = size.split('x')[0] ?? size;
@@ -266,10 +271,11 @@ for (const size of ['1400x820', '1100x820', '800x820'] as const) {
       await expect(page.getByText('bench note 60:')).toBeVisible({ timeout: 5000 });
       // the composer is the tab + the box with its 32 px row now (designer's composer-strip A, signed
       // m_24325): 44 px more than the old label line and box, so the budget is 180 + 44
-      await test.step('at rest: the head + one line, the composer whole, ≤ 224 px', async () => {
-        await expect(page.getByTestId('inbox.block.row.1')).toBeVisible();
-        expect(await block.evaluate((e) => e.getBoundingClientRect().height), 'the head + one line').toBeLessThan(90);
-        expect(await bottomPart(page), 'the block + the composer at rest').toBeLessThanOrEqual(224);
+      await test.step(`at rest: the head + 3 lines + more, the composer whole, ≤ ${String(BOTTOM_H)} px`, async () => {
+        await expect(page.getByTestId('inbox.block.row.3')).toBeVisible();
+        expect(await block.evaluate((e) => e.getBoundingClientRect().height), 'the head + 3 lines + more').toBeLessThan(BLOCK_H);
+        const bottom = await bottomPart(page);
+        expect(bottom, 'the block + the composer at rest').toBeLessThanOrEqual(BOTTOM_H);
         await expect(page.getByTestId('composer.keys')).toBeVisible();
         await shoot(page, core, `h10-${w}-rest`);
       });
@@ -385,6 +391,42 @@ test("inbox/block-views: one inbox, 3 projects: the row says its project, the he
     core.dispose();
   }
 });
+
+// designer m_26234: a short window gives rows back, 3 → 2 → 1, so the thread keeps 40% of the
+// window; the '+ n more' row counts what went; never a scroll inside the folded block. On this world
+// (85 px above the thread, 196 px of head and composer, 28 px rows) 3 rows hold from 655 px, 2 from 608
+for (const [size, want] of [['1100x700', 3], ['1100x630', 2], ['1100x560', 1]] as const) {
+  test(`inbox/block-views: a short window at ${size}: ${String(want)} row(s), the thread keeps 40%`, async () => {
+    const core = new FakeCore(longWorld() as unknown as ConstructorParameters<typeof FakeCore>[0]);
+    const s = await launchDesktop({ core, route: `agent/${P}/perf`, size });
+    try {
+      const { page } = s;
+      const block = page.getByTestId('inbox.block');
+      await expect(block).toBeVisible({ timeout: 10_000 });
+      // the harness's size sets the width only: the content height is set here
+      const [w, h] = size.split('x').map(Number);
+      await s.app.evaluate(({ BrowserWindow }, [w2, h2]) => {
+        const win = BrowserWindow.getAllWindows().sort((a, b) => (b.getSize()[0] ?? 0) - (a.getSize()[0] ?? 0))[0];
+        win?.setContentSize(w2 ?? 0, h2 ?? 0);
+      }, [w, h] as const);
+      await expect.poll(() => page.evaluate(() => window.innerHeight)).toBe(h);
+      await expect(block).toHaveAttribute('data-rows', String(want), { timeout: 3000 });
+      for (let n = 1; n <= 5; n++) await expect(page.getByTestId(`inbox.block.row.${String(n)}`)).toHaveCount(n <= want ? 1 : 0);
+      await expect(page.getByTestId('inbox.block.more')).toContainText(`+ ${String(5 - want)} more · `);
+      const m = await page.evaluate(() => {
+        const b = document.querySelector('[data-testid="inbox.block"]');
+        const l = document.querySelector('[data-testid="thread.list"]');
+        return { win: window.innerHeight, top: l?.getBoundingClientRect().top ?? 0, block: b?.getBoundingClientRect().top ?? 0, scroll: (b?.scrollHeight ?? 0) - (b?.clientHeight ?? 0) };
+      });
+      expect(m.scroll, 'never a scroll inside the folded block').toBeLessThanOrEqual(1);
+      if (want > 1) expect(m.block - m.top, 'the thread keeps 40% of the window').toBeGreaterThanOrEqual(0.4 * m.win);
+      await shoot(page, core, `short-${size}`);
+    } finally {
+      await s.close();
+      core.dispose();
+    }
+  });
+}
 
 test("inbox/block-views: one inbox on bise's home: bise's own items say 'bise · <age>'", async () => {
   const core = new FakeCore(threeWorld() as unknown as ConstructorParameters<typeof FakeCore>[0]);

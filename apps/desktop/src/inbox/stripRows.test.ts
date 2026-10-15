@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Card } from '@/proto';
 import { cardKey } from './order';
-import { STRIP_ROWS, stripKey, stripList, stripOpen, stripView, stripWords } from './stripRows';
+import { fitRows, rowWords, STRIP_ROWS, stripKey, stripList, stripOpen, stripView, stripWords } from './stripRows';
 
 const card = (id: number, rank: number, project = 'acme', question = `q${String(id)}`): Card => ({
   id,
@@ -72,5 +72,27 @@ describe('the inbox strip (W7/K24)', () => {
 
   it("a row says who and the question's first line", () => {
     expect(stripWords(card(7, 0, 'acme', 'npm publish?\nit is 2.5.0'))).toEqual({ who: 't7', what: 'npm publish?' });
+  });
+
+  it("a row's words as the TUI's box_row: who, '$ ' and a command's lines, a patch's counts, the first line with words, the note", () => {
+    const c = card(7, 0);
+    expect(rowWords({ ...c, question: '\n  npm publish?\nit is 2.5.0', note: 'answered\n another way' })).toEqual({ who: 't7', cmd: false, what: 'npm publish?', note: 'answered another way' });
+    expect(rowWords({ ...c, kind: 'approval', question: 'npm publish' })).toEqual({ who: 't7', cmd: true, what: 'npm publish', note: '' });
+    expect(rowWords({ ...c, kind: 'approval', question: 'make test\n  --all\n\nthe gate' }).what).toBe('make test · 2 lines');
+    const patch = 'diff --git a/a.rs b/a.rs\n--- a/a.rs\n+++ b/a.rs\n+x\n-y\n+z\n+++ b/b.rs\n+w';
+    expect(rowWords({ ...c, kind: 'approval', question: patch })).toEqual({ who: 't7', cmd: false, what: 'a.rs +1 file · +3 −1', note: '' });
+    // the agent alone on every row, whatever the kind (designer m_26234: the sign says what it is)
+    expect(rowWords({ ...c, kind: 'feature_merge', question: 'merge sb/perf into main?' }).who).toBe('t7');
+  });
+
+  it('a short window gives rows back, 3 → 2 → 1, so the thread keeps 40% of it; never 0', () => {
+    // 820 high, 200 px of head and composer, 28 px rows: 3 rows + more is 312, the thread keeps 508
+    expect(fitRows({ win: 820, fixed: 200, row: 28, items: 5 })).toBe(3);
+    // 500 high (the thread wants 200): 3 + more leaves 188, 2 + more 216
+    expect(fitRows({ win: 500, fixed: 200, row: 28, items: 5 })).toBe(2);
+    expect(fitRows({ win: 450, fixed: 200, row: 28, items: 5 })).toBe(1);
+    expect(fitRows({ win: 300, fixed: 280, row: 28, items: 5 })).toBe(1);
+    // 3 items: no '+ n more' row, 3 rows fit where 3 + more did not
+    expect(fitRows({ win: 500, fixed: 200, row: 28, items: 3 })).toBe(3);
   });
 });
