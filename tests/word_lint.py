@@ -12,8 +12,10 @@ catalog's (tests/words/*.gen.json, generated from rust/proto/src/words/):
     would match any test message), each {arg} typed by its name (HOLE_KINDS, one line per kind;
     words-inbox m_27144, words-panel m_27163):
       count  n, pos, count, total, left, more        digits ('12', '1.2k')
-      name   agent, from, to, who, asker, maker, by   one token, no space
-      time   len, age, at, when, time, since, ago     a digit in it ('3m', '2 h', 'fri 08:07')
+      name   agent, from, to, who, asker, maker, by,  one token, no space
+             name
+      time   len, age, at, when, time, since, ago,    a digit in it ('3m', '2 h', 'fri 08:07')
+             dur
       rev    rev, sha, version                        a digit in it ('a1b2c3d')
       any other name                                 any text
     so '{n} agents {head}' is not 'main and your agents use …', 'waiting for {len}' not
@@ -61,8 +63,8 @@ MIN_FIXED = 6
 #   kind     names                                        pattern
 HOLE_KINDS = [
     ("count", {"n", "pos", "count", "total", "left", "more"}, r"\d[\d.,]*[kKM%]?"),
-    ("name", {"agent", "from", "to", "who", "asker", "maker", "by"}, r"\S+?"),
-    ("time", {"len", "age", "at", "when", "time", "since", "ago"}, r"(?:[a-z]+ ){0,2}\d[\d:.,]*(?: ?[a-z]{1,4})?"),
+    ("name", {"agent", "from", "to", "who", "asker", "maker", "by", "name"}, r"\S+?"),
+    ("time", {"len", "age", "at", "when", "time", "since", "ago", "dur"}, r"(?:[a-z]+ ){0,2}\d[\d:.,]*(?: ?[a-z]{1,4})?"),
     ("rev", {"rev", "sha", "version"}, r"\S*\d\S*"),
 ]
 ANY = r".+?"
