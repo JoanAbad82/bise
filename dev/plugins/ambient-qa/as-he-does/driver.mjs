@@ -3888,6 +3888,11 @@ async function rowsDC47(harness, say) {
   // 1. at-steady: the @ list never leaves for a frame while he types a file name
   await row('at steady', async () => {
     await harness();
+    // a file only the core's file answer can match (no agent, no artifact by that name): the bug's case
+    // (cand-dc47r typed 'READM' in a world with no such file: the list closed with no row, nothing proven)
+    const FN = `dcsteady${T}`;
+    await say(`[[bash: printf x > ${FN}.md && git add ${FN}.md]] seeded ${FN}`);
+    await page.waitForTimeout(4000);
     await clear();
     await page.keyboard.type('@', { delay: 20 });
     const open = await page.locator('[data-testid="composer.pick"]').first().waitFor({ timeout: 8000 }).then(() => true, () => false);
@@ -3898,17 +3903,17 @@ async function rowsDC47(harness, say) {
       const tick = () => {
         if (!w.on) return;
         const el = document.querySelector('[data-testid="composer.pick"]');
-        w.frames.push({ present: !!el && el.isConnected, same: el === first, h: Math.round(el?.getBoundingClientRect().height ?? 0) });
+        w.frames.push({ present: !!el && el.isConnected, same: el === first, h: Math.round(el?.getBoundingClientRect().height ?? 0), words: (el?.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 60) });
         requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
       new MutationObserver((rs) => { for (const r of rs) for (const n of r.removedNodes) if (n === first || (n instanceof Element && first && n.contains(first))) w.removed += 1; }).observe(document.body, { childList: true, subtree: true });
     });
-    await page.keyboard.type('READM', { delay: 40 });
-    await page.waitForTimeout(600);
+    await page.keyboard.type(FN.slice(0, 6), { delay: 40 });
+    await page.waitForTimeout(800);
     await shot('dc47-at-steady');
-    const w = await page.evaluate(() => { const x = window.__qaSteady; x.on = false; return { n: x.frames.length, gone: x.frames.filter((f) => !f.present || !f.same || f.h === 0).length, removed: x.removed }; });
-    step("@ then 5 keys of a file name (READM): the @ list is the same node, drawn, on every frame", open && w.n > 10 && w.gone === 0 && w.removed === 0, { open, ...w, field: await fieldText() });
+    const w = await page.evaluate((fn) => { const x = window.__qaSteady; x.on = false; return { n: x.frames.length, gone: x.frames.filter((f) => !f.present || !f.same || f.h === 0).length, removed: x.removed, fileShown: x.frames.some((f) => f.words.includes(fn)), last: x.frames.at(-1)?.words ?? null }; }, FN);
+    step(`@ then 6 keys of a file's name (${FN}.md): the @ list is the same node, drawn, on every frame, and it shows the file`, open && w.n > 10 && w.gone === 0 && w.removed === 0 && w.fileShown, { open, ...w, field: await fieldText() });
     await page.keyboard.press('Escape');
     await clear();
   });
@@ -3972,10 +3977,14 @@ async function rowsDC47(harness, say) {
     for (const w of [1400, 800]) {
       await resizeWin(w, 900);
       await page.waitForTimeout(700);
-      if (!(await page.locator('[data-testid="app.panel"]').first().isVisible().catch(() => false))) { await page.keyboard.press('Meta+Alt+0'); await page.waitForTimeout(600); }
+      // at 800 the bar slides over (⌘⌥0); closed again before the window grows back (cand-dc47r: left
+      // open, its scrim took every click after)
+      const slid = !(await page.locator('[data-testid="app.panel"]').first().isVisible().catch(() => false));
+      if (slid) { await page.keyboard.press('Meta+Alt+0'); await page.waitForTimeout(600); }
       const r = await page.evaluate(() => {
-        const box = (s) => { const e = document.querySelector(`[data-testid="${s}"]`); if (!e) return null; const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 ? { l: b.left, t: b.top, r: b.right, b: b.bottom, words: (e.textContent ?? '').trim().slice(0, 40) } : null; };
-        const hit = (a, b) => a && b && a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+        // the folded summary sits inside the head's own button: a part inside another isn't an overlap
+        const box = (s) => { const e = document.querySelector(`[data-testid="${s}"]`); if (!e) return null; const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 ? { el: e, l: b.left, t: b.top, r: b.right, b: b.bottom, words: (e.textContent ?? '').trim().slice(0, 40) } : null; };
+        const hit = (a, b) => a && b && !a.el.contains(b.el) && !b.el.contains(a.el) && a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
         return ['agents', 'archived', 'artifacts', 'scheduled'].map((id) => {
           const parts = { label: box(`app.right.${id}.head`), sum: box(`app.right.${id}.summary`), add: box(`app.right.${id}.add`), all: box(`app.right.${id}.all`), scope: box(`app.right.${id}.scope`) };
           const ks = Object.keys(parts).filter((k) => parts[k]);
@@ -3986,6 +3995,7 @@ async function rowsDC47(harness, say) {
       });
       await shot(`dc47-bar-heads-${String(w)}`);
       out.push({ w, heads: r });
+      if (slid) { await page.keyboard.press('Meta+Alt+0'); await page.waitForTimeout(600); }
     }
     await resizeWin(1400, 900);
     const scoped = out.flatMap((x) => x.heads).filter((h) => h.scope !== null);
