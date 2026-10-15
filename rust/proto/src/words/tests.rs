@@ -35,6 +35,32 @@ fn every_hole_is_an_arg_and_every_arg_a_hole() {
 }
 
 #[test]
+fn an_area_split_in_parts_is_one_list() {
+    #[allow(dead_code)]
+    mod a {
+        crate::words! { demo:
+            /// first
+            one_word = "one";
+            /// second
+            two_words = "two";
+        }
+    }
+    #[allow(dead_code)]
+    mod b {
+        crate::words! { demo:
+            /// third
+            three_words(n) = "{n} three";
+        }
+    }
+    const PARTS: &[&[Word]] = &[a::WORDS, b::WORDS];
+    const ALL_DEMO: &[Word] = &super::concat::<{ super::count(PARTS) }>(PARTS);
+    assert_eq!(super::count(PARTS), 3);
+    let keys: Vec<&str> = ALL_DEMO.iter().map(|w| w.key).collect();
+    assert_eq!(keys, ["demo.one_word", "demo.two_words", "demo.three_words"]);
+    assert_eq!(ALL_DEMO[2].args, ["n"]);
+}
+
+#[test]
 fn a_template_fills_and_a_plural_picks() {
     assert_eq!(inbox::where_thread("old"), "in old's thread");
     assert_eq!(inbox::answered_at("avif", inbox::where_inbox), "you: avif · in the inbox");

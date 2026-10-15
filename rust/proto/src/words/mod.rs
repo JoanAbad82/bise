@@ -63,6 +63,41 @@ pub const ALL: &[(&str, &[Word])] = &[
     ("thread", thread::WORDS),
 ];
 
+/// The words of an area split into submodules, as one list (architect
+/// m_27109: an area file near 1,000 lines splits, its keys stay
+/// `<area>.<name>`). In the area's file:
+///
+/// ```ignore
+/// const PARTS: &[&[Word]] = &[general::WORDS, update::WORDS];
+/// pub const WORDS: &[Word] = &super::concat::<{ super::count(PARTS) }>(PARTS);
+/// ```
+pub const fn concat<const N: usize>(parts: &[&[Word]]) -> [Word; N] {
+    const BLANK: Word = Word { key: "", args: &[], one: None, text: "", doc: "" };
+    let mut out = [BLANK; N];
+    let (mut i, mut at) = (0, 0);
+    while i < parts.len() {
+        let mut j = 0;
+        while j < parts[i].len() {
+            out[at] = parts[i][j];
+            at += 1;
+            j += 1;
+        }
+        i += 1;
+    }
+    assert!(at == N, "concat: N is not the parts' count");
+    out
+}
+
+/// How many words the parts hold (`concat`'s N).
+pub const fn count(parts: &[&[Word]]) -> usize {
+    let (mut i, mut n) = (0, 0);
+    while i < parts.len() {
+        n += parts[i].len();
+        i += 1;
+    }
+    n
+}
+
 /// A template with its holes filled: `{name}` takes that arg's words.
 /// The catalog test holds every hole to a declared arg; an unknown one
 /// would stay as written.
