@@ -114,7 +114,7 @@ export interface ComposerFrameProps {
    *  'to perf  ψ sb/perf  context 42k · 17%'; none: the box alone */
   tab?: ReactNode;
   /** his words answer a question (composer-target A, designer m_26531): the tab in the accent on its
-   *  7% tint ('↳ answering search · …'), the box's 1.5 px accent border with `answerTip` as its tip,
+   *  7% tint ('↳ answering search · …') with `answerTip` as its tip, the box's 1.5 px accent border,
    *  the send filled accent; off in 120 ms (esc). An approval never sets it: words never approve */
   answering?: boolean;
   answerTip?: string | undefined;
@@ -166,9 +166,9 @@ export function ComposerFrame({ children, tab, answering, answerTip, tools, tool
       {tabs}
       {dock}
       {quote}
-      {tab != null && <div className={cx("tab", answering && "acc")} data-testid={sub(testId, "tab")}>{tab}</div>}
-      <div className={cx("box", focus && "is-focus", answering && "ans")} data-testid={sub(testId, "box")} data-answering={answering || undefined}
-        {...(answering ? tipAttrs(answerTip) : {})}>
+      {/* answering, the tab is the pink border's label: its tip says where his words go (designer m_26683) */}
+      {tab != null && <div className={cx("tab", answering && "acc")} data-testid={sub(testId, "tab")} {...(answering ? tipAttrs(answerTip) : {})}>{tab}</div>}
+      <div className={cx("box", focus && "is-focus", answering && "ans")} data-testid={sub(testId, "box")} data-answering={answering || undefined}>
         <div className="line">
           {lead}
           <div className="in">{children}</div>

@@ -164,6 +164,8 @@ describe('which items his words answer (ambient m_8773, the TUI and hub choice_k
   it("a docked item only options decide says what it waits for; a question says nothing", () => {
     expect(pickWaits({ kind: 'merge', options: two })).toBe('the merge waits for 1 or 2');
     expect(pickWaits({ kind: 'question', approval: true, options: two })).toBe('the approval waits for 1 or 2');
+    expect(pickWaits({ kind: 'approval', approval: true, options: two })).toBe('the approval waits for 1 or 2');
+    expect(pickWaits({ kind: 'merge', approval: true, options: two }), "an approval's own verb").toBe('the merge waits for 1 or 2');
     expect(pickWaits({ kind: 'feature_merge', options: [...two, { n: 3, label: 'drop' }] })).toBe('the merge waits for 1 to 3');
     expect(pickWaits({ kind: 'question', options: two })).toBeNull();
     expect(digitWords(1)).toBe('1');

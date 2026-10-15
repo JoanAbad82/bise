@@ -197,10 +197,13 @@ export const ThreadComposer = memo(function ThreadComposer({
       setNote(null);
       // the card he answered was closed by the hub while he typed (card-draft-keep): his words go
       // to its asker as a plain message, then the block lets the card go
-      if (answer !== null && answer.closed === true && answer.asker !== undefined) {
+      // an approval or a choice open: they go to its asker as a plain message, the item stays
+      if (answer !== null && (answer.closed === true || answer.message === true) && answer.asker !== undefined) {
         store.send({ project: answer.project, agent: answer.asker, text: out.text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}), ...(out.parts === undefined ? {} : { parts: out.parts }) });
-        sentClosed.current = true;
-        leaveClosed();
+        if (answer.closed === true) {
+          sentClosed.current = true;
+          leaveClosed();
+        }
         onSent();
         return;
       }
@@ -281,7 +284,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   // the box's row: '+' always; the mode and the model only for a message (an answer has neither)
   const answering = answer !== null;
   // pink only while his words answer a question (composer-target A): a closed one takes them as a message
-  const pink = answering && answer.closed !== true;
+  const pink = answering && answer.closed !== true && answer.message !== true;
   const attach = useCallback((paths: readonly string[]) => {
     actions.current?.attach(paths);
   }, []);
@@ -361,6 +364,8 @@ export interface CardAt {
   readonly asker?: string;
   /** the hub closed it while his words were typed: they go to `asker` as a plain message */
   readonly closed?: boolean;
+  /** an approval or a choice: his words go to `asker` as a plain message, never an answer */
+  readonly message?: boolean;
   /** the pink border's tip ('your words answer search's question · esc writes to bise') */
   readonly tip?: string;
 }
@@ -368,9 +373,12 @@ export interface CardAt {
 /** The inbox block's 'where am i' on bise's own view (no project, no agent: 'esc to bise instead'). */
 export const HERE_BISE = { project: null, agent: null } as const;
 
-/** The card his words answer while the block has one open, else none (an approval: none). Pure. */
-export function answerOf(a: { project: string; card?: number; answer: number | null; asker?: string; closed?: boolean; tip?: string } | null): CardAt | null {
+/** The card his words answer while the block has one open (an approval: the card his words go
+ *  to the asker of, as a message), else none. Pure. */
+export function answerOf(a: { project: string; card?: number; answer: number | null; asker?: string; closed?: boolean; message?: boolean; tip?: string } | null): CardAt | null {
   if (a === null) return null;
+  // an approval or a choice open: his words go to its asker as a plain message (designer m_26683)
+  if (a.message === true && a.card !== undefined && a.asker !== undefined) return { project: a.project, card: a.card, asker: a.asker, message: true };
   // closed by the hub while he typed: its draft key stays, his words go to the asker (card-draft-keep)
   if (a.closed === true && a.card !== undefined) return { project: a.project, card: a.card, closed: true, ...(a.asker === undefined ? {} : { asker: a.asker }) };
   if (a.answer === null) return null;

@@ -75,7 +75,8 @@ export function digitWords(n: number): string {
  *  waits for 1 or 2'); none for an item his words answer. Pure. */
 export function pickWaits(c: Pick<Card, 'approval' | 'kind' | 'options'>): string | null {
   if (takesWords(c) || c.options.length === 0) return null;
-  const noun = c.approval === true ? 'approval' : c.kind === 'feature_merge' ? 'merge' : c.kind === 'feature_try' ? 'try' : c.kind === 'signin' ? 'sign-in' : c.kind;
+  // the item's own verb ('the merge'), else 'the approval' (designer m_26683)
+  const noun = c.kind === 'merge' || c.kind === 'feature_merge' ? 'merge' : c.kind === 'feature_try' ? 'try' : c.kind === 'signin' ? 'sign-in' : c.approval === true ? 'approval' : c.kind;
   return `the ${noun} waits for ${digitWords(c.options.length)}`;
 }
 

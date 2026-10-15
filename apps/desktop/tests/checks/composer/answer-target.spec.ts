@@ -1,14 +1,16 @@
 // composer/answer-target · his pick A on page composer-target (designer m_26531): where his words go
 // while an item is open. Passes when, on the scripted core (FakeCore, fake data), on acme's main:
-//   (1) answering: search's question open, the box has a 1.5 px accent border with its tip 'your words
-//       answer search's question · esc writes to bise', the tab is in the accent and reads
+//   (1) answering: search's question open, the box has a 1.5 px accent border, the tab is its label
+//       with the tip 'your words answer search's question · esc writes to bise' (designer m_26683), in
+//       the accent, and reads
 //       '↳ answering search · <the question cut after a whole word>' with 'esc to bise instead' at its
 //       right, the placeholder is 'your answer to search, then ⏎', the send is filled accent, the
 //       open card has a 2 px accent rail on its left;
 //   (2) at 800 px the question leaves the tab first, then 'esc to bise instead'; '↳ answering search'
 //       always stays whole;
-//   (3) an approval open (perf's merge): none of it: tab 'to bise · the merge waits for 1 or 2',
-//       the box's plain line, the send ink, no rail;
+//   (3) an approval open (perf's merge): none of it: the tab says where his words really go, 'to perf
+//       · the merge waits for 1 or 2' + 'esc to bise instead', the box's plain line, the send ink, no
+//       rail; typed words go to perf as a plain message, never an answer (designer m_26683);
 //   (4) esc with words typed: the pink is gone within 120 ms (+ a frame), the tab says 'to bise',
 //       the half answer stays with the question (it is back when he opens it again).
 // Writes shots for designer (light + dark at 1100 and 800: answering, typed, approval, after esc).
@@ -52,6 +54,8 @@ const world = (now: number) => {
   ];
 };
 
+type Cmd = { cmd?: string; project?: string; agent?: string; text?: string };
+
 /** What the composer and the open card look like now: the pink parts, read from the computed style. */
 const look = (page: Page) =>
   page.evaluate(() => {
@@ -69,6 +73,7 @@ const look = (page: Page) =>
       accent,
       boxShadow: box === null ? '' : getComputedStyle(box).boxShadow,
       boxTip: box?.dataset['tip'] ?? null,
+      tabTip: tab?.dataset['tip'] ?? null,
       tabAcc: tab?.classList.contains('acc') ?? false,
       tabColor: tab === null ? '' : getComputedStyle(tab.querySelector('.lbl') ?? tab).color,
       sendBg: send === null ? '' : getComputedStyle(send).backgroundColor,
@@ -122,7 +127,8 @@ test('composer/answer-target: pink while his words answer a question, never for 
       await page.waitForTimeout(200);
       const a = await look(page);
       expect(a.boxShadow, 'a 1.5 px accent border').toContain(`${a.accent} 0px 0px 0px 1.5px`);
-      expect(a.boxTip).toBe("your words answer search's question · esc writes to bise");
+      expect(a.tabTip, "the tab's tip, never over the label").toBe("your words answer search's question · esc writes to bise");
+      expect(a.boxTip, 'the box has no tip of its own').toBeNull();
       expect(a.tabAcc).toBe(true);
       expect(a.tabColor, 'the tab in the accent').toBe(a.accent);
       expect(a.sendBg, 'the send filled accent').toBe(a.accent);
@@ -169,17 +175,28 @@ test('composer/answer-target: pink while his words answer a question, never for 
 
       // (3) an approval: words never approve, nothing pink
       await openRow(2);
-      await expect(to).toHaveText(/^to bise · the \w+ waits for 1 or 2/u);
-      await expect(field).not.toHaveAttribute('aria-placeholder', /your answer/u);
+      await expect(to).toHaveText('to perf · the merge waits for 1 or 2');
+      await expect(end).toHaveText('esc to bise instead');
+      await expect(field).toHaveAttribute('aria-placeholder', 'write to perf, then ⏎');
       await page.waitForTimeout(200);
       const p = await look(page);
       expect(p.boxShadow).not.toContain(p.accent);
       expect(p.boxTip).toBeNull();
+      expect(p.tabTip).toBeNull();
       expect(p.tabAcc).toBe(false);
       expect(p.sendBg).not.toBe(p.accent);
       expect(p.rail).toBe(false);
       expect(p.cardShadow).not.toContain(p.accent);
       await shot(`${t}-1100-approval`);
+      // typed words go to perf as a plain message; the merge still waits
+      const sends = (core.cmds() as Cmd[]).filter((c) => c.cmd === 'send').length;
+      await field.click();
+      await page.keyboard.type(`after the bench ${t}`);
+      await page.keyboard.press('Enter');
+      await expect.poll(() => (core.cmds() as Cmd[]).filter((c) => c.cmd === 'send').length, { timeout: 3000 }).toBe(sends + 1);
+      expect((core.cmds() as Cmd[]).filter((c) => c.cmd === 'send').at(-1)).toMatchObject({ project: P, agent: 'perf', text: `after the bench ${t}` });
+      expect((core.cmds() as Cmd[]).some((c) => c.cmd === 'answer'), 'a typed line never answers the merge').toBe(false);
+      await expect(page.getByTestId('inbox.block.open.2'), 'the merge still waits').toBeVisible();
       await field.click();
       await page.keyboard.press('Escape');
       await expect(page.getByTestId('inbox.block.open.2')).toHaveCount(0);

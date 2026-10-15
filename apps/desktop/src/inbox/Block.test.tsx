@@ -117,7 +117,8 @@ describe('the inbox block (b2)', () => {
   it('an approval: only its options decide; the composer says what it waits for and sends plain words', () => {
     const { hub, told } = mount({ project: null, agent: null });
     fireEvent.click(screen.getByTestId('inbox.block.row.1'));
-    expect(told.at(-1)).toEqual({ project: P, card: 10, label: 'to bise · the approval waits for 1 or 2', answer: null });
+    // his typed words go to the asker as a plain message, and the label says so (designer m_26683)
+    expect(told.at(-1)).toEqual({ project: P, card: 10, label: 'to perf · the approval waits for 1 or 2', end: 'esc to bise instead', answer: null, asker: 'perf', message: true, placeholder: 'write to perf, then ⏎' });
     // ←→ walk the options, ⌘⏎ picks the one the keys are on
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     fireEvent.keyDown(window, { key: 'Enter', metaKey: true });
@@ -312,6 +313,9 @@ describe('one inbox (designer m_19631)', () => {
       label: 'to perf · telemetry · the approval waits for 1 or 2',
       end: 'esc to bise instead',
       answer: null,
+      asker: 'perf',
+      message: true,
+      placeholder: 'write to perf, then ⏎',
     });
   });
 
@@ -321,12 +325,17 @@ describe('one inbox (designer m_19631)', () => {
     expect(answeringOf(card('t-1'), { project: P, agent: 'search' }, 'acme').end).toBe('esc to search instead');
   });
 
-  it('an approval never takes his words: no placeholder, no tip (composer-target A: no pink)', () => {
+  it('an approval never takes his words: they go to its asker as a message, the label says so, no tip (no pink)', () => {
     const a = answeringOf(card('t-1', true), { project: null, agent: null }, 'telemetry');
-    expect(a.label).toBe('to bise · the approval waits for 1 or 2');
+    expect(a.label).toBe('to perf · the approval waits for 1 or 2');
+    expect(a.end).toBe('esc to bise instead');
     expect(a.answer).toBeNull();
-    expect(a.placeholder).toBeUndefined();
+    expect(a.message).toBe(true);
+    expect(a.asker).toBe('perf');
+    expect(a.placeholder).toBe('write to perf, then ⏎');
     expect(a.tip).toBeUndefined();
+    // perf's own thread: esc changes nothing, so no end
+    expect(answeringOf(card(P, true), { project: P, agent: 'perf' }, 'acme').end).toBeUndefined();
   });
 
   it('the question is cut after a whole word within 40 characters, one line', () => {

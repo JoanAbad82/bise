@@ -49,6 +49,8 @@ export interface Answering {
   /** the hub closed the open card while his words were typed: they stay in its draft and go to
    *  `asker` as a plain message (card-draft-keep) */
   readonly closed?: boolean;
+  /** an approval or a choice is open: his words go to `asker` as a plain message (never an answer) */
+  readonly message?: boolean;
 }
 
 /** Where the block is: the screen's project and agent (none: bise's view, settings, review…). */
@@ -246,9 +248,13 @@ export function answeringOf(c: Card, here: Here, pname?: string): Answering {
     const label = `${ANSWERING_HEAD} ${other ?? who} · ${cutWords(c.question, 40)}`;
     return { project: c.project, card: c.id, label, end: `esc to ${to} instead`, answer: c.id, asker: c.agent, placeholder: `your answer to ${who}, then ⏎`, tip: answerTip(who, to) };
   }
+  // an approval or a choice never takes his words (designer m_26683): typed, they go to its asker as
+  // a plain message, and the label says so ('to perf · the merge waits for 1 or 2'); esc names the
+  // screen's own addressee when it is someone else
   const waits = pickWaits(c) ?? 'it waits for its options';
-  if (other !== null) return { project: c.project, card: c.id, label: `to ${other} · ${waits}`, end: `esc to ${to} instead`, answer: null };
-  return { project: c.project, card: c.id, label: `to ${to} · ${waits}`, answer: null };
+  const asker = shownName(c.agent);
+  const same = other === null && asker === to;
+  return { project: c.project, card: c.id, label: `to ${other ?? asker} · ${waits}`, ...(same ? {} : { end: `esc to ${to} instead` }), answer: null, asker: c.agent, message: true, placeholder: `write to ${asker}, then ⏎` };
 }
 
 /**
@@ -461,7 +467,7 @@ export function InboxBlock({ here, onAnswer, now: pinned, only, rest }: InboxBlo
   const { project: hp, agent: ha } = here;
   const isClosed = openCard !== undefined && openCard === closed;
   const told = openCard === undefined ? null : (isClosed ? closedAnswering : answeringOf)(openCard, { project: hp, agent: ha }, projectWord(names.get(openCard.project), openCard.project));
-  const tellKey = told === null ? '' : `${told.project}/${String(told.card)}/${told.label}/${told.end ?? ''}/${String(told.answer)}/${String(told.closed === true)}`;
+  const tellKey = told === null ? '' : `${told.project}/${String(told.card)}/${told.label}/${told.end ?? ''}/${String(told.answer)}/${String(told.closed === true)}/${told.asker ?? ''}`;
   // told in the layout phase (ghost-badge): an item he opens swaps the composer to its draft in the
   // same task as his click (an update from a layout effect is sync, so is the field's swap after
   // it); told from a passive effect, the swap came a render later, and a key typed in between went
