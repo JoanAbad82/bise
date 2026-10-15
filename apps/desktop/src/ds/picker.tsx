@@ -12,8 +12,12 @@
 // whatever `maxHeight` says); the list scrolls inside, the current row in view on open. Placement:
 // pickerPlace (8 px from the trigger, clamped in the window); a menu that opens from a trigger is
 // PickerPop or Dropdown (dropdown.tsx), never a Picker placed by a screen. css/picker.css.
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { cx, sub } from "./cx";
+import { useFitText, usePickerList } from "./hooks";
+import { PICKER_CAP } from "./place";
+
+export { PICKER_CAP, pickerPlace, type PickerPlace } from "./place";
 
 export interface PickerRow {
   id: string;
@@ -101,36 +105,6 @@ export function stepActive(ids: readonly string[], active: string | null, key: s
   }
 }
 
-/** The tallest a picker gets, as a part of the window's height (his m_26194: about 50vh). */
-export const PICKER_CAP = 0.5;
-/** The widest a picker gets (⌘K's 640 aside): picker.css's max-width. */
-const PICKER_W = 420;
-
-/**
- * A picker's place (designer m_24793, his m_25470): 8 px from its anchor (the composer's box, else
- * its trigger), aligned to its trigger's left edge, or its right edge when the trigger sits right
- * ("auto": the left edge unless a 420 px picker would pass the window's right), 8 px inside the
- * window. On its `side` (above: the composer's; below: a menu's) when the room there takes 240 px
- * or is the larger; else the other side. Its whole height fits that room (8 px from the anchor, 8
- * from the window's edge) and half the window: the list scrolls inside, the footer stays. Fixed
- * coordinates. Pure.
- */
-export function pickerPlace(
-  anchor: { top: number; bottom: number },
-  trigger: { left: number; right: number },
-  align: "start" | "end" | "auto",
-  win: { width: number; height: number },
-  side: "above" | "below" = "above",
-): { style: CSSProperties; maxHeight: number } {
-  const above = anchor.top - 16;
-  const below = win.height - anchor.bottom - 16;
-  const up = side === "above" ? above >= 240 || above >= below : !(below >= 240 || below >= above);
-  const a = align === "auto" ? (trigger.left + PICKER_W + 8 <= win.width ? "start" : "end") : align;
-  const x: CSSProperties = a === "start" ? { left: Math.max(8, trigger.left) } : { right: Math.max(8, win.width - trigger.right) };
-  const y: CSSProperties = up ? { bottom: win.height - anchor.top + 8 } : { top: anchor.bottom + 8 };
-  return { style: { position: "fixed", ...x, ...y }, maxHeight: Math.min(Math.floor(win.height * PICKER_CAP), Math.max(96, up ? above : below)) };
-}
-
 /** The row a typed prefix jumps to: the first walkable row after `from` (or from the top when the
  *  prefix is longer than one letter) whose words start with it; null: none. Pure. */
 export function typeahead(groups: readonly PickerGroup[], from: string | null, prefix: string): string | null {
@@ -164,14 +138,7 @@ export function cutWords(text: string, fits: (t: string) => boolean): string {
 /** An inline secondary, cut after a whole word to the room left (its full words in the row's tip). */
 export function PickerCut({ text }: { text: string }) {
   const ref = useRef<HTMLSpanElement>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (el === null) return;
-    el.textContent = cutWords(text, (t) => {
-      el.textContent = t;
-      return el.scrollWidth <= el.clientWidth;
-    });
-  }, [text]);
+  useFitText(ref, text, cutWords);
   return (
     <span ref={ref} className="s">
       {text}
@@ -181,38 +148,12 @@ export function PickerCut({ text }: { text: string }) {
 
 /** The list you pick from. */
 export function Picker({ title, titleKeys, groups, footer, keyline, empty, active, ownKeys = false, onPick, onClose, wide, inline = false, maxHeight, style, testId }: PickerProps) {
-  const shell = useRef<HTMLDivElement>(null);
-  const list = useRef<HTMLDivElement>(null);
   const ids = walkable(groups);
   const current = groups.flatMap((g) => g.rows).find((r) => r.current === true && r.disabled !== true)?.id ?? null;
-  const [own, setOwn] = useState<string | null>(current ?? ids[0] ?? null);
-  // the caller's keys: the pointer's row wins until its active row moves (the last input wins)
-  const [hover, setHover] = useState<{ id: string; at: string | null } | null>(null);
-  const on = active === undefined ? own : hover !== null && hover.at === active ? hover.id : active;
-  const [edges, setEdges] = useState({ top: false, bottom: false });
+  // its state is hooks.ts's: the active row (its own, or the caller's with the pointer's), the
+  // focus on open, the active row kept in the list's view, the fades at the clipped edges
+  const { shell, list, on, setOwn, point, edges, onScroll } = usePickerList({ first: current ?? ids[0] ?? null, active, ownKeys, rows: groups });
   const typed = useRef({ s: "", at: 0 });
-  // its own keys: the focus on open
-  useEffect(() => {
-    if (ownKeys) shell.current?.focus();
-  }, [ownKeys]);
-  // the active row stays in view (never the page)
-  useLayoutEffect(() => {
-    if (on === null) return;
-    // in the list's own scroll only (never the window's): the current row in view on open
-    const l = list.current;
-    const row = l?.querySelector<HTMLElement>(`[data-row="${CSS.escape(on)}"]`);
-    if (l == null || row == null) return;
-    if (row.offsetTop < l.scrollTop) l.scrollTop = row.offsetTop;
-    else if (row.offsetTop + row.offsetHeight > l.scrollTop + l.clientHeight) l.scrollTop = row.offsetTop + row.offsetHeight - l.clientHeight;
-  }, [on]);
-  // the fades at the clipped edges
-  const onScroll = () => {
-    const el = list.current;
-    if (el === null) return;
-    const next = { top: el.scrollTop > 0, bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 1 };
-    setEdges((e) => (e.top === next.top && e.bottom === next.bottom ? e : next));
-  };
-  useLayoutEffect(onScroll, [groups]);
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!ownKeys) return;
     if (e.key === "Escape") {
@@ -265,8 +206,7 @@ export function Picker({ title, titleKeys, groups, footer, keyline, empty, activ
                 data-tip={r.tip === undefined || r.tip === "" ? undefined : r.tip}
                 onMouseMove={() => {
                   if (r.disabled === true || on === r.id) return;
-                  if (active === undefined) setOwn(r.id);
-                  else setHover({ id: r.id, at: active });
+                  point(r.id);
                 }}
                 onClick={r.disabled === true ? undefined : () => { onPick(r.id); }}
                 data-testid={r.testId ?? sub(testId, r.id)}>

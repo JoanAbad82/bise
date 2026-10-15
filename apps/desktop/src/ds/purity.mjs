@@ -5,11 +5,9 @@
 /** The only file of src/ds that may call React's state and effect hooks or watch sizes. */
 export const HOOKS_FILE = "hooks.ts";
 
-/** One named exception, its reason, and who removes it (no other may come). */
-export const EXCEPTIONS = {
-  // TODO(menus-ds): move Picker's state and effects onto hooks.ts (usePickerList), then drop this line
-  "picker.tsx": "the Picker's list state, in the middle of menus-ds's rework",
-};
+/** Named exceptions, each with its reason and who removes it: none left (menus-ds moved the
+ *  Picker's state onto hooks.ts's usePickerList); no other may come. */
+export const EXCEPTIONS = {};
 
 const STATE = ["useState", "useEffect", "useLayoutEffect", "useReducer", "useSyncExternalStore", "ResizeObserver"];
 const REWRITE = ["innerHTML", "dangerouslySetInnerHTML"];

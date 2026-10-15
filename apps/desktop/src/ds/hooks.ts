@@ -2,7 +2,8 @@
 // its own row's hover (architect m_26213). What they never do: reach the store, the IPC or the app;
 // they read the DOM of the component that calls them, nothing else. purity.mjs checks that every
 // useState/useEffect/useLayoutEffect/ResizeObserver of src/ds is here. Owner: amb-kit.
-import { useCallback, useEffect, useLayoutEffect, useState, type DependencyList, type Ref, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DependencyList, type FocusEvent, type Ref, type RefObject } from "react";
+import { pickerPlace, type PickerPlace } from "./place";
 
 /** Whether the system asks for reduced motion (none: no matchMedia, as in unit tests). */
 export function reducedMotion(): boolean {
@@ -142,6 +143,150 @@ export function useInputTextShort(text: string | undefined, active: boolean, ref
     [ref, active, text],
   );
   return [short, fit];
+}
+
+/**
+ * A Picker's list state (picker.tsx): the active row, its own (`active` undefined: its keys) or the
+ * caller's, where the pointer's row wins until the caller's moves (the last input wins); the focus
+ * on its shell when it has its keys; the active row kept in the list's own scroll (never the
+ * window's: the current row in view on open); the 16 px fades at the clipped edges, again when
+ * `rows` change.
+ */
+export function usePickerList(o: { first: string | null; active: string | null | undefined; ownKeys: boolean; rows: unknown }) {
+  const shell = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const [own, setOwn] = useState<string | null>(o.first);
+  const [hover, setHover] = useState<{ id: string; at: string | null } | null>(null);
+  const on = o.active === undefined ? own : hover !== null && hover.at === o.active ? hover.id : o.active;
+  const [edges, setEdges] = useState({ top: false, bottom: false });
+  const { ownKeys, active, rows } = o;
+  useEffect(() => {
+    if (ownKeys) shell.current?.focus();
+  }, [ownKeys]);
+  useLayoutEffect(() => {
+    if (on === null) return;
+    const l = list.current;
+    const row = l?.querySelector<HTMLElement>(`[data-row="${CSS.escape(on)}"]`);
+    if (l == null || row == null) return;
+    if (row.offsetTop < l.scrollTop) l.scrollTop = row.offsetTop;
+    else if (row.offsetTop + row.offsetHeight > l.scrollTop + l.clientHeight) l.scrollTop = row.offsetTop + row.offsetHeight - l.clientHeight;
+  }, [on]);
+  const onScroll = () => {
+    const el = list.current;
+    if (el === null) return;
+    const next = { top: el.scrollTop > 0, bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 1 };
+    setEdges((e) => (e.top === next.top && e.bottom === next.bottom ? e : next));
+  };
+  useLayoutEffect(onScroll, [rows]);
+  /** the pointer on a row */
+  const point = (id: string) => {
+    if (active === undefined) setOwn(id);
+    else setHover({ id, at: active });
+  };
+  return { shell, list, on, setOwn, point, edges, onScroll };
+}
+
+/** `el`'s words cut to its room by `cut` (picker.tsx cutWords: after a whole word, one '…'), again
+ *  when `text` changes. */
+export function useFitText(ref: RefObject<HTMLElement | null>, text: string, cut: (text: string, fits: (t: string) => boolean) => string): void {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el === null) return;
+    el.textContent = cut(text, (t) => {
+      el.textContent = t;
+      return el.scrollWidth <= el.clientWidth;
+    });
+  }, [ref, text, cut]);
+}
+
+/** An open/closed state: `toggle` flips it, `close` closes it (a Dropdown's menu). */
+export function useOpen(): { readonly open: boolean; readonly toggle: () => void; readonly close: () => void } {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => {
+    setOpen(false);
+  }, []);
+  const toggle = useCallback(() => {
+    setOpen((x) => !x);
+  }, []);
+  return { open, toggle, close };
+}
+
+/** Where a PickerPop goes: on which edge of its anchor, which side first, the box it opens from. */
+export interface PopAt {
+  /** the anchor's closest ancestor matching it is the box it opens 8 px from ('.box': the composer's) */
+  box?: string;
+  align: "start" | "end" | "auto";
+  side: "above" | "below";
+  /** at least the anchor's width */
+  match: boolean;
+}
+
+function placeOf(a: HTMLElement | null, at: PopAt): PickerPlace | null {
+  if (a === null) return null;
+  const t = a.getBoundingClientRect();
+  const b = (at.box === undefined ? null : a.closest(at.box))?.getBoundingClientRect() ?? t;
+  const p = pickerPlace(b, t, at.align, { width: window.innerWidth, height: window.innerHeight }, at.side);
+  return at.match ? { ...p, style: { ...p.style, minWidth: Math.max(240, Math.round(t.width)) } } : p;
+}
+
+/**
+ * A PickerPop's floating (dropdown.tsx): its place, measured when its layer mounts (`mount`, its
+ * ref: the anchor's ref is set by then, even when it opens with its screen) before the first paint,
+ * again on a resize; a press outside it and its anchor, or esc (first, at the document), calls
+ * `onClose`; the focus back on the anchor when it goes, if it had it (`focus`, its layer's
+ * onFocus/onBlur); `layer`: where it portals (the body).
+ */
+export function usePop(anchor: RefObject<HTMLElement | null>, at: PopAt, onClose: () => void) {
+  const menu = useRef<HTMLDivElement | null>(null);
+  const held = useRef(false);
+  const [place, setPlace] = useState<PickerPlace | null>(null);
+  const { box, align, side, match } = at;
+  const mount = useCallback(
+    (el: HTMLDivElement | null) => {
+      menu.current = el;
+      if (el !== null) setPlace(placeOf(anchor.current, { box, align, side, match }));
+    },
+    [anchor, box, align, side, match],
+  );
+  useEffect(() => {
+    const resize = () => {
+      setPlace(placeOf(anchor.current, { box, align, side, match }));
+    };
+    const down = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (anchor.current?.contains(t) === true || menu.current?.contains(t) === true) return;
+      onClose();
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      e.preventDefault();
+      onClose();
+    };
+    window.addEventListener("resize", resize);
+    document.addEventListener("pointerdown", down, true);
+    document.addEventListener("keydown", key, true);
+    return () => {
+      window.removeEventListener("resize", resize);
+      document.removeEventListener("pointerdown", down, true);
+      document.removeEventListener("keydown", key, true);
+    };
+  }, [anchor, box, align, side, match, onClose]);
+  useLayoutEffect(() => {
+    const a = anchor;
+    return () => {
+      if (held.current) a.current?.focus({ preventScroll: true });
+    };
+  }, [anchor]);
+  const focus = {
+    onFocus: () => {
+      held.current = true;
+    },
+    onBlur: (e: FocusEvent<HTMLElement>) => {
+      if (!e.currentTarget.contains(e.relatedTarget)) held.current = false;
+    },
+  };
+  return { place, mount, focus, layer: document.body };
 }
 
 /** Hand `el` on to the caller's ref, a function or an object. */
