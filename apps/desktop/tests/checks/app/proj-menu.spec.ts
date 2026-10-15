@@ -89,10 +89,13 @@ for (const size of ['1400x860', '800x640']) {
       expect(await top(list.getByText('archived', { exact: true }))).toBeGreaterThan(await top(page.getByTestId(`${MENU}.quiet.docs`)));
       // every row wears the right bar's mark (one source): the menu's mark is the bar's for each live agent
       for (const [head, name] of [['active', 'copy'], ['active', 'search'], ['active', 'perf'], ['quiet', 'seo'], ['quiet', 'checkout'], ['quiet', 'lint'], ['quiet', 'docs']]) {
-        // the bar draws '∿' as the ds Dot (no text): it is checked by its own row below
-        const bar = (await page.getByTestId(`app.right.agent.${name}.sign`).innerText()).trim();
+        // the bar draws '∿' as the ds Dot 'wk', whose breath the window's clock rewrites in place
+        // ('· ~ ∿ ≈ ∿ ~'): its text is a frame, so a working row is read by its state, never its text
+        const bar = await page
+          .getByTestId(`app.right.agent.${name}.sign`)
+          .evaluate((el) => (el.querySelector('.b-dot.wk') !== null ? '∿' : (el as HTMLElement).innerText.trim()));
         const mark = (await page.getByTestId(`${MENU}.${head}.${name}.mark`).innerText()).trim();
-        if (bar !== '') expect(mark, `${name}: the bar's mark`).toBe(bar);
+        expect(mark, `${name}: the bar's mark`).toBe(bar);
       }
       await expect(page.getByTestId(`${MENU}.active.copy.mark`)).toHaveText('?');
       await expect(page.getByTestId(`${MENU}.active.search.mark`)).toHaveText('∿');
