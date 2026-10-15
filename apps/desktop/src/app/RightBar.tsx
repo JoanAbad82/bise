@@ -8,7 +8,7 @@
 // only its own, its name after the head's count.
 // Owner: amb-win. The rows' words are pure (barrows.ts).
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Act, Dot, Press, tipAttrs } from '@/ds';
+import { Act, Dot, Press, Ring, Slide, tipAttrs } from '@/ds';
 import { markTip } from './tipwords';
 import type { Agent } from '@/proto';
 import { useAllArtifacts } from '@/artifacts';
@@ -238,6 +238,7 @@ function Row({ r, onOpen, on, onOpenPr }: { r: BarRow; onOpen: () => void; on?: 
         onClick={onOpen}
         data-testid={r.testId}
         data-group={r.group}
+        data-slide-row
       >
         {/* each mark says itself in the ds tip (tipwords.ts); the row has none, its words are there */}
         <span className={`app-rb-g ${r.tone}`} {...tipAttrs(head ? r.title : r.tips?.glyph)} data-testid={`${r.testId}.sign`}>
@@ -256,17 +257,23 @@ function Row({ r, onOpen, on, onOpenPr }: { r: BarRow; onOpen: () => void; on?: 
             {r.cu.g}
           </span>
         )}
-        {/* the role takes what is left and cuts first, after a whole word (none fits: it goes); its words on hover */}
-        <FitWords className="app-rb-role" text={r.sub} testId={`${r.testId}.role`} whole />
+        {/* the now line takes all that is left up to the filled columns, cut with '…' and cut first;
+            the row's hover slides it to show the rest (ds Slide, his ask m_26200) */}
+        <Slide className="app-rb-role" full={r.sub} testId={`${r.testId}.role`}>
+          {r.sub}
+        </Slide>
         {!head && (
-          // time 40 px, % 32 px, right-aligned; short on room the % wraps away first, then the time
+          // time 40 px, the ring 12 px (with its % from 70 %: 40 px on every row then), right-aligned;
+          // short on room the % wraps away first, then the time
           <span className="app-rb-cols">
             <span className="app-rb-cols-0" />
             <span className="app-rb-time" {...tipAttrs(r.tips?.time)} data-testid={`${r.testId}.time`}>
               {r.time ?? ''}
             </span>
-            <span className="app-rb-pct" {...tipAttrs(r.tips?.pct)} data-testid={`${r.testId}.pct`}>
+            {/* its context: the composer's ring (his m_26205), its words in the tip; from 70 % the number too */}
+            <span className="app-rb-pct" {...tipAttrs(r.tips?.pct)} data-testid={`${r.testId}.pct`} data-loud={r.pct !== undefined && r.pct !== '' ? true : undefined}>
               {r.pct ?? ''}
+              {r.ctx !== undefined && <Ring pct={r.ctx} testId={`${r.testId}.ring`} />}
             </span>
           </span>
         )}

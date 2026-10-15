@@ -1119,19 +1119,6 @@
   align-items: center;
   gap: var(--s-2);
 }
-.b-composer .tab .ring {
-  display: block;
-  flex: none;
-}
-.b-composer .tab .ring .track {
-  fill: none;
-  stroke: var(--c-text-3);
-  stroke-width: 1;
-}
-.b-composer .tab .ring .used {
-  fill: var(--c-text-2);
-  stroke: none;
-}
 .b-composer .tab .ctx .num {
   font-family: var(--font-ui);
   font-variant-numeric: tabular-nums;

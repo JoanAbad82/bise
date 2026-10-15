@@ -6,7 +6,7 @@
 // (actions.ts). Owner: amb-win.
 import { memo, useState } from 'react';
 import { Peek } from './Peek';
-import { Act, Button, cx, Empty, Head, IconButton, Row } from '@/ds';
+import { Act, Button, cx, Empty, Head, IconButton, Row, Slide } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAgents, useStore } from '@/store';
 import { useRouter } from '@/app/router';
@@ -119,7 +119,7 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: 
     });
   };
   return (
-    <div className={sel ? 'ag-item is-sel' : 'ag-item'} data-row={a.name} data-testid={`agents.row.${id}`} data-status={a.status} data-sel={sel || undefined} aria-selected={sel}>
+    <div className={sel ? 'ag-item is-sel' : 'ag-item'} data-row={a.name} data-testid={`agents.row.${id}`} data-slide-row data-status={a.status} data-sel={sel || undefined} aria-selected={sel}>
       {/* one row (designer m_19489): its sign, its name, then at its right its acts (shown on
           hover, on the ↑↓-selected row and with the focus in it; an archived one's restore always)
           and its end, so a row is one line high. bise's own row has no acts. */}
@@ -206,11 +206,12 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: 
       </div>
       {/* one line each, full words on hover, and only when there are words: the acts sit on the
           row's own line now, so a line or a report that comes never moves them (qa-flows'
-          app/clicks), and an agent with neither stays one line high (designer m_19489) */}
+          app/clicks), and an agent with neither stays one line high (designer m_19489); a cut
+          line slides on the row's hover to show the rest (ds Slide, his ask m_26200) */}
       {lineOf(a) !== '' && (
-        <p className="ag-line" title={lineOf(a)}>
+        <Slide className="ag-line" full={lineOf(a)} testId={`agents.line.${id}`}>
           {lineOf(a)}
-        </p>
+        </Slide>
       )}
       {a.report != null && (
         <p className="ag-report" title={`${a.report.kind} · ${a.report.text}`} data-testid={`agents.report.${id}`}>

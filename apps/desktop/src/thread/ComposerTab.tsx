@@ -5,6 +5,7 @@
 // on a resize or new words, never per keystroke (the composer above it is memoised). Owner: amb-win.
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Agent } from '@/proto';
+import { Ring } from '@/ds';
 import { usePlaces, useProjects } from '@/store';
 import { placeOf as placeOfAgent, tilde, worktreeParts } from '@/app/barplaces';
 import { contextOf, RING_CLEAR_PCT, ringTip, tabFit, tabPlace, wordCut, type TabFit, type TabPlace, type TabWords } from './tab';
@@ -28,22 +29,6 @@ export function useTabWords(label: string, place: TabPlace | undefined, context:
   const worktree = place?.worktree;
   const tip = place?.tip;
   return useMemo(() => ({ label, place: name === undefined ? undefined : { name, worktree: worktree === true, tip: tip ?? '' }, context, who }), [label, name, worktree, tip, context, who]);
-}
-
-/** The context as a 12 px gauge (designer m_25940, never read as a spinner): a filled wedge in text-2
- *  from 12 o'clock clockwise, inside a 1 px text-3 circle. */
-function Ring({ pct }: { pct: number }) {
-  const p = Math.max(0, Math.min(100, pct)) / 100;
-  const r = 4;
-  const a = p * 2 * Math.PI;
-  const x = (6 + r * Math.sin(a)).toFixed(3);
-  const y = (6 - r * Math.cos(a)).toFixed(3);
-  return (
-    <svg className="ring" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
-      <circle className="track" cx="6" cy="6" r="5.5" />
-      {p >= 1 ? <circle className="used" cx="6" cy="6" r={r} /> : p > 0 && <path className="used" d={`M6 6 L6 ${String(6 - r)} A${String(r)} ${String(r)} 0 ${p > 0.5 ? 1 : 0} 1 ${x} ${y} Z`} />}
-    </svg>
-  );
 }
 
 const ALL: TabFit = { branch: true, project: true, context: true };
@@ -138,10 +123,11 @@ export function ComposerTab({ words, mark, end, testId }: { words: TabWords; mar
         </span>
       ) : (
         ring !== null && (
-          // the ring, its words in the tip; past 80% the numbers show in clear beside it
+          // the tokens and the ring, its words in the tip; past 80% the percent shows in clear too
           <span className={fit.context ? 'end ctx' : 'end ctx gone'} data-item="context" data-testid={`${testId}.context`} data-tip={ringTip(words.who ?? 'its', ring)} aria-label={ringTip(words.who ?? 'its', ring)} aria-hidden={!fit.context || undefined} data-pct={Math.round(ring.pct)}>
+            {/* the tokens used left of the ring (his ask m_26205: '84k'), past 80% its percent too */}
+            <span className="num">{ring.pct > RING_CLEAR_PCT ? `${ring.tokens} · ${String(Math.round(ring.pct))}%` : ring.tokens}</span>
             <Ring pct={ring.pct} />
-            {ring.pct > RING_CLEAR_PCT && <span className="num">{`${ring.tokens} · ${String(Math.round(ring.pct))}%`}</span>}
           </span>
         )
       )}

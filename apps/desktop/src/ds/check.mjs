@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { purityFaults } from "./purity.mjs";
 
 const here = import.meta.dirname;
 const read = (p) => readFileSync(p, "utf8");
@@ -119,14 +120,10 @@ const tsx = readdirSync(here).filter((f) => f.endsWith(".tsx"));
 // the code without its comments (a comment may name window.html or document the DOM)
 const src = Object.fromEntries(tsx.map((f) => [f, noComments(read(join(here, f))).replace(/^\s*\/\/.*$/gm, "")]));
 
-law("components are pure: no state, effect, store, or DOM rewrite", () => {
-  for (const [f, s] of Object.entries(src)) {
-    for (const bad of ["useState", "useEffect", "useLayoutEffect", "useReducer", "useSyncExternalStore", "innerHTML", "dangerouslySetInnerHTML"]) {
-      assert.ok(!s.includes(bad), `${f} uses ${bad}`);
-    }
-    const dom = s.match(/\b(?:window|document)\.\w/);
-    assert.ok(!dom, `${f} reaches the DOM: ${dom && dom[0]}`);
-  }
+law("components are pure: their state and effects only through hooks.ts, never the store, the app or a DOM rewrite (purity.mjs)", () => {
+  const files = readdirSync(here).filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$|\.pending\.ts$/.test(f));
+  const faults = purityFaults(Object.fromEntries(files.map((f) => [f, noComments(read(join(here, f))).replace(/^\s*\/\/.*$/gm, "")])));
+  assert.deepEqual(faults, []);
 });
 
 law("every clickable part can carry a data-testid", () => {

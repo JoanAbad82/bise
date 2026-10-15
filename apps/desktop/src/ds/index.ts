@@ -24,3 +24,5 @@ export * from "./mark";
 export * from "./tip";
 export * from "./picker";
 export * from "./gust";
+export * from "./slide";
+export * from "./ring";

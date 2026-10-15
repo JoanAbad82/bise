@@ -1,0 +1,35 @@
+// @vitest-environment happy-dom
+// src/ds Slide: Vibe Work's pace (44 px/s, 80 ms delay), the words whole in the DOM, and the row's
+// mark ([data-slide-row]) the hover listens on. The pixels and the slide itself: the harness checks.
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { Slide, SLIDE_DELAY_MS, SLIDE_PX_PER_S, slideMs } from "./index";
+
+afterEach(cleanup);
+
+describe("ds Slide", () => {
+  it("slides at Vibe Work's pace: 44 px a second, after 80 ms", () => {
+    expect(SLIDE_PX_PER_S).toBe(44);
+    expect(SLIDE_DELAY_MS).toBe(80);
+    expect(slideMs(0)).toBe(0);
+    expect(slideMs(-3)).toBe(0);
+    expect(slideMs(44)).toBe(1000);
+    expect(slideMs(110)).toBe(2500);
+  });
+
+  it("keeps every word in the DOM (the CSS cuts, never the text) and its delay in a variable", () => {
+    const words = "all his picks decided; signing builders' shots (composer-strip, inbox)";
+    const { getByTestId } = render(
+      <button data-slide-row type="button">
+        <Slide className="role" full={words} testId="r.role">
+          {words}
+        </Slide>
+      </button>,
+    );
+    const el = getByTestId("r.role");
+    expect(el.textContent).toBe(words);
+    expect(el.className).toBe("b-slide role");
+    expect(el.querySelector(".b-slide-in")?.textContent).toBe(words);
+    expect(el.style.getPropertyValue("--slide-delay")).toBe("80ms");
+  });
+});

@@ -2,8 +2,9 @@
 // Tool, Fold, Day, Answered, Marker, Route (and its handoff), SchedHead, BriefLine, CardLine, Art, Diff. The answer's words come in as ReactNode: the
 // markdown render is src/thread's. Msg is memo'd: it sits in a long, virtualized list, and a new
 // message must not re-render the others.
-import { memo, useLayoutEffect, useRef, useState, type MouseEventHandler, type ReactNode, type Ref } from "react";
+import { memo, useRef, type MouseEventHandler, type ReactNode, type Ref } from "react";
 import { cx, st, sub } from "./cx";
+import { useFitsAfterWords } from "./hooks";
 import { Bar, Chip, Dot } from "./prim";
 import { BiseMark } from "./mark";
 import { Quote } from "./composer";
@@ -115,18 +116,7 @@ export function Fold({ children, open, onToggle, hint, testId }: { children: Rea
  *  row with no room for it after its words drops it whole. */
 function FoldHint({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [fits, setFits] = useState(true);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    const row = el?.parentElement;
-    if (el == null || row == null) return;
-    // the words' end: a range over the row's own content before the hint
-    const r = document.createRange();
-    r.setStartBefore(row.firstChild ?? el);
-    r.setEndBefore(el);
-    const words = r.getBoundingClientRect().right;
-    setFits(words + 8 <= el.getBoundingClientRect().left);
-  }, [children]);
+  const fits = useFitsAfterWords(ref, 8, [children]);
   return <span ref={ref} className="b-fold-hint" data-fits={fits}>{children}</span>;
 }
 

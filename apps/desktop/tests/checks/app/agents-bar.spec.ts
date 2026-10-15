@@ -3,8 +3,11 @@
 // in the queue, a worktree two agents share (the waiting one past the cap), an open PR with no agent.
 // Passes when, light and dark, at 1400, 1100 and 800 (slid over):
 //   - signs: the breeze, '?' pink, '✓' pink, '▲' red, '○' text-3, '…' on an event; no state word;
-//   - columns: time 40 and % 32 right-aligned at the same x on every row, the mark 16 last, empty
-//     columns keep their place; a long name: the role cut first, then the % goes, the mark stays;
+//   - columns: time 40 and the context's 12 px ring (40 with its % from 70 %) right-aligned at the
+//     same x on every row that has one, the mark 16 last; an empty one leaves its room to the now line
+//     (his m_26200), which fills the row up to the columns or the mark; a long name: the role cut first, then the % goes, the mark stays;
+//   - the now line: every word in the DOM, cut with '…' by the CSS; the row's hover slides it until
+//     its last word shows (ds Slide, Vibe Work's pace), back home when the pointer leaves;
 //   - marks: '↑' pink (merge card), red (checks fail), text-2 open, text-3 draft, '…' to land, 'ψ' no
 //     PR, none in the shared checkout; the ds tip: the TUI's words, '· click opens the PR'; a click
 //     on the mark opens the review screen;
@@ -29,6 +32,12 @@ const agent = (name: string, status: string, over: Record<string, unknown> = {})
 });
 const use = (pct: number) => ({ usage: { model: 'm', context: pct * 1000, window: 100_000, words: '', short: `${String(pct)}%` } });
 const LONG = 'proofreading-pages';
+/** One serialization for a color: Chromium may say a role's color as 'color(srgb r g b)' (red on main
+ *  before agent-rows: launch's '○' read color(srgb 0.49 0.46 0.42) for text-3's rgb(125, 118, 108)). */
+const normColor = <T extends { c: string }>(x: T): T => {
+  const m = /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)\)$/u.exec(x.c);
+  return m === null ? x : { ...x, c: `rgb(${[m[1], m[2], m[3]].map((v) => String(Math.round(Number(v) * 255))).join(', ')})` };
+};
 const pr = (number: number, over: Record<string, unknown> = {}) => ({ number, url: `https://github.com/acme/shop/pull/${String(number)}`, branch: '', agents: [], state: 'open', checks: 'pass', review: 'none', words: 'checks pass', text: '', ...over });
 const world = (theme: string) => [
   prefs(theme),
@@ -107,7 +116,7 @@ for (const theme of ['light', 'dark']) {
       // signs, no state words
       const sign = (id: string) => row(id).locator('.app-rb-g');
       await expect(sign('perf').locator('.b-dot.wk')).toBeVisible();
-      const looks = async (id: string) => sign(id).evaluate((el) => ({ g: el.textContent, c: getComputedStyle(el).color }));
+      const looks = async (id: string) => sign(id).evaluate((el) => ({ g: el.textContent, c: getComputedStyle(el).color })).then(normColor);
       const color = (v: string) => page.evaluate((x) => { const d = document.createElement('i'); d.style.color = `var(${x})`; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; }, v);
       const [acc, err, t2, t3] = [await color('--c-accent'), await color('--c-err'), await color('--c-text-2'), await color('--c-text-3')];
       expect(await looks('search')).toEqual({ g: '?', c: acc });
@@ -125,10 +134,33 @@ for (const theme of ['light', 'dark']) {
         }),
       );
       const normal = cols.filter((c) => c.id !== `app.right.agent.${LONG}`);
-      expect(new Set(normal.map((c) => c.time)).size, 'time column aligned').toBe(1);
-      expect(new Set(normal.map((c) => c.pct)).size, '% column aligned').toBe(1);
+      expect(new Set(normal.filter((c) => c.tw > 0).map((c) => c.time)).size, 'time column aligned').toBe(1);
+      expect(new Set(normal.filter((c) => c.pw > 0).map((c) => c.pct)).size, '% column aligned').toBe(1);
       expect(new Set(cols.map((c) => c.mark)).size, 'mark column aligned').toBe(1);
-      expect([normal[0]?.tw, normal[0]?.pw], 'time 40, % 32').toEqual([40, 32]);
+      expect(new Set(cols.filter((c) => c.pw > 0).map((c) => c.pw)).size, 'one % column width on every row').toBe(1);
+      const perfCols = cols.find((c) => c.id === 'app.right.agent.perf');
+      expect([perfCols?.tw, perfCols?.pw], "time 40, the % column 40 (a row's 71%: the number and its ring)").toEqual([40, 40]);
+      const brokenCols = cols.find((c) => c.id === 'app.right.agent.broken');
+      expect([brokenCols?.tw, brokenCols?.pw], 'no time and no usage: no columns').toEqual([0, 0]);
+      expect(cols.find((c) => c.id === 'app.right.agent.launch')?.tw, 'no time: no time column').toBe(0);
+      // every row with usage shows its context ring (his m_26205), the composer's 12 px ds Ring, its words in the tip
+      await expect(page.getByTestId('app.right.agent.launch.ring')).toBeVisible();
+      expect(Math.round((await page.getByTestId('app.right.agent.launch.ring').boundingBox())?.width ?? 0)).toBe(12);
+      await expect(page.getByTestId('app.right.agent.launch.pct')).toHaveAttribute('data-tip', /29% of launch's context used/u);
+      await expect(page.getByTestId('app.right.agent.broken.ring')).toHaveCount(0);
+      // the now line fills its row (his m_26200): its right edge 8 px (the gap) before the first filled
+      // column, else before the mark (or the row's padding when it has none)
+      const fills = await page.locator('[data-testid="app.right.agents"] .app-rb-arow:not(.app-rb-ghead):not(.app-rb-orphan)').evaluateAll((es) =>
+        es.map((e: Element) => {
+          const role = e.querySelector('.app-rb-role') as HTMLElement;
+          const shown: HTMLElement[] = Array.from(e.querySelectorAll<HTMLElement>('.app-rb-time, .app-rb-pct, .app-rb-mark')).filter((x) => x.getBoundingClientRect().width > 0);
+          const first = shown.at(0);
+          const next = first !== undefined ? first.getBoundingClientRect().left : e.getBoundingClientRect().right - parseFloat(getComputedStyle(e).paddingRight);
+          const gap = shown.length > 0 ? parseFloat(getComputedStyle(e).columnGap) : 0;
+          return { id: e.getAttribute('data-testid'), room: Math.round(next - gap - role.getBoundingClientRect().right) };
+        }),
+      );
+      for (const f of fills) expect(f.room, `${f.id ?? ''}: the now line reaches the next column`).toBeLessThanOrEqual(1);
       await expect(row('perf').getByTestId('app.right.agent.perf.time')).toHaveText('4 min');
       await expect(row('perf').getByTestId('app.right.agent.perf.pct')).toHaveText('71%');
       // under 70 % the column is empty, the row's tip says it (desktop-delight v2)
@@ -158,19 +190,22 @@ for (const theme of ['light', 'dark']) {
       expect(timeGone, 'then the time').toBeGreaterThan(pctGone);
       expect(steps.every((x) => x.mark), 'the mark never goes').toBe(true);
       expect(steps.filter((x) => x.nameCut).every((x) => x.role === 0 && !x.pct && !x.time), 'the name cuts last').toBe(true);
-      // the role cuts after a whole word with '…', or goes whole when not one word fits (designer m_23711)
-      const roles = await page.locator('[data-testid="app.right.agents"] .app-rb-arow:not(.app-rb-ghead):not(.app-rb-orphan) .app-rb-role').evaluateAll((es) =>
-        es.map((e) => ({ shown: e.textContent, full: e.getAttribute('title') ?? e.textContent })),
-      );
-      for (const r of roles) {
-        if (r.shown === r.full) continue;
-        expect(r.shown === '' || (r.shown.endsWith('…') && `${r.full} `.startsWith(`${r.shown.slice(0, -1)} `)), `'${r.shown}' of '${r.full}'`).toBe(true);
-      }
-      await expect(page.getByTestId('app.right.agent.broken.role')).toHaveText(/^import the…$|^import the catalog$/u);
-      await expect(page.getByTestId(`app.right.agent.${LONG}.role`)).toHaveText(/^(|the…|the copy…|the copy of…|the copy of every…)$/u);
+      // the now line keeps every word (the CSS cuts with '…'); the row's hover slides it, after 80 ms,
+      // until its last word shows at the box's right edge; it goes home when the pointer leaves
+      await expect(page.getByTestId(`app.right.agent.${LONG}.role`)).toHaveText('the copy of every page, one by one');
+      const longRole = page.getByTestId(`app.right.agent.${LONG}.role`);
+      await expect(longRole).toHaveAttribute('data-over', 'true');
+      const slid = async () => longRole.evaluate((e) => { const i = e.querySelector('.b-slide-in') as HTMLElement; return { ends: Math.round(i.getBoundingClientRect().right - e.getBoundingClientRect().right), x: Math.round(new DOMMatrix(getComputedStyle(i).transform).m41), ms: e.style.getPropertyValue('--slide-ms') }; });
+      expect((await slid()).x, 'still at rest').toBe(0);
+      await row(LONG).hover();
+      await expect.poll(async () => (await slid()).ends, { timeout: 5000, message: 'its last word at the right edge' }).toBe(0);
+      expect((await slid()).x).toBeLessThan(0);
+      await page.screenshot({ path: test.info().outputPath(`agents-bar-${theme}-slide.png`) });
+      await page.mouse.move(1, 400);
+      await expect.poll(async () => (await slid()).x, { timeout: 5000, message: 'home again' }).toBe(0);
       // marks and their tints
       const mark = (id: string) => page.getByTestId(`${id}.mark`);
-      const markLook = async (id: string) => mark(id).evaluate((el) => ({ g: el.textContent, c: getComputedStyle(el).color }));
+      const markLook = async (id: string) => mark(id).evaluate((el) => ({ g: el.textContent, c: getComputedStyle(el).color })).then(normColor);
       expect(await markLook('app.right.agent.search')).toEqual({ g: '↑', c: acc });
       expect(await markLook('app.right.agent.pay')).toEqual({ g: '↑', c: err });
       expect(await markLook(`app.right.agent.${LONG}`)).toEqual({ g: '↑', c: t3 });
@@ -191,7 +226,7 @@ for (const theme of ['light', 'dark']) {
       expect(Math.round((await sign('stock').boundingBox())?.x ?? 0), 'same sign column').toBe(Math.round((await sign('perf').boundingBox())?.x ?? 0));
       // the orphan PR: no sign, its branch text-3
       await expect(page.getByTestId('app.right.pr.420').locator('.app-rb-g')).toHaveText('');
-      expect(await page.getByTestId('app.right.pr.420').locator('.app-rb-name').evaluate((e) => getComputedStyle(e).color)).toBe(t3);
+      expect(await page.getByTestId('app.right.pr.420').locator('.app-rb-name').evaluate((e) => getComputedStyle(e).color).then((c) => normColor({ c }).c)).toBe(t3);
       // the tip: the ds's (hover-tips), the TUI's words with the branch last, then where the click
       // goes; 280 px at most, never interactive
       await mark('app.right.agent.pay').hover();
@@ -208,7 +243,7 @@ for (const theme of ['light', 'dark']) {
       await expect(psiTip).toHaveText('ψ worktree: its own copy of the repo, on sb/perf · /tmp/wt/perf/shop · click opens its changes');
       const mono = psiTip.locator('.m');
       await expect(mono).toHaveText(['sb/perf', '/tmp/wt/perf/shop']);
-      expect(await mono.first().evaluate((e) => getComputedStyle(e).color)).toBe(await color('--c-text'));
+      expect(await mono.first().evaluate((e) => getComputedStyle(e).color).then((c) => normColor({ c }).c)).toBe(await color('--c-text'));
       expect(await mono.first().evaluate((e) => getComputedStyle(e).fontFamily)).toMatch(/mono/iu);
       await page.screenshot({ path: test.info().outputPath(`agents-bar-${theme}-psi-tip.png`) });
       // ARCHIVED: sign + name + age
@@ -218,7 +253,7 @@ for (const theme of ['light', 'dark']) {
       // ARTIFACTS: the title in the pink chip (accent on its 10 % tint, 24 px, the kind's glyph inside), cut
       // after a whole word with one '…'; the row's hover lifts the tint; 'new' stays ink
       const chip = page.getByTestId(`app.right.artifact.${P}.product-page.chip`);
-      const chipLook = async () => chip.evaluate((e) => ({ c: getComputedStyle(e).color, bg: getComputedStyle(e).backgroundColor, h: Math.round(e.getBoundingClientRect().height), t: e.textContent }));
+      const chipLook = async () => chip.evaluate((e) => ({ c: getComputedStyle(e).color, bg: getComputedStyle(e).backgroundColor, h: Math.round(e.getBoundingClientRect().height), t: e.textContent })).then(normColor);
       const ink = await color('--c-text');
       const rest = await chipLook();
       expect(rest.c).toBe(acc);
@@ -226,7 +261,7 @@ for (const theme of ['light', 'dark']) {
       expect(rest.t).toMatch(/^↗ product page, before .*\S…$/u);
       expect(rest.t, 'cut after a whole word').not.toMatch(/\s…$/u);
       await expect(page.getByTestId(`app.right.artifact.${P}.replay.chip`)).toHaveText('↗ flash sale replay');
-      expect(await page.getByTestId(`app.right.artifact.${P}.product-page.new`).evaluate((e) => getComputedStyle(e).color)).toBe(ink);
+      expect(await page.getByTestId(`app.right.artifact.${P}.product-page.new`).evaluate((e) => getComputedStyle(e).color).then((c) => normColor({ c }).c)).toBe(ink);
       await page.getByTestId(`app.right.artifact.${P}.replay`).hover();
       await page.getByTestId(`app.right.artifact.${P}.product-page`).hover();
       const hovered = await chipLook();

@@ -113,16 +113,18 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     await expect(page.getByTestId('composer.tab.to')).toHaveText(/^to perf[ ·~∿≈]{5}$/u);
     await expect(page.locator('[data-testid="composer.tab.to"] [data-testid="thread.mark"]')).toHaveCount(1);
     await expect(page.getByTestId('composer.tab.place')).toHaveText('ψperf');
-    // the context as a 14 px ring, its words in the tip; no numbers in clear under 80% (desktop-delight touch 4)
+    // the context: its tokens left of a 12 px ring (his m_26205: '84k'), its words in the tip; no
+    // percent in clear under 80% (desktop-delight touch 4)
     const ctx = page.getByTestId('composer.tab.context');
     await expect(ctx).toHaveAttribute('data-pct', '17');
     await expect(ctx).toHaveAttribute('data-tip', "17% of perf's context used · 42k tokens · compacts at 90%");
-    await expect(ctx).toHaveText('');
+    await expect(ctx).toHaveText('42k');
+    expect(await ctx.evaluate((e) => (e.querySelector('.num')?.getBoundingClientRect().right ?? 0) <= (e.querySelector('svg.b-ring')?.getBoundingClientRect().left ?? 0)), 'the tokens left of the ring').toBe(true);
     // a gauge, never a spinner (designer m_25940): 12 px, a filled wedge inside a 1 px circle
-    expect(await ctx.locator('svg.ring').evaluate((e) => Math.round(e.getBoundingClientRect().width)), 'a 12 px gauge').toBe(12);
-    expect(await ctx.locator('svg.ring .used').evaluate((e) => e.tagName.toLowerCase()), 'a filled wedge').toBe('path');
-    expect(await ctx.locator('svg.ring .used').evaluate((e) => getComputedStyle(e).fill), 'filled, not stroked').not.toBe('none');
-    expect(await ctx.locator('svg.ring .track').evaluate((e) => getComputedStyle(e).strokeWidth), 'its 1 px circle').toBe('1px');
+    expect(await ctx.locator('svg.b-ring').evaluate((e) => Math.round(e.getBoundingClientRect().width)), 'a 12 px gauge').toBe(12);
+    expect(await ctx.locator('svg.b-ring .used').evaluate((e) => e.tagName.toLowerCase()), 'a filled wedge').toBe('path');
+    expect(await ctx.locator('svg.b-ring .used').evaluate((e) => getComputedStyle(e).fill), 'filled, not stroked').not.toBe('none');
+    expect(await ctx.locator('svg.b-ring .track').evaluate((e) => getComputedStyle(e).strokeWidth), 'its 1 px circle').toBe('1px');
     await expect(page.getByTestId('composer.voice'), "voice gets its key like dictate").toContainText('⌃R⌃R voice');
     await expect(page.getByTestId('composer.tab.project'), 'the crumb names the project').toHaveCount(0);
     await expect(tab).not.toContainText(/idle|opus|yolo/u);
@@ -329,7 +331,7 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     await crop('86');
     expect(await page.getByTestId('composer.tab.context').locator('.num').evaluate((e) => getComputedStyle(e).fontVariantNumeric), 'tabular figures').toContain('tabular-nums');
     await core.send(withPerf('42k · 17%') as never);
-    await expect(page.getByTestId('composer.tab.context')).toHaveText('');
+    await expect(page.getByTestId('composer.tab.context')).toHaveText('42k');
     await crop('17');
 
     // tuck away: the 'tip:' line only on an empty, focused composer

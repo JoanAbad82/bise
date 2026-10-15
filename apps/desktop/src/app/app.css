@@ -791,8 +791,8 @@ body:has(.app-shell) {
 }
 /* an agent's row (desktop-agents-bar §2): the sign 16 + 8, the name in ink never cut before the
    role, the role text-3 taking what is left (cut first), time 40 and % 32 right-aligned, the mark
-   16 last. The columns keep their place empty; short on room the % wraps away, then the time (the
-   0-wide first item keeps the time from staying on its line alone); the mark never goes */
+   16 last. A row with both columns empty leaves their room to the role; short on room the % wraps away, then the
+   time (the 0-wide first item keeps the time from staying on its line alone); the mark never goes */
 .app-rb-arow .app-rb-g {
   width: 16px;
 }
@@ -807,10 +807,14 @@ body:has(.app-shell) {
 .app-rb-role {
   flex: 1 1 0;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   color: var(--c-text-3);
   font-size: var(--t-12);
+}
+/* empty columns give their room to the now line (his ask m_26200): a row with neither a time nor a
+   ring has no columns; an empty time goes (the % column right of it keeps the times aligned) */
+.app-rb-cols:not(:has(.app-rb-time:not(:empty), .app-rb-pct:not(:empty))),
+.app-rb-time:empty {
+  display: none;
 }
 .app-rb-cols {
   display: flex;
@@ -834,10 +838,23 @@ body:has(.app-shell) {
   text-align: right;
 }
 .app-rb-pct {
-  width: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-1);
+  width: 12px;
+  height: var(--h-row);
   margin-left: var(--s-2);
   color: var(--c-text-3);
-  text-align: right;
+}
+/* the context ring (his ask m_26205), the composer's ds Ring; from 70 % its number before it, and
+   the column 40 px on every row of the list so the times stay aligned */
+.app-rb-rows:has(.app-rb-pct[data-loud]) .app-rb-pct {
+  width: 40px;
+}
+/* no time before it: no space either, the now line comes up to the ring */
+.app-rb-time:empty + .app-rb-pct {
+  margin-left: 0;
 }
 .app-rb-mark {
   flex: none;

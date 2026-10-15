@@ -45,6 +45,8 @@ export interface BarRow {
   /** an agent's columns (desktop-agents-bar §2): its turn's or wait's length, its context used; '' empty, the column stays */
   readonly time?: string;
   readonly pct?: string;
+  /** its context used, 1-100, for the % column's ring (his ask m_26205); none: no usage, or 0 */
+  readonly ctx?: number;
   /** its worktree's mark, last (§3): '↑' '…' 'ψ', tinted, its tip */
   readonly mark?: Mark;
   /** the worktree group it is in (its head's too): the 1 px rule in the margin */
@@ -160,11 +162,12 @@ function agentRow(x: ProjAgent, now: number, all: boolean, n: number | undefined
     time: timeOf(x.a, now),
     pct: loud ? pct : '',
     title: s.title,
-    tips: { glyph: pct === '' || loud ? signWords : `${signWords} · ${pctTip(x.a, pct)}`, time: timeTip(x.a, now), pct: loud ? pctTip(x.a, pct) : '' },
+    tips: { glyph: pct === '' || loud ? signWords : `${signWords} · ${pctTip(x.a, pct)}`, time: timeTip(x.a, now), pct: pctTip(x.a, pct) },
     testId: `app.right.agent.${idOf(all, x.project, x.a.name)}`,
     waits: s.g === '?',
     ...(!numbered && sign.working ? { working: true } : {}),
     ...(cu === null ? {} : { cu }),
+    ...(pct === '' ? {} : { ctx: Number.parseInt(pct, 10) }),
     ...(mark === undefined ? {} : { mark }),
     ...(group === undefined ? {} : { group }),
   };

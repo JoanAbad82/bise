@@ -57,8 +57,12 @@ describe('AGENTS signs and columns (§2)', () => {
       ['', ''],
     ]);
     expect(rows[0]?.tips?.glyph).toMatch(/ · 31% of w's context used/);
+    // the ring in the % column (his m_26205): every row with usage, its words in the column's tip
+    expect(rows.map((r) => r.ctx)).toEqual([31, undefined, undefined, undefined]);
+    expect(rows[0]?.tips?.pct).toBe("31% of w's context used: 31k of 100k");
     const loud = agentRows([ag('w', { status: 'working', usage: { model: 'm', context: 70_000, window: 100_000, words: '', short: '' } })], NOW, false);
     expect(loud[0]?.pct).toBe('70%');
+    expect(loud[0]?.ctx).toBe(70);
     expect(loud[0]?.tips?.glyph).not.toMatch(/context/);
   });
 });
