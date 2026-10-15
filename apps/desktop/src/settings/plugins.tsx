@@ -6,6 +6,7 @@
 // The core answers every act with `plugins` again. Owner: amb-home.
 import type { AppCmd, Plugin, PluginLogin } from '@/proto';
 import { Act, Button, Chip, Group, Help, Toggle, type GroupItem } from '@/ds';
+import { settings } from '@/proto/words.gen';
 
 /** A plugin counts as on when it loads (disabled: off; shadowed, invalid: not his to toggle). */
 export function isOn(p: Plugin): boolean {
@@ -16,20 +17,20 @@ export function isOn(p: Plugin): boolean {
 export function loginWords(l: PluginLogin): string {
   switch (l.state) {
     case 'needs':
-      return `${l.host} · needs a login`;
+      return settings.login_needs({ host: l.host });
     case 'in':
-      return l.tools == null ? `${l.host} · logged in` : `${l.host} · logged in · ${String(l.tools)} tool${l.tools === 1 ? '' : 's'}`;
+      return l.tools == null ? settings.login_in({ host: l.host }) : settings.login_in_tools({ host: l.host, n: l.tools });
     case 'pending':
-      return `${l.host} · log in in your browser…`;
+      return settings.login_pending({ host: l.host });
     default:
-      return `${l.host} · not logged in`;
+      return settings.login_out({ host: l.host });
   }
 }
 
 export function Plugins({ items, project, send }: { items: readonly Plugin[] | null; project?: string; send: (cmd: AppCmd) => void }) {
   const at = project === undefined ? {} : { project };
-  if (items === null) return <Help>looking at your plugins…</Help>;
-  if (items.length === 0) return <Help>no plugin yet: a plugin adds skills and tools to your agents (docs/plugins.md).</Help>;
+  if (items === null) return <Help>{settings.plugins_looking}</Help>;
+  if (items.length === 0) return <Help>{settings.plugins_none}</Help>;
   const rows: GroupItem[] = items.map((p) => ({
     id: p.name,
     label: p.name,
@@ -51,10 +52,10 @@ export function Plugins({ items, project, send }: { items: readonly Plugin[] | n
   const logins = items.flatMap((p) => p.logins ?? []);
   return (
     <>
-      <Group testId="settings.plugins" items={rows} help="a change applies to the agents' next sessions." />
+      <Group testId="settings.plugins" items={rows} help={settings.plugins_help} />
       {logins.length > 0 && (
         <Group
-          title="servers that log in"
+          title={settings.plugins_logins}
           testId="settings.plugins.logins"
           items={logins.map((l) => ({
             id: l.name,
@@ -63,7 +64,7 @@ export function Plugins({ items, project, send }: { items: readonly Plugin[] | n
             control:
               l.state === 'in' ? (
                 <Act tone="err" onClick={() => { send({ cmd: 'plugin_logout', ...at, name: l.name }); }} testId={`settings.login.${l.name}.out`}>
-                  log out
+                  {settings.log_out}
                 </Act>
               ) : (
                 <Button
@@ -73,7 +74,7 @@ export function Plugins({ items, project, send }: { items: readonly Plugin[] | n
                   }}
                   testId={`settings.login.${l.name}`}
                 >
-                  log in
+                  {settings.log_in}
                 </Button>
               ),
           }))}

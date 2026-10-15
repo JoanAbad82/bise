@@ -9,6 +9,7 @@ import { useState } from 'react';
 import type { Found, ProjectRow } from '@/proto';
 import { Act, Button, Field, Group, IconButton, Kbd } from '@/ds';
 import type { SettingsPorts } from './Settings';
+import { settings } from '@/proto/words.gen';
 import { AddSheet } from './AddSheet';
 
 /** The projects he orders (bise's home is not one of them), in their order. */
@@ -21,8 +22,8 @@ export function ordered(projects: readonly ProjectRow[]): ProjectRow[] {
  * gone; its hub couldn't start: the core's `down`, architect m_18354), never a silent row. Pure.
  */
 export function projectSub(p: ProjectRow): string {
-  if (p.missing === true) return `${p.path} · its folder is gone`;
-  if (p.down != null && p.down !== '') return `${p.path} · ${p.down}`;
+  if (p.missing === true) return settings.project_gone({ path: p.path });
+  if (p.down != null && p.down !== '') return settings.project_down({ path: p.path, why: p.down });
   return p.path;
 }
 
@@ -48,7 +49,7 @@ export function Projects({ projects, ports }: { projects: readonly ProjectRow[];
               <Field
                 autoFocus
                 defaultValue={p.name}
-                placeholder="its name in bise, then ⏎"
+                placeholder={settings.project_name_field}
                 testId={`settings.project.${p.project}.name`}
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') {
@@ -73,24 +74,24 @@ export function Projects({ projects, ports }: { projects: readonly ProjectRow[];
               <span className="settings-row-acts" data-testid={`settings.project.${p.project}.confirm`}>
                 {/* designer m_18736: nothing ghost in rows; remove is an Act in the error tone, asked once */}
                 <Act tone="err" onClick={() => { ports.send({ cmd: 'project_remove', project: p.project }); setConfirm(null); }} testId={`settings.project.${p.project}.remove.yes`}>
-                  remove
+                  {settings.project_remove}
                 </Act>
                 <Act onClick={() => { setConfirm(null); }} testId={`settings.project.${p.project}.remove.no`}>
-                  keep
+                  {settings.project_keep}
                 </Act>
               </span>
             ) : (
               <span className="settings-row-acts">
-                <IconButton size="row" label="move up" disabled={i === 0} onClick={() => { move(p, -1); }} testId={`settings.project.${p.project}.up`}>↑</IconButton>
-                <IconButton size="row" label="move down" disabled={i === ps.length - 1} onClick={() => { move(p, 1); }} testId={`settings.project.${p.project}.down`}>↓</IconButton>
-                <Act onClick={() => { setRenaming(p.project); }} testId={`settings.project.${p.project}.rename`}>rename</Act>
-                <Act tone="err" onClick={() => { setConfirm(p.project); }} testId={`settings.project.${p.project}.remove`}>remove</Act>
+                <IconButton size="row" label={settings.project_up} disabled={i === 0} onClick={() => { move(p, -1); }} testId={`settings.project.${p.project}.up`}>↑</IconButton>
+                <IconButton size="row" label={settings.project_down_move} disabled={i === ps.length - 1} onClick={() => { move(p, 1); }} testId={`settings.project.${p.project}.down`}>↓</IconButton>
+                <Act onClick={() => { setRenaming(p.project); }} testId={`settings.project.${p.project}.rename`}>{settings.project_rename}</Act>
+                <Act tone="err" onClick={() => { setConfirm(p.project); }} testId={`settings.project.${p.project}.remove`}>{settings.project_remove}</Act>
               </span>
             ),
         }))}
         help={
           confirm !== null
-            ? `remove ${ps.find((p) => p.project === confirm)?.name ?? ''} from bise? its folder and its git history stay.`
+            ? settings.project_remove_ask({ name: ps.find((p) => p.project === confirm)?.name ?? '' })
             : // a broken core says so in the window's top line (CoreLine), its one place (designer m_18973)
               undefined
         }
@@ -102,7 +103,7 @@ export function Projects({ projects, ports }: { projects: readonly ProjectRow[];
         }}
         testId="settings.project.add"
       >
-        add a project
+        {settings.add_project}
       </Button>
       <AddSheet
         open={sheet}

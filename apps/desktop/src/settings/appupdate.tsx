@@ -13,6 +13,7 @@ import { tipAttrs } from '@/ds/tip';
 import { whenWords } from '@/artifacts/model';
 import { updatedTip } from '@/app/tipwords';
 import { shortVersion } from '@/app/UpdateLine';
+import { settings } from '@/proto/words.gen';
 
 /** Where a test build gets its first Developer ID one (designer m_25699). */
 export const DOWNLOAD_URL = 'https://bise.dev/download';
@@ -34,46 +35,46 @@ export interface DistRow {
 export function distRow(s: UpdateState, version: string | null): DistRow | null {
   if (version === null) return null;
   const mine = shortVersion(version);
-  const me = `bise ${mine}`;
+  const me = settings.dist_me({ version: mine });
   switch (s.state) {
     case 'none':
-      if (s.cant === undefined) return { kind: 'current', label: me, sub: 'up to date' };
+      if (s.cant === undefined) return { kind: 'current', label: me, sub: settings.dist_current };
       // the reason is the row's sub, beside its act (designer m_26934)
-      if (s.move === 'failed') return { kind: 'off', label: 'updates are off here', sub: "bise couldn't move itself. drag it to Applications to get updates.", err: true, act: 'move' };
+      if (s.move === 'failed') return { kind: 'off', label: settings.dist_off, sub: settings.dist_move_failed, err: true, act: 'move' };
       return {
         kind: 'off',
-        label: 'updates are off here',
-        sub: s.cant === 'disk_image' ? "bise runs from the disk image, so it can't update itself." : "bise isn't in Applications, so it can't replace itself.",
+        label: settings.dist_off,
+        sub: s.cant === 'disk_image' ? settings.dist_disk_image : settings.dist_not_applications,
         ...(s.move === 'can' ? { act: 'move' as const } : {}),
       };
     case 'downloading':
-      return { kind: 'getting', label: me, sub: `getting ${shortVersion(s.version)}` };
+      return { kind: 'getting', label: me, sub: settings.dist_getting({ version: shortVersion(s.version) }) };
     case 'ready':
-      return { kind: 'ready', label: `${shortVersion(s.version)} is ready`, help: 'it installs by itself when you quit or step away. your agents keep running.', act: 'restart' };
+      return { kind: 'ready', label: settings.dist_ready({ version: shortVersion(s.version) }), help: settings.dist_ready_help, act: 'restart' };
     case 'failed': {
       const next = shortVersion(s.version);
-      const failed = { kind: 'failed', label: me, sub: 'update failed' } as const;
+      const failed = { kind: 'failed', label: me, sub: settings.dist_failed } as const;
       switch (s.reason) {
         case 'new_signer':
-          return { ...failed, help: "this test build can't update itself. download bise once from bise.dev/download; later updates come by themselves.", link: 'bise.dev/download' };
+          return { ...failed, help: settings.dist_new_signer, link: settings.dist_download_link };
         case 'swap':
-          return { ...failed, help: `${next} couldn't be installed. bise tries again later.` };
+          return { ...failed, help: settings.dist_swap({ version: next }) };
         case 'signature':
-          return { ...failed, help: `${next} was refused: its signature didn't check out. bise keeps ${mine}.` };
+          return { ...failed, help: settings.dist_signature({ version: next, mine }) };
         case 'download':
         case undefined:
-          return { ...failed, help: `the download of ${next} failed. bise tries again later.` };
+          return { ...failed, help: settings.dist_download({ version: next }) };
       }
     }
     // falls through: every reason returned above
     case 'went_bad':
-      return { kind: 'went_bad', label: "the new bise didn't start right", act: 'back' };
+      return { kind: 'went_bad', label: settings.dist_went_bad, act: 'back' };
   }
 }
 
 /** The trace line after a quiet install (7 days, main's readTrace), else null. Pure. */
 export function traceLine(info: UpdateInfo, now: number): string | null {
-  return info.updated === null ? null : `updated to ${shortVersion(info.updated.version)} · ${whenWords(info.updated.at, now)}`;
+  return info.updated === null ? null : settings.dist_updated({ version: shortVersion(info.updated.version), when: whenWords(info.updated.at, now) });
 }
 
 export interface DistPorts {
@@ -117,15 +118,15 @@ export function DistUpdateGroup({
   const control: ReactNode =
     row.act === 'restart' ? (
       <Button kind="pri" onClick={() => ports?.install()} testId="settings.dist.restart">
-        restart to update
+        {settings.update_restart}
       </Button>
     ) : row.act === 'back' ? (
       <Button onClick={() => ports?.revert()} testId="settings.dist.back">
-        go back
+        {settings.dist_back}
       </Button>
     ) : row.act === 'move' ? (
       <Button onClick={() => ports?.move()} testId="settings.dist.move">
-        move to Applications
+        {settings.dist_move}
       </Button>
     ) : undefined;
   const trace = row.kind === 'current' ? traceLine(info, now) : null;
@@ -153,16 +154,16 @@ export function DistUpdateGroup({
     },
     {
       id: 'beta',
-      label: 'beta builds',
-      sub: 'new builds a few days early. turning it off keeps your build until stable passes it.',
-      control: <Toggle on={beta} label="beta builds" onChange={setBeta} testId="settings.pref.desktop_channel" />,
+      label: settings.dist_beta,
+      sub: settings.dist_beta_sub,
+      control: <Toggle on={beta} label={settings.dist_beta} onChange={setBeta} testId="settings.pref.desktop_channel" />,
     },
   ];
   const help = row.help ?? trace;
   return (
     <div className="settings-update" data-state={row.kind}>
       <Group
-        title="update"
+        title={settings.update_title}
         testId="settings.dist"
         items={items}
         help={

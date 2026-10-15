@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import type { Account, AppCmd } from '@/proto';
 import { Act, Button, Chip, Field, Group, Help, type GroupItem } from '@/ds';
+import { settings } from '@/proto/words.gen';
 
 /**
  * The expired ChatGPT sign-in (bar V14 / S28 / L2): the agents its expiry stopped (the hub's
@@ -31,7 +32,7 @@ export interface KeyError {
 /** a refusal's words for him: the core's text without its account id ("anthropic-key: …") */
 export function keyErrorWords(text: string, id: string | null): string {
   const t = id !== null && text.startsWith(`${id}: `) ? text.slice(id.length + 2) : text;
-  return t.trim() === '' ? 'the provider refused this key' : t.trim();
+  return t.trim() === '' ? settings.key_refused : t.trim();
 }
 
 /**
@@ -63,9 +64,9 @@ export const ofProvider = (a: Account, provider: string): boolean => (a.provider
 
 /** An expired sign-in's line (bar V14 / S28): it expired, and the agents it stopped wait. */
 export function expiredWords(waiting: readonly string[]): string {
-  if (waiting.length === 0) return 'your sign-in expired: sign in again';
-  const names = waiting.length <= 3 ? waiting.join(', ') : `${waiting.slice(0, 2).join(', ')} and ${String(waiting.length - 2)} more`;
-  return `your sign-in expired: ${names} ${waiting.length === 1 ? 'waits' : 'wait'}`;
+  if (waiting.length === 0) return settings.expired_alone;
+  const names = waiting.length <= 3 ? waiting.join(', ') : settings.names_more({ names: waiting.slice(0, 2).join(', '), more: waiting.length - 2 });
+  return waiting.length === 1 ? settings.expired_waits({ names }) : settings.expired_wait({ names });
 }
 
 export interface AccountsProps {
@@ -111,11 +112,11 @@ export function Accounts({ accounts, send, keyError = null, want = null, signin 
         : a.state === 'expired'
           ? expiredWords(signin?.waiting ?? [])
           : want !== null && ofProvider(a, want.provider)
-          ? `sign in for ${want.model}`
-          : 'sign in with your browser',
+          ? settings.sign_in_for({ model: want.model })
+          : settings.sign_in_browser,
     control:
       a.state === 'signed_in' ? (
-        <Chip tone="ok" testId={`settings.account.${a.id}.ok`}>✓ signed in</Chip>
+        <Chip tone="ok" testId={`settings.account.${a.id}.ok`}>{settings.signed_in}</Chip>
       ) : (
         <Button
           state={busy.includes(a.id) ? 'loading' : undefined}
@@ -125,25 +126,25 @@ export function Accounts({ accounts, send, keyError = null, want = null, signin 
           }}
           testId={`settings.account.${a.id}`}
         >
-          {a.state === 'expired' ? 'sign in again' : 'sign in'}
+          {a.state === 'expired' ? settings.sign_in_again : settings.sign_in}
         </Button>
       ),
   }));
   const firstKey = wantKey ?? keys[0];
   items.push({
     id: 'key',
-    label: 'an API key',
-    sub: key ? `${key.label}${key.who != null ? ` · ${key.who}` : ''}` : 'Anthropic, OpenAI, Mistral…',
+    label: settings.api_key,
+    sub: key ? `${key.label}${key.who != null ? ` · ${key.who}` : ''}` : settings.api_key_sub,
     control: key ? (
       <span className="settings-row-acts">
-        <Chip tone="ok">✓ added</Chip>
+        <Chip tone="ok">{settings.key_added}</Chip>
         <Button kind="ghost" onClick={() => { send({ cmd: 'key_remove', id: key.id }); }} testId={`settings.key.${key.id}.remove`}>
-          remove
+          {settings.key_remove}
         </Button>
       </span>
     ) : firstKey ? (
       <Button onClick={() => { setKeyFor(firstKey.id); setBad(false); setSent(null); }} testId="settings.key.add">
-        add a key
+        {settings.key_add}
       </Button>
     ) : undefined,
   });
@@ -151,7 +152,7 @@ export function Accounts({ accounts, send, keyError = null, want = null, signin 
     <>
       {want !== null && (
         <Help testId="settings.models.want">
-          {`${want.model} needs ${want.providerName}: sign in or add its key here, then it's set.`}
+          {settings.model_needs({ model: want.model, provider: want.providerName })}
         </Help>
       )}
       <Group testId="settings.models" items={items} />
@@ -181,15 +182,15 @@ export function Accounts({ accounts, send, keyError = null, want = null, signin 
               }
             }}
           >
-            <Help>{`waiting for you to sign in to ${label} in your browser…`}</Help>
+            <Help>{settings.signing_wait({ label })}</Help>
             <span className="settings-row-acts">
               {url !== null && copy && (
                 <Act onClick={() => { copy(url); }} testId="settings.signing.copy">
-                  copy the link
+                  {settings.signing_copy}
                 </Act>
               )}
               <Act onClick={cancel} testId="settings.signing.cancel">
-                cancel
+                {settings.cancel}
               </Act>
             </span>
           </div>
@@ -200,7 +201,7 @@ export function Accounts({ accounts, send, keyError = null, want = null, signin 
           <Field
             autoFocus
             type="password"
-            placeholder="paste your key, then ⏎"
+            placeholder={settings.key_paste}
             state={bad || field === 'refused' ? 'error' : undefined}
             testId="settings.key.field"
             onChange={() => {
@@ -229,12 +230,12 @@ export function Accounts({ accounts, send, keyError = null, want = null, signin 
           />
           <Help err={bad || field === 'refused'} testId="settings.key.help">
             {bad
-              ? 'paste a key first'
+              ? settings.key_first
               : field === 'refused' && keyError !== null
-                ? `${keyErrorWords(keyError.text, keyFor)}. check it, then ⏎ again`
+                ? settings.key_check({ why: keyErrorWords(keyError.text, keyFor) })
                 : field === 'checking'
-                  ? 'checking the key with the provider…'
-                  : 'it stays on this Mac; esc cancels'}
+                  ? settings.key_checking
+                  : settings.key_stays}
           </Help>
         </div>
       )}

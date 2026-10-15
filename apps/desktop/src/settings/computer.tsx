@@ -9,6 +9,7 @@
 import { useEffect } from 'react';
 import type { AppCmd, CoreEv } from '@/proto';
 import { Act, Button, Chip, Group, Help, Toggle, type GroupItem } from '@/ds';
+import { settings } from '@/proto/words.gen';
 
 export type ComputerUse = Extract<CoreEv, { ev: 'computer_use' }>;
 
@@ -73,12 +74,12 @@ export function Computer({ cu, send }: { cu: ComputerUse | null; send: (cmd: App
         items={[
           {
             id: 'on',
-            label: 'agents may drive Chrome and your apps',
-            sub: on ? (cu?.ready === true ? 'ready: step by step, and you can take the wheel' : 'set it up below') : 'off: agents never touch your browser or apps',
+            label: settings.cu_label,
+            sub: on ? (cu?.ready === true ? settings.cu_ready : settings.cu_set_up) : settings.cu_off,
             control: (
               <Toggle
                 on={on}
-                label="computer use"
+                label={settings.cu_switch}
                 onChange={(v) => {
                   send({ cmd: 'computer_use', act: v ? 'on' : 'off' });
                 }}
@@ -88,9 +89,9 @@ export function Computer({ cu, send }: { cu: ComputerUse | null; send: (cmd: App
           },
         ]}
       />
-      {on && web.length === 0 && <Help>checking Chrome and its extension…</Help>}
-      {on && web.length > 0 && <Group title="in Chrome" testId="settings.cu.web" items={web.map(row)} />}
-      {on && apps.length > 0 && <Group title="for apps" testId="settings.cu.apps" items={apps.map(row)} />}
+      {on && web.length === 0 && <Help>{settings.cu_checking}</Help>}
+      {on && web.length > 0 && <Group title={settings.cu_web} testId="settings.cu.web" items={web.map(row)} />}
+      {on && apps.length > 0 && <Group title={settings.cu_apps} testId="settings.cu.apps" items={apps.map(row)} />}
       {cu?.flash != null && <Chip tone="ok">{cu.flash}</Chip>}
       {cu?.said != null && <Help err>{cu.said}</Help>}
       {on && (
@@ -101,7 +102,7 @@ export function Computer({ cu, send }: { cu: ComputerUse | null; send: (cmd: App
           }}
           testId="settings.cu.uninstall"
         >
-          turn off and remove its files
+          {settings.cu_uninstall}
         </Act>
       )}
     </>

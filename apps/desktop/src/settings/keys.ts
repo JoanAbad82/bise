@@ -1,7 +1,9 @@
 // The app's key list (bar 3.5: ⌘/ and settings · keys): every key of the
 // app in one table, with the meaning the TUI's key has (rust/tui/src/help.rs
 // ROWS), ⌘ standing in for ctrl where a Mac app has its own gesture. Pure
-// data. Owner: amb-home; a chunk that adds a key adds its row here (ask).
+// data; the words are bise_proto's (words::settings, issue 29). Owner:
+// amb-home; a chunk that adds a key adds its row here (ask).
+import { settings } from '@/proto/words.gen';
 
 export interface KeyRow {
   /** the keys, as drawn ("⌘1 … ⌘9") */
@@ -20,61 +22,61 @@ export interface KeySection {
 export const KEY_SECTIONS: readonly KeySection[] = [
   {
     id: 'anywhere',
-    title: 'from any app',
+    title: settings.keys_anywhere,
     rows: [
-      { keys: 'hold fn', action: 'talk to bise, with what is in front of you' },
-      { keys: 'fn fn', action: 'hands-free voice; fn again stops' },
-      { keys: 'fn space', action: 'the spotlight: find an agent, or ask bise' },
+      { keys: 'hold fn', action: settings.key_hold_fn },
+      { keys: 'fn fn', action: settings.key_fn_fn },
+      { keys: 'fn space', action: settings.key_fn_space },
     ],
   },
   {
     id: 'window',
-    title: 'the window',
+    title: settings.keys_window,
     rows: [
-      { keys: '⌘0', action: 'bise' },
-      { keys: '⌘1 … ⌘9', action: 'a project, in the order of settings · projects' },
-      { keys: '⌥0 / ⌥1 … ⌥9', action: "the project's main / an agent", tui: '⌥ + 0…9' },
-      { keys: '⌘K', action: 'find an agent, a page or an artifact' },
-      { keys: '⌘[ / ⌘]', action: 'back / forward' },
-      { keys: '⌘I', action: 'the inbox: what waits for you, most blocking first', tui: '/inbox, ctrl+1-9' },
-      { keys: '⌘F', action: 'find in the thread', tui: 'ctrl+f' },
-      { keys: '⌘D', action: "the agent's changes", tui: '/diff' },
-      { keys: '⌘⇧A', action: 'the artifacts', tui: '/artifacts' },
-      { keys: '⌘E', action: 'unfold / fold everything', tui: 'ctrl+o' },
-      { keys: '⌘,', action: 'settings' },
-      { keys: '⌘/', action: 'this list', tui: '/shortcuts' },
+      { keys: '⌘0', action: settings.key_bise },
+      { keys: '⌘1 … ⌘9', action: settings.key_project },
+      { keys: '⌥0 / ⌥1 … ⌥9', action: settings.key_main_or_agent, tui: '⌥ + 0…9' },
+      { keys: '⌘K', action: settings.key_find_agent },
+      { keys: '⌘[ / ⌘]', action: settings.key_back_forward },
+      { keys: '⌘I', action: settings.key_inbox, tui: '/inbox, ctrl+1-9' },
+      { keys: '⌘F', action: settings.key_find, tui: 'ctrl+f' },
+      { keys: '⌘D', action: settings.key_diff, tui: '/diff' },
+      { keys: '⌘⇧A', action: settings.key_artifacts, tui: '/artifacts' },
+      { keys: '⌘E', action: settings.key_fold, tui: 'ctrl+o' },
+      { keys: '⌘,', action: settings.key_settings },
+      { keys: '⌘/', action: settings.key_this_list, tui: '/shortcuts' },
     ],
   },
   {
     id: 'composer',
-    title: 'the composer',
+    title: settings.keys_composer,
     rows: [
-      { keys: '⏎', action: 'send; during a turn, steer it' },
-      { keys: '⇧⏎', action: 'a new line' },
-      { keys: 'tab', action: 'during a turn: queue it for the end of the turn' },
-      { keys: '↑', action: 'in an empty composer: your queued or last message back' },
-      { keys: 'ctrl+c', action: 'stop the turn', tui: 'ctrl+c' },
-      { keys: 'esc', action: 'put the draft away; close what is open' },
-      { keys: '⌘.', action: "stop the agent's turn" },
-      { keys: '/', action: 'commands' },
-      { keys: '@', action: 'a file' },
-      { keys: '$', action: 'a skill' },
-      { keys: '⌘V', action: 'paste text, an image, or a long text as a chip' },
-      { keys: 'ctrl+r', action: 'dictation into the composer' },
+      { keys: '⏎', action: settings.key_send },
+      { keys: '⇧⏎', action: settings.key_new_line },
+      { keys: 'tab', action: settings.key_queue },
+      { keys: '↑', action: settings.key_last },
+      { keys: 'ctrl+c', action: settings.key_stop_turn, tui: 'ctrl+c' },
+      { keys: 'esc', action: settings.key_put_away },
+      { keys: '⌘.', action: settings.key_stop_agent },
+      { keys: '/', action: settings.key_commands },
+      { keys: '@', action: settings.key_file },
+      { keys: '$', action: settings.key_skill },
+      { keys: '⌘V', action: settings.key_paste_chip },
+      { keys: 'ctrl+r', action: settings.key_dictation },
     ],
   },
   {
     id: 'inbox',
-    title: 'the inbox',
+    title: settings.keys_inbox,
     rows: [
-      { keys: '↑ ↓', action: 'the previous / next item' },
-      { keys: 'ctrl+p / ctrl+n', action: 'the previous / next item, round from the last to the first' },
-      { keys: 'ctrl+o', action: "open the item's folded lines" },
-      { keys: '← →', action: "walk the item's options" },
-      { keys: '1 … 9', action: 'pick that option' },
-      { keys: '⏎', action: 'pick the option on, or send your typed answer' },
-      { keys: '⌘⌫', action: 'close it without answering', tui: 'ctrl+x' },
-      { keys: 'esc', action: 'back' },
+      { keys: '↑ ↓', action: settings.key_prev_next },
+      { keys: 'ctrl+p / ctrl+n', action: settings.key_prev_next_round },
+      { keys: 'ctrl+o', action: settings.key_open_folded },
+      { keys: '← →', action: settings.key_walk_options },
+      { keys: '1 … 9', action: settings.key_pick_option },
+      { keys: '⏎', action: settings.key_pick_or_send },
+      { keys: '⌘⌫', action: settings.key_close_item, tui: 'ctrl+x' },
+      { keys: 'esc', action: settings.key_back },
     ],
   },
 ];

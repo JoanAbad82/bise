@@ -7,9 +7,18 @@
 // rewritten sentences, main's refusalWords); only the ▲ of the last two is red. What it reads is
 // amb-mac's window.bise.app.update() (src/main/update/tryswap.ts), fed by settings/screen.tsx.
 // updateRow is the pure part. Owner: amb-home.
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import type { AppRefusal, AppSwapResult, AppUpdate } from '@/shared/api';
 import { Button, Group } from '@/ds';
+import { settings } from '@/proto/words.gen';
+
+/** A template's words with a node in each hole (a sha drawn as Sha): the holes are filled with marks, then the marks give way to the nodes. */
+export function withNodes<K extends string>(words: (a: Record<K, string>) => string, nodes: Record<K, ReactNode>): ReactNode {
+  const marks = Object.fromEntries(Object.keys(nodes).map((k) => [k, `\u0000${k}\u0000`])) as Record<K, string>;
+  return words(marks)
+    .split(/\u0000(\w+)\u0000/)
+    .map((part, i) => (i % 2 === 0 ? part : <Fragment key={i}>{nodes[part as K]}</Fragment>));
+}
 
 /** The row's state (null: no row, his app off a try bundle or not known yet). Pure. */
 export type UpdateRow =
@@ -105,7 +114,7 @@ export function UpdateGroup({ update, ports }: { update: AppUpdate | null; ports
       },
       (e: unknown) => {
         setRestarting(null);
-        setLine(refusalLine('not_started', `the update didn't start: ${e instanceof Error ? e.message : String(e)}`));
+        setLine(refusalLine('not_started', settings.update_not_started({ why: e instanceof Error ? e.message : String(e) })));
       },
     );
   };
@@ -114,49 +123,49 @@ export function UpdateGroup({ update, ports }: { update: AppUpdate | null; ports
   let control: ReactNode = undefined;
   switch (row.kind) {
     case 'ready':
-      label = 'a new build is ready';
-      sub = row.live !== null ? (<><Sha sha={row.to} /> · you run <Sha sha={row.live} /></>) : <Sha sha={row.to} />;
+      label = settings.update_ready;
+      sub = row.live !== null ? withNodes(settings.update_ready_sub, { to: <Sha sha={row.to} />, live: <Sha sha={row.live} /> }) : <Sha sha={row.to} />;
       control = (
         <Button kind="pri" onClick={() => { go(row.to); }} testId="settings.update.restart">
-          restart to update
+          {settings.update_restart}
         </Button>
       );
       break;
     case 'current':
-      label = '✓ up to date';
-      sub = row.live !== null ? (<>you run <Sha sha={row.live} />, the newest build</>) : 'this is the newest build';
+      label = settings.update_current;
+      sub = row.live !== null ? withNodes(settings.update_current_sub, { live: <Sha sha={row.live} /> }) : settings.update_newest;
       break;
     case 'restarting':
-      label = (<>restarting on <Sha sha={row.to} />…</>);
-      sub = 'the window comes back in a moment. your agents keep running.';
+      label = withNodes(settings.update_restarting, { to: <Sha sha={row.to} /> });
+      sub = settings.update_restarting_sub;
       break;
     case 'failed':
-      label = (<><Err /> couldn&apos;t update to <Sha sha={row.to} /></>);
-      sub = row.live !== null ? (<>you&apos;re still on <Sha sha={row.live} />. nothing is lost.</>) : 'nothing is lost.';
+      label = (<><Err /> {withNodes(settings.update_failed, { to: <Sha sha={row.to} /> })}</>);
+      sub = row.live !== null ? withNodes(settings.update_still_on, { live: <Sha sha={row.live} /> }) : settings.update_nothing_lost;
       control = (
         <span className="settings-update-acts">
           <Button onClick={() => { go(row.to); }} testId="settings.update.again">
-            try again
+            {settings.update_again}
           </Button>
           <Button onClick={() => { ports?.showLog(); }} testId="settings.update.log">
-            show the log
+            {settings.update_log}
           </Button>
         </span>
       );
       break;
     case 'test':
-      label = 'updates come from the try';
-      sub = 'this app runs on a test home, not yours';
+      label = settings.update_test;
+      sub = settings.update_test_sub;
       break;
     case 'stuck':
-      label = row.live !== null ? (<>you run <Sha sha={row.live} /></>) : 'this build';
+      label = row.live !== null ? withNodes(settings.update_you_run, { live: <Sha sha={row.live} /> }) : settings.update_this_build;
       break;
   }
   const help = line ?? (row.kind === 'stuck' ? refusalLine(row.refused, row.why) : null);
   return (
     <div className={row.kind === 'test' ? 'settings-update is-test' : 'settings-update'} data-state={row.kind}>
       <Group
-        title="update"
+        title={settings.update_title}
         testId="settings.update"
         items={[{ id: 'row', label: (
               <span className="settings-update-t" data-testid="settings.update.label">

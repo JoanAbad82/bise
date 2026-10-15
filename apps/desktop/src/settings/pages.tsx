@@ -20,21 +20,22 @@ import { KEY_SECTIONS } from './keys';
 import { appName, excludedApps, flag, knownApps, num, str, type Prefs } from './prefs';
 import type { SettingsData, SettingsPorts } from './Settings';
 import type { NotifyAuth } from '@/shared/api';
+import { settings } from '@/proto/words.gen';
 
 export type Page = 'setup' | 'general' | 'voice' | 'privacy' | 'quiet' | 'models' | 'approvals' | 'projects' | 'plugins' | 'computer' | 'keys';
 
 export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
-  { id: 'general', title: 'general', sub: 'bise on your Mac.' },
-  { id: 'setup', title: 'setup', sub: 'what bise needs, checked again. /setup in the terminal.' },
-  { id: 'voice', title: 'voice and fn', sub: 'how you talk to bise.' },
-  { id: 'privacy', title: 'context and privacy', sub: 'what fn adds to your question. nothing is read unless you hold fn.' },
-  { id: 'quiet', title: 'quiet moments', sub: 'when notifications wait, and how they come back.' },
-  { id: 'models', title: 'models', sub: 'your subscription is enough; an API key works too. /models and /provider in the terminal.' },
-  { id: 'approvals', title: 'approvals', sub: 'what runs without asking you. /approvals in the terminal.' },
-  { id: 'projects', title: 'projects', sub: "one main per project; yours, bise, coordinates them. the order is ⌘1 … ⌘9's." },
-  { id: 'plugins', title: 'plugins', sub: 'what your agents can use besides the repo: skills, tools, servers. /plugins in the terminal.' },
-  { id: 'computer', title: 'computer use', sub: 'agents drive Chrome and your apps, step by step. /computer-use in the terminal.' },
-  { id: 'keys', title: 'keys', sub: "every terminal key works here too; ⌘ adds a Mac app's gestures. /help in the terminal." },
+  { id: 'general', title: settings.page_general, sub: settings.page_general_sub },
+  { id: 'setup', title: settings.page_setup, sub: settings.page_setup_sub },
+  { id: 'voice', title: settings.page_voice, sub: settings.page_voice_sub },
+  { id: 'privacy', title: settings.page_privacy, sub: settings.page_privacy_sub },
+  { id: 'quiet', title: settings.page_quiet, sub: settings.page_quiet_sub },
+  { id: 'models', title: settings.page_models, sub: settings.page_models_sub },
+  { id: 'approvals', title: settings.page_approvals, sub: settings.page_approvals_sub },
+  { id: 'projects', title: settings.page_projects, sub: settings.page_projects_sub },
+  { id: 'plugins', title: settings.page_plugins, sub: settings.page_plugins_sub },
+  { id: 'computer', title: settings.page_computer, sub: settings.page_computer_sub },
+  { id: 'keys', title: settings.page_keys, sub: settings.page_keys_sub },
 ];
 
 /**
@@ -47,13 +48,13 @@ export function notifyRow(auth: NotifyAuth | null): { sub: string; act: 'ask' | 
     case null:
       return null;
     case 'never':
-      return { sub: "questions can reach you when bise isn't in front", act: 'ask', button: 'turn on' };
+      return { sub: settings.notify_never, act: 'ask', button: settings.notify_turn_on };
     case 'asked':
-      return { sub: 'macOS asked you; your answer is in System Settings', act: 'open', button: 'open System Settings' };
+      return { sub: settings.notify_asked, act: 'open', button: settings.open_system_settings };
     case 'on':
-      return { sub: "questions reach you when bise isn't in front", act: null, button: '' };
+      return { sub: settings.notify_on, act: null, button: '' };
     case 'off':
-      return { sub: 'off in macOS: questions wait in bise until you look', act: 'open', button: 'open System Settings' };
+      return { sub: settings.notify_off, act: 'open', button: settings.open_system_settings };
   }
 }
 
@@ -92,6 +93,7 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
   switch (page) {
     case 'general': {
       const themes = ['system', 'light', 'dark'] as const;
+      const themeWords = [settings.theme_system, settings.theme_light, settings.theme_dark];
       const theme = str(prefs, 'theme', 'system');
       const on = Math.max(0, themes.indexOf(theme === 'auto' ? 'system' : (theme as (typeof themes)[number])));
       return (
@@ -101,11 +103,11 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
           items={[
             {
               id: 'theme',
-              label: 'appearance',
-              sub: 'light, dark, or as macOS',
+              label: settings.theme_label,
+              sub: settings.theme_sub,
               control: (
                 <Seg
-                  items={themes}
+                  items={themeWords}
                   on={on}
                   onPick={(i) => {
                     setPref('theme', themes[i] ?? 'system');
@@ -137,20 +139,20 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
     case 'voice': {
       const lang = str(prefs, 'voice.language', 'auto');
       const langs: readonly (readonly [string, string])[] = [
-        ['auto', 'auto'],
-        ['en', 'English'],
-        ['fr', 'Français'],
+        ['auto', settings.lang_auto],
+        ['en', settings.lang_en],
+        ['fr', settings.lang_fr],
       ];
       return (
         <Group
           testId="settings.voice"
           items={[
-            tg('voice.fn_hold', 'hold fn to talk', 'your words go when you let go'),
-            tg('voice.fn_twice', 'fn fn: hands-free', 'talk without holding; fn again stops'),
+            tg('voice.fn_hold', settings.voice_fn_hold, settings.voice_fn_hold_sub),
+            tg('voice.fn_twice', settings.voice_fn_twice, settings.voice_fn_twice_sub),
             {
               id: 'voice.language',
-              label: 'what bise hears',
-              sub: 'the language of your voice',
+              label: settings.voice_language,
+              sub: settings.voice_language_sub,
               control: (
                 <Seg
                   items={langs.map(([, n]) => n)}
@@ -173,27 +175,27 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
       return (
         <>
           <Group
-            title="notifications wait"
+            title={settings.quiet_wait}
             testId="settings.quiet"
             items={[
-              tg('quiet.call', 'during a call', 'Zoom, Meet, FaceTime: the pearl blushes, nothing shows'),
-              tg('quiet.share', 'while you share your screen', 'never a notification during a share'),
-              tg('quiet.fullscreen', 'in full screen', 'Keynote, a game, a video'),
-              tg('quiet.focus', 'in focus mode', 'follows macOS focus'),
+              tg('quiet.call', settings.quiet_call, settings.quiet_call_sub),
+              tg('quiet.share', settings.quiet_share, settings.quiet_share_sub),
+              tg('quiet.fullscreen', settings.quiet_fullscreen, settings.quiet_fullscreen_sub),
+              tg('quiet.focus', settings.quiet_focus, settings.quiet_focus_sub),
             ]}
           />
           <Group
-            title="then"
+            title={settings.quiet_then}
             testId="settings.quiet.then"
             items={[
-              tg('quiet.batch', 'they come together', '“2 questions · 1 min”, one at a time'),
+              tg('quiet.batch', settings.quiet_batch, settings.quiet_batch_sub),
               {
                 id: 'quiet.batch_min',
-                label: 'at most every',
-                sub: 'to group the rest',
+                label: settings.quiet_batch_min,
+                sub: settings.quiet_batch_min_sub,
                 control: (
                   <Seg
-                    items={['10 min', '30 min', '60 min']}
+                    items={[10, 30, 60].map((n) => settings.minutes({ n }))}
                     on={Math.max(0, [10, 30, 60].indexOf(every))}
                     onPick={(i) => {
                       setPref('quiet.batch_min', [10, 30, 60][i] ?? 30);
@@ -202,7 +204,7 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
                   />
                 ),
               },
-              tg('quiet.away_card', 'while you were away', 'one notification when you open your Mac again'),
+              tg('quiet.away_card', settings.quiet_away, settings.quiet_away_sub),
             ]}
           />
         </>
@@ -249,12 +251,12 @@ function notifyItems(auth: NotifyAuth | null, act: ((a: 'ask' | 'open') => void)
   return [
     {
       id: 'notify',
-      label: 'macOS notifications',
+      label: settings.notify_label,
       sub: <span data-testid="settings.notify.sub">{row.sub}</span>,
       control:
         go === null ? (
           <Chip tone="ok" testId="settings.notify.on">
-            on
+            {settings.notify_on_chip}
           </Chip>
         ) : (
           // designer m_18736: nothing ghost in rows; 'turn on' (ask) is the row's own action, the
@@ -283,26 +285,26 @@ function Privacy({ prefs, setPref, tg }: { prefs: Prefs | null; setPref: (key: s
   return (
     <>
       <Group
-        title="when you hold fn"
+        title={settings.privacy_hold}
         testId="settings.privacy"
         items={[
-          tg('context.shot', 'a screenshot of the window in front', 'never the whole screen'),
-          tg('context.url', "the tab's URL and title", 'Chrome, Safari, Arc'),
-          tg('context.file', 'the open file and your selection', 'VS Code, Cursor, Xcode, Zed'),
-          tg('context.window_text', 'the text of the window', 'mails, docs, tickets: bise sees what you see'),
+          tg('context.shot', settings.privacy_shot, settings.privacy_shot_sub),
+          tg('context.url', settings.privacy_url, settings.privacy_url_sub),
+          tg('context.file', settings.privacy_file, settings.privacy_file_sub),
+          tg('context.window_text', settings.privacy_window_text, settings.privacy_window_text_sub),
         ]}
       />
       <Group
-        title="kept"
+        title={settings.privacy_kept}
         testId="settings.privacy.kept"
         items={[
           {
             id: 'shots_keep_days',
-            label: 'screenshots',
-            sub: 'in the thread, then deleted',
+            label: settings.privacy_shots,
+            sub: settings.privacy_shots_sub,
             control: (
               <Seg
-                items={['1 day', '7 days', '30 days']}
+                items={[1, 7, 30].map((n) => settings.days({ n }))}
                 on={Math.max(0, [1, 7, 30].indexOf(days))}
                 onPick={(i) => {
                   setPref('shots_keep_days', [1, 7, 30][i] ?? 7);
@@ -314,9 +316,9 @@ function Privacy({ prefs, setPref, tg }: { prefs: Prefs | null; setPref: (key: s
         ]}
       />
       <Group
-        title="never sent to an agent"
+        title={settings.privacy_apps}
         testId="settings.privacy.apps"
-        help="fn reads nothing in these apps: no title, URL, file, selection, text or capture."
+        help={settings.privacy_apps_help}
         items={[
           ...knownApps(prefs).map((id) => ({
             id,
@@ -335,10 +337,10 @@ function Privacy({ prefs, setPref, tg }: { prefs: Prefs | null; setPref: (key: s
           })),
           {
             id: 'add',
-            label: adding ? <AddApp onAdd={(id) => { flip(id); setAdding(false); }} onCancel={() => { setAdding(false); }} /> : 'another app',
+            label: adding ? <AddApp onAdd={(id) => { flip(id); setAdding(false); }} onCancel={() => { setAdding(false); }} /> : settings.privacy_another_app,
             control: adding ? undefined : (
               <Button kind="ghost" onClick={() => { setAdding(true); }} testId="settings.app.add">
-                add…
+                {settings.privacy_add}
               </Button>
             ),
           },
@@ -361,7 +363,7 @@ function AddApp({ onAdd, onCancel }: { onAdd: (id: string) => void; onCancel: ()
   return (
     <Field
       autoFocus
-      placeholder="its bundle id (com.example.app), then ⏎"
+      placeholder={settings.privacy_app_id}
       testId="settings.app.id"
       onKeyDown={(e) => {
         const v = e.currentTarget.value.trim();
@@ -389,12 +391,12 @@ export function KeyList(): ReactNode {
           items={s.rows.map((r) => ({
             id: r.keys,
             label: r.action,
-            sub: r.tui === undefined ? undefined : `terminal: ${r.tui}`,
+            sub: r.tui === undefined ? undefined : settings.key_terminal({ keys: r.tui }),
             control: <Kbd>{r.keys}</Kbd>,
           }))}
         />
       ))}
-      <Chip>/help and /shortcuts in the terminal list the same keys</Chip>
+      <Chip>{settings.keys_same}</Chip>
     </>
   );
 }
@@ -446,16 +448,16 @@ function Models({ data, ports }: { data: SettingsData; ports: SettingsPorts }) {
 function KeychainRow({ k, send }: { k: NonNullable<SettingsData['keychain']>; send: (cmd: AppCmd) => void }) {
   const on = k.store === 'keychain';
   // a move's own lines are the core's (secrets_cli, the terminal's words); with none, where they are
-  const said = k.moving ? 'moving them…' : (k.lines?.join(' ') ?? '');
-  const now = on ? 'on: your keys and sign-ins are in the macOS keychain.' : "off: they're in files in ~/.bise. same switch as /keychain in the terminal.";
+  const said = k.moving ? settings.keychain_moving : (k.lines?.join(' ') ?? '');
+  const now = on ? settings.keychain_on : settings.keychain_off;
   return (
     <Group
-      title="your keys and sign-ins"
+      title={settings.keychain_title}
       testId="settings.keychain"
       items={[
         {
           id: 'keychain',
-          label: 'keep them in the macOS keychain',
+          label: settings.keychain_label,
           sub: (
             <span data-testid="settings.keychain.sub" className={k.failed === true && !k.moving ? 'settings-err' : undefined}>
               {said !== '' ? said : now}
@@ -465,7 +467,7 @@ function KeychainRow({ k, send }: { k: NonNullable<SettingsData['keychain']>; se
             <Toggle
               on={on}
               state={k.moving ? 'disabled' : undefined}
-              label="keep your keys and sign-ins in the macOS keychain"
+              label={settings.keychain_switch}
               onChange={(v) => {
                 send({ cmd: 'keychain', to: v ? 'on' : 'off' });
               }}

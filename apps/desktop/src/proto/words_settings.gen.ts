@@ -4,4 +4,598 @@
 // bise_proto::words::settings: rust/proto/src/words/settings.rs, never a word typed here.
 
 export const settings = {
+  /** the nav's page: general */
+  page_general: "general",
+  /** general's line under its title */
+  page_general_sub: "bise on your Mac.",
+  /** the nav's page: setup */
+  page_setup: "setup",
+  /** setup's line under its title */
+  page_setup_sub: "what bise needs, checked again. /setup in the terminal.",
+  /** the nav's page: voice */
+  page_voice: "voice and fn",
+  /** voice's line under its title */
+  page_voice_sub: "how you talk to bise.",
+  /** the nav's page: context and privacy */
+  page_privacy: "context and privacy",
+  /** privacy's line under its title */
+  page_privacy_sub: "what fn adds to your question. nothing is read unless you hold fn.",
+  /** the nav's page: quiet moments */
+  page_quiet: "quiet moments",
+  /** quiet's line under its title */
+  page_quiet_sub: "when notifications wait, and how they come back.",
+  /** the nav's page: models */
+  page_models: "models",
+  /** models' line under its title */
+  page_models_sub: "your subscription is enough; an API key works too. /models and /provider in the terminal.",
+  /** the nav's page: approvals */
+  page_approvals: "approvals",
+  /** approvals' line under its title */
+  page_approvals_sub: "what runs without asking you. /approvals in the terminal.",
+  /** the nav's page: projects */
+  page_projects: "projects",
+  /** projects' line under its title */
+  page_projects_sub: "one main per project; yours, bise, coordinates them. the order is ⌘1 … ⌘9's.",
+  /** the nav's page: plugins */
+  page_plugins: "plugins",
+  /** plugins' line under its title */
+  page_plugins_sub: "what your agents can use besides the repo: skills, tools, servers. /plugins in the terminal.",
+  /** the nav's page: computer use */
+  page_computer: "computer use",
+  /** computer use's line under its title */
+  page_computer_sub: "agents drive Chrome and your apps, step by step. /computer-use in the terminal.",
+  /** the nav's page: keys */
+  page_keys: "keys",
+  /** keys' line under its title */
+  page_keys_sub: "every terminal key works here too; ⌘ adds a Mac app's gestures. /help in the terminal.",
+  /** general: the macOS notifications row's label */
+  notify_label: "macOS notifications",
+  /** notifications never asked */
+  notify_never: "questions can reach you when bise isn't in front",
+  /** notifications never asked: its button */
+  notify_turn_on: "turn on",
+  /** notifications asked once, the answer in System Settings */
+  notify_asked: "macOS asked you; your answer is in System Settings",
+  /** notifications on */
+  notify_on: "questions reach you when bise isn't in front",
+  /** notifications on: its chip */
+  notify_on_chip: "on",
+  /** notifications off in macOS */
+  notify_off: "off in macOS: questions wait in bise until you look",
+  /** a button that opens macOS's System Settings (notifications, a denied permission) */
+  open_system_settings: "open System Settings",
+  /** general: the theme row */
+  theme_label: "appearance",
+  /** general: the theme row's line */
+  theme_sub: "light, dark, or as macOS",
+  /** a theme: as macOS */
+  theme_system: "system",
+  /** a theme: light */
+  theme_light: "light",
+  /** a theme: dark */
+  theme_dark: "dark",
+  /** voice: hold fn */
+  voice_fn_hold: "hold fn to talk",
+  /** voice: hold fn's line */
+  voice_fn_hold_sub: "your words go when you let go",
+  /** voice: fn twice */
+  voice_fn_twice: "fn fn: hands-free",
+  /** voice: fn twice's line */
+  voice_fn_twice_sub: "talk without holding; fn again stops",
+  /** voice: the language row */
+  voice_language: "what bise hears",
+  /** voice: the language row's line */
+  voice_language_sub: "the language of your voice",
+  /** a voice language: let the model guess */
+  lang_auto: "auto",
+  /** a voice language: English */
+  lang_en: "English",
+  /** a voice language: French */
+  lang_fr: "Français",
+  /** quiet: the first group's title */
+  quiet_wait: "notifications wait",
+  /** quiet: during a call */
+  quiet_call: "during a call",
+  /** quiet: during a call's line */
+  quiet_call_sub: "Zoom, Meet, FaceTime: the pearl blushes, nothing shows",
+  /** quiet: during a share */
+  quiet_share: "while you share your screen",
+  /** quiet: during a share's line */
+  quiet_share_sub: "never a notification during a share",
+  /** quiet: full screen */
+  quiet_fullscreen: "in full screen",
+  /** quiet: full screen's line */
+  quiet_fullscreen_sub: "Keynote, a game, a video",
+  /** quiet: focus mode */
+  quiet_focus: "in focus mode",
+  /** quiet: focus mode's line */
+  quiet_focus_sub: "follows macOS focus",
+  /** quiet: the second group's title */
+  quiet_then: "then",
+  /** quiet: the batch row */
+  quiet_batch: "they come together",
+  /** quiet: the batch row's line */
+  quiet_batch_sub: "“2 questions · 1 min”, one at a time",
+  /** quiet: how often a batch comes */
+  quiet_batch_min: "at most every",
+  /** quiet: how often's line */
+  quiet_batch_min_sub: "to group the rest",
+  /** quiet: a batch's minutes */
+  minutes: (a: { n: string | number }): string => String(a.n) + " min",
+  /** quiet: the away card */
+  quiet_away: "while you were away",
+  /** quiet: the away card's line */
+  quiet_away_sub: "one notification when you open your Mac again",
+  /** privacy: the first group's title */
+  privacy_hold: "when you hold fn",
+  /** privacy: the screenshot */
+  privacy_shot: "a screenshot of the window in front",
+  /** privacy: the screenshot's line */
+  privacy_shot_sub: "never the whole screen",
+  /** privacy: the tab's URL */
+  privacy_url: "the tab's URL and title",
+  /** privacy: the tab's URL's line */
+  privacy_url_sub: "Chrome, Safari, Arc",
+  /** privacy: the open file */
+  privacy_file: "the open file and your selection",
+  /** privacy: the open file's line */
+  privacy_file_sub: "VS Code, Cursor, Xcode, Zed",
+  /** privacy: the window's text */
+  privacy_window_text: "the text of the window",
+  /** privacy: the window's text's line */
+  privacy_window_text_sub: "mails, docs, tickets: bise sees what you see",
+  /** privacy: the second group's title */
+  privacy_kept: "kept",
+  /** privacy: the screenshots row */
+  privacy_shots: "screenshots",
+  /** privacy: the screenshots row's line */
+  privacy_shots_sub: "in the thread, then deleted",
+  /** privacy: how long screenshots are kept */
+  days: (a: { n: number }): string => a.n === 1 ? String(a.n) + " day" : String(a.n) + " days",
+  /** privacy: the excluded apps' group */
+  privacy_apps: "never sent to an agent",
+  /** privacy: the excluded apps' help */
+  privacy_apps_help: "fn reads nothing in these apps: no title, URL, file, selection, text or capture.",
+  /** privacy: the row that adds an app */
+  privacy_another_app: "another app",
+  /** privacy: its button */
+  privacy_add: "add…",
+  /** privacy: the bundle id field */
+  privacy_app_id: "its bundle id (com.example.app), then ⏎",
+  /** keys: the terminal's key, when it differs */
+  key_terminal: (a: { keys: string | number }): string => "terminal: " + String(a.keys),
+  /** keys: the chip under the list */
+  keys_same: "/help and /shortcuts in the terminal list the same keys",
+  /** keys page: the keychain group */
+  keychain_title: "your keys and sign-ins",
+  /** keys page: the keychain row */
+  keychain_label: "keep them in the macOS keychain",
+  /** keys page: the keychain switch's label */
+  keychain_switch: "keep your keys and sign-ins in the macOS keychain",
+  /** keys page: the move under way */
+  keychain_moving: "moving them…",
+  /** keys page: they are in the keychain */
+  keychain_on: "on: your keys and sign-ins are in the macOS keychain.",
+  /** keys page: they are in files */
+  keychain_off: "off: they're in files in ~/.bise. same switch as /keychain in the terminal.",
+  /** a key the provider refused, with no words of its own */
+  key_refused: "the provider refused this key",
+  /** an expired sign-in, nothing waiting on it */
+  expired_alone: "your sign-in expired: sign in again",
+  /** an expired sign-in: one agent waits on it */
+  expired_waits: (a: { names: string | number }): string => "your sign-in expired: " + String(a.names) + " waits",
+  /** an expired sign-in: agents wait on it */
+  expired_wait: (a: { names: string | number }): string => "your sign-in expired: " + String(a.names) + " wait",
+  /** the names of more than 3 agents: two, and how many more */
+  names_more: (a: { names: string | number; more: string | number }): string => String(a.names) + " and " + String(a.more) + " more",
+  /** a subscription's line: sign in for the model that waits */
+  sign_in_for: (a: { model: string | number }): string => "sign in for " + String(a.model),
+  /** a subscription's line: not signed in */
+  sign_in_browser: "sign in with your browser",
+  /** a subscription's chip: signed in */
+  signed_in: "✓ signed in",
+  /** a subscription's button: expired */
+  sign_in_again: "sign in again",
+  /** a subscription's button; the setup check's act for a model */
+  sign_in: "sign in",
+  /** the key row */
+  api_key: "an API key",
+  /** the key row's line, no key yet */
+  api_key_sub: "Anthropic, OpenAI, Mistral…",
+  /** the key row's chip: a key is set */
+  key_added: "✓ added",
+  /** the key row's remove */
+  key_remove: "remove",
+  /** the key row's button */
+  key_add: "add a key",
+  /** a model waits for its provider's setup */
+  model_needs: (a: { model: string | number; provider: string | number }): string => String(a.model) + " needs " + String(a.provider) + ": sign in or add its key here, then it's set.",
+  /** a sign-in under way in his browser */
+  signing_wait: (a: { label: string | number }): string => "waiting for you to sign in to " + String(a.label) + " in your browser…",
+  /** a sign-in under way: copy its link */
+  signing_copy: "copy the link",
+  /** a sign-in under way: cancel it */
+  cancel: "cancel",
+  /** the key field's placeholder */
+  key_paste: "paste your key, then ⏎",
+  /** the key field: ⏎ with nothing typed */
+  key_first: "paste a key first",
+  /** the key field: the provider refused it */
+  key_check: (a: { why: string | number }): string => String(a.why) + ". check it, then ⏎ again",
+  /** the key field: the core checks it */
+  key_checking: "checking the key with the provider…",
+  /** the key field's help */
+  key_stays: "it stays on this Mac; esc cancels",
+  /** a role's model: set in settings */
+  role_set_here: "set here",
+  /** a role's model: from his environment */
+  role_from_env: "from your environment",
+  /** a role's model: follows another role */
+  role_follows: (a: { role: string | number }): string => "follows " + String(a.role),
+  /** a role's model: the default */
+  role_default: "the default",
+  /** a role's picker label */
+  role_model: (a: { role: string | number }): string => String(a.role) + "'s model",
+  /** a role's picker: back to the role it follows */
+  role_as: (a: { role: string | number }): string => "as " + String(a.role),
+  /** a model whose provider needs its setup first */
+  role_setup_first: (a: { provider: string | number }): string => String(a.provider) + ": set up first",
+  /** the roles' group */
+  roles_title: "which model does what",
+  /** the roles' help */
+  roles_help: "the terminal's /models shows the same",
+  /** setup check: the microphone */
+  perm_mic: "microphone",
+  /** setup check: what fn loses without the microphone */
+  perm_mic_lost: "fn can't hear you without it",
+  /** setup check: accessibility */
+  perm_accessibility: "accessibility",
+  /** setup check: what fn loses without accessibility */
+  perm_accessibility_lost: "fn works only in bise’s own windows without it",
+  /** setup check: screen recording */
+  perm_screen: "screen recording",
+  /** setup check: what fn loses without screen recording */
+  perm_screen_lost: "fn sends your words without a capture without it",
+  /** setup check: a permission allowed */
+  perm_allowed: "allowed",
+  /** setup check: a permission denied */
+  perm_denied: (a: { lost: string | number }): string => "denied: " + String(a.lost),
+  /** setup check: a permission not asked */
+  perm_not_asked: "not asked yet",
+  /** setup check: ask a permission */
+  perm_allow: "allow",
+  /** setup check: the model row */
+  check_model: "a model",
+  /** setup check: a model signed out */
+  check_signed_out: (a: { label: string | number }): string => String(a.label) + ": signed out, sign in again",
+  /** setup check: no model at all */
+  check_no_model: "no subscription or key yet: agents can’t answer",
+  /** setup check: bise's home */
+  check_home: "bise’s home",
+  /** setup check: bise's home not known yet */
+  check_home_unknown: "not known yet: check again in a moment",
+  /** setup check: bise's home gone */
+  check_home_gone: (a: { path: string | number }): string => String(a.path) + " is gone: restart bise and it makes it again",
+  /** setup check: a check with no fix */
+  check_needs_you: "needs you",
+  /** setup check: nothing left */
+  check_all_set: "all set.",
+  /** setup check: what is left */
+  check_left: (a: { n: number }): string => a.n === 1 ? String(a.n) + " thing needs you." : String(a.n) + " things need you.",
+  /** setup check: read them again */
+  check_again: "check again",
+  /** plugins: a login needed */
+  login_needs: (a: { host: string | number }): string => String(a.host) + " · needs a login",
+  /** plugins: logged in */
+  login_in: (a: { host: string | number }): string => String(a.host) + " · logged in",
+  /** plugins: logged in, with its tools */
+  login_in_tools: (a: { host: string | number; n: number }): string => a.n === 1 ? String(a.host) + " · logged in · " + String(a.n) + " tool" : String(a.host) + " · logged in · " + String(a.n) + " tools",
+  /** plugins: a login under way */
+  login_pending: (a: { host: string | number }): string => String(a.host) + " · log in in your browser…",
+  /** plugins: logged out */
+  login_out: (a: { host: string | number }): string => String(a.host) + " · not logged in",
+  /** plugins: none read yet */
+  plugins_looking: "looking at your plugins…",
+  /** plugins: none at all */
+  plugins_none: "no plugin yet: a plugin adds skills and tools to your agents (docs/plugins.md).",
+  /** plugins: the group's help */
+  plugins_help: "a change applies to the agents' next sessions.",
+  /** plugins: the logins' group */
+  plugins_logins: "servers that log in",
+  /** plugins: log out */
+  log_out: "log out",
+  /** plugins: log in */
+  log_in: "log in",
+  /** computer use: the switch's row */
+  cu_label: "agents may drive Chrome and your apps",
+  /** computer use: on and ready */
+  cu_ready: "ready: step by step, and you can take the wheel",
+  /** computer use: on, not ready */
+  cu_set_up: "set it up below",
+  /** computer use: off */
+  cu_off: "off: agents never touch your browser or apps",
+  /** computer use: the switch's label */
+  cu_switch: "computer use",
+  /** computer use: the first check */
+  cu_checking: "checking Chrome and its extension…",
+  /** computer use: the web steps' group */
+  cu_web: "in Chrome",
+  /** computer use: the apps' steps' group */
+  cu_apps: "for apps",
+  /** computer use: remove it */
+  cu_uninstall: "turn off and remove its files",
+  /** a project's line: its folder is gone */
+  project_gone: (a: { path: string | number }): string => String(a.path) + " · its folder is gone",
+  /** a project's line: what is wrong with it */
+  project_down: (a: { path: string | number; why: string | number }): string => String(a.path) + " · " + String(a.why),
+  /** a project's rename field */
+  project_name_field: "its name in bise, then ⏎",
+  /** a project's remove, asked: yes */
+  project_remove: "remove",
+  /** a project's remove, asked: no */
+  project_keep: "keep",
+  /** a project's move up */
+  project_up: "move up",
+  /** a project's move down */
+  project_down_move: "move down",
+  /** a project's rename */
+  project_rename: "rename",
+  /** a project's remove, asked once */
+  project_remove_ask: (a: { name: string | number }): string => "remove " + String(a.name) + " from bise? its folder and its git history stay.",
+  /** the add button; the add sheet's head */
+  add_project: "add a project",
+  /** the add sheet's line under its head */
+  add_sub: "a folder, a git repo. its main starts right away.",
+  /** the add sheet's cancel */
+  add_cancel: "cancel",
+  /** the add sheet's path field */
+  add_path: "a folder's path",
+  /** the add sheet's folder panel */
+  add_choose: "choose…",
+  /** the add sheet: look in his folders again */
+  add_rescan: "look again",
+  /** the add sheet's switch */
+  add_land: "main may land on main",
+  /** the add sheet's switch, on */
+  add_land_on: "main commits to main once the tests pass, without asking you",
+  /** the add sheet's switch, off */
+  add_land_off: "otherwise your repo's flow decides: a pull request or an approval",
+  /** the core can't start projects (CoreEv broken, as CoreLine says it) */
+  add_broken: (a: { reason: string | number }): string => "▲ bise can't start your projects: " + String(a.reason) + ".",
+  /** the scan refused */
+  scan_failed: (a: { why: string | number }): string => "▲ the look in your folders failed: " + String(a.why),
+  /** the scan found nothing new */
+  scan_nothing: "nothing new in your folders",
+  /** the scan found repos */
+  scan_found: (a: { n: string | number }): string => "found in your folders · " + String(a.n),
+  /** the core didn't answer the scan */
+  no_answer: (a: { s: string | number }): string => "▲ bise didn't answer in " + String(a.s) + " s",
+  /** the scan under way */
+  scan_looking: "looking in your folders…",
+  /** the scan under way, its seconds */
+  scan_looking_s: (a: { s: string | number }): string => "looking in your folders… · " + String(a.s) + " s",
+  /** the add button, nothing to add */
+  add: "add",
+  /** the add button, one project */
+  add_one: (a: { name: string | number }): string => "add " + String(a.name),
+  /** the add button, projects */
+  add_many: (a: { n: string | number }): string => "add " + String(a.n) + " projects",
+  /** the add refused */
+  add_failed: (a: { names: string | number; why: string | number }): string => "▲ couldn't add " + String(a.names) + ": " + String(a.why),
+  /** the core didn't answer the add */
+  add_no_answer: (a: { s: string | number; names: string | number }): string => "▲ bise didn't answer in " + String(a.s) + " s: " + String(a.names) + " isn't added",
+  /** the add under way, one project */
+  adding_one: (a: { name: string | number }): string => "adding " + String(a.name) + "… its main starts there",
+  /** the add under way, projects */
+  adding_many: (a: { n: string | number }): string => "adding " + String(a.n) + " projects…",
+  /** an age (a found repo's day, an approval rule's): today */
+  age_today: "today",
+  /** an age: yesterday */
+  age_yesterday: "yesterday",
+  /** an age: days ago */
+  age_days: (a: { n: string | number }): string => String(a.n) + " days ago",
+  /** an age: weeks ago */
+  age_weeks: (a: { n: string | number }): string => String(a.n) + " weeks ago",
+  /** an age: months ago */
+  age_months: (a: { n: string | number }): string => String(a.n) + " months ago",
+  /** an age: years ago */
+  age_years: (a: { n: string | number }): string => String(a.n) + " years ago",
+  /** a found repo's line */
+  found_sub: (a: { path: string | number; when: string | number }): string => String(a.path) + " · " + String(a.when),
+  /** a found repo's line, a git repo */
+  found_sub_git: (a: { path: string | number; when: string | number }): string => String(a.path) + " · git · " + String(a.when),
+  /** approvals: the jev checker with no model */
+  checker_jev: (a: { who: string | number }): string => "Jev · " + String(a.who),
+  /** approvals: a checker with its model */
+  checker_model: (a: { who: string | number; model: string | number }): string => String(a.who) + " · " + String(a.model),
+  /** approvals: no checker */
+  checker_off: "off · every command asks you",
+  /** approvals: no checker known yet */
+  checker_none: "none yet",
+  /** approvals: the hub hasn't sent them */
+  approvals_none: "the hub hasn't sent its approvals yet.",
+  /** approvals: the repo they apply to, when it has no path */
+  approvals_this_repo: "this repo",
+  /** approvals: the mode row */
+  approvals_mode: "mode",
+  /** approvals: yolo's line */
+  approvals_yolo: "everything runs, no notification",
+  /** approvals: auto's line */
+  approvals_auto: "the checker decides; else a notification asks you",
+  /** approvals: the mode set by the environment */
+  approvals_env: (a: { mode: string | number }): string => String(a.mode) + " · this session (BISE_APPROVALS)",
+  /** approvals: the checker row */
+  approvals_checker: "checker",
+  /** approvals: the checker row's line */
+  approvals_checker_sub: "settings · models changes it",
+  /** approvals: a rule's remove, asked */
+  rule_remove_ask: "remove it?",
+  /** approvals: a rule's remove */
+  rule_remove: "remove",
+  /** approvals: a rule's remove, no */
+  rule_keep: "keep it",
+  /** approvals: the page's head */
+  approvals_in: (a: { repo: string | number }): string => "what runs without asking you in " + String(a.repo) + ".",
+  /** approvals: the rules' group */
+  approvals_rules: "always allowed here",
+  /** approvals: no rule */
+  approvals_empty: "nothing yet: a notification's “always allow” adds a rule here.",
+  /** update: a swap that didn't start */
+  update_not_started: (a: { why: string | number }): string => "the update didn't start: " + String(a.why),
+  /** update: a new build is ready */
+  update_ready: "a new build is ready",
+  /** update: the new build's sha, and the one he runs */
+  update_ready_sub: (a: { to: string | number; live: string | number }): string => String(a.to) + " · you run " + String(a.live),
+  /** update: restart to update */
+  update_restart: "restart to update",
+  /** update: up to date */
+  update_current: "✓ up to date",
+  /** update: up to date, the build he runs */
+  update_current_sub: (a: { live: string | number }): string => "you run " + String(a.live) + ", the newest build",
+  /** update: up to date, no sha known */
+  update_newest: "this is the newest build",
+  /** update: restarting on the new build */
+  update_restarting: (a: { to: string | number }): string => "restarting on " + String(a.to) + "…",
+  /** update: restarting's line */
+  update_restarting_sub: "the window comes back in a moment. your agents keep running.",
+  /** update: a failed swap (after its ▲) */
+  update_failed: (a: { to: string | number }): string => "couldn't update to " + String(a.to),
+  /** update: a failed swap's line */
+  update_still_on: (a: { live: string | number }): string => "you're still on " + String(a.live) + ". nothing is lost.",
+  /** update: no swap from here, the build he runs */
+  update_you_run: (a: { live: string | number }): string => "you run " + String(a.live),
+  /** update: a failed swap's line, no sha known */
+  update_nothing_lost: "nothing is lost.",
+  /** update: try again */
+  update_again: "try again",
+  /** update: show the log */
+  update_log: "show the log",
+  /** update: a test app */
+  update_test: "updates come from the try",
+  /** update: a test app's line */
+  update_test_sub: "this app runs on a test home, not yours",
+  /** update: no swap from here */
+  update_this_build: "this build",
+  /** update: the group's title */
+  update_title: "update",
+  /** dist update: the app and its version */
+  dist_me: (a: { version: string | number }): string => "bise " + String(a.version),
+  /** dist update: up to date */
+  dist_current: "up to date",
+  /** dist update: off */
+  dist_off: "updates are off here",
+  /** dist update: a move that didn't happen */
+  dist_move_failed: "bise couldn't move itself. drag it to Applications to get updates.",
+  /** dist update: off, a disk image */
+  dist_disk_image: "bise runs from the disk image, so it can't update itself.",
+  /** dist update: off, not in Applications */
+  dist_not_applications: "bise isn't in Applications, so it can't replace itself.",
+  /** dist update: getting a version */
+  dist_getting: (a: { version: string | number }): string => "getting " + String(a.version),
+  /** dist update: a version is ready */
+  dist_ready: (a: { version: string | number }): string => String(a.version) + " is ready",
+  /** dist update: ready's help */
+  dist_ready_help: "it installs by itself when you quit or step away. your agents keep running.",
+  /** dist update: failed */
+  dist_failed: "update failed",
+  /** dist update: a test build that can't update itself */
+  dist_new_signer: "this test build can't update itself. download bise once from bise.dev/download; later updates come by themselves.",
+  /** dist update: the new_signer help's link */
+  dist_download_link: "bise.dev/download",
+  /** dist update: an install that failed */
+  dist_swap: (a: { version: string | number }): string => String(a.version) + " couldn't be installed. bise tries again later.",
+  /** dist update: a signature refused */
+  dist_signature: (a: { version: string | number; mine: string | number }): string => String(a.version) + " was refused: its signature didn't check out. bise keeps " + String(a.mine) + ".",
+  /** dist update: a download that failed */
+  dist_download: (a: { version: string | number }): string => "the download of " + String(a.version) + " failed. bise tries again later.",
+  /** dist update: the new build didn't start */
+  dist_went_bad: "the new bise didn't start right",
+  /** dist update: the trace after a quiet install */
+  dist_updated: (a: { version: string | number; when: string | number }): string => "updated to " + String(a.version) + " · " + String(a.when),
+  /** dist update: go back */
+  dist_back: "go back",
+  /** dist update: move to Applications */
+  dist_move: "move to Applications",
+  /** dist update: the beta row */
+  dist_beta: "beta builds",
+  /** dist update: the beta row's line */
+  dist_beta_sub: "new builds a few days early. turning it off keeps your build until stable passes it.",
+  /** keys: from any app */
+  keys_anywhere: "from any app",
+  /** hold fn */
+  key_hold_fn: "talk to bise, with what is in front of you",
+  /** fn fn */
+  key_fn_fn: "hands-free voice; fn again stops",
+  /** fn space */
+  key_fn_space: "the spotlight: find an agent, or ask bise",
+  /** keys: the window */
+  keys_window: "the window",
+  /** ⌘0 */
+  key_bise: "bise",
+  /** ⌘1 … ⌘9 */
+  key_project: "a project, in the order of settings · projects",
+  /** ⌥0 / ⌥1 … ⌥9 */
+  key_main_or_agent: "the project's main / an agent",
+  /** ⌘K */
+  key_find_agent: "find an agent, a page or an artifact",
+  /** ⌘[ / ⌘] */
+  key_back_forward: "back / forward",
+  /** ⌘I */
+  key_inbox: "the inbox: what waits for you, most blocking first",
+  /** ⌘F */
+  key_find: "find in the thread",
+  /** ⌘D */
+  key_diff: "the agent's changes",
+  /** ⌘⇧A */
+  key_artifacts: "the artifacts",
+  /** ⌘E */
+  key_fold: "unfold / fold everything",
+  /** ⌘, */
+  key_settings: "settings",
+  /** ⌘/ */
+  key_this_list: "this list",
+  /** keys: the composer */
+  keys_composer: "the composer",
+  /** ⏎ */
+  key_send: "send; during a turn, steer it",
+  /** ⇧⏎ */
+  key_new_line: "a new line",
+  /** tab */
+  key_queue: "during a turn: queue it for the end of the turn",
+  /** ↑ */
+  key_last: "in an empty composer: your queued or last message back",
+  /** ctrl+c */
+  key_stop_turn: "stop the turn",
+  /** esc */
+  key_put_away: "put the draft away; close what is open",
+  /** ⌘. */
+  key_stop_agent: "stop the agent's turn",
+  /** / */
+  key_commands: "commands",
+  /** @ */
+  key_file: "a file",
+  /** $ */
+  key_skill: "a skill",
+  /** ⌘V */
+  key_paste_chip: "paste text, an image, or a long text as a chip",
+  /** ctrl+r */
+  key_dictation: "dictation into the composer",
+  /** keys: the inbox */
+  keys_inbox: "the inbox",
+  /** ↑ ↓ */
+  key_prev_next: "the previous / next item",
+  /** ctrl+p / ctrl+n */
+  key_prev_next_round: "the previous / next item, round from the last to the first",
+  /** ctrl+o */
+  key_open_folded: "open the item's folded lines",
+  /** ← → */
+  key_walk_options: "walk the item's options",
+  /** 1 … 9 */
+  key_pick_option: "pick that option",
+  /** ⏎ in the inbox */
+  key_pick_or_send: "pick the option on, or send your typed answer",
+  /** ⌘⌫ */
+  key_close_item: "close it without answering",
+  /** esc in the inbox */
+  key_back: "back",
 } as const;

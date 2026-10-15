@@ -5,13 +5,14 @@
 // setup first (bar L5, hold.ts). Pure: draws the core's roles and models. Owner: amb-kit.
 import type { AppCmd, Model, RoleRow } from '@/proto';
 import { Group, Help, Seg, Select, type GroupItem } from '@/ds';
+import { settings } from '@/proto/words.gen';
 import { modelRow } from './hold';
 
 /** Where a role's model comes from, in his words. */
 export function roleSource(r: RoleRow): string {
-  if (r.source === 'config') return 'set here';
-  if (r.source === 'env') return 'from your environment';
-  return r.follows != null && r.follows !== '' ? `follows ${r.follows}` : 'the default';
+  if (r.source === 'config') return settings.role_set_here;
+  if (r.source === 'env') return settings.role_from_env;
+  return r.follows != null && r.follows !== '' ? settings.role_follows({ role: r.follows }) : settings.role_default;
 }
 
 /** The efforts a role can take: its model's (none: the model takes no effort). */
@@ -53,14 +54,14 @@ export function Roles({ roles, models, error = null, set }: RolesProps) {
           {chat ? (
             <span className="settings-pick">
               <Select
-                label={`${r.name}'s model`}
+                label={settings.role_model({ role: r.name })}
                 value={r.source === 'default' ? FALLBACK : r.model}
                 options={[
-                  { value: FALLBACK, label: r.follows != null && r.follows !== '' ? `as ${r.follows}` : 'the default' },
+                  { value: FALLBACK, label: r.follows != null && r.follows !== '' ? settings.role_as({ role: r.follows }) : settings.role_default },
                   ...(!known && r.source !== 'default' ? [{ value: r.model, label: r.model }] : []),
                   ...models
                     .filter((m) => m.alias_of == null || m.alias_of === '')
-                    .map((m) => ({ value: m.id, label: m.label, hint: m.key_ready === false ? `${m.provider}: set up first` : undefined })),
+                    .map((m) => ({ value: m.id, label: m.label, hint: m.key_ready === false ? settings.role_setup_first({ provider: m.provider }) : undefined })),
                 ]}
                 onChange={(v) => {
                   set({ cmd: 'role_set', role: r.role, model: v === FALLBACK ? null : v }, v === FALLBACK ? null : v);
@@ -90,7 +91,7 @@ export function Roles({ roles, models, error = null, set }: RolesProps) {
   });
   return (
     <>
-      <Group title="which model does what" testId="settings.roles" items={items} help="the terminal's /models shows the same" />
+      <Group title={settings.roles_title} testId="settings.roles" items={items} help={settings.roles_help} />
       {error !== null && (
         <Help err testId="settings.roles.error">
           {error}

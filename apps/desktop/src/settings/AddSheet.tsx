@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AppCmd, ProjectRow } from '@/proto';
 import { Act, Button, Check, Field, Group, Sheet, Toggle } from '@/ds';
 import { useBroken, useCoreEvent, useFound, useProjects, type Ev } from '@/store';
+import { settings } from '@/proto/words.gen';
 import { addLabel, addPaths, addSay, foundSub, offers, scanSay } from './add';
 
 /** The clock, read only in the click handlers (when he looks again or adds). */
@@ -126,7 +127,7 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
       <span className={said.kind === 'failed' ? 'err' : undefined}>{said.text}</span>
       {said.kind === 'failed' && (
         <Act onClick={again} testId="settings.add.rescan">
-          look again
+          {settings.add_rescan}
         </Act>
       )}
     </span>
@@ -136,8 +137,8 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
     <Sheet
       open
       onClose={onClose}
-      title="add a project"
-      sub="a folder, a git repo. its main starts right away."
+      title={settings.add_project}
+      sub={settings.add_sub}
       onPrimary={go}
       testId="settings.add"
       foot={
@@ -148,7 +149,7 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
             </span>
           )}
           <Button kind="ghost" onClick={onClose} testId="settings.add.cancel">
-            cancel
+            {settings.add_cancel}
           </Button>
           <Button kind="pri" disabled={blocked} state={busy ? 'loading' : undefined} onClick={go} testId="settings.add.go">
             {addLabel(all)}
@@ -159,7 +160,7 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
       <div className="settings-add-path">
         <Field
           autoFocus
-          placeholder="a folder's path"
+          placeholder={settings.add_path}
           value={typed}
           onChange={(e) => {
             setTyped(e.currentTarget.value);
@@ -176,7 +177,7 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
             }}
             testId="settings.add.choose"
           >
-            choose…
+            {settings.add_choose}
           </Button>
         )}
       </div>
@@ -212,9 +213,9 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
           items={[
             {
               id: 'land',
-              label: 'main may land on main',
-              sub: land ? 'main commits to main once the tests pass, without asking you' : "otherwise your repo's flow decides: a pull request or an approval",
-              control: <Toggle on={land} label="main may land on main" onChange={setLand} testId="settings.add.land" />,
+              label: settings.add_land,
+              sub: land ? settings.add_land_on : settings.add_land_off,
+              control: <Toggle on={land} label={settings.add_land} onChange={setLand} testId="settings.add.land" />,
             },
           ]}
         />

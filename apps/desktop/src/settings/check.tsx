@@ -7,6 +7,7 @@
 // come on their own). Pure checks() plus its page. Owner: amb-home.
 import type { Account, AppCmd, Grant, Perm, ProjectRow } from '@/proto';
 import { Button, Chip, Group, Help, type GroupItem } from '@/ds';
+import { settings } from '@/proto/words.gen';
 
 export type Perms = Readonly<Partial<Record<Perm, Grant>>>;
 
@@ -24,9 +25,9 @@ export interface Check {
 }
 
 const PERM_WORDS: Record<string, [string, string]> = {
-  mic: ['microphone', "fn can't hear you without it"],
-  accessibility: ['accessibility', 'fn works only in bise’s own windows without it'],
-  screen: ['screen recording', 'fn sends your words without a capture without it'],
+  mic: [settings.perm_mic, settings.perm_mic_lost],
+  accessibility: [settings.perm_accessibility, settings.perm_accessibility_lost],
+  screen: [settings.perm_screen, settings.perm_screen_lost],
 };
 
 /** What bise needs now, from the helper's perms, his accounts and his projects. */
@@ -38,10 +39,10 @@ export function checks(perms: Perms, accounts: readonly Account[], projects: rea
       const [label, lost] = PERM_WORDS[p] ?? [p, ''];
       out.push(
         g === 'allowed'
-          ? { id: p, label, ok: true, detail: 'allowed', fix: null }
+          ? { id: p, label, ok: true, detail: settings.perm_allowed, fix: null }
           : g === 'denied'
-            ? { id: p, label, ok: false, detail: `denied: ${lost}`, fix: { t: 'perm', perm: p, action: 'open' }, act: 'open System Settings' }
-            : { id: p, label, ok: false, detail: 'not asked yet', fix: { t: 'perm', perm: p, action: 'ask' }, act: 'allow' },
+            ? { id: p, label, ok: false, detail: settings.perm_denied({ lost }), fix: { t: 'perm', perm: p, action: 'open' }, act: settings.open_system_settings }
+            : { id: p, label, ok: false, detail: settings.perm_not_asked, fix: { t: 'perm', perm: p, action: 'ask' }, act: settings.perm_allow },
       );
     }
   }
@@ -49,16 +50,16 @@ export function checks(perms: Perms, accounts: readonly Account[], projects: rea
   const expired = accounts.find((a) => a.state === 'expired');
   out.push(
     signed
-      ? { id: 'model', label: 'a model', ok: true, detail: `${signed.label}${signed.who != null ? ` · ${signed.who}` : ''}`, fix: null }
-      : { id: 'model', label: 'a model', ok: false, detail: expired ? `${expired.label}: signed out, sign in again` : 'no subscription or key yet: agents can’t answer', fix: { t: 'models' }, act: 'sign in' },
+      ? { id: 'model', label: settings.check_model, ok: true, detail: `${signed.label}${signed.who != null ? ` · ${signed.who}` : ''}`, fix: null }
+      : { id: 'model', label: settings.check_model, ok: false, detail: expired ? settings.check_signed_out({ label: expired.label }) : settings.check_no_model, fix: { t: 'models' }, act: settings.sign_in },
   );
   const home = projects.find((p) => p.home);
   out.push(
     home === undefined
-      ? { id: 'home', label: 'bise’s home', ok: false, detail: 'not known yet: check again in a moment', fix: null }
+      ? { id: 'home', label: settings.check_home, ok: false, detail: settings.check_home_unknown, fix: null }
       : home.missing === true
-        ? { id: 'home', label: 'bise’s home', ok: false, detail: `${home.path} is gone: restart bise and it makes it again`, fix: null }
-        : { id: 'home', label: 'bise’s home', ok: true, detail: home.path, fix: null },
+        ? { id: 'home', label: settings.check_home, ok: false, detail: settings.check_home_gone({ path: home.path }), fix: null }
+        : { id: 'home', label: settings.check_home, ok: true, detail: home.path, fix: null },
   );
   return out;
 }
@@ -89,20 +90,20 @@ export function SetupCheck({ list, ports }: { list: readonly Check[]; ports: Che
         {c.act}
       </Button>
     ) : (
-      <Chip tone="err">needs you</Chip>
+      <Chip tone="err">{settings.check_needs_you}</Chip>
     ),
   }));
   return (
     <>
       <Group testId="settings.check" items={items} />
-      <Help>{bad === 0 ? 'all set.' : `${String(bad)} ${bad === 1 ? 'thing needs' : 'things need'} you.`}</Help>
+      <Help>{bad === 0 ? settings.check_all_set : settings.check_left({ n: bad })}</Help>
       <Button
         onClick={() => {
           ports.send({ cmd: 'setup_check' });
         }}
         testId="settings.check.again"
       >
-        check again
+        {settings.check_again}
       </Button>
     </>
   );

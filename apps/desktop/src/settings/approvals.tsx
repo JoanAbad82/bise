@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { useListKeys } from '@/app/listkeys';
 import { Act, Group, Help, Seg, type GroupItem } from '@/ds';
 import type { ApprovalRule, HubCmd, HubEv } from '@/proto';
+import { settings } from '@/proto/words.gen';
 
 export type ApprovalsEv = Extract<HubEv, { ev: 'approvals' }>;
 export type ApprovalsCmd = Extract<HubCmd, { cmd: 'approvals' | 'remove_rule' }>;
@@ -17,12 +18,12 @@ export type ApprovalsCmd = Extract<HubCmd, { cmd: 'approvals' | 'remove_rule' }>
 /** Its age in words: today, yesterday, 3 days ago, 2 weeks ago, 5 months ago; '' when unknown. */
 export function age(days: number | null): string {
   if (days === null) return '';
-  if (days <= 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 14) return `${String(days)} days ago`;
-  if (days < 60) return `${String(Math.floor(days / 7))} weeks ago`;
-  if (days < 730) return `${String(Math.floor(days / 30))} months ago`;
-  return `${String(Math.floor(days / 365))} years ago`;
+  if (days <= 0) return settings.age_today;
+  if (days === 1) return settings.age_yesterday;
+  if (days < 14) return settings.age_days({ n: days });
+  if (days < 60) return settings.age_weeks({ n: Math.floor(days / 7) });
+  if (days < 730) return settings.age_months({ n: Math.floor(days / 30) });
+  return settings.age_years({ n: Math.floor(days / 365) });
 }
 
 /** A rule's note as the TUI's list says it: its age (from added_ms, counted here: the hub never
@@ -40,10 +41,10 @@ export function ruleWhat(r: ApprovalRule): string {
 /** The checker in words (the TUI's). */
 export function checkerWords(a: ApprovalsEv): string {
   const model = a.checker_model ?? '';
-  if (a.checker === 'jev') return model !== '' ? `${a.checker_who} · ${model}` : `Jev · ${a.checker_who}`;
+  if (a.checker === 'jev') return model !== '' ? settings.checker_model({ who: a.checker_who, model }) : settings.checker_jev({ who: a.checker_who });
   if (a.checker === 'model') return a.checker_who;
-  if (a.checker === 'off') return 'off · every command asks you';
-  return 'none yet';
+  if (a.checker === 'off') return settings.checker_off;
+  return settings.checker_none;
 }
 
 function tilde(p: string, home: string): string {
@@ -96,16 +97,16 @@ export function Approvals({ approvals: a, send, error = null, home = '', now: pi
       return false;
     },
   });
-  if (a === null) return <Help testId="settings.approvals.none">the hub hasn't sent its approvals yet.</Help>;
+  if (a === null) return <Help testId="settings.approvals.none">{settings.approvals_none}</Help>;
   const modes = ['auto', 'yolo'] as const;
-  const repo = a.repo === '' ? 'this repo' : tilde(a.repo, home);
+  const repo = a.repo === '' ? settings.approvals_this_repo : tilde(a.repo, home);
   const head: GroupItem[] = [
     {
       id: 'mode',
-      label: 'mode',
-      sub: a.mode === 'yolo' ? 'everything runs, no notification' : 'the checker decides; else a notification asks you',
+      label: settings.approvals_mode,
+      sub: a.mode === 'yolo' ? settings.approvals_yolo : settings.approvals_auto,
       control: a.env ? (
-        <span className="v">{`${a.mode} · this session (BISE_APPROVALS)`}</span>
+        <span className="v">{settings.approvals_env({ mode: a.mode })}</span>
       ) : (
         <Seg
           items={modes}
@@ -118,7 +119,7 @@ export function Approvals({ approvals: a, send, error = null, home = '', now: pi
         />
       ),
     },
-    { id: 'checker', label: 'checker', sub: 'settings · models changes it', value: checkerWords(a) },
+    { id: 'checker', label: settings.approvals_checker, sub: settings.approvals_checker_sub, value: checkerWords(a) },
   ];
   // rows by position: a rule has no id, its fields are its identity (sent back whole to remove it)
   const rules: GroupItem[] = a.rules.map((r, i) => ({
@@ -127,8 +128,8 @@ export function Approvals({ approvals: a, send, error = null, home = '', now: pi
     sub: ruleNote(r, now),
     control:
       asking === r ? (
-        <span className="settings-row-acts" role="group" aria-label="remove it?">
-          <span className="settings-ask">remove it?</span>
+        <span className="settings-row-acts" role="group" aria-label={settings.rule_remove_ask}>
+          <span className="settings-ask">{settings.rule_remove_ask}</span>
           {/* designer m_18736: nothing ghost in rows; remove is an Act in the error tone, asked once */}
           <Act
             tone="err"
@@ -138,31 +139,31 @@ export function Approvals({ approvals: a, send, error = null, home = '', now: pi
             }}
             testId={`settings.approvals.rule.${String(i)}.yes`}
           >
-            remove
+            {settings.rule_remove}
           </Act>
           <Act onClick={() => { setAsking(null); }} testId={`settings.approvals.rule.${String(i)}.keep`}>
-            keep it
+            {settings.rule_keep}
           </Act>
         </span>
       ) : (
         <Act tone="err" disabled={send === null} onClick={() => { setAsking(r); }} testId={`settings.approvals.rule.${String(i)}.remove`}>
-          remove
+          {settings.rule_remove}
         </Act>
       ),
   }));
   return (
     <div ref={ref} tabIndex={-1} className="settings-approvals" onKeyDown={onKeyDown}>
-      <Help testId="settings.approvals.repo">{`what runs without asking you in ${repo}.`}</Help>
+      <Help testId="settings.approvals.repo">{settings.approvals_in({ repo })}</Help>
       <Group testId="settings.approvals" items={head} />
       {rules.length > 0 ? (
         <Group
-          title="always allowed here"
+          title={settings.approvals_rules}
           testId="settings.approvals.rules"
           list
           items={rules.map((it) => ({ ...it, sel: it.id === sel, onPick: () => { setSel(it.id); } }))}
         />
       ) : (
-        <Help testId="settings.approvals.empty">nothing yet: a notification's “always allow” adds a rule here.</Help>
+        <Help testId="settings.approvals.empty">{settings.approvals_empty}</Help>
       )}
       {error != null && error !== '' && (
         <Help err testId="settings.approvals.error">

@@ -5,13 +5,14 @@
 // WAIT_MS; never a spinner with no end. Pure: the sheet (AddSheet.tsx) feeds it what it saw since
 // it asked. Owner: amb-home.
 import type { Found, ProjectRow } from '@/proto';
+import { settings } from '@/proto/words.gen';
 
 /** How long the sheet waits for the core before it says so. */
 export const WAIT_MS = 20_000;
 
 /** The words of CoreEv broken, as CoreLine says them. */
 export function brokenLine(reason: string): string {
-  return `▲ bise can't start your projects: ${reason.replace(/\.$/, '')}.`;
+  return settings.add_broken({ reason: reason.replace(/\.$/, '') });
 }
 
 export type ScanSay =
@@ -26,11 +27,11 @@ export type ScanSay =
  */
 export function scanSay(s: { answered: boolean; n: number; error: string | null; broken: string | null; ms: number }): ScanSay {
   if (s.broken !== null) return { kind: 'failed', text: brokenLine(s.broken) };
-  if (s.error !== null) return { kind: 'failed', text: `▲ the look in your folders failed: ${s.error}` };
-  if (s.answered) return { kind: 'found', n: s.n, text: s.n === 0 ? 'nothing new in your folders' : `found in your folders · ${String(s.n)}` };
-  if (s.ms >= WAIT_MS) return { kind: 'failed', text: `▲ bise didn't answer in ${String(Math.round(WAIT_MS / 1000))} s` };
+  if (s.error !== null) return { kind: 'failed', text: settings.scan_failed({ why: s.error }) };
+  if (s.answered) return { kind: 'found', n: s.n, text: s.n === 0 ? settings.scan_nothing : settings.scan_found({ n: s.n }) };
+  if (s.ms >= WAIT_MS) return { kind: 'failed', text: settings.no_answer({ s: Math.round(WAIT_MS / 1000) }) };
   const secs = Math.floor(s.ms / 1000);
-  return { kind: 'looking', text: secs < 1 ? 'looking in your folders…' : `looking in your folders… · ${String(secs)} s` };
+  return { kind: 'looking', text: secs < 1 ? settings.scan_looking : settings.scan_looking_s({ s: secs }) };
 }
 
 /** The last part of a path: what 'add shop' names. */
@@ -40,9 +41,9 @@ export function base(p: string): string {
 
 /** What the primary button says it will do. */
 export function addLabel(paths: readonly string[]): string {
-  if (paths.length === 0) return 'add';
-  if (paths.length === 1) return `add ${base(paths[0] ?? '')}`;
-  return `add ${String(paths.length)} projects`;
+  if (paths.length === 0) return settings.add;
+  if (paths.length === 1) return settings.add_one({ name: base(paths[0] ?? '') });
+  return settings.add_many({ n: paths.length });
 }
 
 /**
@@ -66,9 +67,9 @@ export function addSay(s: { paths: readonly string[]; projects: readonly Project
   if (rows.every((r) => r !== undefined)) return { kind: 'added', rows };
   if (s.broken !== null) return { kind: 'failed', text: brokenLine(s.broken) };
   const missing = s.paths.filter((_, i) => rows[i] === undefined).map(base);
-  if (s.error !== null) return { kind: 'failed', text: `▲ couldn't add ${missing.join(', ')}: ${s.error}` };
-  if (s.ms >= WAIT_MS) return { kind: 'failed', text: `▲ bise didn't answer in ${String(Math.round(WAIT_MS / 1000))} s: ${missing.join(', ')} isn't added` };
-  return { kind: 'adding', text: s.paths.length === 1 ? `adding ${base(s.paths[0] ?? '')}… its main starts there` : `adding ${String(s.paths.length)} projects…` };
+  if (s.error !== null) return { kind: 'failed', text: settings.add_failed({ names: missing.join(', '), why: s.error }) };
+  if (s.ms >= WAIT_MS) return { kind: 'failed', text: settings.add_no_answer({ s: Math.round(WAIT_MS / 1000), names: missing.join(', ') }) };
+  return { kind: 'adding', text: s.paths.length === 1 ? settings.adding_one({ name: base(s.paths[0] ?? '') }) : settings.adding_many({ n: s.paths.length }) };
 }
 
 /** The found repos the sheet offers: not his yet, the most recent first, 8 at most. */
@@ -87,6 +88,6 @@ export function addPaths(ticked: readonly string[], typed: string): string[] {
 export function foundSub(f: Found, now: number): string {
   const day = 86_400_000;
   const d = Math.floor(now / day) - Math.floor(f.last_ms / day);
-  const when = d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 30 ? `${String(d)} days ago` : new Date(f.last_ms).toISOString().slice(0, 10);
-  return `${f.path} · ${f.git ? 'git · ' : ''}${when}`;
+  const when = d <= 0 ? settings.age_today : d === 1 ? settings.age_yesterday : d < 30 ? settings.age_days({ n: d }) : new Date(f.last_ms).toISOString().slice(0, 10);
+  return f.git ? settings.found_sub_git({ path: f.path, when }) : settings.found_sub({ path: f.path, when });
 }
