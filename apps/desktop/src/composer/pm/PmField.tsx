@@ -128,8 +128,11 @@ export interface PmFieldProps {
 /** The draft is written this long after the last change (never on each key of a burst). */
 const DRAFT_DEBOUNCE_MS = 400;
 
+/** The list's session: the same trigger at the same place, whatever its query says. */
+const sessionKey = (t: Trigger | null): string =>
+  t === null ? "" : `${t.kind}:${t.start}:${t.quoted ? "q" : ""}`;
 const triggerKey = (t: Trigger | null): string =>
-  t === null ? "" : `${t.kind}:${t.start}:${t.quoted ? "q" : ""}:${t.query}`;
+  t === null ? "" : `${sessionKey(t)}:${t.query}`;
 
 /** On a command line, the argument being typed (its popup), before any @ or $ in it. */
 function slotOf(
@@ -385,7 +388,12 @@ export function PmField(p: PmFieldProps): JSX.Element {
         ? [
             ...agentRows(trigger, p.sources.agents),
             ...artifactRows(trigger, p.sources.artifacts ?? [], openedAt),
-            ...(files.key === tkey ? fileRows(files.items) : []),
+            // the last answer of this same @ stays while the next query's is on its way: a
+            // key typed never empties the list for a frame (his flicker, at-steady)
+            ...(files.key === tkey ||
+            files.key.startsWith(`${sessionKey(trigger)}:`)
+              ? fileRows(files.items)
+              : []),
           ]
         : trigger.kind === "skill"
           ? skillRows(trigger, p.sources.skills)
