@@ -34,13 +34,16 @@
 .b-ptrig:disabled {
   opacity: 0.4;
 }
+/* the words: a block (text-overflow's ellipsis needs one; its parts sit on one baseline), its line
+   --lh-ui high so the clip of overflow:hidden never cuts a descender (his shot: 'opus 5.5 high', the
+   p and g cut at 13/1). The half-leading is even: the glyphs stay where they were, centered. */
 .b-ptrig .w {
-  display: inline-flex;
-  align-items: baseline;
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: pre;
+  line-height: var(--lh-ui);
 }
 .b-ptrig .v {
   flex: none;
