@@ -120,14 +120,14 @@ test('composer/strip: the tab over the box, the row of controls, no band', async
     await expect(ctx).toHaveAttribute('data-tip', "17% of perf's context used · 42k tokens · compacts at 90%");
     await expect(ctx).toHaveText('42k');
     expect(await ctx.evaluate((e) => (e.querySelector('.num')?.getBoundingClientRect().right ?? 0) <= (e.querySelector('svg.b-ring')?.getBoundingClientRect().left ?? 0)), 'the tokens left of the ring').toBe(true);
-    // a gauge, never a spinner (designer m_25940): 12 px, a donut (his ask on agent-rows): a 1.5 px
-    // arc on a track of the same width, nothing filled; always shown in the tab
+    // a gauge, never a spinner (designer m_25940, m_26307): 12 px, a dial (his ask on agent-rows): a
+    // 2 px arc on a full 1 px track, nothing filled; always shown in the tab
     expect(await ctx.locator('svg.b-ring').evaluate((e) => Math.round(e.getBoundingClientRect().width)), 'a 12 px gauge').toBe(12);
     await expect(ctx.locator('svg.b-ring'), 'the tab keeps it at rest').toBeVisible();
     const donut = await ctx.locator('svg.b-ring').evaluate((e) => Array.from(e.querySelectorAll('circle')).map((c) => ({ k: c.getAttribute('class'), fill: getComputedStyle(c).fill, w: getComputedStyle(c).strokeWidth, dash: c.getAttribute('stroke-dasharray') })));
     expect(donut, 'an arc of 17 on its track, none filled').toEqual([
-      { k: 'track', fill: 'none', w: '1.5px', dash: null },
-      { k: 'used', fill: 'none', w: '1.5px', dash: '17 83' },
+      { k: 'track', fill: 'none', w: '1px', dash: null },
+      { k: 'used', fill: 'none', w: '2px', dash: '17 83' },
     ]);
     await expect(page.getByTestId('composer.voice'), "voice gets its key like dictate").toContainText('⌃R⌃R voice');
     await expect(page.getByTestId('composer.tab.project'), 'the crumb names the project').toHaveCount(0);
