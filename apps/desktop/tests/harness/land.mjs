@@ -39,6 +39,9 @@ export const LAND = [
   // answer 23 pages back in its thread (the store's window around it, the gap row loads newer)
   'checks/inbox/inbox-open.spec.ts',
   'checks/thread/reading.spec.ts',
+  // a 50k-entry thread with lines appending: ⌘F counts every hit via the hub, jumps far back, the read
+  // row and the current match never move, no long task while he scrolls (his m_26614, thread-perf)
+  'checks/thread/history-perf.spec.ts',
   'checks/thread/streaming.spec.ts',
   'checks/thread/esc-order.spec.ts',
   'checks/thread/first-run.spec.ts',

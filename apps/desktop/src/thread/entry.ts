@@ -16,10 +16,29 @@ export function posOfKey(key: string): number | undefined {
   return Number.isSafeInteger(n) ? n : undefined;
 }
 
+/**
+ * One Intl.DateTimeFormat per form and zone: making one costs ~0.1 ms, and the rows asked for
+ * thousands per render (a day line and a clock per row: thread-perf's profile, 0.4 s of a find).
+ */
+const formats = new Map<string, Intl.DateTimeFormat>();
+function format(locale: string, opts: Intl.DateTimeFormatOptions, tz: string | undefined): Intl.DateTimeFormat {
+  const key = `${locale}|${tz ?? ''}|${JSON.stringify(opts)}`;
+  let f = formats.get(key);
+  if (f === undefined) {
+    f = new Intl.DateTimeFormat(locale, { ...opts, timeZone: tz });
+    formats.set(key, f);
+  }
+  return f;
+}
+const CLOCK: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
+const YMD: Intl.DateTimeFormatOptions = { year: 'numeric', month: '2-digit', day: '2-digit' };
+const DAY_MONTH: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+const WEEKDAY: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' };
+
 /** "14:05" in his time zone. */
 export function clock(ms: number, tz?: string): string {
   if (ms <= 0) return '';
-  return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }).format(ms);
+  return format('en-GB', CLOCK, tz).format(ms);
 }
 
 /**
@@ -28,9 +47,9 @@ export function clock(ms: number, tz?: string): string {
  */
 export function whenOf(ms: number, now: number, tz?: string): string {
   if (ms <= 0) return '';
-  const day = (t: number) => new Intl.DateTimeFormat('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: tz }).format(t);
+  const day = (t: number) => format('en-GB', YMD, tz).format(t);
   if (day(ms) === day(now)) return clock(ms, tz);
-  const d = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: tz }).format(ms);
+  const d = format('en-GB', DAY_MONTH, tz).format(ms);
   return `${d} ${clock(ms, tz)}`;
 }
 
@@ -74,7 +93,7 @@ export const GROUP_GAP_MS = 5 * 60_000;
 
 /** The day a time falls on, in his time zone ('2026-10-06'). */
 function dayOf(ms: number, tz?: string): string {
-  return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: tz }).format(ms);
+  return format('en-CA', YMD, tz).format(ms);
 }
 
 /** Two times on the same day (a time of 0 is never a new day). */
@@ -86,7 +105,7 @@ export function sameDay(a: number, b: number, tz?: string): boolean {
 export function dayLabel(ms: number, now: number, tz?: string): string {
   if (sameDay(ms, now, tz)) return 'today';
   if (sameDay(ms, now - 86_400_000, tz)) return 'yesterday';
-  const f = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz }).formatToParts(ms);
+  const f = format('en-GB', WEEKDAY, tz).formatToParts(ms);
   const part = (t: string) => f.find((p) => p.type === t)?.value ?? '';
   return `${part('weekday')} ${part('day')} ${part('month')}`.toLowerCase();
 }

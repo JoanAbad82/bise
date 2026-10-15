@@ -38,6 +38,7 @@ import { ComputerLine } from './ComputerLine';
 import { entryKey } from './entry';
 import { MISS_WORDS } from './answerlink';
 import { flashEntry, useAnswerReveal } from './useAnswerReveal';
+import { useFindGo } from './useFindGo';
 import { quoteSourcePos } from './quote';
 import { QUOTE_SOURCE_EVENT } from '@/composer/pm/AttachList';
 import { FindBar } from './FindBar';
@@ -140,6 +141,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
   }, [store, tkey]);
   // answered-link: a '✓ answered' row's click brings his answer here into view (answerlink.ts)
   const answerMiss = useAnswerReveal(store, project, agent, list);
+  // ⌘F: the current match into view, its page read around it when it isn't held (useFindGo.ts)
+  const findGo = useFindGo(store, project, agent, list);
   // H10 (designer m_19835): scrolled up to read, the inbox block is one line and the composer's keys line hides
   const [reading, setReading] = useState(false);
   // his bug 3: a selection in the thread, then a key, quotes it in the composer
@@ -417,7 +420,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName, artifa
               project={project}
               agent={agent}
               mark={mark}
-              onGo={(pos) => list.current?.scrollTo(entryKey(pos))}
+              onGo={findGo}
               onClose={() => {
                 setFindOpen(false);
               }}

@@ -44,6 +44,7 @@ import {
 } from "./types";
 import { applyTyped } from "./apply";
 import { answers, listsLive, merged, planJump, planNewer } from "./window";
+import { trim } from "./trim";
 import { answered, echoOf, keepLanded, sentOf, ECHO_SLACK_MS, type Sent } from "./echo";
 import { EMPTY, type Thread } from "./base";
 import { answeredFromOf, answersOf, cardAnsweredOf, cardKeyOf, jumpOf, keptAnswers, type AnswerAt, type AnswerFrom, type AnsweredFrom, type CardAnswered } from "./answered";
@@ -575,6 +576,20 @@ export class Store extends StoreVoice {
     if (plan === null) return;
     t.ask = plan.ask;
     this.command({ cmd: "page", project, agent, before: plan.ask.before, limit: plan.limit });
+  }
+  /**
+   * He reads the entry at `pos` (the list's row under its top edge, as he scrolls): the entries far
+   * from it leave the view and the store (trim.ts), the hub pages them back when he scrolls there.
+   * Not while a window page is asked.
+   */
+  reading(project: string, agent: string, pos: number): void {
+    const key = threadKey(project, agent);
+    const t = this.threads.get(key);
+    if (t === undefined || t.ask !== undefined) return;
+    const { view, dropped } = trim(t.view, pos);
+    if (dropped.length === 0) return;
+    for (const p of dropped) t.byPos.delete(p);
+    this.setView(key, t, view);
   }
   /**
    * ⌘F over a whole thread (`thread/find`, thread-perf): the hub searches its transcript and its

@@ -78,7 +78,7 @@ impl TIndex {
             let n = buf.len();
             for (i, c) in buf.iter().enumerate() {
                 if *c == b'\n' {
-                    if self.lines % STEP == 0 {
+                    if self.lines.is_multiple_of(STEP) {
                         self.offs.push(self.end);
                     }
                     self.lines += 1;

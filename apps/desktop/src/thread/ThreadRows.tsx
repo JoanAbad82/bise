@@ -214,6 +214,15 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   const onOlder = useCallback(() => {
     store.olderPage(project, agent);
   }, [store, project, agent]);
+  // scrolled up: the store keeps the entries near the one he reads (trim.ts), the far ones are paged back
+  const onRead = useCallback(
+    (key: string) => {
+      // an entry's row, or a folded run's (its first entry)
+      const pos = posOfKey(key) ?? (key.startsWith('r:') ? Number(key.slice(2)) : undefined);
+      if (pos !== undefined) store.reading(project, agent, pos);
+    },
+    [store, project, agent],
+  );
   // his own send goes to the bottom even when he had scrolled up
   const sent = pending.length;
   const last = useRef(sent);
@@ -233,5 +242,5 @@ export const Rows = memo(function Rows({ tkey, project, agent, bise, listRef, on
   if (!view.loaded && keys.length === 0 && tail === undefined) return <div className="th-list th-loading" data-testid="thread.loading" />;
   // one list per thread (key): another agent's thread is a new mount, so it opens at its end or
   // where he left it (keep.ts), never with the last thread's scroll, stick or opened rows
-  return <ThreadList key={tkey} ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} tail={tail} testId="thread.list" keepKey={tkey} holdPart=".th-row" reactKey={reactKey} {...(onReading === undefined ? {} : { onReading })} />;
+  return <ThreadList key={tkey} ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} tail={tail} testId="thread.list" keepKey={tkey} holdPart=".th-row" reactKey={reactKey} onRead={onRead} {...(onReading === undefined ? {} : { onReading })} />;
 });

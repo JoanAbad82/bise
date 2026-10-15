@@ -1,6 +1,8 @@
 //! `sb inspect`, `sb history` and `sb show` (RFC 0001 §7.5, BISE-233), and
 //! the transcript pages the TUI's scroll-back reads: an agent's thread
-//! from its transcript, and the search index over every thread. `answer`
+//! from its transcript, and the search index over every thread. The typed
+//! thread pages read through the transcript's offset index (tindex.rs,
+//! `page_lines`): a page costs its own lines, not the file's. `answer`
 //! works over an agents dir and an agent list, no Shell, so a reader of
 //! another hub's threads (stream C) calls it with that hub's.
 

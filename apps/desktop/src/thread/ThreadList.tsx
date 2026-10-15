@@ -5,8 +5,11 @@
 //   not confirmed yet), so a new entry mounts one row and an entry replaced
 //   at its pos re-renders that row only (the row reads its entry with the
 //   store's per-key hook, not from this list's props);
-// - an older page that comes in front doesn't move what he reads
-//   (firstItemIndex goes down by the rows added in front);
+// - rows that come or go before the one he reads don't move it: an older
+//   page in front (firstItemIndex goes down), far rows the store trimmed
+//   (it goes up; trim.ts, told the row he reads by onRead), a window's gap
+//   filled above him; the row is held at its y by its key (thread-perf);
+// - a jump of his (⌘F's match, his answer far back) wins over that hold;
 // - at the bottom it follows new rows; scrolled up, it stays where he is;
 // - the list never holds the composer: it sits beside it in the screen.
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
@@ -74,18 +77,23 @@ export interface ThreadListProps {
    * line hides), or he is back at the end. Told on each change.
    */
   onReading?: (reading: boolean) => void;
+  /** the key of the row he reads, scrolled up, when it changes (the store keeps the rows near it: trim.ts) */
+  onRead?: (key: string) => void;
 }
 
 /**
  * The first item's index for Virtuoso: down by the number of rows that came
- * in front of the previous first one (an older page), unchanged otherwise.
- * Pure, exported for the tests.
+ * in front of the previous first one (an older page), up by the number of
+ * rows that left the front (the store's trim: far entries leave the view,
+ * `before` the keys the list had), unchanged otherwise. Pure, exported for the tests.
  */
-export function nextFirstIndex(prev: { first: string | undefined; index: number }, keys: readonly string[]): { first: string | undefined; index: number } {
+export function nextFirstIndex(prev: { first: string | undefined; index: number }, keys: readonly string[], before: readonly string[] = []): { first: string | undefined; index: number } {
   const first = keys[0];
   if (first === prev.first) return prev;
   const k = prev.first === undefined ? -1 : keys.indexOf(prev.first);
-  return { first, index: k > 0 ? prev.index - k : prev.index };
+  if (k > 0) return { first, index: prev.index - k };
+  const j = first === undefined ? -1 : before.indexOf(first);
+  return { first, index: k < 0 && j > 0 ? prev.index + j : prev.index };
 }
 
 /**
@@ -131,18 +139,26 @@ export function newAtEnd(last: string | undefined, keys: readonly string[]): num
   return i < 0 ? 0 : keys.length - 1 - i;
 }
 
-export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, keepKey, holdPart, reactKey, onReading }: ThreadListProps) {
+export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, keepKey, holdPart, reactKey, onReading, onRead }: ThreadListProps) {
   const virtuoso = useRef<VirtuosoHandle>(null);
   // the anchor of firstItemIndex, moved during render (React's
   // "state from the previous render" pattern): no effect, no extra frame
   const [anchor, setAnchor] = useState<{ first: string | undefined; index: number }>({ first: keys[0], index: START });
-  const next = nextFirstIndex(anchor, keys);
+  // the keys of the last commit: rows that left the front (the store's trim) move firstItemIndex up
+  const lastKeys = useRef(keys);
+  const next = nextFirstIndex(anchor, keys, lastKeys.current);
   if (next !== anchor) setAnchor(next);
 
   // the row he reads, measured at each scroll of his (not while held): when
-  // an older page comes in front, that row is held at that y (hold below)
+  // rows come or go before it (an older page in front, a gap filled above, far rows trimmed), that
+  // row is held at that y (hold below). `key`: its key, which a change of the keys doesn't move
   const scroller = useRef<HTMLElement | null>(null);
-  const reading = useRef<{ index: number; top: number } | undefined>(undefined);
+  const reading = useRef<{ index: number; top: number; key?: string } | undefined>(undefined);
+  const keysNow = useRef(keys);
+  keysNow.current = keys;
+  const tellRead = useRef(onRead);
+  tellRead.current = onRead;
+  const told = useRef<string | undefined>(undefined);
   // click: held because he opened or closed a row (it keeps its y even at the end: never re-stuck)
   const held = useRef<{ index: number; top: number; until: number; click?: boolean } | undefined>(undefined);
   const holdRef = useRef<() => void>(() => undefined);
@@ -159,7 +175,14 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
       const b = partOf(r, holdPart).getBoundingClientRect();
       return { index: Number(r.dataset.itemIndex), top: b.top, bottom: b.bottom };
     });
-    reading.current = anchorRow(rows, el.getBoundingClientRect().top);
+    const a = anchorRow(rows, el.getBoundingClientRect().top);
+    const key = a === undefined ? undefined : keysNow.current[a.index - firstIndex.current];
+    reading.current = a === undefined ? undefined : { ...a, ...(key === undefined ? {} : { key }) };
+    // the store keeps the rows near it (trim.ts); told when it changes, while he reads up there
+    if (key !== undefined && key !== told.current && !stick.current) {
+      told.current = key;
+      tellRead.current?.(key);
+    }
     placeRef.current();
   }, [holdPart]);
   const scrollerRef = useCallback(
@@ -317,11 +340,18 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
   useLayoutEffect(() => {
     const before = firstIndex.current;
     firstIndex.current = next.index;
-    // an older page came in front: hold the row he read at the last scroll
-    if (next.index >= before || stick.current || reading.current === undefined) return;
-    held.current = { ...reading.current, until: Date.now() + HOLD_MS };
+    lastKeys.current = keys;
+    // rows came or went before the row he read at the last scroll (an older page in front, a gap
+    // filled above, far rows trimmed): hold it. Rows added at the end move nothing
+    const r = reading.current;
+    if (stick.current || r === undefined) return;
+    const at = r.key === undefined ? -1 : keys.indexOf(r.key);
+    const index = at < 0 ? r.index : next.index + at;
+    if (index === r.index && next.index === before) return;
+    reading.current = { ...r, index };
+    held.current = { index, top: r.top, until: Date.now() + HOLD_MS };
     return keepHeld();
-  }, [next.index, keepHeld]);
+  }, [keys, next.index, keepHeld]);
   const onGrow = useCallback(() => {
     // a row he opened stays where he opened it, even at the end
     if (held.current?.click === true) hold();
@@ -441,11 +471,19 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
     () => ({
       scrollTo(key) {
         const i = keys.indexOf(key);
-        if (i >= 0) virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
+        if (i < 0) return;
+        // a jump of his (⌘F, a quote's source) wins over the row held still
+        held.current = undefined;
+        stopHold.current();
+        virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
       },
       reveal(key) {
         const i = keys.indexOf(key);
         if (i < 0) return;
+        // a jump of his (⌘F's match, his answer far back) wins over the row held still: the window
+        // that came in front for it would hold the row he read before (the keys' hold)
+        held.current = undefined;
+        stopHold.current();
         // a row drawn and whole in the view stays where it is (his ask: only when it is outside)
         const el = scroller.current;
         const row = el?.querySelector<HTMLElement>(`[data-item-index="${String(next.index + i)}"]`) ?? null;

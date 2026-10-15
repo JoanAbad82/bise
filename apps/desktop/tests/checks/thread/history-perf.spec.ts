@@ -116,24 +116,60 @@ const framesOff = (page: Page) =>
   });
 type ProfNode = { id: number; callFrame: { functionName: string; url: string; lineNumber: number }; hitCount?: number };
 /** THREAD_PERF_PROFILE=1: a CPU profile around `run`, its top self-time functions (ms) in the output (off by default: it slows what it measures). */
-async function profiled(s: { cdp: import('@playwright/test').CDPSession }, name: string, run: () => Promise<void>): Promise<void> {
-  if (process.env['THREAD_PERF_PROFILE'] !== '1') return run();
+/**
+ * The renderer's main thread while `run` runs, from a CPU profile (sampled every 250 µs): each run
+ * of busy samples is a task the page can't draw a frame during. Off-screen, Chromium throttles
+ * requestAnimationFrame, so rAF deltas say nothing of jank there; the tasks do. taskP95 / taskMax:
+ * the busy runs' lengths (ms); busy: the share of the time the thread worked. Its top self-time
+ * functions go to profile-<name>.txt.
+ */
+async function profiled(s: { cdp: import('@playwright/test').CDPSession }, name: string, run: () => Promise<void>): Promise<{ taskP95: number; taskMax: number; busy: number }> {
   await s.cdp.send('Profiler.enable');
-  await s.cdp.send('Profiler.setSamplingInterval', { interval: 200 });
+  await s.cdp.send('Profiler.setSamplingInterval', { interval: 250 });
   await s.cdp.send('Profiler.start');
   await run();
-  const { profile } = (await s.cdp.send('Profiler.stop')) as unknown as { profile: { nodes: ProfNode[]; startTime: number; endTime: number; samples: number[] } };
-  const per = (profile.endTime - profile.startTime) / 1000 / Math.max(1, profile.samples.length);
+  const { profile } = (await s.cdp.send('Profiler.stop')) as unknown as { profile: { nodes: ProfNode[]; startTime: number; endTime: number; samples: number[]; timeDeltas: number[] } };
+  const byId = new Map(profile.nodes.map((n) => [n.id, n]));
+  const idle = (id: number) => {
+    const f = byId.get(id)?.callFrame.functionName;
+    return f === '(idle)';
+  };
+  // a sample's time is the delta to the next one
+  const tasks: number[] = [];
+  let cur = 0;
+  let busy = 0;
   const self = new Map<string, number>();
-  for (const n of profile.nodes) {
-    const f = n.callFrame;
-    const k = `${f.functionName || '(anon)'} ${f.url.split('/').pop() ?? ''}:${String(f.lineNumber)}`;
-    self.set(k, (self.get(k) ?? 0) + (n.hitCount ?? 0) * per);
-  }
+  profile.samples.forEach((id, i) => {
+    const dt = (profile.timeDeltas[i + 1] ?? 0) / 1000;
+    if (idle(id)) {
+      if (cur > 0) tasks.push(cur);
+      cur = 0;
+      return;
+    }
+    cur += dt;
+    busy += dt;
+    const f = byId.get(id)?.callFrame;
+    if (f !== undefined) {
+      const k = `${f.functionName || '(anon)'} ${f.url.split('/').pop() ?? ''}:${String(f.lineNumber)}`;
+      self.set(k, (self.get(k) ?? 0) + dt);
+    }
+  });
+  if (cur > 0) tasks.push(cur);
+  tasks.sort((a, b) => a - b);
   const top = [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40).map(([k, ms]) => `${ms.toFixed(1)} ms  ${k}`);
   writeFileSync(test.info().outputPath(`profile-${name}.txt`), top.join('\n'));
+  const span = (profile.endTime - profile.startTime) / 1000;
+  const r = (x: number) => Math.round(x * 10) / 10;
+  return { taskP95: r(tasks[Math.floor(tasks.length * 0.95)] ?? 0), taskMax: r(tasks.at(-1) ?? 0), busy: r((100 * busy) / Math.max(1, span)) };
 }
-const yOf = async (page: Page, sel: string) => page.locator(sel).first().evaluate((e) => e.getBoundingClientRect().top).catch(() => NaN);
+const yOf = async (page: Page, sel: string) => page.locator(sel).first().evaluate((e) => e.getBoundingClientRect().top, undefined, { timeout: 1000 }).catch(() => NaN);
+/** What the list draws now: its first and last entry rows, the find count (for a red run's output). */
+const drawn = (page: Page) =>
+  page.evaluate(() => {
+    const ids = Array.from(document.querySelectorAll('[data-testid^="thread.entry."]'), (e) => e.getAttribute('data-testid') ?? '');
+    const list = document.querySelector<HTMLElement>('[data-testid="thread.list"]');
+    return { first: ids[0], last: ids.at(-1), n: ids.length, count: document.querySelector('[data-testid="thread.find.count"]')?.textContent, gap: document.querySelector('[data-testid="thread.gap"]') !== null, stuck: list?.dataset.stuck, top: list?.querySelector('[data-virtuoso-scroller]')?.scrollTop };
+  });
 
 test('thread/history-perf: 50k entries, lines appending, scroll up and ⌘F stay smooth and still', async () => {
   test.setTimeout(420_000);
@@ -161,13 +197,16 @@ test('thread/history-perf: 50k entries, lines appending, scroll up and ⌘F stay
     // 1. he wheels up through the history while lines append
     await framesOn(page);
     const appending = hub.append(40, 100);
-    await profiled(s, 'scroll', async () => {
+    const st = await profiled(s, 'scroll', async () => {
       for (let i = 0; i < 80; i++) {
         await page.mouse.wheel(0, -600);
         await page.waitForTimeout(50);
       }
       await appending;
     });
+    out.scrollTaskP95 = st.taskP95;
+    out.scrollTaskMax = st.taskMax;
+    out.scrollBusy = st.busy;
     const scroll = await framesOff(page);
     out.scrollP95 = scroll.p95;
     out.scrollMax = scroll.max;
@@ -199,14 +238,20 @@ test('thread/history-perf: 50k entries, lines appending, scroll up and ⌘F stay
     await framesOn(page);
     const t0 = Date.now();
     const app3 = hub.append(50, 100);
-    await page.keyboard.type('kumquat');
     const count = page.getByTestId('thread.find.count');
-    // capped at CAP: the old find paged the history in a page at a time (it never got there)
-    const all = await expect(count).toHaveText(/^\d+\/5\d$/, { timeout: CAP }).then(() => true, () => false);
-    out.findAllMs = Date.now() - t0;
-    out.findAllDone = all ? 1 : 0;
-    out.findCountAtEnd = Number(/\/(\d+)/.exec((await count.textContent()) ?? '')?.[1] ?? -1);
-    await app3;
+    const all = { done: false };
+    const ft = await profiled(s, 'find', async () => {
+      await page.keyboard.type('kumquat');
+      // capped at CAP: the old find paged the history in a page at a time (it never got there)
+      all.done = await expect(count).toHaveText(/^\d+\/5\d$/, { timeout: CAP }).then(() => true, () => false);
+      out.findAllMs = Date.now() - t0;
+      await app3;
+    });
+    out.findTaskP95 = ft.taskP95;
+    out.findTaskMax = ft.taskMax;
+    out.findBusy = ft.busy;
+    out.findAllDone = all.done ? 1 : 0;
+    out.findCountAtEnd = Number(/\/(\d+)/.exec((await count.textContent({ timeout: 5000 })) ?? '')?.[1] ?? -1);
     const find = await framesOff(page);
     out.findP95 = find.p95;
     out.findMax = find.max;
@@ -215,7 +260,10 @@ test('thread/history-perf: 50k entries, lines appending, scroll up and ⌘F stay
     // 4. find open on its current match: it doesn't move while lines append
     await page.waitForTimeout(1500);
     const hit = page.locator('[data-testid^="thread.entry."][data-hit]').first();
-    const hitId = (await hit.getAttribute('data-testid').catch(() => null)) ?? '';
+    const hitId = (await hit.getAttribute('data-testid', { timeout: 10_000 }).catch(() => null)) ?? '';
+    out.hitShown = hitId === '' ? 0 : 1;
+    writeFileSync(test.info().outputPath('at-hit.json'), JSON.stringify({ hitId, drawn: await drawn(page), cmds: (core.cmds() as unknown as Cmd[]).filter((c) => c.agent === 'perf').slice(-12) }, null, 2));
+    await page.screenshot({ path: test.info().outputPath('at-hit.png') });
     const h0 = await yOf(page, `[data-testid="${hitId}"]`);
     let hdrift = 0;
     const app4 = hub.append(30, 60);
@@ -234,8 +282,48 @@ test('thread/history-perf: 50k entries, lines appending, scroll up and ⌘F stay
     const jumped = await expect(page.getByTestId('thread.entry.1200')).toBeInViewport({ timeout: CAP }).then(() => true, () => false);
     out.jumpMs = Date.now() - t1;
     out.jumpDone = jumped ? 1 : 0;
+
+    // 6. architect m_26633: back to the 50 hits, ⏎ to the oldest one (each hit a page read around
+    // it), then he scrolls newer through the window with find open: the counter and the current
+    // match stay right
+    await field.fill('kumquat');
+    await expect(count).toHaveText(/^1\/5\d$/, { timeout: 10_000 });
+    const n = Number(/\/(\d+)/.exec((await count.textContent()) ?? '')?.[1] ?? 0);
+    const t2 = Date.now();
+    const wt = await profiled(s, 'walk', async () => {
+      for (let i = 1; i < n; i++) {
+        await page.keyboard.press('Enter');
+        await expect(count).toHaveText(`${String(i + 1)}/${String(n)}`, { timeout: 5000 });
+      }
+      await expect(page.getByTestId('thread.entry.500'), 'the oldest hit, shown').toBeInViewport({ timeout: 10_000 });
+    });
+    out.walkMs = Date.now() - t2;
+    out.walkTaskMax = wt.taskMax;
+    await page.getByTestId('thread.entry.500').hover();
+    const newer = await profiled(s, 'newer', async () => {
+      for (let i = 0; i < 60; i++) {
+        await page.mouse.wheel(0, 900);
+        await page.waitForTimeout(50);
+      }
+    });
+    out.newerTaskP95 = newer.taskP95;
+    out.newerTaskMax = newer.taskMax;
+    out.newerCountKept = (await count.textContent()) === `${String(n)}/${String(n)}` ? 1 : 0;
+    const shownNow = await drawn(page);
+    out.newerFirstShown = Number(shownNow.first?.split('.')[2] ?? -1);
     out.domEnd = await page.evaluate(() => document.getElementsByTagName('*').length);
     out.storeRows = await page.locator('[data-testid^="thread.entry."]').count();
+
+    // what must hold (the before ran this to its limits: find never got there, the window froze)
+    expect(out.findAllDone, 'find counts every hit of a 50k-entry thread').toBe(1);
+    expect(out.findAllMs, 'in under 5 s').toBeLessThan(5000);
+    expect(out.readDriftPx, 'the row he reads stays put while lines append').toBeLessThan(1);
+    expect(out.driftPx, 'the current match stays put while lines append').toBeLessThan(1);
+    expect(out.jumpDone, 'a hit 48,800 entries back is shown').toBe(1);
+    expect(out.jumpMs, 'in under 5 s').toBeLessThan(5000);
+    expect(out.scrollTaskMax, 'no long task while he scrolls up').toBeLessThan(50);
+    expect(out.newerCountKept, 'scrolling newer with find open keeps its counter on the oldest hit').toBe(1);
+    expect(out.newerFirstShown, 'he went newer through the window').toBeGreaterThan(500);
   } finally {
     hub.end();
     console.log('history-perf', JSON.stringify(out));

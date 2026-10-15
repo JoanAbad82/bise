@@ -30,6 +30,7 @@
 {"ev":"entry","project":"acme-1a2b3c4d","agent":"perf","entry":{"pos":35,"at_ms":1791100035000,"kind":"wake","text":"cargo test ended · rc 101 · after 3m10s","wake":{"id":3,"ev":"ended","kind":"bg","what":"cargo test","rc":101,"after_ms":190000,"tail":["test cart::total ... FAILED","test result: FAILED. 210 passed; 2 failed"],"msg":57}}}
 {"ev":"entry","project":"acme-1a2b3c4d","agent":"main","entry":{"pos":36,"at_ms":1791100035000,"kind":"wake","text":"cargo test ended · rc 101 · after 3m10s","wake":{"id":3,"ev":"ended","kind":"bg","what":"cargo test","rc":101,"after_ms":190000,"tail":["test cart::total ... FAILED","test result: FAILED. 210 passed; 2 failed"],"msg":57,"agent":"perf"}}}
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":"running the tests"}
+{"ev":"thread_hits","project":"acme-1a2b3c4d","agent":"perf","rid":7,"needle":"bench","hits":[{"pos":3,"n":1},{"pos":40,"n":2}],"upto":41}
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":""}
 {"ev":"partial","project":"acme-1a2b3c4d","agent":"perf","call":"17.0","off":0,"text":"the tests pass:\n- one"}
 {"ev":"partial","project":"acme-1a2b3c4d","agent":"perf","call":"17.0","off":21,"text":"\n- two"}

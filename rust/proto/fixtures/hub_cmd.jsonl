@@ -2,6 +2,7 @@
 {"cmd":"subscribe","project":"acme-1a2b3c4d","agent":"perf","limit":60}
 {"cmd":"unsubscribe","project":"acme-1a2b3c4d","agent":"perf"}
 {"cmd":"page","project":"acme-1a2b3c4d","agent":"perf","before":200,"limit":60}
+{"cmd":"find","project":"acme-1a2b3c4d","agent":"perf","needle":"bench","rid":7}
 {"cmd":"page","project":"acme-1a2b3c4d","agent":"perf","before":4}
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"perf","text":"look at the cold bench","mode":"now"}
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"perf","text":"and the warm one","mode":"now","cid":12}
