@@ -5,7 +5,8 @@
 // project, the project's name in place of the role. A click opens the agent full in the centre (his
 // pick), an artifact its view, a task the scheduled screen; 'all ›' the full list in the centre.
 // ARTIFACTS and SCHEDULED & WATCHING follow the thread in view (barscope.ts): a sub-agent's shows
-// only its own, its name after the head's count.
+// only its own, its name on a line under the head ('for perf'). A head's parts never meet: the
+// label gives way ('…') under '+ add' and 'all ›' (app/bar-heads).
 // Owner: amb-win. The rows' words are pure (barrows.ts).
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Act, Dot, Press, Ring, Slide, tipAttrs } from '@/ds';
@@ -27,7 +28,7 @@ import { pauseInSeconds } from '@/thread/wake';
 import { keep, useKeptScroll } from './keep';
 import { useRoute, useRouter } from './router';
 import { agentRows, archivedRows, artifactRows, capRows, scheduledRows, watchRows, type BarRow, type ProjAgent } from './barrows';
-import { barScope, inScope, scopeWords, type ScopeWords } from './barscope';
+import { barScope, inScope, scopeCountTip, scopeWords, type ScopeWords } from './barscope';
 import { FitWords } from './FitWords';
 import { DoneSign } from './Marks';
 
@@ -105,7 +106,7 @@ function Section({
   count?: number;
   summary: string;
   noFold?: boolean;
-  /** its scope's words after the count ('by perf': a sub-agent's thread, barscope.ts), their tip, its line at 0 */
+  /** its scope's words on a line under the head ('by perf': a sub-agent's thread, barscope.ts), their tip, its line at 0 */
   scope?: ScopeWords | null;
   /** the rows of its full list, when it shows a part ('all ›' stays while the full list has some) */
   full?: number;
@@ -126,14 +127,9 @@ function Section({
     <section className="app-rb-sec" data-testid={`app.right.${id}`} data-folded={shut || undefined}>
       <div className="app-rb-head" ref={head} data-folds={!noFold || undefined}>
         <Press look="app-rb-title" aria-expanded={!shut} onClick={noFold ? undefined : toggle} data-testid={`app.right.${id}.head`}>
-          <span className="app-rb-label">
+          {/* folded, the scope line goes with the rows: the count's tip says the scope (designer m_26425) */}
+          <span className="app-rb-label" {...tipAttrs(shut && scope !== null && (id === 'artifacts' || id === 'scheduled') ? scopeCountTip(id, count ?? rows.length, scope) : undefined)}>
             {`${title} · ${String(count ?? rows.length)}`}
-            {/* in the label: 8 px after the count, the fold's chevron after it */}
-            {scope !== null && (
-              <span className="app-rb-scope" {...tipAttrs(scope.tip)} data-testid={`app.right.${id}.scope`}>
-                {scope.words}
-              </span>
-            )}
           </span>
           {shut && summary !== '' && (
             <span className="app-rb-sum" data-testid={`app.right.${id}.summary`}>
@@ -149,6 +145,13 @@ function Section({
           </Act>
         )}
       </div>
+      {/* the scope's words, a line of their own under the head: on its line they ran under 'all ›'
+          with a long agent name (his bug, main m_26417); a long name ends in '…'; folded, it goes */}
+      {!shut && scope !== null && (
+        <div className="app-rb-scope" {...tipAttrs(scope.tip)} data-testid={`app.right.${id}.scope`}>
+          {scope.words}
+        </div>
+      )}
       {/* a scoped head at 0 rows: one text-3 line ('perf made nothing yet', designer m_25031) */}
       {!shut && rows.length === 0 && scope !== null && (
         <div className="app-rb-rows">

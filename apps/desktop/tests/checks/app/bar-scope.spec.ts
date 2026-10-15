@@ -5,7 +5,7 @@
 //   - bise's thread: every project's rows, no scope words;
 //   - storefront's main: storefront's rows only, no scope words;
 //   - perf's thread (a click on its row, the bar follows): only perf's artifact, task and alarm,
-//     'by perf' / 'for perf' after the counts with their tips, 'all ›' opens storefront's full list;
+//     'by perf' / 'for perf' on a line under the heads, with their tips, 'all ›' opens storefront's full list;
 //   - bench's thread: 'ARTIFACTS · 0 by bench', 'bench made nothing yet', 'all ›' still there; its alarm;
 //   - AGENTS keeps every agent at each level.
 // Shots: bar-scope-<theme>-<bise|main|perf|bench>.png. Owner: amb-win.
@@ -74,7 +74,7 @@ for (const theme of ['light', 'dark']) {
       const { page } = s;
       const ids = (sec: string) =>
         page.locator(`[data-testid="app.right.${sec}"] .app-rb-row[data-testid]`).evaluateAll((es) => es.map((e) => e.getAttribute('data-testid') ?? ''));
-      // a head's 'NAME · count', without its scope words (they sit in the label, after the count)
+      // a head's 'NAME · count' (its scope words sit on their own line under it)
       const head = (sec: string) => () => page.getByTestId(`app.right.${sec}.head`).locator('.app-rb-label').evaluate((el) => el.firstChild?.textContent ?? '');
       const shot = async (name: string) => {
         await page.mouse.move(1, 400);
@@ -112,18 +112,17 @@ for (const theme of ['light', 'dark']) {
       // AGENTS keeps every agent
       await expect(page.getByTestId('app.right.agent.bench')).toBeVisible();
       await expect(page.getByTestId('app.right.agent.search')).toBeVisible();
-      // the scope words sit 8 px after the count, sans 12, text-3, lowercase
-      const gap = await page.getByTestId('app.right.artifacts.head').evaluate((el) => {
-        // the count's own text, not the label (the scope words and the chevron are in it)
-        const range = document.createRange();
-        const text = el.querySelector('.app-rb-label')?.firstChild;
-        if (text) range.selectNodeContents(text);
-        const l = range.getBoundingClientRect();
-        const w = el.querySelector('.app-rb-scope');
+      // the scope words: a line under the head, on the label's left edge, sans 12, text-3, lowercase
+      // (bar-heads, main m_26417: after the count they ran under 'all ›'; app/bar-heads checks the boxes)
+      const gap = await page.getByTestId('app.right.artifacts').evaluate((sec) => {
+        const l = sec.querySelector('.app-rb-label')?.getBoundingClientRect();
+        const h = sec.querySelector('.app-rb-head')?.getBoundingClientRect();
+        const w = sec.querySelector('.app-rb-scope');
         const r = w?.getBoundingClientRect();
-        return { gap: Math.round((r?.left ?? 0) - l.right), size: w === null ? '' : getComputedStyle(w).fontSize, caps: w === null ? '' : getComputedStyle(w).textTransform };
+        return { left: Math.round((r?.left ?? 0) + 8 - (l?.left ?? 0)), under: (r?.top ?? 0) >= (h?.bottom ?? 0) - 0.5, size: w === null ? '' : getComputedStyle(w).fontSize, caps: w === null ? '' : getComputedStyle(w).textTransform };
       });
-      expect(gap.gap, 'the scope words, 8 px after the count').toBe(8);
+      expect(gap.left, "the scope words on the label's left edge").toBe(0);
+      expect(gap.under, 'the scope words under the head').toBe(true);
       expect(gap.size).toBe('12px');
       expect(gap.caps).not.toBe('uppercase');
       await shot('perf');

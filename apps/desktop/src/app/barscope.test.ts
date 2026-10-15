@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { barScope, inScope, scopeWords } from './barscope';
+import { barScope, inScope, scopeCountTip, scopeWords } from './barscope';
 
 describe("the right bar's scope (main m_25024, designer m_25031)", () => {
   it("bise's thread: every project, no filter, no words", () => {
@@ -35,6 +35,15 @@ describe("the right bar's scope (main m_25024, designer m_25031)", () => {
       tip: "only perf's scheduled tasks and alarms · all › shows storefront's",
       empty: 'nothing wakes perf',
     });
+  });
+  it("a folded scoped head's count says the scope (designer m_26425)", () => {
+    const s = barScope({ screen: 'thread', project: 'shop', agent: 'perf' }, 'shop');
+    const art = scopeWords(s, 'artifacts', 'storefront');
+    const sch = scopeWords(s, 'scheduled', 'storefront');
+    if (art === null || sch === null) throw new Error('scoped');
+    expect(scopeCountTip('scheduled', 0, sch)).toBe('0 scheduled for perf');
+    expect(scopeCountTip('artifacts', 1, art)).toBe('1 artifact by perf');
+    expect(scopeCountTip('artifacts', 3, art)).toBe('3 artifacts by perf');
   });
   it("on bise's thread an agent's route never scopes the bar (the bar is every project's)", () => {
     expect(barScope({ screen: 'thread', project: 'home', agent: 'perf' }, '')).toEqual({ level: 'bise' });

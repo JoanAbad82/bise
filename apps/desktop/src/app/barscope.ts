@@ -26,7 +26,7 @@ export function inScope(scope: BarScope, agent: string): boolean {
   return scope.level !== 'agent' || scope.agent === agent;
 }
 
-/** A scoped head's words (designer m_25031): after the count, their tip, the line at 0 rows. */
+/** A scoped head's words (designer m_25031): a line under the head, their tip, the line at 0 rows. */
 export interface ScopeWords {
   readonly words: string;
   readonly tip: string;
@@ -34,7 +34,8 @@ export interface ScopeWords {
 }
 
 /**
- * The words a section head says of its scope (designer m_25031): on a sub-agent's thread 'by perf'
+ * The words a section head says of its scope (designer m_25031), on a line of their own under it
+ * (bar-heads, designer m_26425): on a sub-agent's thread 'by perf'
  * (ARTIFACTS), 'for perf' (SCHEDULED & WATCHING: what wakes it); none on a project's main or bise's
  * thread, the bar's top says it. `projectName`: whose full list 'all ›' opens. Pure.
  */
@@ -44,4 +45,13 @@ export function scopeWords(scope: BarScope, section: 'artifacts' | 'scheduled', 
   return section === 'artifacts'
     ? { words: `by ${a}`, tip: `only what ${a} made · all › shows ${projectName}'s`, empty: `${a} made nothing yet` }
     : { words: `for ${a}`, tip: `only ${a}'s scheduled tasks and alarms · all › shows ${projectName}'s`, empty: `nothing wakes ${a}` };
+}
+
+/**
+ * A folded scoped head's count tip (designer m_26425): the scope line folds with the rows, the
+ * count says the scope instead ('2 scheduled for perf', '1 artifact by perf'). Pure.
+ */
+export function scopeCountTip(section: 'artifacts' | 'scheduled', n: number, scope: ScopeWords): string {
+  const what = section === 'scheduled' ? 'scheduled' : n === 1 ? 'artifact' : 'artifacts';
+  return `${String(n)} ${what} ${scope.words}`;
 }

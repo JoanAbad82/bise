@@ -650,8 +650,12 @@ body:has(.app-shell) {
 }
 /* each part of a head sits in the head's own 28 px line, so its text is centred in the hover box
    (his m_22731: the label's 'font' shorthand reset its line to normal: the text sat at the box's top) */
+/* at a narrow bar the label gives way ('…') under '+ add' and 'all ›', never runs under them */
 .app-rb-label {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font: 600 var(--t-11) / var(--h-row-tight) var(--font-ui);
   letter-spacing: 0.04em;
 }
@@ -683,12 +687,17 @@ body:has(.app-shell) {
   outline: 2px solid var(--c-focus);
   outline-offset: -2px;
 }
-/* a scoped head's words, 8 px after the count: lowercase sans 12 text-3 (designer m_25031) */
+/* a scoped head's words, a line of their own under the head (his bug, main m_26417: after the
+   count they ran under 'all ›'): lowercase sans 12 text-3 (designer m_25031), the rows' left edge,
+   one line, a long name ends in '…' */
 .app-rb-scope {
-  margin-left: var(--s-2);
+  margin: calc(-1 * var(--gap-tight)) 0 var(--gap-tight);
+  padding: 0 var(--pad-row-x);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--c-text-3);
-  font: 400 var(--t-12) / var(--h-row-tight) var(--font-ui);
-  letter-spacing: 0;
+  font: 400 var(--t-12) / var(--s-5) var(--font-ui);
 }
 .app-rb-none,
 .app-rb-none:hover {
