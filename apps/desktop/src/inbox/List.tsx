@@ -116,12 +116,13 @@ export function InboxView({ cards, records, answered, onEnd, names, projects, po
         <div className="ip-filters">
           <Dropdown label={f.project === '' ? 'all projects' : (names[f.project] ?? f.project)} testId="inbox.projects"
             groups={[
-              { id: 'projects', rows: [
+              // 800: each part under its head, two choices (designer m_26260); wide, no head
+              { id: 'projects', head: 'projects', look: 'ip-heads-narrow', rows: [
                 { id: 'p:', name: 'all projects', current: f.project === '', testId: 'inbox.projects.all' },
                 ...projects.map((p) => ({ id: `p:${p.project}`, name: p.name !== '' ? p.name : p.project, current: f.project === p.project, testId: `inbox.projects.${p.project}` })),
               ] },
               // 800: the agents and 'withdrawn' come in here (past.css shows them only narrow)
-              { id: 'agents', look: 'ip-narrow-only', rows: [
+              { id: 'agents', head: 'agents', look: 'ip-narrow-only', rows: [
                 { id: 'a:', name: 'all agents', current: f.agent === '', testId: 'inbox.projects.agents.all' },
                 ...askers.map((a) => ({ id: `a:${a}`, name: shownName(a), current: f.agent === a, testId: `inbox.projects.agent.${a}` })),
                 { id: 'withdrawn', name: 'withdrawn', current: f.state === 'withdrawn', testId: 'inbox.projects.withdrawn' },

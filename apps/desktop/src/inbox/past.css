@@ -56,6 +56,8 @@
 .ip-d-go { align-self: flex-start; padding: 0; border: 0; background: none; font: var(--t-13) var(--font-ui); color: var(--c-text); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 
 .ip-narrow-only { display: none; }
+/* the projects menu's 'projects' head shows only at 800, where the agents join it under theirs */
+.ip-heads-narrow > .b-picker-ghead { display: none; }
 /* 800: the agents into the projects menu, 'withdrawn' too; the rows drop the project and the
    'where' whole, never half (the detail keeps them) */
 @media (max-width: 900px) {
@@ -64,5 +66,6 @@
   .ip-search { flex-basis: 160px; }
   .ip-wide-only, .ip-filters .ip-wide-only, .ip-proj, .ip-where { display: none; }
   .ip-narrow-only { display: revert; }
+  .ip-heads-narrow > .b-picker-ghead { display: flex; }
   span.ip-narrow-only { display: inline; }
 }
