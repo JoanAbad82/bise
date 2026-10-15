@@ -12,6 +12,7 @@
 // The thread's side (⏎ on an empty composer, c copies, esc cancels) is thread/empty-enter. That the
 // stopped agents' turns really go on after a real sign-in is the core's and the hub's. Owner: amb-home.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { common, settings } from '../../../src/proto/words.gen';
 
 type Cmd = { cmd?: string; id?: string };
 
@@ -58,8 +59,8 @@ test('settings/sign-in-expired: the expired sign-in says who waits, signs in aga
     const button = page.getByTestId('settings.account.chatgpt');
 
     await test.step("settings › models: 'your sign-in expired: perf, main wait', 'sign in again'; the inbox holds the item", async () => {
-      await expect(row).toContainText('your sign-in expired: perf, main wait', { timeout: 10_000 });
-      await expect(button).toHaveText('sign in again');
+      await expect(row).toContainText(settings.expired_wait({ names: 'perf, main' }), { timeout: 10_000 });
+      await expect(button).toHaveText(settings.sign_in_again);
       await expect(page.getByTestId('inbox.block')).toContainText('sign', { timeout: 5000 });
       await page.screenshot({ path: test.info().outputPath('expired.png') });
     });
@@ -68,7 +69,7 @@ test('settings/sign-in-expired: the expired sign-in says who waits, signs in aga
       await button.click();
       expect(await core.waitCmd((c) => (c as Cmd).cmd === 'sign_in', 3000)).toMatchObject({ cmd: 'sign_in', id: 'chatgpt' });
       await core.send({ ev: 'signing', id: 'chatgpt', url: 'https://auth.example.test/fake-sign-in' } as never);
-      await expect(page.getByTestId('settings.signing')).toContainText('waiting for you to sign in to ChatGPT in your browser…', { timeout: 3000 });
+      await expect(page.getByTestId('settings.signing')).toContainText(common.signing_wait({ label: 'ChatGPT' }), { timeout: 3000 });
       await expect(page.getByTestId('settings.signing.copy')).toBeVisible();
       await page.screenshot({ path: test.info().outputPath('signing.png') });
     });
@@ -77,7 +78,7 @@ test('settings/sign-in-expired: the expired sign-in says who waits, signs in aga
       await core.send(accounts('signed_in') as never);
       await core.send(projects([]) as never);
       await core.send({ ev: 'agents', project: P, agents: [agent('main', 'working'), agent('perf', 'working')] } as never);
-      await expect(page.getByTestId('settings.account.chatgpt.ok')).toHaveText('✓ signed in', { timeout: 3000 });
+      await expect(page.getByTestId('settings.account.chatgpt.ok')).toHaveText(settings.signed_in, { timeout: 3000 });
       await expect(page.getByTestId('settings.signing')).toHaveCount(0);
       await expect(row).not.toContainText('expired');
       await expect(page.getByTestId('inbox.block')).toHaveCount(0);

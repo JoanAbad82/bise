@@ -12,6 +12,7 @@
 // Owner: amb-home.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { settings } from '../../../src/proto/words.gen';
 
 type Cmd = { cmd?: string; to?: string };
 const HOME = 'bise-home-00000000';
@@ -66,14 +67,14 @@ test('settings/keychain: /keychain on moves the keys (scripted core), the keys p
       const toggle = page.getByTestId('settings.keychain.toggle');
       await expect(toggle).toBeVisible({ timeout: 5000 });
       await expect(toggle).toHaveAttribute('aria-checked', 'false');
-      await expect(page.getByTestId('settings.keychain.sub')).toHaveText("off: they're in files in ~/.bise. same switch as /keychain in the terminal.");
+      await expect(page.getByTestId('settings.keychain.sub')).toHaveText(settings.keychain_off);
       await page.getByTestId('settings.keychain').scrollIntoViewIfNeeded();
       await shoot(page, 'keychain-off');
     });
 
     await test.step("the move: 'moving them…' with the switch waiting, then on with its lines", async () => {
       await core.send({ ev: 'keychain', store: 'file', moving: true } as never);
-      await expect(page.getByTestId('settings.keychain.sub')).toHaveText('moving them…', { timeout: 3000 });
+      await expect(page.getByTestId('settings.keychain.sub')).toHaveText(settings.keychain_moving, { timeout: 3000 });
       await expect(page.getByTestId('settings.keychain.toggle')).toHaveAttribute('aria-disabled', 'true');
       await core.send({ ev: 'keychain', store: 'keychain', moving: false, lines: [MOVED] } as never);
       const toggle = page.getByTestId('settings.keychain.toggle');

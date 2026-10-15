@@ -35,8 +35,6 @@ crate::words! { settings:
     key_add = "add a key";
     /// a model waits for its provider's setup
     model_needs(model, provider) = "{model} needs {provider}: sign in or add its key here, then it's set.";
-    /// a sign-in under way in his browser
-    signing_wait(label) = "waiting for you to sign in to {label} in your browser…";
     /// a sign-in under way: copy its link
     signing_copy = "copy the link";
     /// a sign-in under way: cancel it

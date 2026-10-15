@@ -14,9 +14,10 @@ import { settings } from '@/proto/words.gen';
 
 /** A template's words with a node in each hole (a sha drawn as Sha): the holes are filled with marks, then the marks give way to the nodes. */
 export function withNodes<K extends string>(words: (a: Record<K, string>) => string, nodes: Record<K, ReactNode>): ReactNode {
-  const marks = Object.fromEntries(Object.keys(nodes).map((k) => [k, `\u0000${k}\u0000`])) as Record<K, string>;
+  // a private-use character marks a hole: never in a word
+  const marks = Object.fromEntries(Object.keys(nodes).map((k) => [k, `\uE000${k}\uE000`])) as Record<K, string>;
   return words(marks)
-    .split(/\u0000(\w+)\u0000/)
+    .split(/\uE000(\w+)\uE000/)
     .map((part, i) => (i % 2 === 0 ? part : <Fragment key={i}>{nodes[part as K]}</Fragment>));
 }
 

@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import type { Account, AppCmd } from '@/proto';
 import { Act, Button, Chip, Field, Group, Help, type GroupItem } from '@/ds';
-import { settings } from '@/proto/words.gen';
+import { common, settings } from '@/proto/words.gen';
 
 /**
  * The expired ChatGPT sign-in (bar V14 / S28 / L2): the agents its expiry stopped (the hub's
@@ -182,7 +182,7 @@ export function Accounts({ accounts, send, keyError = null, want = null, signin 
               }
             }}
           >
-            <Help>{settings.signing_wait({ label })}</Help>
+            <Help>{common.signing_wait({ label })}</Help>
             <span className="settings-row-acts">
               {url !== null && copy && (
                 <Act onClick={() => { copy(url); }} testId="settings.signing.copy">

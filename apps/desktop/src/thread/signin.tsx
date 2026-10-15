@@ -7,9 +7,7 @@
 // Owner: amb-home.
 import { useCallback, useEffect, useState } from 'react';
 import { useSigning, useStore } from '@/store';
-
-/** The TUI's waiting words (resign.rs WAITING). */
-export const WAITING = 'waiting for you to sign in to ChatGPT in your browser…';
+import { common } from '@/proto/words.gen';
 
 /** How long 'c copied' shows (resign.rs COPIED_FOR). */
 export const COPIED_MS = 2000;
@@ -54,7 +52,7 @@ export function useThreadSignIn(waits: boolean): {
 export function SignInLine({ copied }: { copied: boolean }) {
   return (
     <div className="th-signin" data-testid="thread.signin" aria-live="polite">
-      <span>{WAITING}</span>
+      <span>{common.signing_wait({ label: 'ChatGPT' })}</span>
       <span className="th-signin-keys" data-testid="thread.signin.keys">
         {signInKeys(copied)}
       </span>

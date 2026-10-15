@@ -210,8 +210,6 @@ export const settings = {
   key_add: "add a key",
   /** a model waits for its provider's setup */
   model_needs: (a: { model: string | number; provider: string | number }): string => String(a.model) + " needs " + String(a.provider) + ": sign in or add its key here, then it's set.",
-  /** a sign-in under way in his browser */
-  signing_wait: (a: { label: string | number }): string => "waiting for you to sign in to " + String(a.label) + " in your browser…",
   /** a sign-in under way: copy its link */
   signing_copy: "copy the link",
   /** a sign-in under way: cancel it */

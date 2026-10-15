@@ -11,6 +11,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { test, expect } from '../../harness';
+import { settings } from '../../../src/proto/words.gen';
 import { launchOn, realWorld, tui, tuiReady, type Tui } from '../world';
 
 const T = {
@@ -90,7 +91,7 @@ test("settings/approvals: the mode, the rules in the TUI's words, remove asks in
       note('keep-row', i);
       expect.soft(i, 'the rule has a row').toBeGreaterThanOrEqual(0);
       await page.locator(T.rule(i, 'remove')).click({ timeout: 5000 });
-      await expect.soft(page.getByText('remove it?'), 'it asks inline').toBeVisible({ timeout: 5000 });
+      await expect.soft(page.getByText(settings.rule_remove_ask), 'it asks inline').toBeVisible({ timeout: 5000 });
       await page.locator(T.rule(i, 'keep')).click({ timeout: 5000 });
       await expect.soft(page.locator(T.rules), 'keep: still there').toContainText(`check-${n}`);
       expect.soft(readFileSync(file, 'utf8'), 'keep: still in the file').toContain(keepPat);

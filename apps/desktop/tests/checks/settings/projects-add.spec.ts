@@ -17,6 +17,7 @@
 // That its agents really work in that folder is the core's (S11, ambient_setup_e2e); qa-flows runs
 // setup/workspace on the real core. Owner: amb-home.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { settings } from '../../../src/proto/words.gen';
 
 const HOME = 'bise-home-00000000';
 const SHOP = 'shop-5e6f7a8b';
@@ -72,7 +73,7 @@ test('settings/projects-add: he picks a folder with no terminal, it becomes a pr
     await expect(page.getByTestId('settings.add.found').locator('.b-group')).toHaveCount(0);
     await page.screenshot({ path: test.info().outputPath('add-sheet-looking.png') });
     await core.send(FOUND as never);
-    await expect(scan).toHaveText('found in your folders · 2');
+    await expect(scan).toHaveText(settings.scan_found({ n: 2 }));
     await expect(page.getByTestId('settings.add.found')).toContainText('/nowhere/code/blog · git · today');
 
     // the frame for designer: blog ticked, the toggle on, light then dark
@@ -93,7 +94,7 @@ test('settings/projects-add: he picks a folder with no terminal, it becomes a pr
     await expect(go, 'the picked folder is in the sheet').toHaveText('add shop');
     await go.click();
     expect(await core.waitCmd((c) => c.cmd === 'project_add', 3000)).toMatchObject({ cmd: 'project_add', path: PICKED });
-    await expect(page.getByTestId('settings.add.say'), 'add says what it does while the core works').toHaveText('adding shop… its main starts there');
+    await expect(page.getByTestId('settings.add.say'), 'add says what it does while the core works').toHaveText(settings.adding_one({ name: 'shop' }));
 
     // the core adds it: its row in the sidebar, its bise there
     await core.send({ ev: 'projects', projects: [home, shop] } as never);
@@ -133,7 +134,7 @@ test("settings/projects-add: the core's refusal and its broken state show in pla
     await core.waitCmd((c) => c.cmd === 'project_add', 3000);
     await core.send({ ev: 'error', cmd: 'project_add', text: '/nowhere/not-here is not a folder' } as never);
     const say = page.getByTestId('settings.add.say');
-    await expect(say).toHaveText("▲ couldn't add not-here: /nowhere/not-here is not a folder");
+    await expect(say).toHaveText(settings.add_failed({ names: 'not-here', why: '/nowhere/not-here is not a folder' }));
     await expect(go, 'the button works again').toBeEnabled();
     await expect(page.getByTestId('settings.add')).toBeVisible();
 

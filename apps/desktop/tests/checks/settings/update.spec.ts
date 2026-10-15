@@ -11,6 +11,7 @@
 // Owner: amb-home.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { settings } from '../../../src/proto/words.gen';
 
 const A = '20b1044e7d1c55aa0aaaaaaaaaaaaaaaaaaaaaaa';
 const B = '3f9a2c1d0be63ab90bbbbbbbbbbbbbbbbbbbbbbb';
@@ -62,11 +63,12 @@ for (const size of SIZES) {
           await shoot(page, `update-${name}-${w}`);
           return;
         }
+        const [a, b] = [A.slice(0, 7), B.slice(0, 7)];
         const words: Record<string, [string, string]> = {
-          ready: ['a new build is ready', '3f9a2c1 · you run 20b1044'],
-          current: ['✓ up to date', 'you run 3f9a2c1, the newest build'],
-          failed: ["▲ couldn't update to 3f9a2c1", "you're still on 20b1044. nothing is lost."],
-          test: ['updates come from the try', 'this app runs on a test home, not yours'],
+          ready: [settings.update_ready, settings.update_ready_sub({ to: b, live: a })],
+          current: [settings.update_current, settings.update_current_sub({ live: b })],
+          failed: [`▲ ${settings.update_failed({ to: b })}`, settings.update_still_on({ live: a })],
+          test: [settings.update_test, settings.update_test_sub],
         };
         const [t, sub] = words[name] ?? ['', ''];
         await expect.poll(async () => flat(await label.textContent()), { timeout: 5000, message: 'the row' }).toBe(t);
@@ -77,8 +79,8 @@ for (const size of SIZES) {
           s.app.process().stdout?.on('data', (d: Buffer) => said.push(String(d)));
           await page.getByTestId('settings.update.restart').click();
           await expect.poll(() => said.join(''), { timeout: 5000, message: 'swapped at once, back on settings › general' }).toContain('bise-desktop: app swap settings/general');
-          await expect.poll(async () => flat(await label.textContent()), { timeout: 2000 }).toBe('restarting on 3f9a2c1…');
-          expect(flat(await row.textContent())).toContain('the window comes back in a moment. your agents keep running.');
+          await expect.poll(async () => flat(await label.textContent()), { timeout: 2000 }).toBe(settings.update_restarting({ to: B.slice(0, 7) }));
+          expect(flat(await row.textContent())).toContain(settings.update_restarting_sub);
           await shoot(page, `update-restarting-${w}`);
         }
         if (name === 'failed') {

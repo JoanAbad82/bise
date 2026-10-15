@@ -1447,13 +1447,6 @@
     "one": null,
     "text": "copy the link"
   },
-  "settings.signing_wait": {
-    "args": [
-      "label"
-    ],
-    "one": null,
-    "text": "waiting for you to sign in to {label} in your browser…"
-  },
   "settings.theme_dark": {
     "args": [],
     "one": null,
