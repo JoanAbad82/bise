@@ -2,7 +2,8 @@
 // box the frame gives it, the right column at 55% beside its maker's thread (or the whole width
 // under 1000 px, and the centre route artifacts/<p>/<id> until the frame wires the column). Its
 // head (title, version menu, '↗ browser', ⋯, ✕), then the page from the pages server, 16 px in on
-// a 3% backdrop. A link inside the page goes to his browser (the shell's guard). The composer's
+// a 3% backdrop. A link inside the page goes to his browser (the shell's guard, main's
+// framelink.ts); one that names another artifact opens it here (links.ts). The composer's
 // words come from maker.ts. Owner: amb-kit (the list, the model); task-panel (the open view).
 import { ImageView } from './ImageView';
 import { isImageSrc } from './zoom';
@@ -22,6 +23,7 @@ import { useAllArtifacts } from './hooks';
 import { kindOf, pathOf, versions } from './model';
 import { putInDraft } from './put';
 import { useAboutWords } from './maker';
+import { takeVersion, useArtifactLinks } from './links';
 import './artifacts.css';
 
 /** What the window's bridge offers here (each one absent in a plain browser or a test: its item hides). */
@@ -198,7 +200,9 @@ export function ArtifactOpen({ project, id, onClose, composer = true, lead }: Ar
   const versionsAt = useRef<HTMLButtonElement>(null);
   const moreAt = useRef<HTMLButtonElement>(null);
   const [at] = useState(() => takeAnchor(`${project}/${id}`));
-  const [v, setV] = useState<number | null>(null);
+  const [v, setV] = useState<number | null>(() => takeVersion(`${project}/${id}`));
+  // a link in the page that names another artifact: the panel opens it (links.ts)
+  useArtifactLinks(project);
   // the live line he moved away from (another version picked): it goes; a new line shows again
   const [goneLine, setGoneLine] = useState<string | null>(null);
   const [now] = useState(() => Date.now());

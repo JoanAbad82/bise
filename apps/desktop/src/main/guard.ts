@@ -1,20 +1,28 @@
 // The guard on every page (lead m_9585, qa-type m_9583: a dropped file
 // opened a new normal window on his screen). For the shipped app (security)
 // and for test runs (nothing in his face):
-//   - no page ever opens a window: setWindowOpenHandler denies all; an http,
-//     https or mailto link goes through openLink (his browser; a stdout line
-//     in test mode), anything else is dropped;
-//   - no page ever leaves the app's own page: will-navigate and
-//     will-frame-navigate away from it are prevented (a dropped file's file://,
-//     a link without a handler), web links again through openLink; the one
-//     exception is a subframe on the pages server (http://127.0.0.1:<port>,
-//     amb-kit m_11871: one artifact open in the window, in a sandboxed
-//     iframe), never the main frame; a link that leaves it goes to openLink;
+//   - no page ever opens a window: setWindowOpenHandler denies all (target=_blank,
+//     ⌘-click, a middle click, window.open);
+//   - no page ever leaves the app's own page: will-navigate, will-frame-navigate
+//     and will-redirect away from it are prevented (a dropped file's file://,
+//     a link without a handler), web links through openLink (his browser; a
+//     stdout line in test mode; anything but http, https, mailto dropped);
+//   - a subframe (one artifact open in the window, amb-kit m_11871) shows only
+//     the pages server (http://127.0.0.1:<port>); what a link in it does is
+//     framelink.ts's one rule (art-links): its own files stay, another
+//     artifact opens in the panel (IPC.artifactLink to that window), the rest
+//     goes to openLink. For the guard to see a frame's navigation at all, the
+//     window's CSP lets frames ask for any web, mailto or artifact: url
+//     (renderer/index.html): Chromium's CSP check failed it before the guard
+//     and left an error page in the panel (his blank page). The second wall:
+//     session.webRequest cancels any subframe request off the pages server;
 //   - no <webview>.
 // In test mode also: a window that isn't offscreen is destroyed at birth, and
 // every window's show/showInactive/focus are no-ops, with a 'show' that still
 // happens destroying the window (the last fence).
-import { app, webFrameMain, type BrowserWindow, type WebContents } from 'electron';
+import { app, session, webFrameMain, type BrowserWindow, type WebContents, type WebFrameMain } from 'electron';
+import { IPC, TEST_WINDOW_OPEN_HOOK } from '../shared/api';
+import { frameLink, isPagesFrame, type FrameLink } from './framelink';
 import { openLink } from './ipc';
 
 export interface OwnPage {
@@ -46,16 +54,6 @@ export function isOwnPage(url: string, own: OwnPage): boolean {
   return false;
 }
 
-/** Pure: may a subframe show `url`? Only the local pages server: http on 127.0.0.1, any port. */
-export function isPagesFrame(url: string): boolean {
-  try {
-    const u = new URL(url);
-    return u.protocol === 'http:' && u.hostname === '127.0.0.1' && u.username === '' && u.password === '';
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Put in an artifact's frame (his ask, main m_21531; designer m_21535): an esc the page didn't use
  * (its own field or menu prevents it) tells the window, which closes the artifact (ArtifactView's
@@ -69,25 +67,48 @@ export const ESC_FORWARD = `(() => {
   }, true);
 })();`;
 
+/** What a link in an artifact's frame does (framelink.ts): another artifact to this window, the rest to openLink. */
+function follow(wc: WebContents, link: FrameLink, testMode: boolean): void {
+  if (link.do === 'artifact') {
+    if (!wc.isDestroyed()) wc.send(IPC.artifactLink, link.v === undefined ? { id: link.id } : { id: link.id, v: link.v });
+  } else if (link.do === 'out') {
+    void openLink(link.url, testMode);
+  }
+}
+
+/** Who started a frame's navigation: null for the app's own page (the panel setting its src) or none known. */
+function starter(initiator: WebFrameMain | null | undefined, own: OwnPage): string | null {
+  const from = initiator?.url;
+  return from === undefined || from === '' || isOwnPage(from, own) ? null : from;
+}
+
 function guardContents(wc: WebContents, own: OwnPage, testMode: boolean): void {
+  // target=_blank, ⌘-click, a middle click, window.open: never a window (the app's own page opens none)
   wc.setWindowOpenHandler(({ url }) => {
-    void openLink(url, testMode);
+    follow(wc, frameLink(url, null, true), testMode);
     return { action: 'deny' };
   });
-  const stay = (e: { preventDefault: () => void; isMainFrame?: boolean }, url: string): void => {
-    if (isOwnPage(url, own)) return;
-    if (e.isMainFrame === false && isPagesFrame(url)) return;
+  type Nav = { preventDefault: () => void; url: string; isMainFrame: boolean; initiator?: WebFrameMain | null };
+  const stay = (e: Nav): void => {
+    if (isOwnPage(e.url, own)) return;
+    if (e.isMainFrame) {
+      e.preventDefault();
+      void openLink(e.url, testMode);
+      return;
+    }
+    const link = frameLink(e.url, starter(e.initiator, own));
+    if (link.do === 'stay') return;
     e.preventDefault();
-    void openLink(url, testMode);
+    follow(wc, link, testMode);
   };
   wc.on('will-navigate', (e) => {
-    stay(e, e.url);
+    stay(e);
   });
   wc.on('will-frame-navigate', (e) => {
-    stay(e, e.url);
+    stay(e);
   });
   wc.on('will-redirect', (e) => {
-    stay(e, e.url);
+    stay(e);
   });
   wc.on('will-attach-webview', (e) => {
     e.preventDefault();
@@ -98,6 +119,16 @@ function guardContents(wc: WebContents, own: OwnPage, testMode: boolean): void {
     const f = webFrameMain.fromId(pid, rid);
     if (f === undefined || !isPagesFrame(f.url)) return;
     f.executeJavaScript(ESC_FORWARD).catch(() => undefined);
+  });
+}
+
+/**
+ * The second wall (architect m_26370), whatever the guard decided: a subframe's request that
+ * isn't the pages server's is cancelled, so no outside site ever shows inside a window.
+ */
+function fenceFrames(): void {
+  session.defaultSession.webRequest.onBeforeRequest((d, done) => {
+    done({ cancel: d.resourceType === 'subFrame' && !isPagesFrame(d.url) });
   });
 }
 
@@ -119,9 +150,16 @@ function fenceWindow(win: BrowserWindow): void {
 
 /** Before any window: every page of the app is guarded from birth. */
 export function installGuard(own: OwnPage, testMode: boolean): void {
+  // the harness replaces each page's window-open handler with its own: it runs this one too
+  if (testMode) {
+    (globalThis as unknown as Record<string, unknown>)[TEST_WINDOW_OPEN_HOOK] = (wc: WebContents, url: string): void => {
+      follow(wc, frameLink(url, null, true), testMode);
+    };
+  }
   app.on('web-contents-created', (_e, wc) => {
     guardContents(wc, own, testMode);
   });
+  void app.whenReady().then(fenceFrames);
   if (testMode) {
     app.on('browser-window-created', (_e, win) => {
       fenceWindow(win);

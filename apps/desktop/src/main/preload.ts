@@ -5,7 +5,7 @@
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
-import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type AppSwapResult, type AppUpdate, type BiseApi, type CrashReport, type CapsuleState, type MenuAction, type NotifyAuth, type Surface, type TermOpened, type UpdateInfo, type UpdateState } from '../shared/api';
+import { HOME_ARG, IPC, OFFSCREEN_ARG, SURFACE_ARG, TEST_ENV, type AppSwapResult, type AppUpdate, type ArtifactLink, type BiseApi, type CrashReport, type CapsuleState, type MenuAction, type NotifyAuth, type Surface, type TermOpened, type UpdateInfo, type UpdateState } from '../shared/api';
 import { argValue } from './args';
 import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
 import { coreBridge } from './core/bridge';
@@ -24,6 +24,7 @@ interface Pushed {
   [IPC.fullScreen]: boolean;
   [IPC.notifyState]: NotifyAuth;
   [IPC.route]: string;
+  [IPC.artifactLink]: ArtifactLink;
   [IPC.termData]: { id: string; bytes: Uint8Array };
   [IPC.termExit]: { id: string; code: number | null };
   [IPC.updateState]: UpdateState;
@@ -173,6 +174,7 @@ const api: BiseApi = {
     ipcRenderer.send(IPC.openWindow, route);
   },
   onRoute: (listener) => listen(IPC.route, listener),
+  onArtifactLink: (listener) => listen(IPC.artifactLink, listener),
   onFullScreen: (listener) => {
     const off = listen(IPC.fullScreen, listener);
     void ipcRenderer.invoke(IPC.fullScreen).then((full: unknown) => {

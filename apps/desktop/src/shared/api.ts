@@ -158,6 +158,11 @@ export interface BiseApi {
   /** Main asks this window to go to a route (openWindow while it was open); returns the unsubscribe. */
   readonly onRoute: (listener: (route: string) => void) => () => void;
   /**
+   * A link in this window's artifact frame names another artifact (an `artifact:<id>[@vN]`, the
+   * pages server's /a/<id>/… or /p/<id>, framelink.ts): the panel opens it. Returns the unsubscribe.
+   */
+  readonly onArtifactLink: (listener: (link: ArtifactLink) => void) => () => void;
+  /**
    * This window in macOS full screen or not: called at once with the state now, then on every
    * enter / leave (lead m_15020: macOS hides the lights in full screen, so the sidebar's 40 px
    * room for them goes). Returns the unsubscribe.
@@ -170,6 +175,12 @@ export interface BiseApi {
 }
 
 /** What open answers: the shell's id and, for a shell that was already running, its screen now. */
+/** Another artifact a link in a window's artifact frame names (main's framelink.ts): its id, and its version when the link says one. */
+export interface ArtifactLink {
+  readonly id: string;
+  readonly v?: number;
+}
+
 export type TermOpened = { readonly id: string; readonly screen: Uint8Array | null } | { readonly error: string };
 
 /**
@@ -366,6 +377,8 @@ export const IPC = {
   fullScreen: 'bise:full-screen',
   openWindow: 'bise:open-window',
   route: 'bise:route',
+  /** main -> a window: a link in its artifact's frame names another artifact (guard.ts, framelink.ts) */
+  artifactLink: 'bise:artifact-link',
   quit: 'bise:quit',
   termOpen: 'bise:term-open',
   termWrite: 'bise:term-write',
@@ -508,6 +521,11 @@ export const TEST_CLIP_FILE_ENV = 'BISE_DESKTOP_TEST_CLIPBOARD_FILE';
  * can't be read or a window doesn't answer within 2 s. Never defined outside test mode.
  */
 export const TEST_CLIP_HOOK = '__biseTestClip';
+/**
+ * test mode: the guard's new-window rule as a function of main's globalThis, `(webContents, url)`:
+ * the harness's own setWindowOpenHandler replaces the guard's, so it calls this (guard.ts).
+ */
+export const TEST_WINDOW_OPEN_HOOK = '__biseTestWindowOpen';
 
 /** Test mode: the capsule's changes as stdout lines: `CAPSULE_LINE show top keys` / `CAPSULE_LINE hide`. */
 export const CAPSULE_LINE = 'bise-desktop: capsule';

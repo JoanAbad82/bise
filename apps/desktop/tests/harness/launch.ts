@@ -77,7 +77,12 @@ async function guardsOnce(app: ElectronApplication): Promise<void> {
     const blocked: string[] = [];
     g.__biseHarnessBlocked = blocked;
     const guard = (wc: Electron.WebContents): void => {
-      wc.setWindowOpenHandler((d) => { blocked.push(`window.open ${d.url}`); return { action: 'deny' }; });
+      // the app's own rule still runs (guard.ts TEST_WINDOW_OPEN_HOOK: a link to his browser's stub, an artifact to the panel)
+      wc.setWindowOpenHandler((d) => {
+        blocked.push(`window.open ${d.url}`);
+        (globalThis as unknown as { __biseTestWindowOpen?: (w: Electron.WebContents, u: string) => void }).__biseTestWindowOpen?.(wc, d.url);
+        return { action: 'deny' };
+      });
       wc.on('will-navigate', (e, url) => { blocked.push(`navigate ${url}`); e.preventDefault(); });
     };
     webContents.getAllWebContents().forEach(guard);

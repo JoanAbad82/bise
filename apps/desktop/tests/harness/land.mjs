@@ -40,6 +40,9 @@ export const LAND = [
   // an html artifact its script builds shows whole, follows a new version and a reopen; '↗ browser'
   // opens the hub's page (art-viewer, architect m_25527)
   'checks/artifacts/script-page.spec.ts',
+  // a link in the panel's artifact (html, bise page, office viewer): his browser, another artifact
+  // in the panel, an anchor scrolls; the frame never leaves its artifact (art-links, architect m_26370)
+  'checks/artifacts/links.spec.ts',
 ];
 
 const here = path.dirname(fileURLToPath(import.meta.url));
