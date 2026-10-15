@@ -7,7 +7,9 @@
 #                     or of laws/ proofs/ changed: PROOF, every bend/proofs/*.bend
 #                     in parallel (tests/proof_run.py, 4 jobs);
 #                     no changed source over 1,000 lines or its count in
-#                     tests/line_limits.txt (tests/line_gate.py, ~0.1 s).
+#                     tests/line_limits.txt (tests/line_gate.py, ~0.1 s);
+#                     no changed test hard-codes a UI word past its count in
+#                     tests/word_literals.txt (tests/word_lint.py, issue 29).
 #                     The tests run bins.sh's cached sb-core of the tree's
 #                     hub/ vendor/ itself (SB_CORE_BIN = the cache file, one
 #                     compile per source hash for every worktree and the
@@ -492,6 +494,8 @@ if [ "$mode" = full ]; then
   # needs no build): an unlisted file over 1,000 lines or a count above its
   # file's, which a commit without the quick gate can leave
   python3 tests/line_gate.py --all || { echo "GATE full FAILED"; exit 1; }
+  # every test against tests/word_literals.txt (issue 29, ~1 s)
+  python3 tests/word_lint.py --all || { echo "GATE full FAILED"; exit 1; }
   export FUZZ_RUNS="${FUZZ_RUNS:-2000}"
   rm -f "$red"; export SB_RED_FILE="$red"
   # the e2e/tmux tests this change can break (tests/test_map.py; the user's
@@ -562,6 +566,9 @@ python3 "$root/tests/pick_gate.py" || { echo "GATE quick FAILED"; exit 1; }
 # no changed source file over 1,000 lines or past its count in the shrink-only
 # tests/line_limits.txt (tests/line_gate.py, architecture-principles.md rule 5)
 GATE_BASE="$base" python3 "$root/tests/line_gate.py" $changed || { echo "GATE quick FAILED"; exit 1; }
+# no changed test hard-codes a UI word past its count in the shrink-only
+# tests/word_literals.txt (tests/word_lint.py, issue 29: read it by key)
+GATE_BASE="$base" python3 "$root/tests/word_lint.py" $changed || { echo "GATE quick FAILED"; exit 1; }
 cache="${CARGO_TARGET_DIR:-$root/rust/target}/gate-cache"
 # the proofs files are checked in a copy of bend/ in it (tests/proof_run.py:
 # bend refuses an import path with a dot, like ~/.bise/gate/...)
@@ -635,6 +642,8 @@ for f in $changed; do
     bend/hub/*|bend/vendor/*) add switchboard ;;
     rust/proto/*) add bise-proto; add bend-tui; add switchboard; add bend-harness; proto_ts=1 ;;
     apps/desktop/src/proto/*) proto_ts=1 ;;
+    # bise_proto::words' JSON for the Python tests (a stale one is red)
+    tests/words/*) proto_ts=1 ;;
     # bise-proto's Anchor, generated for the SDK too (architect m_23712)
     office/sdk/src/anchor.gen.ts) proto_ts=1; office=1 ;;
     office/*) office=1; office_skills=1 ;;

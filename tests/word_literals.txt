@@ -1,0 +1,13 @@
+# The UI words left as literals in the tests (issue 29, docs/issues/29-ui-words-live-once.md), a
+# shrink-only ratchet: "<count> <path>", sorted by path. A test reads a word by its key
+# (tests/words.py's w(), the desktop's words_<area>.gen.ts); a count never goes up, a drop lowers it
+# in the same commit, at 0 its line goes. Only a change that adds keys to the catalog may raise a
+# count, by literals of those keys (another area's chunk moves them). Checked by tests/word_lint.py.
+1 apps/desktop/tests/checks/app/menus.spec.ts
+1 apps/desktop/tests/checks/app/trigger-ink.spec.ts
+3 apps/desktop/tests/checks/inbox/inbox-open.spec.ts
+6 apps/desktop/tests/checks/inbox/inbox-screen.spec.ts
+1 apps/desktop/tests/checks/thread/hover-time.spec.ts
+2 apps/desktop/tests/checks/thread/reading.spec.ts
+1 tests/tui_artifacts_tmux.py
+1 tests/tui_pause_tmux.py

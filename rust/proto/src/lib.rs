@@ -60,6 +60,9 @@
 //! `client` for the screen ones): the TUI's popup and `/help` read it, a
 //! client over the wire gets it serialized.
 //!
+//! [`words`] is the UI words' catalog: the TUI, the desktop (generated TS)
+//! and the tests (generated JSON) read every word they show from it.
+//!
 //! The fixtures (`fixtures/*.jsonl`) are the one source for the Rust
 //! tests, the native helper's laws and the Python e2e.
 
@@ -87,6 +90,7 @@ pub mod jsonrpc;
 pub mod rpc;
 pub mod slash;
 pub mod thread;
+pub mod words;
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;

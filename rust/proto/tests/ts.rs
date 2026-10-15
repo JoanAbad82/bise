@@ -8,6 +8,8 @@
 //!   `app_methods.gen.ts`: app_rpc's names as constants;
 //! - `anchor.ts` also goes, the same bytes, to
 //!   `office/sdk/src/anchor.gen.ts` (the office SDK's `at()` takes it);
+//! - `words_<area>.gen.ts` + `words.gen.ts`: the UI words (bise_proto::words),
+//!   and their JSON for the Python tests in `tests/words/` (see `ts/words.rs`);
 //! - `fixtures.gen.ts`: every fixture line as a typed constant, so
 //!   `pnpm typecheck` fails when a fixture doesn't fit its generated type;
 //! - u64/i64 come out as `number` (ids, positions, `*_ms`: safe below 2^53),
@@ -18,6 +20,9 @@
 //! `cargo test -p bise-proto --features ts --test ts` fails when a file is
 //! stale; `BISE_PROTO_BLESS=1` writes them.
 #![cfg(feature = "ts")]
+
+#[path = "ts/words.rs"]
+mod words;
 
 use bise_proto::{anchor, app_cmd, app_rows, app_rpc, commands, core_ev, context, diff, draft, helper, hub, inbox, log, ops, parts, pty, rows, rpc, thread};
 use std::collections::{BTreeMap, BTreeSet};
@@ -254,6 +259,7 @@ fn render_all() -> BTreeMap<String, String> {
     out.insert("app_methods.gen.ts".to_string(), render_app_methods());
     out.insert("methods.gen.ts".to_string(), render_methods());
     out.insert("chips.gen.ts".to_string(), render_chips());
+    out.extend(words::render_ts(header));
     out
 }
 
@@ -337,4 +343,30 @@ fn omitted_fields_are_optional_and_ids_are_numbers() {
     assert!(!ev.contains("bigint"), "{ev}");
     // the Unknown variants are not in the TS
     assert!(!ev.contains("\"unknown\"") && !ev.contains("raw:"), "{ev}");
+}
+
+#[test]
+fn the_words_json_is_fresh() {
+    let dir = words::json_dir();
+    let want = words::render_json();
+    let present: Vec<String> = std::fs::read_dir(&dir)
+        .map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| n.ends_with(".gen.json")).collect())
+        .unwrap_or_default();
+    if std::env::var_os(BLESS).is_some_and(|v| v == "1") {
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in present.iter().filter(|n| !want.contains_key(*n)) {
+            std::fs::remove_file(dir.join(name)).unwrap();
+        }
+        for (name, text) in &want {
+            std::fs::write(dir.join(name), text).unwrap();
+        }
+        return;
+    }
+    let mut stale: Vec<String> = want
+        .iter()
+        .filter(|(name, text)| std::fs::read_to_string(dir.join(name)).ok().as_deref() != Some(text.as_str()))
+        .map(|(name, _)| name.clone())
+        .collect();
+    stale.extend(present.iter().filter(|n| !want.contains_key(*n)).map(|n| format!("{n} (not generated)")));
+    assert!(stale.is_empty(), "tests/words is stale: {stale:?}; run {BLESS}=1 cargo test -p bise-proto --features ts --test ts");
 }

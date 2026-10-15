@@ -15,6 +15,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tui_tmux import tui_session, run, in_view, tmux, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
+
+# the inbox's words, by key (bise_proto::words::inbox): a word designer changes moves this test
+TODAY = w("inbox.day_today")
+ALPHA = w("inbox.answered_at", said="alpha", place=w("inbox.where_inbox"))
+MOOT = w("inbox.withdrawn", why="moot now")
 
 COLS, ROWS = 150, 42
 CTRL = "\x1b[%d;5u"   # ctrl+digit, the kitty keyboard protocol's form
@@ -68,14 +74,14 @@ def main():
         # the list: waiting on top, then today's answers on two lines
         t.typed("/inbox")
         t.keys("Enter")
-        sc = t.wait_all(["waiting for you · 1", "› 1  main  third: ship the readme?", "today",
-                         "✓ main  first: pick one", "you: alpha · in the inbox",
-                         "– main  second: never mind", "withdrawn: moot now"])
-        assert sc.index("waiting for you") < sc.index("today") < sc.index("✓ main"), sc
+        sc = t.wait_all(["waiting for you · 1", "› 1  main  third: ship the readme?", TODAY,
+                         "✓ main  first: pick one", ALPHA,
+                         "– main  second: never mind", MOOT])
+        assert sc.index("waiting for you") < sc.index(TODAY) < sc.index("✓ main"), sc
         shot(t, "inbox-150")
         tmux("resize-window", "-t", t.name, "-x", "80")
         t.wait_gone("╭─ inbox · 1 waiting")  # the frame redrawn narrow
-        sc = t.wait_all(["› 1  main  third: ship the readme?", "you: alpha · in the inbox"])
+        sc = t.wait_all(["› 1  main  third: ship the readme?", ALPHA])
         assert all(len(r.rstrip()) <= 80 for r in sc.splitlines()), sc
         shot(t, "inbox-80")
         tmux("resize-window", "-t", t.name, "-x", str(COLS))

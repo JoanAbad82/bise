@@ -1,16 +1,19 @@
 //! The history's words (architect m_24257): one place for what the
 //! terminal and the desktop say on a row, pure. The caller passes the
-//! UTC offset (seconds east) and its now: this crate has no clock.
+//! UTC offset (seconds east) and its now: this crate has no clock. The
+//! words themselves are the catalog's ([`crate::words::inbox`]); the
+//! choices (which word for which state) are here.
 
 use super::{InboxRecord, InboxState, Where};
 use crate::thread::when;
+use crate::words::inbox;
 
 /// `in the inbox`, `on a page`, `in perf's thread`.
 pub fn where_words(w: &Where) -> String {
     match w {
-        Where::Inbox | Where::Unknown => "in the inbox".into(),
-        Where::Thread { agent } => format!("in {agent}'s thread"),
-        Where::Page { .. } => "on a page".into(),
+        Where::Inbox | Where::Unknown => inbox::where_inbox.into(),
+        Where::Thread { agent } => inbox::where_thread(agent),
+        Where::Page { .. } => inbox::where_page.into(),
     }
 }
 
@@ -21,11 +24,11 @@ pub fn second_line(r: &InboxRecord) -> String {
         InboxState::Answered => {
             let said = r.said.as_deref().map(one_line).unwrap_or_default();
             match &r.at {
-                Some(w) => format!("you: {said} · {}", where_words(w)),
-                None => format!("you: {said}"),
+                Some(w) => inbox::answered_at(said, where_words(w)),
+                None => inbox::answered(said),
             }
         }
-        _ => format!("withdrawn: {}", reason(r.reason.as_deref().unwrap_or(""))),
+        _ => inbox::withdrawn(reason(r.reason.as_deref().unwrap_or(""))),
     }
 }
 
@@ -38,10 +41,10 @@ pub fn reason(res: &str) -> String {
         return why.trim().to_string();
     }
     match res {
-        "agent stopped" => "its agent stopped".into(),
-        "closed" => "you closed it".into(),
-        "interrupted" => "its call was interrupted".into(),
-        "" | "closed by main" => "closed by main".into(),
+        "agent stopped" => inbox::reason_agent_stopped.into(),
+        "closed" => inbox::reason_closed.into(),
+        "interrupted" => inbox::reason_interrupted.into(),
+        "" | "closed by main" => inbox::reason_closed_by_main.into(),
         r => r.strip_prefix("main: ").unwrap_or(r).to_string(),
     }
 }
@@ -52,9 +55,9 @@ pub fn day_head(ms: u64, now: u64, off: i32) -> String {
     let (ny, nm, nd, ..) = when::civil(now, off);
     let (yy, ym, yd, ..) = when::civil(now.saturating_sub(86_400_000), off);
     if (y, m, d) == (ny, nm, nd) {
-        "today".into()
+        inbox::day_today.into()
     } else if (y, m, d) == (yy, ym, yd) {
-        "yesterday".into()
+        inbox::day_yesterday.into()
     } else {
         let t = when::day_and_time(ms, off, now, off);
         // `sep 28 18:02` -> `sep 28`; `dec 30 2024 18:02` -> `dec 30 2024`
