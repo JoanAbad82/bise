@@ -61,7 +61,7 @@
 # the bend results are cached in $CARGO_TARGET_DIR/gate-cache.
 # Sharing the machine (BISE-244, loop-speed.md §0): quick, full and new's
 # seed build run under nice 10 (GATE_NICE) with CARGO_BUILD_JOBS = half the
-# cores (unless set); one full gate at a time on the machine (a lock,
+# cores (unless set); one full gate or rerun at a time on the machine (a lock,
 # <gate dir>/full-<uid>.lock; the others print and set "waiting for the
 # gate"); one seed build per deps key (the other tasks wait, then clone it).
 # The gate dir: ~/.bise/gate ($BISE_HOME/gate), writable in auto's sandbox
@@ -393,7 +393,10 @@ gate_lock() {
   locked=1
   [ -z "$said" ] || { echo "got the gate after $((SECONDS - t0))s"; sb_note "full gate running"; }
 }
-[ "$mode" = full ] && gate_lock
+# a rerun too: it runs e2e/tmux tests like a full gate's, and next to one
+# (audit-blind's rerun beside its second full gate, 2026-10-14) both sets
+# timed out at ~350 s (partial_e2e, repl_start_e2e, subscriptions_e2e)
+case "$mode" in full|rerun) gate_lock ;; esac
 export PATH="$HOME/.bend/bin:$HOME/.cargo/bin:$PATH"
 # the oldest macOS the binaries run on (rust/.cargo/config.toml, BISE-164):
 # for the quick sb-core's cc too
