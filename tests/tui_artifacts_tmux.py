@@ -94,7 +94,7 @@ def wide(t, E):
         # the empty list
         command(t, "/artifacts", "artifacts · what your agents made")
         sc = t.wait("nothing yet. when an agent makes a page, a doc or a file for you, it lands here.")
-        assert "agents add what they make with sb artifact add. bise pages come in by themselves." in sc, sc
+        assert "sb artifact" not in sc, sc
         shot(t, "150-empty")
         t.keys("Escape")
         t.wait_gone("what your agents made")

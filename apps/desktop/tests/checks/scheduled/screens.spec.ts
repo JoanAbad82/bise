@@ -157,3 +157,24 @@ test('scheduled/screens: the list and one task, light and dark, 1400 and 800', a
     await s.close();
   }
 });
+
+// sb-words (Benjamin's feedback, Gabriel's « Ouais grave »): the empty list says what to do in plain
+// words, never the sb command agents run; light and dark at 1400 for designer's sign-off.
+test('scheduled/screens: the empty list asks him in plain words, no sb command', async () => {
+  const core = new FakeCore(world(Date.now(), 'light').filter((e) => e.ev !== 'scheduled').concat([{ ev: 'scheduled', project: SHOP, items: [] }, { ev: 'scheduled', project: ACME, items: [] }] as never) as never);
+  const s = await launchDesktop({ core, route: 'scheduled', size: '1400x820' });
+  try {
+    const { page } = s;
+    const empty = page.getByTestId('scheduled.empty');
+    await expect(empty).toBeVisible({ timeout: 10_000 });
+    await expect(empty).toHaveText('nothing scheduled. ask an agent to “check the build every 5m” and it shows here.');
+    for (const t of ['light', 'dark'] as const) {
+      await core.send({ ev: 'prefs', prefs: { onboarded: true, theme: t } } as never);
+      await expect.poll(() => page.evaluate(() => document.documentElement.dataset['theme']), { timeout: 5000 }).toBe(t);
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: test.info().outputPath(`empty-${t}-1400.png`) });
+    }
+  } finally {
+    await s.close();
+  }
+});

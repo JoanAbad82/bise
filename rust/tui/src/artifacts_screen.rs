@@ -594,11 +594,6 @@ pub(crate) fn lines(sc: &mut Screen, all: &[Artifact], width: usize, height: usi
                 "  nothing yet. when an agent makes a page, a doc or a file for you, it lands here.",
                 Style::default().fg(text()),
             )));
-            out.push(Line::from(""));
-            out.push(Line::from(Span::styled(
-                "  agents add what they make with sb artifact add. bise pages come in by themselves.",
-                Style::default().fg(dim()),
-            )));
         } else {
             out.push(Line::from(Span::styled("  nothing matches. esc clears the search.", Style::default().fg(text()))));
         }

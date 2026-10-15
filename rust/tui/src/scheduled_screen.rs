@@ -344,7 +344,7 @@ pub(crate) fn lines_with(sc: &mut Screen, all: &[Task], watches: &[Watch], width
         let words = if !sc.query.is_empty() {
             "nothing scheduled matches."
         } else if n_active == 0 {
-            "nothing scheduled. agents set them with sb every; tell one \"check the build every 5m\"."
+            "nothing scheduled. ask an agent to \"check the build every 5m\" and it shows here."
         } else {
             ""
         };

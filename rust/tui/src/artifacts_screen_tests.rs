@@ -131,7 +131,7 @@ fn the_empty_list_says_how_things_get_in() {
     let mut sc = screen();
     let out = render(&mut sc, &[], 144, 20);
     assert!(out.contains("nothing yet. when an agent makes a page, a doc or a file for you, it lands here."), "{out}");
-    assert!(out.contains("agents add what they make with sb artifact add. bise pages come in by themselves."), "{out}");
+    assert!(!out.contains("sb artifact"), "{out}");
     assert!(out.ends_with("esc close"), "{out}");
 }
 

@@ -213,7 +213,7 @@ function OpenSheet({ onClose, send, pickFolder, onAdded }: AddSheetProps) {
             {
               id: 'land',
               label: 'main may land on main',
-              sub: land ? 'sb land after the tests, without asking you' : "otherwise your repo's flow decides: a pull request or an approval",
+              sub: land ? 'main commits to main once the tests pass, without asking you' : "otherwise your repo's flow decides: a pull request or an approval",
               control: <Toggle on={land} label="main may land on main" onChange={setLand} testId="settings.add.land" />,
             },
           ]}

@@ -116,7 +116,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
           </span>
         )}
         {list.length === 0 ? (
-          <div className="sch-empty" data-testid="scheduled.empty">nothing scheduled. agents set them with sb every; tell one “check the build every 5m”.</div>
+          <div className="sch-empty" data-testid="scheduled.empty">nothing scheduled. ask an agent to “check the build every 5m” and it shows here.</div>
         ) : shown.length === 0 ? (
           <div className="sch-empty" data-testid="scheduled.none">nothing matches. esc clears the search.</div>
         ) : (

@@ -343,7 +343,7 @@ pub fn switch(f: Option<&Flow>, to: FlowMode) -> Result<String, String> {
     }
     Ok(match to {
         FlowMode::Pr => "flow saved: lands via PRs. agents open a PR per task; you merge.".into(),
-        FlowMode::Trunk => "flow saved: lands on main. agents land tested commits with `sb land`.".into(),
+        FlowMode::Trunk => "flow saved: lands on main. agents commit there once their tests pass.".into(),
     })
 }
 

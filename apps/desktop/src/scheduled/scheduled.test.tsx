@@ -98,7 +98,7 @@ describe('the scheduled screen', () => {
 
   it('nothing scheduled says how one comes', () => {
     render(<ScheduledView tasks={[]} ports={{ stop: () => undefined }} now={NOW} />);
-    expect(screen.getByTestId('scheduled.empty').textContent).toBe('nothing scheduled. agents set them with sb every; tell one “check the build every 5m”.');
+    expect(screen.getByTestId('scheduled.empty').textContent).toBe('nothing scheduled. ask an agent to “check the build every 5m” and it shows here.');
   });
 });
 
