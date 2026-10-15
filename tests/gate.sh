@@ -225,11 +225,12 @@ PY
   echo "now: cd $wt && export CARGO_TARGET_DIR=$tgt   (end: gate.sh done $name)"
   exit 0
 fi
-case "$mode" in quick|full|rerun) ;; *) echo "usage: gate.sh [quick|full|rerun|new [name]|done [name]|wait <file|pid>]" >&2; exit 2 ;; esac
+case "$mode" in quick|full|rerun|land) ;; *) echo "usage: gate.sh [quick|full|rerun|land <base> <head>|new [name]|done [name]|wait <file|pid>]" >&2; exit 2 ;; esac
 cd "$(dirname "$0")/.."
 root="$PWD"
-# a linked worktree has a .git file (the shared checkout a directory)
-[ -f "$root/.git" ] && sb_place "$root"
+# a linked worktree has a .git file (the shared checkout a directory); a
+# land check runs in the hub's land queue, not for the agent
+[ -f "$root/.git" ] && [ "$mode" != land ] && sb_place "$root"
 share_machine
 # a task worktree the hub made (<task dir>/<repo>, its <task dir>/owner)
 # with no CARGO_TARGET_DIR and no rust/target yet: its target is
@@ -403,15 +404,23 @@ export PATH="$HOME/.bend/bin:$HOME/.cargo/bin:$PATH"
 # the oldest macOS the binaries run on (rust/.cargo/config.toml, BISE-164):
 # for the quick sb-core's cc too
 export MACOSX_DEPLOYMENT_TARGET; MACOSX_DEPLOYMENT_TARGET="$(scripts/bins.sh macos-target)"
-base="${GATE_BASE:-HEAD}"
-changed="$( { git diff --name-only "$base"; git ls-files --others --exclude-standard; } | sort -u)"
+if [ "$mode" = land ]; then
+  # the land's own paths: main's tip before it (base) to the rebased tip
+  base="${2:-}" head="${3:-}"
+  { [ -n "$base" ] && [ -n "$head" ]; } || { echo "usage: gate.sh land <base> <head>" >&2; exit 2; }
+  [ "$(git rev-parse HEAD)" = "$(git rev-parse "$head")" ] || { echo "GATE land FAILED: tree (HEAD is not $head)"; exit 1; }
+  changed="$(git diff --name-only "$base" "$head")" || { echo "GATE land FAILED: diff ($base..$head)"; exit 1; }
+else
+  base="${GATE_BASE:-HEAD}"
+  changed="$( { git diff --name-only "$base"; git ls-files --others --exclude-standard; } | sort -u)"
+fi
 hub_changed=0 bend_changed=0
 printf '%s\n' "$changed" | grep -qE '^bend/(hub|vendor)/' && hub_changed=1
 printf '%s\n' "$changed" | grep -qE '^bend/(core|hub|vendor|laws|proofs)/.*\.bend$' && bend_changed=1
 # ./sb-core (not in git, BISE-114): the build of this tree's hub/ vendor/,
 # from bins.sh's cache shared by every worktree (a copy; ~15 s on a miss).
 # quick with a hub/ change: bins.sh compiles it in the background (below)
-if [ $hub_changed = 0 ] || [ "$mode" = full ]; then
+if [ "$mode" != land ] && { [ $hub_changed = 0 ] || [ "$mode" = full ]; }; then
   scripts/bins.sh sb-core || { echo "FAIL sb-core build"; exit 1; }
 fi
 # the EDR of a company Mac (CrowdStrike) deletes a fresh unsigned binary
@@ -430,17 +439,20 @@ sbcore_gone() {  # <file>: say so and true when the sb-core that was built is go
 # Without pnpm: 'skipped' in quick, red in full (strict). Without
 # node_modules: quick skips; full installs them from the lockfile
 # (--frozen-lockfile, no Electron download: check needs no binary).
-desktop_check() {
-  [ -d "$root/apps/desktop" ] || return 0
-  local miss="" d
-  # a launchd job (the nightly, a gate run outside the bash tool's file cap)
-  # has no shell setup: its PATH lacks the node manager's bin. Its default
-  # node (fnm's, Volta's, pnpm's own home) has pnpm next to node
-  if ! command -v pnpm >/dev/null 2>&1; then
-    for d in "${FNM_DIR:-$HOME/.local/share/fnm}/aliases/default/bin" "$HOME/.volta/bin" "$HOME/Library/pnpm"; do
-      if [ -x "$d/pnpm" ]; then export PATH="$d:$PATH"; break; fi
-    done
-  fi
+# a launchd job (the nightly, a gate run outside the bash tool's file cap)
+# or the hub's land queue has no shell setup: its PATH lacks the node
+# manager's bin. Its default node (fnm's, Volta's, pnpm's own home) has
+# pnpm next to node
+desktop_path() {
+  local d
+  command -v pnpm >/dev/null 2>&1 && return 0
+  for d in "${FNM_DIR:-$HOME/.local/share/fnm}/aliases/default/bin" "$HOME/.volta/bin" "$HOME/Library/pnpm"; do
+    if [ -x "$d/pnpm" ]; then export PATH="$d:$PATH"; return 0; fi
+  done
+}
+desktop_deps() {  # [strict]: node_modules (installed when strict); what is missing on stdout
+  local miss=""
+  desktop_path
   if ! command -v pnpm >/dev/null 2>&1; then miss="no pnpm on PATH (nor fnm's default, Volta's or ~/Library/pnpm)"
   elif [ ! -d "$root/apps/desktop/node_modules" ]; then
     if [ "${1:-}" = strict ]; then
@@ -448,6 +460,11 @@ desktop_check() {
         || miss="pnpm install failed ($(tail -1 "$run/desktop_install.log"))"
     else miss="no node_modules; run pnpm -C apps/desktop install"; fi
   fi
+  echo "$miss"
+}
+desktop_check() {
+  [ -d "$root/apps/desktop" ] || return 0
+  local miss; desktop_path; miss="$(desktop_deps "${1:-}")"
   if [ -n "$miss" ]; then
     if [ "${1:-}" = strict ]; then echo "FAIL desktop_check: $miss"; return 1; fi
     echo "skipped desktop_check: $miss"; return 0
@@ -467,6 +484,87 @@ desktop_why() {  # <changed path>...
   [ "$w" = none ] || echo "${w#desktop }"
 }
 
+# ---- the one map from a changed path to its steps (quick and land): the
+# crates to test or lint (pkgs: the changed ones and the crates using them)
+# and the flags proto_ts, office, office_skills, crossterm_changed, kit
+pkgs=""
+add() { case " $pkgs " in *" $1 "*) ;; *) pkgs="$pkgs $1" ;; esac; }
+map_paths() {  # <changed path>...
+  local f
+  for f in "$@"; do
+    case "$f" in
+      rust/Cargo.toml|rust/Cargo.lock|rust/.cargo/*) add bise-session; add bise-home; add bise-peer; add bise-catalog; add bend-plugins; add bend-images; add bend-tui; add switchboard; add bend-harness ;;
+      rust/home/*) add bise-home; add bend-plugins; add bend-images; add bend-tui; add switchboard; add bise-catalog; add bend-harness ;;
+      rust/catalog/*) add bise-catalog; add bend-harness ;;
+      rust/computer-use/*) add bise-computer-use; add bend-harness ;;
+      rust/plugins/*) add bend-plugins; add bend-tui; add bend-harness ;;
+      rust/images/*) add bend-images; add bend-tui; add bend-harness ;;
+      rust/tui/*) add bend-tui; add bend-harness ;;
+      rust/vendor/crossterm/*) add bend-tui; add bend-harness; crossterm_changed=1 ;;
+      rust/switchboard/*) add switchboard; add bend-harness ;;
+      rust/peer/*) add bise-peer; add switchboard; add bend-harness ;;
+      rust/harness/*) add bend-harness ;;
+      rust/session/*) add bise-session; add switchboard; add bend-harness ;;
+      bend/hub/*|bend/vendor/*) add switchboard ;;
+      rust/proto/*) add bise-proto; add bend-tui; add switchboard; add bend-harness; proto_ts=1 ;;
+      apps/desktop/src/proto/*) proto_ts=1 ;;
+      # bise_proto::words' JSON for the Python tests (a stale one is red)
+      tests/words/*) proto_ts=1 ;;
+      # bise-proto's Anchor, generated for the SDK too (architect m_23712)
+      office/sdk/src/anchor.gen.ts) proto_ts=1; office=1 ;;
+      office/*) office=1; office_skills=1 ;;
+      kit/office/*) office=1 ;;
+      # the skills teach the SDK through bise office run (architect m_23951)
+      plugins/sheets/*|plugins/slides/*|plugins/docs/*|rust/jsrt/*) office_skills=1 ;;
+    esac
+    # the kit's node checks (kit/*.check.mjs, no deps, ~0.1 s)
+    case "$f" in kit/*) kit=1 ;; esac
+  done
+}
+kit_check() { local f; for f in "$root"/kit/check.mjs "$root"/kit/*.check.mjs; do echo "node ${f#"$root"/}"; node "$f" || return 1; done; }
+# ---- land (docs/issues/28): `gate.sh land <base> <head>`, run by `sb land`
+# (bise.toml's [land] check) in the worktree, rebased on main's tip <base>,
+# before main moves: only the fast steps that are always green on main
+# (lines, clippy, generated proto TS, the desktop's types and build, the
+# office SDK, the kit), only for the paths <base>..<head> touches
+# (map_paths). No e2e, tmux, PROOF or vitest: the quick/full gate and the
+# nightly keep those. No known reds here. A docs-only land runs no step.
+# Red: "FAIL <step>", its error lines, then "GATE land FAILED: <step>"
+# (land_check.rs reads those words).
+if [ "$mode" = land ]; then
+  t0=$SECONDS
+  map_paths $changed
+  dwhy=""; [ -n "$changed" ] && dwhy="$(desktop_why $changed)"
+  src=0; printf '%s\n' "$changed" | grep -qE '\.(rs|bend|ts|tsx|py)$|^tests/line_limits\.txt$' && src=1
+  ran=""
+  lstep() {  # <name> <cmd...>
+    local n=$1 s=$SECONDS log="$run/land-$1.log"; shift
+    "$@" >"$log" 2>&1 & wait $!
+    if [ $? = 0 ]; then echo "ok   $n ($((SECONDS - s))s)"; ran="$ran $n"; return 0; fi
+    echo "FAIL $n ($((SECONDS - s))s)"
+    # its error lines (and rustc's --> places), else the log's tail
+    local pat='(^|[^a-z_])(error|Error|ERROR|FAIL|failed|✗|×)'
+    if grep -qE "$pat" "$log"; then grep -E "$pat|^ *--> " "$log" | grep -v '^error: could not compile' | head -20
+    else tail -20 "$log"; fi
+    cp "$log" "$gdir/sb-gate-land-$n.log" 2>/dev/null && echo "log: $gdir/sb-gate-land-$n.log"
+    echo "GATE land FAILED: $n"; exit 1
+  }
+  desktop_land() {
+    local miss; desktop_path; miss="$(desktop_deps strict)"
+    [ -z "$miss" ] || { echo "error: $miss"; return 1; }
+    cd "$root/apps/desktop" && pnpm -s typecheck && pnpm -s build
+  }
+  target="${CARGO_TARGET_DIR:-$root/rust/target}"
+  [ $src = 1 ] && lstep line_gate env GATE_BASE="$base" python3 tests/line_gate.py $changed
+  # quick's clippy, in its warm dir: the workspace, so both share every artifact
+  [ -n "$pkgs" ] && lstep clippy bash -c "cd rust && cargo clippy --offline -q --workspace --all-targets --target-dir '$target/clippy' -- -D warnings"
+  [ "${proto_ts:-0}" = 1 ] && lstep proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"
+  [ -n "$dwhy" ] && lstep desktop desktop_land
+  [ "${office:-0}" = 1 ] && lstep office_check tests/office_check.sh strict
+  [ "${kit:-0}" = 1 ] && lstep kit kit_check
+  echo "GATE land GREEN ($((SECONDS - t0))s):${ran:- no step for these paths}"
+  exit 0
+fi
 # the tree's state (HEAD, the diff, the untracked files): a red full gate
 # leaves the e2e/tmux tests it failed in <gate dir>/red-<state>, for
 # gate.sh rerun on exactly this tree
@@ -525,6 +623,8 @@ if [ "$mode" = full ]; then
   rm -f "$gdir/pick-$$.why"
   # ${a[@]+...}: macOS /bin/bash 3.2 calls an empty array unbound under set -u
   tests/run_all.sh ${pick_args[@]+"${pick_args[@]}"} & wait $!; rc=$?
+  # which reds are known (tests/known_reds.txt, their owner on it) and which are new
+  [ $rc = 0 ] || { [ -s "$red" ] && python3 tests/known_reds.py split $(cat "$red"); }
   [ $rc = 0 ] || { [ -s "$red" ] && echo "only e2e/tmux tests failed: gate.sh rerun runs them alone on this tree"; }
   [ $rc = 0 ] || sbcore_gone "$root/sb-core"
   # apps/desktop/src/proto matches bise-proto every time (a generated file
@@ -559,6 +659,8 @@ python3 -B "$root/tests/wait_test.py" >/dev/null || { python3 -B "$root/tests/wa
 python3 "$root/tests/bise_env.py" >/dev/null || { python3 "$root/tests/bise_env.py"; echo "GATE quick FAILED"; exit 1; }
 # no merge or stash conflict marker in a tracked file (2393001f landed stash markers)
 python3 "$root/tests/conflict_markers.py" >/dev/null || { python3 "$root/tests/conflict_markers.py"; echo "GATE quick FAILED"; exit 1; }
+# tests/known_reds.txt parses (tests/known_reds.py, issue 28)
+python3 "$root/tests/known_reds.py" --self-test >/dev/null || { python3 "$root/tests/known_reds.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 # the full gate's test map knows every test and every top-level path (tests/test_map.py)
 python3 "$root/tests/test_map.py" --self-test >/dev/null || { python3 "$root/tests/test_map.py" --self-test; echo "GATE quick FAILED"; exit 1; }
 # no new Bool.pick walk that never stops; the list of old ones only shrinks (tests/pick_gate.py)
@@ -622,36 +724,8 @@ else
   # a hit: ./sb-core was just put in place from it
   SB_CORE_BIN="$(scripts/bins.sh path sb-core 2>/dev/null)" && export SB_CORE_BIN || unset SB_CORE_BIN
 fi
-# the crates to test: changed ones and the crates depending on them
-pkgs=""
-add() { case " $pkgs " in *" $1 "*) ;; *) pkgs="$pkgs $1" ;; esac; }
-for f in $changed; do
-  case "$f" in
-    rust/Cargo.toml|rust/Cargo.lock|rust/.cargo/*) add bise-session; add bise-home; add bise-peer; add bise-catalog; add bend-plugins; add bend-images; add bend-tui; add switchboard; add bend-harness ;;
-    rust/home/*) add bise-home; add bend-plugins; add bend-images; add bend-tui; add switchboard; add bise-catalog; add bend-harness ;;
-    rust/catalog/*) add bise-catalog; add bend-harness ;;
-    rust/computer-use/*) add bise-computer-use; add bend-harness ;;
-    rust/plugins/*) add bend-plugins; add bend-tui; add bend-harness ;;
-    rust/images/*) add bend-images; add bend-tui; add bend-harness ;;
-    rust/tui/*) add bend-tui; add bend-harness ;;
-    rust/vendor/crossterm/*) add bend-tui; add bend-harness; crossterm_changed=1 ;;
-    rust/switchboard/*) add switchboard; add bend-harness ;;
-    rust/peer/*) add bise-peer; add switchboard; add bend-harness ;;
-    rust/harness/*) add bend-harness ;;
-    rust/session/*) add bise-session; add switchboard; add bend-harness ;;
-    bend/hub/*|bend/vendor/*) add switchboard ;;
-    rust/proto/*) add bise-proto; add bend-tui; add switchboard; add bend-harness; proto_ts=1 ;;
-    apps/desktop/src/proto/*) proto_ts=1 ;;
-    # bise_proto::words' JSON for the Python tests (a stale one is red)
-    tests/words/*) proto_ts=1 ;;
-    # bise-proto's Anchor, generated for the SDK too (architect m_23712)
-    office/sdk/src/anchor.gen.ts) proto_ts=1; office=1 ;;
-    office/*) office=1; office_skills=1 ;;
-    kit/office/*) office=1 ;;
-    # the skills teach the SDK through bise office run (architect m_23951)
-    plugins/sheets/*|plugins/slides/*|plugins/docs/*|rust/jsrt/*) office_skills=1 ;;
-  esac
-done
+# the crates to test, and the other steps (map_paths, above)
+map_paths $changed
 step() {  # <name> <cmd...>: one line when green, the failures and the log when red
   local n=$1 s=$SECONDS; shift
   # in the background: a kill or ctrl-c reaches the trap at once

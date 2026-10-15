@@ -96,3 +96,60 @@ fn too_many_changes_in_a_worktree_are_refused_with_the_list() {
     assert_eq!(git(&wt, &["log", "--format=%s", "-1"]).unwrap(), "t", "nothing landed");
     let _ = std::fs::remove_dir_all(ws.parent().unwrap());
 }
+
+#[test]
+fn a_moved_base_runs_the_land_check_from_mains_tip_and_red_refuses() {
+    // bise.toml at main's tip: a check that is red when the merged tree
+    // has both a and its twin (the two-lands-each-export-it case)
+    let ws = repo("land-check");
+    sh(
+        &ws,
+        "printf '[land]\\ncheck = \"sh check.sh\"\\n' > bise.toml \
+         && printf 'echo \"$1 $2\" > ../args; if [ -f twin ] && [ -f mine ]; then echo \"FAIL dup\"; echo \"error: twin and mine\"; echo \"GATE land FAILED: dup\"; exit 1; fi\\n' > check.sh \
+         && git add . && git commit -qm check",
+    );
+    let wt = worktree(&ws);
+    let mut j = job("x", &wt, &ws, &[], &[]);
+    j.place = "wt:x".into();
+    j.here = false;
+    // a fast-forward: no merge, no check
+    sh(&wt, "echo 1 > one && git add one && git commit -qm one");
+    run(&j, &Queue::default(), &mut || {}).unwrap();
+    assert!(!ws.parent().unwrap().join("args").exists(), "a fast-forward runs no check");
+    // main moves (another land), the branch adds the clash: refused with
+    // the step's words, main unmoved, the branch rebased on it
+    sh(&ws, "echo t > twin && git add twin && git commit -qm twin");
+    sh(&wt, "echo m > mine && git add mine && git commit -qm mine");
+    let base = git(&ws, &["rev-parse", "main"]).unwrap();
+    let e = run(&j, &Queue::default(), &mut || {}).unwrap_err();
+    assert_eq!(e, "the land check is red at dup on main + your branch:\u{a}error: twin and mine\u{a}your branch is rebased on main: fix it, then sb land again");
+    assert_eq!(git(&ws, &["rev-parse", "main"]).unwrap(), base, "main did not move");
+    assert_eq!(log(&wt), lines(&["twin", "one", "check", "init"]));
+    assert!(git(&wt, &["merge-base", "--is-ancestor", "main", "HEAD"]).is_ok(), "rebased");
+    let head = git(&wt, &["rev-parse", "HEAD"]).unwrap();
+    let args = std::fs::read_to_string(ws.parent().unwrap().join("args")).unwrap();
+    assert_eq!(args.trim(), format!("{} {}", base, head), "<base> <head>");
+    // the branch cannot switch its own check off: it is read at main's tip
+    sh(&wt, "printf '[land]\\ncheck = \"true\"\\n' > bise.toml && git commit -qam off");
+    sh(&ws, "echo t2 > twin && git commit -qam twin2");
+    assert!(run(&j, &Queue::default(), &mut || {}).unwrap_err().contains("red at dup"));
+    // fixed: lands
+    sh(&wt, "git rm -q mine && git commit -qm fix");
+    let o = run(&j, &Queue::default(), &mut || {}).unwrap();
+    assert!(!o.unchecked);
+    let _ = std::fs::remove_dir_all(ws.parent().unwrap());
+}
+
+#[test]
+fn a_here_land_on_main_is_said_unchecked_when_the_repo_has_a_land_check() {
+    let ws = repo("here-unchecked");
+    sh(&ws, "echo a2 > a");
+    let o = run(&job("x", &ws, &ws, &["a"], &[]), &Queue::default(), &mut || {}).unwrap();
+    assert!(!o.unchecked, "no bise.toml: nothing to say");
+    sh(&ws, "printf '[land]\\ncheck = \"false\"\\n' > bise.toml && git add bise.toml && git commit -qm check && echo a3 > a");
+    let o = run(&job("x", &ws, &ws, &["a"], &[]), &Queue::default(), &mut || {}).unwrap();
+    assert!(o.unchecked);
+    let line = crate::flow::land_line("x", 1, &o.target, &o.sha, o.pushed, o.unchecked);
+    assert_eq!(line, format!("✓ x landed 1 commit on main ({}) · not checked (--here)", o.sha));
+    let _ = std::fs::remove_dir_all(ws.parent().unwrap());
+}

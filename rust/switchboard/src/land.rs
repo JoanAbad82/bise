@@ -12,9 +12,12 @@
 //!   the place also changed is refused (main decides).
 //! - plain, from a worktree: its own files first (with the message), then
 //!   the branch is rebased on main (the worktree must be clean: every
-//!   agent landed its files), the repo's check runs if main had moved,
-//!   main moves to the branch (fast-forward); in trunk flow with `push`,
-//!   main is pushed. From the shared folder: `--here`, then the push.
+//!   agent landed its files); if main had moved, the land check
+//!   (`bise.toml` at main's tip, [`crate::land_check`], issue 28) and the
+//!   user's own check run on the rebased tree, then main moves to the
+//!   branch (fast-forward); in trunk flow with `push`, main is pushed.
+//!   From the shared folder: `--here`, then the push; `--here` is not
+//!   checked, and its line says so when the repo has a land check.
 //!   main is the repo's default branch (`trunk::trunk_ref`, issue #8),
 //!   not the shared folder's branch: its files move only when it has
 //!   main checked out ([`move_main`]).
@@ -70,6 +73,9 @@ pub struct Outcome {
     /// New files of the place that no agent claimed, made since the agent
     /// started: not landed, named in the answer ([`left_out_note`]).
     pub left_out: Vec<String>,
+    /// A `--here` land moved main without the repo's land check
+    /// (`land_check`, issue 28): its line says so.
+    pub unchecked: bool,
 }
 
 // ---- git ----
@@ -372,6 +378,9 @@ pub fn run_onto(job: &Job, queue: &Queue, joined: &mut dyn FnMut(), onto_now: &m
     }
     let target = head_ref(&job.dir)?;
     let _turn = queue.wait_turn(&target, &job.place, joined);
+    // --here is not checked (issue 28): said when it moves main in a repo
+    // that has a land check
+    let unchecked = target == main && crate::land_check::command(&job.dir, &target).is_some();
     let new = commit_files(&job.dir, &target, &mine, &job.message, &mut || {})?;
     let (pushed, push_error) = pushed(job, &target, &main);
     Ok(Outcome {
@@ -381,6 +390,7 @@ pub fn run_onto(job: &Job, queue: &Queue, joined: &mut dyn FnMut(), onto_now: &m
         pushed,
         push_error,
         left_out,
+        unchecked,
     })
 }
 
@@ -464,6 +474,12 @@ fn land_branch(job: &Job, l: Line, main: &str, real_main: &str, mine: &[String],
                 )
             });
         }
+        // the merge case: the repo's land check on the rebased tree, in
+        // this turn, so land N is checked on top of N-1 (land_check)
+        let head = git(&job.dir, &["rev-parse", "HEAD"])?;
+        if let Some(check) = crate::land_check::command(&job.dir, &base) {
+            crate::land_check::run(&job.dir, &check, &base, &head)?;
+        }
         if let Some(check) = &job.flow.check {
             run_check(&job.dir, check)?;
         }
@@ -482,6 +498,7 @@ fn land_branch(job: &Job, l: Line, main: &str, real_main: &str, mine: &[String],
         pushed,
         push_error,
         left_out,
+        unchecked: false,
     })
 }
 

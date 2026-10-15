@@ -6,7 +6,7 @@
 // under 3 min. Needs `pnpm build` first (pnpm check builds).
 //   node tests/harness/land.mjs [--list]
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -126,7 +126,36 @@ function heavyArgv(cmd) {
 
 const playwright = path.join(desktop, 'node_modules', '.bin', 'playwright');
 const t0 = Date.now();
-const [bin, args] = heavyArgv([playwright, 'test', '-c', path.join(here, 'playwright.config.ts'), ...LAND.map((f) => path.join('tests', f))]);
-const r = spawnSync(bin, args, { cwd: desktop, stdio: 'inherit', env: process.env });
+// the list on screen, a JSON report on the side: the red checks' names (issue 28)
+const report = path.join(os.tmpdir(), `test-land-${process.pid}.json`);
+const [bin, args] = heavyArgv([playwright, 'test', '-c', path.join(here, 'playwright.config.ts'), '--reporter=list,json', ...LAND.map((f) => path.join('tests', f))]);
+const r = spawnSync(bin, args, { cwd: desktop, stdio: 'inherit', env: { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: report } });
 console.log(`test:land: ${r.status === 0 ? 'green' : 'RED'} (${LAND.length} checks, ${Math.round((Date.now() - t0) / 1000)} s with the lock wait)`);
+if (r.status !== 0) {
+  // which reds are known (tests/known_reds.txt, their owner on it) and which are new
+  const reds = redChecks(report);
+  if (reds.length) spawnSync('python3', [path.resolve(desktop, '..', '..', 'tests', 'known_reds.py'), 'split', ...reds], { stdio: 'inherit' });
+}
+rmSync(report, { force: true });
 process.exit(r.status ?? 1);
+
+/** The red checks of a Playwright JSON report, by spec name (`history-perf` for
+ * checks/app/history-perf.spec.ts): known_reds.txt's names. */
+function redChecks(file) {
+  let data;
+  try {
+    data = JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return [];
+  }
+  const red = new Set();
+  const walk = (suite) => {
+    for (const spec of suite.specs ?? []) {
+      const bad = (spec.tests ?? []).some((t) => !['expected', 'skipped', 'flaky'].includes(t.status));
+      if (bad) red.add(path.basename(spec.file ?? suite.file ?? '').replace(/\.spec\.ts$/, ''));
+    }
+    for (const s of suite.suites ?? []) walk(s);
+  };
+  for (const s of data.suites ?? []) walk(s);
+  return [...red].filter(Boolean);
+}

@@ -757,7 +757,7 @@ impl Shell {
             let (body, line) = match res {
                 Ok(o) => {
                     landed = art::landed_rec(&job.shared, &job.agent, &o.target, &o.sha, o.commits);
-                    let mut text = crate::flow::land_line(&job.agent, o.commits, &o.target, &o.sha, o.pushed);
+                    let mut text = crate::flow::land_line(&job.agent, o.commits, &o.target, &o.sha, o.pushed, o.unchecked);
                     if let Some(e) = &o.push_error {
                         text = format!("{} ({})", text, e);
                     }

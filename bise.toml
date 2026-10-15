@@ -1,0 +1,8 @@
+# bise.toml: this repo's config every checkout shares (tracked; the per-user
+# flow is .switchboard/config.toml, ignored). Read from main's tip, never from
+# the branch being landed (rust/switchboard/src/flow.rs, land_check.rs).
+
+[land]
+# run on a worktree land whose base moved, on the rebased tree, before main
+# moves, as `<check> <base> <head>`; red refuses the land (issue 28)
+check = "tests/gate.sh land"
