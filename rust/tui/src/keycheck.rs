@@ -636,8 +636,25 @@ mod tests {
             for (status, body) in [(401, ANTHROPIC_BAD_KEY), (200, "{}")] {
                 let (mut s, _) = l.accept().unwrap();
                 use std::io::{Read, Write};
+                // the whole request (headers, then Content-Length bytes):
+                // one read got only its first segment under the full
+                // suite, and closing with bytes unread sends a reset the
+                // client saw before the answer (os error 54)
+                let mut req = Vec::new();
                 let mut buf = [0u8; 4096];
-                let _ = s.read(&mut buf);
+                loop {
+                    if let Some(end) = req.windows(4).position(|w| w == b"\r\n\r\n") {
+                        let head = String::from_utf8_lossy(&req[..end]).to_ascii_lowercase();
+                        let len: usize = head.lines().find_map(|l| l.strip_prefix("content-length:")).map_or(0, |v| v.trim().parse().unwrap_or(0));
+                        if req.len() >= end + 4 + len {
+                            break;
+                        }
+                    }
+                    match s.read(&mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => req.extend_from_slice(&buf[..n]),
+                    }
+                }
                 calls += 1;
                 let _ = write!(s, "HTTP/1.1 {} X\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", status, body.len(), body);
             }
