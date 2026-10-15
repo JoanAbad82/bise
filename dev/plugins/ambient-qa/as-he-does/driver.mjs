@@ -1395,7 +1395,9 @@ async function newRows(harness, say) {
     await page.waitForTimeout(800);
     const inbox = await page.evaluate(() => !!document.querySelector('[data-testid^="inbox"], [data-testid="app.inbox"]'));
     await shot('cmd-i');
-    step('⌘I opens the inbox (CDP key; a native menu accelerator would not get it)', inbox, { inbox });
+    // ⌘I is src/main/menu.ts's CmdOrCtrl+I since inbox-screen: off-screen it is never pressed, so this
+    // row only says whether the key reached the page (cand-9d10q: it didn't); ⌃1 above opens the item
+    step('⌘I: the native menu accelerator (CmdOrCtrl+I), not reachable by CDP; read only', true, { inbox, reached: inbox });
     await page.keyboard.press('Escape');
   });
 
@@ -2829,7 +2831,7 @@ async function rows233B(harness, say) {
       return e ? { t: e.textContent, c: getComputedStyle(e).color, bg: getComputedStyle(e).backgroundColor, row: rows.at(-1).getAttribute('data-testid') } : null;
     }), 90000, 1000);
     const mine = await page.evaluate(() => {
-      const e = [...document.querySelectorAll('[data-testid="thread.list"] [data-side="me"] [data-testid="thread.artname"]')].at(-1);
+      const e = [...document.querySelectorAll('[data-testid="thread.list"] [data-side="you"] [data-testid="thread.artname"]')].at(-1);
       return e ? { t: e.textContent, c: getComputedStyle(e).color } : null;
     }).catch(() => null);
     await page.mouse.move(1, 400);
@@ -3256,10 +3258,19 @@ async function rowsC2BA(harness, say) {
     const more = page.locator('[data-testid="app.right.agents.more"]').first();
     if (/^\+ \d+ more$/.test(flat(await more.textContent({ timeout: 500 }).catch(() => '')))) await more.click({ timeout: 2000 }).catch(() => {});
   };
+  // a menu left open (the composer's Picker) or a row folded again takes the first click
+  // (cand-9d10q: 'to bise' after goAgent('zcwt'), the same click worked two rows later): esc, unfold,
+  // scroll the row in, click, three times
   const goAgent = async (a) => {
-    await unfold();
-    await page.locator(`[data-testid="app.right.agent.${a}"]`).first().click({ timeout: 5000 }).catch(() => {});
-    return until(async () => ((await agentNow()) === a ? true : null), 8000, 250);
+    for (let i = 0; i < 3; i += 1) {
+      await page.keyboard.press('Escape').catch(() => {});
+      await unfold();
+      const r = page.locator(`[data-testid="app.right.agent.${a}"]`).first();
+      await r.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+      await r.click({ timeout: 5000 }).catch(() => {});
+      if (await until(async () => ((await agentNow()) === a ? true : null), 4000, 250)) return true;
+    }
+    return null;
   };
   const T = String(Date.now()).slice(-5);
   const NL = String.fromCharCode(92) + 'n';
@@ -3330,7 +3341,8 @@ async function rowsC2BA(harness, say) {
       attach: words('composer.attach'), mode: words('composer.mode'), model: words('composer.model'),
       send: !!document.querySelector('[data-testid="composer"] [data-testid="composer.send"], [data-testid="composer"] [data-testid="composer.stop"], [data-testid="composer"] button[aria-label*="send" i]'),
       row: rowEl ? (rowEl.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) : null,
-      keys: shown('composer.keys'),
+      // the key line is the ds frame's '.keys' (ds/composer.tsx), no testid of its own
+      keys: shown('composer.keys') || [...document.querySelectorAll('[data-testid="composer"] > .keys')].some((e) => e.getBoundingClientRect().width > 0 && (e.textContent ?? '').trim() !== ''),
     };
   }).catch((e) => ({ error: String(e).slice(0, 200) }));
   const noBand = (x) => !!x && (x.after === 'none' || x.after === 'normal') && /linear-gradient/.test(x.mask ?? '') && /^[^,]* 0px 0px 0px 1px$/.test(x.shadow ?? '') && x.radius === '16px';
@@ -3533,12 +3545,13 @@ async function rowsC2BA(harness, say) {
     step("a card main withdraws mid answer stays open '· closed', the tab 'to main · the question is closed', his words kept",
       !c1.error && c1.closed && /· closed/.test(c1.word) && c1.field === c1.HALF && c1.screen, c1);
     if (c1.error) return;
-    const before = await page.evaluate(() => document.querySelectorAll('[data-testid="thread.list"] [data-side="me"]').length).catch(() => 0);
+    // his rows are data-side="you" (thread/entry.ts sideOf)
+    const before = await page.evaluate(() => document.querySelectorAll('[data-testid="thread.list"] [data-side="you"]').length).catch(() => 0);
     await field.click({ timeout: 3000 }).catch(() => {});
     await page.keyboard.press('End');
     await page.keyboard.press('Enter');
     const sent = await until(async () => page.evaluate(([h]) => {
-      const me = [...document.querySelectorAll('[data-testid="thread.list"] [data-side="me"]')];
+      const me = [...document.querySelectorAll('[data-testid="thread.list"] [data-side="you"]')];
       return me.some((e) => (e.textContent ?? '').includes(h)) ? me.length : null;
     }, [c1.HALF]), 20000, 500);
     await page.waitForTimeout(1500);
@@ -3716,6 +3729,111 @@ async function rowsC2BA(harness, say) {
     await harness();
     await answerWith(K, 1);
   });
+
+  // 3ce74eb9a's cut (desk-cut-3 m_26275). The inline inbox stacks up to 3 notifications, then a faint
+  // '+ N more · …' row (dfbd39d64, the TUI's more_row); a short window gives rows back (fitRows)
+  const S = `zcS${T}`;
+  await row('inbox stack', async () => {
+    for (let i = 1; i <= 4; i += 1) {
+      await card(`${S}${String(i)} which stack row ${String(i)}?`, ['1. zcs-yes', '2. zcs-no'], `seeded stack ${String(i)}`);
+      await idle();
+    }
+    await harness();
+    await page.keyboard.press('Escape');
+    const st = await until(async () => page.evaluate(() => {
+      const b = document.querySelector('[data-testid="inbox.block"]');
+      if (!b) return null;
+      // a row's ArtWords carries the row's testid too: one per testid
+      const ids = [...new Set([...b.querySelectorAll('[data-testid]')].filter((e) => /^inbox\.block\.row\.\d+$/.test(e.getAttribute('data-testid') ?? '') && e.getBoundingClientRect().height > 0).map((e) => e.getAttribute('data-testid')))];
+      const more = b.querySelector('[data-testid="inbox.block.more"]');
+      const out = { count: Number(b.getAttribute('data-count')), fit: Number(b.getAttribute('data-rows')), rows: ids.length, more: more ? (more.textContent ?? '').replace(/\s+/g, ' ').trim() : null, faint: more ? getComputedStyle(more.querySelector('.strip-more') ?? more).color : null };
+      return out.count >= 4 ? out : null;
+    }).catch(() => null), 60000, 1000);
+    await page.mouse.move(1, 400);
+    await shot('3ce7-inbox-stack');
+    step("the inline inbox stacks up to 3 rows (fewer only on a short window), then a faint '+ N more · …' row",
+      !!st && st.rows <= 3 && st.rows === Math.min(3, st.fit || 3, st.count) && (st.count <= st.rows || /^\+ \d+ more\b/.test(st.more ?? '')), st);
+  });
+  // no 'jan 1 1970' in the inbox (a card with no time drew the epoch)
+  await row('inbox no 1970', async () => {
+    await click('inbox', page.locator('[data-testid="app.sidebar.inbox"]').first());
+    await page.waitForTimeout(1500);
+    const words = flat(await text('[data-testid="app.main"]'));
+    await shot('3ce7-inbox-no-1970');
+    const block = flat(await text('[data-testid="inbox.block"]'));
+    step("no 'jan 1 1970' (or any 1970 date) in the inbox screen or the inline inbox", words !== '' && !/1970|\bjan 1\b/i.test(`${words} ${block}`), { screen: words.slice(0, 400), hit: /.{0,40}(1970|\bjan 1\b).{0,40}/i.exec(`${words} ${block}`)?.[0] ?? null });
+    await harness();
+  });
+  // the agents' now line fills its row, slides on the row's hover, each row with usage has its ring
+  // (018208a0e/88801bb6d, as agents-bar.spec)
+  await row('agents now line', async () => {
+    await unfold();
+    await page.mouse.move(1, 400);
+    const rows = await page.locator('[data-testid="app.right.agents"] .app-rb-arow:not(.app-rb-ghead):not(.app-rb-orphan)').evaluateAll((es) => es.map((e) => {
+      const role = e.querySelector('.app-rb-role');
+      const shown = [...e.querySelectorAll('.app-rb-time, .app-rb-pct, .app-rb-mark')].filter((x) => x.getBoundingClientRect().width > 0);
+      const first = shown.at(0);
+      const next = first !== undefined ? first.getBoundingClientRect().left : e.getBoundingClientRect().right - parseFloat(getComputedStyle(e).paddingRight);
+      const gap = shown.length > 0 ? parseFloat(getComputedStyle(e).columnGap) : 0;
+      const pct = (e.querySelector('.app-rb-pct')?.textContent ?? '').trim();
+      return { id: e.getAttribute('data-testid'), room: role ? Math.round(next - gap - role.getBoundingClientRect().right) : null, over: role?.hasAttribute('data-over') ?? false, pct, ring: !!e.querySelector('[data-testid$=".ring"]') };
+    })).catch((e) => String(e).slice(0, 200));
+    const list = Array.isArray(rows) ? rows : [];
+    const fills = list.filter((r) => r.room !== null).every((r) => r.room <= 1);
+    step("the agents' now line fills its row up to the next column (or the mark)", list.length > 0 && fills, { rows: list.slice(0, 12) });
+    const long = list.find((r) => r.over);
+    let slid = null;
+    if (long) {
+      const L = page.locator(`[data-testid="${long.id}"]`).first();
+      const read = () => page.locator(`[data-testid="${long.id}.role"]`).first().evaluate((e) => { const i = e.querySelector('.b-slide-in'); return { ends: Math.round(i.getBoundingClientRect().right - e.getBoundingClientRect().right), x: Math.round(new DOMMatrix(getComputedStyle(i).transform).m41), words: e.textContent }; }).catch(() => null);
+      const rest = await read();
+      await L.hover({ timeout: 3000 }).catch(() => {});
+      const on = await until(async () => { const r = await read(); return r && r.x < 0 && r.ends === 0 ? r : null; }, 8000, 200);
+      await shot('3ce7-now-line-slid');
+      await page.mouse.move(1, 400);
+      const back = await until(async () => { const r = await read(); return r && r.x === 0 ? r : null; }, 8000, 200);
+      slid = { id: long.id, rest, on, back };
+    }
+    step("an agent's cut now line slides on its row's hover until its last word shows, then goes home",
+      long ? !!slid?.on && slid.rest?.x === 0 && !!slid.back : true, slid ?? { why: 'no cut now line in this world: nothing to slide' });
+    // the fake provider reports no usage: a row with no % has no ring; every row with a % has one
+    step('each agent row with its context % shows its ring', list.every((r) => r.pct === '' || r.ring), { rings: list.filter((r) => r.ring).length, withPct: list.filter((r) => r.pct !== '').length });
+  });
+  // the first key after opening an inbox item goes to its answer, never the thread's draft (3ce74eb9a)
+  await row('inbox first key', async () => {
+    const F1 = `zcF${T}`;
+    await card(`${F1} first key goes where?`, ['1. zcf-yes', '2. zcf-no'], 'seeded first key');
+    await idle();
+    await harness();
+    await clear();
+    await page.keyboard.press('Escape');
+    const rowL = page.locator('[data-testid^="inbox.block.row."]', { hasText: F1 }).first();
+    const listed = await until(async () => {
+      if (await rowL.isVisible().catch(() => false)) return true;
+      await page.locator('[data-testid="inbox.block.more"]').first().click({ timeout: 1000 }).catch(() => {});
+      return null;
+    }, 30000, 1000);
+    let got = { listed: !!listed };
+    if (listed) {
+      await rowL.click({ timeout: 3000 });
+      // no wait: his key comes right after the click
+      await page.keyboard.type('zqk', { delay: 0 });
+      await page.waitForTimeout(400);
+      const answering = /answering/.test(flat(await text('[data-testid="composer"]')));
+      const inAnswer = await fieldText();
+      await shot('3ce7-inbox-first-key');
+      await page.keyboard.press('Meta+a');
+      await page.keyboard.press('Backspace');
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(600);
+      const draft = await fieldText();
+      got = { ...got, answering, inAnswer, draft };
+    }
+    step("the first key typed after opening an inbox item goes to its answer, the thread's draft untouched",
+      !!got.answering && /^zqk$/.test(got.inAnswer ?? '') && !/zqk/.test(got.draft ?? ''), got);
+    await answerWith(F1, 1);
+    for (let i = 1; i <= 4; i += 1) await answerWith(`${S}${String(i)}`, 1);
+  });
 }
 
 async function quickRows(harness, say) {
@@ -3790,6 +3908,9 @@ async function quickRows(harness, say) {
     return { n: all.length, at: all.findIndex((r) => r.getAttribute('aria-selected') === 'true'), title: all.find((r) => r.getAttribute('aria-selected') === 'true')?.textContent?.trim().slice(0, 60) ?? null };
   });
   await page.evaluate(() => { document.querySelector('[data-testid="artifacts.screen"]')?.focus(); });
+  // the kept selection comes back once the rows are in (cand-9d10q read row 0, then it jumped to the
+  // kept 'start here'): read where it starts after it settles
+  await until(async () => { const a = await selected(); await page.waitForTimeout(400); const b = await selected(); return a.at === b.at && a.n === b.n ? true : null; }, 6000, 200);
   const s0 = await selected();
   await page.keyboard.press('ArrowDown');
   await page.waitForTimeout(150);
