@@ -215,6 +215,7 @@ describe('who a question waits for (ambient m_10689)', () => {
     expect(cardLine('bise', multi, false)).toBe('? bise asks: which branch first? · in the inbox below');
     expect(cardLine('perf', '', false)).toBe('? perf asks · in the inbox below');
     expect(cardLine('perf', 'which bench?', true)).toBe('? waits for you · in the inbox below');
+    expect(cardLine('lean-install', 'lean installs: start the plan lean-install recommends?', false, 'plan')).toBe('? lean-install proposes a plan: lean installs: start the plan lean-install recommends? · in the inbox below');
   });
 });
 

@@ -123,7 +123,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
         <span className="ic-k">{closed ? `${age(now - card.since_ms)} · closed` : age(now - card.since_ms)}</span>
       </div>
       <div className="ic-q" data-testid={`${id}.q`}>
-        {full === false ? <Folded text={card.question} project={card.project} testId={`${id}.more`} q={`${id}.q`} /> : <ArtWords text={card.question} project={card.project} testId={`${id}.q`} />}
+        {full === false && card.kind !== 'plan' ? <Folded text={card.question} project={card.project} testId={`${id}.more`} q={`${id}.q`} /> : <Question card={card} id={id} />}
       </div>
       {card.page != null && <PageChip page={card.page} open={acts.openPage} id={id} />}
       {card.options.length > 0 && (
@@ -294,6 +294,29 @@ function Folded({ text, project, testId, q }: { text: string; project: string; t
   );
 }
 
+/** The question, as written; a plan's (plan-ok, designer m_26765): its question ink, the plan under it in text-2. */
+function Question({ card, id }: { card: CardRow; id: string }) {
+  const [q, gist] = card.kind === 'plan' ? planParts(card.question) : [card.question, ''];
+  return (
+    <>
+      <ArtWords text={q} project={card.project} testId={`${id}.q`} />
+      {gist !== '' && <p className="ic-qd">{gist}</p>}
+    </>
+  );
+}
+
+/** A plan's question: its first line, then what the plan does. Pure. */
+export function planParts(text: string): [string, string] {
+  const at = text.indexOf('\n');
+  return at < 0 ? [text, ''] : [text.slice(0, at), text.slice(at + 1).trim()];
+}
+
+/** What typing does (a plan's card: what he types changes it, its agent reads it; plan-ok). */
+export function typeWords(c: Pick<CardRow, 'kind' | 'agent'>, n: number): string {
+  if (c.kind === 'plan') return `or type what to change: ${c.agent === 'main' ? 'bise' : c.agent} reads it`;
+  return n > 0 ? 'or type your answer below' : 'type your answer below';
+}
+
 /** Words answer it (a question), not only its options. */
 
 /** A card's title: an approval asks like a question ('bise asks', 'search asks'; ambient m_11426:
@@ -309,6 +332,9 @@ export function kindTitle(kind: string, agent0: string): string {
   switch (kind) {
     case 'question':
       return `${agent} asks`;
+    // a plan an agent proposes (plan-ok, Gabriel's pick A): its own card, its words reach it
+    case 'plan':
+      return `${agent} proposes a plan`;
     case 'blocked':
       return `${agent} is blocked`;
     case 'failed':

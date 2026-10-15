@@ -49,6 +49,13 @@ pub(crate) fn bar(app: &App, lead: u16) -> Option<Span<'static>> {
     Some(Span::styled(format!("{}{}", g, " ".repeat(lead.saturating_sub(1) as usize)), Style::default().fg(theme::accent())))
 }
 
+/// The empty composer's words while his words answer (the desktop's
+/// `placeholder`, designer m_26765): `your answer to search, then ⏎`.
+/// None: the usual placeholder.
+pub(crate) fn placeholder(app: &App) -> Option<String> {
+    answering(app).map(|a| format!("your answer to {}, then {}", if a.who == "main" { "bise" } else { &a.who }, if theme::ascii_mode() { "enter" } else { "⏎" }))
+}
+
 /// The divider's two sides while his words answer, in `room` columns
 /// (from the label's start to the right side's end): the label
 /// ` ↳ answering search · which size… ` in the accent, the end

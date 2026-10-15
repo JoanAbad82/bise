@@ -545,6 +545,11 @@ pub fn next_daily(now: u64, minute: u32) -> u64 {
     mk(tm).unwrap_or(today + DAY_MS)
 }
 
+/// The local `HH:MM` at `ms` (a plan's 'started 11:42').
+pub fn hh_mm(ms: u64) -> String {
+    tm_of(ms).map_or_else(String::new, |t| format!("{:02}:{:02}", t.tm_hour, t.tm_min))
+}
+
 /// `14:20`, `tomorrow 07:30`, or `2025-10-04 18:00` past tomorrow.
 fn when_label(ms: u64, now: u64) -> String {
     let (Some(t), Some(n)) = (tm_of(ms), tm_of(now)) else { return format!("{} ms", ms) };

@@ -605,13 +605,14 @@ impl Store {
         Ok(out)
     }
 
-    /// The start notes just sent (kind `start`, sent, not routed yet):
-    /// marked routed to main (`to: main`); the ones marked.
-    pub fn route_starts(&self, id: &str) -> Result<Vec<Note>, String> {
+    /// The start notes just sent (kind `start`, sent, not routed yet)
+    /// that `which` takes: marked routed to `to`; the ones marked. A
+    /// plan's go to its agent (daemon/page_plan.rs), the others to main.
+    pub fn route_starts(&self, id: &str, which: &dyn Fn(&Note) -> bool, to: &str) -> Result<Vec<Note>, String> {
         let mut notes = self.notes(id);
         let mut out = Vec::new();
-        for n in notes.iter_mut().filter(|n| n.kind == "start" && n.status == "sent" && !n.extra.contains_key("to")) {
-            n.extra.insert("to".into(), Value::String("main".into()));
+        for n in notes.iter_mut().filter(|n| n.kind == "start" && n.status == "sent" && !n.extra.contains_key("to") && which(n)) {
+            n.extra.insert("to".into(), Value::String(to.into()));
             out.push(n.clone());
         }
         if !out.is_empty() {

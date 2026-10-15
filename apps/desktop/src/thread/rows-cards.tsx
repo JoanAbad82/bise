@@ -436,7 +436,7 @@ export function CardRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
         openInbox({ project: ctx.project, card: c.id });
       }}
     >
-      <ArtWords text={cardLine(shownName(ctx.agent), c.question, follows).replace(/^\? /u, '')} project={ctx.project} testId={testId} />
+      <ArtWords text={cardLine(shownName(ctx.agent), c.question, follows, c.kind ?? undefined).replace(/^\? /u, '')} project={ctx.project} testId={testId} />
     </CardLine>
   );
 }
@@ -492,8 +492,10 @@ function AnswerLink({ at, here, children, testId }: { at: AnswerAt; here: string
  * inbox below'; right under the ask it answers (the ask carries the question), '? waits for you · in
  * the inbox below'. Pure.
  */
-export function cardLine(who: string, question: string, follows: boolean): string {
+export function cardLine(who: string, question: string, follows: boolean, kind = 'question'): string {
   if (follows) return '? waits for you · in the inbox below';
   const first = question.split('\n').find((l) => l.trim() !== '')?.trim() ?? '';
-  return first === '' ? `? ${who} asks · in the inbox below` : `? ${who} asks: ${first} · in the inbox below`;
+  // a plan an agent proposes (plan-ok): its own words, as in the inbox
+  const asks = kind === 'plan' ? `${who} proposes a plan` : `${who} asks`;
+  return first === '' ? `? ${asks} · in the inbox below` : `? ${asks}: ${first} · in the inbox below`;
 }

@@ -110,8 +110,8 @@ fn serves_the_page_in_its_shell_with_the_csp() {
     assert!(t.contains("<title>weekly &lt;update&gt;</title>"));
     assert!(t.contains("<main id=\"bise-page\" data-page=\"w\" data-version=\"1\" data-latest=\"1\" data-agent=\"t1\""));
     assert!(t.contains(FRAG) && t.contains("/kit/kit.js") && t.contains("/kit/notes.js") && t.contains("/kit/tokens.css"));
-    let order: Vec<usize> = ["tokens.css", "kit.css", "notes.css", "/kit/ask.js", "/kit/kit.js", "pearl.js", "notelines.js", "notes-anchors.js", "notes-fold.js", "/kit/notes.js"].iter().map(|f| t.find(f).unwrap()).collect();
-    assert!(order.windows(2).all(|w| w[0] < w[1]), "the shell's order: tokens, kit, notes css, then ask.js, kit.js, pearl.js, notelines.js, notes-anchors.js, notes-fold.js, notes.js");
+    let order: Vec<usize> = ["tokens.css", "kit.css", "notes.css", "/kit/ask.js", "/kit/kit.js", "plan.js", "pearl.js", "notelines.js", "notes-anchors.js", "notes-fold.js", "/kit/notes.js"].iter().map(|f| t.find(f).unwrap()).collect();
+    assert!(order.windows(2).all(|w| w[0] < w[1]), "the shell's order: tokens, kit, notes css, then ask.js, kit.js, plan.js, pearl.js, notelines.js, notes-anchors.js, notes-fold.js, notes.js");
     assert!(String::from_utf8_lossy(&r.bytes()).contains(&format!("Content-Security-Policy: {CSP}\r\n")));
     assert_eq!(text(&get(&p, "/p/w/v/1/body")), FRAG);
     assert_eq!(get(&p, "/p/w/v/2").status, 404);

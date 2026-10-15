@@ -299,7 +299,7 @@ fn where_line(app: &App, agent: &str) -> Option<String> {
     if sb.agents.iter().any(|a| a.name == agent && a.main) || agent == "main" {
         return None;
     }
-    let role = sb.agents.iter().find(|a| a.name == agent).map(|a| a.role.split_whitespace().collect::<Vec<_>>().join(" ")).unwrap_or_default();
+    let role = sb.agents.iter().find(|a| a.name == agent).map(|a| shown_role(&a.role)).unwrap_or_default();
     let step = last_step(app, agent);
     match (role.is_empty(), step) {
         (true, None) => None,
@@ -307,6 +307,20 @@ fn where_line(app: &App, agent: &str) -> Option<String> {
         (true, Some(s)) => Some(format!("{agent}'s last step: {s}")),
         (false, Some(s)) => Some(format!("{agent} is {role} · its last step: {s}")),
     }
+}
+
+/// A role as the box says it, on one line; a tool call in it
+/// (`{{bash: sleep 300}}`) never shows: a role that is only one is none
+/// (designer m_26765).
+pub(crate) fn shown_role(role: &str) -> String {
+    let mut out = String::new();
+    let mut rest = role;
+    while let Some(i) = rest.find("{{") {
+        out.push_str(&rest[..i]);
+        rest = rest[i..].find("}}").map_or("", |j| &rest[i + j + 2..]);
+    }
+    out.push_str(rest);
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// The last tool row `agent` finished, in the feed this TUI holds:
@@ -935,3 +949,15 @@ mod card_keys;
 pub(crate) use card_keys::{divider_label, fit_pairs, key_pairs};
 #[path = "answer_target.rs"]
 pub(crate) mod answer_target;
+
+#[cfg(test)]
+mod role_tests {
+    /// Law: a tool call in a role never shows; a role that is only one is none.
+    #[test]
+    fn a_role_never_shows_a_tool_call() {
+        assert_eq!(super::shown_role("{{bash: sleep 300}}"), "");
+        assert_eq!(super::shown_role("lean installs {{bash: sleep 300}} by default"), "lean installs by default");
+        assert_eq!(super::shown_role("shipping\n  2.5.0"), "shipping 2.5.0");
+        assert_eq!(super::shown_role("half {{open"), "half");
+    }
+}

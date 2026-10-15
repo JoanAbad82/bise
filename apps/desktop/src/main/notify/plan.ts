@@ -9,6 +9,7 @@ import type { Card } from '../../proto';
 export const WORDS = {
   en: {
     asks: 'asks',
+    proposes: 'proposes a plan',
     open: 'open in bise',
     reply: 'Reply',
     placeholder: 'your answer',
@@ -18,6 +19,7 @@ export const WORDS = {
   },
   fr: {
     asks: 'demande',
+    proposes: 'propose un plan',
     open: 'ouvrir dans bise',
     reply: 'Répondre',
     placeholder: 'ta réponse',
@@ -67,7 +69,8 @@ export const cardKey = (project: string, id: number): string => `${project}#${id
 export function titleOf(c: Card, place: Place | undefined, lang: Lang): string {
   const who = c.agent === 'main' || c.agent === '' ? 'bise' : c.agent;
   const where = place === undefined || place.home ? '' : ` · ${place.name}`;
-  return `${who} ${WORDS[lang].asks}${where}`;
+  // a plan an agent proposes (plan-ok): 'lean-install proposes a plan'
+  return `${who} ${c.kind === 'plan' ? WORDS[lang].proposes : WORDS[lang].asks}${where}`;
 }
 
 /** The notification for a card (designer m_14211). */

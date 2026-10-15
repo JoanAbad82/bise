@@ -158,9 +158,9 @@ fn start_notes_go_to_main_not_in_the_agents_message() {
     let sent = s.send(&Target::Page("bugs".into()), 12).unwrap();
     let m = s.meta("bugs").unwrap();
     assert_eq!(notes_message(&m, "u", &sent), "", "only start notes: nothing for the page's agent");
-    let starts = s.route_starts("bugs").unwrap();
+    let starts = s.route_starts("bugs", &|_| true, "main").unwrap();
     assert_eq!(starts.len(), 2);
-    assert!(s.route_starts("bugs").unwrap().is_empty(), "routed once");
+    assert!(s.route_starts("bugs", &|_| true, "main").unwrap().is_empty(), "routed once");
     let msg = start_message(&m, "http://127.0.0.1:47100/p/bugs", &starts);
     assert!(msg.starts_with("you asked for an agent on these items of the page \"bugs\" (bugs v1, http://127.0.0.1:47100/p/bugs):\n1. item b2 \"login fails on Safari\"\n2. item b3: this one first\n"), "{msg}");
     assert!(msg.contains("ask t1 (the page's agent) to publish it again with data-agent=") && msg.contains("<page-start page=\"bugs\" version=\"1\">[{"), "{msg}");

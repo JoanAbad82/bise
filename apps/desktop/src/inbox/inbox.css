@@ -54,6 +54,8 @@
 .ic-k { flex: none; margin-left: auto; color: var(--c-text-3); }
 /* over 55vh the question gives way first (it scrolls), then the options (they scroll); the header and the footer always show */
 .ic-q { flex: 0 1000 auto; margin: var(--gap-tight) 0 var(--gap-block); min-height: 0; overflow-y: auto; font: 15px/1.45 var(--font-read); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* a plan's card: what it does, under its question (plan-ok, designer m_26765) */
+.ic-qd { margin: calc(var(--s-1) * 1.5) 0 0; color: var(--c-text-2); }
 .ic-opts { display: flex; flex-direction: column; gap: var(--gap-tight); flex: 0 1 auto; min-height: 0; overflow-y: auto; }
 .ic-opt { flex: none; }
 .ic-opt {

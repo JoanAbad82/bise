@@ -1,0 +1,48 @@
+"""A plan an agent proposes, in a real terminal (tmux, 80 columns) against
+the fake provider (plan-ok, Gabriel's pick A): main publishes a page whose
+plan lean-install runs; the inbox box has lean-install's item, and opened
+in place it reads 'lean-install proposes a plan', the question, the gist
+whole, its 4 choices, and 'or type what to change: lean-install reads it';
+words typed there answer it, and lean-install gets them.
+
+python3 -u tests/tui_plan_tmux.py
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from tui_tmux import tui_session, run, MAIN_IDLE  # noqa: E402
+
+COLS, ROWS = 80, 40
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CTRL = "\x1b[%d;5u"   # ctrl+digit, the kitty keyboard protocol's form
+
+
+def main():
+    with tui_session(COLS, ROWS, env="BISE_CTRL_DIGITS=1") as t:
+        t.wait("bise :*")
+        t.wait_re(MAIN_IDLE)
+        page = os.path.join(t.E.tmp, "lean.html")
+        open(page, "w").write(open(os.path.join(ROOT, "kit", "examples", "lean-plan.html")).read())
+        t.typed("/new lean-install: make installs lean by default {{bash: sleep 300}}")
+        t.keys("Enter")
+        t.wait("lean-install")
+        t.typed('[[bash: sb page publish %s --id lean --title "lean installs"]]' % page)
+        t.keys("Enter")
+        t.wait("1 waiting for you", 90)
+        t.typed(CTRL % ord("1"))
+        sc = t.wait("lean-install proposes a plan")
+        sc = t.wait("or type what to change: lean-install reads it")
+        for words in ("lean installs: start the plan lean-install recommends?", "1 start the plan", "open the plan"):
+            assert words in sc.replace("\n", " ") or words in sc, (words, sc)
+        assert "bise asks" not in sc and "send these" not in sc, sc
+        if os.environ.get("SHOT_OUT"):
+            open(os.environ["SHOT_OUT"], "w").write(sc)
+        # his words answer it: lean-install gets them
+        t.typed("ok, but keep win32: we need it")
+        t.keys("Enter")
+        t.wait("sent to lean-install", 30)
+
+
+if __name__ == "__main__":
+    run(main)

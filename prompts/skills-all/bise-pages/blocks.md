@@ -19,7 +19,25 @@ unique, and stay the same across versions (the user's notes anchor on them): `p1
 A `data-to` is a short label in the user's language, whatever language the draft itself is in:
 `Slack · reply to Benjamin, on French`, never `on français` (notifications and batch lines read it).
 | `compare` | 2 to 4 options side by side (venues, drafts, tools) | `<ol>` of `<li data-id="moulin">`: an `<h3>` name, a `<ul>` of facts, a `<p>` with the why |
+| `plan` | a plan you propose and run yourself (PRs, a migration) | `data-agent="<your name>"`, `data-do="start the plan"`; an `<h3>` name, one `<p>`: what it does and gains in one or two whole sentences, then `<ol>` of `<li data-id="p1"><strong>part</strong> what it does</li>`; `data-optional` on a part that can go |
 | `checklist` | what's left to do, who, by when | `<ol>` of `<li data-id="t1" data-who="Camille" data-due="2026-05-20">` the task `</li>`; `data-done` when done; the kit shows `Camille · friday` and what is late. `data-who="yours"`: a step only the user can do (a payment, a login): `you · friday`, and a notification when every step before it is done; your own steps: `data-who="bise"` or none |
+
+**A plan you propose** (you run it: PRs, a migration, a fix in parts): one `plan` block, never a
+`review`. Review is for items he handles one by one (mails, tickets, comments); a plan is one pick.
+`data-agent` is you (who runs it), `data-do` its verb (`start the plan`). Its `<p>` is what the
+notification says, whole: what it does and gains in one or two sentences (`3 PRs, about −2.6 GB a
+worktree: pnpm installs lean by default, AGENTS.md says which install to run, and win32 leaves the
+platform binaries`), never a list cut short. The other ways worth a pick (1 to 3) go right after it
+in a `compare` with `data-for="<the plan's id>"`, each `<li data-id data-do="start it, but keep
+win32">` with an `<h3>` name and a `<p>` why: `data-do` is the notification's choice, words that
+say what happens. The hub makes one notification, from you: `<page>: start the plan <you>
+recommends?`, your `<p>`, `1 start the plan`, one choice per other way, `open the plan and its
+alternatives`; what he types instead comes to you as his words: change the plan and publish the
+next version (it replaces the notification). His start (the notification or the page's button)
+comes to you as `the user started your plan …` or `… the other way …`: start it now, then publish
+again with `data-started="11:42"` on the plan (or on the way he picked) and `data-done="12:10"` (the
+time) on each part as it lands; the page shows `∿ <you> is on 2 · started 11:42`, then `✓ done 12:10`.
+See `examples/lean-plan.html`.
 
 **A plan you work through with him** (buy the domain, set up the offsite): its checklist is
 marked `data-plan` (`<section data-kit="checklist" data-id="steps" data-plan>`): only then do
@@ -71,7 +89,7 @@ Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small
   new)` is two columns (`total`, `new today`). In prose, a key number in `<code>`.
 - **Items** (review, compare, checklist) keep their `data-id` across versions. Each reaction
   comes back to you as a note with the item's id: review `approve` / `skip`, email `approve` /
-  `skip`, compare `keep` / `drop` / `pick`, checklist `tick`. Sending, replying or booking is
+  `skip`, compare `keep` / `drop` / `pick`, checklist `tick`, a plan's `start` (to you). Sending, replying or booking is
   still your tool call, after the user's word.
 - **Drafts** (a Slack message, a post, a reply) go in a `message` block, a mail in an `email`
   block: never in `<pre>` or `<code>`, those are for code.

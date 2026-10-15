@@ -247,6 +247,30 @@ body {
 #bise-page [data-kit="email"] > [data-kit-ui] { margin-top: var(--space-4); }
 #bise-page [data-kit="email"][data-verdict="skip"] > :not([data-kit-ui]) { opacity: .45; }
 
+/* plan (plan-ok): the plan an agent proposes, a card: its name, what it does, its parts in
+   order, one ink start; started, a quiet line says who is on which part */
+[data-kit="plan"] { background: var(--surface-card); border-radius: 10px; padding: var(--space-4) 22px; margin: var(--space-4) 0; box-shadow: 3px 3px 0 var(--drop); }
+#bise-page [data-kit="plan"] > h3 { margin: 0 0 6px; }
+#bise-page [data-kit="plan"] > p:not([data-kit-ui]) { margin: 0 0 var(--space-3); }
+#bise-page [data-kit="plan"] > ol { margin: 0 0 var(--space-4); padding-left: 1.4em; }
+#bise-page [data-kit="plan"] > ol > li { margin: 0 0 var(--space-2); font: var(--text-small)/1.5 var(--font-ui); }
+#bise-page [data-kit="plan"] > ol > li > strong { display: block; font-weight: 600; }
+#bise-page [data-kit="plan"] > ol > li[data-done] > strong::before { content: "✓ "; color: var(--accent); }
+#bise-page [data-kit="plan"] li > [data-when] { display: inline; margin-left: var(--space-2); font: 12px var(--font-mono); color: var(--kick); }
+#bise-page [data-kit="plan"] button[data-plan-act="start-plan"] { background: var(--ink); color: var(--surface-made); }
+#bise-page [data-kit-ui] [data-started-line] { font: var(--text-small)/1.5 var(--font-ui); color: var(--ink); }
+#bise-page [data-started-line] > [data-mark] { font-family: var(--font-mono); }
+#bise-page [data-started-line="working"] > [data-mark] { color: var(--dim); display: inline-block; animation: bise-breathe 2.4s var(--ease-arrive) infinite alternate; }
+#bise-page [data-started-line="done"] > [data-mark] { color: var(--accent); }
+/* a way's only control is its start (plan.js): no ♡ ✗ pick (a start is the pick), and once another
+   one started, no bar at all: the card shrinks to its text (designer m_26765) */
+#bise-page [data-kit="compare"][data-for] li[data-id] > [data-kit-ui]:not([data-way-go]), #bise-page [data-kit="compare"] li[data-id] > [data-way-go][hidden] { display: none; }
+/* (its cards are plain columns, not the subgrid's 4 shared rows, whose empty tracks kept the height) */
+#bise-page [data-kit="compare"][data-for] li[data-id] { display: flex; grid-row: auto; }
+#bise-page [data-kit="compare"][data-for] li[data-id] > * { align-self: auto; }
+/* its other ways: a compare named by data-for, 'other ways' above, 'start this one' under each */
+#bise-page [data-kit="compare"] > [data-ways] { font: var(--text-kicker)/2 var(--font-mono); color: var(--kick); margin: 0 0 var(--space-2); }
+
 /* compare: 2 to 4 variants side by side, each a card with its facts and its why; ♡ ✗ pick under it */
 #bise-page [data-kit="compare"] > :is(ol, ul) { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); }
 #bise-page [data-kit="compare"] li[data-id] { display: flex; flex-direction: column; margin: 0; background: var(--surface-card); border-radius: 10px; padding: var(--space-3) var(--space-4); box-shadow: 3px 3px 0 var(--drop); font-size: var(--text-small); transition: opacity .3s var(--ease-arrive), box-shadow .3s var(--ease-arrive); }

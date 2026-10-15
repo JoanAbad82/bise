@@ -9,6 +9,10 @@
 
 use super::*;
 
+// a plan's own card (plan-ok): its own file, beside the drafts' batch card
+#[path = "page_plan.rs"]
+mod page_plan;
+
 /// What a page's path did with a line he sent ([`Shell::page_first`]).
 pub(super) enum Page {
     /// taken there (a step ticked, a drafts or replaced batch card)
@@ -66,6 +70,18 @@ impl Shell {
                         if let Some(s) = p.store.steps(id).into_iter().find(|s| Some(s.card) == card && !s.info.is_null()) {
                             c["batch"] = s.info;
                         }
+                        continue;
+                    }
+                    // a plan's own card (plan-ok): the page at the plan; its
+                    // last option ('open the plan and its alternatives')
+                    // opens it in the app, nothing sent (notif-open)
+                    if let Some(b) = block.strip_prefix("plan:") {
+                        let url = format!("{}#{}", p.url(id), b);
+                        let n = c["text"].as_str().map_or(0, |t| bise_proto::rows::split_choices(t).1.len()) as u32;
+                        if n > 0 {
+                            c["opens"] = crate::card_link::opens_json(&[(n, bise_proto::rows::OptAct::artifact(id, Some(b), Some(&url)))]);
+                        }
+                        c["page"] = json!({"id": id, "block": b, "url": url});
                         continue;
                     }
                     // a step of his: its row (roadmap D)
@@ -270,6 +286,8 @@ impl Shell {
         // data-plan makes step cards (the filter on `due` below). A
         // promises page or a meeting page has none, so its rows of his
         // show in sb page waiting and the state's overdue count only.
+        // a plan's own card (plan-ok, page_plan.rs): no batch card beside it
+        let planned = self.page_plan(id);
         let Some(pages) = self.pg.pages.clone() else { return };
         let Some(meta) = pages.store.meta(id) else { return };
         let html = pages.store.html(id, meta.version()).unwrap_or_default();
@@ -279,7 +297,7 @@ impl Shell {
         // drafts batch on any page but a promises or meeting page (never a
         // card there): a feedback page's replies have no plan (pm's C fail
         // 42: 3 Slack replies and no card)
-        let drafts = match crate::pages::drafts::carded(id) {
+        let drafts = match crate::pages::drafts::carded(id) && !planned {
             // (a draft whose item's agent is still at work waits: m_6168)
             true => crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &notes, &pages.store.questions(id), &meta.went_blocks()), &|a| pages.held(id, a, meta.version())),
             false => Vec::new(),
@@ -316,7 +334,7 @@ impl Shell {
             steps = kept;
         }
         changed |= self.page_batch(id, &meta.title, &mut steps, &drafts, &open);
-        for s in steps.iter_mut().filter(|s| s.reply.is_none() && s.block != crate::pages::checklist::BATCH) {
+        for s in steps.iter_mut().filter(|s| s.reply.is_none() && s.block != crate::pages::checklist::BATCH && !s.block.starts_with("plan:")) {
             let still = due.iter().any(|r| r.block == s.block && r.item == s.item);
             if still && open.contains(&s.card) {
                 continue;
@@ -702,6 +720,9 @@ impl Shell {
         if key.starts_with("drafts:") {
             return self.page_drafts_answer(client, &id, card, reply);
         }
+        if key.starts_with("plan:") {
+            return self.page_plan_answer(client, &id, card, reply);
+        }
         match key.strip_prefix("row:").and_then(|k| k.split_once('/')).map(|(_, i)| i.to_string()) {
             Some(item) => self.page_tick(&id, &item, reply),
             None => self.page_question_answer(&id, &key, card, reply, "inbox"),
@@ -778,9 +799,11 @@ impl Shell {
         }
         for (card, id, block) in closed {
             self.page_cards().remove(&card);
-            if block.starts_with("row:") {
+            if block.starts_with("row:") || block.starts_with("plan:") {
                 // a step's card closed another way (the user closed it):
-                // it stays closed; a tick still ticks the row
+                // it stays closed; a tick still ticks the row (a plan's:
+                // not asked again for that version, its page's button
+                // still starts it)
                 let mut steps = pages.store.steps(&id);
                 for s in steps.iter_mut().filter(|s| s.card == card && s.reply.is_none()) {
                     s.reply = Some(String::new());

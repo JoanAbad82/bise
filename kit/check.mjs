@@ -71,7 +71,9 @@ const events = [];
 class CustomEvent { constructor(type, init) { this.type = type; this.detail = init && init.detail; } }
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Map, WeakMap, String, Number, Date, CustomEvent, parseInt });
 vm.runInContext(readFileSync(join(here, "kit.js"), "utf8"), ctx, { filename: "kit.js" });
+vm.runInContext(readFileSync(join(here, "plan.js"), "utf8"), ctx, { filename: "plan.js" });
 const K = ctx.BiseKit;
+const PL = ctx.BisePlan;
 const doc = { dispatchEvent: (e) => events.push({ type: e.type, detail: JSON.parse(JSON.stringify(e.detail)) }), createElement: (t) => new El(t) };
 const j = (x) => JSON.parse(JSON.stringify(x));
 
@@ -623,6 +625,48 @@ law("a write his word triggers is its own action block: its button says the writ
   assert.equal(bars.length, 1, "one bar, however often it is decorated");
   assert.deepEqual(bars[0].children.map((b) => b.textContent), ["close OPS-12", "skip"]);
   assert.equal(K.react(a, null, "approve").kind, "approve");
+});
+
+law("a plan (plan.js): one start saying its verb, optional parts say so, never approve or skip; started, who is on which part; its other ways each start", () => {
+  const main = parse(readFileSync(join(here, "examples", "lean-plan.html"), "utf8"));
+  const [, plan, ways] = blocks(main);
+  PL.draw(doc, main);
+  PL.draw(doc, main);
+  const bar = (b) => b.children.filter((n) => n.hasAttribute("data-kit-ui"));
+  assert.equal(bar(plan).length, 1, "one bar, however often it is drawn");
+  assert.deepEqual(bar(plan)[0].children.map((b) => [b.getAttribute("data-plan-act"), b.textContent]), [["start-plan", "start the plan"]]);
+  assert.ok(!bar(plan)[0].children.some((b) => b.hasAttribute("data-act")), "no kit.js act: a start is no approve");
+  const parts = K.options(plan);
+  assert.deepEqual(parts.map((li) => li.children.filter((n) => n.hasAttribute("data-when")).map((t) => t.textContent).join("")), ["", "", "optional"]);
+  assert.equal(bar(ways)[0].textContent, "other ways");
+  const wayWords = () => K.options(ways).map((li) => li.children.filter((n) => n.hasAttribute("data-way-go")).flatMap((u) => u.children).map((b) => b.textContent));
+  assert.deepEqual(wayWords(), [["start this one"], ["start this one"]]);
+  // clicked: starting…, and the ways' starts go
+  plan.setAttribute("data-starting", "");
+  PL.draw(doc, main);
+  assert.equal(bar(plan)[0].children[0].textContent, "starting…");
+  assert.deepEqual(wayWords(), [[], []]);
+  // the agent marks it: '∿ lean-install is on 2 · started 11:42' (working, its real name), then '✓ done 12:10'
+  plan.removeAttribute("data-starting");
+  plan.setAttribute("data-started", "11:42");
+  parts[0].setAttribute("data-done", "11:58");
+  PL.draw(doc, main);
+  assert.equal(bar(plan)[0].textContent, "∿ lean-install is on 2 · started 11:42");
+  assert.equal(bar(plan)[0].children[0].getAttribute("data-started-line"), "working");
+  for (const li of parts) li.setAttribute("data-done", "12:10");
+  PL.draw(doc, main);
+  assert.equal(bar(plan)[0].textContent, "✓ done 12:10");
+  assert.equal(bar(plan)[0].children[0].getAttribute("data-started-line"), "done");
+  // the ways' bars are hidden once their starts go: the cards shrink to their text
+  assert.ok(K.options(ways).every((li) => li.children.find((n) => n.hasAttribute("data-way-go")).hasAttribute("hidden")));
+  // an other way started: it says so
+  plan.removeAttribute("data-started");
+  K.options(ways)[1].setAttribute("data-started", "11:50");
+  PL.draw(doc, main);
+  const go = K.options(ways)[1].children.filter((n) => n.hasAttribute("data-way-go"))[0];
+  assert.equal(go.textContent, "∿ lean-install is on it · started 11:50");
+  assert.ok(!go.hasAttribute("hidden"));
+  assert.deepEqual(j(PL.core.wayBar({ started: null, starting: false }, true)), {}, "another started: no start");
 });
 
 law("a page opened with ?theme=light|dark wears it (the desktop window's pref), else the system's", () => {

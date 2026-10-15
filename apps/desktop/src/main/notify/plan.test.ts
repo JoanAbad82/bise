@@ -24,6 +24,9 @@ describe('notify plan: what one notification says (designer m_14211)', () => {
     expect(titleOf(card({ agent: 'main' }), acme, 'en')).toBe('bise asks · acme');
     expect(titleOf(card(), { name: 'bise', home: true }, 'en')).toBe('search asks');
     expect(titleOf(card(), acme, 'fr')).toBe('search demande · acme');
+    // a plan an agent proposes (plan-ok): its own words
+    expect(titleOf(card({ kind: 'plan', agent: 'lean-install' }), acme, 'en')).toBe('lean-install proposes a plan · acme');
+    expect(titleOf(card({ kind: 'plan', agent: 'lean-install' }), acme, 'fr')).toBe('lean-install propose un plan · acme');
   });
 
   it("a question: its choices then 'open in bise', a reply field; the body is the question as written", () => {

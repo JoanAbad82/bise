@@ -17,8 +17,10 @@ use super::questions::text_of;
 pub const OPEN: &str = "open the plan and its alternatives";
 /// The same with no alternative on the page.
 pub const OPEN_ALONE: &str = "open the plan";
-/// At most this many alternatives are options on the notification.
-pub const MAX_ALTS: usize = 3;
+/// At most this many alternatives are options on the notification (4
+/// rows with the start and the page, designer m_26765); a 3rd lives on
+/// the page, reached by 'open the plan and its alternatives'.
+pub const MAX_ALTS: usize = 2;
 
 /// One other way to do it: an item of the plan's compare.
 #[derive(Clone, Debug, PartialEq)]
@@ -47,6 +49,8 @@ pub struct Plan {
     /// `data-started` on the block: the time it was started
     pub started: Option<String>,
     pub alts: Vec<Alt>,
+    /// the compare block of its other ways
+    pub ways: Option<String>,
 }
 
 impl Plan {
@@ -56,7 +60,7 @@ impl Plan {
     }
 
     /// The notification's options, in order: its verb, each other way
-    /// (3 at most), then the page.
+    /// (2 at most), then the page.
     pub fn choices(&self) -> Vec<String> {
         let mut out = vec![self.todo.clone()];
         out.extend(self.alts.iter().take(MAX_ALTS).map(|a| a.todo.clone()));
@@ -76,7 +80,38 @@ impl Plan {
             t => format!("{t}: {q}"),
         };
         let opts: Vec<String> = self.choices().iter().enumerate().map(|(i, c)| format!("{}. {c}", i + 1)).collect();
-        format!("{q}\n{}\n{}", self.gist, opts.join("\n"))
+        // a blank line before the options: a gist that starts with a
+        // number ('3 PRs, …') is never read as one of them
+        format!("{q}\n{}\n\n{}", self.gist, opts.join("\n"))
+    }
+
+    /// What a start note on `block` (and `item`) starts: the plan, its
+    /// other way n, or nothing of it.
+    pub fn start_of(&self, block: &str, item: Option<&str>) -> Option<PlanAnswer<'static>> {
+        if block == self.block {
+            return Some(PlanAnswer::Start);
+        }
+        if self.ways.as_deref() != Some(block) {
+            return None;
+        }
+        self.alts.iter().position(|a| Some(a.item.as_str()) == item).map(PlanAnswer::Alt)
+    }
+
+    /// The message to the agent that runs it: he started it (or its other
+    /// way `alt`) at `at`, from the notification or the page; start now,
+    /// then publish the plan again with data-started.
+    pub fn start_message(&self, title: &str, page: &str, version: u64, url: &str, alt: Option<usize>, at: &str) -> String {
+        let (what, mark) = match alt.and_then(|i| self.alts.get(i)) {
+            Some(a) => (
+                format!("the other way \"{}\" ({}) of your plan \"{}\"", a.name, a.todo, self.name),
+                format!("data-started=\"{at}\" on its item {} in the compare {}", a.item, self.ways.as_deref().unwrap_or("")),
+            ),
+            None => (format!("your plan \"{}\"", self.name), format!("data-started=\"{at}\" on the plan block {}", self.block)),
+        };
+        format!(
+            "the user started {what} at {at}, on the page \"{title}\" ({page} v{version}, {url}). start it now, part by part; \
+then publish the page again with {mark}, and data-done=\"<HH:MM>\" on each part as it lands: the page shows '∿ <you> is on 2 · started {at}', then '✓ done' with the last part's time."
+        )
     }
 
     /// The card's key in steps.json: one card per plan, replaced by a
@@ -95,9 +130,11 @@ pub fn of_fragment(html: &str) -> Option<Plan> {
     let gist = first(body, "p").map(text_of).unwrap_or_default();
     // the parts are its <ol>; a <ul> before it holds the gains
     let parts = items(first(body, "ol").unwrap_or("")).into_iter().map(|(h, b)| (attr(h, "data-id").unwrap_or_default(), title_of(b))).collect();
+    let of_plan = |h: &&str| attr(h, "data-kit").as_deref() == Some("compare") && attr(h, "data-for").as_deref() == Some(block.as_str());
+    let ways = sections(html).into_iter().find(|(h, _)| of_plan(h)).and_then(|(h, _)| attr(h, "data-id"));
     let alts = sections(html)
         .into_iter()
-        .filter(|(h, _)| attr(h, "data-kit").as_deref() == Some("compare") && attr(h, "data-for").as_deref() == Some(block.as_str()))
+        .filter(|(h, _)| of_plan(h))
         .flat_map(|(_, b)| items(b))
         .filter_map(|(h, b)| {
             Some(Alt { item: attr(h, "data-id")?, todo: attr(h, "data-do")?, name: title_of(b), started: attr(h, "data-started").filter(|s| !s.is_empty()) })
@@ -112,6 +149,7 @@ pub fn of_fragment(html: &str) -> Option<Plan> {
         parts,
         started: attr(head, "data-started").filter(|s| !s.is_empty()),
         alts,
+        ways,
     })
 }
 
@@ -250,7 +288,7 @@ mod tests {
         assert_eq!(
             p.card_text("lean installs"),
             "lean installs: start the plan lean-install recommends?\n\
-3 PRs, about −2.6 GB and −2 min 40 for each new worktree: pnpm installs lean by default, AGENTS.md says which install to run, and win32 leaves the platform binaries (that one goes through CI).\n\
+3 PRs, about −2.6 GB and −2 min 40 for each new worktree: pnpm installs lean by default, AGENTS.md says which install to run, and win32 leaves the platform binaries (that one goes through CI).\n\n\
 1. start the plan\n2. start it, but keep win32\n3. start all 3 and linux/arm64\n4. open the plan and its alternatives"
         );
         assert!(!p.is_started());
@@ -259,13 +297,14 @@ mod tests {
         assert_eq!(alone.choices(), vec!["start the plan", "open the plan"]);
     }
 
-    /// Law: at most 3 other ways are options; the page stays last.
+    /// Law: at most 2 other ways are options (4 rows); the rest live on
+    /// the page, which stays last.
     #[test]
-    fn at_most_three_other_ways() {
+    fn at_most_two_other_ways() {
         let alt = |i: usize| format!(r#"<li data-id="a{i}" data-do="way {i}"><h3>way {i}</h3></li>"#);
         let html = format!(r#"<section data-kit="plan" data-id="pl" data-agent="x" data-do="start the plan"><h3>n</h3><p>g</p><ol><li data-id="p1">a</li></ol></section><section data-kit="compare" data-id="o" data-for="pl"><ol>{}</ol></section>"#, (1..=4).map(alt).collect::<String>());
         let p = of_fragment(&html).unwrap();
-        assert_eq!(p.choices(), vec!["start the plan", "way 1", "way 2", "way 3", OPEN]);
+        assert_eq!(p.choices(), vec!["start the plan", "way 1", "way 2", OPEN]);
         // a compare for another block is not its other ways
         assert!(of_fragment(&html.replace("data-for=\"pl\"", "data-for=\"other\"")).unwrap().alts.is_empty());
     }
@@ -286,6 +325,21 @@ mod tests {
         assert_eq!(answer("ok, but keep win32: we need it", &p), PlanAnswer::Words("ok, but keep win32: we need it"));
         assert_eq!(answer("2 but shorter", &p), PlanAnswer::Words("2 but shorter"));
         assert_eq!(answer("  ", &p), PlanAnswer::Empty);
+    }
+
+    /// Law: a start note names the plan or one of its other ways; the
+    /// agent hears which, and how to mark it started.
+    #[test]
+    fn a_start_names_the_plan_or_its_other_way() {
+        let p = of_fragment(LEAN).unwrap();
+        assert_eq!(p.ways.as_deref(), Some("others"));
+        assert_eq!(p.start_of("plan", None), Some(PlanAnswer::Start));
+        assert_eq!(p.start_of("others", Some("arm64")), Some(PlanAnswer::Alt(1)));
+        assert_eq!((p.start_of("others", Some("nope")), p.start_of("title", None)), (None, None));
+        let m = p.start_message("lean installs", "lean", 4, "http://x/p/lean", Some(0), "11:42");
+        assert!(m.starts_with("the user started the other way \"1 and 2 only\" (start it, but keep win32) of your plan \"make installs lean by default\" at 11:42"), "{m}");
+        assert!(m.contains("data-started=\"11:42\" on its item keep-win32 in the compare others"), "{m}");
+        assert!(p.start_message("t", "lean", 4, "u", None, "9:05").contains("data-started=\"9:05\" on the plan block plan"));
     }
 
     /// Law: started from either door, the plan is started (no card).

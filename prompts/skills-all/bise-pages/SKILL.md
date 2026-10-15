@@ -93,6 +93,7 @@ Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kep
 - `checklist`: `<li data-id data-who data-due="2026-05-20">`, `data-done` when done. A plan
   worked through with him (buy the domain, set up the offsite): read "a plan" in `blocks.md`
   before you publish one.
+- `plan`: a plan you propose and run, never a `review`: "a plan you propose", `blocks.md`.
 
 **A draft of anything that leaves goes in its own block, never in prose:** a Slack message or a
 post in a `message` block (`data-to="Slack · #team"`: `copy` and `open #team`), a mail or a

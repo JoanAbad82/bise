@@ -369,7 +369,9 @@ impl Shell {
                     pages.push(&id, "notes", &json!({"notes": pages.store.notes(&id)}));
                     self.page_watch_push();
                 }
-                let starts = pages.locked(|s| s.route_starts(&id)).unwrap_or_default();
+                // a plan's start goes to its agent (plan-ok), the others to main
+                self.page_plan_starts(&id);
+                let starts = pages.locked(|s| s.route_starts(&id, &|_| true, MAIN)).unwrap_or_default();
                 if let (false, Some(meta)) = (starts.is_empty(), pages.store.meta(&id)) {
                     let msg = crate::pages::store::start_message(&meta, &pages.url(&id), &starts);
                     let msg = Self::page_hint(MAIN, msg);

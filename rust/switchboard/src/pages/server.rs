@@ -247,7 +247,7 @@ pub fn esc(s: &str) -> String {
 fn shell(pages: &Pages, title: &str, head: &str, main_attrs: &str, inner: &str) -> String {
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<meta name=\"bise-token\" content=\"{}\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/kit/tokens.css\">\n<link rel=\"stylesheet\" href=\"/kit/kit.css\">\n<link rel=\"stylesheet\" href=\"/kit/notes.css\">\n<script src=\"/kit/ask.js\" defer></script>
-<script src=\"/kit/kit.js\" defer></script>\n<script src=\"/kit/pearl.js\" defer></script>\n<script src=\"/kit/notelines.js\" defer></script>
+<script src=\"/kit/kit.js\" defer></script>\n<script src=\"/kit/plan.js\" defer></script>\n<script src=\"/kit/pearl.js\" defer></script>\n<script src=\"/kit/notelines.js\" defer></script>
 <script src=\"/kit/notes-anchors.js\" defer></script>
 <script src=\"/kit/notes-fold.js\" defer></script>
 <script src=\"/kit/notes.js\" defer></script>\n{head}</head>\n<body>\n<main {main_attrs}>\n{inner}\n</main>\n</body>\n</html>\n",
