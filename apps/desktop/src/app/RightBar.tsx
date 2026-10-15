@@ -257,11 +257,9 @@ function Row({ r, onOpen, on, onOpenPr }: { r: BarRow; onOpen: () => void; on?: 
             {r.cu.g}
           </span>
         )}
-        {/* the now line takes all that is left up to the filled columns, cut with '…' and cut first;
+        {/* the now line takes all that is left up to the filled columns, cut first, after a whole word;
             the row's hover slides it to show the rest (ds Slide, his ask m_26200) */}
-        <Slide className="app-rb-role" full={r.sub} testId={`${r.testId}.role`}>
-          {r.sub}
-        </Slide>
+        <Slide className="app-rb-role" text={r.sub} testId={`${r.testId}.role`} />
         {!head && (
           // time 40 px, the ring 12 px (with its % from 70 %: 40 px on every row then), right-aligned;
           // short on room the % wraps away first, then the time

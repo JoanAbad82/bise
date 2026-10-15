@@ -4,31 +4,7 @@
 // left, the CSS ellipsis says the rest. The pause line measures the same way. Owner: amb-win.
 import { useLayoutEffect, useRef, useState } from 'react';
 import { fitNote } from '@/thread/wake';
-
-let canvas: CanvasRenderingContext2D | null | undefined;
-/** A text's width in px in `font` (a CSS font shorthand). */
-export function textWidth(font: string): (s: string) => number {
-  canvas ??= document.createElement('canvas').getContext('2d');
-  const ctx = canvas;
-  if (ctx === null) return (s) => s.length * 7;
-  ctx.font = font;
-  return (s) => ctx.measureText(s).width;
-}
-
-/**
- * Whole words that fit `avail` (an agent's role in the right bar, desktop-agents-bar §2, designer
- * m_23711): the text, else its longest run of whole words with '…', else '' (not even one whole
- * word fits: the words go whole, never a cut word). Pure.
- */
-export function wholeWords(text: string, avail: number, width: (s: string) => number): string {
-  if (width(text) <= avail) return text;
-  const words = text.split(/\s+/u).filter((x) => x !== '');
-  for (let k = words.length - 1; k >= 1; k--) {
-    const cut = `${words.slice(0, k).join(' ')}…`;
-    if (width(cut) <= avail) return cut;
-  }
-  return '';
-}
+import { textWidth, wholeWords } from '@/ds';
 
 /**
  * `whole`: cut by `wholeWords` (one whole word at least, else nothing), its whole text on hover.

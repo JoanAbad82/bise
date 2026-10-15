@@ -29,7 +29,7 @@ describe('the right bar marks', () => {
     expect(signTip('?', agent({ waits: 1 }), NOW)).toBe('? perf waits for you');
     expect(signTip('…', agent({ status: 'working', waiting_on: { who: 'agent', name: 'docs' } }), NOW)).toBe('… perf continues when docs answers');
     expect(signTip('…', agent({ status: 'working', waiting_on: { who: 'agent', name: 'main' } }), NOW)).toBe('… perf continues when bise answers');
-    expect(signTip('▲', agent({ status: 'failed' }), NOW)).toBe('▲ perf failed');
+    expect(signTip('✗', agent({ status: 'failed' }), NOW)).toBe('✗ perf failed');
     expect(signTip('✓', agent({ status: 'done' }), NOW)).toBe('✓ perf is done');
     expect(signTip('○', agent({}), NOW)).toBe('○ perf is idle');
     expect(signTip('○', agent({}), NOW, '14:20')).toBe('○ perf is idle: wakes at 14:20');

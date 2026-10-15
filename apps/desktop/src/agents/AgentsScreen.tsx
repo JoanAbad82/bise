@@ -209,9 +209,7 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: 
           app/clicks), and an agent with neither stays one line high (designer m_19489); a cut
           line slides on the row's hover to show the rest (ds Slide, his ask m_26200) */}
       {lineOf(a) !== '' && (
-        <Slide className="ag-line" full={lineOf(a)} testId={`agents.line.${id}`}>
-          {lineOf(a)}
-        </Slide>
+        <Slide className="ag-line" text={lineOf(a)} testId={`agents.line.${id}`} />
       )}
       {a.report != null && (
         <p className="ag-report" title={`${a.report.kind} · ${a.report.text}`} data-testid={`agents.report.${id}`}>

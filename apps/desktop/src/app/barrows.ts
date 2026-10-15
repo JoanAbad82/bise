@@ -92,7 +92,7 @@ const idOf = (all: boolean, project: string, name: string) => (all ? `${project}
 
 /**
  * The bar's sign (desktop-agents-bar §2), the TUI's: the breeze while it works, '?' pink when it
- * waits for him, '✓' pink done, '▲' red failed, '…' when it waits on an event or another agent,
+ * waits for him, '✓' pink done, '✗' red failed (designer m_26248: '▲' is a cut turn), '…' when it waits on an event or another agent,
  * '○' text-3 at rest (a next wake too: its time is in the hover). No state words. Pure.
  */
 export function barSign(s: Sign): { g: string; tone: BarRow['tone']; working: boolean } {
@@ -106,7 +106,7 @@ export function barSign(s: Sign): { g: string; tone: BarRow['tone']; working: bo
     case '⋯':
       return { g: '…', tone: 'dim', working: false };
     case '✗':
-      return { g: '▲', tone: 'err', working: false };
+      return { g: '✗', tone: 'err', working: false };
     case '✓':
       return { g: '✓', tone: 'acc', working: false };
     default:
@@ -259,7 +259,7 @@ export function agentRows(agents: readonly ProjAgent[], now: number, all: boolea
 
 /**
  * ARCHIVED (desktop-agents-bar): its sign, its name, its age, newest first: '✓ release-32 2 h' done,
- * '▲ import 1 d' red failed, '– old 3 d' stopped; no state words (the hover says it). Pure.
+ * '✗ import 1 d' red failed, '– old 3 d' stopped; no state words (the hover says it). Pure.
  */
 export function archivedRows(agents: readonly ProjAgent[], now: number, all: boolean): BarRow[] {
   return agents
@@ -272,7 +272,7 @@ export function archivedRows(agents: readonly ProjAgent[], now: number, all: boo
         key: `r:${x.project}/${x.a.name}`,
         project: x.project,
         agent: x.a.name,
-        glyph: st === 'done' ? '✓' : st === 'failed' ? '▲' : '–',
+        glyph: st === 'done' ? '✓' : st === 'failed' ? '✗' : '–',
         tone: st === 'failed' ? 'err' : 'dim',
         name: x.a.name,
         sub: all ? x.projectName : '',
@@ -281,7 +281,7 @@ export function archivedRows(agents: readonly ProjAgent[], now: number, all: boo
         title: `${st} · ${x.a.title !== '' ? x.a.title : x.a.purpose}`,
         testId: `app.right.archived.${idOf(all, x.project, x.a.name)}`,
         waits: false,
-        tips: { glyph: `${st === 'done' ? '✓' : st === 'failed' ? '▲' : '–'} ${x.a.name} ${st === 'done' ? 'is done' : st}`, end: archivedAgeTip(st, now - x.a.since_ms) },
+        tips: { glyph: `${st === 'done' ? '✓' : st === 'failed' ? '✗' : '–'} ${x.a.name} ${st === 'done' ? 'is done' : st}`, end: archivedAgeTip(st, now - x.a.since_ms) },
       };
     });
 }

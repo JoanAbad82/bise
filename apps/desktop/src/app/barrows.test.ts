@@ -41,7 +41,7 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
       watch: 4,
     });
   });
-  it("ARCHIVED: sign, name, age, no 'done ·': ✓ done, ▲ red failed, – stopped", () => {
+  it("ARCHIVED: sign, name, age, no 'done ·': ✓ done, ✗ red failed, – stopped", () => {
     const rows = archivedRows(
       [
         ag('release-32', { archived: true, status: 'done', since_ms: NOW - 2 * 3_600_000 }),
@@ -51,7 +51,7 @@ describe('the right bar rows (designer desktop-right-bar v5)', () => {
       NOW,
       false,
     );
-    expect(rows.map((r) => `${r.glyph} ${r.name} ${r.end}`)).toEqual(['✓ release-32 2 h', '▲ import 1 d', '– b 2 d']);
+    expect(rows.map((r) => `${r.glyph} ${r.name} ${r.end}`)).toEqual(['✓ release-32 2 h', '✗ import 1 d', '– b 2 d']);
     expect(rows.map((r) => r.tone)).toEqual(['dim', 'err', 'dim']);
     expect(rows[0]?.title).toBe("done · release-32's job");
   });

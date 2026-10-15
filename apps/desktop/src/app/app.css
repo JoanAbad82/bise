@@ -852,6 +852,10 @@ body:has(.app-shell) {
 .app-rb-rows:has(.app-rb-pct[data-loud]) .app-rb-pct {
   width: 40px;
 }
+/* the bar's rings in text-3 so a list of them stays quiet (designer m_26248) */
+.app-rb-pct .b-ring .used {
+  fill: var(--c-text-3);
+}
 /* no time before it: no space either, the now line comes up to the ring */
 .app-rb-time:empty + .app-rb-pct {
   margin-left: 0;

@@ -3,7 +3,7 @@
 // mark ([data-slide-row]) the hover listens on. The pixels and the slide itself: the harness checks.
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { Slide, SLIDE_DELAY_MS, SLIDE_PX_PER_S, slideMs } from "./index";
+import { Slide, SLIDE_DELAY_MS, SLIDE_PX_PER_S, slideMs, wholeWords } from "./index";
 
 afterEach(cleanup);
 
@@ -17,19 +17,24 @@ describe("ds Slide", () => {
     expect(slideMs(110)).toBe(2500);
   });
 
-  it("keeps every word in the DOM (the CSS cuts, never the text) and its delay in a variable", () => {
+  it("cuts after a whole word with one '…', never mid-word; not one word fits: nothing (designer m_23711, m_26248)", () => {
+    const w = (s: string) => s.length * 7;
+    expect(wholeWords("price rules", 200, w)).toBe("price rules");
+    expect(wholeWords("import the catalog", 80, w)).toBe("import the…");
+    expect(wholeWords("import the catalog", 60, w)).toBe("import…");
+    expect(wholeWords("proofreading", 40, w)).toBe("");
+  });
+
+  it("shows its whole words at rest when there is no room measured, its delay in a variable", () => {
     const words = "all his picks decided; signing builders' shots (composer-strip, inbox)";
     const { getByTestId } = render(
       <button data-slide-row type="button">
-        <Slide className="role" full={words} testId="r.role">
-          {words}
-        </Slide>
+        <Slide className="role" text={words} testId="r.role" />
       </button>,
     );
     const el = getByTestId("r.role");
     expect(el.textContent).toBe(words);
     expect(el.className).toBe("b-slide role");
-    expect(el.querySelector(".b-slide-in")?.textContent).toBe(words);
     expect(el.style.getPropertyValue("--slide-delay")).toBe("80ms");
   });
 });

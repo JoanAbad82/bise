@@ -2,19 +2,19 @@
 // on FakeCore with places (hub/agents): solo worktrees with each PR state, a shared checkout, a land
 // in the queue, a worktree two agents share (the waiting one past the cap), an open PR with no agent.
 // Passes when, light and dark, at 1400, 1100 and 800 (slid over):
-//   - signs: the breeze, '?' pink, '✓' pink, '▲' red, '○' text-3, '…' on an event; no state word;
+//   - signs: the breeze, '?' pink, '✓' pink, '✗' red (designer m_26248), '○' text-3, '…' on an event; no state word;
 //   - columns: time 40 and the context's 12 px ring (40 with its % from 70 %) right-aligned at the
 //     same x on every row that has one, the mark 16 last; an empty one leaves its room to the now line
 //     (his m_26200), which fills the row up to the columns or the mark; a long name: the role cut first, then the % goes, the mark stays;
-//   - the now line: every word in the DOM, cut with '…' by the CSS; the row's hover slides it until
-//     its last word shows (ds Slide, Vibe Work's pace), back home when the pointer leaves;
+//   - the now line: cut after a whole word with '…' at rest; the row's hover shows its whole words
+//     and slides them until the last one shows (ds Slide, Vibe Work's pace), home and cut again after;
 //   - marks: '↑' pink (merge card), red (checks fail), text-2 open, text-3 draft, '…' to land, 'ψ' no
 //     PR, none in the shared checkout; the ds tip: the TUI's words, '· click opens the PR'; a click
 //     on the mark opens the review screen;
 //   - the group: a 28 px 'ψ sb/flash-sale' head with '↑ #418', its rows with no mark, the 1 px rule
 //     in the margin, the TUI's order; the orphan PR: no sign, its '↑', opens its branch;
 //   - the 8-row cap never hides the agent that waits (its head shows with it); 'AGENTS · N' counts agents;
-//   - ARCHIVED: '✓ release-32 2 h', '▲ import 1 d'; ARTIFACTS: the title in art-chips' pink chip, cut
+//   - ARCHIVED: '✓ release-32 2 h', '✗ import 1 d'; ARTIFACTS: the title in art-chips' pink chip, cut
 //     after a word with '…', the hover's tint, 'new' in ink.
 // Shots: agents-bar-<theme>-<width>.png, agents-bar-<theme>-tip.png. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
@@ -121,7 +121,7 @@ for (const theme of ['light', 'dark']) {
       const [acc, err, t2, t3] = [await color('--c-accent'), await color('--c-err'), await color('--c-text-2'), await color('--c-text-3')];
       expect(await looks('search')).toEqual({ g: '?', c: acc });
       expect(await looks('docs')).toEqual({ g: '✓', c: acc });
-      expect(await looks('broken')).toEqual({ g: '▲', c: err });
+      expect(await looks('broken')).toEqual({ g: '✗', c: err });
       expect(await looks('launch')).toEqual({ g: '○', c: t3 });
       expect((await looks('bench')).g).toBe('…');
       const words = await page.getByTestId('app.right.agents').innerText();
@@ -190,19 +190,31 @@ for (const theme of ['light', 'dark']) {
       expect(timeGone, 'then the time').toBeGreaterThan(pctGone);
       expect(steps.every((x) => x.mark), 'the mark never goes').toBe(true);
       expect(steps.filter((x) => x.nameCut).every((x) => x.role === 0 && !x.pct && !x.time), 'the name cuts last').toBe(true);
-      // the now line keeps every word (the CSS cuts with '…'); the row's hover slides it, after 80 ms,
-      // until its last word shows at the box's right edge; it goes home when the pointer leaves
-      await expect(page.getByTestId(`app.right.agent.${LONG}.role`)).toHaveText('the copy of every page, one by one');
+      // at rest the now line cuts after a whole word with one '…', or goes whole when not one word fits
+      // (designer m_23711, kept in m_26248); its whole words in its label
+      const roles = await page.locator('[data-testid="app.right.agents"] .app-rb-arow:not(.app-rb-ghead):not(.app-rb-orphan) .app-rb-role').evaluateAll((es) =>
+        es.map((e) => ({ shown: e.textContent, full: e.getAttribute('aria-label') ?? e.textContent })),
+      );
+      for (const r of roles) {
+        if (r.shown === r.full) continue;
+        expect(r.shown === '' || (r.shown.endsWith('…') && `${r.full} `.startsWith(`${r.shown.slice(0, -1)} `)), `'${r.shown}' of '${r.full}'`).toBe(true);
+      }
+      expect(roles.some((r) => r.shown !== r.full), 'a cut one in the list').toBe(true);
+      // the row's hover shows the whole words and slides them, after 80 ms, until the last one shows
+      // at the box's right edge; it goes home, cut again, when the pointer leaves
       const longRole = page.getByTestId(`app.right.agent.${LONG}.role`);
+      await expect(longRole).toHaveAttribute('aria-label', 'the copy of every page, one by one');
       await expect(longRole).toHaveAttribute('data-over', 'true');
       const slid = async () => longRole.evaluate((e) => { const i = e.querySelector('.b-slide-in') as HTMLElement; return { ends: Math.round(i.getBoundingClientRect().right - e.getBoundingClientRect().right), x: Math.round(new DOMMatrix(getComputedStyle(i).transform).m41), ms: e.style.getPropertyValue('--slide-ms') }; });
       expect((await slid()).x, 'still at rest').toBe(0);
       await row(LONG).hover();
+      await expect(longRole).toHaveText('the copy of every page, one by one');
       await expect.poll(async () => (await slid()).ends, { timeout: 5000, message: 'its last word at the right edge' }).toBe(0);
       expect((await slid()).x).toBeLessThan(0);
       await page.screenshot({ path: test.info().outputPath(`agents-bar-${theme}-slide.png`) });
       await page.mouse.move(1, 400);
       await expect.poll(async () => (await slid()).x, { timeout: 5000, message: 'home again' }).toBe(0);
+      await expect(longRole, 'cut again at rest').not.toHaveText('the copy of every page, one by one');
       // marks and their tints
       const mark = (id: string) => page.getByTestId(`${id}.mark`);
       const markLook = async (id: string) => mark(id).evaluate((el) => ({ g: el.textContent, c: getComputedStyle(el).color })).then(normColor);
@@ -249,7 +261,7 @@ for (const theme of ['light', 'dark']) {
       // ARCHIVED: sign + name + age
       await page.getByTestId('app.right.archived.head').click();
       await expect(page.getByTestId('app.right.archived.release-32')).toHaveText(/^✓\s*release-32\s*2 h$/u);
-      await expect(page.getByTestId('app.right.archived.import')).toHaveText(/^▲\s*import\s*1 d$/u);
+      await expect(page.getByTestId('app.right.archived.import')).toHaveText(/^✗\s*import\s*1 d$/u);
       // ARTIFACTS: the title in the pink chip (accent on its 10 % tint, 24 px, the kind's glyph inside), cut
       // after a whole word with one '…'; the row's hover lifts the tint; 'new' stays ink
       const chip = page.getByTestId(`app.right.artifact.${P}.product-page.chip`);

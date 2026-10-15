@@ -16,7 +16,7 @@ const merge = (p: string): Card => ({ id: 9, project: 'shop', kind: 'merge', age
 const nums = (...names: string[]) => new Map(names.map((n, i) => [n, i + 1] as const));
 
 describe('AGENTS signs and columns (§2)', () => {
-  it("the TUI's sign, no state word anywhere: breeze, ? pink, ✓ pink, ▲ red, ○ text-3, … on an event", () => {
+  it("the TUI's sign, no state word anywhere: breeze, ? pink, ✓ pink, ✗ red, ○ text-3, … on an event", () => {
     const rows = agentRows(
       [
         ag('w', { status: 'working', turn_ms: 4 * 60_000 }),
@@ -33,7 +33,7 @@ describe('AGENTS signs and columns (§2)', () => {
       ['w', '∿', 'ink', true],
       ['q', '?', 'acc', false],
       ['d', '✓', 'acc', false],
-      ['f', '▲', 'err', false],
+      ['f', '✗', 'err', false],
       ['r', '○', 'dim', false],
       ['e', '…', 'ink', false],
     ]);

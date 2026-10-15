@@ -113,7 +113,7 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(sign('search')).toHaveText('?');
     // the bar's signs say it, no state words (desktop-agents-bar §2); a next wake is in the hover
     await expect(page.getByTestId('app.right.agent.search')).not.toContainText('waits');
-    await expect(sign('ci-fix')).toHaveText('▲');
+    await expect(sign('ci-fix')).toHaveText('✗');
     await expect(page.getByTestId('app.right.agent.ci-fix')).not.toContainText('failed');
     await expect(sign('deploy-watch')).toHaveText('○');
     await expect(page.getByTestId('app.right.agent.deploy-watch')).toHaveAttribute('aria-label', /^wakes at /u);

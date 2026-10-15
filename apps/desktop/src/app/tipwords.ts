@@ -79,7 +79,7 @@ export function scheduledTip(n: number): string {
 
 /**
  * An agent's sign: '∿ perf is working', '? perf waits for you', '… perf continues when cargo test
- * ends', '▲ perf failed', '✓ perf is done', '○ perf is idle' ('○ perf is idle: wakes at 14:20').
+ * ends', '✗ perf failed', '✓ perf is done', '○ perf is idle' ('○ perf is idle: wakes at 14:20').
  * `g`: the bar's sign (barrows barSign), `wake`: its next wake's clock, ''. A click opens it.
  */
 export function signTip(g: string, a: Agent, now: number, wake = ''): string {
@@ -95,7 +95,7 @@ export function signTip(g: string, a: Agent, now: number, wake = ''): string {
         const p = raw === null ? null : shownPause(raw);
         return p === null ? `${n} is waiting` : `${n} ${p.state} ${p.note}${p.more}`;
       }
-      case '▲':
+      case '✗':
         return `${n} failed`;
       case '✓':
         return `${n} is done`;

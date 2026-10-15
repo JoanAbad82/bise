@@ -9,58 +9,70 @@ export function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** How many px `inner` overflows `box` by, kept fresh as either resizes; 0 when it fits. */
-export function useOverflow(box: RefObject<HTMLElement | null>, inner: RefObject<HTMLElement | null>, deps: DependencyList): number {
-  const [over, setOver] = useState(0);
+let canvas: CanvasRenderingContext2D | null | undefined;
+/** A text's width in px in `font` (a CSS font shorthand), by a canvas; none (unit tests): 7 px a character. */
+export function textWidth(font: string): (s: string) => number {
+  canvas ??= typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d");
+  const ctx = canvas;
+  if (ctx == null) return (s) => s.length * 7;
+  ctx.font = font;
+  return (s) => ctx.measureText(s).width;
+}
+
+/** The room inside `box` (its client width) and its font, kept fresh as it resizes; Infinity and ''
+ *  until measured. */
+export function useRoom(box: RefObject<HTMLElement | null>): { readonly avail: number; readonly font: string } {
+  const [room, setRoom] = useState<{ avail: number; font: string }>({ avail: Infinity, font: "" });
   useLayoutEffect(() => {
     const el = box.current;
-    const words = inner.current;
-    if (el === null || words === null) return;
+    if (el === null) return;
     const measure = () => {
-      const n = Math.max(0, Math.ceil(words.scrollWidth - el.clientWidth));
-      setOver((was) => (was === n ? was : n));
+      const avail = el.clientWidth;
+      const font = getComputedStyle(el).font;
+      setRoom((r) => (r.avail === avail && r.font === font ? r : { avail, font }));
     };
     measure();
     if (typeof ResizeObserver !== "function") return;
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-    ro.observe(words);
     return () => {
       ro.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the caller's deps say when its content changed
-  }, deps);
-  return over;
+  }, [box]);
+  return room;
 }
 
 /**
- * A slide's way back (Slide, Vibe Work's text-hover-scroll): true from when its row (the nearest
- * `[data-slide-row]`, else `box`) loses the hover or the focus after `moving` slid, until the
- * transform's transition ends at home. While true the line stays whole, so it never shows its '…'
- * mid-way. `active`: there is something to slide.
+ * A slide's hold (Slide, Vibe Work's text-hover-scroll): `held` while its row (the nearest
+ * `[data-slide-row]`, else `box`) has the pointer or the focus; `back` from when it loses them after
+ * `moving` slid, until the transform's transition ends at home. While either is true the line shows
+ * its whole words, so it never shows its '…' mid-way. `active`: there is something to slide.
  */
-export function useSlideBack(box: RefObject<HTMLElement | null>, moving: RefObject<HTMLElement | null>, active: boolean): boolean {
+export function useSlideHold(box: RefObject<HTMLElement | null>, moving: RefObject<HTMLElement | null>, active: boolean): { readonly held: boolean; readonly back: boolean } {
   const [back, setBack] = useState(false);
+  const [held, setHeld] = useState(false);
   useEffect(() => {
     const el = box.current;
     const words = moving.current;
     if (el === null || words === null || !active) return;
     const row = el.closest("[data-slide-row]") ?? el;
     let moved = false;
-    let held = row.matches(":hover");
+    let on = false;
     const leave = () => {
-      held = false;
+      on = false;
+      setHeld(false);
       if (moved) setBack(true);
     };
     const enter = () => {
-      held = true;
+      on = true;
+      setHeld(true);
       setBack(false);
     };
     const start = (e: TransitionEvent) => {
       if (e.propertyName === "transform") moved = true;
     };
     const end = (e: TransitionEvent) => {
-      if (e.propertyName !== "transform" || held || row.matches(":focus-visible, :has(:focus-visible)")) return;
+      if (e.propertyName !== "transform" || on || row.matches(":focus-visible, :has(:focus-visible)")) return;
       moved = false;
       setBack(false);
     };
@@ -79,7 +91,7 @@ export function useSlideBack(box: RefObject<HTMLElement | null>, moving: RefObje
       words.removeEventListener("transitionend", end);
     };
   }, [box, moving, active]);
-  return active && back;
+  return { held: active && held, back: active && back };
 }
 
 /** Whether `el`'s parent row has `gap` px between the end of its words before `el` and `el`'s

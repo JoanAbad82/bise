@@ -11,7 +11,7 @@ import type { Agent } from '@/proto';
 import { useNowFor } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { shownName } from '@/agents/model';
-import { textWidth } from '@/app/FitWords';
+import { textWidth } from '@/ds';
 import { digitRuns, fitNote, pauseInSeconds, pauseLine } from './wake';
 
 /** Words with their digits mono. */
